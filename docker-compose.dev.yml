@@ -1,0 +1,27 @@
+version: "3.8"
+
+# Development compose - only runs database and redis
+# Apps are run locally with pnpm dev
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: nexus-postgres-dev
+    environment:
+      POSTGRES_USER: nexus
+      POSTGRES_PASSWORD: nexus_password
+      POSTGRES_DB: nexus
+    volumes:
+      - postgres_data_dev:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7-alpine
+    container_name: nexus-redis-dev
+    command: redis-server
+    ports:
+      - "6379:6379"
+
+volumes:
+  postgres_data_dev:

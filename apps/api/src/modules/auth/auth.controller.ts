@@ -1,0 +1,88 @@
+import {
+  Controller,
+  Get,
+  Post,
+  Req,
+  Res,
+  UseGuards,
+  HttpStatus,
+} from "@nestjs/common";
+import { AuthGuard } from "@nestjs/passport";
+import { ConfigService } from "@nestjs/config";
+import { Request, Response } from "express";
+import { AuthService } from "./auth.service";
+import { JwtRefreshGuard } from "./guards/jwt-refresh.guard";
+import { JwtAuthGuard } from "./guards/jwt-auth.guard";
+import { CurrentUser } from "./decorators/current-user.decorator";
+
+@Controller("auth")
+export class AuthController {
+  constructor(
+    private readonly authService: AuthService,
+    private readonly configService: ConfigService
+  ) {}
+
+  @Get("discord")
+  @UseGuards(AuthGuard("discord"))
+  discordAuth() {
+    // Redirects to Discord OAuth
+  }
+
+  @Get("discord/callback")
+  @UseGuards(AuthGuard("discord"))
+  async discordCallback(@Req() req: Request, @Res() res: Response) {
+    const user = req.user as any;
+    const tokens = await this.authService.generateTokens(user);
+
+    // Set refresh token as HTTP-only cookie
+    res.cookie("refresh_token", tokens.refreshToken, {
+      httpOnly: true,
+      secure: this.configService.get("NODE_ENV") === "production",
+      sameSite: "lax",
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      path: "/api/auth",
+    });
+
+    // Redirect to frontend with access token
+    const appUrl = this.configService.get("APP_URL") || "http://localhost:3000";
+    res.redirect(`${appUrl}/auth/callback?token=${tokens.accessToken}`);
+  }
+
+  @Post("refresh")
+  @UseGuards(JwtRefreshGuard)
+  async refresh(@Req() req: Request, @Res() res: Response) {
+    const user = req.user as any;
+    const refreshToken = req.cookies?.refresh_token;
+
+    const tokens = await this.authService.refreshTokens(user.sub, refreshToken);
+
+    res.cookie("refresh_token", tokens.refreshToken, {
+      httpOnly: true,
+      secure: this.configService.get("NODE_ENV") === "production",
+      sameSite: "lax",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      path: "/api/auth",
+    });
+
+    return res.json({ accessToken: tokens.accessToken });
+  }
+
+  @Post("logout")
+  @UseGuards(JwtAuthGuard)
+  async logout(
+    @CurrentUser("sub") userId: string,
+    @Res() res: Response
+  ) {
+    await this.authService.logout(userId);
+
+    res.clearCookie("refresh_token", { path: "/api/auth" });
+
+    return res.status(HttpStatus.OK).json({ message: "Logged out successfully" });
+  }
+
+  @Get("me")
+  @UseGuards(JwtAuthGuard)
+  async me(@CurrentUser() user: any) {
+    return user;
+  }
+}
