@@ -1,0 +1,267 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// User & Authentication
+// ============================================
+
+model User {
+  id            String    @id @default(cuid())
+  discordId     String    @unique
+  username      String
+  discriminator String
+  avatar        String?
+  email         String?
+  nickname      String?
+  role          UserRole  @default(USER)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  riotAccounts    RiotAccount[]
+  hostedAuctions  Auction[]           @relation("AuctionHost")
+  participations  AuctionParticipant[]
+  captainedTeams  Team[]              @relation("TeamCaptain")
+  sessions        Session[]
+
+  @@index([discordId])
+  @@map("users")
+}
+
+enum UserRole {
+  USER
+  MODERATOR
+  ADMIN
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  userId       String
+  refreshToken String   @unique
+  userAgent    String?
+  ipAddress    String?
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+// ============================================
+// Riot Account Verification
+// ============================================
+
+model RiotAccount {
+  id           String    @id @default(cuid())
+  userId       String
+  puuid        String    @unique
+  summonerId   String
+  gameName     String
+  tagLine      String
+  tier         String    @default("UNRANKED")
+  rank         String    @default("")
+  lp           Int       @default(0)
+  mmrPoints    Int       @default(0)
+  isPrimary    Boolean   @default(false)
+  verifiedAt   DateTime?
+  lastSyncedAt DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([gameName, tagLine])
+  @@index([userId])
+  @@index([puuid])
+  @@map("riot_accounts")
+}
+
+// ============================================
+// Auction System
+// ============================================
+
+model Auction {
+  id           String        @id @default(cuid())
+  name         String
+  hostId       String
+  status       AuctionStatus @default(WAITING)
+  maxTeams     Int           @default(2)
+  teamBudget   Int           @default(1000)
+  minBid       Int           @default(10)
+  bidTimeLimit Int           @default(30) // seconds
+  startedAt    DateTime?
+  completedAt  DateTime?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  // Relations
+  host         User                 @relation("AuctionHost", fields: [hostId], references: [id])
+  teams        Team[]
+  participants AuctionParticipant[]
+  matches      Match[]
+  bidHistory   BidHistory[]
+
+  @@index([hostId])
+  @@index([status])
+  @@map("auctions")
+}
+
+enum AuctionStatus {
+  WAITING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model Team {
+  id          String   @id @default(cuid())
+  auctionId   String
+  name        String
+  captainId   String
+  budget      Int      @default(1000)
+  spentBudget Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  auction       Auction              @relation(fields: [auctionId], references: [id], onDelete: Cascade)
+  captain       User                 @relation("TeamCaptain", fields: [captainId], references: [id])
+  members       AuctionParticipant[]
+  matchesAsTeamA Match[]             @relation("TeamA")
+  matchesAsTeamB Match[]             @relation("TeamB")
+  wonMatches    Match[]              @relation("MatchWinner")
+
+  @@index([auctionId])
+  @@index([captainId])
+  @@map("teams")
+}
+
+model AuctionParticipant {
+  id            String             @id @default(cuid())
+  auctionId     String
+  userId        String
+  teamId        String?
+  preferredRole PreferredRole?
+  soldPrice     Int?
+  status        ParticipantStatus  @default(WAITING)
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  // Relations
+  auction Auction @relation(fields: [auctionId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id])
+  team    Team?   @relation(fields: [teamId], references: [id])
+
+  @@unique([auctionId, userId])
+  @@index([auctionId])
+  @@index([userId])
+  @@index([teamId])
+  @@map("auction_participants")
+}
+
+enum PreferredRole {
+  TOP
+  JUNGLE
+  MID
+  ADC
+  SUPPORT
+  FILL
+}
+
+enum ParticipantStatus {
+  WAITING
+  ON_AUCTION
+  SOLD
+  UNSOLD
+}
+
+model BidHistory {
+  id            String   @id @default(cuid())
+  auctionId     String
+  participantId String
+  teamId        String
+  amount        Int
+  createdAt     DateTime @default(now())
+
+  auction Auction @relation(fields: [auctionId], references: [id], onDelete: Cascade)
+
+  @@index([auctionId])
+  @@index([participantId])
+  @@map("bid_history")
+}
+
+// ============================================
+// Match System
+// ============================================
+
+model Match {
+  id             String      @id @default(cuid())
+  auctionId      String
+  teamAId        String
+  teamBId        String
+  winnerId       String?
+  status         MatchStatus @default(PENDING)
+  tournamentCode String?
+  riotMatchId    String?
+  scheduledAt    DateTime?
+  startedAt      DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  // Relations
+  auction Auction @relation(fields: [auctionId], references: [id], onDelete: Cascade)
+  teamA   Team    @relation("TeamA", fields: [teamAId], references: [id])
+  teamB   Team    @relation("TeamB", fields: [teamBId], references: [id])
+  winner  Team?   @relation("MatchWinner", fields: [winnerId], references: [id])
+
+  @@index([auctionId])
+  @@index([teamAId])
+  @@index([teamBId])
+  @@map("matches")
+}
+
+enum MatchStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+// ============================================
+// Discord Integration
+// ============================================
+
+model DiscordChannel {
+  id        String      @id @default(cuid())
+  guildId   String
+  channelId String      @unique
+  type      ChannelType
+  status    ChannelStatus @default(AVAILABLE)
+  name      String?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@index([guildId])
+  @@index([type, status])
+  @@map("discord_channels")
+}
+
+enum ChannelType {
+  VOICE
+  TEXT
+}
+
+enum ChannelStatus {
+  AVAILABLE
+  IN_USE
+  DISABLED
+}
