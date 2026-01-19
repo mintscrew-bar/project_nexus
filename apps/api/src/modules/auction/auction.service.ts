@@ -17,7 +17,7 @@ export enum AuctionStatus {
 export class AuctionService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly redis: RedisService
+    private readonly redis: RedisService,
   ) {}
 
   async create(data: {
@@ -160,7 +160,10 @@ export class AuctionService {
     }
 
     // Check team budget
-    const teamSpent = team.members.reduce((sum, m) => sum + (m.soldPrice || 0), 0);
+    const teamSpent = team.members.reduce(
+      (sum, m) => sum + (m.soldPrice || 0),
+      0,
+    );
     if (teamSpent + data.amount > auction.teamBudget) {
       throw new BadRequestException("Exceeds team budget");
     }
@@ -170,7 +173,7 @@ export class AuctionService {
     await this.redis.set(
       `auction:${data.auctionId}:participant:${data.participantId}:bidder`,
       data.teamId,
-      300
+      300,
     );
 
     return {
@@ -182,10 +185,10 @@ export class AuctionService {
 
   async completeBid(auctionId: string, participantId: string) {
     const bidderTeamId = await this.redis.get(
-      `auction:${auctionId}:participant:${participantId}:bidder`
+      `auction:${auctionId}:participant:${participantId}:bidder`,
     );
     const bidAmount = await this.redis.get(
-      `auction:${auctionId}:participant:${participantId}:bid`
+      `auction:${auctionId}:participant:${participantId}:bid`,
     );
 
     if (!bidderTeamId || !bidAmount) {

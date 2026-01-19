@@ -8,7 +8,7 @@ export class RedisService implements OnModuleDestroy {
 
   constructor(private readonly configService: ConfigService) {
     this.client = new Redis(
-      this.configService.get("REDIS_URL") || "redis://localhost:6379"
+      this.configService.get("REDIS_URL") || "redis://localhost:6379",
     );
   }
 
@@ -85,7 +85,7 @@ export class RedisService implements OnModuleDestroy {
   async checkRateLimit(
     key: string,
     limit: number,
-    windowSeconds: number
+    windowSeconds: number,
   ): Promise<{ allowed: boolean; remaining: number; resetIn: number }> {
     const current = await this.incr(key);
 

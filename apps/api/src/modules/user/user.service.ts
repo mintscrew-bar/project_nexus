@@ -76,10 +76,7 @@ export class UserService {
     participations.forEach((p) => {
       if (!p.team) return;
 
-      const teamMatches = [
-        ...p.team.matchesAsTeamA,
-        ...p.team.matchesAsTeamB,
-      ];
+      const teamMatches = [...p.team.matchesAsTeamA, ...p.team.matchesAsTeamB];
 
       teamMatches.forEach((match) => {
         if (match.winnerId === p.team!.id) {

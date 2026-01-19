@@ -19,7 +19,7 @@ import { CurrentUser } from "./decorators/current-user.decorator";
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
-    private readonly configService: ConfigService
+    private readonly configService: ConfigService,
   ) {}
 
   @Get("discord")
@@ -69,15 +69,14 @@ export class AuthController {
 
   @Post("logout")
   @UseGuards(JwtAuthGuard)
-  async logout(
-    @CurrentUser("sub") userId: string,
-    @Res() res: Response
-  ) {
+  async logout(@CurrentUser("sub") userId: string, @Res() res: Response) {
     await this.authService.logout(userId);
 
     res.clearCookie("refresh_token", { path: "/api/auth" });
 
-    return res.status(HttpStatus.OK).json({ message: "Logged out successfully" });
+    return res
+      .status(HttpStatus.OK)
+      .json({ message: "Logged out successfully" });
   }
 
   @Get("me")

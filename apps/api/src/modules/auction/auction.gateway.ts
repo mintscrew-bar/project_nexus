@@ -22,13 +22,15 @@ interface AuthenticatedSocket extends Socket {
     credentials: true,
   },
 })
-export class AuctionGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class AuctionGateway
+  implements OnGatewayConnection, OnGatewayDisconnect
+{
   @WebSocketServer()
   server: Server;
 
   constructor(
     private readonly authService: AuthService,
-    private readonly auctionService: AuctionService
+    private readonly auctionService: AuctionService,
   ) {}
 
   async handleConnection(client: AuthenticatedSocket) {
@@ -49,7 +51,7 @@ export class AuctionGateway implements OnGatewayConnection, OnGatewayDisconnect 
 
       client.userId = payload.sub;
       console.log(`Client connected: ${client.userId}`);
-    } catch (error) {
+    } catch (_error) {
       client.disconnect();
     }
   }
@@ -61,7 +63,7 @@ export class AuctionGateway implements OnGatewayConnection, OnGatewayDisconnect 
   @SubscribeMessage("join-auction")
   async handleJoinAuction(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { auctionId: string }
+    @MessageBody() data: { auctionId: string },
   ) {
     client.join(`auction:${data.auctionId}`);
 
@@ -76,7 +78,7 @@ export class AuctionGateway implements OnGatewayConnection, OnGatewayDisconnect 
   @SubscribeMessage("leave-auction")
   handleLeaveAuction(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { auctionId: string }
+    @MessageBody() data: { auctionId: string },
   ) {
     client.leave(`auction:${data.auctionId}`);
   }
@@ -90,7 +92,7 @@ export class AuctionGateway implements OnGatewayConnection, OnGatewayDisconnect 
       participantId: string;
       teamId: string;
       amount: number;
-    }
+    },
   ) {
     if (!client.userId) {
       return { error: "Unauthorized" };

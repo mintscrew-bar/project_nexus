@@ -34,7 +34,7 @@ export class RiotService {
   constructor(
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
-    private readonly redis: RedisService
+    private readonly redis: RedisService,
   ) {
     this.apiKey = this.configService.get("RIOT_API_KEY") || "";
   }
@@ -44,7 +44,7 @@ export class RiotService {
     const rateLimit = await this.redis.checkRateLimit("riot:api", 20, 1);
     if (!rateLimit.allowed) {
       throw new BadRequestException(
-        `Rate limited. Try again in ${rateLimit.resetIn}s`
+        `Rate limited. Try again in ${rateLimit.resetIn}s`,
       );
     }
 
@@ -60,7 +60,9 @@ export class RiotService {
       puuid: string;
       gameName: string;
       tagLine: string;
-    }>(`${this.asiaUrl}/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}`);
+    }>(
+      `${this.asiaUrl}/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}`,
+    );
 
     const summoner = await this.request<{
       id: string;
@@ -118,11 +120,7 @@ export class RiotService {
     };
   }
 
-  async startVerification(
-    userId: string,
-    gameName: string,
-    tagLine: string
-  ) {
+  async startVerification(userId: string, gameName: string, tagLine: string) {
     const summoner = await this.getSummonerByRiotId(gameName, tagLine);
 
     // Generate random icon ID for verification
@@ -139,7 +137,7 @@ export class RiotService {
         currentIconId: summoner.profileIconId,
         requiredIconId: verificationIconId,
       }),
-      600
+      600,
     );
 
     return {
@@ -162,12 +160,12 @@ export class RiotService {
 
     // Check current profile icon
     const summoner = await this.request<{ profileIconId: number }>(
-      `${this.baseUrl}/lol/summoner/v4/summoners/by-puuid/${data.puuid}`
+      `${this.baseUrl}/lol/summoner/v4/summoners/by-puuid/${data.puuid}`,
     );
 
     if (summoner.profileIconId !== data.requiredIconId) {
       throw new BadRequestException(
-        `Profile icon mismatch. Expected ${data.requiredIconId}, got ${summoner.profileIconId}`
+        `Profile icon mismatch. Expected ${data.requiredIconId}, got ${summoner.profileIconId}`,
       );
     }
 

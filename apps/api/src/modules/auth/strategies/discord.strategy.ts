@@ -8,7 +8,7 @@ import { AuthService, DiscordProfile } from "../auth.service";
 export class DiscordStrategy extends PassportStrategy(Strategy, "discord") {
   constructor(
     private readonly configService: ConfigService,
-    private readonly authService: AuthService
+    private readonly authService: AuthService,
   ) {
     super({
       clientID: configService.get("DISCORD_CLIENT_ID"),
@@ -21,7 +21,7 @@ export class DiscordStrategy extends PassportStrategy(Strategy, "discord") {
   async validate(
     accessToken: string,
     refreshToken: string,
-    profile: Profile
+    profile: Profile,
   ): Promise<any> {
     const discordProfile: DiscordProfile = {
       id: profile.id,

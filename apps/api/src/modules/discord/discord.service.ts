@@ -6,7 +6,7 @@ import { RedisService } from "../redis/redis.service";
 export class DiscordService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly redis: RedisService
+    private readonly redis: RedisService,
   ) {}
 
   // Channel pool management
@@ -24,7 +24,11 @@ export class DiscordService {
     return null;
   }
 
-  async releaseChannel(guildId: string, channelId: string, type: "voice" | "text") {
+  async releaseChannel(
+    guildId: string,
+    channelId: string,
+    type: "voice" | "text",
+  ) {
     const cacheKey = `channel_pool:${guildId}:${type}`;
     await this.redis.hset(cacheKey, channelId, "available");
   }
@@ -32,7 +36,7 @@ export class DiscordService {
   async registerChannelPool(
     guildId: string,
     channelIds: string[],
-    type: "voice" | "text"
+    type: "voice" | "text",
   ) {
     const cacheKey = `channel_pool:${guildId}:${type}`;
 

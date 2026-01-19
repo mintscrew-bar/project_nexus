@@ -29,7 +29,8 @@ export class PrismaService
     }
 
     const models = Reflect.ownKeys(this).filter(
-      (key) => typeof key === "string" && !key.startsWith("_") && !key.startsWith("$")
+      (key) =>
+        typeof key === "string" && !key.startsWith("_") && !key.startsWith("$"),
     );
 
     return Promise.all(
@@ -39,7 +40,7 @@ export class PrismaService
           return (model as any).deleteMany();
         }
         return Promise.resolve();
-      })
+      }),
     );
   }
 }
