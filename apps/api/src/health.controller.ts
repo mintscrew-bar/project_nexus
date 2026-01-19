@@ -6,7 +6,7 @@ import { RedisService } from "./modules/redis/redis.service";
 export class HealthController {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly redis: RedisService
+    private readonly redis: RedisService,
   ) {}
 
   @Get()
@@ -21,7 +21,7 @@ export class HealthController {
     };
 
     const allHealthy = Object.values(checks.services).every(
-      (s) => s.status === "healthy"
+      (s) => s.status === "healthy",
     );
 
     return {
@@ -34,7 +34,7 @@ export class HealthController {
     try {
       await this.prisma.$queryRaw`SELECT 1`;
       return { status: "healthy" };
-    } catch (error) {
+    } catch (_error) {
       return { status: "unhealthy", error: "Database connection failed" };
     }
   }
@@ -43,7 +43,7 @@ export class HealthController {
     try {
       await this.redis.ping();
       return { status: "healthy" };
-    } catch (error) {
+    } catch (_error) {
       return { status: "unhealthy", error: "Redis connection failed" };
     }
   }

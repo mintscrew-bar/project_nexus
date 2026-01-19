@@ -72,7 +72,7 @@ export class MatchService {
     data: {
       winnerId: string;
       riotMatchId?: string;
-    }
+    },
   ) {
     return this.prisma.match.update({
       where: { id: matchId },

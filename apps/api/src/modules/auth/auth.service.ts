@@ -25,7 +25,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
-    private readonly redis: RedisService
+    private readonly redis: RedisService,
   ) {}
 
   async validateDiscordUser(profile: DiscordProfile) {
@@ -58,7 +58,11 @@ export class AuthService {
     return user;
   }
 
-  async generateTokens(user: { id: string; discordId: string; username: string }) {
+  async generateTokens(user: {
+    id: string;
+    discordId: string;
+    username: string;
+  }) {
     const payload: TokenPayload = {
       sub: user.id,
       discordId: user.discordId,
@@ -78,7 +82,7 @@ export class AuthService {
     await this.redis.set(
       `refresh_token:${user.id}`,
       refreshTokenHash,
-      7 * 24 * 60 * 60 // 7 days
+      7 * 24 * 60 * 60, // 7 days
     );
 
     return { accessToken, refreshToken };

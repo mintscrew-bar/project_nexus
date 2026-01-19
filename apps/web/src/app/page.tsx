@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Logo } from "@/components/Logo";
 
 export default function Home() {
   return (
@@ -6,6 +7,9 @@ export default function Home() {
       {/* Hero Section */}
       <section className="flex flex-col items-center justify-center min-h-screen px-4 text-center">
         <div className="max-w-4xl mx-auto">
+          <div className="flex justify-center mb-6">
+            <Logo size="xl" />
+          </div>
           <h1 className="text-5xl md:text-7xl font-bold mb-6">
             <span className="text-primary-500">Project</span>{" "}
             <span className="text-accent-blue">Nexus</span>

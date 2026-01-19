@@ -13,9 +13,18 @@ async function bootstrap() {
   app.use(helmet());
 
   // CORS
+  const corsOrigins = configService
+    .get("CORS_ORIGINS")
+    ?.split(",")
+    .map((origin) => origin.trim()) || [
+    configService.get("APP_URL") || "http://localhost:3000",
+  ];
+
   app.enableCors({
-    origin: configService.get("APP_URL") || "http://localhost:3000",
+    origin: corsOrigins,
     credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   });
 
   // Global validation pipe
@@ -24,7 +33,7 @@ async function bootstrap() {
       whitelist: true,
       forbidNonWhitelisted: true,
       transform: true,
-    })
+    }),
   );
 
   // Global prefix

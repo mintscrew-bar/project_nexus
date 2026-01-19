@@ -7,7 +7,6 @@ import {
   Routes,
   SlashCommandBuilder,
   Interaction,
-  GuildMember,
   VoiceChannel,
 } from "discord.js";
 
@@ -26,7 +25,7 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
     });
 
     this.rest = new REST({ version: "10" }).setToken(
-      this.configService.get("DISCORD_BOT_TOKEN") || ""
+      this.configService.get("DISCORD_BOT_TOKEN") || "",
     );
   }
 
@@ -34,7 +33,9 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
     const token = this.configService.get("DISCORD_BOT_TOKEN");
 
     if (!token) {
-      console.warn("Discord bot token not configured, skipping bot initialization");
+      console.warn(
+        "Discord bot token not configured, skipping bot initialization",
+      );
       return;
     }
 
@@ -63,15 +64,13 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
         .setName("nexus")
         .setDescription("Nexus tournament commands")
         .addSubcommand((sub) =>
-          sub.setName("link").setDescription("Link your Discord to Nexus")
+          sub.setName("link").setDescription("Link your Discord to Nexus"),
         )
         .addSubcommand((sub) =>
-          sub.setName("profile").setDescription("View your Nexus profile")
+          sub.setName("profile").setDescription("View your Nexus profile"),
         )
         .addSubcommand((sub) =>
-          sub
-            .setName("auction")
-            .setDescription("View current auction status")
+          sub.setName("auction").setDescription("View current auction status"),
         ),
     ].map((cmd) => cmd.toJSON());
 
@@ -81,9 +80,9 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
       await this.rest.put(
         Routes.applicationGuildCommands(
           this.configService.get("DISCORD_CLIENT_ID") || "",
-          guildId
+          guildId,
         ),
-        { body: commands }
+        { body: commands },
       );
     }
   }
@@ -145,11 +144,7 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
     return false;
   }
 
-  async sendNotification(
-    guildId: string,
-    channelId: string,
-    message: string
-  ) {
+  async sendNotification(guildId: string, channelId: string, message: string) {
     const guild = await this.client.guilds.fetch(guildId);
     const channel = await guild.channels.fetch(channelId);
 

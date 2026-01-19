@@ -1,11 +1,4 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Param,
-  UseGuards,
-} from "@nestjs/common";
+import { Controller, Get, Post, Body, Param, UseGuards } from "@nestjs/common";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { AuctionService } from "./auction.service";
@@ -24,7 +17,7 @@ export class AuctionController {
       maxTeams: number;
       teamBudget: number;
       minBid: number;
-    }
+    },
   ) {
     return this.auctionService.create({
       ...data,
