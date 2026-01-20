@@ -5,7 +5,7 @@ import {
   ForbiddenException,
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
-import { PostCategory } from "@nexus/database";
+import { PostCategory } from "./community.types";
 
 export interface CreatePostDto {
   title: string;

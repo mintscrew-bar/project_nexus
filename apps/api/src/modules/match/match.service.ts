@@ -5,7 +5,8 @@ import {
   ForbiddenException,
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
-import { RoomStatus, MatchStatus, BracketType } from "@nexus/database";
+import { RoomStatus, MatchStatus } from "@nexus/database";
+import { BracketType, MatchStatus } from "../community/community.types";
 
 export interface BracketMatch {
   id: string;

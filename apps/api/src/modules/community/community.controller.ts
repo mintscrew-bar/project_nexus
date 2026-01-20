@@ -19,7 +19,7 @@ import {
   UpdatePostDto,
   CreateCommentDto,
 } from "./community.service";
-import { PostCategory } from "@nexus/database";
+import { PostCategory } from "./community.types";
 
 @Controller("community")
 export class CommunityController {

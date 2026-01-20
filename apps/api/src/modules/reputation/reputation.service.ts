@@ -6,7 +6,7 @@ import {
   ConflictException,
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
-import { ReportReason, ReportStatus } from "@nexus/database";
+import { ReportReason, ReportStatus } from "../community/community.types";
 
 export interface SubmitRatingDto {
   targetUserId: string;

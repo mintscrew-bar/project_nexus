@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Body, Param, UseGuards } from "@nestjs/common";
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  UseGuards,
+  HttpCode,
+  HttpStatus,
+} from "@nestjs/common";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { AuctionService } from "./auction.service";
@@ -8,35 +17,21 @@ import { AuctionService } from "./auction.service";
 export class AuctionController {
   constructor(private readonly auctionService: AuctionService) {}
 
-  @Post()
-  async create(
-    @CurrentUser("id") userId: string,
-    @Body()
-    data: {
-      name: string;
-      maxTeams: number;
-      teamBudget: number;
-      minBid: number;
-    },
+  @Post(":roomId/start")
+  @HttpCode(HttpStatus.OK)
+  async startAuction(
+    @CurrentUser("sub") userId: string,
+    @Param("roomId") roomId: string,
   ) {
-    return this.auctionService.create({
-      ...data,
-      hostId: userId,
-    });
+    return this.auctionService.startAuction(userId, roomId);
   }
 
-  @Get(":id")
-  async findOne(@Param("id") id: string) {
-    return this.auctionService.findById(id);
-  }
-
-  @Post(":id/join")
-  async join(@Param("id") id: string, @CurrentUser("id") userId: string) {
-    return this.auctionService.join(id, userId);
-  }
-
-  @Post(":id/start")
-  async start(@Param("id") id: string, @CurrentUser("id") userId: string) {
-    return this.auctionService.startAuction(id, userId);
+  @Get(":roomId/state")
+  async getAuctionState(@Param("roomId") roomId: string) {
+    const state = this.auctionService.getAuctionState(roomId);
+    if (!state) {
+      return { error: "Auction not started" };
+    }
+    return { state };
   }
 }
