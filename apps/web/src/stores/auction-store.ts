@@ -1,13 +1,16 @@
 import { create } from 'zustand';
-import { io, Socket } from 'socket.io-client';
-import { useAuthStore } from './auth-store';
+import { auctionApi } from '@/lib/api-client';
+import {
+  connectAuctionSocket,
+  disconnectAuctionSocket,
+  auctionSocketHelpers,
+} from '@/lib/socket-client';
 
-// Placeholder Types - these should eventually come from a shared @nexus/types package
 interface Player {
   id: string;
   username: string;
   tier: string;
-  mainRole: string;
+  position: string;
 }
 
 interface Team {
@@ -15,146 +18,151 @@ interface Team {
   name: string;
   captainId: string;
   members: Player[];
-  remainingBudget: number;
+  remainingGold: number;
 }
 
-interface Bid {
-  userId: string;
-  username: string;
-  amount: number;
-  timestamp: string;
-}
-
-// This mirrors the backend AuctionState interface
-interface LiveAuctionState {
+interface AuctionState {
   roomId: string;
   currentPlayerIndex: number;
+  currentPlayer: Player | null;
   currentHighestBid: number;
   currentHighestBidder: string | null;
   timerEnd: number;
   yuchalCount: number;
   maxYuchalCycles: number;
+  status: 'WAITING' | 'IN_PROGRESS' | 'COMPLETED';
 }
 
 interface AuctionStoreState {
-  socket: Socket | null;
-  liveState: LiveAuctionState | null;
+  auctionState: AuctionState | null;
   players: Player[];
   teams: Team[];
-  bidHistory: Bid[];
   isConnected: boolean;
+  isLoading: boolean;
   error: string | null;
-  currentUserIsCaptain: boolean;
-  currentUserTeam: Team | null;
 
-  connect: (auctionId: string) => void;
-  disconnect: () => void;
-  placeBid: (amount: number) => void;
+  // REST API methods
+  startAuction: (roomId: string) => Promise<void>;
+  getAuctionState: (roomId: string) => Promise<void>;
+
+  // WebSocket methods
+  connectToAuction: (roomId: string) => void;
+  disconnectFromAuction: () => void;
+  placeBid: (roomId: string, amount: number) => void;
 }
 
 export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
-  socket: null,
-  liveState: null,
+  auctionState: null,
   players: [],
   teams: [],
-  bidHistory: [],
   isConnected: false,
+  isLoading: false,
   error: null,
-  currentUserIsCaptain: false,
-  currentUserTeam: null,
 
-  connect: (auctionId) => {
-    // Prevent multiple connections
-    if (get().socket) return;
-
-    const authState = useAuthStore.getState();
-    const token = authState.accessToken;
-    const currentUserId = authState.user?.id;
-
-    if (!token) {
-      set({ error: "Authentication token not found." });
-      return;
+  startAuction: async (roomId: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      await auctionApi.startAuction(roomId);
+      set({ isLoading: false });
+    } catch (err: any) {
+      set({
+        error: err.response?.data?.message || err.message || "Failed to start auction.",
+        isLoading: false,
+      });
     }
+  },
 
-    const socket = io(`${process.env.NEXT_PUBLIC_API_URL}/auction`, {
-      auth: { token },
-      transports: ['websocket'],
-    });
+  getAuctionState: async (roomId: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await auctionApi.getAuctionState(roomId);
+      if (response.state) {
+        set({ auctionState: response.state, isLoading: false });
+      } else {
+        set({ error: response.error || "Auction not started", isLoading: false });
+      }
+    } catch (err: any) {
+      set({
+        error: err.response?.data?.message || err.message || "Failed to get auction state.",
+        isLoading: false,
+      });
+    }
+  },
 
-    socket.on('connect', () => {
-      set({ isConnected: true, error: null });
-      socket.emit('join-room', { roomId: auctionId }, (response: any) => {
-        if (response.success) {
-          const teams: Team[] = response.teams;
-          const currentUserTeam = teams.find(team => team.captainId === currentUserId) || null;
-          const currentUserIsCaptain = !!currentUserTeam;
+  connectToAuction: (roomId: string) => {
+    const socket = connectAuctionSocket();
 
-          set({
-            liveState: response.state,
-            players: response.players,
-            teams: teams,
-            currentUserIsCaptain,
-            currentUserTeam,
-          });
-        } else {
-          set({ error: response.error || 'Failed to join room.' });
-        }
+    auctionSocketHelpers.joinAuction(roomId);
+
+    auctionSocketHelpers.onAuctionStarted((data: { state: AuctionState; teams: Team[]; players: Player[] }) => {
+      set({
+        auctionState: data.state,
+        teams: data.teams,
+        players: data.players,
       });
     });
 
-    socket.on('disconnect', () => {
-      set({ isConnected: false, currentUserIsCaptain: false, currentUserTeam: null });
-    });
-
-    socket.on('connect_error', (err) => {
-      set({ error: err.message, isConnected: false });
-    });
-    
-    // Listener for new bids
-    socket.on('bid-placed', (bid: Bid) => {
+    auctionSocketHelpers.onNewBid((data: { bidder: string; amount: number; timerEnd: number }) => {
       set((state) => ({
-        bidHistory: [...state.bidHistory, bid],
-        liveState: state.liveState ? { ...state.liveState, currentHighestBid: bid.amount, currentHighestBidder: bid.userId, timerEnd: state.liveState.timerEnd } : null
+        auctionState: state.auctionState
+          ? {
+              ...state.auctionState,
+              currentHighestBid: data.amount,
+              currentHighestBidder: data.bidder,
+              timerEnd: data.timerEnd,
+            }
+          : null,
       }));
     });
-    
-    // Listener for bid resolution
-    socket.on('bid-resolved', (result: any) => {
-      // TODO: Update teams, players, and liveState based on the result
-      console.log('Bid resolved:', result);
+
+    auctionSocketHelpers.onPlayerSold((data: { player: Player; team: string; amount: number; teams: Team[] }) => {
+      set((state) => ({
+        teams: data.teams,
+        players: state.players.filter((p) => p.id !== data.player.id),
+      }));
     });
 
-    // Listener for timer updates
-    socket.on('timer-expired', () => {
-      console.log('Timer expired!');
-      // Possibly trigger a resolve bid action
-    });
-    
-    // Listener for full auction state updates
-    socket.on('auction-state-update', (newState: any) => {
-        set({
-            liveState: newState.liveState,
-            players: newState.players,
-            teams: newState.teams
-        });
+    auctionSocketHelpers.onPlayerUnsold((data: { player: Player; yuchalCount: number }) => {
+      set((state) => ({
+        auctionState: state.auctionState
+          ? { ...state.auctionState, yuchalCount: data.yuchalCount }
+          : null,
+      }));
     });
 
-
-    set({ socket });
-  },
-
-  disconnect: () => {
-    get().socket?.disconnect();
-    set({ socket: null, isConnected: false, liveState: null, players: [], teams: [], bidHistory: [] });
-  },
-  
-  placeBid: (amount: number) => {
-    const { socket, liveState } = get();
-    if (socket && liveState) {
-      socket.emit('place-bid', {
-        roomId: liveState.roomId,
-        amount: amount,
+    auctionSocketHelpers.onAuctionComplete((data: { teams: Team[] }) => {
+      set({
+        teams: data.teams,
+        auctionState: {
+          ...get().auctionState!,
+          status: 'COMPLETED',
+        },
       });
-    }
+    });
+
+    auctionSocketHelpers.onTimerUpdate((data: { timeLeft: number }) => {
+      set((state) => ({
+        auctionState: state.auctionState
+          ? { ...state.auctionState, timerEnd: Date.now() + data.timeLeft * 1000 }
+          : null,
+      }));
+    });
+
+    set({ isConnected: true });
+  },
+
+  disconnectFromAuction: () => {
+    auctionSocketHelpers.offAllListeners();
+    disconnectAuctionSocket();
+    set({
+      isConnected: false,
+      auctionState: null,
+      players: [],
+      teams: [],
+    });
+  },
+
+  placeBid: (roomId: string, amount: number) => {
+    auctionSocketHelpers.placeBid(roomId, amount);
   },
 }));
