@@ -296,7 +296,7 @@ export class AuthService {
 
   async validateToken(token: string): Promise<TokenPayload | null> {
     try {
-      return await this.jwtService.verifyAsync(token, {
+      return await this.jwtService.verifyAsync<TokenPayload>(token, {
         secret: this.configService.get("JWT_ACCESS_SECRET"),
       });
     } catch {

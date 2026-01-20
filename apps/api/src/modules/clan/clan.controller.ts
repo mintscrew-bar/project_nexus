@@ -15,7 +15,7 @@ import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { ClanService, CreateClanDto, UpdateClanDto } from "./clan.service";
 import { ClanGateway } from "./clan.gateway";
-import { ClanRole } from "@nexus/database";
+import { ClanMemberRole } from "@nexus/database";
 
 @Controller("clans")
 @UseGuards(JwtAuthGuard)
@@ -149,7 +149,7 @@ export class ClanController {
     @CurrentUser("sub") userId: string,
     @Param("id") clanId: string,
     @Param("memberId") memberId: string,
-    @Body() body: { role: ClanRole },
+    @Body() body: { role: ClanMemberRole },
   ) {
     const result = await this.clanService.promoteMember(
       userId,

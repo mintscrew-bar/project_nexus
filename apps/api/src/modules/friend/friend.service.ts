@@ -5,7 +5,7 @@ import {
   ConflictException,
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
-import { FriendshipStatus } from "@nexus/database";
+import { FriendshipStatus } from "../community/community.types";
 
 @Injectable()
 export class FriendService {

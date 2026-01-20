@@ -16,7 +16,7 @@ async function bootstrap() {
   const corsOrigins = configService
     .get("CORS_ORIGINS")
     ?.split(",")
-    .map((origin) => origin.trim()) || [
+    .map((origin: string) => origin.trim()) || [
     configService.get("APP_URL") || "http://localhost:3000",
   ];
 

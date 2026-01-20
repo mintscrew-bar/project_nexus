@@ -17,7 +17,7 @@ import {
   SubmitRatingDto,
   SubmitReportDto,
 } from "./reputation.service";
-import { ReportStatus } from "@nexus/database";
+import { ReportStatus } from "../community/community.types";
 
 @Controller("reputation")
 export class ReputationController {
