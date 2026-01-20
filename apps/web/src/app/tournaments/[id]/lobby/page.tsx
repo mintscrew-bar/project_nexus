@@ -1,72 +1,70 @@
 "use client";
 
-import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { useEffect } from "react";
+import { useLobbyStore } from "@/stores/lobby-store";
+import { useAuthStore } from "@/stores/auth-store";
+import { Users, Crown, Check, X, RefreshCcw } from "lucide-react";
 import Link from "next/link";
-import { Users, Crown, Check, X } from "lucide-react";
-
-// Placeholder for Room data and Participant data
-interface Participant {
-  id: string;
-  username: string;
-  isHost: boolean;
-  isReady: boolean;
-}
-
-interface Room {
-  id: string;
-  title: string;
-  hostId: string;
-  currentPlayers: number;
-  maxPlayers: number;
-  isPrivate: boolean;
-  status: "WAITING" | "IN_PROGRESS" | "COMPLETED";
-  teamMode: "AUCTION" | "LADDER";
-  participants: Participant[];
-}
-
-const dummyRoom: Room = {
-  id: "room-123",
-  title: "경매 내전: 실력자 구함",
-  hostId: "user-host", // Placeholder host ID
-  currentPlayers: 3,
-  maxPlayers: 10,
-  isPrivate: false,
-  status: "WAITING",
-  teamMode: "AUCTION",
-  participants: [
-    { id: "user-host", username: "HostPlayer", isHost: true, isReady: true },
-    { id: "user-1", username: "Player1", isHost: false, isReady: true },
-    { id: "user-2", username: "Player2", isHost: false, isReady: false },
-  ],
-};
 
 
 export default function TournamentLobbyPage() {
   const params = useParams();
+  const router = useRouter();
   const roomId = params.id as string;
-  // TODO: Replace with real data from a store (e.g., useRoomLobbyStore)
-  const [room, setRoom] = useState<Room | null>(dummyRoom);
-  // TODO: Get current user ID from auth store
-  const currentUserId = "user-1"; 
+  
+  const { connect, disconnect, room, isConnected, error, gameStarting, setReady, startGame } = useLobbyStore();
+  const { user: currentUser } = useAuthStore();
 
   useEffect(() => {
-    // TODO: Fetch real room data and subscribe to updates
-    console.log(`Fetching lobby data for room: ${roomId}`);
-  }, [roomId]);
+    if (roomId) {
+      connect(roomId);
+    }
+    return () => {
+      disconnect();
+    };
+  }, [roomId, connect, disconnect]);
 
-  if (!room) {
+  useEffect(() => {
+    if (gameStarting && room) {
+      if (room.teamMode === "AUCTION") {
+        router.push(`/auction/${room.id}`);
+      }
+      // Add other team selection methods later
+    }
+  }, [gameStarting, room, router]);
+
+  if (!isConnected && !error) {
     return (
       <div className="flex-grow p-8 text-center text-ui-text-muted">
-        <p>로비 정보를 불러오는 중...</p>
+        <p>로비에 연결하는 중...</p>
       </div>
     );
   }
 
-  const isCurrentUserHost = room.hostId === currentUserId;
-  const currentUserIsReady = room.participants.find(p => p.id === currentUserId)?.isReady || false;
-  const allPlayersReady = room.participants.length > 0 && room.participants.every(p => p.isReady);
+  if (error) {
+    return (
+      <div className="flex-grow p-8 text-center">
+        <p className="text-lol-accent-red mb-4">로비에 연결할 수 없습니다: {error}</p>
+        <Link href="/tournaments" className="px-4 py-2 bg-brand-500 hover:bg-brand-600 text-white rounded-lg">
+          로비 목록으로 돌아가기
+        </Link>
+      </div>
+    );
+  }
 
+  if (!room) {
+    return (
+        <div className="flex-grow p-8 text-center text-ui-text-muted">
+            <p>방 정보를 기다리는 중...</p>
+        </div>
+    );
+  }
+  
+  const isCurrentUserHost = room.hostId === currentUser?.id;
+  const currentUserParticipant = room.participants.find(p => p.id === currentUser?.id);
+  const currentUserIsReady = currentUserParticipant?.isReady || false;
+  const allPlayersReady = room.participants.length > 0 && room.participants.every(p => p.isReady);
 
   return (
     <div className="flex-grow p-8">
@@ -108,10 +106,16 @@ export default function TournamentLobbyPage() {
             <div>
               <h2 className="text-2xl font-bold text-ui-text-base mb-4">로비 컨트롤</h2>
               <div className="space-y-3">
-                <button className="w-full px-6 py-3 bg-brand-500 hover:bg-brand-600 text-white font-bold rounded-lg transition-colors duration-200">
-                  {currentUserIsReady ? "준비 완료" : "준비하기"}
+                <button 
+                  className="w-full px-6 py-3 bg-brand-500 hover:bg-brand-600 text-white font-bold rounded-lg transition-colors duration-200"
+                  onClick={() => setReady(!currentUserIsReady)}
+                >
+                  {currentUserIsReady ? "준비 취소" : "준비하기"}
                 </button>
-                <button className="w-full px-6 py-3 bg-ui-border hover:bg-ui-text-muted text-ui-text-base font-bold rounded-lg transition-colors duration-200">
+                <button 
+                  className="w-full px-6 py-3 bg-ui-border hover:bg-ui-text-muted text-ui-text-base font-bold rounded-lg transition-colors duration-200"
+                  onClick={() => disconnect()} // Should probably navigate back too
+                >
                   로비 나가기
                 </button>
               </div>
@@ -119,8 +123,9 @@ export default function TournamentLobbyPage() {
             
             {isCurrentUserHost && (
                 <button
-                    className="w-full mt-6 px-6 py-3 bg-lol-accent-green hover:bg-lol-accent-green/80 text-white font-bold rounded-lg transition-colors duration-200"
-                    disabled={!allPlayersReady || room.participants.length < 2} // Example: needs at least 2 players and all ready
+                    className="w-full mt-6 px-6 py-3 bg-lol-accent-green hover:bg-lol-accent-green/80 text-white font-bold rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={!allPlayersReady || room.participants.length < 2}
+                    onClick={() => startGame()}
                 >
                     내전 시작
                 </button>

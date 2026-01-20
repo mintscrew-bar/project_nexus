@@ -10,6 +10,10 @@ import { AuctionModule } from "./modules/auction/auction.module";
 import { MatchModule } from "./modules/match/match.module";
 import { RiotModule } from "./modules/riot/riot.module";
 import { DiscordModule } from "./modules/discord/discord.module";
+import { ClanModule } from "./modules/clan/clan.module";
+import { CommunityModule } from "./modules/community/community.module";
+import { ReputationModule } from "./modules/reputation/reputation.module";
+import { FriendModule } from "./modules/friend/friend.module";
 import { PrismaModule } from "./modules/prisma/prisma.module";
 import { RedisModule } from "./modules/redis/redis.module";
 import { HealthController } from "./health.controller";
@@ -46,6 +50,10 @@ import { RiotTournamentService } from "./modules/riot/riot-tournament.service";
     MatchModule,
     RiotModule,
     DiscordModule,
+    ClanModule,
+    CommunityModule,
+    ReputationModule,
+    FriendModule,
   ],
   controllers: [HealthController],
 })
