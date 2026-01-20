@@ -3,13 +3,38 @@
 @tailwind utilities;
 
 @layer base {
-  :root {
-    --background: 30 36 40;
-    --foreground: 240 230 210;
+  :root { /* Light Theme Colors */
+    --color-brand-50: 239 242 253;
+    --color-brand-100: 215 224 251;
+    --color-brand-200: 174 192 248;
+    --color-brand-300: 134 156 245;
+    --color-brand-400: 97 119 241;
+    --color-brand-500: 102 126 234; /* #667EEA */
+    --color-brand-600: 90 111 202;
+    --color-brand-700: 78 96 170;
+    --color-brand-800: 66 81 137;
+    --color-brand-900: 54 66 105;
+    --color-brand-purple: 118 75 162; /* #764BA2 */
+
+    --color-ui-background: 248 250 252; /* rgb(248 250 252) */
+    --color-ui-card: 255 255 255; /* rgb(255 255 255) */
+    --color-ui-border: 226 232 240; /* rgb(226 232 240) */
+    --color-ui-text-base: 30 41 59; /* rgb(30 41 59) */
+    --color-ui-text-muted: 100 116 139; /* rgb(100 116 139) */
+    --color-ui-text-accent: 102 126 234; /* brand blue */
+  }
+
+  .dark { /* Dark Theme Colors */
+    --color-ui-background: 17 24 39; /* rgb(17 24 39) */
+    --color-ui-card: 31 41 55; /* rgb(31 41 55) */
+    --color-ui-border: 75 85 99; /* rgb(75 85 99) */
+    --color-ui-text-base: 229 231 235; /* rgb(229 231 235) */
+    --color-ui-text-muted: 156 163 175; /* rgb(156 163 175) */
+    --color-ui-text-accent: 102 126 234; /* brand blue */
   }
 
   body {
-    @apply antialiased;
+    @apply antialiased bg-ui-background text-ui-text-base;
   }
 }
 

@@ -1,66 +1,57 @@
 import {
   Injectable,
-  BadRequestException,
   NotFoundException,
+  BadRequestException,
+  ForbiddenException,
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
-import { RedisService } from "../redis/redis.service";
+import { RoomStatus, TeamMode } from "@nexus/database";
 
-export enum AuctionStatus {
-  WAITING = "WAITING",
-  IN_PROGRESS = "IN_PROGRESS",
-  COMPLETED = "COMPLETED",
-  CANCELLED = "CANCELLED",
+// Tier-based gold allocation
+const TIER_GOLD: Record<string, number> = {
+  IRON: 3000,
+  BRONZE: 2900,
+  SILVER: 2800,
+  GOLD: 2600,
+  PLATINUM: 2400,
+  EMERALD: 2200,
+  DIAMOND: 2000,
+  MASTER: 2000,
+  GRANDMASTER: 2000,
+  CHALLENGER: 2000,
+  UNRANKED: 2500,
+};
+
+const BID_INCREMENT = 100;
+const SOFT_TIMER_SECONDS = 5;
+const BONUS_GOLD = 500;
+
+export interface AuctionState {
+  roomId: string;
+  currentPlayerIndex: number;
+  currentHighestBid: number;
+  currentHighestBidder: string | null;
+  timerEnd: number;
+  yuchalCount: number;
+  maxYuchalCycles: number;
 }
 
 @Injectable()
 export class AuctionService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly redis: RedisService,
-  ) {}
+  private auctionStates = new Map<string, AuctionState>();
 
-  async create(data: {
-    name: string;
-    hostId: string;
-    maxTeams: number;
-    teamBudget: number;
-    minBid: number;
-  }) {
-    return this.prisma.auction.create({
-      data: {
-        name: data.name,
-        hostId: data.hostId,
-        maxTeams: data.maxTeams,
-        teamBudget: data.teamBudget,
-        minBid: data.minBid,
-        status: AuctionStatus.WAITING,
-      },
-    });
-  }
+  constructor(private readonly prisma: PrismaService) {}
 
-  async findById(id: string) {
-    const auction = await this.prisma.auction.findUnique({
-      where: { id },
+  // ========================================
+  // Auction Initialization
+  // ========================================
+
+  async startAuction(hostId: string, roomId: string) {
+    const room = await this.prisma.room.findUnique({
+      where: { id: roomId },
       include: {
-        host: true,
-        teams: {
-          include: {
-            captain: true,
-            members: {
-              include: {
-                user: {
-                  include: {
-                    riotAccounts: {
-                      where: { isPrimary: true },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
         participants: {
+          where: { role: "PLAYER" },
           include: {
             user: {
               include: {
@@ -71,137 +62,399 @@ export class AuctionService {
             },
           },
         },
+        teams: true,
       },
     });
 
-    if (!auction) {
-      throw new NotFoundException("Auction not found");
+    if (!room) {
+      throw new NotFoundException("Room not found");
     }
 
-    return auction;
-  }
-
-  async join(auctionId: string, userId: string) {
-    const auction = await this.findById(auctionId);
-
-    if (auction.status !== AuctionStatus.WAITING) {
-      throw new BadRequestException("Cannot join auction in progress");
+    if (room.hostId !== hostId) {
+      throw new ForbiddenException("Only host can start auction");
     }
 
-    const existingParticipant = await this.prisma.auctionParticipant.findFirst({
-      where: { auctionId, userId },
+    if (room.status !== RoomStatus.WAITING) {
+      throw new BadRequestException("Room already started");
+    }
+
+    if (room.teamMode !== TeamMode.AUCTION) {
+      throw new BadRequestException("Room is not in auction mode");
+    }
+
+    // Calculate number of teams
+    const numTeams = Math.floor(room.participants.length / 5);
+    if (numTeams < 2) {
+      throw new BadRequestException("Need at least 10 players for auction");
+    }
+
+    // Select captains (random or by highest tier)
+    const sortedPlayers = room.participants.sort((a, b) => {
+      const aTier = a.user.riotAccounts[0]?.tier || "UNRANKED";
+      const bTier = b.user.riotAccounts[0]?.tier || "UNRANKED";
+      return (TIER_GOLD[bTier] || 0) - (TIER_GOLD[aTier] || 0);
     });
 
-    if (existingParticipant) {
-      throw new BadRequestException("Already joined this auction");
-    }
+    const captains = sortedPlayers.slice(0, numTeams);
+    const players = sortedPlayers.slice(numTeams);
 
-    return this.prisma.auctionParticipant.create({
-      data: {
-        auctionId,
-        userId,
-      },
-    });
-  }
+    // Create teams with tier-based budgets
+    const teams = await Promise.all(
+      captains.map(async (captain, index) => {
+        const tier = captain.user.riotAccounts[0]?.tier || "UNRANKED";
+        const initialBudget = TIER_GOLD[tier] || 2500;
 
-  async startAuction(auctionId: string, hostId: string) {
-    const auction = await this.findById(auctionId);
-
-    if (auction.hostId !== hostId) {
-      throw new BadRequestException("Only host can start the auction");
-    }
-
-    if (auction.status !== AuctionStatus.WAITING) {
-      throw new BadRequestException("Auction already started");
-    }
-
-    return this.prisma.auction.update({
-      where: { id: auctionId },
-      data: {
-        status: AuctionStatus.IN_PROGRESS,
-        startedAt: new Date(),
-      },
-    });
-  }
-
-  async placeBid(data: {
-    auctionId: string;
-    participantId: string;
-    teamId: string;
-    amount: number;
-    bidderId: string;
-  }) {
-    const auction = await this.findById(data.auctionId);
-
-    if (auction.status !== AuctionStatus.IN_PROGRESS) {
-      throw new BadRequestException("Auction is not in progress");
-    }
-
-    const team = auction.teams.find((t) => t.id === data.teamId);
-    if (!team) {
-      throw new BadRequestException("Team not found");
-    }
-
-    if (team.captainId !== data.bidderId) {
-      throw new BadRequestException("Only team captain can place bids");
-    }
-
-    // Get current highest bid from Redis
-    const currentBidKey = `auction:${data.auctionId}:participant:${data.participantId}:bid`;
-    const currentBidStr = await this.redis.get(currentBidKey);
-    const currentBid = currentBidStr ? parseInt(currentBidStr) : 0;
-
-    if (data.amount <= currentBid) {
-      throw new BadRequestException("Bid must be higher than current bid");
-    }
-
-    if (data.amount < auction.minBid) {
-      throw new BadRequestException(`Minimum bid is ${auction.minBid}`);
-    }
-
-    // Check team budget
-    const teamSpent = team.members.reduce(
-      (sum, m) => sum + (m.soldPrice || 0),
-      0,
+        return this.prisma.team.create({
+          data: {
+            roomId,
+            name: `Team ${index + 1}`,
+            captainId: captain.userId,
+            color: this.getTeamColor(index),
+            initialBudget,
+            remainingBudget: initialBudget,
+            members: {
+              create: {
+                userId: captain.userId,
+                assignedRole: captain.user.riotAccounts[0]?.mainRole,
+              },
+            },
+          },
+        });
+      }),
     );
-    if (teamSpent + data.amount > auction.teamBudget) {
-      throw new BadRequestException("Exceeds team budget");
-    }
 
-    // Store bid in Redis
-    await this.redis.set(currentBidKey, data.amount.toString(), 300); // 5 min TTL
-    await this.redis.set(
-      `auction:${data.auctionId}:participant:${data.participantId}:bidder`,
-      data.teamId,
-      300,
+    // Update room status
+    await this.prisma.room.update({
+      where: { id: roomId },
+      data: { status: RoomStatus.TEAM_SELECTION },
+    });
+
+    // Mark captains as captains in participants
+    await Promise.all(
+      captains.map((captain) =>
+        this.prisma.roomParticipant.update({
+          where: { id: captain.id },
+          data: {
+            isCaptain: true,
+            teamId: teams.find((t) => t.captainId === captain.userId)?.id,
+          },
+        }),
+      ),
     );
+
+    // Initialize auction state
+    const auctionState: AuctionState = {
+      roomId,
+      currentPlayerIndex: 0,
+      currentHighestBid: 0,
+      currentHighestBidder: null,
+      timerEnd: Date.now() + 30000, // 30 seconds initial
+      yuchalCount: 0,
+      maxYuchalCycles: numTeams,
+    };
+
+    this.auctionStates.set(roomId, auctionState);
 
     return {
-      participantId: data.participantId,
-      teamId: data.teamId,
-      amount: data.amount,
+      teams,
+      players: players.map((p) => ({
+        id: p.userId,
+        username: p.user.username,
+        avatar: p.user.avatar,
+        tier: p.user.riotAccounts[0]?.tier,
+        rank: p.user.riotAccounts[0]?.rank,
+        mainRole: p.user.riotAccounts[0]?.mainRole,
+        subRole: p.user.riotAccounts[0]?.subRole,
+      })),
+      auctionState,
     };
   }
 
-  async completeBid(auctionId: string, participantId: string) {
-    const bidderTeamId = await this.redis.get(
-      `auction:${auctionId}:participant:${participantId}:bidder`,
-    );
-    const bidAmount = await this.redis.get(
-      `auction:${auctionId}:participant:${participantId}:bid`,
-    );
+  // ========================================
+  // Bidding Logic
+  // ========================================
 
-    if (!bidderTeamId || !bidAmount) {
-      throw new BadRequestException("No winning bid found");
+  async placeBid(
+    userId: string,
+    roomId: string,
+    amount: number,
+  ): Promise<AuctionState> {
+    const state = this.auctionStates.get(roomId);
+    if (!state) {
+      throw new BadRequestException("Auction not started");
     }
 
-    // Update participant with team assignment
-    return this.prisma.auctionParticipant.update({
-      where: { id: participantId },
-      data: {
-        teamId: bidderTeamId,
-        soldPrice: parseInt(bidAmount),
+    // Get team
+    const team = await this.prisma.team.findFirst({
+      where: { roomId, captainId: userId },
+    });
+
+    if (!team) {
+      throw new ForbiddenException("Only captains can bid");
+    }
+
+    // Validate bid
+    if (amount < state.currentHighestBid + BID_INCREMENT) {
+      throw new BadRequestException(
+        `Bid must be at least ${state.currentHighestBid + BID_INCREMENT}`,
+      );
+    }
+
+    if (amount > team.remainingBudget) {
+      throw new BadRequestException("Insufficient budget");
+    }
+
+    if (amount % BID_INCREMENT !== 0) {
+      throw new BadRequestException(`Bid must be multiple of ${BID_INCREMENT}`);
+    }
+
+    // Get current player being auctioned
+    const room = await this.prisma.room.findUnique({
+      where: { id: roomId },
+      include: {
+        participants: {
+          where: { role: "PLAYER", isCaptain: false, teamId: null },
+          include: {
+            user: {
+              include: {
+                riotAccounts: { where: { isPrimary: true } },
+              },
+            },
+          },
+          orderBy: { joinedAt: "asc" },
+        },
       },
     });
+
+    const currentPlayer = room?.participants[state.currentPlayerIndex];
+    if (!currentPlayer) {
+      throw new BadRequestException("No player to bid on");
+    }
+
+    // Update state with soft timer reset
+    state.currentHighestBid = amount;
+    state.currentHighestBidder = team.id;
+    state.timerEnd = Date.now() + SOFT_TIMER_SECONDS * 1000;
+    state.yuchalCount = 0; // Reset yuchal count
+
+    // Record bid
+    await this.prisma.auctionBid.create({
+      data: {
+        roomId,
+        teamId: team.id,
+        targetUserId: currentPlayer.userId,
+        amount,
+      },
+    });
+
+    return state;
+  }
+
+  // ========================================
+  // Auction Resolution
+  // ========================================
+
+  async resolveCurrentBid(roomId: string): Promise<{
+    sold: boolean;
+    player?: any;
+    team?: any;
+    price?: number;
+  }> {
+    const state = this.auctionStates.get(roomId);
+    if (!state) {
+      throw new BadRequestException("Auction not started");
+    }
+
+    const room = await this.prisma.room.findUnique({
+      where: { id: roomId },
+      include: {
+        participants: {
+          where: { role: "PLAYER", isCaptain: false, teamId: null },
+          include: {
+            user: {
+              include: {
+                riotAccounts: { where: { isPrimary: true } },
+              },
+            },
+          },
+          orderBy: { joinedAt: "asc" },
+        },
+        teams: {
+          include: {
+            captain: true,
+          },
+          orderBy: { remainingBudget: "desc" },
+        },
+      },
+    });
+
+    const currentPlayer = room?.participants[state.currentPlayerIndex];
+    if (!currentPlayer) {
+      throw new BadRequestException("No player to resolve");
+    }
+
+    // Check if there was a bid
+    if (state.currentHighestBidder) {
+      // Sold!
+      const team = await this.prisma.team.findUnique({
+        where: { id: state.currentHighestBidder },
+      });
+
+      if (!team) {
+        throw new NotFoundException("Team not found");
+      }
+
+      // Deduct budget
+      await this.prisma.team.update({
+        where: { id: team.id },
+        data: {
+          remainingBudget: team.remainingBudget - state.currentHighestBid,
+        },
+      });
+
+      // Assign player to team
+      await this.prisma.teamMember.create({
+        data: {
+          teamId: team.id,
+          userId: currentPlayer.userId,
+          soldPrice: state.currentHighestBid,
+        },
+      });
+
+      await this.prisma.roomParticipant.update({
+        where: { id: currentPlayer.id },
+        data: { teamId: team.id },
+      });
+
+      // Move to next player
+      state.currentPlayerIndex++;
+      state.currentHighestBid = 0;
+      state.currentHighestBidder = null;
+      state.timerEnd = Date.now() + 30000;
+      state.yuchalCount = 0;
+
+      return {
+        sold: true,
+        player: currentPlayer,
+        team,
+        price: state.currentHighestBid,
+      };
+    } else {
+      // Yuchal (no sale)
+      state.yuchalCount++;
+
+      // If yuchal cycle complete, assign to team with most budget
+      if (state.yuchalCount >= state.maxYuchalCycles) {
+        const targetTeam = room!.teams[0]; // Sorted by remainingBudget desc
+
+        // Check if team has any budget
+        if (targetTeam.remainingBudget === 0 && !targetTeam.hasReceivedBonus) {
+          // Give bonus gold
+          await this.prisma.team.update({
+            where: { id: targetTeam.id },
+            data: {
+              remainingBudget: BONUS_GOLD,
+              hasReceivedBonus: true,
+            },
+          });
+        }
+
+        // Assign player for free
+        await this.prisma.teamMember.create({
+          data: {
+            teamId: targetTeam.id,
+            userId: currentPlayer.userId,
+            soldPrice: 0,
+          },
+        });
+
+        await this.prisma.roomParticipant.update({
+          where: { id: currentPlayer.id },
+          data: { teamId: targetTeam.id },
+        });
+
+        // Record yuchal
+        await this.prisma.auctionBid.create({
+          data: {
+            roomId,
+            teamId: targetTeam.id,
+            targetUserId: currentPlayer.userId,
+            amount: 0,
+            isYuchal: true,
+          },
+        });
+
+        // Move to next player
+        state.currentPlayerIndex++;
+        state.currentHighestBid = 0;
+        state.currentHighestBidder = null;
+        state.timerEnd = Date.now() + 30000;
+        state.yuchalCount = 0;
+
+        return {
+          sold: true,
+          player: currentPlayer,
+          team: targetTeam,
+          price: 0,
+        };
+      }
+
+      // Continue auction for same player
+      state.timerEnd = Date.now() + 30000;
+
+      return { sold: false };
+    }
+  }
+
+  // ========================================
+  // Auction Completion
+  // ========================================
+
+  async checkAuctionComplete(roomId: string): Promise<boolean> {
+    const room = await this.prisma.room.findUnique({
+      where: { id: roomId },
+      include: {
+        participants: {
+          where: { role: "PLAYER", teamId: null },
+        },
+      },
+    });
+
+    // All players assigned (except captains who are already assigned)
+    const state = this.auctionStates.get(roomId);
+    if (!state) return false;
+
+    return room!.participants.length === 0;
+  }
+
+  async completeAuction(roomId: string) {
+    await this.prisma.room.update({
+      where: { id: roomId },
+      data: { status: RoomStatus.IN_PROGRESS },
+    });
+
+    this.auctionStates.delete(roomId);
+
+    return { message: "Auction completed" };
+  }
+
+  // ========================================
+  // Utility
+  // ========================================
+
+  getAuctionState(roomId: string): AuctionState | undefined {
+    return this.auctionStates.get(roomId);
+  }
+
+  private getTeamColor(index: number): string {
+    const colors = [
+      "#3B82F6", // Blue
+      "#EF4444", // Red
+      "#10B981", // Green
+      "#F59E0B", // Yellow
+      "#8B5CF6", // Purple
+      "#EC4899", // Pink
+    ];
+    return colors[index % colors.length];
   }
 }

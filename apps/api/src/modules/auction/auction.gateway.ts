@@ -13,6 +13,7 @@ import { AuctionService } from "./auction.service";
 
 interface AuthenticatedSocket extends Socket {
   userId?: string;
+  username?: string;
 }
 
 @WebSocketGateway({
@@ -35,7 +36,9 @@ export class AuctionGateway
 
   async handleConnection(client: AuthenticatedSocket) {
     try {
-      const token = client.handshake.auth?.token;
+      const token =
+        client.handshake.auth?.token ||
+        client.handshake.headers?.authorization?.replace("Bearer ", "");
 
       if (!token) {
         client.disconnect();
@@ -50,37 +53,38 @@ export class AuctionGateway
       }
 
       client.userId = payload.sub;
-      console.log(`Client connected: ${client.userId}`);
+      client.username = payload.username;
+      console.log(`Auction client connected: ${client.username}`);
     } catch (_error) {
       client.disconnect();
     }
   }
 
   handleDisconnect(client: AuthenticatedSocket) {
-    console.log(`Client disconnected: ${client.userId}`);
+    console.log(`Auction client disconnected: ${client.username}`);
   }
 
-  @SubscribeMessage("join-auction")
-  async handleJoinAuction(
+  @SubscribeMessage("join-room")
+  async handleJoinRoom(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { auctionId: string },
+    @MessageBody() data: { roomId: string },
   ) {
-    client.join(`auction:${data.auctionId}`);
+    client.join(`room:${data.roomId}`);
 
-    const auction = await this.auctionService.findById(data.auctionId);
+    const state = this.auctionService.getAuctionState(data.roomId);
 
     return {
-      event: "auction-state",
-      data: auction,
+      success: true,
+      state,
     };
   }
 
-  @SubscribeMessage("leave-auction")
-  handleLeaveAuction(
+  @SubscribeMessage("leave-room")
+  handleLeaveRoom(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { auctionId: string },
+    @MessageBody() data: { roomId: string },
   ) {
-    client.leave(`auction:${data.auctionId}`);
+    client.leave(`room:${data.roomId}`);
   }
 
   @SubscribeMessage("place-bid")
@@ -88,9 +92,7 @@ export class AuctionGateway
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody()
     data: {
-      auctionId: string;
-      participantId: string;
-      teamId: string;
+      roomId: string;
       amount: number;
     },
   ) {
@@ -99,27 +101,64 @@ export class AuctionGateway
     }
 
     try {
-      const bid = await this.auctionService.placeBid({
-        ...data,
-        bidderId: client.userId,
-      });
+      const state = await this.auctionService.placeBid(
+        client.userId,
+        data.roomId,
+        data.amount,
+      );
 
-      // Broadcast to all clients in the auction room
-      this.server.to(`auction:${data.auctionId}`).emit("new-bid", {
-        participantId: bid.participantId,
-        teamId: bid.teamId,
-        amount: bid.amount,
+      // Broadcast to all clients in the room
+      this.server.to(`room:${data.roomId}`).emit("bid-placed", {
+        userId: client.userId,
+        username: client.username,
+        amount: data.amount,
+        timerEnd: state.timerEnd,
         timestamp: new Date().toISOString(),
       });
 
-      return { success: true };
+      return { success: true, state };
+    } catch (error: any) {
+      return { error: error.message };
+    }
+  }
+
+  @SubscribeMessage("resolve-bid")
+  async handleResolveBid(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() data: { roomId: string },
+  ) {
+    if (!client.userId) {
+      return { error: "Unauthorized" };
+    }
+
+    try {
+      const result = await this.auctionService.resolveCurrentBid(data.roomId);
+
+      // Broadcast result
+      this.server.to(`room:${data.roomId}`).emit("bid-resolved", result);
+
+      // Check if auction is complete
+      const isComplete = await this.auctionService.checkAuctionComplete(
+        data.roomId,
+      );
+
+      if (isComplete) {
+        await this.auctionService.completeAuction(data.roomId);
+        this.server.to(`room:${data.roomId}`).emit("auction-complete");
+      }
+
+      return { success: true, result };
     } catch (error: any) {
       return { error: error.message };
     }
   }
 
   // Emit auction state updates
-  emitAuctionUpdate(auctionId: string, event: string, data: any) {
-    this.server.to(`auction:${auctionId}`).emit(event, data);
+  emitAuctionUpdate(roomId: string, event: string, data: any) {
+    this.server.to(`room:${roomId}`).emit(event, data);
+  }
+
+  emitTimerExpired(roomId: string) {
+    this.server.to(`room:${roomId}`).emit("timer-expired");
   }
 }

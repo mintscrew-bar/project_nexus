@@ -23,6 +23,15 @@ nexus/
 └── docker-compose.yml
 ```
 
+## Documentation
+
+For more detailed documentation, please see the files in the `docs` directory. This includes information on:
+
+- Server Setup
+- Technical Plans
+- API and Tournament Setup
+- and more...
+
 ## Getting Started
 
 ### Prerequisites
