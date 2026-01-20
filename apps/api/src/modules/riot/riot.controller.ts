@@ -2,17 +2,21 @@ import {
   Controller,
   Get,
   Post,
+  Put,
   Body,
   Param,
   UseGuards,
   Query,
+  HttpCode,
+  HttpStatus,
 } from "@nestjs/common";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { Public } from "../auth/decorators/public.decorator";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
-import { RiotService } from "./riot.service";
+import { RiotService, RegisterRiotAccountDto } from "./riot.service";
 import { DataDragonService } from "./data-dragon.service";
 import { RiotTournamentService } from "./riot-tournament.service";
+import { Role } from "@nexus/database";
 
 @Controller("riot")
 export class RiotController {
@@ -22,10 +26,15 @@ export class RiotController {
     private readonly tournamentService: RiotTournamentService,
   ) {}
 
+  // ========================================
+  // Verification & Registration
+  // ========================================
+
   @Post("verify/start")
+  @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)
   async startVerification(
-    @CurrentUser("id") userId: string,
+    @CurrentUser("sub") userId: string,
     @Body() data: { gameName: string; tagLine: string },
   ) {
     return this.riotService.startVerification(
@@ -35,16 +44,60 @@ export class RiotController {
     );
   }
 
-  @Post("verify/confirm")
+  @Get("verify/check")
   @UseGuards(JwtAuthGuard)
-  async confirmVerification(@CurrentUser("id") userId: string) {
-    return this.riotService.verifyAccount(userId);
+  async checkVerification(@CurrentUser("sub") userId: string) {
+    return this.riotService.checkVerification(userId);
+  }
+
+  @Post("register")
+  @HttpCode(HttpStatus.CREATED)
+  @UseGuards(JwtAuthGuard)
+  async registerAccount(
+    @CurrentUser("sub") userId: string,
+    @Body() dto: RegisterRiotAccountDto,
+  ) {
+    return this.riotService.registerRiotAccount(userId, dto);
+  }
+
+  // ========================================
+  // Account Management
+  // ========================================
+
+  @Get("accounts")
+  @UseGuards(JwtAuthGuard)
+  async getMyAccounts(@CurrentUser("sub") userId: string) {
+    return this.riotService.getUserRiotAccounts(userId);
+  }
+
+  @Put("accounts/:id/primary")
+  @UseGuards(JwtAuthGuard)
+  async setPrimaryAccount(
+    @CurrentUser("sub") userId: string,
+    @Param("id") accountId: string,
+  ) {
+    return this.riotService.setPrimaryAccount(userId, accountId);
   }
 
   @Post("accounts/:id/sync")
+  @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)
   async syncAccount(@Param("id") id: string) {
     return this.riotService.syncRankedInfo(id);
+  }
+
+  @Put("accounts/:id/champions/:role")
+  @UseGuards(JwtAuthGuard)
+  async updateChampions(
+    @Param("id") accountId: string,
+    @Param("role") role: Role,
+    @Body() body: { championIds: string[] },
+  ) {
+    return this.riotService.updateChampionPreferences(
+      accountId,
+      role,
+      body.championIds,
+    );
   }
 
   @Get("summoner/:gameName/:tagLine")
@@ -131,13 +184,13 @@ export class RiotController {
   @UseGuards(JwtAuthGuard)
   async createProvider() {
     // TODO: Admin 권한 체크 추가
-    return this.riotTournamentService.createProviderManually();
+    return this.tournamentService.createProviderManually();
   }
 
   @Post("tournament/create")
   @UseGuards(JwtAuthGuard)
   async createTournament(@Body() data: { providerId: string }) {
     // TODO: Admin 권한 체크 추가
-    return this.riotTournamentService.createTournamentManually(data.providerId);
+    return this.tournamentService.createTournamentManually(data.providerId);
   }
 }
