@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm install:*)",
+      "Bash(test:*)",
+      "Bash(docker compose:*)",
+      "Bash(pnpm db:generate:*)",
+      "Bash(pnpm db:push:*)",
+      "Bash(pnpm build:*)",
+      "Bash(pnpm dev)",
+      "Bash(timeout:*)",
+      "Bash(tasklist)",
+      "Bash(findstr /i \"node\")"
+    ]
+  }
+}

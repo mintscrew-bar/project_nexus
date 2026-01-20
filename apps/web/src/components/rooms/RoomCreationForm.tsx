@@ -25,8 +25,8 @@ export function RoomCreationForm({ onCancel, onRoomCreated }: RoomCreationFormPr
 
     const roomData = {
       title,
-      maxPlayers,
-      teamMode,
+      maxSize: maxPlayers as 10 | 15 | 20,
+      mode: teamMode === "AUCTION" ? "AUCTION" as const : "SNAKE_DRAFT" as const,
       isPrivate,
       password: isPrivate ? password : undefined,
     };

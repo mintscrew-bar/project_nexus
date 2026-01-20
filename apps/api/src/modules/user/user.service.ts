@@ -21,12 +21,21 @@ export class UserService {
   }
 
   async findByDiscordId(discordId: string) {
-    return this.prisma.user.findUnique({
-      where: { discordId },
+    const authProvider = await this.prisma.authProvider.findFirst({
+      where: {
+        provider: "DISCORD",
+        providerId: discordId,
+      },
       include: {
-        riotAccounts: true,
+        user: {
+          include: {
+            riotAccounts: true,
+          },
+        },
       },
     });
+
+    return authProvider?.user || null;
   }
 
   async getProfile(userId: string) {
@@ -38,7 +47,7 @@ export class UserService {
         },
         _count: {
           select: {
-            participations: true,
+            roomParticipations: true,
           },
         },
       },
@@ -58,7 +67,7 @@ export class UserService {
   }
 
   async getUserStats(userId: string) {
-    const participations = await this.prisma.auctionParticipant.findMany({
+    const teamMembers = await this.prisma.teamMember.findMany({
       where: { userId },
       include: {
         team: {
@@ -73,13 +82,13 @@ export class UserService {
     let wins = 0;
     let losses = 0;
 
-    participations.forEach((p) => {
-      if (!p.team) return;
+    teamMembers.forEach((tm) => {
+      if (!tm.team) return;
 
-      const teamMatches = [...p.team.matchesAsTeamA, ...p.team.matchesAsTeamB];
+      const teamMatches = [...tm.team.matchesAsTeamA, ...tm.team.matchesAsTeamB];
 
       teamMatches.forEach((match) => {
-        if (match.winnerId === p.team!.id) {
+        if (match.winnerId === tm.team!.id) {
           wins++;
         } else if (match.winnerId) {
           losses++;
@@ -92,7 +101,7 @@ export class UserService {
       wins,
       losses,
       winRate: wins + losses > 0 ? (wins / (wins + losses)) * 100 : 0,
-      participations: participations.length,
+      participations: teamMembers.length,
     };
   }
 

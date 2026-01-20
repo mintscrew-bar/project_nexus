@@ -14,11 +14,10 @@ import axios from "axios";
  * 참고: https://ddragon.leagueoflegends.com/
  */
 
-interface DataDragonVersion {
-  version: string;
-}
+// DataDragon versions API returns an array of version strings (e.g., ["14.1.1", "14.1.0", ...])
+type DataDragonVersions = string[];
 
-interface ChampionData {
+export interface ChampionData {
   data: Record<
     string,
     {
@@ -39,7 +38,7 @@ interface ChampionData {
   >;
 }
 
-interface ItemData {
+export interface ItemData {
   data: Record<
     string,
     {
@@ -86,7 +85,7 @@ export class DataDragonService {
     }
 
     try {
-      const response = await axios.get<DataDragonVersion[]>(
+      const response = await axios.get<DataDragonVersions>(
         `${this.baseUrl}/api/versions.json`,
       );
       const version = response.data[0]; // 최신 버전

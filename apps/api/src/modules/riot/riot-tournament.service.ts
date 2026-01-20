@@ -150,7 +150,7 @@ export class RiotTournamentService {
         this.tournamentId = savedTournamentId;
       } else {
         // 환경변수에서 가져오기
-        this.tournamentId = this.configService.get("RIOT_TOURNAMENT_ID");
+        this.tournamentId = this.configService.get("RIOT_TOURNAMENT_ID") || null;
       }
 
       if (!this.tournamentId) {

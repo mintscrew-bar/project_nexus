@@ -7,27 +7,27 @@ import { Gavel } from "lucide-react";
 const BID_INCREMENT = 100; // Should come from backend or a shared constant
 
 export function BiddingPanel() {
-  const { placeBid, liveState, currentUserIsCaptain, currentUserTeam } = useAuctionStore();
+  const { placeBid, auctionState, currentUserIsCaptain, currentUserTeam } = useAuctionStore();
   const [bidAmount, setBidAmount] = useState(0);
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
-    if (liveState) {
+    if (auctionState) {
       // Set a default bid amount when a new player is up
-      const suggestedBid = liveState.currentHighestBid > 0 
-        ? liveState.currentHighestBid + BID_INCREMENT 
+      const suggestedBid = auctionState.currentHighestBid > 0 
+        ? auctionState.currentHighestBid + BID_INCREMENT 
         : BID_INCREMENT;
       setBidAmount(suggestedBid);
       setErrorMessage(""); // Clear error on new player/bid state
     }
-  }, [liveState?.currentPlayerIndex, liveState?.currentHighestBid]);
+  }, [auctionState?.currentPlayerIndex, auctionState?.currentHighestBid]);
 
-  if (!currentUserIsCaptain || !liveState || !currentUserTeam) {
+  if (!currentUserIsCaptain || !auctionState || !currentUserTeam) {
     return null; // Don't show panel if not a captain or auction is not live
   }
 
   const currentBudget = currentUserTeam.remainingBudget;
-  const minBid = liveState.currentHighestBid + BID_INCREMENT;
+  const minBid = auctionState.currentHighestBid + BID_INCREMENT;
 
   // Client-side validation
   const isBidValid = bidAmount >= minBid && bidAmount <= currentBudget && bidAmount % BID_INCREMENT === 0;

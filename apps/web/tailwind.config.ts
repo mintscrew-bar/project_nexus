@@ -56,20 +56,68 @@ const config: Config = {
           'sans-serif',
         ],
       },
-      // 간단하고 성능에 영향 없는 애니메이션만
+      // 애니메이션 시스템
       animation: {
         'fade-in': 'fadeIn 200ms ease-out',
+        'fade-out': 'fadeOut 200ms ease-in',
         'slide-in': 'slideIn 300ms ease-out',
+        'slide-out': 'slideOut 300ms ease-in',
+        'slide-up': 'slideUp 300ms ease-out',
+        'slide-down': 'slideDown 300ms ease-out',
+        'scale-in': 'scaleIn 200ms ease-out',
+        'scale-out': 'scaleOut 200ms ease-in',
+        'bounce-in': 'bounceIn 400ms cubic-bezier(0.68, -0.55, 0.265, 1.55)',
+        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+        'shimmer': 'shimmer 2s infinite linear',
+        'spin-slow': 'spin 2s linear infinite',
       },
       keyframes: {
         fadeIn: {
           from: { opacity: '0' },
           to: { opacity: '1' },
         },
+        fadeOut: {
+          from: { opacity: '1' },
+          to: { opacity: '0' },
+        },
         slideIn: {
           from: { transform: 'translateX(100%)' },
           to: { transform: 'translateX(0)' },
         },
+        slideOut: {
+          from: { transform: 'translateX(0)' },
+          to: { transform: 'translateX(100%)' },
+        },
+        slideUp: {
+          from: { transform: 'translateY(20px)', opacity: '0' },
+          to: { transform: 'translateY(0)', opacity: '1' },
+        },
+        slideDown: {
+          from: { transform: 'translateY(-20px)', opacity: '0' },
+          to: { transform: 'translateY(0)', opacity: '1' },
+        },
+        scaleIn: {
+          from: { transform: 'scale(0.95)', opacity: '0' },
+          to: { transform: 'scale(1)', opacity: '1' },
+        },
+        scaleOut: {
+          from: { transform: 'scale(1)', opacity: '1' },
+          to: { transform: 'scale(0.95)', opacity: '0' },
+        },
+        bounceIn: {
+          '0%': { transform: 'scale(0.3)', opacity: '0' },
+          '50%': { transform: 'scale(1.05)' },
+          '70%': { transform: 'scale(0.9)' },
+          '100%': { transform: 'scale(1)', opacity: '1' },
+        },
+        shimmer: {
+          '0%': { backgroundPosition: '-200% 0' },
+          '100%': { backgroundPosition: '200% 0' },
+        },
+      },
+      // 반응형 브레이크포인트 추가
+      screens: {
+        'xs': '475px',
       },
       // Transition duration (성능 최적화)
       transitionDuration: {

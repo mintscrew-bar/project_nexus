@@ -5,8 +5,7 @@ import {
   ForbiddenException,
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
-import { RoomStatus, MatchStatus } from "@nexus/database";
-import { BracketType, MatchStatus } from "../community/community.types";
+import { RoomStatus, MatchStatus, BracketType } from "@nexus/database";
 
 export interface BracketMatch {
   id: string;
@@ -470,14 +469,14 @@ export class MatchService {
   // ========================================
 
   async create(data: {
-    auctionId: string;
+    roomId: string;
     teamAId: string;
     teamBId: string;
     tournamentCode?: string;
   }) {
     return this.prisma.match.create({
       data: {
-        auctionId: data.auctionId,
+        roomId: data.roomId,
         teamAId: data.teamAId,
         teamBId: data.teamBId,
         tournamentCode: data.tournamentCode,
@@ -504,9 +503,9 @@ export class MatchService {
     });
   }
 
-  async getMatchesByAuction(auctionId: string) {
+  async getMatchesByRoom(roomId: string) {
     return this.prisma.match.findMany({
-      where: { auctionId },
+      where: { roomId },
       include: {
         teamA: true,
         teamB: true,

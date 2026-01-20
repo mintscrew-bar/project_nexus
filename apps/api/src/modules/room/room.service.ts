@@ -273,11 +273,11 @@ export class RoomService {
       throw new BadRequestException("Not in room");
     }
 
-    // If host leaves, cancel room
+    // If host leaves, mark room as completed (cancelled)
     if (room.hostId === userId) {
       await this.prisma.room.update({
         where: { id: roomId },
-        data: { status: RoomStatus.CANCELLED },
+        data: { status: RoomStatus.COMPLETED },
       });
       return { message: "Room cancelled" };
     }

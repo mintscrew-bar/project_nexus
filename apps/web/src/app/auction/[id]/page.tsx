@@ -13,24 +13,24 @@ export default function AuctionRoomPage() {
   const params = useParams();
   const auctionId = params.id as string;
 
-  const { connect, disconnect, isConnected, error, liveState } = useAuctionStore();
+  const { connectToAuction, disconnectFromAuction, isConnected, error, auctionState } = useAuctionStore();
 
   useEffect(() => {
     if (auctionId) {
-      connect(auctionId);
+      connectToAuction(auctionId);
     }
-    
+
     return () => {
-      disconnect();
+      disconnectFromAuction();
     };
-  }, [auctionId, connect, disconnect]);
+  }, [auctionId, connectToAuction, disconnectFromAuction]);
 
   const ConnectionStatus = () => (
     <div className="absolute top-4 right-4 text-sm">
       {isConnected ? (
-        <span className="text-lol-accent-green">● Connected</span>
+        <span className="text-accent-success">● Connected</span>
       ) : (
-        <span className="text-lol-accent-red">● Disconnected</span>
+        <span className="text-accent-danger">● Disconnected</span>
       )}
     </div>
   );
@@ -39,13 +39,13 @@ export default function AuctionRoomPage() {
     <div className="flex-grow p-8 relative">
       <ConnectionStatus />
       <div className="container mx-auto">
-        <h1 className="text-3xl font-bold mb-4 text-ui-text-base">
-          Auction Room: <span className="text-brand-500">{auctionId}</span>
+        <h1 className="text-3xl font-bold mb-4 text-text-primary">
+          Auction Room: <span className="text-accent-primary">{auctionId}</span>
         </h1>
 
-        {error && <div className="text-lol-accent-red mb-4">Error: {error}</div>}
+        {error && <div className="text-accent-danger mb-4">Error: {error}</div>}
 
-        {liveState ? (
+        {auctionState ? (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Main Column */}
             <div className="lg:col-span-2 space-y-6">
@@ -60,7 +60,8 @@ export default function AuctionRoomPage() {
             </div>
           </div>
         ) : (
-          <div className="text-ui-text-muted text-center py-10">
+          <div className="text-text-secondary text-center py-10">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent-primary mx-auto mb-4"></div>
             <p>Waiting for auction state...</p>
           </div>
         )}

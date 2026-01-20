@@ -11,13 +11,13 @@ export function AuthButton() {
       <div className="flex items-center gap-4">
         <Link
           href="/profile"
-          className="text-gray-300 hover:text-primary-500 transition-colors"
+          className="text-text-secondary hover:text-accent-primary transition-colors"
         >
           {user.username}
         </Link>
         <button
           onClick={() => logout()}
-          className="text-gray-300 hover:text-primary-500 transition-colors"
+          className="text-text-secondary hover:text-accent-primary transition-colors"
         >
           로그아웃
         </button>
@@ -28,7 +28,7 @@ export function AuthButton() {
   return (
     <Link
       href="/auth/login"
-      className="text-gray-300 hover:text-primary-500 transition-colors"
+      className="text-text-secondary hover:text-accent-primary transition-colors"
     >
       로그인
     </Link>

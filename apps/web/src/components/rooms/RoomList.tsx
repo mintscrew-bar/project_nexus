@@ -26,7 +26,7 @@ export function RoomList() {
       <div className="text-center py-10">
         <p className="text-accent-danger mb-4">에러: {error}</p>
         <button
-          onClick={fetchRooms}
+          onClick={() => fetchRooms()}
           className="px-4 py-2 bg-accent-primary hover:bg-accent-hover text-white rounded-lg flex items-center mx-auto"
         >
           <RefreshCcw className="h-4 w-4 mr-2" /> 다시 시도
@@ -61,7 +61,7 @@ export function RoomList() {
                 <Users className="h-4 w-4 mr-1" /> {room.currentPlayers}/{room.maxPlayers}
               </span>
               <span>
-                방식: {room.teamMode === "AUCTION" ? "경매" : "사다리타기"}
+                방식: {room.mode === "AUCTION" ? "경매" : "사다리타기"}
               </span>
               <span
                 className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
