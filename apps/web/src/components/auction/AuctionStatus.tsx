@@ -28,20 +28,20 @@ export function AuctionStatus() {
 
   if (!liveState) {
     return (
-      <div className="p-4 bg-ui-card border border-ui-border rounded-lg text-center">
-        <p className="text-ui-text-muted">Waiting for auction to start...</p>
+      <div className="p-4 bg-bg-secondary border border-bg-tertiary rounded-lg text-center">
+        <p className="text-text-secondary">Waiting for auction to start...</p>
       </div>
     );
   }
 
   const currentPlayer = players[liveState.currentPlayerIndex];
-  const timerColor = timeLeft <= 5 ? "text-lol-accent-red" : "text-brand-500"; // Red when time is low
+  const timerColor = timeLeft <= 5 ? "text-accent-danger" : "text-accent-primary"; // Red when time is low
 
   return (
-    <div className="p-6 bg-ui-card border-2 border-brand-500 rounded-2xl shadow-lg">
+    <div className="p-6 bg-bg-secondary border-2 border-accent-primary rounded-2xl shadow-lg">
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-2xl font-bold text-ui-text-accent">Live Auction</h2>
-        <div className="flex items-center space-x-2 text-lg font-semibold text-ui-text-base">
+        <h2 className="text-2xl font-bold text-text-primary">Live Auction</h2>
+        <div className="flex items-center space-x-2 text-lg font-semibold text-text-primary">
           <Timer className={`h-6 w-6 ${timerColor}`} />
           <span className={timerColor}>{timeLeft}s</span>
         </div>
@@ -50,19 +50,19 @@ export function AuctionStatus() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Current Player Info */}
         <div className="space-y-2">
-            <p className="text-sm text-ui-text-muted">Now Bidding:</p>
-            <p className="text-3xl font-bold text-ui-text-base">{currentPlayer?.username || 'N/A'}</p>
+            <p className="text-sm text-text-secondary">Now Bidding:</p>
+            <p className="text-3xl font-bold text-text-primary">{currentPlayer?.username || 'N/A'}</p>
             <div className="flex space-x-2">
-                <span className="px-2 py-1 bg-brand-900 text-brand-200 text-xs font-semibold rounded-full">{currentPlayer?.tier || 'UNRANKED'}</span>
-                <span className="px-2 py-1 bg-lol-dark-500 text-lol-dark-100 text-xs font-semibold rounded-full">{currentPlayer?.mainRole || 'FILL'}</span>
+                <span className="px-2 py-1 bg-accent-primary/20 text-accent-primary text-xs font-semibold rounded-full">{currentPlayer?.tier || 'UNRANKED'}</span>
+                <span className="px-2 py-1 bg-bg-tertiary text-text-secondary text-xs font-semibold rounded-full">{currentPlayer?.mainRole || 'FILL'}</span>
             </div>
         </div>
         
         {/* Current Bid Info */}
         <div className="space-y-2 text-right">
-            <p className="text-sm text-ui-text-muted">Current Bid:</p>
-            <p className="text-4xl font-bold text-brand-500">{liveState.currentHighestBid.toLocaleString()}</p>
-            <p className="text-sm text-ui-text-muted">
+            <p className="text-sm text-text-secondary">Current Bid:</p>
+            <p className="text-4xl font-bold text-accent-primary">{liveState.currentHighestBid.toLocaleString()}</p>
+            <p className="text-sm text-text-secondary">
                 by {liveState.currentHighestBidder || 'No one yet'}
             </p>
         </div>

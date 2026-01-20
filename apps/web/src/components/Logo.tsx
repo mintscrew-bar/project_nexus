@@ -35,7 +35,7 @@ export function Logo({ className, size = "md", variant = "default" }: LogoProps)
   if (variant === "text-only") {
     return (
       <div className={cn("flex items-center gap-2", className)}>
-        <span className="text-2xl font-bold bg-gradient-to-r from-primary-500 to-accent-blue bg-clip-text text-transparent">
+        <span className="text-2xl font-bold text-text-primary">
           NEXUS
         </span>
       </div>
@@ -54,7 +54,7 @@ export function Logo({ className, size = "md", variant = "default" }: LogoProps)
           priority
         />
       </div>
-      <span className="text-2xl font-bold bg-gradient-to-r from-primary-500 to-accent-blue bg-clip-text text-transparent">
+      <span className="text-2xl font-bold text-text-primary">
         NEXUS
       </span>
     </div>

@@ -25,6 +25,12 @@ model User {
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
+  reputationScore Float?          // 평판 점수 (1-5)
+  isBanned        Boolean         @default(false)
+  banReason       String?
+  bannedAt        DateTime?
+  banUntil        DateTime?       // 임시 밴 만료 시간
+
   // Relations
   authProviders      AuthProvider[]
   termsAgreements    TermsAgreement[]
@@ -38,15 +44,16 @@ model User {
   ownedClans         Clan[]                 @relation("ClanOwner")
   posts              Post[]
   comments           Comment[]
-  postVotes          PostVote[]
-  commentVotes       CommentVote[]
-  sentReputations    Reputation[]           @relation("ReputationFrom")
-  receivedReputations Reputation[]          @relation("ReputationTo")
-  reports            Report[]               @relation("ReportFrom")
-  reportedBy         Report[]               @relation("ReportTarget")
-  friendsInitiated   Friendship[]           @relation("FriendshipInitiator")
-  friendsReceived    Friendship[]           @relation("FriendshipReceiver")
+  postLikes          PostLike[]
+  ratingsGiven       UserRating[]           @relation("RaterUser")
+  ratingsReceived    UserRating[]           @relation("RatedUser")
+  reportsSubmitted   UserReport[]           @relation("ReporterUser")
+  reportsReceived    UserReport[]           @relation("ReportedUser")
+  friendships        Friendship[]           @relation("UserFriendships")
+  friendOf           Friendship[]           @relation("FriendOfUser")
   chatMessages       ChatMessage[]
+  clanChatMessages   ClanChatMessage[]
+  snakeDraftPicks    SnakeDraftPick[]
 
   @@index([email])
   @@index([reputation])
@@ -207,6 +214,7 @@ model Room {
   matches           Match[]
   chatMessages      ChatMessage[]
   discordChannels   RoomDiscordChannel[]
+  snakeDraftPicks   SnakeDraftPick[]
 
   @@index([hostId])
   @@index([status])
@@ -215,11 +223,10 @@ model Room {
 }
 
 enum RoomStatus {
-  WAITING        // Waiting for players
-  TEAM_SELECTION // Captain selection or team composition in progress
-  IN_PROGRESS    // Match(es) in progress
-  COMPLETED      // All matches completed
-  CANCELLED
+  WAITING
+  TEAM_SELECTION
+  IN_PROGRESS
+  COMPLETED
 }
 
 enum TeamMode {
@@ -344,16 +351,17 @@ model TeamMember {
 // ============================================
 
 model SnakeDraftPick {
-  id          String   @id @default(cuid())
-  roomId      String
-  teamId      String
-  userId      String
-  pickNumber  Int      // 1, 2, 3, ...
-  createdAt   DateTime @default(now())
+  id         String   @id @default(cuid())
+  roomId     String
+  teamId     String
+  userId     String
+  pickNumber Int
+  createdAt  DateTime @default(now())
 
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
   team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([roomId, pickNumber])
   @@index([roomId])
   @@index([teamId])
   @@map("snake_draft_picks")
@@ -391,8 +399,10 @@ model Match {
   teamBId         String
   winnerId        String?
   status          MatchStatus  @default(PENDING)
-  matchNumber     Int          // For tournaments (1, 2, 3...)
+  matchNumber     Int?         // For tournaments (1, 2, 3...)
   bracketRound    String?      // "quarter", "semi", "final"
+  round           Int?
+  bracketType     BracketType?
 
   // Riot integration
   tournamentCode  String?
@@ -409,6 +419,9 @@ model Match {
   teamB  Team  @relation("TeamB", fields: [teamBId], references: [id])
   winner Team? @relation("MatchWinner", fields: [winnerId], references: [id])
 
+  ratings UserRating[]
+  reports UserReport[]
+
   @@index([roomId])
   @@index([teamAId])
   @@index([teamBId])
@@ -416,11 +429,16 @@ model Match {
   @@map("matches")
 }
 
+enum BracketType {
+  SINGLE
+  ROUND_ROBIN
+  SINGLE_ELIMINATION
+}
+
 enum MatchStatus {
   PENDING
   IN_PROGRESS
   COMPLETED
-  CANCELLED
 }
 
 // ============================================
@@ -439,8 +457,12 @@ model Clan {
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
+  minTier   String?    // 최소 티어 요구사항
+  discord   String?    // 디스코드 링크
+
   owner   User         @relation("ClanOwner", fields: [ownerId], references: [id])
   members ClanMember[]
+  chatMessages ClanChatMessage[]
 
   @@index([ownerId])
   @@index([isRecruiting])
@@ -451,7 +473,7 @@ model ClanMember {
   id        String         @id @default(cuid())
   clanId    String
   userId    String
-  role      ClanMemberRole @default(MEMBER)
+  role      ClanRole @default(MEMBER)
   joinedAt  DateTime       @default(now())
 
   clan Clan @relation(fields: [clanId], references: [id], onDelete: Cascade)
@@ -463,171 +485,149 @@ model ClanMember {
   @@map("clan_members")
 }
 
-enum ClanMemberRole {
+enum ClanRole {
   OWNER
-  ADMIN
+  OFFICER
   MEMBER
+}
+
+model ClanChatMessage {
+  id        String   @id @default(cuid())
+  clanId    String
+  userId    String
+  content   String
+  createdAt DateTime @default(now())
+
+  clan Clan @relation(fields: [clanId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([clanId, createdAt])
+  @@map("clan_chat_messages")
 }
 
 // ============================================
 // Community / Forum
 // ============================================
 
-model Board {
-  id          String   @id @default(cuid())
-  name        String   @unique
-  slug        String   @unique
-  description String?
-  order       Int      @default(0)
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-
-  posts Post[]
-
-  @@index([slug])
-  @@index([order])
-  @@map("boards")
-}
-
 model Post {
-  id          String    @id @default(cuid())
-  boardId     String
-  authorId    String
-  title       String
-  content     String
-  viewCount   Int       @default(0)
-  isPinned    Boolean   @default(false)
-  isLocked    Boolean   @default(false)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id        String       @id @default(cuid())
+  title     String
+  content   String
+  category  PostCategory
+  authorId  String
+  views     Int          @default(0)
+  isPinned  Boolean      @default(false)
+  isEdited  Boolean      @default(false)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
 
-  board    Board         @relation(fields: [boardId], references: [id], onDelete: Cascade)
-  author   User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  author   User       @relation(fields: [authorId], references: [id], onDelete: Cascade)
   comments Comment[]
-  votes    PostVote[]
+  likes    PostLike[]
 
-  @@index([boardId, createdAt])
+  @@index([category, isPinned, createdAt])
   @@index([authorId])
-  @@index([isPinned, createdAt])
   @@map("posts")
 }
 
+enum PostCategory {
+  NOTICE
+  FREE
+  TIP
+  QNA
+}
+
 model Comment {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   postId    String
   authorId  String
   content   String
-  parentId  String?  // For nested comments
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  parentId  String?   // 대댓글 지원
+  isEdited  Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
-  post     Post           @relation(fields: [postId], references: [id], onDelete: Cascade)
-  author   User           @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  parent   Comment?       @relation("CommentReplies", fields: [parentId], references: [id])
-  replies  Comment[]      @relation("CommentReplies")
-  votes    CommentVote[]
+  post    Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author  User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  parent  Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies Comment[] @relation("CommentReplies")
 
   @@index([postId, createdAt])
-  @@index([authorId])
   @@index([parentId])
   @@map("comments")
 }
 
-model PostVote {
+model PostLike {
   id        String   @id @default(cuid())
   postId    String
   userId    String
-  value     Int      // +1 for upvote, -1 for downvote
   createdAt DateTime @default(now())
 
   post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([postId, userId])
+  @@unique([userId, postId])
   @@index([postId])
-  @@index([userId])
-  @@map("post_votes")
-}
-
-model CommentVote {
-  id        String   @id @default(cuid())
-  commentId String
-  userId    String
-  value     Int      // +1 for upvote, -1 for downvote
-  createdAt DateTime @default(now())
-
-  comment Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([commentId, userId])
-  @@index([commentId])
-  @@index([userId])
-  @@map("comment_votes")
+  @@map("post_likes")
 }
 
 // ============================================
 // Reputation System
 // ============================================
 
-model Reputation {
-  id        String         @id @default(cuid())
-  fromId    String
-  toId      String
-  matchId   String
-  type      ReputationType
-  comment   String?
-  createdAt DateTime       @default(now())
+model UserRating {
+  id                   String   @id @default(cuid())
+  reporterId           String
+  targetUserId         String
+  matchId              String
+  skillRating          Int      // 1-5
+  attitudeRating       Int      // 1-5
+  communicationRating  Int      // 1-5
+  comment              String?
+  createdAt            DateTime @default(now())
 
-  from User @relation("ReputationFrom", fields: [fromId], references: [id], onDelete: Cascade)
-  to   User @relation("ReputationTo", fields: [toId], references: [id], onDelete: Cascade)
+  reporter User  @relation("RaterUser", fields: [reporterId], references: [id], onDelete: Cascade)
+  target   User  @relation("RatedUser", fields: [targetUserId], references: [id], onDelete: Cascade)
+  match    Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
 
-  @@unique([fromId, toId, matchId])
-  @@index([toId])
-  @@index([matchId])
-  @@map("reputations")
+  @@unique([reporterId, targetUserId, matchId])
+  @@index([targetUserId])
+  @@map("user_ratings")
 }
 
-enum ReputationType {
-  POSITIVE    // +2 points
-  NEUTRAL     // 0 points
-  NEGATIVE    // -3 points
-}
+model UserReport {
+  id           String       @id @default(cuid())
+  reporterId   String
+  targetUserId String
+  matchId      String?
+  reason       ReportReason
+  description  String
+  status       ReportStatus @default(PENDING)
+  reviewerNote String?
+  reviewedAt   DateTime?
+  createdAt    DateTime     @default(now())
 
-model Report {
-  id          String       @id @default(cuid())
-  fromId      String
-  targetId    String
-  reason      ReportReason
-  description String?
-  status      ReportStatus @default(PENDING)
-  reviewedBy  String?
-  reviewNote  String?
-  createdAt   DateTime     @default(now())
-  reviewedAt  DateTime?
+  reporter User   @relation("ReporterUser", fields: [reporterId], references: [id], onDelete: Cascade)
+  target   User   @relation("ReportedUser", fields: [targetUserId], references: [id], onDelete: Cascade)
+  match    Match? @relation(fields: [matchId], references: [id], onDelete: SetNull)
 
-  from   User @relation("ReportFrom", fields: [fromId], references: [id], onDelete: Cascade)
-  target User @relation("ReportTarget", fields: [targetId], references: [id], onDelete: Cascade)
-
-  @@index([targetId, status])
+  @@index([targetUserId, status, createdAt])
   @@index([status])
-  @@index([createdAt])
-  @@map("reports")
+  @@map("user_reports")
 }
 
 enum ReportReason {
-  TOXIC_BEHAVIOR
+  TOXICITY
   AFK
-  INTENTIONAL_FEEDING
+  GRIEFING
   CHEATING
-  HARASSMENT
   OTHER
 }
 
 enum ReportStatus {
   PENDING
-  REVIEWING
-  RESOLVED
-  DISMISSED
+  APPROVED
+  REJECTED
 }
 
 // ============================================
@@ -635,20 +635,19 @@ enum ReportStatus {
 // ============================================
 
 model Friendship {
-  id           String           @id @default(cuid())
-  initiatorId  String
-  receiverId   String
-  status       FriendshipStatus @default(PENDING)
-  createdAt    DateTime         @default(now())
-  acceptedAt   DateTime?
+  id        String           @id @default(cuid())
+  userId    String
+  friendId  String
+  status    FriendshipStatus @default(PENDING)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
 
-  initiator User @relation("FriendshipInitiator", fields: [initiatorId], references: [id], onDelete: Cascade)
-  receiver  User @relation("FriendshipReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  user   User @relation("UserFriendships", fields: [userId], references: [id], onDelete: Cascade)
+  friend User @relation("FriendOfUser", fields: [friendId], references: [id], onDelete: Cascade)
 
-  @@unique([initiatorId, receiverId])
-  @@index([initiatorId])
-  @@index([receiverId])
-  @@index([status])
+  @@unique([userId, friendId])
+  @@index([userId, status])
+  @@index([friendId, status])
   @@map("friendships")
 }
 
