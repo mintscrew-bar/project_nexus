@@ -12,10 +12,11 @@ import {
 
 @Injectable()
 export class DiscordVoiceService {
+  private client!: Client;
+
   constructor(
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
-    private client: Client,
   ) {}
 
   setClient(client: Client) {

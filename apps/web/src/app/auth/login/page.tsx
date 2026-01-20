@@ -14,10 +14,10 @@ export default function LoginPage() {
             <Logo size="xl" />
           </div>
           <h1 className="text-4xl font-bold mb-2">
-            <span className="text-primary-500">Project</span>{" "}
-            <span className="text-accent-blue">Nexus</span>
+            <span className="text-text-primary">Project</span>{" "}
+            <span className="text-accent-primary">Nexus</span>
           </h1>
-          <p className="text-gray-400">
+          <p className="text-text-secondary">
             LoL 내전 토너먼트 플랫폼에 오신 것을 환영합니다
           </p>
         </div>
@@ -25,8 +25,8 @@ export default function LoginPage() {
         <div className="card">
           <div className="space-y-6">
             <div>
-              <h2 className="text-2xl font-semibold mb-2">로그인</h2>
-              <p className="text-gray-400 text-sm">
+              <h2 className="text-2xl font-semibold text-text-primary mb-2">로그인</h2>
+              <p className="text-text-secondary text-sm">
                 Discord 계정으로 로그인하여 시작하세요
               </p>
             </div>
@@ -38,7 +38,7 @@ export default function LoginPage() {
             >
               {isLoading ? (
                 <>
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-dark-500"></div>
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
                   <span>연결 중...</span>
                 </>
               ) : (
@@ -55,14 +55,14 @@ export default function LoginPage() {
               )}
             </button>
 
-            <div className="text-center text-xs text-gray-500">
+            <div className="text-center text-xs text-text-tertiary">
               <p>
                 로그인하면{" "}
-                <a href="#" className="text-primary-500 hover:underline">
+                <a href="#" className="text-accent-primary hover:underline">
                   이용약관
                 </a>
                 과{" "}
-                <a href="#" className="text-primary-500 hover:underline">
+                <a href="#" className="text-accent-primary hover:underline">
                   개인정보 처리방침
                 </a>
                 에 동의하는 것으로 간주됩니다.

@@ -19,6 +19,7 @@ interface Team {
   captainId: string;
   members: Player[];
   remainingGold: number;
+  remainingBudget: number;
 }
 
 interface AuctionState {
@@ -33,13 +34,23 @@ interface AuctionState {
   status: 'WAITING' | 'IN_PROGRESS' | 'COMPLETED';
 }
 
+interface BidHistoryEntry {
+  username: string;
+  amount: number;
+  timestamp: number;
+}
+
 interface AuctionStoreState {
   auctionState: AuctionState | null;
   players: Player[];
   teams: Team[];
+  bidHistory: BidHistoryEntry[];
   isConnected: boolean;
   isLoading: boolean;
   error: string | null;
+  currentUserId: string | null;
+  currentUserIsCaptain: boolean;
+  currentUserTeam: Team | null;
 
   // REST API methods
   startAuction: (roomId: string) => Promise<void>;
@@ -48,16 +59,21 @@ interface AuctionStoreState {
   // WebSocket methods
   connectToAuction: (roomId: string) => void;
   disconnectFromAuction: () => void;
-  placeBid: (roomId: string, amount: number) => void;
+  placeBid: (amount: number) => void;
+  setCurrentUserId: (userId: string) => void;
 }
 
 export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
   auctionState: null,
   players: [],
   teams: [],
+  bidHistory: [],
   isConnected: false,
   isLoading: false,
   error: null,
+  currentUserId: null,
+  currentUserIsCaptain: false,
+  currentUserTeam: null,
 
   startAuction: async (roomId: string) => {
     set({ isLoading: true, error: null });
@@ -112,6 +128,7 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
               timerEnd: data.timerEnd,
             }
           : null,
+        bidHistory: [...state.bidHistory, { username: data.bidder, amount: data.amount, timestamp: Date.now() }],
       }));
     });
 
@@ -159,10 +176,24 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
       auctionState: null,
       players: [],
       teams: [],
+      bidHistory: [],
     });
   },
 
-  placeBid: (roomId: string, amount: number) => {
-    auctionSocketHelpers.placeBid(roomId, amount);
+  placeBid: (amount: number) => {
+    const { auctionState } = get();
+    if (auctionState?.roomId) {
+      auctionSocketHelpers.placeBid(auctionState.roomId, amount);
+    }
+  },
+
+  setCurrentUserId: (userId: string) => {
+    const { teams } = get();
+    const userTeam = teams.find(team => team.captainId === userId);
+    set({
+      currentUserId: userId,
+      currentUserIsCaptain: !!userTeam,
+      currentUserTeam: userTeam || null,
+    });
   },
 }));

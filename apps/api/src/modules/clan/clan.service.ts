@@ -6,7 +6,7 @@ import {
   ConflictException,
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
-import { ClanMemberRole } from "@nexus/database";
+import { ClanRole } from "@nexus/database";
 
 export interface CreateClanDto {
   name: string;
@@ -76,7 +76,7 @@ export class ClanService {
         members: {
           create: {
             userId: ownerId,
-            role: ClanMemberRole.OWNER,
+            role: ClanRole.OWNER,
             // TODO: Verify if joinedAt is auto-generated
           },
         },
@@ -215,7 +215,7 @@ export class ClanService {
 
     const member = clan.members[0];
 
-    if (!member || (member.role !== ClanMemberRole.OWNER && member.role !== ClanMemberRole.OFFICER)) {
+    if (!member || (member.role !== ClanRole.OWNER && member.role !== ClanRole.OFFICER)) {
       throw new ForbiddenException("Only clan owner or officers can update clan");
     }
 
@@ -276,7 +276,7 @@ export class ClanService {
       data: {
         clanId,
         userId,
-        role: ClanMemberRole.MEMBER,
+        role: ClanRole.MEMBER,
         joinedAt: new Date(),
       },
       include: {
@@ -309,7 +309,7 @@ export class ClanService {
       throw new NotFoundException("You are not a member of this clan");
     }
 
-    if (membership.role === ClanMemberRole.OWNER) {
+    if (membership.role === ClanRole.OWNER) {
       throw new BadRequestException(
         "Owner cannot leave clan. Transfer ownership or delete the clan.",
       );
@@ -342,7 +342,7 @@ export class ClanService {
 
     const member = clan.members[0];
 
-    if (!member || (member.role !== ClanMemberRole.OWNER && member.role !== ClanMemberRole.OFFICER)) {
+    if (!member || (member.role !== ClanRole.OWNER && member.role !== ClanRole.OFFICER)) {
       throw new ForbiddenException("Only owner or officers can kick members");
     }
 
@@ -357,12 +357,12 @@ export class ClanService {
       throw new NotFoundException("Target user is not a member");
     }
 
-    if (targetMember.role === ClanMemberRole.OWNER) {
+    if (targetMember.role === ClanRole.OWNER) {
       throw new BadRequestException("Cannot kick clan owner");
     }
 
     // Officers can only kick members, not other officers
-    if (member.role === ClanMemberRole.OFFICER && targetMember.role === ClanMemberRole.OFFICER) {
+    if (member.role === ClanRole.OFFICER && targetMember.role === ClanRole.OFFICER) {
       throw new ForbiddenException("Officers cannot kick other officers");
     }
 
@@ -391,7 +391,7 @@ export class ClanService {
       throw new ForbiddenException("Only clan owner can promote members");
     }
 
-    if (newRole === ClanMemberRole.OWNER) {
+    if (newRole === ClanRole.OWNER) {
       throw new BadRequestException(
         "Use transfer ownership endpoint to change owner",
       );
@@ -453,7 +453,7 @@ export class ClanService {
     // Update new owner's role
     await this.prisma.clanMember.update({
       where: { id: newOwnerMembership.id },
-      data: { role: ClanMemberRole.OWNER },
+      data: { role: ClanRole.OWNER },
     });
 
     // Demote previous owner to officer
@@ -467,7 +467,7 @@ export class ClanService {
     if (oldOwnerMembership) {
       await this.prisma.clanMember.update({
         where: { id: oldOwnerMembership.id },
-        data: { role: ClanMemberRole.OFFICER },
+        data: { role: ClanRole.OFFICER },
       });
     }
 

@@ -9,11 +9,13 @@ import {
   Interaction,
   VoiceChannel,
 } from "discord.js";
+import type { DiscordVoiceService } from "./discord-voice.service";
 
 @Injectable()
 export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
   private client: Client;
   private rest: REST;
+  private voiceService: DiscordVoiceService | null = null;
 
   constructor(private readonly configService: ConfigService) {
     this.client = new Client({
@@ -151,5 +153,14 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
     if (channel?.isTextBased()) {
       await channel.send(message);
     }
+  }
+
+  // Methods required by DiscordModule
+  getClient(): Client {
+    return this.client;
+  }
+
+  setVoiceService(voiceService: DiscordVoiceService): void {
+    this.voiceService = voiceService;
   }
 }

@@ -3,7 +3,8 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/auth-store";
-import { Logo } from "@/components/Logo";
+import { LoadingSpinner, EmptyState, Card, CardHeader, CardTitle, CardContent } from "@/components/ui";
+import { Gamepad2, Trophy, TrendingUp, History } from "lucide-react";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -21,8 +22,8 @@ export default function DashboardPage() {
     return (
       <div className="flex items-center justify-center flex-grow">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-500 mx-auto mb-4"></div>
-          <p className="text-ui-text-muted">로딩 중...</p>
+          <LoadingSpinner size="lg" />
+          <p className="text-text-secondary mt-4">로딩 중...</p>
         </div>
       </div>
     );
@@ -33,34 +34,73 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="flex-grow p-8"> {/* flex-grow to fill available space, padding for content */}
+    <div className="flex-grow p-4 md:p-8 animate-fade-in">
       <div className="container mx-auto">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2 text-ui-text-base">대시보드</h1>
-          <p className="text-ui-text-muted">환영합니다, {user.username}님!</p>
+          <h1 className="text-3xl font-bold mb-2 text-text-primary">대시보드</h1>
+          <p className="text-text-secondary">환영합니다, {user.username}님!</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-ui-card border border-ui-border rounded-xl p-6 shadow-md">
-            <h3 className="text-lg font-semibold mb-2 text-ui-text-base">총 게임 수</h3>
-            <p className="text-3xl font-bold text-brand-500">0</p>
-          </div>
-          <div className="bg-ui-card border border-ui-border rounded-xl p-6 shadow-md">
-            <h3 className="text-lg font-semibold mb-2 text-ui-text-base">승률</h3>
-            <p className="text-3xl font-bold text-ui-text-accent">-</p>
-          </div>
-          <div className="bg-ui-card border border-ui-border rounded-xl p-6 shadow-md">
-            <h3 className="text-lg font-semibold mb-2 text-ui-text-base">MMR</h3>
-            <p className="text-3xl font-bold text-lol-accent-green">
-              -
-            </p> {/* Kept a specific LoL accent color here for example */}
-          </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8 stagger-children">
+          <Card className="hover-lift">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-text-secondary mb-1">총 게임 수</p>
+                  <p className="text-3xl font-bold text-accent-primary">0</p>
+                </div>
+                <div className="p-3 bg-accent-primary/10 rounded-lg">
+                  <Gamepad2 className="h-6 w-6 text-accent-primary" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="hover-lift">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-text-secondary mb-1">승률</p>
+                  <p className="text-3xl font-bold text-accent-gold">-</p>
+                </div>
+                <div className="p-3 bg-accent-gold/10 rounded-lg">
+                  <Trophy className="h-6 w-6 text-accent-gold" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="hover-lift">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-text-secondary mb-1">MMR</p>
+                  <p className="text-3xl font-bold text-accent-success">-</p>
+                </div>
+                <div className="p-3 bg-accent-success/10 rounded-lg">
+                  <TrendingUp className="h-6 w-6 text-accent-success" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
-        <div className="bg-ui-card border border-ui-border rounded-xl p-6 shadow-md">
-          <h2 className="text-xl font-semibold mb-4 text-ui-text-base">최근 활동</h2>
-          <p className="text-ui-text-muted">아직 활동 내역이 없습니다.</p>
-        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>최근 활동</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <EmptyState
+              icon={History}
+              title="아직 활동 내역이 없습니다"
+              description="내전에 참여하면 여기에 활동 내역이 표시됩니다"
+              action={{
+                label: "내전 참여하기",
+                onClick: () => router.push("/tournaments"),
+              }}
+            />
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

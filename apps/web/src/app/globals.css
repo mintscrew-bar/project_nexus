@@ -116,6 +116,64 @@
   }
 }
 
+@layer utilities {
+  /* 카드 호버 효과 */
+  .hover-lift {
+    @apply transition-all duration-200 hover:-translate-y-1 hover:shadow-lg;
+  }
+
+  /* 스켈레톤 로딩 */
+  .skeleton {
+    @apply bg-gradient-to-r from-bg-tertiary via-bg-elevated to-bg-tertiary bg-[length:200%_100%] animate-shimmer rounded;
+  }
+
+  /* 순차 애니메이션 */
+  .stagger-children > * {
+    @apply animate-slide-up;
+    animation-fill-mode: both;
+  }
+  .stagger-children > *:nth-child(1) { animation-delay: 0ms; }
+  .stagger-children > *:nth-child(2) { animation-delay: 50ms; }
+  .stagger-children > *:nth-child(3) { animation-delay: 100ms; }
+  .stagger-children > *:nth-child(4) { animation-delay: 150ms; }
+  .stagger-children > *:nth-child(5) { animation-delay: 200ms; }
+  .stagger-children > *:nth-child(6) { animation-delay: 250ms; }
+  .stagger-children > *:nth-child(7) { animation-delay: 300ms; }
+  .stagger-children > *:nth-child(8) { animation-delay: 350ms; }
+  .stagger-children > *:nth-child(9) { animation-delay: 400ms; }
+  .stagger-children > *:nth-child(10) { animation-delay: 450ms; }
+
+  /* 강조 효과 - 글로우 */
+  .pulse-glow {
+    animation: pulseGlow 2s ease-in-out infinite;
+  }
+
+  /* 긴급 펄스 (타이머 등) */
+  .pulse-urgent {
+    animation: pulseUrgent 0.5s ease-in-out infinite;
+  }
+
+  /* 플래시 효과 (입찰 등) */
+  .flash {
+    animation: flash 0.3s ease-out;
+  }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 5px rgb(11 196 226 / 50%); }
+  50% { box-shadow: 0 0 20px rgb(11 196 226 / 80%); }
+}
+
+@keyframes pulseUrgent {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes flash {
+  0% { background-color: rgb(11 196 226 / 30%); }
+  100% { background-color: transparent; }
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
@@ -123,13 +181,13 @@
 }
 
 ::-webkit-scrollbar-track {
-  @apply bg-dark-700;
+  @apply bg-bg-secondary;
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-dark-400 rounded-full;
+  @apply bg-bg-elevated rounded-full;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-dark-300;
+  @apply bg-text-tertiary;
 }

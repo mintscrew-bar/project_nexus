@@ -1,6 +1,5 @@
 import { create } from 'zustand';
 import { io, Socket } from 'socket.io-client';
-import { useAuthStore } from './auth-store';
 
 // Placeholder Types - should eventually come from @nexus/types
 interface Participant {
@@ -47,14 +46,8 @@ export const useLobbyStore = create<LobbyStoreState>((set, get) => ({
   connect: (roomId) => {
     if (get().socket) return;
 
-    const token = useAuthStore.getState().accessToken;
-    if (!token) {
-      set({ error: "Authentication token not found." });
-      return;
-    }
-
     const socket = io(`${API_URL}/lobby`, {
-      auth: { token },
+      withCredentials: true,
       transports: ['websocket'],
     });
 

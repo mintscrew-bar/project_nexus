@@ -4,8 +4,10 @@ import { AuctionService } from "./auction.service";
 import { AuctionGateway } from "./auction.gateway";
 import { AuctionStateService } from "./auction-state.service";
 import { AuctionTimerService } from "./auction-timer.service";
+import { AuthModule } from "../auth/auth.module";
 
 @Module({
+  imports: [AuthModule],
   controllers: [AuctionController],
   providers: [
     AuctionService,

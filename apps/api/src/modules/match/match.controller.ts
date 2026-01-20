@@ -80,7 +80,7 @@ export class MatchController {
 
     // Emit match start to all clients watching the match
     this.matchGateway.emitMatchStarted(matchId, {
-      tournamentCode: result.tournamentCode,
+      tournamentCode: result.tournamentCode ?? undefined,
     });
 
     return result;
@@ -102,13 +102,6 @@ export class MatchController {
     // Emit match result to all clients
     this.matchGateway.emitMatchResult(matchId, { winnerId: body.winnerId });
 
-    // Get match to find roomId
-    const match = await this.matchService.findById(matchId);
-
-    // Emit bracket update
-    const matches = await this.matchService.getRoomMatches(match.room.id);
-    this.matchGateway.emitBracketUpdate(match.room.id, { matches });
-
     return result;
   }
 
@@ -116,8 +109,8 @@ export class MatchController {
   // Legacy endpoints (kept for backward compatibility)
   // ========================================
 
-  @Get("auction/:auctionId")
-  async getByAuction(@Param("auctionId") auctionId: string) {
-    return this.matchService.getMatchesByAuction(auctionId);
+  @Get("room/:roomId/matches")
+  async getByRoom(@Param("roomId") roomId: string) {
+    return this.matchService.getMatchesByRoom(roomId);
   }
 }

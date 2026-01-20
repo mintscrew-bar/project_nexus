@@ -1,0 +1,62 @@
+'use client';
+
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { cn } from '@/lib/utils';
+import { Logo } from '@/components/Logo';
+import { ThemeToggle } from '@/components/ThemeToggle';
+import { UserMenu } from '@/components/UserMenu';
+import { MobileMenu } from '@/components/MobileMenu';
+
+const navItems = [
+  { href: '/tournaments', label: '내전' },
+  { href: '/matches', label: '내전 전적' },
+  { href: '/clans', label: '클랜' },
+  { href: '/community', label: '커뮤니티' },
+];
+
+export function Header() {
+  const pathname = usePathname();
+
+  const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
+
+  return (
+    <header className="bg-bg-secondary border-b border-bg-tertiary px-4 py-3 flex justify-between items-center z-10 sticky top-0">
+      {/* Left: Logo + Mobile Menu */}
+      <div className="flex items-center gap-2">
+        <MobileMenu />
+        <Link href="/" className="flex items-center">
+          <Logo className="h-8 w-auto" />
+          <span className="ml-2 text-xl font-bold text-text-primary hidden sm:block">Nexus</span>
+        </Link>
+      </div>
+
+      {/* Center: Navigation (hidden on mobile) */}
+      <nav className="flex-grow justify-center hidden md:flex">
+        <ul className="flex space-x-1">
+          {navItems.map((item) => (
+            <li key={item.href}>
+              <Link
+                href={item.href}
+                className={cn(
+                  'px-4 py-2 rounded-lg font-medium transition-colors duration-150',
+                  isActive(item.href)
+                    ? 'bg-accent-primary/10 text-accent-primary'
+                    : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary'
+                )}
+              >
+                {item.label}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </nav>
+
+      {/* Right: Theme Toggle + Auth */}
+      <div className="flex items-center gap-3">
+        <ThemeToggle />
+        <UserMenu />
+      </div>
+    </header>
+  );
+}
