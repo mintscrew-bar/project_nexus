@@ -2,7 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { PassportStrategy } from "@nestjs/passport";
 import { Strategy, Profile } from "passport-discord";
 import { ConfigService } from "@nestjs/config";
-import { AuthService, DiscordProfile } from "../auth.service";
+import { AuthService } from "../auth.service";
 
 @Injectable()
 export class DiscordStrategy extends PassportStrategy(Strategy, "discord") {
@@ -14,7 +14,7 @@ export class DiscordStrategy extends PassportStrategy(Strategy, "discord") {
       clientID: configService.get("DISCORD_CLIENT_ID"),
       clientSecret: configService.get("DISCORD_CLIENT_SECRET"),
       callbackURL: configService.get("DISCORD_CALLBACK_URL"),
-      scope: ["identify", "email", "guilds"],
+      scope: ["identify", "email"],
     });
   }
 
@@ -23,14 +23,19 @@ export class DiscordStrategy extends PassportStrategy(Strategy, "discord") {
     refreshToken: string,
     profile: Profile,
   ): Promise<any> {
-    const discordProfile: DiscordProfile = {
-      id: profile.id,
-      username: profile.username,
-      discriminator: profile.discriminator,
-      avatar: profile.avatar,
+    const user = await this.authService.validateOAuthUser({
+      provider: "discord",
+      providerId: profile.id,
       email: profile.email,
-    };
+      username: profile.discriminator !== "0" ? `${profile.username}#${profile.discriminator}` : profile.username,
+      avatar: profile.avatar ? `https://cdn.discordapp.com/avatars/${profile.id}/${profile.avatar}.png` : undefined,
+      metadata: {
+        accessToken,
+        refreshToken,
+        discriminator: profile.discriminator,
+      },
+    });
 
-    return this.authService.validateDiscordUser(discordProfile);
+    return user;
   }
 }
