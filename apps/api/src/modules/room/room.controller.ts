@@ -12,6 +12,7 @@ import {
   HttpStatus,
 } from "@nestjs/common";
 import { RoomService, CreateRoomDto, JoinRoomDto } from "./room.service";
+import { SnakeDraftService } from "./snake-draft.service";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { RoomStatus, TeamMode } from "@nexus/database";
@@ -19,7 +20,10 @@ import { RoomStatus, TeamMode } from "@nexus/database";
 @Controller("rooms")
 @UseGuards(JwtAuthGuard)
 export class RoomController {
-  constructor(private readonly roomService: RoomService) {}
+  constructor(
+    private readonly roomService: RoomService,
+    private readonly snakeDraftService: SnakeDraftService,
+  ) {}
 
   // ========================================
   // Room CRUD
@@ -128,5 +132,59 @@ export class RoomController {
     @Body() body: { content: string },
   ) {
     return this.roomService.sendChatMessage(userId, roomId, body.content);
+  }
+
+  // ========================================
+  // Snake Draft
+  // ========================================
+
+  @Post(":id/snake-draft/start")
+  @HttpCode(HttpStatus.OK)
+  async startSnakeDraft(
+    @CurrentUser("sub") userId: string,
+    @Param("id") roomId: string,
+  ) {
+    return this.snakeDraftService.startSnakeDraft(userId, roomId);
+  }
+
+  @Post(":id/snake-draft/pick")
+  @HttpCode(HttpStatus.OK)
+  async makeSnakeDraftPick(
+    @CurrentUser("sub") userId: string,
+    @Param("id") roomId: string,
+    @Body() body: { targetPlayerId: string },
+  ) {
+    return this.snakeDraftService.makePick(
+      userId,
+      roomId,
+      body.targetPlayerId,
+    );
+  }
+
+  @Get(":id/snake-draft/state")
+  async getSnakeDraftState(@Param("id") roomId: string) {
+    const state = this.snakeDraftService.getDraftState(roomId);
+    if (!state) {
+      return { error: "Draft not started" };
+    }
+    return { state };
+  }
+
+  @Post(":id/snake-draft/auto-pick")
+  @HttpCode(HttpStatus.OK)
+  async autoPickSnakeDraft(
+    @CurrentUser("sub") userId: string,
+    @Param("id") roomId: string,
+  ) {
+    return this.snakeDraftService.autoPick(roomId);
+  }
+
+  @Post(":id/snake-draft/complete")
+  @HttpCode(HttpStatus.OK)
+  async completeSnakeDraft(
+    @CurrentUser("sub") userId: string,
+    @Param("id") roomId: string,
+  ) {
+    return this.snakeDraftService.completeDraft(roomId);
   }
 }
