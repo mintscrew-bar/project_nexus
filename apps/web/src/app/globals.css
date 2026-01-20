@@ -3,64 +3,116 @@
 @tailwind utilities;
 
 @layer base {
-  :root { /* Light Theme Colors */
-    --color-brand-50: 239 242 253;
-    --color-brand-100: 215 224 251;
-    --color-brand-200: 174 192 248;
-    --color-brand-300: 134 156 245;
-    --color-brand-400: 97 119 241;
-    --color-brand-500: 102 126 234; /* #667EEA */
-    --color-brand-600: 90 111 202;
-    --color-brand-700: 78 96 170;
-    --color-brand-800: 66 81 137;
-    --color-brand-900: 54 66 105;
-    --color-brand-purple: 118 75 162; /* #764BA2 */
+  :root { /* Light Theme (Placeholder - Dark is Primary) */
+    /* Background Colors */
+    --color-bg-primary: 240 240 240; /* Light equivalent */
+    --color-bg-secondary: 255 255 255;
+    --color-bg-tertiary: 230 230 230;
+    --color-bg-elevated: 220 220 220;
 
-    --color-ui-background: 248 250 252; /* rgb(248 250 252) */
-    --color-ui-card: 255 255 255; /* rgb(255 255 255) */
-    --color-ui-border: 226 232 240; /* rgb(226 232 240) */
-    --color-ui-text-base: 30 41 59; /* rgb(30 41 59) */
-    --color-ui-text-muted: 100 116 139; /* rgb(100 116 139) */
-    --color-ui-text-accent: 102 126 234; /* brand blue */
+    /* Text Colors */
+    --color-text-primary: 15 15 15;
+    --color-text-secondary: 70 70 70;
+    --color-text-tertiary: 112 112 112;
+    --color-text-muted: 150 150 150;
+
+    /* Accent Colors (Placeholder for light theme if different) */
+    --color-accent-primary: 11 196 226; /* #0bc4e2 */
+    --color-accent-hover: 9 168 194;   /* #09a8c2 */
+    --color-accent-active: 7 140 168;  /* #078ca8 */
+
+    --color-accent-gold: 200 155 60;   /* #c89b3c */
+    --color-accent-success: 0 200 83;  /* #00c853 */
+    --color-accent-danger: 255 23 68;  /* #ff1744 */
+    --color-accent-warning: 255 167 38; /* #ffa726 */
+
+    /* Tier Colors */
+    --color-tier-iron: 90 90 90;      /* #5a5a5a */
+    --color-tier-bronze: 205 127 50;  /* #cd7f32 */
+    --color-tier-silver: 192 192 192; /* #c0c0c0 */
+    --color-tier-gold: 255 215 0;     /* #ffd700 */
+    --color-tier-platinum: 64 224 208;/* #40e0d0 */
+    --color-tier-emerald: 80 200 120; /* #50c878 */
+    --color-tier-diamond: 185 242 255;/* #b9f2ff */
+    --color-tier-master: 155 48 255;  /* #9b30ff */
+    --color-tier-grandmaster: 255 69 0;/* #ff4500 */
+    --color-tier-challenger: 244 196 48;/* #f4c430 */
   }
 
-  .dark { /* Dark Theme Colors */
-    --color-ui-background: 17 24 39; /* rgb(17 24 39) */
-    --color-ui-card: 31 41 55; /* rgb(31 41 55) */
-    --color-ui-border: 75 85 99; /* rgb(75 85 99) */
-    --color-ui-text-base: 229 231 235; /* rgb(229 231 235) */
-    --color-ui-text-muted: 156 163 175; /* rgb(156 163 175) */
-    --color-ui-text-accent: 102 126 234; /* brand blue */
+  .dark { /* Dark Theme (Primary per Design System) */
+    /* Background Colors */
+    --color-bg-primary: 15 15 15;      /* #0f0f0f */
+    --color-bg-secondary: 26 26 26;    /* #1a1a1a */
+    --color-bg-tertiary: 36 36 36;     /* #242424 */
+    --color-bg-elevated: 42 42 42;     /* #2a2a2a */
+
+    /* Text Colors */
+    --color-text-primary: 240 240 240; /* #f0f0f0 */
+    --color-text-secondary: 176 176 176; /* #b0b0b0 */
+    --color-text-tertiary: 112 112 112; /* #707070 */
+    --color-text-muted: 74 74 74;      /* #4a4a4a */
+
+    /* Accent Colors (Same for Dark Theme unless specified) */
+    --color-accent-primary: 11 196 226; /* #0bc4e2 */
+    --color-accent-hover: 9 168 194;   /* #09a8c2 */
+    --color-accent-active: 7 140 168;  /* #078ca8 */
+
+    --color-accent-gold: 200 155 60;   /* #c89b3c */
+    --color-accent-success: 0 200 83;  /* #00c853 */
+    --color-accent-danger: 255 23 68;  /* #ff1744 */
+    --color-accent-warning: 255 167 38; /* #ffa726 */
+
+    /* Tier Colors (Same for Dark Theme unless specified) */
+    --color-tier-iron: 90 90 90;      /* #5a5a5a */
+    --color-tier-bronze: 205 127 50;  /* #cd7f32 */
+    --color-tier-silver: 192 192 192; /* #c0c0c0 */
+    --color-tier-gold: 255 215 0;     /* #ffd700 */
+    --color-tier-platinum: 64 224 208;/* #40e0d0 */
+    --color-tier-emerald: 80 200 120; /* #50c878 */
+    --color-tier-diamond: 185 242 255;/* #b9f2ff */
+    --color-tier-master: 155 48 255;  /* #9b30ff */
+    --color-tier-grandmaster: 255 69 0;/* #ff4500 */
+    --color-tier-challenger: 244 196 48;/* #f4c430 */
   }
 
   body {
-    @apply antialiased bg-ui-background text-ui-text-base;
+    @apply antialiased bg-bg-primary text-text-primary; /* Use new semantic colors */
   }
 }
 
 @layer components {
   .btn-primary {
-    @apply bg-primary-500 hover:bg-primary-400 text-dark-500 font-semibold
-           px-6 py-3 rounded-lg transition-all duration-200
-           shadow-lg hover:shadow-primary-500/30;
+    @apply px-6 py-2.5 bg-accent-primary hover:bg-accent-hover active:bg-accent-active
+           text-white font-medium rounded-lg transition-colors duration-150
+           disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
   .btn-secondary {
-    @apply border-2 border-primary-500 text-primary-500
-           hover:bg-primary-500 hover:text-dark-500
-           font-semibold px-6 py-3 rounded-lg transition-all duration-200;
+    @apply px-6 py-2.5 bg-bg-tertiary hover:bg-bg-elevated
+           text-text-primary font-medium border border-text-tertiary
+           rounded-lg transition-colors duration-150;
+  }
+
+  .btn-danger {
+    @apply px-6 py-2.5 bg-accent-danger hover:bg-red-600
+           text-white font-medium rounded-lg
+           transition-colors duration-150;
   }
 
   .card {
-    @apply bg-dark-600 border border-dark-400 rounded-xl p-6
-           shadow-lg hover:border-primary-500/50 transition-colors;
+    @apply bg-bg-secondary border border-bg-tertiary rounded-lg p-4
+           hover:border-accent-primary/50 transition-all duration-200;
+  }
+
+  .card-elevated {
+    @apply bg-bg-elevated border border-bg-tertiary rounded-xl p-6 shadow-xl;
   }
 
   .input {
-    @apply bg-dark-700 border border-dark-400 rounded-lg px-4 py-3
-           text-white placeholder-dark-300
-           focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500
-           transition-colors;
+    @apply w-full px-4 py-2.5 bg-bg-tertiary
+           border border-text-muted text-text-primary
+           rounded-lg focus:border-accent-primary focus:outline-none
+           transition-colors duration-150 placeholder:text-text-muted;
   }
 }
 

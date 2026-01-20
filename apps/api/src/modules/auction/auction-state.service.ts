@@ -189,7 +189,7 @@ export class AuctionStateService {
         throw new BadRequestException("Auction is not in bidding phase");
       }
 
-      const { bidderId, _currentBid } = state.currentPhase;
+      const { bidderId, currentBid } = state.currentPhase;
 
       if (!bidderId) {
         // 유찰 처리
@@ -248,8 +248,8 @@ export class AuctionStateService {
     }
 
     // DB에서 실제 배치된 플레이어 수 확인
-    const auction = await this.prisma.auction.findUnique({
-      where: { id: auctionId },
+    const room = await this.prisma.room.findUnique({
+      where: { id: auctionId }, // auctionId is actually roomId here
       include: {
         participants: {
           where: {
@@ -259,11 +259,11 @@ export class AuctionStateService {
       },
     });
 
-    if (!auction) {
+    if (!room) {
       return false;
     }
 
-    const assignedCount = auction.participants.length;
+    const assignedCount = room.participants.length;
     const totalCount = state.participants.length;
     const unsoldCount = state.unsoldPlayers.length;
 

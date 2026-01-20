@@ -19,14 +19,14 @@ export function ThemeToggle() {
 
   return (
     <button
-      className="flex items-center justify-center p-2 rounded-md hover:bg-ui-card"
+      className="flex items-center justify-center p-2 rounded-md hover:bg-bg-tertiary"
       onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
       aria-label="Toggle theme"
     >
       {theme === "dark" ? (
-        <Sun className="h-5 w-5 text-ui-text-base" />
+        <Sun className="h-5 w-5 text-text-primary" />
       ) : (
-        <Moon className="h-5 w-5 text-ui-text-base" />
+        <Moon className="h-5 w-5 text-text-primary" />
       )}
     </button>
   );

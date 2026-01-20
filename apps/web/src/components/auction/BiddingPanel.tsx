@@ -49,8 +49,8 @@ export function BiddingPanel() {
   };
 
   return (
-    <div className="mt-6 p-6 bg-ui-card border border-ui-border rounded-2xl shadow-lg">
-      <h3 className="text-xl font-bold text-ui-text-base mb-4">Place Your Bid</h3>
+    <div className="mt-6 p-6 bg-bg-secondary border border-bg-tertiary rounded-2xl shadow-lg">
+      <h3 className="text-xl font-bold text-text-primary mb-4">Place Your Bid</h3>
       <div className="flex items-center space-x-4 mb-2">
         <input
           type="number"
@@ -58,21 +58,21 @@ export function BiddingPanel() {
           min={minBid}
           value={bidAmount}
           onChange={(e) => setBidAmount(parseInt(e.target.value, 10))}
-          className="flex-grow p-3 bg-ui-background border border-ui-border rounded-lg text-lg font-semibold text-ui-text-base focus:ring-2 focus:ring-brand-500 focus:outline-none"
+          className="flex-grow p-3 bg-bg-tertiary border border-text-muted rounded-lg text-lg font-semibold text-text-primary focus:ring-2 focus:ring-accent-primary focus:outline-none"
         />
         <button
           onClick={handlePlaceBid}
           disabled={!isBidValid} // Disable based on validation
-          className="px-8 py-3 bg-brand-500 hover:bg-brand-600 text-white font-bold rounded-lg flex items-center space-x-2 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-8 py-3 bg-accent-primary hover:bg-accent-hover text-white font-bold rounded-lg flex items-center space-x-2 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Gavel className="h-5 w-5" />
           <span>Place Bid</span>
         </button>
       </div>
-      {errorMessage && <p className="text-lol-accent-red text-sm mt-2">{errorMessage}</p>}
+      {errorMessage && <p className="text-accent-danger text-sm mt-2">{errorMessage}</p>}
       {currentUserIsCaptain && currentUserTeam && (
-        <p className="text-ui-text-muted text-sm text-right">
-          Your budget: <span className="font-semibold text-lol-accent-gold">{currentBudget.toLocaleString()}</span>
+        <p className="text-text-secondary text-sm text-right">
+          Your budget: <span className="font-semibold text-accent-gold">{currentBudget.toLocaleString()}</span>
         </p>
       )}
     </div>

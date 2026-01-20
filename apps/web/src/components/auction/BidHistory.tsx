@@ -8,18 +8,18 @@ export function BidHistory() {
 
   return (
     <div className="mt-6">
-      <h3 className="text-lg font-bold text-ui-text-base mb-2 flex items-center">
-        <ScrollText className="h-5 w-5 mr-2 text-ui-text-muted" />
+      <h3 className="text-lg font-bold text-text-primary mb-2 flex items-center">
+        <ScrollText className="h-5 w-5 mr-2 text-text-secondary" />
         Bid History
       </h3>
-      <div className="h-48 overflow-y-auto p-4 bg-ui-background border border-ui-border rounded-lg space-y-2">
+      <div className="h-48 overflow-y-auto p-4 bg-bg-tertiary border border-text-muted rounded-lg space-y-2">
         {bidHistory.length === 0 ? (
-          <p className="text-ui-text-muted text-sm text-center">No bids yet.</p>
+          <p className="text-text-secondary text-sm text-center">No bids yet.</p>
         ) : (
           bidHistory.slice().reverse().map((bid, index) => (
             <div key={index} className="flex justify-between items-center text-sm">
-              <span className="font-semibold text-ui-text-base">{bid.username}</span>
-              <span className="font-bold text-brand-500">{bid.amount.toLocaleString()}</span>
+              <span className="font-semibold text-text-primary">{bid.username}</span>
+              <span className="font-bold text-accent-primary">{bid.amount.toLocaleString()}</span>
             </div>
           ))
         )}
