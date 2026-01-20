@@ -12,25 +12,44 @@ datasource db {
 // ============================================
 
 model User {
-  id            String    @id @default(cuid())
-  discordId     String    @unique
+  id            String        @id @default(cuid())
+  email         String?       @unique
+  emailVerified Boolean       @default(false)
+  password      String?       // bcrypt hash for email auth
   username      String
-  discriminator String
   avatar        String?
-  email         String?
-  nickname      String?
-  role          UserRole  @default(USER)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  role          UserRole      @default(USER)
+  reputation    Int           @default(100)
+  isRestricted  Boolean       @default(false)
+  restrictedUntil DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 
   // Relations
-  riotAccounts    RiotAccount[]
-  hostedAuctions  Auction[]           @relation("AuctionHost")
-  participations  AuctionParticipant[]
-  captainedTeams  Team[]              @relation("TeamCaptain")
-  sessions        Session[]
+  authProviders      AuthProvider[]
+  termsAgreements    TermsAgreement[]
+  riotAccounts       RiotAccount[]
+  hostedRooms        Room[]                 @relation("RoomHost")
+  roomParticipations RoomParticipant[]
+  captainedTeams     Team[]                 @relation("TeamCaptain")
+  teamMembers        TeamMember[]
+  sessions           Session[]
+  clanMemberships    ClanMember[]
+  ownedClans         Clan[]                 @relation("ClanOwner")
+  posts              Post[]
+  comments           Comment[]
+  postVotes          PostVote[]
+  commentVotes       CommentVote[]
+  sentReputations    Reputation[]           @relation("ReputationFrom")
+  receivedReputations Reputation[]          @relation("ReputationTo")
+  reports            Report[]               @relation("ReportFrom")
+  reportedBy         Report[]               @relation("ReportTarget")
+  friendsInitiated   Friendship[]           @relation("FriendshipInitiator")
+  friendsReceived    Friendship[]           @relation("FriendshipReceiver")
+  chatMessages       ChatMessage[]
 
-  @@index([discordId])
+  @@index([email])
+  @@index([reputation])
   @@map("users")
 }
 
@@ -38,6 +57,43 @@ enum UserRole {
   USER
   MODERATOR
   ADMIN
+}
+
+model AuthProvider {
+  id         String       @id @default(cuid())
+  userId     String
+  provider   AuthProviderType
+  providerId String       // Discord ID, Google ID, etc.
+  metadata   Json?        // Store additional provider-specific data
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerId])
+  @@index([userId])
+  @@map("auth_providers")
+}
+
+enum AuthProviderType {
+  EMAIL
+  GOOGLE
+  DISCORD
+}
+
+model TermsAgreement {
+  id                String   @id @default(cuid())
+  userId            String
+  termsOfService    Boolean  @default(false)
+  privacyPolicy     Boolean  @default(false)
+  ageVerification   Boolean  @default(false)
+  marketingConsent  Boolean  @default(false)
+  agreedAt          DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("terms_agreements")
 }
 
 model Session {
@@ -52,31 +108,43 @@ model Session {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([expiresAt])
   @@map("sessions")
 }
 
 // ============================================
-// Riot Account Verification
+// Riot Account & Champion Preferences
 // ============================================
 
 model RiotAccount {
-  id           String    @id @default(cuid())
-  userId       String
-  puuid        String    @unique
-  summonerId   String
-  gameName     String
-  tagLine      String
-  tier         String    @default("UNRANKED")
-  rank         String    @default("")
-  lp           Int       @default(0)
-  mmrPoints    Int       @default(0)
-  isPrimary    Boolean   @default(false)
-  verifiedAt   DateTime?
-  lastSyncedAt DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id            String    @id @default(cuid())
+  userId        String
+  puuid         String    @unique
+  summonerId    String
+  gameName      String
+  tagLine       String
+
+  // Current rank
+  tier          String    @default("UNRANKED")
+  rank          String    @default("")
+  lp            Int       @default(0)
+
+  // User reported peak tier
+  peakTier      String?
+  peakRank      String?
+
+  // Roles
+  mainRole      Role?
+  subRole       Role?
+
+  isPrimary     Boolean   @default(false)
+  verifiedAt    DateTime?
+  lastSyncedAt  DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  championPreferences ChampionPreference[]
 
   @@unique([gameName, tagLine])
   @@index([userId])
@@ -84,118 +152,232 @@ model RiotAccount {
   @@map("riot_accounts")
 }
 
-// ============================================
-// Auction System
-// ============================================
-
-model Auction {
-  id           String        @id @default(cuid())
-  name         String
-  hostId       String
-  status       AuctionStatus @default(WAITING)
-  maxTeams     Int           @default(2)
-  teamBudget   Int           @default(1000)
-  minBid       Int           @default(10)
-  bidTimeLimit Int           @default(30) // seconds
-  startedAt    DateTime?
-  completedAt  DateTime?
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-
-  // Relations
-  host         User                 @relation("AuctionHost", fields: [hostId], references: [id])
-  teams        Team[]
-  participants AuctionParticipant[]
-  matches      Match[]
-  bidHistory   BidHistory[]
-
-  @@index([hostId])
-  @@index([status])
-  @@map("auctions")
-}
-
-enum AuctionStatus {
-  WAITING
-  IN_PROGRESS
-  COMPLETED
-  CANCELLED
-}
-
-model Team {
-  id          String   @id @default(cuid())
-  auctionId   String
-  name        String
-  captainId   String
-  budget      Int      @default(1000)
-  spentBudget Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  // Relations
-  auction       Auction              @relation(fields: [auctionId], references: [id], onDelete: Cascade)
-  captain       User                 @relation("TeamCaptain", fields: [captainId], references: [id])
-  members       AuctionParticipant[]
-  matchesAsTeamA Match[]             @relation("TeamA")
-  matchesAsTeamB Match[]             @relation("TeamB")
-  wonMatches    Match[]              @relation("MatchWinner")
-
-  @@index([auctionId])
-  @@index([captainId])
-  @@map("teams")
-}
-
-model AuctionParticipant {
-  id            String             @id @default(cuid())
-  auctionId     String
-  userId        String
-  teamId        String?
-  preferredRole PreferredRole?
-  soldPrice     Int?
-  status        ParticipantStatus  @default(WAITING)
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
-
-  // Relations
-  auction Auction @relation(fields: [auctionId], references: [id], onDelete: Cascade)
-  user    User    @relation(fields: [userId], references: [id])
-  team    Team?   @relation(fields: [teamId], references: [id])
-
-  @@unique([auctionId, userId])
-  @@index([auctionId])
-  @@index([userId])
-  @@index([teamId])
-  @@map("auction_participants")
-}
-
-enum PreferredRole {
+enum Role {
   TOP
   JUNGLE
   MID
   ADC
   SUPPORT
-  FILL
 }
 
-enum ParticipantStatus {
-  WAITING
-  ON_AUCTION
-  SOLD
-  UNSOLD
+model ChampionPreference {
+  id             String   @id @default(cuid())
+  riotAccountId  String
+  role           Role
+  championId     String   // Champion key from Data Dragon
+  order          Int      // Display order (1, 2, 3, ...)
+  createdAt      DateTime @default(now())
+
+  riotAccount RiotAccount @relation(fields: [riotAccountId], references: [id], onDelete: Cascade)
+
+  @@unique([riotAccountId, role, championId])
+  @@index([riotAccountId, role])
+  @@map("champion_preferences")
 }
 
-model BidHistory {
-  id            String   @id @default(cuid())
-  auctionId     String
-  participantId String
-  teamId        String
-  amount        Int
-  createdAt     DateTime @default(now())
+// ============================================
+// Room System
+// ============================================
 
-  auction Auction @relation(fields: [auctionId], references: [id], onDelete: Cascade)
+model Room {
+  id              String       @id @default(cuid())
+  name            String
+  hostId          String
+  password        String?      // bcrypt hash for private rooms
+  maxParticipants Int          @default(10) // 10, 15, 20
+  isPrivate       Boolean      @default(false)
+  status          RoomStatus   @default(WAITING)
 
-  @@index([auctionId])
-  @@index([participantId])
-  @@map("bid_history")
+  // Settings
+  teamMode        TeamMode     @default(SNAKE_DRAFT)
+  allowSpectators Boolean      @default(true)
+
+  // Discord integration
+  discordGuildId     String?
+  discordCategoryId  String?
+
+  startedAt       DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  host              User                @relation("RoomHost", fields: [hostId], references: [id])
+  participants      RoomParticipant[]
+  teams             Team[]
+  matches           Match[]
+  chatMessages      ChatMessage[]
+  discordChannels   RoomDiscordChannel[]
+
+  @@index([hostId])
+  @@index([status])
+  @@index([isPrivate])
+  @@map("rooms")
+}
+
+enum RoomStatus {
+  WAITING        // Waiting for players
+  TEAM_SELECTION // Captain selection or team composition in progress
+  IN_PROGRESS    // Match(es) in progress
+  COMPLETED      // All matches completed
+  CANCELLED
+}
+
+enum TeamMode {
+  SNAKE_DRAFT
+  AUCTION
+}
+
+model RoomParticipant {
+  id              String                @id @default(cuid())
+  roomId          String
+  userId          String
+  role            RoomParticipantRole   @default(PLAYER)
+  isReady         Boolean               @default(false)
+  isCaptain       Boolean               @default(false)
+  teamId          String?
+  joinedAt        DateTime              @default(now())
+
+  room  Room  @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team  Team? @relation(fields: [teamId], references: [id])
+
+  @@unique([roomId, userId])
+  @@index([roomId])
+  @@index([userId])
+  @@index([teamId])
+  @@map("room_participants")
+}
+
+enum RoomParticipantRole {
+  PLAYER
+  SPECTATOR
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  roomId    String
+  userId    String
+  content   String
+  createdAt DateTime @default(now())
+
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([roomId, createdAt])
+  @@index([userId])
+  @@map("chat_messages")
+}
+
+model RoomDiscordChannel {
+  id        String   @id @default(cuid())
+  roomId    String
+  channelId String   @unique
+  channelType DiscordChannelType
+  teamName  String?  // For team-specific voice channels
+  createdAt DateTime @default(now())
+
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@index([roomId])
+  @@map("room_discord_channels")
+}
+
+enum DiscordChannelType {
+  VOICE
+  TEXT
+}
+
+// ============================================
+// Team System (Snake Draft & Auction)
+// ============================================
+
+model Team {
+  id          String   @id @default(cuid())
+  roomId      String
+  name        String
+  captainId   String
+  color       String?  // Hex color for UI
+
+  // Auction specific
+  initialBudget Int      @default(0)
+  remainingBudget Int    @default(0)
+  hasReceivedBonus Boolean @default(false)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  room            Room              @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  captain         User              @relation("TeamCaptain", fields: [captainId], references: [id])
+  members         TeamMember[]
+  snakeDraftPicks SnakeDraftPick[]
+  auctionBids     AuctionBid[]
+  matchesAsTeamA  Match[]           @relation("TeamA")
+  matchesAsTeamB  Match[]           @relation("TeamB")
+  wonMatches      Match[]           @relation("MatchWinner")
+  roomParticipants RoomParticipant[]
+
+  @@index([roomId])
+  @@index([captainId])
+  @@map("teams")
+}
+
+model TeamMember {
+  id         String    @id @default(cuid())
+  teamId     String
+  userId     String
+  assignedRole Role?
+  soldPrice  Int?      // For auction mode
+  pickOrder  Int?      // For snake draft mode
+  joinedAt   DateTime  @default(now())
+
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, userId])
+  @@index([teamId])
+  @@index([userId])
+  @@map("team_members")
+}
+
+// ============================================
+// Snake Draft
+// ============================================
+
+model SnakeDraftPick {
+  id          String   @id @default(cuid())
+  roomId      String
+  teamId      String
+  userId      String
+  pickNumber  Int      // 1, 2, 3, ...
+  createdAt   DateTime @default(now())
+
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, pickNumber])
+  @@index([roomId])
+  @@index([teamId])
+  @@map("snake_draft_picks")
+}
+
+// ============================================
+// Auction System
+// ============================================
+
+model AuctionBid {
+  id           String   @id @default(cuid())
+  roomId       String
+  teamId       String
+  targetUserId String   // Player being bid on
+  amount       Int
+  isYuchal     Boolean  @default(false) // 유찰 (no sale)
+  createdAt    DateTime @default(now())
+
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@index([roomId, createdAt])
+  @@index([teamId])
+  @@index([targetUserId])
+  @@map("auction_bids")
 }
 
 // ============================================
@@ -203,29 +385,34 @@ model BidHistory {
 // ============================================
 
 model Match {
-  id             String      @id @default(cuid())
-  auctionId      String
-  teamAId        String
-  teamBId        String
-  winnerId       String?
-  status         MatchStatus @default(PENDING)
-  tournamentCode String?
-  riotMatchId    String?
-  scheduledAt    DateTime?
-  startedAt      DateTime?
-  completedAt    DateTime?
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  id              String       @id @default(cuid())
+  roomId          String
+  teamAId         String
+  teamBId         String
+  winnerId        String?
+  status          MatchStatus  @default(PENDING)
+  matchNumber     Int          // For tournaments (1, 2, 3...)
+  bracketRound    String?      // "quarter", "semi", "final"
 
-  // Relations
-  auction Auction @relation(fields: [auctionId], references: [id], onDelete: Cascade)
-  teamA   Team    @relation("TeamA", fields: [teamAId], references: [id])
-  teamB   Team    @relation("TeamB", fields: [teamBId], references: [id])
-  winner  Team?   @relation("MatchWinner", fields: [winnerId], references: [id])
+  // Riot integration
+  tournamentCode  String?
+  riotMatchId     String?
 
-  @@index([auctionId])
+  scheduledAt     DateTime?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  room   Room  @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  teamA  Team  @relation("TeamA", fields: [teamAId], references: [id])
+  teamB  Team  @relation("TeamB", fields: [teamBId], references: [id])
+  winner Team? @relation("MatchWinner", fields: [winnerId], references: [id])
+
+  @@index([roomId])
   @@index([teamAId])
   @@index([teamBId])
+  @@index([status])
   @@map("matches")
 }
 
@@ -237,31 +424,236 @@ enum MatchStatus {
 }
 
 // ============================================
-// Discord Integration
+// Clan System
 // ============================================
 
-model DiscordChannel {
-  id        String      @id @default(cuid())
-  guildId   String
-  channelId String      @unique
-  type      ChannelType
-  status    ChannelStatus @default(AVAILABLE)
-  name      String?
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
+model Clan {
+  id          String     @id @default(cuid())
+  name        String     @unique
+  tag         String     @unique // [TAG] format
+  description String?
+  logo        String?
+  ownerId     String
+  isRecruiting Boolean   @default(true)
+  maxMembers  Int        @default(50)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
 
-  @@index([guildId])
-  @@index([type, status])
-  @@map("discord_channels")
+  owner   User         @relation("ClanOwner", fields: [ownerId], references: [id])
+  members ClanMember[]
+
+  @@index([ownerId])
+  @@index([isRecruiting])
+  @@map("clans")
 }
 
-enum ChannelType {
-  VOICE
-  TEXT
+model ClanMember {
+  id        String         @id @default(cuid())
+  clanId    String
+  userId    String
+  role      ClanMemberRole @default(MEMBER)
+  joinedAt  DateTime       @default(now())
+
+  clan Clan @relation(fields: [clanId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([clanId, userId])
+  @@index([clanId])
+  @@index([userId])
+  @@map("clan_members")
 }
 
-enum ChannelStatus {
-  AVAILABLE
-  IN_USE
-  DISABLED
+enum ClanMemberRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+// ============================================
+// Community / Forum
+// ============================================
+
+model Board {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  slug        String   @unique
+  description String?
+  order       Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  posts Post[]
+
+  @@index([slug])
+  @@index([order])
+  @@map("boards")
+}
+
+model Post {
+  id          String    @id @default(cuid())
+  boardId     String
+  authorId    String
+  title       String
+  content     String
+  viewCount   Int       @default(0)
+  isPinned    Boolean   @default(false)
+  isLocked    Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  board    Board         @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  author   User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  comments Comment[]
+  votes    PostVote[]
+
+  @@index([boardId, createdAt])
+  @@index([authorId])
+  @@index([isPinned, createdAt])
+  @@map("posts")
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  postId    String
+  authorId  String
+  content   String
+  parentId  String?  // For nested comments
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  post     Post           @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author   User           @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  parent   Comment?       @relation("CommentReplies", fields: [parentId], references: [id])
+  replies  Comment[]      @relation("CommentReplies")
+  votes    CommentVote[]
+
+  @@index([postId, createdAt])
+  @@index([authorId])
+  @@index([parentId])
+  @@map("comments")
+}
+
+model PostVote {
+  id        String   @id @default(cuid())
+  postId    String
+  userId    String
+  value     Int      // +1 for upvote, -1 for downvote
+  createdAt DateTime @default(now())
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+  @@index([postId])
+  @@index([userId])
+  @@map("post_votes")
+}
+
+model CommentVote {
+  id        String   @id @default(cuid())
+  commentId String
+  userId    String
+  value     Int      // +1 for upvote, -1 for downvote
+  createdAt DateTime @default(now())
+
+  comment Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([commentId, userId])
+  @@index([commentId])
+  @@index([userId])
+  @@map("comment_votes")
+}
+
+// ============================================
+// Reputation System
+// ============================================
+
+model Reputation {
+  id        String         @id @default(cuid())
+  fromId    String
+  toId      String
+  matchId   String
+  type      ReputationType
+  comment   String?
+  createdAt DateTime       @default(now())
+
+  from User @relation("ReputationFrom", fields: [fromId], references: [id], onDelete: Cascade)
+  to   User @relation("ReputationTo", fields: [toId], references: [id], onDelete: Cascade)
+
+  @@unique([fromId, toId, matchId])
+  @@index([toId])
+  @@index([matchId])
+  @@map("reputations")
+}
+
+enum ReputationType {
+  POSITIVE    // +2 points
+  NEUTRAL     // 0 points
+  NEGATIVE    // -3 points
+}
+
+model Report {
+  id          String       @id @default(cuid())
+  fromId      String
+  targetId    String
+  reason      ReportReason
+  description String?
+  status      ReportStatus @default(PENDING)
+  reviewedBy  String?
+  reviewNote  String?
+  createdAt   DateTime     @default(now())
+  reviewedAt  DateTime?
+
+  from   User @relation("ReportFrom", fields: [fromId], references: [id], onDelete: Cascade)
+  target User @relation("ReportTarget", fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@index([targetId, status])
+  @@index([status])
+  @@index([createdAt])
+  @@map("reports")
+}
+
+enum ReportReason {
+  TOXIC_BEHAVIOR
+  AFK
+  INTENTIONAL_FEEDING
+  CHEATING
+  HARASSMENT
+  OTHER
+}
+
+enum ReportStatus {
+  PENDING
+  REVIEWING
+  RESOLVED
+  DISMISSED
+}
+
+// ============================================
+// Friend System
+// ============================================
+
+model Friendship {
+  id           String           @id @default(cuid())
+  initiatorId  String
+  receiverId   String
+  status       FriendshipStatus @default(PENDING)
+  createdAt    DateTime         @default(now())
+  acceptedAt   DateTime?
+
+  initiator User @relation("FriendshipInitiator", fields: [initiatorId], references: [id], onDelete: Cascade)
+  receiver  User @relation("FriendshipReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@unique([initiatorId, receiverId])
+  @@index([initiatorId])
+  @@index([receiverId])
+  @@index([status])
+  @@map("friendships")
+}
+
+enum FriendshipStatus {
+  PENDING
+  ACCEPTED
+  BLOCKED
 }
