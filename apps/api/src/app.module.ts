@@ -5,6 +5,7 @@ import { ScheduleModule } from "@nestjs/schedule";
 
 import { AuthModule } from "./modules/auth/auth.module";
 import { UserModule } from "./modules/user/user.module";
+import { RoomModule } from "./modules/room/room.module";
 import { AuctionModule } from "./modules/auction/auction.module";
 import { MatchModule } from "./modules/match/match.module";
 import { RiotModule } from "./modules/riot/riot.module";
@@ -40,6 +41,7 @@ import { RiotTournamentService } from "./modules/riot/riot-tournament.service";
     // Feature modules
     AuthModule,
     UserModule,
+    RoomModule,
     AuctionModule,
     MatchModule,
     RiotModule,
