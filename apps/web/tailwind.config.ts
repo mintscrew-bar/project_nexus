@@ -9,72 +9,71 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Semantic Brand Colors (Referenced from CSS variables in globals.css)
-        brand: {
-          50:  'rgb(var(--color-brand-50) / <alpha-value>)',
-          100: 'rgb(var(--color-brand-100) / <alpha-value>)',
-          200: 'rgb(var(--color-brand-200) / <alpha-value>)',
-          300: 'rgb(var(--color-brand-300) / <alpha-value>)',
-          400: 'rgb(var(--color-brand-400) / <alpha-value>)',
-          500: 'rgb(var(--color-brand-500) / <alpha-value>)', // Main brand blue
-          600: 'rgb(var(--color-brand-600) / <alpha-value>)',
-          700: 'rgb(var(--color-brand-700) / <alpha-value>)',
-          800: 'rgb(var(--color-brand-800) / <alpha-value>)',
-          900: 'rgb(var(--color-brand-900) / <alpha-value>)',
-          purple: 'rgb(var(--color-brand-purple) / <alpha-value>)', // Secondary brand purple
+        // Background Colors (Dark Theme)
+        bg: {
+          primary: '#0f0f0f',
+          secondary: '#1a1a1a',
+          tertiary: '#242424',
+          elevated: '#2a2a2a',
         },
-        // Semantic UI Colors
-        ui: {
-          background: 'rgb(var(--color-ui-background) / <alpha-value>)',
-          card: 'rgb(var(--color-ui-card) / <alpha-value>)',
-          border: 'rgb(var(--color-ui-border) / <alpha-value>)',
-          text: {
-            base: 'rgb(var(--color-ui-text-base) / <alpha-value>)',
-            muted: 'rgb(var(--color-ui-text-muted) / <alpha-value>)',
-            accent: 'rgb(var(--color-ui-text-accent) / <alpha-value>)',
-          },
+        // Text Colors
+        text: {
+          primary: '#f0f0f0',
+          secondary: '#b0b0b0',
+          tertiary: '#707070',
+          muted: '#4a4a4a',
         },
-        // Existing LoL Theme Colors (Moved under 'lol' namespace for clarity)
-        lol: {
-          primary: { // Gold
-            50: "#fdf4e3", 100: "#f9e4b8", 200: "#f5d38a", 300: "#f1c15c", 400: "#edb338",
-            500: "#C89B3C", 600: "#a67c30", 700: "#845d24", 800: "#624018", 900: "#40240c",
-          },
-          secondary: { // Teal
-            50: "#e8f4fc", 100: "#c5e2f7", 200: "#9ecff2", 300: "#77bcec", 400: "#59ace8",
-            500: "#0397AB", 600: "#027a8b", 700: "#025d6a", 800: "#014049", 900: "#002428",
-          },
-          dark: { // Dark base
-            50: "#e6e6e8", 100: "#c0c0c5", 200: "#96969f", 300: "#6c6c79", 400: "#4d4d5c",
-            500: "#1E2328", 600: "#191d21", 700: "#13161a", 800: "#0d0f12", 900: "#07080a",
-          },
-          accent: {
-            blue: "#0AC8B9", gold: "#F0E6D2", red: "#FF4655", green: "#00FF87",
-          },
+        // Accent Colors (치지직 + LoL 테마)
+        accent: {
+          primary: '#0bc4e2',
+          hover: '#09a8c2',
+          active: '#078ca8',
+          gold: '#c89b3c',
+          success: '#00c853',
+          danger: '#ff1744',
+          warning: '#ffa726',
+        },
+        // Tier Colors (LoL 티어 시스템)
+        tier: {
+          iron: '#5a5a5a',
+          bronze: '#cd7f32',
+          silver: '#c0c0c0',
+          gold: '#ffd700',
+          platinum: '#40e0d0',
+          emerald: '#50c878',
+          diamond: '#b9f2ff',
+          master: '#9b30ff',
+          grandmaster: '#ff4500',
+          challenger: '#f4c430',
         },
       },
       fontFamily: {
-        display: ["var(--font-beaufort)", "serif"],
-        sans: ["var(--font-spiegel)", "sans-serif"],
+        sans: [
+          'Pretendard Variable',
+          '-apple-system',
+          'BlinkMacSystemFont',
+          'Segoe UI',
+          'sans-serif',
+        ],
       },
+      // 간단하고 성능에 영향 없는 애니메이션만
       animation: {
-        "pulse-gold": "pulse-gold 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
-        "slide-up": "slide-up 0.3s ease-out",
-        "fade-in": "fade-in 0.2s ease-out",
+        'fade-in': 'fadeIn 200ms ease-out',
+        'slide-in': 'slideIn 300ms ease-out',
       },
       keyframes: {
-        "pulse-gold": {
-          "0%, 100%": { boxShadow: "0 0 0 0 rgba(200, 155, 60, 0.4)" },
-          "50%": { boxShadow: "0 0 0 15px rgba(200, 155, 60, 0)" },
+        fadeIn: {
+          from: { opacity: '0' },
+          to: { opacity: '1' },
         },
-        "slide-up": {
-          "0%": { transform: "translateY(10px)", opacity: "0" },
-          "100%": { transform: "translateY(0)", opacity: "1" },
+        slideIn: {
+          from: { transform: 'translateX(100%)' },
+          to: { transform: 'translateX(0)' },
         },
-        "fade-in": {
-          "0%": { opacity: "0" },
-          "100%": { opacity: "1" },
-        },
+      },
+      // Transition duration (성능 최적화)
+      transitionDuration: {
+        '150': '150ms',
       },
     },
   },
