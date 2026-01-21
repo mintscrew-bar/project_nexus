@@ -81,27 +81,28 @@ interface AuctionState {
 - 백엔드 API 응답 구조 확인
 - Store 타입과 컴포넌트 Props 타입 통일
 
-### 4. WebSocket 이벤트 불일치 가능성
-**상태**: 🟡 테스트 필요
+### 4. WebSocket 이벤트 불일치 수정 완료 ✅
+**상태**: 🟢 수정됨
 **영향**: 실시간 기능 (경매, 드래프트, 채팅)
 
-**문제**:
-- Socket 클라이언트 이벤트 이름
-- 백엔드 Gateway 이벤트 이름
-- 일치 여부 미확인
+**발견 및 수정한 문제**:
 
-**예시**:
-```typescript
-// Frontend (socket-client.ts)
-auctionSocket?.on('auction-started', ...)
+#### Auction Namespace (`/auction`)
+- ❌ `join-auction` → ✅ `join-room`
+- ❌ `new-bid` → ✅ `bid-placed`
+- ✅ 추가된 이벤트: `bid-resolved`, `timer-expired`
 
-// Backend (auction.gateway.ts)
-@SubscribeMessage('auction-started')  // 일치하는지 확인 필요
-```
+#### Room/Lobby Namespace (`/room`)
+- ❌ Namespace: `/lobby` → ✅ `/room`
+- ❌ `join-lobby` → ✅ `join-room`
+- ❌ `set-ready-status` → ✅ `toggle-ready`
+- ❌ `room-update` 리스너 → ✅ `ready-status-changed`, `user-joined`, `user-left` 리스너로 교체
+- ⚠️ `start-game` 이벤트 - 백엔드 미구현
 
-**해결 방법**:
-- 통합 테스트 필요
-- 이벤트 이름 상수로 관리 고려
+**참조**: [`WEBSOCKET_EVENTS.md`](./WEBSOCKET_EVENTS.md)
+
+**남은 작업**:
+- 백엔드에 `start-game` 이벤트 핸들러 추가 필요
 
 ---
 
