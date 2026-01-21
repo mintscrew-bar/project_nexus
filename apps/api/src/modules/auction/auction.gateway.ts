@@ -137,6 +137,17 @@ export class AuctionGateway
       // Broadcast result
       this.server.to(`room:${data.roomId}`).emit("bid-resolved", result);
 
+      // Emit specific event based on result
+      if (result.sold && result.player && result.team) {
+        this.emitPlayerSold(data.roomId, {
+          player: result.player,
+          team: result.team,
+          price: result.price!,
+        });
+      } else if (!result.sold && result.player) {
+        this.emitPlayerUnsold(data.roomId, { player: result.player });
+      }
+
       // Check if auction is complete
       const isComplete = await this.auctionService.checkAuctionComplete(
         data.roomId,
@@ -153,12 +164,35 @@ export class AuctionGateway
     }
   }
 
-  // Emit auction state updates
-  emitAuctionUpdate(roomId: string, event: string, data: any) {
-    this.server.to(`room:${roomId}`).emit(event, data);
+  // ========================================
+  // Emit Methods (called from service or external)
+  // ========================================
+
+  emitAuctionStarted(roomId: string, data: any) {
+    this.server.to(`room:${roomId}`).emit("auction-started", data);
+  }
+
+  emitPlayerSold(roomId: string, data: {
+    player: any;
+    team: any;
+    price: number;
+  }) {
+    this.server.to(`room:${roomId}`).emit("player-sold", data);
+  }
+
+  emitPlayerUnsold(roomId: string, data: { player: any }) {
+    this.server.to(`room:${roomId}`).emit("player-unsold", data);
+  }
+
+  emitTimerUpdate(roomId: string, timeLeft: number) {
+    this.server.to(`room:${roomId}`).emit("timer-update", { timeLeft });
   }
 
   emitTimerExpired(roomId: string) {
     this.server.to(`room:${roomId}`).emit("timer-expired");
+  }
+
+  emitAuctionUpdate(roomId: string, event: string, data: any) {
+    this.server.to(`room:${roomId}`).emit(event, data);
   }
 }

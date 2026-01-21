@@ -4,3 +4,5 @@ export * from './RoomCard';
 export * from './ChatBox';
 export * from './ParticipantList';
 export * from './AuctionBoard';
+export * from './DraftBoard';
+export * from './BracketView';

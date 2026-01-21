@@ -424,6 +424,59 @@ export class RoomService {
   }
 
   // ========================================
+  // Game Start
+  // ========================================
+
+  async startGame(hostId: string, roomId: string) {
+    const room = await this.prisma.room.findUnique({
+      where: { id: roomId },
+      include: {
+        participants: {
+          where: { role: "PLAYER" },
+        },
+      },
+    });
+
+    if (!room) {
+      throw new NotFoundException("Room not found");
+    }
+
+    if (room.hostId !== hostId) {
+      throw new ForbiddenException("Only host can start the game");
+    }
+
+    if (room.status !== RoomStatus.WAITING) {
+      throw new BadRequestException("Room has already started");
+    }
+
+    // Check if all players are ready
+    const allReady = room.participants.every((p) => p.isReady);
+    if (!allReady) {
+      throw new BadRequestException("Not all players are ready");
+    }
+
+    // Minimum 2 players required
+    if (room.participants.length < 2) {
+      throw new BadRequestException("At least 2 players required to start");
+    }
+
+    // Update room status
+    await this.prisma.room.update({
+      where: { id: roomId },
+      data: {
+        status: RoomStatus.IN_PROGRESS,
+        startedAt: new Date(),
+      },
+    });
+
+    return {
+      success: true,
+      roomId,
+      teamMode: room.teamMode,
+    };
+  }
+
+  // ========================================
   // Chat Messages
   // ========================================
 
