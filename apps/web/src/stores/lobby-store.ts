@@ -46,18 +46,18 @@ export const useLobbyStore = create<LobbyStoreState>((set, get) => ({
   connect: (roomId) => {
     if (get().socket) return;
 
-    const socket = io(`${API_URL}/lobby`, {
+    const socket = io(`${API_URL}/room`, {
       withCredentials: true,
       transports: ['websocket'],
     });
 
     socket.on('connect', () => {
       set({ isConnected: true, error: null });
-      socket.emit('join-lobby', { roomId }, (response: any) => {
+      socket.emit('join-room', { roomId }, (response: any) => {
         if (response.success) {
           set({ room: response.room });
         } else {
-          set({ error: response.error || 'Failed to join lobby.' });
+          set({ error: response.error || 'Failed to join room.' });
         }
       });
     });
@@ -69,11 +69,30 @@ export const useLobbyStore = create<LobbyStoreState>((set, get) => ({
     socket.on('connect_error', (err) => {
       set({ error: err.message, isConnected: false });
     });
-    
-    socket.on('room-update', (updatedRoom: Room) => {
-      set({ room: updatedRoom });
+
+    // Listen for user join/leave events to update participant list
+    socket.on('user-joined', (data: { userId: string; username: string }) => {
+      console.log('User joined:', data);
     });
-    
+
+    socket.on('user-left', (data: { userId: string; username: string }) => {
+      console.log('User left:', data);
+    });
+
+    socket.on('ready-status-changed', (data: { userId: string; isReady: boolean }) => {
+      const currentRoom = get().room;
+      if (currentRoom) {
+        const updatedParticipants = currentRoom.participants.map(p =>
+          p.id === data.userId ? { ...p, isReady: data.isReady } : p
+        );
+        set({ room: { ...currentRoom, participants: updatedParticipants } });
+      }
+    });
+
+    socket.on('all-ready', () => {
+      console.log('All players ready!');
+    });
+
     socket.on('game-starting', () => {
       set({ gameStarting: true });
     });
@@ -88,7 +107,7 @@ export const useLobbyStore = create<LobbyStoreState>((set, get) => ({
   setReady: (isReady: boolean) => {
     const { socket, room } = get();
     if (socket && room) {
-      socket.emit('set-ready-status', { roomId: room.id, isReady });
+      socket.emit('toggle-ready', { roomId: room.id });
     }
   },
 

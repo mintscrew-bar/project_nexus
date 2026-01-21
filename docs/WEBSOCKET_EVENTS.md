@@ -79,19 +79,37 @@ on('timer-expired', () => void)
 
 ```typescript
 emit('join-room', { roomId: string })
+→ returns: { success: boolean, room: Room } | { error: string }
+
 emit('leave-room', { roomId: string })
-emit('send-message', { roomId: string, message: string })
+→ returns: { success: boolean } | { error: string }
+
+emit('toggle-ready', { roomId: string })
+→ returns: { success: boolean, isReady: boolean } | { error: string }
+
+emit('send-message', { roomId: string, content: string })
+→ returns: { success: boolean, message: Message } | { error: string }
 ```
 
 #### Server → Client
 
 ```typescript
-on('room-update', (room: Room) => void)
-on('participant-joined', (data: { participant: Participant }) => void)
-on('participant-left', (data: { userId: string }) => void)
-on('participant-ready', (data: { userId: string, isReady: boolean }) => void)
+on('user-joined', (data: { userId: string, username: string }) => void)
+on('user-left', (data: { userId: string, username: string }) => void)
+on('ready-status-changed', (data: { userId: string, isReady: boolean }) => void)
+on('all-ready', () => void)
 on('new-message', (message: Message) => void)
 ```
+
+#### 🔴 Event Name Mismatches Found
+
+| Frontend (lobby-store.ts) | Backend (room.gateway.ts) | Status | Fix |
+|---------------------------|---------------------------|--------|-----|
+| `join-lobby` | `join-room` | ❌ Wrong | Frontend |
+| `set-ready-status` | `toggle-ready` | ❌ Wrong | Frontend |
+| `start-game` | Not implemented | ⚠️ Missing | Backend |
+| `room-update` listener | Not emitted | ⚠️ Missing | Backend |
+| `game-starting` listener | Not emitted | ⚠️ Missing | Backend |
 
 ### 3. Snake Draft Events (`/snake-draft`)
 
