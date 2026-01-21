@@ -15,6 +15,7 @@ import { RoomService, CreateRoomDto, JoinRoomDto } from "./room.service";
 import { SnakeDraftService } from "./snake-draft.service";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
+import { Public } from "../auth/decorators/public.decorator";
 import { RoomStatus, TeamMode } from "@nexus/database";
 
 @Controller("rooms")
@@ -39,6 +40,7 @@ export class RoomController {
   }
 
   @Get()
+  @Public()
   async listRooms(
     @Query("status") status?: RoomStatus,
     @Query("teamMode") teamMode?: TeamMode,
@@ -52,6 +54,7 @@ export class RoomController {
   }
 
   @Get(":id")
+  @Public()
   async getRoom(@Param("id") id: string) {
     return this.roomService.getRoomById(id);
   }
