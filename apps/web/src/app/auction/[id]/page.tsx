@@ -1,70 +1,84 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { useEffect } from "react";
-import { useAuctionStore } from "@/stores/auction-store";
-
-import { AuctionStatus } from "@/components/auction/AuctionStatus";
-import { BiddingPanel } from "@/components/auction/BiddingPanel";
-import { BidHistory } from "@/components/auction/BidHistory";
-import { TeamList } from "@/components/auction/TeamList";
+import { useAuction } from "@/hooks/useAuction";
+import { AuctionBoard } from "@/components/domain";
+import { LoadingSpinner, Badge } from "@/components/ui";
 
 export default function AuctionRoomPage() {
   const params = useParams();
   const auctionId = params.id as string;
 
-  const { connectToAuction, disconnectFromAuction, isConnected, error, auctionState } = useAuctionStore();
+  const {
+    auctionState,
+    players,
+    teams,
+    isConnected,
+    isLoading,
+    error,
+    placeBid,
+  } = useAuction(auctionId);
 
-  useEffect(() => {
-    if (auctionId) {
-      connectToAuction(auctionId);
-    }
+  if (isLoading) {
+    return (
+      <div className="flex-grow flex items-center justify-center">
+        <div className="text-center">
+          <LoadingSpinner size="lg" />
+          <p className="text-text-secondary mt-4">경매 방에 연결 중...</p>
+        </div>
+      </div>
+    );
+  }
 
-    return () => {
-      disconnectFromAuction();
-    };
-  }, [auctionId, connectToAuction, disconnectFromAuction]);
+  if (error) {
+    return (
+      <div className="flex-grow flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-accent-danger mb-4">오류: {error}</p>
+          <p className="text-text-secondary">경매 방에 연결할 수 없습니다</p>
+        </div>
+      </div>
+    );
+  }
 
-  const ConnectionStatus = () => (
-    <div className="absolute top-4 right-4 text-sm">
-      {isConnected ? (
-        <span className="text-accent-success">● Connected</span>
-      ) : (
-        <span className="text-accent-danger">● Disconnected</span>
-      )}
-    </div>
-  );
+  if (!auctionState) {
+    return (
+      <div className="flex-grow flex items-center justify-center">
+        <div className="text-center">
+          <LoadingSpinner size="lg" />
+          <p className="text-text-secondary mt-4">경매 시작 대기 중...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex-grow p-8 relative">
-      <ConnectionStatus />
+    <div className="flex-grow p-4 md:p-8 relative">
+      {/* Connection Status Badge */}
+      <div className="absolute top-4 right-4 z-10">
+        <Badge variant={isConnected ? 'success' : 'danger'}>
+          {isConnected ? '● 연결됨' : '● 연결 끊김'}
+        </Badge>
+      </div>
+
       <div className="container mx-auto">
-        <h1 className="text-3xl font-bold mb-4 text-text-primary">
-          Auction Room: <span className="text-accent-primary">{auctionId}</span>
-        </h1>
+        {/* Page Header */}
+        <div className="mb-6 animate-fade-in">
+          <h1 className="text-3xl font-bold text-text-primary mb-2">
+            경매 진행 중
+          </h1>
+          <p className="text-text-secondary">
+            Room ID: <span className="text-accent-primary font-mono">{auctionId}</span>
+          </p>
+        </div>
 
-        {error && <div className="text-accent-danger mb-4">Error: {error}</div>}
-
-        {auctionState ? (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Main Column */}
-            <div className="lg:col-span-2 space-y-6">
-              <AuctionStatus />
-              <BiddingPanel />
-            </div>
-            
-            {/* Right Sidebar Column */}
-            <div className="lg:col-span-1 space-y-6">
-              <BidHistory />
-              <TeamList />
-            </div>
-          </div>
-        ) : (
-          <div className="text-text-secondary text-center py-10">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent-primary mx-auto mb-4"></div>
-            <p>Waiting for auction state...</p>
-          </div>
-        )}
+        {/* Auction Board */}
+        <AuctionBoard
+          auctionState={auctionState}
+          teams={teams}
+          onPlaceBid={placeBid}
+          disabled={!isConnected}
+        />
       </div>
     </div>
   );
