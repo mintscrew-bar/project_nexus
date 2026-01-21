@@ -183,6 +183,33 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
+  @SubscribeMessage("start-game")
+  async handleStartGame(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() data: { roomId: string },
+  ) {
+    try {
+      if (!client.userId) {
+        return { error: "Unauthorized" };
+      }
+
+      const result = await this.roomService.startGame(
+        client.userId,
+        data.roomId,
+      );
+
+      // Notify all players that game is starting
+      this.server.to(data.roomId).emit("game-starting", {
+        roomId: result.roomId,
+        teamMode: result.teamMode,
+      });
+
+      return result;
+    } catch (error: any) {
+      return { error: error.message };
+    }
+  }
+
   // ========================================
   // Chat Events
   // ========================================
