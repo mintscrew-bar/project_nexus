@@ -186,7 +186,7 @@ export const roomSocketHelpers = {
 // Auction Socket 헬퍼 함수
 export const auctionSocketHelpers = {
   joinAuction: (roomId: string) => {
-    auctionSocket?.emit("join-auction", { roomId });
+    auctionSocket?.emit("join-room", { roomId });  // ✅ Fixed: join-auction → join-room
   },
 
   placeBid: (roomId: string, amount: number) => {
@@ -198,7 +198,7 @@ export const auctionSocketHelpers = {
   },
 
   onNewBid: (callback: (data: any) => void) => {
-    auctionSocket?.on("new-bid", callback);
+    auctionSocket?.on("bid-placed", callback);  // ✅ Fixed: new-bid → bid-placed
   },
 
   onPlayerSold: (callback: (data: any) => void) => {
@@ -217,13 +217,23 @@ export const auctionSocketHelpers = {
     auctionSocket?.on("timer-update", callback);
   },
 
+  onBidResolved: (callback: (data: any) => void) => {
+    auctionSocket?.on("bid-resolved", callback);  // ✅ Added: missing event
+  },
+
+  onTimerExpired: (callback: (data: any) => void) => {
+    auctionSocket?.on("timer-expired", callback);  // ✅ Added: missing event
+  },
+
   offAllListeners: () => {
     auctionSocket?.off("auction-started");
-    auctionSocket?.off("new-bid");
+    auctionSocket?.off("bid-placed");  // ✅ Fixed
     auctionSocket?.off("player-sold");
     auctionSocket?.off("player-unsold");
     auctionSocket?.off("auction-complete");
     auctionSocket?.off("timer-update");
+    auctionSocket?.off("bid-resolved");  // ✅ Added
+    auctionSocket?.off("timer-expired");  // ✅ Added
   },
 };
 
