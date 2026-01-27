@@ -154,11 +154,7 @@ export class RoomController {
     @Param("id") roomId: string,
     @Body() body: { targetPlayerId: string },
   ) {
-    return this.snakeDraftService.makePick(
-      userId,
-      roomId,
-      body.targetPlayerId,
-    );
+    return this.snakeDraftService.makePick(userId, roomId, body.targetPlayerId);
   }
 
   @Get(":id/snake-draft/state")

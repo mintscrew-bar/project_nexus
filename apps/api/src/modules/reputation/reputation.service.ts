@@ -445,7 +445,9 @@ export class ReputationService {
     const [totalReports, pendingReports, approvedReports, rejectedReports] =
       await Promise.all([
         this.prisma.userReport.count(),
-        this.prisma.userReport.count({ where: { status: ReportStatus.PENDING } }),
+        this.prisma.userReport.count({
+          where: { status: ReportStatus.PENDING },
+        }),
         this.prisma.userReport.count({
           where: { status: ReportStatus.APPROVED },
         }),

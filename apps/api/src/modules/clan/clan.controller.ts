@@ -128,11 +128,7 @@ export class ClanController {
     @Param("id") clanId: string,
     @Param("memberId") memberId: string,
   ) {
-    const result = await this.clanService.kickMember(
-      userId,
-      clanId,
-      memberId,
-    );
+    const result = await this.clanService.kickMember(userId, clanId, memberId);
 
     // Broadcast member kicked to all clan members
     this.clanGateway.emitMemberKicked(clanId, {

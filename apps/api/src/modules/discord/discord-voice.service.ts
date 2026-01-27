@@ -57,7 +57,12 @@ export class DiscordVoiceService {
 
     // Create team voice channels
     const teamChannels: Array<{ teamName: string; channelId: string }> = [];
-    const teamNames = ["🔵 Blue Team", "🔴 Red Team", "🟢 Green Team", "🟡 Yellow Team"];
+    const teamNames = [
+      "🔵 Blue Team",
+      "🔴 Red Team",
+      "🟢 Green Team",
+      "🟡 Yellow Team",
+    ];
 
     for (let i = 0; i < numTeams; i++) {
       const channel = await guild.channels.create({

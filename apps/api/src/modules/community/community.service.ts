@@ -217,7 +217,9 @@ export class CommunityService {
         throw new BadRequestException("Content cannot be empty");
       }
       if (dto.content.length > 10000) {
-        throw new BadRequestException("Content too long (max 10000 characters)");
+        throw new BadRequestException(
+          "Content too long (max 10000 characters)",
+        );
       }
     }
 

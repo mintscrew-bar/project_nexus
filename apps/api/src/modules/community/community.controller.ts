@@ -102,11 +102,7 @@ export class CommunityController {
     @Param("id") commentId: string,
     @Body() body: { content: string },
   ) {
-    return this.communityService.updateComment(
-      userId,
-      commentId,
-      body.content,
-    );
+    return this.communityService.updateComment(userId, commentId, body.content);
   }
 
   @Delete("comments/:id")

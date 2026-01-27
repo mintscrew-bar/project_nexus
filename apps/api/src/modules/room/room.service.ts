@@ -33,9 +33,7 @@ export class RoomService {
   async createRoom(hostId: string, dto: CreateRoomDto) {
     // Validate max participants
     if (![10, 15, 20].includes(dto.maxParticipants)) {
-      throw new BadRequestException(
-        "Max participants must be 10, 15, or 20",
-      );
+      throw new BadRequestException("Max participants must be 10, 15, or 20");
     }
 
     // Hash password if provided
@@ -323,9 +321,7 @@ export class RoomService {
 
     if (updates.maxParticipants) {
       if (![10, 15, 20].includes(updates.maxParticipants)) {
-        throw new BadRequestException(
-          "Max participants must be 10, 15, or 20",
-        );
+        throw new BadRequestException("Max participants must be 10, 15, or 20");
       }
       data.maxParticipants = updates.maxParticipants;
     }

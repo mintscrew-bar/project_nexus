@@ -48,7 +48,9 @@ export class FriendService {
         throw new ConflictException("Friend request already pending");
       }
       if (existingFriendship.status === FriendshipStatus.BLOCKED) {
-        throw new BadRequestException("Cannot send friend request to blocked user");
+        throw new BadRequestException(
+          "Cannot send friend request to blocked user",
+        );
       }
     }
 
@@ -310,7 +312,11 @@ export class FriendService {
       where: {
         OR: [
           { userId, friendId, status: FriendshipStatus.ACCEPTED },
-          { userId: friendId, friendId: userId, status: FriendshipStatus.ACCEPTED },
+          {
+            userId: friendId,
+            friendId: userId,
+            status: FriendshipStatus.ACCEPTED,
+          },
         ],
       },
     });
