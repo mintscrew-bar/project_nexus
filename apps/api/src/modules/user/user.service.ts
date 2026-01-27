@@ -85,7 +85,10 @@ export class UserService {
     teamMembers.forEach((tm) => {
       if (!tm.team) return;
 
-      const teamMatches = [...tm.team.matchesAsTeamA, ...tm.team.matchesAsTeamB];
+      const teamMatches = [
+        ...tm.team.matchesAsTeamA,
+        ...tm.team.matchesAsTeamB,
+      ];
 
       teamMatches.forEach((match) => {
         if (match.winnerId === tm.team!.id) {

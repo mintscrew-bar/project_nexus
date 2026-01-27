@@ -27,8 +27,13 @@ export class DiscordStrategy extends PassportStrategy(Strategy, "discord") {
       provider: "discord",
       providerId: profile.id,
       email: profile.email,
-      username: profile.discriminator !== "0" ? `${profile.username}#${profile.discriminator}` : profile.username,
-      avatar: profile.avatar ? `https://cdn.discordapp.com/avatars/${profile.id}/${profile.avatar}.png` : undefined,
+      username:
+        profile.discriminator !== "0"
+          ? `${profile.username}#${profile.discriminator}`
+          : profile.username,
+      avatar: profile.avatar
+        ? `https://cdn.discordapp.com/avatars/${profile.id}/${profile.avatar}.png`
+        : undefined,
       metadata: {
         accessToken,
         refreshToken,

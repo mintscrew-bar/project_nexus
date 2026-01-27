@@ -172,11 +172,14 @@ export class AuctionGateway
     this.server.to(`room:${roomId}`).emit("auction-started", data);
   }
 
-  emitPlayerSold(roomId: string, data: {
-    player: any;
-    team: any;
-    price: number;
-  }) {
+  emitPlayerSold(
+    roomId: string,
+    data: {
+      player: any;
+      team: any;
+      price: number;
+    },
+  ) {
     this.server.to(`room:${roomId}`).emit("player-sold", data);
   }
 

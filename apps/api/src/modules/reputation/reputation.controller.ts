@@ -111,11 +111,7 @@ export class ReputationController {
     @Param("userId") userId: string,
     @Body() body: { reason: string; duration?: number },
   ) {
-    return this.reputationService.banUser(
-      userId,
-      body.reason,
-      body.duration,
-    );
+    return this.reputationService.banUser(userId, body.reason, body.duration);
   }
 
   @Post("users/:userId/unban")

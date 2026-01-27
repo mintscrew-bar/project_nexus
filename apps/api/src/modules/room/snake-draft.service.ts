@@ -120,7 +120,10 @@ export class SnakeDraftService {
     );
 
     // Initialize snake draft state
-    const pickOrder = this.generatePickOrder(teams.map((t) => t.id), numTeams);
+    const pickOrder = this.generatePickOrder(
+      teams.map((t) => t.id),
+      numTeams,
+    );
 
     const draftState: SnakeDraftState = {
       roomId,
@@ -279,7 +282,9 @@ export class SnakeDraftService {
     state.timerEnd = Date.now() + PICK_TIMER_SECONDS * 1000;
 
     // Check if we need to reverse
-    const numTeams = state.pickOrder.filter((id, i, arr) => arr.indexOf(id) === i).length;
+    const numTeams = state.pickOrder.filter(
+      (id, i, arr) => arr.indexOf(id) === i,
+    ).length;
     if (state.currentTeamIndex % numTeams === 0) {
       state.currentRound++;
       state.isReversing = !state.isReversing;
@@ -303,7 +308,9 @@ export class SnakeDraftService {
     }
 
     // Pick random player from available
-    const randomIndex = Math.floor(Math.random() * state.availablePlayers.length);
+    const randomIndex = Math.floor(
+      Math.random() * state.availablePlayers.length,
+    );
     const targetPlayerId = state.availablePlayers[randomIndex];
 
     const currentTeamId = state.pickOrder[state.currentTeamIndex];

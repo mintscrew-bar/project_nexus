@@ -7,8 +7,8 @@ import {
   OnGatewayConnection,
   OnGatewayDisconnect,
 } from "@nestjs/websockets";
-import { Server, Socket } from "socket.io";
 import { UseGuards } from "@nestjs/common";
+import { Server, Socket } from "socket.io";
 import { RoomService } from "./room.service";
 import { AuthService } from "../auth/auth.service";
 

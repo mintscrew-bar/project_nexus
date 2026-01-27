@@ -39,7 +39,7 @@ export class AuthController {
       secure: this.configService.get("NODE_ENV") === "production",
       sameSite: "lax",
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-      path: "/auth",
+      path: "/api/auth",
     });
 
     return res.json({
@@ -58,7 +58,7 @@ export class AuthController {
       secure: this.configService.get("NODE_ENV") === "production",
       sameSite: "lax",
       maxAge: 7 * 24 * 60 * 60 * 1000,
-      path: "/auth",
+      path: "/api/auth",
     });
 
     return res.json({
@@ -88,7 +88,7 @@ export class AuthController {
       secure: this.configService.get("NODE_ENV") === "production",
       sameSite: "lax",
       maxAge: 7 * 24 * 60 * 60 * 1000,
-      path: "/auth",
+      path: "/api/auth",
     });
 
     // Redirect to frontend with access token
@@ -117,7 +117,7 @@ export class AuthController {
       secure: this.configService.get("NODE_ENV") === "production",
       sameSite: "lax",
       maxAge: 7 * 24 * 60 * 60 * 1000,
-      path: "/auth",
+      path: "/api/auth",
     });
 
     const appUrl = this.configService.get("APP_URL") || "http://localhost:3000";
@@ -141,7 +141,7 @@ export class AuthController {
       secure: this.configService.get("NODE_ENV") === "production",
       sameSite: "lax",
       maxAge: 7 * 24 * 60 * 60 * 1000,
-      path: "/auth",
+      path: "/api/auth",
     });
 
     return res.json({ accessToken: tokens.accessToken });
@@ -157,7 +157,7 @@ export class AuthController {
     const refreshToken = req.cookies?.refresh_token;
     await this.authService.logout(userId, refreshToken);
 
-    res.clearCookie("refresh_token", { path: "/auth" });
+    res.clearCookie("refresh_token", { path: "/api/auth" });
 
     return res
       .status(HttpStatus.OK)

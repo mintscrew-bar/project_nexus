@@ -58,9 +58,7 @@ export class ClanService {
 
     // Validate tag format (2-5 characters, alphanumeric)
     if (!/^[A-Z0-9]{2,5}$/.test(dto.tag.toUpperCase())) {
-      throw new BadRequestException(
-        "Tag must be 2-5 alphanumeric characters",
-      );
+      throw new BadRequestException("Tag must be 2-5 alphanumeric characters");
     }
 
     // Create clan with owner as first member
@@ -215,8 +213,13 @@ export class ClanService {
 
     const member = clan.members[0];
 
-    if (!member || (member.role !== ClanRole.OWNER && member.role !== ClanRole.OFFICER)) {
-      throw new ForbiddenException("Only clan owner or officers can update clan");
+    if (
+      !member ||
+      (member.role !== ClanRole.OWNER && member.role !== ClanRole.OFFICER)
+    ) {
+      throw new ForbiddenException(
+        "Only clan owner or officers can update clan",
+      );
     }
 
     return this.prisma.clan.update({
@@ -322,11 +325,7 @@ export class ClanService {
     return { message: "Left clan successfully" };
   }
 
-  async kickMember(
-    userId: string,
-    clanId: string,
-    targetUserId: string,
-  ) {
+  async kickMember(userId: string, clanId: string, targetUserId: string) {
     const clan = await this.prisma.clan.findUnique({
       where: { id: clanId },
       include: {
@@ -342,7 +341,10 @@ export class ClanService {
 
     const member = clan.members[0];
 
-    if (!member || (member.role !== ClanRole.OWNER && member.role !== ClanRole.OFFICER)) {
+    if (
+      !member ||
+      (member.role !== ClanRole.OWNER && member.role !== ClanRole.OFFICER)
+    ) {
       throw new ForbiddenException("Only owner or officers can kick members");
     }
 
@@ -362,7 +364,10 @@ export class ClanService {
     }
 
     // Officers can only kick members, not other officers
-    if (member.role === ClanRole.OFFICER && targetMember.role === ClanRole.OFFICER) {
+    if (
+      member.role === ClanRole.OFFICER &&
+      targetMember.role === ClanRole.OFFICER
+    ) {
       throw new ForbiddenException("Officers cannot kick other officers");
     }
 
@@ -416,11 +421,7 @@ export class ClanService {
     return { message: "Member role updated successfully" };
   }
 
-  async transferOwnership(
-    userId: string,
-    clanId: string,
-    newOwnerId: string,
-  ) {
+  async transferOwnership(userId: string, clanId: string, newOwnerId: string) {
     const clan = await this.prisma.clan.findUnique({
       where: { id: clanId },
     });

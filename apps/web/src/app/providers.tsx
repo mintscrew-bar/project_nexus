@@ -1,9 +1,25 @@
 "use client";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { SessionProvider } from "next-auth/react";
-import { ThemeProvider } from "next-themes"; // Import ThemeProvider
-import { useState, type ReactNode } from "react";
+import { ThemeProvider } from "next-themes";
+import { useState, type ReactNode, useEffect } from "react";
+import { useAuthStore } from "@/stores/auth-store";
+
+function AuthInitializer({ children }: { children: ReactNode }) {
+  const initializeAuth = useAuthStore((state) => state.initializeAuth);
+  const isLoading = useAuthStore((state) => state.isLoading);
+
+  useEffect(() => {
+    initializeAuth();
+  }, [initializeAuth]);
+
+  // Optionally, show a loading spinner while auth state is being determined
+  if (isLoading) {
+    return <div>Loading...</div>; // Replace with a proper global spinner/loader
+  }
+
+  return <>{children}</>;
+}
 
 export function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(
@@ -19,10 +35,10 @@ export function Providers({ children }: { children: ReactNode }) {
   );
 
   return (
-    <ThemeProvider attribute="class" defaultTheme="system" enableSystem> {/* Wrap with ThemeProvider */}
-      <SessionProvider>
-        <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-      </SessionProvider>
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+      <QueryClientProvider client={queryClient}>
+        <AuthInitializer>{children}</AuthInitializer>
+      </QueryClientProvider>
     </ThemeProvider>
   );
 }

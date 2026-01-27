@@ -4,7 +4,7 @@ import { useAuthStore } from "@/stores/auth-store";
 import { Logo } from "@/components/Logo";
 
 export default function LoginPage() {
-  const { login, loginWithGoogle, isLoading } = useAuthStore();
+  const { loginWithDiscord, loginWithGoogle, isLoading } = useAuthStore();
 
   return (
     <div className="flex min-h-screen items-center justify-center px-4">
@@ -32,7 +32,7 @@ export default function LoginPage() {
             </div>
 
             <button
-              onClick={login}
+              onClick={loginWithDiscord}
               disabled={isLoading}
               className="w-full btn-primary flex items-center justify-center gap-3 py-4 text-lg disabled:opacity-50 disabled:cursor-not-allowed"
             >
