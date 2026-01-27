@@ -27,7 +27,6 @@ export function Header() {
         <MobileMenu />
         <Link href="/" className="flex items-center">
           <Logo className="h-8 w-auto" />
-          <span className="ml-2 text-xl font-bold text-text-primary hidden sm:block">Nexus</span>
         </Link>
       </div>
 
