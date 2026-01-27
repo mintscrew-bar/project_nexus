@@ -72,10 +72,13 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
 
   async onModuleInit() {
     const token = this.configService.get("DISCORD_BOT_TOKEN");
+    const clientId = this.configService.get("DISCORD_CLIENT_ID");
+    const guildId = this.configService.get("DISCORD_GUILD_ID");
 
-    if (!token) {
+    if (!token || !clientId || !guildId ||
+        token.includes("your-") || clientId.includes("your-") || guildId.includes("your-")) {
       console.warn(
-        "Discord bot token not configured, skipping bot initialization",
+        "Discord bot not properly configured, skipping bot initialization",
       );
       return;
     }
@@ -84,11 +87,17 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
       this.setupEventHandlers();
       await this.registerCommands();
       await this.client.login(token);
+<<<<<<< HEAD
 
       console.log("Discord bot initialized successfully");
     } catch (error) {
       console.warn("Discord bot initialization failed:", error.message);
       console.warn("Application will continue without Discord bot features");
+=======
+      console.log("Discord bot initialized");
+    } catch (error) {
+      console.warn("Failed to initialize Discord bot:", error instanceof Error ? error.message : error);
+>>>>>>> 3b553b2d94a3c353197231914982b5253fba61fc
     }
   }
 

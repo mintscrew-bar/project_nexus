@@ -203,6 +203,45 @@ npx prisma generate
 - CORS 설정 확인 (`.env`의 `CORS_ORIGINS`)
 - 방화벽 설정 확인
 
+### OAuth 401 에러 (invalid_client)
+- Google/Discord Console에서 **리디렉션 URI**가 정확히 일치하는지 확인
+- `.env`의 콜백 URL에 `/api` prefix가 포함되어 있는지 확인:
+  ```
+  GOOGLE_CALLBACK_URL=http://localhost:4000/api/auth/google/callback
+  DISCORD_CALLBACK_URL=http://localhost:4000/api/auth/discord/callback
+  ```
+
+### Discord 봇 초기화 실패
+Discord 봇 자격 증명이 없거나 잘못된 경우 경고 메시지가 표시되지만 서버는 정상 작동합니다:
+```
+Discord bot not properly configured, skipping bot initialization
+```
+
+### API 404 에러
+- `apps/web/next.config.js`의 rewrite 설정이 올바른지 확인
+- API 서버가 4000 포트에서 실행 중인지 확인
+
+---
+
+## 🐳 Docker로 인프라 실행 (권장)
+
+```bash
+# PostgreSQL
+docker run -d \
+  --name nexus-postgres \
+  -p 5432:5432 \
+  -e POSTGRES_USER=nexus \
+  -e POSTGRES_PASSWORD=nexus_password \
+  -e POSTGRES_DB=nexus \
+  postgres:15
+
+# Redis
+docker run -d \
+  --name nexus-redis \
+  -p 6379:6379 \
+  redis:7
+```
+
 ---
 
 ## 📚 추가 문서

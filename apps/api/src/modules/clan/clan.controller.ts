@@ -13,6 +13,7 @@ import {
 } from "@nestjs/common";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
+import { Public } from "../auth/decorators/public.decorator";
 import { ClanService, CreateClanDto, UpdateClanDto } from "./clan.service";
 import { ClanGateway } from "./clan.gateway";
 import { ClanRole } from "@nexus/database";
@@ -39,6 +40,7 @@ export class ClanController {
   }
 
   @Get()
+  @Public()
   async listClans(
     @Query("search") search?: string,
     @Query("isRecruiting") isRecruiting?: string,
@@ -57,6 +59,7 @@ export class ClanController {
   }
 
   @Get(":id")
+  @Public()
   async getClan(@Param("id") id: string) {
     return this.clanService.getClanById(id);
   }
