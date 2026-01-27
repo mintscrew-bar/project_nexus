@@ -16,6 +16,7 @@ interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: () => void;
+  loginWithGoogle: () => void;
   logout: () => Promise<void>;
   fetchUser: () => Promise<void>;
   setUser: (user: User | null) => void;
@@ -28,6 +29,10 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   login: () => {
     authApi.login();
+  },
+
+  loginWithGoogle: () => {
+    authApi.loginWithGoogle();
   },
 
   logout: async () => {
