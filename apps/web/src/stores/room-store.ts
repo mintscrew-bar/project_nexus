@@ -8,14 +8,14 @@ import {
 
 interface Room {
   id: string;
-  title: string;
+  name: string;
   hostId: string;
-  currentPlayers: number;
-  maxPlayers: number;
+  maxParticipants: number;
   isPrivate: boolean;
-  status: "WAITING" | "IN_PROGRESS" | "COMPLETED";
-  mode: "AUCTION" | "SNAKE_DRAFT";
+  status: "WAITING" | "IN_PROGRESS" | "COMPLETED" | "DRAFT" | "DRAFT_COMPLETED" | "TEAM_SELECTION";
+  teamMode: "AUCTION" | "SNAKE_DRAFT";
   createdAt: string;
+  participants?: any[];
 }
 
 interface Participant {
@@ -33,11 +33,18 @@ interface ChatMessage {
 }
 
 interface RoomCreationData {
-  title: string;
-  maxSize: 10 | 15 | 20;
-  mode: "AUCTION" | "SNAKE_DRAFT";
-  isPrivate: boolean;
+  name: string;
+  maxParticipants: 10 | 15 | 20;
+  teamMode: "AUCTION" | "SNAKE_DRAFT";
   password?: string;
+  allowSpectators?: boolean;
+  // Auction settings
+  startingPoints?: number;
+  minBidIncrement?: number;
+  bidTimeLimit?: number;
+  // Snake draft settings
+  pickTimeLimit?: number;
+  captainSelection?: "RANDOM" | "TIER";
 }
 
 interface RoomStoreState {

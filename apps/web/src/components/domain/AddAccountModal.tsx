@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Modal } from '@/components/ui/Modal'; // Use custom Modal
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/Input';
+import { Button } from '@/components/ui/Button';
+import { Label } from '@/components/ui/Label';
 import { useRiotStore } from '@/stores/riot-store';
 import { useDdragonStore } from '@/stores/ddragon-store';
 import { X, Loader2, CheckCircle, AlertCircle, Info, Sword, Shield } from 'lucide-react';
@@ -17,7 +17,7 @@ interface AddAccountModalProps {
 }
 
 type Role = 'TOP' | 'JUNGLE' | 'MID' | 'ADC' | 'SUPPORT';
-const ROLES: Role[] = ['TOP', 'JUNGLE', 'MID' | 'ADC', 'SUPPORT'];
+const ROLES: Role[] = ['TOP', 'JUNGLE', 'MID', 'ADC', 'SUPPORT'];
 
 export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountModalProps) {
   const {

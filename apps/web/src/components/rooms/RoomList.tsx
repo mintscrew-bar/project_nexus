@@ -57,12 +57,7 @@ export function RoomList() {
       {rooms.map((room) => (
         <RoomCard
           key={room.id}
-          room={{
-            ...room,
-            currentPlayers: room.currentPlayers || 0,
-            maxPlayers: room.maxPlayers || 10,
-            createdAt: room.createdAt || new Date().toISOString(),
-          }}
+          room={room}
           onClick={() => router.push(`/tournaments/${room.id}/lobby`)}
         />
       ))}

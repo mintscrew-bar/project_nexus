@@ -11,3 +11,6 @@ export * from './Modal';
 export * from './Toast';
 export * from './Select';
 export * from './Tabs';
+export * from './Label';
+export * from './Switch';
+export * from './Alert';

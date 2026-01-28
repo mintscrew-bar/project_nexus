@@ -1,10 +1,10 @@
 "use client";
 
-import { Modal } from '@/components/ui/Modal'; // Use custom Modal
-import { Button } from '@/components/ui/button';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
-import { Loader2, Swords, Trophy, Info, Copy, ShieldCheck } from 'lucide-react';
+import { Modal } from '@/components/ui/Modal';
+import { Button } from '@/components/ui/Button';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/Alert';
+import { Badge } from '@/components/ui/Badge';
+import { Loader2, Swords, Trophy, Info, Copy, ShieldCheck, AlertCircle } from 'lucide-react';
 import { Match } from './BracketView'; // Import the Match interface
 import { useState } from 'react';
 import { useAuthStore } from '@/stores/auth-store';

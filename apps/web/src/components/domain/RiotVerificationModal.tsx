@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal'; // Use custom Modal
-import { Button } from '@/components/ui/button'; // Assuming Button is available in ui
+import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils'; // For button styling
 
 // Verification step modal

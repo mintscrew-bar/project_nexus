@@ -1,13 +1,11 @@
 "use client";
 
-"use client";
-
 import { useEffect, useState } from 'react';
-import { Modal } from '@/components/ui/Modal'; // Use custom Modal
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
+import { Modal } from '@/components/ui/Modal';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { Label } from '@/components/ui/Label';
+import { Switch } from '@/components/ui/Switch';
 import { Loader2, Settings } from 'lucide-react';
 import { RoomSettingsDto, useLobbyStore } from '@/stores/lobby-store';
 
@@ -16,8 +14,8 @@ interface RoomSettingsModalProps {
   onClose: () => void;
   room: {
     id: string;
-    title: string;
-    maxPlayers: number;
+    name: string;
+    maxParticipants: number;
     isPrivate: boolean;
   };
 }
@@ -25,8 +23,8 @@ interface RoomSettingsModalProps {
 export function RoomSettingsModal({ isOpen, onClose, room }: RoomSettingsModalProps) {
   const { updateRoomSettings } = useLobbyStore();
   const [settings, setSettings] = useState<RoomSettingsDto>({
-    name: room.title,
-    maxParticipants: room.maxPlayers,
+    name: room.name,
+    maxParticipants: room.maxParticipants,
     password: '',
   });
   const [isPrivate, setIsPrivate] = useState(room.isPrivate);
@@ -36,8 +34,8 @@ export function RoomSettingsModal({ isOpen, onClose, room }: RoomSettingsModalPr
   useEffect(() => {
     if (isOpen) {
       setSettings({
-        name: room.title,
-        maxParticipants: room.maxPlayers,
+        name: room.name,
+        maxParticipants: room.maxParticipants,
         password: '',
       });
       setIsPrivate(room.isPrivate);
@@ -107,7 +105,7 @@ export function RoomSettingsModal({ isOpen, onClose, room }: RoomSettingsModalPr
             <Input
               id="password"
               type="password"
-              value={settings.password}
+              value={settings.password || ''}
               onChange={(e) => setSettings({ ...settings, password: e.target.value })}
               placeholder="새 비밀번호"
             />

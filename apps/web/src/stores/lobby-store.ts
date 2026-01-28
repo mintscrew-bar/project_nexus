@@ -13,13 +13,12 @@ interface Participant {
 
 interface Room {
   id: string;
-  title: string;
+  name: string;
   hostId: string;
-  currentPlayers: number;
-  maxPlayers: number;
+  maxParticipants: number;
   isPrivate: boolean;
-  status: "WAITING" | "IN_PROGRESS" | "COMPLETED" | "DRAFT" | "DRAFT_COMPLETED";
-  teamMode: "AUCTION" | "LADDER" | "SNAKE_DRAFT"; // Add SNAKE_DRAFT
+  status: "WAITING" | "IN_PROGRESS" | "COMPLETED" | "DRAFT" | "DRAFT_COMPLETED" | "TEAM_SELECTION";
+  teamMode: "AUCTION" | "SNAKE_DRAFT";
   participants: Participant[];
 }
 

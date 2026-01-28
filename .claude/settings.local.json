@@ -11,7 +11,10 @@
       "Bash(timeout:*)",
       "Bash(tasklist)",
       "Bash(findstr /i \"node\")",
-      "Bash(npx eslint:*)"
+      "Bash(npx eslint:*)",
+      "Bash(pnpm exec tsc:*)",
+      "Bash(pnpm exec prisma generate:*)",
+      "Bash(grep:*)"
     ]
   }
 }

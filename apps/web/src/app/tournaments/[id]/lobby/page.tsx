@@ -80,7 +80,7 @@ export default function TournamentLobbyPage() {
     <div className="flex-grow p-8">
       <div className="container mx-auto">
         <h1 className="text-3xl font-bold mb-4 text-text-primary">
-          {room.title} <span className="text-accent-primary text-xl">#{room.id.slice(0, 4)}</span>
+          {room.name} <span className="text-accent-primary text-xl">#{room.id.slice(0, 4)}</span>
         </h1>
         <p className="text-text-secondary mb-6">
           방장: {room.participants.find(p => p.isHost)?.username || 'N/A'} | 팀 구성 방식: {room.teamMode === "AUCTION" ? "경매" : "스네이크"}
@@ -92,7 +92,7 @@ export default function TournamentLobbyPage() {
           <div className="lg:col-span-1 bg-bg-secondary border border-bg-tertiary rounded-xl p-6">
             <h2 className="text-2xl font-bold text-text-primary mb-4 flex items-center">
               <Users className="h-6 w-6 mr-2 text-text-secondary" />
-              참가자 ({room.participants.length}/{room.maxPlayers})
+              참가자 ({room.participants.length}/{room.maxParticipants})
             </h2>
             <div className="space-y-2">
               {room.participants.map(p => (
@@ -157,10 +157,11 @@ export default function TournamentLobbyPage() {
                     </button>
                 )}
                 {room.status === 'DRAFT_COMPLETED' ? (
-                  <Link href={`/tournaments/${room.id}/bracket`} passHref>
-                    <a className="w-full text-center px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg transition-colors duration-200 block">
-                      대진표 보기
-                    </a>
+                  <Link
+                    href={`/tournaments/${room.id}/bracket`}
+                    className="w-full text-center px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg transition-colors duration-200 block"
+                  >
+                    대진표 보기
                   </Link>
                 ) : (
                   <button 

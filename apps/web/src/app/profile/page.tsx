@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
 import { useRiotStore } from '@/stores/riot-store';
 import { AddAccountModal } from '@/components/domain/AddAccountModal'; // Updated import
-import { LoadingSpinner, Card, CardHeader, CardTitle, CardContent, Badge, Button } from '@/components/ui';
-import { Star, Plus, RefreshCw, Shield, Trophy, TrendingUp } from 'lucide-react';
+import { LoadingSpinner, Card, CardHeader, CardTitle, CardContent, Badge, Button, Label } from '@/components/ui';
+import { Star, Plus, RefreshCw, Shield, Trophy, TrendingUp, Loader2 } from 'lucide-react';
 import { TierBadge } from '@/components/domain/TierBadge';
 
 export default function ProfilePage() {

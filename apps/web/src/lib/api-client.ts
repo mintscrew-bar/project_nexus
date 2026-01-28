@@ -118,7 +118,7 @@ export const authApi = {
 
   logout: async () => {
     try {
-      await apiClient.post("/api/auth/logout");
+      await apiClient.post("/auth/logout");
     } catch (error) {
       console.error("Logout error:", error);
     } finally {
@@ -326,6 +326,16 @@ export const matchApi = {
 
 // Riot API 관련 API
 export const riotApi = {
+  // 챔피언 목록 조회 (Data Dragon)
+  getChampions: async () => {
+    const version = process.env.NEXT_PUBLIC_DDRAGON_VERSION || "14.1.1";
+    const response = await fetch(
+      `https://ddragon.leagueoflegends.com/cdn/${version}/data/ko_KR/champion.json`
+    );
+    const data = await response.json();
+    return { data: data.data, version: data.version };
+  },
+
   // 인증 시작
   startVerification: async (gameName: string, tagLine: string) => {
     const response = await apiClient.post("/riot/verify/start", { gameName, tagLine });

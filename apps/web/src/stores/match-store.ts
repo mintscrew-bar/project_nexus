@@ -143,7 +143,7 @@ export const useMatchStore = create<MatchStoreState>((set, get) => ({
 
   reportResult: async (matchId: string, winnerId: string) => {
     try {
-      await matchApi.reportResult(matchId, { winnerId });
+      await matchApi.reportResult(matchId, { winnerTeamId: winnerId });
       // Optimistically update the state, the websocket event will be the source of truth
       set(state => ({
         roomMatches: state.roomMatches.map(m =>
