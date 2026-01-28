@@ -28,21 +28,20 @@ const TEAM_MODES: { value: TeamMode; label: string; description: string; icon: R
 ];
 
 const PLAYER_OPTIONS = [
-  { value: 10, label: "10명", description: "5 vs 5 단판", teams: 2 },
-  { value: 12, label: "12명", description: "6 vs 6 (1명 교체)", teams: 2 },
-  { value: 16, label: "16명", description: "4팀 토너먼트", teams: 4 },
+  { value: 10, label: "10명", description: "5 vs 5", teams: 2 },
+  { value: 15, label: "15명", description: "3팀 (5v5v5)", teams: 3 },
   { value: 20, label: "20명", description: "4팀 토너먼트 (5인)", teams: 4 },
 ];
 
 export function RoomCreationForm({ onCancel, onRoomCreated }: RoomCreationFormProps) {
   const router = useRouter();
   const { createRoom, isLoading, error } = useRoomStore();
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [maxPlayers, setMaxPlayers] = useState(10);
+  const [name, setName] = useState("");
+  const [maxParticipants, setMaxParticipants] = useState(10);
   const [teamMode, setTeamMode] = useState<TeamMode>("AUCTION");
   const [isPrivate, setIsPrivate] = useState(false);
   const [password, setPassword] = useState("");
+  const [allowSpectators, setAllowSpectators] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // 경매 설정
@@ -58,17 +57,24 @@ export function RoomCreationForm({ onCancel, onRoomCreated }: RoomCreationFormPr
     e.preventDefault();
     setErrorMessage(null);
 
-    if (!title.trim()) {
+    if (!name.trim()) {
       setErrorMessage("방 제목을 입력해주세요");
       return;
     }
 
     const roomData = {
-      title: title.trim(),
-      maxSize: maxPlayers as 10 | 15 | 20,
-      mode: teamMode as "AUCTION" | "SNAKE_DRAFT",
-      isPrivate,
+      name: name.trim(),
+      maxParticipants: maxParticipants as 10 | 15 | 20,
+      teamMode: teamMode,
       password: isPrivate ? password : undefined,
+      allowSpectators: allowSpectators,
+      // Auction settings
+      startingPoints,
+      minBidIncrement,
+      bidTimeLimit,
+      // Snake draft settings
+      pickTimeLimit,
+      captainSelection,
     };
 
     const newRoom = await createRoom(roomData);
@@ -83,43 +89,27 @@ export function RoomCreationForm({ onCancel, onRoomCreated }: RoomCreationFormPr
     }
   };
 
-  const selectedPlayerOption = PLAYER_OPTIONS.find(opt => opt.value === maxPlayers);
+  const selectedPlayerOption = PLAYER_OPTIONS.find(opt => opt.value === maxParticipants);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       {/* 기본 정보 */}
       <div className="space-y-4">
         <div>
-          <label htmlFor="title" className="block text-text-primary text-sm font-semibold mb-2">
+          <label htmlFor="name" className="block text-text-primary text-sm font-semibold mb-2">
             방 제목 <span className="text-accent-danger">*</span>
           </label>
           <input
             type="text"
-            id="title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
+            id="name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
             placeholder="예: 다이아+ 경매 내전, 즐겜팟 모집"
             className="w-full input"
             maxLength={50}
             required
           />
-          <p className="text-text-tertiary text-xs mt-1">{title.length}/50자</p>
-        </div>
-
-        <div>
-          <label htmlFor="description" className="block text-text-primary text-sm font-semibold mb-2">
-            방 설명 <span className="text-text-tertiary">(선택)</span>
-          </label>
-          <textarea
-            id="description"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="추가 규칙이나 참가 조건을 입력하세요"
-            className="w-full input resize-none"
-            rows={2}
-            maxLength={200}
-          />
-          <p className="text-text-tertiary text-xs mt-1">{description.length}/200자</p>
+          <p className="text-text-tertiary text-xs mt-1">{name.length}/50자</p>
         </div>
       </div>
 
@@ -129,14 +119,14 @@ export function RoomCreationForm({ onCancel, onRoomCreated }: RoomCreationFormPr
           <Users className="w-4 h-4 inline mr-2" />
           참가 인원
         </label>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
           {PLAYER_OPTIONS.map((option) => (
             <button
               key={option.value}
               type="button"
-              onClick={() => setMaxPlayers(option.value)}
+              onClick={() => setMaxParticipants(option.value)}
               className={`p-3 rounded-lg border-2 transition-all text-left ${
-                maxPlayers === option.value
+                maxParticipants === option.value
                   ? "border-accent-primary bg-accent-primary/10"
                   : "border-bg-tertiary hover:border-bg-elevated bg-bg-tertiary/50"
               }`}
@@ -272,51 +262,74 @@ export function RoomCreationForm({ onCancel, onRoomCreated }: RoomCreationFormPr
           </div>
         </div>
       )}
-
-      {/* 비공개 설정 */}
-      <div className="p-4 bg-bg-tertiary/50 rounded-lg border border-bg-elevated">
-        <label className="flex items-center justify-between cursor-pointer">
-          <div className="flex items-center gap-3">
-            {isPrivate ? (
-              <Lock className="w-5 h-5 text-accent-gold" />
-            ) : (
-              <Unlock className="w-5 h-5 text-text-secondary" />
-            )}
-            <div>
-              <div className="text-text-primary font-medium">비공개 방</div>
-              <div className="text-text-secondary text-xs">비밀번호를 아는 사람만 참여할 수 있습니다</div>
+      
+      {/* 상세 설정 */}
+      <div className="grid grid-cols-2 gap-6">
+        {/* 비공개 설정 */}
+        <div className="p-4 bg-bg-tertiary/50 rounded-lg border border-bg-elevated">
+          <label className="flex items-center justify-between cursor-pointer">
+            <div className="flex items-center gap-3">
+              {isPrivate ? (
+                <Lock className="w-5 h-5 text-accent-gold" />
+              ) : (
+                <Unlock className="w-5 h-5 text-text-secondary" />
+              )}
+              <div>
+                <div className="text-text-primary font-medium">비공개 방</div>
+                <div className="text-text-secondary text-xs">비밀번호를 사용합니다</div>
+              </div>
             </div>
-          </div>
-          <div className="relative">
-            <input
-              type="checkbox"
-              checked={isPrivate}
-              onChange={(e) => setIsPrivate(e.target.checked)}
-              className="sr-only"
-            />
-            <div className={`w-11 h-6 rounded-full transition-colors ${isPrivate ? "bg-accent-primary" : "bg-bg-elevated"}`}>
-              <div className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-transform ${isPrivate ? "translate-x-5" : "translate-x-0.5"} mt-0.5`} />
+            <div className="relative">
+              <input
+                type="checkbox"
+                checked={isPrivate}
+                onChange={(e) => setIsPrivate(e.target.checked)}
+                className="sr-only"
+              />
+              <div className={`w-11 h-6 rounded-full transition-colors ${isPrivate ? "bg-accent-primary" : "bg-bg-elevated"}`}>
+                <div className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-transform ${isPrivate ? "translate-x-5" : "translate-x-0.5"} mt-0.5`} />
+              </div>
             </div>
-          </div>
-        </label>
+          </label>
 
-        {isPrivate && (
-          <div className="mt-4">
-            <label htmlFor="password" className="block text-text-secondary text-xs mb-1">
-              비밀번호
-            </label>
-            <input
-              type="password"
-              id="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="비밀번호를 입력하세요"
-              className="w-full input"
-              required={isPrivate}
-              minLength={4}
-            />
-          </div>
-        )}
+          {isPrivate && (
+            <div className="mt-4">
+              <label htmlFor="password" className="block text-text-secondary text-xs mb-1">
+                비밀번호
+              </label>
+              <input
+                type="password"
+                id="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="비밀번호를 입력하세요"
+                className="w-full input"
+                required={isPrivate}
+                minLength={4}
+              />
+            </div>
+          )}
+        </div>
+        {/* 관전 허용 설정 */}
+        <div className="p-4 bg-bg-tertiary/50 rounded-lg border border-bg-elevated">
+          <label className="flex items-center justify-between cursor-pointer h-full">
+            <div className="flex items-center gap-3">
+                <div className="text-text-primary font-medium">관전 허용</div>
+                <div className="text-text-secondary text-xs">다른 유저가 관전할 수 있습니다</div>
+            </div>
+            <div className="relative">
+              <input
+                type="checkbox"
+                checked={allowSpectators}
+                onChange={(e) => setAllowSpectators(e.target.checked)}
+                className="sr-only"
+              />
+              <div className={`w-11 h-6 rounded-full transition-colors ${allowSpectators ? "bg-accent-primary" : "bg-bg-elevated"}`}>
+                <div className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-transform ${allowSpectators ? "translate-x-5" : "translate-x-0.5"} mt-0.5`} />
+              </div>
+            </div>
+          </label>
+        </div>
       </div>
 
       {/* 요약 */}
@@ -330,6 +343,10 @@ export function RoomCreationForm({ onCancel, onRoomCreated }: RoomCreationFormPr
           {" "}•{" "}
           <span className={isPrivate ? "text-accent-gold" : "text-accent-success"}>
             {isPrivate ? "비공개" : "공개"}
+          </span>
+           •{" "}
+          <span>
+            {allowSpectators ? "관전 허용" : "관전 비허용"}
           </span>
         </div>
       </div>

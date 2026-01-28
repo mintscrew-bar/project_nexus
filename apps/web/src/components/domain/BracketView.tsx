@@ -10,7 +10,7 @@ interface Team {
   score?: number;
 }
 
-interface Match {
+export interface Match { // Exporting for use in other components
   id: string;
   round: number;
   matchNumber: number;
@@ -19,14 +19,16 @@ interface Match {
   winner?: Team;
   status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED';
   scheduledTime?: string;
+  tournamentCode?: string; // Add tournament code to match interface
 }
 
 interface BracketViewProps {
   matches: Match[];
   rounds: number;
+  onMatchClick: (match: Match) => void; // Add click handler prop
 }
 
-export function BracketView({ matches, rounds }: BracketViewProps) {
+export function BracketView({ matches, rounds, onMatchClick }: BracketViewProps) {
   // Group matches by round
   const matchesByRound = React.useMemo(() => {
     const grouped: Record<number, Match[]> = {};
@@ -72,7 +74,8 @@ export function BracketView({ matches, rounds }: BracketViewProps) {
               {matchesByRound[round]?.map(match => (
                 <Card
                   key={match.id}
-                  className={`transition-all ${getMatchStatusColor(match.status)}`}
+                  className={`transition-all hover:border-accent-primary cursor-pointer ${getMatchStatusColor(match.status)}`}
+                  onClick={() => onMatchClick(match)} // Add onClick handler
                 >
                   <CardContent className="p-4">
                     {/* Match Header */}

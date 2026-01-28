@@ -10,7 +10,8 @@
       "Bash(pnpm dev)",
       "Bash(timeout:*)",
       "Bash(tasklist)",
-      "Bash(findstr /i \"node\")"
+      "Bash(findstr /i \"node\")",
+      "Bash(npx eslint:*)"
     ]
   }
 }

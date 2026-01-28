@@ -5,16 +5,25 @@ import {
   ForbiddenException,
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
-import { RoomStatus, TeamMode } from "@nexus/database";
+import { RoomStatus, TeamMode, TeamCaptainSelection } from "@nexus/database";
 import * as bcrypt from "bcrypt";
 
 export interface CreateRoomDto {
   name: string;
   password?: string;
-  maxParticipants: number; // 10, 15, 20
+  maxParticipants: number;
   teamMode: TeamMode;
   allowSpectators?: boolean;
   discordGuildId?: string;
+
+  // Auction Settings
+  startingPoints?: number;
+  minBidIncrement?: number;
+  bidTimeLimit?: number;
+
+  // Snake Draft Settings
+  pickTimeLimit?: number;
+  captainSelection?: TeamCaptainSelection;
 }
 
 export interface JoinRoomDto {
@@ -53,6 +62,14 @@ export class RoomService {
         teamMode: dto.teamMode,
         allowSpectators: dto.allowSpectators ?? true,
         discordGuildId: dto.discordGuildId,
+        
+        // Draft settings
+        startingPoints: dto.startingPoints,
+        minBidIncrement: dto.minBidIncrement,
+        bidTimeLimit: dto.bidTimeLimit,
+        pickTimeLimit: dto.pickTimeLimit,
+        captainSelection: dto.captainSelection,
+
         participants: {
           create: {
             userId: hostId,

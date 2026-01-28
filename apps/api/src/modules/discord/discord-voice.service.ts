@@ -5,9 +5,7 @@ import {
   Client,
   ChannelType,
   PermissionFlagsBits,
-  CategoryChannel,
   VoiceChannel,
-  GuildMember,
 } from "discord.js";
 
 @Injectable()

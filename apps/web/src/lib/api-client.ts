@@ -68,7 +68,10 @@ apiClient.interceptors.response.use(
       } catch (refreshError) {
         // 갱신 실패 시 로그아웃 처리
         accessToken = null;
-        window.location.href = "/auth/login";
+        // 이미 로그인 페이지에 있으면 리다이렉트하지 않음 (무한 루프 방지)
+        if (!window.location.pathname.startsWith("/auth/login")) {
+          window.location.href = "/auth/login";
+        }
         return Promise.reject(refreshError);
       }
     }
@@ -195,13 +198,23 @@ export const roomApi = {
   },
 
   createRoom: async (data: {
-    title: string;
-    maxSize: 10 | 15 | 20;
-    mode: "AUCTION" | "SNAKE_DRAFT";
-    isPrivate: boolean;
+    name: string;
+    maxParticipants: number;
+    teamMode: "AUCTION" | "SNAKE_DRAFT";
     password?: string;
+    allowSpectators?: boolean;
+    startingPoints?: number;
+    minBidIncrement?: number;
+    bidTimeLimit?: number;
+    pickTimeLimit?: number;
+    captainSelection?: "RANDOM" | "TIER";
   }) => {
     const response = await apiClient.post("/rooms", data);
+    return response.data;
+  },
+  
+  update: async (roomId: string, data: any) => {
+    const response = await apiClient.put(`/rooms/${roomId}`, data);
     return response.data;
   },
 
@@ -222,8 +235,8 @@ export const roomApi = {
     return response.data;
   },
 
-  kickParticipant: async (roomId: string, userId: string) => {
-    const response = await apiClient.post(`/rooms/${roomId}/kick/${userId}`);
+  kick: async (roomId: string, participantId: string) => {
+    const response = await apiClient.delete(`/rooms/${roomId}/participants/${participantId}`);
     return response.data;
   },
 
@@ -278,12 +291,12 @@ export const snakeDraftApi = {
 // 매치/토너먼트 관련 API
 export const matchApi = {
   generateBracket: async (roomId: string) => {
-    const response = await apiClient.post(`/matches/${roomId}/bracket`);
+    const response = await apiClient.post(`/matches/bracket/${roomId}`);
     return response.data;
   },
 
   getBracket: async (roomId: string) => {
-    const response = await apiClient.get(`/matches/${roomId}/bracket`);
+    const response = await apiClient.get(`/matches/bracket/${roomId}`);
     return response.data;
   },
 
@@ -294,6 +307,11 @@ export const matchApi = {
 
   startMatch: async (matchId: string) => {
     const response = await apiClient.post(`/matches/${matchId}/start`);
+    return response.data;
+  },
+
+  generateTournamentCode: async (matchId: string) => {
+    const response = await apiClient.post(`/matches/${matchId}/tournament-code`);
     return response.data;
   },
 
@@ -308,39 +326,53 @@ export const matchApi = {
 
 // Riot API 관련 API
 export const riotApi = {
-  verifyAccount: async (data: {
-    gameName: string;
-    tagLine: string;
-    verificationCode: string;
-  }) => {
-    const response = await apiClient.post("/riot/verify", data);
+  // 인증 시작
+  startVerification: async (gameName: string, tagLine: string) => {
+    const response = await apiClient.post("/riot/verify/start", { gameName, tagLine });
     return response.data;
   },
 
-  getMyAccounts: async () => {
+  // 인증 확인
+  checkVerification: async () => {
+    const response = await apiClient.get("/riot/verify/check");
+    return response.data;
+  },
+
+  // 계정 등록
+  registerAccount: async (data: any) => {
+    const response = await apiClient.post("/riot/register", data);
+    return response.data;
+  },
+
+  // 계정 목록 조회
+  getAccounts: async () => {
     const response = await apiClient.get("/riot/accounts");
     return response.data;
   },
 
+  // 티어 동기화
   syncAccount: async (accountId: string) => {
-    const response = await apiClient.post(`/riot/sync/${accountId}`);
+    const response = await apiClient.post(`/riot/accounts/${accountId}/sync`);
     return response.data;
   },
 
+  // 대표 계정 설정
   setPrimaryAccount: async (accountId: string) => {
-    const response = await apiClient.post(`/riot/primary/${accountId}`);
+    const response = await apiClient.put(`/riot/accounts/${accountId}/primary`);
     return response.data;
   },
 
-  setPositions: async (data: { primaryPosition: string; secondaryPosition: string }) => {
-    const response = await apiClient.post("/riot/positions", data);
-    return response.data;
-  },
-
-  updateChampions: async (accountId: string, championIds: number[]) => {
-    const response = await apiClient.post(`/riot/champions/${accountId}`, {
+  // 챔피언 선호도 업데이트
+  updateChampions: async (accountId: string, role: string, championIds: string[]) => {
+    const response = await apiClient.put(`/riot/accounts/${accountId}/champions/${role}`, {
       championIds,
     });
+    return response.data;
+  },
+
+  // 소환사 정보 조회
+  getSummoner: async (gameName: string, tagLine: string) => {
+    const response = await apiClient.get(`/riot/summoner/${gameName}/${tagLine}`);
     return response.data;
   },
 };

@@ -189,7 +189,7 @@ export class AuctionStateService {
         throw new BadRequestException("Auction is not in bidding phase");
       }
 
-      const { bidderId, currentBid } = state.currentPhase;
+      const { bidderId } = state.currentPhase;
 
       if (!bidderId) {
         // 유찰 처리
