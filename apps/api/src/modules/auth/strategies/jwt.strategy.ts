@@ -18,17 +18,10 @@ export class JwtStrategy extends PassportStrategy(Strategy, "jwt") {
   }
 
   async validate(payload: TokenPayload) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: payload.sub },
-      include: {
-        riotAccounts: true,
-      },
-    });
-
-    if (!user) {
-      throw new UnauthorizedException("User not found");
-    }
-
-    return user;
+    // The guard's responsibility is just to validate the token's signature and expiry.
+    // The payload is trustworthy at this point.
+    // We return the payload so it can be accessed in the request handler.
+    // This avoids an unnecessary database call on every authenticated request.
+    return payload;
   }
 }

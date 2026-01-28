@@ -11,7 +11,7 @@ import {
   HttpCode,
   HttpStatus,
 } from "@nestjs/common";
-import { RoomService, CreateRoomDto, JoinRoomDto } from "./room.service";
+import { RoomService, CreateRoomDto } from "./room.service";
 import { SnakeDraftService } from "./snake-draft.service";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";

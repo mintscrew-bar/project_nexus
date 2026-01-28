@@ -5,7 +5,7 @@ import {
   ForbiddenException,
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
-import { RoomStatus, TeamMode } from "@nexus/database";
+import { RoomStatus, TeamMode, TeamCaptainSelection } from "@nexus/database";
 
 export interface SnakeDraftState {
   roomId: string;
@@ -16,8 +16,6 @@ export interface SnakeDraftState {
   availablePlayers: string[]; // User IDs not yet picked
   timerEnd: number;
 }
-
-const PICK_TIMER_SECONDS = 30;
 
 @Injectable()
 export class SnakeDraftService {
@@ -65,16 +63,12 @@ export class SnakeDraftService {
       throw new BadRequestException("Room is not in snake draft mode");
     }
 
-    // Calculate number of teams (2 for 10 players, 3 for 15, 4 for 20)
     const numTeams = Math.floor(room.participants.length / 5);
     if (numTeams < 2) {
       throw new BadRequestException("Need at least 10 players for draft");
     }
 
-    // Select captains - two methods:
-    // 1. Random selection
-    // 2. Coin flip / highest tier players
-    const captains = await this.selectCaptains(room.participants, numTeams);
+    const captains = await this.selectCaptains(room.participants, numTeams, room.captainSelection);
     const players = room.participants.filter(
       (p) => !captains.find((c) => c.id === p.id),
     );
@@ -92,7 +86,7 @@ export class SnakeDraftService {
               create: {
                 userId: captain.userId,
                 assignedRole: captain.user.riotAccounts[0]?.mainRole,
-                pickOrder: 0, // Captain is pick 0
+                pickOrder: 0,
               },
             },
           },
@@ -100,13 +94,11 @@ export class SnakeDraftService {
       }),
     );
 
-    // Update room status
     await this.prisma.room.update({
       where: { id: roomId },
-      data: { status: RoomStatus.TEAM_SELECTION },
+      data: { status: RoomStatus.DRAFT },
     });
 
-    // Mark captains
     await Promise.all(
       captains.map((captain) =>
         this.prisma.roomParticipant.update({
@@ -119,7 +111,6 @@ export class SnakeDraftService {
       ),
     );
 
-    // Initialize snake draft state
     const pickOrder = this.generatePickOrder(
       teams.map((t) => t.id),
       numTeams,
@@ -132,7 +123,7 @@ export class SnakeDraftService {
       pickOrder,
       isReversing: false,
       availablePlayers: players.map((p) => p.userId),
-      timerEnd: Date.now() + PICK_TIMER_SECONDS * 1000,
+      timerEnd: Date.now() + (room.pickTimeLimit || 60) * 1000,
     };
 
     this.draftStates.set(roomId, draftState);
@@ -157,31 +148,29 @@ export class SnakeDraftService {
   // Captain Selection Methods
   // ========================================
 
-  private async selectCaptains(participants: any[], numTeams: number) {
-    // Method 1: Random selection
+  private async selectCaptains(participants: any[], numTeams: number, selectionMethod: TeamCaptainSelection | null) {
+    if (selectionMethod === 'TIER') {
+        return participants
+          .sort((a, b) => {
+            const tierPoints: Record<string, number> = { CHALLENGER: 10, GRANDMASTER: 9, MASTER: 8, DIAMOND: 7, EMERALD: 6, PLATINUM: 5, GOLD: 4, SILVER: 3, BRONZE: 2, IRON: 1, UNRANKED: 0 };
+            const aTier = a.user.riotAccounts[0]?.tier || "UNRANKED";
+            const bTier = b.user.riotAccounts[0]?.tier || "UNRANKED";
+            return (tierPoints[bTier] || 0) - (tierPoints[aTier] || 0);
+          })
+          .slice(0, numTeams);
+    }
+    
+    // Default to RANDOM
     const shuffled = [...participants].sort(() => Math.random() - 0.5);
     return shuffled.slice(0, numTeams);
-
-    // Method 2: Highest tier (commented out, can be used instead)
-    // return participants
-    //   .sort((a, b) => {
-    //     const aTier = a.user.riotAccounts[0]?.tier || "UNRANKED";
-    //     const bTier = b.user.riotAccounts[0]?.tier || "UNRANKED";
-    //     const tierOrder = ["IRON", "BRONZE", "SILVER", "GOLD", "PLATINUM", "EMERALD", "DIAMOND", "MASTER", "GRANDMASTER", "CHALLENGER"];
-    //     return tierOrder.indexOf(bTier) - tierOrder.indexOf(aTier);
-    //   })
-    //   .slice(0, numTeams);
   }
 
   // ========================================
   // Snake Draft Pick Order
   // ========================================
-
-  /**
-   * Generates snake draft pick order
-   * Example for 2 teams: A, B, B, A, A, B, B, A
-   * Example for 3 teams: A, B, C, C, B, A, A, B, C
-   */
+  
+  // ... (rest of the file is unchanged)
+  
   private generatePickOrder(teamIds: string[], numTeams: number): string[] {
     const order: string[] = [];
     const playersPerTeam = 5;
@@ -203,12 +192,9 @@ export class SnakeDraftService {
 
     return order;
   }
-
-  // ========================================
-  // Making Picks
-  // ========================================
-
-  async makePick(
+  // ... (rest of the file is unchanged)
+  
+    async makePick(
     userId: string,
     roomId: string,
     targetPlayerId: string,
@@ -279,7 +265,8 @@ export class SnakeDraftService {
       (id) => id !== targetPlayerId,
     );
     state.currentTeamIndex++;
-    state.timerEnd = Date.now() + PICK_TIMER_SECONDS * 1000;
+    const room = await this.prisma.room.findUnique({ where: { id: roomId }});
+    state.timerEnd = Date.now() + (room?.pickTimeLimit || 60) * 1000;
 
     // Check if we need to reverse
     const numTeams = state.pickOrder.filter(
@@ -292,11 +279,9 @@ export class SnakeDraftService {
 
     return state;
   }
-
-  // ========================================
-  // Auto-Pick (when timer expires)
-  // ========================================
-
+  
+  // ... (rest of the file is unchanged)
+  
   async autoPick(roomId: string): Promise<SnakeDraftState> {
     const state = this.draftStates.get(roomId);
     if (!state) {
@@ -325,12 +310,8 @@ export class SnakeDraftService {
     // Make auto pick (same logic as manual pick)
     return this.makePick(team.captainId, roomId, targetPlayerId);
   }
-
-  // ========================================
-  // Draft Completion
-  // ========================================
-
-  async checkDraftComplete(roomId: string): Promise<boolean> {
+  
+    async checkDraftComplete(roomId: string): Promise<boolean> {
     const state = this.draftStates.get(roomId);
     if (!state) return false;
 
@@ -340,18 +321,14 @@ export class SnakeDraftService {
   async completeDraft(roomId: string) {
     await this.prisma.room.update({
       where: { id: roomId },
-      data: { status: RoomStatus.IN_PROGRESS },
+      data: { status: RoomStatus.DRAFT_COMPLETED },
     });
 
     this.draftStates.delete(roomId);
 
     return { message: "Draft completed" };
   }
-
-  // ========================================
-  // Utility
-  // ========================================
-
+  
   getDraftState(roomId: string): SnakeDraftState | undefined {
     return this.draftStates.get(roomId);
   }

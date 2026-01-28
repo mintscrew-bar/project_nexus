@@ -7,23 +7,6 @@ import {
 import { PrismaService } from "../prisma/prisma.service";
 import { RoomStatus, TeamMode } from "@nexus/database";
 
-// Tier-based gold allocation
-const TIER_GOLD: Record<string, number> = {
-  IRON: 3000,
-  BRONZE: 2900,
-  SILVER: 2800,
-  GOLD: 2600,
-  PLATINUM: 2400,
-  EMERALD: 2200,
-  DIAMOND: 2000,
-  MASTER: 2000,
-  GRANDMASTER: 2000,
-  CHALLENGER: 2000,
-  UNRANKED: 2500,
-};
-
-const BID_INCREMENT = 100;
-const SOFT_TIMER_SECONDS = 5;
 const BONUS_GOLD = 500;
 
 export interface AuctionState {
@@ -89,20 +72,21 @@ export class AuctionService {
     }
 
     // Select captains (random or by highest tier)
-    const sortedPlayers = room.participants.sort((a, b) => {
-      const aTier = a.user.riotAccounts[0]?.tier || "UNRANKED";
-      const bTier = b.user.riotAccounts[0]?.tier || "UNRANKED";
-      return (TIER_GOLD[bTier] || 0) - (TIER_GOLD[aTier] || 0);
+    const sortedPlayers = [...room.participants].sort((a, b) => {
+        // A simple tier-to-point conversion for sorting, can be more complex
+        const tierPoints: Record<string, number> = { CHALLENGER: 10, GRANDMASTER: 9, MASTER: 8, DIAMOND: 7, EMERALD: 6, PLATINUM: 5, GOLD: 4, SILVER: 3, BRONZE: 2, IRON: 1, UNRANKED: 0 };
+        const aTier = a.user.riotAccounts[0]?.tier || "UNRANKED";
+        const bTier = b.user.riotAccounts[0]?.tier || "UNRANKED";
+        return (tierPoints[bTier] || 0) - (tierPoints[aTier] || 0);
     });
 
     const captains = sortedPlayers.slice(0, numTeams);
     const players = sortedPlayers.slice(numTeams);
 
-    // Create teams with tier-based budgets
+    // Create teams with budgets from room settings
     const teams = await Promise.all(
       captains.map(async (captain, index) => {
-        const tier = captain.user.riotAccounts[0]?.tier || "UNRANKED";
-        const initialBudget = TIER_GOLD[tier] || 2500;
+        const initialBudget = room.startingPoints || 1000;
 
         return this.prisma.team.create({
           data: {
@@ -126,7 +110,7 @@ export class AuctionService {
     // Update room status
     await this.prisma.room.update({
       where: { id: roomId },
-      data: { status: RoomStatus.TEAM_SELECTION },
+      data: { status: RoomStatus.DRAFT },
     });
 
     // Mark captains as captains in participants
@@ -148,7 +132,7 @@ export class AuctionService {
       currentPlayerIndex: 0,
       currentHighestBid: 0,
       currentHighestBidder: null,
-      timerEnd: Date.now() + 30000, // 30 seconds initial
+      timerEnd: Date.now() + (room.bidTimeLimit || 30) * 1000,
       yuchalCount: 0,
       maxYuchalCycles: numTeams,
     };
@@ -184,6 +168,12 @@ export class AuctionService {
       throw new BadRequestException("Auction not started");
     }
 
+    const room = await this.prisma.room.findUnique({ where: { id: roomId }});
+    if (!room) throw new NotFoundException("Room not found");
+    
+    const bidIncrement = room.minBidIncrement || 50;
+    const bidTimeLimit = room.bidTimeLimit || 30; // Using the main timer here, soft timer logic needs review
+
     // Get team
     const team = await this.prisma.team.findFirst({
       where: { roomId, captainId: userId },
@@ -194,9 +184,9 @@ export class AuctionService {
     }
 
     // Validate bid
-    if (amount < state.currentHighestBid + BID_INCREMENT) {
+    if (amount < state.currentHighestBid + bidIncrement) {
       throw new BadRequestException(
-        `Bid must be at least ${state.currentHighestBid + BID_INCREMENT}`,
+        `Bid must be at least ${state.currentHighestBid + bidIncrement}`,
       );
     }
 
@@ -204,12 +194,12 @@ export class AuctionService {
       throw new BadRequestException("Insufficient budget");
     }
 
-    if (amount % BID_INCREMENT !== 0) {
-      throw new BadRequestException(`Bid must be multiple of ${BID_INCREMENT}`);
+    if (amount % bidIncrement !== 0) {
+      throw new BadRequestException(`Bid must be multiple of ${bidIncrement}`);
     }
 
     // Get current player being auctioned
-    const room = await this.prisma.room.findUnique({
+    const roomWithParticipants = await this.prisma.room.findUnique({
       where: { id: roomId },
       include: {
         participants: {
@@ -226,12 +216,13 @@ export class AuctionService {
       },
     });
 
-    const currentPlayer = room?.participants[state.currentPlayerIndex];
+    const currentPlayer = roomWithParticipants?.participants[state.currentPlayerIndex];
     if (!currentPlayer) {
       throw new BadRequestException("No player to bid on");
     }
 
-    // Update state with soft timer reset
+    // Using a fixed 5s soft-timer, can be a room setting later
+    const SOFT_TIMER_SECONDS = 5; 
     state.currentHighestBid = amount;
     state.currentHighestBidder = team.id;
     state.timerEnd = Date.now() + SOFT_TIMER_SECONDS * 1000;

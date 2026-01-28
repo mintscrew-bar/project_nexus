@@ -309,32 +309,38 @@ export class AuthService {
   // ========================================
 
   async getUserById(id: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { id },
-      include: {
-        authProviders: true,
-        riotAccounts: {
-          where: { isPrimary: true },
-          include: {
-            championPreferences: {
-              orderBy: { order: "asc" },
+    try {
+      const user = await this.prisma.user.findUnique({
+        where: { id },
+        include: {
+          authProviders: true,
+          riotAccounts: {
+            where: { isPrimary: true },
+            include: {
+              championPreferences: {
+                orderBy: { order: "asc" },
+              },
+            },
+          },
+          clanMemberships: {
+            include: {
+              clan: true,
             },
           },
         },
-        clanMemberships: {
-          include: {
-            clan: true,
-          },
-        },
-      },
-    });
+      });
 
-    if (!user) {
-      throw new UnauthorizedException("User not found");
+      if (!user) {
+        throw new UnauthorizedException("User not found");
+      }
+
+      // Remove sensitive fields
+      const { password: _password, ...safeUser } = user;
+      return safeUser;
+
+    } catch (e) {
+      console.error("Error in getUserById:", e);
+      throw e; // Re-throw the original error to trigger a 500 response
     }
-
-    // Remove sensitive fields
-    const { password, ...safeUser } = user;
-    return safeUser;
   }
 }

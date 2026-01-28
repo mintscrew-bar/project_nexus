@@ -9,7 +9,8 @@ import { RedisService } from "../redis/redis.service";
 import { Role } from "@nexus/database";
 import axios from "axios";
 
-const TIER_POINTS: Record<string, number> = {
+// 티어별 포인트 (팀 밸런싱, 경매 선수 가치 산정에 사용)
+export const TIER_POINTS: Record<string, number> = {
   CHALLENGER: 2800,
   GRANDMASTER: 2600,
   MASTER: 2400,
@@ -23,12 +24,18 @@ const TIER_POINTS: Record<string, number> = {
   UNRANKED: 0,
 };
 
-const DIVISION_POINTS: Record<string, number> = {
+// 디비전별 포인트 (세부 티어 차이 계산에 사용)
+export const DIVISION_POINTS: Record<string, number> = {
   I: 75,
   II: 50,
   III: 25,
   IV: 0,
 };
+
+// 플레이어의 총 포인트 계산 (팀 밸런싱용)
+export function calculatePlayerPoints(tier: string, division: string): number {
+  return (TIER_POINTS[tier] || 0) + (DIVISION_POINTS[division] || 0);
+}
 
 export interface RegisterRiotAccountDto {
   gameName: string;

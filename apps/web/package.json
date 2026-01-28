@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@nexus/types": "workspace:*",
+    "@radix-ui/react-switch": "^1.2.6",
     "@tanstack/react-query": "^5.17.0",
     "axios": "^1.6.5",
     "class-variance-authority": "^0.7.0",

@@ -199,6 +199,15 @@ model Room {
   teamMode        TeamMode     @default(SNAKE_DRAFT)
   allowSpectators Boolean      @default(true)
 
+  // Auction Settings
+  startingPoints  Int?
+  minBidIncrement Int?
+  bidTimeLimit    Int?         @default(30) // seconds
+
+  // Snake Draft Settings
+  pickTimeLimit     Int?                    @default(60) // seconds
+  captainSelection  TeamCaptainSelection?   @default(RANDOM)
+
   // Discord integration
   discordGuildId     String?
   discordCategoryId  String?
@@ -225,6 +234,8 @@ model Room {
 enum RoomStatus {
   WAITING
   TEAM_SELECTION
+  DRAFT
+  DRAFT_COMPLETED
   IN_PROGRESS
   COMPLETED
 }
@@ -233,6 +244,12 @@ enum TeamMode {
   SNAKE_DRAFT
   AUCTION
 }
+
+enum TeamCaptainSelection {
+    RANDOM
+    TIER
+}
+
 
 model RoomParticipant {
   id              String                @id @default(cuid())
