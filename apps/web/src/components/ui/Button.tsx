@@ -20,11 +20,14 @@ const buttonVariants = cva(
           'bg-transparent text-text-primary hover:bg-bg-tertiary focus:ring-accent-primary',
         gold:
           'bg-accent-gold text-bg-primary hover:bg-yellow-600 active:bg-yellow-700 focus:ring-accent-gold',
+        outline:
+          'bg-transparent border border-text-tertiary text-text-primary hover:bg-bg-tertiary focus:ring-accent-primary',
       },
       size: {
         sm: 'px-3 py-1.5 text-sm',
         md: 'px-6 py-2.5 text-base',
         lg: 'px-8 py-3 text-lg',
+        icon: 'h-10 w-10 p-0',
       },
       fullWidth: {
         true: 'w-full',

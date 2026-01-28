@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from 'react';
-import { Input } from '@/components/ui/input';
+import { Input } from '@/components/ui/Input';
 import { Champion } from '@/stores/ddragon-store';
 import Image from 'next/image';
 

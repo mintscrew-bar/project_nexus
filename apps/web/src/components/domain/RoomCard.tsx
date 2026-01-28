@@ -7,17 +7,17 @@ import { cn, getRelativeTime } from '@/lib/utils';
 
 interface Room {
   id: string;
-  title: string;
+  name: string;
   hostId: string;
   hostName?: string;
-  currentPlayers: number;
-  maxPlayers: number;
+  maxParticipants: number;
   isPrivate: boolean;
-  status: 'WAITING' | 'IN_PROGRESS' | 'COMPLETED';
-  mode: 'AUCTION' | 'SNAKE_DRAFT';
+  status: 'WAITING' | 'IN_PROGRESS' | 'COMPLETED' | 'DRAFT' | 'DRAFT_COMPLETED' | 'TEAM_SELECTION';
+  teamMode: 'AUCTION' | 'SNAKE_DRAFT';
   createdAt: string;
   minTier?: string;
   maxTier?: string;
+  participants?: any[];
 }
 
 interface RoomCardProps {
@@ -51,7 +51,8 @@ const getStatusBadge = (status: string) => {
 };
 
 export const RoomCard: React.FC<RoomCardProps> = ({ room, onClick, className }) => {
-  const isFull = room.currentPlayers >= room.maxPlayers;
+  const currentPlayers = room.participants?.length || 0;
+  const isFull = currentPlayers >= room.maxParticipants;
   const canJoin = room.status === 'WAITING' && !isFull;
 
   return (
@@ -69,7 +70,7 @@ export const RoomCard: React.FC<RoomCardProps> = ({ room, onClick, className }) 
         <div className="flex items-start justify-between mb-3">
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-1">
-              <h3 className="text-lg font-semibold text-text-primary">{room.title}</h3>
+              <h3 className="text-lg font-semibold text-text-primary">{room.name}</h3>
               {room.isPrivate && <span className="text-accent-warning">🔒</span>}
             </div>
             <p className="text-sm text-text-secondary">
@@ -84,7 +85,7 @@ export const RoomCard: React.FC<RoomCardProps> = ({ room, onClick, className }) 
           <div>
             <p className="text-xs text-text-tertiary mb-1">게임 모드</p>
             <Badge variant="primary" size="sm">
-              {getModeLabel(room.mode)}
+              {getModeLabel(room.teamMode)}
             </Badge>
           </div>
           <div>
@@ -93,7 +94,7 @@ export const RoomCard: React.FC<RoomCardProps> = ({ room, onClick, className }) 
               variant={isFull ? 'danger' : 'success'}
               size="sm"
             >
-              {room.currentPlayers}/{room.maxPlayers}명
+              {currentPlayers}/{room.maxParticipants}명
             </Badge>
           </div>
         </div>
