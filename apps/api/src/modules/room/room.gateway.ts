@@ -29,6 +29,7 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   private userSockets = new Map<string, string>(); // userId -> socketId
   private socketRooms = new Map<string, string>(); // socketId -> roomId
+  private readonly ROOM_LIST_CHANNEL = "room-list"; // Channel for room list updates
 
   constructor(
     private readonly roomService: RoomService,
@@ -87,20 +88,57 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   // ========================================
+  // Room List Subscription
+  // ========================================
+
+  @SubscribeMessage("subscribe-room-list")
+  async handleSubscribeRoomList(@ConnectedSocket() client: AuthenticatedSocket) {
+    client.join(this.ROOM_LIST_CHANNEL);
+
+    // Send current room list immediately
+    const rooms = await this.roomService.listRooms({ status: "WAITING" as any });
+    return { success: true, rooms };
+  }
+
+  @SubscribeMessage("unsubscribe-room-list")
+  handleUnsubscribeRoomList(@ConnectedSocket() client: AuthenticatedSocket) {
+    client.leave(this.ROOM_LIST_CHANNEL);
+    return { success: true };
+  }
+
+  // Broadcast room list updates to all subscribers
+  async broadcastRoomListUpdate() {
+    const rooms = await this.roomService.listRooms({ status: "WAITING" as any });
+    this.server.to(this.ROOM_LIST_CHANNEL).emit("room-list-updated", rooms);
+  }
+
+  // ========================================
   // Room Events
   // ========================================
 
   @SubscribeMessage("join-room")
   async handleJoinRoom(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { roomId: string },
+    @MessageBody() data: { roomId: string; password?: string },
   ) {
     try {
       if (!client.userId) {
         return { error: "Unauthorized" };
       }
 
-      const room = await this.roomService.getRoomById(data.roomId);
+      // First, check if user is already a participant
+      let room = await this.roomService.getRoomById(data.roomId);
+      const isAlreadyParticipant = room.participants.some(
+        (p) => p.userId === client.userId,
+      );
+
+      // If not a participant, join the room (add to DB)
+      if (!isAlreadyParticipant) {
+        room = await this.roomService.joinRoom(client.userId, {
+          roomId: data.roomId,
+          password: data.password,
+        });
+      }
 
       // Join Socket.IO room
       client.join(data.roomId);
@@ -111,6 +149,12 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
         userId: client.userId,
         username: client.username,
       });
+
+      // Broadcast updated room to all participants
+      this.server.to(data.roomId).emit("room-updated", room);
+
+      // Broadcast room list update to subscribers
+      this.broadcastRoomListUpdate();
 
       return {
         success: true,
@@ -142,6 +186,9 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
         userId: client.userId,
         username: client.username,
       });
+
+      // Broadcast room list update to subscribers
+      this.broadcastRoomListUpdate();
 
       return { success: true };
     } catch (error: any) {

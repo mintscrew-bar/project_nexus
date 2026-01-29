@@ -55,6 +55,7 @@ interface RoomStoreState {
   isLoading: boolean;
   error: string | null;
   isConnected: boolean;
+  isSubscribedToRoomList: boolean;
 
   // REST API methods
   fetchRooms: (params?: { mode?: string; status?: string }) => Promise<void>;
@@ -68,6 +69,10 @@ interface RoomStoreState {
   connectToRoom: (roomId: string) => void;
   disconnectFromRoom: () => void;
   sendChatMessage: (roomId: string, message: string) => void;
+
+  // Room list subscription methods
+  subscribeToRoomList: () => void;
+  unsubscribeFromRoomList: () => void;
 }
 
 export const useRoomStore = create<RoomStoreState>((set, get) => ({
@@ -78,6 +83,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
   isLoading: false,
   error: null,
   isConnected: false,
+  isSubscribedToRoomList: false,
 
   fetchRooms: async (params) => {
     set({ isLoading: true, error: null });
@@ -195,5 +201,29 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
 
   sendChatMessage: (roomId: string, message: string) => {
     roomSocketHelpers.sendMessage(roomId, message);
+  },
+
+  subscribeToRoomList: () => {
+    if (get().isSubscribedToRoomList) return;
+
+    const socket = connectRoomSocket();
+
+    // Subscribe and get initial room list
+    roomSocketHelpers.subscribeRoomList((response: any) => {
+      if (response.success && response.rooms) {
+        set({ rooms: response.rooms, isSubscribedToRoomList: true });
+      }
+    });
+
+    // Listen for room list updates
+    roomSocketHelpers.onRoomListUpdated((rooms: Room[]) => {
+      set({ rooms });
+    });
+  },
+
+  unsubscribeFromRoomList: () => {
+    roomSocketHelpers.unsubscribeRoomList();
+    roomSocketHelpers.offRoomListUpdated();
+    set({ isSubscribedToRoomList: false });
   },
 }));

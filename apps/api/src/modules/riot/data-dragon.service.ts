@@ -38,28 +38,50 @@ export interface ChampionData {
   >;
 }
 
+export interface ItemStats {
+  FlatHPPoolMod?: number; // 체력
+  FlatMPPoolMod?: number; // 마나
+  FlatPhysicalDamageMod?: number; // 공격력
+  FlatMagicDamageMod?: number; // 주문력
+  FlatArmorMod?: number; // 방어력
+  FlatSpellBlockMod?: number; // 마법저항력
+  PercentAttackSpeedMod?: number; // 공격속도
+  FlatCritChanceMod?: number; // 치명타확률
+  FlatMovementSpeedMod?: number; // 이동속도(고정)
+  PercentMovementSpeedMod?: number; // 이동속도(%)
+  PercentLifeStealMod?: number; // 생명력흡수
+  FlatHPRegenMod?: number; // 체력재생
+  FlatMPRegenMod?: number; // 마나재생
+}
+
+export interface ItemInfo {
+  name: string;
+  description: string; // HTML 포함된 설명 (효과 포함)
+  plaintext?: string; // 간단한 설명
+  colloq?: string; // 검색용 별칭
+  image: {
+    full: string;
+    sprite: string;
+    group: string;
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+  };
+  gold: {
+    base: number;
+    total: number;
+    sell: number;
+    purchasable: boolean;
+  };
+  stats: ItemStats;
+  tags?: string[]; // 아이템 태그 (Damage, Health, Armor 등)
+  into?: string[]; // 이 아이템으로 조합되는 상위 아이템
+  from?: string[]; // 이 아이템을 만드는 하위 아이템
+}
+
 export interface ItemData {
-  data: Record<
-    string,
-    {
-      name: string;
-      description: string;
-      image: {
-        full: string;
-        sprite: string;
-        group: string;
-        x: number;
-        y: number;
-        w: number;
-        h: number;
-      };
-      gold: {
-        base: number;
-        total: number;
-        sell: number;
-      };
-    }
-  >;
+  data: Record<string, ItemInfo>;
 }
 
 @Injectable()
@@ -97,8 +119,8 @@ export class DataDragonService {
       return version;
     } catch (error) {
       this.logger.error("Failed to fetch Data Dragon version", error);
-      // 폴백: 하드코딩된 최신 버전 (2024년 기준)
-      return "14.1.1";
+      // 폴백: 하드코딩된 최신 버전 (2025년 기준)
+      return "16.2.1";
     }
   }
 

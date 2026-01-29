@@ -4,16 +4,24 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { useRoomStore } from "@/stores/room-store";
 import { RoomCard } from "@/components/domain";
-import { LoadingSpinner, EmptyState, Button } from "@/components/ui";
+import { LoadingSpinner, EmptyState } from "@/components/ui";
 import { RefreshCcw, Home } from "lucide-react";
 
 export function RoomList() {
   const router = useRouter();
-  const { rooms, isLoading, error, fetchRooms } = useRoomStore();
+  const { rooms, isLoading, error, fetchRooms, subscribeToRoomList, unsubscribeFromRoomList } = useRoomStore();
 
   useEffect(() => {
+    // Initial fetch
     fetchRooms();
-  }, [fetchRooms]);
+
+    // Subscribe to real-time updates
+    subscribeToRoomList();
+
+    return () => {
+      unsubscribeFromRoomList();
+    };
+  }, [fetchRooms, subscribeToRoomList, unsubscribeFromRoomList]);
 
   if (isLoading) {
     return (

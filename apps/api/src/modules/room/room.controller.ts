@@ -13,6 +13,7 @@ import {
 } from "@nestjs/common";
 import { RoomService, CreateRoomDto } from "./room.service";
 import { SnakeDraftService } from "./snake-draft.service";
+import { RoomGateway } from "./room.gateway";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { Public } from "../auth/decorators/public.decorator";
@@ -24,6 +25,7 @@ export class RoomController {
   constructor(
     private readonly roomService: RoomService,
     private readonly snakeDraftService: SnakeDraftService,
+    private readonly roomGateway: RoomGateway,
   ) {}
 
   // ========================================
@@ -36,7 +38,10 @@ export class RoomController {
     @CurrentUser("sub") userId: string,
     @Body() dto: CreateRoomDto,
   ) {
-    return this.roomService.createRoom(userId, dto);
+    const room = await this.roomService.createRoom(userId, dto);
+    // Broadcast room list update
+    this.roomGateway.broadcastRoomListUpdate();
+    return room;
   }
 
   @Get()

@@ -83,17 +83,11 @@ export class AuthController {
     const user = req.user as any;
     const tokens = await this.authService.generateTokens(user);
 
-    res.cookie("refresh_token", tokens.refreshToken, {
-      httpOnly: true,
-      secure: this.configService.get("NODE_ENV") === "production",
-      sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-      path: "/api/auth",
-    });
-
-    // Redirect to frontend with access token
+    // Redirect to Next.js API route which will set the cookie on the frontend domain
     const appUrl = this.configService.get("APP_URL") || "http://localhost:3000";
-    res.redirect(`${appUrl}/auth/callback?token=${tokens.accessToken}`);
+    res.redirect(
+      `${appUrl}/api/auth/callback?access_token=${tokens.accessToken}&refresh_token=${tokens.refreshToken}`,
+    );
   }
 
   // ========================================
@@ -112,16 +106,11 @@ export class AuthController {
     const user = req.user as any;
     const tokens = await this.authService.generateTokens(user);
 
-    res.cookie("refresh_token", tokens.refreshToken, {
-      httpOnly: true,
-      secure: this.configService.get("NODE_ENV") === "production",
-      sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-      path: "/api/auth",
-    });
-
+    // Redirect to Next.js API route which will set the cookie on the frontend domain
     const appUrl = this.configService.get("APP_URL") || "http://localhost:3000";
-    res.redirect(`${appUrl}/auth/callback?token=${tokens.accessToken}`);
+    res.redirect(
+      `${appUrl}/api/auth/callback?access_token=${tokens.accessToken}&refresh_token=${tokens.refreshToken}`,
+    );
   }
 
   // ========================================

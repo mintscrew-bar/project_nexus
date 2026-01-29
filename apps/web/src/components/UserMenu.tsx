@@ -34,9 +34,8 @@ export function UserMenu() {
     );
   }
 
-  const avatarUrl = user.avatar
-    ? `https://cdn.discordapp.com/avatars/${user.discordId}/${user.avatar}.png`
-    : null;
+  // user.avatar is already a full URL from the backend
+  const avatarUrl = user.avatar || null;
 
   return (
     <div className="relative" ref={menuRef}>

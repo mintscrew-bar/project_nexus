@@ -69,14 +69,14 @@ export function Modal({
       {/* Modal */}
       <div
         className={cn(
-          'relative w-full bg-bg-secondary border border-bg-tertiary rounded-xl shadow-2xl animate-scale-in',
+          'relative w-full max-h-[90vh] flex flex-col bg-bg-secondary border border-bg-tertiary rounded-xl shadow-2xl animate-scale-in',
           sizeStyles[size],
           className
         )}
       >
         {/* Header */}
         {(title || showCloseButton) && (
-          <div className="flex items-center justify-between p-4 border-b border-bg-tertiary">
+          <div className="flex items-center justify-between p-4 border-b border-bg-tertiary flex-shrink-0">
             {title && (
               <h2 id="modal-title" className="text-xl font-semibold text-text-primary">
                 {title}
@@ -95,7 +95,7 @@ export function Modal({
         )}
 
         {/* Content */}
-        <div className="p-4">
+        <div className="p-4 overflow-y-auto">
           {children}
         </div>
       </div>

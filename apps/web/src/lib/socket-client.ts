@@ -154,6 +154,23 @@ export const roomSocketHelpers = {
     roomSocket?.emit("send-message", { roomId, message });
   },
 
+  // Room list subscription
+  subscribeRoomList: (callback: (response: any) => void) => {
+    roomSocket?.emit("subscribe-room-list", {}, callback);
+  },
+
+  unsubscribeRoomList: () => {
+    roomSocket?.emit("unsubscribe-room-list");
+  },
+
+  onRoomListUpdated: (callback: (rooms: any[]) => void) => {
+    roomSocket?.on("room-list-updated", callback);
+  },
+
+  offRoomListUpdated: () => {
+    roomSocket?.off("room-list-updated");
+  },
+
   onRoomUpdate: (callback: (data: any) => void) => {
     roomSocket?.on("room-update", callback);
   },
@@ -180,6 +197,7 @@ export const roomSocketHelpers = {
     roomSocket?.off("participant-left");
     roomSocket?.off("participant-ready");
     roomSocket?.off("new-message");
+    roomSocket?.off("room-list-updated");
   },
 };
 

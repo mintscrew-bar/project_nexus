@@ -328,7 +328,7 @@ export const matchApi = {
 export const riotApi = {
   // 챔피언 목록 조회 (Data Dragon)
   getChampions: async () => {
-    const version = process.env.NEXT_PUBLIC_DDRAGON_VERSION || "14.1.1";
+    const version = process.env.NEXT_PUBLIC_DDRAGON_VERSION || "16.2.1";
     const response = await fetch(
       `https://ddragon.leagueoflegends.com/cdn/${version}/data/ko_KR/champion.json`
     );
