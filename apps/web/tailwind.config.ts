@@ -6,45 +6,46 @@ const config: Config = {
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
   ],
+  darkMode: 'class',
   theme: {
     extend: {
       colors: {
-        // Background Colors (Dark Theme)
+        // Background Colors (CSS Variables)
         bg: {
-          primary: '#0f0f0f',
-          secondary: '#1a1a1a',
-          tertiary: '#242424',
-          elevated: '#2a2a2a',
+          primary: 'rgb(var(--color-bg-primary) / <alpha-value>)',
+          secondary: 'rgb(var(--color-bg-secondary) / <alpha-value>)',
+          tertiary: 'rgb(var(--color-bg-tertiary) / <alpha-value>)',
+          elevated: 'rgb(var(--color-bg-elevated) / <alpha-value>)',
         },
         // Text Colors
         text: {
-          primary: '#f0f0f0',
-          secondary: '#b0b0b0',
-          tertiary: '#707070',
-          muted: '#4a4a4a',
+          primary: 'rgb(var(--color-text-primary) / <alpha-value>)',
+          secondary: 'rgb(var(--color-text-secondary) / <alpha-value>)',
+          tertiary: 'rgb(var(--color-text-tertiary) / <alpha-value>)',
+          muted: 'rgb(var(--color-text-muted) / <alpha-value>)',
         },
         // Accent Colors (치지직 + LoL 테마)
         accent: {
-          primary: '#0bc4e2',
-          hover: '#09a8c2',
-          active: '#078ca8',
-          gold: '#c89b3c',
-          success: '#00c853',
-          danger: '#ff1744',
-          warning: '#ffa726',
+          primary: 'rgb(var(--color-accent-primary) / <alpha-value>)',
+          hover: 'rgb(var(--color-accent-hover) / <alpha-value>)',
+          active: 'rgb(var(--color-accent-active) / <alpha-value>)',
+          gold: 'rgb(var(--color-accent-gold) / <alpha-value>)',
+          success: 'rgb(var(--color-accent-success) / <alpha-value>)',
+          danger: 'rgb(var(--color-accent-danger) / <alpha-value>)',
+          warning: 'rgb(var(--color-accent-warning) / <alpha-value>)',
         },
         // Tier Colors (LoL 티어 시스템)
         tier: {
-          iron: '#5a5a5a',
-          bronze: '#cd7f32',
-          silver: '#c0c0c0',
-          gold: '#ffd700',
-          platinum: '#40e0d0',
-          emerald: '#50c878',
-          diamond: '#b9f2ff',
-          master: '#9b30ff',
-          grandmaster: '#ff4500',
-          challenger: '#f4c430',
+          iron: 'rgb(var(--color-tier-iron) / <alpha-value>)',
+          bronze: 'rgb(var(--color-tier-bronze) / <alpha-value>)',
+          silver: 'rgb(var(--color-tier-silver) / <alpha-value>)',
+          gold: 'rgb(var(--color-tier-gold) / <alpha-value>)',
+          platinum: 'rgb(var(--color-tier-platinum) / <alpha-value>)',
+          emerald: 'rgb(var(--color-tier-emerald) / <alpha-value>)',
+          diamond: 'rgb(var(--color-tier-diamond) / <alpha-value>)',
+          master: 'rgb(var(--color-tier-master) / <alpha-value>)',
+          grandmaster: 'rgb(var(--color-tier-grandmaster) / <alpha-value>)',
+          challenger: 'rgb(var(--color-tier-challenger) / <alpha-value>)',
         },
       },
       fontFamily: {

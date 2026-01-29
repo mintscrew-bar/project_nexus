@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { io, Socket } from 'socket.io-client';
-import { roomApi } from '@/lib/api-client'; // Import roomApi
+import { roomApi, getAccessToken } from '@/lib/api-client';
 
 // Placeholder Types - should eventually come from @nexus/types
 interface Participant {
@@ -45,7 +45,7 @@ interface LobbyStoreState {
   gameStarting: boolean;
   messages: ChatMessage[];
 
-  connect: (roomId: string) => void;
+  connect: (roomId: string, password?: string) => void;
   disconnect: () => void;
   setReady: (isReady: boolean) => void;
   startGame: () => void;
@@ -64,17 +64,19 @@ export const useLobbyStore = create<LobbyStoreState>((set, get) => ({
   gameStarting: false,
   messages: [],
 
-  connect: (roomId) => {
+  connect: (roomId, password?) => {
     if (get().socket) return;
 
     const socket = io(`${API_URL}/room`, {
-      withCredentials: true,
+      auth: {
+        token: getAccessToken(),
+      },
       transports: ['websocket'],
     });
 
     socket.on('connect', () => {
       set({ isConnected: true, error: null });
-      socket.emit('join-room', { roomId }, (response: any) => {
+      socket.emit('join-room', { roomId, password }, (response: any) => {
         if (response.success) {
           set({ room: response.room });
         } else {

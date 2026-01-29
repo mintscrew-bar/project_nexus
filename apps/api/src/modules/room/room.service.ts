@@ -288,19 +288,36 @@ export class RoomService {
       throw new BadRequestException("Not in room");
     }
 
-    // If host leaves, mark room as completed (cancelled)
-    if (room.hostId === userId) {
-      await this.prisma.room.update({
-        where: { id: roomId },
-        data: { status: RoomStatus.COMPLETED },
-      });
-      return { message: "Room cancelled" };
-    }
-
-    // Remove participant
+    // Remove participant first
     await this.prisma.roomParticipant.delete({
       where: { id: participant.id },
     });
+
+    // Check remaining participants
+    const remainingCount = room.participants.length - 1;
+
+    // If no participants left and room is waiting, delete the room
+    if (remainingCount === 0 && room.status === RoomStatus.WAITING) {
+      await this.prisma.chatMessage.deleteMany({
+        where: { roomId },
+      });
+      await this.prisma.room.delete({
+        where: { id: roomId },
+      });
+      return { message: "Room deleted (no participants)" };
+    }
+
+    // If host leaves but others remain, transfer host to next participant
+    if (room.hostId === userId && remainingCount > 0) {
+      const nextHost = room.participants.find((p) => p.userId !== userId);
+      if (nextHost) {
+        await this.prisma.room.update({
+          where: { id: roomId },
+          data: { hostId: nextHost.userId },
+        });
+        return { message: "Left room, host transferred" };
+      }
+    }
 
     return { message: "Left room successfully" };
   }

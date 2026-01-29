@@ -28,7 +28,7 @@ export function ChampionImage({
   const getImageUrl = () => {
     // TODO: API에서 버전을 가져와서 동적으로 생성하거나
     // 환경변수로 최신 버전을 관리
-    const version = process.env.NEXT_PUBLIC_DDRAGON_VERSION || "14.1.1";
+    const version = process.env.NEXT_PUBLIC_DDRAGON_VERSION || "16.2.1";
     const baseUrl = "https://ddragon.leagueoflegends.com";
 
     switch (type) {
