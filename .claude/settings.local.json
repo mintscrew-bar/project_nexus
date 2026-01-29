@@ -14,7 +14,11 @@
       "Bash(npx eslint:*)",
       "Bash(pnpm exec tsc:*)",
       "Bash(pnpm exec prisma generate:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(git fetch:*)",
+      "Bash(git pull:*)",
+      "Bash(git stash:*)",
+      "Bash(git add:*)"
     ]
   }
 }
