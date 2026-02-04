@@ -1,11 +1,25 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/stores/auth-store";
-import { authApi } from "@/lib/api-client";
 import { Logo } from "@/components/Logo";
+import { AlertCircle, X } from "lucide-react";
 
 export default function LoginPage() {
+  const searchParams = useSearchParams();
   const { loginWithDiscord, loginWithGoogle, isLoading } = useAuthStore();
+  const [error, setError] = useState<string | null>(null);
+
+  // URL에서 에러 파라미터 확인
+  useEffect(() => {
+    const errorParam = searchParams.get("error");
+    if (errorParam) {
+      setError(decodeURIComponent(errorParam));
+      // URL에서 에러 파라미터 제거
+      window.history.replaceState({}, "", "/auth/login");
+    }
+  }, [searchParams]);
 
   return (
     <div className="flex min-h-screen items-center justify-center px-4">
@@ -22,6 +36,22 @@ export default function LoginPage() {
             LoL 내전 토너먼트 플랫폼에 오신 것을 환영합니다
           </p>
         </div>
+
+        {/* 에러 메시지 */}
+        {error && (
+          <div className="mb-4 p-4 bg-accent-danger/10 border border-accent-danger/30 rounded-lg flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 text-accent-danger flex-shrink-0 mt-0.5" />
+            <div className="flex-grow">
+              <p className="text-accent-danger text-sm">{error}</p>
+            </div>
+            <button
+              onClick={() => setError(null)}
+              className="text-accent-danger/70 hover:text-accent-danger"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
 
         <div className="card">
           <div className="space-y-6">

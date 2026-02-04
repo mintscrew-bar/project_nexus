@@ -6,19 +6,26 @@ import { useLobbyStore } from "@/stores/lobby-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { ChatBox } from "@/components/domain/ChatBox";
 import { RoomSettingsModal } from "@/components/domain/RoomSettingsModal";
-import { Users, Crown, Check, X, MessageSquare, Settings, UserMinus } from "lucide-react";
+import { UserSettingsModal } from "@/components/domain/UserSettingsModal";
+import { TierBadge } from "@/components/domain/TierBadge";
+import { ConfirmModal } from "@/components/ui";
+import { Users, Crown, Check, X, MessageSquare, Settings, UserMinus, UserCog } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 
 
 export default function TournamentLobbyPage() {
   const params = useParams();
   const router = useRouter();
   const roomId = params.id as string;
-  
+
   const { connect, disconnect, room, isConnected, error, gameStarting, messages, setReady, startGame, sendMessage, kickParticipant } = useLobbyStore();
   const { user: currentUser } = useAuthStore();
-  
+
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [isUserSettingsModalOpen, setIsUserSettingsModalOpen] = useState(false);
+  const [kickTarget, setKickTarget] = useState<{ id: string; username: string } | null>(null);
+  const [isKicking, setIsKicking] = useState(false);
 
   useEffect(() => {
     if (roomId) {
@@ -34,8 +41,7 @@ export default function TournamentLobbyPage() {
       if (room.teamMode === "AUCTION") {
         router.push(`/auction/${room.id}`);
       } else if (room.teamMode === "SNAKE_DRAFT") {
-        // TODO: Redirect to snake draft page
-        router.push(`/tournaments/${room.id}/draft`);
+        router.push(`/draft/${room.id}`);
       }
     }
     if (room?.status === 'DRAFT_COMPLETED') {
@@ -97,24 +103,62 @@ export default function TournamentLobbyPage() {
             <div className="space-y-2">
               {room.participants.map(p => (
                 <div key={p.id} className="flex items-center justify-between bg-bg-tertiary p-3 rounded-lg">
-                  <div className="flex items-center space-x-2">
-                    {p.isHost && <Crown className="h-5 w-5 text-accent-gold" />}
-                    <span className="font-semibold text-text-primary">{p.username}</span>
+                  <div className="flex items-center space-x-3">
+                    {/* Avatar */}
+                    <div className="relative w-10 h-10 rounded-full bg-bg-elevated overflow-hidden flex-shrink-0">
+                      {p.avatar ? (
+                        <Image
+                          src={p.avatar}
+                          alt={p.username}
+                          fill
+                          className="object-cover"
+                          unoptimized
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Users className="h-5 w-5 text-text-tertiary" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                      <div className="flex items-center gap-2">
+                        {p.isHost && <Crown className="h-4 w-4 text-accent-gold flex-shrink-0" />}
+                        <span className="font-semibold text-text-primary truncate">{p.username}</span>
+                      </div>
+                      {/* Riot Account & Tier */}
+                      {p.riotAccount && (
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-xs text-text-tertiary truncate">
+                            {p.riotAccount.gameName}#{p.riotAccount.tagLine}
+                          </span>
+                          {p.riotAccount.tier && (
+                            <TierBadge
+                              tier={p.riotAccount.tier}
+                              rank={p.riotAccount.rank || undefined}
+                              size="sm"
+                              showIcon={false}
+                            />
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-shrink-0">
                     {p.isReady ? (
-                      <Check className="h-5 w-5 text-accent-success" />
+                      <span className="flex items-center gap-1 text-xs text-accent-success">
+                        <Check className="h-4 w-4" />
+                        준비
+                      </span>
                     ) : (
-                      <X className="h-5 w-5 text-accent-danger" />
+                      <span className="flex items-center gap-1 text-xs text-text-tertiary">
+                        <X className="h-4 w-4" />
+                        대기
+                      </span>
                     )}
                     {isCurrentUserHost && p.userId !== currentUser?.id && (
                       <button
-                        onClick={() => {
-                          if (window.confirm(`${p.username}님을 강퇴하시겠습니까?`)) {
-                            kickParticipant(room.id, p.id);
-                          }
-                        }}
-                        className="p-1 text-red-500 hover:text-red-700"
+                        onClick={() => setKickTarget({ id: p.id, username: p.username })}
+                        className="p-1 text-accent-danger hover:text-accent-danger/80"
                         title="강퇴"
                       >
                         <UserMinus className="h-4 w-4" />
@@ -149,7 +193,7 @@ export default function TournamentLobbyPage() {
               <div className="space-y-3">
                 {isCurrentUserHost && (
                     <button
-                        className="w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors duration-200 flex items-center justify-center"
+                        className="w-full px-6 py-3 bg-accent-primary hover:bg-accent-hover text-white font-bold rounded-lg transition-colors duration-200 flex items-center justify-center"
                         onClick={() => setIsSettingsModalOpen(true)}
                     >
                         <Settings className="h-5 w-5 mr-2" />
@@ -159,7 +203,7 @@ export default function TournamentLobbyPage() {
                 {room.status === 'DRAFT_COMPLETED' ? (
                   <Link
                     href={`/tournaments/${room.id}/bracket`}
-                    className="w-full text-center px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg transition-colors duration-200 block"
+                    className="w-full text-center px-6 py-3 bg-accent-success hover:bg-accent-success/90 text-white font-bold rounded-lg transition-colors duration-200 block"
                   >
                     대진표 보기
                   </Link>
@@ -171,11 +215,25 @@ export default function TournamentLobbyPage() {
                     {currentUserIsReady ? "준비 취소" : "준비하기"}
                   </button>
                 )}
-                <button 
+                <button
                   className="w-full px-6 py-3 bg-bg-tertiary hover:bg-bg-elevated text-text-primary font-bold rounded-lg transition-colors duration-200"
-                  onClick={() => disconnect()} // Should probably navigate back too
+                  onClick={() => {
+                    disconnect();
+                    router.push('/tournaments');
+                  }}
                 >
                   로비 나가기
+                </button>
+              </div>
+
+              {/* Personal Settings Button */}
+              <div className="mt-4 pt-4 border-t border-bg-tertiary">
+                <button
+                  onClick={() => setIsUserSettingsModalOpen(true)}
+                  className="w-full px-4 py-2 text-text-secondary hover:text-text-primary hover:bg-bg-tertiary rounded-lg transition-colors duration-200 flex items-center justify-center text-sm"
+                >
+                  <UserCog className="h-4 w-4 mr-2" />
+                  내 설정
                 </button>
               </div>
             </div>
@@ -203,6 +261,35 @@ export default function TournamentLobbyPage() {
             room={room}
         />
     )}
+
+    {/* Kick Confirmation Modal */}
+    <ConfirmModal
+      isOpen={!!kickTarget}
+      onClose={() => setKickTarget(null)}
+      onConfirm={async () => {
+        if (kickTarget && room) {
+          setIsKicking(true);
+          try {
+            await kickParticipant(room.id, kickTarget.id);
+          } finally {
+            setIsKicking(false);
+            setKickTarget(null);
+          }
+        }
+      }}
+      title="참가자 강퇴"
+      message={`${kickTarget?.username}님을 강퇴하시겠습니까?`}
+      confirmText="강퇴"
+      cancelText="취소"
+      variant="danger"
+      isLoading={isKicking}
+    />
+
+    {/* User Settings Modal */}
+    <UserSettingsModal
+      isOpen={isUserSettingsModalOpen}
+      onClose={() => setIsUserSettingsModalOpen(false)}
+    />
     </>
   );
 }

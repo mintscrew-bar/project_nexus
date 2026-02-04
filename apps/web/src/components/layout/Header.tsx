@@ -7,6 +7,8 @@ import { Logo } from '@/components/Logo';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { UserMenu } from '@/components/UserMenu';
 import { MobileMenu } from '@/components/MobileMenu';
+import { Users } from 'lucide-react';
+import { useAuthStore } from '@/stores/auth-store';
 
 const navItems = [
   { href: '/tournaments', label: '내전' },
@@ -17,6 +19,7 @@ const navItems = [
 
 export function Header() {
   const pathname = usePathname();
+  const { isAuthenticated } = useAuthStore();
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
 
@@ -51,8 +54,22 @@ export function Header() {
         </ul>
       </nav>
 
-      {/* Right: Theme Toggle + Auth */}
+      {/* Right: Friends + Theme Toggle + Auth */}
       <div className="flex items-center gap-3">
+        {isAuthenticated && (
+          <Link
+            href="/friends"
+            className={cn(
+              'p-2 rounded-lg transition-colors duration-150',
+              isActive('/friends')
+                ? 'bg-accent-primary/10 text-accent-primary'
+                : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary'
+            )}
+            title="친구"
+          >
+            <Users className="h-5 w-5" />
+          </Link>
+        )}
         <ThemeToggle />
         <UserMenu />
       </div>

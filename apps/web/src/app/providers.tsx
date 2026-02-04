@@ -5,6 +5,8 @@ import { ThemeProvider } from "next-themes";
 import { useState, type ReactNode, useEffect } from "react";
 import { useAuthStore } from "@/stores/auth-store";
 import { RiotAccountChecker } from "@/components/RiotAccountChecker";
+import { ToastProvider } from "@/components/ui/Toast";
+import { KeyboardShortcutsProvider } from "@/components/KeyboardShortcuts";
 
 function AuthInitializer({ children }: { children: ReactNode }) {
   const initializeAuth = useAuthStore((state) => state.initializeAuth);
@@ -38,9 +40,13 @@ export function Providers({ children }: { children: ReactNode }) {
   return (
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
       <QueryClientProvider client={queryClient}>
-        <AuthInitializer>
-          <RiotAccountChecker>{children}</RiotAccountChecker>
-        </AuthInitializer>
+        <ToastProvider>
+          <KeyboardShortcutsProvider>
+            <AuthInitializer>
+              <RiotAccountChecker>{children}</RiotAccountChecker>
+            </AuthInitializer>
+          </KeyboardShortcutsProvider>
+        </ToastProvider>
       </QueryClientProvider>
     </ThemeProvider>
   );

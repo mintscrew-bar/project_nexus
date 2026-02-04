@@ -10,10 +10,17 @@ export class GoogleStrategy extends PassportStrategy(Strategy, "google") {
     private readonly configService: ConfigService,
     private readonly authService: AuthService,
   ) {
+    const clientID = configService.get("GOOGLE_CLIENT_ID");
+    const clientSecret = configService.get("GOOGLE_CLIENT_SECRET");
+    const callbackURL = configService.get("GOOGLE_CALLBACK_URL");
+
+    console.log("Google Strategy - clientID:", clientID);
+    console.log("Google Strategy - callbackURL:", callbackURL);
+
     super({
-      clientID: configService.get("GOOGLE_CLIENT_ID"),
-      clientSecret: configService.get("GOOGLE_CLIENT_SECRET"),
-      callbackURL: configService.get("GOOGLE_CALLBACK_URL"),
+      clientID,
+      clientSecret,
+      callbackURL,
       scope: ["email", "profile"],
     });
   }
@@ -24,20 +31,28 @@ export class GoogleStrategy extends PassportStrategy(Strategy, "google") {
     profile: any,
     done: VerifyCallback,
   ): Promise<any> {
-    const { id, displayName, emails, photos } = profile;
+    try {
+      console.log("Google strategy - profile:", JSON.stringify(profile, null, 2));
 
-    const user = await this.authService.validateOAuthUser({
-      provider: "google",
-      providerId: id,
-      email: emails?.[0]?.value,
-      username: displayName || `Google_${id.slice(0, 8)}`,
-      avatar: photos?.[0]?.value,
-      metadata: {
-        accessToken,
-        refreshToken,
-      },
-    });
+      const { id, displayName, emails, photos } = profile;
 
-    done(null, user);
+      const user = await this.authService.validateOAuthUser({
+        provider: "google",
+        providerId: id,
+        email: emails?.[0]?.value,
+        username: displayName || `Google_${id.slice(0, 8)}`,
+        avatar: photos?.[0]?.value,
+        metadata: {
+          accessToken,
+          refreshToken,
+        },
+      });
+
+      console.log("Google strategy - validated user:", JSON.stringify(user, null, 2));
+      done(null, user);
+    } catch (error) {
+      console.error("Google strategy error:", error);
+      done(error as Error, undefined);
+    }
   }
 }

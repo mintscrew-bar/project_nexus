@@ -23,24 +23,32 @@ export class DiscordStrategy extends PassportStrategy(Strategy, "discord") {
     refreshToken: string,
     profile: Profile,
   ): Promise<any> {
-    const user = await this.authService.validateOAuthUser({
-      provider: "discord",
-      providerId: profile.id,
-      email: profile.email,
-      username:
-        profile.discriminator !== "0"
-          ? `${profile.username}#${profile.discriminator}`
-          : profile.username,
-      avatar: profile.avatar
-        ? `https://cdn.discordapp.com/avatars/${profile.id}/${profile.avatar}.png`
-        : undefined,
-      metadata: {
-        accessToken,
-        refreshToken,
-        discriminator: profile.discriminator,
-      },
-    });
+    try {
+      console.log("Discord strategy - profile:", JSON.stringify(profile, null, 2));
 
-    return user;
+      const user = await this.authService.validateOAuthUser({
+        provider: "discord",
+        providerId: profile.id,
+        email: profile.email,
+        username:
+          profile.discriminator !== "0"
+            ? `${profile.username}#${profile.discriminator}`
+            : profile.username,
+        avatar: profile.avatar
+          ? `https://cdn.discordapp.com/avatars/${profile.id}/${profile.avatar}.png`
+          : undefined,
+        metadata: {
+          accessToken,
+          refreshToken,
+          discriminator: profile.discriminator,
+        },
+      });
+
+      console.log("Discord strategy - validated user:", JSON.stringify(user, null, 2));
+      return user;
+    } catch (error) {
+      console.error("Discord strategy error:", error);
+      throw error;
+    }
   }
 }

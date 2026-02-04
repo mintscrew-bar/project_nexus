@@ -7,9 +7,15 @@ import {
   OnGatewayConnection,
   OnGatewayDisconnect,
 } from "@nestjs/websockets";
+import { Inject, forwardRef } from "@nestjs/common";
 import { Server, Socket } from "socket.io";
 import { RoomService } from "./room.service";
+import { SnakeDraftService } from "./snake-draft.service";
+import { SnakeDraftGateway } from "./snake-draft.gateway";
 import { AuthService } from "../auth/auth.service";
+import { AuctionService } from "../auction/auction.service";
+import { AuctionGateway } from "../auction/auction.gateway";
+import { TeamMode } from "@nexus/database";
 
 interface AuthenticatedSocket extends Socket {
   userId?: string;
@@ -34,6 +40,12 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
   constructor(
     private readonly roomService: RoomService,
     private readonly authService: AuthService,
+    private readonly snakeDraftService: SnakeDraftService,
+    private readonly snakeDraftGateway: SnakeDraftGateway,
+    @Inject(forwardRef(() => AuctionService))
+    private readonly auctionService: AuctionService,
+    @Inject(forwardRef(() => AuctionGateway))
+    private readonly auctionGateway: AuctionGateway,
   ) {}
 
   async handleConnection(client: AuthenticatedSocket) {
@@ -68,19 +80,32 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
-  handleDisconnect(client: AuthenticatedSocket) {
+  async handleDisconnect(client: AuthenticatedSocket) {
     if (client.userId) {
       this.userSockets.delete(client.userId);
 
       // Leave room if in one
       const roomId = this.socketRooms.get(client.id);
       if (roomId) {
+        try {
+          // Actually remove participant from database
+          await this.roomService.leaveRoom(client.userId, roomId);
+        } catch (error) {
+          // Room might already be deleted or user not in room, ignore
+          console.log(`Leave room on disconnect error:`, error);
+        }
+
         client.leave(roomId);
         this.socketRooms.delete(client.id);
+
+        // Notify others in the room
         this.server.to(roomId).emit("user-left", {
           userId: client.userId,
           username: client.username,
         });
+
+        // Broadcast room list update to subscribers
+        this.broadcastRoomListUpdate();
       }
 
       console.log(`User ${client.username} disconnected (${client.id})`);
@@ -129,7 +154,7 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
       // First, check if user is already a participant
       let room = await this.roomService.getRoomById(data.roomId);
       const isAlreadyParticipant = room.participants.some(
-        (p) => p.userId === client.userId,
+        (p: any) => p.userId === client.userId,
       );
 
       // If not a participant, join the room (add to DB)
@@ -239,18 +264,32 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
         return { error: "Unauthorized" };
       }
 
-      const result = await this.roomService.startGame(
-        client.userId,
-        data.roomId,
-      );
+      // Get room to check teamMode
+      const room = await this.roomService.getRoomById(data.roomId);
 
-      // Notify all players that game is starting
+      let result;
+      if (room.teamMode === TeamMode.AUCTION) {
+        // Start auction directly
+        result = await this.auctionService.startAuction(client.userId, data.roomId);
+
+        // Emit auction-started event to auction room
+        this.auctionGateway.emitAuctionStarted(data.roomId, result);
+      } else if (room.teamMode === TeamMode.SNAKE_DRAFT) {
+        // Start snake draft directly
+        result = await this.snakeDraftService.startSnakeDraft(client.userId, data.roomId);
+
+        // Emit draft-started event to room (for lobby clients) and draft room (for draft page clients)
+        this.server.to(data.roomId).emit("draft-started", result);
+        this.snakeDraftGateway.emitDraftStarted(data.roomId, result);
+      }
+
+      // Notify all players that game is starting (for navigation)
       this.server.to(data.roomId).emit("game-starting", {
-        roomId: result.roomId,
-        teamMode: result.teamMode,
+        roomId: data.roomId,
+        teamMode: room.teamMode,
       });
 
-      return result;
+      return { success: true, roomId: data.roomId, teamMode: room.teamMode };
     } catch (error: any) {
       return { error: error.message };
     }

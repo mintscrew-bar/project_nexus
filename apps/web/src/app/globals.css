@@ -94,7 +94,7 @@
   }
 
   .btn-danger {
-    @apply px-6 py-2.5 bg-accent-danger hover:bg-red-600
+    @apply px-6 py-2.5 bg-accent-danger hover:bg-accent-danger/90
            text-white font-medium rounded-lg
            transition-colors duration-150;
   }

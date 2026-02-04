@@ -69,13 +69,12 @@ export class ClanService {
         description: dto.description,
         ownerId,
         isRecruiting: dto.isRecruiting,
-        // TODO: Add to schema - minTier: dto.minTier,
-        // TODO: Add to schema - discord: dto.discord,
+        minTier: dto.minTier,
+        discord: dto.discord,
         members: {
           create: {
             userId: ownerId,
             role: ClanRole.OWNER,
-            // TODO: Verify if joinedAt is auto-generated
           },
         },
       },
@@ -353,6 +352,14 @@ export class ClanService {
         userId: targetUserId,
         clanId,
       },
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+          },
+        },
+      },
     });
 
     if (!targetMember) {
@@ -375,7 +382,10 @@ export class ClanService {
       where: { id: targetMember.id },
     });
 
-    return { message: "Member kicked successfully" };
+    return {
+      message: "Member kicked successfully",
+      kickedUser: targetMember.user,
+    };
   }
 
   async promoteMember(
@@ -407,6 +417,14 @@ export class ClanService {
         userId: targetUserId,
         clanId,
       },
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+          },
+        },
+      },
     });
 
     if (!targetMember) {
@@ -418,7 +436,10 @@ export class ClanService {
       data: { role: newRole },
     });
 
-    return { message: "Member role updated successfully" };
+    return {
+      message: "Member role updated successfully",
+      promotedUser: targetMember.user,
+    };
   }
 
   async transferOwnership(userId: string, clanId: string, newOwnerId: string) {

@@ -12,7 +12,9 @@ import {
   HttpStatus,
 } from "@nestjs/common";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { RolesGuard } from "../auth/guards/roles.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
+import { Roles } from "../auth/decorators/roles.decorator";
 import {
   CommunityService,
   CreatePostDto,
@@ -20,6 +22,7 @@ import {
   CreateCommentDto,
 } from "./community.service";
 import { PostCategory } from "./community.types";
+import { UserRole } from "@nexus/database";
 
 @Controller("community")
 export class CommunityController {
@@ -151,18 +154,20 @@ export class CommunityController {
   }
 
   // ========================================
-  // Pin/Unpin (TODO: Add admin/moderator guard)
+  // Pin/Unpin (Admin/Moderator Only)
   // ========================================
 
   @Post("posts/:id/pin")
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.MODERATOR)
   @HttpCode(HttpStatus.OK)
   async pinPost(@Param("id") postId: string) {
     return this.communityService.pinPost(postId);
   }
 
   @Delete("posts/:id/pin")
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.MODERATOR)
   async unpinPost(@Param("id") postId: string) {
     return this.communityService.unpinPost(postId);
   }

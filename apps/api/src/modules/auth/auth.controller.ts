@@ -74,20 +74,26 @@ export class AuthController {
   @Get("google")
   @UseGuards(AuthGuard("google"))
   googleAuth() {
-    // Redirects to Google OAuth
+    // Passport가 Google로 리다이렉트함
   }
 
   @Get("google/callback")
   @UseGuards(AuthGuard("google"))
   async googleCallback(@Req() req: Request, @Res() res: Response) {
-    const user = req.user as any;
-    const tokens = await this.authService.generateTokens(user);
+    try {
+      const user = req.user as any;
+      console.log("Google callback - user:", JSON.stringify(user, null, 2));
+      const tokens = await this.authService.generateTokens(user);
 
-    // Redirect to Next.js API route which will set the cookie on the frontend domain
-    const appUrl = this.configService.get("APP_URL") || "http://localhost:3000";
-    res.redirect(
-      `${appUrl}/api/auth/callback?access_token=${tokens.accessToken}&refresh_token=${tokens.refreshToken}`,
-    );
+      const appUrl = this.configService.get("APP_URL") || "http://localhost:3000";
+      res.redirect(
+        `${appUrl}/api/auth/callback?access_token=${tokens.accessToken}&refresh_token=${tokens.refreshToken}`,
+      );
+    } catch (error) {
+      console.error("Google callback error:", error);
+      const appUrl = this.configService.get("APP_URL") || "http://localhost:3000";
+      res.redirect(`${appUrl}/auth/login?error=${encodeURIComponent(String(error))}`);
+    }
   }
 
   // ========================================
@@ -97,20 +103,26 @@ export class AuthController {
   @Get("discord")
   @UseGuards(AuthGuard("discord"))
   discordAuth() {
-    // Redirects to Discord OAuth
+    // Passport가 Discord로 리다이렉트함
   }
 
   @Get("discord/callback")
   @UseGuards(AuthGuard("discord"))
   async discordCallback(@Req() req: Request, @Res() res: Response) {
-    const user = req.user as any;
-    const tokens = await this.authService.generateTokens(user);
+    try {
+      const user = req.user as any;
+      console.log("Discord callback - user:", JSON.stringify(user, null, 2));
+      const tokens = await this.authService.generateTokens(user);
 
-    // Redirect to Next.js API route which will set the cookie on the frontend domain
-    const appUrl = this.configService.get("APP_URL") || "http://localhost:3000";
-    res.redirect(
-      `${appUrl}/api/auth/callback?access_token=${tokens.accessToken}&refresh_token=${tokens.refreshToken}`,
-    );
+      const appUrl = this.configService.get("APP_URL") || "http://localhost:3000";
+      res.redirect(
+        `${appUrl}/api/auth/callback?access_token=${tokens.accessToken}&refresh_token=${tokens.refreshToken}`,
+      );
+    } catch (error) {
+      console.error("Discord callback error:", error);
+      const appUrl = this.configService.get("APP_URL") || "http://localhost:3000";
+      res.redirect(`${appUrl}/auth/login?error=${encodeURIComponent(String(error))}`);
+    }
   }
 
   // ========================================

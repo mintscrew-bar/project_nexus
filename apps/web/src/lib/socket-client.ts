@@ -7,6 +7,7 @@ let auctionSocket: Socket | null = null;
 let snakeDraftSocket: Socket | null = null;
 let matchSocket: Socket | null = null;
 let clanSocket: Socket | null = null;
+let presenceSocket: Socket | null = null;
 
 const SOCKET_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
@@ -328,6 +329,65 @@ export const matchSocketHelpers = {
   },
 };
 
+// Presence Socket 연결
+export const connectPresenceSocket = () => {
+  if (presenceSocket?.connected) return presenceSocket;
+
+  presenceSocket = io(`${SOCKET_URL}/presence`, {
+    auth: {
+      token: getAccessToken(),
+    },
+    transports: ["websocket"],
+  });
+
+  presenceSocket.on("connect", () => {
+    console.log("✅ Presence Socket Connected");
+  });
+
+  presenceSocket.on("disconnect", () => {
+    console.log("❌ Presence Socket Disconnected");
+  });
+
+  presenceSocket.on("error", (error) => {
+    console.error("Presence Socket Error:", error);
+  });
+
+  return presenceSocket;
+};
+
+// Presence Socket 헬퍼 함수
+export const presenceSocketHelpers = {
+  setStatus: (status: "ONLINE" | "AWAY", callback?: (response: any) => void) => {
+    presenceSocket?.emit("set-status", { status }, callback);
+  },
+
+  getFriendsStatus: (callback: (response: any) => void) => {
+    presenceSocket?.emit("get-friends-status", {}, callback);
+  },
+
+  subscribeFriend: (friendId: string, callback?: (response: any) => void) => {
+    presenceSocket?.emit("subscribe-friend", { friendId }, callback);
+  },
+
+  unsubscribeFriend: (friendId: string) => {
+    presenceSocket?.emit("unsubscribe-friend", { friendId });
+  },
+
+  onFriendStatusChanged: (callback: (data: { userId: string; status: string; lastSeenAt: string }) => void) => {
+    presenceSocket?.on("friend-status-changed", callback);
+  },
+
+  offAllListeners: () => {
+    presenceSocket?.off("friend-status-changed");
+  },
+};
+
+export const disconnectPresenceSocket = () => {
+  presenceSocketHelpers.offAllListeners();
+  presenceSocket?.disconnect();
+  presenceSocket = null;
+};
+
 // Clan Socket 헬퍼 함수
 export const clanSocketHelpers = {
   joinClan: (clanId: string) => {
@@ -373,12 +433,14 @@ export const disconnectAllSockets = () => {
   snakeDraftSocket?.disconnect();
   matchSocket?.disconnect();
   clanSocket?.disconnect();
+  presenceSocket?.disconnect();
 
   roomSocket = null;
   auctionSocket = null;
   snakeDraftSocket = null;
   matchSocket = null;
   clanSocket = null;
+  presenceSocket = null;
 };
 
 // 특정 소켓 연결 해제

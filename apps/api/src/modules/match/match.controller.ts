@@ -4,6 +4,7 @@ import {
   Post,
   Param,
   Body,
+  Query,
   UseGuards,
   HttpCode,
   HttpStatus,
@@ -20,6 +21,24 @@ export class MatchController {
     private readonly matchService: MatchService,
     private readonly matchGateway: MatchGateway,
   ) {}
+
+  // ========================================
+  // User Matches
+  // ========================================
+
+  @Get("my")
+  async getUserMatches(
+    @CurrentUser("sub") userId: string,
+    @Query("status") status?: string,
+    @Query("limit") limit?: string,
+    @Query("offset") offset?: string,
+  ) {
+    return this.matchService.getUserMatches(userId, {
+      status,
+      limit: limit ? parseInt(limit, 10) : undefined,
+      offset: offset ? parseInt(offset, 10) : undefined,
+    });
+  }
 
   // ========================================
   // Bracket Management

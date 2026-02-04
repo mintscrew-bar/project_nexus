@@ -3,8 +3,10 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  Logger,
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
+import { RiotTournamentService } from "../riot/riot-tournament.service";
 import { RoomStatus, MatchStatus, BracketType } from "@nexus/database";
 
 export interface BracketMatch {
@@ -25,7 +27,12 @@ export interface Bracket {
 
 @Injectable()
 export class MatchService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(MatchService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly riotTournamentService: RiotTournamentService,
+  ) {}
 
   // ========================================
   // Bracket Generation
@@ -278,10 +285,22 @@ export class MatchService {
       );
     }
 
-    // TODO: Call Riot Tournament API
-    // This requires tournament provider ID and tournament ID
-    // For now, we'll generate a placeholder code
-    const tournamentCode = `NEXUS-${match.id.substring(0, 8)}`;
+    let tournamentCode: string;
+
+    try {
+      // Call Riot Tournament API to generate code
+      tournamentCode =
+        await this.riotTournamentService.createTournamentCode(matchId);
+      this.logger.log(
+        `Generated Riot tournament code for match ${matchId}: ${tournamentCode}`,
+      );
+    } catch (error: any) {
+      // Fallback to placeholder code if Riot API is not configured or fails
+      this.logger.warn(
+        `Failed to generate Riot tournament code, using placeholder: ${error.message}`,
+      );
+      tournamentCode = `NEXUS-${match.id.substring(0, 8).toUpperCase()}`;
+    }
 
     // Update match with tournament code
     await this.prisma.match.update({
@@ -462,6 +481,72 @@ export class MatchService {
       },
       orderBy: [{ round: "asc" }, { matchNumber: "asc" }],
     });
+  }
+
+  async getUserMatches(
+    userId: string,
+    params?: { status?: string; limit?: number; offset?: number },
+  ) {
+    const { status, limit = 20, offset = 0 } = params || {};
+
+    const where: any = {
+      OR: [
+        { teamA: { members: { some: { userId } } } },
+        { teamB: { members: { some: { userId } } } },
+      ],
+    };
+
+    if (status && status !== "ALL") {
+      where.status = status;
+    }
+
+    const matches = await this.prisma.match.findMany({
+      where,
+      include: {
+        teamA: {
+          include: {
+            members: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    username: true,
+                    avatar: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        teamB: {
+          include: {
+            members: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    username: true,
+                    avatar: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        winner: true,
+        room: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+      take: limit,
+      skip: offset,
+    });
+
+    return matches;
   }
 
   // ========================================

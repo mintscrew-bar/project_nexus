@@ -136,7 +136,7 @@ export class ClanController {
     // Broadcast member kicked to all clan members
     this.clanGateway.emitMemberKicked(clanId, {
       userId: memberId,
-      username: "User", // TODO: get actual username
+      username: result.kickedUser?.username || "Unknown",
       kickedBy: kickerUsername,
     });
 
@@ -160,7 +160,7 @@ export class ClanController {
     // Broadcast member promotion to all clan members
     this.clanGateway.emitMemberPromoted(clanId, {
       userId: memberId,
-      username: "User", // TODO: get actual username
+      username: result.promotedUser?.username || "Unknown",
       newRole: body.role,
     });
 

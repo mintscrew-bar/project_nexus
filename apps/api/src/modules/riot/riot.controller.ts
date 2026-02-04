@@ -11,12 +11,14 @@ import {
   HttpStatus,
 } from "@nestjs/common";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { RolesGuard } from "../auth/guards/roles.guard";
 import { Public } from "../auth/decorators/public.decorator";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
+import { Roles } from "../auth/decorators/roles.decorator";
 import { RiotService, RegisterRiotAccountDto } from "./riot.service";
 import { DataDragonService } from "./data-dragon.service";
 import { RiotTournamentService } from "./riot-tournament.service";
-import { Role } from "@nexus/database";
+import { Role, UserRole } from "@nexus/database";
 
 @Controller("riot")
 export class RiotController {
@@ -181,16 +183,16 @@ export class RiotController {
   // ============================================
 
   @Post("tournament/provider/create")
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
   async createProvider() {
-    // TODO: Admin 권한 체크 추가
     return this.tournamentService.createProviderManually();
   }
 
   @Post("tournament/create")
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
   async createTournament(@Body() data: { providerId: string }) {
-    // TODO: Admin 권한 체크 추가
     return this.tournamentService.createTournamentManually(data.providerId);
   }
 }
