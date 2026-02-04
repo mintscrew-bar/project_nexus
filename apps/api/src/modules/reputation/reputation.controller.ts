@@ -11,13 +11,16 @@ import {
   HttpStatus,
 } from "@nestjs/common";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { RolesGuard } from "../auth/guards/roles.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
+import { Roles } from "../auth/decorators/roles.decorator";
 import {
   ReputationService,
   SubmitRatingDto,
   SubmitReportDto,
 } from "./reputation.service";
 import { ReportStatus } from "../community/community.types";
+import { UserRole } from "@nexus/database";
 
 @Controller("reputation")
 export class ReputationController {
@@ -80,7 +83,8 @@ export class ReputationController {
   }
 
   @Get("reports")
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.MODERATOR)
   async listPendingReports(@Query("limit") limit?: string) {
     return this.reputationService.listPendingReports(
       limit ? parseInt(limit, 10) : 50,
@@ -88,7 +92,8 @@ export class ReputationController {
   }
 
   @Put("reports/:id/status")
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.MODERATOR)
   async updateReportStatus(
     @Param("id") reportId: string,
     @Body() body: { status: ReportStatus; reviewerNote?: string },
@@ -101,11 +106,12 @@ export class ReputationController {
   }
 
   // ========================================
-  // Ban Management (TODO: Add admin/moderator guard)
+  // Ban Management (Admin/Moderator Only)
   // ========================================
 
   @Post("users/:userId/ban")
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.MODERATOR)
   @HttpCode(HttpStatus.OK)
   async banUser(
     @Param("userId") userId: string,
@@ -115,7 +121,8 @@ export class ReputationController {
   }
 
   @Post("users/:userId/unban")
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.MODERATOR)
   @HttpCode(HttpStatus.OK)
   async unbanUser(@Param("userId") userId: string) {
     return this.reputationService.unbanUser(userId);

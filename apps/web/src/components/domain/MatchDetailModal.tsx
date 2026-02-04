@@ -13,6 +13,7 @@ interface MatchDetailModalProps {
   match: Match | null;
   isOpen: boolean;
   isGeneratingCode: boolean;
+  isHost?: boolean;
   onClose: () => void;
   onGenerateCode: (matchId: string) => void;
   onReportResult: (matchId: string, winnerId: string) => Promise<void>;
@@ -22,6 +23,7 @@ export function MatchDetailModal({
   match,
   isOpen,
   isGeneratingCode,
+  isHost = false,
   onClose,
   onGenerateCode,
   onReportResult,
@@ -66,8 +68,8 @@ export function MatchDetailModal({
     }
   };
   
-  // TODO: Improve this check by looking at team members
-  const isUserParticipant = true; // For now, assume user is always a participant for UI testing
+  // Only host can report match results and generate tournament codes
+  const canManageMatch = isHost;
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={`매치 #${match.matchNumber} 상세 정보`} size="md">
@@ -118,7 +120,7 @@ export function MatchDetailModal({
                   <Copy className="h-4 w-4" />
                 </Button>
               </div>
-            ) : (
+            ) : canManageMatch ? (
               <Button
                 className="w-full"
                 onClick={() => onGenerateCode(match.id)}
@@ -129,12 +131,16 @@ export function MatchDetailModal({
                 ) : null}
                 코드 생성하기
               </Button>
+            ) : (
+              <p className="text-sm text-text-secondary text-center py-2">
+                토너먼트 코드가 아직 생성되지 않았습니다.
+              </p>
             )}
-             {copied && <p className="text-xs text-accent-success mt-2 text-center">코드가 복사되었습니다!</p>}
+            {copied && <p className="text-xs text-accent-success mt-2 text-center">코드가 복사되었습니다!</p>}
           </div>
         )}
 
-        {isUserParticipant && match.status === 'IN_PROGRESS' && (
+        {canManageMatch && match.status === 'IN_PROGRESS' && (
           <div className="pt-4 border-t border-bg-tertiary">
             <h3 className="text-md font-semibold mb-2 text-text-primary flex items-center gap-2">
               <ShieldCheck className="h-5 w-5 text-accent-primary" />

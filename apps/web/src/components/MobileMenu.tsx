@@ -1,7 +1,7 @@
 'use client';
 
 import { cn } from '@/lib/utils';
-import { X, Menu, Home, Swords, Trophy, Users, MessageSquare, Settings, LayoutDashboard } from 'lucide-react';
+import { X, Menu, Home, Swords, Trophy, Users, MessageSquare, Settings, User } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
@@ -41,7 +41,7 @@ export function MobileMenu({ className }: MobileMenuProps) {
   ];
 
   const sidebarItems = [
-    { href: '/dashboard', label: '대시보드', icon: LayoutDashboard },
+    { href: '/profile', label: '마이페이지', icon: User },
     { href: '/friends', label: '친구', icon: Users },
     { href: '/settings', label: '설정', icon: Settings },
   ];

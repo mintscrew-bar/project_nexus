@@ -72,8 +72,8 @@ export const ChatBox: React.FC<ChatBoxProps> = ({
                 {/* Avatar */}
                 <Avatar
                   src={msg.avatar}
-                  alt={msg.username}
-                  fallback={msg.username[0]}
+                  alt={msg.username || '?'}
+                  fallback={msg.username?.[0] || '?'}
                   size="sm"
                 />
 
@@ -81,7 +81,7 @@ export const ChatBox: React.FC<ChatBoxProps> = ({
                 <div className={cn('flex-1 max-w-[70%]', isOwn && 'flex flex-col items-end')}>
                   <div className="flex items-baseline gap-2 mb-1">
                     <span className="text-sm font-medium text-text-primary">
-                      {msg.username}
+                      {msg.username || '알 수 없음'}
                     </span>
                     <span className="text-xs text-text-tertiary">
                       {getRelativeTime(msg.createdAt)}

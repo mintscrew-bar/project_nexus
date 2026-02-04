@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
 import { useRiotStore } from '@/stores/riot-store';
-import { AddAccountModal } from '@/components/domain/AddAccountModal'; // Updated import
-import { LoadingSpinner, Card, CardHeader, CardTitle, CardContent, Badge, Button, Label } from '@/components/ui';
-import { Star, Plus, RefreshCw, Shield, Trophy, TrendingUp, Loader2 } from 'lucide-react';
+import { userApi, matchApi } from '@/lib/api-client';
+import { AddAccountModal } from '@/components/domain/AddAccountModal';
+import { LoadingSpinner, Card, CardHeader, CardTitle, CardContent, Badge, Button, Label, Skeleton, EmptyState } from '@/components/ui';
+import { Star, Plus, RefreshCw, Shield, Trophy, TrendingUp, Loader2, Gamepad2, Target, History, Clock } from 'lucide-react';
 import { TierBadge } from '@/components/domain/TierBadge';
 
 export default function ProfilePage() {
@@ -24,6 +25,47 @@ export default function ProfilePage() {
   } = useRiotStore();
 
   const [showAddModal, setShowAddModal] = useState(false);
+  const [stats, setStats] = useState<{
+    gamesPlayed: number;
+    wins: number;
+    losses: number;
+    winRate: number;
+    participations: number;
+  } | null>(null);
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [recentMatches, setRecentMatches] = useState<{
+    id: string;
+    status: string;
+    createdAt: string;
+    teamA: { name: string };
+    teamB: { name: string };
+    winner?: { id: string; name: string };
+  }[]>([]);
+  const [matchesLoading, setMatchesLoading] = useState(false);
+
+  const fetchStats = useCallback(async () => {
+    setStatsLoading(true);
+    try {
+      const data = await userApi.getStats();
+      setStats(data);
+    } catch (error) {
+      console.error('Failed to fetch stats:', error);
+    } finally {
+      setStatsLoading(false);
+    }
+  }, []);
+
+  const fetchRecentMatches = useCallback(async () => {
+    setMatchesLoading(true);
+    try {
+      const data = await matchApi.getUserMatches({ limit: 5 });
+      setRecentMatches(data);
+    } catch (error) {
+      console.error('Failed to fetch recent matches:', error);
+    } finally {
+      setMatchesLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -33,8 +75,10 @@ export default function ProfilePage() {
 
     if (isAuthenticated) {
       fetchAccounts();
+      fetchStats();
+      fetchRecentMatches();
     }
-  }, [isAuthenticated, authLoading, fetchAccounts, router]);
+  }, [isAuthenticated, authLoading, fetchAccounts, fetchStats, fetchRecentMatches, router]);
 
   // Remove handleAddAccount as its logic is now in AddAccountModal
   // const handleAddAccount = async (gameName: string, tagLine: string) => {
@@ -225,7 +269,7 @@ export default function ProfilePage() {
                         const account = accounts.find(acc => acc.id === accountId);
                         selectAccount(account || null);
                       }}
-                      className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-accent-primary focus:border-accent-primary sm:text-sm rounded-md bg-bg-secondary text-text-primary"
+                      className="mt-1 block w-full pl-3 pr-10 py-2 text-base border border-bg-tertiary focus:outline-none focus:ring-accent-primary focus:border-accent-primary sm:text-sm rounded-md bg-bg-secondary text-text-primary"
                     >
                       {accounts.map(account => (
                         <option key={account.id} value={account.id}>
@@ -247,30 +291,137 @@ export default function ProfilePage() {
                         </span>
                       </div>
                     </div>
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm text-text-secondary">총 게임 수</span>
-                        <Trophy className="h-4 w-4 text-text-tertiary" />
-                      </div>
-                      <p className="text-2xl font-bold text-text-primary">0</p>
-                    </div>
-
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm text-text-secondary">승률</span>
-                        <TrendingUp className="h-4 w-4 text-text-tertiary" />
-                      </div>
-                      <p className="text-2xl font-bold text-text-primary">-</p>
-                    </div>
                   </>
                 ) : (
                   <div className="text-center py-4 text-text-secondary">
                     계정을 선택해주세요.
                   </div>
                 )}
+
+                {/* Nexus Stats */}
+                <div className="pt-4 border-t border-bg-tertiary">
+                  <p className="text-sm text-text-tertiary mb-3">내전 통계</p>
+
+                  {statsLoading ? (
+                    <div className="space-y-3">
+                      <Skeleton className="h-12 w-full" />
+                      <Skeleton className="h-12 w-full" />
+                      <Skeleton className="h-12 w-full" />
+                    </div>
+                  ) : stats ? (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between p-3 bg-bg-tertiary rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <Gamepad2 className="h-4 w-4 text-accent-primary" />
+                          <span className="text-sm text-text-secondary">총 게임</span>
+                        </div>
+                        <span className="text-lg font-bold text-text-primary">{stats.gamesPlayed}</span>
+                      </div>
+
+                      <div className="flex items-center justify-between p-3 bg-bg-tertiary rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <Trophy className="h-4 w-4 text-accent-gold" />
+                          <span className="text-sm text-text-secondary">승 / 패</span>
+                        </div>
+                        <span className="text-lg font-bold">
+                          <span className="text-accent-success">{stats.wins}</span>
+                          <span className="text-text-tertiary mx-1">/</span>
+                          <span className="text-accent-danger">{stats.losses}</span>
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between p-3 bg-bg-tertiary rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <TrendingUp className="h-4 w-4 text-accent-success" />
+                          <span className="text-sm text-text-secondary">승률</span>
+                        </div>
+                        <span className={`text-lg font-bold ${
+                          stats.winRate >= 50 ? 'text-accent-success' : 'text-accent-danger'
+                        }`}>
+                          {stats.gamesPlayed > 0 ? `${stats.winRate.toFixed(1)}%` : '-'}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between p-3 bg-bg-tertiary rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <Target className="h-4 w-4 text-accent-primary" />
+                          <span className="text-sm text-text-secondary">참여 횟수</span>
+                        </div>
+                        <span className="text-lg font-bold text-text-primary">{stats.participations}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-4 text-text-tertiary">
+                      통계를 불러올 수 없습니다.
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
           </div>
+        </div>
+
+        {/* Recent Activity Section (integrated from Dashboard) */}
+        <div className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <History className="h-5 w-5 text-accent-primary" />
+                최근 활동
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {matchesLoading ? (
+                <div className="space-y-3">
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-16 w-full" />
+                  ))}
+                </div>
+              ) : recentMatches.length > 0 ? (
+                <div className="space-y-3">
+                  {recentMatches.map((match) => (
+                    <div
+                      key={match.id}
+                      className="flex items-center justify-between p-3 bg-bg-tertiary rounded-lg hover:bg-bg-elevated transition-colors cursor-pointer"
+                      onClick={() => router.push(`/matches`)}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="text-sm">
+                          <p className="font-medium text-text-primary">
+                            {match.teamA?.name ?? 'Team A'} vs {match.teamB?.name ?? 'Team B'}
+                          </p>
+                          <p className="text-xs text-text-tertiary flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {new Date(match.createdAt).toLocaleDateString('ko-KR')}
+                          </p>
+                        </div>
+                      </div>
+                      <Badge
+                        variant={
+                          match.status === 'COMPLETED' ? 'success' :
+                          match.status === 'IN_PROGRESS' ? 'primary' : 'default'
+                        }
+                        size="sm"
+                      >
+                        {match.status === 'COMPLETED' ? '완료' :
+                         match.status === 'IN_PROGRESS' ? '진행 중' : '대기'}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <EmptyState
+                  icon={History}
+                  title="아직 활동 내역이 없습니다"
+                  description="내전에 참여하면 여기에 활동 내역이 표시됩니다"
+                  action={{
+                    label: "내전 참여하기",
+                    onClick: () => router.push("/tournaments"),
+                  }}
+                />
+              )}
+            </CardContent>
+          </Card>
         </div>
       </div>
 

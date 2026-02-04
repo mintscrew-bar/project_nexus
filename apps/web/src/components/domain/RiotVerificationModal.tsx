@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from 'react';
+import Image from 'next/image';
 import { Loader2, ArrowRight, User } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
@@ -33,11 +34,14 @@ function ProfileIcon({
   }
 
   return (
-    <img
+    <Image
       src={getProfileIconUrl(iconId)}
       alt={alt}
+      width={64}
+      height={64}
       className={`object-cover ${className}`}
       onError={() => setHasError(true)}
+      unoptimized
     />
   );
 }

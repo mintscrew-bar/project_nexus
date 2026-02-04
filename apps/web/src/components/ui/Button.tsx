@@ -13,13 +13,13 @@ const buttonVariants = cva(
         secondary:
           'bg-bg-tertiary text-text-primary border border-text-tertiary hover:bg-bg-elevated focus:ring-accent-primary',
         danger:
-          'bg-accent-danger text-white hover:bg-red-600 active:bg-red-700 focus:ring-accent-danger',
+          'bg-accent-danger text-white hover:bg-accent-danger/90 active:bg-accent-danger/80 focus:ring-accent-danger',
         success:
-          'bg-accent-success text-white hover:bg-green-600 active:bg-green-700 focus:ring-accent-success',
+          'bg-accent-success text-white hover:bg-accent-success/90 active:bg-accent-success/80 focus:ring-accent-success',
         ghost:
           'bg-transparent text-text-primary hover:bg-bg-tertiary focus:ring-accent-primary',
         gold:
-          'bg-accent-gold text-bg-primary hover:bg-yellow-600 active:bg-yellow-700 focus:ring-accent-gold',
+          'bg-accent-gold text-bg-primary hover:bg-accent-gold/90 active:bg-accent-gold/80 focus:ring-accent-gold',
         outline:
           'bg-transparent border border-text-tertiary text-text-primary hover:bg-bg-tertiary focus:ring-accent-primary',
       },

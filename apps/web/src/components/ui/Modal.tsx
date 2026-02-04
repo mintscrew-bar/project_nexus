@@ -131,8 +131,8 @@ export function ConfirmModal({
   isLoading = false,
 }: ConfirmModalProps) {
   const confirmButtonStyles = {
-    danger: 'bg-accent-danger hover:bg-red-600',
-    warning: 'bg-accent-warning hover:bg-orange-600',
+    danger: 'bg-accent-danger hover:bg-accent-danger/90',
+    warning: 'bg-accent-warning hover:bg-accent-warning/90',
     default: 'bg-accent-primary hover:bg-accent-hover',
   };
 

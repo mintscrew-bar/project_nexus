@@ -35,6 +35,25 @@ export interface JoinRoomDto {
 export class RoomService {
   constructor(private readonly prisma: PrismaService) {}
 
+  // Transform room data to flatten participant info for frontend
+  private transformRoomData(room: any) {
+    if (!room) return room;
+
+    return {
+      ...room,
+      participants: room.participants?.map((p: any) => ({
+        id: p.id,
+        userId: p.userId,
+        username: p.user?.username || 'Unknown',
+        avatar: p.user?.avatar || null,
+        isHost: p.userId === room.hostId,
+        isReady: p.isReady,
+        role: p.role,
+        riotAccount: p.user?.riotAccounts?.[0] || null,
+      })),
+    };
+  }
+
   // ========================================
   // Room Creation & Management
   // ========================================
@@ -102,7 +121,7 @@ export class RoomService {
       },
     });
 
-    return room;
+    return this.transformRoomData(room);
   }
 
   async getRoomById(roomId: string) {
@@ -170,7 +189,7 @@ export class RoomService {
       throw new NotFoundException("Room not found");
     }
 
-    return room;
+    return this.transformRoomData(room);
   }
 
   async listRooms(filters?: {
@@ -546,7 +565,7 @@ export class RoomService {
       throw new BadRequestException("Message too long (max 500 characters)");
     }
 
-    return this.prisma.chatMessage.create({
+    const message = await this.prisma.chatMessage.create({
       data: {
         roomId,
         userId,
@@ -562,5 +581,15 @@ export class RoomService {
         },
       },
     });
+
+    // Transform for frontend - flatten user data
+    return {
+      id: message.id,
+      userId: message.userId,
+      username: message.user?.username || 'Unknown',
+      avatar: message.user?.avatar || null,
+      message: message.content,
+      createdAt: message.createdAt.toISOString(),
+    };
   }
 }

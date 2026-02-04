@@ -3,12 +3,22 @@ import { io, Socket } from 'socket.io-client';
 import { roomApi, getAccessToken } from '@/lib/api-client';
 
 // Placeholder Types - should eventually come from @nexus/types
+interface RiotAccount {
+  gameName: string;
+  tagLine: string;
+  tier: string | null;
+  rank: string | null;
+  mainRole: string | null;
+}
+
 interface Participant {
   id: string;
-  userId: string; // Add userId to Participant type
+  userId: string;
   username: string;
+  avatar?: string | null;
   isHost: boolean;
   isReady: boolean;
+  riotAccount?: RiotAccount | null;
 }
 
 interface Room {
@@ -20,6 +30,13 @@ interface Room {
   status: "WAITING" | "IN_PROGRESS" | "COMPLETED" | "DRAFT" | "DRAFT_COMPLETED" | "TEAM_SELECTION";
   teamMode: "AUCTION" | "SNAKE_DRAFT";
   participants: Participant[];
+  // Extended settings
+  allowSpectators?: boolean;
+  startingPoints?: number;
+  minBidIncrement?: number;
+  bidTimeLimit?: number;
+  pickTimeLimit?: number;
+  captainSelection?: "RANDOM" | "TIER";
 }
 
 interface ChatMessage {
@@ -35,6 +52,15 @@ export interface RoomSettingsDto {
   name?: string;
   password?: string | null;
   maxParticipants?: number;
+  teamMode?: "AUCTION" | "SNAKE_DRAFT";
+  allowSpectators?: boolean;
+  // Auction settings
+  startingPoints?: number;
+  minBidIncrement?: number;
+  bidTimeLimit?: number;
+  // Snake draft settings
+  pickTimeLimit?: number;
+  captainSelection?: "RANDOM" | "TIER";
 }
 
 interface LobbyStoreState {
@@ -122,7 +148,7 @@ export const useLobbyStore = create<LobbyStoreState>((set, get) => ({
       const currentRoom = get().room;
       if (currentRoom) {
         const updatedParticipants = currentRoom.participants.map(p =>
-          p.id === data.userId ? { ...p, isReady: data.isReady } : p
+          p.userId === data.userId ? { ...p, isReady: data.isReady } : p
         );
         set({ room: { ...currentRoom, participants: updatedParticipants } });
       }
@@ -146,8 +172,12 @@ export const useLobbyStore = create<LobbyStoreState>((set, get) => ({
   },
 
   disconnect: () => {
-    const socket = get().socket;
+    const { socket, room } = get();
     if (socket) {
+      // Emit leave-room before disconnecting for cleaner state management
+      if (room) {
+        socket.emit('leave-room', { roomId: room.id });
+      }
       socket.disconnect();
       set({ socket: null, messages: [], room: null, gameStarting: false });
     }

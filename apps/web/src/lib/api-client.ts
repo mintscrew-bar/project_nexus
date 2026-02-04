@@ -169,7 +169,7 @@ export const userApi = {
   uploadAvatar: async (file: File) => {
     const formData = new FormData();
     formData.append("avatar", file);
-    const response = await apiClient.post("/users/avatar", formData, {
+    const response = await apiClient.post("/users/me/avatar", formData, {
       headers: { "Content-Type": "multipart/form-data" },
     });
     return response.data;
@@ -177,6 +177,24 @@ export const userApi = {
 
   getStats: async () => {
     const response = await apiClient.get("/users/stats");
+    return response.data;
+  },
+
+  getSettings: async () => {
+    const response = await apiClient.get("/users/settings");
+    return response.data;
+  },
+
+  updateSettings: async (data: {
+    notifyMatchStart?: boolean;
+    notifyMatchResult?: boolean;
+    notifyClanActivity?: boolean;
+    showOnlineStatus?: boolean;
+    showMatchHistory?: boolean;
+    allowFriendRequests?: boolean;
+    theme?: string;
+  }) => {
+    const response = await apiClient.patch("/users/settings", data);
     return response.data;
   },
 };
@@ -290,6 +308,11 @@ export const snakeDraftApi = {
 
 // 매치/토너먼트 관련 API
 export const matchApi = {
+  getUserMatches: async (params?: { status?: string; limit?: number; offset?: number }) => {
+    const response = await apiClient.get("/matches/my", { params });
+    return response.data;
+  },
+
   generateBracket: async (roomId: string) => {
     const response = await apiClient.post(`/matches/bracket/${roomId}`);
     return response.data;
@@ -532,6 +555,16 @@ export const communityApi = {
     const response = await apiClient.post(`/community/posts/${postId}/like`);
     return response.data;
   },
+
+  unlikePost: async (postId: string) => {
+    const response = await apiClient.delete(`/community/posts/${postId}/like`);
+    return response.data;
+  },
+
+  hasLikedPost: async (postId: string) => {
+    const response = await apiClient.get(`/community/posts/${postId}/liked`);
+    return response.data;
+  },
 };
 
 // 평판/신고 관련 API
@@ -659,6 +692,29 @@ export const friendApi = {
 
   getStats: async () => {
     const response = await apiClient.get("/friends/stats");
+    return response.data;
+  },
+};
+
+// 온라인 상태 관련 API
+export const presenceApi = {
+  getMyStatus: async () => {
+    const response = await apiClient.get("/presence/me");
+    return response.data;
+  },
+
+  updateMyStatus: async (status: "ONLINE" | "AWAY") => {
+    const response = await apiClient.put("/presence/me", { status });
+    return response.data;
+  },
+
+  getUserStatus: async (userId: string) => {
+    const response = await apiClient.get(`/presence/user/${userId}`);
+    return response.data;
+  },
+
+  getFriendsStatuses: async () => {
+    const response = await apiClient.get("/presence/friends");
     return response.data;
   },
 };

@@ -4,6 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useMatchStore } from "@/stores/match-store";
 import { useAuthStore } from "@/stores/auth-store";
+import { roomApi } from "@/lib/api-client";
 import { BracketView, Match, MatchDetailModal } from "@/components/domain";
 import { LoadingSpinner, Badge, Button } from "@/components/ui";
 import { ArrowLeft, RefreshCw, Trophy } from "lucide-react";
@@ -20,17 +21,27 @@ export default function BracketPage() {
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isGeneratingCode, setIsGeneratingCode] = useState(false);
+  const [isHost, setIsHost] = useState(false);
 
   useEffect(() => {
     if (roomId) {
       fetchRoomMatches(roomId);
       connectToBracket(roomId);
+
+      // Fetch room info to check if user is host
+      roomApi.getRoom(roomId).then((room) => {
+        if (user && room.hostId === user.id) {
+          setIsHost(true);
+        }
+      }).catch(() => {
+        // Ignore errors - user might not be host
+      });
     }
 
     return () => {
       disconnect();
     };
-  }, [roomId, fetchRoomMatches, connectToBracket, disconnect]);
+  }, [roomId, user, fetchRoomMatches, connectToBracket, disconnect]);
 
   const handleRefresh = () => {
     fetchRoomMatches(roomId);
@@ -202,6 +213,7 @@ export default function BracketPage() {
           match={selectedMatch}
           isOpen={isModalOpen}
           isGeneratingCode={isGeneratingCode}
+          isHost={isHost}
           onClose={handleCloseModal}
           onGenerateCode={handleGenerateCode}
           onReportResult={handleReportResult}

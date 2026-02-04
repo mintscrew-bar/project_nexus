@@ -25,6 +25,10 @@ model User {
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
+  // Online status
+  status        UserStatus    @default(OFFLINE)
+  lastSeenAt    DateTime?
+
   reputationScore Float?          // 평판 점수 (1-5)
   isBanned        Boolean         @default(false)
   banReason       String?
@@ -34,6 +38,7 @@ model User {
   // Relations
   authProviders      AuthProvider[]
   termsAgreements    TermsAgreement[]
+  settings           UserSettings?
   riotAccounts       RiotAccount[]
   hostedRooms        Room[]                 @relation("RoomHost")
   roomParticipations RoomParticipant[]
@@ -64,6 +69,12 @@ enum UserRole {
   USER
   MODERATOR
   ADMIN
+}
+
+enum UserStatus {
+  ONLINE
+  OFFLINE
+  AWAY
 }
 
 model AuthProvider {
@@ -117,6 +128,31 @@ model Session {
   @@index([userId])
   @@index([expiresAt])
   @@map("sessions")
+}
+
+model UserSettings {
+  id     String @id @default(cuid())
+  userId String @unique
+
+  // Notification settings
+  notifyMatchStart   Boolean @default(true)
+  notifyMatchResult  Boolean @default(true)
+  notifyClanActivity Boolean @default(true)
+
+  // Privacy settings
+  showOnlineStatus   Boolean @default(true)
+  showMatchHistory   Boolean @default(true)
+  allowFriendRequests Boolean @default(true)
+
+  // Appearance settings
+  theme     String @default("dark") // "dark", "light", "system"
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_settings")
 }
 
 // ============================================

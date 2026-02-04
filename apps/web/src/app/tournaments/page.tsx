@@ -1,13 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { RoomList } from "@/components/rooms/RoomList";
 import { RoomCreationForm } from "@/components/rooms/RoomCreationForm";
 import { Button, Modal } from "@/components/ui";
+import { useKeyboardShortcutsContext } from "@/components/KeyboardShortcuts";
 import { Plus } from "lucide-react";
 
 export default function TournamentsPage() {
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
+  const { setActionHandler } = useKeyboardShortcutsContext();
+
+  // Register "n" key to open room creation modal
+  useEffect(() => {
+    setActionHandler(() => setIsCreatingRoom(true));
+    return () => setActionHandler(null);
+  }, [setActionHandler]);
 
   return (
     <div className="flex-grow p-4 md:p-8">

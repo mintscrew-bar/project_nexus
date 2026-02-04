@@ -163,6 +163,10 @@ export class SnakeDraftGateway
     this.server.to(`draft:${roomId}`).emit(event, data);
   }
 
+  emitDraftStarted(roomId: string, data: any) {
+    this.server.to(`draft:${roomId}`).emit("draft-started", data);
+  }
+
   emitTimerExpired(roomId: string) {
     this.server.to(`draft:${roomId}`).emit("timer-expired");
   }
