@@ -33,7 +33,9 @@
       "Bash(netstat:*)",
       "Bash(taskkill:*)",
       "Bash(curl:*)",
-      "Bash(ping:*)"
+      "Bash(ping:*)",
+      "Bash(git diff:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfix\\(riot\\): 소환사 검색 시 한글 및 특수문자 처리 개선\n\n- URL 인코딩 문제 해결:\n  - api-client.ts에서 fetch API 사용 및 encodeURIComponent\\(\\) 적용\n  - 소환사 페이지에서 useParams\\(\\) 값 명시적 디코딩 추가\n  - 이중 인코딩 방지 처리\n\n- 디버깅을 위한 로깅 추가:\n  - 프론트엔드: getSummoner 함수에 요청 파라미터 및 URL 로깅\n  - 백엔드: riot.controller.ts 및 riot.service.ts에 상세 로깅\n  - Riot API 요청/응답 추적\n\n- 임시 변경사항 \\(테스트용\\):\n  - @UseGuards\\(JwtAuthGuard\\) → @Public\\(\\) \\(추후 복원 필요\\)\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
     ]
   }
 }
