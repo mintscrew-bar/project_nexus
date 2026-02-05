@@ -7,9 +7,12 @@ import {
   ConnectedSocket,
   MessageBody,
 } from "@nestjs/websockets";
+import { Inject, forwardRef } from "@nestjs/common";
 import { Server, Socket } from "socket.io";
 import { AuthService } from "../auth/auth.service";
 import { SnakeDraftService } from "./snake-draft.service";
+import { RoleSelectionService } from "../role-selection/role-selection.service";
+import { RoleSelectionGateway } from "../role-selection/role-selection.gateway";
 
 interface AuthenticatedSocket extends Socket {
   userId?: string;
@@ -32,6 +35,10 @@ export class SnakeDraftGateway
   constructor(
     private readonly authService: AuthService,
     private readonly snakeDraftService: SnakeDraftService,
+    @Inject(forwardRef(() => RoleSelectionService))
+    private readonly roleSelectionService: RoleSelectionService,
+    @Inject(forwardRef(() => RoleSelectionGateway))
+    private readonly roleSelectionGateway: RoleSelectionGateway,
   ) {}
 
   async handleConnection(client: AuthenticatedSocket) {
@@ -130,6 +137,10 @@ export class SnakeDraftGateway
       if (isComplete) {
         await this.snakeDraftService.completeDraft(data.roomId);
         this.server.to(`draft:${data.roomId}`).emit("draft-complete");
+
+        // Start role selection
+        const roleSelectionData = await this.roleSelectionService.startRoleSelection(data.roomId);
+        this.roleSelectionGateway.emitRoleSelectionStarted(data.roomId, roleSelectionData);
       } else {
         // Emit next pick turn
         this.server.to(`draft:${data.roomId}`).emit("next-pick", {

@@ -59,6 +59,8 @@ model User {
   chatMessages       ChatMessage[]
   clanChatMessages   ClanChatMessage[]
   snakeDraftPicks    SnakeDraftPick[]
+  matchParticipations MatchParticipant[]
+  notifications       Notification[]
 
   @@index([email])
   @@index([reputation])
@@ -135,9 +137,15 @@ model UserSettings {
   userId String @unique
 
   // Notification settings
+  notifyFriendRequest Boolean @default(true)
+  notifyFriendAccepted Boolean @default(true)
   notifyMatchStart   Boolean @default(true)
   notifyMatchResult  Boolean @default(true)
+  notifyTeamInvite   Boolean @default(true)
+  notifyMention      Boolean @default(true)
+  notifyComment      Boolean @default(true)
   notifyClanActivity Boolean @default(true)
+  notifySystem       Boolean @default(true)
 
   // Privacy settings
   showOnlineStatus   Boolean @default(true)
@@ -272,6 +280,7 @@ enum RoomStatus {
   TEAM_SELECTION
   DRAFT
   DRAFT_COMPLETED
+  ROLE_SELECTION
   IN_PROGRESS
   COMPLETED
 }
@@ -375,6 +384,8 @@ model Team {
   matchesAsTeamB  Match[]           @relation("TeamB")
   wonMatches      Match[]           @relation("MatchWinner")
   roomParticipants RoomParticipant[]
+  matchParticipants MatchParticipant[]
+  matchTeamStats    MatchTeamStats[]
 
   @@index([roomId])
   @@index([captainId])
@@ -472,8 +483,10 @@ model Match {
   teamB  Team  @relation("TeamB", fields: [teamBId], references: [id])
   winner Team? @relation("MatchWinner", fields: [winnerId], references: [id])
 
-  ratings UserRating[]
-  reports UserReport[]
+  ratings       UserRating[]
+  reports       UserReport[]
+  participants  MatchParticipant[]
+  teamStats     MatchTeamStats[]
 
   @@index([roomId])
   @@index([teamAId])
@@ -492,6 +505,125 @@ enum MatchStatus {
   PENDING
   IN_PROGRESS
   COMPLETED
+}
+
+// ============================================
+// Match Details (Riot API Data)
+// ============================================
+
+model MatchParticipant {
+  id              String   @id @default(cuid())
+  matchId         String
+  userId          String
+  teamId          String
+
+  // Champion & Position
+  championId      Int
+  championName    String
+  position        String   // TOP, JUNGLE, MID, ADC, SUPPORT
+
+  // Summoner Spells
+  summoner1Id     Int
+  summoner2Id     Int
+
+  // KDA
+  kills           Int
+  deaths          Int
+  assists         Int
+
+  // Farm & Gold
+  totalMinionsKilled      Int
+  neutralMinionsKilled    Int
+  goldEarned              Int
+  goldSpent               Int
+
+  // Damage & Combat
+  totalDamageDealt            Int
+  totalDamageDealtToChampions Int
+  totalDamageTaken            Int
+  totalHeal                   Int
+  damageSelfMitigated         Int
+
+  // Vision
+  visionScore             Int
+  wardsPlaced             Int
+  wardsKilled             Int
+  detectorWardsPlaced     Int
+
+  // Items (final build)
+  item0       Int
+  item1       Int
+  item2       Int
+  item3       Int
+  item4       Int
+  item5       Int
+  item6       Int  // Trinket
+
+  // Perks (Runes) - stored as JSON
+  perks       Json
+
+  // Stats
+  champLevel              Int
+  largestKillingSpree     Int
+  largestMultiKill        Int
+  longestTimeSpentLiving  Int
+  totalTimeSpentDead      Int
+
+  // Objectives
+  turretKills             Int
+  inhibitorKills          Int
+  dragonKills             Int
+  baronKills              Int
+
+  // Performance
+  doubleKills             Int
+  tripleKills             Int
+  quadraKills             Int
+  pentaKills              Int
+  firstBloodKill          Boolean
+  firstTowerKill          Boolean
+
+  // Result
+  win                     Boolean
+
+  createdAt   DateTime @default(now())
+
+  match Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team  Team  @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@index([matchId])
+  @@index([userId])
+  @@index([teamId])
+  @@index([championId])
+  @@map("match_participants")
+}
+
+model MatchTeamStats {
+  id              String   @id @default(cuid())
+  matchId         String
+  teamId          String
+  win             Boolean
+
+  // Objectives
+  towerKills      Int
+  inhibitorKills  Int
+  baronKills      Int
+  dragonKills     Int
+  riftHeraldKills Int
+
+  // Bans
+  bans            Json     // Array of champion IDs
+
+  createdAt       DateTime @default(now())
+
+  match Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  team  Team  @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([matchId, teamId])
+  @@index([matchId])
+  @@index([teamId])
+  @@map("match_team_stats")
 }
 
 // ============================================
@@ -708,4 +840,37 @@ enum FriendshipStatus {
   PENDING
   ACCEPTED
   BLOCKED
+}
+
+// ============================================
+// Notification System
+// ============================================
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  message   String
+  link      String?
+  isRead    Boolean          @default(false)
+  data      Json?            // Additional data (JSON)
+  createdAt DateTime         @default(now())
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead, createdAt])
+  @@index([userId, createdAt])
+  @@map("notifications")
+}
+
+enum NotificationType {
+  FRIEND_REQUEST
+  FRIEND_ACCEPTED
+  MATCH_STARTING
+  MATCH_RESULT
+  TEAM_INVITE
+  MENTION
+  COMMENT
+  SYSTEM
 }

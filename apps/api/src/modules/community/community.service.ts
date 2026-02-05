@@ -7,6 +7,7 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { PostCategory } from "./community.types";
+import { NotificationService } from "../notification/notification.service";
 
 export interface CreatePostDto {
   title: string;
@@ -26,7 +27,10 @@ export interface CreateCommentDto {
 
 @Injectable()
 export class CommunityService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationService: NotificationService,
+  ) {}
 
   // ========================================
   // Post Management
@@ -304,6 +308,15 @@ export class CommunityService {
         },
       },
     });
+
+    // Send notification to post author (if not commenting on own post)
+    if (post.authorId !== userId) {
+      await this.notificationService.notifyComment(
+        post.authorId,
+        comment.author.username,
+        postId,
+      );
+    }
 
     return comment;
   }

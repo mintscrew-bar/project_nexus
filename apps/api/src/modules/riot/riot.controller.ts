@@ -103,11 +103,12 @@ export class RiotController {
   }
 
   @Get("summoner/:gameName/:tagLine")
-  @UseGuards(JwtAuthGuard)
+  @Public() // 임시로 인증 제거 (테스트용)
   async getSummoner(
     @Param("gameName") gameName: string,
     @Param("tagLine") tagLine: string,
   ) {
+    console.log('getSummoner controller called with:', { gameName, tagLine });
     return this.riotService.getSummonerByRiotId(gameName, tagLine);
   }
 

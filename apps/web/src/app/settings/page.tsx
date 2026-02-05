@@ -13,9 +13,15 @@ import { User, Bell, Shield, Palette, LogOut, Check, Camera } from "lucide-react
 type SettingsTab = "profile" | "notifications" | "privacy" | "appearance";
 
 interface UserSettings {
+  notifyFriendRequest: boolean;
+  notifyFriendAccepted: boolean;
   notifyMatchStart: boolean;
   notifyMatchResult: boolean;
+  notifyTeamInvite: boolean;
+  notifyMention: boolean;
+  notifyComment: boolean;
   notifyClanActivity: boolean;
+  notifySystem: boolean;
   showOnlineStatus: boolean;
   showMatchHistory: boolean;
   allowFriendRequests: boolean;
@@ -42,9 +48,15 @@ export default function SettingsPage() {
 
   // Settings state
   const [settings, setSettings] = useState<UserSettings>({
+    notifyFriendRequest: true,
+    notifyFriendAccepted: true,
     notifyMatchStart: true,
     notifyMatchResult: true,
+    notifyTeamInvite: true,
+    notifyMention: true,
+    notifyComment: true,
     notifyClanActivity: true,
+    notifySystem: true,
     showOnlineStatus: true,
     showMatchHistory: true,
     allowFriendRequests: true,
@@ -71,9 +83,15 @@ export default function SettingsPage() {
       userApi.getSettings()
         .then((data) => {
           setSettings({
+            notifyFriendRequest: data.notifyFriendRequest ?? true,
+            notifyFriendAccepted: data.notifyFriendAccepted ?? true,
             notifyMatchStart: data.notifyMatchStart ?? true,
             notifyMatchResult: data.notifyMatchResult ?? true,
+            notifyTeamInvite: data.notifyTeamInvite ?? true,
+            notifyMention: data.notifyMention ?? true,
+            notifyComment: data.notifyComment ?? true,
             notifyClanActivity: data.notifyClanActivity ?? true,
+            notifySystem: data.notifySystem ?? true,
             showOnlineStatus: data.showOnlineStatus ?? true,
             showMatchHistory: data.showMatchHistory ?? true,
             allowFriendRequests: data.allowFriendRequests ?? true,
@@ -356,41 +374,134 @@ export default function SettingsPage() {
                     </div>
                   ) : (
                     <>
-                      <div className="flex items-center justify-between py-3 border-b border-bg-tertiary">
-                        <div>
-                          <p className="font-medium text-text-primary">매치 시작 알림</p>
-                          <p className="text-sm text-text-secondary">매치가 시작될 때 알림을 받습니다</p>
+                      <div className="mb-4">
+                        <h3 className="text-sm font-semibold text-text-secondary mb-3">소셜 알림</h3>
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between py-3 border-b border-bg-tertiary">
+                            <div>
+                              <p className="font-medium text-text-primary">친구 요청</p>
+                              <p className="text-sm text-text-secondary">새로운 친구 요청을 받았을 때 알림</p>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={settings.notifyFriendRequest}
+                              onChange={(e) => handleSettingChange("notifyFriendRequest", e.target.checked)}
+                              className="w-5 h-5 accent-accent-primary cursor-pointer"
+                            />
+                          </div>
+                          <div className="flex items-center justify-between py-3 border-b border-bg-tertiary">
+                            <div>
+                              <p className="font-medium text-text-primary">친구 요청 수락</p>
+                              <p className="text-sm text-text-secondary">친구 요청이 수락되었을 때 알림</p>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={settings.notifyFriendAccepted}
+                              onChange={(e) => handleSettingChange("notifyFriendAccepted", e.target.checked)}
+                              className="w-5 h-5 accent-accent-primary cursor-pointer"
+                            />
+                          </div>
+                          <div className="flex items-center justify-between py-3 border-b border-bg-tertiary">
+                            <div>
+                              <p className="font-medium text-text-primary">팀 초대</p>
+                              <p className="text-sm text-text-secondary">팀에 초대되었을 때 알림</p>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={settings.notifyTeamInvite}
+                              onChange={(e) => handleSettingChange("notifyTeamInvite", e.target.checked)}
+                              className="w-5 h-5 accent-accent-primary cursor-pointer"
+                            />
+                          </div>
                         </div>
-                        <input
-                          type="checkbox"
-                          checked={settings.notifyMatchStart}
-                          onChange={(e) => handleSettingChange("notifyMatchStart", e.target.checked)}
-                          className="w-5 h-5 accent-accent-primary cursor-pointer"
-                        />
                       </div>
-                      <div className="flex items-center justify-between py-3 border-b border-bg-tertiary">
-                        <div>
-                          <p className="font-medium text-text-primary">매치 결과 알림</p>
-                          <p className="text-sm text-text-secondary">매치 결과가 등록되었을 때 알림</p>
+
+                      <div className="mb-4">
+                        <h3 className="text-sm font-semibold text-text-secondary mb-3">경기 알림</h3>
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between py-3 border-b border-bg-tertiary">
+                            <div>
+                              <p className="font-medium text-text-primary">경기 시작</p>
+                              <p className="text-sm text-text-secondary">경기가 시작될 때 알림</p>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={settings.notifyMatchStart}
+                              onChange={(e) => handleSettingChange("notifyMatchStart", e.target.checked)}
+                              className="w-5 h-5 accent-accent-primary cursor-pointer"
+                            />
+                          </div>
+                          <div className="flex items-center justify-between py-3 border-b border-bg-tertiary">
+                            <div>
+                              <p className="font-medium text-text-primary">경기 결과</p>
+                              <p className="text-sm text-text-secondary">경기 결과가 등록되었을 때 알림</p>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={settings.notifyMatchResult}
+                              onChange={(e) => handleSettingChange("notifyMatchResult", e.target.checked)}
+                              className="w-5 h-5 accent-accent-primary cursor-pointer"
+                            />
+                          </div>
                         </div>
-                        <input
-                          type="checkbox"
-                          checked={settings.notifyMatchResult}
-                          onChange={(e) => handleSettingChange("notifyMatchResult", e.target.checked)}
-                          className="w-5 h-5 accent-accent-primary cursor-pointer"
-                        />
                       </div>
-                      <div className="flex items-center justify-between py-3">
-                        <div>
-                          <p className="font-medium text-text-primary">클랜 활동 알림</p>
-                          <p className="text-sm text-text-secondary">클랜 관련 활동 알림을 받습니다</p>
+
+                      <div className="mb-4">
+                        <h3 className="text-sm font-semibold text-text-secondary mb-3">커뮤니티 알림</h3>
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between py-3 border-b border-bg-tertiary">
+                            <div>
+                              <p className="font-medium text-text-primary">멘션</p>
+                              <p className="text-sm text-text-secondary">다른 사용자가 나를 멘션했을 때 알림</p>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={settings.notifyMention}
+                              onChange={(e) => handleSettingChange("notifyMention", e.target.checked)}
+                              className="w-5 h-5 accent-accent-primary cursor-pointer"
+                            />
+                          </div>
+                          <div className="flex items-center justify-between py-3 border-b border-bg-tertiary">
+                            <div>
+                              <p className="font-medium text-text-primary">댓글</p>
+                              <p className="text-sm text-text-secondary">내 게시글에 댓글이 달렸을 때 알림</p>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={settings.notifyComment}
+                              onChange={(e) => handleSettingChange("notifyComment", e.target.checked)}
+                              className="w-5 h-5 accent-accent-primary cursor-pointer"
+                            />
+                          </div>
+                          <div className="flex items-center justify-between py-3 border-b border-bg-tertiary">
+                            <div>
+                              <p className="font-medium text-text-primary">클랜 활동</p>
+                              <p className="text-sm text-text-secondary">클랜 관련 활동 알림</p>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={settings.notifyClanActivity}
+                              onChange={(e) => handleSettingChange("notifyClanActivity", e.target.checked)}
+                              className="w-5 h-5 accent-accent-primary cursor-pointer"
+                            />
+                          </div>
                         </div>
-                        <input
-                          type="checkbox"
-                          checked={settings.notifyClanActivity}
-                          onChange={(e) => handleSettingChange("notifyClanActivity", e.target.checked)}
-                          className="w-5 h-5 accent-accent-primary cursor-pointer"
-                        />
+                      </div>
+
+                      <div>
+                        <h3 className="text-sm font-semibold text-text-secondary mb-3">기타</h3>
+                        <div className="flex items-center justify-between py-3">
+                          <div>
+                            <p className="font-medium text-text-primary">시스템 알림</p>
+                            <p className="text-sm text-text-secondary">중요한 시스템 공지사항 알림</p>
+                          </div>
+                          <input
+                            type="checkbox"
+                            checked={settings.notifySystem}
+                            onChange={(e) => handleSettingChange("notifySystem", e.target.checked)}
+                            className="w-5 h-5 accent-accent-primary cursor-pointer"
+                          />
+                        </div>
                       </div>
                     </>
                   )}

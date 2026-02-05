@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Logo } from "@/components/Logo";
 import { AuthButton } from "@/components/AuthButton";
+import { NotificationBell } from "@/components/NotificationBell";
 
 export function NavBar() {
   return (
@@ -36,6 +37,7 @@ export function NavBar() {
           >
             대시보드
           </Link>
+          <NotificationBell />
           <AuthButton />
         </div>
       </nav>

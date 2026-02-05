@@ -1,8 +1,28 @@
+"use client";
+
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui";
+import { useAuthStore } from "@/stores/auth-store";
 
 export default function Home() {
+  const router = useRouter();
+  const { isAuthenticated, isLoading } = useAuthStore();
+
+  useEffect(() => {
+    // If user is already logged in, redirect to dashboard
+    if (!isLoading && isAuthenticated) {
+      router.push("/dashboard");
+    }
+  }, [isAuthenticated, isLoading, router]);
+
+  // Show loading or nothing while checking auth
+  if (isLoading || isAuthenticated) {
+    return null;
+  }
+
   return (
     <main className="flex min-h-screen flex-col">
       {/* Hero Section */}

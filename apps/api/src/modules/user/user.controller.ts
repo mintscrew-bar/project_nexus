@@ -14,7 +14,10 @@ import { FileInterceptor } from "@nestjs/platform-express";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { UserService } from "./user.service";
-import { UserSettingsService, UpdateSettingsDto } from "./user-settings.service";
+import {
+  UserSettingsService,
+  UpdateSettingsDto,
+} from "./user-settings.service";
 import { UploadService } from "../upload/upload.service";
 
 @Controller("users")
@@ -58,7 +61,7 @@ export class UserController {
   @UseInterceptors(FileInterceptor("avatar"))
   async uploadAvatar(
     @CurrentUser("id") userId: string,
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile() file: Express.Multer.File, // Changed from File to Express.Multer.File
   ) {
     if (!file) {
       throw new BadRequestException("파일이 업로드되지 않았습니다.");

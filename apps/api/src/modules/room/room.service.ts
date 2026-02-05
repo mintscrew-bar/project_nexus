@@ -3,7 +3,10 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  Optional,
+  Inject,
 } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../prisma/prisma.service";
 import { RoomStatus, TeamMode, TeamCaptainSelection } from "@nexus/database";
 import * as bcrypt from "bcrypt";
@@ -33,7 +36,15 @@ export interface JoinRoomDto {
 
 @Injectable()
 export class RoomService {
-  constructor(private readonly prisma: PrismaService) {}
+  private discordBotService: any; // DiscordBotService (optional dependency)
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly configService: ConfigService,
+    @Optional() @Inject('DISCORD_BOT_SERVICE') discordBot?: any,
+  ) {
+    this.discordBotService = discordBot;
+  }
 
   // Transform room data to flatten participant info for frontend
   private transformRoomData(room: any) {
@@ -120,6 +131,31 @@ export class RoomService {
         },
       },
     });
+
+    // Send Discord notification (if bot is configured)
+    try {
+      if (this.discordBotService) {
+        const guildId = this.configService.get('DISCORD_GUILD_ID');
+        const channelId = this.configService.get('DISCORD_NOTIFICATION_CHANNEL_ID');
+
+        if (guildId && channelId) {
+          const embed = this.discordBotService.buildRoomCreatedEmbed(
+            room.name,
+            room.host.username,
+            room.maxParticipants,
+          );
+
+          await this.discordBotService.sendEmbedNotification(
+            guildId,
+            channelId,
+            embed,
+          );
+        }
+      }
+    } catch (error) {
+      // Don't fail room creation if Discord notification fails
+      console.warn('Failed to send Discord room creation notification:', error);
+    }
 
     return this.transformRoomData(room);
   }

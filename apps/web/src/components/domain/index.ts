@@ -7,3 +7,4 @@ export * from './AuctionBoard';
 export * from './DraftBoard';
 export * from './BracketView';
 export * from './MatchDetailModal';
+export * from './VictoryScreen';

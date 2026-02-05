@@ -971,4 +971,16 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
       })
       .setTimestamp();
   }
+
+  buildTournamentCompletedEmbed(roomName: string, winnerName: string) {
+    return new EmbedBuilder()
+      .setColor(Colors.Gold)
+      .setTitle("👑 토너먼트 완료!")
+      .setDescription(`**${roomName}** 토너먼트가 종료되었습니다!`)
+      .addFields({
+        name: "🏆 우승 팀",
+        value: `**${winnerName}**`,
+      })
+      .setTimestamp();
+  }
 }

@@ -52,6 +52,7 @@ interface RoomStoreState {
   currentRoom: Room | null;
   participants: Participant[];
   chatMessages: ChatMessage[];
+  typingUsers: Map<string, string>; // userId -> username
   isLoading: boolean;
   error: string | null;
   isConnected: boolean;
@@ -69,6 +70,7 @@ interface RoomStoreState {
   connectToRoom: (roomId: string) => void;
   disconnectFromRoom: () => void;
   sendChatMessage: (roomId: string, message: string) => void;
+  setTypingStatus: (roomId: string, isTyping: boolean) => void;
 
   // Room list subscription methods
   subscribeToRoomList: () => void;
@@ -80,6 +82,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
   currentRoom: null,
   participants: [],
   chatMessages: [],
+  typingUsers: new Map<string, string>(),
   isLoading: false,
   error: null,
   isConnected: false,
@@ -186,6 +189,22 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
       }));
     });
 
+    roomSocketHelpers.onUserTyping((data: { userId: string; username: string }) => {
+      set((state) => {
+        const newTypingUsers = new Map(state.typingUsers);
+        newTypingUsers.set(data.userId, data.username);
+        return { typingUsers: newTypingUsers };
+      });
+    });
+
+    roomSocketHelpers.onUserStoppedTyping((data: { userId: string }) => {
+      set((state) => {
+        const newTypingUsers = new Map(state.typingUsers);
+        newTypingUsers.delete(data.userId);
+        return { typingUsers: newTypingUsers };
+      });
+    });
+
     set({ isConnected: true });
   },
 
@@ -196,11 +215,15 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
     }
     roomSocketHelpers.offAllListeners();
     disconnectRoomSocket();
-    set({ isConnected: false, currentRoom: null, participants: [], chatMessages: [] });
+    set({ isConnected: false, currentRoom: null, participants: [], chatMessages: [], typingUsers: new Map() });
   },
 
   sendChatMessage: (roomId: string, message: string) => {
     roomSocketHelpers.sendMessage(roomId, message);
+  },
+
+  setTypingStatus: (roomId: string, isTyping: boolean) => {
+    roomSocketHelpers.sendIsTyping(roomId, isTyping);
   },
 
   subscribeToRoomList: () => {

@@ -421,7 +421,7 @@ export class AuctionService {
   async completeAuction(roomId: string) {
     await this.prisma.room.update({
       where: { id: roomId },
-      data: { status: RoomStatus.IN_PROGRESS },
+      data: { status: RoomStatus.ROLE_SELECTION },
     });
 
     this.auctionStates.delete(roomId);

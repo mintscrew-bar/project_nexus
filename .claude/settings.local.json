@@ -19,7 +19,21 @@
       "Bash(git pull:*)",
       "Bash(git stash:*)",
       "Bash(git add:*)",
-      "WebFetch(domain:ddragon.leagueoflegends.com)"
+      "WebFetch(domain:ddragon.leagueoflegends.com)",
+      "Bash(npx prisma migrate dev:*)",
+      "Bash(node scripts/setup-tournament.js:*)",
+      "Bash(powershell:*)",
+      "Bash(npx prisma db push:*)",
+      "Bash(npx prisma db execute:*)",
+      "Bash(npx prisma generate:*)",
+      "Bash(node:*)",
+      "Bash(dir:*)",
+      "Bash(findstr:*)",
+      "Bash(pnpm add:*)",
+      "Bash(netstat:*)",
+      "Bash(taskkill:*)",
+      "Bash(curl:*)",
+      "Bash(ping:*)"
     ]
   }
 }

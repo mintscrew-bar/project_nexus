@@ -17,8 +17,8 @@ const nextConfig = {
   async rewrites() {
     return [
       {
-        // Exclude routes that have explicit Next.js API handlers
-        source: "/api/:path((?!auth/callback|auth/refresh|auth/login|auth/register|auth/me|auth/logout|auth/\\[...nextauth\\]).*)",
+        // Proxy all /api requests to backend except NextAuth routes
+        source: "/api/:path((?!auth/\\[...nextauth\\]).*)",
         destination: `${process.env.API_URL || "http://localhost:4000"}/api/:path*`,
       },
     ];

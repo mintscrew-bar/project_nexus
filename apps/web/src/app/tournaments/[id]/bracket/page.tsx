@@ -4,11 +4,19 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useMatchStore } from "@/stores/match-store";
 import { useAuthStore } from "@/stores/auth-store";
-import { roomApi } from "@/lib/api-client";
-import { BracketView, Match, MatchDetailModal } from "@/components/domain";
+import { roomApi, matchApi } from "@/lib/api-client";
+import { BracketView, Match, MatchDetailModal, VictoryScreen } from "@/components/domain";
 import { LoadingSpinner, Badge, Button } from "@/components/ui";
 import { ArrowLeft, RefreshCw, Trophy } from "lucide-react";
 import Link from "next/link";
+import { io, Socket } from "socket.io-client";
+
+interface TeamStanding {
+  teamId: string;
+  teamName: string;
+  wins: number;
+  losses: number;
+}
 
 export default function BracketPage() {
   const params = useParams();
@@ -22,6 +30,10 @@ export default function BracketPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isGeneratingCode, setIsGeneratingCode] = useState(false);
   const [isHost, setIsHost] = useState(false);
+  const [tournamentCompleted, setTournamentCompleted] = useState(false);
+  const [finalStandings, setFinalStandings] = useState<TeamStanding[]>([]);
+  const [matchSocket, setMatchSocket] = useState<Socket | null>(null);
+  const [liveStatus, setLiveStatus] = useState<any>(null);
 
   useEffect(() => {
     if (roomId) {
@@ -36,6 +48,38 @@ export default function BracketPage() {
       }).catch(() => {
         // Ignore errors - user might not be host
       });
+
+      // Connect to match WebSocket for tournament completion events
+      const token = localStorage.getItem('accessToken');
+      if (token) {
+        const socket = io(
+          `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000"}/match`,
+          {
+            auth: { token },
+            transports: ["websocket"],
+          }
+        );
+
+        socket.on("connect", () => {
+          console.log("Connected to match socket");
+          socket.emit("join-bracket", { roomId });
+        });
+
+        socket.on("tournament-completed", (data: {
+          standings: TeamStanding[];
+          completedAt: string;
+        }) => {
+          console.log("Tournament completed:", data);
+          setFinalStandings(data.standings);
+          setTournamentCompleted(true);
+        });
+
+        setMatchSocket(socket);
+
+        return () => {
+          socket.disconnect();
+        };
+      }
     }
 
     return () => {
@@ -47,14 +91,36 @@ export default function BracketPage() {
     fetchRoomMatches(roomId);
   };
 
-  const handleMatchClick = (match: Match) => {
+  const handleMatchClick = async (match: Match) => {
     setSelectedMatch(match);
     setIsModalOpen(true);
+    setLiveStatus(null); // Reset previous live status
+
+    // Fetch live status if match is in progress
+    if (match.status === 'IN_PROGRESS') {
+      try {
+        const status = await matchApi.getLiveStatus(match.id);
+        setLiveStatus(status);
+      } catch (error) {
+        console.error('Failed to fetch live status:', error);
+        setLiveStatus(null);
+      }
+    }
   };
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setSelectedMatch(null);
+    setLiveStatus(null); // Clear live status when modal closes
+  };
+
+  const handleRefreshLiveStatus = async (matchId: string) => {
+    try {
+      const status = await matchApi.getLiveStatus(matchId);
+      setLiveStatus(status);
+    } catch (error) {
+      console.error('Failed to refresh live status:', error);
+    }
   };
 
   const handleGenerateCode = async (matchId: string) => {
@@ -214,10 +280,20 @@ export default function BracketPage() {
           isOpen={isModalOpen}
           isGeneratingCode={isGeneratingCode}
           isHost={isHost}
+          liveStatus={liveStatus}
           onClose={handleCloseModal}
           onGenerateCode={handleGenerateCode}
           onReportResult={handleReportResult}
+          onRefreshLiveStatus={handleRefreshLiveStatus}
         />
+
+        {/* Victory Screen */}
+        {tournamentCompleted && finalStandings.length > 0 && (
+          <VictoryScreen
+            standings={finalStandings}
+            autoRedirectSeconds={30}
+          />
+        )}
       </div>
     </div>
   );
