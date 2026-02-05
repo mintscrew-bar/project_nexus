@@ -6,10 +6,14 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { FriendshipStatus } from "@nexus/database";
+import { NotificationService } from "../notification/notification.service";
 
 @Injectable()
 export class FriendService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationService: NotificationService,
+  ) {}
 
   // ========================================
   // Friend Request Management
@@ -62,6 +66,12 @@ export class FriendService {
         status: FriendshipStatus.PENDING,
       },
       include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+          },
+        },
         friend: {
           select: {
             id: true,
@@ -80,6 +90,13 @@ export class FriendService {
         },
       },
     });
+
+    // Send notification to receiver
+    await this.notificationService.notifyFriendRequest(
+      receiverId,
+      friendship.user.username,
+      senderId,
+    );
 
     return friendship;
   }
@@ -102,8 +119,14 @@ export class FriendService {
       throw new BadRequestException("Friend request is not pending");
     }
 
+    // Get current user info
+    const accepter = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { username: true },
+    });
+
     // Update status to accepted
-    return this.prisma.friendship.update({
+    const updatedFriendship = await this.prisma.friendship.update({
       where: { id: friendshipId },
       data: { status: FriendshipStatus.ACCEPTED },
       include: {
@@ -125,6 +148,17 @@ export class FriendService {
         },
       },
     });
+
+    // Send notification to the original sender
+    if (accepter) {
+      await this.notificationService.notifyFriendAccepted(
+        friendship.userId,
+        accepter.username,
+        userId,
+      );
+    }
+
+    return updatedFriendship;
   }
 
   async rejectFriendRequest(userId: string, friendshipId: string) {

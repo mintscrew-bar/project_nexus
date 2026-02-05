@@ -321,7 +321,7 @@ export class SnakeDraftService {
   async completeDraft(roomId: string) {
     await this.prisma.room.update({
       where: { id: roomId },
-      data: { status: RoomStatus.DRAFT_COMPLETED },
+      data: { status: RoomStatus.ROLE_SELECTION },
     });
 
     this.draftStates.delete(roomId);

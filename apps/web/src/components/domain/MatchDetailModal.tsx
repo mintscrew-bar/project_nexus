@@ -4,19 +4,35 @@ import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/Alert';
 import { Badge } from '@/components/ui/Badge';
-import { Loader2, Swords, Trophy, Info, Copy, ShieldCheck, AlertCircle } from 'lucide-react';
+import { Loader2, Swords, Trophy, Info, Copy, ShieldCheck, AlertCircle, Radio } from 'lucide-react';
 import { Match } from './BracketView'; // Import the Match interface
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuthStore } from '@/stores/auth-store';
+
+interface LiveGameParticipant {
+  puuid: string;
+  championId: number;
+  teamId: number;
+  summonerName?: string;
+}
+
+interface LiveGameStatus {
+  isLive: boolean;
+  gameLength?: number; // seconds
+  gameStartTime?: number; // epoch milliseconds
+  participants?: LiveGameParticipant[];
+}
 
 interface MatchDetailModalProps {
   match: Match | null;
   isOpen: boolean;
   isGeneratingCode: boolean;
   isHost?: boolean;
+  liveStatus?: LiveGameStatus | null;
   onClose: () => void;
   onGenerateCode: (matchId: string) => void;
   onReportResult: (matchId: string, winnerId: string) => Promise<void>;
+  onRefreshLiveStatus?: (matchId: string) => Promise<void>;
 }
 
 export function MatchDetailModal({
@@ -24,14 +40,36 @@ export function MatchDetailModal({
   isOpen,
   isGeneratingCode,
   isHost = false,
+  liveStatus = null,
   onClose,
   onGenerateCode,
   onReportResult,
+  onRefreshLiveStatus,
 }: MatchDetailModalProps) {
   const { user } = useAuthStore();
   const [copied, setCopied] = useState(false);
   const [isReporting, setIsReporting] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
+
+  // Auto-refresh live status every 30 seconds for IN_PROGRESS matches
+  useEffect(() => {
+    if (!isOpen || !match || match.status !== 'IN_PROGRESS' || !onRefreshLiveStatus) {
+      return;
+    }
+
+    // Initial fetch
+    onRefreshLiveStatus(match.id);
+
+    // Set up polling interval (30 seconds)
+    const intervalId = setInterval(() => {
+      onRefreshLiveStatus(match.id);
+    }, 30000);
+
+    // Cleanup on unmount or when dependencies change
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [isOpen, match?.id, match?.status, onRefreshLiveStatus]);
 
   if (!match) return null;
 
@@ -57,6 +95,16 @@ export function MatchDetailModal({
   };
 
   const getStatusBadge = (status: Match['status']) => {
+    // Show live badge if match is in progress AND actually live in Riot servers
+    if (status === 'IN_PROGRESS' && liveStatus?.isLive) {
+      return (
+        <Badge variant="primary" className="flex items-center gap-1">
+          <Radio className="h-3 w-3 animate-pulse" />
+          🎮 라이브
+        </Badge>
+      );
+    }
+
     switch (status) {
       case 'IN_PROGRESS':
         return <Badge variant="primary">진행 중</Badge>;
@@ -66,6 +114,12 @@ export function MatchDetailModal({
       default:
         return <Badge variant="secondary">대기 중</Badge>;
     }
+  };
+
+  const formatGameLength = (seconds: number): string => {
+    const minutes = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${minutes}:${secs.toString().padStart(2, '0')}`;
   };
   
   // Only host can report match results and generate tournament codes
@@ -82,6 +136,29 @@ export function MatchDetailModal({
           <span className="text-sm font-medium text-text-secondary">상태</span>
           {getStatusBadge(match.status)}
         </div>
+
+        {/* Live Game Status */}
+        {match.status === 'IN_PROGRESS' && liveStatus?.isLive && (
+          <Alert variant="primary">
+            <Radio className="h-4 w-4 animate-pulse" />
+            <AlertTitle>🎮 라이브 경기 진행 중</AlertTitle>
+            <AlertDescription>
+              <div className="mt-2 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">경과 시간:</span>
+                  <span className="font-bold text-accent-primary">
+                    {liveStatus.gameLength ? formatGameLength(liveStatus.gameLength) : 'N/A'}
+                  </span>
+                </div>
+                {liveStatus.participants && liveStatus.participants.length > 0 && (
+                  <div className="text-xs text-text-secondary mt-2">
+                    참가자 {liveStatus.participants.length}명 플레이 중
+                  </div>
+                )}
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
 
         <div className="grid grid-cols-2 gap-4 text-center">
           <div className="p-4 bg-bg-tertiary rounded-lg">

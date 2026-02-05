@@ -36,6 +36,8 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private userSockets = new Map<string, string>(); // userId -> socketId
   private socketRooms = new Map<string, string>(); // socketId -> roomId
   private readonly ROOM_LIST_CHANNEL = "room-list"; // Channel for room list updates
+  private typingUsers = new Map<string, Map<string, NodeJS.Timeout>>(); // roomId -> Map<userId, Timeout>
+  private readonly TYPING_TIMEOUT_MS = 3000; // 3 seconds
 
   constructor(
     private readonly roomService: RoomService,
@@ -89,7 +91,7 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
       if (roomId) {
         try {
           // Actually remove participant from database
-          await this.roomService.leaveRoom(client.userId, roomId);
+          await this.roomService.leaveRoom(client.userId!, roomId); // Assert client.userId is string
         } catch (error) {
           // Room might already be deleted or user not in room, ignore
           console.log(`Leave room on disconnect error:`, error);
@@ -103,6 +105,9 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
           userId: client.userId,
           username: client.username,
         });
+
+        // Clear typing status on disconnect
+        this.stopTyping(roomId, client.userId!); // Assert client.userId is string
 
         // Broadcast room list update to subscribers
         this.broadcastRoomListUpdate();
@@ -159,7 +164,7 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       // If not a participant, join the room (add to DB)
       if (!isAlreadyParticipant) {
-        room = await this.roomService.joinRoom(client.userId, {
+        room = await this.roomService.joinRoom(client.userId!, { // Assert client.userId is string
           roomId: data.roomId,
           password: data.password,
         });
@@ -200,7 +205,7 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
         return { error: "Unauthorized" };
       }
 
-      await this.roomService.leaveRoom(client.userId, data.roomId);
+      await this.roomService.leaveRoom(client.userId!, data.roomId); // Assert client.userId is string
 
       // Leave Socket.IO room
       client.leave(data.roomId);
@@ -211,6 +216,9 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
         userId: client.userId,
         username: client.username,
       });
+
+      // Clear typing status when user explicitly leaves
+      this.stopTyping(data.roomId, client.userId!); // Assert client.userId is string
 
       // Broadcast room list update to subscribers
       this.broadcastRoomListUpdate();
@@ -232,7 +240,7 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
       }
 
       const participant = await this.roomService.toggleReady(
-        client.userId,
+        client.userId!, // Assert client.userId is string
         data.roomId,
       );
 
@@ -270,13 +278,13 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
       let result;
       if (room.teamMode === TeamMode.AUCTION) {
         // Start auction directly
-        result = await this.auctionService.startAuction(client.userId, data.roomId);
+        result = await this.auctionService.startAuction(client.userId!, data.roomId); // Assert client.userId is string
 
         // Emit auction-started event to auction room
         this.auctionGateway.emitAuctionStarted(data.roomId, result);
       } else if (room.teamMode === TeamMode.SNAKE_DRAFT) {
         // Start snake draft directly
-        result = await this.snakeDraftService.startSnakeDraft(client.userId, data.roomId);
+        result = await this.snakeDraftService.startSnakeDraft(client.userId!, data.roomId); // Assert client.userId is string
 
         // Emit draft-started event to room (for lobby clients) and draft room (for draft page clients)
         this.server.to(data.roomId).emit("draft-started", result);
@@ -310,7 +318,7 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
       }
 
       const message = await this.roomService.sendChatMessage(
-        client.userId,
+        client.userId!, // Assert client.userId is string
         data.roomId,
         data.content,
       );
@@ -318,9 +326,66 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
       // Broadcast to all in room
       this.server.to(data.roomId).emit("new-message", message);
 
+      // Stop typing after sending message
+      this.stopTyping(data.roomId, client.userId!); // Assert client.userId is string
+
       return { success: true, message };
     } catch (error: any) {
       return { error: error.message };
+    }
+  }
+
+  @SubscribeMessage("is-typing")
+  handleIsTyping(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() data: { roomId: string; isTyping: boolean },
+  ) {
+    if (!client.userId || !client.username) {
+      return;
+    }
+
+    const { roomId, isTyping } = data;
+
+    if (!this.typingUsers.has(roomId)) {
+      this.typingUsers.set(roomId, new Map());
+    }
+    const roomTypingUsers = this.typingUsers.get(roomId)!;
+
+    if (isTyping) {
+      // Clear any existing timeout for this user in this room
+      if (roomTypingUsers.has(client.userId)) {
+        clearTimeout(roomTypingUsers.get(client.userId)!); // Assert timeout is not undefined
+      } else {
+        // User just started typing, broadcast
+        this.server.to(roomId).emit("user-typing", {
+          userId: client.userId,
+          username: client.username,
+        });
+      }
+
+      // Set a new timeout to stop typing after TYPING_TIMEOUT_MS
+      const timeout = setTimeout(() => {
+        this.stopTyping(roomId, client.userId!); // Assert client.userId is string
+      }, this.TYPING_TIMEOUT_MS);
+
+      roomTypingUsers.set(client.userId, timeout);
+    } else {
+      // User explicitly stopped typing
+      this.stopTyping(roomId, client.userId!); // Assert client.userId is string
+    }
+  }
+
+  private stopTyping(roomId: string, userId: string) {
+    const roomTypingUsers = this.typingUsers.get(roomId);
+    if (roomTypingUsers && roomTypingUsers.has(userId)) {
+      clearTimeout(roomTypingUsers.get(userId)!); // Assert timeout is not undefined
+      roomTypingUsers.delete(userId);
+      this.server.to(roomId).emit("user-stopped-typing", { userId });
+
+      // Clean up room entry if no one is typing in that room
+      if (roomTypingUsers.size === 0) {
+        this.typingUsers.delete(roomId);
+      }
     }
   }
 

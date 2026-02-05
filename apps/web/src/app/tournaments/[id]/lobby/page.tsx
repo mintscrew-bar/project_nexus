@@ -44,7 +44,10 @@ export default function TournamentLobbyPage() {
         router.push(`/draft/${room.id}`);
       }
     }
-    if (room?.status === 'DRAFT_COMPLETED') {
+    if (room?.status === 'ROLE_SELECTION') {
+        router.push(`/tournaments/${room.id}/role-selection`);
+    }
+    if (room?.status === 'IN_PROGRESS') {
         router.push(`/tournaments/${room.id}/bracket`);
     }
   }, [gameStarting, room, router]);

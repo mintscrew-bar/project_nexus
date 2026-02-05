@@ -345,6 +345,11 @@ export const matchApi = {
     const response = await apiClient.post(`/matches/${matchId}/result`, data);
     return response.data;
   },
+
+  getLiveStatus: async (matchId: string) => {
+    const response = await apiClient.get(`/matches/${matchId}/live-status`);
+    return response.data;
+  },
 };
 
 // Riot API 관련 API
@@ -405,8 +410,34 @@ export const riotApi = {
 
   // 소환사 정보 조회
   getSummoner: async (gameName: string, tagLine: string) => {
-    const response = await apiClient.get(`/riot/summoner/${gameName}/${tagLine}`);
-    return response.data;
+    // 디버깅용 로그
+    console.log('getSummoner called with:', { gameName, tagLine });
+
+    const encodedGameName = encodeURIComponent(gameName);
+    const encodedTagLine = encodeURIComponent(tagLine);
+    console.log('Encoded:', { encodedGameName, encodedTagLine });
+
+    const url = `${API_BASE_URL}/riot/summoner/${encodedGameName}/${encodedTagLine}`;
+    console.log('Request URL:', url);
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
+      },
+      credentials: 'include',
+    });
+
+    console.log('Response status:', response.status);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Error response:', errorText);
+      throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+    }
+
+    return response.json();
   },
 };
 
@@ -651,42 +682,57 @@ export const friendApi = {
   },
 
   getPendingRequests: async () => {
-    const response = await apiClient.get("/friends/pending");
+    const response = await apiClient.get("/friends/requests/pending");
+    return response.data;
+  },
+
+  getSentRequests: async () => {
+    const response = await apiClient.get("/friends/requests/sent");
     return response.data;
   },
 
   sendRequest: async (targetUserId: string) => {
-    const response = await apiClient.post("/friends/request", { targetUserId });
+    const response = await apiClient.post(`/friends/requests/${targetUserId}`);
     return response.data;
   },
 
   acceptRequest: async (friendshipId: string) => {
-    const response = await apiClient.post(`/friends/${friendshipId}/accept`);
+    const response = await apiClient.post(`/friends/requests/${friendshipId}/accept`);
     return response.data;
   },
 
   rejectRequest: async (friendshipId: string) => {
-    const response = await apiClient.post(`/friends/${friendshipId}/reject`);
+    const response = await apiClient.post(`/friends/requests/${friendshipId}/reject`);
     return response.data;
   },
 
   cancelRequest: async (friendshipId: string) => {
-    const response = await apiClient.delete(`/friends/${friendshipId}/cancel`);
+    const response = await apiClient.delete(`/friends/requests/${friendshipId}`);
     return response.data;
   },
 
-  removeFriend: async (friendshipId: string) => {
-    const response = await apiClient.delete(`/friends/${friendshipId}`);
+  removeFriend: async (friendId: string) => {
+    const response = await apiClient.delete(`/friends/${friendId}`);
     return response.data;
   },
 
   blockUser: async (targetUserId: string) => {
-    const response = await apiClient.post("/friends/block", { targetUserId });
+    const response = await apiClient.post(`/friends/block/${targetUserId}`);
     return response.data;
   },
 
-  unblockUser: async (friendshipId: string) => {
-    const response = await apiClient.post(`/friends/${friendshipId}/unblock`);
+  unblockUser: async (targetUserId: string) => {
+    const response = await apiClient.delete(`/friends/block/${targetUserId}`);
+    return response.data;
+  },
+
+  getBlockedUsers: async () => {
+    const response = await apiClient.get("/friends/blocked");
+    return response.data;
+  },
+
+  getFriendshipStatus: async (targetUserId: string) => {
+    const response = await apiClient.get(`/friends/status/${targetUserId}`);
     return response.data;
   },
 
@@ -715,6 +761,99 @@ export const presenceApi = {
 
   getFriendsStatuses: async () => {
     const response = await apiClient.get("/presence/friends");
+    return response.data;
+  },
+};
+
+// 알림 관련 API
+export const notificationApi = {
+  getNotifications: async (limit = 20, offset = 0) => {
+    const response = await apiClient.get("/notifications", {
+      params: { limit, offset },
+    });
+    return response.data;
+  },
+
+  getUnreadCount: async () => {
+    const response = await apiClient.get("/notifications/unread-count");
+    return response.data;
+  },
+
+  markAsRead: async (notificationId: string) => {
+    const response = await apiClient.post(`/notifications/${notificationId}/read`);
+    return response.data;
+  },
+
+  markAllAsRead: async () => {
+    const response = await apiClient.post("/notifications/read-all");
+    return response.data;
+  },
+
+  deleteNotification: async (notificationId: string) => {
+    const response = await apiClient.delete(`/notifications/${notificationId}`);
+    return response.data;
+  },
+
+  deleteAllRead: async () => {
+    const response = await apiClient.delete("/notifications/read/all");
+    return response.data;
+  },
+};
+
+// 전적 통계 관련 API
+export const statsApi = {
+  getUserChampionStats: async (userId: string) => {
+    const response = await apiClient.get(`/stats/user/${userId}/champion-stats`);
+    return response.data;
+  },
+
+  getUserPositionStats: async (userId: string) => {
+    const response = await apiClient.get(`/stats/user/${userId}/position-stats`);
+    return response.data;
+  },
+
+  getUserRiotAccounts: async (userId: string) => {
+    const response = await apiClient.get(`/stats/user/${userId}/riot-accounts`);
+    return response.data;
+  },
+
+  findUserByRiotAccount: async (gameName: string, tagLine: string) => {
+    const response = await apiClient.get("/stats/summoner", {
+      params: { gameName, tagLine },
+    });
+    return response.data;
+  },
+
+  searchUsers: async (query: string, limit: number = 10) => {
+    const response = await apiClient.get("/stats/users/search", {
+      params: { q: query, limit },
+    });
+    return response.data;
+  },
+
+  getSummonerRiotMatches: async (
+    gameName: string,
+    tagLine: string,
+    count: number = 20,
+    queueId?: number
+  ) => {
+    const response = await apiClient.get(
+      `/stats/summoner/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}/matches`,
+      {
+        params: { count, queueId },
+      }
+    );
+    return response.data;
+  },
+
+  getUserRiotMatches: async (
+    userId: string,
+    count: number = 20,
+    queueId?: number
+  ) => {
+    const response = await apiClient.get(`/stats/user/${userId}/riot-matches`, {
+      params: { count, queueId },
+    });
     return response.data;
   },
 };

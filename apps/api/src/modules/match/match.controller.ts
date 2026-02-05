@@ -121,7 +121,55 @@ export class MatchController {
     // Emit match result to all clients
     this.matchGateway.emitMatchResult(matchId, { winnerId: body.winnerId });
 
+    // If tournament is completed, emit tournament completion event
+    if (result.tournamentCompleted) {
+      const match = await this.matchService.findById(matchId);
+      if (match?.roomId) {
+        await this.matchGateway.emitTournamentCompleted(match.roomId);
+      }
+    }
+
     return result;
+  }
+
+  // ========================================
+  // Match Details & Stats
+  // ========================================
+
+  @Get(":id/details")
+  async getMatchDetails(@Param("id") matchId: string) {
+    return this.matchService.getMatchDetails(matchId);
+  }
+
+  @Get(":id/participants")
+  async getMatchParticipants(@Param("id") matchId: string) {
+    return this.matchService.getMatchParticipants(matchId);
+  }
+
+  // ========================================
+  // Live Match Status
+  // ========================================
+
+  @Get(":id/live-status")
+  async getLiveMatchStatus(@Param("id") matchId: string) {
+    return this.matchService.getLiveMatchStatus(matchId);
+  }
+
+  // ========================================
+  // User Match History
+  // ========================================
+
+  @Get("user/:userId/history")
+  async getUserMatchHistory(
+    @Param("userId") userId: string,
+    @Query("limit") limit?: string,
+    @Query("offset") offset?: string,
+  ) {
+    return this.matchService.getUserMatchHistory(
+      userId,
+      limit ? parseInt(limit, 10) : 20,
+      offset ? parseInt(offset, 10) : 0,
+    );
   }
 
   // ========================================

@@ -8,6 +8,7 @@ let snakeDraftSocket: Socket | null = null;
 let matchSocket: Socket | null = null;
 let clanSocket: Socket | null = null;
 let presenceSocket: Socket | null = null;
+let notificationSocket: Socket | null = null;
 
 const SOCKET_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
@@ -155,6 +156,10 @@ export const roomSocketHelpers = {
     roomSocket?.emit("send-message", { roomId, message });
   },
 
+  sendIsTyping: (roomId: string, isTyping: boolean) => {
+    roomSocket?.emit("is-typing", { roomId, isTyping });
+  },
+
   // Room list subscription
   subscribeRoomList: (callback: (response: any) => void) => {
     roomSocket?.emit("subscribe-room-list", {}, callback);
@@ -192,6 +197,14 @@ export const roomSocketHelpers = {
     roomSocket?.on("new-message", callback);
   },
 
+  onUserTyping: (callback: (data: { userId: string; username: string }) => void) => {
+    roomSocket?.on("user-typing", callback);
+  },
+
+  onUserStoppedTyping: (callback: (data: { userId: string }) => void) => {
+    roomSocket?.on("user-stopped-typing", callback);
+  },
+
   offAllListeners: () => {
     roomSocket?.off("room-update");
     roomSocket?.off("participant-joined");
@@ -199,6 +212,8 @@ export const roomSocketHelpers = {
     roomSocket?.off("participant-ready");
     roomSocket?.off("new-message");
     roomSocket?.off("room-list-updated");
+    roomSocket?.off("user-typing");
+    roomSocket?.off("user-stopped-typing");
   },
 };
 
@@ -402,6 +417,10 @@ export const clanSocketHelpers = {
     clanSocket?.emit("send-message", { clanId, message });
   },
 
+  sendIsTyping: (clanId: string, isTyping: boolean) => {
+    clanSocket?.emit("is-typing", { clanId, isTyping });
+  },
+
   onNewMessage: (callback: (data: any) => void) => {
     clanSocket?.on("new-message", callback);
   },
@@ -418,12 +437,70 @@ export const clanSocketHelpers = {
     clanSocket?.on("clan-update", callback);
   },
 
+  onUserTyping: (callback: (data: { userId: string; username: string }) => void) => {
+    clanSocket?.on("user-typing", callback);
+  },
+
+  onUserStoppedTyping: (callback: (data: { userId: string }) => void) => {
+    clanSocket?.on("user-stopped-typing", callback);
+  },
+
   offAllListeners: () => {
     clanSocket?.off("new-message");
     clanSocket?.off("member-joined");
     clanSocket?.off("member-left");
     clanSocket?.off("clan-update");
+    clanSocket?.off("user-typing");
+    clanSocket?.off("user-stopped-typing");
   },
+};
+
+// Notification Socket 연결
+export const connectNotificationSocket = () => {
+  if (notificationSocket?.connected) return notificationSocket;
+
+  notificationSocket = io(`${SOCKET_URL}/notification`, {
+    auth: {
+      token: getAccessToken(),
+    },
+    transports: ["websocket"],
+  });
+
+  notificationSocket.on("connect", () => {
+    console.log("✅ Notification Socket Connected");
+  });
+
+  notificationSocket.on("disconnect", () => {
+    console.log("❌ Notification Socket Disconnected");
+  });
+
+  notificationSocket.on("error", (error) => {
+    console.error("Notification Socket Error:", error);
+  });
+
+  return notificationSocket;
+};
+
+// Notification Socket 헬퍼 함수
+export const notificationSocketHelpers = {
+  onNotification: (callback: (notification: any) => void) => {
+    notificationSocket?.on("notification", callback);
+  },
+
+  onUnreadCount: (callback: (data: { count: number }) => void) => {
+    notificationSocket?.on("unread-count", callback);
+  },
+
+  offAllListeners: () => {
+    notificationSocket?.off("notification");
+    notificationSocket?.off("unread-count");
+  },
+};
+
+export const disconnectNotificationSocket = () => {
+  notificationSocketHelpers.offAllListeners();
+  notificationSocket?.disconnect();
+  notificationSocket = null;
 };
 
 // 모든 소켓 연결 해제
@@ -434,6 +511,7 @@ export const disconnectAllSockets = () => {
   matchSocket?.disconnect();
   clanSocket?.disconnect();
   presenceSocket?.disconnect();
+  notificationSocket?.disconnect();
 
   roomSocket = null;
   auctionSocket = null;
@@ -441,6 +519,7 @@ export const disconnectAllSockets = () => {
   matchSocket = null;
   clanSocket = null;
   presenceSocket = null;
+  notificationSocket = null;
 };
 
 // 특정 소켓 연결 해제

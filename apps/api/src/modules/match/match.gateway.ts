@@ -135,4 +135,43 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
   emitTournamentCodeGenerated(matchId: string, data: { code: string }) {
     this.server.to(`match:${matchId}`).emit("tournament-code-generated", data);
   }
+
+  async emitTournamentCompleted(roomId: string) {
+    // Get final standings
+    const matches = await this.matchService.getRoomMatches(roomId);
+
+    // Calculate final standings (teams ranked by wins)
+    const teamStats = new Map<string, { teamId: string; teamName: string; wins: number; losses: number }>();
+
+    for (const match of matches) {
+      const teamAId = match.teamA.id;
+      const teamBId = match.teamB.id;
+      const teamAName = match.teamA.name;
+      const teamBName = match.teamB.name;
+
+      if (!teamStats.has(teamAId)) {
+        teamStats.set(teamAId, { teamId: teamAId, teamName: teamAName, wins: 0, losses: 0 });
+      }
+      if (!teamStats.has(teamBId)) {
+        teamStats.set(teamBId, { teamId: teamBId, teamName: teamBName, wins: 0, losses: 0 });
+      }
+
+      if (match.winnerId === teamAId) {
+        teamStats.get(teamAId)!.wins++;
+        teamStats.get(teamBId)!.losses++;
+      } else if (match.winnerId === teamBId) {
+        teamStats.get(teamBId)!.wins++;
+        teamStats.get(teamAId)!.losses++;
+      }
+    }
+
+    // Sort by wins (descending)
+    const standings = Array.from(teamStats.values()).sort((a, b) => b.wins - a.wins);
+
+    // Emit to all clients watching the bracket
+    this.server.to(`bracket:${roomId}`).emit("tournament-completed", {
+      standings,
+      completedAt: new Date(),
+    });
+  }
 }

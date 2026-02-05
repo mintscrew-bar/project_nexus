@@ -17,6 +17,9 @@ import { CommunityModule } from "./modules/community/community.module";
 import { ReputationModule } from "./modules/reputation/reputation.module";
 import { FriendModule } from "./modules/friend/friend.module";
 import { PresenceModule } from "./modules/presence/presence.module";
+import { RoleSelectionModule } from "./modules/role-selection/role-selection.module";
+import { StatsModule } from "./modules/stats/stats.module";
+import { NotificationModule } from "./modules/notification/notification.module";
 import { PrismaModule } from "./modules/prisma/prisma.module";
 import { RedisModule } from "./modules/redis/redis.module";
 import { HealthController } from "./health.controller";
@@ -64,14 +67,17 @@ const projectRoot = resolve(apiRoot, "../..");
     UserModule,
     RoomModule,
     AuctionModule,
+    RoleSelectionModule,
     MatchModule,
     RiotModule,
+    StatsModule,
     DiscordModule,
     ClanModule,
     CommunityModule,
     ReputationModule,
     FriendModule,
     PresenceModule,
+    NotificationModule,
   ],
   controllers: [HealthController],
 })

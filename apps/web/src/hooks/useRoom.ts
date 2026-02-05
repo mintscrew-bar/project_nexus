@@ -11,6 +11,7 @@ export function useRoom(roomId?: string) {
     currentRoom,
     participants,
     chatMessages,
+    typingUsers,
     isConnected,
     isLoading,
     error,
@@ -20,6 +21,7 @@ export function useRoom(roomId?: string) {
     connectToRoom,
     disconnectFromRoom,
     sendChatMessage,
+    setTypingStatus,
   } = useRoomStore();
 
   // 방 ID가 있으면 자동으로 연결
@@ -39,6 +41,7 @@ export function useRoom(roomId?: string) {
     currentRoom,
     participants,
     chatMessages,
+    typingUsers,
     isConnected,
     isLoading,
     error,
@@ -46,5 +49,6 @@ export function useRoom(roomId?: string) {
     leaveRoom,
     toggleReady,
     sendChatMessage,
+    setTypingStatus,
   };
 }

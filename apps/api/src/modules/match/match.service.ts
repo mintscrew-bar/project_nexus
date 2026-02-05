@@ -4,9 +4,16 @@ import {
   BadRequestException,
   ForbiddenException,
   Logger,
+  Inject,
+  forwardRef,
+  Optional,
 } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../prisma/prisma.service";
 import { RiotTournamentService } from "../riot/riot-tournament.service";
+import { RiotSpectatorService, LiveGameStatus } from "../riot/riot-spectator.service";
+import { MatchDataCollectionService } from "./match-data-collection.service";
+import { NotificationService } from "../notification/notification.service";
 import { RoomStatus, MatchStatus, BracketType } from "@nexus/database";
 
 export interface BracketMatch {
@@ -28,11 +35,20 @@ export interface Bracket {
 @Injectable()
 export class MatchService {
   private readonly logger = new Logger(MatchService.name);
+  private discordBotService: any;
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly configService: ConfigService,
     private readonly riotTournamentService: RiotTournamentService,
-  ) {}
+    private readonly riotSpectatorService: RiotSpectatorService,
+    @Inject(forwardRef(() => MatchDataCollectionService))
+    private readonly matchDataCollectionService: MatchDataCollectionService,
+    private readonly notificationService: NotificationService,
+    @Optional() @Inject('DISCORD_BOT_SERVICE') discordBot?: any,
+  ) {
+    this.discordBotService = discordBot;
+  }
 
   // ========================================
   // Bracket Generation
@@ -58,8 +74,8 @@ export class MatchService {
       throw new ForbiddenException("Only host can generate bracket");
     }
 
-    if (room.status !== RoomStatus.TEAM_SELECTION) {
-      throw new BadRequestException("Teams must be finalized first");
+    if (room.status !== RoomStatus.ROLE_SELECTION) {
+      throw new BadRequestException("Role selection must be completed first");
     }
 
     const teamCount = room.teams.length;
@@ -308,6 +324,50 @@ export class MatchService {
       data: { tournamentCode },
     });
 
+    // Send Discord notification
+    try {
+      if (this.discordBotService) {
+        const guildId = this.configService.get('DISCORD_GUILD_ID');
+        const channelId = this.configService.get('DISCORD_NOTIFICATION_CHANNEL_ID');
+
+        if (guildId && channelId) {
+          const embed = this.discordBotService.buildMatchStartEmbed(
+            match.teamA.name,
+            match.teamB.name,
+            tournamentCode,
+          );
+
+          await this.discordBotService.sendEmbedNotification(
+            guildId,
+            channelId,
+            embed,
+          );
+        }
+      }
+    } catch (error) {
+      this.logger.warn('Failed to send Discord match start notification:', error);
+    }
+
+    // Send app notifications to all participants
+    try {
+      const allParticipants = [
+        ...match.teamA.members.map((m) => m.user.id),
+        ...match.teamB.members.map((m) => m.user.id),
+      ];
+
+      await Promise.all(
+        allParticipants.map((userId) =>
+          this.notificationService.notifyMatchStarting(
+            userId,
+            matchId,
+            match.room.name,
+          ),
+        ),
+      );
+    } catch (error) {
+      this.logger.warn('Failed to send match start notifications:', error);
+    }
+
     return tournamentCode;
   }
 
@@ -379,13 +439,121 @@ export class MatchService {
       },
     });
 
-    // Check if bracket is complete
-    await this.checkBracketCompletion(match.roomId);
+    // Send Discord match result notification
+    try {
+      if (this.discordBotService) {
+        const guildId = this.configService.get('DISCORD_GUILD_ID');
+        const channelId = this.configService.get('DISCORD_NOTIFICATION_CHANNEL_ID');
 
-    return { message: "Match result recorded", winnerId };
+        if (guildId && channelId) {
+          const winner = winnerId === match.teamAId ? match.teamA : match.teamB;
+          const loser = winnerId === match.teamAId ? match.teamB : match.teamA;
+
+          const embed = this.discordBotService.buildMatchResultEmbed(
+            winner.name,
+            loser.name,
+          );
+
+          await this.discordBotService.sendEmbedNotification(
+            guildId,
+            channelId,
+            embed,
+          );
+        }
+      }
+    } catch (error) {
+      this.logger.warn('Failed to send Discord match result notification:', error);
+    }
+
+    // Send app notifications to all participants about match result
+    try {
+      const matchWithMembers = await this.prisma.match.findUnique({
+        where: { id: matchId },
+        include: {
+          room: true,
+          teamA: {
+            include: {
+              members: {
+                include: {
+                  user: true,
+                },
+              },
+            },
+          },
+          teamB: {
+            include: {
+              members: {
+                include: {
+                  user: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (matchWithMembers) {
+        const winnerMembers =
+          winnerId === matchWithMembers.teamAId
+            ? matchWithMembers.teamA.members
+            : matchWithMembers.teamB.members;
+        const loserMembers =
+          winnerId === matchWithMembers.teamAId
+            ? matchWithMembers.teamB.members
+            : matchWithMembers.teamA.members;
+
+        // Notify winners
+        await Promise.all(
+          winnerMembers.map((m) =>
+            this.notificationService.notifyMatchResult(
+              m.user.id,
+              matchId,
+              true,
+              matchWithMembers.room.name,
+            ),
+          ),
+        );
+
+        // Notify losers
+        await Promise.all(
+          loserMembers.map((m) =>
+            this.notificationService.notifyMatchResult(
+              m.user.id,
+              matchId,
+              false,
+              matchWithMembers.room.name,
+            ),
+          ),
+        );
+      }
+    } catch (error) {
+      this.logger.warn('Failed to send match result notifications:', error);
+    }
+
+    // Check if bracket is complete
+    const tournamentCompleted = await this.checkBracketCompletion(match.roomId);
+
+    // Start collecting match data in the background (non-blocking)
+    this.logger.log(`Scheduling match data collection for match ${matchId}`);
+    setImmediate(() => {
+      this.matchDataCollectionService
+        .collectMatchData(matchId)
+        .catch((error) => {
+          this.logger.error(
+            `Background match data collection failed for ${matchId}:`,
+            error
+          );
+        });
+    });
+
+    return {
+      message: "Match result recorded",
+      winnerId,
+      tournamentCompleted,
+    };
   }
 
-  private async checkBracketCompletion(roomId: string) {
+  private async checkBracketCompletion(roomId: string): Promise<boolean> {
     const matches = await this.prisma.match.findMany({
       where: { roomId },
     });
@@ -395,11 +563,61 @@ export class MatchService {
     );
 
     if (allComplete) {
-      await this.prisma.room.update({
+      const room = await this.prisma.room.findUnique({
         where: { id: roomId },
-        data: { status: RoomStatus.COMPLETED },
+        select: { status: true },
       });
+
+      // Only update if not already completed (avoid multiple updates)
+      if (room && room.status !== RoomStatus.COMPLETED) {
+        const roomData = await this.prisma.room.update({
+          where: { id: roomId },
+          data: {
+            status: RoomStatus.COMPLETED,
+            completedAt: new Date(),
+          },
+          include: {
+            matches: {
+              where: { winnerId: { not: null } },
+              orderBy: { round: 'desc' },
+              take: 1,
+              include: {
+                winner: true,
+              },
+            },
+          },
+        });
+
+        this.logger.log(`Tournament completed for room ${roomId}`);
+
+        // Send Discord tournament completion notification
+        try {
+          if (this.discordBotService) {
+            const guildId = this.configService.get('DISCORD_GUILD_ID');
+            const channelId = this.configService.get('DISCORD_NOTIFICATION_CHANNEL_ID');
+
+            if (guildId && channelId && roomData.matches[0]?.winner) {
+              const embed = this.discordBotService.buildTournamentCompletedEmbed(
+                roomData.name,
+                roomData.matches[0].winner.name,
+              );
+
+              await this.discordBotService.sendEmbedNotification(
+                guildId,
+                channelId,
+                embed,
+              );
+            }
+          }
+        } catch (error) {
+          this.logger.warn('Failed to send Discord tournament completion notification:', error);
+        }
+
+        return true; // Tournament just completed
+      }
     }
+
+    return false; // Not completed or already was completed
   }
 
   // ========================================
@@ -598,6 +816,272 @@ export class MatchService {
       },
       orderBy: { createdAt: "asc" },
     });
+  }
+
+  // ========================================
+  // Match Details (Riot API Data)
+  // ========================================
+
+  /**
+   * Get match details with participant stats
+   */
+  async getMatchDetails(matchId: string) {
+    const match = await this.prisma.match.findUnique({
+      where: { id: matchId },
+      include: {
+        teamA: {
+          include: {
+            members: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    username: true,
+                    avatar: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        teamB: {
+          include: {
+            members: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    username: true,
+                    avatar: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        participants: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                username: true,
+                avatar: true,
+              },
+            },
+          },
+          orderBy: {
+            teamId: "asc",
+          },
+        },
+        teamStats: {
+          include: {
+            team: {
+              select: {
+                id: true,
+                name: true,
+                color: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!match) {
+      throw new NotFoundException("Match not found");
+    }
+
+    return match;
+  }
+
+  /**
+   * Get match participants
+   */
+  async getMatchParticipants(matchId: string) {
+    return this.prisma.matchParticipant.findMany({
+      where: { matchId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            avatar: true,
+          },
+        },
+        team: {
+          select: {
+            id: true,
+            name: true,
+            color: true,
+          },
+        },
+      },
+      orderBy: {
+        teamId: "asc",
+      },
+    });
+  }
+
+  /**
+   * Get user match history with details
+   */
+  async getUserMatchHistory(userId: string, limit: number = 20, offset: number = 0) {
+    const matches = await this.prisma.matchParticipant.findMany({
+      where: { userId },
+      include: {
+        match: {
+          include: {
+            teamA: {
+              select: {
+                id: true,
+                name: true,
+                color: true,
+              },
+            },
+            teamB: {
+              select: {
+                id: true,
+                name: true,
+                color: true,
+              },
+            },
+            winner: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+        team: {
+          select: {
+            id: true,
+            name: true,
+            color: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+      take: limit,
+      skip: offset,
+    });
+
+    return matches.map((participant) => ({
+      matchId: participant.matchId,
+      match: participant.match,
+      participant: {
+        championId: participant.championId,
+        championName: participant.championName,
+        position: participant.position,
+        kills: participant.kills,
+        deaths: participant.deaths,
+        assists: participant.assists,
+        win: participant.win,
+        kda: participant.deaths === 0
+          ? (participant.kills + participant.assists)
+          : ((participant.kills + participant.assists) / participant.deaths),
+      },
+      team: participant.team,
+    }));
+  }
+
+  // ========================================
+  // Live Match Status (Spectator API)
+  // ========================================
+
+  /**
+   * Get live match status using Riot Spectator-V5 API
+   * Checks if any participants are currently in a live game
+   */
+  async getLiveMatchStatus(matchId: string): Promise<LiveGameStatus> {
+    const match = await this.prisma.match.findUnique({
+      where: { id: matchId },
+      include: {
+        teamA: {
+          include: {
+            members: {
+              include: {
+                user: {
+                  include: {
+                    riotAccounts: {
+                      where: { isPrimary: true },
+                      select: {
+                        puuid: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        teamB: {
+          include: {
+            members: {
+              include: {
+                user: {
+                  include: {
+                    riotAccounts: {
+                      where: { isPrimary: true },
+                      select: {
+                        puuid: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!match) {
+      throw new NotFoundException("Match not found");
+    }
+
+    // Only check for live games if match is in progress
+    if (match.status !== MatchStatus.IN_PROGRESS) {
+      return { isLive: false };
+    }
+
+    // Collect all participant PUUIDs
+    const puuids: string[] = [];
+
+    for (const member of match.teamA.members) {
+      const puuid = member.user.riotAccounts[0]?.puuid;
+      if (puuid) {
+        puuids.push(puuid);
+      }
+    }
+
+    for (const member of match.teamB.members) {
+      const puuid = member.user.riotAccounts[0]?.puuid;
+      if (puuid) {
+        puuids.push(puuid);
+      }
+    }
+
+    if (puuids.length === 0) {
+      this.logger.warn(
+        `No PUUIDs found for match ${matchId} participants`,
+      );
+      return { isLive: false };
+    }
+
+    // Check if any participant is in an active game
+    try {
+      const liveStatus = await this.riotSpectatorService.findActiveGameByPUUIDs(puuids);
+      return liveStatus;
+    } catch (error) {
+      this.logger.error(
+        `Error checking live match status for ${matchId}:`,
+        error,
+      );
+      return { isLive: false };
+    }
   }
 
   // ========================================

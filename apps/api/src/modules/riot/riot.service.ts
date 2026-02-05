@@ -98,13 +98,22 @@ export class RiotService {
   // ========================================
 
   async getSummonerByRiotId(gameName: string, tagLine: string) {
-    const account = await this.request<{
-      puuid: string;
-      gameName: string;
-      tagLine: string;
-    }>(
-      `${this.asiaUrl}/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}`,
-    );
+    console.log('getSummonerByRiotId called with:', { gameName, tagLine });
+    const url = `${this.asiaUrl}/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}`;
+    console.log('Riot API URL:', url);
+
+    let account;
+    try {
+      account = await this.request<{
+        puuid: string;
+        gameName: string;
+        tagLine: string;
+      }>(url);
+      console.log('Riot API response:', account);
+    } catch (error) {
+      console.error('Riot API error:', error);
+      throw error;
+    }
 
     const summoner = await this.request<{
       id: string;
@@ -114,11 +123,19 @@ export class RiotService {
       summonerLevel: number;
     }>(`${this.baseUrl}/lol/summoner/v4/summoners/by-puuid/${account.puuid}`);
 
+    // Fetch ranked info
+    const rankedInfo = await this.getRankedInfo(summoner.id);
+
     return {
       ...account,
       summonerId: summoner.id,
       profileIconId: summoner.profileIconId,
       summonerLevel: summoner.summonerLevel,
+      tier: rankedInfo.tier !== "UNRANKED" ? rankedInfo.tier : undefined,
+      rank: rankedInfo.tier !== "UNRANKED" ? rankedInfo.rank : undefined,
+      leaguePoints: rankedInfo.lp,
+      wins: rankedInfo.wins,
+      losses: rankedInfo.losses,
     };
   }
 
