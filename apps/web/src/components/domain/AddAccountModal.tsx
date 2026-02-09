@@ -5,9 +5,13 @@ import { Button } from '@/components/ui/Button';
 import { Label } from '@/components/ui/Label';
 import { useRiotStore } from '@/stores/riot-store';
 import { useDdragonStore } from '@/stores/ddragon-store';
-import { X, Loader2, CheckCircle, AlertCircle, Info, Sword, Shield } from 'lucide-react';
-import { RiotVerificationModal } from '@/components/domain/RiotVerificationModal';
+import { X, Loader2, CheckCircle, AlertCircle, Info, Sword, Shield, ArrowRight, User } from 'lucide-react';
 import { ChampionSelector } from './ChampionSelector';
+import Image from 'next/image';
+
+const DDRAGON_VERSION = process.env.NEXT_PUBLIC_DDRAGON_VERSION || '16.2.1';
+const getProfileIconUrl = (iconId: number) =>
+  `https://ddragon.leagueoflegends.com/cdn/${DDRAGON_VERSION}/img/profileicon/${iconId}.png`;
 
 // Define specific props for the new AddAccountModal
 interface AddAccountModalProps {
@@ -213,14 +217,80 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
       )}
 
       {step === 2 && verificationData && (
-        <RiotVerificationModal
-          isOpen={true}
-          onClose={onClose}
-          verificationData={verificationData}
-          onVerify={handleVerifyIcon}
-          canGoBack={true}
-          onGoBack={handleGoBackToStep1}
-        />
+        <div className="space-y-4">
+          <p className="text-text-secondary">
+            <span className="font-bold text-accent-primary">
+              {verificationData.gameName}#{verificationData.tagLine}
+            </span>
+            님의 계정을 인증하려면 아래 단계를 따라주세요:
+          </p>
+
+          {/* Icon comparison display */}
+          <div className="flex items-center justify-center gap-6 py-4 bg-bg-tertiary rounded-lg">
+            <div className="text-center">
+              <p className="text-xs text-text-tertiary mb-2">현재 아이콘</p>
+              <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-bg-elevated mx-auto">
+                <Image
+                  src={getProfileIconUrl(verificationData.currentIconId)}
+                  alt="현재 프로필 아이콘"
+                  width={64}
+                  height={64}
+                  className="w-full h-full object-cover"
+                  unoptimized
+                />
+              </div>
+              <p className="text-xs text-text-tertiary mt-1">#{verificationData.currentIconId}</p>
+            </div>
+            <ArrowRight className="w-6 h-6 text-text-tertiary flex-shrink-0" />
+            <div className="text-center">
+              <p className="text-xs text-accent-gold mb-2 font-semibold">변경할 아이콘</p>
+              <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-accent-gold ring-2 ring-accent-gold/30 mx-auto">
+                <Image
+                  src={getProfileIconUrl(verificationData.requiredIconId)}
+                  alt="필요한 프로필 아이콘"
+                  width={64}
+                  height={64}
+                  className="w-full h-full object-cover"
+                  unoptimized
+                />
+              </div>
+              <p className="text-xs text-accent-gold mt-1 font-semibold">#{verificationData.requiredIconId}</p>
+            </div>
+          </div>
+
+          <div className="bg-bg-tertiary rounded-lg p-4 space-y-3">
+            <div className="flex items-start gap-3">
+              <span className="flex-shrink-0 w-6 h-6 bg-accent-primary text-white rounded-full flex items-center justify-center text-sm font-bold">
+                1
+              </span>
+              <p className="text-text-primary text-sm">
+                리그 오브 레전드 클라이언트를 실행하세요
+              </p>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <span className="flex-shrink-0 w-6 h-6 bg-accent-primary text-white rounded-full flex items-center justify-center text-sm font-bold">
+                2
+              </span>
+              <p className="text-text-primary text-sm">
+                프로필 아이콘을 위에 표시된 <span className="font-bold text-accent-gold">노란색 테두리</span> 아이콘으로 변경하세요
+              </p>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <span className="flex-shrink-0 w-6 h-6 bg-accent-primary text-white rounded-full flex items-center justify-center text-sm font-bold">
+                3
+              </span>
+              <p className="text-text-primary text-sm">
+                아래 "인증 완료" 버튼을 클릭하세요
+              </p>
+            </div>
+          </div>
+
+          <p className="text-xs text-text-tertiary text-center">
+            이 아이콘이 없다면 '뒤로'를 누르고 다시 시도하면 다른 아이콘이 지정됩니다.
+          </p>
+        </div>
       )}
 
       {step === 3 && (
@@ -262,14 +332,27 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
       )}
       
       <div className="flex justify-end gap-3 pt-4">
-        <Button variant="outline" onClick={onClose} disabled={isLoading}>
+        {step === 2 && (
+          <Button variant="outline" onClick={handleGoBackToStep1} disabled={isLoading}>
+            뒤로
+          </Button>
+        )}
+        {step !== 2 && (
+          <Button variant="outline" onClick={onClose} disabled={isLoading}>
             <X className="w-4 h-4 mr-2" />
             취소
-        </Button>
+          </Button>
+        )}
         {step === 1 && (
           <Button onClick={handleSummonerSubmit} disabled={!gameName.trim() || !tagLine.trim() || isLoading}>
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             다음
+          </Button>
+        )}
+        {step === 2 && (
+          <Button onClick={handleVerifyIcon} disabled={isLoading}>
+            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            인증 완료
           </Button>
         )}
         {step === 3 && (

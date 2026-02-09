@@ -25,6 +25,7 @@ console.log('🔑 DISCORD_CLIENT_ID after dotenv:', process.env.DISCORD_CLIENT_I
 console.log('🔑 DISCORD_CALLBACK_URL after dotenv:', process.env.DISCORD_CALLBACK_URL);
 console.log('🔑 GOOGLE_CLIENT_ID after dotenv:', process.env.GOOGLE_CLIENT_ID);
 console.log('🔑 GOOGLE_CALLBACK_URL after dotenv:', process.env.GOOGLE_CALLBACK_URL);
+console.log('🔑 RIOT_API_KEY after dotenv:', process.env.RIOT_API_KEY ? `${process.env.RIOT_API_KEY.substring(0, 15)}...` : 'NOT SET');
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);

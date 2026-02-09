@@ -98,11 +98,11 @@ export default function LoginPage() {
             <button
               onClick={loginWithGoogle}
               disabled={isLoading}
-              className="w-full bg-white hover:bg-gray-50 text-gray-900 font-medium flex items-center justify-center gap-3 py-4 text-lg rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-gray-300"
+              className="w-full bg-white hover:bg-bg-tertiary text-text-primary font-medium flex items-center justify-center gap-3 py-4 text-lg rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-bg-tertiary"
             >
               {isLoading ? (
                 <>
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-900"></div>
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-text-primary"></div>
                   <span>연결 중...</span>
                 </>
               ) : (

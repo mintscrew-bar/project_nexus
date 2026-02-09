@@ -37,6 +37,9 @@ export function useKeyboardShortcuts(
         target.tagName === 'TEXTAREA' ||
         target.isContentEditable;
 
+      // Guard against undefined event.key
+      if (!event.key) return;
+
       for (const shortcut of shortcuts) {
         // Skip if typing in input and shortcut should ignore inputs
         if (isInputField && shortcut.ignoreInputs !== false) {
@@ -104,6 +107,9 @@ export function useSequentialShortcuts(
         target.isContentEditable;
 
       if (isInputField) return;
+
+      // Guard against undefined event.key
+      if (!event.key) return;
 
       // Add key to sequence
       pressedKeys.current.push(event.key.toLowerCase());

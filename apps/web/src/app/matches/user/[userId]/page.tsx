@@ -380,7 +380,7 @@ export default function UserStatsPage() {
                         {/* Match Info */}
                         <div>
                           <div className="flex items-center gap-2 mb-1">
-                            <Badge variant={match.participant.win ? "success" : "destructive"}>
+                            <Badge variant={match.participant.win ? "success" : "danger"}>
                               {match.participant.win ? "승리" : "패배"}
                             </Badge>
                             <span className="text-sm text-text-secondary">

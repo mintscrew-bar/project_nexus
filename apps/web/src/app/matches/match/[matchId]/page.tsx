@@ -103,9 +103,7 @@ export default function MatchDetailsPage() {
 
     try {
       const data = await matchApi.getMatch(matchId);
-      // Also fetch detailed participants
-      const detailsData = await matchApi.getMatchDetails(matchId);
-      setMatch(detailsData);
+      setMatch(data);
     } catch (err: any) {
       console.error("Failed to fetch match details:", err);
       setError(err.response?.data?.message || "매치 정보를 불러오는데 실패했습니다.");

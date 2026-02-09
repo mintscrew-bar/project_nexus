@@ -133,7 +133,8 @@ export const useRiotStore = create<RiotStoreState>((set, get) => ({
   },
 
   syncAccount: async (accountId: string) => {
-    set({ isLoading: true, error: null });
+    // Don't set global isLoading to prevent hiding the entire page
+    set({ error: null });
     try {
       const updated = await riotApi.syncAccount(accountId);
 
@@ -146,13 +147,12 @@ export const useRiotStore = create<RiotStoreState>((set, get) => ({
         accounts,
         primaryAccount: accounts.find(a => a.isPrimary) || null,
         selectedAccount: accounts.find(a => a.id === get().selectedAccount?.id) || null,
-        isLoading: false,
       });
     } catch (error: any) {
       set({
         error: error.response?.data?.message || '계정 동기화에 실패했습니다',
-        isLoading: false,
       });
+      throw error; // Re-throw so the UI can handle it
     }
   },
 
