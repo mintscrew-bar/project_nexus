@@ -9,9 +9,121 @@ import { RoomSettingsModal } from "@/components/domain/RoomSettingsModal";
 import { UserSettingsModal } from "@/components/domain/UserSettingsModal";
 import { TierBadge } from "@/components/domain/TierBadge";
 import { ConfirmModal } from "@/components/ui";
-import { Users, Crown, Check, X, MessageSquare, Settings, UserMinus, UserCog } from "lucide-react";
+import { Users, Crown, Check, X, MessageSquare, Settings, UserMinus, UserCog, UserPlus } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
+
+// Position icon URLs from Data Dragon
+const POSITION_ICON_URLS = {
+  TOP: "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-champ-select/global/default/svg/position-top.svg",
+  JUNGLE: "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-champ-select/global/default/svg/position-jungle.svg",
+  MID: "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-champ-select/global/default/svg/position-middle.svg",
+  MIDDLE: "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-champ-select/global/default/svg/position-middle.svg",
+  ADC: "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-champ-select/global/default/svg/position-bottom.svg",
+  BOTTOM: "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-champ-select/global/default/svg/position-bottom.svg",
+  SUPPORT: "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-champ-select/global/default/svg/position-utility.svg",
+  UTILITY: "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-champ-select/global/default/svg/position-utility.svg",
+} as const;
+
+const POSITION_COLORS = {
+  TOP: "brightness-0 saturate-100 sepia-100 hue-rotate-[-15deg]", // Red tint
+  JUNGLE: "brightness-0 saturate-100 sepia-100 hue-rotate-[60deg]", // Green tint
+  MID: "brightness-0 saturate-100 sepia-100 hue-rotate-[180deg]", // Blue tint
+  MIDDLE: "brightness-0 saturate-100 sepia-100 hue-rotate-[180deg]",
+  ADC: "brightness-0 saturate-100 sepia-100 hue-rotate-[20deg]", // Orange tint
+  BOTTOM: "brightness-0 saturate-100 sepia-100 hue-rotate-[20deg]",
+  SUPPORT: "brightness-0 saturate-100 sepia-100 hue-rotate-[35deg]", // Gold tint
+  UTILITY: "brightness-0 saturate-100 sepia-100 hue-rotate-[35deg]",
+} as const;
+
+// Position icon component
+function PositionIcon({ position, className = "", opacity = 1 }: { position: string; className?: string; opacity?: number }) {
+  const iconUrl = POSITION_ICON_URLS[position as keyof typeof POSITION_ICON_URLS];
+  const colorFilter = POSITION_COLORS[position as keyof typeof POSITION_COLORS];
+
+  if (!iconUrl) return null;
+
+  return (
+    <img
+      src={iconUrl}
+      alt={position}
+      className={`w-4 h-4 ${colorFilter} ${className}`}
+      style={{ opacity }}
+      onError={(e) => { e.currentTarget.style.display = 'none'; }}
+    />
+  );
+}
+
+// Player stats tooltip component
+function PlayerStatsTooltip({ participant }: { participant: any }) {
+  // Mock data - replace with actual API data later
+  const stats = {
+    winRate: 56,
+    recentGames: 20,
+    favoriteChampions: {
+      TOP: ["Aatrox", "Garen", "Darius"],
+      JUNGLE: ["Lee Sin", "Vi", "Elise"],
+      MID: ["Ahri", "Zed", "Syndra"],
+      ADC: ["Jinx", "Caitlyn", "Kai'Sa"],
+      SUPPORT: ["Thresh", "Lulu", "Nautilus"],
+    }
+  };
+
+  const primaryPosition = participant.primaryPosition || "MID";
+  const secondaryPosition = participant.secondaryPosition || "TOP";
+
+  return (
+    <div className="absolute left-0 top-full mt-2 w-72 bg-bg-elevated border border-accent-primary/30 rounded-lg shadow-xl p-4 z-50 animate-fade-in">
+      {/* Win Rate */}
+      <div className="mb-3 pb-3 border-b border-bg-tertiary">
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-sm text-text-tertiary">최근 {stats.recentGames}게임 승률</span>
+          <span className={`text-lg font-bold ${
+            stats.winRate >= 60 ? "text-accent-success" :
+            stats.winRate >= 50 ? "text-accent-primary" :
+            "text-accent-danger"
+          }`}>
+            {stats.winRate}%
+          </span>
+        </div>
+        <div className="w-full bg-bg-tertiary rounded-full h-2 overflow-hidden">
+          <div
+            className={`h-full rounded-full transition-all ${
+              stats.winRate >= 60 ? "bg-accent-success" :
+              stats.winRate >= 50 ? "bg-accent-primary" :
+              "bg-accent-danger"
+            }`}
+            style={{ width: `${stats.winRate}%` }}
+          />
+        </div>
+      </div>
+
+      {/* Favorite Champions by Position */}
+      <div className="space-y-2">
+        <div className="text-xs font-semibold text-text-tertiary uppercase">선호 챔피언</div>
+        {[primaryPosition, secondaryPosition].map((position) => {
+          const champions = stats.favoriteChampions[position as keyof typeof stats.favoriteChampions] || [];
+
+          return (
+            <div key={position} className="flex items-start gap-2">
+              <div className="flex items-center gap-1">
+                <PositionIcon position={position} className="!w-3 !h-3" />
+                <span className="text-xs font-medium text-text-secondary">{position}</span>
+              </div>
+              <div className="flex-1 flex flex-wrap gap-1">
+                {champions.slice(0, 3).map((champ, idx) => (
+                  <span key={idx} className="text-xs bg-bg-tertiary px-2 py-0.5 rounded text-text-primary">
+                    {champ}
+                  </span>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 
 export default function TournamentLobbyPage() {
@@ -26,6 +138,8 @@ export default function TournamentLobbyPage() {
   const [isUserSettingsModalOpen, setIsUserSettingsModalOpen] = useState(false);
   const [kickTarget, setKickTarget] = useState<{ id: string; username: string } | null>(null);
   const [isKicking, setIsKicking] = useState(false);
+  const [hoveredPlayer, setHoveredPlayer] = useState<string | null>(null);
+  const [addingFriend, setAddingFriend] = useState<string | null>(null);
 
   useEffect(() => {
     if (roomId) {
@@ -43,9 +157,6 @@ export default function TournamentLobbyPage() {
       } else if (room.teamMode === "SNAKE_DRAFT") {
         router.push(`/draft/${room.id}`);
       }
-    }
-    if (room?.status === 'ROLE_SELECTION') {
-        router.push(`/tournaments/${room.id}/role-selection`);
     }
     if (room?.status === 'IN_PROGRESS') {
         router.push(`/tournaments/${room.id}/bracket`);
@@ -104,72 +215,127 @@ export default function TournamentLobbyPage() {
               참가자 ({room.participants.length}/{room.maxParticipants})
             </h2>
             <div className="space-y-2">
-              {room.participants.map(p => (
-                <div key={p.id} className="flex items-center justify-between bg-bg-tertiary p-3 rounded-lg">
-                  <div className="flex items-center space-x-3">
-                    {/* Avatar */}
-                    <div className="relative w-10 h-10 rounded-full bg-bg-elevated overflow-hidden flex-shrink-0">
-                      {p.avatar ? (
-                        <Image
-                          src={p.avatar}
-                          alt={p.username}
-                          fill
-                          className="object-cover"
-                          unoptimized
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <Users className="h-5 w-5 text-text-tertiary" />
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex flex-col min-w-0">
-                      <div className="flex items-center gap-2">
-                        {p.isHost && <Crown className="h-4 w-4 text-accent-gold flex-shrink-0" />}
-                        <span className="font-semibold text-text-primary truncate">{p.username}</span>
+              {room.participants.map(p => {
+                // Mock position data - replace with actual API data
+                // TODO: Fetch from user's Riot stats
+                const primaryPosition = (p as any).primaryPosition || "MID";
+                const secondaryPosition = (p as any).secondaryPosition || "JUNGLE";
+                const winRate = (p as any).winRate || 54;
+
+                return (
+                  <div
+                    key={p.id}
+                    className="relative flex items-center justify-between bg-bg-tertiary p-3 rounded-lg hover:bg-bg-elevated transition-colors group"
+                    onMouseEnter={() => setHoveredPlayer(p.id)}
+                    onMouseLeave={() => setHoveredPlayer(null)}
+                  >
+                    <div className="flex items-center space-x-3 flex-1 min-w-0">
+                      {/* Avatar */}
+                      <div className="relative w-10 h-10 rounded-full bg-bg-elevated overflow-hidden flex-shrink-0">
+                        {p.avatar ? (
+                          <Image
+                            src={p.avatar}
+                            alt={p.username}
+                            fill
+                            className="object-cover"
+                            unoptimized
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <Users className="h-5 w-5 text-text-tertiary" />
+                          </div>
+                        )}
                       </div>
-                      {/* Riot Account & Tier */}
-                      {p.riotAccount && (
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-xs text-text-tertiary truncate">
-                            {p.riotAccount.gameName}#{p.riotAccount.tagLine}
+
+                      <div className="flex flex-col min-w-0 flex-1">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          {p.isHost && <Crown className="h-4 w-4 text-accent-gold flex-shrink-0" />}
+                          <span className="font-semibold text-text-primary truncate">
+                            {p.riotAccount ? `${p.riotAccount.gameName}#${p.riotAccount.tagLine}` : p.username}
                           </span>
-                          {p.riotAccount.tier && (
-                            <TierBadge
-                              tier={p.riotAccount.tier}
-                              rank={p.riotAccount.rank || undefined}
-                              size="sm"
-                              showIcon={false}
-                            />
+                        </div>
+
+                        {/* Username (if different from Riot account) & Tier */}
+                        <div className="flex items-center gap-2">
+                          {p.riotAccount && (
+                            <>
+                              <span className="text-xs text-text-tertiary truncate">{p.username}</span>
+                              {p.riotAccount.tier && (
+                                <TierBadge
+                                  tier={p.riotAccount.tier}
+                                  rank={p.riotAccount.rank || undefined}
+                                  size="sm"
+                                  showIcon={false}
+                                />
+                              )}
+                            </>
                           )}
                         </div>
+
+                        {/* Positions & Win Rate */}
+                        <div className="flex items-center gap-2 mt-1">
+                          <div className="flex items-center gap-1">
+                            <PositionIcon position={primaryPosition} className="!w-3 !h-3" />
+                            <PositionIcon position={secondaryPosition} className="!w-3 !h-3" opacity={0.6} />
+                          </div>
+                          <span className={`text-xs font-medium ${
+                            winRate >= 60 ? "text-accent-success" :
+                            winRate >= 50 ? "text-accent-primary" :
+                            "text-accent-danger"
+                          }`}>
+                            {winRate}%
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {/* Friend Add Button (show on hover, hide for self and if already friends) */}
+                      {p.userId !== currentUser?.id && (
+                        <button
+                          onClick={async () => {
+                            setAddingFriend(p.id);
+                            // TODO: Add friend API call
+                            setTimeout(() => setAddingFriend(null), 1000);
+                          }}
+                          disabled={!!addingFriend}
+                          className="opacity-0 group-hover:opacity-100 p-1.5 text-accent-primary hover:text-accent-hover hover:bg-accent-primary/10 rounded transition-all disabled:opacity-50"
+                          title="친구 추가"
+                        >
+                          <UserPlus className="h-4 w-4" />
+                        </button>
+                      )}
+
+                      {p.isReady ? (
+                        <span className="flex items-center gap-1 text-xs text-accent-success">
+                          <Check className="h-4 w-4" />
+                          준비
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1 text-xs text-text-tertiary">
+                          <X className="h-4 w-4" />
+                          대기
+                        </span>
+                      )}
+
+                      {isCurrentUserHost && p.userId !== currentUser?.id && (
+                        <button
+                          onClick={() => setKickTarget({ id: p.id, username: p.username })}
+                          className="p-1 text-accent-danger hover:text-accent-danger/80"
+                          title="강퇴"
+                        >
+                          <UserMinus className="h-4 w-4" />
+                        </button>
                       )}
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    {p.isReady ? (
-                      <span className="flex items-center gap-1 text-xs text-accent-success">
-                        <Check className="h-4 w-4" />
-                        준비
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1 text-xs text-text-tertiary">
-                        <X className="h-4 w-4" />
-                        대기
-                      </span>
-                    )}
-                    {isCurrentUserHost && p.userId !== currentUser?.id && (
-                      <button
-                        onClick={() => setKickTarget({ id: p.id, username: p.username })}
-                        className="p-1 text-accent-danger hover:text-accent-danger/80"
-                        title="강퇴"
-                      >
-                        <UserMinus className="h-4 w-4" />
-                      </button>
+
+                    {/* Hover Tooltip */}
+                    {hoveredPlayer === p.id && p.userId !== currentUser?.id && (
+                      <PlayerStatsTooltip participant={p} />
                     )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 

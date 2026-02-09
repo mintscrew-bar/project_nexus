@@ -139,7 +139,7 @@ export function MatchDetailModal({
 
         {/* Live Game Status */}
         {match.status === 'IN_PROGRESS' && liveStatus?.isLive && (
-          <Alert variant="primary">
+          <Alert variant="default">
             <Radio className="h-4 w-4 animate-pulse" />
             <AlertTitle>🎮 라이브 경기 진행 중</AlertTitle>
             <AlertDescription>

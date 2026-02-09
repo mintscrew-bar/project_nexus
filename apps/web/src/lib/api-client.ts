@@ -350,6 +350,13 @@ export const matchApi = {
     const response = await apiClient.get(`/matches/${matchId}/live-status`);
     return response.data;
   },
+
+  getUserMatchHistory: async (userId: string, limit: number = 20, offset: number = 0) => {
+    const response = await apiClient.get(`/matches/user/${userId}/history`, {
+      params: { limit, offset },
+    });
+    return response.data;
+  },
 };
 
 // Riot API 관련 API
@@ -410,34 +417,12 @@ export const riotApi = {
 
   // 소환사 정보 조회
   getSummoner: async (gameName: string, tagLine: string) => {
-    // 디버깅용 로그
     console.log('getSummoner called with:', { gameName, tagLine });
 
-    const encodedGameName = encodeURIComponent(gameName);
-    const encodedTagLine = encodeURIComponent(tagLine);
-    console.log('Encoded:', { encodedGameName, encodedTagLine });
-
-    const url = `${API_BASE_URL}/riot/summoner/${encodedGameName}/${encodedTagLine}`;
-    console.log('Request URL:', url);
-
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
-      },
-      credentials: 'include',
-    });
-
-    console.log('Response status:', response.status);
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Error response:', errorText);
-      throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
-    }
-
-    return response.json();
+    // axios가 URL 인코딩을 자동으로 처리하도록 함
+    const response = await apiClient.get(`/riot/summoner/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}`);
+    console.log('getSummoner response:', response.data);
+    return response.data;
   },
 };
 

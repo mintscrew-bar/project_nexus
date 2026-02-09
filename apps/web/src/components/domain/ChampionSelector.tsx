@@ -13,7 +13,7 @@ interface ChampionSelectorProps {
 }
 
 const DDRAGON_BASE_URL = "https://ddragon.leagueoflegends.com/cdn";
-const version = "13.24.1"; // This should come from ddragon-store
+const version = process.env.NEXT_PUBLIC_DDRAGON_VERSION || "16.2.1";
 
 export function ChampionSelector({
   allChampions,
@@ -60,6 +60,11 @@ export function ChampionSelector({
               width={64}
               height={64}
               className="w-full h-auto transition-transform duration-200 hover:scale-110"
+              unoptimized
+              onError={(e) => {
+                // Hide broken images
+                e.currentTarget.style.display = 'none';
+              }}
             />
             <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
               <p className="text-white text-xs text-center font-bold">{champion.name}</p>

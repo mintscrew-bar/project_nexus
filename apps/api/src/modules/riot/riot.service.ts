@@ -60,9 +60,16 @@ export class RiotService {
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
   ) {
-    this.apiKey = this.configService.get("RIOT_API_KEY") || "";
-    const region = this.configService.get("RIOT_REGION") || "kr";
+    // Try both ConfigService and process.env
+    this.apiKey = this.configService.get("RIOT_API_KEY") || process.env.RIOT_API_KEY || "";
+    const region = this.configService.get("RIOT_REGION") || process.env.RIOT_REGION || "kr";
     this.baseUrl = `https://${region}.api.riotgames.com`;
+
+    console.log('🎮 RiotService initialized:');
+    console.log('  - API Key from ConfigService:', this.configService.get("RIOT_API_KEY") ? 'SET' : 'NOT SET');
+    console.log('  - API Key from process.env:', process.env.RIOT_API_KEY ? 'SET' : 'NOT SET');
+    console.log('  - Final API Key:', this.apiKey ? `${this.apiKey.substring(0, 15)}...` : 'EMPTY');
+    console.log('  - Region:', region);
   }
 
   private async request<T>(url: string): Promise<T> {
@@ -75,14 +82,29 @@ export class RiotService {
     }
 
     try {
+      console.log('Making Riot API request to:', url);
+      console.log('Using API key (full):', this.apiKey);
+      console.log('API key length:', this.apiKey.length);
+
       const response = await axios.get<T>(url, {
         headers: { "X-Riot-Token": this.apiKey },
         timeout: 5000,
       });
+      console.log('Riot API success:', response.status);
       return response.data;
     } catch (error: any) {
+      console.error('Riot API Error:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        url: url,
+        apiKeyUsed: this.apiKey,
+      });
       if (error.response?.status === 404) {
         throw new NotFoundException("Summoner not found");
+      }
+      if (error.response?.status === 403) {
+        throw new BadRequestException("Forbidden - API key may be invalid or lack permissions");
       }
       if (error.response?.status === 429) {
         throw new BadRequestException("Rate limit exceeded");
@@ -116,19 +138,20 @@ export class RiotService {
     }
 
     const summoner = await this.request<{
-      id: string;
+      id: string; // Encrypted summoner ID
       accountId: string;
       puuid: string;
       profileIconId: number;
+      revisionDate: number;
       summonerLevel: number;
     }>(`${this.baseUrl}/lol/summoner/v4/summoners/by-puuid/${account.puuid}`);
 
-    // Fetch ranked info
-    const rankedInfo = await this.getRankedInfo(summoner.id);
+    // Fetch ranked info using PUUID (new Riot API)
+    const rankedInfo = await this.getRankedInfoByPuuid(account.puuid);
 
     return {
       ...account,
-      summonerId: summoner.id,
+      summonerId: summoner.id, // Use actual encrypted summoner ID from API response
       profileIconId: summoner.profileIconId,
       summonerLevel: summoner.summonerLevel,
       tier: rankedInfo.tier !== "UNRANKED" ? rankedInfo.tier : undefined,
@@ -136,6 +159,39 @@ export class RiotService {
       leaguePoints: rankedInfo.lp,
       wins: rankedInfo.wins,
       losses: rankedInfo.losses,
+    };
+  }
+
+  async getRankedInfoByPuuid(puuid: string) {
+    const leagues = await this.request<
+      Array<{
+        queueType: string;
+        tier: string;
+        rank: string;
+        leaguePoints: number;
+        wins: number;
+        losses: number;
+      }>
+    >(`${this.baseUrl}/lol/league/v4/entries/by-puuid/${puuid}`);
+
+    const soloQueue = leagues.find((l) => l.queueType === "RANKED_SOLO_5x5");
+
+    if (!soloQueue) {
+      return {
+        tier: "UNRANKED",
+        rank: "",
+        lp: 0,
+        wins: 0,
+        losses: 0,
+      };
+    }
+
+    return {
+      tier: soloQueue.tier,
+      rank: soloQueue.rank,
+      lp: soloQueue.leaguePoints,
+      wins: soloQueue.wins,
+      losses: soloQueue.losses,
     };
   }
 
@@ -247,17 +303,27 @@ export class RiotService {
 
     const data = JSON.parse(verificationData);
 
-    // Verify icon
-    const summoner = await this.request<{ profileIconId: number }>(
+    // Verify icon and get summoner ID
+    const summoner = await this.request<{
+      id: string; // Encrypted summoner ID
+      profileIconId: number;
+    }>(
       `${this.baseUrl}/lol/summoner/v4/summoners/by-puuid/${data.puuid}`,
     );
+
+    console.log('Summoner API response:', JSON.stringify(summoner, null, 2));
+    console.log('Summoner ID:', summoner.id);
 
     if (summoner.profileIconId !== data.requiredIconId) {
       throw new BadRequestException("Profile icon verification failed");
     }
 
-    // Get ranked info
-    const ranked = await this.getRankedInfo(data.summonerId);
+    // Get ranked info using PUUID (more reliable than summonerId)
+    const ranked = await this.getRankedInfoByPuuid(data.puuid);
+
+    // Use summoner ID from API response instead of Redis data
+    const summonerId = summoner.id;
+    console.log('Final summonerId to be used:', summonerId);
 
     // Validate champion preferences (at least 3 per role)
     for (const role of [dto.mainRole, dto.subRole]) {
@@ -292,7 +358,7 @@ export class RiotService {
       update: {
         gameName: data.gameName,
         tagLine: data.tagLine,
-        summonerId: data.summonerId,
+        summonerId: summonerId,
         tier: ranked.tier,
         rank: ranked.rank,
         lp: ranked.lp,
@@ -309,7 +375,7 @@ export class RiotService {
         puuid: data.puuid,
         gameName: data.gameName,
         tagLine: data.tagLine,
-        summonerId: data.summonerId,
+        summonerId: summonerId,
         tier: ranked.tier,
         rank: ranked.rank,
         lp: ranked.lp,
@@ -375,7 +441,8 @@ export class RiotService {
       throw new NotFoundException("Riot account not found");
     }
 
-    const ranked = await this.getRankedInfo(account.summonerId);
+    // Use PUUID for ranked info to avoid issues with undefined summonerId
+    const ranked = await this.getRankedInfoByPuuid(account.puuid);
 
     return this.prisma.riotAccount.update({
       where: { id: riotAccountId },
