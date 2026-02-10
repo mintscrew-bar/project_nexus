@@ -11,7 +11,7 @@ const SKIP_PATHS = ['/auth', '/'];
 export function RiotAccountChecker({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { isAuthenticated, user } = useAuthStore();
-  const { accounts, fetchAccounts } = useRiotStore();
+  const { fetchAccounts } = useRiotStore();
 
   const [showModal, setShowModal] = useState(false);
   const [checked, setChecked] = useState(false);
@@ -26,9 +26,9 @@ export function RiotAccountChecker({ children }: { children: React.ReactNode }) 
       // Ensure accounts are loaded in the store
       await fetchAccounts();
 
-      // If no accounts, show modal. This relies on the store being up to date.
-      if (!accounts || accounts.length === 0) {
-        // Check if user already dismissed this session
+      // Read FRESH state from store (avoid stale closure on `accounts`)
+      const freshAccounts = useRiotStore.getState().accounts;
+      if (!freshAccounts || freshAccounts.length === 0) {
         const dismissed = sessionStorage.getItem('riot-modal-dismissed');
         if (!dismissed) {
           setShowModal(true);
@@ -41,7 +41,7 @@ export function RiotAccountChecker({ children }: { children: React.ReactNode }) 
     if (isAuthenticated) {
       checkRiotAccount();
     }
-  }, [isAuthenticated, shouldSkip, checked, fetchAccounts, accounts]);
+  }, [isAuthenticated, shouldSkip, checked, fetchAccounts]);
 
   // Reset checked state when user changes
   useEffect(() => {

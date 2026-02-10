@@ -820,12 +820,13 @@ export const statsApi = {
     gameName: string,
     tagLine: string,
     count: number = 20,
-    queueId?: number
+    queueId?: number,
+    start: number = 0
   ) => {
     const response = await apiClient.get(
       `/stats/summoner/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}/matches`,
       {
-        params: { count, queueId },
+        params: { count, queueId, start },
       }
     );
     return response.data;
@@ -839,6 +840,13 @@ export const statsApi = {
     const response = await apiClient.get(`/stats/user/${userId}/riot-matches`, {
       params: { count, queueId },
     });
+    return response.data;
+  },
+
+  getMatchTimeline: async (matchId: string) => {
+    const response = await apiClient.get(
+      `/stats/match/${encodeURIComponent(matchId)}/timeline`
+    );
     return response.data;
   },
 };

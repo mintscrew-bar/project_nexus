@@ -10,17 +10,12 @@ import { KeyboardShortcutsProvider } from "@/components/KeyboardShortcuts";
 
 function AuthInitializer({ children }: { children: ReactNode }) {
   const initializeAuth = useAuthStore((state) => state.initializeAuth);
-  const isLoading = useAuthStore((state) => state.isLoading);
 
   useEffect(() => {
     initializeAuth();
   }, [initializeAuth]);
 
-  // Optionally, show a loading spinner while auth state is being determined
-  if (isLoading) {
-    return <div>Loading...</div>; // Replace with a proper global spinner/loader
-  }
-
+  // Don't block rendering — auth state loads in background and pages react to it
   return <>{children}</>;
 }
 

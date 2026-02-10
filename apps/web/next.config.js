@@ -12,6 +12,14 @@ const nextConfig = {
         protocol: "https",
         hostname: "ddragon.leagueoflegends.com",
       },
+      {
+        protocol: "https",
+        hostname: "lh3.googleusercontent.com",
+      },
+      {
+        protocol: "https",
+        hostname: "raw.communitydragon.org",
+      },
     ],
   },
   async rewrites() {
