@@ -26,17 +26,19 @@ interface AuthState {
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   isAuthenticated: false,
-  isLoading: true,
+  isLoading: true, // Start true so protected pages wait before redirecting
 
   initializeAuth: async () => {
     set({ isLoading: true });
     try {
-      // The interceptor in api-client will handle token refresh.
-      // We just need to ask for the user profile.
-      const user = await authApi.getMe();
+      // Race against a 5s timeout so a slow/unreachable API never blocks the UI
+      const timeout = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("auth_timeout")), 5000)
+      );
+      const user = await Promise.race([authApi.getMe(), timeout]);
       set({ user, isAuthenticated: true });
-    } catch (error) {
-      // This is expected if the user is not logged in.
+    } catch (error: any) {
+      // Expected when not logged in, API unreachable, or timeout
       set({ user: null, isAuthenticated: false });
       setAccessToken(null);
     } finally {

@@ -299,7 +299,8 @@ export class StatsService {
     gameName: string,
     tagLine: string,
     count: number = 20,
-    queueId?: number
+    queueId?: number,
+    start: number = 0
   ) {
     // First, get the summoner info to get PUUID
     const summonerInfo = await this.riotService.getSummonerByRiotId(
@@ -315,10 +316,18 @@ export class StatsService {
     const matches = await this.riotMatchService.getMatchHistoryByPuuid(
       summonerInfo.puuid,
       count,
-      queueId
+      queueId,
+      start
     );
 
     return matches;
+  }
+
+  /**
+   * Get match timeline (item purchases, gold/CS/XP per minute)
+   */
+  async getMatchTimeline(matchId: string) {
+    return this.riotMatchService.getMatchTimeline(matchId);
   }
 
   /**

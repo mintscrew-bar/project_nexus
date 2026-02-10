@@ -70,6 +70,14 @@ export class StatsController {
   }
 
   /**
+   * Get match timeline (item purchases, gold/CS/XP per minute)
+   */
+  @Get("match/:matchId/timeline")
+  async getMatchTimeline(@Param("matchId") matchId: string) {
+    return this.statsService.getMatchTimeline(matchId);
+  }
+
+  /**
    * Get Riot match history for a summoner (by gameName + tagLine)
    */
   @Get("summoner/:gameName/:tagLine/matches")
@@ -77,15 +85,18 @@ export class StatsController {
     @Param("gameName") gameName: string,
     @Param("tagLine") tagLine: string,
     @Query("count") count?: string,
-    @Query("queueId") queueId?: string
+    @Query("queueId") queueId?: string,
+    @Query("start") start?: string
   ) {
     const countNum = count ? parseInt(count, 10) : 20;
     const queueIdNum = queueId ? parseInt(queueId, 10) : undefined;
+    const startNum = start ? parseInt(start, 10) : 0;
     return this.statsService.getRiotMatchHistory(
       gameName,
       tagLine,
       countNum,
-      queueIdNum
+      queueIdNum,
+      startNum
     );
   }
 
