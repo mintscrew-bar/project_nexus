@@ -78,6 +78,19 @@ export class StatsController {
   }
 
   /**
+   * 랭크 게임 챔피언별 시즌 전체 통계 (솔로+자유 전부 집계, DB 캐시 활용)
+   * 최초 요청 시: 전체 매치 페이징 → DB 저장 → 집계 반환
+   * 재요청 시: DB에서 즉시 반환 (Riot API 호출 없음)
+   */
+  @Get("summoner/:gameName/:tagLine/ranked-champion-stats")
+  async getRankedChampionStats(
+    @Param("gameName") gameName: string,
+    @Param("tagLine") tagLine: string,
+  ) {
+    return this.statsService.getRankedChampionStats(gameName, tagLine);
+  }
+
+  /**
    * Get Riot match history for a summoner (by gameName + tagLine)
    */
   @Get("summoner/:gameName/:tagLine/matches")

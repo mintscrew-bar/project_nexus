@@ -864,6 +864,22 @@ model Notification {
   @@map("notifications")
 }
 
+// Riot Match-V5 데이터 영구 캐시
+// - matchId를 PK로 한 번 가져온 매치는 DB에 저장
+// - 재방문 시 Riot API 호출 없이 DB에서 즉시 조회
+// - 챔피언 통계 등 시즌 전체 집계에 활용
+model RiotMatchCache {
+  matchId   String   @id
+  data      Json     // Full MatchDto JSON
+  queueId   Int      // match.info.queueId (빠른 필터링용)
+  gameEnd   DateTime // match.info.gameEndTimestamp
+  createdAt DateTime @default(now())
+
+  @@index([queueId])
+  @@index([gameEnd])
+  @@map("riot_match_cache")
+}
+
 enum NotificationType {
   FRIEND_REQUEST
   FRIEND_ACCEPTED

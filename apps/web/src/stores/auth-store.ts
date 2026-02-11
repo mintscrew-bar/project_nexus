@@ -31,14 +31,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   initializeAuth: async () => {
     set({ isLoading: true });
     try {
+      // refresh token으로 access token을 먼저 발급받은 뒤 /auth/me 조회
+      // → /auth/me에서 불필요한 401이 발생하지 않음
       // Race against a 5s timeout so a slow/unreachable API never blocks the UI
       const timeout = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error("auth_timeout")), 5000)
       );
-      const user = await Promise.race([authApi.getMe(), timeout]);
+      const user = await Promise.race([authApi.initSession(), timeout]);
       set({ user, isAuthenticated: true });
-    } catch (error: any) {
-      // Expected when not logged in, API unreachable, or timeout
+    } catch {
+      // 로그인 안 됐거나 세션 만료 (정상 케이스)
       set({ user: null, isAuthenticated: false });
       setAccessToken(null);
     } finally {

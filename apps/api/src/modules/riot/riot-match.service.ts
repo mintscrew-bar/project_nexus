@@ -1,6 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import axios from "axios";
+import { PrismaService } from "../prisma/prisma.service";
 
 // Riot Match-V5 API Response Types
 export interface MatchDto {
@@ -144,7 +145,10 @@ export class RiotMatchService {
   private readonly timelineCache = new Map<string, { data: any; expires: number }>();
   private readonly MATCH_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly prisma: PrismaService,
+  ) {
     this.apiKey = this.configService.get("RIOT_API_KEY") || "";
     if (!this.apiKey) {
       this.logger.warn("RIOT_API_KEY not configured");
@@ -168,10 +172,28 @@ export class RiotMatchService {
       return null;
     }
 
-    // Check cache first
+    // 1. In-memory cache (fastest)
     const cached = this.matchCache.get(matchId);
     if (cached && cached.expires > Date.now()) {
       return cached.data;
+    }
+
+    // 2. DB 영구 캐시 (서버 재시작해도 유지)
+    try {
+      const dbCached = await this.prisma.riotMatchCache.findUnique({
+        where: { matchId },
+      });
+      if (dbCached) {
+        const matchData = dbCached.data as unknown as MatchDto;
+        // in-memory 캐시에도 올려두기
+        this.matchCache.set(matchId, {
+          data: matchData,
+          expires: Date.now() + this.MATCH_CACHE_TTL_MS,
+        });
+        return matchData;
+      }
+    } catch (dbErr) {
+      this.logger.warn(`DB cache read failed for ${matchId}: ${dbErr}`);
     }
 
     try {
@@ -186,13 +208,29 @@ export class RiotMatchService {
         timeout: 15000,
       });
 
-      // Store in cache
+      const matchData = response.data;
+
+      // in-memory 캐시
       this.matchCache.set(matchId, {
-        data: response.data,
+        data: matchData,
         expires: Date.now() + this.MATCH_CACHE_TTL_MS,
       });
 
-      return response.data;
+      // DB 영구 캐시 저장 (비동기 — 응답 지연 없이 저장)
+      const queueId = matchData.info?.queueId ?? 0;
+      const gameEndTs = matchData.info?.gameEndTimestamp ?? Date.now();
+      this.prisma.riotMatchCache.upsert({
+        where: { matchId },
+        create: {
+          matchId,
+          data: matchData as any,
+          queueId,
+          gameEnd: new Date(gameEndTs),
+        },
+        update: {},  // 이미 존재하면 덮어쓰지 않음
+      }).catch((e) => this.logger.warn(`DB cache write failed for ${matchId}: ${e}`));
+
+      return matchData;
     } catch (error: any) {
       if (error.response?.status === 404) {
         this.logger.warn(`Match not found: ${matchId}`);

@@ -66,12 +66,10 @@ apiClient.interceptors.response.use(
 
         return apiClient(originalRequest);
       } catch (refreshError) {
-        // 갱신 실패 시 로그아웃 처리
+        // 갱신 실패 — 인증 상태만 초기화하고 리다이렉트는 하지 않음
+        // (protected pages가 useAuthStore를 통해 자체적으로 /auth/login으로 리다이렉트함)
         accessToken = null;
-        // 이미 로그인 페이지에 있으면 리다이렉트하지 않음 (무한 루프 방지)
-        if (!window.location.pathname.startsWith("/auth/login")) {
-          window.location.href = "/auth/login";
-        }
+        refreshPromise = null;
         return Promise.reject(refreshError);
       }
     }
@@ -130,6 +128,21 @@ export const authApi = {
   getMe: async () => {
     const response = await apiClient.get("/auth/me");
     return response.data;
+  },
+
+  // 세션 초기화: refresh token으로 access token을 먼저 얻은 뒤 /auth/me 조회
+  // 이렇게 하면 /auth/me 호출 시 401이 발생하지 않음
+  initSession: async () => {
+    const refreshResponse = await axios.post(
+      `${API_BASE_URL}/auth/refresh`,
+      {},
+      { withCredentials: true }
+    );
+    const newToken = refreshResponse.data.accessToken;
+    if (!newToken) throw new Error("No access token in refresh response");
+    setAccessToken(newToken);
+    const meResponse = await apiClient.get("/auth/me");
+    return meResponse.data;
   },
 
   signup: async (data: {
@@ -813,6 +826,14 @@ export const statsApi = {
     const response = await apiClient.get("/stats/users/search", {
       params: { q: query, limit },
     });
+    return response.data;
+  },
+
+  // 랭크 챔피언 통계 — 시즌 전체 집계 (DB 캐시 활용, 백엔드가 모든 페이징 처리)
+  getRankedChampionStats: async (gameName: string, tagLine: string) => {
+    const response = await apiClient.get(
+      `/stats/summoner/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}/ranked-champion-stats`
+    );
     return response.data;
   },
 
