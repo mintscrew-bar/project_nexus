@@ -149,6 +149,30 @@ export class RiotService {
     // Fetch ranked info using PUUID (new Riot API)
     const rankedInfo = await this.getRankedInfoByPuuid(account.puuid);
 
+    // 현재 시즌 티어 스냅샷 저장 (비동기 — 응답 지연 없이)
+    if (rankedInfo.tier !== "UNRANKED") {
+      const currentSeason = "S2026";
+      this.prisma.summonerSeasonTier.upsert({
+        where: { puuid_season: { puuid: account.puuid, season: currentSeason } },
+        create: {
+          puuid: account.puuid,
+          season: currentSeason,
+          tier: rankedInfo.tier,
+          rank: rankedInfo.rank,
+          lp: rankedInfo.lp,
+          wins: rankedInfo.wins,
+          losses: rankedInfo.losses,
+        },
+        update: {
+          tier: rankedInfo.tier,
+          rank: rankedInfo.rank,
+          lp: rankedInfo.lp,
+          wins: rankedInfo.wins,
+          losses: rankedInfo.losses,
+        },
+      }).catch((e) => console.error("Failed to save season tier snapshot:", e));
+    }
+
     return {
       ...account,
       summonerId: summoner.id, // Use actual encrypted summoner ID from API response

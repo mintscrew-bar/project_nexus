@@ -489,6 +489,13 @@ export default function SummonerStatsPage() {
     enabled: !!gameName && !!tagLine,
   });
 
+  const { data: seasonTiers = [] } = useQuery<any[]>({
+    queryKey: ["seasonTiers", gameName, tagLine],
+    queryFn: () => statsApi.getSeasonTiers(gameName, tagLine),
+    staleTime: 60 * 60 * 1000,
+    enabled: !!gameName && !!tagLine,
+  });
+
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
@@ -515,8 +522,7 @@ export default function SummonerStatsPage() {
 
   const getTierImage = (tier?: string) => {
     if (!tier) return null;
-    const version = process.env.NEXT_PUBLIC_DDRAGON_VERSION || "16.2.1";
-    return `https://raw.communitydragon.org/${version}/plugins/rcp-fe-lol-shared-components/global/default/${tier.toLowerCase()}.png`;
+    return `https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-shared-components/global/default/${tier.toLowerCase()}.png`;
   };
 
   const getChampionIcon = (championName: string) => {
@@ -750,7 +756,7 @@ export default function SummonerStatsPage() {
               <div className="pt-3 border-t border-bg-tertiary/50">
                 <p className="text-xs text-text-tertiary mb-2 font-medium tracking-wide">시즌별 티어</p>
                 <div className="flex flex-wrap gap-2">
-                  {/* S2025 — current season (real data) */}
+                  {/* S2026 — current season (real data) */}
                   <div className="flex items-center gap-1.5 bg-bg-tertiary/70 rounded-lg px-2.5 py-2">
                     {summoner.tier && getTierImage(summoner.tier) ? (
                       <img src={getTierImage(summoner.tier)!} alt={summoner.tier} className="w-6 h-6" />
@@ -758,24 +764,41 @@ export default function SummonerStatsPage() {
                       <div className="w-6 h-6 rounded bg-bg-elevated" />
                     )}
                     <div>
-                      <p className="text-[10px] text-text-tertiary leading-none mb-0.5">S2025</p>
+                      <p className="text-[10px] text-text-tertiary leading-none mb-0.5">S2026</p>
                       <p className="text-xs font-bold text-text-primary leading-none">
                         {summoner.tier ? `${summoner.tier.charAt(0)}${summoner.rank}` : '언랭'}
                       </p>
                     </div>
                   </div>
-                  {/* Past seasons — placeholder */}
-                  {['S2024', 'S2023', 'S2022', 'S2021'].map((season) => (
-                    <div key={season} className="flex items-center gap-1.5 bg-bg-tertiary/30 rounded-lg px-2.5 py-2 opacity-50">
-                      <div className="w-6 h-6 rounded bg-bg-elevated flex items-center justify-center">
-                        <span className="text-[9px] text-text-tertiary">?</span>
+                  {/* Past seasons — DB에 저장된 스냅샷 사용 */}
+                  {['S2025', 'S2024', 'S2023', 'S2022'].map((season) => {
+                    const saved = seasonTiers.find((t: any) => t.season === season);
+                    return saved ? (
+                      <div key={season} className="flex items-center gap-1.5 bg-bg-tertiary/70 rounded-lg px-2.5 py-2">
+                        {getTierImage(saved.tier) ? (
+                          <img src={getTierImage(saved.tier)!} alt={saved.tier} className="w-6 h-6" />
+                        ) : (
+                          <div className="w-6 h-6 rounded bg-bg-elevated" />
+                        )}
+                        <div>
+                          <p className="text-[10px] text-text-tertiary leading-none mb-0.5">{season}</p>
+                          <p className="text-xs font-bold text-text-primary leading-none">
+                            {saved.tier.charAt(0)}{saved.rank}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-[10px] text-text-tertiary leading-none mb-0.5">{season}</p>
-                        <p className="text-xs font-medium text-text-tertiary leading-none">–</p>
+                    ) : (
+                      <div key={season} className="flex items-center gap-1.5 bg-bg-tertiary/30 rounded-lg px-2.5 py-2 opacity-50">
+                        <div className="w-6 h-6 rounded bg-bg-elevated flex items-center justify-center">
+                          <span className="text-[9px] text-text-tertiary">?</span>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-text-tertiary leading-none mb-0.5">{season}</p>
+                          <p className="text-xs font-medium text-text-tertiary leading-none">–</p>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </div>
