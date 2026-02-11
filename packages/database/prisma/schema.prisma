@@ -864,6 +864,26 @@ model Notification {
   @@map("notifications")
 }
 
+// 소환사 시즌별 티어 스냅샷
+// - 소환사 페이지 조회 시 현재 시즌 티어를 upsert
+// - 시즌이 바뀌어도 이전 시즌 기록이 남아있음
+model SummonerSeasonTier {
+  id        String   @id @default(cuid())
+  puuid     String
+  season    String   // "S2026", "S2025", ...
+  tier      String   // "GOLD", "PLATINUM", etc.
+  rank      String   // "I", "II", "III", "IV"
+  lp        Int
+  wins      Int
+  losses    Int
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@unique([puuid, season])
+  @@index([puuid])
+  @@map("summoner_season_tiers")
+}
+
 // Riot Match-V5 데이터 영구 캐시
 // - matchId를 PK로 한 번 가져온 매치는 DB에 저장
 // - 재방문 시 Riot API 호출 없이 DB에서 즉시 조회

@@ -837,6 +837,13 @@ export const statsApi = {
     return response.data;
   },
 
+  getSeasonTiers: async (gameName: string, tagLine: string) => {
+    const response = await apiClient.get(
+      `/stats/summoner/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}/season-tiers`
+    );
+    return response.data;
+  },
+
   getSummonerRiotMatches: async (
     gameName: string,
     tagLine: string,

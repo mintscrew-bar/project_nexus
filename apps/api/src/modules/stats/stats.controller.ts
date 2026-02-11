@@ -78,6 +78,17 @@ export class StatsController {
   }
 
   /**
+   * 소환사 시즌별 티어 히스토리 (DB에 축적된 스냅샷)
+   */
+  @Get("summoner/:gameName/:tagLine/season-tiers")
+  async getSummonerSeasonTiers(
+    @Param("gameName") gameName: string,
+    @Param("tagLine") tagLine: string,
+  ) {
+    return this.statsService.getSummonerSeasonTiers(gameName, tagLine);
+  }
+
+  /**
    * 랭크 게임 챔피언별 시즌 전체 통계 (솔로+자유 전부 집계, DB 캐시 활용)
    * 최초 요청 시: 전체 매치 페이징 → DB 저장 → 집계 반환
    * 재요청 시: DB에서 즉시 반환 (Riot API 호출 없음)

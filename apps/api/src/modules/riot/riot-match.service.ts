@@ -415,7 +415,9 @@ export class RiotMatchService {
     count: number = 20,
     queueId?: number,
     type?: string,
-    retries = 3
+    retries = 3,
+    startTime?: number, // Unix seconds
+    endTime?: number,   // Unix seconds
   ): Promise<string[]> {
     if (!this.apiKey) {
       this.logger.error("RIOT_API_KEY not configured");
@@ -434,6 +436,14 @@ export class RiotMatchService {
 
       if (type) {
         params.append("type", type);
+      }
+
+      if (startTime !== undefined) {
+        params.append("startTime", startTime.toString());
+      }
+
+      if (endTime !== undefined) {
+        params.append("endTime", endTime.toString());
       }
 
       const url = `${this.baseUrl}/lol/match/v5/matches/by-puuid/${puuid}/ids?${params}`;
@@ -457,7 +467,7 @@ export class RiotMatchService {
       if (error.response?.status === 429) {
         if (retries > 0) {
           await this.waitForRateLimit(error.response.headers["retry-after"]);
-          return this.getMatchIdsByPuuid(puuid, start, count, queueId, type, retries - 1);
+          return this.getMatchIdsByPuuid(puuid, start, count, queueId, type, retries - 1, startTime, endTime);
         }
         this.logger.error(`Rate limit exhausted fetching match IDs for PUUID ${puuid}`);
         return [];
@@ -466,7 +476,7 @@ export class RiotMatchService {
       if (!error.response && retries > 0) {
         this.logger.warn(`Network error fetching match IDs, retrying (${retries} left)...`);
         await new Promise((resolve) => setTimeout(resolve, 1000));
-        return this.getMatchIdsByPuuid(puuid, start, count, queueId, type, retries - 1);
+        return this.getMatchIdsByPuuid(puuid, start, count, queueId, type, retries - 1, startTime, endTime);
       }
 
       this.logger.error(

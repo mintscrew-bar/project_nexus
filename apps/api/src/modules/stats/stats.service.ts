@@ -381,6 +381,21 @@ export class StatsService {
   }
 
   /**
+   * 소환사의 시즌별 티어 히스토리
+   */
+  async getSummonerSeasonTiers(gameName: string, tagLine: string) {
+    const summonerInfo = await this.riotService.getSummonerByRiotId(gameName, tagLine);
+    if (!summonerInfo) throw new NotFoundException("Summoner not found");
+
+    const tiers = await this.prisma.summonerSeasonTier.findMany({
+      where: { puuid: summonerInfo.puuid },
+      orderBy: { season: "desc" },
+    });
+
+    return tiers;
+  }
+
+  /**
    * 랭크 게임 챔피언별 시즌 전체 통계
    * - 솔로(420) + 자유(440) 랭크 매치 ID를 100개씩 전부 페이징
    * - 각 매치는 DB 캐시 우선 조회 → 없으면 Riot API 호출 후 DB에 저장
@@ -394,6 +409,9 @@ export class StatsService {
     const RANKED_QUEUES = [420, 440];
     const BATCH_SIZE = 100;
 
+    // S2026 시즌 시작: 2026년 1월 9일 UTC (Unix seconds)
+    const SEASON_2026_START = Math.floor(new Date('2026-01-09T00:00:00Z').getTime() / 1000);
+
     // 모든 랭크 매치 ID 수집 (두 큐 타입 병렬로)
     const allMatchIds: string[] = [];
     await Promise.all(
@@ -401,7 +419,7 @@ export class StatsService {
         let start = 0;
         while (true) {
           const ids = await this.riotMatchService.getMatchIdsByPuuid(
-            puuid, start, BATCH_SIZE, queueId
+            puuid, start, BATCH_SIZE, queueId, undefined, 3, SEASON_2026_START
           );
           allMatchIds.push(...ids);
           if (ids.length < BATCH_SIZE) break;
