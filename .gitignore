@@ -7,6 +7,10 @@ dist
 .next
 .turbo
 build
+*.tsbuildinfo
+
+# Claude Code
+.claude/settings.local.json
 
 # Environment files
 .env
