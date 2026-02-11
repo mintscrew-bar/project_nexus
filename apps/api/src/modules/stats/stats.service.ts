@@ -18,6 +18,17 @@ export interface ChampionStats {
   totalDamageDealtToChampions: number;
 }
 
+export interface RankedChampStat {
+  championId: number;
+  championName: string;
+  games: number;
+  wins: number;
+  losses: number;
+  kills: number;
+  deaths: number;
+  assists: number;
+}
+
 export interface PositionStats {
   position: string;
   games: number;
@@ -367,5 +378,79 @@ export class StatsService {
     );
 
     return matches;
+  }
+
+  /**
+   * 랭크 게임 챔피언별 시즌 전체 통계
+   * - 솔로(420) + 자유(440) 랭크 매치 ID를 100개씩 전부 페이징
+   * - 각 매치는 DB 캐시 우선 조회 → 없으면 Riot API 호출 후 DB에 저장
+   * - 재요청 시에는 DB에서 즉시 반환 (API 호출 없음)
+   */
+  async getRankedChampionStats(gameName: string, tagLine: string) {
+    const summonerInfo = await this.riotService.getSummonerByRiotId(gameName, tagLine);
+    if (!summonerInfo) throw new NotFoundException("Summoner not found");
+
+    const puuid = summonerInfo.puuid;
+    const RANKED_QUEUES = [420, 440];
+    const BATCH_SIZE = 100;
+
+    // 모든 랭크 매치 ID 수집 (두 큐 타입 병렬로)
+    const allMatchIds: string[] = [];
+    await Promise.all(
+      RANKED_QUEUES.map(async (queueId) => {
+        let start = 0;
+        while (true) {
+          const ids = await this.riotMatchService.getMatchIdsByPuuid(
+            puuid, start, BATCH_SIZE, queueId
+          );
+          allMatchIds.push(...ids);
+          if (ids.length < BATCH_SIZE) break;
+          start += BATCH_SIZE;
+        }
+      })
+    );
+
+    if (allMatchIds.length === 0) return [];
+
+    // 중복 제거 (솔로 + 자유 사이에 겹칠 일은 없지만 안전하게)
+    const uniqueIds = [...new Set(allMatchIds)];
+
+    // 각 매치 상세 조회 (DB 캐시 우선)
+    const matchDetails = await Promise.all(
+      uniqueIds.map((id) => this.riotMatchService.getMatchById(id))
+    );
+
+    // 챔피언별 통계 집계
+    const statsMap = new Map<string, RankedChampStat>();
+
+    for (const match of matchDetails) {
+      if (!match) continue;
+      const participant = match.info.participants.find((p) => p.puuid === puuid);
+      if (!participant) continue;
+
+      const key = participant.championName;
+      const existing = statsMap.get(key);
+      if (existing) {
+        existing.games++;
+        if (participant.win) existing.wins++;
+        else existing.losses++;
+        existing.kills += participant.kills;
+        existing.deaths += participant.deaths;
+        existing.assists += participant.assists;
+      } else {
+        statsMap.set(key, {
+          championId: participant.championId,
+          championName: participant.championName,
+          games: 1,
+          wins: participant.win ? 1 : 0,
+          losses: participant.win ? 0 : 1,
+          kills: participant.kills,
+          deaths: participant.deaths,
+          assists: participant.assists,
+        });
+      }
+    }
+
+    return Array.from(statsMap.values()).sort((a, b) => b.games - a.games);
   }
 }

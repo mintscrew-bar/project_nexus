@@ -2,7 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
-import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { riotApi, matchApi, statsApi } from "@/lib/api-client";
 import { LoadingSpinner, Button, Badge } from "@/components/ui";
 import { ArrowLeft, Trophy, TrendingUp, Target, Sword, ExternalLink, Loader2, Gamepad2, RefreshCw, Search, ChevronDown, ChevronUp, Shield, Crosshair } from "lucide-react";
@@ -361,6 +361,7 @@ export default function SummonerStatsPage() {
   const [matchDetailTabs, setMatchDetailTabs] = useState<Map<string, 'teams' | 'build' | 'stats' | 'timeline'>>(new Map());
   const [timelineData, setTimelineData] = useState<Map<string, any>>(new Map());
   const [timelineLoading, setTimelineLoading] = useState<Set<string>>(new Set());
+  const [champStatTab, setChampStatTab] = useState<'nexus' | 'ranked'>('ranked');
 
   const toggleMatchExpand = (matchId: string) => {
     if (!expandedMatches.has(matchId)) {
@@ -478,6 +479,16 @@ export default function SummonerStatsPage() {
 
   const riotMatches = riotMatchPages?.pages.flat() ?? [];
 
+  // 랭크 챔피언 통계 전용 쿼리 — 백엔드가 시즌 전체(1000+게임)를 DB 캐시로 집계
+  // 최초: 백엔드가 모든 랭크 매치 페이징 → DB 저장 → 집계 반환
+  // 재요청: DB에서 즉시 반환 (Riot API 호출 없음)
+  const { data: rankedChampionStatsRaw = [], isLoading: isLoadingRankedStats } = useQuery<any[]>({
+    queryKey: ["rankedChampionStats", gameName, tagLine],
+    queryFn: () => statsApi.getRankedChampionStats(gameName, tagLine),
+    staleTime: 10 * 60 * 1000,
+    enabled: !!gameName && !!tagLine,
+  });
+
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
@@ -565,56 +576,6 @@ export default function SummonerStatsPage() {
     return Array.from(statsMap.values()).sort((a, b) => b.games - a.games);
   };
 
-  const calculateRankedChampionStats = (
-    riotMatches: any[],
-    puuid: string
-  ): ChampionStats[] => {
-    const statsMap = new Map<string, ChampionStats>();
-
-    riotMatches.forEach((match) => {
-        const queueId = match.info.queueId;
-        // 420: Solo Rank, 440: Flex Rank
-        if (queueId !== 420 && queueId !== 440) {
-            return;
-        }
-
-        const participant = match.info.participants.find(
-            (p: any) => p.puuid === puuid
-        );
-        if (!participant) {
-            return;
-        }
-
-        const championName = participant.championName;
-        const existing = statsMap.get(championName);
-
-        if (existing) {
-            existing.games++;
-            if (participant.win) existing.wins++;
-            else existing.losses++;
-            existing.kills += participant.kills;
-            existing.deaths += participant.deaths;
-            existing.assists += participant.assists;
-            existing.cs +=
-                participant.totalMinionsKilled + participant.neutralMinionsKilled;
-        } else {
-            statsMap.set(championName, {
-                championId: participant.championId,
-                championName: championName,
-                games: 1,
-                wins: participant.win ? 1 : 0,
-                losses: participant.win ? 0 : 1,
-                kills: participant.kills,
-                deaths: participant.deaths,
-                assists: participant.assists,
-                cs:
-                    participant.totalMinionsKilled + participant.neutralMinionsKilled,
-            });
-        }
-    });
-
-    return Array.from(statsMap.values()).sort((a, b) => b.games - a.games);
-  };
 
   if (isLoading) {
     return (
@@ -642,7 +603,9 @@ export default function SummonerStatsPage() {
 
   const winRate = calculateWinRate();
   const championStats = calculateChampionStats();
-  const rankedChampionStats = summoner ? calculateRankedChampionStats(riotMatches, summoner.puuid) : [];
+  // 전용 랭크 쿼리로 계산 — 페이지네이션과 무관하게 최대 200게임 기준
+  // 백엔드에서 이미 집계된 데이터 — 클라이언트 측 재계산 불필요
+  const rankedChampionStats = rankedChampionStatsRaw;
 
   return (
     <div className="min-h-screen bg-bg-primary">
@@ -694,8 +657,9 @@ export default function SummonerStatsPage() {
             </div>
 
             {/* Summoner Info */}
-            <div className="flex-grow">
-              <div className="flex items-center gap-3 mb-2">
+            <div className="flex-1 min-w-0">
+              {/* Row 1: Name + Nexus link + Refresh */}
+              <div className="flex items-center gap-3 mb-4 flex-wrap">
                 <h1 className="text-3xl font-bold text-text-primary">
                   {summoner.gameName}
                   <span className="text-text-tertiary">#{summoner.tagLine}</span>
@@ -709,9 +673,20 @@ export default function SummonerStatsPage() {
                     Nexus 프로필
                   </Link>
                 )}
+                <Button
+                  onClick={handleRefresh}
+                  variant="secondary"
+                  size="sm"
+                  disabled={isRefreshing}
+                  className="ml-auto"
+                >
+                  <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`} />
+                  {isRefreshing ? "새로고침 중..." : "새로고침"}
+                </Button>
               </div>
 
-              <div className="flex items-center gap-4 mt-4">
+              {/* Row 2: Tier / Win Rate / Ladder / Nexus Rank */}
+              <div className="flex flex-wrap items-stretch gap-3 mb-4">
                 {summoner.tier && summoner.rank ? (
                   <>
                     {/* Tier Badge */}
@@ -735,7 +710,7 @@ export default function SummonerStatsPage() {
 
                     {/* Win Rate */}
                     <div className="bg-bg-tertiary rounded-lg p-3">
-                      <p className="text-sm text-text-secondary mb-1">승률</p>
+                      <p className="text-xs text-text-tertiary mb-1">승률</p>
                       <p className="text-2xl font-bold text-accent-primary">
                         {winRate}%
                       </p>
@@ -743,63 +718,65 @@ export default function SummonerStatsPage() {
                         {summoner.wins}승 {summoner.losses}패
                       </p>
                     </div>
-
-                    {/* Season Tiers Placeholder */}
-                    <div className="bg-bg-tertiary rounded-lg p-3">
-                        <p className="text-sm text-text-secondary mb-2">시즌별 티어</p>
-                        <div className="flex items-center gap-2">
-                            <div className="flex items-center gap-1" title="Season 2023">
-                                <img src={getTierImage('gold')} alt="S2023" className="w-8 h-8"/>
-                                <span className="text-xs text-text-tertiary font-semibold">S23</span>
-                            </div>
-                            <div className="flex items-center gap-1" title="Season 2022">
-                                <img src={getTierImage('platinum')} alt="S2022" className="w-8 h-8"/>
-                                <span className="text-xs text-text-tertiary font-semibold">S22</span>
-                            </div>
-                            <div className="flex items-center gap-1" title="Season 2021">
-                                <img src={getTierImage('diamond')} alt="S2021" className="w-8 h-8"/>
-                                <span className="text-xs text-text-tertiary font-semibold">S21</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Ladder Rank Placeholder */}
-                    <div className="bg-bg-tertiary rounded-lg p-3 text-center">
-                        <p className="text-sm text-text-secondary mb-1">래더 랭킹</p>
-                        <p className="text-2xl font-bold text-text-primary">
-                            -
-                        </p>
-                        <p className="text-xs text-text-tertiary">
-                            상위 -%
-                        </p>
-                    </div>
-
-                    {/* Nexus Rank Placeholder */}
-                    <div className="bg-bg-tertiary rounded-lg p-3 text-center">
-                        <p className="text-sm text-text-secondary mb-1">넥서스 랭킹</p>
-                        <p className="text-2xl font-bold text-text-primary">
-                            -
-                        </p>
-                        <p className="text-xs text-text-tertiary">
-                            상위 -%
-                        </p>
-                    </div>
                   </>
                 ) : (
                   <Badge variant="secondary">언랭</Badge>
                 )}
 
-                {/* Refresh Button */}
-                <Button
-                  onClick={handleRefresh}
-                  variant="secondary"
-                  size="sm"
-                  disabled={isRefreshing}
-                  className="ml-auto"
-                >
-                  <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`} />
-                  {isRefreshing ? "새로고침 중..." : "새로고침"}
-                </Button>
+                {/* Ladder Ranking */}
+                <div className="bg-bg-tertiary rounded-lg p-3">
+                  <p className="text-xs text-text-tertiary mb-1 flex items-center gap-1">
+                    <TrendingUp className="h-3 w-3" />
+                    래더 랭킹
+                  </p>
+                  <p className="text-xl font-bold text-text-secondary">–</p>
+                  <p className="text-xs text-text-tertiary">준비 중</p>
+                </div>
+
+                {/* Nexus Ranking */}
+                <div className="bg-bg-tertiary rounded-lg p-3">
+                  <p className="text-xs text-text-tertiary mb-1 flex items-center gap-1">
+                    <Shield className="h-3 w-3" />
+                    Nexus 랭킹
+                  </p>
+                  <p className="text-xl font-bold text-text-secondary">–</p>
+                  <p className="text-xs text-text-tertiary">
+                    {nexusUserId ? "등록됨" : "미등록"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Row 3: Season Tier History */}
+              <div className="pt-3 border-t border-bg-tertiary/50">
+                <p className="text-xs text-text-tertiary mb-2 font-medium tracking-wide">시즌별 티어</p>
+                <div className="flex flex-wrap gap-2">
+                  {/* S2025 — current season (real data) */}
+                  <div className="flex items-center gap-1.5 bg-bg-tertiary/70 rounded-lg px-2.5 py-2">
+                    {summoner.tier && getTierImage(summoner.tier) ? (
+                      <img src={getTierImage(summoner.tier)!} alt={summoner.tier} className="w-6 h-6" />
+                    ) : (
+                      <div className="w-6 h-6 rounded bg-bg-elevated" />
+                    )}
+                    <div>
+                      <p className="text-[10px] text-text-tertiary leading-none mb-0.5">S2025</p>
+                      <p className="text-xs font-bold text-text-primary leading-none">
+                        {summoner.tier ? `${summoner.tier.charAt(0)}${summoner.rank}` : '언랭'}
+                      </p>
+                    </div>
+                  </div>
+                  {/* Past seasons — placeholder */}
+                  {['S2024', 'S2023', 'S2022', 'S2021'].map((season) => (
+                    <div key={season} className="flex items-center gap-1.5 bg-bg-tertiary/30 rounded-lg px-2.5 py-2 opacity-50">
+                      <div className="w-6 h-6 rounded bg-bg-elevated flex items-center justify-center">
+                        <span className="text-[9px] text-text-tertiary">?</span>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-text-tertiary leading-none mb-0.5">{season}</p>
+                        <p className="text-xs font-medium text-text-tertiary leading-none">–</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
@@ -1561,137 +1538,137 @@ export default function SummonerStatsPage() {
 
           {/* Champion Statistics */}
           <div className="space-y-6">
-            {/* Champion Stats */}
+            {/* Champion Stats (tabbed) */}
             <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-6">
-              <h2 className="text-xl font-bold text-text-primary mb-4 flex items-center gap-2">
-                <Sword className="h-5 w-5 text-accent-primary" />
-                챔피언 통계
-              </h2>
-
-              {championStats.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-text-secondary text-sm">
-                    챔피언 통계가 없습니다
-                  </p>
+              {/* Header + Tabs */}
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold text-text-primary flex items-center gap-2">
+                  <Sword className="h-5 w-5 text-accent-primary" />
+                  챔피언 통계
+                </h2>
+                <div className="flex gap-1 bg-bg-tertiary/50 rounded-lg p-0.5">
+                  <button
+                    onClick={() => setChampStatTab('ranked')}
+                    className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium transition-colors ${
+                      champStatTab === 'ranked'
+                        ? 'bg-accent-primary text-white'
+                        : 'text-text-secondary hover:text-text-primary'
+                    }`}
+                  >
+                    랭크
+                    {isLoadingRankedStats ? (
+                      <Loader2 className="h-3 w-3 animate-spin opacity-70" />
+                    ) : (
+                      <span className={`text-[10px] ${champStatTab === 'ranked' ? 'text-white/70' : 'text-text-tertiary'}`}>
+                        {rankedChampionStats.reduce((sum: number, s: any) => sum + s.games, 0)}
+                      </span>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => setChampStatTab('nexus')}
+                    className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
+                      champStatTab === 'nexus'
+                        ? 'bg-accent-primary text-white'
+                        : 'text-text-secondary hover:text-text-primary'
+                    }`}
+                  >
+                    Nexus
+                  </button>
                 </div>
-              ) : (
-                <div className="space-y-3">
-                  {championStats.slice(0, 5).map((stat) => {
-                    const champWinRate = Math.round((stat.wins / stat.games) * 100);
-                    const avgKDA =
-                      stat.deaths === 0
-                        ? stat.kills + stat.assists
-                        : ((stat.kills + stat.assists) / stat.deaths).toFixed(2);
+              </div>
 
-                    return (
-                      <div
-                        key={stat.championId}
-                        className="flex items-center justify-between p-3 bg-bg-tertiary rounded-lg"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-bg-elevated rounded-full flex items-center justify-center">
-                            <span className="text-xs font-bold text-text-primary">
-                              {stat.championName.substring(0, 2)}
-                            </span>
+              {/* Tab content */}
+              {(() => {
+                const stats = champStatTab === 'ranked' ? rankedChampionStats : championStats;
+                const emptyMsg = champStatTab === 'ranked'
+                  ? '랭크 게임 챔피언 통계가 없습니다'
+                  : 'Nexus 챔피언 통계가 없습니다';
+
+                // 랭크 탭 로딩 중
+                if (champStatTab === 'ranked' && isLoadingRankedStats) {
+                  return (
+                    <div className="space-y-2">
+                      {[...Array(5)].map((_, i) => (
+                        <div key={i} className="flex items-center justify-between p-3 bg-bg-tertiary rounded-lg animate-pulse">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-bg-elevated" />
+                            <div className="space-y-1.5">
+                              <div className="h-3 w-20 bg-bg-elevated rounded" />
+                              <div className="h-2.5 w-14 bg-bg-elevated rounded" />
+                            </div>
                           </div>
-                          <div>
-                            <p className="font-semibold text-text-primary text-sm">
-                              {stat.championName}
-                            </p>
-                            <p className="text-xs text-text-tertiary">
-                              {stat.wins}승 {stat.losses}패
-                            </p>
+                          <div className="space-y-1.5 items-end flex flex-col">
+                            <div className="h-3 w-10 bg-bg-elevated rounded" />
+                            <div className="h-2.5 w-12 bg-bg-elevated rounded" />
                           </div>
                         </div>
-                        <div className="text-right">
-                          <p
-                            className={`font-bold text-sm ${
-                              champWinRate >= 60
-                                ? "text-accent-success"
-                                : champWinRate >= 50
-                                ? "text-accent-primary"
-                                : "text-accent-danger"
-                            }`}
-                          >
-                            {champWinRate}%
-                          </p>
-                          <p className="text-xs text-text-tertiary">
-                            {avgKDA} KDA
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+                      ))}
+                    </div>
+                  );
+                }
 
-            {/* Ranked Champion Stats */}
-            <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-6">
-              <h2 className="text-xl font-bold text-text-primary mb-4 flex items-center gap-2">
-                <Sword className="h-5 w-5 text-accent-primary" />
-                랭크 챔피언 통계
-              </h2>
+                if (stats.length === 0) {
+                  return (
+                    <div className="text-center py-8">
+                      <p className="text-text-secondary text-sm">{emptyMsg}</p>
+                    </div>
+                  );
+                }
 
-              {rankedChampionStats.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-text-secondary text-sm">
-                    랭크 게임 챔피언 통계가 없습니다
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {rankedChampionStats.slice(0, 5).map((stat) => {
-                    const champWinRate = Math.round((stat.wins / stat.games) * 100);
-                    const avgKDA =
-                      stat.deaths === 0
-                        ? stat.kills + stat.assists
-                        : ((stat.kills + stat.assists) / stat.deaths).toFixed(2);
+                return (
+                  <div className="space-y-2">
+                    {stats.slice(0, 5).map((stat) => {
+                      const champWinRate = Math.round((stat.wins / stat.games) * 100);
+                      const avgKDA =
+                        stat.deaths === 0
+                          ? stat.kills + stat.assists
+                          : ((stat.kills + stat.assists) / stat.deaths).toFixed(2);
 
-                    return (
-                      <div
-                        key={stat.championId}
-                        className="flex items-center justify-between p-3 bg-bg-tertiary rounded-lg"
-                      >
-                        <div className="flex items-center gap-3">
-                           <img
+                      return (
+                        <div
+                          key={stat.championId}
+                          className="flex items-center justify-between p-3 bg-bg-tertiary rounded-lg"
+                        >
+                          <div className="flex items-center gap-3">
+                            <img
                               src={getChampionIcon(stat.championName)}
                               alt={stat.championName}
-                              className="w-10 h-10 rounded-full"
+                              className="w-10 h-10 rounded-full flex-shrink-0"
                               onError={(e) => {
                                 e.currentTarget.src = "/placeholder-champion.png";
                               }}
                             />
-                          <div>
-                            <p className="font-semibold text-text-primary text-sm">
-                              {stat.championName}
+                            <div>
+                              <p className="font-semibold text-text-primary text-sm">
+                                {stat.championName}
+                              </p>
+                              <p className="text-xs text-text-tertiary">
+                                {stat.games}게임 · {stat.wins}승 {stat.losses}패
+                              </p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p
+                              className={`font-bold text-sm ${
+                                champWinRate >= 60
+                                  ? "text-accent-success"
+                                  : champWinRate >= 50
+                                  ? "text-accent-primary"
+                                  : "text-accent-danger"
+                              }`}
+                            >
+                              {champWinRate}%
                             </p>
                             <p className="text-xs text-text-tertiary">
-                              {stat.wins}승 {stat.losses}패
+                              {avgKDA} KDA
                             </p>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <p
-                            className={`font-bold text-sm ${
-                              champWinRate >= 60
-                                ? "text-accent-success"
-                                : champWinRate >= 50
-                                ? "text-accent-primary"
-                                : "text-accent-danger"
-                            }`}
-                          >
-                            {champWinRate}%
-                          </p>
-                          <p className="text-xs text-text-tertiary">
-                            {avgKDA} KDA
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+                      );
+                    })}
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Overall Stats */}
