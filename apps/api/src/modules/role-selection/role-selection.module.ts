@@ -7,7 +7,11 @@ import { AuthModule } from "../auth/auth.module";
 import { MatchModule } from "../match/match.module";
 
 @Module({
-  imports: [PrismaModule, forwardRef(() => AuthModule), forwardRef(() => MatchModule)],
+  imports: [
+    PrismaModule,
+    forwardRef(() => AuthModule),
+    forwardRef(() => MatchModule),
+  ],
   controllers: [RoleSelectionController],
   providers: [RoleSelectionService, RoleSelectionGateway],
   exports: [RoleSelectionService, RoleSelectionGateway],

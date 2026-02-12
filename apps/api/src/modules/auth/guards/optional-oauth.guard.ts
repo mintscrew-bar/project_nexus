@@ -22,7 +22,9 @@ const isValidDiscordSnowflake = (id: string | undefined): boolean => {
 /**
  * OAuth 제공자가 설정되지 않은 경우 에러 페이지로 리다이렉트하는 가드
  */
-export function OptionalOAuthGuard(provider: "google" | "discord"): Type<CanActivate> {
+export function OptionalOAuthGuard(
+  provider: "google" | "discord",
+): Type<CanActivate> {
   @Injectable()
   class OptionalOAuthGuardMixin extends AuthGuard(provider) {
     private readonly isEnabled: boolean;

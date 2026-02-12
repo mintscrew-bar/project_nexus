@@ -121,6 +121,16 @@ export class MatchController {
     // Emit match result to all clients
     this.matchGateway.emitMatchResult(matchId, { winnerId: body.winnerId });
 
+    // If bracket advanced (e.g. semi-final → finals), emit updated bracket
+    if (result.bracketAdvanced && result.roomId) {
+      const updatedMatches = await this.matchService.getRoomMatches(
+        result.roomId,
+      );
+      this.matchGateway.emitBracketUpdate(result.roomId, {
+        matches: updatedMatches,
+      });
+    }
+
     // If tournament is completed, emit tournament completion event
     if (result.tournamentCompleted) {
       const match = await this.matchService.findById(matchId);

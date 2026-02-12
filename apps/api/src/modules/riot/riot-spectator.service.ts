@@ -96,7 +96,7 @@ export class RiotSpectatorService {
 
       this.logger.error(
         `Error fetching active game for ${puuid}:`,
-        error.message
+        error.message,
       );
       return null;
     }
@@ -106,9 +106,7 @@ export class RiotSpectatorService {
    * Check if any of the participants are in an active game
    * Returns the first active game found
    */
-  async findActiveGameByPUUIDs(
-    puuids: string[]
-  ): Promise<LiveGameStatus> {
+  async findActiveGameByPUUIDs(puuids: string[]): Promise<LiveGameStatus> {
     if (!this.apiKey) {
       this.logger.error("RIOT_API_KEY not configured");
       return { isLive: false };

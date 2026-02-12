@@ -3,6 +3,8 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  Optional,
+  Inject,
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { RoomStatus, TeamMode } from "@nexus/database";
@@ -22,8 +24,14 @@ export interface AuctionState {
 @Injectable()
 export class AuctionService {
   private auctionStates = new Map<string, AuctionState>();
+  private discordVoiceService: any; // DiscordVoiceService (optional dependency)
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() @Inject("DISCORD_VOICE_SERVICE") discordVoice?: any,
+  ) {
+    this.discordVoiceService = discordVoice;
+  }
 
   // ========================================
   // Auction Initialization
@@ -73,11 +81,23 @@ export class AuctionService {
 
     // Select captains (random or by highest tier)
     const sortedPlayers = [...room.participants].sort((a, b) => {
-        // A simple tier-to-point conversion for sorting, can be more complex
-        const tierPoints: Record<string, number> = { CHALLENGER: 10, GRANDMASTER: 9, MASTER: 8, DIAMOND: 7, EMERALD: 6, PLATINUM: 5, GOLD: 4, SILVER: 3, BRONZE: 2, IRON: 1, UNRANKED: 0 };
-        const aTier = a.user.riotAccounts[0]?.tier || "UNRANKED";
-        const bTier = b.user.riotAccounts[0]?.tier || "UNRANKED";
-        return (tierPoints[bTier] || 0) - (tierPoints[aTier] || 0);
+      // A simple tier-to-point conversion for sorting, can be more complex
+      const tierPoints: Record<string, number> = {
+        CHALLENGER: 10,
+        GRANDMASTER: 9,
+        MASTER: 8,
+        DIAMOND: 7,
+        EMERALD: 6,
+        PLATINUM: 5,
+        GOLD: 4,
+        SILVER: 3,
+        BRONZE: 2,
+        IRON: 1,
+        UNRANKED: 0,
+      };
+      const aTier = a.user.riotAccounts[0]?.tier || "UNRANKED";
+      const bTier = b.user.riotAccounts[0]?.tier || "UNRANKED";
+      return (tierPoints[bTier] || 0) - (tierPoints[aTier] || 0);
     });
 
     const captains = sortedPlayers.slice(0, numTeams);
@@ -126,6 +146,30 @@ export class AuctionService {
       ),
     );
 
+    // Discord 봇: 팀장에게 역할 부여
+    try {
+      if (this.discordVoiceService) {
+        await Promise.all(
+          captains.map(async (captain) => {
+            const discordProvider = await this.prisma.authProvider.findFirst({
+              where: {
+                userId: captain.userId,
+                provider: "DISCORD",
+              },
+            });
+
+            if (discordProvider) {
+              await this.discordVoiceService.assignCaptainRole(
+                discordProvider.providerId,
+              );
+            }
+          }),
+        );
+      }
+    } catch (error) {
+      console.warn("Failed to assign Discord captain roles:", error);
+    }
+
     // Initialize auction state
     const auctionState: AuctionState = {
       roomId,
@@ -168,11 +212,11 @@ export class AuctionService {
       throw new BadRequestException("Auction not started");
     }
 
-    const room = await this.prisma.room.findUnique({ where: { id: roomId }});
+    const room = await this.prisma.room.findUnique({ where: { id: roomId } });
     if (!room) throw new NotFoundException("Room not found");
-    
+
     const bidIncrement = room.minBidIncrement || 50;
-    const bidTimeLimit = room.bidTimeLimit || 30; // Using the main timer here, soft timer logic needs review
+    const bidTimeLimit = room.bidTimeLimit || 30;
 
     // Get team
     const team = await this.prisma.team.findFirst({
@@ -216,16 +260,15 @@ export class AuctionService {
       },
     });
 
-    const currentPlayer = roomWithParticipants?.participants[state.currentPlayerIndex];
+    const currentPlayer =
+      roomWithParticipants?.participants[state.currentPlayerIndex];
     if (!currentPlayer) {
       throw new BadRequestException("No player to bid on");
     }
 
-    // Using a fixed 5s soft-timer, can be a room setting later
-    const SOFT_TIMER_SECONDS = 5; 
     state.currentHighestBid = amount;
     state.currentHighestBidder = team.id;
-    state.timerEnd = Date.now() + SOFT_TIMER_SECONDS * 1000;
+    state.timerEnd = Date.now() + bidTimeLimit * 1000;
     state.yuchalCount = 0; // Reset yuchal count
 
     // Record bid
@@ -317,11 +360,13 @@ export class AuctionService {
         data: { teamId: team.id },
       });
 
+      const bidTimeLimitMs = (room?.bidTimeLimit || 30) * 1000;
+
       // Move to next player
       state.currentPlayerIndex++;
       state.currentHighestBid = 0;
       state.currentHighestBidder = null;
-      state.timerEnd = Date.now() + 30000;
+      state.timerEnd = Date.now() + bidTimeLimitMs;
       state.yuchalCount = 0;
 
       return {
@@ -331,6 +376,8 @@ export class AuctionService {
         price: state.currentHighestBid,
       };
     } else {
+      const bidTimeLimitMs = (room?.bidTimeLimit || 30) * 1000;
+
       // Yuchal (no sale)
       state.yuchalCount++;
 
@@ -379,7 +426,7 @@ export class AuctionService {
         state.currentPlayerIndex++;
         state.currentHighestBid = 0;
         state.currentHighestBidder = null;
-        state.timerEnd = Date.now() + 30000;
+        state.timerEnd = Date.now() + bidTimeLimitMs;
         state.yuchalCount = 0;
 
         return {
@@ -391,7 +438,7 @@ export class AuctionService {
       }
 
       // Continue auction for same player
-      state.timerEnd = Date.now() + 30000;
+      state.timerEnd = Date.now() + bidTimeLimitMs;
 
       return { sold: false };
     }
@@ -423,6 +470,15 @@ export class AuctionService {
       where: { id: roomId },
       data: { status: RoomStatus.ROLE_SELECTION },
     });
+
+    // Discord 봇: 팀 구성 완료 시 팀별 음성채널 배치
+    try {
+      if (this.discordVoiceService) {
+        await this.discordVoiceService.handleTeamAssignment(roomId);
+      }
+    } catch (error) {
+      console.warn("Failed to assign teams to Discord channels:", error);
+    }
 
     this.auctionStates.delete(roomId);
 

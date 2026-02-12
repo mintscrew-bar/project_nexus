@@ -9,14 +9,6 @@ import { BracketView, Match, MatchDetailModal, VictoryScreen } from "@/component
 import { LoadingSpinner, Badge, Button } from "@/components/ui";
 import { ArrowLeft, RefreshCw, Trophy } from "lucide-react";
 import Link from "next/link";
-import { io, Socket } from "socket.io-client";
-
-interface TeamStanding {
-  teamId: string;
-  teamName: string;
-  wins: number;
-  losses: number;
-}
 
 export default function BracketPage() {
   const params = useParams();
@@ -24,15 +16,17 @@ export default function BracketPage() {
   const roomId = params.id as string;
 
   const { user } = useAuthStore();
-  const { roomMatches, isLoading, error, fetchRoomMatches, connectToBracket, disconnect, generateTournamentCode, reportResult } = useMatchStore();
+  const {
+    roomMatches, isLoading, error,
+    fetchRoomMatches, connectToBracket, disconnect,
+    generateTournamentCode, reportResult,
+    tournamentCompleted, finalStandings,
+  } = useMatchStore();
 
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isGeneratingCode, setIsGeneratingCode] = useState(false);
   const [isHost, setIsHost] = useState(false);
-  const [tournamentCompleted, setTournamentCompleted] = useState(false);
-  const [finalStandings, setFinalStandings] = useState<TeamStanding[]>([]);
-  const [matchSocket, setMatchSocket] = useState<Socket | null>(null);
   const [liveStatus, setLiveStatus] = useState<any>(null);
 
   useEffect(() => {
@@ -45,41 +39,7 @@ export default function BracketPage() {
         if (user && room.hostId === user.id) {
           setIsHost(true);
         }
-      }).catch(() => {
-        // Ignore errors - user might not be host
-      });
-
-      // Connect to match WebSocket for tournament completion events
-      const token = localStorage.getItem('accessToken');
-      if (token) {
-        const socket = io(
-          `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000"}/match`,
-          {
-            auth: { token },
-            transports: ["websocket"],
-          }
-        );
-
-        socket.on("connect", () => {
-          console.log("Connected to match socket");
-          socket.emit("join-bracket", { roomId });
-        });
-
-        socket.on("tournament-completed", (data: {
-          standings: TeamStanding[];
-          completedAt: string;
-        }) => {
-          console.log("Tournament completed:", data);
-          setFinalStandings(data.standings);
-          setTournamentCompleted(true);
-        });
-
-        setMatchSocket(socket);
-
-        return () => {
-          socket.disconnect();
-        };
-      }
+      }).catch(() => {});
     }
 
     return () => {
@@ -151,19 +111,20 @@ export default function BracketPage() {
     ? Math.max(...roomMatches.map(m => m.round || 1))
     : 1;
 
-  // Transform matches to BracketView format
+  // Transform matches to BracketView format (API returns teamA/teamB)
   const bracketMatches: Match[] = roomMatches.map((m, index) => ({
     id: m.id,
     round: m.round || 1,
     matchNumber: m.matchNumber || index + 1,
-    team1: m.team1 ? { id: m.team1.id, name: m.team1.name, score: m.team1.score } : undefined,
-    team2: m.team2 ? { id: m.team2.id, name: m.team2.name, score: m.team2.score } : undefined,
+    team1: m.teamA ? { id: m.teamA.id, name: m.teamA.name, score: m.teamA.score } : undefined,
+    team2: m.teamB ? { id: m.teamB.id, name: m.teamB.name, score: m.teamB.score } : undefined,
     winner: m.winnerId
-      ? (m.team1?.id === m.winnerId ? { id: m.team1.id, name: m.team1.name } : { id: m.team2?.id || '', name: m.team2?.name || '' })
+      ? (m.teamA?.id === m.winnerId ? { id: m.teamA.id, name: m.teamA.name } : { id: m.teamB?.id || '', name: m.teamB?.name || '' })
       : undefined,
     status: m.status as 'PENDING' | 'IN_PROGRESS' | 'COMPLETED',
     scheduledTime: m.scheduledTime,
     tournamentCode: m.tournamentCode,
+    bracketSection: m.bracketRound || undefined,
   }));
 
   // Get tournament status
@@ -172,7 +133,11 @@ export default function BracketPage() {
   const inProgressMatches = bracketMatches.filter(m => m.status === 'IN_PROGRESS').length;
 
   // Find winner if tournament is complete
-  const finalMatch = bracketMatches.find(m => m.round === rounds);
+  // For DE, the grand final is the GF-section match; for SE, it's the highest round
+  const isDE = bracketMatches.some(m => m.bracketSection === 'GF');
+  const finalMatch = isDE
+    ? bracketMatches.find(m => m.bracketSection === 'GF')
+    : bracketMatches.find(m => m.round === rounds);
   const tournamentWinner = finalMatch?.status === 'COMPLETED' ? finalMatch.winner : null;
 
   if (isLoading && roomMatches.length === 0) {

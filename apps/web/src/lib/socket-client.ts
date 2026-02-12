@@ -21,6 +21,9 @@ export const connectRoomSocket = () => {
       token: getAccessToken(),
     },
     transports: ["websocket"],
+    reconnection: true,
+    reconnectionAttempts: 5,
+    reconnectionDelay: 2000,
   });
 
   roomSocket.on("connect", () => {
@@ -47,6 +50,9 @@ export const connectAuctionSocket = () => {
       token: getAccessToken(),
     },
     transports: ["websocket"],
+    reconnection: true,
+    reconnectionAttempts: 5,
+    reconnectionDelay: 2000,
   });
 
   auctionSocket.on("connect", () => {
@@ -73,6 +79,9 @@ export const connectSnakeDraftSocket = () => {
       token: getAccessToken(),
     },
     transports: ["websocket"],
+    reconnection: true,
+    reconnectionAttempts: 5,
+    reconnectionDelay: 2000,
   });
 
   snakeDraftSocket.on("connect", () => {
@@ -99,6 +108,9 @@ export const connectMatchSocket = () => {
       token: getAccessToken(),
     },
     transports: ["websocket"],
+    reconnection: true,
+    reconnectionAttempts: 5,
+    reconnectionDelay: 2000,
   });
 
   matchSocket.on("connect", () => {
@@ -125,6 +137,9 @@ export const connectClanSocket = () => {
       token: getAccessToken(),
     },
     transports: ["websocket"],
+    reconnection: true,
+    reconnectionAttempts: 5,
+    reconnectionDelay: 2000,
   });
 
   clanSocket.on("connect", () => {
@@ -353,6 +368,9 @@ export const connectPresenceSocket = () => {
       token: getAccessToken(),
     },
     transports: ["websocket"],
+    reconnection: true,
+    reconnectionAttempts: 5,
+    reconnectionDelay: 2000,
   });
 
   presenceSocket.on("connect", () => {
@@ -464,6 +482,9 @@ export const connectNotificationSocket = () => {
       token: getAccessToken(),
     },
     transports: ["websocket"],
+    reconnection: true,
+    reconnectionAttempts: 5,
+    reconnectionDelay: 2000,
   });
 
   notificationSocket.on("connect", () => {

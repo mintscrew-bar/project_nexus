@@ -108,7 +108,7 @@ export class RiotController {
     @Param("gameName") gameName: string,
     @Param("tagLine") tagLine: string,
   ) {
-    console.log('getSummoner controller called with:', { gameName, tagLine });
+    console.log("getSummoner controller called with:", { gameName, tagLine });
     return this.riotService.getSummonerByRiotId(gameName, tagLine);
   }
 

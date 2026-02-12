@@ -165,8 +165,12 @@ export class AuctionGateway
         this.server.to(`room:${data.roomId}`).emit("auction-complete");
 
         // Start role selection
-        const roleSelectionData = await this.roleSelectionService.startRoleSelection(data.roomId);
-        this.roleSelectionGateway.emitRoleSelectionStarted(data.roomId, roleSelectionData);
+        const roleSelectionData =
+          await this.roleSelectionService.startRoleSelection(data.roomId);
+        this.roleSelectionGateway.emitRoleSelectionStarted(
+          data.roomId,
+          roleSelectionData,
+        );
       }
 
       return { success: true, result };

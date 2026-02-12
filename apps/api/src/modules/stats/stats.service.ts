@@ -44,7 +44,7 @@ export class StatsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly riotMatchService: RiotMatchService,
-    private readonly riotService: RiotService
+    private readonly riotService: RiotService,
   ) {}
 
   /**
@@ -173,7 +173,7 @@ export class StatsService {
    */
   async findUserByRiotAccount(
     gameName: string,
-    tagLine: string
+    tagLine: string,
   ): Promise<{ userId: string; riotAccount: any } | null> {
     const riotAccount = await this.prisma.riotAccount.findFirst({
       where: {
@@ -311,12 +311,12 @@ export class StatsService {
     tagLine: string,
     count: number = 20,
     queueId?: number,
-    start: number = 0
+    start: number = 0,
   ) {
     // First, get the summoner info to get PUUID
     const summonerInfo = await this.riotService.getSummonerByRiotId(
       gameName,
-      tagLine
+      tagLine,
     );
 
     if (!summonerInfo) {
@@ -328,7 +328,7 @@ export class StatsService {
       summonerInfo.puuid,
       count,
       queueId,
-      start
+      start,
     );
 
     return matches;
@@ -347,7 +347,7 @@ export class StatsService {
   async getUserRiotMatchHistory(
     userId: string,
     count: number = 20,
-    queueId?: number
+    queueId?: number,
   ) {
     // Get user's primary Riot account
     const user = await this.prisma.user.findUnique({
@@ -374,7 +374,7 @@ export class StatsService {
     const matches = await this.riotMatchService.getMatchHistoryByPuuid(
       primaryAccount.puuid,
       count,
-      queueId
+      queueId,
     );
 
     return matches;
@@ -384,7 +384,10 @@ export class StatsService {
    * 소환사의 시즌별 티어 히스토리
    */
   async getSummonerSeasonTiers(gameName: string, tagLine: string) {
-    const summonerInfo = await this.riotService.getSummonerByRiotId(gameName, tagLine);
+    const summonerInfo = await this.riotService.getSummonerByRiotId(
+      gameName,
+      tagLine,
+    );
     if (!summonerInfo) throw new NotFoundException("Summoner not found");
 
     const tiers = await this.prisma.summonerSeasonTier.findMany({
@@ -402,7 +405,10 @@ export class StatsService {
    * - 재요청 시에는 DB에서 즉시 반환 (API 호출 없음)
    */
   async getRankedChampionStats(gameName: string, tagLine: string) {
-    const summonerInfo = await this.riotService.getSummonerByRiotId(gameName, tagLine);
+    const summonerInfo = await this.riotService.getSummonerByRiotId(
+      gameName,
+      tagLine,
+    );
     if (!summonerInfo) throw new NotFoundException("Summoner not found");
 
     const puuid = summonerInfo.puuid;
@@ -410,7 +416,9 @@ export class StatsService {
     const BATCH_SIZE = 100;
 
     // S2026 시즌 시작: 2026년 1월 9일 UTC (Unix seconds)
-    const SEASON_2026_START = Math.floor(new Date('2026-01-09T00:00:00Z').getTime() / 1000);
+    const SEASON_2026_START = Math.floor(
+      new Date("2026-01-09T00:00:00Z").getTime() / 1000,
+    );
 
     // 모든 랭크 매치 ID 수집 (두 큐 타입 병렬로)
     const allMatchIds: string[] = [];
@@ -419,13 +427,19 @@ export class StatsService {
         let start = 0;
         while (true) {
           const ids = await this.riotMatchService.getMatchIdsByPuuid(
-            puuid, start, BATCH_SIZE, queueId, undefined, 3, SEASON_2026_START
+            puuid,
+            start,
+            BATCH_SIZE,
+            queueId,
+            undefined,
+            3,
+            SEASON_2026_START,
           );
           allMatchIds.push(...ids);
           if (ids.length < BATCH_SIZE) break;
           start += BATCH_SIZE;
         }
-      })
+      }),
     );
 
     if (allMatchIds.length === 0) return [];
@@ -435,7 +449,7 @@ export class StatsService {
 
     // 각 매치 상세 조회 (DB 캐시 우선)
     const matchDetails = await Promise.all(
-      uniqueIds.map((id) => this.riotMatchService.getMatchById(id))
+      uniqueIds.map((id) => this.riotMatchService.getMatchById(id)),
     );
 
     // 챔피언별 통계 집계
@@ -443,7 +457,9 @@ export class StatsService {
 
     for (const match of matchDetails) {
       if (!match) continue;
-      const participant = match.info.participants.find((p) => p.puuid === puuid);
+      const participant = match.info.participants.find(
+        (p) => p.puuid === puuid,
+      );
       if (!participant) continue;
 
       const key = participant.championName;

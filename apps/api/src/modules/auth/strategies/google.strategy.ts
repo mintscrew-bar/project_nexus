@@ -32,7 +32,10 @@ export class GoogleStrategy extends PassportStrategy(Strategy, "google") {
     done: VerifyCallback,
   ): Promise<any> {
     try {
-      console.log("Google strategy - profile:", JSON.stringify(profile, null, 2));
+      console.log(
+        "Google strategy - profile:",
+        JSON.stringify(profile, null, 2),
+      );
 
       const { id, displayName, emails, photos } = profile;
 
@@ -48,7 +51,10 @@ export class GoogleStrategy extends PassportStrategy(Strategy, "google") {
         },
       });
 
-      console.log("Google strategy - validated user:", JSON.stringify(user, null, 2));
+      console.log(
+        "Google strategy - validated user:",
+        JSON.stringify(user, null, 2),
+      );
       done(null, user);
     } catch (error) {
       console.error("Google strategy error:", error);

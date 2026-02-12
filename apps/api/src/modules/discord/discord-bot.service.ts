@@ -39,11 +39,14 @@ const ROLE_EMOJI: Record<string, string> = {
   SUPPORT: "💚",
 };
 
-// 방 상태 한글 맵핑
+// 방 상태 한글 맵핑 (프로젝트 흐름: WAITING → TEAM_SELECTION → DRAFT → DRAFT_COMPLETED → ROLE_SELECTION → IN_PROGRESS → COMPLETED)
 const ROOM_STATUS_KR: Record<string, string> = {
   WAITING: "대기 중",
-  TEAM_SELECTION: "팀 편성 중",
-  IN_PROGRESS: "진행 중",
+  TEAM_SELECTION: "팀 선택 대기",
+  DRAFT: "드래프트/경매 진행 중",
+  DRAFT_COMPLETED: "드래프트 완료",
+  ROLE_SELECTION: "역할 선택 중",
+  IN_PROGRESS: "대진표 진행 중",
   COMPLETED: "완료됨",
 };
 
@@ -154,6 +157,11 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
           sub.setName("match").setDescription("현재 진행 중인 매치 정보 보기"),
         )
         .addSubcommand((sub) =>
+          sub
+            .setName("bracket")
+            .setDescription("참가 중인 방의 대진표(브래킷) 보기"),
+        )
+        .addSubcommand((sub) =>
           sub.setName("stats").setDescription("내 통계 정보 보기"),
         ),
     ].map((cmd) => cmd.toJSON());
@@ -200,6 +208,9 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
           case "match":
             await this.handleMatchCommand(interaction);
             break;
+          case "bracket":
+            await this.handleBracketCommand(interaction);
+            break;
           case "stats":
             await this.handleStatsCommand(interaction);
             break;
@@ -238,15 +249,16 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
         {
           name: "🏠 방 관련",
           value: [
-            "`/nexus rooms` - 활성 방 목록",
+            "`/nexus rooms` - 활성 방 목록 (대기~역할선택~진행중)",
             "`/nexus team` - 현재 팀 정보",
           ].join("\n"),
         },
         {
           name: "⚔️ 게임 관련",
           value: [
-            "`/nexus auction` - 경매 상태",
-            "`/nexus match` - 매치 정보",
+            "`/nexus auction` - 경매 상태 (경매 방 참가 시)",
+            "`/nexus match` - 현재 진행 중인 매치 정보",
+            "`/nexus bracket` - 참가 중인 방의 대진표 보기",
           ].join("\n"),
         },
       )
@@ -393,11 +405,27 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
   private async handleRoomsCommand(interaction: ChatInputCommandInteraction) {
     const rooms = await this.prisma.room.findMany({
       where: {
-        status: { in: ["WAITING", "TEAM_SELECTION", "IN_PROGRESS"] },
+        status: {
+          in: [
+            "WAITING",
+            "TEAM_SELECTION",
+            "DRAFT",
+            "DRAFT_COMPLETED",
+            "ROLE_SELECTION",
+            "IN_PROGRESS",
+          ],
+        },
       },
-      include: {
-        host: true,
-        participants: true,
+      select: {
+        id: true,
+        name: true,
+        status: true,
+        teamMode: true,
+        isPrivate: true,
+        maxParticipants: true,
+        hostId: true,
+        host: { select: { username: true } },
+        _count: { select: { participants: true } },
       },
       orderBy: { createdAt: "desc" },
       take: 10,
@@ -426,7 +454,13 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
           ? "⏳"
           : room.status === "TEAM_SELECTION"
             ? "👥"
-            : "⚔️";
+            : room.status === "DRAFT"
+              ? "📋"
+              : room.status === "DRAFT_COMPLETED"
+                ? "✅"
+                : room.status === "ROLE_SELECTION"
+                  ? "🎯"
+                  : "⚔️";
       const modeText =
         room.teamMode === "AUCTION" ? "경매" : "스네이크 드래프트";
       const lockIcon = room.isPrivate ? "🔒" : "🔓";
@@ -435,9 +469,9 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
         name: `${statusEmoji} ${room.name} ${lockIcon}`,
         value: [
           `**호스트:** ${room.host.username}`,
-          `**인원:** ${room.participants.length}/${room.maxParticipants}`,
+          `**인원:** ${room._count.participants}/${room.maxParticipants}`,
           `**모드:** ${modeText}`,
-          `**상태:** ${ROOM_STATUS_KR[room.status]}`,
+          `**상태:** ${ROOM_STATUS_KR[room.status] ?? room.status}`,
         ].join("\n"),
         inline: true,
       });
@@ -480,12 +514,15 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
       orderBy: { joinedAt: "desc" },
     });
 
-    if (
-      !teamMember ||
-      !["WAITING", "TEAM_SELECTION", "IN_PROGRESS"].includes(
-        teamMember.team.room.status,
-      )
-    ) {
+    const activeStatuses = [
+      "WAITING",
+      "TEAM_SELECTION",
+      "DRAFT",
+      "DRAFT_COMPLETED",
+      "ROLE_SELECTION",
+      "IN_PROGRESS",
+    ];
+    if (!teamMember || !activeStatuses.includes(teamMember.team.room.status)) {
       await interaction.reply({
         content: "❌ 현재 참가 중인 팀이 없습니다.",
         ephemeral: true,
@@ -544,12 +581,12 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    // 유저가 참가 중인 경매 방 찾기
+    // 유저가 참가 중인 경매 방 찾기 (팀 선택 대기 또는 드래프트 진행 중)
     const participant = await this.prisma.roomParticipant.findFirst({
       where: {
         userId: user.id,
         room: {
-          status: "TEAM_SELECTION",
+          status: { in: ["TEAM_SELECTION", "DRAFT"] },
           teamMode: "AUCTION",
         },
       },
@@ -698,9 +735,9 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
       )
       .addFields(
         {
-          name: `🔵 ${match.teamA.name}`,
+          name: `🔵 ${match.teamA?.name ?? "TBD"}`,
           value:
-            match.teamA.members.map((m) => m.user.username).join(", ") ||
+            match.teamA?.members.map((m) => m.user.username).join(", ") ||
             "팀원 없음",
           inline: true,
         },
@@ -710,9 +747,9 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
           inline: true,
         },
         {
-          name: `🔴 ${match.teamB.name}`,
+          name: `🔴 ${match.teamB?.name ?? "TBD"}`,
           value:
-            match.teamB.members.map((m) => m.user.username).join(", ") ||
+            match.teamB?.members.map((m) => m.user.username).join(", ") ||
             "팀원 없음",
           inline: true,
         },
@@ -722,6 +759,120 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
       embed.addFields({
         name: "🎮 토너먼트 코드",
         value: `\`${match.tournamentCode}\`\n*커스텀 게임에서 이 코드를 입력하세요*`,
+        inline: false,
+      });
+    }
+
+    await interaction.reply({ embeds: [embed] });
+  }
+
+  private async handleBracketCommand(interaction: ChatInputCommandInteraction) {
+    const user = await this.findUserByDiscordId(interaction.user.id);
+
+    if (!user) {
+      await interaction.reply({
+        content: "❌ 계정이 연동되지 않았습니다. `/nexus link`로 연동하세요!",
+        ephemeral: true,
+      });
+      return;
+    }
+
+    // 참가 중인 방 중 대진표가 있는 방 (IN_PROGRESS 또는 COMPLETED)
+    const participant = await this.prisma.roomParticipant.findFirst({
+      where: {
+        userId: user.id,
+        room: {
+          status: { in: ["IN_PROGRESS", "COMPLETED"] },
+        },
+      },
+      select: {
+        roomId: true,
+        room: {
+          select: {
+            id: true,
+            name: true,
+            status: true,
+          },
+        },
+      },
+      orderBy: { joinedAt: "desc" },
+    });
+
+    if (!participant) {
+      await interaction.reply({
+        content:
+          "❌ 대진표가 있는 방에 참가 중이 아닙니다. (역할 선택이 끝난 뒤 대진이 생성됩니다)",
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const matches = await this.prisma.match.findMany({
+      where: { roomId: participant.roomId },
+      select: {
+        id: true,
+        round: true,
+        bracketRound: true,
+        status: true,
+        winnerId: true,
+        tournamentCode: true,
+        teamA: { select: { name: true } },
+        teamB: { select: { name: true } },
+      },
+      orderBy: [{ round: "asc" }, { createdAt: "asc" }],
+    });
+
+    if (matches.length === 0) {
+      await interaction.reply({
+        content: "❌ 해당 방에 아직 매치가 생성되지 않았습니다.",
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const appUrl = this.configService.get("APP_URL") || "http://localhost:3000";
+    const room = participant.room;
+    const completedCount = matches.filter(
+      (m) => m.status === "COMPLETED",
+    ).length;
+
+    const embed = new EmbedBuilder()
+      .setColor(Colors.Blue)
+      .setTitle(`📋 대진표 - ${room.name}`)
+      .setDescription(
+        `**상태:** ${ROOM_STATUS_KR[room.status] ?? room.status} · ${completedCount}/${matches.length}경기 완료`,
+      )
+      .setFooter({
+        text: `웹에서 보기: ${appUrl}/tournaments/${room.id}/bracket`,
+      })
+      .setTimestamp();
+
+    // 라운드별로 그룹
+    const byRound = new Map<number, typeof matches>();
+    for (const m of matches) {
+      const r = m.round ?? 0;
+      if (!byRound.has(r)) byRound.set(r, []);
+      byRound.get(r)!.push(m);
+    }
+
+    const roundOrder = Array.from(byRound.keys()).sort((a, b) => a - b);
+    for (const round of roundOrder) {
+      const list = byRound.get(round)!;
+      const lines = list.map((m) => {
+        const label = m.bracketRound || `R${round}`;
+        const teamA = m.teamA?.name ?? "TBD";
+        const teamB = m.teamB?.name ?? "TBD";
+        const statusIcon =
+          m.status === "COMPLETED"
+            ? "✅"
+            : m.status === "IN_PROGRESS"
+              ? "⚔️"
+              : "⏳";
+        return `${statusIcon} **${label}** ${teamA} vs ${teamB}`;
+      });
+      embed.addFields({
+        name: `라운드 ${round}`,
+        value: lines.join("\n") || "-",
         inline: false,
       });
     }

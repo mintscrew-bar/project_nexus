@@ -239,6 +239,7 @@ export const roomApi = {
     bidTimeLimit?: number;
     pickTimeLimit?: number;
     captainSelection?: "RANDOM" | "TIER";
+    bracketFormat?: string;
   }) => {
     const response = await apiClient.post("/rooms", data);
     return response.data;

@@ -141,19 +141,39 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const matches = await this.matchService.getRoomMatches(roomId);
 
     // Calculate final standings (teams ranked by wins)
-    const teamStats = new Map<string, { teamId: string; teamName: string; wins: number; losses: number }>();
+    const teamStats = new Map<
+      string,
+      { teamId: string; teamName: string; wins: number; losses: number }
+    >();
 
     for (const match of matches) {
-      const teamAId = match.teamA.id;
-      const teamBId = match.teamB.id;
-      const teamAName = match.teamA.name;
-      const teamBName = match.teamB.name;
+      // Type assertion: getRoomMatches includes teamA and teamB relations
+      const matchWithTeams = match as typeof match & {
+        teamA: { id: string; name: string } | null;
+        teamB: { id: string; name: string } | null;
+      };
+
+      if (!matchWithTeams.teamA || !matchWithTeams.teamB) continue; // Skip TBD matches
+      const teamAId = matchWithTeams.teamA.id;
+      const teamBId = matchWithTeams.teamB.id;
+      const teamAName = matchWithTeams.teamA.name;
+      const teamBName = matchWithTeams.teamB.name;
 
       if (!teamStats.has(teamAId)) {
-        teamStats.set(teamAId, { teamId: teamAId, teamName: teamAName, wins: 0, losses: 0 });
+        teamStats.set(teamAId, {
+          teamId: teamAId,
+          teamName: teamAName,
+          wins: 0,
+          losses: 0,
+        });
       }
       if (!teamStats.has(teamBId)) {
-        teamStats.set(teamBId, { teamId: teamBId, teamName: teamBName, wins: 0, losses: 0 });
+        teamStats.set(teamBId, {
+          teamId: teamBId,
+          teamName: teamBName,
+          wins: 0,
+          losses: 0,
+        });
       }
 
       if (match.winnerId === teamAId) {
@@ -166,7 +186,9 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     // Sort by wins (descending)
-    const standings = Array.from(teamStats.values()).sort((a, b) => b.wins - a.wins);
+    const standings = Array.from(teamStats.values()).sort(
+      (a, b) => b.wins - a.wins,
+    );
 
     // Emit to all clients watching the bracket
     this.server.to(`bracket:${roomId}`).emit("tournament-completed", {

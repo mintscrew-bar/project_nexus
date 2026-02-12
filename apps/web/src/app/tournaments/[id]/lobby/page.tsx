@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLobbyStore } from "@/stores/lobby-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { ChatBox } from "@/components/domain/ChatBox";
@@ -140,6 +140,7 @@ export default function TournamentLobbyPage() {
   const [isKicking, setIsKicking] = useState(false);
   const [hoveredPlayer, setHoveredPlayer] = useState<string | null>(null);
   const [addingFriend, setAddingFriend] = useState<string | null>(null);
+  const hasRedirected = useRef(false);
 
   useEffect(() => {
     if (roomId) {
@@ -151,17 +152,27 @@ export default function TournamentLobbyPage() {
   }, [roomId, connect, disconnect]);
 
   useEffect(() => {
-    if (gameStarting && room) {
+    if (hasRedirected.current || !room) return;
+
+    // gameStarting takes priority: redirect to draft/auction phase
+    if (gameStarting) {
+      hasRedirected.current = true;
+      disconnect();
       if (room.teamMode === "AUCTION") {
         router.push(`/auction/${room.id}`);
-      } else if (room.teamMode === "SNAKE_DRAFT") {
+      } else {
         router.push(`/draft/${room.id}`);
       }
+      return;
     }
-    if (room?.status === 'IN_PROGRESS') {
-        router.push(`/tournaments/${room.id}/bracket`);
+
+    // Already past draft phase: go straight to bracket
+    if (room.status === 'IN_PROGRESS') {
+      hasRedirected.current = true;
+      disconnect();
+      router.push(`/tournaments/${room.id}/bracket`);
     }
-  }, [gameStarting, room, router]);
+  }, [gameStarting, room, router, disconnect]);
 
   if (!isConnected && !error) {
     return (

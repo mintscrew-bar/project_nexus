@@ -81,12 +81,15 @@ export class MatchDataCollectionService {
       }
 
       // Get match IDs from tournament code
-      const riotMatchIds = await this.riotMatchService.getMatchIdsByTournamentCode(
-        match.tournamentCode
-      );
+      const riotMatchIds =
+        await this.riotMatchService.getMatchIdsByTournamentCode(
+          match.tournamentCode,
+        );
 
       if (riotMatchIds.length === 0) {
-        this.logger.warn(`No Riot match IDs found for tournament code ${match.tournamentCode}`);
+        this.logger.warn(
+          `No Riot match IDs found for tournament code ${match.tournamentCode}`,
+        );
         // Wait and retry - match might not be available yet
         await this.scheduleRetry(matchId, 1);
         return;
@@ -128,7 +131,7 @@ export class MatchDataCollectionService {
   private async saveMatchData(
     matchId: string,
     match: any,
-    matchData: MatchDto
+    matchData: MatchDto,
   ): Promise<void> {
     try {
       // Build PUUID to User mapping
@@ -162,7 +165,7 @@ export class MatchDataCollectionService {
 
         if (!userMapping) {
           this.logger.warn(
-            `PUUID ${participant.puuid} not found in user mapping, skipping`
+            `PUUID ${participant.puuid} not found in user mapping, skipping`,
           );
           continue;
         }
@@ -195,7 +198,8 @@ export class MatchDataCollectionService {
 
             // Damage
             totalDamageDealt: participant.totalDamageDealt,
-            totalDamageDealtToChampions: participant.totalDamageDealtToChampions,
+            totalDamageDealtToChampions:
+              participant.totalDamageDealtToChampions,
             totalDamageTaken: participant.totalDamageTaken,
             totalHeal: participant.totalHeal,
             damageSelfMitigated: participant.damageSelfMitigated,
@@ -278,26 +282,32 @@ export class MatchDataCollectionService {
   /**
    * Schedule a retry for data collection
    */
-  private async scheduleRetry(matchId: string, attemptNumber: number): Promise<void> {
+  private async scheduleRetry(
+    matchId: string,
+    attemptNumber: number,
+  ): Promise<void> {
     const maxAttempts = 5;
     const delayMs = 60000; // 1 minute
 
     if (attemptNumber >= maxAttempts) {
       this.logger.error(
-        `Max retry attempts (${maxAttempts}) reached for match ${matchId}`
+        `Max retry attempts (${maxAttempts}) reached for match ${matchId}`,
       );
       return;
     }
 
     this.logger.log(
-      `Scheduling retry ${attemptNumber + 1}/${maxAttempts} for match ${matchId} in ${delayMs}ms`
+      `Scheduling retry ${attemptNumber + 1}/${maxAttempts} for match ${matchId} in ${delayMs}ms`,
     );
 
     setTimeout(async () => {
       try {
         await this.collectMatchData(matchId);
       } catch (error) {
-        this.logger.error(`Retry ${attemptNumber + 1} failed for match ${matchId}`);
+        this.logger.error(
+          `Retry ${attemptNumber + 1} failed for match ${matchId}`,
+          error,
+        );
         await this.scheduleRetry(matchId, attemptNumber + 1);
       }
     }, delayMs);
@@ -319,7 +329,9 @@ export class MatchDataCollectionService {
         },
       });
 
-      this.logger.log(`Found ${matches.length} matches pending data collection`);
+      this.logger.log(
+        `Found ${matches.length} matches pending data collection`,
+      );
 
       for (const match of matches) {
         await this.collectMatchData(match.id);

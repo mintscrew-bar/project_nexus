@@ -6,15 +6,21 @@ import { AuctionStateService } from "./auction-state.service";
 import { AuctionTimerService } from "./auction-timer.service";
 import { AuthModule } from "../auth/auth.module";
 import { RoleSelectionModule } from "../role-selection/role-selection.module";
+import { DiscordModule } from "../discord/discord.module";
+import { DiscordVoiceService } from "../discord/discord-voice.service";
 
 @Module({
-  imports: [AuthModule, forwardRef(() => RoleSelectionModule)],
+  imports: [AuthModule, forwardRef(() => RoleSelectionModule), DiscordModule],
   controllers: [AuctionController],
   providers: [
     AuctionService,
     AuctionGateway,
     AuctionStateService,
     AuctionTimerService,
+    {
+      provide: "DISCORD_VOICE_SERVICE",
+      useExisting: DiscordVoiceService,
+    },
   ],
   exports: [AuctionService, AuctionGateway, AuctionStateService],
 })

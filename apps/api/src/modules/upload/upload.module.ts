@@ -4,20 +4,28 @@ import { diskStorage } from "multer";
 import { extname, join } from "path";
 import { randomUUID } from "crypto";
 import { UploadService } from "./upload.service";
-import { Request } from 'express'; // Import Request from express
+import { Request } from "express"; // Import Request from express
 
 @Module({
   imports: [
     MulterModule.register({
       storage: diskStorage({
         destination: join(__dirname, "..", "..", "..", "uploads"),
-        filename: (req: Request, file: Express.Multer.File, cb: (error: Error | null, filename: string) => void) => {
+        filename: (
+          req: Request,
+          file: Express.Multer.File,
+          cb: (error: Error | null, filename: string) => void,
+        ) => {
           const randomName = randomUUID();
           const ext = extname(file.originalname);
           cb(null, `${randomName}${ext}`);
         },
       }),
-      fileFilter: (req: Request, file: Express.Multer.File, cb: (error: Error | null, acceptFile: boolean) => void) => {
+      fileFilter: (
+        req: Request,
+        file: Express.Multer.File,
+        cb: (error: Error | null, acceptFile: boolean) => void,
+      ) => {
         if (file.mimetype.match(/\/(jpg|jpeg|png|gif|webp)$/)) {
           cb(null, true);
         } else {
@@ -33,4 +41,3 @@ import { Request } from 'express'; // Import Request from express
   exports: [MulterModule, UploadService],
 })
 export class UploadModule {}
-

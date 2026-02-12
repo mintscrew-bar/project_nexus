@@ -61,7 +61,9 @@ export class PresenceService {
     });
   }
 
-  async getUserStatus(userId: string): Promise<{ status: UserStatus; lastSeenAt: Date | null }> {
+  async getUserStatus(
+    userId: string,
+  ): Promise<{ status: UserStatus; lastSeenAt: Date | null }> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -90,13 +92,15 @@ export class PresenceService {
     };
   }
 
-  async getFriendsStatuses(userId: string): Promise<Array<{
-    id: string;
-    username: string;
-    avatar: string | null;
-    status: UserStatus;
-    lastSeenAt: Date | null;
-  }>> {
+  async getFriendsStatuses(userId: string): Promise<
+    Array<{
+      id: string;
+      username: string;
+      avatar: string | null;
+      status: UserStatus;
+      lastSeenAt: Date | null;
+    }>
+  > {
     // Get accepted friendships where this user is involved
     const friendships = await this.prisma.friendship.findMany({
       where: {
@@ -167,7 +171,7 @@ export class PresenceService {
     });
 
     return friendships.map((f) =>
-      f.userId === userId ? f.friendId : f.userId
+      f.userId === userId ? f.friendId : f.userId,
     );
   }
 

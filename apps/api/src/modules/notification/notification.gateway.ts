@@ -57,7 +57,7 @@ export class NotificationGateway
     }
   }
 
-  handleDisconnect(client: Socket) {
+  handleDisconnect(_client: Socket) {
     this.logger.log("Client disconnected from notification");
   }
 

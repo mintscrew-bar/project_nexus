@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
 import { Switch } from '@/components/ui/Switch';
-import { Loader2, Users, Lock, Unlock, Gavel, ListOrdered, Trophy, Info, Eye, EyeOff } from 'lucide-react';
+import { Loader2, Users, Lock, Unlock, Gavel, ListOrdered, Trophy, Info, Eye, EyeOff, GitBranch } from 'lucide-react';
 import { RoomSettingsDto, useLobbyStore } from '@/stores/lobby-store';
 
 type TeamMode = "AUCTION" | "SNAKE_DRAFT";
@@ -26,6 +26,7 @@ interface RoomSettingsModalProps {
     bidTimeLimit?: number;
     pickTimeLimit?: number;
     captainSelection?: "RANDOM" | "TIER";
+    bracketFormat?: string;
   };
 }
 
@@ -46,8 +47,10 @@ const TEAM_MODES: { value: TeamMode; label: string; description: string; icon: R
 
 const PLAYER_OPTIONS = [
   { value: 10, label: "10명", description: "5 vs 5" },
-  { value: 15, label: "15명", description: "3팀" },
-  { value: 20, label: "20명", description: "4팀" },
+  { value: 15, label: "15명", description: "3팀 리그전" },
+  { value: 20, label: "20명", description: "4팀 토너먼트" },
+  { value: 30, label: "30명", description: "6팀 리그전" },
+  { value: 40, label: "40명", description: "8팀 토너먼트" },
 ];
 
 export function RoomSettingsModal({ isOpen, onClose, room }: RoomSettingsModalProps) {
@@ -70,6 +73,9 @@ export function RoomSettingsModal({ isOpen, onClose, room }: RoomSettingsModalPr
   const [pickTimeLimit, setPickTimeLimit] = useState(room.pickTimeLimit ?? 60);
   const [captainSelection, setCaptainSelection] = useState<"RANDOM" | "TIER">(room.captainSelection ?? "RANDOM");
 
+  // Bracket format
+  const [useDoubleElim, setUseDoubleElim] = useState(room.bracketFormat === 'DOUBLE_ELIMINATION');
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -86,6 +92,7 @@ export function RoomSettingsModal({ isOpen, onClose, room }: RoomSettingsModalPr
       setBidTimeLimit(room.bidTimeLimit ?? 30);
       setPickTimeLimit(room.pickTimeLimit ?? 60);
       setCaptainSelection(room.captainSelection ?? "RANDOM");
+      setUseDoubleElim(room.bracketFormat === 'DOUBLE_ELIMINATION');
       setError(null);
     }
   }, [isOpen, room]);
@@ -104,6 +111,9 @@ export function RoomSettingsModal({ isOpen, onClose, room }: RoomSettingsModalPr
         bidTimeLimit,
         pickTimeLimit,
         captainSelection,
+        bracketFormat: [4, 8].includes(Math.floor(maxParticipants / 5))
+          ? (useDoubleElim ? 'DOUBLE_ELIMINATION' : 'SINGLE_ELIMINATION')
+          : undefined,
       };
 
       if (isPrivate) {
@@ -169,6 +179,24 @@ export function RoomSettingsModal({ isOpen, onClose, room }: RoomSettingsModalPr
             ))}
           </div>
         </div>
+
+        {/* 더블 일리미네이션 (4/8팀 전용) */}
+        {[20, 40].includes(maxParticipants) && (
+          <div className="p-3 bg-bg-tertiary/50 rounded-lg border border-bg-elevated">
+            <label className="flex items-center justify-between cursor-pointer" onClick={() => setUseDoubleElim(v => !v)}>
+              <div className="flex items-center gap-2">
+                <GitBranch className="w-4 h-4 text-accent-primary" />
+                <div>
+                  <div className="text-text-primary text-sm font-medium">더블 일리미네이션</div>
+                  <div className="text-text-secondary text-xs">패자도 패자조에서 재도전 가능</div>
+                </div>
+              </div>
+              <div className={`w-10 h-5 rounded-full transition-colors ${useDoubleElim ? "bg-accent-primary" : "bg-bg-elevated"}`}>
+                <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform mt-0.5 ${useDoubleElim ? "translate-x-5" : "translate-x-0.5"}`} />
+              </div>
+            </label>
+          </div>
+        )}
 
         {/* 팀 구성 방식 */}
         <div className="space-y-3">

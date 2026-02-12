@@ -8,7 +8,19 @@ import { RiotSpectatorService } from "./riot-spectator.service";
 
 @Module({
   controllers: [RiotController],
-  providers: [RiotService, DataDragonService, RiotTournamentService, RiotMatchService, RiotSpectatorService],
-  exports: [RiotService, DataDragonService, RiotTournamentService, RiotMatchService, RiotSpectatorService],
+  providers: [
+    RiotService,
+    DataDragonService,
+    RiotTournamentService,
+    RiotMatchService,
+    RiotSpectatorService,
+  ],
+  exports: [
+    RiotService,
+    DataDragonService,
+    RiotTournamentService,
+    RiotMatchService,
+    RiotSpectatorService,
+  ],
 })
 export class RiotModule {}

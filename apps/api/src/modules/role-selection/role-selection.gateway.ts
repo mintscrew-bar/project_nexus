@@ -74,7 +74,8 @@ export class RoleSelectionGateway
   ) {
     client.join(`room:${data.roomId}`);
 
-    const roleSelectionData = await this.roleSelectionService.getRoleSelectionData(data.roomId);
+    const roleSelectionData =
+      await this.roleSelectionService.getRoleSelectionData(data.roomId);
 
     return {
       success: true,
@@ -157,7 +158,11 @@ export class RoleSelectionGateway
 
   async completeRoleSelection(roomId: string) {
     try {
-      const room = await this.roleSelectionService.completeRoleSelection(roomId);
+      // Auto-assign any unselected roles before completing
+      await this.roleSelectionService.autoAssignRemainingRoles(roomId);
+
+      const room =
+        await this.roleSelectionService.completeRoleSelection(roomId);
 
       this.stopTimer(roomId);
 
@@ -167,12 +172,22 @@ export class RoleSelectionGateway
       });
 
       return room;
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error completing role selection:", error);
-      // If not all roles are selected, just notify clients
-      this.server.to(`room:${roomId}`).emit("role-selection-timeout", {
-        message: "Time's up! Please finish selecting roles.",
+
+      // Send error message to clients
+      const errorMessage = error?.message || "Role selection completion failed";
+      this.server.to(`room:${roomId}`).emit("role-selection-error", {
+        message: errorMessage,
+        error: error?.response?.message || errorMessage,
       });
+
+      // Also emit timeout event for backward compatibility
+      this.server.to(`room:${roomId}`).emit("role-selection-timeout", {
+        message: errorMessage,
+      });
+
+      throw error; // Re-throw to let caller handle it
     }
   }
 

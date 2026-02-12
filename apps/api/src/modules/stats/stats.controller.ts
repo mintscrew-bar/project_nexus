@@ -35,7 +35,7 @@ export class StatsController {
   @Get("summoner")
   async findUserByRiotAccount(
     @Query("gameName") gameName: string,
-    @Query("tagLine") tagLine: string
+    @Query("tagLine") tagLine: string,
   ) {
     if (!gameName || !tagLine) {
       return { found: false, message: "gameName and tagLine are required" };
@@ -43,7 +43,7 @@ export class StatsController {
 
     const result = await this.statsService.findUserByRiotAccount(
       gameName,
-      tagLine
+      tagLine,
     );
 
     if (!result) {
@@ -61,10 +61,7 @@ export class StatsController {
    * Search users by username
    */
   @Get("users/search")
-  async searchUsers(
-    @Query("q") query: string,
-    @Query("limit") limit?: string
-  ) {
+  async searchUsers(@Query("q") query: string, @Query("limit") limit?: string) {
     const limitNum = limit ? parseInt(limit, 10) : 10;
     return this.statsService.searchUsers(query, limitNum);
   }
@@ -110,7 +107,7 @@ export class StatsController {
     @Param("tagLine") tagLine: string,
     @Query("count") count?: string,
     @Query("queueId") queueId?: string,
-    @Query("start") start?: string
+    @Query("start") start?: string,
   ) {
     const countNum = count ? parseInt(count, 10) : 20;
     const queueIdNum = queueId ? parseInt(queueId, 10) : undefined;
@@ -120,7 +117,7 @@ export class StatsController {
       tagLine,
       countNum,
       queueIdNum,
-      startNum
+      startNum,
     );
   }
 
@@ -131,14 +128,14 @@ export class StatsController {
   async getUserRiotMatchHistory(
     @Param("userId") userId: string,
     @Query("count") count?: string,
-    @Query("queueId") queueId?: string
+    @Query("queueId") queueId?: string,
   ) {
     const countNum = count ? parseInt(count, 10) : 20;
     const queueIdNum = queueId ? parseInt(queueId, 10) : undefined;
     return this.statsService.getUserRiotMatchHistory(
       userId,
       countNum,
-      queueIdNum
+      queueIdNum,
     );
   }
 }

@@ -252,6 +252,9 @@ model Room {
   pickTimeLimit     Int?                    @default(60) // seconds
   captainSelection  TeamCaptainSelection?   @default(RANDOM)
 
+  // Tournament bracket format (for 4/8-team events)
+  bracketFormat     BracketType?            @default(SINGLE_ELIMINATION)
+
   // Discord integration
   discordGuildId     String?
   discordCategoryId  String?
@@ -459,12 +462,12 @@ model AuctionBid {
 model Match {
   id              String       @id @default(cuid())
   roomId          String
-  teamAId         String
-  teamBId         String
+  teamAId         String?      // Optional for TBD bracket slots
+  teamBId         String?      // Optional for TBD bracket slots
   winnerId        String?
   status          MatchStatus  @default(PENDING)
   matchNumber     Int?         // For tournaments (1, 2, 3...)
-  bracketRound    String?      // "quarter", "semi", "final"
+  bracketRound    String?      // "WB_R1", "WB_F", "LB_R1", "LB_F", "GF" (double elim), or "quarter", "semi", "final"
   round           Int?
   bracketType     BracketType?
 
@@ -479,9 +482,9 @@ model Match {
   updatedAt       DateTime     @updatedAt
 
   room   Room  @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  teamA  Team  @relation("TeamA", fields: [teamAId], references: [id])
-  teamB  Team  @relation("TeamB", fields: [teamBId], references: [id])
-  winner Team? @relation("MatchWinner", fields: [winnerId], references: [id])
+  teamA  Team?  @relation("TeamA", fields: [teamAId], references: [id])
+  teamB  Team?  @relation("TeamB", fields: [teamBId], references: [id])
+  winner Team?  @relation("MatchWinner", fields: [winnerId], references: [id])
 
   ratings       UserRating[]
   reports       UserReport[]
@@ -499,6 +502,7 @@ enum BracketType {
   SINGLE
   ROUND_ROBIN
   SINGLE_ELIMINATION
+  DOUBLE_ELIMINATION
 }
 
 enum MatchStatus {

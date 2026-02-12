@@ -37,6 +37,7 @@ interface Room {
   bidTimeLimit?: number;
   pickTimeLimit?: number;
   captainSelection?: "RANDOM" | "TIER";
+  bracketFormat?: string;
 }
 
 interface ChatMessage {
@@ -61,6 +62,8 @@ export interface RoomSettingsDto {
   // Snake draft settings
   pickTimeLimit?: number;
   captainSelection?: "RANDOM" | "TIER";
+  // Bracket format
+  bracketFormat?: string;
 }
 
 interface LobbyStoreState {
@@ -98,6 +101,9 @@ export const useLobbyStore = create<LobbyStoreState>((set, get) => ({
         token: getAccessToken(),
       },
       transports: ['websocket'],
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 2000,
     });
 
     socket.on('connect', () => {
