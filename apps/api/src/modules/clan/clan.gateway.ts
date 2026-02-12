@@ -76,8 +76,9 @@ export class ClanGateway implements OnGatewayConnection, OnGatewayDisconnect {
       // Find what clan the user was in to clear typing status
       // This is a bit more complex for clans as users can be in only one clan.
       // We need to fetch the user's clan to know which room to clear from.
-      this.clanService.getUserClan(client.userId).then(userClan => {
-        if (userClan) { // Check if userClan is not null
+      this.clanService.getUserClan(client.userId).then((userClan) => {
+        if (userClan) {
+          // Check if userClan is not null
           this.stopTyping(userClan.id, client.userId!); // Assert client.userId is string
         }
       });

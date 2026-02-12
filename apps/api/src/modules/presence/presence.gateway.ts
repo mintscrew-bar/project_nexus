@@ -24,7 +24,9 @@ interface AuthenticatedSocket extends Socket {
   },
   namespace: "/presence",
 })
-export class PresenceGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class PresenceGateway
+  implements OnGatewayConnection, OnGatewayDisconnect
+{
   @WebSocketServer()
   server: Server;
 
@@ -75,7 +77,9 @@ export class PresenceGateway implements OnGatewayConnection, OnGatewayDisconnect
       // Notify friends about status change
       await this.broadcastStatusToFriends(payload.sub, UserStatus.ONLINE);
 
-      console.log(`[Presence] User ${payload.username} connected (${client.id})`);
+      console.log(
+        `[Presence] User ${payload.username} connected (${client.id})`,
+      );
     } catch (error) {
       console.error("[Presence] Connection error:", error);
       client.disconnect();
@@ -105,7 +109,9 @@ export class PresenceGateway implements OnGatewayConnection, OnGatewayDisconnect
         await this.broadcastStatusToFriends(client.userId, UserStatus.OFFLINE);
       }
 
-      console.log(`[Presence] User ${client.username} disconnected (${client.id})`);
+      console.log(
+        `[Presence] User ${client.username} disconnected (${client.id})`,
+      );
     }
   }
 
@@ -132,7 +138,9 @@ export class PresenceGateway implements OnGatewayConnection, OnGatewayDisconnect
       return { error: "Unauthorized" };
     }
 
-    const friends = await this.presenceService.getFriendsStatuses(client.userId);
+    const friends = await this.presenceService.getFriendsStatuses(
+      client.userId,
+    );
     return { success: true, friends };
   }
 

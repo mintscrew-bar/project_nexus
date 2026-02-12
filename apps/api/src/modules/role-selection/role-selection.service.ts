@@ -54,7 +54,7 @@ export class RoleSelectionService {
 
     if (room.status !== RoomStatus.DRAFT_COMPLETED) {
       throw new BadRequestException(
-        "Room must be in DRAFT_COMPLETED status to start role selection"
+        "Room must be in DRAFT_COMPLETED status to start role selection",
       );
     }
 
@@ -128,12 +128,12 @@ export class RoleSelectionService {
 
     // Check if role is already taken in the team
     const roleAlreadyTaken = userTeam.members.some(
-      (m) => m.assignedRole === role && m.id !== userTeamMember.id
+      (m) => m.assignedRole === role && m.id !== userTeamMember.id,
     );
 
     if (roleAlreadyTaken) {
       throw new BadRequestException(
-        `Role ${role} is already taken by another team member`
+        `Role ${role} is already taken by another team member`,
       );
     }
 
@@ -188,12 +188,61 @@ export class RoleSelectionService {
     return true;
   }
 
+  async autoAssignRemainingRoles(roomId: string): Promise<void> {
+    const room = await this.prisma.room.findUnique({
+      where: { id: roomId },
+      include: {
+        teams: {
+          include: { members: true },
+        },
+      },
+    });
+
+    if (!room) return;
+
+    const ALL_ROLES: Role[] = [
+      Role.TOP,
+      Role.JUNGLE,
+      Role.MID,
+      Role.ADC,
+      Role.SUPPORT,
+    ];
+
+    for (const team of room.teams) {
+      const takenRoles = team.members
+        .filter((m) => m.assignedRole)
+        .map((m) => m.assignedRole as Role);
+
+      const remainingRoles = ALL_ROLES.filter((r) => !takenRoles.includes(r));
+
+      // Shuffle remaining roles for random assignment
+      for (let i = remainingRoles.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [remainingRoles[i], remainingRoles[j]] = [
+          remainingRoles[j],
+          remainingRoles[i],
+        ];
+      }
+
+      const unassignedMembers = team.members.filter((m) => !m.assignedRole);
+
+      for (let i = 0; i < unassignedMembers.length; i++) {
+        const role = remainingRoles[i];
+        if (!role) continue;
+        await this.prisma.teamMember.update({
+          where: { id: unassignedMembers[i].id },
+          data: { assignedRole: role },
+        });
+      }
+    }
+  }
+
   async completeRoleSelection(roomId: string) {
     const allSelected = await this.checkAllRolesSelected(roomId);
 
     if (!allSelected) {
       throw new BadRequestException(
-        "Not all team members have selected their roles"
+        "Not all team members have selected their roles",
       );
     }
 
@@ -217,18 +266,25 @@ export class RoleSelectionService {
       throw new NotFoundException("Room not found");
     }
 
-    // Generate bracket
+    // Generate bracket (this will also update room status to IN_PROGRESS)
+    // If bracket generation fails, we should not proceed to IN_PROGRESS status
     try {
       await this.matchService.generateBracket(room.hostId, roomId);
-    } catch (error) {
+      // Bracket generation successful - room status is already updated to IN_PROGRESS
+    } catch (error: any) {
+      // Log error with more details
       console.error("Error generating bracket:", error);
-      // Continue anyway, bracket can be generated manually
+
+      // If bracket generation fails, throw error instead of silently continuing
+      // This prevents room from being in IN_PROGRESS state without a bracket
+      throw new BadRequestException(
+        `Failed to generate bracket: ${error.message || "Unknown error"}. Please try again or generate bracket manually.`,
+      );
     }
 
-    // Update room status to IN_PROGRESS
-    const updatedRoom = await this.prisma.room.update({
+    // Fetch updated room (status already updated by generateBracket)
+    const updatedRoom = await this.prisma.room.findUnique({
       where: { id: roomId },
-      data: { status: RoomStatus.IN_PROGRESS },
       include: {
         teams: {
           include: {
@@ -241,6 +297,10 @@ export class RoleSelectionService {
         },
       },
     });
+
+    if (!updatedRoom) {
+      throw new NotFoundException("Room not found after bracket generation");
+    }
 
     // Clean up state
     this.roleSelectionStates.delete(roomId);

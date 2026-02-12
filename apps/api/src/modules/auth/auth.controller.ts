@@ -85,14 +85,18 @@ export class AuthController {
       console.log("Google callback - user:", JSON.stringify(user, null, 2));
       const tokens = await this.authService.generateTokens(user);
 
-      const appUrl = this.configService.get("APP_URL") || "http://localhost:3000";
+      const appUrl =
+        this.configService.get("APP_URL") || "http://localhost:3000";
       res.redirect(
         `${appUrl}/api/auth/callback?access_token=${tokens.accessToken}&refresh_token=${tokens.refreshToken}`,
       );
     } catch (error) {
       console.error("Google callback error:", error);
-      const appUrl = this.configService.get("APP_URL") || "http://localhost:3000";
-      res.redirect(`${appUrl}/auth/login?error=${encodeURIComponent(String(error))}`);
+      const appUrl =
+        this.configService.get("APP_URL") || "http://localhost:3000";
+      res.redirect(
+        `${appUrl}/auth/login?error=${encodeURIComponent(String(error))}`,
+      );
     }
   }
 
@@ -114,14 +118,18 @@ export class AuthController {
       console.log("Discord callback - user:", JSON.stringify(user, null, 2));
       const tokens = await this.authService.generateTokens(user);
 
-      const appUrl = this.configService.get("APP_URL") || "http://localhost:3000";
+      const appUrl =
+        this.configService.get("APP_URL") || "http://localhost:3000";
       res.redirect(
         `${appUrl}/api/auth/callback?access_token=${tokens.accessToken}&refresh_token=${tokens.refreshToken}`,
       );
     } catch (error) {
       console.error("Discord callback error:", error);
-      const appUrl = this.configService.get("APP_URL") || "http://localhost:3000";
-      res.redirect(`${appUrl}/auth/login?error=${encodeURIComponent(String(error))}`);
+      const appUrl =
+        this.configService.get("APP_URL") || "http://localhost:3000";
+      res.redirect(
+        `${appUrl}/auth/login?error=${encodeURIComponent(String(error))}`,
+      );
     }
   }
 

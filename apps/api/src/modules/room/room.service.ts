@@ -8,7 +8,12 @@ import {
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../prisma/prisma.service";
-import { RoomStatus, TeamMode, TeamCaptainSelection } from "@nexus/database";
+import {
+  RoomStatus,
+  TeamMode,
+  TeamCaptainSelection,
+  BracketType,
+} from "@nexus/database";
 import * as bcrypt from "bcrypt";
 
 export interface CreateRoomDto {
@@ -27,6 +32,9 @@ export interface CreateRoomDto {
   // Snake Draft Settings
   pickTimeLimit?: number;
   captainSelection?: TeamCaptainSelection;
+
+  // Tournament bracket format
+  bracketFormat?: BracketType;
 }
 
 export interface JoinRoomDto {
@@ -37,13 +45,16 @@ export interface JoinRoomDto {
 @Injectable()
 export class RoomService {
   private discordBotService: any; // DiscordBotService (optional dependency)
+  private discordVoiceService: any; // DiscordVoiceService (optional dependency)
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
-    @Optional() @Inject('DISCORD_BOT_SERVICE') discordBot?: any,
+    @Optional() @Inject("DISCORD_BOT_SERVICE") discordBot?: any,
+    @Optional() @Inject("DISCORD_VOICE_SERVICE") discordVoice?: any,
   ) {
     this.discordBotService = discordBot;
+    this.discordVoiceService = discordVoice;
   }
 
   // Transform room data to flatten participant info for frontend
@@ -55,7 +66,7 @@ export class RoomService {
       participants: room.participants?.map((p: any) => ({
         id: p.id,
         userId: p.userId,
-        username: p.user?.username || 'Unknown',
+        username: p.user?.username || "Unknown",
         avatar: p.user?.avatar || null,
         isHost: p.userId === room.hostId,
         isReady: p.isReady,
@@ -71,8 +82,10 @@ export class RoomService {
 
   async createRoom(hostId: string, dto: CreateRoomDto) {
     // Validate max participants
-    if (![10, 15, 20].includes(dto.maxParticipants)) {
-      throw new BadRequestException("Max participants must be 10, 15, or 20");
+    if (![10, 15, 20, 30, 40].includes(dto.maxParticipants)) {
+      throw new BadRequestException(
+        "Max participants must be 10, 15, 20, 30, or 40",
+      );
     }
 
     // Hash password if provided
@@ -92,13 +105,14 @@ export class RoomService {
         teamMode: dto.teamMode,
         allowSpectators: dto.allowSpectators ?? true,
         discordGuildId: dto.discordGuildId,
-        
+
         // Draft settings
         startingPoints: dto.startingPoints,
         minBidIncrement: dto.minBidIncrement,
         bidTimeLimit: dto.bidTimeLimit,
         pickTimeLimit: dto.pickTimeLimit,
         captainSelection: dto.captainSelection,
+        bracketFormat: dto.bracketFormat,
 
         participants: {
           create: {
@@ -132,11 +146,38 @@ export class RoomService {
       },
     });
 
+    // Discord 봇 연동: 팀별 음성채널 생성
+    try {
+      if (this.discordVoiceService) {
+        const numTeams = Math.floor(dto.maxParticipants / 5);
+
+        // 팀별 음성채널 생성 (numTeams >= 3일 때 내부 대기실도 함께 생성됨)
+        const channelData = await this.discordVoiceService.createRoomChannels(
+          room.id,
+          room.name,
+          numTeams,
+        );
+
+        // 룸에 Discord 카테고리 ID 저장
+        await this.prisma.room.update({
+          where: { id: room.id },
+          data: {
+            discordCategoryId: channelData.categoryId,
+          },
+        });
+      }
+    } catch (error) {
+      // Discord 채널 생성 실패해도 룸 생성은 성공
+      console.warn("Failed to create Discord channels for room:", error);
+    }
+
     // Send Discord notification (if bot is configured)
     try {
       if (this.discordBotService) {
-        const guildId = this.configService.get('DISCORD_GUILD_ID');
-        const channelId = this.configService.get('DISCORD_NOTIFICATION_CHANNEL_ID');
+        const guildId = this.configService.get("DISCORD_GUILD_ID");
+        const channelId = this.configService.get(
+          "DISCORD_NOTIFICATION_CHANNEL_ID",
+        );
 
         if (guildId && channelId) {
           const embed = this.discordBotService.buildRoomCreatedEmbed(
@@ -154,7 +195,7 @@ export class RoomService {
       }
     } catch (error) {
       // Don't fail room creation if Discord notification fails
-      console.warn('Failed to send Discord room creation notification:', error);
+      console.warn("Failed to send Discord room creation notification:", error);
     }
 
     return this.transformRoomData(room);
@@ -409,8 +450,10 @@ export class RoomService {
     }
 
     if (updates.maxParticipants) {
-      if (![10, 15, 20].includes(updates.maxParticipants)) {
-        throw new BadRequestException("Max participants must be 10, 15, or 20");
+      if (![10, 15, 20, 30, 40].includes(updates.maxParticipants)) {
+        throw new BadRequestException(
+          "Max participants must be 10, 15, 20, 30, or 40",
+        );
       }
       data.maxParticipants = updates.maxParticipants;
     }
@@ -432,6 +475,24 @@ export class RoomService {
         data.isPrivate = false;
       }
     }
+
+    // Auction settings
+    if (updates.startingPoints !== undefined)
+      data.startingPoints = updates.startingPoints;
+    if (updates.minBidIncrement !== undefined)
+      data.minBidIncrement = updates.minBidIncrement;
+    if (updates.bidTimeLimit !== undefined)
+      data.bidTimeLimit = updates.bidTimeLimit;
+
+    // Snake draft settings
+    if (updates.pickTimeLimit !== undefined)
+      data.pickTimeLimit = updates.pickTimeLimit;
+    if (updates.captainSelection !== undefined)
+      data.captainSelection = updates.captainSelection;
+
+    // Bracket format
+    if (updates.bracketFormat !== undefined)
+      data.bracketFormat = updates.bracketFormat;
 
     return this.prisma.room.update({
       where: { id: roomId },
@@ -622,7 +683,7 @@ export class RoomService {
     return {
       id: message.id,
       userId: message.userId,
-      username: message.user?.username || 'Unknown',
+      username: message.user?.username || "Unknown",
       avatar: message.user?.avatar || null,
       message: message.content,
       createdAt: message.createdAt.toISOString(),

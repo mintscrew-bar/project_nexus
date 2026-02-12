@@ -34,7 +34,7 @@ interface ChatMessage {
 
 interface RoomCreationData {
   name: string;
-  maxParticipants: 10 | 15 | 20;
+  maxParticipants: 10 | 15 | 20 | 30 | 40;
   teamMode: "AUCTION" | "SNAKE_DRAFT";
   password?: string;
   allowSpectators?: boolean;
@@ -45,6 +45,8 @@ interface RoomCreationData {
   // Snake draft settings
   pickTimeLimit?: number;
   captainSelection?: "RANDOM" | "TIER";
+  // Bracket format
+  bracketFormat?: string;
 }
 
 interface RoomStoreState {

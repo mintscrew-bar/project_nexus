@@ -122,11 +122,15 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
   // ========================================
 
   @SubscribeMessage("subscribe-room-list")
-  async handleSubscribeRoomList(@ConnectedSocket() client: AuthenticatedSocket) {
+  async handleSubscribeRoomList(
+    @ConnectedSocket() client: AuthenticatedSocket,
+  ) {
     client.join(this.ROOM_LIST_CHANNEL);
 
     // Send current room list immediately
-    const rooms = await this.roomService.listRooms({ status: "WAITING" as any });
+    const rooms = await this.roomService.listRooms({
+      status: "WAITING" as any,
+    });
     return { success: true, rooms };
   }
 
@@ -138,7 +142,9 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   // Broadcast room list updates to all subscribers
   async broadcastRoomListUpdate() {
-    const rooms = await this.roomService.listRooms({ status: "WAITING" as any });
+    const rooms = await this.roomService.listRooms({
+      status: "WAITING" as any,
+    });
     this.server.to(this.ROOM_LIST_CHANNEL).emit("room-list-updated", rooms);
   }
 
@@ -164,7 +170,8 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       // If not a participant, join the room (add to DB)
       if (!isAlreadyParticipant) {
-        room = await this.roomService.joinRoom(client.userId!, { // Assert client.userId is string
+        room = await this.roomService.joinRoom(client.userId!, {
+          // Assert client.userId is string
           roomId: data.roomId,
           password: data.password,
         });
@@ -278,13 +285,19 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
       let result;
       if (room.teamMode === TeamMode.AUCTION) {
         // Start auction directly
-        result = await this.auctionService.startAuction(client.userId!, data.roomId); // Assert client.userId is string
+        result = await this.auctionService.startAuction(
+          client.userId!,
+          data.roomId,
+        ); // Assert client.userId is string
 
         // Emit auction-started event to auction room
         this.auctionGateway.emitAuctionStarted(data.roomId, result);
       } else if (room.teamMode === TeamMode.SNAKE_DRAFT) {
         // Start snake draft directly
-        result = await this.snakeDraftService.startSnakeDraft(client.userId!, data.roomId); // Assert client.userId is string
+        result = await this.snakeDraftService.startSnakeDraft(
+          client.userId!,
+          data.roomId,
+        ); // Assert client.userId is string
 
         // Emit draft-started event to room (for lobby clients) and draft room (for draft page clients)
         this.server.to(data.roomId).emit("draft-started", result);

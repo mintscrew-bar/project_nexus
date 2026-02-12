@@ -152,7 +152,11 @@ export class NotificationService {
   // Helper methods for creating specific notification types
   // ========================================
 
-  async notifyFriendRequest(targetUserId: string, requesterName: string, requesterId: string) {
+  async notifyFriendRequest(
+    targetUserId: string,
+    requesterName: string,
+    requesterId: string,
+  ) {
     return this.create({
       userId: targetUserId,
       type: "FRIEND_REQUEST",
@@ -163,7 +167,11 @@ export class NotificationService {
     });
   }
 
-  async notifyFriendAccepted(userId: string, accepterName: string, accepterId: string) {
+  async notifyFriendAccepted(
+    userId: string,
+    accepterName: string,
+    accepterId: string,
+  ) {
     return this.create({
       userId,
       type: "FRIEND_ACCEPTED",
@@ -185,7 +193,12 @@ export class NotificationService {
     });
   }
 
-  async notifyMatchResult(userId: string, matchId: string, won: boolean, roomName: string) {
+  async notifyMatchResult(
+    userId: string,
+    matchId: string,
+    won: boolean,
+    roomName: string,
+  ) {
     return this.create({
       userId,
       type: "MATCH_RESULT",

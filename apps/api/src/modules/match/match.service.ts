@@ -11,31 +11,24 @@ import {
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../prisma/prisma.service";
 import { RiotTournamentService } from "../riot/riot-tournament.service";
-import { RiotSpectatorService, LiveGameStatus } from "../riot/riot-spectator.service";
+import {
+  RiotSpectatorService,
+  LiveGameStatus,
+} from "../riot/riot-spectator.service";
 import { MatchDataCollectionService } from "./match-data-collection.service";
 import { NotificationService } from "../notification/notification.service";
+import { MatchBracketService, Bracket } from "./match-bracket.service";
+import { MatchAdvancementService } from "./match-advancement.service";
 import { RoomStatus, MatchStatus, BracketType } from "@nexus/database";
 
-export interface BracketMatch {
-  id: string;
-  round: number;
-  matchNumber: number;
-  teamAId: string;
-  teamBId: string;
-  status: MatchStatus;
-  tournamentCode?: string;
-  winnerId?: string;
-}
-
-export interface Bracket {
-  type: BracketType;
-  matches: BracketMatch[];
-}
+// Re-export types for backward compatibility
+export type { BracketMatch, Bracket } from "./match-bracket.service";
 
 @Injectable()
 export class MatchService {
   private readonly logger = new Logger(MatchService.name);
   private discordBotService: any;
+  private discordVoiceService: any;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -45,189 +38,21 @@ export class MatchService {
     @Inject(forwardRef(() => MatchDataCollectionService))
     private readonly matchDataCollectionService: MatchDataCollectionService,
     private readonly notificationService: NotificationService,
-    @Optional() @Inject('DISCORD_BOT_SERVICE') discordBot?: any,
+    private readonly matchBracketService: MatchBracketService,
+    private readonly matchAdvancementService: MatchAdvancementService,
+    @Optional() @Inject("DISCORD_BOT_SERVICE") discordBot?: any,
+    @Optional() @Inject("DISCORD_VOICE_SERVICE") discordVoice?: any,
   ) {
     this.discordBotService = discordBot;
+    this.discordVoiceService = discordVoice;
   }
 
   // ========================================
-  // Bracket Generation
+  // Bracket Generation (delegated to MatchBracketService)
   // ========================================
 
   async generateBracket(hostId: string, roomId: string): Promise<Bracket> {
-    const room = await this.prisma.room.findUnique({
-      where: { id: roomId },
-      include: {
-        teams: {
-          include: {
-            members: true,
-          },
-        },
-      },
-    });
-
-    if (!room) {
-      throw new NotFoundException("Room not found");
-    }
-
-    if (room.hostId !== hostId) {
-      throw new ForbiddenException("Only host can generate bracket");
-    }
-
-    if (room.status !== RoomStatus.ROLE_SELECTION) {
-      throw new BadRequestException("Role selection must be completed first");
-    }
-
-    const teamCount = room.teams.length;
-
-    // Validate all teams have 5 players
-    for (const team of room.teams) {
-      if (team.members.length !== 5) {
-        throw new BadRequestException(
-          `Team ${team.name} does not have 5 players`,
-        );
-      }
-    }
-
-    let bracket: Bracket;
-
-    switch (teamCount) {
-      case 2:
-        bracket = this.generateSingleMatch(room.teams);
-        break;
-      case 3:
-        bracket = this.generateRoundRobin(room.teams);
-        break;
-      case 4:
-        bracket = this.generateSingleElimination(room.teams);
-        break;
-      default:
-        throw new BadRequestException("Invalid team count for bracket");
-    }
-
-    // Create matches in database
-    await Promise.all(
-      bracket.matches.map((match) =>
-        this.prisma.match.create({
-          data: {
-            roomId,
-            round: match.round,
-            matchNumber: match.matchNumber,
-            teamAId: match.teamAId,
-            teamBId: match.teamBId,
-            status: MatchStatus.PENDING,
-            bracketType: bracket.type,
-          },
-        }),
-      ),
-    );
-
-    // Update room status
-    await this.prisma.room.update({
-      where: { id: roomId },
-      data: { status: RoomStatus.IN_PROGRESS },
-    });
-
-    return bracket;
-  }
-
-  // ========================================
-  // Bracket Types
-  // ========================================
-
-  /**
-   * 10-player (2 teams): Single match
-   */
-  private generateSingleMatch(teams: any[]): Bracket {
-    return {
-      type: BracketType.SINGLE,
-      matches: [
-        {
-          id: this.generateMatchId(),
-          round: 1,
-          matchNumber: 1,
-          teamAId: teams[0].id,
-          teamBId: teams[1].id,
-          status: MatchStatus.PENDING,
-        },
-      ],
-    };
-  }
-
-  /**
-   * 15-player (3 teams): Round Robin (리그전)
-   * Each team plays every other team once
-   * Match 1: Team A vs Team B
-   * Match 2: Team B vs Team C
-   * Match 3: Team A vs Team C
-   */
-  private generateRoundRobin(teams: any[]): Bracket {
-    const matches: BracketMatch[] = [];
-    let matchNumber = 1;
-
-    for (let i = 0; i < teams.length; i++) {
-      for (let j = i + 1; j < teams.length; j++) {
-        matches.push({
-          id: this.generateMatchId(),
-          round: 1,
-          matchNumber: matchNumber++,
-          teamAId: teams[i].id,
-          teamBId: teams[j].id,
-          status: MatchStatus.PENDING,
-        });
-      }
-    }
-
-    return {
-      type: BracketType.ROUND_ROBIN,
-      matches,
-    };
-  }
-
-  /**
-   * 20-player (4 teams): Single Elimination Tournament
-   * Semi-finals (Round 1):
-   *   Match 1: Team 1 vs Team 2
-   *   Match 2: Team 3 vs Team 4
-   * Finals (Round 2):
-   *   Match 3: Winner of Match 1 vs Winner of Match 2
-   */
-  private generateSingleElimination(teams: any[]): Bracket {
-    const matches: BracketMatch[] = [];
-
-    // Semi-finals
-    matches.push({
-      id: this.generateMatchId(),
-      round: 1,
-      matchNumber: 1,
-      teamAId: teams[0].id,
-      teamBId: teams[1].id,
-      status: MatchStatus.PENDING,
-    });
-
-    matches.push({
-      id: this.generateMatchId(),
-      round: 1,
-      matchNumber: 2,
-      teamAId: teams[2].id,
-      teamBId: teams[3].id,
-      status: MatchStatus.PENDING,
-    });
-
-    // Finals - will be populated after semi-finals complete
-    matches.push({
-      id: this.generateMatchId(),
-      round: 2,
-      matchNumber: 3,
-      teamAId: "", // TBD
-      teamBId: "", // TBD
-      status: MatchStatus.PENDING,
-    });
-
-    return {
-      type: BracketType.SINGLE_ELIMINATION,
-      matches,
-    };
+    return this.matchBracketService.generateBracket(hostId, roomId);
   }
 
   // ========================================
@@ -287,6 +112,10 @@ export class MatchService {
       return match.tournamentCode;
     }
 
+    if (!match.teamA || !match.teamB) {
+      throw new BadRequestException("Match teams are not yet assigned (TBD)");
+    }
+
     // Get all participant PUUIDs
     const teamAPuuids = match.teamA.members.map(
       (m) => m.user.riotAccounts[0]?.puuid,
@@ -327,13 +156,15 @@ export class MatchService {
     // Send Discord notification
     try {
       if (this.discordBotService) {
-        const guildId = this.configService.get('DISCORD_GUILD_ID');
-        const channelId = this.configService.get('DISCORD_NOTIFICATION_CHANNEL_ID');
+        const guildId = this.configService.get("DISCORD_GUILD_ID");
+        const channelId = this.configService.get(
+          "DISCORD_NOTIFICATION_CHANNEL_ID",
+        );
 
         if (guildId && channelId) {
           const embed = this.discordBotService.buildMatchStartEmbed(
-            match.teamA.name,
-            match.teamB.name,
+            match.teamA!.name,
+            match.teamB!.name,
             tournamentCode,
           );
 
@@ -345,7 +176,10 @@ export class MatchService {
         }
       }
     } catch (error) {
-      this.logger.warn('Failed to send Discord match start notification:', error);
+      this.logger.warn(
+        "Failed to send Discord match start notification:",
+        error,
+      );
     }
 
     // Send app notifications to all participants
@@ -365,7 +199,7 @@ export class MatchService {
         ),
       );
     } catch (error) {
-      this.logger.warn('Failed to send match start notifications:', error);
+      this.logger.warn("Failed to send match start notifications:", error);
     }
 
     return tournamentCode;
@@ -390,7 +224,16 @@ export class MatchService {
     }
 
     if (match.status !== MatchStatus.PENDING) {
-      throw new BadRequestException("Match already started or completed");
+      throw new BadRequestException(
+        `Match already started or completed. Current status: ${match.status}`,
+      );
+    }
+
+    // Validate teams are assigned before starting
+    if (!match.teamAId || !match.teamBId) {
+      throw new BadRequestException(
+        "Cannot start match: teams are not yet assigned (TBD). Please wait for previous round to complete.",
+      );
     }
 
     await this.prisma.match.update({
@@ -400,6 +243,8 @@ export class MatchService {
         startedAt: new Date(),
       },
     });
+
+    this.logger.log(`Match ${matchId} started by host ${hostId}`);
 
     return { message: "Match started", tournamentCode: match.tournamentCode };
   }
@@ -423,11 +268,22 @@ export class MatchService {
     }
 
     if (match.status !== MatchStatus.IN_PROGRESS) {
-      throw new BadRequestException("Match is not in progress");
+      throw new BadRequestException(
+        `Match is not in progress. Current status: ${match.status}`,
+      );
+    }
+
+    // Validate teams are assigned
+    if (!match.teamAId || !match.teamBId) {
+      throw new BadRequestException(
+        "Match teams are not yet assigned (TBD). Cannot report result.",
+      );
     }
 
     if (winnerId !== match.teamAId && winnerId !== match.teamBId) {
-      throw new BadRequestException("Invalid winner team");
+      throw new BadRequestException(
+        `Invalid winner team. Winner ID ${winnerId} does not match either team A (${match.teamAId}) or team B (${match.teamBId})`,
+      );
     }
 
     await this.prisma.match.update({
@@ -439,19 +295,56 @@ export class MatchService {
       },
     });
 
+    // Advance winner to next round (delegated to MatchAdvancementService)
+    let bracketAdvanced = false;
+    if (match.bracketType === BracketType.SINGLE_ELIMINATION) {
+      if (match.round && match.matchNumber) {
+        bracketAdvanced =
+          await this.matchAdvancementService.advanceWinnerToNextRound(
+            match.roomId,
+            match.round,
+            match.matchNumber,
+            winnerId,
+          );
+      } else {
+        this.logger.warn(
+          `Cannot advance winner: match ${matchId} missing round or matchNumber`,
+        );
+      }
+    } else if (match.bracketType === BracketType.DOUBLE_ELIMINATION) {
+      const loserId =
+        winnerId === match.teamAId ? match.teamBId : match.teamAId;
+      if (loserId) {
+        await this.matchAdvancementService.advanceDoubleElimination(
+          match.roomId,
+          match.id,
+          match.bracketRound,
+          winnerId,
+          loserId,
+        );
+        bracketAdvanced = true;
+      } else {
+        this.logger.warn(
+          `Cannot advance double elimination: match ${matchId} missing loser team ID`,
+        );
+      }
+    }
+
     // Send Discord match result notification
     try {
       if (this.discordBotService) {
-        const guildId = this.configService.get('DISCORD_GUILD_ID');
-        const channelId = this.configService.get('DISCORD_NOTIFICATION_CHANNEL_ID');
+        const guildId = this.configService.get("DISCORD_GUILD_ID");
+        const channelId = this.configService.get(
+          "DISCORD_NOTIFICATION_CHANNEL_ID",
+        );
 
         if (guildId && channelId) {
           const winner = winnerId === match.teamAId ? match.teamA : match.teamB;
           const loser = winnerId === match.teamAId ? match.teamB : match.teamA;
 
           const embed = this.discordBotService.buildMatchResultEmbed(
-            winner.name,
-            loser.name,
+            winner?.name ?? "TBD",
+            loser?.name ?? "TBD",
           );
 
           await this.discordBotService.sendEmbedNotification(
@@ -462,7 +355,10 @@ export class MatchService {
         }
       }
     } catch (error) {
-      this.logger.warn('Failed to send Discord match result notification:', error);
+      this.logger.warn(
+        "Failed to send Discord match result notification:",
+        error,
+      );
     }
 
     // Send app notifications to all participants about match result
@@ -495,12 +391,12 @@ export class MatchService {
       if (matchWithMembers) {
         const winnerMembers =
           winnerId === matchWithMembers.teamAId
-            ? matchWithMembers.teamA.members
-            : matchWithMembers.teamB.members;
+            ? (matchWithMembers.teamA?.members ?? [])
+            : (matchWithMembers.teamB?.members ?? []);
         const loserMembers =
           winnerId === matchWithMembers.teamAId
-            ? matchWithMembers.teamB.members
-            : matchWithMembers.teamA.members;
+            ? (matchWithMembers.teamB?.members ?? [])
+            : (matchWithMembers.teamA?.members ?? []);
 
         // Notify winners
         await Promise.all(
@@ -527,11 +423,93 @@ export class MatchService {
         );
       }
     } catch (error) {
-      this.logger.warn('Failed to send match result notifications:', error);
+      this.logger.warn("Failed to send match result notifications:", error);
     }
 
-    // Check if bracket is complete
-    const tournamentCompleted = await this.checkBracketCompletion(match.roomId);
+    // Check if bracket is complete (delegated to MatchAdvancementService)
+    const allComplete =
+      await this.matchAdvancementService.checkBracketCompletion(match.roomId);
+    let tournamentCompleted = false;
+
+    if (allComplete) {
+      const room = await this.prisma.room.findUnique({
+        where: { id: match.roomId },
+        select: { status: true },
+      });
+
+      // Only update if not already completed (avoid multiple updates)
+      if (room && room.status !== RoomStatus.COMPLETED) {
+        // First update room status
+        await this.prisma.room.update({
+          where: { id: match.roomId },
+          data: {
+            status: RoomStatus.COMPLETED,
+            completedAt: new Date(),
+          },
+        });
+
+        // Then fetch winner info separately for Discord notification
+        const winnerMatch = await this.prisma.match.findFirst({
+          where: {
+            roomId: match.roomId,
+            winnerId: { not: null },
+          },
+          orderBy: { round: "desc" },
+          select: {
+            winner: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        });
+
+        const roomData = {
+          name:
+            (
+              await this.prisma.room.findUnique({
+                where: { id: match.roomId },
+                select: { name: true },
+              })
+            )?.name || "",
+          matches: winnerMatch ? [winnerMatch] : [],
+        };
+
+        this.logger.log(`Tournament completed for room ${match.roomId}`);
+
+        // Send Discord tournament completion notification
+        try {
+          if (this.discordBotService) {
+            const guildId = this.configService.get("DISCORD_GUILD_ID");
+            const channelId = this.configService.get(
+              "DISCORD_NOTIFICATION_CHANNEL_ID",
+            );
+
+            if (guildId && channelId && roomData.matches[0]?.winner) {
+              const embed =
+                this.discordBotService.buildTournamentCompletedEmbed(
+                  roomData.name,
+                  roomData.matches[0].winner.name,
+                );
+
+              await this.discordBotService.sendEmbedNotification(
+                guildId,
+                channelId,
+                embed,
+              );
+            }
+          }
+        } catch (error) {
+          this.logger.warn(
+            "Failed to send Discord tournament completion notification:",
+            error,
+          );
+        }
+
+        tournamentCompleted = true;
+      }
+    }
 
     // Start collecting match data in the background (non-blocking)
     this.logger.log(`Scheduling match data collection for match ${matchId}`);
@@ -541,7 +519,7 @@ export class MatchService {
         .catch((error) => {
           this.logger.error(
             `Background match data collection failed for ${matchId}:`,
-            error
+            error,
           );
         });
     });
@@ -550,12 +528,305 @@ export class MatchService {
       message: "Match result recorded",
       winnerId,
       tournamentCompleted,
+      bracketAdvanced,
+      roomId: match.roomId,
     };
   }
 
+  private async advanceWinnerToNextRound(
+    roomId: string,
+    currentRound: number,
+    currentMatchNumber: number,
+    winnerId: string,
+  ): Promise<boolean> {
+    const nextRound = currentRound + 1;
+
+    const nextRoundMatches = await this.prisma.match.findMany({
+      where: { roomId, round: nextRound },
+      select: {
+        id: true,
+        matchNumber: true,
+        teamAId: true,
+        teamBId: true,
+      },
+      orderBy: { matchNumber: "asc" },
+    });
+
+    if (nextRoundMatches.length === 0) return false; // Already the final round
+
+    // Determine position among current round matches to know which slot to fill
+    const currentRoundMatches = await this.prisma.match.findMany({
+      where: { roomId, round: currentRound },
+      select: {
+        id: true,
+        matchNumber: true,
+      },
+      orderBy: { matchNumber: "asc" },
+    });
+
+    const currentMatchIndex = currentRoundMatches.findIndex(
+      (m) => m.matchNumber === currentMatchNumber,
+    );
+
+    if (currentMatchIndex === -1) return false;
+
+    // Every 2 current-round matches map to 1 next-round match
+    const nextMatchIndex = Math.floor(currentMatchIndex / 2);
+    const nextMatch = nextRoundMatches[nextMatchIndex];
+
+    if (!nextMatch) return false;
+
+    // Even index → teamA slot, odd index → teamB slot
+    const isTeamA = currentMatchIndex % 2 === 0;
+
+    try {
+      await this.prisma.match.update({
+        where: { id: nextMatch.id },
+        data: isTeamA ? { teamAId: winnerId } : { teamBId: winnerId },
+      });
+
+      this.logger.log(
+        `Advanced winner ${winnerId} to round ${nextRound} match ${nextMatch.id} (matchNumber: ${nextMatch.matchNumber}) as team${isTeamA ? "A" : "B"}`,
+      );
+
+      return true;
+    } catch (error) {
+      this.logger.error(
+        `Failed to advance winner ${winnerId} to next round:`,
+        error,
+      );
+      return false;
+    }
+  }
+
+  /**
+   * Routes winner and loser to correct next matches in a Double Elimination bracket.
+   * Uses bracketRound (bracketSection) field to determine routing.
+   */
+  private async advanceDoubleElimination(
+    roomId: string,
+    matchId: string,
+    bracketSection: string | null,
+    winnerId: string,
+    loserId: string,
+  ): Promise<void> {
+    if (!bracketSection) {
+      this.logger.warn(
+        `Cannot advance double elimination: match ${matchId} has no bracketSection`,
+      );
+      return;
+    }
+
+    const findMatch = async (section: string) => {
+      const match = await this.prisma.match.findFirst({
+        where: { roomId, bracketRound: section },
+        select: {
+          id: true,
+          bracketRound: true,
+          matchNumber: true,
+        },
+      });
+      if (!match) {
+        this.logger.warn(
+          `Match not found for bracket section ${section} in room ${roomId}`,
+        );
+      }
+      return match;
+    };
+
+    const setTeam = async (
+      targetMatchId: string,
+      isTeamA: boolean,
+      teamId: string,
+    ) => {
+      try {
+        await this.prisma.match.update({
+          where: { id: targetMatchId },
+          data: isTeamA ? { teamAId: teamId } : { teamBId: teamId },
+        });
+        this.logger.log(
+          `Set team ${teamId} as team${isTeamA ? "A" : "B"} in match ${targetMatchId}`,
+        );
+      } catch (error) {
+        this.logger.error(
+          `Failed to set team ${teamId} in match ${targetMatchId}:`,
+          error,
+        );
+        throw error;
+      }
+    };
+
+    // Helper to get index among sibling matches (same bracketSection, ordered by matchNumber)
+    const getIndexAmongSiblings = async (section: string): Promise<number> => {
+      const siblings = await this.prisma.match.findMany({
+        where: { roomId, bracketRound: section },
+        select: {
+          id: true,
+          matchNumber: true,
+        },
+        orderBy: { matchNumber: "asc" },
+      });
+      return siblings.findIndex((m) => m.id === matchId);
+    };
+
+    switch (bracketSection) {
+      case "WB_R1": {
+        // 4-team: Winner → WB_F, Loser → LB_R1
+        // 8-team: Winner → WB_R2, Loser → LB_R1
+        const idx = await getIndexAmongSiblings("WB_R1");
+        const wbNext = (await findMatch("WB_R2")) ?? (await findMatch("WB_F"));
+        if (wbNext && wbNext.bracketRound) {
+          // Find the correct WB_R2/WB_F match for this winner
+          const wbNextMatches = await this.prisma.match.findMany({
+            where: { roomId, bracketRound: wbNext.bracketRound },
+            select: {
+              id: true,
+              matchNumber: true,
+            },
+            orderBy: { matchNumber: "asc" },
+          });
+          const targetWb = wbNextMatches[Math.floor(idx / 2)];
+          if (targetWb) {
+            await setTeam(targetWb.id, idx % 2 === 0, winnerId);
+          } else {
+            this.logger.warn(
+              `Target WB match not found for WB_R1 match ${matchId} at index ${idx}`,
+            );
+          }
+        }
+        // Loser → LB_R1 (same index or cross-bracket slot)
+        const lbR1Matches = await this.prisma.match.findMany({
+          where: { roomId, bracketRound: "LB_R1" },
+          select: {
+            id: true,
+            matchNumber: true,
+            teamAId: true,
+            teamBId: true,
+          },
+          orderBy: { matchNumber: "asc" },
+        });
+        // 4-team: 2 WB_R1 losers go into 1 LB_R1 match (idx 0→teamA, idx 1→teamB)
+        // 8-team: 4 WB_R1 losers go into 2 LB_R1 matches (cross-bracket)
+        if (lbR1Matches.length === 1) {
+          await setTeam(lbR1Matches[0].id, idx === 0, loserId);
+        } else if (lbR1Matches.length > 1) {
+          // Cross-bracket: 0↔3, 1↔2 → idx 0 & 3 → match 0, idx 1 & 2 → match 1
+          const lbMatchIdx = idx < 2 ? idx : 3 - idx;
+          const isTeamA = idx < 2;
+          await setTeam(lbR1Matches[lbMatchIdx].id, isTeamA, loserId);
+        }
+        break;
+      }
+
+      case "WB_R2": {
+        // 8-team: Winner → WB_F, Loser → LB_R2
+        const idx = await getIndexAmongSiblings("WB_R2");
+        const wbFinal = await findMatch("WB_F");
+        if (wbFinal) await setTeam(wbFinal.id, idx === 0, winnerId);
+        // Loser → LB_R2 (drop down)
+        const lbR2Matches = await this.prisma.match.findMany({
+          where: { roomId, bracketRound: "LB_R2" },
+          select: {
+            id: true,
+            matchNumber: true,
+            teamAId: true,
+            teamBId: true,
+          },
+          orderBy: { matchNumber: "asc" },
+        });
+        if (lbR2Matches[idx])
+          await setTeam(lbR2Matches[idx].id, false, loserId); // teamB slot
+        break;
+      }
+
+      case "WB_F": {
+        // Winner → GF (teamA), Loser → LB_F
+        const gf = await findMatch("GF");
+        if (gf) await setTeam(gf.id, true, winnerId);
+        const lbFinal = await findMatch("LB_F");
+        if (lbFinal) await setTeam(lbFinal.id, false, loserId); // teamB slot
+        break;
+      }
+
+      case "LB_R1": {
+        // 4-team: Winner → LB_F (teamA), Loser → eliminated
+        // 8-team: Winner → LB_R2 (teamA), Loser → eliminated
+        const lbNext = (await findMatch("LB_R2")) ?? (await findMatch("LB_F"));
+        if (lbNext && lbNext.bracketRound) {
+          const idx = await getIndexAmongSiblings("LB_R1");
+          const lbNextMatches = await this.prisma.match.findMany({
+            where: { roomId, bracketRound: lbNext.bracketRound },
+            select: {
+              id: true,
+              matchNumber: true,
+            },
+            orderBy: { matchNumber: "asc" },
+          });
+          const target = lbNextMatches[Math.floor(idx / 2)] ?? lbNextMatches[0];
+          if (target) {
+            await setTeam(target.id, true, winnerId);
+          } else {
+            this.logger.warn(
+              `Target LB match not found for LB_R1 match ${matchId} at index ${idx}`,
+            );
+          }
+        }
+        break;
+      }
+
+      case "LB_R2": {
+        // 8-team: Winner → LB_SEMI (teamA), Loser → eliminated
+        const lbSemi = await findMatch("LB_SEMI");
+        if (lbSemi) {
+          const idx = await getIndexAmongSiblings("LB_R2");
+          await setTeam(lbSemi.id, idx === 0, winnerId);
+        }
+        break;
+      }
+
+      case "LB_SEMI": {
+        // 8-team: Winner → LB_F (teamA), Loser → eliminated
+        const lbFinal = await findMatch("LB_F");
+        if (lbFinal) await setTeam(lbFinal.id, true, winnerId);
+        break;
+      }
+
+      case "LB_F": {
+        // Winner → GF (teamB), Loser → eliminated
+        const gf = await findMatch("GF");
+        if (gf) await setTeam(gf.id, false, winnerId);
+        break;
+      }
+
+      case "GF":
+        // Tournament over — handled by checkBracketCompletion
+        this.logger.log(
+          `Grand Final completed. Tournament winner: ${winnerId}`,
+        );
+        break;
+
+      default:
+        this.logger.warn(
+          `Unknown bracketSection: ${bracketSection} for match ${matchId}. Cannot route teams.`,
+        );
+        throw new BadRequestException(
+          `Unknown bracket section: ${bracketSection}. Cannot advance teams.`,
+        );
+    }
+
+    this.logger.log(
+      `[DE] Successfully routed winner=${winnerId} loser=${loserId} from section=${bracketSection} in match ${matchId}`,
+    );
+  }
+
   private async checkBracketCompletion(roomId: string): Promise<boolean> {
+    // Only fetch status field for performance
     const matches = await this.prisma.match.findMany({
       where: { roomId },
+      select: {
+        id: true,
+        status: true,
+      },
     });
 
     const allComplete = matches.every(
@@ -570,37 +841,108 @@ export class MatchService {
 
       // Only update if not already completed (avoid multiple updates)
       if (room && room.status !== RoomStatus.COMPLETED) {
-        const roomData = await this.prisma.room.update({
+        // First update room status
+        await this.prisma.room.update({
           where: { id: roomId },
           data: {
             status: RoomStatus.COMPLETED,
             completedAt: new Date(),
           },
-          include: {
-            matches: {
-              where: { winnerId: { not: null } },
-              orderBy: { round: 'desc' },
-              take: 1,
-              include: {
-                winner: true,
+        });
+
+        // Then fetch winner info separately for Discord notification
+        const winnerMatch = await this.prisma.match.findFirst({
+          where: {
+            roomId,
+            winnerId: { not: null },
+          },
+          orderBy: { round: "desc" },
+          select: {
+            winner: {
+              select: {
+                id: true,
+                name: true,
               },
             },
           },
         });
 
+        const roomData = {
+          name:
+            (
+              await this.prisma.room.findUnique({
+                where: { id: roomId },
+                select: { name: true },
+              })
+            )?.name || "",
+          matches: winnerMatch ? [winnerMatch] : [],
+        };
+
         this.logger.log(`Tournament completed for room ${roomId}`);
+
+        // Discord 봇: 토너먼트 완료 시 대기실로 이동 및 채널 삭제
+        try {
+          if (this.discordVoiceService) {
+            // 1. 모든 참가자를 대기실로 이동
+            await this.discordVoiceService.moveAllToLobby(roomId);
+
+            // 2. 팀장 역할 제거
+            const room = await this.prisma.room.findUnique({
+              where: { id: roomId },
+              include: {
+                teams: {
+                  include: {
+                    captain: {
+                      include: {
+                        authProviders: {
+                          where: { provider: "DISCORD" },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            });
+
+            if (room) {
+              await Promise.all(
+                room.teams.map(async (team) => {
+                  const discordProvider = team.captain.authProviders.find(
+                    (p) => p.provider === "DISCORD",
+                  );
+                  if (discordProvider) {
+                    await this.discordVoiceService.removeCaptainRole(
+                      discordProvider.providerId,
+                    );
+                  }
+                }),
+              );
+            }
+
+            // 3. 생성한 음성채널 삭제
+            await this.discordVoiceService.deleteRoomChannels(roomId);
+          }
+        } catch (error) {
+          this.logger.warn(
+            "Failed to handle Discord cleanup on tournament completion:",
+            error,
+          );
+        }
 
         // Send Discord tournament completion notification
         try {
           if (this.discordBotService) {
-            const guildId = this.configService.get('DISCORD_GUILD_ID');
-            const channelId = this.configService.get('DISCORD_NOTIFICATION_CHANNEL_ID');
+            const guildId = this.configService.get("DISCORD_GUILD_ID");
+            const channelId = this.configService.get(
+              "DISCORD_NOTIFICATION_CHANNEL_ID",
+            );
 
             if (guildId && channelId && roomData.matches[0]?.winner) {
-              const embed = this.discordBotService.buildTournamentCompletedEmbed(
-                roomData.name,
-                roomData.matches[0].winner.name,
-              );
+              const embed =
+                this.discordBotService.buildTournamentCompletedEmbed(
+                  roomData.name,
+                  roomData.matches[0].winner.name,
+                );
 
               await this.discordBotService.sendEmbedNotification(
                 guildId,
@@ -610,7 +952,10 @@ export class MatchService {
             }
           }
         } catch (error) {
-          this.logger.warn('Failed to send Discord tournament completion notification:', error);
+          this.logger.warn(
+            "Failed to send Discord tournament completion notification:",
+            error,
+          );
         }
 
         return true; // Tournament just completed
@@ -692,10 +1037,44 @@ export class MatchService {
   async getRoomMatches(roomId: string) {
     return this.prisma.match.findMany({
       where: { roomId },
-      include: {
-        teamA: true,
-        teamB: true,
-        winner: true,
+      select: {
+        id: true,
+        roomId: true,
+        round: true,
+        matchNumber: true,
+        bracketRound: true,
+        bracketType: true,
+        status: true,
+        teamAId: true,
+        teamBId: true,
+        winnerId: true,
+        tournamentCode: true,
+        scheduledAt: true,
+        startedAt: true,
+        completedAt: true,
+        createdAt: true,
+        updatedAt: true,
+        teamA: {
+          select: {
+            id: true,
+            name: true,
+            color: true,
+          },
+        },
+        teamB: {
+          select: {
+            id: true,
+            name: true,
+            color: true,
+          },
+        },
+        winner: {
+          select: {
+            id: true,
+            name: true,
+            color: true,
+          },
+        },
       },
       orderBy: [{ round: "asc" }, { matchNumber: "asc" }],
     });
@@ -925,7 +1304,11 @@ export class MatchService {
   /**
    * Get user match history with details
    */
-  async getUserMatchHistory(userId: string, limit: number = 20, offset: number = 0) {
+  async getUserMatchHistory(
+    userId: string,
+    limit: number = 20,
+    offset: number = 0,
+  ) {
     const matches = await this.prisma.matchParticipant.findMany({
       where: { userId },
       include: {
@@ -979,9 +1362,10 @@ export class MatchService {
         deaths: participant.deaths,
         assists: participant.assists,
         win: participant.win,
-        kda: participant.deaths === 0
-          ? (participant.kills + participant.assists)
-          : ((participant.kills + participant.assists) / participant.deaths),
+        kda:
+          participant.deaths === 0
+            ? participant.kills + participant.assists
+            : (participant.kills + participant.assists) / participant.deaths,
       },
       team: participant.team,
     }));
@@ -1050,14 +1434,14 @@ export class MatchService {
     // Collect all participant PUUIDs
     const puuids: string[] = [];
 
-    for (const member of match.teamA.members) {
+    for (const member of match.teamA?.members ?? []) {
       const puuid = member.user.riotAccounts[0]?.puuid;
       if (puuid) {
         puuids.push(puuid);
       }
     }
 
-    for (const member of match.teamB.members) {
+    for (const member of match.teamB?.members ?? []) {
       const puuid = member.user.riotAccounts[0]?.puuid;
       if (puuid) {
         puuids.push(puuid);
@@ -1065,15 +1449,14 @@ export class MatchService {
     }
 
     if (puuids.length === 0) {
-      this.logger.warn(
-        `No PUUIDs found for match ${matchId} participants`,
-      );
+      this.logger.warn(`No PUUIDs found for match ${matchId} participants`);
       return { isLive: false };
     }
 
     // Check if any participant is in an active game
     try {
-      const liveStatus = await this.riotSpectatorService.findActiveGameByPUUIDs(puuids);
+      const liveStatus =
+        await this.riotSpectatorService.findActiveGameByPUUIDs(puuids);
       return liveStatus;
     } catch (error) {
       this.logger.error(
@@ -1082,13 +1465,5 @@ export class MatchService {
       );
       return { isLive: false };
     }
-  }
-
-  // ========================================
-  // Utility
-  // ========================================
-
-  private generateMatchId(): string {
-    return `match_${Date.now()}_${Math.random().toString(36).substring(7)}`;
   }
 }

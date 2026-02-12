@@ -3,6 +3,8 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  Optional,
+  Inject,
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { RoomStatus, TeamMode, TeamCaptainSelection } from "@nexus/database";
@@ -20,8 +22,14 @@ export interface SnakeDraftState {
 @Injectable()
 export class SnakeDraftService {
   private draftStates = new Map<string, SnakeDraftState>();
+  private discordVoiceService: any; // DiscordVoiceService (optional dependency)
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() @Inject("DISCORD_VOICE_SERVICE") discordVoice?: any,
+  ) {
+    this.discordVoiceService = discordVoice;
+  }
 
   // ========================================
   // Draft Initialization
@@ -68,7 +76,11 @@ export class SnakeDraftService {
       throw new BadRequestException("Need at least 10 players for draft");
     }
 
-    const captains = await this.selectCaptains(room.participants, numTeams, room.captainSelection);
+    const captains = await this.selectCaptains(
+      room.participants,
+      numTeams,
+      room.captainSelection,
+    );
     const players = room.participants.filter(
       (p) => !captains.find((c) => c.id === p.id),
     );
@@ -111,6 +123,30 @@ export class SnakeDraftService {
       ),
     );
 
+    // Discord 봇: 팀장에게 역할 부여
+    try {
+      if (this.discordVoiceService) {
+        await Promise.all(
+          captains.map(async (captain) => {
+            const discordProvider = await this.prisma.authProvider.findFirst({
+              where: {
+                userId: captain.userId,
+                provider: "DISCORD",
+              },
+            });
+
+            if (discordProvider) {
+              await this.discordVoiceService.assignCaptainRole(
+                discordProvider.providerId,
+              );
+            }
+          }),
+        );
+      }
+    } catch (error) {
+      console.warn("Failed to assign Discord captain roles:", error);
+    }
+
     const pickOrder = this.generatePickOrder(
       teams.map((t) => t.id),
       numTeams,
@@ -148,18 +184,34 @@ export class SnakeDraftService {
   // Captain Selection Methods
   // ========================================
 
-  private async selectCaptains(participants: any[], numTeams: number, selectionMethod: TeamCaptainSelection | null) {
-    if (selectionMethod === 'TIER') {
-        return participants
-          .sort((a, b) => {
-            const tierPoints: Record<string, number> = { CHALLENGER: 10, GRANDMASTER: 9, MASTER: 8, DIAMOND: 7, EMERALD: 6, PLATINUM: 5, GOLD: 4, SILVER: 3, BRONZE: 2, IRON: 1, UNRANKED: 0 };
-            const aTier = a.user.riotAccounts[0]?.tier || "UNRANKED";
-            const bTier = b.user.riotAccounts[0]?.tier || "UNRANKED";
-            return (tierPoints[bTier] || 0) - (tierPoints[aTier] || 0);
-          })
-          .slice(0, numTeams);
+  private async selectCaptains(
+    participants: any[],
+    numTeams: number,
+    selectionMethod: TeamCaptainSelection | null,
+  ) {
+    if (selectionMethod === "TIER") {
+      return participants
+        .sort((a, b) => {
+          const tierPoints: Record<string, number> = {
+            CHALLENGER: 10,
+            GRANDMASTER: 9,
+            MASTER: 8,
+            DIAMOND: 7,
+            EMERALD: 6,
+            PLATINUM: 5,
+            GOLD: 4,
+            SILVER: 3,
+            BRONZE: 2,
+            IRON: 1,
+            UNRANKED: 0,
+          };
+          const aTier = a.user.riotAccounts[0]?.tier || "UNRANKED";
+          const bTier = b.user.riotAccounts[0]?.tier || "UNRANKED";
+          return (tierPoints[bTier] || 0) - (tierPoints[aTier] || 0);
+        })
+        .slice(0, numTeams);
     }
-    
+
     // Default to RANDOM
     const shuffled = [...participants].sort(() => Math.random() - 0.5);
     return shuffled.slice(0, numTeams);
@@ -168,9 +220,9 @@ export class SnakeDraftService {
   // ========================================
   // Snake Draft Pick Order
   // ========================================
-  
+
   // ... (rest of the file is unchanged)
-  
+
   private generatePickOrder(teamIds: string[], numTeams: number): string[] {
     const order: string[] = [];
     const playersPerTeam = 5;
@@ -193,8 +245,8 @@ export class SnakeDraftService {
     return order;
   }
   // ... (rest of the file is unchanged)
-  
-    async makePick(
+
+  async makePick(
     userId: string,
     roomId: string,
     targetPlayerId: string,
@@ -265,7 +317,7 @@ export class SnakeDraftService {
       (id) => id !== targetPlayerId,
     );
     state.currentTeamIndex++;
-    const room = await this.prisma.room.findUnique({ where: { id: roomId }});
+    const room = await this.prisma.room.findUnique({ where: { id: roomId } });
     state.timerEnd = Date.now() + (room?.pickTimeLimit || 60) * 1000;
 
     // Check if we need to reverse
@@ -279,9 +331,9 @@ export class SnakeDraftService {
 
     return state;
   }
-  
+
   // ... (rest of the file is unchanged)
-  
+
   async autoPick(roomId: string): Promise<SnakeDraftState> {
     const state = this.draftStates.get(roomId);
     if (!state) {
@@ -310,8 +362,8 @@ export class SnakeDraftService {
     // Make auto pick (same logic as manual pick)
     return this.makePick(team.captainId, roomId, targetPlayerId);
   }
-  
-    async checkDraftComplete(roomId: string): Promise<boolean> {
+
+  async checkDraftComplete(roomId: string): Promise<boolean> {
     const state = this.draftStates.get(roomId);
     if (!state) return false;
 
@@ -324,11 +376,20 @@ export class SnakeDraftService {
       data: { status: RoomStatus.ROLE_SELECTION },
     });
 
+    // Discord 봇: 팀 구성 완료 시 팀별 음성채널 배치
+    try {
+      if (this.discordVoiceService) {
+        await this.discordVoiceService.handleTeamAssignment(roomId);
+      }
+    } catch (error) {
+      console.warn("Failed to assign teams to Discord channels:", error);
+    }
+
     this.draftStates.delete(roomId);
 
     return { message: "Draft completed" };
   }
-  
+
   getDraftState(roomId: string): SnakeDraftState | undefined {
     return this.draftStates.get(roomId);
   }

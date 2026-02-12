@@ -337,7 +337,6 @@ export class AuthService {
       // Remove sensitive fields
       const { password: _password, ...safeUser } = user;
       return safeUser;
-
     } catch (e) {
       console.error("Error in getUserById:", e);
       throw e; // Re-throw the original error to trigger a 500 response

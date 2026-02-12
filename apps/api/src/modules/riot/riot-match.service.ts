@@ -141,8 +141,14 @@ export class RiotMatchService {
   private readonly baseUrl = "https://asia.api.riotgames.com";
 
   // In-memory cache for match data (matches don't change after the game ends)
-  private readonly matchCache = new Map<string, { data: MatchDto; expires: number }>();
-  private readonly timelineCache = new Map<string, { data: any; expires: number }>();
+  private readonly matchCache = new Map<
+    string,
+    { data: MatchDto; expires: number }
+  >();
+  private readonly timelineCache = new Map<
+    string,
+    { data: any; expires: number }
+  >();
   private readonly MATCH_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
   constructor(
@@ -155,7 +161,10 @@ export class RiotMatchService {
     }
   }
 
-  private async waitForRateLimit(retryAfterHeader?: string, defaultMs = 2000): Promise<void> {
+  private async waitForRateLimit(
+    retryAfterHeader?: string,
+    defaultMs = 2000,
+  ): Promise<void> {
     const waitMs = retryAfterHeader
       ? parseInt(retryAfterHeader, 10) * 1000 + 200
       : defaultMs;
@@ -219,16 +228,20 @@ export class RiotMatchService {
       // DB 영구 캐시 저장 (비동기 — 응답 지연 없이 저장)
       const queueId = matchData.info?.queueId ?? 0;
       const gameEndTs = matchData.info?.gameEndTimestamp ?? Date.now();
-      this.prisma.riotMatchCache.upsert({
-        where: { matchId },
-        create: {
-          matchId,
-          data: matchData as any,
-          queueId,
-          gameEnd: new Date(gameEndTs),
-        },
-        update: {},  // 이미 존재하면 덮어쓰지 않음
-      }).catch((e) => this.logger.warn(`DB cache write failed for ${matchId}: ${e}`));
+      this.prisma.riotMatchCache
+        .upsert({
+          where: { matchId },
+          create: {
+            matchId,
+            data: matchData as any,
+            queueId,
+            gameEnd: new Date(gameEndTs),
+          },
+          update: {}, // 이미 존재하면 덮어쓰지 않음
+        })
+        .catch((e) =>
+          this.logger.warn(`DB cache write failed for ${matchId}: ${e}`),
+        );
 
       return matchData;
     } catch (error: any) {
@@ -242,24 +255,35 @@ export class RiotMatchService {
           await this.waitForRateLimit(error.response.headers["retry-after"]);
           return this.getMatchById(matchId, retries - 1);
         }
-        this.logger.error(`Rate limit exhausted for match ${matchId}, skipping`);
+        this.logger.error(
+          `Rate limit exhausted for match ${matchId}, skipping`,
+        );
         return null;
       }
 
       if (error.response?.status === 403) {
-        this.logger.error(`Riot API key forbidden (expired?) for match ${matchId}`);
+        this.logger.error(
+          `Riot API key forbidden (expired?) for match ${matchId}`,
+        );
         return null;
       }
 
-      if ((error.response?.status === 500 || error.response?.status === 503) && retries > 0) {
-        this.logger.warn(`Riot API ${error.response.status} for ${matchId}, retrying (${retries} left)...`);
+      if (
+        (error.response?.status === 500 || error.response?.status === 503) &&
+        retries > 0
+      ) {
+        this.logger.warn(
+          `Riot API ${error.response.status} for ${matchId}, retrying (${retries} left)...`,
+        );
         await new Promise((resolve) => setTimeout(resolve, 800));
         return this.getMatchById(matchId, retries - 1);
       }
 
       if (!error.response && retries > 0) {
         // Network/timeout error - retry once
-        this.logger.warn(`Network error for match ${matchId}, retrying (${retries} left)...`);
+        this.logger.warn(
+          `Network error for match ${matchId}, retrying (${retries} left)...`,
+        );
         await new Promise((resolve) => setTimeout(resolve, 1000));
         return this.getMatchById(matchId, retries - 1);
       }
@@ -272,9 +296,7 @@ export class RiotMatchService {
   /**
    * Get matches by tournament code
    */
-  async getMatchIdsByTournamentCode(
-    tournamentCode: string
-  ): Promise<string[]> {
+  async getMatchIdsByTournamentCode(tournamentCode: string): Promise<string[]> {
     if (!this.apiKey) {
       this.logger.error("RIOT_API_KEY not configured");
       return [];
@@ -283,7 +305,9 @@ export class RiotMatchService {
     try {
       const url = `${this.baseUrl}/lol/match/v5/matches/by-tournament-code/${tournamentCode}/ids`;
 
-      this.logger.log(`Fetching matches for tournament code: ${tournamentCode}`);
+      this.logger.log(
+        `Fetching matches for tournament code: ${tournamentCode}`,
+      );
 
       const response = await axios.get<string[]>(url, {
         headers: {
@@ -295,13 +319,15 @@ export class RiotMatchService {
       return response.data;
     } catch (error: any) {
       if (error.response?.status === 404) {
-        this.logger.warn(`No matches found for tournament code: ${tournamentCode}`);
+        this.logger.warn(
+          `No matches found for tournament code: ${tournamentCode}`,
+        );
         return [];
       }
 
       this.logger.error(
         `Error fetching matches for tournament code ${tournamentCode}:`,
-        error.message
+        error.message,
       );
       return [];
     }
@@ -357,7 +383,7 @@ export class RiotMatchService {
 
       this.logger.error(
         `Error fetching match timeline ${matchId}:`,
-        error.message
+        error.message,
       );
       return null;
     }
@@ -378,11 +404,11 @@ export class RiotMatchService {
   async waitForMatchData(
     matchId: string,
     maxAttempts: number = 10,
-    delayMs: number = 30000
+    delayMs: number = 30000,
   ): Promise<MatchDto | null> {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       this.logger.log(
-        `Attempt ${attempt}/${maxAttempts} to fetch match ${matchId}`
+        `Attempt ${attempt}/${maxAttempts} to fetch match ${matchId}`,
       );
 
       const match = await this.getMatchById(matchId);
@@ -396,7 +422,9 @@ export class RiotMatchService {
       }
     }
 
-    this.logger.error(`Failed to fetch match ${matchId} after ${maxAttempts} attempts`);
+    this.logger.error(
+      `Failed to fetch match ${matchId} after ${maxAttempts} attempts`,
+    );
     return null;
   }
 
@@ -417,7 +445,7 @@ export class RiotMatchService {
     type?: string,
     retries = 3,
     startTime?: number, // Unix seconds
-    endTime?: number,   // Unix seconds
+    endTime?: number, // Unix seconds
   ): Promise<string[]> {
     if (!this.apiKey) {
       this.logger.error("RIOT_API_KEY not configured");
@@ -467,21 +495,43 @@ export class RiotMatchService {
       if (error.response?.status === 429) {
         if (retries > 0) {
           await this.waitForRateLimit(error.response.headers["retry-after"]);
-          return this.getMatchIdsByPuuid(puuid, start, count, queueId, type, retries - 1, startTime, endTime);
+          return this.getMatchIdsByPuuid(
+            puuid,
+            start,
+            count,
+            queueId,
+            type,
+            retries - 1,
+            startTime,
+            endTime,
+          );
         }
-        this.logger.error(`Rate limit exhausted fetching match IDs for PUUID ${puuid}`);
+        this.logger.error(
+          `Rate limit exhausted fetching match IDs for PUUID ${puuid}`,
+        );
         return [];
       }
 
       if (!error.response && retries > 0) {
-        this.logger.warn(`Network error fetching match IDs, retrying (${retries} left)...`);
+        this.logger.warn(
+          `Network error fetching match IDs, retrying (${retries} left)...`,
+        );
         await new Promise((resolve) => setTimeout(resolve, 1000));
-        return this.getMatchIdsByPuuid(puuid, start, count, queueId, type, retries - 1, startTime, endTime);
+        return this.getMatchIdsByPuuid(
+          puuid,
+          start,
+          count,
+          queueId,
+          type,
+          retries - 1,
+          startTime,
+          endTime,
+        );
       }
 
       this.logger.error(
         `Error fetching match IDs for PUUID ${puuid}:`,
-        error.message
+        error.message,
       );
       return [];
     }
@@ -498,9 +548,14 @@ export class RiotMatchService {
     puuid: string,
     count: number = 20,
     queueId?: number,
-    start: number = 0
+    start: number = 0,
   ): Promise<MatchDto[]> {
-    const matchIds = await this.getMatchIdsByPuuid(puuid, start, count, queueId);
+    const matchIds = await this.getMatchIdsByPuuid(
+      puuid,
+      start,
+      count,
+      queueId,
+    );
 
     if (matchIds.length === 0) {
       return [];
@@ -511,7 +566,9 @@ export class RiotMatchService {
     const matches: MatchDto[] = [];
 
     for (const matchId of matchIds) {
-      const isCached = this.matchCache.has(matchId) && this.matchCache.get(matchId)!.expires > Date.now();
+      const isCached =
+        this.matchCache.has(matchId) &&
+        this.matchCache.get(matchId)!.expires > Date.now();
       const match = await this.getMatchById(matchId);
       if (match !== null) {
         matches.push(match);

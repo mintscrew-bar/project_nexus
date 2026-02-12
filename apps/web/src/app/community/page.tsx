@@ -81,7 +81,14 @@ export default function CommunityPage() {
   const { setActionHandler, setSearchRef } = useKeyboardShortcutsContext();
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  const [posts, setPosts] = useState<Post[]>([]);
+  const [postsByCategory, setPostsByCategory] = useState<
+    Record<PostCategory, Post[]>
+  >({
+    NOTICE: [],
+    FREE: [],
+    TIP: [],
+    QNA: [],
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<
@@ -93,87 +100,137 @@ export default function CommunityPage() {
   // Debounce search query
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
-  // Register keyboard shortcuts
+  // Register keyboard shortcuts (검색만 활성화, 글 작성은 제거)
   useEffect(() => {
     if (searchInputRef.current) {
       setSearchRef(searchInputRef.current);
     }
-    if (isAuthenticated) {
-      setActionHandler(() => router.push("/community/write"));
-    }
+    // 글 작성 자동 라우팅 제거 - 사용자가 명시적으로 글쓰기 버튼을 클릭해야 함
     return () => {
       setSearchRef(null);
       setActionHandler(null);
     };
-  }, [isAuthenticated, router, setActionHandler, setSearchRef]);
+  }, [setSearchRef, setActionHandler]);
 
-  const fetchPosts = useCallback(async () => {
+  // 카테고리별로 게시글 가져오기
+  const fetchPostsByCategory = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await communityApi.getPosts({
-        category: selectedCategory !== "ALL" ? selectedCategory : undefined,
-        limit: 50,
+      const categoriesToFetch: PostCategory[] =
+        selectedCategory === "ALL"
+          ? ["NOTICE", "FREE", "TIP", "QNA"]
+          : [selectedCategory];
+
+      const results = await Promise.all(
+        categoriesToFetch.map(async (category) => {
+          try {
+            const data = await communityApi.getPosts({
+              category,
+              limit: selectedCategory === "ALL" ? 10 : 50, // 전체 보기일 때는 각 카테고리당 10개만
+            });
+            const postsArray = Array.isArray(data) ? data : (data?.posts ?? []);
+            return { category, posts: postsArray };
+          } catch (err) {
+            console.error(`Failed to fetch ${category} posts:`, err);
+            return { category, posts: [] };
+          }
+        }),
+      );
+
+      const newPostsByCategory = {
+        NOTICE: [],
+        FREE: [],
+        TIP: [],
+        QNA: [],
+      } as Record<PostCategory, Post[]>;
+
+      results.forEach(({ category, posts }) => {
+        newPostsByCategory[category] = posts;
       });
-      // API 응답이 배열인지 확인 (posts 프로퍼티가 있을 수도 있음)
-      const postsArray = Array.isArray(data) ? data : (data?.posts ?? []);
-      setPosts(postsArray);
+
+      setPostsByCategory(newPostsByCategory);
     } catch (err: any) {
       setError(err.message || "게시글을 불러오는데 실패했습니다.");
-      setPosts([]);
     } finally {
       setIsLoading(false);
     }
   }, [selectedCategory]);
 
   useEffect(() => {
-    fetchPosts();
-  }, [fetchPosts]);
+    fetchPostsByCategory();
+  }, [fetchPostsByCategory]);
 
-  // Filter and sort posts
-  const filteredAndSortedPosts = useMemo(() => {
-    if (!Array.isArray(posts)) {
-      return { pinnedPosts: [], regularPosts: [], total: 0 };
-    }
-    let result = [...posts];
-
-    // Search filter
-    if (debouncedSearchQuery) {
-      const query = debouncedSearchQuery.toLowerCase();
-      result = result.filter(
-        (post) =>
-          post.title.toLowerCase().includes(query) ||
-          post.content.toLowerCase().includes(query) ||
-          post.author.username.toLowerCase().includes(query),
-      );
-    }
-
-    // Sort (pinned posts always first)
-    const pinnedPosts = result.filter((p) => p.isPinned);
-    const regularPosts = result.filter((p) => !p.isPinned);
-
-    const sortFn = (a: Post, b: Post) => {
-      switch (sortBy) {
-        case "newest":
-          return (
-            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-          );
-        case "popular":
-          return (b._count?.likes || 0) - (a._count?.likes || 0);
-        case "views":
-          return b.views - a.views;
-        case "comments":
-          return (b._count?.comments || 0) - (a._count?.comments || 0);
-        default:
-          return 0;
-      }
+  // 카테고리별로 필터링 및 정렬
+  const processedPostsByCategory = useMemo(() => {
+    const result: Record<
+      PostCategory,
+      { pinnedPosts: Post[]; regularPosts: Post[]; total: number }
+    > = {
+      NOTICE: { pinnedPosts: [], regularPosts: [], total: 0 },
+      FREE: { pinnedPosts: [], regularPosts: [], total: 0 },
+      TIP: { pinnedPosts: [], regularPosts: [], total: 0 },
+      QNA: { pinnedPosts: [], regularPosts: [], total: 0 },
     };
 
-    pinnedPosts.sort(sortFn);
-    regularPosts.sort(sortFn);
+    const categories: PostCategory[] = ["NOTICE", "FREE", "TIP", "QNA"];
 
-    return { pinnedPosts, regularPosts, total: result.length };
-  }, [posts, debouncedSearchQuery, sortBy]);
+    categories.forEach((category) => {
+      let posts = [...postsByCategory[category]];
+
+      // 검색 필터
+      if (debouncedSearchQuery) {
+        const query = debouncedSearchQuery.toLowerCase();
+        posts = posts.filter(
+          (post) =>
+            post.title.toLowerCase().includes(query) ||
+            post.content.toLowerCase().includes(query) ||
+            post.author.username.toLowerCase().includes(query),
+        );
+      }
+
+      // 정렬 함수
+      const sortFn = (a: Post, b: Post) => {
+        switch (sortBy) {
+          case "newest":
+            return (
+              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+            );
+          case "popular":
+            return (b._count?.likes || 0) - (a._count?.likes || 0);
+          case "views":
+            return b.views - a.views;
+          case "comments":
+            return (b._count?.comments || 0) - (a._count?.comments || 0);
+          default:
+            return 0;
+        }
+      };
+
+      // 고정 게시글과 일반 게시글 분리
+      const pinnedPosts = posts.filter((p) => p.isPinned);
+      const regularPosts = posts.filter((p) => !p.isPinned);
+
+      pinnedPosts.sort(sortFn);
+      regularPosts.sort(sortFn);
+
+      result[category] = {
+        pinnedPosts,
+        regularPosts,
+        total: posts.length,
+      };
+    });
+
+    return result;
+  }, [postsByCategory, debouncedSearchQuery, sortBy]);
+
+  // 전체 게시글 수 계산
+  const totalPosts = useMemo(() => {
+    return Object.values(processedPostsByCategory).reduce(
+      (sum, category) => sum + category.total,
+      0,
+    );
+  }, [processedPostsByCategory]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -203,7 +260,7 @@ export default function CommunityPage() {
     );
   };
 
-  if (isLoading && posts.length === 0) {
+  if (isLoading && Object.values(postsByCategory).every((posts) => posts.length === 0)) {
     return (
       <div className="flex-grow p-4 md:p-8">
         <div className="container mx-auto max-w-4xl">
@@ -246,24 +303,29 @@ export default function CommunityPage() {
 
   return (
     <div className="flex-grow p-4 md:p-8 animate-fade-in">
-      <div className="container mx-auto max-w-4xl">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-          <div>
+      <div className="container mx-auto max-w-5xl">
+        {/* Header - 카페 스타일 */}
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-2">
             <h1 className="text-3xl font-bold text-text-primary flex items-center gap-2">
               <MessageSquare className="h-8 w-8 text-accent-primary" />
               커뮤니티
             </h1>
-            <p className="text-text-secondary mt-1">
-              자유롭게 이야기를 나눠보세요
-            </p>
+            {isAuthenticated && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => router.push("/community/write")}
+                className="text-sm"
+              >
+                <Plus className="h-4 w-4 mr-1.5" />
+                글쓰기
+              </Button>
+            )}
           </div>
-          {isAuthenticated && (
-            <Button onClick={() => router.push("/community/write")}>
-              <Plus className="h-4 w-4 mr-2" />
-              글쓰기
-            </Button>
-          )}
+          <p className="text-text-secondary text-sm">
+            자유롭게 이야기를 나눠보세요
+          </p>
         </div>
 
         {/* Search Bar */}
@@ -337,12 +399,12 @@ export default function CommunityPage() {
         {/* Results Info */}
         {debouncedSearchQuery && (
           <p className="text-sm text-text-secondary mb-4">
-            &quot;{debouncedSearchQuery}&quot; 검색 결과: {total}개의 게시글
+            &quot;{debouncedSearchQuery}&quot; 검색 결과: {totalPosts}개의 게시글
           </p>
         )}
 
-        {/* Posts List */}
-        {total === 0 ? (
+        {/* 카테고리별 섹션 */}
+        {totalPosts === 0 ? (
           <EmptyState
             icon={debouncedSearchQuery ? Search : MessageSquare}
             title={
@@ -370,106 +432,182 @@ export default function CommunityPage() {
             }
           />
         ) : (
-          <div className="space-y-2">
-            {/* Pinned Posts */}
-            {pinnedPosts.map((post) => (
-              <Card
-                key={post.id}
-                hoverable
-                onClick={() => router.push(`/community/${post.id}`)}
-                className="cursor-pointer border-accent-primary/30 bg-accent-primary/5"
-              >
-                <CardContent className="p-4">
-                  <div className="flex items-start gap-3">
-                    <Pin className="h-4 w-4 text-accent-primary mt-1 flex-shrink-0" />
-                    <div className="flex-grow min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap mb-1">
-                        {getCategoryBadge(post.category)}
-                        <h3 className="font-semibold text-text-primary truncate">
-                          {post.title}
-                        </h3>
-                      </div>
-                      <div className="flex items-center gap-4 text-xs text-text-tertiary">
-                        <span>{post.author.username}</span>
-                        <span className="flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          {formatDate(post.createdAt)}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Eye className="h-3 w-3" />
-                          {post.views}
-                        </span>
-                        {post._count && (
-                          <>
-                            <span className="flex items-center gap-1">
-                              <Heart className="h-3 w-3" />
-                              {post._count.likes}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <MessageCircle className="h-3 w-3" />
-                              {post._count.comments}
-                            </span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+          <div className="space-y-6">
+            {(["NOTICE", "FREE", "TIP", "QNA"] as PostCategory[]).map(
+              (category) => {
+                const { pinnedPosts, regularPosts, total } =
+                  processedPostsByCategory[category];
+                const categoryTotal = total;
 
-            {/* Regular Posts */}
-            {regularPosts.map((post) => (
-              <Card
-                key={post.id}
-                hoverable
-                onClick={() => router.push(`/community/${post.id}`)}
-                className="cursor-pointer"
-              >
-                <CardContent className="p-4">
-                  <div className="flex items-start gap-3">
-                    <div className="flex-grow min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap mb-1">
-                        {getCategoryBadge(post.category)}
-                        <h3 className="font-semibold text-text-primary truncate">
-                          {post.title}
-                        </h3>
-                      </div>
-                      <div className="flex items-center gap-4 text-xs text-text-tertiary">
-                        <span>{post.author.username}</span>
-                        <span className="flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          {formatDate(post.createdAt)}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Eye className="h-3 w-3" />
-                          {post.views}
-                        </span>
-                        {post._count && (
-                          <>
-                            <span className="flex items-center gap-1">
-                              <Heart className="h-3 w-3" />
-                              {post._count.likes}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <MessageCircle className="h-3 w-3" />
-                              {post._count.comments}
-                            </span>
-                          </>
+                // 선택된 카테고리가 "ALL"이 아니고 현재 카테고리가 아니면 건너뛰기
+                if (
+                  selectedCategory !== "ALL" &&
+                  selectedCategory !== category
+                ) {
+                  return null;
+                }
+
+                // 검색 중이거나 게시글이 없으면 건너뛰기
+                if (!debouncedSearchQuery && categoryTotal === 0) {
+                  return null;
+                }
+
+                const config = categoryConfig[category];
+                const Icon = config.icon;
+
+                return (
+                  <Card key={category} className="overflow-hidden">
+                    {/* 섹션 헤더 */}
+                    <div className="bg-bg-tertiary border-b border-bg-elevated px-4 py-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Icon className={`h-5 w-5 ${config.color}`} />
+                          <h2 className="text-lg font-semibold text-text-primary">
+                            {config.label}
+                          </h2>
+                          <Badge variant="default" size="sm">
+                            {categoryTotal}
+                          </Badge>
+                        </div>
+                        {selectedCategory === "ALL" && categoryTotal > 0 && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setSelectedCategory(category)}
+                            className="text-xs"
+                          >
+                            더보기 →
+                          </Button>
                         )}
                       </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+
+                    {/* 게시글 목록 */}
+                    {categoryTotal === 0 ? (
+                      <div className="p-8 text-center text-text-tertiary text-sm">
+                        {debouncedSearchQuery
+                          ? "검색 결과가 없습니다"
+                          : "게시글이 없습니다"}
+                      </div>
+                    ) : (
+                      <CardContent className="p-0">
+                        {/* 테이블 헤더 */}
+                        <div className="hidden md:grid grid-cols-12 gap-4 px-4 py-3 bg-bg-tertiary/50 border-b border-bg-elevated text-xs font-medium text-text-secondary">
+                          <div className="col-span-6">제목</div>
+                          <div className="col-span-2 text-center">작성자</div>
+                          <div className="col-span-1 text-center">조회</div>
+                          <div className="col-span-1 text-center">좋아요</div>
+                          <div className="col-span-1 text-center">댓글</div>
+                          <div className="col-span-1 text-center">작성일</div>
+                        </div>
+
+                        {/* 게시글 목록 */}
+                        <div className="divide-y divide-bg-elevated">
+                          {/* 고정 게시글 */}
+                          {pinnedPosts.map((post) => (
+                            <div
+                              key={post.id}
+                              onClick={() =>
+                                router.push(`/community/${post.id}`)
+                              }
+                              className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-bg-tertiary cursor-pointer transition-colors border-l-2 border-l-accent-primary bg-accent-primary/5"
+                            >
+                              <div className="col-span-12 md:col-span-6 flex items-center min-w-0 gap-2">
+                                <Pin className="h-3.5 w-3.5 text-accent-primary flex-shrink-0" />
+                                <h3 className="font-semibold text-text-primary truncate">
+                                  {post.title}
+                                </h3>
+                              </div>
+                              <div className="col-span-6 md:col-span-2 flex items-center justify-start md:justify-center text-sm text-text-secondary">
+                                <span className="truncate">
+                                  {post.author.username}
+                                </span>
+                              </div>
+                              <div className="col-span-3 md:col-span-1 flex items-center justify-center text-xs text-text-tertiary">
+                                <div className="flex items-center gap-1">
+                                  <Eye className="h-3 w-3" />
+                                  {post.views}
+                                </div>
+                              </div>
+                              <div className="col-span-3 md:col-span-1 flex items-center justify-center text-xs text-text-tertiary">
+                                <div className="flex items-center gap-1">
+                                  <Heart className="h-3 w-3" />
+                                  {post._count?.likes || 0}
+                                </div>
+                              </div>
+                              <div className="col-span-12 md:col-span-1 flex items-center justify-start md:justify-center text-xs text-text-tertiary">
+                                <div className="flex items-center gap-1">
+                                  <MessageCircle className="h-3 w-3" />
+                                  {post._count?.comments || 0}
+                                </div>
+                              </div>
+                              <div className="col-span-12 md:col-span-1 flex items-center justify-end md:justify-center text-xs text-text-tertiary">
+                                <span className="md:hidden">
+                                  {formatDate(post.createdAt)}
+                                </span>
+                                <span className="hidden md:inline">
+                                  {formatDate(post.createdAt)}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+
+                          {/* 일반 게시글 */}
+                          {regularPosts.map((post) => (
+                            <div
+                              key={post.id}
+                              onClick={() =>
+                                router.push(`/community/${post.id}`)
+                              }
+                              className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-bg-tertiary cursor-pointer transition-colors"
+                            >
+                              <div className="col-span-12 md:col-span-6 flex items-center min-w-0">
+                                <h3 className="font-medium text-text-primary truncate">
+                                  {post.title}
+                                </h3>
+                              </div>
+                              <div className="col-span-6 md:col-span-2 flex items-center justify-start md:justify-center text-sm text-text-secondary">
+                                <span className="truncate">
+                                  {post.author.username}
+                                </span>
+                              </div>
+                              <div className="col-span-3 md:col-span-1 flex items-center justify-center text-xs text-text-tertiary">
+                                <div className="flex items-center gap-1">
+                                  <Eye className="h-3 w-3" />
+                                  {post.views}
+                                </div>
+                              </div>
+                              <div className="col-span-3 md:col-span-1 flex items-center justify-center text-xs text-text-tertiary">
+                                <div className="flex items-center gap-1">
+                                  <Heart className="h-3 w-3" />
+                                  {post._count?.likes || 0}
+                                </div>
+                              </div>
+                              <div className="col-span-12 md:col-span-1 flex items-center justify-start md:justify-center text-xs text-text-tertiary">
+                                <div className="flex items-center gap-1">
+                                  <MessageCircle className="h-3 w-3" />
+                                  {post._count?.comments || 0}
+                                </div>
+                              </div>
+                              <div className="col-span-12 md:col-span-1 flex items-center justify-end md:justify-center text-xs text-text-tertiary">
+                                <span>{formatDate(post.createdAt)}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    )}
+                  </Card>
+                );
+              },
+            )}
           </div>
         )}
 
         {/* Results count */}
-        {total > 0 && (
+        {totalPosts > 0 && (
           <p className="text-sm text-text-tertiary text-center pt-4">
-            총 {total}개의 게시글
+            총 {totalPosts}개의 게시글
           </p>
         )}
       </div>

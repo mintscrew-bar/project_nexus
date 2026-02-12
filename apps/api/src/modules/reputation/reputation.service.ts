@@ -65,8 +65,8 @@ export class ReputationService {
 
     // Verify both users were in the match
     const allMembers = [
-      ...match.teamA.members.map((m) => m.userId),
-      ...match.teamB.members.map((m) => m.userId),
+      ...(match.teamA?.members.map((m) => m.userId) ?? []),
+      ...(match.teamB?.members.map((m) => m.userId) ?? []),
     ];
 
     if (

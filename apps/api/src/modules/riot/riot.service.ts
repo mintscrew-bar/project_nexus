@@ -61,15 +61,26 @@ export class RiotService {
     private readonly redis: RedisService,
   ) {
     // Try both ConfigService and process.env
-    this.apiKey = this.configService.get("RIOT_API_KEY") || process.env.RIOT_API_KEY || "";
-    const region = this.configService.get("RIOT_REGION") || process.env.RIOT_REGION || "kr";
+    this.apiKey =
+      this.configService.get("RIOT_API_KEY") || process.env.RIOT_API_KEY || "";
+    const region =
+      this.configService.get("RIOT_REGION") || process.env.RIOT_REGION || "kr";
     this.baseUrl = `https://${region}.api.riotgames.com`;
 
-    console.log('🎮 RiotService initialized:');
-    console.log('  - API Key from ConfigService:', this.configService.get("RIOT_API_KEY") ? 'SET' : 'NOT SET');
-    console.log('  - API Key from process.env:', process.env.RIOT_API_KEY ? 'SET' : 'NOT SET');
-    console.log('  - Final API Key:', this.apiKey ? `${this.apiKey.substring(0, 15)}...` : 'EMPTY');
-    console.log('  - Region:', region);
+    console.log("🎮 RiotService initialized:");
+    console.log(
+      "  - API Key from ConfigService:",
+      this.configService.get("RIOT_API_KEY") ? "SET" : "NOT SET",
+    );
+    console.log(
+      "  - API Key from process.env:",
+      process.env.RIOT_API_KEY ? "SET" : "NOT SET",
+    );
+    console.log(
+      "  - Final API Key:",
+      this.apiKey ? `${this.apiKey.substring(0, 15)}...` : "EMPTY",
+    );
+    console.log("  - Region:", region);
   }
 
   private async request<T>(url: string): Promise<T> {
@@ -82,18 +93,18 @@ export class RiotService {
     }
 
     try {
-      console.log('Making Riot API request to:', url);
-      console.log('Using API key (full):', this.apiKey);
-      console.log('API key length:', this.apiKey.length);
+      console.log("Making Riot API request to:", url);
+      console.log("Using API key (full):", this.apiKey);
+      console.log("API key length:", this.apiKey.length);
 
       const response = await axios.get<T>(url, {
         headers: { "X-Riot-Token": this.apiKey },
         timeout: 5000,
       });
-      console.log('Riot API success:', response.status);
+      console.log("Riot API success:", response.status);
       return response.data;
     } catch (error: any) {
-      console.error('Riot API Error:', {
+      console.error("Riot API Error:", {
         status: error.response?.status,
         statusText: error.response?.statusText,
         data: error.response?.data,
@@ -104,7 +115,9 @@ export class RiotService {
         throw new NotFoundException("Summoner not found");
       }
       if (error.response?.status === 403) {
-        throw new BadRequestException("Forbidden - API key may be invalid or lack permissions");
+        throw new BadRequestException(
+          "Forbidden - API key may be invalid or lack permissions",
+        );
       }
       if (error.response?.status === 429) {
         throw new BadRequestException("Rate limit exceeded");
@@ -120,9 +133,9 @@ export class RiotService {
   // ========================================
 
   async getSummonerByRiotId(gameName: string, tagLine: string) {
-    console.log('getSummonerByRiotId called with:', { gameName, tagLine });
+    console.log("getSummonerByRiotId called with:", { gameName, tagLine });
     const url = `${this.asiaUrl}/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}`;
-    console.log('Riot API URL:', url);
+    console.log("Riot API URL:", url);
 
     let account;
     try {
@@ -131,9 +144,9 @@ export class RiotService {
         gameName: string;
         tagLine: string;
       }>(url);
-      console.log('Riot API response:', account);
+      console.log("Riot API response:", account);
     } catch (error) {
-      console.error('Riot API error:', error);
+      console.error("Riot API error:", error);
       throw error;
     }
 
@@ -152,25 +165,29 @@ export class RiotService {
     // 현재 시즌 티어 스냅샷 저장 (비동기 — 응답 지연 없이)
     if (rankedInfo.tier !== "UNRANKED") {
       const currentSeason = "S2026";
-      this.prisma.summonerSeasonTier.upsert({
-        where: { puuid_season: { puuid: account.puuid, season: currentSeason } },
-        create: {
-          puuid: account.puuid,
-          season: currentSeason,
-          tier: rankedInfo.tier,
-          rank: rankedInfo.rank,
-          lp: rankedInfo.lp,
-          wins: rankedInfo.wins,
-          losses: rankedInfo.losses,
-        },
-        update: {
-          tier: rankedInfo.tier,
-          rank: rankedInfo.rank,
-          lp: rankedInfo.lp,
-          wins: rankedInfo.wins,
-          losses: rankedInfo.losses,
-        },
-      }).catch((e) => console.error("Failed to save season tier snapshot:", e));
+      this.prisma.summonerSeasonTier
+        .upsert({
+          where: {
+            puuid_season: { puuid: account.puuid, season: currentSeason },
+          },
+          create: {
+            puuid: account.puuid,
+            season: currentSeason,
+            tier: rankedInfo.tier,
+            rank: rankedInfo.rank,
+            lp: rankedInfo.lp,
+            wins: rankedInfo.wins,
+            losses: rankedInfo.losses,
+          },
+          update: {
+            tier: rankedInfo.tier,
+            rank: rankedInfo.rank,
+            lp: rankedInfo.lp,
+            wins: rankedInfo.wins,
+            losses: rankedInfo.losses,
+          },
+        })
+        .catch((e) => console.error("Failed to save season tier snapshot:", e));
     }
 
     return {
@@ -331,12 +348,10 @@ export class RiotService {
     const summoner = await this.request<{
       id: string; // Encrypted summoner ID
       profileIconId: number;
-    }>(
-      `${this.baseUrl}/lol/summoner/v4/summoners/by-puuid/${data.puuid}`,
-    );
+    }>(`${this.baseUrl}/lol/summoner/v4/summoners/by-puuid/${data.puuid}`);
 
-    console.log('Summoner API response:', JSON.stringify(summoner, null, 2));
-    console.log('Summoner ID:', summoner.id);
+    console.log("Summoner API response:", JSON.stringify(summoner, null, 2));
+    console.log("Summoner ID:", summoner.id);
 
     if (summoner.profileIconId !== data.requiredIconId) {
       throw new BadRequestException("Profile icon verification failed");
@@ -347,7 +362,7 @@ export class RiotService {
 
     // Use summoner ID from API response instead of Redis data
     const summonerId = summoner.id;
-    console.log('Final summonerId to be used:', summonerId);
+    console.log("Final summonerId to be used:", summonerId);
 
     // Validate champion preferences (at least 3 per role)
     for (const role of [dto.mainRole, dto.subRole]) {

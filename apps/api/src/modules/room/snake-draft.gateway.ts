@@ -139,8 +139,12 @@ export class SnakeDraftGateway
         this.server.to(`draft:${data.roomId}`).emit("draft-complete");
 
         // Start role selection
-        const roleSelectionData = await this.roleSelectionService.startRoleSelection(data.roomId);
-        this.roleSelectionGateway.emitRoleSelectionStarted(data.roomId, roleSelectionData);
+        const roleSelectionData =
+          await this.roleSelectionService.startRoleSelection(data.roomId);
+        this.roleSelectionGateway.emitRoleSelectionStarted(
+          data.roomId,
+          roleSelectionData,
+        );
       } else {
         // Emit next pick turn
         this.server.to(`draft:${data.roomId}`).emit("next-pick", {

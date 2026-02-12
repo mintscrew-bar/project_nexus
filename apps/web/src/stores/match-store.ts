@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { matchApi } from '@/lib/api-client';
+import { matchApi, getAccessToken } from '@/lib/api-client';
 import { io, Socket } from 'socket.io-client';
 
 interface Team {
@@ -12,20 +12,27 @@ interface Team {
   }>;
 }
 
-interface Match {
+export interface Match {
   id: string;
   roomId: string;
   round: number;
   matchNumber: number;
   bracketRound?: string;
-  team1?: Team;
-  team2?: Team;
+  teamA?: Team;
+  teamB?: Team;
   teamAId?: string;
   teamBId?: string;
   winnerId?: string;
   status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED';
   tournamentCode?: string;
   scheduledTime?: string;
+}
+
+interface TeamStanding {
+  teamId: string;
+  teamName: string;
+  wins: number;
+  losses: number;
 }
 
 interface MatchStoreState {
@@ -40,6 +47,10 @@ interface MatchStoreState {
   roomMatches: Match[];
   roomId: string | null;
   totalRounds: number;
+
+  // Tournament completion
+  tournamentCompleted: boolean;
+  finalStandings: TeamStanding[];
 
   // REST API methods
   fetchMatch: (matchId: string) => Promise<void>;
@@ -70,6 +81,8 @@ export const useMatchStore = create<MatchStoreState>((set, get) => ({
   roomMatches: [],
   roomId: null,
   totalRounds: 0,
+  tournamentCompleted: false,
+  finalStandings: [],
 
   // ========================================
   // REST API Methods
@@ -190,9 +203,12 @@ export const useMatchStore = create<MatchStoreState>((set, get) => ({
 
     const socket = io(`${SOCKET_URL}/match`, {
       auth: {
-        token: localStorage.getItem('accessToken'),
+        token: getAccessToken(),
       },
       transports: ['websocket'],
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 2000,
     });
 
     socket.on('connect', () => {
@@ -258,6 +274,10 @@ export const useMatchStore = create<MatchStoreState>((set, get) => ({
       console.log('Tournament complete!');
     });
 
+    socket.on('tournament-completed', (data: { standings: TeamStanding[]; completedAt: string }) => {
+      set({ tournamentCompleted: true, finalStandings: data.standings });
+    });
+
     set({ socket });
   },
 
@@ -270,9 +290,12 @@ export const useMatchStore = create<MatchStoreState>((set, get) => ({
 
     const socket = io(`${SOCKET_URL}/match`, {
       auth: {
-        token: localStorage.getItem('accessToken'),
+        token: getAccessToken(),
       },
       transports: ['websocket'],
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 2000,
     });
 
     socket.on('connect', () => {

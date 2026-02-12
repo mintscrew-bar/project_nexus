@@ -24,7 +24,10 @@ export class DiscordStrategy extends PassportStrategy(Strategy, "discord") {
     profile: Profile,
   ): Promise<any> {
     try {
-      console.log("Discord strategy - profile:", JSON.stringify(profile, null, 2));
+      console.log(
+        "Discord strategy - profile:",
+        JSON.stringify(profile, null, 2),
+      );
 
       const user = await this.authService.validateOAuthUser({
         provider: "discord",
@@ -44,7 +47,10 @@ export class DiscordStrategy extends PassportStrategy(Strategy, "discord") {
         },
       });
 
-      console.log("Discord strategy - validated user:", JSON.stringify(user, null, 2));
+      console.log(
+        "Discord strategy - validated user:",
+        JSON.stringify(user, null, 2),
+      );
       return user;
     } catch (error) {
       console.error("Discord strategy error:", error);

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRoomStore } from "@/stores/room-store";
 import { useRouter } from "next/navigation";
-import { Users, Lock, Unlock, Gavel, ListOrdered, Trophy, Info } from "lucide-react";
+import { Users, Lock, Unlock, Gavel, ListOrdered, Trophy, Info, GitBranch } from "lucide-react";
 
 interface RoomCreationFormProps {
   onCancel: () => void;
@@ -28,9 +28,11 @@ const TEAM_MODES: { value: TeamMode; label: string; description: string; icon: R
 ];
 
 const PLAYER_OPTIONS = [
-  { value: 10, label: "10명", description: "5 vs 5", teams: 2 },
-  { value: 15, label: "15명", description: "3팀 (5v5v5)", teams: 3 },
-  { value: 20, label: "20명", description: "4팀 토너먼트 (5인)", teams: 4 },
+  { value: 10,  label: "10명",  description: "5 vs 5",     teams: 2, format: "단판",          supportsDE: false },
+  { value: 15,  label: "15명",  description: "3팀 리그전",  teams: 3, format: "리그전",        supportsDE: false },
+  { value: 20,  label: "20명",  description: "4팀 토너먼트", teams: 4, format: "준결승+결승",   supportsDE: true  },
+  { value: 30,  label: "30명",  description: "6팀 리그전",  teams: 6, format: "리그전",        supportsDE: false },
+  { value: 40,  label: "40명",  description: "8팀 토너먼트", teams: 8, format: "8강+4강+결승", supportsDE: true  },
 ];
 
 export function RoomCreationForm({ onCancel, onRoomCreated }: RoomCreationFormProps) {
@@ -53,6 +55,9 @@ export function RoomCreationForm({ onCancel, onRoomCreated }: RoomCreationFormPr
   const [pickTimeLimit, setPickTimeLimit] = useState(60);
   const [captainSelection, setCaptainSelection] = useState<"RANDOM" | "TIER">("RANDOM");
 
+  // 브래킷 포맷 (4/8팀 전용)
+  const [useDoubleElim, setUseDoubleElim] = useState(false);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
@@ -62,9 +67,10 @@ export function RoomCreationForm({ onCancel, onRoomCreated }: RoomCreationFormPr
       return;
     }
 
+    const selectedOption = PLAYER_OPTIONS.find(opt => opt.value === maxParticipants);
     const roomData = {
       name: name.trim(),
-      maxParticipants: maxParticipants as 10 | 15 | 20,
+      maxParticipants: maxParticipants as 10 | 15 | 20 | 30 | 40,
       teamMode: teamMode,
       password: isPrivate ? password : undefined,
       allowSpectators: allowSpectators,
@@ -75,6 +81,10 @@ export function RoomCreationForm({ onCancel, onRoomCreated }: RoomCreationFormPr
       // Snake draft settings
       pickTimeLimit,
       captainSelection,
+      // Bracket format
+      bracketFormat: selectedOption?.supportsDE && useDoubleElim
+        ? 'DOUBLE_ELIMINATION'
+        : 'SINGLE_ELIMINATION',
     };
 
     const newRoom = await createRoom(roomData);
@@ -133,11 +143,38 @@ export function RoomCreationForm({ onCancel, onRoomCreated }: RoomCreationFormPr
             >
               <div className="font-bold text-text-primary">{option.label}</div>
               <div className="text-xs text-text-secondary">{option.description}</div>
-              <div className="text-xs text-accent-primary mt-1">{option.teams}팀</div>
+              <div className="text-xs text-accent-primary mt-1">{option.format}</div>
             </button>
           ))}
         </div>
       </div>
+
+      {/* 더블 일리미네이션 옵션 (4/8팀 전용) */}
+      {selectedPlayerOption?.supportsDE && (
+        <div className="p-4 bg-bg-tertiary/50 rounded-lg border border-bg-elevated">
+          <label className="flex items-center justify-between cursor-pointer">
+            <div className="flex items-center gap-3">
+              <GitBranch className="w-5 h-5 text-accent-primary" />
+              <div>
+                <div className="text-text-primary font-medium">더블 일리미네이션</div>
+                <div className="text-text-secondary text-xs">패자도 패자조에서 재도전 가능 (총 경기 수 증가)</div>
+              </div>
+            </div>
+            <div className="relative" onClick={() => setUseDoubleElim(v => !v)}>
+              <div className={`w-11 h-6 rounded-full transition-colors ${useDoubleElim ? "bg-accent-primary" : "bg-bg-elevated"}`}>
+                <div className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-transform mt-0.5 ${useDoubleElim ? "translate-x-5" : "translate-x-0.5"}`} />
+              </div>
+            </div>
+          </label>
+          {useDoubleElim && (
+            <p className="text-xs text-accent-primary mt-2">
+              {selectedPlayerOption.teams === 4
+                ? "4팀 DE: 승자조(3경기) + 패자조(2경기) + 그랜드파이널(1경기) = 총 6경기"
+                : "8팀 DE: 승자조(7경기) + 패자조(6경기) + 그랜드파이널(1경기) = 총 14경기"}
+            </p>
+          )}
+        </div>
+      )}
 
       {/* 팀 구성 방식 */}
       <div>
@@ -340,6 +377,11 @@ export function RoomCreationForm({ onCancel, onRoomCreated }: RoomCreationFormPr
           <span className="font-semibold text-text-primary">
             {TEAM_MODES.find(m => m.value === teamMode)?.label}
           </span>
+          {selectedPlayerOption?.supportsDE && (
+            <>{" "}•{" "}<span className={useDoubleElim ? "text-accent-primary font-semibold" : ""}>
+              {useDoubleElim ? "더블 일리미네이션" : "싱글 일리미네이션"}
+            </span></>
+          )}
           {" "}•{" "}
           <span className={isPrivate ? "text-accent-gold" : "text-accent-success"}>
             {isPrivate ? "비공개" : "공개"}

@@ -9,6 +9,7 @@ import { AuctionModule } from "../auction/auction.module";
 import { RoleSelectionModule } from "../role-selection/role-selection.module";
 import { DiscordModule } from "../discord/discord.module";
 import { DiscordBotService } from "../discord/discord-bot.service";
+import { DiscordVoiceService } from "../discord/discord-voice.service";
 
 @Module({
   imports: [
@@ -24,8 +25,12 @@ import { DiscordBotService } from "../discord/discord-bot.service";
     SnakeDraftService,
     SnakeDraftGateway,
     {
-      provide: 'DISCORD_BOT_SERVICE',
+      provide: "DISCORD_BOT_SERVICE",
       useExisting: DiscordBotService,
+    },
+    {
+      provide: "DISCORD_VOICE_SERVICE",
+      useExisting: DiscordVoiceService,
     },
   ],
   exports: [RoomService, RoomGateway, SnakeDraftService, SnakeDraftGateway],
