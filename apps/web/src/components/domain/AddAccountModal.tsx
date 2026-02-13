@@ -282,13 +282,13 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
                 3
               </span>
               <p className="text-text-primary text-sm">
-                아래 "인증 완료" 버튼을 클릭하세요
+                아래 &quot;인증 완료&quot; 버튼을 클릭하세요
               </p>
             </div>
           </div>
 
           <p className="text-xs text-text-tertiary text-center">
-            이 아이콘이 없다면 '뒤로'를 누르고 다시 시도하면 다른 아이콘이 지정됩니다.
+            이 아이콘이 없다면 &apos;뒤로&apos;를 누르고 다시 시도하면 다른 아이콘이 지정됩니다.
           </p>
         </div>
       )}

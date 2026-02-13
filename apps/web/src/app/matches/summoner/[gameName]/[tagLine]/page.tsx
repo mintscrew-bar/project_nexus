@@ -7,6 +7,7 @@ import { riotApi, matchApi, statsApi } from "@/lib/api-client";
 import { LoadingSpinner, Button, Badge } from "@/components/ui";
 import { ArrowLeft, Trophy, TrendingUp, Target, Sword, ExternalLink, Loader2, Gamepad2, RefreshCw, Search, ChevronDown, ChevronUp, Shield, Crosshair } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 
 interface SummonerData {
   puuid: string;
@@ -418,41 +419,41 @@ export default function SummonerStatsPage() {
   };
 
   useEffect(() => {
+    const fetchSummonerData = async () => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        // Fetch summoner info from Riot API
+        const summonerData = await riotApi.getSummoner(gameName, tagLine);
+        setSummoner(summonerData);
+
+        // Try to find Nexus user with this Riot account
+        try {
+          const userResult = await statsApi.findUserByRiotAccount(gameName, tagLine);
+          if (userResult.found && userResult.userId) {
+            setNexusUserId(userResult.userId);
+
+            // Fetch match history for this user
+            const matchHistory = await matchApi.getUserMatchHistory(userResult.userId, 20, 0);
+            setMatches(matchHistory);
+          }
+        } catch (err) {
+          console.log("No Nexus user found for this summoner");
+          setMatches([]);
+        }
+
+        setShowRiotMatches(true);
+      } catch (err: any) {
+        console.error("Failed to fetch summoner data:", err);
+        setError(err.response?.data?.message || "소환사 정보를 불러오는데 실패했습니다.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
     fetchSummonerData();
   }, [gameName, tagLine]);
-
-  const fetchSummonerData = async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      // Fetch summoner info from Riot API
-      const summonerData = await riotApi.getSummoner(gameName, tagLine);
-      setSummoner(summonerData);
-
-      // Try to find Nexus user with this Riot account
-      try {
-        const userResult = await statsApi.findUserByRiotAccount(gameName, tagLine);
-        if (userResult.found && userResult.userId) {
-          setNexusUserId(userResult.userId);
-
-          // Fetch match history for this user
-          const matchHistory = await matchApi.getUserMatchHistory(userResult.userId, 20, 0);
-          setMatches(matchHistory);
-        }
-      } catch (err) {
-        console.log("No Nexus user found for this summoner");
-        setMatches([]);
-      }
-
-      setShowRiotMatches(true);
-    } catch (err: any) {
-      console.error("Failed to fetch summoner data:", err);
-      setError(err.response?.data?.message || "소환사 정보를 불러오는데 실패했습니다.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const RIOT_MATCH_COUNT = 10;
 
@@ -650,9 +651,11 @@ export default function SummonerStatsPage() {
           <div className="flex items-start gap-6">
             {/* Profile Icon */}
             <div className="relative">
-              <img
+              <Image
                 src={getProfileIconUrl(summoner.profileIconId)}
                 alt="Profile Icon"
+                width={96}
+                height={96}
                 className="w-24 h-24 rounded-xl border-2 border-accent-primary"
               />
               <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 bg-bg-elevated border border-bg-tertiary rounded-full px-3 py-1">
@@ -698,9 +701,11 @@ export default function SummonerStatsPage() {
                     {/* Tier Badge */}
                     <div className="flex items-center gap-3 bg-bg-tertiary rounded-lg p-3">
                       {getTierImage(summoner.tier) && (
-                        <img
+                        <Image
                           src={getTierImage(summoner.tier)!}
                           alt={summoner.tier}
+                          width={48}
+                          height={48}
                           className="w-12 h-12"
                         />
                       )}
@@ -759,7 +764,7 @@ export default function SummonerStatsPage() {
                   {/* S2026 — current season (real data) */}
                   <div className="flex items-center gap-1.5 bg-bg-tertiary/70 rounded-lg px-2.5 py-2">
                     {summoner.tier && getTierImage(summoner.tier) ? (
-                      <img src={getTierImage(summoner.tier)!} alt={summoner.tier} className="w-6 h-6" />
+                      <Image src={getTierImage(summoner.tier)!} alt={summoner.tier} width={24} height={24} className="w-6 h-6" />
                     ) : (
                       <div className="w-6 h-6 rounded bg-bg-elevated" />
                     )}
@@ -776,7 +781,7 @@ export default function SummonerStatsPage() {
                     return saved ? (
                       <div key={season} className="flex items-center gap-1.5 bg-bg-tertiary/70 rounded-lg px-2.5 py-2">
                         {getTierImage(saved.tier) ? (
-                          <img src={getTierImage(saved.tier)!} alt={saved.tier} className="w-6 h-6" />
+                          <Image src={getTierImage(saved.tier)!} alt={saved.tier} width={24} height={24} className="w-6 h-6" />
                         ) : (
                           <div className="w-6 h-6 rounded bg-bg-elevated" />
                         )}
@@ -846,13 +851,13 @@ export default function SummonerStatsPage() {
                       >
                         <div className="flex items-center gap-4">
                           {/* Champion Icon */}
-                          <img
+                          <Image
                             src={getChampionIcon(match.championName)}
                             alt={match.championName}
+                            width={48}
+                            height={48}
                             className="w-12 h-12 rounded-lg"
-                            onError={(e) => {
-                              e.currentTarget.src = "/placeholder-champion.png";
-                            }}
+                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
                           />
 
                           {/* Match Info */}
@@ -981,13 +986,13 @@ export default function SummonerStatsPage() {
                           {/* Top row: stats */}
                           <div className="flex items-center gap-4">
                             {/* Champion Icon */}
-                            <img
+                            <Image
                               src={getChampionIcon(participant.championName)}
                               alt={participant.championName}
+                              width={48}
+                              height={48}
                               className="w-12 h-12 rounded-xl flex-shrink-0"
-                              onError={(e) => {
-                                e.currentTarget.src = "/placeholder-champion.png";
-                              }}
+                              onError={(e) => { e.currentTarget.style.display = 'none'; }}
                             />
 
                             {/* Game Info */}
@@ -1032,9 +1037,11 @@ export default function SummonerStatsPage() {
                                   className="w-8 h-8 rounded-md bg-bg-tertiary border border-bg-elevated"
                                 >
                                   {item !== 0 && (
-                                    <img
+                                    <Image
                                       src={`https://ddragon.leagueoflegends.com/cdn/${process.env.NEXT_PUBLIC_DDRAGON_VERSION || "16.2.1"}/img/item/${item}.png`}
                                       alt="item"
+                                      width={32}
+                                      height={32}
                                       className="w-full h-full rounded-md"
                                       onError={(e) => { e.currentTarget.style.display = 'none'; }}
                                     />
@@ -1181,11 +1188,13 @@ export default function SummonerStatsPage() {
                                     {/* Champion + Spells + Runes - Compact */}
                                     <div className="flex items-center gap-0.5">
                                       <div className="relative">
-                                        <img
+                                        <Image
                                           src={getChampionIcon(p.championName)}
                                           alt={p.championName}
+                                          width={48}
+                                          height={48}
                                           className="w-12 h-12 rounded"
-                                          onError={(e) => { e.currentTarget.src = "/placeholder-champion.png"; }}
+                                          onError={(e) => { e.currentTarget.style.display = 'none'; }}
                                         />
                                         <span className="absolute -bottom-0.5 -right-0.5 bg-bg-primary/90 text-[8px] px-0.5 rounded text-text-primary font-bold border border-bg-elevated">
                                           {p.champLevel}
@@ -1195,32 +1204,40 @@ export default function SummonerStatsPage() {
                                       {/* Spells + Runes */}
                                       <div className="flex gap-0.5">
                                         <div className="flex flex-col gap-0.5">
-                                          <img
+                                          <Image
                                             src={`https://ddragon.leagueoflegends.com/cdn/${process.env.NEXT_PUBLIC_DDRAGON_VERSION || "16.2.1"}/img/spell/Summoner${getSummonerSpellName(p.summoner1Id)}.png`}
                                             alt="spell1"
+                                            width={20}
+                                            height={20}
                                             className="w-5 h-5 rounded"
                                             onError={(e) => { e.currentTarget.style.opacity = '0.3'; }}
                                           />
-                                          <img
+                                          <Image
                                             src={`https://ddragon.leagueoflegends.com/cdn/${process.env.NEXT_PUBLIC_DDRAGON_VERSION || "16.2.1"}/img/spell/Summoner${getSummonerSpellName(p.summoner2Id)}.png`}
                                             alt="spell2"
+                                            width={20}
+                                            height={20}
                                             className="w-5 h-5 rounded"
                                             onError={(e) => { e.currentTarget.style.opacity = '0.3'; }}
                                           />
                                         </div>
                                         <div className="flex flex-col gap-0.5">
                                           {p.perks?.styles?.[0]?.selections?.[0]?.perk && (
-                                            <img
+                                            <Image
                                               src={`https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/perk-images/styles/${p.perks.styles[0].selections[0].perk}.png`}
                                               alt="primary rune"
+                                              width={20}
+                                              height={20}
                                               className="w-5 h-5 rounded-full bg-bg-primary"
                                               onError={(e) => { e.currentTarget.style.display = 'none'; }}
                                             />
                                           )}
                                           {p.perks?.styles?.[1]?.style && (
-                                            <img
+                                            <Image
                                               src={`https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/perk-images/styles/${p.perks.styles[1].style}.png`}
                                               alt="secondary rune"
+                                              width={14}
+                                              height={14}
                                               className="w-3.5 h-3.5 rounded-full bg-bg-primary opacity-60"
                                               onError={(e) => { e.currentTarget.style.display = 'none'; }}
                                             />
@@ -1299,9 +1316,11 @@ export default function SummonerStatsPage() {
                                       {[p.item0, p.item1, p.item2, p.item3, p.item4, p.item5, p.item6].map((item: number, idx: number) => (
                                         <div key={idx} className={`w-6 h-6 ${idx === 6 ? 'rounded-full' : 'rounded'} bg-bg-primary border border-bg-tertiary`}>
                                           {item !== 0 && (
-                                            <img
+                                            <Image
                                               src={`https://ddragon.leagueoflegends.com/cdn/${process.env.NEXT_PUBLIC_DDRAGON_VERSION || "16.2.1"}/img/item/${item}.png`}
                                               alt="item"
+                                              width={24}
+                                              height={24}
                                               className={`w-full h-full ${idx === 6 ? 'rounded-full' : 'rounded'}`}
                                               onError={(e) => { e.currentTarget.style.display = 'none'; }}
                                             />
@@ -1414,10 +1433,12 @@ export default function SummonerStatsPage() {
                                             {/* Items stacked vertically */}
                                             <div className="flex flex-col gap-0.5 items-center mb-1.5">
                                               {byMinute.get(min)!.map((itemId, i) => (
-                                                <img
+                                                <Image
                                                   key={i}
                                                   src={`https://ddragon.leagueoflegends.com/cdn/${ddVer}/img/item/${itemId}.png`}
                                                   alt={`item ${itemId}`}
+                                                  width={28}
+                                                  height={28}
                                                   className="w-7 h-7 rounded border border-bg-tertiary/80"
                                                   onError={(e) => { e.currentTarget.style.display = 'none'; }}
                                                 />
@@ -1438,9 +1459,11 @@ export default function SummonerStatsPage() {
                                     {[participant.item0, participant.item1, participant.item2, participant.item3, participant.item4, participant.item5, participant.item6].map((item, idx) => (
                                       <div key={idx} className={`${idx === 6 ? 'rounded-full' : 'rounded'} bg-bg-tertiary`}>
                                         {item !== 0 ? (
-                                          <img
+                                          <Image
                                             src={`https://ddragon.leagueoflegends.com/cdn/${ddVer}/img/item/${item}.png`}
                                             alt="item"
+                                            width={48}
+                                            height={48}
                                             className={`w-12 h-12 ${idx === 6 ? 'rounded-full' : 'rounded'} border-2 border-bg-elevated`}
                                             onError={(e) => { e.currentTarget.style.display = 'none'; }}
                                           />
@@ -1541,7 +1564,7 @@ export default function SummonerStatsPage() {
               {riotMatches.length > 0 && hasMoreRiotMatches && (
                 <div className="mt-4 text-center">
                   <button
-                    onClick={loadMoreRiotMatches}
+                    onClick={() => loadMoreRiotMatches()}
                     disabled={isLoadingMoreRiotMatches}
                     className="px-6 py-2 bg-bg-tertiary hover:bg-bg-elevated border border-bg-elevated rounded-lg text-sm text-text-secondary hover:text-text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
@@ -1653,13 +1676,13 @@ export default function SummonerStatsPage() {
                           className="flex items-center justify-between p-3 bg-bg-tertiary rounded-lg"
                         >
                           <div className="flex items-center gap-3">
-                            <img
+                            <Image
                               src={getChampionIcon(stat.championName)}
                               alt={stat.championName}
+                              width={40}
+                              height={40}
                               className="w-10 h-10 rounded-full flex-shrink-0"
-                              onError={(e) => {
-                                e.currentTarget.src = "/placeholder-champion.png";
-                              }}
+                              onError={(e) => { e.currentTarget.style.display = 'none'; }}
                             />
                             <div>
                               <p className="font-semibold text-text-primary text-sm">

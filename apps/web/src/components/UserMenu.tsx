@@ -61,7 +61,7 @@ export function UserMenu() {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 top-full mt-2 w-56 bg-bg-secondary border border-bg-tertiary rounded-xl shadow-xl animate-scale-in origin-top-right overflow-hidden">
+        <div className="absolute right-0 top-full mt-2 w-56 bg-bg-secondary border border-bg-tertiary rounded-xl shadow-xl animate-scale-in origin-top-right overflow-hidden z-50">
           <div className="p-3 border-b border-bg-tertiary">
             <p className="font-semibold text-text-primary">{user.username}</p>
             <p className="text-sm text-text-tertiary">{user.email || `#${user.discriminator}`}</p>

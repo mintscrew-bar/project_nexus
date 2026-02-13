@@ -14,6 +14,10 @@ interface FriendStatus {
   avatar: string | null;
   status: UserStatus;
   lastSeenAt: string | null;
+  // Room info — populated by presence socket when available
+  currentRoomId?: string | null;
+  currentRoomName?: string | null;
+  currentRoomIsPrivate?: boolean;
 }
 
 interface PresenceStoreState {
@@ -44,7 +48,7 @@ export const usePresenceStore = create<PresenceStoreState>((set, get) => ({
 
       // Listen for friend status changes
       presenceSocketHelpers.onFriendStatusChanged((data) => {
-        const { userId, status, lastSeenAt } = data;
+        const { userId, status, lastSeenAt, currentRoomId, currentRoomName, currentRoomIsPrivate } = data as any;
         const currentStatuses = get().friendStatuses;
         const existing = currentStatuses.get(userId);
 
@@ -54,6 +58,7 @@ export const usePresenceStore = create<PresenceStoreState>((set, get) => ({
             ...existing,
             status: status as UserStatus,
             lastSeenAt,
+            ...(currentRoomId !== undefined && { currentRoomId, currentRoomName, currentRoomIsPrivate }),
           });
           set({ friendStatuses: newStatuses });
         }

@@ -9,6 +9,7 @@ import { UserMenu } from '@/components/UserMenu';
 import { MobileMenu } from '@/components/MobileMenu';
 import { Users } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth-store';
+import { useFriendStore } from '@/stores/friend-store';
 
 const navItems = [
   { href: '/tournaments', label: '내전' },
@@ -20,11 +21,13 @@ const navItems = [
 export function Header() {
   const pathname = usePathname();
   const { isAuthenticated } = useAuthStore();
+  const { togglePanel, isOpen, pendingRequests } = useFriendStore();
+  const incomingCount = pendingRequests.filter((r: any) => r.status === 'PENDING').length;
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
 
   return (
-    <header className="bg-bg-secondary border-b border-bg-tertiary px-4 py-3 flex justify-between items-center z-10 sticky top-0">
+    <header className="bg-bg-secondary border-b border-bg-tertiary px-4 py-3 flex justify-between items-center z-50 sticky top-0">
       {/* Left: Logo + Mobile Menu */}
       <div className="flex items-center gap-2">
         <MobileMenu />
@@ -57,18 +60,23 @@ export function Header() {
       {/* Right: Friends + Theme Toggle + Auth */}
       <div className="flex items-center gap-3">
         {isAuthenticated && (
-          <Link
-            href="/friends"
+          <button
+            onClick={togglePanel}
             className={cn(
-              'p-2 rounded-lg transition-colors duration-150',
-              isActive('/friends')
+              'relative p-2 rounded-lg transition-colors duration-150',
+              isOpen
                 ? 'bg-accent-primary/10 text-accent-primary'
                 : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary'
             )}
-            title="친구"
+            title="친구 목록"
           >
             <Users className="h-5 w-5" />
-          </Link>
+            {incomingCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 w-4 h-4 flex items-center justify-center bg-accent-danger text-white text-[9px] font-bold rounded-full">
+                {incomingCount}
+              </span>
+            )}
+          </button>
         )}
         <ThemeToggle />
         <UserMenu />

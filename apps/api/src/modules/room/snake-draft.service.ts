@@ -267,6 +267,11 @@ export class SnakeDraftService {
       throw new NotFoundException("Team not found");
     }
 
+    // Timer expiration check — 서버 기준으로 타이머 만료 여부 확인
+    if (Date.now() > state.timerEnd) {
+      throw new BadRequestException("Pick time has expired");
+    }
+
     // Verify it's the captain's turn
     if (team.captainId !== userId) {
       throw new ForbiddenException("Not your turn to pick");

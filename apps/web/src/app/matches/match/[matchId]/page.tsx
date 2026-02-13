@@ -2,6 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import { matchApi } from "@/lib/api-client";
 import { LoadingSpinner, Button, Badge } from "@/components/ui";
 import { ArrowLeft, Trophy, Swords, Clock, Target, Skull } from "lucide-react";
@@ -94,23 +95,23 @@ export default function MatchDetailsPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    const fetchMatchDetails = async () => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const data = await matchApi.getMatch(matchId);
+        setMatch(data);
+      } catch (err: any) {
+        console.error("Failed to fetch match details:", err);
+        setError(err.response?.data?.message || "매치 정보를 불러오는데 실패했습니다.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
     fetchMatchDetails();
   }, [matchId]);
-
-  const fetchMatchDetails = async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const data = await matchApi.getMatch(matchId);
-      setMatch(data);
-    } catch (err: any) {
-      console.error("Failed to fetch match details:", err);
-      setError(err.response?.data?.message || "매치 정보를 불러오는데 실패했습니다.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const getChampionIcon = (championName: string) => {
     const version = process.env.NEXT_PUBLIC_DDRAGON_VERSION || "16.2.1";
@@ -374,24 +375,28 @@ function ParticipantTable({
                     <div className="flex items-center gap-3">
                       {/* Champion Icon */}
                       <div className="relative">
-                        <img
+                        <Image
                           src={getChampionIcon(participant.championName)}
                           alt={participant.championName}
+                          width={48}
+                          height={48}
                           className="w-12 h-12 rounded-lg"
-                          onError={(e) => {
-                            e.currentTarget.src = "/placeholder-champion.png";
-                          }}
+                          onError={(e) => { e.currentTarget.style.display = 'none'; }}
                         />
                         {/* Summoner Spells */}
                         <div className="absolute -right-1 -bottom-1 flex gap-0.5">
-                          <img
+                          <Image
                             src={getSummonerSpellIcon(participant.summoner1Id)}
                             alt="Spell 1"
+                            width={16}
+                            height={16}
                             className="w-4 h-4 rounded"
                           />
-                          <img
+                          <Image
                             src={getSummonerSpellIcon(participant.summoner2Id)}
                             alt="Spell 2"
+                            width={16}
+                            height={16}
                             className="w-4 h-4 rounded"
                           />
                         </div>
@@ -441,7 +446,7 @@ function ParticipantTable({
                               className="w-8 h-8 bg-bg-elevated rounded border border-bg-tertiary flex items-center justify-center"
                             >
                               {itemIcon && (
-                                <img src={itemIcon} alt={`Item ${itemId}`} className="w-full h-full rounded" />
+                                <Image src={itemIcon} alt={`Item ${itemId}`} width={32} height={32} className="w-full h-full rounded" />
                               )}
                             </div>
                           );

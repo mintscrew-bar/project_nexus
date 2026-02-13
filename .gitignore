@@ -54,3 +54,6 @@ prisma/*.db-journal
 
 # Docker
 docker-compose.override.yml
+
+# Windows artifacts
+nul

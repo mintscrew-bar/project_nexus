@@ -120,7 +120,7 @@ export const ChatBox: React.FC<ChatBoxProps> = ({
             type="submit"
             disabled={!inputValue.trim() || disabled}
             className={cn(
-              'px-6 py-2.5 bg-accent-primary text-white font-medium rounded-lg',
+              'px-4 py-2.5 bg-accent-primary text-white font-medium rounded-lg flex-shrink-0 whitespace-nowrap',
               'transition-colors duration-150',
               'hover:bg-accent-hover active:bg-accent-active',
               'disabled:opacity-50 disabled:cursor-not-allowed'

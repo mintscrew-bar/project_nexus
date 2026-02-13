@@ -2,6 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import { userApi, matchApi, statsApi } from "@/lib/api-client";
 import { LoadingSpinner, Button, Badge } from "@/components/ui";
 import { ArrowLeft, User, Trophy, Target, TrendingUp, Calendar, Loader2, Gamepad2 } from "lucide-react";
@@ -80,37 +81,37 @@ export default function UserStatsPage() {
   const [showRiotMatches, setShowRiotMatches] = useState(false);
 
   useEffect(() => {
+    const fetchUserData = async () => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        // Fetch user info
+        const userData = await userApi.getProfile(userId);
+        setUser(userData);
+
+        // Fetch match history
+        const matches = await matchApi.getUserMatchHistory(userId, 20, 0);
+        setMatchHistory(matches);
+
+        // Fetch riot accounts
+        try {
+          const accounts = await statsApi.getUserRiotAccounts(userId);
+          setRiotAccounts(accounts);
+        } catch (err) {
+          console.log("Failed to fetch Riot accounts:", err);
+          setRiotAccounts([]);
+        }
+      } catch (err: any) {
+        console.error("Failed to fetch user data:", err);
+        setError(err.response?.data?.message || "유저 정보를 불러오는데 실패했습니다.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
     fetchUserData();
   }, [userId]);
-
-  const fetchUserData = async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      // Fetch user info
-      const userData = await userApi.getProfile(userId);
-      setUser(userData);
-
-      // Fetch match history
-      const matches = await matchApi.getUserMatchHistory(userId, 20, 0);
-      setMatchHistory(matches);
-
-      // Fetch riot accounts
-      try {
-        const accounts = await statsApi.getUserRiotAccounts(userId);
-        setRiotAccounts(accounts);
-      } catch (err) {
-        console.log("Failed to fetch Riot accounts:", err);
-        setRiotAccounts([]);
-      }
-    } catch (err: any) {
-      console.error("Failed to fetch user data:", err);
-      setError(err.response?.data?.message || "유저 정보를 불러오는데 실패했습니다.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const fetchRiotMatches = async () => {
     setIsLoadingRiotMatches(true);
@@ -249,9 +250,11 @@ export default function UserStatsPage() {
             {/* Avatar */}
             <div className="relative">
               {user.avatar ? (
-                <img
+                <Image
                   src={user.avatar}
                   alt={user.username}
+                  width={96}
+                  height={96}
                   className="w-24 h-24 rounded-xl border-2 border-accent-primary"
                 />
               ) : (
@@ -368,9 +371,11 @@ export default function UserStatsPage() {
                     >
                       <div className="flex items-center gap-4">
                         {/* Champion Icon */}
-                        <img
+                        <Image
                           src={getChampionIcon(match.participant.championName)}
                           alt={match.participant.championName}
+                          width={48}
+                          height={48}
                           className="w-12 h-12 rounded-lg"
                           onError={(e) => {
                             e.currentTarget.src = "/placeholder-champion.png";
@@ -547,13 +552,13 @@ export default function UserStatsPage() {
                           <div className="flex items-center gap-6">
                             {/* Champion & Spells */}
                             <div className="flex items-center gap-2">
-                              <img
+                              <Image
                                 src={getChampionIcon(participant.championName)}
                                 alt={participant.championName}
+                                width={56}
+                                height={56}
                                 className="w-14 h-14 rounded-lg"
-                                onError={(e) => {
-                                  e.currentTarget.src = "/placeholder-champion.png";
-                                }}
+                                onError={(e) => { e.currentTarget.style.display = 'none'; }}
                               />
                             </div>
 
@@ -585,9 +590,11 @@ export default function UserStatsPage() {
                                   className="w-7 h-7 rounded bg-bg-tertiary border border-bg-elevated flex items-center justify-center"
                                 >
                                   {item !== 0 && (
-                                    <img
+                                    <Image
                                       src={`https://ddragon.leagueoflegends.com/cdn/${process.env.NEXT_PUBLIC_DDRAGON_VERSION || "16.2.1"}/img/item/${item}.png`}
                                       alt="item"
+                                      width={28}
+                                      height={28}
                                       className="w-full h-full"
                                       onError={(e) => { e.currentTarget.style.display = 'none'; }}
                                     />
@@ -609,13 +616,13 @@ export default function UserStatsPage() {
                                       p.puuid === userAccount?.puuid ? "bg-accent-primary/10" : ""
                                     }`}
                                   >
-                                    <img
+                                    <Image
                                       src={getChampionIcon(p.championName)}
                                       alt={p.championName}
+                                      width={16}
+                                      height={16}
                                       className="w-4 h-4 rounded"
-                                      onError={(e) => {
-                                        e.currentTarget.src = "/placeholder-champion.png";
-                                      }}
+                                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
                                     />
                                     <span className={`flex-1 truncate ${
                                       p.puuid === userAccount?.puuid ? "font-bold text-text-primary" : "text-text-secondary"
@@ -638,13 +645,13 @@ export default function UserStatsPage() {
                                       p.puuid === userAccount?.puuid ? "bg-accent-primary/10" : ""
                                     }`}
                                   >
-                                    <img
+                                    <Image
                                       src={getChampionIcon(p.championName)}
                                       alt={p.championName}
+                                      width={16}
+                                      height={16}
                                       className="w-4 h-4 rounded"
-                                      onError={(e) => {
-                                        e.currentTarget.src = "/placeholder-champion.png";
-                                      }}
+                                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
                                     />
                                     <span className={`flex-1 truncate ${
                                       p.puuid === userAccount?.puuid ? "font-bold text-text-primary" : "text-text-secondary"
@@ -698,13 +705,13 @@ export default function UserStatsPage() {
                         className="flex items-center justify-between p-3 bg-bg-tertiary rounded-lg"
                       >
                         <div className="flex items-center gap-3">
-                          <img
+                          <Image
                             src={getChampionIcon(stat.championName)}
                             alt={stat.championName}
+                            width={40}
+                            height={40}
                             className="w-10 h-10 rounded-lg"
-                            onError={(e) => {
-                              e.currentTarget.src = "/placeholder-champion.png";
-                            }}
+                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
                           />
                           <div>
                             <p className="font-semibold text-text-primary text-sm">

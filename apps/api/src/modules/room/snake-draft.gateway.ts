@@ -7,12 +7,13 @@ import {
   ConnectedSocket,
   MessageBody,
 } from "@nestjs/websockets";
-import { Inject, forwardRef } from "@nestjs/common";
+import { Inject, forwardRef, Optional } from "@nestjs/common";
 import { Server, Socket } from "socket.io";
 import { AuthService } from "../auth/auth.service";
 import { SnakeDraftService } from "./snake-draft.service";
 import { RoleSelectionService } from "../role-selection/role-selection.service";
 import { RoleSelectionGateway } from "../role-selection/role-selection.gateway";
+import { RedisService } from "../redis/redis.service";
 
 interface AuthenticatedSocket extends Socket {
   userId?: string;
@@ -39,6 +40,7 @@ export class SnakeDraftGateway
     private readonly roleSelectionService: RoleSelectionService,
     @Inject(forwardRef(() => RoleSelectionGateway))
     private readonly roleSelectionGateway: RoleSelectionGateway,
+    @Optional() private readonly redisService?: RedisService,
   ) {}
 
   async handleConnection(client: AuthenticatedSocket) {
@@ -105,6 +107,29 @@ export class SnakeDraftGateway
   ) {
     if (!client.userId) {
       return { error: "Unauthorized" };
+    }
+
+    // Payload validation
+    if (!data.roomId || !data.targetPlayerId) {
+      return { error: "Invalid pick data" };
+    }
+
+    // Rate limiting: max 3 picks per 2 seconds per user
+    if (this.redisService) {
+      try {
+        const rateLimit = await this.redisService.checkRateLimit(
+          `draft:pick:${client.userId}`,
+          3,
+          2,
+        );
+        if (!rateLimit.allowed) {
+          return {
+            error: `Too many picks. Try again in ${rateLimit.resetIn}s`,
+          };
+        }
+      } catch {
+        // Redis unavailable — allow pick to proceed
+      }
     }
 
     try {

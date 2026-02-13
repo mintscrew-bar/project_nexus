@@ -1,4 +1,4 @@
-/** @type {import('next').NextConfig} */
+/** @type {import('next').NextConfig} */  
 const nextConfig = {
   reactStrictMode: true,
   transpilePackages: ["@nexus/types"],
@@ -33,4 +33,4 @@ const nextConfig = {
   },
 };
 
-module.exports = nextConfig;
+export default nextConfig;
