@@ -227,6 +227,16 @@ export class AuctionService {
       throw new ForbiddenException("Only captains can bid");
     }
 
+    // Timer expiration check — 서버 기준으로 타이머 만료 여부 확인
+    if (Date.now() > state.timerEnd) {
+      throw new BadRequestException("Bidding time has expired");
+    }
+
+    // Self-outbid prevention — 이미 최고가인 팀은 다시 입찰 불가
+    if (state.currentHighestBidder === team.id) {
+      throw new BadRequestException("You are already the highest bidder");
+    }
+
     // Validate bid
     if (amount < state.currentHighestBid + bidIncrement) {
       throw new BadRequestException(

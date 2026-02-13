@@ -7,12 +7,13 @@ import {
   ConnectedSocket,
   MessageBody,
 } from "@nestjs/websockets";
-import { Inject, forwardRef } from "@nestjs/common";
+import { Inject, forwardRef, Optional } from "@nestjs/common";
 import { Server, Socket } from "socket.io";
 import { AuthService } from "../auth/auth.service";
 import { AuctionService } from "./auction.service";
 import { RoleSelectionService } from "../role-selection/role-selection.service";
 import { RoleSelectionGateway } from "../role-selection/role-selection.gateway";
+import { RedisService } from "../redis/redis.service";
 
 interface AuthenticatedSocket extends Socket {
   userId?: string;
@@ -32,6 +33,9 @@ export class AuctionGateway
   @WebSocketServer()
   server: Server;
 
+  // Track connected users per room for disconnect handling
+  private connectedUsers = new Map<string, { userId: string; roomId: string }>();
+
   constructor(
     private readonly authService: AuthService,
     private readonly auctionService: AuctionService,
@@ -39,6 +43,7 @@ export class AuctionGateway
     private readonly roleSelectionService: RoleSelectionService,
     @Inject(forwardRef(() => RoleSelectionGateway))
     private readonly roleSelectionGateway: RoleSelectionGateway,
+    @Optional() private readonly redisService?: RedisService,
   ) {}
 
   async handleConnection(client: AuthenticatedSocket) {
@@ -69,6 +74,10 @@ export class AuctionGateway
 
   handleDisconnect(client: AuthenticatedSocket) {
     console.log(`Auction client disconnected: ${client.username}`);
+    // Clean up user tracking
+    this.connectedUsers.delete(client.id);
+    // Note: Auction continues even if a captain disconnects.
+    // The timer will still expire and resolve normally (yuchal or auto-assign).
   }
 
   @SubscribeMessage("join-room")
@@ -77,6 +86,14 @@ export class AuctionGateway
     @MessageBody() data: { roomId: string },
   ) {
     client.join(`room:${data.roomId}`);
+
+    // Track user connection for disconnect handling
+    if (client.userId) {
+      this.connectedUsers.set(client.id, {
+        userId: client.userId,
+        roomId: data.roomId,
+      });
+    }
 
     const state = this.auctionService.getAuctionState(data.roomId);
 
@@ -105,6 +122,29 @@ export class AuctionGateway
   ) {
     if (!client.userId) {
       return { error: "Unauthorized" };
+    }
+
+    // Payload validation
+    if (!data.roomId || typeof data.amount !== "number" || data.amount <= 0) {
+      return { error: "Invalid bid data" };
+    }
+
+    // Rate limiting: max 5 bids per 3 seconds per user
+    if (this.redisService) {
+      try {
+        const rateLimit = await this.redisService.checkRateLimit(
+          `auction:bid:${client.userId}`,
+          5,
+          3,
+        );
+        if (!rateLimit.allowed) {
+          return {
+            error: `Too many bids. Try again in ${rateLimit.resetIn}s`,
+          };
+        }
+      } catch {
+        // Redis unavailable — allow bid to proceed
+      }
     }
 
     try {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTheme } from "next-themes";
 import { useAuthStore } from "@/stores/auth-store";
 import { userApi } from "@/lib/api-client";
 import { Modal, Button, LoadingSpinner, StatusSelector } from "@/components/ui";
@@ -28,6 +29,7 @@ interface UserSettingsModalProps {
 export function UserSettingsModal({ isOpen, onClose }: UserSettingsModalProps) {
   const { user, isAuthenticated } = useAuthStore();
   const { myStatus, setStatus } = usePresence();
+  const { setTheme: setNextTheme } = useTheme();
   const { addToast } = useToast();
   const [activeTab, setActiveTab] = useState<SettingsTab>("profile");
 
@@ -49,6 +51,7 @@ export function UserSettingsModal({ isOpen, onClose }: UserSettingsModalProps) {
       setSettingsLoading(true);
       userApi.getSettings()
         .then((data) => {
+          const theme = data.theme ?? "dark";
           setSettings({
             notifyMatchStart: data.notifyMatchStart ?? true,
             notifyMatchResult: data.notifyMatchResult ?? true,
@@ -56,8 +59,10 @@ export function UserSettingsModal({ isOpen, onClose }: UserSettingsModalProps) {
             showOnlineStatus: data.showOnlineStatus ?? true,
             showMatchHistory: data.showMatchHistory ?? true,
             allowFriendRequests: data.allowFriendRequests ?? true,
-            theme: data.theme ?? "dark",
+            theme,
           });
+          // 서버에 저장된 테마를 클라이언트에도 동기화
+          setNextTheme(theme);
         })
         .catch((err) => {
           console.error("Failed to fetch settings:", err);
@@ -69,15 +74,25 @@ export function UserSettingsModal({ isOpen, onClose }: UserSettingsModalProps) {
   }, [isOpen, isAuthenticated]);
 
   const handleSettingChange = async (key: keyof UserSettings, value: boolean | string) => {
+    const prevSettings = { ...settings };
     const newSettings = { ...settings, [key]: value };
     setSettings(newSettings);
+
+    // 테마 변경 시 즉시 클라이언트에 적용
+    if (key === "theme" && typeof value === "string") {
+      setNextTheme(value);
+    }
 
     try {
       await userApi.updateSettings({ [key]: value });
       addToast("설정이 저장되었습니다.", "success");
     } catch (error) {
       console.error("Settings update error:", error);
-      setSettings(settings);
+      setSettings(prevSettings);
+      // 테마 변경 실패 시 이전 테마로 롤백
+      if (key === "theme") {
+        setNextTheme(prevSettings.theme);
+      }
       addToast("설정 저장에 실패했습니다.", "error");
     }
   };

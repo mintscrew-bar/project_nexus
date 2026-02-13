@@ -3,12 +3,21 @@ import { io, Socket } from 'socket.io-client';
 import { roomApi, getAccessToken } from '@/lib/api-client';
 
 // Placeholder Types - should eventually come from @nexus/types
+interface ChampionPreference {
+  id: string;
+  championId: string;
+  role: string;
+  order: number;
+}
+
 interface RiotAccount {
   gameName: string;
   tagLine: string;
   tier: string | null;
   rank: string | null;
   mainRole: string | null;
+  subRole: string | null;
+  championPreferences?: ChampionPreference[];
 }
 
 interface Participant {

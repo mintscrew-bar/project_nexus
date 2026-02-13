@@ -49,9 +49,12 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
   disabled = false,
   className,
 }) => {
-  const [bidAmount, setBidAmount] = useState<number>(0);
+  const [accumulatedBid, setAccumulatedBid] = useState<number>(0); // 누적 추가 금액
   const currentTeam = teams.find((t) => t.captainId === currentUserId);
   const isCurrentUserTurn = currentTeam && auctionState.status === 'IN_PROGRESS';
+  const totalBid = auctionState.currentHighestBid + accumulatedBid;
+  const myBudget = currentTeam?.remainingGold || 0;
+  const canPlaceBid = accumulatedBid > 0 && totalBid <= myBudget;
 
   // Timer calculation
   const [timeLeft, setTimeLeft] = useState(0);
@@ -63,18 +66,24 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
     return () => clearInterval(interval);
   }, [auctionState.timerEnd]);
 
+  // 새 선수 경매 시작 또는 다른 팀 입찰 시 누적 금액 초기화
+  React.useEffect(() => {
+    setAccumulatedBid(0);
+  }, [auctionState.currentHighestBid, auctionState.currentPlayer?.id]);
+
   const handleBid = () => {
-    if (bidAmount > auctionState.currentHighestBid && bidAmount <= (currentTeam?.remainingGold || 0)) {
-      onPlaceBid(bidAmount);
-      setBidAmount(0);
+    if (canPlaceBid) {
+      onPlaceBid(totalBid);
+      setAccumulatedBid(0);
     }
   };
 
-  const suggestedBids = [
-    auctionState.currentHighestBid + 50,
-    auctionState.currentHighestBid + 100,
-    auctionState.currentHighestBid + 200,
-  ].filter(bid => bid <= (currentTeam?.remainingGold || 0));
+  const addToBid = (increment: number) => {
+    setAccumulatedBid(prev => {
+      const next = prev + increment;
+      return auctionState.currentHighestBid + next <= myBudget ? next : prev;
+    });
+  };
 
   return (
     <div className={cn('space-y-4', className)}>
@@ -148,54 +157,70 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
         </Card>
       )}
 
-      {/* Bidding Panel */}
+      {/* Bidding Panel - 누적형 */}
       {isCurrentUserTurn && auctionState.currentPlayer && (
         <Card>
           <CardContent className="p-4">
-            <div className="mb-4">
-              <p className="text-sm text-text-tertiary mb-2">
-                남은 골드: <span className="text-accent-gold font-bold">{currentTeam.remainingGold.toLocaleString()}G</span>
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-sm text-text-tertiary">
+                남은 골드: <span className="text-accent-gold font-bold">{myBudget.toLocaleString()}G</span>
+              </p>
+              <p className="text-sm text-text-tertiary">
+                현재 최고가: <span className="text-text-primary font-medium">{auctionState.currentHighestBid.toLocaleString()}G</span>
               </p>
             </div>
 
-            {/* Quick Bid Buttons */}
+            {/* 누적 금액 표시 */}
+            <div className="bg-bg-tertiary rounded-xl p-4 mb-4 text-center">
+              <p className="text-xs text-text-tertiary mb-1">내 입찰가</p>
+              <p className={cn(
+                'text-3xl font-bold',
+                accumulatedBid > 0 ? 'text-accent-gold' : 'text-text-tertiary'
+              )}>
+                {totalBid.toLocaleString()}G
+              </p>
+              {accumulatedBid > 0 && (
+                <p className="text-xs text-text-secondary mt-1">
+                  {auctionState.currentHighestBid.toLocaleString()}G + <span className="text-accent-primary">{accumulatedBid.toLocaleString()}G</span>
+                </p>
+              )}
+              {accumulatedBid === 0 && (
+                <p className="text-xs text-text-tertiary mt-1">아래 버튼으로 금액을 추가하세요</p>
+              )}
+            </div>
+
+            {/* 금액 추가 버튼 */}
             <div className="grid grid-cols-3 gap-2 mb-4">
-              {suggestedBids.map((amount) => (
+              {[50, 100, 500].map((inc) => (
                 <Button
-                  key={amount}
+                  key={inc}
                   variant="secondary"
                   size="sm"
-                  onClick={() => setBidAmount(amount)}
-                  disabled={disabled}
+                  onClick={() => addToBid(inc)}
+                  disabled={disabled || auctionState.currentHighestBid + accumulatedBid + inc > myBudget}
                 >
-                  {amount.toLocaleString()}G
+                  +{inc}G
                 </Button>
               ))}
             </div>
 
-            {/* Custom Bid Input */}
+            {/* 입찰 / 초기화 */}
             <div className="flex gap-2">
-              <input
-                type="number"
-                value={bidAmount || ''}
-                onChange={(e) => setBidAmount(parseInt(e.target.value) || 0)}
-                placeholder="입찰 금액"
-                min={auctionState.currentHighestBid + 1}
-                max={currentTeam.remainingGold}
-                className="flex-1 px-4 py-2.5 bg-bg-tertiary border border-text-muted text-text-primary rounded-lg focus:border-accent-primary focus:outline-none"
-                disabled={disabled}
-              />
+              <Button
+                variant="secondary"
+                onClick={() => setAccumulatedBid(0)}
+                disabled={disabled || accumulatedBid === 0}
+                className="flex-shrink-0"
+              >
+                초기화
+              </Button>
               <Button
                 variant="primary"
                 onClick={handleBid}
-                disabled={
-                  disabled ||
-                  !bidAmount ||
-                  bidAmount <= auctionState.currentHighestBid ||
-                  bidAmount > currentTeam.remainingGold
-                }
+                disabled={disabled || !canPlaceBid}
+                className="flex-1"
               >
-                입찰
+                {canPlaceBid ? `${totalBid.toLocaleString()}G 입찰하기` : '금액을 추가하세요'}
               </Button>
             </div>
           </CardContent>

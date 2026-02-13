@@ -4,6 +4,7 @@ import "./globals.css";
 import { Providers } from "./providers";
 import { Header } from "@/components/layout/Header";
 import { Sidebar } from "@/components/layout/Sidebar";
+import { FriendsPanel } from "@/components/domain/FriendsPanel";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -28,6 +29,7 @@ export default function RootLayout({
               {children}
             </div>
           </main>
+          <FriendsPanel />
         </Providers>
       </body>
     </html>

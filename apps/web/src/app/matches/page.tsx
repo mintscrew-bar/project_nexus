@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { Search, TrendingUp, Clock, User, Target, Users } from "lucide-react";
 import { Button, Input, Badge } from "@/components/ui";
 import { statsApi } from "@/lib/api-client";
@@ -243,9 +244,11 @@ export default function StatsPage() {
                         className="w-full flex items-center gap-3 p-4 hover:bg-bg-tertiary transition-colors text-left border-b border-bg-tertiary/50 last:border-b-0"
                       >
                         {user.avatar ? (
-                          <img
+                          <Image
                             src={user.avatar}
                             alt={user.username}
+                            width={48}
+                            height={48}
                             className="w-12 h-12 rounded-full"
                           />
                         ) : (

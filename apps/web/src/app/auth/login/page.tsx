@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/stores/auth-store";
 import { Logo } from "@/components/Logo";
 import { AlertCircle, X } from "lucide-react";
 
-export default function LoginPage() {
+function LoginPageContent() {
   const searchParams = useSearchParams();
   const { loginWithDiscord, loginWithGoogle, isLoading } = useAuthStore();
   const [error, setError] = useState<string | null>(null);
@@ -147,5 +147,13 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginPageContent />
+    </Suspense>
   );
 }
