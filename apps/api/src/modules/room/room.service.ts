@@ -412,9 +412,12 @@ export class RoomService {
     // Check remaining participants
     const remainingCount = room.participants.length - 1;
 
-    // If no participants left and room is waiting, delete the room
-    if (remainingCount === 0 && room.status === RoomStatus.WAITING) {
-      // Clean up Discord channels before deleting
+    // If no participants left, delete the room (WAITING or COMPLETED)
+    if (
+      remainingCount === 0 &&
+      (room.status === RoomStatus.WAITING || room.status === RoomStatus.COMPLETED)
+    ) {
+      // Clean up Discord channels (category + lobby + team channels) before deleting
       if (this.discordVoiceService) {
         await this.discordVoiceService.deleteRoomChannels(roomId).catch(() => {});
       }
