@@ -8,6 +8,7 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { RoomStatus, TeamMode } from "@nexus/database";
+import { calculateTierScore } from "../common/tier-score.util";
 
 const BONUS_GOLD = 500;
 
@@ -79,25 +80,13 @@ export class AuctionService {
       throw new BadRequestException("Need at least 10 players for auction");
     }
 
-    // Select captains (random or by highest tier)
+    // Select captains by tier score (Tier + Rank + LP 통합 점수 기준)
     const sortedPlayers = [...room.participants].sort((a, b) => {
-      // A simple tier-to-point conversion for sorting, can be more complex
-      const tierPoints: Record<string, number> = {
-        CHALLENGER: 10,
-        GRANDMASTER: 9,
-        MASTER: 8,
-        DIAMOND: 7,
-        EMERALD: 6,
-        PLATINUM: 5,
-        GOLD: 4,
-        SILVER: 3,
-        BRONZE: 2,
-        IRON: 1,
-        UNRANKED: 0,
-      };
-      const aTier = a.user.riotAccounts[0]?.tier || "UNRANKED";
-      const bTier = b.user.riotAccounts[0]?.tier || "UNRANKED";
-      return (tierPoints[bTier] || 0) - (tierPoints[aTier] || 0);
+      const aAcc = a.user.riotAccounts[0];
+      const bAcc = b.user.riotAccounts[0];
+      const aScore = calculateTierScore(aAcc?.tier || "UNRANKED", aAcc?.rank || "", aAcc?.lp || 0);
+      const bScore = calculateTierScore(bAcc?.tier || "UNRANKED", bAcc?.rank || "", bAcc?.lp || 0);
+      return bScore - aScore;
     });
 
     const captains = sortedPlayers.slice(0, numTeams);
@@ -348,26 +337,29 @@ export class AuctionService {
         throw new NotFoundException("Team not found");
       }
 
-      // Deduct budget
-      await this.prisma.team.update({
-        where: { id: team.id },
-        data: {
-          remainingBudget: team.remainingBudget - state.currentHighestBid,
-        },
-      });
+      const soldPrice = state.currentHighestBid;
 
-      // Assign player to team
-      await this.prisma.teamMember.create({
-        data: {
-          teamId: team.id,
-          userId: currentPlayer.userId,
-          soldPrice: state.currentHighestBid,
-        },
-      });
+      // Atomic update: deduct budget, assign player, update participant
+      await this.prisma.$transaction(async (tx) => {
+        await tx.team.update({
+          where: { id: team.id },
+          data: {
+            remainingBudget: team.remainingBudget - soldPrice,
+          },
+        });
 
-      await this.prisma.roomParticipant.update({
-        where: { id: currentPlayer.id },
-        data: { teamId: team.id },
+        await tx.teamMember.create({
+          data: {
+            teamId: team.id,
+            userId: currentPlayer.userId,
+            soldPrice,
+          },
+        });
+
+        await tx.roomParticipant.update({
+          where: { id: currentPlayer.id },
+          data: { teamId: team.id },
+        });
       });
 
       const bidTimeLimitMs = (room?.bidTimeLimit || 30) * 1000;
@@ -383,7 +375,7 @@ export class AuctionService {
         sold: true,
         player: currentPlayer,
         team,
-        price: state.currentHighestBid,
+        price: soldPrice,
       };
     } else {
       const bidTimeLimitMs = (room?.bidTimeLimit || 30) * 1000;
@@ -395,41 +387,39 @@ export class AuctionService {
       if (state.yuchalCount >= state.maxYuchalCycles) {
         const targetTeam = room!.teams[0]; // Sorted by remainingBudget desc
 
-        // Check if team has any budget
-        if (targetTeam.remainingBudget === 0 && !targetTeam.hasReceivedBonus) {
-          // Give bonus gold
-          await this.prisma.team.update({
-            where: { id: targetTeam.id },
+        await this.prisma.$transaction(async (tx) => {
+          if (targetTeam.remainingBudget === 0 && !targetTeam.hasReceivedBonus) {
+            await tx.team.update({
+              where: { id: targetTeam.id },
+              data: {
+                remainingBudget: BONUS_GOLD,
+                hasReceivedBonus: true,
+              },
+            });
+          }
+
+          await tx.teamMember.create({
             data: {
-              remainingBudget: BONUS_GOLD,
-              hasReceivedBonus: true,
+              teamId: targetTeam.id,
+              userId: currentPlayer.userId,
+              soldPrice: 0,
             },
           });
-        }
 
-        // Assign player for free
-        await this.prisma.teamMember.create({
-          data: {
-            teamId: targetTeam.id,
-            userId: currentPlayer.userId,
-            soldPrice: 0,
-          },
-        });
+          await tx.roomParticipant.update({
+            where: { id: currentPlayer.id },
+            data: { teamId: targetTeam.id },
+          });
 
-        await this.prisma.roomParticipant.update({
-          where: { id: currentPlayer.id },
-          data: { teamId: targetTeam.id },
-        });
-
-        // Record yuchal
-        await this.prisma.auctionBid.create({
-          data: {
-            roomId,
-            teamId: targetTeam.id,
-            targetUserId: currentPlayer.userId,
-            amount: 0,
-            isYuchal: true,
-          },
+          await tx.auctionBid.create({
+            data: {
+              roomId,
+              teamId: targetTeam.id,
+              targetUserId: currentPlayer.userId,
+              amount: 0,
+              isYuchal: true,
+            },
+          });
         });
 
         // Move to next player

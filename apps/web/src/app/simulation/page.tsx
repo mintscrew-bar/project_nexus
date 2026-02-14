@@ -100,10 +100,28 @@ interface BracketMatch {
 
 // ─── Constants ──────────────────────────────────────────────────────────────────
 const TIERS = ["IRON", "BRONZE", "SILVER", "GOLD", "PLATINUM", "EMERALD", "DIAMOND", "MASTER", "GRANDMASTER", "CHALLENGER"] as const;
+
+// 티어 기반 점수 계산 (Tier + Rank + LP)
+// IRON IV 0LP=0 / GOLD I 99LP=1599 / MASTER 300LP=3100 / CHALLENGER 고LP=3600+
+const _TIER_BASE: Record<string, number> = {
+  UNRANKED: 0, IRON: 0, BRONZE: 400, SILVER: 800, GOLD: 1200,
+  PLATINUM: 1600, EMERALD: 2000, DIAMOND: 2400,
+  MASTER: 2800, GRANDMASTER: 3200, CHALLENGER: 3600,
+};
+const _RANK_BONUS: Record<string, number> = { IV: 0, III: 100, II: 200, I: 300, "": 0 };
+const _MASTER_PLUS = new Set(["MASTER", "GRANDMASTER", "CHALLENGER"]);
+
+function calculateTierScore(tier: string, rank: string, lp = 0): number {
+  const tierBase = _TIER_BASE[tier] ?? 0;
+  const rankBonus = _MASTER_PLUS.has(tier) ? 0 : (_RANK_BONUS[rank] ?? 0);
+  return tierBase + rankBonus + lp;
+}
+
+// 경매 봇 낙찰가 계산용: 티어 중간값 (Rank II, LP=50 기준)
 const TIER_MMR: Record<string, number> = {
-  IRON: 400, BRONZE: 600, SILVER: 800, GOLD: 1000,
-  PLATINUM: 1200, EMERALD: 1400, DIAMOND: 1600,
-  MASTER: 1800, GRANDMASTER: 2000, CHALLENGER: 2200,
+  IRON: 250, BRONZE: 650, SILVER: 1050, GOLD: 1450,
+  PLATINUM: 1850, EMERALD: 2250, DIAMOND: 2650,
+  MASTER: 3050, GRANDMASTER: 3450, CHALLENGER: 3850,
 };
 const POSITIONS = ["TOP", "JUNGLE", "MID", "ADC", "SUPPORT"];
 const POSITION_LABELS: Record<string, string> = {
@@ -154,15 +172,17 @@ function generateMockPlayers(count: number): MockPlayer[] {
     const rank = ranks[Math.floor(Math.random() * ranks.length)];
     const mainPos = POSITIONS[Math.floor(Math.random() * POSITIONS.length)];
     const secondaryPos = POSITIONS.filter(p => p !== mainPos)[Math.floor(Math.random() * 4)];
-    const baseMmr = TIER_MMR[tier];
-    const variance = Math.floor(Math.random() * 200) - 100;
+    // Master+ 는 랭크 없이 LP만 가산. 일반 티어는 Rank + 랜덤 LP(0-99)로 계산
+    const mockLp = _MASTER_PLUS.has(tier)
+      ? Math.floor(Math.random() * 400) // Master 이상은 LP 범위 넓음
+      : Math.floor(Math.random() * 100);
 
     players.push({
       id: `player-${timestamp}-${i}-${Math.random().toString(36).substr(2, 9)}`,
       name, tier, rank,
       mainPosition: mainPos,
       secondaryPosition: secondaryPos,
-      mmr: baseMmr + variance,
+      mmr: calculateTierScore(tier, rank, mockLp),
       isBot: true,
     });
   }
