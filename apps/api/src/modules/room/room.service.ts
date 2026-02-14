@@ -412,11 +412,8 @@ export class RoomService {
     // Check remaining participants
     const remainingCount = room.participants.length - 1;
 
-    // If no participants left, delete the room (WAITING or COMPLETED)
-    if (
-      remainingCount === 0 &&
-      (room.status === RoomStatus.WAITING || room.status === RoomStatus.COMPLETED)
-    ) {
+    // If no participants left, delete the room regardless of status (prevents zombie rooms)
+    if (remainingCount === 0) {
       // Clean up Discord channels (category + lobby + team channels) before deleting
       if (this.discordVoiceService) {
         await this.discordVoiceService.deleteRoomChannels(roomId).catch(() => {});
@@ -745,9 +742,8 @@ export class RoomService {
       throw new ForbiddenException("Only host can close the room");
     }
 
-    // Move all back to lobby and clean up Discord channels
+    // Clean up Discord channels (Discord auto-removes users from deleted channels)
     if (this.discordVoiceService) {
-      await this.discordVoiceService.moveAllToLobby(roomId).catch(() => {});
       await this.discordVoiceService.deleteRoomChannels(roomId).catch(() => {});
     }
 
