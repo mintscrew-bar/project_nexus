@@ -375,7 +375,7 @@ export class SnakeDraftService {
   async completeDraft(roomId: string) {
     await this.prisma.room.update({
       where: { id: roomId },
-      data: { status: RoomStatus.ROLE_SELECTION },
+      data: { status: RoomStatus.DRAFT_COMPLETED },
     });
 
     // Discord 봇: 팀 구성 완료 시 팀별 음성채널 배치
