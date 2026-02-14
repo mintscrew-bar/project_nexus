@@ -12,7 +12,7 @@ interface Room {
   hostId: string;
   maxParticipants: number;
   isPrivate: boolean;
-  status: "WAITING" | "IN_PROGRESS" | "COMPLETED" | "DRAFT" | "DRAFT_COMPLETED" | "TEAM_SELECTION";
+  status: "WAITING" | "IN_PROGRESS" | "COMPLETED" | "DRAFT" | "DRAFT_COMPLETED" | "ROLE_SELECTION" | "TEAM_SELECTION";
   teamMode: "AUCTION" | "SNAKE_DRAFT";
   createdAt: string;
   participants?: any[];
@@ -158,6 +158,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
 
   connectToRoom: (roomId: string) => {
     const socket = connectRoomSocket();
+    if (!socket) return; // 토큰 없으면 소켓 미연결
 
     roomSocketHelpers.joinRoom(roomId);
 
@@ -232,10 +233,11 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
     if (get().isSubscribedToRoomList) return;
 
     const socket = connectRoomSocket();
+    if (!socket) return; // 토큰 없으면 연결 안 함 → 구독 스킵
 
     // Subscribe and get initial room list
     roomSocketHelpers.subscribeRoomList((response: any) => {
-      if (response.success && response.rooms) {
+      if (response?.success && response.rooms) {
         set({ rooms: response.rooms, isSubscribedToRoomList: true });
       }
     });
