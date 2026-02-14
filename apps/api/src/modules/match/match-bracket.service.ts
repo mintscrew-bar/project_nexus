@@ -37,7 +37,11 @@ export class MatchBracketService {
   async generateBracket(hostId: string, roomId: string): Promise<Bracket> {
     const room = await this.prisma.room.findUnique({
       where: { id: roomId },
-      include: {
+      select: {
+        id: true,
+        hostId: true,
+        status: true,
+        bracketFormat: true,
         teams: {
           include: {
             members: true,
@@ -139,11 +143,11 @@ export class MatchBracketService {
               roomId,
               round: match.round,
               matchNumber: match.matchNumber,
-              teamAId: match.teamAId || null,
-              teamBId: match.teamBId || null,
+              teamAId: match.teamAId ?? undefined,
+              teamBId: match.teamBId ?? undefined,
               status: MatchStatus.PENDING,
               bracketType: bracket.type,
-              bracketRound: match.bracketSection || null,
+              bracketRound: match.bracketSection ?? undefined,
             },
           }),
         ),
@@ -217,8 +221,7 @@ export class MatchBracketService {
           id: this.generateMatchId(),
           round: 1,
           matchNumber: 1,
-          teamAId: teams[0].id,
-          teamBId: teams[1].id,
+          ...this.randomizeSides(teams[0], teams[1]),
           status: MatchStatus.PENDING,
         },
       ],
@@ -239,8 +242,7 @@ export class MatchBracketService {
           id: this.generateMatchId(),
           round: 1,
           matchNumber: matchNumber++,
-          teamAId: teams[i].id,
-          teamBId: teams[j].id,
+          ...this.randomizeSides(teams[i], teams[j]),
           status: MatchStatus.PENDING,
         });
       }
@@ -263,8 +265,7 @@ export class MatchBracketService {
       id: this.generateMatchId(),
       round: 1,
       matchNumber: 1,
-      teamAId: teams[0].id,
-      teamBId: teams[1].id,
+      ...this.randomizeSides(teams[0], teams[1]),
       status: MatchStatus.PENDING,
     });
 
@@ -272,8 +273,7 @@ export class MatchBracketService {
       id: this.generateMatchId(),
       round: 1,
       matchNumber: 2,
-      teamAId: teams[2].id,
-      teamBId: teams[3].id,
+      ...this.randomizeSides(teams[2], teams[3]),
       status: MatchStatus.PENDING,
     });
 
@@ -302,14 +302,13 @@ export class MatchBracketService {
     const matches: BracketMatch[] = [];
     let matchNumber = 1;
 
-    // Round 1: n/2 actual matches
+    // Round 1: n/2 actual matches (랜덤 사이드 배정)
     for (let i = 0; i < n / 2; i++) {
       matches.push({
         id: this.generateMatchId(),
         round: 1,
         matchNumber: matchNumber++,
-        teamAId: teams[i * 2].id,
-        teamBId: teams[i * 2 + 1].id,
+        ...this.randomizeSides(teams[i * 2], teams[i * 2 + 1]),
         status: MatchStatus.PENDING,
       });
     }
@@ -341,13 +340,12 @@ export class MatchBracketService {
   private generateDoubleElimination4(teams: any[]): Bracket {
     let matchNumber = 1;
     const matches: BracketMatch[] = [
-      // WB Round 1
+      // WB Round 1 (랜덤 사이드 배정)
       {
         id: this.generateMatchId(),
         round: 1,
         matchNumber: matchNumber++,
-        teamAId: teams[0].id,
-        teamBId: teams[1].id,
+        ...this.randomizeSides(teams[0], teams[1]),
         status: MatchStatus.PENDING,
         bracketSection: "WB_R1",
       },
@@ -355,8 +353,7 @@ export class MatchBracketService {
         id: this.generateMatchId(),
         round: 1,
         matchNumber: matchNumber++,
-        teamAId: teams[2].id,
-        teamBId: teams[3].id,
+        ...this.randomizeSides(teams[2], teams[3]),
         status: MatchStatus.PENDING,
         bracketSection: "WB_R1",
       },
@@ -402,13 +399,12 @@ export class MatchBracketService {
   private generateDoubleElimination8(teams: any[]): Bracket {
     let matchNumber = 1;
     const matches: BracketMatch[] = [
-      // WB Round 1 (4 matches)
+      // WB Round 1 (4 matches, 랜덤 사이드 배정)
       {
         id: this.generateMatchId(),
         round: 1,
         matchNumber: matchNumber++,
-        teamAId: teams[0].id,
-        teamBId: teams[1].id,
+        ...this.randomizeSides(teams[0], teams[1]),
         status: MatchStatus.PENDING,
         bracketSection: "WB_R1",
       },
@@ -416,8 +412,7 @@ export class MatchBracketService {
         id: this.generateMatchId(),
         round: 1,
         matchNumber: matchNumber++,
-        teamAId: teams[2].id,
-        teamBId: teams[3].id,
+        ...this.randomizeSides(teams[2], teams[3]),
         status: MatchStatus.PENDING,
         bracketSection: "WB_R1",
       },
@@ -425,8 +420,7 @@ export class MatchBracketService {
         id: this.generateMatchId(),
         round: 1,
         matchNumber: matchNumber++,
-        teamAId: teams[4].id,
-        teamBId: teams[5].id,
+        ...this.randomizeSides(teams[4], teams[5]),
         status: MatchStatus.PENDING,
         bracketSection: "WB_R1",
       },
@@ -434,8 +428,7 @@ export class MatchBracketService {
         id: this.generateMatchId(),
         round: 1,
         matchNumber: matchNumber++,
-        teamAId: teams[6].id,
-        teamBId: teams[7].id,
+        ...this.randomizeSides(teams[6], teams[7]),
         status: MatchStatus.PENDING,
         bracketSection: "WB_R1",
       },
@@ -518,6 +511,21 @@ export class MatchBracketService {
       },
     ];
     return { type: BracketType.DOUBLE_ELIMINATION, matches };
+  }
+
+  /**
+   * 블루/레드 사이드를 랜덤으로 배정 (형평성)
+   * teamA = 블루 사이드, teamB = 레드 사이드
+   */
+  private randomizeSides(
+    teamA: any,
+    teamB: any,
+  ): { teamAId: string; teamBId: string } {
+    const swap = Math.random() < 0.5;
+    return {
+      teamAId: swap ? teamB.id : teamA.id,
+      teamBId: swap ? teamA.id : teamB.id,
+    };
   }
 
   /**

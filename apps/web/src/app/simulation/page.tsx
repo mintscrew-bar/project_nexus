@@ -683,7 +683,8 @@ export default function SimulationPage() {
           return { ...a, assignedRole: null };
         }
         if (a.playerId === playerId) {
-          return { ...a, assignedRole: role };
+          // 이미 선택된 라인 다시 클릭 시 취소
+          return { ...a, assignedRole: a.assignedRole === role ? null : role };
         }
         return a;
       });

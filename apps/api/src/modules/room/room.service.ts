@@ -5,6 +5,7 @@ import {
   ForbiddenException,
   Optional,
   Inject,
+  Logger,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../prisma/prisma.service";
@@ -44,6 +45,7 @@ export interface JoinRoomDto {
 
 @Injectable()
 export class RoomService {
+  private readonly logger = new Logger(RoomService.name);
   private discordBotService: any; // DiscordBotService (optional dependency)
   private discordVoiceService: any; // DiscordVoiceService (optional dependency)
 
@@ -112,7 +114,7 @@ export class RoomService {
         bidTimeLimit: dto.bidTimeLimit,
         pickTimeLimit: dto.pickTimeLimit,
         captainSelection: dto.captainSelection,
-        bracketFormat: dto.bracketFormat,
+        ...(dto.bracketFormat && { bracketFormat: dto.bracketFormat }),
 
         participants: {
           create: {
@@ -151,7 +153,7 @@ export class RoomService {
       if (this.discordVoiceService) {
         const numTeams = Math.floor(dto.maxParticipants / 5);
 
-        // 팀별 음성채널 생성 (numTeams >= 3일 때 내부 대기실도 함께 생성됨)
+        // 카테고리 + 내전 대기실 + 팀별 음성채널 생성
         const channelData = await this.discordVoiceService.createRoomChannels(
           room.id,
           room.name,
@@ -168,7 +170,7 @@ export class RoomService {
       }
     } catch (error) {
       // Discord 채널 생성 실패해도 룸 생성은 성공
-      console.warn("Failed to create Discord channels for room:", error);
+      this.logger.warn("Failed to create Discord channels for room:", error);
     }
 
     // Send Discord notification (if bot is configured)
@@ -195,7 +197,7 @@ export class RoomService {
       }
     } catch (error) {
       // Don't fail room creation if Discord notification fails
-      console.warn("Failed to send Discord room creation notification:", error);
+      this.logger.warn("Failed to send Discord room creation notification:", error);
     }
 
     return this.transformRoomData(room);
@@ -269,45 +271,63 @@ export class RoomService {
     return this.transformRoomData(room);
   }
 
+  private readonly validRoomStatuses = new Set<RoomStatus>([
+    "WAITING",
+    "TEAM_SELECTION",
+    "DRAFT",
+    "DRAFT_COMPLETED",
+    "ROLE_SELECTION",
+    "IN_PROGRESS",
+    "COMPLETED",
+  ]);
+  private readonly validTeamModes = new Set<TeamMode>(["SNAKE_DRAFT", "AUCTION"]);
+
   async listRooms(filters?: {
     status?: RoomStatus;
     teamMode?: TeamMode;
     includePrivate?: boolean;
   }) {
-    const where: any = {};
+    try {
+      const where: Record<string, unknown> = {};
 
-    if (filters?.status) {
-      where.status = filters.status;
-    }
+      if (filters?.status && this.validRoomStatuses.has(filters.status)) {
+        where.status = filters.status;
+      }
+      if (filters?.teamMode && this.validTeamModes.has(filters.teamMode)) {
+        where.teamMode = filters.teamMode;
+      }
+      if (!filters?.includePrivate) {
+        where.isPrivate = false;
+      }
 
-    if (filters?.teamMode) {
-      where.teamMode = filters.teamMode;
-    }
-
-    if (!filters?.includePrivate) {
-      where.isPrivate = false;
-    }
-
-    return this.prisma.room.findMany({
-      where,
-      include: {
-        host: {
-          select: {
-            id: true,
-            username: true,
-            avatar: true,
+      return await this.prisma.room.findMany({
+        where,
+        include: {
+          host: {
+            select: {
+              id: true,
+              username: true,
+              avatar: true,
+            },
+          },
+          participants: {
+            select: {
+              id: true,
+              role: true,
+            },
           },
         },
-        participants: {
-          select: {
-            id: true,
-            role: true,
-          },
-        },
-      },
-      orderBy: { createdAt: "desc" },
-      take: 50,
-    });
+        orderBy: { createdAt: "desc" },
+        take: 50,
+      });
+    } catch (error) {
+      const err = error as Error;
+      this.logger.error(
+        `Error listing rooms: ${err?.message ?? String(error)}`,
+        err?.stack,
+      );
+      throw error;
+    }
   }
 
   // ========================================
@@ -394,6 +414,10 @@ export class RoomService {
 
     // If no participants left and room is waiting, delete the room
     if (remainingCount === 0 && room.status === RoomStatus.WAITING) {
+      // Clean up Discord channels before deleting
+      if (this.discordVoiceService) {
+        await this.discordVoiceService.deleteRoomChannels(roomId).catch(() => {});
+      }
       await this.prisma.chatMessage.deleteMany({
         where: { roomId },
       });
@@ -494,7 +518,7 @@ export class RoomService {
     if (updates.bracketFormat !== undefined)
       data.bracketFormat = updates.bracketFormat;
 
-    return this.prisma.room.update({
+    const updatedRoom = await this.prisma.room.update({
       where: { id: roomId },
       data,
       include: {
@@ -506,6 +530,16 @@ export class RoomService {
         },
       },
     });
+
+    // If maxParticipants changed, sync Discord team channels
+    if (updates.maxParticipants && this.discordVoiceService) {
+      const newNumTeams = Math.floor(updates.maxParticipants / 5);
+      this.discordVoiceService.updateRoomChannels(roomId, newNumTeams).catch(
+        (err: Error) => this.logger.warn(`Discord channel update failed: ${err.message}`),
+      );
+    }
+
+    return updatedRoom;
   }
 
   async kickParticipant(hostId: string, roomId: string, participantId: string) {
@@ -688,5 +722,37 @@ export class RoomService {
       message: message.content,
       createdAt: message.createdAt.toISOString(),
     };
+  }
+
+  // ========================================
+  // Close Room (host explicit close)
+  // ========================================
+
+  async closeRoom(hostId: string, roomId: string) {
+    const room = await this.prisma.room.findUnique({
+      where: { id: roomId },
+      include: { participants: true },
+    });
+
+    if (!room) {
+      throw new NotFoundException("Room not found");
+    }
+
+    if (room.hostId !== hostId) {
+      throw new ForbiddenException("Only host can close the room");
+    }
+
+    // Move all back to lobby and clean up Discord channels
+    if (this.discordVoiceService) {
+      await this.discordVoiceService.moveAllToLobby(roomId).catch(() => {});
+      await this.discordVoiceService.deleteRoomChannels(roomId).catch(() => {});
+    }
+
+    // Delete all DB data for this room
+    await this.prisma.chatMessage.deleteMany({ where: { roomId } });
+    await this.prisma.roomParticipant.deleteMany({ where: { roomId } });
+    await this.prisma.room.delete({ where: { id: roomId } });
+
+    return { message: "Room closed" };
   }
 }
