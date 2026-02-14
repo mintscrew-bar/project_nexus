@@ -10,6 +10,7 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  Logger,
 } from "@nestjs/common";
 import { RoomService, CreateRoomDto } from "./room.service";
 import { SnakeDraftService } from "./snake-draft.service";
@@ -22,6 +23,8 @@ import { RoomStatus, TeamMode } from "@nexus/database";
 @Controller("rooms")
 @UseGuards(JwtAuthGuard)
 export class RoomController {
+  private readonly logger = new Logger(RoomController.name);
+
   constructor(
     private readonly roomService: RoomService,
     private readonly snakeDraftService: SnakeDraftService,
@@ -51,11 +54,20 @@ export class RoomController {
     @Query("teamMode") teamMode?: TeamMode,
     @Query("includePrivate") includePrivate?: string,
   ) {
-    return this.roomService.listRooms({
-      status,
-      teamMode,
-      includePrivate: includePrivate === "true",
-    });
+    try {
+      return await this.roomService.listRooms({
+        status,
+        teamMode,
+        includePrivate: includePrivate === "true",
+      });
+    } catch (error) {
+      const err = error as Error;
+      this.logger.error(
+        `listRooms failed: ${err?.message ?? String(error)}`,
+        err?.stack ?? "",
+      );
+      throw error;
+    }
   }
 
   @Get(":id")
@@ -97,6 +109,17 @@ export class RoomController {
     @Param("id") roomId: string,
   ) {
     return this.roomService.leaveRoom(userId, roomId);
+  }
+
+  @Delete(":id")
+  @HttpCode(HttpStatus.OK)
+  async closeRoom(
+    @CurrentUser("sub") userId: string,
+    @Param("id") roomId: string,
+  ) {
+    const result = await this.roomService.closeRoom(userId, roomId);
+    this.roomGateway.broadcastRoomListUpdate();
+    return result;
   }
 
   @Delete(":id/participants/:participantId")

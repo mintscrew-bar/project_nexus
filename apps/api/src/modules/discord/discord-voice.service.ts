@@ -45,7 +45,7 @@ export class DiscordVoiceService {
 
     // Create category
     const category = await guild.channels.create({
-      name: `🎮 ${roomName}`,
+      name: `⚔️ ${roomName}`,
       type: ChannelType.GuildCategory,
       permissionOverwrites: [
         {
@@ -55,57 +55,46 @@ export class DiscordVoiceService {
       ],
     });
 
+    // Create lobby channel first (생성 순서로 맨 위 고정)
+    const lobbyChannel = await guild.channels.create({
+      name: "🏟️ 내전 대기실",
+      type: ChannelType.GuildVoice,
+      parent: category.id,
+      userLimit: 50,
+    });
+
+    await this.prisma.roomDiscordChannel.create({
+      data: {
+        roomId,
+        channelId: lobbyChannel.id,
+        channelType: "VOICE",
+        teamName: "Lobby",
+      },
+    });
+
     // Create team voice channels
+    // displayName: Discord 채널 표시명, dbTeamName: snake-draft의 team.name과 매칭용 (Team 1, Team 2...)
     const teamChannels: Array<{ teamName: string; channelId: string }> = [];
-    const teamNames = [
-      "🔵 Blue Team",
-      "🔴 Red Team",
-      "🟢 Green Team",
-      "🟡 Yellow Team",
-    ];
 
     for (let i = 0; i < numTeams; i++) {
+      const displayName = `⚔️ ${i + 1}팀`;
+      const dbTeamName = `Team ${i + 1}`;
+
       const channel = await guild.channels.create({
-        name: teamNames[i] || `Team ${i + 1}`,
+        name: displayName,
         type: ChannelType.GuildVoice,
         parent: category.id,
-        userLimit: 5, // 5 players per team
+        userLimit: 5,
       });
 
-      teamChannels.push({
-        teamName: teamNames[i] || `Team ${i + 1}`,
-        channelId: channel.id,
-      });
+      teamChannels.push({ teamName: dbTeamName, channelId: channel.id });
 
-      // Store in database
       await this.prisma.roomDiscordChannel.create({
         data: {
           roomId,
           channelId: channel.id,
           channelType: "VOICE",
-          teamName: teamNames[i] || `Team ${i + 1}`,
-        },
-      });
-    }
-
-    // Create lobby/waiting room if needed (15 or 20 players)
-    let lobbyChannelId: string | undefined;
-    if (numTeams >= 3) {
-      const lobbyChannel = await guild.channels.create({
-        name: "⏳ 대기실",
-        type: ChannelType.GuildVoice,
-        parent: category.id,
-        userLimit: 20,
-      });
-
-      lobbyChannelId = lobbyChannel.id;
-
-      await this.prisma.roomDiscordChannel.create({
-        data: {
-          roomId,
-          channelId: lobbyChannel.id,
-          channelType: "VOICE",
-          teamName: "Lobby",
+          teamName: dbTeamName, // "Team 1" 형식으로 저장 → team.name과 매칭
         },
       });
     }
@@ -113,7 +102,7 @@ export class DiscordVoiceService {
     return {
       categoryId: category.id,
       teamChannels,
-      lobbyChannelId,
+      lobbyChannelId: lobbyChannel.id,
     };
   }
 
@@ -232,10 +221,22 @@ export class DiscordVoiceService {
     try {
       const guild = await this.client.guilds.fetch(guildId);
 
-      // Delete category (this will delete all channels inside)
-      const category = await guild.channels.fetch(room.discordCategoryId);
-      if (category) {
-        await category.delete();
+      // Delete child channels first (Discord does NOT auto-delete them with category)
+      for (const ch of room.discordChannels) {
+        try {
+          const channel = await guild.channels.fetch(ch.channelId).catch(() => null);
+          if (channel) await channel.delete();
+        } catch {
+          // Channel may already be deleted, continue
+        }
+      }
+
+      // Then delete the category itself
+      try {
+        const category = await guild.channels.fetch(room.discordCategoryId).catch(() => null);
+        if (category) await category.delete();
+      } catch {
+        // Category may already be deleted
       }
 
       // Clean up database
@@ -246,6 +247,80 @@ export class DiscordVoiceService {
       this.logger.log(`Deleted Discord channels for room ${roomId}`);
     } catch (error) {
       this.logger.error(`Failed to delete channels for room ${roomId}:`, error);
+    }
+  }
+
+  // ========================================
+  // Channel Update (방 설정 변경 시 팀 채널 동기화)
+  // ========================================
+
+  async updateRoomChannels(roomId: string, newNumTeams: number): Promise<void> {
+    const guildId = this.configService.get("DISCORD_GUILD_ID");
+    if (!guildId) return;
+
+    const room = await this.prisma.room.findUnique({
+      where: { id: roomId },
+      include: { discordChannels: true },
+    });
+
+    if (!room || !room.discordCategoryId) return;
+
+    const guild = await this.client.guilds.fetch(guildId);
+    const category = await guild.channels.fetch(room.discordCategoryId).catch(() => null);
+    if (!category) return;
+
+    // Get current team channels (excluding Lobby), sorted by team number
+    const existingTeamChannels = room.discordChannels
+      .filter((ch) => ch.teamName !== "Lobby")
+      .sort((a, b) => {
+        const numA = parseInt(a.teamName?.replace("Team ", "") || "0", 10);
+        const numB = parseInt(b.teamName?.replace("Team ", "") || "0", 10);
+        return numA - numB;
+      });
+    const currentNumTeams = existingTeamChannels.length;
+
+    if (newNumTeams > currentNumTeams) {
+      // Add missing team channels
+      for (let i = currentNumTeams; i < newNumTeams; i++) {
+        const displayName = `⚔️ ${i + 1}팀`;
+        const dbTeamName = `Team ${i + 1}`;
+
+        const channel = await guild.channels.create({
+          name: displayName,
+          type: ChannelType.GuildVoice,
+          parent: room.discordCategoryId,
+          userLimit: 5,
+        });
+
+        await this.prisma.roomDiscordChannel.create({
+          data: {
+            roomId,
+            channelId: channel.id,
+            channelType: "VOICE",
+            teamName: dbTeamName,
+          },
+        });
+
+        this.logger.log(`Added team channel "${displayName}" for room ${roomId}`);
+      }
+    } else if (newNumTeams < currentNumTeams) {
+      // Remove extra team channels (from the end)
+      const toRemove = existingTeamChannels.slice(newNumTeams);
+
+      for (const ch of toRemove) {
+        try {
+          const channel = await guild.channels.fetch(ch.channelId).catch(() => null);
+          if (channel) await channel.delete();
+        } catch {
+          // Already deleted
+        }
+
+        await this.prisma.roomDiscordChannel.delete({
+          where: { id: ch.id },
+        });
+
+        this.logger.log(`Removed team channel "${ch.teamName}" for room ${roomId}`);
+      }
     }
   }
 
@@ -515,13 +590,11 @@ export class DiscordVoiceService {
   // ========================================
 
   /**
-   * 룸의 모든 참가자를 대기실로 이동
+   * 룸의 모든 참가자를 방 내부 대기실(🏠 내전 대기실)로 이동
    * @param roomId 룸 ID
-   * @param lobbyChannelId 대기실 채널 ID (없으면 자동 찾기)
    */
   async moveAllToLobby(
     roomId: string,
-    lobbyChannelId?: string,
   ): Promise<{ success: number; failed: number }> {
     const room = await this.prisma.room.findUnique({
       where: { id: roomId },
@@ -537,6 +610,9 @@ export class DiscordVoiceService {
             },
           },
         },
+        discordChannels: {
+          where: { teamName: "Lobby" },
+        },
       },
     });
 
@@ -544,35 +620,7 @@ export class DiscordVoiceService {
       throw new BadRequestException("Room not found");
     }
 
-    // 대기실 채널 ID 결정: 1) 파라미터로 받은 ID, 2) 룸의 내부 대기실, 3) 외부 대기실 찾기
-    let targetLobbyId: string | undefined = lobbyChannelId;
-
-    if (!targetLobbyId) {
-      // 룸의 내부 대기실 찾기 (createRoomChannels에서 생성한 대기실)
-      const roomChannels = await this.prisma.roomDiscordChannel.findMany({
-        where: {
-          roomId,
-          channelType: "VOICE",
-          teamName: "Lobby",
-        },
-      });
-
-      if (roomChannels.length > 0) {
-        targetLobbyId = roomChannels[0].channelId;
-        this.logger.log(
-          `Using room's internal lobby channel: ${targetLobbyId}`,
-        );
-      } else {
-        // 내부 대기실이 없으면 외부 대기실 찾기
-        const externalLobbyId = await this.findAndAssignLobbyChannel(
-          room.maxParticipants,
-        );
-        if (externalLobbyId) {
-          targetLobbyId = externalLobbyId;
-          this.logger.log(`Using external lobby channel: ${targetLobbyId}`);
-        }
-      }
-    }
+    const targetLobbyId = room.discordChannels[0]?.channelId;
 
     if (!targetLobbyId) {
       this.logger.warn(`No lobby channel found for room ${roomId}`);

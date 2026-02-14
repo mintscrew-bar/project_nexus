@@ -20,19 +20,26 @@ export async function POST(request: NextRequest) {
         'Content-Type': 'application/json',
         'Cookie': `refresh_token=${refreshToken}`,
       },
+      credentials: 'include',
     });
 
+    const responseData = await backendResponse.json().catch(() => ({}));
+
     if (!backendResponse.ok) {
-      // Clear the invalid refresh token cookie
+      // Clear the invalid refresh token cookie (must match path used when setting)
       const response = NextResponse.json(
-        { message: 'Token refresh failed' },
-        { status: 401 }
+        { message: responseData.message || 'Token refresh failed' },
+        { status: backendResponse.status }
       );
-      response.cookies.delete('refresh_token');
+      response.cookies.set('refresh_token', '', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 0,
+        path: '/api/auth',
+      });
       return response;
     }
-
-    const data = await backendResponse.json();
 
     // Get the new refresh token from the backend's Set-Cookie header
     const setCookieHeader = backendResponse.headers.get('set-cookie');
@@ -45,7 +52,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const response = NextResponse.json(data);
+    const response = NextResponse.json(responseData);
 
     // Set the new refresh token cookie on the frontend domain
     if (newRefreshToken) {
