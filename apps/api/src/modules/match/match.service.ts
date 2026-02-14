@@ -919,8 +919,8 @@ export class MatchService {
               );
             }
 
-            // 3. 생성한 음성채널 삭제
-            await this.discordVoiceService.deleteRoomChannels(roomId);
+            // 3. 팀 채널만 삭제 (대기실+카테고리 유지 - 참가자들이 대기실에 있으므로)
+            await this.discordVoiceService.deleteRoomChannels(roomId, true);
           }
         } catch (error) {
           this.logger.warn(

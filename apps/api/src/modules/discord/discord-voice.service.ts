@@ -200,7 +200,14 @@ export class DiscordVoiceService {
   // Channel Cleanup
   // ========================================
 
-  async deleteRoomChannels(roomId: string): Promise<void> {
+  /**
+   * @param keepLobby true = 팀 채널만 삭제, 대기실+카테고리 유지 (토너먼트 완료 시)
+   *                  false(기본) = 전체 삭제 (방 종료 시)
+   */
+  async deleteRoomChannels(
+    roomId: string,
+    keepLobby = false,
+  ): Promise<void> {
     const guildId = this.configService.get("DISCORD_GUILD_ID");
     if (!guildId) {
       return;
@@ -221,8 +228,12 @@ export class DiscordVoiceService {
     try {
       const guild = await this.client.guilds.fetch(guildId);
 
+      const channelsToDelete = keepLobby
+        ? room.discordChannels.filter((ch) => ch.teamName !== "Lobby")
+        : room.discordChannels;
+
       // Delete child channels first (Discord does NOT auto-delete them with category)
-      for (const ch of room.discordChannels) {
+      for (const ch of channelsToDelete) {
         try {
           const channel = await guild.channels.fetch(ch.channelId).catch(() => null);
           if (channel) await channel.delete();
@@ -231,20 +242,33 @@ export class DiscordVoiceService {
         }
       }
 
-      // Then delete the category itself
-      try {
-        const category = await guild.channels.fetch(room.discordCategoryId).catch(() => null);
-        if (category) await category.delete();
-      } catch {
-        // Category may already be deleted
+      if (!keepLobby) {
+        // Delete the category itself
+        try {
+          const category = await guild.channels.fetch(room.discordCategoryId).catch(() => null);
+          if (category) await category.delete();
+        } catch {
+          // Category may already be deleted
+        }
+
+        // Clear discordCategoryId in DB
+        await this.prisma.room.update({
+          where: { id: roomId },
+          data: { discordCategoryId: null },
+        }).catch(() => {}); // Room may already be deleted
       }
 
-      // Clean up database
+      // Clean up DB records for deleted channels
       await this.prisma.roomDiscordChannel.deleteMany({
-        where: { roomId },
+        where: {
+          roomId,
+          ...(keepLobby ? { teamName: { not: "Lobby" } } : {}),
+        },
       });
 
-      this.logger.log(`Deleted Discord channels for room ${roomId}`);
+      this.logger.log(
+        `Deleted Discord channels for room ${roomId} (keepLobby=${keepLobby})`,
+      );
     } catch (error) {
       this.logger.error(`Failed to delete channels for room ${roomId}:`, error);
     }
