@@ -387,7 +387,7 @@ function MyStatsCard({
                       return (
                         <div key={champ.championId} className="flex flex-col items-center gap-1">
                           <Image
-                            src={`https://ddragon.leagueoflegends.com/cdn/14.24.1/img/champion/${champ.championId}.png`}
+                            src={`https://ddragon.leagueoflegends.com/cdn/${process.env.NEXT_PUBLIC_DDRAGON_VERSION || "16.2.1"}/img/champion/${champ.championId}.png`}
                             alt={champ.championName}
                             width={40}
                             height={40}

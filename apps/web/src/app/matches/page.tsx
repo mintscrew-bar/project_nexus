@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Search, TrendingUp, Clock, User, Target, Users } from "lucide-react";
 import { Button, Input, Badge } from "@/components/ui";
+import { useToast } from "@/components/ui/Toast";
 import { statsApi } from "@/lib/api-client";
 
 interface RecentSearch {
@@ -30,6 +31,7 @@ interface SearchResult {
 
 export default function StatsPage() {
   const router = useRouter();
+  const { addToast } = useToast();
   const [searchInput, setSearchInput] = useState("");
   const [searchType, setSearchType] = useState<"summoner" | "user">("summoner");
   const [recentSearches, setRecentSearches] = useState<RecentSearch[]>([]);
@@ -122,14 +124,14 @@ export default function StatsPage() {
           router.push(`/matches/summoner/${encodeURIComponent(gameName.trim())}/${encodeURIComponent(tagLine.trim())}`);
         }
       } else {
-        alert("소환사 이름은 '게임명#태그' 형식으로 입력해주세요. (예: Hide on bush#KR1)");
+        addToast("소환사 이름은 '게임명#태그' 형식으로 입력해주세요. (예: Hide on bush#KR1)", "error");
       }
     } else {
       // User search - if only one result, go directly
       if (searchResults.length === 1) {
         handleUserSelect(searchResults[0]);
       } else if (searchResults.length === 0) {
-        alert("검색 결과가 없습니다.");
+        addToast("검색 결과가 없습니다.", "info");
       }
     }
   };

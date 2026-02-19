@@ -24,6 +24,7 @@ export interface TokenPayload {
   sub: string; // User ID
   email?: string;
   username: string;
+  role: string; // UserRole: USER | MODERATOR | ADMIN
 }
 
 export interface RegisterDto {
@@ -218,11 +219,13 @@ export class AuthService {
     id: string;
     email?: string | null;
     username: string;
+    role?: string;
   }) {
     const payload: TokenPayload = {
       sub: user.id,
       email: user.email || undefined,
       username: user.username,
+      role: user.role || "USER",
     };
 
     const [accessToken, refreshToken] = await Promise.all([

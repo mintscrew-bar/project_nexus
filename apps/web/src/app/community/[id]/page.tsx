@@ -14,6 +14,7 @@ import {
   Badge,
 } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
+import { ConfirmModal } from "@/components/ui/Modal";
 import {
   ArrowLeft,
   Eye,
@@ -85,6 +86,8 @@ export default function PostDetailPage() {
   const [likeCount, setLikeCount] = useState(0);
   const [commentText, setCommentText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [deletePostConfirm, setDeletePostConfirm] = useState(false);
+  const [deleteCommentId, setDeleteCommentId] = useState<string | null>(null);
   const { addToast } = useToast();
 
   const fetchPost = useCallback(async () => {
@@ -155,8 +158,6 @@ export default function PostDetailPage() {
   };
 
   const handleDeletePost = async () => {
-    if (!confirm("정말로 게시글을 삭제하시겠습니까?")) return;
-
     try {
       await communityApi.deletePost(postId);
       addToast("게시글이 삭제되었습니다.", "info");
@@ -167,8 +168,6 @@ export default function PostDetailPage() {
   };
 
   const handleDeleteComment = async (commentId: string) => {
-    if (!confirm("정말로 댓글을 삭제하시겠습니까?")) return;
-
     try {
       await communityApi.deleteComment(commentId);
       addToast("댓글이 삭제되었습니다.", "info");
@@ -215,6 +214,7 @@ export default function PostDetailPage() {
   const CategoryIcon = config.icon;
 
   return (
+    <>
     <div className="flex-grow p-4 md:p-8 animate-fade-in">
       <div className="container mx-auto max-w-3xl">
         {/* Back Button */}
@@ -308,7 +308,7 @@ export default function PostDetailPage() {
                     <Edit className="h-4 w-4 mr-1" />
                     수정
                   </Button>
-                  <Button variant="ghost" size="sm" onClick={handleDeletePost}>
+                  <Button variant="ghost" size="sm" onClick={() => setDeletePostConfirm(true)}>
                     <Trash2 className="h-4 w-4 mr-1" />
                     삭제
                   </Button>
@@ -393,7 +393,7 @@ export default function PostDetailPage() {
                         </div>
                         {user?.id === comment.author.id && (
                           <button
-                            onClick={() => handleDeleteComment(comment.id)}
+                            onClick={() => setDeleteCommentId(comment.id)}
                             className="text-text-tertiary hover:text-accent-danger"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -410,5 +410,25 @@ export default function PostDetailPage() {
         </Card>
       </div>
     </div>
+
+    <ConfirmModal
+      isOpen={deletePostConfirm}
+      onClose={() => setDeletePostConfirm(false)}
+      onConfirm={handleDeletePost}
+      title="게시글 삭제"
+      message="정말로 이 게시글을 삭제하시겠습니까? 삭제된 게시글은 복구할 수 없습니다."
+      confirmText="삭제"
+      variant="danger"
+    />
+    <ConfirmModal
+      isOpen={deleteCommentId !== null}
+      onClose={() => setDeleteCommentId(null)}
+      onConfirm={() => { if (deleteCommentId) handleDeleteComment(deleteCommentId); }}
+      title="댓글 삭제"
+      message="정말로 이 댓글을 삭제하시겠습니까?"
+      confirmText="삭제"
+      variant="danger"
+    />
+    </>
   );
 }

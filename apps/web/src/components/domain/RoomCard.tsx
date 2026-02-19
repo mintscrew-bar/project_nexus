@@ -12,7 +12,7 @@ interface Room {
   hostName?: string;
   maxParticipants: number;
   isPrivate: boolean;
-  status: 'WAITING' | 'IN_PROGRESS' | 'COMPLETED' | 'DRAFT' | 'DRAFT_COMPLETED' | 'TEAM_SELECTION';
+  status: 'WAITING' | 'IN_PROGRESS' | 'COMPLETED' | 'DRAFT' | 'DRAFT_COMPLETED' | 'TEAM_SELECTION' | 'ROLE_SELECTION';
   teamMode: 'AUCTION' | 'SNAKE_DRAFT';
   createdAt: string;
   minTier?: string;

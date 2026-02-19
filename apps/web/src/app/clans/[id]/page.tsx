@@ -15,6 +15,7 @@ import {
   Badge,
 } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
+import { ConfirmModal } from "@/components/ui/Modal";
 import {
   Shield,
   Crown,
@@ -76,6 +77,7 @@ export default function ClanDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [isMember, setIsMember] = useState(false);
   const [myRole, setMyRole] = useState<"OWNER" | "OFFICER" | "MEMBER" | null>(null);
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const { addToast } = useToast();
 
   const fetchClan = useCallback(async () => {
@@ -117,8 +119,6 @@ export default function ClanDetailPage() {
   };
 
   const handleLeaveClan = async () => {
-    if (!confirm("정말로 클랜을 탈퇴하시겠습니까?")) return;
-
     try {
       await clanApi.leaveClan(clanId);
       addToast("클랜을 탈퇴했습니다.", "info");
@@ -175,6 +175,7 @@ export default function ClanDetailPage() {
   const canManage = isOwner || isOfficer;
 
   return (
+    <>
     <div className="flex-grow p-4 md:p-8 animate-fade-in">
       <div className="container mx-auto max-w-4xl">
         {/* Header */}
@@ -240,7 +241,7 @@ export default function ClanDetailPage() {
                       </Button>
                     )}
                     {!isOwner && (
-                      <Button variant="ghost" onClick={handleLeaveClan}>
+                      <Button variant="ghost" onClick={() => setShowLeaveConfirm(true)}>
                         <LogOut className="h-4 w-4 mr-2" />
                         탈퇴
                       </Button>
@@ -327,5 +328,16 @@ export default function ClanDetailPage() {
         </Card>
       </div>
     </div>
+
+    <ConfirmModal
+      isOpen={showLeaveConfirm}
+      onClose={() => setShowLeaveConfirm(false)}
+      onConfirm={handleLeaveClan}
+      title="클랜 탈퇴"
+      message={`정말로 "${clan?.name}" 클랜을 탈퇴하시겠습니까?`}
+      confirmText="탈퇴"
+      variant="danger"
+    />
+    </>
   );
 }
