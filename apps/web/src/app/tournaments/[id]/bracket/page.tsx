@@ -7,6 +7,7 @@ import { useAuthStore } from "@/stores/auth-store";
 import { roomApi, matchApi } from "@/lib/api-client";
 import { BracketView, Match, MatchDetailModal, VictoryScreen } from "@/components/domain";
 import { LoadingSpinner, Badge, Button } from "@/components/ui";
+import { useToast } from "@/components/ui/Toast";
 import { ArrowLeft, RefreshCw, Trophy } from "lucide-react";
 import Link from "next/link";
 
@@ -14,6 +15,7 @@ export default function BracketPage() {
   const params = useParams();
   const router = useRouter();
   const roomId = params.id as string;
+  const { addToast } = useToast();
 
   const { user } = useAuthStore();
   const {
@@ -61,8 +63,7 @@ export default function BracketPage() {
       try {
         const status = await matchApi.getLiveStatus(match.id);
         setLiveStatus(status);
-      } catch (error) {
-        console.error('Failed to fetch live status:', error);
+      } catch {
         setLiveStatus(null);
       }
     }
@@ -78,8 +79,8 @@ export default function BracketPage() {
     try {
       const status = await matchApi.getLiveStatus(matchId);
       setLiveStatus(status);
-    } catch (error) {
-      console.error('Failed to refresh live status:', error);
+    } catch {
+      addToast("라이브 상태 새로고침에 실패했습니다.", "error");
     }
   };
 

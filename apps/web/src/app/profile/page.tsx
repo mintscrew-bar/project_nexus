@@ -9,6 +9,7 @@ import { AddAccountModal } from '@/components/domain/AddAccountModal';
 import { LoadingSpinner, Card, CardHeader, CardTitle, CardContent, Badge, Button, Label, Skeleton, EmptyState } from '@/components/ui';
 import { Star, Plus, RefreshCw, Shield, Trophy, TrendingUp, Loader2, Gamepad2, Target, History, Clock } from 'lucide-react';
 import { TierBadge } from '@/components/domain/TierBadge';
+import { useToast } from '@/components/ui/Toast';
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -25,6 +26,7 @@ export default function ProfilePage() {
   } = useRiotStore();
 
   const [showAddModal, setShowAddModal] = useState(false);
+  const { addToast } = useToast();
   const [stats, setStats] = useState<{
     gamesPlayed: number;
     wins: number;
@@ -48,8 +50,8 @@ export default function ProfilePage() {
     try {
       const data = await userApi.getStats();
       setStats(data);
-    } catch (error) {
-      console.error('Failed to fetch stats:', error);
+    } catch {
+      addToast('전적 통계를 불러오지 못했습니다.', 'error');
     } finally {
       setStatsLoading(false);
     }
@@ -60,8 +62,8 @@ export default function ProfilePage() {
     try {
       const data = await matchApi.getUserMatches({ limit: 5 });
       setRecentMatches(data);
-    } catch (error) {
-      console.error('Failed to fetch recent matches:', error);
+    } catch {
+      addToast('최근 내전 기록을 불러오지 못했습니다.', 'error');
     } finally {
       setMatchesLoading(false);
     }
@@ -91,8 +93,9 @@ export default function ProfilePage() {
   const handleSetPrimary = async (accountId: string) => {
     try {
       await setPrimaryAccount(accountId);
-    } catch (error) {
-      console.error('Failed to set primary account:', error);
+      addToast('대표 계정이 변경되었습니다.', 'success');
+    } catch {
+      addToast('대표 계정 설정에 실패했습니다.', 'error');
     }
   };
 
@@ -100,8 +103,8 @@ export default function ProfilePage() {
     setSyncingAccountId(accountId);
     try {
       await syncAccount(accountId);
-    } catch (error) {
-      console.error('Failed to sync account:', error);
+    } catch {
+      addToast('계정 동기화에 실패했습니다.', 'error');
     } finally {
       setSyncingAccountId(null);
     }

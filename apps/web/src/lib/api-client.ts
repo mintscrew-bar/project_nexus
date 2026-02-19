@@ -879,3 +879,25 @@ export const statsApi = {
     return response.data;
   },
 };
+
+// ========================================
+// Admin API
+// ========================================
+
+export const adminApi = {
+  getStats: async () => {
+    const response = await apiClient.get("/admin/stats");
+    return response.data;
+  },
+
+  getUsers: async (params?: { page?: number; limit?: number; search?: string }) => {
+    const response = await apiClient.get("/admin/users", { params });
+    return response.data;
+  },
+
+  updateUserRole: async (userId: string, role: "USER" | "MODERATOR" | "ADMIN") => {
+    const response = await apiClient.patch(`/admin/users/${userId}/role`, { role });
+    return response.data;
+  },
+};
+

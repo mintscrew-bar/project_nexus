@@ -6,10 +6,12 @@ import { useSnakeDraftStore } from "@/stores/snake-draft-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { DraftBoard } from "@/components/domain/DraftBoard";
 import { LoadingSpinner, Badge } from "@/components/ui";
+import { useToast } from "@/components/ui/Toast";
 
 export default function SnakeDraftPage() {
   const params = useParams();
   const draftId = params.id as string;
+  const { addToast } = useToast();
 
   const { user } = useAuthStore();
   const {
@@ -35,8 +37,8 @@ export default function SnakeDraftPage() {
   const handleMakePick = async (playerId: string) => {
     try {
       await makePick(draftId, playerId);
-    } catch (err) {
-      console.error("Failed to make pick:", err);
+    } catch (err: any) {
+      addToast(err?.response?.data?.message || "픽 선택에 실패했습니다.", "error");
     }
   };
 

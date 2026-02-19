@@ -6,7 +6,7 @@ interface User {
   username: string;
   avatar: string | null;
   email?: string;
-  // Add other fields from your User model as needed
+  role: 'USER' | 'MODERATOR' | 'ADMIN';
   [key: string]: any;
 }
 

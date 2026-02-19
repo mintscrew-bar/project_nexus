@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import { userApi, matchApi, statsApi } from "@/lib/api-client";
 import { LoadingSpinner, Button, Badge } from "@/components/ui";
+import { useToast } from "@/components/ui/Toast";
 import { ArrowLeft, User, Trophy, Target, TrendingUp, Calendar, Loader2, Gamepad2 } from "lucide-react";
 import Link from "next/link";
 
@@ -70,6 +71,7 @@ export default function UserStatsPage() {
   const params = useParams();
   const router = useRouter();
   const userId = params.userId as string;
+  const { addToast } = useToast();
 
   const [user, setUser] = useState<UserData | null>(null);
   const [matchHistory, setMatchHistory] = useState<MatchHistory[]>([]);
@@ -121,7 +123,7 @@ export default function UserStatsPage() {
       setShowRiotMatches(true);
     } catch (err: any) {
       console.error("Failed to fetch Riot matches:", err);
-      alert("Riot 전적을 불러오는데 실패했습니다. Riot 계정이 연동되어 있는지 확인해주세요.");
+      addToast("Riot 전적을 불러오는데 실패했습니다. Riot 계정이 연동되어 있는지 확인해주세요.", "error");
     } finally {
       setIsLoadingRiotMatches(false);
     }

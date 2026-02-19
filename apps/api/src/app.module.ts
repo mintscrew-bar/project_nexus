@@ -20,6 +20,7 @@ import { PresenceModule } from "./modules/presence/presence.module";
 import { RoleSelectionModule } from "./modules/role-selection/role-selection.module";
 import { StatsModule } from "./modules/stats/stats.module";
 import { NotificationModule } from "./modules/notification/notification.module";
+import { AdminModule } from "./modules/admin/admin.module";
 import { PrismaModule } from "./modules/prisma/prisma.module";
 import { RedisModule } from "./modules/redis/redis.module";
 import { HealthController } from "./health.controller";
@@ -78,6 +79,7 @@ const projectRoot = resolve(apiRoot, "../..");
     FriendModule,
     PresenceModule,
     NotificationModule,
+    AdminModule,
   ],
   controllers: [HealthController],
 })

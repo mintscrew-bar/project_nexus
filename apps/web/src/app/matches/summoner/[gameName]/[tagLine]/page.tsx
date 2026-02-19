@@ -5,6 +5,7 @@ import { useEffect, useState, useRef } from "react";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { riotApi, matchApi, statsApi } from "@/lib/api-client";
 import { LoadingSpinner, Button, Badge } from "@/components/ui";
+import { useToast } from "@/components/ui/Toast";
 import { ArrowLeft, Trophy, TrendingUp, Target, Sword, ExternalLink, Loader2, Gamepad2, RefreshCw, Search, ChevronDown, ChevronUp, Shield, Crosshair } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -345,6 +346,7 @@ export default function SummonerStatsPage() {
   const params = useParams();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { addToast } = useToast();
   // useParams()에서 받은 값을 명시적으로 디코딩
   const gameName = decodeURIComponent(params.gameName as string);
   const tagLine = decodeURIComponent(params.tagLine as string);
@@ -403,7 +405,7 @@ export default function SummonerStatsPage() {
     // Parse gameName#tagLine format
     const hashIndex = input.lastIndexOf("#");
     if (hashIndex === -1) {
-      alert("소환사명#태그 형식으로 입력해주세요 (예: Hide on bush#KR1)");
+      addToast("소환사명#태그 형식으로 입력해주세요 (예: Hide on bush#KR1)", "error");
       return;
     }
 
@@ -411,7 +413,7 @@ export default function SummonerStatsPage() {
     const searchTagLine = input.substring(hashIndex + 1).trim();
 
     if (!searchGameName || !searchTagLine) {
-      alert("소환사명#태그 형식으로 입력해주세요 (예: Hide on bush#KR1)");
+      addToast("소환사명#태그 형식으로 입력해주세요 (예: Hide on bush#KR1)", "error");
       return;
     }
 
@@ -510,7 +512,7 @@ export default function SummonerStatsPage() {
       }
     } catch (err: any) {
       console.error("Failed to refresh data:", err);
-      alert("데이터 새로고침에 실패했습니다.");
+      addToast("데이터 새로고침에 실패했습니다.", "error");
     } finally {
       setIsRefreshing(false);
     }

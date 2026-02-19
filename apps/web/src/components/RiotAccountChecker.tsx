@@ -29,7 +29,9 @@ export function RiotAccountChecker({ children }: { children: React.ReactNode }) 
       // Read FRESH state from store (avoid stale closure on `accounts`)
       const freshAccounts = useRiotStore.getState().accounts;
       if (!freshAccounts || freshAccounts.length === 0) {
-        const dismissed = sessionStorage.getItem('riot-modal-dismissed');
+        // Use localStorage with user-specific key so dismissal persists across sessions
+        const dismissedKey = `riot-modal-dismissed-${user?.id}`;
+        const dismissed = localStorage.getItem(dismissedKey);
         if (!dismissed) {
           setShowModal(true);
         }
@@ -41,9 +43,9 @@ export function RiotAccountChecker({ children }: { children: React.ReactNode }) 
     if (isAuthenticated) {
       checkRiotAccount();
     }
-  }, [isAuthenticated, shouldSkip, checked, fetchAccounts]);
+  }, [isAuthenticated, shouldSkip, checked, fetchAccounts, user?.id]);
 
-  // Reset checked state when user changes
+  // Reset checked state when user changes (new login)
   useEffect(() => {
     setChecked(false);
   }, [user?.id]);
@@ -56,7 +58,9 @@ export function RiotAccountChecker({ children }: { children: React.ReactNode }) 
         isOpen={showModal}
         onClose={() => {
           setShowModal(false);
-          sessionStorage.setItem('riot-modal-dismissed', 'true');
+          if (user?.id) {
+            localStorage.setItem(`riot-modal-dismissed-${user.id}`, 'true');
+          }
         }}
         onAccountAdded={() => {
           fetchAccounts(); // Re-fetch accounts to update the state
