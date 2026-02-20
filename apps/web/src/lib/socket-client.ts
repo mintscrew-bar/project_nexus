@@ -9,6 +9,7 @@ let matchSocket: Socket | null = null;
 let clanSocket: Socket | null = null;
 let presenceSocket: Socket | null = null;
 let notificationSocket: Socket | null = null;
+let dmSocket: Socket | null = null;
 
 const SOCKET_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
@@ -524,6 +525,74 @@ export const disconnectNotificationSocket = () => {
   notificationSocket = null;
 };
 
+// DM Socket 연결
+export const connectDmSocket = () => {
+  if (dmSocket?.connected) return dmSocket;
+
+  dmSocket = io(`${SOCKET_URL}/dm`, {
+    auth: {
+      token: getAccessToken(),
+    },
+    transports: ["websocket"],
+    reconnection: true,
+    reconnectionAttempts: 5,
+    reconnectionDelay: 2000,
+  });
+
+  dmSocket.on("connect", () => {
+    console.log("✅ DM Socket Connected");
+  });
+
+  dmSocket.on("disconnect", () => {
+    console.log("❌ DM Socket Disconnected");
+  });
+
+  return dmSocket;
+};
+
+export const dmSocketHelpers = {
+  sendMessage: (receiverId: string, content: string) => {
+    dmSocket?.emit("send-dm", { receiverId, content });
+  },
+
+  sendIsTyping: (receiverId: string, isTyping: boolean) => {
+    dmSocket?.emit("is-typing", { receiverId, isTyping });
+  },
+
+  markRead: (senderId: string) => {
+    dmSocket?.emit("mark-read", { senderId });
+  },
+
+  onNewMessage: (callback: (message: any) => void) => {
+    dmSocket?.on("new-dm", callback);
+  },
+
+  onUserTyping: (callback: (data: { userId: string; username: string }) => void) => {
+    dmSocket?.on("dm-typing", callback);
+  },
+
+  onUserStoppedTyping: (callback: (data: { userId: string }) => void) => {
+    dmSocket?.on("dm-stopped-typing", callback);
+  },
+
+  onUnreadCount: (callback: (data: { total: number }) => void) => {
+    dmSocket?.on("dm-unread-count", callback);
+  },
+
+  offAllListeners: () => {
+    dmSocket?.off("new-dm");
+    dmSocket?.off("dm-typing");
+    dmSocket?.off("dm-stopped-typing");
+    dmSocket?.off("dm-unread-count");
+  },
+};
+
+export const disconnectDmSocket = () => {
+  dmSocketHelpers.offAllListeners();
+  dmSocket?.disconnect();
+  dmSocket = null;
+};
+
 // 모든 소켓 연결 해제
 export const disconnectAllSockets = () => {
   roomSocket?.disconnect();
@@ -533,6 +602,7 @@ export const disconnectAllSockets = () => {
   clanSocket?.disconnect();
   presenceSocket?.disconnect();
   notificationSocket?.disconnect();
+  dmSocket?.disconnect();
 
   roomSocket = null;
   auctionSocket = null;
@@ -541,6 +611,7 @@ export const disconnectAllSockets = () => {
   clanSocket = null;
   presenceSocket = null;
   notificationSocket = null;
+  dmSocket = null;
 };
 
 // 특정 소켓 연결 해제

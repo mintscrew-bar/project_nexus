@@ -901,3 +901,31 @@ export const adminApi = {
   },
 };
 
+// ========================================
+// DM API
+// ========================================
+
+export const dmApi = {
+  getConversations: async () => {
+    const response = await apiClient.get("/dm/conversations");
+    return response.data;
+  },
+
+  getMessages: async (userId: string, cursor?: string) => {
+    const response = await apiClient.get(`/dm/conversations/${userId}`, {
+      params: cursor ? { cursor } : undefined,
+    });
+    return response.data;
+  },
+
+  markAsRead: async (userId: string) => {
+    const response = await apiClient.post(`/dm/conversations/${userId}/read`);
+    return response.data;
+  },
+
+  getUnreadCount: async () => {
+    const response = await apiClient.get("/dm/unread-count");
+    return response.data;
+  },
+};
+
