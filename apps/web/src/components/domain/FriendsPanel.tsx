@@ -38,6 +38,10 @@ import { useLobbyStore } from "@/stores/lobby-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { useToast } from "@/components/ui/Toast";
 import { StatusIndicator } from "@/components/ui";
+import { useDmStore } from "@/stores/dm-store";
+import { connectDmSocket, dmSocketHelpers } from "@/lib/socket-client";
+import { DmChatView } from "@/components/domain/DmChatView";
+import { ArrowLeft } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type ModalState =
@@ -213,6 +217,7 @@ function FriendItem({
   onDragEnd,
   onDragOver,
   onDrop,
+  onOpenDm,
 }: {
   friendship: Friendship;
   currentUserId: string;
@@ -223,16 +228,18 @@ function FriendItem({
   onDragEnd: () => void;
   onDragOver: (e: DragEvent) => void;
   onDrop: (e: DragEvent) => void;
+  onOpenDm: (userId: string) => void;
 }) {
   const router = useRouter();
-  const { addToast } = useToast();
   const getDisplayName = useFriendStore((s) => s.getDisplayName);
   const getFriendStatus = usePresenceStore((s) => s.getFriendStatus);
+  const unreadCounts = useDmStore((s) => s.unreadCounts);
 
   const friendUser =
     friendship.userId === currentUserId ? friendship.friend : friendship.user;
   const displayName = getDisplayName(friendUser.id, friendUser.username);
   const status = getFriendStatus(friendUser.id);
+  const unread = unreadCounts[friendUser.id] ?? 0;
   const [hovered, setHovered] = useState(false);
   const hoverTimer = useRef<ReturnType<typeof setTimeout>>();
 
@@ -254,9 +261,7 @@ function FriendItem({
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       onContextMenu={(e) => { e.preventDefault(); onContextMenu(e, friendship); }}
-      onClick={() => {
-        addToast("DM 기능 준비 중입니다.", "info");
-      }}
+      onClick={() => onOpenDm(friendUser.id)}
       className={`relative flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-pointer transition-colors group select-none
         ${dragging ? "opacity-40" : ""}
         ${dragOver ? "bg-accent-primary/10 border border-dashed border-accent-primary/40" : "hover:bg-bg-elevated"}
@@ -264,6 +269,11 @@ function FriendItem({
     >
       {/* Avatar */}
       <div className="relative flex-shrink-0">
+        {unread > 0 && (
+          <span className="absolute -top-1 -right-1 z-10 min-w-[16px] h-4 px-1 flex items-center justify-center bg-accent-danger text-white text-[9px] font-bold rounded-full leading-none">
+            {unread > 99 ? '99+' : unread}
+          </span>
+        )}
         <div className="w-8 h-8 rounded-full bg-bg-tertiary overflow-hidden">
           {friendUser.avatar ? (
             <Image
@@ -331,6 +341,7 @@ function CategorySection({
   canDelete,
   onRename,
   onDelete,
+  onOpenDm,
 }: {
   label: string;
   categoryId: string | null;
@@ -346,6 +357,7 @@ function CategorySection({
   canDelete: boolean;
   onRename?: () => void;
   onDelete?: () => void;
+  onOpenDm: (userId: string) => void;
 }) {
   const { toggleCategoryCollapse, categories } = useFriendStore();
   const getFriendStatus = usePresenceStore((s) => s.getFriendStatus);
@@ -439,6 +451,7 @@ function CategorySection({
                   setDragFriendId(null);
                   setDragOverCategoryId(null);
                 }}
+                onOpenDm={onOpenDm}
               />
             );
           })}
@@ -941,6 +954,16 @@ export function FriendsPanel() {
   } = useFriendStore();
   const getFriendStatus = usePresenceStore((s) => s.getFriendStatus);
   const room = useLobbyStore((s) => s.room);
+  const {
+    openChatUserId,
+    openChat,
+    closeChat,
+    setTotalUnread,
+    setUnreadCount,
+    appendMessage,
+    updateConversationLastMessage,
+    setTyping,
+  } = useDmStore();
 
   const [tab, setTab] = useState<"friends" | "pending">("friends");
   const [search, setSearch] = useState("");
@@ -959,6 +982,48 @@ export function FriendsPanel() {
   useEffect(() => {
     if (isOpen && isAuthenticated) fetchFriends();
   }, [isOpen, isAuthenticated, fetchFriends]);
+
+  // DM 소켓 연결 + 전역 이벤트 핸들러
+  useEffect(() => {
+    if (!isAuthenticated || !user?.id) return;
+
+    connectDmSocket();
+
+    const handleNewDm = (msg: any) => {
+      appendMessage(msg);
+      updateConversationLastMessage(
+        msg.senderId === user.id ? msg.receiverId : msg.senderId,
+        msg,
+      );
+    };
+
+    const handleUnreadCount = (data: { total: number }) => {
+      setTotalUnread(data.total);
+    };
+
+    const handleTyping = (data: { userId: string }) => {
+      setTyping(data.userId, true);
+    };
+
+    const handleStoppedTyping = (data: { userId: string }) => {
+      setTyping(data.userId, false);
+    };
+
+    dmSocketHelpers.onNewMessage(handleNewDm);
+    dmSocketHelpers.onUnreadCount(handleUnreadCount);
+    dmSocketHelpers.onUserTyping(handleTyping);
+    dmSocketHelpers.onUserStoppedTyping(handleStoppedTyping);
+
+    return () => {
+      dmSocketHelpers.offAllListeners();
+    };
+  }, [isAuthenticated, user?.id, appendMessage, updateConversationLastMessage, setTotalUnread, setTyping]);
+
+  // 패널 닫을 때 채팅 뷰도 닫기
+  const handleClosePanel = () => {
+    closeChat();
+    closePanel();
+  };
 
   const currentUserId = user?.id ?? "";
 
@@ -1035,13 +1100,26 @@ export function FriendsPanel() {
     !!room && room.status === "WAITING" &&
     room.participants.length < room.maxParticipants;
 
+  // 현재 DM 상대 유저 정보
+  const chatPartner = openChatUserId
+    ? (() => {
+        const f = friends.find((fr) => {
+          const fu = getFriendUser(fr);
+          return fu.id === openChatUserId;
+        });
+        if (!f) return null;
+        const fu = getFriendUser(f);
+        return { id: fu.id, username: getDisplayName(fu.id, fu.username), avatar: fu.avatar };
+      })()
+    : null;
+
   if (!isAuthenticated) return null;
 
   return (
     <>
       {/* Backdrop */}
       {isOpen && (
-        <div className="fixed inset-0 z-40" onClick={closePanel} />
+        <div className="fixed inset-0 z-40" onClick={handleClosePanel} />
       )}
 
       {/* Slide-in Panel */}
@@ -1052,35 +1130,81 @@ export function FriendsPanel() {
       >
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-bg-tertiary">
-          <div className="flex items-center gap-2">
-            <Users className="w-4 h-4 text-accent-primary" />
-            <span className="font-semibold text-text-primary text-sm">친구 목록</span>
-          </div>
-          <div className="flex items-center gap-1">
-            {/* Add Friend */}
-            <button
-              title="친구 추가"
-              onClick={() => setModal({ type: "addFriend" })}
-              className="p-1.5 rounded-lg hover:bg-bg-elevated text-text-tertiary hover:text-accent-primary transition-colors"
-            >
-              <UserPlus className="w-4 h-4" />
-            </button>
-            {/* Add Category */}
-            <button
-              title="카테고리 추가"
-              onClick={() => setModal({ type: "addCategory" })}
-              className="p-1.5 rounded-lg hover:bg-bg-elevated text-text-tertiary hover:text-text-primary transition-colors"
-            >
-              <FolderPlus className="w-4 h-4" />
-            </button>
-            <button
-              onClick={closePanel}
-              className="p-1.5 rounded-lg hover:bg-bg-elevated text-text-tertiary hover:text-text-primary transition-colors"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
+          {openChatUserId && chatPartner ? (
+            /* 채팅 뷰 헤더 */
+            <>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={closeChat}
+                  className="p-1.5 rounded-lg hover:bg-bg-elevated text-text-tertiary hover:text-text-primary transition-colors"
+                  title="뒤로"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                </button>
+                <div className="w-6 h-6 rounded-full bg-bg-tertiary overflow-hidden flex-shrink-0">
+                  {chatPartner.avatar ? (
+                    <img src={chatPartner.avatar} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-[10px] font-bold text-text-muted">
+                      {chatPartner.username[0]?.toUpperCase()}
+                    </div>
+                  )}
+                </div>
+                <span className="font-semibold text-text-primary text-sm truncate max-w-[120px]">
+                  {chatPartner.username}
+                </span>
+              </div>
+              <button
+                onClick={handleClosePanel}
+                className="p-1.5 rounded-lg hover:bg-bg-elevated text-text-tertiary hover:text-text-primary transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </>
+          ) : (
+            /* 친구 목록 헤더 */
+            <>
+              <div className="flex items-center gap-2">
+                <Users className="w-4 h-4 text-accent-primary" />
+                <span className="font-semibold text-text-primary text-sm">친구 목록</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  title="친구 추가"
+                  onClick={() => setModal({ type: "addFriend" })}
+                  className="p-1.5 rounded-lg hover:bg-bg-elevated text-text-tertiary hover:text-accent-primary transition-colors"
+                >
+                  <UserPlus className="w-4 h-4" />
+                </button>
+                <button
+                  title="카테고리 추가"
+                  onClick={() => setModal({ type: "addCategory" })}
+                  className="p-1.5 rounded-lg hover:bg-bg-elevated text-text-tertiary hover:text-text-primary transition-colors"
+                >
+                  <FolderPlus className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={handleClosePanel}
+                  className="p-1.5 rounded-lg hover:bg-bg-elevated text-text-tertiary hover:text-text-primary transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </>
+          )}
         </div>
+
+        {/* DM 채팅 뷰 */}
+        {openChatUserId && chatPartner && (
+          <DmChatView
+            otherUserId={chatPartner.id}
+            otherUsername={chatPartner.username}
+            otherAvatar={chatPartner.avatar}
+          />
+        )}
+
+        {/* 친구 목록 뷰 */}
+        {!openChatUserId && <>
 
         {/* Search */}
         {tab === "friends" && (
@@ -1166,6 +1290,7 @@ export function FriendsPanel() {
                         onConfirm: () => deleteCategory(cat.id),
                       });
                     }}
+                    onOpenDm={openChat}
                   />
                 ))}
 
@@ -1184,6 +1309,7 @@ export function FriendsPanel() {
                     onDropToCategory={handleDropToCategory}
                     canRename={false}
                     canDelete={false}
+                    onOpenDm={openChat}
                   />
                 )}
               </>
@@ -1192,6 +1318,8 @@ export function FriendsPanel() {
         ) : (
           <PendingList currentUserId={currentUserId} />
         )}
+
+        </> /* !openChatUserId */}
       </div>
 
       {/* Context Menu */}

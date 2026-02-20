@@ -40,10 +40,10 @@ const ROLE_LABELS: Record<UserRole, string> = {
   ADMIN: "관리자",
 };
 
-const ROLE_VARIANTS: Record<UserRole, "default" | "secondary" | "destructive" | "outline"> = {
-  USER: "outline",
+const ROLE_VARIANTS: Record<UserRole, "default" | "secondary" | "danger"> = {
+  USER: "default",
   MODERATOR: "secondary",
-  ADMIN: "destructive",
+  ADMIN: "danger",
 };
 
 export default function AdminPage() {
@@ -213,7 +213,7 @@ export default function AdminPage() {
                       <td className="px-4 py-3">
                         <div className="flex gap-1 flex-wrap">
                           {u.authProviders.map((p) => (
-                            <Badge key={p.provider} variant="outline" className="text-[10px]">
+                            <Badge key={p.provider} variant="default" className="text-[10px]">
                               {p.provider}
                             </Badge>
                           ))}

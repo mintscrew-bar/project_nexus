@@ -58,6 +58,8 @@ model User {
   friendOf           Friendship[]           @relation("FriendOfUser")
   chatMessages       ChatMessage[]
   clanChatMessages   ClanChatMessage[]
+  sentDMs            DirectMessage[]    @relation("SentDMs")
+  receivedDMs        DirectMessage[]    @relation("ReceivedDMs")
   snakeDraftPicks    SnakeDraftPick[]
   matchParticipations MatchParticipant[]
   notifications       Notification[]
@@ -902,6 +904,22 @@ model RiotMatchCache {
   @@index([queueId])
   @@index([gameEnd])
   @@map("riot_match_cache")
+}
+
+model DirectMessage {
+  id         String   @id @default(cuid())
+  senderId   String
+  receiverId String
+  content    String
+  isRead     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  sender   User @relation("SentDMs",     fields: [senderId],   references: [id], onDelete: Cascade)
+  receiver User @relation("ReceivedDMs", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@index([senderId, receiverId, createdAt])
+  @@index([receiverId, isRead])
+  @@map("direct_messages")
 }
 
 enum NotificationType {
