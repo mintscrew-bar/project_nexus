@@ -5,9 +5,14 @@ import { PrismaService } from "../prisma/prisma.service";
 export class DmService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async sendMessage(senderId: string, receiverId: string, content: string) {
+  async sendMessage(
+    senderId: string,
+    receiverId: string,
+    content: string,
+    senderUsername: string,
+  ) {
     return this.prisma.directMessage.create({
-      data: { senderId, receiverId, content },
+      data: { senderId, receiverId, content, senderUsername },
       include: {
         sender: { select: { id: true, username: true, avatar: true } },
       },
