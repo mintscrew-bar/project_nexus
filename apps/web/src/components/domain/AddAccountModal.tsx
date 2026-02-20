@@ -126,6 +126,8 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
     }
   };
 
+  const totalChampionsSelected = Object.values(championsByRole).reduce((sum, arr) => sum + arr.length, 0);
+
   const handleRoleSubmit = async () => {
     handleClearError();
     if (mainRole === subRole) {
@@ -142,7 +144,7 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
         championsByRole: championsByRole,
       });
       onAccountAdded();
-      onClose(); // Close modal on success
+      onClose();
     } catch (err: any) {
       setLocalError(err.message || '계정 등록에 실패했습니다.');
     } finally {
@@ -310,12 +312,26 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
             </div>
           </div>
           <div>
-            <Label>선호 챔피언 (역할별 최대 5개)</Label>
-            <div className="mt-2 border rounded-lg p-2">
+            <div className="flex items-center gap-2 mb-2">
+              <Label>선호 챔피언 (역할별 최대 5개)</Label>
+              <span className="text-xs text-text-muted bg-bg-tertiary px-2 py-0.5 rounded-full">선택사항</span>
+            </div>
+            {totalChampionsSelected === 0 && (
+              <div className="flex items-start gap-2 p-3 rounded-lg bg-bg-tertiary border border-bg-elevated mb-2">
+                <Info className="w-4 h-4 text-text-muted flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-text-muted">
+                  챔피언을 선택하지 않아도 등록할 수 있습니다. 나중에 프로필에서 언제든 추가할 수 있어요.
+                </p>
+              </div>
+            )}
+            <div className="border rounded-lg p-2">
               <div className="flex border-b mb-2">
                 {ROLES.map(role => (
                   <button key={role} onClick={() => setActiveRoleTab(role)} className={`px-4 py-2 text-sm font-medium ${activeRoleTab === role ? 'border-b-2 border-accent-primary text-accent-primary' : 'text-text-secondary'}`}>
                     {role}
+                    {championsByRole[role].length > 0 && (
+                      <span className="ml-1 text-[10px] text-accent-primary">({championsByRole[role].length})</span>
+                    )}
                   </button>
                 ))}
               </div>
@@ -358,7 +374,7 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
         {step === 3 && (
           <Button onClick={handleRoleSubmit} disabled={isLoading || mainRole === subRole}>
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            계정 등록
+            {totalChampionsSelected === 0 ? '챔피언 없이 등록' : '계정 등록'}
           </Button>
         )}
       </div>
