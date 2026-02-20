@@ -885,18 +885,88 @@ export const statsApi = {
 // ========================================
 
 export const adminApi = {
+  // Stats
   getStats: async () => {
     const response = await apiClient.get("/admin/stats");
     return response.data;
   },
-
+  // Users
   getUsers: async (params?: { page?: number; limit?: number; search?: string }) => {
     const response = await apiClient.get("/admin/users", { params });
     return response.data;
   },
-
   updateUserRole: async (userId: string, role: "USER" | "MODERATOR" | "ADMIN") => {
     const response = await apiClient.patch(`/admin/users/${userId}/role`, { role });
+    return response.data;
+  },
+  banUser: async (userId: string, reason: string, banUntil?: string) => {
+    const response = await apiClient.post(`/admin/users/${userId}/ban`, { reason, banUntil });
+    return response.data;
+  },
+  unbanUser: async (userId: string) => {
+    const response = await apiClient.post(`/admin/users/${userId}/unban`);
+    return response.data;
+  },
+  restrictUser: async (userId: string, restrictedUntil: string) => {
+    const response = await apiClient.post(`/admin/users/${userId}/restrict`, { restrictedUntil });
+    return response.data;
+  },
+  unrestrictUser: async (userId: string) => {
+    const response = await apiClient.post(`/admin/users/${userId}/unrestrict`);
+    return response.data;
+  },
+  // Reports
+  getReports: async (params?: { page?: number; limit?: number; status?: string }) => {
+    const response = await apiClient.get("/admin/reports", { params });
+    return response.data;
+  },
+  reviewReport: async (reportId: string, status: "APPROVED" | "REJECTED", reviewerNote: string) => {
+    const response = await apiClient.patch(`/admin/reports/${reportId}/review`, { status, reviewerNote });
+    return response.data;
+  },
+  // Announcements
+  sendAnnouncement: async (title: string, message: string, link?: string) => {
+    const response = await apiClient.post("/admin/announcements", { title, message, link });
+    return response.data;
+  },
+  // Chat Logs
+  getChatLogs: async (params?: { page?: number; limit?: number; roomName?: string; search?: string }) => {
+    const response = await apiClient.get("/admin/chat-logs", { params });
+    return response.data;
+  },
+  // Community
+  getPosts: async (params?: { page?: number; limit?: number; search?: string }) => {
+    const response = await apiClient.get("/admin/posts", { params });
+    return response.data;
+  },
+  deletePost: async (postId: string) => {
+    const response = await apiClient.delete(`/admin/posts/${postId}`);
+    return response.data;
+  },
+  pinPost: async (postId: string, isPinned: boolean) => {
+    const response = await apiClient.patch(`/admin/posts/${postId}/pin`, { isPinned });
+    return response.data;
+  },
+  deleteComment: async (commentId: string) => {
+    const response = await apiClient.delete(`/admin/comments/${commentId}`);
+    return response.data;
+  },
+  // Clans
+  getClans: async (params?: { page?: number; limit?: number; search?: string }) => {
+    const response = await apiClient.get("/admin/clans", { params });
+    return response.data;
+  },
+  deleteClan: async (clanId: string) => {
+    const response = await apiClient.delete(`/admin/clans/${clanId}`);
+    return response.data;
+  },
+  // Rooms
+  getRooms: async (params?: { page?: number; limit?: number; status?: string }) => {
+    const response = await apiClient.get("/admin/rooms", { params });
+    return response.data;
+  },
+  closeRoom: async (roomId: string) => {
+    const response = await apiClient.post(`/admin/rooms/${roomId}/close`);
     return response.data;
   },
 };
