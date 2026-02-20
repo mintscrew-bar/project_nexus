@@ -58,8 +58,8 @@ model User {
   friendOf           Friendship[]           @relation("FriendOfUser")
   chatMessages       ChatMessage[]
   clanChatMessages   ClanChatMessage[]
-  sentDMs            DirectMessage[]    @relation("SentDMs")
-  receivedDMs        DirectMessage[]    @relation("ReceivedDMs")
+  sentDMs            DirectMessage[]   @relation("SentDMs")
+  receivedDMs        DirectMessage[]   @relation("ReceivedDMs")
   snakeDraftPicks    SnakeDraftPick[]
   matchParticipations MatchParticipant[]
   notifications       Notification[]
@@ -329,13 +329,14 @@ enum RoomParticipantRole {
 
 model ChatMessage {
   id        String   @id @default(cuid())
-  roomId    String
+  roomId    String?
+  roomName  String?  // 방 삭제 후에도 어느 방의 채팅인지 식별
   userId    String
   content   String
   createdAt DateTime @default(now())
 
-  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  room Room? @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([roomId, createdAt])
   @@index([userId])
@@ -907,15 +908,16 @@ model RiotMatchCache {
 }
 
 model DirectMessage {
-  id         String   @id @default(cuid())
-  senderId   String
-  receiverId String
-  content    String
-  isRead     Boolean  @default(false)
-  createdAt  DateTime @default(now())
+  id             String   @id @default(cuid())
+  senderId       String?
+  receiverId     String?
+  senderUsername String   // 계정 삭제 후에도 발신자 식별
+  content        String
+  isRead         Boolean  @default(false)
+  createdAt      DateTime @default(now())
 
-  sender   User @relation("SentDMs",     fields: [senderId],   references: [id], onDelete: Cascade)
-  receiver User @relation("ReceivedDMs", fields: [receiverId], references: [id], onDelete: Cascade)
+  sender   User? @relation("SentDMs",     fields: [senderId],   references: [id], onDelete: SetNull)
+  receiver User? @relation("ReceivedDMs", fields: [receiverId], references: [id], onDelete: SetNull)
 
   @@index([senderId, receiverId, createdAt])
   @@index([receiverId, isRead])

@@ -82,6 +82,7 @@ export class DmGateway implements OnGatewayConnection, OnGatewayDisconnect {
       client.userId,
       receiverId,
       content.trim(),
+      client.username ?? "Unknown",
     );
 
     // 송신자에게도 확인 전송 (멀티 디바이스 대비)

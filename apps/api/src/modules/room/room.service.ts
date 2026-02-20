@@ -696,9 +696,16 @@ export class RoomService {
       throw new BadRequestException("Message too long (max 500 characters)");
     }
 
+    // 방 이름 조회 (방 삭제 후에도 기록 식별용)
+    const room = await this.prisma.room.findUnique({
+      where: { id: roomId },
+      select: { name: true },
+    });
+
     const message = await this.prisma.chatMessage.create({
       data: {
         roomId,
+        roomName: room?.name,
         userId,
         content: content.trim(),
       },
