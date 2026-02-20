@@ -7,7 +7,7 @@ import { Logo } from '@/components/Logo';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { UserMenu } from '@/components/UserMenu';
 import { MobileMenu } from '@/components/MobileMenu';
-import { Users, Shield } from 'lucide-react';
+import { Users, Shield, FlaskConical } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth-store';
 import { useFriendStore } from '@/stores/friend-store';
 
@@ -60,18 +60,32 @@ export function Header() {
       {/* Right: Friends + Theme Toggle + Auth */}
       <div className="flex items-center gap-3">
         {isAuthenticated && user?.role === 'ADMIN' && (
-          <Link
-            href="/admin"
-            className={cn(
-              'p-2 rounded-lg transition-colors duration-150',
-              pathname.startsWith('/admin')
-                ? 'bg-accent-primary/10 text-accent-primary'
-                : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary'
-            )}
-            title="관리자 패널"
-          >
-            <Shield className="h-5 w-5" />
-          </Link>
+          <>
+            <Link
+              href="/simulation"
+              className={cn(
+                'p-2 rounded-lg transition-colors duration-150',
+                pathname.startsWith('/simulation')
+                  ? 'bg-accent-primary/10 text-accent-primary'
+                  : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary'
+              )}
+              title="시뮬레이션"
+            >
+              <FlaskConical className="h-5 w-5" />
+            </Link>
+            <Link
+              href="/admin"
+              className={cn(
+                'p-2 rounded-lg transition-colors duration-150',
+                pathname.startsWith('/admin')
+                  ? 'bg-accent-primary/10 text-accent-primary'
+                  : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary'
+              )}
+              title="관리자 패널"
+            >
+              <Shield className="h-5 w-5" />
+            </Link>
+          </>
         )}
         {isAuthenticated && (
           <button

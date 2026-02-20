@@ -1,7 +1,10 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { Button, Badge, LoadingSpinner } from "@/components/ui";
+import { getTierBgClass } from "@/lib/utils";
+import { useAuthStore } from "@/stores/auth-store";
 import {
   Users,
   Play,
@@ -332,20 +335,9 @@ function PositionIcon({ position, size = 16, className = "", opacity = 1 }: { po
 }
 
 function TierBadge({ tier }: { tier: string }) {
-  const tierColors: Record<string, string> = {
-    IRON: "bg-tier-iron text-white",
-    BRONZE: "bg-tier-bronze text-white",
-    SILVER: "bg-tier-silver text-white",
-    GOLD: "bg-tier-gold text-white",
-    PLATINUM: "bg-tier-platinum text-white",
-    EMERALD: "bg-tier-emerald text-white",
-    DIAMOND: "bg-tier-diamond text-white",
-    MASTER: "bg-tier-master text-white",
-    GRANDMASTER: "bg-tier-grandmaster text-white",
-    CHALLENGER: "bg-tier-challenger text-white",
-  };
+  const bgClass = getTierBgClass(tier);
   return (
-    <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${tierColors[tier] || "bg-bg-tertiary text-text-secondary"}`}>
+    <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold text-white ${bgClass}`}>
       {tier}
     </span>
   );
@@ -550,6 +542,28 @@ function MatchCard({
 
 // ─── Main Component ─────────────────────────────────────────────────────────────
 export default function SimulationPage() {
+  const router = useRouter();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuthStore();
+
+  useEffect(() => {
+    if (!authLoading) {
+      if (!isAuthenticated) router.push("/auth/login");
+      else if (user?.role !== "ADMIN") router.push("/");
+    }
+  }, [authLoading, isAuthenticated, user, router]);
+
+  if (authLoading || !isAuthenticated || user?.role !== "ADMIN") {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <LoadingSpinner />
+      </div>
+    );
+  }
+
+  return <SimulationContent />;
+}
+
+function SimulationContent() {
   // Phase
   const [phase, setPhase] = useState<SimulationPhase>("SETUP");
   const [isInteractive, setIsInteractive] = useState(false);
