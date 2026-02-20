@@ -285,5 +285,5 @@ auctionSocket?.on(AUCTION_EVENTS.BID_PLACED, callback);
 
 ---
 
-**Last Updated**: 2026-01-21
-**Status**: 이벤트 불일치 발견, 수정 필요
+**Last Updated**: 2026-02-20
+**Status**: ✅ 이벤트 불일치 수정 완료. socket-client.ts 및 lobby-store.ts 모두 올바른 이벤트명 사용. start-game 핸들러도 room.gateway.ts에 구현됨.

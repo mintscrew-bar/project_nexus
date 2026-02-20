@@ -209,39 +209,39 @@ nexus/
 
 ---
 
-## ⚠️ 남은 작업
+## ✅ 완료된 작업
 
-### 1. 데이터베이스 스키마 업데이트 (우선순위: 높음)
-- [ ] `docs/SCHEMA_UPDATES_NEEDED.md` 참조
-- [ ] Prisma 스키마 업데이트
-- [ ] 마이그레이션 실행
-- [ ] 타입 재생성 (`prisma generate`)
+### 1. 데이터베이스 스키마 업데이트 ✅
+- [x] Prisma 스키마 업데이트 (모든 모델/필드/관계 반영)
+- [x] 타입 재생성
 
-### 2. 컴파일 오류 해결 (우선순위: 높음)
-- [ ] ClanRole enum import 수정
-- [ ] PostCategory enum 추가
-- [ ] 누락된 필드 추가 (views, category, likes 등)
-- [ ] TypeScript 타입 오류 수정
+### 2. 컴파일 오류 해결 ✅
+- [x] ClanRole enum import 수정
+- [x] PostCategory enum 추가
+- [x] 누락된 필드 추가 (views, category, likes 등)
+- [x] TypeScript 타입 오류 수정
 
-### 3. 추가 개발 (우선순위: 중간)
-- [ ] Admin/Moderator guard 구현
+### 3. 추가 개발 (대부분 완료)
+- [x] Admin/Moderator guard 구현
+- [x] 파일 업로드 (아바타)
+- [x] Cron jobs (자동 밴 해제, 티어 동기화, 세션 정리)
+- [x] 알림 시스템
 - [ ] Email 서비스 (회원가입 인증, 비밀번호 찾기)
-- [ ] 파일 업로드 (아바타, 클랜 로고)
-- [ ] Cron jobs (자동 밴 해제, 티어 동기화)
-- [ ] 알림 시스템
 
-### 4. 프론트엔드 통합 (우선순위: 중간)
-- [ ] 각 페이지별 API 연동
-- [ ] WebSocket 연결 및 이벤트 처리
-- [ ] 상태 관리 (Zustand stores) 완성
+### 4. 프론트엔드 통합 (진행 중)
+- [x] WebSocket 이벤트 이름 통일
+- [x] 상태 관리 (Zustand stores) 기본 완성
+- [x] 에러 바운더리 적용
+- [x] UI 컴포넌트 체계 완성 (18개 UI + 18개 Domain)
+- [ ] 각 페이지별 API 연동 (진행 중)
 - [ ] UI/UX 개선
+
+## ⚠️ 남은 작업
 
 ### 5. 테스트 및 배포 (우선순위: 낮음)
 - [ ] Unit 테스트
 - [ ] Integration 테스트
 - [ ] E2E 테스트
-- [ ] 성능 최적화
-- [ ] Docker 설정
 - [ ] CI/CD 파이프라인
 
 ---

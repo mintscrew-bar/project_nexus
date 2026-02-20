@@ -412,30 +412,29 @@ const AuctionPage = dynamic(() => import('./AuctionPage'), {
 ## 📋 UI Components Checklist
 
 ### 기본 컴포넌트
-- [ ] Button (Primary, Secondary, Danger)
-- [ ] Input (Text, Password, Number)
-- [ ] Card (Basic, Elevated)
-- [ ] Badge (Status, Tier)
-- [ ] Avatar (User, Team)
-- [ ] Modal (Center, Fullscreen)
-- [ ] Dropdown (Select, Menu)
-- [ ] Toast Notification
+- [x] Button (Primary, Secondary, Danger)
+- [x] Input (Text, Password, Number)
+- [x] Card (Basic, Elevated)
+- [x] Badge (Status, Tier)
+- [x] Avatar (User, Team)
+- [x] Modal (Center, Fullscreen)
+- [x] Dropdown (Select, Menu)
+- [x] Toast Notification
 
 ### 레이아웃 컴포넌트
-- [ ] Header/Navbar
-- [ ] Sidebar
-- [ ] Footer
-- [ ] Container/Grid
+- [x] Header/Navbar
+- [x] Sidebar
+- [x] Footer
 
 ### 도메인 컴포넌트
-- [ ] RoomCard (방 목록)
-- [ ] ParticipantList (참가자)
-- [ ] ChatBox (채팅)
-- [ ] AuctionBoard (경매 화면)
-- [ ] DraftBoard (드래프트 화면)
-- [ ] MatchBracket (토너먼트 대진표)
-- [ ] UserProfile (프로필 카드)
-- [ ] TierBadge (티어 배지)
+- [x] RoomCard (방 목록)
+- [x] ParticipantList (참가자)
+- [x] ChatBox (채팅)
+- [x] AuctionBoard (경매 화면)
+- [x] DraftBoard (드래프트 화면)
+- [x] MatchBracket (토너먼트 대진표 - BracketView)
+- [x] UserProfile (프로필 카드)
+- [x] TierBadge (티어 배지)
 
 ---
 

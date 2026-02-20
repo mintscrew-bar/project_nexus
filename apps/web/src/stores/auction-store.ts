@@ -165,6 +165,26 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
       }));
     });
 
+    auctionSocketHelpers.onBidResolved((data: { sold: boolean; player?: any; team?: any; price?: number; nextPlayer?: any; state?: AuctionState }) => {
+      set((state) => {
+        if (!state.auctionState) return state;
+        const updates: Partial<AuctionStoreState> = {};
+        if (data.state) {
+          updates.auctionState = data.state;
+        }
+        if (data.sold && data.team) {
+          updates.teams = state.teams.map(t =>
+            t.id === data.team.id ? { ...t, ...data.team } : t
+          );
+        }
+        return { ...state, ...updates };
+      });
+    });
+
+    auctionSocketHelpers.onTimerExpired(() => {
+      // Timer expired is followed by bid-resolved, no action needed here
+    });
+
     set({ isConnected: true });
   },
 

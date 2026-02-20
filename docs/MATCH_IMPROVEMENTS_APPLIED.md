@@ -130,10 +130,10 @@
 ## 🎯 다음 단계 (선택사항)
 
 향후 개선 가능한 항목:
-- [ ] 파일 분리 (match.service.ts가 너무 큼)
-- [ ] Double Elimination 로직 리팩토링
+- [x] 파일 분리 (match-bracket, match-advancement, match-data-collection 서비스로 분리)
+- [x] Double Elimination 로직 리팩토링 (match-advancement.service.ts로 분리)
 - [ ] 테스트 코드 작성
-- [ ] 성능 최적화 (쿼리 최적화)
+- [x] 성능 최적화 (getRoomMatches 등에 select 적용)
 
 ---
 

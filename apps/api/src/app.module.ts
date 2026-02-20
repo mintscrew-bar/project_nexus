@@ -22,6 +22,7 @@ import { StatsModule } from "./modules/stats/stats.module";
 import { NotificationModule } from "./modules/notification/notification.module";
 import { AdminModule } from "./modules/admin/admin.module";
 import { DmModule } from "./modules/dm/dm.module";
+import { TasksModule } from "./modules/tasks/tasks.module";
 import { PrismaModule } from "./modules/prisma/prisma.module";
 import { RedisModule } from "./modules/redis/redis.module";
 import { HealthController } from "./health.controller";
@@ -82,6 +83,7 @@ const projectRoot = resolve(apiRoot, "../..");
     NotificationModule,
     AdminModule,
     DmModule,
+    TasksModule,
   ],
   controllers: [HealthController],
 })

@@ -1,7 +1,7 @@
 "use client";
 
-import { useParams } from "next/navigation";
-import { useEffect } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { useEffect, useRef } from "react";
 import { useSnakeDraftStore } from "@/stores/snake-draft-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { DraftBoard } from "@/components/domain/DraftBoard";
@@ -10,8 +10,10 @@ import { useToast } from "@/components/ui/Toast";
 
 export default function SnakeDraftPage() {
   const params = useParams();
+  const router = useRouter();
   const draftId = params.id as string;
   const { addToast } = useToast();
+  const hasRedirected = useRef(false);
 
   const { user } = useAuthStore();
   const {
@@ -28,11 +30,18 @@ export default function SnakeDraftPage() {
     if (draftId) {
       connectToDraft(draftId);
     }
-
     return () => {
       disconnectFromDraft();
     };
   }, [draftId, connectToDraft, disconnectFromDraft]);
+
+  useEffect(() => {
+    if (hasRedirected.current) return;
+    if (draftState?.status === "COMPLETED") {
+      hasRedirected.current = true;
+      router.push(`/role-selection/${draftId}`);
+    }
+  }, [draftState?.status, draftId, router]);
 
   const handleMakePick = async (playerId: string) => {
     try {
@@ -77,7 +86,6 @@ export default function SnakeDraftPage() {
 
   return (
     <div className="flex-grow p-4 md:p-8 relative">
-      {/* Connection Status Badge */}
       <div className="absolute top-4 right-4 z-10">
         <Badge variant={isConnected ? 'success' : 'danger'}>
           {isConnected ? '● 연결됨' : '● 연결 끊김'}
@@ -85,7 +93,6 @@ export default function SnakeDraftPage() {
       </div>
 
       <div className="container mx-auto">
-        {/* Page Header */}
         <div className="mb-6 animate-fade-in">
           <h1 className="text-3xl font-bold text-text-primary mb-2">
             스네이크 드래프트
@@ -95,7 +102,6 @@ export default function SnakeDraftPage() {
           </p>
         </div>
 
-        {/* Draft Board */}
         <DraftBoard
           draftState={draftState}
           currentUserId={user?.id}

@@ -1,13 +1,18 @@
 "use client";
 
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
+import { useEffect, useRef } from "react";
 import { useAuction } from "@/hooks/useAuction";
+import { useAuthStore } from "@/stores/auth-store";
 import { AuctionBoard } from "@/components/domain";
 import { LoadingSpinner, Badge } from "@/components/ui";
 
 export default function AuctionRoomPage() {
   const params = useParams();
+  const router = useRouter();
   const auctionId = params.id as string;
+  const { user } = useAuthStore();
+  const hasRedirected = useRef(false);
 
   const {
     auctionState,
@@ -18,6 +23,14 @@ export default function AuctionRoomPage() {
     error,
     placeBid,
   } = useAuction(auctionId);
+
+  useEffect(() => {
+    if (hasRedirected.current) return;
+    if (auctionState?.status === "COMPLETED") {
+      hasRedirected.current = true;
+      router.push(`/role-selection/${auctionId}`);
+    }
+  }, [auctionState?.status, auctionId, router]);
 
   if (isLoading) {
     return (
@@ -54,7 +67,6 @@ export default function AuctionRoomPage() {
 
   return (
     <div className="flex-grow p-4 md:p-8 relative">
-      {/* Connection Status Badge */}
       <div className="absolute top-4 right-4 z-10">
         <Badge variant={isConnected ? 'success' : 'danger'}>
           {isConnected ? '● 연결됨' : '● 연결 끊김'}
@@ -62,7 +74,6 @@ export default function AuctionRoomPage() {
       </div>
 
       <div className="container mx-auto">
-        {/* Page Header */}
         <div className="mb-6 animate-fade-in">
           <h1 className="text-3xl font-bold text-text-primary mb-2">
             경매 진행 중
@@ -72,10 +83,10 @@ export default function AuctionRoomPage() {
           </p>
         </div>
 
-        {/* Auction Board */}
         <AuctionBoard
           auctionState={auctionState}
           teams={teams}
+          currentUserId={user?.id}
           onPlaceBid={placeBid}
           disabled={!isConnected}
         />

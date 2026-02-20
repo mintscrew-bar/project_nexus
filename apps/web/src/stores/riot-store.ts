@@ -46,6 +46,7 @@ interface RiotStoreState {
   // Verification state
   verificationData: VerificationData | null;
   isVerifying: boolean;
+  isIconVerified: boolean;
 
   // Actions - Account Management
   fetchAccounts: () => Promise<void>;
@@ -80,6 +81,7 @@ export const useRiotStore = create<RiotStoreState>((set, get) => ({
   error: null,
   verificationData: null,
   isVerifying: false,
+  isIconVerified: false,
 
   // ========================================
   // Account Management
@@ -186,7 +188,11 @@ export const useRiotStore = create<RiotStoreState>((set, get) => ({
     set({ isVerifying: true, error: null });
     try {
       const result = await riotApi.checkVerification();
-      set({ isVerifying: false });
+      if (result.verified) {
+        set({ isVerifying: false, isIconVerified: true });
+      } else {
+        set({ isVerifying: false });
+      }
       return result;
     } catch (error: any) {
       set({
@@ -202,8 +208,7 @@ export const useRiotStore = create<RiotStoreState>((set, get) => ({
     try {
       await riotApi.registerAccount(data);
 
-      // Clear verification data
-      set({ verificationData: null });
+      set({ verificationData: null, isIconVerified: false });
 
       // Refresh accounts
       await get().fetchAccounts();
@@ -254,6 +259,7 @@ export const useRiotStore = create<RiotStoreState>((set, get) => ({
       error: null,
       verificationData: null,
       isVerifying: false,
+      isIconVerified: false,
     });
   },
 

@@ -10,6 +10,7 @@ let clanSocket: Socket | null = null;
 let presenceSocket: Socket | null = null;
 let notificationSocket: Socket | null = null;
 let dmSocket: Socket | null = null;
+let roleSelectionSocket: Socket | null = null;
 
 const SOCKET_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
@@ -643,4 +644,82 @@ export const disconnectClanSocket = () => {
   clanSocketHelpers.offAllListeners();
   clanSocket?.disconnect();
   clanSocket = null;
+};
+
+// ========================================
+// Role Selection Socket
+// ========================================
+
+export const connectRoleSelectionSocket = () => {
+  if (roleSelectionSocket?.connected) return roleSelectionSocket;
+
+  roleSelectionSocket = io(`${SOCKET_URL}/role-selection`, {
+    auth: { token: getAccessToken() },
+    transports: ["websocket"],
+    reconnection: true,
+    reconnectionAttempts: 5,
+    reconnectionDelay: 2000,
+  });
+
+  roleSelectionSocket.on("connect", () => {
+    console.log("Role selection socket connected");
+  });
+
+  roleSelectionSocket.on("disconnect", () => {
+    console.log("Role selection socket disconnected");
+  });
+
+  return roleSelectionSocket;
+};
+
+export const roleSelectionSocketHelpers = {
+  joinRoom: (roomId: string) => {
+    return new Promise<any>((resolve) => {
+      roleSelectionSocket?.emit("join-room", { roomId }, (response: any) => {
+        resolve(response);
+      });
+    });
+  },
+
+  selectRole: (roomId: string, role: string) => {
+    return new Promise<any>((resolve) => {
+      roleSelectionSocket?.emit("select-role", { roomId, role }, (response: any) => {
+        resolve(response);
+      });
+    });
+  },
+
+  onRoleSelected: (callback: (data: any) => void) => {
+    roleSelectionSocket?.on("role-selected", callback);
+  },
+
+  onRoleSelectionCompleted: (callback: (data: any) => void) => {
+    roleSelectionSocket?.on("role-selection-completed", callback);
+  },
+
+  onRoleSelectionStarted: (callback: (data: any) => void) => {
+    roleSelectionSocket?.on("role-selection-started", callback);
+  },
+
+  onTimerTick: (callback: (data: { timeRemaining: number }) => void) => {
+    roleSelectionSocket?.on("timer-tick", callback);
+  },
+
+  onRoleSelectionError: (callback: (data: any) => void) => {
+    roleSelectionSocket?.on("role-selection-error", callback);
+  },
+
+  offAllListeners: () => {
+    roleSelectionSocket?.off("role-selected");
+    roleSelectionSocket?.off("role-selection-completed");
+    roleSelectionSocket?.off("role-selection-started");
+    roleSelectionSocket?.off("timer-tick");
+    roleSelectionSocket?.off("role-selection-error");
+  },
+};
+
+export const disconnectRoleSelectionSocket = () => {
+  roleSelectionSocketHelpers.offAllListeners();
+  roleSelectionSocket?.disconnect();
+  roleSelectionSocket = null;
 };
