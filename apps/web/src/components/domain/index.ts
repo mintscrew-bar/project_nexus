@@ -8,3 +8,4 @@ export * from './DraftBoard';
 export * from './BracketView';
 export * from './MatchDetailModal';
 export * from './VictoryScreen';
+export * from './UserProfile';

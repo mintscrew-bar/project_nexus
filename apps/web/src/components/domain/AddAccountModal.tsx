@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Modal } from '@/components/ui/Modal'; // Use custom Modal
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Label } from '@/components/ui/Label';
 import { useRiotStore } from '@/stores/riot-store';
 import { useDdragonStore } from '@/stores/ddragon-store';
-import { X, Loader2, CheckCircle, AlertCircle, Info, Sword, Shield, ArrowRight, User } from 'lucide-react';
+import { X, Loader2, AlertCircle, ArrowRight } from 'lucide-react';
 import { ChampionSelector } from './ChampionSelector';
 import Image from 'next/image';
 
@@ -33,6 +33,8 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
     error: storeError,
     reset: resetRiotStore,
     clearError: clearRiotStoreError,
+    isIconVerified,
+    verificationData: storeVerificationData,
   } = useRiotStore();
 
   const { champions, fetchChampions, isLoading: championsLoading } = useDdragonStore();
@@ -56,24 +58,40 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
     TOP: [], JUNGLE: [], MID: [], ADC: [], SUPPORT: []
   });
   const [activeRoleTab, setActiveRoleTab] = useState<Role>('TOP');
+  const stepRef = useRef(step);
+  stepRef.current = step;
 
   useEffect(() => {
     if (isOpen) {
-        fetchChampions();
+      fetchChampions();
+      if (isIconVerified && storeVerificationData) {
+        setStep(3);
+        setVerificationData({
+          gameName: storeVerificationData.gameName,
+          tagLine: storeVerificationData.tagLine,
+          requiredIconId: storeVerificationData.requiredIconId,
+          currentIconId: storeVerificationData.currentIconId,
+        });
+      }
     } else {
-      // Reset all state when modal closes
-      setStep(1);
-      setGameName('');
-      setTagLine('');
-      setLocalError(null);
-      setVerificationData(null);
-      setIsSubmitting(false);
-      setMainRole('MID');
-      setSubRole('ADC');
-      setChampionsByRole({ TOP: [], JUNGLE: [], MID: [], ADC: [], SUPPORT: [] });
-      resetRiotStore();
+      if (isIconVerified) {
+        setLocalError(null);
+        setIsSubmitting(false);
+      } else {
+        setStep(1);
+        setGameName('');
+        setTagLine('');
+        setLocalError(null);
+        setVerificationData(null);
+        setIsSubmitting(false);
+        setMainRole('MID');
+        setSubRole('ADC');
+        setChampionsByRole({ TOP: [], JUNGLE: [], MID: [], ADC: [], SUPPORT: [] });
+        resetRiotStore();
+      }
     }
-  }, [isOpen, fetchChampions, resetRiotStore]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
   
   useEffect(() => {
     setLocalError(storeError);
@@ -81,6 +99,7 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
 
   const handleClearError = () => {
     setLocalError(null);
+    setShowCloseWarning(false);
     clearRiotStoreError();
   };
 
@@ -128,10 +147,30 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
 
   const totalChampionsSelected = Object.values(championsByRole).reduce((sum, arr) => sum + arr.length, 0);
 
+  const [showCloseWarning, setShowCloseWarning] = useState(false);
+
+  const handleClose = () => {
+    if (step === 3) {
+      if (!showCloseWarning) {
+        setShowCloseWarning(true);
+        setLocalError('역할 및 챔피언 선택을 완료하지 않으면 내전에 참여할 수 없습니다. 다시 열면 이 단계부터 이어서 진행할 수 있습니다.');
+        return;
+      }
+      setShowCloseWarning(false);
+      onClose();
+      return;
+    }
+    onClose();
+  };
+
   const handleRoleSubmit = async () => {
     handleClearError();
     if (mainRole === subRole) {
       setLocalError('주 역할과 부 역할은 동일할 수 없습니다.');
+      return;
+    }
+    if (totalChampionsSelected < 5) {
+      setLocalError(`선호 챔피언을 최소 5개 선택해주세요. (현재 ${totalChampionsSelected}개)`);
       return;
     }
     setIsSubmitting(true);
@@ -177,7 +216,7 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={modalTitle()} size="lg">
+    <Modal isOpen={isOpen} onClose={handleClose} title={modalTitle()} size="lg">
       {localError && (
         <div className="mb-4 p-3 bg-accent-danger/10 border border-accent-danger rounded-lg flex items-center gap-2">
           <AlertCircle className="w-5 h-5 text-accent-danger" />
@@ -313,17 +352,11 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
           </div>
           <div>
             <div className="flex items-center gap-2 mb-2">
-              <Label>선호 챔피언 (역할별 최대 5개)</Label>
-              <span className="text-xs text-text-muted bg-bg-tertiary px-2 py-0.5 rounded-full">선택사항</span>
+              <Label>선호 챔피언 (역할별 최대 5개, 총 최소 5개)</Label>
+              <span className={`text-xs px-2 py-0.5 rounded-full ${totalChampionsSelected >= 5 ? 'text-accent-success bg-accent-success/10' : 'text-accent-warning bg-accent-warning/10'}`}>
+                {totalChampionsSelected}/5+
+              </span>
             </div>
-            {totalChampionsSelected === 0 && (
-              <div className="flex items-start gap-2 p-3 rounded-lg bg-bg-tertiary border border-bg-elevated mb-2">
-                <Info className="w-4 h-4 text-text-muted flex-shrink-0 mt-0.5" />
-                <p className="text-xs text-text-muted">
-                  챔피언을 선택하지 않아도 등록할 수 있습니다. 나중에 프로필에서 언제든 추가할 수 있어요.
-                </p>
-              </div>
-            )}
             <div className="border rounded-lg p-2">
               <div className="flex border-b mb-2">
                 {ROLES.map(role => (
@@ -353,8 +386,8 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
             뒤로
           </Button>
         )}
-        {step !== 2 && (
-          <Button variant="outline" onClick={onClose} disabled={isLoading}>
+        {(step === 1 || step === 3) && (
+          <Button variant="outline" onClick={step === 3 ? handleClose : onClose} disabled={isLoading}>
             <X className="w-4 h-4 mr-2" />
             취소
           </Button>
@@ -372,9 +405,9 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
           </Button>
         )}
         {step === 3 && (
-          <Button onClick={handleRoleSubmit} disabled={isLoading || mainRole === subRole}>
+          <Button onClick={handleRoleSubmit} disabled={isLoading || mainRole === subRole || totalChampionsSelected < 5}>
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {totalChampionsSelected === 0 ? '챔피언 없이 등록' : '계정 등록'}
+            계정 등록
           </Button>
         )}
       </div>

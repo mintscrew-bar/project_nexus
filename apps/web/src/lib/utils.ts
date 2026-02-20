@@ -8,24 +8,52 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-/**
- * 티어 이름을 색상 클래스로 변환
- */
+export type TierKey =
+  | 'iron' | 'bronze' | 'silver' | 'gold' | 'platinum'
+  | 'emerald' | 'diamond' | 'master' | 'grandmaster' | 'challenger';
+
+interface TierInfo {
+  key: TierKey;
+  textClass: string;
+  bgClass: string;
+  badgeVariant: string;
+  icon: string;
+}
+
+const TIER_MAP: TierInfo[] = [
+  { key: 'challenger',  textClass: 'text-tier-challenger',  bgClass: 'bg-tier-challenger',  badgeVariant: 'challenger',  icon: '👑' },
+  { key: 'grandmaster', textClass: 'text-tier-grandmaster', bgClass: 'bg-tier-grandmaster', badgeVariant: 'grandmaster', icon: '💎' },
+  { key: 'master',      textClass: 'text-tier-master',      bgClass: 'bg-tier-master',      badgeVariant: 'master',      icon: '⭐' },
+  { key: 'diamond',     textClass: 'text-tier-diamond',     bgClass: 'bg-tier-diamond',     badgeVariant: 'diamond',     icon: '💠' },
+  { key: 'emerald',     textClass: 'text-tier-emerald',     bgClass: 'bg-tier-emerald',     badgeVariant: 'emerald',     icon: '💚' },
+  { key: 'platinum',    textClass: 'text-tier-platinum',    bgClass: 'bg-tier-platinum',    badgeVariant: 'platinum',    icon: '🔷' },
+  { key: 'gold',        textClass: 'text-tier-gold',        bgClass: 'bg-tier-gold',        badgeVariant: 'tier-gold',   icon: '🥇' },
+  { key: 'silver',      textClass: 'text-tier-silver',      bgClass: 'bg-tier-silver',      badgeVariant: 'silver',      icon: '🥈' },
+  { key: 'bronze',      textClass: 'text-tier-bronze',      bgClass: 'bg-tier-bronze',      badgeVariant: 'bronze',      icon: '🥉' },
+  { key: 'iron',        textClass: 'text-tier-iron',        bgClass: 'bg-tier-iron',        badgeVariant: 'iron',        icon: '⚪' },
+];
+
+const DEFAULT_TIER = TIER_MAP[TIER_MAP.length - 1]; // iron
+
+function findTier(tier: string): TierInfo {
+  const lower = tier.toLowerCase();
+  return TIER_MAP.find(t => lower.includes(t.key)) ?? DEFAULT_TIER;
+}
+
 export function getTierColor(tier: string): string {
-  const tierLower = tier.toLowerCase();
+  return findTier(tier).textClass;
+}
 
-  if (tierLower.includes('iron')) return 'text-tier-iron';
-  if (tierLower.includes('bronze')) return 'text-tier-bronze';
-  if (tierLower.includes('silver')) return 'text-tier-silver';
-  if (tierLower.includes('gold')) return 'text-tier-gold';
-  if (tierLower.includes('platinum')) return 'text-tier-platinum';
-  if (tierLower.includes('emerald')) return 'text-tier-emerald';
-  if (tierLower.includes('diamond')) return 'text-tier-diamond';
-  if (tierLower.includes('master')) return 'text-tier-master';
-  if (tierLower.includes('grandmaster')) return 'text-tier-grandmaster';
-  if (tierLower.includes('challenger')) return 'text-tier-challenger';
+export function getTierBgClass(tier: string): string {
+  return findTier(tier).bgClass;
+}
 
-  return 'text-tier-iron';
+export function getTierBadgeVariant(tier: string): string {
+  return findTier(tier).badgeVariant;
+}
+
+export function getTierIcon(tier: string): string {
+  return findTier(tier).icon;
 }
 
 /**

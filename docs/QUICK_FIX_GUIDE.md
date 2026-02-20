@@ -111,40 +111,37 @@ npm run build
 }
 ```
 
-## 📝 스키마 업데이트 체크리스트
+## ✅ 스키마 업데이트 체크리스트 (모두 완료)
 
-스키마 업데이트 시 다음 순서로 진행:
+1. [x] User 모델 업데이트
+   - [x] reputationScore, isBanned, banReason 등 추가
+   - [x] 새로운 관계 추가 (ratings, reports, friendships)
 
-1. [ ] User 모델 업데이트
-   - [ ] reputationScore, isBanned, banReason 등 추가
-   - [ ] 새로운 관계 추가 (ratings, reports, friendships)
+2. [x] Clan 모델 업데이트
+   - [x] minTier, discord 필드 추가
+   - [x] ClanChatMessage 모델 생성
 
-2. [ ] Clan 모델 업데이트
-   - [ ] minTier, discord 필드 추가
-   - [ ] ClanChatMessage 모델 생성
+3. [x] Community 재구조화
+   - [x] 카테고리 기반으로 변경 (PostCategory enum)
+   - [x] Post에 views, isEdited 추가
+   - [x] PostLike 모델 추가
+   - [x] Comment에 isEdited 추가
 
-3. [ ] Community 재구조화
-   - [ ] Board 모델 제거 또는 유지
-   - [ ] Post에 category enum 추가
-   - [ ] Post에 views, isEdited 추가
-   - [ ] PostLike 모델 추가 (PostVote 대체)
-   - [ ] Comment에 isEdited 추가
+4. [x] Reputation/Report 모델 추가
+   - [x] UserRating 모델 생성
+   - [x] UserReport 모델 생성
+   - [x] Enum 추가 (ReportReason, ReportStatus)
 
-4. [ ] Reputation/Report 모델 추가
-   - [ ] UserRating 모델 생성
-   - [ ] UserReport 모델 생성
-   - [ ] Enum 추가 (ReportReason, ReportStatus)
+5. [x] Friendship 모델 추가
+   - [x] Friendship 모델 생성
+   - [x] FriendshipStatus enum 추가
 
-5. [ ] Friendship 모델 추가
-   - [ ] Friendship 모델 생성
-   - [ ] FriendshipStatus enum 추가
+6. [x] Match 모델 업데이트
+   - [x] round, matchNumber, bracketType 추가
+   - [x] BracketType, MatchStatus enum 추가
 
-6. [ ] Match 모델 업데이트
-   - [ ] round, matchNumber, bracketType 추가
-   - [ ] BracketType, MatchStatus enum 추가
-
-7. [ ] SnakeDraftPick 모델 추가
-   - [ ] 전체 모델 생성
+7. [x] SnakeDraftPick 모델 추가
+   - [x] 전체 모델 생성
 
 ## 🎯 최소 작업으로 빌드하기
 

@@ -200,10 +200,10 @@ const winnerMatch = await this.prisma.match.findFirst({
 ## 🎯 다음 단계 (선택사항)
 
 추가 최적화 가능 항목:
-- [ ] 인덱스 최적화 (DB 레벨)
-- [ ] 캐싱 전략 도입 (Redis)
-- [ ] 배치 쿼리 최적화
-- [ ] N+1 쿼리 문제 해결
+- [x] 인덱스 최적화 (DB 레벨) - schema.prisma에 40+ @@index 적용
+- [x] 캐싱 전략 도입 (Redis) - RedisModule 구현, Discord 채널 풀 등에 활용
+- [x] 배치 쿼리 최적화 - stats, match-data-collection에서 배치 처리
+- [x] N+1 쿼리 문제 해결 - select/include로 필요한 필드만 조회
 
 ---
 

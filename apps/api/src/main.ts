@@ -2,43 +2,38 @@ import { NestFactory } from "@nestjs/core";
 import { ValidationPipe } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import helmet from "helmet";
-import * as cookieParser from 'cookie-parser';
-import * as dotenv from 'dotenv';
-import { resolve } from 'path';
+import * as cookieParser from "cookie-parser";
+import * as dotenv from "dotenv";
+import { resolve } from "path";
 import { AppModule } from "./app.module";
+import { GlobalExceptionFilter } from "./common/filters/global-exception.filter";
 
-// ConfigModule이 작동하기 전에 .env 파일을 먼저 로드
 const envPaths = [
-  resolve(process.cwd(), '.env'),
-  resolve(process.cwd(), '..', '..', '.env'),
+  resolve(process.cwd(), ".env"),
+  resolve(process.cwd(), "..", "..", ".env"),
 ];
-
-console.log('📂 CWD:', process.cwd());
-console.log('📂 .env paths:', envPaths);
 
 for (const envPath of envPaths) {
   const result = dotenv.config({ path: envPath, override: true });
-  console.log(`📄 Loading ${envPath}:`, result.error ? 'FAILED' : 'OK');
+  if (process.env.NODE_ENV !== "production") {
+    console.log(`Loading ${envPath}:`, result.error ? "FAILED" : "OK");
+  }
 }
 
-console.log('🔑 DISCORD_CLIENT_ID after dotenv:', process.env.DISCORD_CLIENT_ID);
-console.log('🔑 DISCORD_CALLBACK_URL after dotenv:', process.env.DISCORD_CALLBACK_URL);
-console.log('🔑 GOOGLE_CLIENT_ID after dotenv:', process.env.GOOGLE_CLIENT_ID);
-console.log('🔑 GOOGLE_CALLBACK_URL after dotenv:', process.env.GOOGLE_CALLBACK_URL);
-console.log('🔑 RIOT_API_KEY after dotenv:', process.env.RIOT_API_KEY ? `${process.env.RIOT_API_KEY.substring(0, 15)}...` : 'NOT SET');
-
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    logger:
+      process.env.NODE_ENV === "production"
+        ? ["error", "warn"]
+        : ["log", "error", "warn", "debug"],
+  });
 
   const configService = app.get(ConfigService);
 
-  // Use cookie-parser middleware
   app.use(cookieParser());
 
-  // Security
   app.use(helmet());
 
-  // CORS
   const corsOrigins = configService
     .get("CORS_ORIGINS")
     ?.split(",")
@@ -53,7 +48,6 @@ async function bootstrap() {
     allowedHeaders: ["Content-Type", "Authorization"],
   });
 
-  // Global validation pipe
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -62,13 +56,14 @@ async function bootstrap() {
     }),
   );
 
-  // Global prefix
+  app.useGlobalFilters(new GlobalExceptionFilter());
+
   app.setGlobalPrefix("api");
 
   const port = configService.get("PORT") || 4000;
   await app.listen(port);
 
-  console.log(`🚀 API Server running on http://localhost:${port}`);
+  console.log(`API Server running on port ${port}`);
 }
 
 bootstrap();
