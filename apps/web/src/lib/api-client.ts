@@ -175,7 +175,7 @@ export const userApi = {
   },
 
   updateProfile: async (data: { username?: string; bio?: string }) => {
-    const response = await apiClient.patch("/users/profile", data);
+    const response = await apiClient.patch("/users/me", data);
     return response.data;
   },
 

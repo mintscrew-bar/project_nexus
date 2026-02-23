@@ -31,8 +31,7 @@ export default function AuctionRoomPage() {
     selectManualCaptains,
   } = useAuction(auctionId);
 
-  const isHost = user?.id !== undefined; // TODO: 실제로는 방 hostId와 비교 필요 — 현재는 store에 hostId 없음
-  // captainSelectionPhase.participants에서 자신이 방장인지 확인할 수 있도록 향후 개선 가능
+  const isHost = user?.id === captainSelectionPhase?.hostId;
 
   // VOLUNTEER 타이머 카운트다운 (클라이언트 표시용)
   useEffect(() => {
@@ -106,11 +105,15 @@ export default function AuctionRoomPage() {
               return (
                 <div
                   key={p.id}
-                  className={`flex items-center gap-3 p-3 rounded-lg border transition-all cursor-pointer ${
+                  className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${
+                    (mode === 'MANUAL' && isHost) || (mode === 'VOLUNTEER' && p.id === user?.id)
+                      ? 'cursor-pointer'
+                      : 'cursor-default'
+                  } ${
                     isSelected ? 'border-accent-primary bg-accent-primary/10' : 'border-bg-tertiary bg-bg-secondary hover:border-bg-elevated'
                   }`}
                   onClick={() => {
-                    if (mode === 'MANUAL') {
+                    if (mode === 'MANUAL' && isHost) {
                       setSelectedCaptains(prev =>
                         prev.includes(p.id)
                           ? prev.filter(id => id !== p.id)
@@ -147,7 +150,7 @@ export default function AuctionRoomPage() {
               <div className="flex gap-3 justify-center">
                 <Button
                   onClick={() => finalizeVolunteers(auctionId, tooManyVolunteers ? selectedCaptains : undefined)}
-                  disabled={tooManyVolunteers && selectedCaptains.length !== requiredCount}
+                  disabled={!isHost || (tooManyVolunteers && selectedCaptains.length !== requiredCount)}
                 >
                   <Users className="w-4 h-4 mr-2" />
                   {tooManyVolunteers ? `${selectedCaptains.length}/${requiredCount}명 선택 후 확정` : '지금 마감'}
@@ -160,7 +163,7 @@ export default function AuctionRoomPage() {
             <div className="flex justify-center">
               <Button
                 onClick={() => selectManualCaptains(auctionId, selectedCaptains)}
-                disabled={selectedCaptains.length !== requiredCount}
+                disabled={!isHost || selectedCaptains.length !== requiredCount}
               >
                 <Check className="w-4 h-4 mr-2" />
                 팀장 {selectedCaptains.length}/{requiredCount}명 확정

@@ -17,6 +17,7 @@ model User {
   emailVerified Boolean       @default(false)
   password      String?       // bcrypt hash for email auth
   username      String
+  bio           String?
   avatar        String?
   role          UserRole      @default(USER)
   reputation    Int           @default(100)

@@ -59,6 +59,7 @@ interface CaptainSelectionPhase {
   volunteers: string[];
   timerEnd: number | null;
   participants: Participant[];
+  hostId: string;
 }
 
 interface AuctionStoreState {

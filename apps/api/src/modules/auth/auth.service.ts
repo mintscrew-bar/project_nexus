@@ -263,7 +263,7 @@ export class AuthService {
     }
 
     if (session.expiresAt < new Date()) {
-      await this.prisma.session.delete({ where: { id: session.id } });
+      await this.prisma.session.deleteMany({ where: { id: session.id } });
       throw new UnauthorizedException("Refresh token expired");
     }
 
@@ -277,7 +277,7 @@ export class AuthService {
     }
 
     // Delete old session
-    await this.prisma.session.delete({ where: { id: session.id } });
+    await this.prisma.session.deleteMany({ where: { id: session.id } });
 
     // Generate new tokens
     return this.generateTokens(session.user);

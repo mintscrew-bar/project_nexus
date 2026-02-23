@@ -293,7 +293,7 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
         // MANUAL/VOLUNTEER: 팀장 선정 단계 진입
         const auctionResult = result as any;
         if (auctionResult.captainSelectionPhase) {
-          this.auctionGateway.emitCaptainSelectionPhase(data.roomId, auctionResult.captainSelectionPhase, auctionResult.participants);
+          this.auctionGateway.emitCaptainSelectionPhase(data.roomId, auctionResult.captainSelectionPhase, auctionResult.participants, room.hostId);
 
           // VOLUNTEER: 30초 타이머 후 자동 처리
           if (auctionResult.captainSelectionPhase.mode === 'VOLUNTEER') {

@@ -29,8 +29,12 @@ export class UserController {
     private readonly uploadService: UploadService,
   ) {}
 
+  // ========================================
+  // 정적 경로 먼저 (동적 :id 경로보다 앞에)
+  // ========================================
+
   @Get("me")
-  async getMyProfile(@CurrentUser("id") userId: string) {
+  async getMyProfile(@CurrentUser("sub") userId: string) {
     return this.userService.getProfile(userId);
   }
 
@@ -39,35 +43,37 @@ export class UserController {
     return this.userService.getUserStats(userId);
   }
 
-  @Get(":id")
-  async getProfile(@Param("id") id: string) {
-    return this.userService.getProfile(id);
-  }
-
-  @Get(":id/stats")
-  async getUserStats(@Param("id") id: string) {
-    return this.userService.getUserStats(id);
+  @Get("settings")
+  async getSettings(@CurrentUser("sub") userId: string) {
+    return this.userSettingsService.getSettings(userId);
   }
 
   @Patch("me")
   async updateProfile(
-    @CurrentUser("id") userId: string,
-    @Body() data: { nickname?: string },
+    @CurrentUser("sub") userId: string,
+    @Body() data: { username?: string; bio?: string },
   ) {
     return this.userService.updateProfile(userId, data);
+  }
+
+  @Patch("settings")
+  async updateSettings(
+    @CurrentUser("sub") userId: string,
+    @Body() data: UpdateSettingsDto,
+  ) {
+    return this.userSettingsService.updateSettings(userId, data);
   }
 
   @Post("me/avatar")
   @UseInterceptors(FileInterceptor("avatar"))
   async uploadAvatar(
-    @CurrentUser("id") userId: string,
-    @UploadedFile() file: Express.Multer.File, // Changed from File to Express.Multer.File
+    @CurrentUser("sub") userId: string,
+    @UploadedFile() file: Express.Multer.File,
   ) {
     if (!file) {
       throw new BadRequestException("파일이 업로드되지 않았습니다.");
     }
 
-    // Delete old avatar if exists
     const oldAvatarUrl = await this.userService.getAvatarUrl(userId);
     if (oldAvatarUrl && oldAvatarUrl.startsWith("/uploads/")) {
       const oldFilename = oldAvatarUrl.replace("/uploads/", "");
@@ -81,19 +87,16 @@ export class UserController {
   }
 
   // ========================================
-  // User Settings
+  // 동적 경로 (정적 경로 이후)
   // ========================================
 
-  @Get("settings")
-  async getSettings(@CurrentUser("sub") userId: string) {
-    return this.userSettingsService.getSettings(userId);
+  @Get(":id")
+  async getProfile(@Param("id") id: string) {
+    return this.userService.getProfile(id);
   }
 
-  @Patch("settings")
-  async updateSettings(
-    @CurrentUser("sub") userId: string,
-    @Body() data: UpdateSettingsDto,
-  ) {
-    return this.userSettingsService.updateSettings(userId, data);
+  @Get(":id/stats")
+  async getUserStats(@Param("id") id: string) {
+    return this.userService.getUserStats(id);
   }
 }

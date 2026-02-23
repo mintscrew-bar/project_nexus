@@ -168,8 +168,8 @@ export class AuctionGateway
     }
   }
 
-  emitCaptainSelectionPhase(roomId: string, phase: any, participants: any[]) {
-    this.server.to(`room:${roomId}`).emit("captain-selection-phase", { ...phase, participants });
+  emitCaptainSelectionPhase(roomId: string, phase: any, participants: any[], hostId: string) {
+    this.server.to(`room:${roomId}`).emit("captain-selection-phase", { ...phase, participants, hostId });
   }
 
   async _emitCaptainsConfirmedAndStart(roomId: string, result: any) {
