@@ -1,5 +1,7 @@
 # 내전 관련 코드 개선점 분석
+
 ---
+
 ## 🖼️ 내전/토너먼트 단계별 흐름 다이어그램
 
 ```mermaid
@@ -15,7 +17,6 @@ flowchart LR
 ```
 
 ### 경매/드래프트 내부 로직 및 매치 결과 처리 상세 다이어그램
-
 
 ```mermaid
 flowchart TD
@@ -66,6 +67,7 @@ flowchart TD
     MATCH_RESULT --> COMPLETE
   end
 ```
+
 ---
 
 ## 📋 개요
@@ -75,6 +77,7 @@ flowchart TD
 ---
 
 ## 🔴 주요 문제점
+
 ### 1. **match.service.ts - 파일 복잡도가 너무 높음**
 
 - 파일이 1452줄로 너무 길고 복잡함
@@ -105,7 +108,7 @@ case 'WB_R1': {
 }
 }
 
-````
+```
 
 **개선 방안:**
 // 브래킷 구조를 데이터로 정의
@@ -141,7 +144,7 @@ private async advanceDoubleElimination(
   const rule = structure.routingRules.find(r => r.from === match.bracketRound);
   // 자동 라우팅...
 }
-````
+```
 
 ---
 
@@ -229,6 +232,7 @@ await this.prisma.$transaction(async (tx) => {
 - 사용자에게 명확한 에러 메시지 전달 부족
 
 **개선 방안:**
+
 ```mermaid
 flowchart TD
   ROOM_CREATE["방 생성 - WAITING"]
@@ -262,6 +266,7 @@ flowchart TD
   COMPLETE --> DC_ROLE
   COMPLETE --> DC_CHANNEL
 ```
+
 - `generateMatchId()`가 타임스탬프 + 랜덤 기반
 - 충돌 가능성 (비록 낮지만)
 - Prisma의 `cuid()`를 사용하지 않음

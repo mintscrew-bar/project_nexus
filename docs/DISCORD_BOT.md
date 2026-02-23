@@ -1,6 +1,7 @@
 # Discord 봇 (Nexus Bot)
 
 ---
+
 ## 🖼️ Discord 봇 자동화/연동 구조 다이어그램
 
 ```mermaid
@@ -24,6 +25,7 @@ flowchart TD
 	ROOM_COMPLETE --> REMOVE_ROLE
 	ROOM_COMPLETE --> DELETE_CHANNEL
 ```
+
 ---
 
 Nexus 내전 플랫폼과 연동되는 Discord 슬래시 봇입니다. 웹과 동일한 **내전 진행 흐름**에 맞춰 방·팀·경매·매치·대진표를 조회할 수 있으며, **자동으로 음성채널 관리 및 팀장 역할 부여**를 수행합니다.
