@@ -1,4 +1,72 @@
 # 내전 관련 코드 개선점 분석
+---
+## 🖼️ 내전/토너먼트 단계별 흐름 다이어그램
+
+```mermaid
+flowchart LR
+  WAITING[대기]
+  TEAM_SELECTION[팀 선택]
+  DRAFT[드래프트/경매]
+  DRAFT_COMPLETED[드래프트 완료]
+  ROLE_SELECTION[역할 선택]
+  IN_PROGRESS[대진표 진행]
+  COMPLETED[토너먼트 완료]
+  WAITING --> TEAM_SELECTION --> DRAFT --> DRAFT_COMPLETED --> ROLE_SELECTION --> IN_PROGRESS --> COMPLETED
+```
+
+### 경매/드래프트 내부 로직 및 매치 결과 처리 상세 다이어그램
+
+
+```mermaid
+flowchart TD
+  ROOM_CREATE["방 생성 - WAITING"]
+  TEAM_SELECT["팀 선택 - TEAM_SELECTION"]
+  AUCTION["경매/드래프트 - DRAFT"]
+  AUCTION_START["경매/드래프트 시작"]
+  AUCTION_BID["입찰/픽 진행"]
+  AUCTION_END["경매/드래프트 종료"]
+  CAPTAIN["팀장 선출"]
+  ROLE_SELECT["역할 선택 - ROLE_SELECTION"]
+  BRACKET["대진표 생성 - IN_PROGRESS"]
+  MATCH["매치 진행"]
+  MATCH_RESULT["매치 결과 처리"]
+  COMPLETE["토너먼트 완료 - COMPLETED"]
+
+  ROOM_CREATE --> TEAM_SELECT
+  TEAM_SELECT --> AUCTION
+  AUCTION --> AUCTION_START
+  AUCTION_START --> AUCTION_BID
+  AUCTION_BID --> AUCTION_END
+  AUCTION_END --> CAPTAIN
+  CAPTAIN --> ROLE_SELECT
+  ROLE_SELECT --> BRACKET
+  BRACKET --> MATCH
+  MATCH --> MATCH_RESULT
+  MATCH_RESULT --> COMPLETE
+
+  subgraph Discord_자동화
+    DC_CHANNEL["음성채널 생성/이동"]
+    DC_ROLE["팀장 역할 부여/제거"]
+    DC_NOTIFY["알림 채널 연동"]
+  end
+
+  ROOM_CREATE --> DC_CHANNEL
+  CAPTAIN --> DC_ROLE
+  BRACKET --> DC_NOTIFY
+  COMPLETE --> DC_ROLE
+  COMPLETE --> DC_CHANNEL
+
+  subgraph 경매_드래프트_상세
+    AUCTION_START --> AUCTION_BID
+    AUCTION_BID --> AUCTION_END
+  end
+
+  subgraph 매치_결과_처리
+    MATCH --> MATCH_RESULT
+    MATCH_RESULT --> COMPLETE
+  end
+```
+---
 
 ## 📋 개요
 
@@ -7,49 +75,39 @@
 ---
 
 ## 🔴 주요 문제점
-
 ### 1. **match.service.ts - 파일 복잡도가 너무 높음**
 
-**문제:**
 - 파일이 1452줄로 너무 길고 복잡함
 - 단일 책임 원칙(SRP) 위반
 - 유지보수 및 테스트 어려움
 
 **개선 방안:**
+
 ```typescript
 // 파일 분리 제안:
-- match-bracket.service.ts      // 브래킷 생성 로직
-- match-advancement.service.ts  // 승자 진출 로직
-- match-riot.service.ts          // Riot API 통합
-- match-notification.service.ts  // 알림 처리
+-match -
+  bracket.service.ts - // 브래킷 생성 로직
+  match -
+  advancement.service.ts - // 승자 진출 로직
+  match -
+  riot.service.ts - // Riot API 통합
+  match -
+  notification.service.ts; // 알림 처리
 ```
-
----
 
 ### 2. **Double Elimination 로직의 복잡성**
 
-**문제:**
-- `advanceDoubleElimination()` 메서드가 130줄 이상의 복잡한 switch문
-- 하드코딩된 bracketSection 문자열
 - 4팀/8팀 케이스가 섞여 있어 확장성 부족
 
-**현재 코드 (문제점):**
-```typescript
-// match.service.ts:780-912
 private async advanceDoubleElimination(...) {
-  switch (bracketSection) {
-    case 'WB_R1': {
-      // 복잡한 로직...
-      const idx = await getIndexAmongSiblings('WB_R1');
-      // 하드코딩된 인덱스 계산...
-    }
-    // ... 8개 이상의 케이스
-  }
+case 'WB_R1': {
+// ... 8개 이상의 케이스
 }
-```
+}
+
+````
 
 **개선 방안:**
-```typescript
 // 브래킷 구조를 데이터로 정의
 interface BracketStructure {
   sections: BracketSection[];
@@ -83,17 +141,19 @@ private async advanceDoubleElimination(
   const rule = structure.routingRules.find(r => r.from === match.bracketRound);
   // 자동 라우팅...
 }
-```
+````
 
 ---
 
 ### 3. **TBD 매치 처리 문제**
 
 **문제:**
+
 - 빈 문자열(`''`)을 TBD로 사용
 - `null`이 더 적절한데 타입 안정성 부족
 
 **현재 코드:**
+
 ```typescript
 // match.service.ts:235-238
 matches.push({
@@ -103,6 +163,7 @@ matches.push({
 ```
 
 **개선 방안:**
+
 ```typescript
 // null 사용 및 타입 명확화
 matches.push({
@@ -121,10 +182,12 @@ function isTBDMatch(match: Match): boolean {
 ### 4. **트랜잭션 처리 부족**
 
 **문제:**
+
 - 여러 DB 작업이 원자적으로 처리되지 않음
 - 브래킷 생성, 매치 업데이트 등이 실패 시 데이터 불일치 가능
 
 **현재 코드:**
+
 ```typescript
 // match.service.ts:121-136
 await Promise.all(
@@ -136,6 +199,7 @@ await Promise.all(
 ```
 
 **개선 방안:**
+
 ```typescript
 await this.prisma.$transaction(async (tx) => {
   // 모든 매치 생성
@@ -144,13 +208,13 @@ await this.prisma.$transaction(async (tx) => {
       tx.match.create({...})
     )
   );
-  
+
   // 룸 상태 업데이트
   await tx.room.update({
     where: { id: roomId },
     data: { status: RoomStatus.IN_PROGRESS },
   });
-  
+
   return createdMatches;
 });
 ```
@@ -160,46 +224,50 @@ await this.prisma.$transaction(async (tx) => {
 ### 5. **에러 처리 일관성 부족**
 
 **문제:**
+
 - 일부는 throw, 일부는 warn만 하고 계속 진행
 - 사용자에게 명확한 에러 메시지 전달 부족
 
 **개선 방안:**
-```typescript
-// 커스텀 예외 클래스 사용
-export class MatchNotFoundException extends NotFoundException {
-  constructor(matchId: string) {
-    super(`Match ${matchId} not found`);
-  }
-}
+```mermaid
+flowchart TD
+  ROOM_CREATE["방 생성 - WAITING"]
+  TEAM_SELECT["팀 선택 - TEAM_SELECTION"]
+  AUCTION["경매/드래프트 - DRAFT"]
+  AUCTION_START["경매/드래프트 시작"]
+  AUCTION_BID["입찰/픽 진행"]
+  AUCTION_END["경매/드래프트 종료"]
+  CAPTAIN["팀장 선출"]
+  ROLE_SELECT["역할 선택 - ROLE_SELECTION"]
+  BRACKET["대진표 생성 - IN_PROGRESS"]
+  MATCH["매치 진행"]
+  MATCH_RESULT["매치 결과 처리"]
+  COMPLETE["토너먼트 완료 - COMPLETED"]
 
-export class InvalidBracketStateException extends BadRequestException {
-  constructor(message: string) {
-    super(`Invalid bracket state: ${message}`);
-  }
-}
+  ROOM_CREATE --> TEAM_SELECT
+  TEAM_SELECT --> AUCTION
+  AUCTION --> AUCTION_START
+  AUCTION_START --> AUCTION_BID
+  AUCTION_BID --> AUCTION_END
+  AUCTION_END --> CAPTAIN
+  CAPTAIN --> ROLE_SELECT
+  ROLE_SELECT --> BRACKET
+  BRACKET --> MATCH
+  MATCH --> MATCH_RESULT
+  MATCH_RESULT --> COMPLETE
 
-// 일관된 에러 처리
-try {
-  // ...
-} catch (error) {
-  if (error instanceof MatchNotFoundException) {
-    this.logger.error(`Match not found: ${error.message}`);
-    throw error; // 사용자에게 전달
-  }
-  // ...
-}
+  ROOM_CREATE --> DC_CHANNEL["음성채널 생성/이동"]
+  CAPTAIN --> DC_ROLE["팀장 역할 부여/제거"]
+  BRACKET --> DC_NOTIFY["알림 채널 연동"]
+  COMPLETE --> DC_ROLE
+  COMPLETE --> DC_CHANNEL
 ```
-
----
-
-### 6. **매치 ID 생성 방식**
-
-**문제:**
 - `generateMatchId()`가 타임스탬프 + 랜덤 기반
 - 충돌 가능성 (비록 낮지만)
 - Prisma의 `cuid()`를 사용하지 않음
 
 **현재 코드:**
+
 ```typescript
 // match.service.ts:1449-1451
 private generateMatchId(): string {
@@ -208,6 +276,7 @@ private generateMatchId(): string {
 ```
 
 **개선 방안:**
+
 ```typescript
 // Prisma의 cuid() 사용 (이미 DB에서 사용 중)
 // 또는 UUID v4 사용
@@ -225,11 +294,13 @@ private generateMatchId(): string {
 ### 7. **match-data-collection.service.ts - 재시도 로직**
 
 **문제:**
+
 - `setTimeout`을 사용한 비동기 재시도
 - 메모리 누수 가능성 (서버 재시작 시)
 - 작업 큐 관리 부재
 
 **현재 코드:**
+
 ```typescript
 // match-data-collection.service.ts:281-304
 private async scheduleRetry(matchId: string, attemptNumber: number) {
@@ -240,20 +311,21 @@ private async scheduleRetry(matchId: string, attemptNumber: number) {
 ```
 
 **개선 방안:**
+
 ```typescript
 // BullMQ 또는 Bull 같은 작업 큐 사용
-import { Queue } from 'bullmq';
+import { Queue } from "bullmq";
 
 @Injectable()
 export class MatchDataCollectionService {
   private readonly collectionQueue: Queue;
 
   async collectMatchData(matchId: string) {
-    await this.collectionQueue.add('collect-match-data', {
+    await this.collectionQueue.add("collect-match-data", {
       matchId,
       attempts: 5,
       backoff: {
-        type: 'exponential',
+        type: "exponential",
         delay: 60000,
       },
     });
@@ -269,23 +341,26 @@ export class MatchDataCollectionService {
 ### 8. **WebSocket 연결 관리**
 
 **문제:**
+
 - `match-store.ts`에서 소켓 연결이 제대로 정리되지 않을 수 있음
 - 메모리 누수 가능성
 
 **현재 코드:**
+
 ```typescript
 // match-store.ts:197-282
 connectToBracket: (roomId: string) => {
   const existingSocket = get().socket;
   if (existingSocket?.connected) {
-    existingSocket.emit('leave-bracket', { roomId: get().roomId });
+    existingSocket.emit("leave-bracket", { roomId: get().roomId });
     existingSocket.disconnect();
   }
   // 새 소켓 생성...
-}
+};
 ```
 
 **개선 방안:**
+
 ```typescript
 // 소켓 정리 로직 강화
 connectToBracket: (roomId: string) => {
@@ -295,9 +370,9 @@ connectToBracket: (roomId: string) => {
     existingSocket.removeAllListeners();
     existingSocket.disconnect();
   }
-  
+
   const socket = io(...);
-  
+
   // 컴포넌트 언마운트 시 정리 보장
   return () => {
     socket.removeAllListeners();
@@ -311,10 +386,12 @@ connectToBracket: (roomId: string) => {
 ### 9. **타입 불일치**
 
 **문제:**
+
 - `BracketView.tsx`와 `match-store.ts`의 Match 타입이 다름
 - `teamA/teamB` vs `team1/team2` 불일치
 
 **현재 코드:**
+
 ```typescript
 // match-store.ts
 interface Match {
@@ -337,6 +414,7 @@ const bracketMatches: Match[] = roomMatches.map((m) => ({
 ```
 
 **개선 방안:**
+
 ```typescript
 // 공통 타입 정의 (packages/types/src/index.ts)
 export interface Match {
@@ -347,7 +425,7 @@ export interface Match {
 }
 
 // 모든 곳에서 동일한 타입 사용
-import { Match } from '@nexus/types';
+import { Match } from "@nexus/types";
 
 // 변환 로직 제거
 ```
@@ -357,10 +435,12 @@ import { Match } from '@nexus/types';
 ### 10. **성능 최적화**
 
 **문제:**
+
 - `getRoomMatches()`에서 불필요한 데이터 로드
 - N+1 쿼리 문제 가능성
 
 **현재 코드:**
+
 ```typescript
 // match.service.ts:1050-1060
 async getRoomMatches(roomId: string) {
@@ -376,6 +456,7 @@ async getRoomMatches(roomId: string) {
 ```
 
 **개선 방안:**
+
 ```typescript
 // 필요한 필드만 선택
 async getRoomMatches(roomId: string) {
@@ -420,14 +501,16 @@ async getRoomMatches(roomId: string) {
 ### 11. **로깅 개선**
 
 **문제:**
+
 - 일관성 없는 로그 레벨
 - 민감한 정보 로깅 가능성
 
 **개선 방안:**
+
 ```typescript
 // 구조화된 로깅
 this.logger.log({
-  event: 'bracket_generated',
+  event: "bracket_generated",
   roomId,
   teamCount,
   bracketType: bracket.type,
@@ -440,10 +523,12 @@ this.logger.log({
 ### 12. **검증 로직 강화**
 
 **문제:**
+
 - 브래킷 생성 전 팀 구성 검증이 부족
 - 매치 결과 보고 시 승자 검증이 단순함
 
 **개선 방안:**
+
 ```typescript
 // 검증 서비스 분리
 @Injectable()
@@ -451,23 +536,25 @@ export class MatchValidationService {
   validateBracketGeneration(room: Room): void {
     // 팀 수 검증
     if (room.teams.length < 2) {
-      throw new BadRequestException('최소 2팀이 필요합니다');
+      throw new BadRequestException("최소 2팀이 필요합니다");
     }
-    
+
     // 각 팀 인원 검증
     for (const team of room.teams) {
       if (team.members.length !== 5) {
         throw new BadRequestException(
-          `팀 ${team.name}은 5명이어야 합니다 (현재: ${team.members.length}명)`
+          `팀 ${team.name}은 5명이어야 합니다 (현재: ${team.members.length}명)`,
         );
       }
     }
-    
+
     // 중복 참가자 검증
-    const allUserIds = room.teams.flatMap(t => t.members.map(m => m.userId));
+    const allUserIds = room.teams.flatMap((t) =>
+      t.members.map((m) => m.userId),
+    );
     const uniqueUserIds = new Set(allUserIds);
     if (allUserIds.length !== uniqueUserIds.size) {
-      throw new BadRequestException('중복 참가자가 있습니다');
+      throw new BadRequestException("중복 참가자가 있습니다");
     }
   }
 }
@@ -478,21 +565,23 @@ export class MatchValidationService {
 ### 13. **테스트 코드 부재**
 
 **문제:**
+
 - 복잡한 로직에 대한 테스트가 없음
 - 특히 Double Elimination 로직 테스트 필요
 
 **개선 방안:**
+
 ```typescript
 // match.service.spec.ts
-describe('MatchService', () => {
-  describe('generateDoubleElimination4', () => {
-    it('should generate correct bracket structure', () => {
+describe("MatchService", () => {
+  describe("generateDoubleElimination4", () => {
+    it("should generate correct bracket structure", () => {
       // 테스트 코드
     });
   });
-  
-  describe('advanceDoubleElimination', () => {
-    it('should route winner to WB_F and loser to LB_R1', () => {
+
+  describe("advanceDoubleElimination", () => {
+    it("should route winner to WB_F and loser to LB_R1", () => {
       // 테스트 코드
     });
   });
@@ -517,16 +606,16 @@ describe('MatchService', () => {
 
 ## 📊 우선순위 요약
 
-| 우선순위 | 개선점 | 예상 작업 시간 |
-|---------|--------|---------------|
-| 🔴 높음 | 파일 분리 (match.service.ts) | 8-12시간 |
-| 🔴 높음 | 트랜잭션 처리 추가 | 4-6시간 |
-| 🔴 높음 | Double Elimination 리팩토링 | 12-16시간 |
-| 🟡 중간 | 타입 통일 | 2-4시간 |
-| 🟡 중간 | 에러 처리 개선 | 4-6시간 |
-| 🟡 중간 | 재시도 로직 개선 | 4-6시간 |
-| 🟢 낮음 | 테스트 코드 작성 | 8-12시간 |
-| 🟢 낮음 | 문서화 | 2-4시간 |
+| 우선순위 | 개선점                       | 예상 작업 시간 |
+| -------- | ---------------------------- | -------------- |
+| 🔴 높음  | 파일 분리 (match.service.ts) | 8-12시간       |
+| 🔴 높음  | 트랜잭션 처리 추가           | 4-6시간        |
+| 🔴 높음  | Double Elimination 리팩토링  | 12-16시간      |
+| 🟡 중간  | 타입 통일                    | 2-4시간        |
+| 🟡 중간  | 에러 처리 개선               | 4-6시간        |
+| 🟡 중간  | 재시도 로직 개선             | 4-6시간        |
+| 🟢 낮음  | 테스트 코드 작성             | 8-12시간       |
+| 🟢 낮음  | 문서화                       | 2-4시간        |
 
 ---
 

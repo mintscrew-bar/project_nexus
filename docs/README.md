@@ -7,35 +7,59 @@
 ## 📚 문서 목록
 
 ### 🚀 시작하기
+
 - **[SETUP_GUIDE.md](./SETUP_GUIDE.md)** - 개발 환경 설정 (필독!)
   - 의존성 설치
   - 환경 변수 설정
   - 데이터베이스 설정
   - Discord/Google/Riot API 설정
 
-### 📖 핵심 문서
 - **[API_REFERENCE.md](./API_REFERENCE.md)** - 전체 API 엔드포인트 (100+ endpoints)
   - REST API 명세
   - WebSocket 이벤트
   - 요청/응답 예시
 
 - **[IMPLEMENTATION_STATUS.md](./IMPLEMENTATION_STATUS.md)** - 프로젝트 현황
-  - 완료된 기능 (11개 모듈)
   - 코드 통계
-  - 남은 작업
+
+  ***
+
+  ### 🏗️ 아키텍처 요약
+  - **Backend**: NestJS + Prisma + PostgreSQL + Socket.io
+  - **Frontend**: Next.js 14 + React + TailwindCSS + Zustand
+  - **Auth**: JWT + OAuth2 (Google, Discord), Riot API 연동
+  - **실시간**: WebSocket(방, 경매, 매치 등)
+
+  ***
+
+  ### 🧩 주요 기능
+  - 인증(회원가입, 로그인, 리프레시, 로그아웃, OAuth, Riot 연동)
+  - WebSocket 이벤트(방, 경매, 매치 등 실시간)
+  - DB 스키마/마이그레이션/모델 관리
+  - 성능/보안/최적화/이슈 관리 등 실무적 고려사항
+
+  ***
+
+  ### 📝 문서 보완/추가
+  - API 문서에 실제 응답 예시, 에러 케이스, 인증 흐름, WebSocket 연결/실패/재연결 등 상세 시나리오
+  - 프론트엔드 주요 페이지/컴포넌트 구조, 상태관리 흐름, 디자인 시스템/UX 가이드
+  - DB 스키마/ERD, 마이그레이션/버전 관리, 데이터 흐름
+  - 운영/배포/테스트 자동화(CI/CD, Docker, 환경변수, 린트/포맷/테스트 등)
+  - 실제 서비스 운영 시 발생한 이슈/해결 사례(문서화)
 
 ### 🔧 개발 가이드
+
 - **[SCHEMA_UPDATES_NEEDED.md](./SCHEMA_UPDATES_NEEDED.md)** - 데이터베이스 스키마 변경사항
   - Prisma 스키마 업데이트 필요 사항
   - 모델별 변경 내역
   - 마이그레이션 순서
+    - 인증/세션/관리자용 등 최신 엔드포인트 반영
 
 - **[QUICK_FIX_GUIDE.md](./QUICK_FIX_GUIDE.md)** - 즉시 해결 방법
   - 컴파일 오류 해결
   - 임시 해결책
   - 빌드 가능하게 하는 방법
 
-- **[RIOT_SETUP.md](./RIOT_SETUP.md)** - Riot API 상세 설정
   - API 키 발급
   - Tournament API 신청
   - Rate Limit 처리
@@ -48,14 +72,14 @@
 ```bash
 # 1. 저장소 클론 및 설치
 git clone <repository-url>
-cd nexus
+
 npm install
 
 # 2. 환경 변수 설정
 cp .env.example .env
 # .env 파일 편집 (DATABASE_URL, API 키 등)
 
-# 3. 데이터베이스 설정
+
 cd packages/database
 npx prisma migrate dev
 npx prisma generate
@@ -72,12 +96,14 @@ cd ../../apps/web && npm run dev    # 터미널 2
 ## 📊 프로젝트 개요
 
 ### 기술 스택
+
 - **Backend**: NestJS + Prisma + PostgreSQL + Socket.io
 - **Frontend**: Next.js 14 + React + TailwindCSS + Zustand
 - **Auth**: JWT + OAuth2 (Google, Discord)
 - **External APIs**: Riot Games API, Discord Bot
 
 ### 주요 기능 (11개 모듈)
+
 1. ✅ **인증 시스템** - Google, Discord, Email/Password
 2. ✅ **Riot API 통합** - 계정 인증, 티어 동기화
 3. ✅ **Room 시스템** - 방 생성/관리, 실시간 채팅
@@ -90,7 +116,16 @@ cd ../../apps/web && npm run dev    # 터미널 2
 10. ✅ **Reputation/Report** - 평판, 신고, 자동 밴
 11. ✅ **Friend 시스템** - 친구 관리, 차단
 
-### 통계
+---
+
+### 주요 모듈/도메인
+
+- 인증/세션/유저
+- 방/경매/스네이크드래프트/매치/토너먼트
+- 클랜/커뮤니티/평판/친구
+- 실시간 WebSocket 이벤트
+- 관리자/운영/보안/성능
+
 - **REST API**: 100+ 엔드포인트
 - **WebSocket**: 5개 namespace (room, auction, snake-draft, match, clan)
 - **코드**: 8,000+ 라인
@@ -121,17 +156,20 @@ nexus/
 ## ⚠️ 현재 상태
 
 ### ✅ 완료
+
 - 백엔드 11개 모듈 구현
 - API/Socket 클라이언트 통합
 - Zustand 상태 관리
 - React hooks
 
 ### ⏳ 진행 중
+
 - **우선순위 1**: Prisma 스키마 업데이트 ([SCHEMA_UPDATES_NEEDED.md](./SCHEMA_UPDATES_NEEDED.md))
 - **우선순위 2**: 프론트엔드 컴포넌트 개발
 - **우선순위 3**: 통합 테스트
 
 ### ❌ 미완료
+
 - 테스트 작성
 - 배포 설정
 - 성능 최적화
@@ -141,21 +179,27 @@ nexus/
 ## 🔍 문서 찾기
 
 ### 설정/설치 관련
+
 → [SETUP_GUIDE.md](./SETUP_GUIDE.md)
 
 ### API 사용법
+
 → [API_REFERENCE.md](./API_REFERENCE.md)
 
 ### 컴파일 오류
+
 → [QUICK_FIX_GUIDE.md](./QUICK_FIX_GUIDE.md)
 
 ### 데이터베이스 변경
+
 → [SCHEMA_UPDATES_NEEDED.md](./SCHEMA_UPDATES_NEEDED.md)
 
 ### Riot API 설정
+
 → [RIOT_SETUP.md](./RIOT_SETUP.md)
 
 ### 프로젝트 현황
+
 → [IMPLEMENTATION_STATUS.md](./IMPLEMENTATION_STATUS.md)
 
 ---
@@ -172,12 +216,15 @@ nexus/
 ## 📞 추가 정보
 
 ### Git 히스토리
+
 ```bash
 git log --oneline --graph
 ```
+
 모든 주요 커밋에 상세한 설명 포함
 
 ### Prisma Studio (DB GUI)
+
 ```bash
 cd packages/database
 npx prisma studio
