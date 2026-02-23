@@ -10,6 +10,7 @@ interface Player {
   username: string;
   tier: string;
   rank?: string;
+  mmr?: number;
   position: string;
   avatar?: string;
   champions?: string[];
@@ -111,6 +112,11 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
                     tier={auctionState.currentPlayer.tier}
                     rank={auctionState.currentPlayer.rank}
                   />
+                  {auctionState.currentPlayer.mmr !== undefined && (
+                    <span className="text-sm font-mono font-semibold text-text-muted">
+                      MMR {auctionState.currentPlayer.mmr}
+                    </span>
+                  )}
                   <Badge variant="primary">{auctionState.currentPlayer.position}</Badge>
                 </div>
                 {auctionState.currentPlayer.champions && (
@@ -259,7 +265,12 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
                         </p>
                         <p className="text-xs text-text-secondary">{player.position}</p>
                       </div>
-                      <TierBadge tier={player.tier} size="sm" showIcon={false} />
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        {player.mmr !== undefined && (
+                          <span className="text-[10px] font-mono text-text-muted">{player.mmr}</span>
+                        )}
+                        <TierBadge tier={player.tier} size="sm" showIcon={false} />
+                      </div>
                     </div>
                   ))
                 )}

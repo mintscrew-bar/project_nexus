@@ -10,6 +10,8 @@ interface Player {
   id: string;
   username: string;
   tier: string;
+  rank?: string;
+  mmr?: number;
   position: string;
 }
 

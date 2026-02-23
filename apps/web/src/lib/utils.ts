@@ -57,6 +57,25 @@ export function getTierIcon(tier: string): string {
 }
 
 /**
+ * 롤 티어/랭크/LP → 통합 MMR 점수 변환
+ * 백엔드 tier-score.util.ts 와 동일한 로직
+ *   IRON IV 0LP = 0 … BRONZE IV 0LP = 400 … CHALLENGER = 3600+
+ */
+const TIER_SCORE_BASE: Record<string, number> = {
+  UNRANKED: 0, IRON: 0, BRONZE: 400, SILVER: 800, GOLD: 1200,
+  PLATINUM: 1600, EMERALD: 2000, DIAMOND: 2400,
+  MASTER: 2800, GRANDMASTER: 3200, CHALLENGER: 3600,
+};
+const RANK_SCORE_BONUS: Record<string, number> = { IV: 0, III: 100, II: 200, I: 300, '': 0 };
+const MASTER_PLUS_TIERS = new Set(['MASTER', 'GRANDMASTER', 'CHALLENGER']);
+
+export function calculateTierScore(tier: string, rank: string, lp = 0): number {
+  const base = TIER_SCORE_BASE[tier.toUpperCase()] ?? 0;
+  const bonus = MASTER_PLUS_TIERS.has(tier.toUpperCase()) ? 0 : (RANK_SCORE_BONUS[rank] ?? 0);
+  return base + bonus + lp;
+}
+
+/**
  * 상태를 색상 클래스로 변환
  */
 export function getStatusColor(status: string): string {

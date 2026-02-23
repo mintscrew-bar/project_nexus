@@ -9,6 +9,8 @@ interface Player {
   id: string;
   username: string;
   tier?: string;
+  rank?: string;
+  mmr?: number;
   position?: string;
 }
 
@@ -209,13 +211,20 @@ export function DraftBoard({
                         )}
                       </div>
                     </div>
-                    {player.tier && (
-                      <TierBadge
-                        tier={player.tier}
-                        size="sm"
-                        className={selectedPlayer === player.id ? "opacity-90" : ""}
-                      />
-                    )}
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      {player.mmr !== undefined && (
+                        <span className={`text-xs font-mono font-semibold ${selectedPlayer === player.id ? "text-white/80" : "text-text-muted"}`}>
+                          {player.mmr}
+                        </span>
+                      )}
+                      {player.tier && (
+                        <TierBadge
+                          tier={player.tier}
+                          size="sm"
+                          className={selectedPlayer === player.id ? "opacity-90" : ""}
+                        />
+                      )}
+                    </div>
                   </button>
                 ))}
 

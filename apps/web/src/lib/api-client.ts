@@ -307,9 +307,9 @@ export const snakeDraftApi = {
     return response.data;
   },
 
-  makePick: async (roomId: string, playerId: string) => {
+  makePick: async (roomId: string, targetPlayerId: string) => {
     const response = await apiClient.post(`/rooms/${roomId}/snake-draft/pick`, {
-      playerId,
+      targetPlayerId,
     });
     return response.data;
   },

@@ -174,15 +174,20 @@ export class AuctionService {
 
     return {
       teams,
-      players: players.map((p) => ({
-        id: p.userId,
-        username: p.user.username,
-        avatar: p.user.avatar,
-        tier: p.user.riotAccounts[0]?.tier,
-        rank: p.user.riotAccounts[0]?.rank,
-        mainRole: p.user.riotAccounts[0]?.mainRole,
-        subRole: p.user.riotAccounts[0]?.subRole,
-      })),
+      players: players.map((p) => {
+        const acc = p.user.riotAccounts[0];
+        return {
+          id: p.userId,
+          username: p.user.username,
+          avatar: p.user.avatar,
+          tier: acc?.tier,
+          rank: acc?.rank,
+          lp: acc?.lp,
+          mmr: calculateTierScore(acc?.tier || 'UNRANKED', acc?.rank || '', acc?.lp || 0),
+          mainRole: acc?.mainRole,
+          subRole: acc?.subRole,
+        };
+      }),
       auctionState,
     };
   }
