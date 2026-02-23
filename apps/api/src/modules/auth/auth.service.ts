@@ -1,16 +1,16 @@
 import {
+  BadRequestException,
+  ConflictException,
   Injectable,
   UnauthorizedException,
-  ConflictException,
-  BadRequestException,
 } from "@nestjs/common";
-import { randomUUID } from "crypto";
-import { JwtService } from "@nestjs/jwt";
 import { ConfigService } from "@nestjs/config";
+import { JwtService } from "@nestjs/jwt";
+import { AuthProviderType } from "@nexus/database";
+import * as bcrypt from "bcrypt";
+import { randomUUID } from "crypto";
 import { PrismaService } from "../prisma/prisma.service";
 import { RedisService } from "../redis/redis.service";
-import * as bcrypt from "bcrypt";
-import { AuthProviderType } from "@nexus/database";
 
 export interface OAuthProfile {
   provider: "google" | "discord";
@@ -256,14 +256,17 @@ export class AuthService {
 
   async refreshTokens(userId: string, refreshToken: string) {
     // Find session
-    console.log('AuthService.refreshTokens - userId:', userId);
-    console.log('AuthService.refreshTokens - provided refreshToken:', refreshToken ? '[REDACTED]' : null);
+    console.log("AuthService.refreshTokens - userId:", userId);
+    console.log(
+      "AuthService.refreshTokens - provided refreshToken:",
+      refreshToken ? "[REDACTED]" : null,
+    );
     const session = await this.prisma.session.findUnique({
       where: { refreshToken },
       include: { user: true },
     });
 
-    console.log('AuthService.refreshTokens - session found id:', session?.id);
+    console.log("AuthService.refreshTokens - session found id:", session?.id);
 
     if (!session || session.userId !== userId) {
       throw new UnauthorizedException("Invalid refresh token");
@@ -285,7 +288,10 @@ export class AuthService {
 
     // Delete old session
     await this.prisma.session.deleteMany({ where: { id: session.id } });
-    console.log('AuthService.refreshTokens - deleted old session id:', session.id);
+    console.log(
+      "AuthService.refreshTokens - deleted old session id:",
+      session.id,
+    );
 
     // Generate new tokens
     return this.generateTokens(session.user);

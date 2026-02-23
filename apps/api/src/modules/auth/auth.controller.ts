@@ -1,21 +1,21 @@
 import {
+  Body,
   Controller,
   Get,
+  HttpCode,
+  HttpStatus,
   Post,
-  Body,
   Req,
   Res,
   UseGuards,
-  HttpStatus,
-  HttpCode,
 } from "@nestjs/common";
-import { AuthGuard } from "@nestjs/passport";
 import { ConfigService } from "@nestjs/config";
+import { AuthGuard } from "@nestjs/passport";
 import { Request, Response } from "express";
-import { AuthService, RegisterDto, LoginDto } from "./auth.service";
-import { JwtRefreshGuard } from "./guards/jwt-refresh.guard";
-import { JwtAuthGuard } from "./guards/jwt-auth.guard";
+import { AuthService, LoginDto, RegisterDto } from "./auth.service";
 import { CurrentUser } from "./decorators/current-user.decorator";
+import { JwtAuthGuard } from "./guards/jwt-auth.guard";
+import { JwtRefreshGuard } from "./guards/jwt-refresh.guard";
 
 @Controller("auth")
 export class AuthController {
@@ -144,12 +144,18 @@ export class AuthController {
       const user = req.user as any;
       const refreshToken = req.cookies?.refresh_token;
 
-      console.log('AuthController.refresh - user.sub:', user?.sub);
-      console.log('AuthController.refresh - incoming refresh_token:', refreshToken ? '[REDACTED]' : null);
+      console.log("AuthController.refresh - user.sub:", user?.sub);
+      console.log(
+        "AuthController.refresh - incoming refresh_token:",
+        refreshToken ? "[REDACTED]" : null,
+      );
 
-      const tokens = await this.authService.refreshTokens(user.sub, refreshToken);
+      const tokens = await this.authService.refreshTokens(
+        user.sub,
+        refreshToken,
+      );
 
-      console.log('AuthController.refresh - refreshTokens succeeded');
+      console.log("AuthController.refresh - refreshTokens succeeded");
 
       res.cookie("refresh_token", tokens.refreshToken, {
         httpOnly: true,
@@ -161,7 +167,10 @@ export class AuthController {
 
       return res.json({ accessToken: tokens.accessToken });
     } catch (err) {
-      console.error('AuthController.refresh - error:', err instanceof Error ? err.stack || err.message : err);
+      console.error(
+        "AuthController.refresh - error:",
+        err instanceof Error ? err.stack || err.message : err,
+      );
       throw err; // let GlobalExceptionFilter handle the response formatting
     }
   }
