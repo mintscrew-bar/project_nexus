@@ -290,8 +290,25 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
           data.roomId,
         ); // Assert client.userId is string
 
-        // Emit auction-started event to auction room
-        this.auctionGateway.emitAuctionStarted(data.roomId, result);
+        // MANUAL/VOLUNTEER: 팀장 선정 단계 진입
+        const auctionResult = result as any;
+        if (auctionResult.captainSelectionPhase) {
+          this.auctionGateway.emitCaptainSelectionPhase(data.roomId, auctionResult.captainSelectionPhase, auctionResult.participants);
+
+          // VOLUNTEER: 30초 타이머 후 자동 처리
+          if (auctionResult.captainSelectionPhase.mode === 'VOLUNTEER') {
+            const handle = setTimeout(async () => {
+              try {
+                const autoResult = await this.auctionService.finalizeVolunteers(client.userId!, data.roomId);
+                await this.auctionGateway['_emitCaptainsConfirmedAndStart'](data.roomId, autoResult);
+              } catch (_e) { /* 이미 마감됐거나 방 없어진 경우 무시 */ }
+            }, 30_000);
+            this.auctionService.setCaptainPhaseTimerHandle(data.roomId, handle);
+          }
+        } else {
+          // TIER: 기존처럼 바로 auction-started emit
+          this.auctionGateway.emitAuctionStarted(data.roomId, result);
+        }
       } else if (room.teamMode === TeamMode.SNAKE_DRAFT) {
         // Start snake draft directly
         result = await this.snakeDraftService.startSnakeDraft(

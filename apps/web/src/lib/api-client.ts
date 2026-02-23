@@ -238,7 +238,7 @@ export const roomApi = {
     minBidIncrement?: number;
     bidTimeLimit?: number;
     pickTimeLimit?: number;
-    captainSelection?: "RANDOM" | "TIER";
+    captainSelection?: "RANDOM" | "TIER" | "MANUAL" | "VOLUNTEER";
     bracketFormat?: string;
   }) => {
     const response = await apiClient.post("/rooms", data);

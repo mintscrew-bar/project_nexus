@@ -19,6 +19,10 @@ export function useAuction(roomId?: string) {
     connectToAuction,
     disconnectFromAuction,
     placeBid,
+    captainSelectionPhase,
+    volunteerAsCaptain,
+    finalizeVolunteers,
+    selectManualCaptains,
   } = useAuctionStore();
 
   // 방 ID가 있으면 자동으로 연결
@@ -44,5 +48,9 @@ export function useAuction(roomId?: string) {
     startAuction,
     getAuctionState,
     placeBid,
+    captainSelectionPhase,
+    volunteerAsCaptain,
+    finalizeVolunteers,
+    selectManualCaptains,
   };
 }

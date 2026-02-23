@@ -7,7 +7,7 @@ import {
   Inject,
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
-import { RoomStatus, TeamMode } from "@nexus/database";
+import { RoomStatus, TeamCaptainSelection, TeamMode } from "@nexus/database";
 import { calculateTierScore } from "../common/tier-score.util";
 
 const BONUS_GOLD = 500;
@@ -22,9 +22,18 @@ export interface AuctionState {
   maxYuchalCycles: number;
 }
 
+export interface CaptainSelectionPhase {
+  mode: TeamCaptainSelection;
+  requiredCount: number;
+  volunteers: string[]; // userId[]
+  timerEnd: number | null;
+  timerHandle: ReturnType<typeof setTimeout> | null;
+}
+
 @Injectable()
 export class AuctionService {
   private auctionStates = new Map<string, AuctionState>();
+  private captainPhases = new Map<string, CaptainSelectionPhase>();
   private discordVoiceService: any; // DiscordVoiceService (optional dependency)
 
   constructor(
@@ -80,8 +89,86 @@ export class AuctionService {
       throw new BadRequestException("Need at least 10 players for auction");
     }
 
-    // Select captains by tier score (Tier + Rank + LP 통합 점수 기준)
-    const sortedPlayers = [...room.participants].sort((a, b) => {
+    const captainMode = room.captainSelection ?? TeamCaptainSelection.TIER;
+
+    // MANUAL / VOLUNTEER: 팀장 선정 단계 진입 (경매 시작 보류)
+    if (captainMode === TeamCaptainSelection.MANUAL) {
+      await this.prisma.room.update({
+        where: { id: roomId },
+        data: { status: RoomStatus.DRAFT },
+      });
+
+      return {
+        captainSelectionPhase: {
+          mode: TeamCaptainSelection.MANUAL,
+          requiredCount: numTeams,
+          volunteers: [],
+          timerEnd: null,
+        },
+        participants: room.participants.map((p) => {
+          const acc = p.user.riotAccounts[0];
+          return {
+            id: p.userId,
+            username: p.user.username,
+            avatar: p.user.avatar,
+            tier: acc?.tier,
+            rank: acc?.rank,
+            mmr: calculateTierScore(acc?.tier || 'UNRANKED', acc?.rank || '', acc?.lp || 0),
+          };
+        }),
+      };
+    }
+
+    if (captainMode === TeamCaptainSelection.VOLUNTEER) {
+      const timerEnd = Date.now() + 30_000;
+
+      await this.prisma.room.update({
+        where: { id: roomId },
+        data: { status: RoomStatus.DRAFT },
+      });
+
+      const phase: CaptainSelectionPhase = {
+        mode: TeamCaptainSelection.VOLUNTEER,
+        requiredCount: numTeams,
+        volunteers: [],
+        timerEnd,
+        timerHandle: null,
+      };
+      this.captainPhases.set(roomId, phase);
+
+      return {
+        captainSelectionPhase: {
+          mode: TeamCaptainSelection.VOLUNTEER,
+          requiredCount: numTeams,
+          volunteers: [],
+          timerEnd,
+        },
+        participants: room.participants.map((p) => {
+          const acc = p.user.riotAccounts[0];
+          return {
+            id: p.userId,
+            username: p.user.username,
+            avatar: p.user.avatar,
+            tier: acc?.tier,
+            rank: acc?.rank,
+            mmr: calculateTierScore(acc?.tier || 'UNRANKED', acc?.rank || '', acc?.lp || 0),
+          };
+        }),
+      };
+    }
+
+    // TIER (default): MMR 자동 선정
+    return this._startAuctionWithCaptains(hostId, roomId, room);
+  }
+
+  // ========================================
+  // Captain Selection Helpers
+  // ========================================
+
+  private async _startAuctionWithCaptains(hostId: string, roomId: string, room: any) {
+    const numTeams = Math.floor(room.participants.length / 5);
+
+    const sortedPlayers = [...room.participants].sort((a: any, b: any) => {
       const aAcc = a.user.riotAccounts[0];
       const bAcc = b.user.riotAccounts[0];
       const aScore = calculateTierScore(aAcc?.tier || "UNRANKED", aAcc?.rank || "", aAcc?.lp || 0);
@@ -92,11 +179,46 @@ export class AuctionService {
     const captains = sortedPlayers.slice(0, numTeams);
     const players = sortedPlayers.slice(numTeams);
 
-    // Create teams with budgets from room settings
-    const teams = await Promise.all(
-      captains.map(async (captain, index) => {
-        const initialBudget = room.startingPoints || 1000;
+    const { teams } = await this._applySelectedCaptains(roomId, room, captains.map((c: any) => c.userId));
 
+    const auctionState: AuctionState = {
+      roomId,
+      currentPlayerIndex: 0,
+      currentHighestBid: 0,
+      currentHighestBidder: null,
+      timerEnd: Date.now() + (room.bidTimeLimit || 30) * 1000,
+      yuchalCount: 0,
+      maxYuchalCycles: numTeams,
+    };
+
+    this.auctionStates.set(roomId, auctionState);
+
+    return {
+      teams,
+      players: players.map((p: any) => {
+        const acc = p.user.riotAccounts[0];
+        return {
+          id: p.userId,
+          username: p.user.username,
+          avatar: p.user.avatar,
+          tier: acc?.tier,
+          rank: acc?.rank,
+          lp: acc?.lp,
+          mmr: calculateTierScore(acc?.tier || 'UNRANKED', acc?.rank || '', acc?.lp || 0),
+          mainRole: acc?.mainRole,
+          subRole: acc?.subRole,
+        };
+      }),
+      auctionState,
+    };
+  }
+
+  async _applySelectedCaptains(roomId: string, room: any, captainUserIds: string[]) {
+    const captainParticipants = room.participants.filter((p: any) => captainUserIds.includes(p.userId));
+
+    const teams = await Promise.all(
+      captainParticipants.map(async (captain: any, index: number) => {
+        const initialBudget = room.startingPoints || 1000;
         return this.prisma.team.create({
           data: {
             roomId,
@@ -116,15 +238,13 @@ export class AuctionService {
       }),
     );
 
-    // Update room status
     await this.prisma.room.update({
       where: { id: roomId },
       data: { status: RoomStatus.DRAFT },
     });
 
-    // Mark captains as captains in participants
     await Promise.all(
-      captains.map((captain) =>
+      captainParticipants.map((captain: any) =>
         this.prisma.roomParticipant.update({
           where: { id: captain.id },
           data: {
@@ -135,22 +255,15 @@ export class AuctionService {
       ),
     );
 
-    // Discord 봇: 팀장에게 역할 부여
     try {
       if (this.discordVoiceService) {
         await Promise.all(
-          captains.map(async (captain) => {
+          captainParticipants.map(async (captain: any) => {
             const discordProvider = await this.prisma.authProvider.findFirst({
-              where: {
-                userId: captain.userId,
-                provider: "DISCORD",
-              },
+              where: { userId: captain.userId, provider: "DISCORD" },
             });
-
             if (discordProvider) {
-              await this.discordVoiceService.assignCaptainRole(
-                discordProvider.providerId,
-              );
+              await this.discordVoiceService.assignCaptainRole(discordProvider.providerId);
             }
           }),
         );
@@ -159,22 +272,108 @@ export class AuctionService {
       console.warn("Failed to assign Discord captain roles:", error);
     }
 
-    // Initialize auction state
+    return { teams };
+  }
+
+  async handleVolunteer(userId: string, roomId: string): Promise<{ volunteers: string[] }> {
+    const phase = this.captainPhases.get(roomId);
+    if (!phase || phase.mode !== TeamCaptainSelection.VOLUNTEER) {
+      throw new BadRequestException("Not in volunteer phase");
+    }
+
+    const idx = phase.volunteers.indexOf(userId);
+    if (idx === -1) {
+      phase.volunteers.push(userId);
+    } else {
+      phase.volunteers.splice(idx, 1);
+    }
+
+    return { volunteers: phase.volunteers };
+  }
+
+  async finalizeVolunteers(hostId: string, roomId: string, selectedUserIds?: string[]) {
+    const room = await this.prisma.room.findUnique({
+      where: { id: roomId },
+      include: {
+        participants: {
+          where: { role: "PLAYER" },
+          include: { user: { include: { riotAccounts: { where: { isPrimary: true } } } } },
+        },
+      },
+    });
+    if (!room) throw new NotFoundException("Room not found");
+    if (room.hostId !== hostId) throw new ForbiddenException("Only host can finalize");
+
+    const phase = this.captainPhases.get(roomId);
+    if (!phase || phase.mode !== TeamCaptainSelection.VOLUNTEER) {
+      throw new BadRequestException("Not in volunteer phase");
+    }
+
+    if (phase.timerHandle) {
+      clearTimeout(phase.timerHandle);
+    }
+
+    const numTeams = phase.requiredCount;
+    let captainUserIds: string[];
+
+    if (phase.volunteers.length === 0) {
+      // Fallback: MMR 자동
+      const sorted = [...room.participants].sort((a, b) => {
+        const aAcc = a.user.riotAccounts[0];
+        const bAcc = b.user.riotAccounts[0];
+        return calculateTierScore(bAcc?.tier || 'UNRANKED', bAcc?.rank || '', bAcc?.lp || 0)
+          - calculateTierScore(aAcc?.tier || 'UNRANKED', aAcc?.rank || '', aAcc?.lp || 0);
+      });
+      captainUserIds = sorted.slice(0, numTeams).map((p) => p.userId);
+    } else if (phase.volunteers.length <= numTeams) {
+      // 자원자 부족 or 딱 맞음: 자원자 모두 팀장 + 나머지 MMR로 채움
+      const remaining = numTeams - phase.volunteers.length;
+      captainUserIds = [...phase.volunteers];
+      if (remaining > 0) {
+        const nonVolunteers = room.participants
+          .filter((p) => !phase.volunteers.includes(p.userId))
+          .sort((a, b) => {
+            const aAcc = a.user.riotAccounts[0];
+            const bAcc = b.user.riotAccounts[0];
+            return calculateTierScore(bAcc?.tier || 'UNRANKED', bAcc?.rank || '', bAcc?.lp || 0)
+              - calculateTierScore(aAcc?.tier || 'UNRANKED', aAcc?.rank || '', aAcc?.lp || 0);
+          });
+        captainUserIds.push(...nonVolunteers.slice(0, remaining).map((p) => p.userId));
+      }
+    } else {
+      // 자원자 초과: 방장이 selectedUserIds 지정 필수
+      if (!selectedUserIds || selectedUserIds.length !== numTeams) {
+        throw new BadRequestException(`Select exactly ${numTeams} captains from volunteers`);
+      }
+      const invalidIds = selectedUserIds.filter((id) => !phase.volunteers.includes(id));
+      if (invalidIds.length > 0) {
+        throw new BadRequestException("Selected users must be volunteers");
+      }
+      captainUserIds = selectedUserIds;
+    }
+
+    this.captainPhases.delete(roomId);
+
+    const { teams } = await this._applySelectedCaptains(roomId, room, captainUserIds);
+
+    const nonCaptains = room.participants.filter((p) => !captainUserIds.includes(p.userId));
+    const numTeamsFinal = teams.length;
+
     const auctionState: AuctionState = {
       roomId,
       currentPlayerIndex: 0,
       currentHighestBid: 0,
       currentHighestBidder: null,
-      timerEnd: Date.now() + (room.bidTimeLimit || 30) * 1000,
+      timerEnd: Date.now() + ((room as any).bidTimeLimit || 30) * 1000,
       yuchalCount: 0,
-      maxYuchalCycles: numTeams,
+      maxYuchalCycles: numTeamsFinal,
     };
 
     this.auctionStates.set(roomId, auctionState);
 
     return {
       teams,
-      players: players.map((p) => {
+      players: nonCaptains.map((p) => {
         const acc = p.user.riotAccounts[0];
         return {
           id: p.userId,
@@ -189,7 +388,77 @@ export class AuctionService {
         };
       }),
       auctionState,
+      captainUserIds,
     };
+  }
+
+  async selectManualCaptains(hostId: string, roomId: string, userIds: string[]) {
+    const room = await this.prisma.room.findUnique({
+      where: { id: roomId },
+      include: {
+        participants: {
+          where: { role: "PLAYER" },
+          include: { user: { include: { riotAccounts: { where: { isPrimary: true } } } } },
+        },
+      },
+    });
+    if (!room) throw new NotFoundException("Room not found");
+    if (room.hostId !== hostId) throw new ForbiddenException("Only host can select captains");
+
+    const numTeams = Math.floor(room.participants.length / 5);
+    if (userIds.length !== numTeams) {
+      throw new BadRequestException(`Need exactly ${numTeams} captains`);
+    }
+
+    const participantIds = room.participants.map((p) => p.userId);
+    const invalid = userIds.filter((id) => !participantIds.includes(id));
+    if (invalid.length > 0) {
+      throw new BadRequestException("Selected users must be participants");
+    }
+
+    const { teams } = await this._applySelectedCaptains(roomId, room, userIds);
+    const nonCaptains = room.participants.filter((p) => !userIds.includes(p.userId));
+
+    const auctionState: AuctionState = {
+      roomId,
+      currentPlayerIndex: 0,
+      currentHighestBid: 0,
+      currentHighestBidder: null,
+      timerEnd: Date.now() + ((room as any).bidTimeLimit || 30) * 1000,
+      yuchalCount: 0,
+      maxYuchalCycles: numTeams,
+    };
+
+    this.auctionStates.set(roomId, auctionState);
+
+    return {
+      teams,
+      players: nonCaptains.map((p) => {
+        const acc = p.user.riotAccounts[0];
+        return {
+          id: p.userId,
+          username: p.user.username,
+          avatar: p.user.avatar,
+          tier: acc?.tier,
+          rank: acc?.rank,
+          lp: acc?.lp,
+          mmr: calculateTierScore(acc?.tier || 'UNRANKED', acc?.rank || '', acc?.lp || 0),
+          mainRole: acc?.mainRole,
+          subRole: acc?.subRole,
+        };
+      }),
+      auctionState,
+      captainUserIds: userIds,
+    };
+  }
+
+  getCaptainPhase(roomId: string): CaptainSelectionPhase | undefined {
+    return this.captainPhases.get(roomId);
+  }
+
+  setCaptainPhaseTimerHandle(roomId: string, handle: ReturnType<typeof setTimeout>) {
+    const phase = this.captainPhases.get(roomId);
+    if (phase) phase.timerHandle = handle;
   }
 
   // ========================================

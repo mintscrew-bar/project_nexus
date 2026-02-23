@@ -42,6 +42,25 @@ interface BidHistoryEntry {
   timestamp: number;
 }
 
+type CaptainSelectionMode = 'TIER' | 'MANUAL' | 'VOLUNTEER';
+
+interface Participant {
+  id: string;
+  username: string;
+  avatar?: string;
+  tier?: string;
+  rank?: string;
+  mmr?: number;
+}
+
+interface CaptainSelectionPhase {
+  mode: CaptainSelectionMode;
+  requiredCount: number;
+  volunteers: string[];
+  timerEnd: number | null;
+  participants: Participant[];
+}
+
 interface AuctionStoreState {
   auctionState: AuctionState | null;
   players: Player[];
@@ -53,6 +72,7 @@ interface AuctionStoreState {
   currentUserId: string | null;
   currentUserIsCaptain: boolean;
   currentUserTeam: Team | null;
+  captainSelectionPhase: CaptainSelectionPhase | null;
 
   // REST API methods
   startAuction: (roomId: string) => Promise<void>;
@@ -63,6 +83,11 @@ interface AuctionStoreState {
   disconnectFromAuction: () => void;
   placeBid: (amount: number) => void;
   setCurrentUserId: (userId: string) => void;
+
+  // Captain selection
+  volunteerAsCaptain: (roomId: string) => void;
+  finalizeVolunteers: (roomId: string, selectedUserIds?: string[]) => void;
+  selectManualCaptains: (roomId: string, userIds: string[]) => void;
 }
 
 export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
@@ -76,6 +101,7 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
   currentUserId: null,
   currentUserIsCaptain: false,
   currentUserTeam: null,
+  captainSelectionPhase: null,
 
   startAuction: async (roomId: string) => {
     set({ isLoading: true, error: null });
@@ -112,11 +138,29 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
 
     auctionSocketHelpers.joinAuction(roomId);
 
+    // 팀장 선정 단계 이벤트
+    auctionSocketHelpers.onCaptainSelectionPhase((data: CaptainSelectionPhase) => {
+      set({ captainSelectionPhase: data });
+    });
+
+    auctionSocketHelpers.onVolunteerListUpdated((data: { volunteers: string[] }) => {
+      set((state) => ({
+        captainSelectionPhase: state.captainSelectionPhase
+          ? { ...state.captainSelectionPhase, volunteers: data.volunteers }
+          : null,
+      }));
+    });
+
+    auctionSocketHelpers.onCaptainsConfirmed(() => {
+      set({ captainSelectionPhase: null });
+    });
+
     auctionSocketHelpers.onAuctionStarted((data: { state: AuctionState; teams: Team[]; players: Player[] }) => {
       set({
         auctionState: data.state,
         teams: data.teams,
         players: data.players,
+        captainSelectionPhase: null,
       });
     });
 
@@ -217,5 +261,17 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
       currentUserIsCaptain: !!userTeam,
       currentUserTeam: userTeam || null,
     });
+  },
+
+  volunteerAsCaptain: (roomId: string) => {
+    auctionSocketHelpers.volunteerCaptain(roomId);
+  },
+
+  finalizeVolunteers: (roomId: string, selectedUserIds?: string[]) => {
+    auctionSocketHelpers.finalizeVolunteers(roomId, selectedUserIds);
+  },
+
+  selectManualCaptains: (roomId: string, userIds: string[]) => {
+    auctionSocketHelpers.selectManualCaptains(roomId, userIds);
   },
 }));

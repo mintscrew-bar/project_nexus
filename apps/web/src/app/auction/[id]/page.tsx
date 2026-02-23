@@ -1,11 +1,12 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuction } from "@/hooks/useAuction";
 import { useAuthStore } from "@/stores/auth-store";
 import { AuctionBoard } from "@/components/domain";
-import { LoadingSpinner, Badge } from "@/components/ui";
+import { LoadingSpinner, Badge, Button } from "@/components/ui";
+import { Users, Hand, Check } from "lucide-react";
 
 export default function AuctionRoomPage() {
   const params = useParams();
@@ -13,6 +14,8 @@ export default function AuctionRoomPage() {
   const auctionId = params.id as string;
   const { user } = useAuthStore();
   const hasRedirected = useRef(false);
+  const [selectedCaptains, setSelectedCaptains] = useState<string[]>([]);
+  const [volunteerTimer, setVolunteerTimer] = useState(0);
 
   const {
     auctionState,
@@ -22,7 +25,24 @@ export default function AuctionRoomPage() {
     isLoading,
     error,
     placeBid,
+    captainSelectionPhase,
+    volunteerAsCaptain,
+    finalizeVolunteers,
+    selectManualCaptains,
   } = useAuction(auctionId);
+
+  const isHost = user?.id !== undefined; // TODO: 실제로는 방 hostId와 비교 필요 — 현재는 store에 hostId 없음
+  // captainSelectionPhase.participants에서 자신이 방장인지 확인할 수 있도록 향후 개선 가능
+
+  // VOLUNTEER 타이머 카운트다운 (클라이언트 표시용)
+  useEffect(() => {
+    if (!captainSelectionPhase?.timerEnd) return;
+    const interval = setInterval(() => {
+      const left = Math.max(0, Math.floor((captainSelectionPhase.timerEnd! - Date.now()) / 1000));
+      setVolunteerTimer(left);
+    }, 200);
+    return () => clearInterval(interval);
+  }, [captainSelectionPhase?.timerEnd]);
 
   useEffect(() => {
     if (hasRedirected.current) return;
@@ -49,6 +69,104 @@ export default function AuctionRoomPage() {
         <div className="text-center">
           <p className="text-accent-danger mb-4">오류: {error}</p>
           <p className="text-text-secondary">경매 방에 연결할 수 없습니다</p>
+        </div>
+      </div>
+    );
+  }
+
+  // 팀장 선정 단계
+  if (captainSelectionPhase) {
+    const { mode, requiredCount, volunteers, participants } = captainSelectionPhase;
+    const isVolunteer = volunteers.includes(user?.id ?? '');
+    const tooManyVolunteers = volunteers.length > requiredCount;
+
+    return (
+      <div className="flex-grow p-4 md:p-8">
+        <div className="container mx-auto max-w-2xl">
+          <div className="mb-6 text-center">
+            <h1 className="text-2xl font-bold text-text-primary mb-1">팀장 선정</h1>
+            {mode === 'VOLUNTEER' && (
+              <p className="text-text-secondary">
+                필요 팀장: <span className="font-bold text-accent-primary">{requiredCount}명</span>
+                {captainSelectionPhase.timerEnd && (
+                  <span className="ml-3 text-accent-warning font-mono text-lg">{volunteerTimer}초</span>
+                )}
+              </p>
+            )}
+            {mode === 'MANUAL' && (
+              <p className="text-text-secondary">
+                방장이 <span className="font-bold text-accent-primary">{requiredCount}명</span>의 팀장을 선택합니다
+              </p>
+            )}
+          </div>
+
+          <div className="space-y-2 mb-6">
+            {(participants ?? []).map((p: any) => {
+              const isSelected = mode === 'MANUAL' ? selectedCaptains.includes(p.id) : volunteers.includes(p.id);
+              return (
+                <div
+                  key={p.id}
+                  className={`flex items-center gap-3 p-3 rounded-lg border transition-all cursor-pointer ${
+                    isSelected ? 'border-accent-primary bg-accent-primary/10' : 'border-bg-tertiary bg-bg-secondary hover:border-bg-elevated'
+                  }`}
+                  onClick={() => {
+                    if (mode === 'MANUAL') {
+                      setSelectedCaptains(prev =>
+                        prev.includes(p.id)
+                          ? prev.filter(id => id !== p.id)
+                          : prev.length < requiredCount ? [...prev, p.id] : prev
+                      );
+                    } else if (mode === 'VOLUNTEER' && p.id === user?.id) {
+                      volunteerAsCaptain(auctionId);
+                    }
+                  }}
+                >
+                  <div className="w-8 h-8 rounded-full bg-bg-elevated flex items-center justify-center text-sm font-bold text-text-primary flex-shrink-0">
+                    {p.username[0].toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <span className="font-medium text-text-primary truncate block">{p.username}</span>
+                    {p.tier && <span className="text-xs text-text-tertiary">{p.tier} {p.rank} · MMR {p.mmr}</span>}
+                  </div>
+                  {isSelected && <Check className="w-4 h-4 text-accent-primary flex-shrink-0" />}
+                  {mode === 'VOLUNTEER' && p.id === user?.id && !isSelected && (
+                    <Hand className="w-4 h-4 text-text-tertiary flex-shrink-0" />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {mode === 'VOLUNTEER' && (
+            <div className="space-y-3">
+              <p className="text-sm text-text-secondary text-center">
+                자원자: <span className={`font-bold ${tooManyVolunteers ? 'text-accent-warning' : 'text-accent-primary'}`}>{volunteers.length}</span>/{requiredCount}명
+                {tooManyVolunteers && ' — 초과! 방장이 선택합니다'}
+              </p>
+              {/* 방장 전용: 조기 마감 또는 초과 시 선택 확정 */}
+              <div className="flex gap-3 justify-center">
+                <Button
+                  onClick={() => finalizeVolunteers(auctionId, tooManyVolunteers ? selectedCaptains : undefined)}
+                  disabled={tooManyVolunteers && selectedCaptains.length !== requiredCount}
+                >
+                  <Users className="w-4 h-4 mr-2" />
+                  {tooManyVolunteers ? `${selectedCaptains.length}/${requiredCount}명 선택 후 확정` : '지금 마감'}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {mode === 'MANUAL' && (
+            <div className="flex justify-center">
+              <Button
+                onClick={() => selectManualCaptains(auctionId, selectedCaptains)}
+                disabled={selectedCaptains.length !== requiredCount}
+              >
+                <Check className="w-4 h-4 mr-2" />
+                팀장 {selectedCaptains.length}/{requiredCount}명 확정
+              </Button>
+            </div>
+          )}
         </div>
       </div>
     );

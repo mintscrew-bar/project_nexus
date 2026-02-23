@@ -44,7 +44,7 @@ interface RoomCreationData {
   bidTimeLimit?: number;
   // Snake draft settings
   pickTimeLimit?: number;
-  captainSelection?: "RANDOM" | "TIER";
+  captainSelection?: "RANDOM" | "TIER" | "MANUAL" | "VOLUNTEER";
   // Bracket format
   bracketFormat?: string;
 }

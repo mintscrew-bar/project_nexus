@@ -276,15 +276,43 @@ export const auctionSocketHelpers = {
     auctionSocket?.on("timer-expired", callback);  // ✅ Added: missing event
   },
 
+  // Captain selection events
+  onCaptainSelectionPhase: (callback: (data: any) => void) => {
+    auctionSocket?.on("captain-selection-phase", callback);
+  },
+
+  onVolunteerListUpdated: (callback: (data: any) => void) => {
+    auctionSocket?.on("volunteer-list-updated", callback);
+  },
+
+  onCaptainsConfirmed: (callback: (data: any) => void) => {
+    auctionSocket?.on("captains-confirmed", callback);
+  },
+
+  volunteerCaptain: (roomId: string) => {
+    auctionSocket?.emit("volunteer-captain", { roomId });
+  },
+
+  finalizeVolunteers: (roomId: string, selectedUserIds?: string[]) => {
+    auctionSocket?.emit("finalize-volunteers", { roomId, selectedUserIds });
+  },
+
+  selectManualCaptains: (roomId: string, userIds: string[]) => {
+    auctionSocket?.emit("select-manual-captains", { roomId, userIds });
+  },
+
   offAllListeners: () => {
     auctionSocket?.off("auction-started");
-    auctionSocket?.off("bid-placed");  // ✅ Fixed
+    auctionSocket?.off("bid-placed");
     auctionSocket?.off("player-sold");
     auctionSocket?.off("player-unsold");
     auctionSocket?.off("auction-complete");
     auctionSocket?.off("timer-update");
-    auctionSocket?.off("bid-resolved");  // ✅ Added
-    auctionSocket?.off("timer-expired");  // ✅ Added
+    auctionSocket?.off("bid-resolved");
+    auctionSocket?.off("timer-expired");
+    auctionSocket?.off("captain-selection-phase");
+    auctionSocket?.off("volunteer-list-updated");
+    auctionSocket?.off("captains-confirmed");
   },
 };
 

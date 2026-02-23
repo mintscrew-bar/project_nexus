@@ -54,6 +54,7 @@ export function RoomCreationForm({ onCancel, onRoomCreated }: RoomCreationFormPr
   // 스네이크 드래프트 설정
   const [pickTimeLimit, setPickTimeLimit] = useState(60);
   const [captainSelection, setCaptainSelection] = useState<"RANDOM" | "TIER">("RANDOM");
+  const [auctionCaptainSelection, setAuctionCaptainSelection] = useState<"TIER" | "MANUAL" | "VOLUNTEER">("TIER");
 
   // 브래킷 포맷 (4/8팀 전용)
   const [useDoubleElim, setUseDoubleElim] = useState(false);
@@ -80,7 +81,7 @@ export function RoomCreationForm({ onCancel, onRoomCreated }: RoomCreationFormPr
       bidTimeLimit,
       // Snake draft settings
       pickTimeLimit,
-      captainSelection,
+      captainSelection: teamMode === 'AUCTION' ? auctionCaptainSelection : captainSelection,
       // Bracket format
       bracketFormat: selectedOption?.supportsDE && useDoubleElim
         ? 'DOUBLE_ELIMINATION'
@@ -260,6 +261,29 @@ export function RoomCreationForm({ onCancel, onRoomCreated }: RoomCreationFormPr
               <option value={45}>45초</option>
               <option value={60}>60초</option>
             </select>
+          </div>
+
+          <div>
+            <label className="block text-text-secondary text-xs mb-1">팀장 선정 방식</label>
+            <select
+              value={auctionCaptainSelection}
+              onChange={(e) => setAuctionCaptainSelection(e.target.value as "TIER" | "MANUAL" | "VOLUNTEER")}
+              className="w-full input text-sm"
+            >
+              <option value="TIER">자동 (MMR 기준 상위 N명)</option>
+              <option value="MANUAL">방장 직접 지명</option>
+              <option value="VOLUNTEER">자원 모집 (30초 타이머)</option>
+            </select>
+            {auctionCaptainSelection === "VOLUNTEER" && (
+              <p className="text-xs text-text-tertiary mt-1">
+                경매 시작 시 30초 동안 자원자를 모집합니다. 방장은 조기 마감 가능. 아무도 안 하면 MMR 자동 선정.
+              </p>
+            )}
+            {auctionCaptainSelection === "MANUAL" && (
+              <p className="text-xs text-text-tertiary mt-1">
+                경매 시작 전 방장이 참가자 중 팀장을 직접 지명합니다.
+              </p>
+            )}
           </div>
         </div>
       )}

@@ -111,6 +111,79 @@ export class AuctionGateway
     client.leave(`room:${data.roomId}`);
   }
 
+  // ========================================
+  // Captain Selection Events
+  // ========================================
+
+  @SubscribeMessage("volunteer-captain")
+  async handleVolunteerCaptain(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() data: { roomId: string },
+  ) {
+    if (!client.userId) return { error: "Unauthorized" };
+    try {
+      const result = await this.auctionService.handleVolunteer(client.userId, data.roomId);
+      this.server.to(`room:${data.roomId}`).emit("volunteer-list-updated", result);
+      return { success: true };
+    } catch (error: any) {
+      return { error: error.message };
+    }
+  }
+
+  @SubscribeMessage("finalize-volunteers")
+  async handleFinalizeVolunteers(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() data: { roomId: string; selectedUserIds?: string[] },
+  ) {
+    if (!client.userId) return { error: "Unauthorized" };
+    try {
+      const result = await this.auctionService.finalizeVolunteers(
+        client.userId,
+        data.roomId,
+        data.selectedUserIds,
+      );
+      await this._emitCaptainsConfirmedAndStart(data.roomId, result);
+      return { success: true };
+    } catch (error: any) {
+      return { error: error.message };
+    }
+  }
+
+  @SubscribeMessage("select-manual-captains")
+  async handleSelectManualCaptains(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() data: { roomId: string; userIds: string[] },
+  ) {
+    if (!client.userId) return { error: "Unauthorized" };
+    try {
+      const result = await this.auctionService.selectManualCaptains(
+        client.userId,
+        data.roomId,
+        data.userIds,
+      );
+      await this._emitCaptainsConfirmedAndStart(data.roomId, result);
+      return { success: true };
+    } catch (error: any) {
+      return { error: error.message };
+    }
+  }
+
+  emitCaptainSelectionPhase(roomId: string, phase: any, participants: any[]) {
+    this.server.to(`room:${roomId}`).emit("captain-selection-phase", { ...phase, participants });
+  }
+
+  async _emitCaptainsConfirmedAndStart(roomId: string, result: any) {
+    this.server.to(`room:${roomId}`).emit("captains-confirmed", {
+      captainUserIds: result.captainUserIds,
+      teams: result.teams,
+    });
+    this.server.to(`room:${roomId}`).emit("auction-started", {
+      teams: result.teams,
+      players: result.players,
+      auctionState: result.auctionState,
+    });
+  }
+
   @SubscribeMessage("place-bid")
   async handleBid(
     @ConnectedSocket() client: AuthenticatedSocket,
