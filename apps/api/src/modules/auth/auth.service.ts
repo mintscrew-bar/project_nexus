@@ -4,6 +4,7 @@ import {
   ConflictException,
   BadRequestException,
 } from "@nestjs/common";
+import { randomUUID } from "crypto";
 import { JwtService } from "@nestjs/jwt";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../prisma/prisma.service";
@@ -228,6 +229,7 @@ export class AuthService {
       role: user.role || "USER",
     };
 
+    // Ensure refresh tokens include a unique jwtid to avoid duplicates in DB
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(payload, {
         secret: this.configService.get("JWT_ACCESS_SECRET"),
@@ -236,6 +238,7 @@ export class AuthService {
       this.jwtService.signAsync(payload, {
         secret: this.configService.get("JWT_REFRESH_SECRET"),
         expiresIn: this.configService.get("JWT_REFRESH_EXPIRES_IN") || "7d",
+        jwtid: randomUUID(),
       }),
     ]);
 
@@ -253,10 +256,14 @@ export class AuthService {
 
   async refreshTokens(userId: string, refreshToken: string) {
     // Find session
+    console.log('AuthService.refreshTokens - userId:', userId);
+    console.log('AuthService.refreshTokens - provided refreshToken:', refreshToken ? '[REDACTED]' : null);
     const session = await this.prisma.session.findUnique({
       where: { refreshToken },
       include: { user: true },
     });
+
+    console.log('AuthService.refreshTokens - session found id:', session?.id);
 
     if (!session || session.userId !== userId) {
       throw new UnauthorizedException("Invalid refresh token");
@@ -278,6 +285,7 @@ export class AuthService {
 
     // Delete old session
     await this.prisma.session.deleteMany({ where: { id: session.id } });
+    console.log('AuthService.refreshTokens - deleted old session id:', session.id);
 
     // Generate new tokens
     return this.generateTokens(session.user);

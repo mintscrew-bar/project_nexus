@@ -1,48 +1,62 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from "next/server";
 
-const API_URL = process.env.API_URL || 'http://localhost:4000';
+const API_URL = process.env.API_URL || "http://localhost:4000";
 
 export async function POST(request: NextRequest) {
-  const refreshToken = request.cookies.get('refresh_token')?.value;
+  // Log raw Cookie header and parsed cookie for debugging
+  const rawCookieHeader = request.headers.get("cookie");
+  console.log("Incoming /api/auth/refresh raw Cookie header:", rawCookieHeader);
+
+  const refreshToken = request.cookies.get("refresh_token")?.value;
+  console.log("Parsed refresh_token from request.cookies:", refreshToken);
 
   if (!refreshToken) {
-    return NextResponse.json(
-      { message: 'No refresh token' },
-      { status: 401 }
-    );
+    return NextResponse.json({ message: "No refresh token" }, { status: 401 });
   }
 
   try {
     // Forward the request to the backend with the refresh token as a cookie
     const backendResponse = await fetch(`${API_URL}/api/auth/refresh`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        'Cookie': `refresh_token=${refreshToken}`,
+        "Content-Type": "application/json",
+        Cookie: `refresh_token=${refreshToken}`,
       },
-      credentials: 'include',
+      credentials: "include",
     });
 
-    const responseData = await backendResponse.json().catch(() => ({}));
+    // Log backend response status and headers to help diagnose 500 errors
+    console.log("Backend /api/auth/refresh status:", backendResponse.status);
+    try {
+      // Attempt to read JSON body (may fail if backend returns non-JSON)
+      const responseData = await backendResponse.json().catch(() => ({}));
+      // Attach parsed body for further handling below
+      (backendResponse as any)._parsedBody = responseData;
+    } catch (e) {
+      console.error("Error parsing backend refresh response body:", e);
+      (backendResponse as any)._parsedBody = {};
+    }
+
+    const responseData = (backendResponse as any)._parsedBody;
 
     if (!backendResponse.ok) {
       // Clear the invalid refresh token cookie (must match path used when setting)
       const response = NextResponse.json(
-        { message: responseData.message || 'Token refresh failed' },
-        { status: backendResponse.status }
+        { message: responseData.message || "Token refresh failed" },
+        { status: backendResponse.status },
       );
-      response.cookies.set('refresh_token', '', {
+      response.cookies.set("refresh_token", "", {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
         maxAge: 0,
-        path: '/api/auth',
+        path: "/api/auth",
       });
       return response;
     }
 
     // Get the new refresh token from the backend's Set-Cookie header
-    const setCookieHeader = backendResponse.headers.get('set-cookie');
+    const setCookieHeader = backendResponse.headers.get("set-cookie");
     let newRefreshToken: string | null = null;
 
     if (setCookieHeader) {
@@ -56,21 +70,21 @@ export async function POST(request: NextRequest) {
 
     // Set the new refresh token cookie on the frontend domain
     if (newRefreshToken) {
-      response.cookies.set('refresh_token', newRefreshToken, {
+      response.cookies.set("refresh_token", newRefreshToken, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
         maxAge: 7 * 24 * 60 * 60, // 7 days in seconds
-        path: '/api/auth',
+        path: "/api/auth",
       });
     }
 
     return response;
   } catch (error) {
-    console.error('Refresh token error:', error);
+    console.error("Refresh token error:", error);
     return NextResponse.json(
-      { message: 'Internal server error' },
-      { status: 500 }
+      { message: "Internal server error" },
+      { status: 500 },
     );
   }
 }

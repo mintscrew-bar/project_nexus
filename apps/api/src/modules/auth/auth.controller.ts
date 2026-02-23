@@ -140,20 +140,30 @@ export class AuthController {
   @Post("refresh")
   @UseGuards(JwtRefreshGuard)
   async refresh(@Req() req: Request, @Res() res: Response) {
-    const user = req.user as any;
-    const refreshToken = req.cookies?.refresh_token;
+    try {
+      const user = req.user as any;
+      const refreshToken = req.cookies?.refresh_token;
 
-    const tokens = await this.authService.refreshTokens(user.sub, refreshToken);
+      console.log('AuthController.refresh - user.sub:', user?.sub);
+      console.log('AuthController.refresh - incoming refresh_token:', refreshToken ? '[REDACTED]' : null);
 
-    res.cookie("refresh_token", tokens.refreshToken, {
-      httpOnly: true,
-      secure: this.configService.get("NODE_ENV") === "production",
-      sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-      path: "/api/auth",
-    });
+      const tokens = await this.authService.refreshTokens(user.sub, refreshToken);
 
-    return res.json({ accessToken: tokens.accessToken });
+      console.log('AuthController.refresh - refreshTokens succeeded');
+
+      res.cookie("refresh_token", tokens.refreshToken, {
+        httpOnly: true,
+        secure: this.configService.get("NODE_ENV") === "production",
+        sameSite: "lax",
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+        path: "/api/auth",
+      });
+
+      return res.json({ accessToken: tokens.accessToken });
+    } catch (err) {
+      console.error('AuthController.refresh - error:', err instanceof Error ? err.stack || err.message : err);
+      throw err; // let GlobalExceptionFilter handle the response formatting
+    }
   }
 
   @Post("logout")
