@@ -1,4 +1,4 @@
-import {
+﻿import {
   Injectable,
   NotFoundException,
   BadRequestException,
@@ -11,15 +11,20 @@ import { RoomStatus, TeamCaptainSelection, TeamMode } from "@nexus/database";
 import { calculateTierScore } from "../common/tier-score.util";
 
 const BONUS_GOLD = 500;
+const DEFAULT_BID_TIME_SECONDS = 10;
+const BID_EXTENSION_SECONDS = 5;
+const MAX_BID_TIME_SECONDS = 10;
 
 export interface AuctionState {
   roomId: string;
   currentPlayerIndex: number;
   currentHighestBid: number;
   currentHighestBidder: string | null;
+  currentHighestBidderName?: string | null;
   timerEnd: number;
   yuchalCount: number;
   maxYuchalCycles: number;
+  botCaptainIds: string[]; // testbot_* ?좎? ???紐⑸줉 (?먮룞 ?낆같??
 }
 
 export interface CaptainSelectionPhase {
@@ -41,6 +46,20 @@ export class AuctionService {
     @Optional() @Inject("DISCORD_VOICE_SERVICE") discordVoice?: any,
   ) {
     this.discordVoiceService = discordVoice;
+  }
+
+  private getBaseBidTimerMs(): number {
+    return DEFAULT_BID_TIME_SECONDS * 1000;
+  }
+
+  private getExtendedBidTimerEnd(currentTimerEnd: number): number {
+    const now = Date.now();
+    const remainingMs = Math.max(0, currentTimerEnd - now);
+    const extendedMs = Math.min(
+      MAX_BID_TIME_SECONDS * 1000,
+      remainingMs + BID_EXTENSION_SECONDS * 1000,
+    );
+    return now + extendedMs;
   }
 
   // ========================================
@@ -83,15 +102,15 @@ export class AuctionService {
       throw new BadRequestException("Room is not in auction mode");
     }
 
-    // Calculate number of teams
-    const numTeams = Math.floor(room.participants.length / 5);
-    if (numTeams < 2) {
-      throw new BadRequestException("Need at least 10 players for auction");
+    // Calculate number of teams (?뚯뒪?? 4紐??댁긽?대㈃ 理쒖냼 2? 蹂댁옣, ?ㅼ쟾 10紐낆씠硫?Math.floor)
+    if (room.participants.length < 4) {
+      throw new BadRequestException("Auction mode requires at least 4 players");
     }
+    const numTeams = Math.max(2, Math.floor(room.participants.length / 5));
 
     const captainMode = room.captainSelection ?? TeamCaptainSelection.TIER;
 
-    // MANUAL / VOLUNTEER: 팀장 선정 단계 진입 (경매 시작 보류)
+    // MANUAL / VOLUNTEER: ????좎젙 ?④퀎 吏꾩엯 (寃쎈ℓ ?쒖옉 蹂대쪟)
     if (captainMode === TeamCaptainSelection.MANUAL) {
       await this.prisma.room.update({
         where: { id: roomId },
@@ -157,7 +176,7 @@ export class AuctionService {
       };
     }
 
-    // TIER (default): MMR 자동 선정
+    // TIER (default): MMR ?먮룞 ?좎젙
     return this._startAuctionWithCaptains(hostId, roomId, room);
   }
 
@@ -166,7 +185,7 @@ export class AuctionService {
   // ========================================
 
   private async _startAuctionWithCaptains(hostId: string, roomId: string, room: any) {
-    const numTeams = Math.floor(room.participants.length / 5);
+    const numTeams = Math.max(2, Math.floor(room.participants.length / 5));
 
     const sortedPlayers = [...room.participants].sort((a: any, b: any) => {
       const aAcc = a.user.riotAccounts[0];
@@ -179,16 +198,21 @@ export class AuctionService {
     const captains = sortedPlayers.slice(0, numTeams);
     const players = sortedPlayers.slice(numTeams);
 
-    const { teams } = await this._applySelectedCaptains(roomId, room, captains.map((c: any) => c.userId));
+    const captainUserIds = captains.map((c: any) => c.userId);
+    const { teams } = await this._applySelectedCaptains(roomId, room, captainUserIds);
+
+    const botCaptainIds = this._filterBotCaptains(captainUserIds, room.participants);
 
     const auctionState: AuctionState = {
       roomId,
       currentPlayerIndex: 0,
       currentHighestBid: 0,
       currentHighestBidder: null,
-      timerEnd: Date.now() + (room.bidTimeLimit || 30) * 1000,
+      currentHighestBidderName: null,
+      timerEnd: Date.now() + this.getBaseBidTimerMs(),
       yuchalCount: 0,
       maxYuchalCycles: numTeams,
+      botCaptainIds,
     };
 
     this.auctionStates.set(roomId, auctionState);
@@ -317,7 +341,7 @@ export class AuctionService {
     let captainUserIds: string[];
 
     if (phase.volunteers.length === 0) {
-      // Fallback: MMR 자동
+      // Fallback: MMR ?먮룞
       const sorted = [...room.participants].sort((a, b) => {
         const aAcc = a.user.riotAccounts[0];
         const bAcc = b.user.riotAccounts[0];
@@ -326,7 +350,7 @@ export class AuctionService {
       });
       captainUserIds = sorted.slice(0, numTeams).map((p) => p.userId);
     } else if (phase.volunteers.length <= numTeams) {
-      // 자원자 부족 or 딱 맞음: 자원자 모두 팀장 + 나머지 MMR로 채움
+      // ?먯썝??遺議?or ??留욎쓬: ?먯썝??紐⑤몢 ???+ ?섎㉧吏 MMR濡?梨꾩?
       const remaining = numTeams - phase.volunteers.length;
       captainUserIds = [...phase.volunteers];
       if (remaining > 0) {
@@ -341,7 +365,7 @@ export class AuctionService {
         captainUserIds.push(...nonVolunteers.slice(0, remaining).map((p) => p.userId));
       }
     } else {
-      // 자원자 초과: 방장이 selectedUserIds 지정 필수
+      // ?먯썝??珥덇낵: 諛⑹옣??selectedUserIds 吏???꾩닔
       if (!selectedUserIds || selectedUserIds.length !== numTeams) {
         throw new BadRequestException(`Select exactly ${numTeams} captains from volunteers`);
       }
@@ -358,15 +382,18 @@ export class AuctionService {
 
     const nonCaptains = room.participants.filter((p) => !captainUserIds.includes(p.userId));
     const numTeamsFinal = teams.length;
+    const botCaptainIds = this._filterBotCaptains(captainUserIds, room.participants);
 
     const auctionState: AuctionState = {
       roomId,
       currentPlayerIndex: 0,
       currentHighestBid: 0,
       currentHighestBidder: null,
-      timerEnd: Date.now() + ((room as any).bidTimeLimit || 30) * 1000,
+      currentHighestBidderName: null,
+      timerEnd: Date.now() + this.getBaseBidTimerMs(),
       yuchalCount: 0,
       maxYuchalCycles: numTeamsFinal,
+      botCaptainIds,
     };
 
     this.auctionStates.set(roomId, auctionState);
@@ -405,7 +432,7 @@ export class AuctionService {
     if (!room) throw new NotFoundException("Room not found");
     if (room.hostId !== hostId) throw new ForbiddenException("Only host can select captains");
 
-    const numTeams = Math.floor(room.participants.length / 5);
+    const numTeams = Math.max(2, Math.floor(room.participants.length / 5));
     if (userIds.length !== numTeams) {
       throw new BadRequestException(`Need exactly ${numTeams} captains`);
     }
@@ -418,15 +445,18 @@ export class AuctionService {
 
     const { teams } = await this._applySelectedCaptains(roomId, room, userIds);
     const nonCaptains = room.participants.filter((p) => !userIds.includes(p.userId));
+    const botCaptainIds = this._filterBotCaptains(userIds, room.participants);
 
     const auctionState: AuctionState = {
       roomId,
       currentPlayerIndex: 0,
       currentHighestBid: 0,
       currentHighestBidder: null,
-      timerEnd: Date.now() + ((room as any).bidTimeLimit || 30) * 1000,
+      currentHighestBidderName: null,
+      timerEnd: Date.now() + this.getBaseBidTimerMs(),
       yuchalCount: 0,
       maxYuchalCycles: numTeams,
+      botCaptainIds,
     };
 
     this.auctionStates.set(roomId, auctionState);
@@ -479,23 +509,34 @@ export class AuctionService {
     if (!room) throw new NotFoundException("Room not found");
 
     const bidIncrement = room.minBidIncrement || 50;
-    const bidTimeLimit = room.bidTimeLimit || 30;
 
     // Get team
     const team = await this.prisma.team.findFirst({
       where: { roomId, captainId: userId },
+      include: {
+        captain: {
+          select: {
+            username: true,
+          },
+        },
+        _count: {
+          select: {
+            members: true,
+          },
+        },
+      },
     });
 
     if (!team) {
       throw new ForbiddenException("Only captains can bid");
     }
 
-    // Timer expiration check — 서버 기준으로 타이머 만료 여부 확인
+    // Timer expiration check ???쒕쾭 湲곗??쇰줈 ??대㉧ 留뚮즺 ?щ? ?뺤씤
     if (Date.now() > state.timerEnd) {
       throw new BadRequestException("Bidding time has expired");
     }
 
-    // Self-outbid prevention — 이미 최고가인 팀은 다시 입찰 불가
+    // Self-outbid prevention ???대? 理쒓퀬媛???? ?ㅼ떆 ?낆같 遺덇?
     if (state.currentHighestBidder === team.id) {
       throw new BadRequestException("You are already the highest bidder");
     }
@@ -507,8 +548,19 @@ export class AuctionService {
       );
     }
 
-    if (amount > team.remainingBudget) {
-      throw new BadRequestException("Insufficient budget");
+    // Keep reserve budget for remaining roster slots (simulation parity).
+    const slotsNeeded = Math.max(0, 5 - team._count.members);
+    const reserveAmount = Math.max(0, (slotsNeeded - 1) * 100);
+    const availableToBid = Math.max(0, team.remainingBudget - reserveAmount);
+    if (amount > availableToBid) {
+      throw new BadRequestException(
+        `Insufficient available budget (reserve ${reserveAmount} required)`,
+      );
+    }
+
+    const maxTeamSize = 5;
+    if (team._count.members >= maxTeamSize) {
+      throw new BadRequestException("Team is already full");
     }
 
     if (amount % bidIncrement !== 0) {
@@ -541,7 +593,8 @@ export class AuctionService {
 
     state.currentHighestBid = amount;
     state.currentHighestBidder = team.id;
-    state.timerEnd = Date.now() + bidTimeLimit * 1000;
+    state.currentHighestBidderName = team.captain.username;
+    state.timerEnd = this.getExtendedBidTimerEnd(state.timerEnd);
     state.yuchalCount = 0; // Reset yuchal count
 
     // Record bid
@@ -589,6 +642,11 @@ export class AuctionService {
         teams: {
           include: {
             captain: true,
+            _count: {
+              select: {
+                members: true,
+              },
+            },
           },
           orderBy: { remainingBudget: "desc" },
         },
@@ -636,13 +694,12 @@ export class AuctionService {
         });
       });
 
-      const bidTimeLimitMs = (room?.bidTimeLimit || 30) * 1000;
-
-      // Move to next player
-      state.currentPlayerIndex++;
+      // ?ㅼ쓬 ?좎닔濡??대룞 (DB 荑쇰━媛 ?붾┛ ?좎닔瑜??쒖쇅?섎?濡???긽 0踰덉씠 ?ㅼ쓬 ?좎닔)
+      state.currentPlayerIndex = 0;
       state.currentHighestBid = 0;
       state.currentHighestBidder = null;
-      state.timerEnd = Date.now() + bidTimeLimitMs;
+      state.currentHighestBidderName = null;
+      state.timerEnd = Date.now() + this.getBaseBidTimerMs();
       state.yuchalCount = 0;
 
       return {
@@ -652,69 +709,76 @@ export class AuctionService {
         price: soldPrice,
       };
     } else {
-      const bidTimeLimitMs = (room?.bidTimeLimit || 30) * 1000;
-
       // Yuchal (no sale)
       state.yuchalCount++;
+      const bidIncrement = room.minBidIncrement || 50;
+      const maxTeamSize = 5;
+      const incompleteTeams = room!.teams.filter((t) => t._count.members < maxTeamSize);
+      const anyCanBid = incompleteTeams.some((t) => t.remainingBudget >= bidIncrement);
 
-      // If yuchal cycle complete, assign to team with most budget
-      if (state.yuchalCount >= state.maxYuchalCycles) {
-        const targetTeam = room!.teams[0]; // Sorted by remainingBudget desc
-
-        await this.prisma.$transaction(async (tx) => {
-          if (targetTeam.remainingBudget === 0 && !targetTeam.hasReceivedBonus) {
-            await tx.team.update({
-              where: { id: targetTeam.id },
-              data: {
-                remainingBudget: BONUS_GOLD,
-                hasReceivedBonus: true,
-              },
-            });
-          }
-
-          await tx.teamMember.create({
-            data: {
-              teamId: targetTeam.id,
-              userId: currentPlayer.userId,
-              soldPrice: 0,
-            },
-          });
-
-          await tx.roomParticipant.update({
-            where: { id: currentPlayer.id },
-            data: { teamId: targetTeam.id },
-          });
-
-          await tx.auctionBid.create({
-            data: {
-              roomId,
-              teamId: targetTeam.id,
-              targetUserId: currentPlayer.userId,
-              amount: 0,
-              isYuchal: true,
-            },
-          });
-        });
-
-        // Move to next player
-        state.currentPlayerIndex++;
+      // Simulation rule: if someone can still bid and cycle not exhausted, keep same player.
+      if (state.yuchalCount < state.maxYuchalCycles && anyCanBid) {
         state.currentHighestBid = 0;
         state.currentHighestBidder = null;
-        state.timerEnd = Date.now() + bidTimeLimitMs;
-        state.yuchalCount = 0;
-
-        return {
-          sold: true,
-          player: currentPlayer,
-          team: targetTeam,
-          price: 0,
-        };
+        state.currentHighestBidderName = null;
+        state.timerEnd = Date.now() + this.getBaseBidTimerMs();
+        return { sold: false, player: currentPlayer };
       }
 
-      // Continue auction for same player
-      state.timerEnd = Date.now() + bidTimeLimitMs;
+      // Simulation rule: otherwise force-assign to incomplete team with highest budget.
+      const targetTeamPool = incompleteTeams.length > 0 ? incompleteTeams : room!.teams;
+      const targetTeam = [...targetTeamPool].sort(
+        (a, b) => b.remainingBudget - a.remainingBudget,
+      )[0];
 
-      return { sold: false };
+      await this.prisma.$transaction(async (tx) => {
+        if (targetTeam.remainingBudget === 0 && !targetTeam.hasReceivedBonus) {
+          await tx.team.update({
+            where: { id: targetTeam.id },
+            data: {
+              remainingBudget: BONUS_GOLD,
+              hasReceivedBonus: true,
+            },
+          });
+        }
+
+        await tx.teamMember.create({
+          data: {
+            teamId: targetTeam.id,
+            userId: currentPlayer.userId,
+            soldPrice: 0,
+          },
+        });
+
+        await tx.roomParticipant.update({
+          where: { id: currentPlayer.id },
+          data: { teamId: targetTeam.id },
+        });
+
+        await tx.auctionBid.create({
+          data: {
+            roomId,
+            teamId: targetTeam.id,
+            targetUserId: currentPlayer.userId,
+            amount: 0,
+            isYuchal: true,
+          },
+        });
+      });
+
+      state.currentPlayerIndex = 0;
+      state.currentHighestBid = 0;
+      state.currentHighestBidder = null;
+      state.currentHighestBidderName = null;
+      state.timerEnd = Date.now() + this.getBaseBidTimerMs();
+      state.yuchalCount = 0;
+
+      return {
+        sold: true,
+        player: currentPlayer,
+        team: targetTeam,
+        price: 0,
+      };
     }
   }
 
@@ -745,7 +809,7 @@ export class AuctionService {
       data: { status: RoomStatus.DRAFT_COMPLETED },
     });
 
-    // Discord 봇: 팀 구성 완료 시 팀별 음성채널 배치
+    // Discord 遊? ? 援ъ꽦 ?꾨즺 ???蹂??뚯꽦梨꾨꼸 諛곗튂
     try {
       if (this.discordVoiceService) {
         await this.discordVoiceService.handleTeamAssignment(roomId);
@@ -767,6 +831,212 @@ export class AuctionService {
     return this.auctionStates.get(roomId);
   }
 
+  clearAuctionState(roomId: string): void {
+    const phase = this.captainPhases.get(roomId);
+    if (phase?.timerHandle) {
+      clearTimeout(phase.timerHandle);
+    }
+    this.captainPhases.delete(roomId);
+    this.auctionStates.delete(roomId);
+  }
+
+  async cleanupBotOnlyRoomOnHostDisconnect(
+    userId: string,
+    roomId: string,
+  ): Promise<boolean> {
+    const room = await this.prisma.room.findUnique({
+      where: { id: roomId },
+      include: {
+        discordChannels: {
+          select: {
+            channelId: true,
+            teamName: true,
+          },
+        },
+        participants: {
+          include: {
+            user: {
+              select: {
+                username: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!room || room.hostId !== userId) {
+      return false;
+    }
+
+    // Don't delete rooms that have progressed beyond WAITING
+    // (e.g., DRAFT_COMPLETED, ROLE_SELECTION, IN_PROGRESS)
+    const deletableStatuses: RoomStatus[] = [RoomStatus.WAITING, RoomStatus.DRAFT, RoomStatus.TEAM_SELECTION];
+    if (!deletableStatuses.includes(room.status as RoomStatus)) {
+      return false;
+    }
+
+    const remainingParticipants = room.participants.filter(
+      (p) => p.userId !== userId,
+    );
+    const shouldDelete =
+      remainingParticipants.length === 0 ||
+      remainingParticipants.every((p) =>
+        this.isBotUsername(p.user?.username ?? ""),
+      );
+
+    if (!shouldDelete) {
+      return false;
+    }
+
+    try {
+      if (this.discordVoiceService) {
+        await this.discordVoiceService
+          .deleteRoomChannels(roomId, false, {
+            discordCategoryId: room.discordCategoryId,
+            discordChannels: room.discordChannels,
+          })
+          .catch(() => {});
+      }
+    } catch {
+      // Ignore Discord cleanup failures for zombie-room cleanup.
+    }
+
+    await this.prisma.chatMessage.deleteMany({ where: { roomId } });
+    await this.prisma.room.delete({ where: { id: roomId } });
+    this.clearAuctionState(roomId);
+    return true;
+  }
+
+  /** 寃쎈ℓ ?섏씠吏 珥덇린 濡쒕뱶?? ?꾩옱 teams + ?⑥? players 諛섑솚 */
+  async getFullAuctionData(roomId: string): Promise<{ teams: any[]; players: any[] }> {
+    const room = await this.prisma.room.findUnique({
+      where: { id: roomId },
+      include: {
+        teams: {
+          include: {
+            captain: {
+              select: {
+                username: true,
+              },
+            },
+            members: {
+              include: {
+                user: {
+                  include: { riotAccounts: { where: { isPrimary: true } } },
+                },
+              },
+            },
+          },
+        },
+        participants: {
+          where: { isCaptain: false, teamId: null },
+          include: { user: { include: { riotAccounts: { where: { isPrimary: true } } } } },
+          orderBy: { joinedAt: 'asc' },
+        },
+      },
+    });
+    if (!room) return { teams: [], players: [] };
+
+    const players = room.participants.map((p: any) => {
+      const acc = p.user.riotAccounts[0];
+      return {
+        id: p.userId,
+        username: p.user.username,
+        avatar: p.user.avatar,
+        tier: acc?.tier,
+        rank: acc?.rank,
+        mainRole: acc?.mainRole,
+        subRole: acc?.subRole,
+        mmr: calculateTierScore(acc?.tier || 'UNRANKED', acc?.rank || '', acc?.lp || 0),
+      };
+    });
+
+    const teams = room.teams.map((t: any) => ({
+      id: t.id,
+      name: t.name,
+      captainId: t.captainId,
+      captainName: t.captain?.username ?? null,
+      color: t.color,
+      remainingBudget: t.remainingBudget,
+      remainingGold: t.remainingBudget,
+      members: t.members.map((m: any) => {
+        const acc = m.user?.riotAccounts?.[0];
+        return {
+          id: m.userId,
+          username: m.user?.username ?? 'Unknown',
+          avatar: m.user?.avatar,
+          tier: acc?.tier ?? 'UNRANKED',
+          rank: acc?.rank,
+          mainRole: acc?.mainRole,
+          subRole: acc?.subRole,
+          mmr: calculateTierScore(acc?.tier || 'UNRANKED', acc?.rank || '', acc?.lp || 0),
+          position: m.assignedRole ?? acc?.mainRole ?? 'FLEX',
+        };
+      }),
+    }));
+
+    return { teams, players };
+  }
+
+  /** testbot_NN ?⑦꽩 ?좎? ?앸퀎 */
+  isBotUsername(username: string): boolean {
+    return /^testbot_\d+$/.test(username);
+  }
+
+  /** captainUserIds 以?遊뉗씤 userId留??꾪꽣 (participants 諛곗뿴?먯꽌 username 議고쉶) */
+  private _filterBotCaptains(captainUserIds: string[], participants: any[]): string[] {
+    return captainUserIds.filter((id) => {
+      const p = participants.find((p: any) => p.userId === id);
+      return p && this.isBotUsername(p.user?.username ?? "");
+    });
+  }
+
+  /**
+   * 遊???λ뱾???낆같 ?꾨낫 ?뺣낫 諛섑솚
+   * gateway?먯꽌 bot ?먮룞 ?낆같 ?ㅼ?以꾨쭅???ъ슜
+   */
+  async getBotBidCandidates(roomId: string): Promise<
+    {
+      captainId: string;
+      username: string;
+      teamId: string;
+      remainingBudget: number;
+      memberCount: number;
+      availableToBid: number;
+    }[]
+  > {
+    const state = this.auctionStates.get(roomId);
+    if (!state || state.botCaptainIds.length === 0) return [];
+
+    const teams = await this.prisma.team.findMany({
+      where: { roomId, captainId: { in: state.botCaptainIds } },
+      include: {
+        captain: { select: { username: true } },
+        _count: {
+          select: {
+            members: true,
+          },
+        },
+      },
+    });
+
+    return teams.map((t) => {
+      const memberCount = t._count.members;
+      const slotsNeeded = Math.max(0, 5 - memberCount);
+      const reserveAmount = Math.max(0, (slotsNeeded - 1) * 100);
+      const availableToBid = Math.max(0, t.remainingBudget - reserveAmount);
+      return {
+        captainId: t.captainId,
+        username: t.captain.username,
+        teamId: t.id,
+        remainingBudget: t.remainingBudget,
+        memberCount,
+        availableToBid,
+      };
+    });
+  }
+
   private getTeamColor(index: number): string {
     const colors = [
       "#3B82F6", // Blue
@@ -779,3 +1049,4 @@ export class AuctionService {
     return colors[index % colors.length];
   }
 }
+

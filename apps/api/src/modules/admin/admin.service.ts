@@ -187,19 +187,38 @@ export class AdminService {
   // ── Announcements ─────────────────────────────────────────────────────────
 
   async sendAnnouncement(title: string, message: string, link?: string) {
-    const users = await this.prisma.user.findMany({ select: { id: true } });
+    const BATCH_SIZE = 1000;
+    let sent = 0;
+    let cursor: string | undefined;
 
-    await this.prisma.notification.createMany({
-      data: users.map((u) => ({
-        userId: u.id,
-        type: "SYSTEM" as any,
-        title,
-        message,
-        link: link ?? null,
-      })),
-    });
+    // 배치 처리: 한 번에 1000명씩 조회 + 알림 생성
+    while (true) {
+      const users = await this.prisma.user.findMany({
+        select: { id: true },
+        take: BATCH_SIZE,
+        ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+        orderBy: { id: "asc" },
+      });
 
-    return { sent: users.length };
+      if (users.length === 0) break;
+
+      await this.prisma.notification.createMany({
+        data: users.map((u) => ({
+          userId: u.id,
+          type: "SYSTEM" as any,
+          title,
+          message,
+          link: link ?? null,
+        })),
+      });
+
+      sent += users.length;
+      cursor = users[users.length - 1].id;
+
+      if (users.length < BATCH_SIZE) break;
+    }
+
+    return { sent };
   }
 
   // ── Chat Logs ─────────────────────────────────────────────────────────────
@@ -215,7 +234,13 @@ export class AdminService {
 
     const where: any = {};
     if (roomName) where.roomName = { contains: roomName, mode: "insensitive" };
-    if (search) where.content = { contains: search, mode: "insensitive" };
+    if (search) {
+      where.content = { contains: search, mode: "insensitive" };
+      // 내용 검색 시 최근 30일로 범위 제한 (풀스캔 방지)
+      if (!where.createdAt) {
+        where.createdAt = { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) };
+      }
+    }
 
     const [messages, total] = await Promise.all([
       this.prisma.chatMessage.findMany({
@@ -352,5 +377,85 @@ export class AdminService {
       data: { status: "COMPLETED" as any, completedAt: new Date() },
       select: { id: true, name: true, status: true },
     });
+  }
+
+  // ── Test Bots ──────────────────────────────────────────────────────────────
+
+  /** testbot_01 ~ testbot_{count} 유저를 없으면 생성, 있으면 반환 */
+  async ensureBotUsers(count: number): Promise<{ id: string; username: string }[]> {
+    const bots: { id: string; username: string }[] = [];
+
+    for (let i = 1; i <= count; i++) {
+      const username = `testbot_${String(i).padStart(2, "0")}`;
+      const email = `${username}@nexus.test`;
+
+      const user = await this.prisma.user.upsert({
+        where: { email },
+        update: {},
+        create: {
+          username,
+          email,
+          emailVerified: true,
+          termsAgreements: {
+            create: {
+              termsOfService: true,
+              privacyPolicy: true,
+              ageVerification: true,
+              marketingConsent: false,
+            },
+          },
+        },
+        select: { id: true, username: true },
+      });
+
+      bots.push(user);
+    }
+
+    return bots;
+  }
+
+  /** 방에 봇을 count명 추가. 이미 있는 봇은 스킵, maxParticipants 초과하지 않음 */
+  async addBotToRoom(roomId: string, count: number = 1) {
+    const room = await this.prisma.room.findUnique({
+      where: { id: roomId },
+      include: {
+        participants: { select: { userId: true } },
+      },
+    });
+
+    if (!room) throw new NotFoundException("방을 찾을 수 없습니다.");
+    if (room.status !== "WAITING" as any) {
+      throw new BadRequestException("대기 중인 방에만 봇을 추가할 수 있습니다.");
+    }
+
+    const currentCount = room.participants.length;
+    const available = (room.maxParticipants || 10) - currentCount;
+    if (available <= 0) throw new BadRequestException("방이 가득 찼습니다.");
+
+    const toAdd = Math.min(count, available);
+    const existingBotIds = new Set(room.participants.map((p) => p.userId));
+
+    // 필요한 봇보다 여유 있게 확보 (최대 9개)
+    const bots = await this.ensureBotUsers(Math.min(9, currentCount + toAdd));
+
+    const newBots = bots.filter((b) => !existingBotIds.has(b.id)).slice(0, toAdd);
+    if (newBots.length === 0) throw new BadRequestException("추가할 수 있는 봇이 없습니다.");
+
+    await this.prisma.roomParticipant.createMany({
+      data: newBots.map((bot) => ({
+        roomId,
+        userId: bot.id,
+        role: "PLAYER" as any,
+        isReady: true,
+      })),
+      skipDuplicates: true,
+    });
+
+    const updatedParticipants = await this.prisma.roomParticipant.findMany({
+      where: { roomId },
+      include: { user: { select: { id: true, username: true, avatar: true, role: true } } },
+    });
+
+    return { addedCount: newBots.length, participants: updatedParticipants };
   }
 }

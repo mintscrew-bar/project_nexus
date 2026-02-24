@@ -169,4 +169,13 @@ export class AdminController {
   closeRoom(@Param("id") roomId: string) {
     return this.adminService.closeRoom(roomId);
   }
+
+  // ── Test Bots ───────────────────────────────────────────────────────────────
+  @Post("rooms/:id/add-bot")
+  addBotToRoom(
+    @Param("id") roomId: string,
+    @Body("count") count = 1,
+  ) {
+    return this.adminService.addBotToRoom(roomId, count);
+  }
 }

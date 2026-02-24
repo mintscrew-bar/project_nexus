@@ -255,18 +255,11 @@ export class AuthService {
   }
 
   async refreshTokens(userId: string, refreshToken: string) {
-    // Find session
-    console.log("AuthService.refreshTokens - userId:", userId);
-    console.log(
-      "AuthService.refreshTokens - provided refreshToken:",
-      refreshToken ? "[REDACTED]" : null,
-    );
+    // Validate session (DB read only — no rotation)
     const session = await this.prisma.session.findUnique({
       where: { refreshToken },
       include: { user: true },
     });
-
-    console.log("AuthService.refreshTokens - session found id:", session?.id);
 
     if (!session || session.userId !== userId) {
       throw new UnauthorizedException("Invalid refresh token");
@@ -286,15 +279,22 @@ export class AuthService {
       throw new UnauthorizedException("Account is restricted");
     }
 
-    // Delete old session
-    await this.prisma.session.deleteMany({ where: { id: session.id } });
-    console.log(
-      "AuthService.refreshTokens - deleted old session id:",
-      session.id,
-    );
+    // Issue a new access token only — refresh token stays the same.
+    // No session rotation means: no race condition with multiple tabs,
+    // no unnecessary DB writes on every page refresh.
+    const payload: TokenPayload = {
+      sub: session.user.id,
+      email: session.user.email || undefined,
+      username: session.user.username,
+      role: session.user.role || "USER",
+    };
 
-    // Generate new tokens
-    return this.generateTokens(session.user);
+    const accessToken = await this.jwtService.signAsync(payload, {
+      secret: this.configService.get("JWT_ACCESS_SECRET"),
+      expiresIn: this.configService.get("JWT_ACCESS_EXPIRES_IN") || "15m",
+    });
+
+    return { accessToken };
   }
 
   async logout(userId: string, refreshToken?: string) {

@@ -286,14 +286,21 @@ export class MatchService {
       );
     }
 
-    await this.prisma.match.update({
-      where: { id: matchId },
+    // Atomic update: only update if still IN_PROGRESS (prevents race condition)
+    const updateResult = await this.prisma.match.updateMany({
+      where: { id: matchId, status: MatchStatus.IN_PROGRESS },
       data: {
         status: MatchStatus.COMPLETED,
         winnerId,
         completedAt: new Date(),
       },
     });
+
+    if (updateResult.count === 0) {
+      throw new BadRequestException(
+        "Match result was already reported by another request.",
+      );
+    }
 
     // Advance winner to next round (delegated to MatchAdvancementService)
     let bracketAdvanced = false;

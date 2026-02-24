@@ -11,14 +11,22 @@ import {
   HttpCode,
   HttpStatus,
   Logger,
+  Inject,
+  forwardRef,
 } from "@nestjs/common";
 import { RoomService, CreateRoomDto } from "./room.service";
 import { SnakeDraftService } from "./snake-draft.service";
+import { SnakeDraftGateway } from "./snake-draft.gateway";
 import { RoomGateway } from "./room.gateway";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { Public } from "../auth/decorators/public.decorator";
 import { RoomStatus, TeamMode } from "@nexus/database";
+import { AuctionService } from "../auction/auction.service";
+import { AuctionGateway } from "../auction/auction.gateway";
+import { RoleSelectionService } from "../role-selection/role-selection.service";
+import { RoleSelectionGateway } from "../role-selection/role-selection.gateway";
+import { MatchGateway } from "../match/match.gateway";
 
 @Controller("rooms")
 @UseGuards(JwtAuthGuard)
@@ -28,7 +36,17 @@ export class RoomController {
   constructor(
     private readonly roomService: RoomService,
     private readonly snakeDraftService: SnakeDraftService,
+    private readonly snakeDraftGateway: SnakeDraftGateway,
     private readonly roomGateway: RoomGateway,
+    @Inject(forwardRef(() => AuctionService))
+    private readonly auctionService: AuctionService,
+    @Inject(forwardRef(() => AuctionGateway))
+    private readonly auctionGateway: AuctionGateway,
+    @Inject(forwardRef(() => RoleSelectionService))
+    private readonly roleSelectionService: RoleSelectionService,
+    @Inject(forwardRef(() => RoleSelectionGateway))
+    private readonly roleSelectionGateway: RoleSelectionGateway,
+    private readonly matchGateway: MatchGateway,
   ) {}
 
   // ========================================
@@ -118,6 +136,37 @@ export class RoomController {
     @Param("id") roomId: string,
   ) {
     const result = await this.roomService.closeRoom(userId, roomId);
+    this.roomGateway.broadcastRoomListUpdate();
+    return result;
+  }
+
+  @Post(":id/abort-to-lobby")
+  @HttpCode(HttpStatus.OK)
+  async abortToLobby(
+    @CurrentUser("sub") userId: string,
+    @Param("id") roomId: string,
+  ) {
+    const result = await this.roomService.abortActiveSession(userId, roomId);
+
+    this.snakeDraftService.clearDraftState(roomId);
+    this.auctionService.clearAuctionState(roomId);
+    this.roleSelectionService.clearRoleSelectionState(roomId);
+
+    this.auctionGateway.cleanupRoom(roomId);
+    this.roleSelectionGateway.clearRoomTimer(roomId);
+
+    const payload = {
+      roomId,
+      message: result.message,
+      abortedBy: userId,
+      abortedAt: new Date().toISOString(),
+    };
+
+    this.auctionGateway.emitSessionAborted(roomId, payload);
+    this.snakeDraftGateway.emitSessionAborted(roomId, payload);
+    this.roleSelectionGateway.emitSessionAborted(roomId, payload);
+    this.matchGateway.emitSessionAborted(roomId, payload);
+
     this.roomGateway.broadcastRoomListUpdate();
     return result;
   }

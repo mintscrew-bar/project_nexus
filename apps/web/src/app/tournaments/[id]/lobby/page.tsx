@@ -2,6 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useLobbyStore } from "@/stores/lobby-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { useFriendStore } from "@/stores/friend-store";
@@ -18,7 +19,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
-import { friendApi } from "@/lib/api-client";
+import { friendApi, adminApi, roomApi } from "@/lib/api-client";
 
 const DDRAGON_VERSION = process.env.NEXT_PUBLIC_DDRAGON_VERSION || "16.2.1";
 
@@ -63,24 +64,33 @@ function ChampionIcon({ championId, size = 24 }: { championId: string; size?: nu
   );
 }
 
-function PlayerHoverTooltip({ participant, index, totalCount }: { participant: any; index: number; currentUserId: string; totalCount: number }) {
+function PlayerHoverTooltip({ participant, anchorRect }: { participant: any; anchorRect: DOMRect }) {
   const riot = participant.riotAccount;
   const mainRole = riot?.mainRole || null;
   const subRole = riot?.subRole || null;
-  const champions = riot?.championPreferences || [];
+  const champions = [...(riot?.championPreferences || [])].sort((a: any, b: any) => a.order - b.order);
 
   const champsByRole: Record<string, string[]> = {};
   for (const cp of champions) {
     if (!champsByRole[cp.role]) champsByRole[cp.role] = [];
     champsByRole[cp.role].push(cp.championId);
   }
-  for (const _cp of champions.sort((a: any, b: any) => a.order - b.order)) { /* sorted in-place */ }
   const rolesToShow = [mainRole, subRole].filter(Boolean) as string[];
 
-  const showOnLeft = index >= totalCount / 2;
+  // fixed 포지셔닝: overflow-hidden 컨테이너 밖으로 탈출
+  const TOOLTIP_W = 256;
+  const TOOLTIP_OFFSET = 8;
+  const spaceOnRight = window.innerWidth - anchorRect.right;
+  const left = spaceOnRight >= TOOLTIP_W + TOOLTIP_OFFSET
+    ? anchorRect.right + TOOLTIP_OFFSET
+    : anchorRect.left - TOOLTIP_W - TOOLTIP_OFFSET;
+  const top = Math.min(anchorRect.top, window.innerHeight - 320);
 
-  return (
-    <div className={`absolute top-0 w-64 bg-bg-elevated border border-bg-tertiary rounded-xl shadow-2xl p-4 z-50 animate-fade-in pointer-events-none ${showOnLeft ? 'right-full mr-2' : 'left-full ml-2'}`}>
+  return createPortal(
+    <div
+      className="fixed w-64 bg-bg-elevated border border-bg-tertiary rounded-xl shadow-2xl p-4 z-[9999] animate-fade-in pointer-events-none"
+      style={{ left, top }}
+    >
       <div className="flex items-center gap-3 mb-3 pb-3 border-b border-bg-tertiary">
         <div className="relative w-10 h-10 rounded-full bg-bg-tertiary overflow-hidden flex-shrink-0">
           {participant.avatar ? (
@@ -146,13 +156,14 @@ function PlayerHoverTooltip({ participant, index, totalCount }: { participant: a
         </div>
       )}
       {!riot && <p className="text-xs text-text-tertiary italic">등록된 라이엇 계정이 없습니다</p>}
-    </div>
+    </div>,
+    document.body
   );
 }
 
 /* ─── Participant Card ─── */
 function ParticipantCard({
-  p, index, totalCount, isCurrentUserHost, isSelf, isFriend, isSent, addingFriend,
+  p, isCurrentUserHost, isSelf, isFriend, isSent, addingFriend,
   hoveredPlayer, setHoveredPlayer, handleAddFriend, setKickTarget, currentUserId,
 }: any) {
   const riot = p.riotAccount;
@@ -162,11 +173,19 @@ function ParticipantCard({
     .filter((cp: any) => cp.role === mainRole)
     .sort((a: any, b: any) => a.order - b.order)
     .slice(0, 3);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  const handleMouseEnter = () => {
+    if (cardRef.current) {
+      setHoveredPlayer({ id: p.id, rect: cardRef.current.getBoundingClientRect(), participant: p });
+    }
+  };
 
   return (
     <div
+      ref={cardRef}
       className="relative flex items-center justify-between bg-bg-tertiary p-3 rounded-lg hover:bg-bg-elevated transition-colors group animate-slide-in-right"
-      onMouseEnter={() => setHoveredPlayer(p.id)}
+      onMouseEnter={handleMouseEnter}
       onMouseLeave={() => setHoveredPlayer(null)}
     >
       <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -183,6 +202,9 @@ function ParticipantCard({
             <span className="font-semibold text-sm text-text-primary truncate">{riot ? riot.gameName : p.username}</span>
             {riot && <span className="text-xs text-text-tertiary flex-shrink-0">#{riot.tagLine}</span>}
             {riot?.tier && <TierBadge tier={riot.tier} rank={riot.rank || undefined} size="sm" showIcon={false} className="flex-shrink-0" />}
+            {/^testbot_\d+$/.test(p.username) && (
+              <span className="text-[9px] font-bold bg-bg-secondary text-text-muted px-1 py-0.5 rounded border border-bg-elevated flex-shrink-0">BOT</span>
+            )}
           </div>
           <div className="flex items-center gap-2">
             {riot && <span className="text-[11px] text-text-tertiary truncate">{p.username}</span>}
@@ -223,7 +245,6 @@ function ParticipantCard({
           </button>
         )}
       </div>
-      {hoveredPlayer === p.id && <PlayerHoverTooltip participant={p} index={index} currentUserId={currentUserId} totalCount={totalCount} />}
     </div>
   );
 }
@@ -259,7 +280,8 @@ export default function TournamentLobbyPage() {
   const [isUserSettingsModalOpen, setIsUserSettingsModalOpen] = useState(false);
   const [kickTarget, setKickTarget] = useState<{ id: string; username: string } | null>(null);
   const [isKicking, setIsKicking] = useState(false);
-  const [hoveredPlayer, setHoveredPlayer] = useState<string | null>(null);
+  const [isAddingBot, setIsAddingBot] = useState(false);
+  const [hoveredPlayer, setHoveredPlayer] = useState<{ id: string; rect: DOMRect; participant: any } | null>(null);
   const [addingFriend, setAddingFriend] = useState<string | null>(null);
   const [sentFriendIds, setSentFriendIds] = useState<Set<string>>(new Set());
   const [mobileTab, setMobileTab] = useState<string>("participants");
@@ -282,19 +304,47 @@ export default function TournamentLobbyPage() {
     }
   }, [addToast]);
 
+  const handleAddBot = useCallback(async () => {
+    if (!room) return;
+    setIsAddingBot(true);
+    try {
+      await adminApi.addBotToRoom(room.id, 1);
+      // 방 데이터 재조회 후 로비 store에 직접 반영
+      const updated = await roomApi.getRoom(room.id);
+      useLobbyStore.setState({ room: updated });
+      addToast("봇을 추가했습니다.", "success");
+    } catch (e: any) {
+      addToast(e?.response?.data?.message ?? "봇 추가에 실패했습니다.", "error");
+    } finally {
+      setIsAddingBot(false);
+    }
+  }, [room, addToast]);
+
   useEffect(() => { if (roomId) connect(roomId); return () => { disconnect(); }; }, [roomId, connect, disconnect]);
 
   useEffect(() => {
     if (hasRedirected.current || !room) return;
     if (gameStarting) {
       hasRedirected.current = true;
-      disconnect();
+      disconnect({ skipLeave: true });
       router.push(room.teamMode === "AUCTION" ? `/auction/${room.id}` : `/draft/${room.id}`);
       return;
     }
-    if (room.status === 'IN_PROGRESS') {
+    if (room.status === 'DRAFT' || room.status === 'TEAM_SELECTION') {
       hasRedirected.current = true;
-      disconnect();
+      disconnect({ skipLeave: true });
+      router.push(room.teamMode === "AUCTION" ? `/auction/${room.id}` : `/draft/${room.id}`);
+      return;
+    }
+    if (room.status === 'ROLE_SELECTION') {
+      hasRedirected.current = true;
+      disconnect({ skipLeave: true });
+      router.push(`/role-selection/${room.id}`);
+      return;
+    }
+    if (room.status === 'IN_PROGRESS' || room.status === 'COMPLETED') {
+      hasRedirected.current = true;
+      disconnect({ skipLeave: true });
       router.push(`/tournaments/${room.id}/bracket`);
     }
   }, [gameStarting, room, router, disconnect]);
@@ -347,11 +397,11 @@ export default function TournamentLobbyPage() {
   /* ─── Participants List ─── */
   const participantsList = (
     <div className="space-y-2">
-      {room.participants.map((p: any, idx: number) => {
+      {room.participants.map((p: any) => {
         const isSelf = p.userId === currentUser?.id;
         return (
           <ParticipantCard
-            key={p.id} p={p} index={idx} totalCount={totalParticipants}
+            key={p.id} p={p}
             isCurrentUserHost={isCurrentUserHost} isSelf={isSelf}
             isFriend={friendUserIds.has(p.userId)} isSent={sentFriendIds.has(p.userId)}
             addingFriend={addingFriend} hoveredPlayer={hoveredPlayer}
@@ -371,6 +421,10 @@ export default function TournamentLobbyPage() {
 
   return (
     <>
+      {/* 참가자 호버 툴팁 — overflow-hidden 탈출을 위해 페이지 최상위에서 렌더링 */}
+      {hoveredPlayer && (
+        <PlayerHoverTooltip participant={hoveredPlayer.participant} anchorRect={hoveredPlayer.rect} />
+      )}
       <div className="flex flex-col flex-grow min-h-0">
         {/* ═══ Room Header ═══ */}
         <header className="bg-bg-secondary border-b border-bg-tertiary px-4 py-3 lg:px-6">
@@ -551,15 +605,27 @@ export default function TournamentLobbyPage() {
             </button>
 
             <div className="flex items-center gap-3">
+              {/* 어드민 전용: 봇 추가 버튼 */}
+              {currentUser?.role === 'ADMIN' && room.status === 'WAITING' && totalParticipants < room.maxParticipants && (
+                <button
+                  onClick={handleAddBot}
+                  disabled={isAddingBot}
+                  className="px-4 py-2.5 text-sm font-medium rounded-lg border border-bg-tertiary text-text-secondary hover:text-text-primary hover:bg-bg-tertiary transition-colors disabled:opacity-50"
+                  title="봇 1명 추가 (어드민 전용)"
+                >
+                  {isAddingBot ? "추가 중..." : `봇 추가 (${room.maxParticipants - totalParticipants}자리 남음)`}
+                </button>
+              )}
               {isCurrentUserHost && room.status === 'WAITING' && (
                 <button
                   className={`px-6 py-2.5 font-bold rounded-lg transition-all text-sm text-white ${
-                    allPlayersReady && totalParticipants >= 2
+                    allPlayersReady && totalParticipants >= (room.teamMode === 'AUCTION' ? 4 : 2)
                       ? 'bg-accent-success hover:bg-accent-success/90 animate-glow-success'
                       : 'bg-accent-success/50 cursor-not-allowed opacity-60'
                   }`}
-                  disabled={!allPlayersReady || totalParticipants < 2}
-                  onClick={() => startGame()}
+                  disabled={!allPlayersReady || totalParticipants < (room.teamMode === 'AUCTION' ? 4 : 2)}
+                  onClick={() => startGame((err) => addToast(err, 'error'))}
+                  title={room.teamMode === 'AUCTION' && totalParticipants < 4 ? '경매 모드는 최소 4명이 필요합니다' : undefined}
                 >
                   내전 시작
                 </button>

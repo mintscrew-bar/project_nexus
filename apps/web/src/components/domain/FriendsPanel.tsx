@@ -31,7 +31,7 @@ import {
   UserCheck,
   Sword,
 } from "lucide-react";
-import { statsApi, friendApi } from "@/lib/api-client";
+import { statsApi, friendApi, dmApi } from "@/lib/api-client";
 import { useFriendStore, type Friendship, type FriendCategory } from "@/stores/friend-store";
 import { usePresenceStore } from "@/stores/presence-store";
 import { useLobbyStore } from "@/stores/lobby-store";
@@ -849,6 +849,90 @@ function JoinRoomModal({ roomId, roomName, isPrivate, onClose }: { roomId: strin
   );
 }
 
+// ─── Conversation List (최근 대화) ──────────────────────────────────────────────
+function ConversationList({
+  conversations,
+  onFetchConversations,
+  onOpenChat,
+  getDisplayName,
+}: {
+  conversations: import("@/stores/dm-store").ConversationSummary[];
+  onFetchConversations: () => void;
+  onOpenChat: (userId: string) => void;
+  getDisplayName: (friendId: string, username: string) => string;
+}) {
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!loaded) {
+      onFetchConversations();
+      setLoaded(true);
+    }
+  }, [loaded, onFetchConversations]);
+
+  const formatTime = (iso: string) => {
+    const d = new Date(iso);
+    const now = new Date();
+    const diff = now.getTime() - d.getTime();
+    if (diff < 60000) return "방금";
+    if (diff < 3600000) return `${Math.floor(diff / 60000)}분 전`;
+    if (diff < 86400000) return d.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
+    return d.toLocaleDateString("ko-KR", { month: "short", day: "numeric" });
+  };
+
+  if (conversations.length === 0) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center py-8 text-center">
+        <MessageCircle className="w-8 h-8 text-text-tertiary mb-2" />
+        <p className="text-sm text-text-secondary">대화가 없습니다.</p>
+        <p className="text-xs text-text-tertiary mt-1">친구를 클릭하여 대화를 시작하세요.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex-1 overflow-y-auto">
+      {conversations.map((conv) => (
+        <button
+          key={conv.user.id}
+          onClick={() => onOpenChat(conv.user.id)}
+          className="w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-bg-elevated/60 transition-colors text-left"
+        >
+          <div className="w-8 h-8 rounded-full bg-bg-tertiary overflow-hidden flex-shrink-0">
+            {conv.user.avatar ? (
+              <img src={conv.user.avatar} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-xs font-bold text-text-muted">
+                {conv.user.username[0]?.toUpperCase()}
+              </div>
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-text-primary truncate">
+                {getDisplayName(conv.user.id, conv.user.username)}
+              </span>
+              <span className="text-[10px] text-text-tertiary flex-shrink-0 ml-1">
+                {formatTime(conv.lastAt)}
+              </span>
+            </div>
+            <div className="flex items-center justify-between mt-0.5">
+              <p className="text-xs text-text-secondary truncate pr-2">
+                {conv.lastMessage}
+              </p>
+              {conv.unread > 0 && (
+                <span className="bg-accent-danger text-white text-[10px] px-1.5 py-0.5 rounded-full leading-none flex-shrink-0">
+                  {conv.unread}
+                </span>
+              )}
+            </div>
+          </div>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 // ─── Pending List ─────────────────────────────────────────────────────────────
 function PendingList({ currentUserId }: { currentUserId: string }) {
   const { pendingRequests, acceptRequest, rejectRequest } = useFriendStore();
@@ -958,14 +1042,18 @@ export function FriendsPanel() {
     openChatUserId,
     openChat,
     closeChat,
+    totalUnread: _totalUnread,
     setTotalUnread,
     setUnreadCount,
+    conversations,
+    setConversations,
     appendMessage,
     updateConversationLastMessage,
     setTyping,
   } = useDmStore();
+  const totalUnread = _totalUnread ?? 0;
 
-  const [tab, setTab] = useState<"friends" | "pending">("friends");
+  const [tab, setTab] = useState<"friends" | "pending" | "messages">("friends");
   const [search, setSearch] = useState("");
   const [ctx, setCtx] = useState<CtxState | null>(null);
   const [modal, setModal] = useState<ModalState | null>(null);
@@ -1015,7 +1103,10 @@ export function FriendsPanel() {
     dmSocketHelpers.onUserStoppedTyping(handleStoppedTyping);
 
     return () => {
-      dmSocketHelpers.offAllListeners();
+      dmSocketHelpers.offNewMessage(handleNewDm);
+      dmSocketHelpers.offUnreadCount(handleUnreadCount);
+      dmSocketHelpers.offUserTyping(handleTyping);
+      dmSocketHelpers.offUserStoppedTyping(handleStoppedTyping);
     };
   }, [isAuthenticated, user?.id, appendMessage, updateConversationLastMessage, setTotalUnread, setTyping]);
 
@@ -1197,6 +1288,7 @@ export function FriendsPanel() {
         {/* DM 채팅 뷰 */}
         {openChatUserId && chatPartner && (
           <DmChatView
+            key={chatPartner.id}
             otherUserId={chatPartner.id}
             otherUsername={chatPartner.username}
             otherAvatar={chatPartner.avatar}
@@ -1236,6 +1328,22 @@ export function FriendsPanel() {
           </button>
           <button
             className={`flex-1 py-2 text-xs font-medium transition-colors flex items-center justify-center gap-1.5 ${
+              tab === "messages"
+                ? "text-accent-primary border-b-2 border-accent-primary bg-accent-primary/5"
+                : "text-text-secondary hover:text-text-primary"
+            }`}
+            onClick={() => setTab("messages")}
+          >
+            <MessageCircle className="w-3.5 h-3.5" />
+            메시지
+            {totalUnread > 0 && (
+              <span className="bg-accent-danger text-white text-[10px] px-1.5 py-0.5 rounded-full leading-none">
+                {totalUnread}
+              </span>
+            )}
+          </button>
+          <button
+            className={`flex-1 py-2 text-xs font-medium transition-colors flex items-center justify-center gap-1.5 ${
               tab === "pending"
                 ? "text-accent-primary border-b-2 border-accent-primary bg-accent-primary/5"
                 : "text-text-secondary hover:text-text-primary"
@@ -1243,7 +1351,7 @@ export function FriendsPanel() {
             onClick={() => setTab("pending")}
           >
             <Clock className="w-3.5 h-3.5" />
-            대기 중
+            대기
             {incomingCount > 0 && (
               <span className="bg-accent-danger text-white text-[10px] px-1.5 py-0.5 rounded-full leading-none">
                 {incomingCount}
@@ -1253,7 +1361,7 @@ export function FriendsPanel() {
         </div>
 
         {/* Content */}
-        {tab === "friends" ? (
+        {tab === "friends" && (
           <div className="flex-1 overflow-y-auto p-2">
             {isLoading ? (
               <div className="flex items-center justify-center py-8">
@@ -1315,7 +1423,21 @@ export function FriendsPanel() {
               </>
             )}
           </div>
-        ) : (
+        )}
+        {tab === "messages" && (
+          <ConversationList
+            conversations={conversations}
+            onFetchConversations={async () => {
+              try {
+                const data = await dmApi.getConversations();
+                setConversations(data);
+              } catch { /* ignore */ }
+            }}
+            onOpenChat={openChat}
+            getDisplayName={getDisplayName}
+          />
+        )}
+        {tab === "pending" && (
           <PendingList currentUserId={currentUserId} />
         )}
 

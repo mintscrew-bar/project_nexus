@@ -1,11 +1,12 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSnakeDraftStore } from "@/stores/snake-draft-store";
 import { useAuthStore } from "@/stores/auth-store";
+import { roomApi } from "@/lib/api-client";
 import { DraftBoard } from "@/components/domain/DraftBoard";
-import { LoadingSpinner, Badge } from "@/components/ui";
+import { LoadingSpinner, Badge, Button } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
 
 export default function SnakeDraftPage() {
@@ -14,6 +15,7 @@ export default function SnakeDraftPage() {
   const draftId = params.id as string;
   const { addToast } = useToast();
   const hasRedirected = useRef(false);
+  const [isAborting, setIsAborting] = useState(false);
 
   const { user } = useAuthStore();
   const {
@@ -24,6 +26,9 @@ export default function SnakeDraftPage() {
     makePick,
     connectToDraft,
     disconnectFromDraft,
+    sessionAbortedAt,
+    sessionAbortMessage,
+    clearSessionAbort,
   } = useSnakeDraftStore();
 
   useEffect(() => {
@@ -42,6 +47,35 @@ export default function SnakeDraftPage() {
       router.push(`/role-selection/${draftId}`);
     }
   }, [draftState?.status, draftId, router]);
+
+  useEffect(() => {
+    if (!sessionAbortedAt) return;
+    addToast(sessionAbortMessage ?? "내전이 종료되어 로비로 이동합니다.", "warning");
+    clearSessionAbort();
+    router.push(`/tournaments/${draftId}/lobby`);
+  }, [sessionAbortedAt, sessionAbortMessage, clearSessionAbort, addToast, router, draftId]);
+
+  const handleAbortToLobby = async () => {
+    const confirmed = window.confirm(
+      "현재 판을 종료하고 대기실로 돌아가시겠습니까? 이 판은 전적에 반영되지 않습니다.",
+    );
+    if (!confirmed) return;
+
+    setIsAborting(true);
+    try {
+      disconnectFromDraft();
+      await roomApi.abortToLobby(draftId);
+      addToast("내전을 종료하고 대기실로 복귀합니다.", "success");
+      router.push(`/tournaments/${draftId}/lobby`);
+    } catch (err: any) {
+      addToast(
+        err?.response?.data?.message || "내전 종료에 실패했습니다.",
+        "error",
+      );
+    } finally {
+      setIsAborting(false);
+    }
+  };
 
   const handleMakePick = async (playerId: string) => {
     try {
@@ -86,7 +120,15 @@ export default function SnakeDraftPage() {
 
   return (
     <div className="flex-grow p-4 md:p-8 relative">
-      <div className="absolute top-4 right-4 z-10">
+      <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
+        <Button
+          variant="danger"
+          size="sm"
+          isLoading={isAborting}
+          onClick={handleAbortToLobby}
+        >
+          내전 종료
+        </Button>
         <Badge variant={isConnected ? 'success' : 'danger'}>
           {isConnected ? '● 연결됨' : '● 연결 끊김'}
         </Badge>

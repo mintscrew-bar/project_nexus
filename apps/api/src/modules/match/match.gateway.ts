@@ -67,14 +67,18 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() data: { matchId: string },
   ) {
-    client.join(`match:${data.matchId}`);
+    try {
+      client.join(`match:${data.matchId}`);
 
-    const match = await this.matchService.findById(data.matchId);
+      const match = await this.matchService.findById(data.matchId);
 
-    return {
-      success: true,
-      match,
-    };
+      return {
+        success: true,
+        match,
+      };
+    } catch (error: any) {
+      return { success: false, error: error?.message || "Failed to join match" };
+    }
   }
 
   @SubscribeMessage("leave-match")
@@ -90,14 +94,18 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() data: { roomId: string },
   ) {
-    client.join(`bracket:${data.roomId}`);
+    try {
+      client.join(`bracket:${data.roomId}`);
 
-    const matches = await this.matchService.getRoomMatches(data.roomId);
+      const matches = await this.matchService.getRoomMatches(data.roomId);
 
-    return {
-      success: true,
-      matches,
-    };
+      return {
+        success: true,
+        matches,
+      };
+    } catch (error: any) {
+      return { success: false, error: error?.message || "Failed to join bracket" };
+    }
   }
 
   @SubscribeMessage("leave-bracket")
@@ -136,9 +144,14 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.server.to(`match:${matchId}`).emit("tournament-code-generated", data);
   }
 
+  emitSessionAborted(roomId: string, data: any) {
+    this.server.to(`bracket:${roomId}`).emit("session-aborted", data);
+  }
+
   async emitTournamentCompleted(roomId: string) {
-    // Get final standings
-    const matches = await this.matchService.getRoomMatches(roomId);
+    try {
+      // Get final standings
+      const matches = await this.matchService.getRoomMatches(roomId);
 
     // Calculate final standings (teams ranked by wins)
     const teamStats = new Map<
@@ -195,5 +208,8 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
       standings,
       completedAt: new Date(),
     });
+    } catch (error) {
+      console.error(`[Match] Failed to emit tournament-completed for room ${roomId}:`, error);
+    }
   }
 }

@@ -27,9 +27,12 @@ export class DmGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
 
-  // otherUserId -> Map<myUserId, Timeout>
+  // "senderId:receiverId" → Timeout
   private typingTimers = new Map<string, NodeJS.Timeout>();
   private readonly TYPING_TIMEOUT_MS = 3000;
+
+  // userId → Set<socketId> (disconnect 시 타이핑 정리용)
+  private userSockets = new Map<string, Set<string>>();
 
   constructor(
     private readonly authService: AuthService,
@@ -58,14 +61,47 @@ export class DmGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       // 유저별 전용 room에 조인 → 수신 이벤트 타겟팅에 사용
       client.join(`user:${payload.sub}`);
+
+      // 소켓 추적 (disconnect 정리용)
+      if (!this.userSockets.has(payload.sub)) {
+        this.userSockets.set(payload.sub, new Set());
+      }
+      this.userSockets.get(payload.sub)!.add(client.id);
+
+      // 재접속 시 미읽음 수 즉시 전송 (Redis 캐시 우선)
+      const unread = await this.dmService.getUnreadCount(payload.sub);
+      client.emit("dm-unread-count", { total: unread });
     } catch {
       client.disconnect();
     }
   }
 
   handleDisconnect(client: AuthenticatedSocket) {
-    if (client.userId) {
-      client.leave(`user:${client.userId}`);
+    if (!client.userId) return;
+
+    client.leave(`user:${client.userId}`);
+
+    // 소켓 추적에서 제거
+    const sockets = this.userSockets.get(client.userId);
+    if (sockets) {
+      sockets.delete(client.id);
+      if (sockets.size === 0) {
+        this.userSockets.delete(client.userId);
+
+        // 이 유저의 모든 타이핑 타이머 정리
+        for (const [key, timer] of this.typingTimers.entries()) {
+          if (key.startsWith(`${client.userId}:`)) {
+            clearTimeout(timer);
+            this.typingTimers.delete(key);
+
+            // 상대에게 타이핑 중지 알림
+            const receiverId = key.split(":")[1];
+            this.server.to(`user:${receiverId}`).emit("dm-stopped-typing", {
+              userId: client.userId,
+            });
+          }
+        }
+      }
     }
   }
 
@@ -76,24 +112,48 @@ export class DmGateway implements OnGatewayConnection, OnGatewayDisconnect {
   ) {
     if (!client.userId) return;
     const { receiverId, content } = data;
-    if (!receiverId || !content?.trim()) return;
 
-    const message = await this.dmService.sendMessage(
-      client.userId,
-      receiverId,
-      content.trim(),
-      client.username ?? "Unknown",
-    );
+    // 입력 검증
+    if (!receiverId || typeof receiverId !== "string") {
+      return { success: false, error: "Invalid receiver" };
+    }
+    const trimmed = content?.trim();
+    if (!trimmed) {
+      return { success: false, error: "Message cannot be empty" };
+    }
+    if (trimmed.length > 2000) {
+      return { success: false, error: "Message too long (max 2000)" };
+    }
 
-    // 송신자에게도 확인 전송 (멀티 디바이스 대비)
-    client.emit("new-dm", message);
+    try {
+      // 차단 여부 확인
+      const blocked = await this.dmService.isBlocked(client.userId, receiverId);
+      if (blocked) {
+        return { success: false, error: "Cannot send message to this user" };
+      }
 
-    // 수신자에게 전송
-    this.server.to(`user:${receiverId}`).emit("new-dm", message);
+      // DB 저장 + Redis 카운트 증가 (sendMessage 내부에서 처리)
+      const message = await this.dmService.sendMessage(
+        client.userId,
+        receiverId,
+        trimmed,
+        client.username ?? "Unknown",
+      );
 
-    // 수신자 미읽음 수 업데이트
-    const unread = await this.dmService.getUnreadCount(receiverId);
-    this.server.to(`user:${receiverId}`).emit("dm-unread-count", { total: unread });
+      // 즉시 양쪽에 전달
+      client.emit("new-dm", message);
+      this.server.to(`user:${receiverId}`).emit("new-dm", message);
+
+      // 미읽음 카운트 업데이트 (Redis에서 즉시 조회 — DB COUNT 안 함)
+      const unread = await this.dmService.getUnreadCount(receiverId);
+      this.server.to(`user:${receiverId}`).emit("dm-unread-count", { total: unread });
+
+      // ACK 반환
+      return { success: true, messageId: message.id, createdAt: message.createdAt };
+    } catch (error: any) {
+      console.error(`[DM] Failed to send message from ${client.userId}:`, error?.message);
+      return { success: false, error: "Failed to send message" };
+    }
   }
 
   @SubscribeMessage("is-typing")
@@ -141,9 +201,14 @@ export class DmGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @MessageBody() data: { senderId: string },
   ) {
     if (!client.userId) return;
-    await this.dmService.markAsRead(client.userId, data.senderId);
+    try {
+      await this.dmService.markAsRead(client.userId, data.senderId);
 
-    const unread = await this.dmService.getUnreadCount(client.userId);
-    client.emit("dm-unread-count", { total: unread });
+      // Redis에서 즉시 조회
+      const unread = await this.dmService.getUnreadCount(client.userId);
+      client.emit("dm-unread-count", { total: unread });
+    } catch (error: any) {
+      console.error(`[DM] Failed to mark-read for ${client.userId}:`, error?.message);
+    }
   }
 }

@@ -7,6 +7,7 @@ import { SnakeDraftGateway } from "./snake-draft.gateway";
 import { AuthModule } from "../auth/auth.module";
 import { AuctionModule } from "../auction/auction.module";
 import { RoleSelectionModule } from "../role-selection/role-selection.module";
+import { MatchModule } from "../match/match.module";
 import { DiscordModule } from "../discord/discord.module";
 import { DiscordBotService } from "../discord/discord-bot.service";
 import { DiscordVoiceService } from "../discord/discord-voice.service";
@@ -16,6 +17,7 @@ import { DiscordVoiceService } from "../discord/discord-voice.service";
     AuthModule,
     forwardRef(() => AuctionModule),
     forwardRef(() => RoleSelectionModule),
+    forwardRef(() => MatchModule),
     DiscordModule,
   ],
   controllers: [RoomController],

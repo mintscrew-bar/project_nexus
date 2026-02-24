@@ -22,6 +22,7 @@ interface Room {
 
 interface RoomCardProps {
   room: Room;
+  currentUserId?: string;
   onClick?: () => void;
   className?: string;
 }
@@ -50,18 +51,21 @@ const getStatusBadge = (status: string) => {
   }
 };
 
-export const RoomCard: React.FC<RoomCardProps> = ({ room, onClick, className }) => {
+export const RoomCard: React.FC<RoomCardProps> = ({ room, currentUserId, onClick, className }) => {
   const currentPlayers = room.participants?.length || 0;
   const isFull = currentPlayers >= room.maxParticipants;
+  const isParticipant =
+    !!currentUserId && (room.participants ?? []).some((p: any) => p.userId === currentUserId);
   const canJoin = room.status === 'WAITING' && !isFull;
+  const canEnter = canJoin || isParticipant;
 
   return (
     <Card
-      hoverable={canJoin}
-      onClick={canJoin ? onClick : undefined}
+      hoverable={canEnter}
+      onClick={canEnter ? onClick : undefined}
       className={cn(
         'transition-all duration-150',
-        !canJoin && 'opacity-60 cursor-not-allowed',
+        !canEnter && 'opacity-60 cursor-not-allowed',
         className
       )}
     >
@@ -123,6 +127,11 @@ export const RoomCard: React.FC<RoomCardProps> = ({ room, onClick, className }) 
             <span className="text-sm text-accent-primary font-medium">
               참가 가능 →
             </span>
+          </div>
+        )}
+        {!canJoin && isParticipant && (
+          <div className="ml-auto">
+            <span className="text-sm text-accent-primary font-medium">재입장</span>
           </div>
         )}
       </CardFooter>

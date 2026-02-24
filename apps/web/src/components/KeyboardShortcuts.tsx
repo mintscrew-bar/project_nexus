@@ -40,7 +40,7 @@ export function KeyboardShortcutsProvider({ children }: KeyboardShortcutsProvide
   const router = useRouter();
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [searchRef, setSearchRef] = useState<HTMLInputElement | null>(null);
-  const [actionHandler, setActionHandler] = useState<(() => void) | null>(null);
+  const [actionHandler, setActionHandlerState] = useState<(() => void) | null>(null);
 
   const showHelp = useCallback(() => setIsHelpOpen(true), []);
   const hideHelp = useCallback(() => setIsHelpOpen(false), []);
@@ -57,6 +57,11 @@ export function KeyboardShortcutsProvider({ children }: KeyboardShortcutsProvide
       actionHandler();
     }
   }, [actionHandler]);
+
+  // Store function value safely (avoid React treating it as state updater)
+  const setActionHandler = useCallback((handler: (() => void) | null) => {
+    setActionHandlerState(() => handler);
+  }, []);
 
   // Navigation helper that defers to next tick to avoid render-phase state updates
   const navigate = useCallback((path: string) => {

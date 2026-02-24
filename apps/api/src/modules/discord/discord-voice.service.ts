@@ -207,19 +207,28 @@ export class DiscordVoiceService {
   async deleteRoomChannels(
     roomId: string,
     keepLobby = false,
+    snapshot?: {
+      discordCategoryId?: string | null;
+      discordChannels?: { channelId: string; teamName?: string | null }[];
+    },
   ): Promise<void> {
     const guildId = this.configService.get("DISCORD_GUILD_ID");
     if (!guildId) {
       return;
     }
 
-    // Get room's Discord channels
-    const room = await this.prisma.room.findUnique({
-      where: { id: roomId },
-      include: {
-        discordChannels: true,
-      },
-    });
+    const room =
+      snapshot
+        ? {
+            discordCategoryId: snapshot.discordCategoryId ?? null,
+            discordChannels: snapshot.discordChannels ?? [],
+          }
+        : await this.prisma.room.findUnique({
+            where: { id: roomId },
+            include: {
+              discordChannels: true,
+            },
+          });
 
     if (!room || !room.discordCategoryId) {
       return;

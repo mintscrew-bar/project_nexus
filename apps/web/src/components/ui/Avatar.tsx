@@ -63,6 +63,12 @@ export function Avatar({
             src={src}
             alt={alt}
             fill
+            sizes={
+              size === 'sm' ? '32px' :
+              size === 'md' ? '40px' :
+              size === 'lg' ? '48px' :
+              '64px'
+            }
             className="object-cover"
             onError={() => setImageError(true)}
           />

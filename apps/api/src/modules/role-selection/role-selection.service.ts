@@ -316,6 +316,10 @@ export class RoleSelectionService {
     return this.roleSelectionStates.get(roomId);
   }
 
+  clearRoleSelectionState(roomId: string): void {
+    this.roleSelectionStates.delete(roomId);
+  }
+
   getTimeRemaining(roomId: string): number {
     const state = this.roleSelectionStates.get(roomId);
     if (!state) {

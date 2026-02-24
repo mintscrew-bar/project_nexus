@@ -25,13 +25,32 @@ export class FriendService {
       throw new BadRequestException("Cannot send friend request to yourself");
     }
 
-    // Verify receiver exists
+    // Verify receiver exists and check ban/restriction status
     const receiver = await this.prisma.user.findUnique({
       where: { id: receiverId },
+      select: { id: true, isBanned: true, isRestricted: true, restrictedUntil: true },
     });
 
     if (!receiver) {
       throw new NotFoundException("User not found");
+    }
+
+    if (receiver.isBanned) {
+      throw new BadRequestException("Cannot send friend request to a banned user");
+    }
+
+    if (receiver.isRestricted && receiver.restrictedUntil && receiver.restrictedUntil > new Date()) {
+      throw new BadRequestException("Cannot send friend request to a restricted user");
+    }
+
+    // Also check if sender is banned/restricted
+    const sender = await this.prisma.user.findUnique({
+      where: { id: senderId },
+      select: { isBanned: true, isRestricted: true, restrictedUntil: true },
+    });
+
+    if (sender?.isBanned || (sender?.isRestricted && sender?.restrictedUntil && sender.restrictedUntil > new Date())) {
+      throw new BadRequestException("Your account is restricted");
     }
 
     // Check if friendship already exists in either direction
@@ -232,15 +251,6 @@ export class FriendService {
             id: true,
             username: true,
             avatar: true,
-            riotAccounts: {
-              where: { isPrimary: true },
-              select: {
-                gameName: true,
-                tagLine: true,
-                tier: true,
-                rank: true,
-              },
-            },
           },
         },
         friend: {
@@ -248,15 +258,6 @@ export class FriendService {
             id: true,
             username: true,
             avatar: true,
-            riotAccounts: {
-              where: { isPrimary: true },
-              select: {
-                gameName: true,
-                tagLine: true,
-                tier: true,
-                rank: true,
-              },
-            },
           },
         },
       },
@@ -341,8 +342,8 @@ export class FriendService {
   }
 
   async removeFriend(userId: string, friendId: string) {
-    // Find friendship in either direction
-    const friendship = await this.prisma.friendship.findFirst({
+    // 양방향 모두 삭제 (혹시 양방향 레코드가 있는 경우 대비)
+    const deleted = await this.prisma.friendship.deleteMany({
       where: {
         OR: [
           { userId, friendId, status: FriendshipStatus.ACCEPTED },
@@ -355,14 +356,9 @@ export class FriendService {
       },
     });
 
-    if (!friendship) {
+    if (deleted.count === 0) {
       throw new NotFoundException("Friendship not found");
     }
-
-    // Delete the friendship
-    await this.prisma.friendship.delete({
-      where: { id: friendship.id },
-    });
 
     return { message: "Friend removed successfully" };
   }

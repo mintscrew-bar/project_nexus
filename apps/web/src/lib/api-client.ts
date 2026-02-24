@@ -647,6 +647,16 @@ export const communityApi = {
     const response = await apiClient.get("/community/bookmarks", { params: { limit, offset } });
     return response.data;
   },
+
+  reportPost: async (postId: string, data: { reason: string; description: string }) => {
+    const response = await apiClient.post("/community/reports", { postId, ...data });
+    return response.data;
+  },
+
+  reportComment: async (commentId: string, data: { reason: string; description: string }) => {
+    const response = await apiClient.post("/community/reports", { commentId, ...data });
+    return response.data;
+  },
 };
 
 // 평판/신고 관련 API

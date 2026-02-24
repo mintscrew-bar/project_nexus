@@ -83,25 +83,32 @@ export const useDmStore = create<DmStore>((set, get) => ({
     })),
 
   appendMessage: (message) => {
-    const otherUserId =
-      message.senderId === get().openChatUserId
-        ? message.senderId
-        : message.receiverId;
-    // 실제로 대화 파트너의 ID를 key로 사용
-    const partnerId =
-      message.senderId === get().openChatUserId
-        ? message.receiverId
-        : message.senderId;
+    // FriendsPanel에서 호출 시 현재 유저 ID를 기준으로 partnerId 결정
+    // message.senderId === 나 → partnerId = receiverId (내가 보낸 메시지)
+    // message.senderId !== 나 → partnerId = senderId (상대가 보낸 메시지)
+    // openChatUserId가 null일 수 있으므로, 양쪽 모두에 저장
+    const { openChatUserId } = get();
+
+    // 대화 상대 ID 추론: openChatUserId와 일치하는 쪽이 상대방
+    let partnerId: string;
+    if (openChatUserId === message.senderId) {
+      // 현재 열린 대화 상대가 보낸 메시지
+      partnerId = message.senderId;
+    } else if (openChatUserId === message.receiverId) {
+      // 내가 현재 열린 대화 상대에게 보낸 메시지
+      partnerId = message.receiverId;
+    } else {
+      // 현재 열린 대화와 무관한 메시지 (다른 사람에게서 온 DM)
+      partnerId = message.senderId;
+    }
 
     set((state) => {
       const existing = state.messages[partnerId] ?? [];
-      // 중복 방지
       if (existing.some((m) => m.id === message.id)) return state;
       return {
         messages: { ...state.messages, [partnerId]: [...existing, message] },
       };
     });
-    void otherUserId; // suppress unused
   },
 
   setUnreadCount: (userId, count) =>

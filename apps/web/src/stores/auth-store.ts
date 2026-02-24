@@ -23,24 +23,68 @@ interface AuthState {
   fetchUser: () => Promise<void>;
 }
 
-export const useAuthStore = create<AuthState>((set, get) => ({
+// ============================================================
+// localStorage 캐시 헬퍼 (토큰이 아닌 유저 정보만 저장)
+// → 새로고침 시 헤더에 유저 이름이 즉시 표시됨 (플래시 방지)
+// ============================================================
+const STORAGE_KEY = "nexus_auth_user";
+
+function saveUserToStorage(user: User) {
+  try {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        id: user.id,
+        username: user.username,
+        avatar: user.avatar,
+        role: user.role,
+        email: user.email,
+      })
+    );
+  } catch {}
+}
+
+function loadUserFromStorage(): User | null {
+  try {
+    const data = localStorage.getItem(STORAGE_KEY);
+    return data ? (JSON.parse(data) as User) : null;
+  } catch {
+    return null;
+  }
+}
+
+function clearUserFromStorage() {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {}
+}
+
+export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   isAuthenticated: false,
   isLoading: true, // Start true so protected pages wait before redirecting
 
   initializeAuth: async () => {
     set({ isLoading: true });
+
+    // 캐시된 유저가 있으면 즉시 헤더에 표시 (isAuthenticated는 false 유지)
+    // → 실제 데이터 fetch는 아래 initSession 성공 후 isAuthenticated=true 가 된 뒤 실행
+    const cachedUser = loadUserFromStorage();
+    if (cachedUser) {
+      set({ user: cachedUser });
+    }
+
     try {
       // refresh token으로 access token을 먼저 발급받은 뒤 /auth/me 조회
-      // → /auth/me에서 불필요한 401이 발생하지 않음
-      // Race against a 5s timeout so a slow/unreachable API never blocks the UI
       const timeout = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error("auth_timeout")), 5000)
       );
       const user = await Promise.race([authApi.initSession(), timeout]);
+      saveUserToStorage(user);
       set({ user, isAuthenticated: true });
     } catch {
       // 로그인 안 됐거나 세션 만료 (정상 케이스)
+      clearUserFromStorage();
       set({ user: null, isAuthenticated: false });
       setAccessToken(null);
     } finally {
@@ -54,6 +98,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const { accessToken } = await authApi.emailLogin(credentials);
       setAccessToken(accessToken);
       const user = await authApi.getMe();
+      saveUserToStorage(user);
       set({ user, isAuthenticated: true, isLoading: false });
     } catch (error) {
       console.error("Login failed:", error);
@@ -72,7 +117,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ isLoading: true });
     authApi.loginWithGoogle(); // This redirects
   },
-  
+
   logout: async () => {
     set({ isLoading: true });
     try {
@@ -80,7 +125,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } catch (error) {
       console.error("Logout failed:", error);
     } finally {
-      // Ensure state is always cleared
+      clearUserFromStorage();
       set({ user: null, isAuthenticated: false, isLoading: false });
       setAccessToken(null);
       window.location.href = '/'; // Redirect to home on logout
@@ -95,6 +140,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ isLoading: true });
     try {
       const user = await authApi.getMe();
+      saveUserToStorage(user);
       set({ user, isAuthenticated: true, isLoading: false });
     } catch (error) {
       set({ user: null, isAuthenticated: false, isLoading: false });

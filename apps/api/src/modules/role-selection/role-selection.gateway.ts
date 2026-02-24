@@ -7,6 +7,7 @@ import {
   ConnectedSocket,
   MessageBody,
 } from "@nestjs/websockets";
+import { OnModuleDestroy } from "@nestjs/common";
 import { Server, Socket } from "socket.io";
 import { AuthService } from "../auth/auth.service";
 import { RoleSelectionService } from "./role-selection.service";
@@ -25,17 +26,27 @@ interface AuthenticatedSocket extends Socket {
   },
 })
 export class RoleSelectionGateway
-  implements OnGatewayConnection, OnGatewayDisconnect
+  implements OnGatewayConnection, OnGatewayDisconnect, OnModuleDestroy
 {
   @WebSocketServer()
   server: Server;
 
   private roomTimers = new Map<string, NodeJS.Timeout>();
+  // Guard against duplicate completeRoleSelection calls (timer + all-roles-selected race)
+  private completingRooms = new Set<string>();
 
   constructor(
     private readonly authService: AuthService,
     private readonly roleSelectionService: RoleSelectionService,
   ) {}
+
+  onModuleDestroy() {
+    for (const timer of this.roomTimers.values()) {
+      clearInterval(timer);
+    }
+    this.roomTimers.clear();
+    this.completingRooms.clear();
+  }
 
   async handleConnection(client: AuthenticatedSocket) {
     try {
@@ -72,15 +83,22 @@ export class RoleSelectionGateway
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() data: { roomId: string },
   ) {
-    client.join(`room:${data.roomId}`);
+    try {
+      client.join(`room:${data.roomId}`);
 
-    const roleSelectionData =
-      await this.roleSelectionService.getRoleSelectionData(data.roomId);
+      const roleSelectionData =
+        await this.roleSelectionService.getRoleSelectionData(data.roomId);
 
-    return {
-      success: true,
-      ...roleSelectionData,
-    };
+      return {
+        success: true,
+        ...roleSelectionData,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error?.message || "Failed to join role selection room",
+      };
+    }
   }
 
   @SubscribeMessage("select-role")
@@ -128,16 +146,23 @@ export class RoleSelectionGateway
     this.stopTimer(roomId);
 
     const interval = setInterval(() => {
-      const timeRemaining = this.roleSelectionService.getTimeRemaining(roomId);
+      try {
+        const timeRemaining = this.roleSelectionService.getTimeRemaining(roomId);
 
-      if (timeRemaining <= 0) {
-        this.completeRoleSelection(roomId);
+        if (timeRemaining <= 0) {
+          this.stopTimer(roomId);
+          this.completeRoleSelection(roomId).catch((error) => {
+            console.error(`[RoleSelection] Timer-triggered completion failed for room ${roomId}:`, error);
+          });
+        } else {
+          // Emit timer update every second
+          this.server.to(`room:${roomId}`).emit("timer-tick", {
+            timeRemaining,
+          });
+        }
+      } catch (error) {
+        console.error(`[RoleSelection] Timer tick error for room ${roomId}:`, error);
         this.stopTimer(roomId);
-      } else {
-        // Emit timer update every second
-        this.server.to(`room:${roomId}`).emit("timer-tick", {
-          timeRemaining,
-        });
       }
     }, 1000);
 
@@ -152,19 +177,31 @@ export class RoleSelectionGateway
     }
   }
 
+  clearRoomTimer(roomId: string) {
+    this.stopTimer(roomId);
+  }
+
   // ========================================
   // Completion
   // ========================================
 
   async completeRoleSelection(roomId: string) {
+    // Prevent duplicate completion (timer expiry + all-roles-selected can race)
+    if (this.completingRooms.has(roomId)) {
+      console.log(`[RoleSelection] Already completing room ${roomId}, skipping`);
+      return;
+    }
+    this.completingRooms.add(roomId);
+
     try {
+      // Stop timer first to prevent further tick callbacks
+      this.stopTimer(roomId);
+
       // Auto-assign any unselected roles before completing
       await this.roleSelectionService.autoAssignRemainingRoles(roomId);
 
       const room =
         await this.roleSelectionService.completeRoleSelection(roomId);
-
-      this.stopTimer(roomId);
 
       // Notify all clients
       this.server.to(`room:${roomId}`).emit("role-selection-completed", {
@@ -188,6 +225,8 @@ export class RoleSelectionGateway
       });
 
       throw error; // Re-throw to let caller handle it
+    } finally {
+      this.completingRooms.delete(roomId);
     }
   }
 
@@ -200,5 +239,10 @@ export class RoleSelectionGateway
 
     // Start the timer
     this.startTimer(roomId);
+  }
+
+  emitSessionAborted(roomId: string, data: any) {
+    this.stopTimer(roomId);
+    this.server.to(`room:${roomId}`).emit("session-aborted", data);
   }
 }

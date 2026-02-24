@@ -232,4 +232,15 @@ export class NotificationService {
       data: { postId },
     });
   }
+
+  async notifyReply(userId: string, replierName: string, postId: string) {
+    return this.create({
+      userId,
+      type: "COMMENT",
+      title: "새로운 답글",
+      message: `${replierName}님이 회원님의 댓글에 답글을 남겼습니다.`,
+      link: `/community/${postId}`,
+      data: { postId },
+    });
+  }
 }

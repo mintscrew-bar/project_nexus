@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState } from 'react';
-import { Card, CardContent, Button, Badge, Avatar } from '@/components/ui';
-import { TierBadge } from './TierBadge';
-import { cn } from '@/lib/utils';
+import React, { useMemo, useState } from "react";
+import { Card, CardContent, Button, Badge, Avatar } from "@/components/ui";
+import { TierBadge } from "./TierBadge";
+import { cn } from "@/lib/utils";
+import { Coins, AlertTriangle } from "lucide-react";
 
 interface Player {
   id: string;
@@ -11,7 +12,9 @@ interface Player {
   tier: string;
   rank?: string;
   mmr?: number;
-  position: string;
+  position?: string;
+  mainRole?: string;
+  subRole?: string;
   avatar?: string;
   champions?: string[];
 }
@@ -21,79 +24,158 @@ interface Team {
   name: string;
   captainId: string;
   captainName?: string;
-  members: Player[];
-  remainingGold: number;
+  color?: string;
+  members?: Player[];
+  remainingGold?: number;
+  remainingBudget?: number;
 }
 
 interface AuctionState {
   currentPlayer: Player | null;
+  currentPlayerIndex: number;
   currentHighestBid: number;
   currentHighestBidder: string | null;
+  currentHighestBidderName?: string | null;
   timerEnd: number;
-  status: 'WAITING' | 'IN_PROGRESS' | 'COMPLETED';
+  status: "WAITING" | "IN_PROGRESS" | "COMPLETED";
+  yuchalCount: number;
+  maxYuchalCycles: number;
+}
+
+interface BidHistoryEntry {
+  username: string;
+  amount: number;
+  timestamp: number;
 }
 
 interface AuctionBoardProps {
   auctionState: AuctionState;
   teams: Team[];
+  players: Player[];
   currentUserId?: string;
   onPlaceBid: (amount: number) => void;
   disabled?: boolean;
+  bidHistory?: BidHistoryEntry[];
   className?: string;
 }
+
+const POSITION_LABELS: Record<string, string> = {
+  TOP: "탑",
+  JUNGLE: "정글",
+  MID: "미드",
+  ADC: "원딜",
+  SUPPORT: "서포터",
+  FLEX: "플렉스",
+};
+
+const parseTeamOrder = (name: string): number => {
+  const m = name.match(/\d+/);
+  return m ? Number(m[0]) : Number.MAX_SAFE_INTEGER;
+};
 
 export const AuctionBoard: React.FC<AuctionBoardProps> = ({
   auctionState,
   teams,
+  players: _players,
   currentUserId,
   onPlaceBid,
   disabled = false,
+  bidHistory = [],
   className,
 }) => {
-  const [accumulatedBid, setAccumulatedBid] = useState<number>(0); // 누적 추가 금액
-  const currentTeam = teams.find((t) => t.captainId === currentUserId);
-  const isCurrentUserTurn = currentTeam && auctionState.status === 'IN_PROGRESS';
+  const sortedTeams = useMemo(
+    () =>
+      [...teams].sort((a, b) => {
+        const oa = parseTeamOrder(a.name);
+        const ob = parseTeamOrder(b.name);
+        if (oa !== ob) return oa - ob;
+        return a.name.localeCompare(b.name);
+      }),
+    [teams],
+  );
+
+  const getTeamBudget = (team?: Team | null) =>
+    team?.remainingGold ?? team?.remainingBudget ?? 0;
+
+  const [accumulatedBid, setAccumulatedBid] = useState<number>(0);
+  const currentTeam = sortedTeams.find((t) => t.captainId === currentUserId);
+  const isCurrentUserTurn =
+    Boolean(currentTeam) && auctionState.status === "IN_PROGRESS";
   const totalBid = auctionState.currentHighestBid + accumulatedBid;
-  const myBudget = currentTeam?.remainingGold || 0;
+  const myBudget = getTeamBudget(currentTeam);
   const canPlaceBid = accumulatedBid > 0 && totalBid <= myBudget;
 
-  // Timer calculation
   const [timeLeft, setTimeLeft] = useState(0);
   React.useEffect(() => {
     const interval = setInterval(() => {
-      const remaining = Math.max(0, Math.floor((auctionState.timerEnd - Date.now()) / 1000));
+      const remaining = Math.max(
+        0,
+        Math.floor((auctionState.timerEnd - Date.now()) / 1000),
+      );
       setTimeLeft(remaining);
     }, 100);
     return () => clearInterval(interval);
   }, [auctionState.timerEnd]);
 
-  // 새 선수 경매 시작 또는 다른 팀 입찰 시 누적 금액 초기화
   React.useEffect(() => {
     setAccumulatedBid(0);
   }, [auctionState.currentHighestBid, auctionState.currentPlayer?.id]);
 
   const handleBid = () => {
-    if (canPlaceBid) {
-      onPlaceBid(totalBid);
-      setAccumulatedBid(0);
-    }
+    if (!canPlaceBid) return;
+    onPlaceBid(totalBid);
+    setAccumulatedBid(0);
   };
 
   const addToBid = (increment: number) => {
-    setAccumulatedBid(prev => {
+    setAccumulatedBid((prev) => {
       const next = prev + increment;
       return auctionState.currentHighestBid + next <= myBudget ? next : prev;
     });
   };
 
+  const getPlayerPosition = (player: Player) => {
+    const role = player.mainRole ?? player.position ?? "";
+    return POSITION_LABELS[role] ?? role;
+  };
+
+  const highestBidderName = useMemo(() => {
+    if (auctionState.currentHighestBidderName) {
+      return auctionState.currentHighestBidderName;
+    }
+
+    const bidderId = auctionState.currentHighestBidder;
+    if (!bidderId) return "없음";
+
+    const matchedTeam = sortedTeams.find(
+      (t) => t.id === bidderId || t.captainId === bidderId,
+    );
+    if (!matchedTeam) return "없음";
+    if (matchedTeam.captainName) return matchedTeam.captainName;
+
+    const captainMember = (matchedTeam.members ?? []).find(
+      (m) => m.id === matchedTeam.captainId,
+    );
+    if (captainMember?.username) return captainMember.username;
+
+    const lastBidder = [...bidHistory]
+      .reverse()
+      .find((b) => b.amount === auctionState.currentHighestBid)?.username;
+    return lastBidder ?? "없음";
+  }, [
+    auctionState.currentHighestBid,
+    auctionState.currentHighestBidder,
+    auctionState.currentHighestBidderName,
+    bidHistory,
+    sortedTeams,
+  ]);
+
   return (
-    <div className={cn('space-y-4', className)}>
-      {/* Current Player on Auction */}
+    <div className={cn("space-y-4", className)}>
       {auctionState.currentPlayer && (
         <Card variant="elevated" className="border-accent-primary">
           <CardContent className="p-6">
             <div className="flex items-center gap-6">
-              {/* Player Avatar */}
               <Avatar
                 src={auctionState.currentPlayer.avatar}
                 alt={auctionState.currentPlayer.username}
@@ -102,7 +184,6 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
                 className="ring-4 ring-accent-primary"
               />
 
-              {/* Player Info */}
               <div className="flex-1">
                 <h2 className="text-2xl font-bold text-text-primary mb-2">
                   {auctionState.currentPlayer.username}
@@ -117,43 +198,51 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
                       MMR {auctionState.currentPlayer.mmr}
                     </span>
                   )}
-                  <Badge variant="primary">{auctionState.currentPlayer.position}</Badge>
+                  <Badge variant="primary">
+                    {getPlayerPosition(auctionState.currentPlayer)}
+                  </Badge>
                 </div>
-                {auctionState.currentPlayer.champions && (
-                  <p className="text-sm text-text-secondary">
-                    주 챔피언: {auctionState.currentPlayer.champions.slice(0, 3).join(', ')}
-                  </p>
-                )}
               </div>
 
-              {/* Timer */}
               <div className="text-center">
                 <p className="text-sm text-text-tertiary mb-1">남은 시간</p>
                 <div
                   className={cn(
-                    'text-4xl font-bold',
-                    timeLeft <= 5 ? 'text-accent-danger animate-pulse' : 'text-accent-primary'
+                    "text-4xl font-bold",
+                    timeLeft <= 5
+                      ? "text-accent-danger animate-pulse"
+                      : "text-accent-primary",
                   )}
                 >
                   {timeLeft}초
                 </div>
+                {auctionState.yuchalCount > 0 && (
+                  <div className="flex items-center gap-1 mt-2 text-accent-warning text-xs font-medium justify-center">
+                    <AlertTriangle className="w-3 h-3" />
+                    유찰 {auctionState.yuchalCount}/{auctionState.maxYuchalCycles}
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Current Bid Info */}
             <div className="mt-6 p-4 bg-bg-secondary rounded-lg">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-text-tertiary mb-1">현재 최고 입찰가</p>
-                  <p className="text-2xl font-bold text-accent-gold">
-                    {auctionState.currentHighestBid.toLocaleString()}G
+                  <p className="text-sm text-text-tertiary mb-1">
+                    현재 최고 입찰가
                   </p>
+                  <div className="flex items-center gap-2">
+                    <Coins className="w-5 h-5 text-accent-gold" />
+                    <p className="text-2xl font-bold text-accent-gold">
+                      {auctionState.currentHighestBid.toLocaleString()}G
+                    </p>
+                  </div>
                 </div>
                 {auctionState.currentHighestBidder && (
                   <div className="text-right">
                     <p className="text-sm text-text-tertiary mb-1">최고 입찰자</p>
                     <p className="text-lg font-semibold text-text-primary">
-                      {teams.find(t => t.captainId === auctionState.currentHighestBidder)?.captainName || '알 수 없음'}
+                      {highestBidderName}
                     </p>
                   </div>
                 )}
@@ -163,39 +252,45 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
         </Card>
       )}
 
-      {/* Bidding Panel - 누적형 */}
       {isCurrentUserTurn && auctionState.currentPlayer && (
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-4">
               <p className="text-sm text-text-tertiary">
-                남은 골드: <span className="text-accent-gold font-bold">{myBudget.toLocaleString()}G</span>
-              </p>
-              <p className="text-sm text-text-tertiary">
-                현재 최고가: <span className="text-text-primary font-medium">{auctionState.currentHighestBid.toLocaleString()}G</span>
+                보유 골드:{" "}
+                <span className="text-accent-gold font-bold">
+                  <Coins className="w-3.5 h-3.5 inline mr-0.5" />
+                  {myBudget.toLocaleString()}G
+                </span>
               </p>
             </div>
 
-            {/* 누적 금액 표시 */}
             <div className="bg-bg-tertiary rounded-xl p-4 mb-4 text-center">
-              <p className="text-xs text-text-tertiary mb-1">내 입찰가</p>
-              <p className={cn(
-                'text-3xl font-bold',
-                accumulatedBid > 0 ? 'text-accent-gold' : 'text-text-tertiary'
-              )}>
+              <p className="text-xs text-text-tertiary mb-1">입찰가</p>
+              <p
+                className={cn(
+                  "text-3xl font-bold",
+                  accumulatedBid > 0 ? "text-accent-gold" : "text-text-tertiary",
+                )}
+              >
                 {totalBid.toLocaleString()}G
               </p>
               {accumulatedBid > 0 && (
                 <p className="text-xs text-text-secondary mt-1">
-                  {auctionState.currentHighestBid.toLocaleString()}G + <span className="text-accent-primary">{accumulatedBid.toLocaleString()}G</span>
+                  {auctionState.currentHighestBid.toLocaleString()}G +
+                  <span className="text-accent-primary">
+                    {" "}
+                    {accumulatedBid.toLocaleString()}G
+                  </span>
                 </p>
               )}
               {accumulatedBid === 0 && (
-                <p className="text-xs text-text-tertiary mt-1">아래 버튼으로 금액을 추가하세요</p>
+                <p className="text-xs text-text-tertiary mt-1">
+                  아래 버튼으로 입찰액을 올리세요
+                </p>
               )}
             </div>
 
-            {/* 금액 추가 버튼 */}
             <div className="grid grid-cols-3 gap-2 mb-4">
               {[50, 100, 500].map((inc) => (
                 <Button
@@ -203,14 +298,16 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
                   variant="secondary"
                   size="sm"
                   onClick={() => addToBid(inc)}
-                  disabled={disabled || auctionState.currentHighestBid + accumulatedBid + inc > myBudget}
+                  disabled={
+                    disabled ||
+                    auctionState.currentHighestBid + accumulatedBid + inc > myBudget
+                  }
                 >
                   +{inc}G
                 </Button>
               ))}
             </div>
 
-            {/* 입찰 / 초기화 */}
             <div className="flex gap-2">
               <Button
                 variant="secondary"
@@ -226,58 +323,112 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
                 disabled={disabled || !canPlaceBid}
                 className="flex-1"
               >
-                {canPlaceBid ? `${totalBid.toLocaleString()}G 입찰하기` : '금액을 추가하세요'}
+                {canPlaceBid ? `${totalBid.toLocaleString()}G 입찰` : "금액을 먼저 추가하세요"}
               </Button>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Teams Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {teams.map((team) => (
-          <Card key={team.id} className={cn(team.captainId === currentUserId && 'border-accent-primary')}>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-text-primary">{team.name}</h3>
-                <Badge variant="gold">{team.remainingGold.toLocaleString()}G</Badge>
-              </div>
+        {sortedTeams.map((team) => {
+          const members = team.members ?? [];
+          const teamBudget = getTeamBudget(team);
 
-              {/* Team Members */}
-              <div className="space-y-2">
-                {team.members.length === 0 ? (
-                  <p className="text-sm text-text-tertiary text-center py-4">아직 선수가 없습니다</p>
-                ) : (
-                  team.members.map((player) => (
-                    <div
-                      key={player.id}
-                      className="flex items-center gap-2 p-2 bg-bg-tertiary rounded"
-                    >
-                      <Avatar
-                        src={player.avatar}
-                        alt={player.username}
-                        fallback={player.username[0]}
-                        size="sm"
+          return (
+            <Card
+              key={team.id}
+              className={cn(team.captainId === currentUserId && "border-accent-primary")}
+            >
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    {team.color && (
+                      <div
+                        className="w-3 h-3 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: team.color }}
                       />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-text-primary truncate">
-                          {player.username}
-                        </p>
-                        <p className="text-xs text-text-secondary">{player.position}</p>
-                      </div>
-                      <div className="flex items-center gap-1.5 flex-shrink-0">
-                        {player.mmr !== undefined && (
-                          <span className="text-[10px] font-mono text-text-muted">{player.mmr}</span>
-                        )}
-                        <TierBadge tier={player.tier} size="sm" showIcon={false} />
-                      </div>
+                    )}
+                    <h3 className="text-lg font-semibold text-text-primary">
+                      {team.name}
+                    </h3>
+                  </div>
+                  <div className="flex items-center gap-1 px-2 py-1 bg-accent-gold/20 rounded-lg border border-accent-gold/30">
+                    <Coins className="h-4 w-4 text-accent-gold" />
+                    <span
+                      className={cn(
+                        "font-bold text-sm",
+                        teamBudget === 0 ? "text-accent-danger" : "text-accent-gold",
+                      )}
+                    >
+                      {teamBudget.toLocaleString()}G
+                    </span>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  {members.length === 0 ? (
+                    <p className="text-sm text-text-tertiary text-center py-4">
+                      배정된 선수가 없습니다
+                    </p>
+                  ) : (
+                    members.map((player, idx) => {
+                      const isCaptain = player.id === team.captainId;
+                      return (
+                        <div
+                          key={player.id}
+                          className={cn(
+                            "flex items-center gap-2 p-2 rounded",
+                            isCaptain
+                              ? "bg-accent-gold/10 border border-accent-gold/30"
+                              : "bg-bg-tertiary",
+                          )}
+                        >
+                          <span className="text-xs text-text-tertiary w-4 text-center flex-shrink-0">
+                            {isCaptain ? "C" : idx}
+                          </span>
+                          <Avatar
+                            src={player.avatar}
+                            alt={player.username}
+                            fallback={player.username[0]}
+                            size="sm"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-text-primary truncate">
+                              {player.username}
+                            </p>
+                            <p className="text-xs text-text-secondary">
+                              {getPlayerPosition(player)}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-1.5 flex-shrink-0">
+                            {player.mmr !== undefined && (
+                              <span className="text-[10px] font-mono text-text-muted">
+                                {player.mmr}
+                              </span>
+                            )}
+                            <TierBadge tier={player.tier} size="sm" showIcon={false} />
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                  {Array.from({ length: Math.max(0, 5 - members.length) }).map((_, idx) => (
+                    <div
+                      key={`empty-${idx}`}
+                      className="flex items-center gap-2 p-2 rounded bg-bg-tertiary/50 border border-dashed border-bg-tertiary"
+                    >
+                      <span className="text-xs text-text-tertiary w-4 text-center">
+                        {members.length + idx}
+                      </span>
+                      <span className="flex-1 text-sm text-text-tertiary">빈 슬롯</span>
                     </div>
-                  ))
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
     </div>
   );

@@ -23,11 +23,13 @@ export default function BracketPage() {
     fetchRoomMatches, connectToBracket, disconnect,
     generateTournamentCode, reportResult,
     tournamentCompleted, finalStandings,
+    sessionAbortedAt, sessionAbortMessage, clearSessionAbort,
   } = useMatchStore();
 
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isGeneratingCode, setIsGeneratingCode] = useState(false);
+  const [isAborting, setIsAborting] = useState(false);
   const [isHost, setIsHost] = useState(false);
   const [liveStatus, setLiveStatus] = useState<any>(null);
 
@@ -48,6 +50,13 @@ export default function BracketPage() {
       disconnect();
     };
   }, [roomId, user, fetchRoomMatches, connectToBracket, disconnect]);
+
+  useEffect(() => {
+    if (!sessionAbortedAt) return;
+    addToast(sessionAbortMessage ?? "내전이 종료되어 로비로 이동합니다.", "warning");
+    clearSessionAbort();
+    router.push(`/tournaments/${roomId}/lobby`);
+  }, [sessionAbortedAt, sessionAbortMessage, clearSessionAbort, addToast, router, roomId]);
 
   const handleRefresh = () => {
     fetchRoomMatches(roomId);
@@ -96,15 +105,41 @@ export default function BracketPage() {
           tournamentCode: updatedMatch.tournamentCode,
         });
       }
+    } catch (error: any) {
+      addToast(error?.response?.data?.message || "토너먼트 코드 생성에 실패했습니다.", "error");
     } finally {
       setIsGeneratingCode(false);
     }
   };
 
   const handleReportResult = async (matchId: string, winnerId: string) => {
-    await reportResult(matchId, winnerId);
-    // Close modal after reporting
-    handleCloseModal();
+    try {
+      await reportResult(matchId, winnerId);
+      handleCloseModal();
+    } catch (error: any) {
+      addToast(error?.response?.data?.message || "경기 결과 보고에 실패했습니다.", "error");
+    }
+  };
+
+  const handleAbortToLobby = async () => {
+    const confirmed = window.confirm(
+      "현재 판을 종료하고 대기실로 돌아가시겠습니까? 이 판은 전적에 반영되지 않습니다.",
+    );
+    if (!confirmed) return;
+
+    setIsAborting(true);
+    try {
+      await roomApi.abortToLobby(roomId);
+      addToast("내전을 종료하고 대기실로 복귀합니다.", "success");
+      router.push(`/tournaments/${roomId}/lobby`);
+    } catch (err: any) {
+      addToast(
+        err?.response?.data?.message || "내전 종료에 실패했습니다.",
+        "error",
+      );
+    } finally {
+      setIsAborting(false);
+    }
   };
 
   // Calculate number of rounds based on matches
@@ -186,10 +221,20 @@ export default function BracketPage() {
             </div>
           </div>
 
-          <Button variant="secondary" onClick={handleRefresh} disabled={isLoading}>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="danger"
+              size="sm"
+              isLoading={isAborting}
+              onClick={handleAbortToLobby}
+            >
+              내전 종료
+            </Button>
+            <Button variant="secondary" onClick={handleRefresh} disabled={isLoading}>
             <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
             새로고침
-          </Button>
+            </Button>
+          </div>
         </div>
 
         {/* Tournament Status */}

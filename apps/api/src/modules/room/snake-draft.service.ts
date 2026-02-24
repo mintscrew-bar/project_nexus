@@ -366,8 +366,64 @@ export class SnakeDraftService {
       throw new NotFoundException("Team not found");
     }
 
-    // Make auto pick (same logic as manual pick)
-    return this.makePick(team.captainId, roomId, targetPlayerId);
+    // Auto pick bypasses timer check (called when timer expires)
+    const [participant, roomSettings] = await Promise.all([
+      this.prisma.roomParticipant.findFirst({
+        where: { roomId, userId: targetPlayerId },
+      }),
+      this.prisma.room.findUnique({
+        where: { id: roomId },
+        select: { pickTimeLimit: true },
+      }),
+    ]);
+
+    if (!participant) {
+      throw new NotFoundException("Player not found");
+    }
+
+    const pickNumber = state.currentTeamIndex + 1;
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.teamMember.create({
+        data: {
+          teamId: team.id,
+          userId: targetPlayerId,
+          pickOrder: pickNumber,
+        },
+      });
+
+      await tx.roomParticipant.update({
+        where: { id: participant.id },
+        data: { teamId: team.id },
+      });
+
+      await tx.snakeDraftPick.create({
+        data: {
+          roomId,
+          teamId: team.id,
+          userId: targetPlayerId,
+          pickNumber,
+        },
+      });
+    });
+
+    // Update in-memory state
+    state.availablePlayers = state.availablePlayers.filter(
+      (id) => id !== targetPlayerId,
+    );
+    state.currentTeamIndex++;
+    state.timerEnd =
+      Date.now() + (roomSettings?.pickTimeLimit ?? 60) * 1000;
+
+    const numTeams = state.pickOrder.filter(
+      (id, i, arr) => arr.indexOf(id) === i,
+    ).length;
+    if (state.currentTeamIndex % numTeams === 0) {
+      state.currentRound++;
+      state.isReversing = !state.isReversing;
+    }
+
+    return state;
   }
 
   async checkDraftComplete(roomId: string): Promise<boolean> {
@@ -399,6 +455,148 @@ export class SnakeDraftService {
 
   getDraftState(roomId: string): SnakeDraftState | undefined {
     return this.draftStates.get(roomId);
+  }
+
+  async getClientDraftState(roomId: string): Promise<any | null> {
+    const state = this.draftStates.get(roomId);
+    if (!state) return null;
+
+    const room = await this.prisma.room.findUnique({
+      where: { id: roomId },
+      include: {
+        teams: {
+          include: {
+            members: {
+              include: {
+                user: {
+                  include: {
+                    riotAccounts: { where: { isPrimary: true } },
+                  },
+                },
+              },
+            },
+          },
+        },
+        participants: {
+          where: { role: "PLAYER", teamId: null, isCaptain: false },
+          include: {
+            user: {
+              include: {
+                riotAccounts: { where: { isPrimary: true } },
+              },
+            },
+          },
+          orderBy: { joinedAt: "asc" },
+        },
+      },
+    });
+
+    if (!room) return null;
+
+    const teams = room.teams.map((t: any) => ({
+      id: t.id,
+      name: t.name,
+      captainId: t.captainId,
+      members: t.members.map((m: any) => {
+        const acc = m.user?.riotAccounts?.[0];
+        return {
+          id: m.userId,
+          username: m.user?.username ?? "Unknown",
+          tier: acc?.tier ?? "UNRANKED",
+          rank: acc?.rank,
+          mmr: calculateTierScore(acc?.tier || "UNRANKED", acc?.rank || "", acc?.lp || 0),
+          position: m.assignedRole ?? acc?.mainRole ?? "FLEX",
+        };
+      }),
+    }));
+
+    const availablePlayers = room.participants.map((p: any) => {
+      const acc = p.user?.riotAccounts?.[0];
+      return {
+        id: p.userId,
+        username: p.user?.username ?? "Unknown",
+        tier: acc?.tier ?? "UNRANKED",
+        rank: acc?.rank,
+        mmr: calculateTierScore(acc?.tier || "UNRANKED", acc?.rank || "", acc?.lp || 0),
+        position: acc?.mainRole ?? "FLEX",
+      };
+    });
+
+    return {
+      roomId,
+      teams,
+      availablePlayers,
+      pickOrder: state.pickOrder,
+      currentPickIndex: state.currentTeamIndex,
+      currentTeamId: state.pickOrder[state.currentTeamIndex] ?? null,
+      timerEnd: state.timerEnd,
+      status: "IN_PROGRESS",
+    };
+  }
+
+  clearDraftState(roomId: string): void {
+    this.draftStates.delete(roomId);
+  }
+
+  async cleanupBotOnlyRoomOnHostDisconnect(
+    userId: string,
+    roomId: string,
+  ): Promise<boolean> {
+    const room = await this.prisma.room.findUnique({
+      where: { id: roomId },
+      include: {
+        discordChannels: {
+          select: {
+            channelId: true,
+            teamName: true,
+          },
+        },
+        participants: {
+          include: {
+            user: {
+              select: {
+                username: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!room || room.hostId !== userId) {
+      return false;
+    }
+
+    const remainingParticipants = room.participants.filter(
+      (p) => p.userId !== userId,
+    );
+    const shouldDelete =
+      remainingParticipants.length === 0 ||
+      remainingParticipants.every((p) =>
+        /^testbot_\d+$/.test(p.user?.username ?? ""),
+      );
+
+    if (!shouldDelete) {
+      return false;
+    }
+
+    try {
+      if (this.discordVoiceService) {
+        await this.discordVoiceService
+          .deleteRoomChannels(roomId, false, {
+            discordCategoryId: room.discordCategoryId,
+            discordChannels: room.discordChannels,
+          })
+          .catch(() => {});
+      }
+    } catch {
+      // Ignore Discord cleanup failures for zombie-room cleanup.
+    }
+
+    await this.prisma.chatMessage.deleteMany({ where: { roomId } });
+    await this.prisma.room.delete({ where: { id: roomId } });
+    this.clearDraftState(roomId);
+    return true;
   }
 
   getCurrentPickingTeam(roomId: string): string | null {

@@ -41,6 +41,8 @@ interface MatchStoreState {
   isConnected: boolean;
   isLoading: boolean;
   error: string | null;
+  sessionAbortedAt: number | null;
+  sessionAbortMessage: string | null;
 
   // Match data
   currentMatch: Match | null;
@@ -67,6 +69,7 @@ interface MatchStoreState {
 
   // Internal methods
   reset: () => void;
+  clearSessionAbort: () => void;
 }
 
 const SOCKET_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
@@ -77,6 +80,8 @@ export const useMatchStore = create<MatchStoreState>((set, get) => ({
   isConnected: false,
   isLoading: false,
   error: null,
+  sessionAbortedAt: null,
+  sessionAbortMessage: null,
   currentMatch: null,
   roomMatches: [],
   roomId: null,
@@ -156,7 +161,7 @@ export const useMatchStore = create<MatchStoreState>((set, get) => ({
 
   reportResult: async (matchId: string, winnerId: string) => {
     try {
-      await matchApi.reportResult(matchId, { winnerTeamId: winnerId });
+      await matchApi.reportResult(matchId, { winnerId });
       // Optimistically update the state, the websocket event will be the source of truth
       set(state => ({
         roomMatches: state.roomMatches.map(m =>
@@ -196,15 +201,16 @@ export const useMatchStore = create<MatchStoreState>((set, get) => ({
 
   connectToBracket: (roomId: string) => {
     const existingSocket = get().socket;
-    if (existingSocket?.connected) {
-      existingSocket.emit('leave-bracket', { roomId: get().roomId });
+    if (existingSocket?.connected || existingSocket?.active) {
+      if (existingSocket.connected) {
+        existingSocket.emit('leave-bracket', { roomId: get().roomId });
+      }
+      existingSocket.removeAllListeners();
       existingSocket.disconnect();
     }
 
     const socket = io(`${SOCKET_URL}/match`, {
-      auth: {
-        token: getAccessToken(),
-      },
+      auth: (cb) => cb({ token: getAccessToken() }),
       transports: ['websocket'],
       reconnection: true,
       reconnectionAttempts: 5,
@@ -215,14 +221,21 @@ export const useMatchStore = create<MatchStoreState>((set, get) => ({
       console.log('Connected to match socket');
       set({ isConnected: true, error: null, roomId });
 
-      // Join bracket room
+      // Join bracket room with timeout
+      const ackTimeout = setTimeout(() => {
+        console.warn('[Match] join-bracket ACK timeout');
+      }, 15000);
+
       socket.emit('join-bracket', { roomId }, (response: any) => {
+        clearTimeout(ackTimeout);
         if (response?.success && response?.matches) {
           const totalRounds = Math.max(...response.matches.map((m: Match) => m.round), 0);
           set({
             roomMatches: response.matches,
             totalRounds
           });
+        } else if (response && !response.success) {
+          set({ error: response.error || '대진표 참가에 실패했습니다' });
         }
       });
     });
@@ -278,7 +291,14 @@ export const useMatchStore = create<MatchStoreState>((set, get) => ({
       set({ tournamentCompleted: true, finalStandings: data.standings });
     });
 
-    set({ socket });
+    socket.on('session-aborted', (data: { message?: string }) => {
+      set({
+        sessionAbortedAt: Date.now(),
+        sessionAbortMessage: data?.message ?? 'Session aborted. Returning to lobby.',
+      });
+    });
+
+    set({ socket, sessionAbortedAt: null, sessionAbortMessage: null });
   },
 
   connectToMatch: (matchId: string) => {
@@ -302,10 +322,17 @@ export const useMatchStore = create<MatchStoreState>((set, get) => ({
       console.log('Connected to match socket');
       set({ isConnected: true, error: null });
 
-      // Join match room
+      // Join match room with timeout
+      const matchAckTimeout = setTimeout(() => {
+        console.warn('[Match] join-match ACK timeout');
+      }, 15000);
+
       socket.emit('join-match', { matchId }, (response: any) => {
+        clearTimeout(matchAckTimeout);
         if (response?.success && response?.match) {
           set({ currentMatch: response.match });
+        } else if (response && !response.success) {
+          set({ error: response.error || '매치 참가에 실패했습니다' });
         }
       });
     });
@@ -362,7 +389,14 @@ export const useMatchStore = create<MatchStoreState>((set, get) => ({
       }
     });
 
-    set({ socket });
+    socket.on('session-aborted', (data: { message?: string }) => {
+      set({
+        sessionAbortedAt: Date.now(),
+        sessionAbortMessage: data?.message ?? 'Session aborted. Returning to lobby.',
+      });
+    });
+
+    set({ socket, sessionAbortedAt: null, sessionAbortMessage: null });
   },
 
   disconnect: () => {
@@ -370,19 +404,24 @@ export const useMatchStore = create<MatchStoreState>((set, get) => ({
     const roomId = get().roomId;
     const matchId = get().currentMatch?.id;
 
-    if (socket?.connected) {
-      if (roomId) {
-        socket.emit('leave-bracket', { roomId });
+    if (socket) {
+      if (socket.connected) {
+        if (roomId) {
+          socket.emit('leave-bracket', { roomId });
+        }
+        if (matchId) {
+          socket.emit('leave-match', { matchId });
+        }
       }
-      if (matchId) {
-        socket.emit('leave-match', { matchId });
-      }
+      // Remove all listeners before disconnecting to prevent memory leaks
+      socket.removeAllListeners();
       socket.disconnect();
     }
 
     set({
       socket: null,
-      isConnected: false
+      isConnected: false,
+      error: null,
     });
   },
 
@@ -399,6 +438,12 @@ export const useMatchStore = create<MatchStoreState>((set, get) => ({
       totalRounds: 0,
       error: null,
       isLoading: false,
+      sessionAbortedAt: null,
+      sessionAbortMessage: null,
     });
+  },
+
+  clearSessionAbort: () => {
+    set({ sessionAbortedAt: null, sessionAbortMessage: null });
   },
 }));

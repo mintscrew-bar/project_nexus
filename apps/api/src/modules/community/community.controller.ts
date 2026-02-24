@@ -2,7 +2,7 @@ import {
   Controller,
   Get,
   Post,
-  Put,
+  Patch,
   Delete,
   Body,
   Param,
@@ -20,6 +20,7 @@ import {
   CreatePostDto,
   UpdatePostDto,
   CreateCommentDto,
+  CreatePostReportDto,
 } from "./community.service";
 import { PostCategory } from "./community.types";
 import { UserRole } from "@nexus/database";
@@ -49,6 +50,7 @@ export class CommunityController {
     @Query("authorId") authorId?: string,
     @Query("limit") limit?: string,
     @Query("offset") offset?: string,
+    @Query("sortBy") sortBy?: string,
   ) {
     return this.communityService.listPosts({
       category,
@@ -56,6 +58,7 @@ export class CommunityController {
       authorId,
       limit: limit ? parseInt(limit, 10) : 20,
       offset: offset ? parseInt(offset, 10) : 0,
+      sortBy: sortBy as any,
     });
   }
 
@@ -64,7 +67,7 @@ export class CommunityController {
     return this.communityService.getPostById(id);
   }
 
-  @Put("posts/:id")
+  @Patch("posts/:id")
   @UseGuards(JwtAuthGuard)
   async updatePost(
     @CurrentUser("sub") userId: string,
@@ -98,7 +101,7 @@ export class CommunityController {
     return this.communityService.createComment(userId, postId, dto);
   }
 
-  @Put("comments/:id")
+  @Patch("comments/:id")
   @UseGuards(JwtAuthGuard)
   async updateComment(
     @CurrentUser("sub") userId: string,
@@ -154,6 +157,96 @@ export class CommunityController {
   }
 
   // ========================================
+  // Comment Like/Unlike
+  // ========================================
+
+  @Post("comments/:id/like")
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async likeComment(
+    @CurrentUser("sub") userId: string,
+    @Param("id") commentId: string,
+  ) {
+    return this.communityService.likeComment(userId, commentId);
+  }
+
+  @Delete("comments/:id/like")
+  @UseGuards(JwtAuthGuard)
+  async unlikeComment(
+    @CurrentUser("sub") userId: string,
+    @Param("id") commentId: string,
+  ) {
+    return this.communityService.unlikeComment(userId, commentId);
+  }
+
+  @Get("comments/:id/liked")
+  @UseGuards(JwtAuthGuard)
+  async hasLikedComment(
+    @CurrentUser("sub") userId: string,
+    @Param("id") commentId: string,
+  ) {
+    const hasLiked = await this.communityService.hasUserLikedComment(userId, commentId);
+    return { hasLiked };
+  }
+
+  @Post("comments/liked-status")
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async getCommentLikedStatus(
+    @CurrentUser("sub") userId: string,
+    @Body() body: { commentIds: string[] },
+  ) {
+    return this.communityService.getCommentLikedStatus(userId, body.commentIds);
+  }
+
+  // ========================================
+  // Bookmark
+  // ========================================
+
+  @Post("posts/:id/bookmark")
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async bookmarkPost(
+    @CurrentUser("sub") userId: string,
+    @Param("id") postId: string,
+  ) {
+    return this.communityService.bookmarkPost(userId, postId);
+  }
+
+  @Delete("posts/:id/bookmark")
+  @UseGuards(JwtAuthGuard)
+  async unbookmarkPost(
+    @CurrentUser("sub") userId: string,
+    @Param("id") postId: string,
+  ) {
+    return this.communityService.unbookmarkPost(userId, postId);
+  }
+
+  @Get("posts/:id/bookmarked")
+  @UseGuards(JwtAuthGuard)
+  async hasBookmarkedPost(
+    @CurrentUser("sub") userId: string,
+    @Param("id") postId: string,
+  ) {
+    const bookmarked = await this.communityService.hasUserBookmarkedPost(userId, postId);
+    return { bookmarked };
+  }
+
+  @Get("bookmarks")
+  @UseGuards(JwtAuthGuard)
+  async getBookmarks(
+    @CurrentUser("sub") userId: string,
+    @Query("limit") limit?: string,
+    @Query("offset") offset?: string,
+  ) {
+    return this.communityService.getUserBookmarks(
+      userId,
+      limit ? parseInt(limit, 10) : 20,
+      offset ? parseInt(offset, 10) : 0,
+    );
+  }
+
+  // ========================================
   // Pin/Unpin (Admin/Moderator Only)
   // ========================================
 
@@ -179,5 +272,19 @@ export class CommunityController {
   @Get("users/:userId/stats")
   async getUserStats(@Param("userId") userId: string) {
     return this.communityService.getUserPostStats(userId);
+  }
+
+  // ========================================
+  // Report
+  // ========================================
+
+  @Post("reports")
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.CREATED)
+  async reportContent(
+    @CurrentUser("sub") userId: string,
+    @Body() dto: CreatePostReportDto,
+  ) {
+    return this.communityService.reportContent(userId, dto);
   }
 }

@@ -1,4 +1,4 @@
-import {
+﻿import {
   WebSocketGateway,
   WebSocketServer,
   SubscribeMessage,
@@ -7,7 +7,7 @@ import {
   ConnectedSocket,
   MessageBody,
 } from "@nestjs/websockets";
-import { Inject, forwardRef, Optional } from "@nestjs/common";
+import { Inject, forwardRef, OnModuleDestroy, Optional } from "@nestjs/common";
 import { Server, Socket } from "socket.io";
 import { AuthService } from "../auth/auth.service";
 import { AuctionService } from "./auction.service";
@@ -28,13 +28,19 @@ interface AuthenticatedSocket extends Socket {
   },
 })
 export class AuctionGateway
-  implements OnGatewayConnection, OnGatewayDisconnect
+  implements OnGatewayConnection, OnGatewayDisconnect, OnModuleDestroy
 {
   @WebSocketServer()
   server: Server;
 
   // Track connected users per room for disconnect handling
   private connectedUsers = new Map<string, { userId: string; roomId: string }>();
+
+  // Bot auto-bid timers: key = `${roomId}_${botCaptainId}`
+  private botBidTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  private bidResolveTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  // Guard against concurrent _resolveCurrentBidAndAdvance calls
+  private resolvingRooms = new Set<string>();
 
   constructor(
     private readonly authService: AuthService,
@@ -45,6 +51,20 @@ export class AuctionGateway
     private readonly roleSelectionGateway: RoleSelectionGateway,
     @Optional() private readonly redisService?: RedisService,
   ) {}
+
+  onModuleDestroy() {
+    // 서버 종료 시 모든 타이머 정리
+    for (const timer of this.botBidTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.botBidTimers.clear();
+
+    for (const timer of this.bidResolveTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.bidResolveTimers.clear();
+    this.resolvingRooms.clear();
+  }
 
   async handleConnection(client: AuthenticatedSocket) {
     try {
@@ -72,35 +92,75 @@ export class AuctionGateway
     }
   }
 
-  handleDisconnect(client: AuthenticatedSocket) {
+  async handleDisconnect(client: AuthenticatedSocket) {
     console.log(`Auction client disconnected: ${client.username}`);
-    // Clean up user tracking
+    const trackedUser = this.connectedUsers.get(client.id);
     this.connectedUsers.delete(client.id);
+
+    if (trackedUser) {
+      try {
+        const deleted =
+          await this.auctionService.cleanupBotOnlyRoomOnHostDisconnect(
+            trackedUser.userId,
+            trackedUser.roomId,
+          );
+        if (deleted) {
+          this.cleanupRoom(trackedUser.roomId);
+        }
+      } catch {
+        // Best-effort cleanup only
+      }
+    }
+
     // Note: Auction continues even if a captain disconnects.
     // The timer will still expire and resolve normally (yuchal or auto-assign).
   }
 
-  @SubscribeMessage("join-room")
+    @SubscribeMessage("join-room")
   async handleJoinRoom(
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() data: { roomId: string },
   ) {
-    client.join(`room:${data.roomId}`);
+    try {
+      client.join(`room:${data.roomId}`);
 
-    // Track user connection for disconnect handling
-    if (client.userId) {
-      this.connectedUsers.set(client.id, {
-        userId: client.userId,
-        roomId: data.roomId,
-      });
+      // Track user connection for disconnect handling
+      if (client.userId) {
+        this.connectedUsers.set(client.id, {
+          userId: client.userId,
+          roomId: data.roomId,
+        });
+      }
+
+      const state = this.auctionService.getAuctionState(data.roomId);
+
+      if (!state) {
+        return { success: true, state: null, teams: [], players: [] };
+      }
+
+      // Only schedule bid resolve if timer hasn't expired yet
+      if (state.timerEnd > Date.now()) {
+        this._scheduleBidResolve(data.roomId, state.timerEnd);
+      }
+
+      try {
+        const { teams, players } = await this.auctionService.getFullAuctionData(
+          data.roomId,
+        );
+        return { success: true, state, teams, players };
+      } catch (error) {
+        console.warn(
+          `[Auction] Failed to load full join payload for room ${data.roomId}:`,
+          error,
+        );
+        return { success: true, state, teams: [], players: [] };
+      }
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error?.message || "Failed to join auction room",
+      };
     }
-
-    const state = this.auctionService.getAuctionState(data.roomId);
-
-    return {
-      success: true,
-      state,
-    };
   }
 
   @SubscribeMessage("leave-room")
@@ -109,6 +169,7 @@ export class AuctionGateway
     @MessageBody() data: { roomId: string },
   ) {
     client.leave(`room:${data.roomId}`);
+    this.connectedUsers.delete(client.id);
   }
 
   // ========================================
@@ -182,6 +243,10 @@ export class AuctionGateway
       players: result.players,
       auctionState: result.auctionState,
     });
+    if (result.auctionState?.timerEnd) {
+      this._scheduleBidResolve(roomId, result.auctionState.timerEnd);
+    }
+    // ???????????源끹걬癲????筌?????좊틯 ???濚???筌믨퀣援?    this._scheduleBotBids(roomId).catch(() => {});
   }
 
   @SubscribeMessage("place-bid")
@@ -216,7 +281,7 @@ export class AuctionGateway
           };
         }
       } catch {
-        // Redis unavailable — allow bid to proceed
+        // Redis unavailable ??allow bid to proceed
       }
     }
 
@@ -230,11 +295,13 @@ export class AuctionGateway
       // Broadcast to all clients in the room
       this.server.to(`room:${data.roomId}`).emit("bid-placed", {
         userId: client.userId,
+        teamId: state.currentHighestBidder,
         username: client.username,
         amount: data.amount,
         timerEnd: state.timerEnd,
         timestamp: new Date().toISOString(),
       });
+      this._scheduleBidResolve(data.roomId, state.timerEnd);
 
       return { success: true, state };
     } catch (error: any) {
@@ -252,40 +319,7 @@ export class AuctionGateway
     }
 
     try {
-      const result = await this.auctionService.resolveCurrentBid(data.roomId);
-
-      // Broadcast result
-      this.server.to(`room:${data.roomId}`).emit("bid-resolved", result);
-
-      // Emit specific event based on result
-      if (result.sold && result.player && result.team) {
-        this.emitPlayerSold(data.roomId, {
-          player: result.player,
-          team: result.team,
-          price: result.price!,
-        });
-      } else if (!result.sold && result.player) {
-        this.emitPlayerUnsold(data.roomId, { player: result.player });
-      }
-
-      // Check if auction is complete
-      const isComplete = await this.auctionService.checkAuctionComplete(
-        data.roomId,
-      );
-
-      if (isComplete) {
-        await this.auctionService.completeAuction(data.roomId);
-        this.server.to(`room:${data.roomId}`).emit("auction-complete");
-
-        // Start role selection
-        const roleSelectionData =
-          await this.roleSelectionService.startRoleSelection(data.roomId);
-        this.roleSelectionGateway.emitRoleSelectionStarted(
-          data.roomId,
-          roleSelectionData,
-        );
-      }
-
+      const result = await this._resolveCurrentBidAndAdvance(data.roomId);
       return { success: true, result };
     } catch (error: any) {
       return { error: error.message };
@@ -298,6 +332,10 @@ export class AuctionGateway
 
   emitAuctionStarted(roomId: string, data: any) {
     this.server.to(`room:${roomId}`).emit("auction-started", data);
+    if (data?.auctionState?.timerEnd) {
+      this._scheduleBidResolve(roomId, data.auctionState.timerEnd);
+    }
+    // ???????????源끹걬癲????筌?????좊틯 ???濚???筌믨퀣援?    this._scheduleBotBids(roomId).catch(() => {});
   }
 
   emitPlayerSold(
@@ -326,4 +364,199 @@ export class AuctionGateway
   emitAuctionUpdate(roomId: string, event: string, data: any) {
     this.server.to(`room:${roomId}`).emit(event, data);
   }
+
+  cleanupRoom(roomId: string): void {
+    this._cancelBotTimers(roomId);
+    this._cancelBidResolve(roomId);
+  }
+
+  emitSessionAborted(roomId: string, data: any): void {
+    this.cleanupRoom(roomId);
+    this.server.to(`room:${roomId}`).emit("session-aborted", data);
+  }
+
+  // ========================================
+  // Bot Auto-Bid
+  // ========================================
+
+  /** ?????潁뺛깿??????筌?????좊틯 ??????????濚?*/
+  private async _scheduleBotBids(roomId: string): Promise<void> {
+    const state = this.auctionService.getAuctionState(roomId);
+    if (!state || state.botCaptainIds.length === 0) return;
+
+    this._cancelBotTimers(roomId);
+
+    const candidates = await this.auctionService.getBotBidCandidates(roomId);
+
+    for (const bot of candidates) {
+      if (bot.memberCount >= 5) continue;
+      // Skip if this bot team is already leading.
+      if (state.currentHighestBidder === bot.teamId) continue;
+
+      const delay = 2000 + Math.random() * 6000;
+      const timerId = setTimeout(() => {
+        this._autoBotBid(roomId, bot.captainId, bot.username)
+          .then(() => this._scheduleBotBids(roomId))
+          .catch(() => {});
+      }, delay);
+
+      this.botBidTimers.set(`${roomId}_${bot.captainId}`, timerId);
+    }
+  }
+
+  /** ?????筌?????좊틯 ????덈틖 (癲ル슔?됭짆??????좊틯??좊읈??? */
+    /** Handle a bot auto-bid at minimum valid increment. */
+  private async _autoBotBid(
+    roomId: string,
+    botCaptainId: string,
+    botUsername: string,
+  ): Promise<void> {
+    const state = this.auctionService.getAuctionState(roomId);
+    if (!state) return;
+
+    // Ignore if timer already expired; resolver will handle progression.
+    if (Date.now() > state.timerEnd) return;
+
+    // 60% chance to bid, 40% chance to pass.
+    if (Math.random() > 0.6) return;
+
+    const candidates = await this.auctionService.getBotBidCandidates(roomId);
+    const bot = candidates.find((c) => c.captainId === botCaptainId);
+    if (!bot) return;
+
+    // Avoid self-outbidding current highest bid.
+    if (state.currentHighestBidder === bot.teamId) return;
+
+    const bidIncrement = 50;
+    const minBid = state.currentHighestBid + bidIncrement;
+
+    if (bot.memberCount >= 5) return;
+    if (minBid > bot.availableToBid) return;
+
+    try {
+      const newState = await this.auctionService.placeBid(
+        botCaptainId,
+        roomId,
+        minBid,
+      );
+
+      this.server.to(`room:${roomId}`).emit("bid-placed", {
+        userId: botCaptainId,
+        teamId: newState.currentHighestBidder,
+        username: botUsername,
+        amount: minBid,
+        timerEnd: newState.timerEnd,
+        timestamp: new Date().toISOString(),
+      });
+      this._scheduleBidResolve(roomId, newState.timerEnd);
+
+      console.log(`[BotBid] ${botUsername} bid ${minBid}G in room ${roomId}`);
+    } catch {
+      // Ignore races such as timer expiry or stale state.
+    }
+  }
+
+  private _cancelBotTimers(roomId: string): void {
+    for (const [key, timerId] of this.botBidTimers.entries()) {
+      if (key.startsWith(`${roomId}_`)) {
+        clearTimeout(timerId);
+        this.botBidTimers.delete(key);
+      }
+    }
+  }
+
+  private _cancelBidResolve(roomId: string): void {
+    const timer = this.bidResolveTimers.get(roomId);
+    if (!timer) return;
+
+    clearTimeout(timer);
+    this.bidResolveTimers.delete(roomId);
+  }
+
+  private _scheduleBidResolve(roomId: string, timerEnd: number): void {
+    this._cancelBidResolve(roomId);
+
+    const delayMs = Math.max(0, timerEnd - Date.now());
+    const timer = setTimeout(() => {
+      this._handleBidTimerExpired(roomId).catch((error) => {
+        console.error(`[Auction] Failed to handle timer expiry for room ${roomId}:`, error);
+      });
+    }, delayMs);
+
+    this.bidResolveTimers.set(roomId, timer);
+  }
+
+  private async _handleBidTimerExpired(roomId: string): Promise<void> {
+    const state = this.auctionService.getAuctionState(roomId);
+    if (!state) {
+      this._cancelBidResolve(roomId);
+      return;
+    }
+
+    const remainingMs = state.timerEnd - Date.now();
+    if (remainingMs > 50) {
+      this._scheduleBidResolve(roomId, state.timerEnd);
+      return;
+    }
+
+    this.emitTimerExpired(roomId);
+    await this._resolveCurrentBidAndAdvance(roomId);
+  }
+
+  private async _resolveCurrentBidAndAdvance(roomId: string): Promise<any> {
+    // Prevent concurrent resolve calls (timer expiry + client resolve-bid race)
+    if (this.resolvingRooms.has(roomId)) {
+      console.log(`[Auction] Already resolving room ${roomId}, skipping`);
+      return null;
+    }
+    this.resolvingRooms.add(roomId);
+
+    try {
+      this._cancelBidResolve(roomId);
+
+      const result = await this.auctionService.resolveCurrentBid(roomId);
+      const state = this.auctionService.getAuctionState(roomId) ?? null;
+      const { teams, players } = await this.auctionService.getFullAuctionData(roomId);
+      const payload = { ...result, state, teams, players };
+
+      this.server.to(`room:${roomId}`).emit("bid-resolved", payload);
+
+      if (result.sold && result.player && result.team) {
+        this.emitPlayerSold(roomId, {
+          player: result.player,
+          team: result.team,
+          price: result.price!,
+        });
+      } else if (!result.sold && result.player) {
+        this.emitPlayerUnsold(roomId, { player: result.player });
+      }
+
+      const isComplete = await this.auctionService.checkAuctionComplete(roomId);
+
+      if (isComplete) {
+        this._cancelBotTimers(roomId);
+        this._cancelBidResolve(roomId);
+        await this.auctionService.completeAuction(roomId);
+        const finalData = await this.auctionService.getFullAuctionData(roomId);
+        this.server.to(`room:${roomId}`).emit("auction-complete", {
+          teams: finalData.teams,
+        });
+
+        const roleSelectionData = await this.roleSelectionService.startRoleSelection(roomId);
+        this.roleSelectionGateway.emitRoleSelectionStarted(roomId, roleSelectionData);
+        return payload;
+      }
+
+      if (state) {
+        this._scheduleBidResolve(roomId, state.timerEnd);
+        this._scheduleBotBids(roomId).catch(() => {});
+      }
+
+      return payload;
+    } finally {
+      this.resolvingRooms.delete(roomId);
+    }
+  }
 }
+
+

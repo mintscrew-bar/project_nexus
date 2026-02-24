@@ -144,34 +144,19 @@ export class AuthController {
       const user = req.user as any;
       const refreshToken = req.cookies?.refresh_token;
 
-      console.log("AuthController.refresh - user.sub:", user?.sub);
-      console.log(
-        "AuthController.refresh - incoming refresh_token:",
-        refreshToken ? "[REDACTED]" : null,
-      );
-
-      const tokens = await this.authService.refreshTokens(
+      const { accessToken } = await this.authService.refreshTokens(
         user.sub,
         refreshToken,
       );
 
-      console.log("AuthController.refresh - refreshTokens succeeded");
-
-      res.cookie("refresh_token", tokens.refreshToken, {
-        httpOnly: true,
-        secure: this.configService.get("NODE_ENV") === "production",
-        sameSite: "lax",
-        maxAge: 7 * 24 * 60 * 60 * 1000,
-        path: "/api/auth",
-      });
-
-      return res.json({ accessToken: tokens.accessToken });
+      // Refresh token은 교체하지 않음 — 같은 토큰을 쿠키에 유지
+      return res.json({ accessToken });
     } catch (err) {
       console.error(
         "AuthController.refresh - error:",
         err instanceof Error ? err.stack || err.message : err,
       );
-      throw err; // let GlobalExceptionFilter handle the response formatting
+      throw err;
     }
   }
 

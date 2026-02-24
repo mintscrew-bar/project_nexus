@@ -23,10 +23,7 @@ export function DmChatView({ otherUserId, otherUsername, otherAvatar }: Props) {
     typingUsers,
     setMessages,
     prependMessages,
-    appendMessage,
     clearUnread,
-    setTyping,
-    updateConversationLastMessage,
   } = useDmStore();
 
   const myMessages = messages[otherUserId] ?? [];
@@ -36,6 +33,7 @@ export function DmChatView({ otherUserId, otherUsername, otherAvatar }: Props) {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [sendError, setSendError] = useState<string | null>(null);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const topRef = useRef<HTMLDivElement>(null);
@@ -49,7 +47,7 @@ export function DmChatView({ otherUserId, otherUsername, otherAvatar }: Props) {
       try {
         const data = await dmApi.getMessages(otherUserId);
         setMessages(otherUserId, data.messages, data.nextCursor);
-        await dmApi.markAsRead(otherUserId);
+        // 소켓 mark-read로 서버 처리 + 미읽음 카운트 갱신
         dmSocketHelpers.markRead(otherUserId);
         clearUnread(otherUserId);
       } finally {
@@ -59,42 +57,24 @@ export function DmChatView({ otherUserId, otherUsername, otherAvatar }: Props) {
     init();
   }, [otherUserId, setMessages, clearUnread]);
 
-  // 새 메시지 소켓 수신
+  // 새 메시지 소켓 수신 → 읽음 처리만 담당 (저장은 FriendsPanel에서 전역 처리)
   useEffect(() => {
     const handler = (msg: DirectMessage) => {
-      const isRelevant =
-        (msg.senderId === otherUserId) || (msg.receiverId === otherUserId);
-      if (!isRelevant) return;
-
-      appendMessage(msg);
-      updateConversationLastMessage(otherUserId, msg);
-
-      // 상대방이 보낸 메시지면 읽음 처리
+      // 상대방이 보낸 메시지이고, 현재 대화창이 열려있으면 읽음 처리
       if (msg.senderId === otherUserId) {
-        dmApi.markAsRead(otherUserId).catch(() => {});
         dmSocketHelpers.markRead(otherUserId);
+        clearUnread(otherUserId);
       }
     };
 
     dmSocketHelpers.onNewMessage(handler);
     return () => {
-      // off는 offAllListeners가 아닌 개별 제거가 불가하므로 무시 (언마운트 시 FriendsPanel이 처리)
+      dmSocketHelpers.offNewMessage(handler);
     };
-  }, [otherUserId, appendMessage, updateConversationLastMessage]);
+  }, [otherUserId, clearUnread]);
 
-  // 타이핑 인디케이터 수신
-  useEffect(() => {
-    dmSocketHelpers.onUserTyping((data) => {
-      if (data.userId === otherUserId) {
-        setTyping(otherUserId, true);
-      }
-    });
-    dmSocketHelpers.onUserStoppedTyping((data) => {
-      if (data.userId === otherUserId) {
-        setTyping(otherUserId, false);
-      }
-    });
-  }, [otherUserId, setTyping]);
+  // 타이핑 인디케이터: FriendsPanel에서 전역 관리하므로
+  // DmChatView에서는 useDmStore의 typingUsers만 읽음 (중복 등록 방지)
 
   // 초기 로드 후 맨 아래로 스크롤
   useEffect(() => {
@@ -150,6 +130,19 @@ export function DmChatView({ otherUserId, otherUsername, otherAvatar }: Props) {
     return () => observer.disconnect();
   }, [loadMore]);
 
+  // 언마운트 시 타이핑 타이머 정리 + 타이핑 상태 해제
+  useEffect(() => {
+    return () => {
+      if (typingTimerRef.current) {
+        clearTimeout(typingTimerRef.current);
+      }
+      if (isTypingRef.current) {
+        dmSocketHelpers.sendIsTyping(otherUserId, false);
+        isTypingRef.current = false;
+      }
+    };
+  }, [otherUserId]);
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setInput(e.target.value);
 
@@ -176,8 +169,18 @@ export function DmChatView({ otherUserId, otherUsername, otherAvatar }: Props) {
       if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
     }
 
-    dmSocketHelpers.sendMessage(otherUserId, text);
-    setIsSending(false);
+    setSendError(null);
+    dmSocketHelpers.sendMessage(otherUserId, text, (ack) => {
+      setIsSending(false);
+      if (!ack?.success) {
+        setSendError(ack?.error || '메시지 전송에 실패했습니다.');
+        // 실패 시 입력창에 텍스트 복원
+        setInput(text);
+        setTimeout(() => setSendError(null), 3000);
+      }
+    });
+    // ACK 미수신 대비 타임아웃
+    setTimeout(() => setIsSending(false), 5000);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -291,6 +294,13 @@ export function DmChatView({ otherUserId, otherUsername, otherAvatar }: Props) {
 
         <div ref={bottomRef} />
       </div>
+
+      {/* 전송 에러 */}
+      {sendError && (
+        <div className="px-3 py-1">
+          <p className="text-xs text-red-400">{sendError}</p>
+        </div>
+      )}
 
       {/* 입력창 */}
       <div className="px-3 py-2 border-t border-bg-tertiary">

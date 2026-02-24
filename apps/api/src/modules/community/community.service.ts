@@ -25,6 +25,13 @@ export interface CreateCommentDto {
   parentId?: string; // For nested comments
 }
 
+export interface CreatePostReportDto {
+  reason: "SPAM" | "HARASSMENT" | "INAPPROPRIATE" | "MISINFORMATION" | "OTHER";
+  description: string;
+  postId?: string;
+  commentId?: string;
+}
+
 @Injectable()
 export class CommunityService {
   constructor(
@@ -109,6 +116,9 @@ export class CommunityService {
                 avatar: true,
               },
             },
+            _count: {
+              select: { likes: true },
+            },
             replies: {
               include: {
                 author: {
@@ -117,6 +127,9 @@ export class CommunityService {
                     username: true,
                     avatar: true,
                   },
+                },
+                _count: {
+                  select: { likes: true },
                 },
               },
               orderBy: { createdAt: "asc" },
@@ -147,6 +160,7 @@ export class CommunityService {
     authorId?: string;
     limit?: number;
     offset?: number;
+    sortBy?: "latest" | "popular" | "views" | "comments";
   }) {
     const where: any = {};
 
@@ -164,6 +178,19 @@ export class CommunityService {
     if (filters?.authorId) {
       where.authorId = filters.authorId;
     }
+
+    const getOrderBy = (): any[] => {
+      switch (filters?.sortBy) {
+        case "popular":
+          return [{ isPinned: "desc" }, { likes: { _count: "desc" } }];
+        case "views":
+          return [{ isPinned: "desc" }, { views: "desc" }];
+        case "comments":
+          return [{ isPinned: "desc" }, { comments: { _count: "desc" } }];
+        default:
+          return [{ isPinned: "desc" }, { createdAt: "desc" }];
+      }
+    };
 
     const [posts, total] = await Promise.all([
       this.prisma.post.findMany({
@@ -183,7 +210,7 @@ export class CommunityService {
             },
           },
         },
-        orderBy: [{ isPinned: "desc" }, { createdAt: "desc" }],
+        orderBy: getOrderBy(),
         take: filters?.limit || 20,
         skip: filters?.offset || 0,
       }),
@@ -281,8 +308,9 @@ export class CommunityService {
     }
 
     // If parentId provided, verify parent comment exists
+    let parentComment: { id: string; authorId: string; postId: string } | null = null;
     if (dto.parentId) {
-      const parentComment = await this.prisma.comment.findUnique({
+      parentComment = await this.prisma.comment.findUnique({
         where: { id: dto.parentId },
       });
 
@@ -313,6 +341,15 @@ export class CommunityService {
     if (post.authorId !== userId) {
       await this.notificationService.notifyComment(
         post.authorId,
+        comment.author.username,
+        postId,
+      );
+    }
+
+    // Send notification to parent comment author (if replying, and they're not the post author or replier)
+    if (parentComment && parentComment.authorId !== userId && parentComment.authorId !== post.authorId) {
+      await this.notificationService.notifyReply(
+        parentComment.authorId,
         comment.author.username,
         postId,
       );
@@ -459,6 +496,132 @@ export class CommunityService {
   }
 
   // ========================================
+  // Comment Like/Unlike
+  // ========================================
+
+  async likeComment(userId: string, commentId: string) {
+    const comment = await this.prisma.comment.findUnique({
+      where: { id: commentId },
+    });
+
+    if (!comment) {
+      throw new NotFoundException("Comment not found");
+    }
+
+    const existingLike = await this.prisma.commentLike.findUnique({
+      where: { userId_commentId: { userId, commentId } },
+    });
+
+    if (existingLike) {
+      throw new ConflictException("Already liked this comment");
+    }
+
+    await this.prisma.commentLike.create({
+      data: { userId, commentId },
+    });
+
+    const likeCount = await this.prisma.commentLike.count({ where: { commentId } });
+    return { message: "Comment liked", likeCount };
+  }
+
+  async unlikeComment(userId: string, commentId: string) {
+    const existingLike = await this.prisma.commentLike.findUnique({
+      where: { userId_commentId: { userId, commentId } },
+    });
+
+    if (!existingLike) {
+      throw new NotFoundException("You haven't liked this comment");
+    }
+
+    await this.prisma.commentLike.delete({
+      where: { userId_commentId: { userId, commentId } },
+    });
+
+    const likeCount = await this.prisma.commentLike.count({ where: { commentId } });
+    return { message: "Comment unliked", likeCount };
+  }
+
+  async hasUserLikedComment(userId: string, commentId: string): Promise<boolean> {
+    const like = await this.prisma.commentLike.findUnique({
+      where: { userId_commentId: { userId, commentId } },
+    });
+    return !!like;
+  }
+
+  async getCommentLikedStatus(userId: string, commentIds: string[]): Promise<Record<string, boolean>> {
+    if (commentIds.length === 0) return {};
+
+    const likes = await this.prisma.commentLike.findMany({
+      where: {
+        userId,
+        commentId: { in: commentIds },
+      },
+      select: { commentId: true },
+    });
+
+    const likedSet = new Set(likes.map((l) => l.commentId));
+    return Object.fromEntries(commentIds.map((id) => [id, likedSet.has(id)]));
+  }
+
+  // ========================================
+  // Bookmark
+  // ========================================
+
+  async bookmarkPost(userId: string, postId: string) {
+    const post = await this.prisma.post.findUnique({ where: { id: postId } });
+    if (!post) throw new NotFoundException("Post not found");
+
+    const existing = await this.prisma.postBookmark.findUnique({
+      where: { userId_postId: { userId, postId } },
+    });
+    if (existing) throw new ConflictException("Already bookmarked");
+
+    await this.prisma.postBookmark.create({ data: { userId, postId } });
+    return { bookmarked: true };
+  }
+
+  async unbookmarkPost(userId: string, postId: string) {
+    const existing = await this.prisma.postBookmark.findUnique({
+      where: { userId_postId: { userId, postId } },
+    });
+    if (!existing) throw new NotFoundException("Bookmark not found");
+
+    await this.prisma.postBookmark.delete({
+      where: { userId_postId: { userId, postId } },
+    });
+    return { bookmarked: false };
+  }
+
+  async hasUserBookmarkedPost(userId: string, postId: string): Promise<boolean> {
+    const bm = await this.prisma.postBookmark.findUnique({
+      where: { userId_postId: { userId, postId } },
+    });
+    return !!bm;
+  }
+
+  async getUserBookmarks(userId: string, limit = 20, offset = 0) {
+    const [bookmarks, total] = await Promise.all([
+      this.prisma.postBookmark.findMany({
+        where: { userId },
+        include: {
+          post: {
+            include: {
+              author: { select: { id: true, username: true, avatar: true } },
+              _count: { select: { comments: true, likes: true } },
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+        take: limit,
+        skip: offset,
+      }),
+      this.prisma.postBookmark.count({ where: { userId } }),
+    ]);
+
+    return { posts: bookmarks.map((b) => b.post), total };
+  }
+
+  // ========================================
   // Pin/Unpin (Admin/Moderator only)
   // ========================================
 
@@ -510,5 +673,69 @@ export class CommunityService {
       commentCount,
       totalLikes,
     };
+  }
+
+  // ========================================
+  // Report (Post / Comment)
+  // ========================================
+
+  async reportContent(userId: string, dto: CreatePostReportDto) {
+    if (!dto.postId && !dto.commentId) {
+      throw new BadRequestException("postId or commentId is required");
+    }
+
+    // Check if already reported
+    const existing = await this.prisma.postReport.findFirst({
+      where: {
+        reporterId: userId,
+        postId: dto.postId ?? null,
+        commentId: dto.commentId ?? null,
+      },
+    });
+    if (existing) {
+      throw new ConflictException("Already reported");
+    }
+
+    return this.prisma.postReport.create({
+      data: {
+        reporterId: userId,
+        postId: dto.postId,
+        commentId: dto.commentId,
+        reason: dto.reason,
+        description: dto.description,
+      },
+    });
+  }
+
+  async getPostReports(params: { status?: string; limit?: number; offset?: number }) {
+    const { status, limit = 20, offset = 0 } = params;
+    const where = status ? { status: status as any } : {};
+
+    const [reports, total] = await Promise.all([
+      this.prisma.postReport.findMany({
+        where,
+        include: {
+          reporter: { select: { id: true, username: true, avatar: true } },
+          post: { select: { id: true, title: true } },
+          comment: { select: { id: true, content: true } },
+        },
+        orderBy: { createdAt: "desc" },
+        take: limit,
+        skip: offset,
+      }),
+      this.prisma.postReport.count({ where }),
+    ]);
+
+    return { reports, total };
+  }
+
+  async reviewPostReport(reportId: string, status: "APPROVED" | "REJECTED", reviewerNote?: string) {
+    const report = await this.prisma.postReport.findUnique({ where: { id: reportId } });
+    if (!report) throw new NotFoundException("Report not found");
+
+    return this.prisma.postReport.update({
+      where: { id: reportId },
+      data: { status, reviewerNote, reviewedAt: new Date() },
+    });
   }
 }

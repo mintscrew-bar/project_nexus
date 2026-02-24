@@ -16,12 +16,17 @@ const SOCKET_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
 // Room Socket 연결
 export const connectRoomSocket = () => {
-  if (roomSocket?.connected) return roomSocket;
+  // Reuse existing instance if still connected or reconnecting.
+  if (roomSocket?.connected || roomSocket?.active) return roomSocket;
+  // Clean up stale disconnected socket before creating a new one.
+  if (roomSocket) {
+    roomSocket.removeAllListeners();
+    roomSocket = null;
+  }
 
   roomSocket = io(`${SOCKET_URL}/room`, {
-    auth: {
-      token: getAccessToken(),
-    },
+    // Re-evaluate token for each connection/reconnection attempt.
+    auth: (cb) => cb({ token: getAccessToken() }),
     transports: ["websocket"],
     reconnection: true,
     reconnectionAttempts: 5,
@@ -45,12 +50,17 @@ export const connectRoomSocket = () => {
 
 // Auction Socket 연결
 export const connectAuctionSocket = () => {
-  if (auctionSocket?.connected) return auctionSocket;
+  // Reuse existing instance if still connected or reconnecting.
+  if (auctionSocket?.connected || auctionSocket?.active) return auctionSocket;
+  // Clean up stale disconnected socket before creating a new one.
+  if (auctionSocket) {
+    auctionSocket.removeAllListeners();
+    auctionSocket = null;
+  }
 
   auctionSocket = io(`${SOCKET_URL}/auction`, {
-    auth: {
-      token: getAccessToken(),
-    },
+    // Re-evaluate token for each connection/reconnection attempt.
+    auth: (cb) => cb({ token: getAccessToken() }),
     transports: ["websocket"],
     reconnection: true,
     reconnectionAttempts: 5,
@@ -65,6 +75,10 @@ export const connectAuctionSocket = () => {
     console.log("❌ Auction Socket Disconnected");
   });
 
+  auctionSocket.on("connect_error", (error) => {
+    console.error("Auction Socket Connect Error:", error.message);
+  });
+
   auctionSocket.on("error", (error) => {
     console.error("Auction Socket Error:", error);
   });
@@ -74,12 +88,14 @@ export const connectAuctionSocket = () => {
 
 // Snake Draft Socket 연결
 export const connectSnakeDraftSocket = () => {
-  if (snakeDraftSocket?.connected) return snakeDraftSocket;
+  if (snakeDraftSocket?.connected || snakeDraftSocket?.active) return snakeDraftSocket;
+  if (snakeDraftSocket) {
+    snakeDraftSocket.removeAllListeners();
+    snakeDraftSocket = null;
+  }
 
   snakeDraftSocket = io(`${SOCKET_URL}/snake-draft`, {
-    auth: {
-      token: getAccessToken(),
-    },
+    auth: (cb) => cb({ token: getAccessToken() }),
     transports: ["websocket"],
     reconnection: true,
     reconnectionAttempts: 5,
@@ -103,12 +119,14 @@ export const connectSnakeDraftSocket = () => {
 
 // Match Socket 연결
 export const connectMatchSocket = () => {
-  if (matchSocket?.connected) return matchSocket;
+  if (matchSocket?.connected || matchSocket?.active) return matchSocket;
+  if (matchSocket) {
+    matchSocket.removeAllListeners();
+    matchSocket = null;
+  }
 
   matchSocket = io(`${SOCKET_URL}/match`, {
-    auth: {
-      token: getAccessToken(),
-    },
+    auth: (cb) => cb({ token: getAccessToken() }),
     transports: ["websocket"],
     reconnection: true,
     reconnectionAttempts: 5,
@@ -132,12 +150,14 @@ export const connectMatchSocket = () => {
 
 // Clan Socket 연결
 export const connectClanSocket = () => {
-  if (clanSocket?.connected) return clanSocket;
+  if (clanSocket?.connected || clanSocket?.active) return clanSocket;
+  if (clanSocket) {
+    clanSocket.removeAllListeners();
+    clanSocket = null;
+  }
 
   clanSocket = io(`${SOCKET_URL}/clan`, {
-    auth: {
-      token: getAccessToken(),
-    },
+    auth: (cb) => cb({ token: getAccessToken() }),
     transports: ["websocket"],
     reconnection: true,
     reconnectionAttempts: 5,
@@ -236,12 +256,64 @@ export const roomSocketHelpers = {
 
 // Auction Socket 헬퍼 함수
 export const auctionSocketHelpers = {
-  joinAuction: (roomId: string) => {
-    auctionSocket?.emit("join-room", { roomId });  // ✅ Fixed: join-auction → join-room
+  joinAuction: (roomId: string): Promise<any> => {
+    return new Promise((resolve) => {
+      if (!auctionSocket) {
+        resolve({ success: false, error: "socket_not_initialized" });
+        return;
+      }
+
+      let settled = false;
+      const done = (value: any) => {
+        if (settled) return;
+        settled = true;
+        resolve(value);
+      };
+
+      const emitJoin = () => {
+        const ackTimeout = setTimeout(() => {
+          done({ success: false, error: "join_timeout" });
+        }, 15000);
+
+        auctionSocket?.emit("join-room", { roomId }, (response: any) => {
+          clearTimeout(ackTimeout);
+          done(response ?? {});
+        });
+      };
+
+      if (auctionSocket.connected) {
+        emitJoin();
+        return;
+      }
+
+      const connectTimeout = setTimeout(() => {
+        auctionSocket?.off("connect", onConnect);
+        done({ success: false, error: "connect_timeout" });
+      }, 15000);
+
+      const onConnect = () => {
+        clearTimeout(connectTimeout);
+        emitJoin();
+      };
+
+      auctionSocket.once("connect", onConnect);
+    });
   },
 
-  placeBid: (roomId: string, amount: number) => {
-    auctionSocket?.emit("place-bid", { roomId, amount });
+  placeBid: (roomId: string, amount: number): Promise<any> => {
+    return new Promise((resolve) => {
+      if (!auctionSocket?.connected) {
+        resolve({ error: "소켓이 연결되어 있지 않습니다." });
+        return;
+      }
+      const timeout = setTimeout(() => {
+        resolve({ error: "bid_timeout" });
+      }, 5000);
+      auctionSocket.emit("place-bid", { roomId, amount }, (response: any) => {
+        clearTimeout(timeout);
+        resolve(response ?? {});
+      });
+    });
   },
 
   onAuctionStarted: (callback: (data: any) => void) => {
@@ -289,16 +361,50 @@ export const auctionSocketHelpers = {
     auctionSocket?.on("captains-confirmed", callback);
   },
 
-  volunteerCaptain: (roomId: string) => {
-    auctionSocket?.emit("volunteer-captain", { roomId });
+  onSessionAborted: (callback: (data: any) => void) => {
+    auctionSocket?.on("session-aborted", callback);
   },
 
-  finalizeVolunteers: (roomId: string, selectedUserIds?: string[]) => {
-    auctionSocket?.emit("finalize-volunteers", { roomId, selectedUserIds });
+  volunteerCaptain: (roomId: string): Promise<any> => {
+    return new Promise((resolve) => {
+      if (!auctionSocket?.connected) {
+        resolve({ error: "소켓이 연결되어 있지 않습니다." });
+        return;
+      }
+      const timeout = setTimeout(() => resolve({ error: "volunteer_timeout" }), 10000);
+      auctionSocket.emit("volunteer-captain", { roomId }, (response: any) => {
+        clearTimeout(timeout);
+        resolve(response ?? {});
+      });
+    });
   },
 
-  selectManualCaptains: (roomId: string, userIds: string[]) => {
-    auctionSocket?.emit("select-manual-captains", { roomId, userIds });
+  finalizeVolunteers: (roomId: string, selectedUserIds?: string[]): Promise<any> => {
+    return new Promise((resolve) => {
+      if (!auctionSocket?.connected) {
+        resolve({ error: "소켓이 연결되어 있지 않습니다." });
+        return;
+      }
+      const timeout = setTimeout(() => resolve({ error: "finalize_timeout" }), 10000);
+      auctionSocket.emit("finalize-volunteers", { roomId, selectedUserIds }, (response: any) => {
+        clearTimeout(timeout);
+        resolve(response ?? {});
+      });
+    });
+  },
+
+  selectManualCaptains: (roomId: string, userIds: string[]): Promise<any> => {
+    return new Promise((resolve) => {
+      if (!auctionSocket?.connected) {
+        resolve({ error: "소켓이 연결되어 있지 않습니다." });
+        return;
+      }
+      const timeout = setTimeout(() => resolve({ error: "select_timeout" }), 10000);
+      auctionSocket.emit("select-manual-captains", { roomId, userIds }, (response: any) => {
+        clearTimeout(timeout);
+        resolve(response ?? {});
+      });
+    });
   },
 
   offAllListeners: () => {
@@ -313,21 +419,94 @@ export const auctionSocketHelpers = {
     auctionSocket?.off("captain-selection-phase");
     auctionSocket?.off("volunteer-list-updated");
     auctionSocket?.off("captains-confirmed");
+    auctionSocket?.off("session-aborted");
   },
 };
 
 // Snake Draft Socket 헬퍼 함수
 export const snakeDraftSocketHelpers = {
-  joinDraft: (roomId: string) => {
-    snakeDraftSocket?.emit("join-draft-room", { roomId });
+  joinDraft: (roomId: string): Promise<any> => {
+    return new Promise((resolve) => {
+      if (!snakeDraftSocket) {
+        resolve({ success: false, error: "socket_not_initialized" });
+        return;
+      }
+
+      let settled = false;
+      const done = (value: any) => {
+        if (settled) return;
+        settled = true;
+        resolve(value);
+      };
+
+      const emitJoin = () => {
+        const ackTimeout = setTimeout(() => {
+          done({ success: false, error: "join_timeout" });
+        }, 15000);
+
+        snakeDraftSocket?.emit("join-draft-room", { roomId }, (response: any) => {
+          clearTimeout(ackTimeout);
+          done(response ?? {});
+        });
+      };
+
+      if (snakeDraftSocket.connected) {
+        emitJoin();
+        return;
+      }
+
+      const connectTimeout = setTimeout(() => {
+        snakeDraftSocket?.off("connect", onConnect);
+        done({ success: false, error: "connect_timeout" });
+      }, 15000);
+
+      const onConnect = () => {
+        clearTimeout(connectTimeout);
+        emitJoin();
+      };
+
+      snakeDraftSocket.once("connect", onConnect);
+    });
   },
 
-  makePick: (roomId: string, playerId: string) => {
-    snakeDraftSocket?.emit("make-pick", { roomId, playerId });
+  makePick: (roomId: string, playerId: string): Promise<any> => {
+    return new Promise((resolve) => {
+      if (!snakeDraftSocket?.connected) {
+        resolve({ error: "소켓이 연결되어 있지 않습니다." });
+        return;
+      }
+      const timeout = setTimeout(() => {
+        resolve({ error: "pick_timeout" });
+      }, 10000);
+      snakeDraftSocket.emit(
+        "make-pick",
+        { roomId, targetPlayerId: playerId },
+        (response: any) => {
+          clearTimeout(timeout);
+          resolve(response ?? {});
+        },
+      );
+    });
   },
 
-  getDraftState: (roomId: string) => {
-    snakeDraftSocket?.emit("get-draft-state", { roomId });
+  getDraftState: (roomId: string): Promise<any> => {
+    return new Promise((resolve) => {
+      if (!snakeDraftSocket?.connected) {
+        resolve({ error: "소켓이 연결되어 있지 않습니다." });
+        return;
+      }
+      const timeout = setTimeout(() => {
+        resolve({ error: "state_timeout" });
+      }, 10000);
+      snakeDraftSocket.emit(
+        "get-draft-state",
+        { roomId },
+        (response: any) => {
+          clearTimeout(timeout);
+          resolve(response ?? {});
+        },
+      );
+    });
   },
 
   onDraftStarted: (callback: (data: any) => void) => {
@@ -350,12 +529,17 @@ export const snakeDraftSocketHelpers = {
     snakeDraftSocket?.on("draft-state", callback);
   },
 
+  onSessionAborted: (callback: (data: any) => void) => {
+    snakeDraftSocket?.on("session-aborted", callback);
+  },
+
   offAllListeners: () => {
     snakeDraftSocket?.off("draft-started");
     snakeDraftSocket?.off("pick-made");
     snakeDraftSocket?.off("draft-complete");
     snakeDraftSocket?.off("timer-update");
     snakeDraftSocket?.off("draft-state");
+    snakeDraftSocket?.off("session-aborted");
   },
 };
 
@@ -391,12 +575,14 @@ export const matchSocketHelpers = {
 
 // Presence Socket 연결
 export const connectPresenceSocket = () => {
-  if (presenceSocket?.connected) return presenceSocket;
+  if (presenceSocket?.connected || presenceSocket?.active) return presenceSocket;
+  if (presenceSocket) {
+    presenceSocket.removeAllListeners();
+    presenceSocket = null;
+  }
 
   presenceSocket = io(`${SOCKET_URL}/presence`, {
-    auth: {
-      token: getAccessToken(),
-    },
+    auth: (cb) => cb({ token: getAccessToken() }),
     transports: ["websocket"],
     reconnection: true,
     reconnectionAttempts: 5,
@@ -505,12 +691,14 @@ export const clanSocketHelpers = {
 
 // Notification Socket 연결
 export const connectNotificationSocket = () => {
-  if (notificationSocket?.connected) return notificationSocket;
+  if (notificationSocket?.connected || notificationSocket?.active) return notificationSocket;
+  if (notificationSocket) {
+    notificationSocket.removeAllListeners();
+    notificationSocket = null;
+  }
 
   notificationSocket = io(`${SOCKET_URL}/notification`, {
-    auth: {
-      token: getAccessToken(),
-    },
+    auth: (cb) => cb({ token: getAccessToken() }),
     transports: ["websocket"],
     reconnection: true,
     reconnectionAttempts: 5,
@@ -556,12 +744,17 @@ export const disconnectNotificationSocket = () => {
 
 // DM Socket 연결
 export const connectDmSocket = () => {
-  if (dmSocket?.connected) return dmSocket;
+  if (dmSocket?.connected || dmSocket?.active) return dmSocket;
+
+  // 기존 소켓 정리
+  if (dmSocket) {
+    dmSocket.removeAllListeners();
+    dmSocket.disconnect();
+    dmSocket = null;
+  }
 
   dmSocket = io(`${SOCKET_URL}/dm`, {
-    auth: {
-      token: getAccessToken(),
-    },
+    auth: (cb) => cb({ token: getAccessToken() }),
     transports: ["websocket"],
     reconnection: true,
     reconnectionAttempts: 5,
@@ -576,12 +769,16 @@ export const connectDmSocket = () => {
     console.log("❌ DM Socket Disconnected");
   });
 
+  dmSocket.on("connect_error", (error) => {
+    console.error("DM Socket Connect Error:", error.message);
+  });
+
   return dmSocket;
 };
 
 export const dmSocketHelpers = {
-  sendMessage: (receiverId: string, content: string) => {
-    dmSocket?.emit("send-dm", { receiverId, content });
+  sendMessage: (receiverId: string, content: string, callback?: (ack: any) => void) => {
+    dmSocket?.emit("send-dm", { receiverId, content }, callback);
   },
 
   sendIsTyping: (receiverId: string, isTyping: boolean) => {
@@ -596,16 +793,32 @@ export const dmSocketHelpers = {
     dmSocket?.on("new-dm", callback);
   },
 
+  offNewMessage: (callback: (message: any) => void) => {
+    dmSocket?.off("new-dm", callback);
+  },
+
   onUserTyping: (callback: (data: { userId: string; username: string }) => void) => {
     dmSocket?.on("dm-typing", callback);
+  },
+
+  offUserTyping: (callback: (data: { userId: string; username: string }) => void) => {
+    dmSocket?.off("dm-typing", callback);
   },
 
   onUserStoppedTyping: (callback: (data: { userId: string }) => void) => {
     dmSocket?.on("dm-stopped-typing", callback);
   },
 
+  offUserStoppedTyping: (callback: (data: { userId: string }) => void) => {
+    dmSocket?.off("dm-stopped-typing", callback);
+  },
+
   onUnreadCount: (callback: (data: { total: number }) => void) => {
     dmSocket?.on("dm-unread-count", callback);
+  },
+
+  offUnreadCount: (callback: (data: { total: number }) => void) => {
+    dmSocket?.off("dm-unread-count", callback);
   },
 
   offAllListeners: () => {
@@ -679,10 +892,14 @@ export const disconnectClanSocket = () => {
 // ========================================
 
 export const connectRoleSelectionSocket = () => {
-  if (roleSelectionSocket?.connected) return roleSelectionSocket;
+  if (roleSelectionSocket?.connected || roleSelectionSocket?.active) return roleSelectionSocket;
+  if (roleSelectionSocket) {
+    roleSelectionSocket.removeAllListeners();
+    roleSelectionSocket = null;
+  }
 
   roleSelectionSocket = io(`${SOCKET_URL}/role-selection`, {
-    auth: { token: getAccessToken() },
+    auth: (cb) => cb({ token: getAccessToken() }),
     transports: ["websocket"],
     reconnection: true,
     reconnectionAttempts: 5,
@@ -703,16 +920,60 @@ export const connectRoleSelectionSocket = () => {
 export const roleSelectionSocketHelpers = {
   joinRoom: (roomId: string) => {
     return new Promise<any>((resolve) => {
-      roleSelectionSocket?.emit("join-room", { roomId }, (response: any) => {
-        resolve(response);
-      });
+      if (!roleSelectionSocket) {
+        resolve({ success: false, error: "socket_not_initialized" });
+        return;
+      }
+
+      let settled = false;
+      const done = (value: any) => {
+        if (settled) return;
+        settled = true;
+        resolve(value);
+      };
+
+      const emitJoin = () => {
+        const ackTimeout = setTimeout(() => {
+          done({ success: false, error: "join_timeout" });
+        }, 15000);
+
+        roleSelectionSocket?.emit("join-room", { roomId }, (response: any) => {
+          clearTimeout(ackTimeout);
+          done(response ?? {});
+        });
+      };
+
+      if (roleSelectionSocket.connected) {
+        emitJoin();
+        return;
+      }
+
+      const connectTimeout = setTimeout(() => {
+        roleSelectionSocket?.off("connect", onConnect);
+        done({ success: false, error: "connect_timeout" });
+      }, 15000);
+
+      const onConnect = () => {
+        clearTimeout(connectTimeout);
+        emitJoin();
+      };
+
+      roleSelectionSocket.once("connect", onConnect);
     });
   },
 
-  selectRole: (roomId: string, role: string) => {
+  selectRole: (roomId: string, role: string): Promise<any> => {
     return new Promise<any>((resolve) => {
-      roleSelectionSocket?.emit("select-role", { roomId, role }, (response: any) => {
-        resolve(response);
+      if (!roleSelectionSocket?.connected) {
+        resolve({ error: "소켓이 연결되어 있지 않습니다." });
+        return;
+      }
+      const timeout = setTimeout(() => {
+        resolve({ error: "role_selection_timeout" });
+      }, 15000);
+      roleSelectionSocket.emit("select-role", { roomId, role }, (response: any) => {
+        clearTimeout(timeout);
+        resolve(response ?? {});
       });
     });
   },
@@ -737,12 +998,17 @@ export const roleSelectionSocketHelpers = {
     roleSelectionSocket?.on("role-selection-error", callback);
   },
 
+  onSessionAborted: (callback: (data: any) => void) => {
+    roleSelectionSocket?.on("session-aborted", callback);
+  },
+
   offAllListeners: () => {
     roleSelectionSocket?.off("role-selected");
     roleSelectionSocket?.off("role-selection-completed");
     roleSelectionSocket?.off("role-selection-started");
     roleSelectionSocket?.off("timer-tick");
     roleSelectionSocket?.off("role-selection-error");
+    roleSelectionSocket?.off("session-aborted");
   },
 };
 

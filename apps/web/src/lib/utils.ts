@@ -35,24 +35,25 @@ const TIER_MAP: TierInfo[] = [
 
 const DEFAULT_TIER = TIER_MAP[TIER_MAP.length - 1]; // iron
 
-function findTier(tier: string): TierInfo {
-  const lower = tier.toLowerCase();
-  return TIER_MAP.find(t => lower.includes(t.key)) ?? DEFAULT_TIER;
+function findTier(tier?: string | null): TierInfo {
+  const lower = (tier ?? "").toLowerCase();
+  if (!lower) return DEFAULT_TIER;
+  return TIER_MAP.find((t) => lower.includes(t.key)) ?? DEFAULT_TIER;
 }
 
-export function getTierColor(tier: string): string {
+export function getTierColor(tier?: string | null): string {
   return findTier(tier).textClass;
 }
 
-export function getTierBgClass(tier: string): string {
+export function getTierBgClass(tier?: string | null): string {
   return findTier(tier).bgClass;
 }
 
-export function getTierBadgeVariant(tier: string): string {
+export function getTierBadgeVariant(tier?: string | null): string {
   return findTier(tier).badgeVariant;
 }
 
-export function getTierIcon(tier: string): string {
+export function getTierIcon(tier?: string | null): string {
   return findTier(tier).icon;
 }
 
@@ -69,9 +70,11 @@ const TIER_SCORE_BASE: Record<string, number> = {
 const RANK_SCORE_BONUS: Record<string, number> = { IV: 0, III: 100, II: 200, I: 300, '': 0 };
 const MASTER_PLUS_TIERS = new Set(['MASTER', 'GRANDMASTER', 'CHALLENGER']);
 
-export function calculateTierScore(tier: string, rank: string, lp = 0): number {
-  const base = TIER_SCORE_BASE[tier.toUpperCase()] ?? 0;
-  const bonus = MASTER_PLUS_TIERS.has(tier.toUpperCase()) ? 0 : (RANK_SCORE_BONUS[rank] ?? 0);
+export function calculateTierScore(tier?: string | null, rank?: string | null, lp = 0): number {
+  const normalizedTier = (tier ?? "UNRANKED").toUpperCase();
+  const normalizedRank = rank ?? "";
+  const base = TIER_SCORE_BASE[normalizedTier] ?? 0;
+  const bonus = MASTER_PLUS_TIERS.has(normalizedTier) ? 0 : (RANK_SCORE_BONUS[normalizedRank] ?? 0);
   return base + bonus + lp;
 }
 

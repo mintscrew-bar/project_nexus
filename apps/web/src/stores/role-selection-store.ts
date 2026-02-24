@@ -36,23 +36,36 @@ interface RoleSelectionState {
   isLoading: boolean;
   isCompleted: boolean;
   error: string | null;
+  sessionAbortedAt: number | null;
+  sessionAbortMessage: string | null;
 
   connect: (roomId: string) => void;
   disconnect: () => void;
   selectRole: (roomId: string, role: string) => Promise<void>;
+  clearSessionAbort: () => void;
 }
 
-export const useRoleSelectionStore = create<RoleSelectionState>((set, get) => ({
+export const useRoleSelectionStore = create<RoleSelectionState>((set) => ({
   room: null,
   timeRemaining: 120,
   isConnected: false,
   isLoading: true,
   isCompleted: false,
   error: null,
+  sessionAbortedAt: null,
+  sessionAbortMessage: null,
 
   connect: (roomId: string) => {
-    set({ isLoading: true, error: null, isCompleted: false });
+    set({
+      isLoading: true,
+      error: null,
+      isCompleted: false,
+      sessionAbortedAt: null,
+      sessionAbortMessage: null,
+    });
     connectRoleSelectionSocket();
+    // Clear existing listeners to prevent duplication on reconnect
+    roleSelectionSocketHelpers.offAllListeners();
 
     roleSelectionSocketHelpers.joinRoom(roomId).then((response: any) => {
       if (response?.success) {
@@ -65,12 +78,22 @@ export const useRoleSelectionStore = create<RoleSelectionState>((set, get) => ({
           isConnected: true,
         });
       } else {
+        const errorMsg = response?.error || "Failed to join role selection room.";
         set({
-          error: response?.error || "역할 선택 방에 참여할 수 없습니다.",
+          error:
+            errorMsg === "join_timeout" || errorMsg === "connect_timeout"
+              ? "서버 연결에 실패했습니다. 새로고침 해주세요."
+              : errorMsg,
           isLoading: false,
-          isConnected: true,
+          isConnected: false,
         });
       }
+    }).catch(() => {
+      set({
+        error: "서버 연결에 실패했습니다. 새로고침 해주세요.",
+        isLoading: false,
+        isConnected: false,
+      });
     });
 
     roleSelectionSocketHelpers.onRoleSelected(
@@ -82,29 +105,35 @@ export const useRoleSelectionStore = create<RoleSelectionState>((set, get) => ({
             return {
               ...team,
               members: team.members.map((m) =>
-                m.id === data.memberId
-                  ? { ...m, assignedRole: data.role }
-                  : m
+                m.id === data.memberId ? { ...m, assignedRole: data.role } : m,
               ),
             };
           });
           return { room: { ...state.room, teams: updatedTeams } };
         });
-      }
+      },
     );
 
-    roleSelectionSocketHelpers.onTimerTick(
-      (data: { timeRemaining: number }) => {
-        set({ timeRemaining: Math.ceil(data.timeRemaining / 1000) });
-      }
-    );
+    roleSelectionSocketHelpers.onTimerTick((data: { timeRemaining: number }) => {
+      set({ timeRemaining: Math.ceil(data.timeRemaining / 1000) });
+    });
 
     roleSelectionSocketHelpers.onRoleSelectionCompleted(() => {
       set({ isCompleted: true });
     });
 
     roleSelectionSocketHelpers.onRoleSelectionError((data: any) => {
-      set({ error: data.message || "역할 선택 중 오류가 발생했습니다." });
+      set({
+        error: data.message || "An error occurred while completing role selection.",
+      });
+    });
+
+    roleSelectionSocketHelpers.onSessionAborted((data: { message?: string }) => {
+      set({
+        sessionAbortedAt: Date.now(),
+        sessionAbortMessage:
+          data?.message ?? "Session aborted. Returning to lobby.",
+      });
     });
   },
 
@@ -118,6 +147,8 @@ export const useRoleSelectionStore = create<RoleSelectionState>((set, get) => ({
       isLoading: false,
       isCompleted: false,
       error: null,
+      sessionAbortedAt: null,
+      sessionAbortMessage: null,
     });
   },
 
@@ -127,5 +158,9 @@ export const useRoleSelectionStore = create<RoleSelectionState>((set, get) => ({
       set({ error: response.error });
       throw new Error(response.error);
     }
+  },
+
+  clearSessionAbort: () => {
+    set({ sessionAbortedAt: null, sessionAbortMessage: null });
   },
 }));

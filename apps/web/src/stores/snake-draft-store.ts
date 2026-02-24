@@ -38,6 +38,8 @@ interface SnakeDraftStoreState {
   isConnected: boolean;
   isLoading: boolean;
   error: string | null;
+  sessionAbortedAt: number | null;
+  sessionAbortMessage: string | null;
 
   // REST API methods
   startDraft: (roomId: string, captainSelection: 'RANDOM' | 'TIER') => Promise<void>;
@@ -45,8 +47,9 @@ interface SnakeDraftStoreState {
   getDraftState: (roomId: string) => Promise<void>;
 
   // WebSocket methods
-  connectToDraft: (roomId: string) => void;
+  connectToDraft: (roomId: string) => Promise<void>;
   disconnectFromDraft: () => void;
+  clearSessionAbort: () => void;
 }
 
 export const useSnakeDraftStore = create<SnakeDraftStoreState>((set, get) => ({
@@ -54,6 +57,8 @@ export const useSnakeDraftStore = create<SnakeDraftStoreState>((set, get) => ({
   isConnected: false,
   isLoading: false,
   error: null,
+  sessionAbortedAt: null,
+  sessionAbortMessage: null,
 
   startDraft: async (roomId: string, captainSelection: 'RANDOM' | 'TIER') => {
     set({ isLoading: true, error: null });
@@ -94,10 +99,16 @@ export const useSnakeDraftStore = create<SnakeDraftStoreState>((set, get) => ({
     }
   },
 
-  connectToDraft: (roomId: string) => {
-    const socket = connectSnakeDraftSocket();
-
-    snakeDraftSocketHelpers.joinDraft(roomId);
+  connectToDraft: async (roomId: string) => {
+    connectSnakeDraftSocket();
+    // Clear existing listeners to prevent duplication on reconnect
+    snakeDraftSocketHelpers.offAllListeners();
+    set({
+      isLoading: true,
+      error: null,
+      sessionAbortedAt: null,
+      sessionAbortMessage: null,
+    });
 
     snakeDraftSocketHelpers.onDraftStarted((data: DraftState) => {
       set({ draftState: data });
@@ -159,7 +170,45 @@ export const useSnakeDraftStore = create<SnakeDraftStoreState>((set, get) => ({
       set({ draftState: data });
     });
 
-    set({ isConnected: true });
+    snakeDraftSocketHelpers.onSessionAborted((data: { message?: string }) => {
+      set({
+        sessionAbortedAt: Date.now(),
+        sessionAbortMessage:
+          data?.message ?? "Session aborted. Returning to lobby.",
+      });
+    });
+
+    let joinResponse = await snakeDraftSocketHelpers.joinDraft(roomId);
+
+    // On timeout, retry once if we have no existing state
+    if (
+      !joinResponse?.success &&
+      (joinResponse?.error === 'join_timeout' || joinResponse?.error === 'connect_timeout')
+    ) {
+      if (get().draftState) {
+        // Already have state from a previous connection, keep it
+        set({ isConnected: true, isLoading: false, error: null });
+        return;
+      }
+      joinResponse = await snakeDraftSocketHelpers.joinDraft(roomId);
+    }
+
+    if (joinResponse?.state) {
+      set({ draftState: joinResponse.state });
+    }
+
+    if (!joinResponse?.success && joinResponse?.error) {
+      set({
+        isConnected: false,
+        isLoading: false,
+        error: joinResponse.error === 'join_timeout' || joinResponse.error === 'connect_timeout'
+          ? '서버 연결에 실패했습니다. 새로고침 해주세요.'
+          : joinResponse.error,
+      });
+      return;
+    }
+
+    set({ isConnected: true, isLoading: false });
   },
 
   disconnectFromDraft: () => {
@@ -167,7 +216,15 @@ export const useSnakeDraftStore = create<SnakeDraftStoreState>((set, get) => ({
     disconnectSnakeDraftSocket();
     set({
       isConnected: false,
+      isLoading: false,
       draftState: null,
+      error: null,
+      sessionAbortedAt: null,
+      sessionAbortMessage: null,
     });
+  },
+
+  clearSessionAbort: () => {
+    set({ sessionAbortedAt: null, sessionAbortMessage: null });
   },
 }));

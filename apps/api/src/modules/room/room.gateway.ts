@@ -15,7 +15,7 @@ import { SnakeDraftGateway } from "./snake-draft.gateway";
 import { AuthService } from "../auth/auth.service";
 import { AuctionService } from "../auction/auction.service";
 import { AuctionGateway } from "../auction/auction.gateway";
-import { TeamMode } from "@nexus/database";
+import { RoomStatus, TeamMode } from "@nexus/database";
 
 interface AuthenticatedSocket extends Socket {
   userId?: string;
@@ -89,9 +89,16 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
       // Leave room if in one
       const roomId = this.socketRooms.get(client.id);
       if (roomId) {
+        let autoLeft = false;
         try {
-          // Actually remove participant from database
-          await this.roomService.leaveRoom(client.userId!, roomId); // Assert client.userId is string
+          // Only auto-leave from DB while room is in lobby state.
+          // After game starts (e.g. DRAFT/IN_PROGRESS), navigation disconnects
+          // should not remove participants.
+          const status = await this.roomService.getRoomStatus(roomId);
+          if (status === RoomStatus.WAITING) {
+            await this.roomService.leaveRoom(client.userId!, roomId); // Assert client.userId is string
+            autoLeft = true;
+          }
         } catch (error) {
           // Room might already be deleted or user not in room, ignore
           console.log(`Leave room on disconnect error:`, error);
@@ -100,17 +107,19 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
         client.leave(roomId);
         this.socketRooms.delete(client.id);
 
-        // Notify others in the room
-        this.server.to(roomId).emit("user-left", {
-          userId: client.userId,
-          username: client.username,
-        });
+        if (autoLeft) {
+          // Notify others in the room
+          this.server.to(roomId).emit("user-left", {
+            userId: client.userId,
+            username: client.username,
+          });
+
+          // Broadcast room list update to subscribers
+          this.broadcastRoomListUpdate();
+        }
 
         // Clear typing status on disconnect
         this.stopTyping(roomId, client.userId!); // Assert client.userId is string
-
-        // Broadcast room list update to subscribers
-        this.broadcastRoomListUpdate();
       }
 
       console.log(`User ${client.username} disconnected (${client.id})`);
@@ -128,9 +137,7 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
     client.join(this.ROOM_LIST_CHANNEL);
 
     // Send current room list immediately
-    const rooms = await this.roomService.listRooms({
-      status: "WAITING" as any,
-    });
+    const rooms = await this.roomService.listRooms();
     return { success: true, rooms };
   }
 
@@ -142,10 +149,12 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   // Broadcast room list updates to all subscribers
   async broadcastRoomListUpdate() {
-    const rooms = await this.roomService.listRooms({
-      status: "WAITING" as any,
-    });
-    this.server.to(this.ROOM_LIST_CHANNEL).emit("room-list-updated", rooms);
+    try {
+      const rooms = await this.roomService.listRooms();
+      this.server.to(this.ROOM_LIST_CHANNEL).emit("room-list-updated", rooms);
+    } catch (error) {
+      console.error("[Room] Failed to broadcast room list update:", error);
+    }
   }
 
   // ========================================
@@ -329,6 +338,20 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       return { success: true, roomId: data.roomId, teamMode: room.teamMode };
     } catch (error: any) {
+      // Best-effort rollback: if auction/draft start failed mid-way,
+      // the room status may have been changed to DRAFT already.
+      // Roll it back to WAITING so the host can retry.
+      try {
+        const currentRoom = await this.roomService.getRoomById(data.roomId);
+        if (currentRoom && currentRoom.status !== RoomStatus.WAITING) {
+          await this.roomService.rollbackToWaiting(data.roomId);
+          console.warn(
+            `[Room] Rolled back room ${data.roomId} to WAITING after startGame failure: ${error.message}`,
+          );
+        }
+      } catch (_rollbackError) {
+        // Ignore rollback failures
+      }
       return { error: error.message };
     }
   }

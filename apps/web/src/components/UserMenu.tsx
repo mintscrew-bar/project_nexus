@@ -8,7 +8,7 @@ import Link from 'next/link';
 import { useState, useRef, useEffect } from 'react';
 
 export function UserMenu() {
-  const { user, isAuthenticated, logout } = useAuthStore();
+  const { user, isAuthenticated, isLoading, logout } = useAuthStore();
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -22,6 +22,11 @@ export function UserMenu() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // 인증 초기화 중: 로그인 버튼 대신 스켈레톤을 보여줘서 깜빡임 방지
+  if (isLoading) {
+    return <div className="w-28 h-9 bg-bg-tertiary rounded-lg animate-pulse" />;
+  }
 
   if (!isAuthenticated || !user) {
     return (

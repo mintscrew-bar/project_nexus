@@ -36,7 +36,7 @@ interface Room {
   hostId: string;
   maxParticipants: number;
   isPrivate: boolean;
-  status: "WAITING" | "IN_PROGRESS" | "COMPLETED" | "DRAFT" | "DRAFT_COMPLETED" | "TEAM_SELECTION";
+  status: "WAITING" | "IN_PROGRESS" | "COMPLETED" | "DRAFT" | "DRAFT_COMPLETED" | "TEAM_SELECTION" | "ROLE_SELECTION";
   teamMode: "AUCTION" | "SNAKE_DRAFT";
   participants: Participant[];
   // Extended settings
@@ -84,9 +84,9 @@ interface LobbyStoreState {
   messages: ChatMessage[];
 
   connect: (roomId: string, password?: string) => void;
-  disconnect: () => void;
+  disconnect: (options?: { skipLeave?: boolean }) => void;
   setReady: (isReady: boolean) => void;
-  startGame: () => void;
+  startGame: (onError?: (msg: string) => void) => void;
   sendMessage: (content: string) => void;
   updateRoomSettings: (roomId: string, settings: RoomSettingsDto) => Promise<void>;
   kickParticipant: (roomId: string, participantId: string) => Promise<void>;
@@ -103,12 +103,17 @@ export const useLobbyStore = create<LobbyStoreState>((set, get) => ({
   messages: [],
 
   connect: (roomId, password?) => {
-    if (get().socket) return;
+    const existingSocket = get().socket;
+    if (existingSocket?.connected || existingSocket?.active) return;
+    // Clean up stale disconnected socket
+    if (existingSocket) {
+      existingSocket.removeAllListeners();
+      existingSocket.disconnect();
+      set({ socket: null });
+    }
 
     const socket = io(`${API_URL}/room`, {
-      auth: {
-        token: getAccessToken(),
-      },
+      auth: (cb) => cb({ token: getAccessToken() }),
       transports: ['websocket'],
       reconnection: true,
       reconnectionAttempts: 5,
@@ -127,7 +132,8 @@ export const useLobbyStore = create<LobbyStoreState>((set, get) => ({
     });
 
     socket.on('disconnect', () => {
-      set({ isConnected: false, room: null, gameStarting: false });
+      // room 데이터는 유지 — 재연결 시 connect 핸들러에서 자동 rejoin
+      set({ isConnected: false });
     });
 
     socket.on('connect_error', (err) => {
@@ -186,29 +192,45 @@ export const useLobbyStore = create<LobbyStoreState>((set, get) => ({
     set({ socket });
   },
 
-  disconnect: () => {
+  disconnect: (options) => {
     const { socket, room } = get();
     if (socket) {
       // Emit leave-room before disconnecting for cleaner state management
-      if (room) {
+      if (room && !options?.skipLeave && room.status === 'WAITING') {
         socket.emit('leave-room', { roomId: room.id });
       }
+      socket.removeAllListeners();
       socket.disconnect();
-      set({ socket: null, messages: [], room: null, gameStarting: false });
+      set({
+        socket: null,
+        messages: [],
+        room: null,
+        gameStarting: false,
+        error: null,
+        isConnected: false,
+      });
     }
   },
 
-  setReady: (isReady: boolean) => {
+  setReady: (isReady: boolean, onError?: (msg: string) => void) => {
     const { socket, room } = get();
     if (socket && room) {
-      socket.emit('toggle-ready', { roomId: room.id });
+      socket.emit('toggle-ready', { roomId: room.id }, (response: any) => {
+        if (response && !response.success && onError) {
+          onError(response.error || '레디 상태 변경에 실패했습니다.');
+        }
+      });
     }
   },
 
-  startGame: () => {
+  startGame: (onError?: (msg: string) => void) => {
     const { socket, room } = get();
     if (socket && room) {
-      socket.emit('start-game', { roomId: room.id });
+      socket.emit('start-game', { roomId: room.id }, (response: any) => {
+        if (response && !response.success && onError) {
+          onError(response.error || '게임 시작에 실패했습니다.');
+        }
+      });
     }
   },
 

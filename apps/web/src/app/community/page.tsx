@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/auth-store";
 import { communityApi } from "@/lib/api-client";
@@ -26,6 +26,8 @@ import {
   MessageCircle,
   Search,
   Flame,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -197,11 +199,14 @@ function PopularPostsSection({
   );
 }
 
+const POSTS_PER_PAGE = 20;
+
 export default function CommunityPage() {
   const router = useRouter();
   const { isAuthenticated } = useAuthStore();
   const { setActionHandler, setSearchRef } = useKeyboardShortcutsContext();
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const [, startTransition] = useTransition();
 
   const [postsByCategory, setPostsByCategory] = useState<Record<PostCategory, Post[]>>({
     NOTICE: [],
@@ -209,6 +214,8 @@ export default function CommunityPage() {
     TIP: [],
     QNA: [],
   });
+  const [singleTotal, setSingleTotal] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<PostCategory | "ALL">("ALL");
@@ -225,50 +232,77 @@ export default function CommunityPage() {
     };
   }, [setSearchRef, setActionHandler]);
 
-  const fetchPostsByCategory = useCallback(async () => {
+  // sortBy / 검색 / 카테고리 변경 시 1페이지로 리셋
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedCategory, debouncedSearchQuery, sortBy]);
+
+  const fetchPosts = useCallback(async (page: number = 1) => {
     setIsLoading(true);
     setError(null);
+
+    const apiSortBy = sortBy === "newest" ? "latest" : sortBy;
+
     try {
-      const categoriesToFetch: PostCategory[] =
-        selectedCategory === "ALL"
-          ? ["NOTICE", "FREE", "TIP", "QNA"]
-          : [selectedCategory];
+      if (selectedCategory === "ALL") {
+        // 전체 모드: 각 카테고리별 10개 미리보기 (검색도 서버에서)
+        const results = await Promise.all(
+          (["NOTICE", "FREE", "TIP", "QNA"] as PostCategory[]).map(async (category) => {
+            try {
+              const data = await communityApi.getPosts({
+                category,
+                limit: 10,
+                sortBy: apiSortBy,
+                search: debouncedSearchQuery || undefined,
+              });
+              const postsArray = Array.isArray(data) ? data : (data?.posts ?? []);
+              return { category, posts: postsArray };
+            } catch {
+              return { category, posts: [] as Post[] };
+            }
+          })
+        );
 
-      const results = await Promise.all(
-        categoriesToFetch.map(async (category) => {
-          try {
-            const data = await communityApi.getPosts({
-              category,
-              limit: selectedCategory === "ALL" ? 10 : 50,
-            });
-            const postsArray = Array.isArray(data) ? data : (data?.posts ?? []);
-            return { category, posts: postsArray };
-          } catch {
-            return { category, posts: [] as Post[] };
-          }
-        })
-      );
+        const newPostsByCategory = { NOTICE: [], FREE: [], TIP: [], QNA: [] } as Record<PostCategory, Post[]>;
+        results.forEach(({ category, posts }) => {
+          newPostsByCategory[category] = posts;
+        });
+        setPostsByCategory(newPostsByCategory);
+      } else {
+        // 단일 카테고리: 서버 정렬 + 검색 + 페이지네이션
+        const data = await communityApi.getPosts({
+          category: selectedCategory,
+          limit: POSTS_PER_PAGE,
+          offset: (page - 1) * POSTS_PER_PAGE,
+          sortBy: apiSortBy,
+          search: debouncedSearchQuery || undefined,
+        });
+        const posts = Array.isArray(data) ? data : (data?.posts ?? []);
+        const total = (data as any)?.total ?? posts.length;
+        setSingleTotal(total);
 
-      const newPostsByCategory = {
-        NOTICE: [],
-        FREE: [],
-        TIP: [],
-        QNA: [],
-      } as Record<PostCategory, Post[]>;
-      results.forEach(({ category, posts }) => {
-        newPostsByCategory[category] = posts;
-      });
-      setPostsByCategory(newPostsByCategory);
+        const newPostsByCategory = { NOTICE: [], FREE: [], TIP: [], QNA: [] } as Record<PostCategory, Post[]>;
+        newPostsByCategory[selectedCategory] = posts;
+        setPostsByCategory(newPostsByCategory);
+      }
     } catch (err: any) {
       setError(err.message || "게시글을 불러오는데 실패했습니다.");
     } finally {
       setIsLoading(false);
     }
-  }, [selectedCategory]);
+  }, [selectedCategory, debouncedSearchQuery, sortBy]);
 
   useEffect(() => {
-    fetchPostsByCategory();
-  }, [fetchPostsByCategory]);
+    fetchPosts(1);
+  }, [fetchPosts]);
+
+  const handlePageChange = (page: number) => {
+    startTransition(() => {
+      setCurrentPage(page);
+    });
+    fetchPosts(page);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   const processedPostsByCategory = useMemo(() => {
     const result: Record<
@@ -282,40 +316,14 @@ export default function CommunityPage() {
     };
 
     (["NOTICE", "FREE", "TIP", "QNA"] as PostCategory[]).forEach((category) => {
-      let posts = [...postsByCategory[category]];
-
-      if (debouncedSearchQuery) {
-        const query = debouncedSearchQuery.toLowerCase();
-        posts = posts.filter(
-          (p) =>
-            p.title.toLowerCase().includes(query) ||
-            p.content.toLowerCase().includes(query) ||
-            p.author.username.toLowerCase().includes(query)
-        );
-      }
-
-      const sortFn = (a: Post, b: Post) => {
-        switch (sortBy) {
-          case "newest":
-            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-          case "popular":
-            return (b._count?.likes || 0) - (a._count?.likes || 0);
-          case "views":
-            return b.views - a.views;
-          case "comments":
-            return (b._count?.comments || 0) - (a._count?.comments || 0);
-          default:
-            return 0;
-        }
-      };
-
-      const pinnedPosts = posts.filter((p) => p.isPinned).sort(sortFn);
-      const regularPosts = posts.filter((p) => !p.isPinned).sort(sortFn);
+      const posts = postsByCategory[category];
+      const pinnedPosts = posts.filter((p) => p.isPinned);
+      const regularPosts = posts.filter((p) => !p.isPinned);
       result[category] = { pinnedPosts, regularPosts, total: posts.length };
     });
 
     return result;
-  }, [postsByCategory, debouncedSearchQuery, sortBy]);
+  }, [postsByCategory]);
 
   const allPosts = useMemo(
     () =>
@@ -327,9 +335,13 @@ export default function CommunityPage() {
 
   const totalPosts = useMemo(
     () =>
-      Object.values(processedPostsByCategory).reduce((sum, cat) => sum + cat.total, 0),
-    [processedPostsByCategory]
+      selectedCategory === "ALL"
+        ? Object.values(processedPostsByCategory).reduce((sum, cat) => sum + cat.total, 0)
+        : singleTotal,
+    [processedPostsByCategory, selectedCategory, singleTotal]
   );
+
+  const totalPages = selectedCategory !== "ALL" ? Math.ceil(singleTotal / POSTS_PER_PAGE) : 0;
 
   const categoryCounts = useMemo(() => {
     const counts: Record<PostCategory, number> = { NOTICE: 0, FREE: 0, TIP: 0, QNA: 0 };
@@ -608,6 +620,59 @@ export default function CommunityPage() {
                   <p className="text-sm text-text-tertiary text-center py-2">
                     총 {totalPosts}개의 게시글
                   </p>
+                )}
+
+                {/* 페이지네이션 (단일 카테고리 모드에서만) */}
+                {selectedCategory !== "ALL" && totalPages > 1 && (
+                  <div className="flex items-center justify-center gap-1 py-4">
+                    <button
+                      onClick={() => handlePageChange(currentPage - 1)}
+                      disabled={currentPage === 1}
+                      className="p-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-bg-tertiary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </button>
+                    {Array.from({ length: totalPages }, (_, i) => i + 1)
+                      .filter((page) =>
+                        page === 1 ||
+                        page === totalPages ||
+                        Math.abs(page - currentPage) <= 2
+                      )
+                      .reduce<(number | "...")[]>((acc, page, idx, arr) => {
+                        if (idx > 0 && page - (arr[idx - 1] as number) > 1) {
+                          acc.push("...");
+                        }
+                        acc.push(page);
+                        return acc;
+                      }, [])
+                      .map((item, idx) =>
+                        item === "..." ? (
+                          <span key={`ellipsis-${idx}`} className="px-2 text-text-tertiary text-sm">
+                            …
+                          </span>
+                        ) : (
+                          <button
+                            key={item}
+                            onClick={() => handlePageChange(item as number)}
+                            className={cn(
+                              "w-8 h-8 rounded-lg text-sm font-medium transition-colors",
+                              currentPage === item
+                                ? "bg-accent-primary text-white"
+                                : "text-text-secondary hover:text-text-primary hover:bg-bg-tertiary"
+                            )}
+                          >
+                            {item}
+                          </button>
+                        )
+                      )}
+                    <button
+                      onClick={() => handlePageChange(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                      className="p-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-bg-tertiary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                  </div>
                 )}
               </div>
             )}

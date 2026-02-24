@@ -203,6 +203,15 @@ export class RoomService {
     return this.transformRoomData(room);
   }
 
+  /** 방 상태만 빠르게 조회 (disconnect 등 경량 체크용) */
+  async getRoomStatus(roomId: string): Promise<RoomStatus | null> {
+    const room = await this.prisma.room.findUnique({
+      where: { id: roomId },
+      select: { status: true },
+    });
+    return room?.status ?? null;
+  }
+
   async getRoomById(roomId: string) {
     const room = await this.prisma.room.findUnique({
       where: { id: roomId },
@@ -232,6 +241,15 @@ export class RoomService {
                     rank: true,
                     mainRole: true,
                     subRole: true,
+                    championPreferences: {
+                      select: {
+                        role: true,
+                        championId: true,
+                        order: true,
+                      },
+                      orderBy: { order: "asc" },
+                      take: 15, // 역할당 3개 × 5역할 = 최대 15개로 제한
+                    },
                   },
                 },
               },
@@ -313,6 +331,7 @@ export class RoomService {
           participants: {
             select: {
               id: true,
+              userId: true,
               role: true,
             },
           },
@@ -390,7 +409,15 @@ export class RoomService {
     const room = await this.prisma.room.findUnique({
       where: { id: roomId },
       include: {
-        participants: true,
+        participants: {
+          include: {
+            user: {
+              select: {
+                username: true,
+              },
+            },
+          },
+        },
       },
     });
 
@@ -404,6 +431,34 @@ export class RoomService {
       throw new BadRequestException("Not in room");
     }
 
+    // During active game phases, keep participant slot so user can re-enter.
+    // Exception: host + only bots scenario is cleaned up immediately for bot testing.
+    if (room.status !== RoomStatus.WAITING) {
+      const remainingParticipants = room.participants.filter(
+        (p) => p.userId !== userId,
+      );
+      const allRemainingAreBots =
+        remainingParticipants.length > 0 &&
+        remainingParticipants.every((p: any) =>
+          /^testbot_\d+$/.test(p.user?.username || ""),
+        );
+
+      if (room.hostId === userId && allRemainingAreBots) {
+        if (this.discordVoiceService) {
+          await this.discordVoiceService.deleteRoomChannels(roomId).catch(() => {});
+        }
+        await this.prisma.chatMessage.deleteMany({
+          where: { roomId },
+        });
+        await this.prisma.room.delete({
+          where: { id: roomId },
+        });
+        return { message: "Room deleted (host disconnected during bot test)" };
+      }
+
+      return { message: "Left realtime session, participant preserved" };
+    }
+
     // Remove participant first
     await this.prisma.roomParticipant.delete({
       where: { id: participant.id },
@@ -411,6 +466,14 @@ export class RoomService {
 
     // Check remaining participants
     const remainingCount = room.participants.length - 1;
+    const remainingParticipants = room.participants.filter(
+      (p) => p.userId !== userId,
+    );
+    const allRemainingAreBots =
+      remainingParticipants.length > 0 &&
+      remainingParticipants.every((p: any) =>
+        /^testbot_\d+$/.test(p.user?.username || ""),
+      );
 
     // If no participants left, delete the room regardless of status (prevents zombie rooms)
     if (remainingCount === 0) {
@@ -425,6 +488,20 @@ export class RoomService {
         where: { id: roomId },
       });
       return { message: "Room deleted (no participants)" };
+    }
+
+    // If host leaves and only bots remain, delete room immediately (bot-test cleanup)
+    if (room.hostId === userId && allRemainingAreBots) {
+      if (this.discordVoiceService) {
+        await this.discordVoiceService.deleteRoomChannels(roomId).catch(() => {});
+      }
+      await this.prisma.chatMessage.deleteMany({
+        where: { roomId },
+      });
+      await this.prisma.room.delete({
+        where: { id: roomId },
+      });
+      return { message: "Room deleted (host disconnected during bot test)" };
     }
 
     // If host leaves but others remain, transfer host to next participant
@@ -640,11 +717,11 @@ export class RoomService {
       throw new BadRequestException("At least 2 players required to start");
     }
 
-    // Update room status
+    // Mark game as started (actual status transition to DRAFT/TEAM_SELECTION
+    // is handled by the specific module: snake-draft or auction service)
     await this.prisma.room.update({
       where: { id: roomId },
       data: {
-        status: RoomStatus.IN_PROGRESS,
         startedAt: new Date(),
       },
     });
@@ -674,6 +751,27 @@ export class RoomService {
       },
       orderBy: { createdAt: "desc" },
       take: limit,
+    });
+  }
+
+  async rollbackToWaiting(roomId: string) {
+    await this.prisma.$transaction(async (tx) => {
+      await tx.roomParticipant.updateMany({
+        where: { roomId },
+        data: { teamId: null, isCaptain: false, isReady: false },
+      });
+
+      await tx.snakeDraftPick.deleteMany({ where: { roomId } });
+      await tx.auctionBid.deleteMany({ where: { roomId } });
+      await tx.team.deleteMany({ where: { roomId } });
+
+      await tx.room.update({
+        where: { id: roomId },
+        data: {
+          status: RoomStatus.WAITING,
+          startedAt: null,
+        },
+      });
     });
   }
 
@@ -760,5 +858,117 @@ export class RoomService {
     await this.prisma.room.delete({ where: { id: roomId } });
 
     return { message: "Room closed" };
+  }
+
+  async abortActiveSession(requesterId: string, roomId: string) {
+    const room = await this.prisma.room.findUnique({
+      where: { id: roomId },
+      include: {
+        participants: {
+          include: {
+            user: {
+              select: {
+                username: true,
+              },
+            },
+          },
+        },
+        teams: {
+          include: {
+            captain: {
+              include: {
+                authProviders: {
+                  where: { provider: "DISCORD" },
+                  select: { providerId: true },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!room) {
+      throw new NotFoundException("Room not found");
+    }
+
+    if (room.status === RoomStatus.WAITING) {
+      throw new BadRequestException("Room is already in lobby state");
+    }
+
+    if (room.status === RoomStatus.COMPLETED) {
+      throw new BadRequestException(
+        "Cannot abort a completed session. Start a new one from the lobby.",
+      );
+    }
+
+    if (room.hostId !== requesterId) {
+      throw new ForbiddenException(
+        "Only the room host can abort the active session",
+      );
+    }
+
+    const captainDiscordIds = room.teams
+      .map((team) => team.captain.authProviders[0]?.providerId)
+      .filter((providerId): providerId is string => Boolean(providerId));
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.roomParticipant.updateMany({
+        where: { roomId },
+        data: {
+          teamId: null,
+          isCaptain: false,
+          isReady: false,
+        },
+      });
+
+      await tx.match.deleteMany({
+        where: { roomId },
+      });
+
+      await tx.snakeDraftPick.deleteMany({
+        where: { roomId },
+      });
+
+      await tx.auctionBid.deleteMany({
+        where: { roomId },
+      });
+
+      await tx.team.deleteMany({
+        where: { roomId },
+      });
+
+      await tx.room.update({
+        where: { id: roomId },
+        data: {
+          status: RoomStatus.WAITING,
+          startedAt: null,
+          completedAt: null,
+        },
+      });
+    });
+
+    try {
+      if (this.discordVoiceService) {
+        await Promise.all(
+          captainDiscordIds.map((providerId) =>
+            this.discordVoiceService.removeCaptainRole(providerId),
+          ),
+        );
+        await this.discordVoiceService.moveAllToLobby(roomId);
+      }
+    } catch (error) {
+      this.logger.warn("Failed to clean up Discord state after session abort:", error);
+    }
+
+    this.logger.warn(
+      `Room session aborted: roomId=${roomId}, previousStatus=${room.status}, abortedBy=${requesterId}`,
+    );
+
+    const updatedRoom = await this.getRoomById(roomId);
+    return {
+      message: "Session aborted and room returned to lobby",
+      room: updatedRoom,
+    };
   }
 }

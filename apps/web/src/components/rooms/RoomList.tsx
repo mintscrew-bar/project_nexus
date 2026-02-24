@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useMemo, useRef } from "react";
 import { useRoomStore } from "@/stores/room-store";
+import { useAuthStore } from "@/stores/auth-store";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useKeyboardShortcutsContext } from "@/components/KeyboardShortcuts";
 import { RoomCard } from "@/components/domain";
@@ -12,6 +13,14 @@ import { RefreshCcw, Home, Search, Users, Clock, CheckCircle, Gavel, ListOrdered
 type StatusFilter = "ALL" | "WAITING" | "IN_PROGRESS" | "COMPLETED";
 type ModeFilter = "ALL" | "AUCTION" | "SNAKE_DRAFT";
 type SortOption = "newest" | "oldest" | "mostPlayers" | "leastPlayers";
+
+const IN_PROGRESS_STATUSES = new Set([
+  "IN_PROGRESS",
+  "TEAM_SELECTION",
+  "DRAFT",
+  "ROLE_SELECTION",
+  "DRAFT_COMPLETED",
+]);
 
 const sortOptions: { value: SortOption; label: string }[] = [
   { value: "newest", label: "최신순" },
@@ -23,6 +32,7 @@ const sortOptions: { value: SortOption; label: string }[] = [
 export function RoomList() {
   const router = useRouter();
   const { rooms, isLoading, error, fetchRooms, subscribeToRoomList, unsubscribeFromRoomList } = useRoomStore();
+  const currentUserId = useAuthStore((state) => state.user?.id);
   const { setSearchRef } = useKeyboardShortcutsContext();
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -47,8 +57,12 @@ export function RoomList() {
     // First filter
     const filtered = rooms.filter((room) => {
       // Status filter
-      if (statusFilter !== "ALL" && room.status !== statusFilter) {
-        return false;
+      if (statusFilter !== "ALL") {
+        if (statusFilter === "IN_PROGRESS") {
+          if (!IN_PROGRESS_STATUSES.has(room.status)) return false;
+        } else if (room.status !== statusFilter) {
+          return false;
+        }
       }
 
       // Mode filter
@@ -70,7 +84,9 @@ export function RoomList() {
       if (showOnlyJoinable) {
         const currentPlayers = room.participants?.length || 0;
         const isFull = currentPlayers >= room.maxParticipants;
-        if (room.status !== "WAITING" || isFull) {
+        const isParticipant = !!currentUserId && (room.participants ?? []).some((p: any) => p.userId === currentUserId);
+        const isJoinable = room.status === "WAITING" && !isFull;
+        if (!isJoinable && !isParticipant) {
           return false;
         }
       }
@@ -93,14 +109,14 @@ export function RoomList() {
           return 0;
       }
     });
-  }, [rooms, statusFilter, modeFilter, debouncedSearchQuery, showOnlyJoinable, sortBy]);
+  }, [rooms, statusFilter, modeFilter, debouncedSearchQuery, showOnlyJoinable, sortBy, currentUserId]);
 
   // Count rooms by status
   const statusCounts = useMemo(() => {
     return {
       ALL: rooms.length,
       WAITING: rooms.filter(r => r.status === "WAITING").length,
-      IN_PROGRESS: rooms.filter(r => r.status === "IN_PROGRESS").length,
+      IN_PROGRESS: rooms.filter(r => IN_PROGRESS_STATUSES.has(r.status)).length,
       COMPLETED: rooms.filter(r => r.status === "COMPLETED").length,
     };
   }, [rooms]);
@@ -333,6 +349,7 @@ export function RoomList() {
             <RoomCard
               key={room.id}
               room={room}
+              currentUserId={currentUserId}
               onClick={() => router.push(`/tournaments/${room.id}/lobby`)}
             />
           ))}
