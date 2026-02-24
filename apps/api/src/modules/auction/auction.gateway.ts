@@ -26,6 +26,8 @@ interface AuthenticatedSocket extends Socket {
     origin: process.env.APP_URL || "http://localhost:3000",
     credentials: true,
   },
+  pingInterval: 10000,
+  pingTimeout: 5000,
 })
 export class AuctionGateway
   implements OnGatewayConnection, OnGatewayDisconnect, OnModuleDestroy
@@ -41,6 +43,8 @@ export class AuctionGateway
   private bidResolveTimers = new Map<string, ReturnType<typeof setTimeout>>();
   // Guard against concurrent _resolveCurrentBidAndAdvance calls
   private resolvingRooms = new Set<string>();
+  // In-memory rate limit fallback when Redis is unavailable
+  private bidRateLimits = new Map<string, number[]>();
 
   constructor(
     private readonly authService: AuthService,
@@ -281,7 +285,15 @@ export class AuctionGateway
           };
         }
       } catch {
-        // Redis unavailable ??allow bid to proceed
+        // Redis unavailable — use in-memory fallback
+        const key = `bid:${client.userId}`;
+        const now = Date.now();
+        const timestamps = (this.bidRateLimits.get(key) ?? []).filter(t => now - t < 3000);
+        if (timestamps.length >= 5) {
+          return { error: "Too many bids. Try again shortly." };
+        }
+        timestamps.push(now);
+        this.bidRateLimits.set(key, timestamps);
       }
     }
 
@@ -525,7 +537,7 @@ export class AuctionGateway
         this.emitPlayerSold(roomId, {
           player: result.player,
           team: result.team,
-          price: result.price!,
+          price: result.price ?? 0,
         });
       } else if (!result.sold && result.player) {
         this.emitPlayerUnsold(roomId, { player: result.player });
@@ -536,14 +548,32 @@ export class AuctionGateway
       if (isComplete) {
         this._cancelBotTimers(roomId);
         this._cancelBidResolve(roomId);
-        await this.auctionService.completeAuction(roomId);
+
+        try {
+          await this.auctionService.completeAuction(roomId);
+        } catch (error) {
+          console.error(`[Auction] Failed to complete auction for room ${roomId}:`, error);
+          this.server.to(`room:${roomId}`).emit("auction-error", {
+            error: "경매 완료 처리 중 오류가 발생했습니다.",
+          });
+          return payload;
+        }
+
         const finalData = await this.auctionService.getFullAuctionData(roomId);
         this.server.to(`room:${roomId}`).emit("auction-complete", {
           teams: finalData.teams,
         });
 
-        const roleSelectionData = await this.roleSelectionService.startRoleSelection(roomId);
-        this.roleSelectionGateway.emitRoleSelectionStarted(roomId, roleSelectionData);
+        try {
+          const roleSelectionData = await this.roleSelectionService.startRoleSelection(roomId);
+          this.roleSelectionGateway.emitRoleSelectionStarted(roomId, roleSelectionData);
+        } catch (error) {
+          console.error(`[Auction] Failed to start role selection for room ${roomId}:`, error);
+          this.server.to(`room:${roomId}`).emit("auction-error", {
+            error: "역할 선택 시작 중 오류가 발생했습니다. 호스트가 수동으로 시작해주세요.",
+          });
+        }
+
         return payload;
       }
 

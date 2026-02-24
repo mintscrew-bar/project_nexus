@@ -22,6 +22,8 @@ interface AuthenticatedSocket extends Socket {
     origin: process.env.APP_URL || "http://localhost:3000",
     credentials: true,
   },
+  pingInterval: 10000,
+  pingTimeout: 5000,
 })
 export class DmGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
@@ -123,6 +125,10 @@ export class DmGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
     if (trimmed.length > 2000) {
       return { success: false, error: "Message too long (max 2000)" };
+    }
+
+    if (receiverId === client.userId) {
+      return { success: false, error: "Cannot send message to yourself" };
     }
 
     try {

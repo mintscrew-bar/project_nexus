@@ -152,17 +152,20 @@ export class MatchAdvancementService {
         // 4-team: Winner → WB_F, Loser → LB_R1
         // 8-team: Winner → WB_R2, Loser → LB_R1
         const idx = await getIndexAmongSiblings("WB_R1");
-        const wbNext = (await findMatch("WB_R2")) ?? (await findMatch("WB_F"));
-        if (wbNext && wbNext.bracketRound) {
-          // Find the correct WB_R2/WB_F match for this winner
-          const wbNextMatches = await this.prisma.match.findMany({
-            where: { roomId, bracketRound: wbNext.bracketRound },
-            select: {
-              id: true,
-              matchNumber: true,
-            },
+        // Single query: try WB_R2 first, fallback to WB_F
+        let wbNextMatches = await this.prisma.match.findMany({
+          where: { roomId, bracketRound: "WB_R2" },
+          select: { id: true, matchNumber: true },
+          orderBy: { matchNumber: "asc" },
+        });
+        if (wbNextMatches.length === 0) {
+          wbNextMatches = await this.prisma.match.findMany({
+            where: { roomId, bracketRound: "WB_F" },
+            select: { id: true, matchNumber: true },
             orderBy: { matchNumber: "asc" },
           });
+        }
+        if (wbNextMatches.length > 0) {
           const targetWb = wbNextMatches[Math.floor(idx / 2)];
           if (targetWb) {
             await setTeam(targetWb.id, idx % 2 === 0, winnerId);
@@ -229,23 +232,27 @@ export class MatchAdvancementService {
       case "LB_R1": {
         // 4-team: Winner → LB_F (teamA), Loser → eliminated
         // 8-team: Winner → LB_R2 (teamA), Loser → eliminated
-        const lbNext = (await findMatch("LB_R2")) ?? (await findMatch("LB_F"));
-        if (lbNext && lbNext.bracketRound) {
-          const idx = await getIndexAmongSiblings("LB_R1");
-          const lbNextMatches = await this.prisma.match.findMany({
-            where: { roomId, bracketRound: lbNext.bracketRound },
-            select: {
-              id: true,
-              matchNumber: true,
-            },
+        const lbIdx = await getIndexAmongSiblings("LB_R1");
+        // Single query: try LB_R2 first, fallback to LB_F
+        let lbNextMatches = await this.prisma.match.findMany({
+          where: { roomId, bracketRound: "LB_R2" },
+          select: { id: true, matchNumber: true },
+          orderBy: { matchNumber: "asc" },
+        });
+        if (lbNextMatches.length === 0) {
+          lbNextMatches = await this.prisma.match.findMany({
+            where: { roomId, bracketRound: "LB_F" },
+            select: { id: true, matchNumber: true },
             orderBy: { matchNumber: "asc" },
           });
-          const target = lbNextMatches[Math.floor(idx / 2)] ?? lbNextMatches[0];
+        }
+        if (lbNextMatches.length > 0) {
+          const target = lbNextMatches[Math.floor(lbIdx / 2)] ?? lbNextMatches[0];
           if (target) {
             await setTeam(target.id, true, winnerId);
           } else {
             this.logger.warn(
-              `Target LB match not found for LB_R1 match ${matchId} at index ${idx}`,
+              `Target LB match not found for LB_R1 match ${matchId} at index ${lbIdx}`,
             );
           }
         }

@@ -22,6 +22,8 @@ interface AuthenticatedSocket extends Socket {
     origin: process.env.APP_URL || "http://localhost:3000",
     credentials: true,
   },
+  pingInterval: 10000,
+  pingTimeout: 5000,
 })
 export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
@@ -210,6 +212,10 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
     });
     } catch (error) {
       console.error(`[Match] Failed to emit tournament-completed for room ${roomId}:`, error);
+      this.server.to(`bracket:${roomId}`).emit("tournament-completed-error", {
+        error: "Failed to calculate tournament standings",
+        roomId,
+      });
     }
   }
 }

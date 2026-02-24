@@ -29,8 +29,10 @@ export const connectRoomSocket = () => {
     auth: (cb) => cb({ token: getAccessToken() }),
     transports: ["websocket"],
     reconnection: true,
-    reconnectionAttempts: 5,
-    reconnectionDelay: 2000,
+    reconnectionAttempts: Infinity,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 10000,
+    randomizationFactor: 0.5,
   });
 
   roomSocket.on("connect", () => {
@@ -41,8 +43,8 @@ export const connectRoomSocket = () => {
     console.log("❌ Room Socket Disconnected");
   });
 
-  roomSocket.on("error", (error) => {
-    console.error("Room Socket Error:", error);
+  roomSocket.on("connect_error", (error) => {
+    console.error("Room Socket Connect Error:", error.message);
   });
 
   return roomSocket;
@@ -63,8 +65,10 @@ export const connectAuctionSocket = () => {
     auth: (cb) => cb({ token: getAccessToken() }),
     transports: ["websocket"],
     reconnection: true,
-    reconnectionAttempts: 5,
-    reconnectionDelay: 2000,
+    reconnectionAttempts: Infinity,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 10000,
+    randomizationFactor: 0.5,
   });
 
   auctionSocket.on("connect", () => {
@@ -98,8 +102,10 @@ export const connectSnakeDraftSocket = () => {
     auth: (cb) => cb({ token: getAccessToken() }),
     transports: ["websocket"],
     reconnection: true,
-    reconnectionAttempts: 5,
-    reconnectionDelay: 2000,
+    reconnectionAttempts: Infinity,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 10000,
+    randomizationFactor: 0.5,
   });
 
   snakeDraftSocket.on("connect", () => {
@@ -110,8 +116,8 @@ export const connectSnakeDraftSocket = () => {
     console.log("❌ Snake Draft Socket Disconnected");
   });
 
-  snakeDraftSocket.on("error", (error) => {
-    console.error("Snake Draft Socket Error:", error);
+  snakeDraftSocket.on("connect_error", (error) => {
+    console.error("Snake Draft Socket Connect Error:", error.message);
   });
 
   return snakeDraftSocket;
@@ -129,8 +135,10 @@ export const connectMatchSocket = () => {
     auth: (cb) => cb({ token: getAccessToken() }),
     transports: ["websocket"],
     reconnection: true,
-    reconnectionAttempts: 5,
-    reconnectionDelay: 2000,
+    reconnectionAttempts: Infinity,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 10000,
+    randomizationFactor: 0.5,
   });
 
   matchSocket.on("connect", () => {
@@ -141,8 +149,8 @@ export const connectMatchSocket = () => {
     console.log("❌ Match Socket Disconnected");
   });
 
-  matchSocket.on("error", (error) => {
-    console.error("Match Socket Error:", error);
+  matchSocket.on("connect_error", (error) => {
+    console.error("Match Socket Connect Error:", error.message);
   });
 
   return matchSocket;
@@ -160,8 +168,10 @@ export const connectClanSocket = () => {
     auth: (cb) => cb({ token: getAccessToken() }),
     transports: ["websocket"],
     reconnection: true,
-    reconnectionAttempts: 5,
-    reconnectionDelay: 2000,
+    reconnectionAttempts: Infinity,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 10000,
+    randomizationFactor: 0.5,
   });
 
   clanSocket.on("connect", () => {
@@ -172,8 +182,8 @@ export const connectClanSocket = () => {
     console.log("❌ Clan Socket Disconnected");
   });
 
-  clanSocket.on("error", (error) => {
-    console.error("Clan Socket Error:", error);
+  clanSocket.on("connect_error", (error) => {
+    console.error("Clan Socket Connect Error:", error.message);
   });
 
   return clanSocket;
@@ -215,19 +225,19 @@ export const roomSocketHelpers = {
   },
 
   onRoomUpdate: (callback: (data: any) => void) => {
-    roomSocket?.on("room-update", callback);
+    roomSocket?.on("room-updated", callback);
   },
 
   onParticipantJoined: (callback: (data: any) => void) => {
-    roomSocket?.on("participant-joined", callback);
+    roomSocket?.on("user-joined", callback);
   },
 
   onParticipantLeft: (callback: (data: any) => void) => {
-    roomSocket?.on("participant-left", callback);
+    roomSocket?.on("user-left", callback);
   },
 
   onParticipantReady: (callback: (data: any) => void) => {
-    roomSocket?.on("participant-ready", callback);
+    roomSocket?.on("ready-status-changed", callback);
   },
 
   onNewMessage: (callback: (data: any) => void) => {
@@ -243,10 +253,10 @@ export const roomSocketHelpers = {
   },
 
   offAllListeners: () => {
-    roomSocket?.off("room-update");
-    roomSocket?.off("participant-joined");
-    roomSocket?.off("participant-left");
-    roomSocket?.off("participant-ready");
+    roomSocket?.off("room-updated");
+    roomSocket?.off("user-joined");
+    roomSocket?.off("user-left");
+    roomSocket?.off("ready-status-changed");
     roomSocket?.off("new-message");
     roomSocket?.off("room-list-updated");
     roomSocket?.off("user-typing");
@@ -533,6 +543,18 @@ export const snakeDraftSocketHelpers = {
     snakeDraftSocket?.on("session-aborted", callback);
   },
 
+  onNextPick: (callback: (data: any) => void) => {
+    snakeDraftSocket?.on("next-pick", callback);
+  },
+
+  onAutoPickMade: (callback: (data: any) => void) => {
+    snakeDraftSocket?.on("auto-pick-made", callback);
+  },
+
+  onTimerExpired: (callback: (data: any) => void) => {
+    snakeDraftSocket?.on("timer-expired", callback);
+  },
+
   offAllListeners: () => {
     snakeDraftSocket?.off("draft-started");
     snakeDraftSocket?.off("pick-made");
@@ -540,6 +562,9 @@ export const snakeDraftSocketHelpers = {
     snakeDraftSocket?.off("timer-update");
     snakeDraftSocket?.off("draft-state");
     snakeDraftSocket?.off("session-aborted");
+    snakeDraftSocket?.off("next-pick");
+    snakeDraftSocket?.off("auto-pick-made");
+    snakeDraftSocket?.off("timer-expired");
   },
 };
 
@@ -557,19 +582,19 @@ export const matchSocketHelpers = {
     matchSocket?.on("match-started", callback);
   },
 
-  onMatchCompleted: (callback: (data: any) => void) => {
-    matchSocket?.on("match-completed", callback);
+  onMatchResult: (callback: (data: any) => void) => {
+    matchSocket?.on("match-result", callback);
   },
 
-  onBracketUpdate: (callback: (data: any) => void) => {
-    matchSocket?.on("bracket-update", callback);
+  onBracketUpdated: (callback: (data: any) => void) => {
+    matchSocket?.on("bracket-updated", callback);
   },
 
   offAllListeners: () => {
     matchSocket?.off("bracket-generated");
     matchSocket?.off("match-started");
-    matchSocket?.off("match-completed");
-    matchSocket?.off("bracket-update");
+    matchSocket?.off("match-result");
+    matchSocket?.off("bracket-updated");
   },
 };
 
@@ -585,8 +610,10 @@ export const connectPresenceSocket = () => {
     auth: (cb) => cb({ token: getAccessToken() }),
     transports: ["websocket"],
     reconnection: true,
-    reconnectionAttempts: 5,
-    reconnectionDelay: 2000,
+    reconnectionAttempts: Infinity,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 10000,
+    randomizationFactor: 0.5,
   });
 
   presenceSocket.on("connect", () => {
@@ -597,8 +624,8 @@ export const connectPresenceSocket = () => {
     console.log("❌ Presence Socket Disconnected");
   });
 
-  presenceSocket.on("error", (error) => {
-    console.error("Presence Socket Error:", error);
+  presenceSocket.on("connect_error", (error) => {
+    console.error("Presence Socket Connect Error:", error.message);
   });
 
   return presenceSocket;
@@ -701,8 +728,10 @@ export const connectNotificationSocket = () => {
     auth: (cb) => cb({ token: getAccessToken() }),
     transports: ["websocket"],
     reconnection: true,
-    reconnectionAttempts: 5,
-    reconnectionDelay: 2000,
+    reconnectionAttempts: Infinity,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 10000,
+    randomizationFactor: 0.5,
   });
 
   notificationSocket.on("connect", () => {
@@ -713,8 +742,8 @@ export const connectNotificationSocket = () => {
     console.log("❌ Notification Socket Disconnected");
   });
 
-  notificationSocket.on("error", (error) => {
-    console.error("Notification Socket Error:", error);
+  notificationSocket.on("connect_error", (error) => {
+    console.error("Notification Socket Connect Error:", error.message);
   });
 
   return notificationSocket;
@@ -757,8 +786,10 @@ export const connectDmSocket = () => {
     auth: (cb) => cb({ token: getAccessToken() }),
     transports: ["websocket"],
     reconnection: true,
-    reconnectionAttempts: 5,
-    reconnectionDelay: 2000,
+    reconnectionAttempts: Infinity,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 10000,
+    randomizationFactor: 0.5,
   });
 
   dmSocket.on("connect", () => {
@@ -837,6 +868,16 @@ export const disconnectDmSocket = () => {
 
 // 모든 소켓 연결 해제
 export const disconnectAllSockets = () => {
+  roomSocket?.removeAllListeners();
+  auctionSocket?.removeAllListeners();
+  snakeDraftSocket?.removeAllListeners();
+  matchSocket?.removeAllListeners();
+  clanSocket?.removeAllListeners();
+  presenceSocket?.removeAllListeners();
+  notificationSocket?.removeAllListeners();
+  dmSocket?.removeAllListeners();
+  roleSelectionSocket?.removeAllListeners();
+
   roomSocket?.disconnect();
   auctionSocket?.disconnect();
   snakeDraftSocket?.disconnect();
@@ -845,6 +886,7 @@ export const disconnectAllSockets = () => {
   presenceSocket?.disconnect();
   notificationSocket?.disconnect();
   dmSocket?.disconnect();
+  roleSelectionSocket?.disconnect();
 
   roomSocket = null;
   auctionSocket = null;
@@ -854,6 +896,7 @@ export const disconnectAllSockets = () => {
   presenceSocket = null;
   notificationSocket = null;
   dmSocket = null;
+  roleSelectionSocket = null;
 };
 
 // 특정 소켓 연결 해제
@@ -902,8 +945,10 @@ export const connectRoleSelectionSocket = () => {
     auth: (cb) => cb({ token: getAccessToken() }),
     transports: ["websocket"],
     reconnection: true,
-    reconnectionAttempts: 5,
-    reconnectionDelay: 2000,
+    reconnectionAttempts: Infinity,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 10000,
+    randomizationFactor: 0.5,
   });
 
   roleSelectionSocket.on("connect", () => {
@@ -912,6 +957,10 @@ export const connectRoleSelectionSocket = () => {
 
   roleSelectionSocket.on("disconnect", () => {
     console.log("Role selection socket disconnected");
+  });
+
+  roleSelectionSocket.on("connect_error", (error) => {
+    console.error("Role Selection Socket Connect Error:", error.message);
   });
 
   return roleSelectionSocket;

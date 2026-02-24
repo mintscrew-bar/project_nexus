@@ -85,7 +85,7 @@ interface LobbyStoreState {
 
   connect: (roomId: string, password?: string) => void;
   disconnect: (options?: { skipLeave?: boolean }) => void;
-  setReady: (isReady: boolean) => void;
+  setReady: (isReady?: boolean, onError?: (msg: string) => void) => void;
   startGame: (onError?: (msg: string) => void) => void;
   sendMessage: (content: string) => void;
   updateRoomSettings: (roomId: string, settings: RoomSettingsDto) => Promise<void>;
@@ -116,8 +116,10 @@ export const useLobbyStore = create<LobbyStoreState>((set, get) => ({
       auth: (cb) => cb({ token: getAccessToken() }),
       transports: ['websocket'],
       reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 2000,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 10000,
+      randomizationFactor: 0.5,
     });
 
     socket.on('connect', () => {
@@ -158,11 +160,27 @@ export const useLobbyStore = create<LobbyStoreState>((set, get) => ({
 
     // Listen for user join/leave events to update participant list
     socket.on('user-joined', (data: { userId: string; username: string }) => {
-      console.log('User joined:', data);
+      const currentRoom = get().room;
+      if (currentRoom && !currentRoom.participants.some(p => p.userId === data.userId)) {
+        set({
+          room: {
+            ...currentRoom,
+            participants: [...currentRoom.participants, { id: data.userId, userId: data.userId, username: data.username, isHost: false, isReady: false }],
+          },
+        });
+      }
     });
 
-    socket.on('user-left', (data: { userId: string; username: string }) => {
-      console.log('User left:', data);
+    socket.on('user-left', (data: { userId: string }) => {
+      const currentRoom = get().room;
+      if (currentRoom) {
+        set({
+          room: {
+            ...currentRoom,
+            participants: currentRoom.participants.filter(p => p.userId !== data.userId),
+          },
+        });
+      }
     });
 
     socket.on('ready-status-changed', (data: { userId: string; isReady: boolean }) => {
@@ -212,7 +230,7 @@ export const useLobbyStore = create<LobbyStoreState>((set, get) => ({
     }
   },
 
-  setReady: (isReady: boolean, onError?: (msg: string) => void) => {
+  setReady: (_isReady?: boolean, onError?: (msg: string) => void) => {
     const { socket, room } = get();
     if (socket && room) {
       socket.emit('toggle-ready', { roomId: room.id }, (response: any) => {

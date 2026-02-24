@@ -82,7 +82,12 @@ export class TasksService {
             `https://kr.api.riotgames.com/lol/league/v4/entries/by-puuid/${account.puuid}?api_key=${apiKey}`,
           );
 
-          if (!res.ok) continue;
+          if (!res.ok) {
+            this.logger.warn(
+              `Riot API error for account ${account.id} (puuid: ${account.puuid}): ${res.status} ${res.statusText}`,
+            );
+            continue;
+          }
 
           const entries: any[] = await res.json();
           const soloQ = entries.find(

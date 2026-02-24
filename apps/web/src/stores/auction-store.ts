@@ -98,6 +98,11 @@ interface AuctionStoreState {
 
 function resolveCurrentPlayer(rawState: any, players: Player[]): Player | null {
   if (!players.length) return null;
+  // Prefer server-provided currentPlayer over index-based lookup
+  if (rawState?.currentPlayer?.id) {
+    const found = players.find(p => p.id === rawState.currentPlayer.id);
+    if (found) return found;
+  }
   const idx = typeof rawState?.currentPlayerIndex === 'number' ? rawState.currentPlayerIndex : 0;
   return players[idx] ?? players[0] ?? null;
 }
@@ -214,7 +219,7 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
       sessionAbortedAt: null,
       sessionAbortMessage: null,
     });
-    connectAuctionSocket();
+    const socket = connectAuctionSocket();
     auctionSocketHelpers.offAllListeners();
 
     // 팀장 선정 단계 이벤트
@@ -405,6 +410,34 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
       isLoading: false,
       error: joinResponse?.error || "Failed to join auction room.",
     });
+
+    // Re-join the socket.io room after reconnect to resume receiving events
+    socket?.on('connect', async () => {
+      set({ isConnected: true });
+      const response = await auctionSocketHelpers.joinAuction(roomId);
+      if (response?.success) {
+        const currentState = get();
+        // Prefer fresh server data; fall back to current state if server returns empty
+        const nextPlayers = Array.isArray(response.players) && response.players.length > 0
+          ? response.players
+          : currentState.players;
+        const nextTeams = Array.isArray(response.teams) && response.teams.length > 0
+          ? response.teams
+          : currentState.teams;
+        // If server has no auction state (e.g. captain selection phase), keep existing
+        const nextAuctionState = response.state
+          ? normalizeAuctionState(response.state, nextPlayers)
+          : currentState.auctionState;
+        set({
+          players: nextPlayers,
+          teams: nextTeams,
+          auctionState: nextAuctionState,
+          isConnected: true,
+          isLoading: false,
+        });
+      }
+    });
+    socket?.on('disconnect', () => set({ isConnected: false }));
   },
 
   disconnectFromAuction: () => {

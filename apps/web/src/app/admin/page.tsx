@@ -1023,8 +1023,8 @@ function ChatLogsTab() {
         roomName: roomName || undefined,
         search: search || undefined,
       });
-      setLogs(data.logs);
-      setTotal(data.total);
+      setLogs(data.logs ?? []);
+      setTotal(data.total ?? 0);
     } catch {
       // silent
     } finally {

@@ -653,7 +653,11 @@ export class AuctionService {
       },
     });
 
-    const currentPlayer = room?.participants[state.currentPlayerIndex];
+    if (!room) {
+      throw new NotFoundException("Room not found");
+    }
+
+    const currentPlayer = room.participants[state.currentPlayerIndex];
     if (!currentPlayer) {
       throw new BadRequestException("No player to resolve");
     }
@@ -713,7 +717,7 @@ export class AuctionService {
       state.yuchalCount++;
       const bidIncrement = room.minBidIncrement || 50;
       const maxTeamSize = 5;
-      const incompleteTeams = room!.teams.filter((t) => t._count.members < maxTeamSize);
+      const incompleteTeams = room.teams.filter((t) => t._count.members < maxTeamSize);
       const anyCanBid = incompleteTeams.some((t) => t.remainingBudget >= bidIncrement);
 
       // Simulation rule: if someone can still bid and cycle not exhausted, keep same player.
@@ -726,7 +730,7 @@ export class AuctionService {
       }
 
       // Simulation rule: otherwise force-assign to incomplete team with highest budget.
-      const targetTeamPool = incompleteTeams.length > 0 ? incompleteTeams : room!.teams;
+      const targetTeamPool = incompleteTeams.length > 0 ? incompleteTeams : room.teams;
       const targetTeam = [...targetTeamPool].sort(
         (a, b) => b.remainingBudget - a.remainingBudget,
       )[0];

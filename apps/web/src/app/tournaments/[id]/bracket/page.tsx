@@ -155,7 +155,11 @@ export default function BracketPage() {
     team1: m.teamA ? { id: m.teamA.id, name: m.teamA.name, score: m.teamA.score } : undefined,
     team2: m.teamB ? { id: m.teamB.id, name: m.teamB.name, score: m.teamB.score } : undefined,
     winner: m.winnerId
-      ? (m.teamA?.id === m.winnerId ? { id: m.teamA.id, name: m.teamA.name } : { id: m.teamB?.id || '', name: m.teamB?.name || '' })
+      ? (m.teamA?.id === m.winnerId && m.teamA
+        ? { id: m.teamA.id, name: m.teamA.name }
+        : m.teamB?.id === m.winnerId && m.teamB
+          ? { id: m.teamB.id, name: m.teamB.name }
+          : undefined)
       : undefined,
     status: m.status as 'PENDING' | 'IN_PROGRESS' | 'COMPLETED',
     scheduledTime: m.scheduledTime,

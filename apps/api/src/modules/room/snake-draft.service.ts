@@ -12,6 +12,7 @@ import { calculateTierScore } from "../common/tier-score.util";
 
 export interface SnakeDraftState {
   roomId: string;
+  numTeams: number;
   currentTeamIndex: number;
   currentRound: number;
   pickOrder: string[]; // Team IDs in pick order
@@ -155,6 +156,7 @@ export class SnakeDraftService {
 
     const draftState: SnakeDraftState = {
       roomId,
+      numTeams: teams.length,
       currentTeamIndex: 0,
       currentRound: 1,
       pickOrder,
@@ -252,9 +254,7 @@ export class SnakeDraftService {
       throw new BadRequestException("Draft not started");
     }
 
-    // Get current team that should pick
     const currentTeamId = state.pickOrder[state.currentTeamIndex];
-
     const team = await this.prisma.team.findUnique({
       where: { id: currentTeamId },
     });
@@ -263,83 +263,22 @@ export class SnakeDraftService {
       throw new NotFoundException("Team not found");
     }
 
-    // Timer expiration check — 서버 기준으로 타이머 만료 여부 확인
-    if (Date.now() > state.timerEnd) {
+    // Timer expiration check — 2초 grace period로 네트워크 지연 허용
+    const TIMER_GRACE_MS = 2000;
+    if (Date.now() > state.timerEnd + TIMER_GRACE_MS) {
       throw new BadRequestException("Pick time has expired");
     }
 
-    // Verify it's the captain's turn
     if (team.captainId !== userId) {
       throw new ForbiddenException("Not your turn to pick");
     }
 
-    // Verify player is available
     if (!state.availablePlayers.includes(targetPlayerId)) {
       throw new BadRequestException("Player not available");
     }
 
-    // Get player info and room settings in one go
-    const [participant, roomSettings] = await Promise.all([
-      this.prisma.roomParticipant.findFirst({
-        where: { roomId, userId: targetPlayerId },
-      }),
-      this.prisma.room.findUnique({
-        where: { id: roomId },
-        select: { pickTimeLimit: true },
-      }),
-    ]);
-
-    if (!participant) {
-      throw new NotFoundException("Player not found");
-    }
-
-    const pickNumber = state.currentTeamIndex + 1;
-
-    await this.prisma.$transaction(async (tx) => {
-      await tx.teamMember.create({
-        data: {
-          teamId: team.id,
-          userId: targetPlayerId,
-          pickOrder: pickNumber,
-        },
-      });
-
-      await tx.roomParticipant.update({
-        where: { id: participant.id },
-        data: { teamId: team.id },
-      });
-
-      await tx.snakeDraftPick.create({
-        data: {
-          roomId,
-          teamId: team.id,
-          userId: targetPlayerId,
-          pickNumber,
-        },
-      });
-    });
-
-    // Update in-memory state
-    state.availablePlayers = state.availablePlayers.filter(
-      (id) => id !== targetPlayerId,
-    );
-    state.currentTeamIndex++;
-    state.timerEnd =
-      Date.now() + (roomSettings?.pickTimeLimit ?? 60) * 1000;
-
-    // Check if we need to reverse
-    const numTeams = state.pickOrder.filter(
-      (id, i, arr) => arr.indexOf(id) === i,
-    ).length;
-    if (state.currentTeamIndex % numTeams === 0) {
-      state.currentRound++;
-      state.isReversing = !state.isReversing;
-    }
-
-    return state;
+    return this.executePick(state, roomId, team.id, targetPlayerId);
   }
-
-  // ... (rest of the file is unchanged)
 
   async autoPick(roomId: string): Promise<SnakeDraftState> {
     const state = this.draftStates.get(roomId);
@@ -351,7 +290,6 @@ export class SnakeDraftService {
       throw new BadRequestException("No players available");
     }
 
-    // Pick random player from available
     const randomIndex = Math.floor(
       Math.random() * state.availablePlayers.length,
     );
@@ -366,16 +304,19 @@ export class SnakeDraftService {
       throw new NotFoundException("Team not found");
     }
 
-    // Auto pick bypasses timer check (called when timer expires)
-    const [participant, roomSettings] = await Promise.all([
-      this.prisma.roomParticipant.findFirst({
-        where: { roomId, userId: targetPlayerId },
-      }),
-      this.prisma.room.findUnique({
-        where: { id: roomId },
-        select: { pickTimeLimit: true },
-      }),
-    ]);
+    return this.executePick(state, roomId, team.id, targetPlayerId);
+  }
+
+  /** 공통 픽 실행: DB 트랜잭션 + 인메모리 상태 업데이트 */
+  private async executePick(
+    state: SnakeDraftState,
+    roomId: string,
+    teamId: string,
+    targetPlayerId: string,
+  ): Promise<SnakeDraftState> {
+    const participant = await this.prisma.roomParticipant.findFirst({
+      where: { roomId, userId: targetPlayerId },
+    });
 
     if (!participant) {
       throw new NotFoundException("Player not found");
@@ -383,27 +324,23 @@ export class SnakeDraftService {
 
     const pickNumber = state.currentTeamIndex + 1;
 
+    const roomSettings = await this.prisma.room.findUnique({
+      where: { id: roomId },
+      select: { pickTimeLimit: true },
+    });
+
     await this.prisma.$transaction(async (tx) => {
       await tx.teamMember.create({
-        data: {
-          teamId: team.id,
-          userId: targetPlayerId,
-          pickOrder: pickNumber,
-        },
+        data: { teamId, userId: targetPlayerId, pickOrder: pickNumber },
       });
 
       await tx.roomParticipant.update({
         where: { id: participant.id },
-        data: { teamId: team.id },
+        data: { teamId },
       });
 
       await tx.snakeDraftPick.create({
-        data: {
-          roomId,
-          teamId: team.id,
-          userId: targetPlayerId,
-          pickNumber,
-        },
+        data: { roomId, teamId, userId: targetPlayerId, pickNumber },
       });
     });
 
@@ -415,10 +352,7 @@ export class SnakeDraftService {
     state.timerEnd =
       Date.now() + (roomSettings?.pickTimeLimit ?? 60) * 1000;
 
-    const numTeams = state.pickOrder.filter(
-      (id, i, arr) => arr.indexOf(id) === i,
-    ).length;
-    if (state.currentTeamIndex % numTeams === 0) {
+    if (state.currentTeamIndex % state.numTeams === 0) {
       state.currentRound++;
       state.isReversing = !state.isReversing;
     }
