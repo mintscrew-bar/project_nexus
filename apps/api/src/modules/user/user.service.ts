@@ -43,8 +43,17 @@ export class UserService {
       where: { id: userId },
       include: {
         riotAccounts: {
-          where: { isPrimary: true },
+          include: { championPreferences: true },
+          orderBy: [{ isPrimary: "desc" }, { createdAt: "desc" }],
         },
+        clanMemberships: {
+          include: {
+            clan: {
+              select: { id: true, name: true, tag: true },
+            },
+          },
+        },
+        settings: true,
         _count: {
           select: {
             roomParticipations: true,

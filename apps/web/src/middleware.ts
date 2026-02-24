@@ -1,20 +1,10 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-// /admin 경로는 refresh_token 쿠키가 없으면 로그인 페이지로 보낸다.
-// 실제 role(ADMIN) 검증은 페이지 컴포넌트와 백엔드 API에서 처리한다.
-export function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
-
-  if (pathname.startsWith("/admin")) {
-    const hasRefreshToken = request.cookies.has("refresh_token");
-    if (!hasRefreshToken) {
-      const loginUrl = new URL("/auth/login", request.url);
-      loginUrl.searchParams.set("redirect", pathname);
-      return NextResponse.redirect(loginUrl);
-    }
-  }
-
+// Admin 라우트 보호는 페이지 컴포넌트(클라이언트)에서 처리한다.
+// refresh_token 쿠키가 path="/api/auth"로 제한되어 있어
+// 미들웨어에서는 쿠키에 접근할 수 없기 때문.
+export function middleware(_request: NextRequest) {
   return NextResponse.next();
 }
 

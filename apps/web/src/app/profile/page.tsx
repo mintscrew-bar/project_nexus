@@ -2,14 +2,25 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { useAuthStore } from '@/stores/auth-store';
 import { useRiotStore } from '@/stores/riot-store';
-import { userApi, matchApi } from '@/lib/api-client';
+import { useDdragonStore } from '@/stores/ddragon-store';
+import { userApi, matchApi, statsApi } from '@/lib/api-client';
 import { AddAccountModal } from '@/components/domain/AddAccountModal';
+import { ChampionImage } from '@/components/ChampionImage';
 import { LoadingSpinner, Card, CardHeader, CardTitle, CardContent, Badge, Button, Label, Skeleton, EmptyState } from '@/components/ui';
-import { Star, Plus, RefreshCw, Shield, Trophy, TrendingUp, Loader2, Gamepad2, Target, History, Clock } from 'lucide-react';
+import { Star, Plus, RefreshCw, Shield, Trophy, TrendingUp, Loader2, Gamepad2, Target, History, Clock, Calendar, Users, Settings, User, BarChart3 } from 'lucide-react';
 import { TierBadge } from '@/components/domain/TierBadge';
 import { useToast } from '@/components/ui/Toast';
+
+const ROLE_LABELS: Record<string, string> = {
+  TOP: '탑',
+  JUNGLE: '정글',
+  MID: '미드',
+  ADC: '원딜',
+  SUPPORT: '서포터',
+};
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -24,9 +35,12 @@ export default function ProfilePage() {
     syncAccount,
     selectAccount,
   } = useRiotStore();
+  const { champions, championMap, fetchChampions } = useDdragonStore();
 
   const [showAddModal, setShowAddModal] = useState(false);
   const { addToast } = useToast();
+  const [profileData, setProfileData] = useState<any>(null);
+  const [profileLoading, setProfileLoading] = useState(false);
   const [stats, setStats] = useState<{
     gamesPlayed: number;
     wins: number;
@@ -44,6 +58,21 @@ export default function ProfilePage() {
     winner?: { id: string; name: string };
   }[]>([]);
   const [matchesLoading, setMatchesLoading] = useState(false);
+  const [championStats, setChampionStats] = useState<any[]>([]);
+  const [championStatsLoading, setChampionStatsLoading] = useState(false);
+
+  const fetchProfile = useCallback(async () => {
+    if (!user?.id) return;
+    setProfileLoading(true);
+    try {
+      const data = await userApi.getProfile(user.id);
+      setProfileData(data);
+    } catch {
+      // Profile data is supplementary, don't block on error
+    } finally {
+      setProfileLoading(false);
+    }
+  }, [user?.id]);
 
   const fetchStats = useCallback(async () => {
     setStatsLoading(true);
@@ -69,6 +98,19 @@ export default function ProfilePage() {
     }
   }, []);
 
+  const fetchChampionStats = useCallback(async () => {
+    if (!user?.id) return;
+    setChampionStatsLoading(true);
+    try {
+      const data = await statsApi.getUserChampionStats(user.id);
+      setChampionStats(data.slice(0, 5)); // 상위 5개만
+    } catch {
+      // Not critical
+    } finally {
+      setChampionStatsLoading(false);
+    }
+  }, [user?.id]);
+
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       router.push('/auth/login');
@@ -77,16 +119,13 @@ export default function ProfilePage() {
 
     if (isAuthenticated) {
       fetchAccounts();
+      fetchProfile();
       fetchStats();
       fetchRecentMatches();
+      fetchChampions();
+      fetchChampionStats();
     }
-  }, [isAuthenticated, authLoading, fetchAccounts, fetchStats, fetchRecentMatches, router]);
-
-  // Remove handleAddAccount as its logic is now in AddAccountModal
-  // const handleAddAccount = async (gameName: string, tagLine: string) => {
-  //   console.log('Add account:', gameName, tagLine);
-  //   setShowAddModal(false);
-  // };
+  }, [isAuthenticated, authLoading, fetchAccounts, fetchProfile, fetchStats, fetchRecentMatches, fetchChampions, fetchChampionStats, router]);
 
   const [syncingAccountId, setSyncingAccountId] = useState<string | null>(null);
 
@@ -110,6 +149,48 @@ export default function ProfilePage() {
     }
   };
 
+  // Get champion name from championId (key)
+  const getChampionName = (championId: string): string => {
+    const champ = championMap.get(championId);
+    return champ?.name || championId;
+  };
+
+  const getChampionKey = (championId: string): string => {
+    const champ = championMap.get(championId);
+    return champ?.id || championId;
+  };
+
+  // Get preferred champions grouped by role from profile data
+  const getPreferredChampionsByRole = () => {
+    if (!profileData?.riotAccounts) return [];
+
+    const primary = profileData.riotAccounts.find((a: any) => a.isPrimary) || profileData.riotAccounts[0];
+    if (!primary?.championPreferences?.length) return [];
+
+    const grouped: Record<string, { championId: string; order: number }[]> = {};
+    for (const pref of primary.championPreferences) {
+      if (!grouped[pref.role]) grouped[pref.role] = [];
+      grouped[pref.role].push({ championId: pref.championId, order: pref.order });
+    }
+
+    // Sort each group by order
+    for (const role of Object.keys(grouped)) {
+      grouped[role].sort((a, b) => a.order - b.order);
+    }
+
+    // Order by mainRole first, then subRole, then others
+    const roleOrder: string[] = [];
+    if (primary.mainRole) roleOrder.push(primary.mainRole);
+    if (primary.subRole && primary.subRole !== primary.mainRole) roleOrder.push(primary.subRole);
+    for (const role of Object.keys(grouped)) {
+      if (!roleOrder.includes(role)) roleOrder.push(role);
+    }
+
+    return roleOrder
+      .filter(role => grouped[role]?.length)
+      .map(role => ({ role, champions: grouped[role] }));
+  };
+
   if (authLoading || isLoading) {
     return (
       <div className="flex-grow flex items-center justify-center">
@@ -125,16 +206,189 @@ export default function ProfilePage() {
     return null;
   }
 
+  const primary = profileData?.riotAccounts?.find((a: any) => a.isPrimary) || profileData?.riotAccounts?.[0];
+  const clan = profileData?.clanMemberships?.[0]?.clan;
+  const preferredChampions = getPreferredChampionsByRole();
+  const highlightChampionId = profileData?.settings?.highlightChampionId;
+
   return (
     <div className="flex-grow p-4 md:p-8">
       <div className="container mx-auto max-w-6xl">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2 text-text-primary">마이페이지</h1>
-          <p className="text-text-secondary">
-            {user.username}님의 프로필
-          </p>
-        </div>
+        {/* Profile Hero Section */}
+        <Card className="mb-6">
+          <CardContent className="p-6 md:p-8">
+            <div className="flex flex-col md:flex-row items-start gap-6">
+              {/* Avatar */}
+              <div className="flex-shrink-0">
+                <div className="w-24 h-24 md:w-28 md:h-28 rounded-full bg-bg-tertiary flex items-center justify-center overflow-hidden relative">
+                  {user.avatar ? (
+                    <Image
+                      src={user.avatar}
+                      alt={user.username}
+                      fill
+                      className="object-cover"
+                      unoptimized
+                    />
+                  ) : (
+                    <User className="h-12 w-12 text-text-tertiary" />
+                  )}
+                </div>
+              </div>
+
+              {/* Info */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-3 mb-2">
+                  <h1 className="text-2xl md:text-3xl font-bold text-text-primary">{user.username}</h1>
+                  {clan && (
+                    <Badge variant="primary" size="sm" className="cursor-pointer" onClick={() => router.push(`/clans/${clan.id}`)}>
+                      [{clan.tag}] {clan.name}
+                    </Badge>
+                  )}
+                </div>
+
+                {/* Bio */}
+                <p className="text-text-secondary mb-3 max-w-2xl">
+                  {user.bio || profileData?.bio || (
+                    <span className="text-text-tertiary italic">자기소개가 없습니다. 설정에서 추가해보세요.</span>
+                  )}
+                </p>
+
+                {/* Meta info row */}
+                <div className="flex flex-wrap items-center gap-4 text-sm text-text-secondary">
+                  {/* Primary Riot Account */}
+                  {primary && (
+                    <div className="flex items-center gap-2">
+                      <TierBadge tier={primary.tier} size="sm" />
+                      <span className="font-medium text-text-primary">{primary.gameName}</span>
+                      <span className="text-text-tertiary">#{primary.tagLine}</span>
+                      {primary.rank && (
+                        <span className="text-text-tertiary">{primary.rank} {primary.lp}LP</span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Main / Sub Role */}
+                  {primary?.mainRole && (
+                    <div className="flex items-center gap-1">
+                      <Gamepad2 className="h-4 w-4 text-accent-primary" />
+                      <span>{ROLE_LABELS[primary.mainRole] ?? primary.mainRole}</span>
+                      {primary.subRole && (
+                        <span className="text-text-tertiary">/ {ROLE_LABELS[primary.subRole] ?? primary.subRole}</span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Highlight Champion */}
+                  {highlightChampionId && (
+                    <div className="flex items-center gap-1.5">
+                      <ChampionImage championKey={getChampionKey(highlightChampionId)} size={20} className="rounded" />
+                      <span className="font-medium text-accent-gold">{getChampionName(highlightChampionId)}</span>
+                    </div>
+                  )}
+
+                  {/* Join date */}
+                  <div className="flex items-center gap-1">
+                    <Calendar className="h-4 w-4 text-text-tertiary" />
+                    <span>{new Date(profileData?.createdAt || user.createdAt).toLocaleDateString('ko-KR')} 가입</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Settings button */}
+              <Button variant="ghost" size="sm" onClick={() => router.push('/settings')} className="flex-shrink-0">
+                <Settings className="h-4 w-4 mr-1" />
+                설정
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Preferred Champions Section */}
+        {preferredChampions.length > 0 && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Target className="h-5 w-5 text-accent-primary" />
+                선호 챔피언
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {preferredChampions.map(({ role, champions: champs }) => (
+                  <div key={role}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Badge variant="default" size="sm">{ROLE_LABELS[role] ?? role}</Badge>
+                    </div>
+                    <div className="flex flex-wrap gap-3">
+                      {champs.map(({ championId }) => (
+                        <div key={championId} className="flex items-center gap-2 bg-bg-tertiary rounded-lg px-3 py-2">
+                          <ChampionImage
+                            championKey={getChampionKey(championId)}
+                            size={32}
+                            className="rounded-md"
+                          />
+                          <span className="text-sm font-medium text-text-primary">
+                            {getChampionName(championId)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Most Played Champions (auto from match data) */}
+        {championStats.length > 0 && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="h-5 w-5 text-accent-primary" />
+                내전 모스트 챔피언
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                {championStats.map((champ: any, idx: number) => {
+                  const winRate = champ.games > 0 ? ((champ.wins / champ.games) * 100).toFixed(0) : '0';
+                  const kda = champ.deaths > 0
+                    ? ((champ.kills + champ.assists) / champ.deaths).toFixed(2)
+                    : 'Perfect';
+                  return (
+                    <div key={champ.championId} className="flex items-center gap-3 bg-bg-tertiary rounded-lg p-3">
+                      <div className="relative">
+                        <ChampionImage
+                          championKey={champ.championName || getChampionKey(String(champ.championId))}
+                          size={40}
+                          className="rounded-md"
+                        />
+                        {idx === 0 && (
+                          <div className="absolute -top-1 -right-1 bg-accent-gold text-bg-primary text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                            1
+                          </div>
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-text-primary truncate">
+                          {champ.championName || getChampionName(String(champ.championId))}
+                        </p>
+                        <div className="flex items-center gap-2 text-xs text-text-tertiary">
+                          <span>{champ.games}게임</span>
+                          <span className={Number(winRate) >= 50 ? 'text-accent-success' : 'text-accent-danger'}>
+                            {winRate}%
+                          </span>
+                          <span>{kda} KDA</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Riot Accounts Section */}
@@ -256,115 +510,68 @@ export default function ProfilePage() {
           <div className="lg:col-span-1">
             <Card>
               <CardHeader>
-                <CardTitle>통계</CardTitle>
+                <CardTitle>내전 통계</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                {accounts.length > 0 && (
-                  <div>
-                    <Label htmlFor="account-select" className="text-text-primary">
-                      계정 선택
-                    </Label>
-                    <select
-                      id="account-select"
-                      value={selectedAccount?.id || ''}
-                      onChange={(e) => {
-                        const accountId = e.target.value;
-                        const account = accounts.find(acc => acc.id === accountId);
-                        selectAccount(account || null);
-                      }}
-                      className="mt-1 block w-full pl-3 pr-10 py-2 text-base border border-bg-tertiary focus:outline-none focus:ring-accent-primary focus:border-accent-primary sm:text-sm rounded-md bg-bg-secondary text-text-primary"
-                    >
-                      {accounts.map(account => (
-                        <option key={account.id} value={account.id}>
-                          {account.gameName}#{account.tagLine}
-                        </option>
-                      ))}
-                    </select>
+              <CardContent className="space-y-3">
+                {statsLoading ? (
+                  <div className="space-y-3">
+                    <Skeleton className="h-12 w-full" />
+                    <Skeleton className="h-12 w-full" />
+                    <Skeleton className="h-12 w-full" />
                   </div>
-                )}
-
-                {selectedAccount ? (
+                ) : stats ? (
                   <>
-                    <div className="pt-4 border-t border-bg-tertiary">
-                      <p className="text-sm text-text-tertiary mb-2">선택된 계정 티어</p>
+                    <div className="flex items-center justify-between p-3 bg-bg-tertiary rounded-lg">
                       <div className="flex items-center gap-2">
-                        <TierBadge tier={selectedAccount.tier} size="lg" />
-                        <span className="text-2xl font-bold text-text-primary">
-                          {selectedAccount.rank} • {selectedAccount.lp} LP
-                        </span>
+                        <Gamepad2 className="h-4 w-4 text-accent-primary" />
+                        <span className="text-sm text-text-secondary">총 게임</span>
                       </div>
+                      <span className="text-lg font-bold text-text-primary">{stats.gamesPlayed}</span>
+                    </div>
+
+                    <div className="flex items-center justify-between p-3 bg-bg-tertiary rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <Trophy className="h-4 w-4 text-accent-gold" />
+                        <span className="text-sm text-text-secondary">승 / 패</span>
+                      </div>
+                      <span className="text-lg font-bold">
+                        <span className="text-accent-success">{stats.wins}</span>
+                        <span className="text-text-tertiary mx-1">/</span>
+                        <span className="text-accent-danger">{stats.losses}</span>
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between p-3 bg-bg-tertiary rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <TrendingUp className="h-4 w-4 text-accent-success" />
+                        <span className="text-sm text-text-secondary">승률</span>
+                      </div>
+                      <span className={`text-lg font-bold ${
+                        stats.winRate >= 50 ? 'text-accent-success' : 'text-accent-danger'
+                      }`}>
+                        {stats.gamesPlayed > 0 ? `${stats.winRate.toFixed(1)}%` : '-'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between p-3 bg-bg-tertiary rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <Target className="h-4 w-4 text-accent-primary" />
+                        <span className="text-sm text-text-secondary">참여 횟수</span>
+                      </div>
+                      <span className="text-lg font-bold text-text-primary">{stats.participations}</span>
                     </div>
                   </>
                 ) : (
-                  <div className="text-center py-4 text-text-secondary">
-                    계정을 선택해주세요.
+                  <div className="text-center py-4 text-text-tertiary">
+                    통계를 불러올 수 없습니다.
                   </div>
                 )}
-
-                {/* Nexus Stats */}
-                <div className="pt-4 border-t border-bg-tertiary">
-                  <p className="text-sm text-text-tertiary mb-3">내전 통계</p>
-
-                  {statsLoading ? (
-                    <div className="space-y-3">
-                      <Skeleton className="h-12 w-full" />
-                      <Skeleton className="h-12 w-full" />
-                      <Skeleton className="h-12 w-full" />
-                    </div>
-                  ) : stats ? (
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between p-3 bg-bg-tertiary rounded-lg">
-                        <div className="flex items-center gap-2">
-                          <Gamepad2 className="h-4 w-4 text-accent-primary" />
-                          <span className="text-sm text-text-secondary">총 게임</span>
-                        </div>
-                        <span className="text-lg font-bold text-text-primary">{stats.gamesPlayed}</span>
-                      </div>
-
-                      <div className="flex items-center justify-between p-3 bg-bg-tertiary rounded-lg">
-                        <div className="flex items-center gap-2">
-                          <Trophy className="h-4 w-4 text-accent-gold" />
-                          <span className="text-sm text-text-secondary">승 / 패</span>
-                        </div>
-                        <span className="text-lg font-bold">
-                          <span className="text-accent-success">{stats.wins}</span>
-                          <span className="text-text-tertiary mx-1">/</span>
-                          <span className="text-accent-danger">{stats.losses}</span>
-                        </span>
-                      </div>
-
-                      <div className="flex items-center justify-between p-3 bg-bg-tertiary rounded-lg">
-                        <div className="flex items-center gap-2">
-                          <TrendingUp className="h-4 w-4 text-accent-success" />
-                          <span className="text-sm text-text-secondary">승률</span>
-                        </div>
-                        <span className={`text-lg font-bold ${
-                          stats.winRate >= 50 ? 'text-accent-success' : 'text-accent-danger'
-                        }`}>
-                          {stats.gamesPlayed > 0 ? `${stats.winRate.toFixed(1)}%` : '-'}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center justify-between p-3 bg-bg-tertiary rounded-lg">
-                        <div className="flex items-center gap-2">
-                          <Target className="h-4 w-4 text-accent-primary" />
-                          <span className="text-sm text-text-secondary">참여 횟수</span>
-                        </div>
-                        <span className="text-lg font-bold text-text-primary">{stats.participations}</span>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-center py-4 text-text-tertiary">
-                      통계를 불러올 수 없습니다.
-                    </div>
-                  )}
-                </div>
               </CardContent>
             </Card>
           </div>
         </div>
 
-        {/* Recent Activity Section (integrated from Dashboard) */}
+        {/* Recent Activity Section */}
         <div className="mt-6">
           <Card>
             <CardHeader>
@@ -433,7 +640,8 @@ export default function ProfilePage() {
         isOpen={showAddModal}
         onClose={() => setShowAddModal(false)}
         onAccountAdded={() => {
-          fetchAccounts(); // Refresh accounts after a new one is added
+          fetchAccounts();
+          fetchProfile();
           setShowAddModal(false);
         }}
       />

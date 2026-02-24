@@ -10,7 +10,13 @@ export interface UpdateSettingsDto {
   // Privacy settings
   showOnlineStatus?: boolean;
   showMatchHistory?: boolean;
+  showRiotAccounts?: boolean;
+  showChampionStats?: boolean;
   allowFriendRequests?: boolean;
+
+  // Profile highlight
+  highlightChampionId?: string | null;
+  highlightStatType?: string | null;
 
   // Appearance settings
   theme?: string;

@@ -4,11 +4,13 @@ import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { useAuthStore } from "@/stores/auth-store";
-import { userApi } from "@/lib/api-client";
+import { userApi, statsApi } from "@/lib/api-client";
+import { useDdragonStore } from "@/stores/ddragon-store";
+import { ChampionImage } from "@/components/ChampionImage";
 import { Card, CardHeader, CardTitle, CardContent, Button, Input, Label, LoadingSpinner, StatusSelector, ConfirmModal } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
 import { usePresence } from "@/hooks/usePresence";
-import { User, Bell, Shield, Palette, LogOut, Check, Camera, Info, ChevronDown } from "lucide-react";
+import { User, Bell, Shield, Palette, LogOut, Check, Camera, Info, ChevronDown, Star, Search, X } from "lucide-react";
 
 type SettingsTab = "profile" | "notifications" | "privacy" | "appearance" | "about";
 
@@ -24,13 +26,18 @@ interface UserSettings {
   notifySystem: boolean;
   showOnlineStatus: boolean;
   showMatchHistory: boolean;
+  showRiotAccounts: boolean;
+  showChampionStats: boolean;
   allowFriendRequests: boolean;
+  highlightChampionId: string | null;
+  highlightStatType: string | null;
   theme: string;
 }
 
 export default function SettingsPage() {
   const router = useRouter();
   const { user, isAuthenticated, isLoading, logout } = useAuthStore();
+  const { champions, championMap, fetchChampions } = useDdragonStore();
   const { myStatus, setStatus } = usePresence();
   const { addToast } = useToast();
   const [activeTab, setActiveTab] = useState<SettingsTab>("profile");
@@ -41,6 +48,8 @@ export default function SettingsPage() {
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [championSearch, setChampionSearch] = useState("");
+  const [showChampionPicker, setShowChampionPicker] = useState(false);
 
   // Profile form state
   const [username, setUsername] = useState("");
@@ -59,7 +68,11 @@ export default function SettingsPage() {
     notifySystem: true,
     showOnlineStatus: true,
     showMatchHistory: true,
+    showRiotAccounts: true,
+    showChampionStats: true,
     allowFriendRequests: true,
+    highlightChampionId: null,
+    highlightStatType: null,
     theme: "dark",
   });
   const [settingsLoading, setSettingsLoading] = useState(true);
@@ -76,6 +89,13 @@ export default function SettingsPage() {
       setBio(user.bio || "");
     }
   }, [user]);
+
+  // Fetch champions for highlight picker
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchChampions();
+    }
+  }, [isAuthenticated, fetchChampions]);
 
   // Fetch settings
   useEffect(() => {
@@ -94,7 +114,11 @@ export default function SettingsPage() {
             notifySystem: data.notifySystem ?? true,
             showOnlineStatus: data.showOnlineStatus ?? true,
             showMatchHistory: data.showMatchHistory ?? true,
+            showRiotAccounts: data.showRiotAccounts ?? true,
+            showChampionStats: data.showChampionStats ?? true,
             allowFriendRequests: data.allowFriendRequests ?? true,
+            highlightChampionId: data.highlightChampionId ?? null,
+            highlightStatType: data.highlightStatType ?? null,
             theme: data.theme ?? "dark",
           });
         })
@@ -135,7 +159,7 @@ export default function SettingsPage() {
     }
   };
 
-  const handleSettingChange = async (key: keyof UserSettings, value: boolean | string) => {
+  const handleSettingChange = async (key: keyof UserSettings, value: boolean | string | null) => {
     const newSettings = { ...settings, [key]: value };
     setSettings(newSettings);
 
@@ -346,6 +370,108 @@ export default function SettingsPage() {
                         className="mt-1 w-full px-3 py-2 bg-bg-tertiary border border-bg-elevated rounded-lg text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-accent-primary"
                       />
                     </div>
+
+                    {/* Highlight Champion */}
+                    <div>
+                      <Label>대표 챔피언</Label>
+                      <p className="text-sm text-text-secondary mb-2">프로필에 표시할 대표 챔피언을 선택하세요</p>
+                      {settings.highlightChampionId ? (
+                        <div className="flex items-center gap-3 bg-bg-tertiary rounded-lg p-3">
+                          <ChampionImage
+                            championKey={championMap.get(settings.highlightChampionId)?.id || settings.highlightChampionId}
+                            size={40}
+                            className="rounded-md"
+                          />
+                          <div className="flex-1">
+                            <p className="font-medium text-text-primary">
+                              {championMap.get(settings.highlightChampionId)?.name || settings.highlightChampionId}
+                            </p>
+                            <p className="text-xs text-text-tertiary">대표 챔피언</p>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setShowChampionPicker(true)}
+                            >
+                              변경
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleSettingChange("highlightChampionId", null)}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setShowChampionPicker(true)}
+                          className="border border-dashed border-bg-elevated"
+                        >
+                          <Star className="h-4 w-4 mr-1" />
+                          대표 챔피언 선택
+                        </Button>
+                      )}
+
+                      {/* Champion Picker */}
+                      {showChampionPicker && (
+                        <div className="mt-3 bg-bg-tertiary rounded-lg p-4 border border-bg-elevated">
+                          <div className="relative mb-3">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-tertiary" />
+                            <input
+                              type="text"
+                              value={championSearch}
+                              onChange={(e) => setChampionSearch(e.target.value)}
+                              placeholder="챔피언 검색..."
+                              className="w-full pl-9 pr-3 py-2 bg-bg-primary border border-bg-elevated rounded-lg text-sm text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-accent-primary"
+                              autoFocus
+                            />
+                          </div>
+                          <div className="grid grid-cols-6 sm:grid-cols-8 gap-2 max-h-60 overflow-y-auto">
+                            {champions
+                              .filter((c) =>
+                                c.name.toLowerCase().includes(championSearch.toLowerCase()) ||
+                                c.id.toLowerCase().includes(championSearch.toLowerCase())
+                              )
+                              .map((champ) => (
+                                <button
+                                  key={champ.key}
+                                  onClick={() => {
+                                    handleSettingChange("highlightChampionId", champ.key);
+                                    setShowChampionPicker(false);
+                                    setChampionSearch("");
+                                  }}
+                                  className={`flex flex-col items-center gap-1 p-1.5 rounded-lg hover:bg-bg-elevated transition-colors ${
+                                    settings.highlightChampionId === champ.key ? "ring-2 ring-accent-primary bg-bg-elevated" : ""
+                                  }`}
+                                  title={champ.name}
+                                >
+                                  <ChampionImage championKey={champ.id} size={36} className="rounded-md" />
+                                  <span className="text-[10px] text-text-secondary truncate w-full text-center">
+                                    {champ.name}
+                                  </span>
+                                </button>
+                              ))}
+                          </div>
+                          <div className="mt-3 flex justify-end">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setShowChampionPicker(false);
+                                setChampionSearch("");
+                              }}
+                            >
+                              닫기
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   <div className="flex justify-end items-center gap-3">
@@ -537,12 +663,36 @@ export default function SettingsPage() {
                       <div className="flex items-center justify-between py-3 border-b border-bg-tertiary">
                         <div>
                           <p className="font-medium text-text-primary">전적 공개</p>
-                          <p className="text-sm text-text-secondary">내전 전적을 공개합니다</p>
+                          <p className="text-sm text-text-secondary">내전 전적 및 최근 활동을 공개합니다</p>
                         </div>
                         <input
                           type="checkbox"
                           checked={settings.showMatchHistory}
                           onChange={(e) => handleSettingChange("showMatchHistory", e.target.checked)}
+                          className="w-5 h-5 accent-accent-primary cursor-pointer"
+                        />
+                      </div>
+                      <div className="flex items-center justify-between py-3 border-b border-bg-tertiary">
+                        <div>
+                          <p className="font-medium text-text-primary">Riot 계정 공개</p>
+                          <p className="text-sm text-text-secondary">연동된 Riot 계정 정보를 다른 사용자에게 공개합니다</p>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={settings.showRiotAccounts}
+                          onChange={(e) => handleSettingChange("showRiotAccounts", e.target.checked)}
+                          className="w-5 h-5 accent-accent-primary cursor-pointer"
+                        />
+                      </div>
+                      <div className="flex items-center justify-between py-3 border-b border-bg-tertiary">
+                        <div>
+                          <p className="font-medium text-text-primary">챔피언 통계 공개</p>
+                          <p className="text-sm text-text-secondary">선호 챔피언 및 내전 모스트 챔피언을 공개합니다</p>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={settings.showChampionStats}
+                          onChange={(e) => handleSettingChange("showChampionStats", e.target.checked)}
                           className="w-5 h-5 accent-accent-primary cursor-pointer"
                         />
                       </div>

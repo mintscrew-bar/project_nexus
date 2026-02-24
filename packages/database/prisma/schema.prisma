@@ -51,6 +51,9 @@ model User {
   posts              Post[]
   comments           Comment[]
   postLikes          PostLike[]
+  commentLikes       CommentLike[]
+  bookmarks          PostBookmark[]
+  postReports        PostReport[]           @relation("PostReportReporter")
   ratingsGiven       UserRating[]           @relation("RaterUser")
   ratingsReceived    UserRating[]           @relation("RatedUser")
   reportsSubmitted   UserReport[]           @relation("ReporterUser")
@@ -67,6 +70,8 @@ model User {
 
   @@index([email])
   @@index([reputation])
+  @@index([createdAt])
+  @@index([isBanned])
   @@map("users")
 }
 
@@ -151,9 +156,15 @@ model UserSettings {
   notifySystem       Boolean @default(true)
 
   // Privacy settings
-  showOnlineStatus   Boolean @default(true)
-  showMatchHistory   Boolean @default(true)
+  showOnlineStatus    Boolean @default(true)
+  showMatchHistory    Boolean @default(true)
+  showRiotAccounts    Boolean @default(true)
+  showChampionStats   Boolean @default(true)
   allowFriendRequests Boolean @default(true)
+
+  // Profile highlight
+  highlightChampionId String?  // 대표 챔피언 ID (Data Dragon key)
+  highlightStatType   String?  // "winrate" | "games" | "kda"
 
   // Appearance settings
   theme     String @default("dark") // "dark", "light", "system"
@@ -278,6 +289,7 @@ model Room {
   @@index([hostId])
   @@index([status])
   @@index([isPrivate])
+  @@index([createdAt])
   @@map("rooms")
 }
 
@@ -343,6 +355,8 @@ model ChatMessage {
 
   @@index([roomId, createdAt])
   @@index([userId])
+  @@index([createdAt])
+  @@index([roomName])
   @@map("chat_messages")
 }
 
@@ -716,9 +730,11 @@ model Post {
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
 
-  author   User       @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  comments Comment[]
-  likes    PostLike[]
+  author    User           @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  comments  Comment[]
+  likes     PostLike[]
+  bookmarks PostBookmark[]
+  reports   PostReport[]
 
   @@index([category, isPinned, createdAt])
   @@index([authorId])
@@ -742,14 +758,73 @@ model Comment {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
-  post    Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
-  author  User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  parent  Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
-  replies Comment[] @relation("CommentReplies")
+  post    Post          @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author  User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  parent  Comment?      @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies Comment[]     @relation("CommentReplies")
+  likes   CommentLike[]
+  reports PostReport[]
 
   @@index([postId, createdAt])
   @@index([parentId])
   @@map("comments")
+}
+
+model CommentLike {
+  id        String   @id @default(cuid())
+  commentId String
+  userId    String
+  createdAt DateTime @default(now())
+
+  comment Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, commentId])
+  @@index([commentId])
+  @@map("comment_likes")
+}
+
+model PostBookmark {
+  id        String   @id @default(cuid())
+  postId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])
+  @@index([userId])
+  @@map("post_bookmarks")
+}
+
+model PostReport {
+  id          String            @id @default(cuid())
+  reporterId  String
+  postId      String?
+  commentId   String?
+  reason      PostReportReason
+  description String
+  status      ReportStatus      @default(PENDING)
+  reviewerNote String?
+  reviewedAt  DateTime?
+  createdAt   DateTime          @default(now())
+
+  reporter User     @relation("PostReportReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  post     Post?    @relation(fields: [postId], references: [id], onDelete: SetNull)
+  comment  Comment? @relation(fields: [commentId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([reporterId])
+  @@map("post_reports")
+}
+
+enum PostReportReason {
+  SPAM
+  HARASSMENT
+  INAPPROPRIATE
+  MISINFORMATION
+  OTHER
 }
 
 model PostLike {
@@ -870,7 +945,6 @@ model Notification {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, isRead, createdAt])
-  @@index([userId, createdAt])
   @@map("notifications")
 }
 

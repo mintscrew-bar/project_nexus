@@ -193,6 +193,11 @@ export const userApi = {
     return response.data;
   },
 
+  getUserStats: async (userId: string) => {
+    const response = await apiClient.get(`/users/${userId}/stats`);
+    return response.data;
+  },
+
   getSettings: async () => {
     const response = await apiClient.get("/users/settings");
     return response.data;
@@ -277,6 +282,11 @@ export const roomApi = {
     return response.data;
   },
 
+  abortToLobby: async (roomId: string) => {
+    const response = await apiClient.post(`/rooms/${roomId}/abort-to-lobby`);
+    return response.data;
+  },
+
   getChatMessages: async (roomId: string, limit = 50, offset = 0) => {
     const response = await apiClient.get(`/rooms/${roomId}/messages`, {
       params: { limit, offset },
@@ -354,7 +364,7 @@ export const matchApi = {
 
   reportResult: async (
     matchId: string,
-    data: { winnerTeamId: string; statsJson?: any }
+    data: { winnerId: string; statsJson?: any }
   ) => {
     const response = await apiClient.post(`/matches/${matchId}/result`, data);
     return response.data;
@@ -527,6 +537,8 @@ export const communityApi = {
     category?: string;
     limit?: number;
     offset?: number;
+    sortBy?: string;
+    search?: string;
   }) => {
     const response = await apiClient.get("/community/posts", { params });
     return response.data;
@@ -593,6 +605,46 @@ export const communityApi = {
 
   hasLikedPost: async (postId: string) => {
     const response = await apiClient.get(`/community/posts/${postId}/liked`);
+    return response.data;
+  },
+
+  getCommentLikedStatus: async (commentIds: string[]): Promise<Record<string, boolean>> => {
+    const response = await apiClient.post("/community/comments/liked-status", { commentIds });
+    return response.data;
+  },
+
+  likeComment: async (commentId: string) => {
+    const response = await apiClient.post(`/community/comments/${commentId}/like`);
+    return response.data;
+  },
+
+  unlikeComment: async (commentId: string) => {
+    const response = await apiClient.delete(`/community/comments/${commentId}/like`);
+    return response.data;
+  },
+
+  hasLikedComment: async (commentId: string) => {
+    const response = await apiClient.get(`/community/comments/${commentId}/liked`);
+    return response.data;
+  },
+
+  bookmarkPost: async (postId: string) => {
+    const response = await apiClient.post(`/community/posts/${postId}/bookmark`);
+    return response.data;
+  },
+
+  unbookmarkPost: async (postId: string) => {
+    const response = await apiClient.delete(`/community/posts/${postId}/bookmark`);
+    return response.data;
+  },
+
+  hasBookmarkedPost: async (postId: string) => {
+    const response = await apiClient.get(`/community/posts/${postId}/bookmarked`);
+    return response.data;
+  },
+
+  getBookmarks: async (limit = 20, offset = 0) => {
+    const response = await apiClient.get("/community/bookmarks", { params: { limit, offset } });
     return response.data;
   },
 };
@@ -968,6 +1020,10 @@ export const adminApi = {
   closeRoom: async (roomId: string) => {
     const response = await apiClient.post(`/admin/rooms/${roomId}/close`);
     return response.data;
+  },
+  addBotToRoom: async (roomId: string, count = 1) => {
+    const response = await apiClient.post(`/admin/rooms/${roomId}/add-bot`, { count });
+    return response.data as { addedCount: number; participants: any[] };
   },
 };
 
