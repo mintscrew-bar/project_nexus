@@ -15,6 +15,8 @@ import { Logger } from "@nestjs/common";
     origin: process.env.FRONTEND_URL || "http://localhost:3000",
     credentials: true,
   },
+  pingInterval: 10000,
+  pingTimeout: 5000,
 })
 export class NotificationGateway
   implements OnGatewayConnection, OnGatewayDisconnect
@@ -31,9 +33,12 @@ export class NotificationGateway
 
   async handleConnection(client: Socket) {
     try {
-      // Verify JWT token
-      const token =
-        client.handshake.auth.token || client.handshake.headers.authorization;
+      const raw =
+        client.handshake.auth?.token ||
+        client.handshake.headers?.authorization;
+      const token = raw?.startsWith("Bearer ")
+        ? raw.slice(7).trim()
+        : raw?.trim();
 
       if (!token) {
         this.logger.warn("Client connection rejected: No token provided");
@@ -42,7 +47,7 @@ export class NotificationGateway
       }
 
       const payload = this.jwtService.verify(token, {
-        secret: this.configService.get("JWT_SECRET"),
+        secret: this.configService.get("JWT_ACCESS_SECRET"),
       });
 
       const userId = payload.sub;

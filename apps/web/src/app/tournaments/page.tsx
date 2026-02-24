@@ -13,8 +13,11 @@ export default function TournamentsPage() {
 
   // Register "n" key to open room creation modal
   useEffect(() => {
-    setActionHandler(() => setIsCreatingRoom(true));
-    return () => setActionHandler(null);
+    const handler = () => setIsCreatingRoom(true);
+    setActionHandler(handler);
+    return () => {
+      setActionHandler(null);
+    };
   }, [setActionHandler]);
 
   return (

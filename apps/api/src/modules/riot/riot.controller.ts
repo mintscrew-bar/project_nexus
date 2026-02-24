@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Put,
+  Delete,
   Body,
   Param,
   UseGuards,
@@ -86,6 +87,32 @@ export class RiotController {
   @UseGuards(JwtAuthGuard)
   async syncAccount(@Param("id") id: string) {
     return this.riotService.syncRankedInfo(id);
+  }
+
+  @Delete("accounts/:id")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @UseGuards(JwtAuthGuard)
+  async deleteAccount(
+    @CurrentUser("sub") userId: string,
+    @Param("id") accountId: string,
+  ) {
+    return this.riotService.deleteRiotAccount(userId, accountId);
+  }
+
+  @Put("accounts/:id")
+  @UseGuards(JwtAuthGuard)
+  async updateAccount(
+    @CurrentUser("sub") userId: string,
+    @Param("id") accountId: string,
+    @Body() dto: {
+      mainRole: string;
+      subRole: string;
+      peakTier?: string;
+      peakRank?: string;
+      championsByRole?: Record<string, string[]>;
+    },
+  ) {
+    return this.riotService.updateRiotAccountInfo(userId, accountId, dto as any);
   }
 
   @Put("accounts/:id/champions/:role")

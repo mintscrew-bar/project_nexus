@@ -28,6 +28,8 @@ interface AuthenticatedSocket extends Socket {
     credentials: true,
   },
   namespace: "/room",
+  pingInterval: 10000,
+  pingTimeout: 5000,
 })
 export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
@@ -38,6 +40,8 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private readonly ROOM_LIST_CHANNEL = "room-list"; // Channel for room list updates
   private typingUsers = new Map<string, Map<string, NodeJS.Timeout>>(); // roomId -> Map<userId, Timeout>
   private readonly TYPING_TIMEOUT_MS = 3000; // 3 seconds
+  // Guard against concurrent start-game calls (double-click, race)
+  private startingRooms = new Set<string>();
 
   constructor(
     private readonly roomService: RoomService,
@@ -288,6 +292,12 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
         return { error: "Unauthorized" };
       }
 
+      // Prevent concurrent start-game calls (double-click, race condition)
+      if (this.startingRooms.has(data.roomId)) {
+        return { error: "Game is already starting" };
+      }
+      this.startingRooms.add(data.roomId);
+
       // Get room to check teamMode
       const room = await this.roomService.getRoomById(data.roomId);
 
@@ -325,9 +335,13 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
           data.roomId,
         ); // Assert client.userId is string
 
+        // Get client-friendly state with timerEnd at top level
+        const clientState = await this.snakeDraftService.getClientDraftState(data.roomId);
+        const draftData = clientState ?? result;
+
         // Emit draft-started event to room (for lobby clients) and draft room (for draft page clients)
-        this.server.to(data.roomId).emit("draft-started", result);
-        this.snakeDraftGateway.emitDraftStarted(data.roomId, result);
+        this.server.to(data.roomId).emit("draft-started", draftData);
+        this.snakeDraftGateway.emitDraftStarted(data.roomId, draftData);
       }
 
       // Notify all players that game is starting (for navigation)
@@ -352,7 +366,13 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
       } catch (_rollbackError) {
         // Ignore rollback failures
       }
+
+      // Clean up in-memory draft/auction state on failure
+      this.snakeDraftService.clearDraftState(data.roomId);
+
       return { error: error.message };
+    } finally {
+      this.startingRooms.delete(data.roomId);
     }
   }
 

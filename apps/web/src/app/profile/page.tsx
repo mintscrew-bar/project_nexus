@@ -8,9 +8,10 @@ import { useRiotStore } from '@/stores/riot-store';
 import { useDdragonStore } from '@/stores/ddragon-store';
 import { userApi, matchApi, statsApi } from '@/lib/api-client';
 import { AddAccountModal } from '@/components/domain/AddAccountModal';
+import { EditAccountModal } from '@/components/domain/EditAccountModal';
 import { ChampionImage } from '@/components/ChampionImage';
-import { LoadingSpinner, Card, CardHeader, CardTitle, CardContent, Badge, Button, Label, Skeleton, EmptyState } from '@/components/ui';
-import { Star, Plus, RefreshCw, Shield, Trophy, TrendingUp, Loader2, Gamepad2, Target, History, Clock, Calendar, Users, Settings, User, BarChart3 } from 'lucide-react';
+import { LoadingSpinner, Card, CardHeader, CardTitle, CardContent, Badge, Button, Skeleton, EmptyState, ConfirmModal } from '@/components/ui';
+import { Star, Plus, RefreshCw, Shield, Trophy, TrendingUp, Loader2, Gamepad2, Target, History, Clock, Calendar, Users, Settings, User, BarChart3, Pencil, Trash2 } from 'lucide-react';
 import { TierBadge } from '@/components/domain/TierBadge';
 import { useToast } from '@/components/ui/Toast';
 
@@ -34,10 +35,15 @@ export default function ProfilePage() {
     setPrimaryAccount,
     syncAccount,
     selectAccount,
+    deleteAccount,
   } = useRiotStore();
   const { champions, championMap, fetchChampions } = useDdragonStore();
 
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingAccount, setEditingAccount] = useState<any>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deletingAccountId, setDeletingAccountId] = useState<string | null>(null);
   const { addToast } = useToast();
   const [profileData, setProfileData] = useState<any>(null);
   const [profileLoading, setProfileLoading] = useState(false);
@@ -146,6 +152,19 @@ export default function ProfilePage() {
       addToast('계정 동기화에 실패했습니다.', 'error');
     } finally {
       setSyncingAccountId(null);
+    }
+  };
+
+  const handleDelete = async (accountId: string) => {
+    setDeletingAccountId(accountId);
+    try {
+      await deleteAccount(accountId);
+      addToast('계정이 삭제되었습니다.', 'success');
+      fetchProfile();
+    } catch {
+      addToast('계정 삭제에 실패했습니다.', 'error');
+    } finally {
+      setDeletingAccountId(null);
     }
   };
 
@@ -481,22 +500,50 @@ export default function ProfilePage() {
                             </div>
                           </div>
 
-                          {/* Sync Button */}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleSync(account.id);
-                            }}
-                            className="p-2 hover:bg-bg-elevated rounded-lg transition-colors"
-                            title="티어 동기화"
-                            disabled={syncingAccountId === account.id}
-                          >
-                            {syncingAccountId === account.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin text-text-secondary" />
-                            ) : (
-                              <RefreshCw className="h-4 w-4 text-text-secondary" />
-                            )}
-                          </button>
+                          {/* Action Buttons */}
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSync(account.id);
+                              }}
+                              className="p-2 hover:bg-bg-elevated rounded-lg transition-colors"
+                              title="티어 동기화"
+                              disabled={syncingAccountId === account.id}
+                            >
+                              {syncingAccountId === account.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin text-text-secondary" />
+                              ) : (
+                                <RefreshCw className="h-4 w-4 text-text-secondary" />
+                              )}
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingAccount(account);
+                                setShowEditModal(true);
+                              }}
+                              className="p-2 hover:bg-bg-elevated rounded-lg transition-colors"
+                              title="계정 수정"
+                            >
+                              <Pencil className="h-4 w-4 text-text-secondary" />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setConfirmDeleteId(account.id);
+                              }}
+                              className="p-2 hover:bg-bg-elevated rounded-lg transition-colors"
+                              title="계정 삭제"
+                              disabled={deletingAccountId === account.id}
+                            >
+                              {deletingAccountId === account.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin text-accent-danger" />
+                              ) : (
+                                <Trash2 className="h-4 w-4 text-text-secondary hover:text-accent-danger" />
+                              )}
+                            </button>
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -644,6 +691,36 @@ export default function ProfilePage() {
           fetchProfile();
           setShowAddModal(false);
         }}
+      />
+
+      {/* Edit Account Modal */}
+      <EditAccountModal
+        isOpen={showEditModal}
+        onClose={() => { setShowEditModal(false); setEditingAccount(null); }}
+        onAccountUpdated={() => {
+          fetchAccounts();
+          fetchProfile();
+        }}
+        account={editingAccount}
+      />
+
+      {/* Delete Account Confirmation */}
+      <ConfirmModal
+        isOpen={!!confirmDeleteId}
+        onClose={() => setConfirmDeleteId(null)}
+        onConfirm={async () => {
+          if (confirmDeleteId) {
+            const id = confirmDeleteId;
+            setConfirmDeleteId(null);
+            await handleDelete(id);
+          }
+        }}
+        title="계정 삭제"
+        message="이 Riot 계정을 삭제하시겠습니까? 삭제 후 복구할 수 없습니다."
+        confirmText="삭제"
+        cancelText="취소"
+        variant="danger"
+        isLoading={!!deletingAccountId}
       />
     </div>
   );

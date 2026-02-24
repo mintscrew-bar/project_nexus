@@ -1,7 +1,9 @@
 import {
   Injectable,
   BadRequestException,
+  ForbiddenException,
   NotFoundException,
+  Logger,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../prisma/prisma.service";
@@ -51,6 +53,7 @@ export interface RegisterRiotAccountDto {
 
 @Injectable()
 export class RiotService {
+  private readonly logger = new Logger(RiotService.name);
   private readonly apiKey: string;
   private readonly baseUrl: string;
   private readonly asiaUrl = "https://asia.api.riotgames.com";
@@ -67,20 +70,7 @@ export class RiotService {
       this.configService.get("RIOT_REGION") || process.env.RIOT_REGION || "kr";
     this.baseUrl = `https://${region}.api.riotgames.com`;
 
-    console.log("🎮 RiotService initialized:");
-    console.log(
-      "  - API Key from ConfigService:",
-      this.configService.get("RIOT_API_KEY") ? "SET" : "NOT SET",
-    );
-    console.log(
-      "  - API Key from process.env:",
-      process.env.RIOT_API_KEY ? "SET" : "NOT SET",
-    );
-    console.log(
-      "  - Final API Key:",
-      this.apiKey ? `${this.apiKey.substring(0, 15)}...` : "EMPTY",
-    );
-    console.log("  - Region:", region);
+    this.logger.log(`RiotService initialized (region: ${region})`);
   }
 
   private async request<T>(url: string): Promise<T> {
@@ -93,23 +83,17 @@ export class RiotService {
     }
 
     try {
-      console.log("Making Riot API request to:", url);
-      console.log("Using API key (full):", this.apiKey);
-      console.log("API key length:", this.apiKey.length);
-
       const response = await axios.get<T>(url, {
         headers: { "X-Riot-Token": this.apiKey },
         timeout: 5000,
       });
-      console.log("Riot API success:", response.status);
+      this.logger.debug(`Riot API ${response.status} ${url}`);
       return response.data;
     } catch (error: any) {
-      console.error("Riot API Error:", {
+      this.logger.warn("Riot API Error", {
         status: error.response?.status,
         statusText: error.response?.statusText,
-        data: error.response?.data,
-        url: url,
-        apiKeyUsed: this.apiKey,
+        url,
       });
       if (error.response?.status === 404) {
         throw new NotFoundException("Summoner not found");
@@ -133,9 +117,7 @@ export class RiotService {
   // ========================================
 
   async getSummonerByRiotId(gameName: string, tagLine: string) {
-    console.log("getSummonerByRiotId called with:", { gameName, tagLine });
     const url = `${this.asiaUrl}/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}`;
-    console.log("Riot API URL:", url);
 
     let account;
     try {
@@ -144,9 +126,8 @@ export class RiotService {
         gameName: string;
         tagLine: string;
       }>(url);
-      console.log("Riot API response:", account);
     } catch (error) {
-      console.error("Riot API error:", error);
+      this.logger.warn("getSummonerByRiotId failed", { gameName, tagLine });
       throw error;
     }
 
@@ -187,7 +168,9 @@ export class RiotService {
             losses: rankedInfo.losses,
           },
         })
-        .catch((e) => console.error("Failed to save season tier snapshot:", e));
+        .catch((e) =>
+          this.logger.warn("Failed to save season tier snapshot", e),
+        );
     }
 
     return {
@@ -350,9 +333,6 @@ export class RiotService {
       profileIconId: number;
     }>(`${this.baseUrl}/lol/summoner/v4/summoners/by-puuid/${data.puuid}`);
 
-    console.log("Summoner API response:", JSON.stringify(summoner, null, 2));
-    console.log("Summoner ID:", summoner.id);
-
     if (summoner.profileIconId !== data.requiredIconId) {
       throw new BadRequestException("Profile icon verification failed");
     }
@@ -362,7 +342,6 @@ export class RiotService {
 
     // Use summoner ID from API response instead of Redis data
     const summonerId = summoner.id;
-    console.log("Final summonerId to be used:", summonerId);
 
     // Validate champion preferences (at least 3 per role)
     for (const role of [dto.mainRole, dto.subRole]) {
@@ -559,6 +538,87 @@ export class RiotService {
     return this.prisma.riotAccount.update({
       where: { id: riotAccountId },
       data: { isPrimary: true },
+    });
+  }
+
+  async deleteRiotAccount(userId: string, riotAccountId: string): Promise<void> {
+    const account = await this.prisma.riotAccount.findUnique({
+      where: { id: riotAccountId },
+    });
+
+    if (!account) {
+      throw new NotFoundException("Riot account not found");
+    }
+    if (account.userId !== userId) {
+      throw new ForbiddenException("Cannot delete another user's account");
+    }
+
+    // 삭제하려는 계정이 대표 계정이면 다른 계정을 대표로 지정
+    if (account.isPrimary) {
+      const other = await this.prisma.riotAccount.findFirst({
+        where: { userId, id: { not: riotAccountId } },
+        orderBy: { verifiedAt: "desc" },
+      });
+      if (other) {
+        await this.prisma.riotAccount.update({
+          where: { id: other.id },
+          data: { isPrimary: true },
+        });
+      }
+    }
+
+    await this.prisma.riotAccount.delete({ where: { id: riotAccountId } });
+  }
+
+  async updateRiotAccountInfo(
+    userId: string,
+    riotAccountId: string,
+    dto: {
+      mainRole: Role;
+      subRole: Role;
+      peakTier?: string;
+      peakRank?: string;
+      championsByRole?: { [key in Role]?: string[] };
+    },
+  ) {
+    const account = await this.prisma.riotAccount.findUnique({
+      where: { id: riotAccountId },
+    });
+
+    if (!account) {
+      throw new NotFoundException("Riot account not found");
+    }
+    if (account.userId !== userId) {
+      throw new ForbiddenException("Cannot modify another user's account");
+    }
+
+    if (dto.mainRole === dto.subRole) {
+      throw new BadRequestException("주 역할과 부 역할은 동일할 수 없습니다");
+    }
+
+    const updated = await this.prisma.riotAccount.update({
+      where: { id: riotAccountId },
+      data: {
+        mainRole: dto.mainRole,
+        subRole: dto.subRole,
+        ...(dto.peakTier !== undefined && { peakTier: dto.peakTier }),
+        ...(dto.peakRank !== undefined && { peakRank: dto.peakRank }),
+      },
+    });
+
+    if (dto.championsByRole) {
+      for (const [role, championIds] of Object.entries(dto.championsByRole)) {
+        if (championIds && championIds.length >= 3) {
+          await this.updateChampionPreferences(riotAccountId, role as Role, championIds);
+        }
+      }
+    }
+
+    return this.prisma.riotAccount.findUnique({
+      where: { id: riotAccountId },
+      include: {
+        championPreferences: { orderBy: [{ role: "asc" }, { order: "asc" }] },
+      },
     });
   }
 }

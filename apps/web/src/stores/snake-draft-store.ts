@@ -76,11 +76,21 @@ export const useSnakeDraftStore = create<SnakeDraftStoreState>((set, get) => ({
   makePick: async (roomId: string, playerId: string) => {
     set({ isLoading: true, error: null });
     try {
-      await snakeDraftApi.makePick(roomId, playerId);
+      const response = await snakeDraftSocketHelpers.makePick(roomId, playerId);
+      if (response?.error) {
+        const msg = response.error === 'pick_timeout'
+          ? '픽 요청 시간이 초과되었습니다.'
+          : response.error;
+        set({ error: msg, isLoading: false });
+        setTimeout(() => {
+          if (get().error === msg) set({ error: null });
+        }, 3000);
+        return;
+      }
       set({ isLoading: false });
     } catch (err: any) {
       set({
-        error: err.response?.data?.message || err.message || "Failed to make pick.",
+        error: err.message || "Failed to make pick.",
         isLoading: false,
       });
     }
@@ -100,7 +110,7 @@ export const useSnakeDraftStore = create<SnakeDraftStoreState>((set, get) => ({
   },
 
   connectToDraft: async (roomId: string) => {
-    connectSnakeDraftSocket();
+    const socket = connectSnakeDraftSocket();
     // Clear existing listeners to prevent duplication on reconnect
     snakeDraftSocketHelpers.offAllListeners();
     set({
@@ -146,13 +156,13 @@ export const useSnakeDraftStore = create<SnakeDraftStoreState>((set, get) => ({
       });
     });
 
-    snakeDraftSocketHelpers.onDraftComplete((data: { teams: Team[] }) => {
+    snakeDraftSocketHelpers.onDraftComplete((data?: { teams: Team[] }) => {
       set((state) => ({
         draftState: state.draftState
           ? {
               ...state.draftState,
-              teams: data.teams,
-              status: 'COMPLETED',
+              ...(data?.teams ? { teams: data.teams } : {}),
+              status: 'COMPLETED' as const,
             }
           : null,
       }));
@@ -168,6 +178,27 @@ export const useSnakeDraftStore = create<SnakeDraftStoreState>((set, get) => ({
 
     snakeDraftSocketHelpers.onDraftState((data: DraftState) => {
       set({ draftState: data });
+    });
+
+    snakeDraftSocketHelpers.onNextPick((data: { currentTeamId: string; timerEnd: number }) => {
+      set((state) => {
+        if (!state.draftState) return state;
+        return {
+          draftState: {
+            ...state.draftState,
+            currentTeamId: data.currentTeamId,
+            timerEnd: data.timerEnd,
+          },
+        };
+      });
+    });
+
+    snakeDraftSocketHelpers.onAutoPickMade(() => {
+      // Auto-pick notification — state already updated via pick-made event
+    });
+
+    snakeDraftSocketHelpers.onTimerExpired(() => {
+      // Timer expired — auto-pick will follow via pick-made event
     });
 
     snakeDraftSocketHelpers.onSessionAborted((data: { message?: string }) => {
@@ -209,6 +240,18 @@ export const useSnakeDraftStore = create<SnakeDraftStoreState>((set, get) => ({
     }
 
     set({ isConnected: true, isLoading: false });
+
+    // Re-join the socket.io room after reconnect to resume receiving events
+    socket?.on('connect', async () => {
+      set({ isConnected: true });
+      const response = await snakeDraftSocketHelpers.joinDraft(roomId);
+      if (response?.success && response.state) {
+        set({ draftState: response.state, isLoading: false });
+      } else if (response?.success) {
+        set({ isConnected: true, isLoading: false });
+      }
+    });
+    socket?.on('disconnect', () => set({ isConnected: false }));
   },
 
   disconnectFromDraft: () => {

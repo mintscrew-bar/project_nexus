@@ -7,10 +7,12 @@ import {
   ConnectedSocket,
   MessageBody,
 } from "@nestjs/websockets";
-import { OnModuleDestroy } from "@nestjs/common";
+import { OnModuleDestroy, Inject, forwardRef } from "@nestjs/common";
 import { Server, Socket } from "socket.io";
 import { AuthService } from "../auth/auth.service";
 import { RoleSelectionService } from "./role-selection.service";
+import { MatchGateway } from "../match/match.gateway";
+import { MatchService } from "../match/match.service";
 import { Role } from "@nexus/database";
 
 interface AuthenticatedSocket extends Socket {
@@ -24,6 +26,8 @@ interface AuthenticatedSocket extends Socket {
     origin: process.env.APP_URL || "http://localhost:3000",
     credentials: true,
   },
+  pingInterval: 10000,
+  pingTimeout: 5000,
 })
 export class RoleSelectionGateway
   implements OnGatewayConnection, OnGatewayDisconnect, OnModuleDestroy
@@ -38,6 +42,10 @@ export class RoleSelectionGateway
   constructor(
     private readonly authService: AuthService,
     private readonly roleSelectionService: RoleSelectionService,
+    @Inject(forwardRef(() => MatchGateway))
+    private readonly matchGateway: MatchGateway,
+    @Inject(forwardRef(() => MatchService))
+    private readonly matchService: MatchService,
   ) {}
 
   onModuleDestroy() {
@@ -208,6 +216,14 @@ export class RoleSelectionGateway
         room,
       });
 
+      // Emit bracket-generated so bracket page clients receive the data
+      try {
+        const matches = await this.matchService.getRoomMatches(roomId);
+        this.matchGateway.emitBracketGenerated(roomId, { bracket: matches });
+      } catch (bracketError) {
+        console.error(`[RoleSelection] Failed to emit bracket-generated for room ${roomId}:`, bracketError);
+      }
+
       return room;
     } catch (error: any) {
       console.error("Error completing role selection:", error);
@@ -234,15 +250,21 @@ export class RoleSelectionGateway
   // External Methods (called by other gateways)
   // ========================================
 
-  async emitRoleSelectionStarted(roomId: string, data: any) {
+  async emitRoleSelectionStarted(roomId: string, _data: any) {
+    // Auto-assign roles by preference (mainRole → subRole → random) before notifying clients
+    await this.roleSelectionService.autoAssignRolesByPreference(roomId);
+
+    // Re-fetch data so clients receive the pre-assigned roles immediately
+    const data = await this.roleSelectionService.getRoleSelectionData(roomId);
     this.server.to(`room:${roomId}`).emit("role-selection-started", data);
 
-    // Start the timer
+    // Start the countdown timer
     this.startTimer(roomId);
   }
 
   emitSessionAborted(roomId: string, data: any) {
     this.stopTimer(roomId);
+    this.completingRooms.delete(roomId);
     this.server.to(`room:${roomId}`).emit("session-aborted", data);
   }
 }

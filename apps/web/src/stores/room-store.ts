@@ -166,18 +166,21 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
       set({ currentRoom: room });
     });
 
-    roomSocketHelpers.onParticipantJoined((data: { participant: Participant }) => {
+    // Server emits { userId, username } for user-joined
+    roomSocketHelpers.onParticipantJoined((data: { userId: string; username: string }) => {
       set((state) => ({
-        participants: [...state.participants, data.participant],
+        participants: [...state.participants, { id: data.userId, username: data.username, isReady: false }],
       }));
     });
 
+    // Server emits { userId, username } for user-left
     roomSocketHelpers.onParticipantLeft((data: { userId: string }) => {
       set((state) => ({
         participants: state.participants.filter((p) => p.id !== data.userId),
       }));
     });
 
+    // Server emits { userId, isReady } for ready-status-changed
     roomSocketHelpers.onParticipantReady((data: { userId: string; isReady: boolean }) => {
       set((state) => ({
         participants: state.participants.map((p) =>
@@ -207,6 +210,13 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
         return { typingUsers: newTypingUsers };
       });
     });
+
+    // Re-join the socket.io room after reconnect to resume receiving events
+    socket.on('connect', () => {
+      set({ isConnected: true });
+      roomSocketHelpers.joinRoom(roomId);
+    });
+    socket.on('disconnect', () => set({ isConnected: false }));
 
     set({ isConnected: true });
   },

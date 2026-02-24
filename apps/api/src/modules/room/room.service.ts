@@ -632,6 +632,13 @@ export class RoomService {
       throw new ForbiddenException("Only host can kick participants");
     }
 
+    // Prevent kick during active sessions (draft, auction, role selection, match)
+    if (room.status !== RoomStatus.WAITING) {
+      throw new BadRequestException(
+        "Cannot kick participants while a session is active. Abort the session first.",
+      );
+    }
+
     const participant = await this.prisma.roomParticipant.findUnique({
       where: { id: participantId },
     });

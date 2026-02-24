@@ -22,6 +22,8 @@ interface AuthenticatedSocket extends Socket {
     origin: process.env.APP_URL || "http://localhost:3000",
     credentials: true,
   },
+  pingInterval: 10000,
+  pingTimeout: 5000,
 })
 export class ClanGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()

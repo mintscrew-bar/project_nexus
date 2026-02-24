@@ -80,6 +80,8 @@ export const useClanStore = create<ClanStoreState>((set, get) => ({
 
   connectToClan: (clanId: string) => {
     const socket = connectClanSocket();
+    // Clear existing listeners to prevent duplication on reconnect
+    clanSocketHelpers.offAllListeners();
 
     clanSocketHelpers.joinClan(clanId);
 
@@ -105,9 +107,12 @@ export const useClanStore = create<ClanStoreState>((set, get) => ({
       });
     });
 
-    // Other clan-related listeners can go here if needed
-    // clanSocketHelpers.onMemberJoined(...)
-    // clanSocketHelpers.onMemberLeft(...)
+    // Re-join on reconnect to resume receiving events
+    socket?.on('connect', () => {
+      set({ isConnected: true });
+      clanSocketHelpers.joinClan(clanId);
+    });
+    socket?.on('disconnect', () => set({ isConnected: false }));
 
     set({ isConnected: true });
   },

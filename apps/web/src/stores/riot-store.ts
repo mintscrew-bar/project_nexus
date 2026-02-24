@@ -54,6 +54,8 @@ interface RiotStoreState {
   syncAccount: (accountId: string) => Promise<void>;
   selectAccount: (account: RiotAccount | null) => void;
   updateChampions: (accountId: string, role: string, championIds: string[]) => Promise<void>;
+  updateAccount: (accountId: string, data: { mainRole: string; subRole: string; championsByRole?: Record<string, string[]> }) => Promise<void>;
+  deleteAccount: (accountId: string) => Promise<void>;
 
   // Actions - Verification Flow
   startVerification: (gameName: string, tagLine: string) => Promise<VerificationData>;
@@ -243,6 +245,34 @@ export const useRiotStore = create<RiotStoreState>((set, get) => ({
             isLoading: false,
         });
         throw error;
+    }
+  },
+
+  updateAccount: async (accountId: string, data: { mainRole: string; subRole: string; championsByRole?: Record<string, string[]> }) => {
+    set({ isLoading: true, error: null });
+    try {
+      const updated = await riotApi.updateAccount(accountId, data);
+      const accounts = get().accounts.map(acc => acc.id === accountId ? { ...acc, ...updated } : acc);
+      set({
+        accounts,
+        primaryAccount: accounts.find(a => a.isPrimary) || null,
+        selectedAccount: accounts.find(a => a.id === get().selectedAccount?.id) || null,
+        isLoading: false,
+      });
+    } catch (error: any) {
+      set({ error: error.response?.data?.message || '계정 수정에 실패했습니다.', isLoading: false });
+      throw error;
+    }
+  },
+
+  deleteAccount: async (accountId: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      await riotApi.deleteAccount(accountId);
+      await get().fetchAccounts();
+    } catch (error: any) {
+      set({ error: error.response?.data?.message || '계정 삭제에 실패했습니다.', isLoading: false });
+      throw error;
     }
   },
 

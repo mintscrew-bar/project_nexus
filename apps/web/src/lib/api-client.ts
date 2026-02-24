@@ -439,6 +439,23 @@ export const riotApi = {
     return response.data;
   },
 
+  // 계정 정보 수정 (역할, 챔피언)
+  updateAccount: async (accountId: string, data: {
+    mainRole: string;
+    subRole: string;
+    championsByRole?: Record<string, string[]>;
+    peakTier?: string;
+    peakRank?: string;
+  }) => {
+    const response = await apiClient.put(`/riot/accounts/${accountId}`, data);
+    return response.data;
+  },
+
+  // 계정 삭제
+  deleteAccount: async (accountId: string) => {
+    await apiClient.delete(`/riot/accounts/${accountId}`);
+  },
+
   // 소환사 정보 조회
   getSummoner: async (gameName: string, tagLine: string) => {
     console.log('getSummoner called with:', { gameName, tagLine });

@@ -47,7 +47,7 @@ interface RoleSelectionState {
 
 export const useRoleSelectionStore = create<RoleSelectionState>((set) => ({
   room: null,
-  timeRemaining: 120,
+  timeRemaining: 15,
   isConnected: false,
   isLoading: true,
   isCompleted: false,
@@ -63,38 +63,51 @@ export const useRoleSelectionStore = create<RoleSelectionState>((set) => ({
       sessionAbortedAt: null,
       sessionAbortMessage: null,
     });
-    connectRoleSelectionSocket();
+    const socket = connectRoleSelectionSocket();
     // Clear existing listeners to prevent duplication on reconnect
     roleSelectionSocketHelpers.offAllListeners();
 
-    roleSelectionSocketHelpers.joinRoom(roomId).then((response: any) => {
-      if (response?.success) {
-        set({
-          room: response.room ?? null,
-          timeRemaining: response.timeRemaining
-            ? Math.ceil(response.timeRemaining / 1000)
-            : 120,
-          isLoading: false,
-          isConnected: true,
-        });
-      } else {
-        const errorMsg = response?.error || "Failed to join role selection room.";
-        set({
-          error:
-            errorMsg === "join_timeout" || errorMsg === "connect_timeout"
-              ? "서버 연결에 실패했습니다. 새로고침 해주세요."
-              : errorMsg,
-          isLoading: false,
-          isConnected: false,
-        });
-      }
-    }).catch(() => {
-      set({
-        error: "서버 연결에 실패했습니다. 새로고침 해주세요.",
-        isLoading: false,
-        isConnected: false,
+    const doJoin = (isReconnect = false) => {
+      roleSelectionSocketHelpers.joinRoom(roomId).then((response: any) => {
+        if (response?.success) {
+          set({
+            room: response.room ?? null,
+            timeRemaining: response.timeRemaining
+              ? Math.ceil(response.timeRemaining / 1000)
+              : 15,
+            isLoading: false,
+            isConnected: true,
+          });
+        } else if (!isReconnect) {
+          const errorMsg = response?.error || "Failed to join role selection room.";
+          set({
+            error:
+              errorMsg === "join_timeout" || errorMsg === "connect_timeout"
+                ? "서버 연결에 실패했습니다. 새로고침 해주세요."
+                : errorMsg,
+            isLoading: false,
+            isConnected: false,
+          });
+        }
+      }).catch(() => {
+        if (!isReconnect) {
+          set({
+            error: "서버 연결에 실패했습니다. 새로고침 해주세요.",
+            isLoading: false,
+            isConnected: false,
+          });
+        }
       });
+    };
+
+    doJoin(false);
+
+    // Re-join the socket.io room after reconnect to resume receiving events
+    socket?.on('connect', () => {
+      set({ isConnected: true });
+      doJoin(true);
     });
+    socket?.on('disconnect', () => set({ isConnected: false }));
 
     roleSelectionSocketHelpers.onRoleSelected(
       (data: { userId: string; teamId: string; role: string; memberId: string }) => {
@@ -143,7 +156,7 @@ export const useRoleSelectionStore = create<RoleSelectionState>((set) => ({
     set({
       isConnected: false,
       room: null,
-      timeRemaining: 120,
+      timeRemaining: 15,
       isLoading: false,
       isCompleted: false,
       error: null,

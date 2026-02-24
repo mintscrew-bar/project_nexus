@@ -35,7 +35,7 @@ interface DraftState {
 interface DraftBoardProps {
   draftState: DraftState;
   currentUserId?: string;
-  onMakePick: (playerId: string) => void;
+  onMakePick: (playerId: string) => void | Promise<void>;
   disabled?: boolean;
 }
 
@@ -47,6 +47,7 @@ export function DraftBoard({
 }: DraftBoardProps) {
   const [timeLeft, setTimeLeft] = React.useState(0);
   const [selectedPlayer, setSelectedPlayer] = React.useState<string | null>(null);
+  const [isPicking, setIsPicking] = React.useState(false);
 
   // Calculate time remaining
   React.useEffect(() => {
@@ -62,6 +63,12 @@ export function DraftBoard({
   const currentTeam = draftState.teams.find(t => t.id === draftState.currentTeamId);
   const isMyTurn = currentTeam?.captainId === currentUserId;
 
+  // Clear selection when turn changes or selected player was picked
+  React.useEffect(() => {
+    setSelectedPlayer(null);
+    setIsPicking(false);
+  }, [draftState.currentTeamId]);
+
   // Get position icon
   const getPositionIcon = (position?: string): string => {
     if (!position) return "❓";
@@ -75,9 +82,14 @@ export function DraftBoard({
     }
   };
 
-  const handlePickPlayer = () => {
-    if (selectedPlayer && !disabled && isMyTurn) {
-      onMakePick(selectedPlayer);
+  const handlePickPlayer = async () => {
+    if (selectedPlayer && !disabled && isMyTurn && !isPicking) {
+      setIsPicking(true);
+      try {
+        await onMakePick(selectedPlayer);
+      } finally {
+        setIsPicking(false);
+      }
       setSelectedPlayer(null);
     }
   };
@@ -239,11 +251,11 @@ export function DraftBoard({
                 <div className="mt-4 pt-4 border-t border-bg-tertiary">
                   <Button
                     onClick={handlePickPlayer}
-                    disabled={disabled}
+                    disabled={disabled || isPicking}
                     className="w-full"
                     size="lg"
                   >
-                    선택 확정
+                    {isPicking ? "선택 중..." : "선택 확정"}
                   </Button>
                 </div>
               )}

@@ -127,7 +127,7 @@ export function RoomSettingsModal({ isOpen, onClose, room }: RoomSettingsModalPr
       await updateRoomSettings(room.id, settingsToUpdate);
       onClose();
     } catch (err: any) {
-      setError(err.message || '설정 저장에 실패했습니다.');
+      setError(err.response?.data?.message || err.message || '설정 저장에 실패했습니다.');
     } finally {
       setIsSubmitting(false);
     }

@@ -10,7 +10,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { RoomStatus, Role } from "@nexus/database";
 import { MatchService } from "../match/match.service";
 
-const ROLE_SELECTION_TIME_MS = 120000; // 2 minutes
+const ROLE_SELECTION_TIME_MS = 15000; // 15 seconds (roles are auto-assigned by preference)
 
 export interface RoleSelectionState {
   roomId: string;
@@ -186,6 +186,100 @@ export class RoleSelectionService {
     }
 
     return true;
+  }
+
+  /**
+   * Auto-assign roles for all team members based on their preferred positions.
+   * Priority: mainRole → subRole → random from remaining roles.
+   * Members are shuffled first to ensure fairness when preferences conflict.
+   */
+  async autoAssignRolesByPreference(roomId: string): Promise<void> {
+    const room = await this.prisma.room.findUnique({
+      where: { id: roomId },
+      include: {
+        teams: {
+          include: {
+            members: {
+              include: {
+                user: {
+                  include: {
+                    riotAccounts: {
+                      where: { isPrimary: true },
+                      take: 1,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!room) return;
+
+    const ALL_ROLES: Role[] = [
+      Role.TOP,
+      Role.JUNGLE,
+      Role.MID,
+      Role.ADC,
+      Role.SUPPORT,
+    ];
+
+    for (const team of room.teams) {
+      // Shuffle members for fairness when preferences conflict
+      const members = [...team.members];
+      for (let i = members.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [members[i], members[j]] = [members[j], members[i]];
+      }
+
+      const assignedRoles = new Set<Role>();
+      const assignments = new Map<string, Role>(); // memberId → role
+
+      // Pass 1: Assign mainRole where not contested
+      for (const member of members) {
+        const primaryAccount = member.user.riotAccounts[0];
+        const mainRole = primaryAccount?.mainRole as Role | undefined;
+        if (mainRole && !assignedRoles.has(mainRole)) {
+          assignments.set(member.id, mainRole);
+          assignedRoles.add(mainRole);
+        }
+      }
+
+      // Pass 2: Assign subRole for members who didn't get their mainRole
+      for (const member of members) {
+        if (assignments.has(member.id)) continue;
+        const primaryAccount = member.user.riotAccounts[0];
+        const subRole = primaryAccount?.subRole as Role | undefined;
+        if (subRole && !assignedRoles.has(subRole)) {
+          assignments.set(member.id, subRole);
+          assignedRoles.add(subRole);
+        }
+      }
+
+      // Pass 3: Assign random remaining roles for still-unassigned members
+      const remainingRoles = ALL_ROLES.filter((r) => !assignedRoles.has(r));
+      for (let i = remainingRoles.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [remainingRoles[i], remainingRoles[j]] = [remainingRoles[j], remainingRoles[i]];
+      }
+
+      let remainingIdx = 0;
+      for (const member of members) {
+        if (assignments.has(member.id)) continue;
+        const role = remainingRoles[remainingIdx++];
+        if (role) assignments.set(member.id, role);
+      }
+
+      // Persist all assignments
+      for (const [memberId, role] of assignments) {
+        await this.prisma.teamMember.update({
+          where: { id: memberId },
+          data: { assignedRole: role },
+        });
+      }
+    }
   }
 
   async autoAssignRemainingRoles(roomId: string): Promise<void> {

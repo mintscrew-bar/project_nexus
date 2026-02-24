@@ -213,14 +213,13 @@ export const useMatchStore = create<MatchStoreState>((set, get) => ({
       auth: (cb) => cb({ token: getAccessToken() }),
       transports: ['websocket'],
       reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 2000,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 10000,
+      randomizationFactor: 0.5,
     });
 
-    socket.on('connect', () => {
-      console.log('Connected to match socket');
-      set({ isConnected: true, error: null, roomId });
-
+    const joinBracket = () => {
       // Join bracket room with timeout
       const ackTimeout = setTimeout(() => {
         console.warn('[Match] join-bracket ACK timeout');
@@ -238,6 +237,12 @@ export const useMatchStore = create<MatchStoreState>((set, get) => ({
           set({ error: response.error || '대진표 참가에 실패했습니다' });
         }
       });
+    };
+
+    socket.on('connect', () => {
+      console.log('Connected to match socket');
+      set({ isConnected: true, error: null, roomId });
+      joinBracket();
     });
 
     socket.on('connect_error', (error) => {
@@ -309,19 +314,16 @@ export const useMatchStore = create<MatchStoreState>((set, get) => ({
     }
 
     const socket = io(`${SOCKET_URL}/match`, {
-      auth: {
-        token: getAccessToken(),
-      },
+      auth: (cb) => cb({ token: getAccessToken() }),
       transports: ['websocket'],
       reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 2000,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 10000,
+      randomizationFactor: 0.5,
     });
 
-    socket.on('connect', () => {
-      console.log('Connected to match socket');
-      set({ isConnected: true, error: null });
-
+    const joinMatch = () => {
       // Join match room with timeout
       const matchAckTimeout = setTimeout(() => {
         console.warn('[Match] join-match ACK timeout');
@@ -335,6 +337,12 @@ export const useMatchStore = create<MatchStoreState>((set, get) => ({
           set({ error: response.error || '매치 참가에 실패했습니다' });
         }
       });
+    };
+
+    socket.on('connect', () => {
+      console.log('Connected to match socket');
+      set({ isConnected: true, error: null });
+      joinMatch();
     });
 
     socket.on('connect_error', (error) => {

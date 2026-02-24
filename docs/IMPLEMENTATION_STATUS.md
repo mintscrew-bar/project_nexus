@@ -7,6 +7,7 @@
 ## ✅ 완료된 시스템 (11개 주요 모듈)
 
 ### 1. 인증 시스템 ✅
+
 - **파일**: `apps/api/src/modules/auth/`
 - **기능**:
   - ✅ Google OAuth 2.0
@@ -19,6 +20,7 @@
 - **커밋**: `1a719df - Implement comprehensive authentication system`
 
 ### 2. Riot API 통합 ✅
+
 - **파일**: `apps/api/src/modules/riot/`
 - **기능**:
   - ✅ 계정 인증 (Summoner Code)
@@ -31,6 +33,7 @@
 - **커밋**: `09c58cc - Enhance Riot API integration`
 
 ### 3. Room 시스템 ✅
+
 - **파일**: `apps/api/src/modules/room/`
 - **기능**:
   - ✅ 방 생성/조회/수정/삭제
@@ -43,6 +46,7 @@
 - **커밋**: `0d7d179 - Implement comprehensive room system`
 
 ### 4. Auction 시스템 ✅
+
 - **파일**: `apps/api/src/modules/auction/`
 - **기능**:
   - ✅ 티어별 골드 할당 (Iron 3000 ~ Diamond+ 2000)
@@ -56,6 +60,7 @@
 - **커밋**: `25e076a - Complete Phase 1 MVP: Auction engine`
 
 ### 5. Snake Draft 시스템 ✅
+
 - **파일**: `apps/api/src/modules/room/snake-draft.*`
 - **기능**:
   - ✅ 랜덤/티어 기반 팀장 선택
@@ -68,6 +73,7 @@
 - **커밋**: `3e315a4 - Implement Snake Draft system`
 
 ### 6. Match/Tournament 시스템 ✅
+
 - **파일**: `apps/api/src/modules/match/`
 - **기능**:
   - ✅ 자동 브래킷 생성
@@ -82,6 +88,7 @@
 - **커밋**: `7525269 - Implement comprehensive Match/Tournament bracket system`
 
 ### 7. Discord 음성 통합 ✅
+
 - **파일**: `apps/api/src/modules/discord/`
 - **기능**:
   - ✅ 방 생성 시 자동 카테고리/채널 생성
@@ -93,6 +100,7 @@
 - **커밋**: `25e076a - Complete Phase 1 MVP: Discord voice integration`
 
 ### 8. Clan 시스템 ✅
+
 - **파일**: `apps/api/src/modules/clan/`
 - **기능**:
   - ✅ 클랜 생성/관리 (태그 2-5자 유니크)
@@ -106,6 +114,7 @@
 - **커밋**: `bfb6fae - Implement comprehensive Clan management system`
 
 ### 9. Community/Forum 시스템 ✅
+
 - **파일**: `apps/api/src/modules/community/`
 - **기능**:
   - ✅ 카테고리별 게시판 (공지/자유/팁/Q&A)
@@ -118,6 +127,7 @@
 - **커밋**: `bde9972 - Implement comprehensive Community/Forum system`
 
 ### 10. Reputation/Report 시스템 ✅
+
 - **파일**: `apps/api/src/modules/reputation/`
 - **기능**:
   - ✅ 매치 후 3항목 평가 (실력/태도/의사소통)
@@ -130,6 +140,7 @@
 - **커밋**: `d86fb79 - Implement comprehensive Reputation and Report system`
 
 ### 11. Friend 시스템 ✅
+
 - **파일**: `apps/api/src/modules/friend/`
 - **기능**:
   - ✅ 친구 요청/수락/거절/취소
@@ -187,6 +198,7 @@ nexus/
 ## 📊 통계
 
 ### 코드 통계
+
 - **총 모듈**: 11개
 - **REST 엔드포인트**: 100+ 개
 - **WebSocket Namespaces**: 5개
@@ -201,6 +213,7 @@ nexus/
 - **총 코드 라인**: ~8,000+ 줄
 
 ### 기능 통계
+
 - **인증 방식**: 3개 (Email, Google, Discord)
 - **게임 모드**: 2개 (Auction, Snake Draft)
 - **브래킷 타입**: 3개 (Single, Round Robin, Tournament)
@@ -212,23 +225,26 @@ nexus/
 ## ✅ 완료된 작업
 
 ### 1. 데이터베이스 스키마 업데이트 ✅
+
 - [x] Prisma 스키마 업데이트 (모든 모델/필드/관계 반영)
 - [x] 타입 재생성
 
 ### 2. 컴파일 오류 해결 ✅
+
 - [x] ClanRole enum import 수정
 - [x] PostCategory enum 추가
 - [x] 누락된 필드 추가 (views, category, likes 등)
 - [x] TypeScript 타입 오류 수정
 
 ### 3. 추가 개발 (대부분 완료)
+
 - [x] Admin/Moderator guard 구현
 - [x] 파일 업로드 (아바타)
 - [x] Cron jobs (자동 밴 해제, 티어 동기화, 세션 정리)
 - [x] 알림 시스템
-- [ ] Email 서비스 (회원가입 인증, 비밀번호 찾기)
 
 ### 4. 프론트엔드 통합 (진행 중)
+
 - [x] WebSocket 이벤트 이름 통일
 - [x] 상태 관리 (Zustand stores) 기본 완성
 - [x] 에러 바운더리 적용
@@ -239,6 +255,7 @@ nexus/
 ## ⚠️ 남은 작업
 
 ### 5. 테스트 및 배포 (우선순위: 낮음)
+
 - [ ] Unit 테스트
 - [ ] Integration 테스트
 - [ ] E2E 테스트
@@ -249,12 +266,15 @@ nexus/
 ## 🔧 빠른 시작 (스키마 업데이트 후)
 
 ### 1. 의존성 설치
+
 ```bash
 npm install
 ```
 
 ### 2. 환경 변수 설정
+
 `.env` 파일 생성:
+
 ```env
 DATABASE_URL="postgresql://..."
 JWT_SECRET="your-secret"
@@ -267,6 +287,7 @@ DISCORD_BOT_TOKEN="..."
 ```
 
 ### 3. 데이터베이스 마이그레이션
+
 ```bash
 cd packages/database
 npx prisma migrate dev
@@ -274,12 +295,14 @@ npx prisma generate
 ```
 
 ### 4. 서버 실행
+
 ```bash
 cd apps/api
 npm run dev
 ```
 
 ### 5. 프론트엔드 실행
+
 ```bash
 cd apps/web
 npm run dev
@@ -303,6 +326,7 @@ npm run dev
 ## 🎉 주요 성과
 
 ### 기술 스택 통합
+
 - ✅ NestJS + Prisma + PostgreSQL
 - ✅ WebSocket (Socket.io)
 - ✅ JWT 인증
@@ -311,6 +335,7 @@ npm run dev
 - ✅ Discord Bot
 
 ### 아키텍처 품질
+
 - ✅ 모듈화된 구조
 - ✅ 역할 기반 접근 제어
 - ✅ 실시간 업데이트
@@ -319,6 +344,7 @@ npm run dev
 - ✅ 데이터 검증
 
 ### 개발 속도
+
 - **11개 주요 모듈** in 개발 세션
 - **100+ API 엔드포인트** 구현
 - **5개 WebSocket namespaces** 구현
@@ -329,23 +355,27 @@ npm run dev
 ## 💡 권장 사항
 
 ### 즉시 실행
+
 1. `SCHEMA_UPDATES_NEEDED.md`의 스키마 변경 적용
 2. `npm run build` 오류 모두 해결
 3. Postman/Insomnia로 API 테스트
 
 ### 단기 (1-2주)
+
 1. Admin/Moderator guard 추가
 2. 파일 업로드 구현
 3. Email 서비스 추가
 4. 프론트엔드 주요 페이지 완성
 
 ### 중기 (1개월)
+
 1. 알림 시스템 구현
 2. 전적 시스템 (Riot API 매치 데이터)
 3. 리더보드
 4. 고급 통계
 
 ### 장기 (2-3개월)
+
 1. 모바일 앱 (React Native)
 2. AI 팀 밸런싱
 3. 스트리밍 통합
@@ -356,11 +386,13 @@ npm run dev
 ## 📞 지원
 
 ### 문서
+
 - [API Reference](./API_REFERENCE.md)
 - [Technical Plan](./TECHNICAL_PLAN.md)
 - [Schema Updates](./SCHEMA_UPDATES_NEEDED.md)
 
 ### Git 히스토리
+
 ```bash
 git log --oneline --graph
 ```

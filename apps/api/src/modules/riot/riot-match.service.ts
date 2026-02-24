@@ -239,7 +239,7 @@ export class RiotMatchService {
           },
           update: {}, // 이미 존재하면 덮어쓰지 않음
         })
-        .catch((e) =>
+        .catch((e: any) =>
           this.logger.warn(`DB cache write failed for ${matchId}: ${e}`),
         );
 

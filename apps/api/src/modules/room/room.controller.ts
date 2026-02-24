@@ -224,7 +224,16 @@ export class RoomController {
     @CurrentUser("sub") userId: string,
     @Param("id") roomId: string,
   ) {
-    return this.snakeDraftService.startSnakeDraft(userId, roomId);
+    const result = await this.snakeDraftService.startSnakeDraft(userId, roomId);
+
+    // Broadcast draft-started to all connected clients + start auto-pick timer
+    const clientState = await this.snakeDraftService.getClientDraftState(roomId);
+    if (clientState) {
+      this.snakeDraftGateway.emitDraftStarted(roomId, clientState);
+    }
+    this.roomGateway.broadcastRoomListUpdate();
+
+    return result;
   }
 
   @Post(":id/snake-draft/pick")

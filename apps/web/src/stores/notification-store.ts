@@ -43,6 +43,9 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
 
   initialize: () => {
     const socket = connectNotificationSocket();
+    // Clear existing listeners to prevent duplication
+    notificationSocketHelpers.offAllListeners();
+
     set({ isConnected: true });
 
     // Listen for new notifications
@@ -57,6 +60,10 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     notificationSocketHelpers.onUnreadCount((data: { count: number }) => {
       set({ unreadCount: data.count });
     });
+
+    // Track connection state on reconnect/disconnect
+    socket?.on('connect', () => set({ isConnected: true }));
+    socket?.on('disconnect', () => set({ isConnected: false }));
 
     // Fetch initial data
     get().fetchNotifications();

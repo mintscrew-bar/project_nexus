@@ -42,31 +42,40 @@ export const usePresenceStore = create<PresenceStoreState>((set, get) => ({
 
   connect: () => {
     const socket = connectPresenceSocket();
+    if (!socket) return;
 
-    if (socket) {
+    // Clear existing listeners to prevent duplication
+    presenceSocketHelpers.offAllListeners();
+
+    set({ isConnected: true, myStatus: "ONLINE" });
+
+    // Listen for friend status changes
+    presenceSocketHelpers.onFriendStatusChanged((data) => {
+      const { userId, status, lastSeenAt, currentRoomId, currentRoomName, currentRoomIsPrivate } = data as any;
+      const currentStatuses = get().friendStatuses;
+      const existing = currentStatuses.get(userId);
+
+      if (existing) {
+        const newStatuses = new Map(currentStatuses);
+        newStatuses.set(userId, {
+          ...existing,
+          status: status as UserStatus,
+          lastSeenAt,
+          ...(currentRoomId !== undefined && { currentRoomId, currentRoomName, currentRoomIsPrivate }),
+        });
+        set({ friendStatuses: newStatuses });
+      }
+    });
+
+    // Re-establish presence on reconnect
+    socket.on('connect', () => {
       set({ isConnected: true, myStatus: "ONLINE" });
+      presenceSocketHelpers.setStatus("ONLINE");
+    });
+    socket.on('disconnect', () => set({ isConnected: false }));
 
-      // Listen for friend status changes
-      presenceSocketHelpers.onFriendStatusChanged((data) => {
-        const { userId, status, lastSeenAt, currentRoomId, currentRoomName, currentRoomIsPrivate } = data as any;
-        const currentStatuses = get().friendStatuses;
-        const existing = currentStatuses.get(userId);
-
-        if (existing) {
-          const newStatuses = new Map(currentStatuses);
-          newStatuses.set(userId, {
-            ...existing,
-            status: status as UserStatus,
-            lastSeenAt,
-            ...(currentRoomId !== undefined && { currentRoomId, currentRoomName, currentRoomIsPrivate }),
-          });
-          set({ friendStatuses: newStatuses });
-        }
-      });
-
-      // Fetch initial friend statuses
-      get().fetchFriendsStatuses();
-    }
+    // Fetch initial friend statuses
+    get().fetchFriendsStatuses();
   },
 
   disconnect: () => {

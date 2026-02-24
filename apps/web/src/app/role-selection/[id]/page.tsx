@@ -125,9 +125,9 @@ export default function RoleSelectionPage() {
   }
 
   const timerColor =
-    timeRemaining <= 10
+    timeRemaining <= 5
       ? "text-accent-danger"
-      : timeRemaining <= 30
+      : timeRemaining <= 10
         ? "text-accent-warning"
         : "text-accent-primary";
 
@@ -141,7 +141,7 @@ export default function RoleSelectionPage() {
               역할 선택
             </h1>
             <p className="text-text-secondary text-sm mt-1">
-              각 팀원이 담당할 포지션을 선택하세요
+              선호 포지션을 기반으로 역할이 자동 배정됩니다
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -286,7 +286,7 @@ export default function RoleSelectionPage() {
         {/* Bottom info */}
         <div className="mt-6 text-center">
           <p className="text-text-tertiary text-sm">
-            시간이 만료되면 남은 역할이 자동으로 배정됩니다
+            역할은 선호 포지션(주/부) 기반으로 자동 배정됩니다. 카운트다운 후 대진표로 이동합니다.
           </p>
         </div>
       </div>
