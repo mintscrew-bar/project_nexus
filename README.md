@@ -9,6 +9,31 @@ LoL 내전 토너먼트 플랫폼 - 경매 드래프트 시스템
 - **Database**: PostgreSQL, Redis
 - **Infrastructure**: Docker, Cloudflare Tunnel
 
+## Features
+
+### 🚀 Auction & Draft Simulation
+- **Bot Participation**: Implemented automated bot participation in auctions and drafts to simulate a full lobby experience and enable robust testing.
+- **Advanced Timers & Auto-Bidding**: The auction system now includes sophisticated timers, automatic bid resolution, and an auto-bid mechanism for bots.
+- **Session Management**: Added a crucial "Abort Session" feature, allowing hosts to reset an active game session (draft, auction, bracket) back to the lobby state.
+
+### 💬 Community & Social Features
+- **Rich Content Editor**: Replaced plain text areas with a new Markdown editor for creating and editing community posts.
+- **Interactive Comments**: Users can now reply to and like individual comments, fostering more engaging discussions.
+- **Post Bookmarking**: A bookmarking system has been added for users to save and revisit posts.
+- **Content Reporting**: Implemented a reporting system for both posts and comments to help moderate the community.
+- **Enhanced Sorting**: Added new sorting options for post lists, including by popularity (likes), views, and comment count.
+
+### 🧑‍🤝‍🧑 User Profiles & Settings
+- **Public Profiles**: All users now have a public profile page accessible via `/users/:id`.
+- **Profile Customization**: Users can set a "highlight champion" to feature on their profile and new privacy settings to control the visibility of their Riot accounts, champion stats, and match history.
+- **Detailed Stats**: Profiles now display more detailed information, including preferred champions by role, most-played champions, and clan affiliations.
+
+### ✉️ Direct Messaging (DM) System
+- **Enhanced Reliability**: The DM system has been upgraded with Redis caching for unread message counts and more robust handling of user connection status, ensuring a more reliable real-time chat experience.
+
+### 🛠️ Admin & Testing Tools
+- **Bot Management**: Administrators now have endpoints to easily add test bots to rooms, streamlining the testing process for game modes.
+
 ## Project Structure
 
 ```
