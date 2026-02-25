@@ -53,7 +53,7 @@ interface AuctionBoardProps {
   teams: Team[];
   players: Player[];
   currentUserId?: string;
-  onPlaceBid: (amount: number) => void;
+  onPlaceBid: (amount: number) => void | Promise<void>;
   disabled?: boolean;
   bidHistory?: BidHistoryEntry[];
   className?: string;
@@ -98,12 +98,18 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
     team?.remainingGold ?? team?.remainingBudget ?? 0;
 
   const [accumulatedBid, setAccumulatedBid] = useState<number>(0);
+  const [isBidding, setIsBidding] = useState(false);
   const currentTeam = sortedTeams.find((t) => t.captainId === currentUserId);
   const isCurrentUserTurn =
     Boolean(currentTeam) && auctionState.status === "IN_PROGRESS";
-  const totalBid = auctionState.currentHighestBid + accumulatedBid;
   const myBudget = getTeamBudget(currentTeam);
-  const canPlaceBid = accumulatedBid > 0 && totalBid <= myBudget;
+  // 서버와 동일한 예비금 계산: 남은 슬롯 × 100G를 예비금으로 확보
+  const memberCount = currentTeam?.members?.length ?? 0;
+  const slotsNeeded = Math.max(0, 5 - memberCount);
+  const reserveAmount = Math.max(0, (slotsNeeded - 1) * 100);
+  const availableBudget = Math.max(0, myBudget - reserveAmount);
+  const totalBid = auctionState.currentHighestBid + accumulatedBid;
+  const canPlaceBid = accumulatedBid > 0 && totalBid <= availableBudget && !isBidding;
 
   const [timeLeft, setTimeLeft] = useState(0);
   React.useEffect(() => {
@@ -117,20 +123,32 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
     return () => clearInterval(interval);
   }, [auctionState.timerEnd]);
 
+  // 경매 대상 선수가 바뀔 때만 accumulated 리셋 (다른 사람 입찰 시에는 유지)
   React.useEffect(() => {
     setAccumulatedBid(0);
-  }, [auctionState.currentHighestBid, auctionState.currentPlayer?.id]);
+  }, [auctionState.currentPlayer?.id]);
 
-  const handleBid = () => {
-    if (!canPlaceBid) return;
-    onPlaceBid(totalBid);
-    setAccumulatedBid(0);
+  // 예산 초과 시 accumulated를 자동 클램핑 (예비금 반영)
+  React.useEffect(() => {
+    const maxAccumulated = Math.max(0, availableBudget - auctionState.currentHighestBid);
+    setAccumulatedBid((prev) => Math.min(prev, maxAccumulated));
+  }, [auctionState.currentHighestBid, availableBudget]);
+
+  const handleBid = async () => {
+    if (!canPlaceBid || isBidding) return;
+    setIsBidding(true);
+    try {
+      await onPlaceBid(totalBid);
+    } finally {
+      setAccumulatedBid(0);
+      setIsBidding(false);
+    }
   };
 
   const addToBid = (increment: number) => {
     setAccumulatedBid((prev) => {
       const next = prev + increment;
-      return auctionState.currentHighestBid + next <= myBudget ? next : prev;
+      return auctionState.currentHighestBid + next <= availableBudget ? next : prev;
     });
   };
 
@@ -257,11 +275,16 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-4">
               <p className="text-sm text-text-tertiary">
-                보유 골드:{" "}
+                사용 가능:{" "}
                 <span className="text-accent-gold font-bold">
                   <Coins className="w-3.5 h-3.5 inline mr-0.5" />
-                  {myBudget.toLocaleString()}G
+                  {availableBudget.toLocaleString()}G
                 </span>
+                {reserveAmount > 0 && (
+                  <span className="text-text-muted text-xs ml-1.5">
+                    (예비 {reserveAmount.toLocaleString()}G)
+                  </span>
+                )}
               </p>
             </div>
 
@@ -300,7 +323,8 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
                   onClick={() => addToBid(inc)}
                   disabled={
                     disabled ||
-                    auctionState.currentHighestBid + accumulatedBid + inc > myBudget
+                    isBidding ||
+                    auctionState.currentHighestBid + accumulatedBid + inc > availableBudget
                   }
                 >
                   +{inc}G
@@ -321,9 +345,10 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
                 variant="primary"
                 onClick={handleBid}
                 disabled={disabled || !canPlaceBid}
+                isLoading={isBidding}
                 className="flex-1"
               >
-                {canPlaceBid ? `${totalBid.toLocaleString()}G 입찰` : "금액을 먼저 추가하세요"}
+                {isBidding ? "입찰 중..." : canPlaceBid ? `${totalBid.toLocaleString()}G 입찰` : "금액을 먼저 추가하세요"}
               </Button>
             </div>
           </CardContent>

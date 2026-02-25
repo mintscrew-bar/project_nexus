@@ -86,7 +86,7 @@ interface AuctionStoreState {
   // WebSocket methods
   connectToAuction: (roomId: string) => Promise<void>;
   disconnectFromAuction: () => void;
-  placeBid: (amount: number) => void;
+  placeBid: (amount: number) => Promise<void>;
   setCurrentUserId: (userId: string) => void;
 
   // Captain selection
@@ -220,7 +220,10 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
       sessionAbortMessage: null,
     });
     const socket = connectAuctionSocket();
+    // Clear existing listeners (game events + raw socket events) to prevent duplication
     auctionSocketHelpers.offAllListeners();
+    socket?.off('connect');
+    socket?.off('disconnect');
 
     // 팀장 선정 단계 이벤트
     auctionSocketHelpers.onCaptainSelectionPhase((data: CaptainSelectionPhase) => {
@@ -360,8 +363,6 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
       });
     });
 
-    set({ isConnected: false });
-
     // join-room ACK로 초기 상태 수신 (auction-started를 놓친 경우 처리)
     let joinResponse = await auctionSocketHelpers.joinAuction(roomId);
 
@@ -370,7 +371,8 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
       (joinResponse?.error === "join_timeout" ||
         joinResponse?.error === "connect_timeout")
     ) {
-      if (get().auctionState || get().teams.length > 0) {
+      if ((get().auctionState || get().teams.length > 0) && socket?.connected) {
+        // Already have state and socket is actually connected
         set({ isConnected: true, isLoading: false, error: null });
         return;
       }
@@ -394,10 +396,13 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
       }
 
       const nextState = normalizeAuctionState(joinResponse.state, nextPlayers);
+      // 재연결 시 captainSelectionPhase도 ACK로부터 복원
+      const restoredPhase = joinResponse.captainSelectionPhase ?? null;
       set({
         players: nextPlayers,
         teams: nextTeams,
         auctionState: nextState,
+        captainSelectionPhase: restoredPhase,
         isConnected: true,
         isLoading: false,
         error: null,
@@ -413,6 +418,8 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
 
     // Re-join the socket.io room after reconnect to resume receiving events
     socket?.on('connect', async () => {
+      // 재연결 시 게임 이벤트 리스너는 이미 connectToAuction에서 등록된 상태 유지
+      // (offAllListeners 호출 없이 rejoin만 수행하여 중복 등록 방지)
       set({ isConnected: true });
       const response = await auctionSocketHelpers.joinAuction(roomId);
       if (response?.success) {
@@ -428,12 +435,27 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
         const nextAuctionState = response.state
           ? normalizeAuctionState(response.state, nextPlayers)
           : currentState.auctionState;
+        // captainSelectionPhase: 서버 응답 우선, 없으면 기존 상태 유지
+        const nextCaptainPhase = response.captainSelectionPhase !== undefined
+          ? response.captainSelectionPhase
+          : currentState.captainSelectionPhase;
         set({
           players: nextPlayers,
           teams: nextTeams,
           auctionState: nextAuctionState,
+          captainSelectionPhase: nextCaptainPhase,
           isConnected: true,
           isLoading: false,
+          error: null,
+        });
+      } else {
+        // reconnect 실패 시 명확하게 에러 상태로 전환
+        set({
+          auctionState: null,
+          players: [],
+          teams: [],
+          isConnected: false,
+          error: response?.error || 'Failed to rejoin auction after reconnect.',
         });
       }
     });
@@ -441,6 +463,7 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
   },
 
   disconnectFromAuction: () => {
+    // disconnectAuctionSocket 내부에서 connect/disconnect 핸들러도 제거됨
     auctionSocketHelpers.offAllListeners();
     disconnectAuctionSocket();
     set({
@@ -470,7 +493,7 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
         ? '입찰 요청 시간이 초과되었습니다.'
         : response.error;
       set({ error: msg });
-      // Auto-clear bid error after 3 seconds
+      // Auto-clear bid error after 3 seconds (다른 에러로 교체된 경우엔 클리어 안 함)
       setTimeout(() => {
         if (get().error === msg) set({ error: null });
       }, 3000);
