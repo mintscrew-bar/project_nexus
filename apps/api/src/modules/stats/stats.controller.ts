@@ -6,6 +6,14 @@ export class StatsController {
   constructor(private readonly statsService: StatsService) {}
 
   /**
+   * Get auction statistics for a user
+   */
+  @Get("user/:userId/auction-stats")
+  async getUserAuctionStats(@Param("userId") userId: string) {
+    return this.statsService.getUserAuctionStats(userId);
+  }
+
+  /**
    * Get champion statistics for a user
    */
   @Get("user/:userId/champion-stats")

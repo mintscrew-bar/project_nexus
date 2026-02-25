@@ -957,6 +957,11 @@ export const statsApi = {
     );
     return response.data;
   },
+
+  getUserAuctionStats: async (userId: string) => {
+    const response = await apiClient.get(`/stats/user/${userId}/auction-stats`);
+    return response.data;
+  },
 };
 
 // ========================================

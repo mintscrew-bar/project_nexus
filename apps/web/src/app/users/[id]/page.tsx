@@ -37,6 +37,7 @@ import {
   Swords,
   ChevronUp,
   Star,
+  Gavel,
 } from "lucide-react";
 import { TierBadge } from "@/components/domain/TierBadge";
 import { useToast } from "@/components/ui/Toast";
@@ -126,6 +127,7 @@ export default function UserProfilePage() {
   const [rankedChampStats, setRankedChampStats] = useState<any[]>([]);
   const [positionStats, setPositionStats] = useState<any[]>([]);
   const [seasonTiers, setSeasonTiers] = useState<any[]>([]);
+  const [auctionStats, setAuctionStats] = useState<any>(null);
   const [onlineStatus, setOnlineStatus] = useState<string | null>(null);
 
   // Redirect to own profile if viewing self
@@ -236,6 +238,15 @@ export default function UserProfilePage() {
     }
   }, [profile?.riotAccounts]);
 
+  const fetchAuctionStats = useCallback(async () => {
+    try {
+      const data = await statsApi.getUserAuctionStats(userId);
+      setAuctionStats(data);
+    } catch {
+      // Not critical
+    }
+  }, [userId]);
+
   const fetchOnlineStatus = useCallback(async () => {
     if (!isAuthenticated) return;
     try {
@@ -253,8 +264,9 @@ export default function UserProfilePage() {
     fetchChampions();
     fetchChampionStats();
     fetchPositionStats();
+    fetchAuctionStats();
     fetchOnlineStatus();
-  }, [fetchProfile, fetchFriendshipStatus, fetchMatches, fetchChampions, fetchChampionStats, fetchPositionStats, fetchOnlineStatus]);
+  }, [fetchProfile, fetchFriendshipStatus, fetchMatches, fetchChampions, fetchChampionStats, fetchPositionStats, fetchAuctionStats, fetchOnlineStatus]);
 
   // Fetch data that depends on profile (riotAccounts)
   useEffect(() => {
@@ -760,6 +772,58 @@ export default function UserProfilePage() {
                   </div>
                 ))}
               </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Auction Stats */}
+        {auctionStats && (auctionStats.captainCount > 0 || auctionStats.totalAuctions > 0) && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Gavel className="h-5 w-5 text-accent-warning" />
+                내전 경매 기록
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
+                <div className="bg-bg-tertiary rounded-lg p-3 text-center">
+                  <p className="text-2xl font-bold text-accent-primary">{auctionStats.captainCount}</p>
+                  <p className="text-xs text-text-tertiary mt-1">팀장 횟수</p>
+                </div>
+                <div className="bg-bg-tertiary rounded-lg p-3 text-center">
+                  <p className="text-2xl font-bold text-text-primary">{auctionStats.totalAuctions}</p>
+                  <p className="text-xs text-text-tertiary mt-1">경매 등장</p>
+                </div>
+                <div className="bg-bg-tertiary rounded-lg p-3 text-center">
+                  <p className="text-2xl font-bold text-accent-success">{auctionStats.avgSoldPrice > 0 ? auctionStats.avgSoldPrice : '-'}</p>
+                  <p className="text-xs text-text-tertiary mt-1">평균 낙찰가</p>
+                </div>
+                <div className="bg-bg-tertiary rounded-lg p-3 text-center">
+                  <p className="text-2xl font-bold text-accent-warning">{auctionStats.maxSoldPrice > 0 ? auctionStats.maxSoldPrice : '-'}</p>
+                  <p className="text-xs text-text-tertiary mt-1">최고 낙찰가</p>
+                </div>
+              </div>
+              {auctionStats.titles.length > 0 && (
+                <div>
+                  <p className="text-xs text-text-tertiary mb-2 font-medium uppercase tracking-wide">획득 칭호</p>
+                  <div className="flex flex-wrap gap-2">
+                    {auctionStats.titles.map((t: any) => (
+                      <span
+                        key={t.key}
+                        title={t.description}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-accent-warning/10 text-accent-warning border border-accent-warning/30 cursor-default"
+                      >
+                        <Star className="h-3 w-3" />
+                        {t.label}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {auctionStats.yuchalCount > 0 && (
+                <p className="text-xs text-text-tertiary mt-3">유찰 {auctionStats.yuchalCount}회</p>
+              )}
             </CardContent>
           </Card>
         )}

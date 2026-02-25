@@ -39,6 +39,22 @@ export interface PositionStats {
   assists: number;
 }
 
+export interface AuctionTitle {
+  key: string;
+  label: string;
+  description: string;
+}
+
+export interface AuctionStats {
+  captainCount: number;
+  totalAuctions: number;
+  totalSold: number;
+  yuchalCount: number;
+  avgSoldPrice: number;
+  maxSoldPrice: number;
+  titles: AuctionTitle[];
+}
+
 @Injectable()
 export class StatsService {
   constructor(
@@ -46,6 +62,78 @@ export class StatsService {
     private readonly riotMatchService: RiotMatchService,
     private readonly riotService: RiotService,
   ) {}
+
+  /**
+   * Get auction statistics for a user (captain count, sold prices, titles)
+   */
+  async getUserAuctionStats(userId: string): Promise<AuctionStats> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException("User not found");
+
+    // 팀장 횟수
+    const captainCount = await this.prisma.team.count({
+      where: { captainId: userId },
+    });
+
+    // 경매 낙찰 기록 (soldPrice != null → 경매 대상으로 올라온 적 있음)
+    const soldRecords = await this.prisma.teamMember.findMany({
+      where: { userId, soldPrice: { not: null } },
+      select: { soldPrice: true },
+    });
+
+    const totalAuctions = soldRecords.length;
+    const soldPrices = soldRecords
+      .map((r) => r.soldPrice!)
+      .filter((p) => p > 0);
+    const totalSold = soldPrices.length;
+    const yuchalCount = totalAuctions - totalSold;
+    const avgSoldPrice =
+      totalSold > 0
+        ? Math.round(soldPrices.reduce((s, p) => s + p, 0) / totalSold)
+        : 0;
+    const maxSoldPrice = totalSold > 0 ? Math.max(...soldPrices) : 0;
+
+    // 칭호 계산
+    const titles: AuctionTitle[] = [];
+
+    // 팀장 칭호
+    if (captainCount >= 20) {
+      titles.push({ key: "born_leader", label: "타고난 리더", description: "20회 이상 팀장을 맡은 진정한 리더" });
+    } else if (captainCount >= 10) {
+      titles.push({ key: "captain_master", label: "팀장 장인", description: "10회 이상 팀장을 역임한 베테랑" });
+    } else if (captainCount >= 5) {
+      titles.push({ key: "regular_captain", label: "단골 팀장", description: "5회 이상 팀장을 맡은 경험자" });
+    }
+
+    // 평균 낙찰가 칭호
+    if (avgSoldPrice >= 600) {
+      titles.push({ key: "superstar", label: "슈퍼스타", description: "평균 낙찰가 600 이상의 최고 몸값" });
+    } else if (avgSoldPrice >= 400) {
+      titles.push({ key: "blue_chip", label: "블루칩", description: "평균 낙찰가 400 이상의 고가 선수" });
+    } else if (avgSoldPrice >= 200) {
+      titles.push({ key: "high_value", label: "고가 용병", description: "평균 낙찰가 200 이상의 인기 선수" });
+    }
+
+    // 최고 낙찰가 칭호
+    if (maxSoldPrice >= 800) {
+      titles.push({ key: "ace", label: "팀의 에이스", description: "최고 800 이상에 낙찰된 전설" });
+    }
+
+    // 경험 칭호
+    if (totalAuctions >= 20) {
+      titles.push({ key: "veteran", label: "베테랑", description: "20회 이상 경매에 오른 고참 선수" });
+    }
+
+    return {
+      captainCount,
+      totalAuctions,
+      totalSold,
+      yuchalCount,
+      avgSoldPrice,
+      maxSoldPrice,
+      titles,
+    };
+  }
 
   /**
    * Get champion statistics for a user

@@ -11,7 +11,7 @@ import { AddAccountModal } from '@/components/domain/AddAccountModal';
 import { EditAccountModal } from '@/components/domain/EditAccountModal';
 import { ChampionImage } from '@/components/ChampionImage';
 import { LoadingSpinner, Card, CardHeader, CardTitle, CardContent, Badge, Button, Skeleton, EmptyState, ConfirmModal } from '@/components/ui';
-import { Star, Plus, RefreshCw, Shield, Trophy, TrendingUp, Loader2, Gamepad2, Target, History, Clock, Calendar, Settings, User, BarChart3, Pencil, Trash2, Swords, ChevronUp } from 'lucide-react';
+import { Star, Plus, RefreshCw, Shield, Trophy, TrendingUp, Loader2, Gamepad2, Target, History, Clock, Calendar, Settings, User, BarChart3, Pencil, Trash2, Swords, ChevronUp, Gavel } from 'lucide-react';
 import { TierBadge } from '@/components/domain/TierBadge';
 import { useToast } from '@/components/ui/Toast';
 
@@ -52,6 +52,7 @@ export default function ProfilePage() {
   const [matchesLoading, setMatchesLoading] = useState(false);
   const [championStats, setChampionStats] = useState<any[]>([]);
   const [rankedChampStats, setRankedChampStats] = useState<any[]>([]);
+  const [auctionStats, setAuctionStats] = useState<any>(null);
 
   const fetchProfile = useCallback(async () => {
     if (!user?.id) return;
@@ -122,6 +123,16 @@ export default function ProfilePage() {
     }
   }, [profileData?.riotAccounts]);
 
+  const fetchAuctionStats = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      const data = await statsApi.getUserAuctionStats(user.id);
+      setAuctionStats(data);
+    } catch {
+      // Not critical
+    }
+  }, [user?.id]);
+
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       router.push('/auth/login');
@@ -135,8 +146,9 @@ export default function ProfilePage() {
       fetchRecentMatches();
       fetchChampions();
       fetchChampionStats();
+      fetchAuctionStats();
     }
-  }, [isAuthenticated, authLoading, fetchAccounts, fetchProfile, fetchPositionStats, fetchRecentMatches, fetchChampions, fetchChampionStats, router]);
+  }, [isAuthenticated, authLoading, fetchAccounts, fetchProfile, fetchPositionStats, fetchRecentMatches, fetchChampions, fetchChampionStats, fetchAuctionStats, router]);
 
   // Fetch data that depends on profileData (riotAccounts)
   useEffect(() => {
@@ -520,6 +532,58 @@ export default function ProfilePage() {
                   </div>
                 ))}
               </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Auction Stats */}
+        {auctionStats && (auctionStats.captainCount > 0 || auctionStats.totalAuctions > 0) && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Gavel className="h-5 w-5 text-accent-warning" />
+                내전 경매 기록
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
+                <div className="bg-bg-tertiary rounded-lg p-3 text-center">
+                  <p className="text-2xl font-bold text-accent-primary">{auctionStats.captainCount}</p>
+                  <p className="text-xs text-text-tertiary mt-1">팀장 횟수</p>
+                </div>
+                <div className="bg-bg-tertiary rounded-lg p-3 text-center">
+                  <p className="text-2xl font-bold text-text-primary">{auctionStats.totalAuctions}</p>
+                  <p className="text-xs text-text-tertiary mt-1">경매 등장</p>
+                </div>
+                <div className="bg-bg-tertiary rounded-lg p-3 text-center">
+                  <p className="text-2xl font-bold text-accent-success">{auctionStats.avgSoldPrice > 0 ? auctionStats.avgSoldPrice : '-'}</p>
+                  <p className="text-xs text-text-tertiary mt-1">평균 낙찰가</p>
+                </div>
+                <div className="bg-bg-tertiary rounded-lg p-3 text-center">
+                  <p className="text-2xl font-bold text-accent-warning">{auctionStats.maxSoldPrice > 0 ? auctionStats.maxSoldPrice : '-'}</p>
+                  <p className="text-xs text-text-tertiary mt-1">최고 낙찰가</p>
+                </div>
+              </div>
+              {auctionStats.titles.length > 0 && (
+                <div>
+                  <p className="text-xs text-text-tertiary mb-2 font-medium uppercase tracking-wide">획득 칭호</p>
+                  <div className="flex flex-wrap gap-2">
+                    {auctionStats.titles.map((t: any) => (
+                      <span
+                        key={t.key}
+                        title={t.description}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-accent-warning/10 text-accent-warning border border-accent-warning/30 cursor-default"
+                      >
+                        <Star className="h-3 w-3" />
+                        {t.label}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {auctionStats.yuchalCount > 0 && (
+                <p className="text-xs text-text-tertiary mt-3">유찰 {auctionStats.yuchalCount}회</p>
+              )}
             </CardContent>
           </Card>
         )}
