@@ -65,7 +65,6 @@ export default function SnakeDraftPage() {
 
     setIsAborting(true);
     try {
-      disconnectFromDraft();
       await roomApi.abortToLobby(draftId);
       addToast("내전을 종료하고 대기실로 복귀합니다.", "success");
       router.push(`/tournaments/${draftId}/lobby`);

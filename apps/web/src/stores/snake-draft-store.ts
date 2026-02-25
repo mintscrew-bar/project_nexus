@@ -211,6 +211,24 @@ export const useSnakeDraftStore = create<SnakeDraftStoreState>((set, get) => ({
       });
     });
 
+    // 재연결 핸들러를 초기 join 전에 등록 (join 성공/실패 모두에서 reconnect 가능)
+    socket?.on('connect', async () => {
+      set({ isConnected: true });
+      const response = await snakeDraftSocketHelpers.joinDraft(roomId);
+      if (response?.success && response.state) {
+        set({ draftState: response.state, isLoading: false, error: null });
+      } else if (response?.success) {
+        set({ isConnected: true, isLoading: false, error: null });
+      } else {
+        set({
+          draftState: null,
+          isConnected: false,
+          error: response?.error || 'Failed to rejoin draft after reconnect.',
+        });
+      }
+    });
+    socket?.on('disconnect', () => set({ isConnected: false }));
+
     let joinResponse = await snakeDraftSocketHelpers.joinDraft(roomId);
 
     // On timeout, retry once if we have no existing state
@@ -219,7 +237,6 @@ export const useSnakeDraftStore = create<SnakeDraftStoreState>((set, get) => ({
       (joinResponse?.error === 'join_timeout' || joinResponse?.error === 'connect_timeout')
     ) {
       if (get().draftState && socket?.connected) {
-        // Already have state from a previous connection and socket is actually connected
         set({ isConnected: true, isLoading: false, error: null });
         return;
       }
@@ -229,14 +246,13 @@ export const useSnakeDraftStore = create<SnakeDraftStoreState>((set, get) => ({
     if (joinResponse?.state) {
       set({ draftState: joinResponse.state });
     } else if (joinResponse?.success && !joinResponse?.state) {
-      // 소켓 ACK에 state 없으면 REST API로 폴백 (경매 store와 동일한 패턴)
       try {
         const fallback = await snakeDraftApi.getDraftState(roomId);
         if (fallback?.state) {
           set({ draftState: fallback.state });
         }
       } catch {
-        // 폴백 실패는 무시 — 이미 연결은 됐으므로 진행
+        // 폴백 실패는 무시
       }
     }
 
@@ -252,26 +268,6 @@ export const useSnakeDraftStore = create<SnakeDraftStoreState>((set, get) => ({
     }
 
     set({ isConnected: true, isLoading: false });
-
-    // Re-join the socket.io room after reconnect to resume receiving events
-    // (리스너는 이미 등록되어 있으므로 rejoin emit만 수행)
-    socket?.on('connect', async () => {
-      set({ isConnected: true });
-      const response = await snakeDraftSocketHelpers.joinDraft(roomId);
-      if (response?.success && response.state) {
-        set({ draftState: response.state, isLoading: false, error: null });
-      } else if (response?.success) {
-        set({ isConnected: true, isLoading: false, error: null });
-      } else {
-        // reconnect 실패 시 명확하게 에러 상태로 전환
-        set({
-          draftState: null,
-          isConnected: false,
-          error: response?.error || 'Failed to rejoin draft after reconnect.',
-        });
-      }
-    });
-    socket?.on('disconnect', () => set({ isConnected: false }));
   },
 
   disconnectFromDraft: () => {

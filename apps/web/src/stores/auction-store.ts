@@ -363,6 +363,45 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
       });
     });
 
+    // 재연결 핸들러를 초기 join 전에 등록 (join 성공/실패 모두에서 reconnect 가능)
+    socket?.on('connect', async () => {
+      set({ isConnected: true });
+      const response = await auctionSocketHelpers.joinAuction(roomId);
+      if (response?.success) {
+        const currentState = get();
+        const nextPlayers = Array.isArray(response.players) && response.players.length > 0
+          ? response.players
+          : currentState.players;
+        const nextTeams = Array.isArray(response.teams) && response.teams.length > 0
+          ? response.teams
+          : currentState.teams;
+        const nextAuctionState = response.state
+          ? normalizeAuctionState(response.state, nextPlayers)
+          : currentState.auctionState;
+        const nextCaptainPhase = response.captainSelectionPhase !== undefined
+          ? response.captainSelectionPhase
+          : currentState.captainSelectionPhase;
+        set({
+          players: nextPlayers,
+          teams: nextTeams,
+          auctionState: nextAuctionState,
+          captainSelectionPhase: nextCaptainPhase,
+          isConnected: true,
+          isLoading: false,
+          error: null,
+        });
+      } else {
+        set({
+          auctionState: null,
+          players: [],
+          teams: [],
+          isConnected: false,
+          error: response?.error || 'Failed to rejoin auction after reconnect.',
+        });
+      }
+    });
+    socket?.on('disconnect', () => set({ isConnected: false }));
+
     // join-room ACK로 초기 상태 수신 (auction-started를 놓친 경우 처리)
     let joinResponse = await auctionSocketHelpers.joinAuction(roomId);
 
@@ -372,7 +411,6 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
         joinResponse?.error === "connect_timeout")
     ) {
       if ((get().auctionState || get().teams.length > 0) && socket?.connected) {
-        // Already have state and socket is actually connected
         set({ isConnected: true, isLoading: false, error: null });
         return;
       }
@@ -383,7 +421,6 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
       let nextPlayers = Array.isArray(joinResponse.players) ? joinResponse.players : [];
       let nextTeams = Array.isArray(joinResponse.teams) ? joinResponse.teams : [];
 
-      // Refresh fallback: if socket ACK misses payload, recover from room API.
       if ((nextTeams.length === 0 || nextPlayers.length === 0) && joinResponse.state) {
         try {
           const room = await roomApi.getRoom(roomId);
@@ -396,7 +433,6 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
       }
 
       const nextState = normalizeAuctionState(joinResponse.state, nextPlayers);
-      // 재연결 시 captainSelectionPhase도 ACK로부터 복원
       const restoredPhase = joinResponse.captainSelectionPhase ?? null;
       set({
         players: nextPlayers,
@@ -415,51 +451,6 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
       isLoading: false,
       error: joinResponse?.error || "Failed to join auction room.",
     });
-
-    // Re-join the socket.io room after reconnect to resume receiving events
-    socket?.on('connect', async () => {
-      // 재연결 시 게임 이벤트 리스너는 이미 connectToAuction에서 등록된 상태 유지
-      // (offAllListeners 호출 없이 rejoin만 수행하여 중복 등록 방지)
-      set({ isConnected: true });
-      const response = await auctionSocketHelpers.joinAuction(roomId);
-      if (response?.success) {
-        const currentState = get();
-        // Prefer fresh server data; fall back to current state if server returns empty
-        const nextPlayers = Array.isArray(response.players) && response.players.length > 0
-          ? response.players
-          : currentState.players;
-        const nextTeams = Array.isArray(response.teams) && response.teams.length > 0
-          ? response.teams
-          : currentState.teams;
-        // If server has no auction state (e.g. captain selection phase), keep existing
-        const nextAuctionState = response.state
-          ? normalizeAuctionState(response.state, nextPlayers)
-          : currentState.auctionState;
-        // captainSelectionPhase: 서버 응답 우선, 없으면 기존 상태 유지
-        const nextCaptainPhase = response.captainSelectionPhase !== undefined
-          ? response.captainSelectionPhase
-          : currentState.captainSelectionPhase;
-        set({
-          players: nextPlayers,
-          teams: nextTeams,
-          auctionState: nextAuctionState,
-          captainSelectionPhase: nextCaptainPhase,
-          isConnected: true,
-          isLoading: false,
-          error: null,
-        });
-      } else {
-        // reconnect 실패 시 명확하게 에러 상태로 전환
-        set({
-          auctionState: null,
-          players: [],
-          teams: [],
-          isConnected: false,
-          error: response?.error || 'Failed to rejoin auction after reconnect.',
-        });
-      }
-    });
-    socket?.on('disconnect', () => set({ isConnected: false }));
   },
 
   disconnectFromAuction: () => {

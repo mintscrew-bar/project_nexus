@@ -20,7 +20,7 @@ export default function BracketPage() {
   const { user } = useAuthStore();
   const {
     roomMatches, isLoading, error,
-    fetchRoomMatches, connectToBracket, disconnect,
+    fetchRoomMatches, connectToBracket, disconnect, reset,
     generateTournamentCode, reportResult,
     tournamentCompleted, finalStandings,
     sessionAbortedAt, sessionAbortMessage, clearSessionAbort,
@@ -33,23 +33,27 @@ export default function BracketPage() {
   const [isHost, setIsHost] = useState(false);
   const [liveStatus, setLiveStatus] = useState<any>(null);
 
+  // fetchRoomMatches/connectToBracket/disconnect는 zustand 스토어 함수로 참조가 안정적이므로 dependency에서 제외
   useEffect(() => {
     if (roomId) {
       fetchRoomMatches(roomId);
       connectToBracket(roomId);
-
-      // Fetch room info to check if user is host
-      roomApi.getRoom(roomId).then((room) => {
-        if (user && room.hostId === user.id) {
-          setIsHost(true);
-        }
-      }).catch(() => {});
     }
 
     return () => {
-      disconnect();
+      reset();
     };
-  }, [roomId, user, fetchRoomMatches, connectToBracket, disconnect]);
+  }, [roomId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Host 여부 확인 (user 변경 시에만)
+  useEffect(() => {
+    if (!roomId || !user) return;
+    roomApi.getRoom(roomId).then((room) => {
+      if (room.hostId === user.id) {
+        setIsHost(true);
+      }
+    }).catch(() => {});
+  }, [roomId, user]);
 
   useEffect(() => {
     if (!sessionAbortedAt) return;
