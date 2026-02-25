@@ -160,6 +160,13 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
     const socket = connectRoomSocket();
     if (!socket) return; // 토큰 없으면 소켓 미연결
 
+    // 기존 리스너 정리 (중복 등록 방지)
+    roomSocketHelpers.offAllListeners();
+
+    // 소켓 이벤트 리스너도 정리 (reconnect 핸들러 중복 방지)
+    socket.off('connect');
+    socket.off('disconnect');
+
     roomSocketHelpers.joinRoom(roomId);
 
     roomSocketHelpers.onRoomUpdate((room: Room) => {
@@ -223,8 +230,10 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
 
   disconnectFromRoom: () => {
     const currentRoom = get().currentRoom;
-    if (currentRoom) {
-      roomSocketHelpers.leaveRoom(currentRoom.id);
+    const roomId = currentRoom?.id; // roomId를 먼저 캡처
+
+    if (roomId) {
+      roomSocketHelpers.leaveRoom(roomId);
     }
     roomSocketHelpers.offAllListeners();
     disconnectRoomSocket();
@@ -256,6 +265,21 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
     roomSocketHelpers.onRoomListUpdated((rooms: Room[]) => {
       set({ rooms });
     });
+
+    // Re-subscribe after reconnect
+    const handleReconnect = () => {
+      if (get().isSubscribedToRoomList) {
+        roomSocketHelpers.subscribeRoomList((response: any) => {
+          if (response?.success && response.rooms) {
+            set({ rooms: response.rooms });
+          }
+        });
+      }
+    };
+
+    // 기존 reconnect 핸들러 제거 후 등록 (중복 방지)
+    socket.off('connect', handleReconnect);
+    socket.on('connect', handleReconnect);
   },
 
   unsubscribeFromRoomList: () => {

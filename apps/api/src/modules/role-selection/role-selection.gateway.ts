@@ -161,6 +161,11 @@ export class RoleSelectionGateway
           this.stopTimer(roomId);
           this.completeRoleSelection(roomId).catch((error) => {
             console.error(`[RoleSelection] Timer-triggered completion failed for room ${roomId}:`, error);
+            // 완료 실패 시 타이머 재시작하여 재시도 (completingRooms가 비어있을 때만)
+            if (!this.roomTimers.has(roomId) && !this.completingRooms.has(roomId)) {
+              console.log(`[RoleSelection] Restarting timer for retry in room ${roomId}`);
+              this.startTimer(roomId);
+            }
           });
         } else {
           // Emit timer update every second
@@ -217,11 +222,13 @@ export class RoleSelectionGateway
       });
 
       // Emit bracket-generated so bracket page clients receive the data
+      // 실패해도 bracket은 이미 DB에 생성되었으므로, bracket 페이지에서 재조회 가능
       try {
         const matches = await this.matchService.getRoomMatches(roomId);
         this.matchGateway.emitBracketGenerated(roomId, { bracket: matches });
       } catch (bracketError) {
         console.error(`[RoleSelection] Failed to emit bracket-generated for room ${roomId}:`, bracketError);
+        // bracket 페이지로 이동 후 클라이언트가 직접 조회하므로 치명적이지 않음
       }
 
       return room;

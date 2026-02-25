@@ -104,6 +104,7 @@ export const useLobbyStore = create<LobbyStoreState>((set, get) => ({
 
   connect: (roomId, password?) => {
     const existingSocket = get().socket;
+    // reconnect 시도 중이거나 이미 연결된 경우 중복 연결 방지
     if (existingSocket?.connected || existingSocket?.active) return;
     // Clean up stale disconnected socket
     if (existingSocket) {
@@ -126,9 +127,15 @@ export const useLobbyStore = create<LobbyStoreState>((set, get) => ({
       set({ isConnected: true, error: null });
       socket.emit('join-room', { roomId, password }, (response: any) => {
         if (response.success) {
-          set({ room: response.room });
+          set({ room: response.room, error: null, isConnected: true });
         } else {
-          set({ error: response.error || 'Failed to join room.' });
+          // reconnect 실패 시 명확하게 에러 상태로 전환
+          // (방이 삭제되었거나, 이미 시작되었거나, 비밀번호 오류 등)
+          set({
+            room: null,
+            error: response.error || 'Failed to join room.',
+            isConnected: false
+          });
         }
       });
     });
@@ -213,9 +220,14 @@ export const useLobbyStore = create<LobbyStoreState>((set, get) => ({
   disconnect: (options) => {
     const { socket, room } = get();
     if (socket) {
+      // roomId를 먼저 캡처 (room이 null이 되기 전에)
+      const roomId = room?.id;
+      const roomStatus = room?.status;
+
       // Emit leave-room before disconnecting for cleaner state management
-      if (room && !options?.skipLeave && room.status === 'WAITING') {
-        socket.emit('leave-room', { roomId: room.id });
+      // WAITING 상태일 때만 명시적으로 leave (다른 상태는 백엔드가 알아서 처리)
+      if (roomId && !options?.skipLeave && roomStatus === 'WAITING') {
+        socket.emit('leave-room', { roomId });
       }
       socket.removeAllListeners();
       socket.disconnect();

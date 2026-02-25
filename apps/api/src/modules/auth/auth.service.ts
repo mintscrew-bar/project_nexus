@@ -129,6 +129,52 @@ export class AuthService {
     return user;
   }
 
+  async linkOAuthProvider(userId: string, profile: OAuthProfile) {
+    // Check if this OAuth account is already linked to another user
+    const existingProvider = await this.prisma.authProvider.findUnique({
+      where: {
+        provider_providerId: {
+          provider: profile.provider.toUpperCase() as AuthProviderType,
+          providerId: profile.providerId,
+        },
+      },
+    });
+
+    if (existingProvider) {
+      if (existingProvider.userId === userId) {
+        throw new ConflictException("This account is already linked");
+      } else {
+        throw new ConflictException(
+          "This account is already linked to another user",
+        );
+      }
+    }
+
+    // Link OAuth provider to user
+    await this.prisma.authProvider.create({
+      data: {
+        userId,
+        provider: profile.provider.toUpperCase() as AuthProviderType,
+        providerId: profile.providerId,
+        metadata: profile.metadata,
+      },
+    });
+
+    // Update user avatar if not set
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user?.avatar && profile.avatar) {
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: { avatar: profile.avatar },
+      });
+    }
+
+    return { success: true, message: "Account linked successfully" };
+  }
+
   // ========================================
   // Email Registration & Login
   // ========================================
@@ -358,5 +404,143 @@ export class AuthService {
       console.error("Error in getUserById:", e);
       throw e; // Re-throw the original error to trigger a 500 response
     }
+  }
+
+  // ========================================
+  // Account Linking Helpers
+  // ========================================
+
+  async generateLinkToken(userId: string, provider: string): Promise<string> {
+    const linkToken = randomUUID();
+    const key = `link_token:${linkToken}`;
+
+    // Store userId and provider in Redis for 5 minutes
+    await this.redis.set(key, JSON.stringify({ userId, provider }), "EX", 300);
+
+    return linkToken;
+  }
+
+  async verifyLinkToken(linkToken: string, provider: string): Promise<string> {
+    const key = `link_token:${linkToken}`;
+    const data = await this.redis.get(key);
+
+    if (!data) {
+      throw new UnauthorizedException("Invalid or expired link token");
+    }
+
+    const { userId, provider: storedProvider } = JSON.parse(data);
+
+    if (storedProvider !== provider) {
+      throw new UnauthorizedException("Provider mismatch");
+    }
+
+    // Delete token after use (one-time use)
+    await this.redis.del(key);
+
+    return userId;
+  }
+
+  async getDiscordProfile(code: string): Promise<any> {
+    // Exchange code for access token
+    const tokenResponse = await fetch("https://discord.com/api/oauth2/token", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
+        client_id: this.configService.get("DISCORD_CLIENT_ID")!,
+        client_secret: this.configService.get("DISCORD_CLIENT_SECRET")!,
+        grant_type: "authorization_code",
+        code,
+        redirect_uri:
+          this.configService.get("DISCORD_LINK_CALLBACK_URL") ||
+          this.configService
+            .get("DISCORD_CALLBACK_URL")
+            ?.replace("/callback", "/link/callback") ||
+          "",
+      }),
+    });
+
+    if (!tokenResponse.ok) {
+      throw new BadRequestException("Failed to exchange Discord code");
+    }
+
+    const { access_token } = await tokenResponse.json();
+
+    // Get user profile
+    const profileResponse = await fetch("https://discord.com/api/users/@me", {
+      headers: {
+        Authorization: `Bearer ${access_token}`,
+      },
+    });
+
+    if (!profileResponse.ok) {
+      throw new BadRequestException("Failed to get Discord profile");
+    }
+
+    const profile = await profileResponse.json();
+
+    return {
+      id: profile.id,
+      username:
+        profile.discriminator !== "0"
+          ? `${profile.username}#${profile.discriminator}`
+          : profile.username,
+      email: profile.email,
+      avatar: profile.avatar
+        ? `https://cdn.discordapp.com/avatars/${profile.id}/${profile.avatar}.png`
+        : undefined,
+    };
+  }
+
+  async getGoogleProfile(code: string): Promise<any> {
+    // Exchange code for access token
+    const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
+        client_id: this.configService.get("GOOGLE_CLIENT_ID")!,
+        client_secret: this.configService.get("GOOGLE_CLIENT_SECRET")!,
+        grant_type: "authorization_code",
+        code,
+        redirect_uri:
+          this.configService.get("GOOGLE_LINK_CALLBACK_URL") ||
+          this.configService
+            .get("GOOGLE_CALLBACK_URL")
+            ?.replace("/callback", "/link/callback") ||
+          "",
+      }),
+    });
+
+    if (!tokenResponse.ok) {
+      throw new BadRequestException("Failed to exchange Google code");
+    }
+
+    const { access_token } = await tokenResponse.json();
+
+    // Get user profile
+    const profileResponse = await fetch(
+      "https://www.googleapis.com/oauth2/v2/userinfo",
+      {
+        headers: {
+          Authorization: `Bearer ${access_token}`,
+        },
+      },
+    );
+
+    if (!profileResponse.ok) {
+      throw new BadRequestException("Failed to get Google profile");
+    }
+
+    const profile = await profileResponse.json();
+
+    return {
+      id: profile.id,
+      name: profile.name,
+      email: profile.email,
+      picture: profile.picture,
+    };
   }
 }

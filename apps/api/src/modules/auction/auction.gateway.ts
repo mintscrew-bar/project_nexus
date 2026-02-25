@@ -137,13 +137,31 @@ export class AuctionGateway
       }
 
       const state = this.auctionService.getAuctionState(data.roomId);
+      // 팀장 선정 단계 중일 수 있으므로 captainPhase도 포함 (재연결 시 복원용)
+      const captainPhase = this.auctionService.getCaptainPhase(data.roomId);
 
-      if (!state) {
-        return { success: true, state: null, teams: [], players: [] };
+      if (!state && !captainPhase) {
+        return { success: true, state: null, teams: [], players: [], captainSelectionPhase: null };
+      }
+
+      if (captainPhase && !state) {
+        // 팀장 선정 단계: 경매 아직 시작 안 됨
+        return {
+          success: true,
+          state: null,
+          teams: [],
+          players: [],
+          captainSelectionPhase: {
+            mode: captainPhase.mode,
+            requiredCount: captainPhase.requiredCount,
+            volunteers: captainPhase.volunteers,
+            timerEnd: captainPhase.timerEnd,
+          },
+        };
       }
 
       // Only schedule bid resolve if timer hasn't expired yet
-      if (state.timerEnd > Date.now()) {
+      if (state && state.timerEnd > Date.now()) {
         this._scheduleBidResolve(data.roomId, state.timerEnd);
       }
 
@@ -151,13 +169,13 @@ export class AuctionGateway
         const { teams, players } = await this.auctionService.getFullAuctionData(
           data.roomId,
         );
-        return { success: true, state, teams, players };
+        return { success: true, state, teams, players, captainSelectionPhase: null };
       } catch (error) {
         console.warn(
           `[Auction] Failed to load full join payload for room ${data.roomId}:`,
           error,
         );
-        return { success: true, state, teams: [], players: [] };
+        return { success: true, state, teams: [], players: [], captainSelectionPhase: null };
       }
     } catch (error: any) {
       return {
@@ -207,9 +225,13 @@ export class AuctionGateway
         data.roomId,
         data.selectedUserIds,
       );
-      await this._emitCaptainsConfirmedAndStart(data.roomId, result);
+      await this.emitCaptainsConfirmedAndStart(data.roomId, result);
       return { success: true };
     } catch (error: any) {
+      // 이미 finalize된 경우 (타이머와 수동 호출 동시) → 이미 진행 중이므로 OK 반환
+      if (error.message?.includes("Not in volunteer phase")) {
+        return { success: true, alreadyFinalized: true };
+      }
       return { error: error.message };
     }
   }
@@ -226,7 +248,7 @@ export class AuctionGateway
         data.roomId,
         data.userIds,
       );
-      await this._emitCaptainsConfirmedAndStart(data.roomId, result);
+      await this.emitCaptainsConfirmedAndStart(data.roomId, result);
       return { success: true };
     } catch (error: any) {
       return { error: error.message };
@@ -237,7 +259,8 @@ export class AuctionGateway
     this.server.to(`room:${roomId}`).emit("captain-selection-phase", { ...phase, participants, hostId });
   }
 
-  async _emitCaptainsConfirmedAndStart(roomId: string, result: any) {
+  /** 팀장 확정 후 경매 시작 이벤트 발행 (room.gateway에서도 호출) */
+  async emitCaptainsConfirmedAndStart(roomId: string, result: any) {
     this.server.to(`room:${roomId}`).emit("captains-confirmed", {
       captainUserIds: result.captainUserIds,
       teams: result.teams,
@@ -332,6 +355,10 @@ export class AuctionGateway
 
     try {
       const result = await this._resolveCurrentBidAndAdvance(data.roomId);
+      if (result === null) {
+        // 이미 다른 resolve가 진행 중 (타이머 만료와 수동 resolve 동시 호출)
+        return { success: true, alreadyResolved: true };
+      }
       return { success: true, result };
     } catch (error: any) {
       return { error: error.message };
@@ -380,6 +407,8 @@ export class AuctionGateway
   cleanupRoom(roomId: string): void {
     this._cancelBotTimers(roomId);
     this._cancelBidResolve(roomId);
+    // resolvingRooms guard도 정리 (abort 후 재진입 시 블로킹 방지)
+    this.resolvingRooms.delete(roomId);
   }
 
   emitSessionAborted(roomId: string, data: any): void {

@@ -31,6 +31,7 @@ export default function SnakeDraftPage() {
     clearSessionAbort,
   } = useSnakeDraftStore();
 
+  // connectToDraft/disconnectFromDraft는 zustand 스토어 함수로 참조가 안정적이므로 dependency에서 제외
   useEffect(() => {
     if (draftId) {
       connectToDraft(draftId);
@@ -38,7 +39,7 @@ export default function SnakeDraftPage() {
     return () => {
       disconnectFromDraft();
     };
-  }, [draftId, connectToDraft, disconnectFromDraft]);
+  }, [draftId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (hasRedirected.current) return;
@@ -52,7 +53,8 @@ export default function SnakeDraftPage() {
     if (!sessionAbortedAt) return;
     addToast(sessionAbortMessage ?? "내전이 종료되어 로비로 이동합니다.", "warning");
     clearSessionAbort();
-    router.push(`/tournaments/${draftId}/lobby`);
+    const timer = setTimeout(() => router.push(`/tournaments/${draftId}/lobby`), 1500);
+    return () => clearTimeout(timer);
   }, [sessionAbortedAt, sessionAbortMessage, clearSessionAbort, addToast, router, draftId]);
 
   const handleAbortToLobby = async () => {

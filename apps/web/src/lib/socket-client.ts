@@ -16,7 +16,7 @@ const SOCKET_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
 // Room Socket 연결
 export const connectRoomSocket = () => {
-  // Reuse existing instance if still connected or reconnecting.
+  // Reuse existing instance if still connected, connecting, or reconnecting.
   if (roomSocket?.connected || roomSocket?.active) return roomSocket;
   // Clean up stale disconnected socket before creating a new one.
   if (roomSocket) {
@@ -52,7 +52,7 @@ export const connectRoomSocket = () => {
 
 // Auction Socket 연결
 export const connectAuctionSocket = () => {
-  // Reuse existing instance if still connected or reconnecting.
+  // Reuse existing instance if still connected, connecting, or reconnecting.
   if (auctionSocket?.connected || auctionSocket?.active) return auctionSocket;
   // Clean up stale disconnected socket before creating a new one.
   if (auctionSocket) {
@@ -908,12 +908,16 @@ export const disconnectRoomSocket = () => {
 
 export const disconnectAuctionSocket = () => {
   auctionSocketHelpers.offAllListeners();
+  auctionSocket?.off('connect');
+  auctionSocket?.off('disconnect');
   auctionSocket?.disconnect();
   auctionSocket = null;
 };
 
 export const disconnectSnakeDraftSocket = () => {
   snakeDraftSocketHelpers.offAllListeners();
+  snakeDraftSocket?.off('connect');
+  snakeDraftSocket?.off('disconnect');
   snakeDraftSocket?.disconnect();
   snakeDraftSocket = null;
 };
@@ -1063,6 +1067,8 @@ export const roleSelectionSocketHelpers = {
 
 export const disconnectRoleSelectionSocket = () => {
   roleSelectionSocketHelpers.offAllListeners();
+  roleSelectionSocket?.off('connect');
+  roleSelectionSocket?.off('disconnect');
   roleSelectionSocket?.disconnect();
   roleSelectionSocket = null;
 };

@@ -94,24 +94,35 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const roomId = this.socketRooms.get(client.id);
       if (roomId) {
         let autoLeft = false;
+        let shouldNotifyOthers = false;
+
         try {
           // Only auto-leave from DB while room is in lobby state.
           // After game starts (e.g. DRAFT/IN_PROGRESS), navigation disconnects
           // should not remove participants.
           const status = await this.roomService.getRoomStatus(roomId);
+
+          // leaveRoom 내부에서도 상태를 다시 체크하므로 이중 안전장치
           if (status === RoomStatus.WAITING) {
-            await this.roomService.leaveRoom(client.userId!, roomId); // Assert client.userId is string
-            autoLeft = true;
+            try {
+              await this.roomService.leaveRoom(client.userId!, roomId); // Assert client.userId is string
+              autoLeft = true;
+              shouldNotifyOthers = true;
+            } catch (leaveError: any) {
+              // leaveRoom 실패 (이미 나갔거나, 상태가 변경됨)
+              console.log(`LeaveRoom failed in handleDisconnect: ${leaveError.message}`);
+            }
           }
         } catch (error) {
           // Room might already be deleted or user not in room, ignore
           console.log(`Leave room on disconnect error:`, error);
         }
 
+        // 소켓 방은 항상 나가기 (DB 상태와 무관)
         client.leave(roomId);
         this.socketRooms.delete(client.id);
 
-        if (autoLeft) {
+        if (shouldNotifyOthers) {
           // Notify others in the room
           this.server.to(roomId).emit("user-left", {
             userId: client.userId,
@@ -181,6 +192,8 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
         (p: any) => p.userId === client.userId,
       );
 
+      let isNewJoin = false;
+
       // If not a participant, join the room (add to DB)
       if (!isAlreadyParticipant) {
         room = await this.roomService.joinRoom(client.userId!, {
@@ -188,29 +201,38 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
           roomId: data.roomId,
           password: data.password,
         });
+        isNewJoin = true;
+      } else {
+        // 재입장: 최신 방 데이터 재조회 (상태가 변경되었을 수 있음)
+        room = await this.roomService.getRoomById(data.roomId);
       }
 
       // Join Socket.IO room
       client.join(data.roomId);
       this.socketRooms.set(client.id, data.roomId);
 
-      // Notify others
-      client.to(data.roomId).emit("user-joined", {
-        userId: client.userId,
-        username: client.username,
-      });
+      // Notify others only for new joins (not for reconnects)
+      if (isNewJoin) {
+        client.to(data.roomId).emit("user-joined", {
+          userId: client.userId,
+          username: client.username,
+        });
+      }
 
-      // Broadcast updated room to all participants
+      // Broadcast updated room to all participants (including the joiner)
       this.server.to(data.roomId).emit("room-updated", room);
 
-      // Broadcast room list update to subscribers
-      this.broadcastRoomListUpdate();
+      // Broadcast room list update to subscribers (only for new joins)
+      if (isNewJoin) {
+        this.broadcastRoomListUpdate();
+      }
 
       return {
         success: true,
         room,
       };
     } catch (error: any) {
+      console.error(`[Room] join-room error for user ${client.userId}:`, error.message);
       return { error: error.message };
     }
   }
@@ -319,7 +341,7 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
             const handle = setTimeout(async () => {
               try {
                 const autoResult = await this.auctionService.finalizeVolunteers(client.userId!, data.roomId);
-                await this.auctionGateway['_emitCaptainsConfirmedAndStart'](data.roomId, autoResult);
+                await this.auctionGateway.emitCaptainsConfirmedAndStart(data.roomId, autoResult);
               } catch (_e) { /* 이미 마감됐거나 방 없어진 경우 무시 */ }
             }, 30_000);
             this.auctionService.setCaptainPhaseTimerHandle(data.roomId, handle);

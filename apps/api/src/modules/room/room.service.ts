@@ -393,6 +393,32 @@ export class RoomService {
       }
     }
 
+    // ========================================
+    // Check Discord + Riot account linking (REQUIRED)
+    // ========================================
+
+    // Check Discord account (required for voice channel auto-move)
+    const discordProvider = await this.prisma.authProvider.findFirst({
+      where: { userId, provider: "DISCORD" },
+    });
+
+    if (!discordProvider) {
+      throw new BadRequestException(
+        "DISCORD_NOT_LINKED::Discord 계정 연동이 필요합니다. 설정 페이지에서 Discord 계정을 연동해주세요.",
+      );
+    }
+
+    // Check Riot account (required for match participation)
+    const riotAccount = await this.prisma.riotAccount.findFirst({
+      where: { userId, isPrimary: true },
+    });
+
+    if (!riotAccount) {
+      throw new BadRequestException(
+        "RIOT_NOT_LINKED::Riot 계정 연동이 필요합니다. 프로필 페이지에서 Riot 계정을 연동해주세요.",
+      );
+    }
+
     // Add participant
     await this.prisma.roomParticipant.create({
       data: {
@@ -431,7 +457,8 @@ export class RoomService {
       throw new BadRequestException("Not in room");
     }
 
-    // During active game phases, keep participant slot so user can re-enter.
+    // During active game phases (not WAITING), keep participant slot so user can re-enter.
+    // This prevents accidental removal during network disconnects or page navigation.
     // Exception: host + only bots scenario is cleaned up immediately for bot testing.
     if (room.status !== RoomStatus.WAITING) {
       const remainingParticipants = room.participants.filter(

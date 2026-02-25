@@ -9,18 +9,28 @@ import {
   Query,
   UseGuards,
   Request,
+  Inject,
+  forwardRef,
 } from "@nestjs/common";
 import { AdminService } from "./admin.service";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { UserRole } from "@nexus/database";
+import { RoomGateway } from "../room/room.gateway";
+import { RoomService } from "../room/room.service";
 
 @Controller("admin")
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.ADMIN)
 export class AdminController {
-  constructor(private readonly adminService: AdminService) {}
+  constructor(
+    private readonly adminService: AdminService,
+    @Inject(forwardRef(() => RoomGateway))
+    private readonly roomGateway: RoomGateway,
+    @Inject(forwardRef(() => RoomService))
+    private readonly roomService: RoomService,
+  ) {}
 
   // ── Stats ──────────────────────────────────────────────────────────────────
   @Get("stats")
@@ -172,10 +182,27 @@ export class AdminController {
 
   // ── Test Bots ───────────────────────────────────────────────────────────────
   @Post("rooms/:id/add-bot")
-  addBotToRoom(
+  async addBotToRoom(
     @Param("id") roomId: string,
     @Body("count") count = 1,
   ) {
-    return this.adminService.addBotToRoom(roomId, count);
+    const result = await this.adminService.addBotToRoom(roomId, count);
+
+    // 봇 추가 후 실시간 업데이트
+    try {
+      // 최신 방 데이터 조회
+      const updatedRoom = await this.roomService.getRoomById(roomId);
+
+      // 같은 방에 있는 유저들에게 업데이트 알림
+      this.roomGateway.notifyRoomUpdate(roomId, "room-updated", updatedRoom);
+
+      // 방 목록 구독자들에게 업데이트 알림
+      await this.roomGateway.broadcastRoomListUpdate();
+    } catch (error) {
+      // 실시간 업데이트 실패해도 봇 추가는 성공으로 처리
+      console.error("[Admin] Failed to broadcast bot addition:", error);
+    }
+
+    return result;
   }
 }

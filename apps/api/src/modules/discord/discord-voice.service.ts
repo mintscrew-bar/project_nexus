@@ -41,69 +41,129 @@ export class DiscordVoiceService {
       throw new BadRequestException("Discord guild not configured");
     }
 
-    const guild = await this.client.guilds.fetch(guildId);
+    try {
+      const guild = await this.client.guilds.fetch(guildId);
 
-    // Create category
-    const category = await guild.channels.create({
-      name: `⚔️ ${roomName}`,
-      type: ChannelType.GuildCategory,
-      permissionOverwrites: [
-        {
-          id: guild.id,
-          allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect],
-        },
-      ],
-    });
+      // Create category with retry
+      let category;
+      let retryCount = 0;
+      const MAX_RETRIES = 3;
 
-    // Create lobby channel first (생성 순서로 맨 위 고정)
-    const lobbyChannel = await guild.channels.create({
-      name: "🏟️ 내전 대기실",
-      type: ChannelType.GuildVoice,
-      parent: category.id,
-      userLimit: 50,
-    });
+      while (retryCount < MAX_RETRIES) {
+        try {
+          category = await guild.channels.create({
+            name: `⚔️ ${roomName}`,
+            type: ChannelType.GuildCategory,
+            permissionOverwrites: [
+              {
+                id: guild.id,
+                allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect],
+              },
+            ],
+          });
+          break; // 성공 시 루프 탈출
+        } catch (createError: any) {
+          retryCount++;
+          this.logger.warn(
+            `Failed to create category (attempt ${retryCount}/${MAX_RETRIES}): ${createError.message}`,
+          );
 
-    await this.prisma.roomDiscordChannel.create({
-      data: {
-        roomId,
-        channelId: lobbyChannel.id,
-        channelType: "VOICE",
-        teamName: "Lobby",
-      },
-    });
+          if (retryCount >= MAX_RETRIES) {
+            throw new BadRequestException(
+              `Failed to create Discord category after ${MAX_RETRIES} attempts. Please try again later.`,
+            );
+          }
 
-    // Create team voice channels
-    // displayName: Discord 채널 표시명, dbTeamName: snake-draft의 team.name과 매칭용 (Team 1, Team 2...)
-    const teamChannels: Array<{ teamName: string; channelId: string }> = [];
+          // 재시도 전 대기 (레이트 리밋 회피)
+          await new Promise((resolve) => setTimeout(resolve, 1000 * retryCount));
+        }
+      }
 
-    for (let i = 0; i < numTeams; i++) {
-      const displayName = `⚔️ ${i + 1}팀`;
-      const dbTeamName = `Team ${i + 1}`;
+      if (!category) {
+        throw new BadRequestException("Failed to create Discord category");
+      }
 
-      const channel = await guild.channels.create({
-        name: displayName,
+      // Create lobby channel first (생성 순서로 맨 위 고정)
+      const lobbyChannel = await guild.channels.create({
+        name: "🏟️ 내전 대기실",
         type: ChannelType.GuildVoice,
         parent: category.id,
-        userLimit: 5,
+        userLimit: 50,
       });
-
-      teamChannels.push({ teamName: dbTeamName, channelId: channel.id });
 
       await this.prisma.roomDiscordChannel.create({
         data: {
           roomId,
-          channelId: channel.id,
+          channelId: lobbyChannel.id,
           channelType: "VOICE",
-          teamName: dbTeamName, // "Team 1" 형식으로 저장 → team.name과 매칭
+          teamName: "Lobby",
         },
       });
-    }
 
-    return {
-      categoryId: category.id,
-      teamChannels,
-      lobbyChannelId: lobbyChannel.id,
-    };
+      // Create team voice channels
+      // displayName: Discord 채널 표시명, dbTeamName: snake-draft의 team.name과 매칟용 (Team 1, Team 2...)
+      const teamChannels: Array<{ teamName: string; channelId: string }> = [];
+
+      for (let i = 0; i < numTeams; i++) {
+        const displayName = `⚔️ ${i + 1}팀`;
+        const dbTeamName = `Team ${i + 1}`;
+
+        const channel = await guild.channels.create({
+          name: displayName,
+          type: ChannelType.GuildVoice,
+          parent: category.id,
+          userLimit: 5,
+        });
+
+        teamChannels.push({ teamName: dbTeamName, channelId: channel.id });
+
+        await this.prisma.roomDiscordChannel.create({
+          data: {
+            roomId,
+            channelId: channel.id,
+            channelType: "VOICE",
+            teamName: dbTeamName, // "Team 1" 형식으로 저장 → team.name과 매칭
+          },
+        });
+      }
+
+      this.logger.log(
+        `Successfully created Discord channels for room ${roomId}: category + lobby + ${numTeams} team channels`,
+      );
+
+      return {
+        categoryId: category.id,
+        teamChannels,
+        lobbyChannelId: lobbyChannel.id,
+      };
+    } catch (error: any) {
+      // 생성 중 실패 시 이미 생성된 채널들 정리
+      this.logger.error(`Error creating Discord channels for room ${roomId}:`, error);
+
+      // 부분적으로 생성된 채널들 정리 시도
+      try {
+        const existingChannels = await this.prisma.roomDiscordChannel.findMany({
+          where: { roomId },
+        });
+
+        for (const ch of existingChannels) {
+          try {
+            const guild = await this.client.guilds.fetch(guildId);
+            const channel = await guild.channels.fetch(ch.channelId).catch(() => null);
+            if (channel) await channel.delete();
+          } catch {
+            // 무시
+          }
+        }
+
+        await this.prisma.roomDiscordChannel.deleteMany({ where: { roomId } });
+      } catch (cleanupError) {
+        this.logger.error(`Failed to cleanup channels after error:`, cleanupError);
+      }
+
+      // 에러를 다시 던져서 상위에서 처리하도록
+      throw error;
+    }
   }
 
   // ========================================
@@ -172,6 +232,12 @@ export class DiscordVoiceService {
 
     // Move each member
     for (const member of team.members) {
+      // 봇 계정은 건너뛰기 (Discord 계정 없음)
+      if (/^testbot_\d+$/.test(member.user.username)) {
+        this.logger.debug(`Skipping bot ${member.user.username} for voice channel move`);
+        continue;
+      }
+
       const discordProvider = member.user.authProviders.find(
         (p) => p.provider === "DISCORD",
       );
@@ -665,6 +731,12 @@ export class DiscordVoiceService {
 
     // 모든 참가자를 대기실로 이동
     for (const participant of room.participants) {
+      // 봇 계정은 건너뛰기 (Discord 계정 없음)
+      if (/^testbot_\d+$/.test(participant.user.username)) {
+        this.logger.debug(`Skipping bot ${participant.user.username} for lobby move`);
+        continue;
+      }
+
       const discordProvider = participant.user.authProviders.find(
         (p) => p.provider === "DISCORD",
       );

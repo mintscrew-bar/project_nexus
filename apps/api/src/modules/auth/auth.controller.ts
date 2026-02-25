@@ -178,6 +178,82 @@ export class AuthController {
   }
 
   // ========================================
+  // Account Linking (OAuth 추가 연동)
+  // ========================================
+
+  @Get("link/discord")
+  @UseGuards(JwtAuthGuard)
+  async linkDiscord(@CurrentUser("sub") userId: string, @Res() res: Response) {
+    // Generate temporary link token (5 minutes)
+    const linkToken = await this.authService.generateLinkToken(userId, "discord");
+
+    // Redirect to Discord OAuth with link token in state
+    const discordAuthUrl = `https://discord.com/api/oauth2/authorize?client_id=${this.configService.get("DISCORD_CLIENT_ID")}&redirect_uri=${encodeURIComponent(this.configService.get("DISCORD_LINK_CALLBACK_URL") || this.configService.get("DISCORD_CALLBACK_URL")?.replace("/callback", "/link/callback") || "")}&response_type=code&scope=identify%20email&state=${linkToken}`;
+
+    return res.redirect(discordAuthUrl);
+  }
+
+  @Get("link/discord/callback")
+  async linkDiscordCallback(@Query("code") code: string, @Query("state") linkToken: string, @Res() res: Response) {
+    try {
+      // Verify link token and get userId
+      const userId = await this.authService.verifyLinkToken(linkToken, "discord");
+
+      // Exchange code for access token and get profile
+      const profile = await this.authService.getDiscordProfile(code);
+
+      // Link account
+      await this.authService.linkOAuthProvider(userId, {
+        provider: "discord",
+        providerId: profile.id,
+        email: profile.email,
+        username: profile.username,
+        avatar: profile.avatar,
+        metadata: {},
+      });
+
+      const appUrl = this.configService.get("APP_URL") || "http://localhost:3000";
+      return res.redirect(`${appUrl}/settings?linked=discord&success=true`);
+    } catch (error: any) {
+      const appUrl = this.configService.get("APP_URL") || "http://localhost:3000";
+      return res.redirect(`${appUrl}/settings?linked=discord&success=false&error=${encodeURIComponent(error.message)}`);
+    }
+  }
+
+  @Get("link/google")
+  @UseGuards(JwtAuthGuard)
+  async linkGoogle(@CurrentUser("sub") userId: string, @Res() res: Response) {
+    const linkToken = await this.authService.generateLinkToken(userId, "google");
+
+    const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${this.configService.get("GOOGLE_CLIENT_ID")}&redirect_uri=${encodeURIComponent(this.configService.get("GOOGLE_LINK_CALLBACK_URL") || this.configService.get("GOOGLE_CALLBACK_URL")?.replace("/callback", "/link/callback") || "")}&response_type=code&scope=email%20profile&state=${linkToken}`;
+
+    return res.redirect(googleAuthUrl);
+  }
+
+  @Get("link/google/callback")
+  async linkGoogleCallback(@Query("code") code: string, @Query("state") linkToken: string, @Res() res: Response) {
+    try {
+      const userId = await this.authService.verifyLinkToken(linkToken, "google");
+      const profile = await this.authService.getGoogleProfile(code);
+
+      await this.authService.linkOAuthProvider(userId, {
+        provider: "google",
+        providerId: profile.id,
+        email: profile.email,
+        username: profile.name,
+        avatar: profile.picture,
+        metadata: {},
+      });
+
+      const appUrl = this.configService.get("APP_URL") || "http://localhost:3000";
+      return res.redirect(`${appUrl}/settings?linked=google&success=true`);
+    } catch (error: any) {
+      const appUrl = this.configService.get("APP_URL") || "http://localhost:3000";
+      return res.redirect(`${appUrl}/settings?linked=google&success=false&error=${encodeURIComponent(error.message)}`);
+    }
+  }
+
+  // ========================================
   // User Info
   // ========================================
 

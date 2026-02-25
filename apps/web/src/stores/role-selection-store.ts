@@ -64,8 +64,10 @@ export const useRoleSelectionStore = create<RoleSelectionState>((set) => ({
       sessionAbortMessage: null,
     });
     const socket = connectRoleSelectionSocket();
-    // Clear existing listeners to prevent duplication on reconnect
+    // Clear existing listeners (game events + raw socket events) to prevent duplication
     roleSelectionSocketHelpers.offAllListeners();
+    socket?.off('connect');
+    socket?.off('disconnect');
 
     const doJoin = (isReconnect = false) => {
       roleSelectionSocketHelpers.joinRoom(roomId).then((response: any) => {
@@ -77,20 +79,25 @@ export const useRoleSelectionStore = create<RoleSelectionState>((set) => ({
               : 15,
             isLoading: false,
             isConnected: true,
+            error: null,
           });
-        } else if (!isReconnect) {
+        } else {
           const errorMsg = response?.error || "Failed to join role selection room.";
-          set({
-            error:
-              errorMsg === "join_timeout" || errorMsg === "connect_timeout"
-                ? "서버 연결에 실패했습니다. 새로고침 해주세요."
-                : errorMsg,
-            isLoading: false,
-            isConnected: false,
-          });
+          const displayMsg =
+            errorMsg === "join_timeout" || errorMsg === "connect_timeout"
+              ? "서버 연결에 실패했습니다. 새로고침 해주세요."
+              : errorMsg;
+          if (isReconnect) {
+            // 재연결 실패: 기존 UI 데이터는 유지하되 isConnected만 false로
+            set({ isConnected: false, isLoading: false });
+          } else {
+            set({ error: displayMsg, isLoading: false, isConnected: false });
+          }
         }
       }).catch(() => {
-        if (!isReconnect) {
+        if (isReconnect) {
+          set({ isConnected: false, isLoading: false });
+        } else {
           set({
             error: "서버 연결에 실패했습니다. 새로고침 해주세요.",
             isLoading: false,

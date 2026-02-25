@@ -32,6 +32,7 @@ export function useAuction(roomId?: string) {
   const { isLoading: authLoading, isAuthenticated } = useAuthStore();
 
   // 방 ID가 있으면 자동으로 연결
+  // connectToAuction/disconnectFromAuction는 zustand 스토어 함수로 참조가 안정적이므로 dependency에서 제외
   useEffect(() => {
     if (!roomId || authLoading || !isAuthenticated) return;
 
@@ -40,7 +41,7 @@ export function useAuction(roomId?: string) {
     return () => {
       disconnectFromAuction();
     };
-  }, [roomId, authLoading, isAuthenticated, connectToAuction, disconnectFromAuction]);
+  }, [roomId, authLoading, isAuthenticated]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return {
     auctionState,

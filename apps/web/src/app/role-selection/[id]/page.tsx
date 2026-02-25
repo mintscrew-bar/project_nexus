@@ -45,10 +45,11 @@ export default function RoleSelectionPage() {
     clearSessionAbort,
   } = useRoleSelectionStore();
 
+  // connect/disconnect는 zustand 스토어 함수로 참조가 안정적이므로 dependency에서 제외
   useEffect(() => {
     if (roomId) connect(roomId);
     return () => disconnect();
-  }, [roomId, connect, disconnect]);
+  }, [roomId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (hasRedirected.current) return;
@@ -63,7 +64,9 @@ export default function RoleSelectionPage() {
     if (!sessionAbortedAt) return;
     addToast(sessionAbortMessage ?? "내전이 종료되어 로비로 이동합니다.", "warning");
     clearSessionAbort();
-    router.push(`/tournaments/${roomId}/lobby`);
+    // 사용자가 toast 메시지를 읽을 수 있도록 약간의 딜레이 후 이동
+    const timer = setTimeout(() => router.push(`/tournaments/${roomId}/lobby`), 1500);
+    return () => clearTimeout(timer);
   }, [sessionAbortedAt, sessionAbortMessage, clearSessionAbort, addToast, router, roomId]);
 
   const handleAbortToLobby = async () => {
@@ -249,22 +252,27 @@ export default function RoleSelectionPage() {
                           )}
                         </div>
 
-                        {/* Role buttons - only for me, only if no role yet */}
-                        {isMe && !myRole && (
+                        {/* Role buttons - 내 팀원이면 역할 변경 가능 (자동 배정 후에도) */}
+                        {isMe && (
                           <div className="flex gap-1.5 pl-11">
                             {ROLES.map((role) => {
-                              const taken = takenRoles.includes(role);
+                              const takenByOther = team.members.some(
+                                (m) => m.assignedRole === role && m.userId !== user?.id
+                              );
+                              const isMyCurrentRole = myRole === role;
                               const meta = ROLE_META[role];
                               return (
                                 <button
                                   key={role}
-                                  onClick={() => handleSelectRole(role)}
-                                  disabled={taken || !isConnected}
+                                  onClick={() => !isMyCurrentRole && handleSelectRole(role)}
+                                  disabled={takenByOther || isMyCurrentRole || !isConnected}
                                   className={cn(
                                     "flex-1 flex flex-col items-center gap-0.5 py-2 rounded-lg text-xs font-medium transition-all",
-                                    taken
-                                      ? "bg-bg-tertiary/50 text-text-muted cursor-not-allowed opacity-40"
-                                      : "bg-bg-tertiary hover:bg-bg-elevated hover:scale-105 active:scale-95 cursor-pointer text-text-primary"
+                                    isMyCurrentRole
+                                      ? "bg-accent-primary/20 text-accent-primary border border-accent-primary/30 ring-1 ring-accent-primary/20"
+                                      : takenByOther
+                                        ? "bg-bg-tertiary/50 text-text-muted cursor-not-allowed opacity-40"
+                                        : "bg-bg-tertiary hover:bg-bg-elevated hover:scale-105 active:scale-95 cursor-pointer text-text-primary"
                                   )}
                                 >
                                   <span className="text-lg">{meta.icon}</span>

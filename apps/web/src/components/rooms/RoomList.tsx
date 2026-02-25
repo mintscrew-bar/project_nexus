@@ -121,6 +121,7 @@ export function RoomList() {
     };
   }, [rooms]);
 
+  // fetchRooms, subscribeToRoomList, unsubscribeFromRoomList는 zustand 스토어 함수로 참조가 안정적이므로 dependency에서 제외
   useEffect(() => {
     // Initial fetch
     fetchRooms();
@@ -131,7 +132,7 @@ export function RoomList() {
     return () => {
       unsubscribeFromRoomList();
     };
-  }, [fetchRooms, subscribeToRoomList, unsubscribeFromRoomList]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (isLoading && rooms.length === 0) {
     return (

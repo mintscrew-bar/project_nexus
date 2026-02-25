@@ -42,6 +42,8 @@ export class SnakeDraftGateway
   private autoPickingRooms = new Set<string>();
   // Guard against concurrent manual pick calls
   private manualPickingRooms = new Set<string>();
+  // Guard against double completeDraft (manual + autoPick can both detect isComplete simultaneously)
+  private completingDrafts = new Set<string>();
 
   constructor(
     private readonly authService: AuthService,
@@ -60,6 +62,7 @@ export class SnakeDraftGateway
     this.pickTimers.clear();
     this.autoPickingRooms.clear();
     this.manualPickingRooms.clear();
+    this.completingDrafts.clear();
   }
 
   async handleConnection(client: AuthenticatedSocket) {
@@ -219,20 +222,27 @@ export class SnakeDraftGateway
       );
 
       if (isComplete) {
-        // Get final teams BEFORE completeDraft (which deletes in-memory state)
-        const finalState = await this.snakeDraftService.getClientDraftState(data.roomId);
-        await this.snakeDraftService.completeDraft(data.roomId);
-        this.server.to(`draft:${data.roomId}`).emit("draft-complete", {
-          teams: finalState?.teams ?? [],
-        });
+        // Guard against double completeDraft (race between manual pick and auto-pick timer)
+        if (this.completingDrafts.has(data.roomId)) return { success: true };
+        this.completingDrafts.add(data.roomId);
+        try {
+          // Get final teams BEFORE completeDraft (which deletes in-memory state)
+          const finalState = await this.snakeDraftService.getClientDraftState(data.roomId);
+          await this.snakeDraftService.completeDraft(data.roomId);
+          this.server.to(`draft:${data.roomId}`).emit("draft-complete", {
+            teams: finalState?.teams ?? [],
+          });
 
-        // Start role selection
-        const roleSelectionData =
-          await this.roleSelectionService.startRoleSelection(data.roomId);
-        this.roleSelectionGateway.emitRoleSelectionStarted(
-          data.roomId,
-          roleSelectionData,
-        );
+          // Start role selection
+          const roleSelectionData =
+            await this.roleSelectionService.startRoleSelection(data.roomId);
+          this.roleSelectionGateway.emitRoleSelectionStarted(
+            data.roomId,
+            roleSelectionData,
+          );
+        } finally {
+          this.completingDrafts.delete(data.roomId);
+        }
       } else {
         // Schedule auto-pick timer for next turn
         this._schedulePickTimer(data.roomId, state.timerEnd);
@@ -311,11 +321,14 @@ export class SnakeDraftGateway
     const timer = setTimeout(async () => {
       this.pickTimers.delete(roomId);
 
-      // 중복 autoPick 방지
-      if (this.autoPickingRooms.has(roomId)) return;
+      // 중복 autoPick 방지 + 수동 픽 진행 중이면 스킵 (race condition 방지)
+      if (this.autoPickingRooms.has(roomId) || this.manualPickingRooms.has(roomId)) return;
       this.autoPickingRooms.add(roomId);
 
       try {
+        // 수동 픽이 진행 중이면 auto-pick 스킵 (이벤트 루프 지연으로 인한 race)
+        if (this.manualPickingRooms.has(roomId)) return;
+
         // autoPick 전 현재 팀 정보 저장
         const preState = this.snakeDraftService.getDraftState(roomId);
         if (!preState) return;
@@ -348,16 +361,23 @@ export class SnakeDraftGateway
 
         const isComplete = await this.snakeDraftService.checkDraftComplete(roomId);
         if (isComplete) {
-          // Get final teams BEFORE completeDraft (which deletes in-memory state)
-          const finalState = await this.snakeDraftService.getClientDraftState(roomId);
-          await this.snakeDraftService.completeDraft(roomId);
-          this.server.to(`draft:${roomId}`).emit("draft-complete", {
-            teams: finalState?.teams ?? [],
-          });
+          // Guard against double completeDraft (race between auto-pick and manual pick)
+          if (this.completingDrafts.has(roomId)) return;
+          this.completingDrafts.add(roomId);
+          try {
+            // Get final teams BEFORE completeDraft (which deletes in-memory state)
+            const finalState = await this.snakeDraftService.getClientDraftState(roomId);
+            await this.snakeDraftService.completeDraft(roomId);
+            this.server.to(`draft:${roomId}`).emit("draft-complete", {
+              teams: finalState?.teams ?? [],
+            });
 
-          const roleSelectionData =
-            await this.roleSelectionService.startRoleSelection(roomId);
-          this.roleSelectionGateway.emitRoleSelectionStarted(roomId, roleSelectionData);
+            const roleSelectionData =
+              await this.roleSelectionService.startRoleSelection(roomId);
+            this.roleSelectionGateway.emitRoleSelectionStarted(roomId, roleSelectionData);
+          } finally {
+            this.completingDrafts.delete(roomId);
+          }
         } else {
           if (state?.timerEnd) {
             this._schedulePickTimer(roomId, state.timerEnd);

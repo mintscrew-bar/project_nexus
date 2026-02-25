@@ -389,9 +389,15 @@ export class AdminService {
       const username = `testbot_${String(i).padStart(2, "0")}`;
       const email = `${username}@nexus.test`;
 
+      // 봇의 기본 Tier: SILVER (중간 등급)
+      const botTiers = ["BRONZE", "SILVER", "GOLD", "PLATINUM", "DIAMOND"];
+      const botTier = botTiers[i % botTiers.length]; // 봇마다 다른 티어 할당
+      const botRank = "IV";
+      const botMMR = 1000 + (i * 100); // 기본 MMR: 1100, 1200, 1300...
+
       const user = await this.prisma.user.upsert({
         where: { email },
-        update: {},
+        update: {}, // 이미 있으면 업데이트 안 함 (기존 봇 유지)
         create: {
           username,
           email,
@@ -402,6 +408,22 @@ export class AdminService {
               privacyPolicy: true,
               ageVerification: true,
               marketingConsent: false,
+            },
+          },
+          // 봇용 RiotAccount 생성 (드래프트/경매에서 사용)
+          riotAccounts: {
+            create: {
+              gameName: username,
+              tagLine: "BOT",
+              puuid: `bot_puuid_${i}`,
+              tier: botTier,
+              rank: botRank,
+              leaguePoints: 0,
+              wins: 0,
+              losses: 0,
+              isPrimary: true,
+              mainRole: "FILL", // 봇은 모든 역할 가능
+              subRole: null,
             },
           },
         },

@@ -55,7 +55,8 @@ export default function BracketPage() {
     if (!sessionAbortedAt) return;
     addToast(sessionAbortMessage ?? "내전이 종료되어 로비로 이동합니다.", "warning");
     clearSessionAbort();
-    router.push(`/tournaments/${roomId}/lobby`);
+    const timer = setTimeout(() => router.push(`/tournaments/${roomId}/lobby`), 1500);
+    return () => clearTimeout(timer);
   }, [sessionAbortedAt, sessionAbortMessage, clearSessionAbort, addToast, router, roomId]);
 
   const handleRefresh = () => {

@@ -65,7 +65,8 @@ export default function AuctionRoomPage() {
     if (!sessionAbortedAt) return;
     addToast(sessionAbortMessage ?? "내전이 종료되어 로비로 이동합니다.", "warning");
     clearSessionAbort();
-    router.push(`/tournaments/${auctionId}/lobby`);
+    const timer = setTimeout(() => router.push(`/tournaments/${auctionId}/lobby`), 1500);
+    return () => clearTimeout(timer);
   }, [sessionAbortedAt, sessionAbortMessage, clearSessionAbort, addToast, router, auctionId]);
 
   // 입찰 로그 자동 스크롤
