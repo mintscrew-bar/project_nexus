@@ -69,8 +69,21 @@ export class UserService {
     // Get statistics
     const stats = await this.getUserStats(userId);
 
+    // Strip sensitive fields before returning
+    const {
+      password: _pw,
+      isBanned: _ib,
+      banReason: _br,
+      bannedAt: _ba,
+      banUntil: _be,
+      isRestricted: _ir,
+      restrictedUntil: _ru,
+      emailVerified: _ev,
+      ...safeUser
+    } = user;
+
     return {
-      ...user,
+      ...safeUser,
       stats,
     };
   }

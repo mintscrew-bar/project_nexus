@@ -11,7 +11,7 @@ import { AddAccountModal } from '@/components/domain/AddAccountModal';
 import { EditAccountModal } from '@/components/domain/EditAccountModal';
 import { ChampionImage } from '@/components/ChampionImage';
 import { LoadingSpinner, Card, CardHeader, CardTitle, CardContent, Badge, Button, Skeleton, EmptyState, ConfirmModal } from '@/components/ui';
-import { Star, Plus, RefreshCw, Shield, Trophy, TrendingUp, Loader2, Gamepad2, Target, History, Clock, Calendar, Users, Settings, User, BarChart3, Pencil, Trash2 } from 'lucide-react';
+import { Star, Plus, RefreshCw, Shield, Trophy, TrendingUp, Loader2, Gamepad2, Target, History, Clock, Calendar, Settings, User, BarChart3, Pencil, Trash2, Swords, ChevronUp } from 'lucide-react';
 import { TierBadge } from '@/components/domain/TierBadge';
 import { useToast } from '@/components/ui/Toast';
 
@@ -28,7 +28,6 @@ export default function ProfilePage() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuthStore();
   const {
     accounts,
-    primaryAccount,
     selectedAccount,
     isLoading,
     fetchAccounts,
@@ -37,7 +36,7 @@ export default function ProfilePage() {
     selectAccount,
     deleteAccount,
   } = useRiotStore();
-  const { champions, championMap, fetchChampions } = useDdragonStore();
+  const { championMap, fetchChampions } = useDdragonStore();
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -46,26 +45,13 @@ export default function ProfilePage() {
   const [deletingAccountId, setDeletingAccountId] = useState<string | null>(null);
   const { addToast } = useToast();
   const [profileData, setProfileData] = useState<any>(null);
-  const [profileLoading, setProfileLoading] = useState(false);
-  const [stats, setStats] = useState<{
-    gamesPlayed: number;
-    wins: number;
-    losses: number;
-    winRate: number;
-    participations: number;
-  } | null>(null);
-  const [statsLoading, setStatsLoading] = useState(false);
-  const [recentMatches, setRecentMatches] = useState<{
-    id: string;
-    status: string;
-    createdAt: string;
-    teamA: { name: string };
-    teamB: { name: string };
-    winner?: { id: string; name: string };
-  }[]>([]);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [positionStats, setPositionStats] = useState<any[]>([]);
+  const [seasonTiers, setSeasonTiers] = useState<any[]>([]);
+  const [recentMatches, setRecentMatches] = useState<any[]>([]);
   const [matchesLoading, setMatchesLoading] = useState(false);
   const [championStats, setChampionStats] = useState<any[]>([]);
-  const [championStatsLoading, setChampionStatsLoading] = useState(false);
+  const [rankedChampStats, setRankedChampStats] = useState<any[]>([]);
 
   const fetchProfile = useCallback(async () => {
     if (!user?.id) return;
@@ -80,17 +66,15 @@ export default function ProfilePage() {
     }
   }, [user?.id]);
 
-  const fetchStats = useCallback(async () => {
-    setStatsLoading(true);
+  const fetchPositionStats = useCallback(async () => {
+    if (!user?.id) return;
     try {
-      const data = await userApi.getStats();
-      setStats(data);
+      const data = await statsApi.getUserPositionStats(user.id);
+      setPositionStats(data || []);
     } catch {
-      addToast('전적 통계를 불러오지 못했습니다.', 'error');
-    } finally {
-      setStatsLoading(false);
+      // Not critical
     }
-  }, []);
+  }, [user?.id]);
 
   const fetchRecentMatches = useCallback(async () => {
     setMatchesLoading(true);
@@ -106,16 +90,37 @@ export default function ProfilePage() {
 
   const fetchChampionStats = useCallback(async () => {
     if (!user?.id) return;
-    setChampionStatsLoading(true);
     try {
       const data = await statsApi.getUserChampionStats(user.id);
-      setChampionStats(data.slice(0, 5)); // 상위 5개만
+      setChampionStats(data.slice(0, 5));
     } catch {
       // Not critical
-    } finally {
-      setChampionStatsLoading(false);
     }
   }, [user?.id]);
+
+  const fetchRankedChampStats = useCallback(async () => {
+    if (!profileData?.riotAccounts) return;
+    const primary = profileData.riotAccounts.find((a: any) => a.isPrimary) || profileData.riotAccounts[0];
+    if (!primary?.gameName || !primary?.tagLine) return;
+    try {
+      const data = await statsApi.getRankedChampionStats(primary.gameName, primary.tagLine);
+      setRankedChampStats((data || []).slice(0, 5));
+    } catch {
+      // Not critical
+    }
+  }, [profileData?.riotAccounts]);
+
+  const fetchSeasonTiers = useCallback(async () => {
+    if (!profileData?.riotAccounts) return;
+    const primary = profileData.riotAccounts.find((a: any) => a.isPrimary) || profileData.riotAccounts[0];
+    if (!primary?.gameName || !primary?.tagLine) return;
+    try {
+      const data = await statsApi.getSeasonTiers(primary.gameName, primary.tagLine);
+      setSeasonTiers(data || []);
+    } catch {
+      // Not critical
+    }
+  }, [profileData?.riotAccounts]);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -126,12 +131,20 @@ export default function ProfilePage() {
     if (isAuthenticated) {
       fetchAccounts();
       fetchProfile();
-      fetchStats();
+      fetchPositionStats();
       fetchRecentMatches();
       fetchChampions();
       fetchChampionStats();
     }
-  }, [isAuthenticated, authLoading, fetchAccounts, fetchProfile, fetchStats, fetchRecentMatches, fetchChampions, fetchChampionStats, router]);
+  }, [isAuthenticated, authLoading, fetchAccounts, fetchProfile, fetchPositionStats, fetchRecentMatches, fetchChampions, fetchChampionStats, router]);
+
+  // Fetch data that depends on profileData (riotAccounts)
+  useEffect(() => {
+    if (profileData?.riotAccounts?.length) {
+      fetchRankedChampStats();
+      fetchSeasonTiers();
+    }
+  }, [profileData?.riotAccounts, fetchRankedChampStats, fetchSeasonTiers]);
 
   const [syncingAccountId, setSyncingAccountId] = useState<string | null>(null);
 
@@ -236,6 +249,16 @@ export default function ProfilePage() {
         {/* Profile Hero Section */}
         <Card className="mb-6">
           <CardContent className="p-6 md:p-8">
+            {profileLoading && !profileData ? (
+              <div className="flex flex-col md:flex-row items-start gap-6">
+                <Skeleton className="w-24 h-24 md:w-28 md:h-28 rounded-full flex-shrink-0" />
+                <div className="flex-1 space-y-3">
+                  <Skeleton className="h-8 w-48" />
+                  <Skeleton className="h-4 w-72" />
+                  <Skeleton className="h-4 w-56" />
+                </div>
+              </div>
+            ) : (
             <div className="flex flex-col md:flex-row items-start gap-6">
               {/* Avatar */}
               <div className="flex-shrink-0">
@@ -286,6 +309,16 @@ export default function ProfilePage() {
                     </div>
                   )}
 
+                  {/* Peak Tier */}
+                  {primary?.peakTier && (
+                    <div className="flex items-center gap-1">
+                      <ChevronUp className="h-4 w-4 text-accent-gold" />
+                      <span className="text-text-tertiary">최고</span>
+                      <TierBadge tier={primary.peakTier} size="sm" />
+                      {primary.peakRank && <span className="text-text-tertiary">{primary.peakRank}</span>}
+                    </div>
+                  )}
+
                   {/* Main / Sub Role */}
                   {primary?.mainRole && (
                     <div className="flex items-center gap-1">
@@ -319,6 +352,7 @@ export default function ProfilePage() {
                 설정
               </Button>
             </div>
+            )}
           </CardContent>
         </Card>
 
@@ -404,6 +438,87 @@ export default function ProfilePage() {
                     </div>
                   );
                 })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Ranked Most Played Champions */}
+        {rankedChampStats.length > 0 && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Trophy className="h-5 w-5 text-accent-gold" />
+                이번 시즌 랭크 모스트
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                {rankedChampStats.map((champ: any, idx: number) => {
+                  const winRate = champ.games > 0 ? ((champ.wins / champ.games) * 100).toFixed(0) : '0';
+                  const kda = champ.deaths > 0
+                    ? ((champ.kills + champ.assists) / champ.deaths).toFixed(2)
+                    : 'Perfect';
+                  return (
+                    <div key={champ.championName} className="flex items-center gap-3 bg-bg-tertiary rounded-lg p-3">
+                      <div className="relative">
+                        <ChampionImage
+                          championKey={champ.championName}
+                          size={40}
+                          className="rounded-md"
+                        />
+                        {idx === 0 && (
+                          <div className="absolute -top-1 -right-1 bg-accent-gold text-bg-primary text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                            1
+                          </div>
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-text-primary truncate">
+                          {champ.championName}
+                        </p>
+                        <div className="flex items-center gap-2 text-xs text-text-tertiary">
+                          <span>{champ.games}게임</span>
+                          <span className={Number(winRate) >= 50 ? 'text-accent-success' : 'text-accent-danger'}>
+                            {winRate}%
+                          </span>
+                          <span>{kda} KDA</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Season Tier History */}
+        {seasonTiers.length > 0 && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <TrendingUp className="h-5 w-5 text-accent-primary" />
+                시즌 기록
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                {seasonTiers.map((st: any) => (
+                  <div key={st.season} className="bg-bg-tertiary rounded-lg p-3 text-center">
+                    <p className="text-xs text-text-tertiary mb-1">{st.season}</p>
+                    <div className="flex items-center justify-center gap-1.5">
+                      <TierBadge tier={st.tier} size="sm" />
+                      <span className="text-sm font-medium text-text-primary">{st.rank}</span>
+                    </div>
+                    <p className="text-xs text-text-tertiary mt-1">{st.lp} LP</p>
+                    <p className="text-xs mt-0.5">
+                      <span className="text-accent-success">{st.wins}W</span>
+                      <span className="text-text-tertiary mx-0.5">/</span>
+                      <span className="text-accent-danger">{st.losses}L</span>
+                    </p>
+                  </div>
+                ))}
               </div>
             </CardContent>
           </Card>
@@ -496,7 +611,17 @@ export default function ProfilePage() {
                                 <span className="text-sm text-text-secondary">
                                   {account.rank} • {account.lp} LP
                                 </span>
+                                {account.peakTier && (
+                                  <span className="text-xs text-text-tertiary ml-1">
+                                    (최고 <span className="text-accent-gold">{account.peakTier} {account.peakRank || ''}</span>)
+                                  </span>
+                                )}
                               </div>
+                              {account.lastSyncedAt && (
+                                <p className="text-[11px] text-text-tertiary mt-1">
+                                  마지막 동기화: {new Date(account.lastSyncedAt).toLocaleDateString('ko-KR')}
+                                </p>
+                              )}
                             </div>
                           </div>
 
@@ -554,26 +679,26 @@ export default function ProfilePage() {
           </div>
 
           {/* Stats Section */}
-          <div className="lg:col-span-1">
+          <div className="lg:col-span-1 space-y-6">
             <Card>
               <CardHeader>
                 <CardTitle>내전 통계</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                {statsLoading ? (
+                {profileLoading ? (
                   <div className="space-y-3">
                     <Skeleton className="h-12 w-full" />
                     <Skeleton className="h-12 w-full" />
                     <Skeleton className="h-12 w-full" />
                   </div>
-                ) : stats ? (
+                ) : profileData?.stats ? (
                   <>
                     <div className="flex items-center justify-between p-3 bg-bg-tertiary rounded-lg">
                       <div className="flex items-center gap-2">
                         <Gamepad2 className="h-4 w-4 text-accent-primary" />
                         <span className="text-sm text-text-secondary">총 게임</span>
                       </div>
-                      <span className="text-lg font-bold text-text-primary">{stats.gamesPlayed}</span>
+                      <span className="text-lg font-bold text-text-primary">{profileData.stats.gamesPlayed}</span>
                     </div>
 
                     <div className="flex items-center justify-between p-3 bg-bg-tertiary rounded-lg">
@@ -582,9 +707,9 @@ export default function ProfilePage() {
                         <span className="text-sm text-text-secondary">승 / 패</span>
                       </div>
                       <span className="text-lg font-bold">
-                        <span className="text-accent-success">{stats.wins}</span>
+                        <span className="text-accent-success">{profileData.stats.wins}</span>
                         <span className="text-text-tertiary mx-1">/</span>
-                        <span className="text-accent-danger">{stats.losses}</span>
+                        <span className="text-accent-danger">{profileData.stats.losses}</span>
                       </span>
                     </div>
 
@@ -594,9 +719,9 @@ export default function ProfilePage() {
                         <span className="text-sm text-text-secondary">승률</span>
                       </div>
                       <span className={`text-lg font-bold ${
-                        stats.winRate >= 50 ? 'text-accent-success' : 'text-accent-danger'
+                        profileData.stats.winRate >= 50 ? 'text-accent-success' : 'text-accent-danger'
                       }`}>
-                        {stats.gamesPlayed > 0 ? `${stats.winRate.toFixed(1)}%` : '-'}
+                        {profileData.stats.gamesPlayed > 0 ? `${profileData.stats.winRate.toFixed(1)}%` : '-'}
                       </span>
                     </div>
 
@@ -605,7 +730,7 @@ export default function ProfilePage() {
                         <Target className="h-4 w-4 text-accent-primary" />
                         <span className="text-sm text-text-secondary">참여 횟수</span>
                       </div>
-                      <span className="text-lg font-bold text-text-primary">{stats.participations}</span>
+                      <span className="text-lg font-bold text-text-primary">{profileData.stats.participations}</span>
                     </div>
                   </>
                 ) : (
@@ -615,6 +740,40 @@ export default function ProfilePage() {
                 )}
               </CardContent>
             </Card>
+
+            {/* Position Stats */}
+            {positionStats.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Swords className="h-5 w-5 text-accent-primary" />
+                    포지션별 통계
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {positionStats.map((pos: any) => {
+                    const wr = pos.games > 0 ? ((pos.wins / pos.games) * 100).toFixed(0) : '0';
+                    const kda = pos.deaths > 0
+                      ? ((pos.kills + pos.assists) / pos.deaths).toFixed(2)
+                      : 'Perfect';
+                    return (
+                      <div key={pos.position} className="flex items-center justify-between p-2.5 bg-bg-tertiary rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="default" size="sm">{ROLE_LABELS[pos.position] ?? pos.position}</Badge>
+                          <span className="text-xs text-text-tertiary">{pos.games}게임</span>
+                        </div>
+                        <div className="flex items-center gap-3 text-xs">
+                          <span className={Number(wr) >= 50 ? 'text-accent-success font-medium' : 'text-accent-danger font-medium'}>
+                            {wr}%
+                          </span>
+                          <span className="text-text-secondary">{kda} KDA</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
 
@@ -636,35 +795,54 @@ export default function ProfilePage() {
                 </div>
               ) : recentMatches.length > 0 ? (
                 <div className="space-y-3">
-                  {recentMatches.map((match) => (
-                    <div
-                      key={match.id}
-                      className="flex items-center justify-between p-3 bg-bg-tertiary rounded-lg hover:bg-bg-elevated transition-colors cursor-pointer"
-                      onClick={() => router.push(`/matches`)}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="text-sm">
-                          <p className="font-medium text-text-primary">
-                            {match.teamA?.name ?? 'Team A'} vs {match.teamB?.name ?? 'Team B'}
-                          </p>
-                          <p className="text-xs text-text-tertiary flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            {new Date(match.createdAt).toLocaleDateString('ko-KR')}
-                          </p>
+                  {recentMatches.map((match: any) => {
+                    // Determine win/loss for current user
+                    const myTeam = match.teamA?.members?.find((m: any) => m.userId === user?.id)
+                      ? match.teamA
+                      : match.teamB?.members?.find((m: any) => m.userId === user?.id)
+                        ? match.teamB
+                        : null;
+                    const isWin = match.status === 'COMPLETED' && myTeam && match.winner?.id === myTeam.id;
+                    const isLoss = match.status === 'COMPLETED' && myTeam && match.winner && match.winner.id !== myTeam.id;
+
+                    return (
+                      <div
+                        key={match.id}
+                        className="flex items-center justify-between p-3 bg-bg-tertiary rounded-lg hover:bg-bg-elevated transition-colors cursor-pointer"
+                        onClick={() => router.push(`/matches/match/${match.id}`)}
+                      >
+                        <div className="flex items-center gap-3">
+                          {match.status === 'COMPLETED' && (
+                            <div className={`w-1 h-10 rounded-full ${isWin ? 'bg-accent-success' : isLoss ? 'bg-accent-danger' : 'bg-text-tertiary'}`} />
+                          )}
+                          <div className="text-sm">
+                            <p className="font-medium text-text-primary">
+                              {match.teamA?.name ?? 'Team A'} vs {match.teamB?.name ?? 'Team B'}
+                            </p>
+                            <p className="text-xs text-text-tertiary flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              {new Date(match.createdAt).toLocaleDateString('ko-KR')}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {match.status === 'COMPLETED' && myTeam && (
+                            <Badge variant={isWin ? 'success' : 'danger'} size="sm">
+                              {isWin ? '승리' : '패배'}
+                            </Badge>
+                          )}
+                          {match.status !== 'COMPLETED' && (
+                            <Badge
+                              variant={match.status === 'IN_PROGRESS' ? 'primary' : 'default'}
+                              size="sm"
+                            >
+                              {match.status === 'IN_PROGRESS' ? '진행 중' : '대기'}
+                            </Badge>
+                          )}
                         </div>
                       </div>
-                      <Badge
-                        variant={
-                          match.status === 'COMPLETED' ? 'success' :
-                          match.status === 'IN_PROGRESS' ? 'primary' : 'default'
-                        }
-                        size="sm"
-                      >
-                        {match.status === 'COMPLETED' ? '완료' :
-                         match.status === 'IN_PROGRESS' ? '진행 중' : '대기'}
-                      </Badge>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <EmptyState

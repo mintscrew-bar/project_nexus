@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import { useAuthStore } from "@/stores/auth-store";
 import { useDdragonStore } from "@/stores/ddragon-store";
-import { userApi, matchApi, friendApi, statsApi } from "@/lib/api-client";
+import { userApi, matchApi, friendApi, statsApi, presenceApi } from "@/lib/api-client";
 import { ChampionImage } from "@/components/ChampionImage";
 import {
   LoadingSpinner,
@@ -34,6 +34,9 @@ import {
   MessageSquare,
   Loader2,
   BarChart3,
+  Swords,
+  ChevronUp,
+  Star,
 } from "lucide-react";
 import { TierBadge } from "@/components/domain/TierBadge";
 import { useToast } from "@/components/ui/Toast";
@@ -60,6 +63,9 @@ interface ProfileUser {
     tier: string;
     rank: string;
     lp: number;
+    peakTier: string | null;
+    peakRank: string | null;
+    lastSyncedAt: string | null;
     mainRole: string | null;
     subRole: string | null;
     isPrimary: boolean;
@@ -117,6 +123,10 @@ export default function UserProfilePage() {
   const [recentMatches, setRecentMatches] = useState<any[]>([]);
   const [matchesLoading, setMatchesLoading] = useState(false);
   const [championStats, setChampionStats] = useState<any[]>([]);
+  const [rankedChampStats, setRankedChampStats] = useState<any[]>([]);
+  const [positionStats, setPositionStats] = useState<any[]>([]);
+  const [seasonTiers, setSeasonTiers] = useState<any[]>([]);
+  const [onlineStatus, setOnlineStatus] = useState<string | null>(null);
 
   // Redirect to own profile if viewing self
   useEffect(() => {
@@ -164,8 +174,6 @@ export default function UserProfilePage() {
     setMatchesLoading(true);
     try {
       const data = await matchApi.getUserMatchHistory(userId, 5, 0);
-      // 백엔드는 { matchId, match: {...}, participant: {...}, team: {...} } 래퍼 구조를 반환
-      // 프론트에서 쓰기 쉽게 match 객체를 플랫하게 변환
       const flattened = (data || []).map((item: any) => ({
         id: item.matchId || item.match?.id,
         status: item.match?.status,
@@ -173,6 +181,8 @@ export default function UserProfilePage() {
         teamA: item.match?.teamA,
         teamB: item.match?.teamB,
         winner: item.match?.winner,
+        myTeamId: item.team?.id,
+        participant: item.participant,
       }));
       setRecentMatches(flattened);
     } catch {
@@ -191,13 +201,68 @@ export default function UserProfilePage() {
     }
   }, [userId]);
 
+  const fetchRankedChampStats = useCallback(async () => {
+    if (!profile?.riotAccounts) return;
+    // Respect privacy setting
+    if (profile.settings?.showChampionStats === false) return;
+    const primary = profile.riotAccounts.find((a) => a.isPrimary) || profile.riotAccounts[0];
+    if (!primary?.gameName || !primary?.tagLine) return;
+    try {
+      const data = await statsApi.getRankedChampionStats(primary.gameName, primary.tagLine);
+      setRankedChampStats((data || []).slice(0, 5));
+    } catch {
+      // Not critical
+    }
+  }, [profile?.riotAccounts, profile?.settings?.showChampionStats]);
+
+  const fetchPositionStats = useCallback(async () => {
+    try {
+      const data = await statsApi.getUserPositionStats(userId);
+      setPositionStats(data || []);
+    } catch {
+      // Not critical
+    }
+  }, [userId]);
+
+  const fetchSeasonTiers = useCallback(async () => {
+    if (!profile?.riotAccounts) return;
+    const primary = profile.riotAccounts.find((a) => a.isPrimary) || profile.riotAccounts[0];
+    if (!primary?.gameName || !primary?.tagLine) return;
+    try {
+      const data = await statsApi.getSeasonTiers(primary.gameName, primary.tagLine);
+      setSeasonTiers(data || []);
+    } catch {
+      // Not critical
+    }
+  }, [profile?.riotAccounts]);
+
+  const fetchOnlineStatus = useCallback(async () => {
+    if (!isAuthenticated) return;
+    try {
+      const data = await presenceApi.getUserStatus(userId);
+      setOnlineStatus(data?.status || null);
+    } catch {
+      // Not critical
+    }
+  }, [userId, isAuthenticated]);
+
   useEffect(() => {
     fetchProfile();
     fetchFriendshipStatus();
     fetchMatches();
     fetchChampions();
     fetchChampionStats();
-  }, [fetchProfile, fetchFriendshipStatus, fetchMatches, fetchChampions, fetchChampionStats]);
+    fetchPositionStats();
+    fetchOnlineStatus();
+  }, [fetchProfile, fetchFriendshipStatus, fetchMatches, fetchChampions, fetchChampionStats, fetchPositionStats, fetchOnlineStatus]);
+
+  // Fetch data that depends on profile (riotAccounts)
+  useEffect(() => {
+    if (profile?.riotAccounts?.length) {
+      fetchRankedChampStats();
+      fetchSeasonTiers();
+    }
+  }, [profile?.riotAccounts, fetchRankedChampStats, fetchSeasonTiers]);
 
   const handleFriendAction = async () => {
     if (!isAuthenticated) {
@@ -369,7 +434,7 @@ export default function UserProfilePage() {
           <CardContent className="p-6 md:p-8">
             <div className="flex flex-col md:flex-row items-start gap-6">
               {/* Avatar */}
-              <div className="flex-shrink-0">
+              <div className="flex-shrink-0 relative">
                 <div className="w-24 h-24 md:w-28 md:h-28 rounded-full bg-bg-tertiary flex items-center justify-center overflow-hidden relative">
                   {profile.avatar ? (
                     <Image
@@ -383,6 +448,13 @@ export default function UserProfilePage() {
                     <User className="h-12 w-12 text-text-tertiary" />
                   )}
                 </div>
+                {/* Online Status */}
+                {onlineStatus && (
+                  <div className={`absolute bottom-1 right-1 w-4 h-4 rounded-full border-2 border-bg-primary ${
+                    onlineStatus === 'ONLINE' ? 'bg-accent-success' :
+                    onlineStatus === 'AWAY' ? 'bg-yellow-500' : 'bg-text-tertiary'
+                  }`} title={onlineStatus === 'ONLINE' ? '온라인' : onlineStatus === 'AWAY' ? '자리 비움' : '오프라인'} />
+                )}
               </div>
 
               {/* Info */}
@@ -431,6 +503,16 @@ export default function UserProfilePage() {
                     </div>
                   )}
 
+                  {/* Peak Tier */}
+                  {primary?.peakTier && (
+                    <div className="flex items-center gap-1">
+                      <ChevronUp className="h-4 w-4 text-accent-gold" />
+                      <span className="text-text-tertiary">최고</span>
+                      <TierBadge tier={primary.peakTier} size="sm" />
+                      {primary.peakRank && <span className="text-text-tertiary">{primary.peakRank}</span>}
+                    </div>
+                  )}
+
                   {primary?.mainRole && (
                     <div className="flex items-center gap-1">
                       <Gamepad2 className="h-4 w-4 text-accent-primary" />
@@ -443,6 +525,15 @@ export default function UserProfilePage() {
                           {ROLE_LABELS[primary.subRole] ?? primary.subRole}
                         </span>
                       )}
+                    </div>
+                  )}
+
+                  {/* Reputation */}
+                  {profile.reputationScore != null && (
+                    <div className="flex items-center gap-1">
+                      <Star className="h-4 w-4 text-accent-gold" fill="currentColor" />
+                      <span className="font-medium text-text-primary">{profile.reputationScore.toFixed(1)}</span>
+                      <span className="text-text-tertiary">/ 5.0</span>
                     </div>
                   )}
 
@@ -592,6 +683,87 @@ export default function UserProfilePage() {
           </Card>
         )}
 
+        {/* Ranked Most Played Champions */}
+        {showChampStats && rankedChampStats.length > 0 && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Trophy className="h-5 w-5 text-accent-gold" />
+                이번 시즌 랭크 모스트
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                {rankedChampStats.map((champ: any, idx: number) => {
+                  const winRate = champ.games > 0 ? ((champ.wins / champ.games) * 100).toFixed(0) : '0';
+                  const kda = champ.deaths > 0
+                    ? ((champ.kills + champ.assists) / champ.deaths).toFixed(2)
+                    : 'Perfect';
+                  return (
+                    <div key={champ.championName} className="flex items-center gap-3 bg-bg-tertiary rounded-lg p-3">
+                      <div className="relative">
+                        <ChampionImage
+                          championKey={champ.championName}
+                          size={40}
+                          className="rounded-md"
+                        />
+                        {idx === 0 && (
+                          <div className="absolute -top-1 -right-1 bg-accent-gold text-bg-primary text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                            1
+                          </div>
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-text-primary truncate">
+                          {champ.championName}
+                        </p>
+                        <div className="flex items-center gap-2 text-xs text-text-tertiary">
+                          <span>{champ.games}게임</span>
+                          <span className={Number(winRate) >= 50 ? 'text-accent-success' : 'text-accent-danger'}>
+                            {winRate}%
+                          </span>
+                          <span>{kda} KDA</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Season Tier History */}
+        {seasonTiers.length > 0 && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <TrendingUp className="h-5 w-5 text-accent-primary" />
+                시즌 기록
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                {seasonTiers.map((st: any) => (
+                  <div key={st.season} className="bg-bg-tertiary rounded-lg p-3 text-center">
+                    <p className="text-xs text-text-tertiary mb-1">{st.season}</p>
+                    <div className="flex items-center justify-center gap-1.5">
+                      <TierBadge tier={st.tier} size="sm" />
+                      <span className="text-sm font-medium text-text-primary">{st.rank}</span>
+                    </div>
+                    <p className="text-xs text-text-tertiary mt-1">{st.lp} LP</p>
+                    <p className="text-xs mt-0.5">
+                      <span className="text-accent-success">{st.wins}W</span>
+                      <span className="text-text-tertiary mx-0.5">/</span>
+                      <span className="text-accent-danger">{st.losses}L</span>
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Riot Accounts (view only) */}
           {showRiot && profile.riotAccounts?.length > 0 && (
@@ -630,6 +802,11 @@ export default function UserProfilePage() {
                               <span className="text-sm text-text-secondary">
                                 {account.rank} • {account.lp} LP
                               </span>
+                              {account.peakTier && (
+                                <span className="text-xs text-text-tertiary ml-1">
+                                  (최고 <span className="text-accent-gold">{account.peakTier} {account.peakRank || ''}</span>)
+                                </span>
+                              )}
                               {account.mainRole && (
                                 <span className="text-sm text-text-tertiary ml-2">
                                   {ROLE_LABELS[account.mainRole] ??
@@ -650,7 +827,7 @@ export default function UserProfilePage() {
           )}
 
           {/* Stats Section */}
-          <div className={showRiot && profile.riotAccounts?.length > 0 ? "lg:col-span-1" : "lg:col-span-3"}>
+          <div className={`${showRiot && profile.riotAccounts?.length > 0 ? "lg:col-span-1" : "lg:col-span-3"} space-y-6`}>
             <Card>
               <CardHeader>
                 <CardTitle>내전 통계</CardTitle>
@@ -719,6 +896,40 @@ export default function UserProfilePage() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Position Stats */}
+            {positionStats.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Swords className="h-5 w-5 text-accent-primary" />
+                    포지션별 통계
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {positionStats.map((pos: any) => {
+                    const wr = pos.games > 0 ? ((pos.wins / pos.games) * 100).toFixed(0) : '0';
+                    const kda = pos.deaths > 0
+                      ? ((pos.kills + pos.assists) / pos.deaths).toFixed(2)
+                      : 'Perfect';
+                    return (
+                      <div key={pos.position} className="flex items-center justify-between p-2.5 bg-bg-tertiary rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="default" size="sm">{ROLE_LABELS[pos.position] ?? pos.position}</Badge>
+                          <span className="text-xs text-text-tertiary">{pos.games}게임</span>
+                        </div>
+                        <div className="flex items-center gap-3 text-xs">
+                          <span className={Number(wr) >= 50 ? 'text-accent-success font-medium' : 'text-accent-danger font-medium'}>
+                            {wr}%
+                          </span>
+                          <span className="text-text-secondary">{kda} KDA</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
 
@@ -741,41 +952,49 @@ export default function UserProfilePage() {
                   </div>
                 ) : recentMatches.length > 0 ? (
                   <div className="space-y-3">
-                    {recentMatches.map((match: any) => (
-                      <div
-                        key={match.id}
-                        className="flex items-center justify-between p-3 bg-bg-tertiary rounded-lg"
-                      >
-                        <div className="text-sm">
-                          <p className="font-medium text-text-primary">
-                            {match.teamA?.name ?? "Team A"} vs{" "}
-                            {match.teamB?.name ?? "Team B"}
-                          </p>
-                          <p className="text-xs text-text-tertiary flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            {new Date(match.createdAt).toLocaleDateString(
-                              "ko-KR"
-                            )}
-                          </p>
-                        </div>
-                        <Badge
-                          variant={
-                            match.status === "COMPLETED"
-                              ? "success"
-                              : match.status === "IN_PROGRESS"
-                                ? "primary"
-                                : "default"
-                          }
-                          size="sm"
+                    {recentMatches.map((match: any) => {
+                      const isWin = match.status === 'COMPLETED' && match.myTeamId && match.winner?.id === match.myTeamId;
+                      const isLoss = match.status === 'COMPLETED' && match.myTeamId && match.winner && match.winner.id !== match.myTeamId;
+
+                      return (
+                        <div
+                          key={match.id}
+                          className="flex items-center justify-between p-3 bg-bg-tertiary rounded-lg hover:bg-bg-elevated transition-colors cursor-pointer"
+                          onClick={() => router.push(`/matches/match/${match.id}`)}
                         >
-                          {match.status === "COMPLETED"
-                            ? "완료"
-                            : match.status === "IN_PROGRESS"
-                              ? "진행 중"
-                              : "대기"}
-                        </Badge>
-                      </div>
-                    ))}
+                          <div className="flex items-center gap-3">
+                            {match.status === 'COMPLETED' && (
+                              <div className={`w-1 h-10 rounded-full ${isWin ? 'bg-accent-success' : isLoss ? 'bg-accent-danger' : 'bg-text-tertiary'}`} />
+                            )}
+                            <div className="text-sm">
+                              <p className="font-medium text-text-primary">
+                                {match.teamA?.name ?? "Team A"} vs{" "}
+                                {match.teamB?.name ?? "Team B"}
+                              </p>
+                              <p className="text-xs text-text-tertiary flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                {new Date(match.createdAt).toLocaleDateString("ko-KR")}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {match.status === 'COMPLETED' && match.myTeamId && (
+                              <Badge variant={isWin ? 'success' : 'danger'} size="sm">
+                                {isWin ? '승리' : '패배'}
+                              </Badge>
+                            )}
+                            {match.status !== 'COMPLETED' && (
+                              <Badge
+                                variant={match.status === "IN_PROGRESS" ? "primary" : "default"}
+                                size="sm"
+                              >
+                                {match.status === "IN_PROGRESS" ? "진행 중" : "대기"}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 ) : (
                   <EmptyState
