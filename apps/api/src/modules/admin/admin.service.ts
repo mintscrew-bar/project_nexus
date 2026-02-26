@@ -418,11 +418,9 @@ export class AdminService {
               puuid: `bot_puuid_${i}`,
               tier: botTier,
               rank: botRank,
-              leaguePoints: 0,
-              wins: 0,
-              losses: 0,
+              lp: 0,
               isPrimary: true,
-              mainRole: "FILL", // 봇은 모든 역할 가능
+              mainRole: null,
               subRole: null,
             },
           },

@@ -111,7 +111,7 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
   }
 
   private setupEventHandlers() {
-    this.client.on("ready", () => {
+    this.client.on("clientReady", () => {
       console.log(`Discord bot logged in as ${this.client.user?.tag}`);
       // 봇 상태 메시지 설정
       this.client.user?.setActivity("🎮 /nexus help", { type: 0 });

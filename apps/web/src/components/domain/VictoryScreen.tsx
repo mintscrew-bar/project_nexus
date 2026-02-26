@@ -14,24 +14,27 @@ interface TeamStanding {
 
 interface VictoryScreenProps {
   standings: TeamStanding[];
+  roomId: string;
   onClose?: () => void;
   autoRedirectSeconds?: number;
 }
 
 export function VictoryScreen({
   standings,
+  roomId,
   onClose,
   autoRedirectSeconds = 30,
 }: VictoryScreenProps) {
   const router = useRouter();
   const [countdown, setCountdown] = useState(autoRedirectSeconds);
+  const lobbyUrl = `/tournaments/${roomId}/lobby`;
 
   useEffect(() => {
     const timer = setInterval(() => {
       setCountdown((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          router.push("/tournaments");
+          router.push(lobbyUrl);
           return 0;
         }
         return prev - 1;
@@ -39,14 +42,15 @@ export function VictoryScreen({
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [router]);
+  }, [router, lobbyUrl]);
 
-  const handleManualExit = () => {
-    if (onClose) {
-      onClose();
-    } else {
-      router.push("/tournaments");
-    }
+  const handleBackToLobby = () => {
+    if (onClose) onClose();
+    router.push(lobbyUrl);
+  };
+
+  const handleExitToList = () => {
+    router.push("/tournaments");
   };
 
   const winner = standings[0];
@@ -149,7 +153,7 @@ export function VictoryScreen({
         <div className="border-t border-bg-tertiary pt-6">
           <div className="text-center mb-4">
             <p className="text-text-secondary mb-2">
-              {countdown}초 후 자동으로 룸 목록으로 이동합니다
+              {countdown}초 후 자동으로 로비로 이동합니다
             </p>
             <div className="w-full bg-bg-tertiary rounded-full h-2 overflow-hidden">
               <div
@@ -161,13 +165,22 @@ export function VictoryScreen({
             </div>
           </div>
 
-          <Button
-            onClick={handleManualExit}
-            className="w-full bg-accent-primary hover:bg-accent-hover text-white font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2"
-          >
-            지금 나가기
-            <ArrowRight className="w-5 h-5" />
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              onClick={handleBackToLobby}
+              className="flex-1 bg-accent-primary hover:bg-accent-hover text-white font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2"
+            >
+              로비로 돌아가기
+              <ArrowRight className="w-5 h-5" />
+            </Button>
+            <Button
+              onClick={handleExitToList}
+              variant="secondary"
+              className="py-3 rounded-lg"
+            >
+              나가기
+            </Button>
+          </div>
         </div>
       </div>
 

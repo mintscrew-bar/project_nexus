@@ -52,7 +52,12 @@ export class MatchService {
   // ========================================
 
   async generateBracket(hostId: string, roomId: string): Promise<Bracket> {
-    return this.matchBracketService.generateBracket(hostId, roomId);
+    const bracket = await this.matchBracketService.generateBracket(hostId, roomId);
+
+    // Auto-generate tournament codes for matches with both teams assigned
+    await this.autoGenerateCodesForRoom(roomId);
+
+    return bracket;
   }
 
   // ========================================
@@ -70,13 +75,7 @@ export class MatchService {
           include: {
             members: {
               include: {
-                user: {
-                  include: {
-                    riotAccounts: {
-                      where: { isPrimary: true },
-                    },
-                  },
-                },
+                user: true,
               },
             },
           },
@@ -85,13 +84,7 @@ export class MatchService {
           include: {
             members: {
               include: {
-                user: {
-                  include: {
-                    riotAccounts: {
-                      where: { isPrimary: true },
-                    },
-                  },
-                },
+                user: true,
               },
             },
           },
@@ -114,20 +107,6 @@ export class MatchService {
 
     if (!match.teamA || !match.teamB) {
       throw new BadRequestException("Match teams are not yet assigned (TBD)");
-    }
-
-    // Get all participant PUUIDs
-    const teamAPuuids = match.teamA.members.map(
-      (m) => m.user.riotAccounts[0]?.puuid,
-    );
-    const teamBPuuids = match.teamB.members.map(
-      (m) => m.user.riotAccounts[0]?.puuid,
-    );
-
-    if (teamAPuuids.some((p) => !p) || teamBPuuids.some((p) => !p)) {
-      throw new BadRequestException(
-        "All players must have linked Riot accounts",
-      );
     }
 
     let tournamentCode: string;
@@ -203,6 +182,42 @@ export class MatchService {
     }
 
     return tournamentCode;
+  }
+
+  /**
+   * Auto-generate tournament codes for all matches in a room
+   * that have both teams assigned but no tournament code yet.
+   */
+  private async autoGenerateCodesForRoom(roomId: string): Promise<void> {
+    const matches = await this.prisma.match.findMany({
+      where: {
+        roomId,
+        teamAId: { not: null },
+        teamBId: { not: null },
+        tournamentCode: null,
+      },
+      select: { id: true },
+    });
+
+    for (const match of matches) {
+      try {
+        let code: string;
+        try {
+          code = await this.riotTournamentService.createTournamentCode(match.id);
+        } catch {
+          code = `NEXUS-${match.id.substring(0, 8).toUpperCase()}`;
+        }
+
+        await this.prisma.match.update({
+          where: { id: match.id },
+          data: { tournamentCode: code },
+        });
+
+        this.logger.log(`Auto-generated tournament code for match ${match.id}: ${code}`);
+      } catch (error) {
+        this.logger.warn(`Failed to auto-generate code for match ${match.id}:`, error);
+      }
+    }
   }
 
   // ========================================
@@ -345,6 +360,11 @@ export class MatchService {
           `Cannot advance double elimination: match ${matchId} missing loser team ID`,
         );
       }
+    }
+
+    // Auto-generate tournament codes for newly-ready matches after advancement
+    if (bracketAdvanced) {
+      await this.autoGenerateCodesForRoom(updatedMatch.roomId);
     }
 
     // Send Discord match result notification

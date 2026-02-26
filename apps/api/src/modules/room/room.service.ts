@@ -459,7 +459,7 @@ export class RoomService {
 
     // During active game phases (not WAITING), keep participant slot so user can re-enter.
     // This prevents accidental removal during network disconnects or page navigation.
-    // Exception: host + only bots scenario is cleaned up immediately for bot testing.
+    // Exception: if only bots remain, clean up immediately.
     if (room.status !== RoomStatus.WAITING) {
       const remainingParticipants = room.participants.filter(
         (p) => p.userId !== userId,
@@ -470,7 +470,7 @@ export class RoomService {
           /^testbot_\d+$/.test(p.user?.username || ""),
         );
 
-      if (room.hostId === userId && allRemainingAreBots) {
+      if (allRemainingAreBots || remainingParticipants.length === 0) {
         if (this.discordVoiceService) {
           await this.discordVoiceService.deleteRoomChannels(roomId).catch(() => {});
         }
@@ -480,7 +480,7 @@ export class RoomService {
         await this.prisma.room.delete({
           where: { id: roomId },
         });
-        return { message: "Room deleted (host disconnected during bot test)" };
+        return { message: "Room deleted (only bots remaining)" };
       }
 
       return { message: "Left realtime session, participant preserved" };
@@ -517,8 +517,8 @@ export class RoomService {
       return { message: "Room deleted (no participants)" };
     }
 
-    // If host leaves and only bots remain, delete room immediately (bot-test cleanup)
-    if (room.hostId === userId && allRemainingAreBots) {
+    // If only bots remain, delete room immediately
+    if (allRemainingAreBots) {
       if (this.discordVoiceService) {
         await this.discordVoiceService.deleteRoomChannels(roomId).catch(() => {});
       }
@@ -528,7 +528,7 @@ export class RoomService {
       await this.prisma.room.delete({
         where: { id: roomId },
       });
-      return { message: "Room deleted (host disconnected during bot test)" };
+      return { message: "Room deleted (only bots remaining)" };
     }
 
     // If host leaves but others remain, transfer host to next participant
@@ -930,11 +930,7 @@ export class RoomService {
       throw new BadRequestException("Room is already in lobby state");
     }
 
-    if (room.status === RoomStatus.COMPLETED) {
-      throw new BadRequestException(
-        "Cannot abort a completed session. Start a new one from the lobby.",
-      );
-    }
+    // COMPLETED rooms can also return to lobby for reuse
 
     if (room.hostId !== requesterId) {
       throw new ForbiddenException(

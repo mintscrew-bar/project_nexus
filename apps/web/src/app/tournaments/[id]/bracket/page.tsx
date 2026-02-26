@@ -21,14 +21,13 @@ export default function BracketPage() {
   const {
     roomMatches, isLoading, error,
     fetchRoomMatches, connectToBracket, disconnect, reset,
-    generateTournamentCode, reportResult,
+    startMatch, reportResult,
     tournamentCompleted, finalStandings,
     sessionAbortedAt, sessionAbortMessage, clearSessionAbort,
   } = useMatchStore();
 
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isGeneratingCode, setIsGeneratingCode] = useState(false);
   const [isAborting, setIsAborting] = useState(false);
   const [isHost, setIsHost] = useState(false);
   const [liveStatus, setLiveStatus] = useState<any>(null);
@@ -98,22 +97,15 @@ export default function BracketPage() {
     }
   };
 
-  const handleGenerateCode = async (matchId: string) => {
-    setIsGeneratingCode(true);
+  const handleStartMatch = async (matchId: string) => {
     try {
-      await generateTournamentCode(matchId);
-      // Update selected match with the new code from store
+      await startMatch(matchId);
       const updatedMatch = roomMatches.find(m => m.id === matchId);
       if (updatedMatch && selectedMatch) {
-        setSelectedMatch({
-          ...selectedMatch,
-          tournamentCode: updatedMatch.tournamentCode,
-        });
+        setSelectedMatch({ ...selectedMatch, status: 'IN_PROGRESS' as const });
       }
     } catch (error: any) {
-      addToast(error?.response?.data?.message || "토너먼트 코드 생성에 실패했습니다.", "error");
-    } finally {
-      setIsGeneratingCode(false);
+      addToast(error?.response?.data?.message || "매치 시작에 실패했습니다.", "error");
     }
   };
 
@@ -298,11 +290,10 @@ export default function BracketPage() {
         <MatchDetailModal
           match={selectedMatch}
           isOpen={isModalOpen}
-          isGeneratingCode={isGeneratingCode}
           isHost={isHost}
           liveStatus={liveStatus}
           onClose={handleCloseModal}
-          onGenerateCode={handleGenerateCode}
+          onStartMatch={handleStartMatch}
           onReportResult={handleReportResult}
           onRefreshLiveStatus={handleRefreshLiveStatus}
         />
@@ -311,6 +302,7 @@ export default function BracketPage() {
         {tournamentCompleted && finalStandings.length > 0 && (
           <VictoryScreen
             standings={finalStandings}
+            roomId={roomId}
             autoRedirectSeconds={30}
           />
         )}

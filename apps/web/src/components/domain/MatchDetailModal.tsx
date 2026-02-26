@@ -26,11 +26,10 @@ interface LiveGameStatus {
 interface MatchDetailModalProps {
   match: Match | null;
   isOpen: boolean;
-  isGeneratingCode: boolean;
   isHost?: boolean;
   liveStatus?: LiveGameStatus | null;
   onClose: () => void;
-  onGenerateCode: (matchId: string) => void;
+  onStartMatch: (matchId: string) => Promise<void>;
   onReportResult: (matchId: string, winnerId: string) => Promise<void>;
   onRefreshLiveStatus?: (matchId: string) => Promise<void>;
 }
@@ -38,16 +37,16 @@ interface MatchDetailModalProps {
 export function MatchDetailModal({
   match,
   isOpen,
-  isGeneratingCode,
   isHost = false,
   liveStatus = null,
   onClose,
-  onGenerateCode,
+  onStartMatch,
   onReportResult,
   onRefreshLiveStatus,
 }: MatchDetailModalProps) {
   const { user } = useAuthStore();
   const [copied, setCopied] = useState(false);
+  const [isStarting, setIsStarting] = useState(false);
   const [isReporting, setIsReporting] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
 
@@ -190,30 +189,41 @@ export function MatchDetailModal({
             <h3 className="text-md font-semibold mb-2 text-text-primary">토너먼트 코드</h3>
             {match.tournamentCode ? (
               <div className="flex items-center gap-2">
-                <code className="flex-grow p-2 bg-bg-tertiary rounded font-mono text-text-primary">
+                <code className="flex-grow p-2 bg-bg-tertiary rounded font-mono text-text-primary select-all">
                   {match.tournamentCode}
                 </code>
                 <Button size="icon" variant="ghost" onClick={handleCopyCode}>
                   <Copy className="h-4 w-4" />
                 </Button>
               </div>
-            ) : canManageMatch ? (
-              <Button
-                className="w-full"
-                onClick={() => onGenerateCode(match.id)}
-                disabled={isGeneratingCode || match.status !== 'PENDING'}
-              >
-                {isGeneratingCode ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : null}
-                코드 생성하기
-              </Button>
             ) : (
               <p className="text-sm text-text-secondary text-center py-2">
-                토너먼트 코드가 아직 생성되지 않았습니다.
+                {!match.team1 || !match.team2
+                  ? "팀이 확정되면 코드가 자동 생성됩니다."
+                  : "코드 생성 중..."}
               </p>
             )}
             {copied && <p className="text-xs text-accent-success mt-2 text-center">코드가 복사되었습니다!</p>}
+          </div>
+        )}
+
+        {canManageMatch && match.status === 'PENDING' && match.team1 && match.team2 && (
+          <div className="pt-4 border-t border-bg-tertiary">
+            <Button
+              className="w-full"
+              onClick={async () => {
+                setIsStarting(true);
+                try {
+                  await onStartMatch(match.id);
+                } finally {
+                  setIsStarting(false);
+                }
+              }}
+              disabled={isStarting}
+            >
+              {isStarting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Swords className="mr-2 h-4 w-4" />}
+              매치 시작
+            </Button>
           </div>
         )}
 

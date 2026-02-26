@@ -415,7 +415,7 @@ export class AuthService {
     const key = `link_token:${linkToken}`;
 
     // Store userId and provider in Redis for 5 minutes
-    await this.redis.set(key, JSON.stringify({ userId, provider }), "EX", 300);
+    await this.redis.set(key, JSON.stringify({ userId, provider }), 300);
 
     return linkToken;
   }
