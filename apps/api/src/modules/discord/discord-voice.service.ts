@@ -52,7 +52,7 @@ export class DiscordVoiceService {
       while (retryCount < MAX_RETRIES) {
         try {
           category = await guild.channels.create({
-            name: `⚔️ ${roomName}`,
+            name: `『 ${roomName} 』`,
             type: ChannelType.GuildCategory,
             permissionOverwrites: [
               {
@@ -85,7 +85,7 @@ export class DiscordVoiceService {
 
       // Create lobby channel first (생성 순서로 맨 위 고정)
       const lobbyChannel = await guild.channels.create({
-        name: "🏟️ 내전 대기실",
+        name: "── 대기실 ──",
         type: ChannelType.GuildVoice,
         parent: category.id,
         userLimit: 50,
@@ -105,7 +105,7 @@ export class DiscordVoiceService {
       const teamChannels: Array<{ teamName: string; channelId: string }> = [];
 
       for (let i = 0; i < numTeams; i++) {
-        const displayName = `⚔️ ${i + 1}팀`;
+        const displayName = `┊ ${i + 1}팀`;
         const dbTeamName = `Team ${i + 1}`;
 
         const channel = await guild.channels.create({
@@ -381,7 +381,7 @@ export class DiscordVoiceService {
     if (newNumTeams > currentNumTeams) {
       // Add missing team channels
       for (let i = currentNumTeams; i < newNumTeams; i++) {
-        const displayName = `⚔️ ${i + 1}팀`;
+        const displayName = `┊ ${i + 1}팀`;
         const dbTeamName = `Team ${i + 1}`;
 
         const channel = await guild.channels.create({
@@ -420,6 +420,32 @@ export class DiscordVoiceService {
 
         this.logger.log(`Removed team channel "${ch.teamName}" for room ${roomId}`);
       }
+    }
+  }
+
+  /**
+   * 방 이름 변경 시 Discord 카테고리 이름 동기화
+   */
+  async updateCategoryName(roomId: string, newRoomName: string): Promise<void> {
+    const guildId = this.configService.get("DISCORD_GUILD_ID");
+    if (!guildId) return;
+
+    const room = await this.prisma.room.findUnique({
+      where: { id: roomId },
+      select: { discordCategoryId: true },
+    });
+
+    if (!room?.discordCategoryId) return;
+
+    try {
+      const guild = await this.client.guilds.fetch(guildId);
+      const category = await guild.channels.fetch(room.discordCategoryId).catch(() => null);
+      if (category) {
+        await category.setName(`『 ${newRoomName} 』`);
+        this.logger.log(`Updated Discord category name for room ${roomId}: "${newRoomName}"`);
+      }
+    } catch (error: any) {
+      this.logger.warn(`Failed to update category name for room ${roomId}: ${error.message}`);
     }
   }
 

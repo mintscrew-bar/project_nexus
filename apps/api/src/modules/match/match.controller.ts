@@ -182,12 +182,4 @@ export class MatchController {
     );
   }
 
-  // ========================================
-  // Legacy endpoints (kept for backward compatibility)
-  // ========================================
-
-  @Get("room/:roomId/matches")
-  async getByRoom(@Param("roomId") roomId: string) {
-    return this.matchService.getMatchesByRoom(roomId);
-  }
 }

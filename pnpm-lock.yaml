@@ -207,6 +207,9 @@ importers:
       '@tanstack/react-query':
         specifier: ^5.17.0
         version: 5.90.19(react@18.3.1)
+      '@uiw/react-markdown-preview':
+        specifier: ^5.1.5
+        version: 5.1.5(@types/react@18.3.27)(react-dom@18.3.1)(react@18.3.1)
       '@uiw/react-md-editor':
         specifier: ^4.0.11
         version: 4.0.11(@types/react@18.3.27)(react-dom@18.3.1)(react@18.3.1)

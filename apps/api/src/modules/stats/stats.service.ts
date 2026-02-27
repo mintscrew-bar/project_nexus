@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable, ForbiddenException, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { RiotMatchService } from "../riot/riot-match.service";
 import { RiotService } from "../riot/riot.service";
@@ -64,9 +64,32 @@ export class StatsService {
   ) {}
 
   /**
+   * Check privacy setting for a target user.
+   * Returns true if the setting is enabled or if requester is the owner.
+   */
+  private async checkPrivacy(
+    userId: string,
+    requesterId: string,
+    setting: 'showMatchHistory' | 'showChampionStats' | 'showRiotAccounts',
+  ): Promise<boolean> {
+    if (requesterId === userId) return true;
+    const settings = await this.prisma.userSettings.findUnique({
+      where: { userId },
+      select: { [setting]: true },
+    });
+    return !settings || (settings as any)[setting] !== false;
+  }
+
+  /**
    * Get auction statistics for a user (captain count, sold prices, titles)
    */
-  async getUserAuctionStats(userId: string): Promise<AuctionStats> {
+  async getUserAuctionStats(userId: string, requesterId?: string): Promise<AuctionStats> {
+    if (requesterId) {
+      const allowed = await this.checkPrivacy(userId, requesterId, 'showMatchHistory');
+      if (!allowed) {
+        return { captainCount: 0, totalAuctions: 0, totalSold: 0, yuchalCount: 0, avgSoldPrice: 0, maxSoldPrice: 0, titles: [] };
+      }
+    }
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new NotFoundException("User not found");
 
@@ -138,7 +161,11 @@ export class StatsService {
   /**
    * Get champion statistics for a user
    */
-  async getUserChampionStats(userId: string): Promise<ChampionStats[]> {
+  async getUserChampionStats(userId: string, requesterId?: string): Promise<ChampionStats[]> {
+    if (requesterId) {
+      const allowed = await this.checkPrivacy(userId, requesterId, 'showChampionStats');
+      if (!allowed) return [];
+    }
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
     });
@@ -205,7 +232,11 @@ export class StatsService {
   /**
    * Get position statistics for a user
    */
-  async getUserPositionStats(userId: string): Promise<PositionStats[]> {
+  async getUserPositionStats(userId: string, requesterId?: string): Promise<PositionStats[]> {
+    if (requesterId) {
+      const allowed = await this.checkPrivacy(userId, requesterId, 'showMatchHistory');
+      if (!allowed) return [];
+    }
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
     });
@@ -308,7 +339,11 @@ export class StatsService {
   /**
    * Get user's Riot accounts
    */
-  async getUserRiotAccounts(userId: string) {
+  async getUserRiotAccounts(userId: string, requesterId?: string) {
+    if (requesterId) {
+      const allowed = await this.checkPrivacy(userId, requesterId, 'showRiotAccounts');
+      if (!allowed) return [];
+    }
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       include: {
@@ -466,24 +501,6 @@ export class StatsService {
     );
 
     return matches;
-  }
-
-  /**
-   * 소환사의 시즌별 티어 히스토리
-   */
-  async getSummonerSeasonTiers(gameName: string, tagLine: string) {
-    const summonerInfo = await this.riotService.getSummonerByRiotId(
-      gameName,
-      tagLine,
-    );
-    if (!summonerInfo) throw new NotFoundException("Summoner not found");
-
-    const tiers = await this.prisma.summonerSeasonTier.findMany({
-      where: { puuid: summonerInfo.puuid },
-      orderBy: { season: "desc" },
-    });
-
-    return tiers;
   }
 
   /**

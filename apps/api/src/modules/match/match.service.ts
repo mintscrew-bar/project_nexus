@@ -19,6 +19,7 @@ import { MatchDataCollectionService } from "./match-data-collection.service";
 import { NotificationService } from "../notification/notification.service";
 import { MatchBracketService, Bracket } from "./match-bracket.service";
 import { MatchAdvancementService } from "./match-advancement.service";
+import { RankingService } from "../ranking/ranking.service";
 import { RoomStatus, MatchStatus, BracketType } from "@nexus/database";
 
 // Re-export types for backward compatibility
@@ -40,6 +41,7 @@ export class MatchService {
     private readonly notificationService: NotificationService,
     private readonly matchBracketService: MatchBracketService,
     private readonly matchAdvancementService: MatchAdvancementService,
+    private readonly rankingService: RankingService,
     @Optional() @Inject("DISCORD_BOT_SERVICE") discordBot?: any,
     @Optional() @Inject("DISCORD_VOICE_SERVICE") discordVoice?: any,
   ) {
@@ -544,6 +546,22 @@ export class MatchService {
           );
         }
 
+        // Move all participants back to lobby voice channel
+        try {
+          if (this.discordVoiceService) {
+            const moveResult =
+              await this.discordVoiceService.moveAllToLobby(match.roomId);
+            this.logger.log(
+              `Moved participants to lobby for room ${match.roomId}: ${moveResult.success} success, ${moveResult.failed} failed`,
+            );
+          }
+        } catch (error) {
+          this.logger.warn(
+            "Failed to move participants to lobby after tournament completion:",
+            error,
+          );
+        }
+
         tournamentCompleted = true;
       }
     }
@@ -559,6 +577,26 @@ export class MatchService {
             error,
           );
         });
+    });
+
+    // Update rankings for all participants (non-blocking)
+    setImmediate(async () => {
+      try {
+        const participantUsers = await this.prisma.teamMember.findMany({
+          where: {
+            teamId: { in: [match.teamAId!, match.teamBId!].filter(Boolean) },
+          },
+          select: { userId: true },
+          distinct: ["userId"],
+        });
+
+        for (const { userId: uid } of participantUsers) {
+          await this.rankingService.updateRanking(uid);
+        }
+        this.logger.log(`Updated rankings for ${participantUsers.length} participants of match ${matchId}`);
+      } catch (error) {
+        this.logger.error(`Failed to update rankings for match ${matchId}:`, error);
+      }
     });
 
     return {
@@ -790,17 +828,6 @@ export class MatchService {
     });
   }
 
-  async getMatchesByRoom(roomId: string) {
-    return this.prisma.match.findMany({
-      where: { roomId },
-      include: {
-        teamA: true,
-        teamB: true,
-        winner: true,
-      },
-      orderBy: { createdAt: "asc" },
-    });
-  }
 
   // ========================================
   // Match Details (Riot API Data)

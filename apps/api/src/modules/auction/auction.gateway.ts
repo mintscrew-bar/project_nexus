@@ -45,6 +45,7 @@ export class AuctionGateway
   private resolvingRooms = new Set<string>();
   // In-memory rate limit fallback when Redis is unavailable
   private bidRateLimits = new Map<string, number[]>();
+  private rateLimitCleanupTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(
     private readonly authService: AuthService,
@@ -68,6 +69,12 @@ export class AuctionGateway
     }
     this.bidResolveTimers.clear();
     this.resolvingRooms.clear();
+
+    if (this.rateLimitCleanupTimer) {
+      clearInterval(this.rateLimitCleanupTimer);
+      this.rateLimitCleanupTimer = null;
+    }
+    this.bidRateLimits.clear();
   }
 
   async handleConnection(client: AuthenticatedSocket) {
@@ -317,6 +324,25 @@ export class AuctionGateway
         }
         timestamps.push(now);
         this.bidRateLimits.set(key, timestamps);
+
+        // Schedule periodic cleanup if not already running
+        if (!this.rateLimitCleanupTimer) {
+          this.rateLimitCleanupTimer = setInterval(() => {
+            const cleanupNow = Date.now();
+            for (const [k, v] of this.bidRateLimits.entries()) {
+              const valid = v.filter(t => cleanupNow - t < 3000);
+              if (valid.length === 0) {
+                this.bidRateLimits.delete(k);
+              } else {
+                this.bidRateLimits.set(k, valid);
+              }
+            }
+            if (this.bidRateLimits.size === 0) {
+              clearInterval(this.rateLimitCleanupTimer!);
+              this.rateLimitCleanupTimer = null;
+            }
+          }, 10_000);
+        }
       }
     }
 

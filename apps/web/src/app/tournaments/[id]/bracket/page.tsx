@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { useMatchStore } from "@/stores/match-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { roomApi, matchApi } from "@/lib/api-client";
-import { BracketView, Match, MatchDetailModal, VictoryScreen } from "@/components/domain";
+import { BracketView, Match, MatchDetailModal, VictoryScreen, GameChatPanel } from "@/components/domain";
 import { LoadingSpinner, Badge, Button } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
 import { ArrowLeft, RefreshCw, Trophy } from "lucide-react";
@@ -307,6 +307,9 @@ export default function BracketPage() {
           />
         )}
       </div>
+
+      {/* 채팅 패널 (플로팅, 최종 단계 — unmount 시 소켓 정리) */}
+      <GameChatPanel roomId={roomId} isFinalStage />
     </div>
   );
 }

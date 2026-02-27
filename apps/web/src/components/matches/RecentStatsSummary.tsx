@@ -32,7 +32,7 @@ interface SummaryStats {
     winRate: number;
     playRate: number;
   }[];
-  games: { win: boolean; championName: string; kills: number; deaths: number; assists: number }[];
+  games: { win: boolean; championName: string; kills: number; deaths: number; assists: number; damage: number }[];
 }
 
 function computeRiotStats(matches: any[], puuid: string): SummaryStats {
@@ -44,7 +44,7 @@ function computeRiotStats(matches: any[], puuid: string): SummaryStats {
     if (!m?.info?.participants) continue;
     const p = m.info.participants.find((pp: any) => pp.puuid === puuid);
     if (!p) continue;
-    games.push({ win: p.win, championName: p.championName, kills: p.kills, deaths: p.deaths, assists: p.assists });
+    games.push({ win: p.win, championName: p.championName, kills: p.kills, deaths: p.deaths, assists: p.assists, damage: p.totalDamageDealtToChampions || 0 });
     totalKills += p.kills;
     totalDeaths += p.deaths;
     totalAssists += p.assists;
@@ -92,7 +92,7 @@ function computeNexusStats(matches: NexusMatchHistory[]): SummaryStats {
 
   for (const m of matches) {
     const p = m.participant;
-    games.push({ win: p.win, championName: p.championName, kills: p.kills, deaths: p.deaths, assists: p.assists });
+    games.push({ win: p.win, championName: p.championName, kills: p.kills, deaths: p.deaths, assists: p.assists, damage: 0 });
     totalKills += p.kills;
     totalDeaths += p.deaths;
     totalAssists += p.assists;
@@ -154,6 +154,132 @@ function WinRateDonut({ winRate, size = 64 }: { winRate: number; size?: number }
   );
 }
 
+function KDATrendChart({ games }: { games: SummaryStats["games"] }) {
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null);
+
+  const kdaValues = games.map(g => {
+    const d = Math.max(g.deaths, 1);
+    return (g.kills + g.assists) / d;
+  });
+
+  const maxKda = Math.max(...kdaValues, 1);
+  const W = 300, H = 80;
+  const padL = 28, padR = 8, padT = 8, padB = 16;
+  const cW = W - padL - padR, cH = H - padT - padB;
+
+  const toX = (i: number) => padL + (games.length > 1 ? (i / (games.length - 1)) * cW : cW / 2);
+  const toY = (v: number) => padT + cH - (v / maxKda) * cH;
+
+  const pathD = kdaValues.map((v, i) => `${i === 0 ? 'M' : 'L'}${toX(i).toFixed(1)},${toY(v).toFixed(1)}`).join(' ');
+  const areaD = `${pathD} L${toX(games.length - 1).toFixed(1)},${(padT + cH).toFixed(1)} L${toX(0).toFixed(1)},${(padT + cH).toFixed(1)} Z`;
+
+  return (
+    <div className="relative bg-bg-tertiary/30 rounded-lg p-2">
+      <svg width="100%" viewBox={`0 0 ${W} ${H}`} className="overflow-visible cursor-crosshair"
+        onMouseMove={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          const svgX = ((e.clientX - rect.left) / rect.width) * W;
+          const idx = Math.round(((svgX - padL) / cW) * (games.length - 1));
+          setHoverIdx(Math.max(0, Math.min(games.length - 1, idx)));
+        }}
+        onMouseLeave={() => setHoverIdx(null)}
+      >
+        {/* Y axis labels */}
+        {[0, maxKda / 2, maxKda].map((v, i) => (
+          <text key={i} x={padL - 4} y={toY(v) + 3} textAnchor="end" fontSize="7" fill="currentColor" fillOpacity="0.4">
+            {v.toFixed(1)}
+          </text>
+        ))}
+        {/* Grid line */}
+        <line x1={padL} x2={padL + cW} y1={toY(maxKda / 2)} y2={toY(maxKda / 2)} stroke="currentColor" strokeOpacity="0.06" strokeWidth="1" />
+        {/* Area + Line */}
+        <path d={areaD} fill="#6366f1" fillOpacity="0.08" />
+        <path d={pathD} fill="none" stroke="#6366f1" strokeWidth="1.5" strokeLinejoin="round" />
+        {/* Dots */}
+        {kdaValues.map((v, i) => (
+          <circle key={i} cx={toX(i)} cy={toY(v)} r={hoverIdx === i ? 3.5 : 1.5}
+            fill="#6366f1" fillOpacity={hoverIdx === i ? 1 : 0.5}
+            stroke={hoverIdx === i ? 'white' : 'none'} strokeWidth="1" />
+        ))}
+        {/* Hover line */}
+        {hoverIdx !== null && (
+          <line x1={toX(hoverIdx)} x2={toX(hoverIdx)} y1={padT} y2={padT + cH}
+            stroke="currentColor" strokeOpacity="0.2" strokeWidth="1" strokeDasharray="2,2" />
+        )}
+      </svg>
+      {hoverIdx !== null && (
+        <div className="absolute top-0 z-20 pointer-events-none"
+          style={{ left: `${Math.max(10, Math.min(85, ((toX(hoverIdx)) / W) * 100))}%`, transform: 'translateX(-50%)' }}
+        >
+          <div className="bg-bg-secondary/95 backdrop-blur-sm border border-bg-elevated rounded-lg shadow-xl px-2.5 py-1.5 text-[10px]">
+            <div className="text-text-tertiary">{games[hoverIdx].championName}</div>
+            <div className="font-bold text-accent-primary">KDA {kdaValues[hoverIdx].toFixed(2)}</div>
+            <div className="text-text-secondary">{games[hoverIdx].kills}/{games[hoverIdx].deaths}/{games[hoverIdx].assists}</div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DamageTrendChart({ games }: { games: SummaryStats["games"] }) {
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null);
+
+  const damages = games.map(g => g.damage);
+  const maxDmg = Math.max(...damages, 1);
+  const W = 300, H = 80;
+  const padL = 28, padR = 8, padT = 4, padB = 16;
+  const cW = W - padL - padR, cH = H - padT - padB;
+  const barGap = 2;
+  const barW = Math.max(4, (cW / games.length) - barGap);
+
+  return (
+    <div className="relative bg-bg-tertiary/30 rounded-lg p-2">
+      <svg width="100%" viewBox={`0 0 ${W} ${H}`} className="overflow-visible cursor-crosshair"
+        onMouseMove={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          const svgX = ((e.clientX - rect.left) / rect.width) * W;
+          const idx = Math.floor(((svgX - padL) / cW) * games.length);
+          setHoverIdx(Math.max(0, Math.min(games.length - 1, idx)));
+        }}
+        onMouseLeave={() => setHoverIdx(null)}
+      >
+        {/* Y axis */}
+        <text x={padL - 4} y={padT + 6} textAnchor="end" fontSize="7" fill="currentColor" fillOpacity="0.4">
+          {(maxDmg / 1000).toFixed(0)}k
+        </text>
+        <text x={padL - 4} y={padT + cH + 3} textAnchor="end" fontSize="7" fill="currentColor" fillOpacity="0.4">0</text>
+        {/* Bars */}
+        {damages.map((dmg, i) => {
+          const barH = (dmg / maxDmg) * cH;
+          const x = padL + (i / games.length) * cW + barGap / 2;
+          const y = padT + cH - barH;
+          const isHovered = hoverIdx === i;
+          return (
+            <rect key={i} x={x} y={y} width={barW} height={barH} rx={1.5}
+              fill={games[i].win ? '#22c55e' : '#ef4444'}
+              fillOpacity={isHovered ? 0.9 : 0.6}
+            />
+          );
+        })}
+      </svg>
+      {hoverIdx !== null && (
+        <div className="absolute top-0 z-20 pointer-events-none"
+          style={{ left: `${Math.max(10, Math.min(85, ((padL + (hoverIdx / games.length) * cW + barW / 2) / W) * 100))}%`, transform: 'translateX(-50%)' }}
+        >
+          <div className="bg-bg-secondary/95 backdrop-blur-sm border border-bg-elevated rounded-lg shadow-xl px-2.5 py-1.5 text-[10px]">
+            <div className="text-text-tertiary">{games[hoverIdx].championName}</div>
+            <div className={`font-bold ${games[hoverIdx].win ? 'text-accent-success' : 'text-accent-danger'}`}>
+              {games[hoverIdx].win ? '승리' : '패배'}
+            </div>
+            <div className="text-text-primary font-medium">{damages[hoverIdx].toLocaleString()} 딜량</div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function StatsDisplay({ stats, showCsPerMin }: { stats: SummaryStats; showCsPerMin: boolean }) {
   if (stats.games.length === 0) {
     return (
@@ -197,6 +323,22 @@ function StatsDisplay({ stats, showCsPerMin }: { stats: SummaryStats; showCsPerM
           </div>
         </div>
       </div>
+
+      {/* KDA Trend Chart */}
+      {stats.games.length >= 2 && (
+        <div>
+          <p className="text-xs text-text-tertiary mb-1 font-medium">KDA 추세 (최근 {stats.games.length}게임)</p>
+          <KDATrendChart games={stats.games} />
+        </div>
+      )}
+
+      {/* Damage Trend Chart */}
+      {stats.games.length >= 2 && stats.games.some(g => g.damage > 0) && (
+        <div>
+          <p className="text-xs text-text-tertiary mb-1 font-medium">딜량 추세 (최근 {stats.games.length}게임)</p>
+          <DamageTrendChart games={stats.games} />
+        </div>
+      )}
 
       {/* Most Champions */}
       {stats.mostChampions.length > 0 && (

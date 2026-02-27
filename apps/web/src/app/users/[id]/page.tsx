@@ -126,7 +126,6 @@ export default function UserProfilePage() {
   const [championStats, setChampionStats] = useState<any[]>([]);
   const [rankedChampStats, setRankedChampStats] = useState<any[]>([]);
   const [positionStats, setPositionStats] = useState<any[]>([]);
-  const [seasonTiers, setSeasonTiers] = useState<any[]>([]);
   const [auctionStats, setAuctionStats] = useState<any>(null);
   const [onlineStatus, setOnlineStatus] = useState<string | null>(null);
 
@@ -226,18 +225,6 @@ export default function UserProfilePage() {
     }
   }, [userId]);
 
-  const fetchSeasonTiers = useCallback(async () => {
-    if (!profile?.riotAccounts) return;
-    const primary = profile.riotAccounts.find((a) => a.isPrimary) || profile.riotAccounts[0];
-    if (!primary?.gameName || !primary?.tagLine) return;
-    try {
-      const data = await statsApi.getSeasonTiers(primary.gameName, primary.tagLine);
-      setSeasonTiers(data || []);
-    } catch {
-      // Not critical
-    }
-  }, [profile?.riotAccounts]);
-
   const fetchAuctionStats = useCallback(async () => {
     try {
       const data = await statsApi.getUserAuctionStats(userId);
@@ -272,9 +259,8 @@ export default function UserProfilePage() {
   useEffect(() => {
     if (profile?.riotAccounts?.length) {
       fetchRankedChampStats();
-      fetchSeasonTiers();
     }
-  }, [profile?.riotAccounts, fetchRankedChampStats, fetchSeasonTiers]);
+  }, [profile?.riotAccounts, fetchRankedChampStats]);
 
   const handleFriendAction = async () => {
     if (!isAuthenticated) {
@@ -746,36 +732,6 @@ export default function UserProfilePage() {
         )}
 
         {/* Season Tier History */}
-        {seasonTiers.length > 0 && (
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-accent-primary" />
-                시즌 기록
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                {seasonTiers.map((st: any) => (
-                  <div key={st.season} className="bg-bg-tertiary rounded-lg p-3 text-center">
-                    <p className="text-xs text-text-tertiary mb-1">{st.season}</p>
-                    <div className="flex items-center justify-center gap-1.5">
-                      <TierBadge tier={st.tier} size="sm" />
-                      <span className="text-sm font-medium text-text-primary">{st.rank}</span>
-                    </div>
-                    <p className="text-xs text-text-tertiary mt-1">{st.lp} LP</p>
-                    <p className="text-xs mt-0.5">
-                      <span className="text-accent-success">{st.wins}W</span>
-                      <span className="text-text-tertiary mx-0.5">/</span>
-                      <span className="text-accent-danger">{st.losses}L</span>
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
         {/* Auction Stats */}
         {auctionStats && (auctionStats.captainCount > 0 || auctionStats.totalAuctions > 0) && (
           <Card className="mb-6">

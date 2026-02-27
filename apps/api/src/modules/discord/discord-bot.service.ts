@@ -39,6 +39,21 @@ const ROLE_EMOJI: Record<string, string> = {
   SUPPORT: "💚",
 };
 
+// 티어 순서 맵핑 (정렬용)
+const TIER_ORDER: Record<string, number> = {
+  CHALLENGER: 10,
+  GRANDMASTER: 9,
+  MASTER: 8,
+  DIAMOND: 7,
+  EMERALD: 6,
+  PLATINUM: 5,
+  GOLD: 4,
+  SILVER: 3,
+  BRONZE: 2,
+  IRON: 1,
+  UNRANKED: 0,
+};
+
 // 방 상태 한글 맵핑 (프로젝트 흐름: WAITING → TEAM_SELECTION → DRAFT → DRAFT_COMPLETED → ROLE_SELECTION → IN_PROGRESS → COMPLETED)
 const ROOM_STATUS_KR: Record<string, string> = {
   WAITING: "대기 중",
@@ -163,6 +178,14 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
         )
         .addSubcommand((sub) =>
           sub.setName("stats").setDescription("내 통계 정보 보기"),
+        )
+        .addSubcommand((sub) =>
+          sub
+            .setName("leaderboard")
+            .setDescription("티어+LP 기준 상위 10명 리더보드 보기"),
+        )
+        .addSubcommand((sub) =>
+          sub.setName("clan").setDescription("내가 속한 클랜 정보 보기"),
         ),
     ].map((cmd) => cmd.toJSON());
 
@@ -214,6 +237,12 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
           case "stats":
             await this.handleStatsCommand(interaction);
             break;
+          case "leaderboard":
+            await this.handleLeaderboardCommand(interaction);
+            break;
+          case "clan":
+            await this.handleClanCommand(interaction);
+            break;
         }
       } catch (error) {
         console.error(`Error handling command ${subcommand}:`, error);
@@ -244,6 +273,13 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
             "`/nexus link` - Discord 계정 연동",
             "`/nexus profile [@유저]` - 프로필 보기",
             "`/nexus stats` - 내 통계 보기",
+          ].join("\n"),
+        },
+        {
+          name: "🏅 랭킹 & 클랜",
+          value: [
+            "`/nexus leaderboard` - 티어+LP 상위 10명",
+            "`/nexus clan` - 내 클랜 정보",
           ].join("\n"),
         },
         {
@@ -982,6 +1018,143 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
     }
 
     embed.setFooter({ text: `총 ${ratingStats._count}개의 평가 받음` });
+
+    await interaction.reply({ embeds: [embed] });
+  }
+
+  private async handleLeaderboardCommand(
+    interaction: ChatInputCommandInteraction,
+  ) {
+    const accounts = await this.prisma.riotAccount.findMany({
+      where: { isPrimary: true },
+      select: {
+        gameName: true,
+        tagLine: true,
+        tier: true,
+        rank: true,
+        lp: true,
+        user: { select: { username: true } },
+      },
+    });
+
+    // 티어 + LP 기준 내림차순 정렬
+    const rankValue: Record<string, number> = { I: 4, II: 3, III: 2, IV: 1 };
+    accounts.sort((a, b) => {
+      const tierDiff = (TIER_ORDER[b.tier] ?? 0) - (TIER_ORDER[a.tier] ?? 0);
+      if (tierDiff !== 0) return tierDiff;
+      const rankDiff = (rankValue[b.rank ?? ""] ?? 0) - (rankValue[a.rank ?? ""] ?? 0);
+      if (rankDiff !== 0) return rankDiff;
+      return b.lp - a.lp;
+    });
+
+    const top10 = accounts.slice(0, 10);
+
+    if (top10.length === 0) {
+      await interaction.reply({
+        content: "❌ 등록된 Riot 계정이 없습니다.",
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const lines = top10.map((acc, i) => {
+      const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}.`;
+      const tierEmoji = TIER_EMOJI[acc.tier] || "❓";
+      const rankStr = acc.rank && acc.tier !== "UNRANKED" ? ` ${acc.rank}` : "";
+      return `${medal} ${tierEmoji} **${acc.user.username}** — ${acc.gameName}#${acc.tagLine} · ${acc.tier}${rankStr} ${acc.lp} LP`;
+    });
+
+    const embed = new EmbedBuilder()
+      .setColor(Colors.Gold)
+      .setTitle("🏆 리더보드 — 상위 10명")
+      .setDescription(lines.join("\n"))
+      .setTimestamp();
+
+    await interaction.reply({ embeds: [embed] });
+  }
+
+  private async handleClanCommand(interaction: ChatInputCommandInteraction) {
+    const user = await this.findUserByDiscordId(interaction.user.id);
+
+    if (!user) {
+      await interaction.reply({
+        content:
+          "❌ 계정이 연동되지 않았습니다. `/nexus link`로 연동하세요!",
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const clanMember = await this.prisma.clanMember.findFirst({
+      where: { userId: user.id },
+      include: {
+        clan: {
+          include: {
+            members: {
+              include: {
+                user: {
+                  include: {
+                    riotAccounts: { where: { isPrimary: true } },
+                  },
+                },
+              },
+              orderBy: { joinedAt: "asc" },
+            },
+          },
+        },
+      },
+    });
+
+    if (!clanMember) {
+      await interaction.reply({
+        content:
+          "❌ 가입된 클랜이 없습니다. 웹사이트에서 클랜을 검색하고 가입해보세요!",
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const clan = clanMember.clan;
+    const recruitEmoji = clan.isRecruiting ? "🟢 모집 중" : "🔴 모집 마감";
+    const tierReq = clan.minTier
+      ? `${TIER_EMOJI[clan.minTier] || ""} ${clan.minTier} 이상`
+      : "없음";
+
+    const embed = new EmbedBuilder()
+      .setColor(Colors.Green)
+      .setTitle(`🛡️ ${clan.name} [${clan.tag}]`)
+      .setDescription(clan.description || "클랜 소개가 없습니다.")
+      .addFields(
+        { name: "📋 모집 상태", value: recruitEmoji, inline: true },
+        {
+          name: "👥 멤버 수",
+          value: `${clan.members.length}/${clan.maxMembers}`,
+          inline: true,
+        },
+        { name: "🎯 최소 티어", value: tierReq, inline: true },
+      );
+
+    const memberLines = clan.members.map((m) => {
+      const roleEmoji =
+        m.role === "OWNER" ? "👑" : m.role === "OFFICER" ? "⚔️" : "👤";
+      const riot = m.user.riotAccounts[0];
+      const tierEmoji = riot ? TIER_EMOJI[riot.tier] || "" : "";
+      const tierStr = riot ? `${tierEmoji} ${riot.tier}` : "";
+      return `${roleEmoji} **${m.user.username}** ${tierStr}`;
+    });
+
+    // Embed field value는 1024자 제한
+    const memberText =
+      memberLines.length > 20
+        ? memberLines.slice(0, 20).join("\n") +
+          `\n... 외 ${memberLines.length - 20}명`
+        : memberLines.join("\n") || "멤버 없음";
+
+    embed.addFields({
+      name: "👥 멤버 목록",
+      value: memberText,
+      inline: false,
+    });
 
     await interaction.reply({ embeds: [embed] });
   }

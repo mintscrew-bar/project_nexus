@@ -47,7 +47,6 @@ export default function ProfilePage() {
   const [profileData, setProfileData] = useState<any>(null);
   const [profileLoading, setProfileLoading] = useState(true);
   const [positionStats, setPositionStats] = useState<any[]>([]);
-  const [seasonTiers, setSeasonTiers] = useState<any[]>([]);
   const [recentMatches, setRecentMatches] = useState<any[]>([]);
   const [matchesLoading, setMatchesLoading] = useState(false);
   const [championStats, setChampionStats] = useState<any[]>([]);
@@ -111,18 +110,6 @@ export default function ProfilePage() {
     }
   }, [profileData?.riotAccounts]);
 
-  const fetchSeasonTiers = useCallback(async () => {
-    if (!profileData?.riotAccounts) return;
-    const primary = profileData.riotAccounts.find((a: any) => a.isPrimary) || profileData.riotAccounts[0];
-    if (!primary?.gameName || !primary?.tagLine) return;
-    try {
-      const data = await statsApi.getSeasonTiers(primary.gameName, primary.tagLine);
-      setSeasonTiers(data || []);
-    } catch {
-      // Not critical
-    }
-  }, [profileData?.riotAccounts]);
-
   const fetchAuctionStats = useCallback(async () => {
     if (!user?.id) return;
     try {
@@ -154,9 +141,8 @@ export default function ProfilePage() {
   useEffect(() => {
     if (profileData?.riotAccounts?.length) {
       fetchRankedChampStats();
-      fetchSeasonTiers();
     }
-  }, [profileData?.riotAccounts, fetchRankedChampStats, fetchSeasonTiers]);
+  }, [profileData?.riotAccounts, fetchRankedChampStats]);
 
   const [syncingAccountId, setSyncingAccountId] = useState<string | null>(null);
 
@@ -235,19 +221,72 @@ export default function ProfilePage() {
       .map(role => ({ role, champions: grouped[role] }));
   };
 
-  if (authLoading || isLoading) {
+  if (authLoading || isLoading || !user) {
     return (
-      <div className="flex-grow flex items-center justify-center">
-        <div className="text-center">
-          <LoadingSpinner size="lg" />
-          <p className="text-text-secondary mt-4">로딩 중...</p>
+      <div className="flex-grow p-4 md:p-8 animate-fade-in">
+        <div className="container mx-auto max-w-6xl">
+          {/* 프로필 히어로 스켈레톤 */}
+          <Card className="mb-6">
+            <CardContent className="p-6 md:p-8">
+              <div className="flex flex-col md:flex-row items-start gap-6">
+                <Skeleton className="w-24 h-24 md:w-28 md:h-28 rounded-full flex-shrink-0" />
+                <div className="flex-1 space-y-3 w-full">
+                  <Skeleton className="h-8 w-48" />
+                  <Skeleton className="h-4 w-72" />
+                  <div className="flex gap-3">
+                    <Skeleton className="h-5 w-24" />
+                    <Skeleton className="h-5 w-20" />
+                    <Skeleton className="h-5 w-28" />
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* 내전 통계 + 계정 스켈레톤 */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2">
+              <Card>
+                <CardHeader>
+                  <Skeleton className="h-6 w-40" />
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-20 w-full rounded-lg" />
+                  ))}
+                </CardContent>
+              </Card>
+            </div>
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <Skeleton className="h-6 w-24" />
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {[1, 2, 3, 4].map((i) => (
+                    <Skeleton key={i} className="h-12 w-full rounded-lg" />
+                  ))}
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+
+          {/* 최근 활동 스켈레톤 */}
+          <div className="mt-6">
+            <Card>
+              <CardHeader>
+                <Skeleton className="h-6 w-28" />
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-16 w-full rounded-lg" />
+                ))}
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
     );
-  }
-
-  if (!user) {
-    return null;
   }
 
   const primary = profileData?.riotAccounts?.find((a: any) => a.isPrimary) || profileData?.riotAccounts?.[0];
@@ -500,37 +539,6 @@ export default function ProfilePage() {
                     </div>
                   );
                 })}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Season Tier History */}
-        {seasonTiers.length > 0 && (
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-accent-primary" />
-                시즌 기록
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                {seasonTiers.map((st: any) => (
-                  <div key={st.season} className="bg-bg-tertiary rounded-lg p-3 text-center">
-                    <p className="text-xs text-text-tertiary mb-1">{st.season}</p>
-                    <div className="flex items-center justify-center gap-1.5">
-                      <TierBadge tier={st.tier} size="sm" />
-                      <span className="text-sm font-medium text-text-primary">{st.rank}</span>
-                    </div>
-                    <p className="text-xs text-text-tertiary mt-1">{st.lp} LP</p>
-                    <p className="text-xs mt-0.5">
-                      <span className="text-accent-success">{st.wins}W</span>
-                      <span className="text-text-tertiary mx-0.5">/</span>
-                      <span className="text-accent-danger">{st.losses}L</span>
-                    </p>
-                  </div>
-                ))}
               </div>
             </CardContent>
           </Card>

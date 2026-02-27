@@ -622,28 +622,30 @@ export class RoomService {
     if (updates.bracketFormat !== undefined)
       data.bracketFormat = updates.bracketFormat;
 
-    const updatedRoom = await this.prisma.room.update({
+    await this.prisma.room.update({
       where: { id: roomId },
       data,
-      include: {
-        host: true,
-        participants: {
-          include: {
-            user: true,
-          },
-        },
-      },
     });
 
-    // If maxParticipants changed, sync Discord team channels
-    if (updates.maxParticipants && this.discordVoiceService) {
-      const newNumTeams = Math.floor(updates.maxParticipants / 5);
-      this.discordVoiceService.updateRoomChannels(roomId, newNumTeams).catch(
-        (err: Error) => this.logger.warn(`Discord channel update failed: ${err.message}`),
-      );
+    // Discord 봇 채널 동기화
+    if (this.discordVoiceService) {
+      // 인원 변경 → 팀 채널 수 조정
+      if (updates.maxParticipants) {
+        const newNumTeams = Math.floor(updates.maxParticipants / 5);
+        this.discordVoiceService.updateRoomChannels(roomId, newNumTeams).catch(
+          (err: Error) => this.logger.warn(`Discord channel update failed: ${err.message}`),
+        );
+      }
+      // 방 이름 변경 → 카테고리 이름 동기화
+      if (updates.name) {
+        this.discordVoiceService.updateCategoryName(roomId, updates.name).catch(
+          (err: Error) => this.logger.warn(`Discord category name update failed: ${err.message}`),
+        );
+      }
     }
 
-    return updatedRoom;
+    // getRoomById로 참가자 상세 정보(riotAccount, avatar 등) 포함된 전체 데이터 반환
+    return this.getRoomById(roomId);
   }
 
   async kickParticipant(hostId: string, roomId: string, participantId: string) {

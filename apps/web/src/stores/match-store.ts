@@ -1,6 +1,10 @@
 import { create } from 'zustand';
-import { matchApi, getAccessToken } from '@/lib/api-client';
-import { io, Socket } from 'socket.io-client';
+import { matchApi } from '@/lib/api-client';
+import {
+  connectMatchSocket,
+  disconnectMatchSocket,
+  matchSocketHelpers,
+} from '@/lib/socket-client';
 
 interface Team {
   id: string;
@@ -37,7 +41,6 @@ interface TeamStanding {
 
 interface MatchStoreState {
   // State
-  socket: Socket | null;
   isConnected: boolean;
   isLoading: boolean;
   error: string | null;
@@ -72,11 +75,8 @@ interface MatchStoreState {
   clearSessionAbort: () => void;
 }
 
-const SOCKET_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-
 export const useMatchStore = create<MatchStoreState>((set, get) => ({
   // Initial state
-  socket: null,
   isConnected: false,
   isLoading: false,
   error: null,
@@ -166,7 +166,7 @@ export const useMatchStore = create<MatchStoreState>((set, get) => ({
       set(state => ({
         roomMatches: state.roomMatches.map(m =>
           m.id === matchId
-            ? { ...m, status: 'COMPLETED', winnerId }
+            ? { ...m, status: 'COMPLETED' as const, winnerId }
             : m
         ),
       }));
@@ -177,11 +177,9 @@ export const useMatchStore = create<MatchStoreState>((set, get) => ({
   },
 
   generateTournamentCode: async (matchId: string) => {
-    // This action can be called from the modal, so we don't set global loading
     try {
       const result = await matchApi.generateTournamentCode?.(matchId);
       if (result) {
-        // Update the specific match in the roomMatches array
         set(state => ({
           roomMatches: state.roomMatches.map(m =>
             m.id === matchId ? { ...m, tournamentCode: result.tournamentCode } : m
@@ -189,7 +187,6 @@ export const useMatchStore = create<MatchStoreState>((set, get) => ({
         }));
       }
     } catch (error: any) {
-      // Errors can be handled locally in the component
       console.error('Failed to generate tournament code:', error);
       throw error;
     }
@@ -200,39 +197,23 @@ export const useMatchStore = create<MatchStoreState>((set, get) => ({
   // ========================================
 
   connectToBracket: (roomId: string) => {
-    const existingSocket = get().socket;
-    if (existingSocket?.connected || existingSocket?.active) {
-      if (existingSocket.connected) {
-        existingSocket.emit('leave-bracket', { roomId: get().roomId });
-      }
-      existingSocket.removeAllListeners();
-      existingSocket.disconnect();
-    }
+    // Clean up existing connection
+    get().disconnect();
 
-    const socket = io(`${SOCKET_URL}/match`, {
-      auth: (cb) => cb({ token: getAccessToken() }),
-      transports: ['websocket'],
-      reconnection: true,
-      reconnectionAttempts: Infinity,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 10000,
-      randomizationFactor: 0.5,
-    });
+    const socket = connectMatchSocket();
+    if (!socket) return;
+
+    // Clear existing listeners to prevent duplication
+    matchSocketHelpers.offAllListeners();
+    socket.off('connect');
+    socket.off('disconnect');
+    socket.off('connect_error');
 
     const joinBracket = () => {
-      // Join bracket room with timeout
-      const ackTimeout = setTimeout(() => {
-        console.warn('[Match] join-bracket ACK timeout');
-      }, 15000);
-
-      socket.emit('join-bracket', { roomId }, (response: any) => {
-        clearTimeout(ackTimeout);
+      matchSocketHelpers.joinBracket(roomId).then((response: any) => {
         if (response?.success && response?.matches) {
           const totalRounds = Math.max(...response.matches.map((m: Match) => m.round), 0);
-          set({
-            roomMatches: response.matches,
-            totalRounds
-          });
+          set({ roomMatches: response.matches, totalRounds });
         } else if (response && !response.success) {
           set({ error: response.error || '대진표 참가에 실패했습니다' });
         }
@@ -245,12 +226,9 @@ export const useMatchStore = create<MatchStoreState>((set, get) => ({
       joinBracket();
     });
 
-    socket.on('connect_error', (error) => {
+    socket.on('connect_error', (error: any) => {
       console.error('Match socket connection error:', error);
-      set({
-        isConnected: false,
-        error: '대진표 서버에 연결할 수 없습니다'
-      });
+      set({ isConnected: false, error: '대진표 서버에 연결할 수 없습니다' });
     });
 
     socket.on('disconnect', () => {
@@ -259,20 +237,16 @@ export const useMatchStore = create<MatchStoreState>((set, get) => ({
     });
 
     // Listen to bracket events
-    socket.on('bracket-generated', (data: { bracket: Match[] }) => {
+    matchSocketHelpers.onBracketGenerated((data: { bracket: Match[] }) => {
       const totalRounds = Math.max(...data.bracket.map(m => m.round), 0);
-      set({
-        roomMatches: data.bracket,
-        totalRounds
-      });
+      set({ roomMatches: data.bracket, totalRounds });
     });
 
-    socket.on('bracket-updated', (data: { matches: Match[] }) => {
+    matchSocketHelpers.onBracketUpdated((data: { matches: Match[] }) => {
       set({ roomMatches: data.matches });
     });
-    
-    // Listen for tournament code generated for a specific match in the bracket
-    socket.on('tournament-code-generated', (data: { matchId: string; code: string }) => {
+
+    matchSocketHelpers.onTournamentCodeGenerated((data: { matchId: string; code: string }) => {
       set(state => ({
         roomMatches: state.roomMatches.map(m =>
           m.id === data.matchId ? { ...m, tournamentCode: data.code } : m
@@ -280,57 +254,57 @@ export const useMatchStore = create<MatchStoreState>((set, get) => ({
       }));
     });
 
-    socket.on('match-result', (data: { matchId: string; winnerId: string }) => {
-        set(state => ({
-            roomMatches: state.roomMatches.map(m =>
-                m.id === data.matchId ? { ...m, status: 'COMPLETED', winnerId: data.winnerId } : m
-            ),
-        }));
+    matchSocketHelpers.onMatchResult((data: { matchId: string; winnerId: string }) => {
+      set(state => ({
+        roomMatches: state.roomMatches.map(m =>
+          m.id === data.matchId ? { ...m, status: 'COMPLETED' as const, winnerId: data.winnerId } : m
+        ),
+      }));
     });
 
-    socket.on('bracket-complete', () => {
+    matchSocketHelpers.onBracketComplete(() => {
       console.log('Tournament complete!');
     });
 
-    socket.on('tournament-completed', (data: { standings: TeamStanding[]; completedAt: string }) => {
+    matchSocketHelpers.onTournamentCompleted((data: { standings: TeamStanding[]; completedAt: string }) => {
       set({ tournamentCompleted: true, finalStandings: data.standings });
     });
 
-    socket.on('session-aborted', (data: { message?: string }) => {
+    matchSocketHelpers.onSessionAborted((data: { message?: string }) => {
       set({
         sessionAbortedAt: Date.now(),
         sessionAbortMessage: data?.message ?? 'Session aborted. Returning to lobby.',
       });
     });
 
-    set({ socket, sessionAbortedAt: null, sessionAbortMessage: null });
+    // If already connected, join immediately
+    if (socket.connected) {
+      set({ isConnected: true, roomId });
+      joinBracket();
+    }
+
+    set({ sessionAbortedAt: null, sessionAbortMessage: null });
   },
 
   connectToMatch: (matchId: string) => {
-    const existingSocket = get().socket;
-    if (existingSocket?.connected) {
-      existingSocket.emit('leave-match', { matchId: get().currentMatch?.id });
-      existingSocket.disconnect();
-    }
+    // Clean up existing connection
+    get().disconnect();
 
-    const socket = io(`${SOCKET_URL}/match`, {
-      auth: (cb) => cb({ token: getAccessToken() }),
-      transports: ['websocket'],
-      reconnection: true,
-      reconnectionAttempts: Infinity,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 10000,
-      randomizationFactor: 0.5,
-    });
+    const socket = connectMatchSocket();
+    if (!socket) return;
+
+    matchSocketHelpers.offAllListeners();
+    socket.off('connect');
+    socket.off('disconnect');
+    socket.off('connect_error');
 
     const joinMatch = () => {
-      // Join match room with timeout
-      const matchAckTimeout = setTimeout(() => {
+      const ackTimeout = setTimeout(() => {
         console.warn('[Match] join-match ACK timeout');
       }, 15000);
 
       socket.emit('join-match', { matchId }, (response: any) => {
-        clearTimeout(matchAckTimeout);
+        clearTimeout(ackTimeout);
         if (response?.success && response?.match) {
           set({ currentMatch: response.match });
         } else if (response && !response.success) {
@@ -345,12 +319,9 @@ export const useMatchStore = create<MatchStoreState>((set, get) => ({
       joinMatch();
     });
 
-    socket.on('connect_error', (error) => {
+    socket.on('connect_error', (error: any) => {
       console.error('Match socket connection error:', error);
-      set({
-        isConnected: false,
-        error: '매치 서버에 연결할 수 없습니다'
-      });
+      set({ isConnected: false, error: '매치 서버에 연결할 수 없습니다' });
     });
 
     socket.on('disconnect', () => {
@@ -358,76 +329,64 @@ export const useMatchStore = create<MatchStoreState>((set, get) => ({
       set({ isConnected: false });
     });
 
-    // Listen to match events
-    socket.on('match-started', (data: { tournamentCode?: string }) => {
+    matchSocketHelpers.onMatchStarted((data: { tournamentCode?: string }) => {
       const current = get().currentMatch;
       if (current) {
         set({
-          currentMatch: {
-            ...current,
-            status: 'IN_PROGRESS',
-            tournamentCode: data.tournamentCode
-          }
+          currentMatch: { ...current, status: 'IN_PROGRESS', tournamentCode: data.tournamentCode }
         });
       }
     });
 
-    socket.on('match-result', (data: { winnerId: string }) => {
+    matchSocketHelpers.onMatchResult((data: { winnerId: string }) => {
       const current = get().currentMatch;
       if (current) {
         set({
-          currentMatch: {
-            ...current,
-            status: 'COMPLETED',
-            winnerId: data.winnerId
-          }
+          currentMatch: { ...current, status: 'COMPLETED', winnerId: data.winnerId }
         });
       }
     });
 
-    socket.on('tournament-code-generated', (data: { code: string }) => {
+    matchSocketHelpers.onTournamentCodeGenerated((data: { code: string }) => {
       const current = get().currentMatch;
       if (current) {
         set({
-          currentMatch: {
-            ...current,
-            tournamentCode: data.code
-          }
+          currentMatch: { ...current, tournamentCode: data.code }
         });
       }
     });
 
-    socket.on('session-aborted', (data: { message?: string }) => {
+    matchSocketHelpers.onSessionAborted((data: { message?: string }) => {
       set({
         sessionAbortedAt: Date.now(),
         sessionAbortMessage: data?.message ?? 'Session aborted. Returning to lobby.',
       });
     });
 
-    set({ socket, sessionAbortedAt: null, sessionAbortMessage: null });
+    // If already connected, join immediately
+    if (socket.connected) {
+      set({ isConnected: true });
+      joinMatch();
+    }
+
+    set({ sessionAbortedAt: null, sessionAbortMessage: null });
   },
 
   disconnect: () => {
-    const socket = get().socket;
     const roomId = get().roomId;
     const matchId = get().currentMatch?.id;
 
-    if (socket) {
-      if (socket.connected) {
-        if (roomId) {
-          socket.emit('leave-bracket', { roomId });
-        }
-        if (matchId) {
-          socket.emit('leave-match', { matchId });
-        }
-      }
-      // Remove all listeners before disconnecting to prevent memory leaks
-      socket.removeAllListeners();
-      socket.disconnect();
+    if (roomId) {
+      matchSocketHelpers.leaveBracket(roomId);
+    }
+    if (matchId) {
+      matchSocketHelpers.leaveMatch(matchId);
     }
 
+    matchSocketHelpers.offAllListeners();
+    disconnectMatchSocket();
+
     set({
-      socket: null,
       isConnected: false,
       error: null,
     });
@@ -448,6 +407,8 @@ export const useMatchStore = create<MatchStoreState>((set, get) => ({
       isLoading: false,
       sessionAbortedAt: null,
       sessionAbortMessage: null,
+      tournamentCompleted: false,
+      finalStandings: [],
     });
   },
 

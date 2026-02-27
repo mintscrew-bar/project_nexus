@@ -2,15 +2,16 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import Image from "next/image";
-import { userApi, matchApi, statsApi } from "@/lib/api-client";
-import { LoadingSpinner, Button, Badge } from "@/components/ui";
+import { userApi, matchApi, statsApi, rankingApi } from "@/lib/api-client";
+import { LoadingSpinner, Button, Badge, Skeleton } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
 import { ArrowLeft, User, Trophy, Target, TrendingUp, Calendar, ExternalLink } from "lucide-react";
 import Link from "next/link";
 
 import { getChampionIcon } from "@/components/matches/match-utils";
-import type { RiotAccount, NexusMatchHistory, ChampionStats } from "@/components/matches/match-utils";
+import type { RiotAccount, NexusMatchHistory } from "@/components/matches/match-utils";
 import RecentStatsSummary from "@/components/matches/RecentStatsSummary";
 import RiotMatchList from "@/components/matches/RiotMatchList";
 
@@ -32,6 +33,8 @@ export default function UserStatsPage() {
   const [matchHistory, setMatchHistory] = useState<NexusMatchHistory[]>([]);
   const [riotAccounts, setRiotAccounts] = useState<RiotAccount[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const primaryAccount = riotAccounts.find(a => a.isPrimary) || riotAccounts[0];
@@ -47,6 +50,7 @@ export default function UserStatsPage() {
 
         const matches = await matchApi.getUserMatchHistory(userId, 20, 0);
         setMatchHistory(matches);
+        setHasMore(matches.length >= 20);
 
         try {
           const accounts = await statsApi.getUserRiotAccounts(userId);
@@ -69,6 +73,20 @@ export default function UserStatsPage() {
   const navigateToSummoner = (gameName: string, tagLine: string) => {
     if (gameName && tagLine) {
       router.push(`/matches/summoner/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}`);
+    }
+  };
+
+  const loadMoreMatches = async () => {
+    if (isLoadingMore || !hasMore) return;
+    setIsLoadingMore(true);
+    try {
+      const moreMatches = await matchApi.getUserMatchHistory(userId, 20, matchHistory.length);
+      setMatchHistory((prev) => [...prev, ...moreMatches]);
+      setHasMore(moreMatches.length >= 20);
+    } catch (err) {
+      console.error("Failed to load more matches:", err);
+    } finally {
+      setIsLoadingMore(false);
     }
   };
 
@@ -95,41 +113,73 @@ export default function UserStatsPage() {
     return { totalGames, wins, losses, winRate, avgKDA };
   };
 
-  const calculateChampionStats = (): ChampionStats[] => {
-    const statsMap = new Map<number, ChampionStats>();
 
-    matchHistory.forEach((match) => {
-      const existing = statsMap.get(match.participant.championId);
-      if (existing) {
-        existing.games++;
-        if (match.participant.win) existing.wins++;
-        else existing.losses++;
-        existing.kills += match.participant.kills;
-        existing.deaths += match.participant.deaths;
-        existing.assists += match.participant.assists;
-      } else {
-        statsMap.set(match.participant.championId, {
-          championId: match.participant.championId,
-          championName: match.participant.championName,
-          games: 1,
-          wins: match.participant.win ? 1 : 0,
-          losses: match.participant.win ? 0 : 1,
-          kills: match.participant.kills,
-          deaths: match.participant.deaths,
-          assists: match.participant.assists,
-        });
-      }
-    });
+  // 백엔드에서 챔피언 통계 조회 (전체 MatchParticipant 집계)
+  const { data: championStats = [] } = useQuery<any[]>({
+    queryKey: ["championStats", userId],
+    queryFn: () => statsApi.getUserChampionStats(userId),
+    staleTime: 5 * 60 * 1000,
+    enabled: !isLoading && !!user,
+  });
 
-    return Array.from(statsMap.values()).sort((a, b) => b.games - a.games);
-  };
+  // Nexus 랭킹 조회
+  const { data: nexusRanking } = useQuery({
+    queryKey: ["nexusRanking", userId],
+    queryFn: () => rankingApi.getUserRanking(userId),
+    staleTime: 5 * 60 * 1000,
+    enabled: !isLoading && !!user,
+  });
 
   if (isLoading) {
     return (
-      <div className="flex-grow flex items-center justify-center">
-        <div className="text-center">
-          <LoadingSpinner size="lg" />
-          <p className="text-text-secondary mt-4">유저 정보 불러오는 중...</p>
+      <div className="min-h-screen bg-bg-primary">
+        <div className="border-b border-bg-tertiary">
+          <div className="container mx-auto px-4 py-4">
+            <Skeleton className="h-5 w-36" />
+          </div>
+        </div>
+        <div className="container mx-auto px-4 py-8">
+          {/* 유저 헤더 스켈레톤 */}
+          <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-6 mb-6">
+            <div className="flex items-start gap-6">
+              <Skeleton className="w-24 h-24 rounded-xl flex-shrink-0" />
+              <div className="flex-grow space-y-3">
+                <Skeleton className="h-9 w-40" />
+                <Skeleton className="h-4 w-48" />
+                <div className="flex items-center gap-4 mt-4">
+                  <Skeleton className="h-20 w-28 rounded-lg" />
+                  <Skeleton className="h-20 w-28 rounded-lg" />
+                  <Skeleton className="h-20 w-28 rounded-lg" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 space-y-6">
+              {/* 전적 요약 스켈레톤 */}
+              <Skeleton className="h-48 w-full rounded-xl" />
+              {/* 매치 목록 스켈레톤 */}
+              <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-6">
+                <Skeleton className="h-7 w-40 mb-4" />
+                <div className="space-y-3">
+                  {[1, 2, 3, 4].map((i) => (
+                    <Skeleton key={i} className="h-20 w-full rounded-lg" />
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="space-y-6">
+              <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-6">
+                <Skeleton className="h-7 w-28 mb-4" />
+                <div className="space-y-3">
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-14 w-full rounded-lg" />
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -149,7 +199,6 @@ export default function UserStatsPage() {
   }
 
   const stats = calculateStats();
-  const championStats = calculateChampionStats();
 
   return (
     <div className="min-h-screen bg-bg-primary">
@@ -370,6 +419,20 @@ export default function UserStatsPage() {
                       </div>
                     </Link>
                   ))}
+
+                  {/* 더 보기 버튼 */}
+                  {hasMore && (
+                    <div className="text-center pt-2">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={loadMoreMatches}
+                        disabled={isLoadingMore}
+                      >
+                        {isLoadingMore ? "로딩 중..." : "더 보기"}
+                      </Button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

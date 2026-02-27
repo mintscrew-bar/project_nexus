@@ -36,7 +36,7 @@ interface UserSettings {
 
 export default function SettingsPage() {
   const router = useRouter();
-  const { user, isAuthenticated, isLoading, logout } = useAuthStore();
+  const { user, isAuthenticated, isLoading, logout, fetchUser } = useAuthStore();
   const { champions, championMap, fetchChampions } = useDdragonStore();
   const { myStatus, setStatus } = usePresence();
   const { addToast } = useToast();
@@ -148,6 +148,8 @@ export default function SettingsPage() {
     setSaveSuccess(false);
     try {
       await userApi.updateProfile({ username, bio });
+      // Auth Store 동기화 — 헤더 등에 즉시 반영
+      await fetchUser();
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2000);
       addToast("프로필이 저장되었습니다.", "success");
@@ -214,12 +216,12 @@ export default function SettingsPage() {
     try {
       const response = await userApi.uploadAvatar(file);
       addToast("프로필 사진이 변경되었습니다.", "success");
-      // Update the auth store with new avatar URL
       if (response.avatarUrl) {
-        // The avatar URL needs to be resolved to full URL for display
         const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
         setAvatarPreview(`${apiUrl}${response.avatarUrl}`);
       }
+      // Auth Store 동기화 — 헤더/네비게이션에 새 아바타 즉시 반영
+      await fetchUser();
     } catch (error) {
       console.error("Avatar upload error:", error);
       addToast("프로필 사진 업로드에 실패했습니다.", "error");
@@ -596,7 +598,7 @@ export default function SettingsPage() {
                     <Button
                       onClick={() => router.push("/profile")}
                       size="sm"
-                      variant={user?.riotAccounts && user.riotAccounts.length > 0 ? "outline" : "default"}
+                      variant={user?.riotAccounts && user.riotAccounts.length > 0 ? "outline" : "primary"}
                     >
                       {user?.riotAccounts && user.riotAccounts.length > 0 ? "관리" : "연동하기"}
                     </Button>

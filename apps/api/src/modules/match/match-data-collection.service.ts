@@ -109,10 +109,13 @@ export class MatchDataCollectionService {
         return;
       }
 
-      // Update match with Riot match ID
+      // Update match with Riot match ID and game duration
       await this.prisma.match.update({
         where: { id: matchId },
-        data: { riotMatchId },
+        data: {
+          riotMatchId,
+          gameDuration: matchData.info.gameDuration ?? null,
+        },
       });
 
       // Save match data
@@ -266,11 +269,23 @@ export class MatchDataCollectionService {
             dragonKills: team.objectives.dragon.kills,
             riftHeraldKills: team.objectives.riftHerald.kills,
 
+            // First objectives
+            firstBlood: team.objectives.champion?.first ?? false,
+            firstTower: team.objectives.tower?.first ?? false,
+            firstBaron: team.objectives.baron?.first ?? false,
+            firstDragon: team.objectives.dragon?.first ?? false,
+
             // Bans
             bans: team.bans,
           },
         });
       }
+
+      // Mark data as collected
+      await this.prisma.match.update({
+        where: { id: matchId },
+        data: { dataCollected: true },
+      });
 
       this.logger.log(`Saved match data for match ${matchId}`);
     } catch (error) {

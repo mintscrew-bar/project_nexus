@@ -212,7 +212,7 @@ function TimelineGraphs({
   match: any;
   participant: any;
 }) {
-  const [activeTab, setActiveTab] = useState<'gold' | 'cs' | 'xp'>('gold');
+  const [activeTab, setActiveTab] = useState<'gold' | 'cs' | 'xp' | 'damage'>('gold');
 
   if (!tl?.info?.frames) return null;
 
@@ -241,6 +241,7 @@ function TimelineGraphs({
     { key: 'gold' as const, label: '골드', series: buildSeries(f => f.totalGold), formatVal: (v: number) => `${(v / 1000).toFixed(1)}k` },
     { key: 'cs' as const, label: 'CS', series: buildSeries(f => f.minionsKilled + (f.jungleMinionsKilled || 0)), formatVal: (v: number) => String(Math.round(v)) },
     { key: 'xp' as const, label: '경험치', series: buildSeries(f => f.xp), formatVal: (v: number) => `${(v / 1000).toFixed(1)}k` },
+    { key: 'damage' as const, label: '피해량', series: buildSeries(f => f.damageStats?.totalDamageDoneToChampions ?? 0), formatVal: (v: number) => `${(v / 1000).toFixed(1)}k` },
   ];
 
   const active = tabs.find(t => t.key === activeTab)!;
@@ -273,6 +274,269 @@ function TimelineGraphs({
           label={active.label}
           formatVal={active.formatVal}
         />
+      </div>
+    </div>
+  );
+}
+
+function GoldDiffChart({ tl, participant, match }: { tl: any; participant: any; match: any }) {
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null);
+
+  if (!tl?.info?.frames) return null;
+
+  const myTeamId = participant.teamId;
+  const frames = tl.info.frames;
+
+  // Build participantId → teamId lookup from match data
+  const pidTeamMap = new Map<number, number>();
+  for (const p of (match?.info?.participants || [])) {
+    pidTeamMap.set(p.participantId, p.teamId);
+  }
+
+  const diffs: { min: number; diff: number }[] = [];
+  for (const frame of frames) {
+    const min = Math.round(frame.timestamp / 60000);
+    let allyGold = 0, enemyGold = 0;
+    for (const [pid, pf] of Object.entries(frame.participantFrames || {})) {
+      const p = pf as any;
+      const pTeamId = pidTeamMap.get(Number(pid)) ?? (Number(pid) <= 5 ? 100 : 200);
+      if (pTeamId === myTeamId) allyGold += p.totalGold || 0;
+      else enemyGold += p.totalGold || 0;
+    }
+    diffs.push({ min, diff: allyGold - enemyGold });
+  }
+
+  if (diffs.length < 2) return null;
+
+  const maxMin = diffs[diffs.length - 1].min || 1;
+  const maxAbsDiff = Math.max(...diffs.map(d => Math.abs(d.diff)), 500);
+  const W = 500, H = 120;
+  const padL = 44, padR = 8, padT = 8, padB = 20;
+  const cW = W - padL - padR, cH = H - padT - padB;
+  const midY = padT + cH / 2;
+  const toX = (m: number) => padL + (m / maxMin) * cW;
+  const toY = (d: number) => midY - (d / maxAbsDiff) * (cH / 2);
+
+  // Build area paths split by positive/negative
+  const points = diffs.map(d => ({ x: toX(d.min), y: toY(d.diff) }));
+
+  // Full line path
+  const lineD = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+
+  // Positive area (above midY = gold advantage)
+  const posAreaD = points.map((p, i) => {
+    const clampY = Math.min(p.y, midY);
+    return `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${clampY.toFixed(1)}`;
+  }).join(' ') + ` L${points[points.length - 1].x.toFixed(1)},${midY.toFixed(1)} L${points[0].x.toFixed(1)},${midY.toFixed(1)} Z`;
+
+  // Negative area (below midY = gold disadvantage)
+  const negAreaD = points.map((p, i) => {
+    const clampY = Math.max(p.y, midY);
+    return `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${clampY.toFixed(1)}`;
+  }).join(' ') + ` L${points[points.length - 1].x.toFixed(1)},${midY.toFixed(1)} L${points[0].x.toFixed(1)},${midY.toFixed(1)} Z`;
+
+  const xTicks: number[] = [];
+  for (let m = 0; m <= maxMin; m += 5) xTicks.push(m);
+
+  const hoverDiff = hoverIdx !== null ? diffs[hoverIdx] : null;
+
+  return (
+    <div className="mt-4">
+      <div className="flex items-center gap-2 mb-1.5">
+        <span className="text-xs font-medium text-text-secondary">팀 골드 차이</span>
+        <span className="text-[10px] text-text-tertiary ml-auto">
+          <span className="text-accent-success">위</span>=우세 / <span className="text-accent-danger">아래</span>=열세
+        </span>
+      </div>
+      <div className="relative bg-bg-tertiary/30 rounded-lg p-3 select-none">
+        <svg width="100%" viewBox={`0 0 ${W} ${H}`} className="overflow-visible cursor-crosshair"
+          onMouseMove={(e) => {
+            const rect = e.currentTarget.getBoundingClientRect();
+            const svgX = ((e.clientX - rect.left) / rect.width) * W;
+            const dataMin = ((svgX - padL) / cW) * maxMin;
+            let closest = 0;
+            let minDist = Infinity;
+            diffs.forEach((d, i) => {
+              const dist = Math.abs(d.min - dataMin);
+              if (dist < minDist) { minDist = dist; closest = i; }
+            });
+            setHoverIdx(closest);
+          }}
+          onMouseLeave={() => setHoverIdx(null)}
+        >
+          {/* Zero line */}
+          <line x1={padL} x2={padL + cW} y1={midY} y2={midY} stroke="currentColor" strokeOpacity="0.15" strokeWidth="1" />
+          {/* Y labels */}
+          <text x={padL - 4} y={padT + 4} textAnchor="end" fontSize="7" fill="#22c55e" fillOpacity="0.6">+{(maxAbsDiff / 1000).toFixed(1)}k</text>
+          <text x={padL - 4} y={midY + 3} textAnchor="end" fontSize="7" fill="currentColor" fillOpacity="0.4">0</text>
+          <text x={padL - 4} y={padT + cH + 4} textAnchor="end" fontSize="7" fill="#ef4444" fillOpacity="0.6">-{(maxAbsDiff / 1000).toFixed(1)}k</text>
+          {/* X labels */}
+          {xTicks.map(m => (
+            <text key={m} x={toX(m)} y={H - 2} textAnchor="middle" fontSize="7" fill="currentColor" fillOpacity="0.4">{m}m</text>
+          ))}
+          {/* Areas */}
+          <path d={posAreaD} fill="#22c55e" fillOpacity="0.12" />
+          <path d={negAreaD} fill="#ef4444" fillOpacity="0.12" />
+          {/* Line */}
+          <path d={lineD} fill="none" stroke="#6366f1" strokeWidth="1.5" strokeLinejoin="round" />
+          {/* Hover */}
+          {hoverIdx !== null && hoverDiff && (
+            <>
+              <line x1={toX(hoverDiff.min)} x2={toX(hoverDiff.min)} y1={padT} y2={padT + cH}
+                stroke="currentColor" strokeOpacity="0.25" strokeWidth="1" strokeDasharray="3,2" />
+              <circle cx={toX(hoverDiff.min)} cy={toY(hoverDiff.diff)} r={4}
+                fill={hoverDiff.diff >= 0 ? '#22c55e' : '#ef4444'} stroke="white" strokeWidth="1.5" strokeOpacity="0.5" />
+            </>
+          )}
+        </svg>
+        {hoverIdx !== null && hoverDiff && (
+          <div className="absolute top-1 z-20 pointer-events-none"
+            style={{ left: `${Math.max(10, Math.min(85, (toX(hoverDiff.min) / W) * 100))}%`, transform: 'translateX(-50%)' }}
+          >
+            <div className="bg-bg-secondary/95 backdrop-blur-sm border border-bg-elevated rounded-lg shadow-xl px-2.5 py-1.5 text-[10px]">
+              <div className="text-text-tertiary">{hoverDiff.min}분</div>
+              <div className={`font-bold ${hoverDiff.diff >= 0 ? 'text-accent-success' : 'text-accent-danger'}`}>
+                {hoverDiff.diff >= 0 ? '+' : ''}{(hoverDiff.diff / 1000).toFixed(1)}k 골드
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ObjectEventTimeline({ tl, participant, match }: { tl: any; participant: any; match: any }) {
+  const [hoverEvent, setHoverEvent] = useState<number | null>(null);
+
+  if (!tl?.info?.frames) return null;
+
+  const myTeamId = participant.teamId;
+  const frames = tl.info.frames;
+  const lastFrame = frames[frames.length - 1];
+  const maxMs = lastFrame?.timestamp || 1;
+  const maxMin = Math.round(maxMs / 60000);
+
+  interface ObjectEvent {
+    min: number;
+    timestamp: number;
+    type: 'dragon' | 'baron' | 'herald' | 'tower';
+    isAlly: boolean;
+    detail: string;
+  }
+
+  const events: ObjectEvent[] = [];
+
+  for (const frame of frames) {
+    for (const ev of (frame.events || [])) {
+      if (ev.type === 'ELITE_MONSTER_KILL') {
+        const killerTeamId = ev.killerTeamId;
+        const isAlly = killerTeamId === myTeamId;
+        let etype: ObjectEvent['type'] = 'dragon';
+        let detail = '';
+        if (ev.monsterType === 'BARON_NASHOR') {
+          etype = 'baron';
+          detail = '바론';
+        } else if (ev.monsterType === 'RIFTHERALD') {
+          etype = 'herald';
+          detail = '전령';
+        } else {
+          etype = 'dragon';
+          if (ev.monsterSubType) {
+            const dragonMap: Record<string, string> = {
+              FIRE: '불', INFERNAL: '불',
+              WATER: '바다', OCEAN: '바다',
+              EARTH: '산', MOUNTAIN: '산',
+              AIR: '바람', CLOUD: '바람',
+              CHEMTECH: '화학', HEXTECH: '헥스텍', ELDER: '장로',
+            };
+            const key = ev.monsterSubType.replace('_DRAGON', '');
+            detail = dragonMap[key] || key;
+          } else {
+            detail = '드래곤';
+          }
+        }
+        events.push({
+          min: Math.round(ev.timestamp / 60000),
+          timestamp: ev.timestamp,
+          type: etype,
+          isAlly,
+          detail,
+        });
+      } else if (ev.type === 'BUILDING_KILL' && ev.buildingType === 'TOWER_BUILDING') {
+        const isAlly = ev.teamId !== myTeamId; // teamId = team that lost the tower
+        events.push({
+          min: Math.round(ev.timestamp / 60000),
+          timestamp: ev.timestamp,
+          type: 'tower',
+          isAlly,
+          detail: ev.laneType === 'MID_LANE' ? '미드 타워' : ev.laneType === 'TOP_LANE' ? '탑 타워' : ev.laneType === 'BOT_LANE' ? '봇 타워' : '타워',
+        });
+      }
+    }
+  }
+
+  if (events.length === 0) return null;
+
+  const W = 500, H = 60;
+  const padL = 44, padR = 8;
+  const midY = H / 2;
+  const toX = (min: number) => padL + (min / maxMin) * (W - padL - padR);
+
+  const colorMap = { dragon: '#a78bfa', baron: '#c084fc', herald: '#f59e0b', tower: '#9ca3af' };
+
+  return (
+    <div className="mt-4">
+      <div className="flex items-center gap-2 mb-1.5">
+        <span className="text-xs font-medium text-text-secondary">오브젝트 타임라인</span>
+        <div className="flex items-center gap-3 ml-auto text-[9px] text-text-tertiary">
+          {([['dragon', '드래곤', '#a78bfa'], ['baron', '바론', '#c084fc'], ['herald', '전령', '#f59e0b'], ['tower', '타워', '#9ca3af']] as const).map(([key, label, clr]) => (
+            <span key={key} className="flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full inline-block" style={{ background: clr }} />{label}
+            </span>
+          ))}
+        </div>
+      </div>
+      <div className="relative bg-bg-tertiary/30 rounded-lg p-2 select-none">
+        <svg width="100%" viewBox={`0 0 ${W} ${H}`} className="overflow-visible">
+          {/* Center line */}
+          <line x1={padL} x2={W - padR} y1={midY} y2={midY} stroke="currentColor" strokeOpacity="0.1" strokeWidth="1" />
+          {/* Ally / Enemy labels */}
+          <text x={padL - 4} y={midY - 8} textAnchor="end" fontSize="7" fill="#22c55e" fillOpacity="0.5">아군</text>
+          <text x={padL - 4} y={midY + 13} textAnchor="end" fontSize="7" fill="#ef4444" fillOpacity="0.5">적군</text>
+          {/* Events */}
+          {events.map((ev, i) => {
+            const x = toX(ev.min);
+            const y = ev.isAlly ? midY - 12 : midY + 12;
+            const clr = colorMap[ev.type];
+            return (
+              <g key={i}
+                onMouseEnter={() => setHoverEvent(i)}
+                onMouseLeave={() => setHoverEvent(null)}
+                className="cursor-pointer"
+              >
+                <circle cx={x} cy={y} r={hoverEvent === i ? 6 : 4.5} fill={clr} fillOpacity={hoverEvent === i ? 1 : 0.7}
+                  stroke={ev.isAlly ? '#22c55e' : '#ef4444'} strokeWidth="1" strokeOpacity="0.4" />
+                <text x={x} y={y + 1} textAnchor="middle" fontSize="5" fill="white" fontWeight="bold" className="pointer-events-none">
+                  {ev.type === 'dragon' ? 'D' : ev.type === 'baron' ? 'B' : ev.type === 'herald' ? 'H' : 'T'}
+                </text>
+              </g>
+            );
+          })}
+        </svg>
+        {hoverEvent !== null && events[hoverEvent] && (
+          <div className="absolute top-0 z-20 pointer-events-none"
+            style={{ left: `${Math.max(10, Math.min(85, (toX(events[hoverEvent].min) / W) * 100))}%`, transform: 'translateX(-50%)' }}
+          >
+            <div className="bg-bg-secondary/95 backdrop-blur-sm border border-bg-elevated rounded-lg shadow-xl px-2.5 py-1.5 text-[10px]">
+              <div className="text-text-tertiary">{events[hoverEvent].min}분</div>
+              <div className="font-medium text-text-primary">{events[hoverEvent].detail}</div>
+              <div className={events[hoverEvent].isAlly ? 'text-accent-success' : 'text-accent-danger'}>
+                {events[hoverEvent].isAlly ? '아군 처치' : '적군 처치'}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -858,54 +1122,75 @@ export default function RiotMatchList({
                     })()}
 
                     {/* Stats Tab */}
-                    {matchDetailTabs.get(matchId) === 'stats' && (
-                      <div className="p-4">
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <h3 className="text-sm font-bold text-text-primary mb-3">전투 통계</h3>
-                            <div className="space-y-2 text-xs">
-                              <div className="flex justify-between p-2 bg-bg-tertiary rounded">
-                                <span className="text-text-secondary">총 피해량</span>
-                                <span className="font-semibold text-text-primary">{(participant.totalDamageDealtToChampions).toLocaleString()}</span>
-                              </div>
-                              <div className="flex justify-between p-2 bg-bg-tertiary rounded">
-                                <span className="text-text-secondary">받은 피해량</span>
-                                <span className="font-semibold text-text-primary">{(participant.totalDamageTaken || 0).toLocaleString()}</span>
-                              </div>
-                              <div className="flex justify-between p-2 bg-bg-tertiary rounded">
-                                <span className="text-text-secondary">치유량</span>
-                                <span className="font-semibold text-text-primary">{(participant.totalHeal || 0).toLocaleString()}</span>
-                              </div>
-                              <div className="flex justify-between p-2 bg-bg-tertiary rounded">
-                                <span className="text-text-secondary">CC 시간</span>
-                                <span className="font-semibold text-text-primary">{(participant.timeCCingOthers || 0).toFixed(0)}초</span>
-                              </div>
-                            </div>
-                          </div>
-                          <div>
-                            <h3 className="text-sm font-bold text-text-primary mb-3">경제 통계</h3>
-                            <div className="space-y-2 text-xs">
-                              <div className="flex justify-between p-2 bg-bg-tertiary rounded">
-                                <span className="text-text-secondary">획득 골드</span>
-                                <span className="font-semibold text-accent-gold">{(participant.goldEarned).toLocaleString()}</span>
-                              </div>
-                              <div className="flex justify-between p-2 bg-bg-tertiary rounded">
-                                <span className="text-text-secondary">분당 골드</span>
-                                <span className="font-semibold text-accent-gold">{(participant.goldEarned / (duration / 60)).toFixed(0)}</span>
-                              </div>
-                              <div className="flex justify-between p-2 bg-bg-tertiary rounded">
-                                <span className="text-text-secondary">CS</span>
-                                <span className="font-semibold text-text-primary">{participant.totalMinionsKilled + participant.neutralMinionsKilled}</span>
-                              </div>
-                              <div className="flex justify-between p-2 bg-bg-tertiary rounded">
-                                <span className="text-text-secondary">분당 CS</span>
-                                <span className="font-semibold text-text-primary">{csPerMin}</span>
-                              </div>
-                            </div>
+                    {matchDetailTabs.get(matchId) === 'stats' && (() => {
+                      const allP = match.info.participants;
+
+                      const statDefs = [
+                        { label: '총 피해량', getValue: (p: any) => p.totalDamageDealtToChampions || 0, format: (v: number) => v.toLocaleString(), color: 'from-red-600 to-orange-500' },
+                        { label: '받은 피해량', getValue: (p: any) => p.totalDamageTaken || 0, format: (v: number) => v.toLocaleString(), color: 'from-blue-600 to-cyan-500' },
+                        { label: '치유량', getValue: (p: any) => p.totalHeal || 0, format: (v: number) => v.toLocaleString(), color: 'from-green-600 to-emerald-500' },
+                        { label: 'CC 시간', getValue: (p: any) => p.timeCCingOthers || 0, format: (v: number) => `${v.toFixed(0)}초`, color: 'from-purple-600 to-violet-500' },
+                        { label: '획득 골드', getValue: (p: any) => p.goldEarned || 0, format: (v: number) => v.toLocaleString(), color: 'from-yellow-600 to-amber-500' },
+                        { label: '분당 골드', getValue: (p: any) => (p.goldEarned || 0) / Math.max(duration / 60, 1), format: (v: number) => v.toFixed(0), color: 'from-yellow-600 to-amber-500' },
+                        { label: 'CS', getValue: (p: any) => (p.totalMinionsKilled || 0) + (p.neutralMinionsKilled || 0), format: (v: number) => String(Math.round(v)), color: 'from-teal-600 to-cyan-500' },
+                        { label: '분당 CS', getValue: (p: any) => ((p.totalMinionsKilled || 0) + (p.neutralMinionsKilled || 0)) / Math.max(duration / 60, 1), format: (v: number) => v.toFixed(1), color: 'from-teal-600 to-cyan-500' },
+                      ];
+
+                      return (
+                        <div className="p-4">
+                          <h3 className="text-sm font-bold text-text-primary mb-3">10인 비교 통계</h3>
+                          <div className="grid grid-cols-2 gap-3">
+                            {statDefs.map((stat) => {
+                              const values = allP.map((p: any) => ({ puuid: p.puuid, name: p.riotIdGameName || p.championName, val: stat.getValue(p) }));
+                              const sorted = [...values].sort((a, b) => b.val - a.val);
+                              const maxVal = sorted[0]?.val || 1;
+                              const myVal = stat.getValue(participant);
+                              const myRank = sorted.findIndex(v => v.puuid === participant.puuid) + 1;
+
+                              return (
+                                <div key={stat.label} className="bg-bg-tertiary/50 rounded-lg p-2.5">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <span className="text-xs text-text-secondary font-medium">{stat.label}</span>
+                                    <div className="flex items-center gap-1.5">
+                                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                                        myRank === 1 ? 'bg-amber-500/20 text-amber-300 border border-amber-400/30' :
+                                        myRank <= 3 ? 'bg-accent-primary/15 text-accent-primary border border-accent-primary/30' :
+                                        'bg-bg-elevated text-text-tertiary'
+                                      }`}>
+                                        #{myRank}
+                                      </span>
+                                      <span className="text-xs font-bold text-text-primary">{stat.format(myVal)}</span>
+                                    </div>
+                                  </div>
+                                  <div className="space-y-0.5">
+                                    {sorted.map((v, i) => {
+                                      const isMe = v.puuid === participant.puuid;
+                                      const pct = maxVal > 0 ? (v.val / maxVal) * 100 : 0;
+                                      return (
+                                        <div key={v.puuid} className="flex items-center gap-1.5 group">
+                                          <span className={`text-[9px] w-[52px] truncate ${isMe ? 'text-accent-primary font-bold' : 'text-text-tertiary'}`}>
+                                            {v.name}
+                                          </span>
+                                          <div className="flex-1 h-[6px] bg-bg-elevated rounded-full overflow-hidden">
+                                            <div
+                                              className={`h-full rounded-full transition-all ${isMe ? `bg-gradient-to-r ${stat.color}` : 'bg-text-tertiary/20'}`}
+                                              style={{ width: `${pct}%` }}
+                                            />
+                                          </div>
+                                          <span className={`text-[9px] w-10 text-right ${isMe ? 'text-text-primary font-medium' : 'text-text-tertiary opacity-0 group-hover:opacity-100 transition-opacity'}`}>
+                                            {stat.format(v.val)}
+                                          </span>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
-                      </div>
-                    )}
+                      );
+                    })()}
 
                     {/* Timeline Tab */}
                     {matchDetailTabs.get(matchId) === 'timeline' && (() => {
@@ -923,7 +1208,11 @@ export default function RiotMatchList({
                               타임라인 데이터를 불러올 수 없습니다.
                             </div>
                           ) : (
-                            <TimelineGraphs tl={tl} match={match} participant={participant} />
+                            <>
+                              <TimelineGraphs tl={tl} match={match} participant={participant} />
+                              <GoldDiffChart tl={tl} participant={participant} match={match} />
+                              <ObjectEventTimeline tl={tl} participant={participant} match={match} />
+                            </>
                           )}
                         </div>
                       );

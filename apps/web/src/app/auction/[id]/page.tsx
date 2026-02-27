@@ -9,6 +9,7 @@ import { AuctionBoard } from "@/components/domain";
 import { TierBadge } from "@/components/domain";
 import { LoadingSpinner, Badge, Button, Card, CardContent } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
+import { GameChatPanel } from "@/components/domain/GameChatPanel";
 import { Users, Hand, Check, Coins, ScrollText } from "lucide-react";
 
 export default function AuctionRoomPage() {
@@ -365,6 +366,9 @@ export default function AuctionRoomPage() {
           </div>
         </div>
       </div>
+
+      {/* 채팅 패널 (플로팅) */}
+      <GameChatPanel roomId={auctionId} />
     </div>
   );
 }

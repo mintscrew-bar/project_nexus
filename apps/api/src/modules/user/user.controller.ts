@@ -35,12 +35,12 @@ export class UserController {
 
   @Get("me")
   async getMyProfile(@CurrentUser("sub") userId: string) {
-    return this.userService.getProfile(userId);
+    return this.userService.getProfile(userId, userId);
   }
 
   @Get("stats")
   async getMyStats(@CurrentUser("sub") userId: string) {
-    return this.userService.getUserStats(userId);
+    return this.userService.getUserStats(userId, userId);
   }
 
   @Get("settings")
@@ -91,12 +91,18 @@ export class UserController {
   // ========================================
 
   @Get(":id")
-  async getProfile(@Param("id") id: string) {
-    return this.userService.getProfile(id);
+  async getProfile(
+    @CurrentUser("sub") requesterId: string,
+    @Param("id") id: string,
+  ) {
+    return this.userService.getProfile(id, requesterId);
   }
 
   @Get(":id/stats")
-  async getUserStats(@Param("id") id: string) {
-    return this.userService.getUserStats(id);
+  async getUserStats(
+    @CurrentUser("sub") requesterId: string,
+    @Param("id") id: string,
+  ) {
+    return this.userService.getUserStats(id, requesterId);
   }
 }

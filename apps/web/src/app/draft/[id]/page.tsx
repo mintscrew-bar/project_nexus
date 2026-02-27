@@ -6,6 +6,7 @@ import { useSnakeDraftStore } from "@/stores/snake-draft-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { roomApi } from "@/lib/api-client";
 import { DraftBoard } from "@/components/domain/DraftBoard";
+import { GameChatPanel } from "@/components/domain/GameChatPanel";
 import { LoadingSpinner, Badge, Button } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
 
@@ -152,6 +153,9 @@ export default function SnakeDraftPage() {
           disabled={!isConnected}
         />
       </div>
+
+      {/* 채팅 패널 (플로팅) */}
+      <GameChatPanel roomId={draftId} />
     </div>
   );
 }

@@ -14,6 +14,9 @@ let roleSelectionSocket: Socket | null = null;
 
 const SOCKET_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
+// Room Socket 참조 (connect 없이 기존 인스턴스 조회)
+export const getRoomSocket = () => roomSocket;
+
 // Room Socket 연결
 export const connectRoomSocket = () => {
   // Reuse existing instance if still connected, connecting, or reconnecting.
@@ -200,7 +203,7 @@ export const roomSocketHelpers = {
   },
 
   sendMessage: (roomId: string, message: string) => {
-    roomSocket?.emit("send-message", { roomId, message });
+    roomSocket?.emit("send-message", { roomId, content: message });
   },
 
   sendIsTyping: (roomId: string, isTyping: boolean) => {
@@ -570,8 +573,60 @@ export const snakeDraftSocketHelpers = {
 
 // Match Socket 헬퍼 함수
 export const matchSocketHelpers = {
-  joinMatch: (roomId: string) => {
-    matchSocket?.emit("join-match-room", { roomId });
+  joinMatch: (matchId: string) => {
+    matchSocket?.emit("join-match", { matchId });
+  },
+
+  joinBracket: (roomId: string): Promise<any> => {
+    return new Promise((resolve) => {
+      if (!matchSocket) {
+        resolve({ success: false, error: "socket_not_initialized" });
+        return;
+      }
+
+      let settled = false;
+      const done = (value: any) => {
+        if (settled) return;
+        settled = true;
+        resolve(value);
+      };
+
+      const emitJoin = () => {
+        const ackTimeout = setTimeout(() => {
+          done({ success: false, error: "join_timeout" });
+        }, 15000);
+
+        matchSocket?.emit("join-bracket", { roomId }, (response: any) => {
+          clearTimeout(ackTimeout);
+          done(response ?? {});
+        });
+      };
+
+      if (matchSocket.connected) {
+        emitJoin();
+        return;
+      }
+
+      const connectTimeout = setTimeout(() => {
+        matchSocket?.off("connect", onConnect);
+        done({ success: false, error: "connect_timeout" });
+      }, 15000);
+
+      const onConnect = () => {
+        clearTimeout(connectTimeout);
+        emitJoin();
+      };
+
+      matchSocket.once("connect", onConnect);
+    });
+  },
+
+  leaveMatch: (matchId: string) => {
+    matchSocket?.emit("leave-match", { matchId });
+  },
+
+  leaveBracket: (roomId: string) => {
+    matchSocket?.emit("leave-bracket", { roomId });
   },
 
   onBracketGenerated: (callback: (data: any) => void) => {
@@ -590,11 +645,31 @@ export const matchSocketHelpers = {
     matchSocket?.on("bracket-updated", callback);
   },
 
+  onBracketComplete: (callback: () => void) => {
+    matchSocket?.on("bracket-complete", callback);
+  },
+
+  onTournamentCompleted: (callback: (data: any) => void) => {
+    matchSocket?.on("tournament-completed", callback);
+  },
+
+  onTournamentCodeGenerated: (callback: (data: any) => void) => {
+    matchSocket?.on("tournament-code-generated", callback);
+  },
+
+  onSessionAborted: (callback: (data: any) => void) => {
+    matchSocket?.on("session-aborted", callback);
+  },
+
   offAllListeners: () => {
     matchSocket?.off("bracket-generated");
     matchSocket?.off("match-started");
     matchSocket?.off("match-result");
     matchSocket?.off("bracket-updated");
+    matchSocket?.off("bracket-complete");
+    matchSocket?.off("tournament-completed");
+    matchSocket?.off("tournament-code-generated");
+    matchSocket?.off("session-aborted");
   },
 };
 

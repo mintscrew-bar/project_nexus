@@ -102,6 +102,9 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
   const currentTeam = sortedTeams.find((t) => t.captainId === currentUserId);
   const isCurrentUserTurn =
     Boolean(currentTeam) && auctionState.status === "IN_PROGRESS";
+  const isAlreadyHighestBidder =
+    !!auctionState.currentHighestBidder &&
+    auctionState.currentHighestBidder === currentUserId;
   const myBudget = getTeamBudget(currentTeam);
   // 서버와 동일한 예비금 계산: 남은 슬롯 × 100G를 예비금으로 확보
   const memberCount = currentTeam?.members?.length ?? 0;
@@ -314,6 +317,12 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
               )}
             </div>
 
+            {isAlreadyHighestBidder && (
+              <div className="mb-3 py-2 px-3 rounded-lg bg-accent-primary/10 border border-accent-primary/30 text-sm text-accent-primary text-center font-medium">
+                현재 최고 입찰자입니다
+              </div>
+            )}
+
             <div className="grid grid-cols-3 gap-2 mb-4">
               {[50, 100, 500].map((inc) => (
                 <Button
@@ -324,6 +333,7 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
                   disabled={
                     disabled ||
                     isBidding ||
+                    isAlreadyHighestBidder ||
                     auctionState.currentHighestBid + accumulatedBid + inc > availableBudget
                   }
                 >
@@ -344,11 +354,11 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
               <Button
                 variant="primary"
                 onClick={handleBid}
-                disabled={disabled || !canPlaceBid}
+                disabled={disabled || !canPlaceBid || isAlreadyHighestBidder}
                 isLoading={isBidding}
                 className="flex-1"
               >
-                {isBidding ? "입찰 중..." : canPlaceBid ? `${totalBid.toLocaleString()}G 입찰` : "금액을 먼저 추가하세요"}
+                {isBidding ? "입찰 중..." : isAlreadyHighestBidder ? "최고 입찰 중" : canPlaceBid ? `${totalBid.toLocaleString()}G 입찰` : "금액을 먼저 추가하세요"}
               </Button>
             </div>
           </CardContent>

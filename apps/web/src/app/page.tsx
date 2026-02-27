@@ -18,9 +18,18 @@ export default function Home() {
     }
   }, [isAuthenticated, isLoading, router]);
 
-  // Show loading or nothing while checking auth
+  // 로딩 중 → 풀스크린 로딩 스피너 (AppShell이 셸 없이 렌더)
   if (isLoading || isAuthenticated) {
-    return null;
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-bg-primary">
+        <div className="flex flex-col items-center gap-4 animate-fade-in">
+          <Logo size="xl" />
+          <div className="h-1 w-32 rounded-full bg-bg-tertiary overflow-hidden">
+            <div className="h-full w-1/2 bg-accent-primary rounded-full animate-pulse" />
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (

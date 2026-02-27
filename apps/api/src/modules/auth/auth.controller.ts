@@ -83,7 +83,7 @@ export class AuthController {
   async googleCallback(@Req() req: Request, @Res() res: Response) {
     try {
       const user = req.user as any;
-      console.log("Google callback - user:", JSON.stringify(user, null, 2));
+      await this.authService.checkAccountStatus(user.id);
       const tokens = await this.authService.generateTokens(user);
 
       const appUrl =
@@ -116,7 +116,7 @@ export class AuthController {
   async discordCallback(@Req() req: Request, @Res() res: Response) {
     try {
       const user = req.user as any;
-      console.log("Discord callback - user:", JSON.stringify(user, null, 2));
+      await this.authService.checkAccountStatus(user.id);
       const tokens = await this.authService.generateTokens(user);
 
       const appUrl =

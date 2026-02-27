@@ -11,9 +11,10 @@ import { DiscordModule } from "../discord/discord.module";
 import { DiscordBotService } from "../discord/discord-bot.service";
 import { DiscordVoiceService } from "../discord/discord-voice.service";
 import { NotificationModule } from "../notification/notification.module";
+import { RankingModule } from "../ranking/ranking.module";
 
 @Module({
-  imports: [AuthModule, RiotModule, DiscordModule, NotificationModule],
+  imports: [AuthModule, RiotModule, DiscordModule, NotificationModule, RankingModule],
   controllers: [MatchController],
   providers: [
     MatchService,

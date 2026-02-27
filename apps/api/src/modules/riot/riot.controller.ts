@@ -85,8 +85,11 @@ export class RiotController {
   @Post("accounts/:id/sync")
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)
-  async syncAccount(@Param("id") id: string) {
-    return this.riotService.syncRankedInfo(id);
+  async syncAccount(
+    @CurrentUser("sub") userId: string,
+    @Param("id") id: string,
+  ) {
+    return this.riotService.syncRankedInfo(userId, id);
   }
 
   @Delete("accounts/:id")
@@ -118,11 +121,13 @@ export class RiotController {
   @Put("accounts/:id/champions/:role")
   @UseGuards(JwtAuthGuard)
   async updateChampions(
+    @CurrentUser("sub") userId: string,
     @Param("id") accountId: string,
     @Param("role") role: Role,
     @Body() body: { championIds: string[] },
   ) {
     return this.riotService.updateChampionPreferences(
+      userId,
       accountId,
       role,
       body.championIds,
@@ -135,7 +140,6 @@ export class RiotController {
     @Param("gameName") gameName: string,
     @Param("tagLine") tagLine: string,
   ) {
-    console.log("getSummoner controller called with:", { gameName, tagLine });
     return this.riotService.getSummonerByRiotId(gameName, tagLine);
   }
 

@@ -2,6 +2,7 @@
 export * from './TierBadge';
 export * from './RoomCard';
 export * from './ChatBox';
+export * from './GameChatPanel';
 export * from './ParticipantList';
 export * from './AuctionBoard';
 export * from './DraftBoard';

@@ -1,4 +1,6 @@
-import { Controller, Get, Param, Query } from "@nestjs/common";
+import { Controller, Get, Param, Query, UseGuards } from "@nestjs/common";
+import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { StatsService } from "./stats.service";
 
 @Controller("stats")
@@ -9,32 +11,48 @@ export class StatsController {
    * Get auction statistics for a user
    */
   @Get("user/:userId/auction-stats")
-  async getUserAuctionStats(@Param("userId") userId: string) {
-    return this.statsService.getUserAuctionStats(userId);
+  @UseGuards(JwtAuthGuard)
+  async getUserAuctionStats(
+    @CurrentUser("sub") requesterId: string,
+    @Param("userId") userId: string,
+  ) {
+    return this.statsService.getUserAuctionStats(userId, requesterId);
   }
 
   /**
    * Get champion statistics for a user
    */
   @Get("user/:userId/champion-stats")
-  async getUserChampionStats(@Param("userId") userId: string) {
-    return this.statsService.getUserChampionStats(userId);
+  @UseGuards(JwtAuthGuard)
+  async getUserChampionStats(
+    @CurrentUser("sub") requesterId: string,
+    @Param("userId") userId: string,
+  ) {
+    return this.statsService.getUserChampionStats(userId, requesterId);
   }
 
   /**
    * Get position statistics for a user
    */
   @Get("user/:userId/position-stats")
-  async getUserPositionStats(@Param("userId") userId: string) {
-    return this.statsService.getUserPositionStats(userId);
+  @UseGuards(JwtAuthGuard)
+  async getUserPositionStats(
+    @CurrentUser("sub") requesterId: string,
+    @Param("userId") userId: string,
+  ) {
+    return this.statsService.getUserPositionStats(userId, requesterId);
   }
 
   /**
    * Get user's Riot accounts
    */
   @Get("user/:userId/riot-accounts")
-  async getUserRiotAccounts(@Param("userId") userId: string) {
-    return this.statsService.getUserRiotAccounts(userId);
+  @UseGuards(JwtAuthGuard)
+  async getUserRiotAccounts(
+    @CurrentUser("sub") requesterId: string,
+    @Param("userId") userId: string,
+  ) {
+    return this.statsService.getUserRiotAccounts(userId, requesterId);
   }
 
   /**
@@ -80,17 +98,6 @@ export class StatsController {
   @Get("match/:matchId/timeline")
   async getMatchTimeline(@Param("matchId") matchId: string) {
     return this.statsService.getMatchTimeline(matchId);
-  }
-
-  /**
-   * 소환사 시즌별 티어 히스토리 (DB에 축적된 스냅샷)
-   */
-  @Get("summoner/:gameName/:tagLine/season-tiers")
-  async getSummonerSeasonTiers(
-    @Param("gameName") gameName: string,
-    @Param("tagLine") tagLine: string,
-  ) {
-    return this.statsService.getSummonerSeasonTiers(gameName, tagLine);
   }
 
   /**

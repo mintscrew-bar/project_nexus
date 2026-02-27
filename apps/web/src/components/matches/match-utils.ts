@@ -147,6 +147,27 @@ export function getQueueTypeName(queueId: number): string {
   return queueTypes[queueId] || "기타 게임";
 }
 
+export function getSummonerSpellIcon(spellId: number): string {
+  const spellMap: Record<number, string> = {
+    1: "SummonerBoost",
+    3: "SummonerExhaust",
+    4: "SummonerFlash",
+    6: "SummonerHaste",
+    7: "SummonerHeal",
+    11: "SummonerSmite",
+    12: "SummonerTeleport",
+    13: "SummonerMana",
+    14: "SummonerDot",
+    21: "SummonerBarrier",
+    30: "SummonerPoroRecall",
+    31: "SummonerPoroThrow",
+    32: "SummonerSnowball",
+    39: "SummonerUltBookSmitePlaceholder",
+  };
+  const spellName = spellMap[spellId] || "SummonerFlash";
+  return `https://ddragon.leagueoflegends.com/cdn/${DDRAGON_VERSION}/img/spell/${spellName}.png`;
+}
+
 export function getSummonerSpellName(spellId: number): string {
   const spellMap: Record<number, string> = {
     1: "Boost",

@@ -204,12 +204,22 @@ export const userApi = {
   },
 
   updateSettings: async (data: {
+    notifyFriendRequest?: boolean;
+    notifyFriendAccepted?: boolean;
     notifyMatchStart?: boolean;
     notifyMatchResult?: boolean;
+    notifyTeamInvite?: boolean;
+    notifyMention?: boolean;
+    notifyComment?: boolean;
     notifyClanActivity?: boolean;
+    notifySystem?: boolean;
     showOnlineStatus?: boolean;
     showMatchHistory?: boolean;
+    showRiotAccounts?: boolean;
+    showChampionStats?: boolean;
     allowFriendRequests?: boolean;
+    highlightChampionId?: string | null;
+    highlightStatType?: string | null;
     theme?: string;
   }) => {
     const response = await apiClient.patch("/users/settings", data);
@@ -348,7 +358,7 @@ export const matchApi = {
   },
 
   getMatch: async (matchId: string) => {
-    const response = await apiClient.get(`/matches/${matchId}`);
+    const response = await apiClient.get(`/matches/${matchId}/details`);
     return response.data;
   },
 
@@ -458,11 +468,7 @@ export const riotApi = {
 
   // 소환사 정보 조회
   getSummoner: async (gameName: string, tagLine: string) => {
-    console.log('getSummoner called with:', { gameName, tagLine });
-
-    // axios가 URL 인코딩을 자동으로 처리하도록 함
     const response = await apiClient.get(`/riot/summoner/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}`);
-    console.log('getSummoner response:', response.data);
     return response.data;
   },
 };
@@ -917,13 +923,6 @@ export const statsApi = {
     return response.data;
   },
 
-  getSeasonTiers: async (gameName: string, tagLine: string) => {
-    const response = await apiClient.get(
-      `/stats/summoner/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}/season-tiers`
-    );
-    return response.data;
-  },
-
   getSummonerRiotMatches: async (
     gameName: string,
     tagLine: string,
@@ -960,6 +959,36 @@ export const statsApi = {
 
   getUserAuctionStats: async (userId: string) => {
     const response = await apiClient.get(`/stats/user/${userId}/auction-stats`);
+    return response.data;
+  },
+};
+
+// ========================================
+// Ranking API
+// ========================================
+
+export const rankingApi = {
+  getGlobalRanking: async (page: number = 1, limit: number = 50) => {
+    const response = await apiClient.get("/ranking/global", {
+      params: { page, limit },
+    });
+    return response.data;
+  },
+
+  getClanRanking: async (clanId: string, page: number = 1, limit: number = 50) => {
+    const response = await apiClient.get(`/ranking/clan/${clanId}`, {
+      params: { page, limit },
+    });
+    return response.data;
+  },
+
+  getUserRanking: async (userId: string) => {
+    const response = await apiClient.get(`/ranking/user/${userId}`);
+    return response.data;
+  },
+
+  recalculate: async () => {
+    const response = await apiClient.post("/ranking/recalculate");
     return response.data;
   },
 };

@@ -35,7 +35,7 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
 
-  private userSockets = new Map<string, string>(); // userId -> socketId
+  private userSockets = new Map<string, Set<string>>(); // userId -> Set<socketId>
   private socketRooms = new Map<string, string>(); // socketId -> roomId
   private readonly ROOM_LIST_CHANNEL = "room-list"; // Channel for room list updates
   private typingUsers = new Map<string, Map<string, NodeJS.Timeout>>(); // roomId -> Map<userId, Timeout>
@@ -77,7 +77,10 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
       client.userId = payload.sub;
       client.username = payload.username;
 
-      this.userSockets.set(payload.sub, client.id);
+      if (!this.userSockets.has(payload.sub)) {
+        this.userSockets.set(payload.sub, new Set());
+      }
+      this.userSockets.get(payload.sub)!.add(client.id);
 
       console.log(`User ${payload.username} connected (${client.id})`);
     } catch (error) {
@@ -88,7 +91,13 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   async handleDisconnect(client: AuthenticatedSocket) {
     if (client.userId) {
-      this.userSockets.delete(client.userId);
+      const sockets = this.userSockets.get(client.userId);
+      if (sockets) {
+        sockets.delete(client.id);
+        if (sockets.size === 0) {
+          this.userSockets.delete(client.userId);
+        }
+      }
 
       // Leave room if in one
       const roomId = this.socketRooms.get(client.id);

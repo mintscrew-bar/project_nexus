@@ -2,9 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
-import { Header } from "@/components/layout/Header";
-import { Sidebar } from "@/components/layout/Sidebar";
-import { FriendsPanel } from "@/components/domain/FriendsPanel";
+import { AppShell } from "@/components/layout/AppShell";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -22,14 +20,7 @@ export default function RootLayout({
     <html lang="ko" suppressHydrationWarning>
       <body className={`${inter.className} font-sans min-h-screen flex flex-col`}>
         <Providers>
-          <Header />
-          <main className="flex flex-grow">
-            <Sidebar />
-            <div className="flex-grow overflow-auto bg-bg-primary">
-              {children}
-            </div>
-          </main>
-          <FriendsPanel />
+          <AppShell>{children}</AppShell>
         </Providers>
       </body>
     </html>

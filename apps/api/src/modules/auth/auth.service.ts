@@ -240,6 +240,22 @@ export class AuthService {
       throw new UnauthorizedException("Invalid credentials");
     }
 
+    // Check if banned
+    if (user.isBanned) {
+      if (user.banUntil && user.banUntil <= new Date()) {
+        // Temporary ban expired — lift it
+        await this.prisma.user.update({
+          where: { id: user.id },
+          data: { isBanned: false, banReason: null, bannedAt: null, banUntil: null },
+        });
+      } else {
+        const until = user.banUntil ? ` until ${user.banUntil.toISOString()}` : " permanently";
+        throw new UnauthorizedException(
+          `Account is banned${until}. Reason: ${user.banReason || "N/A"}`,
+        );
+      }
+    }
+
     // Check if restricted
     if (user.isRestricted && user.restrictedUntil) {
       if (user.restrictedUntil > new Date()) {
@@ -261,6 +277,45 @@ export class AuthService {
   // ========================================
   // Token Management
   // ========================================
+
+  /**
+   * Check if user is banned/restricted before issuing tokens.
+   * Call this before generateTokens for OAuth flows.
+   */
+  async checkAccountStatus(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { isBanned: true, banUntil: true, banReason: true, bannedAt: true, isRestricted: true, restrictedUntil: true },
+    });
+    if (!user) return;
+
+    if (user.isBanned) {
+      if (user.banUntil && user.banUntil <= new Date()) {
+        await this.prisma.user.update({
+          where: { id: userId },
+          data: { isBanned: false, banReason: null, bannedAt: null, banUntil: null },
+        });
+      } else {
+        const until = user.banUntil ? ` until ${user.banUntil.toISOString()}` : " permanently";
+        throw new UnauthorizedException(
+          `Account is banned${until}. Reason: ${user.banReason || "N/A"}`,
+        );
+      }
+    }
+
+    if (user.isRestricted && user.restrictedUntil) {
+      if (user.restrictedUntil > new Date()) {
+        throw new UnauthorizedException(
+          `Account restricted until ${user.restrictedUntil.toISOString()}`,
+        );
+      } else {
+        await this.prisma.user.update({
+          where: { id: userId },
+          data: { isRestricted: false, restrictedUntil: null },
+        });
+      }
+    }
+  }
 
   async generateTokens(user: {
     id: string;
@@ -314,6 +369,13 @@ export class AuthService {
     if (session.expiresAt < new Date()) {
       await this.prisma.session.delete({ where: { id: session.id } });
       throw new UnauthorizedException("Refresh token expired");
+    }
+
+    // Check if user is banned
+    if (session.user.isBanned) {
+      if (!session.user.banUntil || session.user.banUntil > new Date()) {
+        throw new UnauthorizedException("Account is banned");
+      }
     }
 
     // Check if user is restricted

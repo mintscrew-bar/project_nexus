@@ -1,10 +1,10 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { riotApi, matchApi, statsApi } from "@/lib/api-client";
-import { LoadingSpinner, Button, Badge } from "@/components/ui";
+import { riotApi, matchApi, statsApi, rankingApi } from "@/lib/api-client";
+import { LoadingSpinner, Button, Badge, Skeleton } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
 import { ArrowLeft, TrendingUp, Sword, ExternalLink, Loader2, RefreshCw, Search, Shield } from "lucide-react";
 import Link from "next/link";
@@ -27,12 +27,7 @@ export default function SummonerStatsPage() {
   const gameName = decodeURIComponent(params.gameName as string);
   const tagLine = decodeURIComponent(params.tagLine as string);
 
-  const [summoner, setSummoner] = useState<SummonerData | null>(null);
-  const [nexusMatches, setNexusMatches] = useState<NexusMatchHistory[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [nexusUserId, setNexusUserId] = useState<string | null>(null);
   const [searchInput, setSearchInput] = useState("");
   const [champStatTab, setChampStatTab] = useState<'nexus' | 'ranked'>('ranked');
 
@@ -64,37 +59,32 @@ export default function SummonerStatsPage() {
     router.push(`/matches/summoner/${encodeURIComponent(searchGameName)}/${encodeURIComponent(searchTagLine)}`);
   };
 
-  useEffect(() => {
-    const fetchSummonerData = async () => {
-      setIsLoading(true);
-      setError(null);
+  // 소환사 기본 정보 (Riot API)
+  const { data: summoner, isLoading: isSummonerLoading, error: summonerError } = useQuery<SummonerData>({
+    queryKey: ["summoner", gameName, tagLine],
+    queryFn: () => riotApi.getSummoner(gameName, tagLine),
+    staleTime: 2 * 60 * 1000,
+    retry: false,
+  });
 
-      try {
-        const summonerData = await riotApi.getSummoner(gameName, tagLine);
-        setSummoner(summonerData);
+  // Nexus 유저 ID 조회
+  const { data: nexusUser } = useQuery({
+    queryKey: ["nexusUser", gameName, tagLine],
+    queryFn: () => statsApi.findUserByRiotAccount(gameName, tagLine),
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+    enabled: !!summoner,
+  });
 
-        try {
-          const userResult = await statsApi.findUserByRiotAccount(gameName, tagLine);
-          if (userResult.found && userResult.userId) {
-            setNexusUserId(userResult.userId);
+  const nexusUserId = nexusUser?.found ? nexusUser.userId : null;
 
-            const matchHistory = await matchApi.getUserMatchHistory(userResult.userId, 20, 0);
-            setNexusMatches(matchHistory);
-          }
-        } catch (err) {
-          console.log("No Nexus user found for this summoner");
-          setNexusMatches([]);
-        }
-      } catch (err: any) {
-        console.error("Failed to fetch summoner data:", err);
-        setError(err.response?.data?.message || "소환사 정보를 불러오는데 실패했습니다.");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchSummonerData();
-  }, [gameName, tagLine]);
+  // Nexus 매치 히스토리
+  const { data: nexusMatches = [] } = useQuery<NexusMatchHistory[]>({
+    queryKey: ["nexusMatches", nexusUserId],
+    queryFn: () => matchApi.getUserMatchHistory(nexusUserId!, 20, 0),
+    staleTime: 2 * 60 * 1000,
+    enabled: !!nexusUserId,
+  });
 
   // 랭크 챔피언 통계
   const { data: rankedChampionStatsRaw = [], isLoading: isLoadingRankedStats } = useQuery<any[]>({
@@ -104,21 +94,21 @@ export default function SummonerStatsPage() {
     enabled: !!gameName && !!tagLine,
   });
 
-  const { data: seasonTiers = [] } = useQuery<any[]>({
-    queryKey: ["seasonTiers", gameName, tagLine],
-    queryFn: () => statsApi.getSeasonTiers(gameName, tagLine),
-    staleTime: 60 * 60 * 1000,
-    enabled: !!gameName && !!tagLine,
+  const { data: nexusRanking } = useQuery({
+    queryKey: ["nexusRanking", nexusUserId],
+    queryFn: () => rankingApi.getUserRanking(nexusUserId!),
+    staleTime: 5 * 60 * 1000,
+    enabled: !!nexusUserId,
   });
+
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
-      const summonerData = await riotApi.getSummoner(gameName, tagLine);
-      setSummoner(summonerData);
+      await queryClient.invalidateQueries({ queryKey: ["summoner", gameName, tagLine] });
       await queryClient.invalidateQueries({ queryKey: ["riotMatches", gameName, tagLine] });
+      await queryClient.invalidateQueries({ queryKey: ["rankedChampionStats", gameName, tagLine] });
     } catch (err: any) {
-      console.error("Failed to refresh data:", err);
       addToast("데이터 새로고침에 실패했습니다.", "error");
     } finally {
       setIsRefreshing(false);
@@ -164,12 +154,61 @@ export default function SummonerStatsPage() {
     return Array.from(statsMap.values()).sort((a, b) => b.games - a.games);
   };
 
+  const isLoading = isSummonerLoading;
+  const error = summonerError ? ((summonerError as any)?.response?.data?.message || "소환사 정보를 불러오는데 실패했습니다.") : null;
+
   if (isLoading) {
     return (
-      <div className="flex-grow flex items-center justify-center">
-        <div className="text-center">
-          <LoadingSpinner size="lg" />
-          <p className="text-text-secondary mt-4">소환사 정보 불러오는 중...</p>
+      <div className="min-h-screen bg-bg-primary">
+        {/* 검색 헤더 스켈레톤 */}
+        <div className="border-b border-bg-tertiary bg-bg-secondary">
+          <div className="container mx-auto px-4 py-3">
+            <Skeleton className="h-10 w-80 mx-auto rounded-lg" />
+          </div>
+        </div>
+        <div className="container mx-auto px-4 py-8">
+          {/* 소환사 프로필 스켈레톤 */}
+          <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-6 mb-6">
+            <div className="flex items-start gap-6">
+              <Skeleton className="w-24 h-24 rounded-xl flex-shrink-0" />
+              <div className="flex-grow space-y-3">
+                <div className="flex items-center gap-3">
+                  <Skeleton className="h-9 w-48" />
+                  <Skeleton className="h-6 w-16 rounded-full" />
+                </div>
+                <Skeleton className="h-4 w-32" />
+                <div className="flex items-center gap-4 mt-4">
+                  <Skeleton className="h-20 w-28 rounded-lg" />
+                  <Skeleton className="h-20 w-28 rounded-lg" />
+                  <Skeleton className="h-20 w-28 rounded-lg" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 space-y-6">
+              <Skeleton className="h-48 w-full rounded-xl" />
+              <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-6">
+                <Skeleton className="h-7 w-32 mb-4" />
+                <div className="space-y-3">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <Skeleton key={i} className="h-20 w-full rounded-lg" />
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="space-y-6">
+              <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-6">
+                <Skeleton className="h-7 w-28 mb-4" />
+                <div className="space-y-3">
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-14 w-full rounded-lg" />
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -309,75 +348,31 @@ export default function SummonerStatsPage() {
                   <Badge variant="secondary">언랭</Badge>
                 )}
 
-                <div className="bg-bg-tertiary rounded-lg p-3">
-                  <p className="text-xs text-text-tertiary mb-1 flex items-center gap-1">
-                    <TrendingUp className="h-3 w-3" />
-                    래더 랭킹
-                  </p>
-                  <p className="text-xl font-bold text-text-secondary">–</p>
-                  <p className="text-xs text-text-tertiary">준비 중</p>
-                </div>
-
-                <div className="bg-bg-tertiary rounded-lg p-3">
-                  <p className="text-xs text-text-tertiary mb-1 flex items-center gap-1">
-                    <Shield className="h-3 w-3" />
-                    Nexus 랭킹
-                  </p>
-                  <p className="text-xl font-bold text-text-secondary">–</p>
-                  <p className="text-xs text-text-tertiary">
-                    {nexusUserId ? "등록됨" : "미등록"}
-                  </p>
-                </div>
-              </div>
-
-              {/* Row 3: Season Tier History */}
-              <div className="pt-3 border-t border-bg-tertiary/50">
-                <p className="text-xs text-text-tertiary mb-2 font-medium tracking-wide">시즌별 티어</p>
-                <div className="flex flex-wrap gap-2">
-                  {/* S2026 — current season */}
-                  <div className="flex items-center gap-1.5 bg-bg-tertiary/70 rounded-lg px-2.5 py-2">
-                    {summoner.tier && getTierImage(summoner.tier) ? (
-                      <Image src={getTierImage(summoner.tier)!} alt={summoner.tier} width={24} height={24} className="w-6 h-6" />
-                    ) : (
-                      <div className="w-6 h-6 rounded bg-bg-elevated" />
-                    )}
-                    <div>
-                      <p className="text-[10px] text-text-tertiary leading-none mb-0.5">S2026</p>
-                      <p className="text-xs font-bold text-text-primary leading-none">
-                        {summoner.tier ? `${summoner.tier.charAt(0)}${summoner.rank}` : '언랭'}
-                      </p>
-                    </div>
+                {nexusUserId && nexusRanking ? (
+                  <div className="bg-bg-tertiary rounded-lg p-3">
+                    <p className="text-xs text-text-tertiary mb-1 flex items-center gap-1">
+                      <Shield className="h-3 w-3" />
+                      Nexus 랭킹
+                    </p>
+                    <p className="text-xl font-bold text-accent-primary">
+                      {nexusRanking.globalRank ? `#${nexusRanking.globalRank}` : '–'}
+                    </p>
+                    <p className="text-xs text-text-tertiary">
+                      {nexusRanking.totalGames}전 {nexusRanking.wins}승 {nexusRanking.losses}패
+                    </p>
                   </div>
-                  {/* Past seasons */}
-                  {['S2025', 'S2024', 'S2023', 'S2022'].map((season) => {
-                    const saved = seasonTiers.find((t: any) => t.season === season);
-                    return saved ? (
-                      <div key={season} className="flex items-center gap-1.5 bg-bg-tertiary/70 rounded-lg px-2.5 py-2">
-                        {getTierImage(saved.tier) ? (
-                          <Image src={getTierImage(saved.tier)!} alt={saved.tier} width={24} height={24} className="w-6 h-6" />
-                        ) : (
-                          <div className="w-6 h-6 rounded bg-bg-elevated" />
-                        )}
-                        <div>
-                          <p className="text-[10px] text-text-tertiary leading-none mb-0.5">{season}</p>
-                          <p className="text-xs font-bold text-text-primary leading-none">
-                            {saved.tier.charAt(0)}{saved.rank}
-                          </p>
-                        </div>
-                      </div>
-                    ) : (
-                      <div key={season} className="flex items-center gap-1.5 bg-bg-tertiary/30 rounded-lg px-2.5 py-2 opacity-50">
-                        <div className="w-6 h-6 rounded bg-bg-elevated flex items-center justify-center">
-                          <span className="text-[9px] text-text-tertiary">?</span>
-                        </div>
-                        <div>
-                          <p className="text-[10px] text-text-tertiary leading-none mb-0.5">{season}</p>
-                          <p className="text-xs font-medium text-text-tertiary leading-none">–</p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                ) : (
+                  <div className="bg-bg-tertiary rounded-lg p-3">
+                    <p className="text-xs text-text-tertiary mb-1 flex items-center gap-1">
+                      <Shield className="h-3 w-3" />
+                      Nexus 랭킹
+                    </p>
+                    <p className="text-xl font-bold text-text-secondary">–</p>
+                    <p className="text-xs text-text-tertiary">
+                      {nexusUserId ? "기록 부족" : "미등록"}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           </div>

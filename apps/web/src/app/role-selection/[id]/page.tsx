@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRoleSelectionStore } from "@/stores/role-selection-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { roomApi } from "@/lib/api-client";
+import { GameChatPanel } from "@/components/domain/GameChatPanel";
 import { LoadingSpinner, Badge, Avatar, Button } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
 import { Clock, Check, Users } from "lucide-react";
@@ -298,6 +299,9 @@ export default function RoleSelectionPage() {
           </p>
         </div>
       </div>
+
+      {/* 채팅 패널 (플로팅) */}
+      <GameChatPanel roomId={roomId} />
     </div>
   );
 }

@@ -126,8 +126,22 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.server.to(`match:${matchId}`).emit("match-started", data);
   }
 
-  emitMatchResult(matchId: string, data: { winnerId: string }) {
+  async emitMatchResult(matchId: string, data: { winnerId: string }) {
+    // Emit to individual match room
     this.server.to(`match:${matchId}`).emit("match-result", data);
+
+    // Also emit to bracket room so bracket view gets real-time updates
+    try {
+      const match = await this.matchService.findById(matchId);
+      if (match?.roomId) {
+        this.server.to(`bracket:${match.roomId}`).emit("match-result", {
+          matchId,
+          winnerId: data.winnerId,
+        });
+      }
+    } catch {
+      // Best-effort: bracket view can fallback to REST polling
+    }
   }
 
   emitBracketGenerated(roomId: string, data: { bracket: any }) {

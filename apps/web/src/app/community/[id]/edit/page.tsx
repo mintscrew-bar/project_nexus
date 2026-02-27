@@ -13,6 +13,7 @@ import {
   Input,
   Label,
   LoadingSpinner,
+  Skeleton,
 } from "@/components/ui";
 import { MarkdownEditor } from "@/components/community/MarkdownEditor";
 import { useToast } from "@/components/ui/Toast";
@@ -113,19 +114,29 @@ export default function EditPostPage() {
     }
   };
 
-  if (authLoading || isLoadingPost) {
+  if (authLoading || isLoadingPost || !isAuthenticated) {
     return (
-      <div className="flex items-center justify-center flex-grow">
-        <div className="text-center">
-          <LoadingSpinner size="lg" />
-          <p className="text-text-secondary mt-4">불러오는 중...</p>
+      <div className="flex-grow p-4 md:p-8 animate-fade-in">
+        <div className="container mx-auto max-w-3xl">
+          <Skeleton className="h-9 w-20 mb-4" />
+          <Card>
+            <CardHeader>
+              <Skeleton className="h-7 w-32" />
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex gap-2">
+                {[1, 2, 3, 4].map((i) => (
+                  <Skeleton key={i} className="h-9 w-16 rounded-lg" />
+                ))}
+              </div>
+              <Skeleton className="h-10 w-full rounded-lg" />
+              <Skeleton className="h-64 w-full rounded-lg" />
+              <Skeleton className="h-10 w-24 rounded-lg" />
+            </CardContent>
+          </Card>
         </div>
       </div>
     );
-  }
-
-  if (!isAuthenticated) {
-    return null;
   }
 
   return (

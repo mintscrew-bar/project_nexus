@@ -3,9 +3,15 @@ import { PrismaService } from "../prisma/prisma.service";
 
 export interface UpdateSettingsDto {
   // Notification settings
+  notifyFriendRequest?: boolean;
+  notifyFriendAccepted?: boolean;
   notifyMatchStart?: boolean;
   notifyMatchResult?: boolean;
+  notifyTeamInvite?: boolean;
+  notifyMention?: boolean;
+  notifyComment?: boolean;
   notifyClanActivity?: boolean;
+  notifySystem?: boolean;
 
   // Privacy settings
   showOnlineStatus?: boolean;

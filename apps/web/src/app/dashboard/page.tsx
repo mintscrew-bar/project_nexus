@@ -7,7 +7,7 @@ import Image from "next/image";
 import { useAuthStore } from "@/stores/auth-store";
 import { useRiotStore } from "@/stores/riot-store";
 import { userApi, roomApi, communityApi, statsApi } from "@/lib/api-client";
-import { Card, CardContent, Button } from "@/components/ui";
+import { Card, CardContent, Button, Skeleton } from "@/components/ui";
 import { TierBadge } from "@/components/domain/TierBadge";
 import {
   Trophy,
@@ -845,7 +845,100 @@ export default function DashboardPage() {
     }
   }, [isAuthenticated, fetchAll]);
 
-  if (authLoading || !isAuthenticated) return null;
+  if (authLoading || !isAuthenticated) {
+    return (
+      <div className="flex-grow p-4 md:p-6 animate-fade-in">
+        <div className="container mx-auto max-w-7xl space-y-5">
+          {/* 배너 캐러셀 스켈레톤 */}
+          <div className="relative overflow-hidden rounded-2xl bg-bg-tertiary min-h-[160px] md:min-h-[200px] p-6 md:p-10">
+            <div className="max-w-lg space-y-3">
+              <Skeleton className="h-6 w-16 rounded-full" />
+              <Skeleton className="h-8 w-64" />
+              <Skeleton className="h-4 w-80" />
+              <Skeleton className="h-4 w-60" />
+              <Skeleton className="h-10 w-32 rounded-lg mt-2" />
+            </div>
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5">
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-1.5 w-1.5 rounded-full" />
+              ))}
+            </div>
+          </div>
+
+          {/* 내 전적 스켈레톤 */}
+          <Card className="overflow-hidden">
+            <div className="bg-bg-tertiary border-b border-bg-elevated px-4 py-3 flex items-center gap-2">
+              <Skeleton className="h-5 w-5 rounded" />
+              <Skeleton className="h-5 w-16" />
+            </div>
+            <CardContent className="p-4">
+              <div className="flex flex-col md:flex-row gap-5">
+                <div className="flex items-center gap-3 md:w-56 flex-shrink-0">
+                  <Skeleton className="w-12 h-12 rounded-lg" />
+                  <div className="space-y-1.5">
+                    <Skeleton className="h-5 w-32" />
+                    <Skeleton className="h-3 w-24" />
+                  </div>
+                </div>
+                <div className="w-px bg-bg-elevated hidden md:block flex-shrink-0" />
+                <div className="flex-grow">
+                  <div className="grid grid-cols-3 gap-2">
+                    {[1, 2, 3].map((i) => (
+                      <Skeleton key={i} className="h-16 rounded-lg" />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* 모집중인 내전 스켈레톤 */}
+          <Card className="overflow-hidden">
+            <div className="bg-bg-tertiary border-b border-bg-elevated px-4 py-3 flex items-center gap-2">
+              <Skeleton className="h-5 w-5 rounded" />
+              <Skeleton className="h-5 w-24" />
+            </div>
+            <CardContent className="p-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="flex flex-col gap-2 p-3 bg-bg-tertiary rounded-xl">
+                    <div className="flex items-center justify-between">
+                      <Skeleton className="h-4 w-24" />
+                      <Skeleton className="h-4 w-10 rounded" />
+                    </div>
+                    <Skeleton className="h-1.5 w-full rounded-full" />
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* 인기글 + 공지사항 스켈레톤 */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            {[1, 2].map((section) => (
+              <Card key={section} className="overflow-hidden">
+                <div className="bg-bg-tertiary border-b border-bg-elevated px-4 py-3 flex items-center gap-2">
+                  <Skeleton className="h-5 w-5 rounded" />
+                  <Skeleton className="h-5 w-16" />
+                </div>
+                <div className="divide-y divide-bg-elevated">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <div key={i} className="flex items-center gap-3 px-4 py-3">
+                      {section === 1 && <Skeleton className="h-4 w-5 flex-shrink-0" />}
+                      <div className="flex-grow space-y-1.5">
+                        <Skeleton className="h-4 w-3/4" />
+                        <Skeleton className="h-3 w-1/3" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-grow p-4 md:p-6 animate-fade-in">

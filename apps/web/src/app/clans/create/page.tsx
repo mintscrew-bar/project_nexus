@@ -12,6 +12,7 @@ import {
   Button,
   Input,
   Label,
+  Skeleton,
 } from "@/components/ui";
 import { ArrowLeft, Shield, Plus } from "lucide-react";
 
@@ -66,12 +67,25 @@ export default function CreateClanPage() {
     }
   };
 
-  if (authLoading) {
-    return null;
-  }
-
-  if (!isAuthenticated) {
-    return null;
+  if (authLoading || !isAuthenticated) {
+    return (
+      <div className="flex-grow p-4 md:p-8 animate-fade-in">
+        <div className="container mx-auto max-w-2xl">
+          <Skeleton className="h-9 w-24 mb-4" />
+          <Card>
+            <CardHeader>
+              <Skeleton className="h-7 w-32" />
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Skeleton className="h-10 w-full rounded-lg" />
+              <Skeleton className="h-10 w-full rounded-lg" />
+              <Skeleton className="h-24 w-full rounded-lg" />
+              <Skeleton className="h-10 w-28 rounded-lg" />
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
   }
 
   return (

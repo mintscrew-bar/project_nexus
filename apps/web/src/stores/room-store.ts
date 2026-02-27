@@ -266,8 +266,9 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
       set({ rooms });
     });
 
-    // Re-subscribe after reconnect
-    const handleReconnect = () => {
+    // Re-subscribe after reconnect — use named function stored on socket
+    // to ensure off() can remove the exact same reference
+    const reconnectHandler = () => {
       if (get().isSubscribedToRoomList) {
         roomSocketHelpers.subscribeRoomList((response: any) => {
           if (response?.success && response.rooms) {
@@ -277,9 +278,13 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
       }
     };
 
-    // 기존 reconnect 핸들러 제거 후 등록 (중복 방지)
-    socket.off('connect', handleReconnect);
-    socket.on('connect', handleReconnect);
+    // Remove any previously attached reconnect handler (stored reference)
+    const prev = (socket as any).__roomListReconnectHandler;
+    if (prev) {
+      socket.off('connect', prev);
+    }
+    (socket as any).__roomListReconnectHandler = reconnectHandler;
+    socket.on('connect', reconnectHandler);
   },
 
   unsubscribeFromRoomList: () => {

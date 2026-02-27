@@ -12,6 +12,7 @@ import {
   Button,
   Input,
   Label,
+  Skeleton,
 } from "@/components/ui";
 import { MarkdownEditor } from "@/components/community/MarkdownEditor";
 import {
@@ -77,12 +78,29 @@ export default function WritePostPage() {
     }
   };
 
-  if (authLoading) {
-    return null;
-  }
-
-  if (!isAuthenticated) {
-    return null;
+  if (authLoading || !isAuthenticated) {
+    return (
+      <div className="flex-grow p-4 md:p-8 animate-fade-in">
+        <div className="container mx-auto max-w-3xl">
+          <Skeleton className="h-9 w-20 mb-4" />
+          <Card>
+            <CardHeader>
+              <Skeleton className="h-7 w-28" />
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex gap-2">
+                {[1, 2, 3, 4].map((i) => (
+                  <Skeleton key={i} className="h-9 w-16 rounded-lg" />
+                ))}
+              </div>
+              <Skeleton className="h-10 w-full rounded-lg" />
+              <Skeleton className="h-64 w-full rounded-lg" />
+              <Skeleton className="h-10 w-24 rounded-lg" />
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
   }
 
   return (

@@ -67,6 +67,8 @@ model User {
   snakeDraftPicks    SnakeDraftPick[]
   matchParticipations MatchParticipant[]
   notifications       Notification[]
+  nexusRanking        NexusRanking?
+  clanRankings        ClanRanking[]
 
   @@index([email])
   @@index([reputation])
@@ -494,6 +496,8 @@ model Match {
   // Riot integration
   tournamentCode  String?
   riotMatchId     String?
+  gameDuration    Int?            // Game duration in seconds (from Riot API)
+  dataCollected   Boolean  @default(false) // Whether Riot match data has been collected
 
   scheduledAt     DateTime?
   startedAt       DateTime?
@@ -529,6 +533,7 @@ enum MatchStatus {
   PENDING
   IN_PROGRESS
   COMPLETED
+  CANCELLED
 }
 
 // ============================================
@@ -636,6 +641,12 @@ model MatchTeamStats {
   dragonKills     Int
   riftHeraldKills Int
 
+  // First objectives
+  firstBlood      Boolean  @default(false)
+  firstTower      Boolean  @default(false)
+  firstBaron      Boolean  @default(false)
+  firstDragon     Boolean  @default(false)
+
   // Bans
   bans            Json     // Array of champion IDs
 
@@ -672,6 +683,7 @@ model Clan {
   owner   User         @relation("ClanOwner", fields: [ownerId], references: [id])
   members ClanMember[]
   chatMessages ClanChatMessage[]
+  clanRankings ClanRanking[]
 
   @@index([ownerId])
   @@index([isRecruiting])
@@ -1010,4 +1022,51 @@ enum NotificationType {
   MENTION
   COMMENT
   SYSTEM
+}
+
+// ============================================
+// Ranking System
+// ============================================
+
+model NexusRanking {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // 글로벌 랭킹
+  totalGames  Int    @default(0)
+  wins        Int    @default(0)
+  losses      Int    @default(0)
+  winRate     Float  @default(0)
+  globalRank  Int?              // null = 최소 게임 수 미달
+
+  // 최근 폼 (최근 20경기)
+  recentWins    Int   @default(0)
+  recentLosses  Int   @default(0)
+
+  updatedAt   DateTime @updatedAt
+
+  @@index([globalRank])
+  @@index([winRate])
+  @@map("nexus_rankings")
+}
+
+model ClanRanking {
+  id        String   @id @default(cuid())
+  userId    String
+  clanId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clan      Clan     @relation(fields: [clanId], references: [id], onDelete: Cascade)
+
+  totalGames  Int    @default(0)
+  wins        Int    @default(0)
+  losses      Int    @default(0)
+  winRate     Float  @default(0)
+  clanRank    Int?
+
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, clanId])
+  @@index([clanId, clanRank])
+  @@map("clan_rankings")
 }
