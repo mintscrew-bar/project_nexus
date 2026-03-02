@@ -12,8 +12,7 @@ interface ChampionSelectorProps {
   maxSelection?: number;
 }
 
-const DDRAGON_BASE_URL = "https://ddragon.leagueoflegends.com/cdn";
-const version = process.env.NEXT_PUBLIC_DDRAGON_VERSION || "16.2.1";
+// champion.image.full은 "Aatrox.png" 형태이므로 로컬 아이콘 경로 직접 사용
 
 export function ChampionSelector({
   allChampions,
@@ -55,7 +54,7 @@ export function ChampionSelector({
             onClick={() => handleSelectChampion(champion.key)}
           >
             <Image
-              src={`${DDRAGON_BASE_URL}/${version}/img/champion/${champion.image.full}`}
+              src={`/icons/champions/${champion.image.full}`}
               alt={champion.name}
               width={64}
               height={64}

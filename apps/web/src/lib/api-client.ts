@@ -1,5 +1,9 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
 
+// 보이지 않는 유니코드 문자 제거 (복사-붙여넣기 시 포함되는 bidirectional formatting 등)
+const stripInvisibleChars = (str: string): string =>
+  str.replace(/[\u200B-\u200F\u2028-\u202E\u2060-\u2069\uFEFF]/g, "");
+
 // Next.js rewrites를 사용하므로 상대 경로 사용
 const API_BASE_URL = "/api";
 
@@ -468,7 +472,7 @@ export const riotApi = {
 
   // 소환사 정보 조회
   getSummoner: async (gameName: string, tagLine: string) => {
-    const response = await apiClient.get(`/riot/summoner/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}`);
+    const response = await apiClient.get(`/riot/summoner/${encodeURIComponent(stripInvisibleChars(gameName))}/${encodeURIComponent(stripInvisibleChars(tagLine))}`);
     return response.data;
   },
 };
@@ -918,7 +922,7 @@ export const statsApi = {
   // 랭크 챔피언 통계 — 시즌 전체 집계 (DB 캐시 활용, 백엔드가 모든 페이징 처리)
   getRankedChampionStats: async (gameName: string, tagLine: string) => {
     const response = await apiClient.get(
-      `/stats/summoner/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}/ranked-champion-stats`
+      `/stats/summoner/${encodeURIComponent(stripInvisibleChars(gameName))}/${encodeURIComponent(stripInvisibleChars(tagLine))}/ranked-champion-stats`
     );
     return response.data;
   },
@@ -931,7 +935,7 @@ export const statsApi = {
     start: number = 0
   ) => {
     const response = await apiClient.get(
-      `/stats/summoner/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}/matches`,
+      `/stats/summoner/${encodeURIComponent(stripInvisibleChars(gameName))}/${encodeURIComponent(stripInvisibleChars(tagLine))}/matches`,
       {
         params: { count, queueId, start },
       }
@@ -1029,12 +1033,12 @@ export const adminApi = {
     return response.data;
   },
   // Reports
-  getReports: async (params?: { page?: number; limit?: number; status?: string }) => {
+  getReports: async (params?: { page?: number; limit?: number; status?: string; category?: string }) => {
     const response = await apiClient.get("/admin/reports", { params });
     return response.data;
   },
-  reviewReport: async (reportId: string, status: "APPROVED" | "REJECTED", reviewerNote: string) => {
-    const response = await apiClient.patch(`/admin/reports/${reportId}/review`, { status, reviewerNote });
+  reviewReport: async (reportId: string, status: "APPROVED" | "REJECTED", reviewerNote: string, category?: string) => {
+    const response = await apiClient.patch(`/admin/reports/${reportId}/review`, { status, reviewerNote, category });
     return response.data;
   },
   // Announcements
@@ -1043,7 +1047,7 @@ export const adminApi = {
     return response.data;
   },
   // Chat Logs
-  getChatLogs: async (params?: { page?: number; limit?: number; roomName?: string; search?: string }) => {
+  getChatLogs: async (params?: { page?: number; limit?: number; category?: string; roomName?: string; userId?: string; search?: string }) => {
     const response = await apiClient.get("/admin/chat-logs", { params });
     return response.data;
   },

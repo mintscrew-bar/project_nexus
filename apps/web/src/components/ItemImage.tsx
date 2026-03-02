@@ -27,8 +27,7 @@ export function ItemImage({
   alt,
   showTooltip = false,
 }: ItemImageProps) {
-  const version = process.env.NEXT_PUBLIC_DDRAGON_VERSION || "16.2.1";
-  const imageUrl = `https://ddragon.leagueoflegends.com/cdn/${version}/img/item/${itemId}.png`;
+  const imageUrl = `/icons/items/${itemId}.png`;
 
   const imageElement = (
     <div className={cn("relative overflow-hidden rounded", className)}>

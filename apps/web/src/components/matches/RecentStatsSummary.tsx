@@ -384,21 +384,50 @@ export default function RecentStatsSummary({
   puuid,
   nexusMatches,
 }: RecentStatsSummaryProps) {
-  const [activeTab, setActiveTab] = useState<"ranked" | "nexus">("ranked");
+  const [activeTab, setActiveTab] = useState<"all" | "ranked" | "normal" | "nexus">("all");
 
   const hasRiot = !!(gameName && tagLine && puuid);
 
-  // Fetch ranked (solo queue) recent 20 games
+  // Fetch all queues recent 20 games
+  const { data: allMatches, isLoading: isLoadingAll } = useQuery<any[]>({
+    queryKey: ["recentAllStats", gameName, tagLine],
+    queryFn: () => statsApi.getSummonerRiotMatches(gameName!, tagLine!, 20),
+    staleTime: 3 * 60 * 1000,
+    retry: false,
+    enabled: hasRiot,
+  });
+
+  // Fetch ranked (solo queue) recent 20 games — 탭 선택 시에만 요청
   const { data: rankedMatches, isLoading: isLoadingRanked } = useQuery<any[]>({
     queryKey: ["recentRankedStats", gameName, tagLine],
     queryFn: () => statsApi.getSummonerRiotMatches(gameName!, tagLine!, 20, 420),
     staleTime: 3 * 60 * 1000,
-    enabled: hasRiot,
+    retry: false,
+    enabled: hasRiot && activeTab === "ranked",
   });
+
+  // Fetch normal (blind+draft) recent 20 games
+  const { data: normalMatches, isLoading: isLoadingNormal } = useQuery<any[]>({
+    queryKey: ["recentNormalStats", gameName, tagLine],
+    queryFn: () => statsApi.getSummonerRiotMatches(gameName!, tagLine!, 20, 430),
+    staleTime: 3 * 60 * 1000,
+    retry: false,
+    enabled: hasRiot && activeTab === "normal",
+  });
+
+  const allStats = useMemo(
+    () => (allMatches && puuid ? computeRiotStats(allMatches, puuid) : null),
+    [allMatches, puuid]
+  );
 
   const rankedStats = useMemo(
     () => (rankedMatches && puuid ? computeRiotStats(rankedMatches, puuid) : null),
     [rankedMatches, puuid]
+  );
+
+  const normalStats = useMemo(
+    () => (normalMatches && puuid ? computeRiotStats(normalMatches, puuid) : null),
+    [normalMatches, puuid]
   );
 
   const nexusStats = useMemo(
@@ -415,16 +444,38 @@ export default function RecentStatsSummary({
         <h2 className="text-lg font-bold text-text-primary">최근 전적 요약</h2>
         <div className="flex gap-1 bg-bg-tertiary/50 rounded-lg p-0.5">
           {hasRiot && (
-            <button
-              onClick={() => setActiveTab("ranked")}
-              className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
-                effectiveTab === "ranked"
-                  ? "bg-accent-primary text-white"
-                  : "text-text-secondary hover:text-text-primary"
-              }`}
-            >
-              랭크
-            </button>
+            <>
+              <button
+                onClick={() => setActiveTab("all")}
+                className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
+                  effectiveTab === "all"
+                    ? "bg-accent-primary text-white"
+                    : "text-text-secondary hover:text-text-primary"
+                }`}
+              >
+                전체
+              </button>
+              <button
+                onClick={() => setActiveTab("ranked")}
+                className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
+                  effectiveTab === "ranked"
+                    ? "bg-accent-primary text-white"
+                    : "text-text-secondary hover:text-text-primary"
+                }`}
+              >
+                랭크
+              </button>
+              <button
+                onClick={() => setActiveTab("normal")}
+                className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
+                  effectiveTab === "normal"
+                    ? "bg-accent-primary text-white"
+                    : "text-text-secondary hover:text-text-primary"
+                }`}
+              >
+                일반
+              </button>
+            </>
           )}
           <button
             onClick={() => setActiveTab("nexus")}
@@ -439,7 +490,33 @@ export default function RecentStatsSummary({
         </div>
       </div>
 
-      {effectiveTab === "ranked" ? (
+      {effectiveTab === "all" ? (
+        isLoadingAll ? (
+          <div className="flex items-center justify-center py-12 gap-2 text-text-tertiary text-sm">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            전적 불러오는 중...
+          </div>
+        ) : allStats ? (
+          <StatsDisplay stats={allStats} showCsPerMin />
+        ) : (
+          <div className="text-center py-8 text-text-tertiary text-sm">
+            최근 전적이 없습니다
+          </div>
+        )
+      ) : effectiveTab === "normal" ? (
+        isLoadingNormal ? (
+          <div className="flex items-center justify-center py-12 gap-2 text-text-tertiary text-sm">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            일반 게임 전적 불러오는 중...
+          </div>
+        ) : normalStats ? (
+          <StatsDisplay stats={normalStats} showCsPerMin />
+        ) : (
+          <div className="text-center py-8 text-text-tertiary text-sm">
+            일반 게임 전적이 없습니다
+          </div>
+        )
+      ) : effectiveTab === "ranked" ? (
         isLoadingRanked ? (
           <div className="flex items-center justify-center py-12 gap-2 text-text-tertiary text-sm">
             <Loader2 className="h-4 w-4 animate-spin" />

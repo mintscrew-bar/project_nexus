@@ -131,11 +131,11 @@ const POSITION_LABELS: Record<string, string> = {
   TOP: "탑", JUNGLE: "정글", MID: "미드", ADC: "원딜", SUPPORT: "서포터",
 };
 const POSITION_ICON_URLS: Record<string, string> = {
-  TOP: "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-champ-select/global/default/svg/position-top.svg",
-  JUNGLE: "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-champ-select/global/default/svg/position-jungle.svg",
-  MID: "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-champ-select/global/default/svg/position-middle.svg",
-  ADC: "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-champ-select/global/default/svg/position-bottom.svg",
-  SUPPORT: "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-champ-select/global/default/svg/position-utility.svg",
+  TOP: "/icons/positions/position-top.svg",
+  JUNGLE: "/icons/positions/position-jungle.svg",
+  MID: "/icons/positions/position-middle.svg",
+  ADC: "/icons/positions/position-bottom.svg",
+  SUPPORT: "/icons/positions/position-utility.svg",
 };
 const TEAM_COLORS = ["#3B82F6", "#EF4444", "#10B981", "#F59E0B", "#8B5CF6", "#EC4899", "#06B6D4", "#F97316"];
 const KOREAN_NAMES = [

@@ -59,37 +59,47 @@ function clearUserFromStorage() {
   } catch {}
 }
 
+// initializeAuth 중복 호출 방지 (React StrictMode 대응)
+let _initPromise: Promise<void> | null = null;
+
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   isAuthenticated: false,
   isLoading: true, // Start true so protected pages wait before redirecting
 
   initializeAuth: async () => {
-    set({ isLoading: true });
+    // 이미 초기화 중이면 기존 Promise를 재사용
+    if (_initPromise) return _initPromise;
 
-    // 캐시된 유저가 있으면 즉시 헤더에 표시 (isAuthenticated는 false 유지)
-    // → 실제 데이터 fetch는 아래 initSession 성공 후 isAuthenticated=true 가 된 뒤 실행
-    const cachedUser = loadUserFromStorage();
-    if (cachedUser) {
-      set({ user: cachedUser });
-    }
+    _initPromise = (async () => {
+      set({ isLoading: true });
 
-    try {
-      // refresh token으로 access token을 먼저 발급받은 뒤 /auth/me 조회
-      const timeout = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("auth_timeout")), 5000)
-      );
-      const user = await Promise.race([authApi.initSession(), timeout]);
-      saveUserToStorage(user);
-      set({ user, isAuthenticated: true });
-    } catch {
-      // 로그인 안 됐거나 세션 만료 (정상 케이스)
-      clearUserFromStorage();
-      set({ user: null, isAuthenticated: false });
-      setAccessToken(null);
-    } finally {
-      set({ isLoading: false });
-    }
+      // 캐시된 유저가 있으면 즉시 헤더에 표시 (isAuthenticated는 false 유지)
+      const cachedUser = loadUserFromStorage();
+      if (cachedUser) {
+        set({ user: cachedUser });
+      }
+
+      try {
+        // refresh token으로 access token을 먼저 발급받은 뒤 /auth/me 조회
+        const timeout = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("auth_timeout")), 5000)
+        );
+        const user = await Promise.race([authApi.initSession(), timeout]);
+        saveUserToStorage(user);
+        set({ user, isAuthenticated: true });
+      } catch {
+        // 로그인 안 됐거나 세션 만료 (정상 케이스)
+        clearUserFromStorage();
+        set({ user: null, isAuthenticated: false });
+        setAccessToken(null);
+      } finally {
+        set({ isLoading: false });
+        _initPromise = null;
+      }
+    })();
+
+    return _initPromise;
   },
 
   emailLogin: async (credentials) => {

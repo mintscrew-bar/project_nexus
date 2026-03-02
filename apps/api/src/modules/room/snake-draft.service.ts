@@ -527,7 +527,6 @@ export class SnakeDraftService {
       // Ignore Discord cleanup failures for zombie-room cleanup.
     }
 
-    await this.prisma.chatMessage.deleteMany({ where: { roomId } });
     await this.prisma.room.delete({ where: { id: roomId } });
     this.clearDraftState(roomId);
     return true;

@@ -69,6 +69,7 @@ model User {
   notifications       Notification[]
   nexusRanking        NexusRanking?
   clanRankings        ClanRanking[]
+  adminAuditLogs      AdminAuditLog[]    @relation("AdminAuditLogs")
 
   @@index([email])
   @@index([reputation])
@@ -587,6 +588,7 @@ model MatchParticipant {
   item4       Int
   item5       Int
   item6       Int  // Trinket
+  item7       Int? // Quest reward (Role Quest slot - boots/wards)
 
   // Perks (Runes) - stored as JSON
   perks       Json
@@ -739,6 +741,9 @@ model Post {
   views     Int          @default(0)
   isPinned  Boolean      @default(false)
   isEdited  Boolean      @default(false)
+  isDeleted Boolean      @default(false)
+  deletedAt DateTime?
+  deletedBy String?      // 삭제한 관리자 ID
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
 
@@ -767,6 +772,9 @@ model Comment {
   content   String
   parentId  String?   // 대댓글 지원
   isEdited  Boolean   @default(false)
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+  deletedBy String?   // 삭제한 관리자 ID
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
@@ -885,6 +893,7 @@ model UserReport {
   reason       ReportReason
   description  String
   status       ReportStatus @default(PENDING)
+  reviewerId   String?      // 심사한 관리자 ID
   reviewerNote String?
   reviewedAt   DateTime?
   createdAt    DateTime     @default(now())
@@ -1022,6 +1031,43 @@ enum NotificationType {
   MENTION
   COMMENT
   SYSTEM
+}
+
+// ============================================
+// Admin Audit Log
+// ============================================
+
+model AdminAuditLog {
+  id          String   @id @default(cuid())
+  adminId     String
+  action      AdminAction
+  targetType  String?  // "user", "post", "comment", "clan", "room", "report"
+  targetId    String?
+  details     Json?    // 추가 정보 (reason, role 변경 전후 등)
+  createdAt   DateTime @default(now())
+
+  admin User @relation("AdminAuditLogs", fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([adminId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("admin_audit_logs")
+}
+
+enum AdminAction {
+  USER_ROLE_CHANGE
+  USER_BAN
+  USER_UNBAN
+  USER_RESTRICT
+  USER_UNRESTRICT
+  REPORT_REVIEW
+  POST_DELETE
+  POST_PIN
+  COMMENT_DELETE
+  CLAN_DELETE
+  ROOM_CLOSE
+  ROOM_ADD_BOT
+  ANNOUNCEMENT_SEND
 }
 
 // ============================================

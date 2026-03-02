@@ -474,9 +474,6 @@ export class RoomService {
         if (this.discordVoiceService) {
           await this.discordVoiceService.deleteRoomChannels(roomId).catch(() => {});
         }
-        await this.prisma.chatMessage.deleteMany({
-          where: { roomId },
-        });
         await this.prisma.room.delete({
           where: { id: roomId },
         });
@@ -508,9 +505,6 @@ export class RoomService {
       if (this.discordVoiceService) {
         await this.discordVoiceService.deleteRoomChannels(roomId).catch(() => {});
       }
-      await this.prisma.chatMessage.deleteMany({
-        where: { roomId },
-      });
       await this.prisma.room.delete({
         where: { id: roomId },
       });
@@ -522,9 +516,6 @@ export class RoomService {
       if (this.discordVoiceService) {
         await this.discordVoiceService.deleteRoomChannels(roomId).catch(() => {});
       }
-      await this.prisma.chatMessage.deleteMany({
-        where: { roomId },
-      });
       await this.prisma.room.delete({
         where: { id: roomId },
       });
@@ -888,8 +879,7 @@ export class RoomService {
       await this.discordVoiceService.deleteRoomChannels(roomId).catch(() => {});
     }
 
-    // Delete all DB data for this room
-    await this.prisma.chatMessage.deleteMany({ where: { roomId } });
+    // Delete room data (chat messages preserved via onDelete: SetNull)
     await this.prisma.roomParticipant.deleteMany({ where: { roomId } });
     await this.prisma.room.delete({ where: { id: roomId } });
 

@@ -1,18 +1,17 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import { useAuthStore } from "@/stores/auth-store";
 import { userApi, statsApi } from "@/lib/api-client";
 import { useDdragonStore } from "@/stores/ddragon-store";
 import { ChampionImage } from "@/components/ChampionImage";
-import { Card, CardHeader, CardTitle, CardContent, Button, Input, Label, LoadingSpinner, StatusSelector, ConfirmModal } from "@/components/ui";
+import { Card, CardHeader, CardTitle, CardContent, Button, Label, LoadingSpinner, ConfirmModal } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
-import { usePresence } from "@/hooks/usePresence";
-import { User, Bell, Shield, Palette, LogOut, Check, Camera, Info, ChevronDown, Star, Search, X, Link as LinkIcon, AlertCircle } from "lucide-react";
+import { useTheme } from "next-themes";
+import { Bell, Shield, Palette, LogOut, Check, ChevronDown, Info, Star, Search, X, Link as LinkIcon, AlertCircle } from "lucide-react";
 
-type SettingsTab = "profile" | "accounts" | "notifications" | "privacy" | "appearance" | "about";
+type SettingsTab = "accounts" | "notifications" | "privacy" | "appearance" | "about";
 
 interface UserSettings {
   notifyFriendRequest: boolean;
@@ -36,24 +35,15 @@ interface UserSettings {
 
 export default function SettingsPage() {
   const router = useRouter();
-  const { user, isAuthenticated, isLoading, logout, fetchUser } = useAuthStore();
+  const { user, isAuthenticated, isLoading, logout } = useAuthStore();
   const { champions, championMap, fetchChampions } = useDdragonStore();
-  const { myStatus, setStatus } = usePresence();
+  const { setTheme: setNextTheme } = useTheme();
   const { addToast } = useToast();
-  const [activeTab, setActiveTab] = useState<SettingsTab>("profile");
-  const [isSaving, setIsSaving] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState(false);
-  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<SettingsTab>("notifications");
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [championSearch, setChampionSearch] = useState("");
   const [showChampionPicker, setShowChampionPicker] = useState(false);
-
-  // Profile form state
-  const [username, setUsername] = useState("");
-  const [bio, setBio] = useState("");
 
   // Settings state
   const [settings, setSettings] = useState<UserSettings>({
@@ -83,13 +73,6 @@ export default function SettingsPage() {
     }
   }, [isAuthenticated, isLoading, router]);
 
-  useEffect(() => {
-    if (user) {
-      setUsername(user.username || "");
-      setBio(user.bio || "");
-    }
-  }, [user]);
-
   // Fetch champions for highlight picker
   useEffect(() => {
     if (isAuthenticated) {
@@ -102,6 +85,7 @@ export default function SettingsPage() {
     if (isAuthenticated) {
       userApi.getSettings()
         .then((data) => {
+          const savedTheme = data.theme ?? "dark";
           setSettings({
             notifyFriendRequest: data.notifyFriendRequest ?? true,
             notifyFriendAccepted: data.notifyFriendAccepted ?? true,
@@ -119,8 +103,10 @@ export default function SettingsPage() {
             allowFriendRequests: data.allowFriendRequests ?? true,
             highlightChampionId: data.highlightChampionId ?? null,
             highlightStatType: data.highlightStatType ?? null,
-            theme: data.theme ?? "dark",
+            theme: savedTheme,
           });
+          // 백엔드에 저장된 테마를 next-themes에 동기화
+          setNextTheme(savedTheme);
         })
         .catch((err) => {
           console.error("Failed to fetch settings:", err);
@@ -143,27 +129,14 @@ export default function SettingsPage() {
     return null;
   }
 
-  const handleSaveProfile = async () => {
-    setIsSaving(true);
-    setSaveSuccess(false);
-    try {
-      await userApi.updateProfile({ username, bio });
-      // Auth Store 동기화 — 헤더 등에 즉시 반영
-      await fetchUser();
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 2000);
-      addToast("프로필이 저장되었습니다.", "success");
-    } catch (error) {
-      console.error("Profile update error:", error);
-      addToast("프로필 저장에 실패했습니다.", "error");
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
   const handleSettingChange = async (key: keyof UserSettings, value: boolean | string | null) => {
     const newSettings = { ...settings, [key]: value };
     setSettings(newSettings);
+
+    // 테마 변경 시 next-themes에 즉시 반영
+    if (key === "theme" && typeof value === "string") {
+      setNextTheme(value);
+    }
 
     try {
       await userApi.updateSettings({ [key]: value });
@@ -171,6 +144,9 @@ export default function SettingsPage() {
       console.error("Settings update error:", error);
       // Revert on error
       setSettings(settings);
+      if (key === "theme") {
+        setNextTheme(settings.theme);
+      }
     }
   };
 
@@ -184,59 +160,7 @@ export default function SettingsPage() {
     }
   };
 
-  const handleAvatarClick = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // Validate file type
-    if (!file.type.match(/^image\/(jpeg|jpg|png|gif|webp)$/)) {
-      addToast("지원하지 않는 이미지 형식입니다. (jpg, png, gif, webp만 가능)", "error");
-      return;
-    }
-
-    // Validate file size (5MB max)
-    if (file.size > 5 * 1024 * 1024) {
-      addToast("이미지 크기는 5MB 이하여야 합니다.", "error");
-      return;
-    }
-
-    // Show preview
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      setAvatarPreview(event.target?.result as string);
-    };
-    reader.readAsDataURL(file);
-
-    // Upload
-    setIsUploadingAvatar(true);
-    try {
-      const response = await userApi.uploadAvatar(file);
-      addToast("프로필 사진이 변경되었습니다.", "success");
-      if (response.avatarUrl) {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-        setAvatarPreview(`${apiUrl}${response.avatarUrl}`);
-      }
-      // Auth Store 동기화 — 헤더/네비게이션에 새 아바타 즉시 반영
-      await fetchUser();
-    } catch (error) {
-      console.error("Avatar upload error:", error);
-      addToast("프로필 사진 업로드에 실패했습니다.", "error");
-      setAvatarPreview(null);
-    } finally {
-      setIsUploadingAvatar(false);
-      // Reset the file input
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
-    }
-  };
-
   const tabs = [
-    { id: "profile" as const, label: "프로필", icon: User },
     { id: "accounts" as const, label: "연결된 계정", icon: LinkIcon },
     { id: "notifications" as const, label: "알림", icon: Bell },
     { id: "privacy" as const, label: "개인정보", icon: Shield },
@@ -284,214 +208,6 @@ export default function SettingsPage() {
 
           {/* Content */}
           <div className="md:col-span-3">
-            {activeTab === "profile" && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>프로필 설정</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="flex items-center gap-4">
-                    <div className="relative group">
-                      <div className="w-20 h-20 rounded-full bg-bg-tertiary flex items-center justify-center overflow-hidden relative">
-                        {(avatarPreview || user.avatar) ? (
-                          <Image
-                            src={avatarPreview || user.avatar!}
-                            alt={user.username}
-                            fill
-                            className="object-cover"
-                            unoptimized
-                          />
-                        ) : (
-                          <User className="h-10 w-10 text-text-tertiary" />
-                        )}
-                        {isUploadingAvatar && (
-                          <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                            <LoadingSpinner size="sm" />
-                          </div>
-                        )}
-                      </div>
-                      <button
-                        onClick={handleAvatarClick}
-                        disabled={isUploadingAvatar}
-                        className="absolute inset-0 rounded-full bg-black/0 group-hover:bg-black/50 flex items-center justify-center transition-colors cursor-pointer"
-                      >
-                        <Camera className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                      </button>
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
-                        onChange={handleAvatarChange}
-                        className="hidden"
-                      />
-                    </div>
-                    <div>
-                      <p className="font-semibold text-text-primary">{user.username}</p>
-                      <p className="text-sm text-text-secondary">{user.email}</p>
-                      <button
-                        onClick={handleAvatarClick}
-                        disabled={isUploadingAvatar}
-                        className="text-sm text-accent-primary hover:underline mt-1"
-                      >
-                        사진 변경
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Status Selector */}
-                  <div className="flex items-center justify-between py-3 border-b border-bg-tertiary">
-                    <div>
-                      <p className="font-medium text-text-primary">온라인 상태</p>
-                      <p className="text-sm text-text-secondary">현재 상태를 설정합니다</p>
-                    </div>
-                    <StatusSelector
-                      currentStatus={myStatus}
-                      onStatusChange={(status) => setStatus(status)}
-                    />
-                  </div>
-
-                  <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="username">사용자 이름</Label>
-                      <Input
-                        id="username"
-                        value={username}
-                        onChange={(e) => setUsername(e.target.value)}
-                        placeholder="사용자 이름"
-                        className="mt-1"
-                      />
-                    </div>
-
-                    <div>
-                      <Label htmlFor="bio">자기소개</Label>
-                      <textarea
-                        id="bio"
-                        value={bio}
-                        onChange={(e) => setBio(e.target.value)}
-                        placeholder="자기소개를 입력하세요"
-                        rows={4}
-                        className="mt-1 w-full px-3 py-2 bg-bg-tertiary border border-bg-elevated rounded-lg text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-accent-primary"
-                      />
-                    </div>
-
-                    {/* Highlight Champion */}
-                    <div>
-                      <Label>대표 챔피언</Label>
-                      <p className="text-sm text-text-secondary mb-2">프로필에 표시할 대표 챔피언을 선택하세요</p>
-                      {settings.highlightChampionId ? (
-                        <div className="flex items-center gap-3 bg-bg-tertiary rounded-lg p-3">
-                          <ChampionImage
-                            championKey={championMap.get(settings.highlightChampionId)?.id || settings.highlightChampionId}
-                            size={40}
-                            className="rounded-md"
-                          />
-                          <div className="flex-1">
-                            <p className="font-medium text-text-primary">
-                              {championMap.get(settings.highlightChampionId)?.name || settings.highlightChampionId}
-                            </p>
-                            <p className="text-xs text-text-tertiary">대표 챔피언</p>
-                          </div>
-                          <div className="flex gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setShowChampionPicker(true)}
-                            >
-                              변경
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleSettingChange("highlightChampionId", null)}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      ) : (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setShowChampionPicker(true)}
-                          className="border border-dashed border-bg-elevated"
-                        >
-                          <Star className="h-4 w-4 mr-1" />
-                          대표 챔피언 선택
-                        </Button>
-                      )}
-
-                      {/* Champion Picker */}
-                      {showChampionPicker && (
-                        <div className="mt-3 bg-bg-tertiary rounded-lg p-4 border border-bg-elevated">
-                          <div className="relative mb-3">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-tertiary" />
-                            <input
-                              type="text"
-                              value={championSearch}
-                              onChange={(e) => setChampionSearch(e.target.value)}
-                              placeholder="챔피언 검색..."
-                              className="w-full pl-9 pr-3 py-2 bg-bg-primary border border-bg-elevated rounded-lg text-sm text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-accent-primary"
-                              autoFocus
-                            />
-                          </div>
-                          <div className="grid grid-cols-6 sm:grid-cols-8 gap-2 max-h-60 overflow-y-auto">
-                            {champions
-                              .filter((c) =>
-                                c.name.toLowerCase().includes(championSearch.toLowerCase()) ||
-                                c.id.toLowerCase().includes(championSearch.toLowerCase())
-                              )
-                              .map((champ) => (
-                                <button
-                                  key={champ.key}
-                                  onClick={() => {
-                                    handleSettingChange("highlightChampionId", champ.key);
-                                    setShowChampionPicker(false);
-                                    setChampionSearch("");
-                                  }}
-                                  className={`flex flex-col items-center gap-1 p-1.5 rounded-lg hover:bg-bg-elevated transition-colors ${
-                                    settings.highlightChampionId === champ.key ? "ring-2 ring-accent-primary bg-bg-elevated" : ""
-                                  }`}
-                                  title={champ.name}
-                                >
-                                  <ChampionImage championKey={champ.id} size={36} className="rounded-md" />
-                                  <span className="text-[10px] text-text-secondary truncate w-full text-center">
-                                    {champ.name}
-                                  </span>
-                                </button>
-                              ))}
-                          </div>
-                          <div className="mt-3 flex justify-end">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                setShowChampionPicker(false);
-                                setChampionSearch("");
-                              }}
-                            >
-                              닫기
-                            </Button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex justify-end items-center gap-3">
-                    {saveSuccess && (
-                      <span className="text-accent-success flex items-center gap-1">
-                        <Check className="h-4 w-4" />
-                        저장됨
-                      </span>
-                    )}
-                    <Button onClick={handleSaveProfile} isLoading={isSaving}>
-                      저장
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
             {activeTab === "accounts" && (
               <Card>
                 <CardHeader>
@@ -906,7 +622,7 @@ export default function SettingsPage() {
                     <InfoRow label="서비스 이름" value="NEXUS" />
                     <InfoRow label="버전" value="1.0.0" mono />
                     <InfoRow label="제작" value="Harumaroon" />
-                    <InfoRow label="문의" value="nexus.lol.kr@gmail.com" accent />
+                    <InfoRow label="문의" value="nexuscshelper@gmail.com" accent href="mailto:nexuscshelper@gmail.com" />
                     <div className="pt-4 mt-3 border-t border-bg-tertiary">
                       <p className="text-xs text-text-tertiary leading-relaxed">
                         &copy; {new Date().getFullYear()} Harumaroon. All rights reserved.
@@ -955,13 +671,16 @@ export default function SettingsPage() {
 }
 
 /* ─── Info row ─── */
-function InfoRow({ label, value, mono, accent }: { label: string; value: string; mono?: boolean; accent?: boolean }) {
+function InfoRow({ label, value, mono, accent, href }: { label: string; value: string; mono?: boolean; accent?: boolean; href?: string }) {
+  const textClass = `text-sm font-medium ${mono ? 'font-mono' : ''} ${accent ? 'text-accent-primary' : 'text-text-primary'}`;
   return (
     <div className="flex items-center justify-between py-2.5 border-b border-bg-tertiary last:border-b-0">
       <span className="text-text-secondary text-sm">{label}</span>
-      <span className={`text-sm font-medium ${mono ? 'font-mono' : ''} ${accent ? 'text-accent-primary' : 'text-text-primary'}`}>
-        {value}
-      </span>
+      {href ? (
+        <a href={href} className={`${textClass} hover:underline`}>{value}</a>
+      ) : (
+        <span className={textClass}>{value}</span>
+      )}
     </div>
   );
 }
@@ -1152,7 +871,7 @@ NEXUS(이하 "서비스")는 이용자의 개인정보를 중요시하며, 「�
 10. 개인정보 보호 책임자
 서비스의 개인정보 보호 책임자는 다음과 같습니다.
 • 책임자: Harumaroon
-• 이메일: nexus.lol.kr@gmail.com
+• 이메일: nexuscshelper@gmail.com
 이용자는 서비스 이용 중 발생하는 모든 개인정보 관련 문의를 위 이메일을 통해 제기할 수 있으며, 서비스는 이용자의 문의에 성실히 답변합니다.
 
 11. 개인정보 처리방침의 변경

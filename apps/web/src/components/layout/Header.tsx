@@ -59,20 +59,22 @@ export function Header() {
 
       {/* Right: Friends + Theme Toggle + Auth */}
       <div className="flex items-center gap-3">
-        {isAuthenticated && user?.role === 'ADMIN' && (
+        {isAuthenticated && (user?.role === 'ADMIN' || user?.role === 'MODERATOR') && (
           <>
-            <Link
-              href="/simulation"
-              className={cn(
-                'p-2 rounded-lg transition-colors duration-150',
-                pathname.startsWith('/simulation')
-                  ? 'bg-accent-primary/10 text-accent-primary'
-                  : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary'
-              )}
-              title="시뮬레이션"
-            >
-              <FlaskConical className="h-5 w-5" />
-            </Link>
+            {user?.role === 'ADMIN' && (
+              <Link
+                href="/simulation"
+                className={cn(
+                  'p-2 rounded-lg transition-colors duration-150',
+                  pathname.startsWith('/simulation')
+                    ? 'bg-accent-primary/10 text-accent-primary'
+                    : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary'
+                )}
+                title="시뮬레이션"
+              >
+                <FlaskConical className="h-5 w-5" />
+              </Link>
+            )}
             <Link
               href="/admin"
               className={cn(

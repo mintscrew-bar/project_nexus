@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import {
   getChampionIcon,
+  getChampionIconById,
   getItemIcon,
   getSummonerSpellIcon,
 } from "@/components/matches/match-utils";
@@ -64,6 +65,7 @@ interface MatchParticipant {
   item4: number;
   item5: number;
   item6: number;
+  item7?: number;
   perks: any;
   doubleKills: number;
   tripleKills: number;
@@ -190,9 +192,7 @@ function getMultiKillBadge(p: MatchParticipant): { label: string; color: string 
   return null;
 }
 
-function getChampionIconById(championId: number): string {
-  return `https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/${championId}.png`;
-}
+// getChampionIconById is imported from match-utils
 
 function formatDuration(seconds: number): string {
   const m = Math.floor(seconds / 60);
@@ -340,6 +340,7 @@ function PlayerRow({
   const multiKill = getMultiKillBadge(participant);
   const items = [participant.item0, participant.item1, participant.item2, participant.item3, participant.item4, participant.item5];
   const trinket = participant.item6;
+  const questItem = participant.item7;
 
   return (
     <div
@@ -487,6 +488,18 @@ function PlayerRow({
             />
           )}
         </div>
+        {/* Quest item */}
+        {questItem != null && questItem !== 0 && (
+          <div className="w-7 h-7 bg-bg-elevated rounded border border-amber-500/40 ml-0.5">
+            <Image
+              src={getItemIcon(questItem)}
+              alt="quest"
+              width={28}
+              height={28}
+              className="w-full h-full rounded"
+            />
+          </div>
+        )}
       </div>
     </div>
   );
@@ -573,7 +586,7 @@ function CompactPlayerRow({
       )}
 
       {/* Items (compact) */}
-      <div className="flex gap-px flex-shrink-0 ml-auto">
+      <div className="flex gap-px flex-shrink-0 ml-auto items-center">
         {[participant.item0, participant.item1, participant.item2, participant.item3, participant.item4, participant.item5].map((itemId, idx) => {
           const icon = getItemIconUrl(itemId);
           return (
@@ -584,6 +597,11 @@ function CompactPlayerRow({
             </div>
           );
         })}
+        {participant.item7 != null && participant.item7 !== 0 && (
+          <div className="w-5 h-5 bg-bg-elevated rounded border border-amber-500/40 ml-px">
+            <Image src={getItemIcon(participant.item7)} alt="quest" width={20} height={20} className="w-full h-full rounded" />
+          </div>
+        )}
       </div>
     </div>
   );

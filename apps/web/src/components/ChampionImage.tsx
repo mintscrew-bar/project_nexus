@@ -26,20 +26,19 @@ export function ChampionImage({
   alt,
 }: ChampionImageProps) {
   const getImageUrl = () => {
-    // TODO: API에서 버전을 가져와서 동적으로 생성하거나
-    // 환경변수로 최신 버전을 관리
-    const version = process.env.NEXT_PUBLIC_DDRAGON_VERSION || "16.2.1";
-    const baseUrl = "https://ddragon.leagueoflegends.com";
-
     switch (type) {
       case "square":
-        return `${baseUrl}/cdn/${version}/img/champion/${championKey}.png`;
-      case "splash":
+        return `/icons/champions/${championKey}.png`;
+      case "splash": {
+        const baseUrl = "https://ddragon.leagueoflegends.com";
         return `${baseUrl}/cdn/img/champion/splash/${championKey}_0.jpg`;
-      case "loading":
+      }
+      case "loading": {
+        const baseUrl = "https://ddragon.leagueoflegends.com";
         return `${baseUrl}/cdn/img/champion/loading/${championKey}_0.jpg`;
+      }
       default:
-        return `${baseUrl}/cdn/${version}/img/champion/${championKey}.png`;
+        return `/icons/champions/${championKey}.png`;
     }
   };
 

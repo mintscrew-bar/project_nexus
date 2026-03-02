@@ -69,15 +69,20 @@ export class AuthService {
     });
 
     if (authProvider) {
-      // Update user info
-      const user = await this.prisma.user.update({
-        where: { id: authProvider.userId },
-        data: {
-          username: profile.username,
-          avatar: profile.avatar,
-        },
-      });
-      return user;
+      // 재로그인 시 사용자가 커스텀한 닉네임/아바타를 덮어쓰지 않음
+      // 아바타가 없을 때만 OAuth 아바타로 설정
+      const updateData: Record<string, string> = {};
+      if (!authProvider.user.avatar && profile.avatar) {
+        updateData.avatar = profile.avatar;
+      }
+
+      if (Object.keys(updateData).length > 0) {
+        return this.prisma.user.update({
+          where: { id: authProvider.userId },
+          data: updateData,
+        });
+      }
+      return authProvider.user;
     }
 
     // Check if email already exists

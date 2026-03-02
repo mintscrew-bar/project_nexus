@@ -46,6 +46,9 @@ type Tab =
   | "chatlogs"
   | "announcements";
 
+// MODERATOR가 접근 가능한 탭
+const MODERATOR_TABS: Tab[] = ["dashboard", "reports", "community", "chatlogs"];
+
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: "dashboard", label: "대시보드", icon: <Activity className="h-4 w-4" /> },
   { id: "users", label: "유저 관리", icon: <Users className="h-4 w-4" /> },
@@ -63,12 +66,20 @@ export default function AdminPage() {
   const { addToast } = useToast();
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
 
+  const isAdmin = user?.role === "ADMIN";
+  const isModerator = user?.role === "MODERATOR";
+  const hasAdminAccess = isAdmin || isModerator;
+
+  const visibleTabs = isAdmin
+    ? TABS
+    : TABS.filter((tab) => MODERATOR_TABS.includes(tab.id));
+
   useEffect(() => {
     if (!authLoading) {
       if (!isAuthenticated) router.push("/auth/login");
-      else if (user?.role !== "ADMIN") router.push("/");
+      else if (!hasAdminAccess) router.push("/");
     }
-  }, [authLoading, isAuthenticated, user, router]);
+  }, [authLoading, isAuthenticated, user, router, hasAdminAccess]);
 
   if (authLoading || (!isAuthenticated && !authLoading)) {
     return (
@@ -77,7 +88,7 @@ export default function AdminPage() {
       </div>
     );
   }
-  if (user?.role !== "ADMIN") return null;
+  if (!hasAdminAccess) return null;
 
   return (
     <div className="flex h-[calc(100vh-64px)]">
@@ -88,7 +99,7 @@ export default function AdminPage() {
           <span className="font-bold text-text-primary text-sm">관리자 패널</span>
         </div>
         <nav className="flex-1 py-2">
-          {TABS.map((tab) => (
+          {visibleTabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
@@ -190,7 +201,7 @@ function DashboardTab({ addToast }: { addToast: (msg: string, type: "success" | 
         <StatCard icon={<Home className="h-5 w-5" />} label="전체 방" value={stats.totalRooms} />
         <StatCard icon={<Activity className="h-5 w-5" />} label="활성 방" value={stats.activeRooms} />
         <StatCard icon={<Sword className="h-5 w-5" />} label="전체 매치" value={stats.totalMatches} />
-        <StatCard icon={<Flag className="h-5 w-5" />} label="미처리 신고" value={stats.pendingReports} sub="처리 대기 중" />
+        <StatCard icon={<Flag className="h-5 w-5" />} label="미처리 신고" value={stats.pendingReports} sub={`유저 ${stats.pendingUserReports ?? 0} / 게시글 ${stats.pendingPostReports ?? 0}`} />
         <StatCard icon={<Shield className="h-5 w-5" />} label="전체 클랜" value={stats.totalClans} />
       </div>
     </div>
@@ -218,6 +229,17 @@ interface AdminUser {
 const ROLE_LABELS: Record<UserRole, string> = { USER: "일반", MODERATOR: "모더레이터", ADMIN: "관리자" };
 const ROLE_VARIANTS: Record<UserRole, "default" | "secondary" | "danger"> = { USER: "default", MODERATOR: "secondary", ADMIN: "danger" };
 
+const BAN_REASONS = [
+  { value: "욕설/비매너", label: "욕설/비매너" },
+  { value: "의도적 게임 방해", label: "의도적 게임 방해" },
+  { value: "핵/치팅 사용", label: "핵/치팅 사용" },
+  { value: "잠수/이탈 반복", label: "잠수/이탈 반복" },
+  { value: "부적절한 닉네임/콘텐츠", label: "부적절한 닉네임/콘텐츠" },
+  { value: "스팸/도배", label: "스팸/도배" },
+  { value: "OTHER", label: "직접 입력" },
+] as const;
+
+
 function UsersTab({ addToast, currentUserId }: { addToast: (msg: string, type: "success" | "error") => void; currentUserId?: string }) {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [total, setTotal] = useState(0);
@@ -227,8 +249,8 @@ function UsersTab({ addToast, currentUserId }: { addToast: (msg: string, type: "
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [banModal, setBanModal] = useState<AdminUser | null>(null);
-  const [banReason, setBanReason] = useState("");
-  const [banUntil, setBanUntil] = useState("");
+  const [banReasonSelect, setBanReasonSelect] = useState("");
+  const [banReasonCustom, setBanReasonCustom] = useState("");
   const [restrictModal, setRestrictModal] = useState<AdminUser | null>(null);
   const [restrictUntil, setRestrictUntil] = useState("");
 
@@ -264,14 +286,20 @@ function UsersTab({ addToast, currentUserId }: { addToast: (msg: string, type: "
     }
   };
 
+  const resetBanForm = () => {
+    setBanModal(null); setBanReasonSelect(""); setBanReasonCustom("");
+  };
+
+  const banReasonFinal = banReasonSelect === "OTHER" ? banReasonCustom : banReasonSelect;
+
   const handleBan = async () => {
     if (!banModal) return;
     setUpdatingId(banModal.id);
     try {
-      await adminApi.banUser(banModal.id, banReason, banUntil || undefined);
-      setUsers((prev) => prev.map((x) => x.id === banModal.id ? { ...x, isBanned: true, banReason, banUntil: banUntil || null } : x));
-      addToast(`${banModal.username} 밴 완료`, "success");
-      setBanModal(null); setBanReason(""); setBanUntil("");
+      await adminApi.banUser(banModal.id, banReasonFinal, undefined);
+      setUsers((prev) => prev.map((x) => x.id === banModal.id ? { ...x, isBanned: true, banReason: banReasonFinal, banUntil: null } : x));
+      addToast(`${banModal.username} 영구 밴 완료`, "success");
+      resetBanForm();
     } catch {
       addToast("밴 처리 실패", "error");
     } finally {
@@ -428,26 +456,37 @@ function UsersTab({ addToast, currentUserId }: { addToast: (msg: string, type: "
 
       {/* 밴 모달 */}
       {banModal && (
-        <Modal title={`${banModal.username} 밴`} onClose={() => { setBanModal(null); setBanReason(""); setBanUntil(""); }}>
+        <Modal title={`${banModal.username} 밴`} onClose={resetBanForm}>
           <div className="space-y-3">
             <div>
               <label className="block text-xs text-text-muted mb-1">사유 *</label>
-              <input
-                type="text" value={banReason} onChange={(e) => setBanReason(e.target.value)}
-                placeholder="밴 사유를 입력하세요"
-                className="w-full px-3 py-2 rounded-lg bg-bg-tertiary text-text-primary text-sm focus:outline-none focus:ring-1 focus:ring-accent-primary"
-              />
+              <div className="flex flex-wrap gap-1.5">
+                {BAN_REASONS.map((r) => (
+                  <button
+                    key={r.value}
+                    onClick={() => setBanReasonSelect(r.value)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      banReasonSelect === r.value
+                        ? "bg-red-500/20 text-red-400 border border-red-500/50"
+                        : "bg-bg-tertiary text-text-muted hover:text-text-primary"
+                    }`}
+                  >
+                    {r.label}
+                  </button>
+                ))}
+              </div>
+              {banReasonSelect === "OTHER" && (
+                <input
+                  type="text" value={banReasonCustom} onChange={(e) => setBanReasonCustom(e.target.value)}
+                  placeholder="사유를 직접 입력하세요"
+                  className="w-full mt-2 px-3 py-2 rounded-lg bg-bg-tertiary text-text-primary text-sm focus:outline-none focus:ring-1 focus:ring-accent-primary"
+                />
+              )}
             </div>
-            <div>
-              <label className="block text-xs text-text-muted mb-1">만료일 (비워두면 영구)</label>
-              <input
-                type="datetime-local" value={banUntil} onChange={(e) => setBanUntil(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg bg-bg-tertiary text-text-primary text-sm focus:outline-none focus:ring-1 focus:ring-accent-primary"
-              />
-            </div>
+            <p className="text-xs text-red-400">영구 밴이 적용됩니다.</p>
             <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => { setBanModal(null); setBanReason(""); setBanUntil(""); }}>취소</Button>
-              <Button variant="danger" onClick={handleBan} disabled={!banReason.trim()}>밴 적용</Button>
+              <Button variant="outline" onClick={resetBanForm}>취소</Button>
+              <Button variant="danger" onClick={handleBan} disabled={!banReasonFinal.trim()}>영구 밴 적용</Button>
             </div>
           </div>
         </Modal>
@@ -477,25 +516,63 @@ function UsersTab({ addToast, currentUserId }: { addToast: (msg: string, type: "
 
 // ── 신고 관리 ─────────────────────────────────────────────────────────────────
 
-interface Report {
+interface UserReportItem {
   id: string;
+  category: "user";
   reason: string;
   description: string | null;
   status: "PENDING" | "APPROVED" | "REJECTED";
   createdAt: string;
-  reporter: { id: string; username: string };
-  target: { id: string; username: string };
+  reporter: { id: string; username: string; avatar?: string };
+  target: { id: string; username: string; avatar?: string; isBanned?: boolean };
+  match?: { id: string } | null;
 }
 
+interface PostReportItem {
+  id: string;
+  category: "post";
+  reason: string;
+  description: string | null;
+  status: "PENDING" | "APPROVED" | "REJECTED";
+  createdAt: string;
+  reporter: { id: string; username: string; avatar?: string };
+  targetLabel: string;
+  post?: { id: string; title: string } | null;
+  comment?: { id: string; content: string } | null;
+}
+
+type ReportItem = UserReportItem | PostReportItem;
+
+const REPORT_CATEGORIES = [
+  { key: "user", label: "유저 신고" },
+  { key: "post", label: "게시글 신고" },
+] as const;
+
+const REASON_LABELS: Record<string, string> = {
+  TOXICITY: "욕설/비매너",
+  AFK: "잠수/이탈",
+  GRIEFING: "고의 방해",
+  CHEATING: "치팅/핵",
+  SPAM: "스팸",
+  HARASSMENT: "괴롭힘",
+  INAPPROPRIATE: "부적절한 콘텐츠",
+  MISINFORMATION: "허위 정보",
+  OTHER: "기타",
+};
+
 function ReportsTab({ addToast }: { addToast: (msg: string, type: "success" | "error") => void }) {
-  const [reports, setReports] = useState<Report[]>([]);
+  const [reports, setReports] = useState<ReportItem[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
+  const [category, setCategory] = useState<"user" | "post">("user");
   const [status, setStatus] = useState<string>("PENDING");
   const [loading, setLoading] = useState(true);
-  const [reviewModal, setReviewModal] = useState<Report | null>(null);
+  const [reviewModal, setReviewModal] = useState<ReportItem | null>(null);
   const [reviewStatus, setReviewStatus] = useState<"APPROVED" | "REJECTED">("APPROVED");
   const [reviewNote, setReviewNote] = useState("");
+  const [banWithApprove, setBanWithApprove] = useState(false);
+  const [banReasonSelect, setBanReasonSelect] = useState("");
+  const [banReasonCustom, setBanReasonCustom] = useState("");
 
   const limit = 20;
   const totalPages = Math.ceil(total / limit);
@@ -503,7 +580,7 @@ function ReportsTab({ addToast }: { addToast: (msg: string, type: "success" | "e
   const fetchReports = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await adminApi.getReports({ page, limit, status: status || undefined });
+      const data = await adminApi.getReports({ page, limit, status: status || undefined, category });
       setReports(data.reports);
       setTotal(data.total);
     } catch {
@@ -511,19 +588,57 @@ function ReportsTab({ addToast }: { addToast: (msg: string, type: "success" | "e
     } finally {
       setLoading(false);
     }
-  }, [page, status, addToast]);
+  }, [page, status, category, addToast]);
 
   useEffect(() => { fetchReports(); }, [fetchReports]);
+
+  const resetReviewBanForm = () => {
+    setReviewModal(null); setReviewNote(""); setBanWithApprove(false);
+    setBanReasonSelect(""); setBanReasonCustom("");
+  };
+
+  const reportBanReasonFinal = banReasonSelect === "OTHER" ? banReasonCustom : banReasonSelect;
 
   const handleReview = async () => {
     if (!reviewModal) return;
     try {
-      await adminApi.reviewReport(reviewModal.id, reviewStatus, reviewNote);
+      await adminApi.reviewReport(reviewModal.id, reviewStatus, reviewNote, reviewModal.category);
+      // 승인 + 밴 체크 시 대상 유저 영구 밴 처리
+      if (reviewStatus === "APPROVED" && banWithApprove && reviewModal.category === "user") {
+        const target = (reviewModal as UserReportItem).target;
+        const reason = reportBanReasonFinal || reviewNote || reviewModal.reason;
+        try {
+          await adminApi.banUser(target.id, reason, undefined);
+          addToast(`${target.username} 영구 밴 처리 완료`, "success");
+        } catch {
+          addToast("신고는 처리됐으나 밴 적용 실패", "error");
+        }
+      }
       setReports((prev) => prev.map((r) => r.id === reviewModal.id ? { ...r, status: reviewStatus } : r));
       addToast("신고 처리 완료", "success");
-      setReviewModal(null); setReviewNote("");
+      resetReviewBanForm();
     } catch {
       addToast("신고 처리 실패", "error");
+    }
+  };
+
+  const handleQuickBan = async (target: { id: string; username: string }) => {
+    try {
+      await adminApi.banUser(target.id, "관리자 밴", undefined);
+      addToast(`${target.username} 밴 완료`, "success");
+      fetchReports();
+    } catch {
+      addToast("밴 처리 실패", "error");
+    }
+  };
+
+  const handleQuickUnban = async (target: { id: string; username: string }) => {
+    try {
+      await adminApi.unbanUser(target.id);
+      addToast(`${target.username} 밴 해제 완료`, "success");
+      fetchReports();
+    } catch {
+      addToast("밴 해제 실패", "error");
     }
   };
 
@@ -534,15 +649,35 @@ function ReportsTab({ addToast }: { addToast: (msg: string, type: "success" | "e
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-text-primary">신고 관리</h2>
-        <select
-          value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}
-          className="px-3 py-1.5 rounded-lg bg-bg-tertiary text-text-primary text-sm focus:outline-none"
-        >
-          <option value="">전체</option>
-          <option value="PENDING">대기</option>
-          <option value="APPROVED">승인</option>
-          <option value="REJECTED">거부</option>
-        </select>
+        <div className="flex items-center gap-2">
+          <select
+            value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}
+            className="px-3 py-1.5 rounded-lg bg-bg-tertiary text-text-primary text-sm focus:outline-none"
+          >
+            <option value="">전체</option>
+            <option value="PENDING">대기</option>
+            <option value="APPROVED">승인</option>
+            <option value="REJECTED">거부</option>
+          </select>
+          <span className="text-text-muted text-xs">총 {total}건</span>
+        </div>
+      </div>
+
+      {/* 카테고리 탭 */}
+      <div className="flex gap-1 bg-bg-tertiary/50 p-1 rounded-lg w-fit">
+        {REPORT_CATEGORIES.map((cat) => (
+          <button
+            key={cat.key}
+            onClick={() => { setCategory(cat.key); setPage(1); }}
+            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              category === cat.key
+                ? "bg-accent-primary text-white"
+                : "text-text-muted hover:text-text-primary"
+            }`}
+          >
+            {cat.label}
+          </button>
+        ))}
       </div>
 
       <Card>
@@ -556,8 +691,12 @@ function ReportsTab({ addToast }: { addToast: (msg: string, type: "success" | "e
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-bg-tertiary text-text-muted">
-                    <th className="text-left px-4 py-3 font-medium">신고자 → 대상</th>
+                    <th className="text-left px-4 py-3 font-medium">신고자</th>
+                    <th className="text-left px-4 py-3 font-medium">
+                      {category === "user" ? "대상 유저" : "대상 콘텐츠"}
+                    </th>
                     <th className="text-left px-4 py-3 font-medium">사유</th>
+                    <th className="text-left px-4 py-3 font-medium">내용</th>
                     <th className="text-left px-4 py-3 font-medium">상태</th>
                     <th className="text-left px-4 py-3 font-medium">날짜</th>
                     <th className="text-left px-4 py-3 font-medium">액션</th>
@@ -567,23 +706,65 @@ function ReportsTab({ addToast }: { addToast: (msg: string, type: "success" | "e
                   {reports.map((r) => (
                     <tr key={r.id} className="border-b border-bg-tertiary/50 hover:bg-bg-tertiary/30">
                       <td className="px-4 py-3">
-                        <span className="text-text-secondary">{r.reporter.username}</span>
-                        <span className="text-text-muted mx-1">→</span>
-                        <span className="font-medium text-text-primary">{r.target.username}</span>
+                        <div className="flex items-center gap-2">
+                          {r.reporter.avatar && (
+                            <img src={r.reporter.avatar} alt="" className="w-5 h-5 rounded-full" />
+                          )}
+                          <span className="text-text-secondary">{r.reporter.username}</span>
+                        </div>
                       </td>
-                      <td className="px-4 py-3 text-text-secondary text-xs max-w-48 truncate">{r.reason}</td>
+                      <td className="px-4 py-3">
+                        {r.category === "user" ? (
+                          <div className="flex items-center gap-2">
+                            {(r as UserReportItem).target.avatar && (
+                              <img src={(r as UserReportItem).target.avatar} alt="" className="w-5 h-5 rounded-full" />
+                            )}
+                            <span className="font-medium text-text-primary">
+                              {(r as UserReportItem).target.username}
+                            </span>
+                            {(r as UserReportItem).target.isBanned && (
+                              <Badge variant="danger" className="text-[9px]">차단됨</Badge>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-text-secondary text-xs max-w-40 truncate block">
+                            {(r as PostReportItem).targetLabel}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <Badge variant="secondary" className="text-[10px]">
+                          {REASON_LABELS[r.reason] ?? r.reason}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3 text-text-secondary text-xs max-w-48 truncate">
+                        {r.description || "-"}
+                      </td>
                       <td className="px-4 py-3">
                         <Badge variant={STATUS_VARIANTS[r.status] ?? "default"} className="text-[10px]">
                           {STATUS_LABELS[r.status] ?? r.status}
                         </Badge>
                       </td>
-                      <td className="px-4 py-3 text-text-muted text-xs">
+                      <td className="px-4 py-3 text-text-muted text-xs whitespace-nowrap">
                         {new Date(r.createdAt).toLocaleDateString("ko-KR")}
                       </td>
                       <td className="px-4 py-3">
-                        {r.status === "PENDING" && (
-                          <Button size="sm" variant="outline" onClick={() => setReviewModal(r)}>처리</Button>
-                        )}
+                        <div className="flex gap-1">
+                          {r.status === "PENDING" && (
+                            <Button size="sm" variant="outline" onClick={() => setReviewModal(r)}>처리</Button>
+                          )}
+                          {r.category === "user" && (
+                            (r as UserReportItem).target.isBanned ? (
+                              <Button size="sm" variant="outline" onClick={() => handleQuickUnban((r as UserReportItem).target)}>
+                                <CheckCircle className="h-3.5 w-3.5 mr-1" />밴해제
+                              </Button>
+                            ) : (
+                              <Button size="sm" variant="danger" onClick={() => handleQuickBan((r as UserReportItem).target)}>
+                                <Ban className="h-3.5 w-3.5 mr-1" />밴
+                              </Button>
+                            )
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -598,9 +779,24 @@ function ReportsTab({ addToast }: { addToast: (msg: string, type: "success" | "e
       {reviewModal && (
         <Modal title="신고 처리" onClose={() => { setReviewModal(null); setReviewNote(""); }}>
           <div className="space-y-3">
-            <div className="bg-bg-tertiary rounded-lg p-3 text-sm">
-              <p className="text-text-muted text-xs mb-1">신고 내용</p>
+            <div className="bg-bg-tertiary rounded-lg p-3 text-sm space-y-2">
+              <div className="flex items-center gap-2 text-text-muted text-xs">
+                <Badge variant="secondary" className="text-[9px]">
+                  {reviewModal.category === "user" ? "유저 신고" : "게시글 신고"}
+                </Badge>
+                <span>{REASON_LABELS[reviewModal.reason] ?? reviewModal.reason}</span>
+              </div>
               <p className="text-text-primary">{reviewModal.description ?? reviewModal.reason}</p>
+              {reviewModal.category === "user" && (
+                <p className="text-text-muted text-xs">
+                  대상: {(reviewModal as UserReportItem).target.username}
+                </p>
+              )}
+              {reviewModal.category === "post" && (
+                <p className="text-text-muted text-xs">
+                  대상: {(reviewModal as PostReportItem).targetLabel}
+                </p>
+              )}
             </div>
             <div className="flex gap-2">
               {(["APPROVED", "REJECTED"] as const).map((s) => (
@@ -623,8 +819,52 @@ function ReportsTab({ addToast }: { addToast: (msg: string, type: "success" | "e
               rows={3}
               className="w-full px-3 py-2 rounded-lg bg-bg-tertiary text-text-primary text-sm resize-none focus:outline-none focus:ring-1 focus:ring-accent-primary"
             />
+            {/* 승인 시 밴 옵션 (유저 신고만) */}
+            {reviewStatus === "APPROVED" && reviewModal.category === "user" && (
+              <div className="space-y-2 border border-red-500/20 rounded-lg p-3 bg-red-500/5">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={banWithApprove}
+                    onChange={(e) => setBanWithApprove(e.target.checked)}
+                    className="rounded"
+                  />
+                  <span className="text-sm text-red-400 font-medium">
+                    대상 유저 ({(reviewModal as UserReportItem).target.username}) 밴 적용
+                  </span>
+                </label>
+                {banWithApprove && (
+                  <div className="space-y-2 pl-6 pt-1">
+                    <label className="block text-xs text-text-muted">밴 사유</label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {BAN_REASONS.map((r) => (
+                        <button
+                          key={r.value}
+                          onClick={() => setBanReasonSelect(r.value)}
+                          className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
+                            banReasonSelect === r.value
+                              ? "bg-red-500/20 text-red-400 border border-red-500/50"
+                              : "bg-bg-tertiary text-text-muted hover:text-text-primary"
+                          }`}
+                        >
+                          {r.label}
+                        </button>
+                      ))}
+                    </div>
+                    {banReasonSelect === "OTHER" && (
+                      <input
+                        type="text" value={banReasonCustom} onChange={(e) => setBanReasonCustom(e.target.value)}
+                        placeholder="사유를 직접 입력하세요"
+                        className="w-full mt-1.5 px-3 py-1.5 rounded-lg bg-bg-tertiary text-text-primary text-sm focus:outline-none focus:ring-1 focus:ring-red-500/50"
+                      />
+                    )}
+                    <p className="text-[11px] text-red-400">영구 밴이 적용됩니다.</p>
+                  </div>
+                )}
+              </div>
+            )}
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => { setReviewModal(null); setReviewNote(""); }}>취소</Button>
+              <Button variant="outline" onClick={resetReviewBanForm}>취소</Button>
               <Button variant="primary" onClick={handleReview}>처리 완료</Button>
             </div>
           </div>
@@ -994,21 +1234,41 @@ function RoomsTab({ addToast }: { addToast: (msg: string, type: "success" | "err
 
 // ── 채팅 로그 ─────────────────────────────────────────────────────────────────
 
+type ChatLogCategory = "room" | "dm" | "clan";
+
 interface ChatLog {
   id: string;
+  category: ChatLogCategory;
   content: string;
-  roomName: string | null;
+  location: string;
+  userId: string | null;
+  username: string;
+  avatar: string | null;
   createdAt: string;
-  user: { username: string } | null;
 }
+
+const CHAT_CATEGORIES: { id: ChatLogCategory; label: string }[] = [
+  { id: "room", label: "방 채팅" },
+  { id: "dm", label: "DM" },
+  { id: "clan", label: "클랜 채팅" },
+];
+
+const LOCATION_HEADERS: Record<ChatLogCategory, string> = {
+  room: "방",
+  dm: "수신자",
+  clan: "클랜",
+};
 
 function ChatLogsTab() {
   const [logs, setLogs] = useState<ChatLog[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
+  const [category, setCategory] = useState<ChatLogCategory>("room");
   const [roomName, setRoomName] = useState("");
+  const [userId, setUserId] = useState("");
   const [search, setSearch] = useState("");
   const [roomInput, setRoomInput] = useState("");
+  const [userInput, setUserInput] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -1020,7 +1280,9 @@ function ChatLogsTab() {
     try {
       const data = await adminApi.getChatLogs({
         page, limit,
-        roomName: roomName || undefined,
+        category,
+        roomName: (category === "room" && roomName) ? roomName : undefined,
+        userId: userId || undefined,
         search: search || undefined,
       });
       setLogs(data.logs ?? []);
@@ -1030,32 +1292,81 @@ function ChatLogsTab() {
     } finally {
       setLoading(false);
     }
-  }, [page, roomName, search]);
+  }, [page, category, roomName, userId, search]);
 
   useEffect(() => { fetchLogs(); }, [fetchLogs]);
+
+  const handleCategoryChange = (cat: ChatLogCategory) => {
+    setCategory(cat);
+    setPage(1);
+    setRoomName("");
+    setRoomInput("");
+  };
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    setRoomName(roomInput);
+    setUserId(userInput);
+    setSearch(searchInput);
+    setPage(1);
+  };
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h2 className="text-lg font-semibold text-text-primary">채팅 로그</h2>
-        <form
-          onSubmit={(e) => { e.preventDefault(); setRoomName(roomInput); setSearch(searchInput); setPage(1); }}
-          className="flex gap-2 flex-wrap"
-        >
-          <input
-            type="text" value={roomInput} onChange={(e) => setRoomInput(e.target.value)}
-            placeholder="방 이름 필터..."
-            className="px-3 py-1.5 rounded-lg bg-bg-tertiary text-text-primary text-sm w-36 focus:outline-none focus:border-accent-primary"
-          />
-          <input
-            type="text" value={searchInput} onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="내용 검색..."
-            className="px-3 py-1.5 rounded-lg bg-bg-tertiary text-text-primary text-sm w-40 focus:outline-none focus:border-accent-primary"
-          />
-          <Button type="submit" size="sm" variant="outline"><Search className="h-4 w-4" /></Button>
-        </form>
+        <span className="text-xs text-text-muted">총 {total.toLocaleString()}건</span>
       </div>
 
+      {/* 카테고리 탭 */}
+      <div className="flex gap-1 bg-bg-tertiary/50 rounded-lg p-1 w-fit">
+        {CHAT_CATEGORIES.map((cat) => (
+          <button
+            key={cat.id}
+            onClick={() => handleCategoryChange(cat.id)}
+            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              category === cat.id
+                ? "bg-accent-primary text-white"
+                : "text-text-secondary hover:text-text-primary hover:bg-bg-tertiary"
+            }`}
+          >
+            {cat.label}
+          </button>
+        ))}
+      </div>
+
+      {/* 필터 */}
+      <form onSubmit={handleSearch} className="flex gap-2 flex-wrap">
+        {category === "room" && (
+          <input
+            type="text" value={roomInput} onChange={(e) => setRoomInput(e.target.value)}
+            placeholder="방 이름..."
+            className="px-3 py-1.5 rounded-lg bg-bg-tertiary text-text-primary text-sm w-36 focus:outline-none focus:ring-1 focus:ring-accent-primary"
+          />
+        )}
+        <input
+          type="text" value={userInput} onChange={(e) => setUserInput(e.target.value)}
+          placeholder="유저 ID..."
+          className="px-3 py-1.5 rounded-lg bg-bg-tertiary text-text-primary text-sm w-44 focus:outline-none focus:ring-1 focus:ring-accent-primary"
+        />
+        <input
+          type="text" value={searchInput} onChange={(e) => setSearchInput(e.target.value)}
+          placeholder="내용 검색..."
+          className="px-3 py-1.5 rounded-lg bg-bg-tertiary text-text-primary text-sm w-40 focus:outline-none focus:ring-1 focus:ring-accent-primary"
+        />
+        <Button type="submit" size="sm" variant="outline"><Search className="h-4 w-4" /></Button>
+        {(roomName || userId || search) && (
+          <Button type="button" size="sm" variant="ghost" onClick={() => {
+            setRoomName(""); setUserId(""); setSearch("");
+            setRoomInput(""); setUserInput(""); setSearchInput("");
+            setPage(1);
+          }}>
+            <X className="h-4 w-4 mr-1" /> 초기화
+          </Button>
+        )}
+      </form>
+
+      {/* 테이블 */}
       <Card>
         <CardContent className="p-0">
           {loading ? (
@@ -1067,21 +1378,36 @@ function ChatLogsTab() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-bg-tertiary text-text-muted">
-                    <th className="text-left px-4 py-3 font-medium">시간</th>
-                    <th className="text-left px-4 py-3 font-medium">방</th>
-                    <th className="text-left px-4 py-3 font-medium">유저</th>
+                    <th className="text-left px-4 py-3 font-medium w-40">시간</th>
+                    <th className="text-left px-4 py-3 font-medium w-32">{LOCATION_HEADERS[category]}</th>
+                    <th className="text-left px-4 py-3 font-medium w-28">유저</th>
                     <th className="text-left px-4 py-3 font-medium">내용</th>
                   </tr>
                 </thead>
                 <tbody>
                   {logs.map((log) => (
                     <tr key={log.id} className="border-b border-bg-tertiary/50 hover:bg-bg-tertiary/30">
-                      <td className="px-4 py-3 text-text-muted text-xs whitespace-nowrap">
+                      <td className="px-4 py-2.5 text-text-muted text-xs whitespace-nowrap">
                         {new Date(log.createdAt).toLocaleString("ko-KR")}
                       </td>
-                      <td className="px-4 py-3 text-xs text-text-secondary">{log.roomName ?? "(삭제된 방)"}</td>
-                      <td className="px-4 py-3 text-text-secondary">{log.user?.username ?? "(탈퇴)"}</td>
-                      <td className="px-4 py-3 text-text-primary max-w-md truncate">{log.content}</td>
+                      <td className="px-4 py-2.5 text-xs text-text-secondary truncate max-w-[8rem]" title={log.location}>
+                        {log.location}
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <div className="flex items-center gap-1.5">
+                          {log.avatar ? (
+                            <img src={log.avatar} alt="" className="w-5 h-5 rounded-full" />
+                          ) : (
+                            <div className="w-5 h-5 rounded-full bg-bg-tertiary" />
+                          )}
+                          <span className="text-text-secondary text-xs truncate max-w-[5rem]" title={log.username}>
+                            {log.username}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-2.5 text-text-primary">
+                        <p className="truncate max-w-lg" title={log.content}>{log.content}</p>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

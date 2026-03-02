@@ -1,5 +1,6 @@
 import { Injectable, ForbiddenException, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
+import { RedisService } from "../redis/redis.service";
 import { RiotMatchService } from "../riot/riot-match.service";
 import { RiotService } from "../riot/riot.service";
 
@@ -59,6 +60,7 @@ export interface AuctionStats {
 export class StatsService {
   constructor(
     private readonly prisma: PrismaService,
+    private readonly redis: RedisService,
     private readonly riotMatchService: RiotMatchService,
     private readonly riotService: RiotService,
   ) {}
@@ -505,11 +507,19 @@ export class StatsService {
 
   /**
    * 랭크 게임 챔피언별 시즌 전체 통계
+   * - Redis 캐시 (10분) → 즉시 반환
    * - 솔로(420) + 자유(440) 랭크 매치 ID를 100개씩 전부 페이징
    * - 각 매치는 DB 캐시 우선 조회 → 없으면 Riot API 호출 후 DB에 저장
-   * - 재요청 시에는 DB에서 즉시 반환 (API 호출 없음)
+   * - 매치 상세는 5개씩 배치 순차 처리 (rate limit 보호)
    */
   async getRankedChampionStats(gameName: string, tagLine: string) {
+    // 1. Redis 캐시 확인 (10분 TTL)
+    const cacheKey = `stats:ranked-champ:${gameName.toLowerCase()}:${tagLine.toLowerCase()}`;
+    const cached = await this.redis.get(cacheKey);
+    if (cached) {
+      return JSON.parse(cached);
+    }
+
     const summonerInfo = await this.riotService.getSummonerByRiotId(
       gameName,
       tagLine,
@@ -525,37 +535,44 @@ export class StatsService {
       new Date("2026-01-09T00:00:00Z").getTime() / 1000,
     );
 
-    // 모든 랭크 매치 ID 수집 (두 큐 타입 병렬로)
+    // 모든 랭크 매치 ID 수집 (큐 타입 순차 처리 — rate limit 보호)
     const allMatchIds: string[] = [];
-    await Promise.all(
-      RANKED_QUEUES.map(async (queueId) => {
-        let start = 0;
-        while (true) {
-          const ids = await this.riotMatchService.getMatchIdsByPuuid(
-            puuid,
-            start,
-            BATCH_SIZE,
-            queueId,
-            undefined,
-            3,
-            SEASON_2026_START,
-          );
-          allMatchIds.push(...ids);
-          if (ids.length < BATCH_SIZE) break;
-          start += BATCH_SIZE;
-        }
-      }),
-    );
+    for (const queueId of RANKED_QUEUES) {
+      let start = 0;
+      while (true) {
+        const ids = await this.riotMatchService.getMatchIdsByPuuid(
+          puuid,
+          start,
+          BATCH_SIZE,
+          queueId,
+          undefined,
+          3,
+          SEASON_2026_START,
+        );
+        allMatchIds.push(...ids);
+        if (ids.length < BATCH_SIZE) break;
+        start += BATCH_SIZE;
+      }
+    }
 
-    if (allMatchIds.length === 0) return [];
+    if (allMatchIds.length === 0) {
+      await this.redis.set(cacheKey, JSON.stringify([]), 600);
+      return [];
+    }
 
-    // 중복 제거 (솔로 + 자유 사이에 겹칠 일은 없지만 안전하게)
+    // 중복 제거
     const uniqueIds = [...new Set(allMatchIds)];
 
-    // 각 매치 상세 조회 (DB 캐시 우선)
-    const matchDetails = await Promise.all(
-      uniqueIds.map((id) => this.riotMatchService.getMatchById(id)),
-    );
+    // 각 매치 상세 조회 — 5개씩 배치 순차 처리 (rate limit 보호)
+    const FETCH_BATCH = 5;
+    const matchDetails: any[] = [];
+    for (let i = 0; i < uniqueIds.length; i += FETCH_BATCH) {
+      const batch = uniqueIds.slice(i, i + FETCH_BATCH);
+      const results = await Promise.all(
+        batch.map((id) => this.riotMatchService.getMatchById(id)),
+      );
+      matchDetails.push(...results);
+    }
 
     // 챔피언별 통계 집계
     const statsMap = new Map<string, RankedChampStat>();
@@ -563,7 +580,7 @@ export class StatsService {
     for (const match of matchDetails) {
       if (!match) continue;
       const participant = match.info.participants.find(
-        (p) => p.puuid === puuid,
+        (p: any) => p.puuid === puuid,
       );
       if (!participant) continue;
 
@@ -590,6 +607,11 @@ export class StatsService {
       }
     }
 
-    return Array.from(statsMap.values()).sort((a, b) => b.games - a.games);
+    const result = Array.from(statsMap.values()).sort((a, b) => b.games - a.games);
+
+    // Redis 캐시 저장 (10분)
+    await this.redis.set(cacheKey, JSON.stringify(result), 600);
+
+    return result;
   }
 }

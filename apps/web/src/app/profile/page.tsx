@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { useAuthStore } from '@/stores/auth-store';
@@ -10,10 +10,11 @@ import { userApi, matchApi, statsApi } from '@/lib/api-client';
 import { AddAccountModal } from '@/components/domain/AddAccountModal';
 import { EditAccountModal } from '@/components/domain/EditAccountModal';
 import { ChampionImage } from '@/components/ChampionImage';
-import { LoadingSpinner, Card, CardHeader, CardTitle, CardContent, Badge, Button, Skeleton, EmptyState, ConfirmModal } from '@/components/ui';
-import { Star, Plus, RefreshCw, Shield, Trophy, TrendingUp, Loader2, Gamepad2, Target, History, Clock, Calendar, Settings, User, BarChart3, Pencil, Trash2, Swords, ChevronUp, Gavel } from 'lucide-react';
+import { LoadingSpinner, Card, CardHeader, CardTitle, CardContent, Badge, Button, Skeleton, EmptyState, ConfirmModal, StatusSelector } from '@/components/ui';
+import { Star, Plus, RefreshCw, Shield, Trophy, TrendingUp, Loader2, Gamepad2, Target, History, Clock, Calendar, Settings, User, BarChart3, Pencil, Trash2, Swords, ChevronUp, Gavel, Camera, Check, X } from 'lucide-react';
 import { TierBadge } from '@/components/domain/TierBadge';
 import { useToast } from '@/components/ui/Toast';
+import { usePresence } from '@/hooks/usePresence';
 
 const ROLE_LABELS: Record<string, string> = {
   TOP: '탑',
@@ -25,7 +26,7 @@ const ROLE_LABELS: Record<string, string> = {
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { user, isAuthenticated, isLoading: authLoading } = useAuthStore();
+  const { user, isAuthenticated, isLoading: authLoading, fetchUser } = useAuthStore();
   const {
     accounts,
     selectedAccount,
@@ -37,6 +38,7 @@ export default function ProfilePage() {
     deleteAccount,
   } = useRiotStore();
   const { championMap, fetchChampions } = useDdragonStore();
+  const { myStatus, setStatus } = usePresence();
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -53,6 +55,15 @@ export default function ProfilePage() {
   const [rankedChampStats, setRankedChampStats] = useState<any[]>([]);
   const [auctionStats, setAuctionStats] = useState<any>(null);
 
+  // 프로필 인라인 편집
+  const [editUsername, setEditUsername] = useState("");
+  const [editBio, setEditBio] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const [profileDirty, setProfileDirty] = useState(false);
+
   const fetchProfile = useCallback(async () => {
     if (!user?.id) return;
     setProfileLoading(true);
@@ -65,6 +76,79 @@ export default function ProfilePage() {
       setProfileLoading(false);
     }
   }, [user?.id]);
+
+  // user가 로드되면 편집 필드 초기화
+  useEffect(() => {
+    if (user) {
+      setEditUsername(user.username || "");
+      setEditBio(user.bio || "");
+      setProfileDirty(false);
+    }
+  }, [user]);
+
+  const handleUsernameChange = (val: string) => {
+    setEditUsername(val);
+    setProfileDirty(val !== (user?.username || "") || editBio !== (user?.bio || ""));
+  };
+
+  const handleBioChange = (val: string) => {
+    setEditBio(val);
+    setProfileDirty(editUsername !== (user?.username || "") || val !== (user?.bio || ""));
+  };
+
+  const handleSaveProfile = async () => {
+    if (!editUsername.trim()) {
+      addToast("사용자 이름을 입력해주세요.", "error");
+      return;
+    }
+    setIsSaving(true);
+    try {
+      await userApi.updateProfile({ username: editUsername.trim(), bio: editBio.trim() });
+      await fetchUser();
+      await fetchProfile();
+      setProfileDirty(false);
+      addToast("프로필이 저장되었습니다.", "success");
+    } catch {
+      addToast("프로필 저장에 실패했습니다.", "error");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.match(/^image\/(jpeg|jpg|png|gif|webp)$/)) {
+      addToast("지원하지 않는 이미지 형식입니다. (jpg, png, gif, webp만 가능)", "error");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      addToast("이미지 크기는 5MB 이하여야 합니다.", "error");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => setAvatarPreview(event.target?.result as string);
+    reader.readAsDataURL(file);
+
+    setIsUploadingAvatar(true);
+    try {
+      const response = await userApi.uploadAvatar(file);
+      if (response.avatarUrl) {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+        setAvatarPreview(`${apiUrl}${response.avatarUrl}`);
+      }
+      await fetchUser();
+      addToast("프로필 사진이 변경되었습니다.", "success");
+    } catch {
+      addToast("프로필 사진 업로드에 실패했습니다.", "error");
+      setAvatarPreview(null);
+    } finally {
+      setIsUploadingAvatar(false);
+      if (avatarInputRef.current) avatarInputRef.current.value = "";
+    }
+  };
 
   const fetchPositionStats = useCallback(async () => {
     if (!user?.id) return;
@@ -311,12 +395,12 @@ export default function ProfilePage() {
               </div>
             ) : (
             <div className="flex flex-col md:flex-row items-start gap-6">
-              {/* Avatar */}
-              <div className="flex-shrink-0">
+              {/* Avatar - 항상 클릭하여 변경 가능 */}
+              <div className="flex-shrink-0 relative group cursor-pointer" onClick={() => avatarInputRef.current?.click()}>
                 <div className="w-24 h-24 md:w-28 md:h-28 rounded-full bg-bg-tertiary flex items-center justify-center overflow-hidden relative">
-                  {user.avatar ? (
+                  {(avatarPreview || user.avatar) ? (
                     <Image
-                      src={user.avatar}
+                      src={avatarPreview || user.avatar!}
                       alt={user.username}
                       fill
                       className="object-cover"
@@ -325,13 +409,38 @@ export default function ProfilePage() {
                   ) : (
                     <User className="h-12 w-12 text-text-tertiary" />
                   )}
+                  {isUploadingAvatar && (
+                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                      <LoadingSpinner size="sm" />
+                    </div>
+                  )}
+                  <div className="absolute inset-0 rounded-full bg-black/0 group-hover:bg-black/50 flex items-center justify-center transition-colors">
+                    <Camera className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
                 </div>
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                  onChange={handleAvatarChange}
+                  className="hidden"
+                />
               </div>
 
               {/* Info */}
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-3 mb-2">
-                  <h1 className="text-2xl md:text-3xl font-bold text-text-primary">{user.username}</h1>
+                {/* 닉네임 */}
+                <div className="flex items-center gap-3 mb-2 group/name">
+                  <div className="inline-flex items-center gap-1.5">
+                    <input
+                      value={editUsername}
+                      onChange={(e) => handleUsernameChange(e.target.value)}
+                      style={{ width: `${Math.max(editUsername.length, 4) + 1}ch` }}
+                      className="text-2xl md:text-3xl font-bold text-text-primary bg-transparent border-b border-transparent hover:border-bg-elevated focus:border-accent-primary focus:outline-none transition-colors"
+                      placeholder="사용자 이름"
+                    />
+                    <Pencil className="h-4 w-4 text-text-tertiary opacity-0 group-hover/name:opacity-100 transition-opacity pointer-events-none flex-shrink-0" />
+                  </div>
                   {clan && (
                     <Badge variant="primary" size="sm" className="cursor-pointer" onClick={() => router.push(`/clans/${clan.id}`)}>
                       [{clan.tag}] {clan.name}
@@ -339,16 +448,25 @@ export default function ProfilePage() {
                   )}
                 </div>
 
-                {/* Bio */}
-                <p className="text-text-secondary mb-3 max-w-2xl">
-                  {user.bio || profileData?.bio || (
-                    <span className="text-text-tertiary italic">자기소개가 없습니다. 설정에서 추가해보세요.</span>
-                  )}
-                </p>
+                {/* 자기소개 */}
+                <div className="inline-flex items-start gap-1.5 group/bio max-w-2xl mb-3">
+                  <textarea
+                    value={editBio}
+                    onChange={(e) => handleBioChange(e.target.value)}
+                    rows={1}
+                    style={{ width: `${Math.max((editBio || '').length, 10) + 2}ch`, maxWidth: '100%' }}
+                    className="text-text-secondary bg-transparent border-b border-transparent hover:border-bg-elevated focus:border-accent-primary focus:outline-none transition-colors text-sm resize-none placeholder:text-text-tertiary placeholder:italic"
+                    placeholder="자기소개를 입력하세요"
+                  />
+                  <Pencil className="h-3.5 w-3.5 mt-1 text-text-tertiary opacity-0 group-hover/bio:opacity-100 transition-opacity pointer-events-none flex-shrink-0" />
+                </div>
 
                 {/* Meta info row */}
                 <div className="flex flex-wrap items-center gap-4 text-sm text-text-secondary">
-                  {/* Primary Riot Account */}
+                  <StatusSelector
+                    currentStatus={myStatus}
+                    onStatusChange={(status) => setStatus(status)}
+                  />
                   {primary && (
                     <div className="flex items-center gap-2">
                       <TierBadge tier={primary.tier} size="sm" />
@@ -359,8 +477,6 @@ export default function ProfilePage() {
                       )}
                     </div>
                   )}
-
-                  {/* Peak Tier */}
                   {primary?.peakTier && (
                     <div className="flex items-center gap-1">
                       <ChevronUp className="h-4 w-4 text-accent-gold" />
@@ -369,8 +485,6 @@ export default function ProfilePage() {
                       {primary.peakRank && <span className="text-text-tertiary">{primary.peakRank}</span>}
                     </div>
                   )}
-
-                  {/* Main / Sub Role */}
                   {primary?.mainRole && (
                     <div className="flex items-center gap-1">
                       <Gamepad2 className="h-4 w-4 text-accent-primary" />
@@ -380,16 +494,12 @@ export default function ProfilePage() {
                       )}
                     </div>
                   )}
-
-                  {/* Highlight Champion */}
                   {highlightChampionId && (
                     <div className="flex items-center gap-1.5">
                       <ChampionImage championKey={getChampionKey(highlightChampionId)} size={20} className="rounded" />
                       <span className="font-medium text-accent-gold">{getChampionName(highlightChampionId)}</span>
                     </div>
                   )}
-
-                  {/* Join date */}
                   <div className="flex items-center gap-1">
                     <Calendar className="h-4 w-4 text-text-tertiary" />
                     <span>{new Date(profileData?.createdAt || user.createdAt).toLocaleDateString('ko-KR')} 가입</span>
@@ -397,11 +507,19 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              {/* Settings button */}
-              <Button variant="ghost" size="sm" onClick={() => router.push('/settings')} className="flex-shrink-0">
-                <Settings className="h-4 w-4 mr-1" />
-                설정
-              </Button>
+              {/* 저장 / 설정 버튼 */}
+              <div className="flex-shrink-0 flex gap-2">
+                {profileDirty && (
+                  <Button size="sm" onClick={handleSaveProfile} isLoading={isSaving}>
+                    <Check className="h-4 w-4 mr-1" />
+                    저장
+                  </Button>
+                )}
+                <Button variant="ghost" size="sm" onClick={() => router.push('/settings')}>
+                  <Settings className="h-4 w-4 mr-1" />
+                  설정
+                </Button>
+              </div>
             </div>
             )}
           </CardContent>

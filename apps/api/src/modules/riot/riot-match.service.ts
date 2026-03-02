@@ -2,6 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import axios from "axios";
 import { PrismaService } from "../prisma/prisma.service";
+import { RedisService } from "../redis/redis.service";
 
 // Riot Match-V5 API Response Types
 export interface MatchDto {
@@ -72,6 +73,7 @@ export interface ParticipantDto {
   item4: number;
   item5: number;
   item6: number;
+  item7?: number; // Quest reward slot (Role Quest - boots/wards)
 
   // Perks
   perks: {
@@ -154,6 +156,7 @@ export class RiotMatchService {
   constructor(
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
+    private readonly redis: RedisService,
   ) {
     this.apiKey = this.configService.get("RIOT_API_KEY") || "";
     if (!this.apiKey) {
@@ -452,6 +455,13 @@ export class RiotMatchService {
       return [];
     }
 
+    // Redis 캐시 확인 (3분 TTL)
+    const cacheKey = `riot:matchids:${puuid}:${start}:${count}:${queueId ?? 'all'}:${type ?? 'all'}:${startTime ?? 0}`;
+    const cached = await this.redis.get(cacheKey);
+    if (cached) {
+      return JSON.parse(cached);
+    }
+
     try {
       const params = new URLSearchParams({
         start: start.toString(),
@@ -484,6 +494,9 @@ export class RiotMatchService {
         },
         timeout: 10000,
       });
+
+      // Redis 캐시 저장 (3분)
+      await this.redis.set(cacheKey, JSON.stringify(response.data), 180);
 
       return response.data;
     } catch (error: any) {

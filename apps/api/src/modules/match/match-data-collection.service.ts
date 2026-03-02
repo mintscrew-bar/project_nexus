@@ -221,6 +221,7 @@ export class MatchDataCollectionService {
             item4: participant.item4,
             item5: participant.item5,
             item6: participant.item6,
+            ...(participant.item7 != null ? { item7: participant.item7 } : {}),
 
             // Perks (stored as JSON)
             perks: participant.perks,

@@ -3,6 +3,8 @@ import {
   BadRequestException,
   ForbiddenException,
   NotFoundException,
+  HttpException,
+  HttpStatus,
   Logger,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
@@ -37,6 +39,19 @@ export const DIVISION_POINTS: Record<string, number> = {
 // 플레이어의 총 포인트 계산 (팀 밸런싱용)
 export function calculatePlayerPoints(tier: string, division: string): number {
   return (TIER_POINTS[tier] || 0) + (DIVISION_POINTS[division] || 0);
+}
+
+// 현재 티어가 기존 최고 티어보다 높은지 비교
+function isHigherTier(
+  currentTier: string,
+  currentRank: string,
+  peakTier: string | null,
+  peakRank: string | null,
+): boolean {
+  if (!peakTier) return true;
+  const currentPoints = calculatePlayerPoints(currentTier, currentRank);
+  const peakPoints = calculatePlayerPoints(peakTier, peakRank || "IV");
+  return currentPoints > peakPoints;
 }
 
 export interface RegisterRiotAccountDto {
@@ -77,8 +92,9 @@ export class RiotService {
     // Rate limiting check (20 requests per second)
     const rateLimit = await this.redis.checkRateLimit("riot:api", 20, 1);
     if (!rateLimit.allowed) {
-      throw new BadRequestException(
+      throw new HttpException(
         `Rate limited. Try again in ${rateLimit.resetIn}s`,
+        HttpStatus.TOO_MANY_REQUESTS,
       );
     }
 
@@ -104,7 +120,7 @@ export class RiotService {
         );
       }
       if (error.response?.status === 429) {
-        throw new BadRequestException("Rate limit exceeded");
+        throw new HttpException("Rate limit exceeded", HttpStatus.TOO_MANY_REQUESTS);
       }
       throw new BadRequestException(
         error.response?.data?.status?.message || "Riot API error",
@@ -352,6 +368,13 @@ export class RiotService {
       data: { isPrimary: false },
     });
 
+    // 사용자 입력 peakTier vs 현재 티어 중 높은 값 사용
+    const inputPeakTier = dto.peakTier || ranked.tier;
+    const inputPeakRank = dto.peakRank || ranked.rank;
+    const useCurrentAsPeak = isHigherTier(ranked.tier, ranked.rank, inputPeakTier, inputPeakRank);
+    const finalPeakTier = useCurrentAsPeak ? ranked.tier : inputPeakTier;
+    const finalPeakRank = useCurrentAsPeak ? ranked.rank : inputPeakRank;
+
     // Create or update Riot account
     const riotAccount = await this.prisma.riotAccount.upsert({
       where: { puuid: data.puuid },
@@ -362,8 +385,8 @@ export class RiotService {
         tier: ranked.tier,
         rank: ranked.rank,
         lp: ranked.lp,
-        peakTier: dto.peakTier || ranked.tier,
-        peakRank: dto.peakRank || ranked.rank,
+        peakTier: finalPeakTier,
+        peakRank: finalPeakRank,
         mainRole: dto.mainRole,
         subRole: dto.subRole,
         isPrimary: true,
@@ -379,8 +402,8 @@ export class RiotService {
         tier: ranked.tier,
         rank: ranked.rank,
         lp: ranked.lp,
-        peakTier: dto.peakTier || ranked.tier,
-        peakRank: dto.peakRank || ranked.rank,
+        peakTier: finalPeakTier,
+        peakRank: finalPeakRank,
         mainRole: dto.mainRole,
         subRole: dto.subRole,
         isPrimary: true,
@@ -447,12 +470,23 @@ export class RiotService {
     // Use PUUID for ranked info to avoid issues with undefined summonerId
     const ranked = await this.getRankedInfoByPuuid(account.puuid);
 
+    // 현재 티어가 최고 티어보다 높으면 peakTier 갱신
+    const peakUpdate = isHigherTier(
+      ranked.tier,
+      ranked.rank,
+      account.peakTier,
+      account.peakRank,
+    )
+      ? { peakTier: ranked.tier, peakRank: ranked.rank }
+      : {};
+
     return this.prisma.riotAccount.update({
       where: { id: riotAccountId },
       data: {
         tier: ranked.tier,
         rank: ranked.rank,
         lp: ranked.lp,
+        ...peakUpdate,
         lastSyncedAt: new Date(),
       },
     });
@@ -592,13 +626,20 @@ export class RiotService {
       throw new BadRequestException("주 역할과 부 역할은 동일할 수 없습니다");
     }
 
+    // peakTier는 기존보다 높을 때만 갱신 (절대 내려가지 않음)
+    let peakUpdate = {};
+    if (dto.peakTier !== undefined) {
+      if (isHigherTier(dto.peakTier, dto.peakRank || "IV", account.peakTier, account.peakRank)) {
+        peakUpdate = { peakTier: dto.peakTier, peakRank: dto.peakRank || "IV" };
+      }
+    }
+
     const updated = await this.prisma.riotAccount.update({
       where: { id: riotAccountId },
       data: {
         mainRole: dto.mainRole,
         subRole: dto.subRole,
-        ...(dto.peakTier !== undefined && { peakTier: dto.peakTier }),
-        ...(dto.peakRank !== undefined && { peakRank: dto.peakRank }),
+        ...peakUpdate,
       },
     });
 

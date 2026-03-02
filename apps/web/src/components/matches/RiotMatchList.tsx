@@ -585,6 +585,7 @@ export default function RiotMatchList({
     },
     initialPageParam: 0,
     staleTime: 3 * 60 * 1000,
+    retry: false,
     enabled: !!gameName && !!tagLine,
   });
 
@@ -745,7 +746,7 @@ export default function RiotMatchList({
                       </div>
                     </div>
 
-                    <div className="flex gap-1 flex-shrink-0">
+                    <div className="flex gap-1 flex-shrink-0 items-center">
                       {[participant.item0, participant.item1, participant.item2, participant.item3, participant.item4, participant.item5].map((item: number, idx: number) => (
                         <div key={idx} className="w-8 h-8 rounded-md bg-bg-tertiary border border-bg-elevated">
                           {item !== 0 && (
@@ -760,6 +761,30 @@ export default function RiotMatchList({
                           )}
                         </div>
                       ))}
+                      <div className="w-8 h-8 rounded-full bg-bg-tertiary border border-bg-elevated">
+                        {participant.item6 !== 0 && (
+                          <Image
+                            src={getItemIcon(participant.item6)}
+                            alt="trinket"
+                            width={32}
+                            height={32}
+                            className="w-full h-full rounded-full"
+                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                          />
+                        )}
+                      </div>
+                      {participant.item7 != null && participant.item7 !== 0 && (
+                        <div className="w-8 h-8 rounded-md bg-bg-tertiary border border-amber-500/40">
+                          <Image
+                            src={getItemIcon(participant.item7)}
+                            alt="quest"
+                            width={32}
+                            height={32}
+                            className="w-full h-full rounded-md"
+                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                          />
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex-1" />
@@ -867,7 +892,7 @@ export default function RiotMatchList({
                         return (
                           <div
                             key={p.puuid}
-                            className={`flex items-center gap-4 py-3 px-4 transition-all text-xs ${
+                            className={`flex items-center flex-nowrap gap-2 lg:gap-4 py-2 lg:py-3 px-2 lg:px-4 transition-all text-xs ${
                               isMe
                                 ? "bg-accent-primary/[0.12] border-l-2 border-accent-primary"
                                 : index % 2 === 0
@@ -880,24 +905,24 @@ export default function RiotMatchList({
                               }
                             }}
                           >
-                            <div className="flex items-center gap-0.5">
+                            <div className="flex items-center gap-0.5 flex-shrink-0">
                               <div className="relative">
                                 <Image
                                   src={getChampionIcon(p.championName)}
                                   alt={p.championName}
                                   width={48}
                                   height={48}
-                                  className="w-12 h-12 rounded"
+                                  className="w-10 h-10 xl:w-12 xl:h-12 rounded"
                                   onError={(e) => { e.currentTarget.style.display = 'none'; }}
                                 />
                                 <span className="absolute -bottom-0.5 -right-0.5 bg-bg-primary/90 text-[8px] px-0.5 rounded text-text-primary font-bold border border-bg-elevated">
                                   {p.champLevel}
                                 </span>
                               </div>
-                              <div className="flex gap-0.5">
+                              <div className="hidden lg:flex gap-0.5">
                                 <div className="flex flex-col gap-0.5">
                                   <Image
-                                    src={`https://ddragon.leagueoflegends.com/cdn/${ddVer}/img/spell/Summoner${getSummonerSpellName(p.summoner1Id)}.png`}
+                                    src={`/icons/spells/Summoner${getSummonerSpellName(p.summoner1Id)}.png`}
                                     alt="spell1"
                                     width={20}
                                     height={20}
@@ -905,7 +930,7 @@ export default function RiotMatchList({
                                     onError={(e) => { e.currentTarget.style.opacity = '0.3'; }}
                                   />
                                   <Image
-                                    src={`https://ddragon.leagueoflegends.com/cdn/${ddVer}/img/spell/Summoner${getSummonerSpellName(p.summoner2Id)}.png`}
+                                    src={`/icons/spells/Summoner${getSummonerSpellName(p.summoner2Id)}.png`}
                                     alt="spell2"
                                     width={20}
                                     height={20}
@@ -916,7 +941,7 @@ export default function RiotMatchList({
                                 <div className="flex flex-col gap-0.5">
                                   {p.perks?.styles?.[0]?.selections?.[0]?.perk && (
                                     <Image
-                                      src={`https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/perk-images/styles/${p.perks.styles[0].selections[0].perk}.png`}
+                                      src={`/icons/perks/${p.perks.styles[0].selections[0].perk}.png`}
                                       alt="primary rune"
                                       width={20}
                                       height={20}
@@ -926,7 +951,7 @@ export default function RiotMatchList({
                                   )}
                                   {p.perks?.styles?.[1]?.style && (
                                     <Image
-                                      src={`https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/perk-images/styles/${p.perks.styles[1].style}.png`}
+                                      src={`/icons/perks/${p.perks.styles[1].style}.png`}
                                       alt="secondary rune"
                                       width={14}
                                       height={14}
@@ -954,7 +979,8 @@ export default function RiotMatchList({
                               )}
                             </div>
 
-                            <div className="flex items-center gap-2 w-16">
+                            {/* 캐리 순위 - xl에서만 표시 */}
+                            <div className="hidden xl:flex items-center gap-2 w-16">
                               <div className={`w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-bold ${
                                 carryRank === 1 ? "bg-amber-500/40 text-amber-200 border border-amber-400/50" :
                                 carryRank === 2 ? "bg-gray-400/40 text-gray-200 border border-gray-400/50" :
@@ -966,12 +992,13 @@ export default function RiotMatchList({
                               <div className="text-[11px] font-medium text-text-secondary">{pKillParticipation}%</div>
                             </div>
 
-                            <div className="w-28 text-center">
+                            <div className="w-20 lg:w-28 text-center flex-shrink-0">
                               <div className="font-bold text-sm">{p.kills}/<span className="text-accent-danger">{p.deaths}</span>/{p.assists}</div>
                               <div className="text-xs text-text-tertiary">{pKda} KDA</div>
                             </div>
 
-                            <div className="w-32">
+                            {/* 딜량 바 - lg에서만 표시 */}
+                            <div className="hidden lg:block w-32 flex-shrink-0">
                               <div className="flex justify-between text-xs mb-0.5">
                                 <span className="text-text-tertiary">딜량</span>
                                 <span className="text-accent-danger font-semibold">{(p.totalDamageDealtToChampions / 1000).toFixed(1)}k</span>
@@ -981,14 +1008,15 @@ export default function RiotMatchList({
                               </div>
                             </div>
 
-                            <div className="w-20 text-center">
+                            {/* CS - lg에서만 표시 */}
+                            <div className="hidden lg:block w-20 text-center flex-shrink-0">
                               <div className="font-medium text-sm">{pCs}</div>
                               <div className="text-xs text-text-tertiary">{pCsPerMin}/m</div>
                             </div>
 
-                            <div className="flex gap-1">
+                            <div className="flex gap-0.5 lg:gap-1 flex-shrink-0 items-center">
                               {[p.item0, p.item1, p.item2, p.item3, p.item4, p.item5, p.item6].map((item: number, idx: number) => (
-                                <div key={idx} className={`w-6 h-6 ${idx === 6 ? 'rounded-full' : 'rounded'} bg-bg-primary border border-bg-tertiary`}>
+                                <div key={idx} className={`w-5 h-5 lg:w-6 lg:h-6 ${idx === 6 ? 'rounded-full' : 'rounded'} bg-bg-primary border border-bg-tertiary`}>
                                   {item !== 0 && (
                                     <Image
                                       src={getItemIcon(item)}
@@ -1001,6 +1029,18 @@ export default function RiotMatchList({
                                   )}
                                 </div>
                               ))}
+                              {p.item7 != null && p.item7 !== 0 && (
+                                <div className="w-5 h-5 lg:w-6 lg:h-6 rounded bg-bg-primary border border-amber-500/40">
+                                  <Image
+                                    src={getItemIcon(p.item7)}
+                                    alt="quest"
+                                    width={24}
+                                    height={24}
+                                    className="w-full h-full rounded"
+                                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                  />
+                                </div>
+                              )}
                             </div>
                           </div>
                         );
@@ -1008,7 +1048,7 @@ export default function RiotMatchList({
 
                       return (
                         <div className="overflow-x-auto">
-                        <div className="min-w-[920px] p-3">
+                        <div className="w-fit min-w-full p-3">
                           <div className={`mb-1.5 rounded ${myTeamWon ? "bg-accent-success/[0.06]" : "bg-accent-danger/[0.06]"}`}>
                             <div className={`flex items-center gap-2 text-[11px] font-bold px-3 py-1 ${myTeamWon ? "text-accent-success" : "text-accent-danger"}`}>
                               <Shield className="h-3 w-3" />
@@ -1099,7 +1139,7 @@ export default function RiotMatchList({
                           )}
 
                           <h3 className="text-sm font-bold text-text-primary mb-3 mt-6">최종 빌드</h3>
-                          <div className="flex gap-2">
+                          <div className="flex gap-2 items-center">
                             {[participant.item0, participant.item1, participant.item2, participant.item3, participant.item4, participant.item5, participant.item6].map((item: number, idx: number) => (
                               <div key={idx} className={`${idx === 6 ? 'rounded-full' : 'rounded'} bg-bg-tertiary`}>
                                 {item !== 0 ? (
@@ -1116,6 +1156,18 @@ export default function RiotMatchList({
                                 )}
                               </div>
                             ))}
+                            {participant.item7 != null && participant.item7 !== 0 && (
+                              <div className="rounded bg-bg-tertiary">
+                                <Image
+                                  src={getItemIcon(participant.item7)}
+                                  alt="quest"
+                                  width={48}
+                                  height={48}
+                                  className="w-12 h-12 rounded border-2 border-amber-500/40"
+                                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                />
+                              </div>
+                            )}
                           </div>
                         </div>
                       );

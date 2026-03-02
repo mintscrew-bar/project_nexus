@@ -24,8 +24,8 @@ export default function SummonerStatsPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { addToast } = useToast();
-  const gameName = decodeURIComponent(params.gameName as string);
-  const tagLine = decodeURIComponent(params.tagLine as string);
+  const gameName = decodeURIComponent(params.gameName as string).replace(/[\u200B-\u200F\u2028-\u202E\u2060-\u2069\uFEFF]/g, "");
+  const tagLine = decodeURIComponent(params.tagLine as string).replace(/[\u200B-\u200F\u2028-\u202E\u2060-\u2069\uFEFF]/g, "");
 
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [searchInput, setSearchInput] = useState("");

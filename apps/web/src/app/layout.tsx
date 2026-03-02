@@ -9,6 +9,9 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "Project Nexus - LoL In-House Tournament",
   description: "League of Legends 내전 토너먼트 플랫폼",
+  icons: {
+    icon: "/icon.png",
+  },
 };
 
 export default function RootLayout({

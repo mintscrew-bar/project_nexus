@@ -9,6 +9,13 @@ import { UserRole } from "@nexus/database";
 import { ROLES_KEY } from "../decorators/roles.decorator";
 import { PrismaService } from "../../prisma/prisma.service";
 
+// ADMIN은 MODERATOR 권한을 포함함
+const ROLE_HIERARCHY: Record<string, UserRole[]> = {
+  [UserRole.ADMIN]: [UserRole.ADMIN, UserRole.MODERATOR, UserRole.USER],
+  [UserRole.MODERATOR]: [UserRole.MODERATOR, UserRole.USER],
+  [UserRole.USER]: [UserRole.USER],
+};
+
 @Injectable()
 export class RolesGuard implements CanActivate {
   constructor(
@@ -42,7 +49,8 @@ export class RolesGuard implements CanActivate {
       throw new ForbiddenException("User not found");
     }
 
-    const hasRole = requiredRoles.some((role) => user.role === role);
+    const effectiveRoles = ROLE_HIERARCHY[user.role] || [user.role];
+    const hasRole = requiredRoles.some((role) => effectiveRoles.includes(role));
 
     if (!hasRole) {
       throw new ForbiddenException(

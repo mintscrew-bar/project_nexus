@@ -130,7 +130,7 @@ export function ItemTooltip({ itemId, children, className }: ItemTooltipProps) {
               {/* 아이템 이름 & 가격 */}
               <div className="flex items-center gap-2 mb-2">
                 <Image
-                  src={`${DDRAGON_BASE}/cdn/${DDRAGON_VERSION}/img/item/${itemId}.png`}
+                  src={`/icons/items/${itemId}.png`}
                   alt={item.name}
                   width={32}
                   height={32}

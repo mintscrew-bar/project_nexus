@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Logo } from "@/components/Logo";
@@ -10,6 +10,7 @@ import { useAuthStore } from "@/stores/auth-store";
 export default function Home() {
   const router = useRouter();
   const { isAuthenticated, isLoading } = useAuthStore();
+  const [timedOut, setTimedOut] = useState(false);
 
   useEffect(() => {
     // If user is already logged in, redirect to dashboard
@@ -18,8 +19,20 @@ export default function Home() {
     }
   }, [isAuthenticated, isLoading, router]);
 
+  // 안전장치: auth 초기화가 7초 이상 걸리면 강제로 로딩 해제
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const { isLoading: stillLoading } = useAuthStore.getState();
+      if (stillLoading) {
+        useAuthStore.setState({ isLoading: false });
+        setTimedOut(true);
+      }
+    }, 7000);
+    return () => clearTimeout(timer);
+  }, []);
+
   // 로딩 중 → 풀스크린 로딩 스피너 (AppShell이 셸 없이 렌더)
-  if (isLoading || isAuthenticated) {
+  if (isLoading || (isAuthenticated && !timedOut)) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-bg-primary">
         <div className="flex flex-col items-center gap-4 animate-fade-in">

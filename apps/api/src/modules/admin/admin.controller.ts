@@ -22,7 +22,6 @@ import { RoomService } from "../room/room.service";
 
 @Controller("admin")
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(UserRole.ADMIN)
 export class AdminController {
   constructor(
     private readonly adminService: AdminService,
@@ -34,12 +33,14 @@ export class AdminController {
 
   // ── Stats ──────────────────────────────────────────────────────────────────
   @Get("stats")
+  @Roles(UserRole.ADMIN, UserRole.MODERATOR)
   getStats() {
     return this.adminService.getStats();
   }
 
-  // ── Users ──────────────────────────────────────────────────────────────────
+  // ── Users (ADMIN only) ──────────────────────────────────────────────────────
   @Get("users")
+  @Roles(UserRole.ADMIN)
   getUsers(
     @Query("page") page = "1",
     @Query("limit") limit = "20",
@@ -49,6 +50,7 @@ export class AdminController {
   }
 
   @Patch("users/:id/role")
+  @Roles(UserRole.ADMIN)
   updateUserRole(
     @Param("id") targetUserId: string,
     @Body("role") role: UserRole,
@@ -58,6 +60,7 @@ export class AdminController {
   }
 
   @Post("users/:id/ban")
+  @Roles(UserRole.ADMIN)
   banUser(
     @Param("id") targetUserId: string,
     @Body() body: { reason: string; banUntil?: string },
@@ -67,11 +70,13 @@ export class AdminController {
   }
 
   @Post("users/:id/unban")
-  unbanUser(@Param("id") targetUserId: string) {
-    return this.adminService.unbanUser(targetUserId);
+  @Roles(UserRole.ADMIN)
+  unbanUser(@Param("id") targetUserId: string, @Request() req: any) {
+    return this.adminService.unbanUser(targetUserId, req.user.sub);
   }
 
   @Post("users/:id/restrict")
+  @Roles(UserRole.ADMIN)
   restrictUser(
     @Param("id") targetUserId: string,
     @Body("restrictedUntil") restrictedUntil: string,
@@ -81,52 +86,78 @@ export class AdminController {
   }
 
   @Post("users/:id/unrestrict")
-  unrestrictUser(@Param("id") targetUserId: string) {
-    return this.adminService.unrestrictUser(targetUserId);
+  @Roles(UserRole.ADMIN)
+  unrestrictUser(@Param("id") targetUserId: string, @Request() req: any) {
+    return this.adminService.unrestrictUser(targetUserId, req.user.sub);
   }
 
-  // ── Reports ────────────────────────────────────────────────────────────────
+  // ── Reports (ADMIN + MODERATOR) ──────────────────────────────────────────
   @Get("reports")
+  @Roles(UserRole.ADMIN, UserRole.MODERATOR)
   getReports(
     @Query("page") page = "1",
     @Query("limit") limit = "20",
     @Query("status") status?: string,
+    @Query("category") category?: string,
   ) {
-    return this.adminService.getReports({ page: parseInt(page), limit: parseInt(limit), status });
+    return this.adminService.getReports({
+      page: parseInt(page),
+      limit: parseInt(limit),
+      status,
+      category: category as "user" | "post" | undefined,
+    });
   }
 
   @Patch("reports/:id/review")
+  @Roles(UserRole.ADMIN, UserRole.MODERATOR)
   reviewReport(
     @Param("id") reportId: string,
-    @Body() body: { status: "APPROVED" | "REJECTED"; reviewerNote: string },
+    @Body() body: { status: "APPROVED" | "REJECTED"; reviewerNote: string; category?: string },
+    @Request() req: any,
   ) {
-    return this.adminService.reviewReport(reportId, body.status, body.reviewerNote);
+    return this.adminService.reviewReport(
+      reportId,
+      body.status,
+      body.reviewerNote,
+      req.user.sub,
+      (body.category as "user" | "post") || "user",
+    );
   }
 
-  // ── Announcements ──────────────────────────────────────────────────────────
+  // ── Announcements (ADMIN only) ──────────────────────────────────────────
   @Post("announcements")
-  sendAnnouncement(@Body() body: { title: string; message: string; link?: string }) {
-    return this.adminService.sendAnnouncement(body.title, body.message, body.link);
+  @Roles(UserRole.ADMIN)
+  sendAnnouncement(
+    @Body() body: { title: string; message: string; link?: string },
+    @Request() req: any,
+  ) {
+    return this.adminService.sendAnnouncement(body.title, body.message, req.user.sub, body.link);
   }
 
-  // ── Chat Logs ──────────────────────────────────────────────────────────────
+  // ── Chat Logs (ADMIN + MODERATOR) ──────────────────────────────────────────
   @Get("chat-logs")
+  @Roles(UserRole.ADMIN, UserRole.MODERATOR)
   getChatLogs(
     @Query("page") page = "1",
     @Query("limit") limit = "50",
+    @Query("category") category?: string,
     @Query("roomName") roomName?: string,
+    @Query("userId") userId?: string,
     @Query("search") search?: string,
   ) {
     return this.adminService.getChatLogs({
       page: parseInt(page),
       limit: parseInt(limit),
+      category: category as any,
       roomName,
+      userId,
       search,
     });
   }
 
-  // ── Community ──────────────────────────────────────────────────────────────
+  // ── Community (ADMIN + MODERATOR) ──────────────────────────────────────────
   @Get("posts")
+  @Roles(UserRole.ADMIN, UserRole.MODERATOR)
   getPosts(
     @Query("page") page = "1",
     @Query("limit") limit = "20",
@@ -136,22 +167,26 @@ export class AdminController {
   }
 
   @Delete("posts/:id")
-  deletePost(@Param("id") postId: string) {
-    return this.adminService.deletePost(postId);
+  @Roles(UserRole.ADMIN, UserRole.MODERATOR)
+  deletePost(@Param("id") postId: string, @Request() req: any) {
+    return this.adminService.deletePost(postId, req.user.sub);
   }
 
   @Patch("posts/:id/pin")
-  pinPost(@Param("id") postId: string, @Body("isPinned") isPinned: boolean) {
-    return this.adminService.pinPost(postId, isPinned);
+  @Roles(UserRole.ADMIN, UserRole.MODERATOR)
+  pinPost(@Param("id") postId: string, @Body("isPinned") isPinned: boolean, @Request() req: any) {
+    return this.adminService.pinPost(postId, isPinned, req.user.sub);
   }
 
   @Delete("comments/:id")
-  deleteComment(@Param("id") commentId: string) {
-    return this.adminService.deleteComment(commentId);
+  @Roles(UserRole.ADMIN, UserRole.MODERATOR)
+  deleteComment(@Param("id") commentId: string, @Request() req: any) {
+    return this.adminService.deleteComment(commentId, req.user.sub);
   }
 
-  // ── Clans ──────────────────────────────────────────────────────────────────
+  // ── Clans (ADMIN only) ──────────────────────────────────────────────────────
   @Get("clans")
+  @Roles(UserRole.ADMIN)
   getClans(
     @Query("page") page = "1",
     @Query("limit") limit = "20",
@@ -161,12 +196,14 @@ export class AdminController {
   }
 
   @Delete("clans/:id")
-  deleteClan(@Param("id") clanId: string) {
-    return this.adminService.deleteClan(clanId);
+  @Roles(UserRole.ADMIN)
+  deleteClan(@Param("id") clanId: string, @Request() req: any) {
+    return this.adminService.deleteClan(clanId, req.user.sub);
   }
 
-  // ── Rooms ──────────────────────────────────────────────────────────────────
+  // ── Rooms (ADMIN only) ──────────────────────────────────────────────────────
   @Get("rooms")
+  @Roles(UserRole.ADMIN)
   getRooms(
     @Query("page") page = "1",
     @Query("limit") limit = "20",
@@ -176,17 +213,20 @@ export class AdminController {
   }
 
   @Post("rooms/:id/close")
-  closeRoom(@Param("id") roomId: string) {
-    return this.adminService.closeRoom(roomId);
+  @Roles(UserRole.ADMIN)
+  closeRoom(@Param("id") roomId: string, @Request() req: any) {
+    return this.adminService.closeRoom(roomId, req.user.sub);
   }
 
-  // ── Test Bots ───────────────────────────────────────────────────────────────
+  // ── Test Bots (ADMIN only) ─────────────────────────────────────────────────
   @Post("rooms/:id/add-bot")
+  @Roles(UserRole.ADMIN)
   async addBotToRoom(
     @Param("id") roomId: string,
     @Body("count") count = 1,
+    @Request() req: any,
   ) {
-    const result = await this.adminService.addBotToRoom(roomId, count);
+    const result = await this.adminService.addBotToRoom(roomId, req.user.sub, count);
 
     // 봇 추가 후 실시간 업데이트
     try {

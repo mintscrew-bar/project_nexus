@@ -90,8 +90,8 @@ export class CommunityService {
   }
 
   async getPostById(postId: string) {
-    const post = await this.prisma.post.findUnique({
-      where: { id: postId },
+    const post = await this.prisma.post.findFirst({
+      where: { id: postId, isDeleted: false },
       include: {
         author: {
           select: {
@@ -135,7 +135,7 @@ export class CommunityService {
               orderBy: { createdAt: "asc" },
             },
           },
-          where: { parentId: null }, // Only top-level comments
+          where: { parentId: null, isDeleted: false }, // Only top-level, non-deleted comments
           orderBy: { createdAt: "desc" },
         },
       },
@@ -162,7 +162,7 @@ export class CommunityService {
     offset?: number;
     sortBy?: "latest" | "popular" | "views" | "comments";
   }) {
-    const where: any = {};
+    const where: any = { isDeleted: false };
 
     if (filters?.category) {
       where.category = filters.category;
@@ -221,8 +221,8 @@ export class CommunityService {
   }
 
   async updatePost(userId: string, postId: string, dto: UpdatePostDto) {
-    const post = await this.prisma.post.findUnique({
-      where: { id: postId },
+    const post = await this.prisma.post.findFirst({
+      where: { id: postId, isDeleted: false },
     });
 
     if (!post) {
@@ -265,8 +265,8 @@ export class CommunityService {
   }
 
   async deletePost(userId: string, postId: string) {
-    const post = await this.prisma.post.findUnique({
-      where: { id: postId },
+    const post = await this.prisma.post.findFirst({
+      where: { id: postId, isDeleted: false },
     });
 
     if (!post) {
@@ -277,8 +277,9 @@ export class CommunityService {
       throw new ForbiddenException("You can only delete your own posts");
     }
 
-    await this.prisma.post.delete({
+    await this.prisma.post.update({
       where: { id: postId },
+      data: { isDeleted: true, deletedAt: new Date() },
     });
 
     return { message: "Post deleted successfully" };
@@ -298,23 +299,23 @@ export class CommunityService {
       throw new BadRequestException("Comment too long (max 1000 characters)");
     }
 
-    // Verify post exists
-    const post = await this.prisma.post.findUnique({
-      where: { id: postId },
+    // Verify post exists and is not deleted
+    const post = await this.prisma.post.findFirst({
+      where: { id: postId, isDeleted: false },
     });
 
     if (!post) {
       throw new NotFoundException("Post not found");
     }
 
-    // If parentId provided, verify parent comment exists
-    let parentComment: { id: string; authorId: string; postId: string } | null = null;
+    // If parentId provided, verify parent comment exists and is not deleted
+    let parentComment: { id: string; authorId: string; postId: string; isDeleted: boolean } | null = null;
     if (dto.parentId) {
       parentComment = await this.prisma.comment.findUnique({
         where: { id: dto.parentId },
       });
 
-      if (!parentComment || parentComment.postId !== postId) {
+      if (!parentComment || parentComment.postId !== postId || parentComment.isDeleted) {
         throw new BadRequestException("Invalid parent comment");
       }
     }
@@ -359,8 +360,8 @@ export class CommunityService {
   }
 
   async updateComment(userId: string, commentId: string, content: string) {
-    const comment = await this.prisma.comment.findUnique({
-      where: { id: commentId },
+    const comment = await this.prisma.comment.findFirst({
+      where: { id: commentId, isDeleted: false },
     });
 
     if (!comment) {
@@ -389,8 +390,8 @@ export class CommunityService {
   }
 
   async deleteComment(userId: string, commentId: string) {
-    const comment = await this.prisma.comment.findUnique({
-      where: { id: commentId },
+    const comment = await this.prisma.comment.findFirst({
+      where: { id: commentId, isDeleted: false },
     });
 
     if (!comment) {
@@ -401,8 +402,9 @@ export class CommunityService {
       throw new ForbiddenException("You can only delete your own comments");
     }
 
-    await this.prisma.comment.delete({
+    await this.prisma.comment.update({
       where: { id: commentId },
+      data: { isDeleted: true, deletedAt: new Date() },
     });
 
     return { message: "Comment deleted successfully" };
@@ -413,9 +415,9 @@ export class CommunityService {
   // ========================================
 
   async likePost(userId: string, postId: string) {
-    // Verify post exists
-    const post = await this.prisma.post.findUnique({
-      where: { id: postId },
+    // Verify post exists and is not deleted
+    const post = await this.prisma.post.findFirst({
+      where: { id: postId, isDeleted: false },
     });
 
     if (!post) {
@@ -500,8 +502,8 @@ export class CommunityService {
   // ========================================
 
   async likeComment(userId: string, commentId: string) {
-    const comment = await this.prisma.comment.findUnique({
-      where: { id: commentId },
+    const comment = await this.prisma.comment.findFirst({
+      where: { id: commentId, isDeleted: false },
     });
 
     if (!comment) {
@@ -568,7 +570,7 @@ export class CommunityService {
   // ========================================
 
   async bookmarkPost(userId: string, postId: string) {
-    const post = await this.prisma.post.findUnique({ where: { id: postId } });
+    const post = await this.prisma.post.findFirst({ where: { id: postId, isDeleted: false } });
     if (!post) throw new NotFoundException("Post not found");
 
     const existing = await this.prisma.postBookmark.findUnique({
@@ -602,7 +604,7 @@ export class CommunityService {
   async getUserBookmarks(userId: string, limit = 20, offset = 0) {
     const [bookmarks, total] = await Promise.all([
       this.prisma.postBookmark.findMany({
-        where: { userId },
+        where: { userId, post: { isDeleted: false } },
         include: {
           post: {
             include: {
@@ -615,7 +617,7 @@ export class CommunityService {
         take: limit,
         skip: offset,
       }),
-      this.prisma.postBookmark.count({ where: { userId } }),
+      this.prisma.postBookmark.count({ where: { userId, post: { isDeleted: false } } }),
     ]);
 
     return { posts: bookmarks.map((b) => b.post), total };
@@ -626,8 +628,8 @@ export class CommunityService {
   // ========================================
 
   async pinPost(postId: string) {
-    const post = await this.prisma.post.findUnique({
-      where: { id: postId },
+    const post = await this.prisma.post.findFirst({
+      where: { id: postId, isDeleted: false },
     });
 
     if (!post) {
@@ -641,8 +643,8 @@ export class CommunityService {
   }
 
   async unpinPost(postId: string) {
-    const post = await this.prisma.post.findUnique({
-      where: { id: postId },
+    const post = await this.prisma.post.findFirst({
+      where: { id: postId, isDeleted: false },
     });
 
     if (!post) {
@@ -661,10 +663,10 @@ export class CommunityService {
 
   async getUserPostStats(userId: string) {
     const [postCount, commentCount, totalLikes] = await Promise.all([
-      this.prisma.post.count({ where: { authorId: userId } }),
-      this.prisma.comment.count({ where: { authorId: userId } }),
+      this.prisma.post.count({ where: { authorId: userId, isDeleted: false } }),
+      this.prisma.comment.count({ where: { authorId: userId, isDeleted: false } }),
       this.prisma.postLike.count({
-        where: { post: { authorId: userId } },
+        where: { post: { authorId: userId, isDeleted: false } },
       }),
     ]);
 

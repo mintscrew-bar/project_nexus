@@ -21,21 +21,19 @@ import Link from "next/link";
 import Image from "next/image";
 import { friendApi, adminApi, roomApi } from "@/lib/api-client";
 
-const DDRAGON_VERSION = process.env.NEXT_PUBLIC_DDRAGON_VERSION || "16.2.1";
-
 function getChampionIconUrl(championId: string) {
-  return `https://ddragon.leagueoflegends.com/cdn/${DDRAGON_VERSION}/img/champion/${championId}.png`;
+  return `/icons/champions/${championId}.png`;
 }
 
 const POSITION_ICON_URLS = {
-  TOP: "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-champ-select/global/default/svg/position-top.svg",
-  JUNGLE: "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-champ-select/global/default/svg/position-jungle.svg",
-  MID: "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-champ-select/global/default/svg/position-middle.svg",
-  MIDDLE: "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-champ-select/global/default/svg/position-middle.svg",
-  ADC: "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-champ-select/global/default/svg/position-bottom.svg",
-  BOTTOM: "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-champ-select/global/default/svg/position-bottom.svg",
-  SUPPORT: "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-champ-select/global/default/svg/position-utility.svg",
-  UTILITY: "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-champ-select/global/default/svg/position-utility.svg",
+  TOP: "/icons/positions/position-top.svg",
+  JUNGLE: "/icons/positions/position-jungle.svg",
+  MID: "/icons/positions/position-middle.svg",
+  MIDDLE: "/icons/positions/position-middle.svg",
+  ADC: "/icons/positions/position-bottom.svg",
+  BOTTOM: "/icons/positions/position-bottom.svg",
+  SUPPORT: "/icons/positions/position-utility.svg",
+  UTILITY: "/icons/positions/position-utility.svg",
 } as const;
 
 const POSITION_LABELS: Record<string, string> = {
@@ -75,7 +73,17 @@ function PlayerHoverTooltip({ participant, anchorRect }: { participant: any; anc
     if (!champsByRole[cp.role]) champsByRole[cp.role] = [];
     champsByRole[cp.role].push(cp.championId);
   }
-  const rolesToShow = [mainRole, subRole].filter(Boolean) as string[];
+
+  // mainRole, subRole 우선 + 챔피언이 등록된 나머지 역할도 포함
+  const rolesToShow: string[] = [];
+  if (mainRole) rolesToShow.push(mainRole);
+  if (subRole && subRole !== mainRole) rolesToShow.push(subRole);
+  for (const role of Object.keys(champsByRole)) {
+    if (!rolesToShow.includes(role)) rolesToShow.push(role);
+  }
+
+  const hasRoles = mainRole || subRole;
+  const hasChampions = champions.length > 0;
 
   // fixed 포지셔닝: overflow-hidden 컨테이너 밖으로 탈출
   const TOOLTIP_W = 256;
@@ -111,8 +119,8 @@ function PlayerHoverTooltip({ participant, anchorRect }: { participant: any; anc
           {riot?.tier && <div className="mt-1"><TierBadge tier={riot.tier} rank={riot.rank || undefined} size="sm" showIcon /></div>}
         </div>
       </div>
-      {rolesToShow.length > 0 && (
-        <div className="mb-3 pb-3 border-b border-bg-tertiary">
+      {hasRoles && (
+        <div className={`${hasChampions ? 'mb-3 pb-3 border-b border-bg-tertiary' : ''}`}>
           <p className="text-[10px] font-semibold text-text-tertiary uppercase tracking-wider mb-2">포지션</p>
           <div className="flex items-center gap-3">
             {mainRole && (
@@ -132,7 +140,7 @@ function PlayerHoverTooltip({ participant, anchorRect }: { participant: any; anc
           </div>
         </div>
       )}
-      {rolesToShow.length > 0 && (
+      {rolesToShow.length > 0 && hasChampions && (
         <div>
           <p className="text-[10px] font-semibold text-text-tertiary uppercase tracking-wider mb-2">선호 챔피언</p>
           <div className="space-y-2">
@@ -149,11 +157,11 @@ function PlayerHoverTooltip({ participant, anchorRect }: { participant: any; anc
                 </div>
               );
             })}
-            {rolesToShow.every((role) => !champsByRole[role]?.length) && (
-              <p className="text-xs text-text-tertiary italic">등록된 선호 챔피언이 없습니다</p>
-            )}
           </div>
         </div>
+      )}
+      {riot && !hasRoles && !hasChampions && (
+        <p className="text-xs text-text-tertiary italic">등록된 포지션/선호 챔피언이 없습니다</p>
       )}
       {!riot && <p className="text-xs text-text-tertiary italic">등록된 라이엇 계정이 없습니다</p>}
     </div>,
