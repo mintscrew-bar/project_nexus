@@ -42,7 +42,7 @@ export function MobileMenu({ className }: MobileMenuProps) {
 
   const sidebarItems = [
     { href: '/profile', label: '마이페이지', icon: User },
-    { href: '/friends', label: '친구', icon: Users },
+    { href: '/ranking', label: '랭킹', icon: Trophy },
     { href: '/settings', label: '설정', icon: Settings },
   ];
 
