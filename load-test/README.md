@@ -12,7 +12,8 @@ cd load-test
 npm install
 
 # 3. 테스트 유저 시드 (DB에 test1~3 유저 생성)
-cd ../packages/database && pnpm db:seed && cd ../../load-test
+# 프로젝트 루트에서 실행
+pnpm --filter @nexus/database db:seed
 
 # 4. 서버 실행 확인 (포트 4000)
 curl http://localhost:4000/api/health
