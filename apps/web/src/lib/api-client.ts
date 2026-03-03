@@ -246,6 +246,14 @@ export const userApi = {
     const response = await apiClient.patch("/users/settings", data);
     return response.data;
   },
+
+  /**
+   * 회원 탈퇴: DELETE /users/me 호출
+   * 성공 시 서버에서 204 No Content 반환
+   */
+  deleteAccount: async () => {
+    await apiClient.delete("/users/me");
+  },
 };
 
 // 방 관련 API
@@ -591,6 +599,7 @@ export const communityApi = {
     offset?: number;
     sortBy?: string;
     search?: string;
+    tag?: string; // 태그 필터
   }) => {
     const response = await apiClient.get("/community/posts", { params });
     return response.data;
@@ -605,6 +614,7 @@ export const communityApi = {
     title: string;
     content: string;
     category: "NOTICE" | "FREE" | "TIP" | "QNA";
+    tags?: string[];
   }) => {
     const response = await apiClient.post("/community/posts", data);
     return response.data;
@@ -612,9 +622,14 @@ export const communityApi = {
 
   updatePost: async (
     postId: string,
-    data: { title?: string; content?: string }
+    data: { title?: string; content?: string; tags?: string[] }
   ) => {
     const response = await apiClient.patch(`/community/posts/${postId}`, data);
+    return response.data;
+  },
+
+  getPopularTags: async (limit = 20): Promise<{ name: string; count: number }[]> => {
+    const response = await apiClient.get("/community/tags/popular", { params: { limit } });
     return response.data;
   },
 

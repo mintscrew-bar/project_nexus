@@ -756,10 +756,35 @@ model Post {
   likes     PostLike[]
   bookmarks PostBookmark[]
   reports   PostReport[]
+  tags      PostTag[]
 
   @@index([category, isPinned, createdAt])
   @@index([authorId])
   @@map("posts")
+}
+
+// 게시글 태그
+model Tag {
+  id        String    @id @default(cuid())
+  name      String    @unique // 태그명 (소문자, 공백 없음)
+  createdAt DateTime  @default(now())
+
+  posts     PostTag[]
+
+  @@map("tags")
+}
+
+// 게시글-태그 다대다 연결 테이블
+model PostTag {
+  postId String
+  tagId  String
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([postId, tagId])
+  @@index([tagId])
+  @@map("post_tags")
 }
 
 enum PostCategory {

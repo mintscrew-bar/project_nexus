@@ -25,6 +25,8 @@ import {
   Flame,
   ChevronLeft,
   ChevronRight,
+  Tag,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -216,6 +218,7 @@ export default function CommunityPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [popularTags, setPopularTags] = useState<{ name: string; count: number }[]>([]);
 
   // URL ?category= 파라미터로 초기 카테고리 결정 (사이드바 deep-link 지원)
   const initialCategory = useMemo<PostCategory | "ALL">(() => {
@@ -226,7 +229,11 @@ export default function CommunityPage() {
     return "ALL";
   }, [searchParams]);
 
+  // URL ?tag= 파라미터로 초기 태그 필터 결정
+  const initialTag = useMemo(() => searchParams.get("tag") || "", [searchParams]);
+
   const [selectedCategory, setSelectedCategory] = useState<PostCategory | "ALL">(initialCategory);
+  const [selectedTag, setSelectedTag] = useState<string>(initialTag);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<SortOption>("newest");
 
@@ -240,10 +247,15 @@ export default function CommunityPage() {
     };
   }, [setSearchRef, setActionHandler]);
 
-  // sortBy / 검색 / 카테고리 변경 시 1페이지로 리셋
+  // sortBy / 검색 / 카테고리 / 태그 변경 시 1페이지로 리셋
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedCategory, debouncedSearchQuery, sortBy]);
+  }, [selectedCategory, debouncedSearchQuery, sortBy, selectedTag]);
+
+  // 인기 태그 로드
+  useEffect(() => {
+    communityApi.getPopularTags(15).then(setPopularTags).catch(() => {});
+  }, []);
 
   const fetchPosts = useCallback(async (page: number = 1) => {
     setIsLoading(true);
@@ -262,6 +274,7 @@ export default function CommunityPage() {
                 limit: 10,
                 sortBy: apiSortBy,
                 search: debouncedSearchQuery || undefined,
+                tag: selectedTag || undefined,
               });
               const postsArray = Array.isArray(data) ? data : (data?.posts ?? []);
               return { category, posts: postsArray };
@@ -284,6 +297,7 @@ export default function CommunityPage() {
           offset: (page - 1) * POSTS_PER_PAGE,
           sortBy: apiSortBy,
           search: debouncedSearchQuery || undefined,
+          tag: selectedTag || undefined,
         });
         const posts = Array.isArray(data) ? data : (data?.posts ?? []);
         const total = (data as any)?.total ?? posts.length;
@@ -298,7 +312,7 @@ export default function CommunityPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedCategory, debouncedSearchQuery, sortBy]);
+  }, [selectedCategory, debouncedSearchQuery, sortBy, selectedTag]);
 
   useEffect(() => {
     fetchPosts(1);
@@ -437,6 +451,35 @@ export default function CommunityPage() {
           </div>
         </div>
 
+        {/* ── 인기 태그 / 태그 필터 ── */}
+        {(popularTags.length > 0 || selectedTag) && (
+          <div className="flex items-center gap-2 flex-wrap mb-3">
+            <Tag className="h-3.5 w-3.5 text-text-tertiary flex-shrink-0" />
+            {selectedTag && (
+              <button
+                onClick={() => setSelectedTag("")}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-accent-primary text-white text-xs"
+              >
+                #{selectedTag}
+                <X className="h-3 w-3" />
+              </button>
+            )}
+            {popularTags
+              .filter((t) => t.name !== selectedTag)
+              .slice(0, 12)
+              .map((t) => (
+                <button
+                  key={t.name}
+                  onClick={() => setSelectedTag(t.name)}
+                  className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-md bg-bg-tertiary text-text-secondary text-xs hover:bg-accent-primary/15 hover:text-accent-primary transition-colors"
+                >
+                  #{t.name}
+                  <span className="text-text-tertiary ml-0.5">{t.count}</span>
+                </button>
+              ))}
+          </div>
+        )}
+
         {/* 에러 */}
         {error && (
           <div className="bg-accent-danger/10 border border-accent-danger/30 rounded-xl p-4 mb-4">
@@ -444,35 +487,33 @@ export default function CommunityPage() {
           </div>
         )}
 
-        {/* 검색 결과 수 */}
-        {debouncedSearchQuery && (
+        {/* 검색 / 태그 필터 결과 수 */}
+        {(debouncedSearchQuery || selectedTag) && (
           <p className="text-sm text-text-secondary mb-4">
-            &quot;{debouncedSearchQuery}&quot; 검색 결과: {totalPosts}개
+            {debouncedSearchQuery && <>&quot;{debouncedSearchQuery}&quot; </>}
+            {selectedTag && <><span className="text-accent-primary">#{selectedTag}</span> </>}
+            검색 결과: {totalPosts}개
           </p>
         )}
 
         {/* 빈 상태 / 게시글 목록 */}
         {totalPosts === 0 && !isLoading ? (
-          // 검색 중이면 Search 아이콘, 아니면 MessageCircle 아이콘 표시
+          // 검색/태그 중이면 Search 아이콘, 아니면 MessageCircle 아이콘 표시
           <EmptyState
-            icon={debouncedSearchQuery ? Search : MessageCircle}
-            title={debouncedSearchQuery ? "검색 결과가 없습니다" : "게시글이 없습니다"}
+            icon={debouncedSearchQuery || selectedTag ? Search : MessageCircle}
+            title={debouncedSearchQuery || selectedTag ? "검색 결과가 없습니다" : "게시글이 없습니다"}
             description={
-              debouncedSearchQuery
-                ? "다른 검색어로 시도해보세요."
+              debouncedSearchQuery || selectedTag
+                ? "다른 검색어나 태그로 시도해보세요."
                 : "첫 번째 게시글을 작성해보세요!"
             }
             action={
-              debouncedSearchQuery
-                ? {
-                    label: "검색어 초기화",
-                    onClick: () => setSearchQuery(""),
-                  }
+              selectedTag
+                ? { label: "태그 필터 초기화", onClick: () => setSelectedTag("") }
+                : debouncedSearchQuery
+                ? { label: "검색어 초기화", onClick: () => setSearchQuery("") }
                 : isAuthenticated
-                ? {
-                    label: "글쓰기",
-                    onClick: () => router.push("/community/write"),
-                  }
+                ? { label: "글쓰기", onClick: () => router.push("/community/write") }
                 : undefined
             }
           />

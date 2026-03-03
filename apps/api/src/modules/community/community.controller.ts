@@ -51,6 +51,7 @@ export class CommunityController {
     @Query("category") category?: PostCategory,
     @Query("search") search?: string,
     @Query("authorId") authorId?: string,
+    @Query("tag") tag?: string,
     @Query("limit") limit?: string,
     @Query("offset") offset?: string,
     @Query("sortBy") sortBy?: string,
@@ -59,10 +60,17 @@ export class CommunityController {
       category,
       search,
       authorId,
+      tag,
       limit: limit ? parseInt(limit, 10) : 20,
       offset: offset ? parseInt(offset, 10) : 0,
       sortBy: sortBy as any,
     });
+  }
+
+  // 인기 태그 조회
+  @Get("tags/popular")
+  async getPopularTags(@Query("limit") limit?: string) {
+    return this.communityService.getPopularTags(limit ? parseInt(limit, 10) : 20);
   }
 
   @Get("posts/:id")

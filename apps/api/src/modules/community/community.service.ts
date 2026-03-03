@@ -14,11 +14,13 @@ export interface CreatePostDto {
   title: string;
   content: string;
   category: PostCategory;
+  tags?: string[]; // 태그명 배열 (소문자 정규화)
 }
 
 export interface UpdatePostDto {
   title?: string;
   content?: string;
+  tags?: string[];
 }
 
 export interface CreateCommentDto {
@@ -78,17 +80,57 @@ export class CommunityService {
             avatar: true,
             riotAccounts: {
               where: { isPrimary: true },
-              select: {
-                tier: true,
-                rank: true,
-              },
+              select: { tier: true, rank: true },
             },
           },
         },
+        tags: { include: { tag: true } },
       },
     });
 
+    // 태그 처리: 태그명으로 upsert 후 연결
+    if (dto.tags && dto.tags.length > 0) {
+      await this.syncPostTags(post.id, dto.tags);
+    }
+
     return post;
+  }
+
+  /**
+   * 태그명 배열을 받아 Tag upsert + PostTag 연결 (동기화)
+   * 기존 태그는 제거하고 새 태그로 교체
+   */
+  private async syncPostTags(postId: string, tagNames: string[]) {
+    // 태그명 정규화: 소문자, 공백 제거, 특수문자 제거, 최대 20자
+    const normalized = Array.from(
+      new Set(
+        tagNames
+          .map((t) => t.toLowerCase().replace(/[^a-z0-9가-힣]/g, "").slice(0, 20))
+          .filter((t) => t.length > 0),
+      ),
+    ).slice(0, 5); // 게시글당 태그 최대 5개
+
+    // 기존 PostTag 삭제
+    await this.prisma.postTag.deleteMany({ where: { postId } });
+
+    if (normalized.length === 0) return;
+
+    // Tag upsert (없으면 생성, 있으면 그대로)
+    const tags = await Promise.all(
+      normalized.map((name) =>
+        this.prisma.tag.upsert({
+          where: { name },
+          create: { name },
+          update: {},
+        }),
+      ),
+    );
+
+    // PostTag 연결
+    await this.prisma.postTag.createMany({
+      data: tags.map((tag) => ({ postId, tagId: tag.id })),
+      skipDuplicates: true,
+    });
   }
 
   async getPostById(postId: string, viewerId?: string, viewerIp?: string) {
@@ -102,13 +144,12 @@ export class CommunityService {
             avatar: true,
             riotAccounts: {
               where: { isPrimary: true },
-              select: {
-                tier: true,
-                rank: true,
-              },
+              select: { tier: true, rank: true },
             },
           },
         },
+        // 태그 포함
+        tags: { include: { tag: true } },
         comments: {
           include: {
             author: {
@@ -179,6 +220,7 @@ export class CommunityService {
     category?: PostCategory;
     search?: string;
     authorId?: string;
+    tag?: string; // 태그 필터
     limit?: number;
     offset?: number;
     sortBy?: "latest" | "popular" | "views" | "comments";
@@ -198,6 +240,13 @@ export class CommunityService {
 
     if (filters?.authorId) {
       where.authorId = filters.authorId;
+    }
+
+    // 태그 필터: 해당 태그를 가진 게시글만 조회
+    if (filters?.tag) {
+      where.tags = {
+        some: { tag: { name: filters.tag.toLowerCase() } },
+      };
     }
 
     const getOrderBy = (): any[] => {
@@ -225,11 +274,9 @@ export class CommunityService {
             },
           },
           _count: {
-            select: {
-              comments: true,
-              likes: true,
-            },
+            select: { comments: true, likes: true },
           },
+          tags: { include: { tag: true } },
         },
         orderBy: getOrderBy(),
         take: filters?.limit || 20,
@@ -275,7 +322,7 @@ export class CommunityService {
       }
     }
 
-    return this.prisma.post.update({
+    const updated = await this.prisma.post.update({
       where: { id: postId },
       data: {
         title: dto.title?.trim(),
@@ -283,6 +330,33 @@ export class CommunityService {
         isEdited: true,
       },
     });
+
+    // 태그 동기화: 배열이 전달된 경우에만 교체
+    if (dto.tags !== undefined) {
+      await this.syncPostTags(postId, dto.tags);
+    }
+
+    return updated;
+  }
+
+  /**
+   * 인기 태그 조회 (게시글 수 기준 상위 N개)
+   */
+  async getPopularTags(limit = 20) {
+    const tags = await this.prisma.tag.findMany({
+      include: {
+        _count: { select: { posts: true } },
+      },
+      orderBy: {
+        posts: { _count: "desc" },
+      },
+      take: limit,
+    });
+    // 게시글이 1개 이상인 태그만 반환
+    return tags.filter((t) => t._count.posts > 0).map((t) => ({
+      name: t.name,
+      count: t._count.posts,
+    }));
   }
 
   async deletePost(userId: string, postId: string) {

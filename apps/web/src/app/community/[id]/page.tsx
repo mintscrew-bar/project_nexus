@@ -36,6 +36,7 @@ import {
   Link,
   Bookmark,
   Flag,
+  Tag,
 } from "lucide-react";
 
 // 게시글/댓글 신고 사유
@@ -81,6 +82,7 @@ interface Post {
     avatar: string | null;
   };
   comments: Comment[];
+  tags?: { tag: { name: string } }[];
   _count?: {
     likes: number;
   };
@@ -476,6 +478,22 @@ export default function PostDetailPage() {
             <div className="prose prose-invert max-w-none mb-6">
               <MarkdownViewer content={post.content} />
             </div>
+
+            {/* Tags */}
+            {post.tags && post.tags.length > 0 && (
+              <div className="flex flex-wrap gap-2 mb-6">
+                {post.tags.map(({ tag }) => (
+                  <button
+                    key={tag.name}
+                    onClick={() => router.push(`/community?tag=${tag.name}`)}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-accent-primary/10 text-accent-primary text-sm hover:bg-accent-primary/20 transition-colors"
+                  >
+                    <Tag className="h-3 w-3" />
+                    {tag.name}
+                  </button>
+                ))}
+              </div>
+            )}
 
             {/* Actions */}
             <div className="flex items-center justify-between pt-6 border-t border-bg-tertiary">

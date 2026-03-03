@@ -22,6 +22,8 @@ import {
   MessageCircle,
   Lightbulb,
   HelpCircle,
+  X,
+  Tag,
 } from "lucide-react";
 
 type PostCategory = "NOTICE" | "FREE" | "TIP" | "QNA";
@@ -40,8 +42,27 @@ export default function WritePostPage() {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [category, setCategory] = useState<PostCategory>("FREE");
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // 태그 정규화: 소문자, 한글/영문/숫자만 허용, 최대 20자
+  const normalizeTag = (val: string) =>
+    val.trim().toLowerCase().replace(/[^a-z0-9가-힣]/g, "").slice(0, 20);
+
+  const handleTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" || e.key === ",") {
+      e.preventDefault();
+      const normalized = normalizeTag(tagInput);
+      if (normalized && !tags.includes(normalized) && tags.length < 5) {
+        setTags([...tags, normalized]);
+      }
+      setTagInput("");
+    }
+  };
+
+  const removeTag = (tag: string) => setTags(tags.filter((t) => t !== tag));
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -69,6 +90,7 @@ export default function WritePostPage() {
         title: title.trim(),
         content: content.trim(),
         category,
+        tags: tags.length > 0 ? tags : undefined,
       });
       router.push(`/community/${post.id}`);
     } catch (err: any) {
@@ -169,6 +191,39 @@ export default function WritePostPage() {
                     onChange={setContent}
                     height={400}
                   />
+                </div>
+              </div>
+
+              {/* Tags */}
+              <div>
+                <Label>태그 <span className="text-text-tertiary text-xs font-normal">(최대 5개, Enter 또는 쉼표로 추가)</span></Label>
+                <div className="mt-1 flex flex-wrap gap-2 p-2 rounded-lg border border-bg-tertiary bg-bg-secondary min-h-[42px] focus-within:border-accent-primary/50 transition-colors">
+                  {tags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-accent-primary/15 text-accent-primary text-sm"
+                    >
+                      <Tag className="h-3 w-3" />
+                      {tag}
+                      <button
+                        type="button"
+                        onClick={() => removeTag(tag)}
+                        className="hover:text-accent-danger transition-colors"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))}
+                  {tags.length < 5 && (
+                    <input
+                      type="text"
+                      value={tagInput}
+                      onChange={(e) => setTagInput(e.target.value)}
+                      onKeyDown={handleTagKeyDown}
+                      placeholder={tags.length === 0 ? "태그 입력..." : ""}
+                      className="flex-1 min-w-[120px] bg-transparent text-sm outline-none placeholder:text-text-tertiary"
+                    />
+                  )}
                 </div>
               </div>
 
