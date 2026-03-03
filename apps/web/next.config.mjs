@@ -2,6 +2,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Docker 컨테이너 빌드 시 standalone 출력 모드 필요
+  output: "standalone",
   transpilePackages: ["@nexus/types", "@uiw/react-md-editor", "@uiw/react-markdown-preview"],
   images: {
     remotePatterns: [
