@@ -537,7 +537,7 @@ export const clanApi = {
 
   updateClan: async (
     clanId: string,
-    data: { name?: string; description?: string; isRecruiting?: boolean }
+    data: { name?: string; description?: string; isRecruiting?: boolean; maxMembers?: number; minTier?: string; discord?: string }
   ) => {
     const response = await apiClient.patch(`/clans/${clanId}`, data);
     return response.data;
