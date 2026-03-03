@@ -6,6 +6,18 @@ import {
   clanSocketHelpers,
 } from '@/lib/socket-client';
 
+interface ClanMember {
+  id: string;
+  userId: string;
+  role: "OWNER" | "OFFICER" | "MEMBER";
+  joinedAt: string;
+  user: {
+    id: string;
+    username: string;
+    avatar: string | null;
+  };
+}
+
 interface Clan {
   id: string;
   name: string;
@@ -17,7 +29,7 @@ interface Clan {
   discord?: string;
   createdAt: string;
   updatedAt: string;
-  members: any[]; // Simplified for now
+  members: ClanMember[];
 }
 
 interface ChatMessage {
@@ -105,6 +117,16 @@ export const useClanStore = create<ClanStoreState>((set, get) => ({
         newTypingUsers.delete(data.userId);
         return { typingUsers: newTypingUsers };
       });
+    });
+
+    // 클랜 정보 변경 시 currentClan 갱신
+    clanSocketHelpers.onClanUpdated((updatedClan: Clan) => {
+      set({ currentClan: updatedClan });
+    });
+
+    // 클랜 해체 시 상태 초기화
+    clanSocketHelpers.onClanDeleted(() => {
+      set({ currentClan: null, chatMessages: [] });
     });
 
     // Re-join on reconnect to resume receiving events
