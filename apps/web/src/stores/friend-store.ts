@@ -125,7 +125,19 @@ export const useFriendStore = create<FriendStore>()(
             friendApi.getFriends(),
             friendApi.getPendingRequests(),
           ]);
-          set({ friends, pendingRequests: pending });
+
+          // 안전망: 백엔드에서 중복 제거를 해도 혹시라도 양방향 레코드(A→B, B→A)가
+          // 동시에 내려오면 동일 유저가 두 번 나타나는 버그가 생기므로 프론트에서도 제거.
+          // userId·friendId 쌍을 정렬하여 키로 사용하면 방향에 상관없이 중복 감지 가능.
+          const seenPairs = new Set<string>();
+          const dedupedFriends = (friends as Friendship[]).filter((f) => {
+            const pairKey = [f.userId, f.friendId].sort().join('|');
+            if (seenPairs.has(pairKey)) return false;
+            seenPairs.add(pairKey);
+            return true;
+          });
+
+          set({ friends: dedupedFriends, pendingRequests: pending });
         } catch {
           // silently fail — panel will show empty state
         } finally {

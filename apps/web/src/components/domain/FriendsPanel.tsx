@@ -1133,13 +1133,21 @@ export function FriendsPanel() {
   );
 
   // Filter friends by search (user/friend 관계 데이터 없는 항목은 제외)
-  const filteredFriends = friends.filter((f) => {
-    const fu = getFriendUser(f);
-    if (!fu) return false;
-    const display = getDisplayName(fu.id, fu.username);
-    const q = search.toLowerCase();
-    return display.toLowerCase().includes(q) || fu.username.toLowerCase().includes(q);
-  });
+  // 렌더링 직전 최종 안전망: 동일한 상대방 유저 ID가 두 번 나타나지 않도록 중복 제거.
+  // store와 백엔드에서도 중복 제거를 하지만, 혹시라도 누락된 경우를 대비.
+  const filteredFriends = (() => {
+    const seenFriendUserIds = new Set<string>();
+    return friends.filter((f) => {
+      const fu = getFriendUser(f);
+      if (!fu) return false;
+      // 같은 상대방 유저가 두 번 나타나면 첫 번째만 유지
+      if (seenFriendUserIds.has(fu.id)) return false;
+      seenFriendUserIds.add(fu.id);
+      const display = getDisplayName(fu.id, fu.username);
+      const q = search.toLowerCase();
+      return display.toLowerCase().includes(q) || fu.username.toLowerCase().includes(q);
+    });
+  })();
 
   // Group into categories
   const friendsByCategory = useCallback(() => {

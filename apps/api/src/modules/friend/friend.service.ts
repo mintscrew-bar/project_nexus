@@ -237,7 +237,8 @@ export class FriendService {
   // ========================================
 
   async getFriends(userId: string) {
-    // Get all accepted friendships where user is either sender or receiver
+    // 양방향 조건으로 수락된 친구 관계를 모두 조회
+    // (userId=A, friendId=B) 또는 (userId=B, friendId=A) 두 방향 모두 포함
     const friendships = await this.prisma.friendship.findMany({
       where: {
         OR: [
@@ -263,8 +264,22 @@ export class FriendService {
       },
     });
 
-    // 프론트 Friendship 타입이 원본 구조를 기대하므로 그대로 반환
-    return friendships;
+    // DB에 양방향 레코드 (A→B, B→A)가 모두 ACCEPTED 상태로 존재하는 경우
+    // 같은 상대방 유저가 두 번 나타나는 버그를 방지하기 위해 중복 제거.
+    // 상대방 userId를 기준으로 Set을 이용해 첫 번째 레코드만 유지.
+    const seenPartnerIds = new Set<string>();
+    const deduplicated = friendships.filter((f) => {
+      // 현재 유저 입장에서 "상대방" ID 결정
+      const partnerId = f.userId === userId ? f.friendId : f.userId;
+      if (seenPartnerIds.has(partnerId)) {
+        // 이미 동일한 상대방의 레코드가 있으면 제거 (중복)
+        return false;
+      }
+      seenPartnerIds.add(partnerId);
+      return true;
+    });
+
+    return deduplicated;
   }
 
   async getPendingRequests(userId: string) {
