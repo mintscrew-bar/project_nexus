@@ -1,0 +1,11 @@
+{
+  "name": "nexus-load-test",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Nexus Fresh 부하 테스트 (Node.js 내장 모듈만 사용)",
+  "scripts": {
+    "http": "node scripts/http-load.js",
+    "http:stress": "node scripts/http-load.js --stress",
+    "socket:chat": "node scripts/socket-load.js"
+  }
+}
