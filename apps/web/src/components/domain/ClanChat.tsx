@@ -149,7 +149,7 @@ export function ClanChat({ clanId }: ClanChatProps) {
     .map(([, username]) => username);
 
   return (
-    <div className="flex flex-col h-[420px] relative">
+    <div className="flex flex-col h-full relative">
       {/* 메시지 목록 */}
       <div
         ref={scrollContainerRef}

@@ -16,6 +16,8 @@ import { useState } from "react";
 export function FloatingDmPanel() {
   const floatingDmTarget = useFriendStore((s) => s.floatingDmTarget);
   const closeFloatingDm = useFriendStore((s) => s.closeFloatingDm);
+  // FriendsPanel 열림 상태 — rightOffset 계산에 반영
+  const isFriendsPanelOpen = useFriendStore((s) => s.isOpen);
   const closeChat = useDmStore((s) => s.closeChat);
   // 최소화 상태 관리
   const [isMinimized, setIsMinimized] = useState(false);
@@ -28,10 +30,13 @@ export function FloatingDmPanel() {
     closeFloatingDm();
   };
 
+  // FriendsPanel(w-72=288px) 열림 상태에 따라 rightOffset 조정
+  const rightOffset = isFriendsPanelOpen ? 288 : 0;
+
   return (
     <div
-      className="fixed bottom-0 right-[288px] z-50 flex flex-col bg-bg-secondary border border-bg-tertiary rounded-t-xl shadow-2xl overflow-hidden"
-      style={{ width: 320 }}
+      className="fixed bottom-0 z-50 flex flex-col bg-bg-secondary border border-bg-tertiary rounded-t-xl shadow-2xl overflow-hidden transition-[right] duration-300"
+      style={{ width: 320, right: rightOffset }}
     >
       {/* 헤더 */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-bg-tertiary bg-bg-secondary/95 backdrop-blur-sm">

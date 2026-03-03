@@ -271,7 +271,7 @@ export default function ClanDetailPage() {
                 클랜 채팅
               </CardTitle>
             </CardHeader>
-            <CardContent className="p-0">
+            <CardContent className="p-0 h-[420px]">
               <ClanChat clanId={clanId} />
             </CardContent>
           </Card>

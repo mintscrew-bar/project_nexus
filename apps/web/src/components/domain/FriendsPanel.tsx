@@ -358,10 +358,11 @@ function CategorySection({
   onDelete?: () => void;
   onOpenDm: (userId: string) => void;
 }) {
-  const { toggleCategoryCollapse, categories } = useFriendStore();
+  const { toggleCategoryCollapse, toggleUncategorizedCollapse, uncategorizedCollapsed, categories } = useFriendStore();
   const getFriendStatus = usePresenceStore((s) => s.getFriendStatus);
   const cat = categories.find((c) => c.id === categoryId);
-  const isCollapsed = cat?.isCollapsed ?? false;
+  // 커스텀 카테고리는 categories 배열에서 접기 상태 조회, 미분류("전체")는 별도 상태 사용
+  const isCollapsed = categoryId ? (cat?.isCollapsed ?? false) : uncategorizedCollapsed;
   const [editingName, setEditingName] = useState(false);
 
   const sectionDragOver = dragOverCategoryId === (categoryId ?? "uncategorized");
@@ -391,7 +392,7 @@ function CategorySection({
       >
         <button
           className="flex items-center gap-1 flex-1 min-w-0"
-          onClick={() => categoryId && toggleCategoryCollapse(categoryId)}
+          onClick={() => categoryId ? toggleCategoryCollapse(categoryId) : toggleUncategorizedCollapse()}
         >
           {isCollapsed ? (
             <ChevronRight className="w-3.5 h-3.5 text-text-tertiary flex-shrink-0" />
@@ -1263,16 +1264,7 @@ export function FriendsPanel() {
             <span className="font-semibold text-text-primary text-sm">친구 목록</span>
           </div>
           <div className="flex items-center gap-1">
-            {/* 클랜 채팅 버튼 (클랜이 있는 유저만 표시) */}
-            {myClan && (
-              <button
-                title={`[${myClan.tag}] ${myClan.name} 채팅`}
-                onClick={toggleClanChat}
-                className="p-1.5 rounded-lg hover:bg-bg-elevated text-text-tertiary hover:text-accent-primary transition-colors"
-              >
-                <Shield className="w-4 h-4" />
-              </button>
-            )}
+            {/* 헤더의 클랜 채팅 아이콘 버튼 제거 → 친구 목록 안에 고정 행으로 이동 */}
             <button
               title="친구 추가"
               onClick={() => setModal({ type: "addFriend" })}
@@ -1375,6 +1367,25 @@ export function FriendsPanel() {
               </div>
             ) : (
               <>
+                {/* 클랜 채팅 고정 행 — 클랜에 가입된 경우만 표시, 클릭 시 플로팅 창 오픈 */}
+                {myClan && (
+                  <button
+                    onClick={toggleClanChat}
+                    className="w-full flex items-center gap-2.5 px-2 py-2 mb-1 rounded-lg hover:bg-bg-elevated group transition-colors text-left"
+                  >
+                    <div className="w-8 h-8 rounded-full bg-accent-primary/15 flex items-center justify-center flex-shrink-0">
+                      <Shield className="w-4 h-4 text-accent-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-text-primary truncate">
+                        [{myClan.tag}] {myClan.name}
+                      </p>
+                      <p className="text-xs text-text-tertiary">클랜 채팅</p>
+                    </div>
+                    <MessageCircle className="w-4 h-4 text-text-tertiary group-hover:text-accent-primary transition-colors flex-shrink-0" />
+                  </button>
+                )}
+
                 {/* Custom categories */}
                 {categories.map((cat) => (
                   <CategorySection

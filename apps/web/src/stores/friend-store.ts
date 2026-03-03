@@ -49,6 +49,8 @@ interface FriendStore {
   // Persisted
   categories: FriendCategory[];
   friendMeta: Record<string, FriendMeta>;
+  // 미분류("전체") 카테고리의 접기 상태 — 커스텀 카테고리와 별도 관리
+  uncategorizedCollapsed: boolean;
 
   // Transient (from API)
   friends: Friendship[];
@@ -79,6 +81,8 @@ interface FriendStore {
   renameCategory: (id: string, name: string) => void;
   deleteCategory: (id: string) => void;
   toggleCategoryCollapse: (id: string) => void;
+  // 미분류("전체") 카테고리 접기/펼치기 토글
+  toggleUncategorizedCollapse: () => void;
   setFriendCategory: (friendId: string, categoryId: string | null) => void;
 
   // Meta
@@ -96,6 +100,7 @@ export const useFriendStore = create<FriendStore>()(
       isClanChatOpen: false,
       categories: [],
       friendMeta: {},
+      uncategorizedCollapsed: false,
       friends: [],
       pendingRequests: [],
       isLoading: false,
@@ -197,6 +202,11 @@ export const useFriendStore = create<FriendStore>()(
         }));
       },
 
+      // 미분류("전체") 카테고리 접기/펼치기
+      toggleUncategorizedCollapse: () => {
+        set((s) => ({ uncategorizedCollapsed: !s.uncategorizedCollapsed }));
+      },
+
       setFriendCategory: (friendId, categoryId) => {
         set((s) => ({
           friendMeta: {
@@ -236,7 +246,7 @@ export const useFriendStore = create<FriendStore>()(
         if (typeof window === 'undefined') return { getItem: () => null, setItem: () => {}, removeItem: () => {} };
         return localStorage;
       }),
-      partialize: (s) => ({ categories: s.categories, friendMeta: s.friendMeta }),
+      partialize: (s) => ({ categories: s.categories, friendMeta: s.friendMeta, uncategorizedCollapsed: s.uncategorizedCollapsed }),
     }
   )
 );
