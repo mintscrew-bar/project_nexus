@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 
 @Injectable()
@@ -196,5 +196,53 @@ export class UserService {
 
     // 유저 레코드 삭제 — Cascade 연관 데이터 자동 삭제
     await this.prisma.user.delete({ where: { id: userId } });
+  }
+
+  // ── 이의신청 ─────────────────────────────────────────────────────────────
+
+  /**
+   * 이의신청 제출: 밴 또는 임시제재 상태인 유저만 제출 가능
+   * - 이미 PENDING 이의신청이 있으면 ConflictException
+   * - reason 최대 1000자 검증
+   */
+  async submitAppeal(userId: string, reason: string) {
+    if (!reason || reason.trim().length === 0) {
+      throw new BadRequestException("이의신청 사유를 입력해주세요.");
+    }
+    if (reason.length > 1000) {
+      throw new BadRequestException("이의신청 사유는 1000자 이내로 입력해주세요.");
+    }
+
+    // 유저 상태 확인 — 밴 또는 임시제재 상태여야 제출 가능
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { isBanned: true, isRestricted: true },
+    });
+    if (!user) throw new NotFoundException("유저를 찾을 수 없습니다.");
+    if (!user.isBanned && !user.isRestricted) {
+      throw new BadRequestException("밴 또는 임시제재 상태에서만 이의신청이 가능합니다.");
+    }
+
+    // 기존 PENDING 이의신청 존재 여부 확인
+    const existing = await this.prisma.appeal.findFirst({
+      where: { userId, status: "PENDING" },
+    });
+    if (existing) {
+      throw new ConflictException("이미 심사 중인 이의신청이 있습니다.");
+    }
+
+    return this.prisma.appeal.create({
+      data: { userId, reason: reason.trim() },
+    });
+  }
+
+  /**
+   * 내 이의신청 조회: 가장 최근 이의신청 반환
+   */
+  async getMyAppeal(userId: string) {
+    return this.prisma.appeal.findFirst({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+    });
   }
 }

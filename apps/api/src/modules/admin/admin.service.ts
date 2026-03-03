@@ -811,4 +811,109 @@ export class AdminService {
       return { addedCount: newBots.length, participants: updatedParticipants };
     });
   }
+
+  // ── Appeals (이의신청) ────────────────────────────────────────────────────
+
+  /**
+   * 이의신청 목록 조회: 상태 필터 + 페이지네이션
+   * - user 정보 포함 (username, avatar, isBanned, banReason, isRestricted)
+   */
+  async getAppeals(params: { page: number; limit: number; status?: string }) {
+    const { page, status } = params;
+    const limit = clampLimit(params.limit);
+    const skip = (page - 1) * limit;
+
+    const where = status ? { status: status as any } : {};
+
+    const [appeals, total] = await Promise.all([
+      this.prisma.appeal.findMany({
+        where,
+        include: {
+          user: {
+            select: {
+              id: true,
+              username: true,
+              avatar: true,
+              isBanned: true,
+              banReason: true,
+              banUntil: true,
+              isRestricted: true,
+              restrictedUntil: true,
+            },
+          },
+          reviewer: { select: { id: true, username: true } },
+        },
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit,
+      }),
+      this.prisma.appeal.count({ where }),
+    ]);
+
+    return { appeals, total, page, limit };
+  }
+
+  /**
+   * 이의신청 처리: 승인(APPROVED) 또는 거절(REJECTED)
+   * - 승인 시: user.isBanned=false / isRestricted=false 자동 해제 (트랜잭션)
+   * - AdminAuditLog에 APPEAL_APPROVE 또는 APPEAL_REJECT 기록
+   */
+  async reviewAppeal(
+    appealId: string,
+    status: "APPROVED" | "REJECTED",
+    adminId: string,
+    adminNote?: string,
+  ) {
+    const appeal = await this.prisma.appeal.findUnique({
+      where: { id: appealId },
+      include: { user: { select: { id: true, isBanned: true, isRestricted: true } } },
+    });
+    if (!appeal) throw new NotFoundException("이의신청을 찾을 수 없습니다.");
+    if (appeal.status !== "PENDING") {
+      throw new BadRequestException("이미 처리된 이의신청입니다.");
+    }
+
+    const action = status === "APPROVED" ? AdminAction.APPEAL_APPROVE : AdminAction.APPEAL_REJECT;
+
+    return this.prisma.$transaction(async (tx) => {
+      // 이의신청 상태 업데이트
+      const updated = await tx.appeal.update({
+        where: { id: appealId },
+        data: {
+          status,
+          adminNote: adminNote ?? null,
+          reviewedBy: adminId,
+          reviewedAt: new Date(),
+        },
+      });
+
+      // 승인 시 제재 자동 해제
+      if (status === "APPROVED") {
+        await tx.user.update({
+          where: { id: appeal.userId },
+          data: {
+            isBanned: false,
+            banReason: null,
+            bannedAt: null,
+            banUntil: null,
+            isRestricted: false,
+            restrictedUntil: null,
+          },
+        });
+      }
+
+      // 감사 로그 기록
+      await tx.adminAuditLog.create({
+        data: {
+          adminId,
+          action,
+          targetType: "appeal",
+          targetId: appealId,
+          details: { userId: appeal.userId, adminNote: adminNote ?? null },
+        },
+      });
+
+      return updated;
+    });
+  }
 }

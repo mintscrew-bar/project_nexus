@@ -245,4 +245,30 @@ export class AdminController {
 
     return result;
   }
+
+  // ── Appeals (ADMIN + MODERATOR) ─────────────────────────────────────────────
+
+  @Get("appeals")
+  @Roles(UserRole.ADMIN, UserRole.MODERATOR)
+  getAppeals(
+    @Query("page") page = "1",
+    @Query("limit") limit = "20",
+    @Query("status") status?: string,
+  ) {
+    return this.adminService.getAppeals({
+      page: parseInt(page),
+      limit: parseInt(limit),
+      status,
+    });
+  }
+
+  @Patch("appeals/:id/review")
+  @Roles(UserRole.ADMIN, UserRole.MODERATOR)
+  reviewAppeal(
+    @Param("id") appealId: string,
+    @Body() body: { status: "APPROVED" | "REJECTED"; adminNote?: string },
+    @Request() req: any,
+  ) {
+    return this.adminService.reviewAppeal(appealId, body.status, req.user.sub, body.adminNote);
+  }
 }

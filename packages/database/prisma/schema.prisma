@@ -70,6 +70,8 @@ model User {
   nexusRanking        NexusRanking?
   clanRankings        ClanRanking[]
   adminAuditLogs      AdminAuditLog[]    @relation("AdminAuditLogs")
+  appeals             Appeal[]           @relation("UserAppeals")
+  reviewedAppeals     Appeal[]           @relation("AppealReviewer")
 
   @@index([email])
   @@index([reputation])
@@ -1100,6 +1102,8 @@ enum AdminAction {
   ROOM_CLOSE
   ROOM_ADD_BOT
   ANNOUNCEMENT_SEND
+  APPEAL_APPROVE
+  APPEAL_REJECT
 }
 
 // ============================================
@@ -1147,4 +1151,33 @@ model ClanRanking {
   @@unique([userId, clanId])
   @@index([clanId, clanRank])
   @@map("clan_rankings")
+}
+
+// ============================================
+// Appeal System (이의신청)
+// ============================================
+
+model Appeal {
+  id         String       @id @default(cuid())
+  userId     String
+  reason     String       // 이의신청 사유 (최대 1000자)
+  status     AppealStatus @default(PENDING)
+  adminNote  String?      // 관리자 처리 메모
+  reviewedBy String?
+  reviewedAt DateTime?
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  user     User  @relation("UserAppeals", fields: [userId], references: [id], onDelete: Cascade)
+  reviewer User? @relation("AppealReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
+
+  @@index([userId, status])
+  @@index([status, createdAt])
+  @@map("appeals")
+}
+
+enum AppealStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }

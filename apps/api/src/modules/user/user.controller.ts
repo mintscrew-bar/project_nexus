@@ -101,6 +101,27 @@ export class UserController {
     await this.userService.deleteAccount(userId);
   }
 
+  /**
+   * POST /users/me/appeals
+   * 이의신청 제출: 밴/임시제재 상태인 유저가 이의신청 사유를 제출
+   */
+  @Post("me/appeals")
+  async submitAppeal(
+    @CurrentUser("sub") userId: string,
+    @Body("reason") reason: string,
+  ) {
+    return this.userService.submitAppeal(userId, reason);
+  }
+
+  /**
+   * GET /users/me/appeals/latest
+   * 내 가장 최근 이의신청 조회 (설정 페이지 상태 표시용)
+   */
+  @Get("me/appeals/latest")
+  async getMyAppeal(@CurrentUser("sub") userId: string) {
+    return this.userService.getMyAppeal(userId);
+  }
+
   // ========================================
   // 동적 경로 (정적 경로 이후)
   // ========================================
