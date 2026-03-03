@@ -3,12 +3,15 @@ import {
   Get,
   Patch,
   Post,
+  Delete,
   Body,
   UseGuards,
   Param,
   UseInterceptors,
   UploadedFile,
   BadRequestException,
+  HttpCode,
+  HttpStatus,
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
@@ -84,6 +87,18 @@ export class UserController {
     await this.userService.updateAvatar(userId, avatarUrl);
 
     return { avatarUrl };
+  }
+
+  /**
+   * DELETE /users/me
+   * 회원 탈퇴: 현재 로그인한 유저의 계정을 삭제한다.
+   * - 성공 시 204 No Content 반환
+   * - ChatMessage/DirectMessage는 익명으로 보존 (onDelete: SetNull)
+   */
+  @Delete("me")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async deleteAccount(@CurrentUser("sub") userId: string): Promise<void> {
+    await this.userService.deleteAccount(userId);
   }
 
   // ========================================

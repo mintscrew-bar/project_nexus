@@ -183,4 +183,18 @@ export class UserService {
     });
     return user?.avatar || null;
   }
+
+  /**
+   * 회원 탈퇴: 유저 레코드를 삭제한다.
+   * - User 모델에 onDelete: Cascade가 설정된 연관 데이터는 자동으로 함께 삭제됨
+   * - ChatMessage / DirectMessage 는 onDelete: SetNull이므로 익명 메시지로 보존됨
+   *   (개인정보처리방침 및 이용약관에 명시된 내용과 일치)
+   */
+  async deleteAccount(userId: string): Promise<void> {
+    // 존재 여부 확인 (없으면 NotFoundException 발생)
+    await this.findById(userId);
+
+    // 유저 레코드 삭제 — Cascade 연관 데이터 자동 삭제
+    await this.prisma.user.delete({ where: { id: userId } });
+  }
 }

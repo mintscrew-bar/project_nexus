@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { authApi, setAccessToken } from "@/lib/api-client";
+import { authApi, userApi, setAccessToken } from "@/lib/api-client";
 
 interface User {
   id: string;
@@ -19,6 +19,8 @@ interface AuthState {
   loginWithDiscord: () => void;
   loginWithGoogle: () => void;
   logout: () => Promise<void>;
+  /** 회원 탈퇴: 계정 삭제 후 로그아웃 처리 */
+  deleteAccount: () => Promise<void>;
   setUser: (user: User | null) => void;
   fetchUser: () => Promise<void>;
 }
@@ -141,6 +143,31 @@ export const useAuthStore = create<AuthState>((set) => ({
       set({ user: null, isAuthenticated: false, isLoading: false });
       setAccessToken(null);
       window.location.href = '/'; // Redirect to home on logout
+    }
+  },
+
+  /**
+   * 회원 탈퇴: 서버에서 유저 계정을 삭제한 뒤 로컬 인증 상태를 초기화한다.
+   * - userApi.deleteAccount() → DELETE /users/me (204 No Content)
+   * - 서버 로그아웃(refresh token 무효화) 후 홈으로 리다이렉트
+   */
+  deleteAccount: async () => {
+    set({ isLoading: true });
+    try {
+      // 서버에서 유저 레코드 삭제
+      await userApi.deleteAccount();
+      // refresh token 쿠키 무효화 및 서버 세션 정리
+      await authApi.logout();
+    } catch (error) {
+      console.error("회원 탈퇴 실패:", error);
+      set({ isLoading: false });
+      throw error; // 컴포넌트에서 에러 핸들링 가능하도록 re-throw
+    } finally {
+      // 로컬 캐시 및 인증 상태 초기화
+      clearUserFromStorage();
+      set({ user: null, isAuthenticated: false, isLoading: false });
+      setAccessToken(null);
+      window.location.href = '/'; // 홈으로 리다이렉트
     }
   },
 

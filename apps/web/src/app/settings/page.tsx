@@ -36,13 +36,16 @@ interface UserSettings {
 
 export default function SettingsPage() {
   const router = useRouter();
-  const { user, isAuthenticated, isLoading, logout } = useAuthStore();
+  const { user, isAuthenticated, isLoading, logout, deleteAccount } = useAuthStore();
   const { champions, championMap, fetchChampions } = useDdragonStore();
   const { setTheme: setNextTheme } = useTheme();
   const { addToast } = useToast();
   const [activeTab, setActiveTab] = useState<SettingsTab>("notifications");
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  // 회원 탈퇴 모달 상태
+  const [isDeleteAccountModalOpen, setIsDeleteAccountModalOpen] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [championSearch, setChampionSearch] = useState("");
   const [showChampionPicker, setShowChampionPicker] = useState(false);
 
@@ -161,6 +164,23 @@ export default function SettingsPage() {
     }
   };
 
+  /**
+   * 회원 탈퇴 확인 후 처리
+   * - deleteAccount() 호출 시 서버 삭제 → 로컬 상태 초기화 → 홈 리다이렉트
+   */
+  const handleDeleteAccount = async () => {
+    setIsDeletingAccount(true);
+    try {
+      await deleteAccount();
+    } catch (error) {
+      console.error("회원 탈퇴 오류:", error);
+      addToast("회원 탈퇴 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.", "error");
+    } finally {
+      setIsDeletingAccount(false);
+      setIsDeleteAccountModalOpen(false);
+    }
+  };
+
   const tabs = [
     { id: "accounts" as const, label: "연결된 계정", icon: LinkIcon },
     { id: "notifications" as const, label: "알림", icon: Bell },
@@ -201,6 +221,13 @@ export default function SettingsPage() {
                   >
                     <LogOut className="h-5 w-5" />
                     <span className="font-medium">로그아웃</span>
+                  </button>
+                  {/* 회원 탈퇴 버튼 — 작고 위험 색상으로 표시 */}
+                  <button
+                    onClick={() => setIsDeleteAccountModalOpen(true)}
+                    className="w-full flex items-center justify-center px-4 py-2 rounded-lg text-xs text-text-tertiary hover:text-accent-danger hover:bg-accent-danger/10 transition-colors"
+                  >
+                    회원 탈퇴
                   </button>
                 </nav>
               </CardContent>
@@ -661,6 +688,19 @@ export default function SettingsPage() {
         cancelText="취소"
         variant="danger"
         isLoading={isLoggingOut}
+      />
+
+      {/* 회원 탈퇴 확인 모달 — 되돌릴 수 없음을 명확히 안내 */}
+      <ConfirmModal
+        isOpen={isDeleteAccountModalOpen}
+        onClose={() => setIsDeleteAccountModalOpen(false)}
+        onConfirm={handleDeleteAccount}
+        title="회원 탈퇴"
+        message="정말로 탈퇴하시겠습니까? 이 작업은 되돌릴 수 없습니다."
+        confirmText="탈퇴하기"
+        cancelText="취소"
+        variant="danger"
+        isLoading={isDeletingAccount}
       />
     </div>
   );
