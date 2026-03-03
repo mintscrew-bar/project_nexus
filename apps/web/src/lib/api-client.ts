@@ -1172,3 +1172,32 @@ export const dmApi = {
   },
 };
 
+// 이의신청 관련 API
+export const appealApi = {
+  /** 이의신청 제출 (밴/임시제재 상태인 유저) */
+  submit: async (reason: string) => {
+    const response = await apiClient.post("/users/me/appeals", { reason });
+    return response.data;
+  },
+
+  /** 내 가장 최근 이의신청 조회 */
+  getLatest: async () => {
+    const response = await apiClient.get("/users/me/appeals/latest");
+    return response.data;
+  },
+
+  // ── 관리자용 ──
+
+  /** 이의신청 목록 조회 */
+  list: async (params: { page?: number; limit?: number; status?: string }) => {
+    const response = await apiClient.get("/admin/appeals", { params });
+    return response.data;
+  },
+
+  /** 이의신청 처리 (승인/거절) */
+  review: async (appealId: string, status: "APPROVED" | "REJECTED", adminNote?: string) => {
+    const response = await apiClient.patch(`/admin/appeals/${appealId}/review`, { status, adminNote });
+    return response.data;
+  },
+};
+

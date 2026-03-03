@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/auth-store";
-import { userApi, statsApi } from "@/lib/api-client";
+import { userApi, statsApi, appealApi } from "@/lib/api-client";
 import { useDdragonStore } from "@/stores/ddragon-store";
 import { ChampionImage } from "@/components/ChampionImage";
 import { Card, CardHeader, CardTitle, CardContent, Button, Label, LoadingSpinner, ConfirmModal } from "@/components/ui";
@@ -46,6 +46,11 @@ export default function SettingsPage() {
   // 회원 탈퇴 모달 상태
   const [isDeleteAccountModalOpen, setIsDeleteAccountModalOpen] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  // 이의신청 모달 상태
+  const [isAppealModalOpen, setIsAppealModalOpen] = useState(false);
+  const [appealReason, setAppealReason] = useState("");
+  const [isSubmittingAppeal, setIsSubmittingAppeal] = useState(false);
+  const [latestAppeal, setLatestAppeal] = useState<{ status: string; adminNote?: string; createdAt: string } | null>(null);
   const [championSearch, setChampionSearch] = useState("");
   const [showChampionPicker, setShowChampionPicker] = useState(false);
 
@@ -83,6 +88,17 @@ export default function SettingsPage() {
       fetchChampions();
     }
   }, [isAuthenticated, fetchChampions]);
+
+  // 밴/제재 상태일 때 최근 이의신청 조회
+  useEffect(() => {
+    if (isAuthenticated && user && (user.isBanned || user.isRestricted)) {
+      appealApi.getLatest()
+        .then((data) => {
+          if (data) setLatestAppeal(data);
+        })
+        .catch(() => {}); // 이의신청 없어도 에러 무시
+    }
+  }, [isAuthenticated, user]);
 
   // Fetch settings
   useEffect(() => {
@@ -181,6 +197,27 @@ export default function SettingsPage() {
     }
   };
 
+  /** 이의신청 제출 처리 */
+  const handleSubmitAppeal = async () => {
+    if (!appealReason.trim()) {
+      addToast("이의신청 사유를 입력해주세요.", "error");
+      return;
+    }
+    setIsSubmittingAppeal(true);
+    try {
+      const result = await appealApi.submit(appealReason.trim());
+      setLatestAppeal(result);
+      setIsAppealModalOpen(false);
+      setAppealReason("");
+      addToast("이의신청이 접수되었습니다. 관리자 심사 후 처리됩니다.", "success");
+    } catch (error: any) {
+      const msg = error?.response?.data?.message ?? "이의신청 제출 중 오류가 발생했습니다.";
+      addToast(msg, "error");
+    } finally {
+      setIsSubmittingAppeal(false);
+    }
+  };
+
   const tabs = [
     { id: "accounts" as const, label: "연결된 계정", icon: LinkIcon },
     { id: "notifications" as const, label: "알림", icon: Bell },
@@ -237,6 +274,58 @@ export default function SettingsPage() {
           {/* Content */}
           <div className="md:col-span-3">
             {activeTab === "accounts" && (
+              <div className="space-y-4">
+                {/* 밴/제재 상태 배너 + 이의신청 UI */}
+                {(user?.isBanned || user?.isRestricted) && (
+                  <div className="p-4 bg-accent-danger/10 border border-accent-danger/30 rounded-lg">
+                    <div className="flex items-start gap-3">
+                      <AlertCircle className="h-5 w-5 text-accent-danger flex-shrink-0 mt-0.5" />
+                      <div className="flex-1">
+                        <p className="font-semibold text-accent-danger">
+                          {user.isBanned ? "계정이 정지되었습니다" : "계정이 임시 제재되었습니다"}
+                        </p>
+                        {user.isBanned && user.banReason && (
+                          <p className="text-sm text-text-secondary mt-1">사유: {user.banReason}</p>
+                        )}
+                        {user.isRestricted && user.restrictedUntil && (
+                          <p className="text-sm text-text-secondary mt-1">
+                            제재 해제 예정: {new Date(user.restrictedUntil).toLocaleDateString("ko-KR")}
+                          </p>
+                        )}
+
+                        {/* 이의신청 상태 표시 */}
+                        {latestAppeal ? (
+                          <div className="mt-3 p-3 bg-bg-secondary rounded-lg">
+                            {latestAppeal.status === "PENDING" && (
+                              <p className="text-sm text-accent-warning font-medium">⏳ 이의신청 심사 중입니다.</p>
+                            )}
+                            {latestAppeal.status === "APPROVED" && (
+                              <p className="text-sm text-accent-success font-medium">✅ 이의신청이 승인되었습니다. 페이지를 새로고침해주세요.</p>
+                            )}
+                            {latestAppeal.status === "REJECTED" && (
+                              <div>
+                                <p className="text-sm text-accent-danger font-medium">❌ 이의신청이 거절되었습니다.</p>
+                                {latestAppeal.adminNote && (
+                                  <p className="text-sm text-text-secondary mt-1">관리자 메모: {latestAppeal.adminNote}</p>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="mt-3"
+                            onClick={() => setIsAppealModalOpen(true)}
+                          >
+                            이의신청하기
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
               <Card>
                 <CardHeader>
                   <CardTitle>연결된 계정</CardTitle>
@@ -365,6 +454,7 @@ export default function SettingsPage() {
                   )}
                 </CardContent>
               </Card>
+              </div>
             )}
 
             {activeTab === "notifications" && (
@@ -702,6 +792,45 @@ export default function SettingsPage() {
         variant="danger"
         isLoading={isDeletingAccount}
       />
+
+      {/* 이의신청 모달 */}
+      {isAppealModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="bg-bg-secondary rounded-xl p-6 w-full max-w-md shadow-xl border border-bg-tertiary">
+            <h2 className="text-lg font-bold text-text-primary mb-2">이의신청</h2>
+            <p className="text-sm text-text-secondary mb-4">
+              제재에 이의가 있으시면 사유를 상세히 작성해주세요.
+              관리자 심사 후 처리 결과를 알려드립니다.
+            </p>
+            <textarea
+              value={appealReason}
+              onChange={(e) => setAppealReason(e.target.value)}
+              maxLength={1000}
+              rows={5}
+              placeholder="이의신청 사유를 입력해주세요. (최대 1000자)"
+              className="w-full bg-bg-primary border border-bg-tertiary rounded-lg p-3 text-sm text-text-primary resize-none focus:outline-none focus:border-accent-primary"
+            />
+            <p className="text-xs text-text-tertiary text-right mt-1">{appealReason.length}/1000</p>
+            <div className="flex gap-3 mt-4">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => { setIsAppealModalOpen(false); setAppealReason(""); }}
+                disabled={isSubmittingAppeal}
+              >
+                취소
+              </Button>
+              <Button
+                className="flex-1"
+                onClick={handleSubmitAppeal}
+                disabled={isSubmittingAppeal || !appealReason.trim()}
+              >
+                {isSubmittingAppeal ? "제출 중..." : "제출하기"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
