@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { useAuthStore } from '@/stores/auth-store';
 import { Header } from './Header';
 import { Sidebar } from './Sidebar';
+import { Footer } from './Footer';
 import { FriendsPanel } from '@/components/domain/FriendsPanel';
 import { FloatingDmPanel } from '@/components/domain/FloatingDmPanel';
 import { FloatingClanChatPanel } from '@/components/domain/FloatingClanChatPanel';
@@ -42,8 +43,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <Header />
       <main className="flex flex-grow">
         <Sidebar />
-        <div className="flex-grow overflow-auto bg-bg-primary">
+        <div className="flex flex-col flex-grow overflow-auto bg-bg-primary">
           {children}
+          <Footer />
         </div>
       </main>
       <FriendsPanel />

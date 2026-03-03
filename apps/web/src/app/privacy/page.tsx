@@ -46,6 +46,7 @@ export default function PrivacyPage() {
             ["1:1 다이렉트 메시지", "회원 탈퇴 후 즉시 파기 또는 최대 90일", "최소 수집 원칙"],
             ["접속 로그", "3개월", "통신비밀보호법"],
             ["신고·제재 기록", "3년", "분쟁 대응"],
+            ["리그 오브 레전드 매치 데이터 캐시", "영구 보관 (변경 불가능한 게임 기록)", "Riot Games API 정책 준수·서비스 운영"],
           ]}
         />
       </Section>
@@ -108,8 +109,24 @@ export default function PrivacyPage() {
       </Section>
 
       <Section title="9. 개인정보 보호책임자">
-        <p className="text-sm">
-          개인정보 처리에 관한 문의 및 불만 사항은 서비스 내 관리자 채널을 통해 접수하시기 바랍니다.
+        <Table
+          headers={["구분", "내용"]}
+          rows={[
+            ["책임자", "Harumaroon (서비스 운영자)"],
+            ["이메일", "nexuscshelper@gmail.com"],
+            ["처리 기간", "접수 후 10일 이내 답변"],
+          ]}
+        />
+        <p className="text-sm mt-2">
+          개인정보 침해로 인한 신고·상담은{" "}
+          <a href="https://www.privacy.go.kr" target="_blank" rel="noopener noreferrer" className="text-accent-primary hover:underline">
+            개인정보보호위원회
+          </a>{" "}
+          또는{" "}
+          <a href="https://cyberbureau.police.go.kr" target="_blank" rel="noopener noreferrer" className="text-accent-primary hover:underline">
+            경찰청 사이버범죄신고시스템
+          </a>
+          을 이용하실 수 있습니다.
         </p>
       </Section>
 
