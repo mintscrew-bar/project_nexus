@@ -156,10 +156,98 @@ export class TasksService {
       });
 
       if (result.count > 0) {
-        this.logger.log(`Cleaned up ${result.count} expired session(s)`);
+        this.logger.log(`만료 세션 정리: ${result.count}건`);
       }
     } catch (error) {
-      this.logger.error("Session cleanup task failed", error);
+      this.logger.error("세션 정리 작업 실패", error);
+    }
+  }
+
+  /**
+   * DM 90일 만료 삭제 - 매일 새벽 3시 10분
+   * 개인정보처리방침 보관기간 준수: DM은 최대 90일 보관
+   */
+  @Cron("10 3 * * *")
+  async handleExpiredDirectMessages(): Promise<void> {
+    try {
+      const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+      const result = await this.prisma.directMessage.deleteMany({
+        where: {
+          createdAt: { lt: ninetyDaysAgo },
+        },
+      });
+
+      if (result.count > 0) {
+        this.logger.log(`DM 만료 삭제: ${result.count}건 (90일 초과)`);
+      }
+    } catch (error) {
+      this.logger.error("DM 만료 삭제 실패", error);
+    }
+  }
+
+  /**
+   * 채팅 로그 1년 만료 삭제 - 매일 새벽 3시 20분
+   * 개인정보처리방침 보관기간 준수: 방 채팅 및 클랜 채팅 최대 1년 보관
+   * 참고: ClanChatMessage 삭제 시 UserReport.clanChatMessageId는 SetNull (스키마 설정)
+   */
+  @Cron("20 3 * * *")
+  async handleExpiredChatLogs(): Promise<void> {
+    try {
+      const oneYearAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
+
+      const [roomResult, clanResult] = await Promise.all([
+        this.prisma.chatMessage.deleteMany({
+          where: { createdAt: { lt: oneYearAgo } },
+        }),
+        this.prisma.clanChatMessage.deleteMany({
+          where: { createdAt: { lt: oneYearAgo } },
+        }),
+      ]);
+
+      const total = roomResult.count + clanResult.count;
+      if (total > 0) {
+        this.logger.log(
+          `채팅 로그 만료 삭제: 방채팅 ${roomResult.count}건, 클랜채팅 ${clanResult.count}건 (1년 초과)`,
+        );
+      }
+    } catch (error) {
+      this.logger.error("채팅 로그 만료 삭제 실패", error);
+    }
+  }
+
+  /**
+   * 신고 기록 3년 만료 삭제 - 매일 새벽 3시 30분
+   * 개인정보처리방침 보관기간 준수: 신고 기록 최대 3년 보관
+   * PENDING 상태(미처리)는 삭제하지 않고 APPROVED/REJECTED만 삭제
+   */
+  @Cron("30 3 * * *")
+  async handleExpiredReports(): Promise<void> {
+    try {
+      const threeYearsAgo = new Date(Date.now() - 3 * 365 * 24 * 60 * 60 * 1000);
+
+      const [userResult, postResult] = await Promise.all([
+        this.prisma.userReport.deleteMany({
+          where: {
+            createdAt: { lt: threeYearsAgo },
+            status: { in: ["APPROVED", "REJECTED"] },
+          },
+        }),
+        this.prisma.postReport.deleteMany({
+          where: {
+            createdAt: { lt: threeYearsAgo },
+            status: { in: ["APPROVED", "REJECTED"] },
+          },
+        }),
+      ]);
+
+      const total = userResult.count + postResult.count;
+      if (total > 0) {
+        this.logger.log(
+          `신고 기록 만료 삭제: 유저신고 ${userResult.count}건, 게시글신고 ${postResult.count}건 (3년 초과)`,
+        );
+      }
+    } catch (error) {
+      this.logger.error("신고 기록 만료 삭제 실패", error);
     }
   }
 }
