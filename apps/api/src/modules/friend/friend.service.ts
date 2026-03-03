@@ -263,12 +263,8 @@ export class FriendService {
       },
     });
 
-    // Transform to return the friend (not the current user)
-    return friendships.map((f) => ({
-      friendshipId: f.id,
-      friend: f.userId === userId ? f.friend : f.user,
-      createdAt: f.createdAt,
-    }));
+    // 프론트 Friendship 타입이 원본 구조를 기대하므로 그대로 반환
+    return friendships;
   }
 
   async getPendingRequests(userId: string) {
@@ -299,11 +295,8 @@ export class FriendService {
       orderBy: { createdAt: "desc" },
     });
 
-    return incomingRequests.map((f) => ({
-      friendshipId: f.id,
-      from: f.user,
-      createdAt: f.createdAt,
-    }));
+    // 프론트 Friendship 타입이 원본 구조를 기대하므로 그대로 반환
+    return incomingRequests;
   }
 
   async getSentRequests(userId: string) {

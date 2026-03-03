@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Logo } from '@/components/Logo';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -23,6 +24,25 @@ export function Header() {
   const { isAuthenticated, user } = useAuthStore();
   const { togglePanel, isOpen, pendingRequests } = useFriendStore();
   const incomingCount = pendingRequests.filter((r: any) => r.status === 'PENDING').length;
+
+  // ---------------------------------------------------------------
+  // Hydration 불일치 방지:
+  // Zustand persist(localStorage)와 auth 상태는 클라이언트에서만 확정된다.
+  // 서버 렌더링 시점에는 isAuthenticated=false, isOpen=false로 고정된 빈 상태를
+  // 렌더링해야 서버 HTML과 클라이언트 첫 렌더가 일치한다.
+  // mounted=true가 되면 실제 클라이언트 상태로 전환하여 UI를 업데이트한다.
+  // ---------------------------------------------------------------
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // 마운트 전(SSR/hydration 단계): 클라이언트 전용 상태를 참조하지 않도록
+  // isAuthenticated/isOpen/incomingCount를 모두 기본값으로 처리
+  const clientIsAuthenticated = mounted && isAuthenticated;
+  const clientIsOpen = mounted && isOpen;
+  const clientIncomingCount = mounted ? incomingCount : 0;
+  const clientUser = mounted ? user : null;
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
 
@@ -59,9 +79,10 @@ export function Header() {
 
       {/* Right: Friends + Theme Toggle + Auth */}
       <div className="flex items-center gap-3">
-        {isAuthenticated && (user?.role === 'ADMIN' || user?.role === 'MODERATOR') && (
+        {/* 어드민/모더레이터 전용 링크: 마운트 후에만 표시하여 hydration 불일치 방지 */}
+        {clientIsAuthenticated && (clientUser?.role === 'ADMIN' || clientUser?.role === 'MODERATOR') && (
           <>
-            {user?.role === 'ADMIN' && (
+            {clientUser?.role === 'ADMIN' && (
               <Link
                 href="/simulation"
                 className={cn(
@@ -89,21 +110,22 @@ export function Header() {
             </Link>
           </>
         )}
-        {isAuthenticated && (
+        {/* 친구 목록 버튼: 마운트 후에만 표시하여 뱃지 카운트 hydration 불일치 방지 */}
+        {clientIsAuthenticated && (
           <button
             onClick={togglePanel}
             className={cn(
               'relative p-2 rounded-lg transition-colors duration-150',
-              isOpen
+              clientIsOpen
                 ? 'bg-accent-primary/10 text-accent-primary'
                 : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary'
             )}
             title="친구 목록"
           >
             <Users className="h-5 w-5" />
-            {incomingCount > 0 && (
+            {clientIncomingCount > 0 && (
               <span className="absolute -top-0.5 -right-0.5 w-4 h-4 flex items-center justify-center bg-accent-danger text-white text-[9px] font-bold rounded-full">
-                {incomingCount}
+                {clientIncomingCount}
               </span>
             )}
           </button>

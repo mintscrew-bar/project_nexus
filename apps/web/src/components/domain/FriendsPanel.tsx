@@ -31,7 +31,7 @@ import {
   UserCheck,
   Sword,
 } from "lucide-react";
-import { statsApi, friendApi, dmApi } from "@/lib/api-client";
+import { statsApi, friendApi, dmApi, clanApi } from "@/lib/api-client";
 import { useFriendStore, type Friendship, type FriendCategory } from "@/stores/friend-store";
 import { usePresenceStore } from "@/stores/presence-store";
 import { useLobbyStore } from "@/stores/lobby-store";
@@ -40,8 +40,7 @@ import { useToast } from "@/components/ui/Toast";
 import { StatusIndicator } from "@/components/ui";
 import { useDmStore } from "@/stores/dm-store";
 import { connectDmSocket, dmSocketHelpers } from "@/lib/socket-client";
-import { DmChatView } from "@/components/domain/DmChatView";
-import { ArrowLeft } from "lucide-react";
+import { Shield } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type ModalState =
@@ -1039,9 +1038,6 @@ export function FriendsPanel() {
   const getFriendStatus = usePresenceStore((s) => s.getFriendStatus);
   const room = useLobbyStore((s) => s.room);
   const {
-    openChatUserId,
-    openChat,
-    closeChat,
     totalUnread: _totalUnread,
     setTotalUnread,
     setUnreadCount,
@@ -1050,8 +1046,15 @@ export function FriendsPanel() {
     appendMessage,
     updateConversationLastMessage,
     setTyping,
+    openChat,
   } = useDmStore();
   const totalUnread = _totalUnread ?? 0;
+
+  // 플로팅 DM/클랜 채팅 창 상태 (friend-store)
+  const openFloatingDm = useFriendStore((s) => s.openFloatingDm);
+  const toggleClanChat = useFriendStore((s) => s.toggleClanChat);
+  // 내 클랜 정보 (클랜 채팅 버튼 표시 여부 결정)
+  const [myClan, setMyClan] = useState<{ id: string; name: string; tag: string } | null>(null);
 
   const [tab, setTab] = useState<"friends" | "pending" | "messages">("friends");
   const [search, setSearch] = useState("");
@@ -1066,9 +1069,16 @@ export function FriendsPanel() {
     onConfirm: () => void;
   } | null>(null);
 
-  // Load friends when panel opens
+  // 패널 열릴 때 친구 목록 + 내 클랜 정보 로드
   useEffect(() => {
-    if (isOpen && isAuthenticated) fetchFriends();
+    if (isOpen && isAuthenticated) {
+      fetchFriends();
+      // 클랜 채팅 버튼 표시를 위해 내 클랜 정보 조회
+      clanApi.getMyClan().then((clan: any) => {
+        if (clan?.id) setMyClan({ id: clan.id, name: clan.name, tag: clan.tag });
+        else setMyClan(null);
+      }).catch(() => setMyClan(null));
+    }
   }, [isOpen, isAuthenticated, fetchFriends]);
 
   // DM 소켓 연결 + 전역 이벤트 핸들러
@@ -1110,9 +1120,8 @@ export function FriendsPanel() {
     };
   }, [isAuthenticated, user?.id, appendMessage, updateConversationLastMessage, setTotalUnread, setTyping]);
 
-  // 패널 닫을 때 채팅 뷰도 닫기
+  // 패널 닫기 (플로팅 DM 창은 독립적이므로 함께 닫지 않음)
   const handleClosePanel = () => {
-    closeChat();
     closePanel();
   };
 
@@ -1123,9 +1132,10 @@ export function FriendsPanel() {
     [currentUserId]
   );
 
-  // Filter friends by search
+  // Filter friends by search (user/friend 관계 데이터 없는 항목은 제외)
   const filteredFriends = friends.filter((f) => {
     const fu = getFriendUser(f);
+    if (!fu) return false;
     const display = getDisplayName(fu.id, fu.username);
     const q = search.toLowerCase();
     return display.toLowerCase().includes(q) || fu.username.toLowerCase().includes(q);
@@ -1161,12 +1171,14 @@ export function FriendsPanel() {
 
   const handleRemove = (friendship: Friendship) => {
     const fu = getFriendUser(friendship);
+    if (!fu) return;
     setConfirmState({
       title: "친구 삭제",
       message: `${fu.username}님을 친구 목록에서 삭제하시겠습니까?`,
       onConfirm: async () => {
         try {
-          await removeFriend(friendship.id);
+          // API는 friendId(상대방 userId)를 받음
+          await removeFriend(fu.id);
           addToast("친구를 삭제했습니다.", "info");
         } catch {
           addToast("친구 삭제에 실패했습니다.", "error");
@@ -1191,18 +1203,35 @@ export function FriendsPanel() {
     !!room && room.status === "WAITING" &&
     room.participants.length < room.maxParticipants;
 
-  // 현재 DM 상대 유저 정보
-  const chatPartner = openChatUserId
-    ? (() => {
-        const f = friends.find((fr) => {
-          const fu = getFriendUser(fr);
-          return fu.id === openChatUserId;
-        });
-        if (!f) return null;
+  // 친구/대화 클릭 시 플로팅 DM 창 열기
+  const handleOpenDm = useCallback(
+    (userId: string) => {
+      // 친구 목록에서 유저 정보 조회
+      const f = friends.find((fr) => {
+        const fu = getFriendUser(fr);
+        return fu.id === userId;
+      });
+      if (f) {
         const fu = getFriendUser(f);
-        return { id: fu.id, username: getDisplayName(fu.id, fu.username), avatar: fu.avatar };
-      })()
-    : null;
+        openFloatingDm({
+          id: fu.id,
+          username: getDisplayName(fu.id, fu.username),
+          avatar: fu.avatar,
+        });
+      } else {
+        // 대화 목록에서 유저 정보 조회 (친구가 아닌 경우 fallback)
+        const conv = conversations.find((c) => c.user.id === userId);
+        openFloatingDm({
+          id: userId,
+          username: conv?.user.username ?? userId,
+          avatar: conv?.user.avatar ?? null,
+        });
+      }
+      // dm-store의 openChat도 호출하여 소켓 읽음 처리 등 기존 로직 유지
+      openChat(userId);
+    },
+    [friends, conversations, getFriendUser, getDisplayName, openFloatingDm, openChat]
+  );
 
   if (!isAuthenticated) return null;
 
@@ -1219,84 +1248,48 @@ export function FriendsPanel() {
           isOpen ? "translate-x-0" : "translate-x-full"
         }`}
       >
-        {/* Header */}
+        {/* Header — 항상 친구 목록 헤더 표시 (DM은 플로팅 창으로 분리) */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-bg-tertiary">
-          {openChatUserId && chatPartner ? (
-            /* 채팅 뷰 헤더 */
-            <>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={closeChat}
-                  className="p-1.5 rounded-lg hover:bg-bg-elevated text-text-tertiary hover:text-text-primary transition-colors"
-                  title="뒤로"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                </button>
-                <div className="w-6 h-6 rounded-full bg-bg-tertiary overflow-hidden flex-shrink-0">
-                  {chatPartner.avatar ? (
-                    <img src={chatPartner.avatar} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-[10px] font-bold text-text-muted">
-                      {chatPartner.username[0]?.toUpperCase()}
-                    </div>
-                  )}
-                </div>
-                <span className="font-semibold text-text-primary text-sm truncate max-w-[120px]">
-                  {chatPartner.username}
-                </span>
-              </div>
+          <div className="flex items-center gap-2">
+            <Users className="w-4 h-4 text-accent-primary" />
+            <span className="font-semibold text-text-primary text-sm">친구 목록</span>
+          </div>
+          <div className="flex items-center gap-1">
+            {/* 클랜 채팅 버튼 (클랜이 있는 유저만 표시) */}
+            {myClan && (
               <button
-                onClick={handleClosePanel}
-                className="p-1.5 rounded-lg hover:bg-bg-elevated text-text-tertiary hover:text-text-primary transition-colors"
+                title={`[${myClan.tag}] ${myClan.name} 채팅`}
+                onClick={toggleClanChat}
+                className="p-1.5 rounded-lg hover:bg-bg-elevated text-text-tertiary hover:text-accent-primary transition-colors"
               >
-                <X className="w-4 h-4" />
+                <Shield className="w-4 h-4" />
               </button>
-            </>
-          ) : (
-            /* 친구 목록 헤더 */
-            <>
-              <div className="flex items-center gap-2">
-                <Users className="w-4 h-4 text-accent-primary" />
-                <span className="font-semibold text-text-primary text-sm">친구 목록</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <button
-                  title="친구 추가"
-                  onClick={() => setModal({ type: "addFriend" })}
-                  className="p-1.5 rounded-lg hover:bg-bg-elevated text-text-tertiary hover:text-accent-primary transition-colors"
-                >
-                  <UserPlus className="w-4 h-4" />
-                </button>
-                <button
-                  title="카테고리 추가"
-                  onClick={() => setModal({ type: "addCategory" })}
-                  className="p-1.5 rounded-lg hover:bg-bg-elevated text-text-tertiary hover:text-text-primary transition-colors"
-                >
-                  <FolderPlus className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={handleClosePanel}
-                  className="p-1.5 rounded-lg hover:bg-bg-elevated text-text-tertiary hover:text-text-primary transition-colors"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            </>
-          )}
+            )}
+            <button
+              title="친구 추가"
+              onClick={() => setModal({ type: "addFriend" })}
+              className="p-1.5 rounded-lg hover:bg-bg-elevated text-text-tertiary hover:text-accent-primary transition-colors"
+            >
+              <UserPlus className="w-4 h-4" />
+            </button>
+            <button
+              title="카테고리 추가"
+              onClick={() => setModal({ type: "addCategory" })}
+              className="p-1.5 rounded-lg hover:bg-bg-elevated text-text-tertiary hover:text-text-primary transition-colors"
+            >
+              <FolderPlus className="w-4 h-4" />
+            </button>
+            <button
+              onClick={handleClosePanel}
+              className="p-1.5 rounded-lg hover:bg-bg-elevated text-text-tertiary hover:text-text-primary transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
-        {/* DM 채팅 뷰 */}
-        {openChatUserId && chatPartner && (
-          <DmChatView
-            key={chatPartner.id}
-            otherUserId={chatPartner.id}
-            otherUsername={chatPartner.username}
-            otherAvatar={chatPartner.avatar}
-          />
-        )}
-
-        {/* 친구 목록 뷰 */}
-        {!openChatUserId && <>
+        {/* 친구 목록 뷰 — 항상 표시 (DM은 플로팅 창으로 분리됨) */}
+        <>
 
         {/* Search */}
         {tab === "friends" && (
@@ -1398,7 +1391,7 @@ export function FriendsPanel() {
                         onConfirm: () => deleteCategory(cat.id),
                       });
                     }}
-                    onOpenDm={openChat}
+                    onOpenDm={handleOpenDm}
                   />
                 ))}
 
@@ -1417,7 +1410,7 @@ export function FriendsPanel() {
                     onDropToCategory={handleDropToCategory}
                     canRename={false}
                     canDelete={false}
-                    onOpenDm={openChat}
+                    onOpenDm={handleOpenDm}
                   />
                 )}
               </>
@@ -1433,7 +1426,7 @@ export function FriendsPanel() {
                 setConversations(data);
               } catch { /* ignore */ }
             }}
-            onOpenChat={openChat}
+            onOpenChat={handleOpenDm}
             getDisplayName={getDisplayName}
           />
         )}
@@ -1441,7 +1434,7 @@ export function FriendsPanel() {
           <PendingList currentUserId={currentUserId} />
         )}
 
-        </> /* !openChatUserId */}
+        </>
       </div>
 
       {/* Context Menu */}

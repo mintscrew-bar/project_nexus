@@ -30,9 +30,21 @@ export interface Friendship {
   friend: FriendUser;
 }
 
+/** 플로팅 DM 창에 필요한 상대 유저 정보 */
+export interface FloatingDmTarget {
+  id: string;
+  username: string;
+  avatar: string | null;
+}
+
 interface FriendStore {
   // Panel state
   isOpen: boolean;
+
+  // 플로팅 DM 창 상태 (롤 스타일 — 패널 왼쪽에 별도 팝업)
+  floatingDmTarget: FloatingDmTarget | null;
+  // 플로팅 클랜 채팅 창 열림 여부
+  isClanChatOpen: boolean;
 
   // Persisted
   categories: FriendCategory[];
@@ -47,6 +59,14 @@ interface FriendStore {
   openPanel: () => void;
   closePanel: () => void;
   togglePanel: () => void;
+
+  // 플로팅 DM 창 액션
+  openFloatingDm: (target: FloatingDmTarget) => void;
+  closeFloatingDm: () => void;
+  // 플로팅 클랜 채팅 창 액션
+  openClanChat: () => void;
+  closeClanChat: () => void;
+  toggleClanChat: () => void;
 
   // Data
   fetchFriends: () => Promise<void>;
@@ -72,6 +92,8 @@ export const useFriendStore = create<FriendStore>()(
   persist(
     (set, get) => ({
       isOpen: false,
+      floatingDmTarget: null,
+      isClanChatOpen: false,
       categories: [],
       friendMeta: {},
       friends: [],
@@ -81,6 +103,20 @@ export const useFriendStore = create<FriendStore>()(
       openPanel: () => set({ isOpen: true }),
       closePanel: () => set({ isOpen: false }),
       togglePanel: () => set((s) => ({ isOpen: !s.isOpen })),
+
+      // 플로팅 DM 창: 같은 유저면 토글, 다른 유저면 전환
+      openFloatingDm: (target) =>
+        set((s) =>
+          s.floatingDmTarget?.id === target.id
+            ? { floatingDmTarget: null }
+            : { floatingDmTarget: target }
+        ),
+      closeFloatingDm: () => set({ floatingDmTarget: null }),
+
+      // 플로팅 클랜 채팅 창
+      openClanChat: () => set({ isClanChatOpen: true }),
+      closeClanChat: () => set({ isClanChatOpen: false }),
+      toggleClanChat: () => set((s) => ({ isClanChatOpen: !s.isClanChatOpen })),
 
       fetchFriends: async () => {
         set({ isLoading: true });
@@ -107,9 +143,14 @@ export const useFriendStore = create<FriendStore>()(
         await get().fetchFriends();
       },
 
-      removeFriend: async (id) => {
-        await friendApi.removeFriend(id);
-        set((s) => ({ friends: s.friends.filter((f) => f.id !== id) }));
+      removeFriend: async (friendUserId) => {
+        await friendApi.removeFriend(friendUserId);
+        // 해당 유저가 포함된 friendship 레코드 모두 제거
+        set((s) => ({
+          friends: s.friends.filter(
+            (f) => f.userId !== friendUserId && f.friendId !== friendUserId,
+          ),
+        }));
       },
 
       addCategory: (name) => {
