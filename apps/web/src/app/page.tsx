@@ -19,7 +19,7 @@ export default function Home() {
     }
   }, [isAuthenticated, isLoading, router]);
 
-  // 안전장치: auth 초기화가 7초 이상 걸리면 강제로 로딩 해제
+  // 안전장치: auth 초기화가 4초 이상 걸리면 강제로 로딩 해제
   useEffect(() => {
     const timer = setTimeout(() => {
       const { isLoading: stillLoading } = useAuthStore.getState();
@@ -27,7 +27,7 @@ export default function Home() {
         useAuthStore.setState({ isLoading: false });
         setTimedOut(true);
       }
-    }, 7000);
+    }, 4000);
     return () => clearTimeout(timer);
   }, []);
 
@@ -37,8 +37,9 @@ export default function Home() {
       <div className="flex min-h-screen flex-col items-center justify-center bg-bg-primary">
         <div className="flex flex-col items-center gap-4 animate-fade-in">
           <Logo size="xl" />
+          {/* 초기 로딩 프로그레스 바 */}
           <div className="h-1 w-32 rounded-full bg-bg-tertiary overflow-hidden">
-            <div className="h-full w-1/2 bg-accent-primary rounded-full animate-pulse" />
+            <div className="h-full w-1/2 bg-accent-primary rounded-full animate-loading-slide" />
           </div>
         </div>
       </div>

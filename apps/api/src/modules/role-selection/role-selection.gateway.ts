@@ -38,6 +38,7 @@ export class RoleSelectionGateway
   private roomTimers = new Map<string, NodeJS.Timeout>();
   // Guard against duplicate completeRoleSelection calls (timer + all-roles-selected race)
   private completingRooms = new Set<string>();
+  private connectedUsers = new Map<string, { userId: string; roomId: string }>();
 
   constructor(
     private readonly authService: AuthService,
@@ -54,6 +55,7 @@ export class RoleSelectionGateway
     }
     this.roomTimers.clear();
     this.completingRooms.clear();
+    this.connectedUsers.clear();
   }
 
   async handleConnection(client: AuthenticatedSocket) {
@@ -84,6 +86,7 @@ export class RoleSelectionGateway
 
   handleDisconnect(client: AuthenticatedSocket) {
     console.log(`Role selection client disconnected: ${client.username}`);
+    this.connectedUsers.delete(client.id);
   }
 
   @SubscribeMessage("join-room")
@@ -93,6 +96,9 @@ export class RoleSelectionGateway
   ) {
     try {
       client.join(`room:${data.roomId}`);
+      if (client.userId) {
+        this.connectedUsers.set(client.id, { userId: client.userId, roomId: data.roomId });
+      }
 
       const roleSelectionData =
         await this.roleSelectionService.getRoleSelectionData(data.roomId);

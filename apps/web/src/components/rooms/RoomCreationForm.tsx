@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useRoomStore } from "@/stores/room-store";
 import { useRouter } from "next/navigation";
-import { Users, Lock, Unlock, Gavel, ListOrdered, Trophy, Info, GitBranch } from "lucide-react";
+import { Users, Lock, Unlock, Gavel, ListOrdered, Trophy, Info, GitBranch, AlertTriangle } from "lucide-react";
+import Link from "next/link";
 
 interface RoomCreationFormProps {
   onCancel: () => void;
@@ -417,12 +418,36 @@ export function RoomCreationForm({ onCancel, onRoomCreated }: RoomCreationFormPr
         </div>
       </div>
 
-      {/* 에러 메시지 */}
-      {errorMessage && (
-        <div className="p-3 bg-accent-danger/10 border border-accent-danger/20 rounded-lg">
-          <p className="text-accent-danger text-sm">{errorMessage}</p>
-        </div>
-      )}
+      {/* 에러 메시지 (계정 연동 에러 시 안내 링크 포함) */}
+      {errorMessage && (() => {
+        const isDiscordError = errorMessage.includes("DISCORD_NOT_LINKED");
+        const isRiotError = errorMessage.includes("RIOT_NOT_LINKED");
+        const displayMessage = errorMessage.includes("::")
+          ? errorMessage.split("::")[1]
+          : errorMessage;
+
+        return (
+          <div className="p-4 bg-accent-danger/10 border border-accent-danger/20 rounded-lg">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-accent-danger shrink-0 mt-0.5" />
+              <div className="space-y-2">
+                <p className="text-accent-danger text-sm font-medium">{displayMessage}</p>
+                {/* 계정 연동 페이지로 안내 */}
+                {isDiscordError && (
+                  <Link href="/settings" className="inline-block text-sm text-accent-primary hover:underline">
+                    설정 페이지에서 Discord 연동하기 →
+                  </Link>
+                )}
+                {isRiotError && (
+                  <Link href="/profile" className="inline-block text-sm text-accent-primary hover:underline">
+                    프로필 페이지에서 Riot 계정 연동하기 →
+                  </Link>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* 버튼 */}
       <div className="flex justify-end gap-3 pt-2">

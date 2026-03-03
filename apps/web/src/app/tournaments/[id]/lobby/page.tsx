@@ -422,7 +422,10 @@ export default function TournamentLobbyPage() {
       router.push(`/role-selection/${room.id}`);
       return;
     }
-    if (room.status === 'IN_PROGRESS' || room.status === 'COMPLETED') {
+    // IN_PROGRESS인 경우에만 bracket으로 리다이렉트.
+    // COMPLETED는 returnToLobby API 호출 후 WAITING으로 리셋되어 오기 때문에
+    // 여기서 리다이렉트하면 무한 루프가 발생한다.
+    if (room.status === 'IN_PROGRESS') {
       hasRedirected.current = true;
       disconnect({ skipLeave: true });
       router.push(`/tournaments/${room.id}/bracket`);

@@ -353,6 +353,9 @@ model ChatMessage {
   content   String
   createdAt DateTime @default(now())
 
+  // onDelete 정책:
+  //   SetNull  → 방 삭제 후에도 채팅 로그 보존 (이력 보존 목적)
+  //   Cascade  → 유저 삭제 시 메시지도 함께 삭제 (소유 데이터)
   room Room? @relation(fields: [roomId], references: [id], onDelete: SetNull)
   user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
 

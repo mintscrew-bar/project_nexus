@@ -210,6 +210,16 @@
   animation: progressFill 0.6s ease-out both;
 }
 
+/* 초기 로딩 바 슬라이딩 애니메이션 */
+@keyframes loadingSlide {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+
+.animate-loading-slide {
+  animation: loadingSlide 1.2s ease-in-out infinite;
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 8px;

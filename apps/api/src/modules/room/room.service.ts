@@ -83,6 +83,27 @@ export class RoomService {
   // ========================================
 
   async createRoom(hostId: string, dto: CreateRoomDto) {
+    // ========================================
+    // Discord + Riot 계정 연동 필수 체크 (방 생성 시에도 검증)
+    // ========================================
+    const discordProvider = await this.prisma.authProvider.findFirst({
+      where: { userId: hostId, provider: "DISCORD" },
+    });
+    if (!discordProvider) {
+      throw new BadRequestException(
+        "DISCORD_NOT_LINKED::Discord 계정 연동이 필요합니다. 설정 페이지에서 Discord 계정을 연동해주세요.",
+      );
+    }
+
+    const riotAccount = await this.prisma.riotAccount.findFirst({
+      where: { userId: hostId, isPrimary: true },
+    });
+    if (!riotAccount) {
+      throw new BadRequestException(
+        "RIOT_NOT_LINKED::Riot 계정 연동이 필요합니다. 프로필 페이지에서 Riot 계정을 연동해주세요.",
+      );
+    }
+
     // Validate max participants
     if (![10, 15, 20, 30, 40].includes(dto.maxParticipants)) {
       throw new BadRequestException(
@@ -472,7 +493,9 @@ export class RoomService {
 
       if (allRemainingAreBots || remainingParticipants.length === 0) {
         if (this.discordVoiceService) {
-          await this.discordVoiceService.deleteRoomChannels(roomId).catch(() => {});
+          await this.discordVoiceService.deleteRoomChannels(roomId).catch((e: any) => {
+            this.logger.warn(`[Room] Discord channel cleanup failed for room ${roomId}: ${e?.message}`);
+          });
         }
         await this.prisma.room.delete({
           where: { id: roomId },
@@ -480,7 +503,16 @@ export class RoomService {
         return { message: "Room deleted (only bots remaining)" };
       }
 
-      return { message: "Left realtime session, participant preserved" };
+      const realRemaining = remainingParticipants.filter(
+        (p: any) => !/^testbot_\d+$/.test(p.user?.username || ""),
+      );
+      if (realRemaining.length < 2) {
+        this.logger.warn(
+          `[Room] Room ${roomId} has only ${realRemaining.length} real participant(s) during active session (status: ${room.status}). Host may need to abort.`,
+        );
+      }
+
+      return { message: "Left realtime session, participant preserved", remainingRealCount: realRemaining.length };
     }
 
     // Remove participant first
@@ -503,7 +535,9 @@ export class RoomService {
     if (remainingCount === 0) {
       // Clean up Discord channels (category + lobby + team channels) before deleting
       if (this.discordVoiceService) {
-        await this.discordVoiceService.deleteRoomChannels(roomId).catch(() => {});
+        await this.discordVoiceService.deleteRoomChannels(roomId).catch((e: any) => {
+          this.logger.warn(`[Room] Discord channel cleanup failed for room ${roomId}: ${e?.message}`);
+        });
       }
       await this.prisma.room.delete({
         where: { id: roomId },
@@ -514,7 +548,9 @@ export class RoomService {
     // If only bots remain, delete room immediately
     if (allRemainingAreBots) {
       if (this.discordVoiceService) {
-        await this.discordVoiceService.deleteRoomChannels(roomId).catch(() => {});
+        await this.discordVoiceService.deleteRoomChannels(roomId).catch((e: any) => {
+          this.logger.warn(`[Room] Discord channel cleanup failed for room ${roomId}: ${e?.message}`);
+        });
       }
       await this.prisma.room.delete({
         where: { id: roomId },
@@ -522,9 +558,11 @@ export class RoomService {
       return { message: "Room deleted (only bots remaining)" };
     }
 
-    // If host leaves but others remain, transfer host to next participant
+    // If host leaves but others remain, transfer host to next real (non-bot) participant
     if (room.hostId === userId && remainingCount > 0) {
-      const nextHost = room.participants.find((p) => p.userId !== userId);
+      const nextHost =
+        remainingParticipants.find((p: any) => !/^testbot_\d+$/.test(p.user?.username || "")) ??
+        remainingParticipants[0];
       if (nextHost) {
         await this.prisma.room.update({
           where: { id: roomId },
@@ -876,7 +914,9 @@ export class RoomService {
 
     // Clean up Discord channels (Discord auto-removes users from deleted channels)
     if (this.discordVoiceService) {
-      await this.discordVoiceService.deleteRoomChannels(roomId).catch(() => {});
+      await this.discordVoiceService.deleteRoomChannels(roomId).catch((e: any) => {
+        this.logger.warn(`[Room] Discord channel cleanup failed for room ${roomId}: ${e?.message}`);
+      });
     }
 
     // Delete room data (chat messages preserved via onDelete: SetNull)
@@ -884,6 +924,120 @@ export class RoomService {
     await this.prisma.room.delete({ where: { id: roomId } });
 
     return { message: "Room closed" };
+  }
+
+  /**
+   * 토너먼트 완료(COMPLETED) 후 방 상태를 WAITING으로 리셋하여 로비로 복귀시킨다.
+   * abortActiveSession과 달리 호스트가 아니어도 호출 가능하며,
+   * COMPLETED 상태에서만 동작한다.
+   */
+  async returnToLobby(requesterId: string, roomId: string) {
+    const room = await this.prisma.room.findUnique({
+      where: { id: roomId },
+      include: {
+        participants: true,
+        teams: {
+          include: {
+            captain: {
+              include: {
+                authProviders: {
+                  where: { provider: "DISCORD" },
+                  select: { providerId: true },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!room) {
+      throw new NotFoundException("Room not found");
+    }
+
+    // COMPLETED 상태에서만 로비 복귀 허용
+    if (room.status !== RoomStatus.COMPLETED) {
+      throw new BadRequestException(
+        `Room is not in COMPLETED state (current: ${room.status}). Use abort-to-lobby for active sessions.`,
+      );
+    }
+
+    // 요청자가 방 참가자인지 확인
+    const isParticipant = room.participants.some((p) => p.userId === requesterId);
+    if (!isParticipant) {
+      throw new ForbiddenException("Only room participants can return to lobby");
+    }
+
+    // Discord 팀장 역할 정리용
+    const captainDiscordIds = room.teams
+      .map((team) => team.captain.authProviders[0]?.providerId)
+      .filter((providerId): providerId is string => Boolean(providerId));
+
+    // 트랜잭션으로 방 상태를 WAITING으로 리셋
+    await this.prisma.$transaction(async (tx) => {
+      // 참가자 팀 배정 해제 및 레디 상태 초기화
+      await tx.roomParticipant.updateMany({
+        where: { roomId },
+        data: {
+          teamId: null,
+          isCaptain: false,
+          isReady: false,
+        },
+      });
+
+      // 매치 데이터 삭제 (전적은 MatchParticipant에 이미 기록됨)
+      await tx.match.deleteMany({
+        where: { roomId },
+      });
+
+      // 드래프트/경매 데이터 삭제
+      await tx.snakeDraftPick.deleteMany({
+        where: { roomId },
+      });
+
+      await tx.auctionBid.deleteMany({
+        where: { roomId },
+      });
+
+      // 팀 삭제
+      await tx.team.deleteMany({
+        where: { roomId },
+      });
+
+      // 방 상태를 WAITING으로 리셋
+      await tx.room.update({
+        where: { id: roomId },
+        data: {
+          status: RoomStatus.WAITING,
+          startedAt: null,
+          completedAt: null,
+        },
+      });
+    });
+
+    // Discord 팀장 역할 해제 및 로비 채널로 이동
+    try {
+      if (this.discordVoiceService) {
+        await Promise.all(
+          captainDiscordIds.map((providerId) =>
+            this.discordVoiceService.removeCaptainRole(providerId),
+          ),
+        );
+        await this.discordVoiceService.moveAllToLobby(roomId);
+      }
+    } catch (error) {
+      this.logger.warn("Failed to clean up Discord state after return to lobby:", error);
+    }
+
+    this.logger.log(
+      `Room returned to lobby after completion: roomId=${roomId}, requestedBy=${requesterId}`,
+    );
+
+    const updatedRoom = await this.getRoomById(roomId);
+    return {
+      message: "Room returned to lobby after tournament completion",
+      room: updatedRoom,
+    };
   }
 
   async abortActiveSession(requesterId: string, roomId: string) {

@@ -140,6 +140,31 @@ export class RoomController {
     return result;
   }
 
+  // 토너먼트 완료 후 로비 복귀 (COMPLETED -> WAITING 리셋)
+  @Post(":id/return-to-lobby")
+  @HttpCode(HttpStatus.OK)
+  async returnToLobby(
+    @CurrentUser("sub") userId: string,
+    @Param("id") roomId: string,
+  ) {
+    const result = await this.roomService.returnToLobby(userId, roomId);
+
+    // 인메모리 상태 정리 (이미 완료된 상태지만 방어적으로)
+    this.snakeDraftService.clearDraftState(roomId);
+    this.auctionService.clearAuctionState(roomId);
+    this.roleSelectionService.clearRoleSelectionState(roomId);
+
+    // 룸 리스트 갱신 브로드캐스트
+    this.roomGateway.broadcastRoomListUpdate();
+
+    // room-updated 이벤트로 로비에 있는 모든 클라이언트에 갱신된 방 데이터 전송
+    if (result.room) {
+      this.roomGateway.notifyRoomUpdate(roomId, "room-updated", result.room);
+    }
+
+    return result;
+  }
+
   @Post(":id/abort-to-lobby")
   @HttpCode(HttpStatus.OK)
   async abortToLobby(
@@ -152,6 +177,7 @@ export class RoomController {
     this.auctionService.clearAuctionState(roomId);
     this.roleSelectionService.clearRoleSelectionState(roomId);
 
+    this.snakeDraftGateway.cleanupRoom(roomId);
     this.auctionGateway.cleanupRoom(roomId);
     this.roleSelectionGateway.clearRoomTimer(roomId);
 

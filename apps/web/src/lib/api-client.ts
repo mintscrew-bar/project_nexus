@@ -301,6 +301,12 @@ export const roomApi = {
     return response.data;
   },
 
+  // 토너먼트 완료 후 로비 복귀 (COMPLETED -> WAITING 리셋)
+  returnToLobby: async (roomId: string) => {
+    const response = await apiClient.post(`/rooms/${roomId}/return-to-lobby`);
+    return response.data;
+  },
+
   getChatMessages: async (roomId: string, limit = 50, offset = 0) => {
     const response = await apiClient.get(`/rooms/${roomId}/messages`, {
       params: { limit, offset },

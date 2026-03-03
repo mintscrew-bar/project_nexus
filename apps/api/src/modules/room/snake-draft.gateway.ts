@@ -302,7 +302,15 @@ export class SnakeDraftGateway
     this.server.to(`draft:${roomId}`).emit("auto-pick-made", data);
   }
 
+  cleanupRoom(roomId: string): void {
+    this._cancelPickTimer(roomId);
+    this.autoPickingRooms.delete(roomId);
+    this.manualPickingRooms.delete(roomId);
+    this.completingDrafts.delete(roomId);
+  }
+
   emitSessionAborted(roomId: string, data: any) {
+    this.cleanupRoom(roomId);
     this.server.to(`draft:${roomId}`).emit("session-aborted", data);
   }
 

@@ -82,8 +82,10 @@ export const useAuthStore = create<AuthState>((set) => ({
 
       try {
         // refresh token으로 access token을 먼저 발급받은 뒤 /auth/me 조회
+        // 캐시된 유저 없으면 비로그인 가능성 높음 → 타임아웃 짧게 (2초)
+        const timeoutMs = cachedUser ? 5000 : 2000;
         const timeout = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("auth_timeout")), 5000)
+          setTimeout(() => reject(new Error("auth_timeout")), timeoutMs)
         );
         const user = await Promise.race([authApi.initSession(), timeout]);
         saveUserToStorage(user);

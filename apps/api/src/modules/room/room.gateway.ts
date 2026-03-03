@@ -394,8 +394,11 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
             `[Room] Rolled back room ${data.roomId} to WAITING after startGame failure: ${error.message}`,
           );
         }
-      } catch (_rollbackError) {
-        // Ignore rollback failures
+      } catch (rollbackError: any) {
+        console.error(
+          `[Room] Rollback to WAITING failed for room ${data.roomId}:`,
+          rollbackError?.message ?? rollbackError,
+        );
       }
 
       // Clean up in-memory draft/auction state on failure

@@ -38,6 +38,12 @@ export interface CaptainSelectionPhase {
 @Injectable()
 export class AuctionService {
   private auctionStates = new Map<string, AuctionState>();
+  /**
+   * captainPhases는 현재 인메모리만 관리됨 (30초 단기 세션).
+   * 서버 재시작 시 DRAFT 상태이지만 captainPhase 정보가 유실될 수 있음.
+   * TODO: RedisService를 AuctionService에 주입하여 captainPhases를 Redis에도 저장하면
+   *       서버 재시작 내구성 확보 가능 (key: `captain-phase:${roomId}`, TTL: 60s).
+   */
   private captainPhases = new Map<string, CaptainSelectionPhase>();
   private discordVoiceService: any; // DiscordVoiceService (optional dependency)
 
@@ -591,13 +597,7 @@ export class AuctionService {
       throw new BadRequestException("No player to bid on");
     }
 
-    state.currentHighestBid = amount;
-    state.currentHighestBidder = team.id;
-    state.currentHighestBidderName = team.captain.username;
-    state.timerEnd = this.getExtendedBidTimerEnd(state.timerEnd);
-    state.yuchalCount = 0; // Reset yuchal count
-
-    // Record bid
+    // Record bid in DB first — update in-memory state only after successful write
     await this.prisma.auctionBid.create({
       data: {
         roomId,
@@ -606,6 +606,12 @@ export class AuctionService {
         amount,
       },
     });
+
+    state.currentHighestBid = amount;
+    state.currentHighestBidder = team.id;
+    state.currentHighestBidderName = team.captain.username;
+    state.timerEnd = this.getExtendedBidTimerEnd(state.timerEnd);
+    state.yuchalCount = 0;
 
     return state;
   }
@@ -714,14 +720,16 @@ export class AuctionService {
       };
     } else {
       // Yuchal (no sale)
-      state.yuchalCount++;
+      const prevYuchalCount = state.yuchalCount;
+      const nextYuchalCount = prevYuchalCount + 1;
       const bidIncrement = room.minBidIncrement || 50;
       const maxTeamSize = 5;
       const incompleteTeams = room.teams.filter((t) => t._count.members < maxTeamSize);
       const anyCanBid = incompleteTeams.some((t) => t.remainingBudget >= bidIncrement);
 
       // Simulation rule: if someone can still bid and cycle not exhausted, keep same player.
-      if (state.yuchalCount < state.maxYuchalCycles && anyCanBid) {
+      if (nextYuchalCount < state.maxYuchalCycles && anyCanBid) {
+        state.yuchalCount = nextYuchalCount;
         state.currentHighestBid = 0;
         state.currentHighestBidder = null;
         state.currentHighestBidderName = null;

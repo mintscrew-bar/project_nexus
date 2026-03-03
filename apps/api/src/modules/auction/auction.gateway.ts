@@ -280,7 +280,10 @@ export class AuctionGateway
     if (result.auctionState?.timerEnd) {
       this._scheduleBidResolve(roomId, result.auctionState.timerEnd);
     }
-    // ???????????源끹걬癲????筌?????좊틯 ???濚???筌믨퀣援?    this._scheduleBotBids(roomId).catch(() => {});
+    // 봇 자동입찰 스케줄링
+    this._scheduleBotBids(roomId).catch((e) => {
+      console.warn(`[Auction] _scheduleBotBids failed for room ${roomId}:`, e?.message);
+    });
   }
 
   @SubscribeMessage("place-bid")
@@ -400,7 +403,10 @@ export class AuctionGateway
     if (data?.auctionState?.timerEnd) {
       this._scheduleBidResolve(roomId, data.auctionState.timerEnd);
     }
-    // ???????????源끹걬癲????筌?????좊틯 ???濚???筌믨퀣援?    this._scheduleBotBids(roomId).catch(() => {});
+    // 봇 자동입찰 스케줄링
+    this._scheduleBotBids(roomId).catch((e) => {
+      console.warn(`[Auction] _scheduleBotBids failed for room ${roomId}:`, e?.message);
+    });
   }
 
   emitPlayerSold(
@@ -430,6 +436,44 @@ export class AuctionGateway
     this.server.to(`room:${roomId}`).emit(event, data);
   }
 
+  /** 역할 선택 시작 (최대 2회 재시도, 500ms 간격) */
+  private async _startRoleSelectionWithRetry(roomId: string, attempt = 1): Promise<void> {
+    try {
+      const roleSelectionData = await this.roleSelectionService.startRoleSelection(roomId);
+      this.roleSelectionGateway.emitRoleSelectionStarted(roomId, roleSelectionData);
+    } catch (error) {
+      console.error(`[Auction] Failed to start role selection for room ${roomId} (attempt ${attempt}):`, error);
+      if (attempt < 3) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        return this._startRoleSelectionWithRetry(roomId, attempt + 1);
+      }
+      // 모든 재시도 실패 → 호스트에게 수동 시작 안내
+      this.server.to(`room:${roomId}`).emit("auction-error", {
+        error: "역할 선택 시작에 실패했습니다. 호스트가 소켓 이벤트 'retry-role-selection'을 전송해 재시도하세요.",
+        retryable: true,
+      });
+    }
+  }
+
+  /**
+   * 역할 선택 수동 재시작 요청.
+   * 상태 가드: roleSelectionService.startRoleSelection이 DRAFT_COMPLETED 상태만 허용하므로
+   * 잘못된 상태에서의 호출은 자동으로 거부됨.
+   */
+  @SubscribeMessage("retry-role-selection")
+  async handleRetryRoleSelection(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() data: { roomId: string },
+  ) {
+    if (!client.userId) return { error: "Unauthorized" };
+    try {
+      await this._startRoleSelectionWithRetry(data.roomId);
+      return { success: true };
+    } catch (error: any) {
+      return { error: error.message };
+    }
+  }
+
   cleanupRoom(roomId: string): void {
     this._cancelBotTimers(roomId);
     this._cancelBidResolve(roomId);
@@ -446,7 +490,7 @@ export class AuctionGateway
   // Bot Auto-Bid
   // ========================================
 
-  /** ?????潁뺛깿??????筌?????좊틯 ??????????濚?*/
+  /** 봇 자동입찰 타이머 스케줄링 */
   private async _scheduleBotBids(roomId: string): Promise<void> {
     const state = this.auctionService.getAuctionState(roomId);
     if (!state || state.botCaptainIds.length === 0) return;
@@ -464,14 +508,16 @@ export class AuctionGateway
       const timerId = setTimeout(() => {
         this._autoBotBid(roomId, bot.captainId, bot.username)
           .then(() => this._scheduleBotBids(roomId))
-          .catch(() => {});
+          .catch((e) => {
+            console.warn(`[Auction] Bot bid/reschedule failed for room ${roomId}:`, e?.message);
+          });
       }, delay);
 
       this.botBidTimers.set(`${roomId}_${bot.captainId}`, timerId);
     }
   }
 
-  /** ?????筌?????좊틯 ????덈틖 (癲ル슔?됭짆??????좊틯??좊읈??? */
+  /** 봇 자동입찰 실행 (최소 입찰 단위로 입찰) */
     /** Handle a bot auto-bid at minimum valid increment. */
   private async _autoBotBid(
     roomId: string,
@@ -619,22 +665,16 @@ export class AuctionGateway
           teams: finalData.teams,
         });
 
-        try {
-          const roleSelectionData = await this.roleSelectionService.startRoleSelection(roomId);
-          this.roleSelectionGateway.emitRoleSelectionStarted(roomId, roleSelectionData);
-        } catch (error) {
-          console.error(`[Auction] Failed to start role selection for room ${roomId}:`, error);
-          this.server.to(`room:${roomId}`).emit("auction-error", {
-            error: "역할 선택 시작 중 오류가 발생했습니다. 호스트가 수동으로 시작해주세요.",
-          });
-        }
+        await this._startRoleSelectionWithRetry(roomId);
 
         return payload;
       }
 
       if (state) {
         this._scheduleBidResolve(roomId, state.timerEnd);
-        this._scheduleBotBids(roomId).catch(() => {});
+        this._scheduleBotBids(roomId).catch((e) => {
+          console.warn(`[Auction] _scheduleBotBids failed for room ${roomId}:`, e?.message);
+        });
       }
 
       return payload;
