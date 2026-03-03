@@ -8,6 +8,7 @@ import {
 import { PrismaService } from "../prisma/prisma.service";
 import { PostCategory } from "./community.types";
 import { NotificationService } from "../notification/notification.service";
+import { RedisService } from "../redis/redis.service";
 
 export interface CreatePostDto {
   title: string;
@@ -37,6 +38,7 @@ export class CommunityService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationService: NotificationService,
+    private readonly redis: RedisService,
   ) {}
 
   // ========================================
@@ -89,7 +91,7 @@ export class CommunityService {
     return post;
   }
 
-  async getPostById(postId: string) {
+  async getPostById(postId: string, viewerId?: string, viewerIp?: string) {
     const post = await this.prisma.post.findFirst({
       where: { id: postId, isDeleted: false },
       include: {
@@ -145,11 +147,30 @@ export class CommunityService {
       throw new NotFoundException("Post not found");
     }
 
-    // Increment view count
-    await this.prisma.post.update({
-      where: { id: postId },
-      data: { views: { increment: 1 } },
-    });
+    // 조회수 중복 방지: 로그인 유저는 userId 기반, 비로그인은 IP 기반으로 24시간 내 중복 방지
+    const viewKey = viewerId
+      ? `view:user:${viewerId}:${postId}`
+      : viewerIp
+        ? `view:ip:${viewerIp}:${postId}`
+        : null;
+
+    if (viewKey) {
+      const alreadyViewed = await this.redis.get(viewKey);
+      if (!alreadyViewed) {
+        // 24시간(86400초) TTL로 조회 기록 저장
+        await this.redis.set(viewKey, "1", 86400);
+        await this.prisma.post.update({
+          where: { id: postId },
+          data: { views: { increment: 1 } },
+        });
+      }
+    } else {
+      // viewKey가 없는 경우(IP도 없음)에는 무조건 카운트 증가
+      await this.prisma.post.update({
+        where: { id: postId },
+        data: { views: { increment: 1 } },
+      });
+    }
 
     return post;
   }

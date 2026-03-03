@@ -7,11 +7,14 @@ import {
   Body,
   Param,
   Query,
+  Req,
   UseGuards,
   HttpCode,
   HttpStatus,
 } from "@nestjs/common";
+import { Request } from "express";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { OptionalJwtGuard } from "../auth/guards/optional-jwt.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { Roles } from "../auth/decorators/roles.decorator";
@@ -63,8 +66,18 @@ export class CommunityController {
   }
 
   @Get("posts/:id")
-  async getPost(@Param("id") id: string) {
-    return this.communityService.getPostById(id);
+  @UseGuards(OptionalJwtGuard)
+  async getPost(
+    @Param("id") id: string,
+    @Req() req: Request,
+  ) {
+    // 로그인 유저이면 userId 기반, 비로그인이면 IP 기반 조회수 중복 방지 (24시간)
+    const user = req.user as any;
+    const viewerId: string | undefined = user?.sub;
+    const viewerIp: string | undefined =
+      (req.headers["x-forwarded-for"] as string)?.split(",")[0].trim() ||
+      req.socket?.remoteAddress;
+    return this.communityService.getPostById(id, viewerId, viewerIp);
   }
 
   @Patch("posts/:id")
