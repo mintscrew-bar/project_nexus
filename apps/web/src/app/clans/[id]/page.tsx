@@ -26,6 +26,7 @@ import {
   MessageCircle,
   ExternalLink,
 } from "lucide-react";
+import { ClanChat } from "@/components/domain/ClanChat";
 
 interface ClanMember {
   id: string;
@@ -260,6 +261,21 @@ export default function ClanDetailPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* 클랜 채팅 (멤버만 볼 수 있음) */}
+        {isMember && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <MessageCircle className="h-5 w-5" />
+                클랜 채팅
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <ClanChat clanId={clanId} />
+            </CardContent>
+          </Card>
+        )}
 
         {/* Members */}
         <Card>
