@@ -9,13 +9,14 @@ export class TasksService {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * 임시 밴 자동 해제 - 매 5분마다 실행
-   * banUntil이 현재 시간보다 이전인 유저의 밴을 해제한다.
+   * 임시 밴 및 임시 제한 자동 해제 - 매 5분마다 실행
+   * banUntil / restrictedUntil이 현재 시간보다 이전인 유저를 자동 해제한다.
    */
   @Cron(CronExpression.EVERY_5_MINUTES)
   async handleAutoUnban(): Promise<void> {
     try {
-      const result = await this.prisma.user.updateMany({
+      // 임시 밴 자동 해제 (banUntil이 설정된 경우만)
+      const banResult = await this.prisma.user.updateMany({
         where: {
           isBanned: true,
           banUntil: {
@@ -31,11 +32,30 @@ export class TasksService {
         },
       });
 
-      if (result.count > 0) {
-        this.logger.log(`Auto-unbanned ${result.count} user(s)`);
+      if (banResult.count > 0) {
+        this.logger.log(`임시 밴 자동 해제: ${banResult.count}명`);
+      }
+
+      // 임시 제한(isRestricted) 자동 해제 - 신고 누적 시 24시간 임시 제한 해제
+      const restrictResult = await this.prisma.user.updateMany({
+        where: {
+          isRestricted: true,
+          restrictedUntil: {
+            not: null,
+            lte: new Date(),
+          },
+        },
+        data: {
+          isRestricted: false,
+          restrictedUntil: null,
+        },
+      });
+
+      if (restrictResult.count > 0) {
+        this.logger.log(`임시 제한 자동 해제: ${restrictResult.count}명`);
       }
     } catch (error) {
-      this.logger.error("Auto-unban task failed", error);
+      this.logger.error("자동 밴/제한 해제 작업 실패", error);
     }
   }
 

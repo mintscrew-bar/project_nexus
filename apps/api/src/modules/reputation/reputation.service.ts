@@ -391,9 +391,16 @@ export class ReputationService {
   // ========================================
 
   private async checkAutoModeration(userId: string) {
+    // 이미 밴/제한 중인 유저는 중복 처리 생략
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { isBanned: true, isRestricted: true },
+    });
+    if (!user || user.isBanned || user.isRestricted) return;
+
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-    // Count pending reports in last 24 hours
+    // 24시간 내 PENDING 신고 수 확인
     const recentReports = await this.prisma.userReport.count({
       where: {
         targetUserId: userId,
@@ -402,16 +409,19 @@ export class ReputationService {
       },
     });
 
-    // Auto-ban if 5+ reports in 24 hours
+    // 신고 5건 이상 → 영구 밴 대신 24시간 임시 제한 (관리자 검토 후 결정)
+    // 허위 신고·집단 신고로 인한 무고한 유저 피해 방지
     if (recentReports >= 5) {
+      const restrictedUntil = new Date(Date.now() + 24 * 60 * 60 * 1000);
       await this.prisma.user.update({
         where: { id: userId },
         data: {
-          isBanned: true,
-          banReason: "Auto-banned: Multiple reports received",
-          bannedAt: new Date(),
+          isRestricted: true,
+          restrictedUntil,
         },
       });
+      // 임시 제한 자동 해제는 tasks.service.ts의 Cron이 처리
+      // 관리자는 신고 목록을 검토 후 수동으로 밴/해제를 결정해야 함
     }
   }
 
