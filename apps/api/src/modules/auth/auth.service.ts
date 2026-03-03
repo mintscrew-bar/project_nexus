@@ -56,8 +56,12 @@ export class AuthService {
   // OAuth (Google, Discord)
   // ========================================
 
-  async validateOAuthUser(profile: OAuthProfile) {
-    // Check if auth provider exists
+  /**
+   * OAuth 유저 검증 및 생성
+   * @returns { user, isNewUser } — isNewUser가 true이면 약관 동의 페이지로 리다이렉트 필요
+   */
+  async validateOAuthUser(profile: OAuthProfile): Promise<{ user: any; isNewUser: boolean }> {
+    // 이미 연동된 OAuth 제공자가 있으면 기존 유저로 처리
     const authProvider = await this.prisma.authProvider.findUnique({
       where: {
         provider_providerId: {
@@ -70,29 +74,28 @@ export class AuthService {
 
     if (authProvider) {
       // 재로그인 시 사용자가 커스텀한 닉네임/아바타를 덮어쓰지 않음
-      // 아바타가 없을 때만 OAuth 아바타로 설정
       const updateData: Record<string, string> = {};
       if (!authProvider.user.avatar && profile.avatar) {
         updateData.avatar = profile.avatar;
       }
 
       if (Object.keys(updateData).length > 0) {
-        return this.prisma.user.update({
+        const updated = await this.prisma.user.update({
           where: { id: authProvider.userId },
           data: updateData,
         });
+        return { user: updated, isNewUser: false };
       }
-      return authProvider.user;
+      return { user: authProvider.user, isNewUser: false };
     }
 
-    // Check if email already exists
+    // 동일 이메일로 기존 계정이 있으면 OAuth 제공자 연결 (신규 아님)
     if (profile.email) {
       const existingUser = await this.prisma.user.findUnique({
         where: { email: profile.email },
       });
 
       if (existingUser) {
-        // Link OAuth provider to existing user
         await this.prisma.authProvider.create({
           data: {
             userId: existingUser.id,
@@ -101,11 +104,12 @@ export class AuthService {
             metadata: profile.metadata,
           },
         });
-        return existingUser;
+        return { user: existingUser, isNewUser: false };
       }
     }
 
-    // Create new user with OAuth provider
+    // 완전히 새로운 유저 — 약관 동의 없이 계정만 생성
+    // 약관 동의는 /auth/agree 페이지에서 명시적으로 처리 (개인정보보호법 제21조)
     const user = await this.prisma.user.create({
       data: {
         email: profile.email,
@@ -119,19 +123,58 @@ export class AuthService {
             metadata: profile.metadata,
           },
         },
-        // Auto-agree to terms for OAuth users
-        termsAgreements: {
-          create: {
-            termsOfService: true,
-            privacyPolicy: true,
-            ageVerification: true,
-            marketingConsent: false,
-          },
-        },
       },
     });
 
-    return user;
+    return { user, isNewUser: true };
+  }
+
+  /**
+   * 신규 OAuth 가입자에게 약관 동의 전용 임시 토큰 발급 (10분 유효)
+   * 정식 JWT 발급 전 약관 동의를 강제하기 위해 Redis에만 저장
+   */
+  async generatePendingTermsToken(userId: string): Promise<string> {
+    const token = randomUUID();
+    // 10분 유효 (약관을 읽고 동의하기에 충분한 시간)
+    await this.redis.set(`pending_terms:${token}`, userId, 600);
+    return token;
+  }
+
+  /**
+   * 임시 토큰을 검증하고 userId 반환 (1회용 — 검증 후 즉시 삭제)
+   */
+  async verifyPendingTermsToken(token: string): Promise<string> {
+    const key = `pending_terms:${token}`;
+    const userId = await this.redis.get(key);
+    if (!userId) {
+      throw new UnauthorizedException("유효하지 않거나 만료된 약관 동의 토큰입니다.");
+    }
+    await this.redis.del(key);
+    return userId;
+  }
+
+  /**
+   * 사용자의 약관 동의 저장 (신규 OAuth 가입자 전용)
+   */
+  async agreeToTerms(userId: string, dto: {
+    termsOfService: boolean;
+    privacyPolicy: boolean;
+    ageVerification: boolean;
+    marketingConsent?: boolean;
+  }) {
+    if (!dto.termsOfService || !dto.privacyPolicy || !dto.ageVerification) {
+      throw new BadRequestException("이용약관, 개인정보처리방침, 연령 확인에 동의해야 합니다.");
+    }
+
+    await this.prisma.termsAgreement.create({
+      data: {
+        userId,
+        termsOfService: dto.termsOfService,
+        privacyPolicy: dto.privacyPolicy,
+        ageVerification: dto.ageVerification,
+        marketingConsent: dto.marketingConsent || false,
+      },
+    });
   }
 
   async linkOAuthProvider(userId: string, profile: OAuthProfile) {

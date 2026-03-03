@@ -29,7 +29,7 @@ export class DiscordStrategy extends PassportStrategy(Strategy, "discord") {
         JSON.stringify(profile, null, 2),
       );
 
-      const user = await this.authService.validateOAuthUser({
+      const result = await this.authService.validateOAuthUser({
         provider: "discord",
         providerId: profile.id,
         email: profile.email,
@@ -49,9 +49,11 @@ export class DiscordStrategy extends PassportStrategy(Strategy, "discord") {
 
       console.log(
         "Discord strategy - validated user:",
-        JSON.stringify(user, null, 2),
+        JSON.stringify(result.user, null, 2),
+        "isNewUser:", result.isNewUser,
       );
-      return user;
+      // { user, isNewUser } 형태로 반환하여 컨트롤러에서 신규 여부 판단
+      return result;
     } catch (error) {
       console.error("Discord strategy error:", error);
       throw error;

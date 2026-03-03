@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -81,20 +82,23 @@ export class AuthController {
   @Get("google/callback")
   @UseGuards(AuthGuard("google"))
   async googleCallback(@Req() req: Request, @Res() res: Response) {
+    const appUrl = this.configService.get("APP_URL") || "http://localhost:3000";
     try {
-      const user = req.user as any;
+      const { user, isNewUser } = req.user as any;
       await this.authService.checkAccountStatus(user.id);
-      const tokens = await this.authService.generateTokens(user);
 
-      const appUrl =
-        this.configService.get("APP_URL") || "http://localhost:3000";
+      if (isNewUser) {
+        // 신규 가입: 약관 동의 없이 임시 토큰으로 /auth/agree 페이지로 이동
+        const pendingToken = await this.authService.generatePendingTermsToken(user.id);
+        return res.redirect(`${appUrl}/auth/agree?token=${pendingToken}`);
+      }
+
+      const tokens = await this.authService.generateTokens(user);
       res.redirect(
         `${appUrl}/api/auth/callback?access_token=${tokens.accessToken}&refresh_token=${tokens.refreshToken}`,
       );
     } catch (error) {
       console.error("Google callback error:", error);
-      const appUrl =
-        this.configService.get("APP_URL") || "http://localhost:3000";
       res.redirect(
         `${appUrl}/auth/login?error=${encodeURIComponent(String(error))}`,
       );
@@ -114,24 +118,75 @@ export class AuthController {
   @Get("discord/callback")
   @UseGuards(AuthGuard("discord"))
   async discordCallback(@Req() req: Request, @Res() res: Response) {
+    const appUrl = this.configService.get("APP_URL") || "http://localhost:3000";
     try {
-      const user = req.user as any;
+      const { user, isNewUser } = req.user as any;
       await this.authService.checkAccountStatus(user.id);
-      const tokens = await this.authService.generateTokens(user);
 
-      const appUrl =
-        this.configService.get("APP_URL") || "http://localhost:3000";
+      if (isNewUser) {
+        // 신규 가입: 약관 동의 없이 임시 토큰으로 /auth/agree 페이지로 이동
+        const pendingToken = await this.authService.generatePendingTermsToken(user.id);
+        return res.redirect(`${appUrl}/auth/agree?token=${pendingToken}`);
+      }
+
+      const tokens = await this.authService.generateTokens(user);
       res.redirect(
         `${appUrl}/api/auth/callback?access_token=${tokens.accessToken}&refresh_token=${tokens.refreshToken}`,
       );
     } catch (error) {
       console.error("Discord callback error:", error);
-      const appUrl =
-        this.configService.get("APP_URL") || "http://localhost:3000";
       res.redirect(
         `${appUrl}/auth/login?error=${encodeURIComponent(String(error))}`,
       );
     }
+  }
+
+  // ========================================
+  // 약관 동의 (신규 OAuth 가입자 전용)
+  // ========================================
+
+  /**
+   * 신규 OAuth 가입자의 약관 동의를 처리하고 정식 JWT를 발급한다.
+   * 개인정보보호법 제21조: 명시적 동의 취득 필수
+   */
+  @Post("agree")
+  @HttpCode(HttpStatus.OK)
+  async agreeToTerms(
+    @Query("token") pendingToken: string,
+    @Body() dto: {
+      termsOfService: boolean;
+      privacyPolicy: boolean;
+      ageVerification: boolean;
+      marketingConsent?: boolean;
+    },
+    @Res() res: Response,
+  ) {
+    if (!pendingToken) {
+      throw new BadRequestException("약관 동의 토큰이 필요합니다.");
+    }
+
+    // 임시 토큰 검증 + userId 획득 (1회용, 검증 후 Redis에서 삭제)
+    const userId = await this.authService.verifyPendingTermsToken(pendingToken);
+
+    // 약관 동의 저장 (필수 항목 미동의 시 예외 발생)
+    await this.authService.agreeToTerms(userId, dto);
+
+    // 동의 완료 후 정식 토큰 발급
+    const user = await this.authService.getUserById(userId);
+    const tokens = await this.authService.generateTokens(user);
+
+    res.cookie("refresh_token", tokens.refreshToken, {
+      httpOnly: true,
+      secure: this.configService.get("NODE_ENV") === "production",
+      sameSite: "lax",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      path: "/api/auth",
+    });
+
+    return res.json({
+      accessToken: tokens.accessToken,
+      message: "약관 동의 완료",
+    });
   }
 
   // ========================================

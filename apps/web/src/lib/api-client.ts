@@ -169,6 +169,23 @@ export const authApi = {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
     window.location.href = `${apiUrl}/api/auth/google`;
   },
+
+  /**
+   * 신규 OAuth 가입자 약관 동의 처리
+   * @param token - /auth/agree?token=... 쿼리 파라미터의 임시 토큰
+   */
+  agreeToTerms: async (
+    token: string,
+    dto: {
+      termsOfService: boolean;
+      privacyPolicy: boolean;
+      ageVerification: boolean;
+      marketingConsent?: boolean;
+    },
+  ): Promise<{ accessToken: string }> => {
+    const response = await apiClient.post(`/auth/agree?token=${token}`, dto);
+    return response.data;
+  },
 };
 
 // 유저 관련 API

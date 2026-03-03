@@ -39,7 +39,7 @@ export class GoogleStrategy extends PassportStrategy(Strategy, "google") {
 
       const { id, displayName, emails, photos } = profile;
 
-      const user = await this.authService.validateOAuthUser({
+      const result = await this.authService.validateOAuthUser({
         provider: "google",
         providerId: id,
         email: emails?.[0]?.value,
@@ -53,9 +53,11 @@ export class GoogleStrategy extends PassportStrategy(Strategy, "google") {
 
       console.log(
         "Google strategy - validated user:",
-        JSON.stringify(user, null, 2),
+        JSON.stringify(result.user, null, 2),
+        "isNewUser:", result.isNewUser,
       );
-      done(null, user);
+      // { user, isNewUser } 형태로 반환하여 컨트롤러에서 신규 여부 판단
+      done(null, result);
     } catch (error) {
       console.error("Google strategy error:", error);
       done(error as Error, undefined);
