@@ -42,4 +42,4 @@ jobs:
           API_URL: http://localhost:4000
 
       - name: 테스트
-        run: pnpm test --passWithNoTests
+        run: pnpm test -- --passWithNoTests
