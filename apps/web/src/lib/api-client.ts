@@ -717,7 +717,9 @@ export const reputationApi = {
 
   reportUser: async (data: {
     targetUserId: string;
-    matchId: string;
+    matchId?: string;
+    /** 클랜 채팅 메시지 신고 시 메시지 ID */
+    clanChatMessageId?: string;
     reason: "TOXICITY" | "AFK" | "GRIEFING" | "CHEATING" | "OTHER";
     description: string;
   }) => {

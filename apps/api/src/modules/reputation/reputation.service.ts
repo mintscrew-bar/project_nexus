@@ -20,6 +20,8 @@ export interface SubmitRatingDto {
 export interface SubmitReportDto {
   targetUserId: string;
   matchId?: string;
+  /** 클랜 채팅 메시지 신고 시 첨부 (DB에 저장해 관리자가 맥락 확인 가능) */
+  clanChatMessageId?: string;
   reason: ReportReason;
   description: string;
 }
@@ -202,7 +204,7 @@ export class ReputationService {
       );
     }
 
-    // If match provided, verify it exists
+    // 매치가 제공된 경우 존재 여부 확인
     if (dto.matchId) {
       const match = await this.prisma.match.findUnique({
         where: { id: dto.matchId },
@@ -210,6 +212,17 @@ export class ReputationService {
 
       if (!match) {
         throw new NotFoundException("Match not found");
+      }
+    }
+
+    // 클랜 채팅 메시지가 제공된 경우 존재 여부 확인
+    if (dto.clanChatMessageId) {
+      const clanMsg = await this.prisma.clanChatMessage.findUnique({
+        where: { id: dto.clanChatMessageId },
+      });
+
+      if (!clanMsg) {
+        throw new NotFoundException("Clan chat message not found");
       }
     }
 
@@ -230,12 +243,13 @@ export class ReputationService {
       );
     }
 
-    // Create report
+    // 신고 생성 (클랜 채팅 메시지 ID 포함)
     const report = await this.prisma.userReport.create({
       data: {
         reporterId,
         targetUserId: dto.targetUserId,
         matchId: dto.matchId,
+        clanChatMessageId: dto.clanChatMessageId,
         reason: dto.reason,
         description: dto.description.trim(),
         status: ReportStatus.PENDING,
@@ -251,6 +265,14 @@ export class ReputationService {
           select: {
             id: true,
             username: true,
+          },
+        },
+        // 클랜 채팅 메시지 내용도 함께 반환
+        clanChatMessage: {
+          select: {
+            id: true,
+            content: true,
+            createdAt: true,
           },
         },
       },
@@ -348,6 +370,14 @@ export class ReputationService {
           select: {
             id: true,
             username: true,
+          },
+        },
+        // 클랜 채팅 메시지 신고인 경우 내용 포함 (관리자가 맥락 확인용)
+        clanChatMessage: {
+          select: {
+            id: true,
+            content: true,
+            createdAt: true,
           },
         },
       },

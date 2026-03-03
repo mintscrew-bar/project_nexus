@@ -724,8 +724,9 @@ model ClanChatMessage {
   content   String
   createdAt DateTime @default(now())
 
-  clan Clan @relation(fields: [clanId], references: [id], onDelete: Cascade)
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clan    Clan         @relation(fields: [clanId], references: [id], onDelete: Cascade)
+  user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reports UserReport[]
 
   @@index([clanId, createdAt])
   @@map("clan_chat_messages")
@@ -889,21 +890,24 @@ model UserRating {
 }
 
 model UserReport {
-  id           String       @id @default(cuid())
-  reporterId   String
-  targetUserId String
-  matchId      String?
-  reason       ReportReason
-  description  String
-  status       ReportStatus @default(PENDING)
-  reviewerId   String?      // 심사한 관리자 ID
-  reviewerNote String?
-  reviewedAt   DateTime?
-  createdAt    DateTime     @default(now())
+  id                String       @id @default(cuid())
+  reporterId        String
+  targetUserId      String
+  matchId           String?
+  // 클랜 채팅 신고 시 해당 메시지 ID (신고 접수 건에 한해 관리자 열람 허용)
+  clanChatMessageId String?
+  reason            ReportReason
+  description       String
+  status            ReportStatus @default(PENDING)
+  reviewerId        String?      // 심사한 관리자 ID
+  reviewerNote      String?
+  reviewedAt        DateTime?
+  createdAt         DateTime     @default(now())
 
-  reporter User   @relation("ReporterUser", fields: [reporterId], references: [id], onDelete: Cascade)
-  target   User   @relation("ReportedUser", fields: [targetUserId], references: [id], onDelete: Cascade)
-  match    Match? @relation(fields: [matchId], references: [id], onDelete: SetNull)
+  reporter        User             @relation("ReporterUser", fields: [reporterId], references: [id], onDelete: Cascade)
+  target          User             @relation("ReportedUser", fields: [targetUserId], references: [id], onDelete: Cascade)
+  match           Match?           @relation(fields: [matchId], references: [id], onDelete: SetNull)
+  clanChatMessage ClanChatMessage? @relation(fields: [clanChatMessageId], references: [id], onDelete: SetNull)
 
   @@index([targetUserId, status, createdAt])
   @@index([status])
