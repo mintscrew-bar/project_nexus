@@ -99,17 +99,37 @@ export default function TermsPage() {
         </ul>
       </Section>
 
-      <Section title="제9조 (면책조항)">
+      <Section title="제9조 (지적재산권)">
+        <ul className="list-disc pl-5 space-y-1.5">
+          <li>서비스의 디자인, 소스 코드, 로고, UI 등 서비스 자체에 관한 저작권 및 지적재산권은 운영자에게 귀속됩니다.</li>
+          <li>이용자가 서비스 내에서 작성한 콘텐츠(게시글, 댓글, 채팅 등)의 저작권은 해당 이용자에게 귀속됩니다. 단, 서비스는 운영·개선 목적으로 해당 콘텐츠를 서비스 내에서 이용할 수 있습니다.</li>
+          <li>리그 오브 레전드, Riot Games 및 관련 로고·챔피언 이미지·게임 데이터는 Riot Games, Inc.의 상표 또는 저작물이며, 서비스는 Riot Games API 정책에 따라 이를 사용합니다.</li>
+        </ul>
+      </Section>
+
+      <Section title="제10조 (회원 탈퇴)">
+        <ul className="list-disc pl-5 space-y-1.5">
+          <li>이용자는 언제든지 서비스 내 설정 페이지를 통해 탈퇴를 요청할 수 있으며, 서비스는 지체 없이 처리합니다.</li>
+          <li>탈퇴 후 이용자의 개인정보는 개인정보처리방침에 따라 파기됩니다.</li>
+          <li>탈퇴 후에도 이용자가 작성한 게시글·댓글·채팅 기록은 서비스 내에 익명으로 남을 수 있습니다. 삭제를 원하는 경우 탈퇴 전 직접 삭제하시기 바랍니다.</li>
+          <li>이용 제한 또는 정지 상태에서는 탈퇴가 제한될 수 있습니다.</li>
+        </ul>
+      </Section>
+
+      <Section title="제11조 (면책조항)">
         <ul className="list-disc pl-5 space-y-1.5">
           <li>서비스는 이용자 간 분쟁에 대해 개입하지 않으며, 이로 인한 손해에 책임을 지지 않습니다.</li>
+          <li>천재지변, 서버 장애, Riot Games API 정책 변경 등 불가항력적 사유로 인한 서비스 중단에 대해 책임을 지지 않습니다.</li>
           <li>
-            본 서비스는 Riot Games와 무관한 팬 제작 서비스입니다. League of Legends는 Riot Games의
-            등록상표입니다.
+            Project Nexus isn&apos;t endorsed by Riot Games and doesn&apos;t reflect the views or
+            opinions of Riot Games or anyone officially involved in producing or managing Riot Games
+            properties. Riot Games, and all associated properties are trademarks or registered
+            trademarks of Riot Games, Inc.
           </li>
         </ul>
       </Section>
 
-      <Section title="제10조 (준거법 및 관할)">
+      <Section title="제12조 (준거법 및 관할)">
         <p>
           이 약관은 대한민국 법령에 따라 해석되며, 서비스 관련 분쟁은 대한민국 법원을 관할 법원으로
           합니다.

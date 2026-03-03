@@ -99,7 +99,24 @@ export default function PrivacyPage() {
         </ul>
       </Section>
 
-      <Section title="8. 개인정보의 안전성 확보 조치">
+      <Section title="8. 개인정보의 파기 절차 및 방법">
+        <ul className="list-disc pl-5 space-y-1.5 text-sm">
+          <li>보유 기간이 경과하거나 이용자가 탈퇴를 요청하면 지체 없이 해당 개인정보를 파기합니다.</li>
+          <li><strong>전자적 파일:</strong> 복구·재생이 불가능한 기술적 방법(데이터베이스 영구 삭제)으로 삭제합니다.</li>
+          <li><strong>접속 로그 등 자동 수집 데이터:</strong> 보유 기간 경과 후 시스템에서 자동 만료·삭제됩니다.</li>
+          <li>탈퇴 후 채팅 메시지는 발신자 정보가 익명(알 수 없음)으로 처리되며, 메시지 내용 자체는 서비스 운영 목적으로 보유 기간 동안 유지될 수 있습니다.</li>
+        </ul>
+      </Section>
+
+      <Section title="9. 쿠키(Cookie) 운영">
+        <ul className="list-disc pl-5 space-y-1.5 text-sm">
+          <li>서비스는 로그인 상태 유지·세션 관리 목적으로 쿠키를 사용합니다.</li>
+          <li>이용자는 브라우저 설정에서 쿠키 저장을 거부할 수 있습니다. 단, 거부 시 로그인이 유지되지 않아 일부 서비스 이용이 제한될 수 있습니다.</li>
+          <li>쿠키 거부 방법: 브라우저 설정 → 개인정보/쿠키 → 쿠키 차단 또는 삭제</li>
+        </ul>
+      </Section>
+
+      <Section title="10. 개인정보의 안전성 확보 조치">
         <ul className="list-disc pl-5 space-y-1.5 text-sm">
           <li>비밀번호 bcrypt 단방향 암호화 저장</li>
           <li>전송 구간 TLS 암호화</li>
@@ -108,7 +125,7 @@ export default function PrivacyPage() {
         </ul>
       </Section>
 
-      <Section title="9. 개인정보 보호책임자">
+      <Section title="11. 개인정보 보호책임자">
         <Table
           headers={["구분", "내용"]}
           rows={[
@@ -128,6 +145,13 @@ export default function PrivacyPage() {
           </a>
           을 이용하실 수 있습니다.
         </p>
+      </Section>
+
+      <Section title="12. 개인정보처리방침의 변경">
+        <ul className="list-disc pl-5 space-y-1.5 text-sm">
+          <li>본 방침이 변경되는 경우 시행 7일 전 서비스 내 공지사항을 통해 안내합니다. 중요한 변경의 경우 30일 전 공지합니다.</li>
+          <li>변경된 방침은 공지된 시행일부터 효력이 발생합니다.</li>
+        </ul>
       </Section>
 
       <div className="mt-10 pt-6 border-t border-bg-tertiary text-sm text-text-tertiary flex gap-4">
