@@ -93,3 +93,9 @@ Client connects per-namespace via `connect*Socket()` functions in `socket-client
 ## Language
 
 The project targets Korean users. UI text, commit messages, and communication are in Korean.
+
+## Claude Code 작업 규칙
+
+- **작업 단위 커밋**: 작업 하나가 완료될 때마다 커밋한다.
+- **한글 주석**: 코드 주석은 한글로 꼼꼼하게 작성한다.
+- **선택지 발생 시 질문**: 구현 방향에 여러 선택지가 있을 경우 임의로 결정하지 않고 반드시 사용자에게 먼저 물어본다.
