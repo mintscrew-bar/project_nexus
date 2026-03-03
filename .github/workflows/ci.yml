@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  ci:
+    name: Lint / Build / Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      - name: pnpm 설치
+        uses: pnpm/action-setup@v3
+        with:
+          version: 8.15.0
+
+      - name: Node.js 20 설정
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: 의존성 설치
+        run: pnpm install --frozen-lockfile
+
+      - name: 린트
+        run: pnpm lint
+
+      - name: 빌드
+        run: pnpm build
+        env:
+          # Next.js standalone 빌드에 필요한 더미 환경변수
+          # TODO: 실제 시크릿은 GitHub Secrets에 등록 후 여기에 참조 추가
+          NEXTAUTH_SECRET: ci-dummy-secret
+          NEXTAUTH_URL: http://localhost:3000
+          API_URL: http://localhost:4000
+
+      - name: 테스트
+        run: pnpm test --passWithNoTests
