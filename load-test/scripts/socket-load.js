@@ -10,11 +10,22 @@
 const http = require("http");
 const path = require("path");
 
-// 프로젝트 루트의 socket.io-client 재사용
-const IO_PATH = path.resolve(
-  __dirname,
-  "../../node_modules/socket.io-client"
-);
+// pnpm 가상 스토어에서 socket.io-client 탐색
+// pnpm은 루트 node_modules/에 직접 노출하지 않고 .pnpm/ 하위에 저장함
+const IO_PATH = (() => {
+  const candidates = [
+    // pnpm 가상 스토어 (버전은 glob으로 찾기 어려우므로 require.resolve 사용)
+    path.resolve(__dirname, "../../node_modules/.pnpm/socket.io-client@4.8.3/node_modules/socket.io-client"),
+    path.resolve(__dirname, "../../node_modules/.pnpm/socket.io-client@4.8.1/node_modules/socket.io-client"),
+    // 루트 node_modules (npm/yarn 환경 대비)
+    path.resolve(__dirname, "../../node_modules/socket.io-client"),
+    // apps/web node_modules (web 앱 의존성으로 설치된 경우)
+    path.resolve(__dirname, "../../apps/web/node_modules/socket.io-client"),
+  ];
+  return candidates.find((p) => {
+    try { require.resolve(p); return true; } catch { return false; }
+  }) || candidates[2]; // 못 찾으면 기본 경로로 에러 메시지 표시
+})();
 
 let io;
 try {
