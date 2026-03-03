@@ -741,16 +741,18 @@ export const disconnectPresenceSocket = () => {
 
 // Clan Socket 헬퍼 함수
 export const clanSocketHelpers = {
+  // 백엔드 이벤트명과 일치: "join-clan-chat", "leave-clan-chat", "send-clan-message"
   joinClan: (clanId: string) => {
-    clanSocket?.emit("join-clan", { clanId });
+    clanSocket?.emit("join-clan-chat", { clanId });
   },
 
   leaveClan: (clanId: string) => {
-    clanSocket?.emit("leave-clan", { clanId });
+    clanSocket?.emit("leave-clan-chat", { clanId });
   },
 
   sendMessage: (clanId: string, message: string) => {
-    clanSocket?.emit("send-message", { clanId, message });
+    // 백엔드: send-clan-message, content 필드 사용
+    clanSocket?.emit("send-clan-message", { clanId, content: message });
   },
 
   sendIsTyping: (clanId: string, isTyping: boolean) => {
@@ -758,7 +760,8 @@ export const clanSocketHelpers = {
   },
 
   onNewMessage: (callback: (data: any) => void) => {
-    clanSocket?.on("new-message", callback);
+    // 백엔드 emit: "new-clan-message"
+    clanSocket?.on("new-clan-message", callback);
   },
 
   onMemberJoined: (callback: (data: any) => void) => {
@@ -769,8 +772,25 @@ export const clanSocketHelpers = {
     clanSocket?.on("member-left", callback);
   },
 
-  onClanUpdate: (callback: (data: any) => void) => {
-    clanSocket?.on("clan-update", callback);
+  onMemberKicked: (callback: (data: any) => void) => {
+    clanSocket?.on("member-kicked", callback);
+  },
+
+  onMemberPromoted: (callback: (data: any) => void) => {
+    clanSocket?.on("member-promoted", callback);
+  },
+
+  onClanUpdated: (callback: (data: any) => void) => {
+    // 백엔드 emit: "clan-updated"
+    clanSocket?.on("clan-updated", callback);
+  },
+
+  onClanDeleted: (callback: () => void) => {
+    clanSocket?.on("clan-deleted", callback);
+  },
+
+  onOwnershipTransferred: (callback: (data: any) => void) => {
+    clanSocket?.on("ownership-transferred", callback);
   },
 
   onUserTyping: (callback: (data: { userId: string; username: string }) => void) => {
@@ -782,10 +802,14 @@ export const clanSocketHelpers = {
   },
 
   offAllListeners: () => {
-    clanSocket?.off("new-message");
+    clanSocket?.off("new-clan-message");
     clanSocket?.off("member-joined");
     clanSocket?.off("member-left");
-    clanSocket?.off("clan-update");
+    clanSocket?.off("member-kicked");
+    clanSocket?.off("member-promoted");
+    clanSocket?.off("clan-updated");
+    clanSocket?.off("clan-deleted");
+    clanSocket?.off("ownership-transferred");
     clanSocket?.off("user-typing");
     clanSocket?.off("user-stopped-typing");
   },

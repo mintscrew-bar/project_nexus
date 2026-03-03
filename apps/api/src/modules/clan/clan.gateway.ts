@@ -180,8 +180,8 @@ export class ClanGateway implements OnGatewayConnection, OnGatewayDisconnect {
       if (clanTypingUsers.has(client.userId)) {
         clearTimeout(clanTypingUsers.get(client.userId)!); // Assert timeout is not undefined
       } else {
-        // User just started typing, broadcast
-        this.server.to(clanId).emit("user-typing", {
+        // 클라이언트가 clan:${clanId} 룸에 조인하므로 동일한 룸명으로 브로드캐스트
+        this.server.to(`clan:${clanId}`).emit("user-typing", {
           userId: client.userId,
           username: client.username,
         });
@@ -204,9 +204,10 @@ export class ClanGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (clanTypingUsers && clanTypingUsers.has(userId)) {
       clearTimeout(clanTypingUsers.get(userId));
       clanTypingUsers.delete(userId);
-      this.server.to(clanId).emit("user-stopped-typing", { userId });
+      // 동일하게 clan:${clanId} 룸으로 브로드캐스트
+      this.server.to(`clan:${clanId}`).emit("user-stopped-typing", { userId });
 
-      // Clean up clan entry if no one is typing in that clan
+      // 클랜 내 타이핑 중인 유저가 없으면 Map 정리
       if (clanTypingUsers.size === 0) {
         this.typingUsers.delete(clanId);
       }

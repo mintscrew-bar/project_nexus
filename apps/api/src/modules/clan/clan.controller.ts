@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Put,
+  Patch,
   Delete,
   Body,
   Param,
@@ -53,7 +54,8 @@ export class ClanController {
     });
   }
 
-  @Get("my-clan")
+  // /clans/my 로 통일 (api-client 기준)
+  @Get("my")
   async getMyClan(@CurrentUser("sub") userId: string) {
     return this.clanService.getUserClan(userId);
   }
@@ -64,7 +66,8 @@ export class ClanController {
     return this.clanService.getClanById(id);
   }
 
-  @Put(":id")
+  // 부분 업데이트이므로 Patch 사용
+  @Patch(":id")
   async updateClan(
     @CurrentUser("sub") userId: string,
     @Param("id") clanId: string,
@@ -143,7 +146,8 @@ export class ClanController {
     return result;
   }
 
-  @Put(":id/members/:memberId/role")
+  // 부분 업데이트이므로 Patch 사용
+  @Patch(":id/members/:memberId/role")
   async promoteMember(
     @CurrentUser("sub") userId: string,
     @Param("id") clanId: string,

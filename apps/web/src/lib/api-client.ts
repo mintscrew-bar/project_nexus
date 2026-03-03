@@ -534,7 +534,8 @@ export const clanApi = {
   },
 
   kickMember: async (clanId: string, userId: string) => {
-    const response = await apiClient.post(`/clans/${clanId}/kick/${userId}`);
+    // 컨트롤러: DELETE /clans/:id/members/:memberId
+    const response = await apiClient.delete(`/clans/${clanId}/members/${userId}`);
     return response.data;
   },
 
@@ -550,7 +551,8 @@ export const clanApi = {
   },
 
   transferOwnership: async (clanId: string, newOwnerId: string) => {
-    const response = await apiClient.post(`/clans/${clanId}/transfer`, {
+    // 컨트롤러: POST /clans/:id/transfer-ownership
+    const response = await apiClient.post(`/clans/${clanId}/transfer-ownership`, {
       newOwnerId,
     });
     return response.data;
