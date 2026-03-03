@@ -10,6 +10,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import { Skeleton } from '@/components/ui';
 import { MatchesSidebarContent } from './sidebar/MatchesSidebarContent';
 import { CommunitySidebarContent } from './sidebar/CommunitySidebarContent';
+import { ClansSidebarContent } from './sidebar/ClansSidebarContent';
 
 interface Room {
   id: string;
@@ -50,6 +51,7 @@ export function Sidebar() {
   // 페이지별 맞춤 사이드바 분기
   const isMatchesRoute = pathname.startsWith('/matches');
   const isCommunityRoute = pathname.startsWith('/community');
+  const isClansRoute = pathname.startsWith('/clans');
 
   return (
     <aside className="w-64 bg-bg-secondary border-r border-bg-tertiary p-4 hidden md:block flex-shrink-0 overflow-y-auto">
@@ -58,6 +60,8 @@ export function Sidebar() {
         <MatchesSidebarContent />
       ) : isCommunityRoute ? (
         <CommunitySidebarContent />
+      ) : isClansRoute ? (
+        <ClansSidebarContent />
       ) : (
         <>
           {/* Quick Actions */}

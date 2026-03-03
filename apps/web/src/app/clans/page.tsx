@@ -9,8 +9,6 @@ import { useDebounce } from "@/hooks/useDebounce";
 import {
   Card,
   CardContent,
-  CardHeader,
-  CardTitle,
   Button,
   Input,
   LoadingSpinner,
@@ -18,7 +16,7 @@ import {
   Badge,
 } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
-import { Users, Search, Plus, Crown, Shield, UserCheck } from "lucide-react";
+import { Users, Search, Shield, UserCheck } from "lucide-react";
 
 interface ClanMember {
   id: string;
@@ -52,7 +50,6 @@ export default function ClansPage() {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [showRecruitingOnly, setShowRecruitingOnly] = useState(false);
-  const [myClan, setMyClan] = useState<Clan | null>(null);
   // 가입 요청 중인 클랜 ID (버튼 로딩 상태 관리)
   const [joiningClanId, setJoiningClanId] = useState<string | null>(null);
   const { addToast } = useToast();
@@ -76,23 +73,9 @@ export default function ClansPage() {
     }
   }, [debouncedSearchQuery, showRecruitingOnly]);
 
-  const fetchMyClan = useCallback(async () => {
-    if (!isAuthenticated) return;
-    try {
-      const data = await clanApi.getMyClan();
-      setMyClan(data);
-    } catch {
-      setMyClan(null);
-    }
-  }, [isAuthenticated]);
-
   useEffect(() => {
     fetchClans();
   }, [fetchClans]);
-
-  useEffect(() => {
-    fetchMyClan();
-  }, [fetchMyClan]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -109,7 +92,6 @@ export default function ClansPage() {
     try {
       await clanApi.joinClan(clanId);
       addToast("클랜에 가입되었습니다.", "success");
-      fetchMyClan();
       fetchClans();
     } catch (err: any) {
       addToast(err.response?.data?.message || err.message || "클랜 가입에 실패했습니다.", "error");
@@ -139,72 +121,8 @@ export default function ClansPage() {
   }
 
   return (
-    <div className="flex-grow p-4 md:p-8 animate-fade-in">
-      <div className="container mx-auto max-w-6xl">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-          <div>
-            <h1 className="text-3xl font-bold text-text-primary flex items-center gap-2">
-              <Shield className="h-8 w-8 text-accent-primary" />
-              클랜
-            </h1>
-            <p className="text-text-secondary mt-1">
-              클랜에 가입하여 함께 내전을 즐기세요
-            </p>
-          </div>
-          {isAuthenticated && !myClan && (
-            <Button onClick={() => router.push("/clans/create")}>
-              <Plus className="h-4 w-4 mr-2" />
-              클랜 만들기
-            </Button>
-          )}
-        </div>
-
-        {/* My Clan Card */}
-        {myClan && (
-          <Card className="mb-6 border-accent-primary/30">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Crown className="h-5 w-5 text-accent-gold" />
-                내 클랜
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 rounded-lg bg-bg-tertiary flex items-center justify-center overflow-hidden relative">
-                    {myClan.logo ? (
-                      <Image
-                        src={myClan.logo}
-                        alt={myClan.name}
-                        fill
-                        className="object-cover"
-                        unoptimized
-                      />
-                    ) : (
-                      <Shield className="h-8 w-8 text-text-tertiary" />
-                    )}
-                  </div>
-                  <div>
-                    <p className="font-semibold text-text-primary text-lg">
-                      [{myClan.tag}] {myClan.name}
-                    </p>
-                    <p className="text-sm text-text-secondary">
-                      멤버 {myClan.members.length}/{myClan.maxMembers}
-                    </p>
-                  </div>
-                </div>
-                <Button
-                  variant="secondary"
-                  onClick={() => router.push(`/clans/${myClan.id}`)}
-                >
-                  클랜 페이지
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
+    <div className="flex-grow p-4 md:p-6 animate-fade-in">
+      <div className="container mx-auto max-w-5xl">
         {/* Search & Filter */}
         <div className="flex flex-col sm:flex-row gap-4 mb-6">
           <form onSubmit={handleSearch} className="flex-grow flex gap-2">
@@ -249,7 +167,7 @@ export default function ClansPage() {
                 : "첫 번째 클랜을 만들어보세요!"
             }
             action={
-              isAuthenticated && !myClan
+              isAuthenticated
                 ? {
                     label: "클랜 만들기",
                     onClick: () => router.push("/clans/create"),
@@ -314,7 +232,6 @@ export default function ClansPage() {
 
                   {/* Join Button */}
                   {isAuthenticated &&
-                    !myClan &&
                     clan.isRecruiting &&
                     clan.members.length < clan.maxMembers && (
                       <Button
