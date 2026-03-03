@@ -748,6 +748,7 @@ model Post {
   isPinned  Boolean      @default(false)
   isEdited  Boolean      @default(false)
   isDeleted Boolean      @default(false)
+  isBlinded Boolean      @default(false) // 임시조치(블라인드) 처리 여부 (신고 3건 이상 자동 or 관리자 수동)
   deletedAt DateTime?
   deletedBy String?      // 삭제한 관리자 ID
   createdAt DateTime     @default(now())
@@ -804,6 +805,7 @@ model Comment {
   parentId  String?   // 대댓글 지원
   isEdited  Boolean   @default(false)
   isDeleted Boolean   @default(false)
+  isBlinded Boolean   @default(false) // 임시조치(블라인드) 처리 여부 (신고 3건 이상 자동 or 관리자 수동)
   deletedAt DateTime?
   deletedBy String?   // 삭제한 관리자 ID
   createdAt DateTime  @default(now())

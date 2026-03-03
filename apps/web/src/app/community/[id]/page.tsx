@@ -55,6 +55,7 @@ interface Comment {
   content: string;
   createdAt: string;
   isEdited: boolean;
+  isBlinded?: boolean; // 임시조치(블라인드) 처리 여부
   author: {
     id: string;
     username: string;
@@ -74,6 +75,7 @@ interface Post {
   views: number;
   isPinned: boolean;
   isEdited: boolean;
+  isBlinded?: boolean; // 임시조치(블라인드) 처리 여부
   createdAt: string;
   updatedAt: string;
   author: {
@@ -474,10 +476,17 @@ export default function PostDetailPage() {
               </div>
             </div>
 
-            {/* Content */}
-            <div className="prose prose-invert max-w-none mb-6">
-              <MarkdownViewer content={post.content} />
-            </div>
+            {/* Content — 블라인드 처리된 게시글은 경고 메시지로 대체 */}
+            {post.isBlinded ? (
+              <div className="flex items-center gap-3 p-4 mb-6 rounded-lg bg-yellow-500/10 border border-yellow-500/30 text-yellow-400">
+                <span className="text-lg">⚠️</span>
+                <p className="text-sm font-medium">이 게시글은 신고에 의해 임시조치 처리되었습니다.</p>
+              </div>
+            ) : (
+              <div className="prose prose-invert max-w-none mb-6">
+                <MarkdownViewer content={post.content} />
+              </div>
+            )}
 
             {/* Tags */}
             {post.tags && post.tags.length > 0 && (
@@ -690,7 +699,10 @@ export default function PostDetailPage() {
                             )}
                           </div>
                         </div>
-                        {editingCommentId === comment.id ? (
+                        {/* 블라인드 처리된 댓글은 경고 메시지 표시 */}
+                        {comment.isBlinded ? (
+                          <p className="text-xs text-yellow-500/80 italic">[블라인드 처리된 댓글입니다]</p>
+                        ) : editingCommentId === comment.id ? (
                           <div className="flex gap-2 mt-1">
                             <input
                               value={editCommentText}
@@ -827,7 +839,10 @@ export default function PostDetailPage() {
                                   )}
                                 </div>
                               </div>
-                              {editingCommentId === reply.id ? (
+                              {/* 블라인드 처리된 대댓글은 경고 메시지 표시 */}
+                              {reply.isBlinded ? (
+                                <p className="text-xs text-yellow-500/80 italic">[블라인드 처리된 댓글입니다]</p>
+                              ) : editingCommentId === reply.id ? (
                                 <div className="flex gap-2 mt-1">
                                   <input
                                     value={editCommentText}

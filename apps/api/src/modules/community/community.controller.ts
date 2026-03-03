@@ -295,6 +295,48 @@ export class CommunityController {
   }
 
   // ========================================
+  // Blind/Unblind (Admin/Moderator Only)
+  // ========================================
+
+  /** 게시글 블라인드(임시조치) 처리 — 관리자/운영자 전용 */
+  @Post("posts/:id/blind")
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.MODERATOR)
+  @HttpCode(HttpStatus.OK)
+  async blindPost(@Param("id") postId: string) {
+    await this.communityService.blindPost(postId);
+    return { message: "게시글이 블라인드 처리되었습니다." };
+  }
+
+  /** 게시글 블라인드 해제 — 관리자/운영자 전용 */
+  @Delete("posts/:id/blind")
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.MODERATOR)
+  async unblindPost(@Param("id") postId: string) {
+    await this.communityService.unblindPost(postId);
+    return { message: "게시글 블라인드가 해제되었습니다." };
+  }
+
+  /** 댓글 블라인드(임시조치) 처리 — 관리자/운영자 전용 */
+  @Post("comments/:id/blind")
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.MODERATOR)
+  @HttpCode(HttpStatus.OK)
+  async blindComment(@Param("id") commentId: string) {
+    await this.communityService.blindComment(commentId);
+    return { message: "댓글이 블라인드 처리되었습니다." };
+  }
+
+  /** 댓글 블라인드 해제 — 관리자/운영자 전용 */
+  @Delete("comments/:id/blind")
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.MODERATOR)
+  async unblindComment(@Param("id") commentId: string) {
+    await this.communityService.unblindComment(commentId);
+    return { message: "댓글 블라인드가 해제되었습니다." };
+  }
+
+  // ========================================
   // User Statistics
   // ========================================
 

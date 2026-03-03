@@ -4,6 +4,8 @@ import {
   BadRequestException,
   ForbiddenException,
   ConflictException,
+  HttpException,
+  HttpStatus,
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { PostCategory } from "./community.types";
@@ -35,6 +37,20 @@ export interface CreatePostReportDto {
   commentId?: string;
 }
 
+// ============================================
+// 금칙어 목록 (서버 자체 운영 정책)
+// ============================================
+const BANNED_WORDS = [
+  '씨발', '개새끼', '병신', '지랄', '꺼져', '죽어', '닥쳐',
+  '시발', 'ㅅㅂ', 'ㅂㅅ', 'ㅈㄹ', 'ㄲㅈ',
+];
+
+/** 금칙어 포함 여부 검사 */
+function containsBannedWord(text: string): boolean {
+  const lower = text.toLowerCase();
+  return BANNED_WORDS.some((word) => lower.includes(word));
+}
+
 @Injectable()
 export class CommunityService {
   constructor(
@@ -48,6 +64,26 @@ export class CommunityService {
   // ========================================
 
   async createPost(userId: string, dto: CreatePostDto) {
+    // 밴/임시제한 유저 글쓰기 차단
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { isBanned: true, isRestricted: true, restrictedUntil: true },
+    });
+    if (user?.isBanned) {
+      throw new ForbiddenException('이용 정지 상태에서는 게시글을 작성할 수 없습니다.');
+    }
+    if (user?.isRestricted && user.restrictedUntil && user.restrictedUntil > new Date()) {
+      throw new ForbiddenException('임시 제한 상태에서는 게시글을 작성할 수 없습니다.');
+    }
+
+    // Rate limit 체크 (10분에 3회 제한)
+    const rateLimitKey = `post_ratelimit:${userId}`;
+    const count = await this.redis.incr(rateLimitKey);
+    if (count === 1) await this.redis.expire(rateLimitKey, 600);
+    if (count > 3) {
+      throw new HttpException('잠시 후 다시 시도해주세요. (10분에 3회 제한)', HttpStatus.TOO_MANY_REQUESTS);
+    }
+
     // Validate title and content
     if (!dto.title || dto.title.trim().length === 0) {
       throw new BadRequestException("Title cannot be empty");
@@ -63,6 +99,11 @@ export class CommunityService {
 
     if (dto.content.length > 10000) {
       throw new BadRequestException("Content too long (max 10000 characters)");
+    }
+
+    // 금칙어 검사: 제목 + 내용 모두 검사
+    if (containsBannedWord(dto.title) || containsBannedWord(dto.content)) {
+      throw new BadRequestException('금칙어가 포함된 게시글은 작성할 수 없습니다.');
     }
 
     const post = await this.prisma.post.create({
@@ -133,7 +174,7 @@ export class CommunityService {
     });
   }
 
-  async getPostById(postId: string, viewerId?: string, viewerIp?: string) {
+  async getPostById(postId: string, viewerId?: string, viewerIp?: string, isAdmin = false) {
     const post = await this.prisma.post.findFirst({
       where: { id: postId, isDeleted: false },
       include: {
@@ -188,6 +229,35 @@ export class CommunityService {
       throw new NotFoundException("Post not found");
     }
 
+    // 블라인드 처리된 게시글: 관리자가 아니면 내용/댓글 마스킹
+    if (post.isBlinded && !isAdmin) {
+      return {
+        ...post,
+        content: '[블라인드 처리된 게시글입니다. 신고에 의해 임시조치되었습니다.]',
+        comments: post.comments.map((c) => ({
+          ...c,
+          content: c.isBlinded ? '[블라인드 처리된 댓글입니다]' : c.content,
+          replies: (c.replies || []).map((r: any) => ({
+            ...r,
+            content: r.isBlinded ? '[블라인드 처리된 댓글입니다]' : r.content,
+          })),
+        })),
+      };
+    }
+
+    // 블라인드되지 않은 게시글의 댓글 중 블라인드된 댓글만 마스킹
+    const maskedPost = {
+      ...post,
+      comments: post.comments.map((c) => ({
+        ...c,
+        content: c.isBlinded && !isAdmin ? '[블라인드 처리된 댓글입니다]' : c.content,
+        replies: (c.replies || []).map((r: any) => ({
+          ...r,
+          content: r.isBlinded && !isAdmin ? '[블라인드 처리된 댓글입니다]' : r.content,
+        })),
+      })),
+    };
+
     // 조회수 중복 방지: 로그인 유저는 userId 기반, 비로그인은 IP 기반으로 24시간 내 중복 방지
     const viewKey = viewerId
       ? `view:user:${viewerId}:${postId}`
@@ -213,7 +283,7 @@ export class CommunityService {
       });
     }
 
-    return post;
+    return maskedPost;
   }
 
   async listPosts(filters?: {
@@ -224,6 +294,7 @@ export class CommunityService {
     limit?: number;
     offset?: number;
     sortBy?: "latest" | "popular" | "views" | "comments";
+    isAdmin?: boolean; // 관리자 여부 (블라인드 마스킹 스킵)
   }) {
     const where: any = { isDeleted: false };
 
@@ -285,7 +356,20 @@ export class CommunityService {
       this.prisma.post.count({ where }),
     ]);
 
-    return { posts, total };
+    // 블라인드 게시물: 관리자가 아니면 제목만 "[블라인드 처리된 게시글]"로 표시, 내용 숨김
+    const isAdmin = filters?.isAdmin ?? false;
+    const maskedPosts = posts.map((post) => {
+      if (post.isBlinded && !isAdmin) {
+        return {
+          ...post,
+          title: '[블라인드 처리된 게시글]',
+          content: '',
+        };
+      }
+      return post;
+    });
+
+    return { posts: maskedPosts, total };
   }
 
   async updatePost(userId: string, postId: string, dto: UpdatePostDto) {
@@ -385,6 +469,18 @@ export class CommunityService {
   // ========================================
 
   async createComment(userId: string, postId: string, dto: CreateCommentDto) {
+    // 밴/임시제한 유저 댓글 작성 차단
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { isBanned: true, isRestricted: true, restrictedUntil: true },
+    });
+    if (user?.isBanned) {
+      throw new ForbiddenException('이용 정지 상태에서는 댓글을 작성할 수 없습니다.');
+    }
+    if (user?.isRestricted && user.restrictedUntil && user.restrictedUntil > new Date()) {
+      throw new ForbiddenException('임시 제한 상태에서는 댓글을 작성할 수 없습니다.');
+    }
+
     // Validate content
     if (!dto.content || dto.content.trim().length === 0) {
       throw new BadRequestException("Comment cannot be empty");
@@ -392,6 +488,11 @@ export class CommunityService {
 
     if (dto.content.length > 1000) {
       throw new BadRequestException("Comment too long (max 1000 characters)");
+    }
+
+    // 금칙어 검사: 댓글 내용 검사
+    if (containsBannedWord(dto.content)) {
+      throw new BadRequestException('금칙어가 포함된 댓글은 작성할 수 없습니다.');
     }
 
     // Verify post exists and is not deleted
@@ -753,6 +854,38 @@ export class CommunityService {
   }
 
   // ========================================
+  // Blind/Unblind (Admin/Moderator only)
+  // ========================================
+
+  /** 게시글 블라인드(임시조치) 처리 — 관리자 수동 */
+  async blindPost(postId: string): Promise<void> {
+    const post = await this.prisma.post.findFirst({ where: { id: postId, isDeleted: false } });
+    if (!post) throw new NotFoundException('게시글을 찾을 수 없습니다.');
+    await this.prisma.post.update({ where: { id: postId }, data: { isBlinded: true } });
+  }
+
+  /** 게시글 블라인드 해제 — 관리자 수동 */
+  async unblindPost(postId: string): Promise<void> {
+    const post = await this.prisma.post.findFirst({ where: { id: postId, isDeleted: false } });
+    if (!post) throw new NotFoundException('게시글을 찾을 수 없습니다.');
+    await this.prisma.post.update({ where: { id: postId }, data: { isBlinded: false } });
+  }
+
+  /** 댓글 블라인드(임시조치) 처리 — 관리자 수동 */
+  async blindComment(commentId: string): Promise<void> {
+    const comment = await this.prisma.comment.findFirst({ where: { id: commentId, isDeleted: false } });
+    if (!comment) throw new NotFoundException('댓글을 찾을 수 없습니다.');
+    await this.prisma.comment.update({ where: { id: commentId }, data: { isBlinded: true } });
+  }
+
+  /** 댓글 블라인드 해제 — 관리자 수동 */
+  async unblindComment(commentId: string): Promise<void> {
+    const comment = await this.prisma.comment.findFirst({ where: { id: commentId, isDeleted: false } });
+    if (!comment) throw new NotFoundException('댓글을 찾을 수 없습니다.');
+    await this.prisma.comment.update({ where: { id: commentId }, data: { isBlinded: false } });
+  }
+
+  // ========================================
   // Statistics
   // ========================================
 
@@ -793,7 +926,7 @@ export class CommunityService {
       throw new ConflictException("Already reported");
     }
 
-    return this.prisma.postReport.create({
+    const report = await this.prisma.postReport.create({
       data: {
         reporterId: userId,
         postId: dto.postId,
@@ -802,6 +935,37 @@ export class CommunityService {
         description: dto.description,
       },
     });
+
+    // 신고 누적 자동 블라인드: 해당 게시글/댓글의 신고 횟수가 3건 이상이면 자동 블라인드 처리
+    const AUTO_BLIND_THRESHOLD = 3;
+
+    if (dto.postId) {
+      const reportCount = await this.prisma.postReport.count({
+        where: { postId: dto.postId },
+      });
+      if (reportCount >= AUTO_BLIND_THRESHOLD) {
+        // 아직 블라인드되지 않은 경우에만 업데이트
+        await this.prisma.post.updateMany({
+          where: { id: dto.postId, isBlinded: false, isDeleted: false },
+          data: { isBlinded: true },
+        });
+      }
+    }
+
+    if (dto.commentId) {
+      const reportCount = await this.prisma.postReport.count({
+        where: { commentId: dto.commentId },
+      });
+      if (reportCount >= AUTO_BLIND_THRESHOLD) {
+        // 아직 블라인드되지 않은 경우에만 업데이트
+        await this.prisma.comment.updateMany({
+          where: { id: dto.commentId, isBlinded: false, isDeleted: false },
+          data: { isBlinded: true },
+        });
+      }
+    }
+
+    return report;
   }
 
   async getPostReports(params: { status?: string; limit?: number; offset?: number }) {
