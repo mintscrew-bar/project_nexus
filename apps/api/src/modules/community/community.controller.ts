@@ -11,13 +11,18 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
 } from "@nestjs/common";
+import { FileInterceptor } from "@nestjs/platform-express";
 import { Request } from "express";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { OptionalJwtGuard } from "../auth/guards/optional-jwt.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { Roles } from "../auth/decorators/roles.decorator";
+import { UploadService } from "../upload/upload.service";
 import {
   CommunityService,
   CreatePostDto,
@@ -30,7 +35,10 @@ import { UserRole } from "@nexus/database";
 
 @Controller("community")
 export class CommunityController {
-  constructor(private readonly communityService: CommunityService) {}
+  constructor(
+    private readonly communityService: CommunityService,
+    private readonly uploadService: UploadService,
+  ) {}
 
   // ========================================
   // Post Management
@@ -307,5 +315,24 @@ export class CommunityController {
     @Body() dto: CreatePostReportDto,
   ) {
     return this.communityService.reportContent(userId, dto);
+  }
+
+  // ========================================
+  // Image Upload (게시글 본문 이미지)
+  // ========================================
+
+  @Post("images")
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.CREATED)
+  @UseInterceptors(FileInterceptor("image"))
+  async uploadImage(
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) {
+      throw new BadRequestException("이미지 파일이 업로드되지 않았습니다.");
+    }
+    // API 서버 기준 정적 파일 URL 반환 (ServeStaticModule이 /uploads 서빙)
+    const url = this.uploadService.getFileUrl(file.filename);
+    return { url };
   }
 }

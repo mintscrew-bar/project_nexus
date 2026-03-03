@@ -633,6 +633,16 @@ export const communityApi = {
     return response.data;
   },
 
+  // 게시글 본문 이미지 업로드 → { url } 반환
+  uploadImage: async (file: File): Promise<{ url: string }> => {
+    const formData = new FormData();
+    formData.append("image", file);
+    const response = await apiClient.post("/community/images", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return response.data;
+  },
+
   deletePost: async (postId: string) => {
     const response = await apiClient.delete(`/community/posts/${postId}`);
     return response.data;
