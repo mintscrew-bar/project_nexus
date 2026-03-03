@@ -35,7 +35,17 @@ import {
   ThumbsUp,
   Link,
   Bookmark,
+  Flag,
 } from "lucide-react";
+
+// 게시글/댓글 신고 사유
+const REPORT_REASONS: { value: string; label: string }[] = [
+  { value: "SPAM", label: "스팸/광고" },
+  { value: "HARASSMENT", label: "욕설/비하/혐오" },
+  { value: "INAPPROPRIATE", label: "부적절한 콘텐츠" },
+  { value: "MISINFORMATION", label: "허위 정보" },
+  { value: "OTHER", label: "기타" },
+];
 
 type PostCategory = "NOTICE" | "FREE" | "TIP" | "QNA";
 
@@ -109,6 +119,38 @@ export default function PostDetailPage() {
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editCommentText, setEditCommentText] = useState("");
   const { addToast } = useToast();
+
+  // 신고 모달 상태
+  type ReportTarget = { type: "post"; id: string } | { type: "comment"; id: string; authorName: string };
+  const [reportTarget, setReportTarget] = useState<ReportTarget | null>(null);
+  const [reportReason, setReportReason] = useState("SPAM");
+  const [reportDescription, setReportDescription] = useState("");
+  const [isSubmittingReport, setIsSubmittingReport] = useState(false);
+  const [reportSuccess, setReportSuccess] = useState(false);
+
+  const openReport = (target: ReportTarget) => {
+    setReportTarget(target);
+    setReportReason("SPAM");
+    setReportDescription("");
+    setReportSuccess(false);
+  };
+
+  const handleSubmitReport = async () => {
+    if (!reportTarget || !reportDescription.trim()) return;
+    setIsSubmittingReport(true);
+    try {
+      if (reportTarget.type === "post") {
+        await communityApi.reportPost(reportTarget.id, { reason: reportReason, description: reportDescription.trim() });
+      } else {
+        await communityApi.reportComment(reportTarget.id, { reason: reportReason, description: reportDescription.trim() });
+      }
+      setReportSuccess(true);
+    } catch {
+      addToast("신고 제출에 실패했습니다. (이미 신고했을 수 있습니다.)", "error");
+    } finally {
+      setIsSubmittingReport(false);
+    }
+  };
 
   const fetchPost = useCallback(async () => {
     setIsLoading(true);
@@ -467,6 +509,18 @@ export default function PostDetailPage() {
                   <Bookmark className={`h-4 w-4 mr-1 ${hasBookmarked ? "fill-current" : ""}`} />
                   {hasBookmarked ? "저장됨" : "저장"}
                 </Button>
+                {/* 본인 글 아닐 때만 신고 버튼 표시 */}
+                {isAuthenticated && !isAuthor && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => openReport({ type: "post", id: postId })}
+                    className="text-text-tertiary hover:text-red-400"
+                  >
+                    <Flag className="h-4 w-4 mr-1" />
+                    신고
+                  </Button>
+                )}
               </div>
               {isAuthor && (
                 <div className="flex items-center gap-2">
@@ -534,7 +588,7 @@ export default function PostDetailPage() {
                 {post.comments.map((comment) => (
                   <div key={comment.id}>
                     {/* 최상위 댓글 */}
-                    <div className="flex gap-3 p-4 rounded-lg bg-bg-tertiary/50">
+                    <div className="group flex gap-3 p-4 rounded-lg bg-bg-tertiary/50">
                       <div className="relative w-8 h-8 rounded-full bg-bg-tertiary overflow-hidden flex-shrink-0">
                         {comment.author.avatar ? (
                           <Image
@@ -591,7 +645,7 @@ export default function PostDetailPage() {
                                 답글
                               </button>
                             )}
-                            {user?.id === comment.author.id && (
+                            {user?.id === comment.author.id ? (
                               <>
                                 <button
                                   onClick={() => handleStartEditComment(comment)}
@@ -606,6 +660,15 @@ export default function PostDetailPage() {
                                   <Trash2 className="h-4 w-4" />
                                 </button>
                               </>
+                            ) : isAuthenticated && (
+                              /* 본인 댓글 아닐 때만 신고 버튼 (hover 시 표시) */
+                              <button
+                                onClick={() => openReport({ type: "comment", id: comment.id, authorName: comment.author.username })}
+                                title="댓글 신고"
+                                className="opacity-0 group-hover:opacity-100 transition-opacity text-text-tertiary hover:text-red-400 ml-1"
+                              >
+                                <Flag className="h-3 w-3" />
+                              </button>
                             )}
                           </div>
                         </div>
@@ -672,7 +735,7 @@ export default function PostDetailPage() {
                         {comment.replies.map((reply) => (
                           <div
                             key={reply.id}
-                            className="flex gap-3 p-3 rounded-lg bg-bg-secondary/50 border-l-2 border-accent-primary/30"
+                            className="group flex gap-3 p-3 rounded-lg bg-bg-secondary/50 border-l-2 border-accent-primary/30"
                           >
                             <div className="text-text-tertiary flex-shrink-0 mt-1">
                               <CornerDownRight className="h-3 w-3" />
@@ -720,7 +783,7 @@ export default function PostDetailPage() {
                                       <span>{commentLikes[reply.id]?.count}</span>
                                     )}
                                   </button>
-                                  {user?.id === reply.author.id && (
+                                  {user?.id === reply.author.id ? (
                                     <>
                                       <button
                                         onClick={() => handleStartEditComment(reply)}
@@ -735,6 +798,14 @@ export default function PostDetailPage() {
                                         <Trash2 className="h-3 w-3" />
                                       </button>
                                     </>
+                                  ) : isAuthenticated && (
+                                    <button
+                                      onClick={() => openReport({ type: "comment", id: reply.id, authorName: reply.author.username })}
+                                      title="댓글 신고"
+                                      className="opacity-0 group-hover:opacity-100 transition-opacity text-text-tertiary hover:text-red-400 ml-1"
+                                    >
+                                      <Flag className="h-3 w-3" />
+                                    </button>
                                   )}
                                 </div>
                               </div>
@@ -774,6 +845,93 @@ export default function PostDetailPage() {
         </Card>
       </div>
     </div>
+
+    {/* 신고 모달 */}
+    {reportTarget && (
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="bg-bg-secondary border border-bg-elevated rounded-xl w-full max-w-sm shadow-xl">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-bg-tertiary">
+            <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+              <Flag className="h-4 w-4 text-red-400" />
+              {reportTarget.type === "post" ? "게시글 신고" : "댓글 신고"}
+            </h3>
+            <button onClick={() => setReportTarget(null)} className="p-1 rounded hover:bg-bg-elevated text-text-tertiary">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          {reportSuccess ? (
+            <div className="p-6 text-center">
+              <p className="text-sm text-text-primary font-medium mb-1">신고가 접수되었습니다</p>
+              <p className="text-xs text-text-tertiary mb-4">운영팀이 검토 후 조치할 예정입니다.</p>
+              <button
+                onClick={() => setReportTarget(null)}
+                className="px-4 py-2 text-sm bg-accent-primary text-white rounded-lg hover:bg-accent-hover"
+              >
+                확인
+              </button>
+            </div>
+          ) : (
+            <div className="p-4 space-y-4">
+              {reportTarget.type === "comment" && (
+                <p className="text-xs text-text-tertiary bg-bg-tertiary rounded-lg px-3 py-2">
+                  <span className="text-text-secondary font-medium">{(reportTarget as any).authorName}</span>님의 댓글을 신고합니다.
+                </p>
+              )}
+              {/* 신고 사유 */}
+              <div>
+                <label className="text-xs text-text-tertiary mb-1.5 block">신고 사유</label>
+                <div className="space-y-1.5">
+                  {REPORT_REASONS.map((r) => (
+                    <label key={r.value} className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="reportReason"
+                        value={r.value}
+                        checked={reportReason === r.value}
+                        onChange={() => setReportReason(r.value)}
+                        className="accent-accent-primary"
+                      />
+                      <span className="text-sm text-text-secondary">{r.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              {/* 상세 설명 */}
+              <div>
+                <label className="text-xs text-text-tertiary mb-1.5 block">
+                  상세 설명 <span className="text-red-400">*</span>
+                </label>
+                <textarea
+                  value={reportDescription}
+                  onChange={(e) => setReportDescription(e.target.value)}
+                  placeholder="신고 내용을 구체적으로 작성해주세요."
+                  maxLength={500}
+                  rows={3}
+                  className="w-full px-3 py-2 bg-bg-tertiary border border-bg-elevated rounded-lg text-sm text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-accent-primary resize-none"
+                />
+                <p className="text-xs text-text-tertiary text-right mt-1">{reportDescription.length}/500</p>
+              </div>
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={() => setReportTarget(null)}
+                  className="px-3 py-2 text-sm text-text-secondary hover:text-text-primary bg-bg-tertiary rounded-lg"
+                >
+                  취소
+                </button>
+                <button
+                  onClick={handleSubmitReport}
+                  disabled={isSubmittingReport || !reportDescription.trim()}
+                  className="px-3 py-2 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSubmittingReport ? "신고 중..." : "신고하기"}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    )}
 
     <ConfirmModal
       isOpen={deletePostConfirm}
