@@ -64,7 +64,7 @@ export interface RiotAccount {
   puuid: string;
   tier?: string;
   rank?: string;
-  leaguePoints?: number;
+  lp?: number;           // 백엔드가 'lp' 필드로 반환 (이전: leaguePoints → 수정)
   wins?: number;
   losses?: number;
   isPrimary: boolean;
@@ -88,6 +88,7 @@ export interface NexusMatchHistory {
     assists: number;
     win: boolean;
     kda: number;
+    damage?: number;  // 내전 딜량 — 백엔드 totalDamageDealtToChampions (#23)
   };
   team: {
     id: string;

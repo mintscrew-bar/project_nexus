@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { statsApi } from "@/lib/api-client";
-import { getChampionIcon, formatKDA } from "./match-utils";
+import { getChampionIcon, formatKDA, getQueueTypeName } from "./match-utils";
 import type { NexusMatchHistory } from "./match-utils";
 import WinLossTrendChart from "./WinLossTrendChart";
 import Image from "next/image";
@@ -32,7 +32,7 @@ interface SummaryStats {
     winRate: number;
     playRate: number;
   }[];
-  games: { win: boolean; championName: string; kills: number; deaths: number; assists: number; damage: number }[];
+  games: { win: boolean; championName: string; kills: number; deaths: number; assists: number; csPerMin?: number; queueId?: number }[];
 }
 
 function computeRiotStats(matches: any[], puuid: string): SummaryStats {
@@ -44,12 +44,17 @@ function computeRiotStats(matches: any[], puuid: string): SummaryStats {
     if (!m?.info?.participants) continue;
     const p = m.info.participants.find((pp: any) => pp.puuid === puuid);
     if (!p) continue;
-    games.push({ win: p.win, championName: p.championName, kills: p.kills, deaths: p.deaths, assists: p.assists, damage: p.totalDamageDealtToChampions || 0 });
+    const cs = (p.totalMinionsKilled || 0) + (p.neutralMinionsKilled || 0);
+    const duration = m.info.gameDuration || 0;
+    // 게임별 CS/분 계산 — 추세 차트용 (duration이 0이면 undefined)
+    const csPerMin = duration > 0 ? cs / (duration / 60) : undefined;
+    // queueId 포함 → 전체 탭 tooltip에서 큐 타입 구분 표시
+    games.push({ win: p.win, championName: p.championName, kills: p.kills, deaths: p.deaths, assists: p.assists, csPerMin, queueId: m.info?.queueId });
     totalKills += p.kills;
     totalDeaths += p.deaths;
     totalAssists += p.assists;
-    totalCs += (p.totalMinionsKilled || 0) + (p.neutralMinionsKilled || 0);
-    totalDuration += m.info.gameDuration || 0;
+    totalCs += cs;
+    totalDuration += duration;
 
     const prev = champMap.get(p.championName) || { games: 0, wins: 0 };
     prev.games++;
@@ -92,7 +97,8 @@ function computeNexusStats(matches: NexusMatchHistory[]): SummaryStats {
 
   for (const m of matches) {
     const p = m.participant;
-    games.push({ win: p.win, championName: p.championName, kills: p.kills, deaths: p.deaths, assists: p.assists, damage: 0 });
+    // 내전은 CS/분 데이터 없음 → csPerMin 미포함
+    games.push({ win: p.win, championName: p.championName, kills: p.kills, deaths: p.deaths, assists: p.assists });
     totalKills += p.kills;
     totalDeaths += p.deaths;
     totalAssists += p.assists;
@@ -212,7 +218,13 @@ function KDATrendChart({ games }: { games: SummaryStats["games"] }) {
           style={{ left: `${Math.max(10, Math.min(85, ((toX(hoverIdx)) / W) * 100))}%`, transform: 'translateX(-50%)' }}
         >
           <div className="bg-bg-secondary/95 backdrop-blur-sm border border-bg-elevated rounded-lg shadow-xl px-2.5 py-1.5 text-[10px]">
-            <div className="text-text-tertiary">{games[hoverIdx].championName}</div>
+            <div className="text-text-tertiary">
+              {games[hoverIdx].championName}
+              {/* 큐 타입 표시 (전체 탭 전용) */}
+              {games[hoverIdx].queueId !== undefined && (
+                <span className="ml-1 text-text-muted">· {getQueueTypeName(games[hoverIdx].queueId!)}</span>
+              )}
+            </div>
             <div className="font-bold text-accent-primary">KDA {kdaValues[hoverIdx].toFixed(2)}</div>
             <div className="text-text-secondary">{games[hoverIdx].kills}/{games[hoverIdx].deaths}/{games[hoverIdx].assists}</div>
           </div>
@@ -222,16 +234,21 @@ function KDATrendChart({ games }: { games: SummaryStats["games"] }) {
   );
 }
 
-function DamageTrendChart({ games }: { games: SummaryStats["games"] }) {
+// CS/분 추세 차트 — Riot 탭 전용, KDA와 함께 핵심 실력 지표
+function CsPerMinTrendChart({ games }: { games: SummaryStats["games"] }) {
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
 
-  const damages = games.map(g => g.damage);
-  const maxDmg = Math.max(...damages, 1);
+  const csValues = games.map(g => g.csPerMin ?? 0);
+  const maxCs = Math.max(...csValues, 1);
   const W = 300, H = 80;
-  const padL = 28, padR = 8, padT = 4, padB = 16;
+  const padL = 28, padR = 8, padT = 8, padB = 16;
   const cW = W - padL - padR, cH = H - padT - padB;
-  const barGap = 2;
-  const barW = Math.max(4, (cW / games.length) - barGap);
+
+  const toX = (i: number) => padL + (games.length > 1 ? (i / (games.length - 1)) * cW : cW / 2);
+  const toY = (v: number) => padT + cH - (v / maxCs) * cH;
+
+  const pathD = csValues.map((v, i) => `${i === 0 ? 'M' : 'L'}${toX(i).toFixed(1)},${toY(v).toFixed(1)}`).join(' ');
+  const areaD = `${pathD} L${toX(games.length - 1).toFixed(1)},${(padT + cH).toFixed(1)} L${toX(0).toFixed(1)},${(padT + cH).toFixed(1)} Z`;
 
   return (
     <div className="relative bg-bg-tertiary/30 rounded-lg p-2">
@@ -239,40 +256,44 @@ function DamageTrendChart({ games }: { games: SummaryStats["games"] }) {
         onMouseMove={(e) => {
           const rect = e.currentTarget.getBoundingClientRect();
           const svgX = ((e.clientX - rect.left) / rect.width) * W;
-          const idx = Math.floor(((svgX - padL) / cW) * games.length);
+          const idx = Math.round(((svgX - padL) / cW) * (games.length - 1));
           setHoverIdx(Math.max(0, Math.min(games.length - 1, idx)));
         }}
         onMouseLeave={() => setHoverIdx(null)}
       >
-        {/* Y axis */}
-        <text x={padL - 4} y={padT + 6} textAnchor="end" fontSize="7" fill="currentColor" fillOpacity="0.4">
-          {(maxDmg / 1000).toFixed(0)}k
-        </text>
-        <text x={padL - 4} y={padT + cH + 3} textAnchor="end" fontSize="7" fill="currentColor" fillOpacity="0.4">0</text>
-        {/* Bars */}
-        {damages.map((dmg, i) => {
-          const barH = (dmg / maxDmg) * cH;
-          const x = padL + (i / games.length) * cW + barGap / 2;
-          const y = padT + cH - barH;
-          const isHovered = hoverIdx === i;
-          return (
-            <rect key={i} x={x} y={y} width={barW} height={barH} rx={1.5}
-              fill={games[i].win ? '#22c55e' : '#ef4444'}
-              fillOpacity={isHovered ? 0.9 : 0.6}
-            />
-          );
-        })}
+        {/* Y축 레이블 */}
+        {[0, maxCs / 2, maxCs].map((v, i) => (
+          <text key={i} x={padL - 4} y={toY(v) + 3} textAnchor="end" fontSize="7" fill="currentColor" fillOpacity="0.4">
+            {v.toFixed(1)}
+          </text>
+        ))}
+        {/* 중간 그리드 라인 */}
+        <line x1={padL} x2={padL + cW} y1={toY(maxCs / 2)} y2={toY(maxCs / 2)} stroke="currentColor" strokeOpacity="0.06" strokeWidth="1" />
+        {/* 영역 + 라인 (초록 계열) */}
+        <path d={areaD} fill="#22c55e" fillOpacity="0.08" />
+        <path d={pathD} fill="none" stroke="#22c55e" strokeWidth="1.5" strokeLinejoin="round" />
+        {/* 게임별 점 */}
+        {csValues.map((v, i) => (
+          <circle key={i} cx={toX(i)} cy={toY(v)} r={hoverIdx === i ? 3.5 : 1.5}
+            fill="#22c55e" fillOpacity={hoverIdx === i ? 1 : 0.5}
+            stroke={hoverIdx === i ? 'white' : 'none'} strokeWidth="1" />
+        ))}
+        {/* 호버 수직선 */}
+        {hoverIdx !== null && (
+          <line x1={toX(hoverIdx)} x2={toX(hoverIdx)} y1={padT} y2={padT + cH}
+            stroke="currentColor" strokeOpacity="0.2" strokeWidth="1" strokeDasharray="2,2" />
+        )}
       </svg>
       {hoverIdx !== null && (
         <div className="absolute top-0 z-20 pointer-events-none"
-          style={{ left: `${Math.max(10, Math.min(85, ((padL + (hoverIdx / games.length) * cW + barW / 2) / W) * 100))}%`, transform: 'translateX(-50%)' }}
+          style={{ left: `${Math.max(10, Math.min(85, ((toX(hoverIdx)) / W) * 100))}%`, transform: 'translateX(-50%)' }}
         >
           <div className="bg-bg-secondary/95 backdrop-blur-sm border border-bg-elevated rounded-lg shadow-xl px-2.5 py-1.5 text-[10px]">
             <div className="text-text-tertiary">{games[hoverIdx].championName}</div>
-            <div className={`font-bold ${games[hoverIdx].win ? 'text-accent-success' : 'text-accent-danger'}`}>
+            <div className="font-bold text-accent-success">CS/분 {csValues[hoverIdx].toFixed(1)}</div>
+            <div className={`text-[10px] ${games[hoverIdx].win ? 'text-accent-success' : 'text-accent-danger'}`}>
               {games[hoverIdx].win ? '승리' : '패배'}
             </div>
-            <div className="text-text-primary font-medium">{damages[hoverIdx].toLocaleString()} 딜량</div>
           </div>
         </div>
       )}
@@ -281,6 +302,9 @@ function DamageTrendChart({ games }: { games: SummaryStats["games"] }) {
 }
 
 function StatsDisplay({ stats, showCsPerMin }: { stats: SummaryStats; showCsPerMin: boolean }) {
+  // 차트 탭 상태 — 한 번에 하나의 차트만 표시
+  const [chartTab, setChartTab] = useState<"trend" | "kda" | "cs">("trend");
+
   if (stats.games.length === 0) {
     return (
       <div className="text-center py-8 text-text-tertiary text-sm">
@@ -289,20 +313,29 @@ function StatsDisplay({ stats, showCsPerMin }: { stats: SummaryStats; showCsPerM
     );
   }
 
+  const hasEnoughGames = stats.games.length >= 2;
+  // CS/분 탭: Riot 탭(showCsPerMin=true)이고 cs 데이터가 하나라도 있을 때만 표시
+  const hasCsData = showCsPerMin && stats.games.some(g => (g.csPerMin ?? 0) > 0);
+
+  // 현재 선택된 차트 탭이 유효하지 않으면 기본값(trend)으로 복귀
+  const effectiveChartTab =
+    (chartTab === "kda" && !hasEnoughGames) ||
+    (chartTab === "cs" && (!hasEnoughGames || !hasCsData))
+      ? "trend"
+      : chartTab;
+
+  // 표시 가능한 차트 탭 목록
+  const chartTabs = [
+    { key: "trend" as const, label: "승패 추이" },
+    ...(hasEnoughGames ? [{ key: "kda" as const, label: "KDA 추세" }] : []),
+    ...(hasEnoughGames && hasCsData ? [{ key: "cs" as const, label: "CS/분 추세" }] : []),
+  ];
+
   return (
-    <div className="space-y-5">
-      {/* Win/Loss Trend Chart */}
-      <div>
-        <p className="text-xs text-text-tertiary mb-1 font-medium">승패 추이 (최근 {stats.games.length}게임)</p>
-        <WinLossTrendChart games={stats.games} />
-      </div>
-
-      {/* Summary Stats Row */}
+    <div className="space-y-4">
+      {/* ─── 핵심 통계 요약 (항상 표시) ─── */}
       <div className="flex items-center gap-4">
-        {/* Win Rate Donut */}
         <WinRateDonut winRate={stats.winRate} />
-
-        {/* Win/Loss + KDA */}
         <div className="flex-1 space-y-1">
           <div className="text-sm">
             <span className="text-accent-success font-bold">{stats.wins}승</span>
@@ -324,26 +357,40 @@ function StatsDisplay({ stats, showCsPerMin }: { stats: SummaryStats; showCsPerM
         </div>
       </div>
 
-      {/* KDA Trend Chart */}
-      {stats.games.length >= 2 && (
-        <div>
-          <p className="text-xs text-text-tertiary mb-1 font-medium">KDA 추세 (최근 {stats.games.length}게임)</p>
-          <KDATrendChart games={stats.games} />
+      {/* ─── 차트 섹션 — 탭으로 한 번에 하나만 표시 (#22) ─── */}
+      {chartTabs.length > 0 && (
+        <div className="bg-bg-tertiary/20 rounded-xl p-3">
+          {/* 차트 선택 탭 버튼 */}
+          <div className="flex gap-1 mb-3">
+            {chartTabs.map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => setChartTab(tab.key)}
+                className={`px-2.5 py-1 rounded text-[11px] font-medium transition-colors ${
+                  effectiveChartTab === tab.key
+                    ? "bg-bg-elevated text-text-primary shadow-sm"
+                    : "text-text-tertiary hover:text-text-secondary"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+            <span className="ml-auto text-[10px] text-text-muted self-center">
+              최근 {stats.games.length}게임
+            </span>
+          </div>
+
+          {/* 선택된 차트만 렌더링 */}
+          {effectiveChartTab === "trend" && <WinLossTrendChart games={stats.games} />}
+          {effectiveChartTab === "kda" && <KDATrendChart games={stats.games} />}
+          {effectiveChartTab === "cs" && <CsPerMinTrendChart games={stats.games} />}
         </div>
       )}
 
-      {/* Damage Trend Chart */}
-      {stats.games.length >= 2 && stats.games.some(g => g.damage > 0) && (
-        <div>
-          <p className="text-xs text-text-tertiary mb-1 font-medium">딜량 추세 (최근 {stats.games.length}게임)</p>
-          <DamageTrendChart games={stats.games} />
-        </div>
-      )}
-
-      {/* Most Champions */}
+      {/* ─── 최근 플레이 챔피언 (항상 표시) ─── */}
       {stats.mostChampions.length > 0 && (
         <div>
-          <p className="text-xs text-text-tertiary mb-2 font-medium">모스트 챔피언</p>
+          <p className="text-xs text-text-tertiary mb-2 font-medium">최근 플레이 챔피언</p>
           <div className="space-y-1.5">
             {stats.mostChampions.map((champ) => (
               <div key={champ.championName} className="flex items-center gap-2.5">
@@ -355,20 +402,17 @@ function StatsDisplay({ stats, showCsPerMin }: { stats: SummaryStats; showCsPerM
                   className="w-7 h-7 rounded-full flex-shrink-0"
                   onError={(e) => { e.currentTarget.style.display = "none"; }}
                 />
-                <span className="text-xs text-text-primary w-16 truncate font-medium">{champ.championName}</span>
-                <span className="text-[11px] text-text-tertiary w-10">{champ.games}게임</span>
-                <span className={`text-[11px] font-bold w-10 ${
+                <span className="text-xs text-text-primary w-20 truncate font-medium">{champ.championName}</span>
+                <span className="text-[11px] text-text-tertiary">{champ.games}게임</span>
+                <span className="text-[11px] text-text-tertiary mx-1">·</span>
+                <span className={`text-[11px] font-bold ${
                   champ.winRate >= 60 ? "text-accent-success" : champ.winRate >= 50 ? "text-text-primary" : "text-accent-danger"
                 }`}>
                   {champ.winRate}%
                 </span>
-                {/* Play rate bar */}
-                <div className="flex-1 h-1.5 bg-bg-elevated rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-accent-primary/60"
-                    style={{ width: `${champ.playRate}%` }}
-                  />
-                </div>
+                <span className="text-[10px] text-text-muted ml-auto">
+                  {champ.wins}승 {champ.games - champ.wins}패
+                </span>
               </div>
             ))}
           </div>
@@ -384,7 +428,8 @@ export default function RecentStatsSummary({
   puuid,
   nexusMatches,
 }: RecentStatsSummaryProps) {
-  const [activeTab, setActiveTab] = useState<"all" | "ranked" | "normal" | "nexus">("all");
+  // 기본 탭을 솔로 랭크로 설정 — 랭크 미연동 시 nexus로 fallback (#21)
+  const [activeTab, setActiveTab] = useState<"all" | "ranked" | "normal" | "nexus">("ranked");
 
   const hasRiot = !!(gameName && tagLine && puuid);
 
@@ -397,7 +442,7 @@ export default function RecentStatsSummary({
     enabled: hasRiot,
   });
 
-  // Fetch ranked (solo queue) recent 20 games — 탭 선택 시에만 요청
+  // 솔로 랭크(420) 최근 20게임 — 기본 탭이라 초기 로드 (#20: 명칭 솔로 랭크)
   const { data: rankedMatches, isLoading: isLoadingRanked } = useQuery<any[]>({
     queryKey: ["recentRankedStats", gameName, tagLine],
     queryFn: () => statsApi.getSummonerRiotMatches(gameName!, tagLine!, 20, 420),
@@ -406,10 +451,19 @@ export default function RecentStatsSummary({
     enabled: hasRiot && activeTab === "ranked",
   });
 
-  // Fetch normal (blind+draft) recent 20 games
+  // 일반 게임: 블라인드(400) + 드래프트(430) 병합 후 최신 20개 (#19)
   const { data: normalMatches, isLoading: isLoadingNormal } = useQuery<any[]>({
     queryKey: ["recentNormalStats", gameName, tagLine],
-    queryFn: () => statsApi.getSummonerRiotMatches(gameName!, tagLine!, 20, 430),
+    queryFn: async () => {
+      const [blind, draft] = await Promise.all([
+        statsApi.getSummonerRiotMatches(gameName!, tagLine!, 20, 400),
+        statsApi.getSummonerRiotMatches(gameName!, tagLine!, 20, 430),
+      ]);
+      // 두 큐 결과를 시작 시간 기준 내림차순 정렬 후 최신 20개만 반환
+      return [...(blind || []), ...(draft || [])]
+        .sort((a, b) => (b.info?.gameStartTimestamp || 0) - (a.info?.gameStartTimestamp || 0))
+        .slice(0, 20);
+    },
     staleTime: 3 * 60 * 1000,
     retry: false,
     enabled: hasRiot && activeTab === "normal",
@@ -455,6 +509,7 @@ export default function RecentStatsSummary({
               >
                 전체
               </button>
+              {/* 솔로 랭크 탭 (#20: 자유 랭크와 구분하기 위해 명칭 명확화) */}
               <button
                 onClick={() => setActiveTab("ranked")}
                 className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
@@ -463,7 +518,7 @@ export default function RecentStatsSummary({
                     : "text-text-secondary hover:text-text-primary"
                 }`}
               >
-                랭크
+                솔로 랭크
               </button>
               <button
                 onClick={() => setActiveTab("normal")}

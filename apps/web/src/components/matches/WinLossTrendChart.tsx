@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { getQueueTypeName } from "./match-utils";
 
 interface GameResult {
   win: boolean;
@@ -8,6 +9,7 @@ interface GameResult {
   kills: number;
   deaths: number;
   assists: number;
+  queueId?: number;  // 큐 타입 (전체 탭에서 구분 표시용)
 }
 
 interface WinLossTrendChartProps {
@@ -122,6 +124,12 @@ export default function WinLossTrendChart({ games }: WinLossTrendChartProps) {
                 {games[hoverIdx].win ? "승" : "패"}
               </span>
               <span className="text-text-secondary">{games[hoverIdx].championName}</span>
+              {/* 큐 타입 뱃지 (전체 탭에서 큐 구분 표시) */}
+              {games[hoverIdx].queueId !== undefined && (
+                <span className="text-text-muted text-[10px]">
+                  {getQueueTypeName(games[hoverIdx].queueId!)}
+                </span>
+              )}
             </div>
             <div className="text-text-tertiary">
               {games[hoverIdx].kills}/{games[hoverIdx].deaths}/{games[hoverIdx].assists} ·

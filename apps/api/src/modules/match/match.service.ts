@@ -994,6 +994,8 @@ export class MatchService {
         deaths: participant.deaths,
         assists: participant.assists,
         win: participant.win,
+        // 내전 딜량 데이터 포함 — 프론트 딜량 추세 차트 활성화용 (#23)
+        damage: participant.totalDamageDealtToChampions,
         kda:
           participant.deaths === 0
             ? participant.kills + participant.assists

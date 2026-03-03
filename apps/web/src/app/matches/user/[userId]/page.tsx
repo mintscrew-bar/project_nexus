@@ -310,7 +310,7 @@ export default function UserStatsPage() {
                     </p>
                     {account.tier && account.rank && (
                       <p className="text-sm text-text-secondary">
-                        {account.tier} {account.rank} - {account.leaguePoints} LP
+                        {account.tier} {account.rank} - {account.lp} LP
                       </p>
                     )}
                   </div>
