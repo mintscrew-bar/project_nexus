@@ -53,6 +53,8 @@ export default function ClansPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showRecruitingOnly, setShowRecruitingOnly] = useState(false);
   const [myClan, setMyClan] = useState<Clan | null>(null);
+  // 가입 요청 중인 클랜 ID (버튼 로딩 상태 관리)
+  const [joiningClanId, setJoiningClanId] = useState<string | null>(null);
   const { addToast } = useToast();
 
   // Debounce search query for API calls
@@ -103,13 +105,16 @@ export default function ClansPage() {
       return;
     }
 
+    setJoiningClanId(clanId);
     try {
       await clanApi.joinClan(clanId);
       addToast("클랜에 가입되었습니다.", "success");
       fetchMyClan();
       fetchClans();
     } catch (err: any) {
-      addToast(err.message || "클랜 가입에 실패했습니다.", "error");
+      addToast(err.response?.data?.message || err.message || "클랜 가입에 실패했습니다.", "error");
+    } finally {
+      setJoiningClanId(null);
     }
   };
 
@@ -316,6 +321,7 @@ export default function ClansPage() {
                         variant="primary"
                         size="sm"
                         className="w-full mt-4"
+                        isLoading={joiningClanId === clan.id}
                         onClick={(e) => {
                           e.stopPropagation();
                           handleJoinClan(clan.id);
