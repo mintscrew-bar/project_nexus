@@ -393,7 +393,8 @@ export class AdminService {
   async getChatLogs(params: {
     page: number;
     limit: number;
-    category?: "all" | "room" | "dm" | "clan";
+    // DM은 개인정보보호법·통신비밀보호법상 임의 열람 위법 소지로 제외
+    category?: "all" | "room" | "clan";
     roomName?: string;
     userId?: string;
     search?: string;
@@ -405,13 +406,8 @@ export class AdminService {
 
     const dateLimit30d = { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) };
 
-    // 카테고리별 분기: room, dm, clan, all
-    if (category === "dm") {
-      return this.getDmLogs({ page, limit, skip, userId, search, dateLimit30d });
-    }
-    if (category === "clan") {
-      return this.getClanChatLogs({ page, limit, skip, userId, search, dateLimit30d });
-    }
+    // DM·클랜 채팅은 개인정보보호법·통신비밀보호법 위법 소지로 자유 열람 차단
+    // 클랜 채팅은 신고 접수 시 신고 처리 흐름을 통해서만 확인 가능
 
     // category === "room" 또는 "all"
     const roomResult = await this.getRoomChatLogs({ page, limit, skip, roomName, userId, search, dateLimit30d });

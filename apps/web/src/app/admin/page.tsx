@@ -526,6 +526,8 @@ interface UserReportItem {
   reporter: { id: string; username: string; avatar?: string };
   target: { id: string; username: string; avatar?: string; isBanned?: boolean };
   match?: { id: string } | null;
+  /** 클랜 채팅 메시지 신고인 경우 해당 메시지 정보 */
+  clanChatMessage?: { id: string; content: string; createdAt: string } | null;
 }
 
 interface PostReportItem {
@@ -737,8 +739,14 @@ function ReportsTab({ addToast }: { addToast: (msg: string, type: "success" | "e
                           {REASON_LABELS[r.reason] ?? r.reason}
                         </Badge>
                       </td>
-                      <td className="px-4 py-3 text-text-secondary text-xs max-w-48 truncate">
-                        {r.description || "-"}
+                      <td className="px-4 py-3 text-text-secondary text-xs max-w-48">
+                        <span className="truncate block">{r.description || "-"}</span>
+                        {/* 클랜 채팅 메시지 신고인 경우 태그 표시 */}
+                        {r.category === "user" && (r as UserReportItem).clanChatMessage && (
+                          <span className="inline-block mt-0.5 px-1.5 py-0.5 rounded text-[9px] bg-purple-500/20 text-purple-300">
+                            클랜 채팅
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <Badge variant={STATUS_VARIANTS[r.status] ?? "default"} className="text-[10px]">
@@ -796,6 +804,15 @@ function ReportsTab({ addToast }: { addToast: (msg: string, type: "success" | "e
                 <p className="text-text-muted text-xs">
                   대상: {(reviewModal as PostReportItem).targetLabel}
                 </p>
+              )}
+              {/* 클랜 채팅 메시지 신고인 경우 메시지 내용 표시 */}
+              {reviewModal.category === "user" && (reviewModal as UserReportItem).clanChatMessage && (
+                <div className="mt-2 bg-bg-secondary rounded-lg p-2 border border-bg-elevated">
+                  <p className="text-[10px] text-text-muted mb-1">신고된 클랜 채팅 메시지</p>
+                  <p className="text-xs text-text-secondary">
+                    {(reviewModal as UserReportItem).clanChatMessage!.content}
+                  </p>
+                </div>
               )}
             </div>
             <div className="flex gap-2">
@@ -1234,7 +1251,9 @@ function RoomsTab({ addToast }: { addToast: (msg: string, type: "success" | "err
 
 // ── 채팅 로그 ─────────────────────────────────────────────────────────────────
 
-type ChatLogCategory = "room" | "dm" | "clan";
+// DM·클랜 채팅은 개인정보보호법·통신비밀보호법상 임의 열람 위법 소지 → 제외
+// 클랜 채팅은 신고 접수 건에 한해 신고 관리 탭에서 확인
+type ChatLogCategory = "room";
 
 interface ChatLog {
   id: string;
@@ -1247,16 +1266,13 @@ interface ChatLog {
   createdAt: string;
 }
 
+// 방 채팅만 허용 (내전 진행 중 신고 대응 목적, 이용약관 고지됨)
 const CHAT_CATEGORIES: { id: ChatLogCategory; label: string }[] = [
   { id: "room", label: "방 채팅" },
-  { id: "dm", label: "DM" },
-  { id: "clan", label: "클랜 채팅" },
 ];
 
 const LOCATION_HEADERS: Record<ChatLogCategory, string> = {
   room: "방",
-  dm: "수신자",
-  clan: "클랜",
 };
 
 function ChatLogsTab() {
