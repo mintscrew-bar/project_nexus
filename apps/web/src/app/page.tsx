@@ -1,23 +1,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
+import dynamic from "next/dynamic";
 import { Logo } from "@/components/Logo";
-import { Button } from "@/components/ui";
 import { useAuthStore } from "@/stores/auth-store";
+import { HeroBanner } from "@/components/home/HeroBanner";
+import { DiscordBanner } from "@/components/home/DiscordBanner";
+
+// 대시보드 컴포넌트는 인증 시에만 필요하므로 dynamic import로 로드
+const DashboardContent = dynamic(
+  () => import("@/components/home/DashboardContent").then((mod) => mod.DashboardContent),
+  { ssr: false }
+);
 
 export default function Home() {
-  const router = useRouter();
   const { isAuthenticated, isLoading } = useAuthStore();
   const [timedOut, setTimedOut] = useState(false);
-
-  useEffect(() => {
-    // If user is already logged in, redirect to dashboard
-    if (!isLoading && isAuthenticated) {
-      router.push("/dashboard");
-    }
-  }, [isAuthenticated, isLoading, router]);
 
   // 안전장치: auth 초기화가 4초 이상 걸리면 강제로 로딩 해제
   useEffect(() => {
@@ -31,13 +29,12 @@ export default function Home() {
     return () => clearTimeout(timer);
   }, []);
 
-  // 로딩 중 → 풀스크린 로딩 스피너 (AppShell이 셸 없이 렌더)
-  if (isLoading || (isAuthenticated && !timedOut)) {
+  // 로딩 중 → 풀스크린 로딩 스피너
+  if (isLoading && !timedOut) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-bg-primary">
         <div className="flex flex-col items-center gap-4 animate-fade-in">
           <Logo size="xl" />
-          {/* 초기 로딩 프로그레스 바 */}
           <div className="h-1 w-32 rounded-full bg-bg-tertiary overflow-hidden">
             <div className="h-full w-1/2 bg-accent-primary rounded-full animate-loading-slide" />
           </div>
@@ -46,72 +43,76 @@ export default function Home() {
     );
   }
 
+  // 인증 상태 → HeroBanner(전폭) + 대시보드 콘텐츠
+  if (isAuthenticated) {
+    return (
+      <div className="flex-grow animate-fade-in">
+        <HeroBanner isAuthenticated />
+        <div className="container mx-auto max-w-7xl space-y-5 p-4 md:p-6">
+          <DashboardContent />
+        </div>
+      </div>
+    );
+  }
+
+  // 미인증 상태 → 랜딩 페이지
   return (
     <main className="flex min-h-screen flex-col">
-      {/* Hero Section */}
-      <section className="flex flex-col items-center justify-center min-h-screen px-4 text-center">
-        <div className="max-w-4xl mx-auto animate-fade-in">
-          <div className="flex justify-center mb-6 animate-bounce-in">
-            <Logo size="xl" />
-          </div>
-          <h1 className="text-5xl md:text-7xl font-bold mb-6 animate-slide-up">
-            <span className="text-text-primary">Project</span>{" "}
-            <span className="text-accent-primary">Nexus</span>
-          </h1>
-          <p className="text-xl md:text-2xl text-text-secondary mb-8 animate-slide-up" style={{ animationDelay: '100ms' }}>
-            LoL 내전 토너먼트의 새로운 기준
-          </p>
-          <p className="text-lg text-text-tertiary mb-12 max-w-2xl mx-auto animate-slide-up" style={{ animationDelay: '200ms' }}>
-            경매 드래프트, 실시간 밸런싱, Discord 연동까지.
-            <br />
-            프로처럼 내전을 즐기세요.
-          </p>
+      {/* 히어로 배너 — 궤도 + 파티클 + Framer Motion */}
+      <HeroBanner />
 
-          <div className="flex flex-col sm:flex-row gap-4 justify-center animate-slide-up" style={{ animationDelay: '300ms' }}>
-            <Link href="/auth/login">
-              <Button size="lg" className="w-full sm:w-auto">
-                Discord로 시작하기
-              </Button>
-            </Link>
-            <Link href="/tournaments">
-              <Button variant="secondary" size="lg" className="w-full sm:w-auto">
-                자세히 알아보기
-              </Button>
-            </Link>
-          </div>
-        </div>
-
-        {/* Feature highlights */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-20 max-w-5xl mx-auto px-4 stagger-children">
-          <div className="card text-center hover-lift">
-            <div className="text-4xl mb-4">🎯</div>
-            <h3 className="text-xl font-semibold text-accent-primary mb-2">
+      {/* Feature highlights */}
+      <section className="py-24 md:py-32 px-6">
+        <h2 className="text-3xl md:text-5xl font-bold text-center text-text-primary mb-16">
+          왜{" "}
+          <span
+            className="bg-clip-text text-transparent"
+            style={{ backgroundImage: "linear-gradient(135deg, #8b5cf6, #6366f1, #d946ef)" }}
+          >
+            NEXUS
+          </span>
+          인가?
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-10 max-w-6xl mx-auto">
+          <div className="group flex flex-col items-center text-center p-8 md:p-10 rounded-2xl bg-bg-secondary/50 border border-bg-tertiary hover:border-violet-500/30 transition-all duration-300 hover:scale-[1.02]">
+            <div className="text-6xl md:text-7xl mb-6">🎯</div>
+            <h3 className="text-2xl md:text-3xl font-bold text-text-primary mb-3">
               경매 드래프트
             </h3>
-            <p className="text-text-secondary">
-              실시간 입찰로 공정하고 재미있는 팀 구성
+            <p className="text-lg text-text-secondary leading-relaxed">
+              실시간 입찰로 공정하고 재미있는 팀 구성.<br className="hidden md:block" />
+              포인트 전략이 승부를 가른다.
             </p>
           </div>
 
-          <div className="card text-center hover-lift">
-            <div className="text-4xl mb-4">⚖️</div>
-            <h3 className="text-xl font-semibold text-accent-primary mb-2">
+          <div className="group flex flex-col items-center text-center p-8 md:p-10 rounded-2xl bg-bg-secondary/50 border border-bg-tertiary hover:border-violet-500/30 transition-all duration-300 hover:scale-[1.02]">
+            <div className="text-6xl md:text-7xl mb-6">⚖️</div>
+            <h3 className="text-2xl md:text-3xl font-bold text-text-primary mb-3">
               자동 밸런싱
             </h3>
-            <p className="text-text-secondary">
-              티어와 전적 기반의 정확한 팀 밸런스
+            <p className="text-lg text-text-secondary leading-relaxed">
+              티어와 전적 기반의 정확한 팀 밸런스.<br className="hidden md:block" />
+              한쪽으로 치우치지 않는 내전.
             </p>
           </div>
 
-          <div className="card text-center hover-lift">
-            <div className="text-4xl mb-4">🎮</div>
-            <h3 className="text-xl font-semibold text-accent-primary mb-2">
+          <div className="group flex flex-col items-center text-center p-8 md:p-10 rounded-2xl bg-bg-secondary/50 border border-bg-tertiary hover:border-violet-500/30 transition-all duration-300 hover:scale-[1.02]">
+            <div className="text-6xl md:text-7xl mb-6">🎮</div>
+            <h3 className="text-2xl md:text-3xl font-bold text-text-primary mb-3">
               Discord 연동
             </h3>
-            <p className="text-text-secondary">
-              음성 채널 자동 이동, 알림, 봇 명령어
+            <p className="text-lg text-text-secondary leading-relaxed">
+              음성 채널 자동 이동, 실시간 알림.<br className="hidden md:block" />
+              봇이 모든 걸 처리한다.
             </p>
           </div>
+        </div>
+      </section>
+
+      {/* Discord 배너 */}
+      <section className="px-6 pb-24 md:pb-32">
+        <div className="max-w-6xl mx-auto">
+          <DiscordBanner />
         </div>
       </section>
     </main>

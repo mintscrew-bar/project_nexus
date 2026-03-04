@@ -46,6 +46,11 @@ export function Sidebar() {
     }
   };
 
+  // 홈(/) 경로에서는 사이드바 숨김
+  if (pathname === '/') {
+    return null;
+  }
+
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
 
   // 페이지별 맞춤 사이드바 분기

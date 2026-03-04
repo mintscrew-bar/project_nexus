@@ -30,8 +30,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const isAuthRoute = pathname.startsWith('/auth');
 
   // / 라우트에서 마운트 후 미인증 or 로딩 중 → 풀스크린 랜딩/로딩
+  // 인증 시에는 Header + 콘텐츠 구조로 렌더 (사이드바는 Sidebar에서 자체 숨김)
   // mounted 전에는 false로 처리하여 SSR HTML과 일치시킴
-  const isLandingFullscreen = pathname === '/' && mounted && (!isAuthenticated || isLoading);
+  const isLandingFullscreen = pathname === '/' && mounted && !isAuthenticated;
 
   if (isAuthRoute || isLandingFullscreen) {
     return <>{children}</>;
