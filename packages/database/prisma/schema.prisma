@@ -46,8 +46,12 @@ model User {
   captainedTeams     Team[]                 @relation("TeamCaptain")
   teamMembers        TeamMember[]
   sessions           Session[]
-  clanMemberships    ClanMember[]
-  ownedClans         Clan[]                 @relation("ClanOwner")
+  clanMemberships      ClanMember[]
+  ownedClans           Clan[]                 @relation("ClanOwner")
+  clanInvitesSent      ClanInvitation[]       @relation("ClanInviter")
+  clanInvitesReceived  ClanInvitation[]       @relation("ClanInvitee")
+  clanAnnouncements    ClanAnnouncement[]     @relation("ClanAnnouncementAuthor")
+  clanActivityLogs     ClanActivityLog[]      @relation("ClanActivityActor")
   posts              Post[]
   comments           Comment[]
   postLikes          PostLike[]
@@ -687,10 +691,13 @@ model Clan {
   minTier   String?    // 최소 티어 요구사항
   discord   String?    // 디스코드 링크
 
-  owner   User         @relation("ClanOwner", fields: [ownerId], references: [id])
-  members ClanMember[]
-  chatMessages ClanChatMessage[]
-  clanRankings ClanRanking[]
+  owner          User               @relation("ClanOwner", fields: [ownerId], references: [id])
+  members        ClanMember[]
+  chatMessages   ClanChatMessage[]
+  clanRankings   ClanRanking[]
+  invitations    ClanInvitation[]
+  announcements  ClanAnnouncement[]
+  activityLogs   ClanActivityLog[]
 
   @@index([ownerId])
   @@index([isRecruiting])
@@ -720,11 +727,13 @@ enum ClanRole {
 }
 
 model ClanChatMessage {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   clanId    String
   userId    String
   content   String
-  createdAt DateTime @default(now())
+  isDeleted Boolean   @default(false)  // 소프트 삭제 여부
+  deletedAt DateTime?                  // 삭제 시각
+  createdAt DateTime  @default(now())
 
   clan    Clan         @relation(fields: [clanId], references: [id], onDelete: Cascade)
   user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -732,6 +741,92 @@ model ClanChatMessage {
 
   @@index([clanId, createdAt])
   @@map("clan_chat_messages")
+}
+
+// 클랜 활동 로그 타입 enum
+enum ClanActivityType {
+  MEMBER_JOIN
+  MEMBER_LEAVE
+  MEMBER_KICK
+  MEMBER_PROMOTE
+  MEMBER_DEMOTE
+  OWNERSHIP_TRANSFER
+  CLAN_UPDATE
+  ANNOUNCEMENT_CREATE
+  INVITE_SENT
+  JOIN_REQUEST
+}
+
+// 초대/가입 요청 타입 enum
+enum ClanInvitationType {
+  INVITE
+  JOIN_REQUEST
+}
+
+// 초대/가입 요청 상태 enum
+enum ClanInvitationStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  EXPIRED
+}
+
+// 클랜 초대 및 가입 요청
+model ClanInvitation {
+  id          String               @id @default(cuid())
+  clanId      String
+  inviterId   String               // 초대한 사람 (JOIN_REQUEST 시 신청자)
+  inviteeId   String?              // 초대 받은 사람 (코드 초대 시 null)
+  type        ClanInvitationType
+  status      ClanInvitationStatus @default(PENDING)
+  inviteCode  String?              @unique  // 초대 코드 (generateInviteCode 시 생성)
+  expiresAt   DateTime?            // 만료 시각
+  resolvedBy  String?              // 수락/거절한 사람
+  resolvedAt  DateTime?            // 처리 시각
+  createdAt   DateTime             @default(now())
+
+  clan     Clan  @relation(fields: [clanId], references: [id], onDelete: Cascade)
+  inviter  User  @relation("ClanInviter", fields: [inviterId], references: [id], onDelete: Cascade)
+  invitee  User? @relation("ClanInvitee", fields: [inviteeId], references: [id], onDelete: SetNull)
+
+  @@unique([clanId, inviteeId, type, status])
+  @@index([clanId, status])
+  @@index([inviteeId, status])
+  @@map("clan_invitations")
+}
+
+// 클랜 공지사항
+model ClanAnnouncement {
+  id        String   @id @default(cuid())
+  clanId    String
+  authorId  String
+  content   String
+  isPinned  Boolean  @default(true)  // 공지 핀 여부
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  clan   Clan @relation(fields: [clanId], references: [id], onDelete: Cascade)
+  author User @relation("ClanAnnouncementAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([clanId, isPinned, createdAt])
+  @@map("clan_announcements")
+}
+
+// 클랜 활동 로그
+model ClanActivityLog {
+  id       String           @id @default(cuid())
+  clanId   String
+  actorId  String?          // 행동한 사람 (시스템 이벤트 시 null)
+  action   ClanActivityType
+  targetId String?          // 대상 유저 ID
+  details  Json?            // 추가 정보
+  createdAt DateTime        @default(now())
+
+  clan  Clan  @relation(fields: [clanId], references: [id], onDelete: Cascade)
+  actor User? @relation("ClanActivityActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([clanId, createdAt])
+  @@map("clan_activity_logs")
 }
 
 // ============================================
@@ -1067,6 +1162,10 @@ enum NotificationType {
   MENTION
   COMMENT
   SYSTEM
+  CLAN_INVITE
+  CLAN_JOIN_REQUEST
+  CLAN_JOIN_APPROVED
+  CLAN_ANNOUNCEMENT
 }
 
 // ============================================
