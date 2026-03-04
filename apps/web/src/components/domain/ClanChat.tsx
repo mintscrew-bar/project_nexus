@@ -1,20 +1,37 @@
-// TODO(Task 13): 무한 스크롤 (상단 스크롤 시 fetchMoreMessages, 스크롤 위치 유지)
-// TODO(Task 13): 메시지 삭제 버튼 (hover 휴지통 아이콘, myRole prop 추가)
-// TODO(Task 13): URL 자동 링크 (regex → <a> 태그), 날짜 구분선
-// TODO(Task 21): 메시지 영역 상단 접을 수 있는 공지 배너
 "use client";
 
-import { useEffect, useRef, useCallback, useState } from "react";
+import { useEffect, useRef, useCallback, useState, useMemo } from "react";
 import Image from "next/image";
 import { useClanStore } from "@/stores/clan-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { cn } from "@/lib/utils";
-import { Users, Send, Flag, X } from "lucide-react";
+import {
+  Users,
+  Send,
+  Flag,
+  X,
+  Trash2,
+  Loader2,
+  ChevronDown,
+  ChevronUp,
+  Megaphone,
+} from "lucide-react";
 import { reputationApi } from "@/lib/api-client";
+import { motion, AnimatePresence } from "framer-motion";
+
+// ========================================
+// Props 타입 정의
+// ========================================
 
 interface ClanChatProps {
   clanId: string;
+  /** 현재 사용자의 클랜 내 역할 — 메시지 삭제 권한 판단에 사용 */
+  myRole?: "OWNER" | "OFFICER" | "MEMBER" | null;
 }
+
+// ========================================
+// 상수 정의
+// ========================================
 
 // 신고 사유 목록
 const REPORT_REASONS: { value: ReportReason; label: string }[] = [
@@ -33,17 +50,180 @@ interface ReportTarget {
   content: string;
 }
 
-export function ClanChat({ clanId }: ClanChatProps) {
+// URL 감지 정규식 — http(s) 및 www 접두어 포함 URL 매칭
+const URL_REGEX =
+  /(?:https?:\/\/|www\.)[^\s<>"')\]]+/gi;
+
+// ========================================
+// 유틸 함수
+// ========================================
+
+/**
+ * 한국어 날짜 문자열 생성 (년.월.일 요일 형식)
+ */
+function formatDateLabel(dateStr: string): string {
+  const d = new Date(dateStr);
+  return d.toLocaleDateString("ko-KR", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    weekday: "long",
+  });
+}
+
+/**
+ * 두 날짜 문자열이 같은 날인지 확인
+ */
+function isSameDay(a: string, b: string): boolean {
+  const da = new Date(a);
+  const db = new Date(b);
+  return (
+    da.getFullYear() === db.getFullYear() &&
+    da.getMonth() === db.getMonth() &&
+    da.getDate() === db.getDate()
+  );
+}
+
+/**
+ * 메시지 content 내 URL을 자동으로 <a> 태그로 변환한 React 노드 배열 반환
+ */
+function renderContentWithLinks(content: string): React.ReactNode[] {
+  const parts: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  // regex lastIndex를 초기화하기 위해 새로 생성
+  const regex = new RegExp(URL_REGEX.source, "gi");
+
+  while ((match = regex.exec(content)) !== null) {
+    // URL 앞의 일반 텍스트
+    if (match.index > lastIndex) {
+      parts.push(content.slice(lastIndex, match.index));
+    }
+
+    const url = match[0];
+    // 프로토콜이 없으면 https:// 추가
+    const href = url.startsWith("http") ? url : `https://${url}`;
+    parts.push(
+      <a
+        key={match.index}
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-accent-primary underline hover:text-accent-hover break-all"
+      >
+        {url}
+      </a>,
+    );
+
+    lastIndex = regex.lastIndex;
+  }
+
+  // 나머지 텍스트
+  if (lastIndex < content.length) {
+    parts.push(content.slice(lastIndex));
+  }
+
+  return parts.length > 0 ? parts : [content];
+}
+
+// ========================================
+// 공지 배너 컴포넌트 (Task 21)
+// ========================================
+
+/**
+ * 채팅 영역 상단에 표시되는 접을 수 있는 공지 배너
+ * - 최신 공지 1개만 표시
+ * - 접으면 한 줄 요약, 펼치면 전체 내용
+ */
+function AnnouncementBanner({ clanId }: { clanId: string }) {
+  const { announcements, fetchAnnouncements } = useClanStore();
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  // 마운트 시 공지사항 로드
+  useEffect(() => {
+    fetchAnnouncements(clanId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clanId]);
+
+  // 최신 고정 공지 또는 최신 공지 1개
+  const latestAnnouncement = useMemo(() => {
+    const pinned = announcements.find((a) => a.isPinned);
+    return pinned || announcements[0] || null;
+  }, [announcements]);
+
+  if (!latestAnnouncement) return null;
+
+  return (
+    <div className="border-b border-bg-tertiary bg-accent-primary/5">
+      <button
+        onClick={() => setIsExpanded((v) => !v)}
+        className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-accent-primary/10 transition-colors"
+      >
+        <Megaphone className="w-3.5 h-3.5 text-accent-primary flex-shrink-0" />
+        <span
+          className={cn(
+            "flex-1 text-xs text-text-secondary",
+            !isExpanded && "truncate",
+          )}
+        >
+          {isExpanded
+            ? latestAnnouncement.content
+            : latestAnnouncement.content}
+        </span>
+        {isExpanded ? (
+          <ChevronUp className="w-3 h-3 text-text-tertiary flex-shrink-0" />
+        ) : (
+          <ChevronDown className="w-3 h-3 text-text-tertiary flex-shrink-0" />
+        )}
+      </button>
+
+      {/* 펼친 상태: 작성자 및 날짜 표시 */}
+      <AnimatePresence>
+        {isExpanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="px-3 pb-2">
+              <p className="text-xs text-text-primary whitespace-pre-wrap leading-relaxed">
+                {latestAnnouncement.content}
+              </p>
+              <p className="text-[10px] text-text-tertiary mt-1">
+                {latestAnnouncement.author?.username ?? "알 수 없음"} ·{" "}
+                {new Date(latestAnnouncement.createdAt).toLocaleDateString("ko-KR")}
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// ========================================
+// 메인 컴포넌트
+// ========================================
+
+export function ClanChat({ clanId, myRole }: ClanChatProps) {
   const { user } = useAuthStore();
   const {
     chatMessages,
+    chatNextCursor,
+    isLoadingMore,
     typingUsers,
     isConnected,
     fetchChatMessages,
+    fetchMoreMessages,
+    deleteChatMessage,
     connectToClan,
     disconnectFromClan,
     sendChatMessage,
     setTypingStatus,
+    resetUnread,
   } = useClanStore();
 
   const [input, setInput] = useState("");
@@ -60,10 +240,14 @@ export function ClanChat({ clanId }: ClanChatProps) {
   const [isSubmittingReport, setIsSubmittingReport] = useState(false);
   const [reportSuccess, setReportSuccess] = useState(false);
 
+  // 메시지 삭제 처리 중인 ID 추적
+  const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
+
   // 초기 마운트 시 소켓 연결 + 메시지 로드
   useEffect(() => {
     fetchChatMessages(clanId);
     connectToClan(clanId);
+    resetUnread();
 
     return () => {
       // 언마운트 시 타이핑 중지 후 소켓 해제
@@ -80,12 +264,36 @@ export function ClanChat({ clanId }: ClanChatProps) {
     }
   }, [chatMessages.length, isAtBottom]);
 
+  // 채팅 포커스 시 미읽음 카운트 리셋
+  useEffect(() => {
+    if (isAtBottom) {
+      resetUnread();
+    }
+  }, [chatMessages.length, isAtBottom, resetUnread]);
+
+  // 무한 스크롤: 상단 근처 도달 시 이전 메시지 로드
   const handleScroll = useCallback(() => {
     const el = scrollContainerRef.current;
     if (!el) return;
+
     const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
     setIsAtBottom(atBottom);
-  }, []);
+
+    // 상단 50px 이내 도달 시 이전 메시지 로드
+    if (el.scrollTop < 50 && chatNextCursor && !isLoadingMore) {
+      const prevScrollHeight = el.scrollHeight;
+      fetchMoreMessages(clanId).then(() => {
+        // 스크롤 위치 유지: 새로 추가된 높이만큼 스크롤 보정
+        requestAnimationFrame(() => {
+          if (scrollContainerRef.current) {
+            const newScrollHeight = scrollContainerRef.current.scrollHeight;
+            scrollContainerRef.current.scrollTop =
+              newScrollHeight - prevScrollHeight;
+          }
+        });
+      });
+    }
+  }, [chatNextCursor, isLoadingMore, fetchMoreMessages, clanId]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setInput(e.target.value);
@@ -115,8 +323,38 @@ export function ClanChat({ clanId }: ClanChatProps) {
     }
   };
 
+  // 메시지 삭제 핸들러
+  const handleDeleteMessage = async (messageId: string) => {
+    setDeletingIds((prev) => new Set(prev).add(messageId));
+    try {
+      await deleteChatMessage(clanId, messageId);
+    } finally {
+      setDeletingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(messageId);
+        return next;
+      });
+    }
+  };
+
+  /**
+   * 메시지 삭제 가능 여부 판단
+   * - 본인 메시지는 항상 삭제 가능
+   * - OWNER, OFFICER는 다른 사람의 메시지도 삭제 가능
+   */
+  const canDelete = (msgUserId: string): boolean => {
+    if (!user) return false;
+    if (msgUserId === user.id) return true;
+    return myRole === "OWNER" || myRole === "OFFICER";
+  };
+
   // 신고 모달 열기
-  const openReport = (msg: { id: string; userId: string; user?: { username: string }; content: string }) => {
+  const openReport = (msg: {
+    id: string;
+    userId: string;
+    user?: { username: string };
+    content: string;
+  }) => {
     setReportTarget({
       messageId: msg.id,
       targetUserId: msg.userId,
@@ -154,13 +392,26 @@ export function ClanChat({ clanId }: ClanChatProps) {
 
   return (
     <div className="flex flex-col h-full relative">
+      {/* 공지 배너 (Task 21) */}
+      <AnnouncementBanner clanId={clanId} />
+
       {/* 메시지 목록 */}
       <div
         ref={scrollContainerRef}
         onScroll={handleScroll}
         className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-bg-elevated"
       >
-        {chatMessages.length === 0 && (
+        {/* 이전 메시지 로딩 인디케이터 */}
+        {isLoadingMore && (
+          <div className="flex items-center justify-center py-2">
+            <Loader2 className="w-4 h-4 text-text-tertiary animate-spin" />
+            <span className="text-xs text-text-tertiary ml-2">
+              이전 메시지 불러오는 중...
+            </span>
+          </div>
+        )}
+
+        {chatMessages.length === 0 && !isLoadingMore && (
           <p className="text-center text-text-tertiary text-sm py-8">
             아직 채팅 메시지가 없습니다. 첫 번째로 인사를 남겨보세요!
           </p>
@@ -172,80 +423,124 @@ export function ClanChat({ clanId }: ClanChatProps) {
           // 같은 유저가 연속으로 보낸 메시지면 아바타/이름 생략
           const showHeader = !prevMsg || prevMsg.userId !== msg.userId;
 
+          // 날짜 구분선: 이전 메시지와 날짜가 다르면 삽입
+          const showDateSeparator =
+            !prevMsg || !isSameDay(prevMsg.createdAt, msg.createdAt);
+
           return (
-            <div
-              key={msg.id}
-              className={cn("group flex items-end gap-2", isMe && "flex-row-reverse")}
-            >
-              {/* 아바타 (연속 메시지이거나 내 메시지면 숨김) */}
-              {!isMe && (
-                <div
-                  className={cn(
-                    "relative w-8 h-8 rounded-full bg-bg-elevated overflow-hidden flex-shrink-0",
-                    !showHeader && "invisible" // 공간 유지하되 숨김
-                  )}
-                >
-                  {msg.user?.avatar ? (
-                    <Image
-                      src={msg.user.avatar}
-                      alt={msg.user?.username ?? ""}
-                      fill
-                      className="object-cover"
-                      unoptimized
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <Users className="h-4 w-4 text-text-tertiary" />
-                    </div>
-                  )}
+            <div key={msg.id}>
+              {/* 날짜 구분선 */}
+              {showDateSeparator && (
+                <div className="flex items-center gap-3 py-3">
+                  <div className="flex-1 h-px bg-bg-elevated" />
+                  <span className="text-[10px] text-text-tertiary font-medium px-2">
+                    {formatDateLabel(msg.createdAt)}
+                  </span>
+                  <div className="flex-1 h-px bg-bg-elevated" />
                 </div>
               )}
 
               <div
                 className={cn(
-                  "flex flex-col max-w-[70%]",
-                  isMe && "items-end"
+                  "group flex items-end gap-2",
+                  isMe && "flex-row-reverse",
                 )}
               >
-                {/* 이름 + 시간 (첫 메시지만) */}
-                {showHeader && !isMe && (
-                  <span className="text-xs text-text-tertiary mb-1 px-1">
-                    {msg.user?.username ?? "알 수 없음"}
-                  </span>
-                )}
-
-                {/* 말풍선 + 신고 버튼 */}
-                <div className={cn("flex items-center gap-1", isMe && "flex-row-reverse")}>
+                {/* 아바타 (연속 메시지이거나 내 메시지면 숨김) */}
+                {!isMe && (
                   <div
                     className={cn(
-                      "px-3 py-2 rounded-2xl text-sm break-words",
-                      isMe
-                        ? "bg-accent-primary text-white rounded-br-sm"
-                        : "bg-bg-elevated text-text-primary rounded-bl-sm"
+                      "relative w-8 h-8 rounded-full bg-bg-elevated overflow-hidden flex-shrink-0",
+                      !showHeader && "invisible", // 공간 유지하되 숨김
                     )}
                   >
-                    {msg.content}
+                    {msg.user?.avatar ? (
+                      <Image
+                        src={msg.user.avatar}
+                        alt={msg.user?.username ?? ""}
+                        fill
+                        className="object-cover"
+                        unoptimized
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Users className="h-4 w-4 text-text-tertiary" />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div
+                  className={cn(
+                    "flex flex-col max-w-[70%]",
+                    isMe && "items-end",
+                  )}
+                >
+                  {/* 이름 + 시간 (첫 메시지만) */}
+                  {showHeader && !isMe && (
+                    <span className="text-xs text-text-tertiary mb-1 px-1">
+                      {msg.user?.username ?? "알 수 없음"}
+                    </span>
+                  )}
+
+                  {/* 말풍선 + 액션 버튼들 */}
+                  <div
+                    className={cn(
+                      "flex items-center gap-1",
+                      isMe && "flex-row-reverse",
+                    )}
+                  >
+                    <div
+                      className={cn(
+                        "px-3 py-2 rounded-2xl text-sm break-words",
+                        isMe
+                          ? "bg-accent-primary text-white rounded-br-sm"
+                          : "bg-bg-elevated text-text-primary rounded-bl-sm",
+                      )}
+                    >
+                      {/* URL 자동 링크 처리된 메시지 내용 */}
+                      {renderContentWithLinks(msg.content)}
+                    </div>
+
+                    {/* 액션 버튼 그룹: 삭제 + 신고 (hover 시 표시) */}
+                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {/* 메시지 삭제 버튼 — 본인 메시지 또는 OWNER/OFFICER */}
+                      {canDelete(msg.userId) && (
+                        <button
+                          onClick={() => handleDeleteMessage(msg.id)}
+                          disabled={deletingIds.has(msg.id)}
+                          title="메시지 삭제"
+                          className="p-1 rounded text-text-tertiary hover:text-red-400 hover:bg-bg-elevated disabled:opacity-40"
+                        >
+                          {deletingIds.has(msg.id) ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-3 w-3" />
+                          )}
+                        </button>
+                      )}
+
+                      {/* 본인 메시지가 아닐 때만 신고 버튼 표시 */}
+                      {!isMe && (
+                        <button
+                          onClick={() => openReport(msg)}
+                          title="메시지 신고"
+                          className="p-1 rounded text-text-tertiary hover:text-red-400 hover:bg-bg-elevated"
+                        >
+                          <Flag className="h-3 w-3" />
+                        </button>
+                      )}
+                    </div>
                   </div>
 
-                  {/* 본인 메시지가 아닐 때만 신고 버튼 표시 */}
-                  {!isMe && (
-                    <button
-                      onClick={() => openReport(msg)}
-                      title="메시지 신고"
-                      className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded text-text-tertiary hover:text-red-400 hover:bg-bg-elevated"
-                    >
-                      <Flag className="h-3 w-3" />
-                    </button>
-                  )}
+                  {/* 시간 */}
+                  <span className="text-xs text-text-tertiary mt-1 px-1">
+                    {new Date(msg.createdAt).toLocaleTimeString("ko-KR", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </span>
                 </div>
-
-                {/* 시간 */}
-                <span className="text-xs text-text-tertiary mt-1 px-1">
-                  {new Date(msg.createdAt).toLocaleTimeString("ko-KR", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </span>
               </div>
             </div>
           );
@@ -261,7 +556,9 @@ export function ClanChat({ clanId }: ClanChatProps) {
             </span>
             <span>
               {otherTypingUsers.slice(0, 2).join(", ")}
-              {otherTypingUsers.length > 2 && ` 외 ${otherTypingUsers.length - 2}명`}이 입력 중...
+              {otherTypingUsers.length > 2 &&
+                ` 외 ${otherTypingUsers.length - 2}명`}
+              이 입력 중...
             </span>
           </div>
         )}
@@ -312,7 +609,9 @@ export function ClanChat({ clanId }: ClanChatProps) {
             {reportSuccess ? (
               /* 신고 완료 화면 */
               <div className="p-6 text-center">
-                <p className="text-sm text-text-primary font-medium mb-1">신고가 접수되었습니다</p>
+                <p className="text-sm text-text-primary font-medium mb-1">
+                  신고가 접수되었습니다
+                </p>
                 <p className="text-xs text-text-tertiary mb-4">
                   운영팀이 검토 후 조치할 예정입니다.
                 </p>
@@ -338,7 +637,9 @@ export function ClanChat({ clanId }: ClanChatProps) {
 
                 {/* 신고 사유 선택 */}
                 <div>
-                  <label className="text-xs text-text-tertiary mb-1.5 block">신고 사유</label>
+                  <label className="text-xs text-text-tertiary mb-1.5 block">
+                    신고 사유
+                  </label>
                   <div className="space-y-1.5">
                     {REPORT_REASONS.map((r) => (
                       <label
