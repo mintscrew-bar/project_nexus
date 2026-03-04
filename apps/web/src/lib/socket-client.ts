@@ -801,6 +801,27 @@ export const clanSocketHelpers = {
     clanSocket?.on("user-stopped-typing", callback);
   },
 
+  // 메시지 삭제 이벤트
+  onMessageDeleted: (callback: (data: { messageId: string }) => void) => {
+    clanSocket?.on("clan-message-deleted", callback);
+  },
+
+  // 공지사항 이벤트
+  onAnnouncementCreated: (callback: (announcement: any) => void) => {
+    clanSocket?.on("clan-announcement-created", callback);
+  },
+
+  onAnnouncementDeleted: (
+    callback: (data: { announcementId: string }) => void,
+  ) => {
+    clanSocket?.on("clan-announcement-deleted", callback);
+  },
+
+  // 가입 요청 이벤트
+  onJoinRequestReceived: (callback: (data: any) => void) => {
+    clanSocket?.on("clan-join-request-received", callback);
+  },
+
   offAllListeners: () => {
     clanSocket?.off("new-clan-message");
     clanSocket?.off("member-joined");
@@ -812,6 +833,10 @@ export const clanSocketHelpers = {
     clanSocket?.off("ownership-transferred");
     clanSocket?.off("user-typing");
     clanSocket?.off("user-stopped-typing");
+    clanSocket?.off("clan-message-deleted");
+    clanSocket?.off("clan-announcement-created");
+    clanSocket?.off("clan-announcement-deleted");
+    clanSocket?.off("clan-join-request-received");
   },
 };
 

@@ -583,10 +583,113 @@ export const clanApi = {
     return response.data;
   },
 
-  getChatMessages: async (clanId: string, limit = 50, offset = 0) => {
+  // cursor 기반 페이지네이션으로 변경
+  getChatMessages: async (clanId: string, cursor?: string, limit = 50) => {
     const response = await apiClient.get(`/clans/${clanId}/messages`, {
-      params: { limit, offset },
+      params: { cursor, limit },
     });
+    return response.data as { messages: any[]; nextCursor: string | null };
+  },
+
+  deleteChatMessage: async (clanId: string, messageId: string) => {
+    const response = await apiClient.delete(
+      `/clans/${clanId}/messages/${messageId}`,
+    );
+    return response.data;
+  },
+
+  // 공지사항
+  getAnnouncements: async (clanId: string) => {
+    const response = await apiClient.get(`/clans/${clanId}/announcements`);
+    return response.data;
+  },
+
+  createAnnouncement: async (clanId: string, content: string) => {
+    const response = await apiClient.post(`/clans/${clanId}/announcements`, {
+      content,
+    });
+    return response.data;
+  },
+
+  deleteAnnouncement: async (clanId: string, announcementId: string) => {
+    const response = await apiClient.delete(
+      `/clans/${clanId}/announcements/${announcementId}`,
+    );
+    return response.data;
+  },
+
+  unpinAnnouncement: async (clanId: string, announcementId: string) => {
+    const response = await apiClient.patch(
+      `/clans/${clanId}/announcements/${announcementId}/unpin`,
+      {},
+    );
+    return response.data;
+  },
+
+  // 초대/가입 요청
+  inviteUser: async (clanId: string, inviteeId: string) => {
+    const response = await apiClient.post(`/clans/${clanId}/invite`, {
+      inviteeId,
+    });
+    return response.data;
+  },
+
+  generateInviteCode: async (clanId: string) => {
+    const response = await apiClient.post(`/clans/${clanId}/invite-code`);
+    return response.data as { code: string; expiresAt: string };
+  },
+
+  requestToJoin: async (clanId: string) => {
+    const response = await apiClient.post(`/clans/${clanId}/request-join`);
+    return response.data;
+  },
+
+  joinByCode: async (code: string) => {
+    const response = await apiClient.post("/clans/join-by-code", { code });
+    return response.data;
+  },
+
+  getMyInvitations: async () => {
+    const response = await apiClient.get("/clans/invitations/my");
+    return response.data;
+  },
+
+  resolveInvitation: async (invitationId: string, accept: boolean) => {
+    const response = await apiClient.post(
+      `/clans/invitations/${invitationId}/resolve`,
+      { accept },
+    );
+    return response.data;
+  },
+
+  getPendingJoinRequests: async (clanId: string) => {
+    const response = await apiClient.get(`/clans/${clanId}/join-requests`);
+    return response.data;
+  },
+
+  resolveJoinRequest: async (
+    clanId: string,
+    requestId: string,
+    accept: boolean,
+  ) => {
+    const response = await apiClient.post(
+      `/clans/${clanId}/join-requests/${requestId}/resolve`,
+      { accept },
+    );
+    return response.data;
+  },
+
+  // 활동 로그
+  getActivityLogs: async (clanId: string, cursor?: string, limit = 20) => {
+    const response = await apiClient.get(`/clans/${clanId}/activity-logs`, {
+      params: { cursor, limit },
+    });
+    return response.data as { logs: any[]; nextCursor: string | null };
+  },
+
+  // 통계
+  getClanStats: async (clanId: string) => {
+    const response = await apiClient.get(`/clans/${clanId}/stats`);
     return response.data;
   },
 };

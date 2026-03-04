@@ -112,11 +112,11 @@ export function ClanChat({ clanId }: ClanChatProps) {
   };
 
   // 신고 모달 열기
-  const openReport = (msg: { id: string; userId: string; username: string; content: string }) => {
+  const openReport = (msg: { id: string; userId: string; user?: { username: string }; content: string }) => {
     setReportTarget({
       messageId: msg.id,
       targetUserId: msg.userId,
-      targetUsername: msg.username,
+      targetUsername: msg.user?.username ?? "알 수 없음",
       content: msg.content,
     });
     setReportReason("TOXICITY");
@@ -181,10 +181,10 @@ export function ClanChat({ clanId }: ClanChatProps) {
                     !showHeader && "invisible" // 공간 유지하되 숨김
                   )}
                 >
-                  {msg.avatar ? (
+                  {msg.user?.avatar ? (
                     <Image
-                      src={msg.avatar}
-                      alt={msg.username}
+                      src={msg.user.avatar}
+                      alt={msg.user?.username ?? ""}
                       fill
                       className="object-cover"
                       unoptimized
@@ -206,7 +206,7 @@ export function ClanChat({ clanId }: ClanChatProps) {
                 {/* 이름 + 시간 (첫 메시지만) */}
                 {showHeader && !isMe && (
                   <span className="text-xs text-text-tertiary mb-1 px-1">
-                    {msg.username}
+                    {msg.user?.username ?? "알 수 없음"}
                   </span>
                 )}
 
