@@ -1,17 +1,24 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
 import {
-  Plus, Bookmark, Flame, ChevronRight,
+  Plus, Bookmark, Flame,
   Megaphone, MessageCircle, Lightbulb, HelpCircle, LayoutList,
 } from 'lucide-react';
 import { communityApi } from '@/lib/api-client';
 import { useAuthStore } from '@/stores/auth-store';
 import { cn } from '@/lib/utils';
+import type { PostCategory } from '@/components/community/community-types';
 
-type PostCategory = 'NOTICE' | 'FREE' | 'TIP' | 'QNA';
+// 카테고리 메타 정보
+const CATEGORY_META: Record<PostCategory, { label: string; icon: React.ElementType; color: string; param: string }> = {
+  NOTICE: { label: '공지사항', icon: Megaphone,       color: 'text-accent-danger',   param: 'NOTICE' },
+  FREE:   { label: '자유게시판', icon: MessageCircle,  color: 'text-text-secondary',  param: 'FREE'   },
+  TIP:    { label: '팁 & 노하우', icon: Lightbulb,    color: 'text-accent-gold',     param: 'TIP'    },
+  QNA:    { label: 'Q&A',         icon: HelpCircle,   color: 'text-accent-primary',  param: 'QNA'    },
+};
 
 interface HotPost {
   id: string;
@@ -20,30 +27,22 @@ interface HotPost {
   _count?: { likes: number; comments: number };
 }
 
-// 카테고리 메타 정보 (community/page.tsx 와 동일)
-const CATEGORY_META: Record<PostCategory, { label: string; icon: React.ElementType; color: string; param: string }> = {
-  NOTICE: { label: '공지사항', icon: Megaphone,       color: 'text-accent-danger',   param: 'NOTICE' },
-  FREE:   { label: '자유게시판', icon: MessageCircle,  color: 'text-text-secondary',  param: 'FREE'   },
-  TIP:    { label: '팁 & 노하우', icon: Lightbulb,    color: 'text-accent-gold',     param: 'TIP'    },
-  QNA:    { label: 'Q&A',         icon: HelpCircle,   color: 'text-accent-primary',  param: 'QNA'    },
-};
-
 export function CommunitySidebarContent() {
   const pathname = usePathname();
-  const router = useRouter();
   const { isAuthenticated } = useAuthStore();
-  const [hotPosts, setHotPosts] = useState<HotPost[]>([]);
 
-  // 인기글 TOP 3 (좋아요 기준)
-  useEffect(() => {
-    communityApi.getPosts({ sortBy: 'popular', limit: 3 }).then((data: any) => {
+  // 인기글 TOP 3 — 메인 페이지와 동일한 쿼리 키로 캐시 공유
+  const { data: hotPostsData } = useQuery({
+    queryKey: ['communityPosts', 'ALL', 'popular', '', '', 1],
+    queryFn: async (): Promise<HotPost[]> => {
+      const data = await communityApi.getPosts({ sortBy: 'popular', limit: 3 });
       const posts = Array.isArray(data) ? data : (data?.posts ?? []);
-      setHotPosts(posts.slice(0, 3));
-    }).catch(() => {});
-  }, []);
+      return posts.slice(0, 3);
+    },
+    staleTime: 5 * 60 * 1000,
+  });
 
-  // 현재 활성 카테고리 (URL 파라미터 기준)
-  const isOnCommunity = pathname.startsWith('/community');
+  const hotPosts = hotPostsData ?? [];
 
   return (
     <div className="space-y-5">

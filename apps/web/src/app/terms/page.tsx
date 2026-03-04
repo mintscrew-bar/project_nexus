@@ -14,7 +14,7 @@ export default function TermsPage() {
 
       <Section title="제1조 (목적)">
         <p>
-          이 약관은 Project Nexus(이하 "서비스")가 제공하는 리그 오브 레전드 내전(커스텀 게임) 매칭
+          이 약관은 Project Nexus(이하 &quot;서비스&quot;)가 제공하는 리그 오브 레전드 내전(커스텀 게임) 매칭
           및 커뮤니티 서비스의 이용 조건과 절차, 이용자와 서비스 간의 권리·의무 및 책임 사항을
           규정함을 목적으로 합니다.
         </p>
@@ -22,10 +22,10 @@ export default function TermsPage() {
 
       <Section title="제2조 (정의)">
         <ul className="list-disc pl-5 space-y-1.5">
-          <li>"서비스"란 Project Nexus가 운영하는 내전 매칭, 클랜, 커뮤니티, 채팅 등 일체의 기능을 말합니다.</li>
-          <li>"이용자"란 이 약관에 동의하고 서비스에 가입하여 이용하는 자를 말합니다.</li>
-          <li>"내전"이란 이용자 간 리그 오브 레전드 커스텀 게임을 조직하고 진행하는 서비스 내 기능을 말합니다.</li>
-          <li>"클랜"이란 서비스 내에서 이용자들이 자발적으로 구성한 그룹을 말합니다.</li>
+          <li>&quot;서비스&quot;란 Project Nexus가 운영하는 내전 매칭, 클랜, 커뮤니티, 채팅 등 일체의 기능을 말합니다.</li>
+          <li>&quot;이용자&quot;란 이 약관에 동의하고 서비스에 가입하여 이용하는 자를 말합니다.</li>
+          <li>&quot;내전&quot;이란 이용자 간 리그 오브 레전드 커스텀 게임을 조직하고 진행하는 서비스 내 기능을 말합니다.</li>
+          <li>&quot;클랜&quot;이란 서비스 내에서 이용자들이 자발적으로 구성한 그룹을 말합니다.</li>
         </ul>
       </Section>
 

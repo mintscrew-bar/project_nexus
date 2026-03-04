@@ -13,7 +13,7 @@ export default function PrivacyPage() {
       </p>
 
       <Section title="1. 수집하는 개인정보 항목">
-        <p>Project Nexus(이하 "서비스")는 다음의 개인정보를 수집합니다.</p>
+        <p>Project Nexus(이하 &quot;서비스&quot;)는 다음의 개인정보를 수집합니다.</p>
         <Table
           headers={["구분", "항목", "수집 방법"]}
           rows={[
