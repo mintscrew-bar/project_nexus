@@ -101,15 +101,16 @@ export class ClanGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     client.join(`clan:${data.clanId}`);
 
-    const messages = await this.clanService.getChatMessages(
+    const result = await this.clanService.getChatMessages(
       client.userId!, // Assert client.userId is string
       data.clanId,
+      undefined,
       50,
     );
 
     return {
       success: true,
-      messages,
+      ...result,
     };
   }
 
@@ -253,5 +254,38 @@ export class ClanGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   emitClanDeleted(clanId: string) {
     this.server.to(`clan:${clanId}`).emit("clan-deleted");
+  }
+
+  emitMessageDeleted(clanId: string, messageId: string) {
+    this.server
+      .to(`clan:${clanId}`)
+      .emit("clan-message-deleted", { messageId });
+  }
+
+  emitAnnouncementCreated(clanId: string, announcement: any) {
+    this.server
+      .to(`clan:${clanId}`)
+      .emit("clan-announcement-created", announcement);
+  }
+
+  emitAnnouncementDeleted(clanId: string, announcementId: string) {
+    this.server
+      .to(`clan:${clanId}`)
+      .emit("clan-announcement-deleted", { announcementId });
+  }
+
+  emitJoinRequestReceived(clanId: string, data: any) {
+    this.server
+      .to(`clan:${clanId}`)
+      .emit("clan-join-request-received", data);
+  }
+
+  emitJoinRequestResolved(
+    clanId: string,
+    data: { requestId: string; accepted: boolean },
+  ) {
+    this.server
+      .to(`clan:${clanId}`)
+      .emit("clan-join-request-resolved", data);
   }
 }

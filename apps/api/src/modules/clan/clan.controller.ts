@@ -46,11 +46,13 @@ export class ClanController {
     @Query("search") search?: string,
     @Query("isRecruiting") isRecruiting?: string,
     @Query("minTier") minTier?: string,
+    @Query("sort") sort?: string,
   ) {
     return this.clanService.listClans({
       search,
       isRecruiting: isRecruiting === "true",
       minTier,
+      sort,
     });
   }
 
@@ -64,6 +66,12 @@ export class ClanController {
   @Public()
   async getClan(@Param("id") id: string) {
     return this.clanService.getClanById(id);
+  }
+
+  @Get(":id/stats")
+  @Public()
+  async getClanStats(@Param("id") clanId: string) {
+    return this.clanService.getClanStats(clanId);
   }
 
   // 부분 업데이트이므로 Patch 사용
@@ -201,12 +209,215 @@ export class ClanController {
   async getChatMessages(
     @CurrentUser("sub") userId: string,
     @Param("id") clanId: string,
+    @Query("cursor") cursor?: string,
     @Query("limit") limit?: string,
   ) {
     return this.clanService.getChatMessages(
       userId,
       clanId,
+      cursor,
       limit ? parseInt(limit, 10) : 50,
+    );
+  }
+
+  @Delete(":id/messages/:messageId")
+  @HttpCode(HttpStatus.OK)
+  async deleteChatMessage(
+    @CurrentUser("sub") userId: string,
+    @Param("id") clanId: string,
+    @Param("messageId") messageId: string,
+  ) {
+    const result = await this.clanService.deleteChatMessage(
+      userId,
+      clanId,
+      messageId,
+    );
+
+    // 메시지 삭제 이벤트 브로드캐스트
+    this.clanGateway.emitMessageDeleted(clanId, messageId);
+
+    return result;
+  }
+
+  // ========================================
+  // Announcement
+  // ========================================
+
+  @Post(":id/announcements")
+  @HttpCode(HttpStatus.CREATED)
+  async createAnnouncement(
+    @CurrentUser("sub") userId: string,
+    @Param("id") clanId: string,
+    @Body() body: { content: string },
+  ) {
+    const announcement = await this.clanService.createAnnouncement(
+      userId,
+      clanId,
+      body.content,
+    );
+
+    // 공지 생성 이벤트 브로드캐스트
+    this.clanGateway.emitAnnouncementCreated(clanId, announcement);
+
+    return announcement;
+  }
+
+  @Get(":id/announcements")
+  async getAnnouncements(
+    @CurrentUser("sub") userId: string,
+    @Param("id") clanId: string,
+  ) {
+    return this.clanService.getAnnouncements(userId, clanId);
+  }
+
+  @Delete(":id/announcements/:announcementId")
+  @HttpCode(HttpStatus.OK)
+  async deleteAnnouncement(
+    @CurrentUser("sub") userId: string,
+    @Param("id") clanId: string,
+    @Param("announcementId") announcementId: string,
+  ) {
+    const result = await this.clanService.deleteAnnouncement(
+      userId,
+      clanId,
+      announcementId,
+    );
+
+    this.clanGateway.emitAnnouncementDeleted(clanId, announcementId);
+
+    return result;
+  }
+
+  @Patch(":id/announcements/:announcementId/unpin")
+  @HttpCode(HttpStatus.OK)
+  async unpinAnnouncement(
+    @CurrentUser("sub") userId: string,
+    @Param("id") clanId: string,
+    @Param("announcementId") announcementId: string,
+  ) {
+    return this.clanService.unpinAnnouncement(userId, clanId, announcementId);
+  }
+
+  // ========================================
+  // Invitation & Join Request
+  // ========================================
+
+  // 내가 받은 초대 목록
+  @Get("invitations/my")
+  async getMyInvitations(@CurrentUser("sub") userId: string) {
+    return this.clanService.getPendingInvitations(userId);
+  }
+
+  // 초대 코드로 가입
+  @Post("join-by-code")
+  @HttpCode(HttpStatus.OK)
+  async joinByCode(
+    @CurrentUser("sub") userId: string,
+    @Body() body: { code: string },
+  ) {
+    const membership = await this.clanService.joinByCode(userId, body.code);
+    if (membership) {
+      this.clanGateway.emitMemberJoined(membership.clanId, {
+        user: membership.user,
+      });
+    }
+    return membership;
+  }
+
+  // 초대 코드 생성
+  @Post(":id/invite-code")
+  @HttpCode(HttpStatus.CREATED)
+  async generateInviteCode(
+    @CurrentUser("sub") userId: string,
+    @Param("id") clanId: string,
+  ) {
+    return this.clanService.generateInviteCode(userId, clanId);
+  }
+
+  // 유저 직접 초대
+  @Post(":id/invite")
+  @HttpCode(HttpStatus.CREATED)
+  async inviteUser(
+    @CurrentUser("sub") userId: string,
+    @Param("id") clanId: string,
+    @Body() body: { inviteeId: string },
+  ) {
+    return this.clanService.inviteUser(userId, clanId, body.inviteeId);
+  }
+
+  // 가입 요청 보내기
+  @Post(":id/request-join")
+  @HttpCode(HttpStatus.CREATED)
+  async requestToJoin(
+    @CurrentUser("sub") userId: string,
+    @Param("id") clanId: string,
+  ) {
+    return this.clanService.requestToJoin(userId, clanId);
+  }
+
+  // 내 초대 수락/거절
+  @Post("invitations/:invitationId/resolve")
+  @HttpCode(HttpStatus.OK)
+  async resolveInvitation(
+    @CurrentUser("sub") userId: string,
+    @Param("invitationId") invitationId: string,
+    @Body() body: { accept: boolean },
+  ) {
+    const result = await this.clanService.resolveInvitation(
+      userId,
+      invitationId,
+      body.accept,
+    );
+
+    if (result.accepted) {
+      // 가입 완료 시 브로드캐스트는 생략 (서버에서 처리)
+    }
+
+    return result;
+  }
+
+  // 가입 요청 목록 조회 (OWNER/OFFICER)
+  @Get(":id/join-requests")
+  async getPendingJoinRequests(
+    @CurrentUser("sub") userId: string,
+    @Param("id") clanId: string,
+  ) {
+    return this.clanService.getPendingJoinRequests(userId, clanId);
+  }
+
+  // 가입 요청 승인/거절 (OWNER/OFFICER)
+  @Post(":id/join-requests/:requestId/resolve")
+  @HttpCode(HttpStatus.OK)
+  async resolveJoinRequest(
+    @CurrentUser("sub") userId: string,
+    @Param("id") clanId: string,
+    @Param("requestId") requestId: string,
+    @Body() body: { accept: boolean },
+  ) {
+    return this.clanService.resolveJoinRequest(
+      userId,
+      clanId,
+      requestId,
+      body.accept,
+    );
+  }
+
+  // ========================================
+  // Activity Log
+  // ========================================
+
+  @Get(":id/activity-logs")
+  async getActivityLogs(
+    @CurrentUser("sub") userId: string,
+    @Param("id") clanId: string,
+    @Query("cursor") cursor?: string,
+    @Query("limit") limit?: string,
+  ) {
+    return this.clanService.getActivityLogs(
+      userId,
+      clanId,
+      cursor,
+      limit ? parseInt(limit, 10) : 20,
     );
   }
 
