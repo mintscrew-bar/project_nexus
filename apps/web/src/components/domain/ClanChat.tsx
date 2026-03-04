@@ -1,3 +1,7 @@
+// TODO(Task 13): 무한 스크롤 (상단 스크롤 시 fetchMoreMessages, 스크롤 위치 유지)
+// TODO(Task 13): 메시지 삭제 버튼 (hover 휴지통 아이콘, myRole prop 추가)
+// TODO(Task 13): URL 자동 링크 (regex → <a> 태그), 날짜 구분선
+// TODO(Task 21): 메시지 영역 상단 접을 수 있는 공지 배너
 "use client";
 
 import { useEffect, useRef, useCallback, useState } from "react";

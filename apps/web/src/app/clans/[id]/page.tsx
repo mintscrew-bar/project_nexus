@@ -1,3 +1,6 @@
+// TODO(Task 11): Tabs 컴포넌트로 4개 탭 분리 (정보/멤버/채팅/통계), presence-store 멤버 온라인 상태, 역할 시각 강화
+// TODO(Task 12): 정보 탭에 공지사항 카드 + OWNER/OFFICER 인라인 작성 폼 (getAnnouncements 연동)
+// TODO(Task 20): 초대 코드로 가입 모달 추가 (joinByCode), 가입 요청 버튼 (비모집 클랜)
 "use client";
 
 import { useEffect, useState, useCallback } from "react";

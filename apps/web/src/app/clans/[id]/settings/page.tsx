@@ -1,3 +1,6 @@
+// TODO(Task 17): 멤버 관리 UX - Dropdown 교체 (MoreHorizontal), 멤버 검색 Input, 벌크 추방 체크박스
+// TODO(Task 18): 초대 & 가입 요청 Card 섹션 (초대 코드 생성/복사, 유저 직접 초대, 가입 요청 목록)
+// TODO(Task 19): 활동 로그 Card 섹션 (한글 변환, 색상 코딩, 커서 페이지네이션 "더 보기")
 "use client";
 
 import { useState, useEffect, useCallback } from "react";

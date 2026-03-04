@@ -1,3 +1,4 @@
+// TODO(Task 22): clan-store unreadCount 연동 → 클랜명 옆 빨간 점/숫자 배지 표시
 'use client';
 
 import { useState, useEffect } from 'react';

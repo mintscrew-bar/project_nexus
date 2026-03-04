@@ -1,3 +1,4 @@
+// TODO(Task 16): 읽지 않은 메시지 뱃지 (unreadCount), 최소화 시 pulse 애니메이션, 드래그 리사이즈
 "use client";
 
 /**

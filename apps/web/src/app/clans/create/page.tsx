@@ -1,3 +1,4 @@
+// TODO(Task 15): 캐릭터 카운터 색상 (green/orange/red), 실시간 태그 프리뷰, Floating label
 "use client";
 
 import { useState, useEffect } from "react";
