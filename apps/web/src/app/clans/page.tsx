@@ -11,12 +11,14 @@ import {
   CardContent,
   Button,
   Input,
-  LoadingSpinner,
   EmptyState,
   Badge,
+  Skeleton,
 } from "@/components/ui";
+import { Dropdown, DropdownItem } from "@/components/ui/Dropdown";
 import { useToast } from "@/components/ui/Toast";
-import { Users, Search, Shield, UserCheck } from "lucide-react";
+import { Users, Search, Shield, UserCheck, ChevronDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface ClanMember {
   id: string;
@@ -41,20 +43,46 @@ interface Clan {
   };
 }
 
+// 정렬 옵션
+type SortOption = "latest" | "members" | "ranking";
+const SORT_LABELS: Record<SortOption, string> = {
+  latest: "최신순",
+  members: "멤버 수순",
+  ranking: "랭킹순",
+};
+
+// 클랜 카드 스켈레톤
+function ClanCardSkeleton() {
+  return (
+    <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-4 space-y-3">
+      <div className="flex items-start gap-4">
+        <Skeleton className="w-14 h-14 rounded-lg flex-shrink-0" />
+        <div className="flex-grow space-y-2">
+          <Skeleton className="h-5 w-2/3" />
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-4/5" />
+          <Skeleton className="h-3 w-1/3" />
+        </div>
+      </div>
+      <Skeleton className="h-8 w-full rounded-lg" />
+    </div>
+  );
+}
+
 export default function ClansPage() {
   const router = useRouter();
-  const { user, isAuthenticated } = useAuthStore();
+  const { isAuthenticated } = useAuthStore();
 
   const [clans, setClans] = useState<Clan[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [showRecruitingOnly, setShowRecruitingOnly] = useState(false);
-  // 가입 요청 중인 클랜 ID (버튼 로딩 상태 관리)
+  const [sortOption, setSortOption] = useState<SortOption>("latest");
+  // 가입/요청 중인 클랜 ID (버튼 로딩 상태 관리)
   const [joiningClanId, setJoiningClanId] = useState<string | null>(null);
   const { addToast } = useToast();
 
-  // Debounce search query for API calls
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
   const fetchClans = useCallback(async () => {
@@ -64,14 +92,15 @@ export default function ClansPage() {
       const data = await clanApi.getClans({
         search: debouncedSearchQuery || undefined,
         isRecruiting: showRecruitingOnly || undefined,
-      });
+        sort: sortOption,
+      } as any);
       setClans(data);
     } catch (err: any) {
       setError(err.message || "클랜 목록을 불러오는데 실패했습니다.");
     } finally {
       setIsLoading(false);
     }
-  }, [debouncedSearchQuery, showRecruitingOnly]);
+  }, [debouncedSearchQuery, showRecruitingOnly, sortOption]);
 
   useEffect(() => {
     fetchClans();
@@ -82,19 +111,42 @@ export default function ClansPage() {
     fetchClans();
   };
 
+  // 가입하기 (즉시 가입 가능 클랜)
   const handleJoinClan = async (clanId: string) => {
     if (!isAuthenticated) {
       router.push("/auth/login");
       return;
     }
-
     setJoiningClanId(clanId);
     try {
       await clanApi.joinClan(clanId);
       addToast("클랜에 가입되었습니다.", "success");
       fetchClans();
     } catch (err: any) {
-      addToast(err.response?.data?.message || err.message || "클랜 가입에 실패했습니다.", "error");
+      addToast(
+        err.response?.data?.message || err.message || "클랜 가입에 실패했습니다.",
+        "error",
+      );
+    } finally {
+      setJoiningClanId(null);
+    }
+  };
+
+  // 가입 요청 (비모집 클랜)
+  const handleRequestJoin = async (clanId: string) => {
+    if (!isAuthenticated) {
+      router.push("/auth/login");
+      return;
+    }
+    setJoiningClanId(clanId);
+    try {
+      await clanApi.requestToJoin(clanId);
+      addToast("가입 요청을 보냈습니다.", "success");
+    } catch (err: any) {
+      addToast(
+        err.response?.data?.message || err.message || "가입 요청에 실패했습니다.",
+        "error",
+      );
     } finally {
       setJoiningClanId(null);
     }
@@ -109,21 +161,18 @@ export default function ClansPage() {
     return "default";
   };
 
-  if (isLoading && clans.length === 0) {
-    return (
-      <div className="flex items-center justify-center flex-grow">
-        <div className="text-center">
-          <LoadingSpinner size="lg" />
-          <p className="text-text-secondary mt-4">클랜 목록 불러오는 중...</p>
-        </div>
-      </div>
-    );
-  }
+  const sortItems: DropdownItem[] = (
+    Object.keys(SORT_LABELS) as SortOption[]
+  ).map((key) => ({
+    key,
+    label: SORT_LABELS[key],
+    onClick: () => setSortOption(key),
+  }));
 
   return (
     <div className="flex-grow p-4 md:p-6 animate-fade-in">
       <div className="container mx-auto max-w-5xl">
-        {/* Search & Filter */}
+        {/* 검색 & 필터 */}
         <div className="flex flex-col sm:flex-row gap-4 mb-6">
           <form onSubmit={handleSearch} className="flex-grow flex gap-2">
             <div className="relative flex-grow">
@@ -140,24 +189,45 @@ export default function ClansPage() {
               검색
             </Button>
           </form>
-          <Button
-            variant={showRecruitingOnly ? "primary" : "secondary"}
-            onClick={() => setShowRecruitingOnly(!showRecruitingOnly)}
-          >
-            <UserCheck className="h-4 w-4 mr-2" />
-            모집 중만
-          </Button>
+
+          <div className="flex gap-2">
+            {/* 정렬 드롭다운 */}
+            <Dropdown
+              trigger={
+                <Button variant="secondary" className="gap-1">
+                  {SORT_LABELS[sortOption]}
+                  <ChevronDown className="h-3 w-3" />
+                </Button>
+              }
+              items={sortItems}
+              align="right"
+            />
+
+            <Button
+              variant={showRecruitingOnly ? "primary" : "secondary"}
+              onClick={() => setShowRecruitingOnly(!showRecruitingOnly)}
+            >
+              <UserCheck className="h-4 w-4 mr-2" />
+              모집 중만
+            </Button>
+          </div>
         </div>
 
-        {/* Error State */}
+        {/* 에러 */}
         {error && (
           <div className="bg-accent-danger/10 border border-accent-danger/30 rounded-xl p-4 mb-6">
             <p className="text-accent-danger">{error}</p>
           </div>
         )}
 
-        {/* Clans List */}
-        {clans.length === 0 ? (
+        {/* 스켈레톤 로딩 */}
+        {isLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <ClanCardSkeleton key={i} />
+            ))}
+          </div>
+        ) : clans.length === 0 ? (
           <EmptyState
             icon={Shield}
             title="클랜이 없습니다"
@@ -176,80 +246,123 @@ export default function ClansPage() {
             }
           />
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {clans.map((clan) => (
-              <Card
-                key={clan.id}
-                hoverable
-                onClick={() => router.push(`/clans/${clan.id}`)}
-                className="cursor-pointer"
-              >
-                <CardContent className="p-4">
-                  <div className="flex items-start gap-4">
-                    <div className="w-14 h-14 rounded-lg bg-bg-tertiary flex items-center justify-center flex-shrink-0 overflow-hidden relative">
-                      {clan.logo ? (
-                        <Image
-                          src={clan.logo}
-                          alt={clan.name}
-                          fill
-                          className="object-cover"
-                          unoptimized
-                        />
-                      ) : (
-                        <Shield className="h-7 w-7 text-text-tertiary" />
-                      )}
-                    </div>
-                    <div className="flex-grow min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 stagger-children">
+            {clans.map((clan) => {
+              const memberCount = clan.members.length;
+              const isFull = memberCount >= clan.maxMembers;
+              const fillPercent = Math.min(
+                (memberCount / clan.maxMembers) * 100,
+                100,
+              );
+
+              return (
+                <Card
+                  key={clan.id}
+                  hoverable
+                  onClick={() => router.push(`/clans/${clan.id}`)}
+                  className="cursor-pointer relative overflow-hidden hover:scale-[1.02] hover:shadow-lg transition-all duration-200"
+                >
+                  {/* 모집 상태 리본 배지 */}
+                  <div
+                    className={cn(
+                      "absolute top-3 right-3 text-xs font-bold px-2 py-0.5 rounded-full",
+                      clan.isRecruiting && !isFull
+                        ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                        : "bg-red-500/20 text-red-400 border border-red-500/30",
+                    )}
+                  >
+                    {clan.isRecruiting && !isFull ? "모집 중" : "정원 마감"}
+                  </div>
+
+                  <CardContent className="p-4">
+                    <div className="flex items-start gap-4">
+                      <div className="w-14 h-14 rounded-lg bg-bg-tertiary flex items-center justify-center flex-shrink-0 overflow-hidden relative">
+                        {clan.logo ? (
+                          <Image
+                            src={clan.logo}
+                            alt={clan.name}
+                            fill
+                            className="object-cover"
+                            unoptimized
+                          />
+                        ) : (
+                          <Shield className="h-7 w-7 text-text-tertiary" />
+                        )}
+                      </div>
+                      <div className="flex-grow min-w-0 pr-14">
+                        {/* 태그 배지 공간 확보 */}
                         <p className="font-semibold text-text-primary truncate">
                           [{clan.tag}] {clan.name}
                         </p>
-                        {clan.isRecruiting && (
-                          <Badge variant="success" size="sm">
-                            모집 중
-                          </Badge>
-                        )}
-                      </div>
-                      <p className="text-sm text-text-secondary mt-1 line-clamp-2">
-                        {clan.description || "클랜 소개가 없습니다."}
-                      </p>
-                      <div className="flex items-center gap-3 mt-2 text-xs text-text-tertiary">
-                        <span className="flex items-center gap-1">
-                          <Users className="h-3 w-3" />
-                          {clan.members.length}/{clan.maxMembers}
-                        </span>
-                        {clan.minTier && (
-                          <Badge
-                            variant={getTierBadgeColor(clan.minTier)}
-                            size="sm"
-                          >
-                            {clan.minTier}+
-                          </Badge>
-                        )}
+                        <p className="text-sm text-text-secondary mt-1 line-clamp-2">
+                          {clan.description || "클랜 소개가 없습니다."}
+                        </p>
+                        <div className="flex items-center gap-3 mt-2 text-xs text-text-tertiary">
+                          <span className="flex items-center gap-1">
+                            <Users className="h-3 w-3" />
+                            {memberCount}/{clan.maxMembers}
+                          </span>
+                          {clan.minTier && (
+                            <Badge
+                              variant={getTierBadgeColor(clan.minTier) as any}
+                              size="sm"
+                            >
+                              {clan.minTier}+
+                            </Badge>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Join Button */}
-                  {isAuthenticated &&
-                    clan.isRecruiting &&
-                    clan.members.length < clan.maxMembers && (
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        className="w-full mt-4"
-                        isLoading={joiningClanId === clan.id}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleJoinClan(clan.id);
-                        }}
-                      >
-                        가입하기
-                      </Button>
+                    {/* 멤버 수 프로그레스 바 */}
+                    <div className="mt-3">
+                      <div className="w-full h-1.5 bg-bg-tertiary rounded-full overflow-hidden">
+                        <div
+                          className={cn(
+                            "h-full rounded-full transition-all duration-300",
+                            isFull ? "bg-red-500" : "bg-accent-primary",
+                          )}
+                          style={{ width: `${fillPercent}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* 가입 버튼 */}
+                    {isAuthenticated && (
+                      <div className="mt-3">
+                        {clan.isRecruiting && !isFull ? (
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            className="w-full"
+                            isLoading={joiningClanId === clan.id}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleJoinClan(clan.id);
+                            }}
+                          >
+                            가입하기
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            className="w-full"
+                            isLoading={joiningClanId === clan.id}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRequestJoin(clan.id);
+                            }}
+                          >
+                            가입 요청
+                          </Button>
+                        )}
+                      </div>
                     )}
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         )}
       </div>
