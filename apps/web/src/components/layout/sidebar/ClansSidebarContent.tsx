@@ -1,4 +1,3 @@
-// TODO(Task 22): clan-store unreadCount 연동 → 클랜명 옆 빨간 점/숫자 배지 표시
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -8,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { Shield, Crown, Users, Plus, ChevronRight, UserCheck } from 'lucide-react';
 import { clanApi } from '@/lib/api-client';
 import { useAuthStore } from '@/stores/auth-store';
+import { useClanStore } from '@/stores/clan-store';
 import { cn } from '@/lib/utils';
 
 interface ClanMember {
@@ -37,6 +37,9 @@ export function ClansSidebarContent() {
   const router = useRouter();
   const [myClan, setMyClan] = useState<Clan | null | undefined>(undefined); // undefined = 로딩 중
   const [recruitingClans, setRecruitingClans] = useState<Clan[]>([]);
+
+  // clan-store에서 미읽음 카운트 가져오기
+  const unreadCount = useClanStore((s) => s.unreadCount);
 
   // 내 클랜 조회
   useEffect(() => {
@@ -79,9 +82,17 @@ export function ClansSidebarContent() {
                 )}
               </div>
               <div className="flex-grow min-w-0">
-                <p className="text-sm font-semibold text-text-primary truncate">
-                  [{myClan.tag}] {myClan.name}
-                </p>
+                <div className="flex items-center gap-1.5">
+                  <p className="text-sm font-semibold text-text-primary truncate">
+                    [{myClan.tag}] {myClan.name}
+                  </p>
+                  {/* 읽지 않은 메시지 배지 */}
+                  {unreadCount > 0 && (
+                    <span className="inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-red-500 text-white text-[9px] font-bold leading-none flex-shrink-0">
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </span>
+                  )}
+                </div>
                 <div className="flex items-center gap-2 mt-0.5">
                   <span className="text-xs text-text-tertiary flex items-center gap-1">
                     <Users className="h-3 w-3" />
