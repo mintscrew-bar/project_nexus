@@ -14,11 +14,8 @@ import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { Roles } from "../auth/decorators/roles.decorator";
-import {
-  ReputationService,
-  SubmitRatingDto,
-  SubmitReportDto,
-} from "./reputation.service";
+import { ReputationService } from "./reputation.service";
+import { SubmitRatingDto, SubmitReportDto } from "./dto";
 import { ReportStatus } from "../community/community.types";
 import { UserRole } from "@nexus/database";
 

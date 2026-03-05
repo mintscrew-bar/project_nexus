@@ -17,10 +17,8 @@ import { FileInterceptor } from "@nestjs/platform-express";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { UserService } from "./user.service";
-import {
-  UserSettingsService,
-  UpdateSettingsDto,
-} from "./user-settings.service";
+import { UserSettingsService } from "./user-settings.service";
+import { UpdateSettingsDto, UpdateProfileDto } from "./dto";
 import { UploadService } from "../upload/upload.service";
 
 @Controller("users")
@@ -54,7 +52,7 @@ export class UserController {
   @Patch("me")
   async updateProfile(
     @CurrentUser("sub") userId: string,
-    @Body() data: { username?: string; bio?: string },
+    @Body() data: UpdateProfileDto,
   ) {
     return this.userService.updateProfile(userId, data);
   }

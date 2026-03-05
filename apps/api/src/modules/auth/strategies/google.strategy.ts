@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { PassportStrategy } from "@nestjs/passport";
 import { Strategy, VerifyCallback } from "passport-google-oauth20";
 import { ConfigService } from "@nestjs/config";
@@ -6,21 +6,16 @@ import { AuthService } from "../auth.service";
 
 @Injectable()
 export class GoogleStrategy extends PassportStrategy(Strategy, "google") {
+  private readonly logger = new Logger(GoogleStrategy.name);
+
   constructor(
     private readonly configService: ConfigService,
     private readonly authService: AuthService,
   ) {
-    const clientID = configService.get("GOOGLE_CLIENT_ID");
-    const clientSecret = configService.get("GOOGLE_CLIENT_SECRET");
-    const callbackURL = configService.get("GOOGLE_CALLBACK_URL");
-
-    console.log("Google Strategy - clientID:", clientID);
-    console.log("Google Strategy - callbackURL:", callbackURL);
-
     super({
-      clientID,
-      clientSecret,
-      callbackURL,
+      clientID: configService.get("GOOGLE_CLIENT_ID"),
+      clientSecret: configService.get("GOOGLE_CLIENT_SECRET"),
+      callbackURL: configService.get("GOOGLE_CALLBACK_URL"),
       scope: ["email", "profile"],
     });
   }
@@ -32,11 +27,6 @@ export class GoogleStrategy extends PassportStrategy(Strategy, "google") {
     done: VerifyCallback,
   ): Promise<any> {
     try {
-      console.log(
-        "Google strategy - profile:",
-        JSON.stringify(profile, null, 2),
-      );
-
       const { id, displayName, emails, photos } = profile;
 
       const result = await this.authService.validateOAuthUser({
@@ -51,16 +41,10 @@ export class GoogleStrategy extends PassportStrategy(Strategy, "google") {
         },
       });
 
-      console.log(
-        "Google strategy - validated user:",
-        JSON.stringify(result.user, null, 2),
-        "isNewUser:",
-        result.isNewUser,
-      );
       // { user, isNewUser } 형태로 반환하여 컨트롤러에서 신규 여부 판단
       done(null, result);
     } catch (error) {
-      console.error("Google strategy error:", error);
+      this.logger.error(`Google OAuth 검증 실패: ${(error as Error).message}`);
       done(error as Error, undefined);
     }
   }

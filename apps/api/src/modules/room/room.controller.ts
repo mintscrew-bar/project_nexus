@@ -14,7 +14,8 @@ import {
   Inject,
   forwardRef,
 } from "@nestjs/common";
-import { RoomService, CreateRoomDto } from "./room.service";
+import { RoomService } from "./room.service";
+import { CreateRoomDto } from "./dto";
 import { SnakeDraftService } from "./snake-draft.service";
 import { SnakeDraftGateway } from "./snake-draft.gateway";
 import { RoomGateway } from "./room.gateway";

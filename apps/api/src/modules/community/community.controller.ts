@@ -23,13 +23,8 @@ import { RolesGuard } from "../auth/guards/roles.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { UploadService } from "../upload/upload.service";
-import {
-  CommunityService,
-  CreatePostDto,
-  UpdatePostDto,
-  CreateCommentDto,
-  CreatePostReportDto,
-} from "./community.service";
+import { CommunityService } from "./community.service";
+import { CreatePostDto, UpdatePostDto, CreateCommentDto, CreatePostReportDto } from "./dto";
 import { PostCategory } from "./community.types";
 import { UserRole } from "@nexus/database";
 

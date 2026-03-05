@@ -14,7 +14,8 @@ import {
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { Public } from "../auth/decorators/public.decorator";
-import { ClanService, CreateClanDto, UpdateClanDto } from "./clan.service";
+import { ClanService } from "./clan.service";
+import { CreateClanDto, UpdateClanDto } from "./dto";
 import { ClanGateway } from "./clan.gateway";
 import { ClanRole } from "@nexus/database";
 

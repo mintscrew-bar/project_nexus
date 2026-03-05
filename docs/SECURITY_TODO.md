@@ -1,92 +1,49 @@
 # 보안 설계 TODO
 
-> 마지막 업데이트: 2026-02-20
-> 보안 감사 후 3단계 구현 플랜에서 Phase 1-1, 1-3만 완료됨. 나머지 항목 진행 필요.
+> 마지막 업데이트: 2026-03-05
+> Phase 1 전체 + Phase 2-1 완료. Phase 2-2, Phase 3 미완료.
 
 ## 완료된 항목
 
 - [x] Phase 1-1: 시크릿 로깅 제거
-- `apps/api/src/main.ts`에서 시크릿 콘솔 출력 전부 제거
-- `.env` 로딩 결과는 `NODE_ENV !== 'production'` 조건으로만 출력
-- 프로덕션 로거를 `["error", "warn"]`으로 제한
+  - `apps/api/src/main.ts`에서 시크릿 콘솔 출력 전부 제거
+  - `.env` 로딩 결과는 `NODE_ENV !== 'production'` 조건으로만 출력
+  - 프로덕션 로거를 `["error", "warn"]`으로 제한
+  - `google.strategy.ts`, `discord.strategy.ts`에서 clientID/profile/user console.log 전부 제거
+  - NestJS Logger 사용으로 전환 (에러만 로깅)
+
+- [x] Phase 1-2: Rate Limiting 실제 적용
+  - `app.module.ts`에 `APP_GUARD`로 `ThrottlerGuard` 글로벌 등록
+  - `auth.controller.ts` 엔드포인트별 제한: login 5/min, register 3/min, refresh 10/min
+  - `health.controller.ts`에 `@SkipThrottle()` 적용
 
 - [x] Phase 1-3: 글로벌 예외 필터
-- `apps/api/src/common/filters/global-exception.filter.ts` 신규 생성
-- `main.ts`에서 `app.useGlobalFilters(new GlobalExceptionFilter())` 등록
-- 프로덕션에서는 stack trace 숨김, 알 수 없는 예외는 일반 메시지 반환
+  - `apps/api/src/common/filters/global-exception.filter.ts` 신규 생성
+  - `main.ts`에서 `app.useGlobalFilters(new GlobalExceptionFilter())` 등록
+  - 프로덕션에서는 stack trace 숨김, 알 수 없는 예외는 일반 메시지 반환
+
+- [x] Phase 1-4: OAuth 콜백 에러 메시지 일반화
+  - Google/Discord 로그인 콜백: `error=auth_failed` 일반 메시지로 통일
+  - Discord/Google 계정 연동 콜백: `error=link_failed` 일반 메시지로 통일
+  - console.error → NestJS Logger 전환
+  - Strategy 파일 내 profile/user JSON 로깅 제거
+
+- [x] Phase 2-1: DTO 클래스 전환
+  - 각 모듈의 `dto/` 폴더에 class-validator 데코레이터 기반 클래스 파일 생성
+  - 컨트롤러 import를 서비스 → dto 폴더로 전환
+  - 대상: auth(RegisterDto, LoginDto), community(CreatePostDto, UpdatePostDto, CreateCommentDto, CreatePostReportDto), room(CreateRoomDto, JoinRoomDto), clan(CreateClanDto, UpdateClanDto), reputation(SubmitRatingDto, SubmitReportDto), riot(RegisterRiotAccountDto), user(UpdateSettingsDto, UpdateProfileDto)
+  - ValidationPipe의 whitelist/forbidNonWhitelisted가 정상 동작
 
 ---
 
 ## 미완료 항목
 
-- [ ] Phase 1-2: Rate Limiting 실제 적용 (높음)
-
-현재 `ThrottlerModule`이 `app.module.ts`에 설정되어 있지만 `ThrottlerGuard`가 적용되지 않아 사실상 무효.
-
-**필요 작업:**
-1. `app.module.ts`에 `APP_GUARD`로 `ThrottlerGuard` 글로벌 등록:
-   ```typescript
-   providers: [
-     { provide: APP_GUARD, useClass: ThrottlerGuard },
-   ],
-   ```
-2. `auth.controller.ts`에 엄격한 엔드포인트별 제한:
-   - `POST /auth/login` — `@Throttle({ default: { limit: 5, ttl: 60000 } })`
-   - `POST /auth/register` — `@Throttle({ default: { limit: 3, ttl: 60000 } })`
-   - `POST /auth/refresh` — `@Throttle({ default: { limit: 10, ttl: 60000 } })`
-3. `health.controller.ts`에 `@SkipThrottle()` 적용
-
-- [ ] Phase 1-4: OAuth 콜백 에러 메시지 일반화 (높음)
-
-**파일:** `apps/api/src/modules/auth/auth.controller.ts`
-
-현재 Google/Discord 콜백 catch에서:
-```typescript
-res.redirect(`${appUrl}/auth/login?error=${encodeURIComponent(String(error))}`);
-```
-내부 에러 메시지가 URL 파라미터로 사용자에게 노출됨.
-
-**수정:**
-```typescript
-res.redirect(`${appUrl}/auth/login?error=auth_failed`);
-```
-
-추가로 `console.log("Google callback - user:", JSON.stringify(user, null, 2))` 같은 유저 정보 로깅도 프로덕션에서는 제거해야 함.
-
----
-
-- [ ] Phase 2-1: DTO 클래스 전환 (높음)
-
-현재 모든 DTO가 `interface`로 정의되어 있어 `ValidationPipe`의 `whitelist`/`forbidNonWhitelisted`가 작동하지 않음.
-
-**대상 모듈 및 DTO:**
-
-| 모듈 | DTO | 검증 필요 항목 |
-|------|-----|---------------|
-| auth | `RegisterDto` | `@IsEmail`, `@MinLength(8)`, `@MaxLength(20)` username |
-| auth | `LoginDto` | `@IsEmail`, `@IsString` password |
-| community | `CreatePostDto` | `@IsString`, `@MaxLength(200)` title, `@MaxLength(10000)` content |
-| community | `UpdatePostDto` | `@IsOptional`, `@MaxLength(200)` title |
-| community | `CreateCommentDto` | `@IsString`, `@MaxLength(2000)` content |
-| room | `CreateRoomDto` | `@IsString` name, `@IsIn` mode, `@Min/@Max` playerCount |
-| room | `JoinRoomDto` | `@IsString` roomId, `@IsOptional` password |
-| clan | `CreateClanDto` | `@IsString`, `@MaxLength(50)` name |
-| clan | `UpdateClanDto` | `@IsOptional` 필드들 |
-| reputation | `SubmitRatingDto` | `@Min(1)`, `@Max(5)` score |
-| reputation | `SubmitReportDto` | `@IsString`, `@MaxLength(1000)` reason |
-| riot | `RegisterRiotAccountDto` | `@IsString` gameName, `@IsString` tagLine |
-| user | `UpdateSettingsDto` | `@IsOptional`, `@IsBoolean` 각 설정 필드 |
-
-**작업 방식:**
-- 각 모듈의 `dto/` 폴더에 클래스 파일 생성
-- 기존 서비스 파일의 interface를 class로 전환
-- `class-validator`, `class-transformer` 데코레이터 추가
-
 - [ ] Phase 2-2: 수동 검증 코드 제거 (중간)
 
 **파일:** `apps/api/src/modules/community/community.service.ts`
 
-Lines 41-55 등에서 수동 if-else 검증이 있음. DTO 데코레이터로 대체 후 삭제.
+Lines 108-130 등에서 수동 if-else 검증이 있음. DTO 데코레이터로 대체 후 삭제.
+단, `containsBannedWord()` 금칙어 검사는 class-validator 커스텀 데코레이터 또는 서비스 레이어에서 유지 필요.
 
 ---
 
@@ -106,7 +63,7 @@ app.use(helmet({
 }));
 ```
 
-**Next.js (`apps/web/next.config.js`):**
+**Next.js (`apps/web/next.config.mjs`):**
 ```javascript
 async headers() {
   return [{
@@ -177,4 +134,4 @@ Redis 기반으로 IP+이메일 조합의 실패 횟수 추적:
 - 파일 업로드 타입/크기 제한 (5MB, 이미지만)
 - 전 WebSocket Gateway JWT 인증
 - Prisma ORM (SQL Injection 방지)
-- ValidationPipe 설정 (whitelist + forbidNonWhitelisted)
+- ValidationPipe 설정 (whitelist + forbidNonWhitelisted) + class DTO 전환 완료

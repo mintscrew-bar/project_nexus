@@ -1,6 +1,7 @@
 import { Module, OnModuleInit } from "@nestjs/common";
+import { APP_GUARD } from "@nestjs/core";
 import { ConfigModule } from "@nestjs/config";
-import { ThrottlerModule } from "@nestjs/throttler";
+import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler";
 import { ScheduleModule } from "@nestjs/schedule";
 import { ServeStaticModule } from "@nestjs/serve-static";
 import { EventEmitterModule } from "@nestjs/event-emitter";
@@ -92,6 +93,10 @@ const projectRoot = resolve(apiRoot, "../..");
     RankingModule,
   ],
   controllers: [HealthController],
+  providers: [
+    // ThrottlerGuard 글로벌 등록 — 모든 HTTP 엔드포인트에 Rate Limiting 적용
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+  ],
 })
 export class AppModule implements OnModuleInit {
   constructor(private readonly tournamentService: RiotTournamentService) {}

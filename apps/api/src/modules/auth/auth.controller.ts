@@ -5,6 +5,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Logger,
   Post,
   Query,
   Req,
@@ -13,14 +14,18 @@ import {
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { AuthGuard } from "@nestjs/passport";
+import { Throttle } from "@nestjs/throttler";
 import { Request, Response } from "express";
-import { AuthService, LoginDto, RegisterDto } from "./auth.service";
+import { AuthService } from "./auth.service";
+import { LoginDto, RegisterDto } from "./dto";
 import { CurrentUser } from "./decorators/current-user.decorator";
 import { JwtAuthGuard } from "./guards/jwt-auth.guard";
 import { JwtRefreshGuard } from "./guards/jwt-refresh.guard";
 
 @Controller("auth")
 export class AuthController {
+  private readonly logger = new Logger(AuthController.name);
+
   constructor(
     private readonly authService: AuthService,
     private readonly configService: ConfigService,
@@ -30,7 +35,9 @@ export class AuthController {
   // Email Registration & Login
   // ========================================
 
+  // 회원가입: 1분에 3회까지
   @Post("register")
+  @Throttle({ default: { limit: 3, ttl: 60000 } })
   @HttpCode(HttpStatus.CREATED)
   async register(@Body() dto: RegisterDto, @Res() res: Response) {
     const tokens = await this.authService.register(dto);
@@ -50,7 +57,9 @@ export class AuthController {
     });
   }
 
+  // 로그인: 1분에 5회까지
   @Post("login")
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
   async login(@Body() dto: LoginDto, @Res() res: Response) {
     const tokens = await this.authService.login(dto);
@@ -100,10 +109,8 @@ export class AuthController {
         `${appUrl}/api/auth/callback?access_token=${tokens.accessToken}&refresh_token=${tokens.refreshToken}`,
       );
     } catch (error) {
-      console.error("Google callback error:", error);
-      res.redirect(
-        `${appUrl}/auth/login?error=${encodeURIComponent(String(error))}`,
-      );
+      this.logger.error(`Google OAuth 콜백 실패: ${(error as Error).message}`);
+      res.redirect(`${appUrl}/auth/login?error=auth_failed`);
     }
   }
 
@@ -138,10 +145,8 @@ export class AuthController {
         `${appUrl}/api/auth/callback?access_token=${tokens.accessToken}&refresh_token=${tokens.refreshToken}`,
       );
     } catch (error) {
-      console.error("Discord callback error:", error);
-      res.redirect(
-        `${appUrl}/auth/login?error=${encodeURIComponent(String(error))}`,
-      );
+      this.logger.error(`Discord OAuth 콜백 실패: ${(error as Error).message}`);
+      res.redirect(`${appUrl}/auth/login?error=auth_failed`);
     }
   }
 
@@ -198,7 +203,9 @@ export class AuthController {
   // Token Management
   // ========================================
 
+  // 토큰 갱신: 1분에 10회까지
   @Post("refresh")
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @UseGuards(JwtRefreshGuard)
   async refresh(@Req() req: Request, @Res() res: Response) {
     try {
@@ -213,9 +220,8 @@ export class AuthController {
       // Refresh token은 교체하지 않음 — 같은 토큰을 쿠키에 유지
       return res.json({ accessToken });
     } catch (err) {
-      console.error(
-        "AuthController.refresh - error:",
-        err instanceof Error ? err.stack || err.message : err,
+      this.logger.error(
+        `토큰 갱신 실패: ${err instanceof Error ? err.message : err}`,
       );
       throw err;
     }
@@ -287,10 +293,11 @@ export class AuthController {
         this.configService.get("APP_URL") || "http://localhost:3000";
       return res.redirect(`${appUrl}/settings?linked=discord&success=true`);
     } catch (error: any) {
+      this.logger.error(`Discord 계정 연동 실패: ${error.message}`);
       const appUrl =
         this.configService.get("APP_URL") || "http://localhost:3000";
       return res.redirect(
-        `${appUrl}/settings?linked=discord&success=false&error=${encodeURIComponent(error.message)}`,
+        `${appUrl}/settings?linked=discord&success=false&error=link_failed`,
       );
     }
   }
@@ -334,10 +341,11 @@ export class AuthController {
         this.configService.get("APP_URL") || "http://localhost:3000";
       return res.redirect(`${appUrl}/settings?linked=google&success=true`);
     } catch (error: any) {
+      this.logger.error(`Google 계정 연동 실패: ${error.message}`);
       const appUrl =
         this.configService.get("APP_URL") || "http://localhost:3000";
       return res.redirect(
-        `${appUrl}/settings?linked=google&success=false&error=${encodeURIComponent(error.message)}`,
+        `${appUrl}/settings?linked=google&success=false&error=link_failed`,
       );
     }
   }

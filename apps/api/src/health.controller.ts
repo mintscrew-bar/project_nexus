@@ -1,7 +1,10 @@
 import { Controller, Get } from "@nestjs/common";
+import { SkipThrottle } from "@nestjs/throttler";
 import { PrismaService } from "./modules/prisma/prisma.service";
 import { RedisService } from "./modules/redis/redis.service";
 
+// 헬스체크는 Rate Limiting 대상에서 제외
+@SkipThrottle()
 @Controller("health")
 export class HealthController {
   constructor(

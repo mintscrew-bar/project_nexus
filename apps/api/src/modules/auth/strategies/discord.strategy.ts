@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { PassportStrategy } from "@nestjs/passport";
 import { Strategy, Profile } from "passport-discord";
 import { ConfigService } from "@nestjs/config";
@@ -6,6 +6,8 @@ import { AuthService } from "../auth.service";
 
 @Injectable()
 export class DiscordStrategy extends PassportStrategy(Strategy, "discord") {
+  private readonly logger = new Logger(DiscordStrategy.name);
+
   constructor(
     private readonly configService: ConfigService,
     private readonly authService: AuthService,
@@ -24,11 +26,6 @@ export class DiscordStrategy extends PassportStrategy(Strategy, "discord") {
     profile: Profile,
   ): Promise<any> {
     try {
-      console.log(
-        "Discord strategy - profile:",
-        JSON.stringify(profile, null, 2),
-      );
-
       const result = await this.authService.validateOAuthUser({
         provider: "discord",
         providerId: profile.id,
@@ -47,16 +44,10 @@ export class DiscordStrategy extends PassportStrategy(Strategy, "discord") {
         },
       });
 
-      console.log(
-        "Discord strategy - validated user:",
-        JSON.stringify(result.user, null, 2),
-        "isNewUser:",
-        result.isNewUser,
-      );
       // { user, isNewUser } 형태로 반환하여 컨트롤러에서 신규 여부 판단
       return result;
     } catch (error) {
-      console.error("Discord strategy error:", error);
+      this.logger.error(`Discord OAuth 검증 실패: ${(error as Error).message}`);
       throw error;
     }
   }
