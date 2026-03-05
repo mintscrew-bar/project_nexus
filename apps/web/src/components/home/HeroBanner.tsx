@@ -140,17 +140,27 @@ export function HeroBanner({ isAuthenticated = false }: HeroBannerProps) {
   }, []);
 
   // ── 글리치 효과 타이머 — 5~12초 간격으로 짧은 글리치 ──
+  // timerIds ref로 모든 타이머를 추적해서 언마운트 시 전부 정리
+  const glitchTimerIds = useRef<ReturnType<typeof setTimeout>[]>([]);
+
   useEffect(() => {
     const triggerGlitch = () => {
       setIsGlitching(true);
       // 글리치 지속 시간: 200~400ms — 체감될 정도의 길이
-      setTimeout(() => setIsGlitching(false), 200 + Math.random() * 200);
+      const offId = setTimeout(() => setIsGlitching(false), 200 + Math.random() * 200);
       // 다음 글리치까지 대기: 5~12초
-      setTimeout(triggerGlitch, 5000 + Math.random() * 7000);
+      const nextId = setTimeout(triggerGlitch, 5000 + Math.random() * 7000);
+      glitchTimerIds.current.push(offId, nextId);
     };
 
-    const initialDelay = setTimeout(triggerGlitch, 3000);
-    return () => clearTimeout(initialDelay);
+    const initialId = setTimeout(triggerGlitch, 3000);
+    glitchTimerIds.current.push(initialId);
+
+    return () => {
+      // 언마운트 시 모든 타이머 정리 (재귀 체인 포함)
+      glitchTimerIds.current.forEach(clearTimeout);
+      glitchTimerIds.current = [];
+    };
   }, []);
 
   // ── 마우스 이벤트 핸들러 ──

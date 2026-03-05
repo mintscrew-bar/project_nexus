@@ -820,7 +820,11 @@ export function DashboardContent() {
   const [isDataLoading, setIsDataLoading] = useState(true);
 
   const fetchAll = useCallback(async () => {
-    if (!user?.id) return;
+    // user.id가 없으면 로딩 상태 해제 후 종료 (무한 스켈레톤 방지)
+    if (!user?.id) {
+      setIsDataLoading(false);
+      return;
+    }
 
     setIsDataLoading(true);
     fetchAccounts();

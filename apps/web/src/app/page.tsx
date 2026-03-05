@@ -6,11 +6,23 @@ import { Logo } from "@/components/Logo";
 import { useAuthStore } from "@/stores/auth-store";
 import { HeroBanner } from "@/components/home/HeroBanner";
 import { DiscordBanner } from "@/components/home/DiscordBanner";
+import { ErrorBoundary, Skeleton } from "@/components/ui";
+
+// 대시보드 스켈레톤 — dynamic 청크 로드 중 빈 화면 방지
+function DashboardFallback() {
+  return (
+    <div className="space-y-6">
+      <Skeleton className="h-[220px] rounded-2xl" />
+      <Skeleton className="h-48 rounded-2xl" />
+      <Skeleton className="h-40 rounded-2xl" />
+    </div>
+  );
+}
 
 // 대시보드 컴포넌트는 인증 시에만 필요하므로 dynamic import로 로드
 const DashboardContent = dynamic(
   () => import("@/components/home/DashboardContent").then((mod) => mod.DashboardContent),
-  { ssr: false }
+  { ssr: false, loading: () => <DashboardFallback /> }
 );
 
 export default function Home() {
@@ -49,7 +61,10 @@ export default function Home() {
       <div className="flex-grow animate-fade-in">
         <HeroBanner isAuthenticated />
         <div className="container mx-auto max-w-7xl space-y-5 p-4 md:p-6">
-          <DashboardContent />
+          {/* 대시보드 개별 컴포넌트 crash가 전체 페이지를 다운시키지 않도록 보호 */}
+          <ErrorBoundary>
+            <DashboardContent />
+          </ErrorBoundary>
         </div>
       </div>
     );
