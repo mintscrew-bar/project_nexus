@@ -120,7 +120,10 @@ export class RiotService {
         );
       }
       if (error.response?.status === 429) {
-        throw new HttpException("Rate limit exceeded", HttpStatus.TOO_MANY_REQUESTS);
+        throw new HttpException(
+          "Rate limit exceeded",
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
       }
       throw new BadRequestException(
         error.response?.data?.status?.message || "Riot API error",
@@ -371,7 +374,12 @@ export class RiotService {
     // 사용자 입력 peakTier vs 현재 티어 중 높은 값 사용
     const inputPeakTier = dto.peakTier || ranked.tier;
     const inputPeakRank = dto.peakRank || ranked.rank;
-    const useCurrentAsPeak = isHigherTier(ranked.tier, ranked.rank, inputPeakTier, inputPeakRank);
+    const useCurrentAsPeak = isHigherTier(
+      ranked.tier,
+      ranked.rank,
+      inputPeakTier,
+      inputPeakRank,
+    );
     const finalPeakTier = useCurrentAsPeak ? ranked.tier : inputPeakTier;
     const finalPeakRank = useCurrentAsPeak ? ranked.rank : inputPeakRank;
 
@@ -509,7 +517,9 @@ export class RiotService {
       throw new NotFoundException("Riot account not found");
     }
     if (account.userId !== userId) {
-      throw new ForbiddenException("Cannot modify another user's champion preferences");
+      throw new ForbiddenException(
+        "Cannot modify another user's champion preferences",
+      );
     }
 
     // Delete existing preferences for this role
@@ -571,7 +581,10 @@ export class RiotService {
     });
   }
 
-  async deleteRiotAccount(userId: string, riotAccountId: string): Promise<void> {
+  async deleteRiotAccount(
+    userId: string,
+    riotAccountId: string,
+  ): Promise<void> {
     const account = await this.prisma.riotAccount.findUnique({
       where: { id: riotAccountId },
     });
@@ -629,12 +642,19 @@ export class RiotService {
     // peakTier는 기존보다 높을 때만 갱신 (절대 내려가지 않음)
     let peakUpdate = {};
     if (dto.peakTier !== undefined) {
-      if (isHigherTier(dto.peakTier, dto.peakRank || "IV", account.peakTier, account.peakRank)) {
+      if (
+        isHigherTier(
+          dto.peakTier,
+          dto.peakRank || "IV",
+          account.peakTier,
+          account.peakRank,
+        )
+      ) {
         peakUpdate = { peakTier: dto.peakTier, peakRank: dto.peakRank || "IV" };
       }
     }
 
-    const updated = await this.prisma.riotAccount.update({
+    await this.prisma.riotAccount.update({
       where: { id: riotAccountId },
       data: {
         mainRole: dto.mainRole,
@@ -646,7 +666,12 @@ export class RiotService {
     if (dto.championsByRole) {
       for (const [role, championIds] of Object.entries(dto.championsByRole)) {
         if (championIds && championIds.length >= 3) {
-          await this.updateChampionPreferences(userId, riotAccountId, role as Role, championIds);
+          await this.updateChampionPreferences(
+            userId,
+            riotAccountId,
+            role as Role,
+            championIds,
+          );
         }
       }
     }

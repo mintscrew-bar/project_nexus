@@ -15,10 +15,14 @@ function clampLimit(limit: number): number {
 function validateFutureDate(dateStr: string, fieldName: string): Date {
   const date = new Date(dateStr);
   if (isNaN(date.getTime())) {
-    throw new BadRequestException(`${fieldName}: 유효하지 않은 날짜 형식입니다.`);
+    throw new BadRequestException(
+      `${fieldName}: 유효하지 않은 날짜 형식입니다.`,
+    );
   }
   if (date <= new Date()) {
-    throw new BadRequestException(`${fieldName}: 미래 날짜만 설정할 수 있습니다.`);
+    throw new BadRequestException(
+      `${fieldName}: 미래 날짜만 설정할 수 있습니다.`,
+    );
   }
   return date;
 }
@@ -50,16 +54,25 @@ export class AdminService {
   // ── Stats ─────────────────────────────────────────────────────────────────
 
   async getStats() {
-    const [totalUsers, totalRooms, activeRooms, totalMatches, pendingUserReports, pendingPostReports, totalClans] =
-      await Promise.all([
-        this.prisma.user.count(),
-        this.prisma.room.count(),
-        this.prisma.room.count({ where: { status: { in: ["WAITING", "IN_PROGRESS"] } } }),
-        this.prisma.match.count(),
-        this.prisma.userReport.count({ where: { status: "PENDING" } }),
-        this.prisma.postReport.count({ where: { status: "PENDING" } }),
-        this.prisma.clan.count(),
-      ]);
+    const [
+      totalUsers,
+      totalRooms,
+      activeRooms,
+      totalMatches,
+      pendingUserReports,
+      pendingPostReports,
+      totalClans,
+    ] = await Promise.all([
+      this.prisma.user.count(),
+      this.prisma.room.count(),
+      this.prisma.room.count({
+        where: { status: { in: ["WAITING", "IN_PROGRESS"] } },
+      }),
+      this.prisma.match.count(),
+      this.prisma.userReport.count({ where: { status: "PENDING" } }),
+      this.prisma.postReport.count({ where: { status: "PENDING" } }),
+      this.prisma.clan.count(),
+    ]);
 
     return {
       totalUsers,
@@ -118,11 +131,17 @@ export class AdminService {
     return { users, total, page, limit };
   }
 
-  async updateUserRole(targetUserId: string, role: UserRole, requesterId: string) {
+  async updateUserRole(
+    targetUserId: string,
+    role: UserRole,
+    requesterId: string,
+  ) {
     if (targetUserId === requesterId)
       throw new BadRequestException("자신의 권한은 변경할 수 없습니다.");
 
-    const user = await this.prisma.user.findUnique({ where: { id: targetUserId } });
+    const user = await this.prisma.user.findUnique({
+      where: { id: targetUserId },
+    });
     if (!user) throw new NotFoundException("유저를 찾을 수 없습니다.");
 
     const result = await this.prisma.user.update({
@@ -131,10 +150,16 @@ export class AdminService {
       select: { id: true, username: true, role: true },
     });
 
-    await this.logAction(requesterId, AdminAction.USER_ROLE_CHANGE, "user", targetUserId, {
-      previousRole: user.role,
-      newRole: role,
-    });
+    await this.logAction(
+      requesterId,
+      AdminAction.USER_ROLE_CHANGE,
+      "user",
+      targetUserId,
+      {
+        previousRole: user.role,
+        newRole: role,
+      },
+    );
 
     return result;
   }
@@ -148,10 +173,14 @@ export class AdminService {
     if (targetUserId === requesterId)
       throw new BadRequestException("자신을 밴할 수 없습니다.");
 
-    const user = await this.prisma.user.findUnique({ where: { id: targetUserId } });
+    const user = await this.prisma.user.findUnique({
+      where: { id: targetUserId },
+    });
     if (!user) throw new NotFoundException("유저를 찾을 수 없습니다.");
 
-    const banUntilDate = banUntil ? validateFutureDate(banUntil, "banUntil") : null;
+    const banUntilDate = banUntil
+      ? validateFutureDate(banUntil, "banUntil")
+      : null;
 
     const result = await this.prisma.user.update({
       where: { id: targetUserId },
@@ -161,56 +190,102 @@ export class AdminService {
         bannedAt: new Date(),
         banUntil: banUntilDate,
       },
-      select: { id: true, username: true, isBanned: true, banReason: true, banUntil: true },
+      select: {
+        id: true,
+        username: true,
+        isBanned: true,
+        banReason: true,
+        banUntil: true,
+      },
     });
 
-    await this.logAction(requesterId, AdminAction.USER_BAN, "user", targetUserId, {
-      reason,
-      banUntil: banUntilDate,
-    });
+    await this.logAction(
+      requesterId,
+      AdminAction.USER_BAN,
+      "user",
+      targetUserId,
+      {
+        reason,
+        banUntil: banUntilDate,
+      },
+    );
 
     return result;
   }
 
   async unbanUser(targetUserId: string, requesterId: string) {
-    const user = await this.prisma.user.findUnique({ where: { id: targetUserId } });
+    const user = await this.prisma.user.findUnique({
+      where: { id: targetUserId },
+    });
     if (!user) throw new NotFoundException("유저를 찾을 수 없습니다.");
 
     const result = await this.prisma.user.update({
       where: { id: targetUserId },
-      data: { isBanned: false, banReason: null, bannedAt: null, banUntil: null },
+      data: {
+        isBanned: false,
+        banReason: null,
+        bannedAt: null,
+        banUntil: null,
+      },
       select: { id: true, username: true, isBanned: true },
     });
 
-    await this.logAction(requesterId, AdminAction.USER_UNBAN, "user", targetUserId);
+    await this.logAction(
+      requesterId,
+      AdminAction.USER_UNBAN,
+      "user",
+      targetUserId,
+    );
 
     return result;
   }
 
-  async restrictUser(targetUserId: string, requesterId: string, restrictedUntil: string) {
+  async restrictUser(
+    targetUserId: string,
+    requesterId: string,
+    restrictedUntil: string,
+  ) {
     if (targetUserId === requesterId)
       throw new BadRequestException("자신을 제재할 수 없습니다.");
 
-    const user = await this.prisma.user.findUnique({ where: { id: targetUserId } });
+    const user = await this.prisma.user.findUnique({
+      where: { id: targetUserId },
+    });
     if (!user) throw new NotFoundException("유저를 찾을 수 없습니다.");
 
-    const restrictedUntilDate = validateFutureDate(restrictedUntil, "restrictedUntil");
+    const restrictedUntilDate = validateFutureDate(
+      restrictedUntil,
+      "restrictedUntil",
+    );
 
     const result = await this.prisma.user.update({
       where: { id: targetUserId },
       data: { isRestricted: true, restrictedUntil: restrictedUntilDate },
-      select: { id: true, username: true, isRestricted: true, restrictedUntil: true },
+      select: {
+        id: true,
+        username: true,
+        isRestricted: true,
+        restrictedUntil: true,
+      },
     });
 
-    await this.logAction(requesterId, AdminAction.USER_RESTRICT, "user", targetUserId, {
-      restrictedUntil: restrictedUntilDate,
-    });
+    await this.logAction(
+      requesterId,
+      AdminAction.USER_RESTRICT,
+      "user",
+      targetUserId,
+      {
+        restrictedUntil: restrictedUntilDate,
+      },
+    );
 
     return result;
   }
 
   async unrestrictUser(targetUserId: string, requesterId: string) {
-    const user = await this.prisma.user.findUnique({ where: { id: targetUserId } });
+    const user = await this.prisma.user.findUnique({
+      where: { id: targetUserId },
+    });
     if (!user) throw new NotFoundException("유저를 찾을 수 없습니다.");
 
     const result = await this.prisma.user.update({
@@ -219,14 +294,24 @@ export class AdminService {
       select: { id: true, username: true, isRestricted: true },
     });
 
-    await this.logAction(requesterId, AdminAction.USER_UNRESTRICT, "user", targetUserId);
+    await this.logAction(
+      requesterId,
+      AdminAction.USER_UNRESTRICT,
+      "user",
+      targetUserId,
+    );
 
     return result;
   }
 
   // ── Reports ───────────────────────────────────────────────────────────────
 
-  async getReports(params: { page: number; limit: number; status?: string; category?: "user" | "post" }) {
+  async getReports(params: {
+    page: number;
+    limit: number;
+    status?: string;
+    category?: "user" | "post";
+  }) {
     const { page, status, category } = params;
     const limit = clampLimit(params.limit);
     const skip = (page - 1) * limit;
@@ -240,7 +325,12 @@ export class AdminService {
     return this.getUserReports(skip, limit, page, status);
   }
 
-  private async getUserReports(skip: number, limit: number, page: number, status?: string) {
+  private async getUserReports(
+    skip: number,
+    limit: number,
+    page: number,
+    status?: string,
+  ) {
     const where = status ? { status: status as any } : {};
 
     const [reports, total] = await Promise.all([
@@ -248,7 +338,9 @@ export class AdminService {
         where,
         include: {
           reporter: { select: { id: true, username: true, avatar: true } },
-          target: { select: { id: true, username: true, avatar: true, isBanned: true } },
+          target: {
+            select: { id: true, username: true, avatar: true, isBanned: true },
+          },
           match: { select: { id: true } },
         },
         orderBy: { createdAt: "desc" },
@@ -269,7 +361,12 @@ export class AdminService {
     };
   }
 
-  private async getPostReports(skip: number, limit: number, page: number, status?: string) {
+  private async getPostReports(
+    skip: number,
+    limit: number,
+    page: number,
+    status?: string,
+  ) {
     const where = status ? { status: status as any } : {};
 
     const [reports, total] = await Promise.all([
@@ -311,7 +408,9 @@ export class AdminService {
     category: "user" | "post" = "user",
   ) {
     if (category === "post") {
-      const report = await this.prisma.postReport.findUnique({ where: { id: reportId } });
+      const report = await this.prisma.postReport.findUnique({
+        where: { id: reportId },
+      });
       if (!report) throw new NotFoundException("신고를 찾을 수 없습니다.");
 
       const result = await this.prisma.postReport.update({
@@ -319,17 +418,25 @@ export class AdminService {
         data: { status, reviewerNote, reviewedAt: new Date() },
       });
 
-      await this.logAction(reviewerId, AdminAction.REPORT_REVIEW, "postReport", reportId, {
-        category,
-        status,
-        reviewerNote,
-      });
+      await this.logAction(
+        reviewerId,
+        AdminAction.REPORT_REVIEW,
+        "postReport",
+        reportId,
+        {
+          category,
+          status,
+          reviewerNote,
+        },
+      );
 
       return result;
     }
 
     // user report
-    const report = await this.prisma.userReport.findUnique({ where: { id: reportId } });
+    const report = await this.prisma.userReport.findUnique({
+      where: { id: reportId },
+    });
     if (!report) throw new NotFoundException("신고를 찾을 수 없습니다.");
 
     const result = await this.prisma.userReport.update({
@@ -337,18 +444,29 @@ export class AdminService {
       data: { status, reviewerNote, reviewerId, reviewedAt: new Date() },
     });
 
-    await this.logAction(reviewerId, AdminAction.REPORT_REVIEW, "userReport", reportId, {
-      category,
-      status,
-      reviewerNote,
-    });
+    await this.logAction(
+      reviewerId,
+      AdminAction.REPORT_REVIEW,
+      "userReport",
+      reportId,
+      {
+        category,
+        status,
+        reviewerNote,
+      },
+    );
 
     return result;
   }
 
   // ── Announcements ─────────────────────────────────────────────────────────
 
-  async sendAnnouncement(title: string, message: string, adminId: string, link?: string) {
+  async sendAnnouncement(
+    title: string,
+    message: string,
+    adminId: string,
+    link?: string,
+  ) {
     const BATCH_SIZE = 1000;
     let sent = 0;
     let cursor: string | undefined;
@@ -380,10 +498,16 @@ export class AdminService {
       if (users.length < BATCH_SIZE) break;
     }
 
-    await this.logAction(adminId, AdminAction.ANNOUNCEMENT_SEND, undefined, undefined, {
-      title,
-      sentCount: sent,
-    });
+    await this.logAction(
+      adminId,
+      AdminAction.ANNOUNCEMENT_SEND,
+      undefined,
+      undefined,
+      {
+        title,
+        sentCount: sent,
+      },
+    );
 
     return { sent };
   }
@@ -400,26 +524,41 @@ export class AdminService {
     search?: string;
   }) {
     const { page, roomName, userId, search } = params;
-    const category = params.category || "all";
+    const _category = params.category || "all";
     const limit = clampLimit(params.limit);
     const skip = (page - 1) * limit;
 
-    const dateLimit30d = { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) };
+    const dateLimit30d = {
+      gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+    };
 
     // DM·클랜 채팅은 개인정보보호법·통신비밀보호법 위법 소지로 자유 열람 차단
     // 클랜 채팅은 신고 접수 시 신고 처리 흐름을 통해서만 확인 가능
 
     // category === "room" 또는 "all"
-    const roomResult = await this.getRoomChatLogs({ page, limit, skip, roomName, userId, search, dateLimit30d });
+    const roomResult = await this.getRoomChatLogs({
+      page,
+      limit,
+      skip,
+      roomName,
+      userId,
+      search,
+      dateLimit30d,
+    });
     return roomResult;
   }
 
   private async getRoomChatLogs(params: {
-    page: number; limit: number; skip: number;
-    roomName?: string; userId?: string; search?: string;
+    page: number;
+    limit: number;
+    skip: number;
+    roomName?: string;
+    userId?: string;
+    search?: string;
     dateLimit30d: { gte: Date };
   }) {
-    const { page, limit, skip, roomName, userId, search, dateLimit30d } = params;
+    const { page, limit, skip, roomName, userId, search, dateLimit30d } =
+      params;
     const where: any = {};
     if (roomName) where.roomName = { contains: roomName, mode: "insensitive" };
     if (userId) where.userId = userId;
@@ -459,8 +598,11 @@ export class AdminService {
   }
 
   private async getDmLogs(params: {
-    page: number; limit: number; skip: number;
-    userId?: string; search?: string;
+    page: number;
+    limit: number;
+    skip: number;
+    userId?: string;
+    search?: string;
     dateLimit30d: { gte: Date };
   }) {
     const { page, limit, skip, userId, search, dateLimit30d } = params;
@@ -503,8 +645,11 @@ export class AdminService {
   }
 
   private async getClanChatLogs(params: {
-    page: number; limit: number; skip: number;
-    userId?: string; search?: string;
+    page: number;
+    limit: number;
+    skip: number;
+    userId?: string;
+    search?: string;
     dateLimit30d: { gte: Date };
   }) {
     const { page, limit, skip, userId, search, dateLimit30d } = params;
@@ -581,7 +726,8 @@ export class AdminService {
   async deletePost(postId: string, adminId: string) {
     const post = await this.prisma.post.findUnique({ where: { id: postId } });
     if (!post) throw new NotFoundException("게시글을 찾을 수 없습니다.");
-    if (post.isDeleted) throw new BadRequestException("이미 삭제된 게시글입니다.");
+    if (post.isDeleted)
+      throw new BadRequestException("이미 삭제된 게시글입니다.");
 
     await this.prisma.post.update({
       where: { id: postId },
@@ -599,26 +745,40 @@ export class AdminService {
     const post = await this.prisma.post.findUnique({ where: { id: postId } });
     if (!post) throw new NotFoundException("게시글을 찾을 수 없습니다.");
 
-    const result = await this.prisma.post.update({ where: { id: postId }, data: { isPinned } });
+    const result = await this.prisma.post.update({
+      where: { id: postId },
+      data: { isPinned },
+    });
 
-    await this.logAction(adminId, AdminAction.POST_PIN, "post", postId, { isPinned });
+    await this.logAction(adminId, AdminAction.POST_PIN, "post", postId, {
+      isPinned,
+    });
 
     return result;
   }
 
   async deleteComment(commentId: string, adminId: string) {
-    const comment = await this.prisma.comment.findUnique({ where: { id: commentId } });
+    const comment = await this.prisma.comment.findUnique({
+      where: { id: commentId },
+    });
     if (!comment) throw new NotFoundException("댓글을 찾을 수 없습니다.");
-    if (comment.isDeleted) throw new BadRequestException("이미 삭제된 댓글입니다.");
+    if (comment.isDeleted)
+      throw new BadRequestException("이미 삭제된 댓글입니다.");
 
     await this.prisma.comment.update({
       where: { id: commentId },
       data: { isDeleted: true, deletedAt: new Date(), deletedBy: adminId },
     });
 
-    await this.logAction(adminId, AdminAction.COMMENT_DELETE, "comment", commentId, {
-      postId: comment.postId,
-    });
+    await this.logAction(
+      adminId,
+      AdminAction.COMMENT_DELETE,
+      "comment",
+      commentId,
+      {
+        postId: comment.postId,
+      },
+    );
 
     return { success: true };
   }
@@ -710,7 +870,9 @@ export class AdminService {
   // ── Test Bots ──────────────────────────────────────────────────────────────
 
   /** testbot_01 ~ testbot_{count} 유저를 없으면 생성, 있으면 반환 */
-  async ensureBotUsers(count: number): Promise<{ id: string; username: string }[]> {
+  async ensureBotUsers(
+    count: number,
+  ): Promise<{ id: string; username: string }[]> {
     const bots: { id: string; username: string }[] = [];
 
     for (let i = 1; i <= count; i++) {
@@ -772,8 +934,10 @@ export class AdminService {
       });
 
       if (!room) throw new NotFoundException("방을 찾을 수 없습니다.");
-      if (room.status !== "WAITING" as any) {
-        throw new BadRequestException("대기 중인 방에만 봇을 추가할 수 있습니다.");
+      if (room.status !== ("WAITING" as any)) {
+        throw new BadRequestException(
+          "대기 중인 방에만 봇을 추가할 수 있습니다.",
+        );
       }
 
       const currentCount = room.participants.length;
@@ -786,8 +950,11 @@ export class AdminService {
       // 필요한 봇보다 여유 있게 확보 (최대 9개)
       const bots = await this.ensureBotUsers(Math.min(9, currentCount + toAdd));
 
-      const newBots = bots.filter((b) => !existingBotIds.has(b.id)).slice(0, toAdd);
-      if (newBots.length === 0) throw new BadRequestException("추가할 수 있는 봇이 없습니다.");
+      const newBots = bots
+        .filter((b) => !existingBotIds.has(b.id))
+        .slice(0, toAdd);
+      if (newBots.length === 0)
+        throw new BadRequestException("추가할 수 있는 봇이 없습니다.");
 
       await tx.roomParticipant.createMany({
         data: newBots.map((bot) => ({
@@ -801,7 +968,11 @@ export class AdminService {
 
       const updatedParticipants = await tx.roomParticipant.findMany({
         where: { roomId },
-        include: { user: { select: { id: true, username: true, avatar: true, role: true } } },
+        include: {
+          user: {
+            select: { id: true, username: true, avatar: true, role: true },
+          },
+        },
       });
 
       await this.logAction(adminId, AdminAction.ROOM_ADD_BOT, "room", roomId, {
@@ -866,14 +1037,19 @@ export class AdminService {
   ) {
     const appeal = await this.prisma.appeal.findUnique({
       where: { id: appealId },
-      include: { user: { select: { id: true, isBanned: true, isRestricted: true } } },
+      include: {
+        user: { select: { id: true, isBanned: true, isRestricted: true } },
+      },
     });
     if (!appeal) throw new NotFoundException("이의신청을 찾을 수 없습니다.");
     if (appeal.status !== "PENDING") {
       throw new BadRequestException("이미 처리된 이의신청입니다.");
     }
 
-    const action = status === "APPROVED" ? AdminAction.APPEAL_APPROVE : AdminAction.APPEAL_REJECT;
+    const action =
+      status === "APPROVED"
+        ? AdminAction.APPEAL_APPROVE
+        : AdminAction.APPEAL_REJECT;
 
     return this.prisma.$transaction(async (tx) => {
       // 이의신청 상태 업데이트

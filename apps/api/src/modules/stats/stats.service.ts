@@ -1,4 +1,7 @@
-import { Injectable, ForbiddenException, NotFoundException } from "@nestjs/common";
+import {
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { RedisService } from "../redis/redis.service";
 import { RiotMatchService } from "../riot/riot-match.service";
@@ -72,7 +75,7 @@ export class StatsService {
   private async checkPrivacy(
     userId: string,
     requesterId: string,
-    setting: 'showMatchHistory' | 'showChampionStats' | 'showRiotAccounts',
+    setting: "showMatchHistory" | "showChampionStats" | "showRiotAccounts",
   ): Promise<boolean> {
     if (requesterId === userId) return true;
     const settings = await this.prisma.userSettings.findUnique({
@@ -85,11 +88,26 @@ export class StatsService {
   /**
    * Get auction statistics for a user (captain count, sold prices, titles)
    */
-  async getUserAuctionStats(userId: string, requesterId?: string): Promise<AuctionStats> {
+  async getUserAuctionStats(
+    userId: string,
+    requesterId?: string,
+  ): Promise<AuctionStats> {
     if (requesterId) {
-      const allowed = await this.checkPrivacy(userId, requesterId, 'showMatchHistory');
+      const allowed = await this.checkPrivacy(
+        userId,
+        requesterId,
+        "showMatchHistory",
+      );
       if (!allowed) {
-        return { captainCount: 0, totalAuctions: 0, totalSold: 0, yuchalCount: 0, avgSoldPrice: 0, maxSoldPrice: 0, titles: [] };
+        return {
+          captainCount: 0,
+          totalAuctions: 0,
+          totalSold: 0,
+          yuchalCount: 0,
+          avgSoldPrice: 0,
+          maxSoldPrice: 0,
+          titles: [],
+        };
       }
     }
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
@@ -123,30 +141,62 @@ export class StatsService {
 
     // 팀장 칭호
     if (captainCount >= 20) {
-      titles.push({ key: "born_leader", label: "타고난 리더", description: "20회 이상 팀장을 맡은 진정한 리더" });
+      titles.push({
+        key: "born_leader",
+        label: "타고난 리더",
+        description: "20회 이상 팀장을 맡은 진정한 리더",
+      });
     } else if (captainCount >= 10) {
-      titles.push({ key: "captain_master", label: "팀장 장인", description: "10회 이상 팀장을 역임한 베테랑" });
+      titles.push({
+        key: "captain_master",
+        label: "팀장 장인",
+        description: "10회 이상 팀장을 역임한 베테랑",
+      });
     } else if (captainCount >= 5) {
-      titles.push({ key: "regular_captain", label: "단골 팀장", description: "5회 이상 팀장을 맡은 경험자" });
+      titles.push({
+        key: "regular_captain",
+        label: "단골 팀장",
+        description: "5회 이상 팀장을 맡은 경험자",
+      });
     }
 
     // 평균 낙찰가 칭호
     if (avgSoldPrice >= 600) {
-      titles.push({ key: "superstar", label: "슈퍼스타", description: "평균 낙찰가 600 이상의 최고 몸값" });
+      titles.push({
+        key: "superstar",
+        label: "슈퍼스타",
+        description: "평균 낙찰가 600 이상의 최고 몸값",
+      });
     } else if (avgSoldPrice >= 400) {
-      titles.push({ key: "blue_chip", label: "블루칩", description: "평균 낙찰가 400 이상의 고가 선수" });
+      titles.push({
+        key: "blue_chip",
+        label: "블루칩",
+        description: "평균 낙찰가 400 이상의 고가 선수",
+      });
     } else if (avgSoldPrice >= 200) {
-      titles.push({ key: "high_value", label: "고가 용병", description: "평균 낙찰가 200 이상의 인기 선수" });
+      titles.push({
+        key: "high_value",
+        label: "고가 용병",
+        description: "평균 낙찰가 200 이상의 인기 선수",
+      });
     }
 
     // 최고 낙찰가 칭호
     if (maxSoldPrice >= 800) {
-      titles.push({ key: "ace", label: "팀의 에이스", description: "최고 800 이상에 낙찰된 전설" });
+      titles.push({
+        key: "ace",
+        label: "팀의 에이스",
+        description: "최고 800 이상에 낙찰된 전설",
+      });
     }
 
     // 경험 칭호
     if (totalAuctions >= 20) {
-      titles.push({ key: "veteran", label: "베테랑", description: "20회 이상 경매에 오른 고참 선수" });
+      titles.push({
+        key: "veteran",
+        label: "베테랑",
+        description: "20회 이상 경매에 오른 고참 선수",
+      });
     }
 
     return {
@@ -163,9 +213,16 @@ export class StatsService {
   /**
    * Get champion statistics for a user
    */
-  async getUserChampionStats(userId: string, requesterId?: string): Promise<ChampionStats[]> {
+  async getUserChampionStats(
+    userId: string,
+    requesterId?: string,
+  ): Promise<ChampionStats[]> {
     if (requesterId) {
-      const allowed = await this.checkPrivacy(userId, requesterId, 'showChampionStats');
+      const allowed = await this.checkPrivacy(
+        userId,
+        requesterId,
+        "showChampionStats",
+      );
       if (!allowed) return [];
     }
     const user = await this.prisma.user.findUnique({
@@ -234,9 +291,16 @@ export class StatsService {
   /**
    * Get position statistics for a user
    */
-  async getUserPositionStats(userId: string, requesterId?: string): Promise<PositionStats[]> {
+  async getUserPositionStats(
+    userId: string,
+    requesterId?: string,
+  ): Promise<PositionStats[]> {
     if (requesterId) {
-      const allowed = await this.checkPrivacy(userId, requesterId, 'showMatchHistory');
+      const allowed = await this.checkPrivacy(
+        userId,
+        requesterId,
+        "showMatchHistory",
+      );
       if (!allowed) return [];
     }
     const user = await this.prisma.user.findUnique({
@@ -343,7 +407,11 @@ export class StatsService {
    */
   async getUserRiotAccounts(userId: string, requesterId?: string) {
     if (requesterId) {
-      const allowed = await this.checkPrivacy(userId, requesterId, 'showRiotAccounts');
+      const allowed = await this.checkPrivacy(
+        userId,
+        requesterId,
+        "showRiotAccounts",
+      );
       if (!allowed) return [];
     }
     const user = await this.prisma.user.findUnique({
@@ -607,7 +675,9 @@ export class StatsService {
       }
     }
 
-    const result = Array.from(statsMap.values()).sort((a, b) => b.games - a.games);
+    const result = Array.from(statsMap.values()).sort(
+      (a, b) => b.games - a.games,
+    );
 
     // Redis 캐시 저장 (10분)
     await this.redis.set(cacheKey, JSON.stringify(result), 600);

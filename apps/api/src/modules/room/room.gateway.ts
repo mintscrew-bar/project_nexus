@@ -102,7 +102,7 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
       // Leave room if in one
       const roomId = this.socketRooms.get(client.id);
       if (roomId) {
-        let autoLeft = false;
+        let _autoLeft = false;
         let shouldNotifyOthers = false;
 
         try {
@@ -115,11 +115,13 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
           if (status === RoomStatus.WAITING) {
             try {
               await this.roomService.leaveRoom(client.userId!, roomId); // Assert client.userId is string
-              autoLeft = true;
+              _autoLeft = true;
               shouldNotifyOthers = true;
             } catch (leaveError: any) {
               // leaveRoom 실패 (이미 나갔거나, 상태가 변경됨)
-              console.log(`LeaveRoom failed in handleDisconnect: ${leaveError.message}`);
+              console.log(
+                `LeaveRoom failed in handleDisconnect: ${leaveError.message}`,
+              );
             }
           }
         } catch (error) {
@@ -241,7 +243,10 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
         room,
       };
     } catch (error: any) {
-      console.error(`[Room] join-room error for user ${client.userId}:`, error.message);
+      console.error(
+        `[Room] join-room error for user ${client.userId}:`,
+        error.message,
+      );
       return { error: error.message };
     }
   }
@@ -343,15 +348,28 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
         // MANUAL/VOLUNTEER: 팀장 선정 단계 진입
         const auctionResult = result as any;
         if (auctionResult.captainSelectionPhase) {
-          this.auctionGateway.emitCaptainSelectionPhase(data.roomId, auctionResult.captainSelectionPhase, auctionResult.participants, room.hostId);
+          this.auctionGateway.emitCaptainSelectionPhase(
+            data.roomId,
+            auctionResult.captainSelectionPhase,
+            auctionResult.participants,
+            room.hostId,
+          );
 
           // VOLUNTEER: 30초 타이머 후 자동 처리
-          if (auctionResult.captainSelectionPhase.mode === 'VOLUNTEER') {
+          if (auctionResult.captainSelectionPhase.mode === "VOLUNTEER") {
             const handle = setTimeout(async () => {
               try {
-                const autoResult = await this.auctionService.finalizeVolunteers(client.userId!, data.roomId);
-                await this.auctionGateway.emitCaptainsConfirmedAndStart(data.roomId, autoResult);
-              } catch (_e) { /* 이미 마감됐거나 방 없어진 경우 무시 */ }
+                const autoResult = await this.auctionService.finalizeVolunteers(
+                  client.userId!,
+                  data.roomId,
+                );
+                await this.auctionGateway.emitCaptainsConfirmedAndStart(
+                  data.roomId,
+                  autoResult,
+                );
+              } catch (_e) {
+                /* 이미 마감됐거나 방 없어진 경우 무시 */
+              }
             }, 30_000);
             this.auctionService.setCaptainPhaseTimerHandle(data.roomId, handle);
           }
@@ -367,7 +385,9 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
         ); // Assert client.userId is string
 
         // Get client-friendly state with timerEnd at top level
-        const clientState = await this.snakeDraftService.getClientDraftState(data.roomId);
+        const clientState = await this.snakeDraftService.getClientDraftState(
+          data.roomId,
+        );
         const draftData = clientState ?? result;
 
         // Emit draft-started event to room (for lobby clients) and draft room (for draft page clients)
