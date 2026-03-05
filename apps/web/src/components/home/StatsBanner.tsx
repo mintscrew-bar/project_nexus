@@ -92,6 +92,38 @@ export function StatsBanner() {
         <div className="w-[40%]" style={{ background: BG_RIGHT }} />
       </div>
 
+      {/* 좌측 배경 장식 — 미니 차트 실루엣 (우측 하단, 희미하게) */}
+      <svg
+        className="absolute right-[42%] md:right-[42%] bottom-2 w-28 h-20 md:w-36 md:h-24 pointer-events-none"
+        viewBox="0 0 140 80"
+        fill="none"
+        style={{ opacity: isHovered ? 0.08 : 0.04, transition: "opacity 0.5s ease" }}
+      >
+        {/* 상승 꺾은선 그래프 */}
+        <polyline
+          points="10,65 30,55 50,60 70,40 90,35 110,20 130,10"
+          stroke={INDIGO_LIGHT}
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+        />
+        {/* 아래 영역 채우기 */}
+        <polygon
+          points="10,65 30,55 50,60 70,40 90,35 110,20 130,10 130,75 10,75"
+          fill={`${INDIGO}40`}
+        />
+      </svg>
+
+      {/* indigo 글로우 광원 — 좌측 상단 */}
+      <div
+        className="absolute -top-12 -left-12 w-40 h-40 rounded-full pointer-events-none transition-opacity duration-700"
+        style={{
+          background: `radial-gradient(circle, ${INDIGO}18 0%, transparent 70%)`,
+          opacity: isHovered ? 0.9 : 0.5,
+        }}
+      />
+
       {/* 세로 구분선 — indigo glow */}
       <div
         className="absolute top-0 bottom-0 left-[60%] w-px pointer-events-none hidden md:block"
@@ -134,21 +166,43 @@ export function StatsBanner() {
             UPDATE
           </span>
 
-          {/* 큰 타이틀 — DiscordBanner 수준의 후크 */}
-          {/* 큰 타이틀 — 모바일에서 폰트 축소 */}
-          <h3 className="text-xl sm:text-2xl md:text-3xl font-black text-white mb-1.5 md:mb-2">
+          {/* 큰 타이틀 — 호버 시 미세 슬라이드 */}
+          <h3
+            className="text-xl sm:text-2xl md:text-3xl font-black text-white mb-1.5 md:mb-2 transition-transform duration-500 ease-out"
+            style={{ transform: isHovered ? "translateX(4px)" : "translateX(0)" }}
+          >
             내전을{" "}
             <span style={{ color: INDIGO_LIGHT }}>지배하는</span>{" "}
             데이터
           </h3>
 
-          {/* 설명 텍스트 — 크고 밝게 */}
-          {/* 설명 텍스트 — 모바일에서 축소 */}
-          <p className="text-xs sm:text-sm md:text-base text-white/60 leading-relaxed mb-2 md:mb-5">
+          {/* 설명 텍스트 — 호버 시 약간 더 이동 */}
+          <p
+            className="text-xs sm:text-sm md:text-base text-white/60 leading-relaxed mb-2 md:mb-5 transition-transform duration-500 ease-out"
+            style={{ transform: isHovered ? "translateX(8px)" : "translateX(0)" }}
+          >
             KDA, 챔피언, 포지션 통계를 자동으로 기록.
             <br className="hidden sm:block" />
             나의 성장을 한눈에.
           </p>
+
+          {/* 모바일 전용 미니 스탯 — md 이상에서는 우측 패널이 담당 */}
+          <div className="flex md:hidden items-center gap-4">
+            {STATS.map((stat, i) => (
+              <div key={stat.label} className="flex items-baseline gap-1">
+                <span className="text-[10px] text-white/35">{stat.label}</span>
+                <span
+                  className="text-lg font-black tabular-nums"
+                  style={{ color: INDIGO_LIGHT }}
+                >
+                  {stat.decimals > 0
+                    ? statValues[i].toFixed(stat.decimals)
+                    : statValues[i]}
+                </span>
+                <span className="text-[10px] text-white/25">{stat.displaySuffix}</span>
+              </div>
+            ))}
+          </div>
 
         </div>
 

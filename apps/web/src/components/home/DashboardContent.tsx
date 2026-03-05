@@ -219,24 +219,35 @@ function BannerCarousel() {
     startTimer();
   };
 
-  // 슬라이드 인덱스별 전용 컴포넌트 매핑
-  const slideComponent = () => {
-    switch (current) {
-      case 0: return <AuctionBanner />;
-      case 1: return <StatsBanner />;
-      case 2: return <DiscordBanner />;
-      default: return <AuctionBanner />;
-    }
-  };
+  // 슬라이드 목록 — 모든 슬라이드를 렌더링하되 현재만 보이게 (페이드 전환)
+  const slides = [
+    <AuctionBanner key="auction" />,
+    <StatsBanner key="stats" />,
+    <DiscordBanner key="discord" />,
+  ];
 
   return (
     // 고정 높이로 모든 슬라이드 크기 통일 — 모바일부터 데스크톱까지 반응형
     <div
-      className="relative h-[180px] sm:h-[210px] md:h-[260px] lg:h-[280px]"
+      className="relative h-[180px] sm:h-[210px] md:h-[260px] lg:h-[280px] rounded-2xl overflow-hidden"
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
-      {slideComponent()}
+      {/* 페이드 크로스페이드 전환 — 모든 슬라이드를 절대 배치, 현재만 visible */}
+      {slides.map((slide, i) => (
+        <div
+          key={i}
+          className="absolute inset-0 transition-all duration-500 ease-out"
+          style={{
+            opacity: i === current ? 1 : 0,
+            // 비활성 슬라이드는 마우스/터치 이벤트 무시 + 스케일 살짝 줄여 깊이감
+            pointerEvents: i === current ? "auto" : "none",
+            transform: i === current ? "scale(1)" : "scale(0.98)",
+          }}
+        >
+          {slide}
+        </div>
+      ))}
 
       {/* 좌우 화살표 — 모바일에서 숨김 (콘텐츠와 겹침 방지) */}
       <button

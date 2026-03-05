@@ -107,8 +107,13 @@ export function AuctionBanner() {
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      {/* ── 배경: 짙은 다크 퍼플 ── */}
-      <div className="absolute inset-0" style={{ background: BG_DARK }} />
+      {/* ── 배경: 다크 퍼플 그라데이션 ── */}
+      <div
+        className="absolute inset-0"
+        style={{
+          background: `linear-gradient(135deg, ${BG_DARK} 0%, #120a2e 50%, ${BG_DARK} 100%)`,
+        }}
+      />
 
       {/* 배경 그리드 패턴 — 경매장 느낌의 미세한 격자 */}
       <div
@@ -120,12 +125,21 @@ export function AuctionBanner() {
         }}
       />
 
-      {/* violet 글로우 광원 (우측 상단) */}
+      {/* violet 글로우 광원 — 우측 상단 (주 광원) */}
       <div
         className="absolute -top-20 -right-20 w-56 h-56 rounded-full pointer-events-none transition-opacity duration-700"
         style={{
-          background: `radial-gradient(circle, ${VIOLET}20 0%, transparent 70%)`,
-          opacity: isHovered ? 1 : 0.5,
+          background: `radial-gradient(circle, ${VIOLET}25 0%, transparent 70%)`,
+          opacity: isHovered ? 1 : 0.6,
+        }}
+      />
+
+      {/* gold 글로우 광원 — 좌측 하단 (입찰가 강조, 경매 긴장감) */}
+      <div
+        className="absolute -bottom-16 -left-16 w-48 h-48 rounded-full pointer-events-none transition-opacity duration-700"
+        style={{
+          background: `radial-gradient(circle, ${GOLD}15 0%, ${VIOLET}08 40%, transparent 70%)`,
+          opacity: isHovered ? 0.9 : 0.5,
         }}
       />
 
@@ -142,23 +156,35 @@ export function AuctionBanner() {
             DRAFT
           </span>
 
-          {/* 큰 후크 타이틀 — 모바일에서 폰트 축소 */}
-          <h3 className="text-xl sm:text-2xl md:text-3xl font-black text-white mb-1.5">
+          {/* 큰 후크 타이틀 — 호버 시 미세 슬라이드 */}
+          <h3
+            className="text-xl sm:text-2xl md:text-3xl font-black text-white mb-1.5 transition-transform duration-500 ease-out"
+            style={{ transform: isHovered ? "translateX(4px)" : "translateX(0)" }}
+          >
             포인트로{" "}
             <span style={{ color: VIOLET_GLOW }}>최강팀</span>을 구성하라
           </h3>
 
-          {/* 부제목 */}
-          <p className="text-xs sm:text-sm text-white/55 mb-1.5 md:mb-4">
+          {/* 부제목 — 호버 시 약간 더 이동 */}
+          <p
+            className="text-xs sm:text-sm text-white/55 mb-1.5 md:mb-4 transition-transform duration-500 ease-out"
+            style={{ transform: isHovered ? "translateX(8px)" : "translateX(0)" }}
+          >
             실시간 입찰 · 전략적 드래프트
           </p>
 
-          {/* 현재 입찰가 — 왼쪽 하단 */}
-          <div className="flex items-baseline gap-1.5">
+          {/* 현재 입찰가 — 호버 시 glow 강화 */}
+          <div
+            className="flex items-baseline gap-1.5 transition-transform duration-500 ease-out"
+            style={{ transform: isHovered ? "translateX(8px)" : "translateX(0)" }}
+          >
             <span className="text-[11px] text-white/30 tracking-wider">현재 입찰</span>
             <span
               className="text-xl md:text-2xl font-black tabular-nums transition-all duration-300"
-              style={{ color: GOLD, textShadow: `0 0 12px ${GOLD}40` }}
+              style={{
+                color: GOLD,
+                textShadow: isHovered ? `0 0 20px ${GOLD}60` : `0 0 12px ${GOLD}40`,
+              }}
             >
               {currentBid}
             </span>
