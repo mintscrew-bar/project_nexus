@@ -1,7 +1,6 @@
-// TODO(Task 15): 캐릭터 카운터 색상 (green/orange/red), 실시간 태그 프리뷰, Floating label
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/auth-store";
 import { clanApi } from "@/lib/api-client";
@@ -11,11 +10,27 @@ import {
   CardHeader,
   CardTitle,
   Button,
-  Input,
-  Label,
   Skeleton,
 } from "@/components/ui";
 import { ArrowLeft, Shield, Plus } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+// ========================================
+// 캐릭터 카운터 색상 계산 헬퍼
+// ========================================
+
+/**
+ * 사용량 비율에 따른 색상 클래스 반환
+ * - <60%: 초록 (여유)
+ * - <85%: 주황 (주의)
+ * - >=85%: 빨강 (위험)
+ */
+function getCounterColor(current: number, max: number): string {
+  const ratio = current / max;
+  if (ratio < 0.6) return "text-emerald-400";
+  if (ratio < 0.85) return "text-orange-400";
+  return "text-red-400";
+}
 
 export default function CreateClanPage() {
   const router = useRouter();
@@ -33,6 +48,13 @@ export default function CreateClanPage() {
       router.push("/auth/login");
     }
   }, [isAuthenticated, authLoading, router]);
+
+  // 실시간 태그 프리뷰 텍스트
+  const tagPreview = useMemo(() => {
+    const displayTag = tag.trim() || "TAG";
+    const displayName = name.trim() || "클랜이름";
+    return `[${displayTag}] ${displayName}`;
+  }, [tag, name]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,7 +84,11 @@ export default function CreateClanPage() {
       });
       router.push(`/clans/${clan.id}`);
     } catch (err: any) {
-      setError(err.response?.data?.message || err.message || "클랜 생성에 실패했습니다.");
+      setError(
+        err.response?.data?.message ||
+          err.message ||
+          "클랜 생성에 실패했습니다.",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -92,7 +118,7 @@ export default function CreateClanPage() {
   return (
     <div className="flex-grow p-4 md:p-8 animate-fade-in">
       <div className="container mx-auto max-w-2xl">
-        {/* Back Button */}
+        {/* 뒤로가기 버튼 */}
         <Button
           variant="ghost"
           className="mb-4"
@@ -111,59 +137,118 @@ export default function CreateClanPage() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Clan Name */}
-              <div>
-                <Label htmlFor="name">클랜 이름</Label>
-                <Input
+              {/* 실시간 태그 프리뷰 */}
+              <div className="bg-bg-tertiary border border-bg-elevated rounded-lg p-4 text-center">
+                <p className="text-[10px] text-text-tertiary uppercase tracking-wider mb-1.5">
+                  미리보기
+                </p>
+                <p className="text-lg font-bold text-text-primary">
+                  {tagPreview}
+                </p>
+              </div>
+
+              {/* 클랜 이름 — Floating label */}
+              <div className="relative">
+                <input
                   id="name"
+                  type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="클랜 이름을 입력하세요"
-                  className="mt-1"
                   maxLength={30}
+                  placeholder=" "
+                  className="peer w-full px-3 pt-5 pb-2 bg-bg-tertiary border border-bg-elevated rounded-lg text-sm text-text-primary placeholder-transparent focus:outline-none focus:ring-2 focus:ring-accent-primary"
                 />
-                <p className="text-xs text-text-tertiary mt-1">
-                  최대 30자까지 입력 가능
-                </p>
+                <label
+                  htmlFor="name"
+                  className="absolute left-3 top-1.5 text-[10px] text-text-tertiary transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-sm peer-focus:top-1.5 peer-focus:text-[10px] peer-focus:text-accent-primary pointer-events-none"
+                >
+                  클랜 이름
+                </label>
+                <div className="flex items-center justify-between mt-1 px-1">
+                  <span className="text-[10px] text-text-tertiary">
+                    최대 30자
+                  </span>
+                  <span
+                    className={cn(
+                      "text-[10px] font-medium tabular-nums",
+                      getCounterColor(name.length, 30),
+                    )}
+                  >
+                    {name.length}/30
+                  </span>
+                </div>
               </div>
 
-              {/* Clan Tag */}
-              <div>
-                <Label htmlFor="tag">클랜 태그</Label>
-                <Input
+              {/* 클랜 태그 — Floating label */}
+              <div className="relative">
+                <input
                   id="tag"
+                  type="text"
                   value={tag}
                   onChange={(e) => setTag(e.target.value.toUpperCase())}
-                  placeholder="예: NEXUS"
-                  className="mt-1 uppercase"
                   maxLength={5}
+                  placeholder=" "
+                  className="peer w-full px-3 pt-5 pb-2 bg-bg-tertiary border border-bg-elevated rounded-lg text-sm text-text-primary uppercase placeholder-transparent focus:outline-none focus:ring-2 focus:ring-accent-primary"
                 />
-                <p className="text-xs text-text-tertiary mt-1">
-                  2~5자의 영문/숫자 (클랜명 앞에 표시됩니다)
-                </p>
+                <label
+                  htmlFor="tag"
+                  className="absolute left-3 top-1.5 text-[10px] text-text-tertiary transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-sm peer-focus:top-1.5 peer-focus:text-[10px] peer-focus:text-accent-primary pointer-events-none"
+                >
+                  클랜 태그 (예: NEXUS)
+                </label>
+                <div className="flex items-center justify-between mt-1 px-1">
+                  <span className="text-[10px] text-text-tertiary">
+                    2~5자 영문/숫자
+                  </span>
+                  <span
+                    className={cn(
+                      "text-[10px] font-medium tabular-nums",
+                      getCounterColor(tag.length, 5),
+                    )}
+                  >
+                    {tag.length}/5
+                  </span>
+                </div>
               </div>
 
-              {/* Description */}
-              <div>
-                <Label htmlFor="description">클랜 소개 (선택)</Label>
+              {/* 클랜 소개 — Floating label */}
+              <div className="relative">
                 <textarea
                   id="description"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder="클랜을 소개해주세요"
                   rows={4}
-                  className="mt-1 w-full px-3 py-2 bg-bg-tertiary border border-bg-elevated rounded-lg text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-accent-primary resize-none"
                   maxLength={500}
+                  placeholder=" "
+                  className="peer w-full px-3 pt-5 pb-2 bg-bg-tertiary border border-bg-elevated rounded-lg text-sm text-text-primary placeholder-transparent focus:outline-none focus:ring-2 focus:ring-accent-primary resize-none"
                 />
-                <p className="text-xs text-text-tertiary mt-1">
-                  최대 500자까지 입력 가능
-                </p>
+                <label
+                  htmlFor="description"
+                  className="absolute left-3 top-1.5 text-[10px] text-text-tertiary transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-sm peer-focus:top-1.5 peer-focus:text-[10px] peer-focus:text-accent-primary pointer-events-none"
+                >
+                  클랜 소개 (선택)
+                </label>
+                <div className="flex items-center justify-between mt-1 px-1">
+                  <span className="text-[10px] text-text-tertiary">
+                    최대 500자
+                  </span>
+                  <span
+                    className={cn(
+                      "text-[10px] font-medium tabular-nums",
+                      getCounterColor(description.length, 500),
+                    )}
+                  >
+                    {description.length}/500
+                  </span>
+                </div>
               </div>
 
-              {/* Recruiting Toggle */}
+              {/* 모집 토글 */}
               <div className="flex items-center justify-between">
                 <div>
-                  <Label>클랜원 모집</Label>
+                  <label className="text-sm font-medium text-text-primary">
+                    클랜원 모집
+                  </label>
                   <p className="text-xs text-text-tertiary">
                     활성화하면 다른 유저가 클랜에 가입할 수 있습니다
                   </p>
@@ -183,14 +268,14 @@ export default function CreateClanPage() {
                 </button>
               </div>
 
-              {/* Error */}
+              {/* 에러 */}
               {error && (
                 <div className="bg-accent-danger/10 border border-accent-danger/30 rounded-lg p-3">
                   <p className="text-accent-danger text-sm">{error}</p>
                 </div>
               )}
 
-              {/* Submit */}
+              {/* 제출 버튼 */}
               <div className="flex justify-end gap-3">
                 <Button
                   type="button"
