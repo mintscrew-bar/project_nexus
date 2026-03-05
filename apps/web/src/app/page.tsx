@@ -61,6 +61,13 @@ export default function Home() {
       {/* 히어로 배너 — 궤도 + 파티클 + Framer Motion */}
       <HeroBanner />
 
+      {/* Discord 배너 — 히어로 바로 아래 */}
+      <section className="px-6 py-6">
+        <div className="max-w-6xl mx-auto">
+          <DiscordBanner />
+        </div>
+      </section>
+
       {/* Feature highlights */}
       <section className="py-24 md:py-32 px-6">
         <h2 className="text-3xl md:text-5xl font-bold text-center text-text-primary mb-16">
@@ -109,12 +116,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Discord 배너 */}
-      <section className="px-6 pb-24 md:pb-32">
-        <div className="max-w-6xl mx-auto">
-          <DiscordBanner />
-        </div>
-      </section>
     </main>
   );
 }

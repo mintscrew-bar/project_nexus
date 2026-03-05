@@ -24,11 +24,13 @@ const config: Config = {
           tertiary: 'rgb(var(--color-text-tertiary) / <alpha-value>)',
           muted: 'rgb(var(--color-text-muted) / <alpha-value>)',
         },
-        // Accent Colors (치지직 + LoL 테마)
+        // Accent Colors — 로고 그라디언트(#667EEA → #764BA2) 기반
         accent: {
           primary: 'rgb(var(--color-accent-primary) / <alpha-value>)',
           hover: 'rgb(var(--color-accent-hover) / <alpha-value>)',
           active: 'rgb(var(--color-accent-active) / <alpha-value>)',
+          purple: 'rgb(var(--color-accent-purple) / <alpha-value>)',
+          info: 'rgb(var(--color-accent-info) / <alpha-value>)',
           gold: 'rgb(var(--color-accent-gold) / <alpha-value>)',
           success: 'rgb(var(--color-accent-success) / <alpha-value>)',
           danger: 'rgb(var(--color-accent-danger) / <alpha-value>)',

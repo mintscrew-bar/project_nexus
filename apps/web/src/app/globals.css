@@ -16,10 +16,12 @@
     --color-text-tertiary: 112 112 112;
     --color-text-muted: 150 150 150;
 
-    /* Accent Colors (Placeholder for light theme if different) */
-    --color-accent-primary: 11 196 226; /* #0bc4e2 */
-    --color-accent-hover: 9 168 194;   /* #09a8c2 */
-    --color-accent-active: 7 140 168;  /* #078ca8 */
+    /* Accent Colors — 로고 그라디언트(#667EEA → #764BA2) 기반 */
+    --color-accent-primary: 102 126 234;  /* #667EEA 로고 인디고 */
+    --color-accent-hover: 123 145 239;    /* #7B91EF 살짝 밝게 */
+    --color-accent-active: 80 96 216;     /* #5060D8 눌림 */
+    --color-accent-purple: 118 75 162;    /* #764BA2 로고 그라디언트 끝색 */
+    --color-accent-info: 11 196 226;      /* #0bc4e2 기존 시안 → info 역할로 강등 */
 
     --color-accent-gold: 200 155 60;   /* #c89b3c */
     --color-accent-success: 0 200 83;  /* #00c853 */
@@ -52,10 +54,12 @@
     --color-text-tertiary: 112 112 112; /* #707070 */
     --color-text-muted: 74 74 74;      /* #4a4a4a */
 
-    /* Accent Colors (Same for Dark Theme unless specified) */
-    --color-accent-primary: 11 196 226; /* #0bc4e2 */
-    --color-accent-hover: 9 168 194;   /* #09a8c2 */
-    --color-accent-active: 7 140 168;  /* #078ca8 */
+    /* Accent Colors — 로고 그라디언트(#667EEA → #764BA2) 기반 */
+    --color-accent-primary: 102 126 234;  /* #667EEA 로고 인디고 */
+    --color-accent-hover: 123 145 239;    /* #7B91EF 살짝 밝게 */
+    --color-accent-active: 80 96 216;     /* #5060D8 눌림 */
+    --color-accent-purple: 118 75 162;    /* #764BA2 로고 그라디언트 끝색 */
+    --color-accent-info: 11 196 226;      /* #0bc4e2 기존 시안 → info 역할로 강등 */
 
     --color-accent-gold: 200 155 60;   /* #c89b3c */
     --color-accent-success: 0 200 83;  /* #00c853 */
@@ -160,8 +164,8 @@
 }
 
 @keyframes pulseGlow {
-  0%, 100% { box-shadow: 0 0 5px rgb(11 196 226 / 50%); }
-  50% { box-shadow: 0 0 20px rgb(11 196 226 / 80%); }
+  0%, 100% { box-shadow: 0 0 5px rgb(102 126 234 / 50%); }
+  50% { box-shadow: 0 0 20px rgb(102 126 234 / 80%); }
 }
 
 @keyframes pulseUrgent {
@@ -170,7 +174,7 @@
 }
 
 @keyframes flash {
-  0% { background-color: rgb(11 196 226 / 30%); }
+  0% { background-color: rgb(102 126 234 / 30%); }
   100% { background-color: transparent; }
 }
 
@@ -227,57 +231,135 @@
   100% { transform: translateY(0) rotate(360deg); }
 }
 
-/* 히어로 배너 — 궤도 회전 */
-@keyframes orbit-spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+/* AuctionBanner — 배경 입찰 숫자가 위로 떠올라 사라지는 효과 */
+@keyframes bid-rise {
+  0%   { opacity: 0.6; transform: translateY(0); }
+  100% { opacity: 0;   transform: translateY(-60px); }
 }
 
-/* 히어로 배너 — 파티클 위로 떠오르기 (vh 단위로 섹션 높이에 맞춤) */
-@keyframes float-up {
+/* BotBanner — 터미널 커서 깜빡임 (step-end로 딱딱 끊기는 점멸) */
+@keyframes terminal-cursor {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+/* AuctionBanner — LIVE 뱃지 빨간 점 맥동 */
+@keyframes live-pulse {
+  0%   { transform: scale(1);   opacity: 1; }
+  50%  { transform: scale(1.4); opacity: 0.6; }
+  100% { transform: scale(1);   opacity: 1; }
+}
+
+/* BotBanner — Discord 타이핑 인디케이터 (3개 점이 순차 바운스) */
+@keyframes discord-typing {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.3; }
+  30% { transform: translateY(-4px); opacity: 0.8; }
+}
+
+/* AuctionBanner — 입찰 중 슬롯 보더 펄스 */
+@keyframes auction-slot-pulse {
+  0%, 100% { border-color: rgba(139, 92, 246, 0.25); box-shadow: 0 0 0 transparent; }
+  50% { border-color: rgba(139, 92, 246, 0.5); box-shadow: 0 0 8px rgba(139, 92, 246, 0.15); }
+}
+
+/* StatsBanner — 프로그레스 바 채우기 (CSS custom property로 목표값 제어) */
+@keyframes bar-fill {
+  from { width: 0%; }
+  to { width: var(--bar-target, 100%); }
+}
+
+/* ─── 히어로 배너 키프레임 애니메이션 ─── */
+
+/* 에너지 빔 — stroke-dashoffset으로 흐르는 레이저 파동 */
+@keyframes energy-flow {
+  0% { stroke-dashoffset: 300; }
+  100% { stroke-dashoffset: 0; }
+}
+
+/* 빔 opacity 맥동 — 살아 숨쉬는 빔 발광 */
+@keyframes beam-pulse {
+  0%, 100% { opacity: 0.15; }
+  50% { opacity: 0.5; }
+}
+
+/* 빔 끝 파티클 호흡 — 반지름 팽창/수축 */
+@keyframes particle-breathe {
+  0%, 100% { r: 2; }
+  50% { r: 5; }
+}
+
+/* 에너지 링 회전 — translate 제거, rotate만 수행 */
+@keyframes ring-rotate {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* 코어 글로우 펄스 — 비대칭 3단계 박동 (인너 + 아우터 분리) */
+@keyframes core-glow-pulse {
   0% {
-    transform: translateY(0) scale(1);
-    opacity: 0;
+    box-shadow:
+      0 0 30px rgb(102 126 234 / 20%),
+      0 0 80px rgb(118 75 162 / 10%);
   }
-  10% { opacity: 0.7; }
-  90% { opacity: 0.7; }
+  40% {
+    box-shadow:
+      0 0 50px rgb(102 126 234 / 55%),
+      0 0 120px rgb(118 75 162 / 30%);
+  }
   100% {
-    transform: translateY(-60vh) scale(0.4);
-    opacity: 0;
+    box-shadow:
+      0 0 30px rgb(102 126 234 / 20%),
+      0 0 80px rgb(118 75 162 / 10%);
   }
 }
 
-/* 히어로 배너 — 로고 글로우 펄스 */
-@keyframes glow-pulse {
-  0%, 100% {
-    box-shadow: 0 0 20px rgb(139 92 246 / 30%), 0 0 60px rgb(139 92 246 / 10%);
-  }
-  50% {
-    box-shadow: 0 0 30px rgb(139 92 246 / 50%), 0 0 80px rgb(139 92 246 / 20%);
-  }
+/* 스캔라인 수평 이동 */
+@keyframes scanline-move {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100vh); }
 }
 
-/* 히어로 배너 — 배경 그라데이션 브리딩 효과 */
-@keyframes gradient-shift {
-  0%, 100% {
-    transform: scale(1);
-    opacity: 0.85;
-  }
-  50% {
-    transform: scale(1.15);
-    opacity: 1;
-  }
+/* 글리치 텍스트 — 전 구간에 걸친 색수차 오프셋 */
+@keyframes glitch-flicker {
+  0%   { transform: translate(0, 0);     opacity: 1; }
+  10%  { transform: translate(-3px, 1px); opacity: 0.85; }
+  20%  { transform: translate(2px, -1px); opacity: 1; }
+  30%  { transform: translate(-1px, 2px); opacity: 0.9; }
+  40%  { transform: translate(3px, 0);    opacity: 1; }
+  50%  { transform: translate(0, -2px);   opacity: 0.88; }
+  60%  { transform: translate(-2px, 1px); opacity: 1; }
+  70%  { transform: translate(1px, -1px); opacity: 0.92; }
+  80%  { transform: translate(0, 1px);    opacity: 1; }
+  90%  { transform: translate(-1px, 0);   opacity: 0.95; }
+  100% { transform: translate(0, 0);      opacity: 1; }
 }
 
-/* 히어로 배너 — 글로우 오브 숨쉬기 효과 */
-@keyframes glow-breathe {
-  0%, 100% {
-    transform: translate(-50%, -50%) scale(1);
-    opacity: 0.6;
-  }
-  50% {
-    transform: translate(-50%, -50%) scale(1.3);
-    opacity: 1;
+/* 중심 점 맥동 — r과 opacity 주기적 변화 */
+@keyframes core-dot-pulse {
+  0%, 100% { r: 4; opacity: 0.8; }
+  50% { r: 7; opacity: 0.3; }
+}
+
+/* 육각형/링 시계 방향 회전 — translate 없이 rotate만 */
+@keyframes hex-rotate-cw {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* 육각형/링 반시계 방향 회전 */
+@keyframes hex-rotate-ccw {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(-360deg); }
+}
+
+/* prefers-reduced-motion 대응 — 모션 감소 선호 시 애니메이션 비활성화 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }
 
