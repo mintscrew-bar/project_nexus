@@ -84,8 +84,8 @@ export function AuctionBanner({ isActive = true }: { isActive?: boolean }) {
   // 현재 표시 중인 입찰 이벤트 인덱스 (순차 등장)
   const [bidIndex, setBidIndex] = useState(0);
 
-  // 입찰가 카운터 — 현재 입찰 단계에 따라 올라감
-  const currentBid = BID_COUNT_STEPS[Math.min(bidIndex, BID_COUNT_STEPS.length - 1)] ?? 0;
+  // 입찰가 카운터 — 최신 입찰 로그와 동기화
+  const currentBid = BID_COUNT_STEPS[Math.max(bidIndex - 1, 0)];
 
   // 슬라이드가 활성화될 때마다 입찰 이벤트 재시작
   useEffect(() => {
