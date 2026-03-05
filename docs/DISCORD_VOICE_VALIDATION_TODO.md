@@ -2,6 +2,8 @@
 
 > **배경**: 게임 시작 시 웹 로비에서 "준비 완료"한 유저와 Discord 음성채널에 실제로 있는 유저가 다를 수 있음.
 > 팀 배정 후 없는 사람한테 이동 명령을 보내면 오류 발생 → 사전 검증 필요.
+>
+> ✅ **완료**: 2026-03-05 — 커밋 `0cae2a4`
 
 ---
 
@@ -10,9 +12,9 @@
 - `GatewayIntentBits.GuildVoiceStates` 인텐트 등록됨 (`discord-bot.service.ts:67`) ✅
 - `getUsersInVoiceChannel(channelId)` 메서드 존재 (`discord-voice.service.ts:448`) ✅
 - `getDiscordUserIdByNexusUserId()` 메서드 존재 (`discord-voice.service.ts:469`) ✅
-- `voiceStateUpdate` 이벤트 핸들러 없음 ❌
-- `start-game` 핸들러에 음성채널 검증 없음 (`room.gateway.ts:307`) ❌
-- 프론트 로비에 음성 상태 표시 없음 ❌
+- `voiceStateUpdate` 이벤트 핸들러 구현됨 (`discord-bot.service.ts`) ✅
+- `start-game` 핸들러에 음성채널 검증 추가됨 (`room.gateway.ts`) ✅
+- 프론트 로비에 음성 상태 실시간 표시 구현됨 ✅
 
 ---
 
