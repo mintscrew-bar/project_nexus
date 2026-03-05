@@ -104,3 +104,4 @@ The project targets Korean users. UI text, commit messages, and communication ar
   - [ ] Task 11: 클랜 상세 페이지 탭 구조
   - [x] Task 10: 클랜 브라우저 카드 리디자인
   ```
+- **TODO 완료 표시**: Task 작업 완료 후 반드시 해당 docs TODO 파일의 항목을 `[x]`로 업데이트하고 커밋한다.
