@@ -41,10 +41,11 @@ export function DiscordBanner() {
 
   return (
     <a
-      href="https://discord.gg/bKqH9pkfggb"
+      href="https://discord.gg/bKqH9pkfgg"
       target="_blank"
       rel="noopener noreferrer"
-      className="group relative block rounded-2xl overflow-hidden cursor-pointer"
+      aria-label="NEXUS Discord 서버 참가하기 (새 탭에서 열림)"
+      className="group relative block h-full rounded-2xl overflow-hidden cursor-pointer"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => {
         setIsHovered(false);
@@ -103,11 +104,11 @@ export function DiscordBanner() {
       {/* 메인 컨텐츠 */}
       <div
         ref={containerRef}
-        className="relative z-10 flex flex-col md:flex-row items-center gap-6 md:gap-10 py-10 md:py-14 px-6 md:px-12"
+        className="relative z-10 flex flex-col md:flex-row items-center gap-2 md:gap-10 py-3 md:py-14 px-4 md:px-12"
       >
-        {/* 왼쪽 — Nexus 로고 (호버 시 살짝 위로 + 회전) */}
+        {/* 왼쪽 — Nexus 로고 (모바일에서 숨김 — 높이 180px에서 공간 부족) */}
         <div
-          className="shrink-0 transition-all duration-500 ease-out"
+          className="hidden md:block shrink-0 w-14 h-14 md:w-20 md:h-20 transition-all duration-500 ease-out"
           style={{
             transform: isHovered
               ? `translateY(-8px) rotate(-3deg) scale(1.05)`
@@ -120,18 +121,17 @@ export function DiscordBanner() {
             alt="Nexus"
             width={80}
             height={80}
-            className="object-contain"
+            className="object-contain w-full h-full"
           />
         </div>
 
         {/* 중앙 — 멘트 */}
         <div className="flex-1 text-center md:text-left">
+          {/* 타이틀 — 모바일에서 폰트 축소 */}
           <p
-            className="text-2xl md:text-3xl font-bold text-white mb-2 transition-all duration-500 ease-out"
+            className="text-base sm:text-2xl md:text-3xl font-bold text-white mb-1.5 md:mb-2 transition-all duration-500 ease-out"
             style={{
-              transform: isHovered
-                ? "translateX(6px)"
-                : "translateX(0)",
+              transform: isHovered ? "translateX(6px)" : "translateX(0)",
             }}
           >
             솔랭은 잠깐 쉬고,
@@ -139,20 +139,45 @@ export function DiscordBanner() {
             <span className="text-[#7289DA]">진짜 내전</span> 한 판 어때?
           </p>
           <p
-            className="text-sm md:text-base text-white/60 transition-all duration-500 ease-out"
+            className="text-xs sm:text-sm md:text-base text-white/60 mb-2 md:mb-3 transition-all duration-500 ease-out"
             style={{
-              transform: isHovered
-                ? "translateX(10px)"
-                : "translateX(0)",
+              transform: isHovered ? "translateX(10px)" : "translateX(0)",
             }}
           >
             경매 드래프트 · 자동 밸런싱 · 실시간 매칭
           </p>
+
+          {/* 봇 기능 칩 — 모바일에서 숨김 (180px 높이에서 공간 부족) */}
+          <div
+            className="hidden sm:flex flex-wrap justify-center md:justify-start gap-2 transition-all duration-500 ease-out"
+            style={{
+              transform: isHovered ? "translateX(10px)" : "translateX(0)",
+            }}
+          >
+            {[
+              { emoji: "🤖", label: "NEXUS 봇 포함" },
+              { emoji: "🏆", label: "내전 알림" },
+              { emoji: "🔊", label: "음성 자동이동" },
+              { emoji: "📊", label: "결과 기록" },
+            ].map((chip) => (
+              <span
+                key={chip.label}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] text-white/70 font-medium"
+                style={{
+                  background: "rgba(255,255,255,0.1)",
+                  border: "1px solid rgba(255,255,255,0.15)",
+                }}
+              >
+                <span>{chip.emoji}</span>
+                {chip.label}
+              </span>
+            ))}
+          </div>
         </div>
 
-        {/* 오른쪽 — Discord 참가 버튼 */}
+        {/* 오른쪽 — Discord 참가 버튼 (모바일에서 패딩 축소) */}
         <div
-          className="shrink-0 flex items-center gap-2.5 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl px-5 py-3 transition-all duration-500 ease-out"
+          className="shrink-0 flex items-center gap-2.5 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl px-3 py-2 md:px-5 md:py-3 transition-all duration-500 ease-out"
           style={{
             transform: isHovered
               ? "translateX(4px) scale(1.03)"
@@ -176,7 +201,7 @@ export function DiscordBanner() {
           >
             <path d="M60.1 4.9A58.5 58.5 0 0045.4.2a.2.2 0 00-.2.1 40.8 40.8 0 00-1.8 3.7 54 54 0 00-16.2 0A37.4 37.4 0 0025.4.3a.2.2 0 00-.2-.1A58.4 58.4 0 0010.5 4.9a.2.2 0 00-.1.1C1.5 18.7-.9 32.2.3 45.5v.2a58.9 58.9 0 0017.7 9a.2.2 0 00.3-.1 42.1 42.1 0 003.6-5.9.2.2 0 00-.1-.3 38.8 38.8 0 01-5.5-2.7.2.2 0 01 0-.4l1.1-.9a.2.2 0 01.2 0 42 42 0 0035.6 0 .2.2 0 01.2 0l1.1.9a.2.2 0 010 .3 36.4 36.4 0 01-5.5 2.7.2.2 0 00-.1.4 47.2 47.2 0 003.6 5.9.2.2 0 00.3.1A58.7 58.7 0 0070.5 45.7v-.2c1.4-15-2.3-28-9.8-39.6a.2.2 0 00-.1 0zM23.7 37.3c-3.4 0-6.3-3.2-6.3-7s2.8-7 6.3-7 6.3 3.1 6.3 7-2.8 7-6.3 7zm23.2 0c-3.4 0-6.3-3.2-6.3-7s2.8-7 6.3-7 6.4 3.1 6.3 7-2.8 7-6.3 7z" />
           </svg>
-          <span className="text-white font-semibold text-sm md:text-base whitespace-nowrap">
+          <span className="text-white font-semibold text-xs md:text-sm lg:text-base whitespace-nowrap">
             Discord 참가하기
           </span>
           {/* 화살표 — 호버 시 오른쪽으로 이동 */}
