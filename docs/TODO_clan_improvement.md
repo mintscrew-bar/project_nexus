@@ -35,7 +35,7 @@
 - OWNER/OFFICER: "공지 작성" 인라인 폼
 - `clanApi.getAnnouncements(clanId)` 연동
 
-- [ ] Task 13: ClanChat 채팅 개선
+- [x] Task 13: ClanChat 채팅 개선
 **파일**: `apps/web/src/components/domain/ClanChat.tsx`
 - 무한 스크롤: 상단 스크롤 시 이전 메시지 로드 (`fetchMoreMessages`, 스크롤 위치 유지)
 - 메시지 삭제: hover 시 휴지통 아이콘 (OWNER/OFFICER 또는 본인), `myRole` prop 추가
@@ -50,13 +50,13 @@
 - 멤버 랭킹 테이블: 순위, 아바타+유저명, 경기수, 승수, 패수, 승률
 - stagger-children 애니메이션, 로딩 스켈레톤
 
-- [ ] Task 15: 클랜 생성 페이지 UX 개선
+- [x] Task 15: 클랜 생성 페이지 UX 개선
 **파일**: `apps/web/src/app/clans/create/page.tsx`
 - 캐릭터 카운터 색상: `<60%` green, `<85%` orange, `≥85%` red
 - 실시간 태그 프리뷰: `[TAG] 클랜이름` 미리보기 박스
 - Floating label: peer CSS 패턴 활용
 
-- [ ] Task 16: 플로팅 채팅 패널 개선
+- [x] Task 16: 플로팅 채팅 패널 개선
 **파일**: `apps/web/src/components/domain/FloatingClanChatPanel.tsx`
 - 읽지 않은 메시지 뱃지 (`unreadCount > 0`일 때 빨간 뱃지)
 - 최소화 상태에서 새 메시지 → 헤더 pulse 애니메이션
@@ -87,12 +87,12 @@
 - 클랜 브라우저: "초대 코드로 가입" 모달 추가 (`joinByCode`)
 - 클랜 상세: 가입 요청 버튼 (비모집 상태 처리)
 
-- [ ] Task 21: 채팅 상단 공지 핀
+- [x] Task 21: 채팅 상단 공지 핀
 **파일**: `apps/web/src/components/domain/ClanChat.tsx`
 - 메시지 영역 상단에 접을 수 있는 공지 배너 추가
 - `announcements` prop 또는 clan-store에서 가져오기
 
-- [ ] Task 22: 사이드바 배지 연결
+- [x] Task 22: 사이드바 배지 연결
 **파일**: `apps/web/src/components/layout/sidebar/ClansSidebarContent.tsx`
 - clan-store의 `unreadCount` 연동
 - 읽지 않은 메시지 있을 시 클랜명 옆 빨간 점/숫자 표시
