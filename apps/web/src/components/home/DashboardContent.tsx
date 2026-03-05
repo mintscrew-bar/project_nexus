@@ -2,10 +2,12 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import Image from "next/image";
 import { useAuthStore } from "@/stores/auth-store";
 import { useRiotStore } from "@/stores/riot-store";
+import { DiscordBanner } from "@/components/home/DiscordBanner";
+import { AuctionBanner } from "@/components/home/AuctionBanner";
+import { StatsBanner } from "@/components/home/StatsBanner";
 import { userApi, roomApi, communityApi, statsApi } from "@/lib/api-client";
 import { Card, CardContent, Button, Skeleton } from "@/components/ui";
 import { TierBadge } from "@/components/domain/TierBadge";
@@ -19,7 +21,6 @@ import {
   Eye,
   Heart,
   Plus,
-  ArrowRight,
   Shield,
   Lock,
   ChevronLeft,
@@ -165,47 +166,16 @@ function GlassCard({
 // Banner Carousel — 보라 테마 통일
 // ─────────────────────────────────────────────────────────────────────────────
 
-const BANNER_SLIDES = [
-  {
-    id: 1,
-    gradient: "from-[#1e1245] via-[#2a1a5e] to-[#1a0d3a]",
-    accentHex: "#8b5cf6",
-    tag: "NEW",
-    title: "경매 드래프트 시스템",
-    description: "실시간 입찰로 팀을 구성하세요. 포인트 전략이 승부를 가른다.",
-    link: "/tournaments",
-    linkLabel: "내전 만들기",
-  },
-  {
-    id: 2,
-    gradient: "from-[#1a1040] via-[#2d1b5e] to-[#15082e]",
-    accentHex: "#a855f7",
-    tag: "FEATURE",
-    title: "Discord 봇 연동",
-    description: "내전 알림, 음성 채널 자동 이동, 결과 공유. 봇이 모든 걸 처리합니다.",
-    link: "/profile",
-    linkLabel: "설정하기",
-  },
-  {
-    id: 3,
-    gradient: "from-[#0f1a30] via-[#162040] to-[#0a1020]",
-    accentHex: "#6366f1",
-    tag: "UPDATE",
-    title: "내전 전적 통계",
-    description: "KDA, 챔피언, 포지션 통계를 자동으로 기록. 나의 성장을 한눈에.",
-    link: "/matches",
-    linkLabel: "전적 보기",
-  },
-];
+// 배너 슬라이드 총 개수 — 각각 전용 컴포넌트로 렌더링
+const TOTAL_SLIDES = 3;
 
 function BannerCarousel() {
-  const router = useRouter();
   const [current, setCurrent] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const startTimer = useCallback(() => {
     timerRef.current = setInterval(() => {
-      setCurrent((c) => (c + 1) % BANNER_SLIDES.length);
+      setCurrent((c) => (c + 1) % TOTAL_SLIDES);
     }, 5000);
   }, []);
 
@@ -222,71 +192,35 @@ function BannerCarousel() {
     startTimer();
   };
 
-  const slide = BANNER_SLIDES[current];
+  // 슬라이드 인덱스별 전용 컴포넌트 매핑 (BotBanner 제거, DiscordBanner에 봇 내용 통합)
+  const slideComponent = () => {
+    switch (current) {
+      case 0: return <AuctionBanner />;
+      case 1: return <StatsBanner />;
+      case 2: return <DiscordBanner />;
+      default: return <AuctionBanner />;
+    }
+  };
 
-  return (
-    <div
-      className={cn(
-        "relative overflow-hidden rounded-2xl bg-gradient-to-r",
-        slide.gradient,
-        "min-h-[180px] md:min-h-[220px] transition-[background] duration-700"
-      )}
-    >
-      {/* 배경 글로우 */}
-      <div
-        className="absolute top-0 right-0 w-1/2 h-full opacity-20"
-        style={{
-          background: `radial-gradient(circle at 70% 50%, ${slide.accentHex}40 0%, transparent 70%)`,
-        }}
-      />
-
-      <div className="relative z-10 px-7 py-9 md:px-10 md:py-10">
-        <div className="max-w-lg">
-          <span
-            className="inline-block px-3 py-1 rounded-full text-[11px] font-bold mb-4 tracking-wider"
-            style={{
-              backgroundColor: `${slide.accentHex}20`,
-              color: slide.accentHex,
-              border: `1px solid ${slide.accentHex}40`,
-            }}
-          >
-            {slide.tag}
-          </span>
-          <h2 className="text-xl md:text-2xl font-bold text-white mb-2.5">{slide.title}</h2>
-          <p className="text-sm md:text-base text-white/60 mb-6 leading-relaxed">
-            {slide.description}
-          </p>
-          <button
-            onClick={() => router.push(slide.link)}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all duration-300 hover:scale-[1.02] hover:shadow-lg active:scale-[0.98]"
-            style={{
-              background: `linear-gradient(135deg, ${slide.accentHex}, ${slide.accentHex}cc)`,
-              boxShadow: `0 4px 20px ${slide.accentHex}30`,
-            }}
-          >
-            {slide.linkLabel}
-            <ArrowRight className="h-4 w-4" />
-          </button>
-        </div>
-      </div>
-
-      {/* 네비게이션 */}
+  // 네비게이션 + dots — 모든 슬라이드에서 공통 사용
+  const NavButtons = () => (
+    <>
+      {/* 좌우 화살표 — 모바일에서 숨김 (콘텐츠와 겹침 방지) */}
       <button
-        onClick={() => goTo((current - 1 + BANNER_SLIDES.length) % BANNER_SLIDES.length)}
-        className="absolute left-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/5 text-white/50 hover:bg-white/10 hover:text-white transition-all z-20 backdrop-blur-sm"
+        onClick={() => goTo((current - 1 + TOTAL_SLIDES) % TOTAL_SLIDES)}
+        className="hidden sm:block absolute left-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/5 text-white/50 hover:bg-white/10 hover:text-white transition-all z-20 backdrop-blur-sm"
       >
         <ChevronLeft className="h-4 w-4" />
       </button>
       <button
-        onClick={() => goTo((current + 1) % BANNER_SLIDES.length)}
-        className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/5 text-white/50 hover:bg-white/10 hover:text-white transition-all z-20 backdrop-blur-sm"
+        onClick={() => goTo((current + 1) % TOTAL_SLIDES)}
+        className="hidden sm:block absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/5 text-white/50 hover:bg-white/10 hover:text-white transition-all z-20 backdrop-blur-sm"
       >
         <ChevronRight className="h-4 w-4" />
       </button>
-
-      {/* Dots */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-20">
-        {BANNER_SLIDES.map((_, i) => (
+      {/* 닷 네비게이션 — bottom-3으로 콘텐츠와 겹침 방지 */}
+      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2 z-20">
+        {Array.from({ length: TOTAL_SLIDES }).map((_, i) => (
           <button
             key={i}
             onClick={() => goTo(i)}
@@ -297,6 +231,14 @@ function BannerCarousel() {
           />
         ))}
       </div>
+    </>
+  );
+
+  return (
+    // 고정 높이로 모든 슬라이드 크기 통일 — 모바일부터 데스크톱까지 반응형
+    <div className="relative h-[180px] sm:h-[210px] md:h-[260px] lg:h-[280px]">
+      {slideComponent()}
+      <NavButtons />
     </div>
   );
 }
