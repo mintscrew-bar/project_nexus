@@ -64,14 +64,14 @@ interface BidEvent {
 
 const BID_EVENTS: BidEvent[] = [
   { id: 0, team: "blue", points: 150, delay: 600 },
-  { id: 1, team: "red", points: 180, delay: 1200 },
-  { id: 2, team: "blue", points: 220, delay: 1800 },
-  { id: 3, team: "red", points: 250, delay: 2400 },
-  { id: 4, team: "blue", points: 280, delay: 3000 },
+  { id: 1, team: "red", points: 200, delay: 1200 },
+  { id: 2, team: "blue", points: 250, delay: 1800 },
+  { id: 3, team: "red", points: 300, delay: 2400 },
+  { id: 4, team: "blue", points: 350, delay: 3000 },
 ];
 
 // 입찰 카운터 표시 최대값 (현재 경매 중인 선수의 최고가가 올라가는 연출)
-const BID_COUNT_STEPS = [150, 180, 220, 250, 280];
+const BID_COUNT_STEPS = [150, 200, 250, 300, 350];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // AuctionBanner 컴포넌트
