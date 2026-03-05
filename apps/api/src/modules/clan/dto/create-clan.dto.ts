@@ -12,7 +12,7 @@ export class CreateClanDto {
   @IsString()
   @MinLength(2, { message: "클랜 태그는 최소 2자 이상이어야 합니다." })
   @MaxLength(5, { message: "클랜 태그는 5자를 초과할 수 없습니다." })
-  @Matches(/^[A-Za-z0-9가-힣]+$/, { message: "클랜 태그는 영문, 숫자, 한글만 사용할 수 있습니다." })
+  @Matches(/^[A-Za-z0-9]+$/, { message: "클랜 태그는 영문과 숫자만 사용할 수 있습니다." })
   tag: string;
 
   @IsOptional()

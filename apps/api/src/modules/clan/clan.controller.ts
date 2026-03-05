@@ -15,9 +15,17 @@ import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { Public } from "../auth/decorators/public.decorator";
 import { ClanService } from "./clan.service";
-import { CreateClanDto, UpdateClanDto } from "./dto";
+import {
+  CreateClanDto,
+  UpdateClanDto,
+  UpdateMemberRoleDto,
+  TransferOwnershipDto,
+  ContentDto,
+  JoinByCodeDto,
+  InviteUserDto,
+  ResolveDto,
+} from "./dto";
 import { ClanGateway } from "./clan.gateway";
-import { ClanRole } from "@nexus/database";
 
 @Controller("clans")
 @UseGuards(JwtAuthGuard)
@@ -160,7 +168,7 @@ export class ClanController {
     @CurrentUser("sub") userId: string,
     @Param("id") clanId: string,
     @Param("memberId") memberId: string,
-    @Body() body: { role: ClanRole },
+    @Body() body: UpdateMemberRoleDto,
   ) {
     const result = await this.clanService.promoteMember(
       userId,
@@ -184,7 +192,7 @@ export class ClanController {
   async transferOwnership(
     @CurrentUser("sub") userId: string,
     @Param("id") clanId: string,
-    @Body() body: { newOwnerId: string },
+    @Body() body: TransferOwnershipDto,
   ) {
     const result = await this.clanService.transferOwnership(
       userId,
@@ -248,7 +256,7 @@ export class ClanController {
   async createAnnouncement(
     @CurrentUser("sub") userId: string,
     @Param("id") clanId: string,
-    @Body() body: { content: string },
+    @Body() body: ContentDto,
   ) {
     const announcement = await this.clanService.createAnnouncement(
       userId,
@@ -313,7 +321,7 @@ export class ClanController {
   @HttpCode(HttpStatus.OK)
   async joinByCode(
     @CurrentUser("sub") userId: string,
-    @Body() body: { code: string },
+    @Body() body: JoinByCodeDto,
   ) {
     const membership = await this.clanService.joinByCode(userId, body.code);
     if (membership) {
@@ -340,7 +348,7 @@ export class ClanController {
   async inviteUser(
     @CurrentUser("sub") userId: string,
     @Param("id") clanId: string,
-    @Body() body: { inviteeId: string },
+    @Body() body: InviteUserDto,
   ) {
     return this.clanService.inviteUser(userId, clanId, body.inviteeId);
   }
@@ -361,7 +369,7 @@ export class ClanController {
   async resolveInvitation(
     @CurrentUser("sub") userId: string,
     @Param("invitationId") invitationId: string,
-    @Body() body: { accept: boolean },
+    @Body() body: ResolveDto,
   ) {
     const result = await this.clanService.resolveInvitation(
       userId,
@@ -392,7 +400,7 @@ export class ClanController {
     @CurrentUser("sub") userId: string,
     @Param("id") clanId: string,
     @Param("requestId") requestId: string,
-    @Body() body: { accept: boolean },
+    @Body() body: ResolveDto,
   ) {
     return this.clanService.resolveJoinRequest(
       userId,
@@ -426,7 +434,7 @@ export class ClanController {
   async sendChatMessage(
     @CurrentUser("sub") userId: string,
     @Param("id") clanId: string,
-    @Body() body: { content: string },
+    @Body() body: ContentDto,
   ) {
     const message = await this.clanService.sendChatMessage(
       userId,

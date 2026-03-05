@@ -250,7 +250,8 @@ export function ClanChat({ clanId, myRole }: ClanChatProps) {
     resetUnread();
 
     return () => {
-      // 언마운트 시 타이핑 중지 후 소켓 해제
+      // 언마운트 시 타이핑 타이머 정리 + 타이핑 중지 + 소켓 해제
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
       setTypingStatus(clanId, false);
       disconnectFromClan();
     };

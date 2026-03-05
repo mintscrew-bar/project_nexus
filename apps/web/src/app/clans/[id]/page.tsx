@@ -802,7 +802,7 @@ export default function ClanDetailPage() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="p-0 h-[480px]">
-                    <ClanChat clanId={clanId} />
+                    <ClanChat clanId={clanId} myRole={myRole} />
                   </CardContent>
                 </Card>
               )}

@@ -7,6 +7,7 @@ import {
   Inject,
   forwardRef,
 } from "@nestjs/common";
+import { randomBytes } from "crypto";
 import { PrismaService } from "../prisma/prisma.service";
 import {
   ClanActivityType,
@@ -523,32 +524,29 @@ export class ClanService {
       throw new BadRequestException("Target user is not a clan member");
     }
 
-    // Update clan owner
-    await this.prisma.clan.update({
-      where: { id: clanId },
-      data: { ownerId: newOwnerId },
-    });
-
-    // Update new owner's role
-    await this.prisma.clanMember.update({
-      where: { id: newOwnerMembership.id },
-      data: { role: ClanRole.OWNER },
-    });
-
-    // Demote previous owner to officer
-    const oldOwnerMembership = await this.prisma.clanMember.findFirst({
-      where: {
-        userId,
-        clanId,
-      },
-    });
-
-    if (oldOwnerMembership) {
-      await this.prisma.clanMember.update({
-        where: { id: oldOwnerMembership.id },
-        data: { role: ClanRole.OFFICER },
+    // 원자적 트랜잭션: clan.ownerId + 역할 두 건을 한 번에 처리
+    await this.prisma.$transaction(async (tx) => {
+      await tx.clan.update({
+        where: { id: clanId },
+        data: { ownerId: newOwnerId },
       });
-    }
+
+      await tx.clanMember.update({
+        where: { id: newOwnerMembership.id },
+        data: { role: ClanRole.OWNER },
+      });
+
+      const oldOwnerMembership = await tx.clanMember.findFirst({
+        where: { userId, clanId },
+      });
+
+      if (oldOwnerMembership) {
+        await tx.clanMember.update({
+          where: { id: oldOwnerMembership.id },
+          data: { role: ClanRole.OFFICER },
+        });
+      }
+    });
 
     // 소유권 이전 활동 로그 기록
     await this.logActivity(
@@ -987,8 +985,8 @@ export class ClanService {
       );
     }
 
-    // 8자리 랜덤 코드 생성
-    const code = Math.random().toString(36).substring(2, 10).toUpperCase();
+    // 8자리 암호학적 난수 코드 생성 (crypto.randomBytes 사용)
+    const code = randomBytes(4).toString("hex").toUpperCase();
 
     const invitation = await this.prisma.clanInvitation.create({
       data: {
@@ -1062,13 +1060,7 @@ export class ClanService {
    * 초대 코드로 가입
    */
   async joinByCode(userId: string, code: string) {
-    // 이미 클랜이 있는지 확인
-    const existingMembership = await this.prisma.clanMember.findFirst({
-      where: { userId },
-    });
-    if (existingMembership)
-      throw new ConflictException("You are already in a clan");
-
+    // 초대 코드 유효성 사전 확인 (만료 처리는 트랜잭션 외부)
     const invitation = await this.prisma.clanInvitation.findUnique({
       where: { inviteCode: code },
       include: { clan: true },
@@ -1079,7 +1071,6 @@ export class ClanService {
       throw new BadRequestException("Invite code is no longer valid");
     }
     if (invitation.expiresAt && invitation.expiresAt < new Date()) {
-      // 만료 처리
       await this.prisma.clanInvitation.update({
         where: { id: invitation.id },
         data: { status: ClanInvitationStatus.EXPIRED },
@@ -1087,34 +1078,45 @@ export class ClanService {
       throw new BadRequestException("Invite code has expired");
     }
 
-    // 클랜 정원 확인
-    const memberCount = await this.prisma.clanMember.count({
-      where: { clanId: invitation.clanId },
-    });
-    if (memberCount >= invitation.clan.maxMembers) {
-      throw new BadRequestException("Clan is full");
-    }
+    // 멤버십 중복 검사 + 정원 확인 + 초대 처리 + 멤버 추가를 원자적으로 실행
+    const membership = await this.prisma.$transaction(async (tx) => {
+      // 이미 클랜이 있는지 확인
+      const existingMembership = await tx.clanMember.findFirst({
+        where: { userId },
+      });
+      if (existingMembership)
+        throw new ConflictException("You are already in a clan");
 
-    // 초대장 처리 및 멤버 추가
-    await this.prisma.clanInvitation.update({
-      where: { id: invitation.id },
-      data: {
-        status: ClanInvitationStatus.ACCEPTED,
-        resolvedBy: userId,
-        resolvedAt: new Date(),
-      },
-    });
+      // 클랜 정원 확인
+      const memberCount = await tx.clanMember.count({
+        where: { clanId: invitation.clanId },
+      });
+      if (memberCount >= invitation.clan.maxMembers) {
+        throw new BadRequestException("Clan is full");
+      }
 
-    const membership = await this.prisma.clanMember.create({
-      data: {
-        clanId: invitation.clanId,
-        userId,
-        role: ClanRole.MEMBER,
-      },
-      include: {
-        user: { select: { id: true, username: true, avatar: true } },
-        clan: true,
-      },
+      // 초대장 처리
+      await tx.clanInvitation.update({
+        where: { id: invitation.id },
+        data: {
+          status: ClanInvitationStatus.ACCEPTED,
+          resolvedBy: userId,
+          resolvedAt: new Date(),
+        },
+      });
+
+      // 멤버 추가
+      return tx.clanMember.create({
+        data: {
+          clanId: invitation.clanId,
+          userId,
+          role: ClanRole.MEMBER,
+        },
+        include: {
+          user: { select: { id: true, username: true, avatar: true } },
+          clan: true,
+        },
+      });
     });
 
     await this.logActivity(
@@ -1148,29 +1150,31 @@ export class ClanService {
     }
 
     if (accept) {
-      // 이미 클랜이 있는지 확인
-      const existingMembership = await this.prisma.clanMember.findFirst({
-        where: { userId },
-      });
-      if (existingMembership) {
-        throw new ConflictException("You are already in a clan");
-      }
+      // 멤버십 중복 검사 + 초대 처리 + 멤버 추가를 원자적으로 실행
+      await this.prisma.$transaction(async (tx) => {
+        const existingMembership = await tx.clanMember.findFirst({
+          where: { userId },
+        });
+        if (existingMembership) {
+          throw new ConflictException("You are already in a clan");
+        }
 
-      await this.prisma.clanInvitation.update({
-        where: { id: invitationId },
-        data: {
-          status: ClanInvitationStatus.ACCEPTED,
-          resolvedBy: userId,
-          resolvedAt: new Date(),
-        },
-      });
+        await tx.clanInvitation.update({
+          where: { id: invitationId },
+          data: {
+            status: ClanInvitationStatus.ACCEPTED,
+            resolvedBy: userId,
+            resolvedAt: new Date(),
+          },
+        });
 
-      await this.prisma.clanMember.create({
-        data: {
-          clanId: invitation.clanId,
-          userId,
-          role: ClanRole.MEMBER,
-        },
+        await tx.clanMember.create({
+          data: {
+            clanId: invitation.clanId,
+            userId,
+            role: ClanRole.MEMBER,
+          },
+        });
       });
 
       await this.logActivity(
@@ -1233,28 +1237,31 @@ export class ClanService {
     }
 
     if (accept) {
-      const memberCount = await this.prisma.clanMember.count({
-        where: { clanId },
-      });
-      if (memberCount >= clan.maxMembers) {
-        throw new BadRequestException("Clan is full");
-      }
+      // 정원 확인 + 초대 처리 + 멤버 추가를 원자적으로 실행
+      await this.prisma.$transaction(async (tx) => {
+        const memberCount = await tx.clanMember.count({
+          where: { clanId },
+        });
+        if (memberCount >= clan.maxMembers) {
+          throw new BadRequestException("Clan is full");
+        }
 
-      await this.prisma.clanInvitation.update({
-        where: { id: invitationId },
-        data: {
-          status: ClanInvitationStatus.ACCEPTED,
-          resolvedBy: userId,
-          resolvedAt: new Date(),
-        },
-      });
+        await tx.clanInvitation.update({
+          where: { id: invitationId },
+          data: {
+            status: ClanInvitationStatus.ACCEPTED,
+            resolvedBy: userId,
+            resolvedAt: new Date(),
+          },
+        });
 
-      await this.prisma.clanMember.create({
-        data: {
-          clanId,
-          userId: request.inviterId,
-          role: ClanRole.MEMBER,
-        },
+        await tx.clanMember.create({
+          data: {
+            clanId,
+            userId: request.inviterId,
+            role: ClanRole.MEMBER,
+          },
+        });
       });
 
       await this.logActivity(
@@ -1462,6 +1469,9 @@ export class ClanService {
       },
     });
 
-    return membership?.clan || null;
+    if (!membership) return null;
+
+    // 클랜 정보와 현재 유저의 역할을 함께 반환
+    return { ...membership.clan, myRole: membership.role };
   }
 }

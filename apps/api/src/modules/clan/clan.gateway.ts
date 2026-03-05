@@ -75,13 +75,10 @@ export class ClanGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   handleDisconnect(client: AuthenticatedSocket) {
     if (client.userId) {
-      // Find what clan the user was in to clear typing status
-      // This is a bit more complex for clans as users can be in only one clan.
-      // We need to fetch the user's clan to know which room to clear from.
-      this.clanService.getUserClan(client.userId).then((userClan) => {
+      // 비동기 타이핑 상태 정리 (void로 floating promise 억제)
+      void this.clanService.getUserClan(client.userId).then((userClan) => {
         if (userClan) {
-          // Check if userClan is not null
-          this.stopTyping(userClan.id, client.userId!); // Assert client.userId is string
+          this.stopTyping(userClan.id, client.userId!);
         }
       });
     }
@@ -115,15 +112,20 @@ export class ClanGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   @SubscribeMessage("leave-clan-chat")
-  handleLeaveClanChat(
+  async handleLeaveClanChat(
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() data: { clanId: string },
   ) {
-    client.leave(`clan:${data.clanId}`);
-    // Clear typing status when user leaves chat
-    if (client.userId) {
-      this.stopTyping(data.clanId, client.userId!); // Assert client.userId is string
+    if (!client.userId) return;
+
+    // 실제 클랜 멤버인지 확인 후 룸 이탈 처리
+    const userClan = await this.clanService.getUserClan(client.userId);
+    if (!userClan || userClan.id !== data.clanId) {
+      return { error: "Unauthorized to leave this clan chat" };
     }
+
+    client.leave(`clan:${data.clanId}`);
+    this.stopTyping(data.clanId, client.userId);
   }
 
   @SubscribeMessage("send-clan-message")

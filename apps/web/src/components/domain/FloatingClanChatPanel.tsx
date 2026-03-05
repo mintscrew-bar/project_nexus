@@ -55,6 +55,8 @@ export function FloatingClanChatPanel() {
     name: string;
     tag: string;
   } | null>(null);
+  // 현재 유저의 클랜 내 역할 (메시지 삭제 권한 판단에 사용)
+  const [myRole, setMyRole] = useState<"OWNER" | "OFFICER" | "MEMBER" | null>(null);
   const [isLoadingClan, setIsLoadingClan] = useState(false);
   // API 에러 상태 — 에러 시 패널을 바로 닫지 않고 재시도 UI 제공
   const [fetchError, setFetchError] = useState(false);
@@ -122,18 +124,26 @@ export function FloatingClanChatPanel() {
     clanApi
       .getMyClan()
       .then((clan: unknown) => {
-        const c = clan as { id?: string; name?: string; tag?: string } | null;
+        const c = clan as {
+          id?: string;
+          name?: string;
+          tag?: string;
+          myRole?: "OWNER" | "OFFICER" | "MEMBER";
+        } | null;
         if (c?.id) {
           setMyClan({ id: c.id, name: c.name ?? "", tag: c.tag ?? "" });
+          setMyRole(c.myRole ?? null);
         } else {
           // 클랜이 없으면 자동으로 닫기
           setMyClan(null);
+          setMyRole(null);
           closeClanChat();
         }
       })
       .catch(() => {
         // API 에러 시 패널을 닫지 않고 에러 상태만 설정 (재시도 가능)
         setMyClan(null);
+        setMyRole(null);
         setFetchError(true);
       })
       .finally(() => setIsLoadingClan(false));
@@ -249,7 +259,7 @@ export function FloatingClanChatPanel() {
               </button>
             </div>
           ) : myClan ? (
-            <ClanChat clanId={myClan.id} />
+            <ClanChat clanId={myClan.id} myRole={myRole} />
           ) : (
             <div className="flex items-center justify-center h-full text-text-tertiary text-sm">
               클랜에 가입되어 있지 않습니다.
