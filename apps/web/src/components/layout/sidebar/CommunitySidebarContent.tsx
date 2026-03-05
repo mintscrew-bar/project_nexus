@@ -9,16 +9,19 @@ import {
 } from 'lucide-react';
 import { communityApi } from '@/lib/api-client';
 import { useAuthStore } from '@/stores/auth-store';
+import { useCommunityStore } from '@/stores/community-store';
 import { cn } from '@/lib/utils';
 import type { PostCategory } from '@/components/community/community-types';
 
 // 카테고리 메타 정보
-const CATEGORY_META: Record<PostCategory, { label: string; icon: React.ElementType; color: string; param: string }> = {
-  NOTICE: { label: '공지사항', icon: Megaphone,       color: 'text-accent-danger',   param: 'NOTICE' },
-  FREE:   { label: '자유게시판', icon: MessageCircle,  color: 'text-text-secondary',  param: 'FREE'   },
-  TIP:    { label: '팁 & 노하우', icon: Lightbulb,    color: 'text-accent-gold',     param: 'TIP'    },
-  QNA:    { label: 'Q&A',         icon: HelpCircle,   color: 'text-accent-primary',  param: 'QNA'    },
+const CATEGORY_META: Record<PostCategory, { label: string; icon: React.ElementType; color: string }> = {
+  NOTICE: { label: '공지사항', icon: Megaphone,       color: 'text-accent-danger'  },
+  FREE:   { label: '자유게시판', icon: MessageCircle,  color: 'text-text-secondary' },
+  TIP:    { label: '팁 & 노하우', icon: Lightbulb,    color: 'text-accent-gold'    },
+  QNA:    { label: 'Q&A',         icon: HelpCircle,   color: 'text-accent-primary' },
 };
+
+const CATEGORY_KEYS: PostCategory[] = ['NOTICE', 'FREE', 'TIP', 'QNA'];
 
 interface HotPost {
   id: string;
@@ -30,19 +33,28 @@ interface HotPost {
 export function CommunitySidebarContent() {
   const pathname = usePathname();
   const { isAuthenticated } = useAuthStore();
+  const selectedCategory = useCommunityStore((s) => s.selectedCategory);
+  const setSelectedCategory = useCommunityStore((s) => s.setSelectedCategory);
 
-  // 인기글 TOP 3 — 메인 페이지와 동일한 쿼리 키로 캐시 공유
+  // 인기글 TOP 5
   const { data: hotPostsData } = useQuery({
     queryKey: ['communityPosts', 'ALL', 'popular', '', '', 1],
     queryFn: async (): Promise<HotPost[]> => {
-      const data = await communityApi.getPosts({ sortBy: 'popular', limit: 3 });
+      const data = await communityApi.getPosts({ sortBy: 'popular', limit: 5 });
       const posts = Array.isArray(data) ? data : (data?.posts ?? []);
-      return posts.slice(0, 3);
+      return posts.slice(0, 5);
     },
     staleTime: 5 * 60 * 1000,
   });
 
   const hotPosts = hotPostsData ?? [];
+
+  // 카테고리 클릭 핸들러: store 업데이트 + 커뮤니티 메인 경로가 아니면 이동
+  const handleCategoryClick = (category: PostCategory | 'ALL') => {
+    setSelectedCategory(category);
+  };
+
+  const isOnCommunityMain = pathname === '/community';
 
   return (
     <div className="space-y-5">
@@ -62,35 +74,61 @@ export function CommunitySidebarContent() {
               <span>글쓰기</span>
             </Link>
           )}
-          {/* 전체글 */}
-          <Link
-            href="/community"
-            className={cn(
-              'flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
-              pathname === '/community'
-                ? 'bg-accent-primary/10 text-accent-primary'
-                : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary'
-            )}
-          >
-            <LayoutList className="h-4 w-4" />
-            <span>전체글</span>
-          </Link>
+          {/* 전체글 — store 직접 제어 */}
+          {isOnCommunityMain ? (
+            <button
+              onClick={() => handleCategoryClick('ALL')}
+              className={cn(
+                'flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors w-full text-left',
+                selectedCategory === 'ALL'
+                  ? 'bg-accent-primary/10 text-accent-primary'
+                  : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary'
+              )}
+            >
+              <LayoutList className="h-4 w-4" />
+              <span>전체글</span>
+            </button>
+          ) : (
+            <Link
+              href="/community"
+              className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-bg-tertiary transition-colors"
+            >
+              <LayoutList className="h-4 w-4" />
+              <span>전체글</span>
+            </Link>
+          )}
         </div>
       </div>
 
-      {/* 카테고리 네비게이션 (URL 파라미터 기반 deep-link) */}
+      {/* 카테고리 네비게이션 — store 직접 업데이트 */}
       <div>
         <h2 className="text-xs font-semibold text-text-tertiary uppercase tracking-wider mb-2 px-2">
           카테고리
         </h2>
         <div className="space-y-0.5">
-          {(Object.entries(CATEGORY_META) as [PostCategory, typeof CATEGORY_META[PostCategory]][]).map(([key, meta]) => {
+          {CATEGORY_KEYS.map((key) => {
+            const meta = CATEGORY_META[key];
             const Icon = meta.icon;
-            const href = `/community?category=${meta.param}`;
-            return (
+            const isActive = isOnCommunityMain && selectedCategory === key;
+
+            return isOnCommunityMain ? (
+              <button
+                key={key}
+                onClick={() => handleCategoryClick(key)}
+                className={cn(
+                  'flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors w-full text-left',
+                  isActive
+                    ? 'bg-accent-primary/10 text-accent-primary font-medium'
+                    : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary'
+                )}
+              >
+                <Icon className={cn('h-4 w-4', isActive ? 'text-accent-primary' : meta.color)} />
+                <span>{meta.label}</span>
+              </button>
+            ) : (
               <Link
                 key={key}
-                href={href}
+                href={`/community?category=${key}`}
                 className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-text-secondary hover:text-text-primary hover:bg-bg-tertiary transition-colors"
               >
                 <Icon className={cn('h-4 w-4', meta.color)} />
@@ -124,7 +162,7 @@ export function CommunitySidebarContent() {
         </div>
       )}
 
-      {/* 인기글 TOP 3 */}
+      {/* 실시간 인기글 TOP 5 */}
       {hotPosts.length > 0 && (
         <div>
           <div className="flex items-center justify-between mb-2 px-2">
@@ -132,21 +170,26 @@ export function CommunitySidebarContent() {
               <Flame className="h-3.5 w-3.5 text-accent-gold" />
               인기글
             </h2>
-            <Link href="/community" className="text-[10px] text-accent-primary hover:underline">
-              더보기
-            </Link>
           </div>
           <div className="space-y-0.5">
-            {hotPosts.map((post) => {
+            {hotPosts.map((post, idx) => {
               const meta = CATEGORY_META[post.category];
-              const CatIcon = meta.icon;
+              const CatIcon = meta?.icon ?? MessageCircle;
+              const catColor = meta?.color ?? 'text-text-secondary';
               return (
                 <Link
                   key={post.id}
                   href={`/community/${post.id}`}
                   className="flex items-start gap-2 px-3 py-2 rounded-lg hover:bg-bg-tertiary transition-colors group"
                 >
-                  <CatIcon className={cn('h-3.5 w-3.5 mt-0.5 flex-shrink-0', meta.color)} />
+                  {/* 순위 번호 */}
+                  <span className={cn(
+                    'text-xs font-bold w-4 mt-0.5 flex-shrink-0',
+                    idx < 3 ? 'text-accent-gold' : 'text-text-tertiary'
+                  )}>
+                    {idx + 1}
+                  </span>
+                  <CatIcon className={cn('h-3.5 w-3.5 mt-0.5 flex-shrink-0', catColor)} />
                   <div className="flex-grow min-w-0">
                     <p className="text-xs text-text-secondary group-hover:text-text-primary line-clamp-2 leading-relaxed">
                       {post.title}
