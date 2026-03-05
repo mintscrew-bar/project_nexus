@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { AUCTION_COLORS, bannerBadgeStyle, bannerGlowGradient } from "./banner-constants";
 
@@ -78,26 +78,28 @@ const BID_COUNT_STEPS = [150, 180, 220, 250, 280];
 // 경매 드래프트 팀 구성 시각화 — 큰 후크 + 슬롯 채우기 + 실시간 입찰 경쟁
 // ─────────────────────────────────────────────────────────────────────────────
 
-export function AuctionBanner() {
+export function AuctionBanner({ isActive = true }: { isActive?: boolean }) {
   const [isHovered, setIsHovered] = useState(false);
 
   // 현재 표시 중인 입찰 이벤트 인덱스 (순차 등장)
   const [bidIndex, setBidIndex] = useState(0);
-  const timerStarted = useRef(false);
 
   // 입찰가 카운터 — 현재 입찰 단계에 따라 올라감
   const currentBid = BID_COUNT_STEPS[Math.min(bidIndex, BID_COUNT_STEPS.length - 1)] ?? 0;
 
+  // 슬라이드가 활성화될 때마다 입찰 이벤트 재시작
   useEffect(() => {
-    if (timerStarted.current) return;
-    timerStarted.current = true;
+    if (!isActive) {
+      setBidIndex(0);
+      return;
+    }
 
-    // 각 입찰 이벤트를 시간차로 등장시킴 — ID 저장 후 cleanup에서 정리
+    // 각 입찰 이벤트를 시간차로 등장시킴
     const ids = BID_EVENTS.map((evt, i) =>
       setTimeout(() => setBidIndex(i + 1), evt.delay)
     );
     return () => ids.forEach(clearTimeout);
-  }, []);
+  }, [isActive]);
 
   return (
     <Link

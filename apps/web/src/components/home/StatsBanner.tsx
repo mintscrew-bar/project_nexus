@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { STATS_COLORS, bannerBadgeStyle, bannerGlowGradient } from "./banner-constants";
 
@@ -40,31 +40,30 @@ const STAT_COUNT_DURATION = 1400;
 // "스코어보드" 컨셉 — 좌우 60:40 분할 레이아웃
 // ─────────────────────────────────────────────────────────────────────────────
 
-export function StatsBanner() {
+export function StatsBanner({ isActive = true }: { isActive?: boolean }) {
   const [isHovered, setIsHovered] = useState(false);
 
-  // 스탯 카운트업 — 마운트 시 0→목표값
+  // 스탯 카운트업 — 슬라이드가 활성화될 때마다 0→목표값
   const [statValues, setStatValues] = useState<number[]>([0, 0, 0]);
-  const countStarted = useRef(false);
 
   useEffect(() => {
-    if (countStarted.current) return;
-    countStarted.current = true;
+    // 비활성 시 0으로 리셋 — 다음 활성화 때 처음부터 카운트업
+    if (!isActive) {
+      setStatValues([0, 0, 0]);
+      return;
+    }
 
     // 숫자 카운트업 — RAF 기반 easeOutCubic
-    // 프로그레스 바는 CSS @keyframes bar-fill 로 처리 (transition보다 안정적)
     const start = performance.now();
     let frameId: number;
 
     const tick = (now: number) => {
       const elapsed = now - start;
       const progress = Math.min(elapsed / STAT_COUNT_DURATION, 1);
-      // easeOutCubic
       const eased = 1 - Math.pow(1 - progress, 3);
 
       setStatValues(STATS.map((s) => {
         const val = eased * s.targetValue;
-        // 소수점 처리
         return s.decimals > 0
           ? parseFloat(val.toFixed(s.decimals))
           : Math.floor(val);
@@ -74,9 +73,8 @@ export function StatsBanner() {
     };
     frameId = requestAnimationFrame(tick);
 
-    // 언마운트 시 RAF 루프 취소 — 슬라이드 전환 시 누수 방지
     return () => cancelAnimationFrame(frameId);
-  }, []);
+  }, [isActive]);
 
   return (
     <Link
@@ -243,7 +241,10 @@ export function StatsBanner() {
                       "--bar-target": `${stat.barPercent}%`,
                       background: `linear-gradient(90deg, ${INDIGO}, ${INDIGO_LIGHT})`,
                       boxShadow: `0 0 8px ${INDIGO}50`,
-                      animation: `bar-fill 1.2s cubic-bezier(0.16, 1, 0.3, 1) ${200 + i * 150}ms both`,
+                      animation: isActive
+                        ? `bar-fill 1.2s cubic-bezier(0.16, 1, 0.3, 1) ${200 + i * 150}ms both`
+                        : "none",
+                      width: isActive ? undefined : "0%",
                     } as React.CSSProperties & { "--bar-target": string }}
                   />
                 </div>

@@ -220,9 +220,10 @@ function BannerCarousel() {
   };
 
   // 슬라이드 목록 — 모든 슬라이드를 렌더링하되 현재만 보이게 (페이드 전환)
+  // isActive prop으로 활성 슬라이드에서만 애니메이션 시작
   const slides = [
-    <AuctionBanner key="auction" />,
-    <StatsBanner key="stats" />,
+    <AuctionBanner key="auction" isActive={current === 0} />,
+    <StatsBanner key="stats" isActive={current === 1} />,
     <DiscordBanner key="discord" />,
   ];
 
