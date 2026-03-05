@@ -486,7 +486,9 @@ export class ClanService {
     await this.logActivity(
       clanId,
       userId,
-      isPromotion ? ClanActivityType.MEMBER_PROMOTE : ClanActivityType.MEMBER_DEMOTE,
+      isPromotion
+        ? ClanActivityType.MEMBER_PROMOTE
+        : ClanActivityType.MEMBER_DEMOTE,
       targetUserId,
       { oldRole, newRole },
     );
@@ -649,11 +651,7 @@ export class ClanService {
     };
   }
 
-  async deleteChatMessage(
-    userId: string,
-    clanId: string,
-    messageId: string,
-  ) {
+  async deleteChatMessage(userId: string, clanId: string, messageId: string) {
     // 메시지 조회
     const message = await this.prisma.clanChatMessage.findUnique({
       where: { id: messageId },
@@ -681,9 +679,7 @@ export class ClanService {
       membership.role === ClanRole.OFFICER;
 
     if (message.userId !== userId && !isOwnerOrOfficer) {
-      throw new ForbiddenException(
-        "You can only delete your own messages",
-      );
+      throw new ForbiddenException("You can only delete your own messages");
     }
 
     // 소프트 삭제 처리
@@ -751,11 +747,7 @@ export class ClanService {
   // Announcement System
   // ========================================
 
-  async createAnnouncement(
-    userId: string,
-    clanId: string,
-    content: string,
-  ) {
+  async createAnnouncement(userId: string, clanId: string, content: string) {
     const membership = await this.prisma.clanMember.findFirst({
       where: { userId, clanId },
     });

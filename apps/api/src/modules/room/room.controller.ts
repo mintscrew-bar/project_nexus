@@ -253,7 +253,8 @@ export class RoomController {
     const result = await this.snakeDraftService.startSnakeDraft(userId, roomId);
 
     // Broadcast draft-started to all connected clients + start auto-pick timer
-    const clientState = await this.snakeDraftService.getClientDraftState(roomId);
+    const clientState =
+      await this.snakeDraftService.getClientDraftState(roomId);
     if (clientState) {
       this.snakeDraftGateway.emitDraftStarted(roomId, clientState);
     }

@@ -262,7 +262,10 @@ export class RoleSelectionService {
       const remainingRoles = ALL_ROLES.filter((r) => !assignedRoles.has(r));
       for (let i = remainingRoles.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
-        [remainingRoles[i], remainingRoles[j]] = [remainingRoles[j], remainingRoles[i]];
+        [remainingRoles[i], remainingRoles[j]] = [
+          remainingRoles[j],
+          remainingRoles[i],
+        ];
       }
 
       let remainingIdx = 0;

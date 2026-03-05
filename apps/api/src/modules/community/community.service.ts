@@ -41,8 +41,18 @@ export interface CreatePostReportDto {
 // 금칙어 목록 (서버 자체 운영 정책)
 // ============================================
 const BANNED_WORDS = [
-  '씨발', '개새끼', '병신', '지랄', '꺼져', '죽어', '닥쳐',
-  '시발', 'ㅅㅂ', 'ㅂㅅ', 'ㅈㄹ', 'ㄲㅈ',
+  "씨발",
+  "개새끼",
+  "병신",
+  "지랄",
+  "꺼져",
+  "죽어",
+  "닥쳐",
+  "시발",
+  "ㅅㅂ",
+  "ㅂㅅ",
+  "ㅈㄹ",
+  "ㄲㅈ",
 ];
 
 /** 금칙어 포함 여부 검사 */
@@ -70,10 +80,18 @@ export class CommunityService {
       select: { isBanned: true, isRestricted: true, restrictedUntil: true },
     });
     if (user?.isBanned) {
-      throw new ForbiddenException('이용 정지 상태에서는 게시글을 작성할 수 없습니다.');
+      throw new ForbiddenException(
+        "이용 정지 상태에서는 게시글을 작성할 수 없습니다.",
+      );
     }
-    if (user?.isRestricted && user.restrictedUntil && user.restrictedUntil > new Date()) {
-      throw new ForbiddenException('임시 제한 상태에서는 게시글을 작성할 수 없습니다.');
+    if (
+      user?.isRestricted &&
+      user.restrictedUntil &&
+      user.restrictedUntil > new Date()
+    ) {
+      throw new ForbiddenException(
+        "임시 제한 상태에서는 게시글을 작성할 수 없습니다.",
+      );
     }
 
     // Rate limit 체크 (10분에 3회 제한)
@@ -81,7 +99,10 @@ export class CommunityService {
     const count = await this.redis.incr(rateLimitKey);
     if (count === 1) await this.redis.expire(rateLimitKey, 600);
     if (count > 3) {
-      throw new HttpException('잠시 후 다시 시도해주세요. (10분에 3회 제한)', HttpStatus.TOO_MANY_REQUESTS);
+      throw new HttpException(
+        "잠시 후 다시 시도해주세요. (10분에 3회 제한)",
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
     }
 
     // Validate title and content
@@ -103,7 +124,9 @@ export class CommunityService {
 
     // 금칙어 검사: 제목 + 내용 모두 검사
     if (containsBannedWord(dto.title) || containsBannedWord(dto.content)) {
-      throw new BadRequestException('금칙어가 포함된 게시글은 작성할 수 없습니다.');
+      throw new BadRequestException(
+        "금칙어가 포함된 게시글은 작성할 수 없습니다.",
+      );
     }
 
     const post = await this.prisma.post.create({
@@ -146,7 +169,12 @@ export class CommunityService {
     const normalized = Array.from(
       new Set(
         tagNames
-          .map((t) => t.toLowerCase().replace(/[^a-z0-9가-힣]/g, "").slice(0, 20))
+          .map((t) =>
+            t
+              .toLowerCase()
+              .replace(/[^a-z0-9가-힣]/g, "")
+              .slice(0, 20),
+          )
           .filter((t) => t.length > 0),
       ),
     ).slice(0, 5); // 게시글당 태그 최대 5개
@@ -174,7 +202,12 @@ export class CommunityService {
     });
   }
 
-  async getPostById(postId: string, viewerId?: string, viewerIp?: string, isAdmin = false) {
+  async getPostById(
+    postId: string,
+    viewerId?: string,
+    viewerIp?: string,
+    isAdmin = false,
+  ) {
     const post = await this.prisma.post.findFirst({
       where: { id: postId, isDeleted: false },
       include: {
@@ -233,13 +266,14 @@ export class CommunityService {
     if (post.isBlinded && !isAdmin) {
       return {
         ...post,
-        content: '[블라인드 처리된 게시글입니다. 신고에 의해 임시조치되었습니다.]',
+        content:
+          "[블라인드 처리된 게시글입니다. 신고에 의해 임시조치되었습니다.]",
         comments: post.comments.map((c) => ({
           ...c,
-          content: c.isBlinded ? '[블라인드 처리된 댓글입니다]' : c.content,
+          content: c.isBlinded ? "[블라인드 처리된 댓글입니다]" : c.content,
           replies: (c.replies || []).map((r: any) => ({
             ...r,
-            content: r.isBlinded ? '[블라인드 처리된 댓글입니다]' : r.content,
+            content: r.isBlinded ? "[블라인드 처리된 댓글입니다]" : r.content,
           })),
         })),
       };
@@ -250,10 +284,14 @@ export class CommunityService {
       ...post,
       comments: post.comments.map((c) => ({
         ...c,
-        content: c.isBlinded && !isAdmin ? '[블라인드 처리된 댓글입니다]' : c.content,
+        content:
+          c.isBlinded && !isAdmin ? "[블라인드 처리된 댓글입니다]" : c.content,
         replies: (c.replies || []).map((r: any) => ({
           ...r,
-          content: r.isBlinded && !isAdmin ? '[블라인드 처리된 댓글입니다]' : r.content,
+          content:
+            r.isBlinded && !isAdmin
+              ? "[블라인드 처리된 댓글입니다]"
+              : r.content,
         })),
       })),
     };
@@ -362,8 +400,8 @@ export class CommunityService {
       if (post.isBlinded && !isAdmin) {
         return {
           ...post,
-          title: '[블라인드 처리된 게시글]',
-          content: '',
+          title: "[블라인드 처리된 게시글]",
+          content: "",
         };
       }
       return post;
@@ -437,10 +475,12 @@ export class CommunityService {
       take: limit,
     });
     // 게시글이 1개 이상인 태그만 반환
-    return tags.filter((t) => t._count.posts > 0).map((t) => ({
-      name: t.name,
-      count: t._count.posts,
-    }));
+    return tags
+      .filter((t) => t._count.posts > 0)
+      .map((t) => ({
+        name: t.name,
+        count: t._count.posts,
+      }));
   }
 
   async deletePost(userId: string, postId: string) {
@@ -475,10 +515,18 @@ export class CommunityService {
       select: { isBanned: true, isRestricted: true, restrictedUntil: true },
     });
     if (user?.isBanned) {
-      throw new ForbiddenException('이용 정지 상태에서는 댓글을 작성할 수 없습니다.');
+      throw new ForbiddenException(
+        "이용 정지 상태에서는 댓글을 작성할 수 없습니다.",
+      );
     }
-    if (user?.isRestricted && user.restrictedUntil && user.restrictedUntil > new Date()) {
-      throw new ForbiddenException('임시 제한 상태에서는 댓글을 작성할 수 없습니다.');
+    if (
+      user?.isRestricted &&
+      user.restrictedUntil &&
+      user.restrictedUntil > new Date()
+    ) {
+      throw new ForbiddenException(
+        "임시 제한 상태에서는 댓글을 작성할 수 없습니다.",
+      );
     }
 
     // Validate content
@@ -492,7 +540,9 @@ export class CommunityService {
 
     // 금칙어 검사: 댓글 내용 검사
     if (containsBannedWord(dto.content)) {
-      throw new BadRequestException('금칙어가 포함된 댓글은 작성할 수 없습니다.');
+      throw new BadRequestException(
+        "금칙어가 포함된 댓글은 작성할 수 없습니다.",
+      );
     }
 
     // Verify post exists and is not deleted
@@ -505,13 +555,22 @@ export class CommunityService {
     }
 
     // If parentId provided, verify parent comment exists and is not deleted
-    let parentComment: { id: string; authorId: string; postId: string; isDeleted: boolean } | null = null;
+    let parentComment: {
+      id: string;
+      authorId: string;
+      postId: string;
+      isDeleted: boolean;
+    } | null = null;
     if (dto.parentId) {
       parentComment = await this.prisma.comment.findUnique({
         where: { id: dto.parentId },
       });
 
-      if (!parentComment || parentComment.postId !== postId || parentComment.isDeleted) {
+      if (
+        !parentComment ||
+        parentComment.postId !== postId ||
+        parentComment.isDeleted
+      ) {
         throw new BadRequestException("Invalid parent comment");
       }
     }
@@ -544,7 +603,11 @@ export class CommunityService {
     }
 
     // Send notification to parent comment author (if replying, and they're not the post author or replier)
-    if (parentComment && parentComment.authorId !== userId && parentComment.authorId !== post.authorId) {
+    if (
+      parentComment &&
+      parentComment.authorId !== userId &&
+      parentComment.authorId !== post.authorId
+    ) {
       await this.notificationService.notifyReply(
         parentComment.authorId,
         comment.author.username,
@@ -718,7 +781,9 @@ export class CommunityService {
       data: { userId, commentId },
     });
 
-    const likeCount = await this.prisma.commentLike.count({ where: { commentId } });
+    const likeCount = await this.prisma.commentLike.count({
+      where: { commentId },
+    });
     return { message: "Comment liked", likeCount };
   }
 
@@ -735,18 +800,26 @@ export class CommunityService {
       where: { userId_commentId: { userId, commentId } },
     });
 
-    const likeCount = await this.prisma.commentLike.count({ where: { commentId } });
+    const likeCount = await this.prisma.commentLike.count({
+      where: { commentId },
+    });
     return { message: "Comment unliked", likeCount };
   }
 
-  async hasUserLikedComment(userId: string, commentId: string): Promise<boolean> {
+  async hasUserLikedComment(
+    userId: string,
+    commentId: string,
+  ): Promise<boolean> {
     const like = await this.prisma.commentLike.findUnique({
       where: { userId_commentId: { userId, commentId } },
     });
     return !!like;
   }
 
-  async getCommentLikedStatus(userId: string, commentIds: string[]): Promise<Record<string, boolean>> {
+  async getCommentLikedStatus(
+    userId: string,
+    commentIds: string[],
+  ): Promise<Record<string, boolean>> {
     if (commentIds.length === 0) return {};
 
     const likes = await this.prisma.commentLike.findMany({
@@ -766,7 +839,9 @@ export class CommunityService {
   // ========================================
 
   async bookmarkPost(userId: string, postId: string) {
-    const post = await this.prisma.post.findFirst({ where: { id: postId, isDeleted: false } });
+    const post = await this.prisma.post.findFirst({
+      where: { id: postId, isDeleted: false },
+    });
     if (!post) throw new NotFoundException("Post not found");
 
     const existing = await this.prisma.postBookmark.findUnique({
@@ -790,7 +865,10 @@ export class CommunityService {
     return { bookmarked: false };
   }
 
-  async hasUserBookmarkedPost(userId: string, postId: string): Promise<boolean> {
+  async hasUserBookmarkedPost(
+    userId: string,
+    postId: string,
+  ): Promise<boolean> {
     const bm = await this.prisma.postBookmark.findUnique({
       where: { userId_postId: { userId, postId } },
     });
@@ -813,7 +891,9 @@ export class CommunityService {
         take: limit,
         skip: offset,
       }),
-      this.prisma.postBookmark.count({ where: { userId, post: { isDeleted: false } } }),
+      this.prisma.postBookmark.count({
+        where: { userId, post: { isDeleted: false } },
+      }),
     ]);
 
     return { posts: bookmarks.map((b) => b.post), total };
@@ -859,30 +939,50 @@ export class CommunityService {
 
   /** 게시글 블라인드(임시조치) 처리 — 관리자 수동 */
   async blindPost(postId: string): Promise<void> {
-    const post = await this.prisma.post.findFirst({ where: { id: postId, isDeleted: false } });
-    if (!post) throw new NotFoundException('게시글을 찾을 수 없습니다.');
-    await this.prisma.post.update({ where: { id: postId }, data: { isBlinded: true } });
+    const post = await this.prisma.post.findFirst({
+      where: { id: postId, isDeleted: false },
+    });
+    if (!post) throw new NotFoundException("게시글을 찾을 수 없습니다.");
+    await this.prisma.post.update({
+      where: { id: postId },
+      data: { isBlinded: true },
+    });
   }
 
   /** 게시글 블라인드 해제 — 관리자 수동 */
   async unblindPost(postId: string): Promise<void> {
-    const post = await this.prisma.post.findFirst({ where: { id: postId, isDeleted: false } });
-    if (!post) throw new NotFoundException('게시글을 찾을 수 없습니다.');
-    await this.prisma.post.update({ where: { id: postId }, data: { isBlinded: false } });
+    const post = await this.prisma.post.findFirst({
+      where: { id: postId, isDeleted: false },
+    });
+    if (!post) throw new NotFoundException("게시글을 찾을 수 없습니다.");
+    await this.prisma.post.update({
+      where: { id: postId },
+      data: { isBlinded: false },
+    });
   }
 
   /** 댓글 블라인드(임시조치) 처리 — 관리자 수동 */
   async blindComment(commentId: string): Promise<void> {
-    const comment = await this.prisma.comment.findFirst({ where: { id: commentId, isDeleted: false } });
-    if (!comment) throw new NotFoundException('댓글을 찾을 수 없습니다.');
-    await this.prisma.comment.update({ where: { id: commentId }, data: { isBlinded: true } });
+    const comment = await this.prisma.comment.findFirst({
+      where: { id: commentId, isDeleted: false },
+    });
+    if (!comment) throw new NotFoundException("댓글을 찾을 수 없습니다.");
+    await this.prisma.comment.update({
+      where: { id: commentId },
+      data: { isBlinded: true },
+    });
   }
 
   /** 댓글 블라인드 해제 — 관리자 수동 */
   async unblindComment(commentId: string): Promise<void> {
-    const comment = await this.prisma.comment.findFirst({ where: { id: commentId, isDeleted: false } });
-    if (!comment) throw new NotFoundException('댓글을 찾을 수 없습니다.');
-    await this.prisma.comment.update({ where: { id: commentId }, data: { isBlinded: false } });
+    const comment = await this.prisma.comment.findFirst({
+      where: { id: commentId, isDeleted: false },
+    });
+    if (!comment) throw new NotFoundException("댓글을 찾을 수 없습니다.");
+    await this.prisma.comment.update({
+      where: { id: commentId },
+      data: { isBlinded: false },
+    });
   }
 
   // ========================================
@@ -892,7 +992,9 @@ export class CommunityService {
   async getUserPostStats(userId: string) {
     const [postCount, commentCount, totalLikes] = await Promise.all([
       this.prisma.post.count({ where: { authorId: userId, isDeleted: false } }),
-      this.prisma.comment.count({ where: { authorId: userId, isDeleted: false } }),
+      this.prisma.comment.count({
+        where: { authorId: userId, isDeleted: false },
+      }),
       this.prisma.postLike.count({
         where: { post: { authorId: userId, isDeleted: false } },
       }),
@@ -968,7 +1070,11 @@ export class CommunityService {
     return report;
   }
 
-  async getPostReports(params: { status?: string; limit?: number; offset?: number }) {
+  async getPostReports(params: {
+    status?: string;
+    limit?: number;
+    offset?: number;
+  }) {
     const { status, limit = 20, offset = 0 } = params;
     const where = status ? { status: status as any } : {};
 
@@ -990,8 +1096,14 @@ export class CommunityService {
     return { reports, total };
   }
 
-  async reviewPostReport(reportId: string, status: "APPROVED" | "REJECTED", reviewerNote?: string) {
-    const report = await this.prisma.postReport.findUnique({ where: { id: reportId } });
+  async reviewPostReport(
+    reportId: string,
+    status: "APPROVED" | "REJECTED",
+    reviewerNote?: string,
+  ) {
+    const report = await this.prisma.postReport.findUnique({
+      where: { id: reportId },
+    });
     if (!report) throw new NotFoundException("Report not found");
 
     return this.prisma.postReport.update({

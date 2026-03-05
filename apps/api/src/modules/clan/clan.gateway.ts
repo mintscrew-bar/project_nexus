@@ -275,17 +275,13 @@ export class ClanGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   emitJoinRequestReceived(clanId: string, data: any) {
-    this.server
-      .to(`clan:${clanId}`)
-      .emit("clan-join-request-received", data);
+    this.server.to(`clan:${clanId}`).emit("clan-join-request-received", data);
   }
 
   emitJoinRequestResolved(
     clanId: string,
     data: { requestId: string; accepted: boolean },
   ) {
-    this.server
-      .to(`clan:${clanId}`)
-      .emit("clan-join-request-resolved", data);
+    this.server.to(`clan:${clanId}`).emit("clan-join-request-resolved", data);
   }
 }

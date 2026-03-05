@@ -54,7 +54,8 @@ export class GoogleStrategy extends PassportStrategy(Strategy, "google") {
       console.log(
         "Google strategy - validated user:",
         JSON.stringify(result.user, null, 2),
-        "isNewUser:", result.isNewUser,
+        "isNewUser:",
+        result.isNewUser,
       );
       // { user, isNewUser } 형태로 반환하여 컨트롤러에서 신규 여부 판단
       done(null, result);

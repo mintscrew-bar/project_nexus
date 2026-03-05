@@ -34,8 +34,7 @@ export class NotificationGateway
   async handleConnection(client: Socket) {
     try {
       const raw =
-        client.handshake.auth?.token ||
-        client.handshake.headers?.authorization;
+        client.handshake.auth?.token || client.handshake.headers?.authorization;
       const token = raw?.startsWith("Bearer ")
         ? raw.slice(7).trim()
         : raw?.trim();

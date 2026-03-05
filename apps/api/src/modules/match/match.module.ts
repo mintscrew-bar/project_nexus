@@ -14,7 +14,13 @@ import { NotificationModule } from "../notification/notification.module";
 import { RankingModule } from "../ranking/ranking.module";
 
 @Module({
-  imports: [AuthModule, RiotModule, DiscordModule, NotificationModule, RankingModule],
+  imports: [
+    AuthModule,
+    RiotModule,
+    DiscordModule,
+    NotificationModule,
+    RankingModule,
+  ],
   controllers: [MatchController],
   providers: [
     MatchService,

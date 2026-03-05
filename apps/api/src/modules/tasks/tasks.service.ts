@@ -71,10 +71,7 @@ export class TasksService {
       const staleAccounts = await this.prisma.riotAccount.findMany({
         where: {
           verifiedAt: { not: null },
-          OR: [
-            { lastSyncedAt: null },
-            { lastSyncedAt: { lt: sixHoursAgo } },
-          ],
+          OR: [{ lastSyncedAt: null }, { lastSyncedAt: { lt: sixHoursAgo } }],
         },
         select: {
           id: true,
@@ -136,7 +133,9 @@ export class TasksService {
       }
 
       if (synced > 0) {
-        this.logger.log(`Tier sync complete: ${synced}/${staleAccounts.length}`);
+        this.logger.log(
+          `Tier sync complete: ${synced}/${staleAccounts.length}`,
+        );
       }
     } catch (error) {
       this.logger.error("Tier sync task failed", error);
@@ -223,7 +222,9 @@ export class TasksService {
   @Cron("30 3 * * *")
   async handleExpiredReports(): Promise<void> {
     try {
-      const threeYearsAgo = new Date(Date.now() - 3 * 365 * 24 * 60 * 60 * 1000);
+      const threeYearsAgo = new Date(
+        Date.now() - 3 * 365 * 24 * 60 * 60 * 1000,
+      );
 
       const [userResult, postResult] = await Promise.all([
         this.prisma.userReport.deleteMany({

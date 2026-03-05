@@ -247,7 +247,8 @@ export class MatchAdvancementService {
           });
         }
         if (lbNextMatches.length > 0) {
-          const target = lbNextMatches[Math.floor(lbIdx / 2)] ?? lbNextMatches[0];
+          const target =
+            lbNextMatches[Math.floor(lbIdx / 2)] ?? lbNextMatches[0];
           if (target) {
             await setTeam(target.id, true, winnerId);
           } else {

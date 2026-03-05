@@ -18,7 +18,9 @@ export class DmService implements OnModuleInit {
     try {
       await this.redis.ping();
     } catch {
-      console.warn("Redis not available — DM unread counts will use DB fallback");
+      console.warn(
+        "Redis not available — DM unread counts will use DB fallback",
+      );
     }
   }
 

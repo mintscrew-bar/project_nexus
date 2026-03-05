@@ -181,5 +181,4 @@ export class MatchController {
       offset ? parseInt(offset, 10) : 0,
     );
   }
-
 }

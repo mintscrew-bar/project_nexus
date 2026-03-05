@@ -28,7 +28,12 @@ export class FriendService {
     // Verify receiver exists and check ban/restriction status
     const receiver = await this.prisma.user.findUnique({
       where: { id: receiverId },
-      select: { id: true, isBanned: true, isRestricted: true, restrictedUntil: true },
+      select: {
+        id: true,
+        isBanned: true,
+        isRestricted: true,
+        restrictedUntil: true,
+      },
     });
 
     if (!receiver) {
@@ -36,11 +41,19 @@ export class FriendService {
     }
 
     if (receiver.isBanned) {
-      throw new BadRequestException("Cannot send friend request to a banned user");
+      throw new BadRequestException(
+        "Cannot send friend request to a banned user",
+      );
     }
 
-    if (receiver.isRestricted && receiver.restrictedUntil && receiver.restrictedUntil > new Date()) {
-      throw new BadRequestException("Cannot send friend request to a restricted user");
+    if (
+      receiver.isRestricted &&
+      receiver.restrictedUntil &&
+      receiver.restrictedUntil > new Date()
+    ) {
+      throw new BadRequestException(
+        "Cannot send friend request to a restricted user",
+      );
     }
 
     // Also check if sender is banned/restricted
@@ -49,7 +62,12 @@ export class FriendService {
       select: { isBanned: true, isRestricted: true, restrictedUntil: true },
     });
 
-    if (sender?.isBanned || (sender?.isRestricted && sender?.restrictedUntil && sender.restrictedUntil > new Date())) {
+    if (
+      sender?.isBanned ||
+      (sender?.isRestricted &&
+        sender?.restrictedUntil &&
+        sender.restrictedUntil > new Date())
+    ) {
       throw new BadRequestException("Your account is restricted");
     }
 

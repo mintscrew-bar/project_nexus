@@ -36,7 +36,10 @@ export class AuctionGateway
   server: Server;
 
   // Track connected users per room for disconnect handling
-  private connectedUsers = new Map<string, { userId: string; roomId: string }>();
+  private connectedUsers = new Map<
+    string,
+    { userId: string; roomId: string }
+  >();
 
   // Bot auto-bid timers: key = `${roomId}_${botCaptainId}`
   private botBidTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -127,7 +130,7 @@ export class AuctionGateway
     // The timer will still expire and resolve normally (yuchal or auto-assign).
   }
 
-    @SubscribeMessage("join-room")
+  @SubscribeMessage("join-room")
   async handleJoinRoom(
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() data: { roomId: string },
@@ -148,7 +151,13 @@ export class AuctionGateway
       const captainPhase = this.auctionService.getCaptainPhase(data.roomId);
 
       if (!state && !captainPhase) {
-        return { success: true, state: null, teams: [], players: [], captainSelectionPhase: null };
+        return {
+          success: true,
+          state: null,
+          teams: [],
+          players: [],
+          captainSelectionPhase: null,
+        };
       }
 
       if (captainPhase && !state) {
@@ -176,13 +185,25 @@ export class AuctionGateway
         const { teams, players } = await this.auctionService.getFullAuctionData(
           data.roomId,
         );
-        return { success: true, state, teams, players, captainSelectionPhase: null };
+        return {
+          success: true,
+          state,
+          teams,
+          players,
+          captainSelectionPhase: null,
+        };
       } catch (error) {
         console.warn(
           `[Auction] Failed to load full join payload for room ${data.roomId}:`,
           error,
         );
-        return { success: true, state, teams: [], players: [], captainSelectionPhase: null };
+        return {
+          success: true,
+          state,
+          teams: [],
+          players: [],
+          captainSelectionPhase: null,
+        };
       }
     } catch (error: any) {
       return {
@@ -212,8 +233,13 @@ export class AuctionGateway
   ) {
     if (!client.userId) return { error: "Unauthorized" };
     try {
-      const result = await this.auctionService.handleVolunteer(client.userId, data.roomId);
-      this.server.to(`room:${data.roomId}`).emit("volunteer-list-updated", result);
+      const result = await this.auctionService.handleVolunteer(
+        client.userId,
+        data.roomId,
+      );
+      this.server
+        .to(`room:${data.roomId}`)
+        .emit("volunteer-list-updated", result);
       return { success: true };
     } catch (error: any) {
       return { error: error.message };
@@ -262,8 +288,15 @@ export class AuctionGateway
     }
   }
 
-  emitCaptainSelectionPhase(roomId: string, phase: any, participants: any[], hostId: string) {
-    this.server.to(`room:${roomId}`).emit("captain-selection-phase", { ...phase, participants, hostId });
+  emitCaptainSelectionPhase(
+    roomId: string,
+    phase: any,
+    participants: any[],
+    hostId: string,
+  ) {
+    this.server
+      .to(`room:${roomId}`)
+      .emit("captain-selection-phase", { ...phase, participants, hostId });
   }
 
   /** 팀장 확정 후 경매 시작 이벤트 발행 (room.gateway에서도 호출) */
@@ -282,7 +315,10 @@ export class AuctionGateway
     }
     // 봇 자동입찰 스케줄링
     this._scheduleBotBids(roomId).catch((e) => {
-      console.warn(`[Auction] _scheduleBotBids failed for room ${roomId}:`, e?.message);
+      console.warn(
+        `[Auction] _scheduleBotBids failed for room ${roomId}:`,
+        e?.message,
+      );
     });
   }
 
@@ -321,7 +357,9 @@ export class AuctionGateway
         // Redis unavailable — use in-memory fallback
         const key = `bid:${client.userId}`;
         const now = Date.now();
-        const timestamps = (this.bidRateLimits.get(key) ?? []).filter(t => now - t < 3000);
+        const timestamps = (this.bidRateLimits.get(key) ?? []).filter(
+          (t) => now - t < 3000,
+        );
         if (timestamps.length >= 5) {
           return { error: "Too many bids. Try again shortly." };
         }
@@ -333,7 +371,7 @@ export class AuctionGateway
           this.rateLimitCleanupTimer = setInterval(() => {
             const cleanupNow = Date.now();
             for (const [k, v] of this.bidRateLimits.entries()) {
-              const valid = v.filter(t => cleanupNow - t < 3000);
+              const valid = v.filter((t) => cleanupNow - t < 3000);
               if (valid.length === 0) {
                 this.bidRateLimits.delete(k);
               } else {
@@ -405,7 +443,10 @@ export class AuctionGateway
     }
     // 봇 자동입찰 스케줄링
     this._scheduleBotBids(roomId).catch((e) => {
-      console.warn(`[Auction] _scheduleBotBids failed for room ${roomId}:`, e?.message);
+      console.warn(
+        `[Auction] _scheduleBotBids failed for room ${roomId}:`,
+        e?.message,
+      );
     });
   }
 
@@ -437,19 +478,30 @@ export class AuctionGateway
   }
 
   /** 역할 선택 시작 (최대 2회 재시도, 500ms 간격) */
-  private async _startRoleSelectionWithRetry(roomId: string, attempt = 1): Promise<void> {
+  private async _startRoleSelectionWithRetry(
+    roomId: string,
+    attempt = 1,
+  ): Promise<void> {
     try {
-      const roleSelectionData = await this.roleSelectionService.startRoleSelection(roomId);
-      this.roleSelectionGateway.emitRoleSelectionStarted(roomId, roleSelectionData);
+      const roleSelectionData =
+        await this.roleSelectionService.startRoleSelection(roomId);
+      this.roleSelectionGateway.emitRoleSelectionStarted(
+        roomId,
+        roleSelectionData,
+      );
     } catch (error) {
-      console.error(`[Auction] Failed to start role selection for room ${roomId} (attempt ${attempt}):`, error);
+      console.error(
+        `[Auction] Failed to start role selection for room ${roomId} (attempt ${attempt}):`,
+        error,
+      );
       if (attempt < 3) {
         await new Promise((resolve) => setTimeout(resolve, 500));
         return this._startRoleSelectionWithRetry(roomId, attempt + 1);
       }
       // 모든 재시도 실패 → 호스트에게 수동 시작 안내
       this.server.to(`room:${roomId}`).emit("auction-error", {
-        error: "역할 선택 시작에 실패했습니다. 호스트가 소켓 이벤트 'retry-role-selection'을 전송해 재시도하세요.",
+        error:
+          "역할 선택 시작에 실패했습니다. 호스트가 소켓 이벤트 'retry-role-selection'을 전송해 재시도하세요.",
         retryable: true,
       });
     }
@@ -509,7 +561,10 @@ export class AuctionGateway
         this._autoBotBid(roomId, bot.captainId, bot.username)
           .then(() => this._scheduleBotBids(roomId))
           .catch((e) => {
-            console.warn(`[Auction] Bot bid/reschedule failed for room ${roomId}:`, e?.message);
+            console.warn(
+              `[Auction] Bot bid/reschedule failed for room ${roomId}:`,
+              e?.message,
+            );
           });
       }, delay);
 
@@ -518,7 +573,7 @@ export class AuctionGateway
   }
 
   /** 봇 자동입찰 실행 (최소 입찰 단위로 입찰) */
-    /** Handle a bot auto-bid at minimum valid increment. */
+  /** Handle a bot auto-bid at minimum valid increment. */
   private async _autoBotBid(
     roomId: string,
     botCaptainId: string,
@@ -592,7 +647,10 @@ export class AuctionGateway
     const delayMs = Math.max(0, timerEnd - Date.now());
     const timer = setTimeout(() => {
       this._handleBidTimerExpired(roomId).catch((error) => {
-        console.error(`[Auction] Failed to handle timer expiry for room ${roomId}:`, error);
+        console.error(
+          `[Auction] Failed to handle timer expiry for room ${roomId}:`,
+          error,
+        );
       });
     }, delayMs);
 
@@ -629,7 +687,8 @@ export class AuctionGateway
 
       const result = await this.auctionService.resolveCurrentBid(roomId);
       const state = this.auctionService.getAuctionState(roomId) ?? null;
-      const { teams, players } = await this.auctionService.getFullAuctionData(roomId);
+      const { teams, players } =
+        await this.auctionService.getFullAuctionData(roomId);
       const payload = { ...result, state, teams, players };
 
       this.server.to(`room:${roomId}`).emit("bid-resolved", payload);
@@ -653,7 +712,10 @@ export class AuctionGateway
         try {
           await this.auctionService.completeAuction(roomId);
         } catch (error) {
-          console.error(`[Auction] Failed to complete auction for room ${roomId}:`, error);
+          console.error(
+            `[Auction] Failed to complete auction for room ${roomId}:`,
+            error,
+          );
           this.server.to(`room:${roomId}`).emit("auction-error", {
             error: "경매 완료 처리 중 오류가 발생했습니다.",
           });
@@ -673,7 +735,10 @@ export class AuctionGateway
       if (state) {
         this._scheduleBidResolve(roomId, state.timerEnd);
         this._scheduleBotBids(roomId).catch((e) => {
-          console.warn(`[Auction] _scheduleBotBids failed for room ${roomId}:`, e?.message);
+          console.warn(
+            `[Auction] _scheduleBotBids failed for room ${roomId}:`,
+            e?.message,
+          );
         });
       }
 
@@ -683,5 +748,3 @@ export class AuctionGateway
     }
   }
 }
-
-

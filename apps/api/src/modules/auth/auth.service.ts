@@ -60,7 +60,9 @@ export class AuthService {
    * OAuth 유저 검증 및 생성
    * @returns { user, isNewUser } — isNewUser가 true이면 약관 동의 페이지로 리다이렉트 필요
    */
-  async validateOAuthUser(profile: OAuthProfile): Promise<{ user: any; isNewUser: boolean }> {
+  async validateOAuthUser(
+    profile: OAuthProfile,
+  ): Promise<{ user: any; isNewUser: boolean }> {
     // 이미 연동된 OAuth 제공자가 있으면 기존 유저로 처리
     const authProvider = await this.prisma.authProvider.findUnique({
       where: {
@@ -147,7 +149,9 @@ export class AuthService {
     const key = `pending_terms:${token}`;
     const userId = await this.redis.get(key);
     if (!userId) {
-      throw new UnauthorizedException("유효하지 않거나 만료된 약관 동의 토큰입니다.");
+      throw new UnauthorizedException(
+        "유효하지 않거나 만료된 약관 동의 토큰입니다.",
+      );
     }
     await this.redis.del(key);
     return userId;
@@ -156,14 +160,19 @@ export class AuthService {
   /**
    * 사용자의 약관 동의 저장 (신규 OAuth 가입자 전용)
    */
-  async agreeToTerms(userId: string, dto: {
-    termsOfService: boolean;
-    privacyPolicy: boolean;
-    ageVerification: boolean;
-    marketingConsent?: boolean;
-  }) {
+  async agreeToTerms(
+    userId: string,
+    dto: {
+      termsOfService: boolean;
+      privacyPolicy: boolean;
+      ageVerification: boolean;
+      marketingConsent?: boolean;
+    },
+  ) {
     if (!dto.termsOfService || !dto.privacyPolicy || !dto.ageVerification) {
-      throw new BadRequestException("이용약관, 개인정보처리방침, 연령 확인에 동의해야 합니다.");
+      throw new BadRequestException(
+        "이용약관, 개인정보처리방침, 연령 확인에 동의해야 합니다.",
+      );
     }
 
     await this.prisma.termsAgreement.create({
@@ -294,10 +303,17 @@ export class AuthService {
         // Temporary ban expired — lift it
         await this.prisma.user.update({
           where: { id: user.id },
-          data: { isBanned: false, banReason: null, bannedAt: null, banUntil: null },
+          data: {
+            isBanned: false,
+            banReason: null,
+            bannedAt: null,
+            banUntil: null,
+          },
         });
       } else {
-        const until = user.banUntil ? ` until ${user.banUntil.toISOString()}` : " permanently";
+        const until = user.banUntil
+          ? ` until ${user.banUntil.toISOString()}`
+          : " permanently";
         throw new UnauthorizedException(
           `Account is banned${until}. Reason: ${user.banReason || "N/A"}`,
         );
@@ -333,7 +349,14 @@ export class AuthService {
   async checkAccountStatus(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { isBanned: true, banUntil: true, banReason: true, bannedAt: true, isRestricted: true, restrictedUntil: true },
+      select: {
+        isBanned: true,
+        banUntil: true,
+        banReason: true,
+        bannedAt: true,
+        isRestricted: true,
+        restrictedUntil: true,
+      },
     });
     if (!user) return;
 
@@ -341,10 +364,17 @@ export class AuthService {
       if (user.banUntil && user.banUntil <= new Date()) {
         await this.prisma.user.update({
           where: { id: userId },
-          data: { isBanned: false, banReason: null, bannedAt: null, banUntil: null },
+          data: {
+            isBanned: false,
+            banReason: null,
+            bannedAt: null,
+            banUntil: null,
+          },
         });
       } else {
-        const until = user.banUntil ? ` until ${user.banUntil.toISOString()}` : " permanently";
+        const until = user.banUntil
+          ? ` until ${user.banUntil.toISOString()}`
+          : " permanently";
         throw new UnauthorizedException(
           `Account is banned${until}. Reason: ${user.banReason || "N/A"}`,
         );

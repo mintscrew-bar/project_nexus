@@ -38,7 +38,10 @@ export class RoleSelectionGateway
   private roomTimers = new Map<string, NodeJS.Timeout>();
   // Guard against duplicate completeRoleSelection calls (timer + all-roles-selected race)
   private completingRooms = new Set<string>();
-  private connectedUsers = new Map<string, { userId: string; roomId: string }>();
+  private connectedUsers = new Map<
+    string,
+    { userId: string; roomId: string }
+  >();
 
   constructor(
     private readonly authService: AuthService,
@@ -97,7 +100,10 @@ export class RoleSelectionGateway
     try {
       client.join(`room:${data.roomId}`);
       if (client.userId) {
-        this.connectedUsers.set(client.id, { userId: client.userId, roomId: data.roomId });
+        this.connectedUsers.set(client.id, {
+          userId: client.userId,
+          roomId: data.roomId,
+        });
       }
 
       const roleSelectionData =
@@ -161,15 +167,24 @@ export class RoleSelectionGateway
 
     const interval = setInterval(() => {
       try {
-        const timeRemaining = this.roleSelectionService.getTimeRemaining(roomId);
+        const timeRemaining =
+          this.roleSelectionService.getTimeRemaining(roomId);
 
         if (timeRemaining <= 0) {
           this.stopTimer(roomId);
           this.completeRoleSelection(roomId).catch((error) => {
-            console.error(`[RoleSelection] Timer-triggered completion failed for room ${roomId}:`, error);
+            console.error(
+              `[RoleSelection] Timer-triggered completion failed for room ${roomId}:`,
+              error,
+            );
             // 완료 실패 시 타이머 재시작하여 재시도 (completingRooms가 비어있을 때만)
-            if (!this.roomTimers.has(roomId) && !this.completingRooms.has(roomId)) {
-              console.log(`[RoleSelection] Restarting timer for retry in room ${roomId}`);
+            if (
+              !this.roomTimers.has(roomId) &&
+              !this.completingRooms.has(roomId)
+            ) {
+              console.log(
+                `[RoleSelection] Restarting timer for retry in room ${roomId}`,
+              );
               this.startTimer(roomId);
             }
           });
@@ -180,7 +195,10 @@ export class RoleSelectionGateway
           });
         }
       } catch (error) {
-        console.error(`[RoleSelection] Timer tick error for room ${roomId}:`, error);
+        console.error(
+          `[RoleSelection] Timer tick error for room ${roomId}:`,
+          error,
+        );
         this.stopTimer(roomId);
       }
     }, 1000);
@@ -207,7 +225,9 @@ export class RoleSelectionGateway
   async completeRoleSelection(roomId: string) {
     // Prevent duplicate completion (timer expiry + all-roles-selected can race)
     if (this.completingRooms.has(roomId)) {
-      console.log(`[RoleSelection] Already completing room ${roomId}, skipping`);
+      console.log(
+        `[RoleSelection] Already completing room ${roomId}, skipping`,
+      );
       return;
     }
     this.completingRooms.add(roomId);
@@ -233,7 +253,10 @@ export class RoleSelectionGateway
         const matches = await this.matchService.getRoomMatches(roomId);
         this.matchGateway.emitBracketGenerated(roomId, { bracket: matches });
       } catch (bracketError) {
-        console.error(`[RoleSelection] Failed to emit bracket-generated for room ${roomId}:`, bracketError);
+        console.error(
+          `[RoleSelection] Failed to emit bracket-generated for room ${roomId}:`,
+          bracketError,
+        );
         // bracket 페이지로 이동 후 클라이언트가 직접 조회하므로 치명적이지 않음
       }
 

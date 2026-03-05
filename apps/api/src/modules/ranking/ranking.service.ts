@@ -70,10 +70,7 @@ export class RankingService {
         `Updated ranking for user ${userId}: ${wins}W ${losses}L (${winRate.toFixed(1)}%)`,
       );
     } catch (error) {
-      this.logger.error(
-        `Failed to update ranking for user ${userId}:`,
-        error,
-      );
+      this.logger.error(`Failed to update ranking for user ${userId}:`, error);
     }
   }
 
@@ -273,9 +270,7 @@ export class RankingService {
       distinct: ["userId"],
     });
 
-    this.logger.log(
-      `Recalculating rankings for ${users.length} users...`,
-    );
+    this.logger.log(`Recalculating rankings for ${users.length} users...`);
 
     let processed = 0;
     for (const { userId } of users) {

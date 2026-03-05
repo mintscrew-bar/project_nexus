@@ -178,7 +178,11 @@ export class SnakeDraftService {
           tier: acc?.tier,
           rank: acc?.rank,
           lp: acc?.lp,
-          mmr: calculateTierScore(acc?.tier || 'UNRANKED', acc?.rank || '', acc?.lp || 0),
+          mmr: calculateTierScore(
+            acc?.tier || "UNRANKED",
+            acc?.rank || "",
+            acc?.lp || 0,
+          ),
           mainRole: acc?.mainRole,
           subRole: acc?.subRole,
         };
@@ -203,8 +207,16 @@ export class SnakeDraftService {
           // Tier + Rank + LP 통합 점수 기준 정렬
           const aAcc = a.user.riotAccounts[0];
           const bAcc = b.user.riotAccounts[0];
-          const aScore = calculateTierScore(aAcc?.tier || "UNRANKED", aAcc?.rank || "", aAcc?.lp || 0);
-          const bScore = calculateTierScore(bAcc?.tier || "UNRANKED", bAcc?.rank || "", bAcc?.lp || 0);
+          const aScore = calculateTierScore(
+            aAcc?.tier || "UNRANKED",
+            aAcc?.rank || "",
+            aAcc?.lp || 0,
+          );
+          const bScore = calculateTierScore(
+            bAcc?.tier || "UNRANKED",
+            bAcc?.rank || "",
+            bAcc?.lp || 0,
+          );
           return bScore - aScore;
         })
         .slice(0, numTeams);
@@ -349,8 +361,7 @@ export class SnakeDraftService {
       (id) => id !== targetPlayerId,
     );
     state.currentTeamIndex++;
-    state.timerEnd =
-      Date.now() + (roomSettings?.pickTimeLimit ?? 60) * 1000;
+    state.timerEnd = Date.now() + (roomSettings?.pickTimeLimit ?? 60) * 1000;
 
     if (state.currentTeamIndex % state.numTeams === 0) {
       state.currentRound++;
@@ -438,7 +449,11 @@ export class SnakeDraftService {
           username: m.user?.username ?? "Unknown",
           tier: acc?.tier ?? "UNRANKED",
           rank: acc?.rank,
-          mmr: calculateTierScore(acc?.tier || "UNRANKED", acc?.rank || "", acc?.lp || 0),
+          mmr: calculateTierScore(
+            acc?.tier || "UNRANKED",
+            acc?.rank || "",
+            acc?.lp || 0,
+          ),
           position: m.assignedRole ?? acc?.mainRole ?? "FLEX",
         };
       }),
@@ -451,7 +466,11 @@ export class SnakeDraftService {
         username: p.user?.username ?? "Unknown",
         tier: acc?.tier ?? "UNRANKED",
         rank: acc?.rank,
-        mmr: calculateTierScore(acc?.tier || "UNRANKED", acc?.rank || "", acc?.lp || 0),
+        mmr: calculateTierScore(
+          acc?.tier || "UNRANKED",
+          acc?.rank || "",
+          acc?.lp || 0,
+        ),
         position: acc?.mainRole ?? "FLEX",
       };
     });

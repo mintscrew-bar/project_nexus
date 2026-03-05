@@ -1,7 +1,11 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { MatchBracketService } from "./match-bracket.service";
 import { PrismaService } from "../prisma/prisma.service";
-import { BadRequestException, ForbiddenException, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from "@nestjs/common";
 
 const makeTeam = (id: string, memberCount = 5) => ({
   id,
@@ -77,9 +81,9 @@ describe("MatchBracketService", () => {
 
     it("ROLE_SELECTION 상태가 아니면 BadRequestException 발생", async () => {
       setupRoom(2, { status: "WAITING" });
-      await expect(
-        service.generateBracket("host-1", "room-1"),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.generateBracket("host-1", "room-1")).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it("팀원이 5명이 아닌 팀이 있으면 BadRequestException 발생", async () => {
@@ -92,16 +96,16 @@ describe("MatchBracketService", () => {
       });
       prisma.match.findMany.mockResolvedValue([]);
 
-      await expect(
-        service.generateBracket("host-1", "room-1"),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.generateBracket("host-1", "room-1")).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it("지원하지 않는 팀 수(1팀)이면 BadRequestException 발생", async () => {
       setupRoom(1);
-      await expect(
-        service.generateBracket("host-1", "room-1"),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.generateBracket("host-1", "room-1")).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 

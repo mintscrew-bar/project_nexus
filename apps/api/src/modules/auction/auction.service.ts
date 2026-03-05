@@ -138,7 +138,11 @@ export class AuctionService {
             avatar: p.user.avatar,
             tier: acc?.tier,
             rank: acc?.rank,
-            mmr: calculateTierScore(acc?.tier || 'UNRANKED', acc?.rank || '', acc?.lp || 0),
+            mmr: calculateTierScore(
+              acc?.tier || "UNRANKED",
+              acc?.rank || "",
+              acc?.lp || 0,
+            ),
           };
         }),
       };
@@ -176,7 +180,11 @@ export class AuctionService {
             avatar: p.user.avatar,
             tier: acc?.tier,
             rank: acc?.rank,
-            mmr: calculateTierScore(acc?.tier || 'UNRANKED', acc?.rank || '', acc?.lp || 0),
+            mmr: calculateTierScore(
+              acc?.tier || "UNRANKED",
+              acc?.rank || "",
+              acc?.lp || 0,
+            ),
           };
         }),
       };
@@ -190,14 +198,26 @@ export class AuctionService {
   // Captain Selection Helpers
   // ========================================
 
-  private async _startAuctionWithCaptains(hostId: string, roomId: string, room: any) {
+  private async _startAuctionWithCaptains(
+    hostId: string,
+    roomId: string,
+    room: any,
+  ) {
     const numTeams = Math.max(2, Math.floor(room.participants.length / 5));
 
     const sortedPlayers = [...room.participants].sort((a: any, b: any) => {
       const aAcc = a.user.riotAccounts[0];
       const bAcc = b.user.riotAccounts[0];
-      const aScore = calculateTierScore(aAcc?.tier || "UNRANKED", aAcc?.rank || "", aAcc?.lp || 0);
-      const bScore = calculateTierScore(bAcc?.tier || "UNRANKED", bAcc?.rank || "", bAcc?.lp || 0);
+      const aScore = calculateTierScore(
+        aAcc?.tier || "UNRANKED",
+        aAcc?.rank || "",
+        aAcc?.lp || 0,
+      );
+      const bScore = calculateTierScore(
+        bAcc?.tier || "UNRANKED",
+        bAcc?.rank || "",
+        bAcc?.lp || 0,
+      );
       return bScore - aScore;
     });
 
@@ -205,9 +225,16 @@ export class AuctionService {
     const players = sortedPlayers.slice(numTeams);
 
     const captainUserIds = captains.map((c: any) => c.userId);
-    const { teams } = await this._applySelectedCaptains(roomId, room, captainUserIds);
+    const { teams } = await this._applySelectedCaptains(
+      roomId,
+      room,
+      captainUserIds,
+    );
 
-    const botCaptainIds = this._filterBotCaptains(captainUserIds, room.participants);
+    const botCaptainIds = this._filterBotCaptains(
+      captainUserIds,
+      room.participants,
+    );
 
     const auctionState: AuctionState = {
       roomId,
@@ -234,7 +261,11 @@ export class AuctionService {
           tier: acc?.tier,
           rank: acc?.rank,
           lp: acc?.lp,
-          mmr: calculateTierScore(acc?.tier || 'UNRANKED', acc?.rank || '', acc?.lp || 0),
+          mmr: calculateTierScore(
+            acc?.tier || "UNRANKED",
+            acc?.rank || "",
+            acc?.lp || 0,
+          ),
           mainRole: acc?.mainRole,
           subRole: acc?.subRole,
         };
@@ -243,8 +274,14 @@ export class AuctionService {
     };
   }
 
-  async _applySelectedCaptains(roomId: string, room: any, captainUserIds: string[]) {
-    const captainParticipants = room.participants.filter((p: any) => captainUserIds.includes(p.userId));
+  async _applySelectedCaptains(
+    roomId: string,
+    room: any,
+    captainUserIds: string[],
+  ) {
+    const captainParticipants = room.participants.filter((p: any) =>
+      captainUserIds.includes(p.userId),
+    );
 
     const teams = await Promise.all(
       captainParticipants.map(async (captain: any, index: number) => {
@@ -293,7 +330,9 @@ export class AuctionService {
               where: { userId: captain.userId, provider: "DISCORD" },
             });
             if (discordProvider) {
-              await this.discordVoiceService.assignCaptainRole(discordProvider.providerId);
+              await this.discordVoiceService.assignCaptainRole(
+                discordProvider.providerId,
+              );
             }
           }),
         );
@@ -305,7 +344,10 @@ export class AuctionService {
     return { teams };
   }
 
-  async handleVolunteer(userId: string, roomId: string): Promise<{ volunteers: string[] }> {
+  async handleVolunteer(
+    userId: string,
+    roomId: string,
+  ): Promise<{ volunteers: string[] }> {
     const phase = this.captainPhases.get(roomId);
     if (!phase || phase.mode !== TeamCaptainSelection.VOLUNTEER) {
       throw new BadRequestException("Not in volunteer phase");
@@ -321,18 +363,25 @@ export class AuctionService {
     return { volunteers: phase.volunteers };
   }
 
-  async finalizeVolunteers(hostId: string, roomId: string, selectedUserIds?: string[]) {
+  async finalizeVolunteers(
+    hostId: string,
+    roomId: string,
+    selectedUserIds?: string[],
+  ) {
     const room = await this.prisma.room.findUnique({
       where: { id: roomId },
       include: {
         participants: {
           where: { role: "PLAYER" },
-          include: { user: { include: { riotAccounts: { where: { isPrimary: true } } } } },
+          include: {
+            user: { include: { riotAccounts: { where: { isPrimary: true } } } },
+          },
         },
       },
     });
     if (!room) throw new NotFoundException("Room not found");
-    if (room.hostId !== hostId) throw new ForbiddenException("Only host can finalize");
+    if (room.hostId !== hostId)
+      throw new ForbiddenException("Only host can finalize");
 
     const phase = this.captainPhases.get(roomId);
     if (!phase || phase.mode !== TeamCaptainSelection.VOLUNTEER) {
@@ -351,8 +400,18 @@ export class AuctionService {
       const sorted = [...room.participants].sort((a, b) => {
         const aAcc = a.user.riotAccounts[0];
         const bAcc = b.user.riotAccounts[0];
-        return calculateTierScore(bAcc?.tier || 'UNRANKED', bAcc?.rank || '', bAcc?.lp || 0)
-          - calculateTierScore(aAcc?.tier || 'UNRANKED', aAcc?.rank || '', aAcc?.lp || 0);
+        return (
+          calculateTierScore(
+            bAcc?.tier || "UNRANKED",
+            bAcc?.rank || "",
+            bAcc?.lp || 0,
+          ) -
+          calculateTierScore(
+            aAcc?.tier || "UNRANKED",
+            aAcc?.rank || "",
+            aAcc?.lp || 0,
+          )
+        );
       });
       captainUserIds = sorted.slice(0, numTeams).map((p) => p.userId);
     } else if (phase.volunteers.length <= numTeams) {
@@ -365,17 +424,33 @@ export class AuctionService {
           .sort((a, b) => {
             const aAcc = a.user.riotAccounts[0];
             const bAcc = b.user.riotAccounts[0];
-            return calculateTierScore(bAcc?.tier || 'UNRANKED', bAcc?.rank || '', bAcc?.lp || 0)
-              - calculateTierScore(aAcc?.tier || 'UNRANKED', aAcc?.rank || '', aAcc?.lp || 0);
+            return (
+              calculateTierScore(
+                bAcc?.tier || "UNRANKED",
+                bAcc?.rank || "",
+                bAcc?.lp || 0,
+              ) -
+              calculateTierScore(
+                aAcc?.tier || "UNRANKED",
+                aAcc?.rank || "",
+                aAcc?.lp || 0,
+              )
+            );
           });
-        captainUserIds.push(...nonVolunteers.slice(0, remaining).map((p) => p.userId));
+        captainUserIds.push(
+          ...nonVolunteers.slice(0, remaining).map((p) => p.userId),
+        );
       }
     } else {
       // ?먯썝??珥덇낵: 諛⑹옣??selectedUserIds 吏???꾩닔
       if (!selectedUserIds || selectedUserIds.length !== numTeams) {
-        throw new BadRequestException(`Select exactly ${numTeams} captains from volunteers`);
+        throw new BadRequestException(
+          `Select exactly ${numTeams} captains from volunteers`,
+        );
       }
-      const invalidIds = selectedUserIds.filter((id) => !phase.volunteers.includes(id));
+      const invalidIds = selectedUserIds.filter(
+        (id) => !phase.volunteers.includes(id),
+      );
       if (invalidIds.length > 0) {
         throw new BadRequestException("Selected users must be volunteers");
       }
@@ -384,11 +459,20 @@ export class AuctionService {
 
     this.captainPhases.delete(roomId);
 
-    const { teams } = await this._applySelectedCaptains(roomId, room, captainUserIds);
+    const { teams } = await this._applySelectedCaptains(
+      roomId,
+      room,
+      captainUserIds,
+    );
 
-    const nonCaptains = room.participants.filter((p) => !captainUserIds.includes(p.userId));
+    const nonCaptains = room.participants.filter(
+      (p) => !captainUserIds.includes(p.userId),
+    );
     const numTeamsFinal = teams.length;
-    const botCaptainIds = this._filterBotCaptains(captainUserIds, room.participants);
+    const botCaptainIds = this._filterBotCaptains(
+      captainUserIds,
+      room.participants,
+    );
 
     const auctionState: AuctionState = {
       roomId,
@@ -415,7 +499,11 @@ export class AuctionService {
           tier: acc?.tier,
           rank: acc?.rank,
           lp: acc?.lp,
-          mmr: calculateTierScore(acc?.tier || 'UNRANKED', acc?.rank || '', acc?.lp || 0),
+          mmr: calculateTierScore(
+            acc?.tier || "UNRANKED",
+            acc?.rank || "",
+            acc?.lp || 0,
+          ),
           mainRole: acc?.mainRole,
           subRole: acc?.subRole,
         };
@@ -425,18 +513,25 @@ export class AuctionService {
     };
   }
 
-  async selectManualCaptains(hostId: string, roomId: string, userIds: string[]) {
+  async selectManualCaptains(
+    hostId: string,
+    roomId: string,
+    userIds: string[],
+  ) {
     const room = await this.prisma.room.findUnique({
       where: { id: roomId },
       include: {
         participants: {
           where: { role: "PLAYER" },
-          include: { user: { include: { riotAccounts: { where: { isPrimary: true } } } } },
+          include: {
+            user: { include: { riotAccounts: { where: { isPrimary: true } } } },
+          },
         },
       },
     });
     if (!room) throw new NotFoundException("Room not found");
-    if (room.hostId !== hostId) throw new ForbiddenException("Only host can select captains");
+    if (room.hostId !== hostId)
+      throw new ForbiddenException("Only host can select captains");
 
     const numTeams = Math.max(2, Math.floor(room.participants.length / 5));
     if (userIds.length !== numTeams) {
@@ -450,7 +545,9 @@ export class AuctionService {
     }
 
     const { teams } = await this._applySelectedCaptains(roomId, room, userIds);
-    const nonCaptains = room.participants.filter((p) => !userIds.includes(p.userId));
+    const nonCaptains = room.participants.filter(
+      (p) => !userIds.includes(p.userId),
+    );
     const botCaptainIds = this._filterBotCaptains(userIds, room.participants);
 
     const auctionState: AuctionState = {
@@ -478,7 +575,11 @@ export class AuctionService {
           tier: acc?.tier,
           rank: acc?.rank,
           lp: acc?.lp,
-          mmr: calculateTierScore(acc?.tier || 'UNRANKED', acc?.rank || '', acc?.lp || 0),
+          mmr: calculateTierScore(
+            acc?.tier || "UNRANKED",
+            acc?.rank || "",
+            acc?.lp || 0,
+          ),
           mainRole: acc?.mainRole,
           subRole: acc?.subRole,
         };
@@ -492,7 +593,10 @@ export class AuctionService {
     return this.captainPhases.get(roomId);
   }
 
-  setCaptainPhaseTimerHandle(roomId: string, handle: ReturnType<typeof setTimeout>) {
+  setCaptainPhaseTimerHandle(
+    roomId: string,
+    handle: ReturnType<typeof setTimeout>,
+  ) {
     const phase = this.captainPhases.get(roomId);
     if (phase) phase.timerHandle = handle;
   }
@@ -724,8 +828,12 @@ export class AuctionService {
       const nextYuchalCount = prevYuchalCount + 1;
       const bidIncrement = room.minBidIncrement || 50;
       const maxTeamSize = 5;
-      const incompleteTeams = room.teams.filter((t) => t._count.members < maxTeamSize);
-      const anyCanBid = incompleteTeams.some((t) => t.remainingBudget >= bidIncrement);
+      const incompleteTeams = room.teams.filter(
+        (t) => t._count.members < maxTeamSize,
+      );
+      const anyCanBid = incompleteTeams.some(
+        (t) => t.remainingBudget >= bidIncrement,
+      );
 
       // Simulation rule: if someone can still bid and cycle not exhausted, keep same player.
       if (nextYuchalCount < state.maxYuchalCycles && anyCanBid) {
@@ -738,7 +846,8 @@ export class AuctionService {
       }
 
       // Simulation rule: otherwise force-assign to incomplete team with highest budget.
-      const targetTeamPool = incompleteTeams.length > 0 ? incompleteTeams : room.teams;
+      const targetTeamPool =
+        incompleteTeams.length > 0 ? incompleteTeams : room.teams;
       const targetTeam = [...targetTeamPool].sort(
         (a, b) => b.remainingBudget - a.remainingBudget,
       )[0];
@@ -883,7 +992,11 @@ export class AuctionService {
 
     // Don't delete rooms that have progressed beyond WAITING
     // (e.g., DRAFT_COMPLETED, ROLE_SELECTION, IN_PROGRESS)
-    const deletableStatuses: RoomStatus[] = [RoomStatus.WAITING, RoomStatus.DRAFT, RoomStatus.TEAM_SELECTION];
+    const deletableStatuses: RoomStatus[] = [
+      RoomStatus.WAITING,
+      RoomStatus.DRAFT,
+      RoomStatus.TEAM_SELECTION,
+    ];
     if (!deletableStatuses.includes(room.status as RoomStatus)) {
       return false;
     }
@@ -920,7 +1033,9 @@ export class AuctionService {
   }
 
   /** 寃쎈ℓ ?섏씠吏 珥덇린 濡쒕뱶?? ?꾩옱 teams + ?⑥? players 諛섑솚 */
-  async getFullAuctionData(roomId: string): Promise<{ teams: any[]; players: any[] }> {
+  async getFullAuctionData(
+    roomId: string,
+  ): Promise<{ teams: any[]; players: any[] }> {
     const room = await this.prisma.room.findUnique({
       where: { id: roomId },
       include: {
@@ -942,8 +1057,10 @@ export class AuctionService {
         },
         participants: {
           where: { isCaptain: false, teamId: null },
-          include: { user: { include: { riotAccounts: { where: { isPrimary: true } } } } },
-          orderBy: { joinedAt: 'asc' },
+          include: {
+            user: { include: { riotAccounts: { where: { isPrimary: true } } } },
+          },
+          orderBy: { joinedAt: "asc" },
         },
       },
     });
@@ -959,7 +1076,11 @@ export class AuctionService {
         rank: acc?.rank,
         mainRole: acc?.mainRole,
         subRole: acc?.subRole,
-        mmr: calculateTierScore(acc?.tier || 'UNRANKED', acc?.rank || '', acc?.lp || 0),
+        mmr: calculateTierScore(
+          acc?.tier || "UNRANKED",
+          acc?.rank || "",
+          acc?.lp || 0,
+        ),
       };
     });
 
@@ -975,14 +1096,18 @@ export class AuctionService {
         const acc = m.user?.riotAccounts?.[0];
         return {
           id: m.userId,
-          username: m.user?.username ?? 'Unknown',
+          username: m.user?.username ?? "Unknown",
           avatar: m.user?.avatar,
-          tier: acc?.tier ?? 'UNRANKED',
+          tier: acc?.tier ?? "UNRANKED",
           rank: acc?.rank,
           mainRole: acc?.mainRole,
           subRole: acc?.subRole,
-          mmr: calculateTierScore(acc?.tier || 'UNRANKED', acc?.rank || '', acc?.lp || 0),
-          position: m.assignedRole ?? acc?.mainRole ?? 'FLEX',
+          mmr: calculateTierScore(
+            acc?.tier || "UNRANKED",
+            acc?.rank || "",
+            acc?.lp || 0,
+          ),
+          position: m.assignedRole ?? acc?.mainRole ?? "FLEX",
         };
       }),
     }));
@@ -996,7 +1121,10 @@ export class AuctionService {
   }
 
   /** captainUserIds 以?遊뉗씤 userId留??꾪꽣 (participants 諛곗뿴?먯꽌 username 議고쉶) */
-  private _filterBotCaptains(captainUserIds: string[], participants: any[]): string[] {
+  private _filterBotCaptains(
+    captainUserIds: string[],
+    participants: any[],
+  ): string[] {
     return captainUserIds.filter((id) => {
       const p = participants.find((p: any) => p.userId === id);
       return p && this.isBotUsername(p.user?.username ?? "");
@@ -1060,4 +1188,3 @@ export class AuctionService {
     return colors[index % colors.length];
   }
 }
-

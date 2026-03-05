@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException } from "@nestjs/common";
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  BadRequestException,
+} from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 
 @Injectable()
@@ -117,7 +122,13 @@ export class UserService {
         select: { showMatchHistory: true },
       });
       if (settings && !settings.showMatchHistory) {
-        return { gamesPlayed: 0, wins: 0, losses: 0, winRate: 0, participations: 0 };
+        return {
+          gamesPlayed: 0,
+          wins: 0,
+          losses: 0,
+          winRate: 0,
+          participations: 0,
+        };
       }
     }
 
@@ -162,7 +173,10 @@ export class UserService {
     };
   }
 
-  async updateProfile(userId: string, data: { username?: string; bio?: string }) {
+  async updateProfile(
+    userId: string,
+    data: { username?: string; bio?: string },
+  ) {
     return this.prisma.user.update({
       where: { id: userId },
       data,
@@ -210,7 +224,9 @@ export class UserService {
       throw new BadRequestException("이의신청 사유를 입력해주세요.");
     }
     if (reason.length > 1000) {
-      throw new BadRequestException("이의신청 사유는 1000자 이내로 입력해주세요.");
+      throw new BadRequestException(
+        "이의신청 사유는 1000자 이내로 입력해주세요.",
+      );
     }
 
     // 유저 상태 확인 — 밴 또는 임시제재 상태여야 제출 가능
@@ -220,7 +236,9 @@ export class UserService {
     });
     if (!user) throw new NotFoundException("유저를 찾을 수 없습니다.");
     if (!user.isBanned && !user.isRestricted) {
-      throw new BadRequestException("밴 또는 임시제재 상태에서만 이의신청이 가능합니다.");
+      throw new BadRequestException(
+        "밴 또는 임시제재 상태에서만 이의신청이 가능합니다.",
+      );
     }
 
     // 기존 PENDING 이의신청 존재 여부 확인

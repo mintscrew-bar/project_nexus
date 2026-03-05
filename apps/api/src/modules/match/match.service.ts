@@ -54,7 +54,10 @@ export class MatchService {
   // ========================================
 
   async generateBracket(hostId: string, roomId: string): Promise<Bracket> {
-    const bracket = await this.matchBracketService.generateBracket(hostId, roomId);
+    const bracket = await this.matchBracketService.generateBracket(
+      hostId,
+      roomId,
+    );
 
     // Auto-generate tournament codes for matches with both teams assigned
     await this.autoGenerateCodesForRoom(roomId);
@@ -205,7 +208,9 @@ export class MatchService {
       try {
         let code: string;
         try {
-          code = await this.riotTournamentService.createTournamentCode(match.id);
+          code = await this.riotTournamentService.createTournamentCode(
+            match.id,
+          );
         } catch {
           code = `NEXUS-${match.id.substring(0, 8).toUpperCase()}`;
         }
@@ -215,9 +220,14 @@ export class MatchService {
           data: { tournamentCode: code },
         });
 
-        this.logger.log(`Auto-generated tournament code for match ${match.id}: ${code}`);
+        this.logger.log(
+          `Auto-generated tournament code for match ${match.id}: ${code}`,
+        );
       } catch (error) {
-        this.logger.warn(`Failed to auto-generate code for match ${match.id}:`, error);
+        this.logger.warn(
+          `Failed to auto-generate code for match ${match.id}:`,
+          error,
+        );
       }
     }
   }
@@ -347,7 +357,9 @@ export class MatchService {
       }
     } else if (updatedMatch.bracketType === BracketType.DOUBLE_ELIMINATION) {
       const loserId =
-        winnerId === updatedMatch.teamAId ? updatedMatch.teamBId : updatedMatch.teamAId;
+        winnerId === updatedMatch.teamAId
+          ? updatedMatch.teamBId
+          : updatedMatch.teamAId;
       if (loserId) {
         await this.matchAdvancementService.advanceDoubleElimination(
           updatedMatch.roomId,
@@ -378,8 +390,14 @@ export class MatchService {
         );
 
         if (guildId && channelId) {
-          const winner = winnerId === updatedMatch.teamAId ? updatedMatch.teamA : updatedMatch.teamB;
-          const loser = winnerId === updatedMatch.teamAId ? updatedMatch.teamB : updatedMatch.teamA;
+          const winner =
+            winnerId === updatedMatch.teamAId
+              ? updatedMatch.teamA
+              : updatedMatch.teamB;
+          const loser =
+            winnerId === updatedMatch.teamAId
+              ? updatedMatch.teamB
+              : updatedMatch.teamA;
 
           const embed = this.discordBotService.buildMatchResultEmbed(
             winner?.name ?? "TBD",
@@ -549,8 +567,9 @@ export class MatchService {
         // Move all participants back to lobby voice channel
         try {
           if (this.discordVoiceService) {
-            const moveResult =
-              await this.discordVoiceService.moveAllToLobby(match.roomId);
+            const moveResult = await this.discordVoiceService.moveAllToLobby(
+              match.roomId,
+            );
             this.logger.log(
               `Moved participants to lobby for room ${match.roomId}: ${moveResult.success} success, ${moveResult.failed} failed`,
             );
@@ -593,9 +612,14 @@ export class MatchService {
         for (const { userId: uid } of participantUsers) {
           await this.rankingService.updateRanking(uid);
         }
-        this.logger.log(`Updated rankings for ${participantUsers.length} participants of match ${matchId}`);
+        this.logger.log(
+          `Updated rankings for ${participantUsers.length} participants of match ${matchId}`,
+        );
       } catch (error) {
-        this.logger.error(`Failed to update rankings for match ${matchId}:`, error);
+        this.logger.error(
+          `Failed to update rankings for match ${matchId}:`,
+          error,
+        );
       }
     });
 
@@ -827,7 +851,6 @@ export class MatchService {
       },
     });
   }
-
 
   // ========================================
   // Match Details (Riot API Data)

@@ -35,7 +35,10 @@ export class SnakeDraftGateway
   @WebSocketServer()
   server: Server;
 
-  private connectedUsers = new Map<string, { userId: string; roomId: string }>();
+  private connectedUsers = new Map<
+    string,
+    { userId: string; roomId: string }
+  >();
   // Pick timer per room: auto-picks when captain doesn't pick in time
   private pickTimers = new Map<string, ReturnType<typeof setTimeout>>();
   // Guard against concurrent autoPick calls
@@ -124,14 +127,19 @@ export class SnakeDraftGateway
       }
 
       // Use getClientDraftState for rich state with team/player details
-      const state = await this.snakeDraftService.getClientDraftState(data.roomId);
+      const state = await this.snakeDraftService.getClientDraftState(
+        data.roomId,
+      );
 
       return {
         success: true,
         state,
       };
     } catch (error: any) {
-      return { success: false, error: error?.message || "Failed to join draft room" };
+      return {
+        success: false,
+        error: error?.message || "Failed to join draft room",
+      };
     }
   }
 
@@ -181,7 +189,10 @@ export class SnakeDraftGateway
     }
 
     // Race condition guard: reject if auto-pick or another manual pick is in progress
-    if (this.autoPickingRooms.has(data.roomId) || this.manualPickingRooms.has(data.roomId)) {
+    if (
+      this.autoPickingRooms.has(data.roomId) ||
+      this.manualPickingRooms.has(data.roomId)
+    ) {
       return { error: "A pick is already in progress, please wait" };
     }
 
@@ -192,7 +203,9 @@ export class SnakeDraftGateway
 
     try {
       // Capture which team is picking BEFORE advancing state
-      const pickingTeamId = this.snakeDraftService.getCurrentPickingTeam(data.roomId);
+      const pickingTeamId = this.snakeDraftService.getCurrentPickingTeam(
+        data.roomId,
+      );
 
       const state = await this.snakeDraftService.makePick(
         client.userId,
@@ -201,8 +214,12 @@ export class SnakeDraftGateway
       );
 
       // Get enriched state for player details
-      const clientState = await this.snakeDraftService.getClientDraftState(data.roomId);
-      const pickingTeam = clientState?.teams?.find((t: any) => t.id === pickingTeamId);
+      const clientState = await this.snakeDraftService.getClientDraftState(
+        data.roomId,
+      );
+      const pickingTeam = clientState?.teams?.find(
+        (t: any) => t.id === pickingTeamId,
+      );
       const pickedPlayer = pickingTeam?.members?.find(
         (m: any) => m.id === data.targetPlayerId,
       );
@@ -211,7 +228,10 @@ export class SnakeDraftGateway
       // Broadcast with frontend-expected shape
       this.server.to(`draft:${data.roomId}`).emit("pick-made", {
         teamId: pickingTeamId,
-        player: pickedPlayer ?? { id: data.targetPlayerId, username: client.username },
+        player: pickedPlayer ?? {
+          id: data.targetPlayerId,
+          username: client.username,
+        },
         nextTeamId,
         timerEnd: state.timerEnd,
       });
@@ -227,7 +247,9 @@ export class SnakeDraftGateway
         this.completingDrafts.add(data.roomId);
         try {
           // Get final teams BEFORE completeDraft (which deletes in-memory state)
-          const finalState = await this.snakeDraftService.getClientDraftState(data.roomId);
+          const finalState = await this.snakeDraftService.getClientDraftState(
+            data.roomId,
+          );
           await this.snakeDraftService.completeDraft(data.roomId);
           this.server.to(`draft:${data.roomId}`).emit("draft-complete", {
             teams: finalState?.teams ?? [],
@@ -330,7 +352,11 @@ export class SnakeDraftGateway
       this.pickTimers.delete(roomId);
 
       // 중복 autoPick 방지 + 수동 픽 진행 중이면 스킵 (race condition 방지)
-      if (this.autoPickingRooms.has(roomId) || this.manualPickingRooms.has(roomId)) return;
+      if (
+        this.autoPickingRooms.has(roomId) ||
+        this.manualPickingRooms.has(roomId)
+      )
+        return;
       this.autoPickingRooms.add(roomId);
 
       try {
@@ -347,9 +373,13 @@ export class SnakeDraftGateway
         this.emitTimerExpired(roomId);
 
         // Get enriched state for player details
-        const clientState = await this.snakeDraftService.getClientDraftState(roomId);
-        const pickingTeam = clientState?.teams?.find((t: any) => t.id === pickingTeamId);
-        const lastMember = pickingTeam?.members?.[pickingTeam.members.length - 1];
+        const clientState =
+          await this.snakeDraftService.getClientDraftState(roomId);
+        const pickingTeam = clientState?.teams?.find(
+          (t: any) => t.id === pickingTeamId,
+        );
+        const lastMember =
+          pickingTeam?.members?.[pickingTeam.members.length - 1];
         const nextTeamId = state.pickOrder[state.currentTeamIndex] ?? null;
 
         // Emit pick-made with same shape as manual pick
@@ -367,14 +397,16 @@ export class SnakeDraftGateway
           username: lastMember?.username ?? "Auto-pick",
         });
 
-        const isComplete = await this.snakeDraftService.checkDraftComplete(roomId);
+        const isComplete =
+          await this.snakeDraftService.checkDraftComplete(roomId);
         if (isComplete) {
           // Guard against double completeDraft (race between auto-pick and manual pick)
           if (this.completingDrafts.has(roomId)) return;
           this.completingDrafts.add(roomId);
           try {
             // Get final teams BEFORE completeDraft (which deletes in-memory state)
-            const finalState = await this.snakeDraftService.getClientDraftState(roomId);
+            const finalState =
+              await this.snakeDraftService.getClientDraftState(roomId);
             await this.snakeDraftService.completeDraft(roomId);
             this.server.to(`draft:${roomId}`).emit("draft-complete", {
               teams: finalState?.teams ?? [],
@@ -382,7 +414,10 @@ export class SnakeDraftGateway
 
             const roleSelectionData =
               await this.roleSelectionService.startRoleSelection(roomId);
-            this.roleSelectionGateway.emitRoleSelectionStarted(roomId, roleSelectionData);
+            this.roleSelectionGateway.emitRoleSelectionStarted(
+              roomId,
+              roleSelectionData,
+            );
           } finally {
             this.completingDrafts.delete(roomId);
           }
@@ -396,7 +431,10 @@ export class SnakeDraftGateway
           });
         }
       } catch (error) {
-        console.error(`[SnakeDraft] Auto-pick error for room ${roomId}:`, error);
+        console.error(
+          `[SnakeDraft] Auto-pick error for room ${roomId}:`,
+          error,
+        );
       } finally {
         this.autoPickingRooms.delete(roomId);
       }

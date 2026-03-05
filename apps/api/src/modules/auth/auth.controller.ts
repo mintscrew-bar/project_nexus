@@ -89,7 +89,9 @@ export class AuthController {
 
       if (isNewUser) {
         // 신규 가입: 약관 동의 없이 임시 토큰으로 /auth/agree 페이지로 이동
-        const pendingToken = await this.authService.generatePendingTermsToken(user.id);
+        const pendingToken = await this.authService.generatePendingTermsToken(
+          user.id,
+        );
         return res.redirect(`${appUrl}/auth/agree?token=${pendingToken}`);
       }
 
@@ -125,7 +127,9 @@ export class AuthController {
 
       if (isNewUser) {
         // 신규 가입: 약관 동의 없이 임시 토큰으로 /auth/agree 페이지로 이동
-        const pendingToken = await this.authService.generatePendingTermsToken(user.id);
+        const pendingToken = await this.authService.generatePendingTermsToken(
+          user.id,
+        );
         return res.redirect(`${appUrl}/auth/agree?token=${pendingToken}`);
       }
 
@@ -153,7 +157,8 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async agreeToTerms(
     @Query("token") pendingToken: string,
-    @Body() dto: {
+    @Body()
+    dto: {
       termsOfService: boolean;
       privacyPolicy: boolean;
       ageVerification: boolean;
@@ -241,7 +246,10 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   async linkDiscord(@CurrentUser("sub") userId: string, @Res() res: Response) {
     // Generate temporary link token (5 minutes)
-    const linkToken = await this.authService.generateLinkToken(userId, "discord");
+    const linkToken = await this.authService.generateLinkToken(
+      userId,
+      "discord",
+    );
 
     // Redirect to Discord OAuth with link token in state
     const discordAuthUrl = `https://discord.com/api/oauth2/authorize?client_id=${this.configService.get("DISCORD_CLIENT_ID")}&redirect_uri=${encodeURIComponent(this.configService.get("DISCORD_LINK_CALLBACK_URL") || this.configService.get("DISCORD_CALLBACK_URL")?.replace("/callback", "/link/callback") || "")}&response_type=code&scope=identify%20email&state=${linkToken}`;
@@ -250,10 +258,17 @@ export class AuthController {
   }
 
   @Get("link/discord/callback")
-  async linkDiscordCallback(@Query("code") code: string, @Query("state") linkToken: string, @Res() res: Response) {
+  async linkDiscordCallback(
+    @Query("code") code: string,
+    @Query("state") linkToken: string,
+    @Res() res: Response,
+  ) {
     try {
       // Verify link token and get userId
-      const userId = await this.authService.verifyLinkToken(linkToken, "discord");
+      const userId = await this.authService.verifyLinkToken(
+        linkToken,
+        "discord",
+      );
 
       // Exchange code for access token and get profile
       const profile = await this.authService.getDiscordProfile(code);
@@ -268,18 +283,25 @@ export class AuthController {
         metadata: {},
       });
 
-      const appUrl = this.configService.get("APP_URL") || "http://localhost:3000";
+      const appUrl =
+        this.configService.get("APP_URL") || "http://localhost:3000";
       return res.redirect(`${appUrl}/settings?linked=discord&success=true`);
     } catch (error: any) {
-      const appUrl = this.configService.get("APP_URL") || "http://localhost:3000";
-      return res.redirect(`${appUrl}/settings?linked=discord&success=false&error=${encodeURIComponent(error.message)}`);
+      const appUrl =
+        this.configService.get("APP_URL") || "http://localhost:3000";
+      return res.redirect(
+        `${appUrl}/settings?linked=discord&success=false&error=${encodeURIComponent(error.message)}`,
+      );
     }
   }
 
   @Get("link/google")
   @UseGuards(JwtAuthGuard)
   async linkGoogle(@CurrentUser("sub") userId: string, @Res() res: Response) {
-    const linkToken = await this.authService.generateLinkToken(userId, "google");
+    const linkToken = await this.authService.generateLinkToken(
+      userId,
+      "google",
+    );
 
     const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${this.configService.get("GOOGLE_CLIENT_ID")}&redirect_uri=${encodeURIComponent(this.configService.get("GOOGLE_LINK_CALLBACK_URL") || this.configService.get("GOOGLE_CALLBACK_URL")?.replace("/callback", "/link/callback") || "")}&response_type=code&scope=email%20profile&state=${linkToken}`;
 
@@ -287,9 +309,16 @@ export class AuthController {
   }
 
   @Get("link/google/callback")
-  async linkGoogleCallback(@Query("code") code: string, @Query("state") linkToken: string, @Res() res: Response) {
+  async linkGoogleCallback(
+    @Query("code") code: string,
+    @Query("state") linkToken: string,
+    @Res() res: Response,
+  ) {
     try {
-      const userId = await this.authService.verifyLinkToken(linkToken, "google");
+      const userId = await this.authService.verifyLinkToken(
+        linkToken,
+        "google",
+      );
       const profile = await this.authService.getGoogleProfile(code);
 
       await this.authService.linkOAuthProvider(userId, {
@@ -301,11 +330,15 @@ export class AuthController {
         metadata: {},
       });
 
-      const appUrl = this.configService.get("APP_URL") || "http://localhost:3000";
+      const appUrl =
+        this.configService.get("APP_URL") || "http://localhost:3000";
       return res.redirect(`${appUrl}/settings?linked=google&success=true`);
     } catch (error: any) {
-      const appUrl = this.configService.get("APP_URL") || "http://localhost:3000";
-      return res.redirect(`${appUrl}/settings?linked=google&success=false&error=${encodeURIComponent(error.message)}`);
+      const appUrl =
+        this.configService.get("APP_URL") || "http://localhost:3000";
+      return res.redirect(
+        `${appUrl}/settings?linked=google&success=false&error=${encodeURIComponent(error.message)}`,
+      );
     }
   }
 

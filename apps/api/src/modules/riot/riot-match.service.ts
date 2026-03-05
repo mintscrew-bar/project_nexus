@@ -456,7 +456,7 @@ export class RiotMatchService {
     }
 
     // Redis 캐시 확인 (3분 TTL)
-    const cacheKey = `riot:matchids:${puuid}:${start}:${count}:${queueId ?? 'all'}:${type ?? 'all'}:${startTime ?? 0}`;
+    const cacheKey = `riot:matchids:${puuid}:${start}:${count}:${queueId ?? "all"}:${type ?? "all"}:${startTime ?? 0}`;
     const cached = await this.redis.get(cacheKey);
     if (cached) {
       return JSON.parse(cached);

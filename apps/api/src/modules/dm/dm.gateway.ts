@@ -152,12 +152,21 @@ export class DmGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       // 미읽음 카운트 업데이트 (Redis에서 즉시 조회 — DB COUNT 안 함)
       const unread = await this.dmService.getUnreadCount(receiverId);
-      this.server.to(`user:${receiverId}`).emit("dm-unread-count", { total: unread });
+      this.server
+        .to(`user:${receiverId}`)
+        .emit("dm-unread-count", { total: unread });
 
       // ACK 반환
-      return { success: true, messageId: message.id, createdAt: message.createdAt };
+      return {
+        success: true,
+        messageId: message.id,
+        createdAt: message.createdAt,
+      };
     } catch (error: any) {
-      console.error(`[DM] Failed to send message from ${client.userId}:`, error?.message);
+      console.error(
+        `[DM] Failed to send message from ${client.userId}:`,
+        error?.message,
+      );
       return { success: false, error: "Failed to send message" };
     }
   }
@@ -214,7 +223,10 @@ export class DmGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const unread = await this.dmService.getUnreadCount(client.userId);
       client.emit("dm-unread-count", { total: unread });
     } catch (error: any) {
-      console.error(`[DM] Failed to mark-read for ${client.userId}:`, error?.message);
+      console.error(
+        `[DM] Failed to mark-read for ${client.userId}:`,
+        error?.message,
+      );
     }
   }
 }

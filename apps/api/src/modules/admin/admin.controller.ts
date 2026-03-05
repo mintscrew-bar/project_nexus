@@ -46,7 +46,11 @@ export class AdminController {
     @Query("limit") limit = "20",
     @Query("search") search?: string,
   ) {
-    return this.adminService.getUsers({ page: parseInt(page), limit: parseInt(limit), search });
+    return this.adminService.getUsers({
+      page: parseInt(page),
+      limit: parseInt(limit),
+      search,
+    });
   }
 
   @Patch("users/:id/role")
@@ -66,7 +70,12 @@ export class AdminController {
     @Body() body: { reason: string; banUntil?: string },
     @Request() req: any,
   ) {
-    return this.adminService.banUser(targetUserId, req.user.sub, body.reason, body.banUntil);
+    return this.adminService.banUser(
+      targetUserId,
+      req.user.sub,
+      body.reason,
+      body.banUntil,
+    );
   }
 
   @Post("users/:id/unban")
@@ -82,7 +91,11 @@ export class AdminController {
     @Body("restrictedUntil") restrictedUntil: string,
     @Request() req: any,
   ) {
-    return this.adminService.restrictUser(targetUserId, req.user.sub, restrictedUntil);
+    return this.adminService.restrictUser(
+      targetUserId,
+      req.user.sub,
+      restrictedUntil,
+    );
   }
 
   @Post("users/:id/unrestrict")
@@ -112,7 +125,12 @@ export class AdminController {
   @Roles(UserRole.ADMIN, UserRole.MODERATOR)
   reviewReport(
     @Param("id") reportId: string,
-    @Body() body: { status: "APPROVED" | "REJECTED"; reviewerNote: string; category?: string },
+    @Body()
+    body: {
+      status: "APPROVED" | "REJECTED";
+      reviewerNote: string;
+      category?: string;
+    },
     @Request() req: any,
   ) {
     return this.adminService.reviewReport(
@@ -131,7 +149,12 @@ export class AdminController {
     @Body() body: { title: string; message: string; link?: string },
     @Request() req: any,
   ) {
-    return this.adminService.sendAnnouncement(body.title, body.message, req.user.sub, body.link);
+    return this.adminService.sendAnnouncement(
+      body.title,
+      body.message,
+      req.user.sub,
+      body.link,
+    );
   }
 
   // ── Chat Logs (ADMIN + MODERATOR) ──────────────────────────────────────────
@@ -163,7 +186,11 @@ export class AdminController {
     @Query("limit") limit = "20",
     @Query("search") search?: string,
   ) {
-    return this.adminService.getPosts({ page: parseInt(page), limit: parseInt(limit), search });
+    return this.adminService.getPosts({
+      page: parseInt(page),
+      limit: parseInt(limit),
+      search,
+    });
   }
 
   @Delete("posts/:id")
@@ -174,7 +201,11 @@ export class AdminController {
 
   @Patch("posts/:id/pin")
   @Roles(UserRole.ADMIN, UserRole.MODERATOR)
-  pinPost(@Param("id") postId: string, @Body("isPinned") isPinned: boolean, @Request() req: any) {
+  pinPost(
+    @Param("id") postId: string,
+    @Body("isPinned") isPinned: boolean,
+    @Request() req: any,
+  ) {
     return this.adminService.pinPost(postId, isPinned, req.user.sub);
   }
 
@@ -192,7 +223,11 @@ export class AdminController {
     @Query("limit") limit = "20",
     @Query("search") search?: string,
   ) {
-    return this.adminService.getClans({ page: parseInt(page), limit: parseInt(limit), search });
+    return this.adminService.getClans({
+      page: parseInt(page),
+      limit: parseInt(limit),
+      search,
+    });
   }
 
   @Delete("clans/:id")
@@ -209,7 +244,11 @@ export class AdminController {
     @Query("limit") limit = "20",
     @Query("status") status?: string,
   ) {
-    return this.adminService.getRooms({ page: parseInt(page), limit: parseInt(limit), status });
+    return this.adminService.getRooms({
+      page: parseInt(page),
+      limit: parseInt(limit),
+      status,
+    });
   }
 
   @Post("rooms/:id/close")
@@ -226,7 +265,11 @@ export class AdminController {
     @Body("count") count = 1,
     @Request() req: any,
   ) {
-    const result = await this.adminService.addBotToRoom(roomId, req.user.sub, count);
+    const result = await this.adminService.addBotToRoom(
+      roomId,
+      req.user.sub,
+      count,
+    );
 
     // 봇 추가 후 실시간 업데이트
     try {
@@ -269,6 +312,11 @@ export class AdminController {
     @Body() body: { status: "APPROVED" | "REJECTED"; adminNote?: string },
     @Request() req: any,
   ) {
-    return this.adminService.reviewAppeal(appealId, body.status, req.user.sub, body.adminNote);
+    return this.adminService.reviewAppeal(
+      appealId,
+      body.status,
+      req.user.sub,
+      body.adminNote,
+    );
   }
 }

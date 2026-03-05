@@ -125,7 +125,8 @@ export class StatsController {
     @Query("start") start?: string,
   ) {
     const countNum = count ? parseInt(count, 10) : 20;
-    const queueIdNum = queueId != null && queueId !== "" ? parseInt(queueId, 10) : undefined;
+    const queueIdNum =
+      queueId != null && queueId !== "" ? parseInt(queueId, 10) : undefined;
     const startNum = start ? parseInt(start, 10) : 0;
     return this.statsService.getRiotMatchHistory(
       gameName,
@@ -146,7 +147,8 @@ export class StatsController {
     @Query("queueId") queueId?: string,
   ) {
     const countNum = count ? parseInt(count, 10) : 20;
-    const queueIdNum = queueId != null && queueId !== "" ? parseInt(queueId, 10) : undefined;
+    const queueIdNum =
+      queueId != null && queueId !== "" ? parseInt(queueId, 10) : undefined;
     return this.statsService.getUserRiotMatchHistory(
       userId,
       countNum,

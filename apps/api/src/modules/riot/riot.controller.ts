@@ -107,7 +107,8 @@ export class RiotController {
   async updateAccount(
     @CurrentUser("sub") userId: string,
     @Param("id") accountId: string,
-    @Body() dto: {
+    @Body()
+    dto: {
       mainRole: string;
       subRole: string;
       peakTier?: string;
@@ -115,7 +116,11 @@ export class RiotController {
       championsByRole?: Record<string, string[]>;
     },
   ) {
-    return this.riotService.updateRiotAccountInfo(userId, accountId, dto as any);
+    return this.riotService.updateRiotAccountInfo(
+      userId,
+      accountId,
+      dto as any,
+    );
   }
 
   @Put("accounts/:id/champions/:role")

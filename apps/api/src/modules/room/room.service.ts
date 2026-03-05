@@ -218,7 +218,10 @@ export class RoomService {
       }
     } catch (error) {
       // Don't fail room creation if Discord notification fails
-      this.logger.warn("Failed to send Discord room creation notification:", error);
+      this.logger.warn(
+        "Failed to send Discord room creation notification:",
+        error,
+      );
     }
 
     return this.transformRoomData(room);
@@ -319,7 +322,10 @@ export class RoomService {
     "IN_PROGRESS",
     "COMPLETED",
   ]);
-  private readonly validTeamModes = new Set<TeamMode>(["SNAKE_DRAFT", "AUCTION"]);
+  private readonly validTeamModes = new Set<TeamMode>([
+    "SNAKE_DRAFT",
+    "AUCTION",
+  ]);
 
   async listRooms(filters?: {
     status?: RoomStatus;
@@ -493,9 +499,13 @@ export class RoomService {
 
       if (allRemainingAreBots || remainingParticipants.length === 0) {
         if (this.discordVoiceService) {
-          await this.discordVoiceService.deleteRoomChannels(roomId).catch((e: any) => {
-            this.logger.warn(`[Room] Discord channel cleanup failed for room ${roomId}: ${e?.message}`);
-          });
+          await this.discordVoiceService
+            .deleteRoomChannels(roomId)
+            .catch((e: any) => {
+              this.logger.warn(
+                `[Room] Discord channel cleanup failed for room ${roomId}: ${e?.message}`,
+              );
+            });
         }
         await this.prisma.room.delete({
           where: { id: roomId },
@@ -512,7 +522,10 @@ export class RoomService {
         );
       }
 
-      return { message: "Left realtime session, participant preserved", remainingRealCount: realRemaining.length };
+      return {
+        message: "Left realtime session, participant preserved",
+        remainingRealCount: realRemaining.length,
+      };
     }
 
     // Remove participant first
@@ -535,9 +548,13 @@ export class RoomService {
     if (remainingCount === 0) {
       // Clean up Discord channels (category + lobby + team channels) before deleting
       if (this.discordVoiceService) {
-        await this.discordVoiceService.deleteRoomChannels(roomId).catch((e: any) => {
-          this.logger.warn(`[Room] Discord channel cleanup failed for room ${roomId}: ${e?.message}`);
-        });
+        await this.discordVoiceService
+          .deleteRoomChannels(roomId)
+          .catch((e: any) => {
+            this.logger.warn(
+              `[Room] Discord channel cleanup failed for room ${roomId}: ${e?.message}`,
+            );
+          });
       }
       await this.prisma.room.delete({
         where: { id: roomId },
@@ -548,9 +565,13 @@ export class RoomService {
     // If only bots remain, delete room immediately
     if (allRemainingAreBots) {
       if (this.discordVoiceService) {
-        await this.discordVoiceService.deleteRoomChannels(roomId).catch((e: any) => {
-          this.logger.warn(`[Room] Discord channel cleanup failed for room ${roomId}: ${e?.message}`);
-        });
+        await this.discordVoiceService
+          .deleteRoomChannels(roomId)
+          .catch((e: any) => {
+            this.logger.warn(
+              `[Room] Discord channel cleanup failed for room ${roomId}: ${e?.message}`,
+            );
+          });
       }
       await this.prisma.room.delete({
         where: { id: roomId },
@@ -561,8 +582,9 @@ export class RoomService {
     // If host leaves but others remain, transfer host to next real (non-bot) participant
     if (room.hostId === userId && remainingCount > 0) {
       const nextHost =
-        remainingParticipants.find((p: any) => !/^testbot_\d+$/.test(p.user?.username || "")) ??
-        remainingParticipants[0];
+        remainingParticipants.find(
+          (p: any) => !/^testbot_\d+$/.test(p.user?.username || ""),
+        ) ?? remainingParticipants[0];
       if (nextHost) {
         await this.prisma.room.update({
           where: { id: roomId },
@@ -661,15 +683,21 @@ export class RoomService {
       // 인원 변경 → 팀 채널 수 조정
       if (updates.maxParticipants) {
         const newNumTeams = Math.floor(updates.maxParticipants / 5);
-        this.discordVoiceService.updateRoomChannels(roomId, newNumTeams).catch(
-          (err: Error) => this.logger.warn(`Discord channel update failed: ${err.message}`),
-        );
+        this.discordVoiceService
+          .updateRoomChannels(roomId, newNumTeams)
+          .catch((err: Error) =>
+            this.logger.warn(`Discord channel update failed: ${err.message}`),
+          );
       }
       // 방 이름 변경 → 카테고리 이름 동기화
       if (updates.name) {
-        this.discordVoiceService.updateCategoryName(roomId, updates.name).catch(
-          (err: Error) => this.logger.warn(`Discord category name update failed: ${err.message}`),
-        );
+        this.discordVoiceService
+          .updateCategoryName(roomId, updates.name)
+          .catch((err: Error) =>
+            this.logger.warn(
+              `Discord category name update failed: ${err.message}`,
+            ),
+          );
       }
     }
 
@@ -914,9 +942,13 @@ export class RoomService {
 
     // Clean up Discord channels (Discord auto-removes users from deleted channels)
     if (this.discordVoiceService) {
-      await this.discordVoiceService.deleteRoomChannels(roomId).catch((e: any) => {
-        this.logger.warn(`[Room] Discord channel cleanup failed for room ${roomId}: ${e?.message}`);
-      });
+      await this.discordVoiceService
+        .deleteRoomChannels(roomId)
+        .catch((e: any) => {
+          this.logger.warn(
+            `[Room] Discord channel cleanup failed for room ${roomId}: ${e?.message}`,
+          );
+        });
     }
 
     // Delete room data (chat messages preserved via onDelete: SetNull)
@@ -963,9 +995,13 @@ export class RoomService {
     }
 
     // 요청자가 방 참가자인지 확인
-    const isParticipant = room.participants.some((p) => p.userId === requesterId);
+    const isParticipant = room.participants.some(
+      (p) => p.userId === requesterId,
+    );
     if (!isParticipant) {
-      throw new ForbiddenException("Only room participants can return to lobby");
+      throw new ForbiddenException(
+        "Only room participants can return to lobby",
+      );
     }
 
     // Discord 팀장 역할 정리용
@@ -1026,7 +1062,10 @@ export class RoomService {
         await this.discordVoiceService.moveAllToLobby(roomId);
       }
     } catch (error) {
-      this.logger.warn("Failed to clean up Discord state after return to lobby:", error);
+      this.logger.warn(
+        "Failed to clean up Discord state after return to lobby:",
+        error,
+      );
     }
 
     this.logger.log(
@@ -1134,7 +1173,10 @@ export class RoomService {
         await this.discordVoiceService.moveAllToLobby(roomId);
       }
     } catch (error) {
-      this.logger.warn("Failed to clean up Discord state after session abort:", error);
+      this.logger.warn(
+        "Failed to clean up Discord state after session abort:",
+        error,
+      );
     }
 
     this.logger.warn(

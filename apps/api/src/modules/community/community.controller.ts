@@ -78,15 +78,14 @@ export class CommunityController {
   // 인기 태그 조회
   @Get("tags/popular")
   async getPopularTags(@Query("limit") limit?: string) {
-    return this.communityService.getPopularTags(limit ? parseInt(limit, 10) : 20);
+    return this.communityService.getPopularTags(
+      limit ? parseInt(limit, 10) : 20,
+    );
   }
 
   @Get("posts/:id")
   @UseGuards(OptionalJwtGuard)
-  async getPost(
-    @Param("id") id: string,
-    @Req() req: Request,
-  ) {
+  async getPost(@Param("id") id: string, @Req() req: Request) {
     // 로그인 유저이면 userId 기반, 비로그인이면 IP 기반 조회수 중복 방지 (24시간)
     const user = req.user as any;
     const viewerId: string | undefined = user?.sub;
@@ -214,7 +213,10 @@ export class CommunityController {
     @CurrentUser("sub") userId: string,
     @Param("id") commentId: string,
   ) {
-    const hasLiked = await this.communityService.hasUserLikedComment(userId, commentId);
+    const hasLiked = await this.communityService.hasUserLikedComment(
+      userId,
+      commentId,
+    );
     return { hasLiked };
   }
 
@@ -257,7 +259,10 @@ export class CommunityController {
     @CurrentUser("sub") userId: string,
     @Param("id") postId: string,
   ) {
-    const bookmarked = await this.communityService.hasUserBookmarkedPost(userId, postId);
+    const bookmarked = await this.communityService.hasUserBookmarkedPost(
+      userId,
+      postId,
+    );
     return { bookmarked };
   }
 
@@ -367,9 +372,7 @@ export class CommunityController {
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.CREATED)
   @UseInterceptors(FileInterceptor("image"))
-  async uploadImage(
-    @UploadedFile() file: Express.Multer.File,
-  ) {
+  async uploadImage(@UploadedFile() file: Express.Multer.File) {
     if (!file) {
       throw new BadRequestException("이미지 파일이 업로드되지 않았습니다.");
     }
