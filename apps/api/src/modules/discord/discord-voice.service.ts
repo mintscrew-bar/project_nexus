@@ -57,7 +57,10 @@ export class DiscordVoiceService {
             permissionOverwrites: [
               {
                 id: guild.id,
-                allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect],
+                allow: [
+                  PermissionFlagsBits.ViewChannel,
+                  PermissionFlagsBits.Connect,
+                ],
               },
             ],
           });
@@ -75,7 +78,9 @@ export class DiscordVoiceService {
           }
 
           // 재시도 전 대기 (레이트 리밋 회피)
-          await new Promise((resolve) => setTimeout(resolve, 1000 * retryCount));
+          await new Promise((resolve) =>
+            setTimeout(resolve, 1000 * retryCount),
+          );
         }
       }
 
@@ -138,7 +143,10 @@ export class DiscordVoiceService {
       };
     } catch (error: any) {
       // 생성 중 실패 시 이미 생성된 채널들 정리
-      this.logger.error(`Error creating Discord channels for room ${roomId}:`, error);
+      this.logger.error(
+        `Error creating Discord channels for room ${roomId}:`,
+        error,
+      );
 
       // 부분적으로 생성된 채널들 정리 시도
       try {
@@ -149,7 +157,9 @@ export class DiscordVoiceService {
         for (const ch of existingChannels) {
           try {
             const guild = await this.client.guilds.fetch(guildId);
-            const channel = await guild.channels.fetch(ch.channelId).catch(() => null);
+            const channel = await guild.channels
+              .fetch(ch.channelId)
+              .catch(() => null);
             if (channel) await channel.delete();
           } catch {
             // 무시
@@ -158,7 +168,10 @@ export class DiscordVoiceService {
 
         await this.prisma.roomDiscordChannel.deleteMany({ where: { roomId } });
       } catch (cleanupError) {
-        this.logger.error(`Failed to cleanup channels after error:`, cleanupError);
+        this.logger.error(
+          `Failed to cleanup channels after error:`,
+          cleanupError,
+        );
       }
 
       // 에러를 다시 던져서 상위에서 처리하도록
@@ -234,7 +247,9 @@ export class DiscordVoiceService {
     for (const member of team.members) {
       // 봇 계정은 건너뛰기 (Discord 계정 없음)
       if (/^testbot_\d+$/.test(member.user.username)) {
-        this.logger.debug(`Skipping bot ${member.user.username} for voice channel move`);
+        this.logger.debug(
+          `Skipping bot ${member.user.username} for voice channel move`,
+        );
         continue;
       }
 
@@ -283,18 +298,17 @@ export class DiscordVoiceService {
       return;
     }
 
-    const room =
-      snapshot
-        ? {
-            discordCategoryId: snapshot.discordCategoryId ?? null,
-            discordChannels: snapshot.discordChannels ?? [],
-          }
-        : await this.prisma.room.findUnique({
-            where: { id: roomId },
-            include: {
-              discordChannels: true,
-            },
-          });
+    const room = snapshot
+      ? {
+          discordCategoryId: snapshot.discordCategoryId ?? null,
+          discordChannels: snapshot.discordChannels ?? [],
+        }
+      : await this.prisma.room.findUnique({
+          where: { id: roomId },
+          include: {
+            discordChannels: true,
+          },
+        });
 
     if (!room || !room.discordCategoryId) {
       return;
@@ -310,7 +324,9 @@ export class DiscordVoiceService {
       // Delete child channels first (Discord does NOT auto-delete them with category)
       for (const ch of channelsToDelete) {
         try {
-          const channel = await guild.channels.fetch(ch.channelId).catch(() => null);
+          const channel = await guild.channels
+            .fetch(ch.channelId)
+            .catch(() => null);
           if (channel) await channel.delete();
         } catch {
           // Channel may already be deleted, continue
@@ -320,17 +336,21 @@ export class DiscordVoiceService {
       if (!keepLobby) {
         // Delete the category itself
         try {
-          const category = await guild.channels.fetch(room.discordCategoryId).catch(() => null);
+          const category = await guild.channels
+            .fetch(room.discordCategoryId)
+            .catch(() => null);
           if (category) await category.delete();
         } catch {
           // Category may already be deleted
         }
 
         // Clear discordCategoryId in DB
-        await this.prisma.room.update({
-          where: { id: roomId },
-          data: { discordCategoryId: null },
-        }).catch(() => {}); // Room may already be deleted
+        await this.prisma.room
+          .update({
+            where: { id: roomId },
+            data: { discordCategoryId: null },
+          })
+          .catch(() => {}); // Room may already be deleted
       }
 
       // Clean up DB records for deleted channels
@@ -365,7 +385,9 @@ export class DiscordVoiceService {
     if (!room || !room.discordCategoryId) return;
 
     const guild = await this.client.guilds.fetch(guildId);
-    const category = await guild.channels.fetch(room.discordCategoryId).catch(() => null);
+    const category = await guild.channels
+      .fetch(room.discordCategoryId)
+      .catch(() => null);
     if (!category) return;
 
     // Get current team channels (excluding Lobby), sorted by team number
@@ -400,7 +422,9 @@ export class DiscordVoiceService {
           },
         });
 
-        this.logger.log(`Added team channel "${displayName}" for room ${roomId}`);
+        this.logger.log(
+          `Added team channel "${displayName}" for room ${roomId}`,
+        );
       }
     } else if (newNumTeams < currentNumTeams) {
       // Remove extra team channels (from the end)
@@ -408,7 +432,9 @@ export class DiscordVoiceService {
 
       for (const ch of toRemove) {
         try {
-          const channel = await guild.channels.fetch(ch.channelId).catch(() => null);
+          const channel = await guild.channels
+            .fetch(ch.channelId)
+            .catch(() => null);
           if (channel) await channel.delete();
         } catch {
           // Already deleted
@@ -418,7 +444,9 @@ export class DiscordVoiceService {
           where: { id: ch.id },
         });
 
-        this.logger.log(`Removed team channel "${ch.teamName}" for room ${roomId}`);
+        this.logger.log(
+          `Removed team channel "${ch.teamName}" for room ${roomId}`,
+        );
       }
     }
   }
@@ -439,13 +467,19 @@ export class DiscordVoiceService {
 
     try {
       const guild = await this.client.guilds.fetch(guildId);
-      const category = await guild.channels.fetch(room.discordCategoryId).catch(() => null);
+      const category = await guild.channels
+        .fetch(room.discordCategoryId)
+        .catch(() => null);
       if (category) {
         await category.setName(`『 ${newRoomName} 』`);
-        this.logger.log(`Updated Discord category name for room ${roomId}: "${newRoomName}"`);
+        this.logger.log(
+          `Updated Discord category name for room ${roomId}: "${newRoomName}"`,
+        );
       }
     } catch (error: any) {
-      this.logger.warn(`Failed to update category name for room ${roomId}: ${error.message}`);
+      this.logger.warn(
+        `Failed to update category name for room ${roomId}: ${error.message}`,
+      );
     }
   }
 
@@ -503,6 +537,102 @@ export class DiscordVoiceService {
     });
 
     return authProvider?.providerId || null;
+  }
+
+  /**
+   * Discord providerId → Nexus userId 역방향 매핑
+   * @param discordId Discord 계정의 providerId
+   * @returns Nexus 유저 ID 또는 null (미연동 시)
+   */
+  async getNexusUserIdByDiscordId(discordId: string): Promise<string | null> {
+    const authProvider = await this.prisma.authProvider.findUnique({
+      where: {
+        provider_providerId: {
+          provider: "DISCORD",
+          providerId: discordId,
+        },
+      },
+      select: { userId: true },
+    });
+
+    return authProvider?.userId || null;
+  }
+
+  /**
+   * 방의 Lobby 채널 음성 검증
+   * - 방의 Discord Lobby 채널에 있는 유저들의 Discord ID를 조회
+   * - 방 참가자 중 Discord 연동 유저와 비교하여 음성채널 미참가자 목록 반환
+   * @param roomId 검증할 방 ID
+   * @returns missingUsernames: 음성채널 미참가 유저의 Nexus username 목록
+   */
+  async validateVoicePresence(
+    roomId: string,
+  ): Promise<{ valid: boolean; missingUsernames: string[] }> {
+    const guildId = this.configService.get("DISCORD_GUILD_ID");
+    if (!guildId) {
+      // Discord 미설정 시 검증 스킵 (항상 통과)
+      return { valid: true, missingUsernames: [] };
+    }
+
+    // Lobby 채널 ID 조회
+    const lobbyChannel = await this.prisma.roomDiscordChannel.findFirst({
+      where: { roomId, teamName: "Lobby" },
+      select: { channelId: true },
+    });
+
+    if (!lobbyChannel) {
+      // 방에 Discord 채널 자체가 없으면 검증 스킵
+      this.logger.debug(
+        `[validateVoicePresence] 방 ${roomId}에 Lobby 채널 없음 → 검증 스킵`,
+      );
+      return { valid: true, missingUsernames: [] };
+    }
+
+    // Lobby 채널에 현재 접속 중인 Discord 유저 ID 목록
+    const voiceUserIds = await this.getUsersInVoiceChannel(
+      lobbyChannel.channelId,
+    );
+    const voiceUserIdSet = new Set(voiceUserIds);
+
+    // 방 참가자 중 Discord 연동 유저 목록 조회
+    const participants = await this.prisma.roomParticipant.findMany({
+      where: { roomId, isReady: true },
+      include: {
+        user: {
+          select: {
+            username: true,
+            authProviders: {
+              where: { provider: "DISCORD" },
+              select: { providerId: true },
+            },
+          },
+        },
+      },
+    });
+
+    const missingUsernames: string[] = [];
+
+    for (const participant of participants) {
+      const username = participant.user.username;
+
+      // 봇 계정은 검증 스킵
+      if (/^testbot_\d+$/.test(username)) continue;
+
+      const discordProvider = participant.user.authProviders[0];
+
+      // Discord 미연동 유저는 검증 스킵
+      if (!discordProvider) continue;
+
+      // 음성채널 미참가 유저 기록
+      if (!voiceUserIdSet.has(discordProvider.providerId)) {
+        missingUsernames.push(username);
+      }
+    }
+
+    return {
+      valid: missingUsernames.length === 0,
+      missingUsernames,
+    };
   }
 
   // ========================================
@@ -759,7 +889,9 @@ export class DiscordVoiceService {
     for (const participant of room.participants) {
       // 봇 계정은 건너뛰기 (Discord 계정 없음)
       if (/^testbot_\d+$/.test(participant.user.username)) {
-        this.logger.debug(`Skipping bot ${participant.user.username} for lobby move`);
+        this.logger.debug(
+          `Skipping bot ${participant.user.username} for lobby move`,
+        );
         continue;
       }
 

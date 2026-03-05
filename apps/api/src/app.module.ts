@@ -3,6 +3,7 @@ import { ConfigModule } from "@nestjs/config";
 import { ThrottlerModule } from "@nestjs/throttler";
 import { ScheduleModule } from "@nestjs/schedule";
 import { ServeStaticModule } from "@nestjs/serve-static";
+import { EventEmitterModule } from "@nestjs/event-emitter";
 import { join, resolve } from "path";
 
 import { AuthModule } from "./modules/auth/auth.module";
@@ -55,6 +56,9 @@ const projectRoot = resolve(apiRoot, "../..");
 
     // Scheduled tasks
     ScheduleModule.forRoot(),
+
+    // 애플리케이션 내부 이벤트 버스 (Discord 음성 상태 → Room Gateway 연동 등에 사용)
+    EventEmitterModule.forRoot(),
 
     // Static file serving for uploads
     ServeStaticModule.forRoot({

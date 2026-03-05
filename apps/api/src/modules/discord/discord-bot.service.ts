@@ -1,5 +1,6 @@
 import { Injectable, OnModuleInit, OnModuleDestroy } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { EventEmitter2 } from "@nestjs/event-emitter";
 import {
   Client,
   GatewayIntentBits,
@@ -11,6 +12,7 @@ import {
   EmbedBuilder,
   Colors,
   ChatInputCommandInteraction,
+  VoiceState,
 } from "discord.js";
 import { PrismaService } from "../prisma/prisma.service";
 import type { DiscordVoiceService } from "./discord-voice.service";
@@ -74,6 +76,7 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
+    private readonly eventEmitter: EventEmitter2,
   ) {
     this.client = new Client({
       intents: [
@@ -133,6 +136,69 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
     });
 
     this.client.on("interactionCreate", this.handleInteraction.bind(this));
+
+    // ─── 음성채널 입/퇴장 감지 ───
+    // 유저가 음성채널에 입장하거나 퇴장할 때마다 해당 채널이
+    // Nexus 방의 Lobby 채널인지 DB에서 조회하고, 맞으면 내부 이벤트 발행
+    this.client.on(
+      "voiceStateUpdate",
+      this.handleVoiceStateUpdate.bind(this),
+    );
+  }
+
+  /**
+   * Discord 음성채널 입/퇴장 이벤트 핸들러
+   * - 입장(channelId가 새로 생김) 또는 퇴장(channelId가 사라짐) 모두 처리
+   * - 봇 계정(testbot_ 패턴) 은 무시
+   * - 해당 채널이 RoomDiscordChannel(Lobby)에 해당하면 'discord.voice.update' 이벤트 발행
+   */
+  private async handleVoiceStateUpdate(
+    oldState: VoiceState,
+    newState: VoiceState,
+  ) {
+    const discordUserId = newState.member?.user.id || oldState.member?.user.id;
+    if (!discordUserId) return;
+
+    // 봇 계정은 스킵 (Discord 봇 자체 또는 testbot_ 패턴 유저)
+    if (
+      newState.member?.user.bot ||
+      /^testbot_\d+$/.test(newState.member?.user.username || "")
+    ) {
+      return;
+    }
+
+    // 변경된 채널 ID (입장한 채널 또는 퇴장한 채널)
+    const changedChannelId = newState.channelId || oldState.channelId;
+    if (!changedChannelId) return;
+
+    try {
+      // 해당 채널이 Nexus 방의 Discord 채널인지 확인 (Lobby 채널만 관심)
+      const roomChannel = await this.prisma.roomDiscordChannel.findFirst({
+        where: {
+          channelId: changedChannelId,
+          teamName: "Lobby", // Lobby 채널만 음성 검증에 사용
+        },
+        select: { roomId: true },
+      });
+
+      if (!roomChannel) return; // Nexus와 관련 없는 채널이면 무시
+
+      // 현재 음성 상태: 방에 들어온 채널이 Lobby이면 inVoice=true
+      const inVoice = newState.channelId === changedChannelId;
+
+      console.log(
+        `[DiscordBot] voiceStateUpdate: user=${discordUserId}, room=${roomChannel.roomId}, inVoice=${inVoice}`,
+      );
+
+      // Room Gateway로 이벤트 전달
+      this.eventEmitter.emit("discord.voice.update", {
+        discordUserId,
+        roomId: roomChannel.roomId,
+        inVoice,
+      });
+    } catch (error) {
+      console.error("[DiscordBot] voiceStateUpdate 처리 오류:", error);
+    }
   }
 
   private async registerCommands() {
@@ -1042,7 +1108,8 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
     accounts.sort((a, b) => {
       const tierDiff = (TIER_ORDER[b.tier] ?? 0) - (TIER_ORDER[a.tier] ?? 0);
       if (tierDiff !== 0) return tierDiff;
-      const rankDiff = (rankValue[b.rank ?? ""] ?? 0) - (rankValue[a.rank ?? ""] ?? 0);
+      const rankDiff =
+        (rankValue[b.rank ?? ""] ?? 0) - (rankValue[a.rank ?? ""] ?? 0);
       if (rankDiff !== 0) return rankDiff;
       return b.lp - a.lp;
     });
@@ -1058,7 +1125,8 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
     }
 
     const lines = top10.map((acc, i) => {
-      const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}.`;
+      const medal =
+        i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}.`;
       const tierEmoji = TIER_EMOJI[acc.tier] || "❓";
       const rankStr = acc.rank && acc.tier !== "UNRANKED" ? ` ${acc.rank}` : "";
       return `${medal} ${tierEmoji} **${acc.user.username}** — ${acc.gameName}#${acc.tagLine} · ${acc.tier}${rankStr} ${acc.lp} LP`;
@@ -1078,8 +1146,7 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
 
     if (!user) {
       await interaction.reply({
-        content:
-          "❌ 계정이 연동되지 않았습니다. `/nexus link`로 연동하세요!",
+        content: "❌ 계정이 연동되지 않았습니다. `/nexus link`로 연동하세요!",
         ephemeral: true,
       });
       return;

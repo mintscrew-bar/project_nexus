@@ -15,7 +15,7 @@ import { useToast } from "@/components/ui/Toast";
 import {
   Users, Crown, Check, X, MessageSquare, Settings,
   UserMinus, UserCog, UserPlus, CheckCircle,
-  ArrowLeft, Shield, Swords,
+  ArrowLeft, Shield, Swords, Volume2, VolumeX,
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -238,6 +238,18 @@ function ParticipantCard({
         )}
         {!isSelf && isSent && <span className="p-1.5 text-text-tertiary" title="친구 요청됨"><CheckCircle className="h-4 w-4" /></span>}
         {!isSelf && isFriend && <span className="p-1.5 text-accent-success" title="친구"><Check className="h-4 w-4" /></span>}
+        {/* Discord 음성채널 참가 상태 뱃지 (inVoice가 정의된 경우만 표시) */}
+        {p.inVoice !== undefined && (
+          p.inVoice ? (
+            <span title="음성채널 참가 중" className="flex items-center text-green-400">
+              <Volume2 className="h-4 w-4" />
+            </span>
+          ) : (
+            <span title="음성채널 미참가" className="flex items-center text-text-tertiary/50">
+              <VolumeX className="h-4 w-4" />
+            </span>
+          )
+        )}
         {p.isReady ? (
           <span className="flex items-center gap-1 text-xs font-medium text-accent-success bg-accent-success/10 px-2 py-1 rounded-md">
             <Check className="h-3.5 w-3.5 animate-bounce-in" />준비
@@ -325,6 +337,18 @@ function CompactParticipantCard({
           <button onClick={(e) => { e.stopPropagation(); handleAddFriend(p.userId); }} disabled={addingFriend === p.userId} className="opacity-0 group-hover:opacity-100 p-1 text-accent-primary hover:text-accent-hover rounded transition-all disabled:opacity-50" title="친구 추가">
             <UserPlus className="h-3 w-3" />
           </button>
+        )}
+        {/* Discord 음성채널 참가 상태 뱃지 (inVoice가 정의된 경우만 표시) */}
+        {p.inVoice !== undefined && (
+          p.inVoice ? (
+            <span title="음성채널 참가 중" className="flex items-center">
+              <Volume2 className="h-3.5 w-3.5 text-green-400 flex-shrink-0" />
+            </span>
+          ) : (
+            <span title="음성채널 미참가" className="flex items-center">
+              <VolumeX className="h-3.5 w-3.5 text-text-tertiary/50 flex-shrink-0" />
+            </span>
+          )
         )}
         {p.isReady ? (
           <Check className="h-3.5 w-3.5 text-accent-success flex-shrink-0" />
@@ -519,6 +543,13 @@ export default function TournamentLobbyPage() {
   const bracketLabel = room.bracketFormat === "SINGLE_ELIMINATION" ? "싱글 엘리미네이션"
     : room.bracketFormat === "DOUBLE_ELIMINATION" ? "더블 엘리미네이션"
     : room.bracketFormat === "ROUND_ROBIN" ? "라운드 로빈" : room.bracketFormat || "미정";
+
+  // Discord 음성채널 연동 여부: 참가자 중 inVoice가 정의된 유저가 있으면 이 방은 Discord 채널이 있는 것
+  const hasDiscordVoice = room.participants.some((p: any) => p.inVoice !== undefined);
+  // Discord 채널이 있는 경우, 준비된 참가자 중 botbot이 아닌 유저가 모두 음성채널에 있어야 시작 가능
+  const allInVoice = !hasDiscordVoice || room.participants
+    .filter((p: any) => p.isReady && !/^testbot_\d+$/.test(p.username))
+    .every((p: any) => p.inVoice !== false);
 
     /* ─── Participants List ─── */
   const participantsList = (
@@ -754,13 +785,29 @@ export default function TournamentLobbyPage() {
               {isCurrentUserHost && room.status === 'WAITING' && (
                 <button
                   className={`px-6 py-2.5 font-bold rounded-lg transition-all text-sm text-white ${
-                    allPlayersReady && totalParticipants >= (room.teamMode === 'AUCTION' ? 4 : 2)
+                    allPlayersReady && totalParticipants >= (room.teamMode === 'AUCTION' ? 4 : 2) && allInVoice
                       ? 'bg-accent-success hover:bg-accent-success/90 animate-glow-success'
                       : 'bg-accent-success/50 cursor-not-allowed opacity-60'
                   }`}
-                  disabled={!allPlayersReady || totalParticipants < (room.teamMode === 'AUCTION' ? 4 : 2)}
-                  onClick={() => startGame((err) => addToast(err, 'error'))}
-                  title={room.teamMode === 'AUCTION' && totalParticipants < 4 ? '경매 모드는 최소 4명이 필요합니다' : undefined}
+                  disabled={!allPlayersReady || totalParticipants < (room.teamMode === 'AUCTION' ? 4 : 2) || !allInVoice}
+                  onClick={() => startGame((err) => {
+                    // 음성채널 미참가 유저가 있는 경우 구체적인 메시지 표시
+                    if (err.missingVoiceUsers && err.missingVoiceUsers.length > 0) {
+                      addToast(
+                        `음성채널 미참가: ${err.missingVoiceUsers.join(', ')}`,
+                        'error'
+                      );
+                    } else {
+                      addToast(err.message, 'error');
+                    }
+                  })}
+                  title={
+                    room.teamMode === 'AUCTION' && totalParticipants < 4
+                      ? '경매 모드는 최소 4명이 필요합니다'
+                      : hasDiscordVoice && !allInVoice
+                      ? '음성채널에 참가하지 않은 유저가 있습니다'
+                      : undefined
+                  }
                 >
                   내전 시작
                 </button>

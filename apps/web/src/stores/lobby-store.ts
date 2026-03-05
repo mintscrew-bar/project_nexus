@@ -28,6 +28,9 @@ interface Participant {
   isHost: boolean;
   isReady: boolean;
   riotAccount?: RiotAccount | null;
+  // Discord 음성채널 참가 여부 (Lobby 채널 기준)
+  // undefined = 방에 Discord 채널이 없음 (검증 불필요)
+  inVoice?: boolean;
 }
 
 interface Room {
@@ -75,6 +78,13 @@ export interface RoomSettingsDto {
   bracketFormat?: string;
 }
 
+// 게임 시작 실패 시 서버에서 내려오는 에러 응답 타입
+export interface StartGameError {
+  message: string;
+  // 음성채널 미참가 유저 목록 (Discord 채널 있는 방에서만 존재)
+  missingVoiceUsers?: string[];
+}
+
 interface LobbyStoreState {
   socket: Socket | null;
   room: Room | null;
@@ -86,7 +96,7 @@ interface LobbyStoreState {
   connect: (roomId: string, password?: string) => void;
   disconnect: (options?: { skipLeave?: boolean }) => void;
   setReady: (isReady?: boolean, onError?: (msg: string) => void) => void;
-  startGame: (onError?: (msg: string) => void) => void;
+  startGame: (onError?: (err: StartGameError) => void) => void;
   sendMessage: (content: string) => void;
   updateRoomSettings: (roomId: string, settings: RoomSettingsDto) => Promise<void>;
   kickParticipant: (roomId: string, participantId: string) => Promise<void>;
@@ -208,6 +218,18 @@ export const useLobbyStore = create<LobbyStoreState>((set, get) => ({
       set({ gameStarting: true });
     });
 
+    // Discord 음성채널 상태 변경 수신
+    // 서버에서 discordUserId → nexusUserId 변환 후 브로드캐스트
+    socket.on('voice-status-changed', (data: { userId: string; inVoice: boolean }) => {
+      const currentRoom = get().room;
+      if (currentRoom) {
+        const updatedParticipants = currentRoom.participants.map(p =>
+          p.userId === data.userId ? { ...p, inVoice: data.inVoice } : p
+        );
+        set({ room: { ...currentRoom, participants: updatedParticipants } });
+      }
+    });
+
     socket.on('new-message', (message: ChatMessage) => {
       set(state => ({
         messages: [...state.messages, message]
@@ -253,12 +275,15 @@ export const useLobbyStore = create<LobbyStoreState>((set, get) => ({
     }
   },
 
-  startGame: (onError?: (msg: string) => void) => {
+  startGame: (onError?: (err: StartGameError) => void) => {
     const { socket, room } = get();
     if (socket && room) {
       socket.emit('start-game', { roomId: room.id }, (response: any) => {
         if (response && !response.success && onError) {
-          onError(response.error || '게임 시작에 실패했습니다.');
+          onError({
+            message: response.error || '게임 시작에 실패했습니다.',
+            missingVoiceUsers: response.missingVoiceUsers,
+          });
         }
       });
     }

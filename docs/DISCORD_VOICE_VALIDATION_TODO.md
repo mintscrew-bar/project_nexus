@@ -31,7 +31,7 @@
 
 ### 백엔드
 
-- [ ] 1. `discord-bot.service.ts` - voiceStateUpdate 핸들러 추가
+- [x] 1. `discord-bot.service.ts` - voiceStateUpdate 핸들러 추가
 
 `setupEventHandlers()` 메서드에 추가:
 
@@ -61,7 +61,7 @@ this.client.on('voiceStateUpdate', async (oldState, newState) => {
 
 ---
 
-- [ ] 2. `discord-voice.service.ts` - validateVoicePresence 메서드 추가
+- [x] 2. `discord-voice.service.ts` - validateVoicePresence 메서드 추가
 
 ```typescript
 async validateVoicePresence(roomId: string): Promise<{
@@ -111,7 +111,7 @@ async validateVoicePresence(roomId: string): Promise<{
 
 ---
 
-- [ ] 3. `room.gateway.ts` - voiceStateUpdate 이벤트 수신 및 브로드캐스트
+- [x] 3. `room.gateway.ts` - voiceStateUpdate 이벤트 수신 및 브로드캐스트
 
 ```typescript
 // @OnEvent('discord.voice.update') 리스너 추가
@@ -138,7 +138,7 @@ async handleDiscordVoiceUpdate(payload: {
 
 ---
 
-- [ ] 4. `room.gateway.ts` - start-game 검증 강화
+- [x] 4. `room.gateway.ts` - start-game 검증 강화
 
 `handleStartGame` 핸들러에서 실제 시작 전 검증 추가:
 
@@ -155,7 +155,7 @@ if (!voiceCheck.valid) {
 
 ### 프론트엔드
 
-- [ ] 5. 로비 페이지 - 음성 상태 실시간 표시
+- [x] 5. 로비 페이지 - 음성 상태 실시간 표시
 
 **소켓 이벤트 구독** (`apps/web/src/app/tournaments/[id]/lobby/page.tsx` 또는 관련 store):
 
@@ -175,7 +175,7 @@ socket.on('voice-status-changed', ({ userId, inVoice }) => {
 - Discord 채널이 있는 방: 모든 참가자 `inVoice === true`일 때만 활성화
 - Discord 채널 없는 방: 기존 로직 유지 (모두 `isReady === true`면 활성화)
 
-- [ ] 6. 에러 처리 - start-game 실패 시 UI 피드백
+- [x] 6. 에러 처리 - start-game 실패 시 UI 피드백
 
 서버에서 `error: "음성채널에 없는 참가자..."` 반환 시:
 - 토스트 메시지로 누가 없는지 표시

@@ -8,6 +8,7 @@ import {
   OnGatewayDisconnect,
 } from "@nestjs/websockets";
 import { Inject, forwardRef } from "@nestjs/common";
+import { OnEvent } from "@nestjs/event-emitter";
 import { Server, Socket } from "socket.io";
 import { RoomService } from "./room.service";
 import { SnakeDraftService } from "./snake-draft.service";
@@ -15,6 +16,7 @@ import { SnakeDraftGateway } from "./snake-draft.gateway";
 import { AuthService } from "../auth/auth.service";
 import { AuctionService } from "../auction/auction.service";
 import { AuctionGateway } from "../auction/auction.gateway";
+import { DiscordVoiceService } from "../discord/discord-voice.service";
 import { RoomStatus, TeamMode } from "@nexus/database";
 
 interface AuthenticatedSocket extends Socket {
@@ -52,6 +54,8 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly auctionService: AuctionService,
     @Inject(forwardRef(() => AuctionGateway))
     private readonly auctionGateway: AuctionGateway,
+    @Inject("DISCORD_VOICE_SERVICE")
+    private readonly discordVoiceService: DiscordVoiceService,
   ) {}
 
   async handleConnection(client: AuthenticatedSocket) {
@@ -337,6 +341,20 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
       // Get room to check teamMode
       const room = await this.roomService.getRoomById(data.roomId);
 
+      // ─── Discord 음성채널 검증 ───
+      // 방에 Discord 채널이 연동된 경우, 준비된 참가자 중 Discord 연동 유저가
+      // 모두 Lobby 음성채널에 있는지 확인
+      const voiceValidation =
+        await this.discordVoiceService.validateVoicePresence(data.roomId);
+      if (!voiceValidation.valid) {
+        this.startingRooms.delete(data.roomId);
+        const missing = voiceValidation.missingUsernames.join(", ");
+        return {
+          error: `음성채널 미참가 유저가 있습니다: ${missing}`,
+          missingVoiceUsers: voiceValidation.missingUsernames,
+        };
+      }
+
       let result;
       if (room.teamMode === TeamMode.AUCTION) {
         // Start auction directly
@@ -513,6 +531,43 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
       if (roomTypingUsers.size === 0) {
         this.typingUsers.delete(roomId);
       }
+    }
+  }
+
+  // ========================================
+  // Discord 음성채널 연동 이벤트 핸들러
+  // ========================================
+
+  /**
+   * Discord 봇이 voiceStateUpdate를 감지하면 EventEmitter2를 통해 이 리스너로 전달됨
+   * - discordUserId를 Nexus userId로 역변환 후 해당 방에 'voice-status-changed' 이벤트 브로드캐스트
+   * @param payload { discordUserId, roomId, inVoice }
+   */
+  @OnEvent("discord.voice.update")
+  async handleDiscordVoiceUpdate(payload: {
+    discordUserId: string;
+    roomId: string;
+    inVoice: boolean;
+  }) {
+    try {
+      const { discordUserId, roomId, inVoice } = payload;
+
+      // Discord ID → Nexus userId 역방향 조회
+      const nexusUserId =
+        await this.discordVoiceService.getNexusUserIdByDiscordId(discordUserId);
+
+      if (!nexusUserId) {
+        // Discord 미연동 유저이면 무시
+        return;
+      }
+
+      // 해당 방의 모든 클라이언트에게 음성 상태 변경 브로드캐스트
+      this.server.to(roomId).emit("voice-status-changed", {
+        userId: nexusUserId,
+        inVoice,
+      });
+    } catch (error) {
+      console.error("[RoomGateway] Discord 음성 상태 업데이트 처리 오류:", error);
     }
   }
 
