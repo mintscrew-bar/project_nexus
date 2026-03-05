@@ -2,6 +2,11 @@
 
 import { useRef, useState, useCallback } from "react";
 import Image from "next/image";
+import { DISCORD_COLORS, bannerGlowGradient } from "./banner-constants";
+
+// 테마 색상 — 공통 상수에서 가져옴
+const BLURPLE = DISCORD_COLORS.primary;
+const DISCORD_LIGHT = DISCORD_COLORS.light;
 
 // 파편 파티클 데이터
 interface Particle {
@@ -45,7 +50,7 @@ export function DiscordBanner() {
       target="_blank"
       rel="noopener noreferrer"
       aria-label="NEXUS Discord 서버 참가하기 (새 탭에서 열림)"
-      className="group relative block h-full rounded-2xl overflow-hidden cursor-pointer"
+      className="group relative block h-full rounded-2xl overflow-hidden cursor-pointer focus-visible:ring-2 focus-visible:ring-[#5865F2] focus-visible:ring-offset-2 focus-visible:ring-offset-black focus-visible:outline-none"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => {
         setIsHovered(false);
@@ -58,8 +63,8 @@ export function DiscordBanner() {
         className="absolute inset-0 transition-all duration-700 ease-out"
         style={{
           background: isHovered
-            ? `radial-gradient(circle at ${mousePos.x * 100}% ${mousePos.y * 100}%, #7289DA 0%, #5865F2 30%, #4338ca 70%, #1e1b4b 100%)`
-            : "linear-gradient(135deg, #5865F2 0%, #4338ca 50%, #1e1b4b 100%)",
+            ? `radial-gradient(circle at ${mousePos.x * 100}% ${mousePos.y * 100}%, ${DISCORD_LIGHT} 0%, ${BLURPLE} 30%, ${DISCORD_COLORS.accent} 70%, ${DISCORD_COLORS.bgDark} 100%)`
+            : `linear-gradient(135deg, ${BLURPLE} 0%, ${DISCORD_COLORS.accent} 50%, ${DISCORD_COLORS.bgDark} 100%)`,
         }}
       />
 
@@ -85,10 +90,10 @@ export function DiscordBanner() {
               width: p.size,
               height: p.size,
               background: p.id % 3 === 0
-                ? "rgba(114,137,218,0.6)"  // Discord light blue
+                ? `${DISCORD_LIGHT}99`   // Discord light blue
                 : p.id % 3 === 1
-                ? "rgba(99,102,241,0.5)"   // Indigo
-                : "rgba(255,255,255,0.3)",  // White
+                ? `${BLURPLE}80`         // Blurple
+                : "rgba(255,255,255,0.3)", // White
               opacity: isHovered ? 1 : 0,
               transform: isHovered
                 ? `translate(${Math.sin(p.angle) * 15}px, ${Math.cos(p.angle) * 15}px) scale(1)`
@@ -129,14 +134,14 @@ export function DiscordBanner() {
         <div className="flex-1 text-center md:text-left">
           {/* 타이틀 — 모바일에서 폰트 축소 */}
           <p
-            className="text-base sm:text-2xl md:text-3xl font-bold text-white mb-1.5 md:mb-2 transition-all duration-500 ease-out"
+            className="text-base sm:text-xl md:text-3xl font-bold text-white mb-1.5 md:mb-2 transition-all duration-500 ease-out"
             style={{
               transform: isHovered ? "translateX(6px)" : "translateX(0)",
             }}
           >
             솔랭은 잠깐 쉬고,
             <br className="hidden sm:block" />{" "}
-            <span className="text-[#7289DA]">진짜 내전</span> 한 판 어때?
+            <span style={{ color: DISCORD_LIGHT }}>진짜 내전</span> 한 판 어때?
           </p>
           <p
             className="text-xs sm:text-sm md:text-base text-white/60 mb-2 md:mb-3 transition-all duration-500 ease-out"
@@ -186,7 +191,7 @@ export function DiscordBanner() {
               ? "rgba(255,255,255,0.18)"
               : "rgba(255,255,255,0.1)",
             boxShadow: isHovered
-              ? "0 4px 20px rgba(88,101,242,0.3)"
+              ? `0 4px 20px ${BLURPLE}4D`
               : "none",
           }}
         >
@@ -231,7 +236,7 @@ export function DiscordBanner() {
         className="absolute bottom-0 left-0 right-0 h-px transition-opacity duration-500"
         style={{
           opacity: isHovered ? 1 : 0,
-          background: "linear-gradient(90deg, transparent, #7289DA, transparent)",
+          background: bannerGlowGradient(DISCORD_LIGHT),
         }}
       />
 

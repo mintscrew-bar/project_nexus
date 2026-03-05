@@ -4,12 +4,12 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { useAuthStore } from "@/stores/auth-store";
-import { useRiotStore } from "@/stores/riot-store";
+import { useRiotStore, type RiotAccount } from "@/stores/riot-store";
 import { DiscordBanner } from "@/components/home/DiscordBanner";
 import { AuctionBanner } from "@/components/home/AuctionBanner";
 import { StatsBanner } from "@/components/home/StatsBanner";
 import { userApi, roomApi, communityApi, statsApi } from "@/lib/api-client";
-import { Card, CardContent, Button, Skeleton } from "@/components/ui";
+import { Card, CardContent, Button, Skeleton, ErrorBoundary } from "@/components/ui";
 import { TierBadge } from "@/components/domain/TierBadge";
 import {
   Trophy,
@@ -173,6 +173,33 @@ function BannerCarousel() {
   const [current, setCurrent] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // ── 터치 스와이프 지원 ──
+  const touchStartX = useRef(0);
+  const touchEndX = useRef(0);
+  const SWIPE_THRESHOLD = 50; // 최소 스와이프 거리(px)
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+  }, []);
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    touchEndX.current = e.changedTouches[0].clientX;
+    const diff = touchStartX.current - touchEndX.current;
+
+    if (Math.abs(diff) < SWIPE_THRESHOLD) return;
+
+    if (timerRef.current) clearInterval(timerRef.current);
+    if (diff > 0) {
+      // 왼쪽 스와이프 → 다음 슬라이드
+      setCurrent((c) => (c + 1) % TOTAL_SLIDES);
+    } else {
+      // 오른쪽 스와이프 → 이전 슬라이드
+      setCurrent((c) => (c - 1 + TOTAL_SLIDES) % TOTAL_SLIDES);
+    }
+    startTimer();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const startTimer = useCallback(() => {
     timerRef.current = setInterval(() => {
       setCurrent((c) => (c + 1) % TOTAL_SLIDES);
@@ -192,7 +219,7 @@ function BannerCarousel() {
     startTimer();
   };
 
-  // 슬라이드 인덱스별 전용 컴포넌트 매핑 (BotBanner 제거, DiscordBanner에 봇 내용 통합)
+  // 슬라이드 인덱스별 전용 컴포넌트 매핑
   const slideComponent = () => {
     switch (current) {
       case 0: return <AuctionBanner />;
@@ -202,43 +229,50 @@ function BannerCarousel() {
     }
   };
 
-  // 네비게이션 + dots — 모든 슬라이드에서 공통 사용
-  const NavButtons = () => (
-    <>
+  return (
+    // 고정 높이로 모든 슬라이드 크기 통일 — 모바일부터 데스크톱까지 반응형
+    <div
+      className="relative h-[180px] sm:h-[210px] md:h-[260px] lg:h-[280px]"
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+    >
+      {slideComponent()}
+
       {/* 좌우 화살표 — 모바일에서 숨김 (콘텐츠와 겹침 방지) */}
       <button
         onClick={() => goTo((current - 1 + TOTAL_SLIDES) % TOTAL_SLIDES)}
+        aria-label="이전 슬라이드"
         className="hidden sm:block absolute left-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/5 text-white/50 hover:bg-white/10 hover:text-white transition-all z-20 backdrop-blur-sm"
       >
         <ChevronLeft className="h-4 w-4" />
       </button>
       <button
         onClick={() => goTo((current + 1) % TOTAL_SLIDES)}
+        aria-label="다음 슬라이드"
         className="hidden sm:block absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/5 text-white/50 hover:bg-white/10 hover:text-white transition-all z-20 backdrop-blur-sm"
       >
         <ChevronRight className="h-4 w-4" />
       </button>
-      {/* 닷 네비게이션 — bottom-3으로 콘텐츠와 겹침 방지 */}
-      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2 z-20">
+
+      {/* 닷 네비게이션 — 터치 영역 확대 (시각 6px, 터치 44px) */}
+      <div className="absolute bottom-1 left-1/2 -translate-x-1/2 flex gap-1 z-20">
         {Array.from({ length: TOTAL_SLIDES }).map((_, i) => (
           <button
             key={i}
             onClick={() => goTo(i)}
-            className={cn(
-              "h-1.5 rounded-full transition-all duration-500",
-              i === current ? "w-8 bg-white" : "w-1.5 bg-white/30"
-            )}
-          />
+            aria-label={`슬라이드 ${i + 1}/${TOTAL_SLIDES}`}
+            aria-current={i === current ? "true" : undefined}
+            className="flex items-center justify-center h-7 px-1"
+          >
+            <span
+              className={cn(
+                "block h-1.5 rounded-full transition-all duration-500",
+                i === current ? "w-8 bg-white" : "w-1.5 bg-white/30"
+              )}
+            />
+          </button>
         ))}
       </div>
-    </>
-  );
-
-  return (
-    // 고정 높이로 모든 슬라이드 크기 통일 — 모바일부터 데스크톱까지 반응형
-    <div className="relative h-[180px] sm:h-[210px] md:h-[260px] lg:h-[280px]">
-      {slideComponent()}
-      <NavButtons />
     </div>
   );
 }
@@ -254,7 +288,7 @@ function MyStatsCard({
   positionStats,
 }: {
   stats: UserStats | null;
-  primaryAccount: any;
+  primaryAccount: RiotAccount | null;
   championStats: ChampionStat[];
   positionStats: PositionStat[];
 }) {
@@ -839,8 +873,10 @@ export function DashboardContent() {
 
   return (
     <div className="space-y-6">
-      {/* 배너 */}
-      <BannerCarousel />
+      {/* 배너 — 개별 배너 crash 시 전체 대시보드 보호 */}
+      <ErrorBoundary>
+        <BannerCarousel />
+      </ErrorBoundary>
 
       {/* 내 전적 */}
       <MyStatsCard

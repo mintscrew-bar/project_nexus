@@ -17,3 +17,4 @@ export * from './Alert';
 export * from './StatusIndicator';
 export * from './StatusSelector';
 export * from './Dropdown';
+export * from './ErrorBoundary';

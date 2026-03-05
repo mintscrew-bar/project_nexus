@@ -2,16 +2,17 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { AUCTION_COLORS, bannerBadgeStyle, bannerGlowGradient } from "./banner-constants";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 상수 정의
 // ─────────────────────────────────────────────────────────────────────────────
 
-// 테마 색상 — 경매의 긴장감 + 프리미엄 느낌
-const VIOLET = "#8b5cf6";
-const VIOLET_GLOW = "#a78bfa";
-const GOLD = "#f59e0b";
-const BG_DARK = "#0d0820";
+// 테마 색상 — 공통 상수에서 가져옴
+const VIOLET = AUCTION_COLORS.primary;
+const VIOLET_GLOW = AUCTION_COLORS.glow;
+const GOLD = AUCTION_COLORS.accent;
+const BG_DARK = AUCTION_COLORS.bg;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 팀 슬롯 데이터 — 5v5 경매 드래프트로 채워지는 슬롯
@@ -21,8 +22,8 @@ const BG_DARK = "#0d0820";
 const POSITIONS = ["TOP", "JGL", "MID", "BOT", "SUP"] as const;
 
 /** 팀 색상 */
-const TEAM_BLUE = "#3b82f6";
-const TEAM_RED = "#ef4444";
+const TEAM_BLUE = AUCTION_COLORS.teamBlue;
+const TEAM_RED = AUCTION_COLORS.teamRed;
 
 /** 슬롯 상태: "filled"=낙찰됨, "bidding"=현재 입찰 중, "empty"=미입찰 */
 type SlotState = "filled" | "bidding" | "empty";
@@ -102,7 +103,7 @@ export function AuctionBanner() {
     <Link
       href="/tournaments"
       aria-label="경매 드래프트 시스템 — 내전방 목록으로 이동"
-      className="group relative block h-full rounded-2xl overflow-hidden cursor-pointer"
+      className="group relative block h-full rounded-2xl overflow-hidden cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2 focus-visible:ring-offset-black focus-visible:outline-none"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -136,11 +137,7 @@ export function AuctionBanner() {
           {/* DRAFT 뱃지 */}
           <span
             className="inline-block w-fit px-3 py-1 rounded-full text-[11px] font-bold tracking-wider mb-1.5 md:mb-3"
-            style={{
-              color: VIOLET_GLOW,
-              backgroundColor: `${VIOLET}15`,
-              border: `1px solid ${VIOLET}30`,
-            }}
+            style={bannerBadgeStyle(VIOLET_GLOW)}
           >
             DRAFT
           </span>
@@ -245,7 +242,7 @@ export function AuctionBanner() {
         className="absolute bottom-0 left-0 right-0 h-px transition-opacity duration-500"
         style={{
           opacity: isHovered ? 1 : 0.4,
-          background: `linear-gradient(90deg, transparent, ${VIOLET}80, transparent)`,
+          background: bannerGlowGradient(VIOLET),
         }}
       />
 

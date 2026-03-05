@@ -2,19 +2,20 @@
 
 import { useRef, useState, useEffect } from "react";
 import Link from "next/link";
+import { STATS_COLORS, bannerBadgeStyle, bannerGlowGradient } from "./banner-constants";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 상수 정의
 // ─────────────────────────────────────────────────────────────────────────────
 
-// 테마 색상 — indigo 계열
-const INDIGO = "#6366f1";
-const INDIGO_DARK = "#4f46e5";
-const INDIGO_LIGHT = "#818cf8";
+// 테마 색상 — 공통 상수에서 가져옴
+const INDIGO = STATS_COLORS.primary;
+const INDIGO_DARK = STATS_COLORS.dark;
+const INDIGO_LIGHT = STATS_COLORS.glow;
 
 // 좌측 배경 / 우측 배경
-const BG_LEFT = "#0a0e1a";
-const BG_RIGHT = "#0f1628";
+const BG_LEFT = STATS_COLORS.bgLeft;
+const BG_RIGHT = STATS_COLORS.bgRight;
 
 // 스탯 데이터 — 우측 패널에 표시될 3개 행
 interface StatRow {
@@ -81,7 +82,7 @@ export function StatsBanner() {
     <Link
       href="/matches"
       aria-label="내전 전적 통계 — 매치 기록 페이지로 이동"
-      className="group relative block h-full rounded-2xl overflow-hidden cursor-pointer"
+      className="group relative block h-full rounded-2xl overflow-hidden cursor-pointer focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-black focus-visible:outline-none"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -128,11 +129,7 @@ export function StatsBanner() {
           {/* UPDATE 뱃지 */}
           <span
             className="inline-block w-fit px-3 py-1 rounded-full text-[11px] font-bold tracking-wider mb-1.5 md:mb-3"
-            style={{
-              color: INDIGO_LIGHT,
-              backgroundColor: `${INDIGO}15`,
-              border: `1px solid ${INDIGO}30`,
-            }}
+            style={bannerBadgeStyle(INDIGO_LIGHT)}
           >
             UPDATE
           </span>
@@ -212,7 +209,7 @@ export function StatsBanner() {
         className="absolute bottom-0 left-0 right-0 h-px transition-opacity duration-500"
         style={{
           opacity: isHovered ? 1 : 0.3,
-          background: `linear-gradient(90deg, transparent, ${INDIGO}70, transparent)`,
+          background: bannerGlowGradient(INDIGO),
         }}
       />
     </Link>
