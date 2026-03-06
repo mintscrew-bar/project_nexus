@@ -895,7 +895,7 @@ export default function RiotMatchList({
                         return (
                           <div
                             key={p.puuid}
-                            className={`flex items-center flex-nowrap gap-2 lg:gap-4 py-2 lg:py-3 px-2 lg:px-4 transition-all text-xs ${
+                            className={`py-1.5 lg:py-2 px-2 lg:px-4 transition-all text-xs ${
                               isMe
                                 ? "bg-accent-primary/[0.12] border-l-2 border-accent-primary"
                                 : index % 2 === 0
@@ -908,142 +908,184 @@ export default function RiotMatchList({
                               }
                             }}
                           >
-                            <div className="flex items-center gap-0.5 flex-shrink-0">
-                              <div className="relative">
-                                <Image
-                                  src={getChampionIcon(p.championName)}
-                                  alt={p.championName}
-                                  width={48}
-                                  height={48}
-                                  className="w-10 h-10 xl:w-12 xl:h-12 rounded"
-                                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                                />
-                                <span className="absolute -bottom-0.5 -right-0.5 bg-bg-primary/90 text-[8px] px-0.5 rounded text-text-primary font-bold border border-bg-elevated">
-                                  {p.champLevel}
-                                </span>
-                              </div>
-                              <div className="hidden lg:flex gap-0.5">
-                                <div className="flex flex-col gap-0.5">
+                            {/* 1행: 챔피언 + 이름 + 배지 + KDA + 딜량 + CS + 아이템 */}
+                            <div className="flex items-center gap-1.5 sm:gap-2 lg:gap-4">
+                              {/* 챔피언 아이콘 + 스펠/룬 */}
+                              <div className="flex items-center gap-0.5 flex-shrink-0">
+                                <div className="relative">
                                   <Image
-                                    src={`/icons/spells/Summoner${getSummonerSpellName(p.summoner1Id)}.png`}
-                                    alt="spell1"
-                                    width={20}
-                                    height={20}
-                                    className="w-5 h-5 rounded"
-                                    onError={(e) => { e.currentTarget.style.opacity = '0.3'; }}
-                                  />
-                                  <Image
-                                    src={`/icons/spells/Summoner${getSummonerSpellName(p.summoner2Id)}.png`}
-                                    alt="spell2"
-                                    width={20}
-                                    height={20}
-                                    className="w-5 h-5 rounded"
-                                    onError={(e) => { e.currentTarget.style.opacity = '0.3'; }}
-                                  />
-                                </div>
-                                <div className="flex flex-col gap-0.5">
-                                  {p.perks?.styles?.[0]?.selections?.[0]?.perk && (
-                                    <Image
-                                      src={`/icons/perks/${p.perks.styles[0].selections[0].perk}.png`}
-                                      alt="primary rune"
-                                      width={20}
-                                      height={20}
-                                      className="w-5 h-5 rounded-full bg-bg-primary"
-                                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                                    />
-                                  )}
-                                  {p.perks?.styles?.[1]?.style && (
-                                    <Image
-                                      src={`/icons/perks/${p.perks.styles[1].style}.png`}
-                                      alt="secondary rune"
-                                      width={14}
-                                      height={14}
-                                      className="w-3.5 h-3.5 rounded-full bg-bg-primary opacity-60"
-                                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                                    />
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className={`flex-1 min-w-0 ${isMe ? "text-accent-primary font-medium" : "text-text-primary"}`}>
-                              <span className="truncate block text-xs">
-                                {p.riotIdGameName || p.summonerName || "Unknown"}
-                                {p.riotIdTagline && <span className="text-text-tertiary text-[10px]">#{p.riotIdTagline}</span>}
-                              </span>
-                            </div>
-
-                            <div className="flex items-center gap-1">
-                              {isAceRow && (
-                                <span className="flex-shrink-0 px-2 py-0.5 bg-gradient-to-r from-amber-500/30 to-yellow-500/30 border border-amber-400/50 text-amber-300 text-[10px] font-bold rounded">ACE</span>
-                              )}
-                              {isMvpRow && !isAceRow && (
-                                <span className="flex-shrink-0 px-2 py-0.5 bg-gradient-to-r from-blue-500/30 to-cyan-500/30 border border-blue-400/50 text-blue-300 text-[10px] font-bold rounded">MVP</span>
-                              )}
-                            </div>
-
-                            {/* 캐리 순위 - xl에서만 표시 */}
-                            <div className="hidden xl:flex items-center gap-2 w-16">
-                              <div className={`w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-bold ${
-                                carryRank === 1 ? "bg-amber-500/40 text-amber-200 border border-amber-400/50" :
-                                carryRank === 2 ? "bg-gray-400/40 text-gray-200 border border-gray-400/50" :
-                                carryRank === 3 ? "bg-orange-400/40 text-orange-200 border border-orange-400/50" :
-                                "bg-bg-elevated text-text-tertiary"
-                              }`}>
-                                {carryRank}
-                              </div>
-                              <div className="text-[11px] font-medium text-text-secondary">{pKillParticipation}%</div>
-                            </div>
-
-                            <div className="w-20 lg:w-28 text-center flex-shrink-0">
-                              <div className="font-bold text-sm">{p.kills}/<span className="text-accent-danger">{p.deaths}</span>/{p.assists}</div>
-                              <div className="text-xs text-text-tertiary">{pKda} KDA</div>
-                            </div>
-
-                            {/* 딜량 바 - lg에서만 표시 */}
-                            <div className="hidden lg:block w-32 flex-shrink-0">
-                              <div className="flex justify-between text-xs mb-0.5">
-                                <span className="text-text-tertiary">딜량</span>
-                                <span className="text-accent-danger font-semibold">{(p.totalDamageDealtToChampions / 1000).toFixed(1)}k</span>
-                              </div>
-                              <div className="h-2 bg-bg-elevated rounded-full overflow-hidden">
-                                <div className="h-full bg-gradient-to-r from-red-600 to-orange-500" style={{ width: `${damagePercent}%` }} />
-                              </div>
-                            </div>
-
-                            {/* CS - lg에서만 표시 */}
-                            <div className="hidden lg:block w-20 text-center flex-shrink-0">
-                              <div className="font-medium text-sm">{pCs}</div>
-                              <div className="text-xs text-text-tertiary">{pCsPerMin}/m</div>
-                            </div>
-
-                            <div className="flex gap-0.5 lg:gap-1 flex-shrink-0 items-center">
-                              {[p.item0, p.item1, p.item2, p.item3, p.item4, p.item5, p.item6].map((item: number, idx: number) => (
-                                <div key={idx} className={`w-5 h-5 lg:w-6 lg:h-6 ${idx === 6 ? 'rounded-full' : 'rounded'} bg-bg-primary border border-bg-tertiary`}>
-                                  {item !== 0 && (
-                                    <Image
-                                      src={getItemIcon(item)}
-                                      alt="item"
-                                      width={24}
-                                      height={24}
-                                      className={`w-full h-full ${idx === 6 ? 'rounded-full' : 'rounded'}`}
-                                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                                    />
-                                  )}
-                                </div>
-                              ))}
-                              {p.item7 != null && p.item7 !== 0 && (
-                                <div className="w-5 h-5 lg:w-6 lg:h-6 rounded bg-bg-primary border border-amber-500/40">
-                                  <Image
-                                    src={getItemIcon(p.item7)}
-                                    alt="quest"
-                                    width={24}
-                                    height={24}
-                                    className="w-full h-full rounded"
+                                    src={getChampionIcon(p.championName)}
+                                    alt={p.championName}
+                                    width={48}
+                                    height={48}
+                                    className="w-8 h-8 sm:w-10 sm:h-10 xl:w-12 xl:h-12 rounded"
                                     onError={(e) => { e.currentTarget.style.display = 'none'; }}
                                   />
+                                  <span className="absolute -bottom-0.5 -right-0.5 bg-bg-primary/90 text-[8px] px-0.5 rounded text-text-primary font-bold border border-bg-elevated">
+                                    {p.champLevel}
+                                  </span>
                                 </div>
-                              )}
+                                <div className="hidden lg:flex gap-0.5">
+                                  <div className="flex flex-col gap-0.5">
+                                    <Image
+                                      src={`/icons/spells/Summoner${getSummonerSpellName(p.summoner1Id)}.png`}
+                                      alt="spell1"
+                                      width={20}
+                                      height={20}
+                                      className="w-5 h-5 rounded"
+                                      onError={(e) => { e.currentTarget.style.opacity = '0.3'; }}
+                                    />
+                                    <Image
+                                      src={`/icons/spells/Summoner${getSummonerSpellName(p.summoner2Id)}.png`}
+                                      alt="spell2"
+                                      width={20}
+                                      height={20}
+                                      className="w-5 h-5 rounded"
+                                      onError={(e) => { e.currentTarget.style.opacity = '0.3'; }}
+                                    />
+                                  </div>
+                                  <div className="flex flex-col gap-0.5">
+                                    {p.perks?.styles?.[0]?.selections?.[0]?.perk && (
+                                      <Image
+                                        src={`/icons/perks/${p.perks.styles[0].selections[0].perk}.png`}
+                                        alt="primary rune"
+                                        width={20}
+                                        height={20}
+                                        className="w-5 h-5 rounded-full bg-bg-primary"
+                                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                      />
+                                    )}
+                                    {p.perks?.styles?.[1]?.style && (
+                                      <Image
+                                        src={`/icons/perks/${p.perks.styles[1].style}.png`}
+                                        alt="secondary rune"
+                                        width={14}
+                                        height={14}
+                                        className="w-3.5 h-3.5 rounded-full bg-bg-primary opacity-60"
+                                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                      />
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* 이름 + 배지 */}
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-1">
+                                  <span className={`truncate text-[11px] sm:text-xs ${isMe ? "text-accent-primary font-medium" : "text-text-primary"}`}>
+                                    {p.riotIdGameName || p.summonerName || "Unknown"}
+                                    {p.riotIdTagline && <span className="text-text-tertiary text-[10px]">#{p.riotIdTagline}</span>}
+                                  </span>
+                                  {isAceRow && (
+                                    <span className="flex-shrink-0 px-1.5 py-px bg-gradient-to-r from-amber-500/30 to-yellow-500/30 border border-amber-400/50 text-amber-300 text-[9px] font-bold rounded">ACE</span>
+                                  )}
+                                  {isMvpRow && !isAceRow && (
+                                    <span className="flex-shrink-0 px-1.5 py-px bg-gradient-to-r from-blue-500/30 to-cyan-500/30 border border-blue-400/50 text-blue-300 text-[9px] font-bold rounded">MVP</span>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* 캐리 순위 - xl에서만 표시 */}
+                              <div className="hidden xl:flex items-center gap-2 w-16">
+                                <div className={`w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-bold ${
+                                  carryRank === 1 ? "bg-amber-500/40 text-amber-200 border border-amber-400/50" :
+                                  carryRank === 2 ? "bg-gray-400/40 text-gray-200 border border-gray-400/50" :
+                                  carryRank === 3 ? "bg-orange-400/40 text-orange-200 border border-orange-400/50" :
+                                  "bg-bg-elevated text-text-tertiary"
+                                }`}>
+                                  {carryRank}
+                                </div>
+                                <div className="text-[11px] font-medium text-text-secondary">{pKillParticipation}%</div>
+                              </div>
+
+                              {/* KDA */}
+                              <div className="w-16 sm:w-20 lg:w-28 text-center flex-shrink-0">
+                                <div className="font-bold text-[11px] sm:text-sm">{p.kills}/<span className="text-accent-danger">{p.deaths}</span>/{p.assists}</div>
+                                <div className="text-[9px] sm:text-xs text-text-tertiary">{pKda} KDA</div>
+                              </div>
+
+                              {/* 딜량 바 - lg에서만 표시 */}
+                              <div className="hidden lg:block w-32 flex-shrink-0">
+                                <div className="flex justify-between text-xs mb-0.5">
+                                  <span className="text-text-tertiary">딜량</span>
+                                  <span className="text-accent-danger font-semibold">{(p.totalDamageDealtToChampions / 1000).toFixed(1)}k</span>
+                                </div>
+                                <div className="h-2 bg-bg-elevated rounded-full overflow-hidden">
+                                  <div className="h-full bg-gradient-to-r from-red-600 to-orange-500" style={{ width: `${damagePercent}%` }} />
+                                </div>
+                              </div>
+
+                              {/* CS - lg에서만 표시 */}
+                              <div className="hidden lg:block w-20 text-center flex-shrink-0">
+                                <div className="font-medium text-sm">{pCs}</div>
+                                <div className="text-xs text-text-tertiary">{pCsPerMin}/m</div>
+                              </div>
+
+                              {/* 아이템 */}
+                              <div className="flex gap-0.5 lg:gap-1 flex-shrink-0 items-center">
+                                {[p.item0, p.item1, p.item2, p.item3, p.item4, p.item5, p.item6].map((item: number, idx: number) => (
+                                  <div key={idx} className={`w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 ${idx === 6 ? 'rounded-full' : 'rounded'} bg-bg-primary border border-bg-tertiary`}>
+                                    {item !== 0 && (
+                                      <Image
+                                        src={getItemIcon(item)}
+                                        alt="item"
+                                        width={24}
+                                        height={24}
+                                        className={`w-full h-full ${idx === 6 ? 'rounded-full' : 'rounded'}`}
+                                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                      />
+                                    )}
+                                  </div>
+                                ))}
+                                {p.item7 != null && p.item7 !== 0 && (
+                                  <div className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 rounded bg-bg-primary border border-amber-500/40">
+                                    <Image
+                                      src={getItemIcon(p.item7)}
+                                      alt="quest"
+                                      width={24}
+                                      height={24}
+                                      className="w-full h-full rounded"
+                                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* 2행: 모바일 전용 - 스펠/룬 + CS + 딜량 */}
+                            <div className="flex items-center gap-2 mt-1 pl-[calc(2rem+6px)] sm:pl-[calc(2.5rem+6px)] lg:hidden">
+                              {/* 소환사 주문 */}
+                              <div className="flex gap-0.5 items-center flex-shrink-0">
+                                <Image
+                                  src={`/icons/spells/Summoner${getSummonerSpellName(p.summoner1Id)}.png`}
+                                  alt="spell1"
+                                  width={16}
+                                  height={16}
+                                  className="w-4 h-4 rounded"
+                                  onError={(e) => { e.currentTarget.style.opacity = '0.3'; }}
+                                />
+                                <Image
+                                  src={`/icons/spells/Summoner${getSummonerSpellName(p.summoner2Id)}.png`}
+                                  alt="spell2"
+                                  width={16}
+                                  height={16}
+                                  className="w-4 h-4 rounded"
+                                  onError={(e) => { e.currentTarget.style.opacity = '0.3'; }}
+                                />
+                                {p.perks?.styles?.[0]?.selections?.[0]?.perk && (
+                                  <Image
+                                    src={`/icons/perks/${p.perks.styles[0].selections[0].perk}.png`}
+                                    alt="rune"
+                                    width={16}
+                                    height={16}
+                                    className="w-4 h-4 rounded-full bg-bg-primary"
+                                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                  />
+                                )}
+                              </div>
+                              <span className="text-[10px] text-text-secondary">{pCs} CS ({pCsPerMin}/m)</span>
+                              <span className="text-[10px] text-accent-danger">{(p.totalDamageDealtToChampions / 1000).toFixed(1)}k 딜량</span>
+                              <span className="text-[10px] text-text-tertiary">킬관여 {pKillParticipation}%</span>
                             </div>
                           </div>
                         );
@@ -1051,7 +1093,7 @@ export default function RiotMatchList({
 
                       return (
                         <div className="overflow-x-auto">
-                        <div className="w-fit min-w-full p-3">
+                        <div className="min-w-0 w-full p-2 sm:p-3">
                           <div className={`mb-1.5 rounded ${myTeamWon ? "bg-accent-success/[0.06]" : "bg-accent-danger/[0.06]"}`}>
                             <div className={`flex items-center gap-2 text-[11px] font-bold px-3 py-1 ${myTeamWon ? "text-accent-success" : "text-accent-danger"}`}>
                               <Shield className="h-3 w-3" />
