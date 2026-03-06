@@ -186,7 +186,7 @@ export default function SummonerStatsPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
             <div className="lg:col-span-2 space-y-6">
               <Skeleton className="h-48 w-full rounded-xl" />
               <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-6">
@@ -236,24 +236,24 @@ export default function SummonerStatsPage() {
       {/* Search Header */}
       <div className="border-b border-bg-tertiary bg-bg-secondary">
         <div className="container mx-auto px-4 py-3">
-          <div className="relative flex items-center justify-center">
+          <div className="flex items-center gap-2 sm:gap-4">
             <Link
               href="/matches"
-              className="absolute left-0 inline-flex items-center gap-2 text-text-secondary hover:text-text-primary transition-colors text-sm"
+              className="inline-flex items-center gap-1 text-text-secondary hover:text-text-primary transition-colors text-xs sm:text-sm flex-shrink-0"
             >
               <ArrowLeft className="h-4 w-4" />
-              전적 검색
+              <span className="hidden sm:inline">전적 검색</span>
             </Link>
 
-            <form onSubmit={handleSearch} className="w-full max-w-xl">
+            <form onSubmit={handleSearch} className="flex-1 max-w-xl">
               <div className="relative">
-                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-text-tertiary" />
+                <Search className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-text-tertiary" />
                 <input
                   type="text"
                   value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
-                  placeholder="소환사명#태그 (예: Hide on bush#KR1)"
-                  className="w-full pl-12 pr-4 py-3 bg-bg-tertiary border border-bg-elevated rounded-xl text-text-primary placeholder-text-tertiary focus:outline-none focus:border-accent-primary transition-colors text-base"
+                  placeholder="소환사명#태그"
+                  className="w-full pl-9 sm:pl-12 pr-3 sm:pr-4 py-2 sm:py-3 bg-bg-tertiary border border-bg-elevated rounded-xl text-text-primary placeholder-text-tertiary focus:outline-none focus:border-accent-primary transition-colors text-sm sm:text-base"
                 />
               </div>
             </form>
@@ -261,21 +261,21 @@ export default function SummonerStatsPage() {
         </div>
       </div>
 
-      <div className="max-w-screen-2xl mx-auto px-6 py-8">
+      <div className="max-w-screen-2xl mx-auto px-3 sm:px-6 py-4 sm:py-8">
         {/* Summoner Header */}
-        <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-6 mb-6">
-          <div className="flex items-start gap-6">
+        <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-4 sm:p-6 mb-4 sm:mb-6">
+          <div className="flex items-start gap-3 sm:gap-6">
             {/* Profile Icon */}
-            <div className="relative">
+            <div className="relative flex-shrink-0">
               <Image
                 src={getProfileIconUrl(summoner.profileIconId)}
                 alt="Profile Icon"
                 width={96}
                 height={96}
-                className="w-24 h-24 rounded-xl border-2 border-accent-primary"
+                className="w-16 h-16 sm:w-24 sm:h-24 rounded-xl border-2 border-accent-primary"
               />
-              <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 bg-bg-elevated border border-bg-tertiary rounded-full px-3 py-1">
-                <span className="text-xs font-bold text-text-primary">
+              <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 bg-bg-elevated border border-bg-tertiary rounded-full px-2 sm:px-3 py-0.5 sm:py-1">
+                <span className="text-[10px] sm:text-xs font-bold text-text-primary">
                   {summoner.summonerLevel}
                 </span>
               </div>
@@ -284,10 +284,10 @@ export default function SummonerStatsPage() {
             {/* Summoner Info */}
             <div className="flex-1 min-w-0">
               {/* Row 1: Name + Nexus link + Refresh */}
-              <div className="flex items-center gap-3 mb-4 flex-wrap">
-                <h1 className="text-3xl font-bold text-text-primary">
+              <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4 flex-wrap">
+                <h1 className="text-xl sm:text-3xl font-bold text-text-primary">
                   {summoner.gameName}
-                  <span className="text-text-tertiary">#{summoner.tagLine}</span>
+                  <span className="text-text-tertiary text-base sm:text-3xl">#{summoner.tagLine}</span>
                 </h1>
                 {nexusUserId && (
                   <Link
@@ -305,41 +305,41 @@ export default function SummonerStatsPage() {
                   disabled={isRefreshing}
                   className="ml-auto"
                 >
-                  <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`} />
-                  {isRefreshing ? "새로고침 중..." : "새로고침"}
+                  <RefreshCw className={`h-4 w-4 sm:mr-2 ${isRefreshing ? "animate-spin" : ""}`} />
+                  <span className="hidden sm:inline">{isRefreshing ? "새로고침 중..." : "새로고침"}</span>
                 </Button>
               </div>
 
               {/* Row 2: Tier / Win Rate / Ladder / Nexus Rank */}
-              <div className="flex flex-wrap items-stretch gap-3 mb-4">
+              <div className="flex flex-wrap items-stretch gap-2 sm:gap-3 mb-3 sm:mb-4">
                 {summoner.tier && summoner.rank ? (
                   <>
-                    <div className="flex items-center gap-3 bg-bg-tertiary rounded-lg p-3">
+                    <div className="flex items-center gap-2 sm:gap-3 bg-bg-tertiary rounded-lg p-2 sm:p-3">
                       {getTierImage(summoner.tier) && (
                         <Image
                           src={getTierImage(summoner.tier)!}
                           alt={summoner.tier}
                           width={48}
                           height={48}
-                          className="w-12 h-12"
+                          className="w-8 h-8 sm:w-12 sm:h-12"
                         />
                       )}
                       <div>
-                        <p className="font-bold text-text-primary">
+                        <p className="font-bold text-sm sm:text-base text-text-primary">
                           {summoner.tier} {summoner.rank}
                         </p>
-                        <p className="text-sm text-text-secondary">
+                        <p className="text-xs sm:text-sm text-text-secondary">
                           {summoner.leaguePoints} LP
                         </p>
                       </div>
                     </div>
 
-                    <div className="bg-bg-tertiary rounded-lg p-3">
-                      <p className="text-xs text-text-tertiary mb-1">승률</p>
-                      <p className="text-2xl font-bold text-accent-primary">
+                    <div className="bg-bg-tertiary rounded-lg p-2 sm:p-3">
+                      <p className="text-[10px] sm:text-xs text-text-tertiary mb-0.5 sm:mb-1">승률</p>
+                      <p className="text-lg sm:text-2xl font-bold text-accent-primary">
                         {winRate}%
                       </p>
-                      <p className="text-xs text-text-tertiary">
+                      <p className="text-[10px] sm:text-xs text-text-tertiary">
                         {summoner.wins}승 {summoner.losses}패
                       </p>
                     </div>
@@ -349,26 +349,26 @@ export default function SummonerStatsPage() {
                 )}
 
                 {nexusUserId && nexusRanking ? (
-                  <div className="bg-bg-tertiary rounded-lg p-3">
-                    <p className="text-xs text-text-tertiary mb-1 flex items-center gap-1">
+                  <div className="bg-bg-tertiary rounded-lg p-2 sm:p-3">
+                    <p className="text-[10px] sm:text-xs text-text-tertiary mb-0.5 sm:mb-1 flex items-center gap-1">
                       <Shield className="h-3 w-3" />
                       Nexus 랭킹
                     </p>
-                    <p className="text-xl font-bold text-accent-primary">
+                    <p className="text-lg sm:text-xl font-bold text-accent-primary">
                       {nexusRanking.globalRank ? `#${nexusRanking.globalRank}` : '–'}
                     </p>
-                    <p className="text-xs text-text-tertiary">
+                    <p className="text-[10px] sm:text-xs text-text-tertiary">
                       {nexusRanking.totalGames}전 {nexusRanking.wins}승 {nexusRanking.losses}패
                     </p>
                   </div>
                 ) : (
-                  <div className="bg-bg-tertiary rounded-lg p-3">
-                    <p className="text-xs text-text-tertiary mb-1 flex items-center gap-1">
+                  <div className="bg-bg-tertiary rounded-lg p-2 sm:p-3">
+                    <p className="text-[10px] sm:text-xs text-text-tertiary mb-0.5 sm:mb-1 flex items-center gap-1">
                       <Shield className="h-3 w-3" />
                       Nexus 랭킹
                     </p>
-                    <p className="text-xl font-bold text-text-secondary">–</p>
-                    <p className="text-xs text-text-tertiary">
+                    <p className="text-lg sm:text-xl font-bold text-text-secondary">–</p>
+                    <p className="text-[10px] sm:text-xs text-text-tertiary">
                       {nexusUserId ? "기록 부족" : "미등록"}
                     </p>
                   </div>
@@ -378,7 +378,7 @@ export default function SummonerStatsPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
           {/* Main Column */}
           <div className="lg:col-span-2 space-y-6">
             {/* Recent Stats Summary (Ranked / Nexus tabs) */}
@@ -401,10 +401,10 @@ export default function SummonerStatsPage() {
           {/* Sidebar */}
           <div className="space-y-6">
             {/* Champion Stats (tabbed) */}
-            <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold text-text-primary flex items-center gap-2">
-                  <Sword className="h-5 w-5 text-accent-primary" />
+            <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-4 sm:p-6">
+              <div className="flex items-center justify-between mb-3 sm:mb-4">
+                <h2 className="text-sm sm:text-xl font-bold text-text-primary flex items-center gap-2">
+                  <Sword className="h-4 w-4 sm:h-5 sm:w-5 text-accent-primary" />
                   챔피언 통계
                 </h2>
                 <div className="flex gap-1 bg-bg-tertiary/50 rounded-lg p-0.5">
@@ -531,9 +531,9 @@ export default function SummonerStatsPage() {
             </div>
 
             {/* Overall Stats */}
-            <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-6">
-              <h2 className="text-xl font-bold text-text-primary mb-4 flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-accent-primary" />
+            <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-4 sm:p-6">
+              <h2 className="text-sm sm:text-xl font-bold text-text-primary mb-3 sm:mb-4 flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-accent-primary" />
                 종합 통계
               </h2>
 

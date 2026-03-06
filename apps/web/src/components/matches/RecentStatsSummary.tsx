@@ -493,15 +493,15 @@ export default function RecentStatsSummary({
   const effectiveTab = hasRiot ? activeTab : "nexus";
 
   return (
-    <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-5">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-bold text-text-primary">최근 전적 요약</h2>
-        <div className="flex gap-1 bg-bg-tertiary/50 rounded-lg p-0.5">
+    <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-3 sm:p-5">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0 mb-3 sm:mb-4">
+        <h2 className="text-sm sm:text-lg font-bold text-text-primary whitespace-nowrap">최근 전적 요약</h2>
+        <div className="flex gap-0.5 sm:gap-1 bg-bg-tertiary/50 rounded-lg p-0.5 overflow-x-auto">
           {hasRiot && (
             <>
               <button
                 onClick={() => setActiveTab("all")}
-                className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
+                className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded text-[11px] sm:text-xs font-medium transition-colors whitespace-nowrap ${
                   effectiveTab === "all"
                     ? "bg-accent-primary text-white"
                     : "text-text-secondary hover:text-text-primary"
@@ -512,7 +512,7 @@ export default function RecentStatsSummary({
               {/* 솔로 랭크 탭 (#20: 자유 랭크와 구분하기 위해 명칭 명확화) */}
               <button
                 onClick={() => setActiveTab("ranked")}
-                className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
+                className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded text-[11px] sm:text-xs font-medium transition-colors whitespace-nowrap ${
                   effectiveTab === "ranked"
                     ? "bg-accent-primary text-white"
                     : "text-text-secondary hover:text-text-primary"
@@ -522,7 +522,7 @@ export default function RecentStatsSummary({
               </button>
               <button
                 onClick={() => setActiveTab("normal")}
-                className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
+                className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded text-[11px] sm:text-xs font-medium transition-colors whitespace-nowrap ${
                   effectiveTab === "normal"
                     ? "bg-accent-primary text-white"
                     : "text-text-secondary hover:text-text-primary"
@@ -534,13 +534,13 @@ export default function RecentStatsSummary({
           )}
           <button
             onClick={() => setActiveTab("nexus")}
-            className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
+            className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded text-[11px] sm:text-xs font-medium transition-colors whitespace-nowrap ${
               effectiveTab === "nexus"
                 ? "bg-accent-primary text-white"
                 : "text-text-secondary hover:text-text-primary"
             }`}
           >
-            넥서스 내전
+            내전
           </button>
         </div>
       </div>

@@ -617,21 +617,21 @@ export default function RiotMatchList({
   };
 
   return (
-    <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-6">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-bold text-text-primary flex items-center gap-2">
-          <Gamepad2 className="h-5 w-5 text-accent-primary" />
+    <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-3 sm:p-6">
+      <div className="flex items-center justify-between mb-3 sm:mb-4">
+        <h2 className="text-sm sm:text-xl font-bold text-text-primary flex items-center gap-2">
+          <Gamepad2 className="h-4 w-4 sm:h-5 sm:w-5 text-accent-primary" />
           Riot 게임 전적
         </h2>
       </div>
 
       {/* Queue Type Tabs */}
-      <div className="flex gap-1 bg-bg-tertiary/50 rounded-lg p-1 mb-4 overflow-x-auto">
+      <div className="flex gap-0.5 sm:gap-1 bg-bg-tertiary/50 rounded-lg p-0.5 sm:p-1 mb-3 sm:mb-4 overflow-x-auto">
         {QUEUE_TABS.map((tab) => (
           <button
             key={tab.key}
             onClick={() => setSelectedQueueId(tab.queueId)}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap ${
+            className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-md text-[11px] sm:text-xs font-medium transition-colors whitespace-nowrap ${
               selectedQueueId === tab.queueId
                 ? "bg-accent-primary text-white"
                 : "text-text-secondary hover:text-text-primary hover:bg-bg-elevated"
@@ -704,38 +704,39 @@ export default function RiotMatchList({
               >
                 {/* Match Header */}
                 <div
-                  className="px-6 pt-5 pb-4 cursor-pointer hover:bg-bg-tertiary/30 transition-colors"
+                  className="px-3 sm:px-6 pt-3 sm:pt-5 pb-3 sm:pb-4 cursor-pointer hover:bg-bg-tertiary/30 transition-colors"
                   onClick={() => toggleMatchExpand(matchId)}
                 >
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2 sm:gap-4">
                     <Image
                       src={getChampionIcon(participant.championName)}
                       alt={participant.championName}
                       width={48}
                       height={48}
-                      className="w-12 h-12 rounded-xl flex-shrink-0"
+                      className="w-9 h-9 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl flex-shrink-0"
                       onError={(e) => { e.currentTarget.style.display = 'none'; }}
                     />
 
-                    <div className="w-32 flex-shrink-0">
-                      <div className="flex items-center gap-1.5 mb-0.5">
-                        <span className={`font-bold text-sm ${participant.win ? "text-accent-success" : "text-accent-danger"}`}>
+                    <div className="min-w-0 flex-shrink-0">
+                      <div className="flex items-center gap-1 sm:gap-1.5 mb-0.5">
+                        <span className={`font-bold text-xs sm:text-sm ${participant.win ? "text-accent-success" : "text-accent-danger"}`}>
                           {participant.win ? "승리" : "패배"}
                         </span>
-                        <span className="text-xs text-text-secondary truncate">{getQueueTypeName(match.info.queueId)}</span>
+                        <span className="text-[10px] sm:text-xs text-text-secondary truncate hidden sm:inline">{getQueueTypeName(match.info.queueId)}</span>
                       </div>
-                      <div className="text-xs text-text-tertiary">{gameDurationMin}:{gameDurationSec.toString().padStart(2, '0')} · {timeAgo}</div>
-                      <div className="text-xs text-text-tertiary truncate">{participant.championName} · {participant.teamPosition || "FILL"}</div>
+                      <div className="text-[10px] sm:text-xs text-text-tertiary">{gameDurationMin}:{gameDurationSec.toString().padStart(2, '0')} · {timeAgo}</div>
+                      <div className="text-[10px] sm:text-xs text-text-tertiary truncate">{participant.championName}</div>
                     </div>
 
-                    <div className="text-center w-20 flex-shrink-0">
-                      <div className="text-sm font-bold text-text-primary">
-                        {participant.kills} / <span className="text-accent-danger">{participant.deaths}</span> / {participant.assists}
+                    <div className="text-center flex-shrink-0">
+                      <div className="text-xs sm:text-sm font-bold text-text-primary">
+                        {participant.kills}/<span className="text-accent-danger">{participant.deaths}</span>/{participant.assists}
                       </div>
-                      <div className="text-xs text-text-secondary">{kda} KDA</div>
+                      <div className="text-[10px] sm:text-xs text-text-secondary">{kda} KDA</div>
                     </div>
 
-                    <div className="flex items-center gap-3 flex-shrink-0">
+                    {/* CS/킬관여 — 모바일 숨김 */}
+                    <div className="hidden md:flex items-center gap-3 flex-shrink-0">
                       <div className="text-center">
                         <div className="text-sm font-medium text-text-primary">{participant.totalMinionsKilled + participant.neutralMinionsKilled}</div>
                         <div className="text-xs text-text-tertiary">CS</div>
@@ -746,9 +747,10 @@ export default function RiotMatchList({
                       </div>
                     </div>
 
-                    <div className="flex gap-1 flex-shrink-0 items-center">
+                    {/* 아이템 — 모바일에서 축소 표시 */}
+                    <div className="hidden sm:flex gap-1 flex-shrink-0 items-center">
                       {[participant.item0, participant.item1, participant.item2, participant.item3, participant.item4, participant.item5].map((item: number, idx: number) => (
-                        <div key={idx} className="w-8 h-8 rounded-md bg-bg-tertiary border border-bg-elevated">
+                        <div key={idx} className="w-6 h-6 lg:w-8 lg:h-8 rounded-md bg-bg-tertiary border border-bg-elevated">
                           {item !== 0 && (
                             <Image
                               src={getItemIcon(item)}
@@ -761,7 +763,7 @@ export default function RiotMatchList({
                           )}
                         </div>
                       ))}
-                      <div className="w-8 h-8 rounded-full bg-bg-tertiary border border-bg-elevated">
+                      <div className="w-6 h-6 lg:w-8 lg:h-8 rounded-full bg-bg-tertiary border border-bg-elevated">
                         {participant.item6 !== 0 && (
                           <Image
                             src={getItemIcon(participant.item6)}
@@ -774,7 +776,7 @@ export default function RiotMatchList({
                         )}
                       </div>
                       {participant.item7 != null && participant.item7 !== 0 && (
-                        <div className="w-8 h-8 rounded-md bg-bg-tertiary border border-amber-500/40">
+                        <div className="w-6 h-6 lg:w-8 lg:h-8 rounded-md bg-bg-tertiary border border-amber-500/40">
                           <Image
                             src={getItemIcon(participant.item7)}
                             alt="quest"
@@ -789,7 +791,8 @@ export default function RiotMatchList({
 
                     <div className="flex-1" />
 
-                    <div className="flex gap-2 flex-shrink-0" onClick={e => e.stopPropagation()}>
+                    {/* 참가자 목록 — 모바일 숨김 */}
+                    <div className="hidden lg:flex gap-2 flex-shrink-0" onClick={e => e.stopPropagation()}>
                       <div className="flex flex-col justify-center gap-0.5 w-24">
                         {myTeam.map((p: any) => {
                           const isMvp = p.puuid === mvpPuuid;
@@ -833,7 +836,7 @@ export default function RiotMatchList({
                     </div>
 
                     <div className="text-text-tertiary flex-shrink-0">
-                      {isExpanded ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+                      {isExpanded ? <ChevronUp className="h-4 w-4 sm:h-5 sm:w-5" /> : <ChevronDown className="h-4 w-4 sm:h-5 sm:w-5" />}
                     </div>
                   </div>
                 </div>
