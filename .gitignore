@@ -10,7 +10,7 @@ build
 *.tsbuildinfo
 
 # Claude Code
-.claude/settings.local.json
+.claude/
 
 # Environment files
 .env
