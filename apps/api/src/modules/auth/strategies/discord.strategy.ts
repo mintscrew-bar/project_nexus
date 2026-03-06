@@ -26,14 +26,19 @@ export class DiscordStrategy extends PassportStrategy(Strategy, "discord") {
     profile: Profile,
   ): Promise<any> {
     try {
+      // [임시] Discord profile 객체 확인용 로그
+      this.logger.log(`Discord profile: ${JSON.stringify(profile, null, 2)}`);
+
       const result = await this.authService.validateOAuthUser({
         provider: "discord",
         providerId: profile.id,
         email: profile.email,
+        // global_name(표시 이름)이 있으면 우선 사용, 없으면 username 사용
         username:
-          profile.discriminator !== "0"
+          (profile as any).global_name ||
+          (profile.discriminator !== "0"
             ? `${profile.username}#${profile.discriminator}`
-            : profile.username,
+            : profile.username),
         avatar: profile.avatar
           ? `https://cdn.discordapp.com/avatars/${profile.id}/${profile.avatar}.png`
           : undefined,

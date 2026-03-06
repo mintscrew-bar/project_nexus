@@ -72,6 +72,8 @@ services:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${APP_URL:-http://localhost}
     container_name: nexus-web
     restart: unless-stopped
     environment:

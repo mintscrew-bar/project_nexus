@@ -625,8 +625,8 @@ export function HeroBanner({ isAuthenticated = false }: HeroBannerProps) {
           <div
             style={{
               // 비대칭 박동: 2.5s 주기, 40%에서 갑자기 밝아졌다 잦아듦
-              // rounded-full 제거 — 사각형 로고 형태에 맞는 글로우
-              animation: "core-glow-pulse 2.5s ease-in-out infinite",
+              // 로고의 둥근 모서리에 맞춰 box-shadow도 둥글게 적용
+              borderRadius: "22%",
             }}
           >
             <Logo size="xl" variant="icon-only" />

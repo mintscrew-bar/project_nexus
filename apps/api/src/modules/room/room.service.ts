@@ -84,24 +84,32 @@ export class RoomService {
 
   async createRoom(hostId: string, dto: CreateRoomDto) {
     // ========================================
-    // Discord + Riot 계정 연동 필수 체크 (방 생성 시에도 검증)
+    // Discord + Riot 계정 연동 필수 체크 (관리자는 면제)
     // ========================================
-    const discordProvider = await this.prisma.authProvider.findFirst({
-      where: { userId: hostId, provider: "DISCORD" },
+    const host = await this.prisma.user.findUnique({
+      where: { id: hostId },
+      select: { role: true },
     });
-    if (!discordProvider) {
-      throw new BadRequestException(
-        "DISCORD_NOT_LINKED::Discord 계정 연동이 필요합니다. 설정 페이지에서 Discord 계정을 연동해주세요.",
-      );
-    }
+    const isAdmin = host?.role === "ADMIN";
 
-    const riotAccount = await this.prisma.riotAccount.findFirst({
-      where: { userId: hostId, isPrimary: true },
-    });
-    if (!riotAccount) {
-      throw new BadRequestException(
-        "RIOT_NOT_LINKED::Riot 계정 연동이 필요합니다. 프로필 페이지에서 Riot 계정을 연동해주세요.",
-      );
+    if (!isAdmin) {
+      const discordProvider = await this.prisma.authProvider.findFirst({
+        where: { userId: hostId, provider: "DISCORD" },
+      });
+      if (!discordProvider) {
+        throw new BadRequestException(
+          "DISCORD_NOT_LINKED::Discord 계정 연동이 필요합니다. 설정 페이지에서 Discord 계정을 연동해주세요.",
+        );
+      }
+
+      const riotAccount = await this.prisma.riotAccount.findFirst({
+        where: { userId: hostId, isPrimary: true },
+      });
+      if (!riotAccount) {
+        throw new BadRequestException(
+          "RIOT_NOT_LINKED::Riot 계정 연동이 필요합니다. 프로필 페이지에서 Riot 계정을 연동해주세요.",
+        );
+      }
     }
 
     // Validate max participants

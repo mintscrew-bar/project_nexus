@@ -19,6 +19,9 @@ COPY packages/types ./packages/types
 
 # Build
 ENV NEXT_TELEMETRY_DISABLED=1
+# Next.js는 빌드 타임에 NEXT_PUBLIC_* 환경변수를 인라인하므로 ARG로 전달
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 RUN pnpm --filter @nexus/web build
 
 # Production stage
