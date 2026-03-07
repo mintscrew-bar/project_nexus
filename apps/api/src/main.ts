@@ -14,7 +14,7 @@ const envPaths = [
 ];
 
 for (const envPath of envPaths) {
-  const result = dotenv.config({ path: envPath, override: true });
+  const result = dotenv.config({ path: envPath });
   if (process.env.NODE_ENV !== "production") {
     console.log(`Loading ${envPath}:`, result.error ? "FAILED" : "OK");
   }
