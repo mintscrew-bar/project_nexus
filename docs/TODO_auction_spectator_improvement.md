@@ -1,22 +1,22 @@
 # 경매 UI/UX 개선 + 관전자 시스템 구현
 
 > 진행 기준일: 2026-03-09
-> 완료: 0 / 전체: Task 1~19
+> 완료: Task 1~7 / 전체: Task 1~19
 
 ---
 
 ## Phase 1: 백엔드 버그 수정 (긴급)
 
-- [ ] Task 1: 경매 권한 체크 추가
+- [x] Task 1: 경매 권한 체크 추가
   - `auction.gateway.ts` — `resolve-bid` 호스트 권한 체크
   - `auction.gateway.ts` — `retry-role-selection` 호스트 권한 체크
   - 비호스트가 경매를 강제 종료/조작할 수 있는 보안 이슈
 
-- [ ] Task 2: 스네이크 드래프트 타이머 복구 버그 수정
+- [x] Task 2: 스네이크 드래프트 타이머 복구 버그 수정
   - `snake-draft.gateway.ts` — 수동 픽 실패(권한 없음 등) 시 취소된 타이머가 복구되지 않는 문제
   - 타이머 취소를 픽 검증 이후로 이동하거나, catch에서 타이머 재스케줄
 
-- [ ] Task 3: 트랜잭션 누락 수정
+- [x] Task 3: 트랜잭션 누락 수정
   - `auction.service.ts` `_applySelectedCaptains` — 팀 생성 + 상태 전환을 `$transaction`으로 감싸기
   - `snake-draft.service.ts` `startSnakeDraft` — 동일
   - `room.service.ts` `closeRoom` — 참가자 삭제 + 방 삭제를 `$transaction`으로 감싸기
@@ -25,19 +25,19 @@
 
 ## Phase 2: 관전자 시스템 구현
 
-- [ ] Task 4: 백엔드 관전자 로직
+- [x] Task 4: 백엔드 관전자 로직
   - 방 참가 시 SPECTATOR 역할로 입장 가능 (allowSpectators 체크)
   - 방 안에서 PLAYER ↔ SPECTATOR 전환 API
   - 전환 조건: WAITING 상태에서만 전환 가능
   - 팀 수 계산, 매물 풀, 캡틴 선정에서 SPECTATOR 필터링
   - 관전자 입장/퇴장 소켓 이벤트
 
-- [ ] Task 5: 프론트엔드 관전자 UI — 방 로비
+- [x] Task 5: 프론트엔드 관전자 UI — 방 로비
   - 방 참가 시 PLAYER/SPECTATOR 선택 UI (allowSpectators일 때)
   - 방 내부에서 본인 역할 전환 버튼
   - 참가자 목록에서 관전자 섹션 분리 표시
 
-- [ ] Task 6: 프론트엔드 관전자 UI — 경매/드래프트
+- [x] Task 6: 프론트엔드 관전자 UI — 경매/드래프트
   - 관전자는 입찰 패널 대신 "관전 중" 안내 표시
   - 경매/드래프트 전 과정 실시간 구독 (읽기 전용)
   - 채팅 참여 가능
@@ -46,7 +46,7 @@
 
 ## Phase 3: 경매 레이아웃 재구성
 
-- [ ] Task 7: 데스크톱 레이아웃 개선
+- [x] Task 7: 데스크톱 레이아웃 개선
   - 중앙 컬럼 과밀 해소: 팀 카드를 하단 고정 영역 또는 접기/펼치기 구조로 분리
   - 입찰 패널 근처에 경쟁팀 예산 요약 바 추가 (스크롤 없이 파악)
   - 최고 입찰자에 팀 컬러/이름 정보 포함
