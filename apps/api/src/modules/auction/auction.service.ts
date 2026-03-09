@@ -283,44 +283,51 @@ export class AuctionService {
       captainUserIds.includes(p.userId),
     );
 
-    const teams = await Promise.all(
-      captainParticipants.map(async (captain: any, index: number) => {
-        const initialBudget = room.startingPoints || 1000;
-        return this.prisma.team.create({
-          data: {
-            roomId,
-            name: `Team ${index + 1}`,
-            captainId: captain.userId,
-            color: this.getTeamColor(index),
-            initialBudget,
-            remainingBudget: initialBudget,
-            members: {
-              create: {
-                userId: captain.userId,
-                assignedRole: captain.user.riotAccounts[0]?.mainRole,
+    // 팀 생성 + 상태 전환 + 캡틴 배정을 원자적으로 처리
+    const teams = await this.prisma.$transaction(async (tx) => {
+      const createdTeams = await Promise.all(
+        captainParticipants.map(async (captain: any, index: number) => {
+          const initialBudget = room.startingPoints || 1000;
+          return tx.team.create({
+            data: {
+              roomId,
+              name: `Team ${index + 1}`,
+              captainId: captain.userId,
+              color: this.getTeamColor(index),
+              initialBudget,
+              remainingBudget: initialBudget,
+              members: {
+                create: {
+                  userId: captain.userId,
+                  assignedRole: captain.user.riotAccounts[0]?.mainRole,
+                },
               },
             },
-          },
-        });
-      }),
-    );
-
-    await this.prisma.room.update({
-      where: { id: roomId },
-      data: { status: RoomStatus.DRAFT },
-    });
-
-    await Promise.all(
-      captainParticipants.map((captain: any) =>
-        this.prisma.roomParticipant.update({
-          where: { id: captain.id },
-          data: {
-            isCaptain: true,
-            teamId: teams.find((t) => t.captainId === captain.userId)?.id,
-          },
+          });
         }),
-      ),
-    );
+      );
+
+      await tx.room.update({
+        where: { id: roomId },
+        data: { status: RoomStatus.DRAFT },
+      });
+
+      await Promise.all(
+        captainParticipants.map((captain: any) =>
+          tx.roomParticipant.update({
+            where: { id: captain.id },
+            data: {
+              isCaptain: true,
+              teamId: createdTeams.find(
+                (t) => t.captainId === captain.userId,
+              )?.id,
+            },
+          }),
+        ),
+      );
+
+      return createdTeams;
+    });
 
     try {
       if (this.discordVoiceService) {
@@ -950,6 +957,15 @@ export class AuctionService {
 
   getAuctionState(roomId: string): AuctionState | undefined {
     return this.auctionStates.get(roomId);
+  }
+
+  /** 해당 유저가 방의 호스트인지 확인 */
+  async isRoomHost(userId: string, roomId: string): Promise<boolean> {
+    const room = await this.prisma.room.findUnique({
+      where: { id: roomId },
+      select: { hostId: true },
+    });
+    return room?.hostId === userId;
   }
 
   clearAuctionState(roomId: string): void {

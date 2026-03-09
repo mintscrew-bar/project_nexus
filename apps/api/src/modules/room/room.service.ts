@@ -959,9 +959,11 @@ export class RoomService {
         });
     }
 
-    // Delete room data (chat messages preserved via onDelete: SetNull)
-    await this.prisma.roomParticipant.deleteMany({ where: { roomId } });
-    await this.prisma.room.delete({ where: { id: roomId } });
+    // 참가자 삭제 + 방 삭제를 원자적으로 처리 (chat messages preserved via onDelete: SetNull)
+    await this.prisma.$transaction([
+      this.prisma.roomParticipant.deleteMany({ where: { roomId } }),
+      this.prisma.room.delete({ where: { id: roomId } }),
+    ]);
 
     return { message: "Room closed" };
   }

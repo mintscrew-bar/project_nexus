@@ -198,6 +198,10 @@ export class SnakeDraftGateway
 
     this.manualPickingRooms.add(data.roomId);
 
+    // 픽 검증 전에 현재 상태의 timerEnd를 저장 (실패 시 타이머 복구용)
+    const prePickState = this.snakeDraftService.getDraftState(data.roomId);
+    const savedTimerEnd = prePickState?.timerEnd;
+
     // Cancel timer BEFORE making pick to prevent race condition
     this._cancelPickTimer(data.roomId);
 
@@ -278,6 +282,10 @@ export class SnakeDraftGateway
 
       return { success: true, state: clientState };
     } catch (error: any) {
+      // 픽 실패 시 취소했던 타이머를 복구 (autoPick이 계속 동작하도록)
+      if (savedTimerEnd && savedTimerEnd > Date.now()) {
+        this._schedulePickTimer(data.roomId, savedTimerEnd);
+      }
       return { error: error.message };
     } finally {
       this.manualPickingRooms.delete(data.roomId);

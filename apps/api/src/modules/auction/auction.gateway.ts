@@ -420,6 +420,15 @@ export class AuctionGateway
       return { error: "Unauthorized" };
     }
 
+    // 호스트만 수동 resolve 가능
+    const isHost = await this.auctionService.isRoomHost(
+      client.userId,
+      data.roomId,
+    );
+    if (!isHost) {
+      return { error: "호스트만 경매를 수동 진행할 수 있습니다." };
+    }
+
     try {
       const result = await this._resolveCurrentBidAndAdvance(data.roomId);
       if (result === null) {
@@ -518,6 +527,16 @@ export class AuctionGateway
     @MessageBody() data: { roomId: string },
   ) {
     if (!client.userId) return { error: "Unauthorized" };
+
+    // 호스트만 역할 선택 재시작 가능
+    const isHost = await this.auctionService.isRoomHost(
+      client.userId,
+      data.roomId,
+    );
+    if (!isHost) {
+      return { error: "호스트만 역할 선택을 재시작할 수 있습니다." };
+    }
+
     try {
       await this._startRoleSelectionWithRetry(data.roomId);
       return { success: true };

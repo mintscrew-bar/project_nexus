@@ -87,43 +87,49 @@ export class SnakeDraftService {
       (p) => !captains.find((c) => c.id === p.id),
     );
 
-    // Create teams
-    const teams = await Promise.all(
-      captains.map(async (captain, index) => {
-        return this.prisma.team.create({
-          data: {
-            roomId,
-            name: `Team ${index + 1}`,
-            captainId: captain.userId,
-            color: this.getTeamColor(index),
-            members: {
-              create: {
-                userId: captain.userId,
-                assignedRole: captain.user.riotAccounts[0]?.mainRole,
-                pickOrder: 0,
+    // 팀 생성 + 상태 전환 + 캡틴 배정을 원자적으로 처리
+    const teams = await this.prisma.$transaction(async (tx) => {
+      const createdTeams = await Promise.all(
+        captains.map(async (captain, index) => {
+          return tx.team.create({
+            data: {
+              roomId,
+              name: `Team ${index + 1}`,
+              captainId: captain.userId,
+              color: this.getTeamColor(index),
+              members: {
+                create: {
+                  userId: captain.userId,
+                  assignedRole: captain.user.riotAccounts[0]?.mainRole,
+                  pickOrder: 0,
+                },
               },
             },
-          },
-        });
-      }),
-    );
-
-    await this.prisma.room.update({
-      where: { id: roomId },
-      data: { status: RoomStatus.DRAFT },
-    });
-
-    await Promise.all(
-      captains.map((captain) =>
-        this.prisma.roomParticipant.update({
-          where: { id: captain.id },
-          data: {
-            isCaptain: true,
-            teamId: teams.find((t) => t.captainId === captain.userId)?.id,
-          },
+          });
         }),
-      ),
-    );
+      );
+
+      await tx.room.update({
+        where: { id: roomId },
+        data: { status: RoomStatus.DRAFT },
+      });
+
+      await Promise.all(
+        captains.map((captain) =>
+          tx.roomParticipant.update({
+            where: { id: captain.id },
+            data: {
+              isCaptain: true,
+              teamId: createdTeams.find(
+                (t) => t.captainId === captain.userId,
+              )?.id,
+            },
+          }),
+        ),
+      );
+
+      return createdTeams;
+    });
 
     // Discord 봇: 팀장에게 역할 부여
     try {
