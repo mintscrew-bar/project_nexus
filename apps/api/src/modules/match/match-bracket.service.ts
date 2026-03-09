@@ -6,6 +6,7 @@ import {
   Logger,
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
+import { Prisma } from "@prisma/client";
 import { RoomStatus, MatchStatus, BracketType } from "@nexus/database";
 
 export interface BracketMatch {
@@ -134,7 +135,7 @@ export class MatchBracketService {
     }
 
     // Create matches in database with transaction for atomicity
-    await this.prisma.$transaction(async (tx) => {
+    await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // Create all matches
       await Promise.all(
         bracket.matches.map((match) =>
@@ -194,7 +195,7 @@ export class MatchBracketService {
 
     return {
       type: bracketType,
-      matches: matches.map((m) => ({
+      matches: matches.map((m: typeof matches[number]) => ({
         id: m.id,
         round: m.round || 1,
         matchNumber: m.matchNumber || 1,

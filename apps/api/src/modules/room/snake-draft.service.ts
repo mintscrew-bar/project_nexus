@@ -8,6 +8,7 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { RoomStatus, TeamMode, TeamCaptainSelection } from "@nexus/database";
+import { Prisma } from "@prisma/client";
 import { calculateTierScore } from "../common/tier-score.util";
 
 export interface SnakeDraftState {
@@ -84,11 +85,11 @@ export class SnakeDraftService {
       room.captainSelection,
     );
     const players = room.participants.filter(
-      (p) => !captains.find((c) => c.id === p.id),
+      (p: (typeof room.participants)[number]) => !captains.find((c: (typeof room.participants)[number]) => c.id === p.id),
     );
 
     // 팀 생성 + 상태 전환 + 캡틴 배정을 원자적으로 처리
-    const teams = await this.prisma.$transaction(async (tx) => {
+    const teams = await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const createdTeams = await Promise.all(
         captains.map(async (captain, index) => {
           return tx.team.create({
@@ -156,7 +157,7 @@ export class SnakeDraftService {
     }
 
     const pickOrder = this.generatePickOrder(
-      teams.map((t) => t.id),
+      teams.map((t: (typeof teams)[number]) => t.id),
       numTeams,
     );
 
@@ -167,7 +168,7 @@ export class SnakeDraftService {
       currentRound: 1,
       pickOrder,
       isReversing: false,
-      availablePlayers: players.map((p) => p.userId),
+      availablePlayers: players.map((p: (typeof players)[number]) => p.userId),
       timerEnd: Date.now() + (room.pickTimeLimit || 60) * 1000,
     };
 
@@ -175,7 +176,7 @@ export class SnakeDraftService {
 
     return {
       teams,
-      players: players.map((p) => {
+      players: players.map((p: (typeof players)[number]) => {
         const acc = p.user.riotAccounts[0];
         return {
           id: p.userId,
@@ -347,7 +348,7 @@ export class SnakeDraftService {
       select: { pickTimeLimit: true },
     });
 
-    await this.prisma.$transaction(async (tx) => {
+    await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       await tx.teamMember.create({
         data: { teamId, userId: targetPlayerId, pickOrder: pickNumber },
       });
@@ -527,11 +528,11 @@ export class SnakeDraftService {
     }
 
     const remainingParticipants = room.participants.filter(
-      (p) => p.userId !== userId,
+      (p: (typeof room.participants)[number]) => p.userId !== userId,
     );
     const shouldDelete =
       remainingParticipants.length === 0 ||
-      remainingParticipants.every((p) =>
+      remainingParticipants.every((p: (typeof remainingParticipants)[number]) =>
         /^testbot_\d+$/.test(p.user?.username ?? ""),
       );
 

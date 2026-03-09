@@ -169,8 +169,8 @@ export class MatchService {
     // Send app notifications to all participants
     try {
       const allParticipants = [
-        ...match.teamA.members.map((m) => m.user.id),
-        ...match.teamB.members.map((m) => m.user.id),
+        ...match.teamA.members.map((m: { user: { id: string } }) => m.user.id),
+        ...match.teamB.members.map((m: { user: { id: string } }) => m.user.id),
       ];
 
       await Promise.all(
@@ -457,7 +457,7 @@ export class MatchService {
 
         // Notify winners
         await Promise.all(
-          winnerMembers.map((m) =>
+          winnerMembers.map((m: { user: { id: string } }) =>
             this.notificationService.notifyMatchResult(
               m.user.id,
               matchId,
@@ -469,7 +469,7 @@ export class MatchService {
 
         // Notify losers
         await Promise.all(
-          loserMembers.map((m) =>
+          loserMembers.map((m: { user: { id: string } }) =>
             this.notificationService.notifyMatchResult(
               m.user.id,
               matchId,
@@ -1006,7 +1006,7 @@ export class MatchService {
       skip: offset,
     });
 
-    return matches.map((participant) => ({
+    return matches.map((participant: typeof matches[number]) => ({
       matchId: participant.matchId,
       match: participant.match,
       participant: {

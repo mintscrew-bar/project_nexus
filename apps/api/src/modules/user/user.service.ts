@@ -147,7 +147,7 @@ export class UserService {
     let wins = 0;
     let losses = 0;
 
-    teamMembers.forEach((tm) => {
+    teamMembers.forEach((tm: (typeof teamMembers)[number]) => {
       if (!tm.team) return;
 
       const teamMatches = [

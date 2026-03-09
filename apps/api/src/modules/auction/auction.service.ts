@@ -7,6 +7,7 @@
   Inject,
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
+import { Prisma } from "@prisma/client";
 import { RoomStatus, TeamCaptainSelection, TeamMode } from "@nexus/database";
 import { calculateTierScore } from "../common/tier-score.util";
 
@@ -284,7 +285,7 @@ export class AuctionService {
     );
 
     // 팀 생성 + 상태 전환 + 캡틴 배정을 원자적으로 처리
-    const teams = await this.prisma.$transaction(async (tx) => {
+    const teams = await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const createdTeams = await Promise.all(
         captainParticipants.map(async (captain: any, index: number) => {
           const initialBudget = room.startingPoints || 1000;
@@ -559,7 +560,7 @@ export class AuctionService {
 
     const { teams } = await this._applySelectedCaptains(roomId, room, userIds);
     const nonCaptains = room.participants.filter(
-      (p) => !userIds.includes(p.userId),
+      (p: any) => !userIds.includes(p.userId),
     );
     const botCaptainIds = this._filterBotCaptains(userIds, room.participants);
 
@@ -579,7 +580,7 @@ export class AuctionService {
 
     return {
       teams,
-      players: nonCaptains.map((p) => {
+      players: nonCaptains.map((p: any) => {
         const acc = p.user.riotAccounts[0];
         return {
           id: p.userId,
@@ -799,7 +800,7 @@ export class AuctionService {
       const soldPrice = state.currentHighestBid;
 
       // Atomic update: deduct budget, assign player, update participant
-      await this.prisma.$transaction(async (tx) => {
+      await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         await tx.team.update({
           where: { id: team.id },
           data: {
@@ -842,10 +843,10 @@ export class AuctionService {
       const bidIncrement = room.minBidIncrement || 50;
       const maxTeamSize = 5;
       const incompleteTeams = room.teams.filter(
-        (t) => t._count.members < maxTeamSize,
+        (t: any) => t._count.members < maxTeamSize,
       );
       const anyCanBid = incompleteTeams.some(
-        (t) => t.remainingBudget >= bidIncrement,
+        (t: any) => t.remainingBudget >= bidIncrement,
       );
 
       // Simulation rule: if someone can still bid and cycle not exhausted, keep same player.
@@ -865,7 +866,7 @@ export class AuctionService {
         (a, b) => b.remainingBudget - a.remainingBudget,
       )[0];
 
-      await this.prisma.$transaction(async (tx) => {
+      await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         if (targetTeam.remainingBudget === 0 && !targetTeam.hasReceivedBonus) {
           await tx.team.update({
             where: { id: targetTeam.id },
@@ -1033,11 +1034,11 @@ export class AuctionService {
     }
 
     const remainingParticipants = room.participants.filter(
-      (p) => p.userId !== userId,
+      (p: any) => p.userId !== userId,
     );
     const shouldDelete =
       remainingParticipants.length === 0 ||
-      remainingParticipants.every((p) =>
+      remainingParticipants.every((p: any) =>
         this.isBotUsername(p.user?.username ?? ""),
       );
 
@@ -1191,7 +1192,7 @@ export class AuctionService {
       },
     });
 
-    return teams.map((t) => {
+    return teams.map((t: any) => {
       const memberCount = t._count.members;
       const slotsNeeded = Math.max(0, 5 - memberCount);
       const reserveAmount = Math.max(0, (slotsNeeded - 1) * 100);

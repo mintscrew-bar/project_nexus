@@ -268,10 +268,10 @@ export class CommunityService {
         ...post,
         content:
           "[블라인드 처리된 게시글입니다. 신고에 의해 임시조치되었습니다.]",
-        comments: post.comments.map((c) => ({
+        comments: post.comments.map((c: (typeof post.comments)[number]) => ({
           ...c,
           content: c.isBlinded ? "[블라인드 처리된 댓글입니다]" : c.content,
-          replies: (c.replies || []).map((r: any) => ({
+          replies: (c.replies || []).map((r: (typeof c.replies)[number]) => ({
             ...r,
             content: r.isBlinded ? "[블라인드 처리된 댓글입니다]" : r.content,
           })),
@@ -282,11 +282,11 @@ export class CommunityService {
     // 블라인드되지 않은 게시글의 댓글 중 블라인드된 댓글만 마스킹
     const maskedPost = {
       ...post,
-      comments: post.comments.map((c) => ({
+      comments: post.comments.map((c: (typeof post.comments)[number]) => ({
         ...c,
         content:
           c.isBlinded && !isAdmin ? "[블라인드 처리된 댓글입니다]" : c.content,
-        replies: (c.replies || []).map((r: any) => ({
+        replies: (c.replies || []).map((r: (typeof c.replies)[number]) => ({
           ...r,
           content:
             r.isBlinded && !isAdmin
@@ -396,7 +396,7 @@ export class CommunityService {
 
     // 블라인드 게시물: 관리자가 아니면 제목만 "[블라인드 처리된 게시글]"로 표시, 내용 숨김
     const isAdmin = filters?.isAdmin ?? false;
-    const maskedPosts = posts.map((post) => {
+    const maskedPosts = posts.map((post: (typeof posts)[number]) => {
       if (post.isBlinded && !isAdmin) {
         return {
           ...post,
@@ -486,8 +486,8 @@ export class CommunityService {
     });
     // 게시글이 1개 이상인 태그만 반환
     return tags
-      .filter((t) => t._count.posts > 0)
-      .map((t) => ({
+      .filter((t: (typeof tags)[number]) => t._count.posts > 0)
+      .map((t: (typeof tags)[number]) => ({
         name: t.name,
         count: t._count.posts,
       }));
@@ -840,7 +840,7 @@ export class CommunityService {
       select: { commentId: true },
     });
 
-    const likedSet = new Set(likes.map((l) => l.commentId));
+    const likedSet = new Set(likes.map((l: (typeof likes)[number]) => l.commentId));
     return Object.fromEntries(commentIds.map((id) => [id, likedSet.has(id)]));
   }
 
@@ -906,7 +906,7 @@ export class CommunityService {
       }),
     ]);
 
-    return { posts: bookmarks.map((b) => b.post), total };
+    return { posts: bookmarks.map((b: (typeof bookmarks)[number]) => b.post), total };
   }
 
   // ========================================

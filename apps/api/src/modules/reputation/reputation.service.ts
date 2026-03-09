@@ -67,8 +67,8 @@ export class ReputationService {
 
     // Verify both users were in the match
     const allMembers = [
-      ...(match.teamA?.members.map((m) => m.userId) ?? []),
-      ...(match.teamB?.members.map((m) => m.userId) ?? []),
+      ...(match.teamA?.members.map((m: { userId: string }) => m.userId) ?? []),
+      ...(match.teamB?.members.map((m: { userId: string }) => m.userId) ?? []),
     ];
 
     if (
@@ -153,11 +153,11 @@ export class ReputationService {
     }
 
     const avgSkill =
-      ratings.reduce((sum, r) => sum + r.skillRating, 0) / ratings.length;
+      ratings.reduce((sum: number, r: (typeof ratings)[number]) => sum + r.skillRating, 0) / ratings.length;
     const avgAttitude =
-      ratings.reduce((sum, r) => sum + r.attitudeRating, 0) / ratings.length;
+      ratings.reduce((sum: number, r: (typeof ratings)[number]) => sum + r.attitudeRating, 0) / ratings.length;
     const avgCommunication =
-      ratings.reduce((sum, r) => sum + r.communicationRating, 0) /
+      ratings.reduce((sum: number, r: (typeof ratings)[number]) => sum + r.communicationRating, 0) /
       ratings.length;
 
     const overall = (avgSkill + avgAttitude + avgCommunication) / 3;

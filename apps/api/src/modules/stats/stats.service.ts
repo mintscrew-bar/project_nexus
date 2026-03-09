@@ -123,13 +123,13 @@ export class StatsService {
 
     const totalAuctions = soldRecords.length;
     const soldPrices = soldRecords
-      .map((r) => r.soldPrice!)
-      .filter((p) => p > 0);
+      .map((r: (typeof soldRecords)[number]) => r.soldPrice!)
+      .filter((p: number) => p > 0);
     const totalSold = soldPrices.length;
     const yuchalCount = totalAuctions - totalSold;
     const avgSoldPrice =
       totalSold > 0
-        ? Math.round(soldPrices.reduce((s, p) => s + p, 0) / totalSold)
+        ? Math.round(soldPrices.reduce((s: number, p: number) => s + p, 0) / totalSold)
         : 0;
     const maxSoldPrice = totalSold > 0 ? Math.max(...soldPrices) : 0;
 
@@ -250,7 +250,7 @@ export class StatsService {
     // Aggregate stats by champion
     const statsMap = new Map<number, ChampionStats>();
 
-    participants.forEach((p) => {
+    participants.forEach((p: (typeof participants)[number]) => {
       const existing = statsMap.get(p.championId);
       if (existing) {
         existing.games++;
@@ -323,7 +323,7 @@ export class StatsService {
     // Aggregate stats by position
     const statsMap = new Map<string, PositionStats>();
 
-    participants.forEach((p) => {
+    participants.forEach((p: (typeof participants)[number]) => {
       const position = p.position || "UNKNOWN";
       const existing = statsMap.get(position);
       if (existing) {
@@ -484,7 +484,7 @@ export class StatsService {
       },
     });
 
-    return users.map((user) => ({
+    return users.map((user: (typeof users)[number]) => ({
       id: user.id,
       username: user.username,
       avatar: user.avatar,

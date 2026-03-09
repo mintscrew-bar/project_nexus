@@ -114,7 +114,7 @@ export class RoleSelectionService {
     let userTeamMember = null;
 
     for (const team of room.teams) {
-      const member = team.members.find((m) => m.userId === userId);
+      const member = team.members.find((m: (typeof team.members)[number]) => m.userId === userId);
       if (member) {
         userTeam = team;
         userTeamMember = member;
@@ -128,7 +128,7 @@ export class RoleSelectionService {
 
     // Check if role is already taken in the team
     const roleAlreadyTaken = userTeam.members.some(
-      (m) => m.assignedRole === role && m.id !== userTeamMember.id,
+      (m: (typeof userTeam.members)[number]) => m.assignedRole === role && m.id !== userTeamMember.id,
     );
 
     if (roleAlreadyTaken) {
@@ -307,8 +307,8 @@ export class RoleSelectionService {
 
     for (const team of room.teams) {
       const takenRoles = team.members
-        .filter((m) => m.assignedRole)
-        .map((m) => m.assignedRole as Role);
+        .filter((m: (typeof team.members)[number]) => m.assignedRole)
+        .map((m: (typeof team.members)[number]) => m.assignedRole as Role);
 
       const remainingRoles = ALL_ROLES.filter((r) => !takenRoles.includes(r));
 
@@ -321,7 +321,7 @@ export class RoleSelectionService {
         ];
       }
 
-      const unassignedMembers = team.members.filter((m) => !m.assignedRole);
+      const unassignedMembers = team.members.filter((m: (typeof team.members)[number]) => !m.assignedRole);
 
       for (let i = 0; i < unassignedMembers.length; i++) {
         const role = remainingRoles[i];

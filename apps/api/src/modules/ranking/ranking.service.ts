@@ -22,7 +22,7 @@ export class RankingService {
       });
 
       const totalGames = participants.length;
-      const wins = participants.filter((p) => p.win).length;
+      const wins = participants.filter((p: { win: boolean; createdAt: Date }) => p.win).length;
       const losses = totalGames - wins;
       const winRate = totalGames > 0 ? (wins / totalGames) * 100 : 0;
 
@@ -31,7 +31,7 @@ export class RankingService {
         0,
         RankingService.RECENT_GAMES_COUNT,
       );
-      const recentWins = recentGames.filter((p) => p.win).length;
+      const recentWins = recentGames.filter((p: { win: boolean; createdAt: Date }) => p.win).length;
       const recentLosses = recentGames.length - recentWins;
 
       // Upsert NexusRanking
@@ -89,7 +89,7 @@ export class RankingService {
     });
 
     const totalGames = participants.length;
-    const wins = participants.filter((p) => p.win).length;
+    const wins = participants.filter((p: { win: boolean }) => p.win).length;
     const losses = totalGames - wins;
     const winRate = totalGames > 0 ? (wins / totalGames) * 100 : 0;
 
@@ -154,7 +154,7 @@ export class RankingService {
     ]);
 
     // Attach rank numbers
-    const rankedData = rankings.map((r, i) => ({
+    const rankedData = rankings.map((r: (typeof rankings)[number], i: number) => ({
       ...r,
       globalRank: skip + i + 1,
     }));
@@ -201,7 +201,7 @@ export class RankingService {
       this.prisma.clanRanking.count({ where: { clanId } }),
     ]);
 
-    const rankedData = rankings.map((r, i) => ({
+    const rankedData = rankings.map((r: (typeof rankings)[number], i: number) => ({
       ...r,
       clanRank: skip + i + 1,
     }));

@@ -286,7 +286,7 @@ export class FriendService {
     // 같은 상대방 유저가 두 번 나타나는 버그를 방지하기 위해 중복 제거.
     // 상대방 userId를 기준으로 Set을 이용해 첫 번째 레코드만 유지.
     const seenPartnerIds = new Set<string>();
-    const deduplicated = friendships.filter((f) => {
+    const deduplicated = friendships.filter((f: typeof friendships[number]) => {
       // 현재 유저 입장에서 "상대방" ID 결정
       const partnerId = f.userId === userId ? f.friendId : f.userId;
       if (seenPartnerIds.has(partnerId)) {
@@ -360,7 +360,7 @@ export class FriendService {
       orderBy: { createdAt: "desc" },
     });
 
-    return outgoingRequests.map((f) => ({
+    return outgoingRequests.map((f: typeof outgoingRequests[number]) => ({
       friendshipId: f.id,
       to: f.friend,
       createdAt: f.createdAt,
@@ -464,7 +464,7 @@ export class FriendService {
       },
     });
 
-    return blocked.map((b) => ({
+    return blocked.map((b: typeof blocked[number]) => ({
       friendshipId: b.id,
       blockedUser: b.friend,
       createdAt: b.createdAt,

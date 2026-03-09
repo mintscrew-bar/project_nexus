@@ -254,7 +254,7 @@ export class DiscordVoiceService {
       }
 
       const discordProvider = member.user.authProviders.find(
-        (p) => p.provider === "DISCORD",
+        (p: (typeof member.user.authProviders)[number]) => p.provider === "DISCORD",
       );
 
       if (!discordProvider) {
@@ -318,7 +318,7 @@ export class DiscordVoiceService {
       const guild = await this.client.guilds.fetch(guildId);
 
       const channelsToDelete = keepLobby
-        ? room.discordChannels.filter((ch) => ch.teamName !== "Lobby")
+        ? room.discordChannels.filter((ch: (typeof room.discordChannels)[number]) => ch.teamName !== "Lobby")
         : room.discordChannels;
 
       // Delete child channels first (Discord does NOT auto-delete them with category)
@@ -392,8 +392,8 @@ export class DiscordVoiceService {
 
     // Get current team channels (excluding Lobby), sorted by team number
     const existingTeamChannels = room.discordChannels
-      .filter((ch) => ch.teamName !== "Lobby")
-      .sort((a, b) => {
+      .filter((ch: (typeof room.discordChannels)[number]) => ch.teamName !== "Lobby")
+      .sort((a: (typeof room.discordChannels)[number], b: (typeof room.discordChannels)[number]) => {
         const numA = parseInt(a.teamName?.replace("Team ", "") || "0", 10);
         const numB = parseInt(b.teamName?.replace("Team ", "") || "0", 10);
         return numA - numB;
@@ -669,7 +669,7 @@ export class DiscordVoiceService {
     // Move each team to their channel
     for (const team of room.teams) {
       const teamChannel = room.discordChannels.find(
-        (ch) => ch.teamName === team.name,
+        (ch: (typeof room.discordChannels)[number]) => ch.teamName === team.name,
       );
 
       if (!teamChannel) {
@@ -896,7 +896,7 @@ export class DiscordVoiceService {
       }
 
       const discordProvider = participant.user.authProviders.find(
-        (p) => p.provider === "DISCORD",
+        (p: (typeof participant.user.authProviders)[number]) => p.provider === "DISCORD",
       );
 
       if (!discordProvider) {

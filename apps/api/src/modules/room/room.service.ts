@@ -15,6 +15,7 @@ import {
   TeamCaptainSelection,
   BracketType,
 } from "@nexus/database";
+import { Prisma } from "@prisma/client";
 import * as bcrypt from "bcrypt";
 
 export interface CreateRoomDto {
@@ -409,7 +410,7 @@ export class RoomService {
 
     // 정원 체크: PLAYER만 카운트 (관전자는 정원에 포함되지 않음)
     const playerCount = room.participants.filter(
-      (p) => p.role === "PLAYER",
+      (p: (typeof room.participants)[number]) => p.role === "PLAYER",
     ).length;
     if (!joinAsSpectator && playerCount >= room.maxParticipants) {
       throw new BadRequestException("Room is full");
@@ -421,7 +422,7 @@ export class RoomService {
     }
 
     // Check if user is already in room
-    const existing = room.participants.find((p) => p.userId === userId);
+    const existing = room.participants.find((p: (typeof room.participants)[number]) => p.userId === userId);
     if (existing) {
       throw new BadRequestException("Already in room");
     }
@@ -494,7 +495,7 @@ export class RoomService {
       );
     }
 
-    const participant = room.participants.find((p) => p.userId === userId);
+    const participant = room.participants.find((p: (typeof room.participants)[number]) => p.userId === userId);
     if (!participant) {
       throw new BadRequestException("Not in room");
     }
@@ -505,7 +506,7 @@ export class RoomService {
     // SPECTATOR → PLAYER 전환 시 정원 체크
     if (newRole === "PLAYER") {
       const playerCount = room.participants.filter(
-        (p) => p.role === "PLAYER",
+        (p: (typeof room.participants)[number]) => p.role === "PLAYER",
       ).length;
       if (playerCount >= room.maxParticipants) {
         throw new BadRequestException(
@@ -552,7 +553,7 @@ export class RoomService {
     }
 
     // Check if user is in room
-    const participant = room.participants.find((p) => p.userId === userId);
+    const participant = room.participants.find((p: (typeof room.participants)[number]) => p.userId === userId);
     if (!participant) {
       throw new BadRequestException("Not in room");
     }
@@ -562,7 +563,7 @@ export class RoomService {
     // Exception: if only bots remain, clean up immediately.
     if (room.status !== RoomStatus.WAITING) {
       const remainingParticipants = room.participants.filter(
-        (p) => p.userId !== userId,
+        (p: (typeof room.participants)[number]) => p.userId !== userId,
       );
       const allRemainingAreBots =
         remainingParticipants.length > 0 &&
@@ -609,7 +610,7 @@ export class RoomService {
     // Check remaining participants
     const remainingCount = room.participants.length - 1;
     const remainingParticipants = room.participants.filter(
-      (p) => p.userId !== userId,
+      (p: (typeof room.participants)[number]) => p.userId !== userId,
     );
     const allRemainingAreBots =
       remainingParticipants.length > 0 &&
@@ -848,7 +849,7 @@ export class RoomService {
       where: { roomId, role: "PLAYER" },
     });
 
-    return participants.length > 0 && participants.every((p) => p.isReady);
+    return participants.length > 0 && participants.every((p: (typeof participants)[number]) => p.isReady);
   }
 
   // ========================================
@@ -878,7 +879,7 @@ export class RoomService {
     }
 
     // Check if all players are ready
-    const allReady = room.participants.every((p) => p.isReady);
+    const allReady = room.participants.every((p: (typeof room.participants)[number]) => p.isReady);
     if (!allReady) {
       throw new BadRequestException("Not all players are ready");
     }
@@ -926,7 +927,7 @@ export class RoomService {
   }
 
   async rollbackToWaiting(roomId: string) {
-    await this.prisma.$transaction(async (tx) => {
+    await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       await tx.roomParticipant.updateMany({
         where: { roomId },
         data: { teamId: null, isCaptain: false, isReady: false },
@@ -1108,11 +1109,11 @@ export class RoomService {
 
     // Discord 팀장 역할 정리용
     const captainDiscordIds = room.teams
-      .map((team) => team.captain.authProviders[0]?.providerId)
-      .filter((providerId): providerId is string => Boolean(providerId));
+      .map((team: (typeof room.teams)[number]) => team.captain.authProviders[0]?.providerId)
+      .filter((providerId: string | undefined): providerId is string => Boolean(providerId));
 
     // 트랜잭션으로 방 상태를 WAITING으로 리셋
-    await this.prisma.$transaction(async (tx) => {
+    await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // 참가자 팀 배정 해제 및 레디 상태 초기화
       await tx.roomParticipant.updateMany({
         where: { roomId },
@@ -1157,7 +1158,7 @@ export class RoomService {
     try {
       if (this.discordVoiceService) {
         await Promise.all(
-          captainDiscordIds.map((providerId) =>
+          captainDiscordIds.map((providerId: string) =>
             this.discordVoiceService.removeCaptainRole(providerId),
           ),
         );
@@ -1226,10 +1227,10 @@ export class RoomService {
     }
 
     const captainDiscordIds = room.teams
-      .map((team) => team.captain.authProviders[0]?.providerId)
-      .filter((providerId): providerId is string => Boolean(providerId));
+      .map((team: (typeof room.teams)[number]) => team.captain.authProviders[0]?.providerId)
+      .filter((providerId: string | undefined): providerId is string => Boolean(providerId));
 
-    await this.prisma.$transaction(async (tx) => {
+    await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       await tx.roomParticipant.updateMany({
         where: { roomId },
         data: {
@@ -1268,7 +1269,7 @@ export class RoomService {
     try {
       if (this.discordVoiceService) {
         await Promise.all(
-          captainDiscordIds.map((providerId) =>
+          captainDiscordIds.map((providerId: string) =>
             this.discordVoiceService.removeCaptainRole(providerId),
           ),
         );

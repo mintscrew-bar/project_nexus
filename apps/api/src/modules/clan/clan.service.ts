@@ -9,6 +9,7 @@ import {
 } from "@nestjs/common";
 import { randomBytes } from "crypto";
 import { PrismaService } from "../prisma/prisma.service";
+import { Prisma } from "@prisma/client";
 import {
   ClanActivityType,
   ClanInvitationStatus,
@@ -533,7 +534,7 @@ export class ClanService {
     }
 
     // 원자적 트랜잭션: clan.ownerId + 역할 두 건을 한 번에 처리
-    await this.prisma.$transaction(async (tx) => {
+    await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       await tx.clan.update({
         where: { id: clanId },
         data: { ownerId: newOwnerId },
@@ -729,7 +730,7 @@ export class ClanService {
 
     // 전체 클랜 통계 집계
     const totals = rankings.reduce(
-      (acc, r) => ({
+      (acc: { totalGames: number; totalWins: number; totalLosses: number }, r: any) => ({
         totalGames: acc.totalGames + r.totalGames,
         totalWins: acc.totalWins + r.wins,
         totalLosses: acc.totalLosses + r.losses,
@@ -1087,7 +1088,7 @@ export class ClanService {
     }
 
     // 멤버십 중복 검사 + 정원 확인 + 초대 처리 + 멤버 추가를 원자적으로 실행
-    const membership = await this.prisma.$transaction(async (tx) => {
+    const membership = await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // 이미 클랜이 있는지 확인
       const existingMembership = await tx.clanMember.findFirst({
         where: { userId },
@@ -1159,7 +1160,7 @@ export class ClanService {
 
     if (accept) {
       // 멤버십 중복 검사 + 초대 처리 + 멤버 추가를 원자적으로 실행
-      await this.prisma.$transaction(async (tx) => {
+      await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         const existingMembership = await tx.clanMember.findFirst({
           where: { userId },
         });
@@ -1246,7 +1247,7 @@ export class ClanService {
 
     if (accept) {
       // 정원 확인 + 초대 처리 + 멤버 추가를 원자적으로 실행
-      await this.prisma.$transaction(async (tx) => {
+      await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         const memberCount = await tx.clanMember.count({
           where: { clanId },
         });

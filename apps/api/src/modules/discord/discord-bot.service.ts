@@ -388,7 +388,7 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
           value:
             existingUser.riotAccounts.length > 0
               ? existingUser.riotAccounts
-                  .map((r) => `${r.gameName}#${r.tagLine}`)
+                  .map((r: (typeof existingUser.riotAccounts)[number]) => `${r.gameName}#${r.tagLine}`)
                   .join(", ")
               : "없음",
         });
@@ -425,7 +425,7 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    const primaryAccount = user.riotAccounts.find((r) => r.isPrimary);
+    const primaryAccount = user.riotAccounts.find((r: (typeof user.riotAccounts)[number]) => r.isPrimary);
 
     const embed = new EmbedBuilder()
       .setColor(Colors.Gold)
@@ -654,7 +654,7 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
       });
     }
 
-    const memberLines = team.members.map((m) => {
+    const memberLines = team.members.map((m: (typeof team.members)[number]) => {
       const riot = m.user.riotAccounts[0];
       const roleEmoji = m.assignedRole ? ROLE_EMOJI[m.assignedRole] : "❓";
       const tierEmoji = riot ? TIER_EMOJI[riot.tier] || "" : "";
@@ -748,12 +748,12 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
 
     // 미배정 선수 목록
     const unassigned = room.participants.filter(
-      (p) => !p.teamId && !p.isCaptain,
+      (p: (typeof room.participants)[number]) => !p.teamId && !p.isCaptain,
     );
     if (unassigned.length > 0) {
       const playerList = unassigned
         .slice(0, 10)
-        .map((p) => {
+        .map((p: (typeof room.participants)[number]) => {
           const riot = p.user.riotAccounts[0];
           const tierEmoji = riot ? TIER_EMOJI[riot.tier] || "" : "";
           return `${tierEmoji} ${p.user.username}`;
@@ -839,7 +839,7 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
         {
           name: `🔵 ${match.teamA?.name ?? "TBD"}`,
           value:
-            match.teamA?.members.map((m) => m.user.username).join(", ") ||
+            match.teamA?.members.map((m: { user: { username: string } }) => m.user.username).join(", ") ||
             "팀원 없음",
           inline: true,
         },
@@ -851,7 +851,7 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
         {
           name: `🔴 ${match.teamB?.name ?? "TBD"}`,
           value:
-            match.teamB?.members.map((m) => m.user.username).join(", ") ||
+            match.teamB?.members.map((m: { user: { username: string } }) => m.user.username).join(", ") ||
             "팀원 없음",
           inline: true,
         },
@@ -935,7 +935,7 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
     const appUrl = this.configService.get("APP_URL") || "http://localhost:3000";
     const room = participant.room;
     const completedCount = matches.filter(
-      (m) => m.status === "COMPLETED",
+      (m: (typeof matches)[number]) => m.status === "COMPLETED",
     ).length;
 
     const embed = new EmbedBuilder()
@@ -960,7 +960,7 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
     const roundOrder = Array.from(byRound.keys()).sort((a, b) => a - b);
     for (const round of roundOrder) {
       const list = byRound.get(round)!;
-      const lines = list.map((m) => {
+      const lines = list.map((m: (typeof matches)[number]) => {
         const label = m.bracketRound || `R${round}`;
         const teamA = m.teamA?.name ?? "TBD";
         const teamB = m.teamB?.name ?? "TBD";
@@ -1105,7 +1105,7 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
 
     // 티어 + LP 기준 내림차순 정렬
     const rankValue: Record<string, number> = { I: 4, II: 3, III: 2, IV: 1 };
-    accounts.sort((a, b) => {
+    accounts.sort((a: (typeof accounts)[number], b: (typeof accounts)[number]) => {
       const tierDiff = (TIER_ORDER[b.tier] ?? 0) - (TIER_ORDER[a.tier] ?? 0);
       if (tierDiff !== 0) return tierDiff;
       const rankDiff =
@@ -1124,7 +1124,7 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    const lines = top10.map((acc, i) => {
+    const lines = top10.map((acc: (typeof top10)[number], i: number) => {
       const medal =
         i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}.`;
       const tierEmoji = TIER_EMOJI[acc.tier] || "❓";
@@ -1201,7 +1201,7 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
         { name: "🎯 최소 티어", value: tierReq, inline: true },
       );
 
-    const memberLines = clan.members.map((m) => {
+    const memberLines = clan.members.map((m: (typeof clan.members)[number]) => {
       const roleEmoji =
         m.role === "OWNER" ? "👑" : m.role === "OFFICER" ? "⚔️" : "👤";
       const riot = m.user.riotAccounts[0];
