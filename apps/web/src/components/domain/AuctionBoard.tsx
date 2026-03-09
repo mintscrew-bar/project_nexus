@@ -4,7 +4,7 @@ import React, { useMemo, useState } from "react";
 import { Card, CardContent, Button, Badge, Avatar } from "@/components/ui";
 import { TierBadge } from "./TierBadge";
 import { cn } from "@/lib/utils";
-import { Coins, AlertTriangle } from "lucide-react";
+import { Coins, AlertTriangle, ChevronDown, ChevronUp } from "lucide-react";
 
 interface Player {
   id: string;
@@ -114,6 +114,7 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
   const totalBid = auctionState.currentHighestBid + accumulatedBid;
   const canPlaceBid = accumulatedBid > 0 && totalBid <= availableBudget && !isBidding;
 
+  const [teamsExpanded, setTeamsExpanded] = useState(true);
   const [timeLeft, setTimeLeft] = useState(0);
   React.useEffect(() => {
     const interval = setInterval(() => {
@@ -259,18 +260,75 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
                     </p>
                   </div>
                 </div>
-                {auctionState.currentHighestBidder && (
-                  <div className="text-right">
-                    <p className="text-sm text-text-tertiary mb-1">최고 입찰자</p>
-                    <p className="text-lg font-semibold text-text-primary">
-                      {highestBidderName}
-                    </p>
-                  </div>
-                )}
+                {auctionState.currentHighestBidder && (() => {
+                  const bidderTeam = sortedTeams.find(
+                    (t) => t.id === auctionState.currentHighestBidder || t.captainId === auctionState.currentHighestBidder,
+                  );
+                  return (
+                    <div className="text-right">
+                      <p className="text-sm text-text-tertiary mb-1">최고 입찰자</p>
+                      <div className="flex items-center gap-2 justify-end">
+                        {bidderTeam?.color && (
+                          <div
+                            className="w-3 h-3 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: bidderTeam.color }}
+                          />
+                        )}
+                        <p className="text-lg font-semibold text-text-primary">
+                          {highestBidderName}
+                        </p>
+                      </div>
+                      {bidderTeam && (
+                        <p className="text-xs text-text-muted">{bidderTeam.name}</p>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* 팀별 예산 요약 바 — 스크롤 없이 한눈에 확인 */}
+      {auctionState.currentPlayer && sortedTeams.length > 0 && (
+        <div className="flex items-center gap-2 flex-wrap">
+          {sortedTeams.map((team) => {
+            const budget = getTeamBudget(team);
+            const isMine = team.captainId === currentUserId;
+            const isHighest = team.id === auctionState.currentHighestBidder || team.captainId === auctionState.currentHighestBidder;
+            return (
+              <div
+                key={team.id}
+                className={cn(
+                  "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors",
+                  isMine
+                    ? "border-accent-primary/40 bg-accent-primary/10"
+                    : isHighest
+                    ? "border-accent-gold/40 bg-accent-gold/10"
+                    : "border-bg-tertiary bg-bg-secondary",
+                )}
+              >
+                {team.color && (
+                  <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: team.color }} />
+                )}
+                <span className={cn("truncate max-w-[60px]", isMine ? "text-accent-primary" : "text-text-secondary")}>
+                  {team.name}
+                </span>
+                <span className={cn(
+                  "font-bold flex items-center gap-0.5",
+                  budget === 0 ? "text-accent-danger" : "text-accent-gold",
+                )}>
+                  <Coins className="w-3 h-3" />
+                  {budget.toLocaleString()}
+                </span>
+                <span className="text-text-muted">
+                  ({(team.members?.length ?? 0)}/5)
+                </span>
+              </div>
+            );
+          })}
+        </div>
       )}
 
       {isCurrentUserTurn && auctionState.currentPlayer && (
@@ -365,7 +423,23 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
         </Card>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* 팀 상세 — 접기/펼치기 */}
+      <div>
+        <button
+          onClick={() => setTeamsExpanded((prev) => !prev)}
+          className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-bg-secondary hover:bg-bg-tertiary transition-colors mb-2"
+        >
+          <span className="text-sm font-semibold text-text-secondary">
+            팀 구성 ({sortedTeams.length}팀)
+          </span>
+          {teamsExpanded ? (
+            <ChevronUp className="w-4 h-4 text-text-muted" />
+          ) : (
+            <ChevronDown className="w-4 h-4 text-text-muted" />
+          )}
+        </button>
+      </div>
+      {teamsExpanded && <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {sortedTeams.map((team) => {
           const members = team.members ?? [];
           const teamBudget = getTeamBudget(team);
@@ -464,7 +538,7 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
             </Card>
           );
         })}
-      </div>
+      </div>}
     </div>
   );
 };
