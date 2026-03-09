@@ -113,12 +113,22 @@ export class RoomController {
   async joinRoom(
     @CurrentUser("sub") userId: string,
     @Param("id") roomId: string,
-    @Body() body: { password?: string },
+    @Body() body: { password?: string; asSpectator?: boolean },
   ) {
     return this.roomService.joinRoom(userId, {
       roomId,
       password: body.password,
+      asSpectator: body.asSpectator,
     });
+  }
+
+  @Post(":id/toggle-spectator")
+  @HttpCode(HttpStatus.OK)
+  async toggleSpectator(
+    @CurrentUser("sub") userId: string,
+    @Param("id") roomId: string,
+  ) {
+    return this.roomService.toggleSpectator(userId, roomId);
   }
 
   @Post(":id/leave")

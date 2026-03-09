@@ -322,6 +322,36 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
+  @SubscribeMessage("toggle-spectator")
+  async handleToggleSpectator(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() data: { roomId: string },
+  ) {
+    try {
+      if (!client.userId) {
+        return { error: "Unauthorized" };
+      }
+
+      const result = await this.roomService.toggleSpectator(
+        client.userId,
+        data.roomId,
+      );
+
+      // 방 안의 모든 유저에게 역할 변경 알림
+      this.server.to(data.roomId).emit("participant-role-changed", {
+        userId: client.userId,
+        newRole: result.newRole,
+      });
+
+      // 방 목록 갱신
+      this.broadcastRoomListUpdate();
+
+      return { success: true, newRole: result.newRole };
+    } catch (error: any) {
+      return { error: error.message };
+    }
+  }
+
   @SubscribeMessage("start-game")
   async handleStartGame(
     @ConnectedSocket() client: AuthenticatedSocket,

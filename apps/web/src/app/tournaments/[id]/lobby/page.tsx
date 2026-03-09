@@ -371,7 +371,7 @@ export default function TournamentLobbyPage() {
   const router = useRouter();
   const roomId = params.id as string;
 
-  const { connect, disconnect, room, isConnected, error, gameStarting, messages, setReady, startGame, sendMessage, kickParticipant } = useLobbyStore();
+  const { connect, disconnect, room, isConnected, error, gameStarting, messages, setReady, startGame, sendMessage, kickParticipant, toggleSpectator } = useLobbyStore();
   const { user: currentUser } = useAuthStore();
   const { addToast } = useToast();
   const { friends, fetchFriends } = useFriendStore();
@@ -533,11 +533,17 @@ export default function TournamentLobbyPage() {
   const isCurrentUserHost = room.hostId === currentUser?.id;
   const currentUserParticipant = room.participants.find((p: any) => p.userId === currentUser?.id);
   const currentUserIsReady = currentUserParticipant?.isReady || false;
-  const readyCount = room.participants.filter((p: any) => p.isReady).length;
-  const totalParticipants = room.participants.length;
-  const allPlayersReady = totalParticipants > 0 && readyCount === totalParticipants;
-  const emptySlots = Math.max(0, room.maxParticipants - totalParticipants);
-  const readyPercent = totalParticipants > 0 ? (readyCount / totalParticipants) * 100 : 0;
+  const currentUserIsSpectator = currentUserParticipant?.role === "SPECTATOR";
+
+  // 플레이어와 관전자 분리
+  const players = room.participants.filter((p: any) => p.role !== "SPECTATOR");
+  const spectators = room.participants.filter((p: any) => p.role === "SPECTATOR");
+
+  const readyCount = players.filter((p: any) => p.isReady).length;
+  const totalPlayers = players.length;
+  const allPlayersReady = totalPlayers > 0 && readyCount === totalPlayers;
+  const emptySlots = Math.max(0, room.maxParticipants - totalPlayers);
+  const readyPercent = totalPlayers > 0 ? (readyCount / totalPlayers) * 100 : 0;
 
   const teamModeLabel = room.teamMode === "AUCTION" ? "경매" : "스네이크";
   const bracketLabel = room.bracketFormat === "SINGLE_ELIMINATION" ? "싱글 엘리미네이션"
@@ -554,8 +560,23 @@ export default function TournamentLobbyPage() {
     /* ─── Participants List ─── */
   const participantsList = (
     <div>
+      {/* 관전자 전환 버튼 */}
+      {room.allowSpectators && room.status === "WAITING" && currentUserParticipant && (
+        <button
+          onClick={() => toggleSpectator((err) => addToast(err, "error"))}
+          className={`w-full mb-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors border ${
+            currentUserIsSpectator
+              ? "border-accent-primary/30 bg-accent-primary/10 text-accent-primary hover:bg-accent-primary/20"
+              : "border-bg-tertiary bg-bg-tertiary/50 text-text-secondary hover:bg-bg-tertiary"
+          }`}
+        >
+          {currentUserIsSpectator ? "플레이어로 전환" : "관전자로 전환"}
+        </button>
+      )}
+
+      {/* 플레이어 목록 */}
       <div className="grid grid-cols-2 gap-1.5">
-        {room.participants.map((p: any) => {
+        {players.map((p: any) => {
           const isSelf = p.userId === currentUser?.id;
           return (
             <CompactParticipantCard
@@ -575,6 +596,36 @@ export default function TournamentLobbyPage() {
         <div className="mt-2 text-center py-2 rounded-lg border border-dashed border-bg-elevated/60 text-sm text-text-muted">
           <Users className="h-4 w-4 inline mr-1.5 opacity-50" />
           {emptySlots}자리 남음
+        </div>
+      )}
+
+      {/* 관전자 섹션 */}
+      {spectators.length > 0 && (
+        <div className="mt-4">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-xs font-semibold text-text-muted uppercase tracking-wider">관전자</span>
+            <span className="text-xs text-text-muted">{spectators.length}명</span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {spectators.map((p: any) => (
+              <div
+                key={p.id}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-bg-tertiary/50 rounded-lg text-sm text-text-secondary"
+              >
+                {p.avatar ? (
+                  <Image src={p.avatar} alt="" width={20} height={20} className="rounded-full" />
+                ) : (
+                  <div className="w-5 h-5 rounded-full bg-bg-elevated flex items-center justify-center text-[10px] font-bold text-text-muted">
+                    {p.username?.[0]?.toUpperCase()}
+                  </div>
+                )}
+                <span className="truncate max-w-[80px]">{p.username}</span>
+                {p.userId === currentUser?.id && (
+                  <span className="text-[10px] text-accent-primary font-semibold">(나)</span>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>
@@ -620,7 +671,7 @@ export default function TournamentLobbyPage() {
                     <Swords className="h-3 w-3" />{teamModeLabel}
                   </span>
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-bg-tertiary rounded-full text-xs text-text-secondary">
-                    <Users className="h-3 w-3" />{totalParticipants}/{room.maxParticipants}
+                    <Users className="h-3 w-3" />{totalPlayers}/{room.maxParticipants}{spectators.length > 0 && ` (+${spectators.length} 관전)`}
                   </span>
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-bg-tertiary rounded-full text-xs text-text-secondary">
                     {bracketLabel}
@@ -658,7 +709,7 @@ export default function TournamentLobbyPage() {
               <div className="flex items-center justify-between mb-1">
                 <span className="text-xs font-medium text-text-secondary">준비 현황</span>
                 <span className="text-xs font-bold text-text-primary">
-                  {readyCount}/{totalParticipants}
+                  {readyCount}/{totalPlayers}
                   {allPlayersReady && <span className="ml-1 text-accent-success">✓ 전원 준비 완료</span>}
                 </span>
               </div>
@@ -669,7 +720,7 @@ export default function TournamentLobbyPage() {
                 />
               </div>
             </div>
-            {room.status !== 'DRAFT_COMPLETED' && (
+            {room.status !== 'DRAFT_COMPLETED' && !currentUserIsSpectator && (
               <button
                 className={`px-4 py-1.5 text-sm font-bold rounded-lg transition-all duration-200 flex-shrink-0 ${
                   currentUserIsReady
@@ -680,6 +731,11 @@ export default function TournamentLobbyPage() {
               >
                 {currentUserIsReady ? "준비 취소" : "준비하기"}
               </button>
+            )}
+            {room.status !== 'DRAFT_COMPLETED' && currentUserIsSpectator && (
+              <span className="px-4 py-1.5 text-sm font-medium rounded-lg bg-bg-tertiary text-text-muted flex-shrink-0">
+                관전 중
+              </span>
             )}
             {room.status === 'DRAFT_COMPLETED' && (
               <Link href={`/tournaments/${room.id}/bracket`} className="px-4 py-1.5 text-sm font-bold rounded-lg bg-accent-success hover:bg-accent-success/90 text-white flex-shrink-0">
@@ -699,7 +755,7 @@ export default function TournamentLobbyPage() {
                 <h2 className="font-bold text-text-primary flex items-center gap-2">
                   <Users className="h-5 w-5 text-text-secondary" />
                   참가자
-                  <span className="text-sm font-normal text-text-tertiary">{totalParticipants}/{room.maxParticipants}</span>
+                  <span className="text-sm font-normal text-text-tertiary">{totalPlayers}/{room.maxParticipants}</span>
                 </h2>
               </div>
               <div className="flex-1 overflow-y-auto p-4">
@@ -727,7 +783,7 @@ export default function TournamentLobbyPage() {
               <div className="px-4 pt-3 flex-shrink-0">
                 <TabsList className="w-full">
                   <TabsTrigger value="participants" className="flex-1 justify-center">
-                    <Users className="h-4 w-4 mr-1.5" />참가자 ({totalParticipants})
+                    <Users className="h-4 w-4 mr-1.5" />참가자 ({totalPlayers})
                   </TabsTrigger>
                   <TabsTrigger value="chat" className="flex-1 justify-center relative">
                     <MessageSquare className="h-4 w-4 mr-1.5" />채팅
@@ -749,7 +805,7 @@ export default function TournamentLobbyPage() {
           <div className="container mx-auto flex items-center justify-between gap-3">
             {/* Mobile: ready button */}
             <div className="lg:hidden">
-              {room.status !== 'DRAFT_COMPLETED' && (
+              {room.status !== 'DRAFT_COMPLETED' && !currentUserIsSpectator && (
                 <button
                   className={`px-4 py-2 text-sm font-bold rounded-lg transition-all ${
                     currentUserIsReady
@@ -760,6 +816,11 @@ export default function TournamentLobbyPage() {
                 >
                   {currentUserIsReady ? "준비 취소" : "준비하기"}
                 </button>
+              )}
+              {room.status !== 'DRAFT_COMPLETED' && currentUserIsSpectator && (
+                <span className="px-4 py-2 text-sm font-medium rounded-lg bg-bg-tertiary text-text-muted">
+                  관전 중
+                </span>
               )}
             </div>
 
@@ -772,24 +833,24 @@ export default function TournamentLobbyPage() {
 
             <div className="flex items-center gap-3">
               {/* 어드민 전용: 봇 추가 버튼 */}
-              {currentUser?.role === 'ADMIN' && room.status === 'WAITING' && totalParticipants < room.maxParticipants && (
+              {currentUser?.role === 'ADMIN' && room.status === 'WAITING' && totalPlayers < room.maxParticipants && (
                 <button
                   onClick={handleAddBot}
                   disabled={isAddingBot}
                   className="px-4 py-2.5 text-sm font-medium rounded-lg border border-bg-tertiary text-text-secondary hover:text-text-primary hover:bg-bg-tertiary transition-colors disabled:opacity-50"
                   title="봇 1명 추가 (어드민 전용)"
                 >
-                  {isAddingBot ? "추가 중..." : `봇 추가 (${room.maxParticipants - totalParticipants}자리 남음)`}
+                  {isAddingBot ? "추가 중..." : `봇 추가 (${room.maxParticipants - totalPlayers}자리 남음)`}
                 </button>
               )}
               {isCurrentUserHost && room.status === 'WAITING' && (
                 <button
                   className={`px-6 py-2.5 font-bold rounded-lg transition-all text-sm text-white ${
-                    allPlayersReady && totalParticipants >= (room.teamMode === 'AUCTION' ? 4 : 2) && allInVoice
+                    allPlayersReady && totalPlayers >= (room.teamMode === 'AUCTION' ? 4 : 2) && allInVoice
                       ? 'bg-accent-success hover:bg-accent-success/90 animate-glow-success'
                       : 'bg-accent-success/50 cursor-not-allowed opacity-60'
                   }`}
-                  disabled={!allPlayersReady || totalParticipants < (room.teamMode === 'AUCTION' ? 4 : 2) || !allInVoice}
+                  disabled={!allPlayersReady || totalPlayers < (room.teamMode === 'AUCTION' ? 4 : 2) || !allInVoice}
                   onClick={() => startGame((err) => {
                     // 음성채널 미참가 유저가 있는 경우 구체적인 메시지 표시
                     if (err.missingVoiceUsers && err.missingVoiceUsers.length > 0) {
@@ -802,7 +863,7 @@ export default function TournamentLobbyPage() {
                     }
                   })}
                   title={
-                    room.teamMode === 'AUCTION' && totalParticipants < 4
+                    room.teamMode === 'AUCTION' && totalPlayers < 4
                       ? '경매 모드는 최소 4명이 필요합니다'
                       : hasDiscordVoice && !allInVoice
                       ? '음성채널에 참가하지 않은 유저가 있습니다'

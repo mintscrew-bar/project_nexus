@@ -41,6 +41,7 @@ export interface CreateRoomDto {
 export interface JoinRoomDto {
   roomId: string;
   password?: string;
+  asSpectator?: boolean;
 }
 
 @Injectable()
@@ -400,8 +401,17 @@ export class RoomService {
       throw new NotFoundException("Room not found");
     }
 
-    // Check if room is full
-    if (room.participants.length >= room.maxParticipants) {
+    // 관전자 입장 요청 시 allowSpectators 체크
+    const joinAsSpectator = dto.asSpectator === true;
+    if (joinAsSpectator && !room.allowSpectators) {
+      throw new BadRequestException("이 방은 관전을 허용하지 않습니다.");
+    }
+
+    // 정원 체크: PLAYER만 카운트 (관전자는 정원에 포함되지 않음)
+    const playerCount = room.participants.filter(
+      (p) => p.role === "PLAYER",
+    ).length;
+    if (!joinAsSpectator && playerCount >= room.maxParticipants) {
       throw new BadRequestException("Room is full");
     }
 
@@ -454,16 +464,71 @@ export class RoomService {
       );
     }
 
-    // Add participant
+    // 참가자 추가 (관전자 또는 플레이어)
     await this.prisma.roomParticipant.create({
       data: {
         roomId: room.id,
         userId,
-        role: "PLAYER",
+        role: joinAsSpectator ? "SPECTATOR" : "PLAYER",
       },
     });
 
     return this.getRoomById(room.id);
+  }
+
+  /** PLAYER ↔ SPECTATOR 역할 전환 */
+  async toggleSpectator(userId: string, roomId: string) {
+    const room = await this.prisma.room.findUnique({
+      where: { id: roomId },
+      include: { participants: true },
+    });
+
+    if (!room) {
+      throw new NotFoundException("Room not found");
+    }
+
+    // WAITING 상태에서만 전환 가능
+    if (room.status !== RoomStatus.WAITING) {
+      throw new BadRequestException(
+        "게임 진행 중에는 역할을 변경할 수 없습니다.",
+      );
+    }
+
+    const participant = room.participants.find((p) => p.userId === userId);
+    if (!participant) {
+      throw new BadRequestException("Not in room");
+    }
+
+    const newRole =
+      participant.role === "PLAYER" ? "SPECTATOR" : "PLAYER";
+
+    // SPECTATOR → PLAYER 전환 시 정원 체크
+    if (newRole === "PLAYER") {
+      const playerCount = room.participants.filter(
+        (p) => p.role === "PLAYER",
+      ).length;
+      if (playerCount >= room.maxParticipants) {
+        throw new BadRequestException(
+          "플레이어 정원이 가득 찼습니다.",
+        );
+      }
+    }
+
+    // PLAYER → SPECTATOR 전환 시 관전 허용 체크
+    if (newRole === "SPECTATOR" && !room.allowSpectators) {
+      throw new BadRequestException("이 방은 관전을 허용하지 않습니다.");
+    }
+
+    await this.prisma.roomParticipant.update({
+      where: { id: participant.id },
+      data: { role: newRole, isReady: false },
+    });
+
+    return {
+      userId,
+      newRole,
+      room: await this.getRoomById(roomId),
+    };
   }
 
   async leaveRoom(userId: string, roomId: string) {
@@ -763,6 +828,11 @@ export class RoomService {
 
     if (!participant) {
       throw new NotFoundException("Not in room");
+    }
+
+    // 관전자는 레디 불가
+    if (participant.role === "SPECTATOR") {
+      throw new BadRequestException("관전자는 준비 상태를 변경할 수 없습니다.");
     }
 
     const updated = await this.prisma.roomParticipant.update({

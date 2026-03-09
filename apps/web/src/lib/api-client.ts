@@ -294,15 +294,27 @@ export const roomApi = {
     return response.data;
   },
 
-  joinRoom: async (roomId: string, password?: string) => {
+  joinRoom: async (
+    roomId: string,
+    password?: string,
+    asSpectator?: boolean,
+  ) => {
     const response = await apiClient.post(`/rooms/${roomId}/join`, {
       password,
+      asSpectator,
     });
     return response.data;
   },
 
   leaveRoom: async (roomId: string) => {
     const response = await apiClient.post(`/rooms/${roomId}/leave`);
+    return response.data;
+  },
+
+  toggleSpectator: async (roomId: string) => {
+    const response = await apiClient.post(
+      `/rooms/${roomId}/toggle-spectator`,
+    );
     return response.data;
   },
 

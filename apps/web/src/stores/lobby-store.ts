@@ -27,6 +27,7 @@ interface Participant {
   avatar?: string | null;
   isHost: boolean;
   isReady: boolean;
+  role?: "PLAYER" | "SPECTATOR";
   riotAccount?: RiotAccount | null;
   // Discord 음성채널 참가 여부 (Lobby 채널 기준)
   // undefined = 방에 Discord 채널이 없음 (검증 불필요)
@@ -100,6 +101,7 @@ interface LobbyStoreState {
   sendMessage: (content: string) => void;
   updateRoomSettings: (roomId: string, settings: RoomSettingsDto) => Promise<void>;
   kickParticipant: (roomId: string, participantId: string) => Promise<void>;
+  toggleSpectator: (onError?: (msg: string) => void) => void;
 }
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
@@ -220,6 +222,17 @@ export const useLobbyStore = create<LobbyStoreState>((set, get) => ({
 
     // Discord 음성채널 상태 변경 수신
     // 서버에서 discordUserId → nexusUserId 변환 후 브로드캐스트
+    // 관전자 ↔ 플레이어 역할 전환 수신
+    socket.on('participant-role-changed', (data: { userId: string; newRole: "PLAYER" | "SPECTATOR" }) => {
+      const currentRoom = get().room;
+      if (currentRoom) {
+        const updatedParticipants = currentRoom.participants.map(p =>
+          p.userId === data.userId ? { ...p, role: data.newRole, isReady: false } : p
+        );
+        set({ room: { ...currentRoom, participants: updatedParticipants } });
+      }
+    });
+
     socket.on('voice-status-changed', (data: { userId: string; inVoice: boolean }) => {
       const currentRoom = get().room;
       if (currentRoom) {
@@ -313,6 +326,17 @@ export const useLobbyStore = create<LobbyStoreState>((set, get) => ({
     } catch (error) {
       console.error('Failed to kick participant', error);
       throw error;
+    }
+  },
+
+  toggleSpectator: (onError?: (msg: string) => void) => {
+    const { socket, room } = get();
+    if (socket && room) {
+      socket.emit('toggle-spectator', { roomId: room.id }, (response: any) => {
+        if (response && response.error && onError) {
+          onError(response.error);
+        }
+      });
     }
   },
 }));
