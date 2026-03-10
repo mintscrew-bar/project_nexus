@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
-import { Modal } from '@/components/ui/Modal'; // Use custom Modal
+import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Label } from '@/components/ui/Label';
 import { useRiotStore } from '@/stores/riot-store';
-import { useDdragonStore } from '@/stores/ddragon-store';
-import { X, Loader2, AlertCircle, ArrowRight } from 'lucide-react';
+import { useDdragonStore, Champion } from '@/stores/ddragon-store';
+import { X, Loader2, AlertCircle, ArrowRight, ChevronDown } from 'lucide-react';
 import { ChampionSelector } from './ChampionSelector';
 import Image from 'next/image';
 
@@ -51,13 +51,14 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
   } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Role & Champion Selection State
+  // 역할 & 챔피언 선택 상태
   const [mainRole, setMainRole] = useState<Role>('MID');
   const [subRole, setSubRole] = useState<Role>('ADC');
   const [championsByRole, setChampionsByRole] = useState<Record<Role, string[]>>({
     TOP: [], JUNGLE: [], MID: [], ADC: [], SUPPORT: []
   });
-  const [activeRoleTab, setActiveRoleTab] = useState<Role>('TOP');
+  // 아코디언: 주/부 역할은 기본 펼침, 나머지는 접힘
+  const [expandedSections, setExpandedSections] = useState<Set<Role>>(new Set(['MID', 'ADC']));
   const stepRef = useRef(step);
   stepRef.current = step;
 
@@ -87,6 +88,7 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
         setMainRole('MID');
         setSubRole('ADC');
         setChampionsByRole({ TOP: [], JUNGLE: [], MID: [], ADC: [], SUPPORT: [] });
+        setExpandedSections(new Set<Role>(['MID', 'ADC']));
         resetRiotStore();
       }
     }
@@ -145,7 +147,29 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
     }
   };
 
-  const totalChampionsSelected = Object.values(championsByRole).reduce((sum, arr) => sum + arr.length, 0);
+  // 주/부 역할 변경 시 아코디언 펼침 상태 동기화
+  const updateExpandedForRoles = (main: Role, sub: Role) => {
+    setExpandedSections(prev => {
+      const next = new Set(prev);
+      next.add(main);
+      next.add(sub);
+      return next;
+    });
+  };
+
+  const toggleSection = (role: Role) => {
+    setExpandedSections(prev => {
+      const next = new Set(prev);
+      if (next.has(role)) next.delete(role);
+      else next.add(role);
+      return next;
+    });
+  };
+
+  // 주/부 역할별 최소 3개 충족 여부
+  const mainRoleSatisfied = championsByRole[mainRole].length >= 3;
+  const subRoleSatisfied = championsByRole[subRole].length >= 3;
+  const canSubmit = mainRoleSatisfied && subRoleSatisfied && mainRole !== subRole;
 
   const [showCloseWarning, setShowCloseWarning] = useState(false);
 
@@ -169,8 +193,11 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
       setLocalError('주 역할과 부 역할은 동일할 수 없습니다.');
       return;
     }
-    if (totalChampionsSelected < 5) {
-      setLocalError(`선호 챔피언을 최소 5개 선택해주세요. (현재 ${totalChampionsSelected}개)`);
+    if (!mainRoleSatisfied || !subRoleSatisfied) {
+      const missing: string[] = [];
+      if (!mainRoleSatisfied) missing.push(`주 역할(${mainRole}): ${championsByRole[mainRole].length}/3`);
+      if (!subRoleSatisfied) missing.push(`부 역할(${subRole}): ${championsByRole[subRole].length}/3`);
+      setLocalError(`선호 챔피언을 역할별 최소 3개 선택해주세요. ${missing.join(', ')}`);
       return;
     }
     setIsSubmitting(true);
@@ -336,46 +363,104 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
 
       {step === 3 && (
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          {/* ── 역할 선택: 버튼 그룹 ── */}
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label htmlFor="mainRole">주 역할</Label>
-              <select id="mainRole" value={mainRole} onChange={(e) => setMainRole(e.target.value as Role)} className="w-full p-2 mt-1 border rounded-md bg-bg-secondary">
-                {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
-              </select>
-            </div>
-            <div>
-              <Label htmlFor="subRole">부 역할</Label>
-              <select id="subRole" value={subRole} onChange={(e) => setSubRole(e.target.value as Role)} className="w-full p-2 mt-1 border rounded-md bg-bg-secondary">
-                {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
-              </select>
-            </div>
-          </div>
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <Label>선호 챔피언 (역할별 최대 5개, 총 최소 5개)</Label>
-              <span className={`text-xs px-2 py-0.5 rounded-full ${totalChampionsSelected >= 5 ? 'text-accent-success bg-accent-success/10' : 'text-accent-warning bg-accent-warning/10'}`}>
-                {totalChampionsSelected}/5+
-              </span>
-            </div>
-            <div className="border rounded-lg p-2">
-              <div className="flex border-b mb-2">
-                {ROLES.map(role => (
-                  <button key={role} onClick={() => setActiveRoleTab(role)} className={`px-4 py-2 text-sm font-medium ${activeRoleTab === role ? 'border-b-2 border-accent-primary text-accent-primary' : 'text-text-secondary'}`}>
-                    {role}
-                    {championsByRole[role].length > 0 && (
-                      <span className="ml-1 text-[10px] text-accent-primary">({championsByRole[role].length})</span>
-                    )}
+              <Label className="text-xs text-text-tertiary mb-1.5 block">주 역할</Label>
+              <div className="flex gap-1.5">
+                {ROLES.map(r => (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => {
+                      setMainRole(r);
+                      updateExpandedForRoles(r, subRole);
+                    }}
+                    className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                      mainRole === r
+                        ? 'bg-accent-primary text-white shadow-sm'
+                        : 'bg-bg-tertiary text-text-secondary hover:text-text-primary'
+                    }`}
+                  >
+                    {r}
                   </button>
                 ))}
               </div>
-              {championsLoading ? <Loader2 className="animate-spin mx-auto"/> : (
-                <ChampionSelector
-                  allChampions={champions}
-                  selectedChampions={championsByRole[activeRoleTab]}
-                  onSelectionChange={(keys) => handleChampionSelectionChange(activeRoleTab, keys)}
-                />
-              )}
             </div>
+            <div>
+              <Label className="text-xs text-text-tertiary mb-1.5 block">부 역할</Label>
+              <div className="flex gap-1.5">
+                {ROLES.map(r => (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => {
+                      setSubRole(r);
+                      updateExpandedForRoles(mainRole, r);
+                    }}
+                    className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                      subRole === r
+                        ? 'bg-violet-600 text-white shadow-sm'
+                        : 'bg-bg-tertiary text-text-secondary hover:text-text-primary'
+                    }`}
+                  >
+                    {r}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {mainRole === subRole && (
+            <p className="text-xs text-accent-danger">주 역할과 부 역할은 달라야 합니다.</p>
+          )}
+
+          {/* ── 아코디언 섹션: 주/부 역할 펼침, 나머지 접힘 ── */}
+          <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
+            {/* 주 역할 섹션 — 자동포커스 대상 */}
+            <RoleAccordionSection
+              role={mainRole}
+              label="주 역할"
+              isExpanded={expandedSections.has(mainRole)}
+              onToggle={() => toggleSection(mainRole)}
+              isRequired
+              autoFocusSearch
+              champions={champions}
+              championsLoading={championsLoading}
+              selectedChampions={championsByRole[mainRole]}
+              onSelectionChange={(keys) => handleChampionSelectionChange(mainRole, keys)}
+            />
+
+            {/* 부 역할 섹션 */}
+            {mainRole !== subRole && (
+              <RoleAccordionSection
+                role={subRole}
+                label="부 역할"
+                isExpanded={expandedSections.has(subRole)}
+                onToggle={() => toggleSection(subRole)}
+                isRequired
+                champions={champions}
+                championsLoading={championsLoading}
+                selectedChampions={championsByRole[subRole]}
+                onSelectionChange={(keys) => handleChampionSelectionChange(subRole, keys)}
+              />
+            )}
+
+            {/* 나머지 역할 — 선택 사항, 접힌 상태 */}
+            {ROLES.filter(r => r !== mainRole && r !== subRole).map(role => (
+              <RoleAccordionSection
+                key={role}
+                role={role}
+                label="기타"
+                isExpanded={expandedSections.has(role)}
+                onToggle={() => toggleSection(role)}
+                isRequired={false}
+                champions={champions}
+                championsLoading={championsLoading}
+                selectedChampions={championsByRole[role]}
+                onSelectionChange={(keys) => handleChampionSelectionChange(role, keys)}
+              />
+            ))}
           </div>
         </div>
       )}
@@ -405,12 +490,137 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
           </Button>
         )}
         {step === 3 && (
-          <Button onClick={handleRoleSubmit} disabled={isLoading || mainRole === subRole || totalChampionsSelected < 5}>
+          <Button onClick={handleRoleSubmit} disabled={isLoading || !canSubmit}>
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             계정 등록
           </Button>
         )}
       </div>
     </Modal>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RoleAccordionSection — 역할별 아코디언 섹션
+// ─────────────────────────────────────────────────────────────────────────────
+
+const POSITION_ICON_MAP: Record<string, string> = {
+  TOP: "/icons/positions/position-top.svg",
+  JUNGLE: "/icons/positions/position-jungle.svg",
+  MID: "/icons/positions/position-middle.svg",
+  ADC: "/icons/positions/position-bottom.svg",
+  SUPPORT: "/icons/positions/position-utility.svg",
+};
+
+const POSITION_LABEL: Record<string, string> = {
+  TOP: "탑",
+  JUNGLE: "정글",
+  MID: "미드",
+  ADC: "원딜",
+  SUPPORT: "서폿",
+};
+
+function RoleAccordionSection({
+  role,
+  label,
+  isExpanded,
+  onToggle,
+  isRequired,
+  autoFocusSearch = false,
+  champions,
+  championsLoading,
+  selectedChampions,
+  onSelectionChange,
+}: {
+  role: string;
+  label: string;
+  isExpanded: boolean;
+  onToggle: () => void;
+  isRequired: boolean;
+  /** 검색창 자동포커스 — 주 역할 섹션에만 true */
+  autoFocusSearch?: boolean;
+  champions: Champion[];
+  championsLoading: boolean;
+  selectedChampions: string[];
+  onSelectionChange: (keys: string[]) => void;
+}) {
+  const count = selectedChampions.length;
+  const isSatisfied = count >= 3;
+
+  return (
+    <div className={`rounded-xl border transition-colors ${
+      isExpanded ? 'border-bg-elevated bg-bg-secondary/50' : 'border-bg-tertiary'
+    }`}>
+      {/* 아코디언 헤더 */}
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex items-center gap-2.5 w-full px-4 py-3 text-left"
+      >
+        {/* 포지션 아이콘 */}
+        <Image
+          src={POSITION_ICON_MAP[role] || ""}
+          alt={role}
+          width={20}
+          height={20}
+          className="opacity-80"
+          unoptimized
+        />
+
+        {/* 역할 이름 + 라벨 */}
+        <span className="text-sm font-bold text-text-primary">
+          {POSITION_LABEL[role] || role}
+        </span>
+        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+          isRequired
+            ? 'text-accent-primary bg-accent-primary/10'
+            : 'text-text-muted bg-bg-tertiary'
+        }`}>
+          {label}
+        </span>
+
+        {/* 선택 상태 뱃지 */}
+        {count > 0 && (
+          <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full ${
+            isSatisfied
+              ? 'text-accent-success bg-accent-success/10'
+              : 'text-accent-warning bg-accent-warning/10'
+          }`}>
+            {count}/{isRequired ? '3+' : '5'}
+          </span>
+        )}
+
+        {/* 필수 미충족 경고 점 */}
+        {isRequired && !isSatisfied && (
+          <span className="w-2 h-2 rounded-full bg-accent-warning animate-pulse" />
+        )}
+
+        {/* 화살표 */}
+        <ChevronDown className={`w-4 h-4 text-text-muted ml-auto transition-transform duration-200 ${
+          isExpanded ? 'rotate-180' : ''
+        }`} />
+      </button>
+
+      {/* 아코디언 본문 — 펼침 시 */}
+      {isExpanded && (
+        <div className="px-4 pb-4">
+          {championsLoading ? (
+            <div className="flex justify-center py-6">
+              <Loader2 className="animate-spin text-text-tertiary" />
+            </div>
+          ) : (
+            <ChampionSelector
+              allChampions={champions}
+              selectedChampions={selectedChampions}
+              onSelectionChange={onSelectionChange}
+              maxSelection={5}
+              minSelection={isRequired ? 3 : 1}
+              isExpanded={isExpanded}
+              autoFocus={autoFocusSearch}
+            />
+          )}
+        </div>
+      )}
+    </div>
   );
 }
