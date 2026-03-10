@@ -86,14 +86,14 @@ export default function Home() {
       {/* Feature highlights */}
       <section className="py-24 md:py-32 px-6">
         <h2 className="text-3xl md:text-5xl font-bold text-center text-text-primary mb-16">
-          왜{" "}
+          엑셀로 하던 내전,{" "}
           <span
             className="bg-clip-text text-transparent"
             style={{ backgroundImage: "linear-gradient(135deg, #8b5cf6, #6366f1, #d946ef)" }}
           >
-            NEXUS
+            이제 그만할 때
           </span>
-          인가?
+          {" "}됐잖아요.
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-10 max-w-6xl mx-auto">
           <div className="group flex flex-col items-center text-center p-8 md:p-10 rounded-2xl bg-bg-secondary/50 border border-bg-tertiary hover:border-violet-500/30 transition-all duration-300 hover:scale-[1.02]">
@@ -102,8 +102,8 @@ export default function Home() {
               경매 드래프트
             </h3>
             <p className="text-lg text-text-secondary leading-relaxed">
-              실시간 입찰로 공정하고 재미있는 팀 구성.<br className="hidden md:block" />
-              포인트 전략이 승부를 가른다.
+              팀 구성부터가 이미 게임입니다. 경매 시작.<br className="hidden md:block" />
+              팀장님, 그 포인트로 얘를 산다구요?
             </p>
           </div>
 
@@ -113,8 +113,8 @@ export default function Home() {
               자동 밸런싱
             </h3>
             <p className="text-lg text-text-secondary leading-relaxed">
-              티어와 전적 기반의 정확한 팀 밸런스.<br className="hidden md:block" />
-              한쪽으로 치우치지 않는 내전.
+              한쪽만 터지는 내전은<br className="hidden md:block" />
+              이제 그만할 때 됐잖아요.
             </p>
           </div>
 
@@ -124,8 +124,8 @@ export default function Home() {
               Discord 연동
             </h3>
             <p className="text-lg text-text-secondary leading-relaxed">
-              음성 채널 자동 이동, 실시간 알림.<br className="hidden md:block" />
-              봇이 모든 걸 처리한다.
+              음성 이동, 결과 기록, 전부 &lsquo;딸깍&rsquo;.<br className="hidden md:block" />
+              당신은 게임만 하세요.
             </p>
           </div>
         </div>

@@ -685,7 +685,7 @@ export function HeroBanner({ isAuthenticated = false }: HeroBannerProps) {
           className="text-xl md:text-2xl text-text-secondary mb-8"
           variants={itemVariants}
         >
-          LoL 내전 토너먼트의 새로운 기준
+          솔랭 억까에 지쳤다면? 여기서 제대로 된 한 판.
         </motion.p>
 
         {/* CTA 버튼 — 인디고 → 퍼플 그라디언트 */}

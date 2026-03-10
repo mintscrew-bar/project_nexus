@@ -169,9 +169,9 @@ export function StatsBanner({ isActive = true }: { isActive?: boolean }) {
             className="text-xl sm:text-2xl md:text-3xl font-black text-white mb-1.5 md:mb-2 transition-transform duration-500 ease-out"
             style={{ transform: isHovered ? "translateX(4px)" : "translateX(0)" }}
           >
-            내전을{" "}
-            <span style={{ color: INDIGO_LIGHT }}>지배하는</span>{" "}
-            데이터
+            당신의 폼,{" "}
+            <span style={{ color: INDIGO_LIGHT }}>우리가 다 기록</span>하고
+            있습니다
           </h3>
 
           {/* 설명 텍스트 — 호버 시 약간 더 이동 */}
@@ -179,9 +179,9 @@ export function StatsBanner({ isActive = true }: { isActive?: boolean }) {
             className="text-xs sm:text-sm md:text-base text-white/60 leading-relaxed mb-2 md:mb-5 transition-transform duration-500 ease-out"
             style={{ transform: isHovered ? "translateX(8px)" : "translateX(0)" }}
           >
-            KDA, 챔피언, 포지션 통계를 자동으로 기록.
+            KDA, 모스트, 주포지션. 숨길 수 없는 당신의 데이터.
             <br className="hidden sm:block" />
-            나의 성장을 한눈에.
+            &ldquo;나 잘했는데?&rdquo; 이제 데이터로 증명하세요.
           </p>
 
           {/* 모바일 전용 미니 스탯 — md 이상에서는 우측 패널이 담당 */}

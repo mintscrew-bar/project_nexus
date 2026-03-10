@@ -163,8 +163,8 @@ export function AuctionBanner({ isActive = true }: { isActive?: boolean }) {
             className="text-xl sm:text-2xl md:text-3xl font-black text-white mb-1.5 transition-transform duration-500 ease-out"
             style={{ transform: isHovered ? "translateX(4px)" : "translateX(0)" }}
           >
-            포인트로{" "}
-            <span style={{ color: VIOLET_GLOW }}>최강팀</span>을 구성하라
+            팀장님,{" "}
+            <span style={{ color: VIOLET_GLOW }}>포인트 배분</span>은 신중하게
           </h3>
 
           {/* 부제목 — 호버 시 약간 더 이동 */}
@@ -172,7 +172,7 @@ export function AuctionBanner({ isActive = true }: { isActive?: boolean }) {
             className="text-xs sm:text-sm text-white/55 mb-1.5 md:mb-4 transition-transform duration-500 ease-out"
             style={{ transform: isHovered ? "translateX(8px)" : "translateX(0)" }}
           >
-            실시간 입찰 · 전략적 드래프트
+            가성비 원딜? 올스타 상체? 당신의 픽은?
           </p>
 
           {/* 현재 입찰가 — 호버 시 glow 강화 */}
