@@ -49,6 +49,8 @@ export class AuctionGateway
   // In-memory rate limit fallback when Redis is unavailable
   private bidRateLimits = new Map<string, number[]>();
   private rateLimitCleanupTimer: ReturnType<typeof setInterval> | null = null;
+  // 방별 입찰 mutex — 동시 입찰 race condition 방지
+  private bidLocks = new Map<string, Promise<void>>();
 
   constructor(
     private readonly authService: AuthService,
@@ -78,6 +80,7 @@ export class AuctionGateway
       this.rateLimitCleanupTimer = null;
     }
     this.bidRateLimits.clear();
+    this.bidLocks.clear();
   }
 
   async handleConnection(client: AuthenticatedSocket) {
@@ -387,7 +390,22 @@ export class AuctionGateway
       }
     }
 
+    // resolve 진행 중이면 입찰 차단
+    if (this.resolvingRooms.has(data.roomId)) {
+      return { error: "현재 낙찰 처리 중입니다. 잠시 후 다시 시도해주세요." };
+    }
+
+    // 방별 mutex: 동시 입찰 직렬화
+    const prevLock = this.bidLocks.get(data.roomId) ?? Promise.resolve();
+    let releaseLock: () => void;
+    const lockPromise = new Promise<void>((resolve) => {
+      releaseLock = resolve;
+    });
+    this.bidLocks.set(data.roomId, lockPromise);
+
     try {
+      await prevLock;
+
       const state = await this.auctionService.placeBid(
         client.userId,
         data.roomId,
@@ -408,6 +426,12 @@ export class AuctionGateway
       return { success: true, state };
     } catch (error: any) {
       return { error: error.message };
+    } finally {
+      releaseLock!();
+      // 체인이 끝나면 lock 정리
+      if (this.bidLocks.get(data.roomId) === lockPromise) {
+        this.bidLocks.delete(data.roomId);
+      }
     }
   }
 

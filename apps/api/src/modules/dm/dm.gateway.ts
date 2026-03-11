@@ -7,6 +7,7 @@ import {
   ConnectedSocket,
   MessageBody,
 } from "@nestjs/websockets";
+import { OnModuleDestroy } from "@nestjs/common";
 import { Server, Socket } from "socket.io";
 import { AuthService } from "../auth/auth.service";
 import { DmService } from "./dm.service";
@@ -25,7 +26,15 @@ interface AuthenticatedSocket extends Socket {
   pingInterval: 10000,
   pingTimeout: 5000,
 })
-export class DmGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class DmGateway implements OnGatewayConnection, OnGatewayDisconnect, OnModuleDestroy {
+  onModuleDestroy() {
+    for (const timeout of this.typingTimers.values()) {
+      clearTimeout(timeout);
+    }
+    this.typingTimers.clear();
+    this.userSockets.clear();
+  }
+
   @WebSocketServer()
   server: Server;
 

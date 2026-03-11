@@ -1,4 +1,5 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
+import { disconnectAllSockets } from "./socket-client";
 
 // 보이지 않는 유니코드 문자 제거 (복사-붙여넣기 시 포함되는 bidirectional formatting 등)
 const stripInvisibleChars = (str: string): string =>
@@ -124,6 +125,7 @@ export const authApi = {
     } catch (error) {
       console.error("Logout error:", error);
     } finally {
+      disconnectAllSockets();
       accessToken = null;
       window.location.href = "/";
     }

@@ -7,6 +7,7 @@ import {
   OnGatewayConnection,
   OnGatewayDisconnect,
 } from "@nestjs/websockets";
+import { OnModuleDestroy } from "@nestjs/common";
 import { Server, Socket } from "socket.io";
 import { PresenceService } from "./presence.service";
 import { AuthService } from "../auth/auth.service";
@@ -27,7 +28,7 @@ interface AuthenticatedSocket extends Socket {
   pingTimeout: 5000,
 })
 export class PresenceGateway
-  implements OnGatewayConnection, OnGatewayDisconnect
+  implements OnGatewayConnection, OnGatewayDisconnect, OnModuleDestroy
 {
   @WebSocketServer()
   server: Server;
@@ -39,6 +40,11 @@ export class PresenceGateway
     private readonly presenceService: PresenceService,
     private readonly authService: AuthService,
   ) {}
+
+  onModuleDestroy() {
+    this.userSockets.clear();
+    this.socketUsers.clear();
+  }
 
   async handleConnection(client: AuthenticatedSocket) {
     try {

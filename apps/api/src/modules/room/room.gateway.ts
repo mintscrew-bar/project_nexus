@@ -7,7 +7,7 @@ import {
   OnGatewayConnection,
   OnGatewayDisconnect,
 } from "@nestjs/websockets";
-import { Inject, forwardRef } from "@nestjs/common";
+import { Inject, forwardRef, OnModuleDestroy } from "@nestjs/common";
 import { OnEvent } from "@nestjs/event-emitter";
 import { Server, Socket } from "socket.io";
 import { RoomService } from "./room.service";
@@ -33,7 +33,7 @@ interface AuthenticatedSocket extends Socket {
   pingInterval: 10000,
   pingTimeout: 5000,
 })
-export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect, OnModuleDestroy {
   @WebSocketServer()
   server: Server;
 
@@ -57,6 +57,19 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @Inject("DISCORD_VOICE_SERVICE")
     private readonly discordVoiceService: DiscordVoiceService,
   ) {}
+
+  onModuleDestroy() {
+    // 타이핑 타이머 정리
+    for (const roomTyping of this.typingUsers.values()) {
+      for (const timeout of roomTyping.values()) {
+        clearTimeout(timeout);
+      }
+    }
+    this.typingUsers.clear();
+    this.userSockets.clear();
+    this.socketRooms.clear();
+    this.startingRooms.clear();
+  }
 
   async handleConnection(client: AuthenticatedSocket) {
     try {

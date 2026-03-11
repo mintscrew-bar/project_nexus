@@ -7,6 +7,7 @@ import {
   ConnectedSocket,
   MessageBody,
 } from "@nestjs/websockets";
+import { OnModuleDestroy } from "@nestjs/common";
 import { Server, Socket } from "socket.io";
 import { AuthService } from "../auth/auth.service";
 import { ClanService } from "./clan.service";
@@ -25,7 +26,7 @@ interface AuthenticatedSocket extends Socket {
   pingInterval: 10000,
   pingTimeout: 5000,
 })
-export class ClanGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class ClanGateway implements OnGatewayConnection, OnGatewayDisconnect, OnModuleDestroy {
   @WebSocketServer()
   server: Server;
 
@@ -36,6 +37,15 @@ export class ClanGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly authService: AuthService,
     private readonly clanService: ClanService,
   ) {}
+
+  onModuleDestroy() {
+    for (const clanTyping of this.typingUsers.values()) {
+      for (const timeout of clanTyping.values()) {
+        clearTimeout(timeout);
+      }
+    }
+    this.typingUsers.clear();
+  }
 
   async handleConnection(client: AuthenticatedSocket) {
     try {

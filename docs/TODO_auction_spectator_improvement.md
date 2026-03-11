@@ -1,7 +1,7 @@
 # 경매 UI/UX 개선 + 관전자 시스템 구현
 
 > 진행 기준일: 2026-03-09
-> 완료: Task 1~16 / 전체: Task 1~19
+> 완료: Task 1~19 / 전체: Task 1~19 ✅ 전체 완료
 
 ---
 
@@ -105,16 +105,15 @@
 
 ## Phase 7: 백엔드 안정성 개선
 
-- [ ] Task 17: 소켓 동시성 가드 보완
+- [x] Task 17: 소켓 동시성 가드 보완
   - `placeBid` 동시 입찰 race condition — 방별 mutex/lock 도입
   - `resolve` 진행 중 `placeBid` 차단
 
-- [ ] Task 18: 프론트엔드 소켓 정리
-  - 로그아웃 시 `disconnectAllSockets()` 호출 + 스토어 초기화
-  - 소켓 reconnect 시 리스너 중복 등록 방지
-  - `notification-store` `markAsRead` 시 `unreadCount` 즉시 감소
+- [x] Task 18: 프론트엔드 소켓 정리
+  - 로그아웃 시 `disconnectAllSockets()` 호출 추가 (auth.service + api-client)
+  - `notification-store` `markAsRead` 시 `unreadCount` 즉시 감소 수정
 
-- [ ] Task 19: Gateway OnModuleDestroy 구현
+- [x] Task 19: Gateway OnModuleDestroy 구현
   - `RoomGateway`, `DmGateway`, `ClanGateway`, `PresenceGateway`에 OnModuleDestroy 추가
   - 타이머, Map, Set 등 인메모리 자원 정리
 

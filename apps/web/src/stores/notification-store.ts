@@ -98,11 +98,15 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   markAsRead: async (notificationId: string) => {
     try {
       await notificationApi.markAsRead(notificationId);
-      set((state) => ({
-        notifications: state.notifications.map((n) =>
-          n.id === notificationId ? { ...n, isRead: true } : n
-        ),
-      }));
+      set((state) => {
+        const wasUnread = state.notifications.find((n) => n.id === notificationId && !n.isRead);
+        return {
+          notifications: state.notifications.map((n) =>
+            n.id === notificationId ? { ...n, isRead: true } : n
+          ),
+          unreadCount: wasUnread ? Math.max(0, state.unreadCount - 1) : state.unreadCount,
+        };
+      });
     } catch (error) {
       console.error("Failed to mark notification as read:", error);
     }

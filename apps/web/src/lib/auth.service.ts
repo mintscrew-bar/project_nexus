@@ -1,6 +1,7 @@
 // apps/web/src/lib/auth.service.ts
 import { apiClient, setAccessToken } from "./api-client";
 import { useAuthStore } from "@/stores/auth-store";
+import { disconnectAllSockets } from "./socket-client";
 
 export const login = async (email: string, password: string) => {
   const { data } = await apiClient.post("/auth/login", { email, password });
@@ -12,6 +13,8 @@ export const logout = async () => {
   try {
     await apiClient.post("/auth/logout");
   } finally {
+    // 모든 소켓 연결 해제 후 인증 상태 초기화
+    disconnectAllSockets();
     useAuthStore.getState().setUser(null);
     setAccessToken(null);
   }
