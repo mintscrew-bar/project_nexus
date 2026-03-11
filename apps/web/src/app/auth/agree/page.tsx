@@ -15,6 +15,11 @@ function AgreePageContent() {
   const { fetchUser } = useAuthStore();
   const pendingToken = searchParams.get("token");
 
+  // 토큰을 URL에서 즉시 제거 (브라우저 히스토리/Referer 노출 방지)
+  if (typeof window !== "undefined" && pendingToken) {
+    window.history.replaceState({}, "", "/auth/agree");
+  }
+
   const [agreements, setAgreements] = useState({
     termsOfService: false,
     privacyPolicy: false,

@@ -14,6 +14,9 @@ function AuthCallbackContent() {
     const token = searchParams.get("token");
 
     if (token) {
+      // 토큰을 URL에서 즉시 제거 (브라우저 히스토리/Referer 노출 방지)
+      window.history.replaceState({}, "", "/auth/callback");
+
       // 토큰 저장
       setAccessToken(token);
 

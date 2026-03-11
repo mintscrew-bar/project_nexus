@@ -299,6 +299,8 @@ export class RoomController {
     @CurrentUser("sub") userId: string,
     @Param("id") roomId: string,
   ) {
+    // 호스트만 자동픽 실행 가능
+    await this.roomService.assertHost(userId, roomId);
     return this.snakeDraftService.autoPick(roomId);
   }
 
@@ -308,6 +310,8 @@ export class RoomController {
     @CurrentUser("sub") userId: string,
     @Param("id") roomId: string,
   ) {
+    // 호스트만 드래프트 완료 가능
+    await this.roomService.assertHost(userId, roomId);
     return this.snakeDraftService.completeDraft(roomId);
   }
 }

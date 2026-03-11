@@ -89,6 +89,9 @@ export class AuctionStateService {
 
   /**
    * 상태 업데이트 (Optimistic Locking)
+   * ⚠️ 주의: 읽기→수정→저장이 비원자적이므로 동시 호출 시 데이터 손실 가능.
+   * 현재 이 서비스는 메인 경매 로직(auction.service.ts)에서 사용되지 않음.
+   * 메인 경매는 인메모리 Map + bidLocks mutex로 동시성을 제어함.
    */
   async updateState(
     auctionId: string,

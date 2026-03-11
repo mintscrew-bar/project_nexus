@@ -1004,6 +1004,20 @@ export class RoomService {
   // Close Room (host explicit close)
   // ========================================
 
+  /** 호스트 여부 확인 — 컨트롤러에서 재사용 가능한 공용 헬퍼 */
+  async assertHost(userId: string, roomId: string) {
+    const room = await this.prisma.room.findUnique({
+      where: { id: roomId },
+      select: { hostId: true },
+    });
+    if (!room) {
+      throw new NotFoundException("Room not found");
+    }
+    if (room.hostId !== userId) {
+      throw new ForbiddenException("호스트만 이 작업을 수행할 수 있습니다.");
+    }
+  }
+
   async closeRoom(hostId: string, roomId: string) {
     const room = await this.prisma.room.findUnique({
       where: { id: roomId },
