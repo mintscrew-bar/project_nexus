@@ -46,6 +46,8 @@ interface BidHistoryEntry {
   username: string;
   amount: number;
   timestamp: number;
+  playerLabel?: string;
+  isSeparator?: boolean;
 }
 
 interface AuctionBoardProps {

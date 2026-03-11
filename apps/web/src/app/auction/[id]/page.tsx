@@ -26,6 +26,8 @@ export default function AuctionRoomPage() {
   const [isAborting, setIsAborting] = useState(false);
   // 모바일 탭: "auction" | "players" | "log"
   const [mobileTab, setMobileTab] = useState<"auction" | "players" | "log">("auction");
+  // 경매 완료 결과 화면 카운트다운
+  const [completeCountdown, setCompleteCountdown] = useState<number | null>(null);
 
   const {
     auctionState,
@@ -58,12 +60,26 @@ export default function AuctionRoomPage() {
     return () => clearInterval(interval);
   }, [captainSelectionPhase?.timerEnd]);
 
+  // 경매 완료 → 5초 카운트다운 후 역할 선택으로 이동
   useEffect(() => {
     if (hasRedirected.current) return;
-    if (auctionState?.status === "COMPLETED") {
-      hasRedirected.current = true;
-      router.push(`/role-selection/${auctionId}`);
-    }
+    if (auctionState?.status !== "COMPLETED") return;
+
+    setCompleteCountdown(5);
+    const interval = setInterval(() => {
+      setCompleteCountdown((prev) => {
+        if (prev === null || prev <= 1) {
+          clearInterval(interval);
+          if (!hasRedirected.current) {
+            hasRedirected.current = true;
+            router.push(`/role-selection/${auctionId}`);
+          }
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
   }, [auctionState?.status, auctionId, router]);
 
   useEffect(() => {
@@ -246,6 +262,82 @@ export default function AuctionRoomPage() {
     );
   }
 
+  // 경매 완료 결과 요약 화면
+  if (auctionState?.status === "COMPLETED" && completeCountdown !== null) {
+    return (
+      <div className="flex-grow p-4 md:p-8">
+        <div className="container mx-auto max-w-3xl animate-fade-in">
+          <div className="text-center mb-6">
+            <h1 className="text-2xl font-bold text-text-primary mb-2">경매 완료!</h1>
+            <p className="text-text-secondary">
+              {completeCountdown > 0
+                ? `${completeCountdown}초 후 역할 선택으로 이동합니다...`
+                : "이동 중..."}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            {teams
+              .slice()
+              .sort((a, b) => {
+                const oa = a.name.match(/\d+/) ? Number(a.name.match(/\d+/)![0]) : Infinity;
+                const ob = b.name.match(/\d+/) ? Number(b.name.match(/\d+/)![0]) : Infinity;
+                return oa - ob || a.name.localeCompare(b.name);
+              })
+              .map((team) => {
+                const members = (team as any).members ?? [];
+                const budget = (team as any).remainingGold ?? (team as any).remainingBudget ?? 0;
+                return (
+                  <Card key={team.id}>
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          {(team as any).color && (
+                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: (team as any).color }} />
+                          )}
+                          <h3 className="font-semibold text-text-primary">{team.name}</h3>
+                        </div>
+                        <div className="flex items-center gap-1 text-sm">
+                          <Coins className="w-3.5 h-3.5 text-accent-gold" />
+                          <span className="font-bold text-accent-gold">{budget.toLocaleString()}G</span>
+                        </div>
+                      </div>
+                      <div className="space-y-1.5">
+                        {members.map((m: any) => (
+                          <div key={m.id} className={cn(
+                            "flex items-center gap-2 p-1.5 rounded text-sm",
+                            m.id === team.captainId ? "bg-accent-gold/10" : "bg-bg-tertiary",
+                          )}>
+                            <span className="text-[10px] text-text-tertiary w-3 flex-shrink-0">
+                              {m.id === team.captainId ? "C" : "·"}
+                            </span>
+                            <span className="font-medium text-text-primary truncate flex-1">{m.username}</span>
+                            <TierBadge tier={m.tier} size="sm" showIcon={false} />
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+          </div>
+
+          <div className="text-center">
+            <Button
+              variant="primary"
+              onClick={() => {
+                hasRedirected.current = true;
+                router.push(`/role-selection/${auctionId}`);
+              }}
+            >
+              역할 선택으로 이동
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (!auctionState) {
     return (
       <div className="flex-grow flex items-center justify-center">
@@ -324,21 +416,31 @@ export default function AuctionRoomPage() {
         {bidHistory.length === 0 ? (
           <p className="text-xs text-text-tertiary text-center py-4">아직 입찰이 없습니다</p>
         ) : (
-          bidHistory.map((entry, idx) => (
-            <div key={idx} className="flex items-center gap-2 p-1.5 text-xs">
-              <span className="text-text-tertiary font-mono text-[10px] flex-shrink-0">
-                {new Date(entry.timestamp).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
-              </span>
-              <span className="text-text-primary font-medium truncate">
-                {entry.username}
-              </span>
-              <span className="text-text-tertiary">→</span>
-              <span className="text-accent-gold font-bold flex items-center gap-0.5 flex-shrink-0">
-                <Coins className="w-3 h-3" />
-                {entry.amount.toLocaleString()}G
-              </span>
-            </div>
-          ))
+          bidHistory.map((entry, idx) =>
+            entry.isSeparator ? (
+              <div key={idx} className="flex items-center gap-2 py-1.5 my-1">
+                <div className="flex-1 h-px bg-bg-tertiary" />
+                <span className="text-[10px] font-medium text-accent-primary px-1.5">
+                  {entry.playerLabel}
+                </span>
+                <div className="flex-1 h-px bg-bg-tertiary" />
+              </div>
+            ) : (
+              <div key={idx} className="flex items-center gap-2 p-1.5 text-xs">
+                <span className="text-text-tertiary font-mono text-[10px] flex-shrink-0">
+                  {new Date(entry.timestamp).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                </span>
+                <span className="text-text-primary font-medium truncate">
+                  {entry.username}
+                </span>
+                <span className="text-text-tertiary">→</span>
+                <span className="text-accent-gold font-bold flex items-center gap-0.5 flex-shrink-0">
+                  <Coins className="w-3 h-3" />
+                  {entry.amount.toLocaleString()}G
+                </span>
+              </div>
+            )
+          )
         )}
         <div ref={logEndRef} />
       </div>

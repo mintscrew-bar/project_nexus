@@ -42,6 +42,9 @@ interface BidHistoryEntry {
   username: string;
   amount: number;
   timestamp: number;
+  /** 선수 구분 마커 (bid-resolved 시 삽입) */
+  playerLabel?: string;
+  isSeparator?: boolean;
 }
 
 type CaptainSelectionMode = 'TIER' | 'MANUAL' | 'VOLUNTEER';
@@ -357,6 +360,23 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
             timestamp: Date.now(),
           };
         }
+
+        // 다음 선수 구분 마커 삽입
+        const nextPlayerName = data.state?.currentPlayer?.username
+          ?? data.nextPlayer?.username;
+        if (nextPlayerName) {
+          updates.bidHistory = [
+            ...state.bidHistory,
+            {
+              username: '',
+              amount: 0,
+              timestamp: Date.now(),
+              playerLabel: nextPlayerName,
+              isSeparator: true,
+            },
+          ];
+        }
+
         return { ...state, ...updates };
       });
     });
