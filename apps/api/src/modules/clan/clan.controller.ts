@@ -58,7 +58,7 @@ export class ClanController {
   ) {
     return this.clanService.listClans({
       search,
-      isRecruiting: isRecruiting === "true",
+      isRecruiting: isRecruiting !== undefined ? isRecruiting === "true" : undefined,
       minTier,
       sort,
     });

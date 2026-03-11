@@ -180,7 +180,7 @@ export function ClanStats({ clanId }: ClanStatsProps) {
   }
 
   // 승률 기준 내림차순 정렬 (승률 같으면 승 수 기준)
-  const sortedMemberStats = stats.memberStats.slice().sort((a, b) => {
+  const sortedMemberStats = (stats.memberStats || []).slice().sort((a, b) => {
     if (b.winRate !== a.winRate) return b.winRate - a.winRate;
     return b.wins - a.wins;
   });

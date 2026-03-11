@@ -1360,11 +1360,6 @@ export function FriendsPanel() {
               <div className="flex items-center justify-center py-8">
                 <div className="w-5 h-5 border-2 border-accent-primary/30 border-t-accent-primary rounded-full animate-spin" />
               </div>
-            ) : friends.length === 0 && categories.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-8 text-center">
-                <Users className="w-8 h-8 text-text-tertiary mb-2" />
-                <p className="text-sm text-text-secondary">친구가 없습니다.</p>
-              </div>
             ) : (
               <>
                 {/* 클랜 채팅 고정 행 — 클랜에 가입된 경우만 표시, 클릭 시 플로팅 창 오픈 */}
@@ -1384,6 +1379,13 @@ export function FriendsPanel() {
                     </div>
                     <MessageCircle className="w-4 h-4 text-text-tertiary group-hover:text-accent-primary transition-colors flex-shrink-0" />
                   </button>
+                )}
+
+                {friends.length === 0 && categories.length === 0 && (
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                    <Users className="w-8 h-8 text-text-tertiary mb-2" />
+                    <p className="text-sm text-text-secondary">친구가 없습니다.</p>
+                  </div>
                 )}
 
                 {/* Custom categories */}
