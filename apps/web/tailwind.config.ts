@@ -121,7 +121,7 @@ const config: Config = {
           '100%': { backgroundPosition: '200% 0' },
         },
         bidFlash: {
-          '0%': { backgroundColor: 'rgba(var(--color-accent-gold, 255 193 7) / 0.3)' },
+          '0%': { backgroundColor: 'rgba(255, 193, 7, 0.25)' },
           '100%': { backgroundColor: 'transparent' },
         },
         shake: {

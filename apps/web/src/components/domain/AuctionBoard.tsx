@@ -210,36 +210,39 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
   const [bidFlash, setBidFlash] = useState(false);
   const prevBidRef = useRef(auctionState.currentHighestBid);
   useEffect(() => {
-    if (auctionState.currentHighestBid !== prevBidRef.current && prevBidRef.current > 0) {
+    const changed = auctionState.currentHighestBid !== prevBidRef.current && prevBidRef.current > 0;
+    prevBidRef.current = auctionState.currentHighestBid;
+    if (changed) {
       setBidFlash(true);
       const timer = setTimeout(() => setBidFlash(false), 400);
       return () => clearTimeout(timer);
     }
-    prevBidRef.current = auctionState.currentHighestBid;
   }, [auctionState.currentHighestBid]);
 
   // 유찰 shake: yuchalCount가 증가할 때 트리거
   const [yuchalShake, setYuchalShake] = useState(false);
   const prevYuchalRef = useRef(auctionState.yuchalCount);
   useEffect(() => {
-    if (auctionState.yuchalCount > prevYuchalRef.current) {
+    const increased = auctionState.yuchalCount > prevYuchalRef.current;
+    prevYuchalRef.current = auctionState.yuchalCount;
+    if (increased) {
       setYuchalShake(true);
       const timer = setTimeout(() => setYuchalShake(false), 500);
       return () => clearTimeout(timer);
     }
-    prevYuchalRef.current = auctionState.yuchalCount;
   }, [auctionState.yuchalCount]);
 
   // 매물 전환 fade: currentPlayer가 바뀔 때 트리거
   const [playerTransition, setPlayerTransition] = useState(false);
   const prevPlayerIdRef = useRef(auctionState.currentPlayer?.id);
   useEffect(() => {
-    if (auctionState.currentPlayer?.id !== prevPlayerIdRef.current && prevPlayerIdRef.current) {
+    const changed = auctionState.currentPlayer?.id !== prevPlayerIdRef.current && prevPlayerIdRef.current;
+    prevPlayerIdRef.current = auctionState.currentPlayer?.id;
+    if (changed) {
       setPlayerTransition(true);
       const timer = setTimeout(() => setPlayerTransition(false), 300);
       return () => clearTimeout(timer);
     }
-    prevPlayerIdRef.current = auctionState.currentPlayer?.id;
   }, [auctionState.currentPlayer?.id]);
 
   return (
