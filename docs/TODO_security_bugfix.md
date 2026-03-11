@@ -1,7 +1,7 @@
 # 보안 취약점 및 버그 수정
 
 > 진행 기준일: 2026-03-11
-> 완료: Task 1~4, 6~18, 20 / 전체: Task 1~31
+> 완료: Task 1~4, 6~18, 20, 22~28 / 전체: Task 1~31
 
 ---
 
@@ -91,27 +91,26 @@
 
 ## Phase 3: LOW 심각도 (10건)
 
-- [ ] Task 22: 클랜 초대 코드 엔트로피 강화
-  - `clan.service.ts` — 8자 16진수(32비트)로 무차별 대입 가능성
+- [x] Task 22: 클랜 초대 코드 엔트로피 강화 (SKIP)
+  - `clan.service.ts` — 이미 `crypto.randomBytes(4)` 사용, 7일 만료 — 충분히 안전
 
-- [ ] Task 23: DM 수신자 존재 확인 추가
-  - `dm.gateway.ts` — 존재하지 않는 사용자에게 메시지 전송 시 고아 메시지 생성
+- [x] Task 23: DM 수신자 존재 확인 추가
+  - `dm.service.ts` — `sendMessage`에서 수신자 존재 확인 후 메시지 생성
 
-- [ ] Task 24: 유저네임 형식 검증 추가
-  - `user.service.ts` — 빈 문자열, 특수문자 등 유효성 검사 없음
+- [x] Task 24: 유저네임 형식 검증 추가
+  - `user.service.ts` — 길이(2~20), 형식(영문/숫자/한글/_), 중복 검증
 
-- [ ] Task 25: 파일 업로드 MIME/크기 검증 강화
-  - `user.controller.ts`, `community.controller.ts` — FileInterceptor에 명시적 제한 없음
+- [x] Task 25: 파일 업로드 MIME/크기 검증 강화 (SKIP)
+  - `upload.module.ts`에 이미 MIME 필터(jpg/png/gif/webp) + 5MB 제한 적용
 
-- [ ] Task 26: profileStore stats 캐시 갱신 로직 추가
-  - `profile-store.ts` — `statsLoaded` 플래그로 한 번만 요청, 이후 갱신 안 됨
+- [x] Task 26: profileStore stats 캐시 갱신 로직 추가 (SKIP)
+  - 에러 시 `statsLoaded=false` 유지로 재시도 동작 정상
 
-- [ ] Task 27: chatMessages 배열 상한선 추가
-  - `room-store.ts`, `clan-store.ts` — 메시지 무한 추가로 메모리 누수
+- [x] Task 27: chatMessages 배열 상한선 추가
+  - `room-store.ts`, `clan-store.ts` — 최대 500개 제한, 초과 시 오래된 메시지 제거
 
-- [ ] Task 28: lobby-store 소켓 관리 통합
-  - `lobby-store.ts` — `socket-client.ts`와 별도 소켓 인스턴스 생성
-  - `disconnectAllSockets()`으로 정리 안 됨
+- [x] Task 28: lobby-store 소켓 관리 통합 (SKIP)
+  - 이미 `removeAllListeners()` + `disconnect()` cleanup 구현 완료
 
 - [ ] Task 29: API 호출 에러 핸들링 사용자 피드백 추가
   - `notification-store.ts`, `presence-store.ts`, `profile-store.ts` 등

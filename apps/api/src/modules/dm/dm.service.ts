@@ -44,6 +44,15 @@ export class DmService implements OnModuleInit {
     content: string,
     senderUsername: string,
   ) {
+    // 수신자 존재 확인 — 없으면 고아 메시지 생성 방지
+    const receiver = await this.prisma.user.findUnique({
+      where: { id: receiverId },
+      select: { id: true },
+    });
+    if (!receiver) {
+      throw new Error("수신자를 찾을 수 없습니다.");
+    }
+
     const message = await this.prisma.directMessage.create({
       data: { senderId, receiverId, content, senderUsername },
       include: {

@@ -197,9 +197,11 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
     });
 
     roomSocketHelpers.onNewMessage((message: ChatMessage) => {
-      set((state) => ({
-        chatMessages: [...state.chatMessages, message],
-      }));
+      set((state) => {
+        const updated = [...state.chatMessages, message];
+        // 메모리 누수 방지: 최대 500개 유지 (오래된 메시지부터 제거)
+        return { chatMessages: updated.length > 500 ? updated.slice(-500) : updated };
+      });
     });
 
     roomSocketHelpers.onUserTyping((data: { userId: string; username: string }) => {

@@ -177,6 +177,30 @@ export class UserService {
     userId: string,
     data: { username?: string; bio?: string },
   ) {
+    // 유저네임 유효성 검증
+    if (data.username !== undefined) {
+      const trimmed = data.username.trim();
+      if (trimmed.length < 2 || trimmed.length > 20) {
+        throw new BadRequestException(
+          "유저네임은 2~20자여야 합니다.",
+        );
+      }
+      if (!/^[a-zA-Z0-9가-힣_]+$/.test(trimmed)) {
+        throw new BadRequestException(
+          "유저네임은 영문, 숫자, 한글, 밑줄(_)만 사용 가능합니다.",
+        );
+      }
+      // 중복 확인
+      const existing = await this.prisma.user.findFirst({
+        where: { username: trimmed, id: { not: userId } },
+        select: { id: true },
+      });
+      if (existing) {
+        throw new BadRequestException("이미 사용 중인 유저네임입니다.");
+      }
+      data.username = trimmed;
+    }
+
     return this.prisma.user.update({
       where: { id: userId },
       data,

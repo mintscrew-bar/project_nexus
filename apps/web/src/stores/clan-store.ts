@@ -197,10 +197,14 @@ export const useClanStore = create<ClanStoreState>((set, get) => ({
 
     // 새 메시지 수신
     clanSocketHelpers.onNewMessage((message: ChatMessage) => {
-      set((state) => ({
-        chatMessages: [...state.chatMessages, message],
-        unreadCount: state.unreadCount + 1,
-      }));
+      set((state) => {
+        const updated = [...state.chatMessages, message];
+        // 메모리 누수 방지: 최대 500개 유지 (오래된 메시지부터 제거)
+        return {
+          chatMessages: updated.length > 500 ? updated.slice(-500) : updated,
+          unreadCount: state.unreadCount + 1,
+        };
+      });
     });
 
     // 메시지 삭제 이벤트
