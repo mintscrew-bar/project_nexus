@@ -60,9 +60,15 @@ export function GameChatPanel({ roomId, isFinalStage }: GameChatPanelProps) {
         </button>
       )}
 
-      {/* Chat panel */}
+      {/* Chat panel — 모바일: 풀스크린, 데스크톱: 우측 하단 고정 */}
       {isOpen && (
-        <div className="fixed bottom-6 right-6 z-50 w-[360px] h-[480px] bg-bg-primary border border-bg-tertiary rounded-xl shadow-2xl flex flex-col overflow-hidden animate-fade-in">
+        <div className={cn(
+          "fixed z-50 bg-bg-primary border border-bg-tertiary shadow-2xl flex flex-col overflow-hidden animate-fade-in",
+          // 모바일: 전체 화면
+          "inset-0 rounded-none",
+          // sm 이상: 우측 하단 고정 패널
+          "sm:inset-auto sm:bottom-6 sm:right-6 sm:w-[360px] sm:h-[480px] sm:rounded-xl",
+        )}>
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 bg-bg-secondary border-b border-bg-tertiary flex-shrink-0">
             <div className="flex items-center gap-2">
