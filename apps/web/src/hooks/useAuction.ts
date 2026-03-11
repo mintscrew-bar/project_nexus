@@ -28,6 +28,7 @@ export function useAuction(roomId?: string) {
     sessionAbortedAt,
     sessionAbortMessage,
     clearSessionAbort,
+    lastSoldEvent,
   } = useAuctionStore();
   const { isLoading: authLoading, isAuthenticated } = useAuthStore();
 
@@ -61,5 +62,6 @@ export function useAuction(roomId?: string) {
     sessionAbortedAt,
     sessionAbortMessage,
     clearSessionAbort,
+    lastSoldEvent,
   };
 }

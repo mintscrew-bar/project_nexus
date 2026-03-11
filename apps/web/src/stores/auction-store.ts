@@ -78,6 +78,8 @@ interface AuctionStoreState {
   captainSelectionPhase: CaptainSelectionPhase | null;
   sessionAbortedAt: number | null;
   sessionAbortMessage: string | null;
+  /** 최근 낙찰 정보 (피드백 표시용, 일정 시간 후 자동 클리어) */
+  lastSoldEvent: { playerName: string; teamName: string; price: number; timestamp: number } | null;
 
   // REST API methods
   startAuction: (roomId: string) => Promise<void>;
@@ -178,6 +180,7 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
   captainSelectionPhase: null,
   sessionAbortedAt: null,
   sessionAbortMessage: null,
+  lastSoldEvent: null,
 
   startAuction: async (roomId: string) => {
     set({ isLoading: true, error: null });
@@ -346,6 +349,13 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
           updates.teams = nextTeams.map(t =>
             t.id === data.team.id ? { ...t, ...data.team } : t
           );
+          // 낙찰 피드백 정보 저장
+          updates.lastSoldEvent = {
+            playerName: data.player?.username ?? '???',
+            teamName: data.team?.name ?? '???',
+            price: data.price ?? 0,
+            timestamp: Date.now(),
+          };
         }
         return { ...state, ...updates };
       });
@@ -471,6 +481,7 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
       captainSelectionPhase: null,
       sessionAbortedAt: null,
       sessionAbortMessage: null,
+      lastSoldEvent: null,
     });
   },
 

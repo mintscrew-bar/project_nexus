@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState, useCallback } from "react";
+import React, { useMemo, useState, useCallback, useRef, useEffect } from "react";
 import { Card, CardContent, Button, Badge, Avatar } from "@/components/ui";
 import { TierBadge } from "./TierBadge";
 import { cn } from "@/lib/utils";
@@ -205,12 +205,52 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
     sortedTeams,
   ]);
 
+  // ── 실시간 피드백 애니메이션 상태 ──
+  // 입찰 flash: 최고입찰가가 변경될 때 트리거
+  const [bidFlash, setBidFlash] = useState(false);
+  const prevBidRef = useRef(auctionState.currentHighestBid);
+  useEffect(() => {
+    if (auctionState.currentHighestBid !== prevBidRef.current && prevBidRef.current > 0) {
+      setBidFlash(true);
+      const timer = setTimeout(() => setBidFlash(false), 400);
+      return () => clearTimeout(timer);
+    }
+    prevBidRef.current = auctionState.currentHighestBid;
+  }, [auctionState.currentHighestBid]);
+
+  // 유찰 shake: yuchalCount가 증가할 때 트리거
+  const [yuchalShake, setYuchalShake] = useState(false);
+  const prevYuchalRef = useRef(auctionState.yuchalCount);
+  useEffect(() => {
+    if (auctionState.yuchalCount > prevYuchalRef.current) {
+      setYuchalShake(true);
+      const timer = setTimeout(() => setYuchalShake(false), 500);
+      return () => clearTimeout(timer);
+    }
+    prevYuchalRef.current = auctionState.yuchalCount;
+  }, [auctionState.yuchalCount]);
+
+  // 매물 전환 fade: currentPlayer가 바뀔 때 트리거
+  const [playerTransition, setPlayerTransition] = useState(false);
+  const prevPlayerIdRef = useRef(auctionState.currentPlayer?.id);
+  useEffect(() => {
+    if (auctionState.currentPlayer?.id !== prevPlayerIdRef.current && prevPlayerIdRef.current) {
+      setPlayerTransition(true);
+      const timer = setTimeout(() => setPlayerTransition(false), 300);
+      return () => clearTimeout(timer);
+    }
+    prevPlayerIdRef.current = auctionState.currentPlayer?.id;
+  }, [auctionState.currentPlayer?.id]);
+
   return (
     <div className={cn("space-y-4", className)}>
       {auctionState.currentPlayer && (
         <>
           {/* ── 모바일 compact sticky 헤더 (lg 미만) ── */}
-          <div className="lg:hidden sticky top-0 z-20 -mx-4 px-4 py-2 bg-bg-primary/95 backdrop-blur-sm border-b border-bg-tertiary">
+          <div className={cn(
+            "lg:hidden sticky top-0 z-20 -mx-4 px-4 py-2 bg-bg-primary/95 backdrop-blur-sm border-b border-bg-tertiary",
+            yuchalShake && "animate-shake",
+          )}>
             {/* 1줄: 선수 정보 */}
             <div className="flex items-center gap-2 mb-1.5">
               <Avatar
@@ -242,7 +282,7 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
               )}>
                 {timeLeft}초
               </div>
-              <div className="flex items-center gap-1.5 flex-1 min-w-0">
+              <div className={cn("flex items-center gap-1.5 flex-1 min-w-0 rounded px-1 -mx-1", bidFlash && "animate-bid-flash")}>
                 <Coins className="w-4 h-4 text-accent-gold flex-shrink-0" />
                 <span className="text-lg font-bold text-accent-gold">
                   {auctionState.currentHighestBid.toLocaleString()}G
@@ -265,7 +305,11 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
           </div>
 
           {/* ── 데스크톱 현재 선수 카드 (lg 이상) ── */}
-          <Card variant="elevated" className="border-accent-primary hidden lg:block">
+          <Card variant="elevated" className={cn(
+            "border-accent-primary hidden lg:block",
+            playerTransition && "animate-fade-in",
+            yuchalShake && "animate-shake",
+          )}>
             <CardContent className="p-6">
               <div className="flex items-center gap-6">
                 <Avatar
@@ -317,7 +361,7 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
                 </div>
               </div>
 
-              <div className="mt-6 p-4 bg-bg-secondary rounded-lg">
+              <div className={cn("mt-6 p-4 bg-bg-secondary rounded-lg transition-colors", bidFlash && "animate-bid-flash")}>
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-text-tertiary mb-1">

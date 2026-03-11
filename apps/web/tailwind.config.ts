@@ -73,6 +73,9 @@ const config: Config = {
         'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
         'shimmer': 'shimmer 2s infinite linear',
         'spin-slow': 'spin 2s linear infinite',
+        'bid-flash': 'bidFlash 400ms ease-out',
+        'shake': 'shake 500ms ease-in-out',
+        'sold-glow': 'soldGlow 600ms ease-out',
       },
       keyframes: {
         fadeIn: {
@@ -116,6 +119,23 @@ const config: Config = {
         shimmer: {
           '0%': { backgroundPosition: '-200% 0' },
           '100%': { backgroundPosition: '200% 0' },
+        },
+        bidFlash: {
+          '0%': { backgroundColor: 'rgba(var(--color-accent-gold, 255 193 7) / 0.3)' },
+          '100%': { backgroundColor: 'transparent' },
+        },
+        shake: {
+          '0%, 100%': { transform: 'translateX(0)' },
+          '15%': { transform: 'translateX(-4px)' },
+          '30%': { transform: 'translateX(4px)' },
+          '45%': { transform: 'translateX(-3px)' },
+          '60%': { transform: 'translateX(3px)' },
+          '75%': { transform: 'translateX(-1px)' },
+        },
+        soldGlow: {
+          '0%': { boxShadow: '0 0 0 0 rgba(34, 197, 94, 0.5)' },
+          '50%': { boxShadow: '0 0 20px 4px rgba(34, 197, 94, 0.3)' },
+          '100%': { boxShadow: '0 0 0 0 rgba(34, 197, 94, 0)' },
         },
       },
       // 반응형 브레이크포인트 추가

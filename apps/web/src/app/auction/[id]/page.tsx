@@ -43,6 +43,7 @@ export default function AuctionRoomPage() {
     sessionAbortedAt,
     sessionAbortMessage,
     clearSessionAbort,
+    lastSoldEvent,
   } = useAuction(auctionId);
 
   const isHost = user?.id === captainSelectionPhase?.hostId;
@@ -72,6 +73,15 @@ export default function AuctionRoomPage() {
     const timer = setTimeout(() => router.push(`/tournaments/${auctionId}/lobby`), 1500);
     return () => clearTimeout(timer);
   }, [sessionAbortedAt, sessionAbortMessage, clearSessionAbort, addToast, router, auctionId]);
+
+  // 낙찰 토스트 표시
+  useEffect(() => {
+    if (!lastSoldEvent) return;
+    addToast(
+      `${lastSoldEvent.teamName}이(가) ${lastSoldEvent.playerName}을(를) ${lastSoldEvent.price.toLocaleString()}G에 낙찰!`,
+      "success",
+    );
+  }, [lastSoldEvent]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 입찰 로그 자동 스크롤
   useEffect(() => {
