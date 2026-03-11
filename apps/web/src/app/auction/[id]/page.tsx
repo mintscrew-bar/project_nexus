@@ -120,12 +120,26 @@ export default function AuctionRoomPage() {
     );
   }
 
-  if (error) {
+  if (error && !auctionState) {
     return (
       <div className="flex-grow flex items-center justify-center">
         <div className="text-center">
           <p className="text-accent-danger mb-4">오류: {error}</p>
-          <p className="text-text-secondary">경매 방에 연결할 수 없습니다</p>
+          <p className="text-text-secondary mb-6">경매 방에 연결할 수 없습니다</p>
+          <div className="flex gap-3 justify-center">
+            <Button
+              variant="primary"
+              onClick={() => window.location.reload()}
+            >
+              다시 시도
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => router.push(`/tournaments/${auctionId}/lobby`)}
+            >
+              로비로 돌아가기
+            </Button>
+          </div>
         </div>
       </div>
     );
@@ -235,9 +249,18 @@ export default function AuctionRoomPage() {
   if (!auctionState) {
     return (
       <div className="flex-grow flex items-center justify-center">
-        <div className="text-center">
+        <div className="text-center animate-fade-in">
           <LoadingSpinner size="lg" />
-          <p className="text-text-secondary mt-4">경매 시작 대기 중...</p>
+          <p className="text-lg font-semibold text-text-primary mt-4">경매 준비 중</p>
+          <p className="text-text-secondary mt-2">팀장이 확정되었습니다. 잠시 후 경매가 시작됩니다...</p>
+          {!isConnected && (
+            <div className="mt-6">
+              <p className="text-accent-warning text-sm mb-3">연결이 끊어졌습니다</p>
+              <Button variant="primary" size="sm" onClick={() => window.location.reload()}>
+                다시 연결
+              </Button>
+            </div>
+          )}
         </div>
       </div>
     );

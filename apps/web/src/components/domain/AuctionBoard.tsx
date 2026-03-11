@@ -449,6 +449,15 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
         </div>
       )}
 
+      {/* 비캡틴/관전자 관전 안내 */}
+      {!isCurrentUserTurn && auctionState.currentPlayer && !hideBidPanel && (
+        <div className="py-3 px-4 rounded-lg bg-bg-secondary border border-bg-tertiary text-center text-sm text-text-secondary">
+          {currentTeam
+            ? "다른 팀의 입찰 차례입니다. 경매를 관전 중입니다."
+            : "관전 모드 — 팀장만 입찰에 참여할 수 있습니다."}
+        </div>
+      )}
+
       {isCurrentUserTurn && auctionState.currentPlayer && !hideBidPanel && (
         <Card>
           <CardContent className="p-4">
