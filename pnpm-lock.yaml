@@ -252,6 +252,9 @@ importers:
       react-markdown:
         specifier: ^10.1.0
         version: 10.1.0(@types/react@18.3.27)(react@18.3.1)
+      rehype-sanitize:
+        specifier: ^6.0.0
+        version: 6.0.0
       remark-gfm:
         specifier: ^4.0.1
         version: 4.0.1
@@ -5288,6 +5291,14 @@ packages:
       zwitch: 2.0.4
     dev: false
 
+  /hast-util-sanitize@5.0.2:
+    resolution: {integrity: sha512-3yTWghByc50aGS7JlGhk61SPenfE/p1oaFeNwkOOyrscaOkMGrcW9+Cy/QAIOBpZxP1yqDIzFMR0+Np0i0+usg==}
+    dependencies:
+      '@types/hast': 3.0.4
+      '@ungap/structured-clone': 1.3.0
+      unist-util-position: 5.0.0
+    dev: false
+
   /hast-util-select@6.0.4:
     resolution: {integrity: sha512-RqGS1ZgI0MwxLaKLDxjprynNzINEkRHY2i8ln4DDjgv9ZhcYVIHN9rlpiYsqtFwrgpYU361SyWDQcGNIBVu3lw==}
     dependencies:
@@ -8255,6 +8266,13 @@ packages:
       hast-util-select: 6.0.4
       unified: 11.0.5
       unist-util-visit: 5.1.0
+    dev: false
+
+  /rehype-sanitize@6.0.0:
+    resolution: {integrity: sha512-CsnhKNsyI8Tub6L4sm5ZFsme4puGfc6pYylvXo1AeqaGbjOYyzNv3qZPwvs0oMJ39eryyeOdmxwUIo94IpEhqg==}
+    dependencies:
+      '@types/hast': 3.0.4
+      hast-util-sanitize: 5.0.2
     dev: false
 
   /rehype-slug@6.0.0:

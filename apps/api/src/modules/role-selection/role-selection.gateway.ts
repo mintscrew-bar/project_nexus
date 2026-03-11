@@ -10,6 +10,7 @@ import {
 import { OnModuleDestroy, Inject, forwardRef } from "@nestjs/common";
 import { Server, Socket } from "socket.io";
 import { AuthService } from "../auth/auth.service";
+import { PrismaService } from "../prisma/prisma.service";
 import { RoleSelectionService } from "./role-selection.service";
 import { MatchGateway } from "../match/match.gateway";
 import { MatchService } from "../match/match.service";
@@ -45,6 +46,7 @@ export class RoleSelectionGateway
 
   constructor(
     private readonly authService: AuthService,
+    private readonly prisma: PrismaService,
     private readonly roleSelectionService: RoleSelectionService,
     @Inject(forwardRef(() => MatchGateway))
     private readonly matchGateway: MatchGateway,
@@ -98,6 +100,17 @@ export class RoleSelectionGateway
     @MessageBody() data: { roomId: string },
   ) {
     try {
+      // 방 참여자 검증
+      if (client.userId) {
+        const participant = await this.prisma.roomParticipant.findFirst({
+          where: { userId: client.userId, roomId: data.roomId },
+          select: { id: true },
+        });
+        if (!participant) {
+          return { success: false, error: "방 참여자만 입장할 수 있습니다." };
+        }
+      }
+
       client.join(`room:${data.roomId}`);
       if (client.userId) {
         this.connectedUsers.set(client.id, {

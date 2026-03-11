@@ -67,7 +67,9 @@ export const usePresenceStore = create<PresenceStoreState>((set, get) => ({
       }
     });
 
-    // Re-establish presence on reconnect
+    // Re-establish presence on reconnect (기존 핸들러 제거 후 등록)
+    socket.off('connect');
+    socket.off('disconnect');
     socket.on('connect', () => {
       set({ isConnected: true, myStatus: "ONLINE" });
       presenceSocketHelpers.setStatus("ONLINE");

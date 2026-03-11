@@ -10,6 +10,7 @@ import {
 import { Inject, forwardRef, Optional, OnModuleDestroy } from "@nestjs/common";
 import { Server, Socket } from "socket.io";
 import { AuthService } from "../auth/auth.service";
+import { PrismaService } from "../prisma/prisma.service";
 import { SnakeDraftService } from "./snake-draft.service";
 import { RoleSelectionService } from "../role-selection/role-selection.service";
 import { RoleSelectionGateway } from "../role-selection/role-selection.gateway";
@@ -50,6 +51,7 @@ export class SnakeDraftGateway
 
   constructor(
     private readonly authService: AuthService,
+    private readonly prisma: PrismaService,
     private readonly snakeDraftService: SnakeDraftService,
     @Inject(forwardRef(() => RoleSelectionService))
     private readonly roleSelectionService: RoleSelectionService,
@@ -117,6 +119,17 @@ export class SnakeDraftGateway
     @MessageBody() data: { roomId: string },
   ) {
     try {
+      // 방 참여자 검증
+      if (client.userId) {
+        const participant = await this.prisma.roomParticipant.findFirst({
+          where: { userId: client.userId, roomId: data.roomId },
+          select: { id: true },
+        });
+        if (!participant) {
+          return { success: false, error: "방 참여자만 입장할 수 있습니다." };
+        }
+      }
+
       client.join(`draft:${data.roomId}`);
 
       if (client.userId) {

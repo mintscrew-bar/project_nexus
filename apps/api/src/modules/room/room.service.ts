@@ -1004,6 +1004,17 @@ export class RoomService {
   // Close Room (host explicit close)
   // ========================================
 
+  /** 참여자 여부 확인 — 컨트롤러/게이트웨이에서 재사용 가능한 공용 헬퍼 */
+  async assertParticipant(userId: string, roomId: string) {
+    const participant = await this.prisma.roomParticipant.findFirst({
+      where: { userId, roomId },
+      select: { id: true },
+    });
+    if (!participant) {
+      throw new ForbiddenException("방 참여자만 이 작업을 수행할 수 있습니다.");
+    }
+  }
+
   /** 호스트 여부 확인 — 컨트롤러에서 재사용 가능한 공용 헬퍼 */
   async assertHost(userId: string, roomId: string) {
     const room = await this.prisma.room.findUnique({
@@ -1088,13 +1099,10 @@ export class RoomService {
       );
     }
 
-    // 요청자가 방 참가자인지 확인
-    const isParticipant = room.participants.some(
-      (p) => p.userId === requesterId,
-    );
-    if (!isParticipant) {
+    // 호스트만 로비 복귀 가능
+    if (room.hostId !== requesterId) {
       throw new ForbiddenException(
-        "Only room participants can return to lobby",
+        "호스트만 로비로 복귀시킬 수 있습니다.",
       );
     }
 

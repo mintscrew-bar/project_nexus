@@ -61,7 +61,9 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       set({ unreadCount: data.count });
     });
 
-    // Track connection state on reconnect/disconnect
+    // Track connection state on reconnect/disconnect (기존 핸들러 제거 후 등록)
+    socket?.off('connect');
+    socket?.off('disconnect');
     socket?.on('connect', () => set({ isConnected: true }));
     socket?.on('disconnect', () => set({ isConnected: false }));
 

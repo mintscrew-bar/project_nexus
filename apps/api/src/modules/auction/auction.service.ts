@@ -360,6 +360,12 @@ export class AuctionService {
       throw new BadRequestException("Not in volunteer phase");
     }
 
+    // 방 참여자 검증
+    const isParticipant = await this.isRoomParticipant(userId, roomId);
+    if (!isParticipant) {
+      throw new ForbiddenException("방 참여자만 자원할 수 있습니다.");
+    }
+
     const idx = phase.volunteers.indexOf(userId);
     if (idx === -1) {
       phase.volunteers.push(userId);
@@ -966,6 +972,15 @@ export class AuctionService {
       select: { hostId: true },
     });
     return room?.hostId === userId;
+  }
+
+  /** 방 참여자 여부 확인 */
+  async isRoomParticipant(userId: string, roomId: string): Promise<boolean> {
+    const participant = await this.prisma.roomParticipant.findFirst({
+      where: { userId, roomId },
+      select: { id: true },
+    });
+    return !!participant;
   }
 
   clearAuctionState(roomId: string): void {

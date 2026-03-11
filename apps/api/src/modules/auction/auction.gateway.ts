@@ -139,6 +139,17 @@ export class AuctionGateway
     @MessageBody() data: { roomId: string },
   ) {
     try {
+      // 방 참여자 검증 — 비참여자의 실시간 이벤트 구독 차단
+      if (client.userId) {
+        const isParticipant = await this.auctionService.isRoomParticipant(
+          client.userId,
+          data.roomId,
+        );
+        if (!isParticipant) {
+          return { success: false, error: "방 참여자만 입장할 수 있습니다." };
+        }
+      }
+
       client.join(`room:${data.roomId}`);
 
       // Track user connection for disconnect handling

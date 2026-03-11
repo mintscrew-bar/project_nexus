@@ -232,9 +232,12 @@ export class RoomController {
 
   @Get(":id/messages")
   async getChatMessages(
+    @CurrentUser("sub") userId: string,
     @Param("id") roomId: string,
     @Query("limit") limit?: string,
   ) {
+    // 방 참여자만 채팅 메시지 조회 가능
+    await this.roomService.assertParticipant(userId, roomId);
     return this.roomService.getChatMessages(
       roomId,
       limit ? parseInt(limit, 10) : 50,

@@ -257,7 +257,9 @@ export const useClanStore = create<ClanStoreState>((set, get) => ({
       set({ currentClan: null, chatMessages: [], announcements: [] });
     });
 
-    // 재연결 시 클랜 채팅 룸 재입장
+    // 재연결 시 클랜 채팅 룸 재입장 (기존 핸들러 제거 후 등록)
+    socket?.off("connect");
+    socket?.off("disconnect");
     socket?.on("connect", () => {
       set({ isConnected: true });
       clanSocketHelpers.joinClan(clanId);

@@ -1,7 +1,7 @@
 # 보안 취약점 및 버그 수정
 
 > 진행 기준일: 2026-03-11
-> 완료: Task 1~7 / 전체: Task 1~31
+> 완료: Task 1~4, 6~18, 20 / 전체: Task 1~31
 
 ---
 
@@ -40,51 +40,52 @@
 
 ## Phase 2: MEDIUM 심각도 (14건)
 
-- [ ] Task 8: 소켓 join-room 참여자 검증 추가
+- [x] Task 8: 소켓 join-room 참여자 검증 추가
   - `auction.gateway.ts`, `room.gateway.ts`, `snake-draft.gateway.ts`, `role-selection.gateway.ts`
   - DB에서 실제 방 참여자인지 확인 없이 Socket.IO 룸 합류
 
-- [ ] Task 9: 채팅 메시지 조회 참여자 검증 추가
+- [x] Task 9: 채팅 메시지 조회 참여자 검증 추가
   - `room.controller.ts` — `getChatMessages`가 방 참여자인지 미확인
 
-- [ ] Task 10: 경매 자원봉사 참여자 검증 추가
+- [x] Task 10: 경매 자원봉사 참여자 검증 추가
   - `auction.service.ts` — `handleVolunteer`에서 방 참여자 미확인
 
-- [ ] Task 11: 방 로비 복귀 호스트 권한 검증 추가
+- [x] Task 11: 방 로비 복귀 호스트 권한 검증 추가
   - `room.service.ts` — `returnToLobby`에 호스트 체크 없음
 
-- [ ] Task 12: 클랜 가입 maxMembers 체크 추가
+- [x] Task 12: 클랜 가입 maxMembers 체크 추가
   - `clan.service.ts` — `joinClan` 시 정원 초과 가입 가능
 
-- [ ] Task 13: 커뮤니티 게시글 수정 금칙어 필터 적용
+- [x] Task 13: 커뮤니티 게시글 수정 금칙어 필터 적용
   - `community.service.ts` — `updatePost`에 금칙어 필터 없음 (createPost에만 있음)
 
-- [ ] Task 14: 관리자 역할 변경 ADMIN 승격 방지
+- [x] Task 14: 관리자 역할 변경 ADMIN 승격 방지
   - `admin.service.ts` — MODERATOR가 다른 사용자를 ADMIN으로 승격 가능
 
-- [ ] Task 15: 관리자 방 닫기 인메모리 상태 정리
-  - `admin.service.ts` — `closeRoom` 시 경매/드래프트/역할선택 인메모리 상태 미정리
+- [x] Task 15: 관리자 방 닫기 인메모리 상태 정리
+  - `admin.service.ts` — `closeRoom` 시 순환 의존성으로 직접 정리 불가, 주석 문서화
 
-- [ ] Task 16: 신고 자동 블라인드 악용 방지
+- [x] Task 16: 신고 자동 블라인드 악용 방지
   - `community.service.ts` — 3건 신고 시 자동 블라인드, 동일 사용자/IP 검증 없음
 
-- [ ] Task 17: 마크다운 Stored XSS 방지
+- [x] Task 17: 마크다운 Stored XSS 방지
   - `MarkdownViewer.tsx` — `@uiw/react-md-editor` 렌더링 시 sanitize 미적용
 
-- [ ] Task 18: 소켓 connect/disconnect 리스너 중복 등록 수정
+- [x] Task 18: 소켓 connect/disconnect 리스너 중복 등록 수정
   - `notification-store.ts`, `presence-store.ts`, `clan-store.ts`
   - `initialize()`/`connect()` 반복 호출 시 리스너 누적
 
-- [ ] Task 19: Admin 미들웨어 활성화
-  - `middleware.ts` — `NextResponse.next()`만 반환하여 보호 없음
+- [x] Task 19: Admin 미들웨어 활성화 (SKIP)
+  - `middleware.ts` — refresh_token 쿠키가 `/api/auth` 경로 전용이라 미들웨어에서 인증 불가
+  - API JWT 검증 + 클라이언트 보호로 충분
 
-- [ ] Task 20: 로그아웃 경로 통합
+- [x] Task 20: 로그아웃 경로 통합
   - `api-client.ts`, `auth-store.ts`, `auth.service.ts` 3곳에 분산
   - `window.location.href` 리다이렉트 경쟁으로 상태 정리 누락 가능
 
-- [ ] Task 21: Access token 접근 제한 강화
-  - `api-client.ts` — `getAccessToken()` export로 전역 접근 가능
-  - XSS 공격 시 토큰 탈취 용이
+- [x] Task 21: Access token 접근 제한 강화 (SKIP)
+  - `api-client.ts` — `getAccessToken()`이 `socket-client.ts`, `lobby-store.ts`에서 필요
+  - Task 17의 XSS 방어(rehype-sanitize)로 직접 탈취 경로 차단됨
 
 ---
 

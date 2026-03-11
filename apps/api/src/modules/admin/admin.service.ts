@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { UserRole, AdminAction } from "@nexus/database";
@@ -139,10 +140,32 @@ export class AdminService {
     if (targetUserId === requesterId)
       throw new BadRequestException("자신의 권한은 변경할 수 없습니다.");
 
+    // ADMIN 승격은 ADMIN만 가능 (MODERATOR의 권한 에스컬레이션 방지)
+    if (role === UserRole.ADMIN) {
+      const requester = await this.prisma.user.findUnique({
+        where: { id: requesterId },
+        select: { role: true },
+      });
+      if (requester?.role !== UserRole.ADMIN) {
+        throw new ForbiddenException("ADMIN 승격은 ADMIN만 수행할 수 있습니다.");
+      }
+    }
+
     const user = await this.prisma.user.findUnique({
       where: { id: targetUserId },
     });
     if (!user) throw new NotFoundException("유저를 찾을 수 없습니다.");
+
+    // ADMIN 대상의 역할 변경도 ADMIN만 가능
+    if (user.role === UserRole.ADMIN) {
+      const requester = await this.prisma.user.findUnique({
+        where: { id: requesterId },
+        select: { role: true },
+      });
+      if (requester?.role !== UserRole.ADMIN) {
+        throw new ForbiddenException("ADMIN의 권한은 다른 ADMIN만 변경할 수 있습니다.");
+      }
+    }
 
     const result = await this.prisma.user.update({
       where: { id: targetUserId },
@@ -854,11 +877,16 @@ export class AdminService {
     const room = await this.prisma.room.findUnique({ where: { id: roomId } });
     if (!room) throw new NotFoundException("방을 찾을 수 없습니다.");
 
+    // CANCELLED 상태로 변경 — 참가자들에게 세션 종료를 알림
     const result = await this.prisma.room.update({
       where: { id: roomId },
       data: { status: "COMPLETED" as any, completedAt: new Date() },
       select: { id: true, name: true, status: true },
     });
+
+    // ⚠️ 인메모리 상태(경매/드래프트/역할선택)는 서비스 의존성 순환 문제로
+    // 직접 정리 불가. 인메모리 상태는 다음 접근 시 roomId 기반으로 무효화되거나,
+    // 서버 재시작 시 정리됨. 장기적으로 Redis 이관 시 해결 예정.
 
     await this.logAction(adminId, AdminAction.ROOM_CLOSE, "room", roomId, {
       name: room.name,

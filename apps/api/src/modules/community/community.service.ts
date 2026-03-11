@@ -444,6 +444,16 @@ export class CommunityService {
       }
     }
 
+    // 금칙어 검사 (수정 시에도 적용)
+    if (
+      (dto.title && containsBannedWord(dto.title)) ||
+      (dto.content && containsBannedWord(dto.content))
+    ) {
+      throw new BadRequestException(
+        "금칙어가 포함된 게시글은 작성할 수 없습니다.",
+      );
+    }
+
     const updated = await this.prisma.post.update({
       where: { id: postId },
       data: {
@@ -1039,7 +1049,8 @@ export class CommunityService {
     });
 
     // 신고 누적 자동 블라인드: 해당 게시글/댓글의 신고 횟수가 3건 이상이면 자동 블라인드 처리
-    const AUTO_BLIND_THRESHOLD = 3;
+    // 자동 블라인드 임계값: 5명의 서로 다른 사용자 신고 필요 (조직적 악용 방지)
+    const AUTO_BLIND_THRESHOLD = 5;
 
     if (dto.postId) {
       const reportCount = await this.prisma.postReport.count({

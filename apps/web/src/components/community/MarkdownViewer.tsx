@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import rehypeSanitize from "rehype-sanitize";
 import "@uiw/react-md-editor/markdown-editor.css";
 
 const MDEditorMarkdown = dynamic(
@@ -18,6 +19,7 @@ export function MarkdownViewer({ content }: MarkdownViewerProps) {
       <MDEditorMarkdown
         source={content}
         style={{ backgroundColor: "transparent", color: "inherit" }}
+        rehypePlugins={[[rehypeSanitize]]}
       />
     </div>
   );

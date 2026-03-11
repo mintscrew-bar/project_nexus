@@ -127,7 +127,7 @@ export const authApi = {
       // 순환 참조 방지: 동적 import로 socket-client 접근
       import("./socket-client").then(({ disconnectAllSockets }) => disconnectAllSockets()).catch(() => {});
       accessToken = null;
-      window.location.href = "/";
+      // 리다이렉트는 호출자(auth-store)에서 처리 — 상태 정리가 먼저 완료되도록
     }
   },
 

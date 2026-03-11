@@ -302,6 +302,14 @@ export class ClanService {
       throw new BadRequestException("Clan is not recruiting");
     }
 
+    // 정원 초과 체크
+    const memberCount = await this.prisma.clanMember.count({
+      where: { clanId },
+    });
+    if (memberCount >= clan.maxMembers) {
+      throw new BadRequestException("클랜 정원이 가득 찼습니다.");
+    }
+
     // 클랜 멤버로 추가
     const membership = await this.prisma.clanMember.create({
       data: {
