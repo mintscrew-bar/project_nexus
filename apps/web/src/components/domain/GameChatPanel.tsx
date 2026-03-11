@@ -24,9 +24,8 @@ export function GameChatPanel({ roomId, isFinalStage }: GameChatPanelProps) {
   useEffect(() => {
     connect(roomId);
     return () => {
-      if (isFinalStage) {
-        disconnect();
-      }
+      // 항상 언마운트 시 소켓 정리 (이전: isFinalStage일 때만 정리)
+      disconnect();
     };
   }, [roomId]); // eslint-disable-line react-hooks/exhaustive-deps
 

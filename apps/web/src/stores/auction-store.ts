@@ -275,8 +275,16 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
       }));
     });
 
+    // player-sold는 bid-resolved 직후에 도착하므로,
+    // bid-resolved가 이미 teams/players를 갱신한 경우 중복 처리 방지 (no-op)
+    // bid-resolved에 teams/players가 없는 레거시 호환용으로만 동작
     auctionSocketHelpers.onPlayerSold((data: any) => {
       set((state) => {
+        // bid-resolved가 이미 lastSoldEvent를 설정했으면 중복 처리 스킵
+        if (state.lastSoldEvent && Date.now() - state.lastSoldEvent.timestamp < 2000) {
+          return state;
+        }
+
         const nextPlayers = data?.player
           ? state.players.filter((p) => p.id !== data.player.id)
           : state.players;
@@ -352,13 +360,20 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
           updates.teams = nextTeams.map(t =>
             t.id === data.team.id ? { ...t, ...data.team } : t
           );
-          // 낙찰 피드백 정보 저장
-          updates.lastSoldEvent = {
+          // 낙찰 피드백 정보 저장 (5초 후 자동 클리어)
+          const soldEvent = {
             playerName: data.player?.username ?? '???',
             teamName: data.team?.name ?? '???',
             price: data.price ?? 0,
             timestamp: Date.now(),
           };
+          updates.lastSoldEvent = soldEvent;
+          setTimeout(() => {
+            // 다른 이벤트로 교체되지 않았을 때만 클리어
+            if (get().lastSoldEvent?.timestamp === soldEvent.timestamp) {
+              set({ lastSoldEvent: null });
+            }
+          }, 5000);
         }
 
         // 다음 선수 구분 마커 삽입

@@ -13,6 +13,99 @@ import { GameChatPanel } from "@/components/domain/GameChatPanel";
 import { cn } from "@/lib/utils";
 import { Users, Hand, Check, Coins, ScrollText, Gavel } from "lucide-react";
 
+/** 대기 선수 목록 (데스크톱 사이드바 & 모바일 탭에서 공유) */
+function PlayersList({ players, currentPlayerId }: { players: any[]; currentPlayerId?: string }) {
+  return (
+    <>
+      <h3 className="text-sm font-semibold text-text-primary mb-3 flex items-center gap-1.5">
+        <Users className="w-4 h-4" />
+        대기 선수 ({players.length})
+      </h3>
+      <div className="space-y-1.5 max-h-[calc(100vh-220px)] overflow-y-auto">
+        {players.length === 0 ? (
+          <p className="text-xs text-text-tertiary text-center py-4">모든 선수가 배정되었습니다</p>
+        ) : (
+          players.map((player, idx) => {
+            const isCurrentTarget = currentPlayerId === player.id;
+            return (
+              <div
+                key={player.id}
+                className={`flex items-center gap-2 p-2 rounded-lg transition-colors ${
+                  isCurrentTarget
+                    ? "bg-accent-primary/10 border border-accent-primary/30"
+                    : "bg-bg-secondary hover:bg-bg-tertiary"
+                }`}
+              >
+                <span className="text-[10px] text-text-tertiary w-4 text-center flex-shrink-0">
+                  {idx + 1}
+                </span>
+                <div className="w-7 h-7 rounded-full bg-bg-tertiary flex items-center justify-center text-xs font-bold text-text-primary flex-shrink-0">
+                  {player.username[0]}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-text-primary truncate">
+                    {player.username}
+                  </p>
+                  <div className="flex items-center gap-1">
+                    <TierBadge tier={player.tier} size="sm" showIcon={false} />
+                    {player.mmr !== undefined && (
+                      <span className="text-[10px] font-mono text-text-muted">{player.mmr}</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </>
+  );
+}
+
+/** 입찰 로그 (데스크톱 사이드바 & 모바일 탭에서 공유) */
+function BidLog({ bidHistory, logEndRef }: { bidHistory: any[]; logEndRef: React.RefObject<HTMLDivElement> }) {
+  return (
+    <>
+      <h3 className="text-sm font-semibold text-text-primary mb-3 flex items-center gap-1.5">
+        <ScrollText className="w-4 h-4" />
+        입찰 내역
+      </h3>
+      <div className="space-y-1 max-h-[calc(100vh-220px)] overflow-y-auto">
+        {bidHistory.length === 0 ? (
+          <p className="text-xs text-text-tertiary text-center py-4">아직 입찰이 없습니다</p>
+        ) : (
+          bidHistory.map((entry, idx) =>
+            entry.isSeparator ? (
+              <div key={idx} className="flex items-center gap-2 py-1.5 my-1">
+                <div className="flex-1 h-px bg-bg-tertiary" />
+                <span className="text-[10px] font-medium text-accent-primary px-1.5">
+                  {entry.playerLabel}
+                </span>
+                <div className="flex-1 h-px bg-bg-tertiary" />
+              </div>
+            ) : (
+              <div key={idx} className="flex items-center gap-2 p-1.5 text-xs">
+                <span className="text-text-tertiary font-mono text-[10px] flex-shrink-0">
+                  {new Date(entry.timestamp).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                </span>
+                <span className="text-text-primary font-medium truncate">
+                  {entry.username}
+                </span>
+                <span className="text-text-tertiary">→</span>
+                <span className="text-accent-gold font-bold flex items-center gap-0.5 flex-shrink-0">
+                  <Coins className="w-3 h-3" />
+                  {entry.amount.toLocaleString()}G
+                </span>
+              </div>
+            )
+          )
+        )}
+        <div ref={logEndRef} />
+      </div>
+    </>
+  );
+}
+
 export default function AuctionRoomPage() {
   const params = useParams();
   const router = useRouter();
@@ -327,6 +420,7 @@ export default function AuctionRoomPage() {
               variant="primary"
               onClick={() => {
                 hasRedirected.current = true;
+                setCompleteCountdown(0);
                 router.push(`/role-selection/${auctionId}`);
               }}
             >
@@ -358,99 +452,14 @@ export default function AuctionRoomPage() {
     );
   }
 
-  // 대기 선수 목록 컴포넌트 (데스크톱 사이드바 & 모바일 탭에서 공유)
-  const PlayersList = () => (
-    <>
-      <h3 className="text-sm font-semibold text-text-primary mb-3 flex items-center gap-1.5">
-        <Users className="w-4 h-4" />
-        대기 선수 ({players.length})
-      </h3>
-      <div className="space-y-1.5 max-h-[calc(100vh-220px)] overflow-y-auto">
-        {players.length === 0 ? (
-          <p className="text-xs text-text-tertiary text-center py-4">모든 선수가 배정되었습니다</p>
-        ) : (
-          players.map((player, idx) => {
-            const isCurrentTarget = auctionState.currentPlayer?.id === player.id;
-            return (
-              <div
-                key={player.id}
-                className={`flex items-center gap-2 p-2 rounded-lg transition-colors ${
-                  isCurrentTarget
-                    ? "bg-accent-primary/10 border border-accent-primary/30"
-                    : "bg-bg-secondary hover:bg-bg-tertiary"
-                }`}
-              >
-                <span className="text-[10px] text-text-tertiary w-4 text-center flex-shrink-0">
-                  {idx + 1}
-                </span>
-                <div className="w-7 h-7 rounded-full bg-bg-tertiary flex items-center justify-center text-xs font-bold text-text-primary flex-shrink-0">
-                  {player.username[0]}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-text-primary truncate">
-                    {player.username}
-                  </p>
-                  <div className="flex items-center gap-1">
-                    <TierBadge tier={player.tier} size="sm" showIcon={false} />
-                    {player.mmr !== undefined && (
-                      <span className="text-[10px] font-mono text-text-muted">{player.mmr}</span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })
-        )}
-      </div>
-    </>
-  );
-
-  // 입찰 로그 컴포넌트 (데스크톱 사이드바 & 모바일 탭에서 공유)
-  const BidLog = () => (
-    <>
-      <h3 className="text-sm font-semibold text-text-primary mb-3 flex items-center gap-1.5">
-        <ScrollText className="w-4 h-4" />
-        입찰 내역
-      </h3>
-      <div className="space-y-1 max-h-[calc(100vh-220px)] overflow-y-auto">
-        {bidHistory.length === 0 ? (
-          <p className="text-xs text-text-tertiary text-center py-4">아직 입찰이 없습니다</p>
-        ) : (
-          bidHistory.map((entry, idx) =>
-            entry.isSeparator ? (
-              <div key={idx} className="flex items-center gap-2 py-1.5 my-1">
-                <div className="flex-1 h-px bg-bg-tertiary" />
-                <span className="text-[10px] font-medium text-accent-primary px-1.5">
-                  {entry.playerLabel}
-                </span>
-                <div className="flex-1 h-px bg-bg-tertiary" />
-              </div>
-            ) : (
-              <div key={idx} className="flex items-center gap-2 p-1.5 text-xs">
-                <span className="text-text-tertiary font-mono text-[10px] flex-shrink-0">
-                  {new Date(entry.timestamp).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
-                </span>
-                <span className="text-text-primary font-medium truncate">
-                  {entry.username}
-                </span>
-                <span className="text-text-tertiary">→</span>
-                <span className="text-accent-gold font-bold flex items-center gap-0.5 flex-shrink-0">
-                  <Coins className="w-3 h-3" />
-                  {entry.amount.toLocaleString()}G
-                </span>
-              </div>
-            )
-          )
-        )}
-        <div ref={logEndRef} />
-      </div>
-    </>
-  );
-
   // 현재 유저가 캡틴인지 (모바일 하단 입찰 패널 표시 여부 판단)
   const myTeam = teams.find((t) => t.captainId === user?.id);
   const isCaptainTurn = Boolean(myTeam) && auctionState.status === "IN_PROGRESS";
-  const isAlreadyHighest = !!auctionState.currentHighestBidder && auctionState.currentHighestBidder === user?.id;
+  // currentHighestBidder는 teamId 또는 userId일 수 있음 — 둘 다 체크
+  const isAlreadyHighest = !!auctionState.currentHighestBidder && (
+    auctionState.currentHighestBidder === user?.id ||
+    auctionState.currentHighestBidder === myTeam?.id
+  );
 
   return (
     <div className="flex-grow p-4 md:p-6 relative">
@@ -516,7 +525,7 @@ export default function AuctionRoomPage() {
           <div>
             <Card>
               <CardContent className="p-3">
-                <PlayersList />
+                <PlayersList players={players} currentPlayerId={auctionState.currentPlayer?.id} />
               </CardContent>
             </Card>
           </div>
@@ -538,7 +547,7 @@ export default function AuctionRoomPage() {
           <div>
             <Card>
               <CardContent className="p-3">
-                <BidLog />
+                <BidLog bidHistory={bidHistory} logEndRef={logEndRef} />
               </CardContent>
             </Card>
           </div>
@@ -561,14 +570,14 @@ export default function AuctionRoomPage() {
           {mobileTab === "players" && (
             <Card>
               <CardContent className="p-3">
-                <PlayersList />
+                <PlayersList players={players} currentPlayerId={auctionState.currentPlayer?.id} />
               </CardContent>
             </Card>
           )}
           {mobileTab === "log" && (
             <Card>
               <CardContent className="p-3">
-                <BidLog />
+                <BidLog bidHistory={bidHistory} logEndRef={logEndRef} />
               </CardContent>
             </Card>
           )}

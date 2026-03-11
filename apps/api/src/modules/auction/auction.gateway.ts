@@ -615,8 +615,7 @@ export class AuctionGateway
     }
   }
 
-  /** 봇 자동입찰 실행 (최소 입찰 단위로 입찰) */
-  /** Handle a bot auto-bid at minimum valid increment. */
+  /** 봇 자동입찰 실행 (최소 입찰 단위로 입찰, 방별 mutex 사용) */
   private async _autoBotBid(
     roomId: string,
     botCaptainId: string,
@@ -644,7 +643,20 @@ export class AuctionGateway
     if (bot.memberCount >= 5) return;
     if (minBid > bot.availableToBid) return;
 
+    // resolve 진행 중이면 봇 입찰도 차단
+    if (this.resolvingRooms.has(roomId)) return;
+
+    // 방별 mutex — handleBid와 동일한 lock 사용
+    const prevLock = this.bidLocks.get(roomId) ?? Promise.resolve();
+    let releaseLock: () => void;
+    const lockPromise = new Promise<void>((resolve) => {
+      releaseLock = resolve;
+    });
+    this.bidLocks.set(roomId, lockPromise);
+
     try {
+      await prevLock;
+
       const newState = await this.auctionService.placeBid(
         botCaptainId,
         roomId,
@@ -664,6 +676,11 @@ export class AuctionGateway
       console.log(`[BotBid] ${botUsername} bid ${minBid}G in room ${roomId}`);
     } catch {
       // Ignore races such as timer expiry or stale state.
+    } finally {
+      releaseLock!();
+      if (this.bidLocks.get(roomId) === lockPromise) {
+        this.bidLocks.delete(roomId);
+      }
     }
   }
 
