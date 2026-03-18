@@ -26,21 +26,21 @@ interface AuthState {
 }
 
 // ============================================================
-// localStorage 캐시 헬퍼 (토큰이 아닌 유저 정보만 저장)
+// sessionStorage 캐시 헬퍼 (토큰이 아닌 유저 정보만 저장)
 // → 새로고침 시 헤더에 유저 이름이 즉시 표시됨 (플래시 방지)
+// → sessionStorage 사용: 탭/브라우저 종료 시 자동 삭제되어 공유 PC 안전
+// → role 필드 제외: 캐시된 role로 admin 메뉴가 잠시 노출되는 문제 방지
 // ============================================================
 const STORAGE_KEY = "nexus_auth_user";
 
 function saveUserToStorage(user: User) {
   try {
-    localStorage.setItem(
+    sessionStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({
         id: user.id,
         username: user.username,
         avatar: user.avatar,
-        role: user.role,
-        email: user.email,
       })
     );
   } catch {}
@@ -48,7 +48,7 @@ function saveUserToStorage(user: User) {
 
 function loadUserFromStorage(): User | null {
   try {
-    const data = localStorage.getItem(STORAGE_KEY);
+    const data = sessionStorage.getItem(STORAGE_KEY);
     return data ? (JSON.parse(data) as User) : null;
   } catch {
     return null;
@@ -57,6 +57,8 @@ function loadUserFromStorage(): User | null {
 
 function clearUserFromStorage() {
   try {
+    sessionStorage.removeItem(STORAGE_KEY);
+    // 기존 localStorage 캐시가 남아있을 수 있으므로 정리
     localStorage.removeItem(STORAGE_KEY);
   } catch {}
 }

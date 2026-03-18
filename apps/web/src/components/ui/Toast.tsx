@@ -2,8 +2,9 @@
 
 import { cn } from '@/lib/utils';
 import { X, CheckCircle, AlertCircle, AlertTriangle, Info } from 'lucide-react';
-import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { useToastStore } from '@/stores/toast-store';
 
 type ToastVariant = 'success' | 'error' | 'warning' | 'info';
 
@@ -14,50 +15,23 @@ interface Toast {
   duration?: number;
 }
 
-interface ToastContextValue {
-  toasts: Toast[];
-  addToast: (message: string, variant?: ToastVariant, duration?: number) => void;
-  removeToast: (id: string) => void;
-}
-
-const ToastContext = createContext<ToastContextValue | undefined>(undefined);
-
+// 기존 useToast() 호환성 유지 — 내부적으로 toast-store 사용
 export function useToast() {
-  const context = useContext(ToastContext);
-  if (!context) {
-    throw new Error('useToast must be used within a ToastProvider');
-  }
-  return context;
+  const { toasts, addToast, removeToast } = useToastStore();
+  return { toasts, addToast, removeToast };
 }
 
 export function ToastProvider({ children }: { children: ReactNode }) {
-  const [toasts, setToasts] = useState<Toast[]>([]);
-
-  const addToast = useCallback((message: string, variant: ToastVariant = 'info', duration = 5000) => {
-    const id = Math.random().toString(36).slice(2);
-    setToasts((prev) => [...prev, { id, message, variant, duration }]);
-
-    if (duration > 0) {
-      setTimeout(() => {
-        setToasts((prev) => prev.filter((t) => t.id !== id));
-      }, duration);
-    }
-  }, []);
-
-  const removeToast = useCallback((id: string) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
-  }, []);
-
   return (
-    <ToastContext.Provider value={{ toasts, addToast, removeToast }}>
+    <>
       {children}
       <ToastContainer />
-    </ToastContext.Provider>
+    </>
   );
 }
 
 function ToastContainer() {
-  const { toasts, removeToast } = useToast();
+  const { toasts, removeToast } = useToastStore();
 
   if (typeof window === 'undefined' || toasts.length === 0) return null;
 

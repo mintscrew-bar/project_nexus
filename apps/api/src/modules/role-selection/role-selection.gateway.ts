@@ -84,14 +84,12 @@ export class RoleSelectionGateway
 
       client.userId = payload.sub;
       client.username = payload.username;
-      console.log(`Role selection client connected: ${client.username}`);
     } catch (_error) {
       client.disconnect();
     }
   }
 
   handleDisconnect(client: AuthenticatedSocket) {
-    console.log(`Role selection client disconnected: ${client.username}`);
     this.connectedUsers.delete(client.id);
   }
 
@@ -196,9 +194,6 @@ export class RoleSelectionGateway
               !this.roomTimers.has(roomId) &&
               !this.completingRooms.has(roomId)
             ) {
-              console.log(
-                `[RoleSelection] Restarting timer for retry in room ${roomId}`,
-              );
               this.startTimer(roomId);
             }
           });
@@ -239,9 +234,6 @@ export class RoleSelectionGateway
   async completeRoleSelection(roomId: string) {
     // Prevent duplicate completion (timer expiry + all-roles-selected can race)
     if (this.completingRooms.has(roomId)) {
-      console.log(
-        `[RoleSelection] Already completing room ${roomId}, skipping`,
-      );
       return;
     }
     this.completingRooms.add(roomId);

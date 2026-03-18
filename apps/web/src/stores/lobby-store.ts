@@ -213,7 +213,7 @@ export const useLobbyStore = create<LobbyStoreState>((set, get) => ({
     });
 
     socket.on('all-ready', () => {
-      console.log('All players ready!');
+      // 모든 플레이어 준비 완료 이벤트 수신
     });
 
     socket.on('game-starting', (data: { roomId: string; teamMode: string }) => {

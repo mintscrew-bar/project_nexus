@@ -91,14 +91,12 @@ export class SnakeDraftGateway
 
       client.userId = payload.sub;
       client.username = payload.username;
-      console.log(`Snake Draft client connected: ${client.username}`);
     } catch (_error) {
       client.disconnect();
     }
   }
 
   async handleDisconnect(client: AuthenticatedSocket) {
-    console.log(`Snake Draft client disconnected: ${client.username}`);
     const trackedUser = this.connectedUsers.get(client.id);
     this.connectedUsers.delete(client.id);
 

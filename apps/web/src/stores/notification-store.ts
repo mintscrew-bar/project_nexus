@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { toast } from "@/stores/toast-store";
 import { notificationApi } from "@/lib/api-client";
 import {
   connectNotificationSocket,
@@ -83,6 +84,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       const notifications = await notificationApi.getNotifications(limit, offset);
       set({ notifications, isLoading: false });
     } catch (error) {
+      toast.error("알림을 불러오지 못했습니다.");
       console.error("Failed to fetch notifications:", error);
       set({ isLoading: false });
     }
@@ -93,6 +95,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       const { count } = await notificationApi.getUnreadCount();
       set({ unreadCount: count });
     } catch (error) {
+      toast.error("읽지 않은 알림 수를 확인할 수 없습니다.");
       console.error("Failed to fetch unread count:", error);
     }
   },
@@ -110,6 +113,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
         };
       });
     } catch (error) {
+      toast.error("알림 읽음 처리에 실패했습니다.");
       console.error("Failed to mark notification as read:", error);
     }
   },
@@ -122,6 +126,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
         unreadCount: 0,
       }));
     } catch (error) {
+      toast.error("전체 읽음 처리에 실패했습니다.");
       console.error("Failed to mark all notifications as read:", error);
     }
   },
@@ -133,6 +138,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
         notifications: state.notifications.filter((n) => n.id !== notificationId),
       }));
     } catch (error) {
+      toast.error("알림 삭제에 실패했습니다.");
       console.error("Failed to delete notification:", error);
     }
   },
@@ -144,6 +150,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
         notifications: state.notifications.filter((n) => !n.isRead),
       }));
     } catch (error) {
+      toast.error("읽은 알림 삭제에 실패했습니다.");
       console.error("Failed to delete read notifications:", error);
     }
   },

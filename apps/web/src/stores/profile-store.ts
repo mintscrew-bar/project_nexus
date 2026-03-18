@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { userApi, matchApi } from '@/lib/api-client';
+import { toast } from '@/stores/toast-store';
 
 export interface ProfileStats {
   gamesPlayed: number;
@@ -48,6 +49,7 @@ export const useProfileStore = create<ProfileStoreState>((set, get) => ({
       const data = await userApi.getStats();
       set({ stats: data, statsLoaded: true, statsLoading: false });
     } catch (error) {
+      toast.error("전적 정보를 불러오지 못했습니다.");
       console.error('Failed to fetch stats:', error);
       set({ statsLoading: false });
     }
@@ -60,6 +62,7 @@ export const useProfileStore = create<ProfileStoreState>((set, get) => ({
       const data = await matchApi.getUserMatches({ limit: 5 });
       set({ recentMatches: data, matchesLoaded: true, matchesLoading: false });
     } catch (error) {
+      toast.error("최근 매치 정보를 불러오지 못했습니다.");
       console.error('Failed to fetch recent matches:', error);
       set({ matchesLoading: false });
     }

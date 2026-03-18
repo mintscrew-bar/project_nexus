@@ -246,7 +246,13 @@ export const useFriendStore = create<FriendStore>()(
         if (typeof window === 'undefined') return { getItem: () => null, setItem: () => {}, removeItem: () => {} };
         return localStorage;
       }),
-      partialize: (s) => ({ categories: s.categories, friendMeta: s.friendMeta, uncategorizedCollapsed: s.uncategorizedCollapsed }),
+      // 보안: friendMeta(닉네임·메모)는 민감 정보이므로 persist 제외
+      // → 공유 PC에서 친구 닉네임/메모가 localStorage에 남는 문제 방지
+      // → 카테고리 구조와 접기 상태만 유지 (개인정보 미포함)
+      partialize: (s) => ({
+        categories: s.categories,
+        uncategorizedCollapsed: s.uncategorizedCollapsed,
+      }),
     }
   )
 );

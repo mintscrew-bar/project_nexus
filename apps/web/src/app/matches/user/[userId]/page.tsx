@@ -56,7 +56,7 @@ export default function UserStatsPage() {
           const accounts = await statsApi.getUserRiotAccounts(userId);
           setRiotAccounts(accounts);
         } catch (err) {
-          console.log("Failed to fetch Riot accounts:", err);
+          console.error("Failed to fetch Riot accounts:", err);
           setRiotAccounts([]);
         }
       } catch (err: any) {

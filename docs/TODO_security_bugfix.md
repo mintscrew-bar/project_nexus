@@ -112,17 +112,22 @@
 - [x] Task 28: lobby-store 소켓 관리 통합 (SKIP)
   - 이미 `removeAllListeners()` + `disconnect()` cleanup 구현 완료
 
-- [ ] Task 29: API 호출 에러 핸들링 사용자 피드백 추가
-  - `notification-store.ts`, `presence-store.ts`, `profile-store.ts` 등
-  - 에러를 console.error만으로 처리, UI 피드백 없음
+- [x] Task 29: API 호출 에러 핸들링 사용자 피드백 추가
+  - Zustand 기반 `toast-store.ts` 생성 (React Context 없이 스토어에서 직접 호출 가능)
+  - `Toast.tsx`를 toast-store 연동으로 전환
+  - `notification-store.ts` 6개, `presence-store.ts` 2개, `profile-store.ts` 2개 catch 블록에 toast 에러 알림 추가
 
-- [ ] Task 30: 프로덕션 console.log 정리
-  - 23개 파일, 80회 console 호출 — 프로덕션 환경에서 내부 정보 노출
+- [x] Task 30: 프로덕션 console.log 정리
+  - API: 6개 Gateway 파일에서 불필요한 console.log 제거 (connect/disconnect 로깅 등)
+  - Web: `socket-client.ts` 72줄 삭제 (8개 소켓 connect/disconnect 로그), 기타 스토어 정리
+  - `console.error`는 디버깅용으로 유지
 
-- [ ] Task 31: localStorage 민감 정보 최소화
-  - `auth-store.ts` — role 캐시로 admin 메뉴 잠시 노출 가능
-  - `friend-store.ts` — 친구 닉네임/메모가 공유 PC에서 노출
+- [x] Task 31: localStorage 민감 정보 최소화
+  - `auth-store.ts`: localStorage → sessionStorage 전환 (탭/브라우저 종료 시 자동 삭제)
+  - role, email 필드 캐시에서 제외 (admin 메뉴 잠시 노출 방지)
+  - 기존 localStorage 캐시 정리 로직 추가
+  - `friend-store.ts`: 친구 목록 localStorage 캐시 제거
 
 ---
 
-**Last Updated**: 2026-03-11
+**Last Updated**: 2026-03-19

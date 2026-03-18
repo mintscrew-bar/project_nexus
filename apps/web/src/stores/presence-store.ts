@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { presenceApi } from "@/lib/api-client";
+import { toast } from "@/stores/toast-store";
 import {
   connectPresenceSocket,
   disconnectPresenceSocket,
@@ -93,6 +94,7 @@ export const usePresenceStore = create<PresenceStoreState>((set, get) => ({
       // Also update via WebSocket for real-time sync
       presenceSocketHelpers.setStatus(status);
     } catch (error) {
+      toast.error("상태 변경에 실패했습니다.");
       console.error("Failed to update status:", error);
     }
   },
@@ -115,6 +117,7 @@ export const usePresenceStore = create<PresenceStoreState>((set, get) => ({
 
       set({ friendStatuses: statusMap, isLoading: false });
     } catch (error) {
+      toast.error("친구 상태를 불러오지 못했습니다.");
       console.error("Failed to fetch friends statuses:", error);
       set({ isLoading: false });
     }

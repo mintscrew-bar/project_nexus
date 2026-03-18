@@ -38,14 +38,6 @@ export const connectRoomSocket = () => {
     randomizationFactor: 0.5,
   });
 
-  roomSocket.on("connect", () => {
-    console.log("✅ Room Socket Connected");
-  });
-
-  roomSocket.on("disconnect", () => {
-    console.log("❌ Room Socket Disconnected");
-  });
-
   roomSocket.on("connect_error", (error) => {
     console.error("Room Socket Connect Error:", error.message);
   });
@@ -72,14 +64,6 @@ export const connectAuctionSocket = () => {
     reconnectionDelay: 1000,
     reconnectionDelayMax: 10000,
     randomizationFactor: 0.5,
-  });
-
-  auctionSocket.on("connect", () => {
-    console.log("✅ Auction Socket Connected");
-  });
-
-  auctionSocket.on("disconnect", () => {
-    console.log("❌ Auction Socket Disconnected");
   });
 
   auctionSocket.on("connect_error", (error) => {
@@ -111,14 +95,6 @@ export const connectSnakeDraftSocket = () => {
     randomizationFactor: 0.5,
   });
 
-  snakeDraftSocket.on("connect", () => {
-    console.log("✅ Snake Draft Socket Connected");
-  });
-
-  snakeDraftSocket.on("disconnect", () => {
-    console.log("❌ Snake Draft Socket Disconnected");
-  });
-
   snakeDraftSocket.on("connect_error", (error) => {
     console.error("Snake Draft Socket Connect Error:", error.message);
   });
@@ -144,14 +120,6 @@ export const connectMatchSocket = () => {
     randomizationFactor: 0.5,
   });
 
-  matchSocket.on("connect", () => {
-    console.log("✅ Match Socket Connected");
-  });
-
-  matchSocket.on("disconnect", () => {
-    console.log("❌ Match Socket Disconnected");
-  });
-
   matchSocket.on("connect_error", (error) => {
     console.error("Match Socket Connect Error:", error.message);
   });
@@ -175,14 +143,6 @@ export const connectClanSocket = () => {
     reconnectionDelay: 1000,
     reconnectionDelayMax: 10000,
     randomizationFactor: 0.5,
-  });
-
-  clanSocket.on("connect", () => {
-    console.log("✅ Clan Socket Connected");
-  });
-
-  clanSocket.on("disconnect", () => {
-    console.log("❌ Clan Socket Disconnected");
   });
 
   clanSocket.on("connect_error", (error) => {
@@ -691,14 +651,6 @@ export const connectPresenceSocket = () => {
     randomizationFactor: 0.5,
   });
 
-  presenceSocket.on("connect", () => {
-    console.log("✅ Presence Socket Connected");
-  });
-
-  presenceSocket.on("disconnect", () => {
-    console.log("❌ Presence Socket Disconnected");
-  });
-
   presenceSocket.on("connect_error", (error) => {
     console.error("Presence Socket Connect Error:", error.message);
   });
@@ -858,14 +810,6 @@ export const connectNotificationSocket = () => {
     randomizationFactor: 0.5,
   });
 
-  notificationSocket.on("connect", () => {
-    console.log("✅ Notification Socket Connected");
-  });
-
-  notificationSocket.on("disconnect", () => {
-    console.log("❌ Notification Socket Disconnected");
-  });
-
   notificationSocket.on("connect_error", (error) => {
     console.error("Notification Socket Connect Error:", error.message);
   });
@@ -914,14 +858,6 @@ export const connectDmSocket = () => {
     reconnectionDelay: 1000,
     reconnectionDelayMax: 10000,
     randomizationFactor: 0.5,
-  });
-
-  dmSocket.on("connect", () => {
-    console.log("✅ DM Socket Connected");
-  });
-
-  dmSocket.on("disconnect", () => {
-    console.log("❌ DM Socket Disconnected");
   });
 
   dmSocket.on("connect_error", (error) => {
@@ -1077,14 +1013,6 @@ export const connectRoleSelectionSocket = () => {
     reconnectionDelay: 1000,
     reconnectionDelayMax: 10000,
     randomizationFactor: 0.5,
-  });
-
-  roleSelectionSocket.on("connect", () => {
-    console.log("Role selection socket connected");
-  });
-
-  roleSelectionSocket.on("disconnect", () => {
-    console.log("Role selection socket disconnected");
   });
 
   roleSelectionSocket.on("connect_error", (error) => {

@@ -73,11 +73,6 @@ export class ClanGateway implements OnGatewayConnection, OnGatewayDisconnect, On
       const userClan = await this.clanService.getUserClan(payload.sub);
       if (userClan) {
         client.join(`clan:${userClan.id}`);
-        console.log(
-          `Clan client connected: ${client.username} (joined clan:${userClan.id})`,
-        );
-      } else {
-        console.log(`Clan client connected: ${client.username} (no clan)`);
       }
     } catch (_error) {
       client.disconnect();
@@ -93,7 +88,6 @@ export class ClanGateway implements OnGatewayConnection, OnGatewayDisconnect, On
         }
       });
     }
-    console.log(`Clan client disconnected: ${client.username}`);
   }
 
   @SubscribeMessage("join-clan-chat")

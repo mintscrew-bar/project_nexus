@@ -55,14 +55,13 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       client.userId = payload.sub;
       client.username = payload.username;
-      console.log(`Match client connected: ${client.username}`);
     } catch (_error) {
       client.disconnect();
     }
   }
 
-  handleDisconnect(client: AuthenticatedSocket) {
-    console.log(`Match client disconnected: ${client.username}`);
+  handleDisconnect(_client: AuthenticatedSocket) {
+    // no-op
   }
 
   @SubscribeMessage("join-match")

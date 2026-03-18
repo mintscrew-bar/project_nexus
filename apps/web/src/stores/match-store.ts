@@ -221,7 +221,6 @@ export const useMatchStore = create<MatchStoreState>((set, get) => ({
     };
 
     socket.on('connect', () => {
-      console.log('Connected to match socket');
       set({ isConnected: true, error: null, roomId });
       joinBracket();
     });
@@ -232,7 +231,6 @@ export const useMatchStore = create<MatchStoreState>((set, get) => ({
     });
 
     socket.on('disconnect', () => {
-      console.log('Disconnected from match socket');
       set({ isConnected: false });
     });
 
@@ -263,7 +261,7 @@ export const useMatchStore = create<MatchStoreState>((set, get) => ({
     });
 
     matchSocketHelpers.onBracketComplete(() => {
-      console.log('Tournament complete!');
+      // 토너먼트 완료 이벤트 수신
     });
 
     matchSocketHelpers.onTournamentCompleted((data: { standings: TeamStanding[]; completedAt: string }) => {
@@ -314,7 +312,6 @@ export const useMatchStore = create<MatchStoreState>((set, get) => ({
     };
 
     socket.on('connect', () => {
-      console.log('Connected to match socket');
       set({ isConnected: true, error: null });
       joinMatch();
     });
@@ -325,7 +322,6 @@ export const useMatchStore = create<MatchStoreState>((set, get) => ({
     });
 
     socket.on('disconnect', () => {
-      console.log('Disconnected from match socket');
       set({ isConnected: false });
     });
 

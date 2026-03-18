@@ -3,12 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 const API_URL = process.env.API_URL || "http://localhost:4000";
 
 export async function POST(request: NextRequest) {
-  // Log raw Cookie header and parsed cookie for debugging
-  const rawCookieHeader = request.headers.get("cookie");
-  console.log("Incoming /api/auth/refresh raw Cookie header:", rawCookieHeader);
-
   const refreshToken = request.cookies.get("refresh_token")?.value;
-  console.log("Parsed refresh_token from request.cookies:", refreshToken);
 
   if (!refreshToken) {
     return NextResponse.json({ message: "No refresh token" }, { status: 401 });
@@ -25,8 +20,6 @@ export async function POST(request: NextRequest) {
       credentials: "include",
     });
 
-    // Log backend response status and headers to help diagnose 500 errors
-    console.log("Backend /api/auth/refresh status:", backendResponse.status);
     try {
       // Attempt to read JSON body (may fail if backend returns non-JSON)
       const responseData = await backendResponse.json().catch(() => ({}));

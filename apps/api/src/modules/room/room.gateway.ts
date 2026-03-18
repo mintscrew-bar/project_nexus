@@ -100,9 +100,8 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect, On
       }
       this.userSockets.get(payload.sub)!.add(client.id);
 
-      console.log(`User ${payload.username} connected (${client.id})`);
     } catch (error) {
-      console.error("Connection error:", error);
+      // 연결 실패 시 조용히 연결 해제
       client.disconnect();
     }
   }
@@ -135,16 +134,12 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect, On
               await this.roomService.leaveRoom(client.userId!, roomId); // Assert client.userId is string
               _autoLeft = true;
               shouldNotifyOthers = true;
-            } catch (leaveError: any) {
-              // leaveRoom 실패 (이미 나갔거나, 상태가 변경됨)
-              console.log(
-                `LeaveRoom failed in handleDisconnect: ${leaveError.message}`,
-              );
+            } catch (_leaveError: any) {
+              // leaveRoom 실패 (이미 나갔거나, 상태가 변경됨) — 무시
             }
           }
-        } catch (error) {
+        } catch (_error) {
           // Room might already be deleted or user not in room, ignore
-          console.log(`Leave room on disconnect error:`, error);
         }
 
         // 소켓 방은 항상 나가기 (DB 상태와 무관)
@@ -166,7 +161,6 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect, On
         this.stopTyping(roomId, client.userId!); // Assert client.userId is string
       }
 
-      console.log(`User ${client.username} disconnected (${client.id})`);
     }
   }
 
