@@ -24,6 +24,9 @@ import {
   JoinByCodeDto,
   InviteUserDto,
   ResolveDto,
+  ListClansQueryDto,
+  ClanCursorQueryDto,
+  ClanActivityQueryDto,
 } from "./dto";
 import { ClanGateway } from "./clan.gateway";
 
@@ -50,17 +53,12 @@ export class ClanController {
 
   @Get()
   @Public()
-  async listClans(
-    @Query("search") search?: string,
-    @Query("isRecruiting") isRecruiting?: string,
-    @Query("minTier") minTier?: string,
-    @Query("sort") sort?: string,
-  ) {
+  async listClans(@Query() query: ListClansQueryDto) {
     return this.clanService.listClans({
-      search,
-      isRecruiting: isRecruiting !== undefined ? isRecruiting === "true" : undefined,
-      minTier,
-      sort,
+      search: query.search,
+      isRecruiting: query.isRecruiting,
+      minTier: query.minTier,
+      sort: query.sort,
     });
   }
 
@@ -217,14 +215,13 @@ export class ClanController {
   async getChatMessages(
     @CurrentUser("sub") userId: string,
     @Param("id") clanId: string,
-    @Query("cursor") cursor?: string,
-    @Query("limit") limit?: string,
+    @Query() query: ClanCursorQueryDto,
   ) {
     return this.clanService.getChatMessages(
       userId,
       clanId,
-      cursor,
-      limit ? parseInt(limit, 10) : 50,
+      query.cursor,
+      query.limit,
     );
   }
 
@@ -418,14 +415,13 @@ export class ClanController {
   async getActivityLogs(
     @CurrentUser("sub") userId: string,
     @Param("id") clanId: string,
-    @Query("cursor") cursor?: string,
-    @Query("limit") limit?: string,
+    @Query() query: ClanActivityQueryDto,
   ) {
     return this.clanService.getActivityLogs(
       userId,
       clanId,
-      cursor,
-      limit ? parseInt(limit, 10) : 20,
+      query.cursor,
+      query.limit,
     );
   }
 

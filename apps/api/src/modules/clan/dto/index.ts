@@ -8,3 +8,8 @@ export {
   InviteUserDto,
   ResolveDto,
 } from "./clan-body.dto";
+export {
+  ListClansQueryDto,
+  ClanCursorQueryDto,
+  ClanActivityQueryDto,
+} from "./clan-query.dto";

@@ -13,6 +13,10 @@ import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { MatchService } from "./match.service";
 import { MatchGateway } from "./match.gateway";
+import {
+  UserMatchesQueryDto,
+  MatchHistoryQueryDto,
+} from "./dto/match-query.dto";
 
 @Controller("matches")
 @UseGuards(JwtAuthGuard)
@@ -29,14 +33,12 @@ export class MatchController {
   @Get("my")
   async getUserMatches(
     @CurrentUser("sub") userId: string,
-    @Query("status") status?: string,
-    @Query("limit") limit?: string,
-    @Query("offset") offset?: string,
+    @Query() query: UserMatchesQueryDto,
   ) {
     return this.matchService.getUserMatches(userId, {
-      status,
-      limit: limit ? parseInt(limit, 10) : undefined,
-      offset: offset ? parseInt(offset, 10) : undefined,
+      status: query.status,
+      limit: query.limit,
+      offset: query.offset,
     });
   }
 
@@ -172,13 +174,12 @@ export class MatchController {
   @Get("user/:userId/history")
   async getUserMatchHistory(
     @Param("userId") userId: string,
-    @Query("limit") limit?: string,
-    @Query("offset") offset?: string,
+    @Query() query: MatchHistoryQueryDto,
   ) {
     return this.matchService.getUserMatchHistory(
       userId,
-      limit ? parseInt(limit, 10) : 20,
-      offset ? parseInt(offset, 10) : 0,
+      query.limit ?? 20,
+      query.offset ?? 0,
     );
   }
 }

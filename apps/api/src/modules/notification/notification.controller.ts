@@ -12,6 +12,7 @@ import {
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { NotificationService } from "./notification.service";
+import { OffsetPaginationDto } from "@/common/dto/pagination.dto";
 
 @Controller("notifications")
 @UseGuards(JwtAuthGuard)
@@ -19,18 +20,17 @@ export class NotificationController {
   constructor(private readonly notificationService: NotificationService) {}
 
   /**
-   * Get user's notifications
+   * 사용자 알림 목록 조회
    */
   @Get()
   async getNotifications(
     @CurrentUser("sub") userId: string,
-    @Query("limit") limit?: string,
-    @Query("offset") offset?: string,
+    @Query() query: OffsetPaginationDto,
   ) {
     return this.notificationService.getByUserId(
       userId,
-      limit ? parseInt(limit, 10) : 20,
-      offset ? parseInt(offset, 10) : 0,
+      query.limit,
+      query.offset,
     );
   }
 

@@ -24,8 +24,15 @@ import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { UploadService } from "../upload/upload.service";
 import { CommunityService } from "./community.service";
-import { CreatePostDto, UpdatePostDto, CreateCommentDto, CreatePostReportDto } from "./dto";
-import { PostCategory } from "./community.types";
+import {
+  CreatePostDto,
+  UpdatePostDto,
+  CreateCommentDto,
+  CreatePostReportDto,
+  ListPostsQueryDto,
+  LimitQueryDto,
+} from "./dto";
+import { OffsetPaginationDto } from "@/common/dto/pagination.dto";
 import { UserRole } from "@nexus/database";
 
 @Controller("community")
@@ -50,32 +57,22 @@ export class CommunityController {
   }
 
   @Get("posts")
-  async listPosts(
-    @Query("category") category?: PostCategory,
-    @Query("search") search?: string,
-    @Query("authorId") authorId?: string,
-    @Query("tag") tag?: string,
-    @Query("limit") limit?: string,
-    @Query("offset") offset?: string,
-    @Query("sortBy") sortBy?: string,
-  ) {
+  async listPosts(@Query() query: ListPostsQueryDto) {
     return this.communityService.listPosts({
-      category,
-      search,
-      authorId,
-      tag,
-      limit: limit ? parseInt(limit, 10) : 20,
-      offset: offset ? parseInt(offset, 10) : 0,
-      sortBy: sortBy as any,
+      category: query.category,
+      search: query.search,
+      authorId: query.authorId,
+      tag: query.tag,
+      limit: query.limit ?? 20,
+      offset: query.offset ?? 0,
+      sortBy: query.sortBy as any,
     });
   }
 
   // 인기 태그 조회
   @Get("tags/popular")
-  async getPopularTags(@Query("limit") limit?: string) {
-    return this.communityService.getPopularTags(
-      limit ? parseInt(limit, 10) : 20,
-    );
+  async getPopularTags(@Query() query: LimitQueryDto) {
+    return this.communityService.getPopularTags(query.limit ?? 20);
   }
 
   @Get("posts/:id")
@@ -265,13 +262,12 @@ export class CommunityController {
   @UseGuards(JwtAuthGuard)
   async getBookmarks(
     @CurrentUser("sub") userId: string,
-    @Query("limit") limit?: string,
-    @Query("offset") offset?: string,
+    @Query() query: OffsetPaginationDto,
   ) {
     return this.communityService.getUserBookmarks(
       userId,
-      limit ? parseInt(limit, 10) : 20,
-      offset ? parseInt(offset, 10) : 0,
+      query.limit ?? 20,
+      query.offset ?? 0,
     );
   }
 

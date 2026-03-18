@@ -15,14 +15,17 @@ import {
   forwardRef,
 } from "@nestjs/common";
 import { RoomService } from "./room.service";
-import { CreateRoomDto } from "./dto";
+import {
+  CreateRoomDto,
+  ListRoomsQueryDto,
+  ChatMessagesQueryDto,
+} from "./dto";
 import { SnakeDraftService } from "./snake-draft.service";
 import { SnakeDraftGateway } from "./snake-draft.gateway";
 import { RoomGateway } from "./room.gateway";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { Public } from "../auth/decorators/public.decorator";
-import { RoomStatus, TeamMode } from "@nexus/database";
 import { AuctionService } from "../auction/auction.service";
 import { AuctionGateway } from "../auction/auction.gateway";
 import { RoleSelectionService } from "../role-selection/role-selection.service";
@@ -68,16 +71,12 @@ export class RoomController {
 
   @Get()
   @Public()
-  async listRooms(
-    @Query("status") status?: RoomStatus,
-    @Query("teamMode") teamMode?: TeamMode,
-    @Query("includePrivate") includePrivate?: string,
-  ) {
+  async listRooms(@Query() query: ListRoomsQueryDto) {
     try {
       return await this.roomService.listRooms({
-        status,
-        teamMode,
-        includePrivate: includePrivate === "true",
+        status: query.status,
+        teamMode: query.teamMode,
+        includePrivate: query.includePrivate,
       });
     } catch (error) {
       const err = error as Error;
@@ -234,14 +233,11 @@ export class RoomController {
   async getChatMessages(
     @CurrentUser("sub") userId: string,
     @Param("id") roomId: string,
-    @Query("limit") limit?: string,
+    @Query() query: ChatMessagesQueryDto,
   ) {
     // 방 참여자만 채팅 메시지 조회 가능
     await this.roomService.assertParticipant(userId, roomId);
-    return this.roomService.getChatMessages(
-      roomId,
-      limit ? parseInt(limit, 10) : 50,
-    );
+    return this.roomService.getChatMessages(roomId, query.limit ?? 50);
   }
 
   @Post(":id/messages")

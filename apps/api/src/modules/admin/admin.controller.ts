@@ -19,6 +19,13 @@ import { Roles } from "../auth/decorators/roles.decorator";
 import { UserRole } from "@nexus/database";
 import { RoomGateway } from "../room/room.gateway";
 import { RoomService } from "../room/room.service";
+import {
+  AdminPageQueryDto,
+  AdminReportsQueryDto,
+  AdminChatLogsQueryDto,
+  AdminRoomsQueryDto,
+  AdminAppealsQueryDto,
+} from "./dto/admin-query.dto";
 
 @Controller("admin")
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -41,15 +48,11 @@ export class AdminController {
   // ── Users (ADMIN only) ──────────────────────────────────────────────────────
   @Get("users")
   @Roles(UserRole.ADMIN)
-  getUsers(
-    @Query("page") page = "1",
-    @Query("limit") limit = "20",
-    @Query("search") search?: string,
-  ) {
+  getUsers(@Query() query: AdminPageQueryDto) {
     return this.adminService.getUsers({
-      page: parseInt(page),
-      limit: parseInt(limit),
-      search,
+      page: query.page,
+      limit: query.limit,
+      search: query.search,
     });
   }
 
@@ -107,17 +110,12 @@ export class AdminController {
   // ── Reports (ADMIN + MODERATOR) ──────────────────────────────────────────
   @Get("reports")
   @Roles(UserRole.ADMIN, UserRole.MODERATOR)
-  getReports(
-    @Query("page") page = "1",
-    @Query("limit") limit = "20",
-    @Query("status") status?: string,
-    @Query("category") category?: string,
-  ) {
+  getReports(@Query() query: AdminReportsQueryDto) {
     return this.adminService.getReports({
-      page: parseInt(page),
-      limit: parseInt(limit),
-      status,
-      category: category as "user" | "post" | undefined,
+      page: query.page,
+      limit: query.limit,
+      status: query.status,
+      category: query.category as "user" | "post" | undefined,
     });
   }
 
@@ -160,36 +158,25 @@ export class AdminController {
   // ── Chat Logs (ADMIN + MODERATOR) ──────────────────────────────────────────
   @Get("chat-logs")
   @Roles(UserRole.ADMIN, UserRole.MODERATOR)
-  getChatLogs(
-    @Query("page") page = "1",
-    @Query("limit") limit = "50",
-    @Query("category") category?: string,
-    @Query("roomName") roomName?: string,
-    @Query("userId") userId?: string,
-    @Query("search") search?: string,
-  ) {
+  getChatLogs(@Query() query: AdminChatLogsQueryDto) {
     return this.adminService.getChatLogs({
-      page: parseInt(page),
-      limit: parseInt(limit),
-      category: category as any,
-      roomName,
-      userId,
-      search,
+      page: query.page,
+      limit: query.limit,
+      category: query.category as any,
+      roomName: query.roomName,
+      userId: query.userId,
+      search: query.search,
     });
   }
 
   // ── Community (ADMIN + MODERATOR) ──────────────────────────────────────────
   @Get("posts")
   @Roles(UserRole.ADMIN, UserRole.MODERATOR)
-  getPosts(
-    @Query("page") page = "1",
-    @Query("limit") limit = "20",
-    @Query("search") search?: string,
-  ) {
+  getPosts(@Query() query: AdminPageQueryDto) {
     return this.adminService.getPosts({
-      page: parseInt(page),
-      limit: parseInt(limit),
-      search,
+      page: query.page,
+      limit: query.limit,
+      search: query.search,
     });
   }
 
@@ -218,15 +205,11 @@ export class AdminController {
   // ── Clans (ADMIN only) ──────────────────────────────────────────────────────
   @Get("clans")
   @Roles(UserRole.ADMIN)
-  getClans(
-    @Query("page") page = "1",
-    @Query("limit") limit = "20",
-    @Query("search") search?: string,
-  ) {
+  getClans(@Query() query: AdminPageQueryDto) {
     return this.adminService.getClans({
-      page: parseInt(page),
-      limit: parseInt(limit),
-      search,
+      page: query.page,
+      limit: query.limit,
+      search: query.search,
     });
   }
 
@@ -239,15 +222,11 @@ export class AdminController {
   // ── Rooms (ADMIN only) ──────────────────────────────────────────────────────
   @Get("rooms")
   @Roles(UserRole.ADMIN)
-  getRooms(
-    @Query("page") page = "1",
-    @Query("limit") limit = "20",
-    @Query("status") status?: string,
-  ) {
+  getRooms(@Query() query: AdminRoomsQueryDto) {
     return this.adminService.getRooms({
-      page: parseInt(page),
-      limit: parseInt(limit),
-      status,
+      page: query.page,
+      limit: query.limit,
+      status: query.status,
     });
   }
 
@@ -293,15 +272,11 @@ export class AdminController {
 
   @Get("appeals")
   @Roles(UserRole.ADMIN, UserRole.MODERATOR)
-  getAppeals(
-    @Query("page") page = "1",
-    @Query("limit") limit = "20",
-    @Query("status") status?: string,
-  ) {
+  getAppeals(@Query() query: AdminAppealsQueryDto) {
     return this.adminService.getAppeals({
-      page: parseInt(page),
-      limit: parseInt(limit),
-      status,
+      page: query.page,
+      limit: query.limit,
+      status: query.status,
     });
   }
 

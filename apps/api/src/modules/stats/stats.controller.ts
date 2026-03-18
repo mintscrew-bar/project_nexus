@@ -2,6 +2,12 @@ import { Controller, Get, Param, Query, UseGuards } from "@nestjs/common";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { StatsService } from "./stats.service";
+import {
+  FindSummonerQueryDto,
+  MatchHistoryQueryDto,
+  SearchUsersQueryDto,
+  UserMatchHistoryQueryDto,
+} from "./dto/stats-query.dto";
 
 @Controller("stats")
 export class StatsController {
@@ -59,17 +65,10 @@ export class StatsController {
    * Find user by Riot account (gameName + tagLine)
    */
   @Get("summoner")
-  async findUserByRiotAccount(
-    @Query("gameName") gameName: string,
-    @Query("tagLine") tagLine: string,
-  ) {
-    if (!gameName || !tagLine) {
-      return { found: false, message: "gameName and tagLine are required" };
-    }
-
+  async findUserByRiotAccount(@Query() query: FindSummonerQueryDto) {
     const result = await this.statsService.findUserByRiotAccount(
-      gameName,
-      tagLine,
+      query.gameName,
+      query.tagLine,
     );
 
     if (!result) {
@@ -87,9 +86,8 @@ export class StatsController {
    * Search users by username
    */
   @Get("users/search")
-  async searchUsers(@Query("q") query: string, @Query("limit") limit?: string) {
-    const limitNum = limit ? parseInt(limit, 10) : 10;
-    return this.statsService.searchUsers(query, limitNum);
+  async searchUsers(@Query() query: SearchUsersQueryDto) {
+    return this.statsService.searchUsers(query.q, query.limit);
   }
 
   /**
@@ -120,20 +118,14 @@ export class StatsController {
   async getSummonerMatchHistory(
     @Param("gameName") gameName: string,
     @Param("tagLine") tagLine: string,
-    @Query("count") count?: string,
-    @Query("queueId") queueId?: string,
-    @Query("start") start?: string,
+    @Query() query: MatchHistoryQueryDto,
   ) {
-    const countNum = count ? parseInt(count, 10) : 20;
-    const queueIdNum =
-      queueId != null && queueId !== "" ? parseInt(queueId, 10) : undefined;
-    const startNum = start ? parseInt(start, 10) : 0;
     return this.statsService.getRiotMatchHistory(
       gameName,
       tagLine,
-      countNum,
-      queueIdNum,
-      startNum,
+      query.count,
+      query.queueId,
+      query.start,
     );
   }
 
@@ -143,16 +135,12 @@ export class StatsController {
   @Get("user/:userId/riot-matches")
   async getUserRiotMatchHistory(
     @Param("userId") userId: string,
-    @Query("count") count?: string,
-    @Query("queueId") queueId?: string,
+    @Query() query: UserMatchHistoryQueryDto,
   ) {
-    const countNum = count ? parseInt(count, 10) : 20;
-    const queueIdNum =
-      queueId != null && queueId !== "" ? parseInt(queueId, 10) : undefined;
     return this.statsService.getUserRiotMatchHistory(
       userId,
-      countNum,
-      queueIdNum,
+      query.count,
+      query.queueId,
     );
   }
 }

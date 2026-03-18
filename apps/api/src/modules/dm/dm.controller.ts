@@ -9,6 +9,7 @@ import {
 } from "@nestjs/common";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { DmService } from "./dm.service";
+import { DmMessagesQueryDto } from "./dto/dm-query.dto";
 
 @Controller("dm")
 @UseGuards(JwtAuthGuard)
@@ -24,14 +25,13 @@ export class DmController {
   getMessages(
     @Request() req: any,
     @Param("userId") userId: string,
-    @Query("cursor") cursor?: string,
-    @Query("limit") limit?: string,
+    @Query() query: DmMessagesQueryDto,
   ) {
     return this.dmService.getConversation(
       req.user.sub,
       userId,
-      cursor,
-      limit ? parseInt(limit) : 30,
+      query.cursor,
+      query.limit,
     );
   }
 

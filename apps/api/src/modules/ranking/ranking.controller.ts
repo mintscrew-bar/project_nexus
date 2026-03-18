@@ -10,6 +10,7 @@ import {
 } from "@nestjs/common";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RankingService } from "./ranking.service";
+import { RankingQueryDto } from "./dto/ranking-query.dto";
 
 @Controller("ranking")
 export class RankingController {
@@ -19,14 +20,8 @@ export class RankingController {
    * 글로벌 랭킹 (페이지네이션, 최소 10판 이상)
    */
   @Get("global")
-  async getGlobalRanking(
-    @Query("page") page?: string,
-    @Query("limit") limit?: string,
-  ) {
-    return this.rankingService.getGlobalRanking(
-      page ? parseInt(page, 10) : 1,
-      limit ? parseInt(limit, 10) : 50,
-    );
+  async getGlobalRanking(@Query() query: RankingQueryDto) {
+    return this.rankingService.getGlobalRanking(query.page, query.limit);
   }
 
   /**
@@ -35,14 +30,9 @@ export class RankingController {
   @Get("clan/:clanId")
   async getClanRanking(
     @Param("clanId") clanId: string,
-    @Query("page") page?: string,
-    @Query("limit") limit?: string,
+    @Query() query: RankingQueryDto,
   ) {
-    return this.rankingService.getClanRanking(
-      clanId,
-      page ? parseInt(page, 10) : 1,
-      limit ? parseInt(limit, 10) : 50,
-    );
+    return this.rankingService.getClanRanking(clanId, query.page, query.limit);
   }
 
   /**
