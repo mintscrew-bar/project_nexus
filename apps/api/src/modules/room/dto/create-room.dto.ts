@@ -9,12 +9,16 @@ import {
   IsEnum,
   IsBoolean,
 } from "class-validator";
+import { Transform } from "class-transformer";
 import { TeamMode, TeamCaptainSelection, BracketType } from "@nexus/database";
+import { stripAllHtml } from "@/common/utils/sanitize";
 
 /**
  * 내전방 생성 DTO
  */
 export class CreateRoomDto {
+  /** 방 이름은 플레인 텍스트만 허용 (모든 HTML 태그 제거) */
+  @Transform(({ value }) => stripAllHtml(value))
   @IsString()
   @IsNotEmpty({ message: "방 이름을 입력해주세요." })
   @MaxLength(50, { message: "방 이름은 50자를 초과할 수 없습니다." })

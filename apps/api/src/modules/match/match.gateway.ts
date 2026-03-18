@@ -24,6 +24,7 @@ interface AuthenticatedSocket extends Socket {
   },
   pingInterval: 10000,
   pingTimeout: 5000,
+  maxHttpBufferSize: 1e4,
 })
 export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()

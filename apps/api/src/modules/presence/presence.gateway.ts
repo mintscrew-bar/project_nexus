@@ -26,6 +26,7 @@ interface AuthenticatedSocket extends Socket {
   namespace: "/presence",
   pingInterval: 10000,
   pingTimeout: 5000,
+  maxHttpBufferSize: 1e4,
 })
 export class PresenceGateway
   implements OnGatewayConnection, OnGatewayDisconnect, OnModuleDestroy

@@ -1,6 +1,8 @@
 import {
   BadRequestException,
   ConflictException,
+  HttpException,
+  HttpStatus,
   Injectable,
   UnauthorizedException,
 } from "@nestjs/common";
@@ -280,13 +282,37 @@ export class AuthService {
     return this.generateTokens(user);
   }
 
-  async login(dto: LoginDto) {
+  async login(dto: LoginDto, ip: string = "unknown") {
+    const failKey = `login_fail:${dto.email}:${ip}`;
+    const lockKey = `login_lock:${dto.email}`;
+
+    // 계정 잠금 확인 (10회 이상 실패 → 30분 잠금)
+    const accountLocked = await this.redis.exists(lockKey);
+    if (accountLocked) {
+      throw new HttpException(
+        "로그인 시도가 너무 많습니다. 30분 후에 다시 시도해주세요.",
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
+    // IP+이메일 조합 잠금 확인 (5회 이상 실패 → 15분 잠금)
+    const failCountStr = await this.redis.get(failKey);
+    const failCount = failCountStr ? parseInt(failCountStr, 10) : 0;
+    if (failCount >= 5) {
+      throw new HttpException(
+        "로그인 시도가 너무 많습니다. 15분 후에 다시 시도해주세요.",
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
     // Find user
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email },
     });
 
     if (!user || !user.password) {
+      // 실패 카운터 증가 (유저가 없어도 타이밍 공격 방지를 위해 카운트)
+      await this.incrementLoginFailure(failKey, lockKey);
       throw new UnauthorizedException("Invalid credentials");
     }
 
@@ -294,8 +320,13 @@ export class AuthService {
     const isPasswordValid = await bcrypt.compare(dto.password, user.password);
 
     if (!isPasswordValid) {
+      // 실패 카운터 증가
+      await this.incrementLoginFailure(failKey, lockKey);
       throw new UnauthorizedException("Invalid credentials");
     }
+
+    // 로그인 성공 → 실패 카운터 초기화
+    await Promise.all([this.redis.del(failKey), this.redis.del(lockKey)]);
 
     // Check if banned
     if (user.isBanned) {
@@ -336,6 +367,28 @@ export class AuthService {
     }
 
     return this.generateTokens(user);
+  }
+
+  /**
+   * 로그인 실패 카운터 증가 및 계정 잠금 처리
+   * - IP+이메일 조합: 15분 TTL
+   * - 10회 이상 실패 시 계정 자체를 30분 잠금
+   */
+  private async incrementLoginFailure(
+    failKey: string,
+    lockKey: string,
+  ): Promise<void> {
+    const count = await this.redis.incr(failKey);
+
+    // 첫 번째 실패 시 TTL 설정 (15분)
+    if (count === 1) {
+      await this.redis.expire(failKey, 900);
+    }
+
+    // 10회 이상 실패 시 계정 잠금 (30분)
+    if (count >= 10) {
+      await this.redis.set(lockKey, "1", 1800);
+    }
   }
 
   // ========================================

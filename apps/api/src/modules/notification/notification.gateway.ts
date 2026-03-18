@@ -17,6 +17,7 @@ import { Logger } from "@nestjs/common";
   },
   pingInterval: 10000,
   pingTimeout: 5000,
+  maxHttpBufferSize: 1e4,
 })
 export class NotificationGateway
   implements OnGatewayConnection, OnGatewayDisconnect

@@ -1,15 +1,21 @@
 import { IsString, IsOptional, MaxLength, IsArray, ArrayMaxSize } from "class-validator";
+import { Transform } from "class-transformer";
+import { sanitizeHtml, stripAllHtml } from "@/common/utils/sanitize";
 
 /**
  * 게시글 수정 DTO
  */
 export class UpdatePostDto {
+  /** 제목은 플레인 텍스트만 허용 (모든 HTML 태그 제거) */
   @IsOptional()
+  @Transform(({ value }) => stripAllHtml(value))
   @IsString()
   @MaxLength(200, { message: "제목은 200자를 초과할 수 없습니다." })
   title?: string;
 
+  /** 본문은 마크다운 허용, 위험한 태그/속성만 선택적 제거 */
   @IsOptional()
+  @Transform(({ value }) => sanitizeHtml(value))
   @IsString()
   @MaxLength(10000, { message: "내용은 10,000자를 초과할 수 없습니다." })
   content?: string;

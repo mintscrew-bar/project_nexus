@@ -32,7 +32,26 @@ async function bootstrap() {
 
   app.use(cookieParser());
 
-  app.use(helmet());
+  // Security Headers 강화 (CSP 포함)
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          scriptSrc: ["'self'"],
+          styleSrc: ["'self'", "'unsafe-inline'"],
+          imgSrc: [
+            "'self'",
+            "data:",
+            "https://ddragon.leagueoflegends.com",
+            "https://cdn.discordapp.com",
+            "https://raw.communitydragon.org",
+            "https://lh3.googleusercontent.com",
+          ],
+        },
+      },
+    }),
+  );
 
   const corsOrigins = configService
     .get("CORS_ORIGINS")

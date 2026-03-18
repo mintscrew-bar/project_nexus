@@ -61,8 +61,16 @@ export class AuthController {
   @Post("login")
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
-  async login(@Body() dto: LoginDto, @Res() res: Response) {
-    const tokens = await this.authService.login(dto);
+  async login(
+    @Body() dto: LoginDto,
+    @Req() req: Request,
+    @Res() res: Response,
+  ) {
+    const ip =
+      (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
+      req.ip ||
+      "unknown";
+    const tokens = await this.authService.login(dto, ip);
 
     res.cookie("refresh_token", tokens.refreshToken, {
       httpOnly: true,
