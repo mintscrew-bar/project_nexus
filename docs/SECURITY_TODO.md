@@ -1,7 +1,7 @@
 # 보안 설계 TODO
 
-> 마지막 업데이트: 2026-03-05
-> Phase 1 전체 + Phase 2-1 완료. Phase 2-2, Phase 3 미완료.
+> 마지막 업데이트: 2026-03-18
+> Phase 1 전체 + Phase 2-1 + Phase 3 완료. Phase 2-2 미완료.
 
 ## 완료된 항목
 
@@ -47,72 +47,20 @@ Lines 108-130 등에서 수동 if-else 검증이 있음. DTO 데코레이터로 
 
 ---
 
-- [ ] Phase 3-1: Security Headers 강화 (중간)
+- [x] Phase 3-1: Security Headers 강화
+  - API: Helmet CSP 설정 완료 (script/style/img 소스 제한)
+  - Web: X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy 추가
 
-**API (`apps/api/src/main.ts`):**
-```typescript
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      imgSrc: ["'self'", "data:", "https://ddragon.leagueoflegends.com", "https://cdn.discordapp.com", "https://raw.communitydragon.org"],
-    },
-  },
-}));
-```
+- [x] Phase 3-2: 로그인 실패 계정 잠금
+  - Redis 기반 IP+이메일 실패 횟수 추적 구현
+  - 5회 실패 → IP 15분 잠금, 10회 → 계정 30분 잠금
 
-**Next.js (`apps/web/next.config.mjs`):**
-```javascript
-async headers() {
-  return [{
-    source: '/(.*)',
-    headers: [
-      { key: 'X-Content-Type-Options', value: 'nosniff' },
-      { key: 'X-Frame-Options', value: 'DENY' },
-      { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-      { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
-    ],
-  }];
-}
-```
+- [x] Phase 3-3: 사용자 입력 새니타이징
+  - `sanitize.ts` 유틸 생성 (sanitizeHtml + stripAllHtml)
+  - 게시글/댓글/방/클랜 DTO에 @Transform 적용
 
-- [ ] Phase 3-2: 로그인 실패 계정 잠금 (중간)
-
-**파일:** `apps/api/src/modules/auth/auth.service.ts`
-
-Redis 기반으로 IP+이메일 조합의 실패 횟수 추적:
-- 5회 연속 실패 → 해당 IP에서 해당 계정 15분 잠금
-- 10회 연속 실패 → 계정 자체 30분 잠금
-- 성공 시 카운터 리셋
-- 키 패턴: `login_fail:{email}:{ip}` (TTL 15분)
-
-- [ ] Phase 3-3: 사용자 입력 새니타이징 (중간)
-
-**신규 파일:** `apps/api/src/common/utils/sanitize.ts`
-
-게시글/댓글/채팅 등 사용자 입력 텍스트에서 HTML 태그 제거:
-- 커스텀 유틸리티 또는 `sanitize-html` 패키지 사용
-- DTO의 `@Transform()` 데코레이터로 자동 적용
-
-- [ ] Phase 3-4: WebSocket 메시지 크기 제한 (낮음)
-
-**대상 파일 (9개 Gateway):**
-- `apps/api/src/modules/presence/presence.gateway.ts`
-- `apps/api/src/modules/match/match.gateway.ts`
-- `apps/api/src/modules/notification/notification.gateway.ts`
-- `apps/api/src/modules/role-selection/role-selection.gateway.ts`
-- `apps/api/src/modules/room/room.gateway.ts`
-- `apps/api/src/modules/dm/dm.gateway.ts`
-- `apps/api/src/modules/room/snake-draft.gateway.ts`
-- `apps/api/src/modules/auction/auction.gateway.ts`
-- `apps/api/src/modules/clan/clan.gateway.ts`
-
-각 `@WebSocketGateway()` 데코레이터에 추가:
-```typescript
-@WebSocketGateway({ maxHttpBufferSize: 1e4 }) // 10KB
-```
+- [x] Phase 3-4: WebSocket 메시지 크기 제한
+  - 9개 Gateway에 maxHttpBufferSize: 10KB 추가
 
 ---
 
