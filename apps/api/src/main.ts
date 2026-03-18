@@ -64,6 +64,11 @@ async function bootstrap() {
   await app.listen(port);
 
   console.log(`API Server running on port ${port}`);
+
+  // PM2 클러스터 모드: 서버 준비 완료 시그널 전송
+  if (process.send) {
+    process.send("ready");
+  }
 }
 
 bootstrap();

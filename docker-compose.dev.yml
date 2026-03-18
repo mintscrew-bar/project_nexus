@@ -7,6 +7,7 @@ services:
   postgres:
     image: postgres:16-alpine
     container_name: nexus-postgres-dev
+    restart: unless-stopped
     environment:
       POSTGRES_USER: nexus
       POSTGRES_PASSWORD: nexus_password
@@ -24,6 +25,7 @@ services:
   redis:
     image: redis:7-alpine
     container_name: nexus-redis-dev
+    restart: unless-stopped
     command: redis-server
     ports:
       - "6379:6379"
@@ -38,6 +40,7 @@ services:
       context: .
       dockerfile: Dockerfile.dev
     container_name: nexus-api-dev
+    restart: unless-stopped
     command: >
       sh -c "
         pnpm install &&
@@ -72,6 +75,7 @@ services:
       context: .
       dockerfile: Dockerfile.dev
     container_name: nexus-web-dev
+    restart: unless-stopped
     command: pnpm --filter @nexus/web dev -- -H 0.0.0.0
     volumes:
       - .:/app

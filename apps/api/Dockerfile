@@ -37,13 +37,20 @@ FROM node:20-alpine AS runner
 # Prisma 엔진 실행에 필요한 OpenSSL 설치
 RUN apk add --no-cache openssl
 
+# PM2 글로벌 설치
+RUN npm install -g pm2
+
 WORKDIR /app
+
+# 로그 디렉토리 생성
+RUN mkdir -p /app/logs
 
 ENV NODE_ENV=production
 
 # Copy built files
 COPY --from=builder /app/apps/api/dist ./dist
 COPY --from=builder /app/apps/api/package.json ./
+COPY --from=builder /app/apps/api/ecosystem.config.js ./
 
 # node_modules 복사 (workspace symlink은 다음 단계에서 실제 파일로 덮어씀)
 COPY --from=builder /app/node_modules ./node_modules
@@ -57,4 +64,5 @@ COPY --from=builder /app/packages/types/package.json ./node_modules/@nexus/types
 
 EXPOSE 4000
 
-CMD ["node", "dist/main.js"]
+# PM2로 프로세스 관리 (--no-daemon: 컨테이너 포그라운드 유지)
+CMD ["pm2-runtime", "ecosystem.config.js"]
