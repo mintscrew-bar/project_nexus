@@ -44,7 +44,7 @@ export class ReputationController {
   ) {
     return this.reputationService.getUserRatings(
       userId,
-      limit ? parseInt(limit, 10) : 10,
+      limit ? (parseInt(limit, 10) || 10) : 10,
     );
   }
 
@@ -84,7 +84,7 @@ export class ReputationController {
   @Roles(UserRole.ADMIN, UserRole.MODERATOR)
   async listPendingReports(@Query("limit") limit?: string) {
     return this.reputationService.listPendingReports(
-      limit ? parseInt(limit, 10) : 50,
+      limit ? (parseInt(limit, 10) || 50) : 50,
     );
   }
 

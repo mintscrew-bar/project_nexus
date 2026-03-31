@@ -297,7 +297,7 @@ export class AuthService {
 
     // IP+이메일 조합 잠금 확인 (5회 이상 실패 → 15분 잠금)
     const failCountStr = await this.redis.get(failKey);
-    const failCount = failCountStr ? parseInt(failCountStr, 10) : 0;
+    const failCount = failCountStr ? (parseInt(failCountStr, 10) || 0) : 0;
     if (failCount >= 5) {
       throw new HttpException(
         "로그인 시도가 너무 많습니다. 15분 후에 다시 시도해주세요.",

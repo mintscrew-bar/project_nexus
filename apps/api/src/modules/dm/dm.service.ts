@@ -124,7 +124,9 @@ export class DmService implements OnModuleInit {
       // 전체 미읽음에서 차감
       const currentTotal = await this.redis.get(totalKey);
       if (currentTotal !== null) {
-        const newTotal = Math.max(0, parseInt(currentTotal, 10) - unreadCount);
+        const parsed = parseInt(currentTotal, 10);
+        // NaN이면 Redis 키가 오염된 것이므로 0으로 리셋
+        const newTotal = Math.max(0, (isNaN(parsed) ? 0 : parsed) - unreadCount);
         await this.redis.set(totalKey, String(newTotal));
       }
 
@@ -139,7 +141,11 @@ export class DmService implements OnModuleInit {
   async getUnreadCount(userId: string): Promise<number> {
     try {
       const cached = await this.redis.get(UNREAD_KEY(userId));
-      if (cached !== null) return Math.max(0, parseInt(cached, 10));
+      if (cached !== null) {
+        const parsed = parseInt(cached, 10);
+        // NaN이면 캐시 무효 처리 — DB fallback으로 진행
+        if (!isNaN(parsed)) return Math.max(0, parsed);
+      }
     } catch {
       // Redis 실패 → DB fallback
     }
