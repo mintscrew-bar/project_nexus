@@ -32,7 +32,7 @@ async function bootstrap() {
 
   app.use(cookieParser());
 
-  // Security Headers 강화 (CSP 포함)
+  // Security Headers 강화 (CSP + HSTS 포함)
   app.use(
     helmet({
       contentSecurityPolicy: {
@@ -50,15 +50,30 @@ async function bootstrap() {
           ],
         },
       },
+      // HTTPS 강제: HSTS 헤더 (1년, 서브도메인 포함)
+      hsts: {
+        maxAge: 31536000,
+        includeSubDomains: true,
+      },
     }),
   );
 
-  const corsOrigins = configService
-    .get("CORS_ORIGINS")
-    ?.split(",")
-    .map((origin: string) => origin.trim()) || [
-    configService.get("APP_URL") || "http://localhost:3000",
-  ];
+  // CORS_ORIGINS 환경변수 파싱 + 유효한 URL만 허용 (잘못된 origin 필터링)
+  const rawOrigins = configService.get<string>("CORS_ORIGINS");
+  const corsOrigins: string[] = rawOrigins
+    ? rawOrigins
+        .split(",")
+        .map((o) => o.trim())
+        .filter((o) => {
+          try {
+            new URL(o);
+            return true;
+          } catch {
+            console.warn(`[CORS] 유효하지 않은 origin 무시: "${o}"`);
+            return false;
+          }
+        })
+    : [configService.get("APP_URL") || "http://localhost:3000"];
 
   app.enableCors({
     origin: corsOrigins,
