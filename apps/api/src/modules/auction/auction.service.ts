@@ -5,8 +5,10 @@
   ForbiddenException,
   Optional,
   Inject,
+  OnModuleInit,
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
+import { RedisService } from "../redis/redis.service";
 import { Prisma } from "@prisma/client";
 import { RoomStatus, TeamCaptainSelection, TeamMode } from "@nexus/database";
 import { calculateTierScore } from "../common/tier-score.util";
@@ -37,22 +39,135 @@ export interface CaptainSelectionPhase {
 }
 
 @Injectable()
-export class AuctionService {
+export class AuctionService implements OnModuleInit {
+  /** 인메모리 경매 상태 (빠른 동기 접근용) — Redis와 동기화됨 */
   private auctionStates = new Map<string, AuctionState>();
-  /**
-   * captainPhases는 현재 인메모리만 관리됨 (30초 단기 세션).
-   * 서버 재시작 시 DRAFT 상태이지만 captainPhase 정보가 유실될 수 있음.
-   * TODO: RedisService를 AuctionService에 주입하여 captainPhases를 Redis에도 저장하면
-   *       서버 재시작 내구성 확보 가능 (key: `captain-phase:${roomId}`, TTL: 60s).
-   */
+  /** 인메모리 주장 선정 단계 (빠른 동기 접근용) — Redis와 동기화됨 */
   private captainPhases = new Map<string, CaptainSelectionPhase>();
+  /** setTimeout 핸들 — 직렬화 불가로 인메모리 전용 유지 */
+  private captainTimerHandles = new Map<string, ReturnType<typeof setTimeout>>();
   private discordVoiceService: any; // DiscordVoiceService (optional dependency)
+
+  // Redis 키 상수
+  private static readonly AUCTION_STATE_KEY = (roomId: string) =>
+    `auction:state:${roomId}`;
+  private static readonly CAPTAIN_PHASE_KEY = (roomId: string) =>
+    `auction:captain-phase:${roomId}`;
+  private static readonly AUCTION_TTL = 4 * 60 * 60; // 4시간 (진행 중인 경매 최대 지속 시간)
+  private static readonly CAPTAIN_TTL = 120; // 2분 (팀장 선정은 단기 세션)
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly redis: RedisService,
     @Optional() @Inject("DISCORD_VOICE_SERVICE") discordVoice?: any,
   ) {
     this.discordVoiceService = discordVoice;
+  }
+
+  /**
+   * 서버 시작 시 Redis에 남아있는 경매/팀장 선정 상태 복원
+   * (서버 재시작 내구성 확보)
+   */
+  async onModuleInit() {
+    try {
+      await this._restoreStatesFromRedis();
+    } catch (error) {
+      console.warn("[AuctionService] Redis 상태 복원 실패 (정상 시작으로 계속):", error);
+    }
+  }
+
+  /**
+   * 서버 시작 시 DB의 진행 중 경매 방 목록을 조회 후
+   * 각 방의 상태를 Redis에서 복원 (KEYS 명령 없이 안전하게 복원)
+   */
+  private async _restoreStatesFromRedis() {
+    // DRAFT / TEAM_SELECTION 상태인 방만 조회 (경매가 진행 중일 수 있는 상태)
+    const activeRooms = await this.prisma.room.findMany({
+      where: { status: { in: [RoomStatus.DRAFT, RoomStatus.TEAM_SELECTION] } },
+      select: { id: true },
+    });
+
+    if (activeRooms.length === 0) return;
+
+    let restoredCount = 0;
+    await Promise.all(
+      activeRooms.map(async ({ id: roomId }) => {
+        const [stateStr, phaseStr] = await Promise.all([
+          this.redis.get(AuctionService.AUCTION_STATE_KEY(roomId)),
+          this.redis.get(AuctionService.CAPTAIN_PHASE_KEY(roomId)),
+        ]);
+
+        if (stateStr) {
+          try {
+            this.auctionStates.set(roomId, JSON.parse(stateStr) as AuctionState);
+            restoredCount++;
+          } catch {
+            // 손상된 값 무시
+          }
+        }
+
+        if (phaseStr) {
+          try {
+            const phase = JSON.parse(phaseStr) as CaptainSelectionPhase;
+            // timerHandle은 직렬화 불가 — null로 복원
+            phase.timerHandle = null;
+            this.captainPhases.set(roomId, phase);
+          } catch {
+            // 손상된 값 무시
+          }
+        }
+      }),
+    );
+
+    if (restoredCount > 0) {
+      console.log(`[AuctionService] 경매 상태 ${restoredCount}건 Redis에서 복원됨`);
+    }
+  }
+
+  /** 경매 상태를 인메모리 + Redis에 저장 */
+  private _setAuctionState(roomId: string, state: AuctionState): void {
+    this.auctionStates.set(roomId, state);
+    this.redis
+      .set(
+        AuctionService.AUCTION_STATE_KEY(roomId),
+        JSON.stringify(state),
+        AuctionService.AUCTION_TTL,
+      )
+      .catch((e) => console.warn(`[AuctionService] Redis 경매 상태 저장 실패 (${roomId}):`, e));
+  }
+
+  /** 경매 상태를 인메모리 + Redis에서 삭제 */
+  private _deleteAuctionState(roomId: string): void {
+    this.auctionStates.delete(roomId);
+    this.redis
+      .del(AuctionService.AUCTION_STATE_KEY(roomId))
+      .catch((e) => console.warn(`[AuctionService] Redis 경매 상태 삭제 실패 (${roomId}):`, e));
+  }
+
+  /** 팀장 선정 단계를 인메모리 + Redis에 저장 (timerHandle 제외) */
+  private _setCaptainPhase(roomId: string, phase: CaptainSelectionPhase): void {
+    this.captainPhases.set(roomId, phase);
+    const { timerHandle: _, ...serializable } = phase; // timerHandle 제외
+    this.redis
+      .set(
+        AuctionService.CAPTAIN_PHASE_KEY(roomId),
+        JSON.stringify(serializable),
+        AuctionService.CAPTAIN_TTL,
+      )
+      .catch((e) => console.warn(`[AuctionService] Redis 팀장 단계 저장 실패 (${roomId}):`, e));
+  }
+
+  /** 팀장 선정 단계를 인메모리 + Redis에서 삭제 */
+  private _deleteCaptainPhase(roomId: string): void {
+    const handle = this.captainTimerHandles.get(roomId);
+    if (handle) {
+      clearTimeout(handle);
+      this.captainTimerHandles.delete(roomId);
+    }
+    this.captainPhases.delete(roomId);
+    this.redis
+      .del(AuctionService.CAPTAIN_PHASE_KEY(roomId))
+      .catch((e) => console.warn(`[AuctionService] Redis 팀장 단계 삭제 실패 (${roomId}):`, e));
   }
 
   private getBaseBidTimerMs(): number {
@@ -164,7 +279,7 @@ export class AuctionService {
         timerEnd,
         timerHandle: null,
       };
-      this.captainPhases.set(roomId, phase);
+      this._setCaptainPhase(roomId, phase);
 
       return {
         captainSelectionPhase: {
@@ -249,7 +364,7 @@ export class AuctionService {
       botCaptainIds,
     };
 
-    this.auctionStates.set(roomId, auctionState);
+    this._setAuctionState(roomId, auctionState);
 
     return {
       teams,
@@ -374,6 +489,9 @@ export class AuctionService {
       phase.volunteers.splice(idx, 1);
     }
 
+    // volunteers 변경사항을 Redis에 동기화
+    this._setCaptainPhase(roomId, phase);
+
     return { volunteers: phase.volunteers };
   }
 
@@ -471,7 +589,7 @@ export class AuctionService {
       captainUserIds = selectedUserIds;
     }
 
-    this.captainPhases.delete(roomId);
+    this._deleteCaptainPhase(roomId);
 
     const { teams } = await this._applySelectedCaptains(
       roomId,
@@ -500,7 +618,7 @@ export class AuctionService {
       botCaptainIds,
     };
 
-    this.auctionStates.set(roomId, auctionState);
+    this._setAuctionState(roomId, auctionState);
 
     return {
       teams,
@@ -576,7 +694,7 @@ export class AuctionService {
       botCaptainIds,
     };
 
-    this.auctionStates.set(roomId, auctionState);
+    this._setAuctionState(roomId, auctionState);
 
     return {
       teams,
@@ -612,7 +730,11 @@ export class AuctionService {
     handle: ReturnType<typeof setTimeout>,
   ) {
     const phase = this.captainPhases.get(roomId);
-    if (phase) phase.timerHandle = handle;
+    if (phase) {
+      // timerHandle은 인메모리 전용 — Redis 동기화 불필요
+      phase.timerHandle = handle;
+      this.captainTimerHandles.set(roomId, handle);
+    }
   }
 
   // ========================================
@@ -731,6 +853,9 @@ export class AuctionService {
     state.timerEnd = this.getExtendedBidTimerEnd(state.timerEnd);
     state.yuchalCount = 0;
 
+    // 입찰 상태 변경을 Redis에 동기화
+    this._setAuctionState(roomId, state);
+
     return state;
   }
 
@@ -830,6 +955,9 @@ export class AuctionService {
       state.timerEnd = Date.now() + this.getBaseBidTimerMs();
       state.yuchalCount = 0;
 
+      // 낙찰 후 초기화된 상태를 Redis에 동기화
+      this._setAuctionState(roomId, state);
+
       return {
         sold: true,
         player: currentPlayer,
@@ -856,6 +984,8 @@ export class AuctionService {
         state.currentHighestBidder = null;
         state.currentHighestBidderName = null;
         state.timerEnd = Date.now() + this.getBaseBidTimerMs();
+        // 유찰 상태 변경을 Redis에 동기화
+        this._setAuctionState(roomId, state);
         return { sold: false, player: currentPlayer };
       }
 
@@ -908,6 +1038,9 @@ export class AuctionService {
       state.timerEnd = Date.now() + this.getBaseBidTimerMs();
       state.yuchalCount = 0;
 
+      // 강제배정 후 초기화된 상태를 Redis에 동기화
+      this._setAuctionState(roomId, state);
+
       return {
         sold: true,
         player: currentPlayer,
@@ -953,7 +1086,7 @@ export class AuctionService {
       console.warn("Failed to assign teams to Discord channels:", error);
     }
 
-    this.auctionStates.delete(roomId);
+    this._deleteAuctionState(roomId);
 
     return { message: "Auction completed" };
   }
@@ -985,12 +1118,8 @@ export class AuctionService {
   }
 
   clearAuctionState(roomId: string): void {
-    const phase = this.captainPhases.get(roomId);
-    if (phase?.timerHandle) {
-      clearTimeout(phase.timerHandle);
-    }
-    this.captainPhases.delete(roomId);
-    this.auctionStates.delete(roomId);
+    this._deleteCaptainPhase(roomId); // timerHandle clearTimeout + Redis 삭제 포함
+    this._deleteAuctionState(roomId);
   }
 
   async cleanupBotOnlyRoomOnHostDisconnect(
