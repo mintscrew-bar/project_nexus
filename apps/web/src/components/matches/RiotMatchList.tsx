@@ -839,6 +839,62 @@ export default function RiotMatchList({
                       {isExpanded ? <ChevronUp className="h-4 w-4 sm:h-5 sm:w-5" /> : <ChevronDown className="h-4 w-4 sm:h-5 sm:w-5" />}
                     </div>
                   </div>
+
+                  {/* 모바일 전용 2행: 아이템 + CS · 킬관여 · 딜량 */}
+                  <div className="flex items-center gap-2 mt-1.5 sm:hidden">
+                    {/* 아이템 (item0~item5 + 장신구) */}
+                    <div className="flex gap-0.5 items-center flex-shrink-0">
+                      {[participant.item0, participant.item1, participant.item2, participant.item3, participant.item4, participant.item5].map((item: number, idx: number) => (
+                        <div key={idx} className="w-5 h-5 rounded bg-bg-tertiary border border-bg-elevated">
+                          {item !== 0 && (
+                            <Image
+                              src={getItemIcon(item)}
+                              alt="item"
+                              width={20}
+                              height={20}
+                              className="w-full h-full rounded"
+                              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                            />
+                          )}
+                        </div>
+                      ))}
+                      <div className="w-5 h-5 rounded-full bg-bg-tertiary border border-bg-elevated">
+                        {participant.item6 !== 0 && (
+                          <Image
+                            src={getItemIcon(participant.item6)}
+                            alt="trinket"
+                            width={20}
+                            height={20}
+                            className="w-full h-full rounded-full"
+                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                          />
+                        )}
+                      </div>
+                    </div>
+
+                    {/* CS */}
+                    <div className="flex items-center gap-0.5 flex-shrink-0">
+                      <span className="text-[10px] text-text-tertiary">CS</span>
+                      <span className="text-[10px] font-medium text-text-secondary">
+                        {participant.totalMinionsKilled + participant.neutralMinionsKilled}
+                      </span>
+                      <span className="text-[9px] text-text-tertiary">({csPerMin}/분)</span>
+                    </div>
+
+                    {/* 킬관여 */}
+                    <div className="flex items-center gap-0.5 flex-shrink-0">
+                      <span className="text-[10px] text-text-tertiary">킬관여</span>
+                      <span className="text-[10px] font-medium text-text-secondary">{killParticipation}%</span>
+                    </div>
+
+                    {/* 딜량 */}
+                    <div className="flex items-center gap-0.5 flex-shrink-0">
+                      <span className="text-[10px] text-text-tertiary">딜</span>
+                      <span className="text-[10px] font-medium text-text-secondary">
+                        {(participant.totalDamageDealtToChampions / 1000).toFixed(1)}k
+                      </span>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Expanded Content */}
