@@ -28,6 +28,7 @@ import {
   CreatePostDto,
   UpdatePostDto,
   CreateCommentDto,
+  UpdateCommentDto,
   CreatePostReportDto,
   ListPostsQueryDto,
   LimitQueryDto,
@@ -126,9 +127,9 @@ export class CommunityController {
   async updateComment(
     @CurrentUser("sub") userId: string,
     @Param("id") commentId: string,
-    @Body() body: { content: string },
+    @Body() dto: UpdateCommentDto,
   ) {
-    return this.communityService.updateComment(userId, commentId, body.content);
+    return this.communityService.updateComment(userId, commentId, dto.content);
   }
 
   @Delete("comments/:id")

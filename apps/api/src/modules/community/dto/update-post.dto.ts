@@ -1,4 +1,4 @@
-import { IsString, IsOptional, MaxLength, IsArray, ArrayMaxSize } from "class-validator";
+import { IsString, IsOptional, IsNotEmpty, MaxLength, IsArray, ArrayMaxSize } from "class-validator";
 import { Transform } from "class-transformer";
 import { sanitizeHtml, stripAllHtml } from "@/common/utils/sanitize";
 
@@ -10,6 +10,7 @@ export class UpdatePostDto {
   @IsOptional()
   @Transform(({ value }) => stripAllHtml(value))
   @IsString()
+  @IsNotEmpty({ message: "제목은 공백일 수 없습니다." })
   @MaxLength(200, { message: "제목은 200자를 초과할 수 없습니다." })
   title?: string;
 
@@ -17,6 +18,7 @@ export class UpdatePostDto {
   @IsOptional()
   @Transform(({ value }) => sanitizeHtml(value))
   @IsString()
+  @IsNotEmpty({ message: "내용은 공백일 수 없습니다." })
   @MaxLength(10000, { message: "내용은 10,000자를 초과할 수 없습니다." })
   content?: string;
 

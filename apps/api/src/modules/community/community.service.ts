@@ -105,23 +105,6 @@ export class CommunityService {
       );
     }
 
-    // Validate title and content
-    if (!dto.title || dto.title.trim().length === 0) {
-      throw new BadRequestException("Title cannot be empty");
-    }
-
-    if (dto.title.length > 200) {
-      throw new BadRequestException("Title too long (max 200 characters)");
-    }
-
-    if (!dto.content || dto.content.trim().length === 0) {
-      throw new BadRequestException("Content cannot be empty");
-    }
-
-    if (dto.content.length > 10000) {
-      throw new BadRequestException("Content too long (max 10000 characters)");
-    }
-
     // 금칙어 검사: 제목 + 내용 모두 검사
     if (containsBannedWord(dto.title) || containsBannedWord(dto.content)) {
       throw new BadRequestException(
@@ -423,27 +406,6 @@ export class CommunityService {
       throw new ForbiddenException("You can only edit your own posts");
     }
 
-    // Validate if provided
-    if (dto.title !== undefined) {
-      if (!dto.title || dto.title.trim().length === 0) {
-        throw new BadRequestException("Title cannot be empty");
-      }
-      if (dto.title.length > 200) {
-        throw new BadRequestException("Title too long (max 200 characters)");
-      }
-    }
-
-    if (dto.content !== undefined) {
-      if (!dto.content || dto.content.trim().length === 0) {
-        throw new BadRequestException("Content cannot be empty");
-      }
-      if (dto.content.length > 10000) {
-        throw new BadRequestException(
-          "Content too long (max 10000 characters)",
-        );
-      }
-    }
-
     // 금칙어 검사 (수정 시에도 적용)
     if (
       (dto.title && containsBannedWord(dto.title)) ||
@@ -539,15 +501,6 @@ export class CommunityService {
       );
     }
 
-    // Validate content
-    if (!dto.content || dto.content.trim().length === 0) {
-      throw new BadRequestException("Comment cannot be empty");
-    }
-
-    if (dto.content.length > 1000) {
-      throw new BadRequestException("Comment too long (max 1000 characters)");
-    }
-
     // 금칙어 검사: 댓글 내용 검사
     if (containsBannedWord(dto.content)) {
       throw new BadRequestException(
@@ -639,14 +592,6 @@ export class CommunityService {
 
     if (comment.authorId !== userId) {
       throw new ForbiddenException("You can only edit your own comments");
-    }
-
-    if (!content || content.trim().length === 0) {
-      throw new BadRequestException("Comment cannot be empty");
-    }
-
-    if (content.length > 1000) {
-      throw new BadRequestException("Comment too long (max 1000 characters)");
     }
 
     return this.prisma.comment.update({

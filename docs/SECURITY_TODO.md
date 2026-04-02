@@ -1,7 +1,7 @@
 # 보안 설계 TODO
 
-> 마지막 업데이트: 2026-03-18
-> Phase 1 전체 + Phase 2-1 + Phase 3 완료. Phase 2-2 미완료.
+> 마지막 업데이트: 2026-04-02
+> Phase 1 전체 + Phase 2 전체 + Phase 3 완료.
 
 ## 완료된 항목
 
@@ -36,14 +36,11 @@
 
 ---
 
-## 미완료 항목
-
-- [ ] Phase 2-2: 수동 검증 코드 제거 (중간)
-
-**파일:** `apps/api/src/modules/community/community.service.ts`
-
-Lines 108-130 등에서 수동 if-else 검증이 있음. DTO 데코레이터로 대체 후 삭제.
-단, `containsBannedWord()` 금칙어 검사는 class-validator 커스텀 데코레이터 또는 서비스 레이어에서 유지 필요.
+- [x] Phase 2-2: 수동 검증 코드 제거 (중간)
+  - `community.service.ts` — createPost, updatePost, createComment, updateComment의 수동 if-else 검증 제거
+  - `UpdatePostDto`에 `@IsNotEmpty` 추가 (빈 문자열 방지)
+  - `UpdateCommentDto` 신규 생성 + 컨트롤러 updateComment에 DTO 적용
+  - `containsBannedWord()` 금칙어 검사는 서비스 레이어에서 유지
 
 ---
 
