@@ -97,6 +97,9 @@ async function bootstrap() {
 
   app.setGlobalPrefix("api");
 
+  // SIGTERM / SIGINT 수신 시 onApplicationShutdown 훅 실행 (Graceful Shutdown)
+  app.enableShutdownHooks();
+
   const port = configService.get("PORT") || 4000;
   await app.listen(port);
 

@@ -38,8 +38,8 @@ module.exports = {
       // 로그 파일 크기 제한 (10MB 초과 시 로테이션)
       max_size: "10M",
 
-      // Graceful shutdown — NestJS가 연결 정리할 시간 확보
-      kill_timeout: 5000,
+      // Graceful shutdown — 드레인(60초) + NestJS 연결 정리(10초) 여유 포함
+      kill_timeout: 75000,
       listen_timeout: 10000,
 
       // 무중단 재배포 (클러스터 모드에서 하나씩 재시작)

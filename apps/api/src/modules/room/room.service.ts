@@ -3,12 +3,14 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  ServiceUnavailableException,
   Optional,
   Inject,
   Logger,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../prisma/prisma.service";
+import { ShutdownService } from "../common/shutdown.service";
 import {
   RoomStatus,
   TeamMode,
@@ -54,6 +56,7 @@ export class RoomService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
+    private readonly shutdownService: ShutdownService,
     @Optional() @Inject("DISCORD_BOT_SERVICE") discordBot?: any,
     @Optional() @Inject("DISCORD_VOICE_SERVICE") discordVoice?: any,
   ) {
@@ -85,6 +88,13 @@ export class RoomService {
   // ========================================
 
   async createRoom(hostId: string, dto: CreateRoomDto) {
+    // 서버 종료 진행 중이면 신규 방 생성 차단
+    if (this.shutdownService.isShuttingDown()) {
+      throw new ServiceUnavailableException(
+        "서버가 점검 중입니다. 잠시 후 다시 시도해주세요.",
+      );
+    }
+
     // ========================================
     // Discord + Riot 계정 연동 필수 체크 (관리자는 면제)
     // ========================================

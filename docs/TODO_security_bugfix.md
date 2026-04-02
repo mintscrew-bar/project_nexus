@@ -1,7 +1,7 @@
 # 보안 취약점 및 버그 수정
 
-> 진행 기준일: 2026-03-11
-> 완료: Task 1~4, 6~18, 20, 22~28 / 전체: Task 1~31
+> 진행 기준일: 2026-03-11 / 마지막 업데이트: 2026-04-02
+> 완료: Task 1~4, 5, 6~18, 20, 22~31 / 전체 완료
 
 ---
 
@@ -24,10 +24,13 @@
   - `auction-state.service.ts` — `updateState`가 읽기→버전증가→저장이 비원자적
   - 레거시 서비스 (메인 경매는 인메모리 Map + bidLocks mutex 사용) — 경고 주석 추가
 
-- [ ] Task 5: 인메모리 상태 서버 재시작 시 손실 대응 (장기 과제)
-  - `auction.service.ts`, `snake-draft.service.ts`, `role-selection.service.ts`
-  - 경매/드래프트/역할 선택 상태가 모두 인메모리 Map에 저장
-  - Redis 백업 또는 최소한 graceful 복구 메커니즘 필요
+- [x] Task 5: 인메모리 상태 서버 재시작 시 손실 대응
+  - Redis 완전 영속화 대신 Graceful Shutdown + 드레인 방식으로 대응 (업계 표준)
+  - `ShutdownService` 전역 서비스 생성 — `isShuttingDown` 플래그 관리
+  - `AppModule.onApplicationShutdown` — SIGTERM 수신 시 진행 중인 방 최대 60초 대기 후 종료
+  - `RoomService.createRoom` — shutdown 중 신규 방 생성 차단 (503)
+  - `RoomGateway.handleStartGame` — shutdown 중 게임 시작 차단
+  - `ecosystem.config.js` — kill_timeout 5초 → 75초로 증가 (drain 60초 + 여유 15초)
 
 - [x] Task 6: OAuth 콜백 토큰 URL 노출 개선
   - `auth/callback/page.tsx` — 토큰 추출 후 `history.replaceState`로 URL에서 즉시 제거

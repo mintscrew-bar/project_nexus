@@ -8,6 +8,7 @@ import {
   OnGatewayDisconnect,
 } from "@nestjs/websockets";
 import { Inject, forwardRef, OnModuleDestroy } from "@nestjs/common";
+import { ShutdownService } from "../common/shutdown.service";
 import { OnEvent } from "@nestjs/event-emitter";
 import { Server, Socket } from "socket.io";
 import { RoomService } from "./room.service";
@@ -51,6 +52,7 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect, On
     private readonly authService: AuthService,
     private readonly snakeDraftService: SnakeDraftService,
     private readonly snakeDraftGateway: SnakeDraftGateway,
+    private readonly shutdownService: ShutdownService,
     @Inject(forwardRef(() => AuctionService))
     private readonly auctionService: AuctionService,
     @Inject(forwardRef(() => AuctionGateway))
@@ -368,6 +370,11 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect, On
     try {
       if (!client.userId) {
         return { error: "Unauthorized" };
+      }
+
+      // 서버 종료 진행 중이면 게임 시작 차단
+      if (this.shutdownService.isShuttingDown()) {
+        return { error: "서버가 점검 중입니다. 잠시 후 다시 시도해주세요." };
       }
 
       // Prevent concurrent start-game calls (double-click, race condition)
