@@ -258,6 +258,11 @@ export class RiotService {
   // ========================================
 
   async startVerification(userId: string, gameName: string, tagLine: string) {
+    // 인증 시작 시 소환사 캐시를 삭제해 항상 최신 profileIconId를 가져옴
+    // (이전 인증 실패 후 재시도 시 캐시된 구 아이콘 ID가 반환되는 문제 방지)
+    const cacheKey = `riot:summoner:${gameName.toLowerCase()}:${tagLine.toLowerCase()}`;
+    await this.redis.del(cacheKey);
+
     const summoner = await this.getSummonerByRiotId(gameName, tagLine);
 
     // Generate random icon ID for verification (1-28)

@@ -5,7 +5,6 @@ import { ConfigModule, ConfigService } from "@nestjs/config";
 
 import { AuthController } from "./auth.controller";
 import { AuthService } from "./auth.service";
-import { GoogleStrategy } from "./strategies/google.strategy";
 import { DiscordStrategy } from "./strategies/discord.strategy";
 import { LocalStrategy } from "./strategies/local.strategy";
 import { JwtStrategy } from "./strategies/jwt.strategy";
@@ -28,7 +27,6 @@ import { JwtRefreshStrategy } from "./strategies/jwt-refresh.strategy";
   controllers: [AuthController],
   providers: [
     AuthService,
-    GoogleStrategy,
     DiscordStrategy,
     LocalStrategy,
     JwtStrategy,

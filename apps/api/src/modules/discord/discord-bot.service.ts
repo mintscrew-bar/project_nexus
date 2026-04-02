@@ -186,10 +186,6 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
       // 현재 음성 상태: 방에 들어온 채널이 Lobby이면 inVoice=true
       const inVoice = newState.channelId === changedChannelId;
 
-      console.log(
-        `[DiscordBot] voiceStateUpdate: user=${discordUserId}, room=${roomChannel.roomId}, inVoice=${inVoice}`,
-      );
-
       // Room Gateway로 이벤트 전달
       this.eventEmitter.emit("discord.voice.update", {
         discordUserId,

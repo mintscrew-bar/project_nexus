@@ -14,8 +14,9 @@ const nextConfig = {
         hostname: "ddragon.leagueoflegends.com",
       },
       {
-        protocol: "https",
-        hostname: "lh3.googleusercontent.com",
+        protocol: "http",
+        hostname: "localhost",
+        port: "4000",
       },
     ],
   },
@@ -41,6 +42,11 @@ const nextConfig = {
         // Proxy all /api requests to backend except routes handled by Next.js API handlers
         source: "/api/:path((?!auth/refresh|auth/\\[...nextauth\\]).*)",
         destination: `${process.env.API_URL || "http://localhost:4000"}/api/:path*`,
+      },
+      {
+        // 업로드 파일을 API 서버에서 프록시
+        source: "/uploads/:path*",
+        destination: `${process.env.API_URL || "http://localhost:4000"}/uploads/:path*`,
       },
     ];
   },

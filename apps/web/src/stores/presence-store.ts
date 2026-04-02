@@ -26,11 +26,13 @@ interface PresenceStoreState {
   friendStatuses: Map<string, FriendStatus>;
   isConnected: boolean;
   isLoading: boolean;
+  // 수동으로 오프라인 설정 시 자동 감지를 억제하는 플래그
+  isManualOffline: boolean;
 
   // Actions
   connect: () => void;
   disconnect: () => void;
-  setStatus: (status: "ONLINE" | "AWAY") => Promise<void>;
+  setStatus: (status: "ONLINE" | "AWAY" | "OFFLINE") => Promise<void>;
   fetchFriendsStatuses: () => Promise<void>;
   getFriendStatus: (friendId: string) => FriendStatus | undefined;
 }
@@ -40,6 +42,7 @@ export const usePresenceStore = create<PresenceStoreState>((set, get) => ({
   friendStatuses: new Map(),
   isConnected: false,
   isLoading: false,
+  isManualOffline: false,
 
   connect: () => {
     const socket = connectPresenceSocket();
@@ -86,12 +89,23 @@ export const usePresenceStore = create<PresenceStoreState>((set, get) => ({
     set({ isConnected: false, myStatus: "OFFLINE" });
   },
 
-  setStatus: async (status: "ONLINE" | "AWAY") => {
+  setStatus: async (status: "ONLINE" | "AWAY" | "OFFLINE") => {
     try {
+      if (status === "OFFLINE") {
+        // 수동 오프라인: 소켓 연결 해제 → 서버가 자동으로 OFFLINE 처리
+        set({ myStatus: "OFFLINE", isManualOffline: true });
+        disconnectPresenceSocket();
+        return;
+      }
+
+      // 오프라인에서 온라인/자리비움으로 복귀 시 소켓 재연결
+      if (get().isManualOffline) {
+        set({ isManualOffline: false });
+        get().connect();
+      }
+
       await presenceApi.updateMyStatus(status);
       set({ myStatus: status });
-
-      // Also update via WebSocket for real-time sync
       presenceSocketHelpers.setStatus(status);
     } catch (error) {
       toast.error("상태 변경에 실패했습니다.");

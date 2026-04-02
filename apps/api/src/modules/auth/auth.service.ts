@@ -15,7 +15,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { RedisService } from "../redis/redis.service";
 
 export interface OAuthProfile {
-  provider: "google" | "discord";
+  provider: "discord";
   providerId: string;
   email?: string;
   username: string;
@@ -686,54 +686,4 @@ export class AuthService {
     };
   }
 
-  async getGoogleProfile(code: string): Promise<any> {
-    // Exchange code for access token
-    const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: new URLSearchParams({
-        client_id: this.configService.get("GOOGLE_CLIENT_ID")!,
-        client_secret: this.configService.get("GOOGLE_CLIENT_SECRET")!,
-        grant_type: "authorization_code",
-        code,
-        redirect_uri:
-          this.configService.get("GOOGLE_LINK_CALLBACK_URL") ||
-          this.configService
-            .get("GOOGLE_CALLBACK_URL")
-            ?.replace("/callback", "/link/callback") ||
-          "",
-      }),
-    });
-
-    if (!tokenResponse.ok) {
-      throw new BadRequestException("Failed to exchange Google code");
-    }
-
-    const { access_token } = await tokenResponse.json();
-
-    // Get user profile
-    const profileResponse = await fetch(
-      "https://www.googleapis.com/oauth2/v2/userinfo",
-      {
-        headers: {
-          Authorization: `Bearer ${access_token}`,
-        },
-      },
-    );
-
-    if (!profileResponse.ok) {
-      throw new BadRequestException("Failed to get Google profile");
-    }
-
-    const profile = await profileResponse.json();
-
-    return {
-      id: profile.id,
-      name: profile.name,
-      email: profile.email,
-      picture: profile.picture,
-    };
-  }
 }

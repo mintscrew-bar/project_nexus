@@ -46,10 +46,11 @@ async function bootstrap() {
             "https://ddragon.leagueoflegends.com",
             "https://cdn.discordapp.com",
             "https://raw.communitydragon.org",
-            "https://lh3.googleusercontent.com",
           ],
         },
       },
+      // 업로드 이미지를 Next.js 프록시(다른 origin)에서 로드할 수 있도록 허용
+      crossOriginResourcePolicy: { policy: "cross-origin" },
       // HTTPS 강제: HSTS 헤더 (1년, 서브도메인 포함)
       hsts: {
         maxAge: 31536000,

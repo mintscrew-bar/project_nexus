@@ -17,7 +17,6 @@ interface AuthState {
   initializeAuth: () => Promise<void>;
   emailLogin: (credentials: { email: string; password: string }) => Promise<void>;
   loginWithDiscord: () => void;
-  loginWithGoogle: () => void;
   logout: () => Promise<void>;
   /** 회원 탈퇴: 계정 삭제 후 로그아웃 처리 */
   deleteAccount: () => Promise<void>;
@@ -127,11 +126,6 @@ export const useAuthStore = create<AuthState>((set) => ({
   loginWithDiscord: () => {
     set({ isLoading: true });
     authApi.login(); // This redirects
-  },
-
-  loginWithGoogle: () => {
-    set({ isLoading: true });
-    authApi.loginWithGoogle(); // This redirects
   },
 
   logout: async () => {

@@ -104,14 +104,12 @@ export class AuctionGateway
 
       client.userId = payload.sub;
       client.username = payload.username;
-      console.log(`Auction client connected: ${client.username}`);
     } catch (_error) {
       client.disconnect();
     }
   }
 
   async handleDisconnect(client: AuthenticatedSocket) {
-    console.log(`Auction client disconnected: ${client.username}`);
     const trackedUser = this.connectedUsers.get(client.id);
     this.connectedUsers.delete(client.id);
 
@@ -685,7 +683,6 @@ export class AuctionGateway
       });
       this._scheduleBidResolve(roomId, newState.timerEnd);
 
-      console.log(`[BotBid] ${botUsername} bid ${minBid}G in room ${roomId}`);
     } catch {
       // Ignore races such as timer expiry or stale state.
     } finally {
@@ -749,7 +746,6 @@ export class AuctionGateway
   private async _resolveCurrentBidAndAdvance(roomId: string): Promise<any> {
     // Prevent concurrent resolve calls (timer expiry + client resolve-bid race)
     if (this.resolvingRooms.has(roomId)) {
-      console.log(`[Auction] Already resolving room ${roomId}, skipping`);
       return null;
     }
     this.resolvingRooms.add(roomId);

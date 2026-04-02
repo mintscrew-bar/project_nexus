@@ -7,14 +7,15 @@ import { ChevronDown } from "lucide-react";
 
 interface StatusSelectorProps {
   currentStatus: UserStatus;
-  onStatusChange: (status: "ONLINE" | "AWAY") => void;
+  onStatusChange: (status: "ONLINE" | "AWAY" | "OFFLINE") => void;
   disabled?: boolean;
   className?: string;
 }
 
-const statusOptions: { value: "ONLINE" | "AWAY"; label: string }[] = [
+const statusOptions: { value: "ONLINE" | "AWAY" | "OFFLINE"; label: string }[] = [
   { value: "ONLINE", label: "온라인" },
   { value: "AWAY", label: "자리비움" },
+  { value: "OFFLINE", label: "오프라인" },
 ];
 
 export function StatusSelector({
@@ -41,7 +42,7 @@ export function StatusSelector({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleSelect = (status: "ONLINE" | "AWAY") => {
+  const handleSelect = (status: "ONLINE" | "AWAY" | "OFFLINE") => {
     onStatusChange(status);
     setIsOpen(false);
   };

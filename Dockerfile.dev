@@ -15,6 +15,6 @@ COPY packages/database/package.json ./packages/database/
 COPY packages/types/package.json ./packages/types/
 
 # 의존성 설치
-RUN echo "node-linker=hoisted" > .npmrc && pnpm install
+RUN echo "shamefully-hoist=true" > .npmrc && pnpm install
 
 # 소스 코드는 volume mount로 제공

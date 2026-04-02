@@ -111,8 +111,7 @@ export function HeroBanner({ isAuthenticated = false }: HeroBannerProps) {
     <section
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
-      className="relative flex flex-col items-center justify-center h-screen min-h-[600px] px-4 text-center overflow-hidden"
-      style={{ background: "#0a0a0f" }}
+      className="relative flex flex-col items-center justify-center h-screen min-h-[600px] px-4 text-center overflow-hidden bg-bg-primary"
     >
       {/* 레이어 1: 헥스 그리드 배경 — 마우스 패럴랙스 */}
       <div

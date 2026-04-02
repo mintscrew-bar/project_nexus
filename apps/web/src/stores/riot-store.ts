@@ -1,5 +1,7 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import { riotApi } from '@/lib/api-client';
+import { useAuthStore } from '@/stores/auth-store';
 
 interface ChampionPreference {
   id: string;
@@ -75,7 +77,9 @@ interface RiotStoreState {
   clearError: () => void;
 }
 
-export const useRiotStore = create<RiotStoreState>((set, get) => ({
+export const useRiotStore = create<RiotStoreState>()(
+  persist(
+    (set, get) => ({
   accounts: [],
   primaryAccount: null,
   selectedAccount: null,
@@ -212,8 +216,11 @@ export const useRiotStore = create<RiotStoreState>((set, get) => ({
 
       set({ verificationData: null, isIconVerified: false });
 
-      // Refresh accounts
-      await get().fetchAccounts();
+      // 계정 목록 + 유저 프로필 동시 갱신 (설정 패널 즉시 반영)
+      await Promise.all([
+        get().fetchAccounts(),
+        useAuthStore.getState().fetchUser(),
+      ]);
     } catch (error: any) {
       set({
         error: error.response?.data?.message || '계정 등록에 실패했습니다',
@@ -296,4 +303,15 @@ export const useRiotStore = create<RiotStoreState>((set, get) => ({
   clearError: () => {
     set({ error: null });
   },
-}));
+    }),
+    {
+      name: 'riot-verification',           // sessionStorage 키
+      storage: createJSONStorage(() => sessionStorage),
+      // 인증 진행 상태만 저장 — 계정 목록 등 서버 데이터는 제외
+      partialize: (state) => ({
+        isIconVerified: state.isIconVerified,
+        verificationData: state.verificationData,
+      }),
+    }
+  )
+);

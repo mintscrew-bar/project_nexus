@@ -136,8 +136,7 @@ export default function ProfilePage() {
     try {
       const response = await userApi.uploadAvatar(file);
       if (response.avatarUrl) {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-        setAvatarPreview(`${apiUrl}${response.avatarUrl}`);
+        setAvatarPreview(response.avatarUrl);
       }
       await fetchUser();
       addToast("프로필 사진이 변경되었습니다.", "success");
@@ -435,7 +434,7 @@ export default function ProfilePage() {
                     <input
                       value={editUsername}
                       onChange={(e) => handleUsernameChange(e.target.value)}
-                      style={{ width: `${Math.max(editUsername.length, 4) + 1}ch` }}
+                      style={{ width: `${Math.max([...editUsername].reduce((w, c) => w + (/[\uac00-\ud7af\u3000-\u9fff]/.test(c) ? 2 : 1), 0), 4) + 1}ch` }}
                       className="text-2xl md:text-3xl font-bold text-text-primary bg-transparent border-b border-transparent hover:border-bg-elevated focus:border-accent-primary focus:outline-none transition-colors"
                       placeholder="사용자 이름"
                     />
@@ -454,7 +453,7 @@ export default function ProfilePage() {
                     value={editBio}
                     onChange={(e) => handleBioChange(e.target.value)}
                     rows={1}
-                    style={{ width: `${Math.max((editBio || '').length, 10) + 2}ch`, maxWidth: '100%' }}
+                    style={{ width: `${Math.max([...(editBio || '')].reduce((w, c) => w + (/[\uac00-\ud7af\u3000-\u9fff]/.test(c) ? 2 : 1), 0), 18) + 2}ch`, maxWidth: '100%' }}
                     className="text-text-secondary bg-transparent border-b border-transparent hover:border-bg-elevated focus:border-accent-primary focus:outline-none transition-colors text-sm resize-none placeholder:text-text-tertiary placeholder:italic"
                     placeholder="자기소개를 입력하세요"
                   />

@@ -13,6 +13,8 @@ interface ModalProps {
   size?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
   className?: string;
   showCloseButton?: boolean;
+  /** true면 배경 클릭 및 ESC로 닫히지 않음 */
+  disableBackdropClose?: boolean;
 }
 
 export function Modal({
@@ -23,12 +25,13 @@ export function Modal({
   size = 'md',
   className,
   showCloseButton = true,
+  disableBackdropClose = false,
 }: ModalProps) {
   const handleEscape = useCallback((e: KeyboardEvent) => {
-    if (e.key === 'Escape') {
+    if (e.key === 'Escape' && !disableBackdropClose) {
       onClose();
     }
-  }, [onClose]);
+  }, [onClose, disableBackdropClose]);
 
   useEffect(() => {
     if (isOpen) {
@@ -62,7 +65,7 @@ export function Modal({
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in"
-        onClick={onClose}
+        onClick={disableBackdropClose ? undefined : onClose}
         aria-hidden="true"
       />
 

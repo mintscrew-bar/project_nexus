@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect } from "react";
+import { Suspense, useEffect, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { setAccessToken } from "@/lib/api-client";
 import { useAuthStore } from "@/stores/auth-store";
@@ -9,11 +9,17 @@ function AuthCallbackContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { fetchUser } = useAuthStore();
+  const processed = useRef(false);
 
   useEffect(() => {
+    // 중복 실행 방지 (replaceState 후 searchParams 변경으로 재실행되는 문제)
+    if (processed.current) return;
+
     const token = searchParams.get("token");
 
     if (token) {
+      processed.current = true;
+
       // 토큰을 URL에서 즉시 제거 (브라우저 히스토리/Referer 노출 방지)
       window.history.replaceState({}, "", "/auth/callback");
 
@@ -22,11 +28,9 @@ function AuthCallbackContent() {
 
       // 사용자 정보 가져오기
       fetchUser().then(() => {
-        // 대시보드로 리다이렉트
         router.push("/dashboard");
       });
     } else {
-      // 토큰이 없으면 로그인 페이지로
       router.push("/auth/login");
     }
   }, [searchParams, router, fetchUser]);

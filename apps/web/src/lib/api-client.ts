@@ -112,12 +112,6 @@ export const authApi = {
     window.location.href = `${apiUrl}/api/auth/discord`;
   },
 
-  loginWithGoogle: () => {
-    // Google OAuth로 리다이렉트
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-    window.location.href = `${apiUrl}/api/auth/google`;
-  },
-
   logout: async () => {
     try {
       await apiClient.post("/auth/logout");

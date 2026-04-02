@@ -87,42 +87,6 @@ export class AuthController {
   }
 
   // ========================================
-  // Google OAuth
-  // ========================================
-
-  @Get("google")
-  @UseGuards(AuthGuard("google"))
-  googleAuth() {
-    // Passport가 Google로 리다이렉트함
-  }
-
-  @Get("google/callback")
-  @UseGuards(AuthGuard("google"))
-  async googleCallback(@Req() req: Request, @Res() res: Response) {
-    const appUrl = this.configService.get("APP_URL") || "http://localhost:3000";
-    try {
-      const { user, isNewUser } = req.user as any;
-      await this.authService.checkAccountStatus(user.id);
-
-      if (isNewUser) {
-        // 신규 가입: 약관 동의 없이 임시 토큰으로 /auth/agree 페이지로 이동
-        const pendingToken = await this.authService.generatePendingTermsToken(
-          user.id,
-        );
-        return res.redirect(`${appUrl}/auth/agree?token=${pendingToken}`);
-      }
-
-      const tokens = await this.authService.generateTokens(user);
-      res.redirect(
-        `${appUrl}/api/auth/callback?access_token=${tokens.accessToken}&refresh_token=${tokens.refreshToken}`,
-      );
-    } catch (error) {
-      this.logger.error(`Google OAuth 콜백 실패: ${(error as Error).message}`);
-      res.redirect(`${appUrl}/auth/login?error=auth_failed`);
-    }
-  }
-
-  // ========================================
   // Discord OAuth
   // ========================================
 
@@ -306,54 +270,6 @@ export class AuthController {
         this.configService.get("APP_URL") || "http://localhost:3000";
       return res.redirect(
         `${appUrl}/settings?linked=discord&success=false&error=link_failed`,
-      );
-    }
-  }
-
-  @Get("link/google")
-  @UseGuards(JwtAuthGuard)
-  async linkGoogle(@CurrentUser("sub") userId: string, @Res() res: Response) {
-    const linkToken = await this.authService.generateLinkToken(
-      userId,
-      "google",
-    );
-
-    const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${this.configService.get("GOOGLE_CLIENT_ID")}&redirect_uri=${encodeURIComponent(this.configService.get("GOOGLE_LINK_CALLBACK_URL") || this.configService.get("GOOGLE_CALLBACK_URL")?.replace("/callback", "/link/callback") || "")}&response_type=code&scope=email%20profile&state=${linkToken}`;
-
-    return res.redirect(googleAuthUrl);
-  }
-
-  @Get("link/google/callback")
-  async linkGoogleCallback(
-    @Query("code") code: string,
-    @Query("state") linkToken: string,
-    @Res() res: Response,
-  ) {
-    try {
-      const userId = await this.authService.verifyLinkToken(
-        linkToken,
-        "google",
-      );
-      const profile = await this.authService.getGoogleProfile(code);
-
-      await this.authService.linkOAuthProvider(userId, {
-        provider: "google",
-        providerId: profile.id,
-        email: profile.email,
-        username: profile.name,
-        avatar: profile.picture,
-        metadata: {},
-      });
-
-      const appUrl =
-        this.configService.get("APP_URL") || "http://localhost:3000";
-      return res.redirect(`${appUrl}/settings?linked=google&success=true`);
-    } catch (error: any) {
-      this.logger.error(`Google 계정 연동 실패: ${error.message}`);
-      const appUrl =
-        this.configService.get("APP_URL") || "http://localhost:3000";
-      return res.redirect(
-        `${appUrl}/settings?linked=google&success=false&error=link_failed`,
       );
     }
   }

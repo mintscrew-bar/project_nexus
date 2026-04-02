@@ -11,17 +11,10 @@ export class JwtRefreshStrategy extends PassportStrategy(
   "jwt-refresh",
 ) {
   constructor(private readonly configService: ConfigService) {
-    // Extractor with logging to help diagnose missing/invalid refresh tokens
     const extractor = (req: Request) => {
       try {
-        const val = req?.cookies?.refresh_token;
-        console.log(
-          "JwtRefreshStrategy - extracted refresh_token:",
-          val ? "[REDACTED]" : null,
-        );
-        return val;
-      } catch (e) {
-        console.error("JwtRefreshStrategy extractor error:", e);
+        return req?.cookies?.refresh_token;
+      } catch (_e) {
         return null;
       }
     };

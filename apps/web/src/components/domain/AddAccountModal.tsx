@@ -57,8 +57,8 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
   const [championsByRole, setChampionsByRole] = useState<Record<Role, string[]>>({
     TOP: [], JUNGLE: [], MID: [], ADC: [], SUPPORT: []
   });
-  // 아코디언: 주/부 역할은 기본 펼침, 나머지는 접힘
-  const [expandedSections, setExpandedSections] = useState<Set<Role>>(new Set(['MID', 'ADC']));
+  // 현재 펼쳐진 섹션 — null이면 전부 접힘
+  const [openSection, setOpenSection] = useState<Role | null>('MID');
   const stepRef = useRef(step);
   stepRef.current = step;
 
@@ -88,7 +88,7 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
         setMainRole('MID');
         setSubRole('ADC');
         setChampionsByRole({ TOP: [], JUNGLE: [], MID: [], ADC: [], SUPPORT: [] });
-        setExpandedSections(new Set<Role>(['MID', 'ADC']));
+        setOpenSection('MID');
         resetRiotStore();
       }
     }
@@ -136,7 +136,11 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
     try {
       const checkResult = await checkVerification();
       if (!checkResult.verified) {
-        setLocalError(`아이콘을 ${verificationData.requiredIconId}번으로 변경해주세요. 현재 아이콘: ${checkResult.current}`);
+        setLocalError(
+          `아이콘이 아직 반영되지 않았습니다. ` +
+          `현재: #${checkResult.current} → 필요: #${checkResult.expected}\n` +
+          `Riot 서버에 변경사항이 반영되는 데 최대 5분이 걸릴 수 있습니다. 잠시 후 다시 시도해주세요.`
+        );
         return;
       }
       setStep(3);
@@ -147,23 +151,13 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
     }
   };
 
-  // 주/부 역할 변경 시 아코디언 펼침 상태 동기화
-  const updateExpandedForRoles = (main: Role, sub: Role) => {
-    setExpandedSections(prev => {
-      const next = new Set(prev);
-      next.add(main);
-      next.add(sub);
-      return next;
-    });
+  // 주/부 역할 변경 시 새 주 역할로 이동
+  const updateExpandedForRoles = (main: Role, _sub: Role) => {
+    setOpenSection(main);
   };
 
   const toggleSection = (role: Role) => {
-    setExpandedSections(prev => {
-      const next = new Set(prev);
-      if (next.has(role)) next.delete(role);
-      else next.add(role);
-      return next;
-    });
+    setOpenSection(prev => (prev === role ? null : role));
   };
 
   // 주/부 역할별 최소 3개 충족 여부
@@ -243,11 +237,11 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title={modalTitle()} size="lg">
+    <Modal isOpen={isOpen} onClose={handleClose} title={modalTitle()} size="lg" disableBackdropClose={step === 2}>
       {localError && (
         <div className="mb-4 p-3 bg-accent-danger/10 border border-accent-danger rounded-lg flex items-center gap-2">
           <AlertCircle className="w-5 h-5 text-accent-danger" />
-          <p className="text-sm text-accent-danger">{localError}</p>
+          <p className="text-sm text-accent-danger whitespace-pre-line">{localError}</p>
         </div>
       )}
 
@@ -358,6 +352,9 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
           <p className="text-xs text-text-tertiary text-center">
             이 아이콘이 없다면 &apos;뒤로&apos;를 누르고 다시 시도하면 다른 아이콘이 지정됩니다.
           </p>
+          <p className="text-xs text-accent-warning/80 text-center">
+            ⏱ 아이콘 변경 후 Riot 서버 반영까지 최대 5분이 걸릴 수 있습니다.
+          </p>
         </div>
       )}
 
@@ -421,7 +418,7 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
             <RoleAccordionSection
               role={mainRole}
               label="주 역할"
-              isExpanded={expandedSections.has(mainRole)}
+              isExpanded={openSection === mainRole}
               onToggle={() => toggleSection(mainRole)}
               isRequired
               autoFocusSearch
@@ -430,13 +427,24 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
               selectedChampions={championsByRole[mainRole]}
               onSelectionChange={(keys) => handleChampionSelectionChange(mainRole, keys)}
             />
+            {/* 주 역할 완료 버튼 */}
+            {openSection === mainRole && mainRoleSatisfied && (
+              <button
+                type="button"
+                onClick={() => setOpenSection(subRole)}
+                className="w-full flex items-center justify-center gap-2 py-2 text-sm font-semibold text-white bg-accent-primary hover:bg-accent-hover rounded-lg transition-colors"
+              >
+                주 역할 완료 — 부 역할 선택하기
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            )}
 
             {/* 부 역할 섹션 */}
             {mainRole !== subRole && (
               <RoleAccordionSection
                 role={subRole}
                 label="부 역할"
-                isExpanded={expandedSections.has(subRole)}
+                isExpanded={openSection === subRole}
                 onToggle={() => toggleSection(subRole)}
                 isRequired
                 champions={champions}
@@ -445,6 +453,17 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
                 onSelectionChange={(keys) => handleChampionSelectionChange(subRole, keys)}
               />
             )}
+            {/* 부 역할 완료 버튼 */}
+            {openSection === subRole && subRoleSatisfied && (
+              <button
+                type="button"
+                onClick={() => setOpenSection(null)}
+                className="w-full flex items-center justify-center gap-2 py-2 text-sm font-semibold text-white bg-accent-primary hover:bg-accent-hover rounded-lg transition-colors"
+              >
+                부 역할 완료
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            )}
 
             {/* 나머지 역할 — 선택 사항, 접힌 상태 */}
             {ROLES.filter(r => r !== mainRole && r !== subRole).map(role => (
@@ -452,7 +471,7 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
                 key={role}
                 role={role}
                 label="기타"
-                isExpanded={expandedSections.has(role)}
+                isExpanded={openSection === role}
                 onToggle={() => toggleSection(role)}
                 isRequired={false}
                 champions={champions}
@@ -531,6 +550,7 @@ function RoleAccordionSection({
   championsLoading,
   selectedChampions,
   onSelectionChange,
+  onComplete,
 }: {
   role: string;
   label: string;
@@ -543,6 +563,8 @@ function RoleAccordionSection({
   championsLoading: boolean;
   selectedChampions: string[];
   onSelectionChange: (keys: string[]) => void;
+  /** 3개 이상 선택 완료 후 다음 섹션으로 이동 */
+  onComplete?: () => void;
 }) {
   const count = selectedChampions.length;
   const isSatisfied = count >= 3;
@@ -609,15 +631,18 @@ function RoleAccordionSection({
               <Loader2 className="animate-spin text-text-tertiary" />
             </div>
           ) : (
-            <ChampionSelector
-              allChampions={champions}
-              selectedChampions={selectedChampions}
-              onSelectionChange={onSelectionChange}
-              maxSelection={5}
-              minSelection={isRequired ? 3 : 1}
-              isExpanded={isExpanded}
-              autoFocus={autoFocusSearch}
-            />
+            <>
+              <ChampionSelector
+                allChampions={champions}
+                selectedChampions={selectedChampions}
+                onSelectionChange={onSelectionChange}
+                maxSelection={5}
+                minSelection={isRequired ? 3 : 1}
+                isExpanded={isExpanded}
+                autoFocus={autoFocusSearch}
+                role={role}
+              />
+            </>
           )}
         </div>
       )}
