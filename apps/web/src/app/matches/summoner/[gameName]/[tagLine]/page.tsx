@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { riotApi, matchApi, statsApi, rankingApi } from "@/lib/api-client";
 import { LoadingSpinner, Button, Badge, Skeleton } from "@/components/ui";
@@ -31,7 +31,32 @@ export default function SummonerStatsPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshCooldown, setRefreshCooldown] = useState(0); // 갱신 쿨다운 (초)
   const [searchInput, setSearchInput] = useState("");
+  const [showHistory, setShowHistory] = useState(false);
   const [champStatTab, setChampStatTab] = useState<'nexus' | 'ranked'>('ranked');
+
+  // 최근 검색 히스토리 (localStorage, 최대 10개)
+  const HISTORY_KEY = "summoner_search_history";
+  const MAX_HISTORY = 10;
+
+  const getHistory = (): string[] => {
+    try {
+      return JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]");
+    } catch {
+      return [];
+    }
+  };
+
+  const saveToHistory = (gameName: string, tagLine: string) => {
+    const entry = `${gameName}#${tagLine}`;
+    const history = getHistory().filter(h => h.toLowerCase() !== entry.toLowerCase());
+    history.unshift(entry);
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(history.slice(0, MAX_HISTORY)));
+  };
+
+  const removeFromHistory = (entry: string) => {
+    const history = getHistory().filter(h => h !== entry);
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+  };
 
   const navigateToSummoner = (riotIdGameName: string, riotIdTagline: string) => {
     if (riotIdGameName && riotIdTagline) {
@@ -58,6 +83,8 @@ export default function SummonerStatsPage() {
       return;
     }
 
+    saveToHistory(searchGameName, searchTagLine);
+    setShowHistory(false);
     router.push(`/matches/summoner/${encodeURIComponent(searchGameName)}/${encodeURIComponent(searchTagLine)}`);
   };
 
@@ -71,6 +98,26 @@ export default function SummonerStatsPage() {
     staleTime: 2 * 60 * 1000,
     retry: false,
   });
+
+  // 소환사 로드 성공 시 히스토리에 자동 저장
+  useEffect(() => {
+    if (summoner?.gameName && summoner?.tagLine) {
+      saveToHistory(summoner.gameName, summoner.tagLine);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [summoner?.gameName, summoner?.tagLine]);
+
+  // 검색창 외부 클릭 시 히스토리 드롭다운 닫기
+  const searchContainerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
+        setShowHistory(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // Nexus 유저 ID 조회
   const { data: nexusUser } = useQuery({
@@ -265,18 +312,66 @@ export default function SummonerStatsPage() {
               <span className="hidden sm:inline">전적 검색</span>
             </Link>
 
-            <form onSubmit={handleSearch} className="flex-1 max-w-xl">
-              <div className="relative">
-                <Search className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-text-tertiary" />
-                <input
-                  type="text"
-                  value={searchInput}
-                  onChange={(e) => setSearchInput(e.target.value)}
-                  placeholder="소환사명#태그"
-                  className="w-full pl-9 sm:pl-12 pr-3 sm:pr-4 py-2 sm:py-3 bg-bg-tertiary border border-bg-elevated rounded-xl text-text-primary placeholder-text-tertiary focus:outline-none focus:border-accent-primary transition-colors text-sm sm:text-base"
-                />
-              </div>
-            </form>
+            <div ref={searchContainerRef} className="flex-1 max-w-xl relative">
+              <form onSubmit={handleSearch}>
+                <div className="relative">
+                  <Search className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-text-tertiary" />
+                  <input
+                    type="text"
+                    value={searchInput}
+                    onChange={(e) => setSearchInput(e.target.value)}
+                    onFocus={() => setShowHistory(true)}
+                    placeholder="소환사명#태그"
+                    className="w-full pl-9 sm:pl-12 pr-3 sm:pr-4 py-2 sm:py-3 bg-bg-tertiary border border-bg-elevated rounded-xl text-text-primary placeholder-text-tertiary focus:outline-none focus:border-accent-primary transition-colors text-sm sm:text-base"
+                  />
+                </div>
+              </form>
+
+              {/* 최근 검색 히스토리 드롭다운 */}
+              {showHistory && (() => {
+                const history = getHistory();
+                if (!history.length) return null;
+                return (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-bg-secondary border border-bg-tertiary rounded-xl shadow-xl z-50 overflow-hidden">
+                    <div className="px-3 py-2 text-[10px] text-text-tertiary font-medium border-b border-bg-tertiary">최근 검색</div>
+                    {history.map((entry) => (
+                      <div
+                        key={entry}
+                        className="flex items-center gap-2 px-3 py-2 hover:bg-bg-tertiary/60 cursor-pointer group"
+                      >
+                        <Search className="h-3 w-3 text-text-tertiary flex-shrink-0" />
+                        <span
+                          className="flex-1 text-sm text-text-secondary group-hover:text-text-primary transition-colors"
+                          onClick={() => {
+                            const idx = entry.lastIndexOf("#");
+                            if (idx !== -1) {
+                              const gn = entry.substring(0, idx);
+                              const tl = entry.substring(idx + 1);
+                              saveToHistory(gn, tl);
+                              setShowHistory(false);
+                              router.push(`/matches/summoner/${encodeURIComponent(gn)}/${encodeURIComponent(tl)}`);
+                            }
+                          }}
+                        >
+                          {entry}
+                        </span>
+                        <button
+                          className="opacity-0 group-hover:opacity-100 text-text-tertiary hover:text-text-primary transition-all text-xs px-1"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeFromHistory(entry);
+                            // 강제 리렌더
+                            setSearchInput(prev => prev);
+                          }}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+            </div>
           </div>
         </div>
       </div>
