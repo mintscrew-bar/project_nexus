@@ -66,20 +66,33 @@ export class StatsService {
   ) {}
 
   /**
-   * Check privacy setting for a target user.
-   * Returns true if the setting is enabled or if requester is the owner.
+   * 유저와 프라이버시 설정을 한 번에 조회 — checkPrivacy + user.findUnique 통합
+   * 기존: checkPrivacy(DB) + user.findUnique(DB) = 2회
+   * 개선: user include settings = 1회
    */
-  private async checkPrivacy(
-    userId: string,
-    requesterId: string,
-    setting: "showMatchHistory" | "showChampionStats" | "showRiotAccounts",
-  ): Promise<boolean> {
-    if (requesterId === userId) return true;
-    const settings = await this.prisma.userSettings.findUnique({
-      where: { userId },
-      select: { [setting]: true },
+  private async getUserWithSettings(userId: string) {
+    return this.prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        settings: {
+          select: {
+            showMatchHistory: true,
+            showChampionStats: true,
+            showRiotAccounts: true,
+          },
+        },
+      },
     });
-    return !settings || (settings as any)[setting] !== false;
+  }
+
+  private isPrivacyAllowed(
+    settings: { showMatchHistory?: boolean; showChampionStats?: boolean; showRiotAccounts?: boolean } | null,
+    requesterId: string,
+    userId: string,
+    setting: "showMatchHistory" | "showChampionStats" | "showRiotAccounts",
+  ): boolean {
+    if (requesterId === userId) return true;
+    return !settings || settings[setting] !== false;
   }
 
   /**
@@ -89,26 +102,11 @@ export class StatsService {
     userId: string,
     requesterId?: string,
   ): Promise<AuctionStats> {
-    if (requesterId) {
-      const allowed = await this.checkPrivacy(
-        userId,
-        requesterId,
-        "showMatchHistory",
-      );
-      if (!allowed) {
-        return {
-          captainCount: 0,
-          totalAuctions: 0,
-          totalSold: 0,
-          yuchalCount: 0,
-          avgSoldPrice: 0,
-          maxSoldPrice: 0,
-          titles: [],
-        };
-      }
-    }
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    const user = await this.getUserWithSettings(userId);
     if (!user) throw new NotFoundException("User not found");
+    if (requesterId && !this.isPrivacyAllowed(user.settings, requesterId, userId, "showMatchHistory")) {
+      return { captainCount: 0, totalAuctions: 0, totalSold: 0, yuchalCount: 0, avgSoldPrice: 0, maxSoldPrice: 0, titles: [] };
+    }
 
     // 팀장 횟수
     const captainCount = await this.prisma.team.count({
@@ -214,21 +212,9 @@ export class StatsService {
     userId: string,
     requesterId?: string,
   ): Promise<ChampionStats[]> {
-    if (requesterId) {
-      const allowed = await this.checkPrivacy(
-        userId,
-        requesterId,
-        "showChampionStats",
-      );
-      if (!allowed) return [];
-    }
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-    });
-
-    if (!user) {
-      throw new NotFoundException("User not found");
-    }
+    const user = await this.getUserWithSettings(userId);
+    if (!user) throw new NotFoundException("User not found");
+    if (requesterId && !this.isPrivacyAllowed(user.settings, requesterId, userId, "showChampionStats")) return [];
 
     // Get all match participants for this user
     const participants = await this.prisma.matchParticipant.findMany({
@@ -292,21 +278,9 @@ export class StatsService {
     userId: string,
     requesterId?: string,
   ): Promise<PositionStats[]> {
-    if (requesterId) {
-      const allowed = await this.checkPrivacy(
-        userId,
-        requesterId,
-        "showMatchHistory",
-      );
-      if (!allowed) return [];
-    }
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-    });
-
-    if (!user) {
-      throw new NotFoundException("User not found");
-    }
+    const user = await this.getUserWithSettings(userId);
+    if (!user) throw new NotFoundException("User not found");
+    if (requesterId && !this.isPrivacyAllowed(user.settings, requesterId, userId, "showMatchHistory")) return [];
 
     // Get all match participants for this user
     const participants = await this.prisma.matchParticipant.findMany({
@@ -403,17 +377,11 @@ export class StatsService {
    * Get user's Riot accounts
    */
   async getUserRiotAccounts(userId: string, requesterId?: string) {
-    if (requesterId) {
-      const allowed = await this.checkPrivacy(
-        userId,
-        requesterId,
-        "showRiotAccounts",
-      );
-      if (!allowed) return [];
-    }
+    // settings 포함 조회 후 프라이버시 체크 (기존 checkPrivacy + user.findUnique 2회 → 1회)
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       include: {
+        settings: { select: { showRiotAccounts: true } },
         riotAccounts: {
           select: {
             id: true,
@@ -423,7 +391,6 @@ export class StatsService {
             tier: true,
             rank: true,
             lp: true,
-            // Removed wins and losses as they are not directly on RiotAccount model
             isPrimary: true,
             mainRole: true,
           },
@@ -432,19 +399,10 @@ export class StatsService {
       },
     });
 
-    if (!user) {
-      throw new NotFoundException("User not found");
-    }
+    if (!user) throw new NotFoundException("User not found");
+    if (requesterId && !this.isPrivacyAllowed(user.settings, requesterId, userId, "showRiotAccounts")) return [];
 
-    // Type assertion to ensure riotAccounts property is recognized
-    const userWithRiotAccounts = user as typeof user & { riotAccounts: any[] };
-
-    // Explicitly check for riotAccounts as it is included
-    if (!userWithRiotAccounts.riotAccounts) {
-      return []; // Or throw an error, depending on desired behavior
-    }
-
-    return userWithRiotAccounts.riotAccounts;
+    return user.riotAccounts;
   }
 
   /**
@@ -633,7 +591,7 @@ export class StatsService {
       where: { matchId: { in: uniqueIds } },
       select: { matchId: true },
     });
-    const dbCachedSet = new Set(dbCached.map((e) => e.matchId));
+    const dbCachedSet = new Set(dbCached.map((e: { matchId: string }) => e.matchId));
     const cachedIds = uniqueIds.filter((id) => dbCachedSet.has(id));
     const uncachedIds = uniqueIds.filter((id) => !dbCachedSet.has(id));
 
