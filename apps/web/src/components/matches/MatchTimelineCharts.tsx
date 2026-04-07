@@ -389,7 +389,7 @@ export function GoldDiffChart({ tl, participant, match }: { tl: any; participant
   );
 }
 
-export function ObjectEventTimeline({ tl, participant }: { tl: any; participant: any; match?: any }) {
+export function ObjectEventTimeline({ tl, participant }: { tl: any; participant: any }) {
   const [hoverEvent, setHoverEvent] = useState<number | null>(null);
 
   if (!tl?.info?.frames) return null;

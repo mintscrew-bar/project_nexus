@@ -33,6 +33,7 @@ export default function SummonerStatsPage() {
   const [refreshCooldown, setRefreshCooldown] = useState(0); // 갱신 쿨다운 (초)
   const [searchInput, setSearchInput] = useState("");
   const [showHistory, setShowHistory] = useState(false);
+  const [historyVersion, setHistoryVersion] = useState(0); // 히스토리 변경 시 리렌더 트리거
   const [champStatTab, setChampStatTab] = useState<'nexus' | 'ranked'>('ranked');
 
   // 최근 검색 히스토리 (localStorage, 최대 10개)
@@ -340,6 +341,8 @@ export default function SummonerStatsPage() {
 
               {/* 최근 검색 히스토리 드롭다운 */}
               {showHistory && (() => {
+                // historyVersion 참조로 삭제 시 리렌더 보장
+                void historyVersion;
                 const history = getHistory();
                 if (!history.length) return null;
                 return (
@@ -371,8 +374,7 @@ export default function SummonerStatsPage() {
                           onClick={(e) => {
                             e.stopPropagation();
                             removeFromHistory(entry);
-                            // 강제 리렌더
-                            setSearchInput(prev => prev);
+                            setHistoryVersion(v => v + 1); // 리렌더 트리거
                           }}
                         >
                           ✕

@@ -4,7 +4,7 @@ import { useState, useEffect, ReactNode } from "react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 
-const DDRAGON_VERSION = process.env.NEXT_PUBLIC_DDRAGON_VERSION || "16.2.1";
+const DDRAGON_VERSION = process.env.NEXT_PUBLIC_DDRAGON_VERSION || "16.7.1";
 const DDRAGON_BASE = "https://ddragon.leagueoflegends.com";
 
 interface RuneInfo {

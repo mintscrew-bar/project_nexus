@@ -41,7 +41,6 @@ interface RiotMatchListProps {
 }
 
 const RIOT_MATCH_COUNT = 10;
-const ddVer = process.env.NEXT_PUBLIC_DDRAGON_VERSION || "16.2.1";
 
 export default function RiotMatchList({
   gameName,
@@ -1079,7 +1078,7 @@ export default function RiotMatchList({
                             <>
                               <TimelineGraphs tl={tl} match={match} participant={participant} />
                               <GoldDiffChart tl={tl} participant={participant} match={match} />
-                              <ObjectEventTimeline tl={tl} participant={participant} match={match} />
+                              <ObjectEventTimeline tl={tl} participant={participant} />
                             </>
                           )}
                         </div>
