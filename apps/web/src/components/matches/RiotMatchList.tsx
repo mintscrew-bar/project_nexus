@@ -12,6 +12,7 @@ import {
   getItemIcon,
 } from "./match-utils";
 import { ItemTooltip } from "@/components/ItemTooltip";
+import { RuneTooltip } from "@/components/RuneTooltip";
 import Image from "next/image";
 import {
   Loader2,
@@ -1362,6 +1363,112 @@ export default function RiotMatchList({
                               </div>
                             )}
                           </div>
+
+                          {/* 룬 섹션 */}
+                          {participant.perks?.styles?.length > 0 && (() => {
+                            const primaryStyle = participant.perks.styles[0];
+                            const secondaryStyle = participant.perks.styles[1];
+                            const statPerks = participant.perks.statPerks;
+
+                            return (
+                              <div className="mt-6">
+                                <h3 className="text-sm font-bold text-text-primary mb-3">룬</h3>
+                                <div className="flex gap-6 flex-wrap">
+                                  {/* 주 특성 */}
+                                  <div className="flex flex-col gap-2">
+                                    <div className="text-[10px] text-text-tertiary uppercase tracking-wide mb-1">주 특성</div>
+                                    <div className="flex items-center gap-2">
+                                      {/* 스타일 아이콘 */}
+                                      {primaryStyle?.style && (
+                                        <RuneTooltip runeId={primaryStyle.style}>
+                                          <Image
+                                            src={`/icons/perks/${primaryStyle.style}.png`}
+                                            alt="primary style"
+                                            width={28}
+                                            height={28}
+                                            className="w-7 h-7 opacity-60"
+                                            unoptimized
+                                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                          />
+                                        </RuneTooltip>
+                                      )}
+                                      {/* 키스톤 + 일반 룬 */}
+                                      {primaryStyle?.selections?.map((sel: any, i: number) => (
+                                        <RuneTooltip key={sel.perk} runeId={sel.perk}>
+                                          <Image
+                                            src={`/icons/perks/${sel.perk}.png`}
+                                            alt={`perk ${sel.perk}`}
+                                            width={i === 0 ? 36 : 24}
+                                            height={i === 0 ? 36 : 24}
+                                            className={`${i === 0 ? 'w-9 h-9' : 'w-6 h-6'} rounded-full bg-bg-tertiary`}
+                                            unoptimized
+                                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                          />
+                                        </RuneTooltip>
+                                      ))}
+                                    </div>
+                                  </div>
+
+                                  {/* 보조 특성 */}
+                                  {secondaryStyle && (
+                                    <div className="flex flex-col gap-2">
+                                      <div className="text-[10px] text-text-tertiary uppercase tracking-wide mb-1">보조 특성</div>
+                                      <div className="flex items-center gap-2">
+                                        {secondaryStyle.style && (
+                                          <RuneTooltip runeId={secondaryStyle.style}>
+                                            <Image
+                                              src={`/icons/perks/${secondaryStyle.style}.png`}
+                                              alt="secondary style"
+                                              width={24}
+                                              height={24}
+                                              className="w-6 h-6 opacity-60"
+                                              unoptimized
+                                              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                            />
+                                          </RuneTooltip>
+                                        )}
+                                        {secondaryStyle.selections?.map((sel: any) => (
+                                          <RuneTooltip key={sel.perk} runeId={sel.perk}>
+                                            <Image
+                                              src={`/icons/perks/${sel.perk}.png`}
+                                              alt={`perk ${sel.perk}`}
+                                              width={24}
+                                              height={24}
+                                              className="w-6 h-6 rounded-full bg-bg-tertiary"
+                                              unoptimized
+                                              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                            />
+                                          </RuneTooltip>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* 스탯 파편 */}
+                                  {statPerks && (
+                                    <div className="flex flex-col gap-2">
+                                      <div className="text-[10px] text-text-tertiary uppercase tracking-wide mb-1">스탯 파편</div>
+                                      <div className="flex items-center gap-2">
+                                        {[statPerks.offense, statPerks.flex, statPerks.defense].map((perkId: number, i: number) => perkId ? (
+                                          <RuneTooltip key={i} runeId={perkId}>
+                                            <Image
+                                              src={`/icons/perks/${perkId}.png`}
+                                              alt={`stat shard ${perkId}`}
+                                              width={20}
+                                              height={20}
+                                              className="w-5 h-5 rounded-full bg-bg-tertiary"
+                                              unoptimized
+                                              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                            />
+                                          </RuneTooltip>
+                                        ) : null)}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })()}
                         </div>
                       );
                     })()}
