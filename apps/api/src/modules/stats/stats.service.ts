@@ -628,16 +628,29 @@ export class StatsService {
     // 중복 제거
     const uniqueIds = [...new Set(allMatchIds)];
 
-    // 각 매치 상세 조회 — 5개씩 배치 순차 처리 (rate limit 보호)
-    const FETCH_BATCH = 5;
-    const matchDetails: any[] = [];
-    for (let i = 0; i < uniqueIds.length; i += FETCH_BATCH) {
-      const batch = uniqueIds.slice(i, i + FETCH_BATCH);
-      const results = await Promise.all(
-        batch.map((id) => this.riotMatchService.getMatchById(id)),
-      );
-      matchDetails.push(...results);
+    // DB 캐시 보유 여부 단일 쿼리로 확인
+    const dbCached = await this.prisma.riotMatchCache.findMany({
+      where: { matchId: { in: uniqueIds } },
+      select: { matchId: true },
+    });
+    const dbCachedSet = new Set(dbCached.map((e) => e.matchId));
+    const cachedIds = uniqueIds.filter((id) => dbCachedSet.has(id));
+    const uncachedIds = uniqueIds.filter((id) => !dbCachedSet.has(id));
+
+    // 캐시된 매치: 병렬 조회 (DB에서 즉시 반환 — Riot API 호출 없음)
+    const cachedResults = await Promise.all(
+      cachedIds.map((id) => this.riotMatchService.getMatchById(id)),
+    );
+
+    // 미캐시 매치: 1개씩 순차 조회 + 1.2초 대기 (Dev키 100 req/2min 기준)
+    const uncachedResults: any[] = [];
+    for (const id of uncachedIds) {
+      const match = await this.riotMatchService.getMatchById(id);
+      uncachedResults.push(match);
+      await new Promise((r) => setTimeout(r, 1200));
     }
+
+    const matchDetails = [...cachedResults, ...uncachedResults];
 
     // 챔피언별 통계 집계
     const statsMap = new Map<string, RankedChampStat>();
