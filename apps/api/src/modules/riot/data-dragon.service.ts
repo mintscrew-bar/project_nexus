@@ -127,8 +127,10 @@ export class DataDragonService {
       return version;
     } catch (error) {
       this.logger.error("Failed to fetch Data Dragon version", error);
-      // 폴백: 하드코딩된 최신 버전 (2026-04 기준)
-      return "16.7.1";
+      // 폴백: DDragon API 실패 시 폴백 버전을 Redis에 저장해 반복 호출 방지
+      const fallback = "16.7.1";
+      await this.redis.set("ddragon:version", fallback, this.cacheTTL).catch(() => {});
+      return fallback;
     }
   }
 

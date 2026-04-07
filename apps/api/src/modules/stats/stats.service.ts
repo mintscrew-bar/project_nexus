@@ -642,12 +642,22 @@ export class StatsService {
       cachedIds.map((id) => this.riotMatchService.getMatchById(id)),
     );
 
-    // 미캐시 매치: 1개씩 순차 조회 + 1.2초 대기 (Dev키 100 req/2min 기준)
+    // 미캐시 매치: 타임아웃 방지를 위해 최대 40개만 처리
+    // 나머지는 다음 요청 시 점진적으로 DB 캐시에 적재됨
+    const MAX_UNCACHED_FETCH = 40;
     const uncachedResults: any[] = [];
-    for (const id of uncachedIds) {
-      const match = await this.riotMatchService.getMatchById(id);
-      uncachedResults.push(match);
-      await new Promise((r) => setTimeout(r, 1200));
+    for (let i = 0; i < Math.min(uncachedIds.length, MAX_UNCACHED_FETCH); i++) {
+      try {
+        const match = await this.riotMatchService.getMatchById(uncachedIds[i]);
+        uncachedResults.push(match);
+      } catch {
+        // 개별 매치 오류는 건너뜀 — 나머지 처리 계속
+        uncachedResults.push(null);
+      }
+      // 마지막 항목 이후는 대기 불필요
+      if (i < Math.min(uncachedIds.length, MAX_UNCACHED_FETCH) - 1) {
+        await new Promise((r) => setTimeout(r, 1200));
+      }
     }
 
     const matchDetails = [...cachedResults, ...uncachedResults];
