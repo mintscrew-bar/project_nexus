@@ -605,6 +605,16 @@ export default function RiotMatchList({
 
   const riotMatches = riotMatchPages?.pages.flat() ?? [];
 
+  // 큐 탭 변경 시 카드 확장·탭·타임라인 상태 초기화
+  const handleQueueChange = (queueId: number | undefined) => {
+    setSelectedQueueId(queueId);
+    setExpandedMatches(new Set());
+    setMatchDetailTabs(new Map());
+    setStatsSubTabs(new Map());
+    setTimelineData(new Map());
+    mountedMatchesRef.current = new Set();
+  };
+
   const toggleMatchExpand = (matchId: string) => {
     if (!expandedMatches.has(matchId)) {
       mountedMatchesRef.current.add(matchId);
@@ -617,12 +627,22 @@ export default function RiotMatchList({
     });
   };
 
+  const MAX_TIMELINE_CACHE = 5; // 최대 캐시 매치 수 (메모리 누수 방지)
+
   const loadTimeline = async (matchId: string) => {
     if (timelineData.has(matchId) || timelineLoading.has(matchId)) return;
     setTimelineLoading(prev => new Set(prev).add(matchId));
     try {
       const data = await statsApi.getMatchTimeline(matchId);
-      setTimelineData(prev => new Map(prev).set(matchId, data));
+      setTimelineData(prev => {
+        const next = new Map(prev).set(matchId, data);
+        // 캐시 한도 초과 시 가장 오래된 항목 제거
+        if (next.size > MAX_TIMELINE_CACHE) {
+          const oldestKey = next.keys().next().value as string | undefined;
+          if (oldestKey) next.delete(oldestKey);
+        }
+        return next;
+      });
     } catch (err) {
       console.error("Failed to load timeline:", err);
     } finally {
@@ -644,7 +664,7 @@ export default function RiotMatchList({
         {QUEUE_TABS.map((tab) => (
           <button
             key={tab.key}
-            onClick={() => setSelectedQueueId(tab.queueId)}
+            onClick={() => handleQueueChange(tab.queueId)}
             className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-md text-[11px] sm:text-xs font-medium transition-colors whitespace-nowrap ${
               selectedQueueId === tab.queueId
                 ? "bg-accent-primary text-white"
