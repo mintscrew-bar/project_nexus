@@ -564,6 +564,7 @@ export default function RiotMatchList({
   const [expandedMatches, setExpandedMatches] = useState<Set<string>>(new Set());
   const mountedMatchesRef = useRef(new Set<string>());
   const [matchDetailTabs, setMatchDetailTabs] = useState<Map<string, 'teams' | 'build' | 'stats' | 'timeline'>>(new Map());
+  const [statsSubTabs, setStatsSubTabs] = useState<Map<string, 'combat' | 'farm' | 'vision'>>(new Map());
   const [timelineData, setTimelineData] = useState<Map<string, any>>(new Map());
   const [timelineLoading, setTimelineLoading] = useState<Set<string>>(new Set());
 
@@ -1312,23 +1313,64 @@ export default function RiotMatchList({
                     {/* Stats Tab */}
                     {matchDetailTabs.get(matchId) === 'stats' && (() => {
                       const allP = match.info.participants;
+                      const activeStatSub = statsSubTabs.get(matchId) || 'combat';
 
-                      const statDefs = [
-                        { label: '총 피해량', getValue: (p: any) => p.totalDamageDealtToChampions || 0, format: (v: number) => v.toLocaleString(), color: 'from-red-600 to-orange-500' },
-                        { label: '받은 피해량', getValue: (p: any) => p.totalDamageTaken || 0, format: (v: number) => v.toLocaleString(), color: 'from-blue-600 to-cyan-500' },
-                        { label: '치유량', getValue: (p: any) => p.totalHeal || 0, format: (v: number) => v.toLocaleString(), color: 'from-green-600 to-emerald-500' },
-                        { label: 'CC 시간', getValue: (p: any) => p.timeCCingOthers || 0, format: (v: number) => `${v.toFixed(0)}초`, color: 'from-purple-600 to-violet-500' },
-                        { label: '획득 골드', getValue: (p: any) => p.goldEarned || 0, format: (v: number) => v.toLocaleString(), color: 'from-yellow-600 to-amber-500' },
-                        { label: '분당 골드', getValue: (p: any) => (p.goldEarned || 0) / Math.max(duration / 60, 1), format: (v: number) => v.toFixed(0), color: 'from-yellow-600 to-amber-500' },
-                        { label: 'CS', getValue: (p: any) => (p.totalMinionsKilled || 0) + (p.neutralMinionsKilled || 0), format: (v: number) => String(Math.round(v)), color: 'from-teal-600 to-cyan-500' },
-                        { label: '분당 CS', getValue: (p: any) => ((p.totalMinionsKilled || 0) + (p.neutralMinionsKilled || 0)) / Math.max(duration / 60, 1), format: (v: number) => v.toFixed(1), color: 'from-teal-600 to-cyan-500' },
+                      // 카테고리별 통계 정의
+                      const statCategories = {
+                        combat: [
+                          { label: '총 피해량',   getValue: (p: any) => p.totalDamageDealtToChampions || 0, format: (v: number) => v.toLocaleString(),      color: 'from-red-600 to-orange-500' },
+                          { label: '받은 피해량', getValue: (p: any) => p.totalDamageTaken || 0,             format: (v: number) => v.toLocaleString(),      color: 'from-blue-600 to-cyan-500' },
+                          { label: '치유량',      getValue: (p: any) => p.totalHeal || 0,                   format: (v: number) => v.toLocaleString(),      color: 'from-green-600 to-emerald-500' },
+                          { label: 'CC 시간',     getValue: (p: any) => p.timeCCingOthers || 0,             format: (v: number) => `${v.toFixed(0)}초`,    color: 'from-purple-600 to-violet-500' },
+                        ],
+                        farm: [
+                          { label: 'CS',      getValue: (p: any) => (p.totalMinionsKilled || 0) + (p.neutralMinionsKilled || 0),                                           format: (v: number) => String(Math.round(v)), color: 'from-teal-600 to-cyan-500' },
+                          { label: '분당 CS', getValue: (p: any) => ((p.totalMinionsKilled || 0) + (p.neutralMinionsKilled || 0)) / Math.max(duration / 60, 1),            format: (v: number) => v.toFixed(1),          color: 'from-teal-600 to-cyan-500' },
+                          { label: '획득 골드', getValue: (p: any) => p.goldEarned || 0,                                                                                   format: (v: number) => v.toLocaleString(),    color: 'from-yellow-600 to-amber-500' },
+                          { label: '분당 골드', getValue: (p: any) => (p.goldEarned || 0) / Math.max(duration / 60, 1),                                                    format: (v: number) => v.toFixed(0),          color: 'from-yellow-600 to-amber-500' },
+                        ],
+                        vision: [
+                          { label: '시야 점수',     getValue: (p: any) => p.visionScore || 0,          format: (v: number) => String(Math.round(v)), color: 'from-indigo-600 to-blue-500' },
+                          { label: '와드 설치',     getValue: (p: any) => p.wardsPlaced || 0,           format: (v: number) => `${Math.round(v)}개`,  color: 'from-indigo-600 to-blue-500' },
+                          { label: '와드 제거',     getValue: (p: any) => p.wardsKilled || 0,           format: (v: number) => `${Math.round(v)}개`,  color: 'from-violet-600 to-purple-500' },
+                          { label: '제어 와드',     getValue: (p: any) => p.detectorWardsPlaced || 0,   format: (v: number) => `${Math.round(v)}개`,  color: 'from-violet-600 to-purple-500' },
+                        ],
+                      } as const;
+
+                      const SUB_TABS: { key: keyof typeof statCategories; label: string }[] = [
+                        { key: 'combat', label: '전투' },
+                        { key: 'farm',   label: '파밍' },
+                        { key: 'vision', label: '시야' },
                       ];
 
+                      const activeDefs = statCategories[activeStatSub];
+
                       return (
-                        <div className="p-4">
-                          <h3 className="text-sm font-bold text-text-primary mb-3">10인 비교 통계</h3>
+                        <div className="p-3 sm:p-4">
+                          {/* 서브탭 */}
+                          <div className="flex gap-1 mb-3 bg-bg-elevated/50 rounded-lg p-0.5 w-fit">
+                            {SUB_TABS.map(({ key, label }) => (
+                              <button
+                                key={key}
+                                onClick={() => {
+                                  const next = new Map(statsSubTabs);
+                                  next.set(matchId, key);
+                                  setStatsSubTabs(next);
+                                }}
+                                className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                                  activeStatSub === key
+                                    ? 'bg-accent-primary text-white'
+                                    : 'text-text-secondary hover:text-text-primary'
+                                }`}
+                              >
+                                {label}
+                              </button>
+                            ))}
+                          </div>
+
+                          {/* 통계 그리드 */}
                           <div className="grid grid-cols-2 gap-3">
-                            {statDefs.map((stat) => {
+                            {activeDefs.map((stat) => {
                               const values = allP.map((p: any) => ({ puuid: p.puuid, name: p.riotIdGameName || p.championName, val: stat.getValue(p) }));
                               const sorted = [...values].sort((a, b) => b.val - a.val);
                               const maxVal = sorted[0]?.val || 1;
@@ -1351,7 +1393,7 @@ export default function RiotMatchList({
                                     </div>
                                   </div>
                                   <div className="space-y-0.5">
-                                    {sorted.map((v, i) => {
+                                    {sorted.map((v) => {
                                       const isMe = v.puuid === participant.puuid;
                                       const pct = maxVal > 0 ? (v.val / maxVal) * 100 : 0;
                                       return (
