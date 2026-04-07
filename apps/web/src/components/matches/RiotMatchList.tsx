@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { statsApi } from "@/lib/api-client";
 import {
@@ -214,34 +214,46 @@ function TimelineGraphs({
 }) {
   const [activeTab, setActiveTab] = useState<'gold' | 'cs' | 'xp' | 'damage'>('gold');
 
-  if (!tl?.info?.frames) return null;
-
-  const buildSeries = (getVal: (f: any) => number): ParticipantSeries[] => {
-    const map = new Map<number, ParticipantSeries>();
-    for (const p of match.info.participants) {
-      map.set(p.participantId, {
-        participantId: p.participantId,
-        teamId: p.teamId,
-        championName: p.championName,
-        summonerName: p.riotIdGameName || p.summonerName || p.championName,
-        data: [],
-      });
-    }
-    for (const frame of tl.info.frames) {
-      const min = Math.round(frame.timestamp / 60000);
-      for (const [pid, s] of map) {
-        const pf = frame.participantFrames?.[String(pid)];
-        if (pf) s.data.push({ min, value: getVal(pf) });
+  // tl.info.frames가 바뀌지 않는 한 재계산하지 않음 (조건부 return 전에 선언해야 hooks 규칙 준수)
+  const frames: any[] = tl?.info?.frames ?? [];
+  const buildSeries = useMemo(() => {
+    if (!frames.length) return { gold: [], cs: [], xp: [], damage: [] };
+    const make = (getVal: (f: any) => number): ParticipantSeries[] => {
+      const map = new Map<number, ParticipantSeries>();
+      for (const p of match.info.participants) {
+        map.set(p.participantId, {
+          participantId: p.participantId,
+          teamId: p.teamId,
+          championName: p.championName,
+          summonerName: p.riotIdGameName || p.summonerName || p.championName,
+          data: [],
+        });
       }
-    }
-    return Array.from(map.values());
-  };
+      for (const frame of frames) {
+        const min = Math.round(frame.timestamp / 60000);
+        for (const [pid, s] of map) {
+          const pf = frame.participantFrames?.[String(pid)];
+          if (pf) s.data.push({ min, value: getVal(pf) });
+        }
+      }
+      return Array.from(map.values());
+    };
+    return {
+      gold:   make(f => f.totalGold),
+      cs:     make(f => f.minionsKilled + (f.jungleMinionsKilled || 0)),
+      xp:     make(f => f.xp),
+      damage: make(f => f.damageStats?.totalDamageDoneToChampions ?? 0),
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [frames]);
+
+  if (!frames.length) return null;
 
   const tabs = [
-    { key: 'gold' as const, label: '골드', series: buildSeries(f => f.totalGold), formatVal: (v: number) => `${(v / 1000).toFixed(1)}k` },
-    { key: 'cs' as const, label: 'CS', series: buildSeries(f => f.minionsKilled + (f.jungleMinionsKilled || 0)), formatVal: (v: number) => String(Math.round(v)) },
-    { key: 'xp' as const, label: '경험치', series: buildSeries(f => f.xp), formatVal: (v: number) => `${(v / 1000).toFixed(1)}k` },
-    { key: 'damage' as const, label: '피해량', series: buildSeries(f => f.damageStats?.totalDamageDoneToChampions ?? 0), formatVal: (v: number) => `${(v / 1000).toFixed(1)}k` },
+    { key: 'gold'   as const, label: '골드',   series: buildSeries.gold,   formatVal: (v: number) => `${(v / 1000).toFixed(1)}k` },
+    { key: 'cs'     as const, label: 'CS',     series: buildSeries.cs,     formatVal: (v: number) => String(Math.round(v)) },
+    { key: 'xp'     as const, label: '경험치', series: buildSeries.xp,     formatVal: (v: number) => `${(v / 1000).toFixed(1)}k` },
+    { key: 'damage' as const, label: '피해량', series: buildSeries.damage, formatVal: (v: number) => `${(v / 1000).toFixed(1)}k` },
   ];
 
   const active = tabs.find(t => t.key === activeTab)!;
