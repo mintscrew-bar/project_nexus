@@ -1408,7 +1408,7 @@ export default function RiotMatchList({
                                               style={{ width: `${pct}%` }}
                                             />
                                           </div>
-                                          <span className={`text-[9px] w-10 text-right ${isMe ? 'text-text-primary font-medium' : 'text-text-tertiary opacity-0 group-hover:opacity-100 transition-opacity'}`}>
+                                          <span className={`text-[9px] w-10 text-right ${isMe ? 'text-text-primary font-medium' : 'text-text-tertiary/60'}`}>
                                             {stat.format(v.val)}
                                           </span>
                                         </div>
