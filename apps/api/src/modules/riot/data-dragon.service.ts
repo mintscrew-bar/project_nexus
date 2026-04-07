@@ -127,8 +127,8 @@ export class DataDragonService {
       return version;
     } catch (error) {
       this.logger.error("Failed to fetch Data Dragon version", error);
-      // 폴백: 하드코딩된 최신 버전 (2025년 기준)
-      return "16.2.1";
+      // 폴백: 하드코딩된 최신 버전 (2026-04 기준)
+      return "16.7.1";
     }
   }
 
