@@ -1093,6 +1093,70 @@ export default function RiotMatchList({
         </div>
       )}
 
+      {/* 같이 플레이한 사람 */}
+      {riotMatches.length >= 3 && (() => {
+        // 팀 동료 빈도 집계 (리메이크 제외)
+        const duoMap = new Map<string, { gameName: string; tagLine: string; games: number; wins: number }>();
+        for (const match of riotMatches) {
+          const me = match.info.participants.find((p: any) => p.puuid === puuid);
+          if (!me) continue;
+          const gameDur = match.info.gameDuration || 0;
+          if (gameDur < 210) continue; // 리메이크 제외
+          const teammates = match.info.participants.filter(
+            (p: any) => p.teamId === me.teamId && p.puuid !== puuid
+          );
+          for (const p of teammates) {
+            if (!p.riotIdGameName || !p.riotIdTagline) continue;
+            const key = `${p.riotIdGameName}#${p.riotIdTagline}`;
+            const prev = duoMap.get(key) ?? { gameName: p.riotIdGameName, tagLine: p.riotIdTagline, games: 0, wins: 0 };
+            duoMap.set(key, {
+              ...prev,
+              games: prev.games + 1,
+              wins: prev.wins + (me.win ? 1 : 0),
+            });
+          }
+        }
+        // 2판 이상 같이 플레이한 사람만 표시, 최대 8명
+        const duos = Array.from(duoMap.values())
+          .filter(d => d.games >= 2)
+          .sort((a, b) => b.games - a.games)
+          .slice(0, 8);
+
+        if (!duos.length) return null;
+
+        return (
+          <div className="mt-6 pt-6 border-t border-bg-tertiary/50">
+            <h3 className="text-sm font-bold text-text-primary mb-3 flex items-center gap-2">
+              <Shield className="h-4 w-4 text-accent-primary" />
+              같이 플레이한 사람
+            </h3>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {duos.map((duo) => {
+                const winRate = Math.round((duo.wins / duo.games) * 100);
+                return (
+                  <div
+                    key={`${duo.gameName}#${duo.tagLine}`}
+                    className="flex items-center gap-2 p-2 bg-bg-tertiary/40 rounded-lg cursor-pointer hover:bg-bg-tertiary/70 transition-colors"
+                    onClick={() => navigateToSummoner(duo.gameName, duo.tagLine)}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-medium text-text-primary truncate">{duo.gameName}</div>
+                      <div className="text-[10px] text-text-tertiary">#{duo.tagLine}</div>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <div className="text-xs font-bold text-text-primary">{duo.games}판</div>
+                      <div className={`text-[10px] font-medium ${winRate >= 60 ? 'text-accent-success' : winRate >= 50 ? 'text-blue-400' : 'text-text-tertiary'}`}>
+                        {winRate}%
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Load More Button */}
       {riotMatches.length > 0 && hasMoreRiotMatches && (
         <div className="mt-4 text-center">
