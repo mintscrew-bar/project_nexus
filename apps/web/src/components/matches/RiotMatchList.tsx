@@ -581,7 +581,8 @@ export default function RiotMatchList({
     queryFn: ({ pageParam = 0 }) =>
       statsApi.getSummonerRiotMatches(gameName, tagLine, RIOT_MATCH_COUNT, selectedQueueId, pageParam),
     getNextPageParam: (lastPage: any[], _allPages: any[][], lastPageParam: number) => {
-      if (lastPage.length === 0) return undefined;
+      // 반환된 항목이 요청 수보다 적으면 마지막 페이지
+      if (lastPage.length < RIOT_MATCH_COUNT) return undefined;
       return lastPageParam + RIOT_MATCH_COUNT;
     },
     initialPageParam: 0,
