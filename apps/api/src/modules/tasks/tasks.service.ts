@@ -1,12 +1,33 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { Cron, CronExpression } from "@nestjs/schedule";
 import { PrismaService } from "../prisma/prisma.service";
+import { DataDragonService } from "../riot/data-dragon.service";
 
 @Injectable()
 export class TasksService {
   private readonly logger = new Logger(TasksService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly dataDragon: DataDragonService,
+  ) {}
+
+  /**
+   * DDragon 최신 버전 동기화 — 매주 월요일 새벽 4시
+   * 롤 패치는 2주 단위 수요일에 배포되므로 주 1회 갱신으로 충분
+   * Redis 캐시를 무효화한 뒤 재조회하여 최신 버전을 갱신한다
+   */
+  @Cron("0 4 * * 1")
+  async handleDdragonVersionSync(): Promise<void> {
+    try {
+      // TTL 만료를 기다리지 않고 강제 갱신
+      await this.dataDragon.invalidateVersionCache();
+      const version = await this.dataDragon.getLatestVersion();
+      this.logger.log(`DDragon 버전 동기화 완료: ${version}`);
+    } catch (error) {
+      this.logger.error("DDragon 버전 동기화 실패", error);
+    }
+  }
 
   /**
    * 임시 밴 및 임시 제한 자동 해제 - 매 5분마다 실행

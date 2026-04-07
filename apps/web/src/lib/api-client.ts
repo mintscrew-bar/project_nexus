@@ -1128,6 +1128,12 @@ export const statsApi = {
     const response = await apiClient.get(`/stats/user/${userId}/auction-stats`);
     return response.data;
   },
+
+  // DDragon 최신 버전 조회 — 프로필 아이콘 URL 생성에 사용
+  getDdragonVersion: async (): Promise<string> => {
+    const response = await apiClient.get<{ version: string }>("/stats/ddragon-version");
+    return response.data.version;
+  },
 };
 
 // ========================================

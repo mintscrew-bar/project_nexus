@@ -8,10 +8,7 @@ import { useDdragonStore, Champion } from '@/stores/ddragon-store';
 import { X, Loader2, AlertCircle, ArrowRight, ChevronDown } from 'lucide-react';
 import { ChampionSelector } from './ChampionSelector';
 import Image from 'next/image';
-
-const DDRAGON_VERSION = process.env.NEXT_PUBLIC_DDRAGON_VERSION || '16.2.1';
-const getProfileIconUrl = (iconId: number) =>
-  `https://ddragon.leagueoflegends.com/cdn/${DDRAGON_VERSION}/img/profileicon/${iconId}.png`;
+import { useDdragonVersion } from '@/hooks/useDdragonVersion';
 
 // Define specific props for the new AddAccountModal
 interface AddAccountModalProps {
@@ -38,6 +35,7 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
   } = useRiotStore();
 
   const { champions, fetchChampions, isLoading: championsLoading } = useDdragonStore();
+  const ddragonVersion = useDdragonVersion();
 
   const [step, setStep] = useState(1); // 1: Input, 2: Verify, 3: Role Selection
   const [gameName, setGameName] = useState('');
@@ -293,7 +291,7 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
               <p className="text-xs text-text-tertiary mb-2">현재 아이콘</p>
               <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-bg-elevated mx-auto">
                 <Image
-                  src={getProfileIconUrl(verificationData.currentIconId)}
+                  src={`https://ddragon.leagueoflegends.com/cdn/${ddragonVersion}/img/profileicon/${verificationData.currentIconId}.png`}
                   alt="현재 프로필 아이콘"
                   width={64}
                   height={64}
@@ -308,7 +306,7 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
               <p className="text-xs text-accent-gold mb-2 font-semibold">변경할 아이콘</p>
               <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-accent-gold ring-2 ring-accent-gold/30 mx-auto">
                 <Image
-                  src={getProfileIconUrl(verificationData.requiredIconId)}
+                  src={`https://ddragon.leagueoflegends.com/cdn/${ddragonVersion}/img/profileicon/${verificationData.requiredIconId}.png`}
                   alt="필요한 프로필 아이콘"
                   width={64}
                   height={64}

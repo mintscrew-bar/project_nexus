@@ -5,13 +5,7 @@ import Image from 'next/image';
 import { Loader2, ArrowRight, User } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
-
-// Data Dragon version for profile icons
-const DDRAGON_VERSION = process.env.NEXT_PUBLIC_DDRAGON_VERSION || '16.2.1';
-
-// Helper to get profile icon URL
-const getProfileIconUrl = (iconId: number) =>
-  `https://ddragon.leagueoflegends.com/cdn/${DDRAGON_VERSION}/img/profileicon/${iconId}.png`;
+import { useDdragonVersion } from '@/hooks/useDdragonVersion';
 
 // Profile icon component with error fallback
 function ProfileIcon({
@@ -23,6 +17,7 @@ function ProfileIcon({
   alt: string;
   className?: string;
 }) {
+  const version = useDdragonVersion();
   const [hasError, setHasError] = useState(false);
 
   if (hasError) {
@@ -35,7 +30,7 @@ function ProfileIcon({
 
   return (
     <Image
-      src={getProfileIconUrl(iconId)}
+      src={`https://ddragon.leagueoflegends.com/cdn/${version}/img/profileicon/${iconId}.png`}
       alt={alt}
       width={64}
       height={64}

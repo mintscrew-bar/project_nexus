@@ -15,6 +15,7 @@ import {
   getProfileIconUrl,
   getTierImage,
 } from "@/components/matches/match-utils";
+import { useDdragonVersion } from "@/hooks/useDdragonVersion";
 import type { SummonerData, ChampionStats, NexusMatchHistory } from "@/components/matches/match-utils";
 import RecentStatsSummary from "@/components/matches/RecentStatsSummary";
 import RiotMatchList from "@/components/matches/RiotMatchList";
@@ -58,6 +59,9 @@ export default function SummonerStatsPage() {
 
     router.push(`/matches/summoner/${encodeURIComponent(searchGameName)}/${encodeURIComponent(searchTagLine)}`);
   };
+
+  // DDragon 최신 버전 조회 (1주일 캐시 — 패치 주기에 맞춤)
+  const ddragonVersion = useDdragonVersion();
 
   // 소환사 기본 정보 (Riot API)
   const { data: summoner, isLoading: isSummonerLoading, error: summonerError } = useQuery<SummonerData>({
@@ -268,7 +272,7 @@ export default function SummonerStatsPage() {
             {/* Profile Icon */}
             <div className="relative flex-shrink-0">
               <Image
-                src={getProfileIconUrl(summoner.profileIconId)}
+                src={getProfileIconUrl(summoner.profileIconId, ddragonVersion)}
                 alt="Profile Icon"
                 width={96}
                 height={96}

@@ -2,6 +2,7 @@ import { Controller, Get, Param, Query, UseGuards } from "@nestjs/common";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { StatsService } from "./stats.service";
+import { DataDragonService } from "../riot/data-dragon.service";
 import {
   FindSummonerQueryDto,
   MatchHistoryQueryDto,
@@ -11,7 +12,20 @@ import {
 
 @Controller("stats")
 export class StatsController {
-  constructor(private readonly statsService: StatsService) {}
+  constructor(
+    private readonly statsService: StatsService,
+    private readonly dataDragon: DataDragonService,
+  ) {}
+
+  /**
+   * DDragon 최신 버전 반환 — 프론트엔드 프로필 아이콘 URL 생성에 사용
+   * Redis 캐시(1시간) 우선 반환, 없으면 DDragon API 조회
+   */
+  @Get("ddragon-version")
+  async getDdragonVersion(): Promise<{ version: string }> {
+    const version = await this.dataDragon.getLatestVersion();
+    return { version };
+  }
 
   /**
    * Get auction statistics for a user

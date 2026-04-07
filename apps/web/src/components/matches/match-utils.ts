@@ -116,7 +116,8 @@ export const QUEUE_TABS: QueueTab[] = [
 
 // ─── Helper Functions ────────────────────────────────
 
-const DDRAGON_VERSION = process.env.NEXT_PUBLIC_DDRAGON_VERSION || "16.2.1";
+// 하드코딩 제거 — 버전은 백엔드 /api/stats/ddragon-version 에서 동적으로 조회
+// getProfileIconUrl 호출 시 version 파라미터로 전달한다
 
 export function getChampionIcon(championName: string): string {
   return `/icons/champions/${championName}.png`;
@@ -166,8 +167,8 @@ export function getChampionIconById(championId: number): string {
   return `/icons/champions/${championId}.png`;
 }
 
-export function getProfileIconUrl(iconId: number): string {
-  return `https://ddragon.leagueoflegends.com/cdn/${DDRAGON_VERSION}/img/profileicon/${iconId}.png`;
+export function getProfileIconUrl(iconId: number, version: string): string {
+  return `https://ddragon.leagueoflegends.com/cdn/${version}/img/profileicon/${iconId}.png`;
 }
 
 export function getTierImage(tier?: string): string | null {

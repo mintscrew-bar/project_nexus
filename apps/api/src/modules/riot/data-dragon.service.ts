@@ -97,6 +97,14 @@ export class DataDragonService {
   ) {}
 
   /**
+   * Redis 버전 캐시 무효화 (강제 갱신 시 사용)
+   */
+  async invalidateVersionCache(): Promise<void> {
+    await this.redis.del("ddragon:version");
+    this.cachedVersion = null;
+  }
+
+  /**
    * 최신 게임 버전 가져오기
    */
   async getLatestVersion(): Promise<string> {
