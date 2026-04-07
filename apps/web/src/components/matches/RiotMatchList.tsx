@@ -11,6 +11,7 @@ import {
   calculateTimeAgo,
   getItemIcon,
 } from "./match-utils";
+import { ItemTooltip } from "@/components/ItemTooltip";
 import Image from "next/image";
 import {
   Loader2,
@@ -809,39 +810,46 @@ export default function RiotMatchList({
                       {[participant.item0, participant.item1, participant.item2, participant.item3, participant.item4, participant.item5].map((item: number, idx: number) => (
                         <div key={idx} className="w-6 h-6 lg:w-8 lg:h-8 rounded-md bg-bg-tertiary border border-bg-elevated">
                           {item !== 0 && (
+                            <ItemTooltip itemId={String(item)}>
+                              <Image
+                                src={getItemIcon(item)}
+                                alt="item"
+                                width={32}
+                                height={32}
+                                className="w-full h-full rounded-md"
+                                onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                              />
+                            </ItemTooltip>
+                          )}
+                        </div>
+                      ))}
+                      {/* 장신구 — 툴팁 적용 */}
+                      <div className="w-6 h-6 lg:w-8 lg:h-8 rounded-full bg-bg-tertiary border border-bg-elevated">
+                        {participant.item6 !== 0 && (
+                          <ItemTooltip itemId={String(participant.item6)}>
                             <Image
-                              src={getItemIcon(item)}
-                              alt="item"
+                              src={getItemIcon(participant.item6)}
+                              alt="trinket"
+                              width={32}
+                              height={32}
+                              className="w-full h-full rounded-full"
+                              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                            />
+                          </ItemTooltip>
+                        )}
+                      </div>
+                      {participant.item7 != null && participant.item7 !== 0 && (
+                        <div className="w-6 h-6 lg:w-8 lg:h-8 rounded-md bg-bg-tertiary border border-amber-500/40">
+                          <ItemTooltip itemId={String(participant.item7)}>
+                            <Image
+                              src={getItemIcon(participant.item7)}
+                              alt="quest"
                               width={32}
                               height={32}
                               className="w-full h-full rounded-md"
                               onError={(e) => { e.currentTarget.style.display = 'none'; }}
                             />
-                          )}
-                        </div>
-                      ))}
-                      <div className="w-6 h-6 lg:w-8 lg:h-8 rounded-full bg-bg-tertiary border border-bg-elevated">
-                        {participant.item6 !== 0 && (
-                          <Image
-                            src={getItemIcon(participant.item6)}
-                            alt="trinket"
-                            width={32}
-                            height={32}
-                            className="w-full h-full rounded-full"
-                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                          />
-                        )}
-                      </div>
-                      {participant.item7 != null && participant.item7 !== 0 && (
-                        <div className="w-6 h-6 lg:w-8 lg:h-8 rounded-md bg-bg-tertiary border border-amber-500/40">
-                          <Image
-                            src={getItemIcon(participant.item7)}
-                            alt="quest"
-                            width={32}
-                            height={32}
-                            className="w-full h-full rounded-md"
-                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                          />
+                          </ItemTooltip>
                         </div>
                       )}
                     </div>
@@ -904,27 +912,31 @@ export default function RiotMatchList({
                       {[participant.item0, participant.item1, participant.item2, participant.item3, participant.item4, participant.item5].map((item: number, idx: number) => (
                         <div key={idx} className="w-5 h-5 rounded bg-bg-tertiary border border-bg-elevated">
                           {item !== 0 && (
-                            <Image
-                              src={getItemIcon(item)}
-                              alt="item"
-                              width={20}
-                              height={20}
-                              className="w-full h-full rounded"
-                              onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                            />
+                            <ItemTooltip itemId={String(item)}>
+                              <Image
+                                src={getItemIcon(item)}
+                                alt="item"
+                                width={20}
+                                height={20}
+                                className="w-full h-full rounded"
+                                onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                              />
+                            </ItemTooltip>
                           )}
                         </div>
                       ))}
                       <div className="w-5 h-5 rounded-full bg-bg-tertiary border border-bg-elevated">
                         {participant.item6 !== 0 && (
-                          <Image
-                            src={getItemIcon(participant.item6)}
-                            alt="trinket"
-                            width={20}
-                            height={20}
-                            className="w-full h-full rounded-full"
-                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                          />
+                          <ItemTooltip itemId={String(participant.item6)}>
+                            <Image
+                              src={getItemIcon(participant.item6)}
+                              alt="trinket"
+                              width={20}
+                              height={20}
+                              className="w-full h-full rounded-full"
+                              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                            />
+                          </ItemTooltip>
                         )}
                       </div>
                     </div>
@@ -1153,27 +1165,31 @@ export default function RiotMatchList({
                                 {[p.item0, p.item1, p.item2, p.item3, p.item4, p.item5, p.item6].map((item: number, idx: number) => (
                                   <div key={idx} className={`w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 ${idx === 6 ? 'rounded-full' : 'rounded'} bg-bg-primary border border-bg-tertiary`}>
                                     {item !== 0 && (
-                                      <Image
-                                        src={getItemIcon(item)}
-                                        alt="item"
-                                        width={24}
-                                        height={24}
-                                        className={`w-full h-full ${idx === 6 ? 'rounded-full' : 'rounded'}`}
-                                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                                      />
+                                      <ItemTooltip itemId={String(item)}>
+                                        <Image
+                                          src={getItemIcon(item)}
+                                          alt="item"
+                                          width={24}
+                                          height={24}
+                                          className={`w-full h-full ${idx === 6 ? 'rounded-full' : 'rounded'}`}
+                                          onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                        />
+                                      </ItemTooltip>
                                     )}
                                   </div>
                                 ))}
                                 {p.item7 != null && p.item7 !== 0 && (
                                   <div className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 rounded bg-bg-primary border border-amber-500/40">
-                                    <Image
-                                      src={getItemIcon(p.item7)}
-                                      alt="quest"
-                                      width={24}
-                                      height={24}
-                                      className="w-full h-full rounded"
-                                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                                    />
+                                    <ItemTooltip itemId={String(p.item7)}>
+                                      <Image
+                                        src={getItemIcon(p.item7)}
+                                        alt="quest"
+                                        width={24}
+                                        height={24}
+                                        className="w-full h-full rounded"
+                                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                      />
+                                    </ItemTooltip>
                                   </div>
                                 )}
                               </div>
@@ -1291,15 +1307,16 @@ export default function RiotMatchList({
                                   <div key={min} className="flex flex-col items-center px-2.5" style={{ minWidth: '52px' }}>
                                     <div className="flex flex-col gap-0.5 items-center mb-1.5">
                                       {byMinute.get(min)!.map((itemId, i) => (
-                                        <Image
-                                          key={i}
-                                          src={getItemIcon(itemId)}
-                                          alt={`item ${itemId}`}
-                                          width={28}
-                                          height={28}
-                                          className="w-7 h-7 rounded border border-bg-tertiary/80"
-                                          onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                                        />
+                                        <ItemTooltip key={i} itemId={String(itemId)}>
+                                          <Image
+                                            src={getItemIcon(itemId)}
+                                            alt={`item ${itemId}`}
+                                            width={28}
+                                            height={28}
+                                            className="w-7 h-7 rounded border border-bg-tertiary/80"
+                                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                          />
+                                        </ItemTooltip>
                                       ))}
                                     </div>
                                     <div className="w-2 h-2 rounded-full bg-bg-secondary border-2 border-text-tertiary/50 z-10 mb-1" />
@@ -1315,14 +1332,16 @@ export default function RiotMatchList({
                             {[participant.item0, participant.item1, participant.item2, participant.item3, participant.item4, participant.item5, participant.item6].map((item: number, idx: number) => (
                               <div key={idx} className={`${idx === 6 ? 'rounded-full' : 'rounded'} bg-bg-tertiary`}>
                                 {item !== 0 ? (
-                                  <Image
-                                    src={getItemIcon(item)}
-                                    alt="item"
-                                    width={48}
-                                    height={48}
-                                    className={`w-12 h-12 ${idx === 6 ? 'rounded-full' : 'rounded'} border-2 border-bg-elevated`}
-                                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                                  />
+                                  <ItemTooltip itemId={String(item)}>
+                                    <Image
+                                      src={getItemIcon(item)}
+                                      alt="item"
+                                      width={48}
+                                      height={48}
+                                      className={`w-12 h-12 ${idx === 6 ? 'rounded-full' : 'rounded'} border-2 border-bg-elevated`}
+                                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                    />
+                                  </ItemTooltip>
                                 ) : (
                                   <div className={`w-12 h-12 ${idx === 6 ? 'rounded-full' : 'rounded'} border-2 border-bg-elevated bg-bg-secondary`} />
                                 )}
@@ -1330,14 +1349,16 @@ export default function RiotMatchList({
                             ))}
                             {participant.item7 != null && participant.item7 !== 0 && (
                               <div className="rounded bg-bg-tertiary">
-                                <Image
-                                  src={getItemIcon(participant.item7)}
-                                  alt="quest"
-                                  width={48}
-                                  height={48}
-                                  className="w-12 h-12 rounded border-2 border-amber-500/40"
-                                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                                />
+                                <ItemTooltip itemId={String(participant.item7)}>
+                                  <Image
+                                    src={getItemIcon(participant.item7)}
+                                    alt="quest"
+                                    width={48}
+                                    height={48}
+                                    className="w-12 h-12 rounded border-2 border-amber-500/40"
+                                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                  />
+                                </ItemTooltip>
                               </div>
                             )}
                           </div>
