@@ -433,13 +433,13 @@ export default function RecentStatsSummary({
 
   const hasRiot = !!(gameName && tagLine && puuid);
 
-  // Fetch all queues recent 20 games
+  // 전체 탭 선택 시에만 조회 — 불필요한 초기 API 호출 방지
   const { data: allMatches, isLoading: isLoadingAll } = useQuery<any[]>({
     queryKey: ["recentAllStats", gameName, tagLine],
     queryFn: () => statsApi.getSummonerRiotMatches(gameName!, tagLine!, 20),
     staleTime: 3 * 60 * 1000,
     retry: false,
-    enabled: hasRiot,
+    enabled: hasRiot && activeTab === "all",
   });
 
   // 솔로 랭크(420) 최근 20게임 — 기본 탭이라 초기 로드 (#20: 명칭 솔로 랭크)

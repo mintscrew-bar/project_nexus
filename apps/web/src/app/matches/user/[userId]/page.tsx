@@ -44,27 +44,35 @@ export default function UserStatsPage() {
       setIsLoading(true);
       setError(null);
 
-      try {
-        const userData = await userApi.getProfile(userId);
-        setUser(userData);
+      // user, matches, riotAccounts 병렬 조회 — 순차 대기 제거
+      // matches는 21개 조회해 hasMore 판단 (20개 반환 시 마지막 페이지 오인 방지)
+      const [userResult, matchesResult, accountsResult] = await Promise.allSettled([
+        userApi.getProfile(userId),
+        matchApi.getUserMatchHistory(userId, 21, 0),
+        statsApi.getUserRiotAccounts(userId),
+      ]);
 
-        const matches = await matchApi.getUserMatchHistory(userId, 20, 0);
-        setMatchHistory(matches);
-        setHasMore(matches.length >= 20);
-
-        try {
-          const accounts = await statsApi.getUserRiotAccounts(userId);
-          setRiotAccounts(accounts);
-        } catch (err) {
-          console.error("Failed to fetch Riot accounts:", err);
-          setRiotAccounts([]);
-        }
-      } catch (err: any) {
-        console.error("Failed to fetch user data:", err);
+      if (userResult.status === "rejected") {
+        const err: any = userResult.reason;
         setError(err.response?.data?.message || "유저 정보를 불러오는데 실패했습니다.");
-      } finally {
         setIsLoading(false);
+        return;
       }
+
+      setUser(userResult.value);
+
+      if (matchesResult.status === "fulfilled") {
+        const fetched = matchesResult.value;
+        // 21개 조회 후 20개만 표시 — 21개 이상이면 다음 페이지 존재
+        setMatchHistory(fetched.slice(0, 20));
+        setHasMore(fetched.length > 20);
+      }
+
+      if (accountsResult.status === "fulfilled") {
+        setRiotAccounts(accountsResult.value);
+      }
+
+      setIsLoading(false);
     };
 
     fetchUserData();
@@ -80,9 +88,10 @@ export default function UserStatsPage() {
     if (isLoadingMore || !hasMore) return;
     setIsLoadingMore(true);
     try {
-      const moreMatches = await matchApi.getUserMatchHistory(userId, 20, matchHistory.length);
-      setMatchHistory((prev) => [...prev, ...moreMatches]);
-      setHasMore(moreMatches.length >= 20);
+      // 21개 조회 후 20개만 추가 — hasMore 정확한 판단
+      const moreMatches = await matchApi.getUserMatchHistory(userId, 21, matchHistory.length);
+      setMatchHistory((prev) => [...prev, ...moreMatches.slice(0, 20)]);
+      setHasMore(moreMatches.length > 20);
     } catch (err) {
       console.error("Failed to load more matches:", err);
     } finally {

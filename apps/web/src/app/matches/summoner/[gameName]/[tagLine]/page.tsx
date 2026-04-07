@@ -112,6 +112,10 @@ export default function SummonerStatsPage() {
       await queryClient.invalidateQueries({ queryKey: ["summoner", gameName, tagLine] });
       await queryClient.invalidateQueries({ queryKey: ["riotMatches", gameName, tagLine] });
       await queryClient.invalidateQueries({ queryKey: ["rankedChampionStats", gameName, tagLine] });
+      // RecentStatsSummary 쿼리도 함께 무효화
+      await queryClient.invalidateQueries({ queryKey: ["recentAllStats", gameName, tagLine] });
+      await queryClient.invalidateQueries({ queryKey: ["recentRankedStats", gameName, tagLine] });
+      await queryClient.invalidateQueries({ queryKey: ["recentNormalStats", gameName, tagLine] });
     } catch (err: any) {
       addToast("데이터 새로고침에 실패했습니다.", "error");
     } finally {

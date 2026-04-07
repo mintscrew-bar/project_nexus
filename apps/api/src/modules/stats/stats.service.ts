@@ -699,8 +699,10 @@ export class StatsService {
       (a, b) => b.games - a.games,
     );
 
-    // Redis 캐시 저장 (10분)
-    await this.redis.set(cacheKey, JSON.stringify(result), 600);
+    // 미캐시 매치가 MAX 초과면 집계가 불완전 — 30초 TTL로 재시도 유도
+    // 완전 집계 시 10분 TTL 적용
+    const isPartial = uncachedIds.length > MAX_UNCACHED_FETCH;
+    await this.redis.set(cacheKey, JSON.stringify(result), isPartial ? 30 : 600);
 
     return result;
   }
