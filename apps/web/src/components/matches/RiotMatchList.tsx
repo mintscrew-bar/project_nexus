@@ -745,7 +745,9 @@ export default function RiotMatchList({
               achievementTags.push({ label: fmtKill('트리플킬', participant.tripleKills), cls: 'bg-yellow-500/20 border-yellow-400/50 text-yellow-300' });
             if (participant.doubleKills > 0)
               achievementTags.push({ label: fmtKill('더블킬', participant.doubleKills),  cls: 'bg-green-500/20 border-green-400/50 text-green-300' });
-            if (participant.deaths === 0)
+            // 리메이크: 3분 30초 미만 게임 (LP 변동 없음)
+            const isRemake = duration < 210;
+            if (participant.deaths === 0 && !isRemake)
               achievementTags.push({ label: '무결점', cls: 'bg-cyan-500/20 border-cyan-400/50 text-cyan-300' });
             if (participant.firstBloodKill)
               achievementTags.push({ label: '퍼스트 블러드', cls: 'bg-rose-500/20 border-rose-400/50 text-rose-300' });
@@ -755,7 +757,7 @@ export default function RiotMatchList({
             return (
               <div
                 key={matchId}
-                className={`overflow-hidden transition-all ${isExpanded ? 'bg-bg-secondary/60' : participant.win ? 'bg-accent-success/[0.06]' : 'bg-accent-danger/[0.06]'}`}
+                className={`overflow-hidden transition-all ${isExpanded ? 'bg-bg-secondary/60' : isRemake ? 'bg-bg-tertiary/30' : participant.win ? 'bg-accent-success/[0.06]' : 'bg-accent-danger/[0.06]'}`}
               >
                 {/* Match Header */}
                 <div
@@ -774,8 +776,8 @@ export default function RiotMatchList({
 
                     <div className="min-w-0 flex-shrink-0">
                       <div className="flex items-center gap-1 sm:gap-1.5 mb-0.5">
-                        <span className={`font-bold text-xs sm:text-sm ${participant.win ? "text-accent-success" : "text-accent-danger"}`}>
-                          {participant.win ? "승리" : "패배"}
+                        <span className={`font-bold text-xs sm:text-sm ${isRemake ? "text-text-tertiary" : participant.win ? "text-accent-success" : "text-accent-danger"}`}>
+                          {isRemake ? "리메이크" : participant.win ? "승리" : "패배"}
                         </span>
                         <span className="text-[10px] sm:text-xs text-text-secondary truncate hidden sm:inline">{getQueueTypeName(match.info.queueId)}</span>
                       </div>

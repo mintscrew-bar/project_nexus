@@ -29,6 +29,7 @@ export default function SummonerStatsPage() {
   const tagLine = decodeURIComponent(params.tagLine as string).replace(/[\u200B-\u200F\u2028-\u202E\u2060-\u2069\uFEFF]/g, "");
 
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshCooldown, setRefreshCooldown] = useState(0); // 갱신 쿨다운 (초)
   const [searchInput, setSearchInput] = useState("");
   const [champStatTab, setChampStatTab] = useState<'nexus' | 'ranked'>('ranked');
 
@@ -106,7 +107,10 @@ export default function SummonerStatsPage() {
   });
 
 
+  const REFRESH_COOLDOWN_SEC = 30; // 갱신 쿨다운 30초
+
   const handleRefresh = async () => {
+    if (refreshCooldown > 0) return;
     setIsRefreshing(true);
     try {
       await queryClient.invalidateQueries({ queryKey: ["summoner", gameName, tagLine] });
@@ -116,6 +120,14 @@ export default function SummonerStatsPage() {
       await queryClient.invalidateQueries({ queryKey: ["recentAllStats", gameName, tagLine] });
       await queryClient.invalidateQueries({ queryKey: ["recentRankedStats", gameName, tagLine] });
       await queryClient.invalidateQueries({ queryKey: ["recentNormalStats", gameName, tagLine] });
+      // 갱신 성공 시 쿨다운 시작
+      setRefreshCooldown(REFRESH_COOLDOWN_SEC);
+      const timer = setInterval(() => {
+        setRefreshCooldown(prev => {
+          if (prev <= 1) { clearInterval(timer); return 0; }
+          return prev - 1;
+        });
+      }, 1000);
     } catch (err: any) {
       addToast("데이터 새로고침에 실패했습니다.", "error");
     } finally {
@@ -310,11 +322,14 @@ export default function SummonerStatsPage() {
                   onClick={handleRefresh}
                   variant="secondary"
                   size="sm"
-                  disabled={isRefreshing}
+                  disabled={isRefreshing || refreshCooldown > 0}
                   className="ml-auto"
+                  title={refreshCooldown > 0 ? `${refreshCooldown}초 후 갱신 가능` : undefined}
                 >
                   <RefreshCw className={`h-4 w-4 sm:mr-2 ${isRefreshing ? "animate-spin" : ""}`} />
-                  <span className="hidden sm:inline">{isRefreshing ? "새로고침 중..." : "새로고침"}</span>
+                  <span className="hidden sm:inline">
+                    {isRefreshing ? "새로고침 중..." : refreshCooldown > 0 ? `${refreshCooldown}초` : "새로고침"}
+                  </span>
                 </Button>
               </div>
 
