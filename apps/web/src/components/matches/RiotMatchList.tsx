@@ -691,11 +691,32 @@ export default function RiotMatchList({
             const enemyTeam = match.info.participants.filter((p: any) => p.teamId !== participant.teamId);
             const myTeamWon = participant.win;
 
-            const getCarryScore = (p: any) => p.kills * 3 + p.assists + (p.totalDamageDealtToChampions / 1000);
+            // 캐리 점수: KDA 기반 + 딜량 가중 (MVP/ACE 판정에 공통 사용)
+            const getCarryScore = (p: any) =>
+              (p.kills * 3 + p.assists * 1.5) / Math.max(p.deaths, 1) + p.totalDamageDealtToChampions / 10000;
             const winningTeam = myTeamWon ? myTeam : enemyTeam;
             const losingTeam = myTeamWon ? enemyTeam : myTeam;
             const mvpPuuid = [...winningTeam].sort((a, b) => getCarryScore(b) - getCarryScore(a))[0]?.puuid ?? null;
             const acePuuid = [...losingTeam].sort((a, b) => getCarryScore(b) - getCarryScore(a))[0]?.puuid ?? null;
+
+            // ─── 특수 태그 계산 ───
+            const fmtKill = (label: string, count: number) =>
+              count > 1 ? `${label} x${count}` : label;
+            const achievementTags: { label: string; cls: string }[] = [];
+            if (participant.pentaKills > 0)
+              achievementTags.push({ label: fmtKill('펜타킬', participant.pentaKills),  cls: 'bg-red-500/20 border-red-400/50 text-red-300' });
+            if (participant.quadraKills > 0)
+              achievementTags.push({ label: fmtKill('쿼드라킬', participant.quadraKills), cls: 'bg-orange-500/20 border-orange-400/50 text-orange-300' });
+            if (participant.tripleKills > 0)
+              achievementTags.push({ label: fmtKill('트리플킬', participant.tripleKills), cls: 'bg-yellow-500/20 border-yellow-400/50 text-yellow-300' });
+            if (participant.doubleKills > 0)
+              achievementTags.push({ label: fmtKill('더블킬', participant.doubleKills),  cls: 'bg-green-500/20 border-green-400/50 text-green-300' });
+            if (participant.deaths === 0)
+              achievementTags.push({ label: '무결점', cls: 'bg-cyan-500/20 border-cyan-400/50 text-cyan-300' });
+            if (participant.firstBloodKill)
+              achievementTags.push({ label: '퍼스트 블러드', cls: 'bg-rose-500/20 border-rose-400/50 text-rose-300' });
+            if (participant.firstTowerKill)
+              achievementTags.push({ label: '퍼스트 타워', cls: 'bg-slate-500/20 border-slate-400/50 text-slate-300' });
 
             return (
               <div
@@ -726,6 +747,19 @@ export default function RiotMatchList({
                       </div>
                       <div className="text-[10px] sm:text-xs text-text-tertiary">{gameDurationMin}:{gameDurationSec.toString().padStart(2, '0')} · {timeAgo}</div>
                       <div className="text-[10px] sm:text-xs text-text-tertiary truncate">{participant.championName}</div>
+                      {/* 특수 태그 (멀티킬·무결점·퍼스트) */}
+                      {achievementTags.length > 0 && (
+                        <div className="flex flex-wrap gap-0.5 mt-0.5">
+                          {achievementTags.map((tag) => (
+                            <span
+                              key={tag.label}
+                              className={`text-[9px] font-bold px-1 py-px rounded border ${tag.cls}`}
+                            >
+                              {tag.label}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
 
                     <div className="text-center flex-shrink-0">
@@ -930,11 +964,10 @@ export default function RiotMatchList({
                     {/* Teams Tab */}
                     {(matchDetailTabs.get(matchId) || 'teams') === 'teams' && (() => {
                       const allParticipants = match.info.participants;
-                      const sortedByCarry = [...allParticipants].sort((a: any, b: any) => {
-                        const scoreA = (a.kills * 3 + a.assists * 1.5) / Math.max(a.deaths, 1) + a.totalDamageDealtToChampions / 10000;
-                        const scoreB = (b.kills * 3 + b.assists * 1.5) / Math.max(b.deaths, 1) + b.totalDamageDealtToChampions / 10000;
-                        return scoreB - scoreA;
-                      });
+                      // 캐리 랭킹 — 공통 getCarryScore 사용
+                      const sortedByCarry = [...allParticipants].sort((a: any, b: any) =>
+                        getCarryScore(b) - getCarryScore(a)
+                      );
                       const carryRanks = new Map(sortedByCarry.map((p: any, idx: number) => [p.puuid, idx + 1]));
                       const maxDamage = Math.max(...allParticipants.map((p: any) => p.totalDamageDealtToChampions));
 
@@ -945,8 +978,9 @@ export default function RiotMatchList({
                         const carryRank = carryRanks.get(p.puuid) || 10;
                         const damagePercent = (p.totalDamageDealtToChampions / maxDamage) * 100;
                         const pKillParticipation = ((p.kills + p.assists) / Math.max(teamKills, 1) * 100).toFixed(0);
-                        const isAceRow = carryRank === 1;
-                        const isMvpRow = carryRank <= 2 && teamWon;
+                        // 승리팀 1등 = MVP, 패자팀 1등 = ACE (팀별 판정)
+                        const isMvpRow = p.puuid === mvpPuuid;
+                        const isAceRow = p.puuid === acePuuid;
 
                         return (
                           <div
@@ -1032,11 +1066,11 @@ export default function RiotMatchList({
                                     {p.riotIdGameName || p.summonerName || "Unknown"}
                                     {p.riotIdTagline && <span className="text-text-tertiary text-[10px]">#{p.riotIdTagline}</span>}
                                   </span>
-                                  {isAceRow && (
-                                    <span className="flex-shrink-0 px-1.5 py-px bg-gradient-to-r from-amber-500/30 to-yellow-500/30 border border-amber-400/50 text-amber-300 text-[9px] font-bold rounded">ACE</span>
+                                  {isMvpRow && (
+                                    <span className="flex-shrink-0 px-1.5 py-px bg-gradient-to-r from-yellow-500/30 to-amber-500/30 border border-yellow-400/50 text-yellow-300 text-[9px] font-bold rounded">MVP</span>
                                   )}
-                                  {isMvpRow && !isAceRow && (
-                                    <span className="flex-shrink-0 px-1.5 py-px bg-gradient-to-r from-blue-500/30 to-cyan-500/30 border border-blue-400/50 text-blue-300 text-[9px] font-bold rounded">MVP</span>
+                                  {isAceRow && (
+                                    <span className="flex-shrink-0 px-1.5 py-px bg-gradient-to-r from-purple-500/30 to-violet-500/30 border border-purple-400/50 text-purple-300 text-[9px] font-bold rounded">ACE</span>
                                   )}
                                 </div>
                               </div>
