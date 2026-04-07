@@ -747,19 +747,6 @@ export default function RiotMatchList({
                       </div>
                       <div className="text-[10px] sm:text-xs text-text-tertiary">{gameDurationMin}:{gameDurationSec.toString().padStart(2, '0')} · {timeAgo}</div>
                       <div className="text-[10px] sm:text-xs text-text-tertiary truncate">{participant.championName}</div>
-                      {/* 특수 태그 (멀티킬·무결점·퍼스트) */}
-                      {achievementTags.length > 0 && (
-                        <div className="flex flex-wrap gap-0.5 mt-0.5">
-                          {achievementTags.map((tag) => (
-                            <span
-                              key={tag.label}
-                              className={`text-[9px] font-bold px-1 py-px rounded border ${tag.cls}`}
-                            >
-                              {tag.label}
-                            </span>
-                          ))}
-                        </div>
-                      )}
                     </div>
 
                     <div className="text-center flex-shrink-0">
@@ -929,6 +916,20 @@ export default function RiotMatchList({
                       </span>
                     </div>
                   </div>
+
+                  {/* 특수 태그 행 (멀티킬·무결점·퍼스트) — 태그 있을 때만 표시 */}
+                  {achievementTags.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1.5">
+                      {achievementTags.map((tag) => (
+                        <span
+                          key={tag.label}
+                          className={`text-[9px] font-bold px-1.5 py-px rounded border ${tag.cls}`}
+                        >
+                          {tag.label}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Expanded Content */}
