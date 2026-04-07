@@ -20,6 +20,7 @@ import { RiotService } from "./riot.service";
 import { RegisterRiotAccountDto } from "./dto";
 import { DataDragonService } from "./data-dragon.service";
 import { RiotTournamentService } from "./riot-tournament.service";
+import { RiotSpectatorService } from "./riot-spectator.service";
 import { Role, UserRole } from "@nexus/database";
 
 @Controller("riot")
@@ -28,6 +29,7 @@ export class RiotController {
     private readonly riotService: RiotService,
     private readonly dataDragonService: DataDragonService,
     private readonly tournamentService: RiotTournamentService,
+    private readonly spectatorService: RiotSpectatorService,
   ) {}
 
   // ========================================
@@ -232,5 +234,23 @@ export class RiotController {
   @Roles(UserRole.ADMIN)
   async createTournament(@Body() data: { providerId: string }) {
     return this.tournamentService.createTournamentManually(data.providerId);
+  }
+
+  // ============================================
+  // Spectator (라이브 게임)
+  // ============================================
+
+  @Get("summoner/:gameName/:tagLine/live")
+  @Public()
+  async getLiveGame(
+    @Param("gameName") gameName: string,
+    @Param("tagLine") tagLine: string,
+  ) {
+    // puuid 조회 후 라이브 게임 확인
+    const summoner = await this.riotService.getSummonerByRiotId(gameName, tagLine);
+    if (!summoner?.puuid) return { isLive: false };
+    const gameInfo = await this.spectatorService.getActiveGameByPUUID(summoner.puuid);
+    if (!gameInfo) return { isLive: false };
+    return { isLive: true, gameInfo };
   }
 }

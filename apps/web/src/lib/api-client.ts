@@ -514,6 +514,14 @@ export const riotApi = {
     const response = await apiClient.get(`/riot/summoner/${encodeURIComponent(stripInvisibleChars(gameName))}/${encodeURIComponent(stripInvisibleChars(tagLine))}`);
     return response.data;
   },
+
+  // 라이브 게임 조회 (Spectator-V5)
+  getLiveGame: async (gameName: string, tagLine: string) => {
+    const response = await apiClient.get(
+      `/riot/summoner/${encodeURIComponent(stripInvisibleChars(gameName))}/${encodeURIComponent(stripInvisibleChars(tagLine))}/live`
+    );
+    return response.data as { isLive: boolean; gameInfo?: any };
+  },
 };
 
 // 클랜 관련 API

@@ -17,6 +17,7 @@ import {
 } from "@/components/matches/match-utils";
 import { useDdragonVersion } from "@/hooks/useDdragonVersion";
 import type { SummonerData, ChampionStats, NexusMatchHistory } from "@/components/matches/match-utils";
+import { getQueueTypeName } from "@/components/matches/match-utils";
 import RecentStatsSummary from "@/components/matches/RecentStatsSummary";
 import RiotMatchList from "@/components/matches/RiotMatchList";
 
@@ -118,6 +119,16 @@ export default function SummonerStatsPage() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  // 라이브 게임 조회 (30초 폴링)
+  const { data: liveGameData } = useQuery({
+    queryKey: ["liveGame", gameName, tagLine],
+    queryFn: () => riotApi.getLiveGame(gameName, tagLine),
+    staleTime: 0,
+    refetchInterval: 30_000, // 30초마다 갱신
+    retry: false,
+    enabled: !!summoner,
+  });
 
   // Nexus 유저 ID 조회
   const { data: nexusUser } = useQuery({
@@ -398,6 +409,24 @@ export default function SummonerStatsPage() {
 
             {/* Summoner Info */}
             <div className="flex-1 min-w-0">
+              {/* 라이브 게임 배너 */}
+              {liveGameData?.isLive && (
+                <div className="flex items-center gap-2 mb-3 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2">
+                  <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse flex-shrink-0" />
+                  <span className="text-sm font-medium text-red-400">현재 게임 중</span>
+                  {liveGameData.gameInfo?.gameLength != null && (
+                    <span className="text-xs text-text-tertiary ml-1">
+                      ({Math.floor(liveGameData.gameInfo.gameLength / 60)}분 {liveGameData.gameInfo.gameLength % 60}초)
+                    </span>
+                  )}
+                  {liveGameData.gameInfo?.gameQueueConfigId != null && (
+                    <span className="text-xs text-text-secondary ml-auto">
+                      {getQueueTypeName(liveGameData.gameInfo.gameQueueConfigId)}
+                    </span>
+                  )}
+                </div>
+              )}
+
               {/* Row 1: Name + Nexus link + Refresh */}
               <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4 flex-wrap">
                 <h1 className="text-xl sm:text-3xl font-bold text-text-primary">
