@@ -343,13 +343,21 @@ export class MatchService {
     let bracketAdvanced = false;
     if (updatedMatch.bracketType === BracketType.SINGLE_ELIMINATION) {
       if (updatedMatch.round && updatedMatch.matchNumber) {
-        bracketAdvanced =
-          await this.matchAdvancementService.advanceWinnerToNextRound(
-            updatedMatch.roomId,
-            updatedMatch.round,
-            updatedMatch.matchNumber,
-            winnerId,
+        try {
+          bracketAdvanced =
+            await this.matchAdvancementService.advanceWinnerToNextRound(
+              updatedMatch.roomId,
+              updatedMatch.round,
+              updatedMatch.matchNumber,
+              winnerId,
+            );
+        } catch (advanceError) {
+          // 브래킷 진급 실패: 매치 결과는 이미 기록됐으므로 롤백하지 않고 에러만 기록
+          this.logger.error(
+            `[Match] 브래킷 진급 실패 — matchId=${matchId}, round=${updatedMatch.round}, matchNumber=${updatedMatch.matchNumber}`,
+            advanceError,
           );
+        }
       } else {
         this.logger.warn(
           `Cannot advance winner: match ${matchId} missing round or matchNumber`,

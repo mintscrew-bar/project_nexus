@@ -681,6 +681,41 @@ export class RoomService {
     return { message: "Left room successfully" };
   }
 
+  /**
+   * 게임 진행 중(비WAITING) 상태에서 호스트가 나갔을 때 다음 호스트로 이양.
+   * 반환값: 새 호스트 userId (이양 성공), null (이양 불필요 또는 실패)
+   */
+  async transferActiveRoomHost(
+    roomId: string,
+    departingUserId: string,
+  ): Promise<string | null> {
+    const room = await this.prisma.room.findUnique({
+      where: { id: roomId },
+      include: {
+        participants: {
+          include: { user: { select: { username: true } } },
+        },
+      },
+    });
+
+    if (!room || room.hostId !== departingUserId) return null;
+
+    const nextHost = room.participants.find(
+      (p: any) =>
+        p.userId !== departingUserId &&
+        !/^testbot_\d+$/.test(p.user?.username || ""),
+    );
+
+    if (!nextHost) return null;
+
+    await this.prisma.room.update({
+      where: { id: roomId },
+      data: { hostId: nextHost.userId },
+    });
+
+    return nextHost.userId;
+  }
+
   // ========================================
   // Room Settings
   // ========================================

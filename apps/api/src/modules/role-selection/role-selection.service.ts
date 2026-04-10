@@ -126,25 +126,38 @@ export class RoleSelectionService {
       throw new ForbiddenException("User is not a member of any team");
     }
 
-    // Check if role is already taken in the team
-    const roleAlreadyTaken = userTeam.members.some(
-      (m: (typeof userTeam.members)[number]) => m.assignedRole === role && m.id !== userTeamMember.id,
-    );
+    // updateMany의 중첩 where로 원자적 체크+업데이트:
+    // 같은 팀에 이미 동일 역할을 가진 다른 멤버가 있으면 count=0 반환
+    const updateResult = await this.prisma.teamMember.updateMany({
+      where: {
+        id: userTeamMember.id,
+        team: {
+          members: {
+            none: {
+              assignedRole: role,
+              id: { not: userTeamMember.id },
+            },
+          },
+        },
+      },
+      data: { assignedRole: role },
+    });
 
-    if (roleAlreadyTaken) {
+    if (updateResult.count === 0) {
       throw new BadRequestException(
         `Role ${role} is already taken by another team member`,
       );
     }
 
-    // Update the team member's role
-    const updatedMember = await this.prisma.teamMember.update({
+    // updateMany는 include를 지원하지 않으므로 업데이트 후 재조회
+    const updatedMember = await this.prisma.teamMember.findUnique({
       where: { id: userTeamMember.id },
-      data: { assignedRole: role },
-      include: {
-        user: true,
-      },
+      include: { user: true },
     });
+
+    if (!updatedMember) {
+      throw new NotFoundException("Team member not found after update");
+    }
 
     // Check if all roles are selected
     const allRolesSelected = await this.checkAllRolesSelected(roomId);

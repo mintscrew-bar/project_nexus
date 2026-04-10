@@ -139,6 +139,19 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect, On
             } catch (_leaveError: any) {
               // leaveRoom 실패 (이미 나갔거나, 상태가 변경됨) — 무시
             }
+          } else {
+            // 게임 진행 중에도 호스트가 나가면 다음 참가자에게 호스트 이양
+            try {
+              const newHostId = await this.roomService.transferActiveRoomHost(
+                roomId,
+                client.userId!,
+              );
+              if (newHostId) {
+                this.server.to(roomId).emit("host-changed", { newHostId });
+              }
+            } catch (_transferError) {
+              // 이양 실패는 best-effort — 무시
+            }
           }
         } catch (_error) {
           // Room might already be deleted or user not in room, ignore
