@@ -75,6 +75,9 @@ export class UserController {
       throw new BadRequestException("파일이 업로드되지 않았습니다.");
     }
 
+    // 클라이언트 MIME 헤더가 아닌 바이너리 매직 넘버로 실제 포맷 검증
+    await this.uploadService.validateMimeType(file);
+
     const oldAvatarUrl = await this.userService.getAvatarUrl(userId);
     if (oldAvatarUrl && oldAvatarUrl.startsWith("/uploads/")) {
       const oldFilename = oldAvatarUrl.replace("/uploads/", "");

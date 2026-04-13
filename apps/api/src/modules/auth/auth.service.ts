@@ -600,6 +600,44 @@ export class AuthService {
   }
 
   // ========================================
+  // OAuth 콜백 코드 교환 (토큰 URL 노출 방지)
+  // ========================================
+
+  /**
+   * OAuth 인증 완료 후 토큰을 URL에 직접 노출하지 않기 위해
+   * 단회용 임시 코드(UUID)를 Redis에 저장하고 반환한다. (60초 유효)
+   */
+  async generateOAuthCode(tokens: {
+    accessToken: string;
+    refreshToken: string;
+  }): Promise<string> {
+    const code = randomUUID();
+    await this.redis.set(
+      `oauth_code:${code}`,
+      JSON.stringify(tokens),
+      60, // 60초 유효 — 충분히 짧아 탈취 위험 최소화
+    );
+    return code;
+  }
+
+  /**
+   * 임시 코드로 실제 토큰을 교환한다. 단회용이므로 조회 즉시 삭제.
+   */
+  async exchangeOAuthCode(code: string): Promise<{
+    accessToken: string;
+    refreshToken: string;
+  }> {
+    const key = `oauth_code:${code}`;
+    const data = await this.redis.get(key);
+    if (!data) {
+      throw new UnauthorizedException("유효하지 않거나 만료된 인증 코드입니다.");
+    }
+    // 단회용 — 조회 즉시 삭제하여 재사용 방지
+    await this.redis.del(key);
+    return JSON.parse(data);
+  }
+
+  // ========================================
   // Account Linking Helpers
   // ========================================
 

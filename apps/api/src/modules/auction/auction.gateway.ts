@@ -408,6 +408,15 @@ export class AuctionGateway
       }
     }
 
+    // 관전자는 입찰 불가 — 서비스 레이어 도달 전 게이트웨이에서 선제 차단
+    const isSpectator = await this.auctionService.isSpectator(
+      client.userId,
+      data.roomId,
+    );
+    if (isSpectator) {
+      return { error: "관전자는 입찰할 수 없습니다." };
+    }
+
     // resolve 진행 중이면 입찰 차단
     if (this.resolvingRooms.has(data.roomId)) {
       return { error: "현재 낙찰 처리 중입니다. 잠시 후 다시 시도해주세요." };

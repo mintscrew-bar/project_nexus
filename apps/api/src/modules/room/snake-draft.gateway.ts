@@ -218,10 +218,26 @@ export class SnakeDraftGateway
     this._cancelPickTimer(data.roomId);
 
     try {
-      // Capture which team is picking BEFORE advancing state
+      // 현재 턴 팀을 서버 상태에서 조회하여, 요청 유저가 해당 팀 캡틴인지
+      // 게이트웨이 레이어에서 선제 검증 (서비스 레이어에서도 재검증함)
       const pickingTeamId = this.snakeDraftService.getCurrentPickingTeam(
         data.roomId,
       );
+
+      if (!pickingTeamId) {
+        this.manualPickingRooms.delete(data.roomId);
+        return { error: "드래프트 상태를 찾을 수 없습니다." };
+      }
+
+      const isCurrentCaptain =
+        await this.snakeDraftService.isTeamCaptain(
+          pickingTeamId,
+          client.userId,
+        );
+      if (!isCurrentCaptain) {
+        this.manualPickingRooms.delete(data.roomId);
+        return { error: "현재 당신의 픽 차례가 아닙니다." };
+      }
 
       const state = await this.snakeDraftService.makePick(
         client.userId,

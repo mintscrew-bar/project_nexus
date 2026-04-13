@@ -142,9 +142,12 @@ export class DmGateway implements OnGatewayConnection, OnGatewayDisconnect, OnMo
     }
 
     try {
-      // 차단 여부 확인
-      const blocked = await this.dmService.isBlocked(client.userId, receiverId);
-      if (blocked) {
+      // 양방향 차단 확인: 내가 상대를 차단했거나, 상대가 나를 차단한 경우 모두 거부
+      const [blockedByMe, blockedByThem] = await Promise.all([
+        this.dmService.isBlocked(client.userId, receiverId),
+        this.dmService.isBlocked(receiverId, client.userId),
+      ]);
+      if (blockedByMe || blockedByThem) {
         return { success: false, error: "Cannot send message to this user" };
       }
 

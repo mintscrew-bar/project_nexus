@@ -113,9 +113,10 @@ export class AuthController {
       }
 
       const tokens = await this.authService.generateTokens(user);
-      res.redirect(
-        `${appUrl}/api/auth/callback?access_token=${tokens.accessToken}&refresh_token=${tokens.refreshToken}`,
-      );
+      // 토큰을 URL에 직접 노출하지 않고 단회용 코드로 교환
+      // (브라우저 히스토리, 프록시 로그, Referer 헤더 노출 방지)
+      const code = await this.authService.generateOAuthCode(tokens);
+      res.redirect(`${appUrl}/api/auth/callback?code=${code}`);
     } catch (error) {
       this.logger.error(`Discord OAuth 콜백 실패: ${(error as Error).message}`);
       res.redirect(`${appUrl}/auth/login?error=auth_failed`);
@@ -169,6 +170,38 @@ export class AuthController {
       accessToken: tokens.accessToken,
       message: "약관 동의 완료",
     });
+  }
+
+  // ========================================
+  // OAuth 코드 교환 (단회용, 60초 유효)
+  // ========================================
+
+  /**
+   * OAuth 콜백에서 발급한 단회용 코드를 실제 토큰으로 교환한다.
+   * 프론트엔드 Next.js API 라우트가 서버 사이드에서 호출하므로
+   * 브라우저에 토큰이 직접 노출되지 않는다.
+   */
+  @Post("exchange")
+  @HttpCode(HttpStatus.OK)
+  async exchangeCode(
+    @Body("code") code: string,
+    @Res() res: Response,
+  ) {
+    if (!code) {
+      throw new BadRequestException("코드가 필요합니다.");
+    }
+    const tokens = await this.authService.exchangeOAuthCode(code);
+
+    // refresh_token은 HTTP-only 쿠키로 설정
+    res.cookie("refresh_token", tokens.refreshToken, {
+      httpOnly: true,
+      secure: this.configService.get("NODE_ENV") === "production",
+      sameSite: "lax",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      path: "/api/auth",
+    });
+
+    return res.json({ accessToken: tokens.accessToken });
   }
 
   // ========================================

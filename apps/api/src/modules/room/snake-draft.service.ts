@@ -571,6 +571,18 @@ export class SnakeDraftService {
     return state.pickOrder[state.currentTeamIndex] || null;
   }
 
+  /**
+   * 특정 팀의 캡틴이 해당 userId인지 확인한다.
+   * 게이트웨이 레이어에서 현재 턴 픽 권한을 선제 검증할 때 사용.
+   */
+  async isTeamCaptain(teamId: string, userId: string): Promise<boolean> {
+    const team = await this.prisma.team.findUnique({
+      where: { id: teamId },
+      select: { captainId: true },
+    });
+    return team?.captainId === userId;
+  }
+
   private getTeamColor(index: number): string {
     const colors = [
       "#3B82F6", // Blue

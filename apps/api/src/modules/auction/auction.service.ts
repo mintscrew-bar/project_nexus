@@ -837,15 +837,38 @@ export class AuctionService implements OnModuleInit {
       throw new BadRequestException("No player to bid on");
     }
 
-    // Record bid in DB first — update in-memory state only after successful write
-    await this.prisma.auctionBid.create({
-      data: {
-        roomId,
-        teamId: team.id,
-        targetUserId: currentPlayer.userId,
-        amount,
+    // 예산 검증과 입찰 기록을 트랜잭션으로 묶어 원자성 보장.
+    // RepeatableRead: 트랜잭션 내에서 동일 행을 다시 읽을 때 다른 트랜잭션의
+    // 커밋이 보이지 않으므로, 동시 입찰 시 예산 이중 검증 방지.
+    await this.prisma.$transaction(
+      async (tx) => {
+        // 트랜잭션 내에서 최신 예산 재확인
+        const freshTeam = await tx.team.findUnique({
+          where: { id: team.id },
+          select: { remainingBudget: true },
+        });
+        if (!freshTeam) throw new BadRequestException("팀 정보를 찾을 수 없습니다.");
+
+        const freshSlots = Math.max(0, 5 - team._count.members);
+        const freshReserve = Math.max(0, (freshSlots - 1) * 100);
+        const freshAvailable = Math.max(0, freshTeam.remainingBudget - freshReserve);
+        if (amount > freshAvailable) {
+          throw new BadRequestException(
+            `예산 부족 (가용 예산: ${freshAvailable}, 필요 적립금: ${freshReserve})`,
+          );
+        }
+
+        await tx.auctionBid.create({
+          data: {
+            roomId,
+            teamId: team.id,
+            targetUserId: currentPlayer.userId,
+            amount,
+          },
+        });
       },
-    });
+      { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
+    );
 
     state.currentHighestBid = amount;
     state.currentHighestBidder = team.id;
@@ -1115,6 +1138,15 @@ export class AuctionService implements OnModuleInit {
       select: { id: true },
     });
     return !!participant;
+  }
+
+  /** 관전자 여부 확인 — SPECTATOR 역할이면 입찰 불가 */
+  async isSpectator(userId: string, roomId: string): Promise<boolean> {
+    const participant = await this.prisma.roomParticipant.findFirst({
+      where: { userId, roomId },
+      select: { role: true },
+    });
+    return participant?.role === "SPECTATOR";
   }
 
   clearAuctionState(roomId: string): void {
