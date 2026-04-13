@@ -7,6 +7,7 @@ import * as dotenv from "dotenv";
 import { resolve } from "path";
 import { AppModule } from "./app.module";
 import { GlobalExceptionFilter } from "./common/filters/global-exception.filter";
+import { RedisIoAdapter } from "./adapters/redis-io.adapter";
 
 const envPaths = [
   resolve(process.cwd(), ".env"),
@@ -95,6 +96,11 @@ async function bootstrap() {
   );
 
   app.useGlobalFilters(new GlobalExceptionFilter());
+
+  // Redis pub/sub 어댑터 연결 — 실패 시 인메모리 모드로 graceful fallback
+  const redisIoAdapter = new RedisIoAdapter(app);
+  await redisIoAdapter.connectToRedis();
+  app.useWebSocketAdapter(redisIoAdapter);
 
   app.setGlobalPrefix("api");
 

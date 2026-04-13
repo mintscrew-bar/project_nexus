@@ -171,7 +171,7 @@
 **문제**: Socket.IO Redis Adapter 없이 인메모리만 사용 → 수평 확장 불가
 **해결 방향**: `@socket.io/redis-adapter` 도입
 
-- [ ] Task O5: Redis Adapter 도입 및 다중 서버 스케일링 준비
+- [x] Task O5: Redis Adapter 도입 및 다중 서버 스케일링 준비
 
 ### O6. 네임스페이스 Lazy Loading [중기]
 **위치**: `apps/web/src/lib/socket-client.ts:4-12`
