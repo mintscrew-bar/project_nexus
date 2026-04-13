@@ -16,10 +16,20 @@ describe("AuctionService", () => {
       },
       team: {
         findFirst: jest.fn(),
+        findUnique: jest.fn(),
+        update: jest.fn(),
+      },
+      teamMember: {
+        create: jest.fn(),
+      },
+      roomParticipant: {
+        update: jest.fn(),
       },
       auctionBid: {
         create: jest.fn(),
       },
+      // $transaction: 콜백에 prisma 자신을 tx로 넘겨 단위 테스트에서 트랜잭션 동작 시뮬레이션
+      $transaction: jest.fn((cb: (tx: any) => Promise<any>) => cb(prisma)),
     };
 
     redis = {
@@ -137,6 +147,8 @@ describe("AuctionService", () => {
         _count: { members: 0 },
         captain: { username: "Captain1" }
       });
+      // 트랜잭션 내 예산 재확인 쿼리 목
+      prisma.team.findUnique.mockResolvedValue({ remainingBudget: 1000 });
 
       const bidAmount = 600;
       const result = await service.placeBid(userId, roomId, bidAmount);
