@@ -168,8 +168,8 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect, On
             username: client.username,
           });
 
-          // Broadcast room list update to subscribers
-          this.broadcastRoomListUpdate();
+          // 참가자 수 변경 → 방 요약 delta 전송
+          this.broadcastRoomDelta('update', roomId);
         }
 
         // Clear typing status on disconnect
@@ -200,13 +200,43 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect, On
     return { success: true };
   }
 
-  // Broadcast room list updates to all subscribers
-  async broadcastRoomListUpdate() {
+  /**
+   * 방 목록 delta update 브로드캐스트
+   * - type: 'add' | 'update' | 'remove'
+   * - 생성/수정 시 해당 방 요약 데이터만 조회해 전송 (전체 목록 재조회 불필요)
+   * - 삭제 시에는 roomId만 전송
+   */
+  async broadcastRoomDelta(
+    type: 'add' | 'update' | 'remove',
+    roomId: string,
+  ) {
     try {
-      const rooms = await this.roomService.listRooms();
-      this.server.to(this.ROOM_LIST_CHANNEL).emit("room-list-updated", rooms);
+      if (type === 'remove') {
+        // 삭제된 방: roomId만 전송
+        this.server.to(this.ROOM_LIST_CHANNEL).emit('room-list-updated', {
+          type: 'remove',
+          roomId,
+        });
+        return;
+      }
+
+      // 생성/수정된 방: 요약 데이터만 조회해 전송
+      const room = await this.roomService.getRoomSummary(roomId);
+      if (!room) {
+        // 조회 타이밍에 방이 이미 삭제됐으면 remove delta 전송
+        this.server.to(this.ROOM_LIST_CHANNEL).emit('room-list-updated', {
+          type: 'remove',
+          roomId,
+        });
+        return;
+      }
+
+      this.server.to(this.ROOM_LIST_CHANNEL).emit('room-list-updated', {
+        type,
+        room,
+      });
     } catch (error) {
-      console.error("[Room] Failed to broadcast room list update:", error);
+      console.error('[Room] Failed to broadcast room list delta:', error);
     }
   }
 
@@ -260,9 +290,9 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect, On
       // Broadcast updated room to all participants (including the joiner)
       this.server.to(data.roomId).emit("room-updated", room);
 
-      // Broadcast room list update to subscribers (only for new joins)
+      // 신규 입장 시 참가자 수 변경 → 방 요약 delta 전송
       if (isNewJoin) {
-        this.broadcastRoomListUpdate();
+        this.broadcastRoomDelta('update', data.roomId);
       }
 
       return {
@@ -303,8 +333,8 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect, On
       // Clear typing status when user explicitly leaves
       this.stopTyping(data.roomId, client.userId!); // Assert client.userId is string
 
-      // Broadcast room list update to subscribers
-      this.broadcastRoomListUpdate();
+      // 퇴장 시 참가자 수 변경 → 방 요약 delta 전송
+      this.broadcastRoomDelta('update', data.roomId);
 
       return { success: true };
     } catch (error: any) {
@@ -366,8 +396,8 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect, On
         newRole: result.newRole,
       });
 
-      // 방 목록 갱신
-      this.broadcastRoomListUpdate();
+      // 관전자↔플레이어 전환 → 방 요약 delta 전송
+      this.broadcastRoomDelta('update', data.roomId);
 
       return { success: true, newRole: result.newRole };
     } catch (error: any) {

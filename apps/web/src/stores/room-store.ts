@@ -4,6 +4,7 @@ import {
   connectRoomSocket,
   disconnectRoomSocket,
   roomSocketHelpers,
+  type RoomListDelta,
 } from '@/lib/socket-client';
 
 interface Room {
@@ -271,9 +272,26 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
       }
     });
 
-    // Listen for room list updates
-    roomSocketHelpers.onRoomListUpdated((rooms: Room[]) => {
-      set({ rooms });
+    // 방 목록 delta update 수신 — 변경된 방만 패치
+    roomSocketHelpers.onRoomListUpdated((delta: RoomListDelta) => {
+      const current = get().rooms;
+      if (delta.type === 'add') {
+        // 중복 방지: 이미 존재하면 update로 처리
+        const exists = current.some((r) => r.id === delta.room.id);
+        set({ rooms: exists
+          ? current.map((r) => r.id === delta.room.id ? delta.room : r)
+          : [...current, delta.room],
+        });
+      } else if (delta.type === 'update') {
+        // 목록에 없으면 추가 (재구독 없이 놓친 add 복구)
+        const exists = current.some((r) => r.id === delta.room.id);
+        set({ rooms: exists
+          ? current.map((r) => r.id === delta.room.id ? delta.room : r)
+          : [...current, delta.room],
+        });
+      } else if (delta.type === 'remove') {
+        set({ rooms: current.filter((r) => r.id !== delta.roomId) });
+      }
     });
 
     // Re-subscribe after reconnect — use named function stored on socket

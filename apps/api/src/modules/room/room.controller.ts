@@ -64,8 +64,8 @@ export class RoomController {
     @Body() dto: CreateRoomDto,
   ) {
     const room = await this.roomService.createRoom(userId, dto);
-    // Broadcast room list update
-    this.roomGateway.broadcastRoomListUpdate();
+    // 새 방 생성 → add delta 전송
+    this.roomGateway.broadcastRoomDelta('add', room.id);
     return room;
   }
 
@@ -146,7 +146,8 @@ export class RoomController {
     @Param("id") roomId: string,
   ) {
     const result = await this.roomService.closeRoom(userId, roomId);
-    this.roomGateway.broadcastRoomListUpdate();
+    // 방 삭제 → remove delta 전송
+    this.roomGateway.broadcastRoomDelta('remove', roomId);
     return result;
   }
 
@@ -164,8 +165,8 @@ export class RoomController {
     this.auctionService.clearAuctionState(roomId);
     this.roleSelectionService.clearRoleSelectionState(roomId);
 
-    // 룸 리스트 갱신 브로드캐스트
-    this.roomGateway.broadcastRoomListUpdate();
+    // 로비 복귀 후 방 상태 변경 → update delta 전송
+    this.roomGateway.broadcastRoomDelta('update', roomId);
 
     // room-updated 이벤트로 로비에 있는 모든 클라이언트에 갱신된 방 데이터 전송
     if (result.room) {
@@ -203,7 +204,8 @@ export class RoomController {
     this.roleSelectionGateway.emitSessionAborted(roomId, payload);
     this.matchGateway.emitSessionAborted(roomId, payload);
 
-    this.roomGateway.broadcastRoomListUpdate();
+    // 세션 중단 후 방 상태 변경 → update delta 전송
+    this.roomGateway.broadcastRoomDelta('update', roomId);
     return result;
   }
 
@@ -268,7 +270,8 @@ export class RoomController {
     if (clientState) {
       this.snakeDraftGateway.emitDraftStarted(roomId, clientState);
     }
-    this.roomGateway.broadcastRoomListUpdate();
+    // 스네이크 드래프트 시작 → 방 상태 변경 delta 전송
+    this.roomGateway.broadcastRoomDelta('update', roomId);
 
     return result;
   }

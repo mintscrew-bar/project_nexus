@@ -247,6 +247,32 @@ export class RoomService {
     return this.transformRoomData(room);
   }
 
+  /**
+   * 방 목록용 요약 데이터 조회 (delta update 전송 시 사용)
+   * listRooms()와 동일한 select 구조로 단일 방만 조회한다.
+   */
+  async getRoomSummary(roomId: string) {
+    return this.prisma.room.findUnique({
+      where: { id: roomId },
+      include: {
+        host: {
+          select: {
+            id: true,
+            username: true,
+            avatar: true,
+          },
+        },
+        participants: {
+          select: {
+            id: true,
+            userId: true,
+            role: true,
+          },
+        },
+      },
+    });
+  }
+
   /** 방 상태만 빠르게 조회 (disconnect 등 경량 체크용) */
   async getRoomStatus(roomId: string): Promise<RoomStatus | null> {
     const room = await this.prisma.room.findUnique({

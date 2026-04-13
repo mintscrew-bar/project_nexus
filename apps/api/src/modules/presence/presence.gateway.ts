@@ -188,20 +188,10 @@ export class PresenceGateway
     return { success: true };
   }
 
-  // Broadcast status change to all friends
+  // 상태 변경을 구독 중인 친구들에게 브로드캐스트
+  // friend:${userId} 룸은 subscribe-friend 핸들러에서 친구 관계 검증 후 구독되므로
+  // 개별 user:${friendId} 루프 없이 단일 채널 emit만 사용한다
   private async broadcastStatusToFriends(userId: string, status: UserStatus) {
-    const friendIds = await this.presenceService.getFriendIds(userId);
-
-    // Emit to each friend's personal room
-    for (const friendId of friendIds) {
-      this.server.to(`user:${friendId}`).emit("friend-status-changed", {
-        userId,
-        status,
-        lastSeenAt: new Date(),
-      });
-    }
-
-    // Also emit to anyone subscribed to this user
     this.server.to(`friend:${userId}`).emit("friend-status-changed", {
       userId,
       status,

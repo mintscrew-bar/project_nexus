@@ -1,6 +1,13 @@
 import { io, Socket } from "socket.io-client";
 import { getAccessToken, ensureValidToken } from "./api-client";
 
+// 방 목록 delta update 타입
+// type: 'add' — 새 방 추가, 'update' — 기존 방 갱신, 'remove' — 방 삭제
+export type RoomListDelta =
+  | { type: 'add'; room: any }
+  | { type: 'update'; room: any }
+  | { type: 'remove'; roomId: string };
+
 // is-typing 이벤트 debounce 유틸 — contextKey별 독립 관리
 const debounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const debounceEmit = (key: string, fn: () => void, delayMs = 500) => {
@@ -194,7 +201,7 @@ export const roomSocketHelpers = {
     roomSocket?.emit("unsubscribe-room-list");
   },
 
-  onRoomListUpdated: (callback: (rooms: any[]) => void) => {
+  onRoomListUpdated: (callback: (delta: RoomListDelta) => void) => {
     roomSocket?.on("room-list-updated", callback);
   },
 

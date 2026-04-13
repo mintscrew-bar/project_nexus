@@ -157,14 +157,14 @@
 **문제**: join/leave마다 전체 목록 DB 조회 → 모든 구독자에게 전송
 **해결 방향**: 변경된 방 정보만 delta update로 전송
 
-- [ ] Task O3: room.gateway.ts — 방 목록 delta update 방식으로 변경
+- [x] Task O3: room.gateway.ts — 방 목록 delta update 방식으로 변경
 
 ### O4. Presence 더블 브로드캐스트 [중기]
 **위치**: `apps/api/src/modules/presence/presence.gateway.ts:181-199`
 **문제**: `broadcastStatusToFriends()`에서 개인 룸 + 구독자 룸 양쪽에 중복 전송
 **해결 방향**: 채널 하나로 통합
 
-- [ ] Task O4: presence.gateway.ts — 친구 상태 브로드캐스트 채널 통합
+- [x] Task O4: presence.gateway.ts — 친구 상태 브로드캐스트 채널 통합
 
 ### O5. Redis Adapter 미사용 [장기]
 **위치**: 전체 게이트웨이

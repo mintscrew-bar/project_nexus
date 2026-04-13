@@ -258,8 +258,8 @@ export class AdminController {
       // 같은 방에 있는 유저들에게 업데이트 알림
       this.roomGateway.notifyRoomUpdate(roomId, "room-updated", updatedRoom);
 
-      // 방 목록 구독자들에게 업데이트 알림
-      await this.roomGateway.broadcastRoomListUpdate();
+      // 방 목록 구독자들에게 update delta 전송
+      await this.roomGateway.broadcastRoomDelta('update', roomId);
     } catch (error) {
       // 실시간 업데이트 실패해도 봇 추가는 성공으로 처리
       console.error("[Admin] Failed to broadcast bot addition:", error);
