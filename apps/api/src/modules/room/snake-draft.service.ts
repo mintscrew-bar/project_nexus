@@ -243,23 +243,29 @@ export class SnakeDraftService {
   private generatePickOrder(teamIds: string[], numTeams: number): string[] {
     const order: string[] = [];
     const playersPerTeam = 5;
-    const rounds = playersPerTeam - 1; // -1 because captains already picked
+    const picksNeededPerTeam = playersPerTeam - 1; // 캡틴 제외 4명
+    const totalPicksNeeded = picksNeededPerTeam * numTeams;
 
-    for (let round = 0; round < rounds; round++) {
-      if (round % 2 === 0) {
-        // Normal order: A, B, C, ...
-        for (let i = 0; i < numTeams; i++) {
-          order.push(teamIds[i]);
-        }
-      } else {
-        // Reverse order: ..., C, B, A
-        for (let i = numTeams - 1; i >= 0; i--) {
-          order.push(teamIds[i]);
-        }
+    // 공정성 강화: 순환형 스네이크(Rotating Snake)
+    // 매 라운드가 끝날 때 마지막 팀이 다음 라운드의 첫 팀이 되도록 순번을 회전시킵니다.
+    // 3팀 예시 (12픽):
+    // R1: [T1, T2, T3] (3번팀 끝)
+    // R2: [T3, T1, T2] (T3 연속 픽, 2번팀 끝)
+    // R3: [T2, T3, T1] (T2 연속 픽, 1번팀 끝)
+    // R4: [T1, T2, T3] (T1 연속 픽)
+    
+    for (let round = 0; round < picksNeededPerTeam; round++) {
+      // 라운드별 시작 오프셋 계산: (numTeams - (round % numTeams)) % numTeams
+      // R0: 0, R1: 2, R2: 1, R3: 0 (3팀 기준)
+      const startingOffset = (numTeams - (round % numTeams)) % numTeams;
+      
+      for (let i = 0; i < numTeams; i++) {
+        const teamIndex = (startingOffset + i) % numTeams;
+        order.push(teamIds[teamIndex]);
       }
     }
 
-    return order;
+    return order.slice(0, totalPicksNeeded);
   }
   // ... (rest of the file is unchanged)
 

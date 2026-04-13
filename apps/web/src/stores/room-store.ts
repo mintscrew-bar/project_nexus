@@ -275,15 +275,10 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
     // 방 목록 delta update 수신 — 변경된 방만 패치
     roomSocketHelpers.onRoomListUpdated((delta: RoomListDelta) => {
       const current = get().rooms;
-      if (delta.type === 'add') {
-        // 중복 방지: 이미 존재하면 update로 처리
-        const exists = current.some((r) => r.id === delta.room.id);
-        set({ rooms: exists
-          ? current.map((r) => r.id === delta.room.id ? delta.room : r)
-          : [...current, delta.room],
-        });
-      } else if (delta.type === 'update') {
-        // 목록에 없으면 추가 (재구독 없이 놓친 add 복구)
+      if (delta.type === 'add' || delta.type === 'update') {
+        // add: 중복 방지를 위해 이미 존재하면 갱신, 없으면 추가
+        // update: 목록에 없으면 추가 (재구독 없이 놓친 add 복구)
+        // → 두 케이스 모두 동일 로직(upsert)이므로 하나로 처리
         const exists = current.some((r) => r.id === delta.room.id);
         set({ rooms: exists
           ? current.map((r) => r.id === delta.room.id ? delta.room : r)

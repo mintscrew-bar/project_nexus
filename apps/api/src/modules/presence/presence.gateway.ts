@@ -188,15 +188,32 @@ export class PresenceGateway
     return { success: true };
   }
 
-  // 상태 변경을 구독 중인 친구들에게 브로드캐스트
-  // friend:${userId} 룸은 subscribe-friend 핸들러에서 친구 관계 검증 후 구독되므로
-  // 개별 user:${friendId} 루프 없이 단일 채널 emit만 사용한다
+  // 상태 변경을 친구들에게 브로드캐스트 (hybrid 방식)
+  //
+  // [채널 1] friend:${userId} 룸 — subscribe-friend를 명시적으로 호출한 구독자용
+  // [채널 2] user:${friendId} 개인 룸 — 구독 여부와 무관하게 현재 연결된 모든 유저에게 전달
+  //   - DB 조회(getFriendIds) 없이 userSockets Map만 사용
+  //   - 클라이언트가 자신의 친구 목록과 대조해 필요 없는 이벤트를 무시할 수 있음
+  //   - status(온라인/오프라인)는 공개 정보이므로 과도한 노출이 아님
   private async broadcastStatusToFriends(userId: string, status: UserStatus) {
-    this.server.to(`friend:${userId}`).emit("friend-status-changed", {
+    const payload = {
       userId,
       status,
       lastSeenAt: new Date(),
-    });
+    };
+
+    // 채널 1: 명시적으로 subscribe-friend를 호출한 클라이언트
+    this.server.to(`friend:${userId}`).emit("friend-status-changed", payload);
+
+    // 채널 2: 현재 연결된 모든 유저의 개인 룸에 추가 전달
+    // userSockets Map은 게이트웨이 메모리만 사용하므로 DB 조회 없음
+    for (const onlineUserId of this.userSockets.keys()) {
+      // 자기 자신에게는 발송하지 않음
+      if (onlineUserId === userId) continue;
+      this.server
+        .to(`user:${onlineUserId}`)
+        .emit("friend-status-changed", payload);
+    }
   }
 
   // Public method to broadcast status update (can be called from other services)

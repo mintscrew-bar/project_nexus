@@ -156,25 +156,6 @@ export class PresenceService {
     });
   }
 
-  async getFriendIds(userId: string): Promise<string[]> {
-    const friendships = await this.prisma.friendship.findMany({
-      where: {
-        OR: [
-          { userId, status: "ACCEPTED" },
-          { friendId: userId, status: "ACCEPTED" },
-        ],
-      },
-      select: {
-        userId: true,
-        friendId: true,
-      },
-    });
-
-    return friendships.map((f: { userId: string; friendId: string }) =>
-      f.userId === userId ? f.friendId : f.userId,
-    );
-  }
-
   isUserOnline(userId: string): boolean {
     const sockets = this.userConnections.get(userId);
     return sockets !== undefined && sockets.size > 0;

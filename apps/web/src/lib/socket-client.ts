@@ -1217,6 +1217,10 @@ export const disconnectRoleSelectionSocket = () => {
 // 게임 플로우(경매·드래프트·역할선택·매치) 단계를 벗어날 때
 // 이 함수 하나로 네 개의 게임 소켓을 한 번에 정리할 수 있다.
 // 상시 소켓(presence, notification, dm, clan, room)에는 영향 없음.
+//
+// ※ 각 스토어(auction-store, snake-draft-store, match-store, role-selection-store)가
+//    자체적으로 개별 disconnect 함수를 호출하므로 일반 플로우에서는 직접 호출하지 않는다.
+//    긴급 초기화·로그아웃 등 일괄 정리가 필요한 경우에만 사용한다.
 // ============================================================
 export const disconnectGameSockets = () => {
   disconnectAuctionSocket();

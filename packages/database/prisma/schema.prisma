@@ -8,81 +8,902 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ============================================
-// User & Authentication
-// ============================================
-
 model User {
-  id            String        @id @default(cuid())
-  email         String?       @unique
-  emailVerified Boolean       @default(false)
-  password      String?       // bcrypt hash for email auth
-  username      String
-  bio           String?
-  avatar        String?
-  role          UserRole      @default(USER)
-  reputation    Int           @default(100)
-  isRestricted  Boolean       @default(false)
-  restrictedUntil DateTime?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-
-  // Online status
-  status        UserStatus    @default(OFFLINE)
-  lastSeenAt    DateTime?
-
-  reputationScore Float?          // 평판 점수 (1-5)
-  isBanned        Boolean         @default(false)
-  banReason       String?
-  bannedAt        DateTime?
-  banUntil        DateTime?       // 임시 밴 만료 시간
-
-  // Relations
-  authProviders      AuthProvider[]
-  termsAgreements    TermsAgreement[]
-  settings           UserSettings?
-  riotAccounts       RiotAccount[]
-  hostedRooms        Room[]                 @relation("RoomHost")
-  roomParticipations RoomParticipant[]
-  captainedTeams     Team[]                 @relation("TeamCaptain")
-  teamMembers        TeamMember[]
-  sessions           Session[]
-  clanMemberships      ClanMember[]
-  ownedClans           Clan[]                 @relation("ClanOwner")
-  clanInvitesSent      ClanInvitation[]       @relation("ClanInviter")
-  clanInvitesReceived  ClanInvitation[]       @relation("ClanInvitee")
-  clanAnnouncements    ClanAnnouncement[]     @relation("ClanAnnouncementAuthor")
-  clanActivityLogs     ClanActivityLog[]      @relation("ClanActivityActor")
-  posts              Post[]
-  comments           Comment[]
-  postLikes          PostLike[]
-  commentLikes       CommentLike[]
-  bookmarks          PostBookmark[]
-  postReports        PostReport[]           @relation("PostReportReporter")
-  ratingsGiven       UserRating[]           @relation("RaterUser")
-  ratingsReceived    UserRating[]           @relation("RatedUser")
-  reportsSubmitted   UserReport[]           @relation("ReporterUser")
-  reportsReceived    UserReport[]           @relation("ReportedUser")
-  friendships        Friendship[]           @relation("UserFriendships")
-  friendOf           Friendship[]           @relation("FriendOfUser")
-  chatMessages       ChatMessage[]
-  clanChatMessages   ClanChatMessage[]
-  sentDMs            DirectMessage[]   @relation("SentDMs")
-  receivedDMs        DirectMessage[]   @relation("ReceivedDMs")
-  snakeDraftPicks    SnakeDraftPick[]
-  matchParticipations MatchParticipant[]
-  notifications       Notification[]
-  nexusRanking        NexusRanking?
-  clanRankings        ClanRanking[]
+  id                  String             @id @default(cuid())
+  email               String?            @unique
+  emailVerified       Boolean            @default(false)
+  password            String?
+  username            String
+  bio                 String?
+  avatar              String?
+  role                UserRole           @default(USER)
+  reputation          Int                @default(100)
+  isRestricted        Boolean            @default(false)
+  restrictedUntil     DateTime?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  status              UserStatus         @default(OFFLINE)
+  lastSeenAt          DateTime?
+  reputationScore     Float?
+  isBanned            Boolean            @default(false)
+  banReason           String?
+  bannedAt            DateTime?
+  banUntil            DateTime?
   adminAuditLogs      AdminAuditLog[]    @relation("AdminAuditLogs")
-  appeals             Appeal[]           @relation("UserAppeals")
   reviewedAppeals     Appeal[]           @relation("AppealReviewer")
+  appeals             Appeal[]           @relation("UserAppeals")
+  authProviders       AuthProvider[]
+  chatMessages        ChatMessage[]
+  clanActivityLogs    ClanActivityLog[]  @relation("ClanActivityActor")
+  clanAnnouncements   ClanAnnouncement[] @relation("ClanAnnouncementAuthor")
+  clanChatMessages    ClanChatMessage[]
+  clanInvitesReceived ClanInvitation[]   @relation("ClanInvitee")
+  clanInvitesSent     ClanInvitation[]   @relation("ClanInviter")
+  clanMemberships     ClanMember[]
+  clanRankings        ClanRanking[]
+  ownedClans          Clan[]             @relation("ClanOwner")
+  commentLikes        CommentLike[]
+  comments            Comment[]
+  receivedDMs         DirectMessage[]    @relation("ReceivedDMs")
+  sentDMs             DirectMessage[]    @relation("SentDMs")
+  friendOf            Friendship[]       @relation("FriendOfUser")
+  friendships         Friendship[]       @relation("UserFriendships")
+  matchParticipations MatchParticipant[]
+  nexusRanking        NexusRanking?
+  notifications       Notification[]
+  bookmarks           PostBookmark[]
+  postLikes           PostLike[]
+  postReports         PostReport[]       @relation("PostReportReporter")
+  posts               Post[]
+  riotAccounts        RiotAccount[]
+  roomParticipations  RoomParticipant[]
+  hostedRooms         Room[]             @relation("RoomHost")
+  sessions            Session[]
+  snakeDraftPicks     SnakeDraftPick[]
+  teamMembers         TeamMember[]
+  captainedTeams      Team[]             @relation("TeamCaptain")
+  termsAgreements     TermsAgreement[]
+  ratingsGiven        UserRating[]       @relation("RaterUser")
+  ratingsReceived     UserRating[]       @relation("RatedUser")
+  reportsSubmitted    UserReport[]       @relation("ReporterUser")
+  reportsReceived     UserReport[]       @relation("ReportedUser")
+  settings            UserSettings?
 
   @@index([email])
   @@index([reputation])
   @@index([createdAt])
   @@index([isBanned])
   @@map("users")
+}
+
+model AuthProvider {
+  id         String           @id @default(cuid())
+  userId     String
+  provider   AuthProviderType
+  providerId String
+  metadata   Json?
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerId])
+  @@index([userId])
+  @@map("auth_providers")
+}
+
+model TermsAgreement {
+  id               String   @id @default(cuid())
+  userId           String
+  termsOfService   Boolean  @default(false)
+  privacyPolicy    Boolean  @default(false)
+  ageVerification  Boolean  @default(false)
+  marketingConsent Boolean  @default(false)
+  agreedAt         DateTime @default(now())
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("terms_agreements")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  userId       String
+  refreshToken String   @unique
+  userAgent    String?
+  ipAddress    String?
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+model UserSettings {
+  id                   String   @id @default(cuid())
+  userId               String   @unique
+  notifyFriendRequest  Boolean  @default(true)
+  notifyFriendAccepted Boolean  @default(true)
+  notifyMatchStart     Boolean  @default(true)
+  notifyMatchResult    Boolean  @default(true)
+  notifyTeamInvite     Boolean  @default(true)
+  notifyMention        Boolean  @default(true)
+  notifyComment        Boolean  @default(true)
+  notifyClanActivity   Boolean  @default(true)
+  notifySystem         Boolean  @default(true)
+  showOnlineStatus     Boolean  @default(true)
+  showMatchHistory     Boolean  @default(true)
+  showRiotAccounts     Boolean  @default(true)
+  showChampionStats    Boolean  @default(true)
+  allowFriendRequests  Boolean  @default(true)
+  highlightChampionId  String?
+  highlightStatType    String?
+  theme                String   @default("dark")
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_settings")
+}
+
+model RiotAccount {
+  id                  String               @id @default(cuid())
+  userId              String
+  puuid               String               @unique
+  summonerId          String?
+  gameName            String
+  tagLine             String
+  tier                String               @default("UNRANKED")
+  rank                String               @default("")
+  lp                  Int                  @default(0)
+  peakTier            String?
+  peakRank            String?
+  mainRole            Role?
+  subRole             Role?
+  isPrimary           Boolean              @default(false)
+  verifiedAt          DateTime?
+  lastSyncedAt        DateTime?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  championPreferences ChampionPreference[]
+  user                User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([gameName, tagLine])
+  @@index([userId])
+  @@index([puuid])
+  @@map("riot_accounts")
+}
+
+model ChampionPreference {
+  id            String      @id @default(cuid())
+  riotAccountId String
+  role          Role
+  championId    String
+  order         Int
+  createdAt     DateTime    @default(now())
+  riotAccount   RiotAccount @relation(fields: [riotAccountId], references: [id], onDelete: Cascade)
+
+  @@unique([riotAccountId, role, championId])
+  @@index([riotAccountId, role])
+  @@map("champion_preferences")
+}
+
+model Room {
+  id                String                @id @default(cuid())
+  name              String
+  hostId            String
+  password          String?
+  maxParticipants   Int                   @default(10)
+  isPrivate         Boolean               @default(false)
+  status            RoomStatus            @default(WAITING)
+  teamMode          TeamMode              @default(SNAKE_DRAFT)
+  allowSpectators   Boolean               @default(true)
+  startingPoints    Int?
+  minBidIncrement   Int?
+  bidTimeLimit      Int?                  @default(30)
+  pickTimeLimit     Int?                  @default(60)
+  captainSelection  TeamCaptainSelection? @default(RANDOM)
+  bracketFormat     BracketType?          @default(SINGLE_ELIMINATION)
+  discordGuildId    String?
+  discordCategoryId String?
+  startedAt         DateTime?
+  completedAt       DateTime?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  chatMessages      ChatMessage[]
+  matches           Match[]
+  discordChannels   RoomDiscordChannel[]
+  participants      RoomParticipant[]
+  host              User                  @relation("RoomHost", fields: [hostId], references: [id])
+  snakeDraftPicks   SnakeDraftPick[]
+  teams             Team[]
+
+  @@index([hostId])
+  @@index([status])
+  @@index([isPrivate])
+  @@index([createdAt])
+  @@map("rooms")
+}
+
+model RoomParticipant {
+  id        String              @id @default(cuid())
+  roomId    String
+  userId    String
+  role      RoomParticipantRole @default(PLAYER)
+  isReady   Boolean             @default(false)
+  isCaptain Boolean             @default(false)
+  teamId    String?
+  joinedAt  DateTime            @default(now())
+  room      Room                @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  team      Team?               @relation(fields: [teamId], references: [id])
+  user      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, userId])
+  @@index([roomId])
+  @@index([userId])
+  @@index([teamId])
+  @@map("room_participants")
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  roomId    String?
+  roomName  String?
+  userId    String
+  content   String
+  createdAt DateTime @default(now())
+  room      Room?    @relation(fields: [roomId], references: [id])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([roomId, createdAt])
+  @@index([userId])
+  @@index([createdAt])
+  @@index([roomName])
+  @@map("chat_messages")
+}
+
+model RoomDiscordChannel {
+  id          String             @id @default(cuid())
+  roomId      String
+  channelId   String             @unique
+  channelType DiscordChannelType
+  teamName    String?
+  createdAt   DateTime           @default(now())
+  room        Room               @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@index([roomId])
+  @@map("room_discord_channels")
+}
+
+model Team {
+  id                String             @id @default(cuid())
+  roomId            String
+  name              String
+  captainId         String
+  color             String?
+  initialBudget     Int                @default(0)
+  remainingBudget   Int                @default(0)
+  hasReceivedBonus  Boolean            @default(false)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  auctionBids       AuctionBid[]
+  matchParticipants MatchParticipant[]
+  matchTeamStats    MatchTeamStats[]
+  matchesAsTeamA    Match[]            @relation("TeamA")
+  matchesAsTeamB    Match[]            @relation("TeamB")
+  wonMatches        Match[]            @relation("MatchWinner")
+  roomParticipants  RoomParticipant[]
+  snakeDraftPicks   SnakeDraftPick[]
+  members           TeamMember[]
+  captain           User               @relation("TeamCaptain", fields: [captainId], references: [id])
+  room              Room               @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@index([roomId])
+  @@index([captainId])
+  @@map("teams")
+}
+
+model TeamMember {
+  id           String   @id @default(cuid())
+  teamId       String
+  userId       String
+  assignedRole Role?
+  soldPrice    Int?
+  pickOrder    Int?
+  joinedAt     DateTime @default(now())
+  team         Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, userId])
+  @@index([teamId])
+  @@index([userId])
+  @@map("team_members")
+}
+
+model SnakeDraftPick {
+  id         String   @id @default(cuid())
+  roomId     String
+  teamId     String
+  userId     String
+  pickNumber Int
+  createdAt  DateTime @default(now())
+  room       Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  team       Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([roomId])
+  @@index([teamId])
+  @@map("snake_draft_picks")
+}
+
+model AuctionBid {
+  id           String   @id @default(cuid())
+  roomId       String
+  teamId       String
+  targetUserId String
+  amount       Int
+  isYuchal     Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  team         Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@index([roomId, createdAt])
+  @@index([teamId])
+  @@index([targetUserId])
+  @@map("auction_bids")
+}
+
+model Match {
+  id             String             @id @default(cuid())
+  roomId         String
+  teamAId        String?
+  teamBId        String?
+  winnerId       String?
+  status         MatchStatus        @default(PENDING)
+  matchNumber    Int?
+  bracketRound   String?
+  round          Int?
+  bracketType    BracketType?
+  tournamentCode String?
+  riotMatchId    String?
+  gameDuration   Int?
+  dataCollected  Boolean            @default(false)
+  scheduledAt    DateTime?
+  startedAt      DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  participants   MatchParticipant[]
+  teamStats      MatchTeamStats[]
+  room           Room               @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  teamA          Team?              @relation("TeamA", fields: [teamAId], references: [id])
+  teamB          Team?              @relation("TeamB", fields: [teamBId], references: [id])
+  winner         Team?              @relation("MatchWinner", fields: [winnerId], references: [id])
+  ratings        UserRating[]
+  reports        UserReport[]
+
+  @@index([roomId])
+  @@index([teamAId])
+  @@index([teamBId])
+  @@index([status])
+  @@map("matches")
+}
+
+model MatchParticipant {
+  id                          String   @id @default(cuid())
+  matchId                     String
+  userId                      String
+  teamId                      String
+  championId                  Int
+  championName                String
+  position                    String
+  summoner1Id                 Int
+  summoner2Id                 Int
+  kills                       Int
+  deaths                      Int
+  assists                     Int
+  totalMinionsKilled          Int
+  neutralMinionsKilled        Int
+  goldEarned                  Int
+  goldSpent                   Int
+  totalDamageDealt            Int
+  totalDamageDealtToChampions Int
+  totalDamageTaken            Int
+  totalHeal                   Int
+  damageSelfMitigated         Int
+  visionScore                 Int
+  wardsPlaced                 Int
+  wardsKilled                 Int
+  detectorWardsPlaced         Int
+  item0                       Int
+  item1                       Int
+  item2                       Int
+  item3                       Int
+  item4                       Int
+  item5                       Int
+  item6                       Int
+  item7                       Int?
+  perks                       Json
+  champLevel                  Int
+  largestKillingSpree         Int
+  largestMultiKill            Int
+  longestTimeSpentLiving      Int
+  totalTimeSpentDead          Int
+  turretKills                 Int
+  inhibitorKills              Int
+  dragonKills                 Int
+  baronKills                  Int
+  doubleKills                 Int
+  tripleKills                 Int
+  quadraKills                 Int
+  pentaKills                  Int
+  firstBloodKill              Boolean
+  firstTowerKill              Boolean
+  win                         Boolean
+  createdAt                   DateTime @default(now())
+  match                       Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  team                        Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user                        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([matchId])
+  @@index([userId])
+  @@index([teamId])
+  @@index([championId])
+  @@map("match_participants")
+}
+
+model MatchTeamStats {
+  id              String   @id @default(cuid())
+  matchId         String
+  teamId          String
+  win             Boolean
+  towerKills      Int
+  inhibitorKills  Int
+  baronKills      Int
+  dragonKills     Int
+  riftHeraldKills Int
+  firstBlood      Boolean  @default(false)
+  firstTower      Boolean  @default(false)
+  firstBaron      Boolean  @default(false)
+  firstDragon     Boolean  @default(false)
+  bans            Json
+  createdAt       DateTime @default(now())
+  match           Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  team            Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([matchId, teamId])
+  @@index([matchId])
+  @@index([teamId])
+  @@map("match_team_stats")
+}
+
+model Clan {
+  id            String             @id @default(cuid())
+  name          String             @unique
+  tag           String             @unique
+  description   String?
+  logo          String?
+  ownerId       String
+  isRecruiting  Boolean            @default(true)
+  maxMembers    Int                @default(50)
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  minTier       String?
+  discord       String?
+  activityLogs  ClanActivityLog[]
+  announcements ClanAnnouncement[]
+  chatMessages  ClanChatMessage[]
+  invitations   ClanInvitation[]
+  members       ClanMember[]
+  clanRankings  ClanRanking[]
+  owner         User               @relation("ClanOwner", fields: [ownerId], references: [id])
+
+  @@index([ownerId])
+  @@index([isRecruiting])
+  @@map("clans")
+}
+
+model ClanMember {
+  id       String   @id @default(cuid())
+  clanId   String
+  userId   String
+  role     ClanRole @default(MEMBER)
+  joinedAt DateTime @default(now())
+  clan     Clan     @relation(fields: [clanId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([clanId, userId])
+  @@index([clanId])
+  @@index([userId])
+  @@map("clan_members")
+}
+
+model ClanChatMessage {
+  id        String       @id @default(cuid())
+  clanId    String
+  userId    String
+  content   String
+  isDeleted Boolean      @default(false)
+  deletedAt DateTime?
+  createdAt DateTime     @default(now())
+  clan      Clan         @relation(fields: [clanId], references: [id], onDelete: Cascade)
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reports   UserReport[]
+
+  @@index([clanId, createdAt])
+  @@map("clan_chat_messages")
+}
+
+model ClanInvitation {
+  id         String               @id @default(cuid())
+  clanId     String
+  inviterId  String
+  inviteeId  String?
+  type       ClanInvitationType
+  status     ClanInvitationStatus @default(PENDING)
+  inviteCode String?              @unique
+  expiresAt  DateTime?
+  resolvedBy String?
+  resolvedAt DateTime?
+  createdAt  DateTime             @default(now())
+  clan       Clan                 @relation(fields: [clanId], references: [id], onDelete: Cascade)
+  invitee    User?                @relation("ClanInvitee", fields: [inviteeId], references: [id])
+  inviter    User                 @relation("ClanInviter", fields: [inviterId], references: [id], onDelete: Cascade)
+
+  @@unique([clanId, inviteeId, type, status])
+  @@index([clanId, status])
+  @@index([inviteeId, status])
+  @@map("clan_invitations")
+}
+
+model ClanAnnouncement {
+  id        String   @id @default(cuid())
+  clanId    String
+  authorId  String
+  content   String
+  isPinned  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  author    User     @relation("ClanAnnouncementAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  clan      Clan     @relation(fields: [clanId], references: [id], onDelete: Cascade)
+
+  @@index([clanId, isPinned, createdAt])
+  @@map("clan_announcements")
+}
+
+model ClanActivityLog {
+  id        String           @id @default(cuid())
+  clanId    String
+  actorId   String?
+  action    ClanActivityType
+  targetId  String?
+  details   Json?
+  createdAt DateTime         @default(now())
+  actor     User?            @relation("ClanActivityActor", fields: [actorId], references: [id])
+  clan      Clan             @relation(fields: [clanId], references: [id], onDelete: Cascade)
+
+  @@index([clanId, createdAt])
+  @@map("clan_activity_logs")
+}
+
+model Post {
+  id        String         @id @default(cuid())
+  title     String
+  content   String
+  category  PostCategory
+  authorId  String
+  views     Int            @default(0)
+  isPinned  Boolean        @default(false)
+  isEdited  Boolean        @default(false)
+  isDeleted Boolean        @default(false)
+  isBlinded Boolean        @default(false)
+  deletedAt DateTime?
+  deletedBy String?
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  comments  Comment[]
+  bookmarks PostBookmark[]
+  likes     PostLike[]
+  reports   PostReport[]
+  tags      PostTag[]
+  author    User           @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([category, isPinned, createdAt])
+  @@index([authorId])
+  @@map("posts")
+}
+
+model Tag {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  createdAt DateTime  @default(now())
+  posts     PostTag[]
+
+  @@map("tags")
+}
+
+model PostTag {
+  postId String
+  tagId  String
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  tag    Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([postId, tagId])
+  @@index([tagId])
+  @@map("post_tags")
+}
+
+model Comment {
+  id        String        @id @default(cuid())
+  postId    String
+  authorId  String
+  content   String
+  parentId  String?
+  isEdited  Boolean       @default(false)
+  isDeleted Boolean       @default(false)
+  isBlinded Boolean       @default(false)
+  deletedAt DateTime?
+  deletedBy String?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  likes     CommentLike[]
+  author    User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  parent    Comment?      @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies   Comment[]     @relation("CommentReplies")
+  post      Post          @relation(fields: [postId], references: [id], onDelete: Cascade)
+  reports   PostReport[]
+
+  @@index([postId, createdAt])
+  @@index([parentId])
+  @@map("comments")
+}
+
+model CommentLike {
+  id        String   @id @default(cuid())
+  commentId String
+  userId    String
+  createdAt DateTime @default(now())
+  comment   Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, commentId])
+  @@index([commentId])
+  @@map("comment_likes")
+}
+
+model PostBookmark {
+  id        String   @id @default(cuid())
+  postId    String
+  userId    String
+  createdAt DateTime @default(now())
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])
+  @@index([userId])
+  @@map("post_bookmarks")
+}
+
+model PostReport {
+  id           String           @id @default(cuid())
+  reporterId   String
+  postId       String?
+  commentId    String?
+  reason       PostReportReason
+  description  String
+  status       ReportStatus     @default(PENDING)
+  reviewerNote String?
+  reviewedAt   DateTime?
+  createdAt    DateTime         @default(now())
+  comment      Comment?         @relation(fields: [commentId], references: [id])
+  post         Post?            @relation(fields: [postId], references: [id])
+  reporter     User             @relation("PostReportReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])
+  @@index([reporterId])
+  @@map("post_reports")
+}
+
+model PostLike {
+  id        String   @id @default(cuid())
+  postId    String
+  userId    String
+  createdAt DateTime @default(now())
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])
+  @@index([postId])
+  @@map("post_likes")
+}
+
+model UserRating {
+  id                  String   @id @default(cuid())
+  reporterId          String
+  targetUserId        String
+  matchId             String
+  skillRating         Int
+  attitudeRating      Int
+  communicationRating Int
+  comment             String?
+  createdAt           DateTime @default(now())
+  match               Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  reporter            User     @relation("RaterUser", fields: [reporterId], references: [id], onDelete: Cascade)
+  target              User     @relation("RatedUser", fields: [targetUserId], references: [id], onDelete: Cascade)
+
+  @@unique([reporterId, targetUserId, matchId])
+  @@index([targetUserId])
+  @@map("user_ratings")
+}
+
+model UserReport {
+  id                String           @id @default(cuid())
+  reporterId        String
+  targetUserId      String
+  matchId           String?
+  clanChatMessageId String?
+  reason            ReportReason
+  description       String
+  status            ReportStatus     @default(PENDING)
+  reviewerId        String?
+  reviewerNote      String?
+  reviewedAt        DateTime?
+  createdAt         DateTime         @default(now())
+  clanChatMessage   ClanChatMessage? @relation(fields: [clanChatMessageId], references: [id])
+  match             Match?           @relation(fields: [matchId], references: [id])
+  reporter          User             @relation("ReporterUser", fields: [reporterId], references: [id], onDelete: Cascade)
+  target            User             @relation("ReportedUser", fields: [targetUserId], references: [id], onDelete: Cascade)
+
+  @@index([targetUserId, status, createdAt])
+  @@index([status])
+  @@map("user_reports")
+}
+
+model Friendship {
+  id        String           @id @default(cuid())
+  userId    String
+  friendId  String
+  status    FriendshipStatus @default(PENDING)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  friend    User             @relation("FriendOfUser", fields: [friendId], references: [id], onDelete: Cascade)
+  user      User             @relation("UserFriendships", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, friendId])
+  @@index([userId, status])
+  @@index([friendId, status])
+  @@map("friendships")
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  message   String
+  link      String?
+  isRead    Boolean          @default(false)
+  data      Json?
+  createdAt DateTime         @default(now())
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead, createdAt])
+  @@map("notifications")
+}
+
+model SummonerSeasonTier {
+  id        String   @id @default(cuid())
+  puuid     String
+  season    String
+  tier      String
+  rank      String
+  lp        Int
+  wins      Int
+  losses    Int
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@unique([puuid, season])
+  @@index([puuid])
+  @@map("summoner_season_tiers")
+}
+
+model RiotMatchCache {
+  matchId   String   @id
+  data      Json
+  queueId   Int
+  gameEnd   DateTime
+  createdAt DateTime @default(now())
+
+  @@index([queueId])
+  @@index([gameEnd])
+  @@map("riot_match_cache")
+}
+
+model DirectMessage {
+  id             String   @id @default(cuid())
+  senderId       String?
+  receiverId     String?
+  senderUsername String
+  content        String
+  isRead         Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  receiver       User?    @relation("ReceivedDMs", fields: [receiverId], references: [id])
+  sender         User?    @relation("SentDMs", fields: [senderId], references: [id])
+
+  @@index([senderId, receiverId, createdAt])
+  @@index([receiverId, isRead])
+  @@map("direct_messages")
+}
+
+model AdminAuditLog {
+  id         String      @id @default(cuid())
+  adminId    String
+  action     AdminAction
+  targetType String?
+  targetId   String?
+  details    Json?
+  createdAt  DateTime    @default(now())
+  admin      User        @relation("AdminAuditLogs", fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([adminId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("admin_audit_logs")
+}
+
+model NexusRanking {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  totalGames   Int      @default(0)
+  wins         Int      @default(0)
+  losses       Int      @default(0)
+  winRate      Float    @default(0)
+  globalRank   Int?
+  recentWins   Int      @default(0)
+  recentLosses Int      @default(0)
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([globalRank])
+  @@index([winRate])
+  @@map("nexus_rankings")
+}
+
+model ClanRanking {
+  id         String   @id @default(cuid())
+  userId     String
+  clanId     String
+  totalGames Int      @default(0)
+  wins       Int      @default(0)
+  losses     Int      @default(0)
+  winRate    Float    @default(0)
+  clanRank   Int?
+  updatedAt  DateTime @updatedAt
+  clan       Clan     @relation(fields: [clanId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, clanId])
+  @@index([clanId, clanRank])
+  @@map("clan_rankings")
+}
+
+model Appeal {
+  id         String       @id @default(cuid())
+  userId     String
+  reason     String
+  status     AppealStatus @default(PENDING)
+  adminNote  String?
+  reviewedBy String?
+  reviewedAt DateTime?
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  reviewer   User?        @relation("AppealReviewer", fields: [reviewedBy], references: [id])
+  user       User         @relation("UserAppeals", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([status, createdAt])
+  @@map("appeals")
 }
 
 enum UserRole {
@@ -97,134 +918,10 @@ enum UserStatus {
   AWAY
 }
 
-model AuthProvider {
-  id         String       @id @default(cuid())
-  userId     String
-  provider   AuthProviderType
-  providerId String       // Discord ID, Google ID, etc.
-  metadata   Json?        // Store additional provider-specific data
-  createdAt  DateTime     @default(now())
-  updatedAt  DateTime     @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([provider, providerId])
-  @@index([userId])
-  @@map("auth_providers")
-}
-
 enum AuthProviderType {
   EMAIL
   GOOGLE
   DISCORD
-}
-
-model TermsAgreement {
-  id                String   @id @default(cuid())
-  userId            String
-  termsOfService    Boolean  @default(false)
-  privacyPolicy     Boolean  @default(false)
-  ageVerification   Boolean  @default(false)
-  marketingConsent  Boolean  @default(false)
-  agreedAt          DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@map("terms_agreements")
-}
-
-model Session {
-  id           String   @id @default(cuid())
-  userId       String
-  refreshToken String   @unique
-  userAgent    String?
-  ipAddress    String?
-  expiresAt    DateTime
-  createdAt    DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([expiresAt])
-  @@map("sessions")
-}
-
-model UserSettings {
-  id     String @id @default(cuid())
-  userId String @unique
-
-  // Notification settings
-  notifyFriendRequest Boolean @default(true)
-  notifyFriendAccepted Boolean @default(true)
-  notifyMatchStart   Boolean @default(true)
-  notifyMatchResult  Boolean @default(true)
-  notifyTeamInvite   Boolean @default(true)
-  notifyMention      Boolean @default(true)
-  notifyComment      Boolean @default(true)
-  notifyClanActivity Boolean @default(true)
-  notifySystem       Boolean @default(true)
-
-  // Privacy settings
-  showOnlineStatus    Boolean @default(true)
-  showMatchHistory    Boolean @default(true)
-  showRiotAccounts    Boolean @default(true)
-  showChampionStats   Boolean @default(true)
-  allowFriendRequests Boolean @default(true)
-
-  // Profile highlight
-  highlightChampionId String?  // 대표 챔피언 ID (Data Dragon key)
-  highlightStatType   String?  // "winrate" | "games" | "kda"
-
-  // Appearance settings
-  theme     String @default("dark") // "dark", "light", "system"
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("user_settings")
-}
-
-// ============================================
-// Riot Account & Champion Preferences
-// ============================================
-
-model RiotAccount {
-  id            String    @id @default(cuid())
-  userId        String
-  puuid         String    @unique
-  summonerId    String?   // Optional - PUUID is used for all API calls
-  gameName      String
-  tagLine       String
-
-  // Current rank
-  tier          String    @default("UNRANKED")
-  rank          String    @default("")
-  lp            Int       @default(0)
-
-  // User reported peak tier
-  peakTier      String?
-  peakRank      String?
-
-  // Roles
-  mainRole      Role?
-  subRole       Role?
-
-  isPrimary     Boolean   @default(false)
-  verifiedAt    DateTime?
-  lastSyncedAt  DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  championPreferences ChampionPreference[]
-
-  @@unique([gameName, tagLine])
-  @@index([userId])
-  @@index([puuid])
-  @@map("riot_accounts")
 }
 
 enum Role {
@@ -233,74 +930,6 @@ enum Role {
   MID
   ADC
   SUPPORT
-}
-
-model ChampionPreference {
-  id             String   @id @default(cuid())
-  riotAccountId  String
-  role           Role
-  championId     String   // Champion key from Data Dragon
-  order          Int      // Display order (1, 2, 3, ...)
-  createdAt      DateTime @default(now())
-
-  riotAccount RiotAccount @relation(fields: [riotAccountId], references: [id], onDelete: Cascade)
-
-  @@unique([riotAccountId, role, championId])
-  @@index([riotAccountId, role])
-  @@map("champion_preferences")
-}
-
-// ============================================
-// Room System
-// ============================================
-
-model Room {
-  id              String       @id @default(cuid())
-  name            String
-  hostId          String
-  password        String?      // bcrypt hash for private rooms
-  maxParticipants Int          @default(10) // 10, 15, 20
-  isPrivate       Boolean      @default(false)
-  status          RoomStatus   @default(WAITING)
-
-  // Settings
-  teamMode        TeamMode     @default(SNAKE_DRAFT)
-  allowSpectators Boolean      @default(true)
-
-  // Auction Settings
-  startingPoints  Int?
-  minBidIncrement Int?
-  bidTimeLimit    Int?         @default(30) // seconds
-
-  // Snake Draft Settings
-  pickTimeLimit     Int?                    @default(60) // seconds
-  captainSelection  TeamCaptainSelection?   @default(RANDOM)
-
-  // Tournament bracket format (for 4/8-team events)
-  bracketFormat     BracketType?            @default(SINGLE_ELIMINATION)
-
-  // Discord integration
-  discordGuildId     String?
-  discordCategoryId  String?
-
-  startedAt       DateTime?
-  completedAt     DateTime?
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
-
-  host              User                @relation("RoomHost", fields: [hostId], references: [id])
-  participants      RoomParticipant[]
-  teams             Team[]
-  matches           Match[]
-  chatMessages      ChatMessage[]
-  discordChannels   RoomDiscordChannel[]
-  snakeDraftPicks   SnakeDraftPick[]
-
-  @@index([hostId])
-  @@index([status])
-  @@index([isPrivate])
-  @@index([createdAt])
-  @@map("rooms")
 }
 
 enum RoomStatus {
@@ -319,32 +948,10 @@ enum TeamMode {
 }
 
 enum TeamCaptainSelection {
-    RANDOM
-    TIER
-    MANUAL
-    VOLUNTEER
-}
-
-
-model RoomParticipant {
-  id              String                @id @default(cuid())
-  roomId          String
-  userId          String
-  role            RoomParticipantRole   @default(PLAYER)
-  isReady         Boolean               @default(false)
-  isCaptain       Boolean               @default(false)
-  teamId          String?
-  joinedAt        DateTime              @default(now())
-
-  room  Room  @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  team  Team? @relation(fields: [teamId], references: [id])
-
-  @@unique([roomId, userId])
-  @@index([roomId])
-  @@index([userId])
-  @@index([teamId])
-  @@map("room_participants")
+  RANDOM
+  TIER
+  MANUAL
+  VOLUNTEER
 }
 
 enum RoomParticipantRole {
@@ -352,185 +959,9 @@ enum RoomParticipantRole {
   SPECTATOR
 }
 
-model ChatMessage {
-  id        String   @id @default(cuid())
-  roomId    String?
-  roomName  String?  // 방 삭제 후에도 어느 방의 채팅인지 식별
-  userId    String
-  content   String
-  createdAt DateTime @default(now())
-
-  // onDelete 정책:
-  //   SetNull  → 방 삭제 후에도 채팅 로그 보존 (이력 보존 목적)
-  //   Cascade  → 유저 삭제 시 메시지도 함께 삭제 (소유 데이터)
-  room Room? @relation(fields: [roomId], references: [id], onDelete: SetNull)
-  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([roomId, createdAt])
-  @@index([userId])
-  @@index([createdAt])
-  @@index([roomName])
-  @@map("chat_messages")
-}
-
-model RoomDiscordChannel {
-  id        String   @id @default(cuid())
-  roomId    String
-  channelId String   @unique
-  channelType DiscordChannelType
-  teamName  String?  // For team-specific voice channels
-  createdAt DateTime @default(now())
-
-  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
-
-  @@index([roomId])
-  @@map("room_discord_channels")
-}
-
 enum DiscordChannelType {
   VOICE
   TEXT
-}
-
-// ============================================
-// Team System (Snake Draft & Auction)
-// ============================================
-
-model Team {
-  id          String   @id @default(cuid())
-  roomId      String
-  name        String
-  captainId   String
-  color       String?  // Hex color for UI
-
-  // Auction specific
-  initialBudget Int      @default(0)
-  remainingBudget Int    @default(0)
-  hasReceivedBonus Boolean @default(false)
-
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  room            Room              @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  captain         User              @relation("TeamCaptain", fields: [captainId], references: [id])
-  members         TeamMember[]
-  snakeDraftPicks SnakeDraftPick[]
-  auctionBids     AuctionBid[]
-  matchesAsTeamA  Match[]           @relation("TeamA")
-  matchesAsTeamB  Match[]           @relation("TeamB")
-  wonMatches      Match[]           @relation("MatchWinner")
-  roomParticipants RoomParticipant[]
-  matchParticipants MatchParticipant[]
-  matchTeamStats    MatchTeamStats[]
-
-  @@index([roomId])
-  @@index([captainId])
-  @@map("teams")
-}
-
-model TeamMember {
-  id         String    @id @default(cuid())
-  teamId     String
-  userId     String
-  assignedRole Role?
-  soldPrice  Int?      // For auction mode
-  pickOrder  Int?      // For snake draft mode
-  joinedAt   DateTime  @default(now())
-
-  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([teamId, userId])
-  @@index([teamId])
-  @@index([userId])
-  @@map("team_members")
-}
-
-// ============================================
-// Snake Draft
-// ============================================
-
-model SnakeDraftPick {
-  id         String   @id @default(cuid())
-  roomId     String
-  teamId     String
-  userId     String
-  pickNumber Int
-  createdAt  DateTime @default(now())
-
-  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([roomId])
-  @@index([teamId])
-  @@map("snake_draft_picks")
-}
-
-// ============================================
-// Auction System
-// ============================================
-
-model AuctionBid {
-  id           String   @id @default(cuid())
-  roomId       String
-  teamId       String
-  targetUserId String   // Player being bid on
-  amount       Int
-  isYuchal     Boolean  @default(false) // 유찰 (no sale)
-  createdAt    DateTime @default(now())
-
-  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
-
-  @@index([roomId, createdAt])
-  @@index([teamId])
-  @@index([targetUserId])
-  @@map("auction_bids")
-}
-
-// ============================================
-// Match System
-// ============================================
-
-model Match {
-  id              String       @id @default(cuid())
-  roomId          String
-  teamAId         String?      // Optional for TBD bracket slots
-  teamBId         String?      // Optional for TBD bracket slots
-  winnerId        String?
-  status          MatchStatus  @default(PENDING)
-  matchNumber     Int?         // For tournaments (1, 2, 3...)
-  bracketRound    String?      // "WB_R1", "WB_F", "LB_R1", "LB_F", "GF" (double elim), or "quarter", "semi", "final"
-  round           Int?
-  bracketType     BracketType?
-
-  // Riot integration
-  tournamentCode  String?
-  riotMatchId     String?
-  gameDuration    Int?            // Game duration in seconds (from Riot API)
-  dataCollected   Boolean  @default(false) // Whether Riot match data has been collected
-
-  scheduledAt     DateTime?
-  startedAt       DateTime?
-  completedAt     DateTime?
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
-
-  room   Room  @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  teamA  Team?  @relation("TeamA", fields: [teamAId], references: [id])
-  teamB  Team?  @relation("TeamB", fields: [teamBId], references: [id])
-  winner Team?  @relation("MatchWinner", fields: [winnerId], references: [id])
-
-  ratings       UserRating[]
-  reports       UserReport[]
-  participants  MatchParticipant[]
-  teamStats     MatchTeamStats[]
-
-  @@index([roomId])
-  @@index([teamAId])
-  @@index([teamBId])
-  @@index([status])
-  @@map("matches")
 }
 
 enum BracketType {
@@ -547,204 +978,12 @@ enum MatchStatus {
   CANCELLED
 }
 
-// ============================================
-// Match Details (Riot API Data)
-// ============================================
-
-model MatchParticipant {
-  id              String   @id @default(cuid())
-  matchId         String
-  userId          String
-  teamId          String
-
-  // Champion & Position
-  championId      Int
-  championName    String
-  position        String   // TOP, JUNGLE, MID, ADC, SUPPORT
-
-  // Summoner Spells
-  summoner1Id     Int
-  summoner2Id     Int
-
-  // KDA
-  kills           Int
-  deaths          Int
-  assists         Int
-
-  // Farm & Gold
-  totalMinionsKilled      Int
-  neutralMinionsKilled    Int
-  goldEarned              Int
-  goldSpent               Int
-
-  // Damage & Combat
-  totalDamageDealt            Int
-  totalDamageDealtToChampions Int
-  totalDamageTaken            Int
-  totalHeal                   Int
-  damageSelfMitigated         Int
-
-  // Vision
-  visionScore             Int
-  wardsPlaced             Int
-  wardsKilled             Int
-  detectorWardsPlaced     Int
-
-  // Items (final build)
-  item0       Int
-  item1       Int
-  item2       Int
-  item3       Int
-  item4       Int
-  item5       Int
-  item6       Int  // Trinket
-  item7       Int? // Quest reward (Role Quest slot - boots/wards)
-
-  // Perks (Runes) - stored as JSON
-  perks       Json
-
-  // Stats
-  champLevel              Int
-  largestKillingSpree     Int
-  largestMultiKill        Int
-  longestTimeSpentLiving  Int
-  totalTimeSpentDead      Int
-
-  // Objectives
-  turretKills             Int
-  inhibitorKills          Int
-  dragonKills             Int
-  baronKills              Int
-
-  // Performance
-  doubleKills             Int
-  tripleKills             Int
-  quadraKills             Int
-  pentaKills              Int
-  firstBloodKill          Boolean
-  firstTowerKill          Boolean
-
-  // Result
-  win                     Boolean
-
-  createdAt   DateTime @default(now())
-
-  match Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
-  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  team  Team  @relation(fields: [teamId], references: [id], onDelete: Cascade)
-
-  @@index([matchId])
-  @@index([userId])
-  @@index([teamId])
-  @@index([championId])
-  @@map("match_participants")
-}
-
-model MatchTeamStats {
-  id              String   @id @default(cuid())
-  matchId         String
-  teamId          String
-  win             Boolean
-
-  // Objectives
-  towerKills      Int
-  inhibitorKills  Int
-  baronKills      Int
-  dragonKills     Int
-  riftHeraldKills Int
-
-  // First objectives
-  firstBlood      Boolean  @default(false)
-  firstTower      Boolean  @default(false)
-  firstBaron      Boolean  @default(false)
-  firstDragon     Boolean  @default(false)
-
-  // Bans
-  bans            Json     // Array of champion IDs
-
-  createdAt       DateTime @default(now())
-
-  match Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
-  team  Team  @relation(fields: [teamId], references: [id], onDelete: Cascade)
-
-  @@unique([matchId, teamId])
-  @@index([matchId])
-  @@index([teamId])
-  @@map("match_team_stats")
-}
-
-// ============================================
-// Clan System
-// ============================================
-
-model Clan {
-  id          String     @id @default(cuid())
-  name        String     @unique
-  tag         String     @unique // [TAG] format
-  description String?
-  logo        String?
-  ownerId     String
-  isRecruiting Boolean   @default(true)
-  maxMembers  Int        @default(50)
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-
-  minTier   String?    // 최소 티어 요구사항
-  discord   String?    // 디스코드 링크
-
-  owner          User               @relation("ClanOwner", fields: [ownerId], references: [id])
-  members        ClanMember[]
-  chatMessages   ClanChatMessage[]
-  clanRankings   ClanRanking[]
-  invitations    ClanInvitation[]
-  announcements  ClanAnnouncement[]
-  activityLogs   ClanActivityLog[]
-
-  @@index([ownerId])
-  @@index([isRecruiting])
-  @@map("clans")
-}
-
-model ClanMember {
-  id        String         @id @default(cuid())
-  clanId    String
-  userId    String
-  role      ClanRole @default(MEMBER)
-  joinedAt  DateTime       @default(now())
-
-  clan Clan @relation(fields: [clanId], references: [id], onDelete: Cascade)
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([clanId, userId])
-  @@index([clanId])
-  @@index([userId])
-  @@map("clan_members")
-}
-
 enum ClanRole {
   OWNER
   OFFICER
   MEMBER
 }
 
-model ClanChatMessage {
-  id        String    @id @default(cuid())
-  clanId    String
-  userId    String
-  content   String
-  isDeleted Boolean   @default(false)  // 소프트 삭제 여부
-  deletedAt DateTime?                  // 삭제 시각
-  createdAt DateTime  @default(now())
-
-  clan    Clan         @relation(fields: [clanId], references: [id], onDelete: Cascade)
-  user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  reports UserReport[]
-
-  @@index([clanId, createdAt])
-  @@map("clan_chat_messages")
-}
-
-// 클랜 활동 로그 타입 enum
 enum ClanActivityType {
   MEMBER_JOIN
   MEMBER_LEAVE
@@ -758,132 +997,16 @@ enum ClanActivityType {
   JOIN_REQUEST
 }
 
-// 초대/가입 요청 타입 enum
 enum ClanInvitationType {
   INVITE
   JOIN_REQUEST
 }
 
-// 초대/가입 요청 상태 enum
 enum ClanInvitationStatus {
   PENDING
   ACCEPTED
   REJECTED
   EXPIRED
-}
-
-// 클랜 초대 및 가입 요청
-model ClanInvitation {
-  id          String               @id @default(cuid())
-  clanId      String
-  inviterId   String               // 초대한 사람 (JOIN_REQUEST 시 신청자)
-  inviteeId   String?              // 초대 받은 사람 (코드 초대 시 null)
-  type        ClanInvitationType
-  status      ClanInvitationStatus @default(PENDING)
-  inviteCode  String?              @unique  // 초대 코드 (generateInviteCode 시 생성)
-  expiresAt   DateTime?            // 만료 시각
-  resolvedBy  String?              // 수락/거절한 사람
-  resolvedAt  DateTime?            // 처리 시각
-  createdAt   DateTime             @default(now())
-
-  clan     Clan  @relation(fields: [clanId], references: [id], onDelete: Cascade)
-  inviter  User  @relation("ClanInviter", fields: [inviterId], references: [id], onDelete: Cascade)
-  invitee  User? @relation("ClanInvitee", fields: [inviteeId], references: [id], onDelete: SetNull)
-
-  @@unique([clanId, inviteeId, type, status])
-  @@index([clanId, status])
-  @@index([inviteeId, status])
-  @@map("clan_invitations")
-}
-
-// 클랜 공지사항
-model ClanAnnouncement {
-  id        String   @id @default(cuid())
-  clanId    String
-  authorId  String
-  content   String
-  isPinned  Boolean  @default(true)  // 공지 핀 여부
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  clan   Clan @relation(fields: [clanId], references: [id], onDelete: Cascade)
-  author User @relation("ClanAnnouncementAuthor", fields: [authorId], references: [id], onDelete: Cascade)
-
-  @@index([clanId, isPinned, createdAt])
-  @@map("clan_announcements")
-}
-
-// 클랜 활동 로그
-model ClanActivityLog {
-  id       String           @id @default(cuid())
-  clanId   String
-  actorId  String?          // 행동한 사람 (시스템 이벤트 시 null)
-  action   ClanActivityType
-  targetId String?          // 대상 유저 ID
-  details  Json?            // 추가 정보
-  createdAt DateTime        @default(now())
-
-  clan  Clan  @relation(fields: [clanId], references: [id], onDelete: Cascade)
-  actor User? @relation("ClanActivityActor", fields: [actorId], references: [id], onDelete: SetNull)
-
-  @@index([clanId, createdAt])
-  @@map("clan_activity_logs")
-}
-
-// ============================================
-// Community / Forum
-// ============================================
-
-model Post {
-  id        String       @id @default(cuid())
-  title     String
-  content   String
-  category  PostCategory
-  authorId  String
-  views     Int          @default(0)
-  isPinned  Boolean      @default(false)
-  isEdited  Boolean      @default(false)
-  isDeleted Boolean      @default(false)
-  isBlinded Boolean      @default(false) // 임시조치(블라인드) 처리 여부 (신고 3건 이상 자동 or 관리자 수동)
-  deletedAt DateTime?
-  deletedBy String?      // 삭제한 관리자 ID
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
-
-  author    User           @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  comments  Comment[]
-  likes     PostLike[]
-  bookmarks PostBookmark[]
-  reports   PostReport[]
-  tags      PostTag[]
-
-  @@index([category, isPinned, createdAt])
-  @@index([authorId])
-  @@map("posts")
-}
-
-// 게시글 태그
-model Tag {
-  id        String    @id @default(cuid())
-  name      String    @unique // 태그명 (소문자, 공백 없음)
-  createdAt DateTime  @default(now())
-
-  posts     PostTag[]
-
-  @@map("tags")
-}
-
-// 게시글-태그 다대다 연결 테이블
-model PostTag {
-  postId String
-  tagId  String
-
-  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
-  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
-
-  @@id([postId, tagId])
-  @@index([tagId])
-  @@map("post_tags")
 }
 
 enum PostCategory {
@@ -893,150 +1016,12 @@ enum PostCategory {
   QNA
 }
 
-model Comment {
-  id        String    @id @default(cuid())
-  postId    String
-  authorId  String
-  content   String
-  parentId  String?   // 대댓글 지원
-  isEdited  Boolean   @default(false)
-  isDeleted Boolean   @default(false)
-  isBlinded Boolean   @default(false) // 임시조치(블라인드) 처리 여부 (신고 3건 이상 자동 or 관리자 수동)
-  deletedAt DateTime?
-  deletedBy String?   // 삭제한 관리자 ID
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-
-  post    Post          @relation(fields: [postId], references: [id], onDelete: Cascade)
-  author  User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  parent  Comment?      @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
-  replies Comment[]     @relation("CommentReplies")
-  likes   CommentLike[]
-  reports PostReport[]
-
-  @@index([postId, createdAt])
-  @@index([parentId])
-  @@map("comments")
-}
-
-model CommentLike {
-  id        String   @id @default(cuid())
-  commentId String
-  userId    String
-  createdAt DateTime @default(now())
-
-  comment Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, commentId])
-  @@index([commentId])
-  @@map("comment_likes")
-}
-
-model PostBookmark {
-  id        String   @id @default(cuid())
-  postId    String
-  userId    String
-  createdAt DateTime @default(now())
-
-  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, postId])
-  @@index([userId])
-  @@map("post_bookmarks")
-}
-
-model PostReport {
-  id          String            @id @default(cuid())
-  reporterId  String
-  postId      String?
-  commentId   String?
-  reason      PostReportReason
-  description String
-  status      ReportStatus      @default(PENDING)
-  reviewerNote String?
-  reviewedAt  DateTime?
-  createdAt   DateTime          @default(now())
-
-  reporter User     @relation("PostReportReporter", fields: [reporterId], references: [id], onDelete: Cascade)
-  post     Post?    @relation(fields: [postId], references: [id], onDelete: SetNull)
-  comment  Comment? @relation(fields: [commentId], references: [id], onDelete: SetNull)
-
-  @@index([status, createdAt])
-  @@index([reporterId])
-  @@map("post_reports")
-}
-
 enum PostReportReason {
   SPAM
   HARASSMENT
   INAPPROPRIATE
   MISINFORMATION
   OTHER
-}
-
-model PostLike {
-  id        String   @id @default(cuid())
-  postId    String
-  userId    String
-  createdAt DateTime @default(now())
-
-  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, postId])
-  @@index([postId])
-  @@map("post_likes")
-}
-
-// ============================================
-// Reputation System
-// ============================================
-
-model UserRating {
-  id                   String   @id @default(cuid())
-  reporterId           String
-  targetUserId         String
-  matchId              String
-  skillRating          Int      // 1-5
-  attitudeRating       Int      // 1-5
-  communicationRating  Int      // 1-5
-  comment              String?
-  createdAt            DateTime @default(now())
-
-  reporter User  @relation("RaterUser", fields: [reporterId], references: [id], onDelete: Cascade)
-  target   User  @relation("RatedUser", fields: [targetUserId], references: [id], onDelete: Cascade)
-  match    Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
-
-  @@unique([reporterId, targetUserId, matchId])
-  @@index([targetUserId])
-  @@map("user_ratings")
-}
-
-model UserReport {
-  id                String       @id @default(cuid())
-  reporterId        String
-  targetUserId      String
-  matchId           String?
-  // 클랜 채팅 신고 시 해당 메시지 ID (신고 접수 건에 한해 관리자 열람 허용)
-  clanChatMessageId String?
-  reason            ReportReason
-  description       String
-  status            ReportStatus @default(PENDING)
-  reviewerId        String?      // 심사한 관리자 ID
-  reviewerNote      String?
-  reviewedAt        DateTime?
-  createdAt         DateTime     @default(now())
-
-  reporter        User             @relation("ReporterUser", fields: [reporterId], references: [id], onDelete: Cascade)
-  target          User             @relation("ReportedUser", fields: [targetUserId], references: [id], onDelete: Cascade)
-  match           Match?           @relation(fields: [matchId], references: [id], onDelete: SetNull)
-  clanChatMessage ClanChatMessage? @relation(fields: [clanChatMessageId], references: [id], onDelete: SetNull)
-
-  @@index([targetUserId, status, createdAt])
-  @@index([status])
-  @@map("user_reports")
 }
 
 enum ReportReason {
@@ -1053,105 +1038,10 @@ enum ReportStatus {
   REJECTED
 }
 
-// ============================================
-// Friend System
-// ============================================
-
-model Friendship {
-  id        String           @id @default(cuid())
-  userId    String
-  friendId  String
-  status    FriendshipStatus @default(PENDING)
-  createdAt DateTime         @default(now())
-  updatedAt DateTime         @updatedAt
-
-  user   User @relation("UserFriendships", fields: [userId], references: [id], onDelete: Cascade)
-  friend User @relation("FriendOfUser", fields: [friendId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, friendId])
-  @@index([userId, status])
-  @@index([friendId, status])
-  @@map("friendships")
-}
-
 enum FriendshipStatus {
   PENDING
   ACCEPTED
   BLOCKED
-}
-
-// ============================================
-// Notification System
-// ============================================
-
-model Notification {
-  id        String           @id @default(cuid())
-  userId    String
-  type      NotificationType
-  title     String
-  message   String
-  link      String?
-  isRead    Boolean          @default(false)
-  data      Json?            // Additional data (JSON)
-  createdAt DateTime         @default(now())
-  
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, isRead, createdAt])
-  @@map("notifications")
-}
-
-// 소환사 시즌별 티어 스냅샷
-// - 소환사 페이지 조회 시 현재 시즌 티어를 upsert
-// - 시즌이 바뀌어도 이전 시즌 기록이 남아있음
-model SummonerSeasonTier {
-  id        String   @id @default(cuid())
-  puuid     String
-  season    String   // "S2026", "S2025", ...
-  tier      String   // "GOLD", "PLATINUM", etc.
-  rank      String   // "I", "II", "III", "IV"
-  lp        Int
-  wins      Int
-  losses    Int
-  updatedAt DateTime @updatedAt
-  createdAt DateTime @default(now())
-
-  @@unique([puuid, season])
-  @@index([puuid])
-  @@map("summoner_season_tiers")
-}
-
-// Riot Match-V5 데이터 영구 캐시
-// - matchId를 PK로 한 번 가져온 매치는 DB에 저장
-// - 재방문 시 Riot API 호출 없이 DB에서 즉시 조회
-// - 챔피언 통계 등 시즌 전체 집계에 활용
-model RiotMatchCache {
-  matchId   String   @id
-  data      Json     // Full MatchDto JSON
-  queueId   Int      // match.info.queueId (빠른 필터링용)
-  gameEnd   DateTime // match.info.gameEndTimestamp
-  createdAt DateTime @default(now())
-
-  @@index([queueId])
-  @@index([gameEnd])
-  @@map("riot_match_cache")
-}
-
-model DirectMessage {
-  id             String   @id @default(cuid())
-  senderId       String?
-  receiverId     String?
-  senderUsername String   // 계정 삭제 후에도 발신자 식별
-  content        String
-  isRead         Boolean  @default(false)
-  createdAt      DateTime @default(now())
-
-  sender   User? @relation("SentDMs",     fields: [senderId],   references: [id], onDelete: SetNull)
-  receiver User? @relation("ReceivedDMs", fields: [receiverId], references: [id], onDelete: SetNull)
-
-  @@index([senderId, receiverId, createdAt])
-  @@index([receiverId, isRead])
-  @@map("direct_messages")
 }
 
 enum NotificationType {
@@ -1167,27 +1057,6 @@ enum NotificationType {
   CLAN_JOIN_REQUEST
   CLAN_JOIN_APPROVED
   CLAN_ANNOUNCEMENT
-}
-
-// ============================================
-// Admin Audit Log
-// ============================================
-
-model AdminAuditLog {
-  id          String   @id @default(cuid())
-  adminId     String
-  action      AdminAction
-  targetType  String?  // "user", "post", "comment", "clan", "room", "report"
-  targetId    String?
-  details     Json?    // 추가 정보 (reason, role 변경 전후 등)
-  createdAt   DateTime @default(now())
-
-  admin User @relation("AdminAuditLogs", fields: [adminId], references: [id], onDelete: Cascade)
-
-  @@index([adminId])
-  @@index([action])
-  @@index([createdAt])
-  @@map("admin_audit_logs")
 }
 
 enum AdminAction {
@@ -1206,76 +1075,6 @@ enum AdminAction {
   ANNOUNCEMENT_SEND
   APPEAL_APPROVE
   APPEAL_REJECT
-}
-
-// ============================================
-// Ranking System
-// ============================================
-
-model NexusRanking {
-  id        String   @id @default(cuid())
-  userId    String   @unique
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  // 글로벌 랭킹
-  totalGames  Int    @default(0)
-  wins        Int    @default(0)
-  losses      Int    @default(0)
-  winRate     Float  @default(0)
-  globalRank  Int?              // null = 최소 게임 수 미달
-
-  // 최근 폼 (최근 20경기)
-  recentWins    Int   @default(0)
-  recentLosses  Int   @default(0)
-
-  updatedAt   DateTime @updatedAt
-
-  @@index([globalRank])
-  @@index([winRate])
-  @@map("nexus_rankings")
-}
-
-model ClanRanking {
-  id        String   @id @default(cuid())
-  userId    String
-  clanId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  clan      Clan     @relation(fields: [clanId], references: [id], onDelete: Cascade)
-
-  totalGames  Int    @default(0)
-  wins        Int    @default(0)
-  losses      Int    @default(0)
-  winRate     Float  @default(0)
-  clanRank    Int?
-
-  updatedAt   DateTime @updatedAt
-
-  @@unique([userId, clanId])
-  @@index([clanId, clanRank])
-  @@map("clan_rankings")
-}
-
-// ============================================
-// Appeal System (이의신청)
-// ============================================
-
-model Appeal {
-  id         String       @id @default(cuid())
-  userId     String
-  reason     String       // 이의신청 사유 (최대 1000자)
-  status     AppealStatus @default(PENDING)
-  adminNote  String?      // 관리자 처리 메모
-  reviewedBy String?
-  reviewedAt DateTime?
-  createdAt  DateTime     @default(now())
-  updatedAt  DateTime     @updatedAt
-
-  user     User  @relation("UserAppeals", fields: [userId], references: [id], onDelete: Cascade)
-  reviewer User? @relation("AppealReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
-
-  @@index([userId, status])
-  @@index([status, createdAt])
-  @@map("appeals")
 }
 
 enum AppealStatus {
