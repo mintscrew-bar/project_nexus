@@ -20,6 +20,23 @@ const debounceEmit = (key: string, fn: () => void, delayMs = 500) => {
   debounceTimers.set(key, timer);
 };
 
+// ============================================================
+// 소켓 인스턴스 — 두 그룹으로 구분
+//
+// [상시 소켓] 로그인 후 항상 연결 유지
+//   - presence      : 온라인 상태 표시
+//   - notification  : 실시간 알림
+//   - dm            : 다이렉트 메시지
+//   - clan          : 클랜 채팅
+//   - room          : 방 목록·채팅 (방 입장 시 connect, 퇴장 시 disconnect)
+//
+// [게임 소켓] 특정 게임 단계에서만 연결 — 단계 종료 시 반드시 disconnect
+//   - auction       : 경매 단계 (AUCTION 방 IN_PROGRESS)
+//   - snakeDraft    : 스네이크 드래프트 단계 (SNAKE_DRAFT 방 DRAFT)
+//   - match         : 매치·브래킷 단계 (IN_PROGRESS 이후)
+//   - roleSelection : 역할 선택 단계 (ROLE_SELECTION)
+// ============================================================
+
 // Socket.io 클라이언트 인스턴스
 let roomSocket: Socket | null = null;
 let auctionSocket: Socket | null = null;
@@ -64,7 +81,11 @@ export const connectRoomSocket = () => {
   return roomSocket;
 };
 
-// Auction Socket 연결
+// ============================================================
+// [게임 소켓] Auction — 경매 단계 전용
+// 사용 시점: 방 상태가 IN_PROGRESS(경매 방식)인 동안
+// 해제 시점: 경매 완료 또는 방 퇴장 시 useAuctionStore.disconnectFromAuction() 호출
+// ============================================================
 export const connectAuctionSocket = () => {
   // Reuse existing instance if still connected, connecting, or reconnecting.
   if (auctionSocket?.connected || auctionSocket?.active) return auctionSocket;
@@ -96,7 +117,11 @@ export const connectAuctionSocket = () => {
   return auctionSocket;
 };
 
-// Snake Draft Socket 연결
+// ============================================================
+// [게임 소켓] Snake Draft — 스네이크 드래프트 단계 전용
+// 사용 시점: 방 상태가 DRAFT(스네이크 드래프트 방식)인 동안
+// 해제 시점: 드래프트 완료 또는 방 퇴장 시 useSnakeDraftStore.disconnectFromDraft() 호출
+// ============================================================
 export const connectSnakeDraftSocket = () => {
   if (snakeDraftSocket?.connected || snakeDraftSocket?.active) return snakeDraftSocket;
   if (snakeDraftSocket) {
@@ -121,7 +146,11 @@ export const connectSnakeDraftSocket = () => {
   return snakeDraftSocket;
 };
 
-// Match Socket 연결
+// ============================================================
+// [게임 소켓] Match — 매치·브래킷 단계 전용
+// 사용 시점: 팀 구성 완료 후 매치/토너먼트 브래킷이 진행되는 동안
+// 해제 시점: 토너먼트 완료 또는 방 퇴장 시 disconnectMatchSocket() 호출
+// ============================================================
 export const connectMatchSocket = () => {
   if (matchSocket?.connected || matchSocket?.active) return matchSocket;
   if (matchSocket) {
@@ -1026,6 +1055,11 @@ export const disconnectClanSocket = () => {
 // Role Selection Socket
 // ========================================
 
+// ============================================================
+// [게임 소켓] Role Selection — 역할 선택 단계 전용
+// 사용 시점: 방 상태가 ROLE_SELECTION인 동안
+// 해제 시점: 역할 선택 완료 또는 세션 중단 시 useRoleSelectionStore.disconnect() 호출
+// ============================================================
 export const connectRoleSelectionSocket = () => {
   if (roleSelectionSocket?.connected || roleSelectionSocket?.active) return roleSelectionSocket;
   if (roleSelectionSocket) {
@@ -1151,4 +1185,36 @@ export const disconnectRoleSelectionSocket = () => {
   roleSelectionSocket?.off('disconnect');
   roleSelectionSocket?.disconnect();
   roleSelectionSocket = null;
+};
+
+// ============================================================
+// 게임 소켓 일괄 해제 유틸
+// 게임 플로우(경매·드래프트·역할선택·매치) 단계를 벗어날 때
+// 이 함수 하나로 네 개의 게임 소켓을 한 번에 정리할 수 있다.
+// 상시 소켓(presence, notification, dm, clan, room)에는 영향 없음.
+// ============================================================
+export const disconnectGameSockets = () => {
+  disconnectAuctionSocket();
+  disconnectSnakeDraftSocket();
+  disconnectMatchSocket();
+  disconnectRoleSelectionSocket();
+};
+
+// ============================================================
+// 디버그 유틸 — 현재 연결된 소켓 수 반환
+// 개발·디버깅 목적으로만 사용한다. 프로덕션 렌더링 로직에는 사용하지 말 것.
+// ============================================================
+export const getConnectedSocketCount = (): number => {
+  const sockets: Array<Socket | null> = [
+    roomSocket,
+    auctionSocket,
+    snakeDraftSocket,
+    matchSocket,
+    clanSocket,
+    presenceSocket,
+    notificationSocket,
+    dmSocket,
+    roleSelectionSocket,
+  ];
+  return sockets.filter((s) => s?.connected).length;
 };

@@ -178,7 +178,7 @@
 **문제**: 최대 9개 소켓 동시 연결 가능 — 불필요한 TCP 오버헤드
 **해결 방향**: 게임 단계별 필요한 네임스페이스만 연결
 
-- [ ] Task O6: socket-client.ts — 게임 단계별 소켓 lazy connect/disconnect
+- [x] Task O6: socket-client.ts — 게임 단계별 소켓 lazy connect/disconnect
 
 ---
 
