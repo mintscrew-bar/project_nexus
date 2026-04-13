@@ -38,6 +38,8 @@ export class RoleSelectionGateway
   server: Server;
 
   private roomTimers = new Map<string, NodeJS.Timeout>();
+  // 정확한 타이머 만료 시점에 completeRoleSelection을 호출하는 setTimeout Map
+  private roomResolveTimers = new Map<string, NodeJS.Timeout>();
   // Guard against duplicate completeRoleSelection calls (timer + all-roles-selected race)
   private completingRooms = new Set<string>();
   private connectedUsers = new Map<
@@ -60,6 +62,11 @@ export class RoleSelectionGateway
       clearInterval(timer);
     }
     this.roomTimers.clear();
+    // 정확한 완료 타이머도 함께 정리
+    for (const timer of this.roomResolveTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.roomResolveTimers.clear();
     this.completingRooms.clear();
     this.connectedUsers.clear();
   }
@@ -174,31 +181,18 @@ export class RoleSelectionGateway
   // ========================================
 
   startTimer(roomId: string) {
-    // Clear existing timer if any
+    // 기존 타이머(interval + resolve timeout) 모두 정리
     this.stopTimer(roomId);
 
+    // ── 5초 interval: UI 동기화용 tick 전송 ──────────────────────────────
     const interval = setInterval(() => {
       try {
         const timeRemaining =
           this.roleSelectionService.getTimeRemaining(roomId);
 
-        if (timeRemaining <= 0) {
-          this.stopTimer(roomId);
-          this.completeRoleSelection(roomId).catch((error) => {
-            console.error(
-              `[RoleSelection] Timer-triggered completion failed for room ${roomId}:`,
-              error,
-            );
-            // 완료 실패 시 타이머 재시작하여 재시도 (completingRooms가 비어있을 때만)
-            if (
-              !this.roomTimers.has(roomId) &&
-              !this.completingRooms.has(roomId)
-            ) {
-              this.startTimer(roomId);
-            }
-          });
-        } else {
-          // 5초 간격으로 서버 시간 보정 값 전송 (클라이언트는 로컬 카운트다운 사용)
+        // 5초 간격으로 서버 시간 보정 값 전송 (클라이언트는 로컬 카운트다운 사용)
+        // timeRemaining > 0 일 때만 tick 전송 (0 이하면 resolve timer가 처리)
+        if (timeRemaining > 0) {
           this.server.to(`room:${roomId}`).emit("timer-tick", {
             timeRemaining,
           });
@@ -213,13 +207,45 @@ export class RoleSelectionGateway
     }, 5000);
 
     this.roomTimers.set(roomId, interval);
+
+    // ── 정확한 완료 시점 setTimeout: 게임 종료 지연 없이 즉시 트리거 ──────
+    // 현재 남은 시간을 기반으로 정확한 만료 시각에 completeRoleSelection 호출
+    const timeRemaining = this.roleSelectionService.getTimeRemaining(roomId);
+    // 음수 방지: 이미 만료된 경우 즉시(0ms) 실행
+    const delay = Math.max(0, timeRemaining);
+
+    const resolveTimeout = setTimeout(() => {
+      this.roomResolveTimers.delete(roomId);
+      // interval tick도 더 이상 불필요하므로 정리
+      const tickTimer = this.roomTimers.get(roomId);
+      if (tickTimer) {
+        clearInterval(tickTimer);
+        this.roomTimers.delete(roomId);
+      }
+
+      this.completeRoleSelection(roomId).catch((error) => {
+        console.error(
+          `[RoleSelection] Resolve-timer completion failed for room ${roomId}:`,
+          error,
+        );
+      });
+    }, delay);
+
+    this.roomResolveTimers.set(roomId, resolveTimeout);
   }
 
   stopTimer(roomId: string) {
+    // 5초 interval 정리
     const timer = this.roomTimers.get(roomId);
     if (timer) {
       clearInterval(timer);
       this.roomTimers.delete(roomId);
+    }
+    // 정확한 완료 setTimeout 정리
+    const resolveTimer = this.roomResolveTimers.get(roomId);
+    if (resolveTimer) {
+      clearTimeout(resolveTimer);
+      this.roomResolveTimers.delete(roomId);
     }
   }
 

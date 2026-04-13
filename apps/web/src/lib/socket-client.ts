@@ -1,5 +1,5 @@
 import { io, Socket } from "socket.io-client";
-import { getAccessToken, ensureValidToken } from "./api-client";
+import { ensureValidToken } from "./api-client";
 
 // 방 목록 delta update 타입
 // type: 'add' — 새 방 추가, 'update' — 기존 방 갱신, 'remove' — 방 삭제
@@ -978,6 +978,13 @@ export const dmSocketHelpers = {
 };
 
 export const disconnectDmSocket = () => {
+  // dm-typing-* 접두사 타이머 정리 — 연결 해제 후 불필요한 emit 방지
+  debounceTimers.forEach((timer, key) => {
+    if (key.startsWith('dm-typing-')) {
+      clearTimeout(timer);
+      debounceTimers.delete(key);
+    }
+  });
   dmSocketHelpers.offAllListeners();
   dmSocket?.disconnect();
   dmSocket = null;
@@ -985,6 +992,10 @@ export const disconnectDmSocket = () => {
 
 // 모든 소켓 연결 해제
 export const disconnectAllSockets = () => {
+  // 남아있는 debounce 타이머 전부 정리 — 메모리 누수 방지
+  debounceTimers.forEach((timer) => clearTimeout(timer));
+  debounceTimers.clear();
+
   roomSocket?.removeAllListeners();
   auctionSocket?.removeAllListeners();
   snakeDraftSocket?.removeAllListeners();
@@ -1018,6 +1029,13 @@ export const disconnectAllSockets = () => {
 
 // 특정 소켓 연결 해제
 export const disconnectRoomSocket = () => {
+  // room-typing-* 접두사 타이머 정리 — 연결 해제 후 불필요한 emit 방지
+  debounceTimers.forEach((timer, key) => {
+    if (key.startsWith('room-typing-')) {
+      clearTimeout(timer);
+      debounceTimers.delete(key);
+    }
+  });
   roomSocketHelpers.offAllListeners();
   roomSocket?.disconnect();
   roomSocket = null;
@@ -1046,6 +1064,13 @@ export const disconnectMatchSocket = () => {
 };
 
 export const disconnectClanSocket = () => {
+  // clan-typing-* 접두사 타이머 정리 — 연결 해제 후 불필요한 emit 방지
+  debounceTimers.forEach((timer, key) => {
+    if (key.startsWith('clan-typing-')) {
+      clearTimeout(timer);
+      debounceTimers.delete(key);
+    }
+  });
   clanSocketHelpers.offAllListeners();
   clanSocket?.disconnect();
   clanSocket = null;
