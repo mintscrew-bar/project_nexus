@@ -265,8 +265,19 @@ export class RiotService {
 
     const summoner = await this.getSummonerByRiotId(gameName, tagLine);
 
-    // Generate random icon ID for verification (1-28)
-    const verificationIconId = Math.floor(Math.random() * 28) + 1;
+    // 기본 프로필 아이콘 범위(1-28)에서 현재 아이콘과 다른 ID를 선택
+    // 현재 아이콘과 동일하면 사용자가 아이콘을 변경하지 않아도 인증이 통과되는 취약점 방지
+    let verificationIconId: number;
+    let attempts = 0;
+    do {
+      verificationIconId = Math.floor(Math.random() * 28) + 1;
+      attempts++;
+    } while (verificationIconId === summoner.profileIconId && attempts < 10);
+
+    // 10회 시도에도 다른 아이콘을 찾지 못한 경우(실질적으로 불가능) 고정값 사용
+    if (verificationIconId === summoner.profileIconId) {
+      verificationIconId = summoner.profileIconId === 1 ? 2 : 1;
+    }
 
     // Store verification data in Redis (expires in 10 minutes)
     await this.redis.set(
