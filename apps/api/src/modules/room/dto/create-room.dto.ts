@@ -30,8 +30,8 @@ export class CreateRoomDto {
   password?: string;
 
   @IsInt()
-  @Min(2, { message: "최소 2명 이상이어야 합니다." })
-  @Max(20, { message: "최대 20명까지 가능합니다." })
+  @Min(10, { message: "최소 10명 이상이어야 합니다." })
+  @Max(40, { message: "최대 40명까지 가능합니다." })
   maxParticipants: number;
 
   @IsEnum(TeamMode, { message: "유효한 팀 모드를 선택해주세요." })
