@@ -102,35 +102,35 @@
 **문제**: 토큰 만료 후 재연결 시 갱신 없이 동일한 만료 토큰 재사용 → 서버 거부 → 무한 루프
 **해결 방향**: `auth` 콜백에서 토큰 만료 확인 후 refresh token으로 갱신 후 전달
 
-- [ ] Task S1: socket-client.ts — 재연결 시 토큰 자동 갱신 로직 추가
+- [x] Task S1: socket-client.ts — 재연결 시 토큰 자동 갱신 로직 추가
 
 ### S2. 재연결 후 room-store 이벤트 리스너 손실 [P0]
 **위치**: `apps/web/src/stores/room-store.ts:159-227`
 **문제**: `socket.on('connect')` 핸들러에서 `joinRoom()`만 재호출, 이벤트 리스너는 재등록 안 됨
 **해결 방향**: `connect` 이벤트 시 `setupListeners()` 함수로 리스너 전체 재등록
 
-- [ ] Task S2: room-store.ts — reconnect 시 이벤트 리스너 재등록 보장
+- [x] Task S2: room-store.ts — reconnect 시 이벤트 리스너 재등록 보장
 
 ### S3. 경매 상태 복구 불완전 [P1]
 **위치**: `apps/web/src/stores/auction-store.ts:450-498`
 **문제**: early return 시 `sessionAbortedAt`/`sessionAbortMessage` 미초기화, REST 폴백 에러 무시
 **해결 방향**: `connectToAuction` 진입 시 세션 상태 항상 초기화
 
-- [ ] Task S3: auction-store.ts — 재연결 시 세션 상태 초기화 및 폴백 에러 처리
+- [x] Task S3: auction-store.ts — 재연결 시 세션 상태 초기화 및 폴백 에러 처리
 
 ### S4. auction timer-update 이벤트 미구현 [P1]
 **위치**: `apps/api/src/modules/auction/auction.gateway.ts:511-513`
 **문제**: `emitTimerUpdate()` 메서드가 정의됐으나 호출하는 곳 없음. 경매 타이머 UI 미업데이트.
 **해결 방향**: `_scheduleBidResolve` 내 setInterval로 500ms마다 timeLeft emit
 
-- [ ] Task S4: auction.gateway.ts — timer-update 이벤트 실제 emit 구현
+- [x] Task S4: auction.gateway.ts — timer-update 이벤트 실제 emit 구현
 
 ### S5. Presence 친구 구독 권한 미검증 [P1]
 **위치**: `apps/api/src/modules/presence/presence.gateway.ts:150-178`
 **문제**: `subscribe-friend` 핸들러에서 실제 친구 관계 검증 없이 누구나 구독 가능
 **해결 방향**: FriendService로 실제 친구 관계 확인 후 구독 허용
 
-- [ ] Task S5: presence.gateway.ts — subscribe-friend 친구 관계 검증 추가
+- [x] Task S5: presence.gateway.ts — subscribe-friend 친구 관계 검증 추가
 
 ---
 
@@ -143,14 +143,14 @@
 **문제**: 매초 모든 참가자에게 `timer-tick` 브로드캐스트
 **해결 방향**: 서버는 5초 간격 보정 전송, 클라이언트 로컬 카운트다운
 
-- [ ] Task O1: role-selection.gateway.ts — 타이머 tick 간격 5초로 변경 + 클라이언트 로컬 카운트다운
+- [x] Task O1: role-selection.gateway.ts — 타이머 tick 간격 5초로 변경 + 클라이언트 로컬 카운트다운
 
 ### O2. 타이핑 이벤트 클라이언트 디바운싱 [즉시 적용]
 **위치**: `apps/web/src/lib/socket-client.ts:168-170`, `dm.gateway.ts`, `clan.gateway.ts`
 **문제**: 매 키 입력마다 is-typing 이벤트 전송
 **해결 방향**: socket-client.ts에 debounce 유틸 추가, 500ms throttle 적용
 
-- [ ] Task O2: socket-client.ts — is-typing 500ms debounce 적용
+- [x] Task O2: socket-client.ts — is-typing 500ms debounce 적용
 
 ### O3. 방 목록 전체 재조회 브로드캐스트 [중기]
 **위치**: `apps/api/src/modules/room/room.gateway.ts:191-198`

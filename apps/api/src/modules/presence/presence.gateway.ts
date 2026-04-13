@@ -11,7 +11,8 @@ import { OnModuleDestroy } from "@nestjs/common";
 import { Server, Socket } from "socket.io";
 import { PresenceService } from "./presence.service";
 import { AuthService } from "../auth/auth.service";
-import { UserStatus } from "@nexus/database";
+import { FriendService } from "../friend/friend.service";
+import { UserStatus, FriendshipStatus } from "@nexus/database";
 
 interface AuthenticatedSocket extends Socket {
   userId?: string;
@@ -40,6 +41,7 @@ export class PresenceGateway
   constructor(
     private readonly presenceService: PresenceService,
     private readonly authService: AuthService,
+    private readonly friendService: FriendService,
   ) {}
 
   onModuleDestroy() {
@@ -156,10 +158,19 @@ export class PresenceGateway
       return { error: "Unauthorized" };
     }
 
-    // Join the friend's channel to receive their status updates
+    // 실제 친구 관계 검증 — ACCEPTED 상태가 아니면 구독 거부
+    const friendship = await this.friendService.getFriendshipStatus(
+      client.userId,
+      data.friendId,
+    );
+    if (friendship.status !== FriendshipStatus.ACCEPTED) {
+      return { error: "Not friends" };
+    }
+
+    // 친구 채널 구독
     client.join(`friend:${data.friendId}`);
 
-    // Get and return current status
+    // 현재 상태 반환
     const status = await this.presenceService.getUserStatus(data.friendId);
     return { success: true, ...status };
   }

@@ -5,6 +5,33 @@ import {
   roleSelectionSocketHelpers,
 } from "@/lib/socket-client";
 
+// 로컬 카운트다운 인터벌 (서버 5초 tick 사이에 매초 감소)
+let localCountdownInterval: ReturnType<typeof setInterval> | null = null;
+
+const startLocalCountdown = (initialSeconds: number, setFn: (fn: (s: any) => any) => void) => {
+  if (localCountdownInterval) {
+    clearInterval(localCountdownInterval);
+  }
+  setFn((state: any) => ({ ...state, timeRemaining: initialSeconds }));
+  localCountdownInterval = setInterval(() => {
+    setFn((state: any) => {
+      const next = Math.max(0, state.timeRemaining - 1);
+      if (next <= 0 && localCountdownInterval) {
+        clearInterval(localCountdownInterval);
+        localCountdownInterval = null;
+      }
+      return { ...state, timeRemaining: next };
+    });
+  }, 1000);
+};
+
+const stopLocalCountdown = () => {
+  if (localCountdownInterval) {
+    clearInterval(localCountdownInterval);
+    localCountdownInterval = null;
+  }
+};
+
 interface TeamMember {
   id: string;
   userId: string;
@@ -72,15 +99,18 @@ export const useRoleSelectionStore = create<RoleSelectionState>((set) => ({
     const doJoin = (isReconnect = false) => {
       roleSelectionSocketHelpers.joinRoom(roomId).then((response: any) => {
         if (response?.success) {
+          const initialSeconds = response.timeRemaining
+            ? Math.ceil(response.timeRemaining / 1000)
+            : 15;
           set({
             room: response.room ?? null,
-            timeRemaining: response.timeRemaining
-              ? Math.ceil(response.timeRemaining / 1000)
-              : 15,
+            timeRemaining: initialSeconds,
             isLoading: false,
             isConnected: true,
             error: null,
           });
+          // 로컬 카운트다운 시작 (서버 5초 보정 tick 사이에 매초 감소)
+          startLocalCountdown(initialSeconds, set);
         } else {
           const errorMsg = response?.error || "Failed to join role selection room.";
           const displayMsg =
@@ -135,7 +165,9 @@ export const useRoleSelectionStore = create<RoleSelectionState>((set) => ({
     );
 
     roleSelectionSocketHelpers.onTimerTick((data: { timeRemaining: number }) => {
-      set({ timeRemaining: Math.ceil(data.timeRemaining / 1000) });
+      // 서버 5초 보정 tick 수신 시 로컬 카운트다운을 서버 값으로 재동기화
+      const syncedSeconds = Math.ceil(data.timeRemaining / 1000);
+      startLocalCountdown(syncedSeconds, set);
     });
 
     roleSelectionSocketHelpers.onRoleSelectionCompleted(() => {
@@ -158,6 +190,7 @@ export const useRoleSelectionStore = create<RoleSelectionState>((set) => ({
   },
 
   disconnect: () => {
+    stopLocalCountdown();
     roleSelectionSocketHelpers.offAllListeners();
     disconnectRoleSelectionSocket();
     set({

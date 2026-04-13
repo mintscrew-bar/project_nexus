@@ -410,7 +410,8 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
 
     // 재연결 핸들러를 초기 join 전에 등록 (join 성공/실패 모두에서 reconnect 가능)
     socket?.on('connect', async () => {
-      set({ isConnected: true });
+      // 재연결 시 세션 중단 상태 초기화 (이전 세션 상태 잔류 방지)
+      set({ isConnected: true, sessionAbortedAt: null, sessionAbortMessage: null });
       const response = await auctionSocketHelpers.joinAuction(roomId);
       if (response?.success) {
         const currentState = get();
@@ -472,8 +473,9 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
           const fallback = mapRoomFallbackData(room);
           if (nextTeams.length === 0) nextTeams = fallback.teams;
           if (nextPlayers.length === 0) nextPlayers = fallback.players;
-        } catch {
-          // Keep socket payload as-is when fallback fails.
+        } catch (fallbackErr) {
+          // 폴백 REST 호출 실패 — 소켓 페이로드 그대로 유지 (로그만 출력)
+          console.error('[auction-store] REST fallback failed:', fallbackErr);
         }
       }
 

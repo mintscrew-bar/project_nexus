@@ -167,62 +167,70 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
     socket.off('connect');
     socket.off('disconnect');
 
+    // 이벤트 리스너 등록 함수 — 재연결 시에도 동일하게 호출
+    const setupListeners = () => {
+      roomSocketHelpers.offAllListeners(); // 중복 등록 방지
+
+      roomSocketHelpers.onRoomUpdate((room: Room) => {
+        set({ currentRoom: room });
+      });
+
+      // Server emits { userId, username } for user-joined
+      roomSocketHelpers.onParticipantJoined((data: { userId: string; username: string }) => {
+        set((state) => ({
+          participants: [...state.participants, { id: data.userId, username: data.username, isReady: false }],
+        }));
+      });
+
+      // Server emits { userId, username } for user-left
+      roomSocketHelpers.onParticipantLeft((data: { userId: string }) => {
+        set((state) => ({
+          participants: state.participants.filter((p) => p.id !== data.userId),
+        }));
+      });
+
+      // Server emits { userId, isReady } for ready-status-changed
+      roomSocketHelpers.onParticipantReady((data: { userId: string; isReady: boolean }) => {
+        set((state) => ({
+          participants: state.participants.map((p) =>
+            p.id === data.userId ? { ...p, isReady: data.isReady } : p
+          ),
+        }));
+      });
+
+      roomSocketHelpers.onNewMessage((message: ChatMessage) => {
+        set((state) => {
+          const updated = [...state.chatMessages, message];
+          // 메모리 누수 방지: 최대 500개 유지 (오래된 메시지부터 제거)
+          return { chatMessages: updated.length > 500 ? updated.slice(-500) : updated };
+        });
+      });
+
+      roomSocketHelpers.onUserTyping((data: { userId: string; username: string }) => {
+        set((state) => {
+          const newTypingUsers = new Map(state.typingUsers);
+          newTypingUsers.set(data.userId, data.username);
+          return { typingUsers: newTypingUsers };
+        });
+      });
+
+      roomSocketHelpers.onUserStoppedTyping((data: { userId: string }) => {
+        set((state) => {
+          const newTypingUsers = new Map(state.typingUsers);
+          newTypingUsers.delete(data.userId);
+          return { typingUsers: newTypingUsers };
+        });
+      });
+    };
+
+    // 최초 리스너 등록 및 방 입장
+    setupListeners();
     roomSocketHelpers.joinRoom(roomId);
 
-    roomSocketHelpers.onRoomUpdate((room: Room) => {
-      set({ currentRoom: room });
-    });
-
-    // Server emits { userId, username } for user-joined
-    roomSocketHelpers.onParticipantJoined((data: { userId: string; username: string }) => {
-      set((state) => ({
-        participants: [...state.participants, { id: data.userId, username: data.username, isReady: false }],
-      }));
-    });
-
-    // Server emits { userId, username } for user-left
-    roomSocketHelpers.onParticipantLeft((data: { userId: string }) => {
-      set((state) => ({
-        participants: state.participants.filter((p) => p.id !== data.userId),
-      }));
-    });
-
-    // Server emits { userId, isReady } for ready-status-changed
-    roomSocketHelpers.onParticipantReady((data: { userId: string; isReady: boolean }) => {
-      set((state) => ({
-        participants: state.participants.map((p) =>
-          p.id === data.userId ? { ...p, isReady: data.isReady } : p
-        ),
-      }));
-    });
-
-    roomSocketHelpers.onNewMessage((message: ChatMessage) => {
-      set((state) => {
-        const updated = [...state.chatMessages, message];
-        // 메모리 누수 방지: 최대 500개 유지 (오래된 메시지부터 제거)
-        return { chatMessages: updated.length > 500 ? updated.slice(-500) : updated };
-      });
-    });
-
-    roomSocketHelpers.onUserTyping((data: { userId: string; username: string }) => {
-      set((state) => {
-        const newTypingUsers = new Map(state.typingUsers);
-        newTypingUsers.set(data.userId, data.username);
-        return { typingUsers: newTypingUsers };
-      });
-    });
-
-    roomSocketHelpers.onUserStoppedTyping((data: { userId: string }) => {
-      set((state) => {
-        const newTypingUsers = new Map(state.typingUsers);
-        newTypingUsers.delete(data.userId);
-        return { typingUsers: newTypingUsers };
-      });
-    });
-
-    // Re-join the socket.io room after reconnect to resume receiving events
+    // 재연결 시: 이벤트 리스너 전체 재등록 + 방 재입장
     socket.on('connect', () => {
       set({ isConnected: true });
+      setupListeners();
       roomSocketHelpers.joinRoom(roomId);
     });
     socket.on('disconnect', () => set({ isConnected: false }));

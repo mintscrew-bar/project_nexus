@@ -1,5 +1,17 @@
 import { io, Socket } from "socket.io-client";
-import { getAccessToken } from "./api-client";
+import { getAccessToken, ensureValidToken } from "./api-client";
+
+// is-typing 이벤트 debounce 유틸 — contextKey별 독립 관리
+const debounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const debounceEmit = (key: string, fn: () => void, delayMs = 500) => {
+  const existing = debounceTimers.get(key);
+  if (existing) clearTimeout(existing);
+  const timer = setTimeout(() => {
+    fn();
+    debounceTimers.delete(key);
+  }, delayMs);
+  debounceTimers.set(key, timer);
+};
 
 // Socket.io 클라이언트 인스턴스
 let roomSocket: Socket | null = null;
@@ -29,7 +41,7 @@ export const connectRoomSocket = () => {
 
   roomSocket = io(`${SOCKET_URL}/room`, {
     // Re-evaluate token for each connection/reconnection attempt.
-    auth: (cb) => cb({ token: getAccessToken() }),
+    auth: async (cb) => cb({ token: await ensureValidToken() }),
     transports: ["websocket"],
     reconnection: true,
     reconnectionAttempts: Infinity,
@@ -57,7 +69,7 @@ export const connectAuctionSocket = () => {
 
   auctionSocket = io(`${SOCKET_URL}/auction`, {
     // Re-evaluate token for each connection/reconnection attempt.
-    auth: (cb) => cb({ token: getAccessToken() }),
+    auth: async (cb) => cb({ token: await ensureValidToken() }),
     transports: ["websocket"],
     reconnection: true,
     reconnectionAttempts: Infinity,
@@ -86,7 +98,7 @@ export const connectSnakeDraftSocket = () => {
   }
 
   snakeDraftSocket = io(`${SOCKET_URL}/snake-draft`, {
-    auth: (cb) => cb({ token: getAccessToken() }),
+    auth: async (cb) => cb({ token: await ensureValidToken() }),
     transports: ["websocket"],
     reconnection: true,
     reconnectionAttempts: Infinity,
@@ -111,7 +123,7 @@ export const connectMatchSocket = () => {
   }
 
   matchSocket = io(`${SOCKET_URL}/match`, {
-    auth: (cb) => cb({ token: getAccessToken() }),
+    auth: async (cb) => cb({ token: await ensureValidToken() }),
     transports: ["websocket"],
     reconnection: true,
     reconnectionAttempts: Infinity,
@@ -136,7 +148,7 @@ export const connectClanSocket = () => {
   }
 
   clanSocket = io(`${SOCKET_URL}/clan`, {
-    auth: (cb) => cb({ token: getAccessToken() }),
+    auth: async (cb) => cb({ token: await ensureValidToken() }),
     transports: ["websocket"],
     reconnection: true,
     reconnectionAttempts: Infinity,
@@ -167,7 +179,10 @@ export const roomSocketHelpers = {
   },
 
   sendIsTyping: (roomId: string, isTyping: boolean) => {
-    roomSocket?.emit("is-typing", { roomId, isTyping });
+    // 매 키 입력마다 전송하지 않도록 500ms debounce 적용
+    debounceEmit(`room-typing-${roomId}`, () => {
+      roomSocket?.emit("is-typing", { roomId, isTyping });
+    });
   },
 
   // Room list subscription
@@ -642,7 +657,7 @@ export const connectPresenceSocket = () => {
   }
 
   presenceSocket = io(`${SOCKET_URL}/presence`, {
-    auth: (cb) => cb({ token: getAccessToken() }),
+    auth: async (cb) => cb({ token: await ensureValidToken() }),
     transports: ["websocket"],
     reconnection: true,
     reconnectionAttempts: Infinity,
@@ -708,7 +723,10 @@ export const clanSocketHelpers = {
   },
 
   sendIsTyping: (clanId: string, isTyping: boolean) => {
-    clanSocket?.emit("is-typing", { clanId, isTyping });
+    // 매 키 입력마다 전송하지 않도록 500ms debounce 적용
+    debounceEmit(`clan-typing-${clanId}`, () => {
+      clanSocket?.emit("is-typing", { clanId, isTyping });
+    });
   },
 
   onNewMessage: (callback: (data: any) => void) => {
@@ -801,7 +819,7 @@ export const connectNotificationSocket = () => {
   }
 
   notificationSocket = io(`${SOCKET_URL}/notification`, {
-    auth: (cb) => cb({ token: getAccessToken() }),
+    auth: async (cb) => cb({ token: await ensureValidToken() }),
     transports: ["websocket"],
     reconnection: true,
     reconnectionAttempts: Infinity,
@@ -851,7 +869,7 @@ export const connectDmSocket = () => {
   }
 
   dmSocket = io(`${SOCKET_URL}/dm`, {
-    auth: (cb) => cb({ token: getAccessToken() }),
+    auth: async (cb) => cb({ token: await ensureValidToken() }),
     transports: ["websocket"],
     reconnection: true,
     reconnectionAttempts: Infinity,
@@ -873,7 +891,10 @@ export const dmSocketHelpers = {
   },
 
   sendIsTyping: (receiverId: string, isTyping: boolean) => {
-    dmSocket?.emit("is-typing", { receiverId, isTyping });
+    // 매 키 입력마다 전송하지 않도록 500ms debounce 적용
+    debounceEmit(`dm-typing-${receiverId}`, () => {
+      dmSocket?.emit("is-typing", { receiverId, isTyping });
+    });
   },
 
   markRead: (senderId: string) => {
@@ -1006,7 +1027,7 @@ export const connectRoleSelectionSocket = () => {
   }
 
   roleSelectionSocket = io(`${SOCKET_URL}/role-selection`, {
-    auth: (cb) => cb({ token: getAccessToken() }),
+    auth: async (cb) => cb({ token: await ensureValidToken() }),
     transports: ["websocket"],
     reconnection: true,
     reconnectionAttempts: Infinity,

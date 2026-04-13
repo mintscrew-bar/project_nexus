@@ -45,6 +45,8 @@ export class AuctionGateway
   // Bot auto-bid timers: key = `${roomId}_${botCaptainId}`
   private botBidTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private bidResolveTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  // 타이머 진행 상황 브로드캐스트용 인터벌 (500ms마다 timeLeft emit)
+  private timerUpdateIntervals = new Map<string, ReturnType<typeof setInterval>>();
   // Guard against concurrent _resolveCurrentBidAndAdvance calls
   private resolvingRooms = new Set<string>();
   // In-memory rate limit fallback when Redis is unavailable
@@ -74,6 +76,12 @@ export class AuctionGateway
       clearTimeout(timer);
     }
     this.bidResolveTimers.clear();
+
+    for (const interval of this.timerUpdateIntervals.values()) {
+      clearInterval(interval);
+    }
+    this.timerUpdateIntervals.clear();
+
     this.resolvingRooms.clear();
 
     if (this.rateLimitCleanupTimer) {
@@ -704,10 +712,17 @@ export class AuctionGateway
 
   private _cancelBidResolve(roomId: string): void {
     const timer = this.bidResolveTimers.get(roomId);
-    if (!timer) return;
+    if (timer) {
+      clearTimeout(timer);
+      this.bidResolveTimers.delete(roomId);
+    }
 
-    clearTimeout(timer);
-    this.bidResolveTimers.delete(roomId);
+    // 타이머 업데이트 인터벌도 함께 정리
+    const interval = this.timerUpdateIntervals.get(roomId);
+    if (interval) {
+      clearInterval(interval);
+      this.timerUpdateIntervals.delete(roomId);
+    }
   }
 
   private _scheduleBidResolve(roomId: string, timerEnd: number): void {
@@ -724,6 +739,17 @@ export class AuctionGateway
     }, delayMs);
 
     this.bidResolveTimers.set(roomId, timer);
+
+    // 500ms 간격으로 남은 시간 브로드캐스트 (타이머 UI 업데이트)
+    const updateInterval = setInterval(() => {
+      const timeLeft = Math.max(0, Math.ceil((timerEnd - Date.now()) / 1000));
+      this.emitTimerUpdate(roomId, timeLeft);
+      if (timeLeft <= 0) {
+        clearInterval(updateInterval);
+        this.timerUpdateIntervals.delete(roomId);
+      }
+    }, 500);
+    this.timerUpdateIntervals.set(roomId, updateInterval);
   }
 
   private async _handleBidTimerExpired(roomId: string): Promise<void> {

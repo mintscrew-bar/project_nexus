@@ -104,6 +104,46 @@ async function refreshAccessToken(): Promise<string> {
   }
 }
 
+// 소켓 인증용: JWT 만료 여부 확인 후 필요 시 갱신하여 유효한 토큰 반환
+export async function ensureValidToken(): Promise<string | null> {
+  if (!accessToken) return null;
+
+  try {
+    // JWT payload 디코드 (서명 검증 없이 만료 시간만 확인)
+    const payload = JSON.parse(atob(accessToken.split('.')[1]));
+    const expiresAt = payload.exp * 1000;
+    // 만료 30초 전부터 미리 갱신
+    if (Date.now() < expiresAt - 30_000) {
+      return accessToken;
+    }
+  } catch {
+    // 디코드 실패 시 갱신 시도
+  }
+
+  // 토큰이 만료됐거나 곧 만료되므로 갱신
+  if (refreshPromise) {
+    try {
+      const newToken = await refreshPromise;
+      accessToken = newToken;
+      return newToken;
+    } catch {
+      return null;
+    }
+  }
+
+  refreshPromise = refreshAccessToken();
+  try {
+    const newToken = await refreshPromise;
+    accessToken = newToken;
+    refreshPromise = null;
+    return newToken;
+  } catch {
+    accessToken = null;
+    refreshPromise = null;
+    return null;
+  }
+}
+
 // 인증 관련 API
 export const authApi = {
   login: () => {

@@ -198,7 +198,7 @@ export class RoleSelectionGateway
             }
           });
         } else {
-          // Emit timer update every second
+          // 5초 간격으로 서버 시간 보정 값 전송 (클라이언트는 로컬 카운트다운 사용)
           this.server.to(`room:${roomId}`).emit("timer-tick", {
             timeRemaining,
           });
@@ -210,7 +210,7 @@ export class RoleSelectionGateway
         );
         this.stopTimer(roomId);
       }
-    }, 1000);
+    }, 5000);
 
     this.roomTimers.set(roomId, interval);
   }
