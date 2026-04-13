@@ -243,6 +243,7 @@ model RoomParticipant {
   @@index([roomId])
   @@index([userId])
   @@index([teamId])
+  @@index([roomId, isReady, role]) // 방 시작 대기 체크: WHERE roomId=X AND isReady=true AND role='PLAYER'
   @@map("room_participants")
 }
 
@@ -350,6 +351,7 @@ model AuctionBid {
   @@index([roomId, createdAt])
   @@index([teamId])
   @@index([targetUserId])
+  @@index([targetUserId, createdAt]) // 사용자별 최근 입찰 내역 조회 최적화
   @@map("auction_bids")
 }
 

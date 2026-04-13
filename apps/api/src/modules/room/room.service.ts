@@ -131,6 +131,9 @@ export class RoomService {
       );
     }
 
+    // 게임 설정값 서비스 레이어 재검증 — ValidationPipe 우회 방어
+    this.validateGameSettings(dto);
+
     // Hash password if provided
     let hashedPassword: string | undefined;
     if (dto.password) {
@@ -767,6 +770,9 @@ export class RoomService {
       throw new BadRequestException("Cannot update room after it has started");
     }
 
+    // 게임 설정값 서비스 레이어 재검증 — ValidationPipe 우회 방어
+    this.validateGameSettings(updates);
+
     const data: any = {};
 
     if (updates.name) {
@@ -1362,5 +1368,51 @@ export class RoomService {
       message: "Session aborted and room returned to lobby",
       room: updatedRoom,
     };
+  }
+
+  // ========================================
+  // 내부 검증 헬퍼
+  // ========================================
+
+  /**
+   * 방 생성/수정 시 게임 설정값의 허용 범위를 서비스 레이어에서 재검증한다.
+   * DTO의 ValidationPipe가 우회되는 경우를 대비한 이중 방어선.
+   */
+  private validateGameSettings(
+    dto: Partial<{
+      bidTimeLimit?: number;
+      pickTimeLimit?: number;
+      startingPoints?: number;
+      minBidIncrement?: number;
+    }>,
+  ): void {
+    if (dto.bidTimeLimit !== undefined) {
+      if (dto.bidTimeLimit < 5 || dto.bidTimeLimit > 120) {
+        throw new BadRequestException(
+          "bidTimeLimit은 5~120초 사이여야 합니다.",
+        );
+      }
+    }
+    if (dto.pickTimeLimit !== undefined) {
+      if (dto.pickTimeLimit < 5 || dto.pickTimeLimit > 300) {
+        throw new BadRequestException(
+          "pickTimeLimit은 5~300초 사이여야 합니다.",
+        );
+      }
+    }
+    if (dto.startingPoints !== undefined) {
+      if (dto.startingPoints < 100 || dto.startingPoints > 100000) {
+        throw new BadRequestException(
+          "startingPoints는 100~100,000 사이여야 합니다.",
+        );
+      }
+    }
+    if (dto.minBidIncrement !== undefined) {
+      if (dto.minBidIncrement < 10 || dto.minBidIncrement > 10000) {
+        throw new BadRequestException(
+          "minBidIncrement는 10~10,000 사이여야 합니다.",
+        );
+      }
+    }
   }
 }

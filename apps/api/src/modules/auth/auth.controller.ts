@@ -256,14 +256,37 @@ export class AuthController {
   @Get("link/discord")
   @UseGuards(JwtAuthGuard)
   async linkDiscord(@CurrentUser("sub") userId: string, @Res() res: Response) {
-    // Generate temporary link token (5 minutes)
-    const linkToken = await this.authService.generateLinkToken(
-      userId,
-      "discord",
-    );
+    // redirect_uri를 환경변수에서 고정값으로 가져오되, 화이트리스트 검증 후 사용.
+    // 동적 폴백 체인 대신 명시적 단일 값을 사용하여 Open Redirect 방지.
+    const allowedCallbackUrl = this.configService.get<string>("DISCORD_LINK_CALLBACK_URL");
+    const appUrl = this.configService.get<string>("APP_URL") || "http://localhost:3000";
 
-    // Redirect to Discord OAuth with link token in state
-    const discordAuthUrl = `https://discord.com/api/oauth2/authorize?client_id=${this.configService.get("DISCORD_CLIENT_ID")}&redirect_uri=${encodeURIComponent(this.configService.get("DISCORD_LINK_CALLBACK_URL") || this.configService.get("DISCORD_CALLBACK_URL")?.replace("/callback", "/link/callback") || "")}&response_type=code&scope=identify%20email&state=${linkToken}`;
+    if (!allowedCallbackUrl) {
+      this.logger.error("DISCORD_LINK_CALLBACK_URL 환경변수가 설정되지 않았습니다.");
+      throw new BadRequestException("Discord 연동 설정 오류입니다.");
+    }
+
+    // 허용된 도메인 화이트리스트 검증 (Open Redirect 방지)
+    const allowedOrigins = [
+      new URL(appUrl).origin,
+      "http://localhost:4000",
+    ];
+    const callbackOrigin = new URL(allowedCallbackUrl).origin;
+    if (!allowedOrigins.includes(callbackOrigin)) {
+      this.logger.error(`허용되지 않은 redirect_uri 도메인: ${callbackOrigin}`);
+      throw new BadRequestException("허용되지 않은 콜백 URL입니다.");
+    }
+
+    // Generate temporary link token (5 minutes)
+    const linkToken = await this.authService.generateLinkToken(userId, "discord");
+
+    const discordAuthUrl =
+      `https://discord.com/api/oauth2/authorize` +
+      `?client_id=${this.configService.get("DISCORD_CLIENT_ID")}` +
+      `&redirect_uri=${encodeURIComponent(allowedCallbackUrl)}` +
+      `&response_type=code` +
+      `&scope=identify%20email` +
+      `&state=${linkToken}`;
 
     return res.redirect(discordAuthUrl);
   }

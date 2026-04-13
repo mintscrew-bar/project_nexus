@@ -14,6 +14,7 @@ import {
   HttpStatus,
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
+import { Throttle } from "@nestjs/throttler";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { UserService } from "./user.service";
@@ -35,16 +36,19 @@ export class UserController {
   // ========================================
 
   @Get("me")
+  @Throttle({ default: { limit: 30, ttl: 60000 } }) // 분당 30회
   async getMyProfile(@CurrentUser("sub") userId: string) {
     return this.userService.getProfile(userId, userId);
   }
 
   @Get("stats")
+  @Throttle({ default: { limit: 30, ttl: 60000 } }) // 분당 30회
   async getMyStats(@CurrentUser("sub") userId: string) {
     return this.userService.getUserStats(userId, userId);
   }
 
   @Get("settings")
+  @Throttle({ default: { limit: 30, ttl: 60000 } }) // 분당 30회
   async getSettings(@CurrentUser("sub") userId: string) {
     return this.userSettingsService.getSettings(userId);
   }

@@ -17,6 +17,7 @@ import {
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { Request } from "express";
+import { Throttle } from "@nestjs/throttler";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { OptionalJwtGuard } from "../auth/guards/optional-jwt.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
@@ -58,6 +59,7 @@ export class CommunityController {
   }
 
   @Get("posts")
+  @Throttle({ default: { limit: 100, ttl: 60000 } }) // 분당 100회 — 크롤링 방지
   async listPosts(@Query() query: ListPostsQueryDto) {
     return this.communityService.listPosts({
       category: query.category,

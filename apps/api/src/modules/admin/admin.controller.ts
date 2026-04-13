@@ -12,6 +12,7 @@ import {
   Inject,
   forwardRef,
 } from "@nestjs/common";
+import { Throttle } from "@nestjs/throttler";
 import { AdminService } from "./admin.service";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
@@ -110,6 +111,7 @@ export class AdminController {
   // ── Reports (ADMIN + MODERATOR) ──────────────────────────────────────────
   @Get("reports")
   @Roles(UserRole.ADMIN, UserRole.MODERATOR)
+  @Throttle({ default: { limit: 60, ttl: 60000 } }) // 분당 60회
   getReports(@Query() query: AdminReportsQueryDto) {
     return this.adminService.getReports({
       page: query.page,
