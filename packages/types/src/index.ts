@@ -191,3 +191,25 @@ export interface VerifyRiotAccountDto {
   gameName: string;
   tagLine: string;
 }
+
+// ============================================
+// LoL Game Element Mappings (EN ↔ KO)
+// ============================================
+
+export {
+  CHAMPION_MAPPINGS,
+  ITEM_MAPPINGS,
+  RUNE_MAPPINGS,
+  getChampionKoreanName,
+  getItemKoreanName,
+  getRuneKoreanName,
+  getChampionEnglishName,
+  getItemEnglishName,
+  getRuneEnglishName,
+  getAllChampionNames,
+  getAllChampionKoreanNames,
+  getAllItemNames,
+  getAllItemKoreanNames,
+  getAllRuneNames,
+  getAllRuneKoreanNames,
+} from './lol-mappings';
