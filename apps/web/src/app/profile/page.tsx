@@ -10,7 +10,7 @@ import { userApi, matchApi, statsApi } from '@/lib/api-client';
 import { AddAccountModal } from '@/components/domain/AddAccountModal';
 import { EditAccountModal } from '@/components/domain/EditAccountModal';
 import { ChampionImage } from '@/components/ChampionImage';
-import { LoadingSpinner, Card, CardHeader, CardTitle, CardContent, Badge, Button, Skeleton, EmptyState, ConfirmModal, StatusSelector } from '@/components/ui';
+import { LoadingSpinner, Card, CardHeader, CardTitle, CardContent, Badge, Button, Skeleton, EmptyState, ConfirmModal, StatusSelector, Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui';
 import { Star, Plus, RefreshCw, Shield, Trophy, TrendingUp, Loader2, Gamepad2, Target, History, Clock, Calendar, Settings, User, BarChart3, Pencil, Trash2, Swords, ChevronUp, Gavel, Camera, Check, X } from 'lucide-react';
 import { TierBadge } from '@/components/domain/TierBadge';
 import { useToast } from '@/components/ui/Toast';
@@ -460,58 +460,85 @@ export default function ProfilePage() {
                   <Pencil className="h-3.5 w-3.5 mt-1 text-text-tertiary opacity-0 group-hover/bio:opacity-100 transition-opacity pointer-events-none flex-shrink-0" />
                 </div>
 
-                {/* Meta info row */}
-                <div className="flex flex-wrap items-center gap-4 text-sm text-text-secondary">
-                  <StatusSelector
-                    currentStatus={myStatus}
-                    onStatusChange={(status) => setStatus(status)}
-                  />
+                {/* Meta info row — 2-column grid with tier/role emphasis */}
+                <div className="space-y-4">
+                  {/* 주라인 & 티어 그리드 */}
                   {primary && (
-                    <div className="flex items-center gap-2">
-                      <TierBadge tier={primary.tier} size="sm" />
-                      <span className="font-medium text-text-primary">{primary.gameName}</span>
-                      <span className="text-text-tertiary">#{primary.tagLine}</span>
-                      {primary.rank && (
-                        <span className="text-text-tertiary">{primary.rank} {primary.lp}LP</span>
-                      )}
+                    <div className="grid grid-cols-2 gap-6">
+                      {/* 왼쪽: 주라인 */}
+                      <div className="flex items-center gap-3">
+                        {primary.mainRole && (
+                          <div className="flex items-center gap-2 px-3 py-2 bg-accent-primary/10 rounded-lg border border-accent-primary/30">
+                            <Gamepad2 className="h-5 w-5 text-accent-primary flex-shrink-0" />
+                            <div className="text-sm font-medium text-text-primary">
+                              {ROLE_LABELS[primary.mainRole] ?? primary.mainRole}
+                              {primary.subRole && (
+                                <span className="text-text-tertiary ml-1">/ {ROLE_LABELS[primary.subRole] ?? primary.subRole}</span>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* 오른쪽: 솔로/자유 랭크 티어 */}
+                      <div className="flex flex-col gap-2 text-right">
+                        {primary.tier && (
+                          <div className="flex items-center justify-end gap-2">
+                            <TierBadge tier={primary.tier} size="md" />
+                            <div className="text-sm">
+                              {primary.rank && <span className="font-medium text-text-primary">{primary.rank}</span>}
+                              {primary.lp && <span className="text-text-secondary ml-1">{primary.lp}LP</span>}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
-                  {primary?.peakTier && (
-                    <div className="flex items-center gap-1">
-                      <ChevronUp className="h-4 w-4 text-accent-gold" />
-                      <span className="text-text-tertiary">최고</span>
-                      <TierBadge tier={primary.peakTier} size="sm" />
-                      {primary.peakRank && <span className="text-text-tertiary">{primary.peakRank}</span>}
-                    </div>
-                  )}
-                  {primary?.mainRole && (
-                    <div className="flex items-center gap-1">
-                      <Gamepad2 className="h-4 w-4 text-accent-primary" />
-                      <span>{ROLE_LABELS[primary.mainRole] ?? primary.mainRole}</span>
-                      {primary.subRole && (
-                        <span className="text-text-tertiary">/ {ROLE_LABELS[primary.subRole] ?? primary.subRole}</span>
-                      )}
-                    </div>
-                  )}
-                  {highlightChampionId && (
-                    <div className="flex items-center gap-1.5">
-                      <ChampionImage championKey={getChampionKey(highlightChampionId)} size={20} className="rounded" />
-                      <span className="font-medium text-accent-gold">{getChampionName(highlightChampionId)}</span>
-                    </div>
-                  )}
-                  <div className="flex items-center gap-1">
-                    <Calendar className="h-4 w-4 text-text-tertiary" />
-                    <span>{new Date(profileData?.createdAt || user.createdAt).toLocaleDateString('ko-KR')} 가입</span>
+
+                  {/* 아래: 게임명 · 최고 티어 · 가입일 */}
+                  <div className="flex items-center gap-2 text-xs text-text-tertiary">
+                    <StatusSelector
+                      currentStatus={myStatus}
+                      onStatusChange={(status) => setStatus(status)}
+                    />
+                    {primary && (
+                      <>
+                        <span className="font-medium text-text-primary">{primary.gameName}</span>
+                        <span>#{primary.tagLine}</span>
+                        <span>·</span>
+                        {primary.peakTier && (
+                          <>
+                            <span>최고 {primary.peakTier}</span>
+                            {primary.peakRank && <span>{primary.peakRank}</span>}
+                            <span>·</span>
+                          </>
+                        )}
+                        <Calendar className="h-3 w-3 flex-shrink-0" />
+                        <span>{new Date(profileData?.createdAt || user.createdAt).toLocaleDateString('ko-KR')} 가입</span>
+                      </>
+                    )}
+                    {highlightChampionId && (
+                      <>
+                        <span>·</span>
+                        <ChampionImage championKey={getChampionKey(highlightChampionId)} size={14} className="rounded" />
+                        <span className="text-accent-gold">{getChampionName(highlightChampionId)}</span>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
 
-              {/* 저장 / 설정 버튼 */}
+              {/* 저장 / 공개 프로필 / 설정 버튼 */}
               <div className="flex-shrink-0 flex gap-2">
                 {profileDirty && (
                   <Button size="sm" onClick={handleSaveProfile} isLoading={isSaving}>
                     <Check className="h-4 w-4 mr-1" />
                     저장
+                  </Button>
+                )}
+                {user?.id && (
+                  <Button variant="ghost" size="sm" onClick={() => router.push(`/users/${user.id}`)}>
+                    내 공개 프로필 →
                   </Button>
                 )}
                 <Button variant="ghost" size="sm" onClick={() => router.push('/settings')}>
@@ -524,139 +551,143 @@ export default function ProfilePage() {
           </CardContent>
         </Card>
 
-        {/* Preferred Champions Section */}
-        {preferredChampions.length > 0 && (
+        {/* Champions Tabbed Section */}
+        {(preferredChampions.length > 0 || championStats.length > 0 || rankedChampStats.length > 0) && (
           <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Target className="h-5 w-5 text-accent-primary" />
-                선호 챔피언
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {preferredChampions.map(({ role, champions: champs }) => (
-                  <div key={role}>
-                    <div className="flex items-center gap-2 mb-2">
-                      <Badge variant="default" size="sm">{ROLE_LABELS[role] ?? role}</Badge>
-                    </div>
-                    <div className="flex flex-wrap gap-3">
-                      {champs.map(({ championId }) => (
-                        <div key={championId} className="flex items-center gap-2 bg-bg-tertiary rounded-lg px-3 py-2">
-                          <ChampionImage
-                            championKey={getChampionKey(championId)}
-                            size={32}
-                            className="rounded-md"
-                          />
-                          <span className="text-sm font-medium text-text-primary">
-                            {getChampionName(championId)}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
+            <CardContent className="p-6 md:p-8">
+              <Tabs defaultValue="auto-stats">
+                <TabsList className="mb-6">
+                  {championStats.length > 0 && (
+                    <TabsTrigger value="auto-stats">
+                      <BarChart3 className="h-4 w-4 mr-2" />
+                      내전 모스트
+                    </TabsTrigger>
+                  )}
+                  {preferredChampions.length > 0 && (
+                    <TabsTrigger value="preferred">
+                      <Target className="h-4 w-4 mr-2" />
+                      선호 포지션
+                    </TabsTrigger>
+                  )}
+                  {rankedChampStats.length > 0 && (
+                    <TabsTrigger value="ranked">
+                      <Trophy className="h-4 w-4 mr-2" />
+                      랭크 모스트
+                    </TabsTrigger>
+                  )}
+                </TabsList>
 
-        {/* Most Played Champions (auto from match data) */}
-        {championStats.length > 0 && (
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <BarChart3 className="h-5 w-5 text-accent-primary" />
-                내전 모스트 챔피언
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-                {championStats.map((champ: any, idx: number) => {
-                  const winRate = champ.games > 0 ? ((champ.wins / champ.games) * 100).toFixed(0) : '0';
-                  const kda = champ.deaths > 0
-                    ? ((champ.kills + champ.assists) / champ.deaths).toFixed(2)
-                    : 'Perfect';
-                  return (
-                    <div key={champ.championId} className="flex items-center gap-3 bg-bg-tertiary rounded-lg p-3">
-                      <div className="relative">
-                        <ChampionImage
-                          championKey={champ.championName || getChampionKey(String(champ.championId))}
-                          size={40}
-                          className="rounded-md"
-                        />
-                        {idx === 0 && (
-                          <div className="absolute -top-1 -right-1 bg-accent-gold text-bg-primary text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
-                            1
+                {/* 내전 모스트 탭 */}
+                {championStats.length > 0 && (
+                  <TabsContent value="auto-stats" className="space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                      {championStats.map((champ: any, idx: number) => {
+                        const winRate = champ.games > 0 ? ((champ.wins / champ.games) * 100).toFixed(0) : '0';
+                        const kda = champ.deaths > 0
+                          ? ((champ.kills + champ.assists) / champ.deaths).toFixed(2)
+                          : 'Perfect';
+                        return (
+                          <div key={champ.championId} className="flex items-center gap-3 bg-bg-tertiary rounded-lg p-3">
+                            <div className="relative">
+                              <ChampionImage
+                                championKey={champ.championName || getChampionKey(String(champ.championId))}
+                                size={40}
+                                className="rounded-md"
+                              />
+                              {idx === 0 && (
+                                <div className="absolute -top-1 -right-1 bg-accent-gold text-bg-primary text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                                  1
+                                </div>
+                              )}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-medium text-text-primary truncate">
+                                {champ.championName || getChampionName(String(champ.championId))}
+                              </p>
+                              <div className="flex items-center gap-2 text-xs text-text-tertiary">
+                                <span>{champ.games}게임</span>
+                                <span className={Number(winRate) >= 50 ? 'text-accent-success' : 'text-accent-danger'}>
+                                  {winRate}%
+                                </span>
+                                <span>{kda} KDA</span>
+                              </div>
+                            </div>
                           </div>
-                        )}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-text-primary truncate">
-                          {champ.championName || getChampionName(String(champ.championId))}
-                        </p>
-                        <div className="flex items-center gap-2 text-xs text-text-tertiary">
-                          <span>{champ.games}게임</span>
-                          <span className={Number(winRate) >= 50 ? 'text-accent-success' : 'text-accent-danger'}>
-                            {winRate}%
-                          </span>
-                          <span>{kda} KDA</span>
-                        </div>
-                      </div>
+                        );
+                      })}
                     </div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
-        )}
+                  </TabsContent>
+                )}
 
-        {/* Ranked Most Played Champions */}
-        {rankedChampStats.length > 0 && (
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Trophy className="h-5 w-5 text-accent-gold" />
-                이번 시즌 랭크 모스트
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-                {rankedChampStats.map((champ: any, idx: number) => {
-                  const winRate = champ.games > 0 ? ((champ.wins / champ.games) * 100).toFixed(0) : '0';
-                  const kda = champ.deaths > 0
-                    ? ((champ.kills + champ.assists) / champ.deaths).toFixed(2)
-                    : 'Perfect';
-                  return (
-                    <div key={champ.championName} className="flex items-center gap-3 bg-bg-tertiary rounded-lg p-3">
-                      <div className="relative">
-                        <ChampionImage
-                          championKey={champ.championName}
-                          size={40}
-                          className="rounded-md"
-                        />
-                        {idx === 0 && (
-                          <div className="absolute -top-1 -right-1 bg-accent-gold text-bg-primary text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
-                            1
-                          </div>
-                        )}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-text-primary truncate">
-                          {champ.championName}
-                        </p>
-                        <div className="flex items-center gap-2 text-xs text-text-tertiary">
-                          <span>{champ.games}게임</span>
-                          <span className={Number(winRate) >= 50 ? 'text-accent-success' : 'text-accent-danger'}>
-                            {winRate}%
-                          </span>
-                          <span>{kda} KDA</span>
+                {/* 선호 포지션 탭 */}
+                {preferredChampions.length > 0 && (
+                  <TabsContent value="preferred" className="space-y-4">
+                    {preferredChampions.map(({ role, champions: champs }) => (
+                      <div key={role}>
+                        <div className="flex items-center gap-2 mb-2">
+                          <Badge variant="default" size="sm">{ROLE_LABELS[role] ?? role}</Badge>
+                        </div>
+                        <div className="flex flex-wrap gap-3">
+                          {champs.map(({ championId }) => (
+                            <div key={championId} className="flex items-center gap-2 bg-bg-tertiary rounded-lg px-3 py-2">
+                              <ChampionImage
+                                championKey={getChampionKey(championId)}
+                                size={32}
+                                className="rounded-md"
+                              />
+                              <span className="text-sm font-medium text-text-primary">
+                                {getChampionName(championId)}
+                              </span>
+                            </div>
+                          ))}
                         </div>
                       </div>
+                    ))}
+                  </TabsContent>
+                )}
+
+                {/* 랭크 모스트 탭 */}
+                {rankedChampStats.length > 0 && (
+                  <TabsContent value="ranked" className="space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                      {rankedChampStats.map((champ: any, idx: number) => {
+                        const winRate = champ.games > 0 ? ((champ.wins / champ.games) * 100).toFixed(0) : '0';
+                        const kda = champ.deaths > 0
+                          ? ((champ.kills + champ.assists) / champ.deaths).toFixed(2)
+                          : 'Perfect';
+                        return (
+                          <div key={champ.championName} className="flex items-center gap-3 bg-bg-tertiary rounded-lg p-3">
+                            <div className="relative">
+                              <ChampionImage
+                                championKey={champ.championName}
+                                size={40}
+                                className="rounded-md"
+                              />
+                              {idx === 0 && (
+                                <div className="absolute -top-1 -right-1 bg-accent-gold text-bg-primary text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                                  1
+                                </div>
+                              )}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-medium text-text-primary truncate">
+                                {champ.championName}
+                              </p>
+                              <div className="flex items-center gap-2 text-xs text-text-tertiary">
+                                <span>{champ.games}게임</span>
+                                <span className={Number(winRate) >= 50 ? 'text-accent-success' : 'text-accent-danger'}>
+                                  {winRate}%
+                                </span>
+                                <span>{kda} KDA</span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
-                  );
-                })}
-              </div>
+                  </TabsContent>
+                )}
+              </Tabs>
             </CardContent>
           </Card>
         )}
