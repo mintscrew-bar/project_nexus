@@ -68,22 +68,28 @@ For more detailed documentation, please see the files in the `docs` directory. T
 ### Development Setup
 
 ```bash
-# 1. 의존성 설치
-pnpm install
-
-# 2. 환경 변수 설정
+# 1. 환경 변수 설정
 cp .env.example .env
 # .env 파일 수정
 
-# 3. 개발용 DB 시작
-docker compose -f docker-compose.dev.yml up -d
+# 2. 전체 스택 실행 (web + api + postgres + redis)
+pnpm compose:up
+```
 
-# 4. Prisma 클라이언트 생성 & 마이그레이션
-pnpm db:generate
-pnpm db:push
+`compose:up` 실행 시 API 컨테이너가 아래를 자동 수행합니다.
+- `pnpm install`
+- Prisma client generate
+- migration deploy 실패 시 `db push` fallback
+- API/Web dev 서버 기동
 
-# 5. 개발 서버 시작
-pnpm dev
+중요:
+- `pnpm dev`와 `pnpm compose:up`을 동시에 실행하지 마세요. (포트 충돌로 `EADDRINUSE` 발생)
+- 포트가 이미 사용 중이면 `.env`에서 `API_HOST_PORT`, `WEB_HOST_PORT` 값을 변경하세요.
+
+정리:
+
+```bash
+pnpm compose:down
 ```
 
 ### Production Deployment

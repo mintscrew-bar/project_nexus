@@ -243,7 +243,10 @@ export class DiscordVoiceService {
     let success = 0;
     let failed = 0;
 
-    // Move each member
+    // Discord API rate limit: 5 requests/second per bot token 기준으로
+    // 요청 간 250ms 지연을 두어 10~20명 이동 시에도 제한에 걸리지 않도록 함.
+    const MOVE_DELAY_MS = 250;
+
     for (const member of team.members) {
       // 봇 계정은 건너뛰기 (Discord 계정 없음)
       if (/^testbot_\d+$/.test(member.user.username)) {
@@ -271,6 +274,11 @@ export class DiscordVoiceService {
         success++;
       } else {
         failed++;
+      }
+
+      // 다음 이동 전 지연 — rate limit 방어 (마지막 멤버 이후에는 불필요)
+      if (member !== team.members[team.members.length - 1]) {
+        await new Promise((resolve) => setTimeout(resolve, MOVE_DELAY_MS));
       }
     }
 

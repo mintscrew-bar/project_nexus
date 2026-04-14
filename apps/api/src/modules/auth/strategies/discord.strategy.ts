@@ -12,10 +12,15 @@ export class DiscordStrategy extends PassportStrategy(Strategy, "discord") {
     private readonly configService: ConfigService,
     private readonly authService: AuthService,
   ) {
+    const apiUrl = configService.get<string>("API_URL") || "http://localhost:4000";
+    const callbackURL =
+      configService.get<string>("DISCORD_CALLBACK_URL") ||
+      `${apiUrl}/api/auth/discord/callback`;
+
     super({
       clientID: configService.get<string>("DISCORD_CLIENT_ID")!,
       clientSecret: configService.get<string>("DISCORD_CLIENT_SECRET")!,
-      callbackURL: configService.get<string>("DISCORD_CALLBACK_URL")!,
+      callbackURL,
       scope: ["identify", "email"],
     });
   }

@@ -61,8 +61,10 @@ COPY --from=builder /app/packages/database/dist ./node_modules/@nexus/database/d
 COPY --from=builder /app/packages/database/package.json ./node_modules/@nexus/database/package.json
 COPY --from=builder /app/packages/types/dist ./node_modules/@nexus/types/dist
 COPY --from=builder /app/packages/types/package.json ./node_modules/@nexus/types/package.json
+# Prisma 스키마/마이그레이션 파일
+COPY --from=builder /app/packages/database/prisma ./prisma
 
 EXPOSE 4000
 
-# PM2로 프로세스 관리 (--no-daemon: 컨테이너 포그라운드 유지)
-CMD ["pm2-runtime", "ecosystem.config.js"]
+# 스키마 동기화 후 API 시작 (로컬/초기 DB에서도 안전하게 기동)
+CMD ["sh", "-c", "node_modules/.bin/prisma db push --schema=/app/prisma/schema.prisma && pm2-runtime ecosystem.config.js"]

@@ -59,6 +59,23 @@ export class AuthService {
   // ========================================
 
   /**
+   * 필수 약관 동의(서비스/개인정보/연령)가 완료되었는지 확인
+   */
+  private async hasRequiredTermsAgreement(userId: string): Promise<boolean> {
+    const agreement = await this.prisma.termsAgreement.findFirst({
+      where: {
+        userId,
+        termsOfService: true,
+        privacyPolicy: true,
+        ageVerification: true,
+      },
+      select: { id: true },
+    });
+
+    return !!agreement;
+  }
+
+  /**
    * OAuth 유저 검증 및 생성
    * @returns { user, isNewUser } — isNewUser가 true이면 약관 동의 페이지로 리다이렉트 필요
    */
@@ -77,6 +94,10 @@ export class AuthService {
     });
 
     if (authProvider) {
+      const hasTermsAgreement = await this.hasRequiredTermsAgreement(
+        authProvider.userId,
+      );
+
       // 재로그인 시 사용자가 커스텀한 닉네임/아바타를 덮어쓰지 않음
       const updateData: Record<string, string> = {};
       if (!authProvider.user.avatar && profile.avatar) {
@@ -88,9 +109,9 @@ export class AuthService {
           where: { id: authProvider.userId },
           data: updateData,
         });
-        return { user: updated, isNewUser: false };
+        return { user: updated, isNewUser: !hasTermsAgreement };
       }
-      return { user: authProvider.user, isNewUser: false };
+      return { user: authProvider.user, isNewUser: !hasTermsAgreement };
     }
 
     // 동일 이메일로 기존 계정이 있으면 OAuth 제공자 연결 (신규 아님)
@@ -108,7 +129,10 @@ export class AuthService {
             metadata: profile.metadata,
           },
         });
-        return { user: existingUser, isNewUser: false };
+        const hasTermsAgreement = await this.hasRequiredTermsAgreement(
+          existingUser.id,
+        );
+        return { user: existingUser, isNewUser: !hasTermsAgreement };
       }
     }
 
@@ -176,6 +200,10 @@ export class AuthService {
         "이용약관, 개인정보처리방침, 연령 확인에 동의해야 합니다.",
       );
     }
+
+    // 이미 필수 약관 동의가 존재하면 중복 생성하지 않고 성공 처리
+    const hasTermsAgreement = await this.hasRequiredTermsAgreement(userId);
+    if (hasTermsAgreement) return;
 
     await this.prisma.termsAgreement.create({
       data: {
@@ -297,7 +325,7 @@ export class AuthService {
 
     // IP+이메일 조합 잠금 확인 (5회 이상 실패 → 15분 잠금)
     const failCountStr = await this.redis.get(failKey);
-    const failCount = failCountStr ? (parseInt(failCountStr, 10) || 0) : 0;
+    const failCount = failCountStr ? parseInt(failCountStr, 10) || 0 : 0;
     if (failCount >= 5) {
       throw new HttpException(
         "로그인 시도가 너무 많습니다. 15분 후에 다시 시도해주세요.",
@@ -461,11 +489,12 @@ export class AuthService {
       role: user.role || "USER",
     };
 
-    // Ensure refresh tokens include a unique jwtid to avoid duplicates in DB
+    // access token에도 jti 포함 — 로그아웃 시 블랙리스트 등록에 사용
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(payload, {
         secret: this.configService.get("JWT_ACCESS_SECRET"),
         expiresIn: this.configService.get("JWT_ACCESS_EXPIRES_IN") || "15m",
+        jwtid: randomUUID(),
       }),
       this.jwtService.signAsync(payload, {
         secret: this.configService.get("JWT_REFRESH_SECRET"),
@@ -536,7 +565,7 @@ export class AuthService {
     return { accessToken };
   }
 
-  async logout(userId: string, refreshToken?: string) {
+  async logout(userId: string, refreshToken?: string, accessToken?: string) {
     if (refreshToken) {
       // Delete specific session
       await this.prisma.session.deleteMany({
@@ -547,6 +576,59 @@ export class AuthService {
       await this.prisma.session.deleteMany({
         where: { userId },
       });
+    }
+
+    // access token의 jti를 Redis 블랙리스트에 등록
+    // access token 만료 시간(기본 15분) 동안 재사용 불가하도록 TTL 설정
+    if (accessToken) {
+      await this.blacklistAccessToken(accessToken);
+    }
+  }
+
+  /**
+   * Access token을 즉시 무효화한다.
+   * JWT의 jti(JWT ID)를 Redis 블랙리스트에 등록하고,
+   * 토큰 만료 시간까지 남은 시간을 TTL로 설정한다.
+   * 관리자가 특정 사용자를 강제 로그아웃시킬 때도 사용한다.
+   */
+  async blacklistAccessToken(accessToken: string): Promise<void> {
+    try {
+      const decoded = this.jwtService.decode(accessToken) as {
+        jti?: string;
+        exp?: number;
+      } | null;
+      if (!decoded?.jti || !decoded?.exp) return;
+
+      const now = Math.floor(Date.now() / 1000);
+      const ttlSeconds = Math.max(1, decoded.exp - now);
+
+      await this.redis.set(`blacklist:jti:${decoded.jti}`, "1", ttlSeconds);
+    } catch {
+      // 블랙리스트 등록 실패는 로그아웃 자체를 실패시키지 않음
+    }
+  }
+
+  /**
+   * Access token의 jti가 블랙리스트에 있는지 확인한다.
+   * JwtAuthGuard에서 매 요청마다 호출한다.
+   */
+  async isTokenBlacklisted(jti: string): Promise<boolean> {
+    return this.redis.exists(`blacklist:jti:${jti}`);
+  }
+
+  /**
+   * 특정 사용자의 모든 세션을 강제 종료하고 현재 access token을 즉시 무효화.
+   * 관리자가 계정 해킹 의심 시 긴급 차단에 사용한다.
+   */
+  async forceLogoutUser(
+    targetUserId: string,
+    currentAccessToken?: string,
+  ): Promise<void> {
+    // 모든 refresh session 삭제
+    await this.prisma.session.deleteMany({ where: { userId: targetUserId } });
+    // 현재 access token도 즉시 무효화
+    if (currentAccessToken) {
+      await this.blacklistAccessToken(currentAccessToken);
     }
   }
 
@@ -630,7 +712,9 @@ export class AuthService {
     const key = `oauth_code:${code}`;
     const data = await this.redis.get(key);
     if (!data) {
-      throw new UnauthorizedException("유효하지 않거나 만료된 인증 코드입니다.");
+      throw new UnauthorizedException(
+        "유효하지 않거나 만료된 인증 코드입니다.",
+      );
     }
     // 단회용 — 조회 즉시 삭제하여 재사용 방지
     await this.redis.del(key);
@@ -671,6 +755,20 @@ export class AuthService {
     return userId;
   }
 
+  async isValidLinkToken(linkToken: string, provider: string): Promise<boolean> {
+    const key = `link_token:${linkToken}`;
+    const data = await this.redis.get(key);
+
+    if (!data) return false;
+
+    try {
+      const parsed = JSON.parse(data);
+      return parsed.provider === provider && typeof parsed.userId === "string";
+    } catch {
+      return false;
+    }
+  }
+
   async getDiscordProfile(code: string): Promise<any> {
     // Exchange code for access token
     const tokenResponse = await fetch("https://discord.com/api/oauth2/token", {
@@ -685,9 +783,7 @@ export class AuthService {
         code,
         redirect_uri:
           this.configService.get("DISCORD_LINK_CALLBACK_URL") ||
-          this.configService
-            .get("DISCORD_CALLBACK_URL")
-            ?.replace("/callback", "/link/callback") ||
+          this.configService.get("DISCORD_CALLBACK_URL") ||
           "",
       }),
     });
@@ -723,5 +819,4 @@ export class AuthService {
         : undefined,
     };
   }
-
 }

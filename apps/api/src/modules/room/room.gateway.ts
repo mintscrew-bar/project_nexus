@@ -410,6 +410,7 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect, On
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() data: { roomId: string },
   ) {
+    let coreStartSucceeded = false;
     try {
       if (!client.userId) {
         return { error: "Unauthorized" };
@@ -426,7 +427,13 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect, On
       }
       this.startingRooms.add(data.roomId);
 
-      // Get room to check teamMode
+      // 서비스 레이어의 호스트/레디/최소인원 검증을 반드시 거치도록 통합
+      const startResult = await this.roomService.startGame(
+        client.userId,
+        data.roomId,
+      );
+
+      // Get room to check teamMode (latest)
       const room = await this.roomService.getRoomById(data.roomId);
 
       // ─── Discord 음성채널 검증 ───
@@ -454,12 +461,19 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect, On
         // MANUAL/VOLUNTEER: 팀장 선정 단계 진입
         const auctionResult = result as any;
         if (auctionResult.captainSelectionPhase) {
-          this.auctionGateway.emitCaptainSelectionPhase(
-            data.roomId,
-            auctionResult.captainSelectionPhase,
-            auctionResult.participants,
-            room.hostId,
-          );
+          try {
+            this.auctionGateway.emitCaptainSelectionPhase(
+              data.roomId,
+              auctionResult.captainSelectionPhase,
+              auctionResult.participants,
+              room.hostId,
+            );
+          } catch (emitError) {
+            console.error(
+              `[Room] Failed to emit captain-selection-phase for room ${data.roomId}:`,
+              emitError,
+            );
+          }
 
           // VOLUNTEER: 30초 타이머 후 자동 처리
           if (auctionResult.captainSelectionPhase.mode === "VOLUNTEER") {
@@ -481,7 +495,14 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect, On
           }
         } else {
           // TIER: 기존처럼 바로 auction-started emit
-          this.auctionGateway.emitAuctionStarted(data.roomId, result);
+          try {
+            this.auctionGateway.emitAuctionStarted(data.roomId, result);
+          } catch (emitError) {
+            console.error(
+              `[Room] Failed to emit auction-started for room ${data.roomId}:`,
+              emitError,
+            );
+          }
         }
       } else if (room.teamMode === TeamMode.SNAKE_DRAFT) {
         // Start snake draft directly
@@ -497,24 +518,48 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect, On
         const draftData = clientState ?? result;
 
         // Emit draft-started event to room (for lobby clients) and draft room (for draft page clients)
-        this.server.to(data.roomId).emit("draft-started", draftData);
-        this.snakeDraftGateway.emitDraftStarted(data.roomId, draftData);
+        try {
+          this.server.to(data.roomId).emit("draft-started", draftData);
+          this.snakeDraftGateway.emitDraftStarted(data.roomId, draftData);
+        } catch (emitError) {
+          console.error(
+            `[Room] Failed to emit draft-started for room ${data.roomId}:`,
+            emitError,
+          );
+        }
       }
 
-      // Notify all players that game is starting (for navigation)
-      this.server.to(data.roomId).emit("game-starting", {
-        roomId: data.roomId,
-        teamMode: room.teamMode,
-      });
+      coreStartSucceeded = true;
 
-      return { success: true, roomId: data.roomId, teamMode: room.teamMode };
+      // Notify all players that game is starting (for navigation)
+      try {
+        this.server.to(data.roomId).emit("game-starting", {
+          roomId: data.roomId,
+          teamMode: room.teamMode,
+        });
+      } catch (emitError) {
+        console.error(
+          `[Room] Failed to emit game-starting for room ${data.roomId}:`,
+          emitError,
+        );
+      }
+
+      return {
+        success: true,
+        roomId: data.roomId,
+        teamMode: startResult.teamMode,
+      };
     } catch (error: any) {
       // Best-effort rollback: if auction/draft start failed mid-way,
       // the room status may have been changed to DRAFT already.
       // Roll it back to WAITING so the host can retry.
       try {
         const currentRoom = await this.roomService.getRoomById(data.roomId);
-        if (currentRoom && currentRoom.status !== RoomStatus.WAITING) {
+        if (
+          !coreStartSucceeded &&
+          currentRoom &&
+          currentRoom.status !== RoomStatus.WAITING
+        ) {
           await this.roomService.rollbackToWaiting(data.roomId);
           console.warn(
             `[Room] Rolled back room ${data.roomId} to WAITING after startGame failure: ${error.message}`,
@@ -527,8 +572,9 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect, On
         );
       }
 
-      // Clean up in-memory draft/auction state on failure
+      // 시작 실패 시 in-memory draft/auction state 정리
       this.snakeDraftService.clearDraftState(data.roomId);
+      this.auctionService.clearAuctionState(data.roomId);
 
       return { error: error.message };
     } finally {

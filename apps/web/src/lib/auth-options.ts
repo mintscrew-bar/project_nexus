@@ -16,6 +16,14 @@ interface ExtendedJWT extends JWT {
   user?: any;
 }
 
+function getApiBaseUrl(): string {
+  return (
+    process.env.API_URL ||
+    process.env.NEXT_PUBLIC_API_URL ||
+    "http://localhost:4000"
+  );
+}
+
 declare module "next-auth" {
   interface Session {
     backendTokens?: BackendTokens;
@@ -27,7 +35,8 @@ declare module "next-auth" {
 }
 
 async function refreshToken(token: ExtendedJWT): Promise<ExtendedJWT> {
-  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/refresh`, {
+  const apiBase = getApiBaseUrl();
+  const res = await fetch(`${apiBase}/auth/refresh`, {
     method: "POST",
     headers: {
       authorization: `Refresh ${token.backendTokens?.refreshToken}`,
@@ -59,8 +68,9 @@ export const authOptions: AuthOptions = {
           throw new Error("Missing credentials");
         }
 
+        const apiBase = getApiBaseUrl();
         const res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/auth/login`,
+          `${apiBase}/auth/login`,
           {
             method: "POST",
             headers: {

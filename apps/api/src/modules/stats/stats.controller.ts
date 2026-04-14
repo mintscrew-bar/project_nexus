@@ -1,4 +1,5 @@
 import { Controller, Get, Param, Query, UseGuards } from "@nestjs/common";
+import { Throttle } from "@nestjs/throttler";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { StatsService } from "./stats.service";
@@ -79,6 +80,7 @@ export class StatsController {
    * Find user by Riot account (gameName + tagLine)
    */
   @Get("summoner")
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
   async findUserByRiotAccount(@Query() query: FindSummonerQueryDto) {
     const result = await this.statsService.findUserByRiotAccount(
       query.gameName,
@@ -100,6 +102,7 @@ export class StatsController {
    * Search users by username
    */
   @Get("users/search")
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
   async searchUsers(@Query() query: SearchUsersQueryDto) {
     return this.statsService.searchUsers(query.q, query.limit);
   }
@@ -108,6 +111,7 @@ export class StatsController {
    * Get match timeline (item purchases, gold/CS/XP per minute)
    */
   @Get("match/:matchId/timeline")
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
   async getMatchTimeline(@Param("matchId") matchId: string) {
     return this.statsService.getMatchTimeline(matchId);
   }
@@ -118,6 +122,7 @@ export class StatsController {
    * 재요청 시: DB에서 즉시 반환 (Riot API 호출 없음)
    */
   @Get("summoner/:gameName/:tagLine/ranked-champion-stats")
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   async getRankedChampionStats(
     @Param("gameName") gameName: string,
     @Param("tagLine") tagLine: string,
@@ -129,6 +134,7 @@ export class StatsController {
    * Get Riot match history for a summoner (by gameName + tagLine)
    */
   @Get("summoner/:gameName/:tagLine/matches")
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
   async getSummonerMatchHistory(
     @Param("gameName") gameName: string,
     @Param("tagLine") tagLine: string,
@@ -147,6 +153,7 @@ export class StatsController {
    * Get Riot match history for a user (uses primary Riot account)
    */
   @Get("user/:userId/riot-matches")
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
   async getUserRiotMatchHistory(
     @Param("userId") userId: string,
     @Query() query: UserMatchHistoryQueryDto,

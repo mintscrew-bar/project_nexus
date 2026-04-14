@@ -64,6 +64,29 @@ export class RoomService {
     this.discordVoiceService = discordVoice;
   }
 
+  /**
+   * 동시성 충돌(P2034) 발생 시 직렬화 트랜잭션을 재시도한다.
+   */
+  private async runSerializableTx<T>(
+    fn: (tx: Prisma.TransactionClient) => Promise<T>,
+    maxRetries = 3,
+  ): Promise<T> {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        return await this.prisma.$transaction(fn, {
+          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+        });
+      } catch (error: any) {
+        if (error?.code === "P2034" && attempt < maxRetries) {
+          continue;
+        }
+        throw error;
+      }
+    }
+
+    throw new BadRequestException("트랜잭션 재시도 한도를 초과했습니다.");
+  }
+
   // Transform room data to flatten participant info for frontend
   private transformRoomData(room: any) {
     if (!room) return room;
@@ -430,138 +453,135 @@ export class RoomService {
   // ========================================
 
   async joinRoom(userId: string, dto: JoinRoomDto) {
-    const room = await this.prisma.room.findUnique({
-      where: { id: dto.roomId },
-      include: {
-        participants: true,
-      },
-    });
-
-    if (!room) {
-      throw new NotFoundException("Room not found");
-    }
-
-    // 관전자 입장 요청 시 allowSpectators 체크
     const joinAsSpectator = dto.asSpectator === true;
-    if (joinAsSpectator && !room.allowSpectators) {
-      throw new BadRequestException("이 방은 관전을 허용하지 않습니다.");
-    }
 
-    // 정원 체크: PLAYER만 카운트 (관전자는 정원에 포함되지 않음)
-    const playerCount = room.participants.filter(
-      (p: (typeof room.participants)[number]) => p.role === "PLAYER",
-    ).length;
-    if (!joinAsSpectator && playerCount >= room.maxParticipants) {
-      throw new BadRequestException("Room is full");
-    }
+    const joinedRoomId = await this.runSerializableTx(async (tx) => {
+      const room = await tx.room.findUnique({
+        where: { id: dto.roomId },
+        include: {
+          participants: true,
+        },
+      });
 
-    // Check if room has started
-    if (room.status !== RoomStatus.WAITING) {
-      throw new BadRequestException("Room has already started");
-    }
-
-    // Check if user is already in room
-    const existing = room.participants.find((p: (typeof room.participants)[number]) => p.userId === userId);
-    if (existing) {
-      throw new BadRequestException("Already in room");
-    }
-
-    // Verify password for private rooms
-    if (room.isPrivate && room.password) {
-      if (!dto.password) {
-        throw new BadRequestException("Password required");
+      if (!room) {
+        throw new NotFoundException("Room not found");
       }
 
-      const isValid = await bcrypt.compare(dto.password, room.password);
-      if (!isValid) {
-        throw new BadRequestException("Invalid password");
+      if (joinAsSpectator && !room.allowSpectators) {
+        throw new BadRequestException("이 방은 관전을 허용하지 않습니다.");
       }
-    }
 
-    // ========================================
-    // Check Discord + Riot account linking (REQUIRED)
-    // ========================================
+      // 정원 체크: PLAYER만 카운트 (관전자는 정원에 포함되지 않음)
+      const playerCount = room.participants.filter(
+        (p: (typeof room.participants)[number]) => p.role === "PLAYER",
+      ).length;
+      if (!joinAsSpectator && playerCount >= room.maxParticipants) {
+        throw new BadRequestException("Room is full");
+      }
 
-    // Check Discord account (required for voice channel auto-move)
-    const discordProvider = await this.prisma.authProvider.findFirst({
-      where: { userId, provider: "DISCORD" },
-    });
+      if (room.status !== RoomStatus.WAITING) {
+        throw new BadRequestException("Room has already started");
+      }
 
-    if (!discordProvider) {
-      throw new BadRequestException(
-        "DISCORD_NOT_LINKED::Discord 계정 연동이 필요합니다. 설정 페이지에서 Discord 계정을 연동해주세요.",
+      const existing = room.participants.find(
+        (p: (typeof room.participants)[number]) => p.userId === userId,
       );
-    }
+      if (existing) {
+        throw new BadRequestException("Already in room");
+      }
 
-    // Check Riot account (required for match participation)
-    const riotAccount = await this.prisma.riotAccount.findFirst({
-      where: { userId, isPrimary: true },
+      // Verify password for private rooms
+      if (room.isPrivate && room.password) {
+        if (!dto.password) {
+          throw new BadRequestException("Password required");
+        }
+
+        const isValid = await bcrypt.compare(dto.password, room.password);
+        if (!isValid) {
+          throw new BadRequestException("Invalid password");
+        }
+      }
+
+      const discordProvider = await tx.authProvider.findFirst({
+        where: { userId, provider: "DISCORD" },
+      });
+
+      if (!discordProvider) {
+        throw new BadRequestException(
+          "DISCORD_NOT_LINKED::Discord 계정 연동이 필요합니다. 설정 페이지에서 Discord 계정을 연동해주세요.",
+        );
+      }
+
+      const riotAccount = await tx.riotAccount.findFirst({
+        where: { userId, isPrimary: true },
+      });
+
+      if (!riotAccount) {
+        throw new BadRequestException(
+          "RIOT_NOT_LINKED::Riot 계정 연동이 필요합니다. 프로필 페이지에서 Riot 계정을 연동해주세요.",
+        );
+      }
+
+      await tx.roomParticipant.create({
+        data: {
+          roomId: room.id,
+          userId,
+          role: joinAsSpectator ? "SPECTATOR" : "PLAYER",
+        },
+      });
+
+      return room.id;
     });
 
-    if (!riotAccount) {
-      throw new BadRequestException(
-        "RIOT_NOT_LINKED::Riot 계정 연동이 필요합니다. 프로필 페이지에서 Riot 계정을 연동해주세요.",
-      );
-    }
-
-    // 참가자 추가 (관전자 또는 플레이어)
-    await this.prisma.roomParticipant.create({
-      data: {
-        roomId: room.id,
-        userId,
-        role: joinAsSpectator ? "SPECTATOR" : "PLAYER",
-      },
-    });
-
-    return this.getRoomById(room.id);
+    return this.getRoomById(joinedRoomId);
   }
 
   /** PLAYER ↔ SPECTATOR 역할 전환 */
   async toggleSpectator(userId: string, roomId: string) {
-    const room = await this.prisma.room.findUnique({
-      where: { id: roomId },
-      include: { participants: true },
-    });
+    const newRole = await this.runSerializableTx(async (tx) => {
+      const room = await tx.room.findUnique({
+        where: { id: roomId },
+        include: { participants: true },
+      });
 
-    if (!room) {
-      throw new NotFoundException("Room not found");
-    }
+      if (!room) {
+        throw new NotFoundException("Room not found");
+      }
 
-    // WAITING 상태에서만 전환 가능
-    if (room.status !== RoomStatus.WAITING) {
-      throw new BadRequestException(
-        "게임 진행 중에는 역할을 변경할 수 없습니다.",
-      );
-    }
-
-    const participant = room.participants.find((p: (typeof room.participants)[number]) => p.userId === userId);
-    if (!participant) {
-      throw new BadRequestException("Not in room");
-    }
-
-    const newRole =
-      participant.role === "PLAYER" ? "SPECTATOR" : "PLAYER";
-
-    // SPECTATOR → PLAYER 전환 시 정원 체크
-    if (newRole === "PLAYER") {
-      const playerCount = room.participants.filter(
-        (p: (typeof room.participants)[number]) => p.role === "PLAYER",
-      ).length;
-      if (playerCount >= room.maxParticipants) {
+      if (room.status !== RoomStatus.WAITING) {
         throw new BadRequestException(
-          "플레이어 정원이 가득 찼습니다.",
+          "게임 진행 중에는 역할을 변경할 수 없습니다.",
         );
       }
-    }
 
-    // PLAYER → SPECTATOR 전환 시 관전 허용 체크
-    if (newRole === "SPECTATOR" && !room.allowSpectators) {
-      throw new BadRequestException("이 방은 관전을 허용하지 않습니다.");
-    }
+      const participant = room.participants.find(
+        (p: (typeof room.participants)[number]) => p.userId === userId,
+      );
+      if (!participant) {
+        throw new BadRequestException("Not in room");
+      }
 
-    await this.prisma.roomParticipant.update({
-      where: { id: participant.id },
-      data: { role: newRole, isReady: false },
+      const nextRole = participant.role === "PLAYER" ? "SPECTATOR" : "PLAYER";
+
+      if (nextRole === "PLAYER") {
+        const playerCount = room.participants.filter(
+          (p: (typeof room.participants)[number]) => p.role === "PLAYER",
+        ).length;
+        if (playerCount >= room.maxParticipants) {
+          throw new BadRequestException("플레이어 정원이 가득 찼습니다.");
+        }
+      }
+
+      if (nextRole === "SPECTATOR" && !room.allowSpectators) {
+        throw new BadRequestException("이 방은 관전을 허용하지 않습니다.");
+      }
+
+      await tx.roomParticipant.update({
+        where: { id: participant.id },
+        data: { role: nextRole, isReady: false },
+      });
+
+      return nextRole;
     });
 
     return {

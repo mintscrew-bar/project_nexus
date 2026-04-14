@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { authApi, setAccessToken } from "@/lib/api-client";
 import { useAuthStore } from "@/stores/auth-store";
@@ -13,12 +13,18 @@ function AgreePageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { fetchUser } = useAuthStore();
-  const pendingToken = searchParams.get("token");
+  const [pendingToken, setPendingToken] = useState<string | null>(null);
+  const [tokenResolved, setTokenResolved] = useState(false);
 
-  // 토큰을 URL에서 즉시 제거 (브라우저 히스토리/Referer 노출 방지)
-  if (typeof window !== "undefined" && pendingToken) {
-    window.history.replaceState({}, "", "/auth/agree");
-  }
+  useEffect(() => {
+    const tokenFromUrl = searchParams.get("token");
+    if (tokenFromUrl) {
+      // 최초 진입 시 토큰을 상태에 보관한 뒤 URL에서 제거
+      setPendingToken(tokenFromUrl);
+      window.history.replaceState({}, "", "/auth/agree");
+    }
+    setTokenResolved(true);
+  }, [searchParams]);
 
   const [agreements, setAgreements] = useState({
     termsOfService: false,
@@ -67,6 +73,14 @@ function AgreePageContent() {
       setIsSubmitting(false);
     }
   };
+
+  if (!tokenResolved) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-text-tertiary" />
+      </div>
+    );
+  }
 
   if (!pendingToken) {
     return (

@@ -46,6 +46,7 @@ const projectRoot = resolve(apiRoot, "../..");
       envFilePath: [
         resolve(apiRoot, ".env.local"),
         resolve(apiRoot, ".env"),
+        resolve(projectRoot, ".env.local"),
         resolve(projectRoot, ".env"),
       ],
     }),

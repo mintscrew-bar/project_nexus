@@ -20,9 +20,20 @@ import {
 import Link from "next/link";
 import Image from "next/image";
 import { friendApi, adminApi, roomApi } from "@/lib/api-client";
+import { getChampionIcon, getChampionIconById } from "@/components/matches/match-utils";
 
 function getChampionIconUrl(championId: string) {
-  return `/icons/champions/${championId}.png`;
+  const raw = String(championId ?? "").trim();
+  if (!raw) return "";
+
+  // DB의 championPreference.championId가 숫자 문자열인 경우(예: "103")
+  // 매치 유틸의 ID->key 매핑을 사용해 실제 아이콘 경로를 구한다.
+  if (/^\d+$/.test(raw)) {
+    return getChampionIconById(Number(raw));
+  }
+
+  // 문자열 키인 경우(예: "Ahri")는 그대로 챔피언 키 경로를 사용
+  return getChampionIcon(raw);
 }
 
 const POSITION_ICON_URLS = {
@@ -54,10 +65,31 @@ function PositionIcon({ position, className = "", opacity = 1, showLabel = false
 }
 
 function ChampionIcon({ championId, size = 24 }: { championId: string; size?: number }) {
+  const iconUrl = getChampionIconUrl(championId);
   return (
     <div className="rounded-full overflow-hidden bg-bg-tertiary flex-shrink-0 border border-bg-tertiary" style={{ width: size, height: size }}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={getChampionIconUrl(championId)} alt={championId} width={size} height={size} className="w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+      {iconUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={iconUrl}
+          alt={championId}
+          width={size}
+          height={size}
+          className="w-full h-full object-cover"
+          onError={(e) => {
+            // 로드 실패 시 빈 원(skeleton처럼 보이는 상태) 대신 fallback 표시
+            e.currentTarget.style.display = "none";
+            const fallback = e.currentTarget.nextElementSibling as HTMLElement | null;
+            if (fallback) fallback.style.display = "flex";
+          }}
+        />
+      ) : null}
+      <div
+        className="w-full h-full hidden items-center justify-center bg-bg-elevated text-[10px] font-bold text-text-muted"
+        aria-label="champion-fallback"
+      >
+        ?
+      </div>
     </div>
   );
 }

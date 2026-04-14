@@ -147,9 +147,9 @@ export async function ensureValidToken(): Promise<string | null> {
 // 인증 관련 API
 export const authApi = {
   login: () => {
-    // Discord OAuth로 리다이렉트
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-    window.location.href = `${apiUrl}/api/auth/discord`;
+    // 동일 오리진 /api 경유 (next.config rewrites 통해 백엔드로 전달)
+    // 환경변수 오설정으로 다른 도메인/포트로 튀는 문제를 방지
+    window.location.href = "/api/auth/discord";
   },
 
   logout: async () => {
@@ -202,8 +202,7 @@ export const authApi = {
   },
 
   googleLogin: () => {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-    window.location.href = `${apiUrl}/api/auth/google`;
+    window.location.href = "/api/auth/google";
   },
 
   /**

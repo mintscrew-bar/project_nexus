@@ -129,10 +129,16 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
   }
 
   private setupEventHandlers() {
-    this.client.on("clientReady", () => {
+    this.client.on("clientReady", async () => {
       console.log(`Discord bot logged in as ${this.client.user?.tag}`);
       // 봇 상태 메시지 설정
       this.client.user?.setActivity("🎮 /nexus help", { type: 0 });
+
+      // 서버 재시작 후 현재 Discord 음성 채널 멤버 상태를 동기화.
+      // 재시작 전에 이미 채널에 있던 유저들을 "음성 접속 중"으로 복구한다.
+      await this.syncVoiceStatesOnReady().catch((err) =>
+        console.warn("[DiscordBot] 음성 상태 동기화 실패:", err?.message),
+      );
     });
 
     this.client.on("interactionCreate", this.handleInteraction.bind(this));
@@ -194,6 +200,62 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
       });
     } catch (error) {
       console.error("[DiscordBot] voiceStateUpdate 처리 오류:", error);
+    }
+  }
+
+  /**
+   * 봇이 ready 상태가 됐을 때 현재 음성 채널 멤버 상태를 전체 동기화한다.
+   * 서버 재시작 시 이미 Discord 채널에 있는 유저들이
+   * "음성 미접속"으로 잘못 표시되는 문제를 해결한다.
+   *
+   * 동작:
+   * 1. DB에서 WAITING 상태인 방들의 Lobby Discord 채널 조회
+   * 2. Discord API로 각 채널의 현재 멤버 목록 fetch
+   * 3. 멤버별로 'discord.voice.update' 이벤트를 재발행하여 상태 복구
+   */
+  private async syncVoiceStatesOnReady(): Promise<void> {
+    const guildId = this.configService.get("DISCORD_GUILD_ID");
+    if (!guildId) return;
+
+    // WAITING 방의 Lobby 채널만 조회 (게임 진행 중인 방은 제외)
+    const lobbyChannels = await this.prisma.roomDiscordChannel.findMany({
+      where: {
+        teamName: "Lobby",
+        room: { status: "WAITING" },
+      },
+      select: { channelId: true, roomId: true },
+    });
+
+    if (lobbyChannels.length === 0) return;
+
+    try {
+      const guild = await this.client.guilds.fetch(guildId);
+
+      for (const { channelId, roomId } of lobbyChannels) {
+        try {
+          const channel = await guild.channels.fetch(channelId);
+          if (!channel || channel.type !== 2 /* GuildVoice */) continue;
+
+          const voiceChannel = channel as import("discord.js").VoiceChannel;
+          // 현재 채널에 있는 멤버들에 대해 inVoice=true 이벤트 발행
+          for (const [, member] of voiceChannel.members) {
+            if (member.user.bot) continue;
+            this.eventEmitter.emit("discord.voice.update", {
+              discordUserId: member.user.id,
+              roomId,
+              inVoice: true,
+            });
+          }
+        } catch {
+          // 채널이 삭제됐거나 접근 불가 — 개별 채널 실패는 무시
+        }
+      }
+
+      console.log(
+        `[DiscordBot] 음성 상태 동기화 완료 (대상 채널 ${lobbyChannels.length}개)`,
+      );
+    } catch (error) {
+      console.warn("[DiscordBot] 음성 상태 동기화 중 오류:", error);
     }
   }
 

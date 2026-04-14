@@ -11,6 +11,7 @@ import {
   HttpCode,
   HttpStatus,
 } from "@nestjs/common";
+import { Throttle } from "@nestjs/throttler";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { Public } from "../auth/decorators/public.decorator";
@@ -144,6 +145,7 @@ export class RiotController {
 
   @Get("summoner/:gameName/:tagLine")
   @Public() // 임시로 인증 제거 (테스트용)
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
   async getSummoner(
     @Param("gameName") gameName: string,
     @Param("tagLine") tagLine: string,
@@ -242,6 +244,7 @@ export class RiotController {
 
   @Get("summoner/:gameName/:tagLine/live")
   @Public()
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
   async getLiveGame(
     @Param("gameName") gameName: string,
     @Param("tagLine") tagLine: string,

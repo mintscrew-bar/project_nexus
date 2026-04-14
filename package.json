@@ -17,7 +17,11 @@
     "db:generate": "turbo db:generate",
     "db:push": "turbo db:push",
     "db:migrate": "turbo db:migrate",
-    "db:studio": "pnpm --filter @nexus/database studio"
+    "db:studio": "pnpm --filter @nexus/database studio",
+    "compose:up": "docker compose up --build",
+    "compose:down": "docker compose down --remove-orphans",
+    "compose:logs:api": "docker compose logs --tail=120 api",
+    "compose:logs:web": "docker compose logs --tail=120 web"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",

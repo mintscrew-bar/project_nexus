@@ -100,6 +100,15 @@ export class AuthController {
   @UseGuards(AuthGuard("discord"))
   async discordCallback(@Req() req: Request, @Res() res: Response) {
     const appUrl = this.configService.get("APP_URL") || "http://localhost:3000";
+    const code = req.query.code as string;
+    const state = req.query.state as string;
+
+    // state가 있어도 일반 OAuth 로그인에서 함께 전달될 수 있으므로
+    // 실제 Redis link token인지 확인된 경우에만 연동 로직으로 분기한다.
+    if (state && await this.authService.isValidLinkToken(state, "discord")) {
+      return this.handleDiscordLink(code, state, res);
+    }
+
     try {
       const { user, isNewUser } = req.user as any;
       await this.authService.checkAccountStatus(user.id);
@@ -240,7 +249,13 @@ export class AuthController {
     @Res() res: Response,
   ) {
     const refreshToken = req.cookies?.refresh_token;
-    await this.authService.logout(userId, refreshToken);
+    // Authorization 헤더에서 access token 추출 — 블랙리스트 등록용
+    const authHeader = req.headers["authorization"] as string | undefined;
+    const accessToken = authHeader?.startsWith("Bearer ")
+      ? authHeader.slice(7)
+      : undefined;
+
+    await this.authService.logout(userId, refreshToken, accessToken);
 
     res.clearCookie("refresh_token", { path: "/api/auth" });
 
@@ -256,25 +271,15 @@ export class AuthController {
   @Get("link/discord")
   @UseGuards(JwtAuthGuard)
   async linkDiscord(@CurrentUser("sub") userId: string, @Res() res: Response) {
-    // redirect_uri를 환경변수에서 고정값으로 가져오되, 화이트리스트 검증 후 사용.
-    // 동적 폴백 체인 대신 명시적 단일 값을 사용하여 Open Redirect 방지.
-    const allowedCallbackUrl = this.configService.get<string>("DISCORD_LINK_CALLBACK_URL");
+    // DISCORD_LINK_CALLBACK_URL이 없으면 기본 DISCORD_CALLBACK_URL 사용
+    const allowedCallbackUrl = 
+      this.configService.get<string>("DISCORD_LINK_CALLBACK_URL") || 
+      this.configService.get<string>("DISCORD_CALLBACK_URL");
     const appUrl = this.configService.get<string>("APP_URL") || "http://localhost:3000";
 
     if (!allowedCallbackUrl) {
-      this.logger.error("DISCORD_LINK_CALLBACK_URL 환경변수가 설정되지 않았습니다.");
+      this.logger.error("Discord 콜백 URL 환경변수가 설정되지 않았습니다.");
       throw new BadRequestException("Discord 연동 설정 오류입니다.");
-    }
-
-    // 허용된 도메인 화이트리스트 검증 (Open Redirect 방지)
-    const allowedOrigins = [
-      new URL(appUrl).origin,
-      "http://localhost:4000",
-    ];
-    const callbackOrigin = new URL(allowedCallbackUrl).origin;
-    if (!allowedOrigins.includes(callbackOrigin)) {
-      this.logger.error(`허용되지 않은 redirect_uri 도메인: ${callbackOrigin}`);
-      throw new BadRequestException("허용되지 않은 콜백 URL입니다.");
     }
 
     // Generate temporary link token (5 minutes)
@@ -297,6 +302,12 @@ export class AuthController {
     @Query("state") linkToken: string,
     @Res() res: Response,
   ) {
+    // This route is kept for backward compatibility if specifically registered
+    return this.handleDiscordLink(code, linkToken, res);
+  }
+
+  private async handleDiscordLink(code: string, linkToken: string, res: Response) {
+    const appUrl = this.configService.get("APP_URL") || "http://localhost:3000";
     try {
       // Verify link token and get userId
       const userId = await this.authService.verifyLinkToken(
@@ -317,13 +328,9 @@ export class AuthController {
         metadata: {},
       });
 
-      const appUrl =
-        this.configService.get("APP_URL") || "http://localhost:3000";
       return res.redirect(`${appUrl}/settings?linked=discord&success=true`);
     } catch (error: any) {
       this.logger.error(`Discord 계정 연동 실패: ${error.message}`);
-      const appUrl =
-        this.configService.get("APP_URL") || "http://localhost:3000";
       return res.redirect(
         `${appUrl}/settings?linked=discord&success=false&error=link_failed`,
       );

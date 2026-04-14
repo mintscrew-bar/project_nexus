@@ -5,7 +5,11 @@ export async function GET(request: NextRequest) {
   const code = searchParams.get('code');
 
   const appUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+  // 서버 사이드에서는 내부 네트워크 주소(API_URL)를 우선 사용
+  const apiUrl =
+    process.env.API_URL ||
+    process.env.NEXT_PUBLIC_API_URL ||
+    'http://localhost:4000';
 
   if (!code) {
     return NextResponse.redirect(new URL('/auth/login?error=missing_code', appUrl));

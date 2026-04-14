@@ -8,6 +8,7 @@
     "build": "tsc",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
+    "db:push:accept": "prisma db push --accept-data-loss",
     "db:migrate": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
     "db:studio": "prisma studio",

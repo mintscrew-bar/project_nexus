@@ -5,6 +5,7 @@ import { RiotMatchService, MatchDto } from "../riot/riot-match.service";
 @Injectable()
 export class MatchDataCollectionService {
   private readonly logger = new Logger(MatchDataCollectionService.name);
+  private readonly retryTimers = new Map<string, NodeJS.Timeout>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -14,9 +15,11 @@ export class MatchDataCollectionService {
   /**
    * Collect and save match data from Riot API
    */
-  async collectMatchData(matchId: string): Promise<void> {
+  async collectMatchData(matchId: string, attemptNumber = 1): Promise<void> {
     try {
-      this.logger.log(`Starting data collection for match ${matchId}`);
+      this.logger.log(
+        `Starting data collection for match ${matchId} (attempt ${attemptNumber})`,
+      );
 
       // Get match from database
       const match = await this.prisma.match.findUnique({
@@ -72,11 +75,13 @@ export class MatchDataCollectionService {
 
       if (!match) {
         this.logger.error(`Match ${matchId} not found in database`);
+        this.clearRetryTimer(matchId);
         return;
       }
 
       if (!match.tournamentCode) {
         this.logger.warn(`Match ${matchId} has no tournament code`);
+        this.clearRetryTimer(matchId);
         return;
       }
 
@@ -91,7 +96,7 @@ export class MatchDataCollectionService {
           `No Riot match IDs found for tournament code ${match.tournamentCode}`,
         );
         // Wait and retry - match might not be available yet
-        await this.scheduleRetry(matchId, 1);
+        await this.scheduleRetry(matchId, attemptNumber);
         return;
       }
 
@@ -105,7 +110,7 @@ export class MatchDataCollectionService {
 
       if (!matchData) {
         this.logger.error(`Failed to fetch match data for ${riotMatchId}`);
-        await this.scheduleRetry(matchId, 1);
+        await this.scheduleRetry(matchId, attemptNumber);
         return;
       }
 
@@ -121,10 +126,11 @@ export class MatchDataCollectionService {
       // Save match data
       await this.saveMatchData(matchId, match, matchData);
 
+      this.clearRetryTimer(matchId);
       this.logger.log(`Successfully collected data for match ${matchId}`);
     } catch (error) {
       this.logger.error(`Error collecting data for match ${matchId}:`, error);
-      throw error;
+      await this.scheduleRetry(matchId, attemptNumber);
     }
   }
 
@@ -137,6 +143,13 @@ export class MatchDataCollectionService {
     matchData: MatchDto,
   ): Promise<void> {
     try {
+      if (!match.teamAId || !match.teamBId || !match.teamA || !match.teamB) {
+        this.logger.warn(
+          `Match ${matchId} has incomplete team assignment, skipping data save`,
+        );
+        return;
+      }
+
       // Build PUUID to User mapping
       const puuidToUser = new Map<string, { userId: string; teamId: string }>();
 
@@ -162,130 +175,103 @@ export class MatchDataCollectionService {
         }
       }
 
-      // Save participants
-      for (const participant of matchData.info.participants) {
-        const userMapping = puuidToUser.get(participant.puuid);
+      // 멱등성 보장:
+      // 기존 전적을 트랜잭션 내에서 교체(replace)해 중복/부분 저장을 방지한다.
+      await this.prisma.$transaction(async (tx) => {
+        await tx.matchParticipant.deleteMany({ where: { matchId } });
+        await tx.matchTeamStats.deleteMany({ where: { matchId } });
 
-        if (!userMapping) {
-          this.logger.warn(
-            `PUUID ${participant.puuid} not found in user mapping, skipping`,
-          );
-          continue;
+        for (const participant of matchData.info.participants) {
+          const userMapping = puuidToUser.get(participant.puuid);
+
+          if (!userMapping) {
+            this.logger.warn(
+              `PUUID ${participant.puuid} not found in user mapping, skipping`,
+            );
+            continue;
+          }
+
+          await tx.matchParticipant.create({
+            data: {
+              matchId,
+              userId: userMapping.userId,
+              teamId: userMapping.teamId,
+              championId: participant.championId,
+              championName: participant.championName,
+              position: participant.teamPosition || "UNKNOWN",
+              summoner1Id: participant.summoner1Id,
+              summoner2Id: participant.summoner2Id,
+              kills: participant.kills,
+              deaths: participant.deaths,
+              assists: participant.assists,
+              totalMinionsKilled: participant.totalMinionsKilled,
+              neutralMinionsKilled: participant.neutralMinionsKilled,
+              goldEarned: participant.goldEarned,
+              goldSpent: participant.goldSpent,
+              totalDamageDealt: participant.totalDamageDealt,
+              totalDamageDealtToChampions:
+                participant.totalDamageDealtToChampions,
+              totalDamageTaken: participant.totalDamageTaken,
+              totalHeal: participant.totalHeal,
+              damageSelfMitigated: participant.damageSelfMitigated,
+              visionScore: participant.visionScore,
+              wardsPlaced: participant.wardsPlaced,
+              wardsKilled: participant.wardsKilled,
+              detectorWardsPlaced: participant.detectorWardsPlaced,
+              item0: participant.item0,
+              item1: participant.item1,
+              item2: participant.item2,
+              item3: participant.item3,
+              item4: participant.item4,
+              item5: participant.item5,
+              item6: participant.item6,
+              ...(participant.item7 != null ? { item7: participant.item7 } : {}),
+              perks: participant.perks,
+              champLevel: participant.champLevel,
+              largestKillingSpree: participant.largestKillingSpree,
+              largestMultiKill: participant.largestMultiKill,
+              longestTimeSpentLiving: participant.longestTimeSpentLiving,
+              totalTimeSpentDead: participant.totalTimeSpentDead,
+              turretKills: participant.turretKills || 0,
+              inhibitorKills: participant.inhibitorKills || 0,
+              dragonKills: participant.dragonKills || 0,
+              baronKills: participant.baronKills || 0,
+              doubleKills: participant.doubleKills,
+              tripleKills: participant.tripleKills,
+              quadraKills: participant.quadraKills,
+              pentaKills: participant.pentaKills,
+              firstBloodKill: participant.firstBloodKill,
+              firstTowerKill: participant.firstTowerKill,
+              win: participant.win,
+            },
+          });
         }
 
-        await this.prisma.matchParticipant.create({
-          data: {
-            matchId,
-            userId: userMapping.userId,
-            teamId: userMapping.teamId,
+        for (const team of matchData.info.teams) {
+          const teamId = team.teamId === 100 ? match.teamAId : match.teamBId;
+          await tx.matchTeamStats.create({
+            data: {
+              matchId,
+              teamId,
+              win: team.win,
+              towerKills: team.objectives.tower.kills,
+              inhibitorKills: team.objectives.inhibitor.kills,
+              baronKills: team.objectives.baron.kills,
+              dragonKills: team.objectives.dragon.kills,
+              riftHeraldKills: team.objectives.riftHerald.kills,
+              firstBlood: team.objectives.champion?.first ?? false,
+              firstTower: team.objectives.tower?.first ?? false,
+              firstBaron: team.objectives.baron?.first ?? false,
+              firstDragon: team.objectives.dragon?.first ?? false,
+              bans: team.bans,
+            },
+          });
+        }
 
-            // Champion & Position
-            championId: participant.championId,
-            championName: participant.championName,
-            position: participant.teamPosition || "UNKNOWN",
-
-            // Summoner Spells
-            summoner1Id: participant.summoner1Id,
-            summoner2Id: participant.summoner2Id,
-
-            // KDA
-            kills: participant.kills,
-            deaths: participant.deaths,
-            assists: participant.assists,
-
-            // Farm & Gold
-            totalMinionsKilled: participant.totalMinionsKilled,
-            neutralMinionsKilled: participant.neutralMinionsKilled,
-            goldEarned: participant.goldEarned,
-            goldSpent: participant.goldSpent,
-
-            // Damage
-            totalDamageDealt: participant.totalDamageDealt,
-            totalDamageDealtToChampions:
-              participant.totalDamageDealtToChampions,
-            totalDamageTaken: participant.totalDamageTaken,
-            totalHeal: participant.totalHeal,
-            damageSelfMitigated: participant.damageSelfMitigated,
-
-            // Vision
-            visionScore: participant.visionScore,
-            wardsPlaced: participant.wardsPlaced,
-            wardsKilled: participant.wardsKilled,
-            detectorWardsPlaced: participant.detectorWardsPlaced,
-
-            // Items
-            item0: participant.item0,
-            item1: participant.item1,
-            item2: participant.item2,
-            item3: participant.item3,
-            item4: participant.item4,
-            item5: participant.item5,
-            item6: participant.item6,
-            ...(participant.item7 != null ? { item7: participant.item7 } : {}),
-
-            // Perks (stored as JSON)
-            perks: participant.perks,
-
-            // Stats
-            champLevel: participant.champLevel,
-            largestKillingSpree: participant.largestKillingSpree,
-            largestMultiKill: participant.largestMultiKill,
-            longestTimeSpentLiving: participant.longestTimeSpentLiving,
-            totalTimeSpentDead: participant.totalTimeSpentDead,
-
-            // Objectives
-            turretKills: participant.turretKills || 0,
-            inhibitorKills: participant.inhibitorKills || 0,
-            dragonKills: participant.dragonKills || 0,
-            baronKills: participant.baronKills || 0,
-
-            // Performance
-            doubleKills: participant.doubleKills,
-            tripleKills: participant.tripleKills,
-            quadraKills: participant.quadraKills,
-            pentaKills: participant.pentaKills,
-            firstBloodKill: participant.firstBloodKill,
-            firstTowerKill: participant.firstTowerKill,
-
-            // Result
-            win: participant.win,
-          },
+        await tx.match.update({
+          where: { id: matchId },
+          data: { dataCollected: true },
         });
-      }
-
-      // Save team stats
-      for (const team of matchData.info.teams) {
-        const teamId = team.teamId === 100 ? match.teamAId : match.teamBId;
-
-        await this.prisma.matchTeamStats.create({
-          data: {
-            matchId,
-            teamId,
-            win: team.win,
-
-            // Objectives
-            towerKills: team.objectives.tower.kills,
-            inhibitorKills: team.objectives.inhibitor.kills,
-            baronKills: team.objectives.baron.kills,
-            dragonKills: team.objectives.dragon.kills,
-            riftHeraldKills: team.objectives.riftHerald.kills,
-
-            // First objectives
-            firstBlood: team.objectives.champion?.first ?? false,
-            firstTower: team.objectives.tower?.first ?? false,
-            firstBaron: team.objectives.baron?.first ?? false,
-            firstDragon: team.objectives.dragon?.first ?? false,
-
-            // Bans
-            bans: team.bans,
-          },
-        });
-      }
-
-      // Mark data as collected
-      await this.prisma.match.update({
-        where: { id: matchId },
-        data: { dataCollected: true },
       });
 
       this.logger.log(`Saved match data for match ${matchId}`);
@@ -309,24 +295,36 @@ export class MatchDataCollectionService {
       this.logger.error(
         `Max retry attempts (${maxAttempts}) reached for match ${matchId}`,
       );
+      this.clearRetryTimer(matchId);
       return;
     }
 
+    if (this.retryTimers.has(matchId)) {
+      this.logger.debug(
+        `Retry already scheduled for match ${matchId}, skipping duplicate`,
+      );
+      return;
+    }
+
+    const nextAttempt = attemptNumber + 1;
+
     this.logger.log(
-      `Scheduling retry ${attemptNumber + 1}/${maxAttempts} for match ${matchId} in ${delayMs}ms`,
+      `Scheduling retry ${nextAttempt}/${maxAttempts} for match ${matchId} in ${delayMs}ms`,
     );
 
-    setTimeout(async () => {
+    const timer = setTimeout(async () => {
+      this.retryTimers.delete(matchId);
       try {
-        await this.collectMatchData(matchId);
+        await this.collectMatchData(matchId, nextAttempt);
       } catch (error) {
         this.logger.error(
-          `Retry ${attemptNumber + 1} failed for match ${matchId}`,
+          `Retry ${nextAttempt} failed for match ${matchId}`,
           error,
         );
-        await this.scheduleRetry(matchId, attemptNumber + 1);
+        await this.scheduleRetry(matchId, nextAttempt);
       }
     }, delayMs);
+    this.retryTimers.set(matchId, timer);
   }
 
   /**
@@ -356,6 +354,14 @@ export class MatchDataCollectionService {
       }
     } catch (error) {
       this.logger.error("Error collecting pending matches:", error);
+    }
+  }
+
+  private clearRetryTimer(matchId: string): void {
+    const timer = this.retryTimers.get(matchId);
+    if (timer) {
+      clearTimeout(timer);
+      this.retryTimers.delete(matchId);
     }
   }
 }

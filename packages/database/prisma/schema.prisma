@@ -447,6 +447,7 @@ model MatchParticipant {
   team                        Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
   user                        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@unique([matchId, userId])
   @@index([matchId])
   @@index([userId])
   @@index([teamId])

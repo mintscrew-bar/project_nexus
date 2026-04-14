@@ -52,8 +52,10 @@ export class AuctionGateway
   // In-memory rate limit fallback when Redis is unavailable
   private bidRateLimits = new Map<string, number[]>();
   private rateLimitCleanupTimer: ReturnType<typeof setInterval> | null = null;
-  // 방별 입찰 mutex — 동시 입찰 race condition 방지
+  // 방별 입찰 mutex — in-memory 폴백 (Redis 불가 시)
   private bidLocks = new Map<string, Promise<void>>();
+  // Redis 분산 락 TTL: 입찰 처리는 통상 100ms 이내이므로 5초면 충분
+  private readonly BID_LOCK_TTL_MS = 5000;
 
   constructor(
     private readonly authService: AuthService,
@@ -422,16 +424,33 @@ export class AuctionGateway
       return { error: "현재 낙찰 처리 중입니다. 잠시 후 다시 시도해주세요." };
     }
 
-    // 방별 mutex: 동시 입찰 직렬화
-    const prevLock = this.bidLocks.get(data.roomId) ?? Promise.resolve();
-    let releaseLock: () => void;
-    const lockPromise = new Promise<void>((resolve) => {
-      releaseLock = resolve;
-    });
-    this.bidLocks.set(data.roomId, lockPromise);
+    // 방별 분산 락: Redis가 사용 가능하면 분산 락, 불가능하면 in-memory 폴백
+    const lockKey = `bid:lock:${data.roomId}`;
+    let redisLockToken: string | null = null;
+    let inMemoryRelease: (() => void) | null = null;
 
     try {
-      await prevLock;
+      if (this.redisService) {
+        // Redis 분산 락 획득 시도 (다중 서버 인스턴스 안전)
+        redisLockToken = await this.redisService.acquireLock(
+          lockKey,
+          this.BID_LOCK_TTL_MS,
+        );
+        if (!redisLockToken) {
+          // 다른 서버에서 락을 보유 중 — 재시도하지 않고 즉시 거부
+          return { error: "입찰 처리 중입니다. 잠시 후 다시 시도해주세요." };
+        }
+      } else {
+        // Redis 불가 시 in-memory Promise 체인 폴백
+        const prevLock = this.bidLocks.get(data.roomId) ?? Promise.resolve();
+        let releaseLock!: () => void;
+        const lockPromise = new Promise<void>((resolve) => {
+          releaseLock = resolve;
+        });
+        this.bidLocks.set(data.roomId, lockPromise);
+        inMemoryRelease = releaseLock;
+        await prevLock;
+      }
 
       const state = await this.auctionService.placeBid(
         client.userId,
@@ -454,10 +473,11 @@ export class AuctionGateway
     } catch (error: any) {
       return { error: error.message };
     } finally {
-      releaseLock!();
-      // 체인이 끝나면 lock 정리
-      if (this.bidLocks.get(data.roomId) === lockPromise) {
-        this.bidLocks.delete(data.roomId);
+      // 락 해제 (Redis 또는 in-memory)
+      if (redisLockToken) {
+        await this.redisService!.releaseLock(lockKey, redisLockToken);
+      } else if (inMemoryRelease) {
+        inMemoryRelease();
       }
     }
   }
