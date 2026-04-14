@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, ReactNode, useRef } from "react";
+import { createPortal } from "react-dom";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 
@@ -84,8 +85,13 @@ export function RuneTooltip({ runeId, children, className }: RuneTooltipProps) {
   const [loading, setLoading] = useState(false);
   const [placement, setPlacement] = useState<"top" | "bottom">("top");
   const [alignment, setAlignment] = useState<"center" | "left" | "right">("center");
+  const [isMounted, setIsMounted] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   useEffect(() => {
     if (isHovered && !rune && !loading) {
@@ -134,6 +140,25 @@ export function RuneTooltip({ runeId, children, className }: RuneTooltipProps) {
     return () => clearTimeout(timer);
   }, [isHovered]);
 
+  const tooltipStyle: React.CSSProperties = containerRef.current
+    ? (() => {
+        const rect = containerRef.current!.getBoundingClientRect();
+        const isTop = placement === "top";
+
+        return {
+          position: "fixed",
+          zIndex: 9999,
+          width: "18rem",
+          left: alignment === "center"
+            ? rect.left + rect.width / 2 - 144
+            : alignment === "left"
+            ? rect.left
+            : rect.right - 288,
+          top: isTop ? rect.top - 240 - 8 : rect.bottom + 8,
+        };
+      })()
+    : { display: "none" };
+
   return (
     <div
       ref={containerRef}
@@ -143,16 +168,11 @@ export function RuneTooltip({ runeId, children, className }: RuneTooltipProps) {
     >
       {children}
 
-      {isHovered && (
+      {isMounted && isHovered && createPortal(
         <div
           ref={tooltipRef}
-          className={cn(
-            "absolute z-50 w-72 bg-bg-primary border border-bg-tertiary rounded-lg shadow-xl p-3 pointer-events-none animate-fade-in",
-            placement === "top" ? "bottom-full mb-2" : "top-full mt-2",
-            alignment === "center" && "left-1/2 -translate-x-1/2",
-            alignment === "left" && "left-0",
-            alignment === "right" && "right-0"
-          )}
+          style={tooltipStyle}
+          className="bg-bg-primary border border-bg-tertiary rounded-lg shadow-xl p-3 pointer-events-none animate-fade-in"
         >
           {loading ? (
             <div className="text-text-tertiary text-sm">로딩 중...</div>
@@ -189,17 +209,8 @@ export function RuneTooltip({ runeId, children, className }: RuneTooltipProps) {
           ) : (
             <div className="text-text-tertiary text-sm">룬 정보를 찾을 수 없습니다</div>
           )}
-
-          {/* 툴팁 화살표 — 위치에 따라 방향 변경 */}
-          <div
-            className={cn(
-              "absolute border-8 border-transparent",
-              placement === "top"
-                ? "top-full left-1/2 -translate-x-1/2 border-t-bg-tertiary"
-                : "bottom-full left-1/2 -translate-x-1/2 border-b-bg-tertiary"
-            )}
-          />
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
