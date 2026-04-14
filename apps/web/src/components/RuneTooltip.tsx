@@ -22,22 +22,45 @@ let runeDataCache: RuneInfo[] | null = null;
 async function fetchRuneData(): Promise<RuneInfo[]> {
   if (runeDataCache) return runeDataCache;
 
-  const response = await fetch(
-    `${DDRAGON_BASE}/cdn/${DDRAGON_VERSION}/data/ko_KR/runesReforged.json`
-  );
-  const styles: any[] = await response.json();
+  try {
+    const response = await fetch(
+      `${DDRAGON_BASE}/cdn/${DDRAGON_VERSION}/data/ko_KR/runesReforged.json`
+    );
 
-  // 모든 스타일의 룬을 단일 맵으로 평탄화
-  const runes: RuneInfo[] = [];
-  for (const style of styles) {
-    for (const slot of style.slots) {
-      for (const rune of slot.runes) {
-        runes.push(rune);
+    if (!response.ok) {
+      console.warn(`DDragon 룬 데이터 로드 실패: ${response.status}`);
+      // 영문 폴백 시도
+      const fallbackResponse = await fetch(
+        `${DDRAGON_BASE}/cdn/${DDRAGON_VERSION}/data/en_US/runesReforged.json`
+      );
+      const styles: any[] = await fallbackResponse.json();
+      const runes: RuneInfo[] = [];
+      for (const style of styles) {
+        for (const slot of style.slots) {
+          for (const rune of slot.runes) {
+            runes.push(rune);
+          }
+        }
+      }
+      runeDataCache = runes;
+      return runes;
+    }
+
+    const styles: any[] = await response.json();
+    const runes: RuneInfo[] = [];
+    for (const style of styles) {
+      for (const slot of style.slots) {
+        for (const rune of slot.runes) {
+          runes.push(rune);
+        }
       }
     }
+    runeDataCache = runes;
+    return runes;
+  } catch (error) {
+    console.error("룬 데이터 로드 중 오류:", error);
+    return [];
   }
-  runeDataCache = runes;
-  return runes;
 }
 
 // HTML 태그 제거

@@ -54,6 +54,10 @@ const STAT_NAMES: Record<string, string> = {
   PercentLifeStealMod: "생명력 흡수",
   FlatHPRegenMod: "체력 재생",
   FlatMPRegenMod: "마나 재생",
+  PercentHealMod: "치유량",
+  PercentOmniVampMod: "전능 흡수",
+  FlatCastingTimeMod: "시전 시간",
+  PercentMovementSpeedMod: "이동 속도",
 };
 
 // 스탯 포맷팅
@@ -70,12 +74,29 @@ let itemDataCache: Record<string, ItemInfo> | null = null;
 async function fetchItemData(): Promise<Record<string, ItemInfo>> {
   if (itemDataCache) return itemDataCache;
 
-  const response = await fetch(
-    `${DDRAGON_BASE}/cdn/${DDRAGON_VERSION}/data/ko_KR/item.json`
-  );
-  const json = await response.json();
-  itemDataCache = json.data;
-  return json.data;
+  try {
+    const response = await fetch(
+      `${DDRAGON_BASE}/cdn/${DDRAGON_VERSION}/data/ko_KR/item.json`
+    );
+
+    if (!response.ok) {
+      console.warn(`DDragon 아이템 데이터 로드 실패: ${response.status}`);
+      // 영문 폴백 시도
+      const fallbackResponse = await fetch(
+        `${DDRAGON_BASE}/cdn/${DDRAGON_VERSION}/data/en_US/item.json`
+      );
+      const json = await fallbackResponse.json();
+      itemDataCache = json.data || {};
+      return itemDataCache;
+    }
+
+    const json = await response.json();
+    itemDataCache = json.data || {};
+    return itemDataCache;
+  } catch (error) {
+    console.error("아이템 데이터 로드 중 오류:", error);
+    return {};
+  }
 }
 
 // HTML 태그 제거 및 정리
@@ -212,9 +233,11 @@ export function ItemTooltip({ itemId, children, className }: ItemTooltipProps) {
               )}
 
               {/* 설명 (효과) */}
-              <div className="text-xs text-text-secondary border-t border-bg-tertiary pt-2 whitespace-pre-wrap">
-                {cleanDescription(item.description)}
-              </div>
+              {(item.description || item.plaintext) && (
+                <div className="text-xs text-text-secondary border-t border-bg-tertiary pt-2 whitespace-pre-wrap">
+                  {cleanDescription(item.description || item.plaintext || "")}
+                </div>
+              )}
 
               {/* 판매 가격 */}
               <p className="text-xs text-text-tertiary mt-2">
@@ -223,7 +246,10 @@ export function ItemTooltip({ itemId, children, className }: ItemTooltipProps) {
             </>
           ) : (
             <div className="text-text-tertiary text-sm">
-              아이템 정보를 찾을 수 없습니다
+              <p>아이템 정보를 찾을 수 없습니다</p>
+              <p className="text-[10px] mt-1 text-text-muted">
+                (아이템 ID: {itemId})
+              </p>
             </div>
           )}
 
