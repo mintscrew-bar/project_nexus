@@ -259,6 +259,40 @@ export default function RiotMatchList({
                       </div>
                       <div className="text-[10px] sm:text-xs text-text-tertiary">{gameDurationMin}:{gameDurationSec.toString().padStart(2, '0')} · {timeAgo}</div>
                       <div className="text-[10px] sm:text-xs text-text-tertiary truncate">{participant.championName}</div>
+
+                      {/* 데스크탑: 소환사 주문 + 룬 (sm 이상) */}
+                      <div className="hidden sm:flex gap-0.5 items-center mt-1">
+                        <Image
+                          src={`/icons/spells/Summoner${getSummonerSpellName(participant.summoner1Id)}.png`}
+                          alt="spell1"
+                          width={14}
+                          height={14}
+                          className="w-3.5 h-3.5 rounded"
+                          title="소환사 주문"
+                          onError={(e) => { e.currentTarget.style.opacity = '0.3'; }}
+                        />
+                        <Image
+                          src={`/icons/spells/Summoner${getSummonerSpellName(participant.summoner2Id)}.png`}
+                          alt="spell2"
+                          width={14}
+                          height={14}
+                          className="w-3.5 h-3.5 rounded"
+                          title="소환사 주문"
+                          onError={(e) => { e.currentTarget.style.opacity = '0.3'; }}
+                        />
+                        {participant.perks?.styles?.[0]?.selections?.[0]?.perk && (
+                          <RuneTooltip runeId={participant.perks.styles[0].selections[0].perk}>
+                            <Image
+                              src={`/icons/perks/${participant.perks.styles[0].selections[0].perk}.png`}
+                              alt="keystone"
+                              width={14}
+                              height={14}
+                              className="w-3.5 h-3.5 rounded-full bg-bg-tertiary cursor-help hover:opacity-80 transition-opacity"
+                              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                            />
+                          </RuneTooltip>
+                        )}
+                      </div>
                     </div>
 
                     <div className="text-center flex-shrink-0">
@@ -560,24 +594,28 @@ export default function RiotMatchList({
                                   </div>
                                   <div className="flex flex-col gap-0.5">
                                     {p.perks?.styles?.[0]?.selections?.[0]?.perk && (
-                                      <Image
-                                        src={`/icons/perks/${p.perks.styles[0].selections[0].perk}.png`}
-                                        alt="primary rune"
-                                        width={20}
-                                        height={20}
-                                        className="w-5 h-5 rounded-full bg-bg-primary"
-                                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                                      />
+                                      <RuneTooltip runeId={p.perks.styles[0].selections[0].perk}>
+                                        <Image
+                                          src={`/icons/perks/${p.perks.styles[0].selections[0].perk}.png`}
+                                          alt="primary rune"
+                                          width={20}
+                                          height={20}
+                                          className="w-5 h-5 rounded-full bg-bg-primary cursor-help hover:opacity-80 transition-opacity"
+                                          onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                        />
+                                      </RuneTooltip>
                                     )}
                                     {p.perks?.styles?.[1]?.style && (
-                                      <Image
-                                        src={`/icons/perks/${p.perks.styles[1].style}.png`}
-                                        alt="secondary rune"
-                                        width={14}
-                                        height={14}
-                                        className="w-3.5 h-3.5 rounded-full bg-bg-primary opacity-60"
-                                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                                      />
+                                      <RuneTooltip runeId={p.perks.styles[1].style}>
+                                        <Image
+                                          src={`/icons/perks/${p.perks.styles[1].style}.png`}
+                                          alt="secondary rune"
+                                          width={14}
+                                          height={14}
+                                          className="w-3.5 h-3.5 rounded-full bg-bg-primary opacity-60 cursor-help hover:opacity-100 transition-opacity"
+                                          onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                        />
+                                      </RuneTooltip>
                                     )}
                                   </div>
                                 </div>

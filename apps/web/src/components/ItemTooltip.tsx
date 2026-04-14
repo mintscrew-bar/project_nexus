@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, ReactNode } from "react";
+import { useState, useEffect, ReactNode, useRef } from "react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 
@@ -97,6 +97,10 @@ export function ItemTooltip({ itemId, children, className }: ItemTooltipProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [item, setItem] = useState<ItemInfo | null>(null);
   const [loading, setLoading] = useState(false);
+  const [placement, setPlacement] = useState<"top" | "bottom">("top");
+  const [alignment, setAlignment] = useState<"center" | "left" | "right">("center");
+  const containerRef = useRef<HTMLDivElement>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (isHovered && !item && !loading) {
@@ -109,12 +113,54 @@ export function ItemTooltip({ itemId, children, className }: ItemTooltipProps) {
     }
   }, [isHovered, item, itemId, loading]);
 
+  // 툴팁 위치 계산 — 뷰포트 범위 감지
+  useEffect(() => {
+    if (!isHovered || !containerRef.current) return;
+
+    const calculatePlacement = () => {
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+
+      const TOOLTIP_HEIGHT = 240; // 대략적인 툴팁 높이
+      const TOOLTIP_WIDTH = 288; // w-72 = 18rem = 288px
+      const MARGIN = 8; // mb-2 = 8px
+
+      // 위쪽 공간 계산 — 뷰포트 위에서 요소까지의 거리
+      const spaceAbove = rect.top - MARGIN;
+      // 필요한 높이는 TOOLTIP_HEIGHT + MARGIN
+      const needsAbove = spaceAbove >= TOOLTIP_HEIGHT + MARGIN;
+
+      // 좌우 위치 계산
+      const windowWidth = window.innerWidth;
+      const tooltipLeft = rect.left + rect.width / 2 - TOOLTIP_WIDTH / 2;
+      const tooltipRight = tooltipLeft + TOOLTIP_WIDTH;
+
+      let newAlignment: "center" | "left" | "right" = "center";
+      // 왼쪽으로 넘침
+      if (tooltipLeft < 8) {
+        newAlignment = "left";
+      }
+      // 오른쪽으로 넘침
+      else if (tooltipRight > windowWidth - 8) {
+        newAlignment = "right";
+      }
+
+      setPlacement(needsAbove ? "top" : "bottom");
+      setAlignment(newAlignment);
+    };
+
+    // 이벤트 루프에서 다음 프레임에 계산 (DOM 완성 후)
+    const timer = setTimeout(calculatePlacement, 0);
+    return () => clearTimeout(timer);
+  }, [isHovered]);
+
   const stats = item?.stats
     ? Object.entries(item.stats).filter(([_, value]) => value && value !== 0)
     : [];
 
   return (
     <div
+      ref={containerRef}
       className={cn("relative inline-block", className)}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -122,7 +168,16 @@ export function ItemTooltip({ itemId, children, className }: ItemTooltipProps) {
       {children}
 
       {isHovered && (
-        <div className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 bg-bg-primary border border-bg-tertiary rounded-lg shadow-xl p-3 pointer-events-none animate-fade-in">
+        <div
+          ref={tooltipRef}
+          className={cn(
+            "absolute z-50 w-72 bg-bg-primary border border-bg-tertiary rounded-lg shadow-xl p-3 pointer-events-none animate-fade-in",
+            placement === "top" ? "bottom-full mb-2" : "top-full mt-2",
+            alignment === "center" && "left-1/2 -translate-x-1/2",
+            alignment === "left" && "left-0",
+            alignment === "right" && "right-0"
+          )}
+        >
           {loading ? (
             <div className="text-text-tertiary text-sm">로딩 중...</div>
           ) : item ? (
@@ -172,8 +227,15 @@ export function ItemTooltip({ itemId, children, className }: ItemTooltipProps) {
             </div>
           )}
 
-          {/* 툴팁 화살표 */}
-          <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-bg-tertiary" />
+          {/* 툴팁 화살표 — 위치에 따라 방향 변경 */}
+          <div
+            className={cn(
+              "absolute border-8 border-transparent",
+              placement === "top"
+                ? "top-full left-1/2 -translate-x-1/2 border-t-bg-tertiary"
+                : "bottom-full left-1/2 -translate-x-1/2 border-b-bg-tertiary"
+            )}
+          />
         </div>
       )}
     </div>
