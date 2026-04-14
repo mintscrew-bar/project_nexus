@@ -4,6 +4,7 @@ import { useState, useEffect, ReactNode, useRef } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
+import { getItemKoreanName } from "@nexus/types";
 
 const DDRAGON_VERSION = process.env.NEXT_PUBLIC_DDRAGON_VERSION || "16.7.1";
 const DDRAGON_BASE = "https://ddragon.leagueoflegends.com";
@@ -236,7 +237,7 @@ export function ItemTooltip({ itemId, children, className }: ItemTooltipProps) {
                   unoptimized
                 />
                 <div>
-                  <p className="font-semibold text-text-primary">{item.name}</p>
+                  <p className="font-semibold text-text-primary">{getItemKoreanName(item.name) || item.name}</p>
                   <p className="text-xs text-accent-gold">
                     {item.gold.total.toLocaleString()}G
                   </p>

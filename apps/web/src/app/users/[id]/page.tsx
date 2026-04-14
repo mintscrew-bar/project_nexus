@@ -45,6 +45,7 @@ import {
 } from "lucide-react";
 import { TierBadge } from "@/components/domain/TierBadge";
 import { useToast } from "@/components/ui/Toast";
+import { getChampionKoreanName } from "@nexus/types";
 
 const ROLE_LABELS: Record<string, string> = {
   TOP: "탑",
@@ -308,7 +309,10 @@ export default function UserProfilePage() {
 
   const getChampionName = (championId: string): string => {
     const champ = championMap.get(championId);
-    return champ?.name || championId;
+    if (!champ?.name) return championId;
+    // 영문 이름을 한글로 변환
+    const koreanName = getChampionKoreanName(champ.name);
+    return koreanName || champ.name;
   };
 
   const getChampionKey = (championId: string): string => {

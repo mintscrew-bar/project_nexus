@@ -4,6 +4,7 @@ import { useState, useEffect, ReactNode, useRef } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
+import { getRuneKoreanName } from "@nexus/types";
 
 const DDRAGON_VERSION = process.env.NEXT_PUBLIC_DDRAGON_VERSION || "16.7.1";
 const DDRAGON_BASE = "https://ddragon.leagueoflegends.com";
@@ -189,7 +190,7 @@ export function RuneTooltip({ runeId, children, className }: RuneTooltipProps) {
                   unoptimized
                   onError={(e) => { e.currentTarget.style.display = 'none'; }}
                 />
-                <p className="font-semibold text-text-primary">{rune.name}</p>
+                <p className="font-semibold text-text-primary">{getRuneKoreanName(rune.name) || rune.name}</p>
               </div>
 
               {/* 짧은 설명 */}

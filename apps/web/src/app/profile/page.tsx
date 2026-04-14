@@ -15,6 +15,7 @@ import { Star, Plus, RefreshCw, Shield, Trophy, TrendingUp, Loader2, Gamepad2, T
 import { TierBadge } from '@/components/domain/TierBadge';
 import { useToast } from '@/components/ui/Toast';
 import { usePresence } from '@/hooks/usePresence';
+import { getChampionKoreanName } from '@nexus/types';
 
 const ROLE_LABELS: Record<string, string> = {
   TOP: '탑',
@@ -262,10 +263,13 @@ export default function ProfilePage() {
     }
   };
 
-  // Get champion name from championId (key)
+  // Get champion name from championId (key) — returns Korean name
   const getChampionName = (championId: string): string => {
     const champ = championMap.get(championId);
-    return champ?.name || championId;
+    if (!champ?.name) return championId;
+    // 영문 이름을 한글로 변환
+    const koreanName = getChampionKoreanName(champ.name);
+    return koreanName || champ.name;
   };
 
   const getChampionKey = (championId: string): string => {
