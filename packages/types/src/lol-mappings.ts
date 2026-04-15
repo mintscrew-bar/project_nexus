@@ -425,3 +425,43 @@ export const SUMMONER_SPELL_MAPPINGS: Record<number, string> = {
 export function getSummonerSpellKoreanName(spellId: number): string {
   return SUMMONER_SPELL_MAPPINGS[spellId] ?? String(spellId);
 }
+
+// ============================================
+// 검색 유틸리티 (한글/영문 모두 지원)
+// ============================================
+
+/**
+ * 챔피언 이름 검색 — 한글 또는 영문 쿼리 모두 지원
+ * 부분 일치(포함 여부)로 검색
+ * @param query - 검색어 (한글 또는 영문, 빈 문자열이면 전체 반환)
+ * @returns 매칭된 영문 챔피언 이름 배열
+ */
+export function searchChampionsByQuery(query: string): string[] {
+  // 빈 쿼리면 전체 챔피언 목록 반환
+  if (!query.trim()) return Object.keys(CHAMPION_MAPPINGS);
+  const q = query.toLowerCase().trim();
+  return Object.entries(CHAMPION_MAPPINGS)
+    .filter(([en, ko]) =>
+      // 영문 이름 소문자 부분 일치 또는 한글 이름 부분 일치
+      en.toLowerCase().includes(q) || ko.includes(query.trim())
+    )
+    .map(([en]) => en);
+}
+
+/**
+ * 아이템 이름 검색 — 한글 또는 영문 쿼리 모두 지원
+ * 부분 일치(포함 여부)로 검색
+ * @param query - 검색어 (한글 또는 영문, 빈 문자열이면 전체 반환)
+ * @returns 매칭된 영문 아이템 이름 배열
+ */
+export function searchItemsByQuery(query: string): string[] {
+  // 빈 쿼리면 전체 아이템 목록 반환
+  if (!query.trim()) return Object.keys(ITEM_MAPPINGS);
+  const q = query.toLowerCase().trim();
+  return Object.entries(ITEM_MAPPINGS)
+    .filter(([en, ko]) =>
+      // 영문 이름 소문자 부분 일치 또는 한글 이름 부분 일치
+      en.toLowerCase().includes(q) || ko.includes(query.trim())
+    )
+    .map(([en]) => en);
+}

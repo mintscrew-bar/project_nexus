@@ -21,6 +21,8 @@ import {
   getAllItemKoreanNames,
   getAllRuneNames,
   getAllRuneKoreanNames,
+  searchChampionsByQuery,
+  searchItemsByQuery,
 } from './lol-mappings';
 
 describe('LoL Mappings', () => {
@@ -245,6 +247,79 @@ describe('LoL Mappings', () => {
       const summoner2Id = 11; // 강타
       expect(getSummonerSpellKoreanName(summoner1Id)).toBe('점멸');
       expect(getSummonerSpellKoreanName(summoner2Id)).toBe('강타');
+    });
+  });
+
+  describe('searchChampionsByQuery', () => {
+    test('한글 전체 이름으로 검색 — "아리" → Ahri 포함', () => {
+      const result = searchChampionsByQuery('아리');
+      expect(result).toContain('Ahri');
+    });
+
+    test('영문 부분 문자열로 검색 — "Ah" → Ahri 포함', () => {
+      const result = searchChampionsByQuery('Ah');
+      expect(result).toContain('Ahri');
+    });
+
+    test('영문 소문자로 검색 — "ah" → Ahri 포함', () => {
+      const result = searchChampionsByQuery('ah');
+      expect(result).toContain('Ahri');
+    });
+
+    test('빈 쿼리 — 전체 챔피언 목록 반환', () => {
+      const result = searchChampionsByQuery('');
+      expect(result.length).toBe(Object.keys(CHAMPION_MAPPINGS).length);
+    });
+
+    test('공백만 있는 쿼리 — 전체 챔피언 목록 반환', () => {
+      const result = searchChampionsByQuery('   ');
+      expect(result.length).toBe(Object.keys(CHAMPION_MAPPINGS).length);
+    });
+
+    test('존재하지 않는 이름 검색 — 빈 배열 반환', () => {
+      const result = searchChampionsByQuery('없는챔피언xyz');
+      expect(result).toHaveLength(0);
+    });
+
+    test('한글 부분 이름으로 검색 — "아" → 아리, 아트록스 등 포함', () => {
+      const result = searchChampionsByQuery('아');
+      expect(result).toContain('Ahri');
+      expect(result).toContain('Aatrox');
+    });
+
+    test('검색 결과 타입이 영문 이름 배열인지 확인', () => {
+      const result = searchChampionsByQuery('Garen');
+      expect(result).toContain('Garen');
+      // 결과가 영문 키인지 확인 (한글이 아니어야 함)
+      result.forEach(name => {
+        expect(CHAMPION_MAPPINGS).toHaveProperty(name);
+      });
+    });
+  });
+
+  describe('searchItemsByQuery', () => {
+    test('영문 부분 문자열로 검색 — "Doran" → 도란 계열 아이템 포함', () => {
+      const result = searchItemsByQuery('Doran');
+      expect(result).toContain("Doran's Blade");
+      expect(result).toContain("Doran's Shield");
+      expect(result).toContain("Doran's Ring");
+    });
+
+    test('한글로 검색 — "도란" → 도란 계열 아이템 포함', () => {
+      const result = searchItemsByQuery('도란');
+      expect(result).toContain("Doran's Blade");
+      expect(result).toContain("Doran's Shield");
+      expect(result).toContain("Doran's Ring");
+    });
+
+    test('빈 쿼리 — 전체 아이템 목록 반환', () => {
+      const result = searchItemsByQuery('');
+      expect(result.length).toBe(Object.keys(ITEM_MAPPINGS).length);
+    });
+
+    test('존재하지 않는 이름 검색 — 빈 배열 반환', () => {
+      const result = searchItemsByQuery('없는아이템xyz');
+      expect(result).toHaveLength(0);
     });
   });
 

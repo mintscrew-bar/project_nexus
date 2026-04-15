@@ -45,7 +45,7 @@ import {
 } from "lucide-react";
 import { TierBadge } from "@/components/domain/TierBadge";
 import { useToast } from "@/components/ui/Toast";
-import { getChampionKoreanName } from "@nexus/types";
+import { getChampionKoreanName, searchChampionsByQuery } from "@nexus/types";
 
 const ROLE_LABELS: Record<string, string> = {
   TOP: "탑",
@@ -131,6 +131,8 @@ export default function UserProfilePage() {
   const [championStats, setChampionStats] = useState<any[]>([]);
   const [rankedChampStats, setRankedChampStats] = useState<any[]>([]);
   const [positionStats, setPositionStats] = useState<any[]>([]);
+  // 챔피언 검색 필터 (한글/영문 모두 지원)
+  const [championFilter, setChampionFilter] = useState('');
   const [auctionStats, setAuctionStats] = useState<any>(null);
   const [onlineStatus, setOnlineStatus] = useState<string | null>(null);
 
@@ -632,8 +634,25 @@ export default function UserProfilePage() {
                 {/* 내전 모스트 탭 */}
                 {championStats.length > 0 && (
                   <TabsContent value="auto-stats" className="space-y-4">
+                    {/* 챔피언 검색 필터 입력창 */}
+                    <input
+                      type="text"
+                      placeholder="챔피언 검색 (한글/영문)"
+                      value={championFilter}
+                      onChange={e => setChampionFilter(e.target.value)}
+                      className="w-full max-w-xs px-3 py-1.5 text-sm rounded-md bg-bg-secondary border border-border-default text-text-primary placeholder:text-text-tertiary focus:outline-none focus:border-accent-primary transition-colors"
+                    />
+                    {/* 필터 결과가 없을 경우 안내 메시지 */}
+                    {championFilter.trim() && searchChampionsByQuery(championFilter).length === 0 && (
+                      <p className="text-sm text-text-tertiary">검색 결과가 없습니다.</p>
+                    )}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-                      {championStats.map((champ: any, idx: number) => {
+                      {(championFilter.trim()
+                        ? championStats.filter(s =>
+                            searchChampionsByQuery(championFilter).includes(s.championName)
+                          )
+                        : championStats
+                      ).map((champ: any, idx: number) => {
                         const winRate = champ.games > 0 ? ((champ.wins / champ.games) * 100).toFixed(0) : '0';
                         const kda = champ.deaths > 0
                           ? ((champ.kills + champ.assists) / champ.deaths).toFixed(2)

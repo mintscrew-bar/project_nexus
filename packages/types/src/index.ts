@@ -214,4 +214,6 @@ export {
   getAllItemKoreanNames,
   getAllRuneNames,
   getAllRuneKoreanNames,
+  searchChampionsByQuery,
+  searchItemsByQuery,
 } from './lol-mappings';
