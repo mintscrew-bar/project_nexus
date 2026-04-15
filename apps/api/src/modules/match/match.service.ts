@@ -21,6 +21,7 @@ import { MatchBracketService, Bracket } from "./match-bracket.service";
 import { MatchAdvancementService } from "./match-advancement.service";
 import { RankingService } from "../ranking/ranking.service";
 import { RoomStatus, MatchStatus, BracketType } from "@nexus/database";
+import { getChampionKoreanName, getSummonerSpellKoreanName } from "@nexus/types";
 
 // Re-export types for backward compatibility
 export type { BracketMatch, Bracket } from "./match-bracket.service";
@@ -1020,6 +1021,11 @@ export class MatchService {
       participant: {
         championId: participant.championId,
         championName: participant.championName,
+        // 영문 챔피언명을 한글로 변환하여 추가 (기존 영문 필드는 유지)
+        championNameKorean: getChampionKoreanName(participant.championName),
+        // 소환사 주문 ID를 한글명으로 변환하여 추가
+        summoner1Korean: getSummonerSpellKoreanName(participant.summoner1Id),
+        summoner2Korean: getSummonerSpellKoreanName(participant.summoner2Id),
         position: participant.position,
         kills: participant.kills,
         deaths: participant.deaths,

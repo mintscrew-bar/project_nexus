@@ -3,10 +3,13 @@ import { PrismaService } from "../prisma/prisma.service";
 import { RedisService } from "../redis/redis.service";
 import { RiotMatchService } from "../riot/riot-match.service";
 import { RiotService } from "../riot/riot.service";
+import { getChampionKoreanName } from "@nexus/types";
 
 export interface ChampionStats {
   championId: number;
   championName: string;
+  /** 챔피언 한글명 (예: "아리") — 프론트 한글 표시용 */
+  championNameKorean: string;
   games: number;
   wins: number;
   losses: number;
@@ -22,6 +25,8 @@ export interface ChampionStats {
 export interface RankedChampStat {
   championId: number;
   championName: string;
+  /** 챔피언 한글명 (예: "아리") — 프론트 한글 표시용 */
+  championNameKorean: string;
   games: number;
   wins: number;
   losses: number;
@@ -253,6 +258,8 @@ export class StatsService {
         statsMap.set(p.championId, {
           championId: p.championId,
           championName: p.championName,
+          // 영문 챔피언명을 한글로 변환하여 추가 (기존 영문 필드는 유지)
+          championNameKorean: getChampionKoreanName(p.championName),
           games: 1,
           wins: p.win ? 1 : 0,
           losses: p.win ? 0 : 1,
@@ -643,6 +650,8 @@ export class StatsService {
         statsMap.set(key, {
           championId: participant.championId,
           championName: participant.championName,
+          // 영문 챔피언명을 한글로 변환하여 추가 (기존 영문 필드는 유지)
+          championNameKorean: getChampionKoreanName(participant.championName),
           games: 1,
           wins: participant.win ? 1 : 0,
           losses: participant.win ? 0 : 1,
