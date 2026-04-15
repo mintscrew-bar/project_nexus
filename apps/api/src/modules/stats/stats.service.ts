@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { RedisService } from "../redis/redis.service";
 import { RiotMatchService } from "../riot/riot-match.service";
@@ -61,6 +62,64 @@ export interface AuctionStats {
   titles: AuctionTitle[];
 }
 
+export interface LabSampleOverview {
+  matchesWithStats: number;
+  participantRows: number;
+  playersInDataset: number;
+  championsInDataset: number;
+  itemSelections: number;
+  recentMatches30d: number;
+}
+
+export interface LabLaneProfile {
+  position: string;
+  games: number;
+  winRate: number;
+  avgKills: number;
+  avgDeaths: number;
+  avgAssists: number;
+  avgDamage: number;
+  avgGold: number;
+}
+
+export interface LabChampionSignal {
+  championId: number;
+  championName: string;
+  championNameKorean: string;
+  games: number;
+  winRate: number;
+  avgKills: number;
+  avgDeaths: number;
+  avgAssists: number;
+}
+
+export interface LabItemTrend {
+  itemId: number;
+  picks: number;
+  uniqueUsers: number;
+}
+
+export interface LabMasteryLeader {
+  userId: string;
+  username: string;
+  avatar: string | null;
+  championId: number;
+  championName: string;
+  championNameKorean: string;
+  games: number;
+  winRate: number;
+  avgKda: number;
+  masteryScore: number;
+}
+
+export interface LabOverview {
+  sample: LabSampleOverview;
+  laneProfiles: LabLaneProfile[];
+  championSignals: LabChampionSignal[];
+  itemTrends: LabItemTrend[];
+  masteryLeaders: LabMasteryLeader[];
+}
+
 @Injectable()
 export class StatsService {
   constructor(
@@ -88,6 +147,224 @@ export class StatsService {
         },
       },
     });
+  }
+
+  async getLabOverview(): Promise<LabOverview> {
+    const [
+      matchesWithStats,
+      participantRows,
+      playersInDatasetRows,
+      championsInDatasetRows,
+      itemSelectionsRows,
+      recentMatchesRows,
+      laneProfileRows,
+      championSignalRows,
+      itemTrendRows,
+      masteryLeaderRows,
+    ] = await Promise.all([
+      this.prisma.matchParticipant.groupBy({
+        by: ["matchId"],
+      }),
+      this.prisma.matchParticipant.count(),
+      this.prisma.$queryRaw<{ count: bigint }[]>(Prisma.sql`
+        SELECT COUNT(DISTINCT "userId")::bigint AS count
+        FROM "match_participants"
+      `),
+      this.prisma.$queryRaw<{ count: bigint }[]>(Prisma.sql`
+        SELECT COUNT(DISTINCT "championId")::bigint AS count
+        FROM "match_participants"
+      `),
+      this.prisma.$queryRaw<{ count: bigint }[]>(Prisma.sql`
+        SELECT COUNT(*)::bigint AS count
+        FROM (
+          SELECT unnest(ARRAY["item0", "item1", "item2", "item3", "item4", "item5", "item6"]) AS item_id
+          FROM "match_participants"
+        ) items
+        WHERE item_id > 0
+      `),
+      this.prisma.$queryRaw<{ count: bigint }[]>(Prisma.sql`
+        SELECT COUNT(DISTINCT mp."matchId")::bigint AS count
+        FROM "match_participants" mp
+        INNER JOIN "matches" m ON m."id" = mp."matchId"
+        WHERE COALESCE(m."completedAt", m."createdAt") >= NOW() - INTERVAL '30 days'
+      `),
+      this.prisma.$queryRaw<
+        {
+          position: string;
+          games: bigint;
+          winRate: number;
+          avgKills: number;
+          avgDeaths: number;
+          avgAssists: number;
+          avgDamage: number;
+          avgGold: number;
+        }[]
+      >(Prisma.sql`
+        SELECT
+          "position",
+          COUNT(*)::bigint AS games,
+          ROUND(AVG(CASE WHEN "win" THEN 1.0 ELSE 0.0 END) * 100, 1)::float AS "winRate",
+          ROUND(AVG("kills"), 1)::float AS "avgKills",
+          ROUND(AVG("deaths"), 1)::float AS "avgDeaths",
+          ROUND(AVG("assists"), 1)::float AS "avgAssists",
+          ROUND(AVG("totalDamageDealtToChampions"), 0)::float AS "avgDamage",
+          ROUND(AVG("goldEarned"), 0)::float AS "avgGold"
+        FROM "match_participants"
+        WHERE "position" IS NOT NULL
+          AND "position" <> ''
+          AND "position" <> 'UNKNOWN'
+        GROUP BY "position"
+        ORDER BY COUNT(*) DESC
+      `),
+      this.prisma.$queryRaw<
+        {
+          championId: number;
+          championName: string;
+          games: bigint;
+          winRate: number;
+          avgKills: number;
+          avgDeaths: number;
+          avgAssists: number;
+        }[]
+      >(Prisma.sql`
+        SELECT
+          "championId",
+          "championName",
+          COUNT(*)::bigint AS games,
+          ROUND(AVG(CASE WHEN "win" THEN 1.0 ELSE 0.0 END) * 100, 1)::float AS "winRate",
+          ROUND(AVG("kills"), 1)::float AS "avgKills",
+          ROUND(AVG("deaths"), 1)::float AS "avgDeaths",
+          ROUND(AVG("assists"), 1)::float AS "avgAssists"
+        FROM "match_participants"
+        GROUP BY "championId", "championName"
+        HAVING COUNT(*) >= 3
+        ORDER BY COUNT(*) DESC, "winRate" DESC
+        LIMIT 12
+      `),
+      this.prisma.$queryRaw<
+        {
+          itemId: number;
+          picks: bigint;
+          uniqueUsers: bigint;
+        }[]
+      >(Prisma.sql`
+        SELECT
+          item_id AS "itemId",
+          COUNT(*)::bigint AS picks,
+          COUNT(DISTINCT "userId")::bigint AS "uniqueUsers"
+        FROM (
+          SELECT
+            "userId",
+            unnest(ARRAY["item0", "item1", "item2", "item3", "item4", "item5", "item6"]) AS item_id
+          FROM "match_participants"
+        ) items
+        WHERE item_id > 0
+        GROUP BY item_id
+        ORDER BY COUNT(*) DESC
+        LIMIT 12
+      `),
+      this.prisma.$queryRaw<
+        {
+          userId: string;
+          username: string;
+          avatar: string | null;
+          championId: number;
+          championName: string;
+          games: bigint;
+          winRate: number;
+          avgKda: number;
+          masteryScore: number;
+        }[]
+      >(Prisma.sql`
+        WITH champion_user AS (
+          SELECT
+            mp."userId",
+            u."username",
+            u."avatar",
+            mp."championId",
+            mp."championName",
+            COUNT(*)::bigint AS games,
+            AVG(CASE WHEN mp."win" THEN 1.0 ELSE 0.0 END) * 100 AS "winRate",
+            AVG((mp."kills" + mp."assists")::float / GREATEST(mp."deaths", 1)) AS "avgKda"
+          FROM "match_participants" mp
+          INNER JOIN "users" u ON u."id" = mp."userId"
+          GROUP BY mp."userId", u."username", u."avatar", mp."championId", mp."championName"
+          HAVING COUNT(*) >= 4
+        ),
+        ranked AS (
+          SELECT
+            *,
+            ROUND((games * 4) + ("winRate" * 0.45) + ("avgKda" * 8), 1) AS "masteryScore",
+            ROW_NUMBER() OVER (
+              PARTITION BY "userId"
+              ORDER BY ((games * 4) + ("winRate" * 0.45) + ("avgKda" * 8)) DESC, games DESC
+            ) AS rn
+          FROM champion_user
+        )
+        SELECT
+          "userId",
+          "username",
+          "avatar",
+          "championId",
+          "championName",
+          games,
+          ROUND("winRate", 1)::float AS "winRate",
+          ROUND("avgKda", 2)::float AS "avgKda",
+          "masteryScore"
+        FROM ranked
+        WHERE rn = 1
+        ORDER BY "masteryScore" DESC
+        LIMIT 10
+      `),
+    ]);
+
+    return {
+      sample: {
+        matchesWithStats: matchesWithStats.length,
+        participantRows,
+        playersInDataset: Number(playersInDatasetRows[0]?.count ?? 0),
+        championsInDataset: Number(championsInDatasetRows[0]?.count ?? 0),
+        itemSelections: Number(itemSelectionsRows[0]?.count ?? 0),
+        recentMatches30d: Number(recentMatchesRows[0]?.count ?? 0),
+      },
+      laneProfiles: laneProfileRows.map((row) => ({
+        position: row.position,
+        games: Number(row.games),
+        winRate: Number(row.winRate),
+        avgKills: Number(row.avgKills),
+        avgDeaths: Number(row.avgDeaths),
+        avgAssists: Number(row.avgAssists),
+        avgDamage: Number(row.avgDamage),
+        avgGold: Number(row.avgGold),
+      })),
+      championSignals: championSignalRows.map((row) => ({
+        championId: row.championId,
+        championName: row.championName,
+        championNameKorean: getChampionKoreanName(row.championName),
+        games: Number(row.games),
+        winRate: Number(row.winRate),
+        avgKills: Number(row.avgKills),
+        avgDeaths: Number(row.avgDeaths),
+        avgAssists: Number(row.avgAssists),
+      })),
+      itemTrends: itemTrendRows.map((row) => ({
+        itemId: row.itemId,
+        picks: Number(row.picks),
+        uniqueUsers: Number(row.uniqueUsers),
+      })),
+      masteryLeaders: masteryLeaderRows.map((row) => ({
+        userId: row.userId,
+        username: row.username,
+        avatar: row.avatar,
+        championId: row.championId,
+        championName: row.championName,
+        championNameKorean: getChampionKoreanName(row.championName),
+        games: Number(row.games),
+        winRate: Number(row.winRate),
+        avgKda: Number(row.avgKda),
+        masteryScore: Number(row.masteryScore),
+      })),
+    };
   }
 
   private isPrivacyAllowed(

@@ -8,9 +8,11 @@ import { Logo } from '@/components/Logo';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { UserMenu } from '@/components/UserMenu';
 import { MobileMenu } from '@/components/MobileMenu';
+import { DiscordIcon } from '@/components/icons/DiscordIcon';
 import { Users, Shield, FlaskConical } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth-store';
 import { useFriendStore } from '@/stores/friend-store';
+import { NEXUS_DISCORD_INVITE_URL } from '@/lib/constants';
 
 const navItems = [
   { href: '/tournaments', label: '내전' },
@@ -43,6 +45,10 @@ export function Header() {
   const clientIsOpen = mounted && isOpen;
   const clientIncomingCount = mounted ? incomingCount : 0;
   const clientUser = mounted ? user : null;
+  const visibleNavItems =
+    clientUser?.role === 'ADMIN'
+      ? [...navItems.slice(0, 2), { href: '/lab', label: '실험실' }, ...navItems.slice(2)]
+      : navItems;
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
 
@@ -59,7 +65,7 @@ export function Header() {
       {/* Center: Navigation (hidden on mobile) */}
       <nav className="flex-grow justify-center hidden md:flex">
         <ul className="flex space-x-1">
-          {navItems.map((item) => (
+          {visibleNavItems.map((item) => (
             <li key={item.href}>
               <Link
                 href={item.href}
@@ -79,6 +85,16 @@ export function Header() {
 
       {/* Right: Friends + Theme Toggle + Auth */}
       <div className="flex items-center gap-3">
+        <a
+          href={NEXUS_DISCORD_INVITE_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="hidden rounded-lg p-2 text-[#8EA1FF] transition-colors duration-150 hover:bg-[#5865F2]/10 hover:text-[#C7D2FE] md:inline-flex"
+          title="Discord 커뮤니티"
+          aria-label="Discord 커뮤니티"
+        >
+          <DiscordIcon className="h-5 w-5" />
+        </a>
         {/* 어드민/모더레이터 전용 링크: 마운트 후에만 표시하여 hydration 불일치 방지 */}
         {clientIsAuthenticated && (clientUser?.role === 'ADMIN' || clientUser?.role === 'MODERATOR') && (
           <>

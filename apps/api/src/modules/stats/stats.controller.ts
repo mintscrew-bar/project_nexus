@@ -1,7 +1,9 @@
 import { Controller, Get, Param, Query, UseGuards } from "@nestjs/common";
 import { Throttle } from "@nestjs/throttler";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { RolesGuard } from "../auth/guards/roles.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
+import { Roles } from "../auth/decorators/roles.decorator";
 import { StatsService } from "./stats.service";
 import { DataDragonService } from "../riot/data-dragon.service";
 import {
@@ -10,6 +12,7 @@ import {
   SearchUsersQueryDto,
   UserMatchHistoryQueryDto,
 } from "./dto/stats-query.dto";
+import { UserRole } from "@nexus/database";
 
 @Controller("stats")
 export class StatsController {
@@ -38,6 +41,16 @@ export class StatsController {
     @Param("userId") userId: string,
   ) {
     return this.statsService.getUserAuctionStats(userId, requesterId);
+  }
+
+  /**
+   * Admin-only lab overview for experimental research dashboard
+   */
+  @Get("lab/overview")
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  async getLabOverview() {
+    return this.statsService.getLabOverview();
   }
 
   /**

@@ -1,11 +1,14 @@
 'use client';
 
 import { cn } from '@/lib/utils';
-import { X, Menu, Home, Swords, Trophy, Users, MessageSquare, Settings, User } from 'lucide-react';
+import { X, Menu, Home, Swords, Trophy, Users, MessageSquare, Settings, User, FlaskConical, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { Logo } from './Logo';
+import { DiscordIcon } from './icons/DiscordIcon';
+import { NEXUS_DISCORD_INVITE_URL } from '@/lib/constants';
+import { useAuthStore } from '@/stores/auth-store';
 
 interface MobileMenuProps {
   className?: string;
@@ -14,6 +17,8 @@ interface MobileMenuProps {
 export function MobileMenu({ className }: MobileMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
+  const { user } = useAuthStore();
+  const [mounted, setMounted] = useState(false);
 
   // Close menu on route change
   useEffect(() => {
@@ -21,6 +26,10 @@ export function MobileMenu({ className }: MobileMenuProps) {
   }, [pathname]);
 
   // Lock body scroll when menu is open
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
@@ -39,6 +48,10 @@ export function MobileMenu({ className }: MobileMenuProps) {
     { href: '/clans', label: '클랜', icon: Users },
     { href: '/community', label: '커뮤니티', icon: MessageSquare },
   ];
+  const visibleNavItems =
+    mounted && user?.role === 'ADMIN'
+      ? [...navItems.slice(0, 3), { href: '/lab', label: '실험실', icon: FlaskConical }, ...navItems.slice(3)]
+      : navItems;
 
   const sidebarItems = [
     { href: '/profile', label: '마이페이지', icon: User },
@@ -97,7 +110,7 @@ export function MobileMenu({ className }: MobileMenuProps) {
               메뉴
             </h3>
             <ul className="space-y-1">
-              {navItems.map((item) => (
+              {visibleNavItems.map((item) => (
                 <li key={item.href}>
                   <Link
                     href={item.href}
@@ -140,6 +153,24 @@ export function MobileMenu({ className }: MobileMenuProps) {
                 </li>
               ))}
             </ul>
+          </div>
+
+          <div>
+            <h3 className="text-xs font-semibold text-text-tertiary uppercase tracking-wider mb-2 px-3">
+              커뮤니티
+            </h3>
+            <a
+              href={NEXUS_DISCORD_INVITE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-between rounded-lg border border-[#5865F2]/20 bg-[#5865F2]/10 px-3 py-3 text-[#C7D2FE] transition-colors hover:bg-[#5865F2]/20"
+            >
+              <span className="flex items-center gap-3">
+                <DiscordIcon className="h-5 w-5" />
+                <span className="font-medium">Discord 참가</span>
+              </span>
+              <ExternalLink className="h-4 w-4" />
+            </a>
           </div>
         </nav>
       </div>

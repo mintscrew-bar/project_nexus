@@ -3,6 +3,7 @@
 import { useRef, useState, useCallback } from "react";
 import Image from "next/image";
 import { DISCORD_COLORS, bannerGlowGradient } from "./banner-constants";
+import { NEXUS_DISCORD_INVITE_URL } from "@/lib/constants";
 
 // 테마 색상 — 공통 상수에서 가져옴
 const BLURPLE = DISCORD_COLORS.primary;
@@ -46,7 +47,7 @@ export function DiscordBanner() {
 
   return (
     <a
-      href="https://discord.gg/bKqH9pkfgg"
+      href={NEXUS_DISCORD_INVITE_URL}
       target="_blank"
       rel="noopener noreferrer"
       aria-label="NEXUS Discord 서버 참가하기 (새 탭에서 열림)"

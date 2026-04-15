@@ -487,6 +487,13 @@ export const riotApi = {
     return { data: data.data, version: data.version };
   },
 
+  getItems: async (locale: string = "ko_KR") => {
+    const response = await apiClient.get("/riot/ddragon/items", {
+      params: { locale },
+    });
+    return response.data;
+  },
+
   // 인증 시작
   startVerification: async (gameName: string, tagLine: string) => {
     const response = await apiClient.post("/riot/verify/start", { gameName, tagLine });
@@ -1128,6 +1135,11 @@ export const notificationApi = {
 
 // 전적 통계 관련 API
 export const statsApi = {
+  getLabOverview: async () => {
+    const response = await apiClient.get("/stats/lab/overview");
+    return response.data;
+  },
+
   getUserChampionStats: async (userId: string) => {
     const response = await apiClient.get(`/stats/user/${userId}/champion-stats`);
     return response.data;
