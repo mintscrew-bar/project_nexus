@@ -525,11 +525,9 @@ getEnglishName(korean: string): string | undefined {
 
 ## 마이그레이션 체크리스트
 
-- [ ] 데이터베이스 스키마 영문 기준으로 정규화
-- [ ] 기존 한글 데이터 마이그레이션 스크립트 실행
-- [ ] API 응답에 한글 필드 추가 (매핑 함수 사용)
-- [ ] 프론트엔드 입력 처리 (한글 ↔ 영문 변환)
-- [ ] Socket.IO 이벤트에 한글 이름 포함
-- [ ] 검색 기능 한글/영문 모두 지원
-- [ ] 통합 테스트 및 E2E 테스트 실행
-- [ ] 프로덕션 배포 전 데이터 백업
+- [x] 데이터베이스 스키마 영문 기준으로 정규화 (championName: String 영문 저장)
+- [x] API 응답에 한글 필드 추가 — stats.service.ts, match.service.ts에 `championNameKorean`, `summoner1Korean`, `summoner2Korean` 추가
+- [x] 프론트엔드 입력 처리 (한글 ↔ 영문 변환) — matches, profile, users 등 7개 컴포넌트 적용
+- [ ] Socket.IO 이벤트에 한글 이름 포함 (소켓 이벤트에서 텍스트 표시 없음 — 해당 없음)
+- [ ] 검색 기능 한글/영문 모두 지원 (검색 기능 미구현 — 별도 태스크)
+- [ ] 통합 테스트 및 E2E 테스트 작성
