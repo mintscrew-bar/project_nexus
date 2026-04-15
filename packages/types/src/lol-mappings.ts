@@ -389,3 +389,39 @@ export function getAllRuneNames(): string[] {
 export function getAllRuneKoreanNames(): string[] {
   return Object.values(RUNE_MAPPINGS);
 }
+
+// ============================================
+// 소환사 주문 매핑 (숫자 ID → 한글 이름)
+// 출처: Riot Games Data Dragon 16.8.1 패치 기준
+// DB의 MatchParticipant.summoner1Id / summoner2Id 필드에 저장된 ID와 매핑
+// ============================================
+
+export const SUMMONER_SPELL_MAPPINGS: Record<number, string> = {
+  1: "정화",         // SummonerBoost — 군중 제어 해제
+  2202: "점멸",      // SummonerCherryFlash — 아레나 모드 전용 점멸
+  2201: "도주",      // SummonerCherryHold — 아레나 모드 전용 이동기
+  14: "점화",        // SummonerDot — 점화
+  3: "탈진",         // SummonerExhaust — 탈진
+  4: "점멸",         // SummonerFlash — 표준 점멸
+  6: "유체화",       // SummonerHaste — 유체화(고스트)
+  7: "회복",         // SummonerHeal — 회복
+  13: "총명",        // SummonerMana — 총명
+  30: "왕을 향해!",  // SummonerPoroRecall — 칼바람 나락 포로 귀환
+  31: "포로 던지기", // SummonerPoroThrow — 칼바람 나락 포로 던지기
+  11: "강타",        // SummonerSmite — 강타
+  39: "표식",        // SummonerSnowURFSnowball_Mark — 눈보라 URF 눈덩이
+  32: "표식",        // SummonerSnowball — 일반 표식(칼바람)
+  21: "방어막",      // SummonerBarrier — 방어막
+  12: "순간이동",    // SummonerTeleport — 순간이동
+  54: "결정 미완료", // Summoner_UltBookPlaceholder — 자리 채움용(궁 주문서)
+  55: "결정 미완료(강타)", // Summoner_UltBookSmitePlaceholder — 자리 채움용(강타)
+};
+
+/**
+ * 소환사 주문 ID로 한글 이름 조회
+ * @param spellId - DB에 저장된 숫자형 소환사 주문 ID
+ * @returns 한글 소환사 주문 이름, 매핑이 없으면 숫자 문자열 반환
+ */
+export function getSummonerSpellKoreanName(spellId: number): string {
+  return SUMMONER_SPELL_MAPPINGS[spellId] ?? String(spellId);
+}

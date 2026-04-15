@@ -7,12 +7,14 @@ import {
   CHAMPION_MAPPINGS,
   ITEM_MAPPINGS,
   RUNE_MAPPINGS,
+  SUMMONER_SPELL_MAPPINGS,
   getChampionKoreanName,
   getChampionEnglishName,
   getItemKoreanName,
   getItemEnglishName,
   getRuneKoreanName,
   getRuneEnglishName,
+  getSummonerSpellKoreanName,
   getAllChampionNames,
   getAllChampionKoreanNames,
   getAllItemNames,
@@ -197,6 +199,52 @@ describe('LoL Mappings', () => {
       const selectedKorean = '아리';
       const englishName = getChampionEnglishName(selectedKorean);
       expect(englishName).toBe('Ahri');
+    });
+  });
+
+  describe('Summoner Spells', () => {
+    test('getSummonerSpellKoreanName should return korean name for known IDs', () => {
+      // 주요 소환사 주문 ID 조회 검증
+      expect(getSummonerSpellKoreanName(4)).toBe('점멸');
+      expect(getSummonerSpellKoreanName(11)).toBe('강타');
+      expect(getSummonerSpellKoreanName(14)).toBe('점화');
+      expect(getSummonerSpellKoreanName(12)).toBe('순간이동');
+      expect(getSummonerSpellKoreanName(21)).toBe('방어막');
+      expect(getSummonerSpellKoreanName(1)).toBe('정화');
+      expect(getSummonerSpellKoreanName(3)).toBe('탈진');
+      expect(getSummonerSpellKoreanName(6)).toBe('유체화');
+      expect(getSummonerSpellKoreanName(7)).toBe('회복');
+      expect(getSummonerSpellKoreanName(13)).toBe('총명');
+    });
+
+    test('getSummonerSpellKoreanName should return string of the id for unknown IDs', () => {
+      // 존재하지 않는 ID는 숫자 문자열로 반환
+      expect(getSummonerSpellKoreanName(9999)).toBe('9999');
+      expect(getSummonerSpellKoreanName(0)).toBe('0');
+    });
+
+    test('SUMMONER_SPELL_MAPPINGS should contain all standard summoner spells', () => {
+      // 일반 솔로랭크에서 사용하는 핵심 소환사 주문 포함 여부 확인
+      const standardSpells = [4, 11, 14, 12, 21, 1, 3, 6, 7];
+      standardSpells.forEach((spellId) => {
+        expect(SUMMONER_SPELL_MAPPINGS).toHaveProperty(String(spellId));
+      });
+    });
+
+    test('All summoner spell names should be non-empty strings', () => {
+      // 매핑된 모든 주문 이름이 비어 있지 않은 문자열인지 검증
+      Object.values(SUMMONER_SPELL_MAPPINGS).forEach((name) => {
+        expect(typeof name).toBe('string');
+        expect(name.length).toBeGreaterThan(0);
+      });
+    });
+
+    test('should work with MatchParticipant summoner spell display', () => {
+      // DB에서 읽어온 summoner1Id/summoner2Id를 화면에 표시하는 시나리오
+      const summoner1Id = 4;  // 점멸
+      const summoner2Id = 11; // 강타
+      expect(getSummonerSpellKoreanName(summoner1Id)).toBe('점멸');
+      expect(getSummonerSpellKoreanName(summoner2Id)).toBe('강타');
     });
   });
 
