@@ -215,7 +215,7 @@
 4. **장기** (남은 작업)
    - [x] CI/CD 설정 (`.github/workflows/ci.yml` — lint/build/test)
    - [x] 단위 테스트 작성 (7개 spec 파일)
-   - [ ] Integration 테스트 작성
+   - [x] Integration 테스트 작성 (stats/match 한글 필드 검증 54개)
    - [ ] E2E 테스트 작성
 
 ---

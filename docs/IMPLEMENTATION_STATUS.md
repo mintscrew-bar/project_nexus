@@ -258,7 +258,7 @@ nexus/
 
 - [x] Unit 테스트 (7개 spec 파일 — auction, room, snake-draft, match, community, shutdown)
 - [x] CI/CD 파이프라인 (`.github/workflows/ci.yml`)
-- [ ] Integration 테스트
+- [x] Integration 테스트 (stats/match 서비스 한글 필드 검증)
 - [ ] E2E 테스트
 
 ---

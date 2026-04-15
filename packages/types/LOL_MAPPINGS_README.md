@@ -265,7 +265,7 @@ export const CHAMPION_MAPPINGS: Record<string, string> = {
 - [x] 소환사 주문 매핑 추가 (18종, `getSummonerSpellKoreanName`)
 - [ ] 스킨 이름 매핑 추가 (프로젝트에서 미사용 — 필요 시 추가)
 - [ ] 능력(Q, W, E, R) 이름 매핑 추가 (약 900개 — 필요 시 추가)
-- [ ] 자동 업데이트 스크립트 (Riot API 연동)
+- [x] 자동 업데이트 스크립트 (`scripts/update-mappings.ts`, `pnpm mappings:update`)
 
 ## 📞 문의 및 버그 리포팅
 
