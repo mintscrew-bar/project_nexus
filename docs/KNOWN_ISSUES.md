@@ -77,17 +77,17 @@
 **해결**: `app/error.tsx`, `app/global-error.tsx`, `app/not-found.tsx` 생성됨.
 
 ### 8. 테스트 코드 부재
-**상태**: 🟢 장기 과제
+**상태**: 🟡 일부 완료
 **영향**: 코드 품질
 
-**문제**:
-- 단위 테스트 없음
-- 통합 테스트 없음
-- E2E 테스트 없음
+**현황**:
+- ✅ 단위 테스트: 7개 spec 파일 (auction, room, snake-draft, match, community, shutdown)
+- ❌ 통합 테스트 없음
+- ❌ E2E 테스트 없음
 
-**해결 방법**:
-- Jest + React Testing Library 설정
-- 핵심 비즈니스 로직부터 테스트 작성
+**남은 작업**:
+- Integration 테스트 (Jest + Supertest)
+- E2E 테스트 (Playwright 또는 Cypress)
 
 ---
 
@@ -213,8 +213,10 @@
    - [x] Cron jobs (자동 밴 해제, 티어 동기화)
 
 4. **장기** (남은 작업)
-   - [ ] 테스트 코드 작성
-   - [ ] CI/CD 설정
+   - [x] CI/CD 설정 (`.github/workflows/ci.yml` — lint/build/test)
+   - [x] 단위 테스트 작성 (7개 spec 파일)
+   - [ ] Integration 테스트 작성
+   - [ ] E2E 테스트 작성
 
 ---
 

@@ -183,7 +183,7 @@ nexus/
 │       │   └── stores/         🚧 일부 구현 (유저 작업)
 │       └── package.json
 ├── packages/
-│   └── database/               ⚠️ 스키마 업데이트 필요
+│   └── database/               ✅ 스키마 완료
 │       └── prisma/
 │           └── schema.prisma
 └── docs/                       ✅ 문서화 완료
@@ -256,10 +256,10 @@ nexus/
 
 ### 5. 테스트 및 배포 (우선순위: 낮음)
 
-- [ ] Unit 테스트
+- [x] Unit 테스트 (7개 spec 파일 — auction, room, snake-draft, match, community, shutdown)
+- [x] CI/CD 파이프라인 (`.github/workflows/ci.yml`)
 - [ ] Integration 테스트
 - [ ] E2E 테스트
-- [ ] CI/CD 파이프라인
 
 ---
 
@@ -315,11 +315,13 @@ npm run dev
 1. ✅ 모든 백엔드 모듈 구현
 2. ✅ API 문서 작성
 3. ✅ 스키마 변경사항 문서화
-4. ⏳ **스키마 업데이트 및 마이그레이션**
-5. ⏳ **컴파일 오류 해결**
-6. ⏳ 프론트엔드 통합
-7. ⏳ 테스트 작성
-8. ⏳ 배포
+4. ✅ **스키마 업데이트 및 마이그레이션**
+5. ✅ **컴파일 오류 해결**
+6. ✅ CI/CD 파이프라인 (`.github/workflows/ci.yml`)
+7. ✅ 프론트엔드 통합 (UI 컴포넌트 체계 + Store 완성)
+8. ✅ Unit 테스트 (7개 spec 파일)
+9. ⏳ Integration / E2E 테스트
+10. ⏳ 배포
 
 ---
 
