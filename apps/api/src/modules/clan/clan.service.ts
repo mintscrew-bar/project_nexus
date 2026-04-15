@@ -32,12 +32,24 @@ export interface UpdateClanDto {
   name?: string;
   description?: string;
   isRecruiting?: boolean;
-  minTier?: string;
-  discord?: string;
+  minTier?: string | null;
+  maxMembers?: number;
+  discord?: string | null;
+  officerCanManageSettings?: boolean;
+  officerCanManageMembers?: boolean;
+  officerCanManageAnnouncements?: boolean;
+  officerCanManageInvitations?: boolean;
 }
 
 export interface InviteMemberDto {
   userId: string;
+}
+
+interface OfficerPermissions {
+  officerCanManageSettings: boolean;
+  officerCanManageMembers: boolean;
+  officerCanManageAnnouncements: boolean;
+  officerCanManageInvitations: boolean;
 }
 
 @Injectable()
@@ -47,6 +59,68 @@ export class ClanService {
     @Inject(forwardRef(() => NotificationService))
     private readonly notificationService: NotificationService,
   ) {}
+
+  private canManageSettings(
+    role: ClanRole,
+    permissions: OfficerPermissions,
+  ) {
+    return (
+      role === ClanRole.OWNER ||
+      (role === ClanRole.OFFICER && permissions.officerCanManageSettings)
+    );
+  }
+
+  private canManageMembers(
+    role: ClanRole,
+    permissions: OfficerPermissions,
+  ) {
+    return (
+      role === ClanRole.OWNER ||
+      (role === ClanRole.OFFICER && permissions.officerCanManageMembers)
+    );
+  }
+
+  private canManageAnnouncements(
+    role: ClanRole,
+    permissions: OfficerPermissions,
+  ) {
+    return (
+      role === ClanRole.OWNER ||
+      (role === ClanRole.OFFICER && permissions.officerCanManageAnnouncements)
+    );
+  }
+
+  private canManageInvitations(
+    role: ClanRole,
+    permissions: OfficerPermissions,
+  ) {
+    return (
+      role === ClanRole.OWNER ||
+      (role === ClanRole.OFFICER && permissions.officerCanManageInvitations)
+    );
+  }
+
+  private async getOfficerPermissions(clanId: string): Promise<OfficerPermissions> {
+    const rows = await this.prisma.$queryRaw<OfficerPermissions[]>(Prisma.sql`
+      SELECT
+        "officerCanManageSettings",
+        "officerCanManageMembers",
+        "officerCanManageAnnouncements",
+        "officerCanManageInvitations"
+      FROM "clans"
+      WHERE "id" = ${clanId}
+      LIMIT 1
+    `);
+
+    return (
+      rows[0] ?? {
+        officerCanManageSettings: true,
+        officerCanManageMembers: true,
+        officerCanManageAnnouncements: true,
+        officerCanManageInvitations: true,
+      }
+    );
+  }
 
   // ========================================
   // Clan CRUD
@@ -165,7 +239,12 @@ export class ClanService {
       throw new NotFoundException("Clan not found");
     }
 
-    return clan;
+    const permissions = await this.getOfficerPermissions(clanId);
+
+    return {
+      ...clan,
+      ...permissions,
+    };
   }
 
   async listClans(filters?: {
@@ -202,18 +281,26 @@ export class ClanService {
 
     return this.prisma.clan.findMany({
       where,
-      include: {
-        members: {
-          select: {
-            id: true,
-            role: true,
-          },
-        },
+      select: {
+        id: true,
+        name: true,
+        tag: true,
+        description: true,
+        logo: true,
+        isRecruiting: true,
+        maxMembers: true,
+        minTier: true,
+        discord: true,
         owner: {
           select: {
             id: true,
             username: true,
             avatar: true,
+          },
+        },
+        _count: {
+          select: {
+            members: true,
           },
         },
       },
@@ -237,24 +324,88 @@ export class ClanService {
 
     const member = clan.members[0];
 
-    if (
-      !member ||
-      (member.role !== ClanRole.OWNER && member.role !== ClanRole.OFFICER)
-    ) {
+    const permissions = await this.getOfficerPermissions(clanId);
+
+    if (!member || !this.canManageSettings(member.role, permissions)) {
       throw new ForbiddenException(
         "Only clan owner or officers can update clan",
       );
     }
 
+    const ownerOnlyFieldsChanged =
+      dto.name !== undefined ||
+      dto.minTier !== undefined ||
+      dto.maxMembers !== undefined ||
+      dto.officerCanManageSettings !== undefined ||
+      dto.officerCanManageMembers !== undefined ||
+      dto.officerCanManageAnnouncements !== undefined ||
+      dto.officerCanManageInvitations !== undefined;
+
+    if (ownerOnlyFieldsChanged && member.role !== ClanRole.OWNER) {
+      throw new ForbiddenException(
+        "Only clan owner can change clan policies",
+      );
+    }
+
+    if (dto.maxMembers !== undefined) {
+      const currentMemberCount = await this.prisma.clanMember.count({
+        where: { clanId },
+      });
+
+      if (dto.maxMembers < currentMemberCount) {
+        throw new BadRequestException(
+          `클랜 정원은 현재 인원(${currentMemberCount}명)보다 작을 수 없습니다.`,
+        );
+      }
+    }
+
+    const updateData: Prisma.ClanUpdateInput = {
+      ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
+      ...(dto.description !== undefined
+        ? { description: dto.description?.trim() || null }
+        : {}),
+      ...(dto.isRecruiting !== undefined
+        ? { isRecruiting: dto.isRecruiting }
+        : {}),
+      ...(dto.minTier !== undefined
+        ? { minTier: dto.minTier?.trim() || null }
+        : {}),
+      ...(dto.maxMembers !== undefined ? { maxMembers: dto.maxMembers } : {}),
+      ...(dto.discord !== undefined
+        ? { discord: dto.discord?.trim() || null }
+        : {}),
+    };
+
     const updated = await this.prisma.clan.update({
       where: { id: clanId },
-      data: dto,
+      data: updateData,
     });
+
+    await this.prisma.$executeRaw(Prisma.sql`
+      UPDATE "clans"
+      SET
+        "officerCanManageSettings" = ${dto.officerCanManageSettings ?? permissions.officerCanManageSettings},
+        "officerCanManageMembers" = ${dto.officerCanManageMembers ?? permissions.officerCanManageMembers},
+        "officerCanManageAnnouncements" = ${dto.officerCanManageAnnouncements ?? permissions.officerCanManageAnnouncements},
+        "officerCanManageInvitations" = ${dto.officerCanManageInvitations ?? permissions.officerCanManageInvitations}
+      WHERE "id" = ${clanId}
+    `);
 
     // 클랜 정보 변경 활동 로그 기록
     await this.logActivity(clanId, userId, ClanActivityType.CLAN_UPDATE);
 
-    return updated;
+    return {
+      ...updated,
+      officerCanManageSettings:
+        dto.officerCanManageSettings ?? permissions.officerCanManageSettings,
+      officerCanManageMembers:
+        dto.officerCanManageMembers ?? permissions.officerCanManageMembers,
+      officerCanManageAnnouncements:
+        dto.officerCanManageAnnouncements ??
+        permissions.officerCanManageAnnouncements,
+      officerCanManageInvitations:
+        dto.officerCanManageInvitations ?? permissions.officerCanManageInvitations,
+    };
   }
 
   async deleteClan(userId: string, clanId: string) {
@@ -384,10 +535,9 @@ export class ClanService {
 
     const member = clan.members[0];
 
-    if (
-      !member ||
-      (member.role !== ClanRole.OWNER && member.role !== ClanRole.OFFICER)
-    ) {
+    const permissions = await this.getOfficerPermissions(clanId);
+
+    if (!member || !this.canManageMembers(member.role, permissions)) {
       throw new ForbiddenException("Only owner or officers can kick members");
     }
 
@@ -762,10 +912,9 @@ export class ClanService {
     if (!membership) {
       throw new ForbiddenException("You are not a member of this clan");
     }
-    if (
-      membership.role !== ClanRole.OWNER &&
-      membership.role !== ClanRole.OFFICER
-    ) {
+    const permissions = await this.getOfficerPermissions(clanId);
+
+    if (!this.canManageAnnouncements(membership.role, permissions)) {
       throw new ForbiddenException(
         "Only owner or officers can create announcements",
       );
@@ -845,10 +994,9 @@ export class ClanService {
     if (!membership) {
       throw new ForbiddenException("You are not a member of this clan");
     }
-    if (
-      membership.role !== ClanRole.OWNER &&
-      membership.role !== ClanRole.OFFICER
-    ) {
+    const permissions = await this.getOfficerPermissions(clanId);
+
+    if (!this.canManageAnnouncements(membership.role, permissions)) {
       throw new ForbiddenException(
         "Only owner or officers can delete announcements",
       );
@@ -880,10 +1028,9 @@ export class ClanService {
     if (!membership) {
       throw new ForbiddenException("You are not a member of this clan");
     }
-    if (
-      membership.role !== ClanRole.OWNER &&
-      membership.role !== ClanRole.OFFICER
-    ) {
+    const permissions = await this.getOfficerPermissions(clanId);
+
+    if (!this.canManageAnnouncements(membership.role, permissions)) {
       throw new ForbiddenException(
         "Only owner or officers can unpin announcements",
       );
@@ -918,10 +1065,9 @@ export class ClanService {
     if (!clan) throw new NotFoundException("Clan not found");
 
     const inviter = clan.members[0];
-    if (
-      !inviter ||
-      (inviter.role !== ClanRole.OWNER && inviter.role !== ClanRole.OFFICER)
-    ) {
+    const permissions = await this.getOfficerPermissions(clanId);
+
+    if (!inviter || !this.canManageInvitations(inviter.role, permissions)) {
       throw new ForbiddenException("Only owner or officers can invite users");
     }
 
@@ -985,10 +1131,9 @@ export class ClanService {
     if (!clan) throw new NotFoundException("Clan not found");
 
     const member = clan.members[0];
-    if (
-      !member ||
-      (member.role !== ClanRole.OWNER && member.role !== ClanRole.OFFICER)
-    ) {
+    const permissions = await this.getOfficerPermissions(clanId);
+
+    if (!member || !this.canManageInvitations(member.role, permissions)) {
       throw new ForbiddenException(
         "Only owner or officers can generate invite codes",
       );
@@ -1222,10 +1367,9 @@ export class ClanService {
     if (!clan) throw new NotFoundException("Clan not found");
 
     const member = clan.members[0];
-    if (
-      !member ||
-      (member.role !== ClanRole.OWNER && member.role !== ClanRole.OFFICER)
-    ) {
+    const permissions = await this.getOfficerPermissions(clanId);
+
+    if (!member || !this.canManageInvitations(member.role, permissions)) {
       throw new ForbiddenException(
         "Only owner or officers can resolve join requests",
       );
@@ -1333,6 +1477,93 @@ export class ClanService {
     });
   }
 
+  async getSentInvitations(userId: string, clanId: string) {
+    const membership = await this.prisma.clanMember.findFirst({
+      where: { userId, clanId },
+    });
+
+    if (!membership) {
+      throw new ForbiddenException("You are not a member of this clan");
+    }
+    const permissions = await this.getOfficerPermissions(clanId);
+
+    if (!this.canManageInvitations(membership.role, permissions)) {
+      throw new ForbiddenException(
+        "Only owner or officers can view sent invitations",
+      );
+    }
+
+    return this.prisma.clanInvitation.findMany({
+      where: {
+        clanId,
+        type: ClanInvitationType.INVITE,
+        status: ClanInvitationStatus.PENDING,
+        inviteeId: { not: null },
+      },
+      include: {
+        invitee: {
+          select: {
+            id: true,
+            username: true,
+            avatar: true,
+          },
+        },
+        inviter: {
+          select: {
+            id: true,
+            username: true,
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
+  async cancelInvitation(userId: string, clanId: string, invitationId: string) {
+    const membership = await this.prisma.clanMember.findFirst({
+      where: { userId, clanId },
+    });
+
+    if (!membership) {
+      throw new ForbiddenException("You are not a member of this clan");
+    }
+    const permissions = await this.getOfficerPermissions(clanId);
+
+    if (!this.canManageInvitations(membership.role, permissions)) {
+      throw new ForbiddenException(
+        "Only owner or officers can cancel invitations",
+      );
+    }
+
+    const invitation = await this.prisma.clanInvitation.findUnique({
+      where: { id: invitationId },
+    });
+
+    if (!invitation || invitation.clanId !== clanId) {
+      throw new NotFoundException("Invitation not found");
+    }
+    if (invitation.type !== ClanInvitationType.INVITE) {
+      throw new BadRequestException("Not an invitation");
+    }
+    if (invitation.status !== ClanInvitationStatus.PENDING) {
+      throw new BadRequestException("Invitation already resolved");
+    }
+    if (!invitation.inviteeId) {
+      throw new BadRequestException("Invite codes cannot be canceled here");
+    }
+
+    await this.prisma.clanInvitation.update({
+      where: { id: invitationId },
+      data: {
+        status: ClanInvitationStatus.REJECTED,
+        resolvedBy: userId,
+        resolvedAt: new Date(),
+      },
+    });
+
+    return { invitationId };
+  }
+
   /**
    * 클랜에 대한 가입 요청 목록 조회 (OWNER/OFFICER 전용)
    */
@@ -1344,10 +1575,9 @@ export class ClanService {
     if (!membership) {
       throw new ForbiddenException("You are not a member of this clan");
     }
-    if (
-      membership.role !== ClanRole.OWNER &&
-      membership.role !== ClanRole.OFFICER
-    ) {
+    const permissions = await this.getOfficerPermissions(clanId);
+
+    if (!this.canManageInvitations(membership.role, permissions)) {
       throw new ForbiddenException(
         "Only owner or officers can view join requests",
       );

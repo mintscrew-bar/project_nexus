@@ -7,7 +7,8 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import { useAuthStore } from "@/stores/auth-store";
-import { clanApi } from "@/lib/api-client";
+import { clanApi, statsApi } from "@/lib/api-client";
+import { useDebounce } from "@/hooks/useDebounce";
 import {
   Card,
   CardContent,
@@ -37,8 +38,23 @@ import {
   X,
   ChevronDown,
   Activity,
+  Sparkles,
+  UserRoundPlus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+const CLAN_TIERS = [
+  "IRON",
+  "BRONZE",
+  "SILVER",
+  "GOLD",
+  "PLATINUM",
+  "EMERALD",
+  "DIAMOND",
+  "MASTER",
+  "GRANDMASTER",
+  "CHALLENGER",
+] as const;
 
 // ─────────────────────────────────────────────────────────────
 // 타입 정의
@@ -72,6 +88,10 @@ interface Clan {
   maxMembers: number;
   minTier: string | null;
   discord: string | null;
+  officerCanManageSettings: boolean;
+  officerCanManageMembers: boolean;
+  officerCanManageAnnouncements: boolean;
+  officerCanManageInvitations: boolean;
   members: ClanMember[];
 }
 
@@ -84,6 +104,33 @@ interface JoinRequest {
     avatar: string | null;
   };
   createdAt: string;
+}
+
+interface SentInvitation {
+  id: string;
+  createdAt: string;
+  expiresAt: string;
+  invitee: {
+    id: string;
+    username: string;
+    avatar: string | null;
+  } | null;
+  inviter: {
+    id: string;
+    username: string;
+  };
+}
+
+interface UserSearchResult {
+  id: string;
+  username: string;
+  avatar: string | null;
+  primaryRiotAccount: {
+    gameName: string;
+    tagLine: string;
+    tier: string | null;
+    rank: string | null;
+  } | null;
 }
 
 interface ActivityLog {
@@ -159,9 +206,16 @@ export default function ClanSettingsPage() {
   const [myRole, setMyRole] = useState<"OWNER" | "OFFICER" | "MEMBER" | null>(null);
 
   // ── 정보 수정 폼 상태 ──
+  const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [discord, setDiscord] = useState("");
   const [isRecruiting, setIsRecruiting] = useState(false);
+  const [minTier, setMinTier] = useState("");
+  const [maxMembers, setMaxMembers] = useState("50");
+  const [officerCanManageSettings, setOfficerCanManageSettings] = useState(true);
+  const [officerCanManageMembers, setOfficerCanManageMembers] = useState(true);
+  const [officerCanManageAnnouncements, setOfficerCanManageAnnouncements] = useState(true);
+  const [officerCanManageInvitations, setOfficerCanManageInvitations] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // ── 멤버 관리 상태 ──
@@ -173,13 +227,19 @@ export default function ClanSettingsPage() {
   const [inviteCode, setInviteCode] = useState<{ code: string; expiresAt: string } | null>(null);
   const [isGeneratingCode, setIsGeneratingCode] = useState(false);
   const [inviteSearchQuery, setInviteSearchQuery] = useState("");
-  const [inviteUserId, setInviteUserId] = useState("");
   const [isInviting, setIsInviting] = useState(false);
+  const [inviteSearchResults, setInviteSearchResults] = useState<UserSearchResult[]>([]);
+  const [isSearchingUsers, setIsSearchingUsers] = useState(false);
+  const [sentInvitations, setSentInvitations] = useState<SentInvitation[]>([]);
+  const [isLoadingInvitations, setIsLoadingInvitations] = useState(false);
+  const [cancelingInvitationId, setCancelingInvitationId] = useState<string | null>(null);
 
   // ── 가입 요청 상태 ──
   const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
   const [isLoadingRequests, setIsLoadingRequests] = useState(false);
   const [resolvingRequestId, setResolvingRequestId] = useState<string | null>(null);
+  const [selectedJoinRequestIds, setSelectedJoinRequestIds] = useState<Set<string>>(new Set());
+  const [isBulkResolvingRequests, setIsBulkResolvingRequests] = useState(false);
 
   // ── 활동 로그 상태 ──
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
@@ -198,6 +258,7 @@ export default function ClanSettingsPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const { addToast } = useToast();
+  const debouncedInviteSearchQuery = useDebounce(inviteSearchQuery, 250);
 
   // ─────────────────────────────────────────────────────────────
   // 데이터 로딩
@@ -223,9 +284,16 @@ export default function ClanSettingsPage() {
       }
 
       // 폼 초기값 세팅
+      setName(data.name || "");
       setDescription(data.description || "");
       setDiscord(data.discord || "");
       setIsRecruiting(data.isRecruiting);
+      setMinTier(data.minTier || "");
+      setMaxMembers(String(data.maxMembers ?? 50));
+      setOfficerCanManageSettings(data.officerCanManageSettings);
+      setOfficerCanManageMembers(data.officerCanManageMembers);
+      setOfficerCanManageAnnouncements(data.officerCanManageAnnouncements);
+      setOfficerCanManageInvitations(data.officerCanManageInvitations);
     } catch {
       addToast("클랜 정보를 불러오는데 실패했습니다.", "error");
       router.push(`/clans/${clanId}`);
@@ -246,6 +314,36 @@ export default function ClanSettingsPage() {
       setIsLoadingRequests(false);
     }
   }, [clanId]);
+
+  const fetchSentInvitations = useCallback(async () => {
+    setIsLoadingInvitations(true);
+    try {
+      const data = await clanApi.getSentInvitations(clanId);
+      setSentInvitations(data);
+    } catch {
+      // 조용히 처리
+    } finally {
+      setIsLoadingInvitations(false);
+    }
+  }, [clanId]);
+
+  const searchInviteCandidates = useCallback(async (query: string) => {
+    const normalized = query.trim();
+    if (normalized.length < 2) {
+      setInviteSearchResults([]);
+      return;
+    }
+
+    setIsSearchingUsers(true);
+    try {
+      const data = await statsApi.searchUsers(normalized, 8);
+      setInviteSearchResults(data);
+    } catch {
+      setInviteSearchResults([]);
+    } finally {
+      setIsSearchingUsers(false);
+    }
+  }, []);
 
   // 활동 로그 로드 (커서 페이지네이션)
   const fetchActivityLogs = useCallback(
@@ -282,9 +380,14 @@ export default function ClanSettingsPage() {
   useEffect(() => {
     if (myRole && myRole !== "MEMBER") {
       fetchJoinRequests();
+      fetchSentInvitations();
       fetchActivityLogs();
     }
-  }, [myRole, fetchJoinRequests, fetchActivityLogs]);
+  }, [myRole, fetchJoinRequests, fetchSentInvitations, fetchActivityLogs]);
+
+  useEffect(() => {
+    searchInviteCandidates(debouncedInviteSearchQuery);
+  }, [debouncedInviteSearchQuery, searchInviteCandidates]);
 
   // ─────────────────────────────────────────────────────────────
   // 클랜 정보 수정
@@ -293,11 +396,41 @@ export default function ClanSettingsPage() {
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      await clanApi.updateClan(clanId, {
+      const payload: {
+        name?: string;
+        description?: string;
+        discord?: string;
+        isRecruiting?: boolean;
+        minTier?: string;
+        maxMembers?: number;
+        officerCanManageSettings?: boolean;
+        officerCanManageMembers?: boolean;
+        officerCanManageAnnouncements?: boolean;
+        officerCanManageInvitations?: boolean;
+      } = {
         description: description.trim() || undefined,
         discord: discord.trim() || undefined,
         isRecruiting,
-      });
+      };
+
+      if (isOwner) {
+        payload.name = name.trim() || undefined;
+        payload.minTier = minTier || undefined;
+
+        const parsedMaxMembers = Number(maxMembers);
+        if (!Number.isInteger(parsedMaxMembers) || parsedMaxMembers < 2) {
+          addToast("클랜 정원은 2명 이상의 정수여야 합니다.", "error");
+          setIsSubmitting(false);
+          return;
+        }
+        payload.maxMembers = parsedMaxMembers;
+        payload.officerCanManageSettings = officerCanManageSettings;
+        payload.officerCanManageMembers = officerCanManageMembers;
+        payload.officerCanManageAnnouncements = officerCanManageAnnouncements;
+        payload.officerCanManageInvitations = officerCanManageInvitations;
+      }
+
+      await clanApi.updateClan(clanId, payload);
       addToast("클랜 정보가 수정되었습니다.", "success");
       fetchClan();
     } catch (err: any) {
@@ -432,15 +565,14 @@ export default function ClanSettingsPage() {
   // ─────────────────────────────────────────────────────────────
   // 유저 직접 초대
   // ─────────────────────────────────────────────────────────────
-  const handleInviteUser = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!inviteUserId.trim()) return;
+  const handleInviteUser = async (inviteeId: string) => {
     setIsInviting(true);
     try {
-      await clanApi.inviteUser(clanId, inviteUserId.trim());
+      await clanApi.inviteUser(clanId, inviteeId);
       addToast("초대를 보냈습니다.", "success");
-      setInviteUserId("");
       setInviteSearchQuery("");
+      setInviteSearchResults([]);
+      fetchSentInvitations();
     } catch (err: any) {
       addToast(
         err.response?.data?.message || "초대에 실패했습니다.",
@@ -448,6 +580,22 @@ export default function ClanSettingsPage() {
       );
     } finally {
       setIsInviting(false);
+    }
+  };
+
+  const handleCancelInvitation = async (invitationId: string) => {
+    setCancelingInvitationId(invitationId);
+    try {
+      await clanApi.cancelInvitation(clanId, invitationId);
+      addToast("초대를 취소했습니다.", "success");
+      setSentInvitations((prev) => prev.filter((inv) => inv.id !== invitationId));
+    } catch (err: any) {
+      addToast(
+        err.response?.data?.message || "초대 취소에 실패했습니다.",
+        "error"
+      );
+    } finally {
+      setCancelingInvitationId(null);
     }
   };
 
@@ -461,6 +609,11 @@ export default function ClanSettingsPage() {
       addToast(accept ? "가입 요청을 수락했습니다." : "가입 요청을 거절했습니다.", "success");
       // 목록에서 제거
       setJoinRequests((prev) => prev.filter((r) => r.id !== requestId));
+      setSelectedJoinRequestIds((prev) => {
+        const next = new Set(prev);
+        next.delete(requestId);
+        return next;
+      });
       if (accept) fetchClan(); // 멤버 목록 갱신
     } catch (err: any) {
       addToast(
@@ -472,10 +625,50 @@ export default function ClanSettingsPage() {
     }
   };
 
+  const handleBulkResolveRequests = async (accept: boolean) => {
+    const requestIds = Array.from(selectedJoinRequestIds);
+    if (requestIds.length === 0) return;
+
+    setIsBulkResolvingRequests(true);
+    try {
+      await Promise.all(
+        requestIds.map((requestId) =>
+          clanApi.resolveJoinRequest(clanId, requestId, accept)
+        )
+      );
+      addToast(
+        accept
+          ? `${requestIds.length}개의 가입 요청을 수락했습니다.`
+          : `${requestIds.length}개의 가입 요청을 거절했습니다.`,
+        "success"
+      );
+      setJoinRequests((prev) => prev.filter((r) => !selectedJoinRequestIds.has(r.id)));
+      setSelectedJoinRequestIds(new Set());
+      if (accept) fetchClan();
+    } catch (err: any) {
+      addToast(
+        err.response?.data?.message || "일괄 처리에 실패했습니다.",
+        "error"
+      );
+    } finally {
+      setIsBulkResolvingRequests(false);
+    }
+  };
+
   // ─────────────────────────────────────────────────────────────
   // 파생 값 계산
   // ─────────────────────────────────────────────────────────────
   const isOwner = myRole === "OWNER";
+  const canManageSettings = isOwner || (myRole === "OFFICER" && clan?.officerCanManageSettings);
+  const canManageMembers = isOwner || (myRole === "OFFICER" && clan?.officerCanManageMembers);
+  const canManageInvitations =
+    isOwner || (myRole === "OFFICER" && clan?.officerCanManageInvitations);
+  const memberUserIds = new Set((clan?.members ?? []).map((member) => member.userId));
+  const invitedUserIds = new Set(
+    sentInvitations
+      .map((invitation) => invitation.invitee?.id)
+      .filter((id): id is string => Boolean(id))
+  );
 
   // 멤버 검색 필터 적용
   const filteredMembers = (clan?.members ?? [])
@@ -526,6 +719,136 @@ export default function ClanSettingsPage() {
             </CardHeader>
             <CardContent>
               <form onSubmit={handleUpdateClan} className="space-y-5">
+                {!canManageSettings && (
+                  <div className="rounded-lg border border-bg-elevated bg-bg-secondary px-3 py-3 text-sm text-text-tertiary">
+                    현재 이 클랜에서는 임원이 클랜 정보 수정 권한을 갖고 있지 않습니다.
+                  </div>
+                )}
+
+                {isOwner && (
+                  <>
+                    <div>
+                      <Label htmlFor="name">클랜 이름</Label>
+                      <Input
+                        id="name"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        placeholder="클랜 이름"
+                        maxLength={50}
+                        className="mt-1"
+                      />
+                      <p className="text-xs text-text-tertiary mt-1">
+                        {name.length}/50
+                      </p>
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div>
+                        <Label htmlFor="minTier">가입 최소 티어</Label>
+                        <select
+                          id="minTier"
+                          value={minTier}
+                          onChange={(e) => setMinTier(e.target.value)}
+                          className="mt-1 w-full px-3 py-2 bg-bg-tertiary border border-bg-elevated rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-primary"
+                        >
+                          <option value="">제한 없음</option>
+                          {CLAN_TIERS.map((tier) => (
+                            <option key={tier} value={tier}>
+                              {tier}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <Label htmlFor="maxMembers">클랜 정원</Label>
+                        <Input
+                          id="maxMembers"
+                          type="number"
+                          min={Math.max(clan.members.length, 2)}
+                          max={100}
+                          value={maxMembers}
+                          onChange={(e) => setMaxMembers(e.target.value)}
+                          className="mt-1"
+                        />
+                        <p className="text-xs text-text-tertiary mt-1">
+                          현재 인원보다 작게 설정할 수 없습니다.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border border-bg-elevated bg-bg-secondary/60 p-4 space-y-3">
+                      <div>
+                        <p className="text-sm font-semibold text-text-primary">
+                          임원 권한 정책
+                        </p>
+                        <p className="text-xs text-text-tertiary mt-1">
+                          클랜장이 임원의 관리 범위를 직접 제한할 수 있습니다.
+                        </p>
+                      </div>
+
+                      {[
+                        {
+                          key: "settings",
+                          label: "클랜 정보 수정",
+                          description: "소개, 디스코드, 모집 상태를 수정할 수 있습니다.",
+                          enabled: officerCanManageSettings,
+                          onToggle: setOfficerCanManageSettings,
+                        },
+                        {
+                          key: "members",
+                          label: "멤버 관리",
+                          description: "일반 멤버 추방을 처리할 수 있습니다.",
+                          enabled: officerCanManageMembers,
+                          onToggle: setOfficerCanManageMembers,
+                        },
+                        {
+                          key: "announcements",
+                          label: "공지 관리",
+                          description: "공지 작성과 삭제를 처리할 수 있습니다.",
+                          enabled: officerCanManageAnnouncements,
+                          onToggle: setOfficerCanManageAnnouncements,
+                        },
+                        {
+                          key: "invitations",
+                          label: "초대 및 가입 요청",
+                          description: "초대 발송과 가입 요청 승인/거절을 처리할 수 있습니다.",
+                          enabled: officerCanManageInvitations,
+                          onToggle: setOfficerCanManageInvitations,
+                        },
+                      ].map((permission) => (
+                        <div
+                          key={permission.key}
+                          className="flex items-center justify-between gap-4 rounded-lg bg-bg-tertiary px-3 py-2"
+                        >
+                          <div>
+                            <p className="text-sm font-medium text-text-primary">
+                              {permission.label}
+                            </p>
+                            <p className="text-xs text-text-tertiary">
+                              {permission.description}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => permission.onToggle(!permission.enabled)}
+                            aria-label={`${permission.label} 권한 토글`}
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                              permission.enabled ? "bg-accent-primary" : "bg-bg-elevated"
+                            }`}
+                          >
+                            <span
+                              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                permission.enabled ? "translate-x-6" : "translate-x-1"
+                              }`}
+                            />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+
                 {/* 소개 */}
                 <div>
                   <Label htmlFor="description">클랜 소개</Label>
@@ -533,6 +856,7 @@ export default function ClanSettingsPage() {
                     id="description"
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
+                    disabled={!canManageSettings}
                     placeholder="클랜을 소개해주세요"
                     rows={4}
                     maxLength={500}
@@ -550,6 +874,7 @@ export default function ClanSettingsPage() {
                     id="discord"
                     value={discord}
                     onChange={(e) => setDiscord(e.target.value)}
+                    disabled={!canManageSettings}
                     placeholder="https://discord.gg/..."
                     className="mt-1"
                   />
@@ -565,6 +890,7 @@ export default function ClanSettingsPage() {
                   </div>
                   <button
                     type="button"
+                    disabled={!canManageSettings}
                     onClick={() => setIsRecruiting(!isRecruiting)}
                     aria-label={isRecruiting ? "모집 중지" : "모집 시작"}
                     className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
@@ -580,7 +906,11 @@ export default function ClanSettingsPage() {
                 </div>
 
                 <div className="flex justify-end">
-                  <Button type="submit" isLoading={isSubmitting}>
+                  <Button
+                    type="submit"
+                    isLoading={isSubmitting}
+                    disabled={!canManageSettings}
+                  >
                     변경 사항 저장
                   </Button>
                 </div>
@@ -624,6 +954,11 @@ export default function ClanSettingsPage() {
 
             {/* 멤버 목록 */}
             <CardContent className="p-0">
+              {!canManageMembers && (
+                <div className="px-4 py-3 text-sm text-text-tertiary border-t border-bg-tertiary">
+                  현재 이 클랜에서는 임원이 멤버 관리 권한을 갖고 있지 않습니다.
+                </div>
+              )}
               <div className="divide-y divide-bg-tertiary">
                 {filteredMembers.map((member) => {
                   const isMe = member.userId === user?.id;
@@ -635,7 +970,9 @@ export default function ClanSettingsPage() {
                     !isMe &&
                     !isMemberOwner &&
                     (isOwner ||
-                      (myRole === "OFFICER" && !isMemberOfficer));
+                      (canManageMembers &&
+                        myRole === "OFFICER" &&
+                        !isMemberOfficer));
                   const canPromote =
                     isOwner && !isMe && !isMemberOwner && !isMemberOfficer;
                   const canDemote = isOwner && !isMe && isMemberOfficer;
@@ -819,6 +1156,11 @@ export default function ClanSettingsPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
+              {!canManageInvitations && (
+                <div className="rounded-lg border border-bg-elevated bg-bg-secondary px-3 py-3 text-sm text-text-tertiary">
+                  현재 이 클랜에서는 임원이 초대 및 가입 요청 관리 권한을 갖고 있지 않습니다.
+                </div>
+              )}
               {/* 초대 코드 생성/복사 */}
               <div>
                 <h3 className="text-sm font-semibold text-text-primary mb-2">
@@ -842,6 +1184,7 @@ export default function ClanSettingsPage() {
                       size="sm"
                       onClick={handleGenerateInviteCode}
                       isLoading={isGeneratingCode}
+                      disabled={!canManageInvitations}
                       title="새 코드 생성"
                     >
                       <RefreshCw className="h-4 w-4" />
@@ -853,6 +1196,7 @@ export default function ClanSettingsPage() {
                     size="sm"
                     onClick={handleGenerateInviteCode}
                     isLoading={isGeneratingCode}
+                    disabled={!canManageInvitations}
                   >
                     <RefreshCw className="h-4 w-4 mr-2" />
                     초대 코드 생성
@@ -871,28 +1215,181 @@ export default function ClanSettingsPage() {
                 <h3 className="text-sm font-semibold text-text-primary mb-2">
                   유저 직접 초대
                 </h3>
-                <form onSubmit={handleInviteUser} className="flex gap-2">
-                  <Input
-                    placeholder="유저 ID를 입력하세요"
-                    value={inviteUserId}
-                    onChange={(e) => {
-                      setInviteUserId(e.target.value);
-                      setInviteSearchQuery(e.target.value);
-                    }}
-                    className="flex-1"
-                  />
-                  <Button
-                    type="submit"
-                    size="sm"
-                    isLoading={isInviting}
-                    disabled={!inviteUserId.trim()}
-                  >
-                    초대
-                  </Button>
-                </form>
+                <div className="rounded-xl border border-bg-elevated bg-bg-secondary/70 p-3">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-tertiary" />
+                    <Input
+                      placeholder="유저명으로 검색하세요"
+                      value={inviteSearchQuery}
+                      onChange={(e) => setInviteSearchQuery(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+
+                  <div className="mt-3 rounded-lg border border-dashed border-bg-elevated bg-bg-tertiary/60">
+                    {inviteSearchQuery.trim().length < 2 ? (
+                      <div className="flex items-center gap-2 px-3 py-4 text-sm text-text-tertiary">
+                        <Sparkles className="h-4 w-4" />
+                        두 글자 이상 입력하면 초대 가능한 유저를 검색합니다.
+                      </div>
+                    ) : isSearchingUsers ? (
+                      <div className="flex justify-center py-4">
+                        <LoadingSpinner size="sm" />
+                      </div>
+                    ) : inviteSearchResults.length === 0 ? (
+                      <p className="px-3 py-4 text-sm text-text-tertiary">
+                        검색 결과가 없습니다.
+                      </p>
+                    ) : (
+                      <div className="divide-y divide-bg-elevated">
+                        {inviteSearchResults.map((candidate) => {
+                          const isMemberCandidate = memberUserIds.has(candidate.id);
+                          const isInvitedCandidate = invitedUserIds.has(candidate.id);
+                          const canInvite =
+                            !isMemberCandidate && !isInvitedCandidate && !isInviting;
+
+                          return (
+                            <div
+                              key={candidate.id}
+                              className="flex items-center justify-between gap-3 px-3 py-3"
+                            >
+                              <div className="flex items-center gap-3 min-w-0">
+                                <div className="relative w-10 h-10 rounded-full bg-bg-elevated overflow-hidden flex-shrink-0">
+                                  {candidate.avatar ? (
+                                    <Image
+                                      src={candidate.avatar}
+                                      alt={candidate.username}
+                                      fill
+                                      className="object-cover"
+                                      unoptimized
+                                    />
+                                  ) : (
+                                    <div className="w-full h-full flex items-center justify-center">
+                                      <Users className="h-4 w-4 text-text-tertiary" />
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <p className="text-sm font-medium text-text-primary truncate">
+                                      {candidate.username}
+                                    </p>
+                                    {isMemberCandidate && (
+                                      <Badge variant="secondary" size="sm">
+                                        이미 멤버
+                                      </Badge>
+                                    )}
+                                    {isInvitedCandidate && (
+                                      <Badge variant="primary" size="sm">
+                                        초대 대기중
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <p className="text-xs text-text-tertiary truncate">
+                                    {candidate.primaryRiotAccount
+                                      ? `${candidate.primaryRiotAccount.gameName}#${candidate.primaryRiotAccount.tagLine}${
+                                          candidate.primaryRiotAccount.tier
+                                            ? ` · ${candidate.primaryRiotAccount.tier}`
+                                            : ""
+                                        }`
+                                      : "대표 라이엇 계정 정보 없음"}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant={canInvite ? "secondary" : "ghost"}
+                                disabled={!canInvite || !canManageInvitations}
+                                isLoading={isInviting}
+                                onClick={() => handleInviteUser(candidate.id)}
+                              >
+                                <UserRoundPlus className="h-4 w-4 mr-1.5" />
+                                초대
+                              </Button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
                 <p className="text-xs text-text-tertiary mt-1">
-                  초대할 유저의 ID를 정확히 입력해주세요.
+                  이미 멤버이거나 초대한 유저는 목록에서 상태로 구분됩니다.
                 </p>
+              </div>
+
+              <div>
+                <h3 className="text-sm font-semibold text-text-primary mb-2 flex items-center gap-2">
+                  보낸 초대
+                  {sentInvitations.length > 0 && (
+                    <span className="bg-accent-primary text-white text-xs px-1.5 py-0.5 rounded-full">
+                      {sentInvitations.length}
+                    </span>
+                  )}
+                </h3>
+
+                {isLoadingInvitations ? (
+                  <div className="flex justify-center py-4">
+                    <LoadingSpinner size="sm" />
+                  </div>
+                ) : sentInvitations.length === 0 ? (
+                  <p className="text-text-tertiary text-sm py-2">
+                    대기 중인 초대가 없습니다.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {sentInvitations.map((invitation) => (
+                      <div
+                        key={invitation.id}
+                        className="flex items-center justify-between gap-3 p-3 bg-bg-tertiary rounded-lg"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-8 h-8 rounded-full bg-bg-elevated overflow-hidden flex-shrink-0">
+                            {invitation.invitee?.avatar ? (
+                              <Image
+                                src={invitation.invitee.avatar}
+                                alt={invitation.invitee.username}
+                                width={32}
+                                height={32}
+                                className="object-cover"
+                                unoptimized
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <Users className="h-4 w-4 text-text-tertiary" />
+                              </div>
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-text-primary truncate">
+                              {invitation.invitee?.username ?? invitation.invitee?.id ?? "알 수 없는 유저"}
+                            </p>
+                            <p className="text-xs text-text-tertiary">
+                              발송: {new Date(invitation.createdAt).toLocaleDateString("ko-KR")} ·
+                              만료: {new Date(invitation.expiresAt).toLocaleDateString("ko-KR")}
+                            </p>
+                          </div>
+                        </div>
+
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          disabled={
+                            cancelingInvitationId === invitation.id || !canManageInvitations
+                          }
+                          isLoading={cancelingInvitationId === invitation.id}
+                          onClick={() => handleCancelInvitation(invitation.id)}
+                        >
+                          취소
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* 가입 요청 목록 */}
@@ -916,12 +1413,80 @@ export default function ClanSettingsPage() {
                   </p>
                 ) : (
                   <div className="space-y-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-bg-elevated bg-bg-secondary px-3 py-2">
+                      <label className="flex items-center gap-2 text-xs text-text-secondary">
+                        <input
+                          type="checkbox"
+                          checked={
+                            joinRequests.length > 0 &&
+                            selectedJoinRequestIds.size === joinRequests.length
+                          }
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedJoinRequestIds(
+                                new Set(joinRequests.map((request) => request.id))
+                              );
+                            } else {
+                              setSelectedJoinRequestIds(new Set());
+                            }
+                          }}
+                          className="w-4 h-4 rounded border-bg-elevated accent-accent-primary cursor-pointer"
+                        />
+                        전체 선택
+                      </label>
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="secondary"
+                          disabled={
+                            selectedJoinRequestIds.size === 0 ||
+                            isBulkResolvingRequests ||
+                            !canManageInvitations
+                          }
+                          isLoading={isBulkResolvingRequests}
+                          onClick={() => handleBulkResolveRequests(true)}
+                        >
+                          선택 수락 ({selectedJoinRequestIds.size})
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          disabled={
+                            selectedJoinRequestIds.size === 0 ||
+                            isBulkResolvingRequests ||
+                            !canManageInvitations
+                          }
+                          onClick={() => handleBulkResolveRequests(false)}
+                        >
+                          선택 거절 ({selectedJoinRequestIds.size})
+                        </Button>
+                      </div>
+                    </div>
+
                     {joinRequests.map((request) => (
                       <div
                         key={request.id}
                         className="flex items-center justify-between p-3 bg-bg-tertiary rounded-lg"
                       >
                         <div className="flex items-center gap-3">
+                          <input
+                            type="checkbox"
+                            checked={selectedJoinRequestIds.has(request.id)}
+                            onChange={(e) => {
+                              setSelectedJoinRequestIds((prev) => {
+                                const next = new Set(prev);
+                                if (e.target.checked) {
+                                  next.add(request.id);
+                                } else {
+                                  next.delete(request.id);
+                                }
+                                return next;
+                              });
+                            }}
+                            className="w-4 h-4 rounded border-bg-elevated accent-accent-primary cursor-pointer"
+                          />
                           <div className="w-8 h-8 rounded-full bg-bg-elevated overflow-hidden flex-shrink-0">
                             {request.user.avatar ? (
                               <Image
@@ -952,7 +1517,11 @@ export default function ClanSettingsPage() {
                         <div className="flex gap-1">
                           <button
                             onClick={() => handleResolveRequest(request.id, true)}
-                            disabled={resolvingRequestId === request.id}
+                            disabled={
+                              resolvingRequestId === request.id ||
+                              isBulkResolvingRequests ||
+                              !canManageInvitations
+                            }
                             className="p-1.5 rounded-lg bg-accent-success/10 text-accent-success hover:bg-accent-success/20 transition-colors disabled:opacity-50"
                             aria-label="수락"
                           >
@@ -960,7 +1529,11 @@ export default function ClanSettingsPage() {
                           </button>
                           <button
                             onClick={() => handleResolveRequest(request.id, false)}
-                            disabled={resolvingRequestId === request.id}
+                            disabled={
+                              resolvingRequestId === request.id ||
+                              isBulkResolvingRequests ||
+                              !canManageInvitations
+                            }
                             className="p-1.5 rounded-lg bg-accent-danger/10 text-accent-danger hover:bg-accent-danger/20 transition-colors disabled:opacity-50"
                             aria-label="거절"
                           >

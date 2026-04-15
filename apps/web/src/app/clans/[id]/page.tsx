@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
@@ -40,8 +41,28 @@ import {
   Trash2,
   KeyRound,
 } from "lucide-react";
-import { ClanChat } from "@/components/domain/ClanChat";
-import { ClanStats } from "@/components/domain/ClanStats";
+
+const ClanChat = dynamic(
+  () => import("@/components/domain/ClanChat").then((mod) => mod.ClanChat),
+  {
+    loading: () => (
+      <div className="flex h-full items-center justify-center">
+        <LoadingSpinner size="sm" />
+      </div>
+    ),
+  }
+);
+
+const ClanStats = dynamic(
+  () => import("@/components/domain/ClanStats").then((mod) => mod.ClanStats),
+  {
+    loading: () => (
+      <div className="flex justify-center py-8">
+        <LoadingSpinner size="sm" />
+      </div>
+    ),
+  }
+);
 
 // ─────────────────────────────────────────────────────────────
 // 타입 정의
@@ -77,6 +98,10 @@ interface Clan {
   maxMembers: number;
   minTier: string | null;
   discord: string | null;
+  officerCanManageSettings: boolean;
+  officerCanManageMembers: boolean;
+  officerCanManageAnnouncements: boolean;
+  officerCanManageInvitations: boolean;
   createdAt: string;
   members: ClanMember[];
   owner: {
@@ -465,9 +490,16 @@ export default function ClanDetailPage() {
 
   const isOwner = user?.id === clan.ownerId;
   const isOfficer = myRole === "OFFICER";
-  const canManage = isOwner || isOfficer;
-  // 관리자(OWNER/OFFICER)는 공지 작성/삭제 가능
-  const canPost = isMember && canManage;
+  const canManage =
+    isOwner ||
+    (isOfficer &&
+      (clan.officerCanManageSettings ||
+        clan.officerCanManageMembers ||
+        clan.officerCanManageAnnouncements ||
+        clan.officerCanManageInvitations));
+  const canPost =
+    isMember &&
+    (isOwner || (isOfficer && clan.officerCanManageAnnouncements));
 
   // 멤버를 역할 순서로 정렬 (OWNER → OFFICER → MEMBER)
   const sortedMembers = clan.members.slice().sort((a, b) => {

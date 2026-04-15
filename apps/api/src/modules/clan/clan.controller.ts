@@ -313,6 +313,14 @@ export class ClanController {
     return this.clanService.getPendingInvitations(userId);
   }
 
+  @Get(":id/invitations/sent")
+  async getSentInvitations(
+    @CurrentUser("sub") userId: string,
+    @Param("id") clanId: string,
+  ) {
+    return this.clanService.getSentInvitations(userId, clanId);
+  }
+
   // 초대 코드로 가입
   @Post("join-by-code")
   @HttpCode(HttpStatus.OK)
@@ -348,6 +356,16 @@ export class ClanController {
     @Body() body: InviteUserDto,
   ) {
     return this.clanService.inviteUser(userId, clanId, body.inviteeId);
+  }
+
+  @Delete(":id/invitations/:invitationId")
+  @HttpCode(HttpStatus.OK)
+  async cancelInvitation(
+    @CurrentUser("sub") userId: string,
+    @Param("id") clanId: string,
+    @Param("invitationId") invitationId: string,
+  ) {
+    return this.clanService.cancelInvitation(userId, clanId, invitationId);
   }
 
   // 가입 요청 보내기

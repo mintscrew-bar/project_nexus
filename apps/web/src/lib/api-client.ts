@@ -565,7 +565,12 @@ export const riotApi = {
 
 // 클랜 관련 API
 export const clanApi = {
-  getClans: async (params?: { search?: string; isRecruiting?: boolean }) => {
+  getClans: async (params?: {
+    search?: string;
+    isRecruiting?: boolean;
+    minTier?: string;
+    sort?: string;
+  }) => {
     const response = await apiClient.get("/clans", { params });
     return response.data;
   },
@@ -592,7 +597,18 @@ export const clanApi = {
 
   updateClan: async (
     clanId: string,
-    data: { name?: string; description?: string; isRecruiting?: boolean; maxMembers?: number; minTier?: string; discord?: string }
+    data: {
+      name?: string;
+      description?: string;
+      isRecruiting?: boolean;
+      maxMembers?: number;
+      minTier?: string;
+      discord?: string;
+      officerCanManageSettings?: boolean;
+      officerCanManageMembers?: boolean;
+      officerCanManageAnnouncements?: boolean;
+      officerCanManageInvitations?: boolean;
+    }
   ) => {
     const response = await apiClient.patch(`/clans/${clanId}`, data);
     return response.data;
@@ -686,6 +702,18 @@ export const clanApi = {
     const response = await apiClient.post(`/clans/${clanId}/invite`, {
       inviteeId,
     });
+    return response.data;
+  },
+
+  getSentInvitations: async (clanId: string) => {
+    const response = await apiClient.get(`/clans/${clanId}/invitations/sent`);
+    return response.data;
+  },
+
+  cancelInvitation: async (clanId: string, invitationId: string) => {
+    const response = await apiClient.delete(
+      `/clans/${clanId}/invitations/${invitationId}`,
+    );
     return response.data;
   },
 

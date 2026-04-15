@@ -28,11 +28,6 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-interface ClanMember {
-  id: string;
-  role: "OWNER" | "OFFICER" | "MEMBER";
-}
-
 interface Clan {
   id: string;
   name: string;
@@ -43,11 +38,13 @@ interface Clan {
   maxMembers: number;
   minTier: string | null;
   discord: string | null;
-  members: ClanMember[];
   owner: {
     id: string;
     username: string;
     avatar: string | null;
+  };
+  _count: {
+    members: number;
   };
 }
 
@@ -179,7 +176,7 @@ export default function ClansPage() {
         search: debouncedSearchQuery || undefined,
         isRecruiting: showRecruitingOnly || undefined,
         sort: sortOption,
-      } as any);
+      });
       setClans(data);
     } catch (err: any) {
       setError(err.message || "클랜 목록을 불러오는데 실패했습니다.");
@@ -346,7 +343,7 @@ export default function ClansPage() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 stagger-children">
               {clans.map((clan) => {
-                const memberCount = clan.members.length;
+                const memberCount = clan._count.members;
                 const isFull = memberCount >= clan.maxMembers;
                 const fillPercent = Math.min(
                   (memberCount / clan.maxMembers) * 100,

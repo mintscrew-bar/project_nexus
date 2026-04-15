@@ -493,6 +493,10 @@ model Clan {
   updatedAt     DateTime           @updatedAt
   minTier       String?
   discord       String?
+  officerCanManageSettings      Boolean @default(true)
+  officerCanManageMembers       Boolean @default(true)
+  officerCanManageAnnouncements Boolean @default(true)
+  officerCanManageInvitations   Boolean @default(true)
   activityLogs  ClanActivityLog[]
   announcements ClanAnnouncement[]
   chatMessages  ClanChatMessage[]
