@@ -18,6 +18,7 @@ import {
 import { useDdragonVersion } from "@/hooks/useDdragonVersion";
 import type { SummonerData, ChampionStats, NexusMatchHistory } from "@/components/matches/match-utils";
 import { getQueueTypeName } from "@/components/matches/match-utils";
+import { getChampionKoreanName } from "@nexus/types";
 import RecentStatsSummary from "@/components/matches/RecentStatsSummary";
 import RiotMatchList from "@/components/matches/RiotMatchList";
 
@@ -648,7 +649,7 @@ export default function SummonerStatsPage() {
                             />
                             <div>
                               <p className="font-semibold text-text-primary text-sm">
-                                {stat.championName}
+                                {getChampionKoreanName(stat.championName)}
                               </p>
                               <p className="text-xs text-text-tertiary">
                                 {stat.games}게임 · {stat.wins}승 {stat.losses}패

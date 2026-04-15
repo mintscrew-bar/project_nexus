@@ -11,6 +11,7 @@ import { ArrowLeft, User, Trophy, Target, TrendingUp, Calendar, ExternalLink } f
 import Link from "next/link";
 
 import { getChampionIcon } from "@/components/matches/match-utils";
+import { getChampionKoreanName } from "@nexus/types";
 import type { RiotAccount, NexusMatchHistory } from "@/components/matches/match-utils";
 import RecentStatsSummary from "@/components/matches/RecentStatsSummary";
 import RiotMatchList from "@/components/matches/RiotMatchList";
@@ -411,7 +412,7 @@ export default function UserStatsPage() {
                             </span>
                           </div>
                           <p className="text-sm font-semibold text-text-primary">
-                            {match.participant.championName}
+                            {getChampionKoreanName(match.participant.championName)}
                           </p>
                           <p className="text-xs text-text-tertiary">
                             {match.team.name}
@@ -486,7 +487,7 @@ export default function UserStatsPage() {
                           />
                           <div>
                             <p className="font-semibold text-text-primary text-sm">
-                              {stat.championName}
+                              {getChampionKoreanName(stat.championName)}
                             </p>
                             <p className="text-xs text-text-tertiary">
                               {stat.wins}승 {stat.losses}패

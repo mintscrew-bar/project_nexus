@@ -29,6 +29,7 @@ import {
   Crosshair,
 } from "lucide-react";
 import { Button } from "@/components/ui";
+import { getChampionKoreanName } from "@nexus/types";
 
 
 // ─── Main Component ──────────────────────────────────
@@ -258,7 +259,7 @@ export default function RiotMatchList({
                         <span className="text-[10px] sm:text-xs text-text-secondary truncate hidden sm:inline">{getQueueTypeName(match.info.queueId)}</span>
                       </div>
                       <div className="text-[10px] sm:text-xs text-text-tertiary">{gameDurationMin}:{gameDurationSec.toString().padStart(2, '0')} · {timeAgo}</div>
-                      <div className="text-[10px] sm:text-xs text-text-tertiary truncate">{participant.championName}</div>
+                      <div className="text-[10px] sm:text-xs text-text-tertiary truncate">{getChampionKoreanName(participant.championName)}</div>
 
                       {/* 데스크탑: 소환사 주문 + 룬 (sm 이상) */}
                       <div className="hidden sm:flex gap-0.5 items-center mt-1">

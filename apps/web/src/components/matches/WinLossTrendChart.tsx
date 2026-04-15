@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { getQueueTypeName } from "./match-utils";
+import { getChampionKoreanName } from "@nexus/types";
 
 interface GameResult {
   win: boolean;
@@ -123,7 +124,7 @@ export default function WinLossTrendChart({ games }: WinLossTrendChartProps) {
               <span className={`font-bold ${games[hoverIdx].win ? "text-accent-success" : "text-accent-danger"}`}>
                 {games[hoverIdx].win ? "승" : "패"}
               </span>
-              <span className="text-text-secondary">{games[hoverIdx].championName}</span>
+              <span className="text-text-secondary">{getChampionKoreanName(games[hoverIdx].championName)}</span>
               {/* 큐 타입 뱃지 (전체 탭에서 큐 구분 표시) */}
               {games[hoverIdx].queueId !== undefined && (
                 <span className="text-text-muted text-[10px]">

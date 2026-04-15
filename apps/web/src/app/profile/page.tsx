@@ -606,7 +606,7 @@ export default function ProfilePage() {
                             </div>
                             <div className="min-w-0 flex-1">
                               <p className="text-sm font-medium text-text-primary truncate">
-                                {champ.championName || getChampionName(String(champ.championId))}
+                                {getChampionKoreanName(champ.championName || getChampionName(String(champ.championId)))}
                               </p>
                               <div className="flex items-center gap-2 text-xs text-text-tertiary">
                                 <span>{champ.games}게임</span>
@@ -675,7 +675,7 @@ export default function ProfilePage() {
                             </div>
                             <div className="min-w-0 flex-1">
                               <p className="text-sm font-medium text-text-primary truncate">
-                                {champ.championName}
+                                {getChampionKoreanName(champ.championName)}
                               </p>
                               <div className="flex items-center gap-2 text-xs text-text-tertiary">
                                 <span>{champ.games}게임</span>

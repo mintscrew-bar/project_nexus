@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { statsApi } from "@/lib/api-client";
 import { getChampionIcon, formatKDA, getQueueTypeName } from "./match-utils";
+import { getChampionKoreanName } from "@nexus/types";
 import type { NexusMatchHistory } from "./match-utils";
 import WinLossTrendChart from "./WinLossTrendChart";
 import Image from "next/image";
@@ -219,7 +220,7 @@ function KDATrendChart({ games }: { games: SummaryStats["games"] }) {
         >
           <div className="bg-bg-secondary/95 backdrop-blur-sm border border-bg-elevated rounded-lg shadow-xl px-2.5 py-1.5 text-[10px]">
             <div className="text-text-tertiary">
-              {games[hoverIdx].championName}
+              {getChampionKoreanName(games[hoverIdx].championName)}
               {/* 큐 타입 표시 (전체 탭 전용) */}
               {games[hoverIdx].queueId !== undefined && (
                 <span className="ml-1 text-text-muted">· {getQueueTypeName(games[hoverIdx].queueId!)}</span>
@@ -289,7 +290,7 @@ function CsPerMinTrendChart({ games }: { games: SummaryStats["games"] }) {
           style={{ left: `${Math.max(10, Math.min(85, ((toX(hoverIdx)) / W) * 100))}%`, transform: 'translateX(-50%)' }}
         >
           <div className="bg-bg-secondary/95 backdrop-blur-sm border border-bg-elevated rounded-lg shadow-xl px-2.5 py-1.5 text-[10px]">
-            <div className="text-text-tertiary">{games[hoverIdx].championName}</div>
+            <div className="text-text-tertiary">{getChampionKoreanName(games[hoverIdx].championName)}</div>
             <div className="font-bold text-accent-success">CS/분 {csValues[hoverIdx].toFixed(1)}</div>
             <div className={`text-[10px] ${games[hoverIdx].win ? 'text-accent-success' : 'text-accent-danger'}`}>
               {games[hoverIdx].win ? '승리' : '패배'}
@@ -402,7 +403,7 @@ function StatsDisplay({ stats, showCsPerMin }: { stats: SummaryStats; showCsPerM
                   className="w-7 h-7 rounded-full flex-shrink-0"
                   onError={(e) => { e.currentTarget.style.display = "none"; }}
                 />
-                <span className="text-xs text-text-primary w-20 truncate font-medium">{champ.championName}</span>
+                <span className="text-xs text-text-primary w-20 truncate font-medium">{getChampionKoreanName(champ.championName)}</span>
                 <span className="text-[11px] text-text-tertiary">{champ.games}게임</span>
                 <span className="text-[11px] text-text-tertiary mx-1">·</span>
                 <span className={`text-[11px] font-bold ${
