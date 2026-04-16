@@ -190,6 +190,93 @@ export class RiotMatchService {
     await new Promise((resolve) => setTimeout(resolve, waitMs));
   }
 
+  private async propagateKnownPuuids(matchData: MatchDto): Promise<void> {
+    const participantPuuids = Array.from(
+      new Set(matchData.metadata.participants.filter(Boolean)),
+    );
+
+    if (participantPuuids.length === 0) {
+      return;
+    }
+
+    const linkedAccounts = await this.prisma.riotAccount.findMany({
+      where: {
+        puuid: { in: participantPuuids },
+      },
+      select: {
+        puuid: true,
+        gameName: true,
+        tagLine: true,
+        userId: true,
+      },
+    });
+
+    const hasNexusUser = linkedAccounts.length > 0;
+
+    const existingRows = await this.prisma.knownPuuid.findMany({
+      where: { puuid: { in: participantPuuids } },
+      select: {
+        puuid: true,
+        priority: true,
+        isNexusUser: true,
+        gameName: true,
+        tagLine: true,
+      },
+    });
+
+    const existingMap = new Map(
+      existingRows.map((row) => [row.puuid, row]),
+    );
+    const linkedMap = new Map(
+      linkedAccounts.map((row) => [row.puuid, row]),
+    );
+
+    await Promise.all(
+      participantPuuids.map((puuid) => {
+        const existing = existingMap.get(puuid);
+        const linked = linkedMap.get(puuid);
+        const nextPriority = linked
+          ? Math.max(existing?.priority ?? 0, 10)
+          : Math.max(existing?.priority ?? 0, hasNexusUser ? 5 : 0);
+
+        return this.prisma.knownPuuid.upsert({
+          where: { puuid },
+          create: {
+            puuid,
+            gameName: linked?.gameName,
+            tagLine: linked?.tagLine,
+            priority: nextPriority,
+            isNexusUser: Boolean(linked),
+          },
+          update: {
+            gameName: linked?.gameName ?? existing?.gameName ?? undefined,
+            tagLine: linked?.tagLine ?? existing?.tagLine ?? undefined,
+            priority: nextPriority,
+            isNexusUser: Boolean(linked) || existing?.isNexusUser || false,
+          },
+        });
+      }),
+    );
+
+    await Promise.all(
+      Array.from(new Set(linkedAccounts.map((account) => account.userId))).map(
+        (userId) =>
+          this.prisma.statsRecomputeQueue.upsert({
+            where: { userId },
+            create: {
+              userId,
+              reason: "riot-match-added",
+              queuedAt: new Date(),
+            },
+            update: {
+              reason: "riot-match-added",
+              queuedAt: new Date(),
+            },
+          }),
+      ),
+    );
+  }
+
   /**
    * Get match data by match ID (with in-memory cache + 429 retry)
    */
@@ -246,7 +333,7 @@ export class RiotMatchService {
       // DB 영구 캐시 저장 (비동기 — 응답 지연 없이 저장)
       const queueId = matchData.info?.queueId ?? 0;
       const gameEndTs = matchData.info?.gameEndTimestamp ?? Date.now();
-      this.prisma.riotMatchCache
+      void this.prisma.riotMatchCache
         .upsert({
           where: { matchId },
           create: {
@@ -257,6 +344,7 @@ export class RiotMatchService {
           },
           update: {}, // 이미 존재하면 덮어쓰지 않음
         })
+        .then(() => this.propagateKnownPuuids(matchData))
         .catch((e: any) =>
           this.logger.warn(`DB cache write failed for ${matchId}: ${e}`),
         );

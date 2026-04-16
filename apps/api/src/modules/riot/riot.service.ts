@@ -88,6 +88,57 @@ export class RiotService {
     this.logger.log(`RiotService initialized (region: ${region})`);
   }
 
+  private async upsertKnownPuuid(
+    puuid: string,
+    options?: {
+      gameName?: string;
+      tagLine?: string;
+      priority?: number;
+      isNexusUser?: boolean;
+    },
+  ): Promise<void> {
+    const existing = await this.prisma.knownPuuid.findUnique({
+      where: { puuid },
+    });
+
+    const nextPriority = Math.max(existing?.priority ?? 0, options?.priority ?? 0);
+
+    await this.prisma.knownPuuid.upsert({
+      where: { puuid },
+      create: {
+        puuid,
+        gameName: options?.gameName,
+        tagLine: options?.tagLine,
+        priority: nextPriority,
+        isNexusUser: options?.isNexusUser ?? false,
+      },
+      update: {
+        gameName: options?.gameName ?? existing?.gameName ?? undefined,
+        tagLine: options?.tagLine ?? existing?.tagLine ?? undefined,
+        priority: nextPriority,
+        isNexusUser: options?.isNexusUser ?? existing?.isNexusUser ?? false,
+      },
+    });
+  }
+
+  private async enqueueStatsRecompute(
+    userId: string,
+    reason: string,
+  ): Promise<void> {
+    await this.prisma.statsRecomputeQueue.upsert({
+      where: { userId },
+      create: {
+        userId,
+        reason,
+        queuedAt: new Date(),
+      },
+      update: {
+        reason,
+        queuedAt: new Date(),
+      },
+    });
+  }
+
   private async request<T>(url: string): Promise<T> {
     // Rate limiting check (20 requests per second)
     const rateLimit = await this.redis.checkRateLimit("riot:api", 20, 1);
@@ -462,6 +513,14 @@ export class RiotService {
       });
     }
 
+    await this.upsertKnownPuuid(data.puuid, {
+      gameName: data.gameName,
+      tagLine: data.tagLine,
+      priority: 10,
+      isNexusUser: true,
+    });
+    await this.enqueueStatsRecompute(userId, "account-linked");
+
     // Clean up verification data
     await this.redis.del(`verify:${userId}`);
 
@@ -504,7 +563,7 @@ export class RiotService {
       ? { peakTier: ranked.tier, peakRank: ranked.rank }
       : {};
 
-    return this.prisma.riotAccount.update({
+    const updated = await this.prisma.riotAccount.update({
       where: { id: riotAccountId },
       data: {
         tier: ranked.tier,
@@ -514,6 +573,16 @@ export class RiotService {
         lastSyncedAt: new Date(),
       },
     });
+
+    await this.upsertKnownPuuid(account.puuid, {
+      gameName: account.gameName,
+      tagLine: account.tagLine,
+      priority: 10,
+      isNexusUser: true,
+    });
+    await this.enqueueStatsRecompute(userId, "rank-sync");
+
+    return updated;
   }
 
   async updateChampionPreferences(

@@ -6,6 +6,8 @@ import { RiotMatchService } from "../riot/riot-match.service";
 import { RiotService } from "../riot/riot.service";
 import { getChampionKoreanName } from "@nexus/types";
 
+export type QueueGroup = "ranked" | "normal" | "aram" | "custom" | "all";
+
 export interface ChampionStats {
   championId: number;
   championName: string;
@@ -34,6 +36,14 @@ export interface RankedChampStat {
   kills: number;
   deaths: number;
   assists: number;
+}
+
+export interface ChampionStatsCacheResponse {
+  queueGroup: QueueGroup;
+  matchCount: number;
+  isPartial: boolean;
+  computedAt: string;
+  stats: RankedChampStat[];
 }
 
 export interface PositionStats {
@@ -128,6 +138,508 @@ export class StatsService {
     private readonly riotMatchService: RiotMatchService,
     private readonly riotService: RiotService,
   ) {}
+
+  private readonly queueGroupToQueueIds: Record<
+    Exclude<QueueGroup, "custom" | "all">,
+    number[]
+  > = {
+    ranked: [420, 440],
+    normal: [400, 430],
+    aram: [450],
+  };
+
+  private getCurrentSeason(): string {
+    return String(new Date().getUTCFullYear());
+  }
+
+  private getSeasonStartDate(): Date {
+    return new Date(Date.UTC(new Date().getUTCFullYear(), 0, 1, 0, 0, 0, 0));
+  }
+
+  private getChampionStatsCacheKey(userId: string, queueGroup: QueueGroup): string {
+    return `stats:champ:${queueGroup}:${userId}`;
+  }
+
+  private toRankedChampStatArray(stats: unknown): RankedChampStat[] {
+    if (!Array.isArray(stats)) return [];
+    return stats as RankedChampStat[];
+  }
+
+  private aggregateParticipantRows(
+    rows: Array<{
+      championId: number;
+      championName: string;
+      kills: number;
+      deaths: number;
+      assists: number;
+      win: boolean;
+    }>,
+  ): RankedChampStat[] {
+    const statsMap = new Map<number, RankedChampStat>();
+
+    for (const row of rows) {
+      const existing = statsMap.get(row.championId);
+      if (existing) {
+        existing.games++;
+        if (row.win) existing.wins++;
+        else existing.losses++;
+        existing.kills += row.kills;
+        existing.deaths += row.deaths;
+        existing.assists += row.assists;
+        continue;
+      }
+
+      statsMap.set(row.championId, {
+        championId: row.championId,
+        championName: row.championName,
+        championNameKorean: getChampionKoreanName(row.championName),
+        games: 1,
+        wins: row.win ? 1 : 0,
+        losses: row.win ? 0 : 1,
+        kills: row.kills,
+        deaths: row.deaths,
+        assists: row.assists,
+      });
+    }
+
+    return Array.from(statsMap.values()).sort((a, b) => b.games - a.games);
+  }
+
+  private extractStatsFromRiotMatchCacheRows(
+    rows: Array<{ data: Prisma.JsonValue }>,
+    puuidSet: Set<string>,
+  ): { stats: RankedChampStat[]; matchCount: number } {
+    const participantRows = this.extractParticipantRowsFromRiotMatchCacheRows(
+      rows,
+      puuidSet,
+    );
+    return {
+      stats: this.aggregateParticipantRows(participantRows),
+      matchCount: participantRows.length,
+    };
+  }
+
+  private extractParticipantRowsFromRiotMatchCacheRows(
+    rows: Array<{ data: Prisma.JsonValue }>,
+    puuidSet: Set<string>,
+  ): Array<{
+    championId: number;
+    championName: string;
+    kills: number;
+    deaths: number;
+    assists: number;
+    win: boolean;
+  }> {
+    const participantRows: Array<{
+      championId: number;
+      championName: string;
+      kills: number;
+      deaths: number;
+      assists: number;
+      win: boolean;
+    }> = [];
+
+    for (const row of rows) {
+      const match = row.data as any;
+      const participants = match?.info?.participants;
+      if (!Array.isArray(participants)) continue;
+
+      const participant = participants.find((p: any) => puuidSet.has(p.puuid));
+      if (!participant) continue;
+
+      participantRows.push({
+        championId: participant.championId,
+        championName: participant.championName,
+        kills: participant.kills ?? 0,
+        deaths: participant.deaths ?? 0,
+        assists: participant.assists ?? 0,
+        win: Boolean(participant.win),
+      });
+    }
+
+    return participantRows;
+  }
+
+  private async getLinkedAccounts(userId: string) {
+    return this.prisma.riotAccount.findMany({
+      where: { userId },
+      select: {
+        puuid: true,
+      },
+    });
+  }
+
+  private async computeQueueGroupStats(
+    userId: string,
+    queueGroup: QueueGroup,
+  ): Promise<{ stats: RankedChampStat[]; matchCount: number; isPartial: boolean }> {
+    const season = this.getCurrentSeason();
+    const seasonStart = this.getSeasonStartDate();
+
+    if (queueGroup === "custom") {
+      const rows = await this.prisma.matchParticipant.findMany({
+        where: {
+          userId,
+          match: {
+            createdAt: {
+              gte: seasonStart,
+            },
+          },
+        },
+        select: {
+          championId: true,
+          championName: true,
+          kills: true,
+          deaths: true,
+          assists: true,
+          win: true,
+        },
+      });
+
+      return {
+        stats: this.aggregateParticipantRows(rows),
+        matchCount: rows.length,
+        isPartial: false,
+      };
+    }
+
+    if (queueGroup === "all") {
+      const linkedAccounts = await this.getLinkedAccounts(userId);
+      const puuidSet = new Set(linkedAccounts.map((account) => account.puuid));
+      const seasonStart = this.getSeasonStartDate();
+
+      const riotRows = puuidSet.size
+        ? await this.prisma.riotMatchCache.findMany({
+            where: {
+              queueId: { in: [420, 440, 400, 430, 450] },
+              gameEnd: { gte: seasonStart },
+            },
+            select: { data: true },
+            orderBy: { gameEnd: "desc" },
+          })
+        : [];
+
+      const customRows = await this.prisma.matchParticipant.findMany({
+        where: {
+          userId,
+          match: {
+            createdAt: {
+              gte: seasonStart,
+            },
+          },
+        },
+        select: {
+          championId: true,
+          championName: true,
+          kills: true,
+          deaths: true,
+          assists: true,
+          win: true,
+        },
+      });
+
+      const riotParticipantRows = this.extractParticipantRowsFromRiotMatchCacheRows(
+        riotRows,
+        puuidSet,
+      );
+      const mergedRows = [
+        ...riotParticipantRows,
+        ...customRows.map((row) => ({
+          championId: row.championId,
+          championName: row.championName,
+          kills: row.kills,
+          deaths: row.deaths,
+          assists: row.assists,
+          win: row.win,
+        })),
+      ];
+
+      const knownPuuidRows = puuidSet.size
+        ? await this.prisma.knownPuuid.findMany({
+            where: {
+              puuid: { in: Array.from(puuidSet) },
+            },
+            select: {
+              rankedFetchedAt: true,
+              normalFetchedAt: true,
+              aramFetchedAt: true,
+            },
+          })
+        : [];
+
+      return {
+        stats: this.aggregateParticipantRows(mergedRows),
+        matchCount: mergedRows.length,
+        isPartial: knownPuuidRows.some(
+          (row) =>
+            row.rankedFetchedAt == null ||
+            row.normalFetchedAt == null ||
+            row.aramFetchedAt == null,
+        ),
+      };
+    }
+
+    const linkedAccounts = await this.getLinkedAccounts(userId);
+    const puuidSet = new Set(linkedAccounts.map((account) => account.puuid));
+
+    if (puuidSet.size === 0) {
+      return {
+        stats: [],
+        matchCount: 0,
+        isPartial: false,
+      };
+    }
+
+    const queueIds = this.queueGroupToQueueIds[queueGroup];
+    const rows = await this.prisma.riotMatchCache.findMany({
+      where: {
+        queueId: { in: queueIds },
+        gameEnd: { gte: seasonStart },
+      },
+      select: {
+        data: true,
+      },
+      orderBy: {
+        gameEnd: "desc",
+      },
+    });
+
+    const result = this.extractStatsFromRiotMatchCacheRows(rows, puuidSet);
+
+    const knownPuuidRows = await this.prisma.knownPuuid.findMany({
+      where: {
+        puuid: { in: Array.from(puuidSet) },
+      },
+      select: {
+        rankedFetchedAt: true,
+        normalFetchedAt: true,
+        aramFetchedAt: true,
+      },
+    });
+
+    const fetchedField =
+      queueGroup === "ranked"
+        ? "rankedFetchedAt"
+        : queueGroup === "normal"
+          ? "normalFetchedAt"
+          : "aramFetchedAt";
+
+    const isPartial = knownPuuidRows.some((row) => row[fetchedField] == null);
+
+    await this.prisma.matchStatsCache.upsert({
+      where: {
+        userId_queueGroup_season: {
+          userId,
+          queueGroup,
+          season,
+        },
+      },
+      create: {
+        userId,
+        queueGroup,
+        season,
+        stats: result.stats as unknown as Prisma.JsonArray,
+        matchCount: result.matchCount,
+        isPartial,
+      },
+      update: {
+        stats: result.stats as unknown as Prisma.JsonArray,
+        matchCount: result.matchCount,
+        isPartial,
+        computedAt: new Date(),
+      },
+    });
+
+    await this.redis.set(
+      this.getChampionStatsCacheKey(userId, queueGroup),
+      JSON.stringify({
+        queueGroup,
+        matchCount: result.matchCount,
+        isPartial,
+        computedAt: new Date().toISOString(),
+        stats: result.stats,
+      } satisfies ChampionStatsCacheResponse),
+      3600,
+    );
+
+    return {
+      stats: result.stats,
+      matchCount: result.matchCount,
+      isPartial,
+    };
+  }
+
+  async recomputeChampionStatsForUser(userId: string): Promise<void> {
+    const queueGroups: QueueGroup[] = ["ranked", "normal", "aram", "custom", "all"];
+    for (const queueGroup of queueGroups) {
+      await this.computeQueueGroupStats(userId, queueGroup);
+    }
+
+    await this.prisma.statsRecomputeQueue.delete({
+      where: { userId },
+    }).catch(() => undefined);
+  }
+
+  async getChampionStatsCacheByUserId(
+    userId: string,
+    queueGroup: QueueGroup = "ranked",
+  ): Promise<ChampionStatsCacheResponse> {
+    const cacheKey = this.getChampionStatsCacheKey(userId, queueGroup);
+    const redisCached = await this.redis.get(cacheKey);
+    if (redisCached) {
+      return JSON.parse(redisCached);
+    }
+
+    const dbCached = await this.prisma.matchStatsCache.findUnique({
+      where: {
+        userId_queueGroup_season: {
+          userId,
+          queueGroup,
+          season: this.getCurrentSeason(),
+        },
+      },
+    });
+
+    if (dbCached) {
+      const response: ChampionStatsCacheResponse = {
+        queueGroup: queueGroup,
+        matchCount: dbCached.matchCount,
+        isPartial: dbCached.isPartial,
+        computedAt: dbCached.computedAt.toISOString(),
+        stats: this.toRankedChampStatArray(dbCached.stats),
+      };
+      await this.redis.set(cacheKey, JSON.stringify(response), 3600);
+      return response;
+    }
+
+    const computed = await this.computeQueueGroupStats(userId, queueGroup);
+    return {
+      queueGroup,
+      matchCount: computed.matchCount,
+      isPartial: computed.isPartial,
+      computedAt: new Date().toISOString(),
+      stats: computed.stats,
+    };
+  }
+
+  async getChampionStatsCacheByRiotId(
+    gameName: string,
+    tagLine: string,
+    queueGroup: QueueGroup = "ranked",
+  ): Promise<ChampionStatsCacheResponse> {
+    const found = await this.findUserByRiotAccount(gameName, tagLine);
+    if (!found) {
+      throw new NotFoundException("Summoner not found");
+    }
+
+    return this.getChampionStatsCacheByUserId(found.userId, queueGroup);
+  }
+
+  async enqueueStatsRefresh(userId: string): Promise<void> {
+    await this.prisma.statsRecomputeQueue.upsert({
+      where: { userId },
+      create: {
+        userId,
+        reason: "manual-refresh",
+        queuedAt: new Date(),
+      },
+      update: {
+        reason: "manual-refresh",
+        queuedAt: new Date(),
+      },
+    });
+  }
+
+  async getFetchStatus(userId: string) {
+    const [user, knownPuuids, caches, queued] = await Promise.all([
+      this.prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          riotAccounts: {
+            select: {
+              puuid: true,
+              gameName: true,
+              tagLine: true,
+              isPrimary: true,
+            },
+            orderBy: [{ isPrimary: "desc" }, { createdAt: "desc" }],
+          },
+        },
+      }),
+      this.prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          riotAccounts: {
+            select: { puuid: true },
+          },
+        },
+      }).then(async (user) => {
+        const puuids = user?.riotAccounts.map((account) => account.puuid) ?? [];
+        if (puuids.length === 0) return [];
+        return this.prisma.knownPuuid.findMany({
+          where: { puuid: { in: puuids } },
+        });
+      }),
+      this.prisma.matchStatsCache.findMany({
+        where: {
+          userId,
+          season: this.getCurrentSeason(),
+        },
+        select: {
+          queueGroup: true,
+          matchCount: true,
+          isPartial: true,
+          computedAt: true,
+        },
+      }),
+      this.prisma.statsRecomputeQueue.findUnique({
+        where: { userId },
+      }),
+    ]);
+
+    if (!user) throw new NotFoundException("User not found");
+
+    const latestFetchedAt = {
+      ranked: knownPuuids.reduce<Date | null>(
+        (acc, row) => (!acc || (row.rankedFetchedAt && row.rankedFetchedAt > acc) ? row.rankedFetchedAt : acc),
+        null,
+      ),
+      normal: knownPuuids.reduce<Date | null>(
+        (acc, row) => (!acc || (row.normalFetchedAt && row.normalFetchedAt > acc) ? row.normalFetchedAt : acc),
+        null,
+      ),
+      aram: knownPuuids.reduce<Date | null>(
+        (acc, row) => (!acc || (row.aramFetchedAt && row.aramFetchedAt > acc) ? row.aramFetchedAt : acc),
+        null,
+      ),
+      custom: knownPuuids.reduce<Date | null>(
+        (acc, row) => (!acc || (row.customFetchedAt && row.customFetchedAt > acc) ? row.customFetchedAt : acc),
+        null,
+      ),
+    };
+
+    return {
+      userId,
+      queuedAt: queued?.queuedAt?.toISOString() ?? null,
+      accounts: user.riotAccounts,
+      queueGroups: ["ranked", "normal", "aram", "custom", "all"].map(
+        (queueGroup) => {
+          const cache = caches.find((entry) => entry.queueGroup === queueGroup);
+          return {
+            queueGroup,
+            fetchedAt:
+              queueGroup === "all"
+                ? null
+                : latestFetchedAt[queueGroup as Exclude<QueueGroup, "all">]?.toISOString() ?? null,
+            matchCount: cache?.matchCount ?? 0,
+            isPartial: cache?.isPartial ?? false,
+            computedAt: cache?.computedAt.toISOString() ?? null,
+          };
+        },
+      ),
+    };
+  }
 
   /**
    * 유저와 프라이버시 설정을 한 번에 조회 — checkPrivacy + user.findUnique 통합
@@ -820,134 +1332,11 @@ export class StatsService {
    * - 매치 상세는 5개씩 배치 순차 처리 (rate limit 보호)
    */
   async getRankedChampionStats(gameName: string, tagLine: string) {
-    // 1. Redis 캐시 확인 (10분 TTL)
-    const cacheKey = `stats:ranked-champ:${gameName.toLowerCase()}:${tagLine.toLowerCase()}`;
-    const cached = await this.redis.get(cacheKey);
-    if (cached) {
-      return JSON.parse(cached);
-    }
-
-    const summonerInfo = await this.riotService.getSummonerByRiotId(
+    const response = await this.getChampionStatsCacheByRiotId(
       gameName,
       tagLine,
+      "ranked",
     );
-    if (!summonerInfo) throw new NotFoundException("Summoner not found");
-
-    const puuid = summonerInfo.puuid;
-    const RANKED_QUEUES = [420, 440];
-    const BATCH_SIZE = 100;
-
-    // S2026 시즌 시작: 2026년 1월 9일 UTC (Unix seconds)
-    const SEASON_2026_START = Math.floor(
-      new Date("2026-01-09T00:00:00Z").getTime() / 1000,
-    );
-
-    // 모든 랭크 매치 ID 수집 (큐 타입 순차 처리 — rate limit 보호)
-    const allMatchIds: string[] = [];
-    for (const queueId of RANKED_QUEUES) {
-      let start = 0;
-      while (true) {
-        const ids = await this.riotMatchService.getMatchIdsByPuuid(
-          puuid,
-          start,
-          BATCH_SIZE,
-          queueId,
-          undefined,
-          3,
-          SEASON_2026_START,
-        );
-        allMatchIds.push(...ids);
-        if (ids.length < BATCH_SIZE) break;
-        start += BATCH_SIZE;
-      }
-    }
-
-    if (allMatchIds.length === 0) {
-      await this.redis.set(cacheKey, JSON.stringify([]), 600);
-      return [];
-    }
-
-    // 중복 제거
-    const uniqueIds = [...new Set(allMatchIds)];
-
-    // DB 캐시 보유 여부 단일 쿼리로 확인
-    const dbCached = await this.prisma.riotMatchCache.findMany({
-      where: { matchId: { in: uniqueIds } },
-      select: { matchId: true },
-    });
-    const dbCachedSet = new Set(dbCached.map((e: { matchId: string }) => e.matchId));
-    const cachedIds = uniqueIds.filter((id) => dbCachedSet.has(id));
-    const uncachedIds = uniqueIds.filter((id) => !dbCachedSet.has(id));
-
-    // 캐시된 매치: 병렬 조회 (DB에서 즉시 반환 — Riot API 호출 없음)
-    const cachedResults = await Promise.all(
-      cachedIds.map((id) => this.riotMatchService.getMatchById(id)),
-    );
-
-    // 미캐시 매치: 타임아웃 방지를 위해 최대 40개만 처리
-    // 나머지는 다음 요청 시 점진적으로 DB 캐시에 적재됨
-    const MAX_UNCACHED_FETCH = 40;
-    const uncachedResults: any[] = [];
-    for (let i = 0; i < Math.min(uncachedIds.length, MAX_UNCACHED_FETCH); i++) {
-      try {
-        const match = await this.riotMatchService.getMatchById(uncachedIds[i]);
-        uncachedResults.push(match);
-      } catch {
-        // 개별 매치 오류는 건너뜀 — 나머지 처리 계속
-        uncachedResults.push(null);
-      }
-      // 마지막 항목 이후는 대기 불필요
-      if (i < Math.min(uncachedIds.length, MAX_UNCACHED_FETCH) - 1) {
-        await new Promise((r) => setTimeout(r, 1200));
-      }
-    }
-
-    const matchDetails = [...cachedResults, ...uncachedResults];
-
-    // 챔피언별 통계 집계
-    const statsMap = new Map<string, RankedChampStat>();
-
-    for (const match of matchDetails) {
-      if (!match) continue;
-      const participant = match.info.participants.find(
-        (p: any) => p.puuid === puuid,
-      );
-      if (!participant) continue;
-
-      const key = participant.championName;
-      const existing = statsMap.get(key);
-      if (existing) {
-        existing.games++;
-        if (participant.win) existing.wins++;
-        else existing.losses++;
-        existing.kills += participant.kills;
-        existing.deaths += participant.deaths;
-        existing.assists += participant.assists;
-      } else {
-        statsMap.set(key, {
-          championId: participant.championId,
-          championName: participant.championName,
-          // 영문 챔피언명을 한글로 변환하여 추가 (기존 영문 필드는 유지)
-          championNameKorean: getChampionKoreanName(participant.championName),
-          games: 1,
-          wins: participant.win ? 1 : 0,
-          losses: participant.win ? 0 : 1,
-          kills: participant.kills,
-          deaths: participant.deaths,
-          assists: participant.assists,
-        });
-      }
-    }
-
-    const result = Array.from(statsMap.values()).sort(
-      (a, b) => b.games - a.games,
-    );
-
-    // 미캐시 매치가 MAX 초과면 집계가 불완전 — 30초 TTL로 재시도 유도
-    // 완전 집계 시 10분 TTL 적용
-    const isPartial = uncachedIds.length > MAX_UNCACHED_FETCH;
-    await this.redis.set(cacheKey, JSON.stringify(result), isPartial ? 30 : 600);
-
-    return result;
+    return response.stats;
   }
 }

@@ -1,4 +1,12 @@
-import { Controller, Get, Param, Query, UseGuards } from "@nestjs/common";
+import {
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  UseGuards,
+  ForbiddenException,
+} from "@nestjs/common";
 import { Throttle } from "@nestjs/throttler";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
@@ -13,6 +21,7 @@ import {
   UserMatchHistoryQueryDto,
 } from "./dto/stats-query.dto";
 import { UserRole } from "@nexus/database";
+import { QueueGroup } from "./stats.service";
 
 @Controller("stats")
 export class StatsController {
@@ -141,6 +150,40 @@ export class StatsController {
     @Param("tagLine") tagLine: string,
   ) {
     return this.statsService.getRankedChampionStats(gameName, tagLine);
+  }
+
+  @Get("champion-stats")
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
+  async getChampionStats(
+    @Query("gameName") gameName: string,
+    @Query("tagLine") tagLine: string,
+    @Query("queueGroup") queueGroup: QueueGroup = "ranked",
+  ) {
+    return this.statsService.getChampionStatsCacheByRiotId(
+      gameName,
+      tagLine,
+      queueGroup,
+    );
+  }
+
+  @Get("fetch-status/:userId")
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
+  async getFetchStatus(@Param("userId") userId: string) {
+    return this.statsService.getFetchStatus(userId);
+  }
+
+  @Post("refresh/:userId")
+  @UseGuards(JwtAuthGuard)
+  async enqueueRefresh(
+    @CurrentUser("sub") requesterId: string,
+    @Param("userId") userId: string,
+  ) {
+    if (requesterId !== userId) {
+      throw new ForbiddenException("Cannot refresh another user's stats");
+    }
+
+    await this.statsService.enqueueStatsRefresh(userId);
+    return { queued: true };
   }
 
   /**

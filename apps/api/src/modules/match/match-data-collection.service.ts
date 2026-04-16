@@ -274,6 +274,25 @@ export class MatchDataCollectionService {
         });
       });
 
+      await Promise.all(
+        Array.from(
+          new Set(Array.from(puuidToUser.values()).map(({ userId }) => userId)),
+        ).map((userId) =>
+          this.prisma.statsRecomputeQueue.upsert({
+            where: { userId },
+            create: {
+              userId,
+              reason: "custom-match-added",
+              queuedAt: new Date(),
+            },
+            update: {
+              reason: "custom-match-added",
+              queuedAt: new Date(),
+            },
+          }),
+        ),
+      );
+
       this.logger.log(`Saved match data for match ${matchId}`);
     } catch (error) {
       this.logger.error(`Error saving match data for match ${matchId}:`, error);

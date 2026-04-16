@@ -49,6 +49,7 @@ model User {
   friendOf            Friendship[]       @relation("FriendOfUser")
   friendships         Friendship[]       @relation("UserFriendships")
   matchParticipations MatchParticipant[]
+  matchStatsCaches    MatchStatsCache[]
   nexusRanking        NexusRanking?
   notifications       Notification[]
   bookmarks           PostBookmark[]
@@ -68,6 +69,7 @@ model User {
   reportsSubmitted    UserReport[]       @relation("ReporterUser")
   reportsReceived     UserReport[]       @relation("ReportedUser")
   settings            UserSettings?
+  statsRecomputeQueue StatsRecomputeQueue?
 
   @@index([email])
   @@index([reputation])
@@ -813,6 +815,58 @@ model SummonerSeasonTier {
   @@unique([puuid, season])
   @@index([puuid])
   @@map("summoner_season_tiers")
+}
+
+model KnownPuuid {
+  puuid              String   @id
+  gameName           String?
+  tagLine            String?
+  priority           Int      @default(0)
+  isNexusUser        Boolean  @default(false)
+  rankedFetchedAt    DateTime?
+  normalFetchedAt    DateTime?
+  aramFetchedAt      DateTime?
+  customFetchedAt    DateTime?
+  rankedLastMatchId  String?
+  normalLastMatchId  String?
+  aramLastMatchId    String?
+  customLastMatchId  String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([priority, rankedFetchedAt])
+  @@index([priority, normalFetchedAt])
+  @@index([priority, aramFetchedAt])
+  @@index([priority, customFetchedAt])
+  @@index([isNexusUser, priority])
+  @@map("known_puuids")
+}
+
+model MatchStatsCache {
+  id         String   @id @default(cuid())
+  userId     String
+  queueGroup String
+  season     String
+  stats      Json
+  matchCount Int
+  isPartial  Boolean  @default(false)
+  computedAt DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, queueGroup, season])
+  @@index([userId])
+  @@map("match_stats_cache")
+}
+
+model StatsRecomputeQueue {
+  userId     String   @id
+  reason     String?
+  queuedAt   DateTime @default(now())
+  lastSeenAt DateTime @updatedAt
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([queuedAt])
+  @@map("stats_recompute_queue")
 }
 
 model RiotMatchCache {

@@ -2,15 +2,300 @@ import { Injectable, Logger } from "@nestjs/common";
 import { Cron, CronExpression } from "@nestjs/schedule";
 import { PrismaService } from "../prisma/prisma.service";
 import { DataDragonService } from "../riot/data-dragon.service";
+import { RiotMatchService } from "../riot/riot-match.service";
+import { RedisService } from "../redis/redis.service";
+import { StatsService } from "../stats/stats.service";
+
+type QueueGroupConfig = {
+  name: "ranked" | "normal" | "aram" | "custom";
+  queueIds: number[];
+  limit: number;
+  staleHours: number;
+  includeNexusUsers: boolean;
+  fetchedAtField:
+    | "rankedFetchedAt"
+    | "normalFetchedAt"
+    | "aramFetchedAt"
+    | "customFetchedAt";
+  lastMatchIdField:
+    | "rankedLastMatchId"
+    | "normalLastMatchId"
+    | "aramLastMatchId"
+    | "customLastMatchId";
+};
 
 @Injectable()
 export class TasksService {
   private readonly logger = new Logger(TasksService.name);
+  private readonly matchFetchConfigs: QueueGroupConfig[] = [
+    {
+      name: "ranked",
+      queueIds: [420, 440],
+      limit: 25,
+      staleHours: 6,
+      includeNexusUsers: true,
+      fetchedAtField: "rankedFetchedAt",
+      lastMatchIdField: "rankedLastMatchId",
+    },
+    {
+      name: "normal",
+      queueIds: [400, 430],
+      limit: 15,
+      staleHours: 12,
+      includeNexusUsers: true,
+      fetchedAtField: "normalFetchedAt",
+      lastMatchIdField: "normalLastMatchId",
+    },
+    {
+      name: "aram",
+      queueIds: [450],
+      limit: 7,
+      staleHours: 24,
+      includeNexusUsers: true,
+      fetchedAtField: "aramFetchedAt",
+      lastMatchIdField: "aramLastMatchId",
+    },
+    {
+      name: "custom",
+      queueIds: [0],
+      limit: 3,
+      staleHours: 24,
+      includeNexusUsers: false,
+      fetchedAtField: "customFetchedAt",
+      lastMatchIdField: "customLastMatchId",
+    },
+  ];
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly dataDragon: DataDragonService,
+    private readonly riotMatchService: RiotMatchService,
+    private readonly redis: RedisService,
+    private readonly statsService: StatsService,
   ) {}
+
+  private getSeasonStartUnixSeconds(): number {
+    const now = new Date();
+    return Math.floor(
+      Date.UTC(now.getUTCFullYear(), 0, 1, 0, 0, 0, 0) / 1000,
+    );
+  }
+
+  private async fetchQueueMatchIdsUntilKnown(
+    puuid: string,
+    queueId: number,
+    lastKnownMatchId?: string | null,
+  ): Promise<string[]> {
+    const newIds: string[] = [];
+    let start = 0;
+    const count = 100;
+    const seasonStart = this.getSeasonStartUnixSeconds();
+
+    while (true) {
+      const ids = await this.riotMatchService.getMatchIdsByPuuid(
+        puuid,
+        start,
+        count,
+        queueId,
+        undefined,
+        3,
+        seasonStart,
+      );
+
+      if (ids.length === 0) {
+        break;
+      }
+
+      let shouldStop = false;
+      for (const id of ids) {
+        if (lastKnownMatchId && id === lastKnownMatchId) {
+          shouldStop = true;
+          break;
+        }
+        newIds.push(id);
+      }
+
+      if (shouldStop || ids.length < count) {
+        break;
+      }
+
+      start += count;
+    }
+
+    return newIds;
+  }
+
+  private async fetchMatchesForKnownPuuid(
+    puuid: string,
+    queueIds: number[],
+    lastKnownMatchId?: string | null,
+  ): Promise<{ latestMatchId: string | null; fetchedCount: number }> {
+    let latestMatchId: string | null = null;
+    const seen = new Set<string>();
+    const orderedNewIds: string[] = [];
+
+    for (const queueId of queueIds) {
+      const ids = await this.fetchQueueMatchIdsUntilKnown(
+        puuid,
+        queueId,
+        lastKnownMatchId,
+      );
+
+      if (!latestMatchId && ids.length > 0) {
+        latestMatchId = ids[0];
+      }
+
+      for (const id of ids) {
+        if (!seen.has(id)) {
+          seen.add(id);
+          orderedNewIds.push(id);
+        }
+      }
+    }
+
+    for (const matchId of orderedNewIds.reverse()) {
+      await this.riotMatchService.getMatchById(matchId);
+      await new Promise((resolve) => setTimeout(resolve, 150));
+    }
+
+    return {
+      latestMatchId,
+      fetchedCount: orderedNewIds.length,
+    };
+  }
+
+  private async processMatchFetchGroup(
+    config: QueueGroupConfig,
+  ): Promise<void> {
+    const staleBefore = new Date(
+      Date.now() - config.staleHours * 60 * 60 * 1000,
+    );
+
+    const where: any = {
+      OR: [
+        { [config.fetchedAtField]: null },
+        { [config.fetchedAtField]: { lt: staleBefore } },
+      ],
+    };
+
+    if (!config.includeNexusUsers) {
+      where.isNexusUser = false;
+    }
+
+    const candidates = await this.prisma.knownPuuid.findMany({
+      where,
+      orderBy: [
+        { priority: "desc" },
+        { [config.fetchedAtField]: "asc" },
+      ] as any,
+      take: config.limit,
+    });
+
+    if (candidates.length === 0) {
+      return;
+    }
+
+    this.logger.log(
+      `Match fetch [${config.name}] processing ${candidates.length} PUUID(s)`,
+    );
+
+    for (const candidate of candidates) {
+      try {
+        const lastKnownMatchId = candidate[config.lastMatchIdField];
+        const result = await this.fetchMatchesForKnownPuuid(
+          candidate.puuid,
+          config.queueIds,
+          lastKnownMatchId,
+        );
+
+        const nextLastMatchId =
+          result.latestMatchId ?? lastKnownMatchId ?? null;
+
+        await this.prisma.knownPuuid.update({
+          where: { puuid: candidate.puuid },
+          data: {
+            [config.fetchedAtField]: new Date(),
+            [config.lastMatchIdField]: nextLastMatchId,
+          } as any,
+        });
+
+        this.logger.log(
+          `Match fetch [${config.name}] ${candidate.puuid}: ${result.fetchedCount} new match(es)`,
+        );
+      } catch (error) {
+        this.logger.warn(
+          `Match fetch [${config.name}] failed for ${candidate.puuid}: ${error}`,
+        );
+      }
+    }
+  }
+
+  /**
+   * KnownPuuid 기반 Riot 매치 사전 수집 — 30분마다 실행
+   */
+  @Cron("*/30 * * * *")
+  async handleMatchFetch(): Promise<void> {
+    const lockKey = "tasks:match-fetch";
+    const lockToken = await this.redis.acquireLock(lockKey, 25 * 60 * 1000);
+
+    if (!lockToken) {
+      this.logger.warn("Match fetch skipped: another worker holds the lock");
+      return;
+    }
+
+    try {
+      for (const config of this.matchFetchConfigs) {
+        await this.processMatchFetchGroup(config);
+      }
+    } catch (error) {
+      this.logger.error("Match fetch task failed", error);
+    } finally {
+      await this.redis.releaseLock(lockKey, lockToken);
+    }
+  }
+
+  /**
+   * StatsRecomputeQueue 기반 개인 통계 캐시 재계산 — 매 정시 실행
+   */
+  @Cron("0 * * * *")
+  async handleMatchStatsCompute(): Promise<void> {
+    const lockKey = "tasks:match-stats-compute";
+    const lockToken = await this.redis.acquireLock(lockKey, 55 * 60 * 1000);
+
+    if (!lockToken) {
+      this.logger.warn("Match stats compute skipped: another worker holds the lock");
+      return;
+    }
+
+    try {
+      const queuedUsers = await this.prisma.statsRecomputeQueue.findMany({
+        orderBy: [{ queuedAt: "asc" }],
+        take: 100,
+      });
+
+      if (queuedUsers.length === 0) {
+        return;
+      }
+
+      this.logger.log(
+        `Match stats compute processing ${queuedUsers.length} user(s)`,
+      );
+
+      for (const queued of queuedUsers) {
+        try {
+          await this.statsService.recomputeChampionStatsForUser(queued.userId);
+        } catch (error) {
+          this.logger.warn(
+            `Match stats compute failed for ${queued.userId}: ${error}`,
+          );
+        }
+      }
+    } catch (error) {
+      this.logger.error("Match stats compute task failed", error);
+    } finally {
+      await this.redis.releaseLock(lockKey, lockToken);
+    }
+  }
 
   /**
    * DDragon 최신 버전 동기화 — 매주 월요일 새벽 4시
