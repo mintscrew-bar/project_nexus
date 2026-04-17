@@ -2,7 +2,6 @@ import { Test, TestingModule } from "@nestjs/testing";
 import { SnakeDraftService } from "./snake-draft.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { RoomStatus, TeamMode } from "@nexus/database";
-import { BadRequestException, ForbiddenException, NotFoundException } from "@nestjs/common";
 
 describe("SnakeDraftService", () => {
   let service: SnakeDraftService;
@@ -50,30 +49,47 @@ describe("SnakeDraftService", () => {
     it("2팀일 때 표준 스네이크와 동일하게 동작한다 (1-2-2-1 반복)", () => {
       const teamIds = ["T1", "T2"];
       const order = (service as any).generatePickOrder(teamIds, 2);
-      
+
       // R0 (start T1): T1, T2
       // R1 (start T2): T2, T1 -> T2 더블
       // R2 (start T1): T1, T2 -> T1 더블
       // R3 (start T2): T2, T1 -> T2 더블
-      expect(order.slice(0, 8)).toEqual(["T1", "T2", "T2", "T1", "T1", "T2", "T2", "T1"]);
+      expect(order.slice(0, 8)).toEqual([
+        "T1",
+        "T2",
+        "T2",
+        "T1",
+        "T1",
+        "T2",
+        "T2",
+        "T1",
+      ]);
     });
 
     it("3팀일 때 12픽 내에서 모든 팀(T1, T2, T3)이 정확히 한 번씩 연속 픽을 갖는다", () => {
       const teamIds = ["T1", "T2", "T3"];
       const order = (service as any).generatePickOrder(teamIds, 3);
-      
+
       // R0 (start T1): T1, T2, T3
       // R1 (start T3): T3, T1, T2 (T3 더블: index 2, 3)
       // R2 (start T2): T2, T3, T1 (T2 더블: index 5, 6)
       // R3 (start T1): T1, T2, T3 (T1 더블: index 8, 9)
-      
+
       const expected = [
-        "T1", "T2", "T3", // R0
-        "T3", "T1", "T2", // R1 (T3 연속)
-        "T2", "T3", "T1", // R2 (T2 연속)
-        "T1", "T2", "T3"  // R3 (T1 연속)
+        "T1",
+        "T2",
+        "T3", // R0
+        "T3",
+        "T1",
+        "T2", // R1 (T3 연속)
+        "T2",
+        "T3",
+        "T1", // R2 (T2 연속)
+        "T1",
+        "T2",
+        "T3", // R3 (T1 연속)
       ];
-      
+
       expect(order.slice(0, 12)).toEqual(expected);
 
       // 연속 픽 지점 검증
@@ -92,7 +108,10 @@ describe("SnakeDraftService", () => {
         id: `p${i}`,
         userId: `u${i}`,
         role: "PLAYER",
-        user: { username: `user${i}`, riotAccounts: [{ isPrimary: true, mainRole: "TOP" }] },
+        user: {
+          username: `user${i}`,
+          riotAccounts: [{ isPrimary: true, mainRole: "TOP" }],
+        },
       }));
 
       prisma.room.findUnique.mockResolvedValue({

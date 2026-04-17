@@ -105,7 +105,7 @@ export class AuthController {
 
     // state가 있어도 일반 OAuth 로그인에서 함께 전달될 수 있으므로
     // 실제 Redis link token인지 확인된 경우에만 연동 로직으로 분기한다.
-    if (state && await this.authService.isValidLinkToken(state, "discord")) {
+    if (state && (await this.authService.isValidLinkToken(state, "discord"))) {
       return this.handleDiscordLink(code, state, res);
     }
 
@@ -192,10 +192,7 @@ export class AuthController {
    */
   @Post("exchange")
   @HttpCode(HttpStatus.OK)
-  async exchangeCode(
-    @Body("code") code: string,
-    @Res() res: Response,
-  ) {
+  async exchangeCode(@Body("code") code: string, @Res() res: Response) {
     if (!code) {
       throw new BadRequestException("코드가 필요합니다.");
     }
@@ -272,10 +269,9 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   async linkDiscord(@CurrentUser("sub") userId: string, @Res() res: Response) {
     // DISCORD_LINK_CALLBACK_URL이 없으면 기본 DISCORD_CALLBACK_URL 사용
-    const allowedCallbackUrl = 
-      this.configService.get<string>("DISCORD_LINK_CALLBACK_URL") || 
+    const allowedCallbackUrl =
+      this.configService.get<string>("DISCORD_LINK_CALLBACK_URL") ||
       this.configService.get<string>("DISCORD_CALLBACK_URL");
-    const appUrl = this.configService.get<string>("APP_URL") || "http://localhost:3000";
 
     if (!allowedCallbackUrl) {
       this.logger.error("Discord 콜백 URL 환경변수가 설정되지 않았습니다.");
@@ -283,7 +279,10 @@ export class AuthController {
     }
 
     // Generate temporary link token (5 minutes)
-    const linkToken = await this.authService.generateLinkToken(userId, "discord");
+    const linkToken = await this.authService.generateLinkToken(
+      userId,
+      "discord",
+    );
 
     const discordAuthUrl =
       `https://discord.com/api/oauth2/authorize` +
@@ -306,7 +305,11 @@ export class AuthController {
     return this.handleDiscordLink(code, linkToken, res);
   }
 
-  private async handleDiscordLink(code: string, linkToken: string, res: Response) {
+  private async handleDiscordLink(
+    code: string,
+    linkToken: string,
+    res: Response,
+  ) {
     const appUrl = this.configService.get("APP_URL") || "http://localhost:3000";
     try {
       // Verify link token and get userId

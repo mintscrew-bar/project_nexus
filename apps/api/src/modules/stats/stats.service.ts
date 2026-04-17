@@ -1,10 +1,20 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import {
+  ForbiddenException,
+  HttpException,
+  HttpStatus,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { RedisService } from "../redis/redis.service";
 import { RiotMatchService } from "../riot/riot-match.service";
 import { RiotService } from "../riot/riot.service";
 import { getChampionKoreanName } from "@nexus/types";
+import {
+  aggregateCustomMatchStats,
+  CustomMatchAggregateRow,
+} from "./utils/custom-match-aggregator";
 
 export type QueueGroup = "ranked" | "normal" | "aram" | "custom" | "all";
 
@@ -44,6 +54,97 @@ export interface ChampionStatsCacheResponse {
   isPartial: boolean;
   computedAt: string;
   stats: RankedChampStat[];
+}
+
+export interface LabUserProfileFallbackChampion {
+  championId: number;
+  championName: string;
+  championNameKorean: string;
+  games: number;
+  wins: number;
+  losses: number;
+  winRate: number;
+  avgKda: number;
+}
+
+export interface LabUserProfileFallbackResponse {
+  userId: string;
+  customGames: number;
+  threshold: number;
+  message: string;
+  summary: {
+    rankedGames: number;
+    wins: number;
+    losses: number;
+    winRate: number;
+    avgKda: number;
+  };
+  champions: LabUserProfileFallbackChampion[];
+}
+
+export interface LabUserProfileCompareEntry {
+  championId: number;
+  championName: string;
+  championNameKorean: string;
+  ranked: {
+    games: number;
+    wins: number;
+    losses: number;
+    winRate: number;
+    avgKda: number;
+  };
+  custom: {
+    games: number;
+    wins: number;
+    losses: number;
+    winRate: number;
+    avgKda: number;
+  };
+  delta: {
+    games: number;
+    winRate: number;
+    avgKda: number;
+  };
+  signal: "ranked-favored" | "scrim-favored" | "aligned" | "insufficient-data";
+}
+
+export interface LabUserProfileCompareResponse {
+  userId: string;
+  summary: {
+    rankedGames: number;
+    customGames: number;
+    rankedWinRate: number;
+    customWinRate: number;
+    rankedAvgKda: number;
+    customAvgKda: number;
+    winRateDelta: number;
+    avgKdaDelta: number;
+  };
+  champions: LabUserProfileCompareEntry[];
+}
+
+export interface RecentGamesSnapshot {
+  last20: {
+    wins: number;
+    games: number;
+    avgKda: number;
+    avgDamageShare: number;
+  };
+  lastPlayedAt: string | null;
+}
+
+interface AggregatedParticipantRow {
+  championId: number;
+  championName: string;
+  kills: number;
+  deaths: number;
+  assists: number;
+  win: boolean;
+}
+
+interface CacheParticipantRow extends AggregatedParticipantRow {
+  playedAt: Date;
+  damageShare: number;
 }
 
 export interface PositionStats {
@@ -156,8 +257,66 @@ export class StatsService {
     return new Date(Date.UTC(new Date().getUTCFullYear(), 0, 1, 0, 0, 0, 0));
   }
 
-  private getChampionStatsCacheKey(userId: string, queueGroup: QueueGroup): string {
+  private getChampionStatsCacheKey(
+    userId: string,
+    queueGroup: QueueGroup,
+  ): string {
     return `stats:champ:${queueGroup}:${userId}`;
+  }
+
+  private async invalidateChampionStatsCaches(
+    userId: string,
+    queueGroup: QueueGroup,
+  ): Promise<void> {
+    const targetQueueGroups: QueueGroup[] =
+      queueGroup === "all"
+        ? ["ranked", "normal", "aram", "custom", "all"]
+        : [queueGroup];
+
+    await Promise.all(
+      targetQueueGroups.map(async (targetQueueGroup) => {
+        await this.redis.del(
+          this.getChampionStatsCacheKey(userId, targetQueueGroup),
+        );
+        await this.prisma.matchStatsCache
+          .delete({
+            where: {
+              userId_queueGroup_season: {
+                userId,
+                queueGroup: targetQueueGroup,
+                season: this.getCurrentSeason(),
+              },
+            },
+          })
+          .catch(() => undefined);
+      }),
+    );
+  }
+
+  private async bumpKnownPuuidPriority(
+    userId: string,
+    queueGroup: QueueGroup,
+  ): Promise<void> {
+    if (queueGroup === "custom") {
+      return;
+    }
+
+    const linkedAccounts = await this.getLinkedAccounts(userId);
+    const puuids = linkedAccounts.map((account) => account.puuid);
+
+    if (puuids.length === 0) {
+      return;
+    }
+
+    await this.prisma.knownPuuid.updateMany({
+      where: {
+        puuid: { in: puuids },
+        priority: { lt: 20 },
+      },
+      data: {
+        priority: 20,
+      },
+    });
   }
 
   private toRankedChampStatArray(stats: unknown): RankedChampStat[] {
@@ -166,14 +325,7 @@ export class StatsService {
   }
 
   private aggregateParticipantRows(
-    rows: Array<{
-      championId: number;
-      championName: string;
-      kills: number;
-      deaths: number;
-      assists: number;
-      win: boolean;
-    }>,
+    rows: AggregatedParticipantRow[],
   ): RankedChampStat[] {
     const statsMap = new Map<number, RankedChampStat>();
 
@@ -205,10 +357,138 @@ export class StatsService {
     return Array.from(statsMap.values()).sort((a, b) => b.games - a.games);
   }
 
+  private roundMetric(value: number, digits = 4): number {
+    return Number(value.toFixed(digits));
+  }
+
+  private computeStatWinRate(stat: RankedChampStat): number {
+    return stat.games > 0 ? stat.wins / stat.games : 0;
+  }
+
+  private computeStatAvgKda(stat: RankedChampStat): number {
+    return stat.games > 0
+      ? (stat.kills + stat.assists) / Math.max(stat.deaths, 1)
+      : 0;
+  }
+
+  private toRankedStatsFromCustomAggregate(
+    rows: CustomMatchAggregateRow[],
+  ): RankedChampStat[] {
+    return rows.map((row) => ({
+      championId: row.championId,
+      championName: row.championName ?? String(row.championId),
+      championNameKorean: getChampionKoreanName(
+        row.championName ?? String(row.championId),
+      ),
+      games: row.games,
+      wins: row.wins,
+      losses: row.games - row.wins,
+      kills: row.kills,
+      deaths: row.deaths,
+      assists: row.assists,
+    }));
+  }
+
+  private buildRecentGamesSnapshot(
+    rows: CacheParticipantRow[],
+  ): RecentGamesSnapshot {
+    const recentRows = [...rows]
+      .sort((a, b) => b.playedAt.getTime() - a.playedAt.getTime())
+      .slice(0, 20);
+
+    if (recentRows.length === 0) {
+      return {
+        last20: {
+          wins: 0,
+          games: 0,
+          avgKda: 0,
+          avgDamageShare: 0,
+        },
+        lastPlayedAt: null,
+      };
+    }
+
+    const wins = recentRows.filter((row) => row.win).length;
+    const avgKda =
+      recentRows.reduce(
+        (sum, row) => sum + (row.kills + row.assists) / Math.max(row.deaths, 1),
+        0,
+      ) / recentRows.length;
+    const avgDamageShare =
+      recentRows.reduce((sum, row) => sum + row.damageShare, 0) /
+      recentRows.length;
+
+    return {
+      last20: {
+        wins,
+        games: recentRows.length,
+        avgKda: this.roundMetric(avgKda, 2),
+        avgDamageShare: this.roundMetric(avgDamageShare, 4),
+      },
+      lastPlayedAt: recentRows[0].playedAt.toISOString(),
+    };
+  }
+
+  private async persistChampionStatsCache(
+    userId: string,
+    queueGroup: QueueGroup,
+    season: string,
+    payload: {
+      stats: RankedChampStat[];
+      matchCount: number;
+      isPartial: boolean;
+      recentGames: RecentGamesSnapshot;
+    },
+  ): Promise<void> {
+    const computedAt = new Date();
+
+    await this.prisma.matchStatsCache.upsert({
+      where: {
+        userId_queueGroup_season: {
+          userId,
+          queueGroup,
+          season,
+        },
+      },
+      create: {
+        userId,
+        queueGroup,
+        season,
+        stats: payload.stats as unknown as Prisma.JsonArray,
+        recentGames: payload.recentGames as unknown as Prisma.JsonObject,
+        matchCount: payload.matchCount,
+        isPartial: payload.isPartial,
+      },
+      update: {
+        stats: payload.stats as unknown as Prisma.JsonArray,
+        recentGames: payload.recentGames as unknown as Prisma.JsonObject,
+        matchCount: payload.matchCount,
+        isPartial: payload.isPartial,
+        computedAt,
+      },
+    });
+
+    await this.redis.set(
+      this.getChampionStatsCacheKey(userId, queueGroup),
+      JSON.stringify({
+        queueGroup,
+        matchCount: payload.matchCount,
+        isPartial: payload.isPartial,
+        computedAt: computedAt.toISOString(),
+        stats: payload.stats,
+      } satisfies ChampionStatsCacheResponse),
+      3600,
+    );
+  }
+
   private extractStatsFromRiotMatchCacheRows(
-    rows: Array<{ data: Prisma.JsonValue }>,
+    rows: Array<{ data: Prisma.JsonValue; gameEnd: Date }>,
     puuidSet: Set<string>,
-  ): { stats: RankedChampStat[]; matchCount: number } {
+  ): {
+    stats: RankedChampStat[];
+    matchCount: number;
+    recentGames: RecentGamesSnapshot;
+  } {
     const participantRows = this.extractParticipantRowsFromRiotMatchCacheRows(
       rows,
       puuidSet,
@@ -216,28 +496,15 @@ export class StatsService {
     return {
       stats: this.aggregateParticipantRows(participantRows),
       matchCount: participantRows.length,
+      recentGames: this.buildRecentGamesSnapshot(participantRows),
     };
   }
 
   private extractParticipantRowsFromRiotMatchCacheRows(
-    rows: Array<{ data: Prisma.JsonValue }>,
+    rows: Array<{ data: Prisma.JsonValue; gameEnd: Date }>,
     puuidSet: Set<string>,
-  ): Array<{
-    championId: number;
-    championName: string;
-    kills: number;
-    deaths: number;
-    assists: number;
-    win: boolean;
-  }> {
-    const participantRows: Array<{
-      championId: number;
-      championName: string;
-      kills: number;
-      deaths: number;
-      assists: number;
-      win: boolean;
-    }> = [];
+  ): CacheParticipantRow[] {
+    const participantRows: CacheParticipantRow[] = [];
 
     for (const row of rows) {
       const match = row.data as any;
@@ -246,6 +513,12 @@ export class StatsService {
 
       const participant = participants.find((p: any) => puuidSet.has(p.puuid));
       if (!participant) continue;
+      const teamDamage = participants
+        .filter((p: any) => p.teamId === participant.teamId)
+        .reduce(
+          (sum: number, p: any) => sum + (p.totalDamageDealtToChampions ?? 0),
+          0,
+        );
 
       participantRows.push({
         championId: participant.championId,
@@ -254,10 +527,60 @@ export class StatsService {
         deaths: participant.deaths ?? 0,
         assists: participant.assists ?? 0,
         win: Boolean(participant.win),
+        playedAt: row.gameEnd,
+        damageShare:
+          teamDamage > 0
+            ? this.roundMetric(
+                (participant.totalDamageDealtToChampions ?? 0) / teamDamage,
+              )
+            : 0,
       });
     }
 
     return participantRows;
+  }
+
+  private normalizeCustomParticipantRows(
+    rows: Array<{
+      championId: number;
+      championName: string;
+      kills: number;
+      deaths: number;
+      assists: number;
+      win: boolean;
+      teamId: string;
+      totalDamageDealtToChampions: number;
+      match: {
+        createdAt: Date;
+        participants: Array<{
+          teamId: string;
+          totalDamageDealtToChampions: number;
+        }>;
+      };
+    }>,
+  ): CacheParticipantRow[] {
+    return rows.map((row) => {
+      const teamDamage = row.match.participants
+        .filter((participant) => participant.teamId === row.teamId)
+        .reduce(
+          (sum, participant) => sum + participant.totalDamageDealtToChampions,
+          0,
+        );
+
+      return {
+        championId: row.championId,
+        championName: row.championName,
+        kills: row.kills,
+        deaths: row.deaths,
+        assists: row.assists,
+        win: row.win,
+        playedAt: row.match.createdAt,
+        damageShare:
+          teamDamage > 0
+            ? this.roundMetric(row.totalDamageDealtToChampions / teamDamage)
+            : 0,
+      };
+    });
   }
 
   private async getLinkedAccounts(userId: string) {
@@ -272,11 +595,28 @@ export class StatsService {
   private async computeQueueGroupStats(
     userId: string,
     queueGroup: QueueGroup,
-  ): Promise<{ stats: RankedChampStat[]; matchCount: number; isPartial: boolean }> {
+  ): Promise<{
+    stats: RankedChampStat[];
+    matchCount: number;
+    isPartial: boolean;
+    recentGames: RecentGamesSnapshot;
+  }> {
     const season = this.getCurrentSeason();
     const seasonStart = this.getSeasonStartDate();
+    let result: {
+      stats: RankedChampStat[];
+      matchCount: number;
+      isPartial: boolean;
+      recentGames: RecentGamesSnapshot;
+    };
 
     if (queueGroup === "custom") {
+      const aggregatedRows = await aggregateCustomMatchStats(this.prisma, {
+        userId,
+        fromDate: seasonStart,
+        groupBy: "champion",
+        dateField: "createdAt",
+      });
       const rows = await this.prisma.matchParticipant.findMany({
         where: {
           userId,
@@ -292,21 +632,38 @@ export class StatsService {
           kills: true,
           deaths: true,
           assists: true,
+          teamId: true,
+          totalDamageDealtToChampions: true,
           win: true,
+          match: {
+            select: {
+              createdAt: true,
+              participants: {
+                select: {
+                  teamId: true,
+                  totalDamageDealtToChampions: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: {
+          match: {
+            createdAt: "desc",
+          },
         },
       });
+      const participantRows = this.normalizeCustomParticipantRows(rows);
 
-      return {
-        stats: this.aggregateParticipantRows(rows),
-        matchCount: rows.length,
+      result = {
+        stats: this.toRankedStatsFromCustomAggregate(aggregatedRows),
+        matchCount: participantRows.length,
         isPartial: false,
+        recentGames: this.buildRecentGamesSnapshot(participantRows),
       };
-    }
-
-    if (queueGroup === "all") {
+    } else if (queueGroup === "all") {
       const linkedAccounts = await this.getLinkedAccounts(userId);
       const puuidSet = new Set(linkedAccounts.map((account) => account.puuid));
-      const seasonStart = this.getSeasonStartDate();
 
       const riotRows = puuidSet.size
         ? await this.prisma.riotMatchCache.findMany({
@@ -314,7 +671,7 @@ export class StatsService {
               queueId: { in: [420, 440, 400, 430, 450] },
               gameEnd: { gte: seasonStart },
             },
-            select: { data: true },
+            select: { data: true, gameEnd: true },
             orderBy: { gameEnd: "desc" },
           })
         : [];
@@ -334,25 +691,33 @@ export class StatsService {
           kills: true,
           deaths: true,
           assists: true,
+          teamId: true,
+          totalDamageDealtToChampions: true,
           win: true,
+          match: {
+            select: {
+              createdAt: true,
+              participants: {
+                select: {
+                  teamId: true,
+                  totalDamageDealtToChampions: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: {
+          match: {
+            createdAt: "desc",
+          },
         },
       });
 
-      const riotParticipantRows = this.extractParticipantRowsFromRiotMatchCacheRows(
-        riotRows,
-        puuidSet,
-      );
-      const mergedRows = [
-        ...riotParticipantRows,
-        ...customRows.map((row) => ({
-          championId: row.championId,
-          championName: row.championName,
-          kills: row.kills,
-          deaths: row.deaths,
-          assists: row.assists,
-          win: row.win,
-        })),
-      ];
+      const riotParticipantRows =
+        this.extractParticipantRowsFromRiotMatchCacheRows(riotRows, puuidSet);
+      const customParticipantRows =
+        this.normalizeCustomParticipantRows(customRows);
+      const mergedRows = [...riotParticipantRows, ...customParticipantRows];
 
       const knownPuuidRows = puuidSet.size
         ? await this.prisma.knownPuuid.findMany({
@@ -367,7 +732,7 @@ export class StatsService {
           })
         : [];
 
-      return {
+      result = {
         stats: this.aggregateParticipantRows(mergedRows),
         matchCount: mergedRows.length,
         isPartial: knownPuuidRows.some(
@@ -376,108 +741,89 @@ export class StatsService {
             row.normalFetchedAt == null ||
             row.aramFetchedAt == null,
         ),
+        recentGames: this.buildRecentGamesSnapshot(mergedRows),
       };
+    } else {
+      const linkedAccounts = await this.getLinkedAccounts(userId);
+      const puuidSet = new Set(linkedAccounts.map((account) => account.puuid));
+
+      if (puuidSet.size === 0) {
+        result = {
+          stats: [],
+          matchCount: 0,
+          isPartial: false,
+          recentGames: this.buildRecentGamesSnapshot([]),
+        };
+      } else {
+        const queueIds = this.queueGroupToQueueIds[queueGroup];
+        const rows = await this.prisma.riotMatchCache.findMany({
+          where: {
+            queueId: { in: queueIds },
+            gameEnd: { gte: seasonStart },
+          },
+          select: {
+            data: true,
+            gameEnd: true,
+          },
+          orderBy: {
+            gameEnd: "desc",
+          },
+        });
+
+        const riotResult = this.extractStatsFromRiotMatchCacheRows(
+          rows,
+          puuidSet,
+        );
+
+        const knownPuuidRows = await this.prisma.knownPuuid.findMany({
+          where: {
+            puuid: { in: Array.from(puuidSet) },
+          },
+          select: {
+            rankedFetchedAt: true,
+            normalFetchedAt: true,
+            aramFetchedAt: true,
+          },
+        });
+
+        const fetchedField =
+          queueGroup === "ranked"
+            ? "rankedFetchedAt"
+            : queueGroup === "normal"
+              ? "normalFetchedAt"
+              : "aramFetchedAt";
+
+        result = {
+          stats: riotResult.stats,
+          matchCount: riotResult.matchCount,
+          isPartial: knownPuuidRows.some((row) => row[fetchedField] == null),
+          recentGames: riotResult.recentGames,
+        };
+      }
     }
 
-    const linkedAccounts = await this.getLinkedAccounts(userId);
-    const puuidSet = new Set(linkedAccounts.map((account) => account.puuid));
+    await this.persistChampionStatsCache(userId, queueGroup, season, result);
 
-    if (puuidSet.size === 0) {
-      return {
-        stats: [],
-        matchCount: 0,
-        isPartial: false,
-      };
-    }
-
-    const queueIds = this.queueGroupToQueueIds[queueGroup];
-    const rows = await this.prisma.riotMatchCache.findMany({
-      where: {
-        queueId: { in: queueIds },
-        gameEnd: { gte: seasonStart },
-      },
-      select: {
-        data: true,
-      },
-      orderBy: {
-        gameEnd: "desc",
-      },
-    });
-
-    const result = this.extractStatsFromRiotMatchCacheRows(rows, puuidSet);
-
-    const knownPuuidRows = await this.prisma.knownPuuid.findMany({
-      where: {
-        puuid: { in: Array.from(puuidSet) },
-      },
-      select: {
-        rankedFetchedAt: true,
-        normalFetchedAt: true,
-        aramFetchedAt: true,
-      },
-    });
-
-    const fetchedField =
-      queueGroup === "ranked"
-        ? "rankedFetchedAt"
-        : queueGroup === "normal"
-          ? "normalFetchedAt"
-          : "aramFetchedAt";
-
-    const isPartial = knownPuuidRows.some((row) => row[fetchedField] == null);
-
-    await this.prisma.matchStatsCache.upsert({
-      where: {
-        userId_queueGroup_season: {
-          userId,
-          queueGroup,
-          season,
-        },
-      },
-      create: {
-        userId,
-        queueGroup,
-        season,
-        stats: result.stats as unknown as Prisma.JsonArray,
-        matchCount: result.matchCount,
-        isPartial,
-      },
-      update: {
-        stats: result.stats as unknown as Prisma.JsonArray,
-        matchCount: result.matchCount,
-        isPartial,
-        computedAt: new Date(),
-      },
-    });
-
-    await this.redis.set(
-      this.getChampionStatsCacheKey(userId, queueGroup),
-      JSON.stringify({
-        queueGroup,
-        matchCount: result.matchCount,
-        isPartial,
-        computedAt: new Date().toISOString(),
-        stats: result.stats,
-      } satisfies ChampionStatsCacheResponse),
-      3600,
-    );
-
-    return {
-      stats: result.stats,
-      matchCount: result.matchCount,
-      isPartial,
-    };
+    return result;
   }
 
   async recomputeChampionStatsForUser(userId: string): Promise<void> {
-    const queueGroups: QueueGroup[] = ["ranked", "normal", "aram", "custom", "all"];
+    const queueGroups: QueueGroup[] = [
+      "ranked",
+      "normal",
+      "aram",
+      "custom",
+      "all",
+    ];
     for (const queueGroup of queueGroups) {
       await this.computeQueueGroupStats(userId, queueGroup);
     }
 
-    await this.prisma.statsRecomputeQueue.delete({
-      where: { userId },
-    }).catch(() => undefined);
+    await this.prisma.statsRecomputeQueue
+      .delete({
+        where: { userId },
+      })
+      .catch(() => undefined);
   }
 
   async getChampionStatsCacheByUserId(
@@ -535,16 +881,320 @@ export class StatsService {
     return this.getChampionStatsCacheByUserId(found.userId, queueGroup);
   }
 
-  async enqueueStatsRefresh(userId: string): Promise<void> {
+  async getLabUserProfileFallback(
+    userId: string,
+    requesterId?: string,
+  ): Promise<LabUserProfileFallbackResponse> {
+    const user = await this.getUserWithSettings(userId);
+    if (!user) {
+      throw new NotFoundException("User not found");
+    }
+
+    if (
+      requesterId &&
+      !this.isPrivacyAllowed(
+        user.settings,
+        requesterId,
+        userId,
+        "showChampionStats",
+      )
+    ) {
+      throw new ForbiddenException("Champion stats are private");
+    }
+
+    const [customCache, rankedCache] = await Promise.all([
+      this.getChampionStatsCacheByUserId(userId, "custom"),
+      this.getChampionStatsCacheByUserId(userId, "ranked"),
+    ]);
+
+    if (customCache.matchCount >= 10) {
+      throw new NotFoundException(
+        "Lab fallback is only available for users with fewer than 10 custom games",
+      );
+    }
+
+    const champions = rankedCache.stats.map((stat) => {
+      const avgKda =
+        stat.games > 0
+          ? (stat.kills + stat.assists) / Math.max(stat.deaths, 1)
+          : 0;
+      const winRate = stat.games > 0 ? stat.wins / stat.games : 0;
+
+      return {
+        championId: stat.championId,
+        championName: stat.championName,
+        championNameKorean: stat.championNameKorean,
+        games: stat.games,
+        wins: stat.wins,
+        losses: stat.losses,
+        winRate: this.roundMetric(winRate, 4),
+        avgKda: this.roundMetric(avgKda, 2),
+      };
+    });
+
+    const rankedGames = champions.reduce(
+      (sum, champion) => sum + champion.games,
+      0,
+    );
+    const wins = champions.reduce((sum, champion) => sum + champion.wins, 0);
+    const losses = champions.reduce(
+      (sum, champion) => sum + champion.losses,
+      0,
+    );
+    const totalKills = rankedCache.stats.reduce(
+      (sum, champion) => sum + champion.kills,
+      0,
+    );
+    const totalDeaths = rankedCache.stats.reduce(
+      (sum, champion) => sum + champion.deaths,
+      0,
+    );
+    const totalAssists = rankedCache.stats.reduce(
+      (sum, champion) => sum + champion.assists,
+      0,
+    );
+
+    return {
+      userId,
+      customGames: customCache.matchCount,
+      threshold: 10,
+      message:
+        "랭크 전적 기반 성향 참고 데이터입니다. 내전 데이터와는 별도로 해석해야 합니다.",
+      summary: {
+        rankedGames,
+        wins,
+        losses,
+        winRate: rankedGames > 0 ? this.roundMetric(wins / rankedGames, 4) : 0,
+        avgKda:
+          rankedGames > 0
+            ? this.roundMetric(
+                (totalKills + totalAssists) / Math.max(totalDeaths, 1),
+                2,
+              )
+            : 0,
+      },
+      champions,
+    };
+  }
+
+  async getLabUserProfileComparison(
+    userId: string,
+    requesterId?: string,
+  ): Promise<LabUserProfileCompareResponse> {
+    const user = await this.getUserWithSettings(userId);
+    if (!user) {
+      throw new NotFoundException("User not found");
+    }
+
+    if (
+      requesterId &&
+      !this.isPrivacyAllowed(
+        user.settings,
+        requesterId,
+        userId,
+        "showChampionStats",
+      )
+    ) {
+      throw new ForbiddenException("Champion stats are private");
+    }
+
+    const [rankedCache, customCache] = await Promise.all([
+      this.getChampionStatsCacheByUserId(userId, "ranked"),
+      this.getChampionStatsCacheByUserId(userId, "custom"),
+    ]);
+
+    const rankedMap = new Map(
+      rankedCache.stats.map((stat) => [stat.championId, stat] as const),
+    );
+    const customMap = new Map(
+      customCache.stats.map((stat) => [stat.championId, stat] as const),
+    );
+    const championIds = Array.from(
+      new Set([...rankedMap.keys(), ...customMap.keys()]),
+    );
+
+    const champions = championIds
+      .map((championId): LabUserProfileCompareEntry => {
+        const rankedStat =
+          rankedMap.get(championId) ??
+          ({
+            championId,
+            championName:
+              customMap.get(championId)?.championName ?? String(championId),
+            championNameKorean:
+              customMap.get(championId)?.championNameKorean ??
+              String(championId),
+            games: 0,
+            wins: 0,
+            losses: 0,
+            kills: 0,
+            deaths: 0,
+            assists: 0,
+          } satisfies RankedChampStat);
+        const customStat =
+          customMap.get(championId) ??
+          ({
+            championId,
+            championName:
+              rankedMap.get(championId)?.championName ?? String(championId),
+            championNameKorean:
+              rankedMap.get(championId)?.championNameKorean ??
+              String(championId),
+            games: 0,
+            wins: 0,
+            losses: 0,
+            kills: 0,
+            deaths: 0,
+            assists: 0,
+          } satisfies RankedChampStat);
+
+        const rankedWinRate = this.computeStatWinRate(rankedStat);
+        const customWinRate = this.computeStatWinRate(customStat);
+        const rankedAvgKda = this.computeStatAvgKda(rankedStat);
+        const customAvgKda = this.computeStatAvgKda(customStat);
+        const winRateDelta = customWinRate - rankedWinRate;
+        const avgKdaDelta = customAvgKda - rankedAvgKda;
+
+        let signal: LabUserProfileCompareEntry["signal"] = "aligned";
+        if (rankedStat.games < 3 || customStat.games < 3) {
+          signal = "insufficient-data";
+        } else if (winRateDelta >= 0.15 || avgKdaDelta >= 1) {
+          signal = "scrim-favored";
+        } else if (winRateDelta <= -0.15 || avgKdaDelta <= -1) {
+          signal = "ranked-favored";
+        }
+
+        return {
+          championId,
+          championName: rankedStat.championName || customStat.championName,
+          championNameKorean:
+            rankedStat.championNameKorean || customStat.championNameKorean,
+          ranked: {
+            games: rankedStat.games,
+            wins: rankedStat.wins,
+            losses: rankedStat.losses,
+            winRate: this.roundMetric(rankedWinRate, 4),
+            avgKda: this.roundMetric(rankedAvgKda, 2),
+          },
+          custom: {
+            games: customStat.games,
+            wins: customStat.wins,
+            losses: customStat.losses,
+            winRate: this.roundMetric(customWinRate, 4),
+            avgKda: this.roundMetric(customAvgKda, 2),
+          },
+          delta: {
+            games: customStat.games - rankedStat.games,
+            winRate: this.roundMetric(winRateDelta, 4),
+            avgKda: this.roundMetric(avgKdaDelta, 2),
+          },
+          signal,
+        };
+      })
+      .sort((a, b) => {
+        const gameDelta =
+          b.ranked.games + b.custom.games - (a.ranked.games + a.custom.games);
+        if (gameDelta !== 0) return gameDelta;
+        return Math.abs(b.delta.winRate) - Math.abs(a.delta.winRate);
+      });
+
+    const totalRankedKills = rankedCache.stats.reduce(
+      (sum, stat) => sum + stat.kills,
+      0,
+    );
+    const totalRankedDeaths = rankedCache.stats.reduce(
+      (sum, stat) => sum + stat.deaths,
+      0,
+    );
+    const totalRankedAssists = rankedCache.stats.reduce(
+      (sum, stat) => sum + stat.assists,
+      0,
+    );
+    const totalCustomKills = customCache.stats.reduce(
+      (sum, stat) => sum + stat.kills,
+      0,
+    );
+    const totalCustomDeaths = customCache.stats.reduce(
+      (sum, stat) => sum + stat.deaths,
+      0,
+    );
+    const totalCustomAssists = customCache.stats.reduce(
+      (sum, stat) => sum + stat.assists,
+      0,
+    );
+    const rankedWins = rankedCache.stats.reduce(
+      (sum, stat) => sum + stat.wins,
+      0,
+    );
+    const customWins = customCache.stats.reduce(
+      (sum, stat) => sum + stat.wins,
+      0,
+    );
+
+    const rankedWinRate =
+      rankedCache.matchCount > 0 ? rankedWins / rankedCache.matchCount : 0;
+    const customWinRate =
+      customCache.matchCount > 0 ? customWins / customCache.matchCount : 0;
+    const rankedAvgKda =
+      rankedCache.matchCount > 0
+        ? (totalRankedKills + totalRankedAssists) /
+          Math.max(totalRankedDeaths, 1)
+        : 0;
+    const customAvgKda =
+      customCache.matchCount > 0
+        ? (totalCustomKills + totalCustomAssists) /
+          Math.max(totalCustomDeaths, 1)
+        : 0;
+
+    return {
+      userId,
+      summary: {
+        rankedGames: rankedCache.matchCount,
+        customGames: customCache.matchCount,
+        rankedWinRate: this.roundMetric(rankedWinRate, 4),
+        customWinRate: this.roundMetric(customWinRate, 4),
+        rankedAvgKda: this.roundMetric(rankedAvgKda, 2),
+        customAvgKda: this.roundMetric(customAvgKda, 2),
+        winRateDelta: this.roundMetric(customWinRate - rankedWinRate, 4),
+        avgKdaDelta: this.roundMetric(customAvgKda - rankedAvgKda, 2),
+      },
+      champions,
+    };
+  }
+
+  async enqueueStatsRefresh(
+    userId: string,
+    queueGroup: QueueGroup = "ranked",
+  ): Promise<void> {
+    const existingQueue = await this.prisma.statsRecomputeQueue.findUnique({
+      where: { userId },
+      select: {
+        queuedAt: true,
+      },
+    });
+
+    if (
+      existingQueue?.queuedAt &&
+      Date.now() - existingQueue.queuedAt.getTime() < 30 * 60 * 1000
+    ) {
+      throw new HttpException(
+        "Stats refresh can only be requested once every 30 minutes",
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
+    await this.bumpKnownPuuidPriority(userId, queueGroup);
+    await this.invalidateChampionStatsCaches(userId, queueGroup);
+
     await this.prisma.statsRecomputeQueue.upsert({
       where: { userId },
       create: {
         userId,
-        reason: "manual-refresh",
+        reason: `manual-refresh:${queueGroup}`,
         queuedAt: new Date(),
       },
       update: {
-        reason: "manual-refresh",
+        reason: `manual-refresh:${queueGroup}`,
         queuedAt: new Date(),
       },
     });
@@ -567,20 +1217,23 @@ export class StatsService {
           },
         },
       }),
-      this.prisma.user.findUnique({
-        where: { id: userId },
-        select: {
-          riotAccounts: {
-            select: { puuid: true },
+      this.prisma.user
+        .findUnique({
+          where: { id: userId },
+          select: {
+            riotAccounts: {
+              select: { puuid: true },
+            },
           },
-        },
-      }).then(async (user) => {
-        const puuids = user?.riotAccounts.map((account) => account.puuid) ?? [];
-        if (puuids.length === 0) return [];
-        return this.prisma.knownPuuid.findMany({
-          where: { puuid: { in: puuids } },
-        });
-      }),
+        })
+        .then(async (user) => {
+          const puuids =
+            user?.riotAccounts.map((account) => account.puuid) ?? [];
+          if (puuids.length === 0) return [];
+          return this.prisma.knownPuuid.findMany({
+            where: { puuid: { in: puuids } },
+          });
+        }),
       this.prisma.matchStatsCache.findMany({
         where: {
           userId,
@@ -602,19 +1255,31 @@ export class StatsService {
 
     const latestFetchedAt = {
       ranked: knownPuuids.reduce<Date | null>(
-        (acc, row) => (!acc || (row.rankedFetchedAt && row.rankedFetchedAt > acc) ? row.rankedFetchedAt : acc),
+        (acc, row) =>
+          !acc || (row.rankedFetchedAt && row.rankedFetchedAt > acc)
+            ? row.rankedFetchedAt
+            : acc,
         null,
       ),
       normal: knownPuuids.reduce<Date | null>(
-        (acc, row) => (!acc || (row.normalFetchedAt && row.normalFetchedAt > acc) ? row.normalFetchedAt : acc),
+        (acc, row) =>
+          !acc || (row.normalFetchedAt && row.normalFetchedAt > acc)
+            ? row.normalFetchedAt
+            : acc,
         null,
       ),
       aram: knownPuuids.reduce<Date | null>(
-        (acc, row) => (!acc || (row.aramFetchedAt && row.aramFetchedAt > acc) ? row.aramFetchedAt : acc),
+        (acc, row) =>
+          !acc || (row.aramFetchedAt && row.aramFetchedAt > acc)
+            ? row.aramFetchedAt
+            : acc,
         null,
       ),
       custom: knownPuuids.reduce<Date | null>(
-        (acc, row) => (!acc || (row.customFetchedAt && row.customFetchedAt > acc) ? row.customFetchedAt : acc),
+        (acc, row) =>
+          !acc || (row.customFetchedAt && row.customFetchedAt > acc)
+            ? row.customFetchedAt
+            : acc,
         null,
       ),
     };
@@ -631,7 +1296,9 @@ export class StatsService {
             fetchedAt:
               queueGroup === "all"
                 ? null
-                : latestFetchedAt[queueGroup as Exclude<QueueGroup, "all">]?.toISOString() ?? null,
+                : (latestFetchedAt[
+                    queueGroup as Exclude<QueueGroup, "all">
+                  ]?.toISOString() ?? null),
             matchCount: cache?.matchCount ?? 0,
             isPartial: cache?.isPartial ?? false,
             computedAt: cache?.computedAt.toISOString() ?? null,
@@ -880,7 +1547,11 @@ export class StatsService {
   }
 
   private isPrivacyAllowed(
-    settings: { showMatchHistory?: boolean; showChampionStats?: boolean; showRiotAccounts?: boolean } | null,
+    settings: {
+      showMatchHistory?: boolean;
+      showChampionStats?: boolean;
+      showRiotAccounts?: boolean;
+    } | null,
     requesterId: string,
     userId: string,
     setting: "showMatchHistory" | "showChampionStats" | "showRiotAccounts",
@@ -898,8 +1569,24 @@ export class StatsService {
   ): Promise<AuctionStats> {
     const user = await this.getUserWithSettings(userId);
     if (!user) throw new NotFoundException("User not found");
-    if (requesterId && !this.isPrivacyAllowed(user.settings, requesterId, userId, "showMatchHistory")) {
-      return { captainCount: 0, totalAuctions: 0, totalSold: 0, yuchalCount: 0, avgSoldPrice: 0, maxSoldPrice: 0, titles: [] };
+    if (
+      requesterId &&
+      !this.isPrivacyAllowed(
+        user.settings,
+        requesterId,
+        userId,
+        "showMatchHistory",
+      )
+    ) {
+      return {
+        captainCount: 0,
+        totalAuctions: 0,
+        totalSold: 0,
+        yuchalCount: 0,
+        avgSoldPrice: 0,
+        maxSoldPrice: 0,
+        titles: [],
+      };
     }
 
     // 팀장 횟수
@@ -921,7 +1608,9 @@ export class StatsService {
     const yuchalCount = totalAuctions - totalSold;
     const avgSoldPrice =
       totalSold > 0
-        ? Math.round(soldPrices.reduce((s: number, p: number) => s + p, 0) / totalSold)
+        ? Math.round(
+            soldPrices.reduce((s: number, p: number) => s + p, 0) / totalSold,
+          )
         : 0;
     const maxSoldPrice = totalSold > 0 ? Math.max(...soldPrices) : 0;
 
@@ -1008,7 +1697,16 @@ export class StatsService {
   ): Promise<ChampionStats[]> {
     const user = await this.getUserWithSettings(userId);
     if (!user) throw new NotFoundException("User not found");
-    if (requesterId && !this.isPrivacyAllowed(user.settings, requesterId, userId, "showChampionStats")) return [];
+    if (
+      requesterId &&
+      !this.isPrivacyAllowed(
+        user.settings,
+        requesterId,
+        userId,
+        "showChampionStats",
+      )
+    )
+      return [];
 
     // Get all match participants for this user
     const participants = await this.prisma.matchParticipant.findMany({
@@ -1076,7 +1774,16 @@ export class StatsService {
   ): Promise<PositionStats[]> {
     const user = await this.getUserWithSettings(userId);
     if (!user) throw new NotFoundException("User not found");
-    if (requesterId && !this.isPrivacyAllowed(user.settings, requesterId, userId, "showMatchHistory")) return [];
+    if (
+      requesterId &&
+      !this.isPrivacyAllowed(
+        user.settings,
+        requesterId,
+        userId,
+        "showMatchHistory",
+      )
+    )
+      return [];
 
     // Get all match participants for this user
     const participants = await this.prisma.matchParticipant.findMany({
@@ -1196,7 +1903,16 @@ export class StatsService {
     });
 
     if (!user) throw new NotFoundException("User not found");
-    if (requesterId && !this.isPrivacyAllowed(user.settings, requesterId, userId, "showRiotAccounts")) return [];
+    if (
+      requesterId &&
+      !this.isPrivacyAllowed(
+        user.settings,
+        requesterId,
+        userId,
+        "showRiotAccounts",
+      )
+    )
+      return [];
 
     return user.riotAccounts;
   }

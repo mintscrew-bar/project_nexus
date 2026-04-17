@@ -142,7 +142,7 @@ export class PresenceService {
     });
 
     // Extract friend info (the other person in the friendship)
-    return friendships.map((f: typeof friendships[number]) => {
+    return friendships.map((f: (typeof friendships)[number]) => {
       const friend = f.userId === userId ? f.friend : f.user;
       const showStatus = friend.settings?.showOnlineStatus ?? true;
 

@@ -3,11 +3,18 @@ import { join } from "path";
 import { unlink, open } from "fs/promises";
 
 /** 이미지 포맷 매직 바이트 시그니처 목록 */
-const IMAGE_SIGNATURES: Array<{ mime: string; bytes: number[]; offset?: number }> = [
+const IMAGE_SIGNATURES: Array<{
+  mime: string;
+  bytes: number[];
+  offset?: number;
+}> = [
   // JPEG: FF D8 FF
   { mime: "image/jpeg", bytes: [0xff, 0xd8, 0xff] },
   // PNG: 89 50 4E 47 0D 0A 1A 0A
-  { mime: "image/png", bytes: [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a] },
+  {
+    mime: "image/png",
+    bytes: [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a],
+  },
   // GIF87a / GIF89a: 47 49 46 38
   { mime: "image/gif", bytes: [0x47, 0x49, 0x46, 0x38] },
   // WebP: "RIFF" 4바이트 + 4바이트 크기 + "WEBP"

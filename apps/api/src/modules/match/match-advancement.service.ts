@@ -43,7 +43,8 @@ export class MatchAdvancementService {
     });
 
     const currentMatchIndex = currentRoundMatches.findIndex(
-      (m: { id: string; matchNumber: number | null }) => m.matchNumber === currentMatchNumber,
+      (m: { id: string; matchNumber: number | null }) =>
+        m.matchNumber === currentMatchNumber,
     );
 
     if (currentMatchIndex === -1) return false;
@@ -144,7 +145,9 @@ export class MatchAdvancementService {
         },
         orderBy: { matchNumber: "asc" },
       });
-      return siblings.findIndex((m: { id: string; matchNumber: number | null }) => m.id === matchId);
+      return siblings.findIndex(
+        (m: { id: string; matchNumber: number | null }) => m.id === matchId,
+      );
     };
 
     switch (bracketSection) {
@@ -319,7 +322,8 @@ export class MatchAdvancementService {
     });
 
     const allComplete = matches.every(
-      (m: { id: string; status: MatchStatus }) => m.status === MatchStatus.COMPLETED,
+      (m: { id: string; status: MatchStatus }) =>
+        m.status === MatchStatus.COMPLETED,
     );
 
     return allComplete;

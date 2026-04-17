@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import Image from 'next/image';
 import { useAuthStore } from '@/stores/auth-store';
 import { useDmStore, DirectMessage } from '@/stores/dm-store';
 import { dmApi } from '@/lib/api-client';
@@ -26,7 +27,10 @@ export function DmChatView({ otherUserId, otherUsername, otherAvatar }: Props) {
     clearUnread,
   } = useDmStore();
 
-  const myMessages = messages[otherUserId] ?? [];
+  const myMessages = useMemo(
+    () => messages[otherUserId] ?? [],
+    [messages, otherUserId],
+  );
   const isOtherTyping = typingUsers[otherUserId] ?? false;
 
   const [input, setInput] = useState('');
@@ -243,7 +247,13 @@ export function DmChatView({ otherUserId, otherUsername, otherAvatar }: Props) {
                   {showAvatar && (
                     <div className="w-6 h-6 rounded-full bg-bg-tertiary flex items-center justify-center overflow-hidden">
                       {otherAvatar ? (
-                        <img src={otherAvatar} alt="" className="w-full h-full object-cover" />
+                        <Image
+                          src={otherAvatar}
+                          alt=""
+                          width={24}
+                          height={24}
+                          className="w-full h-full object-cover"
+                        />
                       ) : (
                         <span className="text-[10px] font-bold text-text-muted">
                           {otherUsername[0]?.toUpperCase()}

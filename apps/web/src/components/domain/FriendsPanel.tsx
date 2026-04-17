@@ -900,7 +900,13 @@ function ConversationList({
         >
           <div className="w-8 h-8 rounded-full bg-bg-tertiary overflow-hidden flex-shrink-0">
             {conv.user.avatar ? (
-              <img src={conv.user.avatar} alt="" className="w-full h-full object-cover" />
+              <Image
+                src={conv.user.avatar}
+                alt=""
+                width={32}
+                height={32}
+                className="w-full h-full object-cover"
+              />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-xs font-bold text-text-muted">
                 {conv.user.username[0]?.toUpperCase()}

@@ -85,52 +85,56 @@ export class SnakeDraftService {
       room.captainSelection,
     );
     const players = room.participants.filter(
-      (p: (typeof room.participants)[number]) => !captains.find((c: (typeof room.participants)[number]) => c.id === p.id),
+      (p: (typeof room.participants)[number]) =>
+        !captains.find(
+          (c: (typeof room.participants)[number]) => c.id === p.id,
+        ),
     );
 
     // 팀 생성 + 상태 전환 + 캡틴 배정을 원자적으로 처리
-    const teams = await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      const createdTeams = await Promise.all(
-        captains.map(async (captain, index) => {
-          return tx.team.create({
-            data: {
-              roomId,
-              name: `Team ${index + 1}`,
-              captainId: captain.userId,
-              color: this.getTeamColor(index),
-              members: {
-                create: {
-                  userId: captain.userId,
-                  assignedRole: captain.user.riotAccounts[0]?.mainRole,
-                  pickOrder: 0,
+    const teams = await this.prisma.$transaction(
+      async (tx: Prisma.TransactionClient) => {
+        const createdTeams = await Promise.all(
+          captains.map(async (captain, index) => {
+            return tx.team.create({
+              data: {
+                roomId,
+                name: `Team ${index + 1}`,
+                captainId: captain.userId,
+                color: this.getTeamColor(index),
+                members: {
+                  create: {
+                    userId: captain.userId,
+                    assignedRole: captain.user.riotAccounts[0]?.mainRole,
+                    pickOrder: 0,
+                  },
                 },
               },
-            },
-          });
-        }),
-      );
-
-      await tx.room.update({
-        where: { id: roomId },
-        data: { status: RoomStatus.DRAFT },
-      });
-
-      await Promise.all(
-        captains.map((captain) =>
-          tx.roomParticipant.update({
-            where: { id: captain.id },
-            data: {
-              isCaptain: true,
-              teamId: createdTeams.find(
-                (t) => t.captainId === captain.userId,
-              )?.id,
-            },
+            });
           }),
-        ),
-      );
+        );
 
-      return createdTeams;
-    });
+        await tx.room.update({
+          where: { id: roomId },
+          data: { status: RoomStatus.DRAFT },
+        });
+
+        await Promise.all(
+          captains.map((captain) =>
+            tx.roomParticipant.update({
+              where: { id: captain.id },
+              data: {
+                isCaptain: true,
+                teamId: createdTeams.find((t) => t.captainId === captain.userId)
+                  ?.id,
+              },
+            }),
+          ),
+        );
+
+        return createdTeams;
+      },
+    );
 
     // Discord 봇: 팀장에게 역할 부여
     try {
@@ -253,12 +257,12 @@ export class SnakeDraftService {
     // R2: [T3, T1, T2] (T3 연속 픽, 2번팀 끝)
     // R3: [T2, T3, T1] (T2 연속 픽, 1번팀 끝)
     // R4: [T1, T2, T3] (T1 연속 픽)
-    
+
     for (let round = 0; round < picksNeededPerTeam; round++) {
       // 라운드별 시작 오프셋 계산: (numTeams - (round % numTeams)) % numTeams
       // R0: 0, R1: 2, R2: 1, R3: 0 (3팀 기준)
       const startingOffset = (numTeams - (round % numTeams)) % numTeams;
-      
+
       for (let i = 0; i < numTeams; i++) {
         const teamIndex = (startingOffset + i) % numTeams;
         order.push(teamIds[teamIndex]);

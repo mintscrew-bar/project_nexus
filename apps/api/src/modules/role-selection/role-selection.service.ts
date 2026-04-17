@@ -114,7 +114,9 @@ export class RoleSelectionService {
     let userTeamMember = null;
 
     for (const team of room.teams) {
-      const member = team.members.find((m: (typeof team.members)[number]) => m.userId === userId);
+      const member = team.members.find(
+        (m: (typeof team.members)[number]) => m.userId === userId,
+      );
       if (member) {
         userTeam = team;
         userTeamMember = member;
@@ -334,7 +336,9 @@ export class RoleSelectionService {
         ];
       }
 
-      const unassignedMembers = team.members.filter((m: (typeof team.members)[number]) => !m.assignedRole);
+      const unassignedMembers = team.members.filter(
+        (m: (typeof team.members)[number]) => !m.assignedRole,
+      );
 
       for (let i = 0; i < unassignedMembers.length; i++) {
         const role = remainingRoles[i];

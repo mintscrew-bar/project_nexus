@@ -69,7 +69,11 @@ describe("CommunityService", () => {
   // ============================================================
   describe("createPost", () => {
     const userId = "user-1";
-    const baseDto = { title: "제목", content: "내용입니다", category: "GENERAL" as any };
+    const baseDto = {
+      title: "제목",
+      content: "내용입니다",
+      category: "GENERAL" as any,
+    };
 
     it("밴된 유저는 ForbiddenException을 던진다", async () => {
       prisma.user.findUnique.mockResolvedValue({
@@ -102,7 +106,11 @@ describe("CommunityService", () => {
         restrictedUntil: new Date(Date.now() - 1000), // 이미 지남
       });
       redis.incr.mockResolvedValue(1); // 첫 번째 호출
-      prisma.post.create.mockResolvedValue({ id: "post-1", tags: [], author: {} });
+      prisma.post.create.mockResolvedValue({
+        id: "post-1",
+        tags: [],
+        author: {},
+      });
 
       // 예외 없이 진행되어야 함
       await expect(service.createPost(userId, baseDto)).resolves.toBeDefined();
@@ -128,11 +136,18 @@ describe("CommunityService", () => {
         restrictedUntil: null,
       });
       redis.incr.mockResolvedValue(1); // 첫 번째 요청
-      prisma.post.create.mockResolvedValue({ id: "post-1", tags: [], author: {} });
+      prisma.post.create.mockResolvedValue({
+        id: "post-1",
+        tags: [],
+        author: {},
+      });
 
       await service.createPost(userId, baseDto);
 
-      expect(redis.expire).toHaveBeenCalledWith(`post_ratelimit:${userId}`, 600);
+      expect(redis.expire).toHaveBeenCalledWith(
+        `post_ratelimit:${userId}`,
+        600,
+      );
     });
 
     it("제목에 금칙어가 포함되면 BadRequestException을 던진다", async () => {
@@ -170,7 +185,13 @@ describe("CommunityService", () => {
         restrictedUntil: null,
       });
       redis.incr.mockResolvedValue(2);
-      const createdPost = { id: "post-1", title: "제목", content: "내용", tags: [], author: { id: userId } };
+      const createdPost = {
+        id: "post-1",
+        title: "제목",
+        content: "내용",
+        tags: [],
+        author: { id: userId },
+      };
       prisma.post.create.mockResolvedValue(createdPost);
 
       const result = await service.createPost(userId, baseDto);
@@ -196,7 +217,10 @@ describe("CommunityService", () => {
     });
 
     it("본인 게시글이 아니면 ForbiddenException을 던진다", async () => {
-      prisma.post.findFirst.mockResolvedValue({ id: postId, authorId: "other-user" });
+      prisma.post.findFirst.mockResolvedValue({
+        id: postId,
+        authorId: "other-user",
+      });
 
       await expect(
         service.updatePost(userId, postId, { title: "새 제목" }),
@@ -224,7 +248,9 @@ describe("CommunityService", () => {
       const updated = { id: postId, title: "새 제목", isEdited: true };
       prisma.post.update.mockResolvedValue(updated);
 
-      const result = await service.updatePost(userId, postId, { title: "새 제목" });
+      const result = await service.updatePost(userId, postId, {
+        title: "새 제목",
+      });
 
       expect(prisma.post.update).toHaveBeenCalled();
       expect(result).toEqual(updated);
@@ -281,7 +307,10 @@ describe("CommunityService", () => {
         isRestricted: false,
         restrictedUntil: null,
       });
-      prisma.post.findFirst.mockResolvedValue({ id: postId, authorId: "author" });
+      prisma.post.findFirst.mockResolvedValue({
+        id: postId,
+        authorId: "author",
+      });
       // parentId가 다른 게시글의 댓글
       prisma.comment.findUnique.mockResolvedValue({
         id: "parent-1",
@@ -291,7 +320,10 @@ describe("CommunityService", () => {
       });
 
       await expect(
-        service.createComment(userId, postId, { content: "답글", parentId: "parent-1" }),
+        service.createComment(userId, postId, {
+          content: "답글",
+          parentId: "parent-1",
+        }),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -301,7 +333,10 @@ describe("CommunityService", () => {
         isRestricted: false,
         restrictedUntil: null,
       });
-      prisma.post.findFirst.mockResolvedValue({ id: postId, authorId: "post-author" });
+      prisma.post.findFirst.mockResolvedValue({
+        id: postId,
+        authorId: "post-author",
+      });
       const createdComment = {
         id: "comment-1",
         content: "정상 댓글",
@@ -309,10 +344,16 @@ describe("CommunityService", () => {
       };
       prisma.comment.create.mockResolvedValue(createdComment);
 
-      const result = await service.createComment(userId, postId, { content: "정상 댓글" });
+      const result = await service.createComment(userId, postId, {
+        content: "정상 댓글",
+      });
 
       expect(prisma.comment.create).toHaveBeenCalled();
-      expect(notification.notifyComment).toHaveBeenCalledWith("post-author", "user1", postId);
+      expect(notification.notifyComment).toHaveBeenCalledWith(
+        "post-author",
+        "user1",
+        postId,
+      );
       expect(result).toEqual(createdComment);
     });
 
@@ -347,9 +388,9 @@ describe("CommunityService", () => {
     };
 
     it("postId와 commentId가 모두 없으면 BadRequestException을 던진다", async () => {
-      await expect(
-        service.reportContent(userId, baseReport),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.reportContent(userId, baseReport)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it("이미 신고한 게시글은 ConflictException을 던진다", async () => {
@@ -390,7 +431,10 @@ describe("CommunityService", () => {
       prisma.postReport.count.mockResolvedValue(6); // 임계값 초과
       prisma.comment.updateMany.mockResolvedValue({ count: 1 });
 
-      await service.reportContent(userId, { ...baseReport, commentId: "comment-1" });
+      await service.reportContent(userId, {
+        ...baseReport,
+        commentId: "comment-1",
+      });
 
       expect(prisma.comment.updateMany).toHaveBeenCalledWith({
         where: { id: "comment-1", isBlinded: false, isDeleted: false },

@@ -1,5 +1,6 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { calculateTierScore as sharedCalculateTierScore } from "@nexus/types";
 
 /**
  * Tailwind 클래스 병합 유틸리티
@@ -57,25 +58,8 @@ export function getTierIcon(tier?: string | null): string {
   return findTier(tier).icon;
 }
 
-/**
- * 롤 티어/랭크/LP → 통합 MMR 점수 변환
- * 백엔드 tier-score.util.ts 와 동일한 로직
- *   IRON IV 0LP = 0 … BRONZE IV 0LP = 400 … CHALLENGER = 3600+
- */
-const TIER_SCORE_BASE: Record<string, number> = {
-  UNRANKED: 0, IRON: 0, BRONZE: 400, SILVER: 800, GOLD: 1200,
-  PLATINUM: 1600, EMERALD: 2000, DIAMOND: 2400,
-  MASTER: 2800, GRANDMASTER: 3200, CHALLENGER: 3600,
-};
-const RANK_SCORE_BONUS: Record<string, number> = { IV: 0, III: 100, II: 200, I: 300, '': 0 };
-const MASTER_PLUS_TIERS = new Set(['MASTER', 'GRANDMASTER', 'CHALLENGER']);
-
 export function calculateTierScore(tier?: string | null, rank?: string | null, lp = 0): number {
-  const normalizedTier = (tier ?? "UNRANKED").toUpperCase();
-  const normalizedRank = rank ?? "";
-  const base = TIER_SCORE_BASE[normalizedTier] ?? 0;
-  const bonus = MASTER_PLUS_TIERS.has(normalizedTier) ? 0 : (RANK_SCORE_BONUS[normalizedRank] ?? 0);
-  return base + bonus + lp;
+  return sharedCalculateTierScore(tier ?? "UNRANKED", rank ?? "", lp);
 }
 
 /**

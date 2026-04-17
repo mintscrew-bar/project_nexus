@@ -21,7 +21,10 @@ import { MatchBracketService, Bracket } from "./match-bracket.service";
 import { MatchAdvancementService } from "./match-advancement.service";
 import { RankingService } from "../ranking/ranking.service";
 import { RoomStatus, MatchStatus, BracketType } from "@nexus/database";
-import { getChampionKoreanName, getSummonerSpellKoreanName } from "@nexus/types";
+import {
+  getChampionKoreanName,
+  getSummonerSpellKoreanName,
+} from "@nexus/types";
 
 // Re-export types for backward compatibility
 export type { BracketMatch, Bracket } from "./match-bracket.service";
@@ -1015,7 +1018,7 @@ export class MatchService {
       skip: offset,
     });
 
-    return matches.map((participant: typeof matches[number]) => ({
+    return matches.map((participant: (typeof matches)[number]) => ({
       matchId: participant.matchId,
       match: participant.match,
       participant: {

@@ -195,7 +195,7 @@ export class MatchBracketService {
 
     return {
       type: bracketType,
-      matches: matches.map((m: typeof matches[number]) => ({
+      matches: matches.map((m: (typeof matches)[number]) => ({
         id: m.id,
         round: m.round || 1,
         matchNumber: m.matchNumber || 1,

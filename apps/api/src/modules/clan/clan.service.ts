@@ -60,20 +60,14 @@ export class ClanService {
     private readonly notificationService: NotificationService,
   ) {}
 
-  private canManageSettings(
-    role: ClanRole,
-    permissions: OfficerPermissions,
-  ) {
+  private canManageSettings(role: ClanRole, permissions: OfficerPermissions) {
     return (
       role === ClanRole.OWNER ||
       (role === ClanRole.OFFICER && permissions.officerCanManageSettings)
     );
   }
 
-  private canManageMembers(
-    role: ClanRole,
-    permissions: OfficerPermissions,
-  ) {
+  private canManageMembers(role: ClanRole, permissions: OfficerPermissions) {
     return (
       role === ClanRole.OWNER ||
       (role === ClanRole.OFFICER && permissions.officerCanManageMembers)
@@ -100,7 +94,9 @@ export class ClanService {
     );
   }
 
-  private async getOfficerPermissions(clanId: string): Promise<OfficerPermissions> {
+  private async getOfficerPermissions(
+    clanId: string,
+  ): Promise<OfficerPermissions> {
     const rows = await this.prisma.$queryRaw<OfficerPermissions[]>(Prisma.sql`
       SELECT
         "officerCanManageSettings",
@@ -342,9 +338,7 @@ export class ClanService {
       dto.officerCanManageInvitations !== undefined;
 
     if (ownerOnlyFieldsChanged && member.role !== ClanRole.OWNER) {
-      throw new ForbiddenException(
-        "Only clan owner can change clan policies",
-      );
+      throw new ForbiddenException("Only clan owner can change clan policies");
     }
 
     if (dto.maxMembers !== undefined) {
@@ -404,7 +398,8 @@ export class ClanService {
         dto.officerCanManageAnnouncements ??
         permissions.officerCanManageAnnouncements,
       officerCanManageInvitations:
-        dto.officerCanManageInvitations ?? permissions.officerCanManageInvitations,
+        dto.officerCanManageInvitations ??
+        permissions.officerCanManageInvitations,
     };
   }
 
@@ -880,7 +875,10 @@ export class ClanService {
 
     // 전체 클랜 통계 집계
     const totals = rankings.reduce(
-      (acc: { totalGames: number; totalWins: number; totalLosses: number }, r: any) => ({
+      (
+        acc: { totalGames: number; totalWins: number; totalLosses: number },
+        r: any,
+      ) => ({
         totalGames: acc.totalGames + r.totalGames,
         totalWins: acc.totalWins + r.wins,
         totalLosses: acc.totalLosses + r.losses,
@@ -1233,45 +1231,47 @@ export class ClanService {
     }
 
     // 멤버십 중복 검사 + 정원 확인 + 초대 처리 + 멤버 추가를 원자적으로 실행
-    const membership = await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      // 이미 클랜이 있는지 확인
-      const existingMembership = await tx.clanMember.findFirst({
-        where: { userId },
-      });
-      if (existingMembership)
-        throw new ConflictException("You are already in a clan");
+    const membership = await this.prisma.$transaction(
+      async (tx: Prisma.TransactionClient) => {
+        // 이미 클랜이 있는지 확인
+        const existingMembership = await tx.clanMember.findFirst({
+          where: { userId },
+        });
+        if (existingMembership)
+          throw new ConflictException("You are already in a clan");
 
-      // 클랜 정원 확인
-      const memberCount = await tx.clanMember.count({
-        where: { clanId: invitation.clanId },
-      });
-      if (memberCount >= invitation.clan.maxMembers) {
-        throw new BadRequestException("Clan is full");
-      }
+        // 클랜 정원 확인
+        const memberCount = await tx.clanMember.count({
+          where: { clanId: invitation.clanId },
+        });
+        if (memberCount >= invitation.clan.maxMembers) {
+          throw new BadRequestException("Clan is full");
+        }
 
-      // 초대장 처리
-      await tx.clanInvitation.update({
-        where: { id: invitation.id },
-        data: {
-          status: ClanInvitationStatus.ACCEPTED,
-          resolvedBy: userId,
-          resolvedAt: new Date(),
-        },
-      });
+        // 초대장 처리
+        await tx.clanInvitation.update({
+          where: { id: invitation.id },
+          data: {
+            status: ClanInvitationStatus.ACCEPTED,
+            resolvedBy: userId,
+            resolvedAt: new Date(),
+          },
+        });
 
-      // 멤버 추가
-      return tx.clanMember.create({
-        data: {
-          clanId: invitation.clanId,
-          userId,
-          role: ClanRole.MEMBER,
-        },
-        include: {
-          user: { select: { id: true, username: true, avatar: true } },
-          clan: true,
-        },
-      });
-    });
+        // 멤버 추가
+        return tx.clanMember.create({
+          data: {
+            clanId: invitation.clanId,
+            userId,
+            role: ClanRole.MEMBER,
+          },
+          include: {
+            user: { select: { id: true, username: true, avatar: true } },
+            clan: true,
+          },
+        });
+      },
+    );
 
     await this.logActivity(
       invitation.clanId,

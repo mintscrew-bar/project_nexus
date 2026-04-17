@@ -17,6 +17,7 @@ import { DataDragonService } from "../riot/data-dragon.service";
 import {
   FindSummonerQueryDto,
   MatchHistoryQueryDto,
+  RefreshStatsQueryDto,
   SearchUsersQueryDto,
   UserMatchHistoryQueryDto,
 } from "./dto/stats-query.dto";
@@ -177,13 +178,15 @@ export class StatsController {
   async enqueueRefresh(
     @CurrentUser("sub") requesterId: string,
     @Param("userId") userId: string,
+    @Query() query: RefreshStatsQueryDto,
   ) {
     if (requesterId !== userId) {
       throw new ForbiddenException("Cannot refresh another user's stats");
     }
 
-    await this.statsService.enqueueStatsRefresh(userId);
-    return { queued: true };
+    const queueGroup = query.queueGroup ?? "ranked";
+    await this.statsService.enqueueStatsRefresh(userId, queueGroup);
+    return { queued: true, queueGroup };
   }
 
   /**

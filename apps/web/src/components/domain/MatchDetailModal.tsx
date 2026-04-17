@@ -68,7 +68,7 @@ export function MatchDetailModal({
     return () => {
       clearInterval(intervalId);
     };
-  }, [isOpen, match?.id, match?.status, onRefreshLiveStatus]);
+  }, [isOpen, match, onRefreshLiveStatus]);
 
   if (!match) return null;
 

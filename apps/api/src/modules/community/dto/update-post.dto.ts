@@ -1,4 +1,11 @@
-import { IsString, IsOptional, IsNotEmpty, MaxLength, IsArray, ArrayMaxSize } from "class-validator";
+import {
+  IsString,
+  IsOptional,
+  IsNotEmpty,
+  MaxLength,
+  IsArray,
+  ArrayMaxSize,
+} from "class-validator";
 import { Transform } from "class-transformer";
 import { sanitizeHtml, stripAllHtml } from "@/common/utils/sanitize";
 

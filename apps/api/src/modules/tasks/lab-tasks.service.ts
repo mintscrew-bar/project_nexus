@@ -27,9 +27,7 @@ export class LabTasksService {
     const lockToken = await this.redis.acquireLock(lockKey, 55 * 60 * 1000);
 
     if (!lockToken) {
-      this.logger.warn(
-        "RiotTierRefreshTask 건너뜀: 다른 워커가 락을 보유 중",
-      );
+      this.logger.warn("RiotTierRefreshTask 건너뜀: 다른 워커가 락을 보유 중");
       return;
     }
 
@@ -70,10 +68,7 @@ export class LabTasksService {
     const priorityAccounts = await this.prisma.riotAccount.findMany({
       where: {
         userId: { in: Array.from(activeUserIdSet) },
-        OR: [
-          { lastSyncedAt: null },
-          { lastSyncedAt: { lt: todayStart } },
-        ],
+        OR: [{ lastSyncedAt: null }, { lastSyncedAt: { lt: todayStart } }],
       },
       select: {
         id: true,
@@ -133,7 +128,9 @@ export class LabTasksService {
           );
 
           if (!res.ok) {
-            throw new Error(`API ${res.status}: ${account.gameName}#${account.tagLine}`);
+            throw new Error(
+              `API ${res.status}: ${account.gameName}#${account.tagLine}`,
+            );
           }
 
           const entries: any[] = await res.json();
@@ -186,9 +183,7 @@ export class LabTasksService {
     const lockToken = await this.redis.acquireLock(lockKey, 55 * 60 * 1000);
 
     if (!lockToken) {
-      this.logger.warn(
-        "LabSnapshotTask 건너뜀: 다른 워커가 락을 보유 중",
-      );
+      this.logger.warn("LabSnapshotTask 건너뜀: 다른 워커가 락을 보유 중");
       return;
     }
 

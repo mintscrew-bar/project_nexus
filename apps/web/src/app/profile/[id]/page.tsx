@@ -103,7 +103,7 @@ export default function PublicProfilePage() {
 
     loadProfile();
     loadFriendStatus();
-  }, [targetId, isAuthenticated]);
+  }, [targetId, isAuthenticated, addToast]);
 
   // 친구 요청 보내기
   const handleSendFriendRequest = async () => {

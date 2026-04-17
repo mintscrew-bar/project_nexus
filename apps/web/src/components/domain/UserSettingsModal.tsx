@@ -71,7 +71,7 @@ export function UserSettingsModal({ isOpen, onClose }: UserSettingsModalProps) {
           setSettingsLoading(false);
         });
     }
-  }, [isOpen, isAuthenticated]);
+  }, [isOpen, isAuthenticated, setNextTheme]);
 
   const handleSettingChange = async (key: keyof UserSettings, value: boolean | string) => {
     const prevSettings = { ...settings };

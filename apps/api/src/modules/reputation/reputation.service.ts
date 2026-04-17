@@ -153,12 +153,21 @@ export class ReputationService {
     }
 
     const avgSkill =
-      ratings.reduce((sum: number, r: (typeof ratings)[number]) => sum + r.skillRating, 0) / ratings.length;
+      ratings.reduce(
+        (sum: number, r: (typeof ratings)[number]) => sum + r.skillRating,
+        0,
+      ) / ratings.length;
     const avgAttitude =
-      ratings.reduce((sum: number, r: (typeof ratings)[number]) => sum + r.attitudeRating, 0) / ratings.length;
+      ratings.reduce(
+        (sum: number, r: (typeof ratings)[number]) => sum + r.attitudeRating,
+        0,
+      ) / ratings.length;
     const avgCommunication =
-      ratings.reduce((sum: number, r: (typeof ratings)[number]) => sum + r.communicationRating, 0) /
-      ratings.length;
+      ratings.reduce(
+        (sum: number, r: (typeof ratings)[number]) =>
+          sum + r.communicationRating,
+        0,
+      ) / ratings.length;
 
     const overall = (avgSkill + avgAttitude + avgCommunication) / 3;
 

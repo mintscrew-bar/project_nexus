@@ -45,7 +45,10 @@ export class AuctionService implements OnModuleInit {
   /** 인메모리 주장 선정 단계 (빠른 동기 접근용) — Redis와 동기화됨 */
   private captainPhases = new Map<string, CaptainSelectionPhase>();
   /** setTimeout 핸들 — 직렬화 불가로 인메모리 전용 유지 */
-  private captainTimerHandles = new Map<string, ReturnType<typeof setTimeout>>();
+  private captainTimerHandles = new Map<
+    string,
+    ReturnType<typeof setTimeout>
+  >();
   private discordVoiceService: any; // DiscordVoiceService (optional dependency)
 
   // Redis 키 상수
@@ -72,7 +75,10 @@ export class AuctionService implements OnModuleInit {
     try {
       await this._restoreStatesFromRedis();
     } catch (error) {
-      console.warn("[AuctionService] Redis 상태 복원 실패 (정상 시작으로 계속):", error);
+      console.warn(
+        "[AuctionService] Redis 상태 복원 실패 (정상 시작으로 계속):",
+        error,
+      );
     }
   }
 
@@ -99,7 +105,10 @@ export class AuctionService implements OnModuleInit {
 
         if (stateStr) {
           try {
-            this.auctionStates.set(roomId, JSON.parse(stateStr) as AuctionState);
+            this.auctionStates.set(
+              roomId,
+              JSON.parse(stateStr) as AuctionState,
+            );
             restoredCount++;
           } catch {
             // 손상된 값 무시
@@ -120,7 +129,9 @@ export class AuctionService implements OnModuleInit {
     );
 
     if (restoredCount > 0) {
-      console.log(`[AuctionService] 경매 상태 ${restoredCount}건 Redis에서 복원됨`);
+      console.log(
+        `[AuctionService] 경매 상태 ${restoredCount}건 Redis에서 복원됨`,
+      );
     }
   }
 
@@ -133,7 +144,12 @@ export class AuctionService implements OnModuleInit {
         JSON.stringify(state),
         AuctionService.AUCTION_TTL,
       )
-      .catch((e) => console.warn(`[AuctionService] Redis 경매 상태 저장 실패 (${roomId}):`, e));
+      .catch((e) =>
+        console.warn(
+          `[AuctionService] Redis 경매 상태 저장 실패 (${roomId}):`,
+          e,
+        ),
+      );
   }
 
   /** 경매 상태를 인메모리 + Redis에서 삭제 */
@@ -141,7 +157,12 @@ export class AuctionService implements OnModuleInit {
     this.auctionStates.delete(roomId);
     this.redis
       .del(AuctionService.AUCTION_STATE_KEY(roomId))
-      .catch((e) => console.warn(`[AuctionService] Redis 경매 상태 삭제 실패 (${roomId}):`, e));
+      .catch((e) =>
+        console.warn(
+          `[AuctionService] Redis 경매 상태 삭제 실패 (${roomId}):`,
+          e,
+        ),
+      );
   }
 
   /** 팀장 선정 단계를 인메모리 + Redis에 저장 (timerHandle 제외) */
@@ -154,7 +175,12 @@ export class AuctionService implements OnModuleInit {
         JSON.stringify(serializable),
         AuctionService.CAPTAIN_TTL,
       )
-      .catch((e) => console.warn(`[AuctionService] Redis 팀장 단계 저장 실패 (${roomId}):`, e));
+      .catch((e) =>
+        console.warn(
+          `[AuctionService] Redis 팀장 단계 저장 실패 (${roomId}):`,
+          e,
+        ),
+      );
   }
 
   /** 팀장 선정 단계를 인메모리 + Redis에서 삭제 */
@@ -167,7 +193,12 @@ export class AuctionService implements OnModuleInit {
     this.captainPhases.delete(roomId);
     this.redis
       .del(AuctionService.CAPTAIN_PHASE_KEY(roomId))
-      .catch((e) => console.warn(`[AuctionService] Redis 팀장 단계 삭제 실패 (${roomId}):`, e));
+      .catch((e) =>
+        console.warn(
+          `[AuctionService] Redis 팀장 단계 삭제 실패 (${roomId}):`,
+          e,
+        ),
+      );
   }
 
   private getBaseBidTimerMs(): number {
@@ -400,50 +431,51 @@ export class AuctionService implements OnModuleInit {
     );
 
     // 팀 생성 + 상태 전환 + 캡틴 배정을 원자적으로 처리
-    const teams = await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      const createdTeams = await Promise.all(
-        captainParticipants.map(async (captain: any, index: number) => {
-          const initialBudget = room.startingPoints || 1000;
-          return tx.team.create({
-            data: {
-              roomId,
-              name: `Team ${index + 1}`,
-              captainId: captain.userId,
-              color: this.getTeamColor(index),
-              initialBudget,
-              remainingBudget: initialBudget,
-              members: {
-                create: {
-                  userId: captain.userId,
-                  assignedRole: captain.user.riotAccounts[0]?.mainRole,
+    const teams = await this.prisma.$transaction(
+      async (tx: Prisma.TransactionClient) => {
+        const createdTeams = await Promise.all(
+          captainParticipants.map(async (captain: any, index: number) => {
+            const initialBudget = room.startingPoints || 1000;
+            return tx.team.create({
+              data: {
+                roomId,
+                name: `Team ${index + 1}`,
+                captainId: captain.userId,
+                color: this.getTeamColor(index),
+                initialBudget,
+                remainingBudget: initialBudget,
+                members: {
+                  create: {
+                    userId: captain.userId,
+                    assignedRole: captain.user.riotAccounts[0]?.mainRole,
+                  },
                 },
               },
-            },
-          });
-        }),
-      );
-
-      await tx.room.update({
-        where: { id: roomId },
-        data: { status: RoomStatus.DRAFT },
-      });
-
-      await Promise.all(
-        captainParticipants.map((captain: any) =>
-          tx.roomParticipant.update({
-            where: { id: captain.id },
-            data: {
-              isCaptain: true,
-              teamId: createdTeams.find(
-                (t) => t.captainId === captain.userId,
-              )?.id,
-            },
+            });
           }),
-        ),
-      );
+        );
 
-      return createdTeams;
-    });
+        await tx.room.update({
+          where: { id: roomId },
+          data: { status: RoomStatus.DRAFT },
+        });
+
+        await Promise.all(
+          captainParticipants.map((captain: any) =>
+            tx.roomParticipant.update({
+              where: { id: captain.id },
+              data: {
+                isCaptain: true,
+                teamId: createdTeams.find((t) => t.captainId === captain.userId)
+                  ?.id,
+              },
+            }),
+          ),
+        );
+
+        return createdTeams;
+      },
+    );
 
     try {
       if (this.discordVoiceService) {
@@ -847,11 +879,15 @@ export class AuctionService implements OnModuleInit {
           where: { id: team.id },
           select: { remainingBudget: true },
         });
-        if (!freshTeam) throw new BadRequestException("팀 정보를 찾을 수 없습니다.");
+        if (!freshTeam)
+          throw new BadRequestException("팀 정보를 찾을 수 없습니다.");
 
         const freshSlots = Math.max(0, 5 - team._count.members);
         const freshReserve = Math.max(0, (freshSlots - 1) * 100);
-        const freshAvailable = Math.max(0, freshTeam.remainingBudget - freshReserve);
+        const freshAvailable = Math.max(
+          0,
+          freshTeam.remainingBudget - freshReserve,
+        );
         if (amount > freshAvailable) {
           throw new BadRequestException(
             `예산 부족 (가용 예산: ${freshAvailable}, 필요 적립금: ${freshReserve})`,

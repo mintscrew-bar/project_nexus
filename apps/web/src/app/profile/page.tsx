@@ -172,7 +172,7 @@ export default function ProfilePage() {
     } finally {
       setMatchesLoading(false);
     }
-  }, []);
+  }, [addToast]);
 
   const fetchChampionStats = useCallback(async () => {
     if (!user?.id) return;

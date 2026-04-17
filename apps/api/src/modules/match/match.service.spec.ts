@@ -9,7 +9,10 @@ import { NotificationService } from "../notification/notification.service";
 import { MatchBracketService } from "./match-bracket.service";
 import { MatchAdvancementService } from "./match-advancement.service";
 import { RankingService } from "../ranking/ranking.service";
-import { getChampionKoreanName, getSummonerSpellKoreanName } from "@nexus/types";
+import {
+  getChampionKoreanName,
+  getSummonerSpellKoreanName,
+} from "@nexus/types";
 
 describe("MatchService", () => {
   let service: MatchService;
@@ -112,7 +115,7 @@ describe("MatchService", () => {
           matchId: "match-1",
           championId: 103,
           championName: "Ahri",
-          summoner1Id: 4,  // 점멸
+          summoner1Id: 4, // 점멸
           summoner2Id: 14, // 점화
           position: "MIDDLE",
           kills: 8,
@@ -206,8 +209,8 @@ describe("MatchService", () => {
           matchId: "match-1",
           championId: 103,
           championName: "Ahri",
-          summoner1Id: 4,   // SummonerFlash — 점멸
-          summoner2Id: 14,  // SummonerDot — 점화
+          summoner1Id: 4, // SummonerFlash — 점멸
+          summoner2Id: 14, // SummonerDot — 점화
           position: "MIDDLE",
           kills: 5,
           deaths: 3,
@@ -273,8 +276,8 @@ describe("MatchService", () => {
           matchId: "match-1",
           championId: 60,
           championName: "Elise",
-          summoner1Id: 11,  // SummonerSmite — 강타
-          summoner2Id: 12,  // SummonerTeleport — 순간이동
+          summoner1Id: 11, // SummonerSmite — 강타
+          summoner2Id: 12, // SummonerTeleport — 순간이동
           position: "JUNGLE",
           kills: 3,
           deaths: 1,
@@ -310,8 +313,8 @@ describe("MatchService", () => {
           matchId: "match-1",
           championId: 103,
           championName: "Ahri",
-          summoner1Id: 9999,  // 매핑에 없는 ID
-          summoner2Id: 8888,  // 매핑에 없는 ID
+          summoner1Id: 9999, // 매핑에 없는 ID
+          summoner2Id: 8888, // 매핑에 없는 ID
           position: "MIDDLE",
           kills: 5,
           deaths: 2,
@@ -346,8 +349,8 @@ describe("MatchService", () => {
           matchId: "match-1",
           championId: 103,
           championName: "Ahri",
-          summoner1Id: 4,   // 점멸
-          summoner2Id: 14,  // 점화
+          summoner1Id: 4, // 점멸
+          summoner2Id: 14, // 점화
           position: "MIDDLE",
           kills: 8,
           deaths: 2,
@@ -366,8 +369,8 @@ describe("MatchService", () => {
           matchId: "match-2",
           championId: 238,
           championName: "Zed",
-          summoner1Id: 4,   // 점멸
-          summoner2Id: 6,   // 유체화(고스트)
+          summoner1Id: 4, // 점멸
+          summoner2Id: 6, // 유체화(고스트)
           position: "MIDDLE",
           kills: 12,
           deaths: 4,
@@ -425,7 +428,7 @@ describe("MatchService", () => {
           summoner2Id: 14,
           position: "MIDDLE",
           kills: 10,
-          deaths: 0,  // 무사망
+          deaths: 0, // 무사망
           assists: 5,
           win: true,
           totalDamageDealtToChampions: 40000,

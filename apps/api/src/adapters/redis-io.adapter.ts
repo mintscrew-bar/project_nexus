@@ -1,7 +1,7 @@
-import { IoAdapter } from '@nestjs/platform-socket.io';
-import { ServerOptions } from 'socket.io';
-import { createAdapter } from '@socket.io/redis-adapter';
-import Redis from 'ioredis';
+import { IoAdapter } from "@nestjs/platform-socket.io";
+import { ServerOptions } from "socket.io";
+import { createAdapter } from "@socket.io/redis-adapter";
+import Redis from "ioredis";
 
 /**
  * Redis pub/sub 기반 Socket.IO 어댑터
@@ -24,7 +24,7 @@ export class RedisIoAdapter extends IoAdapter {
    * - 연결 실패 시 예외를 throw하지 않고 null 상태 유지 (서버는 계속 동작)
    */
   async connectToRedis(): Promise<void> {
-    const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+    const redisUrl = process.env.REDIS_URL || "redis://localhost:6379";
 
     try {
       // pub/sub 각각 독립 클라이언트 생성 (ioredis 권장 패턴)
@@ -36,20 +36,20 @@ export class RedisIoAdapter extends IoAdapter {
       const subClient = pubClient.duplicate();
 
       // 두 클라이언트 모두 ready 상태가 될 때까지 대기
-      await Promise.all([
-        pubClient.connect(),
-        subClient.connect(),
-      ]);
+      await Promise.all([pubClient.connect(), subClient.connect()]);
 
       // 클래스 멤버로 보관 — close() 시 연결 정리에 사용
       this.pubClient = pubClient;
       this.subClient = subClient;
 
       this.adapterConstructor = createAdapter(pubClient, subClient);
-      console.log('[RedisIoAdapter] Redis 어댑터 연결 성공');
+      console.log("[RedisIoAdapter] Redis 어댑터 연결 성공");
     } catch (err) {
       // Redis 없이도 서버가 동작해야 하므로 경고만 출력
-      console.warn('[RedisIoAdapter] Redis 연결 실패, 인메모리 모드로 동작:', err);
+      console.warn(
+        "[RedisIoAdapter] Redis 연결 실패, 인메모리 모드로 동작:",
+        err,
+      );
       this.adapterConstructor = null;
     }
   }
@@ -91,12 +91,12 @@ export class RedisIoAdapter extends IoAdapter {
     }
 
     if (cleanupPromises.length > 0) {
-      console.log('[RedisIoAdapter] Redis 연결 종료 중...');
+      console.log("[RedisIoAdapter] Redis 연결 종료 중...");
       try {
         await Promise.all(cleanupPromises);
-        console.log('[RedisIoAdapter] Redis 연결 정리 완료');
+        console.log("[RedisIoAdapter] Redis 연결 정리 완료");
       } catch (err) {
-        console.error('[RedisIoAdapter] Redis 연결 종료 중 오류:', err);
+        console.error("[RedisIoAdapter] Redis 연결 종료 중 오류:", err);
       }
     }
   }

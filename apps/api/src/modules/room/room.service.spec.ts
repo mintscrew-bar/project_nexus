@@ -1,5 +1,8 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { ServiceUnavailableException, BadRequestException } from "@nestjs/common";
+import {
+  ServiceUnavailableException,
+  BadRequestException,
+} from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { RoomService } from "./room.service";
 import { PrismaService } from "../prisma/prisma.service";
@@ -88,7 +91,9 @@ describe("RoomService", () => {
 
     it("Riot 미연동 일반 유저는 BadRequestException을 던진다", async () => {
       prisma.user.findUnique.mockResolvedValue({ role: "USER" });
-      prisma.authProvider.findFirst.mockResolvedValue({ id: "discord-provider" }); // Discord 연동
+      prisma.authProvider.findFirst.mockResolvedValue({
+        id: "discord-provider",
+      }); // Discord 연동
       prisma.riotAccount.findFirst.mockResolvedValue(null); // Riot 미연동
 
       await expect(service.createRoom("host-1", baseDto)).rejects.toThrow(

@@ -146,10 +146,7 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
     // ─── 음성채널 입/퇴장 감지 ───
     // 유저가 음성채널에 입장하거나 퇴장할 때마다 해당 채널이
     // Nexus 방의 Lobby 채널인지 DB에서 조회하고, 맞으면 내부 이벤트 발행
-    this.client.on(
-      "voiceStateUpdate",
-      this.handleVoiceStateUpdate.bind(this),
-    );
+    this.client.on("voiceStateUpdate", this.handleVoiceStateUpdate.bind(this));
   }
 
   /**
@@ -446,7 +443,10 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
           value:
             existingUser.riotAccounts.length > 0
               ? existingUser.riotAccounts
-                  .map((r: (typeof existingUser.riotAccounts)[number]) => `${r.gameName}#${r.tagLine}`)
+                  .map(
+                    (r: (typeof existingUser.riotAccounts)[number]) =>
+                      `${r.gameName}#${r.tagLine}`,
+                  )
                   .join(", ")
               : "없음",
         });
@@ -483,7 +483,9 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    const primaryAccount = user.riotAccounts.find((r: (typeof user.riotAccounts)[number]) => r.isPrimary);
+    const primaryAccount = user.riotAccounts.find(
+      (r: (typeof user.riotAccounts)[number]) => r.isPrimary,
+    );
 
     const embed = new EmbedBuilder()
       .setColor(Colors.Gold)
@@ -897,8 +899,9 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
         {
           name: `🔵 ${match.teamA?.name ?? "TBD"}`,
           value:
-            match.teamA?.members.map((m: { user: { username: string } }) => m.user.username).join(", ") ||
-            "팀원 없음",
+            match.teamA?.members
+              .map((m: { user: { username: string } }) => m.user.username)
+              .join(", ") || "팀원 없음",
           inline: true,
         },
         {
@@ -909,8 +912,9 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
         {
           name: `🔴 ${match.teamB?.name ?? "TBD"}`,
           value:
-            match.teamB?.members.map((m: { user: { username: string } }) => m.user.username).join(", ") ||
-            "팀원 없음",
+            match.teamB?.members
+              .map((m: { user: { username: string } }) => m.user.username)
+              .join(", ") || "팀원 없음",
           inline: true,
         },
       );
@@ -1163,14 +1167,16 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
 
     // 티어 + LP 기준 내림차순 정렬
     const rankValue: Record<string, number> = { I: 4, II: 3, III: 2, IV: 1 };
-    accounts.sort((a: (typeof accounts)[number], b: (typeof accounts)[number]) => {
-      const tierDiff = (TIER_ORDER[b.tier] ?? 0) - (TIER_ORDER[a.tier] ?? 0);
-      if (tierDiff !== 0) return tierDiff;
-      const rankDiff =
-        (rankValue[b.rank ?? ""] ?? 0) - (rankValue[a.rank ?? ""] ?? 0);
-      if (rankDiff !== 0) return rankDiff;
-      return b.lp - a.lp;
-    });
+    accounts.sort(
+      (a: (typeof accounts)[number], b: (typeof accounts)[number]) => {
+        const tierDiff = (TIER_ORDER[b.tier] ?? 0) - (TIER_ORDER[a.tier] ?? 0);
+        if (tierDiff !== 0) return tierDiff;
+        const rankDiff =
+          (rankValue[b.rank ?? ""] ?? 0) - (rankValue[a.rank ?? ""] ?? 0);
+        if (rankDiff !== 0) return rankDiff;
+        return b.lp - a.lp;
+      },
+    );
 
     const top10 = accounts.slice(0, 10);
 

@@ -1,4 +1,15 @@
-import { IsInt, IsNotEmpty, IsOptional, IsString, Max, Min } from "class-validator";
+import {
+  IsIn,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+} from "class-validator";
+
+const QUEUE_GROUPS = ["ranked", "normal", "aram", "custom", "all"] as const;
+export type QueueGroupQuery = (typeof QUEUE_GROUPS)[number];
 
 // /stats/users/search
 export class SearchUsersQueryDto {
@@ -53,4 +64,14 @@ export class FindSummonerQueryDto {
   @IsString()
   @IsNotEmpty({ message: "tagLine은 필수입니다." })
   tagLine: string;
+}
+
+// /stats/refresh/:userId
+export class RefreshStatsQueryDto {
+  @IsOptional()
+  @IsIn(QUEUE_GROUPS, {
+    message:
+      "queueGroup은 ranked, normal, aram, custom, all 중 하나여야 합니다.",
+  })
+  queueGroup?: QueueGroupQuery = "ranked";
 }

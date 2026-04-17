@@ -87,7 +87,6 @@ export class PresenceGateway
 
       // Notify friends about status change
       await this.broadcastStatusToFriends(payload.sub, UserStatus.ONLINE);
-
     } catch (error) {
       console.error("[Presence] Connection error:", error);
       client.disconnect();
@@ -116,7 +115,6 @@ export class PresenceGateway
       if (isFullyOffline) {
         await this.broadcastStatusToFriends(client.userId, UserStatus.OFFLINE);
       }
-
     }
   }
 

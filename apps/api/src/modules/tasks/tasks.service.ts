@@ -24,6 +24,8 @@ type QueueGroupConfig = {
     | "customLastMatchId";
 };
 
+export type MatchFetchQueueGroup = QueueGroupConfig["name"];
+
 @Injectable()
 export class TasksService {
   private readonly logger = new Logger(TasksService.name);
@@ -76,9 +78,7 @@ export class TasksService {
 
   private getSeasonStartUnixSeconds(): number {
     const now = new Date();
-    return Math.floor(
-      Date.UTC(now.getUTCFullYear(), 0, 1, 0, 0, 0, 0) / 1000,
-    );
+    return Math.floor(Date.UTC(now.getUTCFullYear(), 0, 1, 0, 0, 0, 0) / 1000);
   }
 
   private async fetchQueueMatchIdsUntilKnown(
@@ -254,6 +254,16 @@ export class TasksService {
     }
   }
 
+  async runMatchFetch(queueGroup?: MatchFetchQueueGroup): Promise<void> {
+    const targets = queueGroup
+      ? this.matchFetchConfigs.filter((config) => config.name === queueGroup)
+      : this.matchFetchConfigs;
+
+    for (const config of targets) {
+      await this.processMatchFetchGroup(config);
+    }
+  }
+
   /**
    * StatsRecomputeQueue 기반 개인 통계 캐시 재계산 — 매 정시 실행
    */
@@ -263,7 +273,9 @@ export class TasksService {
     const lockToken = await this.redis.acquireLock(lockKey, 55 * 60 * 1000);
 
     if (!lockToken) {
-      this.logger.warn("Match stats compute skipped: another worker holds the lock");
+      this.logger.warn(
+        "Match stats compute skipped: another worker holds the lock",
+      );
       return;
     }
 
@@ -294,6 +306,72 @@ export class TasksService {
       this.logger.error("Match stats compute task failed", error);
     } finally {
       await this.redis.releaseLock(lockKey, lockToken);
+    }
+  }
+
+  async runMatchStatsCompute(userId?: string): Promise<void> {
+    if (userId) {
+      await this.statsService.recomputeChampionStatsForUser(userId);
+      return;
+    }
+
+    const queuedUsers = await this.prisma.statsRecomputeQueue.findMany({
+      orderBy: [{ queuedAt: "asc" }],
+      take: 100,
+    });
+
+    for (const queued of queuedUsers) {
+      await this.statsService.recomputeChampionStatsForUser(queued.userId);
+    }
+  }
+
+  async runKnownPuuidCleanup(): Promise<{
+    demotedCount: number;
+    deletedCount: number;
+  }> {
+    const demoteBefore = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000);
+    const deleteBefore = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
+
+    const [demoted, deleted] = await this.prisma.$transaction([
+      this.prisma.knownPuuid.updateMany({
+        where: {
+          priority: { gte: 5, lte: 9 },
+          updatedAt: { lt: demoteBefore },
+        },
+        data: {
+          priority: 0,
+        },
+      }),
+      this.prisma.knownPuuid.deleteMany({
+        where: {
+          priority: { gte: 0, lte: 4 },
+          updatedAt: { lt: deleteBefore },
+        },
+      }),
+    ]);
+
+    return {
+      demotedCount: demoted.count,
+      deletedCount: deleted.count,
+    };
+  }
+
+  /**
+   * KnownPuuid 미활동 정리 - 매월 1일 새벽 2시
+   * priority 5~9는 180일 미활동 시 0으로 강등, 0~4는 365일 미활동 시 삭제
+   */
+  @Cron("0 2 1 * *")
+  async handleKnownPuuidCleanup(): Promise<void> {
+    try {
+      const result = await this.runKnownPuuidCleanup();
+
+      if (result.demotedCount > 0 || result.deletedCount > 0) {
+        this.logger.log(
+          `KnownPuuid 정리 완료: 강등 ${result.demotedCount}건, 삭제 ${result.deletedCount}건`,
+        );
+      }
+    } catch (error) {
+      this.logger.error("KnownPuuid 정리 작업 실패", error);
     }
   }
 

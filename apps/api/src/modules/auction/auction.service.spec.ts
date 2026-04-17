@@ -2,7 +2,11 @@ import { Test, TestingModule } from "@nestjs/testing";
 import { AuctionService, AuctionState } from "./auction.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { RedisService } from "../redis/redis.service";
-import { BadRequestException, NotFoundException, ForbiddenException } from "@nestjs/common";
+import {
+  BadRequestException,
+  NotFoundException,
+  ForbiddenException,
+} from "@nestjs/common";
 
 describe("AuctionService", () => {
   let service: AuctionService;
@@ -86,7 +90,10 @@ describe("AuctionService", () => {
         timerEnd: Date.now() + 10000,
       });
 
-      prisma.room.findUnique.mockResolvedValue({ id: roomId, minBidIncrement: 100 });
+      prisma.room.findUnique.mockResolvedValue({
+        id: roomId,
+        minBidIncrement: 100,
+      });
       prisma.team.findFirst.mockResolvedValue(null);
 
       await expect(service.placeBid(userId, roomId, 100)).rejects.toThrow(
@@ -103,7 +110,10 @@ describe("AuctionService", () => {
         timerEnd: Date.now() + 10000,
       });
 
-      prisma.room.findUnique.mockResolvedValue({ id: roomId, minBidIncrement: 100 });
+      prisma.room.findUnique.mockResolvedValue({
+        id: roomId,
+        minBidIncrement: 100,
+      });
       prisma.team.findFirst.mockResolvedValue({
         id: teamId,
         remainingBudget: 600,
@@ -130,22 +140,22 @@ describe("AuctionService", () => {
       (service as any).auctionStates.set(roomId, state);
 
       prisma.room.findUnique.mockImplementation(({ include }: any) => {
-          if (include?.participants) {
-              return Promise.resolve({
-                  id: roomId,
-                  participants: [
-                      { id: "p1", userId: "user-p1", user: { username: "Player1" } }
-                  ]
-              });
-          }
-          return Promise.resolve({ id: roomId, minBidIncrement: 100 });
+        if (include?.participants) {
+          return Promise.resolve({
+            id: roomId,
+            participants: [
+              { id: "p1", userId: "user-p1", user: { username: "Player1" } },
+            ],
+          });
+        }
+        return Promise.resolve({ id: roomId, minBidIncrement: 100 });
       });
 
       prisma.team.findFirst.mockResolvedValue({
         id: teamId,
         remainingBudget: 1000,
         _count: { members: 0 },
-        captain: { username: "Captain1" }
+        captain: { username: "Captain1" },
       });
       // 트랜잭션 내 예산 재확인 쿼리 목
       prisma.team.findUnique.mockResolvedValue({ remainingBudget: 1000 });
@@ -194,7 +204,7 @@ describe("AuctionService", () => {
 
       expect(result.sold).toBe(true);
       expect(prisma.teamMember.create).toHaveBeenCalled();
-      
+
       const state = (service as any).auctionStates.get(roomId);
       expect(state.currentHighestBid).toBe(0);
       expect(state.currentHighestBidder).toBeNull();
@@ -215,9 +225,7 @@ describe("AuctionService", () => {
         id: roomId,
         minBidIncrement: 100,
         participants: [{ id: "p1", userId: "user-p1" }],
-        teams: [
-          { id: "t1", remainingBudget: 1000, _count: { members: 0 } }
-        ],
+        teams: [{ id: "t1", remainingBudget: 1000, _count: { members: 0 } }],
       });
 
       const result = await service.resolveCurrentBid(roomId);

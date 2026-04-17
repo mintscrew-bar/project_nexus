@@ -1,4 +1,11 @@
-import { IsString, IsNotEmpty, IsOptional, IsEnum, IsObject, MaxLength } from "class-validator";
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsEnum,
+  IsObject,
+  MaxLength,
+} from "class-validator";
 import { Role } from "@nexus/database";
 
 /**

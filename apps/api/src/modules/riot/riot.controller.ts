@@ -250,9 +250,14 @@ export class RiotController {
     @Param("tagLine") tagLine: string,
   ) {
     // puuid 조회 후 라이브 게임 확인
-    const summoner = await this.riotService.getSummonerByRiotId(gameName, tagLine);
+    const summoner = await this.riotService.getSummonerByRiotId(
+      gameName,
+      tagLine,
+    );
     if (!summoner?.puuid) return { isLive: false };
-    const gameInfo = await this.spectatorService.getActiveGameByPUUID(summoner.puuid);
+    const gameInfo = await this.spectatorService.getActiveGameByPUUID(
+      summoner.puuid,
+    );
     if (!gameInfo) return { isLive: false };
     return { isLive: true, gameInfo };
   }

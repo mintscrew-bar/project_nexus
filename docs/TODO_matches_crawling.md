@@ -1,7 +1,7 @@
 # 전적 페이지 크롤링/배치 처리 개선 계획
 
 > 진행 기준일: 2026-04-16
-> 완료: 10 / 전체: 24개 (Task 1~23 + Task 2-1)
+> 완료: 24 / 전체: 24개 (Task 1~23 + Task 2-1)
 > 연계 문서: [Lab 대시보드 TODO](./TODO_lab_dashboard.md)
 
 ---
@@ -346,12 +346,12 @@ ALL     = RANKED + NORMAL + ARAM + CUSTOM  (전체 탭용)
   - 응답에 `computedAt`, `isPartial`, `matchCount`, `queueGroup` 포함
   - **기존 `getRankedChampionStats` 하위 호환**: `queueGroup` 파라미터 없으면 `ranked` 기본값
 
-- [ ] Task 9: `POST /stats/refresh/:userId?queueGroup=` — 수동 갱신 트리거
+- [x] Task 9: `POST /stats/refresh/:userId?queueGroup=` — 수동 갱신 트리거
   - 큐 그룹 지정 갱신 (미지정 시 ranked만)
   - Rate limit: 유저당 30분에 1회
   - 지정 userId를 `StatsRecomputeQueue(reason='manual-refresh')`에 enqueue
   - 필요 시 연결된 `KnownPuuid.priority`를 20으로 올려 다음 fetch 배치도 당김
-  - **현재 상태**: `userId` 기준 수동 재계산 enqueue까지만 구현. `queueGroup` 단위 선택 갱신은 아직 미구현
+  - 구현: `reason='manual-refresh:{queueGroup}'`로 enqueue, 선택 큐 캐시 무효화, Riot 계정 연결 PUUID priority=20 승격
 
 - [x] Task 10: `GET /stats/fetch-status/:userId` — 수집 상태 조회
   - 연결된 계정 목록 + 각 큐 그룹별 최신 `*FetchedAt`, `isPartial`, `matchCount` 반환
@@ -361,7 +361,7 @@ ALL     = RANKED + NORMAL + ARAM + CUSTOM  (전체 탭용)
 
 ## Phase 4: 프론트엔드 — 챔피언 통계 탭 확장
 
-- [ ] Task 11: 챔피언 통계 사이드바 탭 추가
+- [x] Task 11: 챔피언 통계 사이드바 탭 추가
   > 연계: [Lab Task 24/25 (챔피언 분석 탭)](./TODO_lab_dashboard.md) — 전적 페이지 '내전' 탭과 Lab 챔피언 분석은 동일한 내전 MatchParticipant 데이터를 원본으로 사용. 개인 통계(이쪽)와 커뮤니티 통계(Lab)의 UI 진입 동선이 다를 뿐
   - 현재: 랭크 탭 / Nexus 탭
   - 변경: **랭크 / 일반 / 칼바람 / 내전 / 전체 / Nexus** 6탭
@@ -374,13 +374,13 @@ ALL     = RANKED + NORMAL + ARAM + CUSTOM  (전체 탭용)
     - 미등록 유저: 공통 스탯만 표시 (낙찰가 등 Nexus 전용 데이터 없음)
     - 미등록 유저에게 "Nexus에 등록하면 낙찰가·팀 구성 이력 등 추가 통계를 볼 수 있어요" 유도 문구
 
-- [ ] Task 12: `RecentStatsSummary` 탭 구조 개선
+- [x] Task 12: `RecentStatsSummary` 탭 구조 개선
   - 현재: 전체 / 솔로랭크 / 일반게임
   - 변경: 전체 / 솔로랭크 / 자유랭크 / 일반게임 / 칼바람
   - 각 탭에서 해당 queueId 매치만 필터링
   - 자유랭크(440) 탭 신규 추가
 
-- [ ] Task 13: 갱신 버튼 및 수집 상태 UX
+- [x] Task 13: 갱신 버튼 및 수집 상태 UX
   - 챔피언 통계 탭 전환 시 해당 queueGroup의 `isPartial` 상태 확인
   - `isPartial=true` 이면 "수집 중..." 인디케이터 + "새로고침" 버튼 강조
   - "마지막 계산: N분 전" 툴팁 표시 (`computedAt` 기반)
@@ -390,7 +390,7 @@ ALL     = RANKED + NORMAL + ARAM + CUSTOM  (전체 탭용)
 
 ## Phase 5: 운영 & 관리
 
-- [ ] Task 14: Admin API — 배치 상태 모니터링
+- [x] Task 14: Admin API — 배치 상태 모니터링
   - `GET /admin/matches/queue-stats`:
     ```json
     {
@@ -406,8 +406,9 @@ ALL     = RANKED + NORMAL + ARAM + CUSTOM  (전체 탭용)
     ```
   - `POST /admin/matches/trigger-fetch?queueGroup=ranked` — 배치 수동 실행
   - `POST /admin/matches/recompute-stats?puuid=` — 특정 PUUID 통계 강제 재계산
+  - 구현: `recompute-stats?userId=` 도 함께 지원 (내부 집계 키가 userId 기반이기 때문)
 
-- [ ] Task 15: `KnownPuuid` 크기 관리
+- [x] Task 15: `KnownPuuid` 크기 관리
   - 보관 정책:
     - priority ≥ 10 (내전 유저): 영구 보관
     - priority 5~9: 180일 미활동 시 priority=0 강등
@@ -418,24 +419,25 @@ ALL     = RANKED + NORMAL + ARAM + CUSTOM  (전체 탭용)
 
 ## Phase 6: 마이그레이션 & 시딩
 
-- [ ] Task 16: 기존 `RiotAccount` PUUID 시딩
-  - `scripts/seed-known-puuids.ts`
+- [x] Task 16: 기존 `RiotAccount` PUUID 시딩
+  - `packages/database/prisma/seed-known-puuids.ts`
   - 모든 `RiotAccount.puuid` → `KnownPuuid` priority=10으로 upsert
 
-- [ ] Task 17: 기존 `RiotMatchCache` PUUID 역추출 시딩
-  - `scripts/backfill-known-puuids.ts`
+- [x] Task 17: 기존 `RiotMatchCache` PUUID 역추출 시딩
+  - `packages/database/prisma/backfill-known-puuids.ts`
   - 이미 캐시된 매치에서 `metadata.participants` PUUID 추출 → `KnownPuuid` upsert
   - 1,000건씩 배치 처리 (메모리 부하 방지)
 
-- [ ] Task 18: 빌드/린트 검증 및 배포 체크리스트
+- [x] Task 18: 빌드/린트 검증 및 배포 체크리스트
   - `pnpm build && pnpm lint`
   - 배포 순서: DB 마이그레이션 → 시딩 스크립트 → 서버 재시작 → Admin 수동 배치 트리거
+  - 검증(2026-04-17): `pnpm lint`, `pnpm build` 모두 통과
 
 ---
 
 ## Phase 7: Lab 연계 확장
 
-- [ ] Task 19: 통계 유틸 공통 패키지 추출
+- [x] Task 19: 통계 유틸 공통 패키지 추출
   > 연계: [Lab 공통 인프라 전체](./TODO_lab_dashboard.md) — Lab과 Matches 양쪽에서 동일 로직 사용
   - `packages/stats-utils/` 신규 패키지 생성 (또는 `@nexus/types`에 추가)
   - **공통화 대상 함수/상수**:
@@ -464,8 +466,9 @@ ALL     = RANKED + NORMAL + ARAM + CUSTOM  (전체 탭용)
     ```
   - Lab(`LabStatsService`) 및 Matches(`MatchStatsComputeTask`, `getChampionStats`) 모두 이 패키지에서 import
   - **주의**: 현재 Lab TODO에 인라인으로 정의된 `wilsonLower` 함수 구현체를 이 패키지로 이동
+  - 구현: `@nexus/types`에 `stats-utils.ts` 추가, `calculateTierScore/tierScore/isTierAbove/wilsonLower/wilsonUpper/getConfidenceLevel` export
 
-- [ ] Task 20: MatchStatsCache → Lab PSS 연계 조회 최적화
+- [x] Task 20: MatchStatsCache → Lab PSS 연계 조회 최적화
   > 연계: [Lab Task 19 (팀 밸런스 PSS)](./TODO_lab_dashboard.md) — PSS 계산에 필요한 유저별 최근 20게임 성과를 MatchStatsCache에서 조회
   - `MatchStatsCache`에 `recentGames Json?` 필드 추가 고려 (최근 20게임 요약 통계)
     ```
@@ -476,8 +479,9 @@ ALL     = RANKED + NORMAL + ARAM + CUSTOM  (전체 탭용)
     ```
   - 이렇게 하면 Lab 오라클이 PSS 계산 시 유저별 MatchStatsCache 1건만 조회하면 됨 (매번 MatchParticipant 20행 집계 불필요)
   - `MatchStatsComputeTask` (Task 7)에서 `recentGames` 함께 계산하여 저장
+  - 구현: `MatchStatsCache.recentGames` 필드 추가, `ranked/normal/aram/custom/all` 전부 집계 시 최근 20게임 요약(`avgKda`, `avgDamageShare`, `lastPlayedAt`)을 함께 upsert
 
-- [ ] Task 21: 내전(custom) 데이터 집계 로직 중복 제거
+- [x] Task 21: 내전(custom) 데이터 집계 로직 중복 제거
   > 연계: [Lab Task 8 (LabSnapshotTask)](./TODO_lab_dashboard.md) — 내전 MatchParticipant 집계 로직이 Lab과 Matches 양쪽에 존재
   - **현재 문제**: 내전 데이터 집계가 두 곳에서 발생
     - `MatchStatsComputeTask`: 유저별 custom queueGroup 개인 챔피언 통계
@@ -493,16 +497,19 @@ ALL     = RANKED + NORMAL + ARAM + CUSTOM  (전체 탭용)
     })
     ```
   - Lab과 Matches 모두 이 함수를 호출하되, `groupBy`와 필터만 다르게 전달
+  - 구현: `apps/api/src/modules/stats/utils/custom-match-aggregator.ts` 추가, `StatsService(custom)`와 `LabStatsService.computeChampionSnapshots()`가 동일 집계 유틸 사용
 
-- [ ] Task 22: KnownPuuid 기반 Lab 콜드스타트 보완 데이터 제공
+- [x] Task 22: KnownPuuid 기반 Lab 콜드스타트 보완 데이터 제공
   > 연계: [Lab 콜드스타트 전략](./TODO_lab_dashboard.md) — 내전 0~9게임 구간에서 MatchStatsCache 랭크 전적을 참고로 표시
   - Lab 0단계(콜드) 상태에서 유저 프로필 조회 시:
     - `MatchStatsCache(queueGroup='ranked')` 에서 해당 유저의 챔피언 풀/승률/KDA 가져오기
     - "랭크 전적 기반 성향 참고" 배너와 함께 표시 (내전 데이터가 아님을 명확히 구분)
   - 이를 위해 Lab API에 `GET /stats/lab/user-profile/:userId/fallback` 엔드포인트 추가
     - 내전 게임 수 < 10 일 때만 동작, 10게임 이상이면 404
+  - 구현: JWT 보호 하에 `GET /stats/lab/user-profile/:userId/fallback` 추가, `showChampionStats` 프라이버시를 존중하고 `custom < 10`일 때 ranked 캐시 요약/챔피언 풀 반환
+  - 확장 구현: `GET /stats/lab/user-profile/:userId/compare` 추가, ranked vs custom 요약 및 챔피언별 delta/signal(`scrim-favored`, `ranked-favored`) 반환
 
-- [ ] Task 23: 배치 cron 실행 순서 및 의존성 문서화
+- [x] Task 23: 배치 cron 실행 순서 및 의존성 문서화
   > 연계: [Lab Task 7 (티어 갱신), Lab Task 8 (스냅샷)](./TODO_lab_dashboard.md)
   - **전체 배치 실행 순서 (시간순)**:
     ```
@@ -526,6 +533,16 @@ ALL     = RANKED + NORMAL + ARAM + CUSTOM  (전체 탭용)
     RiotTierRefreshTask ──→ RiotAccount.tier ──→ 장인 D2+ 게이트 (Lab Task 14)
     ```
   - **주의**: RiotTierRefreshTask(새벽 3시)가 LabSnapshotTask(새벽 4시)보다 먼저 실행되어야 장인 목록에 최신 티어가 반영됨. 현재 시간 설정 적절함.
+  - 구현 기준 문서화:
+    - `TasksService.handleMatchFetch()` — `*/30 * * * *`
+    - `TasksService.handleMatchStatsCompute()` — `0 * * * *`
+    - `TasksService.handleKnownPuuidCleanup()` — `0 2 1 * *`
+    - `LabTasksService.handleRiotTierRefresh()` — `0 3 * * *`
+    - `LabTasksService.handleLabSnapshot()` — `0 4 * * *`
+  - 현재 상태:
+    - Match 쪽 파이프라인은 `KnownPuuid -> RiotMatchCache -> MatchStatsCache`로 완성
+    - Lab 쪽 파이프라인은 `MatchParticipant -> Lab*Snapshot`으로 별도 완성
+    - 문서에 적힌 "Bull 큐 즉시 트리거"는 아직 미구현이며, 현재는 야간 cron 재계산 기준
 
 ---
 
@@ -550,10 +567,11 @@ ALL     = RANKED + NORMAL + ARAM + CUSTOM  (전체 탭용)
 [배치 흐름 — 시간순 전체 파이프라인]
   매 30분   MatchFetchTask          → RiotMatchCache 저장 (Riot API 수집)
   매 정시   MatchStatsComputeTask   → MatchStatsCache upsert + Redis 갱신
+  매월 1일  새벽 2시 KnownPuuidCleanup → KnownPuuid 강등/삭제
   새벽 3시  RiotTierRefreshTask     → RiotAccount.tier 갱신 [Lab 장인 전제]
   새벽 4시  LabSnapshotTask         → LabChampion/Synergy/Counter Snapshot [Lab 전용]
 
-  ※ 내전 매치 등록 즉시 → 누적 게임 수 임계값 체크 → Bull 큐로 LabSnapshotTask 트리거 (콜드스타트)
+  ※ 현재 구현은 cron 기반 재계산이며, 내전 매치 등록 직후 LabSnapshotTask를 Bull로 즉시 트리거하는 경로는 아직 없다.
 
 [조회 흐름]
   유저 요청 (queueGroup 지정)
@@ -573,4 +591,35 @@ ALL     = RANKED + NORMAL + ARAM + CUSTOM  (전체 탭용)
 
 ---
 
-**Last Updated**: 2026-04-16
+## Phase 8: 지능형 랭커 시딩 및 데이터 최적화 [보류]
+
+> **주의**: 5,000명 이상의 고티어 유저를 일시에 수집할 경우 Riot API 할당량 및 DB I/O 부하가 예상됨. 시스템 안정성을 위해 [보류] 처리하며, 서비스 안정기에 단계적 도입 검토.
+
+- [ ] **Task 24: `LeagueScanTask` — 최상위 메타 리더 리스트 정기 수집 [보류]**
+  - **주기**: 매주 1회 (챌린저/그마/마스터 KR 전체)
+  - **로직**: `league-v4` API 응답의 `puuid`를 추출하여 `KnownPuuid`에 **Priority 5**로 Upsert
+  - **최적화**: 기존 P10(Nexus 유저) 정보 보호를 위해 `priority = GREATEST(priority, 5)` 적용
+
+- [ ] **Task 25: `AdminSeedingAPI` — 수동 시딩 트리거 [보류]**
+  - 특정 시점에 랭커 리스트를 즉시 갱신하고 시딩하기 위한 관리자 전용 엔드포인트
+  - `POST /admin/matches/seed-high-tiers`
+
+- [ ] **Task 26: `MatchFetchTask` 가중치 및 슬롯 제한 (과부하 방지) [보류]**
+  - 전체 배치 수집 슬롯(50명) 중 시딩 유저(P5) 비중을 **30%(15명) 이내**로 제한
+  - Nexus 유저(P10)의 수집 속도를 보장하면서, 랭커 데이터는 '느린 차선'으로 점진적 수집
+
+- [ ] **Task 27: 시딩 유저 최초 소급 범위 제한 [보류]**
+  - `rankedLastMatchId`가 없는 신규 시딩 유저의 최초 수집 범위를 **최근 100판**으로 제한
+  - 시즌 전체 통계 확보와 API 할당량 방어 사이의 균형 (100판 = 약 5페이지)
+
+- [ ] **Task 28: 벌크 인서트(Bulk Insert) 최적화 [보류]**
+  - 수집된 매치 데이터를 `RiotMatchCache`에 저장할 때 `createMany(skipDuplicates)` 활용
+  - DB 트랜잭션 횟수를 줄여 I/O 부하 최소화 및 CPU 자원 절약
+
+- [ ] **Task 29: 패치 인식형 수집 중단 전략 [보류]**
+  - 시딩 유저 수집 시 현재 패치 버전과 다른 매치 발견 시 즉시 해당 유저 수집 중단 로직 검토
+  - 오직 '현재 메타' 분석에 필요한 최신 데이터에만 리소스 집중
+
+---
+
+**Last Updated**: 2026-04-17

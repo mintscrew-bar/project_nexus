@@ -27,7 +27,9 @@ interface AuthenticatedSocket extends Socket {
   pingTimeout: 5000,
   maxHttpBufferSize: 1e4,
 })
-export class DmGateway implements OnGatewayConnection, OnGatewayDisconnect, OnModuleDestroy {
+export class DmGateway
+  implements OnGatewayConnection, OnGatewayDisconnect, OnModuleDestroy
+{
   onModuleDestroy() {
     for (const timeout of this.typingTimers.values()) {
       clearTimeout(timeout);

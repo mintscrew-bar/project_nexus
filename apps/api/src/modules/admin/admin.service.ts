@@ -32,6 +32,13 @@ function validateFutureDate(dateStr: string, fieldName: string): Date {
 export class AdminService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private readonly matchFetchStaleHours = {
+    ranked: 6,
+    normal: 12,
+    aram: 24,
+    custom: 24,
+  } as const;
+
   // ── Audit Log ───────────────────────────────────────────────────────────────
 
   private async logAction(
@@ -85,6 +92,136 @@ export class AdminService {
       pendingPostReports,
       totalClans,
     };
+  }
+
+  async getMatchQueueStats() {
+    const now = Date.now();
+    const rankedStaleBefore = new Date(
+      now - this.matchFetchStaleHours.ranked * 60 * 60 * 1000,
+    );
+    const normalStaleBefore = new Date(
+      now - this.matchFetchStaleHours.normal * 60 * 60 * 1000,
+    );
+    const aramStaleBefore = new Date(
+      now - this.matchFetchStaleHours.aram * 60 * 60 * 1000,
+    );
+    const customStaleBefore = new Date(
+      now - this.matchFetchStaleHours.custom * 60 * 60 * 1000,
+    );
+
+    const [
+      knownPuuidsTotal,
+      nexusUsers,
+      rankedPending,
+      normalPending,
+      aramPending,
+      customPending,
+      riotMatchCacheSize,
+      matchStatsCacheGrouped,
+      recomputeQueueSize,
+    ] = await Promise.all([
+      this.prisma.knownPuuid.count(),
+      this.prisma.knownPuuid.count({
+        where: { isNexusUser: true },
+      }),
+      this.prisma.knownPuuid.count({
+        where: {
+          OR: [
+            { rankedFetchedAt: null },
+            { rankedFetchedAt: { lt: rankedStaleBefore } },
+          ],
+        },
+      }),
+      this.prisma.knownPuuid.count({
+        where: {
+          OR: [
+            { normalFetchedAt: null },
+            { normalFetchedAt: { lt: normalStaleBefore } },
+          ],
+        },
+      }),
+      this.prisma.knownPuuid.count({
+        where: {
+          OR: [
+            { aramFetchedAt: null },
+            { aramFetchedAt: { lt: aramStaleBefore } },
+          ],
+        },
+      }),
+      this.prisma.knownPuuid.count({
+        where: {
+          isNexusUser: false,
+          OR: [
+            { customFetchedAt: null },
+            { customFetchedAt: { lt: customStaleBefore } },
+          ],
+        },
+      }),
+      this.prisma.riotMatchCache.count(),
+      this.prisma.matchStatsCache.groupBy({
+        by: ["queueGroup"],
+        _count: { _all: true },
+      }),
+      this.prisma.statsRecomputeQueue.count(),
+    ]);
+
+    const matchStatsCacheSize = {
+      ranked: 0,
+      normal: 0,
+      aram: 0,
+      custom: 0,
+      all: 0,
+    };
+
+    for (const row of matchStatsCacheGrouped) {
+      if (row.queueGroup in matchStatsCacheSize) {
+        matchStatsCacheSize[
+          row.queueGroup as keyof typeof matchStatsCacheSize
+        ] = row._count._all;
+      }
+    }
+
+    return {
+      knownPuuids: {
+        total: knownPuuidsTotal,
+        nexusUsers,
+      },
+      fetchPending: {
+        ranked: rankedPending,
+        normal: normalPending,
+        aram: aramPending,
+        custom: customPending,
+      },
+      riotMatchCacheSize,
+      matchStatsCacheSize,
+      statsRecomputeQueueSize: recomputeQueueSize,
+    };
+  }
+
+  async resolveStatsRecomputeUserId(params: {
+    userId?: string;
+    puuid?: string;
+  }) {
+    if (params.userId) {
+      return params.userId;
+    }
+
+    if (!params.puuid) {
+      throw new BadRequestException("userId 또는 puuid 중 하나는 필수입니다.");
+    }
+
+    const account = await this.prisma.riotAccount.findUnique({
+      where: { puuid: params.puuid },
+      select: { userId: true },
+    });
+
+    if (!account?.userId) {
+      throw new NotFoundException(
+        "해당 puuid와 연결된 유저를 찾을 수 없습니다.",
+      );
+    }
+
+    return account.userId;
   }
 
   // ── Users ─────────────────────────────────────────────────────────────────
@@ -147,7 +284,9 @@ export class AdminService {
         select: { role: true },
       });
       if (requester?.role !== UserRole.ADMIN) {
-        throw new ForbiddenException("ADMIN 승격은 ADMIN만 수행할 수 있습니다.");
+        throw new ForbiddenException(
+          "ADMIN 승격은 ADMIN만 수행할 수 있습니다.",
+        );
       }
     }
 
@@ -163,7 +302,9 @@ export class AdminService {
         select: { role: true },
       });
       if (requester?.role !== UserRole.ADMIN) {
-        throw new ForbiddenException("ADMIN의 권한은 다른 ADMIN만 변경할 수 있습니다.");
+        throw new ForbiddenException(
+          "ADMIN의 권한은 다른 ADMIN만 변경할 수 있습니다.",
+        );
       }
     }
 

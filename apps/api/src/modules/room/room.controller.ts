@@ -15,11 +15,7 @@ import {
   forwardRef,
 } from "@nestjs/common";
 import { RoomService } from "./room.service";
-import {
-  CreateRoomDto,
-  ListRoomsQueryDto,
-  ChatMessagesQueryDto,
-} from "./dto";
+import { CreateRoomDto, ListRoomsQueryDto, ChatMessagesQueryDto } from "./dto";
 import { SnakeDraftService } from "./snake-draft.service";
 import { SnakeDraftGateway } from "./snake-draft.gateway";
 import { RoomGateway } from "./room.gateway";
@@ -65,7 +61,7 @@ export class RoomController {
   ) {
     const room = await this.roomService.createRoom(userId, dto);
     // 새 방 생성 → add delta 전송
-    this.roomGateway.broadcastRoomDelta('add', room.id);
+    this.roomGateway.broadcastRoomDelta("add", room.id);
     return room;
   }
 
@@ -147,7 +143,7 @@ export class RoomController {
   ) {
     const result = await this.roomService.closeRoom(userId, roomId);
     // 방 삭제 → remove delta 전송
-    this.roomGateway.broadcastRoomDelta('remove', roomId);
+    this.roomGateway.broadcastRoomDelta("remove", roomId);
     return result;
   }
 
@@ -166,7 +162,7 @@ export class RoomController {
     this.roleSelectionService.clearRoleSelectionState(roomId);
 
     // 로비 복귀 후 방 상태 변경 → update delta 전송
-    this.roomGateway.broadcastRoomDelta('update', roomId);
+    this.roomGateway.broadcastRoomDelta("update", roomId);
 
     // room-updated 이벤트로 로비에 있는 모든 클라이언트에 갱신된 방 데이터 전송
     if (result.room) {
@@ -205,7 +201,7 @@ export class RoomController {
     this.matchGateway.emitSessionAborted(roomId, payload);
 
     // 세션 중단 후 방 상태 변경 → update delta 전송
-    this.roomGateway.broadcastRoomDelta('update', roomId);
+    this.roomGateway.broadcastRoomDelta("update", roomId);
     return result;
   }
 
@@ -271,7 +267,7 @@ export class RoomController {
       this.snakeDraftGateway.emitDraftStarted(roomId, clientState);
     }
     // 스네이크 드래프트 시작 → 방 상태 변경 delta 전송
-    this.roomGateway.broadcastRoomDelta('update', roomId);
+    this.roomGateway.broadcastRoomDelta("update", roomId);
 
     return result;
   }

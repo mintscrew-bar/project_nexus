@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button, Badge, LoadingSpinner } from "@/components/ui";
 import { getTierBgClass } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
+import { calculateTierScore } from "@nexus/types";
 import {
   Users,
   Play,
@@ -104,28 +105,13 @@ interface BracketMatch {
 // ─── Constants ──────────────────────────────────────────────────────────────────
 const TIERS = ["IRON", "BRONZE", "SILVER", "GOLD", "PLATINUM", "EMERALD", "DIAMOND", "MASTER", "GRANDMASTER", "CHALLENGER"] as const;
 
-// 티어 기반 점수 계산 (Tier + Rank + LP)
-// IRON IV 0LP=0 / GOLD I 99LP=1599 / MASTER 300LP=3100 / CHALLENGER 고LP=3600+
-const _TIER_BASE: Record<string, number> = {
-  UNRANKED: 0, IRON: 0, BRONZE: 400, SILVER: 800, GOLD: 1200,
-  PLATINUM: 1600, EMERALD: 2000, DIAMOND: 2400,
-  MASTER: 2800, GRANDMASTER: 3200, CHALLENGER: 3600,
-};
-const _RANK_BONUS: Record<string, number> = { IV: 0, III: 100, II: 200, I: 300, "": 0 };
-const _MASTER_PLUS = new Set(["MASTER", "GRANDMASTER", "CHALLENGER"]);
-
-function calculateTierScore(tier: string, rank: string, lp = 0): number {
-  const tierBase = _TIER_BASE[tier] ?? 0;
-  const rankBonus = _MASTER_PLUS.has(tier) ? 0 : (_RANK_BONUS[rank] ?? 0);
-  return tierBase + rankBonus + lp;
-}
-
 // 경매 봇 낙찰가 계산용: 티어 중간값 (Rank II, LP=50 기준)
 const TIER_MMR: Record<string, number> = {
   IRON: 250, BRONZE: 650, SILVER: 1050, GOLD: 1450,
   PLATINUM: 1850, EMERALD: 2250, DIAMOND: 2650,
   MASTER: 3050, GRANDMASTER: 3450, CHALLENGER: 3850,
 };
+const MASTER_PLUS_TIERS = new Set(["MASTER", "GRANDMASTER", "CHALLENGER"]);
 const POSITIONS = ["TOP", "JUNGLE", "MID", "ADC", "SUPPORT"];
 const POSITION_LABELS: Record<string, string> = {
   TOP: "탑", JUNGLE: "정글", MID: "미드", ADC: "원딜", SUPPORT: "서포터",
@@ -176,7 +162,7 @@ function generateMockPlayers(count: number): MockPlayer[] {
     const mainPos = POSITIONS[Math.floor(Math.random() * POSITIONS.length)];
     const secondaryPos = POSITIONS.filter(p => p !== mainPos)[Math.floor(Math.random() * 4)];
     // Master+ 는 랭크 없이 LP만 가산. 일반 티어는 Rank + 랜덤 LP(0-99)로 계산
-    const mockLp = _MASTER_PLUS.has(tier)
+    const mockLp = MASTER_PLUS_TIERS.has(tier)
       ? Math.floor(Math.random() * 400) // Master 이상은 LP 범위 넓음
       : Math.floor(Math.random() * 100);
 
@@ -633,7 +619,7 @@ function SimulationContent() {
   useEffect(() => {
     const calc = Math.floor(playerCount / 5);
     if (calc !== teamCount && calc > 0) setTeamCount(calc);
-  }, [playerCount]);
+  }, [playerCount, teamCount]);
 
   // Initialize players
   const initializePlayers = useCallback(() => {
@@ -652,7 +638,9 @@ function SimulationContent() {
   }, [players, teamCount, startingBudget]);
 
   useEffect(() => { initializePlayers(); }, [initializePlayers]);
-  useEffect(() => { if (players.length > 0) initializeTeams(); }, [players, teamCount, startingBudget]);
+  useEffect(() => {
+    if (players.length > 0) initializeTeams();
+  }, [players, initializeTeams]);
 
   const addLog = (message: string) => {
     setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${message}`]);
@@ -847,7 +835,7 @@ function SimulationContent() {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [phase, roleSelectionState?.phase, isInteractive, autoAssignAllRoles, completeRoleSelection]);
+  }, [phase, roleSelectionState, isInteractive, autoAssignAllRoles, completeRoleSelection]);
 
   // 타이머 만료 시 자동 배정 후 완료
   useEffect(() => {
@@ -857,7 +845,7 @@ function SimulationContent() {
       autoAssignAllRoles();
       setTimeout(() => completeRoleSelection(), 500);
     }
-  }, [phase, roleSelectionState?.timeLeft, roleSelectionState?.phase, autoAssignAllRoles, completeRoleSelection]);
+  }, [phase, roleSelectionState, autoAssignAllRoles, completeRoleSelection]);
 
   // Check if team formation is done
   useEffect(() => {
@@ -1249,7 +1237,7 @@ function SimulationContent() {
     }, speed);
 
     return () => clearInterval(timer);
-  }, [isRunning, simulationMode, auctionState?.phase, botSpeed, botBid, resolveAuction]);
+  }, [isRunning, simulationMode, auctionState, botSpeed, botBid, resolveAuction]);
 
   // ─── DRAFT ────────────────────────────────────────────────────────────────────
   const startDraft = () => {
@@ -1345,7 +1333,7 @@ function SimulationContent() {
     const speed = botSpeed === "slow" ? 2000 : botSpeed === "fast" ? 300 : 800;
     const timer = setTimeout(() => { botPick(); }, speed);
     return () => clearTimeout(timer);
-  }, [isRunning, simulationMode, draftState?.currentTeamIndex, draftState?.phase, botSpeed, botPick, isUserTurnDraft]);
+  }, [isRunning, simulationMode, draftState, botSpeed, botPick, isUserTurnDraft]);
 
   // ─── RANDOM / BALANCED ────────────────────────────────────────────────────────
   const startRandom = () => {

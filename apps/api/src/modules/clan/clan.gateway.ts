@@ -27,7 +27,9 @@ interface AuthenticatedSocket extends Socket {
   pingTimeout: 5000,
   maxHttpBufferSize: 1e4,
 })
-export class ClanGateway implements OnGatewayConnection, OnGatewayDisconnect, OnModuleDestroy {
+export class ClanGateway
+  implements OnGatewayConnection, OnGatewayDisconnect, OnModuleDestroy
+{
   @WebSocketServer()
   server: Server;
 

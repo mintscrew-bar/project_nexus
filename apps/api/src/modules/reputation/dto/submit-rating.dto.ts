@@ -1,4 +1,12 @@
-import { IsString, IsNotEmpty, IsInt, Min, Max, IsOptional, MaxLength } from "class-validator";
+import {
+  IsString,
+  IsNotEmpty,
+  IsInt,
+  Min,
+  Max,
+  IsOptional,
+  MaxLength,
+} from "class-validator";
 
 /**
  * 매치 후 평가 제출 DTO

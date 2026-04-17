@@ -4,9 +4,20 @@ import { useParams, useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { riotApi, matchApi, statsApi, rankingApi } from "@/lib/api-client";
-import { LoadingSpinner, Button, Badge, Skeleton } from "@/components/ui";
+import { Button, Badge, Skeleton } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
-import { ArrowLeft, TrendingUp, Sword, ExternalLink, Loader2, RefreshCw, Search, Shield } from "lucide-react";
+import {
+  ArrowLeft,
+  TrendingUp,
+  Sword,
+  ExternalLink,
+  Loader2,
+  RefreshCw,
+  Search,
+  Shield,
+  Clock3,
+  AlertCircle,
+} from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -22,6 +33,44 @@ import { getChampionKoreanName } from "@nexus/types";
 import RecentStatsSummary from "@/components/matches/RecentStatsSummary";
 import RiotMatchList from "@/components/matches/RiotMatchList";
 
+type QueueGroup = "ranked" | "normal" | "aram" | "custom" | "all";
+
+interface ChampionStatsCacheResponse {
+  queueGroup: QueueGroup;
+  matchCount: number;
+  isPartial: boolean;
+  computedAt: string;
+  stats: Array<{
+    championId: number;
+    championName: string;
+    championNameKorean?: string;
+    games: number;
+    wins: number;
+    losses: number;
+    kills: number;
+    deaths: number;
+    assists: number;
+  }>;
+}
+
+interface FetchStatusResponse {
+  userId: string;
+  queuedAt: string | null;
+  accounts: Array<{
+    puuid: string;
+    gameName: string;
+    tagLine: string;
+    isPrimary: boolean;
+  }>;
+  queueGroups: Array<{
+    queueGroup: QueueGroup;
+    fetchedAt: string | null;
+    matchCount: number;
+    isPartial: boolean;
+    computedAt: string | null;
+  }>;
+}
+
 export default function SummonerStatsPage() {
   const params = useParams();
   const router = useRouter();
@@ -35,7 +84,7 @@ export default function SummonerStatsPage() {
   const [searchInput, setSearchInput] = useState("");
   const [showHistory, setShowHistory] = useState(false);
   const [historyVersion, setHistoryVersion] = useState(0); // 히스토리 변경 시 리렌더 트리거
-  const [champStatTab, setChampStatTab] = useState<'nexus' | 'ranked'>('ranked');
+  const [champStatTab, setChampStatTab] = useState<QueueGroup | "nexus">("ranked");
 
   // 최근 검색 히스토리 (localStorage, 최대 10개)
   const HISTORY_KEY = "summoner_search_history";
@@ -151,12 +200,34 @@ export default function SummonerStatsPage() {
     enabled: !!nexusUserId,
   });
 
-  // 랭크 챔피언 통계
-  const { data: rankedChampionStatsRaw = [], isLoading: isLoadingRankedStats } = useQuery<any[]>({
+  const { data: fetchStatus } = useQuery<FetchStatusResponse>({
+    queryKey: ["statsFetchStatus", nexusUserId],
+    queryFn: () => statsApi.getFetchStatus(nexusUserId!),
+    staleTime: 60 * 1000,
+    enabled: !!nexusUserId,
+  });
+
+  const currentQueueGroup = champStatTab === "nexus" ? null : champStatTab;
+
+  const {
+    data: championStatsCache,
+    isLoading: isLoadingChampionStats,
+    isFetching: isFetchingChampionStats,
+  } = useQuery<ChampionStatsCacheResponse>({
+    queryKey: ["championStatsCache", gameName, tagLine, currentQueueGroup],
+    queryFn: () => statsApi.getChampionStats(gameName, tagLine, currentQueueGroup!),
+    staleTime: 10 * 60 * 1000,
+    enabled: !!gameName && !!tagLine && !!nexusUserId && !!currentQueueGroup,
+  });
+
+  const {
+    data: legacyRankedChampionStats = [],
+    isLoading: isLoadingLegacyRankedStats,
+  } = useQuery<any[]>({
     queryKey: ["rankedChampionStats", gameName, tagLine],
     queryFn: () => statsApi.getRankedChampionStats(gameName, tagLine),
     staleTime: 10 * 60 * 1000,
-    enabled: !!gameName && !!tagLine,
+    enabled: !!gameName && !!tagLine && !nexusUserId && champStatTab === "ranked",
   });
 
   const { data: nexusRanking } = useQuery({
@@ -173,13 +244,18 @@ export default function SummonerStatsPage() {
     if (refreshCooldown > 0) return;
     setIsRefreshing(true);
     try {
+      if (nexusUserId) {
+        await statsApi.refreshStats(nexusUserId, currentQueueGroup ?? "ranked");
+        await queryClient.invalidateQueries({ queryKey: ["statsFetchStatus", nexusUserId] });
+      }
       await queryClient.invalidateQueries({ queryKey: ["summoner", gameName, tagLine] });
       await queryClient.invalidateQueries({ queryKey: ["riotMatches", gameName, tagLine] });
-      await queryClient.invalidateQueries({ queryKey: ["rankedChampionStats", gameName, tagLine] });
-      // RecentStatsSummary 쿼리도 함께 무효화
+      await queryClient.invalidateQueries({ queryKey: ["championStatsCache", gameName, tagLine] });
       await queryClient.invalidateQueries({ queryKey: ["recentAllStats", gameName, tagLine] });
-      await queryClient.invalidateQueries({ queryKey: ["recentRankedStats", gameName, tagLine] });
+      await queryClient.invalidateQueries({ queryKey: ["recentSoloRankedStats", gameName, tagLine] });
+      await queryClient.invalidateQueries({ queryKey: ["recentFlexRankedStats", gameName, tagLine] });
       await queryClient.invalidateQueries({ queryKey: ["recentNormalStats", gameName, tagLine] });
+      await queryClient.invalidateQueries({ queryKey: ["recentAramStats", gameName, tagLine] });
       // 갱신 성공 시 쿨다운 시작
       setRefreshCooldown(REFRESH_COOLDOWN_SEC);
       const timer = setInterval(() => {
@@ -193,6 +269,22 @@ export default function SummonerStatsPage() {
     } finally {
       setIsRefreshing(false);
     }
+  };
+
+  const formatRelativeTime = (value?: string | null) => {
+    if (!value) return "기록 없음";
+
+    const diffMs = Date.now() - new Date(value).getTime();
+    const diffMinutes = Math.max(0, Math.floor(diffMs / 60000));
+
+    if (diffMinutes < 1) return "방금 전";
+    if (diffMinutes < 60) return `${diffMinutes}분 전`;
+
+    const diffHours = Math.floor(diffMinutes / 60);
+    if (diffHours < 24) return `${diffHours}시간 전`;
+
+    const diffDays = Math.floor(diffHours / 24);
+    return `${diffDays}일 전`;
   };
 
   const calculateWinRate = () => {
@@ -309,7 +401,49 @@ export default function SummonerStatsPage() {
 
   const winRate = calculateWinRate();
   const championStats = calculateChampionStats();
-  const rankedChampionStats = rankedChampionStatsRaw;
+  const queueStatus = currentQueueGroup
+    ? fetchStatus?.queueGroups.find((entry) => entry.queueGroup === currentQueueGroup)
+    : null;
+  const queueTabs: Array<{
+    key: QueueGroup | "nexus";
+    label: string;
+    count?: number;
+  }> = nexusUserId
+    ? [
+        { key: "ranked", label: "랭크" },
+        { key: "normal", label: "일반" },
+        { key: "aram", label: "칼바람" },
+        { key: "custom", label: "내전" },
+        { key: "all", label: "전체" },
+        { key: "nexus", label: "Nexus" },
+      ]
+    : [
+        { key: "ranked", label: "랭크" },
+        { key: "nexus", label: "Nexus" },
+      ];
+  const fallbackRankedStats = !nexusUserId && champStatTab === "ranked" ? legacyRankedChampionStats : [];
+  const resolvedStats = champStatTab === "nexus"
+    ? championStats
+    : nexusUserId
+    ? (championStatsCache?.stats ?? [])
+    : fallbackRankedStats;
+  const currentMatchCount =
+    champStatTab === "nexus"
+      ? championStats.reduce((sum, stat) => sum + stat.games, 0)
+      : !nexusUserId && champStatTab === "ranked"
+      ? legacyRankedChampionStats.reduce((sum: number, stat: any) => sum + stat.games, 0)
+      : (championStatsCache?.matchCount ?? queueStatus?.matchCount ?? 0);
+  const currentComputedAt =
+    champStatTab === "nexus" ? null : (championStatsCache?.computedAt ?? queueStatus?.computedAt ?? null);
+  const isCurrentPartial = champStatTab === "nexus" ? false : (championStatsCache?.isPartial ?? queueStatus?.isPartial ?? false);
+  const currentFetchedAt =
+    champStatTab === "nexus" ? null : (queueStatus?.fetchedAt ?? null);
+  const isChampionTabLoading =
+    champStatTab === "nexus"
+      ? false
+      : nexusUserId
+      ? (isLoadingChampionStats || isFetchingChampionStats)
+      : (champStatTab === "ranked" && isLoadingLegacyRankedStats);
 
   return (
     <div className="min-h-screen bg-bg-primary">
@@ -447,15 +581,21 @@ export default function SummonerStatsPage() {
                 )}
                 <Button
                   onClick={handleRefresh}
-                  variant="secondary"
+                  variant={isCurrentPartial ? "primary" : "secondary"}
                   size="sm"
                   disabled={isRefreshing || refreshCooldown > 0}
-                  className="ml-auto"
+                  className={`ml-auto ${isCurrentPartial ? "shadow-lg shadow-amber-500/10" : ""}`}
                   title={refreshCooldown > 0 ? `${refreshCooldown}초 후 갱신 가능` : undefined}
                 >
                   <RefreshCw className={`h-4 w-4 sm:mr-2 ${isRefreshing ? "animate-spin" : ""}`} />
                   <span className="hidden sm:inline">
-                    {isRefreshing ? "새로고침 중..." : refreshCooldown > 0 ? `${refreshCooldown}초` : "새로고침"}
+                    {isRefreshing
+                      ? "새로고침 중..."
+                      : refreshCooldown > 0
+                      ? `${refreshCooldown}초`
+                      : isCurrentPartial
+                      ? "수집 요청"
+                      : "새로고침"}
                   </span>
                 </Button>
               </div>
@@ -557,44 +697,76 @@ export default function SummonerStatsPage() {
                   <Sword className="h-4 w-4 sm:h-5 sm:w-5 text-accent-primary" />
                   챔피언 통계
                 </h2>
-                <div className="flex gap-1 bg-bg-tertiary/50 rounded-lg p-0.5">
-                  <button
-                    onClick={() => setChampStatTab('ranked')}
-                    className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium transition-colors ${
-                      champStatTab === 'ranked'
-                        ? 'bg-accent-primary text-white'
-                        : 'text-text-secondary hover:text-text-primary'
-                    }`}
-                  >
-                    랭크
-                    {isLoadingRankedStats ? (
-                      <Loader2 className="h-3 w-3 animate-spin opacity-70" />
-                    ) : (
-                      <span className={`text-[10px] ${champStatTab === 'ranked' ? 'text-white/70' : 'text-text-tertiary'}`}>
-                        {rankedChampionStats.reduce((sum: number, s: any) => sum + s.games, 0)}
-                      </span>
-                    )}
-                  </button>
-                  <button
-                    onClick={() => setChampStatTab('nexus')}
-                    className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
-                      champStatTab === 'nexus'
-                        ? 'bg-accent-primary text-white'
-                        : 'text-text-secondary hover:text-text-primary'
-                    }`}
-                  >
-                    Nexus
-                  </button>
+                <div className="flex gap-1 bg-bg-tertiary/50 rounded-lg p-0.5 overflow-x-auto">
+                  {queueTabs.map((tab) => {
+                    const tabStatus =
+                      tab.key === "nexus" || !fetchStatus
+                        ? null
+                        : fetchStatus.queueGroups.find((entry) => entry.queueGroup === tab.key);
+
+                    return (
+                      <button
+                        key={tab.key}
+                        onClick={() => setChampStatTab(tab.key)}
+                        className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium transition-colors whitespace-nowrap ${
+                          champStatTab === tab.key
+                            ? "bg-accent-primary text-white"
+                            : "text-text-secondary hover:text-text-primary"
+                        }`}
+                      >
+                        {tab.label}
+                        {tab.key !== "nexus" && tabStatus && (
+                          <span className={`text-[10px] ${champStatTab === tab.key ? "text-white/70" : "text-text-tertiary"}`}>
+                            {tabStatus.matchCount}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
-              {(() => {
-                const stats = champStatTab === 'ranked' ? rankedChampionStats : championStats;
-                const emptyMsg = champStatTab === 'ranked'
-                  ? '랭크 게임 챔피언 통계가 없습니다'
-                  : 'Nexus 챔피언 통계가 없습니다';
+              {champStatTab !== "nexus" && nexusUserId && (
+                <div className={`mb-4 rounded-lg border px-3 py-2 text-xs ${
+                  isCurrentPartial
+                    ? "border-amber-500/30 bg-amber-500/10 text-amber-200"
+                    : "border-bg-tertiary bg-bg-tertiary/40 text-text-secondary"
+                }`}>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      {isCurrentPartial ? (
+                        <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
+                      ) : (
+                        <Clock3 className="h-3.5 w-3.5 flex-shrink-0" />
+                      )}
+                      <span>
+                        {isCurrentPartial ? "수집 중인 전적이 있어 통계가 부분 집계 상태입니다." : "캐시된 통계를 표시하고 있습니다."}
+                      </span>
+                    </div>
+                    {fetchStatus?.queuedAt && (
+                      <Badge variant="secondary" className="text-[10px]">
+                        대기열 {formatRelativeTime(fetchStatus.queuedAt)}
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-text-tertiary">
+                    <span>마지막 계산: {formatRelativeTime(currentComputedAt)}</span>
+                    {currentQueueGroup !== "all" && (
+                      <span>마지막 수집: {formatRelativeTime(currentFetchedAt)}</span>
+                    )}
+                    <span>{currentMatchCount}게임 집계</span>
+                  </div>
+                </div>
+              )}
 
-                if (champStatTab === 'ranked' && isLoadingRankedStats) {
+              {(() => {
+                const stats = resolvedStats;
+                const emptyMsg =
+                  champStatTab === "nexus"
+                    ? "Nexus 챔피언 통계가 없습니다"
+                    : "해당 큐 챔피언 통계가 없습니다";
+
+                if (isChampionTabLoading) {
                   return (
                     <div className="space-y-2">
                       {[...Array(5)].map((_, i) => (

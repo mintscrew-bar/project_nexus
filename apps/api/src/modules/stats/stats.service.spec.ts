@@ -4,7 +4,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { RedisService } from "../redis/redis.service";
 import { RiotMatchService } from "../riot/riot-match.service";
 import { RiotService } from "../riot/riot.service";
-import { NotFoundException } from "@nestjs/common";
+import { ForbiddenException, NotFoundException } from "@nestjs/common";
 import { getChampionKoreanName } from "@nexus/types";
 
 describe("StatsService", () => {
@@ -17,8 +17,16 @@ describe("StatsService", () => {
   beforeEach(async () => {
     // Prisma mock — 실제 DB 연결 없이 단위 테스트
     prisma = {
+      $queryRaw: jest.fn(),
       user: {
         findUnique: jest.fn(),
+      },
+      knownPuuid: {
+        findMany: jest.fn(),
+      },
+      matchStatsCache: {
+        findUnique: jest.fn(),
+        upsert: jest.fn(),
       },
       matchParticipant: {
         findMany: jest.fn(),
@@ -31,6 +39,7 @@ describe("StatsService", () => {
       },
       riotAccount: {
         findFirst: jest.fn(),
+        findMany: jest.fn(),
       },
       riotMatchCache: {
         findMany: jest.fn(),
@@ -193,9 +202,7 @@ describe("StatsService", () => {
       const ahriStats = result.find((r) => r.championName === "Ahri");
       const zedStats = result.find((r) => r.championName === "Zed");
 
-      expect(ahriStats?.championNameKorean).toBe(
-        getChampionKoreanName("Ahri"),
-      );
+      expect(ahriStats?.championNameKorean).toBe(getChampionKoreanName("Ahri"));
       expect(zedStats?.championNameKorean).toBe(getChampionKoreanName("Zed"));
     });
 
@@ -298,166 +305,386 @@ describe("StatsService", () => {
     const gameName = "테스터";
     const tagLine = "KR1";
 
-    it("Redis 캐시가 있으면 캐시 데이터를 반환한다", async () => {
-      // 캐시에 이미 데이터가 존재하는 시나리오
-      const cachedData = [
+    it("랭크 캐시 응답에서 stats 배열만 반환한다", async () => {
+      const cacheSpy = jest
+        .spyOn(service, "getChampionStatsCacheByRiotId")
+        .mockResolvedValue({
+          queueGroup: "ranked",
+          matchCount: 2,
+          isPartial: false,
+          computedAt: "2026-04-17T00:00:00.000Z",
+          stats: [
+            {
+              championId: 103,
+              championName: "Ahri",
+              championNameKorean: "아리",
+              games: 2,
+              wins: 1,
+              losses: 1,
+              kills: 12,
+              deaths: 6,
+              assists: 16,
+            },
+          ],
+        });
+
+      const result = await service.getRankedChampionStats(gameName, tagLine);
+
+      expect(cacheSpy).toHaveBeenCalledWith(gameName, tagLine, "ranked");
+      expect(result).toEqual([
         {
           championId: 103,
           championName: "Ahri",
           championNameKorean: "아리",
-          games: 5,
-          wins: 3,
-          losses: 2,
-          kills: 25,
-          deaths: 10,
-          assists: 40,
+          games: 2,
+          wins: 1,
+          losses: 1,
+          kills: 12,
+          deaths: 6,
+          assists: 16,
         },
-      ];
-      redis.get.mockResolvedValue(JSON.stringify(cachedData));
-
-      const result = await service.getRankedChampionStats(gameName, tagLine);
-
-      // Redis 캐시 히트 시 Riot API를 호출하지 않아야 함
-      expect(riotService.getSummonerByRiotId).not.toHaveBeenCalled();
-      expect(result).toEqual(cachedData);
+      ]);
     });
 
-    it("소환사를 찾을 수 없으면 NotFoundException을 던진다", async () => {
-      redis.get.mockResolvedValue(null);
-      riotService.getSummonerByRiotId.mockResolvedValue(null);
+    it("소환사를 찾을 수 없으면 NotFoundException을 그대로 전달한다", async () => {
+      jest
+        .spyOn(service, "getChampionStatsCacheByRiotId")
+        .mockRejectedValue(new NotFoundException("Summoner not found"));
 
       await expect(
         service.getRankedChampionStats(gameName, tagLine),
       ).rejects.toThrow(NotFoundException);
     });
+  });
 
-    it("랭크 매치 ID가 없으면 빈 배열을 반환하고 캐시에 저장한다", async () => {
-      redis.get.mockResolvedValue(null);
-      riotService.getSummonerByRiotId.mockResolvedValue({
-        puuid: "test-puuid-123",
-      });
-      // 매치 ID가 없는 경우
-      riotMatchService.getMatchIdsByPuuid.mockResolvedValue([]);
+  describe("getChampionStatsCacheByUserId", () => {
+    it("랭크 캐시 계산 시 recentGames 요약을 함께 저장한다", async () => {
+      prisma.matchStatsCache.findUnique.mockResolvedValue(null);
+      prisma.riotAccount.findMany.mockResolvedValue([{ puuid: "puuid-1" }]);
+      prisma.riotMatchCache.findMany.mockResolvedValue([
+        {
+          gameEnd: new Date("2026-04-17T12:00:00.000Z"),
+          data: {
+            info: {
+              participants: [
+                {
+                  puuid: "puuid-1",
+                  teamId: 100,
+                  championId: 103,
+                  championName: "Ahri",
+                  kills: 8,
+                  deaths: 2,
+                  assists: 10,
+                  totalDamageDealtToChampions: 24000,
+                  win: true,
+                },
+                {
+                  puuid: "ally-1",
+                  teamId: 100,
+                  totalDamageDealtToChampions: 16000,
+                },
+              ],
+            },
+          },
+        },
+        {
+          gameEnd: new Date("2026-04-16T12:00:00.000Z"),
+          data: {
+            info: {
+              participants: [
+                {
+                  puuid: "puuid-1",
+                  teamId: 200,
+                  championId: 103,
+                  championName: "Ahri",
+                  kills: 4,
+                  deaths: 4,
+                  assists: 6,
+                  totalDamageDealtToChampions: 18000,
+                  win: false,
+                },
+                {
+                  puuid: "ally-2",
+                  teamId: 200,
+                  totalDamageDealtToChampions: 22000,
+                },
+              ],
+            },
+          },
+        },
+      ]);
+      prisma.knownPuuid.findMany.mockResolvedValue([
+        {
+          rankedFetchedAt: new Date(),
+          normalFetchedAt: new Date(),
+          aramFetchedAt: new Date(),
+        },
+      ]);
 
-      const result = await service.getRankedChampionStats(gameName, tagLine);
+      await service.getChampionStatsCacheByUserId("user-1", "ranked");
 
-      expect(result).toEqual([]);
-      // 빈 배열도 캐시에 저장되어야 함
-      expect(redis.set).toHaveBeenCalledWith(
-        expect.stringContaining("stats:ranked-champ:"),
-        JSON.stringify([]),
-        600,
+      expect(prisma.matchStatsCache.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          create: expect.objectContaining({
+            recentGames: {
+              last20: {
+                wins: 1,
+                games: 2,
+                avgKda: 5.75,
+                avgDamageShare: 0.525,
+              },
+              lastPlayedAt: "2026-04-17T12:00:00.000Z",
+            },
+          }),
+        }),
       );
     });
 
-    it("매치 데이터로 집계 시 championNameKorean 필드가 포함된다", async () => {
-      redis.get.mockResolvedValue(null);
-      riotService.getSummonerByRiotId.mockResolvedValue({
-        puuid: "test-puuid-123",
+    it("custom queueGroup도 캐시에 upsert하고 recentGames를 저장한다", async () => {
+      prisma.matchStatsCache.findUnique.mockResolvedValue(null);
+      prisma.$queryRaw.mockResolvedValue([
+        {
+          championId: 103,
+          championName: "Ahri",
+          games: BigInt(1),
+          wins: BigInt(1),
+          kills: 10,
+          deaths: 2,
+          assists: 8,
+          avgKda: 9,
+          avgDamage: 20000,
+          avgGold: 0,
+        },
+      ]);
+      prisma.matchParticipant.findMany.mockResolvedValue([
+        {
+          championId: 103,
+          championName: "Ahri",
+          kills: 10,
+          deaths: 2,
+          assists: 8,
+          teamId: "team-a",
+          totalDamageDealtToChampions: 20000,
+          win: true,
+          match: {
+            createdAt: new Date("2026-04-15T09:00:00.000Z"),
+            participants: [
+              { teamId: "team-a", totalDamageDealtToChampions: 20000 },
+              { teamId: "team-a", totalDamageDealtToChampions: 10000 },
+              { teamId: "team-b", totalDamageDealtToChampions: 15000 },
+            ],
+          },
+        },
+      ]);
+
+      await service.getChampionStatsCacheByUserId("user-1", "custom");
+
+      expect(prisma.matchStatsCache.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          create: expect.objectContaining({
+            queueGroup: "custom",
+            recentGames: {
+              last20: {
+                wins: 1,
+                games: 1,
+                avgKda: 9,
+                avgDamageShare: 0.6667,
+              },
+              lastPlayedAt: "2026-04-15T09:00:00.000Z",
+            },
+          }),
+        }),
+      );
+    });
+  });
+
+  describe("getLabUserProfileFallback", () => {
+    it("내전 10판 미만이면 ranked fallback 요약을 반환한다", async () => {
+      prisma.user.findUnique.mockResolvedValue({
+        id: "user-1",
+        settings: { showChampionStats: true },
       });
-      // 1개의 랭크 매치 ID 반환 (첫 번째 큐 1개, 두 번째 큐 0개)
-      riotMatchService.getMatchIdsByPuuid
-        .mockResolvedValueOnce(["KR_123456"])
-        .mockResolvedValueOnce([]);
 
-      // DB 캐시 확인: 해당 매치 ID가 캐시에 없음
-      prisma.riotMatchCache.findMany.mockResolvedValue([]);
-
-      // Riot API에서 매치 상세 조회 결과 mock
-      riotMatchService.getMatchById.mockResolvedValue({
-        info: {
-          participants: [
+      jest
+        .spyOn(service, "getChampionStatsCacheByUserId")
+        .mockResolvedValueOnce({
+          queueGroup: "custom",
+          matchCount: 4,
+          isPartial: false,
+          computedAt: "2026-04-17T00:00:00.000Z",
+          stats: [],
+        })
+        .mockResolvedValueOnce({
+          queueGroup: "ranked",
+          matchCount: 8,
+          isPartial: false,
+          computedAt: "2026-04-17T00:00:00.000Z",
+          stats: [
             {
-              puuid: "test-puuid-123",
               championId: 103,
               championName: "Ahri",
-              kills: 8,
-              deaths: 2,
-              assists: 10,
-              win: true,
+              championNameKorean: "아리",
+              games: 5,
+              wins: 3,
+              losses: 2,
+              kills: 25,
+              deaths: 10,
+              assists: 30,
+            },
+            {
+              championId: 238,
+              championName: "Zed",
+              championNameKorean: "제드",
+              games: 3,
+              wins: 1,
+              losses: 2,
+              kills: 18,
+              deaths: 12,
+              assists: 9,
             },
           ],
-        },
-      });
-
-      const result = await service.getRankedChampionStats(gameName, tagLine);
-
-      expect(result).toHaveLength(1);
-      // championNameKorean 필드 존재 확인
-      expect(result[0]).toHaveProperty("championNameKorean");
-      // 실제 매핑 함수 결과와 일치 확인
-      expect(result[0].championNameKorean).toBe(getChampionKoreanName("Ahri"));
-      expect(result[0].championNameKorean).toBe("아리");
-    });
-
-    it("집계 결과가 게임 수 내림차순으로 정렬된다", async () => {
-      redis.get.mockResolvedValue(null);
-      riotService.getSummonerByRiotId.mockResolvedValue({
-        puuid: "test-puuid-123",
-      });
-      // 두 개의 매치 ID: Zed 1게임, Ahri 2게임
-      riotMatchService.getMatchIdsByPuuid
-        .mockResolvedValueOnce(["KR_1", "KR_2", "KR_3"])
-        .mockResolvedValueOnce([]);
-
-      prisma.riotMatchCache.findMany.mockResolvedValue([]);
-
-      // 매치별 다른 챔피언 사용 (Ahri 2회, Zed 1회)
-      riotMatchService.getMatchById
-        .mockResolvedValueOnce({
-          info: {
-            participants: [
-              {
-                puuid: "test-puuid-123",
-                championId: 103,
-                championName: "Ahri",
-                kills: 5,
-                deaths: 2,
-                assists: 7,
-                win: true,
-              },
-            ],
-          },
-        })
-        .mockResolvedValueOnce({
-          info: {
-            participants: [
-              {
-                puuid: "test-puuid-123",
-                championId: 238,
-                championName: "Zed",
-                kills: 8,
-                deaths: 3,
-                assists: 2,
-                win: false,
-              },
-            ],
-          },
-        })
-        .mockResolvedValueOnce({
-          info: {
-            participants: [
-              {
-                puuid: "test-puuid-123",
-                championId: 103,
-                championName: "Ahri",
-                kills: 10,
-                deaths: 1,
-                assists: 12,
-                win: true,
-              },
-            ],
-          },
         });
 
-      const result = await service.getRankedChampionStats(gameName, tagLine);
+      const result = await service.getLabUserProfileFallback(
+        "user-1",
+        "viewer-1",
+      );
 
-      // Ahri 2게임, Zed 1게임 → Ahri가 첫 번째여야 함
-      expect(result[0].championName).toBe("Ahri");
-      expect(result[0].games).toBe(2);
-      expect(result[0].championNameKorean).toBe("아리");
-      expect(result[1].championName).toBe("Zed");
-      expect(result[1].championNameKorean).toBe(getChampionKoreanName("Zed"));
+      expect(result.customGames).toBe(4);
+      expect(result.summary.rankedGames).toBe(8);
+      expect(result.summary.wins).toBe(4);
+      expect(result.summary.losses).toBe(4);
+      expect(result.summary.winRate).toBe(0.5);
+      expect(result.summary.avgKda).toBe(3.73);
+      expect(result.champions[0].winRate).toBe(0.6);
+      expect(result.champions[0].avgKda).toBe(5.5);
+    });
+
+    it("내전 10판 이상이면 fallback을 열지 않는다", async () => {
+      prisma.user.findUnique.mockResolvedValue({
+        id: "user-1",
+        settings: { showChampionStats: true },
+      });
+
+      jest
+        .spyOn(service, "getChampionStatsCacheByUserId")
+        .mockResolvedValueOnce({
+          queueGroup: "custom",
+          matchCount: 10,
+          isPartial: false,
+          computedAt: "2026-04-17T00:00:00.000Z",
+          stats: [],
+        })
+        .mockResolvedValueOnce({
+          queueGroup: "ranked",
+          matchCount: 0,
+          isPartial: false,
+          computedAt: "2026-04-17T00:00:00.000Z",
+          stats: [],
+        });
+
+      await expect(
+        service.getLabUserProfileFallback("user-1", "viewer-1"),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it("showChampionStats=false면 fallback도 비공개 처리한다", async () => {
+      prisma.user.findUnique.mockResolvedValue({
+        id: "user-1",
+        settings: { showChampionStats: false },
+      });
+
+      await expect(
+        service.getLabUserProfileFallback("user-1", "viewer-1"),
+      ).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe("getLabUserProfileComparison", () => {
+    it("ranked와 custom 캐시를 합쳐 비교 응답을 만든다", async () => {
+      prisma.user.findUnique.mockResolvedValue({
+        id: "user-1",
+        settings: { showChampionStats: true },
+      });
+
+      jest
+        .spyOn(service, "getChampionStatsCacheByUserId")
+        .mockResolvedValueOnce({
+          queueGroup: "ranked",
+          matchCount: 10,
+          isPartial: false,
+          computedAt: "2026-04-17T00:00:00.000Z",
+          stats: [
+            {
+              championId: 103,
+              championName: "Ahri",
+              championNameKorean: "아리",
+              games: 6,
+              wins: 3,
+              losses: 3,
+              kills: 24,
+              deaths: 12,
+              assists: 24,
+            },
+            {
+              championId: 238,
+              championName: "Zed",
+              championNameKorean: "제드",
+              games: 4,
+              wins: 2,
+              losses: 2,
+              kills: 20,
+              deaths: 12,
+              assists: 8,
+            },
+          ],
+        })
+        .mockResolvedValueOnce({
+          queueGroup: "custom",
+          matchCount: 6,
+          isPartial: false,
+          computedAt: "2026-04-17T00:00:00.000Z",
+          stats: [
+            {
+              championId: 103,
+              championName: "Ahri",
+              championNameKorean: "아리",
+              games: 4,
+              wins: 4,
+              losses: 0,
+              kills: 18,
+              deaths: 4,
+              assists: 22,
+            },
+            {
+              championId: 266,
+              championName: "Aatrox",
+              championNameKorean: "아트록스",
+              games: 2,
+              wins: 1,
+              losses: 1,
+              kills: 9,
+              deaths: 8,
+              assists: 10,
+            },
+          ],
+        });
+
+      const result = await service.getLabUserProfileComparison(
+        "user-1",
+        "viewer-1",
+      );
+
+      expect(result.summary.rankedGames).toBe(10);
+      expect(result.summary.customGames).toBe(6);
+      expect(result.summary.rankedWinRate).toBe(0.5);
+      expect(result.summary.customWinRate).toBe(0.8333);
+      expect(result.summary.winRateDelta).toBe(0.3333);
+      expect(result.champions[0].championName).toBe("Ahri");
+      expect(result.champions[0].signal).toBe("scrim-favored");
+      expect(result.champions[0].delta.winRate).toBe(0.5);
+      expect(result.champions[1].championName).toBe("Zed");
+      expect(result.champions[1].signal).toBe("insufficient-data");
     });
   });
 });

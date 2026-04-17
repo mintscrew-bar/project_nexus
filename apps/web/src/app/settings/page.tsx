@@ -139,7 +139,7 @@ export default function SettingsPage() {
           setSettingsLoading(false);
         });
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, setNextTheme]);
 
   if (isLoading) {
     return (

@@ -153,7 +153,7 @@ export default function UserProfilePage() {
     } finally {
       setIsLoading(false);
     }
-  }, [userId]);
+  }, [userId, addToast]);
 
   const fetchFriendshipStatus = useCallback(async () => {
     if (!isAuthenticated) return;

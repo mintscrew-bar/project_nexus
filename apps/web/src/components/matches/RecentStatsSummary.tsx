@@ -429,8 +429,9 @@ export default function RecentStatsSummary({
   puuid,
   nexusMatches,
 }: RecentStatsSummaryProps) {
-  // 기본 탭을 솔로 랭크로 설정 — 랭크 미연동 시 nexus로 fallback (#21)
-  const [activeTab, setActiveTab] = useState<"all" | "ranked" | "normal" | "nexus">("ranked");
+  const [activeTab, setActiveTab] = useState<
+    "all" | "soloRanked" | "flexRanked" | "normal" | "aram" | "nexus"
+  >("soloRanked");
 
   const hasRiot = !!(gameName && tagLine && puuid);
 
@@ -443,16 +444,22 @@ export default function RecentStatsSummary({
     enabled: hasRiot && activeTab === "all",
   });
 
-  // 솔로 랭크(420) 최근 20게임 — 기본 탭이라 초기 로드 (#20: 명칭 솔로 랭크)
-  const { data: rankedMatches, isLoading: isLoadingRanked } = useQuery<any[]>({
-    queryKey: ["recentRankedStats", gameName, tagLine],
+  const { data: soloRankedMatches, isLoading: isLoadingSoloRanked } = useQuery<any[]>({
+    queryKey: ["recentSoloRankedStats", gameName, tagLine],
     queryFn: () => statsApi.getSummonerRiotMatches(gameName!, tagLine!, 20, 420),
     staleTime: 3 * 60 * 1000,
     retry: false,
-    enabled: hasRiot && activeTab === "ranked",
+    enabled: hasRiot && activeTab === "soloRanked",
   });
 
-  // 일반 게임: 블라인드(400) + 드래프트(430) 병합 후 최신 20개 (#19)
+  const { data: flexRankedMatches, isLoading: isLoadingFlexRanked } = useQuery<any[]>({
+    queryKey: ["recentFlexRankedStats", gameName, tagLine],
+    queryFn: () => statsApi.getSummonerRiotMatches(gameName!, tagLine!, 20, 440),
+    staleTime: 3 * 60 * 1000,
+    retry: false,
+    enabled: hasRiot && activeTab === "flexRanked",
+  });
+
   const { data: normalMatches, isLoading: isLoadingNormal } = useQuery<any[]>({
     queryKey: ["recentNormalStats", gameName, tagLine],
     queryFn: async () => {
@@ -470,14 +477,27 @@ export default function RecentStatsSummary({
     enabled: hasRiot && activeTab === "normal",
   });
 
+  const { data: aramMatches, isLoading: isLoadingAram } = useQuery<any[]>({
+    queryKey: ["recentAramStats", gameName, tagLine],
+    queryFn: () => statsApi.getSummonerRiotMatches(gameName!, tagLine!, 20, 450),
+    staleTime: 3 * 60 * 1000,
+    retry: false,
+    enabled: hasRiot && activeTab === "aram",
+  });
+
   const allStats = useMemo(
     () => (allMatches && puuid ? computeRiotStats(allMatches, puuid) : null),
     [allMatches, puuid]
   );
 
-  const rankedStats = useMemo(
-    () => (rankedMatches && puuid ? computeRiotStats(rankedMatches, puuid) : null),
-    [rankedMatches, puuid]
+  const soloRankedStats = useMemo(
+    () => (soloRankedMatches && puuid ? computeRiotStats(soloRankedMatches, puuid) : null),
+    [soloRankedMatches, puuid]
+  );
+
+  const flexRankedStats = useMemo(
+    () => (flexRankedMatches && puuid ? computeRiotStats(flexRankedMatches, puuid) : null),
+    [flexRankedMatches, puuid]
   );
 
   const normalStats = useMemo(
@@ -485,12 +505,16 @@ export default function RecentStatsSummary({
     [normalMatches, puuid]
   );
 
+  const aramStats = useMemo(
+    () => (aramMatches && puuid ? computeRiotStats(aramMatches, puuid) : null),
+    [aramMatches, puuid]
+  );
+
   const nexusStats = useMemo(
     () => (nexusMatches ? computeNexusStats(nexusMatches) : null),
     [nexusMatches]
   );
 
-  // If no riot account, default to nexus tab
   const effectiveTab = hasRiot ? activeTab : "nexus";
 
   return (
@@ -510,16 +534,25 @@ export default function RecentStatsSummary({
               >
                 전체
               </button>
-              {/* 솔로 랭크 탭 (#20: 자유 랭크와 구분하기 위해 명칭 명확화) */}
               <button
-                onClick={() => setActiveTab("ranked")}
+                onClick={() => setActiveTab("soloRanked")}
                 className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded text-[11px] sm:text-xs font-medium transition-colors whitespace-nowrap ${
-                  effectiveTab === "ranked"
+                  effectiveTab === "soloRanked"
                     ? "bg-accent-primary text-white"
                     : "text-text-secondary hover:text-text-primary"
                 }`}
               >
                 솔로 랭크
+              </button>
+              <button
+                onClick={() => setActiveTab("flexRanked")}
+                className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded text-[11px] sm:text-xs font-medium transition-colors whitespace-nowrap ${
+                  effectiveTab === "flexRanked"
+                    ? "bg-accent-primary text-white"
+                    : "text-text-secondary hover:text-text-primary"
+                }`}
+              >
+                자유 랭크
               </button>
               <button
                 onClick={() => setActiveTab("normal")}
@@ -530,6 +563,16 @@ export default function RecentStatsSummary({
                 }`}
               >
                 일반
+              </button>
+              <button
+                onClick={() => setActiveTab("aram")}
+                className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded text-[11px] sm:text-xs font-medium transition-colors whitespace-nowrap ${
+                  effectiveTab === "aram"
+                    ? "bg-accent-primary text-white"
+                    : "text-text-secondary hover:text-text-primary"
+                }`}
+              >
+                칼바람
               </button>
             </>
           )}
@@ -572,17 +615,43 @@ export default function RecentStatsSummary({
             일반 게임 전적이 없습니다
           </div>
         )
-      ) : effectiveTab === "ranked" ? (
-        isLoadingRanked ? (
+      ) : effectiveTab === "aram" ? (
+        isLoadingAram ? (
           <div className="flex items-center justify-center py-12 gap-2 text-text-tertiary text-sm">
             <Loader2 className="h-4 w-4 animate-spin" />
-            랭크 전적 불러오는 중...
+            칼바람 전적 불러오는 중...
           </div>
-        ) : rankedStats ? (
-          <StatsDisplay stats={rankedStats} showCsPerMin />
+        ) : aramStats ? (
+          <StatsDisplay stats={aramStats} showCsPerMin={false} />
         ) : (
           <div className="text-center py-8 text-text-tertiary text-sm">
-            랭크 전적을 불러올 수 없습니다
+            칼바람 전적이 없습니다
+          </div>
+        )
+      ) : effectiveTab === "flexRanked" ? (
+        isLoadingFlexRanked ? (
+          <div className="flex items-center justify-center py-12 gap-2 text-text-tertiary text-sm">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            자유 랭크 전적 불러오는 중...
+          </div>
+        ) : flexRankedStats ? (
+          <StatsDisplay stats={flexRankedStats} showCsPerMin />
+        ) : (
+          <div className="text-center py-8 text-text-tertiary text-sm">
+            자유 랭크 전적이 없습니다
+          </div>
+        )
+      ) : effectiveTab === "soloRanked" ? (
+        isLoadingSoloRanked ? (
+          <div className="flex items-center justify-center py-12 gap-2 text-text-tertiary text-sm">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            솔로 랭크 전적 불러오는 중...
+          </div>
+        ) : soloRankedStats ? (
+          <StatsDisplay stats={soloRankedStats} showCsPerMin />
+        ) : (
+          <div className="text-center py-8 text-text-tertiary text-sm">
+            솔로 랭크 전적이 없습니다
           </div>
         )
       ) : (

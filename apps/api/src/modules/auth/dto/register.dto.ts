@@ -1,4 +1,11 @@
-import { IsEmail, IsString, MinLength, MaxLength, IsBoolean, IsOptional } from "class-validator";
+import {
+  IsEmail,
+  IsString,
+  MinLength,
+  MaxLength,
+  IsBoolean,
+  IsOptional,
+} from "class-validator";
 
 /**
  * 회원가입 요청 DTO

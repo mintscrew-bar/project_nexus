@@ -101,7 +101,10 @@ export class RiotService {
       where: { puuid },
     });
 
-    const nextPriority = Math.max(existing?.priority ?? 0, options?.priority ?? 0);
+    const nextPriority = Math.max(
+      existing?.priority ?? 0,
+      options?.priority ?? 0,
+    );
 
     await this.prisma.knownPuuid.upsert({
       where: { puuid },

@@ -755,7 +755,10 @@ export class AuthService {
     return userId;
   }
 
-  async isValidLinkToken(linkToken: string, provider: string): Promise<boolean> {
+  async isValidLinkToken(
+    linkToken: string,
+    provider: string,
+  ): Promise<boolean> {
     const key = `link_token:${linkToken}`;
     const data = await this.redis.get(key);
 

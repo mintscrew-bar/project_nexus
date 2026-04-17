@@ -1,7 +1,7 @@
 # Lab 대시보드 구현 계획
 
 > 진행 기준일: 2026-04-16
-> 완료: 8 / 전체: Task 1~42
+> 완료: 12 / 전체: Task 1~42
 > 연계 문서: [전적 페이지 크롤링/배치 TODO](./TODO_matches_crawling.md)
 
 ---
@@ -321,7 +321,7 @@ API 요청 시 fallback 우선순위:
 
 ## Phase 2: 백엔드 — 메타 레이더 API
 
-- [ ] Task 9: `GET /stats/lab/meta/radar` — 메타 레이더 개요 API
+- [x] Task 9: `GET /stats/lab/meta/radar` — 메타 레이더 개요 API
   - **트렌딩 챔피언 TOP 5** — 아래 알고리즘으로 감지:
 
     ```
@@ -368,7 +368,7 @@ API 요청 시 fallback 우선순위:
 
   - 데이터 샘플 현황 (총 게임 수, 기간, 참여 유저 수)
 
-- [ ] Task 10: `GET /stats/lab/meta/patch-impact` — 패치 임팩트 API
+- [x] Task 10: `GET /stats/lab/meta/patch-impact` — 패치 임팩트 API
   - `patchVersion` 기준 이전/이후 챔피언 승률 비교
   - 상위 5 수혜 챔피언 / 상위 5 피해 챔피언
   - **비교 방법**:
@@ -380,7 +380,7 @@ API 요청 시 fallback 우선순위:
   - **주의(caveat)**: 내전 데이터로 패치 임팩트를 측정하면, 실제 패치 효과 + 메타 인식 변화(밴률 변화에 따른 간접 효과) + 표본 노이즈가 혼재. UI에 "내전 데이터 기반 — 패치 노트와 결과가 다를 수 있습니다" 면책 문구 필요.
   - `patchVersion` 데이터 부족 시 graceful fallback: 패치 구분 없는 전체 기간 통계 표시
 
-- [ ] Task 11: `GET /stats/lab/meta/ban-rates` — 밴률 통계 API
+- [x] Task 11: `GET /stats/lab/meta/ban-rates` — 밴률 통계 API
   - `MatchTeamStats.bans` JSON 파싱 집계
   - 챔피언별 밴률 + 밴 시 팀 승률 연관성
   - **밴률 계산**: `ban_rate = 해당 챔피언 밴 횟수 / 전체 매치 수` (매치당 최대 10밴이므로 100%를 초과할 수 없으나, 분모를 전체 매치 수로 통일하여 직관적 해석 유지)
@@ -389,12 +389,13 @@ API 요청 시 fallback 우선순위:
 
 ## Phase 3: 백엔드 — 챔피언 분석 API
 
-- [ ] Task 12: `GET /stats/lab/champions` — 챔피언 목록 통계 API
+- [x] Task 12: `GET /stats/lab/champions` — 챔피언 목록 통계 API
   - 픽률 / 밴률 / 승률 삼각지표 전체 목록
   - 필터: `period` (30d/90d/all), `position` (포지션별)
   - `LabChampionSnapshot` 캐시 우선 조회, 없으면 실시간 집계
   - **정렬 기본값**: `wilsonLower` DESC (소표본 보정된 승률 기준)
   - 응답에 `confidenceLevel` (`low` / `moderate` / `high`) 포함
+  - 구현: `GET /stats/lab/champions?period=30d&position=TOP` 추가, 스냅샷 우선 + 실시간 집계 fallback, 응답에 `source`(`snapshot|realtime`) 포함
 
 - [ ] Task 13: `GET /stats/lab/champions/:championId` — 챔피언 상세 API
   - 기간별 승률 추이 (라인 차트용 시계열 데이터)

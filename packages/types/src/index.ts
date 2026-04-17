@@ -217,3 +217,17 @@ export {
   searchChampionsByQuery,
   searchItemsByQuery,
 } from './lol-mappings';
+
+export {
+  CONFIDENCE_THRESHOLDS,
+  TIER_BASE,
+  RANK_BONUS,
+  wilsonLower,
+  wilsonUpper,
+  getConfidenceLevel,
+  calculateTierScore,
+  tierScore,
+  isTierAbove,
+} from './stats-utils';
+
+export type { ConfidenceLevel } from './stats-utils';

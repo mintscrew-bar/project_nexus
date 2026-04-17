@@ -126,7 +126,10 @@ export class DmService implements OnModuleInit {
       if (currentTotal !== null) {
         const parsed = parseInt(currentTotal, 10);
         // NaN이면 Redis 키가 오염된 것이므로 0으로 리셋
-        const newTotal = Math.max(0, (isNaN(parsed) ? 0 : parsed) - unreadCount);
+        const newTotal = Math.max(
+          0,
+          (isNaN(parsed) ? 0 : parsed) - unreadCount,
+        );
         await this.redis.set(totalKey, String(newTotal));
       }
 
@@ -171,7 +174,12 @@ export class DmService implements OnModuleInit {
       where: { receiverId: userId, isRead: false },
       _count: { id: true },
     });
-    return Object.fromEntries(result.map((r: { senderId: string | null; _count: { id: number } }) => [r.senderId, r._count.id]));
+    return Object.fromEntries(
+      result.map((r: { senderId: string | null; _count: { id: number } }) => [
+        r.senderId,
+        r._count.id,
+      ]),
+    );
   }
 
   async getConversationList(userId: string, limit = 50) {
@@ -212,20 +220,48 @@ export class DmService implements OnModuleInit {
       ORDER BY c."lastAt" DESC
     `;
 
-    const userIds = raw.map((r: { otherUserId: string; lastMessage: string; lastAt: Date; unread: bigint }) => r.otherUserId);
+    const userIds = raw.map(
+      (r: {
+        otherUserId: string;
+        lastMessage: string;
+        lastAt: Date;
+        unread: bigint;
+      }) => r.otherUserId,
+    );
     const users = await this.prisma.user.findMany({
       where: { id: { in: userIds } },
       select: { id: true, username: true, avatar: true },
     });
-    const userMap = Object.fromEntries(users.map((u: { id: string; username: string; avatar: string | null }) => [u.id, u]));
+    const userMap = Object.fromEntries(
+      users.map(
+        (u: { id: string; username: string; avatar: string | null }) => [
+          u.id,
+          u,
+        ],
+      ),
+    );
 
     return raw
-      .filter((r: { otherUserId: string; lastMessage: string; lastAt: Date; unread: bigint }) => userMap[r.otherUserId])
-      .map((r: { otherUserId: string; lastMessage: string; lastAt: Date; unread: bigint }) => ({
-        user: userMap[r.otherUserId],
-        lastMessage: r.lastMessage,
-        lastAt: r.lastAt,
-        unread: Number(r.unread),
-      }));
+      .filter(
+        (r: {
+          otherUserId: string;
+          lastMessage: string;
+          lastAt: Date;
+          unread: bigint;
+        }) => userMap[r.otherUserId],
+      )
+      .map(
+        (r: {
+          otherUserId: string;
+          lastMessage: string;
+          lastAt: Date;
+          unread: bigint;
+        }) => ({
+          user: userMap[r.otherUserId],
+          lastMessage: r.lastMessage,
+          lastAt: r.lastAt,
+          unread: Number(r.unread),
+        }),
+      );
   }
 }

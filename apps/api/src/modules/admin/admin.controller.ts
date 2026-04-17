@@ -18,6 +18,7 @@ import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { UserRole } from "@nexus/database";
+import { TasksService, MatchFetchQueueGroup } from "../tasks/tasks.service";
 import { RoomGateway } from "../room/room.gateway";
 import { RoomService } from "../room/room.service";
 import {
@@ -26,6 +27,8 @@ import {
   AdminChatLogsQueryDto,
   AdminRoomsQueryDto,
   AdminAppealsQueryDto,
+  AdminMatchQueueQueryDto,
+  AdminRecomputeStatsQueryDto,
 } from "./dto/admin-query.dto";
 
 @Controller("admin")
@@ -33,6 +36,7 @@ import {
 export class AdminController {
   constructor(
     private readonly adminService: AdminService,
+    private readonly tasksService: TasksService,
     @Inject(forwardRef(() => RoomGateway))
     private readonly roomGateway: RoomGateway,
     @Inject(forwardRef(() => RoomService))
@@ -44,6 +48,34 @@ export class AdminController {
   @Roles(UserRole.ADMIN, UserRole.MODERATOR)
   getStats() {
     return this.adminService.getStats();
+  }
+
+  @Get("matches/queue-stats")
+  @Roles(UserRole.ADMIN)
+  getMatchQueueStats() {
+    return this.adminService.getMatchQueueStats();
+  }
+
+  @Post("matches/trigger-fetch")
+  @Roles(UserRole.ADMIN)
+  async triggerMatchFetch(@Query() query: AdminMatchQueueQueryDto) {
+    const queueGroup = query.queueGroup as MatchFetchQueueGroup | undefined;
+    await this.tasksService.runMatchFetch(queueGroup);
+    return {
+      ok: true,
+      queueGroup: queueGroup ?? "all",
+    };
+  }
+
+  @Post("matches/recompute-stats")
+  @Roles(UserRole.ADMIN)
+  async recomputeMatchStats(@Query() query: AdminRecomputeStatsQueryDto) {
+    const userId = await this.adminService.resolveStatsRecomputeUserId(query);
+    await this.tasksService.runMatchStatsCompute(userId);
+    return {
+      ok: true,
+      userId,
+    };
   }
 
   // ── Users (ADMIN only) ──────────────────────────────────────────────────────
@@ -261,7 +293,7 @@ export class AdminController {
       this.roomGateway.notifyRoomUpdate(roomId, "room-updated", updatedRoom);
 
       // 방 목록 구독자들에게 update delta 전송
-      await this.roomGateway.broadcastRoomDelta('update', roomId);
+      await this.roomGateway.broadcastRoomDelta("update", roomId);
     } catch (error) {
       // 실시간 업데이트 실패해도 봇 추가는 성공으로 처리
       console.error("[Admin] Failed to broadcast bot addition:", error);

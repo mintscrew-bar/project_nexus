@@ -27,7 +27,9 @@ export class JwtStrategy extends PassportStrategy(Strategy, "jwt") {
         `blacklist:jti:${payload.jti}`,
       );
       if (isBlacklisted) {
-        throw new UnauthorizedException("토큰이 만료되었습니다. 다시 로그인해주세요.");
+        throw new UnauthorizedException(
+          "토큰이 만료되었습니다. 다시 로그인해주세요.",
+        );
       }
     }
 

@@ -35,7 +35,9 @@ interface AuthenticatedSocket extends Socket {
   pingTimeout: 5000,
   maxHttpBufferSize: 1e4,
 })
-export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect, OnModuleDestroy {
+export class RoomGateway
+  implements OnGatewayConnection, OnGatewayDisconnect, OnModuleDestroy
+{
   @WebSocketServer()
   server: Server;
 
@@ -101,8 +103,7 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect, On
         this.userSockets.set(payload.sub, new Set());
       }
       this.userSockets.get(payload.sub)!.add(client.id);
-
-    } catch (error) {
+    } catch {
       // 연결 실패 시 조용히 연결 해제
       client.disconnect();
     }
@@ -169,13 +170,12 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect, On
           });
 
           // 참가자 수 변경 → 방 요약 delta 전송
-          this.broadcastRoomDelta('update', roomId);
+          this.broadcastRoomDelta("update", roomId);
         }
 
         // Clear typing status on disconnect
         this.stopTyping(roomId, client.userId!); // Assert client.userId is string
       }
-
     }
   }
 
@@ -206,15 +206,12 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect, On
    * - 생성/수정 시 해당 방 요약 데이터만 조회해 전송 (전체 목록 재조회 불필요)
    * - 삭제 시에는 roomId만 전송
    */
-  async broadcastRoomDelta(
-    type: 'add' | 'update' | 'remove',
-    roomId: string,
-  ) {
+  async broadcastRoomDelta(type: "add" | "update" | "remove", roomId: string) {
     try {
-      if (type === 'remove') {
+      if (type === "remove") {
         // 삭제된 방: roomId만 전송
-        this.server.to(this.ROOM_LIST_CHANNEL).emit('room-list-updated', {
-          type: 'remove',
+        this.server.to(this.ROOM_LIST_CHANNEL).emit("room-list-updated", {
+          type: "remove",
           roomId,
         });
         return;
@@ -224,19 +221,19 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect, On
       const room = await this.roomService.getRoomSummary(roomId);
       if (!room) {
         // 조회 타이밍에 방이 이미 삭제됐으면 remove delta 전송
-        this.server.to(this.ROOM_LIST_CHANNEL).emit('room-list-updated', {
-          type: 'remove',
+        this.server.to(this.ROOM_LIST_CHANNEL).emit("room-list-updated", {
+          type: "remove",
           roomId,
         });
         return;
       }
 
-      this.server.to(this.ROOM_LIST_CHANNEL).emit('room-list-updated', {
+      this.server.to(this.ROOM_LIST_CHANNEL).emit("room-list-updated", {
         type,
         room,
       });
     } catch (error) {
-      console.error('[Room] Failed to broadcast room list delta:', error);
+      console.error("[Room] Failed to broadcast room list delta:", error);
     }
   }
 
@@ -292,7 +289,7 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect, On
 
       // 신규 입장 시 참가자 수 변경 → 방 요약 delta 전송
       if (isNewJoin) {
-        this.broadcastRoomDelta('update', data.roomId);
+        this.broadcastRoomDelta("update", data.roomId);
       }
 
       return {
@@ -334,7 +331,7 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect, On
       this.stopTyping(data.roomId, client.userId!); // Assert client.userId is string
 
       // 퇴장 시 참가자 수 변경 → 방 요약 delta 전송
-      this.broadcastRoomDelta('update', data.roomId);
+      this.broadcastRoomDelta("update", data.roomId);
 
       return { success: true };
     } catch (error: any) {
@@ -397,7 +394,7 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect, On
       });
 
       // 관전자↔플레이어 전환 → 방 요약 delta 전송
-      this.broadcastRoomDelta('update', data.roomId);
+      this.broadcastRoomDelta("update", data.roomId);
 
       return { success: true, newRole: result.newRole };
     } catch (error: any) {
@@ -701,7 +698,10 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect, On
         inVoice,
       });
     } catch (error) {
-      console.error("[RoomGateway] Discord 음성 상태 업데이트 처리 오류:", error);
+      console.error(
+        "[RoomGateway] Discord 음성 상태 업데이트 처리 오류:",
+        error,
+      );
     }
   }
 

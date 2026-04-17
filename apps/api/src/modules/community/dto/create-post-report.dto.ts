@@ -1,7 +1,19 @@
-import { IsString, IsNotEmpty, MaxLength, IsOptional, IsIn } from "class-validator";
+import {
+  IsString,
+  IsNotEmpty,
+  MaxLength,
+  IsOptional,
+  IsIn,
+} from "class-validator";
 
 // 게시글/댓글 신고 사유 — Prisma enum이 아닌 커뮤니티 전용 사유
-const POST_REPORT_REASONS = ["SPAM", "HARASSMENT", "INAPPROPRIATE", "MISINFORMATION", "OTHER"] as const;
+const POST_REPORT_REASONS = [
+  "SPAM",
+  "HARASSMENT",
+  "INAPPROPRIATE",
+  "MISINFORMATION",
+  "OTHER",
+] as const;
 
 /**
  * 게시글/댓글 신고 DTO

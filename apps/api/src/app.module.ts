@@ -1,4 +1,9 @@
-import { Module, OnModuleInit, OnApplicationShutdown, Logger } from "@nestjs/common";
+import {
+  Module,
+  OnModuleInit,
+  OnApplicationShutdown,
+  Logger,
+} from "@nestjs/common";
 import { APP_GUARD } from "@nestjs/core";
 import { ConfigModule } from "@nestjs/config";
 import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler";
@@ -125,7 +130,9 @@ export class AppModule implements OnModuleInit, OnApplicationShutdown {
    */
   async onApplicationShutdown(signal?: string): Promise<void> {
     this.shutdownService.setShuttingDown();
-    this.logger.warn(`[Shutdown] ${signal ?? "UNKNOWN"} 수신 — 진행 중인 방 드레인 시작`);
+    this.logger.warn(
+      `[Shutdown] ${signal ?? "UNKNOWN"} 수신 — 진행 중인 방 드레인 시작`,
+    );
 
     const start = Date.now();
 
@@ -146,7 +153,9 @@ export class AppModule implements OnModuleInit, OnApplicationShutdown {
       this.logger.warn(
         `[Shutdown] 진행 중인 방 ${activeCount}개 (${elapsed}s 경과) — ${this.DRAIN_CHECK_INTERVAL_MS / 1000}초 후 재확인`,
       );
-      await new Promise((resolve) => setTimeout(resolve, this.DRAIN_CHECK_INTERVAL_MS));
+      await new Promise((resolve) =>
+        setTimeout(resolve, this.DRAIN_CHECK_INTERVAL_MS),
+      );
     }
 
     this.logger.warn("[Shutdown] 드레인 타임아웃(60s) — 강제 종료");

@@ -1,4 +1,4 @@
-import { IsInt, IsOptional, IsString, Max, Min } from "class-validator";
+import { IsIn, IsInt, IsOptional, IsString, Max, Min } from "class-validator";
 
 // 공통 관리자 목록 페이지네이션
 export class AdminPageQueryDto {
@@ -79,3 +79,21 @@ export class AdminRoomsQueryDto {
 
 // 이의 제기 목록 조회
 export class AdminAppealsQueryDto extends AdminRoomsQueryDto {}
+
+export class AdminMatchQueueQueryDto {
+  @IsOptional()
+  @IsIn(["ranked", "normal", "aram", "custom"], {
+    message: "queueGroup은 ranked, normal, aram, custom 중 하나여야 합니다.",
+  })
+  queueGroup?: "ranked" | "normal" | "aram" | "custom";
+}
+
+export class AdminRecomputeStatsQueryDto {
+  @IsOptional()
+  @IsString()
+  userId?: string;
+
+  @IsOptional()
+  @IsString()
+  puuid?: string;
+}

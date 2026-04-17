@@ -46,7 +46,10 @@ export class AuctionGateway
   private botBidTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private bidResolveTimers = new Map<string, ReturnType<typeof setTimeout>>();
   // 타이머 진행 상황 브로드캐스트용 인터벌 (500ms마다 timeLeft emit)
-  private timerUpdateIntervals = new Map<string, ReturnType<typeof setInterval>>();
+  private timerUpdateIntervals = new Map<
+    string,
+    ReturnType<typeof setInterval>
+  >();
   // Guard against concurrent _resolveCurrentBidAndAdvance calls
   private resolvingRooms = new Set<string>();
   // In-memory rate limit fallback when Redis is unavailable
@@ -719,7 +722,6 @@ export class AuctionGateway
         timestamp: new Date().toISOString(),
       });
       this._scheduleBidResolve(roomId, newState.timerEnd);
-
     } catch {
       // Ignore races such as timer expiry or stale state.
     } finally {

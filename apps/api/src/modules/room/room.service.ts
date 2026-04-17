@@ -612,7 +612,9 @@ export class RoomService {
     }
 
     // Check if user is in room
-    const participant = room.participants.find((p: (typeof room.participants)[number]) => p.userId === userId);
+    const participant = room.participants.find(
+      (p: (typeof room.participants)[number]) => p.userId === userId,
+    );
     if (!participant) {
       throw new BadRequestException("Not in room");
     }
@@ -946,7 +948,10 @@ export class RoomService {
       where: { roomId, role: "PLAYER" },
     });
 
-    return participants.length > 0 && participants.every((p: (typeof participants)[number]) => p.isReady);
+    return (
+      participants.length > 0 &&
+      participants.every((p: (typeof participants)[number]) => p.isReady)
+    );
   }
 
   // ========================================
@@ -976,7 +981,9 @@ export class RoomService {
     }
 
     // Check if all players are ready
-    const allReady = room.participants.every((p: (typeof room.participants)[number]) => p.isReady);
+    const allReady = room.participants.every(
+      (p: (typeof room.participants)[number]) => p.isReady,
+    );
     if (!allReady) {
       throw new BadRequestException("Not all players are ready");
     }
@@ -1199,15 +1206,18 @@ export class RoomService {
 
     // 호스트만 로비 복귀 가능
     if (room.hostId !== requesterId) {
-      throw new ForbiddenException(
-        "호스트만 로비로 복귀시킬 수 있습니다.",
-      );
+      throw new ForbiddenException("호스트만 로비로 복귀시킬 수 있습니다.");
     }
 
     // Discord 팀장 역할 정리용
     const captainDiscordIds = room.teams
-      .map((team: (typeof room.teams)[number]) => team.captain.authProviders[0]?.providerId)
-      .filter((providerId: string | undefined): providerId is string => Boolean(providerId));
+      .map(
+        (team: (typeof room.teams)[number]) =>
+          team.captain.authProviders[0]?.providerId,
+      )
+      .filter((providerId: string | undefined): providerId is string =>
+        Boolean(providerId),
+      );
 
     // 트랜잭션으로 방 상태를 WAITING으로 리셋
     await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
@@ -1324,8 +1334,13 @@ export class RoomService {
     }
 
     const captainDiscordIds = room.teams
-      .map((team: (typeof room.teams)[number]) => team.captain.authProviders[0]?.providerId)
-      .filter((providerId: string | undefined): providerId is string => Boolean(providerId));
+      .map(
+        (team: (typeof room.teams)[number]) =>
+          team.captain.authProviders[0]?.providerId,
+      )
+      .filter((providerId: string | undefined): providerId is string =>
+        Boolean(providerId),
+      );
 
     await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       await tx.roomParticipant.updateMany({

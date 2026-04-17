@@ -229,11 +229,10 @@ export class SnakeDraftGateway
         return { error: "드래프트 상태를 찾을 수 없습니다." };
       }
 
-      const isCurrentCaptain =
-        await this.snakeDraftService.isTeamCaptain(
-          pickingTeamId,
-          client.userId,
-        );
+      const isCurrentCaptain = await this.snakeDraftService.isTeamCaptain(
+        pickingTeamId,
+        client.userId,
+      );
       if (!isCurrentCaptain) {
         this.manualPickingRooms.delete(data.roomId);
         return { error: "현재 당신의 픽 차례가 아닙니다." };

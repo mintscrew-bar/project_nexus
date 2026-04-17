@@ -59,7 +59,6 @@ const STAT_NAMES: Record<string, string> = {
   PercentHealMod: "치유량",
   PercentOmniVampMod: "전능 흡수",
   FlatCastingTimeMod: "시전 시간",
-  PercentMovementSpeedMod: "이동 속도",
 };
 
 // 스탯 포맷팅
@@ -88,13 +87,15 @@ async function fetchItemData(): Promise<Record<string, ItemInfo>> {
         `${DDRAGON_BASE}/cdn/${DDRAGON_VERSION}/data/en_US/item.json`
       );
       const json = await fallbackResponse.json();
-      itemDataCache = json.data || {};
-      return itemDataCache;
+      const data = (json.data || {}) as Record<string, ItemInfo>;
+      itemDataCache = data;
+      return data;
     }
 
     const json = await response.json();
-    itemDataCache = json.data || {};
-    return itemDataCache;
+    const data = (json.data || {}) as Record<string, ItemInfo>;
+    itemDataCache = data;
+    return data;
   } catch (error) {
     console.error("아이템 데이터 로드 중 오류:", error);
     return {};

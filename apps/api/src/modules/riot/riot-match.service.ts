@@ -164,19 +164,30 @@ export class RiotMatchService {
     }
 
     // 만료된 in-memory 캐시 엔트리를 1시간마다 정리 (메모리 누수 방지)
-    setInterval(() => {
-      const now = Date.now();
-      let cleaned = 0;
-      for (const [key, val] of this.matchCache) {
-        if (val.expires < now) { this.matchCache.delete(key); cleaned++; }
-      }
-      for (const [key, val] of this.timelineCache) {
-        if (val.expires < now) { this.timelineCache.delete(key); cleaned++; }
-      }
-      if (cleaned > 0) {
-        this.logger.debug(`in-memory 캐시 정리: ${cleaned}개 만료 엔트리 삭제`);
-      }
-    }, 60 * 60 * 1000); // 1시간마다
+    setInterval(
+      () => {
+        const now = Date.now();
+        let cleaned = 0;
+        for (const [key, val] of this.matchCache) {
+          if (val.expires < now) {
+            this.matchCache.delete(key);
+            cleaned++;
+          }
+        }
+        for (const [key, val] of this.timelineCache) {
+          if (val.expires < now) {
+            this.timelineCache.delete(key);
+            cleaned++;
+          }
+        }
+        if (cleaned > 0) {
+          this.logger.debug(
+            `in-memory 캐시 정리: ${cleaned}개 만료 엔트리 삭제`,
+          );
+        }
+      },
+      60 * 60 * 1000,
+    ); // 1시간마다
   }
 
   private async waitForRateLimit(
@@ -224,12 +235,8 @@ export class RiotMatchService {
       },
     });
 
-    const existingMap = new Map(
-      existingRows.map((row) => [row.puuid, row]),
-    );
-    const linkedMap = new Map(
-      linkedAccounts.map((row) => [row.puuid, row]),
-    );
+    const existingMap = new Map(existingRows.map((row) => [row.puuid, row]));
+    const linkedMap = new Map(linkedAccounts.map((row) => [row.puuid, row]));
 
     await Promise.all(
       participantPuuids.map((puuid) => {

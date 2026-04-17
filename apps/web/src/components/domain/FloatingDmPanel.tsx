@@ -8,6 +8,7 @@
  */
 
 import { X, Minus } from "lucide-react";
+import Image from "next/image";
 import { useFriendStore } from "@/stores/friend-store";
 import { useDmStore } from "@/stores/dm-store";
 import { DmChatView } from "@/components/domain/DmChatView";
@@ -44,9 +45,11 @@ export function FloatingDmPanel() {
           {/* 아바타 */}
           <div className="w-6 h-6 rounded-full bg-bg-tertiary overflow-hidden flex-shrink-0">
             {floatingDmTarget.avatar ? (
-              <img
+              <Image
                 src={floatingDmTarget.avatar}
                 alt=""
+                width={24}
+                height={24}
                 className="w-full h-full object-cover"
               />
             ) : (

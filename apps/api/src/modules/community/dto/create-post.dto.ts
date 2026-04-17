@@ -1,4 +1,12 @@
-import { IsString, IsNotEmpty, MaxLength, IsEnum, IsOptional, IsArray, ArrayMaxSize } from "class-validator";
+import {
+  IsString,
+  IsNotEmpty,
+  MaxLength,
+  IsEnum,
+  IsOptional,
+  IsArray,
+  ArrayMaxSize,
+} from "class-validator";
 import { Transform } from "class-transformer";
 import { PostCategory } from "@nexus/database";
 import { sanitizeHtml, stripAllHtml } from "@/common/utils/sanitize";

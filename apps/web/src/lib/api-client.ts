@@ -1140,6 +1140,36 @@ export const statsApi = {
     return response.data;
   },
 
+  getChampionStats: async (
+    gameName: string,
+    tagLine: string,
+    queueGroup: "ranked" | "normal" | "aram" | "custom" | "all" = "ranked",
+  ) => {
+    const response = await apiClient.get("/stats/champion-stats", {
+      params: {
+        gameName: stripInvisibleChars(gameName),
+        tagLine: stripInvisibleChars(tagLine),
+        queueGroup,
+      },
+    });
+    return response.data;
+  },
+
+  getFetchStatus: async (userId: string) => {
+    const response = await apiClient.get(`/stats/fetch-status/${userId}`);
+    return response.data;
+  },
+
+  refreshStats: async (
+    userId: string,
+    queueGroup: "ranked" | "normal" | "aram" | "custom" | "all" = "ranked",
+  ) => {
+    const response = await apiClient.post(`/stats/refresh/${userId}`, undefined, {
+      params: { queueGroup },
+    });
+    return response.data;
+  },
+
   getUserChampionStats: async (userId: string) => {
     const response = await apiClient.get(`/stats/user/${userId}/champion-stats`);
     return response.data;

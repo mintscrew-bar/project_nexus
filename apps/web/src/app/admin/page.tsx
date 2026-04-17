@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/auth-store";
 import { adminApi, appealApi } from "@/lib/api-client";
@@ -713,7 +714,13 @@ function ReportsTab({ addToast }: { addToast: (msg: string, type: "success" | "e
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           {r.reporter.avatar && (
-                            <img src={r.reporter.avatar} alt="" className="w-5 h-5 rounded-full" />
+                            <Image
+                              src={r.reporter.avatar}
+                              alt=""
+                              width={20}
+                              height={20}
+                              className="w-5 h-5 rounded-full"
+                            />
                           )}
                           <span className="text-text-secondary">{r.reporter.username}</span>
                         </div>
@@ -722,7 +729,13 @@ function ReportsTab({ addToast }: { addToast: (msg: string, type: "success" | "e
                         {r.category === "user" ? (
                           <div className="flex items-center gap-2">
                             {(r as UserReportItem).target.avatar && (
-                              <img src={(r as UserReportItem).target.avatar} alt="" className="w-5 h-5 rounded-full" />
+                              <Image
+                                src={(r as UserReportItem).target.avatar!}
+                                alt=""
+                                width={20}
+                                height={20}
+                                className="w-5 h-5 rounded-full"
+                              />
                             )}
                             <span className="font-medium text-text-primary">
                               {(r as UserReportItem).target.username}
@@ -1415,7 +1428,13 @@ function ChatLogsTab() {
                       <td className="px-4 py-2.5">
                         <div className="flex items-center gap-1.5">
                           {log.avatar ? (
-                            <img src={log.avatar} alt="" className="w-5 h-5 rounded-full" />
+                            <Image
+                              src={log.avatar}
+                              alt=""
+                              width={20}
+                              height={20}
+                              className="w-5 h-5 rounded-full"
+                            />
                           ) : (
                             <div className="w-5 h-5 rounded-full bg-bg-tertiary" />
                           )}

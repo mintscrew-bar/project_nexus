@@ -181,9 +181,7 @@ export class UserService {
     if (data.username !== undefined) {
       const trimmed = data.username.trim();
       if (trimmed.length < 2 || trimmed.length > 20) {
-        throw new BadRequestException(
-          "유저네임은 2~20자여야 합니다.",
-        );
+        throw new BadRequestException("유저네임은 2~20자여야 합니다.");
       }
       if (!/^[a-zA-Z0-9가-힣_]+$/.test(trimmed)) {
         throw new BadRequestException(

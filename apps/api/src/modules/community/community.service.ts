@@ -785,7 +785,9 @@ export class CommunityService {
       select: { commentId: true },
     });
 
-    const likedSet = new Set(likes.map((l: (typeof likes)[number]) => l.commentId));
+    const likedSet = new Set(
+      likes.map((l: (typeof likes)[number]) => l.commentId),
+    );
     return Object.fromEntries(commentIds.map((id) => [id, likedSet.has(id)]));
   }
 
@@ -851,7 +853,10 @@ export class CommunityService {
       }),
     ]);
 
-    return { posts: bookmarks.map((b: (typeof bookmarks)[number]) => b.post), total };
+    return {
+      posts: bookmarks.map((b: (typeof bookmarks)[number]) => b.post),
+      total,
+    };
   }
 
   // ========================================
