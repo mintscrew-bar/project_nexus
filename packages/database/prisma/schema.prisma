@@ -370,6 +370,7 @@ model Match {
   bracketType    BracketType?
   tournamentCode String?
   riotMatchId    String?
+  patchVersion   String?            // ex: "14.8" — 패치 임팩트 분석용
   gameDuration   Int?
   dataCollected  Boolean            @default(false)
   scheduledAt    DateTime?
@@ -848,6 +849,7 @@ model MatchStatsCache {
   queueGroup String
   season     String
   stats      Json
+  recentGames Json?
   matchCount Int
   isPartial  Boolean  @default(false)
   computedAt DateTime @default(now())
@@ -1142,4 +1144,66 @@ enum AppealStatus {
   PENDING
   APPROVED
   REJECTED
+}
+
+// ─── Lab 대시보드 스냅샷 테이블 ───
+
+// 챔피언별 기간별 집계 캐시 — 야간 cron 갱신
+model LabChampionSnapshot {
+  id           String   @id @default(cuid())
+  period       String   // '30d' | '90d' | 'all'
+  patchVersion String?
+  championId   Int
+  position     String?  // null = 전체 포지션
+  games        Int
+  wins         Int
+  avgKda       Float
+  avgDamage    Float
+  avgGold      Float
+  pickRate     Float    // 해당 기간 전체 게임 대비 픽률
+  banRate      Float    // 해당 기간 전체 게임 대비 밴률
+  wilsonLower  Float    // Wilson score 하한 — 정렬/티어 기준
+  computedAt   DateTime @default(now())
+
+  @@unique([period, patchVersion, championId, position])
+  @@index([period, championId])
+  @@index([period, position, wilsonLower])
+  @@map("lab_champion_snapshots")
+}
+
+// 챔피언 2인 시너지 캐시
+model LabSynergySnapshot {
+  id          String   @id @default(cuid())
+  period      String   // '30d' | '90d' | 'all'
+  champ1Id    Int      // 항상 champ1Id < champ2Id (정규화)
+  champ2Id    Int
+  games       Int
+  wins        Int
+  winRate     Float    // 표시용
+  wilsonLower Float    // 정렬 기준
+  computedAt  DateTime @default(now())
+
+  @@unique([period, champ1Id, champ2Id])
+  @@index([period, champ1Id])
+  @@index([period, champ2Id])
+  @@map("lab_synergy_snapshots")
+}
+
+// 챔피언 상성 캐시
+model LabCounterSnapshot {
+  id          String   @id @default(cuid())
+  period      String   // '30d' | '90d' | 'all'
+  champId     Int
+  vsChampId   Int
+  position    String?  // null = 전체 포지션, 값 있으면 맞라인 상성
+  games       Int
+  wins        Int      // champId 기준 승리 수
+  winRate     Float    // 표시용
+  wilsonLower Float    // 정렬 기준
+  computedAt  DateTime @default(now())
+
+  @@unique([period, champId, vsChampId, position])
+  @@index([period, champId])
+  @@index([period, champId, position])
+  @@map("lab_counter_snapshots")
 }

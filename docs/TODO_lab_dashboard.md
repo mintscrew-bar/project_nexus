@@ -1,7 +1,7 @@
 # Lab 대시보드 구현 계획
 
 > 진행 기준일: 2026-04-16
-> 완료: 0 / 전체: Task 1~42
+> 완료: 5 / 전체: Task 1~42
 > 연계 문서: [전적 페이지 크롤링/배치 TODO](./TODO_matches_crawling.md)
 
 ---
@@ -177,7 +177,7 @@ API 요청 시 fallback 우선순위:
 
 ## Phase 0: DB 스키마 확장
 
-- [ ] Task 1: `Match` 모델에 `patchVersion String?` 필드 추가
+- [x] Task 1: `Match` 모델에 `patchVersion String?` 필드 추가
   - 패치 임팩트 분석의 전제 조건
   - Riot API 매치 데이터 수집 시 `gameVersion` 파싱하여 저장 (ex: `"14.8"`)
   - **파싱 규칙**: `gameVersion` (ex: `"14.8.616.1234"`)에서 앞 두 자리만 추출 → `"14.8"`
@@ -192,7 +192,7 @@ API 요청 시 fallback 우선순위:
     ```
   - 이후 신규 내전 매치 등록 시 Riot API에서 gameVersion을 함께 받아 바로 저장 (별도 배치 불필요)
 
-- [ ] Task 2: `LabChampionSnapshot` 모델 추가
+- [x] Task 2: `LabChampionSnapshot` 모델 추가
   > 연계: [Matches Task 2 (MatchStatsCache)](./TODO_matches_crawling.md) — MatchStatsCache는 유저별 개인 통계(ranked/normal/aram/custom), LabChampionSnapshot은 내전 커뮤니티 전체 챔피언 집계. 집계 단위가 다르므로 중복이 아님
   > 연계: [Matches Task 21 (집계 로직 중복 제거)](./TODO_matches_crawling.md) — 내전 MatchParticipant 집계 공통 함수 활용
   - 챔피언별 기간별(30d/90d/all) 집계 캐시 테이블
@@ -204,19 +204,19 @@ API 요청 시 fallback 우선순위:
     - `wilsonLower`: Wilson score 하한값 — 정렬/티어 분류의 실제 기준 (Float)
   - **최소 게임 수**: 5게임 미만인 챔피언-포지션 조합은 스냅샷에서 제외
 
-- [ ] Task 3: `LabSynergySnapshot` 모델 추가
+- [x] Task 3: `LabSynergySnapshot` 모델 추가
   - 챔피언 2인 조합 승률 캐시 테이블
   - 필드: `period`, `champ1Id`, `champ2Id` (항상 champ1Id < champ2Id로 정규화), `games`, `wins`, `winRate`, `wilsonLower`, `computedAt`
   - **최소 게임 수: 3게임** (임계값 근거: 2인 조합 경우의 수가 약 C(160,2) ≈ 12,720이므로, 소표본 환경에서 5게임 이상을 요구하면 유의미한 조합이 거의 남지 않는다. 3게임으로 낮추되 신뢰도 등급(낮음)을 반드시 표시)
   - **주의**: `winRate`는 표시용이고, 정렬 기준은 `wilsonLower` 사용
 
-- [ ] Task 4: `LabCounterSnapshot` 모델 추가
+- [x] Task 4: `LabCounterSnapshot` 모델 추가
   - 챔피언 상성 (A가 B를 만났을 때 승률) 캐시 테이블
   - 필드: `period`, `champId`, `vsChampId`, `position?`, `games`, `wins`, `winRate`, `wilsonLower`, `computedAt`
   - **최소 게임 수: 3게임** (근거: 시너지와 동일한 조합 폭발 문제. 같은 포지션 맞라인으로 한정하면 경우의 수가 줄어들지만, 내전 특성상 포지션 유동성이 높아 전체 매치업도 허용)
   - **`position` 필드 추가**: 같은 포지션 맞라인 상성과 전체 상성을 구분하여 저장 (null = 전체)
 
-- [ ] Task 5: DB 스키마 푸시 및 Prisma 클라이언트 재생성
+- [x] Task 5: DB 스키마 푸시 및 Prisma 클라이언트 재생성
   - `pnpm db:push && pnpm db:generate`
 
 ---
