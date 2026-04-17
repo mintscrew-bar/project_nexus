@@ -1,7 +1,7 @@
 # Lab 대시보드 구현 계획
 
 > 진행 기준일: 2026-04-16
-> 완료: 5 / 전체: Task 1~42
+> 완료: 8 / 전체: Task 1~42
 > 연계 문서: [전적 페이지 크롤링/배치 TODO](./TODO_matches_crawling.md)
 
 ---
@@ -227,7 +227,7 @@ API 요청 시 fallback 우선순위:
   - Lab의 개인 참조 데이터(`MatchStatsCache`, 콜드스타트 fallback, 오라클 PSS 입력)는 모두 `userId` 기준으로 해석한다.
   - Riot 계정이 여러 개 연결된 경우에도 Lab은 "계정별"이 아니라 "Nexus 유저별" 전적을 사용한다.
 
-- [ ] Task 6: `LabStatsService` 분리 생성
+- [x] Task 6: `LabStatsService` 분리 생성
   - 기존 `StatsService`에서 Lab 관련 메서드를 `LabStatsService`로 추출
   - Lab 전용 Redis 캐시 키 네임스페이스: `lab:*`
   - 캐시 TTL 전략:
@@ -247,7 +247,7 @@ API 요청 시 fallback 우선순위:
     - `RiotTierRefreshTask`, `LabSnapshotTask`는 Redis lock 또는 DB advisory lock으로 단일 실행 보장
     - 멀티 인스턴스 환경에서도 같은 cron이 중복 집계하지 않도록 job key를 고정
 
-- [ ] Task 7: RiotAccount 티어 배치 갱신 Cron Job 작성
+- [x] Task 7: RiotAccount 티어 배치 갱신 Cron Job 작성
   > 연계: [Matches Task 1 (KnownPuuid)](./TODO_matches_crawling.md) — 갱신 대상 선정에 KnownPuuid.isNexusUser 활용 가능 (활성 유저 리스트 = KnownPuuid WHERE isNexusUser=true AND priority>=10)
   > 연계: [Matches Task 23 (배치 실행 순서)](./TODO_matches_crawling.md) — 새벽 3시 실행, LabSnapshotTask(새벽 4시) 이전에 완료되어야 함
   - **목적**: 장인 D2+ 게이트가 항상 최신 티어 기반이어야 함. 유저가 프로필을 열 때만 갱신하면 오래된 데이터로 잘못 필터링될 수 있음.
@@ -274,7 +274,7 @@ API 요청 시 fallback 우선순위:
   - **불변성 원칙**: 이미 당일 갱신된 계정(`lastSyncedAt >= 오늘 00:00`)은 스킵
   - **SummonerSeasonTier 동기화**: 시즌 변경 감지 시 (tier가 크게 하락하면) SummonerSeasonTier에 이전 시즌 기록 스냅샷 저장
 
-- [ ] Task 8: 스냅샷 야간 집계 Cron Job 작성
+- [x] Task 8: 스냅샷 야간 집계 Cron Job 작성
   > 연계: [Matches Task 7 (MatchStatsComputeTask)](./TODO_matches_crawling.md) — MatchStatsComputeTask(매 정시)가 MatchStatsCache를 갱신한 후, LabSnapshotTask(새벽 4시)가 이를 참조. 실행 순서 의존성 있음
   > 연계: [Matches Task 21 (집계 로직 중복 제거)](./TODO_matches_crawling.md) — 내전 MatchParticipant 집계 시 공통 함수 `aggregateCustomMatchStats()` 사용
   > 연계: [Matches Task 23 (배치 실행 순서)](./TODO_matches_crawling.md) — 전체 배치 파이프라인 순서 참조

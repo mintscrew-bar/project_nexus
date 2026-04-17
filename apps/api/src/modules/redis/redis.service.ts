@@ -117,6 +117,29 @@ export class RedisService implements OnModuleDestroy {
     await this.client.eval(lua, 1, key, token);
   }
 
+  /**
+   * SCAN 기반 패턴 매칭 키 일괄 삭제 — 스냅샷 갱신 후 lab:* 캐시 무효화 등에 사용
+   */
+  async deleteByPattern(pattern: string): Promise<number> {
+    let deleted = 0;
+    let cursor = "0";
+    do {
+      const [nextCursor, keys] = await this.client.scan(
+        cursor,
+        "MATCH",
+        pattern,
+        "COUNT",
+        200,
+      );
+      cursor = nextCursor;
+      if (keys.length > 0) {
+        await this.client.del(...keys);
+        deleted += keys.length;
+      }
+    } while (cursor !== "0");
+    return deleted;
+  }
+
   // Rate limiting helper
   async checkRateLimit(
     key: string,
