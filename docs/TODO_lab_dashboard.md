@@ -1,7 +1,7 @@
 # Lab 대시보드 구현 계획
 
 > 진행 기준일: 2026-04-16
-> 완료: 12 / 전체: Task 1~42
+> 완료: 12 / 전체: Task 1~40
 > 연계 문서: [전적 페이지 크롤링/배치 TODO](./TODO_matches_crawling.md)
 
 ---
@@ -686,6 +686,7 @@ API 요청 시 fallback 우선순위:
 ## Phase 7: 프론트엔드 — 메타 레이더 탭
 
 - [ ] Task 23: 메타 레이더 탭 UI 구현
+  > 연계: [Phase 13 Task 39 (LabRankedChampionSnapshot)](#phase-13-외부-고티어-데이터-활용-matches-phase-8-후속) — "내전 vs 랭크 메타 비교 섹션"의 랭크 측 데이터는 Task 39 스냅샷에 의존. Task 39 전이면 해당 섹션은 숨김 또는 "랭크 데이터 수집 중" 플레이스홀더 처리.
   - **트렌딩 챔피언 카드** — 챔피언 아이콘 + 픽률 변화 화살표 + 승률
   - **포지션별 티어 그리드** — 5포지션 × 티어 (S/A/B/C/D) 표
   - **내전 vs 랭크 메타 비교 섹션** — 승률 차이 ±N% 강조 (이게 핵심 차별점)
@@ -802,6 +803,205 @@ API 요청 시 fallback 우선순위:
 
 ---
 
+## Phase 13: 외부 고티어 데이터 활용 (Matches Phase 8 후속)
+
+> 기준일: 2026-04-21
+> 선행 조건: [Matches Phase 8](./TODO_matches_crawling.md) Task 24/25 완료 (KR 챌린저+그마 시딩 파이프라인 가동)
+> 배경: Matches Phase 8은 P7 시딩 유저의 랭크 매치를 `RiotMatchCache`에 쌓는 것까지만 책임진다. "수집된 데이터를 어떻게 쓸지"는 Task 24-1에서 Lab TODO로 명시적으로 분리되었다.
+
+### 설계 원칙
+
+- **Nexus 유저 데이터와 엄격 분리**: 시딩 유저(P7, `isNexusUser=false`)의 랭크 매치는 내전 통계와 절대 합산하지 않는다. 집계 테이블/스냅샷을 분리 저장해 UI에서도 구분 표시한다.
+- **Phase 8 priority 정책 준수**: 시딩 데이터 조회 시 필터는 `KnownPuuid.priority = 7 AND isNexusUser = false`로 고정. P5(내전 동반)·P10(Nexus)와 혼용 금지.
+- **증분 재계산 원칙**: period 윈도우 특성에 따라 전략을 분리한다 (Task 39 상세 참조).
+
+### Phase 13 범위
+
+- [ ] **Task 39-1: `RiotMatchCache.patchVersion` 컬럼 추가 (Task 39 선행)**
+  > 선행 필수: Task 39가 patchVersion을 `@@unique`에 포함하려면 이 컬럼이 소스 테이블에 있어야 함. 매번 `metadata->info->gameVersion`을 파싱하는 것은 배치 성능상 부적합.
+
+  **스키마 변경**:
+  ```prisma
+  model RiotMatchCache {
+    // ... 기존 필드
+    patchVersion String?  // ex: "14.8" — info.gameVersion 앞 두 자리
+    @@index([patchVersion])
+  }
+  ```
+
+  **저장 로직**:
+  - `RiotMatchService.getMatchById()` 에서 신규 저장 시 `info.gameVersion` 파싱해 함께 `create`
+  - 파싱 규칙은 Matches `Match.patchVersion` 과 동일 (ex: `"14.8.616.1234"` → `"14.8"`)
+
+  **백필 배치** (`packages/database/prisma/backfill-riot-cache-patch-version.ts`):
+  - `WHERE patchVersion IS NULL` 레코드에 대해 1,000건씩 chunk 처리
+  - `metadata`가 이미 있으므로 Riot API 재호출 불필요 (저장된 JSON에서 파싱만)
+
+  **완료 기준**:
+  - 신규 매치 저장 시 `patchVersion` 자동 채움
+  - 백필 스크립트 1회 실행 후 `WHERE patchVersion IS NULL` 0건
+
+- [ ] **Task 39: `LabRankedChampionSnapshot` — 외부 랭크 메타 챔피언 스냅샷**
+  > 연계: [Matches Phase 8 Task 24](./TODO_matches_crawling.md) — 이 스냅샷의 원본 데이터가 LeagueScanTask로 수집됨
+  > 연계: [Lab Task 23 (메타 레이더 UI)](#phase-7-프론트엔드--메타-레이더-탭) — "내전 vs 랭크 메타 비교" 섹션의 랭크 측 데이터 소스
+  > 선행: Task 39-1 (`RiotMatchCache.patchVersion`) 완료 필수
+
+  **목적**: KR 챌린저+그마 시딩 유저(P7)의 랭크 매치를 기반으로 "현재 메타에서 뭐가 강한지"를 챔피언-포지션 단위로 집계. 내전 데이터(`LabChampionSnapshot`)와 별도 테이블로 유지.
+
+  **스키마**:
+  ```prisma
+  model LabRankedChampionSnapshot {
+    id            String   @id @default(cuid())
+    period        String   // '7d' | '30d' | 'current_patch' — 랭크 메타는 짧은 윈도우가 유의미
+    patchVersion  String?  // period='current_patch'일 때만 값 있음, 그 외 null
+    championId    Int
+    position      String?  // null = 전체 포지션
+    games         Int
+    wins          Int
+    avgKda        Float
+    avgDamage     Float
+    pickRate      Float
+    banRate       Float
+    wilsonLower   Float
+    confidence    String   // 'low' | 'moderate' | 'high'
+    lastMatchCreatedAt DateTime?  // 증분 재계산 cursor (current_patch 전용)
+    computedAt    DateTime @default(now())
+
+    @@unique([period, patchVersion, championId, position])
+    @@index([period, championId])
+    @@index([period, position, wilsonLower])
+    @@map("lab_ranked_champion_snapshots")
+  }
+  ```
+
+  **데이터 소스 (PostgreSQL)**:
+  ```sql
+  -- participant 레벨 집계: 한 매치에 시딩 유저 N명이 있으면 N개 participant가 카운트됨
+  FROM riot_match_caches rm
+  JOIN LATERAL jsonb_array_elements(rm.metadata->'info'->'participants') AS p(participant) ON true
+  JOIN known_puuids kp
+    ON kp.puuid = (p.participant->>'puuid')
+   AND kp.priority = 7
+   AND kp.is_nexus_user = false
+  WHERE rm.queue_id IN (420, 440)
+    AND rm.game_creation >= EXTRACT(EPOCH FROM (NOW() - INTERVAL '30 days')) * 1000
+  ```
+
+  **중복 집계 방지 규칙**:
+  - 집계 단위는 **participant**(유저 × 챔피언 × 매치). 한 매치 내 시딩 유저 N명은 N개 participant로 정상 집계
+  - 동일 participant가 여러 시딩 PUUID에 매칭되는 경우(스키마상 불가능하지만 방어적으로)에만 `(matchId, puuid)` 기준 `DISTINCT` 적용
+
+  **집계 전략 (period별 분리)**:
+
+  | period | 방식 | 근거 |
+  |--------|------|------|
+  | `7d` | **전체 재계산** (매일 새벽 5시) | 윈도우 짧아 매일 7일치 전부 스캔해도 비용 제한적 |
+  | `30d` | **전체 재계산** (매일 새벽 5시) | 누적량 크지만 챌린저+그마 PUUID 1k명 × 30일 = 수만 건 수준. `queue_id`+`game_creation` 인덱스로 처리 가능 |
+  | `current_patch` | **증분 upsert** | `lastMatchCreatedAt` 이후 신규 매치만 `games`/`wins` delta 합산. 패치 전환 시에는 해당 patchVersion 전체 재계산 1회 |
+
+  **배치 스케줄**:
+  - `@Cron('0 5 * * *')` (매일 새벽 5시, `LabSnapshotTask`(4시) 직후)
+  - period 처리 순서: `7d` → `30d` → `current_patch`
+  - 신규 패치 감지 로직: 당일 매치 중 `patchVersion` 최빈값이 기존 스냅샷과 다르면 → 해당 patchVersion으로 `current_patch` 전체 재계산
+
+  **최소 게임 수 및 신뢰도 뱃지**:
+  ```
+  games < 5:   스냅샷에 저장하지 않음 (insufficient, UI 비표시)
+  games 5~14:  confidence='low'     — 목록 노출하되 회색 텍스트 + "참고용" 뱃지
+  games 15~29: confidence='moderate' — 일반 표시
+  games 30+:   confidence='high'    — 굵은 표시
+  ```
+  → Lab 전역 신뢰도 규칙(line 110~115)과 동일. 랭크 표본이 커도 저픽률 챔피언(오른/이블린 등) 노출 기회를 위해 임계값을 내전 스냅샷과 일치시킴.
+
+  **완료 기준**:
+  - `LabRankedChampionSnapshot`에 period 3종 × 포지션 6종 × 등장 챔피언 조합이 채워짐
+  - 한 매치에 시딩 유저 여러 명 있어도 participant 단위로 정상 집계 (Nexus 유저/P5 포함 안 됨)
+  - `current_patch` 증분 upsert 시 `lastMatchCreatedAt` cursor가 정확히 전진
+  - 신규 패치 전환 시 이전 patchVersion 스냅샷은 남아 있고 `current_patch` row만 새 패치로 교체
+
+- [ ] **Task 40: PSS 티어 베이스라인 보정 (Task 19 확장)**
+  > 연계: [Lab Task 19 (팀 밸런스 예측 API)](#phase-5-백엔드--오라클-api) — 기존 PSS 공식에 외부 랭크 메타를 보조 신호로 추가
+  > 연계: [Matches Phase 8 Task 24-1](./TODO_matches_crawling.md) — "(3) Lab PSS 티어 베이스라인 보정" 분리 항목의 구체 설계
+  > 선행: Task 39 배포 후 2주 안정 운영
+
+  **목적**: Task 19의 PSS가 Nexus 유저 내전 전적에만 의존하면, 내전 표본이 적은 유저(저기여자)의 예측 신뢰도가 떨어진다. 해당 유저의 **솔로랭크 티어 + 주력 챔피언의 외부 랭크 성과**를 보조 베이스라인으로 더해 신뢰도를 끌어올린다.
+
+  **보조 함수 정의**:
+  ```typescript
+  // tierPercentile: 솔로랭크 티어를 0~1 백분위로 변환
+  // Matches Task 14의 tierScore 재사용 (IRON I=0 ~ CHALLENGER=36+)
+  // CHALLENGER LP 반영은 제외 (LP 변동성이 커서 보조 신호로 부적합)
+  tierPercentile(tier, rank) = tierScore(tier, rank) / tierScore('CHALLENGER', 'I')
+
+  // user_top3_champions: 유저 주력 챔피언 TOP 3
+  // 소스: MatchStatsCache(userId, queueGroup='custom')
+  // 최근 30일 이내 + 해당 챔피언 3게임 이상 플레이한 것만 포함
+  // 3개 미달 시: 2개 또는 1개만 사용, 전부 미달 시 두 번째 항 제외
+  ```
+
+  **공식 변경**:
+  ```
+  기존 PSS (Task 19):
+    PSS = base_winrate × 0.6
+        + kda_factor × 0.1
+        + damage_factor × 0.1
+        + nexus_ranking_winrate × 0.2
+
+  변경 PSS (Task 40 적용 후, RiotAccount 연동 유저):
+    PSS = base_winrate × 0.5           // -0.1
+        + kda_factor × 0.1
+        + damage_factor × 0.1
+        + nexus_ranking_winrate × 0.2
+        + ranked_baseline × 0.1        // +0.1 신규
+
+    ranked_baseline =
+      w1 × tierPercentile(RiotAccount.tier, rank)
+      + w2 × avg(LabRankedChampionSnapshot.wilsonLower
+                  WHERE championId IN user_top3_champions
+                    AND period = '30d')
+      (w1 + w2 = 1.0, 초기값 w1=0.7, w2=0.3)
+
+  RiotAccount 미연동 유저 (회귀 방지 — 가중치 합=1.0 유지):
+    PSS = base_winrate × 0.6           // 복구
+        + kda_factor × 0.1
+        + damage_factor × 0.1
+        + nexus_ranking_winrate × 0.2
+        (ranked_baseline 항 제외)
+  ```
+
+  **적용 조건 (동적 가중치)**:
+  ```
+  내전 게임 수 >= 30: 보정 가중치 0.1 → 0.05 (내전 데이터 우선) + base_winrate 0.55로 복구
+  내전 게임 수 15~29: 기본 가중치 0.1, base_winrate 0.5
+  내전 게임 수 5~14:  보정 가중치 0.1 → 0.15, base_winrate 0.45
+  내전 게임 수 < 5:   보정 가중치 0.1 → 0.20, base_winrate 0.40 + "외부 랭크 기반 참고치" 배너
+  ```
+  → 모든 구간에서 가중치 총합 1.0 유지 (base_winrate가 항상 차액 흡수).
+
+  **주의 사항**:
+  - `LabRankedChampionSnapshot`에 user_top3_champions가 하나도 없으면 `ranked_baseline`의 두 번째 항은 제외하고 `w1`만 사용 (`w1 × tierPercentile`). tierPercentile도 없으면 ranked_baseline 항 자체 제외 + 가중치 base_winrate로 복구.
+  - Lab Task 19 응답의 `confidence`에 다음 필드 추가:
+    - `rankedBaselineApplied: boolean` — 보정 실제 적용 여부
+    - `rankedBaselineReason: 'full' | 'tier_only' | 'fallback'` — 적용 수준 투명성
+  - 보정이 내전 실제 성과보다 티어를 더 믿는 것으로 해석되면 사용자 반발 가능 → **A/B 실험 기간을 두고 보정 유무 승률 예측 정확도 비교 후 확정**
+
+  **완료 기준**:
+  - `tierPercentile`, `user_top3_champions` 헬퍼가 `@nexus/types` 또는 `LabStatsService`에 구현
+  - PSS 입력에 `ranked_baseline` 필드가 실제 반영되고, 응답 스키마에 `rankedBaselineApplied/Reason` 노출
+  - `RiotAccount` 미연동 유저 PSS 스케일이 보정 적용 유저와 동일 범위(0~1)에서 비교 가능
+  - 내전 30게임 이상 유저와 5게임 미만 유저의 PSS 변화량이 공식과 일치
+
+  **재검토 조건**:
+  - Task 39가 실제 배포되어 최소 2주간 안정 운영된 후 착수
+  - A/B 비교에서 보정 적용군의 승률 예측 오차가 유의하게 낮지 않으면 보류
+
+### Phase 13 제외 항목 (명시적)
+
+- **외부 시딩 유저의 장인 목록 노출**: Phase 8 Task 24-1이 "Nexus 유저 장인 시스템 보강 전제 데이터"만 범위로 잡았기 때문에, 외부 유저를 Lab Task 14 장인 목록에 섞는 작업은 **범위 외**. 추후 별도 태스크로 재검토.
+- **외부 시너지/카운터 스냅샷**: 랭크 매치에서 시너지/카운터를 뽑는 것은 경우의 수 폭발과 포지션 혼재 문제로 효용 대비 비용이 크다. 현재는 **챔피언 단위 메타만** 활용.
+
+---
+
 ## DB 모델링 요약
 
 ### 추가 필드 (기존 모델)
@@ -904,4 +1104,4 @@ function wilsonLower(wins: number, total: number, z = 1.96): number {
 
 ---
 
-**Last Updated**: 2026-04-16
+**Last Updated**: 2026-04-21
