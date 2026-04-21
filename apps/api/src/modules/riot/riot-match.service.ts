@@ -201,6 +201,20 @@ export class RiotMatchService {
     await new Promise((resolve) => setTimeout(resolve, waitMs));
   }
 
+  /**
+   * Riot `info.gameVersion` (ex: "14.8.616.1234")에서 패치 버전("14.8")만 추출.
+   * 챔피언/아이템 메타가 패치 단위로 바뀌므로 Lab 분석 시 기준 키로 사용.
+   */
+  private parsePatchVersion(gameVersion?: string): string | null {
+    if (!gameVersion) return null;
+    const parts = gameVersion.split(".");
+    if (parts.length < 2) return null;
+    const major = parts[0]?.trim();
+    const minor = parts[1]?.trim();
+    if (!major || !minor) return null;
+    return `${major}.${minor}`;
+  }
+
   private async propagateKnownPuuids(matchData: MatchDto): Promise<void> {
     const participantPuuids = Array.from(
       new Set(matchData.metadata.participants.filter(Boolean)),
@@ -340,6 +354,9 @@ export class RiotMatchService {
       // DB 영구 캐시 저장 (비동기 — 응답 지연 없이 저장)
       const queueId = matchData.info?.queueId ?? 0;
       const gameEndTs = matchData.info?.gameEndTimestamp ?? Date.now();
+      const patchVersion = this.parsePatchVersion(
+        matchData.info?.gameVersion,
+      );
       void this.prisma.riotMatchCache
         .upsert({
           where: { matchId },
@@ -348,6 +365,7 @@ export class RiotMatchService {
             data: matchData as any,
             queueId,
             gameEnd: new Date(gameEndTs),
+            patchVersion,
           },
           update: {}, // 이미 존재하면 덮어쓰지 않음
         })

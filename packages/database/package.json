@@ -14,7 +14,8 @@
     "db:studio": "prisma studio",
     "db:seed": "ts-node prisma/seed.ts",
     "db:seed-known-puuids": "ts-node prisma/seed-known-puuids.ts",
-    "db:backfill-known-puuids": "ts-node prisma/backfill-known-puuids.ts"
+    "db:backfill-known-puuids": "ts-node prisma/backfill-known-puuids.ts",
+    "db:backfill-patch-version": "ts-node prisma/backfill-riot-cache-patch-version.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.0.0"

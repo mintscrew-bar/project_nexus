@@ -872,14 +872,16 @@ model StatsRecomputeQueue {
 }
 
 model RiotMatchCache {
-  matchId   String   @id
-  data      Json
-  queueId   Int
-  gameEnd   DateTime
-  createdAt DateTime @default(now())
+  matchId      String   @id
+  data         Json
+  queueId      Int
+  gameEnd      DateTime
+  patchVersion String?  // ex: "14.8" — info.gameVersion 앞 두 자리
+  createdAt    DateTime @default(now())
 
   @@index([queueId])
   @@index([gameEnd])
+  @@index([patchVersion])
   @@map("riot_match_cache")
 }
 

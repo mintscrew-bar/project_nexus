@@ -1,7 +1,7 @@
 # Lab 대시보드 구현 계획
 
 > 진행 기준일: 2026-04-16
-> 완료: 12 / 전체: Task 1~40
+> 완료: 13 / 전체: Task 1~40
 > 연계 문서: [전적 페이지 크롤링/배치 TODO](./TODO_matches_crawling.md)
 
 ---
@@ -817,7 +817,7 @@ API 요청 시 fallback 우선순위:
 
 ### Phase 13 범위
 
-- [ ] **Task 39-1: `RiotMatchCache.patchVersion` 컬럼 추가 (Task 39 선행)**
+- [x] **Task 39-1: `RiotMatchCache.patchVersion` 컬럼 추가 (Task 39 선행)**
   > 선행 필수: Task 39가 patchVersion을 `@@unique`에 포함하려면 이 컬럼이 소스 테이블에 있어야 함. 매번 `metadata->info->gameVersion`을 파싱하는 것은 배치 성능상 부적합.
 
   **스키마 변경**:
