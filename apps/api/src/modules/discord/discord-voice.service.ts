@@ -1,5 +1,6 @@
 import { Injectable, BadRequestException, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { Cron } from "@nestjs/schedule";
 import { PrismaService } from "../prisma/prisma.service";
 import {
   Client,
@@ -13,14 +14,39 @@ import {
 export class DiscordVoiceService {
   private client!: Client;
   private readonly logger = new Logger(DiscordVoiceService.name);
+  private readonly moveDelayMs: number;
+  private readonly staleChannelHours: number;
 
   constructor(
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
-  ) {}
+  ) {
+    this.moveDelayMs = this.readPositiveInt("DISCORD_VOICE_MOVE_DELAY_MS", 300);
+    this.staleChannelHours = this.readPositiveInt(
+      "DISCORD_STALE_CHANNEL_HOURS",
+      6,
+    );
+  }
 
   setClient(client: Client) {
     this.client = client;
+  }
+
+  private readPositiveInt(key: string, fallback: number): number {
+    const value = Number(this.configService.get(key));
+    return Number.isFinite(value) && value > 0 ? value : fallback;
+  }
+
+  private isDiscordReady(): boolean {
+    return Boolean(this.client?.isReady?.());
+  }
+
+  private async delay(ms = this.moveDelayMs): Promise<void> {
+    await new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  private shouldSkipBotUsername(username: string): boolean {
+    return /^testbot_\d+$/.test(username);
   }
 
   // ========================================
@@ -189,7 +215,13 @@ export class DiscordVoiceService {
   ): Promise<boolean> {
     const guildId = this.configService.get("DISCORD_GUILD_ID");
     if (!guildId) {
-      throw new BadRequestException("Discord guild not configured");
+      this.logger.warn("Discord guild not configured, skipping voice move");
+      return false;
+    }
+
+    if (!this.isDiscordReady()) {
+      this.logger.warn("Discord bot is not ready, skipping voice move");
+      return false;
     }
 
     try {
@@ -243,13 +275,9 @@ export class DiscordVoiceService {
     let success = 0;
     let failed = 0;
 
-    // Discord API rate limit: 5 requests/second per bot token 기준으로
-    // 요청 간 250ms 지연을 두어 10~20명 이동 시에도 제한에 걸리지 않도록 함.
-    const MOVE_DELAY_MS = 250;
-
-    for (const member of team.members) {
+    for (const [index, member] of team.members.entries()) {
       // 봇 계정은 건너뛰기 (Discord 계정 없음)
-      if (/^testbot_\d+$/.test(member.user.username)) {
+      if (this.shouldSkipBotUsername(member.user.username)) {
         this.logger.debug(
           `Skipping bot ${member.user.username} for voice channel move`,
         );
@@ -277,9 +305,9 @@ export class DiscordVoiceService {
         failed++;
       }
 
-      // 다음 이동 전 지연 — rate limit 방어 (마지막 멤버 이후에는 불필요)
-      if (member !== team.members[team.members.length - 1]) {
-        await new Promise((resolve) => setTimeout(resolve, MOVE_DELAY_MS));
+      // Discord voice move는 짧은 간격으로 직렬 처리해 429와 부분 이동 실패를 줄인다.
+      if (index < team.members.length - 1) {
+        await this.delay();
       }
     }
 
@@ -530,6 +558,11 @@ export class DiscordVoiceService {
       return [];
     }
 
+    if (!this.isDiscordReady()) {
+      this.logger.warn("Discord bot is not ready, returning empty voice list");
+      return [];
+    }
+
     try {
       const guild = await this.client.guilds.fetch(guildId);
       const channel = (await guild.channels.fetch(channelId)) as VoiceChannel;
@@ -593,6 +626,13 @@ export class DiscordVoiceService {
       return { valid: true, missingUsernames: [] };
     }
 
+    if (!this.isDiscordReady()) {
+      this.logger.warn(
+        "[validateVoicePresence] Discord bot is not ready, skipping voice validation",
+      );
+      return { valid: true, missingUsernames: [] };
+    }
+
     // Lobby 채널 ID 조회
     const lobbyChannel = await this.prisma.roomDiscordChannel.findFirst({
       where: { roomId, teamName: "Lobby" },
@@ -635,7 +675,7 @@ export class DiscordVoiceService {
       const username = participant.user.username;
 
       // 봇 계정은 검증 스킵
-      if (/^testbot_\d+$/.test(username)) continue;
+      if (this.shouldSkipBotUsername(username)) continue;
 
       const discordProvider = participant.user.authProviders[0];
 
@@ -686,7 +726,10 @@ export class DiscordVoiceService {
     }
 
     // Move each team to their channel
-    for (const team of room.teams) {
+    let success = 0;
+    let failed = 0;
+
+    for (const [index, team] of room.teams.entries()) {
       const teamChannel = room.discordChannels.find(
         (ch: (typeof room.discordChannels)[number]) =>
           ch.teamName === team.name,
@@ -694,11 +737,33 @@ export class DiscordVoiceService {
 
       if (!teamChannel) {
         this.logger.warn(`No Discord channel found for team ${team.name}`);
+        failed += team.members.length;
         continue;
       }
 
-      await this.moveTeamToChannel(team.id, teamChannel.channelId);
+      try {
+        const result = await this.moveTeamToChannel(
+          team.id,
+          teamChannel.channelId,
+        );
+        success += result.success;
+        failed += result.failed;
+      } catch (error) {
+        failed += team.members.length;
+        this.logger.warn(
+          `Failed to move team ${team.name} for room ${roomId}:`,
+          error,
+        );
+      }
+
+      if (index < room.teams.length - 1) {
+        await this.delay();
+      }
     }
+
+    this.logger.log(
+      `Discord team assignment finished for room ${roomId}: ${success} success, ${failed} failed`,
+    );
   }
 
   // ========================================
@@ -906,9 +971,9 @@ export class DiscordVoiceService {
     let failed = 0;
 
     // 모든 참가자를 대기실로 이동
-    for (const participant of room.participants) {
+    for (const [index, participant] of room.participants.entries()) {
       // 봇 계정은 건너뛰기 (Discord 계정 없음)
-      if (/^testbot_\d+$/.test(participant.user.username)) {
+      if (this.shouldSkipBotUsername(participant.user.username)) {
         this.logger.debug(
           `Skipping bot ${participant.user.username} for lobby move`,
         );
@@ -943,11 +1008,91 @@ export class DiscordVoiceService {
         );
         failed++;
       }
+
+      if (index < room.participants.length - 1) {
+        await this.delay();
+      }
     }
 
     this.logger.log(
       `Moved ${success} users to lobby, ${failed} failed for room ${roomId}`,
     );
     return { success, failed };
+  }
+
+  /**
+   * 서버 장애 등으로 삭제되지 않은 빈 임시 내전 음성 채널을 매일 새벽 정리한다.
+   * 활성 상태 방은 건드리지 않고, 오래된 WAITING/COMPLETED 방의 빈 채널만 대상으로 한다.
+   */
+  @Cron("0 4 * * *")
+  async cleanupStaleEmptyRoomChannels(): Promise<void> {
+    const guildId = this.configService.get("DISCORD_GUILD_ID");
+    if (!guildId || !this.isDiscordReady()) return;
+
+    const staleBefore = new Date(
+      Date.now() - this.staleChannelHours * 60 * 60 * 1000,
+    );
+
+    const rooms = await this.prisma.room.findMany({
+      where: {
+        discordCategoryId: { not: null },
+        updatedAt: { lt: staleBefore },
+        status: { in: ["WAITING", "COMPLETED"] },
+      },
+      select: {
+        id: true,
+        name: true,
+        discordCategoryId: true,
+        discordChannels: {
+          select: { channelId: true, teamName: true },
+        },
+      },
+    });
+
+    if (rooms.length === 0) return;
+
+    const guild = await this.client.guilds.fetch(guildId);
+    let cleanedRooms = 0;
+
+    for (const room of rooms) {
+      try {
+        const channels = await Promise.all(
+          room.discordChannels.map(async (record) => ({
+            record,
+            channel: await guild.channels
+              .fetch(record.channelId)
+              .catch(() => null),
+          })),
+        );
+
+        const hasActiveVoiceMember = channels.some(({ channel }) => {
+          return (
+            channel?.type === ChannelType.GuildVoice &&
+            channel.members.size > 0
+          );
+        });
+
+        if (hasActiveVoiceMember) continue;
+
+        await this.deleteRoomChannels(room.id, false, {
+          discordCategoryId: room.discordCategoryId,
+          discordChannels: room.discordChannels,
+        });
+        cleanedRooms++;
+      } catch (error) {
+        this.logger.warn(
+          `Failed to cleanup stale Discord channels for room ${room.id} (${room.name}):`,
+          error,
+        );
+      }
+
+      await this.delay();
+    }
+
+    if (cleanedRooms > 0) {
+      this.logger.log(
+        `Cleaned up stale empty Discord channels for ${cleanedRooms}/${rooms.length} rooms`,
+      );
+    }
   }
 }

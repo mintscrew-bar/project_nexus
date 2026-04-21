@@ -1,5 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { Cron, CronExpression } from "@nestjs/schedule";
+import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../prisma/prisma.service";
 import { DataDragonService } from "../riot/data-dragon.service";
 import { RiotMatchService } from "../riot/riot-match.service";
@@ -44,9 +45,9 @@ type HighTierSeedingResult = {
 export class TasksService {
   private readonly logger = new Logger(TasksService.name);
   private readonly seededHighTierPriority = 7;
-  private readonly rankedSeededSlotCap = 15;
-  private readonly rankedSeededStaleHours = 72;
-  private readonly rankedSeededInitialBackfillLimit = 100;
+  private readonly rankedSeededSlotCap: number;
+  private readonly rankedSeededStaleHours: number;
+  private readonly rankedSeededInitialBackfillLimit: number;
   private readonly matchFetchConfigs: QueueGroupConfig[] = [
     {
       name: "ranked",
@@ -87,13 +88,38 @@ export class TasksService {
   ];
 
   constructor(
+    private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
     private readonly dataDragon: DataDragonService,
     private readonly riotService: RiotService,
     private readonly riotMatchService: RiotMatchService,
     private readonly redis: RedisService,
     private readonly statsService: StatsService,
-  ) {}
+  ) {
+    this.rankedSeededSlotCap = this.getPositiveIntConfig(
+      "MATCH_FETCH_RANKED_SEEDED_SLOT_CAP",
+      15,
+    );
+    this.rankedSeededStaleHours = this.getPositiveIntConfig(
+      "MATCH_FETCH_RANKED_SEEDED_STALE_HOURS",
+      72,
+    );
+    this.rankedSeededInitialBackfillLimit = this.getPositiveIntConfig(
+      "MATCH_FETCH_RANKED_SEEDED_INITIAL_BACKFILL_LIMIT",
+      100,
+    );
+  }
+
+  private getPositiveIntConfig(key: string, fallback: number): number {
+    const raw = this.configService.get<string>(key);
+    if (!raw) return fallback;
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      this.logger.warn(`Invalid config ${key}=${raw}, fallback=${fallback}`);
+      return fallback;
+    }
+    return Math.floor(parsed);
+  }
 
   private async upsertHighTierSeededPuuid(
     puuid: string,

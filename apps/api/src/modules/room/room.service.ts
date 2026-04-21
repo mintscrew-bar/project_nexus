@@ -993,6 +993,18 @@ export class RoomService {
       throw new BadRequestException("At least 2 players required to start");
     }
 
+    if (this.discordVoiceService) {
+      const voiceValidation =
+        await this.discordVoiceService.validateVoicePresence(roomId);
+      if (!voiceValidation.valid) {
+        const missing = voiceValidation.missingUsernames.join(", ");
+        throw new BadRequestException({
+          message: `음성채널 미참가 유저가 있습니다: ${missing}`,
+          missingVoiceUsers: voiceValidation.missingUsernames,
+        });
+      }
+    }
+
     // Mark game as started (actual status transition to DRAFT/TEAM_SELECTION
     // is handled by the specific module: snake-draft or auction service)
     await this.prisma.room.update({

@@ -433,20 +433,6 @@ export class RoomGateway
       // Get room to check teamMode (latest)
       const room = await this.roomService.getRoomById(data.roomId);
 
-      // ─── Discord 음성채널 검증 ───
-      // 방에 Discord 채널이 연동된 경우, 준비된 참가자 중 Discord 연동 유저가
-      // 모두 Lobby 음성채널에 있는지 확인
-      const voiceValidation =
-        await this.discordVoiceService.validateVoicePresence(data.roomId);
-      if (!voiceValidation.valid) {
-        this.startingRooms.delete(data.roomId);
-        const missing = voiceValidation.missingUsernames.join(", ");
-        return {
-          error: `음성채널 미참가 유저가 있습니다: ${missing}`,
-          missingVoiceUsers: voiceValidation.missingUsernames,
-        };
-      }
-
       let result;
       if (room.teamMode === TeamMode.AUCTION) {
         // Start auction directly
@@ -573,7 +559,27 @@ export class RoomGateway
       this.snakeDraftService.clearDraftState(data.roomId);
       this.auctionService.clearAuctionState(data.roomId);
 
-      return { error: error.message };
+      const errorResponse =
+        typeof error?.getResponse === "function" ? error.getResponse() : null;
+      const errorMessage =
+        typeof errorResponse === "object" &&
+        errorResponse !== null &&
+        "message" in errorResponse
+          ? Array.isArray(errorResponse.message)
+            ? errorResponse.message.join(", ")
+            : String(errorResponse.message)
+          : error.message;
+      const missingVoiceUsers =
+        typeof errorResponse === "object" &&
+        errorResponse !== null &&
+        "missingVoiceUsers" in errorResponse
+          ? errorResponse.missingVoiceUsers
+          : undefined;
+
+      return {
+        error: errorMessage,
+        ...(missingVoiceUsers ? { missingVoiceUsers } : {}),
+      };
     } finally {
       this.startingRooms.delete(data.roomId);
     }
