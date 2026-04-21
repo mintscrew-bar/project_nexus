@@ -194,6 +194,12 @@ function DashboardTab({ addToast }: { addToast: (msg: string, type: "success" | 
       aram: number;
       custom: number;
     };
+    seededPolicy: {
+      priority: number;
+      slotCap: number;
+      staleHours: number;
+      initialBackfillLimit: number;
+    };
     riotMatchCacheSize: number;
     matchStatsCacheSize: { ranked: number; normal: number; aram: number; custom: number; all: number };
     statsRecomputeQueueSize: number;
@@ -390,7 +396,7 @@ function DashboardTab({ addToast }: { addToast: (msg: string, type: "success" | 
           {queueLoading || !queueStats ? (
             <div className="flex justify-center py-8"><LoadingSpinner /></div>
           ) : (
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 text-sm">
               <div className="rounded-lg bg-bg-tertiary/60 p-3">
                 <p className="text-xs text-text-muted">KnownPuuid 전체</p>
                 <p className="text-lg font-semibold text-text-primary">{queueStats.knownPuuids.total.toLocaleString()}</p>
@@ -410,6 +416,15 @@ function DashboardTab({ addToast }: { addToast: (msg: string, type: "success" | 
                 <p className="text-xs text-text-muted">비랭크 대기</p>
                 <p className="text-lg font-semibold text-text-primary">{(queueStats.fetchPending.normal + queueStats.fetchPending.aram + queueStats.fetchPending.custom).toLocaleString()}</p>
                 <p className="text-[11px] text-text-muted">N {queueStats.fetchPending.normal} / A {queueStats.fetchPending.aram} / C {queueStats.fetchPending.custom}</p>
+              </div>
+              <div className="rounded-lg bg-bg-tertiary/60 p-3">
+                <p className="text-xs text-text-muted">Seeded 정책</p>
+                <p className="text-lg font-semibold text-text-primary">
+                  P{queueStats.seededPolicy.priority} · {queueStats.seededPolicy.slotCap} 슬롯
+                </p>
+                <p className="text-[11px] text-text-muted">
+                  stale {queueStats.seededPolicy.staleHours}h / backfill {queueStats.seededPolicy.initialBackfillLimit}
+                </p>
               </div>
             </div>
           )}

@@ -223,12 +223,26 @@ export interface LabMasteryLeader {
   masteryScore: number;
 }
 
+export interface LabSeededChampionLeader {
+  puuid: string;
+  gameName: string | null;
+  tagLine: string | null;
+  championId: number;
+  championName: string;
+  championNameKorean: string;
+  games: number;
+  winRate: number;
+  avgKda: number;
+  lastGameAt: string;
+}
+
 export interface LabOverview {
   sample: LabSampleOverview;
   laneProfiles: LabLaneProfile[];
   championSignals: LabChampionSignal[];
   itemTrends: LabItemTrend[];
   masteryLeaders: LabMasteryLeader[];
+  seededChampionLeaders: LabSeededChampionLeader[];
 }
 
 @Injectable()
@@ -1340,6 +1354,7 @@ export class StatsService {
       championSignalRows,
       itemTrendRows,
       masteryLeaderRows,
+      seededChampionLeaderRows,
     ] = await Promise.all([
       this.prisma.matchParticipant.groupBy({
         by: ["matchId"],
@@ -1495,6 +1510,83 @@ export class StatsService {
         ORDER BY "masteryScore" DESC
         LIMIT 10
       `),
+      this.prisma.$queryRaw<
+        {
+          puuid: string;
+          gameName: string | null;
+          tagLine: string | null;
+          championId: number;
+          championName: string;
+          games: bigint;
+          winRate: number;
+          avgKda: number;
+          lastGameAt: Date;
+        }[]
+      >(Prisma.sql`
+        WITH seeded AS (
+          SELECT
+            kp."puuid",
+            kp."gameName",
+            kp."tagLine"
+          FROM "known_puuids" kp
+          WHERE kp."priority" = 7
+        ),
+        seeded_participants AS (
+          SELECT
+            s."puuid",
+            s."gameName",
+            s."tagLine",
+            (participant->>'championId')::int AS "championId",
+            participant->>'championName' AS "championName",
+            CASE WHEN (participant->>'win')::boolean THEN 1 ELSE 0 END AS win,
+            ((participant->>'kills')::float + (participant->>'assists')::float)
+              / GREATEST((participant->>'deaths')::float, 1) AS kda,
+            rmc."gameEnd" AS "gameEnd"
+          FROM "riot_match_cache" rmc
+          INNER JOIN LATERAL jsonb_array_elements((rmc."data"::jsonb->'info'->'participants')) participant ON TRUE
+          INNER JOIN seeded s ON s."puuid" = participant->>'puuid'
+          WHERE rmc."queueId" IN (420, 440)
+            AND rmc."gameEnd" >= NOW() - INTERVAL '90 days'
+        ),
+        per_champion AS (
+          SELECT
+            "puuid",
+            "gameName",
+            "tagLine",
+            "championId",
+            "championName",
+            COUNT(*)::bigint AS games,
+            ROUND(AVG(win) * 100, 1)::float AS "winRate",
+            ROUND(AVG(kda), 2)::float AS "avgKda",
+            MAX("gameEnd") AS "lastGameAt"
+          FROM seeded_participants
+          GROUP BY "puuid", "gameName", "tagLine", "championId", "championName"
+          HAVING COUNT(*) >= 8
+        ),
+        ranked AS (
+          SELECT
+            *,
+            ROW_NUMBER() OVER (
+              PARTITION BY "puuid"
+              ORDER BY games DESC, "avgKda" DESC, "winRate" DESC
+            ) AS rn
+          FROM per_champion
+        )
+        SELECT
+          "puuid",
+          "gameName",
+          "tagLine",
+          "championId",
+          "championName",
+          games,
+          "winRate",
+          "avgKda",
+          "lastGameAt"
+        FROM ranked
+        WHERE rn = 1
+        ORDER BY games DESC, "avgKda" DESC
+        LIMIT 12
+      `),
     ]);
 
     return {
@@ -1542,6 +1634,18 @@ export class StatsService {
         winRate: Number(row.winRate),
         avgKda: Number(row.avgKda),
         masteryScore: Number(row.masteryScore),
+      })),
+      seededChampionLeaders: seededChampionLeaderRows.map((row) => ({
+        puuid: row.puuid,
+        gameName: row.gameName,
+        tagLine: row.tagLine,
+        championId: row.championId,
+        championName: row.championName,
+        championNameKorean: getChampionKoreanName(row.championName),
+        games: Number(row.games),
+        winRate: Number(row.winRate),
+        avgKda: Number(row.avgKda),
+        lastGameAt: row.lastGameAt.toISOString(),
       })),
     };
   }

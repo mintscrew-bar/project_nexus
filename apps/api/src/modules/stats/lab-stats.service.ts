@@ -2,7 +2,14 @@ import { Injectable, Logger } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { RedisService } from "../redis/redis.service";
-import { wilsonLower, getConfidenceLevel, ConfidenceLevel } from "@nexus/types";
+import { DataDragonService } from "../riot/data-dragon.service";
+import {
+  wilsonLower,
+  wilsonUpper,
+  getConfidenceLevel,
+  ConfidenceLevel,
+  tierScore,
+} from "@nexus/types";
 import { getChampionKoreanName } from "@nexus/types";
 import { aggregateCustomMatchStats } from "./utils/custom-match-aggregator";
 
@@ -46,6 +53,302 @@ export interface LabCounterSnapshotRow {
   confidenceLevel: ConfidenceLevel;
 }
 
+export interface LabChampionWinrateTrendPoint {
+  // 주차 시작일 (UTC, ISO 8601). 주 단위 rolling — 일별 집계는 빈 날이 많아 차트가 들쭉날쭉함
+  weekStart: string;
+  games: number;
+  wins: number;
+  winRate: number;
+}
+
+export interface LabChampionPositionRow {
+  position: string;
+  games: number;
+  wins: number;
+  winRate: number;
+  pickRateWithinChampion: number; // 해당 챔피언 전체 경기 대비 이 포지션 비중
+  wilsonLower: number;
+  confidenceLevel: ConfidenceLevel;
+}
+
+export interface LabChampionItemComboRow {
+  itemIds: [number, number];
+  games: number;
+  wins: number;
+  winRate: number;
+  wilsonLower: number;
+}
+
+export interface LabChampionRuneComboRow {
+  primaryStyle: number;
+  subStyle: number;
+  keystonePerk: number;
+  games: number;
+  wins: number;
+  winRate: number;
+  wilsonLower: number;
+}
+
+export interface LabChampionDetailResponse {
+  championId: number;
+  championName: string;
+  championNameKorean: string;
+  period: "30d" | "90d" | "all";
+  totals: {
+    games: number;
+    wins: number;
+    winRate: number;
+  };
+  winrateTrend: LabChampionWinrateTrendPoint[]; // 데이터 포인트 3개 미만이면 빈 배열
+  trendInsufficient: boolean;
+  positions: LabChampionPositionRow[];
+  topItemCombos: LabChampionItemComboRow[]; // 최대 5
+  topRuneCombos: LabChampionRuneComboRow[]; // 최대 3
+}
+
+export interface LabChampionMasteryCriteria {
+  minTier: string;
+  minRank: string;
+  minGames: number;
+  minWinRate: number;
+  isRelaxed: boolean;
+}
+
+export type LabChampionMasteryBadge = "커뮤니티 인증" | "고평가" | "기준 완화";
+
+export interface LabChampionMasteryEntry {
+  rank: number;
+  userId: string;
+  username: string;
+  avatar: string | null;
+  riotTier: string;
+  riotRank: string;
+  champGames: number;
+  champWins: number;
+  champWinRate: number;
+  wilsonLower: number;
+  avgKda: number;
+  masteryScore: number;
+  scoreBreakdown: {
+    volume: number;
+    skill: number;
+    impact: number;
+    recency: number;
+  };
+  lastPlayedAt: string;
+  nexusWinRate: number;
+  nexusGlobalRank: number | null;
+  avgSoldPrice: number | null;
+  badges: LabChampionMasteryBadge[];
+}
+
+export interface LabChampionMasteryResponse {
+  championId: number;
+  championName: string;
+  championNameKorean: string;
+  appliedCriteria: LabChampionMasteryCriteria;
+  totalUniquePlayersOnChamp: number;
+  qualifiedCount: number;
+  insufficient: boolean;
+  masteries: LabChampionMasteryEntry[];
+}
+
+export interface LabSynergyRow {
+  champ1Id: number;
+  champ2Id: number;
+  champ1NameKorean: string;
+  champ2NameKorean: string;
+  games: number;
+  wins: number;
+  winRate: number;
+  wilsonLower: number;
+  expectedWinRate: number;
+  deltaWinRate: number;
+  confidenceLevel: ConfidenceLevel;
+  badges: Array<"시너지 효과 있음">;
+}
+
+export interface LabSynergyResponse {
+  period: Period;
+  championId: number | null;
+  source: "snapshot" | "realtime";
+  rows: LabSynergyRow[];
+}
+
+export type LabCounterVerdict = "favorable" | "unfavorable" | "even";
+
+export interface LabCounterRow {
+  champId: number;
+  vsChampId: number;
+  champNameKorean: string;
+  vsChampNameKorean: string;
+  position: string | null;
+  games: number;
+  wins: number;
+  winRate: number;
+  wilsonLower: number;
+  wilsonUpper: number;
+  confidenceLevel: ConfidenceLevel;
+  verdict: LabCounterVerdict;
+}
+
+export interface LabCounterResponse {
+  period: Period;
+  championId: number | null;
+  vsChampionId: number | null;
+  position: string | null;
+  source: "snapshot" | "realtime";
+  rows: LabCounterRow[];
+}
+
+export type LabCompositionType =
+  | "TEAMFIGHT"
+  | "SPLIT_PUSH"
+  | "POKE"
+  | "EARLY_AGGRO"
+  | "TANK_LINE";
+
+export interface LabCompositionRow {
+  type: LabCompositionType;
+  label: string;
+  games: number;
+  wins: number;
+  winRate: number;
+  pickRate: number;
+  avgGameDurationSec: number;
+  confidenceLevel: ConfidenceLevel;
+}
+
+export interface LabCompositionsResponse {
+  period: Period;
+  source: "realtime";
+  totalTeams: number;
+  topTypes: LabCompositionRow[];
+  rows: LabCompositionRow[];
+  caveat: string;
+}
+
+export interface AuctionEfficiencyBucket {
+  label: string;
+  minPrice: number;
+  maxPrice: number | null;
+  games: number;
+  users: number;
+  avgKda: number;
+  avgDamageShare: number;
+  winRate: number;
+  avgPerformance: number;
+}
+
+export interface AuctionEfficiencyPoint {
+  userId: string;
+  username: string;
+  soldPrice: number;
+  performance: number;
+  expectedPerformance: number;
+  efficiency: number;
+}
+
+export interface AuctionEfficiencyLeader {
+  userId: string;
+  username: string;
+  soldPrice: number;
+  performance: number;
+  expectedPerformance: number;
+  efficiency: number;
+  games: number;
+  winRate: number;
+  avgKda: number;
+  avgDamageShare: number;
+}
+
+export interface LabAuctionEfficiencyResponse {
+  period: Period;
+  source: "realtime";
+  sampleSize: {
+    users: number;
+    games: number;
+  };
+  regression: {
+    beta0: number;
+    beta1: number;
+    residualStdDev: number;
+  };
+  buckets: AuctionEfficiencyBucket[];
+  scatter: AuctionEfficiencyPoint[];
+  efficiencyTop: AuctionEfficiencyLeader[];
+  overpricedTop: AuctionEfficiencyLeader[];
+  unsoldSummary: {
+    users: number;
+    games: number;
+    winRate: number;
+    avgPerformance: number;
+  };
+}
+
+export type LabBalanceConfidence = "high" | "moderate" | "low";
+
+export interface LabBalancePlayerScore {
+  userId: string;
+  username: string;
+  team: "A" | "B";
+  recentGames: number;
+  pss: number;
+  components: {
+    baseWinrate: number;
+    kdaFactor: number;
+    damageFactor: number;
+    nexusWinRateFactor: number;
+  };
+}
+
+export interface LabBalanceScoreResponse {
+  teamA: {
+    avgPss: number;
+    modelWinRate: number;
+    adjustedWinRate: number;
+  };
+  teamB: {
+    avgPss: number;
+    modelWinRate: number;
+    adjustedWinRate: number;
+  };
+  confidence: {
+    level: LabBalanceConfidence;
+    message: string;
+  };
+  similarMatches: {
+    count: number;
+    teamAWins: number;
+    teamBWins: number;
+    teamAWinRate: number;
+  };
+  players: LabBalancePlayerScore[];
+  caveat: string;
+}
+
+export interface LabBanRecommendationRow {
+  championId: number;
+  championNameKorean: string;
+  banScore: number;
+  contributions: {
+    userMastery: number;
+    metaStrength: number;
+    threatScore: number;
+  };
+  reasons: string[];
+}
+
+export interface LabBanRecommendResponse {
+  period: Period;
+  mode: "global" | "byTeam";
+  recommendations?: LabBanRecommendationRow[];
+  byTeam?: {
+    teamA: LabBanRecommendationRow[];
+    teamB: LabBanRecommendationRow[];
+  };
+}
+
 export interface LabChampionListRow {
   championId: number;
   championName: string;
@@ -73,6 +376,7 @@ const POSITIONS = ["TOP", "JUNGLE", "MID", "ADC", "SUPPORT", null] as const;
 const MIN_GAMES_CHAMPION = 5;
 const MIN_GAMES_SYNERGY = 3;
 const MIN_GAMES_COUNTER = 3;
+const MASTERY_TOP_LIMIT = 50;
 
 @Injectable()
 export class LabStatsService {
@@ -81,6 +385,7 @@ export class LabStatsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
+    private readonly dataDragon: DataDragonService,
   ) {}
 
   // ─── 캐시 헬퍼 ───
@@ -925,20 +1230,25 @@ export class LabStatsService {
   async getChampions(
     period: Period = "30d",
     position?: string,
+    includeLowSample = false,
   ): Promise<{
     period: Period;
     position: string | null;
+    includeLowSample: boolean;
     source: "snapshot" | "realtime";
     champions: LabChampionListRow[];
   }> {
     const normalizedPosition = position?.trim() || null;
+    const minGames = includeLowSample ? 1 : MIN_GAMES_CHAMPION;
     const cacheKey = this.labCacheKey(
-      `champions:${period}:${normalizedPosition ?? "all"}`,
+      `champions:${period}:${normalizedPosition ?? "all"}:${includeLowSample ? "all-samples" : "stable-only"}`,
     );
     const cached = await this.redis.get(cacheKey);
     if (cached) return JSON.parse(cached);
 
-    const snapshotRows = await this.prisma.labChampionSnapshot.findMany({
+    const snapshotRows = includeLowSample
+      ? []
+      : await this.prisma.labChampionSnapshot.findMany({
       where: {
         period,
         position: normalizedPosition,
@@ -992,6 +1302,7 @@ export class LabStatsService {
       const result = {
         period,
         position: normalizedPosition,
+        includeLowSample,
         source: "snapshot" as const,
         champions,
       };
@@ -1029,7 +1340,7 @@ export class LabStatsService {
           period,
           position: normalizedPosition,
           groupBy: "champion",
-          minGames: MIN_GAMES_CHAMPION,
+          minGames,
           dateField: "completedAt",
         }),
       ]);
@@ -1077,10 +1388,2104 @@ export class LabStatsService {
     const result = {
       period,
       position: normalizedPosition,
+      includeLowSample,
       source: "realtime" as const,
       champions,
     };
     await this.redis.set(cacheKey, JSON.stringify(result), 1800);
     return result;
+  }
+
+  // ─── Task 13: 챔피언 상세 (승률 추이 / 포지션 분포 / 아이템·룬 TOP) ───
+
+  /**
+   * 챔피언 상세 통계.
+   * - 승률 추이: 주 단위(rolling 7일) 윈도우. 내전 특성상 일별은 빈 날이 많음.
+   * - 포지션 분포: LabChampionSnapshot(period, championId, position≠null) 재활용.
+   * - 아이템 TOP 5: 완성 아이템(Data Dragon `into`가 빈 아이템) 중 2-조합 빈도 + Wilson lower 정렬.
+   * - 룬 TOP 3: `perks` JSON의 (primaryStyle, subStyle, keystonePerk) 3-tuple 집계.
+   */
+  async getChampionDetail(
+    championId: number,
+    period: Period = "30d",
+  ): Promise<LabChampionDetailResponse | null> {
+    const cacheKey = this.labCacheKey(`champion:detail:${championId}:${period}`);
+    const cached = await this.redis.get(cacheKey);
+    if (cached) return JSON.parse(cached);
+
+    const periodFilter = this.getPeriodFilter(period);
+
+    // 1) 총계 + 챔피언 이름 — 해당 기간 MatchParticipant 집계
+    const totalsRows = await this.prisma.$queryRaw<
+      {
+        games: bigint;
+        wins: bigint;
+        championName: string | null;
+      }[]
+    >(Prisma.sql`
+      SELECT
+        COUNT(*)::bigint AS "games",
+        COUNT(*) FILTER (WHERE mp."win" = true)::bigint AS "wins",
+        MIN(mp."championName") AS "championName"
+      FROM "match_participants" mp
+      INNER JOIN "matches" m ON m."id" = mp."matchId"
+      WHERE mp."championId" = ${championId}
+        AND m."completedAt" IS NOT NULL
+        ${periodFilter ? Prisma.sql`AND m."completedAt" >= ${periodFilter}` : Prisma.empty}
+    `);
+
+    const totalGames = Number(totalsRows[0]?.games ?? 0n);
+    const totalWins = Number(totalsRows[0]?.wins ?? 0n);
+    const championName = totalsRows[0]?.championName ?? String(championId);
+
+    if (totalGames === 0) {
+      // 해당 기간 데이터 없음 — null 반환 (컨트롤러에서 404로 변환)
+      return null;
+    }
+
+    // 2) 주간 승률 추이 (DATE_TRUNC week, ISO 월요일 시작)
+    const weeklyRows = await this.prisma.$queryRaw<
+      { weekStart: Date; games: bigint; wins: bigint }[]
+    >(Prisma.sql`
+      SELECT
+        DATE_TRUNC('week', m."completedAt") AS "weekStart",
+        COUNT(*)::bigint AS "games",
+        COUNT(*) FILTER (WHERE mp."win" = true)::bigint AS "wins"
+      FROM "match_participants" mp
+      INNER JOIN "matches" m ON m."id" = mp."matchId"
+      WHERE mp."championId" = ${championId}
+        AND m."completedAt" IS NOT NULL
+        ${periodFilter ? Prisma.sql`AND m."completedAt" >= ${periodFilter}` : Prisma.empty}
+      GROUP BY DATE_TRUNC('week', m."completedAt")
+      ORDER BY DATE_TRUNC('week', m."completedAt") ASC
+    `);
+
+    const trendInsufficient = weeklyRows.length < 3;
+    const winrateTrend: LabChampionWinrateTrendPoint[] = trendInsufficient
+      ? []
+      : weeklyRows.map((row) => {
+          const games = Number(row.games);
+          const wins = Number(row.wins);
+          return {
+            weekStart: row.weekStart.toISOString(),
+            games,
+            wins,
+            winRate: games > 0 ? Math.round((wins / games) * 10000) / 10000 : 0,
+          };
+        });
+
+    // 3) 포지션 분포 — 스냅샷 우선, 미스 시 실시간 집계
+    const positionSnapshots = await this.prisma.labChampionSnapshot.findMany({
+      where: {
+        period,
+        championId,
+        position: { not: null },
+      },
+    });
+
+    let positions: LabChampionPositionRow[];
+    if (positionSnapshots.length > 0) {
+      positions = positionSnapshots
+        .map((row) => {
+          const games = row.games;
+          const wins = row.wins;
+          const winRate = games > 0 ? wins / games : 0;
+          return {
+            position: row.position as string,
+            games,
+            wins,
+            winRate: Math.round(winRate * 10000) / 10000,
+            pickRateWithinChampion:
+              totalGames > 0
+                ? Math.round((games / totalGames) * 10000) / 10000
+                : 0,
+            wilsonLower: Math.round(row.wilsonLower * 1000000) / 1000000,
+            confidenceLevel: getConfidenceLevel(games),
+          } satisfies LabChampionPositionRow;
+        })
+        .sort((a, b) => b.games - a.games);
+    } else {
+      // 스냅샷 미생성 기간/챔피언 — 실시간 그룹핑
+      const positionRows = await this.prisma.$queryRaw<
+        { position: string; games: bigint; wins: bigint }[]
+      >(Prisma.sql`
+        SELECT
+          mp."position" AS "position",
+          COUNT(*)::bigint AS "games",
+          COUNT(*) FILTER (WHERE mp."win" = true)::bigint AS "wins"
+        FROM "match_participants" mp
+        INNER JOIN "matches" m ON m."id" = mp."matchId"
+        WHERE mp."championId" = ${championId}
+          AND m."completedAt" IS NOT NULL
+          ${periodFilter ? Prisma.sql`AND m."completedAt" >= ${periodFilter}` : Prisma.empty}
+        GROUP BY mp."position"
+      `);
+
+      positions = positionRows
+        .map((row) => {
+          const games = Number(row.games);
+          const wins = Number(row.wins);
+          const winRate = games > 0 ? wins / games : 0;
+          return {
+            position: row.position,
+            games,
+            wins,
+            winRate: Math.round(winRate * 10000) / 10000,
+            pickRateWithinChampion:
+              totalGames > 0
+                ? Math.round((games / totalGames) * 10000) / 10000
+                : 0,
+            wilsonLower:
+              Math.round(wilsonLower(wins, games, 1.96) * 1000000) / 1000000,
+            confidenceLevel: getConfidenceLevel(games),
+          } satisfies LabChampionPositionRow;
+        })
+        .sort((a, b) => b.games - a.games);
+    }
+
+    // 4) 아이템 TOP 5 / 룬 TOP 3 — MatchParticipant 로드 (완성 아이템 판별은 Data Dragon)
+    const completedItemIds = await this.dataDragon
+      .getCompletedItemIds()
+      .catch((err) => {
+        this.logger.warn(
+          `Data Dragon completed items fetch failed, item combos skipped: ${err}`,
+        );
+        return new Set<number>();
+      });
+
+    const participants = await this.prisma.matchParticipant.findMany({
+      where: {
+        championId,
+        match: {
+          completedAt: periodFilter ? { gte: periodFilter } : { not: null },
+        },
+      },
+      select: {
+        win: true,
+        item0: true,
+        item1: true,
+        item2: true,
+        item3: true,
+        item4: true,
+        item5: true,
+        item6: true,
+        perks: true,
+      },
+    });
+
+    // 아이템 2-조합 집계 — 완성 아이템만, 정규화된 (low, high) 튜플
+    const itemComboCounter = new Map<
+      string,
+      { itemIds: [number, number]; games: number; wins: number }
+    >();
+
+    for (const p of participants) {
+      const itemsOnParticipant = [
+        p.item0,
+        p.item1,
+        p.item2,
+        p.item3,
+        p.item4,
+        p.item5,
+        p.item6,
+      ]
+        .filter((id) => id && completedItemIds.has(id))
+        .filter((id, idx, arr) => arr.indexOf(id) === idx);
+
+      if (itemsOnParticipant.length < 2) continue;
+
+      // 2코어 조합 전체 pairs (nC2)
+      for (let i = 0; i < itemsOnParticipant.length; i++) {
+        for (let j = i + 1; j < itemsOnParticipant.length; j++) {
+          const a = Math.min(itemsOnParticipant[i], itemsOnParticipant[j]);
+          const b = Math.max(itemsOnParticipant[i], itemsOnParticipant[j]);
+          const key = `${a}_${b}`;
+          const existing = itemComboCounter.get(key);
+          if (existing) {
+            existing.games += 1;
+            if (p.win) existing.wins += 1;
+          } else {
+            itemComboCounter.set(key, {
+              itemIds: [a, b],
+              games: 1,
+              wins: p.win ? 1 : 0,
+            });
+          }
+        }
+      }
+    }
+
+    const topItemCombos: LabChampionItemComboRow[] = Array.from(
+      itemComboCounter.values(),
+    )
+      .filter((entry) => entry.games >= 3) // 3게임 미만 조합은 노이즈
+      .map((entry) => {
+        const winRate = entry.games > 0 ? entry.wins / entry.games : 0;
+        return {
+          itemIds: entry.itemIds,
+          games: entry.games,
+          wins: entry.wins,
+          winRate: Math.round(winRate * 10000) / 10000,
+          wilsonLower:
+            Math.round(wilsonLower(entry.wins, entry.games, 1.96) * 1000000) /
+            1000000,
+        };
+      })
+      .sort((a, b) => b.wilsonLower - a.wilsonLower)
+      .slice(0, 5);
+
+    // 룬 3-tuple 집계
+    const runeComboCounter = new Map<
+      string,
+      {
+        primaryStyle: number;
+        subStyle: number;
+        keystonePerk: number;
+        games: number;
+        wins: number;
+      }
+    >();
+
+    for (const p of participants) {
+      const parsed = this.extractRuneTriplet(p.perks);
+      if (!parsed) continue;
+      const key = `${parsed.primaryStyle}_${parsed.subStyle}_${parsed.keystonePerk}`;
+      const existing = runeComboCounter.get(key);
+      if (existing) {
+        existing.games += 1;
+        if (p.win) existing.wins += 1;
+      } else {
+        runeComboCounter.set(key, {
+          primaryStyle: parsed.primaryStyle,
+          subStyle: parsed.subStyle,
+          keystonePerk: parsed.keystonePerk,
+          games: 1,
+          wins: p.win ? 1 : 0,
+        });
+      }
+    }
+
+    const topRuneCombos: LabChampionRuneComboRow[] = Array.from(
+      runeComboCounter.values(),
+    )
+      .filter((entry) => entry.games >= 3)
+      .map((entry) => {
+        const winRate = entry.games > 0 ? entry.wins / entry.games : 0;
+        return {
+          primaryStyle: entry.primaryStyle,
+          subStyle: entry.subStyle,
+          keystonePerk: entry.keystonePerk,
+          games: entry.games,
+          wins: entry.wins,
+          winRate: Math.round(winRate * 10000) / 10000,
+          wilsonLower:
+            Math.round(wilsonLower(entry.wins, entry.games, 1.96) * 1000000) /
+            1000000,
+        };
+      })
+      .sort((a, b) => b.wilsonLower - a.wilsonLower)
+      .slice(0, 3);
+
+    const totalWinRate =
+      totalGames > 0 ? Math.round((totalWins / totalGames) * 10000) / 10000 : 0;
+
+    const result: LabChampionDetailResponse = {
+      championId,
+      championName,
+      championNameKorean: getChampionKoreanName(championName),
+      period,
+      totals: {
+        games: totalGames,
+        wins: totalWins,
+        winRate: totalWinRate,
+      },
+      winrateTrend,
+      trendInsufficient,
+      positions,
+      topItemCombos,
+      topRuneCombos,
+    };
+
+    await this.redis.set(cacheKey, JSON.stringify(result), 1800);
+    return result;
+  }
+
+  // ─── Task 15: 시너지 조합 조회 API ───
+
+  async getSynergy(
+    period: Period = "30d",
+    championId?: number,
+    limit = 50,
+  ): Promise<LabSynergyResponse> {
+    const normalizedLimit = Math.max(1, Math.min(100, Math.floor(limit)));
+    const normalizedChampionId =
+      typeof championId === "number" && Number.isInteger(championId) && championId > 0
+        ? championId
+        : null;
+    const cacheKey = this.labCacheKey(
+      `synergy:${period}:${normalizedChampionId ?? "all"}:${normalizedLimit}`,
+    );
+    const cached = await this.redis.get(cacheKey);
+    if (cached) return JSON.parse(cached);
+
+    const periodFilter = this.getPeriodFilter(period);
+
+    // 챔피언 단일 승률 맵 (expected win rate 계산용)
+    const championRates = await this.prisma.$queryRaw<
+      { championId: number; games: bigint; wins: bigint }[]
+    >(Prisma.sql`
+      SELECT
+        mp."championId" AS "championId",
+        COUNT(*)::bigint AS "games",
+        COUNT(*) FILTER (WHERE mp."win" = true)::bigint AS "wins"
+      FROM "match_participants" mp
+      INNER JOIN "matches" m ON m."id" = mp."matchId"
+      WHERE m."completedAt" IS NOT NULL
+        ${periodFilter ? Prisma.sql`AND m."completedAt" >= ${periodFilter}` : Prisma.empty}
+      GROUP BY mp."championId"
+    `);
+
+    const championWinRateMap = new Map<number, number>();
+    for (const row of championRates) {
+      const games = Number(row.games);
+      const wins = Number(row.wins);
+      championWinRateMap.set(row.championId, games > 0 ? wins / games : 0);
+    }
+
+    const snapshotWhere: Prisma.LabSynergySnapshotWhereInput = {
+      period,
+      ...(normalizedChampionId
+        ? {
+            OR: [{ champ1Id: normalizedChampionId }, { champ2Id: normalizedChampionId }],
+          }
+        : {}),
+    };
+    const snapshots = await this.prisma.labSynergySnapshot.findMany({
+      where: snapshotWhere,
+      orderBy: { wilsonLower: "desc" },
+      take: normalizedLimit,
+    });
+
+    let rowsSource: "snapshot" | "realtime" = "snapshot";
+    let rows = snapshots.map((row) => ({
+      champ1Id: row.champ1Id,
+      champ2Id: row.champ2Id,
+      games: row.games,
+      wins: row.wins,
+      winRate: row.winRate,
+      wilsonLower: row.wilsonLower,
+    }));
+
+    // 스냅샷 미스 시 실시간 fallback
+    if (rows.length === 0) {
+      rowsSource = "realtime";
+      const realtimeRows = await this.prisma.$queryRaw<
+        {
+          champ1Id: number;
+          champ2Id: number;
+          games: bigint;
+          wins: bigint;
+        }[]
+      >(Prisma.sql`
+        SELECT
+          LEAST(a."championId", b."championId") AS "champ1Id",
+          GREATEST(a."championId", b."championId") AS "champ2Id",
+          COUNT(*)::bigint AS "games",
+          COUNT(*) FILTER (WHERE a."win" = true)::bigint AS "wins"
+        FROM "match_participants" a
+        INNER JOIN "match_participants" b
+          ON a."matchId" = b."matchId"
+          AND a."teamId" = b."teamId"
+          AND a."id" < b."id"
+        INNER JOIN "matches" m ON m."id" = a."matchId"
+        WHERE m."completedAt" IS NOT NULL
+          ${periodFilter ? Prisma.sql`AND m."completedAt" >= ${periodFilter}` : Prisma.empty}
+          ${
+            normalizedChampionId
+              ? Prisma.sql`AND (a."championId" = ${normalizedChampionId} OR b."championId" = ${normalizedChampionId})`
+              : Prisma.empty
+          }
+        GROUP BY 1, 2
+        HAVING COUNT(*) >= ${MIN_GAMES_SYNERGY}
+        ORDER BY COUNT(*) DESC
+        LIMIT ${normalizedLimit}
+      `);
+
+      rows = realtimeRows.map((row) => {
+        const games = Number(row.games);
+        const wins = Number(row.wins);
+        return {
+          champ1Id: row.champ1Id,
+          champ2Id: row.champ2Id,
+          games,
+          wins,
+          winRate: games > 0 ? wins / games : 0,
+          wilsonLower: wilsonLower(wins, games),
+        };
+      });
+    }
+
+    const championIds = Array.from(
+      new Set(rows.flatMap((row) => [row.champ1Id, row.champ2Id])),
+    );
+    const championNameRows =
+      championIds.length > 0
+        ? await this.prisma.$queryRaw<{ championId: number; championName: string }[]>(
+            Prisma.sql`
+              SELECT
+                mp."championId" AS "championId",
+                MIN(mp."championName") AS "championName"
+              FROM "match_participants" mp
+              WHERE mp."championId" IN (${Prisma.join(championIds)})
+              GROUP BY mp."championId"
+            `,
+          )
+        : [];
+    const championNameMap = new Map(
+      championNameRows.map((row) => [row.championId, row.championName]),
+    );
+
+    const enriched: LabSynergyRow[] = rows
+      .map((row) => {
+        const champ1Rate = championWinRateMap.get(row.champ1Id) ?? 0;
+        const champ2Rate = championWinRateMap.get(row.champ2Id) ?? 0;
+        const expectedWinRate = Math.min((champ1Rate * champ2Rate) / 0.5, 1);
+        const deltaWinRate = row.winRate - expectedWinRate;
+        const isSynergyEffective =
+          row.games >= 5 && row.wilsonLower > expectedWinRate;
+        const champ1Name = championNameMap.get(row.champ1Id) ?? String(row.champ1Id);
+        const champ2Name = championNameMap.get(row.champ2Id) ?? String(row.champ2Id);
+
+        return {
+          champ1Id: row.champ1Id,
+          champ2Id: row.champ2Id,
+          champ1NameKorean: getChampionKoreanName(champ1Name),
+          champ2NameKorean: getChampionKoreanName(champ2Name),
+          games: row.games,
+          wins: row.wins,
+          winRate: Math.round(row.winRate * 10000) / 10000,
+          wilsonLower: Math.round(row.wilsonLower * 1000000) / 1000000,
+          expectedWinRate: Math.round(expectedWinRate * 10000) / 10000,
+          deltaWinRate: Math.round(deltaWinRate * 10000) / 10000,
+          confidenceLevel: getConfidenceLevel(row.games),
+          badges: isSynergyEffective ? ["시너지 효과 있음"] : [],
+        } satisfies LabSynergyRow;
+      })
+      .sort((a, b) => b.wilsonLower - a.wilsonLower)
+      .slice(0, normalizedLimit);
+
+    const result: LabSynergyResponse = {
+      period,
+      championId: normalizedChampionId,
+      source: rowsSource,
+      rows: enriched,
+    };
+
+    await this.redis.set(cacheKey, JSON.stringify(result), 1800);
+    return result;
+  }
+
+  // ─── Task 16: 카운터 상성 조회 API ───
+
+  async getCounter(
+    period: Period = "30d",
+    championId?: number,
+    vsChampionId?: number,
+    position?: string,
+    limit = 50,
+  ): Promise<LabCounterResponse> {
+    const normalizedLimit = Math.max(1, Math.min(100, Math.floor(limit)));
+    const normalizedChampionId =
+      typeof championId === "number" && Number.isInteger(championId) && championId > 0
+        ? championId
+        : null;
+    const normalizedVsChampionId =
+      typeof vsChampionId === "number" &&
+      Number.isInteger(vsChampionId) &&
+      vsChampionId > 0
+        ? vsChampionId
+        : null;
+    const normalizedPosition =
+      typeof position === "string" && position.trim().length > 0
+        ? position.trim().toUpperCase()
+        : null;
+
+    const cacheKey = this.labCacheKey(
+      `counter:${period}:${normalizedChampionId ?? "all"}:${normalizedVsChampionId ?? "all"}:${normalizedPosition ?? "all"}:${normalizedLimit}`,
+    );
+    const cached = await this.redis.get(cacheKey);
+    if (cached) return JSON.parse(cached);
+
+    const periodFilter = this.getPeriodFilter(period);
+
+    const snapshotWhere: Prisma.LabCounterSnapshotWhereInput = {
+      period,
+      ...(normalizedChampionId ? { champId: normalizedChampionId } : {}),
+      ...(normalizedVsChampionId ? { vsChampId: normalizedVsChampionId } : {}),
+      ...(normalizedPosition ? { position: normalizedPosition } : {}),
+    };
+
+    const snapshots = await this.prisma.labCounterSnapshot.findMany({
+      where: snapshotWhere,
+      orderBy: { wilsonLower: "desc" },
+      take: normalizedLimit,
+    });
+
+    let source: "snapshot" | "realtime" = "snapshot";
+    let rows = snapshots.map((row) => ({
+      champId: row.champId,
+      vsChampId: row.vsChampId,
+      position: row.position,
+      games: row.games,
+      wins: row.wins,
+      winRate: row.winRate,
+      wilsonLower: row.wilsonLower,
+    }));
+
+    if (rows.length === 0) {
+      source = "realtime";
+
+      const realtimeRows = await this.prisma.$queryRaw<
+        {
+          champId: number;
+          vsChampId: number;
+          position: string | null;
+          games: bigint;
+          wins: bigint;
+        }[]
+      >(Prisma.sql`
+        SELECT
+          a."championId" AS "champId",
+          b."championId" AS "vsChampId",
+          ${normalizedPosition ? Prisma.sql`a."position"` : Prisma.sql`NULL::text`} AS "position",
+          COUNT(*)::bigint AS "games",
+          COUNT(*) FILTER (WHERE a."win" = true)::bigint AS "wins"
+        FROM "match_participants" a
+        INNER JOIN "match_participants" b
+          ON a."matchId" = b."matchId"
+          AND a."teamId" <> b."teamId"
+          ${normalizedPosition ? Prisma.sql`AND a."position" = b."position"` : Prisma.empty}
+        INNER JOIN "matches" m ON m."id" = a."matchId"
+        WHERE m."completedAt" IS NOT NULL
+          ${periodFilter ? Prisma.sql`AND m."completedAt" >= ${periodFilter}` : Prisma.empty}
+          ${normalizedChampionId ? Prisma.sql`AND a."championId" = ${normalizedChampionId}` : Prisma.empty}
+          ${normalizedVsChampionId ? Prisma.sql`AND b."championId" = ${normalizedVsChampionId}` : Prisma.empty}
+          ${normalizedPosition ? Prisma.sql`AND a."position" = ${normalizedPosition}` : Prisma.empty}
+          ${normalizedPosition ? Prisma.sql`AND a."position" <> '' AND a."position" <> 'UNKNOWN'` : Prisma.empty}
+        GROUP BY a."championId", b."championId", ${normalizedPosition ? Prisma.sql`a."position"` : Prisma.sql`NULL::text`}
+        HAVING COUNT(*) >= ${MIN_GAMES_COUNTER}
+        ORDER BY COUNT(*) DESC
+        LIMIT ${normalizedLimit}
+      `);
+
+      rows = realtimeRows.map((row) => {
+        const games = Number(row.games);
+        const wins = Number(row.wins);
+        const winRate = games > 0 ? wins / games : 0;
+        return {
+          champId: row.champId,
+          vsChampId: row.vsChampId,
+          position: row.position,
+          games,
+          wins,
+          winRate,
+          wilsonLower: wilsonLower(wins, games),
+        };
+      });
+    }
+
+    const championIds = Array.from(
+      new Set(rows.flatMap((row) => [row.champId, row.vsChampId])),
+    );
+    const championNameRows =
+      championIds.length > 0
+        ? await this.prisma.$queryRaw<{ championId: number; championName: string }[]>(
+            Prisma.sql`
+              SELECT
+                mp."championId" AS "championId",
+                MIN(mp."championName") AS "championName"
+              FROM "match_participants" mp
+              WHERE mp."championId" IN (${Prisma.join(championIds)})
+              GROUP BY mp."championId"
+            `,
+          )
+        : [];
+    const championNameMap = new Map(
+      championNameRows.map((row) => [row.championId, row.championName]),
+    );
+
+    const enriched: LabCounterRow[] = rows
+      .map((row) => {
+        const lower = wilsonLower(row.wins, row.games);
+        const upper = wilsonUpper(row.wins, row.games);
+        const verdict: LabCounterVerdict =
+          lower > 0.55 ? "favorable" : upper < 0.45 ? "unfavorable" : "even";
+        const champName = championNameMap.get(row.champId) ?? String(row.champId);
+        const vsChampName =
+          championNameMap.get(row.vsChampId) ?? String(row.vsChampId);
+
+        return {
+          champId: row.champId,
+          vsChampId: row.vsChampId,
+          champNameKorean: getChampionKoreanName(champName),
+          vsChampNameKorean: getChampionKoreanName(vsChampName),
+          position: row.position,
+          games: row.games,
+          wins: row.wins,
+          winRate: Math.round(row.winRate * 10000) / 10000,
+          wilsonLower: Math.round(lower * 1000000) / 1000000,
+          wilsonUpper: Math.round(upper * 1000000) / 1000000,
+          confidenceLevel: getConfidenceLevel(row.games),
+          verdict,
+        } satisfies LabCounterRow;
+      })
+      .sort((a, b) => b.wilsonLower - a.wilsonLower)
+      .slice(0, normalizedLimit);
+
+    const result: LabCounterResponse = {
+      period,
+      championId: normalizedChampionId,
+      vsChampionId: normalizedVsChampionId,
+      position: normalizedPosition,
+      source,
+      rows: enriched,
+    };
+
+    await this.redis.set(cacheKey, JSON.stringify(result), 1800);
+    return result;
+  }
+
+  // ─── Task 17: 팀 조합 유형 분석 API ───
+
+  async getCompositions(period: Period = "30d"): Promise<LabCompositionsResponse> {
+    const cacheKey = this.labCacheKey(`compositions:${period}`);
+    const cached = await this.redis.get(cacheKey);
+    if (cached) return JSON.parse(cached);
+
+    const periodFilter = this.getPeriodFilter(period);
+
+    const [championData, earlyAggroRows, teamRows] = await Promise.all([
+      this.dataDragon.getChampionData("ko_KR"),
+      this.prisma.$queryRaw<
+        { championId: number; games: bigint; wins: bigint }[]
+      >(Prisma.sql`
+        SELECT
+          mp."championId" AS "championId",
+          COUNT(*)::bigint AS "games",
+          COUNT(*) FILTER (WHERE mp."win" = true)::bigint AS "wins"
+        FROM "match_participants" mp
+        INNER JOIN "matches" m ON m."id" = mp."matchId"
+        WHERE m."completedAt" IS NOT NULL
+          AND m."gameDuration" IS NOT NULL
+          AND m."gameDuration" < 1500
+          ${periodFilter ? Prisma.sql`AND m."completedAt" >= ${periodFilter}` : Prisma.empty}
+        GROUP BY mp."championId"
+        HAVING COUNT(*) >= 5
+      `),
+      this.prisma.$queryRaw<
+        {
+          matchId: string;
+          teamId: string;
+          win: boolean;
+          gameDurationSec: number | null;
+          championIds: number[];
+        }[]
+      >(Prisma.sql`
+        SELECT
+          mp."matchId" AS "matchId",
+          mp."teamId" AS "teamId",
+          BOOL_OR(mp."win") AS "win",
+          MIN(m."gameDuration") AS "gameDurationSec",
+          ARRAY_AGG(mp."championId")::int[] AS "championIds"
+        FROM "match_participants" mp
+        INNER JOIN "matches" m ON m."id" = mp."matchId"
+        WHERE m."completedAt" IS NOT NULL
+          ${periodFilter ? Prisma.sql`AND m."completedAt" >= ${periodFilter}` : Prisma.empty}
+        GROUP BY mp."matchId", mp."teamId"
+      `),
+    ]);
+
+    const championTagsById = new Map<number, Set<string>>();
+    for (const champion of Object.values(championData.data)) {
+      const championId = Number(champion.key);
+      if (!Number.isFinite(championId)) continue;
+      const tags = Array.isArray((champion as { tags?: string[] }).tags)
+        ? (champion as { tags?: string[] }).tags!
+        : [];
+      championTagsById.set(
+        championId,
+        new Set(tags.map((tag) => tag.toUpperCase())),
+      );
+    }
+
+    const earlyAggroChampionSet = new Set<number>();
+    for (const row of earlyAggroRows) {
+      const games = Number(row.games);
+      const wins = Number(row.wins);
+      const winRate = games > 0 ? wins / games : 0;
+      if (winRate >= 0.52) {
+        earlyAggroChampionSet.add(row.championId);
+      }
+    }
+
+    type TeamCompositionEval = {
+      type: LabCompositionType;
+      score: number;
+      matched: boolean;
+    };
+
+    const classifyTeam = (
+      championIds: number[],
+      gameDurationSec: number | null,
+    ): LabCompositionType => {
+      let mage = 0;
+      let tank = 0;
+      let fighter = 0;
+      let assassin = 0;
+      let marksman = 0;
+      let earlyAggroCount = 0;
+
+      for (const championId of championIds) {
+        const tags = championTagsById.get(championId) ?? new Set<string>();
+        if (tags.has("MAGE")) mage += 1;
+        if (tags.has("TANK")) tank += 1;
+        if (tags.has("FIGHTER")) fighter += 1;
+        if (tags.has("ASSASSIN")) assassin += 1;
+        if (tags.has("MARKSMAN")) marksman += 1;
+        if (earlyAggroChampionSet.has(championId)) earlyAggroCount += 1;
+      }
+
+      const longRange = mage + marksman;
+      const evaluations: TeamCompositionEval[] = [
+        {
+          type: "TEAMFIGHT",
+          score: (mage + tank) / 5,
+          matched: mage + tank >= 3,
+        },
+        {
+          type: "SPLIT_PUSH",
+          score: (fighter + assassin) / 5,
+          matched: fighter + assassin >= 2,
+        },
+        {
+          type: "POKE",
+          score: (longRange + Math.min(mage, 2)) / 7,
+          matched: mage >= 2 && longRange >= 3,
+        },
+        {
+          type: "EARLY_AGGRO",
+          score: earlyAggroCount / 5,
+          matched: earlyAggroCount >= 3 && (gameDurationSec ?? 99999) < 1500,
+        },
+        {
+          type: "TANK_LINE",
+          score: tank / 5,
+          matched: tank >= 3,
+        },
+      ];
+
+      const matched = evaluations.filter((e) => e.matched);
+      const target = (matched.length > 0 ? matched : evaluations).sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        const order: LabCompositionType[] = [
+          "TEAMFIGHT",
+          "SPLIT_PUSH",
+          "POKE",
+          "EARLY_AGGRO",
+          "TANK_LINE",
+        ];
+        return order.indexOf(a.type) - order.indexOf(b.type);
+      });
+      return target[0].type;
+    };
+
+    const aggregate = new Map<
+      LabCompositionType,
+      { games: number; wins: number; durationSum: number; durationCount: number }
+    >();
+    const allTypes: LabCompositionType[] = [
+      "TEAMFIGHT",
+      "SPLIT_PUSH",
+      "POKE",
+      "EARLY_AGGRO",
+      "TANK_LINE",
+    ];
+    for (const type of allTypes) {
+      aggregate.set(type, { games: 0, wins: 0, durationSum: 0, durationCount: 0 });
+    }
+
+    for (const team of teamRows) {
+      const type = classifyTeam(team.championIds, team.gameDurationSec);
+      const bucket = aggregate.get(type)!;
+      bucket.games += 1;
+      if (team.win) bucket.wins += 1;
+      if (typeof team.gameDurationSec === "number" && team.gameDurationSec > 0) {
+        bucket.durationSum += team.gameDurationSec;
+        bucket.durationCount += 1;
+      }
+    }
+
+    const labels: Record<LabCompositionType, string> = {
+      TEAMFIGHT: "한타",
+      SPLIT_PUSH: "스플릿",
+      POKE: "포킹",
+      EARLY_AGGRO: "속공",
+      TANK_LINE: "탱커라인",
+    };
+
+    const totalTeams = teamRows.length;
+    const rows: LabCompositionRow[] = allTypes
+      .map((type) => {
+        const bucket = aggregate.get(type)!;
+        const winRate = bucket.games > 0 ? bucket.wins / bucket.games : 0;
+        const pickRate = totalTeams > 0 ? bucket.games / totalTeams : 0;
+        const avgGameDurationSec =
+          bucket.durationCount > 0
+            ? Math.round(bucket.durationSum / bucket.durationCount)
+            : 0;
+        return {
+          type,
+          label: labels[type],
+          games: bucket.games,
+          wins: bucket.wins,
+          winRate: Math.round(winRate * 10000) / 10000,
+          pickRate: Math.round(pickRate * 10000) / 10000,
+          avgGameDurationSec,
+          confidenceLevel: getConfidenceLevel(bucket.games),
+        } satisfies LabCompositionRow;
+      })
+      .sort((a, b) => b.winRate - a.winRate);
+
+    const result: LabCompositionsResponse = {
+      period,
+      source: "realtime",
+      totalTeams,
+      topTypes: rows.slice(0, 3),
+      rows,
+      caveat:
+        "챔피언 태그 기반 근사 분류이며 실제 팀 전략과 차이가 있을 수 있습니다.",
+    };
+
+    await this.redis.set(cacheKey, JSON.stringify(result), 1800);
+    return result;
+  }
+
+  // ─── Task 18: 오라클 경매 효율 API ───
+
+  async getAuctionEfficiency(
+    period: Period = "30d",
+  ): Promise<LabAuctionEfficiencyResponse> {
+    const cacheKey = this.labCacheKey(`oracle:auction-efficiency:${period}`);
+    const cached = await this.redis.get(cacheKey);
+    if (cached) return JSON.parse(cached);
+
+    const periodFilter = this.getPeriodFilter(period);
+
+    const rows = await this.prisma.$queryRaw<
+      {
+        userId: string;
+        username: string;
+        soldPrice: number;
+        games: bigint;
+        wins: bigint;
+        avgKda: number;
+        avgDamageShare: number;
+      }[]
+    >(Prisma.sql`
+      WITH team_totals AS (
+        SELECT
+          mp."matchId",
+          mp."teamId",
+          SUM(mp."totalDamageDealtToChampions")::float AS "teamDamage"
+        FROM "match_participants" mp
+        GROUP BY mp."matchId", mp."teamId"
+      ),
+      auction_entries AS (
+        SELECT DISTINCT
+          t."roomId" AS "roomId",
+          tm."userId" AS "userId",
+          tm."soldPrice"::float AS "soldPrice"
+        FROM "team_members" tm
+        INNER JOIN "teams" t ON t."id" = tm."teamId"
+        INNER JOIN "rooms" r ON r."id" = t."roomId"
+        WHERE r."teamMode" = 'AUCTION'
+          AND tm."soldPrice" IS NOT NULL
+      )
+      SELECT
+        mp."userId" AS "userId",
+        MIN(u."username") AS "username",
+        ROUND(AVG(ae."soldPrice"), 2)::float AS "soldPrice",
+        COUNT(*)::bigint AS "games",
+        COUNT(*) FILTER (WHERE mp."win" = true)::bigint AS "wins",
+        ROUND(AVG((mp."kills" + mp."assists")::float / GREATEST(mp."deaths", 1)), 4)::float AS "avgKda",
+        ROUND(AVG(
+          CASE WHEN tt."teamDamage" > 0
+            THEN mp."totalDamageDealtToChampions"::float / tt."teamDamage"
+            ELSE 0
+          END
+        ), 6)::float AS "avgDamageShare"
+      FROM "match_participants" mp
+      INNER JOIN "matches" m ON m."id" = mp."matchId"
+      INNER JOIN "users" u ON u."id" = mp."userId"
+      INNER JOIN team_totals tt
+        ON tt."matchId" = mp."matchId"
+       AND tt."teamId" = mp."teamId"
+      INNER JOIN auction_entries ae
+        ON ae."roomId" = m."roomId"
+       AND ae."userId" = mp."userId"
+      WHERE m."completedAt" IS NOT NULL
+        ${periodFilter ? Prisma.sql`AND m."completedAt" >= ${periodFilter}` : Prisma.empty}
+      GROUP BY mp."userId"
+      HAVING COUNT(*) >= 3
+    `);
+
+    const normalized = rows.map((row) => {
+      const games = Number(row.games);
+      const wins = Number(row.wins);
+      const winRate = games > 0 ? wins / games : 0;
+      return {
+        userId: row.userId,
+        username: row.username,
+        soldPrice: row.soldPrice,
+        games,
+        wins,
+        winRate,
+        avgKda: row.avgKda,
+        avgDamageShare: row.avgDamageShare,
+      };
+    });
+
+    const percentile01 = (values: number[], value: number): number => {
+      if (values.length <= 1) return 1;
+      const sorted = [...values].sort((a, b) => a - b);
+      const idx = sorted.findIndex((v) => v >= value);
+      const rank = idx === -1 ? sorted.length - 1 : idx;
+      return rank / (sorted.length - 1);
+    };
+
+    const kdaValues = normalized.map((r) => r.avgKda);
+    const damageValues = normalized.map((r) => r.avgDamageShare);
+    const winValues = normalized.map((r) => r.winRate);
+
+    const scored = normalized.map((row) => {
+      const kdaNorm = percentile01(kdaValues, row.avgKda);
+      const damageNorm = percentile01(damageValues, row.avgDamageShare);
+      const winNorm = percentile01(winValues, row.winRate);
+      const performance = kdaNorm * 0.4 + damageNorm * 0.3 + winNorm * 0.3;
+      return {
+        ...row,
+        performance,
+      };
+    });
+
+    const priced = scored.filter((r) => r.soldPrice > 0);
+    const unsold = scored.filter((r) => r.soldPrice <= 0);
+
+    let beta0 = 0;
+    let beta1 = 0;
+    if (priced.length >= 2) {
+      const xMean = priced.reduce((sum, r) => sum + r.soldPrice, 0) / priced.length;
+      const yMean =
+        priced.reduce((sum, r) => sum + r.performance, 0) / priced.length;
+      let cov = 0;
+      let varX = 0;
+      for (const row of priced) {
+        cov += (row.soldPrice - xMean) * (row.performance - yMean);
+        varX += (row.soldPrice - xMean) ** 2;
+      }
+      beta1 = varX > 0 ? cov / varX : 0;
+      beta0 = yMean - beta1 * xMean;
+    }
+
+    const withResidual = priced.map((row) => {
+      const expectedPerformance = beta0 + beta1 * row.soldPrice;
+      const efficiency = row.performance - expectedPerformance;
+      return {
+        ...row,
+        expectedPerformance,
+        efficiency,
+      };
+    });
+
+    const residualStdDev =
+      withResidual.length > 1
+        ? Math.sqrt(
+            withResidual.reduce((sum, row) => sum + row.efficiency ** 2, 0) /
+              (withResidual.length - 1),
+          )
+        : 0;
+
+    const bins = [
+      { label: "0~99", min: 0, max: 99 },
+      { label: "100~199", min: 100, max: 199 },
+      { label: "200~399", min: 200, max: 399 },
+      { label: "400~599", min: 400, max: 599 },
+      { label: "600+", min: 600, max: null as number | null },
+    ];
+
+    const buckets: AuctionEfficiencyBucket[] = bins.map((bin) => {
+      const inBin = withResidual.filter((row) =>
+        bin.max === null
+          ? row.soldPrice >= bin.min
+          : row.soldPrice >= bin.min && row.soldPrice <= bin.max,
+      );
+      const games = inBin.reduce((sum, row) => sum + row.games, 0);
+      const wins = inBin.reduce((sum, row) => sum + row.wins, 0);
+      const avgKda =
+        inBin.length > 0
+          ? inBin.reduce((sum, row) => sum + row.avgKda, 0) / inBin.length
+          : 0;
+      const avgDamageShare =
+        inBin.length > 0
+          ? inBin.reduce((sum, row) => sum + row.avgDamageShare, 0) / inBin.length
+          : 0;
+      const avgPerformance =
+        inBin.length > 0
+          ? inBin.reduce((sum, row) => sum + row.performance, 0) / inBin.length
+          : 0;
+      return {
+        label: bin.label,
+        minPrice: bin.min,
+        maxPrice: bin.max,
+        games,
+        users: inBin.length,
+        avgKda: Math.round(avgKda * 100) / 100,
+        avgDamageShare: Math.round(avgDamageShare * 10000) / 10000,
+        winRate: games > 0 ? Math.round((wins / games) * 10000) / 10000 : 0,
+        avgPerformance: Math.round(avgPerformance * 10000) / 10000,
+      };
+    });
+
+    const scatter: AuctionEfficiencyPoint[] = withResidual.map((row) => ({
+      userId: row.userId,
+      username: row.username,
+      soldPrice: Math.round(row.soldPrice),
+      performance: Math.round(row.performance * 10000) / 10000,
+      expectedPerformance: Math.round(row.expectedPerformance * 10000) / 10000,
+      efficiency: Math.round(row.efficiency * 10000) / 10000,
+    }));
+
+    const toLeader = (row: (typeof withResidual)[number]): AuctionEfficiencyLeader => ({
+      userId: row.userId,
+      username: row.username,
+      soldPrice: Math.round(row.soldPrice),
+      performance: Math.round(row.performance * 10000) / 10000,
+      expectedPerformance: Math.round(row.expectedPerformance * 10000) / 10000,
+      efficiency: Math.round(row.efficiency * 10000) / 10000,
+      games: row.games,
+      winRate: Math.round(row.winRate * 10000) / 10000,
+      avgKda: Math.round(row.avgKda * 100) / 100,
+      avgDamageShare: Math.round(row.avgDamageShare * 10000) / 10000,
+    });
+
+    const efficiencyTop = withResidual
+      .filter((r) => residualStdDev <= 0 || r.efficiency > residualStdDev)
+      .sort((a, b) => b.efficiency - a.efficiency)
+      .slice(0, 5)
+      .map(toLeader);
+
+    const overpricedTop = withResidual
+      .filter((r) => residualStdDev <= 0 || r.efficiency < -residualStdDev)
+      .sort((a, b) => a.efficiency - b.efficiency)
+      .slice(0, 5)
+      .map(toLeader);
+
+    const unsoldGames = unsold.reduce((sum, row) => sum + row.games, 0);
+    const unsoldWins = unsold.reduce((sum, row) => sum + row.wins, 0);
+    const unsoldAvgPerformance =
+      unsold.length > 0
+        ? unsold.reduce((sum, row) => sum + row.performance, 0) / unsold.length
+        : 0;
+
+    const result: LabAuctionEfficiencyResponse = {
+      period,
+      source: "realtime",
+      sampleSize: {
+        users: scored.length,
+        games: scored.reduce((sum, row) => sum + row.games, 0),
+      },
+      regression: {
+        beta0: Math.round(beta0 * 1000000) / 1000000,
+        beta1: Math.round(beta1 * 1000000) / 1000000,
+        residualStdDev: Math.round(residualStdDev * 1000000) / 1000000,
+      },
+      buckets,
+      scatter,
+      efficiencyTop,
+      overpricedTop,
+      unsoldSummary: {
+        users: unsold.length,
+        games: unsoldGames,
+        winRate: unsoldGames > 0 ? Math.round((unsoldWins / unsoldGames) * 10000) / 10000 : 0,
+        avgPerformance: Math.round(unsoldAvgPerformance * 10000) / 10000,
+      },
+    };
+
+    await this.redis.set(cacheKey, JSON.stringify(result), 1800);
+    return result;
+  }
+
+  // ─── Task 19: 오라클 팀 밸런스 예측 API ───
+
+  async getBalanceScore(
+    teamA: string[],
+    teamB: string[],
+  ): Promise<LabBalanceScoreResponse> {
+    const uniqueA = Array.from(new Set(teamA));
+    const uniqueB = Array.from(new Set(teamB));
+    const allUsers = Array.from(new Set([...uniqueA, ...uniqueB]));
+
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: allUsers } },
+      select: {
+        id: true,
+        username: true,
+        nexusRanking: { select: { winRate: true } },
+      },
+    });
+    const userMap = new Map(users.map((u) => [u.id, u]));
+
+    const rawRows = await this.prisma.$queryRaw<
+      {
+        userId: string;
+        matchId: string;
+        completedAt: Date;
+        win: boolean;
+        kda: number;
+        damageShare: number;
+      }[]
+    >(Prisma.sql`
+      WITH team_totals AS (
+        SELECT
+          mp."matchId",
+          mp."teamId",
+          SUM(mp."totalDamageDealtToChampions")::float AS "teamDamage"
+        FROM "match_participants" mp
+        GROUP BY mp."matchId", mp."teamId"
+      )
+      SELECT
+        mp."userId" AS "userId",
+        mp."matchId" AS "matchId",
+        m."completedAt" AS "completedAt",
+        mp."win" AS "win",
+        ((mp."kills" + mp."assists")::float / GREATEST(mp."deaths", 1))::float AS "kda",
+        CASE WHEN tt."teamDamage" > 0
+          THEN mp."totalDamageDealtToChampions"::float / tt."teamDamage"
+          ELSE 0
+        END::float AS "damageShare"
+      FROM "match_participants" mp
+      INNER JOIN "matches" m ON m."id" = mp."matchId"
+      INNER JOIN team_totals tt
+        ON tt."matchId" = mp."matchId"
+       AND tt."teamId" = mp."teamId"
+      WHERE m."completedAt" IS NOT NULL
+        AND mp."userId" IN (${Prisma.join(allUsers)})
+      ORDER BY mp."userId" ASC, m."completedAt" DESC
+    `);
+
+    const rowsByUser = new Map<string, typeof rawRows>();
+    for (const row of rawRows) {
+      const arr = rowsByUser.get(row.userId) ?? [];
+      if (arr.length < 20) {
+        arr.push(row);
+      }
+      rowsByUser.set(row.userId, arr);
+    }
+
+    const sampledRows = Array.from(rowsByUser.values()).flat();
+    const median = (values: number[]): number => {
+      if (values.length === 0) return 1;
+      const sorted = [...values].sort((a, b) => a - b);
+      const mid = Math.floor(sorted.length / 2);
+      return sorted.length % 2 === 0
+        ? (sorted[mid - 1] + sorted[mid]) / 2
+        : sorted[mid];
+    };
+    const kdaMedian = median(sampledRows.map((r) => r.kda));
+
+    const pssByUser = new Map<
+      string,
+      {
+        pss: number;
+        recentGames: number;
+        baseWinrate: number;
+        kdaFactor: number;
+        damageFactor: number;
+        nexusWinRateFactor: number;
+      }
+    >();
+
+    for (const userId of allUsers) {
+      const rows = rowsByUser.get(userId) ?? [];
+      const recentGames = rows.length;
+      const wins = rows.filter((r) => r.win).length;
+      const avgKda =
+        recentGames > 0
+          ? rows.reduce((sum, r) => sum + r.kda, 0) / recentGames
+          : 0;
+      const avgDamageShare =
+        recentGames > 0
+          ? rows.reduce((sum, r) => sum + r.damageShare, 0) / recentGames
+          : 0;
+      const baseWinrate = wilsonLower(wins, recentGames);
+      const kdaFactor = kdaMedian > 0 ? Math.min(avgKda / kdaMedian, 2) : 0;
+      const damageFactor = Math.min(Math.max(avgDamageShare, 0), 1);
+      const nexusWinRate = (userMap.get(userId)?.nexusRanking?.winRate ?? 50) / 100;
+      const nexusWinRateFactor = Math.min(Math.max(nexusWinRate, 0), 1);
+      const pss =
+        baseWinrate * 0.6 +
+        kdaFactor * 0.1 +
+        damageFactor * 0.1 +
+        nexusWinRateFactor * 0.2;
+
+      pssByUser.set(userId, {
+        pss,
+        recentGames,
+        baseWinrate,
+        kdaFactor,
+        damageFactor,
+        nexusWinRateFactor,
+      });
+    }
+
+    const avg = (values: number[]): number =>
+      values.length > 0 ? values.reduce((s, v) => s + v, 0) / values.length : 0;
+
+    const teamAPss = avg(uniqueA.map((id) => pssByUser.get(id)?.pss ?? 0));
+    const teamBPss = avg(uniqueB.map((id) => pssByUser.get(id)?.pss ?? 0));
+    const sumPss = teamAPss + teamBPss;
+    const modelWinRateA = sumPss > 0 ? teamAPss / sumPss : 0.5;
+
+    const matchupRows = await this.prisma.$queryRaw<
+      {
+        matchId: string;
+        teamId: string;
+        win: boolean;
+        userIds: string[];
+      }[]
+    >(Prisma.sql`
+      SELECT
+        mp."matchId" AS "matchId",
+        mp."teamId" AS "teamId",
+        BOOL_OR(mp."win") AS "win",
+        ARRAY_AGG(mp."userId") AS "userIds"
+      FROM "match_participants" mp
+      INNER JOIN "matches" m ON m."id" = mp."matchId"
+      WHERE m."completedAt" IS NOT NULL
+        AND mp."userId" IN (${Prisma.join(allUsers)})
+      GROUP BY mp."matchId", mp."teamId"
+      HAVING COUNT(*) >= 1
+    `);
+
+    const byMatch = new Map<string, typeof matchupRows>();
+    for (const row of matchupRows) {
+      const arr = byMatch.get(row.matchId) ?? [];
+      arr.push(row);
+      byMatch.set(row.matchId, arr);
+    }
+
+    let similarCount = 0;
+    let similarTeamAWins = 0;
+    for (const rows of byMatch.values()) {
+      if (rows.length < 2) continue;
+      for (let i = 0; i < rows.length; i++) {
+        for (let j = i + 1; j < rows.length; j++) {
+          const aTeam = rows[i];
+          const bTeam = rows[j];
+          const aInATeam = aTeam.userIds.filter((id) => uniqueA.includes(id)).length;
+          const bInATeam = aTeam.userIds.filter((id) => uniqueB.includes(id)).length;
+          const aInBTeam = bTeam.userIds.filter((id) => uniqueA.includes(id)).length;
+          const bInBTeam = bTeam.userIds.filter((id) => uniqueB.includes(id)).length;
+
+          if (aInATeam >= 3 && bInBTeam >= 3) {
+            similarCount += 1;
+            if (aTeam.win) similarTeamAWins += 1;
+          } else if (aInBTeam >= 3 && bInATeam >= 3) {
+            similarCount += 1;
+            if (bTeam.win) similarTeamAWins += 1;
+          }
+        }
+      }
+    }
+
+    const directWinRateA = similarCount > 0 ? similarTeamAWins / similarCount : modelWinRateA;
+    const adjustedWinRateA =
+      similarCount >= 5
+        ? modelWinRateA * 0.7 + directWinRateA * 0.3
+        : modelWinRateA;
+
+    const minGames = Math.min(
+      ...allUsers.map((id) => pssByUser.get(id)?.recentGames ?? 0),
+    );
+    const confidenceLevel: LabBalanceConfidence =
+      minGames >= 10 ? "high" : minGames >= 5 ? "moderate" : "low";
+    const confidenceMessage =
+      confidenceLevel === "high"
+        ? "참가자 전원이 최근 10게임 이상 데이터 보유"
+        : confidenceLevel === "moderate"
+          ? "참가자 전원이 최근 5게임 이상 데이터 보유"
+          : "일부 유저의 최근 경기 데이터가 부족합니다";
+
+    const players: LabBalancePlayerScore[] = allUsers.map((id) => {
+      const score = pssByUser.get(id)!;
+      const user = userMap.get(id);
+      return {
+        userId: id,
+        username: user?.username ?? id.slice(0, 8),
+        team: uniqueA.includes(id) ? "A" : "B",
+        recentGames: score.recentGames,
+        pss: Math.round(score.pss * 10000) / 10000,
+        components: {
+          baseWinrate: Math.round(score.baseWinrate * 10000) / 10000,
+          kdaFactor: Math.round(score.kdaFactor * 10000) / 10000,
+          damageFactor: Math.round(score.damageFactor * 10000) / 10000,
+          nexusWinRateFactor: Math.round(score.nexusWinRateFactor * 10000) / 10000,
+        },
+      };
+    });
+
+    return {
+      teamA: {
+        avgPss: Math.round(teamAPss * 10000) / 10000,
+        modelWinRate: Math.round(modelWinRateA * 10000) / 10000,
+        adjustedWinRate: Math.round(adjustedWinRateA * 10000) / 10000,
+      },
+      teamB: {
+        avgPss: Math.round(teamBPss * 10000) / 10000,
+        modelWinRate: Math.round((1 - modelWinRateA) * 10000) / 10000,
+        adjustedWinRate: Math.round((1 - adjustedWinRateA) * 10000) / 10000,
+      },
+      confidence: {
+        level: confidenceLevel,
+        message: confidenceMessage,
+      },
+      similarMatches: {
+        count: similarCount,
+        teamAWins: similarTeamAWins,
+        teamBWins: similarCount - similarTeamAWins,
+        teamAWinRate:
+          similarCount > 0
+            ? Math.round((similarTeamAWins / similarCount) * 10000) / 10000
+            : 0,
+      },
+      players,
+      caveat:
+        "개인 성과 기반 참고용 예측이며 챔피언 선택/밴픽/컨디션/소통 변수는 반영되지 않습니다.",
+    };
+  }
+
+  // ─── Task 20: 오라클 밴픽 추천 API ───
+
+  async getBanRecommend(params: {
+    period?: Period;
+    userIds?: string[];
+    teamAUserIds?: string[];
+    teamBUserIds?: string[];
+  }): Promise<LabBanRecommendResponse> {
+    const period = params.period ?? "30d";
+    const userIds = Array.from(new Set(params.userIds ?? []));
+    const teamAUserIds = Array.from(new Set(params.teamAUserIds ?? []));
+    const teamBUserIds = Array.from(new Set(params.teamBUserIds ?? []));
+
+    const isByTeam = teamAUserIds.length > 0 && teamBUserIds.length > 0;
+    const targetUsersGlobal = isByTeam
+      ? Array.from(new Set([...teamAUserIds, ...teamBUserIds]))
+      : userIds;
+
+    if (targetUsersGlobal.length === 0) {
+      return { period, mode: isByTeam ? "byTeam" : "global", recommendations: [] };
+    }
+
+    const cacheKey = this.labCacheKey(
+      `oracle:ban-recommend:${period}:${userIds.join(",")}:${teamAUserIds.join(",")}:${teamBUserIds.join(",")}`,
+    );
+    const cached = await this.redis.get(cacheKey);
+    if (cached) return JSON.parse(cached);
+
+    const periodFilter = this.getPeriodFilter(period);
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: targetUsersGlobal } },
+      select: { id: true, username: true },
+    });
+    const usernameById = new Map(users.map((u) => [u.id, u.username]));
+
+    const masteryRows = await this.prisma.$queryRaw<
+      {
+        userId: string;
+        championId: number;
+        championName: string;
+        games: bigint;
+        wins: bigint;
+      }[]
+    >(Prisma.sql`
+      SELECT
+        mp."userId" AS "userId",
+        mp."championId" AS "championId",
+        MIN(mp."championName") AS "championName",
+        COUNT(*)::bigint AS "games",
+        COUNT(*) FILTER (WHERE mp."win" = true)::bigint AS "wins"
+      FROM "match_participants" mp
+      INNER JOIN "matches" m ON m."id" = mp."matchId"
+      WHERE m."completedAt" IS NOT NULL
+        AND mp."userId" IN (${Prisma.join(targetUsersGlobal)})
+      GROUP BY mp."userId", mp."championId"
+      HAVING COUNT(*) >= 3
+    `);
+
+    const threatRows = await this.prisma.$queryRaw<
+      {
+        userId: string;
+        championId: number;
+        games: bigint;
+        wins: bigint;
+      }[]
+    >(Prisma.sql`
+      WITH ranked AS (
+        SELECT
+          mp."userId" AS "userId",
+          mp."championId" AS "championId",
+          mp."win" AS "win",
+          ROW_NUMBER() OVER (
+            PARTITION BY mp."userId", mp."championId"
+            ORDER BY m."completedAt" DESC
+          ) AS rn
+        FROM "match_participants" mp
+        INNER JOIN "matches" m ON m."id" = mp."matchId"
+        WHERE m."completedAt" IS NOT NULL
+          AND mp."userId" IN (${Prisma.join(targetUsersGlobal)})
+      )
+      SELECT
+        "userId",
+        "championId",
+        COUNT(*)::bigint AS "games",
+        COUNT(*) FILTER (WHERE "win" = true)::bigint AS "wins"
+      FROM ranked
+      WHERE rn <= 5
+      GROUP BY "userId", "championId"
+    `);
+
+    const metaRows = await this.prisma.$queryRaw<
+      {
+        championId: number;
+        wilsonLower: number;
+        pickRate: number;
+      }[]
+    >(Prisma.sql`
+      SELECT DISTINCT ON (lcs."championId")
+        lcs."championId" AS "championId",
+        lcs."wilsonLower" AS "wilsonLower",
+        lcs."pickRate" AS "pickRate"
+      FROM "lab_champion_snapshots" lcs
+      WHERE lcs."period" = ${period}
+        AND lcs."position" IS NULL
+      ORDER BY lcs."championId", lcs."computedAt" DESC
+    `);
+
+    const championIds = Array.from(
+      new Set(masteryRows.map((r) => r.championId)),
+    );
+    const championNameRows =
+      championIds.length > 0
+        ? await this.prisma.$queryRaw<{ championId: number; championName: string }[]>(
+            Prisma.sql`
+              SELECT
+                mp."championId" AS "championId",
+                MIN(mp."championName") AS "championName"
+              FROM "match_participants" mp
+              WHERE mp."championId" IN (${Prisma.join(championIds)})
+              GROUP BY mp."championId"
+            `,
+          )
+        : [];
+    const championNameById = new Map(
+      championNameRows.map((r) => [r.championId, r.championName]),
+    );
+
+    const sortedMeta = [...metaRows].sort(
+      (a, b) => b.wilsonLower - a.wilsonLower || b.pickRate - a.pickRate,
+    );
+    const metaStrengthByChampion = new Map<number, number>();
+    for (let i = 0; i < sortedMeta.length; i++) {
+      const ratio = (i + 1) / sortedMeta.length;
+      const score = ratio <= 0.1 ? 1.0 : ratio <= 0.3 ? 0.75 : ratio <= 0.6 ? 0.5 : 0.25;
+      metaStrengthByChampion.set(sortedMeta[i].championId, score);
+    }
+
+    const masteryByUserChamp = new Map<
+      string,
+      { games: number; wins: number; score: number }
+    >();
+    for (const row of masteryRows) {
+      const games = Number(row.games);
+      const wins = Number(row.wins);
+      const wl = wilsonLower(wins, games);
+      masteryByUserChamp.set(`${row.userId}:${row.championId}`, {
+        games,
+        wins,
+        score: games * wl,
+      });
+    }
+
+    const threatByUserChamp = new Map<string, number>();
+    for (const row of threatRows) {
+      const games = Number(row.games);
+      const wins = Number(row.wins);
+      threatByUserChamp.set(
+        `${row.userId}:${row.championId}`,
+        games > 0 ? wins / games : 0,
+      );
+    }
+
+    const buildForTargets = (targets: string[]): LabBanRecommendationRow[] => {
+      const scoreMap = new Map<
+        number,
+        {
+          userMastery: number;
+          metaStrength: number;
+          threatScore: number;
+          topUserForMastery?: { userId: string; games: number; winRate: number };
+          topUserForThreat?: { userId: string; threat: number };
+        }
+      >();
+
+      for (const userId of targets) {
+        for (const championId of championIds) {
+          const key = `${userId}:${championId}`;
+          const mastery = masteryByUserChamp.get(key);
+          if (!mastery) continue;
+          const threat = threatByUserChamp.get(key) ?? 0;
+          const meta = metaStrengthByChampion.get(championId) ?? 0.25;
+
+          const bucket =
+            scoreMap.get(championId) ??
+            {
+              userMastery: 0,
+              metaStrength: 0,
+              threatScore: 0,
+            };
+
+          const masteryContrib = mastery.score * 0.5;
+          const metaContrib = meta * 0.3;
+          const threatContrib = threat * 0.2;
+
+          bucket.userMastery += masteryContrib;
+          bucket.metaStrength += metaContrib;
+          bucket.threatScore += threatContrib;
+
+          const champWinRate = mastery.games > 0 ? mastery.wins / mastery.games : 0;
+          if (
+            !bucket.topUserForMastery ||
+            masteryContrib >
+              (bucket.topUserForMastery.games *
+                0.5 *
+                (bucket.topUserForMastery.winRate || 0))
+          ) {
+            bucket.topUserForMastery = {
+              userId,
+              games: mastery.games,
+              winRate: champWinRate,
+            };
+          }
+          if (
+            !bucket.topUserForThreat ||
+            threat > bucket.topUserForThreat.threat
+          ) {
+            bucket.topUserForThreat = { userId, threat };
+          }
+
+          scoreMap.set(championId, bucket);
+        }
+      }
+
+      return Array.from(scoreMap.entries())
+        .map(([championId, c]) => {
+          const total = c.userMastery + c.metaStrength + c.threatScore;
+          const reasons: string[] = [];
+          if (c.topUserForMastery) {
+            const username =
+              usernameById.get(c.topUserForMastery.userId) ??
+              c.topUserForMastery.userId.slice(0, 8);
+            reasons.push(
+              `${username}의 주력 챔피언 (${c.topUserForMastery.games}게임 ${(c.topUserForMastery.winRate * 100).toFixed(1)}%)`,
+            );
+          }
+          if ((metaStrengthByChampion.get(championId) ?? 0.25) >= 0.75) {
+            reasons.push("현재 상위 메타 챔피언");
+          }
+          if (c.topUserForThreat && c.topUserForThreat.threat >= 0.6) {
+            const username =
+              usernameById.get(c.topUserForThreat.userId) ??
+              c.topUserForThreat.userId.slice(0, 8);
+            reasons.push(
+              `${username} 최근 5게임 위협도 ${(c.topUserForThreat.threat * 100).toFixed(1)}%`,
+            );
+          }
+
+          const championName =
+            championNameById.get(championId) ?? String(championId);
+          return {
+            championId,
+            championNameKorean: getChampionKoreanName(championName),
+            banScore: Math.round(total * 10000) / 10000,
+            contributions: {
+              userMastery: Math.round(c.userMastery * 10000) / 10000,
+              metaStrength: Math.round(c.metaStrength * 10000) / 10000,
+              threatScore: Math.round(c.threatScore * 10000) / 10000,
+            },
+            reasons,
+          } satisfies LabBanRecommendationRow;
+        })
+        .sort((a, b) => b.banScore - a.banScore)
+        .slice(0, 5);
+    };
+
+    const result: LabBanRecommendResponse = isByTeam
+      ? {
+          period,
+          mode: "byTeam",
+          byTeam: {
+            teamA: buildForTargets(teamBUserIds),
+            teamB: buildForTargets(teamAUserIds),
+          },
+        }
+      : {
+          period,
+          mode: "global",
+          recommendations: buildForTargets(userIds),
+        };
+
+    await this.redis.set(cacheKey, JSON.stringify(result), 1800);
+    return result;
+  }
+
+  // ─── Task 14: 챔피언 장인 목록 (동적 티어 완화 + masteryScore) ───
+
+  async getChampionMastery(championId: number): Promise<LabChampionMasteryResponse> {
+    const cacheKey = this.labCacheKey(`champion:mastery:${championId}`);
+    const cached = await this.redis.get(cacheKey);
+    if (cached) return JSON.parse(cached);
+
+    const championRows = await this.prisma.$queryRaw<
+      {
+        userId: string;
+        championName: string | null;
+        games: bigint;
+        wins: bigint;
+        avgKda: number;
+        avgDamageShare: number;
+        avgVisionShare: number;
+        lastPlayedAt: Date;
+      }[]
+    >(Prisma.sql`
+      WITH team_totals AS (
+        SELECT
+          mp."matchId",
+          mp."teamId",
+          SUM(mp."totalDamageDealtToChampions")::float AS "teamDamage",
+          SUM(mp."visionScore")::float AS "teamVision"
+        FROM "match_participants" mp
+        GROUP BY mp."matchId", mp."teamId"
+      )
+      SELECT
+        mp."userId" AS "userId",
+        MIN(mp."championName") AS "championName",
+        COUNT(*)::bigint AS "games",
+        COUNT(*) FILTER (WHERE mp."win" = true)::bigint AS "wins",
+        ROUND(AVG((mp."kills" + mp."assists")::float / GREATEST(mp."deaths", 1)), 4)::float AS "avgKda",
+        ROUND(AVG(
+          CASE WHEN tt."teamDamage" > 0
+            THEN mp."totalDamageDealtToChampions"::float / tt."teamDamage"
+            ELSE 0
+          END
+        ), 6)::float AS "avgDamageShare",
+        ROUND(AVG(
+          CASE WHEN tt."teamVision" > 0
+            THEN mp."visionScore"::float / tt."teamVision"
+            ELSE 0
+          END
+        ), 6)::float AS "avgVisionShare",
+        MAX(m."completedAt") AS "lastPlayedAt"
+      FROM "match_participants" mp
+      INNER JOIN "matches" m ON m."id" = mp."matchId"
+      INNER JOIN team_totals tt
+        ON tt."matchId" = mp."matchId"
+       AND tt."teamId" = mp."teamId"
+      WHERE m."completedAt" IS NOT NULL
+        AND mp."championId" = ${championId}
+      GROUP BY mp."userId"
+    `);
+
+    const totalUniquePlayersOnChamp = championRows.length;
+    const championName = championRows[0]?.championName ?? String(championId);
+
+    if (championRows.length === 0) {
+      const empty: LabChampionMasteryResponse = {
+        championId,
+        championName,
+        championNameKorean: getChampionKoreanName(championName),
+        appliedCriteria: {
+          minTier: "DIAMOND",
+          minRank: "II",
+          minGames: 10,
+          minWinRate: 0.4,
+          isRelaxed: false,
+        },
+        totalUniquePlayersOnChamp: 0,
+        qualifiedCount: 0,
+        insufficient: true,
+        masteries: [],
+      };
+      await this.redis.set(cacheKey, JSON.stringify(empty), 1800);
+      return empty;
+    }
+
+    const userIds = championRows.map((r) => r.userId);
+    const [users, auctionRows] = await Promise.all([
+      this.prisma.user.findMany({
+        where: { id: { in: userIds } },
+        select: {
+          id: true,
+          username: true,
+          avatar: true,
+          riotAccounts: {
+            select: {
+              puuid: true,
+              tier: true,
+              rank: true,
+              lp: true,
+              isPrimary: true,
+            },
+          },
+          nexusRanking: {
+            select: {
+              winRate: true,
+              globalRank: true,
+            },
+          },
+        },
+      }),
+      this.prisma.$queryRaw<
+        { userId: string; avgSoldPrice: number | null }[]
+      >(Prisma.sql`
+        WITH auction_entries AS (
+          SELECT DISTINCT
+            t."roomId" AS "roomId",
+            tm."userId" AS "userId",
+            tm."soldPrice"::float AS "soldPrice"
+          FROM "team_members" tm
+          INNER JOIN "teams" t ON t."id" = tm."teamId"
+          INNER JOIN "rooms" r ON r."id" = t."roomId"
+          WHERE r."teamMode" = 'AUCTION'
+            AND tm."soldPrice" IS NOT NULL
+        )
+        SELECT
+          mp."userId" AS "userId",
+          ROUND(AVG(ae."soldPrice"), 2)::float AS "avgSoldPrice"
+        FROM "match_participants" mp
+        INNER JOIN "matches" m ON m."id" = mp."matchId"
+        INNER JOIN auction_entries ae
+          ON ae."roomId" = m."roomId"
+         AND ae."userId" = mp."userId"
+        WHERE m."completedAt" IS NOT NULL
+          AND mp."championId" = ${championId}
+          AND mp."userId" IN (${Prisma.join(userIds)})
+        GROUP BY mp."userId"
+      `),
+    ]);
+
+    const allPuuids = users.flatMap((u) => u.riotAccounts.map((ra) => ra.puuid));
+    const seasonTiers =
+      allPuuids.length > 0
+        ? await this.prisma.summonerSeasonTier.findMany({
+            where: { puuid: { in: allPuuids } },
+            select: {
+              puuid: true,
+              tier: true,
+              rank: true,
+              lp: true,
+              updatedAt: true,
+            },
+            orderBy: { updatedAt: "desc" },
+          })
+        : [];
+
+    const latestSeasonTierByPuuid = new Map<
+      string,
+      { tier: string; rank: string; lp: number }
+    >();
+    for (const row of seasonTiers) {
+      if (!latestSeasonTierByPuuid.has(row.puuid)) {
+        latestSeasonTierByPuuid.set(row.puuid, {
+          tier: row.tier,
+          rank: row.rank,
+          lp: row.lp,
+        });
+      }
+    }
+
+    const userMap = new Map(users.map((u) => [u.id, u]));
+    const avgSoldPriceMap = new Map(
+      auctionRows.map((row) => [row.userId, row.avgSoldPrice]),
+    );
+
+    const candidates = championRows
+      .map((row) => {
+        const user = userMap.get(row.userId);
+        if (!user) return null;
+
+        const accounts = user.riotAccounts.map((account) => {
+          const seasonal = latestSeasonTierByPuuid.get(account.puuid);
+          return {
+            tier: (seasonal?.tier ?? account.tier ?? "UNRANKED").toUpperCase(),
+            rank: (seasonal?.rank ?? account.rank ?? "").toUpperCase(),
+            lp: seasonal?.lp ?? account.lp ?? 0,
+            isPrimary: account.isPrimary,
+          };
+        });
+
+        let selectedRanked = null as
+          | {
+              tier: string;
+              rank: string;
+              lp: number;
+            }
+          | null;
+
+        const primary = accounts.find((a) => a.isPrimary);
+        if (primary) {
+          selectedRanked = primary;
+        } else if (accounts.length > 0) {
+          selectedRanked = [...accounts].sort(
+            (a, b) =>
+              tierScore(b.tier, b.rank, b.lp) - tierScore(a.tier, a.rank, a.lp),
+          )[0];
+        }
+
+        const games = Number(row.games);
+        const wins = Number(row.wins);
+        const champWinRate = games > 0 ? wins / games : 0;
+
+        return {
+          userId: row.userId,
+          username: user.username,
+          avatar: user.avatar,
+          riotTier: selectedRanked?.tier ?? "UNRANKED",
+          riotRank: selectedRanked?.rank ?? "",
+          riotLp: selectedRanked?.lp ?? 0,
+          games,
+          wins,
+          champWinRate,
+          avgKda: row.avgKda,
+          avgDamageShare: row.avgDamageShare,
+          avgVisionShare: row.avgVisionShare,
+          lastPlayedAt: row.lastPlayedAt,
+          nexusWinRate: user.nexusRanking?.winRate ?? 0,
+          nexusGlobalRank: user.nexusRanking?.globalRank ?? null,
+          avgSoldPrice: avgSoldPriceMap.get(row.userId) ?? null,
+        };
+      })
+      .filter((row): row is NonNullable<typeof row> => row !== null);
+
+    const criteriaLevels: Array<LabChampionMasteryCriteria> = [
+      {
+        minTier: "DIAMOND",
+        minRank: "II",
+        minGames: 10,
+        minWinRate: 0.4,
+        isRelaxed: false,
+      },
+      {
+        minTier: "PLATINUM",
+        minRank: "I",
+        minGames: 7,
+        minWinRate: 0.4,
+        isRelaxed: true,
+      },
+      {
+        minTier: "PLATINUM",
+        minRank: "II",
+        minGames: 5,
+        minWinRate: 0.35,
+        isRelaxed: true,
+      },
+    ];
+
+    const passesCriteria = (
+      row: (typeof candidates)[number],
+      criteria: LabChampionMasteryCriteria,
+    ): boolean => {
+      if (row.riotTier === "UNRANKED") return false;
+      if (row.games < criteria.minGames) return false;
+      if (row.champWinRate < criteria.minWinRate) return false;
+      return (
+        tierScore(row.riotTier, row.riotRank, row.riotLp) >=
+        tierScore(criteria.minTier, criteria.minRank)
+      );
+    };
+
+    let appliedCriteria = criteriaLevels[0];
+    let qualified = candidates.filter((row) => passesCriteria(row, appliedCriteria));
+    if (qualified.length < 10) {
+      appliedCriteria = criteriaLevels[1];
+      qualified = candidates.filter((row) => passesCriteria(row, appliedCriteria));
+    }
+    if (qualified.length < 5) {
+      appliedCriteria = criteriaLevels[2];
+      qualified = candidates.filter((row) => passesCriteria(row, appliedCriteria));
+    }
+
+    const percentile = (values: number[], value: number): number => {
+      if (values.length === 0) return 0;
+      if (values.length === 1) return 100;
+      const sorted = [...values].sort((a, b) => a - b);
+      const idx = sorted.findIndex((v) => v >= value);
+      const rankIndex = idx === -1 ? sorted.length - 1 : idx;
+      return (rankIndex / (sorted.length - 1)) * 100;
+    };
+
+    const kdaValues = qualified.map((r) => r.avgKda);
+    const damageShareValues = qualified.map((r) => r.avgDamageShare);
+    const visionShareValues = qualified.map((r) => r.avgVisionShare);
+
+    const scored = qualified.map((row) => {
+      const volumeScore =
+        Math.min(Math.log2(row.games + 1) / Math.log2(51), 1) * 100;
+      const skillScore = wilsonLower(row.wins, row.games) * 100;
+      const kdaPct = percentile(kdaValues, row.avgKda);
+      const damagePct = percentile(damageShareValues, row.avgDamageShare);
+      const visionPct = percentile(visionShareValues, row.avgVisionShare);
+      const impactScore = kdaPct * 0.4 + damagePct * 0.4 + visionPct * 0.2;
+
+      const daysAgo =
+        (Date.now() - row.lastPlayedAt.getTime()) / (1000 * 60 * 60 * 24);
+      const recencyScore =
+        daysAgo < 30 ? 100 : daysAgo < 60 ? 60 : daysAgo < 90 ? 30 : 0;
+
+      const masteryScore =
+        volumeScore * 0.3 +
+        skillScore * 0.4 +
+        impactScore * 0.2 +
+        recencyScore * 0.1;
+
+      return {
+        ...row,
+        volumeScore,
+        skillScore,
+        impactScore,
+        recencyScore,
+        masteryScore,
+      };
+    });
+
+    scored.sort((a, b) => b.masteryScore - a.masteryScore);
+    const topScored = scored.slice(0, MASTERY_TOP_LIMIT);
+    const insufficient = topScored.length < 3;
+
+    const masteryScores = topScored.map((r) => r.masteryScore);
+    const soldPriceValues = topScored
+      .map((r) => r.avgSoldPrice)
+      .filter((v): v is number => typeof v === "number");
+    const masteryQ3 =
+      masteryScores.length > 0
+        ? [...masteryScores].sort((a, b) => a - b)[
+            Math.floor((masteryScores.length - 1) * 0.75)
+          ]
+        : 0;
+    const soldQ3 =
+      soldPriceValues.length > 0
+        ? [...soldPriceValues].sort((a, b) => a - b)[
+            Math.floor((soldPriceValues.length - 1) * 0.75)
+          ]
+        : null;
+
+    const masteries: LabChampionMasteryEntry[] = topScored.map((row, idx) => {
+      const badges: LabChampionMasteryBadge[] = [];
+      const highSoldPrice =
+        typeof row.avgSoldPrice === "number" &&
+        soldQ3 !== null &&
+        row.avgSoldPrice >= soldQ3;
+      const highMastery = row.masteryScore >= masteryQ3;
+
+      if (highSoldPrice && highMastery) badges.push("커뮤니티 인증");
+      else if (highSoldPrice) badges.push("고평가");
+      if (appliedCriteria.isRelaxed) badges.push("기준 완화");
+
+      return {
+        rank: idx + 1,
+        userId: row.userId,
+        username: row.username,
+        avatar: row.avatar,
+        riotTier: row.riotTier,
+        riotRank: row.riotRank,
+        champGames: row.games,
+        champWins: row.wins,
+        champWinRate: Math.round(row.champWinRate * 10000) / 10000,
+        wilsonLower: Math.round(wilsonLower(row.wins, row.games) * 1000000) / 1000000,
+        avgKda: Math.round(row.avgKda * 100) / 100,
+        masteryScore: Math.round(row.masteryScore * 100) / 100,
+        scoreBreakdown: {
+          volume: Math.round(row.volumeScore * 100) / 100,
+          skill: Math.round(row.skillScore * 100) / 100,
+          impact: Math.round(row.impactScore * 100) / 100,
+          recency: row.recencyScore,
+        },
+        lastPlayedAt: row.lastPlayedAt.toISOString(),
+        nexusWinRate: row.nexusWinRate,
+        nexusGlobalRank: row.nexusGlobalRank,
+        avgSoldPrice: row.avgSoldPrice,
+        badges,
+      };
+    });
+
+    const result: LabChampionMasteryResponse = {
+      championId,
+      championName,
+      championNameKorean: getChampionKoreanName(championName),
+      appliedCriteria,
+      totalUniquePlayersOnChamp,
+      qualifiedCount: qualified.length,
+      insufficient,
+      masteries,
+    };
+
+    await this.redis.set(cacheKey, JSON.stringify(result), 1800);
+    return result;
+  }
+
+  /**
+   * Riot perks JSON에서 (primaryStyle, subStyle, keystonePerk)를 추출.
+   * 구조: { styles: [{ description: "primaryStyle", style: number, selections: [{ perk: number, ... }, ...] },
+   *                  { description: "subStyle", style: number, ... }] }
+   */
+  private extractRuneTriplet(perks: Prisma.JsonValue): {
+    primaryStyle: number;
+    subStyle: number;
+    keystonePerk: number;
+  } | null {
+    if (!perks || typeof perks !== "object") return null;
+    const styles = (perks as { styles?: unknown }).styles;
+    if (!Array.isArray(styles) || styles.length < 2) return null;
+
+    const primary = styles[0] as
+      | {
+          style?: number;
+          selections?: { perk?: number }[];
+        }
+      | undefined;
+    const sub = styles[1] as { style?: number } | undefined;
+
+    const primaryStyle = primary?.style;
+    const subStyle = sub?.style;
+    const keystonePerk = primary?.selections?.[0]?.perk;
+
+    if (
+      typeof primaryStyle !== "number" ||
+      typeof subStyle !== "number" ||
+      typeof keystonePerk !== "number"
+    ) {
+      return null;
+    }
+
+    return { primaryStyle, subStyle, keystonePerk };
   }
 }

@@ -1,4 +1,14 @@
-import { Controller, Get, Param, Query, UseGuards } from "@nestjs/common";
+import {
+  Body,
+  BadRequestException,
+  Controller,
+  Get,
+  NotFoundException,
+  Param,
+  Post,
+  Query,
+  UseGuards,
+} from "@nestjs/common";
 import { Throttle } from "@nestjs/throttler";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
@@ -54,8 +64,217 @@ export class LabController {
   async getChampions(
     @Query("period") period: Period = "30d",
     @Query("position") position?: string,
+    @Query("includeLowSample") includeLowSample?: string,
   ) {
-    return this.labStatsService.getChampions(period, position);
+    const includeLow = ["1", "true", "yes", "on"].includes(
+      (includeLowSample ?? "").toLowerCase(),
+    );
+    return this.labStatsService.getChampions(period, position, includeLow);
+  }
+
+  /**
+   * Task 13: 챔피언 상세 통계
+   * 기간별 승률 추이, 포지션 분포, 아이템/룬 조합 TOP
+   */
+  @Get("champions/:championId")
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  async getChampionDetail(
+    @Param("championId") championIdParam: string,
+    @Query("period") period: Period = "30d",
+  ) {
+    const championId = Number(championIdParam);
+    if (!Number.isInteger(championId) || championId <= 0) {
+      throw new BadRequestException("championId must be a positive integer");
+    }
+
+    const detail = await this.labStatsService.getChampionDetail(championId, period);
+    if (!detail) {
+      throw new NotFoundException("Champion detail not found for this period");
+    }
+
+    return detail;
+  }
+
+  /**
+   * Task 14: 챔피언 장인 통계
+   * 티어/표본/승률 게이트 + 동적 완화 + masteryScore
+   */
+  @Get("champions/:championId/mastery")
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  async getChampionMastery(@Param("championId") championIdParam: string) {
+    const championId = Number(championIdParam);
+    if (!Number.isInteger(championId) || championId <= 0) {
+      throw new BadRequestException("championId must be a positive integer");
+    }
+
+    return this.labStatsService.getChampionMastery(championId);
+  }
+
+  /**
+   * Task 15: 시너지 조합 통계
+   * period + 특정 챔피언 기준 파트너 필터 지원
+   */
+  @Get("synergy")
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  async getSynergy(
+    @Query("period") period: Period = "30d",
+    @Query("championId") championIdParam?: string,
+    @Query("limit") limitParam?: string,
+  ) {
+    let championId: number | undefined;
+    if (championIdParam !== undefined) {
+      championId = Number(championIdParam);
+      if (!Number.isInteger(championId) || championId <= 0) {
+        throw new BadRequestException("championId must be a positive integer");
+      }
+    }
+
+    let limit: number | undefined;
+    if (limitParam !== undefined) {
+      limit = Number(limitParam);
+      if (!Number.isInteger(limit) || limit <= 0) {
+        throw new BadRequestException("limit must be a positive integer");
+      }
+    }
+
+    return this.labStatsService.getSynergy(period, championId, limit);
+  }
+
+  /**
+   * Task 16: 카운터 상성 통계
+   * period/champion/vsChampion/position 필터 지원
+   */
+  @Get("counter")
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  async getCounter(
+    @Query("period") period: Period = "30d",
+    @Query("championId") championIdParam?: string,
+    @Query("vsChampionId") vsChampionIdParam?: string,
+    @Query("position") position?: string,
+    @Query("limit") limitParam?: string,
+  ) {
+    let championId: number | undefined;
+    if (championIdParam !== undefined) {
+      championId = Number(championIdParam);
+      if (!Number.isInteger(championId) || championId <= 0) {
+        throw new BadRequestException("championId must be a positive integer");
+      }
+    }
+
+    let vsChampionId: number | undefined;
+    if (vsChampionIdParam !== undefined) {
+      vsChampionId = Number(vsChampionIdParam);
+      if (!Number.isInteger(vsChampionId) || vsChampionId <= 0) {
+        throw new BadRequestException("vsChampionId must be a positive integer");
+      }
+    }
+
+    let limit: number | undefined;
+    if (limitParam !== undefined) {
+      limit = Number(limitParam);
+      if (!Number.isInteger(limit) || limit <= 0) {
+        throw new BadRequestException("limit must be a positive integer");
+      }
+    }
+
+    return this.labStatsService.getCounter(
+      period,
+      championId,
+      vsChampionId,
+      position,
+      limit,
+    );
+  }
+
+  /**
+   * Task 17: 팀 구성 유형 분석 통계
+   * 태그 기반 근사 분류 (한타/스플릿/포킹/속공/탱커라인)
+   */
+  @Get("compositions")
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  async getCompositions(@Query("period") period: Period = "30d") {
+    return this.labStatsService.getCompositions(period);
+  }
+
+  /**
+   * Task 18: 경매 효율 분석 통계
+   * AUCTION 모드 낙찰가 대비 성과 잔차 기반 가성비 분석
+   */
+  @Get("oracle/auction-efficiency")
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
+  async getAuctionEfficiency(@Query("period") period: Period = "30d") {
+    return this.labStatsService.getAuctionEfficiency(period);
+  }
+
+  /**
+   * Task 19: 팀 밸런스 예측
+   * 요청 팀 구성(teamA/teamB) 기준 예상 승률과 신뢰도 반환
+   */
+  @Post("oracle/balance-score")
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
+  async getBalanceScore(
+    @Body() body: { teamA?: string[]; teamB?: string[] },
+  ) {
+    const teamA = Array.isArray(body?.teamA) ? body.teamA.filter(Boolean) : [];
+    const teamB = Array.isArray(body?.teamB) ? body.teamB.filter(Boolean) : [];
+
+    if (teamA.length === 0 || teamB.length === 0) {
+      throw new BadRequestException("teamA and teamB must be non-empty arrays");
+    }
+
+    const overlap = teamA.filter((id) => teamB.includes(id));
+    if (overlap.length > 0) {
+      throw new BadRequestException("same user cannot be in both teams");
+    }
+
+    return this.labStatsService.getBalanceScore(teamA, teamB);
+  }
+
+  /**
+   * Task 20: 밴픽 추천
+   * global(userIds) 또는 byTeam(teamAUserIds/teamBUserIds) 모드 지원
+   */
+  @Get("oracle/ban-recommend")
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
+  async getBanRecommend(
+    @Query("period") period: Period = "30d",
+    @Query("userIds") userIdsQuery?: string,
+    @Query("teamAUserIds") teamAUserIdsQuery?: string,
+    @Query("teamBUserIds") teamBUserIdsQuery?: string,
+  ) {
+    const parseCsv = (value?: string): string[] =>
+      (value ?? "")
+        .split(",")
+        .map((v) => v.trim())
+        .filter((v) => v.length > 0);
+
+    const userIds = parseCsv(userIdsQuery);
+    const teamAUserIds = parseCsv(teamAUserIdsQuery);
+    const teamBUserIds = parseCsv(teamBUserIdsQuery);
+
+    const byTeamMode = teamAUserIds.length > 0 || teamBUserIds.length > 0;
+    if (byTeamMode) {
+      if (teamAUserIds.length === 0 || teamBUserIds.length === 0) {
+        throw new BadRequestException(
+          "teamAUserIds and teamBUserIds must both be provided in byTeam mode",
+        );
+      }
+      const overlap = teamAUserIds.filter((id) => teamBUserIds.includes(id));
+      if (overlap.length > 0) {
+        throw new BadRequestException("same user cannot be in both teams");
+      }
+    } else if (userIds.length === 0) {
+      throw new BadRequestException(
+        "userIds is required when teamAUserIds/teamBUserIds are not provided",
+      );
+    }
+
+    return this.labStatsService.getBanRecommend({
+      period,
+      userIds,
+      teamAUserIds,
+      teamBUserIds,
+    });
   }
 
   /**

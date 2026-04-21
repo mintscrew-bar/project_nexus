@@ -1140,6 +1140,109 @@ export const statsApi = {
     return response.data;
   },
 
+  getLabMetaRadar: async (period: "30d" | "90d" | "all" = "30d") => {
+    const response = await apiClient.get("/stats/lab/meta/radar", {
+      params: { period },
+    });
+    return response.data;
+  },
+
+  getLabPatchImpact: async () => {
+    const response = await apiClient.get("/stats/lab/meta/patch-impact");
+    return response.data;
+  },
+
+  getLabBanRates: async (period: "30d" | "90d" | "all" = "30d") => {
+    const response = await apiClient.get("/stats/lab/meta/ban-rates", {
+      params: { period },
+    });
+    return response.data;
+  },
+
+  getLabChampionDetail: async (
+    championId: number,
+    period: "30d" | "90d" | "all" = "30d",
+  ) => {
+    const response = await apiClient.get(
+      `/stats/lab/champions/${championId}`,
+      { params: { period } },
+    );
+    return response.data;
+  },
+
+  getLabChampions: async (params?: {
+    period?: "30d" | "90d" | "all";
+    position?: "TOP" | "JUNGLE" | "MID" | "ADC" | "SUPPORT";
+    includeLowSample?: boolean;
+  }) => {
+    const response = await apiClient.get("/stats/lab/champions", {
+      params,
+    });
+    return response.data;
+  },
+
+  getLabChampionMastery: async (championId: number) => {
+    const response = await apiClient.get(
+      `/stats/lab/champions/${championId}/mastery`,
+    );
+    return response.data;
+  },
+
+  getLabSynergy: async (params?: {
+    period?: "30d" | "90d" | "all";
+    championId?: number;
+    limit?: number;
+  }) => {
+    const response = await apiClient.get("/stats/lab/synergy", { params });
+    return response.data;
+  },
+
+  getLabCounter: async (params?: {
+    period?: "30d" | "90d" | "all";
+    championId?: number;
+    vsChampionId?: number;
+    position?: string;
+    limit?: number;
+  }) => {
+    const response = await apiClient.get("/stats/lab/counter", { params });
+    return response.data;
+  },
+
+  getLabCompositions: async (params?: { period?: "30d" | "90d" | "all" }) => {
+    const response = await apiClient.get("/stats/lab/compositions", { params });
+    return response.data;
+  },
+
+  getLabAuctionEfficiency: async (params?: { period?: "30d" | "90d" | "all" }) => {
+    const response = await apiClient.get("/stats/lab/oracle/auction-efficiency", {
+      params,
+    });
+    return response.data;
+  },
+
+  getLabBalanceScore: async (data: { teamA: string[]; teamB: string[] }) => {
+    const response = await apiClient.post("/stats/lab/oracle/balance-score", data);
+    return response.data;
+  },
+
+  getLabBanRecommend: async (params: {
+    period?: "30d" | "90d" | "all";
+    userIds?: string[];
+    teamAUserIds?: string[];
+    teamBUserIds?: string[];
+  }) => {
+    const query = {
+      period: params.period,
+      userIds: params.userIds?.join(","),
+      teamAUserIds: params.teamAUserIds?.join(","),
+      teamBUserIds: params.teamBUserIds?.join(","),
+    };
+    const response = await apiClient.get("/stats/lab/oracle/ban-recommend", {
+      params: query,
+    });
+    return response.data;
+  },
+
   getChampionStats: async (
     gameName: string,
     tagLine: string,

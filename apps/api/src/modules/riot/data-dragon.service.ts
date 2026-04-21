@@ -201,6 +201,34 @@ export class DataDragonService {
   }
 
   /**
+   * 완성 아이템 ID 집합을 반환한다.
+   * - 판별 기준: `into` 필드가 비어있는 아이템 (= 더 이상 상위 조합이 없음)
+   * - `Boots` 태그 아이템은 제외 (장인 분석에서 부츠는 별도 카테고리)
+   * - 구매 불가 아이템(`purchasable=false`)도 제외 (오른 아이템 등 제외)
+   */
+  async getCompletedItemIds(locale: string = "ko_KR"): Promise<Set<number>> {
+    const itemData = await this.getItemData(locale);
+    const completedIds = new Set<number>();
+
+    for (const [idStr, info] of Object.entries(itemData.data)) {
+      const hasUpgrade = Array.isArray(info.into) && info.into.length > 0;
+      if (hasUpgrade) continue;
+
+      if (info.gold?.purchasable === false) continue;
+
+      const tags = info.tags ?? [];
+      if (tags.includes("Boots")) continue;
+
+      const itemId = Number(idStr);
+      if (!Number.isFinite(itemId) || itemId <= 0) continue;
+
+      completedIds.add(itemId);
+    }
+
+    return completedIds;
+  }
+
+  /**
    * 챔피언 이미지 URL 생성
    * @param championKey 챔피언 키 (예: "Aatrox", "Ahri")
    * @param type 이미지 타입: "square" (아이콘), "splash" (스플래시 아트), "loading" (로딩 화면)

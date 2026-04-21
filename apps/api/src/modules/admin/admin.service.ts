@@ -4,6 +4,7 @@ import {
   BadRequestException,
   ForbiddenException,
 } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../prisma/prisma.service";
 import { UserRole, AdminAction } from "@nexus/database";
 
@@ -30,7 +31,10 @@ function validateFutureDate(dateStr: string, fieldName: string): Date {
 
 @Injectable()
 export class AdminService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly configService: ConfigService,
+  ) {}
 
   private readonly seededHighTierPriority = 7;
   private readonly matchFetchStaleHours = {
@@ -39,6 +43,16 @@ export class AdminService {
     aram: 24,
     custom: 24,
   } as const;
+
+  private getPositiveIntConfig(key: string, fallback: number): number {
+    const raw = this.configService.get<string>(key);
+    if (!raw) return fallback;
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      return fallback;
+    }
+    return Math.floor(parsed);
+  }
 
   // ── Audit Log ───────────────────────────────────────────────────────────────
 
@@ -225,6 +239,15 @@ export class AdminService {
         normal: normalPending,
         aram: aramPending,
         custom: customPending,
+      },
+      seededPolicy: {
+        priority: this.seededHighTierPriority,
+        slotCap: this.getPositiveIntConfig("MATCH_FETCH_RANKED_SEEDED_SLOT_CAP", 15),
+        staleHours: this.getPositiveIntConfig("MATCH_FETCH_RANKED_SEEDED_STALE_HOURS", 72),
+        initialBackfillLimit: this.getPositiveIntConfig(
+          "MATCH_FETCH_RANKED_SEEDED_INITIAL_BACKFILL_LIMIT",
+          100,
+        ),
       },
       riotMatchCacheSize,
       matchStatsCacheSize,
