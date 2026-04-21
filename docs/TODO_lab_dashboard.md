@@ -1,7 +1,7 @@
 # Lab 대시보드 구현 계획
 
 > 진행 기준일: 2026-04-16
-> 완료: 13 / 전체: Task 1~40
+> 완료: 32 / 전체: Task 1~40
 > 연계 문서: [전적 페이지 크롤링/배치 TODO](./TODO_matches_crawling.md)
 
 ---
@@ -397,16 +397,17 @@ API 요청 시 fallback 우선순위:
   - 응답에 `confidenceLevel` (`low` / `moderate` / `high`) 포함
   - 구현: `GET /stats/lab/champions?period=30d&position=TOP` 추가, 스냅샷 우선 + 실시간 집계 fallback, 응답에 `source`(`snapshot|realtime`) 포함
 
-- [ ] Task 13: `GET /stats/lab/champions/:championId` — 챔피언 상세 API
+- [x] Task 13: `GET /stats/lab/champions/:championId` — 챔피언 상세 API
   - 기간별 승률 추이 (라인 차트용 시계열 데이터)
     - **집계 단위**: 7일 윈도우(weekly rolling) — 일별로 하면 내전 특성상 빈 날이 많아 차트가 들쭉날쭉해짐
     - 데이터 포인트가 3개 미만이면 차트 대신 "데이터 부족" 표시
   - 포지션별 픽률/승률 분포
   - 최고 성과 아이템 조합 TOP 5 (item0~6 중 완성 아이템 기준 2코어 조합)
     - **완성 아이템 판별**: Riot Data Dragon의 아이템 JSON에서 `"into"` 필드가 없는 아이템을 완성 아이템으로 간주. 부츠(itemId 3xxx 계열) 제외.
-  - 최고 성과 룬 조합 TOP 3 (`perks` JSON에서 primaryStyle + subStyle 키스톤 조합 기준)
+  - 최고 성과 룬 조합 TOP 3 (`perks` JSON에서 `(primaryStyle, subStyle, keystonePerk)` 3-tuple 기준)
+  - 구현: `LabChampionSnapshot`(포지션 분포) + `MatchParticipant`(주간 추이, 아이템/룬) 혼합, `DataDragonService.getCompletedItemIds()` 재사용, `GET /stats/lab/champions/:championId?period=30d` 라우트 오픈
 
-- [ ] Task 14: `GET /stats/lab/champions/:championId/mastery` — 장인 API
+- [x] Task 14: `GET /stats/lab/champions/:championId/mastery` — 장인 API
 
   **설계 배경**: op.gg/deeplol처럼 "티어 컷 + 표본 수 + 승률"을 조건으로 잡되, 내전 특성에 맞게 조정한다.
   Riot 계정 `RiotAccount.tier` / `RiotAccount.rank` 필드가 이미 존재하므로 이를 게이트로 활용.
@@ -541,19 +542,21 @@ API 요청 시 fallback 우선순위:
   ```
 
   **주의(caveat)**: 커뮤니티 규모가 작아 D2+ 유저 자체가 적은 경우, 동적 완화가 자주 발동될 수 있음. 장기적으로는 커뮤니티가 성장할수록 기준이 의미를 가지므로, 초기에는 완화 기준 적용 사실을 UI에 투명하게 노출하는 것이 핵심.
+  - 구현: `GET /stats/lab/champions/:championId/mastery` 추가, D2+/P1+/P2+ 단계 완화 + `masteryScore`(volume/skill/impact/recency) 계산, `NexusRanking`/경매 평균 낙찰가/배지(`커뮤니티 인증`·`고평가`·`기준 완화`) 포함
 
 ---
 
 ## Phase 4: 백엔드 — 조합 분석 API
 
-- [ ] Task 15: `GET /stats/lab/synergy` — 시너지 조합 API
+- [x] Task 15: `GET /stats/lab/synergy` — 시너지 조합 API
   - 챔피언 2인 동반 픽 시 승률 목록
   - `LabSynergySnapshot` 기반 조회
   - 필터: 특정 챔피언 기준 시너지 파트너 조회
   - **정렬 기준**: `wilsonLower` DESC (단순 winRate 정렬 금지 — 2게임 2승 100%가 상위에 오는 문제 방지)
   - **시너지 유의성 표시**: `expected_win_rate = champA_winRate × champB_winRate / 0.5` 대비 실제 조합 승률이 유의하게 높은 경우만 "시너지 효과 있음" 뱃지 부여 (독립 가정 대비 초과 승률)
+  - 구현: `GET /stats/lab/synergy?period=30d&championId=...&limit=...` 오픈, 스냅샷 우선 + 실시간 fallback, `expectedWinRate`/`deltaWinRate`/`badges`(시너지 효과 있음) 응답 포함
 
-- [ ] Task 16: `GET /stats/lab/counter` — 카운터 상성 API
+- [x] Task 16: `GET /stats/lab/counter` — 카운터 상성 API
   - 챔피언 A vs 챔피언 B 매치업 승률
   - `LabCounterSnapshot` 기반 조회
   - 포지션 기준 필터 (같은 포지션 맞라인 상성)
@@ -561,8 +564,9 @@ API 요청 시 fallback 우선순위:
     - 유리(favorable): `wilsonLower > 0.55`
     - 불리(unfavorable): `wilsonUpper < 0.45` (Wilson score 상한이 45% 미만)
     - 무난(even): 그 외
+  - 구현: `GET /stats/lab/counter?period=30d&championId=...&vsChampionId=...&position=...&limit=...` 오픈, 스냅샷 우선 + 실시간 fallback, 응답에 `wilsonUpper`/`verdict(favorable|unfavorable|even)` 포함
 
-- [ ] Task 17: `GET /stats/lab/compositions` — 팀 구성 유형 분석 API
+- [x] Task 17: `GET /stats/lab/compositions` — 팀 구성 유형 분석 API
   - 팀 조합을 유형 분류 (한타/스플릿/포킹/속공/탱커라인)
   - **분류 알고리즘**:
     ```
@@ -577,12 +581,13 @@ API 요청 시 fallback 우선순위:
     ```
   - **주의(caveat)**: 태그 기반 분류는 근사치(approximation)이며, 실제 팀 전략과 괴리가 있을 수 있음. "참고용" 뱃지 상시 표시.
   - 유형별 승률 집계 + 현재 내전에서 가장 강한 팀 구성 유형 TOP 3
+  - 구현: `GET /stats/lab/compositions?period=30d` 오픈, Data Dragon 태그 + 속공 지표(25분 미만 구간 승률 우세 챔피언) 기반 팀 분류, `rows` + `topTypes`(상위 3유형) 응답
 
 ---
 
 ## Phase 5: 백엔드 — 오라클 API
 
-- [ ] Task 18: `GET /stats/lab/oracle/auction-efficiency` — 경매 효율 분석 API
+- [x] Task 18: `GET /stats/lab/oracle/auction-efficiency` — 경매 효율 분석 API
   - **독점 콘텐츠**: `TeamMember.soldPrice` ↔ `MatchParticipant` 성과 조인
   - **조인 경로**: `TeamMember(teamId, userId)` → `Team(id, roomId)` → `Match(roomId)` → `MatchParticipant(matchId, userId)`
   - 낙찰가 구간별 평균 KDA, 데미지, 승률
@@ -606,8 +611,9 @@ API 요청 시 fallback 우선순위:
     ```
   - **시각화 데이터**: 산점도용 (x=soldPrice, y=performance) 원시 데이터 + 회귀선 계수 응답에 포함
   - **유찰(soldPrice=0 또는 null) 처리**: 경매 모드 경기만 대상 (`Room.teamMode = 'AUCTION'`), 유찰 유저는 별도 "유찰 후 성과" 섹션으로 분리
+  - 구현: `GET /stats/lab/oracle/auction-efficiency?period=30d` 오픈, 낙찰가 구간 버킷/산점도/회귀계수(β0,β1)/잔차 표준편차/가성비왕 TOP5/고평가 TOP5/유찰 요약 응답
 
-- [ ] Task 19: `POST /stats/lab/oracle/balance-score` — 팀 밸런스 예측 API
+- [x] Task 19: `POST /stats/lab/oracle/balance-score` — 팀 밸런스 예측 API
   - 요청: `{ teamA: userId[], teamB: userId[] }`
   - 응답: 양 팀 예상 승률, 신뢰도, 과거 유사 조합 레퍼런스 수
   - **유저 실력 스코어(Player Strength Score) 산출**:
@@ -645,8 +651,9 @@ API 요청 시 fallback 우선순위:
     ```
   - **주의(caveat)**: 이 예측은 개인 실력 기반이며, 챔피언 선택/밴픽/컨디션/소통 등 게임 내 변수를 반영하지 않음. UI에 "참고용 예측이며 실제 결과와 다를 수 있습니다" 문구 상시 표시.
   - **ELO/TrueSkill 도입 시점**: 커뮤니티 규모가 충분히 커져 유저당 평균 30게임 이상이 되면, PSS 대신 TrueSkill 레이팅 시스템 도입을 검토. 현재 소표본에서는 수렴이 느려 실용성이 떨어짐.
+  - 구현: `POST /stats/lab/oracle/balance-score` 오픈, `teamA[]/teamB[]` 입력 검증, 최근 20경기 기반 PSS + Bradley-Terry 기본 승률 + 직접대전(3인 이상 겹침, 5게임 이상 시 30% 보정) + 신뢰도(high/moderate/low) 반환
 
-- [ ] Task 20: `GET /stats/lab/oracle/ban-recommend` — 밴픽 추천 API
+- [x] Task 20: `GET /stats/lab/oracle/ban-recommend` — 밴픽 추천 API
   - 요청: `?userIds=...` (오늘 참가자 유저 ID 목록)
   - **추천 우선순위 결정 로직**:
     ```
@@ -666,45 +673,50 @@ API 요청 시 fallback 우선순위:
     ```
   - **팀 구분 시**: 요청에 `?teamAUserIds=...&teamBUserIds=...`로 팀을 구분하면, 각 팀 시점에서 상대에 대한 밴 추천 제공
   - 현재 메타 강세 챔피언 + 상대 장인 챔피언 교차 분석
+  - 구현: `GET /stats/lab/oracle/ban-recommend` 오픈 (`userIds=...` 또는 `teamAUserIds=...&teamBUserIds=...`), `ban_score = user_mastery*0.5 + meta_strength*0.3 + threat_score*0.2` 집계, 상위 5개 + 이유(reasons) 반환
 
 ---
 
 ## Phase 6: 프론트엔드 — 공통 레이아웃
 
-- [ ] Task 21: `/lab` 페이지 탭 레이아웃 재구성
+- [x] Task 21: `/lab` 페이지 탭 레이아웃 재구성
   - 기존 단일 페이지 → 4개 탭 구조로 전환
   - 탭: 메타 레이더 / 챔피언 분석 / 조합 분석 / 오라클
   - URL 쿼리 파라미터로 탭 상태 관리 (`?tab=meta`)
   - 기간 필터 (30일/90일/전체) 글로벌 상태로 공유
+  - 구현: `/lab` 상단 탭/기간 선택 UI 추가, `tab`/`period`를 URL 쿼리에 동기화(`router.replace`), 메타 탭은 기존 대시보드 유지, 나머지 탭은 Phase 7~10 연결용 플레이스홀더로 전환
 
-- [ ] Task 22: `lab-store.ts` Zustand 스토어 생성
+- [x] Task 22: `lab-store.ts` Zustand 스토어 생성
   - 전역 기간 필터, 포지션 필터 상태 관리
   - 탭별 캐시 무효화 처리
+  - 구현: `apps/web/src/stores/lab-store.ts` 추가(`activeTab/period/position/cacheVersion`), `set*` 액션 + `invalidateTabCache`/`invalidateAllCaches` 제공, `/lab` 페이지에서 `tab/period` 쿼리와 스토어 상태 양방향 동기화
 
 ---
 
 ## Phase 7: 프론트엔드 — 메타 레이더 탭
 
-- [ ] Task 23: 메타 레이더 탭 UI 구현
+- [x] Task 23: 메타 레이더 탭 UI 구현
   > 연계: [Phase 13 Task 39 (LabRankedChampionSnapshot)](#phase-13-외부-고티어-데이터-활용-matches-phase-8-후속) — "내전 vs 랭크 메타 비교 섹션"의 랭크 측 데이터는 Task 39 스냅샷에 의존. Task 39 전이면 해당 섹션은 숨김 또는 "랭크 데이터 수집 중" 플레이스홀더 처리.
   - **트렌딩 챔피언 카드** — 챔피언 아이콘 + 픽률 변화 화살표 + 승률
   - **포지션별 티어 그리드** — 5포지션 × 티어 (S/A/B/C/D) 표
   - **내전 vs 랭크 메타 비교 섹션** — 승률 차이 ±N% 강조 (이게 핵심 차별점)
   - 패치 임팩트 카드 (수혜/피해 챔피언 각 3개)
   - 신뢰도 등급 뱃지 (`low` / `moderate` / `high`) 각 지표 옆에 표시
+  - 구현: `statsApi.getLabMetaRadar/getLabPatchImpact/getLabBanRates` 연결, 메타 탭에 트렌딩 TOP5·포지션별 티어 그리드·패치 임팩트(수혜/피해 TOP3)·밴률 리스트+신뢰도 뱃지 렌더링, 랭크 비교 섹션은 Task 39 전제 플레이스홀더 처리
 
 ---
 
 ## Phase 8: 프론트엔드 — 챔피언 분석 탭
 
-- [ ] Task 24: 챔피언 목록 뷰 구현
+- [x] Task 24: 챔피언 목록 뷰 구현
   - 챔피언 검색 인풋 (한글/영문 모두 지원)
   - 픽률 / 승률 / 밴률 정렬 가능한 테이블
   - 포지션 필터 칩
   - 티어 뱃지 자동 표시 (tier_score 기반)
   - 게임 수 5 미만 챔피언은 목록에서 기본 숨김 (토글로 표시 가능)
+  - 구현: 챔피언 탭에 검색/정렬/포지션 칩/티어 배지/신뢰도 컬럼 추가, `GET /stats/lab/champions` 연동(`includeLowSample` 쿼리 지원 추가)으로 5게임 미만 토글 제공
 
-- [ ] Task 25: 챔피언 상세 모달/패널 구현
+- [x] Task 25: 챔피언 상세 모달/패널 구현
   - 기간별 승률 추이 라인 차트 (recharts/nivo)
   - 포지션별 분포 파이 차트
   - 최고 성과 빌드 TOP 5 (아이템 아이콘 2개 + 승률/게임 수)
@@ -718,45 +730,52 @@ API 요청 시 fallback 우선순위:
     - 자격 통과자 < 3명 시 "장인 데이터 부족" 안내
     - scoreBreakdown 툴팁: 볼륨/실력/임팩트/최근성 각 점수 세부 표시
   - 신뢰도 등급별 UI 차별화 (low: 흐리게, high: 강조)
+  - 구현: 챔피언 목록 행 클릭 시 `GET /stats/lab/champions/:championId` + `/mastery` 병렬 호출 모달 추가, 주간 승률 SVG 라인차트/포지션 파이차트/아이템 TOP5/룬 TOP3/장인 TOP50(포디움+테이블, 뱃지, 완화기준 배너, 데이터 부족 안내, scoreBreakdown 툴팁) 렌더링
 
 ---
 
 ## Phase 9: 프론트엔드 — 조합 분석 탭
 
-- [ ] Task 26: 시너지 조합 뷰 구현
+- [x] Task 26: 시너지 조합 뷰 구현
   - 챔피언 선택 → 시너지 파트너 승률 순위 표시
   - 조합 카드: 챔피언 두 아이콘 + 게임 수 + 승률 + 신뢰도 뱃지
   - 최소 게임 수 미달 조합은 "데이터 부족" 처리
+  - 구현: 조합 탭에 `GET /stats/lab/synergy` 연동, 챔피언 선택 드롭다운(`GET /stats/lab/champions` catalog) + 시너지 카드(아이콘 2개/게임수/승률/신뢰도/배지) + 빈 결과 안내 추가
 
-- [ ] Task 27: 카운터 상성 뷰 구현
+- [x] Task 27: 카운터 상성 뷰 구현
   - 챔피언 선택 → 상대하기 좋은/나쁜 챔피언 목록
   - 색상 코딩: 빨간(불리) / 초록(유리) — Wilson bound 기반 판별
   - 포지션 기준 필터
+  - 구현: 조합 탭 카운터 섹션 추가, `GET /stats/lab/counter` 연동(기준 챔피언/상대 챔피언/포지션 필터), 유리/불리/비등 색상 배지와 데이터 부족 상태 처리
 
-- [ ] Task 28: 팀 구성 유형 분석 뷰 구현
+- [x] Task 28: 팀 구성 유형 분석 뷰 구현
   - 유형별 승률 바 차트
   - 각 유형 대표 챔피언 아이콘 예시
   - "참고용" 뱃지 상시 표시
+  - 구현: 조합 탭에 `GET /stats/lab/compositions` 연동, 유형별 승률 바/픽률/평균 경기 길이 표시 + 유형별 대표 챔피언 아이콘 예시 + `참고용` 뱃지 및 caveat 문구 렌더링
 
 ---
 
 ## Phase 10: 프론트엔드 — 오라클 탭
 
-- [ ] Task 29: 경매 효율 분석 뷰 구현
+- [x] Task 29: 경매 효율 분석 뷰 구현
   - **핵심 콘텐츠**: 낙찰가 구간별 평균 성과 그래프 (산점도 + 회귀선)
   - 가성비왕 TOP 5 / 고평가 TOP 5 카드
   - 전체 경매 참가자 효율 테이블
+  - 구현: 오라클 탭에 `GET /stats/lab/oracle/auction-efficiency` 연동, 산점도+회귀선 SVG, 낙찰가 구간별 성과 바, 가성비왕/고평가 TOP5 카드, 전체 효율 테이블 렌더링
 
-- [ ] Task 30: 팀 밸런스 예측기 UI 구현
+- [x] Task 30: 팀 밸런스 예측기 UI 구현
   - 유저 검색 → 팀 A / 팀 B에 드래그 or 버튼으로 배치
   - "예측" 버튼 → 승률 바 + 신뢰도 + 유사 과거 조합 참고 수 표시
   - 결과: "팀 A 승률 58% — 신뢰도 보통 — 샘플 12게임" 형식
   - "참고용 예측" 면책 문구 상시 표시
+  - 구현: 오라클 탭에 `searchUsers` 기반 유저 검색 + 팀 A/B 버튼 배치 + `POST /stats/lab/oracle/balance-score` 예측 버튼 연결, 승률 바/신뢰도/유사 샘플 수 결과와 면책 문구 렌더링
 
-- [ ] Task 31: 밴픽 추천기 UI 구현
+- [x] Task 31: 밴픽 추천기 UI 구현
   - 참가자 선택 (최대 10명)
   - 추천 밴 챔피언 카드 (이유 포함: "A 유저 장인 + 현재 S티어")
   - 포지션별 픽 추천 (현재 OP 챔피언 기준)
+  - 구현: 오라클 탭에 참가자 밴 풀(최대 10명) 선택 UI + `GET /stats/lab/oracle/ban-recommend` 연동 추천 밴 카드(사유 포함) + 메타 레이더 tiers 기반 포지션별 OP 픽 추천 섹션 추가
 
 ---
 
