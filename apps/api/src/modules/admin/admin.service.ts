@@ -32,6 +32,7 @@ function validateFutureDate(dateStr: string, fieldName: string): Date {
 export class AdminService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private readonly seededHighTierPriority = 7;
   private readonly matchFetchStaleHours = {
     ranked: 6,
     normal: 12,
@@ -112,7 +113,10 @@ export class AdminService {
     const [
       knownPuuidsTotal,
       nexusUsers,
+      seededUsers,
       rankedPending,
+      rankedPendingNexus,
+      rankedPendingSeeded,
       normalPending,
       aramPending,
       customPending,
@@ -126,6 +130,31 @@ export class AdminService {
       }),
       this.prisma.knownPuuid.count({
         where: {
+          isNexusUser: false,
+          priority: this.seededHighTierPriority,
+        },
+      }),
+      this.prisma.knownPuuid.count({
+        where: {
+          OR: [
+            { rankedFetchedAt: null },
+            { rankedFetchedAt: { lt: rankedStaleBefore } },
+          ],
+        },
+      }),
+      this.prisma.knownPuuid.count({
+        where: {
+          isNexusUser: true,
+          OR: [
+            { rankedFetchedAt: null },
+            { rankedFetchedAt: { lt: rankedStaleBefore } },
+          ],
+        },
+      }),
+      this.prisma.knownPuuid.count({
+        where: {
+          isNexusUser: false,
+          priority: this.seededHighTierPriority,
           OR: [
             { rankedFetchedAt: null },
             { rankedFetchedAt: { lt: rankedStaleBefore } },
@@ -185,9 +214,14 @@ export class AdminService {
       knownPuuids: {
         total: knownPuuidsTotal,
         nexusUsers,
+        seeded: seededUsers,
       },
       fetchPending: {
-        ranked: rankedPending,
+        ranked: {
+          total: rankedPending,
+          nexus: rankedPendingNexus,
+          seeded: rankedPendingSeeded,
+        },
         normal: normalPending,
         aram: aramPending,
         custom: customPending,

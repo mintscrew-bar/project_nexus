@@ -3,6 +3,7 @@ import { Cron, CronExpression } from "@nestjs/schedule";
 import { PrismaService } from "../prisma/prisma.service";
 import { DataDragonService } from "../riot/data-dragon.service";
 import { RiotMatchService } from "../riot/riot-match.service";
+import { RiotService } from "../riot/riot.service";
 import { RedisService } from "../redis/redis.service";
 import { StatsService } from "../stats/stats.service";
 
@@ -26,9 +27,26 @@ type QueueGroupConfig = {
 
 export type MatchFetchQueueGroup = QueueGroupConfig["name"];
 
+type HighTierSeedingResult = {
+  ok: boolean;
+  skipped: boolean;
+  reason?: string;
+  challengerCount: number;
+  grandmasterCount: number;
+  targetCount: number;
+  insertedCount: number;
+  updatedCount: number;
+  failedCount: number;
+  missingPuuidCount: number;
+};
+
 @Injectable()
 export class TasksService {
   private readonly logger = new Logger(TasksService.name);
+  private readonly seededHighTierPriority = 7;
+  private readonly rankedSeededSlotCap = 15;
+  private readonly rankedSeededStaleHours = 72;
+  private readonly rankedSeededInitialBackfillLimit = 100;
   private readonly matchFetchConfigs: QueueGroupConfig[] = [
     {
       name: "ranked",
@@ -71,10 +89,93 @@ export class TasksService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly dataDragon: DataDragonService,
+    private readonly riotService: RiotService,
     private readonly riotMatchService: RiotMatchService,
     private readonly redis: RedisService,
     private readonly statsService: StatsService,
   ) {}
+
+  private async upsertHighTierSeededPuuid(
+    puuid: string,
+  ): Promise<"inserted" | "updated"> {
+    const rows = await this.prisma.$queryRaw<Array<{ inserted: boolean }>>`
+      INSERT INTO "known_puuids" ("puuid", "priority", "isNexusUser", "createdAt", "updatedAt")
+      VALUES (${puuid}, ${this.seededHighTierPriority}, false, NOW(), NOW())
+      ON CONFLICT ("puuid") DO UPDATE
+      SET "priority" = GREATEST("known_puuids"."priority", EXCLUDED."priority"),
+          "updatedAt" = NOW()
+      RETURNING ("xmax" = 0) AS inserted
+    `;
+
+    return rows[0]?.inserted ? "inserted" : "updated";
+  }
+
+  private async runHighTierSeedingInternal(): Promise<HighTierSeedingResult> {
+    const highTier = await this.riotService.getHighTierSoloQueuePuuids();
+    const uniquePuuids = [...new Set(highTier.puuids)];
+
+    let insertedCount = 0;
+    let updatedCount = 0;
+    let failedCount = 0;
+
+    for (const puuid of uniquePuuids) {
+      try {
+        const upserted = await this.upsertHighTierSeededPuuid(puuid);
+        if (upserted === "inserted") {
+          insertedCount += 1;
+        } else {
+          updatedCount += 1;
+        }
+      } catch (error) {
+        failedCount += 1;
+        this.logger.warn(`High-tier seeding failed for ${puuid}: ${error}`);
+      }
+    }
+
+    const result: HighTierSeedingResult = {
+      ok: true,
+      skipped: false,
+      challengerCount: highTier.challengerCount,
+      grandmasterCount: highTier.grandmasterCount,
+      targetCount: uniquePuuids.length,
+      insertedCount,
+      updatedCount,
+      failedCount,
+      missingPuuidCount: highTier.missingPuuidCount,
+    };
+
+    this.logger.log(
+      `High-tier seeding completed: challenger=${result.challengerCount}, grandmaster=${result.grandmasterCount}, target=${result.targetCount}, inserted=${result.insertedCount}, updated=${result.updatedCount}, failed=${result.failedCount}, missingPuuid=${result.missingPuuidCount}`,
+    );
+
+    return result;
+  }
+
+  async runHighTierSeeding(): Promise<HighTierSeedingResult> {
+    const lockKey = "tasks:high-tier-seeding";
+    const lockToken = await this.redis.acquireLock(lockKey, 20 * 60 * 1000);
+
+    if (!lockToken) {
+      return {
+        ok: false,
+        skipped: true,
+        reason: "another worker holds the lock",
+        challengerCount: 0,
+        grandmasterCount: 0,
+        targetCount: 0,
+        insertedCount: 0,
+        updatedCount: 0,
+        failedCount: 0,
+        missingPuuidCount: 0,
+      };
+    }
+
+    try {
+      return await this.runHighTierSeedingInternal();
+    } finally {
+      await this.redis.releaseLock(lockKey, lockToken);
+    }
+  }
 
   private getSeasonStartUnixSeconds(): number {
     const now = new Date();
@@ -85,6 +186,7 @@ export class TasksService {
     puuid: string,
     queueId: number,
     lastKnownMatchId?: string | null,
+    maxNewIds?: number,
   ): Promise<string[]> {
     const newIds: string[] = [];
     let start = 0;
@@ -113,6 +215,10 @@ export class TasksService {
           break;
         }
         newIds.push(id);
+        if (maxNewIds !== undefined && newIds.length >= maxNewIds) {
+          shouldStop = true;
+          break;
+        }
       }
 
       if (shouldStop || ids.length < count) {
@@ -129,16 +235,26 @@ export class TasksService {
     puuid: string,
     queueIds: number[],
     lastKnownMatchId?: string | null,
+    maxBackfillMatchIds?: number,
   ): Promise<{ latestMatchId: string | null; fetchedCount: number }> {
     let latestMatchId: string | null = null;
     const seen = new Set<string>();
     const orderedNewIds: string[] = [];
 
     for (const queueId of queueIds) {
+      const remainingBudget =
+        maxBackfillMatchIds !== undefined
+          ? Math.max(0, maxBackfillMatchIds - orderedNewIds.length)
+          : undefined;
+      if (remainingBudget === 0) {
+        break;
+      }
+
       const ids = await this.fetchQueueMatchIdsUntilKnown(
         puuid,
         queueId,
         lastKnownMatchId,
+        remainingBudget,
       );
 
       if (!latestMatchId && ids.length > 0) {
@@ -149,7 +265,20 @@ export class TasksService {
         if (!seen.has(id)) {
           seen.add(id);
           orderedNewIds.push(id);
+          if (
+            maxBackfillMatchIds !== undefined &&
+            orderedNewIds.length >= maxBackfillMatchIds
+          ) {
+            break;
+          }
         }
+      }
+
+      if (
+        maxBackfillMatchIds !== undefined &&
+        orderedNewIds.length >= maxBackfillMatchIds
+      ) {
+        break;
       }
     }
 
@@ -171,25 +300,80 @@ export class TasksService {
       Date.now() - config.staleHours * 60 * 60 * 1000,
     );
 
-    const where: any = {
+    const staleCondition: any = {
       OR: [
         { [config.fetchedAtField]: null },
         { [config.fetchedAtField]: { lt: staleBefore } },
       ],
     };
 
+    const baseWhere: any = { ...staleCondition };
     if (!config.includeNexusUsers) {
-      where.isNexusUser = false;
+      baseWhere.isNexusUser = false;
     }
 
-    const candidates = await this.prisma.knownPuuid.findMany({
-      where,
-      orderBy: [
-        { priority: "desc" },
-        { [config.fetchedAtField]: "asc" },
-      ] as any,
-      take: config.limit,
-    });
+    let candidates: Array<{
+      puuid: string;
+      isNexusUser: boolean;
+      priority: number;
+      [key: string]: any;
+    }> = [];
+
+    if (config.name === "ranked") {
+      const seededStaleBefore = new Date(
+        Date.now() - this.rankedSeededStaleHours * 60 * 60 * 1000,
+      );
+
+      const nonSeededCandidates = await this.prisma.knownPuuid.findMany({
+        where: {
+          ...baseWhere,
+          NOT: {
+            isNexusUser: false,
+            priority: this.seededHighTierPriority,
+          },
+        },
+        orderBy: [
+          { priority: "desc" },
+          { [config.fetchedAtField]: "asc" },
+        ] as any,
+        take: config.limit,
+      });
+
+      const seededCandidates = await this.prisma.knownPuuid.findMany({
+        where: {
+          isNexusUser: false,
+          priority: this.seededHighTierPriority,
+          OR: [
+            { [config.fetchedAtField]: null },
+            { [config.fetchedAtField]: { lt: seededStaleBefore } },
+          ],
+        } as any,
+        orderBy: [
+          { priority: "desc" },
+          { [config.fetchedAtField]: "asc" },
+        ] as any,
+        take: this.rankedSeededSlotCap,
+      });
+
+      const selectedNonSeeded = nonSeededCandidates.slice(0, config.limit);
+      const remaining = Math.max(0, config.limit - selectedNonSeeded.length);
+      const seededTake = Math.min(remaining, this.rankedSeededSlotCap);
+      const selectedSeeded = seededCandidates.slice(0, seededTake);
+      candidates = [...selectedNonSeeded, ...selectedSeeded];
+
+      this.logger.log(
+        `Match fetch [${config.name}] slots: total=${candidates.length}, nexus=${candidates.filter((candidate) => candidate.isNexusUser).length}, seeded=${selectedSeeded.length}`,
+      );
+    } else {
+      candidates = await this.prisma.knownPuuid.findMany({
+        where: baseWhere,
+        orderBy: [
+          { priority: "desc" },
+          { [config.fetchedAtField]: "asc" },
+        ] as any,
+        take: config.limit,
+      });
+    }
 
     if (candidates.length === 0) {
       return;
@@ -202,10 +386,19 @@ export class TasksService {
     for (const candidate of candidates) {
       try {
         const lastKnownMatchId = candidate[config.lastMatchIdField];
+        const isRankedSeededCandidate =
+          config.name === "ranked" &&
+          !candidate.isNexusUser &&
+          candidate.priority === this.seededHighTierPriority;
+        const maxBackfillMatchIds =
+          isRankedSeededCandidate && !lastKnownMatchId
+            ? this.rankedSeededInitialBackfillLimit
+            : undefined;
         const result = await this.fetchMatchesForKnownPuuid(
           candidate.puuid,
           config.queueIds,
           lastKnownMatchId,
+          maxBackfillMatchIds,
         );
 
         const nextLastMatchId =
@@ -222,6 +415,11 @@ export class TasksService {
         this.logger.log(
           `Match fetch [${config.name}] ${candidate.puuid}: ${result.fetchedCount} new match(es)`,
         );
+        if (maxBackfillMatchIds !== undefined) {
+          this.logger.log(
+            `Match fetch [${config.name}] ${candidate.puuid}: initial seeded backfill capped at ${maxBackfillMatchIds}`,
+          );
+        }
       } catch (error) {
         this.logger.warn(
           `Match fetch [${config.name}] failed for ${candidate.puuid}: ${error}`,
@@ -261,6 +459,23 @@ export class TasksService {
 
     for (const config of targets) {
       await this.processMatchFetchGroup(config);
+    }
+  }
+
+  /**
+   * KR 챌린저 + 그마 PUUID 시딩 — 3일마다 새벽 5시 실행
+   */
+  @Cron("0 5 */3 * *")
+  async handleHighTierSeeding(): Promise<void> {
+    try {
+      const result = await this.runHighTierSeeding();
+      if (result.skipped) {
+        this.logger.warn(
+          `High-tier seeding skipped: ${result.reason ?? "lock not acquired"}`,
+        );
+      }
+    } catch (error) {
+      this.logger.error("High-tier seeding task failed", error);
     }
   }
 

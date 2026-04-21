@@ -1,7 +1,7 @@
 # 전적 페이지 크롤링/배치 처리 개선 계획
 
 > 진행 기준일: 2026-04-16
-> 완료: 24 / 전체: 24개 (Task 1~23 + Task 2-1)
+> 완료: 28 / 전체: 31개 (Task 1~23 + Task 2-1 + Task 24~27 완료)
 > 연계 문서: [Lab 대시보드 TODO](./TODO_lab_dashboard.md)
 
 ---
@@ -166,6 +166,7 @@ ALL     = RANKED + NORMAL + ARAM + CUSTOM  (전체 탭용)
   ```
   - **우선순위 정책**:
     - Nexus 등록 유저 PUUID → priority=10, isNexusUser=true
+    - 고티어 시딩 PUUID → priority=7, isNexusUser=false
     - 내전 유저와 같은 게임 플레이어 → priority=5
     - 일반 전파 → priority=0
   - **Nexus 등록 유저의 CUSTOM 수집 생략**: `isNexusUser=true`인 PUUID는 `customFetchedAt` 갱신 안 함. 내전 통계는 내부 `Match` 테이블에서 파생.
@@ -394,14 +395,19 @@ ALL     = RANKED + NORMAL + ARAM + CUSTOM  (전체 탭용)
   - `GET /admin/matches/queue-stats`:
     ```json
     {
-      "knownPuuids": { "total": 12453, "nexusUsers": 48 },
+      "knownPuuids": { "total": 12453, "nexusUsers": 48, "seeded": 950 },
       "fetchPending": {
-        "ranked": 342,  // rankedFetchedAt IS NULL or stale
+        "ranked": {
+          "total": 342,  // rankedFetchedAt IS NULL or stale
+          "nexus": 12,
+          "seeded": 340
+        },
         "normal": 891,
-        "aram": 1203
+        "aram": 1203,
+        "custom": 210
       },
       "riotMatchCacheSize": 98432,
-      "matchStatsCacheSize": { "ranked": 4821, "normal": 2341, "aram": 1023, "all": 4821 }
+      "matchStatsCacheSize": { "ranked": 4821, "normal": 2341, "aram": 1023, "custom": 211, "all": 4821 }
     }
     ```
   - `POST /admin/matches/trigger-fetch?queueGroup=ranked` — 배치 수동 실행
@@ -411,7 +417,7 @@ ALL     = RANKED + NORMAL + ARAM + CUSTOM  (전체 탭용)
 - [x] Task 15: `KnownPuuid` 크기 관리
   - 보관 정책:
     - priority ≥ 10 (내전 유저): 영구 보관
-    - priority 5~9: 180일 미활동 시 priority=0 강등
+    - priority 5~9 (내전 동반 + 시딩): 180일 미활동 시 priority=0 강등
     - priority 0~4: 365일 미활동 시 삭제
   - `@Cron('0 2 1 * *')` (매월 1일 새벽 2시) 정리 배치
 
@@ -591,35 +597,74 @@ ALL     = RANKED + NORMAL + ARAM + CUSTOM  (전체 탭용)
 
 ---
 
-## Phase 8: 지능형 랭커 시딩 및 데이터 최적화 [보류]
+## Phase 8: 지능형 랭커 시딩 및 데이터 최적화 [우선순위 재정의]
 
-> **주의**: 5,000명 이상의 고티어 유저를 일시에 수집할 경우 Riot API 할당량 및 DB I/O 부하가 예상됨. 시스템 안정성을 위해 [보류] 처리하며, 서비스 안정기에 단계적 도입 검토.
+> 기준일: 2026-04-20
+> 운영 리스크(할당량/DB 부하) 대비 효과를 기준으로 [즉시 착수], [조건부], [장기 검토]로 분류한다.
 
-- [ ] **Task 24: `LeagueScanTask` — 최상위 메타 리더 리스트 정기 수집 [보류]**
-  - **주기**: 매주 1회 (챌린저/그마/마스터 KR 전체)
-  - **로직**: `league-v4` API 응답의 `puuid`를 추출하여 `KnownPuuid`에 **Priority 5**로 Upsert
-  - **최적화**: 기존 P10(Nexus 유저) 정보 보호를 위해 `priority = GREATEST(priority, 5)` 적용
+### [즉시 착수] 안정성 방어 (선행 필수)
 
-- [ ] **Task 25: `AdminSeedingAPI` — 수동 시딩 트리거 [보류]**
-  - 특정 시점에 랭커 리스트를 즉시 갱신하고 시딩하기 위한 관리자 전용 엔드포인트
-  - `POST /admin/matches/seed-high-tiers`
+- [x] **Task 26: `MatchFetchTask` 가중치 및 슬롯 제한 (과부하 방지)**
+  - 전체 수집 슬롯(50명) 중 시딩 유저(P7) 비중을 **30%(15명) 이내**로 제한
+  - Nexus 유저(P10)는 기존 처리 속도 유지, 시딩 유저는 느린 차선 적용
+  - 고티어 시딩 유저의 `rankedFetchedAt` 신선도 목표는 **3일 이내**로 설정 (`< now - 72h` 우선 재수집)
+  - 완료 기준:
+    - `ranked` 대상 선정 시 P7 상한(15)과 비시딩 슬롯(35)이 코드 레벨에서 보장됨
+    - 로그에 `seededCount`, `nexusCount`가 분리 출력됨
 
-- [ ] **Task 26: `MatchFetchTask` 가중치 및 슬롯 제한 (과부하 방지) [보류]**
-  - 전체 배치 수집 슬롯(50명) 중 시딩 유저(P5) 비중을 **30%(15명) 이내**로 제한
-  - Nexus 유저(P10)의 수집 속도를 보장하면서, 랭커 데이터는 '느린 차선'으로 점진적 수집
+- [x] **Task 27: 시딩 유저 최초 소급 범위 제한**
+  - `rankedLastMatchId`가 없는 신규 시딩 유저는 최초 수집 범위를 **최근 100판(약 5페이지)** 으로 제한
+  - 기존 Nexus 유저/기존 수집 유저는 기존 증분 수집 규칙 유지
+  - 완료 기준:
+    - 신규 시딩 유저 최초 수집에서 누적 신규 `matchId` 수가 100을 넘기면 다음 배치로 이월됨
+    - 결과적으로 Riot match-v5 호출은 queue당 1페이지 수준에서 종료됨
+    - `rankedLastMatchId` 저장 및 다음 배치 증분 연동이 정상 동작
 
-- [ ] **Task 27: 시딩 유저 최초 소급 범위 제한 [보류]**
-  - `rankedLastMatchId`가 없는 신규 시딩 유저의 최초 수집 범위를 **최근 100판**으로 제한
-  - 시즌 전체 통계 확보와 API 할당량 방어 사이의 균형 (100판 = 약 5페이지)
+### [조건부] 운영 도구 (26/27 완료 후)
 
-- [ ] **Task 28: 벌크 인서트(Bulk Insert) 최적화 [보류]**
-  - 수집된 매치 데이터를 `RiotMatchCache`에 저장할 때 `createMany(skipDuplicates)` 활용
-  - DB 트랜잭션 횟수를 줄여 I/O 부하 최소화 및 CPU 자원 절약
+- [x] **Task 24: `LeagueScanTask` — 최상위 메타 리더 리스트 정기 수집**
+  - 주기: **3일마다 1회** (KR 챌린저 + 그마)
+  - `league-v4`의 `puuid`를 `KnownPuuid`로 upsert하며, `priority = GREATEST(priority, 7)` 적용
+  - 목표: 고티어 표본 변동을 주 단위가 아닌 72시간 단위로 반영
+  - 완료 기준:
+    - 시딩 실행 시 P10/Nexus 유저 priority가 절대 하락하지 않음
+    - 1회 실행당 추가/갱신 건수 및 실패 건수 로그 제공
 
-- [ ] **Task 29: 패치 인식형 수집 중단 전략 [보류]**
-  - 시딩 유저 수집 시 현재 패치 버전과 다른 매치 발견 시 즉시 해당 유저 수집 중단 로직 검토
-  - 오직 '현재 메타' 분석에 필요한 최신 데이터에만 리소스 집중
+- [ ] **Task 24-1: 시딩 데이터 활용 경로 확정 (Phase 8 범위 고정)**
+  - Phase 8 범위는 **(1) 장인 시스템 보강 전제 데이터 확보**까지만 포함
+  - 즉시 적용:
+    - D2+ 고티어에서 특정 챔피언을 많이 플레이하는 PUUID 후보를 KnownPuuid + RiotMatchCache로 조회 가능하도록 유지
+  - Phase 8 제외 (Lab TODO 분리):
+    - (2) 랭크 메타 챔피언 스냅샷 신규 테이블/배치/UI
+    - (3) Lab PSS 티어 베이스라인 보정 로직
+
+- [x] **Task 25: `AdminSeedingAPI` — 수동 시딩 트리거**
+  - 엔드포인트: `POST /admin/matches/seed-high-tiers`
+  - 운영자가 점검 후 특정 시점 즉시 시딩 가능하도록 제공
+  - 완료 기준:
+    - 관리자 권한 검증 + 호출 rate limit 적용
+    - 실행 결과(추가/갱신/실패) 응답 반환
+
+### [장기 검토] 아키텍처 영향 큼
+
+- [ ] **Task 30: 고티어 시딩 단축 주기 확장 (12~24시간)**
+  - 현재 목표(3일) 대비 더 짧은 주기(12~24h)로 확장하는 옵션
+  - 전제: Riot API quota/서버 부하 모니터링에서 2주 이상 안정성 확인
+  - 재검토 조건:
+    - 429 비율, 배치 실행 시간, DB write latency가 허용 범위 내일 것
+
+- [ ] **Task 28: 벌크 인서트(Bulk Insert) 최적화**
+  - 단순 `createMany(skipDuplicates)` 치환은 보류
+  - 이유: 현재 `getMatchById`의 후속 처리(`KnownPuuid` 전파, `StatsRecomputeQueue` enqueue)와 결합되어 있어 부작용 위험이 큼
+  - 재검토 조건:
+    - 매치 저장과 후처리를 분리한 ingestion pipeline 설계가 먼저 완료될 것
+
+- [ ] **Task 29: 패치 인식형 수집 중단 전략**
+  - 목적이 "현재 메타 분석"에 한정될 때만 적용 검토
+  - 개인 전적 완결성(히스토리/통계)이 요구되는 기본 파이프라인에는 기본 적용하지 않음
+  - 재검토 조건:
+    - 메타 분석 전용 시딩 경로(분리 queueGroup 또는 별도 task) 설계 완료
 
 ---
 
-**Last Updated**: 2026-04-17
+**Last Updated**: 2026-04-21

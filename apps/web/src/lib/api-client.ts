@@ -1293,6 +1293,22 @@ export const adminApi = {
     const response = await apiClient.get("/admin/stats");
     return response.data;
   },
+  getMatchQueueStats: async () => {
+    const response = await apiClient.get("/admin/matches/queue-stats");
+    return response.data;
+  },
+  triggerMatchFetch: async (queueGroup?: "ranked" | "normal" | "aram" | "custom") => {
+    const response = await apiClient.post("/admin/matches/trigger-fetch", undefined, {
+      params: queueGroup ? { queueGroup } : undefined,
+    });
+    return response.data;
+  },
+  recomputeMatchStats: async (params: { userId?: string; puuid?: string }) => {
+    const response = await apiClient.post("/admin/matches/recompute-stats", undefined, {
+      params,
+    });
+    return response.data;
+  },
   // Users
   getUsers: async (params?: { page?: number; limit?: number; search?: string }) => {
     const response = await apiClient.get("/admin/users", { params });
@@ -1375,6 +1391,10 @@ export const adminApi = {
   addBotToRoom: async (roomId: string, count = 1) => {
     const response = await apiClient.post(`/admin/rooms/${roomId}/add-bot`, { count });
     return response.data as { addedCount: number; participants: any[] };
+  },
+  seedHighTiers: async () => {
+    const response = await apiClient.post("/admin/matches/seed-high-tiers");
+    return response.data;
   },
 };
 

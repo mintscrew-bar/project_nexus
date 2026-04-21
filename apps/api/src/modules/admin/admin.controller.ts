@@ -78,6 +78,27 @@ export class AdminController {
     };
   }
 
+  @Post("matches/seed-high-tiers")
+  @Roles(UserRole.ADMIN)
+  @Throttle({ default: { limit: 5, ttl: 600000 } }) // 10분당 5회
+  async seedHighTiers() {
+    const result = await this.tasksService.runHighTierSeeding();
+    return {
+      ok: result.ok,
+      skipped: result.skipped,
+      reason: result.reason,
+      summary: {
+        challengerCount: result.challengerCount,
+        grandmasterCount: result.grandmasterCount,
+        targetCount: result.targetCount,
+        insertedCount: result.insertedCount,
+        updatedCount: result.updatedCount,
+        failedCount: result.failedCount,
+        missingPuuidCount: result.missingPuuidCount,
+      },
+    };
+  }
+
   // ── Users (ADMIN only) ──────────────────────────────────────────────────────
   @Get("users")
   @Roles(UserRole.ADMIN)

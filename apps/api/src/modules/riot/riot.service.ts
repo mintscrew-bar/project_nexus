@@ -66,6 +66,22 @@ export interface RegisterRiotAccountDto {
   };
 }
 
+type RiotLeagueEntryDto = {
+  puuid?: string;
+  summonerId: string;
+};
+
+type RiotLeagueListDto = {
+  entries: RiotLeagueEntryDto[];
+};
+
+export type HighTierSoloQueuePuuidResult = {
+  puuids: string[];
+  challengerCount: number;
+  grandmasterCount: number;
+  missingPuuidCount: number;
+};
+
 @Injectable()
 export class RiotService {
   private readonly logger = new Logger(RiotService.name);
@@ -304,6 +320,37 @@ export class RiotService {
       lp: soloQueue.leaguePoints,
       wins: soloQueue.wins,
       losses: soloQueue.losses,
+    };
+  }
+
+  async getHighTierSoloQueuePuuids(): Promise<HighTierSoloQueuePuuidResult> {
+    const queue = "RANKED_SOLO_5x5";
+    const [challenger, grandmaster] = await Promise.all([
+      this.request<RiotLeagueListDto>(
+        `${this.baseUrl}/lol/league/v4/challengerleagues/by-queue/${queue}`,
+      ),
+      this.request<RiotLeagueListDto>(
+        `${this.baseUrl}/lol/league/v4/grandmasterleagues/by-queue/${queue}`,
+      ),
+    ]);
+
+    const entries = [...challenger.entries, ...grandmaster.entries];
+    const puuids = entries
+      .map((entry) => entry.puuid)
+      .filter((puuid): puuid is string => Boolean(puuid));
+    const missingPuuidCount = entries.length - puuids.length;
+
+    if (missingPuuidCount > 0) {
+      this.logger.warn(
+        `High-tier league entries without puuid: ${missingPuuidCount}`,
+      );
+    }
+
+    return {
+      puuids,
+      challengerCount: challenger.entries.length,
+      grandmasterCount: grandmaster.entries.length,
+      missingPuuidCount,
     };
   }
 
