@@ -24,6 +24,7 @@ describe("AuctionService", () => {
         update: jest.fn(),
       },
       teamMember: {
+        count: jest.fn(),
         create: jest.fn(),
       },
       roomParticipant: {
@@ -72,6 +73,7 @@ describe("AuctionService", () => {
         currentHighestBid: 0,
         currentHighestBidder: null,
         timerEnd: Date.now() + 10000,
+        bidIncrement: 100,
       });
 
       prisma.room.findUnique.mockResolvedValue(null);
@@ -88,6 +90,7 @@ describe("AuctionService", () => {
         currentHighestBid: 0,
         currentHighestBidder: null,
         timerEnd: Date.now() + 10000,
+        bidIncrement: 100,
       });
 
       prisma.room.findUnique.mockResolvedValue({
@@ -108,6 +111,7 @@ describe("AuctionService", () => {
         currentHighestBid: 500,
         currentHighestBidder: "other-team",
         timerEnd: Date.now() + 10000,
+        bidIncrement: 100,
       });
 
       prisma.room.findUnique.mockResolvedValue({
@@ -135,6 +139,7 @@ describe("AuctionService", () => {
         timerEnd: Date.now() + 10000,
         yuchalCount: 0,
         maxYuchalCycles: 1,
+        bidIncrement: 100,
         botCaptainIds: [],
       };
       (service as any).auctionStates.set(roomId, state);
@@ -159,6 +164,7 @@ describe("AuctionService", () => {
       });
       // 트랜잭션 내 예산 재확인 쿼리 목
       prisma.team.findUnique.mockResolvedValue({ remainingBudget: 1000 });
+      prisma.teamMember.count.mockResolvedValue(0);
 
       const bidAmount = 600;
       const result = await service.placeBid(userId, roomId, bidAmount);
@@ -182,6 +188,7 @@ describe("AuctionService", () => {
         timerEnd: Date.now() + 10000,
         yuchalCount: 0,
         maxYuchalCycles: 2,
+        bidIncrement: 100,
       });
     });
 
@@ -219,6 +226,7 @@ describe("AuctionService", () => {
         timerEnd: Date.now() + 10000,
         yuchalCount: 0,
         maxYuchalCycles: 2,
+        bidIncrement: 100,
       });
 
       prisma.room.findUnique.mockResolvedValue({

@@ -40,6 +40,7 @@ interface AuctionState {
   status: "WAITING" | "IN_PROGRESS" | "COMPLETED";
   yuchalCount: number;
   maxYuchalCycles: number;
+  bidIncrement?: number;
 }
 
 interface BidHistoryEntry {
@@ -109,12 +110,15 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
     Boolean(currentTeam) && auctionState.status === "IN_PROGRESS";
   const isAlreadyHighestBidder =
     !!auctionState.currentHighestBidder &&
-    auctionState.currentHighestBidder === currentUserId;
+    (auctionState.currentHighestBidder === currentUserId ||
+      auctionState.currentHighestBidder === currentTeam?.id);
   const myBudget = getTeamBudget(currentTeam);
-  // 서버와 동일한 예비금 계산: 남은 슬롯 × 100G를 예비금으로 확보
+  const bidIncrement = auctionState.bidIncrement ?? 50;
+  const bidSteps = [bidIncrement, bidIncrement * 2, bidIncrement * 5];
+  // 서버와 동일한 예비금 계산: 남은 빈자리당 최소 입찰 단위를 확보
   const memberCount = currentTeam?.members?.length ?? 0;
   const slotsNeeded = Math.max(0, 5 - memberCount);
-  const reserveAmount = Math.max(0, (slotsNeeded - 1) * 100);
+  const reserveAmount = Math.max(0, (slotsNeeded - 1) * bidIncrement);
   const availableBudget = Math.max(0, myBudget - reserveAmount);
   const totalBid = auctionState.currentHighestBid + accumulatedBid;
   const canPlaceBid = accumulatedBid > 0 && totalBid <= availableBudget && !isBidding;
@@ -511,7 +515,7 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
             )}
 
             <div className="grid grid-cols-3 gap-2 mb-4">
-              {[50, 100, 500].map((inc) => (
+              {bidSteps.map((inc) => (
                 <Button
                   key={inc}
                   variant="secondary"

@@ -17,6 +17,7 @@ const BONUS_GOLD = 500;
 const DEFAULT_BID_TIME_SECONDS = 10;
 const BID_EXTENSION_SECONDS = 5;
 const MAX_BID_TIME_SECONDS = 10;
+const DEFAULT_BID_INCREMENT = 50;
 
 export interface AuctionState {
   roomId: string;
@@ -27,6 +28,7 @@ export interface AuctionState {
   timerEnd: number;
   yuchalCount: number;
   maxYuchalCycles: number;
+  bidIncrement: number;
   botCaptainIds: string[]; // testbot_* ?좎? ???紐⑸줉 (?먮룞 ?낆같??
 }
 
@@ -392,6 +394,7 @@ export class AuctionService implements OnModuleInit {
       timerEnd: Date.now() + this.getBaseBidTimerMs(),
       yuchalCount: 0,
       maxYuchalCycles: numTeams,
+      bidIncrement: room.minBidIncrement || DEFAULT_BID_INCREMENT,
       botCaptainIds,
     };
 
@@ -647,6 +650,7 @@ export class AuctionService implements OnModuleInit {
       timerEnd: Date.now() + this.getBaseBidTimerMs(),
       yuchalCount: 0,
       maxYuchalCycles: numTeamsFinal,
+      bidIncrement: room.minBidIncrement || DEFAULT_BID_INCREMENT,
       botCaptainIds,
     };
 
@@ -723,6 +727,7 @@ export class AuctionService implements OnModuleInit {
       timerEnd: Date.now() + this.getBaseBidTimerMs(),
       yuchalCount: 0,
       maxYuchalCycles: numTeams,
+      bidIncrement: room.minBidIncrement || DEFAULT_BID_INCREMENT,
       botCaptainIds,
     };
 
@@ -786,7 +791,10 @@ export class AuctionService implements OnModuleInit {
     const room = await this.prisma.room.findUnique({ where: { id: roomId } });
     if (!room) throw new NotFoundException("Room not found");
 
-    const bidIncrement = room.minBidIncrement || 50;
+    const bidIncrement = room.minBidIncrement || DEFAULT_BID_INCREMENT;
+    if (!state.bidIncrement) {
+      state.bidIncrement = bidIncrement;
+    }
 
     // Get team
     const team = await this.prisma.team.findFirst({
@@ -828,7 +836,7 @@ export class AuctionService implements OnModuleInit {
 
     // Keep reserve budget for remaining roster slots (simulation parity).
     const slotsNeeded = Math.max(0, 5 - team._count.members);
-    const reserveAmount = Math.max(0, (slotsNeeded - 1) * 100);
+    const reserveAmount = Math.max(0, (slotsNeeded - 1) * bidIncrement);
     const availableToBid = Math.max(0, team.remainingBudget - reserveAmount);
     if (amount > availableToBid) {
       throw new BadRequestException(
@@ -882,8 +890,11 @@ export class AuctionService implements OnModuleInit {
         if (!freshTeam)
           throw new BadRequestException("팀 정보를 찾을 수 없습니다.");
 
-        const freshSlots = Math.max(0, 5 - team._count.members);
-        const freshReserve = Math.max(0, (freshSlots - 1) * 100);
+        const freshMemberCount = await tx.teamMember.count({
+          where: { teamId: team.id },
+        });
+        const freshSlots = Math.max(0, 5 - freshMemberCount);
+        const freshReserve = Math.max(0, (freshSlots - 1) * bidIncrement);
         const freshAvailable = Math.max(
           0,
           freshTeam.remainingBudget - freshReserve,
@@ -1027,7 +1038,7 @@ export class AuctionService implements OnModuleInit {
       // Yuchal (no sale)
       const prevYuchalCount = state.yuchalCount;
       const nextYuchalCount = prevYuchalCount + 1;
-      const bidIncrement = room.minBidIncrement || 50;
+      const bidIncrement = room.minBidIncrement || DEFAULT_BID_INCREMENT;
       const maxTeamSize = 5;
       const incompleteTeams = room.teams.filter(
         (t: any) => t._count.members < maxTeamSize,
@@ -1377,6 +1388,12 @@ export class AuctionService implements OnModuleInit {
     const state = this.auctionStates.get(roomId);
     if (!state || state.botCaptainIds.length === 0) return [];
 
+    const room = await this.prisma.room.findUnique({
+      where: { id: roomId },
+      select: { minBidIncrement: true },
+    });
+    const bidIncrement = room?.minBidIncrement || DEFAULT_BID_INCREMENT;
+
     const teams = await this.prisma.team.findMany({
       where: { roomId, captainId: { in: state.botCaptainIds } },
       include: {
@@ -1392,7 +1409,7 @@ export class AuctionService implements OnModuleInit {
     return teams.map((t: any) => {
       const memberCount = t._count.members;
       const slotsNeeded = Math.max(0, 5 - memberCount);
-      const reserveAmount = Math.max(0, (slotsNeeded - 1) * 100);
+      const reserveAmount = Math.max(0, (slotsNeeded - 1) * bidIncrement);
       const availableToBid = Math.max(0, t.remainingBudget - reserveAmount);
       return {
         captainId: t.captainId,

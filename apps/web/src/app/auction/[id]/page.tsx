@@ -626,9 +626,11 @@ function MobileBidPanel({
   const [accBid, setAccBid] = useState(0);
   const [isBidding, setIsBidding] = useState(false);
 
+  const bidIncrement = auctionState.bidIncrement ?? 50;
+  const bidSteps = [bidIncrement, bidIncrement * 2, bidIncrement * 5];
   const memberCount = myTeam.members?.length ?? 0;
   const slotsNeeded = Math.max(0, 5 - memberCount);
-  const reserveAmount = Math.max(0, (slotsNeeded - 1) * 100);
+  const reserveAmount = Math.max(0, (slotsNeeded - 1) * bidIncrement);
   const budget = (myTeam.remainingGold ?? myTeam.remainingBudget ?? 0);
   const availableBudget = Math.max(0, budget - reserveAmount);
   const totalBid = auctionState.currentHighestBid + accBid;
@@ -683,7 +685,7 @@ function MobileBidPanel({
         <>
           {/* 2줄: 증액 버튼 + 초기화 + 입찰 */}
           <div className="flex items-center gap-2">
-            {[50, 100, 500].map((inc) => (
+            {bidSteps.map((inc) => (
               <Button
                 key={inc}
                 variant="secondary"

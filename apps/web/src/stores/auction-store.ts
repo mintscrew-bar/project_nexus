@@ -35,6 +35,7 @@ interface AuctionState {
   timerEnd: number;
   yuchalCount: number;
   maxYuchalCycles: number;
+  bidIncrement: number;
   status: 'WAITING' | 'IN_PROGRESS' | 'COMPLETED';
 }
 
@@ -125,6 +126,7 @@ function normalizeAuctionState(rawState: any, players: Player[]): AuctionState |
     timerEnd: typeof rawState.timerEnd === 'number' ? rawState.timerEnd : Date.now(),
     yuchalCount: typeof rawState.yuchalCount === 'number' ? rawState.yuchalCount : 0,
     maxYuchalCycles: typeof rawState.maxYuchalCycles === 'number' ? rawState.maxYuchalCycles : 0,
+    bidIncrement: typeof rawState.bidIncrement === 'number' ? rawState.bidIncrement : 50,
     status: rawState.status ?? 'IN_PROGRESS',
   };
 }

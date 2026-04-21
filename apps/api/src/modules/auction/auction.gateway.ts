@@ -59,6 +59,7 @@ export class AuctionGateway
   private bidLocks = new Map<string, Promise<void>>();
   // Redis 분산 락 TTL: 입찰 처리는 통상 100ms 이내이므로 5초면 충분
   private readonly BID_LOCK_TTL_MS = 5000;
+  private readonly BID_LOCK_RETRY_DELAY_MS = 50;
 
   constructor(
     private readonly authService: AuthService,
@@ -427,39 +428,19 @@ export class AuctionGateway
       return { error: "현재 낙찰 처리 중입니다. 잠시 후 다시 시도해주세요." };
     }
 
-    // 방별 분산 락: Redis가 사용 가능하면 분산 락, 불가능하면 in-memory 폴백
-    const lockKey = `bid:lock:${data.roomId}`;
-    let redisLockToken: string | null = null;
-    let inMemoryRelease: (() => void) | null = null;
-
     try {
-      if (this.redisService) {
-        // Redis 분산 락 획득 시도 (다중 서버 인스턴스 안전)
-        redisLockToken = await this.redisService.acquireLock(
-          lockKey,
-          this.BID_LOCK_TTL_MS,
-        );
-        if (!redisLockToken) {
-          // 다른 서버에서 락을 보유 중 — 재시도하지 않고 즉시 거부
-          return { error: "입찰 처리 중입니다. 잠시 후 다시 시도해주세요." };
+      const state = await this._withRoomBidLock(data.roomId, async () => {
+        if (this.resolvingRooms.has(data.roomId)) {
+          throw new Error(
+            "현재 낙찰 처리 중입니다. 잠시 후 다시 시도해주세요.",
+          );
         }
-      } else {
-        // Redis 불가 시 in-memory Promise 체인 폴백
-        const prevLock = this.bidLocks.get(data.roomId) ?? Promise.resolve();
-        let releaseLock!: () => void;
-        const lockPromise = new Promise<void>((resolve) => {
-          releaseLock = resolve;
-        });
-        this.bidLocks.set(data.roomId, lockPromise);
-        inMemoryRelease = releaseLock;
-        await prevLock;
-      }
-
-      const state = await this.auctionService.placeBid(
-        client.userId,
-        data.roomId,
-        data.amount,
-      );
+        return this.auctionService.placeBid(
+          client.userId!,
+          data.roomId,
+          data.amount,
+        );
+      });
 
       // Broadcast to all clients in the room
       this.server.to(`room:${data.roomId}`).emit("bid-placed", {
@@ -475,13 +456,6 @@ export class AuctionGateway
       return { success: true, state };
     } catch (error: any) {
       return { error: error.message };
-    } finally {
-      // 락 해제 (Redis 또는 in-memory)
-      if (redisLockToken) {
-        await this.redisService!.releaseLock(lockKey, redisLockToken);
-      } else if (inMemoryRelease) {
-        inMemoryRelease();
-      }
     }
   }
 
@@ -504,7 +478,9 @@ export class AuctionGateway
     }
 
     try {
-      const result = await this._resolveCurrentBidAndAdvance(data.roomId);
+      const result = await this._resolveCurrentBidAndAdvance(data.roomId, {
+        force: true,
+      });
       if (result === null) {
         // 이미 다른 resolve가 진행 중 (타이머 만료와 수동 resolve 동시 호출)
         return { success: true, alreadyResolved: true };
@@ -696,22 +672,13 @@ export class AuctionGateway
     // resolve 진행 중이면 봇 입찰도 차단
     if (this.resolvingRooms.has(roomId)) return;
 
-    // 방별 mutex — handleBid와 동일한 lock 사용
-    const prevLock = this.bidLocks.get(roomId) ?? Promise.resolve();
-    let releaseLock: () => void;
-    const lockPromise = new Promise<void>((resolve) => {
-      releaseLock = resolve;
-    });
-    this.bidLocks.set(roomId, lockPromise);
-
     try {
-      await prevLock;
-
-      const newState = await this.auctionService.placeBid(
-        botCaptainId,
-        roomId,
-        minBid,
-      );
+      const newState = await this._withRoomBidLock(roomId, async () => {
+        if (this.resolvingRooms.has(roomId)) {
+          throw new Error("Resolving bid");
+        }
+        return this.auctionService.placeBid(botCaptainId, roomId, minBid);
+      });
 
       this.server.to(`room:${roomId}`).emit("bid-placed", {
         userId: botCaptainId,
@@ -724,11 +691,6 @@ export class AuctionGateway
       this._scheduleBidResolve(roomId, newState.timerEnd);
     } catch {
       // Ignore races such as timer expiry or stale state.
-    } finally {
-      releaseLock!();
-      if (this.bidLocks.get(roomId) === lockPromise) {
-        this.bidLocks.delete(roomId);
-      }
     }
   }
 
@@ -800,76 +762,144 @@ export class AuctionGateway
     await this._resolveCurrentBidAndAdvance(roomId);
   }
 
-  private async _resolveCurrentBidAndAdvance(roomId: string): Promise<any> {
+  private async _resolveCurrentBidAndAdvance(
+    roomId: string,
+    options: { force?: boolean } = {},
+  ): Promise<any> {
     // Prevent concurrent resolve calls (timer expiry + client resolve-bid race)
     if (this.resolvingRooms.has(roomId)) {
       return null;
     }
     this.resolvingRooms.add(roomId);
-
     try {
-      this._cancelBidResolve(roomId);
+      return await this._withRoomBidLock(
+        roomId,
+        async () => {
+          const latestState = this.auctionService.getAuctionState(roomId);
+          if (latestState && !options.force) {
+            const remainingMs = latestState.timerEnd - Date.now();
+            if (remainingMs > 50) {
+              this._scheduleBidResolve(roomId, latestState.timerEnd);
+              return null;
+            }
+          }
 
-      const result = await this.auctionService.resolveCurrentBid(roomId);
-      const state = this.auctionService.getAuctionState(roomId) ?? null;
-      const { teams, players } =
-        await this.auctionService.getFullAuctionData(roomId);
-      const payload = { ...result, state, teams, players };
+          this._cancelBidResolve(roomId);
 
-      this.server.to(`room:${roomId}`).emit("bid-resolved", payload);
+          const result = await this.auctionService.resolveCurrentBid(roomId);
+          const state = this.auctionService.getAuctionState(roomId) ?? null;
+          const { teams, players } =
+            await this.auctionService.getFullAuctionData(roomId);
+          const payload = { ...result, state, teams, players };
 
-      if (result.sold && result.player && result.team) {
-        this.emitPlayerSold(roomId, {
-          player: result.player,
-          team: result.team,
-          price: result.price ?? 0,
-        });
-      } else if (!result.sold && result.player) {
-        this.emitPlayerUnsold(roomId, { player: result.player });
-      }
+          this.server.to(`room:${roomId}`).emit("bid-resolved", payload);
 
-      const isComplete = await this.auctionService.checkAuctionComplete(roomId);
+          if (result.sold && result.player && result.team) {
+            this.emitPlayerSold(roomId, {
+              player: result.player,
+              team: result.team,
+              price: result.price ?? 0,
+            });
+          } else if (!result.sold && result.player) {
+            this.emitPlayerUnsold(roomId, { player: result.player });
+          }
 
-      if (isComplete) {
-        this._cancelBotTimers(roomId);
-        this._cancelBidResolve(roomId);
+          const isComplete =
+            await this.auctionService.checkAuctionComplete(roomId);
 
-        try {
-          await this.auctionService.completeAuction(roomId);
-        } catch (error) {
-          console.error(
-            `[Auction] Failed to complete auction for room ${roomId}:`,
-            error,
-          );
-          this.server.to(`room:${roomId}`).emit("auction-error", {
-            error: "경매 완료 처리 중 오류가 발생했습니다.",
-          });
+          if (isComplete) {
+            this._cancelBotTimers(roomId);
+            this._cancelBidResolve(roomId);
+
+            try {
+              await this.auctionService.completeAuction(roomId);
+            } catch (error) {
+              console.error(
+                `[Auction] Failed to complete auction for room ${roomId}:`,
+                error,
+              );
+              this.server.to(`room:${roomId}`).emit("auction-error", {
+                error: "경매 완료 처리 중 오류가 발생했습니다.",
+              });
+              return payload;
+            }
+
+            const finalData =
+              await this.auctionService.getFullAuctionData(roomId);
+            this.server.to(`room:${roomId}`).emit("auction-complete", {
+              teams: finalData.teams,
+            });
+
+            await this._startRoleSelectionWithRetry(roomId);
+
+            return payload;
+          }
+
+          if (state) {
+            this._scheduleBidResolve(roomId, state.timerEnd);
+            this._scheduleBotBids(roomId).catch((e) => {
+              console.warn(
+                `[Auction] _scheduleBotBids failed for room ${roomId}:`,
+                e?.message,
+              );
+            });
+          }
+
           return payload;
-        }
-
-        const finalData = await this.auctionService.getFullAuctionData(roomId);
-        this.server.to(`room:${roomId}`).emit("auction-complete", {
-          teams: finalData.teams,
-        });
-
-        await this._startRoleSelectionWithRetry(roomId);
-
-        return payload;
-      }
-
-      if (state) {
-        this._scheduleBidResolve(roomId, state.timerEnd);
-        this._scheduleBotBids(roomId).catch((e) => {
-          console.warn(
-            `[Auction] _scheduleBotBids failed for room ${roomId}:`,
-            e?.message,
-          );
-        });
-      }
-
-      return payload;
+        },
+        { wait: true },
+      );
     } finally {
       this.resolvingRooms.delete(roomId);
+    }
+  }
+
+  private async _withRoomBidLock<T>(
+    roomId: string,
+    work: () => Promise<T>,
+    options: { wait?: boolean } = {},
+  ): Promise<T> {
+    const lockKey = `bid:lock:${roomId}`;
+    let redisLockToken: string | null = null;
+    let inMemoryRelease: (() => void) | null = null;
+    let lockPromise: Promise<void> | null = null;
+
+    try {
+      if (this.redisService) {
+        for (;;) {
+          redisLockToken = await this.redisService.acquireLock(
+            lockKey,
+            this.BID_LOCK_TTL_MS,
+          );
+          if (redisLockToken) break;
+          if (!options.wait) {
+            throw new Error("입찰 처리 중입니다. 잠시 후 다시 시도해주세요.");
+          }
+          await new Promise((resolve) =>
+            setTimeout(resolve, this.BID_LOCK_RETRY_DELAY_MS),
+          );
+        }
+      } else {
+        const prevLock = this.bidLocks.get(roomId) ?? Promise.resolve();
+        let releaseLock!: () => void;
+        lockPromise = new Promise<void>((resolve) => {
+          releaseLock = resolve;
+        });
+        this.bidLocks.set(roomId, lockPromise);
+        inMemoryRelease = releaseLock;
+        await prevLock;
+      }
+
+      return await work();
+    } finally {
+      if (redisLockToken) {
+        await this.redisService!.releaseLock(lockKey, redisLockToken);
+      } else if (inMemoryRelease) {
+        inMemoryRelease();
+        if (this.bidLocks.get(roomId) === lockPromise) {
+          this.bidLocks.delete(roomId);
+        }
+      }
     }
   }
 }
