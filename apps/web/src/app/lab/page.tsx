@@ -3,11 +3,13 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { getChampionKoreanName } from "@nexus/types";
 import { useAuthStore } from "@/stores/auth-store";
+import { LabPeriod, LabTabKey, useLabStore } from "@/stores/lab-store";
 import { riotApi, statsApi } from "@/lib/api-client";
 import { getChampionIconById, getItemIcon } from "@/components/matches/match-utils";
+import { RuneTooltip } from "@/components/RuneTooltip";
 import {
   Badge,
   Card,
@@ -16,14 +18,18 @@ import {
   CardHeader,
   CardTitle,
   LoadingSpinner,
+  Modal,
 } from "@/components/ui";
 import {
   Activity,
   ArrowRight,
   Beaker,
   Brain,
+  Crown,
   ChevronRight,
   FlaskConical,
+  Medal,
+  Info,
   ShieldAlert,
   Swords,
   Target,
@@ -31,6 +37,19 @@ import {
   Trophy,
   Users,
 } from "lucide-react";
+
+const LAB_TABS: Array<{ key: LabTabKey; label: string }> = [
+  { key: "meta", label: "메타 레이더" },
+  { key: "champions", label: "챔피언 분석" },
+  { key: "compositions", label: "조합 분석" },
+  { key: "oracle", label: "오라클" },
+];
+
+const LAB_PERIODS: Array<{ key: LabPeriod; label: string }> = [
+  { key: "30d", label: "30일" },
+  { key: "90d", label: "90일" },
+  { key: "all", label: "전체" },
+];
 
 type LabOverview = {
   sample: {
@@ -78,6 +97,389 @@ type LabOverview = {
     avgKda: number;
     masteryScore: number;
   }>;
+  seededChampionLeaders: Array<{
+    puuid: string;
+    gameName: string | null;
+    tagLine: string | null;
+    championId: number;
+    championName: string;
+    championNameKorean: string;
+    games: number;
+    winRate: number;
+    avgKda: number;
+    lastGameAt: string;
+  }>;
+};
+
+type MetaRadarResponse = {
+  trending: Array<{
+    championId: number;
+    championName: string;
+    championNameKorean: string;
+    recentGames: number;
+    recentWinRate: number;
+    recentPickRate: number;
+    prevPickRate: number;
+    pickRateDelta: number;
+  }>;
+  tiers: Record<
+    string,
+    Array<{
+      championId: number;
+      games: number;
+      winRate: number;
+      pickRate: number;
+      tier: "S" | "A" | "B" | "C" | "D";
+      confidenceLevel: "low" | "moderate" | "high" | "insufficient";
+    }>
+  >;
+  sample: {
+    totalGames: number;
+    totalPlayers: number;
+    period: LabPeriod;
+  };
+};
+
+type PatchImpactResponse = {
+  currentPatch: string | null;
+  previousPatch: string | null;
+  buffed: Array<{
+    championId: number;
+    championNameKorean: string;
+    deltaWinRate: number;
+    currentWinRate: number;
+  }>;
+  nerfed: Array<{
+    championId: number;
+    championNameKorean: string;
+    deltaWinRate: number;
+    currentWinRate: number;
+  }>;
+  insufficient: boolean;
+};
+
+type BanRatesResponse = {
+  totalMatches: number;
+  banStats: Array<{
+    championId: number;
+    banRate: number;
+    banTeamWinRate: number;
+    confidenceLevel: "low" | "moderate" | "high" | "insufficient";
+  }>;
+};
+
+type ChampionListResponse = {
+  period: LabPeriod;
+  position: string | null;
+  includeLowSample: boolean;
+  source: "snapshot" | "realtime";
+  champions: Array<{
+    championId: number;
+    championName: string;
+    championNameKorean: string;
+    games: number;
+    wins: number;
+    losses: number;
+    winRate: number;
+    pickRate: number;
+    banRate: number;
+    wilsonLower: number;
+    confidenceLevel: "low" | "moderate" | "high" | "insufficient";
+  }>;
+};
+
+type SynergyResponse = {
+  period: LabPeriod;
+  championId: number | null;
+  source: "snapshot" | "realtime";
+  rows: Array<{
+    champ1Id: number;
+    champ2Id: number;
+    champ1NameKorean: string;
+    champ2NameKorean: string;
+    games: number;
+    wins: number;
+    winRate: number;
+    wilsonLower: number;
+    expectedWinRate: number;
+    deltaWinRate: number;
+    confidenceLevel: "low" | "moderate" | "high" | "insufficient";
+    badges: Array<"시너지 효과 있음">;
+  }>;
+};
+
+type CounterResponse = {
+  period: LabPeriod;
+  championId: number | null;
+  vsChampionId: number | null;
+  position: string | null;
+  source: "snapshot" | "realtime";
+  rows: Array<{
+    champId: number;
+    vsChampId: number;
+    champNameKorean: string;
+    vsChampNameKorean: string;
+    position: string | null;
+    games: number;
+    wins: number;
+    winRate: number;
+    wilsonLower: number;
+    wilsonUpper: number;
+    confidenceLevel: "low" | "moderate" | "high" | "insufficient";
+    verdict: "favorable" | "unfavorable" | "even";
+  }>;
+};
+
+type CompositionsResponse = {
+  period: LabPeriod;
+  source: "realtime";
+  totalTeams: number;
+  topTypes: Array<{
+    type: "TEAMFIGHT" | "SPLIT_PUSH" | "POKE" | "EARLY_AGGRO" | "TANK_LINE";
+    label: string;
+    games: number;
+    wins: number;
+    winRate: number;
+    pickRate: number;
+    avgGameDurationSec: number;
+    confidenceLevel: "low" | "moderate" | "high" | "insufficient";
+  }>;
+  rows: Array<{
+    type: "TEAMFIGHT" | "SPLIT_PUSH" | "POKE" | "EARLY_AGGRO" | "TANK_LINE";
+    label: string;
+    games: number;
+    wins: number;
+    winRate: number;
+    pickRate: number;
+    avgGameDurationSec: number;
+    confidenceLevel: "low" | "moderate" | "high" | "insufficient";
+  }>;
+  caveat: string;
+};
+
+type AuctionEfficiencyResponse = {
+  period: LabPeriod;
+  source: "realtime";
+  sampleSize: {
+    users: number;
+    games: number;
+  };
+  regression: {
+    beta0: number;
+    beta1: number;
+    residualStdDev: number;
+  };
+  buckets: Array<{
+    label: string;
+    minPrice: number;
+    maxPrice: number | null;
+    games: number;
+    users: number;
+    avgKda: number;
+    avgDamageShare: number;
+    winRate: number;
+    avgPerformance: number;
+  }>;
+  scatter: Array<{
+    userId: string;
+    username: string;
+    soldPrice: number;
+    performance: number;
+    expectedPerformance: number;
+    efficiency: number;
+  }>;
+  efficiencyTop: Array<{
+    userId: string;
+    username: string;
+    soldPrice: number;
+    performance: number;
+    expectedPerformance: number;
+    efficiency: number;
+    games: number;
+    winRate: number;
+    avgKda: number;
+    avgDamageShare: number;
+  }>;
+  overpricedTop: Array<{
+    userId: string;
+    username: string;
+    soldPrice: number;
+    performance: number;
+    expectedPerformance: number;
+    efficiency: number;
+    games: number;
+    winRate: number;
+    avgKda: number;
+    avgDamageShare: number;
+  }>;
+  unsoldSummary: {
+    users: number;
+    games: number;
+    winRate: number;
+    avgPerformance: number;
+  };
+};
+
+type BalanceScoreResponse = {
+  teamA: {
+    avgPss: number;
+    modelWinRate: number;
+    adjustedWinRate: number;
+  };
+  teamB: {
+    avgPss: number;
+    modelWinRate: number;
+    adjustedWinRate: number;
+  };
+  confidence: {
+    level: "high" | "moderate" | "low";
+    message: string;
+  };
+  similarMatches: {
+    count: number;
+    teamAWins: number;
+    teamBWins: number;
+    teamAWinRate: number;
+  };
+  players: Array<{
+    userId: string;
+    username: string;
+    team: "A" | "B";
+    recentGames: number;
+    pss: number;
+    components: {
+      baseWinrate: number;
+      kdaFactor: number;
+      damageFactor: number;
+      nexusWinRateFactor: number;
+    };
+  }>;
+  caveat: string;
+};
+
+type BanRecommendResponse = {
+  period: LabPeriod;
+  mode: "global" | "byTeam";
+  recommendations?: Array<{
+    championId: number;
+    championNameKorean: string;
+    banScore: number;
+    contributions: {
+      userMastery: number;
+      metaStrength: number;
+      threatScore: number;
+    };
+    reasons: string[];
+  }>;
+  byTeam?: {
+    teamA: Array<{
+      championId: number;
+      championNameKorean: string;
+      banScore: number;
+      contributions: {
+        userMastery: number;
+        metaStrength: number;
+        threatScore: number;
+      };
+      reasons: string[];
+    }>;
+    teamB: Array<{
+      championId: number;
+      championNameKorean: string;
+      banScore: number;
+      contributions: {
+        userMastery: number;
+        metaStrength: number;
+        threatScore: number;
+      };
+      reasons: string[];
+    }>;
+  };
+};
+
+type ChampionDetailResponse = {
+  championId: number;
+  championName: string;
+  championNameKorean: string;
+  period: LabPeriod;
+  totals: {
+    games: number;
+    wins: number;
+    winRate: number;
+  };
+  winrateTrend: Array<{
+    weekStart: string;
+    games: number;
+    wins: number;
+    winRate: number;
+  }>;
+  trendInsufficient: boolean;
+  positions: Array<{
+    position: string;
+    games: number;
+    wins: number;
+    winRate: number;
+    pickRateWithinChampion: number;
+    wilsonLower: number;
+    confidenceLevel: "low" | "moderate" | "high" | "insufficient";
+  }>;
+  topItemCombos: Array<{
+    itemIds: [number, number];
+    games: number;
+    wins: number;
+    winRate: number;
+    wilsonLower: number;
+  }>;
+  topRuneCombos: Array<{
+    primaryStyle: number;
+    subStyle: number;
+    keystonePerk: number;
+    games: number;
+    wins: number;
+    winRate: number;
+    wilsonLower: number;
+  }>;
+};
+
+type ChampionMasteryResponse = {
+  championId: number;
+  championName: string;
+  championNameKorean: string;
+  appliedCriteria: {
+    minTier: string;
+    minRank: string;
+    minGames: number;
+    minWinRate: number;
+    isRelaxed: boolean;
+  };
+  totalUniquePlayersOnChamp: number;
+  qualifiedCount: number;
+  insufficient: boolean;
+  masteries: Array<{
+    rank: number;
+    userId: string;
+    username: string;
+    avatar: string | null;
+    riotTier: string;
+    riotRank: string;
+    champGames: number;
+    champWins: number;
+    champWinRate: number;
+    wilsonLower: number;
+    avgKda: number;
+    masteryScore: number;
+    scoreBreakdown: {
+      volume: number;
+      skill: number;
+      impact: number;
+      recency: number;
+    };
+    lastPlayedAt: string;
+    nexusWinRate: number;
+    nexusGlobalRank: number | null;
+    avgSoldPrice: number | null;
+    badges: Array<"커뮤니티 인증" | "고평가" | "기준 완화">;
+  }>;
 };
 
 type ItemData = {
@@ -96,6 +498,47 @@ const POSITION_LABELS: Record<string, string> = {
 function formatPosition(position: string) {
   return POSITION_LABELS[position] ?? position;
 }
+
+function formatRate(rate: number) {
+  return `${(rate * 100).toFixed(1)}%`;
+}
+
+function tierBadgeVariant(tier: string): "secondary" | "diamond" | "platinum" | "emerald" | "master" | "grandmaster" | "challenger" | "tier-gold" | "silver" | "bronze" | "iron" {
+  const normalized = tier.toUpperCase();
+  if (normalized === "CHALLENGER") return "challenger";
+  if (normalized === "GRANDMASTER") return "grandmaster";
+  if (normalized === "MASTER") return "master";
+  if (normalized === "DIAMOND") return "diamond";
+  if (normalized === "EMERALD") return "emerald";
+  if (normalized === "PLATINUM") return "platinum";
+  if (normalized === "GOLD") return "tier-gold";
+  if (normalized === "SILVER") return "silver";
+  if (normalized === "BRONZE") return "bronze";
+  if (normalized === "IRON") return "iron";
+  return "secondary";
+}
+
+function tierLabel(tier: string, rank: string) {
+  return [tier, rank].filter(Boolean).join(" ");
+}
+
+function confidenceLabel(level: "low" | "moderate" | "high" | "insufficient") {
+  if (level === "high") return "높음";
+  if (level === "moderate") return "보통";
+  if (level === "low") return "낮음";
+  return "부족";
+}
+
+const COMPOSITION_EXAMPLE_CHAMPIONS: Record<
+  "TEAMFIGHT" | "SPLIT_PUSH" | "POKE" | "EARLY_AGGRO" | "TANK_LINE",
+  number[]
+> = {
+  TEAMFIGHT: [89, 99, 53], // Leona, Lux, Blitzcrank
+  SPLIT_PUSH: [157, 92, 114], // Yasuo, Riven, Fiora
+  POKE: [81, 115, 74], // Ezreal, Ziggs, Heimerdinger
+  EARLY_AGGRO: [64, 121, 91], // LeeSin, Khazix, Talon
+  TANK_LINE: [54, 516, 113], // Malphite, Ornn, Sejuani
+};
 
 function StatMetric({
   label,
@@ -126,13 +569,88 @@ function StatMetric({
 
 export default function LabPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, isAuthenticated, isLoading: authLoading } = useAuthStore();
+  const {
+    activeTab,
+    period: activePeriod,
+    position: activePosition,
+    setActiveTab,
+    setPeriod,
+    setPosition,
+  } = useLabStore();
   const [overview, setOverview] = useState<LabOverview | null>(null);
   const [itemData, setItemData] = useState<Record<string, ItemData>>({});
+  const [metaRadar, setMetaRadar] = useState<MetaRadarResponse | null>(null);
+  const [patchImpact, setPatchImpact] = useState<PatchImpactResponse | null>(null);
+  const [banRates, setBanRates] = useState<BanRatesResponse | null>(null);
+  const [championList, setChampionList] = useState<ChampionListResponse | null>(null);
+  const [championSearch, setChampionSearch] = useState("");
+  const [includeLowSample, setIncludeLowSample] = useState(false);
+  const [championSort, setChampionSort] = useState<"pickRate" | "winRate" | "banRate">("winRate");
+  const [selectedChampionId, setSelectedChampionId] = useState<number | null>(null);
+  const [championDetail, setChampionDetail] = useState<ChampionDetailResponse | null>(null);
+  const [championMastery, setChampionMastery] = useState<ChampionMasteryResponse | null>(null);
+  const [championDetailLoading, setChampionDetailLoading] = useState(false);
+  const [championDetailError, setChampionDetailError] = useState<string | null>(null);
+  const [synergyChampionId, setSynergyChampionId] = useState<number | null>(null);
+  const [synergyData, setSynergyData] = useState<SynergyResponse | null>(null);
+  const [synergyLoading, setSynergyLoading] = useState(false);
+  const [counterChampionId, setCounterChampionId] = useState<number | null>(null);
+  const [counterVsChampionId, setCounterVsChampionId] = useState<number | null>(null);
+  const [counterPosition, setCounterPosition] = useState<"ALL" | "TOP" | "JUNGLE" | "MID" | "ADC" | "SUPPORT">("ALL");
+  const [counterData, setCounterData] = useState<CounterResponse | null>(null);
+  const [counterLoading, setCounterLoading] = useState(false);
+  const [compositionsData, setCompositionsData] = useState<CompositionsResponse | null>(null);
+  const [compositionsLoading, setCompositionsLoading] = useState(false);
+  const [auctionData, setAuctionData] = useState<AuctionEfficiencyResponse | null>(null);
+  const [auctionLoading, setAuctionLoading] = useState(false);
+  const [oracleSearchQuery, setOracleSearchQuery] = useState("");
+  const [oracleSearchResults, setOracleSearchResults] = useState<
+    Array<{ id: string; username: string; avatar: string | null }>
+  >([]);
+  const [oracleSearching, setOracleSearching] = useState(false);
+  const [oracleTeamA, setOracleTeamA] = useState<Array<{ id: string; username: string; avatar: string | null }>>([]);
+  const [oracleTeamB, setOracleTeamB] = useState<Array<{ id: string; username: string; avatar: string | null }>>([]);
+  const [balanceResult, setBalanceResult] = useState<BalanceScoreResponse | null>(null);
+  const [balanceLoading, setBalanceLoading] = useState(false);
+  const [balanceError, setBalanceError] = useState<string | null>(null);
+  const [banParticipants, setBanParticipants] = useState<
+    Array<{ id: string; username: string; avatar: string | null }>
+  >([]);
+  const [banRecommendResult, setBanRecommendResult] = useState<BanRecommendResponse | null>(null);
+  const [banRecommendLoading, setBanRecommendLoading] = useState(false);
+  const [banRecommendError, setBanRecommendError] = useState<string | null>(null);
+  const [championCatalog, setChampionCatalog] = useState<Array<{ championId: number; championNameKorean: string; championName: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const isAdmin = user?.role === "ADMIN";
+
+  const queryTab = useMemo<LabTabKey>(() => {
+    const fromQuery = searchParams.get("tab");
+    return LAB_TABS.some((tab) => tab.key === fromQuery)
+      ? (fromQuery as LabTabKey)
+      : "meta";
+  }, [searchParams]);
+  const queryPeriod = useMemo<LabPeriod>(() => {
+    const fromQuery = searchParams.get("period");
+    return LAB_PERIODS.some((period) => period.key === fromQuery)
+      ? (fromQuery as LabPeriod)
+      : "30d";
+  }, [searchParams]);
+
+  const updateLabQuery = (tab: LabTabKey, period: LabPeriod) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", tab);
+    params.set("period", period);
+    router.replace(`/lab?${params.toString()}`);
+  };
+
+  useEffect(() => {
+    if (activeTab !== queryTab) setActiveTab(queryTab);
+    if (activePeriod !== queryPeriod) setPeriod(queryPeriod);
+  }, [activePeriod, activeTab, queryPeriod, queryTab, setActiveTab, setPeriod]);
 
   useEffect(() => {
     if (!authLoading && (!isAuthenticated || !isAdmin)) {
@@ -145,11 +663,20 @@ export default function LabPage() {
 
     let cancelled = false;
 
-    Promise.all([statsApi.getLabOverview(), riotApi.getItems("ko_KR")])
-      .then(([labOverview, itemsResponse]) => {
+    Promise.all([
+      statsApi.getLabOverview(),
+      riotApi.getItems("ko_KR"),
+      statsApi.getLabMetaRadar(activePeriod),
+      statsApi.getLabPatchImpact(),
+      statsApi.getLabBanRates(activePeriod),
+    ])
+      .then(([labOverview, itemsResponse, metaRadarResponse, patchImpactResponse, banRatesResponse]) => {
         if (cancelled) return;
         setOverview(labOverview);
         setItemData(itemsResponse?.data ?? {});
+        setMetaRadar(metaRadarResponse);
+        setPatchImpact(patchImpactResponse);
+        setBanRates(banRatesResponse);
       })
       .catch(() => {
         if (cancelled) return;
@@ -164,12 +691,566 @@ export default function LabPage() {
     return () => {
       cancelled = true;
     };
-  }, [authLoading, isAuthenticated, isAdmin]);
+  }, [authLoading, isAuthenticated, isAdmin, activePeriod]);
+
+  useEffect(() => {
+    if (authLoading || !isAuthenticated || !isAdmin || activeTab !== "champions") return;
+
+    let cancelled = false;
+    statsApi
+      .getLabChampions({
+        period: activePeriod,
+        position: activePosition === "ALL" ? undefined : activePosition,
+        includeLowSample,
+      })
+      .then((response) => {
+        if (cancelled) return;
+        setChampionList(response);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setChampionList({
+          period: activePeriod,
+          position: activePosition === "ALL" ? null : activePosition,
+          includeLowSample,
+          source: "realtime",
+          champions: [],
+        });
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    activePeriod,
+    activePosition,
+    activeTab,
+    authLoading,
+    includeLowSample,
+    isAdmin,
+    isAuthenticated,
+  ]);
+
+  useEffect(() => {
+    if (!selectedChampionId) return;
+
+    let cancelled = false;
+    setChampionDetailLoading(true);
+    setChampionDetailError(null);
+
+    Promise.all([
+      statsApi.getLabChampionDetail(selectedChampionId, activePeriod),
+      statsApi.getLabChampionMastery(selectedChampionId),
+    ])
+      .then(([detailResponse, masteryResponse]) => {
+        if (cancelled) return;
+        setChampionDetail(detailResponse);
+        setChampionMastery(masteryResponse);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setChampionDetail(null);
+        setChampionMastery(null);
+        setChampionDetailError("챔피언 상세 데이터를 불러오지 못했습니다.");
+      })
+      .finally(() => {
+        if (!cancelled) setChampionDetailLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedChampionId, activePeriod]);
+
+  useEffect(() => {
+    if (authLoading || !isAuthenticated || !isAdmin || activeTab !== "compositions") return;
+
+    let cancelled = false;
+    statsApi
+      .getLabChampions({
+        period: activePeriod,
+        includeLowSample: true,
+      })
+      .then((response: ChampionListResponse) => {
+        if (cancelled) return;
+        const catalog = response.champions
+          .map((row: ChampionListResponse["champions"][number]) => ({
+            championId: row.championId,
+            championNameKorean: row.championNameKorean,
+            championName: row.championName,
+          }))
+          .sort((a, b) =>
+            a.championNameKorean.localeCompare(b.championNameKorean, "ko"),
+          );
+        setChampionCatalog(catalog);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setChampionCatalog([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activePeriod, activeTab, authLoading, isAdmin, isAuthenticated]);
+
+  useEffect(() => {
+    if (authLoading || !isAuthenticated || !isAdmin || activeTab !== "compositions") return;
+
+    let cancelled = false;
+    setSynergyLoading(true);
+    statsApi
+      .getLabSynergy({
+        period: activePeriod,
+        championId: synergyChampionId ?? undefined,
+        limit: 30,
+      })
+      .then((response) => {
+        if (cancelled) return;
+        setSynergyData(response);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setSynergyData({
+          period: activePeriod,
+          championId: synergyChampionId,
+          source: "realtime",
+          rows: [],
+        });
+      })
+      .finally(() => {
+        if (!cancelled) setSynergyLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    activePeriod,
+    activeTab,
+    authLoading,
+    isAuthenticated,
+    isAdmin,
+    synergyChampionId,
+  ]);
+
+  useEffect(() => {
+    if (authLoading || !isAuthenticated || !isAdmin || activeTab !== "compositions") return;
+
+    let cancelled = false;
+    setCounterLoading(true);
+    statsApi
+      .getLabCounter({
+        period: activePeriod,
+        championId: counterChampionId ?? undefined,
+        vsChampionId: counterVsChampionId ?? undefined,
+        position: counterPosition === "ALL" ? undefined : counterPosition,
+        limit: 30,
+      })
+      .then((response) => {
+        if (cancelled) return;
+        setCounterData(response);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setCounterData({
+          period: activePeriod,
+          championId: counterChampionId,
+          vsChampionId: counterVsChampionId,
+          position: counterPosition === "ALL" ? null : counterPosition,
+          source: "realtime",
+          rows: [],
+        });
+      })
+      .finally(() => {
+        if (!cancelled) setCounterLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    activePeriod,
+    activeTab,
+    authLoading,
+    isAuthenticated,
+    isAdmin,
+    counterChampionId,
+    counterVsChampionId,
+    counterPosition,
+  ]);
+
+  useEffect(() => {
+    if (authLoading || !isAuthenticated || !isAdmin || activeTab !== "compositions") return;
+
+    let cancelled = false;
+    setCompositionsLoading(true);
+    statsApi
+      .getLabCompositions({ period: activePeriod })
+      .then((response) => {
+        if (cancelled) return;
+        setCompositionsData(response);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setCompositionsData({
+          period: activePeriod,
+          source: "realtime",
+          totalTeams: 0,
+          topTypes: [],
+          rows: [],
+          caveat: "조합 유형 데이터를 불러오지 못했습니다.",
+        });
+      })
+      .finally(() => {
+        if (!cancelled) setCompositionsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activePeriod, activeTab, authLoading, isAuthenticated, isAdmin]);
+
+  useEffect(() => {
+    if (authLoading || !isAuthenticated || !isAdmin || activeTab !== "oracle") return;
+
+    let cancelled = false;
+    setAuctionLoading(true);
+    statsApi
+      .getLabAuctionEfficiency({ period: activePeriod })
+      .then((response) => {
+        if (cancelled) return;
+        setAuctionData(response);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setAuctionData({
+          period: activePeriod,
+          source: "realtime",
+          sampleSize: { users: 0, games: 0 },
+          regression: { beta0: 0, beta1: 0, residualStdDev: 0 },
+          buckets: [],
+          scatter: [],
+          efficiencyTop: [],
+          overpricedTop: [],
+          unsoldSummary: { users: 0, games: 0, winRate: 0, avgPerformance: 0 },
+        });
+      })
+      .finally(() => {
+        if (!cancelled) setAuctionLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activePeriod, activeTab, authLoading, isAuthenticated, isAdmin]);
+
+  useEffect(() => {
+    if (activeTab !== "oracle") return;
+    const q = oracleSearchQuery.trim();
+    if (q.length < 2) {
+      setOracleSearchResults([]);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      setOracleSearching(true);
+      statsApi
+        .searchUsers(q, 8)
+        .then((data) => {
+          if (cancelled) return;
+          const users = (Array.isArray(data) ? data : data?.users ?? []) as Array<{
+            id: string;
+            username: string;
+            avatar: string | null;
+          }>;
+          setOracleSearchResults(users);
+        })
+        .catch(() => {
+          if (!cancelled) setOracleSearchResults([]);
+        })
+        .finally(() => {
+          if (!cancelled) setOracleSearching(false);
+        });
+    }, 300);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [activeTab, oracleSearchQuery]);
 
   const avgParticipantsPerMatch = useMemo(() => {
     if (!overview?.sample.matchesWithStats) return 0;
     return overview.sample.participantRows / overview.sample.matchesWithStats;
   }, [overview]);
+
+  const championRowsWithTier = useMemo(() => {
+    const rows = championList?.champions ?? [];
+    if (rows.length === 0) return [];
+
+    const wilsonValues = rows.map((row) => row.wilsonLower);
+    const pickValues = rows.map((row) => row.pickRate);
+    const wMin = Math.min(...wilsonValues);
+    const wMax = Math.max(...wilsonValues);
+    const pMin = Math.min(...pickValues);
+    const pMax = Math.max(...pickValues);
+    const wRange = wMax - wMin || 1;
+    const pRange = pMax - pMin || 1;
+
+    const scored = rows.map((row) => {
+      const wilsonNorm = (row.wilsonLower - wMin) / wRange;
+      const pickNorm = (row.pickRate - pMin) / pRange;
+      const tierScore = wilsonNorm * 0.6 + pickNorm * 0.4;
+      return { ...row, tierScore };
+    });
+    scored.sort((a, b) => b.tierScore - a.tierScore);
+
+    return scored.map((row, idx) => {
+      const percentile = idx / scored.length;
+      const tier =
+        percentile < 0.1
+          ? "S"
+          : percentile < 0.3
+            ? "A"
+            : percentile < 0.6
+              ? "B"
+              : percentile < 0.85
+                ? "C"
+                : "D";
+      return { ...row, tier };
+    });
+  }, [championList]);
+
+  const championRowsFiltered = useMemo(() => {
+    const keyword = championSearch.trim().toLowerCase();
+    const filtered =
+      keyword.length === 0
+        ? championRowsWithTier
+        : championRowsWithTier.filter((row) => {
+            const ko = row.championNameKorean.toLowerCase();
+            const en = row.championName.toLowerCase();
+            return ko.includes(keyword) || en.includes(keyword);
+          });
+
+    const sorted = [...filtered].sort((a, b) => {
+      if (championSort === "pickRate") return b.pickRate - a.pickRate;
+      if (championSort === "banRate") return b.banRate - a.banRate;
+      return b.winRate - a.winRate;
+    });
+    return sorted;
+  }, [championRowsWithTier, championSearch, championSort]);
+
+  const selectedChampionRow = useMemo(
+    () =>
+      championRowsWithTier.find((row) => row.championId === selectedChampionId) ??
+      null,
+    [championRowsWithTier, selectedChampionId],
+  );
+
+  const trendChartData = useMemo(() => {
+    const points = championDetail?.winrateTrend ?? [];
+    if (points.length === 0) return null;
+
+    const width = 520;
+    const height = 220;
+    const pad = { left: 34, right: 10, top: 10, bottom: 28 };
+    const chartWidth = width - pad.left - pad.right;
+    const chartHeight = height - pad.top - pad.bottom;
+    const xDenom = Math.max(points.length - 1, 1);
+
+    const minRate = Math.min(...points.map((p) => p.winRate));
+    const maxRate = Math.max(...points.map((p) => p.winRate));
+    const yMin = Math.max(0, minRate - 0.08);
+    const yMax = Math.min(1, maxRate + 0.08);
+    const yRange = Math.max(yMax - yMin, 0.01);
+
+    const toX = (idx: number) => pad.left + (idx / xDenom) * chartWidth;
+    const toY = (rate: number) => pad.top + chartHeight - ((rate - yMin) / yRange) * chartHeight;
+
+    const path = points
+      .map((point, idx) => `${idx === 0 ? "M" : "L"}${toX(idx).toFixed(1)},${toY(point.winRate).toFixed(1)}`)
+      .join(" ");
+    const area = `${path} L${toX(points.length - 1).toFixed(1)},${(pad.top + chartHeight).toFixed(1)} L${toX(0).toFixed(1)},${(pad.top + chartHeight).toFixed(1)} Z`;
+    const yTicks = [yMin, (yMin + yMax) / 2, yMax];
+    const xTicks = points.map((point, idx) => ({
+      x: toX(idx),
+      label: new Date(point.weekStart).toLocaleDateString("ko-KR", {
+        month: "numeric",
+        day: "numeric",
+      }),
+    }));
+
+    return { width, height, pad, points, yTicks, xTicks, toY, path, area };
+  }, [championDetail]);
+
+  const positionPie = useMemo(() => {
+    const rows = championDetail?.positions ?? [];
+    const total = rows.reduce((acc, row) => acc + row.games, 0);
+    if (rows.length === 0 || total === 0) return [];
+
+    const colors = ["#34d399", "#22d3ee", "#818cf8", "#f59e0b", "#f472b6", "#a3e635"];
+    let startAngle = -Math.PI / 2;
+    return rows.map((row, idx) => {
+      const slice = (row.games / total) * Math.PI * 2;
+      const endAngle = startAngle + slice;
+      const largeArc = slice > Math.PI ? 1 : 0;
+      const radius = 76;
+      const cx = 96;
+      const cy = 96;
+      const x1 = cx + Math.cos(startAngle) * radius;
+      const y1 = cy + Math.sin(startAngle) * radius;
+      const x2 = cx + Math.cos(endAngle) * radius;
+      const y2 = cy + Math.sin(endAngle) * radius;
+      const path = `M ${cx} ${cy} L ${x1.toFixed(2)} ${y1.toFixed(2)} A ${radius} ${radius} 0 ${largeArc} 1 ${x2.toFixed(2)} ${y2.toFixed(2)} Z`;
+      const data = {
+        ...row,
+        path,
+        color: colors[idx % colors.length],
+      };
+      startAngle = endAngle;
+      return data;
+    });
+  }, [championDetail]);
+
+  const synergyRows = useMemo(() => {
+    const rows = synergyData?.rows ?? [];
+    if (!synergyChampionId) return rows;
+    return rows.filter(
+      (row) => row.champ1Id === synergyChampionId || row.champ2Id === synergyChampionId,
+    );
+  }, [synergyData, synergyChampionId]);
+
+  const auctionScatterChart = useMemo(() => {
+    const points = auctionData?.scatter ?? [];
+    if (points.length === 0) return null;
+
+    const width = 700;
+    const height = 320;
+    const pad = { left: 44, right: 12, top: 12, bottom: 32 };
+    const chartWidth = width - pad.left - pad.right;
+    const chartHeight = height - pad.top - pad.bottom;
+
+    const xMin = Math.min(...points.map((p) => p.soldPrice), 0);
+    const xMax = Math.max(...points.map((p) => p.soldPrice), 100);
+    const yMin = Math.min(...points.map((p) => p.performance), 0);
+    const yMax = Math.max(...points.map((p) => p.performance), 1);
+    const xRange = Math.max(xMax - xMin, 1);
+    const yRange = Math.max(yMax - yMin, 0.01);
+
+    const toX = (price: number) => pad.left + ((price - xMin) / xRange) * chartWidth;
+    const toY = (perf: number) => pad.top + chartHeight - ((perf - yMin) / yRange) * chartHeight;
+
+    const xTicks = 5;
+    const yTicks = 4;
+    const xTickValues = Array.from({ length: xTicks + 1 }, (_, i) => xMin + (xRange * i) / xTicks);
+    const yTickValues = Array.from({ length: yTicks + 1 }, (_, i) => yMin + (yRange * i) / yTicks);
+
+    const b0 = auctionData?.regression.beta0 ?? 0;
+    const b1 = auctionData?.regression.beta1 ?? 0;
+    const x1 = xMin;
+    const x2 = xMax;
+    const y1 = b0 + b1 * x1;
+    const y2 = b0 + b1 * x2;
+
+    return {
+      width,
+      height,
+      pad,
+      points,
+      xTickValues,
+      yTickValues,
+      toX,
+      toY,
+      line: {
+        x1: toX(x1),
+        y1: toY(y1),
+        x2: toX(x2),
+        y2: toY(y2),
+      },
+    };
+  }, [auctionData]);
+
+  const oracleSelectedUserIds = useMemo(
+    () => new Set([...oracleTeamA.map((u) => u.id), ...oracleTeamB.map((u) => u.id)]),
+    [oracleTeamA, oracleTeamB],
+  );
+
+  const addUserToTeam = (
+    team: "A" | "B",
+    user: { id: string; username: string; avatar: string | null },
+  ) => {
+    if (oracleSelectedUserIds.has(user.id)) return;
+    if (team === "A") setOracleTeamA((prev) => [...prev, user]);
+    else setOracleTeamB((prev) => [...prev, user]);
+  };
+
+  const removeUserFromTeam = (team: "A" | "B", userId: string) => {
+    if (team === "A") setOracleTeamA((prev) => prev.filter((u) => u.id !== userId));
+    else setOracleTeamB((prev) => prev.filter((u) => u.id !== userId));
+  };
+
+  const runBalancePrediction = async () => {
+    if (oracleTeamA.length === 0 || oracleTeamB.length === 0) {
+      setBalanceError("팀 A와 팀 B에 최소 1명씩 배치해 주세요.");
+      return;
+    }
+    setBalanceLoading(true);
+    setBalanceError(null);
+    try {
+      const response = (await statsApi.getLabBalanceScore({
+        teamA: oracleTeamA.map((u) => u.id),
+        teamB: oracleTeamB.map((u) => u.id),
+      })) as BalanceScoreResponse;
+      setBalanceResult(response);
+    } catch {
+      setBalanceResult(null);
+      setBalanceError("팀 밸런스 예측에 실패했습니다.");
+    } finally {
+      setBalanceLoading(false);
+    }
+  };
+
+  const addBanParticipant = (user: {
+    id: string;
+    username: string;
+    avatar: string | null;
+  }) => {
+    if (banParticipants.some((u) => u.id === user.id)) return;
+    if (banParticipants.length >= 10) {
+      setBanRecommendError("참가자는 최대 10명까지 선택할 수 있습니다.");
+      return;
+    }
+    setBanRecommendError(null);
+    setBanParticipants((prev) => [...prev, user]);
+  };
+
+  const removeBanParticipant = (userId: string) => {
+    setBanParticipants((prev) => prev.filter((u) => u.id !== userId));
+  };
+
+  const runBanRecommend = async () => {
+    if (banParticipants.length === 0) {
+      setBanRecommendError("참가자를 1명 이상 선택해 주세요.");
+      return;
+    }
+
+    setBanRecommendLoading(true);
+    setBanRecommendError(null);
+    try {
+      const response = (await statsApi.getLabBanRecommend({
+        period: activePeriod,
+        userIds: banParticipants.map((u) => u.id),
+      })) as BanRecommendResponse;
+      setBanRecommendResult(response);
+    } catch {
+      setBanRecommendResult(null);
+      setBanRecommendError("밴 추천 생성에 실패했습니다.");
+    } finally {
+      setBanRecommendLoading(false);
+    }
+  };
 
   if (authLoading || (isAuthenticated && isAdmin && loading)) {
     return (
@@ -265,10 +1346,1461 @@ export default function LabPage() {
               icon={FlaskConical}
             />
           </div>
+
+          <div className="mt-8 flex flex-col gap-4 rounded-2xl border border-white/10 bg-bg-secondary/60 p-4">
+            <div className="flex flex-wrap items-center gap-2">
+              {LAB_TABS.map((tab) => (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => {
+                    setActiveTab(tab.key);
+                    updateLabQuery(tab.key, activePeriod);
+                  }}
+                  className={`rounded-xl px-3 py-2 text-sm font-semibold transition-colors ${
+                    activeTab === tab.key
+                      ? "bg-emerald-500/20 text-emerald-300"
+                      : "bg-bg-primary/60 text-text-secondary hover:bg-bg-elevated"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-xs uppercase tracking-[0.18em] text-text-tertiary">기간</p>
+              {LAB_PERIODS.map((period) => (
+                <button
+                  key={period.key}
+                  type="button"
+                  onClick={() => {
+                    setPeriod(period.key);
+                    updateLabQuery(activeTab, period.key);
+                  }}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+                    activePeriod === period.key
+                      ? "bg-cyan-500/20 text-cyan-300"
+                      : "bg-bg-primary/60 text-text-secondary hover:bg-bg-elevated"
+                  }`}
+                >
+                  {period.label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
 
       <section className="mx-auto max-w-7xl px-4 py-10 md:px-6 md:py-12">
+        {activeTab === "oracle" ? (
+          <Card className="border-white/10 bg-bg-secondary/80">
+            <CardHeader>
+              <CardTitle>경매 효율 분석</CardTitle>
+              <CardDescription>
+                낙찰가 대비 성과(가성비)를 산점도와 회귀선으로 확인하고, 상·하위 유저를 비교합니다.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {auctionLoading ? (
+                <div className="flex min-h-[260px] items-center justify-center">
+                  <LoadingSpinner />
+                </div>
+              ) : !auctionData || auctionData.scatter.length === 0 ? (
+                <div className="rounded-xl border border-white/10 bg-bg-primary/50 p-4 text-sm text-text-secondary">
+                  경매 효율 데이터가 없습니다. (데이터 부족)
+                </div>
+              ) : (
+                <div className="space-y-5">
+                  <div className="grid gap-3 md:grid-cols-4">
+                    <div className="rounded-xl border border-white/10 bg-bg-primary/50 p-3">
+                      <p className="text-xs text-text-tertiary">분석 유저</p>
+                      <p className="mt-1 text-xl font-bold text-text-primary">{auctionData.sampleSize.users}명</p>
+                    </div>
+                    <div className="rounded-xl border border-white/10 bg-bg-primary/50 p-3">
+                      <p className="text-xs text-text-tertiary">분석 경기</p>
+                      <p className="mt-1 text-xl font-bold text-text-primary">{auctionData.sampleSize.games}경기</p>
+                    </div>
+                    <div className="rounded-xl border border-white/10 bg-bg-primary/50 p-3">
+                      <p className="text-xs text-text-tertiary">회귀 기울기</p>
+                      <p className="mt-1 text-xl font-bold text-cyan-300">{auctionData.regression.beta1.toFixed(4)}</p>
+                    </div>
+                    <div className="rounded-xl border border-white/10 bg-bg-primary/50 p-3">
+                      <p className="text-xs text-text-tertiary">미낙찰 표본</p>
+                      <p className="mt-1 text-xl font-bold text-text-primary">{auctionData.unsoldSummary.users}명</p>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+                    <Card className="border-white/10 bg-bg-primary/40">
+                      <CardHeader>
+                        <CardTitle className="text-base">산점도 + 회귀선</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {auctionScatterChart ? (
+                          <svg viewBox={`0 0 ${auctionScatterChart.width} ${auctionScatterChart.height}`} className="w-full">
+                            {auctionScatterChart.xTickValues.map((tick, idx) => (
+                              <g key={`x-${idx}`}>
+                                <line
+                                  x1={auctionScatterChart.toX(tick)}
+                                  x2={auctionScatterChart.toX(tick)}
+                                  y1={auctionScatterChart.pad.top}
+                                  y2={auctionScatterChart.height - auctionScatterChart.pad.bottom}
+                                  stroke="currentColor"
+                                  strokeOpacity={0.08}
+                                />
+                                <text
+                                  x={auctionScatterChart.toX(tick)}
+                                  y={auctionScatterChart.height - 8}
+                                  textAnchor="middle"
+                                  fontSize="10"
+                                  fill="currentColor"
+                                  fillOpacity={0.65}
+                                >
+                                  {Math.round(tick)}
+                                </text>
+                              </g>
+                            ))}
+                            {auctionScatterChart.yTickValues.map((tick, idx) => (
+                              <g key={`y-${idx}`}>
+                                <line
+                                  x1={auctionScatterChart.pad.left}
+                                  x2={auctionScatterChart.width - auctionScatterChart.pad.right}
+                                  y1={auctionScatterChart.toY(tick)}
+                                  y2={auctionScatterChart.toY(tick)}
+                                  stroke="currentColor"
+                                  strokeOpacity={0.08}
+                                />
+                                <text
+                                  x={auctionScatterChart.pad.left - 5}
+                                  y={auctionScatterChart.toY(tick) + 3}
+                                  textAnchor="end"
+                                  fontSize="10"
+                                  fill="currentColor"
+                                  fillOpacity={0.65}
+                                >
+                                  {tick.toFixed(2)}
+                                </text>
+                              </g>
+                            ))}
+                            <line
+                              x1={auctionScatterChart.line.x1}
+                              y1={auctionScatterChart.line.y1}
+                              x2={auctionScatterChart.line.x2}
+                              y2={auctionScatterChart.line.y2}
+                              stroke="#22d3ee"
+                              strokeWidth={2}
+                              strokeDasharray="6 4"
+                            />
+                            {auctionScatterChart.points.map((point) => (
+                              <circle
+                                key={`point-${point.userId}`}
+                                cx={auctionScatterChart.toX(point.soldPrice)}
+                                cy={auctionScatterChart.toY(point.performance)}
+                                r={Math.min(6, Math.max(3, Math.abs(point.efficiency) * 14))}
+                                fill={point.efficiency >= 0 ? "#34d399" : "#fb7185"}
+                                fillOpacity={0.65}
+                              >
+                                <title>{`${point.username} | 낙찰가 ${point.soldPrice} | 성과 ${point.performance.toFixed(3)} | 효율 ${point.efficiency >= 0 ? "+" : ""}${point.efficiency.toFixed(3)}`}</title>
+                              </circle>
+                            ))}
+                          </svg>
+                        ) : null}
+                      </CardContent>
+                    </Card>
+
+                    <Card className="border-white/10 bg-bg-primary/40">
+                      <CardHeader>
+                        <CardTitle className="text-base">낙찰가 구간별 평균 성과</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-2">
+                        {auctionData.buckets.map((bucket) => (
+                          <div key={`bucket-${bucket.label}`} className="rounded-lg border border-white/10 bg-bg-secondary/40 p-2">
+                            <div className="mb-1 flex items-center justify-between text-xs text-text-secondary">
+                              <span>{bucket.label}</span>
+                              <span>{bucket.users}명 · {bucket.games}게임</span>
+                            </div>
+                            <div className="h-2 w-full overflow-hidden rounded-full bg-bg-tertiary">
+                              <div className="h-full rounded-full bg-violet-400" style={{ width: `${Math.max(4, bucket.avgPerformance * 100)}%` }} />
+                            </div>
+                            <p className="mt-1 text-xs text-text-tertiary">
+                              평균 성과 {bucket.avgPerformance.toFixed(3)} · 승률 {(bucket.winRate * 100).toFixed(1)}%
+                            </p>
+                          </div>
+                        ))}
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  <div className="grid gap-4 xl:grid-cols-2">
+                    <Card className="border-white/10 bg-emerald-500/10">
+                      <CardHeader>
+                        <CardTitle className="text-base text-emerald-200">가성비왕 TOP 5</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-2">
+                        {auctionData.efficiencyTop.map((row, idx) => (
+                          <div key={`eff-top-${row.userId}`} className="flex items-center justify-between rounded-lg border border-emerald-300/20 bg-bg-primary/50 px-3 py-2 text-sm">
+                            <span className="text-text-primary">{idx + 1}. {row.username}</span>
+                            <span className="font-semibold text-emerald-300">
+                              +{row.efficiency.toFixed(3)}
+                            </span>
+                          </div>
+                        ))}
+                      </CardContent>
+                    </Card>
+                    <Card className="border-white/10 bg-rose-500/10">
+                      <CardHeader>
+                        <CardTitle className="text-base text-rose-200">고평가 TOP 5</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-2">
+                        {auctionData.overpricedTop.map((row, idx) => (
+                          <div key={`over-top-${row.userId}`} className="flex items-center justify-between rounded-lg border border-rose-300/20 bg-bg-primary/50 px-3 py-2 text-sm">
+                            <span className="text-text-primary">{idx + 1}. {row.username}</span>
+                            <span className="font-semibold text-rose-300">
+                              {row.efficiency.toFixed(3)}
+                            </span>
+                          </div>
+                        ))}
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  <div className="overflow-x-auto rounded-xl border border-white/10">
+                    <table className="min-w-full text-sm">
+                      <thead className="bg-bg-primary/70 text-text-tertiary">
+                        <tr>
+                          <th className="px-3 py-2 text-left">유저</th>
+                          <th className="px-3 py-2 text-right">낙찰가</th>
+                          <th className="px-3 py-2 text-right">성과</th>
+                          <th className="px-3 py-2 text-right">예상</th>
+                          <th className="px-3 py-2 text-right">효율</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[...auctionData.scatter]
+                          .sort((a, b) => b.efficiency - a.efficiency)
+                          .map((row) => (
+                            <tr key={`auction-row-${row.userId}`} className="border-t border-white/10">
+                              <td className="px-3 py-2 text-text-primary">{row.username}</td>
+                              <td className="px-3 py-2 text-right text-text-secondary">{row.soldPrice}</td>
+                              <td className="px-3 py-2 text-right text-text-secondary">{row.performance.toFixed(3)}</td>
+                              <td className="px-3 py-2 text-right text-text-secondary">{row.expectedPerformance.toFixed(3)}</td>
+                              <td className={`px-3 py-2 text-right font-semibold ${row.efficiency >= 0 ? "text-emerald-300" : "text-rose-300"}`}>
+                                {row.efficiency >= 0 ? "+" : ""}
+                                {row.efficiency.toFixed(3)}
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="my-2 border-t border-white/10" />
+
+                  <div>
+                    <h3 className="text-base font-semibold text-text-primary">팀 밸런스 예측기</h3>
+                    <p className="text-xs text-text-secondary">
+                      유저를 팀 A/B에 배치한 뒤 예측 버튼으로 승률과 신뢰도를 확인합니다.
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border border-white/10 bg-bg-primary/40 p-3">
+                    <div className="mb-2 flex items-center gap-2">
+                      <input
+                        value={oracleSearchQuery}
+                        onChange={(e) => setOracleSearchQuery(e.target.value)}
+                        placeholder="유저명 검색 (2글자 이상)"
+                        className="w-full rounded-lg border border-white/10 bg-bg-secondary/60 px-3 py-2 text-sm text-text-primary outline-none placeholder:text-text-tertiary"
+                      />
+                    </div>
+                    {oracleSearching ? (
+                      <p className="text-xs text-text-secondary">검색 중...</p>
+                    ) : oracleSearchResults.length === 0 ? (
+                      <p className="text-xs text-text-tertiary">검색 결과가 없습니다.</p>
+                    ) : (
+                      <div className="grid gap-2 md:grid-cols-2">
+                        {oracleSearchResults.map((user) => {
+                          const selected = oracleSelectedUserIds.has(user.id);
+                          const selectedBan = banParticipants.some((u) => u.id === user.id);
+                          return (
+                            <div key={`oracle-user-${user.id}`} className="flex items-center justify-between rounded-lg border border-white/10 bg-bg-secondary/40 px-2 py-1.5">
+                              <span className={`text-sm ${selected ? "text-text-tertiary" : "text-text-primary"}`}>
+                                {user.username}
+                              </span>
+                              <div className="flex gap-1">
+                                <button
+                                  type="button"
+                                  disabled={selected}
+                                  onClick={() => addUserToTeam("A", user)}
+                                  className="rounded bg-emerald-500/20 px-2 py-1 text-xs text-emerald-300 disabled:opacity-40"
+                                >
+                                  팀 A
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={selected}
+                                  onClick={() => addUserToTeam("B", user)}
+                                  className="rounded bg-cyan-500/20 px-2 py-1 text-xs text-cyan-300 disabled:opacity-40"
+                                >
+                                  팀 B
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={selectedBan || banParticipants.length >= 10}
+                                  onClick={() => addBanParticipant(user)}
+                                  className="rounded bg-amber-500/20 px-2 py-1 text-xs text-amber-300 disabled:opacity-40"
+                                >
+                                  밴 풀
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid gap-4 xl:grid-cols-2">
+                    <Card className="border-emerald-400/25 bg-emerald-500/10">
+                      <CardHeader>
+                        <CardTitle className="text-base text-emerald-200">팀 A</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-2">
+                        {oracleTeamA.length === 0 ? (
+                          <p className="text-sm text-text-secondary">아직 배치된 유저가 없습니다.</p>
+                        ) : (
+                          oracleTeamA.map((user) => (
+                            <div key={`team-a-${user.id}`} className="flex items-center justify-between rounded-lg border border-white/10 bg-bg-primary/50 px-3 py-2">
+                              <span className="text-sm text-text-primary">{user.username}</span>
+                              <button
+                                type="button"
+                                onClick={() => removeUserFromTeam("A", user.id)}
+                                className="text-xs text-rose-300 hover:text-rose-200"
+                              >
+                                제거
+                              </button>
+                            </div>
+                          ))
+                        )}
+                      </CardContent>
+                    </Card>
+                    <Card className="border-cyan-400/25 bg-cyan-500/10">
+                      <CardHeader>
+                        <CardTitle className="text-base text-cyan-200">팀 B</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-2">
+                        {oracleTeamB.length === 0 ? (
+                          <p className="text-sm text-text-secondary">아직 배치된 유저가 없습니다.</p>
+                        ) : (
+                          oracleTeamB.map((user) => (
+                            <div key={`team-b-${user.id}`} className="flex items-center justify-between rounded-lg border border-white/10 bg-bg-primary/50 px-3 py-2">
+                              <span className="text-sm text-text-primary">{user.username}</span>
+                              <button
+                                type="button"
+                                onClick={() => removeUserFromTeam("B", user.id)}
+                                className="text-xs text-rose-300 hover:text-rose-200"
+                              >
+                                제거
+                              </button>
+                            </div>
+                          ))
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={runBalancePrediction}
+                      disabled={balanceLoading}
+                      className="rounded-lg bg-violet-500/20 px-4 py-2 text-sm font-semibold text-violet-300 hover:bg-violet-500/30 disabled:opacity-50"
+                    >
+                      {balanceLoading ? "예측 중..." : "예측"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOracleTeamA([]);
+                        setOracleTeamB([]);
+                        setBalanceResult(null);
+                        setBalanceError(null);
+                      }}
+                      className="rounded-lg bg-bg-primary/60 px-4 py-2 text-sm text-text-secondary hover:bg-bg-elevated"
+                    >
+                      팀 초기화
+                    </button>
+                  </div>
+
+                  {balanceError ? (
+                    <div className="rounded-lg border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">
+                      {balanceError}
+                    </div>
+                  ) : null}
+
+                  {balanceResult ? (
+                    <div className="space-y-3 rounded-xl border border-white/10 bg-bg-primary/40 p-3">
+                      <div className="grid gap-3 md:grid-cols-3">
+                        <div className="rounded-lg border border-white/10 bg-bg-secondary/40 p-3">
+                          <p className="text-xs text-text-tertiary">팀 A 예상 승률</p>
+                          <p className="mt-1 text-xl font-bold text-emerald-300">
+                            {(balanceResult.teamA.adjustedWinRate * 100).toFixed(1)}%
+                          </p>
+                        </div>
+                        <div className="rounded-lg border border-white/10 bg-bg-secondary/40 p-3">
+                          <p className="text-xs text-text-tertiary">팀 B 예상 승률</p>
+                          <p className="mt-1 text-xl font-bold text-cyan-300">
+                            {(balanceResult.teamB.adjustedWinRate * 100).toFixed(1)}%
+                          </p>
+                        </div>
+                        <div className="rounded-lg border border-white/10 bg-bg-secondary/40 p-3">
+                          <p className="text-xs text-text-tertiary">신뢰도</p>
+                          <p className="mt-1 text-xl font-bold text-text-primary">
+                            {balanceResult.confidence.level === "high"
+                              ? "높음"
+                              : balanceResult.confidence.level === "moderate"
+                                ? "보통"
+                                : "낮음"}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="h-3 w-full overflow-hidden rounded-full bg-bg-tertiary">
+                        <div
+                          className="h-full bg-emerald-400"
+                          style={{ width: `${Math.max(2, Math.min(98, balanceResult.teamA.adjustedWinRate * 100))}%` }}
+                        />
+                      </div>
+                      <p className="text-xs text-text-secondary">
+                        팀 A 승률 {(balanceResult.teamA.adjustedWinRate * 100).toFixed(1)}% · 신뢰도{" "}
+                        {balanceResult.confidence.level === "high"
+                          ? "높음"
+                          : balanceResult.confidence.level === "moderate"
+                            ? "보통"
+                            : "낮음"}{" "}
+                        · 샘플 {balanceResult.similarMatches.count}게임
+                      </p>
+                      <p className="text-xs text-amber-200">
+                        참고용 예측입니다. 실제 결과는 밴픽/조합/컨디션에 따라 달라질 수 있습니다.
+                      </p>
+                    </div>
+                  ) : null}
+
+                  <div className="my-2 border-t border-white/10" />
+
+                  <div>
+                    <h3 className="text-base font-semibold text-text-primary">밴픽 추천기</h3>
+                    <p className="text-xs text-text-secondary">
+                      참가자를 최대 10명 선택하면 추천 밴 챔피언과 포지션별 OP 픽을 제공합니다.
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border border-white/10 bg-bg-primary/40 p-3">
+                    <div className="mb-2 flex flex-wrap items-center gap-2">
+                      {banParticipants.map((user) => (
+                        <span
+                          key={`ban-participant-${user.id}`}
+                          className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-1 text-xs text-amber-200"
+                        >
+                          {user.username}
+                          <button
+                            type="button"
+                            onClick={() => removeBanParticipant(user.id)}
+                            className="text-rose-300"
+                          >
+                            x
+                          </button>
+                        </span>
+                      ))}
+                      {banParticipants.length === 0 ? (
+                        <p className="text-xs text-text-tertiary">
+                          상단 검색 결과의 `밴 풀` 버튼으로 참가자를 추가하세요.
+                        </p>
+                      ) : null}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={runBanRecommend}
+                        disabled={banRecommendLoading}
+                        className="rounded-lg bg-amber-500/20 px-4 py-2 text-sm font-semibold text-amber-300 hover:bg-amber-500/30 disabled:opacity-50"
+                      >
+                        {banRecommendLoading ? "추천 생성 중..." : "밴 추천 생성"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBanParticipants([]);
+                          setBanRecommendResult(null);
+                          setBanRecommendError(null);
+                        }}
+                        className="rounded-lg bg-bg-primary/60 px-4 py-2 text-sm text-text-secondary hover:bg-bg-elevated"
+                      >
+                        밴 풀 초기화
+                      </button>
+                      <span className="text-xs text-text-tertiary">
+                        {banParticipants.length}/10
+                      </span>
+                    </div>
+                  </div>
+
+                  {banRecommendError ? (
+                    <div className="rounded-lg border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">
+                      {banRecommendError}
+                    </div>
+                  ) : null}
+
+                  {banRecommendResult?.recommendations?.length ? (
+                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                      {banRecommendResult.recommendations.map((row) => (
+                        <div key={`ban-rec-${row.championId}`} className="rounded-xl border border-amber-300/25 bg-amber-500/10 p-3">
+                          <div className="flex items-center gap-2">
+                            <div className="relative h-9 w-9 overflow-hidden rounded-lg border border-white/10">
+                              <Image
+                                src={getChampionIconById(row.championId)}
+                                alt={row.championNameKorean}
+                                fill
+                                className="object-cover"
+                                unoptimized
+                              />
+                            </div>
+                            <div>
+                              <p className="font-semibold text-text-primary">{row.championNameKorean}</p>
+                              <p className="text-xs text-amber-200">banScore {row.banScore.toFixed(2)}</p>
+                            </div>
+                          </div>
+                          <ul className="mt-2 space-y-1 text-xs text-text-secondary">
+                            {row.reasons.map((reason, idx) => (
+                              <li key={`ban-reason-${row.championId}-${idx}`}>- {reason}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  <Card className="border-white/10 bg-bg-primary/40">
+                    <CardHeader>
+                      <CardTitle className="text-base">포지션별 픽 추천 (현재 OP 기준)</CardTitle>
+                    </CardHeader>
+                    <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+                      {(["TOP", "JUNGLE", "MID", "ADC", "SUPPORT"] as const).map((position) => {
+                        const picks = (metaRadar?.tiers?.[position] ?? []).slice(0, 3);
+                        return (
+                          <div key={`pick-rec-${position}`} className="rounded-lg border border-white/10 bg-bg-secondary/40 p-2">
+                            <p className="mb-2 text-xs font-semibold text-text-primary">{formatPosition(position)}</p>
+                            <div className="space-y-1.5">
+                              {picks.length === 0 ? (
+                                <p className="text-xs text-text-tertiary">데이터 없음</p>
+                              ) : (
+                                picks.map((pick) => (
+                                  <div key={`pick-${position}-${pick.championId}`} className="flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-1.5">
+                                      <div className="relative h-6 w-6 overflow-hidden rounded border border-white/10">
+                                        <Image
+                                          src={getChampionIconById(pick.championId)}
+                                          alt={`pick-${pick.championId}`}
+                                          fill
+                                          className="object-cover"
+                                          unoptimized
+                                        />
+                                      </div>
+                                      <span className="text-xs text-text-secondary">#{pick.championId}</span>
+                                    </div>
+                                    <Badge variant={pick.tier === "S" ? "success" : "secondary"} size="sm">
+                                      {pick.tier}
+                                    </Badge>
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {activeTab === "compositions" ? (
+          <Card className="border-white/10 bg-bg-secondary/80">
+            <CardHeader>
+              <CardTitle>시너지 조합 분석</CardTitle>
+              <CardDescription>
+                챔피언을 선택해 시너지 파트너 승률 순위를 확인합니다.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="mb-4 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSynergyChampionId(null)}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
+                    synergyChampionId === null
+                      ? "bg-emerald-500/20 text-emerald-300"
+                      : "bg-bg-primary/60 text-text-secondary"
+                  }`}
+                >
+                  전체 조합
+                </button>
+                <select
+                  value={synergyChampionId ?? ""}
+                  onChange={(e) =>
+                    setSynergyChampionId(
+                      e.target.value ? Number(e.target.value) : null,
+                    )
+                  }
+                  className="min-w-[240px] rounded-lg border border-white/10 bg-bg-primary/70 px-3 py-2 text-sm text-text-primary outline-none"
+                >
+                  <option value="">챔피언 선택</option>
+                  {championCatalog.map((champion) => (
+                    <option key={`synergy-option-${champion.championId}`} value={champion.championId}>
+                      {champion.championNameKorean}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {synergyLoading ? (
+                <div className="flex min-h-[220px] items-center justify-center">
+                  <LoadingSpinner />
+                </div>
+              ) : synergyRows.length === 0 ? (
+                <div className="rounded-xl border border-white/10 bg-bg-primary/50 p-4 text-sm text-text-secondary">
+                  조건에 맞는 시너지 조합이 없습니다. (데이터 부족)
+                </div>
+              ) : (
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  {synergyRows.map((row) => {
+                    const isFiltered = synergyChampionId !== null;
+                    const partnerId =
+                      isFiltered && row.champ1Id === synergyChampionId
+                        ? row.champ2Id
+                        : row.champ1Id;
+                    const partnerName =
+                      isFiltered && row.champ1Id === synergyChampionId
+                        ? row.champ2NameKorean
+                        : row.champ1NameKorean;
+                    return (
+                      <div key={`${row.champ1Id}-${row.champ2Id}`} className={`rounded-xl border border-white/10 bg-bg-primary/50 p-3 ${row.confidenceLevel === "low" ? "opacity-80" : ""}`}>
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <div className="relative h-9 w-9 overflow-hidden rounded-lg border border-white/10">
+                              <Image src={getChampionIconById(row.champ1Id)} alt={row.champ1NameKorean} fill className="object-cover" unoptimized />
+                            </div>
+                            <span className="text-xs text-text-tertiary">+</span>
+                            <div className="relative h-9 w-9 overflow-hidden rounded-lg border border-white/10">
+                              <Image src={getChampionIconById(row.champ2Id)} alt={row.champ2NameKorean} fill className="object-cover" unoptimized />
+                            </div>
+                          </div>
+                          <Badge variant={row.confidenceLevel === "high" ? "success" : "warning"} size="sm">
+                            {confidenceLabel(row.confidenceLevel)}
+                          </Badge>
+                        </div>
+                        <p className="mt-2 text-sm font-semibold text-text-primary">
+                          {isFiltered ? `파트너: ${partnerName}` : `${row.champ1NameKorean} + ${row.champ2NameKorean}`}
+                        </p>
+                        <p className="mt-1 text-xs text-text-secondary">
+                          {row.games}게임 · 승률 {formatRate(row.winRate)}
+                        </p>
+                        <p className="mt-1 text-xs text-text-tertiary">
+                          기대 대비 {row.deltaWinRate >= 0 ? "+" : ""}
+                          {(row.deltaWinRate * 100).toFixed(1)}%p
+                        </p>
+                        {row.badges.length > 0 ? (
+                          <div className="mt-2 flex flex-wrap gap-1">
+                            {row.badges.map((badge) => (
+                              <Badge key={`${row.champ1Id}-${row.champ2Id}-${badge}`} variant="success" size="sm">
+                                {badge}
+                              </Badge>
+                            ))}
+                          </div>
+                        ) : null}
+                        {isFiltered ? (
+                          <button
+                            type="button"
+                            onClick={() => setSynergyChampionId(partnerId)}
+                            className="mt-3 text-xs text-cyan-300 hover:text-cyan-200"
+                          >
+                            {partnerName} 중심으로 보기
+                          </button>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div className="my-6 border-t border-white/10" />
+
+              <div className="mb-3">
+                <h3 className="text-base font-semibold text-text-primary">카운터 상성</h3>
+                <p className="text-xs text-text-secondary">
+                  챔피언 기준 상성 데이터를 포지션별로 확인합니다.
+                </p>
+              </div>
+
+              <div className="mb-4 grid gap-2 md:grid-cols-4">
+                <select
+                  value={counterChampionId ?? ""}
+                  onChange={(e) =>
+                    setCounterChampionId(e.target.value ? Number(e.target.value) : null)
+                  }
+                  className="rounded-lg border border-white/10 bg-bg-primary/70 px-3 py-2 text-sm text-text-primary outline-none"
+                >
+                  <option value="">기준 챔피언 (전체)</option>
+                  {championCatalog.map((champion) => (
+                    <option key={`counter-champion-${champion.championId}`} value={champion.championId}>
+                      {champion.championNameKorean}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={counterVsChampionId ?? ""}
+                  onChange={(e) =>
+                    setCounterVsChampionId(e.target.value ? Number(e.target.value) : null)
+                  }
+                  className="rounded-lg border border-white/10 bg-bg-primary/70 px-3 py-2 text-sm text-text-primary outline-none"
+                >
+                  <option value="">상대 챔피언 (전체)</option>
+                  {championCatalog.map((champion) => (
+                    <option key={`counter-vs-${champion.championId}`} value={champion.championId}>
+                      {champion.championNameKorean}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={counterPosition}
+                  onChange={(e) =>
+                    setCounterPosition(
+                      (e.target.value || "ALL") as
+                        | "ALL"
+                        | "TOP"
+                        | "JUNGLE"
+                        | "MID"
+                        | "ADC"
+                        | "SUPPORT",
+                    )
+                  }
+                  className="rounded-lg border border-white/10 bg-bg-primary/70 px-3 py-2 text-sm text-text-primary outline-none"
+                >
+                  <option value="ALL">전체 포지션</option>
+                  <option value="TOP">탑</option>
+                  <option value="JUNGLE">정글</option>
+                  <option value="MID">미드</option>
+                  <option value="ADC">원딜</option>
+                  <option value="SUPPORT">서포터</option>
+                </select>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCounterChampionId(null);
+                    setCounterVsChampionId(null);
+                    setCounterPosition("ALL");
+                  }}
+                  className="rounded-lg bg-bg-primary/60 px-3 py-2 text-sm text-text-secondary hover:bg-bg-elevated"
+                >
+                  필터 초기화
+                </button>
+              </div>
+
+              {counterLoading ? (
+                <div className="flex min-h-[180px] items-center justify-center">
+                  <LoadingSpinner />
+                </div>
+              ) : (counterData?.rows ?? []).length === 0 ? (
+                <div className="rounded-xl border border-white/10 bg-bg-primary/50 p-4 text-sm text-text-secondary">
+                  조건에 맞는 카운터 데이터가 없습니다. (데이터 부족)
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {(counterData?.rows ?? []).map((row) => (
+                    <div
+                      key={`${row.champId}-${row.vsChampId}-${row.position ?? "ALL"}`}
+                      className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border px-3 py-2 ${
+                        row.verdict === "favorable"
+                          ? "border-emerald-400/25 bg-emerald-500/10"
+                          : row.verdict === "unfavorable"
+                            ? "border-rose-400/25 bg-rose-500/10"
+                            : "border-white/10 bg-bg-primary/50"
+                      } ${row.confidenceLevel === "low" ? "opacity-80" : ""}`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className="relative h-8 w-8 overflow-hidden rounded-md border border-white/10">
+                          <Image src={getChampionIconById(row.champId)} alt={row.champNameKorean} fill className="object-cover" unoptimized />
+                        </div>
+                        <span className="text-xs text-text-tertiary">vs</span>
+                        <div className="relative h-8 w-8 overflow-hidden rounded-md border border-white/10">
+                          <Image src={getChampionIconById(row.vsChampId)} alt={row.vsChampNameKorean} fill className="object-cover" unoptimized />
+                        </div>
+                        <p className="text-sm text-text-primary">
+                          {row.champNameKorean} vs {row.vsChampNameKorean}
+                          {row.position ? ` (${formatPosition(row.position)})` : ""}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-text-secondary">
+                        <span>{row.games}게임</span>
+                        <span>승률 {formatRate(row.winRate)}</span>
+                        <Badge
+                          variant={
+                            row.verdict === "favorable"
+                              ? "success"
+                              : row.verdict === "unfavorable"
+                                ? "danger"
+                                : "secondary"
+                          }
+                          size="sm"
+                        >
+                          {row.verdict === "favorable"
+                            ? "유리"
+                            : row.verdict === "unfavorable"
+                              ? "불리"
+                              : "비등"}
+                        </Badge>
+                        <Badge variant={row.confidenceLevel === "high" ? "success" : "warning"} size="sm">
+                          {confidenceLabel(row.confidenceLevel)}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="my-6 border-t border-white/10" />
+
+              <div className="mb-3">
+                <h3 className="text-base font-semibold text-text-primary">팀 구성 유형 분석</h3>
+                <p className="text-xs text-text-secondary">
+                  한타/스플릿/포킹/속공/탱커라인 유형별 승률과 픽률입니다.
+                </p>
+              </div>
+
+              {compositionsLoading ? (
+                <div className="flex min-h-[180px] items-center justify-center">
+                  <LoadingSpinner />
+                </div>
+              ) : (compositionsData?.rows ?? []).length === 0 ? (
+                <div className="rounded-xl border border-white/10 bg-bg-primary/50 p-4 text-sm text-text-secondary">
+                  조합 유형 데이터가 없습니다. (데이터 부족)
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {(compositionsData?.rows ?? []).map((row) => {
+                    const barWidth = Math.max(4, row.winRate * 100);
+                    return (
+                      <div
+                        key={`composition-${row.type}`}
+                        className={`rounded-xl border border-white/10 bg-bg-primary/50 p-3 ${row.confidenceLevel === "low" ? "opacity-80" : ""}`}
+                      >
+                        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex items-center gap-3">
+                            <p className="font-semibold text-text-primary">{row.label}</p>
+                            <div className="flex items-center gap-1">
+                              {(COMPOSITION_EXAMPLE_CHAMPIONS[row.type] ?? []).map((championId) => (
+                                <div key={`${row.type}-${championId}`} className="relative h-6 w-6 overflow-hidden rounded border border-white/10">
+                                  <Image
+                                    src={getChampionIconById(championId)}
+                                    alt={`${row.label}-example-${championId}`}
+                                    fill
+                                    className="object-cover"
+                                    unoptimized
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge variant={row.confidenceLevel === "high" ? "success" : "warning"} size="sm">
+                              {confidenceLabel(row.confidenceLevel)}
+                            </Badge>
+                            <Badge variant="secondary" size="sm">
+                              참고용
+                            </Badge>
+                          </div>
+                        </div>
+                        <div className="h-2 w-full overflow-hidden rounded-full bg-bg-tertiary">
+                          <div className="h-full rounded-full bg-cyan-400" style={{ width: `${barWidth}%` }} />
+                        </div>
+                        <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-text-secondary">
+                          <span>{row.games}팀</span>
+                          <span>승률 {(row.winRate * 100).toFixed(1)}%</span>
+                          <span>픽률 {(row.pickRate * 100).toFixed(1)}%</span>
+                          <span>평균 길이 {Math.round(row.avgGameDurationSec / 60)}분</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  <p className="text-xs text-text-tertiary">{compositionsData?.caveat}</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {activeTab === "champions" ? (
+          <Card className="border-white/10 bg-bg-secondary/80">
+            <CardHeader>
+              <CardTitle>챔피언 분석 목록</CardTitle>
+              <CardDescription>
+                검색/정렬/포지션 필터 기반으로 챔피언 픽률·승률·밴률을 탐색합니다.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <input
+                  value={championSearch}
+                  onChange={(e) => setChampionSearch(e.target.value)}
+                  placeholder="챔피언 검색 (한글/영문)"
+                  className="w-full rounded-xl border border-white/10 bg-bg-primary/70 px-3 py-2 text-sm text-text-primary outline-none placeholder:text-text-tertiary md:max-w-sm"
+                />
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setChampionSort("pickRate")}
+                    className={`rounded-lg px-3 py-1.5 text-xs ${championSort === "pickRate" ? "bg-emerald-500/20 text-emerald-300" : "bg-bg-primary/60 text-text-secondary"}`}
+                  >
+                    픽률순
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setChampionSort("winRate")}
+                    className={`rounded-lg px-3 py-1.5 text-xs ${championSort === "winRate" ? "bg-emerald-500/20 text-emerald-300" : "bg-bg-primary/60 text-text-secondary"}`}
+                  >
+                    승률순
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setChampionSort("banRate")}
+                    className={`rounded-lg px-3 py-1.5 text-xs ${championSort === "banRate" ? "bg-emerald-500/20 text-emerald-300" : "bg-bg-primary/60 text-text-secondary"}`}
+                  >
+                    밴률순
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIncludeLowSample((prev) => !prev)}
+                    className={`rounded-lg px-3 py-1.5 text-xs ${includeLowSample ? "bg-cyan-500/20 text-cyan-300" : "bg-bg-primary/60 text-text-secondary"}`}
+                  >
+                    5게임 미만 포함
+                  </button>
+                </div>
+              </div>
+
+              <div className="mb-4 flex flex-wrap items-center gap-2">
+                {(["ALL", "TOP", "JUNGLE", "MID", "ADC", "SUPPORT"] as const).map((position) => (
+                  <button
+                    key={position}
+                    type="button"
+                    onClick={() => setPosition(position)}
+                    className={`rounded-lg px-3 py-1.5 text-xs ${activePosition === position ? "bg-violet-500/20 text-violet-300" : "bg-bg-primary/60 text-text-secondary"}`}
+                  >
+                    {position === "ALL" ? "전체" : formatPosition(position)}
+                  </button>
+                ))}
+              </div>
+
+              <div className="overflow-x-auto rounded-xl border border-white/10">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-bg-primary/70 text-text-tertiary">
+                    <tr>
+                      <th className="px-3 py-2 text-left">챔피언</th>
+                      <th className="px-3 py-2 text-right">티어</th>
+                      <th className="px-3 py-2 text-right">게임</th>
+                      <th className="px-3 py-2 text-right">승률</th>
+                      <th className="px-3 py-2 text-right">픽률</th>
+                      <th className="px-3 py-2 text-right">밴률</th>
+                      <th className="px-3 py-2 text-right">신뢰도</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {championRowsFiltered.map((row) => (
+                      <tr
+                        key={row.championId}
+                        className={`border-t border-white/10 bg-bg-secondary/40 transition-colors hover:bg-bg-elevated/60 ${
+                          row.confidenceLevel === "low" ? "opacity-80" : ""
+                        }`}
+                      >
+                        <td className="px-3 py-2">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedChampionId(row.championId)}
+                            className="flex items-center gap-2 text-left"
+                          >
+                            <div className="relative h-8 w-8 overflow-hidden rounded-lg border border-white/10">
+                              <Image
+                                src={getChampionIconById(row.championId)}
+                                alt={row.championNameKorean}
+                                fill
+                                className="object-cover"
+                                unoptimized
+                              />
+                            </div>
+                            <span className="text-text-primary">{row.championNameKorean}</span>
+                          </button>
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          <Badge variant={row.tier === "S" ? "success" : row.tier === "A" ? "default" : "secondary"}>
+                            {row.tier}
+                          </Badge>
+                        </td>
+                        <td className="px-3 py-2 text-right text-text-secondary">{row.games}</td>
+                        <td className="px-3 py-2 text-right text-text-secondary">{(row.winRate * 100).toFixed(1)}%</td>
+                        <td className="px-3 py-2 text-right text-text-secondary">{row.pickRate.toFixed(2)}%</td>
+                        <td className="px-3 py-2 text-right text-text-secondary">{row.banRate.toFixed(2)}%</td>
+                        <td className="px-3 py-2 text-right">
+                          <Badge variant={row.confidenceLevel === "high" ? "success" : "warning"}>
+                            {confidenceLabel(row.confidenceLevel)}
+                          </Badge>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {championRowsFiltered.length === 0 ? (
+                <p className="mt-3 text-sm text-text-secondary">조건에 맞는 챔피언 데이터가 없습니다.</p>
+              ) : null}
+            </CardContent>
+          </Card>
+        ) : null}
+
+        <Modal
+          isOpen={selectedChampionId !== null}
+          onClose={() => setSelectedChampionId(null)}
+          size="full"
+          title={
+            selectedChampionRow
+              ? `${selectedChampionRow.championNameKorean} 상세 분석`
+              : "챔피언 상세 분석"
+          }
+        >
+          {championDetailLoading ? (
+            <div className="flex min-h-[320px] items-center justify-center">
+              <LoadingSpinner />
+            </div>
+          ) : championDetailError ? (
+            <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 p-4 text-sm text-rose-200">
+              {championDetailError}
+            </div>
+          ) : championDetail && championMastery ? (
+            <div className="space-y-6">
+              <div className="grid gap-3 md:grid-cols-4">
+                <div className="rounded-xl border border-white/10 bg-bg-primary/50 p-3">
+                  <p className="text-xs text-text-tertiary">누적 게임</p>
+                  <p className="mt-1 text-xl font-bold text-text-primary">{championDetail.totals.games}</p>
+                </div>
+                <div className="rounded-xl border border-white/10 bg-bg-primary/50 p-3">
+                  <p className="text-xs text-text-tertiary">승률</p>
+                  <p className="mt-1 text-xl font-bold text-emerald-300">{formatRate(championDetail.totals.winRate)}</p>
+                </div>
+                <div className="rounded-xl border border-white/10 bg-bg-primary/50 p-3">
+                  <p className="text-xs text-text-tertiary">장인 자격 통과</p>
+                  <p className="mt-1 text-xl font-bold text-cyan-300">{championMastery.qualifiedCount}명</p>
+                </div>
+                <div className="rounded-xl border border-white/10 bg-bg-primary/50 p-3">
+                  <p className="text-xs text-text-tertiary">기간</p>
+                  <p className="mt-1 text-xl font-bold text-text-primary">{championDetail.period}</p>
+                </div>
+              </div>
+
+              <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+                <Card className="border-white/10 bg-bg-primary/40">
+                  <CardHeader>
+                    <CardTitle className="text-base">기간별 승률 추이</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {championDetail.trendInsufficient || !trendChartData ? (
+                      <p className="text-sm text-text-secondary">주간 데이터가 3포인트 미만이라 추이를 표시하지 않습니다.</p>
+                    ) : (
+                      <svg viewBox={`0 0 ${trendChartData.width} ${trendChartData.height}`} className="w-full">
+                        {trendChartData.yTicks.map((tick, idx) => (
+                          <g key={idx}>
+                            <line
+                              x1={trendChartData.pad.left}
+                              x2={trendChartData.width - trendChartData.pad.right}
+                              y1={trendChartData.toY(tick)}
+                              y2={trendChartData.toY(tick)}
+                              stroke="currentColor"
+                              strokeOpacity={0.12}
+                            />
+                            <text
+                              x={trendChartData.pad.left - 4}
+                              y={trendChartData.toY(tick) + 4}
+                              textAnchor="end"
+                              fontSize="10"
+                              fill="currentColor"
+                              fillOpacity={0.6}
+                            >
+                              {(tick * 100).toFixed(1)}%
+                            </text>
+                          </g>
+                        ))}
+                        <path d={trendChartData.area} fill="#10b981" fillOpacity={0.12} />
+                        <path d={trendChartData.path} stroke="#34d399" strokeWidth="2.5" fill="none" />
+                        {trendChartData.points.map((point, idx) => (
+                          <circle
+                            key={point.weekStart}
+                            cx={trendChartData.xTicks[idx].x}
+                            cy={trendChartData.toY(point.winRate)}
+                            r="3.5"
+                            fill="#34d399"
+                          />
+                        ))}
+                        {trendChartData.xTicks.map((tick, idx) => (
+                          <text
+                            key={`${tick.label}-${idx}`}
+                            x={tick.x}
+                            y={trendChartData.height - 8}
+                            textAnchor="middle"
+                            fontSize="10"
+                            fill="currentColor"
+                            fillOpacity={0.6}
+                          >
+                            {tick.label}
+                          </text>
+                        ))}
+                      </svg>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card className="border-white/10 bg-bg-primary/40">
+                  <CardHeader>
+                    <CardTitle className="text-base">포지션 분포</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {positionPie.length === 0 ? (
+                      <p className="text-sm text-text-secondary">포지션 분포 데이터가 없습니다.</p>
+                    ) : (
+                      <div className="flex flex-col gap-4 md:flex-row md:items-center">
+                        <svg viewBox="0 0 192 192" className="h-44 w-44 shrink-0">
+                          {positionPie.map((slice) => (
+                            <path key={slice.position} d={slice.path} fill={slice.color} opacity={slice.confidenceLevel === "low" ? 0.7 : 1} />
+                          ))}
+                          <circle cx="96" cy="96" r="36" fill="rgba(15,23,42,0.9)" />
+                        </svg>
+                        <div className="w-full space-y-2">
+                          {positionPie.map((slice) => (
+                            <div key={`legend-${slice.position}`} className={`rounded-lg border border-white/10 bg-bg-secondary/40 px-3 py-2 text-xs ${slice.confidenceLevel === "low" ? "opacity-75" : ""}`}>
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="font-semibold text-text-primary">{formatPosition(slice.position)}</span>
+                                <Badge variant={slice.confidenceLevel === "high" ? "success" : "warning"} size="sm">
+                                  {confidenceLabel(slice.confidenceLevel)}
+                                </Badge>
+                              </div>
+                              <p className="mt-1 text-text-secondary">
+                                {slice.games}게임 · 점유율 {(slice.pickRateWithinChampion * 100).toFixed(1)}% · 승률 {formatRate(slice.winRate)}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="grid gap-4 xl:grid-cols-2">
+                <Card className="border-white/10 bg-bg-primary/40">
+                  <CardHeader>
+                    <CardTitle className="text-base">최고 성과 빌드 TOP 5</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {championDetail.topItemCombos.length === 0 ? (
+                      <p className="text-sm text-text-secondary">조건을 만족하는 빌드 조합이 없습니다.</p>
+                    ) : championDetail.topItemCombos.map((combo) => (
+                      <div key={`${combo.itemIds[0]}-${combo.itemIds[1]}`} className="flex items-center justify-between rounded-lg border border-white/10 bg-bg-secondary/50 px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          <div className="relative h-8 w-8 overflow-hidden rounded-md border border-white/10">
+                            <Image src={getItemIcon(combo.itemIds[0])} alt={`item-${combo.itemIds[0]}`} fill className="object-cover" unoptimized />
+                          </div>
+                          <div className="relative h-8 w-8 overflow-hidden rounded-md border border-white/10">
+                            <Image src={getItemIcon(combo.itemIds[1])} alt={`item-${combo.itemIds[1]}`} fill className="object-cover" unoptimized />
+                          </div>
+                        </div>
+                        <p className="text-xs text-text-secondary">{combo.games}게임</p>
+                        <p className="text-sm font-semibold text-emerald-300">{formatRate(combo.winRate)}</p>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+
+                <Card className="border-white/10 bg-bg-primary/40">
+                  <CardHeader>
+                    <CardTitle className="text-base">최고 성과 룬 TOP 3</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {championDetail.topRuneCombos.length === 0 ? (
+                      <p className="text-sm text-text-secondary">조건을 만족하는 룬 조합이 없습니다.</p>
+                    ) : championDetail.topRuneCombos.map((combo) => (
+                      <div key={`${combo.primaryStyle}-${combo.subStyle}-${combo.keystonePerk}`} className="flex items-center justify-between rounded-lg border border-white/10 bg-bg-secondary/50 px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          {[combo.keystonePerk, combo.primaryStyle, combo.subStyle].map((runeId) => (
+                            <RuneTooltip runeId={runeId} key={`${combo.primaryStyle}-${runeId}`}>
+                              <div className="relative h-8 w-8 overflow-hidden rounded-full border border-white/10 bg-slate-950/50">
+                                <Image
+                                  src={`/icons/perks/${runeId}.png`}
+                                  alt={`rune-${runeId}`}
+                                  fill
+                                  className="object-cover"
+                                  unoptimized
+                                />
+                              </div>
+                            </RuneTooltip>
+                          ))}
+                        </div>
+                        <p className="text-xs text-text-secondary">{combo.games}게임</p>
+                        <p className="text-sm font-semibold text-cyan-300">{formatRate(combo.winRate)}</p>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              </div>
+
+              {championMastery.appliedCriteria.isRelaxed ? (
+                <div className="rounded-lg border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
+                  현재 완화 기준 적용 중: {championMastery.appliedCriteria.minTier} {championMastery.appliedCriteria.minRank} 이상 · {championMastery.appliedCriteria.minGames}게임 · 승률 {(championMastery.appliedCriteria.minWinRate * 100).toFixed(0)}%+
+                </div>
+              ) : null}
+
+              {championMastery.insufficient ? (
+                <div className="rounded-lg border border-white/10 bg-bg-primary/50 px-3 py-4 text-sm text-text-secondary">
+                  자격 통과자가 3명 미만이라 장인 데이터가 부족합니다.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <h3 className="text-lg font-semibold text-text-primary">장인 목록 (최대 50위)</h3>
+                  <div className="grid gap-3 md:grid-cols-3">
+                    {championMastery.masteries.slice(0, 3).map((entry) => (
+                      <div key={`podium-${entry.userId}`} className="rounded-xl border border-white/10 bg-bg-primary/50 p-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 text-text-primary">
+                            {entry.rank === 1 ? <Crown className="h-4 w-4 text-amber-300" /> : <Medal className={`h-4 w-4 ${entry.rank === 2 ? "text-slate-300" : "text-amber-600"}`} />}
+                            <span className="font-semibold">{entry.rank}위</span>
+                          </div>
+                          <Badge variant={tierBadgeVariant(entry.riotTier)} size="sm">
+                            {tierLabel(entry.riotTier, entry.riotRank)}
+                          </Badge>
+                        </div>
+                        <p className="mt-2 font-semibold text-text-primary">{entry.username}</p>
+                        <p className="text-xs text-text-secondary">
+                          {entry.champGames}게임 · 챔프승률 {formatRate(entry.champWinRate)} · 내전승률 {(entry.nexusWinRate * 100).toFixed(1)}%
+                        </p>
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {entry.badges.map((badge) => (
+                            <Badge key={`${entry.userId}-${badge}`} variant={badge === "커뮤니티 인증" ? "success" : badge === "고평가" ? "warning" : "secondary"} size="sm">
+                              {badge}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="overflow-x-auto rounded-xl border border-white/10">
+                    <table className="min-w-full text-sm">
+                      <thead className="bg-bg-primary/70 text-text-tertiary">
+                        <tr>
+                          <th className="px-3 py-2 text-left">순위</th>
+                          <th className="px-3 py-2 text-left">이름</th>
+                          <th className="px-3 py-2 text-left">티어</th>
+                          <th className="px-3 py-2 text-right">게임</th>
+                          <th className="px-3 py-2 text-right">승률</th>
+                          <th className="px-3 py-2 text-right">점수</th>
+                          <th className="px-3 py-2 text-right">masteryScore</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {championMastery.masteries.map((entry) => (
+                          <tr key={`mastery-${entry.userId}`} className="border-t border-white/10">
+                            <td className="px-3 py-2 text-text-secondary">{entry.rank}</td>
+                            <td className="px-3 py-2">
+                              <div className="flex items-center gap-2">
+                                <span className="text-text-primary">{entry.username}</span>
+                                {entry.badges.map((badge) => (
+                                  <Badge key={`${entry.userId}-${badge}-row`} variant={badge === "커뮤니티 인증" ? "success" : badge === "고평가" ? "warning" : "secondary"} size="sm">
+                                    {badge}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </td>
+                            <td className="px-3 py-2">
+                              <Badge variant={tierBadgeVariant(entry.riotTier)} size="sm">
+                                {tierLabel(entry.riotTier, entry.riotRank)}
+                              </Badge>
+                            </td>
+                            <td className="px-3 py-2 text-right text-text-secondary">{entry.champGames}</td>
+                            <td className="px-3 py-2 text-right text-text-secondary">{formatRate(entry.champWinRate)}</td>
+                            <td className="px-3 py-2 text-right">
+                              <span
+                                className="inline-flex items-center gap-1 text-text-secondary"
+                                title={`볼륨 ${entry.scoreBreakdown.volume.toFixed(1)} / 실력 ${entry.scoreBreakdown.skill.toFixed(1)} / 임팩트 ${entry.scoreBreakdown.impact.toFixed(1)} / 최근성 ${entry.scoreBreakdown.recency.toFixed(1)}`}
+                              >
+                                <Info className="h-3.5 w-3.5" />
+                                분해
+                              </span>
+                            </td>
+                            <td className="px-3 py-2">
+                              <div className="flex items-center justify-end gap-2">
+                                <div className="h-2 w-28 overflow-hidden rounded-full bg-bg-tertiary">
+                                  <div className="h-full rounded-full bg-emerald-400" style={{ width: `${Math.min((entry.masteryScore / 100) * 100, 100)}%` }} />
+                                </div>
+                                <span className="w-10 text-right text-text-primary">{entry.masteryScore.toFixed(1)}</span>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-text-secondary">챔피언을 선택하면 상세 데이터를 불러옵니다.</p>
+          )}
+        </Modal>
+
+        {activeTab === "meta" ? (
+          <>
+        <div className="mb-6 grid gap-6 xl:grid-cols-2">
+          <Card className="border-white/10 bg-bg-secondary/80">
+            <CardHeader>
+              <CardTitle>트렌딩 챔피언</CardTitle>
+              <CardDescription>최근 픽률 상승폭 기준 TOP 5</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {(metaRadar?.trending ?? []).slice(0, 5).map((champion) => (
+                <div key={champion.championId} className="flex items-center gap-3 rounded-xl border border-white/10 bg-bg-primary/60 p-3">
+                  <div className="relative h-10 w-10 overflow-hidden rounded-lg border border-white/10 bg-slate-950/60">
+                    <Image
+                      src={getChampionIconById(champion.championId)}
+                      alt={champion.championNameKorean}
+                      fill
+                      className="object-cover"
+                      unoptimized
+                    />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-semibold text-text-primary">{champion.championNameKorean}</p>
+                    <p className="text-xs text-text-tertiary">
+                      승률 {champion.recentWinRate.toFixed(1)}% · 최근 {champion.recentGames}게임
+                    </p>
+                  </div>
+                  <Badge variant="success">+{champion.pickRateDelta.toFixed(2)}%p</Badge>
+                </div>
+              ))}
+              {(metaRadar?.trending ?? []).length === 0 ? (
+                <p className="text-sm text-text-secondary">트렌딩 데이터가 아직 부족합니다.</p>
+              ) : null}
+            </CardContent>
+          </Card>
+
+          <Card className="border-white/10 bg-bg-secondary/80">
+            <CardHeader>
+              <CardTitle>내전 vs 랭크 메타 비교</CardTitle>
+              <CardDescription>Task 39 연계 전까지 랭크 섹션은 플레이스홀더로 유지됩니다.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-2xl border border-dashed border-white/15 bg-bg-primary/60 p-4 text-sm text-text-secondary">
+                랭크 메타 스냅샷 수집 중입니다. Phase 13 Task 39 완료 후 내전 대비 승률 차이 섹션이 활성화됩니다.
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card className="mb-6 border-white/10 bg-bg-secondary/80">
+          <CardHeader>
+            <CardTitle>포지션별 티어 그리드</CardTitle>
+            <CardDescription>Wilson + Pick 가중 점수 기반 (S/A/B/C/D)</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+            {["TOP", "JUNGLE", "MID", "ADC", "SUPPORT"].map((position) => {
+              const rows = (metaRadar?.tiers?.[position] ?? []).slice(0, 5);
+              return (
+                <div key={position} className="rounded-xl border border-white/10 bg-bg-primary/60 p-3">
+                  <p className="mb-2 text-sm font-semibold text-text-primary">{formatPosition(position)}</p>
+                  <div className="space-y-2">
+                    {rows.map((row) => (
+                      <div key={`${position}-${row.championId}`} className="flex items-center justify-between gap-2 text-xs">
+                        <span className="truncate text-text-secondary">#{row.championId}</span>
+                        <div className="flex items-center gap-1">
+                          <Badge variant={row.tier === "S" ? "success" : row.tier === "A" ? "default" : "secondary"}>
+                            {row.tier}
+                          </Badge>
+                          <Badge variant={row.confidenceLevel === "high" ? "success" : "warning"}>
+                            {row.confidenceLevel}
+                          </Badge>
+                        </div>
+                      </div>
+                    ))}
+                    {rows.length === 0 ? (
+                      <p className="text-xs text-text-tertiary">데이터 부족</p>
+                    ) : null}
+                  </div>
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+
+        <div className="mb-6 grid gap-6 xl:grid-cols-2">
+          <Card className="border-white/10 bg-bg-secondary/80">
+            <CardHeader>
+              <CardTitle>패치 임팩트</CardTitle>
+              <CardDescription>
+                {patchImpact?.currentPatch && patchImpact?.previousPatch
+                  ? `${patchImpact.previousPatch} → ${patchImpact.currentPatch}`
+                  : "패치 비교 데이터 준비 중"}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-3 md:grid-cols-2">
+              <div>
+                <p className="mb-2 text-sm font-semibold text-emerald-300">수혜 TOP 3</p>
+                <div className="space-y-2">
+                  {(patchImpact?.buffed ?? []).slice(0, 3).map((row) => (
+                    <div key={`buff-${row.championId}`} className="rounded-lg border border-white/10 bg-bg-primary/60 px-3 py-2 text-xs text-text-secondary">
+                      {row.championNameKorean} · +{row.deltaWinRate.toFixed(1)}%p
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="mb-2 text-sm font-semibold text-rose-300">피해 TOP 3</p>
+                <div className="space-y-2">
+                  {(patchImpact?.nerfed ?? []).slice(0, 3).map((row) => (
+                    <div key={`nerf-${row.championId}`} className="rounded-lg border border-white/10 bg-bg-primary/60 px-3 py-2 text-xs text-text-secondary">
+                      {row.championNameKorean} · {row.deltaWinRate.toFixed(1)}%p
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-white/10 bg-bg-secondary/80">
+            <CardHeader>
+              <CardTitle>밴률 통계</CardTitle>
+              <CardDescription>밴률 상위 챔피언과 밴팀 승률 연관성</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {(banRates?.banStats ?? []).slice(0, 8).map((row) => (
+                <div key={`ban-${row.championId}`} className="flex items-center justify-between rounded-lg border border-white/10 bg-bg-primary/60 px-3 py-2 text-xs">
+                  <span className="text-text-secondary">#{row.championId}</span>
+                  <span className="text-text-secondary">밴률 {row.banRate.toFixed(2)}%</span>
+                  <span className="text-text-secondary">밴팀승률 {row.banTeamWinRate.toFixed(1)}%</span>
+                  <Badge variant={row.confidenceLevel === "high" ? "success" : "warning"}>
+                    {row.confidenceLevel}
+                  </Badge>
+                </div>
+              ))}
+              {(banRates?.banStats ?? []).length === 0 ? (
+                <p className="text-sm text-text-secondary">밴 통계 데이터가 부족합니다.</p>
+              ) : null}
+            </CardContent>
+          </Card>
+        </div>
+
         <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
           <Card className="border-white/10 bg-bg-secondary/80">
             <CardHeader>
@@ -371,6 +2903,77 @@ export default function LabPage() {
             </CardContent>
           </Card>
         </div>
+
+        <Card className="mt-6 border-white/10 bg-bg-secondary/80">
+          <CardHeader>
+            <div className="flex items-center gap-2 text-cyan-300">
+              <Trophy className="h-4 w-4" />
+              <span className="text-sm font-semibold uppercase tracking-[0.18em]">Seeded Ranked Leaders</span>
+            </div>
+            <CardTitle>고티어 시딩 기반 장인 후보</CardTitle>
+            <CardDescription>
+              KnownPuuid(priority=7) + RiotMatchCache(랭크 90일) 기준으로 PUUID별 대표 챔피언을 추립니다.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {overview.seededChampionLeaders.length === 0 ? (
+              <p className="rounded-2xl border border-white/10 bg-bg-primary/60 p-4 text-sm text-text-secondary">
+                아직 조건을 만족하는 시딩 장인 후보 데이터가 없습니다.
+              </p>
+            ) : overview.seededChampionLeaders.map((entry, index) => {
+              const hasRiotId = Boolean(entry.gameName && entry.tagLine);
+              const href = hasRiotId
+                ? `/matches/summoner/${encodeURIComponent(entry.gameName!)}/${encodeURIComponent(entry.tagLine!)}`
+                : undefined;
+
+              const content = (
+                <div className="flex items-center gap-4 rounded-2xl border border-white/10 bg-bg-primary/60 p-4 transition-colors hover:bg-bg-elevated">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-cyan-500/10 text-sm font-bold text-cyan-300">
+                    {index + 1}
+                  </div>
+                  <div className="relative h-11 w-11 overflow-hidden rounded-xl border border-white/10 bg-slate-950/60">
+                    <Image
+                      src={getChampionIconById(entry.championId)}
+                      alt={entry.championName}
+                      fill
+                      className="object-cover"
+                      unoptimized
+                    />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-semibold text-text-primary">
+                      {entry.championNameKorean || getChampionKoreanName(entry.championName)}
+                    </p>
+                    <p className="truncate text-xs text-text-tertiary">
+                      {entry.gameName && entry.tagLine
+                        ? `${entry.gameName}#${entry.tagLine}`
+                        : `${entry.puuid.slice(0, 8)}...`}
+                    </p>
+                    <p className="text-xs text-text-secondary">
+                      {entry.games}게임 · {entry.winRate.toFixed(1)}% · 평균 KDA {entry.avgKda.toFixed(2)}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-text-tertiary">
+                      최근 {new Date(entry.lastGameAt).toLocaleDateString("ko-KR")}
+                    </p>
+                    {hasRiotId ? <ChevronRight className="ml-auto mt-1 h-4 w-4 text-text-tertiary" /> : null}
+                  </div>
+                </div>
+              );
+
+              if (!href) {
+                return <div key={`${entry.puuid}-${entry.championId}`}>{content}</div>;
+              }
+
+              return (
+                <Link key={`${entry.puuid}-${entry.championId}`} href={href}>
+                  {content}
+                </Link>
+              );
+            })}
+          </CardContent>
+        </Card>
 
         <div className="mt-6 grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
           <Card className="border-white/10 bg-bg-secondary/80">
@@ -495,6 +3098,8 @@ export default function LabPage() {
             </CardContent>
           </Card>
         </div>
+          </>
+        ) : null}
       </section>
     </div>
   );
