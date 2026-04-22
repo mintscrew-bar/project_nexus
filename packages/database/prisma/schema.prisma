@@ -1191,6 +1191,30 @@ model LabSynergySnapshot {
   @@map("lab_synergy_snapshots")
 }
 
+// 외부 고티어(챌린저+그마) 시딩 유저 랭크 매치 기반 챔피언 메타 스냅샷
+model LabRankedChampionSnapshot {
+  id                   String    @id @default(cuid())
+  period               String    // '7d' | '30d' | 'current_patch'
+  patchVersion         String?   // period='current_patch'일 때만 값 있음
+  championId           Int
+  position             String?   // null = 전체 포지션
+  games                Int
+  wins                 Int
+  avgKda               Float
+  avgDamage            Float
+  pickRate             Float
+  banRate              Float
+  wilsonLower          Float
+  confidence           String    // 'low' | 'moderate' | 'high'
+  lastMatchCreatedAt   DateTime? // 증분 재계산 cursor (current_patch 전용)
+  computedAt           DateTime  @default(now())
+
+  @@unique([period, patchVersion, championId, position])
+  @@index([period, championId])
+  @@index([period, position, wilsonLower])
+  @@map("lab_ranked_champion_snapshots")
+}
+
 // 챔피언 상성 캐시
 model LabCounterSnapshot {
   id          String   @id @default(cuid())

@@ -1243,6 +1243,33 @@ export const statsApi = {
     return response.data;
   },
 
+  // Task 37: 유저 간 직접 대전 상성
+  getLabHeadToHead: async (userAId: string, userBId: string) => {
+    const response = await apiClient.get("/stats/lab/oracle/head-to-head", {
+      params: { userAId, userBId },
+    });
+    return response.data;
+  },
+
+  // Task 38: 시간대별/요일별 패턴
+  getLabPlayPatterns: async (period: "30d" | "90d" | "all" = "30d") => {
+    const response = await apiClient.get("/stats/lab/meta/play-patterns", {
+      params: { period },
+    });
+    return response.data;
+  },
+
+  // Task 39: 외부 고티어 랭크 메타 챔피언 스냅샷
+  getLabRankedSnapshots: async (params?: {
+    period?: "7d" | "30d" | "current_patch";
+    position?: string;
+  }) => {
+    const response = await apiClient.get("/stats/lab/meta/ranked-snapshots", {
+      params,
+    });
+    return response.data;
+  },
+
   getChampionStats: async (
     gameName: string,
     tagLine: string,

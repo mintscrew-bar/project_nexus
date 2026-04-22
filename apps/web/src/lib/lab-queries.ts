@@ -390,6 +390,88 @@ export type BanRecommendResponse = {
 
 export type ItemData = { name: string; image?: { full?: string } };
 
+// Task 37: 유저 간 직접 대전 상성
+export type HeadToHeadResponse = {
+  userAId: string;
+  userBId: string;
+  totalGames: number;
+  userAWins: number;
+  userBWins: number;
+  userAWinRate: number;
+  userBWinRate: number;
+  confidence: "insufficient" | "low" | "moderate" | "high";
+  positionBreakdown: Array<{
+    userAPosition: string;
+    userBPosition: string;
+    games: number;
+    userAWins: number;
+    userAWinRate: number;
+  }>;
+  recentMatches: Array<{
+    matchId: string;
+    completedAt: string | null;
+    userAChampionId: number;
+    userAChampionName: string;
+    userAPosition: string;
+    userAKills: number;
+    userADeaths: number;
+    userAAssists: number;
+    userAWin: boolean;
+    userBChampionId: number;
+    userBChampionName: string;
+    userBPosition: string;
+    userBKills: number;
+    userBDeaths: number;
+    userBAssists: number;
+    userBWin: boolean;
+  }>;
+};
+
+// Task 38: 시간대별/요일별 패턴 분석
+export type PlayPatternsResponse = {
+  heatmap: Array<{
+    dayOfWeek: number;
+    hour: number;
+    games: number;
+    wins: number;
+    winRate: number;
+  }>;
+  byDayOfWeek: Array<{
+    dayOfWeek: number;
+    dayLabel: string;
+    games: number;
+    avgGamesPerWeek: number;
+  }>;
+  byHour: Array<{
+    hour: number;
+    games: number;
+    avgGamesPerDay: number;
+  }>;
+  peakDayOfWeek: number;
+  peakHour: number;
+  totalGames: number;
+  periodDays: number;
+};
+
+// Task 39: 외부 고티어 랭크 메타 챔피언 스냅샷
+export type RankedSnapshotsResponse = {
+  period: string;
+  patchVersion: string | null;
+  champions: Array<{
+    championId: number;
+    position: string | null;
+    games: number;
+    wins: number;
+    winRate: number;
+    avgKda: number;
+    avgDamage: number;
+    pickRate: number;
+    wilsonLower: number;
+    confidence: string;
+  }>;
+  computedAt: string | null;
+};
+
 // ─── 쿼리 키 팩토리 ────────────────────────────────────────────────────────────
 
 export const labQueryKeys = {
@@ -430,6 +512,15 @@ export const labQueryKeys = {
 
   auctionEfficiency: (period: LabPeriod) =>
     ["lab", "oracle", "auction-efficiency", period] as const,
+
+  headToHead: (userAId: string, userBId: string) =>
+    ["lab", "oracle", "head-to-head", userAId, userBId] as const,
+
+  playPatterns: (period: LabPeriod) =>
+    ["lab", "meta", "play-patterns", period] as const,
+
+  rankedSnapshots: (params: { period?: string; position?: string }) =>
+    ["lab", "meta", "ranked-snapshots", params] as const,
 } as const;
 
 // ─── 쿼리 옵션 팩토리 ─────────────────────────────────────────────────────────
@@ -539,5 +630,30 @@ export const labQueryOptions = {
       queryFn: () =>
         statsApi.getLabAuctionEfficiency({ period }) as Promise<AuctionEfficiencyResponse>,
       staleTime: 30 * 60 * 1000,
+    }),
+
+  headToHead: (userAId: string, userBId: string) =>
+    queryOptions<HeadToHeadResponse>({
+      queryKey: labQueryKeys.headToHead(userAId, userBId),
+      queryFn: () =>
+        statsApi.getLabHeadToHead(userAId, userBId) as Promise<HeadToHeadResponse>,
+      staleTime: 10 * 60 * 1000,
+      enabled: Boolean(userAId) && Boolean(userBId) && userAId !== userBId,
+    }),
+
+  playPatterns: (period: LabPeriod) =>
+    queryOptions<PlayPatternsResponse>({
+      queryKey: labQueryKeys.playPatterns(period),
+      queryFn: () =>
+        statsApi.getLabPlayPatterns(period) as Promise<PlayPatternsResponse>,
+      staleTime: 60 * 60 * 1000,
+    }),
+
+  rankedSnapshots: (params: { period?: "7d" | "30d" | "current_patch"; position?: string } = {}) =>
+    queryOptions<RankedSnapshotsResponse>({
+      queryKey: labQueryKeys.rankedSnapshots(params),
+      queryFn: () =>
+        statsApi.getLabRankedSnapshots(params) as Promise<RankedSnapshotsResponse>,
+      staleTime: 60 * 60 * 1000,
     }),
 } as const;

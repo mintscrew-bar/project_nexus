@@ -281,6 +281,50 @@ export class LabController {
   }
 
   /**
+   * Task 39: 외부 고티어 랭크 메타 챔피언 스냅샷 조회
+   * 내전 LabChampionSnapshot과 분리된 데이터. 메타 레이더 비교 섹션에서 활용.
+   */
+  @Get("meta/ranked-snapshots")
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
+  async getRankedChampionSnapshots(
+    @Query("period") period: "7d" | "30d" | "current_patch" = "30d",
+    @Query("position") position?: string,
+  ) {
+    return this.labStatsService.getRankedChampionSnapshots(period, position);
+  }
+
+  /**
+   * Task 38: 시간대별/요일별 패턴 분석
+   * 요일 × 시간대 히트맵 + 피크 시간대 집계
+   */
+  @Get("meta/play-patterns")
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
+  async getPlayPatterns(@Query("period") period: Period = "30d") {
+    return this.labStatsService.getPlayPatterns(period);
+  }
+
+  /**
+   * Task 37: 유저 간 직접 대전 상성 분석
+   * 두 유저가 서로 다른 팀으로 만난 내전 대전 기록 집계
+   */
+  @Get("oracle/head-to-head")
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
+  async getHeadToHead(
+    @Query("userAId") userAId: string,
+    @Query("userBId") userBId: string,
+  ) {
+    if (!userAId || !userBId) {
+      throw new BadRequestException("userAId and userBId are required");
+    }
+    if (userAId === userBId) {
+      throw new BadRequestException(
+        "userAId and userBId must be different users",
+      );
+    }
+    return this.labStatsService.getHeadToHead(userAId, userBId);
+  }
+
+  /**
    * Task 22: 콜드스타트 유저 프로필 fallback
    * 내전 10판 미만일 때 ranked MatchStatsCache를 참고 데이터로 반환
    */

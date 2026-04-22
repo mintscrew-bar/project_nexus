@@ -1,7 +1,7 @@
 # Lab 대시보드 구현 계획
 
 > 진행 기준일: 2026-04-22
-> 완료: 37 / 전체: Task 1~40 (Task 39-1 포함)
+> 완료: 41 / 전체: Task 1~40 (Task 39-1 포함)
 > 연계 문서: [전적 페이지 크롤링/배치 TODO](./TODO_matches_crawling.md)
 
 ---
@@ -811,16 +811,15 @@ API 요청 시 fallback 우선순위:
 
 ## Phase 12: 추가 분석 기능 (확장)
 
-- [ ] Task 37: 유저 간 상성 분석 API (`GET /stats/lab/oracle/head-to-head`)
+- [x] Task 37: 유저 간 상성 분석 API (`GET /stats/lab/oracle/head-to-head`)
   - 내전 독점 기능: 같은 커뮤니티 유저 A vs 유저 B의 직접 대전 전적
   - `MatchParticipant` 기반 — 같은 matchId에서 다른 teamId인 두 유저 조회
   - 응답: 직접 대전 횟수, A 승률, 포지션별 상성, 최근 5경기 결과
-  - **의미**: 외부 사이트에서 절대 제공할 수 없는 커뮤니티 내부 데이터. 유저 간 라이벌 관계나 상성을 분석하여 밴픽/팀 구성 전략에 활용 가능.
+  - 구현: `LabStatsService.getHeadToHead()`, `GET /stats/lab/oracle/head-to-head?userAId&userBId`, `lab-queries.ts` 타입+queryOptions 추가
 
-- [ ] Task 38: 시간대별/요일별 패턴 분석 (`GET /stats/lab/meta/play-patterns`)
-  - `Match.completedAt` 기준 요일/시간대별 게임 빈도 및 승률 편차 분석
-  - 내전은 보통 저녁~야간에 집중되므로 시간대별 참가자 수/컨디션 차이가 승률에 영향을 줄 수 있음
-  - 히트맵 시각화 (요일 × 시간대 매트릭스)
+- [x] Task 38: 시간대별/요일별 패턴 분석 (`GET /stats/lab/meta/play-patterns`)
+  - `Match.completedAt` 기준 요일/시간대별 게임 빈도 및 피크 분석 (KST 기준)
+  - 구현: `LabStatsService.getPlayPatterns()`, `GET /stats/lab/meta/play-patterns?period`, 히트맵(dayOfWeek×hour)/요일별/시간대별 집계 + peakDayOfWeek/peakHour 반환, `lab-queries.ts` 타입+queryOptions 추가
 
 ---
 
@@ -862,7 +861,7 @@ API 요청 시 fallback 우선순위:
   - 신규 매치 저장 시 `patchVersion` 자동 채움
   - 백필 스크립트 1회 실행 후 `WHERE patchVersion IS NULL` 0건
 
-- [ ] **Task 39: `LabRankedChampionSnapshot` — 외부 랭크 메타 챔피언 스냅샷**
+- [x] **Task 39: `LabRankedChampionSnapshot` — 외부 랭크 메타 챔피언 스냅샷**
   > 연계: [Matches Phase 8 Task 24](./TODO_matches_crawling.md) — 이 스냅샷의 원본 데이터가 LeagueScanTask로 수집됨
   > 연계: [Lab Task 23 (메타 레이더 UI)](#phase-7-프론트엔드--메타-레이더-탭) — "내전 vs 랭크 메타 비교" 섹션의 랭크 측 데이터 소스
   > 선행: Task 39-1 (`RiotMatchCache.patchVersion`) 완료 필수
@@ -939,6 +938,14 @@ API 요청 시 fallback 우선순위:
   - 한 매치에 시딩 유저 여러 명 있어도 participant 단위로 정상 집계 (Nexus 유저/P5 포함 안 됨)
   - `current_patch` 증분 upsert 시 `lastMatchCreatedAt` cursor가 정확히 전진
   - 신규 패치 전환 시 이전 patchVersion 스냅샷은 남아 있고 `current_patch` row만 새 패치로 교체
+
+  **구현**:
+  - Prisma 스키마: `lab_ranked_champion_snapshots` 모델 추가, `pnpm db:push` 반영
+  - `LabStatsService.computeRankedChampionSnapshots()` + `computeRankedSnapshotForPeriod()` 추가
+  - `GET /stats/lab/meta/ranked-snapshots?period&position` 엔드포인트
+  - `LabTasksService.handleRankedChampionSnapshot()` — `@Cron('0 5 * * *')` 새벽 5시 배치
+  - `POST /admin/lab/recompute-ranked-snapshots` Admin 수동 트리거
+  - `lab-queries.ts` RankedSnapshotsResponse 타입 + queryOptions 추가
 
 - [ ] **Task 40: PSS 티어 베이스라인 보정 (Task 19 확장)**
   > 연계: [Lab Task 19 (팀 밸런스 예측 API)](#phase-5-백엔드--오라클-api) — 기존 PSS 공식에 외부 랭크 메타를 보조 신호로 추가

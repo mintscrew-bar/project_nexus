@@ -209,4 +209,40 @@ export class LabTasksService {
   async getLabDataPhase() {
     return this.labStatsService.getDataPhase();
   }
+
+  // ─── Task 39: LabRankedChampionSnapshotTask — 매일 새벽 5시 ───
+
+  /**
+   * 외부 고티어 시딩 유저 랭크 매치 → LabRankedChampionSnapshot 재계산
+   * LabSnapshotTask(새벽 4시) 직후 실행
+   */
+  @Cron("0 5 * * *")
+  async handleRankedChampionSnapshot(): Promise<void> {
+    const lockKey = "tasks:ranked-champion-snapshot";
+    const lockToken = await this.redis.acquireLock(lockKey, 55 * 60 * 1000);
+
+    if (!lockToken) {
+      this.logger.warn(
+        "RankedChampionSnapshotTask 건너뜀: 다른 워커가 락을 보유 중",
+      );
+      return;
+    }
+
+    try {
+      await this.labStatsService.computeRankedChampionSnapshots();
+    } catch (error) {
+      this.logger.error("RankedChampionSnapshotTask 실패", error);
+    } finally {
+      await this.redis.releaseLock(lockKey, lockToken);
+    }
+  }
+
+  /** 수동 트리거용 — Admin API에서 호출 */
+  async runRankedChampionSnapshot(): Promise<{
+    sevenDay: number;
+    thirtyDay: number;
+    currentPatch: number;
+  }> {
+    return this.labStatsService.computeRankedChampionSnapshots();
+  }
 }

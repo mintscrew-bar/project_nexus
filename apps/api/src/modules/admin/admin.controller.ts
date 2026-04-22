@@ -378,4 +378,16 @@ export class AdminController {
   getLabDataPhase() {
     return this.labTasksService.getLabDataPhase();
   }
+
+  /**
+   * Task 39: 외부 랭크 챔피언 스냅샷 수동 재계산 트리거
+   * 고티어 시딩 유저 랭크 매치 → LabRankedChampionSnapshot 즉시 재계산
+   */
+  @Post("lab/recompute-ranked-snapshots")
+  @Roles(UserRole.ADMIN)
+  @Throttle({ default: { limit: 3, ttl: 600000 } }) // 10분당 3회
+  async recomputeRankedChampionSnapshots() {
+    const result = await this.labTasksService.runRankedChampionSnapshot();
+    return { ok: true, ...result };
+  }
 }
