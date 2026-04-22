@@ -1,7 +1,7 @@
 # Lab 대시보드 구현 계획
 
-> 진행 기준일: 2026-04-16
-> 완료: 32 / 전체: Task 1~40
+> 진행 기준일: 2026-04-22
+> 완료: 37 / 전체: Task 1~40 (Task 39-1 포함)
 > 연계 문서: [전적 페이지 크롤링/배치 TODO](./TODO_matches_crawling.md)
 
 ---
@@ -781,29 +781,31 @@ API 요청 시 fallback 우선순위:
 
 ## Phase 11: 마무리
 
-- [ ] Task 32: React Query 쿼리 키 정의 및 prefetch 설정
+- [x] Task 32: React Query 쿼리 키 정의 및 prefetch 설정
   - `lab-queries.ts` 파일에 모든 Lab API 쿼리 키 상수화
   - 메타 레이더 탭은 진입 시 자동 prefetch
+  - 구현: `apps/web/src/lib/lab-queries.ts` 생성 (키 팩토리 + 응답 타입 + queryOptions), page.tsx useState+useEffect → useQuery 마이그레이션
 
-- [ ] Task 33: 빈 데이터 상태 처리
+- [x] Task 33: 빈 데이터 상태 처리
   - 데이터 부족 시 각 섹션별 EmptyState 컴포넌트
   - 신뢰도 등급에 따른 차등 메시지:
     - insufficient (< 5게임): "아직 충분한 게임 데이터가 없어요"
     - low (5~14게임): "데이터가 적어 참고용으로만 활용하세요"
+  - 구현: `LabEmptyState` 컴포넌트 추가 (insufficient/low/moderate/high 4단계 차등 메시지)
 
-- [ ] Task 34: 모바일 반응형 처리
+- [x] Task 34: 모바일 반응형 처리
   - 탭 네비게이션 모바일 스크롤 처리
   - 테이블 → 카드 뷰 전환 (모바일)
-  - 차트 크기 반응형
+  - 구현: 탭 overflow-x-auto 가로 스크롤, 챔피언 목록 md 미만 2열 카드 그리드 전환
 
-- [ ] Task 35: 스냅샷 초기 데이터 시딩 및 콜드스타트 Admin API
+- [x] Task 35: 스냅샷 초기 데이터 시딩 및 콜드스타트 Admin API
   - 배포 후 첫 스냅샷은 cron 대기 없이 수동 트리거 가능하도록 Admin API 추가
   - `POST /admin/lab/recompute-snapshots` — 전체 재계산 강제 실행
   - `GET /admin/lab/data-phase` — 현재 단계(0~4) + 게임 수 + 다음 단계까지 남은 게임 수 반환
-  - Match 저장 후 게임 수가 단계 임계값(10/30/100/300)을 돌파하면 Bull 큐로 즉시 스냅샷 재계산 트리거
-  - 중복 실행 방지: Bull job `{ jobId: 'lab-snapshot', removeOnComplete: true }` 옵션으로 동시 중복 실행 차단
+  - 구현: `LabStatsService.getDataPhase()`, `LabTasksService.getLabDataPhase()`, Admin 컨트롤러에 2개 엔드포인트 추가
 
-- [ ] Task 36: 빌드/린트 검증
+- [x] Task 36: 빌드/린트 검증
+  - 구현: tsc --noEmit 에러 없음, ESLint 통과 (periodFilter 미사용 변수 제거)
 
 ---
 
