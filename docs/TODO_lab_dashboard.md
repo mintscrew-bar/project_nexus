@@ -811,15 +811,17 @@ API 요청 시 fallback 우선순위:
 
 ## Phase 12: 추가 분석 기능 (확장)
 
-- [x] Task 37: 유저 간 상성 분석 API (`GET /stats/lab/oracle/head-to-head`)
+- [x] Task 37: 유저 간 상성 분석 API + UI (`GET /stats/lab/oracle/head-to-head`)
   - 내전 독점 기능: 같은 커뮤니티 유저 A vs 유저 B의 직접 대전 전적
   - `MatchParticipant` 기반 — 같은 matchId에서 다른 teamId인 두 유저 조회
   - 응답: 직접 대전 횟수, A 승률, 포지션별 상성, 최근 5경기 결과
   - 구현: `LabStatsService.getHeadToHead()`, `GET /stats/lab/oracle/head-to-head?userAId&userBId`, `lab-queries.ts` 타입+queryOptions 추가
+  - UI: 오라클 탭에 유저 검색(2명) → 직접 대전 카드(전체 전적+최근 5경기) 추가
 
-- [x] Task 38: 시간대별/요일별 패턴 분석 (`GET /stats/lab/meta/play-patterns`)
+- [x] Task 38: 시간대별/요일별 패턴 분석 API + UI (`GET /stats/lab/meta/play-patterns`)
   - `Match.completedAt` 기준 요일/시간대별 게임 빈도 및 피크 분석 (KST 기준)
   - 구현: `LabStatsService.getPlayPatterns()`, `GET /stats/lab/meta/play-patterns?period`, 히트맵(dayOfWeek×hour)/요일별/시간대별 집계 + peakDayOfWeek/peakHour 반환, `lab-queries.ts` 타입+queryOptions 추가
+  - UI: 메타 탭에 요일별 막대 + 시간대별 막대 차트 + 피크 요일/시간 표시
 
 ---
 
@@ -939,13 +941,14 @@ API 요청 시 fallback 우선순위:
   - `current_patch` 증분 upsert 시 `lastMatchCreatedAt` cursor가 정확히 전진
   - 신규 패치 전환 시 이전 patchVersion 스냅샷은 남아 있고 `current_patch` row만 새 패치로 교체
 
-  **구현**:
+  **구현 (백엔드 + 프론트엔드)**:
   - Prisma 스키마: `lab_ranked_champion_snapshots` 모델 추가, `pnpm db:push` 반영
   - `LabStatsService.computeRankedChampionSnapshots()` + `computeRankedSnapshotForPeriod()` 추가
   - `GET /stats/lab/meta/ranked-snapshots?period&position` 엔드포인트
   - `LabTasksService.handleRankedChampionSnapshot()` — `@Cron('0 5 * * *')` 새벽 5시 배치
   - `POST /admin/lab/recompute-ranked-snapshots` Admin 수동 트리거
   - `lab-queries.ts` RankedSnapshotsResponse 타입 + queryOptions 추가
+  - UI: 메타 탭 "내전 vs 랭크 메타 비교" 플레이스홀더를 실제 비교 카드로 교체 (wilsonLower 상위 20개, 내전 승률 대비 delta 시각화)
 
 - [ ] **Task 40: PSS 티어 베이스라인 보정 (Task 19 확장)**
   > 연계: [Lab Task 19 (팀 밸런스 예측 API)](#phase-5-백엔드--오라클-api) — 기존 PSS 공식에 외부 랭크 메타를 보조 신호로 추가

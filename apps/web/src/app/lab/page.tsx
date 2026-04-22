@@ -25,6 +25,9 @@ import {
   type BalanceScoreResponse,
   type BanRecommendResponse,
   type ItemData,
+  type PlayPatternsResponse,
+  type RankedSnapshotsResponse,
+  type HeadToHeadResponse,
 } from "@/lib/lab-queries";
 import { getChampionIconById, getItemIcon } from "@/components/matches/match-utils";
 import { RuneTooltip } from "@/components/RuneTooltip";
@@ -242,6 +245,14 @@ export default function LabPage() {
   const [banRecommendLoading, setBanRecommendLoading] = useState(false);
   const [banRecommendError, setBanRecommendError] = useState<string | null>(null);
 
+  // Task 37: head-to-head 상태
+  const [h2hUserA, setH2hUserA] = useState<{ id: string; username: string; avatar: string | null } | null>(null);
+  const [h2hUserB, setH2hUserB] = useState<{ id: string; username: string; avatar: string | null } | null>(null);
+  const [h2hSearchQuery, setH2hSearchQuery] = useState("");
+  const [h2hSearchResults, setH2hSearchResults] = useState<Array<{ id: string; username: string; avatar: string | null }>>([]);
+  const [h2hSearching, setH2hSearching] = useState(false);
+  const [h2hSelectingFor, setH2hSelectingFor] = useState<"A" | "B" | null>(null);
+
   const queryClient = useQueryClient();
   const isAdmin = user?.role === "ADMIN";
 
@@ -358,6 +369,25 @@ export default function LabPage() {
     enabled: canFetch && activeTab === "oracle",
   });
 
+  // Task 37: 직접 대전 상성
+  const { data: h2hData, isLoading: h2hLoading } = useQuery<HeadToHeadResponse>({
+    ...labQueryOptions.headToHead(h2hUserA?.id ?? "", h2hUserB?.id ?? ""),
+    enabled: canFetch && activeTab === "oracle" && !!h2hUserA && !!h2hUserB,
+  });
+
+  // ─── React Query: 메타 탭 추가 데이터 ───────────────────────────────────────
+  // Task 38: 활동 패턴
+  const { data: playPatterns } = useQuery<PlayPatternsResponse>({
+    ...labQueryOptions.playPatterns(activePeriod),
+    enabled: canFetch && activeTab === "meta",
+  });
+
+  // Task 39: 외부 랭크 메타 스냅샷
+  const { data: rankedSnapshots } = useQuery<RankedSnapshotsResponse>({
+    ...labQueryOptions.rankedSnapshots({ period: "30d" }),
+    enabled: canFetch && activeTab === "meta",
+  });
+
   // 초기 로딩: overview + metaRadar가 준비될 때까지 로딩 표시
   const loading = canFetch && (overviewLoading || metaRadarLoading);
   const error = overviewError ? "실험실 데이터를 불러오지 못했습니다." : null;
@@ -428,6 +458,41 @@ export default function LabPage() {
       clearTimeout(timer);
     };
   }, [activeTab, oracleSearchQuery]);
+
+  // Task 37: head-to-head 유저 검색
+  useEffect(() => {
+    if (activeTab !== "oracle") return;
+    const q = h2hSearchQuery.trim();
+    if (q.length < 2) {
+      setH2hSearchResults([]);
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      setH2hSearching(true);
+      statsApi
+        .searchUsers(q, 8)
+        .then((data) => {
+          if (cancelled) return;
+          const users = (Array.isArray(data) ? data : data?.users ?? []) as Array<{
+            id: string;
+            username: string;
+            avatar: string | null;
+          }>;
+          setH2hSearchResults(users);
+        })
+        .catch(() => {
+          if (!cancelled) setH2hSearchResults([]);
+        })
+        .finally(() => {
+          if (!cancelled) setH2hSearching(false);
+        });
+    }, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [activeTab, h2hSearchQuery]);
 
   const avgParticipantsPerMatch = useMemo(() => {
     if (!overview?.sample.matchesWithStats) return 0;
@@ -843,7 +908,8 @@ export default function LabPage() {
 
       <section className="mx-auto max-w-7xl px-4 py-10 md:px-6 md:py-12">
         {activeTab === "oracle" ? (
-          <Card className="border-white/10 bg-bg-secondary/80">
+          <>
+          <Card className="border-white/10 bg-bg-secondary/80 mb-6">
             <CardHeader>
               <CardTitle>경매 효율 분석</CardTitle>
               <CardDescription>
@@ -1371,6 +1437,205 @@ export default function LabPage() {
               )}
             </CardContent>
           </Card>
+
+          {/* Task 37: 유저 간 직접 대전 상성 */}
+          <Card className="border-white/10 bg-bg-secondary/80">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Swords className="h-4 w-4 text-rose-400" />
+                직접 대전 상성
+              </CardTitle>
+              <CardDescription>
+                두 유저를 선택해 내전에서의 직접 대전 전적을 확인합니다.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="mb-4 grid gap-4 md:grid-cols-2">
+                {/* 유저 A 선택 */}
+                {(["A", "B"] as const).map((side) => {
+                  const selected = side === "A" ? h2hUserA : h2hUserB;
+                  return (
+                    <div key={side} className="rounded-xl border border-white/10 bg-bg-primary/40 p-3">
+                      <p className="mb-2 text-xs font-semibold text-text-secondary">유저 {side}</p>
+                      {selected ? (
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <div className="relative h-8 w-8 overflow-hidden rounded-full border border-white/10">
+                              {selected.avatar ? (
+                                <Image src={selected.avatar} alt={selected.username} fill className="object-cover" unoptimized />
+                              ) : (
+                                <div className="flex h-full w-full items-center justify-center bg-bg-secondary text-xs font-bold text-text-secondary">
+                                  {selected.username[0]}
+                                </div>
+                              )}
+                            </div>
+                            <span className="text-sm font-medium text-text-primary">{selected.username}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => side === "A" ? setH2hUserA(null) : setH2hUserB(null)}
+                            className="rounded px-2 py-0.5 text-xs text-text-tertiary hover:text-text-primary"
+                          >
+                            변경
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setH2hSelectingFor(side);
+                            setH2hSearchQuery("");
+                            setH2hSearchResults([]);
+                          }}
+                          className="w-full rounded-lg border border-dashed border-white/20 py-2 text-xs text-text-tertiary hover:border-white/40 hover:text-text-secondary"
+                        >
+                          + 유저 선택
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* 유저 검색 드롭다운 */}
+              {h2hSelectingFor && (
+                <div className="mb-4 rounded-xl border border-white/10 bg-bg-primary/60 p-3">
+                  <p className="mb-2 text-xs text-text-secondary">유저 {h2hSelectingFor} 검색</p>
+                  <input
+                    type="text"
+                    value={h2hSearchQuery}
+                    onChange={(e) => setH2hSearchQuery(e.target.value)}
+                    placeholder="닉네임 입력..."
+                    className="w-full rounded-lg bg-bg-primary px-3 py-2 text-sm text-text-primary placeholder:text-text-tertiary focus:outline-none"
+                    autoFocus
+                  />
+                  {h2hSearching && (
+                    <div className="mt-2 flex items-center gap-2 text-xs text-text-tertiary">
+                      <LoadingSpinner />
+                      검색 중...
+                    </div>
+                  )}
+                  {h2hSearchResults.length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      {h2hSearchResults.map((u) => (
+                        <button
+                          key={u.id}
+                          type="button"
+                          onClick={() => {
+                            if (h2hSelectingFor === "A") setH2hUserA(u);
+                            else setH2hUserB(u);
+                            setH2hSelectingFor(null);
+                            setH2hSearchQuery("");
+                          }}
+                          className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-bg-secondary/60"
+                        >
+                          <div className="relative h-6 w-6 overflow-hidden rounded-full border border-white/10">
+                            {u.avatar ? (
+                              <Image src={u.avatar} alt={u.username} fill className="object-cover" unoptimized />
+                            ) : (
+                              <div className="flex h-full w-full items-center justify-center bg-bg-secondary text-xs font-bold text-text-secondary">
+                                {u.username[0]}
+                              </div>
+                            )}
+                          </div>
+                          <span className="text-text-primary">{u.username}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setH2hSelectingFor(null)}
+                    className="mt-2 text-xs text-text-tertiary hover:text-text-secondary"
+                  >
+                    취소
+                  </button>
+                </div>
+              )}
+
+              {/* 결과 */}
+              {h2hLoading ? (
+                <div className="flex min-h-[120px] items-center justify-center">
+                  <LoadingSpinner />
+                </div>
+              ) : h2hUserA && h2hUserB && h2hData ? (
+                <div className="space-y-4">
+                  {h2hData.totalGames === 0 ? (
+                    <div className="rounded-xl border border-white/10 bg-bg-primary/40 p-4 text-center text-sm text-text-secondary">
+                      두 유저의 직접 대전 기록이 없습니다.
+                    </div>
+                  ) : (
+                    <>
+                      {/* 전체 전적 */}
+                      <div className="grid grid-cols-3 gap-3">
+                        <div className="rounded-xl border border-white/10 bg-bg-primary/40 p-3 text-center">
+                          <p className="text-xs text-text-tertiary">{h2hUserA.username}</p>
+                          <p className="mt-1 text-2xl font-bold text-emerald-400">{h2hData.userAWins}</p>
+                          <p className="text-xs text-text-secondary">{formatRate(h2hData.userAWinRate)}</p>
+                        </div>
+                        <div className="rounded-xl border border-white/10 bg-bg-primary/50 p-3 text-center">
+                          <p className="text-xs text-text-tertiary">총 대전</p>
+                          <p className="mt-1 text-2xl font-bold text-text-primary">{h2hData.totalGames}</p>
+                          <Badge variant={
+                            h2hData.confidence === "high" ? "success" :
+                            h2hData.confidence === "moderate" ? "default" : "warning"
+                          } className="mt-1 text-[10px]">
+                            {h2hData.confidence === "high" ? "신뢰도 높음" :
+                             h2hData.confidence === "moderate" ? "보통" :
+                             h2hData.confidence === "low" ? "낮음" : "부족"}
+                          </Badge>
+                        </div>
+                        <div className="rounded-xl border border-white/10 bg-bg-primary/40 p-3 text-center">
+                          <p className="text-xs text-text-tertiary">{h2hUserB.username}</p>
+                          <p className="mt-1 text-2xl font-bold text-rose-400">{h2hData.userBWins}</p>
+                          <p className="text-xs text-text-secondary">{formatRate(h2hData.userBWinRate)}</p>
+                        </div>
+                      </div>
+
+                      {/* 최근 5경기 */}
+                      {h2hData.recentMatches.length > 0 && (
+                        <div>
+                          <p className="mb-2 text-xs font-semibold text-text-secondary">최근 {h2hData.recentMatches.length}경기</p>
+                          <div className="space-y-1.5">
+                            {h2hData.recentMatches.map((m, idx) => (
+                              <div key={`${m.matchId}-${idx}`} className="flex items-center gap-2 rounded-lg bg-bg-primary/40 px-3 py-2 text-xs">
+                                <div className="flex flex-1 items-center gap-1.5">
+                                  <div className="relative h-6 w-6 overflow-hidden rounded border border-white/10">
+                                    <Image src={getChampionIconById(m.userAChampionId)} alt={m.userAChampionName} fill className="object-cover" unoptimized />
+                                  </div>
+                                  <span className={m.userAWin ? "font-medium text-emerald-400" : "text-text-tertiary"}>
+                                    {m.userAKills}/{m.userADeaths}/{m.userAAssists}
+                                  </span>
+                                  <span className="text-text-tertiary">{formatPosition(m.userAPosition)}</span>
+                                </div>
+                                <Badge variant={m.userAWin ? "success" : "danger"} className="shrink-0 text-[10px]">
+                                  {m.userAWin ? `${h2hUserA.username} 승` : `${h2hUserB.username} 승`}
+                                </Badge>
+                                <div className="flex flex-1 items-center justify-end gap-1.5">
+                                  <span className="text-text-tertiary">{formatPosition(m.userBPosition)}</span>
+                                  <span className={m.userBWin ? "font-medium text-emerald-400" : "text-text-tertiary"}>
+                                    {m.userBKills}/{m.userBDeaths}/{m.userBAssists}
+                                  </span>
+                                  <div className="relative h-6 w-6 overflow-hidden rounded border border-white/10">
+                                    <Image src={getChampionIconById(m.userBChampionId)} alt={m.userBChampionName} fill className="object-cover" unoptimized />
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              ) : !h2hUserA || !h2hUserB ? (
+                <div className="rounded-xl border border-dashed border-white/15 bg-bg-primary/40 p-4 text-center text-xs text-text-tertiary">
+                  두 유저를 선택하면 직접 대전 전적이 표시됩니다.
+                </div>
+              ) : null}
+            </CardContent>
+          </Card>
+          </>
         ) : null}
 
         {activeTab === "compositions" ? (
@@ -2195,12 +2460,100 @@ export default function LabPage() {
           <Card className="border-white/10 bg-bg-secondary/80">
             <CardHeader>
               <CardTitle>내전 vs 랭크 메타 비교</CardTitle>
-              <CardDescription>Task 39 연계 전까지 랭크 섹션은 플레이스홀더로 유지됩니다.</CardDescription>
+              <CardDescription>
+                고티어(챌린저+그마) 랭크 메타와 내전 메타의 챔피언 승률 차이를 비교합니다.
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="rounded-2xl border border-dashed border-white/15 bg-bg-primary/60 p-4 text-sm text-text-secondary">
-                랭크 메타 스냅샷 수집 중입니다. Phase 13 Task 39 완료 후 내전 대비 승률 차이 섹션이 활성화됩니다.
-              </div>
+              {!rankedSnapshots || rankedSnapshots.champions.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-white/15 bg-bg-primary/60 p-4 text-sm text-text-secondary">
+                  랭크 메타 스냅샷 수집 중입니다. 고티어 시딩 유저 배치가 완료되면 데이터가 표시됩니다.
+                </div>
+              ) : (() => {
+                // 내전 스냅샷 맵 (championId → winRate)
+                const customMap = new Map(
+                  (metaRadar?.tiers ? Object.values(metaRadar.tiers).flat() : []).map((c) => [
+                    c.championId,
+                    c.winRate,
+                  ]),
+                );
+                // 랭크 스냅샷 상위 20개 (wilsonLower 기준)
+                const rankedTop = rankedSnapshots.champions
+                  .filter((r) => r.position === null && r.games >= 5)
+                  .slice(0, 20);
+
+                // 내전 대비 격차 계산
+                const compared = rankedTop
+                  .map((r) => ({
+                    ...r,
+                    customWinRate: customMap.get(r.championId) ?? null,
+                    delta:
+                      customMap.get(r.championId) !== undefined
+                        ? r.winRate - (customMap.get(r.championId) as number)
+                        : null,
+                  }))
+                  .filter((r) => r.customWinRate !== null)
+                  .sort((a, b) => Math.abs(b.delta ?? 0) - Math.abs(a.delta ?? 0));
+
+                return (
+                  <div className="space-y-2">
+                    <div className="mb-3 flex gap-4 text-xs text-text-tertiary">
+                      <span className="flex items-center gap-1">
+                        <span className="inline-block h-2 w-2 rounded-full bg-emerald-400" />
+                        랭크 우세 (랭크 승률 더 높음)
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <span className="inline-block h-2 w-2 rounded-full bg-rose-400" />
+                        내전 우세 (내전 승률 더 높음)
+                      </span>
+                    </div>
+                    {compared.slice(0, 10).map((row) => {
+                      const isRankedBetter = (row.delta ?? 0) > 0;
+                      return (
+                        <div
+                          key={row.championId}
+                          className="flex items-center gap-2 rounded-lg bg-bg-primary/40 px-3 py-2"
+                        >
+                          <Image
+                            src={getChampionIconById(row.championId)}
+                            alt={String(row.championId)}
+                            width={24}
+                            height={24}
+                            className="rounded-full"
+                          />
+                          <span className="w-20 truncate text-xs text-text-secondary">
+                            #{row.championId}
+                          </span>
+                          <div className="flex flex-1 items-center gap-2 text-xs">
+                            <span className="text-text-tertiary">
+                              내전 {formatRate(row.customWinRate ?? 0)}
+                            </span>
+                            <ArrowRight className="h-3 w-3 text-text-tertiary" />
+                            <span className="font-medium text-text-primary">
+                              랭크 {formatRate(row.winRate)}
+                            </span>
+                          </div>
+                          <Badge
+                            variant={isRankedBetter ? "success" : "danger"}
+                            className="shrink-0 text-xs"
+                          >
+                            {isRankedBetter ? "+" : ""}
+                            {((row.delta ?? 0) * 100).toFixed(1)}%p
+                          </Badge>
+                        </div>
+                      );
+                    })}
+                    {compared.length === 0 && (
+                      <p className="text-sm text-text-secondary">
+                        내전과 랭크 데이터가 겹치는 챔피언이 없습니다.
+                      </p>
+                    )}
+                    <p className="mt-2 text-xs text-text-tertiary">
+                      * 랭크 기준: KR 챌린저+그마 30일 데이터 (최소 5경기)
+                    </p>
+                  </div>
+                );
+              })()}
             </CardContent>
           </Card>
         </div>
@@ -2239,6 +2592,75 @@ export default function LabPage() {
             })}
           </CardContent>
         </Card>
+
+        {/* Task 38: 활동 패턴 히트맵 */}
+        {playPatterns && playPatterns.totalGames > 0 && (
+          <Card className="mb-6 border-white/10 bg-bg-secondary/80">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Activity className="h-4 w-4 text-cyan-400" />
+                내전 활동 패턴
+              </CardTitle>
+              <CardDescription>
+                KST 기준 요일·시간대별 내전 빈도 분석 (총 {playPatterns.totalGames}경기 / {playPatterns.periodDays}일)
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-6 md:grid-cols-2">
+                {/* 요일별 막대 */}
+                <div>
+                  <p className="mb-3 text-xs font-semibold text-text-secondary">요일별 빈도</p>
+                  <div className="space-y-1.5">
+                    {playPatterns.byDayOfWeek.map((d) => {
+                      const maxGames = Math.max(...playPatterns.byDayOfWeek.map((x) => x.games), 1);
+                      const pct = d.games / maxGames;
+                      return (
+                        <div key={d.dayOfWeek} className="flex items-center gap-2">
+                          <span className={`w-4 text-xs font-medium ${d.dayOfWeek === playPatterns.peakDayOfWeek ? "text-cyan-400" : "text-text-tertiary"}`}>
+                            {d.dayLabel}
+                          </span>
+                          <div className="flex-1 rounded-full bg-bg-primary/60">
+                            <div
+                              className={`h-4 rounded-full ${d.dayOfWeek === playPatterns.peakDayOfWeek ? "bg-cyan-500" : "bg-white/20"}`}
+                              style={{ width: `${Math.max(pct * 100, 2)}%` }}
+                            />
+                          </div>
+                          <span className="w-8 text-right text-xs text-text-secondary">{d.games}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 시간대별 막대 */}
+                <div>
+                  <p className="mb-3 text-xs font-semibold text-text-secondary">시간대별 빈도 (KST)</p>
+                  <div className="flex h-32 items-end gap-0.5">
+                    {playPatterns.byHour.map((h) => {
+                      const maxGames = Math.max(...playPatterns.byHour.map((x) => x.games), 1);
+                      const pct = h.games / maxGames;
+                      return (
+                        <div key={h.hour} className="group relative flex flex-1 flex-col items-center">
+                          <div
+                            className={`w-full rounded-t transition-colors ${h.hour === playPatterns.peakHour ? "bg-cyan-500" : "bg-white/20 group-hover:bg-white/30"}`}
+                            style={{ height: `${Math.max(pct * 100, 2)}%` }}
+                          />
+                          {h.hour % 6 === 0 && (
+                            <span className="absolute -bottom-5 text-[9px] text-text-tertiary">{h.hour}시</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="mt-6 flex gap-4 text-xs text-text-tertiary">
+                    <span>피크 요일: <span className="text-cyan-400 font-medium">{["일", "월", "화", "수", "목", "금", "토"][playPatterns.peakDayOfWeek]}요일</span></span>
+                    <span>피크 시간: <span className="text-cyan-400 font-medium">{playPatterns.peakHour}시</span></span>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <div className="mb-6 grid gap-6 xl:grid-cols-2">
           <Card className="border-white/10 bg-bg-secondary/80">
