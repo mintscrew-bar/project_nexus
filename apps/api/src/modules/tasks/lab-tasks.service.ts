@@ -196,12 +196,17 @@ export class LabTasksService {
     }
   }
 
-  /** 수동 트리거용 */
+  /** 수동 트리거용 — Admin API에서 호출 */
   async runLabSnapshot(): Promise<{
     champions: number;
     synergies: number;
     counters: number;
   }> {
     return this.labStatsService.recomputeAllSnapshots();
+  }
+
+  /** Task 35: Lab 데이터 단계 조회 — Admin API에서 호출 */
+  async getLabDataPhase() {
+    return this.labStatsService.getDataPhase();
   }
 }

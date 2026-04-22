@@ -87,7 +87,10 @@ export class LabController {
       throw new BadRequestException("championId must be a positive integer");
     }
 
-    const detail = await this.labStatsService.getChampionDetail(championId, period);
+    const detail = await this.labStatsService.getChampionDetail(
+      championId,
+      period,
+    );
     if (!detail) {
       throw new NotFoundException("Champion detail not found for this period");
     }
@@ -165,7 +168,9 @@ export class LabController {
     if (vsChampionIdParam !== undefined) {
       vsChampionId = Number(vsChampionIdParam);
       if (!Number.isInteger(vsChampionId) || vsChampionId <= 0) {
-        throw new BadRequestException("vsChampionId must be a positive integer");
+        throw new BadRequestException(
+          "vsChampionId must be a positive integer",
+        );
       }
     }
 
@@ -212,9 +217,7 @@ export class LabController {
    */
   @Post("oracle/balance-score")
   @Throttle({ default: { limit: 20, ttl: 60000 } })
-  async getBalanceScore(
-    @Body() body: { teamA?: string[]; teamB?: string[] },
-  ) {
+  async getBalanceScore(@Body() body: { teamA?: string[]; teamB?: string[] }) {
     const teamA = Array.isArray(body?.teamA) ? body.teamA.filter(Boolean) : [];
     const teamB = Array.isArray(body?.teamB) ? body.teamB.filter(Boolean) : [];
 

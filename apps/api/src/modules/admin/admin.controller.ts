@@ -19,6 +19,7 @@ import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { UserRole } from "@nexus/database";
 import { TasksService, MatchFetchQueueGroup } from "../tasks/tasks.service";
+import { LabTasksService } from "../tasks/lab-tasks.service";
 import { RoomGateway } from "../room/room.gateway";
 import { RoomService } from "../room/room.service";
 import {
@@ -37,6 +38,7 @@ export class AdminController {
   constructor(
     private readonly adminService: AdminService,
     private readonly tasksService: TasksService,
+    private readonly labTasksService: LabTasksService,
     @Inject(forwardRef(() => RoomGateway))
     private readonly roomGateway: RoomGateway,
     @Inject(forwardRef(() => RoomService))
@@ -348,5 +350,32 @@ export class AdminController {
       req.user.sub,
       body.adminNote,
     );
+  }
+
+  // ── Lab 스냅샷 Admin (ADMIN only) ──────────────────────────────────────────
+
+  /**
+   * Task 35: Lab 스냅샷 전체 재계산 수동 트리거
+   * cron 대기 없이 즉시 실행. 배포 후 첫 시딩 및 긴급 재집계 시 사용.
+   */
+  @Post("lab/recompute-snapshots")
+  @Roles(UserRole.ADMIN)
+  @Throttle({ default: { limit: 5, ttl: 600000 } }) // 10분당 5회
+  async recomputeLabSnapshots() {
+    const result = await this.labTasksService.runLabSnapshot();
+    return {
+      ok: true,
+      ...result,
+    };
+  }
+
+  /**
+   * Task 35: 현재 Lab 데이터 단계 조회
+   * 단계 0~4, 총 매치 수, 다음 단계까지 남은 게임 수, 마지막 스냅샷 시각 반환.
+   */
+  @Get("lab/data-phase")
+  @Roles(UserRole.ADMIN)
+  getLabDataPhase() {
+    return this.labTasksService.getLabDataPhase();
   }
 }

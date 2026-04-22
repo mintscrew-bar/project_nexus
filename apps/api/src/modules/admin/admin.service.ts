@@ -242,8 +242,14 @@ export class AdminService {
       },
       seededPolicy: {
         priority: this.seededHighTierPriority,
-        slotCap: this.getPositiveIntConfig("MATCH_FETCH_RANKED_SEEDED_SLOT_CAP", 15),
-        staleHours: this.getPositiveIntConfig("MATCH_FETCH_RANKED_SEEDED_STALE_HOURS", 72),
+        slotCap: this.getPositiveIntConfig(
+          "MATCH_FETCH_RANKED_SEEDED_SLOT_CAP",
+          15,
+        ),
+        staleHours: this.getPositiveIntConfig(
+          "MATCH_FETCH_RANKED_SEEDED_STALE_HOURS",
+          72,
+        ),
         initialBackfillLimit: this.getPositiveIntConfig(
           "MATCH_FETCH_RANKED_SEEDED_INITIAL_BACKFILL_LIMIT",
           100,

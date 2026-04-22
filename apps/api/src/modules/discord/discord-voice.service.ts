@@ -1067,8 +1067,7 @@ export class DiscordVoiceService {
 
         const hasActiveVoiceMember = channels.some(({ channel }) => {
           return (
-            channel?.type === ChannelType.GuildVoice &&
-            channel.members.size > 0
+            channel?.type === ChannelType.GuildVoice && channel.members.size > 0
           );
         });
 

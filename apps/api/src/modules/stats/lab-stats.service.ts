@@ -1249,13 +1249,13 @@ export class LabStatsService {
     const snapshotRows = includeLowSample
       ? []
       : await this.prisma.labChampionSnapshot.findMany({
-      where: {
-        period,
-        position: normalizedPosition,
-        games: { gte: MIN_GAMES_CHAMPION },
-      },
-      orderBy: { wilsonLower: "desc" },
-    });
+          where: {
+            period,
+            position: normalizedPosition,
+            games: { gte: MIN_GAMES_CHAMPION },
+          },
+          orderBy: { wilsonLower: "desc" },
+        });
 
     const championIds = snapshotRows.map((row) => row.championId);
     const championNames = new Map<number, string>();
@@ -1409,7 +1409,9 @@ export class LabStatsService {
     championId: number,
     period: Period = "30d",
   ): Promise<LabChampionDetailResponse | null> {
-    const cacheKey = this.labCacheKey(`champion:detail:${championId}:${period}`);
+    const cacheKey = this.labCacheKey(
+      `champion:detail:${championId}:${period}`,
+    );
     const cached = await this.redis.get(cacheKey);
     if (cached) return JSON.parse(cached);
 
@@ -1719,7 +1721,9 @@ export class LabStatsService {
   ): Promise<LabSynergyResponse> {
     const normalizedLimit = Math.max(1, Math.min(100, Math.floor(limit)));
     const normalizedChampionId =
-      typeof championId === "number" && Number.isInteger(championId) && championId > 0
+      typeof championId === "number" &&
+      Number.isInteger(championId) &&
+      championId > 0
         ? championId
         : null;
     const cacheKey = this.labCacheKey(
@@ -1756,7 +1760,10 @@ export class LabStatsService {
       period,
       ...(normalizedChampionId
         ? {
-            OR: [{ champ1Id: normalizedChampionId }, { champ2Id: normalizedChampionId }],
+            OR: [
+              { champ1Id: normalizedChampionId },
+              { champ2Id: normalizedChampionId },
+            ],
           }
         : {}),
     };
@@ -1830,7 +1837,9 @@ export class LabStatsService {
     );
     const championNameRows =
       championIds.length > 0
-        ? await this.prisma.$queryRaw<{ championId: number; championName: string }[]>(
+        ? await this.prisma.$queryRaw<
+            { championId: number; championName: string }[]
+          >(
             Prisma.sql`
               SELECT
                 mp."championId" AS "championId",
@@ -1853,8 +1862,10 @@ export class LabStatsService {
         const deltaWinRate = row.winRate - expectedWinRate;
         const isSynergyEffective =
           row.games >= 5 && row.wilsonLower > expectedWinRate;
-        const champ1Name = championNameMap.get(row.champ1Id) ?? String(row.champ1Id);
-        const champ2Name = championNameMap.get(row.champ2Id) ?? String(row.champ2Id);
+        const champ1Name =
+          championNameMap.get(row.champ1Id) ?? String(row.champ1Id);
+        const champ2Name =
+          championNameMap.get(row.champ2Id) ?? String(row.champ2Id);
 
         return {
           champ1Id: row.champ1Id,
@@ -1896,7 +1907,9 @@ export class LabStatsService {
   ): Promise<LabCounterResponse> {
     const normalizedLimit = Math.max(1, Math.min(100, Math.floor(limit)));
     const normalizedChampionId =
-      typeof championId === "number" && Number.isInteger(championId) && championId > 0
+      typeof championId === "number" &&
+      Number.isInteger(championId) &&
+      championId > 0
         ? championId
         : null;
     const normalizedVsChampionId =
@@ -1999,7 +2012,9 @@ export class LabStatsService {
     );
     const championNameRows =
       championIds.length > 0
-        ? await this.prisma.$queryRaw<{ championId: number; championName: string }[]>(
+        ? await this.prisma.$queryRaw<
+            { championId: number; championName: string }[]
+          >(
             Prisma.sql`
               SELECT
                 mp."championId" AS "championId",
@@ -2020,7 +2035,8 @@ export class LabStatsService {
         const upper = wilsonUpper(row.wins, row.games);
         const verdict: LabCounterVerdict =
           lower > 0.55 ? "favorable" : upper < 0.45 ? "unfavorable" : "even";
-        const champName = championNameMap.get(row.champId) ?? String(row.champId);
+        const champName =
+          championNameMap.get(row.champId) ?? String(row.champId);
         const vsChampName =
           championNameMap.get(row.vsChampId) ?? String(row.vsChampId);
 
@@ -2057,7 +2073,9 @@ export class LabStatsService {
 
   // ─── Task 17: 팀 조합 유형 분석 API ───
 
-  async getCompositions(period: Period = "30d"): Promise<LabCompositionsResponse> {
+  async getCompositions(
+    period: Period = "30d",
+  ): Promise<LabCompositionsResponse> {
     const cacheKey = this.labCacheKey(`compositions:${period}`);
     const cached = await this.redis.get(cacheKey);
     if (cached) return JSON.parse(cached);
@@ -2185,23 +2203,30 @@ export class LabStatsService {
       ];
 
       const matched = evaluations.filter((e) => e.matched);
-      const target = (matched.length > 0 ? matched : evaluations).sort((a, b) => {
-        if (b.score !== a.score) return b.score - a.score;
-        const order: LabCompositionType[] = [
-          "TEAMFIGHT",
-          "SPLIT_PUSH",
-          "POKE",
-          "EARLY_AGGRO",
-          "TANK_LINE",
-        ];
-        return order.indexOf(a.type) - order.indexOf(b.type);
-      });
+      const target = (matched.length > 0 ? matched : evaluations).sort(
+        (a, b) => {
+          if (b.score !== a.score) return b.score - a.score;
+          const order: LabCompositionType[] = [
+            "TEAMFIGHT",
+            "SPLIT_PUSH",
+            "POKE",
+            "EARLY_AGGRO",
+            "TANK_LINE",
+          ];
+          return order.indexOf(a.type) - order.indexOf(b.type);
+        },
+      );
       return target[0].type;
     };
 
     const aggregate = new Map<
       LabCompositionType,
-      { games: number; wins: number; durationSum: number; durationCount: number }
+      {
+        games: number;
+        wins: number;
+        durationSum: number;
+        durationCount: number;
+      }
     >();
     const allTypes: LabCompositionType[] = [
       "TEAMFIGHT",
@@ -2211,7 +2236,12 @@ export class LabStatsService {
       "TANK_LINE",
     ];
     for (const type of allTypes) {
-      aggregate.set(type, { games: 0, wins: 0, durationSum: 0, durationCount: 0 });
+      aggregate.set(type, {
+        games: 0,
+        wins: 0,
+        durationSum: 0,
+        durationCount: 0,
+      });
     }
 
     for (const team of teamRows) {
@@ -2219,7 +2249,10 @@ export class LabStatsService {
       const bucket = aggregate.get(type)!;
       bucket.games += 1;
       if (team.win) bucket.wins += 1;
-      if (typeof team.gameDurationSec === "number" && team.gameDurationSec > 0) {
+      if (
+        typeof team.gameDurationSec === "number" &&
+        team.gameDurationSec > 0
+      ) {
         bucket.durationSum += team.gameDurationSec;
         bucket.durationCount += 1;
       }
@@ -2384,7 +2417,8 @@ export class LabStatsService {
     let beta0 = 0;
     let beta1 = 0;
     if (priced.length >= 2) {
-      const xMean = priced.reduce((sum, r) => sum + r.soldPrice, 0) / priced.length;
+      const xMean =
+        priced.reduce((sum, r) => sum + r.soldPrice, 0) / priced.length;
       const yMean =
         priced.reduce((sum, r) => sum + r.performance, 0) / priced.length;
       let cov = 0;
@@ -2437,7 +2471,8 @@ export class LabStatsService {
           : 0;
       const avgDamageShare =
         inBin.length > 0
-          ? inBin.reduce((sum, row) => sum + row.avgDamageShare, 0) / inBin.length
+          ? inBin.reduce((sum, row) => sum + row.avgDamageShare, 0) /
+            inBin.length
           : 0;
       const avgPerformance =
         inBin.length > 0
@@ -2465,7 +2500,9 @@ export class LabStatsService {
       efficiency: Math.round(row.efficiency * 10000) / 10000,
     }));
 
-    const toLeader = (row: (typeof withResidual)[number]): AuctionEfficiencyLeader => ({
+    const toLeader = (
+      row: (typeof withResidual)[number],
+    ): AuctionEfficiencyLeader => ({
       userId: row.userId,
       username: row.username,
       soldPrice: Math.round(row.soldPrice),
@@ -2516,7 +2553,10 @@ export class LabStatsService {
       unsoldSummary: {
         users: unsold.length,
         games: unsoldGames,
-        winRate: unsoldGames > 0 ? Math.round((unsoldWins / unsoldGames) * 10000) / 10000 : 0,
+        winRate:
+          unsoldGames > 0
+            ? Math.round((unsoldWins / unsoldGames) * 10000) / 10000
+            : 0,
         avgPerformance: Math.round(unsoldAvgPerformance * 10000) / 10000,
       },
     };
@@ -2630,7 +2670,8 @@ export class LabStatsService {
       const baseWinrate = wilsonLower(wins, recentGames);
       const kdaFactor = kdaMedian > 0 ? Math.min(avgKda / kdaMedian, 2) : 0;
       const damageFactor = Math.min(Math.max(avgDamageShare, 0), 1);
-      const nexusWinRate = (userMap.get(userId)?.nexusRanking?.winRate ?? 50) / 100;
+      const nexusWinRate =
+        (userMap.get(userId)?.nexusRanking?.winRate ?? 50) / 100;
       const nexusWinRateFactor = Math.min(Math.max(nexusWinRate, 0), 1);
       const pss =
         baseWinrate * 0.6 +
@@ -2692,10 +2733,18 @@ export class LabStatsService {
         for (let j = i + 1; j < rows.length; j++) {
           const aTeam = rows[i];
           const bTeam = rows[j];
-          const aInATeam = aTeam.userIds.filter((id) => uniqueA.includes(id)).length;
-          const bInATeam = aTeam.userIds.filter((id) => uniqueB.includes(id)).length;
-          const aInBTeam = bTeam.userIds.filter((id) => uniqueA.includes(id)).length;
-          const bInBTeam = bTeam.userIds.filter((id) => uniqueB.includes(id)).length;
+          const aInATeam = aTeam.userIds.filter((id) =>
+            uniqueA.includes(id),
+          ).length;
+          const bInATeam = aTeam.userIds.filter((id) =>
+            uniqueB.includes(id),
+          ).length;
+          const aInBTeam = bTeam.userIds.filter((id) =>
+            uniqueA.includes(id),
+          ).length;
+          const bInBTeam = bTeam.userIds.filter((id) =>
+            uniqueB.includes(id),
+          ).length;
 
           if (aInATeam >= 3 && bInBTeam >= 3) {
             similarCount += 1;
@@ -2708,7 +2757,8 @@ export class LabStatsService {
       }
     }
 
-    const directWinRateA = similarCount > 0 ? similarTeamAWins / similarCount : modelWinRateA;
+    const directWinRateA =
+      similarCount > 0 ? similarTeamAWins / similarCount : modelWinRateA;
     const adjustedWinRateA =
       similarCount >= 5
         ? modelWinRateA * 0.7 + directWinRateA * 0.3
@@ -2739,7 +2789,8 @@ export class LabStatsService {
           baseWinrate: Math.round(score.baseWinrate * 10000) / 10000,
           kdaFactor: Math.round(score.kdaFactor * 10000) / 10000,
           damageFactor: Math.round(score.damageFactor * 10000) / 10000,
-          nexusWinRateFactor: Math.round(score.nexusWinRateFactor * 10000) / 10000,
+          nexusWinRateFactor:
+            Math.round(score.nexusWinRateFactor * 10000) / 10000,
         },
       };
     });
@@ -2793,7 +2844,11 @@ export class LabStatsService {
       : userIds;
 
     if (targetUsersGlobal.length === 0) {
-      return { period, mode: isByTeam ? "byTeam" : "global", recommendations: [] };
+      return {
+        period,
+        mode: isByTeam ? "byTeam" : "global",
+        recommendations: [],
+      };
     }
 
     const cacheKey = this.labCacheKey(
@@ -2802,7 +2857,6 @@ export class LabStatsService {
     const cached = await this.redis.get(cacheKey);
     if (cached) return JSON.parse(cached);
 
-    const periodFilter = this.getPeriodFilter(period);
     const users = await this.prisma.user.findMany({
       where: { id: { in: targetUsersGlobal } },
       select: { id: true, username: true },
@@ -2886,7 +2940,9 @@ export class LabStatsService {
     );
     const championNameRows =
       championIds.length > 0
-        ? await this.prisma.$queryRaw<{ championId: number; championName: string }[]>(
+        ? await this.prisma.$queryRaw<
+            { championId: number; championName: string }[]
+          >(
             Prisma.sql`
               SELECT
                 mp."championId" AS "championId",
@@ -2907,7 +2963,8 @@ export class LabStatsService {
     const metaStrengthByChampion = new Map<number, number>();
     for (let i = 0; i < sortedMeta.length; i++) {
       const ratio = (i + 1) / sortedMeta.length;
-      const score = ratio <= 0.1 ? 1.0 : ratio <= 0.3 ? 0.75 : ratio <= 0.6 ? 0.5 : 0.25;
+      const score =
+        ratio <= 0.1 ? 1.0 : ratio <= 0.3 ? 0.75 : ratio <= 0.6 ? 0.5 : 0.25;
       metaStrengthByChampion.set(sortedMeta[i].championId, score);
     }
 
@@ -2943,7 +3000,11 @@ export class LabStatsService {
           userMastery: number;
           metaStrength: number;
           threatScore: number;
-          topUserForMastery?: { userId: string; games: number; winRate: number };
+          topUserForMastery?: {
+            userId: string;
+            games: number;
+            winRate: number;
+          };
           topUserForThreat?: { userId: string; threat: number };
         }
       >();
@@ -2956,13 +3017,11 @@ export class LabStatsService {
           const threat = threatByUserChamp.get(key) ?? 0;
           const meta = metaStrengthByChampion.get(championId) ?? 0.25;
 
-          const bucket =
-            scoreMap.get(championId) ??
-            {
-              userMastery: 0,
-              metaStrength: 0,
-              threatScore: 0,
-            };
+          const bucket = scoreMap.get(championId) ?? {
+            userMastery: 0,
+            metaStrength: 0,
+            threatScore: 0,
+          };
 
           const masteryContrib = mastery.score * 0.5;
           const metaContrib = meta * 0.3;
@@ -2972,13 +3031,14 @@ export class LabStatsService {
           bucket.metaStrength += metaContrib;
           bucket.threatScore += threatContrib;
 
-          const champWinRate = mastery.games > 0 ? mastery.wins / mastery.games : 0;
+          const champWinRate =
+            mastery.games > 0 ? mastery.wins / mastery.games : 0;
           if (
             !bucket.topUserForMastery ||
             masteryContrib >
-              (bucket.topUserForMastery.games *
+              bucket.topUserForMastery.games *
                 0.5 *
-                (bucket.topUserForMastery.winRate || 0))
+                (bucket.topUserForMastery.winRate || 0)
           ) {
             bucket.topUserForMastery = {
               userId,
@@ -3060,7 +3120,9 @@ export class LabStatsService {
 
   // ─── Task 14: 챔피언 장인 목록 (동적 티어 완화 + masteryScore) ───
 
-  async getChampionMastery(championId: number): Promise<LabChampionMasteryResponse> {
+  async getChampionMastery(
+    championId: number,
+  ): Promise<LabChampionMasteryResponse> {
     const cacheKey = this.labCacheKey(`champion:mastery:${championId}`);
     const cached = await this.redis.get(cacheKey);
     if (cached) return JSON.parse(cached);
@@ -3193,7 +3255,9 @@ export class LabStatsService {
       `),
     ]);
 
-    const allPuuids = users.flatMap((u) => u.riotAccounts.map((ra) => ra.puuid));
+    const allPuuids = users.flatMap((u) =>
+      u.riotAccounts.map((ra) => ra.puuid),
+    );
     const seasonTiers =
       allPuuids.length > 0
         ? await this.prisma.summonerSeasonTier.findMany({
@@ -3243,13 +3307,11 @@ export class LabStatsService {
           };
         });
 
-        let selectedRanked = null as
-          | {
-              tier: string;
-              rank: string;
-              lp: number;
-            }
-          | null;
+        let selectedRanked = null as {
+          tier: string;
+          rank: string;
+          lp: number;
+        } | null;
 
         const primary = accounts.find((a) => a.isPrimary);
         if (primary) {
@@ -3324,14 +3386,20 @@ export class LabStatsService {
     };
 
     let appliedCriteria = criteriaLevels[0];
-    let qualified = candidates.filter((row) => passesCriteria(row, appliedCriteria));
+    let qualified = candidates.filter((row) =>
+      passesCriteria(row, appliedCriteria),
+    );
     if (qualified.length < 10) {
       appliedCriteria = criteriaLevels[1];
-      qualified = candidates.filter((row) => passesCriteria(row, appliedCriteria));
+      qualified = candidates.filter((row) =>
+        passesCriteria(row, appliedCriteria),
+      );
     }
     if (qualified.length < 5) {
       appliedCriteria = criteriaLevels[2];
-      qualified = candidates.filter((row) => passesCriteria(row, appliedCriteria));
+      qualified = candidates.filter((row) =>
+        passesCriteria(row, appliedCriteria),
+      );
     }
 
     const percentile = (values: number[], value: number): number => {
@@ -3420,7 +3488,8 @@ export class LabStatsService {
         champGames: row.games,
         champWins: row.wins,
         champWinRate: Math.round(row.champWinRate * 10000) / 10000,
-        wilsonLower: Math.round(wilsonLower(row.wins, row.games) * 1000000) / 1000000,
+        wilsonLower:
+          Math.round(wilsonLower(row.wins, row.games) * 1000000) / 1000000,
         avgKda: Math.round(row.avgKda * 100) / 100,
         masteryScore: Math.round(row.masteryScore * 100) / 100,
         scoreBreakdown: {
@@ -3487,5 +3556,55 @@ export class LabStatsService {
     }
 
     return { primaryStyle, subStyle, keystonePerk };
+  }
+
+  // ─── Task 35: Admin — 콜드스타트/데이터 단계 조회 ───
+
+  /**
+   * 현재 Lab 데이터 단계(0~4)를 반환한다.
+   * - 0단계(콜드):    0~9게임
+   * - 1단계(워밍업):  10~29게임
+   * - 2단계(기본):    30~99게임
+   * - 3단계(안정):    100~299게임
+   * - 4단계(성숙):    300+게임
+   */
+  async getDataPhase(): Promise<{
+    phase: number;
+    totalMatches: number;
+    nextPhaseThreshold: number | null;
+    remainingUntilNextPhase: number | null;
+    snapshotLastComputedAt: Date | null;
+  }> {
+    const THRESHOLDS = [0, 10, 30, 100, 300];
+
+    const totalMatches = await this.prisma.match.count({
+      where: { completedAt: { not: null } },
+    });
+
+    let phase = 0;
+    for (let i = THRESHOLDS.length - 1; i >= 0; i--) {
+      if (totalMatches >= THRESHOLDS[i]) {
+        phase = i;
+        break;
+      }
+    }
+
+    const nextThreshold = THRESHOLDS[phase + 1] ?? null;
+    const remaining =
+      nextThreshold !== null ? nextThreshold - totalMatches : null;
+
+    // 가장 최근 스냅샷 computedAt
+    const latestSnapshot = await this.prisma.labChampionSnapshot.findFirst({
+      orderBy: { computedAt: "desc" },
+      select: { computedAt: true },
+    });
+
+    return {
+      phase,
+      totalMatches,
+      nextPhaseThreshold: nextThreshold,
+      remainingUntilNextPhase: remaining,
+      snapshotLastComputedAt: latestSnapshot?.computedAt ?? null,
+    };
   }
 }

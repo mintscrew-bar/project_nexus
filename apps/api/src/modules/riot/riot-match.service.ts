@@ -354,9 +354,7 @@ export class RiotMatchService {
       // DB 영구 캐시 저장 (비동기 — 응답 지연 없이 저장)
       const queueId = matchData.info?.queueId ?? 0;
       const gameEndTs = matchData.info?.gameEndTimestamp ?? Date.now();
-      const patchVersion = this.parsePatchVersion(
-        matchData.info?.gameVersion,
-      );
+      const patchVersion = this.parsePatchVersion(matchData.info?.gameVersion);
       void this.prisma.riotMatchCache
         .upsert({
           where: { matchId },

@@ -5,9 +5,27 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getChampionKoreanName } from "@nexus/types";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/auth-store";
 import { LabPeriod, LabTabKey, useLabStore } from "@/stores/lab-store";
-import { riotApi, statsApi } from "@/lib/api-client";
+import { statsApi } from "@/lib/api-client";
+import {
+  labQueryOptions,
+  type LabOverview,
+  type MetaRadarResponse,
+  type PatchImpactResponse,
+  type BanRatesResponse,
+  type ChampionListResponse,
+  type SynergyResponse,
+  type CounterResponse,
+  type CompositionsResponse,
+  type AuctionEfficiencyResponse,
+  type ChampionDetailResponse,
+  type ChampionMasteryResponse,
+  type BalanceScoreResponse,
+  type BanRecommendResponse,
+  type ItemData,
+} from "@/lib/lab-queries";
 import { getChampionIconById, getItemIcon } from "@/components/matches/match-utils";
 import { RuneTooltip } from "@/components/RuneTooltip";
 import {
@@ -51,441 +69,6 @@ const LAB_PERIODS: Array<{ key: LabPeriod; label: string }> = [
   { key: "all", label: "전체" },
 ];
 
-type LabOverview = {
-  sample: {
-    matchesWithStats: number;
-    participantRows: number;
-    playersInDataset: number;
-    championsInDataset: number;
-    itemSelections: number;
-    recentMatches30d: number;
-  };
-  laneProfiles: Array<{
-    position: string;
-    games: number;
-    winRate: number;
-    avgKills: number;
-    avgDeaths: number;
-    avgAssists: number;
-    avgDamage: number;
-    avgGold: number;
-  }>;
-  championSignals: Array<{
-    championId: number;
-    championName: string;
-    championNameKorean: string;
-    games: number;
-    winRate: number;
-    avgKills: number;
-    avgDeaths: number;
-    avgAssists: number;
-  }>;
-  itemTrends: Array<{
-    itemId: number;
-    picks: number;
-    uniqueUsers: number;
-  }>;
-  masteryLeaders: Array<{
-    userId: string;
-    username: string;
-    avatar: string | null;
-    championId: number;
-    championName: string;
-    championNameKorean: string;
-    games: number;
-    winRate: number;
-    avgKda: number;
-    masteryScore: number;
-  }>;
-  seededChampionLeaders: Array<{
-    puuid: string;
-    gameName: string | null;
-    tagLine: string | null;
-    championId: number;
-    championName: string;
-    championNameKorean: string;
-    games: number;
-    winRate: number;
-    avgKda: number;
-    lastGameAt: string;
-  }>;
-};
-
-type MetaRadarResponse = {
-  trending: Array<{
-    championId: number;
-    championName: string;
-    championNameKorean: string;
-    recentGames: number;
-    recentWinRate: number;
-    recentPickRate: number;
-    prevPickRate: number;
-    pickRateDelta: number;
-  }>;
-  tiers: Record<
-    string,
-    Array<{
-      championId: number;
-      games: number;
-      winRate: number;
-      pickRate: number;
-      tier: "S" | "A" | "B" | "C" | "D";
-      confidenceLevel: "low" | "moderate" | "high" | "insufficient";
-    }>
-  >;
-  sample: {
-    totalGames: number;
-    totalPlayers: number;
-    period: LabPeriod;
-  };
-};
-
-type PatchImpactResponse = {
-  currentPatch: string | null;
-  previousPatch: string | null;
-  buffed: Array<{
-    championId: number;
-    championNameKorean: string;
-    deltaWinRate: number;
-    currentWinRate: number;
-  }>;
-  nerfed: Array<{
-    championId: number;
-    championNameKorean: string;
-    deltaWinRate: number;
-    currentWinRate: number;
-  }>;
-  insufficient: boolean;
-};
-
-type BanRatesResponse = {
-  totalMatches: number;
-  banStats: Array<{
-    championId: number;
-    banRate: number;
-    banTeamWinRate: number;
-    confidenceLevel: "low" | "moderate" | "high" | "insufficient";
-  }>;
-};
-
-type ChampionListResponse = {
-  period: LabPeriod;
-  position: string | null;
-  includeLowSample: boolean;
-  source: "snapshot" | "realtime";
-  champions: Array<{
-    championId: number;
-    championName: string;
-    championNameKorean: string;
-    games: number;
-    wins: number;
-    losses: number;
-    winRate: number;
-    pickRate: number;
-    banRate: number;
-    wilsonLower: number;
-    confidenceLevel: "low" | "moderate" | "high" | "insufficient";
-  }>;
-};
-
-type SynergyResponse = {
-  period: LabPeriod;
-  championId: number | null;
-  source: "snapshot" | "realtime";
-  rows: Array<{
-    champ1Id: number;
-    champ2Id: number;
-    champ1NameKorean: string;
-    champ2NameKorean: string;
-    games: number;
-    wins: number;
-    winRate: number;
-    wilsonLower: number;
-    expectedWinRate: number;
-    deltaWinRate: number;
-    confidenceLevel: "low" | "moderate" | "high" | "insufficient";
-    badges: Array<"시너지 효과 있음">;
-  }>;
-};
-
-type CounterResponse = {
-  period: LabPeriod;
-  championId: number | null;
-  vsChampionId: number | null;
-  position: string | null;
-  source: "snapshot" | "realtime";
-  rows: Array<{
-    champId: number;
-    vsChampId: number;
-    champNameKorean: string;
-    vsChampNameKorean: string;
-    position: string | null;
-    games: number;
-    wins: number;
-    winRate: number;
-    wilsonLower: number;
-    wilsonUpper: number;
-    confidenceLevel: "low" | "moderate" | "high" | "insufficient";
-    verdict: "favorable" | "unfavorable" | "even";
-  }>;
-};
-
-type CompositionsResponse = {
-  period: LabPeriod;
-  source: "realtime";
-  totalTeams: number;
-  topTypes: Array<{
-    type: "TEAMFIGHT" | "SPLIT_PUSH" | "POKE" | "EARLY_AGGRO" | "TANK_LINE";
-    label: string;
-    games: number;
-    wins: number;
-    winRate: number;
-    pickRate: number;
-    avgGameDurationSec: number;
-    confidenceLevel: "low" | "moderate" | "high" | "insufficient";
-  }>;
-  rows: Array<{
-    type: "TEAMFIGHT" | "SPLIT_PUSH" | "POKE" | "EARLY_AGGRO" | "TANK_LINE";
-    label: string;
-    games: number;
-    wins: number;
-    winRate: number;
-    pickRate: number;
-    avgGameDurationSec: number;
-    confidenceLevel: "low" | "moderate" | "high" | "insufficient";
-  }>;
-  caveat: string;
-};
-
-type AuctionEfficiencyResponse = {
-  period: LabPeriod;
-  source: "realtime";
-  sampleSize: {
-    users: number;
-    games: number;
-  };
-  regression: {
-    beta0: number;
-    beta1: number;
-    residualStdDev: number;
-  };
-  buckets: Array<{
-    label: string;
-    minPrice: number;
-    maxPrice: number | null;
-    games: number;
-    users: number;
-    avgKda: number;
-    avgDamageShare: number;
-    winRate: number;
-    avgPerformance: number;
-  }>;
-  scatter: Array<{
-    userId: string;
-    username: string;
-    soldPrice: number;
-    performance: number;
-    expectedPerformance: number;
-    efficiency: number;
-  }>;
-  efficiencyTop: Array<{
-    userId: string;
-    username: string;
-    soldPrice: number;
-    performance: number;
-    expectedPerformance: number;
-    efficiency: number;
-    games: number;
-    winRate: number;
-    avgKda: number;
-    avgDamageShare: number;
-  }>;
-  overpricedTop: Array<{
-    userId: string;
-    username: string;
-    soldPrice: number;
-    performance: number;
-    expectedPerformance: number;
-    efficiency: number;
-    games: number;
-    winRate: number;
-    avgKda: number;
-    avgDamageShare: number;
-  }>;
-  unsoldSummary: {
-    users: number;
-    games: number;
-    winRate: number;
-    avgPerformance: number;
-  };
-};
-
-type BalanceScoreResponse = {
-  teamA: {
-    avgPss: number;
-    modelWinRate: number;
-    adjustedWinRate: number;
-  };
-  teamB: {
-    avgPss: number;
-    modelWinRate: number;
-    adjustedWinRate: number;
-  };
-  confidence: {
-    level: "high" | "moderate" | "low";
-    message: string;
-  };
-  similarMatches: {
-    count: number;
-    teamAWins: number;
-    teamBWins: number;
-    teamAWinRate: number;
-  };
-  players: Array<{
-    userId: string;
-    username: string;
-    team: "A" | "B";
-    recentGames: number;
-    pss: number;
-    components: {
-      baseWinrate: number;
-      kdaFactor: number;
-      damageFactor: number;
-      nexusWinRateFactor: number;
-    };
-  }>;
-  caveat: string;
-};
-
-type BanRecommendResponse = {
-  period: LabPeriod;
-  mode: "global" | "byTeam";
-  recommendations?: Array<{
-    championId: number;
-    championNameKorean: string;
-    banScore: number;
-    contributions: {
-      userMastery: number;
-      metaStrength: number;
-      threatScore: number;
-    };
-    reasons: string[];
-  }>;
-  byTeam?: {
-    teamA: Array<{
-      championId: number;
-      championNameKorean: string;
-      banScore: number;
-      contributions: {
-        userMastery: number;
-        metaStrength: number;
-        threatScore: number;
-      };
-      reasons: string[];
-    }>;
-    teamB: Array<{
-      championId: number;
-      championNameKorean: string;
-      banScore: number;
-      contributions: {
-        userMastery: number;
-        metaStrength: number;
-        threatScore: number;
-      };
-      reasons: string[];
-    }>;
-  };
-};
-
-type ChampionDetailResponse = {
-  championId: number;
-  championName: string;
-  championNameKorean: string;
-  period: LabPeriod;
-  totals: {
-    games: number;
-    wins: number;
-    winRate: number;
-  };
-  winrateTrend: Array<{
-    weekStart: string;
-    games: number;
-    wins: number;
-    winRate: number;
-  }>;
-  trendInsufficient: boolean;
-  positions: Array<{
-    position: string;
-    games: number;
-    wins: number;
-    winRate: number;
-    pickRateWithinChampion: number;
-    wilsonLower: number;
-    confidenceLevel: "low" | "moderate" | "high" | "insufficient";
-  }>;
-  topItemCombos: Array<{
-    itemIds: [number, number];
-    games: number;
-    wins: number;
-    winRate: number;
-    wilsonLower: number;
-  }>;
-  topRuneCombos: Array<{
-    primaryStyle: number;
-    subStyle: number;
-    keystonePerk: number;
-    games: number;
-    wins: number;
-    winRate: number;
-    wilsonLower: number;
-  }>;
-};
-
-type ChampionMasteryResponse = {
-  championId: number;
-  championName: string;
-  championNameKorean: string;
-  appliedCriteria: {
-    minTier: string;
-    minRank: string;
-    minGames: number;
-    minWinRate: number;
-    isRelaxed: boolean;
-  };
-  totalUniquePlayersOnChamp: number;
-  qualifiedCount: number;
-  insufficient: boolean;
-  masteries: Array<{
-    rank: number;
-    userId: string;
-    username: string;
-    avatar: string | null;
-    riotTier: string;
-    riotRank: string;
-    champGames: number;
-    champWins: number;
-    champWinRate: number;
-    wilsonLower: number;
-    avgKda: number;
-    masteryScore: number;
-    scoreBreakdown: {
-      volume: number;
-      skill: number;
-      impact: number;
-      recency: number;
-    };
-    lastPlayedAt: string;
-    nexusWinRate: number;
-    nexusGlobalRank: number | null;
-    avgSoldPrice: number | null;
-    badges: Array<"커뮤니티 인증" | "고평가" | "기준 완화">;
-  }>;
-};
-
-type ItemData = {
-  name: string;
-  image?: { full?: string };
-};
 
 const POSITION_LABELS: Record<string, string> = {
   TOP: "탑",
@@ -540,6 +123,60 @@ const COMPOSITION_EXAMPLE_CHAMPIONS: Record<
   TANK_LINE: [54, 516, 113], // Malphite, Ornn, Sejuani
 };
 
+// ─── Task 33: Lab 전용 빈 데이터 상태 컴포넌트 ───────────────────────────────
+type LabConfidenceLevel = "insufficient" | "low" | "moderate" | "high";
+
+function LabEmptyState({
+  level = "insufficient",
+  section,
+  className,
+}: {
+  level?: LabConfidenceLevel;
+  section?: string;
+  className?: string;
+}) {
+  const messages: Record<LabConfidenceLevel, { title: string; desc: string }> = {
+    insufficient: {
+      title: "아직 충분한 게임 데이터가 없어요",
+      desc: section
+        ? `${section} 분석을 위한 데이터가 부족합니다. 내전이 더 진행되면 자동으로 활성화됩니다.`
+        : "내전 데이터가 쌓이면 분석이 시작됩니다.",
+    },
+    low: {
+      title: "데이터가 적어 참고용으로만 활용하세요",
+      desc: section
+        ? `${section}의 표본이 5~14게임 수준입니다. 결과가 실제와 다를 수 있습니다.`
+        : "표본이 적어 통계 신뢰도가 낮습니다.",
+    },
+    moderate: {
+      title: "데이터를 수집 중입니다",
+      desc: section ? `${section} 데이터를 불러오는 중입니다.` : "잠시 후 다시 확인해 주세요.",
+    },
+    high: {
+      title: "데이터를 불러오는 중입니다",
+      desc: "잠시 후 다시 확인해 주세요.",
+    },
+  };
+
+  const { title, desc } = messages[level];
+  const textColor =
+    level === "insufficient"
+      ? "text-text-tertiary"
+      : level === "low"
+        ? "text-amber-400/70"
+        : "text-text-secondary";
+
+  return (
+    <div className={`flex flex-col items-center justify-center py-10 text-center ${className ?? ""}`}>
+      <div className="mb-3 rounded-full bg-bg-tertiary p-4">
+        <FlaskConical className={`h-7 w-7 ${textColor}`} />
+      </div>
+      <p className={`font-semibold ${textColor}`}>{title}</p>
+      <p className="mt-1 max-w-xs text-xs text-text-tertiary">{desc}</p>
+    </div>
+  );
+}
+
 function StatMetric({
   label,
   value,
@@ -579,32 +216,15 @@ export default function LabPage() {
     setPeriod,
     setPosition,
   } = useLabStore();
-  const [overview, setOverview] = useState<LabOverview | null>(null);
-  const [itemData, setItemData] = useState<Record<string, ItemData>>({});
-  const [metaRadar, setMetaRadar] = useState<MetaRadarResponse | null>(null);
-  const [patchImpact, setPatchImpact] = useState<PatchImpactResponse | null>(null);
-  const [banRates, setBanRates] = useState<BanRatesResponse | null>(null);
-  const [championList, setChampionList] = useState<ChampionListResponse | null>(null);
+  // ─── UI 전용 로컬 state ───────────────────────────────────────────────────────
   const [championSearch, setChampionSearch] = useState("");
   const [includeLowSample, setIncludeLowSample] = useState(false);
   const [championSort, setChampionSort] = useState<"pickRate" | "winRate" | "banRate">("winRate");
   const [selectedChampionId, setSelectedChampionId] = useState<number | null>(null);
-  const [championDetail, setChampionDetail] = useState<ChampionDetailResponse | null>(null);
-  const [championMastery, setChampionMastery] = useState<ChampionMasteryResponse | null>(null);
-  const [championDetailLoading, setChampionDetailLoading] = useState(false);
-  const [championDetailError, setChampionDetailError] = useState<string | null>(null);
   const [synergyChampionId, setSynergyChampionId] = useState<number | null>(null);
-  const [synergyData, setSynergyData] = useState<SynergyResponse | null>(null);
-  const [synergyLoading, setSynergyLoading] = useState(false);
   const [counterChampionId, setCounterChampionId] = useState<number | null>(null);
   const [counterVsChampionId, setCounterVsChampionId] = useState<number | null>(null);
   const [counterPosition, setCounterPosition] = useState<"ALL" | "TOP" | "JUNGLE" | "MID" | "ADC" | "SUPPORT">("ALL");
-  const [counterData, setCounterData] = useState<CounterResponse | null>(null);
-  const [counterLoading, setCounterLoading] = useState(false);
-  const [compositionsData, setCompositionsData] = useState<CompositionsResponse | null>(null);
-  const [compositionsLoading, setCompositionsLoading] = useState(false);
-  const [auctionData, setAuctionData] = useState<AuctionEfficiencyResponse | null>(null);
-  const [auctionLoading, setAuctionLoading] = useState(false);
   const [oracleSearchQuery, setOracleSearchQuery] = useState("");
   const [oracleSearchResults, setOracleSearchResults] = useState<
     Array<{ id: string; username: string; avatar: string | null }>
@@ -621,11 +241,126 @@ export default function LabPage() {
   const [banRecommendResult, setBanRecommendResult] = useState<BanRecommendResponse | null>(null);
   const [banRecommendLoading, setBanRecommendLoading] = useState(false);
   const [banRecommendError, setBanRecommendError] = useState<string | null>(null);
-  const [championCatalog, setChampionCatalog] = useState<Array<{ championId: number; championNameKorean: string; championName: string }>>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
+  const queryClient = useQueryClient();
   const isAdmin = user?.role === "ADMIN";
+
+  // ─── 인증 확인 후 enabled 여부 결정 ──────────────────────────────────────────
+  const canFetch = !authLoading && isAuthenticated && isAdmin;
+
+  // ─── React Query: 초기 메타 데이터 ───────────────────────────────────────────
+  const { data: overview, isLoading: overviewLoading, isError: overviewError } = useQuery({
+    ...labQueryOptions.overview(),
+    enabled: canFetch,
+  });
+
+  const { data: itemsResponse } = useQuery<{ data: Record<string, ItemData> }>({
+    ...labQueryOptions.items("ko_KR"),
+    enabled: canFetch,
+  });
+  const itemData: Record<string, ItemData> = itemsResponse?.data ?? {};
+
+  const { data: metaRadar, isLoading: metaRadarLoading } = useQuery<MetaRadarResponse>({
+    ...labQueryOptions.metaRadar(activePeriod),
+    enabled: canFetch,
+  });
+
+  const { data: patchImpact } = useQuery<PatchImpactResponse>({
+    ...labQueryOptions.patchImpact(),
+    enabled: canFetch,
+  });
+
+  const { data: banRates } = useQuery<BanRatesResponse>({
+    ...labQueryOptions.banRates(activePeriod),
+    enabled: canFetch,
+  });
+
+  // ─── 메타 레이더 진입 시 prefetch (다음 기간 미리 로드) ──────────────────────
+  useEffect(() => {
+    if (!canFetch) return;
+    const otherPeriods: LabPeriod[] = (["30d", "90d", "all"] as LabPeriod[]).filter(
+      (p) => p !== activePeriod,
+    );
+    otherPeriods.forEach((p) => {
+      void queryClient.prefetchQuery(labQueryOptions.metaRadar(p));
+    });
+  }, [canFetch, activePeriod, queryClient]);
+
+  // ─── React Query: 챔피언 분석 탭 ─────────────────────────────────────────────
+  const { data: championList } = useQuery<ChampionListResponse>({
+    ...labQueryOptions.champions({
+      period: activePeriod,
+      position: activePosition === "ALL" ? undefined : activePosition,
+      includeLowSample,
+    }),
+    enabled: canFetch && activeTab === "champions",
+  });
+
+  // 챔피언 상세 (모달)
+  const { data: championDetail, isLoading: championDetailLoading, isError: championDetailIsError } = useQuery<ChampionDetailResponse>({
+    ...labQueryOptions.championDetail(selectedChampionId ?? 0, activePeriod),
+    enabled: canFetch && !!selectedChampionId,
+  });
+
+  const { data: championMastery } = useQuery<ChampionMasteryResponse>({
+    ...labQueryOptions.championMastery(selectedChampionId ?? 0),
+    enabled: canFetch && !!selectedChampionId,
+  });
+
+  const championDetailError = championDetailIsError ? "챔피언 상세 데이터를 불러오지 못했습니다." : null;
+
+  // 조합 탭용 챔피언 카탈로그 (includeLowSample=true로 전체 목록)
+  const { data: catalogResponse } = useQuery<ChampionListResponse>({
+    ...labQueryOptions.champions({ period: activePeriod, includeLowSample: true }),
+    enabled: canFetch && activeTab === "compositions",
+  });
+  const championCatalog = useMemo(
+    () =>
+      (catalogResponse?.champions ?? [])
+        .map((row) => ({
+          championId: row.championId,
+          championNameKorean: row.championNameKorean,
+          championName: row.championName,
+        }))
+        .sort((a, b) => a.championNameKorean.localeCompare(b.championNameKorean, "ko")),
+    [catalogResponse],
+  );
+
+  // ─── React Query: 조합 분석 탭 ───────────────────────────────────────────────
+  const { data: synergyData, isLoading: synergyLoading } = useQuery<SynergyResponse>({
+    ...labQueryOptions.synergy({
+      period: activePeriod,
+      championId: synergyChampionId ?? undefined,
+      limit: 30,
+    }),
+    enabled: canFetch && activeTab === "compositions",
+  });
+
+  const { data: counterData, isLoading: counterLoading } = useQuery<CounterResponse>({
+    ...labQueryOptions.counter({
+      period: activePeriod,
+      championId: counterChampionId ?? undefined,
+      vsChampionId: counterVsChampionId ?? undefined,
+      position: counterPosition === "ALL" ? undefined : counterPosition,
+      limit: 30,
+    }),
+    enabled: canFetch && activeTab === "compositions",
+  });
+
+  const { data: compositionsData, isLoading: compositionsLoading } = useQuery<CompositionsResponse>({
+    ...labQueryOptions.compositions(activePeriod),
+    enabled: canFetch && activeTab === "compositions",
+  });
+
+  // ─── React Query: 오라클 탭 ───────────────────────────────────────────────────
+  const { data: auctionData, isLoading: auctionLoading } = useQuery<AuctionEfficiencyResponse>({
+    ...labQueryOptions.auctionEfficiency(activePeriod),
+    enabled: canFetch && activeTab === "oracle",
+  });
+
+  // 초기 로딩: overview + metaRadar가 준비될 때까지 로딩 표시
+  const loading = canFetch && (overviewLoading || metaRadarLoading);
+  const error = overviewError ? "실험실 데이터를 불러오지 못했습니다." : null;
 
   const queryTab = useMemo<LabTabKey>(() => {
     const fromQuery = searchParams.get("tab");
@@ -657,293 +392,6 @@ export default function LabPage() {
       router.replace("/");
     }
   }, [authLoading, isAuthenticated, isAdmin, router]);
-
-  useEffect(() => {
-    if (authLoading || !isAuthenticated || !isAdmin) return;
-
-    let cancelled = false;
-
-    Promise.all([
-      statsApi.getLabOverview(),
-      riotApi.getItems("ko_KR"),
-      statsApi.getLabMetaRadar(activePeriod),
-      statsApi.getLabPatchImpact(),
-      statsApi.getLabBanRates(activePeriod),
-    ])
-      .then(([labOverview, itemsResponse, metaRadarResponse, patchImpactResponse, banRatesResponse]) => {
-        if (cancelled) return;
-        setOverview(labOverview);
-        setItemData(itemsResponse?.data ?? {});
-        setMetaRadar(metaRadarResponse);
-        setPatchImpact(patchImpactResponse);
-        setBanRates(banRatesResponse);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setError("실험실 데이터를 불러오지 못했습니다.");
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [authLoading, isAuthenticated, isAdmin, activePeriod]);
-
-  useEffect(() => {
-    if (authLoading || !isAuthenticated || !isAdmin || activeTab !== "champions") return;
-
-    let cancelled = false;
-    statsApi
-      .getLabChampions({
-        period: activePeriod,
-        position: activePosition === "ALL" ? undefined : activePosition,
-        includeLowSample,
-      })
-      .then((response) => {
-        if (cancelled) return;
-        setChampionList(response);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setChampionList({
-          period: activePeriod,
-          position: activePosition === "ALL" ? null : activePosition,
-          includeLowSample,
-          source: "realtime",
-          champions: [],
-        });
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    activePeriod,
-    activePosition,
-    activeTab,
-    authLoading,
-    includeLowSample,
-    isAdmin,
-    isAuthenticated,
-  ]);
-
-  useEffect(() => {
-    if (!selectedChampionId) return;
-
-    let cancelled = false;
-    setChampionDetailLoading(true);
-    setChampionDetailError(null);
-
-    Promise.all([
-      statsApi.getLabChampionDetail(selectedChampionId, activePeriod),
-      statsApi.getLabChampionMastery(selectedChampionId),
-    ])
-      .then(([detailResponse, masteryResponse]) => {
-        if (cancelled) return;
-        setChampionDetail(detailResponse);
-        setChampionMastery(masteryResponse);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setChampionDetail(null);
-        setChampionMastery(null);
-        setChampionDetailError("챔피언 상세 데이터를 불러오지 못했습니다.");
-      })
-      .finally(() => {
-        if (!cancelled) setChampionDetailLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedChampionId, activePeriod]);
-
-  useEffect(() => {
-    if (authLoading || !isAuthenticated || !isAdmin || activeTab !== "compositions") return;
-
-    let cancelled = false;
-    statsApi
-      .getLabChampions({
-        period: activePeriod,
-        includeLowSample: true,
-      })
-      .then((response: ChampionListResponse) => {
-        if (cancelled) return;
-        const catalog = response.champions
-          .map((row: ChampionListResponse["champions"][number]) => ({
-            championId: row.championId,
-            championNameKorean: row.championNameKorean,
-            championName: row.championName,
-          }))
-          .sort((a, b) =>
-            a.championNameKorean.localeCompare(b.championNameKorean, "ko"),
-          );
-        setChampionCatalog(catalog);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setChampionCatalog([]);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [activePeriod, activeTab, authLoading, isAdmin, isAuthenticated]);
-
-  useEffect(() => {
-    if (authLoading || !isAuthenticated || !isAdmin || activeTab !== "compositions") return;
-
-    let cancelled = false;
-    setSynergyLoading(true);
-    statsApi
-      .getLabSynergy({
-        period: activePeriod,
-        championId: synergyChampionId ?? undefined,
-        limit: 30,
-      })
-      .then((response) => {
-        if (cancelled) return;
-        setSynergyData(response);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setSynergyData({
-          period: activePeriod,
-          championId: synergyChampionId,
-          source: "realtime",
-          rows: [],
-        });
-      })
-      .finally(() => {
-        if (!cancelled) setSynergyLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    activePeriod,
-    activeTab,
-    authLoading,
-    isAuthenticated,
-    isAdmin,
-    synergyChampionId,
-  ]);
-
-  useEffect(() => {
-    if (authLoading || !isAuthenticated || !isAdmin || activeTab !== "compositions") return;
-
-    let cancelled = false;
-    setCounterLoading(true);
-    statsApi
-      .getLabCounter({
-        period: activePeriod,
-        championId: counterChampionId ?? undefined,
-        vsChampionId: counterVsChampionId ?? undefined,
-        position: counterPosition === "ALL" ? undefined : counterPosition,
-        limit: 30,
-      })
-      .then((response) => {
-        if (cancelled) return;
-        setCounterData(response);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setCounterData({
-          period: activePeriod,
-          championId: counterChampionId,
-          vsChampionId: counterVsChampionId,
-          position: counterPosition === "ALL" ? null : counterPosition,
-          source: "realtime",
-          rows: [],
-        });
-      })
-      .finally(() => {
-        if (!cancelled) setCounterLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    activePeriod,
-    activeTab,
-    authLoading,
-    isAuthenticated,
-    isAdmin,
-    counterChampionId,
-    counterVsChampionId,
-    counterPosition,
-  ]);
-
-  useEffect(() => {
-    if (authLoading || !isAuthenticated || !isAdmin || activeTab !== "compositions") return;
-
-    let cancelled = false;
-    setCompositionsLoading(true);
-    statsApi
-      .getLabCompositions({ period: activePeriod })
-      .then((response) => {
-        if (cancelled) return;
-        setCompositionsData(response);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setCompositionsData({
-          period: activePeriod,
-          source: "realtime",
-          totalTeams: 0,
-          topTypes: [],
-          rows: [],
-          caveat: "조합 유형 데이터를 불러오지 못했습니다.",
-        });
-      })
-      .finally(() => {
-        if (!cancelled) setCompositionsLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [activePeriod, activeTab, authLoading, isAuthenticated, isAdmin]);
-
-  useEffect(() => {
-    if (authLoading || !isAuthenticated || !isAdmin || activeTab !== "oracle") return;
-
-    let cancelled = false;
-    setAuctionLoading(true);
-    statsApi
-      .getLabAuctionEfficiency({ period: activePeriod })
-      .then((response) => {
-        if (cancelled) return;
-        setAuctionData(response);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setAuctionData({
-          period: activePeriod,
-          source: "realtime",
-          sampleSize: { users: 0, games: 0 },
-          regression: { beta0: 0, beta1: 0, residualStdDev: 0 },
-          buckets: [],
-          scatter: [],
-          efficiencyTop: [],
-          overpricedTop: [],
-          unsoldSummary: { users: 0, games: 0, winRate: 0, avgPerformance: 0 },
-        });
-      })
-      .finally(() => {
-        if (!cancelled) setAuctionLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [activePeriod, activeTab, authLoading, isAuthenticated, isAdmin]);
 
   useEffect(() => {
     if (activeTab !== "oracle") return;
@@ -1347,8 +795,9 @@ export default function LabPage() {
             />
           </div>
 
-          <div className="mt-8 flex flex-col gap-4 rounded-2xl border border-white/10 bg-bg-secondary/60 p-4">
-            <div className="flex flex-wrap items-center gap-2">
+          <div className="mt-8 flex flex-col gap-3 rounded-2xl border border-white/10 bg-bg-secondary/60 p-4">
+            {/* 탭 — 모바일에서 가로 스크롤 처리 */}
+            <div className="-mx-1 flex items-center gap-2 overflow-x-auto px-1 pb-1 scrollbar-none">
               {LAB_TABS.map((tab) => (
                 <button
                   key={tab.key}
@@ -1357,7 +806,7 @@ export default function LabPage() {
                     setActiveTab(tab.key);
                     updateLabQuery(tab.key, activePeriod);
                   }}
-                  className={`rounded-xl px-3 py-2 text-sm font-semibold transition-colors ${
+                  className={`shrink-0 rounded-xl px-3 py-2 text-sm font-semibold transition-colors ${
                     activeTab === tab.key
                       ? "bg-emerald-500/20 text-emerald-300"
                       : "bg-bg-primary/60 text-text-secondary hover:bg-bg-elevated"
@@ -1367,8 +816,9 @@ export default function LabPage() {
                 </button>
               ))}
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="text-xs uppercase tracking-[0.18em] text-text-tertiary">기간</p>
+            {/* 기간 필터 */}
+            <div className="flex items-center gap-2">
+              <p className="shrink-0 text-xs uppercase tracking-[0.18em] text-text-tertiary">기간</p>
               {LAB_PERIODS.map((period) => (
                 <button
                   key={period.key}
@@ -2299,7 +1749,8 @@ export default function LabPage() {
                 ))}
               </div>
 
-              <div className="overflow-x-auto rounded-xl border border-white/10">
+              {/* 챔피언 목록 — md 이상: 테이블, 미만: 카드 그리드 */}
+              <div className="hidden overflow-x-auto rounded-xl border border-white/10 md:block">
                 <table className="min-w-full text-sm">
                   <thead className="bg-bg-primary/70 text-text-tertiary">
                     <tr>
@@ -2357,8 +1808,53 @@ export default function LabPage() {
                   </tbody>
                 </table>
               </div>
+              {/* 모바일: 카드 그리드 */}
+              <div className="grid grid-cols-2 gap-3 md:hidden">
+                {championRowsFiltered.map((row) => (
+                  <button
+                    key={row.championId}
+                    type="button"
+                    onClick={() => setSelectedChampionId(row.championId)}
+                    className={`rounded-xl border border-white/10 bg-bg-secondary/40 p-3 text-left transition-colors hover:bg-bg-elevated/60 ${
+                      row.confidenceLevel === "low" ? "opacity-80" : ""
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-lg border border-white/10">
+                        <Image
+                          src={getChampionIconById(row.championId)}
+                          alt={row.championNameKorean}
+                          fill
+                          className="object-cover"
+                          unoptimized
+                        />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-text-primary">{row.championNameKorean}</p>
+                        <Badge variant={row.tier === "S" ? "success" : row.tier === "A" ? "default" : "secondary"} className="mt-0.5 text-xs">
+                          {row.tier}
+                        </Badge>
+                      </div>
+                    </div>
+                    <div className="mt-2 grid grid-cols-3 gap-1 text-xs text-text-tertiary">
+                      <div>
+                        <p>승률</p>
+                        <p className="font-semibold text-text-secondary">{(row.winRate * 100).toFixed(1)}%</p>
+                      </div>
+                      <div>
+                        <p>픽률</p>
+                        <p className="font-semibold text-text-secondary">{row.pickRate.toFixed(1)}%</p>
+                      </div>
+                      <div>
+                        <p>게임</p>
+                        <p className="font-semibold text-text-secondary">{row.games}</p>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
               {championRowsFiltered.length === 0 ? (
-                <p className="mt-3 text-sm text-text-secondary">조건에 맞는 챔피언 데이터가 없습니다.</p>
+                <LabEmptyState level="insufficient" section="챔피언 목록" className="mt-4" />
               ) : null}
             </CardContent>
           </Card>
