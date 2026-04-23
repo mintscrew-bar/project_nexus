@@ -103,6 +103,12 @@ export type MetaRadarResponse = {
 export type PatchImpactResponse = {
   currentPatch: string | null;
   previousPatch: string | null;
+  sample: {
+    currentGames: number;
+    previousGames: number;
+    currentTeams: number;
+    previousTeams: number;
+  };
   buffed: Array<{
     championId: number;
     championNameKorean: string;
@@ -114,6 +120,31 @@ export type PatchImpactResponse = {
     championNameKorean: string;
     deltaWinRate: number;
     currentWinRate: number;
+  }>;
+  positionShifts: Array<{
+    position: string;
+    currentWinRate: number;
+    prevWinRate: number;
+    deltaWinRate: number;
+    currentPickRate: number;
+    prevPickRate: number;
+    deltaPickRate: number;
+    currentGames: number;
+    prevGames: number;
+    confidenceLevel: "low" | "moderate" | "high" | "insufficient";
+  }>;
+  compositionShifts: Array<{
+    type: "TEAMFIGHT" | "SPLIT_PUSH" | "POKE" | "EARLY_AGGRO" | "TANK_LINE";
+    label: string;
+    currentWinRate: number;
+    prevWinRate: number;
+    deltaWinRate: number;
+    currentPickRate: number;
+    prevPickRate: number;
+    deltaPickRate: number;
+    currentGames: number;
+    prevGames: number;
+    confidenceLevel: "low" | "moderate" | "high" | "insufficient";
   }>;
   insufficient: boolean;
 };
@@ -221,6 +252,22 @@ export type AuctionEfficiencyResponse = {
   period: LabPeriod;
   source: "realtime";
   sampleSize: { users: number; games: number };
+  moneyball: {
+    baselineIndex: number;
+    indexStdDev: number;
+    minGamesForTrend: number;
+    minGamesForRole: number;
+    calibration: {
+      quarter: string;
+      mode: "quarter" | "fallback";
+      sampleUsers: number;
+      pricedUsers: number;
+      priorGames: number;
+      scale: number;
+      observedIqr: number | null;
+      targetIqr: number;
+    };
+  };
   regression: { beta0: number; beta1: number; residualStdDev: number };
   buckets: Array<{
     label: string;
@@ -240,6 +287,13 @@ export type AuctionEfficiencyResponse = {
     performance: number;
     expectedPerformance: number;
     efficiency: number;
+    moneyballIndex: number;
+    reliability: number;
+    recentTrendDelta: number;
+    recentTrendPercent: number | null;
+    recentGames: number;
+    previousGames: number;
+    trendConfidence: "insufficient" | "low" | "moderate" | "high";
   }>;
   efficiencyTop: Array<{
     userId: string;
@@ -252,6 +306,13 @@ export type AuctionEfficiencyResponse = {
     winRate: number;
     avgKda: number;
     avgDamageShare: number;
+    moneyballIndex: number;
+    reliability: number;
+    recentTrendDelta: number;
+    recentTrendPercent: number | null;
+    recentGames: number;
+    previousGames: number;
+    trendConfidence: "insufficient" | "low" | "moderate" | "high";
   }>;
   overpricedTop: Array<{
     userId: string;
@@ -264,7 +325,143 @@ export type AuctionEfficiencyResponse = {
     winRate: number;
     avgKda: number;
     avgDamageShare: number;
+    moneyballIndex: number;
+    reliability: number;
+    recentTrendDelta: number;
+    recentTrendPercent: number | null;
+    recentGames: number;
+    previousGames: number;
+    trendConfidence: "insufficient" | "low" | "moderate" | "high";
   }>;
+  trendingTop: Array<{
+    userId: string;
+    username: string;
+    soldPrice: number;
+    performance: number;
+    expectedPerformance: number;
+    efficiency: number;
+    games: number;
+    winRate: number;
+    avgKda: number;
+    avgDamageShare: number;
+    moneyballIndex: number;
+    reliability: number;
+    recentTrendDelta: number;
+    recentTrendPercent: number | null;
+    recentGames: number;
+    previousGames: number;
+    trendConfidence: "insufficient" | "low" | "moderate" | "high";
+  }>;
+  moneyballTop: Array<{
+    userId: string;
+    username: string;
+    soldPrice: number;
+    performance: number;
+    expectedPerformance: number;
+    efficiency: number;
+    games: number;
+    winRate: number;
+    avgKda: number;
+    avgDamageShare: number;
+    moneyballIndex: number;
+    reliability: number;
+    recentTrendDelta: number;
+    recentTrendPercent: number | null;
+    recentGames: number;
+    previousGames: number;
+    trendConfidence: "insufficient" | "low" | "moderate" | "high";
+  }>;
+  bubbleRiskTop: Array<{
+    userId: string;
+    username: string;
+    soldPrice: number;
+    performance: number;
+    expectedPerformance: number;
+    efficiency: number;
+    games: number;
+    winRate: number;
+    avgKda: number;
+    avgDamageShare: number;
+    moneyballIndex: number;
+    recentTrendDelta: number;
+    recentTrendPercent: number | null;
+    recentGames: number;
+    previousGames: number;
+  }>;
+  roleForm: {
+    users: Array<{
+      userId: string;
+      username: string;
+      totalGames: number;
+      activeRoles: number;
+      primaryPosition: string | null;
+      primaryGames: number;
+      versatilityScore: number;
+      confidence: "insufficient" | "low" | "moderate" | "high";
+      offRolePenalty: {
+        winRateDelta: number;
+        deathRateDelta: number;
+        performanceDelta: number;
+      } | null;
+      positions: Array<{
+        position: string;
+        games: number;
+        winRate: number;
+        avgKda: number;
+        avgDeaths: number;
+        avgDamageShare: number;
+        avgPerformance: number;
+      }>;
+    }>;
+    versatilityTop: Array<{
+      userId: string;
+      username: string;
+      totalGames: number;
+      activeRoles: number;
+      primaryPosition: string | null;
+      primaryGames: number;
+      versatilityScore: number;
+      confidence: "insufficient" | "low" | "moderate" | "high";
+      offRolePenalty: {
+        winRateDelta: number;
+        deathRateDelta: number;
+        performanceDelta: number;
+      } | null;
+      positions: Array<{
+        position: string;
+        games: number;
+        winRate: number;
+        avgKda: number;
+        avgDeaths: number;
+        avgDamageShare: number;
+        avgPerformance: number;
+      }>;
+    }>;
+    offRoleRiskTop: Array<{
+      userId: string;
+      username: string;
+      totalGames: number;
+      activeRoles: number;
+      primaryPosition: string | null;
+      primaryGames: number;
+      versatilityScore: number;
+      confidence: "insufficient" | "low" | "moderate" | "high";
+      offRolePenalty: {
+        winRateDelta: number;
+        deathRateDelta: number;
+        performanceDelta: number;
+      } | null;
+      positions: Array<{
+        position: string;
+        games: number;
+        winRate: number;
+        avgKda: number;
+        avgDeaths: number;
+        avgDamageShare: number;
+        avgPerformance: number;
+      }>;
+    }>;
+  };
   unsoldSummary: { users: number; games: number; winRate: number; avgPerformance: number };
 };
 
@@ -363,6 +560,13 @@ export type BalanceScoreResponse = {
 export type BanRecommendResponse = {
   period: LabPeriod;
   mode: "global" | "byTeam";
+  meta: {
+    source: "custom" | "hybrid" | "ranked_only" | "none";
+    customMetaCount: number;
+    rankedMetaCount: number;
+    externalSupplementedCount: number;
+    rankedPeriod: "30d" | "current_patch" | null;
+  };
   recommendations?: Array<{
     championId: number;
     championNameKorean: string;

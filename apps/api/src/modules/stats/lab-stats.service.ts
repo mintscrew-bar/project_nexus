@@ -247,6 +247,13 @@ export interface AuctionEfficiencyPoint {
   performance: number;
   expectedPerformance: number;
   efficiency: number;
+  moneyballIndex: number;
+  reliability: number;
+  recentTrendDelta: number;
+  recentTrendPercent: number | null;
+  recentGames: number;
+  previousGames: number;
+  trendConfidence: "insufficient" | "low" | "moderate" | "high";
 }
 
 export interface AuctionEfficiencyLeader {
@@ -260,6 +267,40 @@ export interface AuctionEfficiencyLeader {
   winRate: number;
   avgKda: number;
   avgDamageShare: number;
+  moneyballIndex: number;
+  reliability: number;
+  recentTrendDelta: number;
+  recentTrendPercent: number | null;
+  recentGames: number;
+  previousGames: number;
+  trendConfidence: "insufficient" | "low" | "moderate" | "high";
+}
+
+export interface AuctionRoleFormPosition {
+  position: string;
+  games: number;
+  winRate: number;
+  avgKda: number;
+  avgDeaths: number;
+  avgDamageShare: number;
+  avgPerformance: number;
+}
+
+export interface AuctionRoleFormUser {
+  userId: string;
+  username: string;
+  totalGames: number;
+  activeRoles: number;
+  primaryPosition: string | null;
+  primaryGames: number;
+  versatilityScore: number;
+  confidence: "insufficient" | "low" | "moderate" | "high";
+  offRolePenalty: {
+    winRateDelta: number;
+    deathRateDelta: number;
+    performanceDelta: number;
+  } | null;
+  positions: AuctionRoleFormPosition[];
 }
 
 export interface LabAuctionEfficiencyResponse {
@@ -268,6 +309,22 @@ export interface LabAuctionEfficiencyResponse {
   sampleSize: {
     users: number;
     games: number;
+  };
+  moneyball: {
+    baselineIndex: number;
+    indexStdDev: number;
+    minGamesForTrend: number;
+    minGamesForRole: number;
+    calibration: {
+      quarter: string;
+      mode: "quarter" | "fallback";
+      sampleUsers: number;
+      pricedUsers: number;
+      priorGames: number;
+      scale: number;
+      observedIqr: number | null;
+      targetIqr: number;
+    };
   };
   regression: {
     beta0: number;
@@ -278,6 +335,14 @@ export interface LabAuctionEfficiencyResponse {
   scatter: AuctionEfficiencyPoint[];
   efficiencyTop: AuctionEfficiencyLeader[];
   overpricedTop: AuctionEfficiencyLeader[];
+  trendingTop: AuctionEfficiencyLeader[];
+  moneyballTop: AuctionEfficiencyLeader[];
+  bubbleRiskTop: AuctionEfficiencyLeader[];
+  roleForm: {
+    users: AuctionRoleFormUser[];
+    versatilityTop: AuctionRoleFormUser[];
+    offRoleRiskTop: AuctionRoleFormUser[];
+  };
   unsoldSummary: {
     users: number;
     games: number;
@@ -342,6 +407,13 @@ export interface LabBanRecommendationRow {
 export interface LabBanRecommendResponse {
   period: Period;
   mode: "global" | "byTeam";
+  meta: {
+    source: "custom" | "hybrid" | "ranked_only" | "none";
+    customMetaCount: number;
+    rankedMetaCount: number;
+    externalSupplementedCount: number;
+    rankedPeriod: "30d" | "current_patch" | null;
+  };
   recommendations?: LabBanRecommendationRow[];
   byTeam?: {
     teamA: LabBanRecommendationRow[];
@@ -562,7 +634,10 @@ export class LabStatsService {
         FROM "match_participants" a
         INNER JOIN "match_participants" b
           ON a."matchId" = b."matchId"
-          AND a."teamId" = b."teamId"
+          AND (
+            (a."teamId" IS NOT NULL AND b."teamId" IS NOT NULL AND a."teamId" = b."teamId")
+            OR (a."teamId" IS NULL AND b."teamId" IS NULL AND a."win" = b."win")
+          )
           AND a."id" < b."id"
         INNER JOIN "matches" m ON m."id" = a."matchId"
         WHERE m."completedAt" IS NOT NULL
@@ -641,7 +716,10 @@ export class LabStatsService {
         FROM "match_participants" a
         INNER JOIN "match_participants" b
           ON a."matchId" = b."matchId"
-          AND a."teamId" <> b."teamId"
+          AND (
+            (a."teamId" IS NOT NULL AND b."teamId" IS NOT NULL AND a."teamId" <> b."teamId")
+            OR (a."teamId" IS NULL AND b."teamId" IS NULL AND a."win" <> b."win")
+          )
         INNER JOIN "matches" m ON m."id" = a."matchId"
         WHERE m."completedAt" IS NOT NULL
           ${periodFilter ? Prisma.sql`AND m."completedAt" >= ${periodFilter}` : Prisma.empty}
@@ -705,7 +783,10 @@ export class LabStatsService {
         FROM "match_participants" a
         INNER JOIN "match_participants" b
           ON a."matchId" = b."matchId"
-          AND a."teamId" <> b."teamId"
+          AND (
+            (a."teamId" IS NOT NULL AND b."teamId" IS NOT NULL AND a."teamId" <> b."teamId")
+            OR (a."teamId" IS NULL AND b."teamId" IS NULL AND a."win" <> b."win")
+          )
           AND a."position" = b."position"
         INNER JOIN "matches" m ON m."id" = a."matchId"
         WHERE m."completedAt" IS NOT NULL
@@ -1035,8 +1116,39 @@ export class LabStatsService {
   async getPatchImpact(): Promise<{
     currentPatch: string | null;
     previousPatch: string | null;
+    sample: {
+      currentGames: number;
+      previousGames: number;
+      currentTeams: number;
+      previousTeams: number;
+    };
     buffed: any[];
     nerfed: any[];
+    positionShifts: Array<{
+      position: string;
+      currentWinRate: number;
+      prevWinRate: number;
+      deltaWinRate: number;
+      currentPickRate: number;
+      prevPickRate: number;
+      deltaPickRate: number;
+      currentGames: number;
+      prevGames: number;
+      confidenceLevel: ConfidenceLevel;
+    }>;
+    compositionShifts: Array<{
+      type: LabCompositionType;
+      label: string;
+      currentWinRate: number;
+      prevWinRate: number;
+      deltaWinRate: number;
+      currentPickRate: number;
+      prevPickRate: number;
+      deltaPickRate: number;
+      currentGames: number;
+      prevGames: number;
+      confidenceLevel: ConfidenceLevel;
+    }>;
     insufficient: boolean;
   }> {
     const cacheKey = this.labCacheKey("meta:patch-impact");
@@ -1059,8 +1171,16 @@ export class LabStatsService {
       const result = {
         currentPatch: patches[0]?.patchVersion ?? null,
         previousPatch: null,
+        sample: {
+          currentGames: 0,
+          previousGames: 0,
+          currentTeams: 0,
+          previousTeams: 0,
+        },
         buffed: [],
         nerfed: [],
+        positionShifts: [],
+        compositionShifts: [],
         insufficient: true,
       };
       await this.redis.set(cacheKey, JSON.stringify(result), 3600);
@@ -1136,11 +1256,317 @@ export class LabStatsService {
 
     impacts.sort((a, b) => b.deltaWinRate - a.deltaWinRate);
 
+    const [patchCounts, positionRows, earlyAggroRows, teamRows, championData] =
+      await Promise.all([
+        this.prisma.$queryRaw<
+          { patchVersion: string; games: bigint; teams: bigint }[]
+        >(Prisma.sql`
+          SELECT
+            m."patchVersion" AS "patchVersion",
+            COUNT(DISTINCT m."id")::bigint AS "games",
+            COUNT(DISTINCT CONCAT(m."id"::text, ':', COALESCE(mp."teamId", CONCAT('__WIN__:', mp."win"::text))))::bigint AS "teams"
+          FROM "matches" m
+          INNER JOIN "match_participants" mp ON mp."matchId" = m."id"
+          WHERE m."patchVersion" IN (${currentPatch}, ${previousPatch})
+            AND m."completedAt" IS NOT NULL
+          GROUP BY m."patchVersion"
+        `),
+        this.prisma.$queryRaw<
+          {
+            patchVersion: string;
+            position: string;
+            wins: bigint;
+            games: bigint;
+          }[]
+        >(Prisma.sql`
+          SELECT
+            m."patchVersion" AS "patchVersion",
+            mp."position" AS "position",
+            COUNT(*) FILTER (WHERE mp."win" = true)::bigint AS "wins",
+            COUNT(*)::bigint AS "games"
+          FROM "match_participants" mp
+          INNER JOIN "matches" m ON m."id" = mp."matchId"
+          WHERE m."patchVersion" IN (${currentPatch}, ${previousPatch})
+            AND m."completedAt" IS NOT NULL
+            AND mp."position" IS NOT NULL
+            AND mp."position" <> ''
+            AND mp."position" <> 'UNKNOWN'
+          GROUP BY m."patchVersion", mp."position"
+        `),
+        this.prisma.$queryRaw<
+          { championId: number; games: bigint; wins: bigint }[]
+        >(Prisma.sql`
+          SELECT
+            mp."championId" AS "championId",
+            COUNT(*)::bigint AS "games",
+            COUNT(*) FILTER (WHERE mp."win" = true)::bigint AS "wins"
+          FROM "match_participants" mp
+          INNER JOIN "matches" m ON m."id" = mp."matchId"
+          WHERE m."patchVersion" IN (${currentPatch}, ${previousPatch})
+            AND m."completedAt" IS NOT NULL
+            AND m."gameDuration" IS NOT NULL
+            AND m."gameDuration" < 1500
+          GROUP BY mp."championId"
+          HAVING COUNT(*) >= 5
+        `),
+        this.prisma.$queryRaw<
+          {
+            patchVersion: string;
+            matchId: string;
+            teamId: string;
+            win: boolean;
+            gameDurationSec: number | null;
+            championIds: number[];
+          }[]
+        >(Prisma.sql`
+          SELECT
+            m."patchVersion" AS "patchVersion",
+            mp."matchId" AS "matchId",
+            COALESCE(mp."teamId", CONCAT('__WIN__:', mp."win"::text)) AS "teamId",
+            BOOL_OR(mp."win") AS "win",
+            MIN(m."gameDuration") AS "gameDurationSec",
+            ARRAY_AGG(mp."championId")::int[] AS "championIds"
+          FROM "match_participants" mp
+          INNER JOIN "matches" m ON m."id" = mp."matchId"
+          WHERE m."patchVersion" IN (${currentPatch}, ${previousPatch})
+            AND m."completedAt" IS NOT NULL
+          GROUP BY m."patchVersion", mp."matchId", COALESCE(mp."teamId", CONCAT('__WIN__:', mp."win"::text))
+        `),
+        this.dataDragon.getChampionData("ko_KR"),
+      ]);
+
+    const patchCountMap = new Map(
+      patchCounts.map((row) => [
+        row.patchVersion,
+        { games: Number(row.games), teams: Number(row.teams) },
+      ]),
+    );
+    const currentGames = patchCountMap.get(currentPatch)?.games ?? 0;
+    const previousGames = patchCountMap.get(previousPatch)?.games ?? 0;
+    const currentTeams = patchCountMap.get(currentPatch)?.teams ?? 0;
+    const previousTeams = patchCountMap.get(previousPatch)?.teams ?? 0;
+
+    const positionMap = new Map<
+      string,
+      {
+        currentGames: number;
+        currentWins: number;
+        prevGames: number;
+        prevWins: number;
+      }
+    >();
+    for (const row of positionRows) {
+      const prev = positionMap.get(row.position) ?? {
+        currentGames: 0,
+        currentWins: 0,
+        prevGames: 0,
+        prevWins: 0,
+      };
+      if (row.patchVersion === currentPatch) {
+        prev.currentGames = Number(row.games);
+        prev.currentWins = Number(row.wins);
+      } else if (row.patchVersion === previousPatch) {
+        prev.prevGames = Number(row.games);
+        prev.prevWins = Number(row.wins);
+      }
+      positionMap.set(row.position, prev);
+    }
+    const positionShifts = Array.from(positionMap.entries())
+      .map(([position, agg]) => {
+        const currentWinRate =
+          agg.currentGames > 0 ? agg.currentWins / agg.currentGames : 0;
+        const prevWinRate = agg.prevGames > 0 ? agg.prevWins / agg.prevGames : 0;
+        const currentPickRate =
+          currentGames > 0 ? agg.currentGames / (currentGames * 10) : 0;
+        const prevPickRate =
+          previousGames > 0 ? agg.prevGames / (previousGames * 10) : 0;
+        return {
+          position,
+          currentWinRate: Math.round(currentWinRate * 1000) / 10,
+          prevWinRate: Math.round(prevWinRate * 1000) / 10,
+          deltaWinRate: Math.round((currentWinRate - prevWinRate) * 1000) / 10,
+          currentPickRate: Math.round(currentPickRate * 10000) / 100,
+          prevPickRate: Math.round(prevPickRate * 10000) / 100,
+          deltaPickRate: Math.round((currentPickRate - prevPickRate) * 10000) / 100,
+          currentGames: agg.currentGames,
+          prevGames: agg.prevGames,
+          confidenceLevel: getConfidenceLevel(
+            Math.min(agg.currentGames, agg.prevGames),
+          ),
+        };
+      })
+      .filter((row) => row.currentGames >= 5 && row.prevGames >= 5)
+      .sort(
+        (a, b) =>
+          Math.abs(b.deltaWinRate) + Math.abs(b.deltaPickRate) * 0.3 -
+          (Math.abs(a.deltaWinRate) + Math.abs(a.deltaPickRate) * 0.3),
+      );
+
+    const championTagsById = new Map<number, Set<string>>();
+    for (const champion of Object.values(championData.data)) {
+      const championId = Number(champion.key);
+      if (!Number.isFinite(championId)) continue;
+      const tags = Array.isArray((champion as { tags?: string[] }).tags)
+        ? (champion as { tags?: string[] }).tags!
+        : [];
+      championTagsById.set(
+        championId,
+        new Set(tags.map((tag) => tag.toUpperCase())),
+      );
+    }
+    const earlyAggroChampionSet = new Set<number>();
+    for (const row of earlyAggroRows) {
+      const games = Number(row.games);
+      const wins = Number(row.wins);
+      if (games <= 0) continue;
+      if (wins / games >= 0.52) {
+        earlyAggroChampionSet.add(row.championId);
+      }
+    }
+    const classifyTeam = (
+      championIds: number[],
+      gameDurationSec: number | null,
+    ): LabCompositionType => {
+      let mage = 0;
+      let tank = 0;
+      let fighter = 0;
+      let assassin = 0;
+      let marksman = 0;
+      let earlyAggroCount = 0;
+
+      for (const championId of championIds) {
+        const tags = championTagsById.get(championId) ?? new Set<string>();
+        if (tags.has("MAGE")) mage += 1;
+        if (tags.has("TANK")) tank += 1;
+        if (tags.has("FIGHTER")) fighter += 1;
+        if (tags.has("ASSASSIN")) assassin += 1;
+        if (tags.has("MARKSMAN")) marksman += 1;
+        if (earlyAggroChampionSet.has(championId)) earlyAggroCount += 1;
+      }
+
+      const longRange = mage + marksman;
+      const evaluations: Array<{
+        type: LabCompositionType;
+        score: number;
+        matched: boolean;
+      }> = [
+        { type: "TEAMFIGHT", score: (mage + tank) / 5, matched: mage + tank >= 3 },
+        {
+          type: "SPLIT_PUSH",
+          score: (fighter + assassin) / 5,
+          matched: fighter + assassin >= 2,
+        },
+        {
+          type: "POKE",
+          score: (longRange + Math.min(mage, 2)) / 7,
+          matched: mage >= 2 && longRange >= 3,
+        },
+        {
+          type: "EARLY_AGGRO",
+          score: earlyAggroCount / 5,
+          matched: earlyAggroCount >= 3 && (gameDurationSec ?? 99999) < 1500,
+        },
+        { type: "TANK_LINE", score: tank / 5, matched: tank >= 3 },
+      ];
+      const matched = evaluations.filter((e) => e.matched);
+      const order: LabCompositionType[] = [
+        "TEAMFIGHT",
+        "SPLIT_PUSH",
+        "POKE",
+        "EARLY_AGGRO",
+        "TANK_LINE",
+      ];
+      const target = (matched.length > 0 ? matched : evaluations).sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        return order.indexOf(a.type) - order.indexOf(b.type);
+      });
+      return target[0].type;
+    };
+    const compositionLabel: Record<LabCompositionType, string> = {
+      TEAMFIGHT: "한타",
+      SPLIT_PUSH: "스플릿",
+      POKE: "포킹",
+      EARLY_AGGRO: "속공",
+      TANK_LINE: "탱커라인",
+    };
+    const compositionAgg = new Map<
+      LabCompositionType,
+      {
+        currentGames: number;
+        currentWins: number;
+        prevGames: number;
+        prevWins: number;
+      }
+    >();
+    for (const type of [
+      "TEAMFIGHT",
+      "SPLIT_PUSH",
+      "POKE",
+      "EARLY_AGGRO",
+      "TANK_LINE",
+    ] as LabCompositionType[]) {
+      compositionAgg.set(type, {
+        currentGames: 0,
+        currentWins: 0,
+        prevGames: 0,
+        prevWins: 0,
+      });
+    }
+    for (const row of teamRows) {
+      const type = classifyTeam(row.championIds, row.gameDurationSec);
+      const current = compositionAgg.get(type)!;
+      if (row.patchVersion === currentPatch) {
+        current.currentGames += 1;
+        if (row.win) current.currentWins += 1;
+      } else if (row.patchVersion === previousPatch) {
+        current.prevGames += 1;
+        if (row.win) current.prevWins += 1;
+      }
+    }
+    const compositionShifts = Array.from(compositionAgg.entries())
+      .map(([type, agg]) => {
+        const currentWinRate =
+          agg.currentGames > 0 ? agg.currentWins / agg.currentGames : 0;
+        const prevWinRate = agg.prevGames > 0 ? agg.prevWins / agg.prevGames : 0;
+        const currentPickRate =
+          currentTeams > 0 ? agg.currentGames / currentTeams : 0;
+        const prevPickRate = previousTeams > 0 ? agg.prevGames / previousTeams : 0;
+        return {
+          type,
+          label: compositionLabel[type],
+          currentWinRate: Math.round(currentWinRate * 1000) / 10,
+          prevWinRate: Math.round(prevWinRate * 1000) / 10,
+          deltaWinRate: Math.round((currentWinRate - prevWinRate) * 1000) / 10,
+          currentPickRate: Math.round(currentPickRate * 10000) / 100,
+          prevPickRate: Math.round(prevPickRate * 10000) / 100,
+          deltaPickRate: Math.round((currentPickRate - prevPickRate) * 10000) / 100,
+          currentGames: agg.currentGames,
+          prevGames: agg.prevGames,
+          confidenceLevel: getConfidenceLevel(
+            Math.min(agg.currentGames, agg.prevGames),
+          ),
+        };
+      })
+      .filter((row) => row.currentGames >= 5 && row.prevGames >= 5)
+      .sort(
+        (a, b) =>
+          Math.abs(b.deltaPickRate) + Math.abs(b.deltaWinRate) * 0.5 -
+          (Math.abs(a.deltaPickRate) + Math.abs(a.deltaWinRate) * 0.5),
+      );
+
     const result = {
       currentPatch,
       previousPatch,
+      sample: {
+        currentGames,
+        previousGames,
+        currentTeams,
+        previousTeams,
+      },
       buffed: impacts.slice(0, 5),
       nerfed: impacts.slice(-5).reverse(),
+      positionShifts: positionShifts.slice(0, 5),
+      compositionShifts: compositionShifts.slice(0, 5),
       insufficient: false,
     };
 
@@ -1802,7 +2228,10 @@ export class LabStatsService {
         FROM "match_participants" a
         INNER JOIN "match_participants" b
           ON a."matchId" = b."matchId"
-          AND a."teamId" = b."teamId"
+          AND (
+            (a."teamId" IS NOT NULL AND b."teamId" IS NOT NULL AND a."teamId" = b."teamId")
+            OR (a."teamId" IS NULL AND b."teamId" IS NULL AND a."win" = b."win")
+          )
           AND a."id" < b."id"
         INNER JOIN "matches" m ON m."id" = a."matchId"
         WHERE m."completedAt" IS NOT NULL
@@ -1976,7 +2405,10 @@ export class LabStatsService {
         FROM "match_participants" a
         INNER JOIN "match_participants" b
           ON a."matchId" = b."matchId"
-          AND a."teamId" <> b."teamId"
+          AND (
+            (a."teamId" IS NOT NULL AND b."teamId" IS NOT NULL AND a."teamId" <> b."teamId")
+            OR (a."teamId" IS NULL AND b."teamId" IS NULL AND a."win" <> b."win")
+          )
           ${normalizedPosition ? Prisma.sql`AND a."position" = b."position"` : Prisma.empty}
         INNER JOIN "matches" m ON m."id" = a."matchId"
         WHERE m."completedAt" IS NOT NULL
@@ -2111,7 +2543,7 @@ export class LabStatsService {
       >(Prisma.sql`
         SELECT
           mp."matchId" AS "matchId",
-          mp."teamId" AS "teamId",
+          COALESCE(mp."teamId", CONCAT('__WIN__:', mp."win"::text)) AS "teamId",
           BOOL_OR(mp."win") AS "win",
           MIN(m."gameDuration") AS "gameDurationSec",
           ARRAY_AGG(mp."championId")::int[] AS "championIds"
@@ -2119,7 +2551,7 @@ export class LabStatsService {
         INNER JOIN "matches" m ON m."id" = mp."matchId"
         WHERE m."completedAt" IS NOT NULL
           ${periodFilter ? Prisma.sql`AND m."completedAt" >= ${periodFilter}` : Prisma.empty}
-        GROUP BY mp."matchId", mp."teamId"
+        GROUP BY mp."matchId", COALESCE(mp."teamId", CONCAT('__WIN__:', mp."win"::text))
       `),
     ]);
 
@@ -2313,25 +2745,31 @@ export class LabStatsService {
     if (cached) return JSON.parse(cached);
 
     const periodFilter = this.getPeriodFilter(period);
-
-    const rows = await this.prisma.$queryRaw<
+    const TREND_WINDOW = 5;
+    const TREND_MIN_SEGMENT = 3;
+    const MONEYBALL_PRIOR_GAMES = 8;
+    const gameRows = await this.prisma.$queryRaw<
       {
         userId: string;
         username: string;
+        matchId: string;
+        completedAt: Date;
         soldPrice: number;
-        games: bigint;
-        wins: bigint;
-        avgKda: number;
-        avgDamageShare: number;
+        win: boolean;
+        kills: number;
+        deaths: number;
+        assists: number;
+        damageShare: number;
+        position: string | null;
       }[]
     >(Prisma.sql`
       WITH team_totals AS (
         SELECT
           mp."matchId",
-          mp."teamId",
+          COALESCE(mp."teamId", CONCAT('__WIN__:', mp."win"::text)) AS "teamKey",
           SUM(mp."totalDamageDealtToChampions")::float AS "teamDamage"
         FROM "match_participants" mp
-        GROUP BY mp."matchId", mp."teamId"
+        GROUP BY mp."matchId", COALESCE(mp."teamId", CONCAT('__WIN__:', mp."win"::text))
       ),
       auction_entries AS (
         SELECT DISTINCT
@@ -2346,45 +2784,103 @@ export class LabStatsService {
       )
       SELECT
         mp."userId" AS "userId",
-        MIN(u."username") AS "username",
-        ROUND(AVG(ae."soldPrice"), 2)::float AS "soldPrice",
-        COUNT(*)::bigint AS "games",
-        COUNT(*) FILTER (WHERE mp."win" = true)::bigint AS "wins",
-        ROUND(AVG((mp."kills" + mp."assists")::float / GREATEST(mp."deaths", 1)), 4)::float AS "avgKda",
-        ROUND(AVG(
+        u."username" AS "username",
+        mp."matchId" AS "matchId",
+        m."completedAt" AS "completedAt",
+        ae."soldPrice"::float AS "soldPrice",
+        mp."win" AS "win",
+        mp."kills" AS "kills",
+        mp."deaths" AS "deaths",
+        mp."assists" AS "assists",
+        ROUND((
           CASE WHEN tt."teamDamage" > 0
             THEN mp."totalDamageDealtToChampions"::float / tt."teamDamage"
             ELSE 0
           END
-        ), 6)::float AS "avgDamageShare"
+        )::numeric, 6)::float AS "damageShare",
+        CASE
+          WHEN mp."position" IS NULL OR mp."position" = '' OR mp."position" = 'UNKNOWN' THEN NULL
+          ELSE mp."position"
+        END AS "position"
       FROM "match_participants" mp
       INNER JOIN "matches" m ON m."id" = mp."matchId"
       INNER JOIN "users" u ON u."id" = mp."userId"
       INNER JOIN team_totals tt
         ON tt."matchId" = mp."matchId"
-       AND tt."teamId" = mp."teamId"
+       AND tt."teamKey" = COALESCE(mp."teamId", CONCAT('__WIN__:', mp."win"::text))
       INNER JOIN auction_entries ae
         ON ae."roomId" = m."roomId"
        AND ae."userId" = mp."userId"
       WHERE m."completedAt" IS NOT NULL
         ${periodFilter ? Prisma.sql`AND m."completedAt" >= ${periodFilter}` : Prisma.empty}
-      GROUP BY mp."userId"
-      HAVING COUNT(*) >= 3
+      ORDER BY m."completedAt" DESC, mp."matchId" DESC
     `);
 
-    const normalized = rows.map((row) => {
-      const games = Number(row.games);
-      const wins = Number(row.wins);
+    type UserAccumulator = {
+      userId: string;
+      username: string;
+      soldPriceSum: number;
+      games: number;
+      wins: number;
+      kdaSum: number;
+      damageShareSum: number;
+      perGame: Array<{
+        completedAt: Date;
+        soldPrice: number;
+        kda: number;
+        deaths: number;
+        damageShare: number;
+        win: boolean;
+        position: string | null;
+      }>;
+    };
+
+    const byUser = new Map<string, UserAccumulator>();
+    for (const row of gameRows) {
+      const current = byUser.get(row.userId) ?? {
+        userId: row.userId,
+        username: row.username,
+        soldPriceSum: 0,
+        games: 0,
+        wins: 0,
+        kdaSum: 0,
+        damageShareSum: 0,
+        perGame: [],
+      };
+      const kda = (row.kills + row.assists) / Math.max(row.deaths, 1);
+      current.soldPriceSum += row.soldPrice;
+      current.games += 1;
+      current.wins += row.win ? 1 : 0;
+      current.kdaSum += kda;
+      current.damageShareSum += row.damageShare;
+      current.perGame.push({
+        completedAt: row.completedAt,
+        soldPrice: row.soldPrice,
+        kda,
+        deaths: row.deaths,
+        damageShare: row.damageShare,
+        win: row.win,
+        position: row.position,
+      });
+      byUser.set(row.userId, current);
+    }
+
+    const normalized = Array.from(byUser.values())
+      .filter((row) => row.games >= 3)
+      .map((row) => {
+      const games = row.games;
+      const wins = row.wins;
       const winRate = games > 0 ? wins / games : 0;
       return {
         userId: row.userId,
         username: row.username,
-        soldPrice: row.soldPrice,
+        soldPrice: row.soldPriceSum / Math.max(row.games, 1),
         games,
         wins,
         winRate,
-        avgKda: row.avgKda,
-        avgDamageShare: row.avgDamageShare,
+        avgKda: row.kdaSum / Math.max(row.games, 1),
+        avgDamageShare: row.damageShareSum / Math.max(row.games, 1),
+        perGame: row.perGame,
       };
     });
 
@@ -2448,6 +2944,197 @@ export class LabStatsService {
               (withResidual.length - 1),
           )
         : 0;
+    const residualSafe = Math.max(residualStdDev, 0.000001);
+    const baselineMoneyball = 100;
+    const defaultMoneyballScale = 15;
+    const defaultPriorGames = MONEYBALL_PRIOR_GAMES;
+    const TARGET_Z_IQR = 1.349;
+
+    const getQuarterKey = (date: Date): string => {
+      const month = date.getUTCMonth();
+      const quarter = Math.floor(month / 3) + 1;
+      return `${date.getUTCFullYear()}-Q${quarter}`;
+    };
+    const quantile = (values: number[], q: number): number | null => {
+      if (values.length === 0) return null;
+      const sorted = [...values].sort((a, b) => a - b);
+      const pos = (sorted.length - 1) * q;
+      const lower = Math.floor(pos);
+      const upper = Math.ceil(pos);
+      if (lower === upper) return sorted[lower];
+      const weight = pos - lower;
+      return sorted[lower] * (1 - weight) + sorted[upper] * weight;
+    };
+    const computeIqr = (values: number[]): number | null => {
+      const q1 = quantile(values, 0.25);
+      const q3 = quantile(values, 0.75);
+      if (q1 === null || q3 === null) return null;
+      return q3 - q1;
+    };
+    const clamp = (value: number, min: number, max: number): number =>
+      Math.min(max, Math.max(min, value));
+
+    const latestCompletedAt = gameRows[0]?.completedAt ?? new Date();
+    const currentQuarterKey = getQuarterKey(latestCompletedAt);
+    const quarterGamesByUser = new Map<string, number>();
+    for (const row of gameRows) {
+      if (getQuarterKey(row.completedAt) !== currentQuarterKey) continue;
+      quarterGamesByUser.set(
+        row.userId,
+        (quarterGamesByUser.get(row.userId) ?? 0) + 1,
+      );
+    }
+    const quarterEligibleUsers = new Set(
+      Array.from(quarterGamesByUser.entries())
+        .filter(([, games]) => games >= 3)
+        .map(([userId]) => userId),
+    );
+    const quarterResidualRows = withResidual.filter((r) =>
+      quarterEligibleUsers.has(r.userId),
+    );
+    const quarterZScores = quarterResidualRows.map(
+      (r) => r.efficiency / residualSafe,
+    );
+    const fallbackZScores = withResidual.map((r) => r.efficiency / residualSafe);
+    const quarterIqr = computeIqr(quarterZScores);
+    const fallbackIqr = computeIqr(fallbackZScores);
+    const useQuarterCalibration =
+      quarterResidualRows.length >= 8 &&
+      quarterIqr !== null &&
+      quarterIqr > 0.05;
+    const calibrationMode: "quarter" | "fallback" = useQuarterCalibration
+      ? "quarter"
+      : "fallback";
+    const observedIqr = useQuarterCalibration ? quarterIqr : fallbackIqr;
+
+    const usersForPrior = useQuarterCalibration
+      ? Array.from(quarterGamesByUser.values()).filter((games) => games >= 3)
+      : normalized.map((r) => r.games);
+    const medianGames = quantile(usersForPrior, 0.5);
+    const moneyballPriorGames = clamp(
+      Math.round(medianGames ?? defaultPriorGames),
+      6,
+      14,
+    );
+    const calibratedScale =
+      observedIqr !== null && observedIqr > 0.05
+        ? clamp(defaultMoneyballScale * (TARGET_Z_IQR / observedIqr), 10, 22)
+        : defaultMoneyballScale;
+
+    const gameKdaValues = gameRows.map(
+      (row) => (row.kills + row.assists) / Math.max(row.deaths, 1),
+    );
+    const gameDamageValues = gameRows.map((row) => row.damageShare);
+    const gamePerformanceByUser = new Map<
+      string,
+      Array<{
+        completedAt: Date;
+        soldPrice: number;
+        kda: number;
+        damageShare: number;
+        performance: number;
+        deaths: number;
+        win: boolean;
+        position: string | null;
+      }>
+    >();
+    for (const row of gameRows) {
+      const gameKda = (row.kills + row.assists) / Math.max(row.deaths, 1);
+      const kdaNorm = percentile01(gameKdaValues, gameKda);
+      const damageNorm = percentile01(gameDamageValues, row.damageShare);
+      const winNorm = row.win ? 1 : 0;
+      const perf = kdaNorm * 0.4 + damageNorm * 0.3 + winNorm * 0.3;
+      const bucket = gamePerformanceByUser.get(row.userId) ?? [];
+      bucket.push({
+        completedAt: row.completedAt,
+        soldPrice: row.soldPrice,
+        kda: gameKda,
+        damageShare: row.damageShare,
+        performance: perf,
+        deaths: row.deaths,
+        win: row.win,
+        position: row.position,
+      });
+      gamePerformanceByUser.set(row.userId, bucket);
+    }
+
+    const trendByUser = new Map<
+      string,
+      {
+        recentTrendDelta: number;
+        recentTrendPercent: number | null;
+        recentGames: number;
+        previousGames: number;
+        trendConfidence: "insufficient" | "low" | "moderate" | "high";
+      }
+    >();
+    for (const row of withResidual) {
+      const games = [...(gamePerformanceByUser.get(row.userId) ?? [])].sort(
+        (a, b) => b.completedAt.getTime() - a.completedAt.getTime(),
+      );
+      const recent = games.slice(0, TREND_WINDOW);
+      const previous = games.slice(TREND_WINDOW, TREND_WINDOW * 2);
+      const recentAvgEff =
+        recent.length > 0
+          ? recent.reduce(
+              (sum, g) => sum + (g.performance - (beta0 + beta1 * g.soldPrice)),
+              0,
+            ) / recent.length
+          : 0;
+      const previousAvgEff =
+        previous.length > 0
+          ? previous.reduce(
+              (sum, g) => sum + (g.performance - (beta0 + beta1 * g.soldPrice)),
+              0,
+            ) / previous.length
+          : 0;
+      const recentTrendDelta = recentAvgEff - previousAvgEff;
+      const recentTrendPercent =
+        previous.length > 0 && Math.abs(previousAvgEff) >= 0.0001
+          ? (recentTrendDelta / Math.abs(previousAvgEff)) * 100
+          : null;
+      const segment = Math.min(recent.length, previous.length);
+      const trendConfidence: "insufficient" | "low" | "moderate" | "high" =
+        segment >= 5
+          ? "high"
+          : segment >= 4
+            ? "moderate"
+            : segment >= TREND_MIN_SEGMENT
+              ? "low"
+              : "insufficient";
+      trendByUser.set(row.userId, {
+        recentTrendDelta,
+        recentTrendPercent,
+        recentGames: recent.length,
+        previousGames: previous.length,
+        trendConfidence,
+      });
+    }
+
+    const withIndex = withResidual.map((row) => {
+      const trend = trendByUser.get(row.userId);
+      const reliability = Math.sqrt(
+        row.games / (row.games + moneyballPriorGames),
+      );
+      const moneyballIndex = Math.max(
+        50,
+        Math.min(
+          150,
+          baselineMoneyball +
+            (row.efficiency / residualSafe) * calibratedScale * reliability,
+        ),
+      );
+      return {
+        ...row,
+        moneyballIndex,
+        reliability,
+        recentTrendDelta: trend?.recentTrendDelta ?? 0,
+        recentTrendPercent: trend?.recentTrendPercent ?? null,
+        recentGames: trend?.recentGames ?? 0,
+        previousGames: trend?.previousGames ?? 0,
+        trendConfidence: trend?.trendConfidence ?? "insufficient",
+      };
+    });
 
     const bins = [
       { label: "0~99", min: 0, max: 99 },
@@ -2458,7 +3145,7 @@ export class LabStatsService {
     ];
 
     const buckets: AuctionEfficiencyBucket[] = bins.map((bin) => {
-      const inBin = withResidual.filter((row) =>
+      const inBin = withIndex.filter((row) =>
         bin.max === null
           ? row.soldPrice >= bin.min
           : row.soldPrice >= bin.min && row.soldPrice <= bin.max,
@@ -2491,17 +3178,27 @@ export class LabStatsService {
       };
     });
 
-    const scatter: AuctionEfficiencyPoint[] = withResidual.map((row) => ({
+    const scatter: AuctionEfficiencyPoint[] = withIndex.map((row) => ({
       userId: row.userId,
       username: row.username,
       soldPrice: Math.round(row.soldPrice),
       performance: Math.round(row.performance * 10000) / 10000,
       expectedPerformance: Math.round(row.expectedPerformance * 10000) / 10000,
       efficiency: Math.round(row.efficiency * 10000) / 10000,
+      moneyballIndex: Math.round(row.moneyballIndex * 10) / 10,
+      reliability: Math.round(row.reliability * 1000) / 1000,
+      recentTrendDelta: Math.round(row.recentTrendDelta * 10000) / 10000,
+      recentTrendPercent:
+        row.recentTrendPercent === null
+          ? null
+          : Math.round(row.recentTrendPercent * 10) / 10,
+      recentGames: row.recentGames,
+      previousGames: row.previousGames,
+      trendConfidence: row.trendConfidence,
     }));
 
     const toLeader = (
-      row: (typeof withResidual)[number],
+      row: (typeof withIndex)[number],
     ): AuctionEfficiencyLeader => ({
       userId: row.userId,
       username: row.username,
@@ -2513,19 +3210,185 @@ export class LabStatsService {
       winRate: Math.round(row.winRate * 10000) / 10000,
       avgKda: Math.round(row.avgKda * 100) / 100,
       avgDamageShare: Math.round(row.avgDamageShare * 10000) / 10000,
+      moneyballIndex: Math.round(row.moneyballIndex * 10) / 10,
+      recentTrendDelta: Math.round(row.recentTrendDelta * 10000) / 10000,
+      recentTrendPercent:
+        row.recentTrendPercent === null
+          ? null
+          : Math.round(row.recentTrendPercent * 10) / 10,
+      recentGames: row.recentGames,
+      previousGames: row.previousGames,
+      trendConfidence: row.trendConfidence,
+      reliability: Math.round(row.reliability * 1000) / 1000,
     });
 
-    const efficiencyTop = withResidual
+    const efficiencyTop = withIndex
       .filter((r) => residualStdDev <= 0 || r.efficiency > residualStdDev)
       .sort((a, b) => b.efficiency - a.efficiency)
       .slice(0, 5)
       .map(toLeader);
 
-    const overpricedTop = withResidual
+    const overpricedTop = withIndex
       .filter((r) => residualStdDev <= 0 || r.efficiency < -residualStdDev)
       .sort((a, b) => a.efficiency - b.efficiency)
       .slice(0, 5)
       .map(toLeader);
+
+    const trendingTop = withIndex
+      .filter((r) => r.trendConfidence !== "insufficient")
+      .sort((a, b) => b.recentTrendDelta - a.recentTrendDelta)
+      .slice(0, 5)
+      .map(toLeader);
+
+    const moneyballTop = withIndex
+      .filter((r) => r.games >= 5)
+      .sort((a, b) => b.moneyballIndex - a.moneyballIndex)
+      .slice(0, 5)
+      .map(toLeader);
+
+    const bubbleRiskTop = withIndex
+      .filter((r) => r.games >= 5)
+      .sort((a, b) => a.moneyballIndex - b.moneyballIndex)
+      .slice(0, 5)
+      .map(toLeader);
+
+    const roleFormUsersRaw = withIndex.map((row): AuctionRoleFormUser | null => {
+        const games = [...(gamePerformanceByUser.get(row.userId) ?? [])];
+        const positionMap = new Map<
+          string,
+          {
+            games: number;
+            wins: number;
+            kdaSum: number;
+            deathsSum: number;
+            damageShareSum: number;
+            performanceSum: number;
+          }
+        >();
+        for (const g of games) {
+          if (!g.position) continue;
+          const current = positionMap.get(g.position) ?? {
+            games: 0,
+            wins: 0,
+            kdaSum: 0,
+            deathsSum: 0,
+            damageShareSum: 0,
+            performanceSum: 0,
+          };
+          current.games += 1;
+          current.wins += g.win ? 1 : 0;
+          current.kdaSum += g.kda;
+          current.deathsSum += g.deaths;
+          current.damageShareSum += g.damageShare;
+          current.performanceSum += g.performance;
+          positionMap.set(g.position, current);
+        }
+        if (positionMap.size === 0) return null;
+
+        const positions = Array.from(positionMap.entries())
+          .map(([position, agg]) => ({
+            position,
+            games: agg.games,
+            winRate: agg.games > 0 ? agg.wins / agg.games : 0,
+            avgKda: agg.games > 0 ? agg.kdaSum / agg.games : 0,
+            avgDeaths: agg.games > 0 ? agg.deathsSum / agg.games : 0,
+            avgDamageShare: agg.games > 0 ? agg.damageShareSum / agg.games : 0,
+            avgPerformance: agg.games > 0 ? agg.performanceSum / agg.games : 0,
+          }))
+          .sort((a, b) => b.games - a.games);
+
+        const primary = positions[0] ?? null;
+        const offRoles = positions.filter((p) => p.position !== primary?.position);
+        const offRoleTotals = offRoles.reduce(
+          (acc, p) => ({
+            games: acc.games + p.games,
+            winsWeighted: acc.winsWeighted + p.winRate * p.games,
+            deathsWeighted: acc.deathsWeighted + p.avgDeaths * p.games,
+            perfWeighted: acc.perfWeighted + p.avgPerformance * p.games,
+          }),
+          { games: 0, winsWeighted: 0, deathsWeighted: 0, perfWeighted: 0 },
+        );
+        const offRolePenalty =
+          primary && offRoleTotals.games >= 3
+            ? {
+                winRateDelta:
+                  primary.winRate - offRoleTotals.winsWeighted / offRoleTotals.games,
+                deathRateDelta:
+                  (offRoleTotals.deathsWeighted / offRoleTotals.games -
+                    primary.avgDeaths) /
+                  Math.max(primary.avgDeaths, 0.1),
+                performanceDelta:
+                  primary.avgPerformance -
+                  offRoleTotals.perfWeighted / offRoleTotals.games,
+              }
+            : null;
+
+        const activeRoles = positions.filter((p) => p.games >= 3).length;
+        const perfMean =
+          positions.reduce((sum, p) => sum + p.avgPerformance, 0) /
+          Math.max(positions.length, 1);
+        const perfVariance =
+          positions.reduce((sum, p) => sum + (p.avgPerformance - perfMean) ** 2, 0) /
+          Math.max(positions.length, 1);
+        const perfStdDev = Math.sqrt(perfVariance);
+        const coverage = activeRoles / 5;
+        const consistency = Math.max(0, 1 - perfStdDev / 0.2);
+        const versatilityScore = Math.round((coverage * 0.55 + consistency * 0.45) * 100);
+        const confidence: "insufficient" | "low" | "moderate" | "high" =
+          row.games >= 20
+            ? "high"
+            : row.games >= 10
+              ? "moderate"
+              : row.games >= 5
+                ? "low"
+                : "insufficient";
+
+        return {
+          userId: row.userId,
+          username: row.username,
+          totalGames: row.games,
+          activeRoles,
+          primaryPosition: primary?.position ?? null,
+          primaryGames: primary?.games ?? 0,
+          versatilityScore,
+          confidence,
+          offRolePenalty:
+            offRolePenalty === null
+              ? null
+              : {
+                  winRateDelta: Math.round(offRolePenalty.winRateDelta * 10000) / 10000,
+                  deathRateDelta:
+                    Math.round(offRolePenalty.deathRateDelta * 10000) / 10000,
+                  performanceDelta:
+                    Math.round(offRolePenalty.performanceDelta * 10000) / 10000,
+                },
+          positions: positions.map((p) => ({
+            position: p.position,
+            games: p.games,
+            winRate: Math.round(p.winRate * 10000) / 10000,
+            avgKda: Math.round(p.avgKda * 100) / 100,
+            avgDeaths: Math.round(p.avgDeaths * 100) / 100,
+            avgDamageShare: Math.round(p.avgDamageShare * 10000) / 10000,
+            avgPerformance: Math.round(p.avgPerformance * 10000) / 10000,
+          })),
+        };
+      });
+    const roleFormUsers: AuctionRoleFormUser[] = roleFormUsersRaw
+      .filter((u): u is AuctionRoleFormUser => u !== null)
+      .sort((a, b) => b.totalGames - a.totalGames);
+
+    const versatilityTop = roleFormUsers
+      .filter((u) => u.totalGames >= 5)
+      .sort((a, b) => b.versatilityScore - a.versatilityScore)
+      .slice(0, 5);
+    const offRoleRiskTop = roleFormUsers
+      .filter((u) => u.offRolePenalty !== null && u.totalGames >= 5)
+      .sort(
+        (a, b) =>
+          (b.offRolePenalty?.performanceDelta ?? 0) -
+          (a.offRolePenalty?.performanceDelta ?? 0),
+      )
+      .slice(0, 5);
 
     const unsoldGames = unsold.reduce((sum, row) => sum + row.games, 0);
     const unsoldWins = unsold.reduce((sum, row) => sum + row.wins, 0);
@@ -2541,6 +3404,29 @@ export class LabStatsService {
         users: scored.length,
         games: scored.reduce((sum, row) => sum + row.games, 0),
       },
+      moneyball: {
+        baselineIndex: baselineMoneyball,
+        indexStdDev: Math.round(calibratedScale * 10) / 10,
+        minGamesForTrend: TREND_MIN_SEGMENT,
+        minGamesForRole: 5,
+        calibration: {
+          quarter: currentQuarterKey,
+          mode: calibrationMode,
+          sampleUsers:
+            calibrationMode === "quarter"
+              ? quarterEligibleUsers.size
+              : normalized.length,
+          pricedUsers:
+            calibrationMode === "quarter"
+              ? quarterResidualRows.length
+              : withResidual.length,
+          priorGames: moneyballPriorGames,
+          scale: Math.round(calibratedScale * 1000) / 1000,
+          observedIqr:
+            observedIqr === null ? null : Math.round(observedIqr * 1000) / 1000,
+          targetIqr: TARGET_Z_IQR,
+        },
+      },
       regression: {
         beta0: Math.round(beta0 * 1000000) / 1000000,
         beta1: Math.round(beta1 * 1000000) / 1000000,
@@ -2550,6 +3436,14 @@ export class LabStatsService {
       scatter,
       efficiencyTop,
       overpricedTop,
+      trendingTop,
+      moneyballTop,
+      bubbleRiskTop,
+      roleForm: {
+        users: roleFormUsers,
+        versatilityTop,
+        offRoleRiskTop,
+      },
       unsoldSummary: {
         users: unsold.length,
         games: unsoldGames,
@@ -2598,10 +3492,10 @@ export class LabStatsService {
       WITH team_totals AS (
         SELECT
           mp."matchId",
-          mp."teamId",
+          COALESCE(mp."teamId", CONCAT('__WIN__:', mp."win"::text)) AS "teamKey",
           SUM(mp."totalDamageDealtToChampions")::float AS "teamDamage"
         FROM "match_participants" mp
-        GROUP BY mp."matchId", mp."teamId"
+        GROUP BY mp."matchId", COALESCE(mp."teamId", CONCAT('__WIN__:', mp."win"::text))
       )
       SELECT
         mp."userId" AS "userId",
@@ -2617,7 +3511,7 @@ export class LabStatsService {
       INNER JOIN "matches" m ON m."id" = mp."matchId"
       INNER JOIN team_totals tt
         ON tt."matchId" = mp."matchId"
-       AND tt."teamId" = mp."teamId"
+       AND tt."teamKey" = COALESCE(mp."teamId", CONCAT('__WIN__:', mp."win"::text))
       WHERE m."completedAt" IS NOT NULL
         AND mp."userId" IN (${Prisma.join(allUsers)})
       ORDER BY mp."userId" ASC, m."completedAt" DESC
@@ -2707,14 +3601,14 @@ export class LabStatsService {
     >(Prisma.sql`
       SELECT
         mp."matchId" AS "matchId",
-        mp."teamId" AS "teamId",
+        COALESCE(mp."teamId", CONCAT('__WIN__:', mp."win"::text)) AS "teamId",
         BOOL_OR(mp."win") AS "win",
         ARRAY_AGG(mp."userId") AS "userIds"
       FROM "match_participants" mp
       INNER JOIN "matches" m ON m."id" = mp."matchId"
       WHERE m."completedAt" IS NOT NULL
         AND mp."userId" IN (${Prisma.join(allUsers)})
-      GROUP BY mp."matchId", mp."teamId"
+      GROUP BY mp."matchId", COALESCE(mp."teamId", CONCAT('__WIN__:', mp."win"::text))
       HAVING COUNT(*) >= 1
     `);
 
@@ -2847,6 +3741,13 @@ export class LabStatsService {
       return {
         period,
         mode: isByTeam ? "byTeam" : "global",
+        meta: {
+          source: "none",
+          customMetaCount: 0,
+          rankedMetaCount: 0,
+          externalSupplementedCount: 0,
+          rankedPeriod: null,
+        },
         recommendations: [],
       };
     }
@@ -2918,6 +3819,10 @@ export class LabStatsService {
       GROUP BY "userId", "championId"
     `);
 
+    const championIds = Array.from(
+      new Set(masteryRows.map((r) => r.championId)),
+    );
+
     const metaRows = await this.prisma.$queryRaw<
       {
         championId: number;
@@ -2932,12 +3837,34 @@ export class LabStatsService {
       FROM "lab_champion_snapshots" lcs
       WHERE lcs."period" = ${period}
         AND lcs."position" IS NULL
+        ${
+          championIds.length > 0
+            ? Prisma.sql`AND lcs."championId" IN (${Prisma.join(championIds)})`
+            : Prisma.empty
+        }
       ORDER BY lcs."championId", lcs."computedAt" DESC
     `);
 
-    const championIds = Array.from(
-      new Set(masteryRows.map((r) => r.championId)),
-    );
+    // 내전 메타 표본이 얕을 때 외부 랭크 메타(고티어 시딩)로 보강
+    const rankedPeriod: "30d" | "current_patch" =
+      period === "30d" ? "30d" : "current_patch";
+    const rankedMetaRows =
+      championIds.length > 0
+        ? await this.prisma.labRankedChampionSnapshot.findMany({
+            where: {
+              period: rankedPeriod,
+              position: null,
+              championId: { in: championIds },
+            },
+            select: {
+              championId: true,
+              wilsonLower: true,
+              pickRate: true,
+            },
+            orderBy: [{ wilsonLower: "desc" }, { pickRate: "desc" }],
+            take: 120,
+          })
+        : [];
     const championNameRows =
       championIds.length > 0
         ? await this.prisma.$queryRaw<
@@ -2957,7 +3884,22 @@ export class LabStatsService {
       championNameRows.map((r) => [r.championId, r.championName]),
     );
 
-    const sortedMeta = [...metaRows].sort(
+    const customMetaChampionSet = new Set(metaRows.map((r) => r.championId));
+    const externalSupplementedRows = rankedMetaRows.filter(
+      (r) => !customMetaChampionSet.has(r.championId),
+    );
+    const mergedMetaRows = [...metaRows, ...externalSupplementedRows];
+
+    const metaSource: LabBanRecommendResponse["meta"]["source"] =
+      metaRows.length === 0
+        ? rankedMetaRows.length > 0
+          ? "ranked_only"
+          : "none"
+        : externalSupplementedRows.length > 0
+          ? "hybrid"
+          : "custom";
+
+    const sortedMeta = [...mergedMetaRows].sort(
       (a, b) => b.wilsonLower - a.wilsonLower || b.pickRate - a.pickRate,
     );
     const metaStrengthByChampion = new Map<number, number>();
@@ -3103,6 +4045,13 @@ export class LabStatsService {
       ? {
           period,
           mode: "byTeam",
+          meta: {
+            source: metaSource,
+            customMetaCount: metaRows.length,
+            rankedMetaCount: rankedMetaRows.length,
+            externalSupplementedCount: externalSupplementedRows.length,
+            rankedPeriod: rankedMetaRows.length > 0 ? rankedPeriod : null,
+          },
           byTeam: {
             teamA: buildForTargets(teamBUserIds),
             teamB: buildForTargets(teamAUserIds),
@@ -3111,6 +4060,13 @@ export class LabStatsService {
       : {
           period,
           mode: "global",
+          meta: {
+            source: metaSource,
+            customMetaCount: metaRows.length,
+            rankedMetaCount: rankedMetaRows.length,
+            externalSupplementedCount: externalSupplementedRows.length,
+            rankedPeriod: rankedMetaRows.length > 0 ? rankedPeriod : null,
+          },
           recommendations: buildForTargets(userIds),
         };
 
@@ -3142,36 +4098,36 @@ export class LabStatsService {
       WITH team_totals AS (
         SELECT
           mp."matchId",
-          mp."teamId",
+          COALESCE(mp."teamId", CONCAT('__WIN__:', mp."win"::text)) AS "teamKey",
           SUM(mp."totalDamageDealtToChampions")::float AS "teamDamage",
           SUM(mp."visionScore")::float AS "teamVision"
         FROM "match_participants" mp
-        GROUP BY mp."matchId", mp."teamId"
+        GROUP BY mp."matchId", COALESCE(mp."teamId", CONCAT('__WIN__:', mp."win"::text))
       )
       SELECT
         mp."userId" AS "userId",
         MIN(mp."championName") AS "championName",
         COUNT(*)::bigint AS "games",
         COUNT(*) FILTER (WHERE mp."win" = true)::bigint AS "wins",
-        ROUND(AVG((mp."kills" + mp."assists")::float / GREATEST(mp."deaths", 1)), 4)::float AS "avgKda",
+        ROUND(AVG((mp."kills" + mp."assists")::float / GREATEST(mp."deaths", 1))::numeric, 4)::float AS "avgKda",
         ROUND(AVG(
           CASE WHEN tt."teamDamage" > 0
             THEN mp."totalDamageDealtToChampions"::float / tt."teamDamage"
             ELSE 0
           END
-        ), 6)::float AS "avgDamageShare",
+        )::numeric, 6)::float AS "avgDamageShare",
         ROUND(AVG(
           CASE WHEN tt."teamVision" > 0
             THEN mp."visionScore"::float / tt."teamVision"
             ELSE 0
           END
-        ), 6)::float AS "avgVisionShare",
+        )::numeric, 6)::float AS "avgVisionShare",
         MAX(m."completedAt") AS "lastPlayedAt"
       FROM "match_participants" mp
       INNER JOIN "matches" m ON m."id" = mp."matchId"
       INNER JOIN team_totals tt
         ON tt."matchId" = mp."matchId"
-       AND tt."teamId" = mp."teamId"
+       AND tt."teamKey" = COALESCE(mp."teamId", CONCAT('__WIN__:', mp."win"::text))
       WHERE m."completedAt" IS NOT NULL
         AND mp."championId" = ${championId}
       GROUP BY mp."userId"
@@ -3658,8 +4614,8 @@ export class LabStatsService {
         SELECT "patchVersion", COUNT(*) AS cnt
         FROM "riot_match_cache"
         WHERE "patchVersion" IS NOT NULL
-          AND "queue_id" IN (420, 440)
-          AND "game_end" >= NOW() - INTERVAL '7 days'
+          AND "queueId" IN (420, 440)
+          AND "gameEnd" >= NOW() - INTERVAL '7 days'
         GROUP BY "patchVersion"
         ORDER BY cnt DESC
         LIMIT 1
@@ -3730,7 +4686,7 @@ export class LabStatsService {
         (rm."data"->'info'->>'gameCreation')::bigint                 AS "gameCreation"
       FROM "riot_match_cache" rm,
            jsonb_array_elements(rm."data"->'info'->'participants') AS p(value)
-      WHERE rm."queue_id" IN (420, 440)
+      WHERE rm."queueId" IN (420, 440)
         ${timeFilter}
         ${patchFilter}
         AND p.value->>'puuid' = ANY(${puuidSet})
@@ -3782,10 +4738,8 @@ export class LabStatsService {
       }
     }
 
-    // 전체 게임 수 (포지션 슬롯 기준 분모)
-    const totalGames = rows.filter(
-      (r) => r.position === null || r.position === "",
-    ).length;
+    // 전체 표본 수(참가자 행 기준 분모)
+    const totalGames = rows.length;
     const posGames = new Map<string, number>();
     for (const row of rows) {
       if (row.position) {
@@ -3793,116 +4747,133 @@ export class LabStatsService {
       }
     }
 
+    const allRows = Array.from(aggMap.entries())
+      .filter(([, agg]) => agg.games >= 5)
+      .map(([key, agg]) => {
+        const [champIdStr, posStr] = key.split(":");
+        const championId = Number(champIdStr);
+        const position = posStr === "ALL" ? null : posStr;
+        const avgKda = agg.totalKda / agg.games;
+        const avgDamage = agg.totalDamage / agg.games;
+        const confidence = getConfidenceLevel(agg.games);
+        const denom = position ? (posGames.get(position) ?? 1) : totalGames || 1;
+        const pickRate = agg.games / denom;
+        const lastMatchCreatedAt = agg.maxGameCreation
+          ? new Date(agg.maxGameCreation)
+          : null;
+
+        return {
+          championId,
+          position,
+          games: agg.games,
+          wins: agg.wins,
+          avgKda,
+          avgDamage,
+          pickRate,
+          wilsonLower: wilsonLower(agg.wins, agg.games),
+          confidence,
+          lastMatchCreatedAt,
+          totalKda: agg.totalKda,
+          totalDamage: agg.totalDamage,
+        };
+      });
+
+    if (period !== "current_patch") {
+      await this.prisma.$transaction([
+        this.prisma.labRankedChampionSnapshot.deleteMany({
+          where: { period },
+        }),
+        ...(allRows.length > 0
+          ? [
+              this.prisma.labRankedChampionSnapshot.createMany({
+                data: allRows.map((row) => ({
+                  period,
+                  patchVersion: null,
+                  championId: row.championId,
+                  position: row.position,
+                  games: row.games,
+                  wins: row.wins,
+                  avgKda: row.avgKda,
+                  avgDamage: row.avgDamage,
+                  pickRate: row.pickRate,
+                  banRate: 0,
+                  wilsonLower: row.wilsonLower,
+                  confidence: row.confidence,
+                  lastMatchCreatedAt: row.lastMatchCreatedAt,
+                })),
+              }),
+            ]
+          : []),
+      ]);
+
+      this.logger.log(
+        `LabRankedChampionSnapshot(${period}): ${allRows.length}건 재생성, 원본 rows ${rows.length}건`,
+      );
+      return allRows.length;
+    }
+
     let upserted = 0;
-    for (const [key, agg] of aggMap.entries()) {
-      if (agg.games < 5) continue; // insufficient — 저장 안 함
+    for (const row of allRows) {
+      const {
+        championId,
+        position,
+        games,
+        wins,
+        avgKda,
+        avgDamage,
+        pickRate,
+        wilsonLower: wilson,
+        confidence,
+        lastMatchCreatedAt,
+        totalKda,
+        totalDamage,
+      } = row;
 
-      const [champIdStr, posStr] = key.split(":");
-      const championId = Number(champIdStr);
-      const position = posStr === "ALL" ? null : posStr;
+      // 증분 upsert: games/wins delta 합산
+      const existing2 = await this.prisma.labRankedChampionSnapshot.findFirst({
+        where: {
+          period: "current_patch",
+          patchVersion: targetPatchVersion,
+          championId,
+          position,
+        },
+      });
 
-      const avgKda = agg.totalKda / agg.games;
-      const avgDamage = agg.totalDamage / agg.games;
-      const wilson = wilsonLower(agg.wins, agg.games);
-      const confidence = getConfidenceLevel(agg.games);
-
-      const denom = position ? (posGames.get(position) ?? 1) : totalGames || 1;
-      const pickRate = agg.games / (denom * 10); // 10명 중 1명 픽 기준
-
-      const lastMatchCreatedAt = agg.maxGameCreation
-        ? new Date(agg.maxGameCreation)
-        : null;
-
-      if (period === "current_patch" && targetPatchVersion) {
-        // 증분 upsert: games/wins delta 합산
-        const existing2 = await this.prisma.labRankedChampionSnapshot.findFirst(
-          {
-            where: {
-              period: "current_patch",
-              patchVersion: targetPatchVersion,
-              championId,
-              position,
-            },
-          },
-        );
-
-        if (existing2) {
-          const newGames = existing2.games + agg.games;
-          const newWins = existing2.wins + agg.wins;
-          await this.prisma.labRankedChampionSnapshot.update({
-            where: { id: existing2.id },
-            data: {
-              games: newGames,
-              wins: newWins,
-              avgKda:
-                (existing2.avgKda * existing2.games + agg.totalKda) / newGames,
-              avgDamage:
-                (existing2.avgDamage * existing2.games + agg.totalDamage) /
-                newGames,
-              pickRate,
-              banRate: 0,
-              wilsonLower: wilsonLower(newWins, newGames),
-              confidence: getConfidenceLevel(newGames),
-              lastMatchCreatedAt,
-              computedAt: new Date(),
-            },
-          });
-        } else {
-          await this.prisma.labRankedChampionSnapshot.create({
-            data: {
-              period: "current_patch",
-              patchVersion: targetPatchVersion,
-              championId,
-              position,
-              games: agg.games,
-              wins: agg.wins,
-              avgKda,
-              avgDamage,
-              pickRate,
-              banRate: 0,
-              wilsonLower: wilson,
-              confidence,
-              lastMatchCreatedAt,
-            },
-          });
-        }
-      } else {
-        // 전체 재계산 upsert (null → "" 변환으로 unique key 처리)
-        await this.prisma.labRankedChampionSnapshot.upsert({
-          where: {
-            period_patchVersion_championId_position: {
-              period,
-              patchVersion: "", // null 대신 빈 문자열로 unique key 처리
-              championId,
-              position: position ?? "",
-            },
-          },
-          create: {
-            period,
-            patchVersion: "", // null 대신 빈 문자열 — unique key sentinel
-            championId,
-            position,
-            games: agg.games,
-            wins: agg.wins,
-            avgKda,
-            avgDamage,
+      if (existing2) {
+        const newGames = existing2.games + games;
+        const newWins = existing2.wins + wins;
+        await this.prisma.labRankedChampionSnapshot.update({
+          where: { id: existing2.id },
+          data: {
+            games: newGames,
+            wins: newWins,
+            avgKda: (existing2.avgKda * existing2.games + totalKda) / newGames,
+            avgDamage:
+              (existing2.avgDamage * existing2.games + totalDamage) / newGames,
             pickRate,
             banRate: 0,
-            wilsonLower: wilson,
-            confidence,
-            lastMatchCreatedAt,
-          },
-          update: {
-            games: agg.games,
-            wins: agg.wins,
-            avgKda,
-            avgDamage,
-            pickRate,
-            banRate: 0,
-            wilsonLower: wilson,
-            confidence,
+            wilsonLower: wilsonLower(newWins, newGames),
+            confidence: getConfidenceLevel(newGames),
             lastMatchCreatedAt,
             computedAt: new Date(),
+          },
+        });
+      } else {
+        await this.prisma.labRankedChampionSnapshot.create({
+          data: {
+            period: "current_patch",
+            patchVersion: targetPatchVersion,
+            championId,
+            position,
+            games,
+            wins,
+            avgKda,
+            avgDamage,
+            pickRate,
+            banRate: 0,
+            wilsonLower: wilson,
+            confidence,
+            lastMatchCreatedAt,
           },
         });
       }
@@ -4230,7 +5201,10 @@ export class LabStatsService {
       FROM "match_participants" a
       JOIN "match_participants" b
         ON a."matchId" = b."matchId"
-       AND a."teamId"  != b."teamId"
+       AND (
+         (a."teamId" IS NOT NULL AND b."teamId" IS NOT NULL AND a."teamId" <> b."teamId")
+         OR (a."teamId" IS NULL AND b."teamId" IS NULL AND a."win" <> b."win")
+       )
       JOIN "matches" m ON m."id" = a."matchId"
       WHERE a."userId" = ${userAId}
         AND b."userId" = ${userBId}

@@ -2,13 +2,13 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getChampionKoreanName } from "@nexus/types";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/auth-store";
 import { LabPeriod, LabTabKey, useLabStore } from "@/stores/lab-store";
-import { statsApi } from "@/lib/api-client";
+import { adminApi, statsApi } from "@/lib/api-client";
 import {
   labQueryOptions,
   type LabOverview,
@@ -72,6 +72,21 @@ const LAB_PERIODS: Array<{ key: LabPeriod; label: string }> = [
   { key: "all", label: "전체" },
 ];
 
+const LAB_TAB_MIN_PHASE: Record<LabTabKey, number> = {
+  meta: 0,
+  champions: 0,
+  compositions: 2, // 30경기 이상
+  oracle: 2, // 30경기 이상
+};
+
+const LAB_PHASE_MATCH_THRESHOLD: Record<number, number> = {
+  0: 0,
+  1: 10,
+  2: 30,
+  3: 100,
+  4: 300,
+};
+
 
 const POSITION_LABELS: Record<string, string> = {
   TOP: "탑",
@@ -113,6 +128,26 @@ function confidenceLabel(level: "low" | "moderate" | "high" | "insufficient") {
   if (level === "moderate") return "보통";
   if (level === "low") return "낮음";
   return "부족";
+}
+
+function LabSourceBadge({ source }: { source?: "snapshot" | "realtime" }) {
+  if (!source) return null;
+  return source === "snapshot" ? (
+    <Badge variant="success" size="sm">스냅샷</Badge>
+  ) : (
+    <Badge variant="warning" size="sm">실시간 집계</Badge>
+  );
+}
+
+function BanMetaSourceBadge({
+  source,
+}: {
+  source?: "custom" | "hybrid" | "ranked_only" | "none";
+}) {
+  if (!source || source === "none") return null;
+  if (source === "custom") return <Badge variant="success" size="sm">내전 메타</Badge>;
+  if (source === "hybrid") return <Badge variant="warning" size="sm">하이브리드 메타</Badge>;
+  return <Badge variant="warning" size="sm">외부 랭크 메타</Badge>;
 }
 
 const COMPOSITION_EXAMPLE_CHAMPIONS: Record<
@@ -259,6 +294,18 @@ export default function LabPage() {
   // ─── 인증 확인 후 enabled 여부 결정 ──────────────────────────────────────────
   const canFetch = !authLoading && isAuthenticated && isAdmin;
 
+  const { data: labDataPhase } = useQuery({
+    queryKey: ["lab", "data-phase"] as const,
+    queryFn: () => adminApi.getLabDataPhase(),
+    staleTime: 5 * 60 * 1000,
+    enabled: canFetch,
+  });
+  const currentPhase = labDataPhase?.phase ?? 0;
+  const isTabUnlocked = useCallback(
+    (tab: LabTabKey) => currentPhase >= LAB_TAB_MIN_PHASE[tab],
+    [currentPhase],
+  );
+
   // ─── React Query: 초기 메타 데이터 ───────────────────────────────────────────
   const { data: overview, isLoading: overviewLoading, isError: overviewError } = useQuery({
     ...labQueryOptions.overview(),
@@ -273,29 +320,29 @@ export default function LabPage() {
 
   const { data: metaRadar, isLoading: metaRadarLoading } = useQuery<MetaRadarResponse>({
     ...labQueryOptions.metaRadar(activePeriod),
-    enabled: canFetch,
+    enabled: canFetch && activeTab === "meta",
   });
 
   const { data: patchImpact } = useQuery<PatchImpactResponse>({
     ...labQueryOptions.patchImpact(),
-    enabled: canFetch,
+    enabled: canFetch && activeTab === "meta",
   });
 
   const { data: banRates } = useQuery<BanRatesResponse>({
     ...labQueryOptions.banRates(activePeriod),
-    enabled: canFetch,
+    enabled: canFetch && activeTab === "meta",
   });
 
   // ─── 메타 레이더 진입 시 prefetch (다음 기간 미리 로드) ──────────────────────
   useEffect(() => {
-    if (!canFetch) return;
+    if (!canFetch || activeTab !== "meta") return;
     const otherPeriods: LabPeriod[] = (["30d", "90d", "all"] as LabPeriod[]).filter(
       (p) => p !== activePeriod,
     );
     otherPeriods.forEach((p) => {
       void queryClient.prefetchQuery(labQueryOptions.metaRadar(p));
     });
-  }, [canFetch, activePeriod, queryClient]);
+  }, [canFetch, activePeriod, activeTab, queryClient]);
 
   // ─── React Query: 챔피언 분석 탭 ─────────────────────────────────────────────
   const { data: championList } = useQuery<ChampionListResponse>({
@@ -335,6 +382,33 @@ export default function LabPage() {
         }))
         .sort((a, b) => a.championNameKorean.localeCompare(b.championNameKorean, "ko")),
     [catalogResponse],
+  );
+  const championNameById = useMemo(() => {
+    const map = new Map<number, string>();
+    for (const row of championCatalog) {
+      map.set(row.championId, row.championNameKorean);
+    }
+    for (const row of metaRadar?.trending ?? []) {
+      map.set(row.championId, row.championNameKorean);
+    }
+    for (const row of overview?.championSignals ?? []) {
+      map.set(row.championId, row.championNameKorean);
+    }
+    for (const row of overview?.masteryLeaders ?? []) {
+      map.set(row.championId, row.championNameKorean);
+    }
+    for (const row of overview?.seededChampionLeaders ?? []) {
+      map.set(row.championId, row.championNameKorean);
+    }
+    for (const row of championList?.champions ?? []) {
+      map.set(row.championId, row.championNameKorean);
+    }
+    return map;
+  }, [championCatalog, metaRadar, overview, championList]);
+  const championDisplayName = useCallback(
+    (championId: number) =>
+      championNameById.get(championId) ?? `챔피언 #${championId}`,
+    [championNameById],
   );
 
   // ─── React Query: 조합 분석 탭 ───────────────────────────────────────────────
@@ -389,7 +463,7 @@ export default function LabPage() {
   });
 
   // 초기 로딩: overview + metaRadar가 준비될 때까지 로딩 표시
-  const loading = canFetch && (overviewLoading || metaRadarLoading);
+  const loading = canFetch && (overviewLoading || (activeTab === "meta" && metaRadarLoading));
   const error = overviewError ? "실험실 데이터를 불러오지 못했습니다." : null;
 
   const queryTab = useMemo<LabTabKey>(() => {
@@ -398,6 +472,7 @@ export default function LabPage() {
       ? (fromQuery as LabTabKey)
       : "meta";
   }, [searchParams]);
+  const safeQueryTab = isTabUnlocked(queryTab) ? queryTab : "meta";
   const queryPeriod = useMemo<LabPeriod>(() => {
     const fromQuery = searchParams.get("period");
     return LAB_PERIODS.some((period) => period.key === fromQuery)
@@ -405,23 +480,36 @@ export default function LabPage() {
       : "30d";
   }, [searchParams]);
 
-  const updateLabQuery = (tab: LabTabKey, period: LabPeriod) => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("tab", tab);
-    params.set("period", period);
-    router.replace(`/lab?${params.toString()}`);
-  };
+  const updateLabQuery = useCallback(
+    (tab: LabTabKey, period: LabPeriod) => {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("tab", tab);
+      params.set("period", period);
+      router.replace(`/lab?${params.toString()}`);
+    },
+    [router, searchParams],
+  );
 
   useEffect(() => {
-    if (activeTab !== queryTab) setActiveTab(queryTab);
-    if (activePeriod !== queryPeriod) setPeriod(queryPeriod);
-  }, [activePeriod, activeTab, queryPeriod, queryTab, setActiveTab, setPeriod]);
-
-  useEffect(() => {
-    if (!authLoading && (!isAuthenticated || !isAdmin)) {
-      router.replace("/");
+    if (!isTabUnlocked(queryTab)) {
+      updateLabQuery("meta", queryPeriod);
+      if (activeTab !== "meta") setActiveTab("meta");
+      return;
     }
-  }, [authLoading, isAuthenticated, isAdmin, router]);
+    if (activeTab !== safeQueryTab) setActiveTab(safeQueryTab);
+    if (activePeriod !== queryPeriod) setPeriod(queryPeriod);
+  }, [
+    activePeriod,
+    activeTab,
+    queryPeriod,
+    queryTab,
+    safeQueryTab,
+    setActiveTab,
+    setPeriod,
+    currentPhase,
+    updateLabQuery,
+    isTabUnlocked,
+  ]);
 
   useEffect(() => {
     if (activeTab !== "oracle") return;
@@ -774,7 +862,30 @@ export default function LabPage() {
   }
 
   if (!isAuthenticated || !isAdmin) {
-    return null;
+    return (
+      <div className="mx-auto max-w-4xl px-4 py-16">
+        <Card className="border-amber-500/20 bg-amber-500/5">
+          <CardContent className="flex items-start gap-4 p-6">
+            <ShieldAlert className="mt-0.5 h-5 w-5 text-amber-300" />
+            <div className="space-y-2">
+              <p className="text-lg font-semibold text-text-primary">Lab 접근 권한 필요</p>
+              <p className="text-sm leading-6 text-text-secondary">
+                현재 Lab은 관리자 전용 연구 영역입니다. 접근 권한이 필요한 경우 운영진에게 요청해 주세요.
+              </p>
+              <div className="pt-1">
+                <Link
+                  href="/"
+                  className="inline-flex items-center gap-2 rounded-lg bg-bg-primary/70 px-3 py-1.5 text-xs font-semibold text-text-secondary hover:bg-bg-elevated"
+                >
+                  홈으로 이동
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   if (error || !overview) {
@@ -861,13 +972,28 @@ export default function LabPage() {
           </div>
 
           <div className="mt-8 flex flex-col gap-3 rounded-2xl border border-white/10 bg-bg-secondary/60 p-4">
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <Badge variant="secondary" size="sm">
+                데이터 단계 {currentPhase}
+              </Badge>
+              <span className="text-text-tertiary">
+                총 {labDataPhase?.totalMatches ?? 0}경기
+              </span>
+              {typeof labDataPhase?.remainingUntilNextPhase === "number" ? (
+                <span className="text-text-tertiary">
+                  다음 단계까지 {labDataPhase.remainingUntilNextPhase}경기
+                </span>
+              ) : null}
+            </div>
             {/* 탭 — 모바일에서 가로 스크롤 처리 */}
             <div className="-mx-1 flex items-center gap-2 overflow-x-auto px-1 pb-1 scrollbar-none">
               {LAB_TABS.map((tab) => (
                 <button
                   key={tab.key}
                   type="button"
+                  disabled={!isTabUnlocked(tab.key)}
                   onClick={() => {
+                    if (!isTabUnlocked(tab.key)) return;
                     setActiveTab(tab.key);
                     updateLabQuery(tab.key, activePeriod);
                   }}
@@ -875,12 +1001,50 @@ export default function LabPage() {
                     activeTab === tab.key
                       ? "bg-emerald-500/20 text-emerald-300"
                       : "bg-bg-primary/60 text-text-secondary hover:bg-bg-elevated"
+                  } ${
+                    !isTabUnlocked(tab.key)
+                      ? "cursor-not-allowed opacity-50"
+                      : ""
                   }`}
                 >
-                  {tab.label}
+                  <span className="inline-flex items-center gap-1">
+                    {tab.label}
+                    {!isTabUnlocked(tab.key) ? (
+                      <Badge variant="secondary" size="sm">
+                        {LAB_TAB_MIN_PHASE[tab.key]}단계 필요
+                      </Badge>
+                    ) : null}
+                  </span>
                 </button>
               ))}
             </div>
+            {LAB_TABS.some((tab) => !isTabUnlocked(tab.key)) ? (
+              <div className="rounded-xl border border-amber-400/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+                <p className="font-semibold">잠긴 분석 탭이 있습니다</p>
+                <div className="mt-1 space-y-0.5 text-amber-100/80">
+                  {LAB_TABS.filter((tab) => !isTabUnlocked(tab.key)).map((tab) => {
+                    const requiredPhase = LAB_TAB_MIN_PHASE[tab.key];
+                    const requiredMatches = LAB_PHASE_MATCH_THRESHOLD[requiredPhase] ?? 0;
+                    const currentMatches = labDataPhase?.totalMatches ?? 0;
+                    const remaining = Math.max(requiredMatches - currentMatches, 0);
+                    return (
+                      <p key={`locked-${tab.key}`}>
+                        {tab.label}: 최소 {requiredMatches}경기 필요 (현재 {currentMatches}경기, {remaining}경기 부족)
+                      </p>
+                    );
+                  })}
+                </div>
+                <div className="mt-2">
+                  <Link
+                    href="/matches"
+                    className="inline-flex items-center gap-1 rounded-md bg-bg-primary/60 px-2 py-1 text-[11px] font-semibold text-text-secondary hover:bg-bg-elevated"
+                  >
+                    내전 전적 보기
+                    <ArrowRight className="h-3 w-3" />
+                  </Link>
+                </div>
+              </div>
+            ) : null}
             {/* 기간 필터 */}
             <div className="flex items-center gap-2">
               <p className="shrink-0 text-xs uppercase tracking-[0.18em] text-text-tertiary">기간</p>
@@ -915,6 +1079,14 @@ export default function LabPage() {
               <CardDescription>
                 낙찰가 대비 성과(가성비)를 산점도와 회귀선으로 확인하고, 상·하위 유저를 비교합니다.
               </CardDescription>
+              <div className="flex items-center gap-2">
+                <LabSourceBadge source={auctionData?.source} />
+              </div>
+              <div className="flex flex-wrap gap-2 text-xs">
+                <a href="#oracle-auction-core" className="rounded-md bg-bg-primary/60 px-2 py-1 text-text-secondary hover:bg-bg-elevated">경매 코어</a>
+                <a href="#oracle-team-balance" className="rounded-md bg-bg-primary/60 px-2 py-1 text-text-secondary hover:bg-bg-elevated">팀 밸런스</a>
+                <a href="#oracle-ban-recommend" className="rounded-md bg-bg-primary/60 px-2 py-1 text-text-secondary hover:bg-bg-elevated">밴 추천</a>
+              </div>
             </CardHeader>
             <CardContent>
               {auctionLoading ? (
@@ -926,8 +1098,8 @@ export default function LabPage() {
                   경매 효율 데이터가 없습니다. (데이터 부족)
                 </div>
               ) : (
-                <div className="space-y-5">
-                  <div className="grid gap-3 md:grid-cols-4">
+                <div id="oracle-auction-core" className="space-y-5">
+                  <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
                     <div className="rounded-xl border border-white/10 bg-bg-primary/50 p-3">
                       <p className="text-xs text-text-tertiary">분석 유저</p>
                       <p className="mt-1 text-xl font-bold text-text-primary">{auctionData.sampleSize.users}명</p>
@@ -944,7 +1116,27 @@ export default function LabPage() {
                       <p className="text-xs text-text-tertiary">미낙찰 표본</p>
                       <p className="mt-1 text-xl font-bold text-text-primary">{auctionData.unsoldSummary.users}명</p>
                     </div>
+                    <div className="rounded-xl border border-white/10 bg-bg-primary/50 p-3">
+                      <p className="text-xs text-text-tertiary">Moneyball 최고</p>
+                      <p className="mt-1 text-xl font-bold text-emerald-300">
+                        {auctionData.moneyballTop[0]?.moneyballIndex.toFixed(1) ?? "-"}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-white/10 bg-bg-primary/50 p-3">
+                      <p className="text-xs text-text-tertiary">폼 급상승 유저</p>
+                      <p className="mt-1 text-xl font-bold text-cyan-300">
+                        {auctionData.trendingTop[0]?.username ?? "-"}
+                      </p>
+                    </div>
                   </div>
+                  <p className="text-xs text-text-tertiary">
+                    캘리브레이션: {auctionData.moneyball.calibration.quarter} ·{" "}
+                    {auctionData.moneyball.calibration.mode === "quarter"
+                      ? "분기 재학습 적용"
+                      : "표본 부족으로 기본 스케일"} · prior{" "}
+                    {auctionData.moneyball.calibration.priorGames}게임 · scale{" "}
+                    {auctionData.moneyball.calibration.scale.toFixed(2)}
+                  </p>
 
                   <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
                     <Card className="border-white/10 bg-bg-primary/40">
@@ -1056,9 +1248,10 @@ export default function LabPage() {
                         {auctionData.efficiencyTop.map((row, idx) => (
                           <div key={`eff-top-${row.userId}`} className="flex items-center justify-between rounded-lg border border-emerald-300/20 bg-bg-primary/50 px-3 py-2 text-sm">
                             <span className="text-text-primary">{idx + 1}. {row.username}</span>
-                            <span className="font-semibold text-emerald-300">
-                              +{row.efficiency.toFixed(3)}
-                            </span>
+                            <div className="text-right">
+                              <p className="font-semibold text-emerald-300">+{row.efficiency.toFixed(3)}</p>
+                              <p className="text-xs text-text-tertiary">MBI {row.moneyballIndex.toFixed(1)}</p>
+                            </div>
                           </div>
                         ))}
                       </CardContent>
@@ -1071,9 +1264,56 @@ export default function LabPage() {
                         {auctionData.overpricedTop.map((row, idx) => (
                           <div key={`over-top-${row.userId}`} className="flex items-center justify-between rounded-lg border border-rose-300/20 bg-bg-primary/50 px-3 py-2 text-sm">
                             <span className="text-text-primary">{idx + 1}. {row.username}</span>
-                            <span className="font-semibold text-rose-300">
-                              {row.efficiency.toFixed(3)}
-                            </span>
+                            <div className="text-right">
+                              <p className="font-semibold text-rose-300">{row.efficiency.toFixed(3)}</p>
+                              <p className="text-xs text-text-tertiary">MBI {row.moneyballIndex.toFixed(1)}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </CardContent>
+                    </Card>
+                    <Card className="border-white/10 bg-cyan-500/10">
+                      <CardHeader>
+                        <CardTitle className="text-base text-cyan-200">최근 폼 상승 TOP 5</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-2">
+                        {auctionData.trendingTop.map((row, idx) => (
+                          <div key={`trend-top-${row.userId}`} className="flex items-center justify-between rounded-lg border border-cyan-300/20 bg-bg-primary/50 px-3 py-2 text-sm">
+                            <span className="text-text-primary">{idx + 1}. {row.username}</span>
+                            <div className="text-right">
+                              <p className="font-semibold text-cyan-300">
+                                {row.recentTrendDelta >= 0 ? "+" : ""}
+                                {(row.recentTrendDelta * 100).toFixed(1)}%p
+                              </p>
+                              <p className="text-xs text-text-tertiary">
+                                {row.trendConfidence === "insufficient"
+                                  ? "비교 표본 부족"
+                                  : row.recentTrendPercent === null
+                                  ? "비교 표본 부족"
+                                  : `${row.recentTrendPercent >= 0 ? "+" : ""}${row.recentTrendPercent.toFixed(1)}%`}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </CardContent>
+                    </Card>
+                    <Card className="border-white/10 bg-amber-500/10">
+                      <CardHeader>
+                        <CardTitle className="text-base text-amber-200">거품 리스크 TOP 5</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-2">
+                        {auctionData.bubbleRiskTop.map((row, idx) => (
+                          <div key={`bubble-top-${row.userId}`} className="flex items-center justify-between rounded-lg border border-amber-300/20 bg-bg-primary/50 px-3 py-2 text-sm">
+                            <span className="text-text-primary">{idx + 1}. {row.username}</span>
+                            <div className="text-right">
+                              <p className="font-semibold text-amber-300">
+                                MBI {row.moneyballIndex.toFixed(1)}
+                              </p>
+                              <p className="text-xs text-text-tertiary">
+                                효율 {row.efficiency >= 0 ? "+" : ""}
+                                {row.efficiency.toFixed(3)}
+                              </p>
+                            </div>
                           </div>
                         ))}
                       </CardContent>
@@ -1089,6 +1329,8 @@ export default function LabPage() {
                           <th className="px-3 py-2 text-right">성과</th>
                           <th className="px-3 py-2 text-right">예상</th>
                           <th className="px-3 py-2 text-right">효율</th>
+                          <th className="px-3 py-2 text-right">MBI</th>
+                          <th className="px-3 py-2 text-right">최근 추세</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1104,15 +1346,66 @@ export default function LabPage() {
                                 {row.efficiency >= 0 ? "+" : ""}
                                 {row.efficiency.toFixed(3)}
                               </td>
+                              <td className={`px-3 py-2 text-right font-semibold ${row.moneyballIndex >= 100 ? "text-emerald-300" : "text-amber-300"}`}>
+                                {row.moneyballIndex.toFixed(1)}
+                              </td>
+                              <td className={`px-3 py-2 text-right font-semibold ${row.recentTrendDelta >= 0 ? "text-cyan-300" : "text-rose-300"}`}>
+                                {row.trendConfidence === "insufficient"
+                                  ? "표본부족"
+                                  : `${row.recentTrendDelta >= 0 ? "+" : ""}${(row.recentTrendDelta * 100).toFixed(1)}%p`}
+                              </td>
                             </tr>
                           ))}
                       </tbody>
                     </table>
                   </div>
 
+                  <Card className="border-white/10 bg-bg-primary/40">
+                    <CardHeader>
+                      <CardTitle className="text-base">포지션별 폼 분석</CardTitle>
+                      <CardDescription>
+                        주포지션 대비 오프포지션 성과/데스 패널티와 범용성 점수를 제공합니다.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="grid gap-4 xl:grid-cols-2">
+                      <div className="space-y-2">
+                        <p className="text-xs font-semibold text-text-secondary">범용성 점수 TOP 5</p>
+                        {auctionData.roleForm.versatilityTop.map((row, idx) => (
+                          <div key={`vers-top-${row.userId}`} className="rounded-lg border border-white/10 bg-bg-secondary/40 px-3 py-2">
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-text-primary">{idx + 1}. {row.username}</span>
+                              <span className="font-semibold text-cyan-300">{row.versatilityScore}점</span>
+                            </div>
+                            <p className="mt-1 text-xs text-text-tertiary">
+                              주포지션 {row.primaryPosition ? formatPosition(row.primaryPosition) : "-"} ({row.primaryGames}게임) ·
+                              커버 {row.activeRoles}라인 · 신뢰도 {confidenceLabel(row.confidence)}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="space-y-2">
+                        <p className="text-xs font-semibold text-text-secondary">오프포지션 리스크 TOP 5</p>
+                        {auctionData.roleForm.offRoleRiskTop.map((row, idx) => (
+                          <div key={`off-risk-${row.userId}`} className="rounded-lg border border-white/10 bg-bg-secondary/40 px-3 py-2">
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-text-primary">{idx + 1}. {row.username}</span>
+                              <span className="font-semibold text-rose-300">
+                                {((row.offRolePenalty?.performanceDelta ?? 0) * 100).toFixed(1)}%p 하락
+                              </span>
+                            </div>
+                            <p className="mt-1 text-xs text-text-tertiary">
+                              승률 하락 {((row.offRolePenalty?.winRateDelta ?? 0) * 100).toFixed(1)}%p ·
+                              데스 증가 {((row.offRolePenalty?.deathRateDelta ?? 0) * 100).toFixed(1)}%
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+
                   <div className="my-2 border-t border-white/10" />
 
-                  <div>
+                  <div id="oracle-team-balance">
                     <h3 className="text-base font-semibold text-text-primary">팀 밸런스 예측기</h3>
                     <p className="text-xs text-text-secondary">
                       유저를 팀 A/B에 배치한 뒤 예측 버튼으로 승률과 신뢰도를 확인합니다.
@@ -1302,11 +1595,24 @@ export default function LabPage() {
 
                   <div className="my-2 border-t border-white/10" />
 
-                  <div>
+                  <div id="oracle-ban-recommend">
                     <h3 className="text-base font-semibold text-text-primary">밴픽 추천기</h3>
                     <p className="text-xs text-text-secondary">
                       참가자를 최대 10명 선택하면 추천 밴 챔피언과 포지션별 OP 픽을 제공합니다.
                     </p>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <BanMetaSourceBadge source={banRecommendResult?.meta.source} />
+                      {banRecommendResult?.meta.source === "hybrid" ? (
+                        <span className="text-xs text-text-tertiary">
+                          내전 메타에 외부 랭크 메타 {banRecommendResult.meta.externalSupplementedCount}개 보강
+                        </span>
+                      ) : null}
+                      {banRecommendResult?.meta.source === "ranked_only" ? (
+                        <span className="text-xs text-text-tertiary">
+                          내전 메타 부족으로 외부 랭크 메타 기준 사용
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
 
                   <div className="rounded-xl border border-white/10 bg-bg-primary/40 p-3">
@@ -1419,7 +1725,7 @@ export default function LabPage() {
                                           unoptimized
                                         />
                                       </div>
-                                      <span className="text-xs text-text-secondary">#{pick.championId}</span>
+                                      <span className="text-xs text-text-secondary">{championDisplayName(pick.championId)}</span>
                                     </div>
                                     <Badge variant={pick.tier === "S" ? "success" : "secondary"} size="sm">
                                       {pick.tier}
@@ -1645,6 +1951,14 @@ export default function LabPage() {
               <CardDescription>
                 챔피언을 선택해 시너지 파트너 승률 순위를 확인합니다.
               </CardDescription>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs text-text-tertiary">시너지</span>
+                <LabSourceBadge source={synergyData?.source} />
+                <span className="text-xs text-text-tertiary">카운터</span>
+                <LabSourceBadge source={counterData?.source} />
+                <span className="text-xs text-text-tertiary">조합 유형</span>
+                <LabSourceBadge source={compositionsData?.source} />
+              </div>
             </CardHeader>
             <CardContent>
               <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -1960,6 +2274,12 @@ export default function LabPage() {
               <CardDescription>
                 검색/정렬/포지션 필터 기반으로 챔피언 픽률·승률·밴률을 탐색합니다.
               </CardDescription>
+              <div className="flex items-center gap-2">
+                <LabSourceBadge source={championList?.source} />
+                {championList?.source === "realtime" ? (
+                  <span className="text-xs text-text-tertiary">스냅샷 미스 시 원본 집계</span>
+                ) : null}
+              </div>
             </CardHeader>
             <CardContent>
               <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -2424,6 +2744,86 @@ export default function LabPage() {
 
         {activeTab === "meta" ? (
           <>
+        <Card className="mb-6 border-amber-300/20 bg-amber-500/10">
+          <CardHeader>
+            <div className="flex items-center gap-2 text-amber-200">
+              <Beaker className="h-4 w-4" />
+              <span className="text-sm font-semibold uppercase tracking-[0.18em]">Patch Impact Briefing</span>
+            </div>
+            <CardTitle>패치 임팩트 핵심 브리핑</CardTitle>
+            <CardDescription>
+              {patchImpact?.currentPatch && patchImpact?.previousPatch
+                ? `${patchImpact.previousPatch} → ${patchImpact.currentPatch} 기준 내전 양상 변화`
+                : "패치 비교 데이터 준비 중"}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="rounded-xl border border-white/10 bg-bg-primary/50 p-3">
+                <p className="mb-2 text-xs font-semibold text-emerald-300">수혜 챔피언</p>
+                <div className="space-y-1.5">
+                  {(patchImpact?.buffed ?? []).slice(0, 5).map((row) => (
+                    <p key={`patch-brief-buff-${row.championId}`} className="text-xs text-text-secondary">
+                      {row.championNameKorean} · +{row.deltaWinRate.toFixed(1)}%p
+                    </p>
+                  ))}
+                  {(patchImpact?.buffed ?? []).length === 0 ? (
+                    <p className="text-xs text-text-tertiary">데이터 없음</p>
+                  ) : null}
+                </div>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-bg-primary/50 p-3">
+                <p className="mb-2 text-xs font-semibold text-rose-300">피해 챔피언</p>
+                <div className="space-y-1.5">
+                  {(patchImpact?.nerfed ?? []).slice(0, 5).map((row) => (
+                    <p key={`patch-brief-nerf-${row.championId}`} className="text-xs text-text-secondary">
+                      {row.championNameKorean} · {row.deltaWinRate.toFixed(1)}%p
+                    </p>
+                  ))}
+                  {(patchImpact?.nerfed ?? []).length === 0 ? (
+                    <p className="text-xs text-text-tertiary">데이터 없음</p>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="rounded-xl border border-white/10 bg-bg-primary/50 p-3">
+                <p className="mb-2 text-xs font-semibold text-cyan-300">포지션 변화 TOP 3</p>
+                <div className="space-y-1.5">
+                  {(patchImpact?.positionShifts ?? []).slice(0, 3).map((row) => (
+                    <p key={`patch-brief-pos-${row.position}`} className="text-xs text-text-secondary">
+                      {formatPosition(row.position)} · 승률 {row.deltaWinRate >= 0 ? "+" : ""}
+                      {row.deltaWinRate.toFixed(1)}%p · 픽률 {row.deltaPickRate >= 0 ? "+" : ""}
+                      {row.deltaPickRate.toFixed(2)}%p
+                    </p>
+                  ))}
+                  {(patchImpact?.positionShifts ?? []).length === 0 ? (
+                    <p className="text-xs text-text-tertiary">데이터 없음</p>
+                  ) : null}
+                </div>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-bg-primary/50 p-3">
+                <p className="mb-2 text-xs font-semibold text-violet-300">조합 변화 TOP 3</p>
+                <div className="space-y-1.5">
+                  {(patchImpact?.compositionShifts ?? []).slice(0, 3).map((row) => (
+                    <p key={`patch-brief-comp-${row.type}`} className="text-xs text-text-secondary">
+                      {row.label} · 픽률 {row.deltaPickRate >= 0 ? "+" : ""}
+                      {row.deltaPickRate.toFixed(2)}%p · 승률 {row.deltaWinRate >= 0 ? "+" : ""}
+                      {row.deltaWinRate.toFixed(1)}%p
+                    </p>
+                  ))}
+                  {(patchImpact?.compositionShifts ?? []).length === 0 ? (
+                    <p className="text-xs text-text-tertiary">데이터 없음</p>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+            <p className="text-xs text-text-tertiary">
+              표본: 현재 {patchImpact?.sample.currentGames ?? 0}경기 / 이전 {patchImpact?.sample.previousGames ?? 0}경기
+            </p>
+          </CardContent>
+        </Card>
+
         <div className="mb-6 grid gap-6 xl:grid-cols-2">
           <Card className="border-white/10 bg-bg-secondary/80">
             <CardHeader>
@@ -2470,11 +2870,11 @@ export default function LabPage() {
                   랭크 메타 스냅샷 수집 중입니다. 고티어 시딩 유저 배치가 완료되면 데이터가 표시됩니다.
                 </div>
               ) : (() => {
-                // 내전 스냅샷 맵 (championId → winRate)
+                // 내전 스냅샷 맵 (championId → winRate/games)
                 const customMap = new Map(
                   (metaRadar?.tiers ? Object.values(metaRadar.tiers).flat() : []).map((c) => [
                     c.championId,
-                    c.winRate,
+                    { winRate: c.winRate, games: c.games },
                   ]),
                 );
                 // 랭크 스냅샷 상위 20개 (wilsonLower 기준)
@@ -2486,10 +2886,11 @@ export default function LabPage() {
                 const compared = rankedTop
                   .map((r) => ({
                     ...r,
-                    customWinRate: customMap.get(r.championId) ?? null,
+                    customWinRate: (customMap.get(r.championId)?.winRate ?? null) as number | null,
+                    customGames: (customMap.get(r.championId)?.games ?? null) as number | null,
                     delta:
                       customMap.get(r.championId) !== undefined
-                        ? r.winRate - (customMap.get(r.championId) as number)
+                        ? r.winRate - (customMap.get(r.championId)?.winRate as number)
                         : null,
                   }))
                   .filter((r) => r.customWinRate !== null)
@@ -2516,21 +2917,21 @@ export default function LabPage() {
                         >
                           <Image
                             src={getChampionIconById(row.championId)}
-                            alt={String(row.championId)}
+                            alt={championDisplayName(row.championId)}
                             width={24}
                             height={24}
                             className="rounded-full"
                           />
                           <span className="w-20 truncate text-xs text-text-secondary">
-                            #{row.championId}
+                            {championDisplayName(row.championId)}
                           </span>
                           <div className="flex flex-1 items-center gap-2 text-xs">
                             <span className="text-text-tertiary">
-                              내전 {formatRate(row.customWinRate ?? 0)}
+                              내전 {formatRate(row.customWinRate ?? 0)} ({row.customGames ?? 0}게임)
                             </span>
                             <ArrowRight className="h-3 w-3 text-text-tertiary" />
                             <span className="font-medium text-text-primary">
-                              랭크 {formatRate(row.winRate)}
+                              랭크 {formatRate(row.winRate)} ({row.games}게임)
                             </span>
                           </div>
                           <Badge
@@ -2572,13 +2973,26 @@ export default function LabPage() {
                   <div className="space-y-2">
                     {rows.map((row) => (
                       <div key={`${position}-${row.championId}`} className="flex items-center justify-between gap-2 text-xs">
-                        <span className="truncate text-text-secondary">#{row.championId}</span>
+                        <div className="flex min-w-0 items-center gap-1.5">
+                          <div className="relative h-5 w-5 shrink-0 overflow-hidden rounded border border-white/10">
+                            <Image
+                              src={getChampionIconById(row.championId)}
+                              alt={championDisplayName(row.championId)}
+                              fill
+                              className="object-cover"
+                              unoptimized
+                            />
+                          </div>
+                          <span className="truncate text-text-secondary">
+                            {championDisplayName(row.championId)}
+                          </span>
+                        </div>
                         <div className="flex items-center gap-1">
                           <Badge variant={row.tier === "S" ? "success" : row.tier === "A" ? "default" : "secondary"}>
                             {row.tier}
                           </Badge>
                           <Badge variant={row.confidenceLevel === "high" ? "success" : "warning"}>
-                            {row.confidenceLevel}
+                            {confidenceLabel(row.confidenceLevel)}
                           </Badge>
                         </div>
                       </div>
@@ -2665,7 +3079,7 @@ export default function LabPage() {
         <div className="mb-6 grid gap-6 xl:grid-cols-2">
           <Card className="border-white/10 bg-bg-secondary/80">
             <CardHeader>
-              <CardTitle>패치 임팩트</CardTitle>
+              <CardTitle>패치 임팩트 상세</CardTitle>
               <CardDescription>
                 {patchImpact?.currentPatch && patchImpact?.previousPatch
                   ? `${patchImpact.previousPatch} → ${patchImpact.currentPatch}`
@@ -2704,16 +3118,85 @@ export default function LabPage() {
             <CardContent className="space-y-2">
               {(banRates?.banStats ?? []).slice(0, 8).map((row) => (
                 <div key={`ban-${row.championId}`} className="flex items-center justify-between rounded-lg border border-white/10 bg-bg-primary/60 px-3 py-2 text-xs">
-                  <span className="text-text-secondary">#{row.championId}</span>
+                  <div className="flex items-center gap-2">
+                    <div className="relative h-6 w-6 overflow-hidden rounded border border-white/10">
+                      <Image
+                        src={getChampionIconById(row.championId)}
+                        alt={championDisplayName(row.championId)}
+                        fill
+                        className="object-cover"
+                        unoptimized
+                      />
+                    </div>
+                    <span className="text-text-secondary">{championDisplayName(row.championId)}</span>
+                  </div>
                   <span className="text-text-secondary">밴률 {row.banRate.toFixed(2)}%</span>
                   <span className="text-text-secondary">밴팀승률 {row.banTeamWinRate.toFixed(1)}%</span>
                   <Badge variant={row.confidenceLevel === "high" ? "success" : "warning"}>
-                    {row.confidenceLevel}
+                    {confidenceLabel(row.confidenceLevel)}
                   </Badge>
                 </div>
               ))}
               {(banRates?.banStats ?? []).length === 0 ? (
                 <p className="text-sm text-text-secondary">밴 통계 데이터가 부족합니다.</p>
+              ) : null}
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="mb-6 grid gap-6 xl:grid-cols-2">
+          <Card className="border-white/10 bg-bg-secondary/80">
+            <CardHeader>
+              <CardTitle>포지션 변화 상세</CardTitle>
+              <CardDescription>패치 전후 포지션별 승률/픽률 변화</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {(patchImpact?.positionShifts ?? []).slice(0, 5).map((row) => (
+                <div key={`patch-pos-detail-${row.position}`} className="rounded-lg border border-white/10 bg-bg-primary/60 px-3 py-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-text-primary">{formatPosition(row.position)}</span>
+                    <Badge variant={row.deltaWinRate >= 0 ? "success" : "warning"}>
+                      승률 {row.deltaWinRate >= 0 ? "+" : ""}
+                      {row.deltaWinRate.toFixed(1)}%p
+                    </Badge>
+                  </div>
+                  <p className="mt-1 text-text-tertiary">
+                    픽률 {row.prevPickRate.toFixed(2)}% → {row.currentPickRate.toFixed(2)}% (
+                    {row.deltaPickRate >= 0 ? "+" : ""}
+                    {row.deltaPickRate.toFixed(2)}%p) · 표본 {row.prevGames}/{row.currentGames}
+                  </p>
+                </div>
+              ))}
+              {(patchImpact?.positionShifts ?? []).length === 0 ? (
+                <p className="text-sm text-text-secondary">포지션 변화 데이터가 부족합니다.</p>
+              ) : null}
+            </CardContent>
+          </Card>
+
+          <Card className="border-white/10 bg-bg-secondary/80">
+            <CardHeader>
+              <CardTitle>조합 변화 상세</CardTitle>
+              <CardDescription>패치 전후 조합 타입 분포/승률 변화</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {(patchImpact?.compositionShifts ?? []).slice(0, 5).map((row) => (
+                <div key={`patch-comp-detail-${row.type}`} className="rounded-lg border border-white/10 bg-bg-primary/60 px-3 py-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-text-primary">{row.label}</span>
+                    <Badge variant={row.deltaPickRate >= 0 ? "success" : "warning"}>
+                      픽률 {row.deltaPickRate >= 0 ? "+" : ""}
+                      {row.deltaPickRate.toFixed(2)}%p
+                    </Badge>
+                  </div>
+                  <p className="mt-1 text-text-tertiary">
+                    승률 {row.prevWinRate.toFixed(1)}% → {row.currentWinRate.toFixed(1)}% (
+                    {row.deltaWinRate >= 0 ? "+" : ""}
+                    {row.deltaWinRate.toFixed(1)}%p) · 팀표본 {row.prevGames}/{row.currentGames}
+                  </p>
+                </div>
+              ))}
+              {(patchImpact?.compositionShifts ?? []).length === 0 ? (
+                <p className="text-sm text-text-secondary">조합 변화 데이터가 부족합니다.</p>
               ) : null}
             </CardContent>
           </Card>

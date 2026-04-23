@@ -11,14 +11,18 @@ import {
 } from "@nestjs/common";
 import { Throttle } from "@nestjs/throttler";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { RolesGuard } from "../auth/guards/roles.guard";
+import { Roles } from "../auth/decorators/roles.decorator";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { LabStatsService } from "./lab-stats.service";
 import { StatsService } from "./stats.service";
+import { UserRole } from "@nexus/database";
 
 type Period = "30d" | "90d" | "all";
 
 @Controller("stats/lab")
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserRole.ADMIN)
 export class LabController {
   constructor(
     private readonly labStatsService: LabStatsService,
