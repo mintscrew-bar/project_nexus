@@ -196,6 +196,8 @@ export class MatchDataCollectionService {
               matchId,
               userId: userMapping.userId,
               teamId: userMapping.teamId,
+              puuid: participant.puuid,
+              riotTeamId: participant.teamId,
               championId: participant.championId,
               championName: participant.championName,
               position: participant.teamPosition || "UNKNOWN",

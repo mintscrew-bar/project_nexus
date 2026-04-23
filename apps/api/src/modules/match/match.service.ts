@@ -106,6 +106,11 @@ export class MatchService {
       throw new NotFoundException("Match not found");
     }
 
+    // 토너먼트 코드 발급은 내부(roomId 있는) 매치에만 적용 — 외부 인제스트 매치는 해당 없음
+    if (!match.room) {
+      throw new BadRequestException("Tournament code requires an internal match");
+    }
+
     if (match.room.hostId !== hostId) {
       throw new ForbiddenException("Only host can generate tournament code");
     }
@@ -176,14 +181,12 @@ export class MatchService {
         ...match.teamA.members.map((m: { user: { id: string } }) => m.user.id),
         ...match.teamB.members.map((m: { user: { id: string } }) => m.user.id),
       ];
+      // 클로저 안에서 좁힘 유실 방지 — 위에서 match.room 검증 완료
+      const roomName = match.room.name;
 
       await Promise.all(
         allParticipants.map((userId) =>
-          this.notificationService.notifyMatchStarting(
-            userId,
-            matchId,
-            match.room.name,
-          ),
+          this.notificationService.notifyMatchStarting(userId, matchId, roomName),
         ),
       );
     } catch (error) {
@@ -250,6 +253,11 @@ export class MatchService {
       throw new NotFoundException("Match not found");
     }
 
+    // 매치 시작은 내부(roomId 있는) 매치에만 적용 — 외부 인제스트 매치는 시작 개념이 없음
+    if (!match.room) {
+      throw new BadRequestException("Cannot start an external (ingested) match");
+    }
+
     if (match.room.hostId !== hostId) {
       throw new ForbiddenException("Only host can start match");
     }
@@ -292,6 +300,13 @@ export class MatchService {
 
     if (!match) {
       throw new NotFoundException("Match not found");
+    }
+
+    // 결과 보고는 내부(roomId 있는) 매치에만 적용 — 외부 인제스트 매치는 결과가 이미 확정 상태
+    if (!match.room || !match.roomId) {
+      throw new BadRequestException(
+        "Cannot report result for an external (ingested) match",
+      );
     }
 
     if (match.room.hostId !== hostId) {
@@ -343,6 +358,12 @@ export class MatchService {
       throw new NotFoundException("Match not found after update");
     }
 
+    // 위에서 roomId는 이미 검증됨 — 동일 매치이므로 updatedMatch.roomId도 NULL이 아님
+    const roomId = updatedMatch.roomId;
+    if (!roomId) {
+      throw new BadRequestException("Internal match required for reporting");
+    }
+
     // Advance winner to next round (delegated to MatchAdvancementService)
     let bracketAdvanced = false;
     if (updatedMatch.bracketType === BracketType.SINGLE_ELIMINATION) {
@@ -350,7 +371,7 @@ export class MatchService {
         try {
           bracketAdvanced =
             await this.matchAdvancementService.advanceWinnerToNextRound(
-              updatedMatch.roomId,
+              roomId,
               updatedMatch.round,
               updatedMatch.matchNumber,
               winnerId,
@@ -374,7 +395,7 @@ export class MatchService {
           : updatedMatch.teamAId;
       if (loserId) {
         await this.matchAdvancementService.advanceDoubleElimination(
-          updatedMatch.roomId,
+          roomId,
           updatedMatch.id,
           updatedMatch.bracketRound,
           winnerId,
@@ -390,7 +411,7 @@ export class MatchService {
 
     // Auto-generate tournament codes for newly-ready matches after advancement
     if (bracketAdvanced) {
-      await this.autoGenerateCodesForRoom(updatedMatch.roomId);
+      await this.autoGenerateCodesForRoom(roomId);
     }
 
     // Send Discord match result notification
@@ -457,7 +478,7 @@ export class MatchService {
         },
       });
 
-      if (matchWithMembers) {
+      if (matchWithMembers && matchWithMembers.room) {
         const winnerMembers =
           winnerId === matchWithMembers.teamAId
             ? (matchWithMembers.teamA?.members ?? [])
@@ -466,6 +487,8 @@ export class MatchService {
           winnerId === matchWithMembers.teamAId
             ? (matchWithMembers.teamB?.members ?? [])
             : (matchWithMembers.teamA?.members ?? []);
+        // 클로저 안에서 좁힘 유실 방지
+        const roomName = matchWithMembers.room.name;
 
         // Notify winners
         await Promise.all(
@@ -474,7 +497,7 @@ export class MatchService {
               m.user.id,
               matchId,
               true,
-              matchWithMembers.room.name,
+              roomName,
             ),
           ),
         );
@@ -486,7 +509,7 @@ export class MatchService {
               m.user.id,
               matchId,
               false,
-              matchWithMembers.room.name,
+              roomName,
             ),
           ),
         );
@@ -497,12 +520,12 @@ export class MatchService {
 
     // Check if bracket is complete (delegated to MatchAdvancementService)
     const allComplete =
-      await this.matchAdvancementService.checkBracketCompletion(match.roomId);
+      await this.matchAdvancementService.checkBracketCompletion(roomId);
     let tournamentCompleted = false;
 
     if (allComplete) {
       const room = await this.prisma.room.findUnique({
-        where: { id: match.roomId },
+        where: { id: roomId },
         select: { status: true },
       });
 
@@ -510,7 +533,7 @@ export class MatchService {
       if (room && room.status !== RoomStatus.COMPLETED) {
         // First update room status
         await this.prisma.room.update({
-          where: { id: match.roomId },
+          where: { id: roomId },
           data: {
             status: RoomStatus.COMPLETED,
             completedAt: new Date(),
@@ -520,7 +543,7 @@ export class MatchService {
         // Then fetch winner info separately for Discord notification
         const winnerMatch = await this.prisma.match.findFirst({
           where: {
-            roomId: match.roomId,
+            roomId: roomId,
             winnerId: { not: null },
           },
           orderBy: { round: "desc" },
@@ -538,14 +561,14 @@ export class MatchService {
           name:
             (
               await this.prisma.room.findUnique({
-                where: { id: match.roomId },
+                where: { id: roomId },
                 select: { name: true },
               })
             )?.name || "",
           matches: winnerMatch ? [winnerMatch] : [],
         };
 
-        this.logger.log(`Tournament completed for room ${match.roomId}`);
+        this.logger.log(`Tournament completed for room ${roomId}`);
 
         // Send Discord tournament completion notification
         try {
@@ -580,10 +603,10 @@ export class MatchService {
         try {
           if (this.discordVoiceService) {
             const moveResult = await this.discordVoiceService.moveAllToLobby(
-              match.roomId,
+              roomId,
             );
             this.logger.log(
-              `Moved participants to lobby for room ${match.roomId}: ${moveResult.success} success, ${moveResult.failed} failed`,
+              `Moved participants to lobby for room ${roomId}: ${moveResult.success} success, ${moveResult.failed} failed`,
             );
           }
         } catch (error) {
@@ -640,7 +663,7 @@ export class MatchService {
       winnerId,
       tournamentCompleted,
       bracketAdvanced,
-      roomId: match.roomId,
+      roomId: roomId,
     };
   }
 

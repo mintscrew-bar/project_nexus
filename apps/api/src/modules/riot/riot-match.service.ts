@@ -1,5 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { EventEmitter2 } from "@nestjs/event-emitter";
 import axios from "axios";
 import { PrismaService } from "../prisma/prisma.service";
 import { RedisService } from "../redis/redis.service";
@@ -157,6 +158,7 @@ export class RiotMatchService {
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
+    private readonly eventEmitter: EventEmitter2,
   ) {
     this.apiKey = this.configService.get("RIOT_API_KEY") || "";
     if (!this.apiKey) {
@@ -367,7 +369,14 @@ export class RiotMatchService {
           },
           update: {}, // 이미 존재하면 덮어쓰지 않음
         })
-        .then(() => this.propagateKnownPuuids(matchData))
+        .then(() => {
+          // 캐시 저장 완료 → 정규화 ingest 트리거 (RiotMatchCacheIngestService가 listen)
+          const result = this.eventEmitter.emit("riot.match.cached", {
+            matchId,
+          });
+          this.logger.log(`Emitted riot.match.cached for ${matchId} (received=${result})`);
+          return this.propagateKnownPuuids(matchData);
+        })
         .catch((e: any) =>
           this.logger.warn(`DB cache write failed for ${matchId}: ${e}`),
         );

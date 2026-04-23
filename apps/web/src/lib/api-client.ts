@@ -1427,6 +1427,16 @@ export const adminApi = {
     const response = await apiClient.get("/admin/matches/queue-stats");
     return response.data;
   },
+  getLabDataPhase: async () => {
+    const response = await apiClient.get("/admin/lab/data-phase");
+    return response.data as {
+      phase: number;
+      totalMatches: number;
+      nextPhaseThreshold: number | null;
+      remainingUntilNextPhase: number | null;
+      snapshotLastComputedAt: string | null;
+    };
+  },
   triggerMatchFetch: async (queueGroup?: "ranked" | "normal" | "aram" | "custom") => {
     const response = await apiClient.post("/admin/matches/trigger-fetch", undefined, {
       params: queueGroup ? { queueGroup } : undefined,

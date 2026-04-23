@@ -562,12 +562,13 @@ export class StatsService {
       deaths: number;
       assists: number;
       win: boolean;
-      teamId: string;
+      // 외부 인제스트 매치는 teamId NULL — 팀 데미지 집계 시 같은 팀(NULL=NULL) 매칭은 제외된다.
+      teamId: string | null;
       totalDamageDealtToChampions: number;
       match: {
         createdAt: Date;
         participants: Array<{
-          teamId: string;
+          teamId: string | null;
           totalDamageDealtToChampions: number;
         }>;
       };
@@ -1488,7 +1489,7 @@ export class StatsService {
         ranked AS (
           SELECT
             *,
-            ROUND((games * 4) + ("winRate" * 0.45) + ("avgKda" * 8), 1) AS "masteryScore",
+            ROUND(((games * 4) + ("winRate" * 0.45) + ("avgKda" * 8))::numeric, 1) AS "masteryScore",
             ROW_NUMBER() OVER (
               PARTITION BY "userId"
               ORDER BY ((games * 4) + ("winRate" * 0.45) + ("avgKda" * 8)) DESC, games DESC
@@ -1502,8 +1503,8 @@ export class StatsService {
           "championId",
           "championName",
           games,
-          ROUND("winRate", 1)::float AS "winRate",
-          ROUND("avgKda", 2)::float AS "avgKda",
+          ROUND("winRate"::numeric, 1)::float AS "winRate",
+          ROUND("avgKda"::numeric, 2)::float AS "avgKda",
           "masteryScore"
         FROM ranked
         WHERE rn = 1
@@ -1556,8 +1557,8 @@ export class StatsService {
             "championId",
             "championName",
             COUNT(*)::bigint AS games,
-            ROUND(AVG(win) * 100, 1)::float AS "winRate",
-            ROUND(AVG(kda), 2)::float AS "avgKda",
+            ROUND((AVG(win) * 100)::numeric, 1)::float AS "winRate",
+            ROUND(AVG(kda)::numeric, 2)::float AS "avgKda",
             MAX("gameEnd") AS "lastGameAt"
           FROM seeded_participants
           GROUP BY "puuid", "gameName", "tagLine", "championId", "championName"

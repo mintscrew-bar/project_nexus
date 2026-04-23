@@ -272,8 +272,9 @@ export class RankingService {
    * Recalculate all rankings (admin/cron)
    */
   async recalculateAllRankings(): Promise<{ processed: number }> {
-    // Get all users who have participated in matches
+    // Get all users who have participated in matches (외부 인제스트 매치는 userId NULL → 제외)
     const users = await this.prisma.matchParticipant.findMany({
+      where: { userId: { not: null } },
       select: { userId: true },
       distinct: ["userId"],
     });
@@ -282,6 +283,7 @@ export class RankingService {
 
     let processed = 0;
     for (const { userId } of users) {
+      if (!userId) continue;
       await this.updateRanking(userId);
       processed++;
     }

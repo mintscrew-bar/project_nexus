@@ -5,6 +5,7 @@ import { MatchGateway } from "./match.gateway";
 import { MatchDataCollectionService } from "./match-data-collection.service";
 import { MatchBracketService } from "./match-bracket.service";
 import { MatchAdvancementService } from "./match-advancement.service";
+import { RiotMatchCacheIngestService } from "./riot-match-cache-ingest.service";
 import { RiotModule } from "../riot/riot.module";
 import { AuthModule } from "../auth/auth.module";
 import { DiscordModule } from "../discord/discord.module";
@@ -28,6 +29,7 @@ import { RankingModule } from "../ranking/ranking.module";
     MatchDataCollectionService,
     MatchBracketService,
     MatchAdvancementService,
+    RiotMatchCacheIngestService,
     {
       provide: "DISCORD_BOT_SERVICE",
       useExisting: DiscordBotService,
@@ -43,6 +45,7 @@ import { RankingModule } from "../ranking/ranking.module";
     MatchDataCollectionService,
     MatchBracketService,
     MatchAdvancementService,
+    RiotMatchCacheIngestService,
   ],
 })
 export class MatchModule {}

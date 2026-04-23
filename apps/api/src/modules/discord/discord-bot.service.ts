@@ -893,7 +893,7 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
       .setColor(match.status === "IN_PROGRESS" ? Colors.Red : Colors.Yellow)
       .setTitle(`${statusEmoji} 매치 정보`)
       .setDescription(
-        `**${match.room.name}** - ${match.bracketRound || `${match.matchNumber}번째 매치`}`,
+        `**${match.room?.name ?? "(외부 매치)"}** - ${match.bracketRound || `${match.matchNumber}번째 매치`}`,
       )
       .addFields(
         {
