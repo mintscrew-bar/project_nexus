@@ -1,17 +1,14 @@
 import { create } from "zustand";
 
-export type LabTabKey = "meta" | "champions" | "compositions" | "oracle";
 export type LabPeriod = "30d" | "90d" | "all";
 export type LabPosition = "TOP" | "JUNGLE" | "MID" | "ADC" | "SUPPORT" | "ALL";
 
-type LabCacheKey = LabTabKey | "global";
+type LabCacheKey = "meta" | "champions" | "compositions" | "oracle" | "global";
 
 interface LabStoreState {
-  activeTab: LabTabKey;
   period: LabPeriod;
   position: LabPosition;
   cacheVersion: Record<LabCacheKey, number>;
-  setActiveTab: (tab: LabTabKey) => void;
   setPeriod: (period: LabPeriod) => void;
   setPosition: (position: LabPosition) => void;
   invalidateTabCache: (tab: LabCacheKey) => void;
@@ -27,11 +24,9 @@ const initialCacheVersion: Record<LabCacheKey, number> = {
 };
 
 export const useLabStore = create<LabStoreState>((set) => ({
-  activeTab: "meta",
   period: "30d",
   position: "ALL",
   cacheVersion: initialCacheVersion,
-  setActiveTab: (activeTab) => set({ activeTab }),
   setPeriod: (period) => set({ period }),
   setPosition: (position) => set({ position }),
   invalidateTabCache: (tab) =>
