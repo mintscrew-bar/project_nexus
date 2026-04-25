@@ -109,7 +109,7 @@ Phase 0 (정보 설계) ─┐
     - `lab-store`의 `activeTab` state 제거
   - **의존**: Phase 0 완료.
 
-- [ ] Task 1-2: 컴포넌트 폴더 추출
+- [x] Task 1-2: 컴포넌트 폴더 추출
   - **목표**: 3,507줄 page.tsx를 의미 단위 컴포넌트로 쪼갠다.
   - **폴더 구조**: `apps/web/src/components/lab/`
     - `LabHero.tsx` — 히어로 + StatMetric 4개
@@ -406,9 +406,9 @@ Phase 1 완료 후 병렬 가능.
 
 ## 진행 상황
 
-- 전체: 11 / 30 (필수 27 + 선택 4)
+- 전체: 12 / 30 (필수 27 + 선택 4)
 - Phase 0: 2 / 2 ✓
-- Phase 1: 2 / 3 (Task 1-2 대기)
+- Phase 1: 3 / 3 ✓
 - Phase 2: 4 / 5 (Task 2-5 대기)
 - Phase 3: 1 / 6
 - Phase 4: 2 / 8
