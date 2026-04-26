@@ -2,7 +2,6 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useMemo } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/auth-store";
@@ -13,125 +12,13 @@ import {
   type ChampionMasteryResponse,
 } from "@/lib/lab-queries";
 import { getChampionIconById, getItemIcon } from "@/components/matches/match-utils";
-import { formatRate, formatKda, formatPosition, confidenceLabel } from "@/lib/lab-format";
+import { formatRate } from "@/lib/lab-format";
 import {
-  Badge,
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-  LoadingSpinner,
+  Badge, Card, CardContent, CardDescription, CardHeader, CardTitle, LoadingSpinner,
 } from "@/components/ui";
+import { TrendChart } from "@/components/lab/charts/TrendChart";
+import { PositionPie } from "@/components/lab/charts/PositionPie";
 import { ArrowLeft, Crown, Medal } from "lucide-react";
-
-/** 기간별 승률 추이 SVG 차트 */
-function TrendChart({ detail }: { detail: ChampionDetailResponse }) {
-  const chart = useMemo(() => {
-    const points = detail.winrateTrend;
-    if (points.length < 3) return null;
-    const width = 520;
-    const height = 220;
-    const pad = { left: 34, right: 10, top: 10, bottom: 28 };
-    const chartWidth = width - pad.left - pad.right;
-    const chartHeight = height - pad.top - pad.bottom;
-    const xDenom = Math.max(points.length - 1, 1);
-    const minRate = Math.min(...points.map((p) => p.winRate));
-    const maxRate = Math.max(...points.map((p) => p.winRate));
-    const yMin = Math.max(0, minRate - 0.08);
-    const yMax = Math.min(1, maxRate + 0.08);
-    const yRange = Math.max(yMax - yMin, 0.01);
-    const toX = (idx: number) => pad.left + (idx / xDenom) * chartWidth;
-    const toY = (rate: number) => pad.top + chartHeight - ((rate - yMin) / yRange) * chartHeight;
-    const path = points.map((p, i) => `${i === 0 ? "M" : "L"}${toX(i).toFixed(1)},${toY(p.winRate).toFixed(1)}`).join(" ");
-    const area = `${path} L${toX(points.length - 1).toFixed(1)},${(pad.top + chartHeight).toFixed(1)} L${toX(0).toFixed(1)},${(pad.top + chartHeight).toFixed(1)} Z`;
-    const yTicks = [yMin, (yMin + yMax) / 2, yMax];
-    const xTicks = points.map((p, i) => ({
-      x: toX(i),
-      label: new Date(p.weekStart).toLocaleDateString("ko-KR", { month: "numeric", day: "numeric" }),
-    }));
-    return { width, height, pad, points, yTicks, xTicks, toX, toY, path, area };
-  }, [detail]);
-
-  if (!chart) {
-    return <p className="text-sm text-text-secondary">주간 데이터가 3포인트 미만이라 추이를 표시하지 않습니다.</p>;
-  }
-
-  return (
-    <svg viewBox={`0 0 ${chart.width} ${chart.height}`} className="w-full">
-      {chart.yTicks.map((tick, idx) => (
-        <g key={idx}>
-          <line x1={chart.pad.left} x2={chart.width - chart.pad.right} y1={chart.toY(tick)} y2={chart.toY(tick)} stroke="currentColor" strokeOpacity={0.12} />
-          <text x={chart.pad.left - 4} y={chart.toY(tick) + 4} textAnchor="end" fontSize="10" fill="currentColor" fillOpacity={0.6}>
-            {(tick * 100).toFixed(1)}%
-          </text>
-        </g>
-      ))}
-      <path d={chart.area} fill="var(--color-accent-success, #00c853)" fillOpacity={0.1} />
-      <path d={chart.path} stroke="var(--color-accent-success, #00c853)" strokeWidth="2.5" fill="none" />
-      {chart.points.map((p, i) => (
-        <circle key={p.weekStart} cx={chart.xTicks[i].x} cy={chart.toY(p.winRate)} r="3.5" fill="var(--color-accent-success, #00c853)" />
-      ))}
-      {chart.xTicks.map((tick, i) => (
-        <text key={`${tick.label}-${i}`} x={tick.x} y={chart.height - 8} textAnchor="middle" fontSize="10" fill="currentColor" fillOpacity={0.6}>
-          {tick.label}
-        </text>
-      ))}
-    </svg>
-  );
-}
-
-/** 포지션 분포 파이 차트 */
-function PositionPie({ detail }: { detail: ChampionDetailResponse }) {
-  const slices = useMemo(() => {
-    const rows = detail.positions;
-    const total = rows.reduce((acc, r) => acc + r.games, 0);
-    if (rows.length === 0 || total === 0) return [];
-    const colors = ["#667EEA", "#0bc4e2", "#764BA2", "#ffa726", "#f472b6"];
-    let startAngle = -Math.PI / 2;
-    return rows.map((row, idx) => {
-      const slice = (row.games / total) * Math.PI * 2;
-      const endAngle = startAngle + slice;
-      const largeArc = slice > Math.PI ? 1 : 0;
-      const r = 76; const cx = 96; const cy = 96;
-      const x1 = cx + Math.cos(startAngle) * r;
-      const y1 = cy + Math.sin(startAngle) * r;
-      const x2 = cx + Math.cos(endAngle) * r;
-      const y2 = cy + Math.sin(endAngle) * r;
-      const path = `M ${cx} ${cy} L ${x1.toFixed(2)} ${y1.toFixed(2)} A ${r} ${r} 0 ${largeArc} 1 ${x2.toFixed(2)} ${y2.toFixed(2)} Z`;
-      startAngle = endAngle;
-      return { ...row, path, color: colors[idx % colors.length] };
-    });
-  }, [detail]);
-
-  if (slices.length === 0) return <p className="text-sm text-text-secondary">포지션 분포 데이터가 없습니다.</p>;
-
-  return (
-    <div className="flex flex-col gap-4 md:flex-row md:items-center">
-      <svg viewBox="0 0 192 192" className="h-44 w-44 shrink-0">
-        {slices.map((s) => (
-          <path key={s.position} d={s.path} fill={s.color} opacity={s.confidenceLevel === "low" ? 0.6 : 1} />
-        ))}
-        <circle cx="96" cy="96" r="36" fill="rgba(15,23,42,0.9)" />
-      </svg>
-      <div className="w-full space-y-2">
-        {slices.map((s) => (
-          <div key={`legend-${s.position}`} className={`rounded-lg border border-white/10 bg-bg-secondary/40 px-3 py-2 text-xs ${s.confidenceLevel === "low" ? "opacity-75" : ""}`}>
-            <div className="flex items-center justify-between gap-2">
-              <span className="font-semibold text-text-primary">{formatPosition(s.position)}</span>
-              <Badge variant={s.confidenceLevel === "high" ? "success" : "warning"} size="sm">
-                {confidenceLabel(s.confidenceLevel)}
-              </Badge>
-            </div>
-            <p className="mt-1 text-text-secondary">
-              {s.games}게임 · {(s.pickRateWithinChampion * 100).toFixed(1)}% · 승률 {formatRate(s.winRate)}
-            </p>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 export default function ChampionDetailPage() {
   const params = useParams<{ championId: string }>();
@@ -141,12 +28,9 @@ export default function ChampionDetailPage() {
   const isAdmin = user?.role === "ADMIN";
   const canFetch = !authLoading && isAuthenticated && isAdmin;
 
-  // URL period 우선, 없으면 store
   const urlPeriod = searchParams.get("period") as LabPeriod | null;
   const activePeriod: LabPeriod =
-    urlPeriod && ["30d", "90d", "all"].includes(urlPeriod)
-      ? urlPeriod
-      : storePeriod;
+    urlPeriod && ["30d", "90d", "all"].includes(urlPeriod) ? urlPeriod : storePeriod;
 
   const championId = Number(params.championId);
 
@@ -161,11 +45,7 @@ export default function ChampionDetailPage() {
   });
 
   if (detailLoading || authLoading) {
-    return (
-      <div className="flex min-h-[40vh] items-center justify-center">
-        <LoadingSpinner />
-      </div>
-    );
+    return <div className="flex min-h-[40vh] items-center justify-center"><LoadingSpinner /></div>;
   }
 
   if (detailError || !detail) {
@@ -190,13 +70,7 @@ export default function ChampionDetailPage() {
       {/* 헤더 */}
       <div className="flex items-center gap-4">
         <div className="relative h-16 w-16 overflow-hidden rounded-2xl border border-white/10 bg-slate-950/60">
-          <Image
-            src={getChampionIconById(detail.championId)}
-            alt={detail.championNameKorean}
-            fill
-            className="object-cover"
-            unoptimized
-          />
+          <Image src={getChampionIconById(detail.championId)} alt={detail.championNameKorean} fill className="object-cover" unoptimized />
         </div>
         <div>
           <h1 className="text-2xl font-bold text-text-primary">{detail.championNameKorean}</h1>
@@ -223,21 +97,12 @@ export default function ChampionDetailPage() {
       {/* 추이 + 포지션 분포 */}
       <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
         <Card className="border-white/10 bg-bg-secondary/80">
-          <CardHeader>
-            <CardTitle className="text-base">기간별 승률 추이</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <TrendChart detail={detail} />
-          </CardContent>
+          <CardHeader><CardTitle className="text-base">기간별 승률 추이</CardTitle></CardHeader>
+          <CardContent><TrendChart detail={detail} /></CardContent>
         </Card>
-
         <Card className="border-white/10 bg-bg-secondary/80">
-          <CardHeader>
-            <CardTitle className="text-base">포지션 분포</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <PositionPie detail={detail} />
-          </CardContent>
+          <CardHeader><CardTitle className="text-base">포지션 분포</CardTitle></CardHeader>
+          <CardContent><PositionPie detail={detail} /></CardContent>
         </Card>
       </div>
 
@@ -288,10 +153,7 @@ export default function ChampionDetailPage() {
                 >
                   <div className="flex items-center gap-2">
                     {[combo.keystonePerk, combo.primaryStyle, combo.subStyle].map((runeId) => (
-                      <span
-                        key={runeId}
-                        className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-bg-primary/70 text-xs text-text-tertiary"
-                      >
+                      <span key={runeId} className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-bg-primary/70 text-xs text-text-tertiary">
                         {runeId}
                       </span>
                     ))}
@@ -305,7 +167,7 @@ export default function ChampionDetailPage() {
         </Card>
       </div>
 
-      {/* ── 장인 명단 (Task 2-4) ── */}
+      {/* 장인 명단 */}
       <Card className="border-white/10 bg-bg-secondary/80">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -320,9 +182,7 @@ export default function ChampionDetailPage() {
         </CardHeader>
         <CardContent>
           {masteryLoading ? (
-            <div className="flex min-h-[120px] items-center justify-center">
-              <LoadingSpinner />
-            </div>
+            <div className="flex min-h-[120px] items-center justify-center"><LoadingSpinner /></div>
           ) : !mastery || mastery.insufficient || mastery.masteries.length === 0 ? (
             <p className="text-sm text-text-secondary">
               장인 자격을 통과한 유저가 없습니다.
@@ -358,9 +218,7 @@ export default function ChampionDetailPage() {
                     <p className="text-xs text-text-tertiary">
                       {entry.champGames}게임 · 승률 {(entry.champWinRate * 100).toFixed(1)}% · KDA {entry.avgKda.toFixed(2)}
                     </p>
-                    <p className="text-xs text-text-tertiary">
-                      {entry.riotTier} {entry.riotRank}
-                    </p>
+                    <p className="text-xs text-text-tertiary">{entry.riotTier} {entry.riotRank}</p>
                   </div>
                   <div className="text-right">
                     <div className="flex items-center gap-1 text-accent-gold">
