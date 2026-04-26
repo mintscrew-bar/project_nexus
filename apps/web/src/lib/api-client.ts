@@ -943,10 +943,21 @@ export const reputationApi = {
     return response.data;
   },
 
-  getUserRatings: async (userId: string, limit = 10, offset = 0) => {
-    const response = await apiClient.get(`/reputation/user/${userId}/ratings`, {
-      params: { limit, offset },
+  getUserRatings: async (userId: string, limit = 10) => {
+    const response = await apiClient.get(`/reputation/users/${userId}/ratings`, {
+      params: { limit },
     });
+    return response.data;
+  },
+
+  getUserStats: async (userId: string): Promise<{
+    totalRatings: number;
+    averageSkill: number;
+    averageAttitude: number;
+    averageCommunication: number;
+    overallAverage: number;
+  }> => {
+    const response = await apiClient.get(`/reputation/users/${userId}/stats`);
     return response.data;
   },
 
