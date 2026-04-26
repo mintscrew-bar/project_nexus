@@ -20,6 +20,7 @@ import Image from "next/image";
 import { friendApi, adminApi, roomApi } from "@/lib/api-client";
 import { PlayerHoverCard } from "./_components/PlayerHoverCard";
 import { CompactParticipantCard } from "./_components/CompactParticipantCard";
+import { PlayerProfileModal } from "./_components/PlayerProfileModal";
 
 /* ─── Main Page ─── */
 export default function TournamentLobbyPage() {
@@ -38,6 +39,7 @@ export default function TournamentLobbyPage() {
   const [isKicking, setIsKicking] = useState(false);
   const [isAddingBot, setIsAddingBot] = useState(false);
   const [hoveredPlayer, setHoveredPlayer] = useState<{ id: string; rect: DOMRect; participant: any } | null>(null);
+  const [profileUserId, setProfileUserId] = useState<string | null>(null);
   const [addingFriend, setAddingFriend] = useState<string | null>(null);
   const [sentFriendIds, setSentFriendIds] = useState<Set<string>>(new Set());
   const [mobileTab, setMobileTab] = useState<string>("participants");
@@ -313,7 +315,8 @@ export default function TournamentLobbyPage() {
         <PlayerHoverCard
           participant={hoveredPlayer.participant}
           anchorRect={hoveredPlayer.rect}
-          onOpenProfile={() => {
+          onOpenProfile={(userId) => {
+            setProfileUserId(userId);
             setHoveredPlayer(null);
           }}
           onMouseEnter={cancelHoverClose}
@@ -581,6 +584,7 @@ export default function TournamentLobbyPage() {
         isLoading={isKicking}
       />
       <UserSettingsModal isOpen={isUserSettingsModalOpen} onClose={() => setIsUserSettingsModalOpen(false)} />
+      <PlayerProfileModal userId={profileUserId} onClose={() => setProfileUserId(null)} />
     </>
   );
 }
