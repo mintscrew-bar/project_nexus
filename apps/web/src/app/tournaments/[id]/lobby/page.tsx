@@ -42,6 +42,18 @@ export default function TournamentLobbyPage() {
   const [sentFriendIds, setSentFriendIds] = useState<Set<string>>(new Set());
   const [mobileTab, setMobileTab] = useState<string>("participants");
   const hasRedirected = useRef(false);
+  const hoverCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const scheduleHoverClose = useCallback(() => {
+    if (hoverCloseTimer.current) clearTimeout(hoverCloseTimer.current);
+    hoverCloseTimer.current = setTimeout(() => setHoveredPlayer(null), 80);
+  }, []);
+
+  const cancelHoverClose = useCallback(() => {
+    if (!hoverCloseTimer.current) return;
+    clearTimeout(hoverCloseTimer.current);
+    hoverCloseTimer.current = null;
+  }, []);
 
   useEffect(() => { if (currentUser?.id) fetchFriends(); }, [currentUser?.id, fetchFriends]);
 
@@ -241,6 +253,8 @@ export default function TournamentLobbyPage() {
               isFriend={friendUserIds.has(p.userId)} isSent={sentFriendIds.has(p.userId)}
               addingFriend={addingFriend}
               setHoveredPlayer={setHoveredPlayer}
+              scheduleHoverClose={scheduleHoverClose}
+              cancelHoverClose={cancelHoverClose}
               handleAddFriend={handleAddFriend}
               setKickTarget={setKickTarget}
               cardRef={null}
@@ -296,7 +310,15 @@ export default function TournamentLobbyPage() {
     <>
       {/* 참가자 호버 툴팁 — overflow-hidden 탈출을 위해 페이지 최상위에서 렌더링 */}
       {hoveredPlayer && (
-        <PlayerHoverCard participant={hoveredPlayer.participant} anchorRect={hoveredPlayer.rect} />
+        <PlayerHoverCard
+          participant={hoveredPlayer.participant}
+          anchorRect={hoveredPlayer.rect}
+          onOpenProfile={() => {
+            setHoveredPlayer(null);
+          }}
+          onMouseEnter={cancelHoverClose}
+          onMouseLeave={scheduleHoverClose}
+        />
       )}
       <div className="flex flex-col flex-grow min-h-0">
         {/* ═══ Room Header ═══ */}

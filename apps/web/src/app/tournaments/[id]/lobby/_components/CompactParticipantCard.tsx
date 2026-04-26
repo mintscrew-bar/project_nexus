@@ -9,13 +9,14 @@ import { PositionIcon } from "./icons";
 /* ─── Compact Participant Card (for large rooms) ─── */
 export function CompactParticipantCard({
   p, isCurrentUserHost, isSelf, isFriend, isSent, addingFriend,
-  setHoveredPlayer, handleAddFriend, setKickTarget, cardRef: _,
+  setHoveredPlayer, scheduleHoverClose, cancelHoverClose, handleAddFriend, setKickTarget, cardRef: _,
 }: any) {
   const riot = p.riotAccount;
   const mainRole = riot?.mainRole || null;
   const compactRef = useRef<HTMLDivElement>(null);
 
   const handleMouseEnter = () => {
+    cancelHoverClose?.();
     if (compactRef.current) {
       setHoveredPlayer({ id: p.id, rect: compactRef.current.getBoundingClientRect(), participant: p });
     }
@@ -26,7 +27,7 @@ export function CompactParticipantCard({
       ref={compactRef}
       className="relative flex items-center gap-2 bg-bg-tertiary px-2.5 py-2 rounded-lg hover:bg-bg-elevated transition-colors group"
       onMouseEnter={handleMouseEnter}
-      onMouseLeave={() => setHoveredPlayer(null)}
+      onMouseLeave={scheduleHoverClose ?? (() => setHoveredPlayer(null))}
     >
       {/* Avatar */}
       <div className="relative w-7 h-7 rounded-full bg-bg-elevated overflow-hidden flex-shrink-0">

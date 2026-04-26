@@ -9,7 +9,7 @@ import { ChampionIcon, PositionIcon } from "./icons";
 /* ─── Participant Card ─── */
 export function ParticipantCard({
   p, isCurrentUserHost, isSelf, isFriend, isSent, addingFriend,
-  setHoveredPlayer, handleAddFriend, setKickTarget,
+  setHoveredPlayer, scheduleHoverClose, cancelHoverClose, handleAddFriend, setKickTarget,
 }: any) {
   const riot = p.riotAccount;
   const mainRole = riot?.mainRole || null;
@@ -21,6 +21,7 @@ export function ParticipantCard({
   const cardRef = useRef<HTMLDivElement>(null);
 
   const handleMouseEnter = () => {
+    cancelHoverClose?.();
     if (cardRef.current) {
       setHoveredPlayer({ id: p.id, rect: cardRef.current.getBoundingClientRect(), participant: p });
     }
@@ -31,7 +32,7 @@ export function ParticipantCard({
       ref={cardRef}
       className="relative flex items-center justify-between bg-bg-tertiary p-3 rounded-lg hover:bg-bg-elevated transition-colors group animate-slide-in-right"
       onMouseEnter={handleMouseEnter}
-      onMouseLeave={() => setHoveredPlayer(null)}
+      onMouseLeave={scheduleHoverClose ?? (() => setHoveredPlayer(null))}
     >
       <div className="flex items-center gap-3 flex-1 min-w-0">
         <div className="relative w-10 h-10 rounded-full bg-bg-elevated overflow-hidden flex-shrink-0">
