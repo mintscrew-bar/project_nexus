@@ -3,12 +3,12 @@
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/auth-store";
 import { useLabStore, type LabPeriod } from "@/stores/lab-store";
 import { adminApi } from "@/lib/api-client";
 import { Badge, LoadingSpinner } from "@/components/ui";
-import { ArrowRight, FlaskConical, Info, ShieldAlert } from "lucide-react";
+import { ArrowRight, FlaskConical, Info, RefreshCw, ShieldAlert } from "lucide-react";
 
 // 기간 필터 옵션
 const LAB_PERIODS: Array<{ key: LabPeriod; label: string }> = [
@@ -41,6 +41,18 @@ const LAB_TABS = [
   { href: "/lab/oracle", label: "오라클" },
 ];
 
+/** 타임스탬프 → "N분 전 / N시간 전 / N일 전" 표기 */
+function relativeTime(isoStr: string | null | undefined): string {
+  if (!isoStr) return "없음";
+  const diff = Date.now() - new Date(isoStr).getTime();
+  const min = Math.floor(diff / 60_000);
+  if (min < 1) return "방금 전";
+  if (min < 60) return `${min}분 전`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}시간 전`;
+  return `${Math.floor(hr / 24)}일 전`;
+}
+
 export default function LabLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -58,6 +70,8 @@ export default function LabLayout({ children }: { children: React.ReactNode }) {
     }
   }, [searchParams, activePeriod, setPeriod]);
 
+  const queryClient = useQueryClient();
+
   const { data: labDataPhase } = useQuery({
     queryKey: ["lab", "data-phase"] as const,
     queryFn: () => adminApi.getLabDataPhase(),
@@ -66,6 +80,15 @@ export default function LabLayout({ children }: { children: React.ReactNode }) {
   });
 
   const currentPhase = labDataPhase?.phase ?? 0;
+
+  // 수동 스냅샷 재계산
+  const { mutate: triggerRecompute, isPending: isRecomputing } = useMutation({
+    mutationFn: () => adminApi.recomputeLabSnapshots(),
+    onSuccess: () => {
+      // 모든 lab 관련 쿼리 무효화해 새 데이터 로드
+      void queryClient.invalidateQueries({ queryKey: ["lab"] });
+    },
+  });
 
   function isTabUnlocked(href: string) {
     return currentPhase >= (LAB_TAB_MIN_PHASE[href] ?? 0);
@@ -127,7 +150,7 @@ export default function LabLayout({ children }: { children: React.ReactNode }) {
 
           {/* 단계 + 탭 + 기간 */}
           <div className="rounded-2xl border border-white/10 bg-bg-secondary/60 p-3 space-y-3">
-            {/* 데이터 단계 정보 */}
+            {/* 데이터 단계 정보 + 신선도 + 재계산 버튼 */}
             <div className="flex flex-wrap items-center gap-2 text-xs">
               <div className="group relative inline-flex">
                 <Badge variant="secondary" size="sm">
@@ -160,6 +183,20 @@ export default function LabLayout({ children }: { children: React.ReactNode }) {
                   · 다음 단계까지 {labDataPhase.remainingUntilNextPhase}경기
                 </span>
               ) : null}
+              {/* 스냅샷 신선도 */}
+              <span className="text-text-tertiary">
+                · 스냅샷 {relativeTime(labDataPhase?.snapshotLastComputedAt)}
+              </span>
+              {/* 수동 재계산 버튼 */}
+              <button
+                type="button"
+                onClick={() => triggerRecompute()}
+                disabled={isRecomputing}
+                className="ml-auto flex items-center gap-1 rounded-lg bg-bg-primary/60 px-2 py-1 text-xs text-text-secondary transition-colors hover:bg-bg-elevated disabled:cursor-wait disabled:opacity-60"
+              >
+                <RefreshCw className={`h-3 w-3 ${isRecomputing ? "animate-spin" : ""}`} />
+                {isRecomputing ? "재계산 중..." : "지금 새로고침"}
+              </button>
             </div>
 
             {/* 탭 네비게이션 */}

@@ -1437,6 +1437,10 @@ export const adminApi = {
       snapshotLastComputedAt: string | null;
     };
   },
+  recomputeLabSnapshots: async () => {
+    const response = await apiClient.post("/admin/lab/recompute-snapshots");
+    return response.data as { champion: number; synergy: number; counter: number };
+  },
   triggerMatchFetch: async (queueGroup?: "ranked" | "normal" | "aram" | "custom") => {
     const response = await apiClient.post("/admin/matches/trigger-fetch", undefined, {
       params: queueGroup ? { queueGroup } : undefined,
