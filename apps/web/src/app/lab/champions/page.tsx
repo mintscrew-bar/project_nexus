@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/stores/auth-store";
 import { useLabStore } from "@/stores/lab-store";
@@ -10,6 +11,7 @@ import {
   Card, CardContent, CardDescription, CardHeader, CardTitle, LoadingSpinner,
 } from "@/components/ui";
 import { LabSourceBadge } from "@/components/lab/shared/LabSourceBadge";
+import { GitCompareArrows } from "lucide-react";
 import { ChampionFilters } from "@/components/lab/champions/ChampionFilters";
 import { ChampionListTable } from "@/components/lab/champions/ChampionListTable";
 
@@ -128,6 +130,13 @@ export default function LabChampionsPage() {
           {championList?.source === "realtime" && (
             <span className="text-xs text-text-tertiary">스냅샷 미스 시 원본 집계</span>
           )}
+          <Link
+            href={`/lab/champions/compare?period=${activePeriod}`}
+            className="ml-auto flex items-center gap-1.5 rounded-lg bg-bg-primary/60 px-2.5 py-1.5 text-xs text-text-secondary transition-colors hover:bg-bg-elevated hover:text-text-primary"
+          >
+            <GitCompareArrows className="h-3.5 w-3.5" />
+            챔피언 비교
+          </Link>
         </div>
       </CardHeader>
       <CardContent>
