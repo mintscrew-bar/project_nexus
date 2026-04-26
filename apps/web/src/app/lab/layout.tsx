@@ -8,7 +8,7 @@ import { useAuthStore } from "@/stores/auth-store";
 import { useLabStore, type LabPeriod } from "@/stores/lab-store";
 import { adminApi } from "@/lib/api-client";
 import { Badge, LoadingSpinner } from "@/components/ui";
-import { ArrowRight, FlaskConical, ShieldAlert } from "lucide-react";
+import { ArrowRight, FlaskConical, Info, ShieldAlert } from "lucide-react";
 
 // 기간 필터 옵션
 const LAB_PERIODS: Array<{ key: LabPeriod; label: string }> = [
@@ -129,11 +129,33 @@ export default function LabLayout({ children }: { children: React.ReactNode }) {
           <div className="rounded-2xl border border-white/10 bg-bg-secondary/60 p-3 space-y-3">
             {/* 데이터 단계 정보 */}
             <div className="flex flex-wrap items-center gap-2 text-xs">
-              <Badge variant="secondary" size="sm">
-                데이터 단계 {currentPhase}
-              </Badge>
+              <div className="group relative inline-flex">
+                <Badge variant="secondary" size="sm">
+                  데이터 단계 {currentPhase}
+                </Badge>
+                {/* 단계 설명 툴팁 */}
+                <div className="pointer-events-none absolute bottom-full left-0 z-50 mb-2 hidden w-56 rounded-xl border border-white/10 bg-bg-elevated p-3 text-xs shadow-lg group-hover:block">
+                  <p className="mb-1.5 font-semibold text-text-primary">데이터 단계 안내</p>
+                  {[
+                    { phase: 0, label: "0단계", desc: "표본 부족 (집계 전)" },
+                    { phase: 1, label: "1단계", desc: "10경기 이상 — 기본 집계" },
+                    { phase: 2, label: "2단계", desc: "30경기 이상 — 조합·오라클 해금" },
+                    { phase: 3, label: "3단계", desc: "100경기 이상 — 신뢰도 분석" },
+                    { phase: 4, label: "4단계", desc: "300경기 이상 — 풀 기능" },
+                  ].map((row) => (
+                    <div
+                      key={row.phase}
+                      className={`flex items-start gap-1.5 py-0.5 ${row.phase === currentPhase ? "text-accent-primary" : "text-text-tertiary"}`}
+                    >
+                      <span className="shrink-0 font-medium">{row.label}:</span>
+                      <span>{row.desc}</span>
+                    </div>
+                  ))}
+                </div>
+                <Info className="ml-1 h-3 w-3 text-text-tertiary group-hover:text-text-secondary" />
+              </div>
               <span className="text-text-tertiary">총 {labDataPhase?.totalMatches ?? 0}경기</span>
-              {typeof labDataPhase?.remainingUntilNextPhase === "number" ? (
+              {typeof labDataPhase?.remainingUntilNextPhase === "number" && labDataPhase.remainingUntilNextPhase > 0 ? (
                 <span className="text-text-tertiary">
                   · 다음 단계까지 {labDataPhase.remainingUntilNextPhase}경기
                 </span>
