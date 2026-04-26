@@ -5,8 +5,9 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { labQueryOptions, type SynergyResponse } from "@/lib/lab-queries";
+import type { LabPeriod } from "@/stores/lab-store";
 import { getChampionIconById } from "@/components/matches/match-utils";
-import { formatRate, confidenceLabel } from "@/lib/lab-format";
+import { formatRate } from "@/lib/lab-format";
 import { Badge, Card, CardContent, CardDescription, CardHeader, CardTitle, LoadingSpinner } from "@/components/ui";
 import { LabEmptyState } from "@/components/lab/shared/LabEmptyState";
 import { LabSourceBadge } from "@/components/lab/shared/LabSourceBadge";
@@ -18,7 +19,7 @@ interface ChampionCatalogItem {
 }
 
 interface Props {
-  activePeriod: string;
+  activePeriod: LabPeriod;
   canFetch: boolean;
   /** 챔피언 셀렉트박스용 목록 (가나다 정렬) */
   championCatalog: ChampionCatalogItem[];
@@ -94,7 +95,11 @@ export function SynergyCard({ activePeriod, canFetch, championCatalog }: Props) 
               return (
                 <div
                   key={`${row.champ1Id}-${row.champ2Id}`}
-                  className={`rounded-xl border border-white/10 bg-bg-primary/50 p-3 ${row.confidenceLevel === "low" ? "opacity-80" : ""}`}
+                  className={`rounded-xl bg-bg-primary/50 p-3 ${
+                    row.confidenceLevel === "low"
+                      ? "border border-dashed border-white/10 opacity-70"
+                      : "border border-white/10"
+                  }`}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
@@ -110,9 +115,6 @@ export function SynergyCard({ activePeriod, canFetch, championCatalog }: Props) 
                         </div>
                       </Link>
                     </div>
-                    <Badge variant={row.confidenceLevel === "high" ? "success" : "warning"} size="sm">
-                      {confidenceLabel(row.confidenceLevel)}
-                    </Badge>
                   </div>
                   <p className="mt-2 text-sm font-semibold text-text-primary">
                     {isFiltered ? `파트너: ${partnerName}` : `${row.champ1NameKorean} + ${row.champ2NameKorean}`}

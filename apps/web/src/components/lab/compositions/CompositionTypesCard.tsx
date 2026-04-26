@@ -4,9 +4,9 @@ import Image from "next/image";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { labQueryOptions, type CompositionsResponse } from "@/lib/lab-queries";
+import type { LabPeriod } from "@/stores/lab-store";
 import { getChampionIconById } from "@/components/matches/match-utils";
-import { confidenceLabel } from "@/lib/lab-format";
-import { Badge, Card, CardContent, CardDescription, CardHeader, CardTitle, LoadingSpinner } from "@/components/ui";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, LoadingSpinner } from "@/components/ui";
 import { LabEmptyState } from "@/components/lab/shared/LabEmptyState";
 import { LabSourceBadge } from "@/components/lab/shared/LabSourceBadge";
 
@@ -20,7 +20,7 @@ const COMPOSITION_EXAMPLE_CHAMPIONS: Record<string, number[]> = {
 };
 
 interface Props {
-  activePeriod: string;
+  activePeriod: LabPeriod;
   canFetch: boolean;
 }
 
@@ -52,7 +52,11 @@ export function CompositionTypesCard({ activePeriod, canFetch }: Props) {
             {rows.map((row) => (
               <div
                 key={`comp-${row.type}`}
-                className={`rounded-xl border border-white/10 bg-bg-primary/50 p-3 ${row.confidenceLevel === "low" ? "opacity-80" : ""}`}
+                className={`rounded-xl bg-bg-primary/50 p-3 ${
+                  row.confidenceLevel === "low"
+                    ? "border border-dashed border-white/10 opacity-70"
+                    : "border border-white/10"
+                }`}
               >
                 <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-3">
@@ -73,9 +77,6 @@ export function CompositionTypesCard({ activePeriod, canFetch }: Props) {
                       ))}
                     </div>
                   </div>
-                  <Badge variant={row.confidenceLevel === "high" ? "success" : "warning"} size="sm">
-                    {confidenceLabel(row.confidenceLevel)}
-                  </Badge>
                 </div>
                 {/* 승률 바 */}
                 <div className="h-2 w-full overflow-hidden rounded-full bg-bg-tertiary">

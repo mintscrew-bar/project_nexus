@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { labQueryOptions, type CounterResponse } from "@/lib/lab-queries";
+import type { LabPeriod } from "@/stores/lab-store";
 import { getChampionIconById } from "@/components/matches/match-utils";
 import { formatRate } from "@/lib/lab-format";
 import { Badge, Card, CardContent, CardDescription, CardHeader, CardTitle, LoadingSpinner } from "@/components/ui";
@@ -20,7 +21,7 @@ interface ChampionCatalogItem {
 }
 
 interface Props {
-  activePeriod: string;
+  activePeriod: LabPeriod;
   canFetch: boolean;
   /** 챔피언 셀렉트박스용 목록 (가나다 정렬) */
   championCatalog: ChampionCatalogItem[];
