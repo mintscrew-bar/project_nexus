@@ -1398,12 +1398,12 @@ export class StatsService {
         SELECT
           "position",
           COUNT(*)::bigint AS games,
-          ROUND(AVG(CASE WHEN "win" THEN 1.0 ELSE 0.0 END) * 100, 1)::float AS "winRate",
-          ROUND(AVG("kills"), 1)::float AS "avgKills",
-          ROUND(AVG("deaths"), 1)::float AS "avgDeaths",
-          ROUND(AVG("assists"), 1)::float AS "avgAssists",
-          ROUND(AVG("totalDamageDealtToChampions"), 0)::float AS "avgDamage",
-          ROUND(AVG("goldEarned"), 0)::float AS "avgGold"
+          ROUND((AVG(CASE WHEN "win" THEN 1.0 ELSE 0.0 END) * 100)::numeric, 1)::float AS "winRate",
+          ROUND(AVG("kills")::numeric, 1)::float AS "avgKills",
+          ROUND(AVG("deaths")::numeric, 1)::float AS "avgDeaths",
+          ROUND(AVG("assists")::numeric, 1)::float AS "avgAssists",
+          ROUND(AVG("totalDamageDealtToChampions")::numeric, 0)::float AS "avgDamage",
+          ROUND(AVG("goldEarned")::numeric, 0)::float AS "avgGold"
         FROM "match_participants"
         WHERE "position" IS NOT NULL
           AND "position" <> ''
@@ -1426,10 +1426,10 @@ export class StatsService {
           "championId",
           "championName",
           COUNT(*)::bigint AS games,
-          ROUND(AVG(CASE WHEN "win" THEN 1.0 ELSE 0.0 END) * 100, 1)::float AS "winRate",
-          ROUND(AVG("kills"), 1)::float AS "avgKills",
-          ROUND(AVG("deaths"), 1)::float AS "avgDeaths",
-          ROUND(AVG("assists"), 1)::float AS "avgAssists"
+          ROUND((AVG(CASE WHEN "win" THEN 1.0 ELSE 0.0 END) * 100)::numeric, 1)::float AS "winRate",
+          ROUND(AVG("kills")::numeric, 1)::float AS "avgKills",
+          ROUND(AVG("deaths")::numeric, 1)::float AS "avgDeaths",
+          ROUND(AVG("assists")::numeric, 1)::float AS "avgAssists"
         FROM "match_participants"
         GROUP BY "championId", "championName"
         HAVING COUNT(*) >= 3
@@ -2153,9 +2153,12 @@ export class StatsService {
    * - 매치 상세는 5개씩 배치 순차 처리 (rate limit 보호)
    */
   async getRankedChampionStats(gameName: string, tagLine: string) {
-    const response = await this.getChampionStatsCacheByRiotId(
-      gameName,
-      tagLine,
+    const found = await this.findUserByRiotAccount(gameName, tagLine);
+    if (!found) {
+      return [];
+    }
+    const response = await this.getChampionStatsCacheByUserId(
+      found.userId,
       "ranked",
     );
     return response.stats;
