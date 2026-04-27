@@ -13,6 +13,46 @@ import { RedisService } from "../redis/redis.service";
 import { Role } from "@nexus/database";
 import axios from "axios";
 
+// 승인된 API key 메서드별 레이트 리밋 (limit / windowSeconds)
+const RIOT_RATE_LIMITS: Record<string, { limit: number; windowSeconds: number }> = {
+  // champion-rotation, challenger/grandmaster/master/leagues-list: 30 req/10s
+  TIER_LIST:     { limit: 30,    windowSeconds: 10 },
+  // league entries by queue/tier/division, league-exp entries:    50 req/10s
+  LEAGUE_ENTRIES:{ limit: 50,    windowSeconds: 10 },
+  // account-v1 by riot-id / by puuid:                          1000 req/min
+  ACCOUNT:       { limit: 1000,  windowSeconds: 60 },
+  // summoner-v4:                                               1600 req/min
+  SUMMONER:      { limit: 1600,  windowSeconds: 60 },
+  // match-v5:                                                  2000 req/10s
+  MATCH:         { limit: 2000,  windowSeconds: 10 },
+  // spectator-v5:                                             3000 req/10s
+  SPECTATOR:     { limit: 3000,  windowSeconds: 10 },
+  // champion-mastery-v4, lol-challenges-v1, clash-v1,
+  // league entries/by-puuid, lol-status-v4:                 20000 req/10s
+  HIGH:          { limit: 20000, windowSeconds: 10 },
+};
+
+// URL 패턴 → 레이트 리밋 그룹 매핑
+function resolveRateLimitGroup(url: string): keyof typeof RIOT_RATE_LIMITS {
+  if (
+    url.includes("/lol/platform/v3/champion-rotations") ||
+    url.includes("/lol/league/v4/challengerleagues/") ||
+    url.includes("/lol/league/v4/grandmasterleagues/") ||
+    url.includes("/lol/league/v4/masterleagues/") ||
+    url.includes("/lol/league/v4/leagues/")
+  ) return "TIER_LIST";
+
+  // /entries/{queue}/{tier}/{division} — 대문자로 시작하는 큐명으로 구분
+  if (/\/lol\/league(?:-exp)?\/v4\/entries\/[A-Z]/.test(url)) return "LEAGUE_ENTRIES";
+
+  if (url.includes("/riot/account/v1/")) return "ACCOUNT";
+  if (url.includes("/lol/summoner/v4/")) return "SUMMONER";
+  if (url.includes("/lol/match/v5/"))    return "MATCH";
+  if (url.includes("/lol/spectator/v5/")) return "SPECTATOR";
+
+  return "HIGH";
+}
+
 // 티어별 포인트 (팀 밸런싱, 경매 선수 가치 산정에 사용)
 export const TIER_POINTS: Record<string, number> = {
   CHALLENGER: 2800,
@@ -159,11 +199,16 @@ export class RiotService {
   }
 
   private async request<T>(url: string): Promise<T> {
-    // Rate limiting check (20 requests per second)
-    const rateLimit = await this.redis.checkRateLimit("riot:api", 20, 1);
+    const group = resolveRateLimitGroup(url);
+    const { limit, windowSeconds } = RIOT_RATE_LIMITS[group];
+    const rateLimit = await this.redis.checkRateLimit(
+      `riot:rl:${group.toLowerCase()}`,
+      limit,
+      windowSeconds,
+    );
     if (!rateLimit.allowed) {
       throw new HttpException(
-        `Rate limited. Try again in ${rateLimit.resetIn}s`,
+        `Rate limited (${group}). Try again in ${rateLimit.resetIn}s`,
         HttpStatus.TOO_MANY_REQUESTS,
       );
     }

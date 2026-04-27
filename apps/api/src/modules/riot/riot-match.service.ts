@@ -338,6 +338,12 @@ export class RiotMatchService {
 
       this.logger.log(`Fetching match data: ${matchId}`);
 
+      // match-v5: 2000 req/10s 사전 체크 — 429 이전에 로컬에서 제어
+      const rl = await this.redis.checkRateLimit("riot:rl:match", 2000, 10);
+      if (!rl.allowed) {
+        await new Promise((r) => setTimeout(r, rl.resetIn * 1000 + 200));
+      }
+
       const response = await axios.get<MatchDto>(url, {
         headers: {
           "X-Riot-Token": this.apiKey,
@@ -622,6 +628,12 @@ export class RiotMatchService {
       const url = `${this.baseUrl}/lol/match/v5/matches/by-puuid/${puuid}/ids?${params}`;
 
       this.logger.log(`Fetching match IDs for PUUID: ${puuid}`);
+
+      // match-v5: 2000 req/10s 사전 체크
+      const rl = await this.redis.checkRateLimit("riot:rl:match", 2000, 10);
+      if (!rl.allowed) {
+        await new Promise((r) => setTimeout(r, rl.resetIn * 1000 + 200));
+      }
 
       const response = await axios.get<string[]>(url, {
         headers: {
