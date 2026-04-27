@@ -133,7 +133,7 @@ export class RiotSpectatorService {
           };
         }
 
-        // Add small delay to avoid rate limiting
+        // spectator-v5: 3,000 req/10s = 300 req/s — 100ms 간격은 안전 마진
         await new Promise((resolve) => setTimeout(resolve, 100));
       } catch (error) {
         this.logger.error(`Error checking PUUID ${puuid}:`, error);

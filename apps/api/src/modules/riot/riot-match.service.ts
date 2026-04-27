@@ -721,21 +721,13 @@ export class RiotMatchService {
       return [];
     }
 
-    // Fetch detailed data for each match sequentially with delay to respect rate limits
-    // Dev key: 20 req/s, 100 req/2min — cached matches skip the API call entirely
+    // match-v5: 2,000 req/10s — getMatchById 내부 Redis checkRateLimit이 스로틀 담당
     const matches: MatchDto[] = [];
 
     for (const matchId of matchIds) {
-      const isCached =
-        this.matchCache.has(matchId) &&
-        this.matchCache.get(matchId)!.expires > Date.now();
       const match = await this.getMatchById(matchId);
       if (match !== null) {
         matches.push(match);
-      }
-      // Skip delay if data came from cache
-      if (!isCached) {
-        await new Promise((resolve) => setTimeout(resolve, 250));
       }
     }
 

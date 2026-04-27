@@ -115,7 +115,7 @@ export class LabTasksService {
     let synced = 0;
     let failed = 0;
 
-    // 50명씩 청크로 나눠 처리 (분당 50건 안전 마진)
+    // 50명씩 청크로 나눠 처리 — HIGH 그룹 20,000 req/10s 기준 동시 50건은 여유로움
     const chunkSize = 50;
     for (let i = 0; i < allAccounts.length; i += chunkSize) {
       const chunk = allAccounts.slice(i, i + chunkSize);
@@ -158,9 +158,9 @@ export class LabTasksService {
         }
       }
 
-      // 청크 사이 1분 대기 (rate limit 안전 마진)
+      // 청크 사이 2초 대기 — Redis rate check가 없으므로 최소 간격 유지
       if (i + chunkSize < allAccounts.length) {
-        await new Promise((r) => setTimeout(r, 60_000));
+        await new Promise((r) => setTimeout(r, 2_000));
       }
     }
 

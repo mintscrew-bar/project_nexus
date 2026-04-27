@@ -721,7 +721,8 @@ export class TasksService {
           if (!apiKey) break;
 
           const res = await fetch(
-            `https://kr.api.riotgames.com/lol/league/v4/entries/by-puuid/${account.puuid}?api_key=${apiKey}`,
+            `https://kr.api.riotgames.com/lol/league/v4/entries/by-puuid/${account.puuid}`,
+            { headers: { "X-Riot-Token": apiKey } },
           );
 
           if (!res.ok) {
@@ -748,8 +749,8 @@ export class TasksService {
 
           synced++;
 
-          // Riot API rate limit: 20 req/s, 100 req/2min
-          await new Promise((r) => setTimeout(r, 1500));
+          // entries/by-puuid → HIGH 그룹: 20,000 req/10s — 딜레이 불필요
+          await new Promise((r) => setTimeout(r, 50));
         } catch {
           this.logger.warn(
             `Failed to sync account ${account.gameName}#${account.tagLine}`,
