@@ -230,8 +230,8 @@ export class RiotService {
         throw new NotFoundException("Summoner not found");
       }
       if (error.response?.status === 403) {
-        throw new BadRequestException(
-          "Forbidden - API key may be invalid or lack permissions",
+        throw new ForbiddenException(
+          "Riot API key is invalid or expired",
         );
       }
       if (error.response?.status === 429) {
