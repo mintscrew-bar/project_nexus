@@ -18,7 +18,6 @@
 - Riot API key를 베타 서버 `.env`에 설정한다.
 - Discord Developer Portal OAuth redirect URL을 베타 도메인으로 등록한다.
 - Discord bot을 테스트 서버에 초대하고 권한을 확인한다.
-- Google OAuth를 사용한다면 Google Console redirect URL도 베타 도메인으로 등록한다.
 
 ### 법/정책/운영
 
@@ -84,7 +83,7 @@ DISCORD_GUILD_ID=<discord guild id>
 
 ### 신규 사용자
 
-1. Discord 또는 Google로 로그인
+1. Discord로 로그인
 2. 약관 동의 페이지 표시 확인
 3. 필수 약관 미동의 시 진행 불가 확인
 4. 약관 동의 후 대시보드 또는 홈으로 이동 확인

@@ -12,7 +12,7 @@
   - 의존성 설치
   - 환경 변수 설정
   - 데이터베이스 설정
-  - Discord/Google/Riot API 설정
+  - Discord/Riot API 설정
 
 - **[API_REFERENCE.md](./API_REFERENCE.md)** - 전체 API 엔드포인트 (100+ endpoints)
   - REST API 명세
@@ -27,7 +27,7 @@
   ### 🏗️ 아키텍처 요약
   - **Backend**: NestJS + Prisma + PostgreSQL + Socket.io
   - **Frontend**: Next.js 14 + React + TailwindCSS + Zustand
-  - **Auth**: JWT + OAuth2 (Google, Discord), Riot API 연동
+  - **Auth**: JWT + Discord OAuth2, Riot API 연동
   - **실시간**: WebSocket(방, 경매, 매치 등)
 
   ***
@@ -49,11 +49,10 @@
 
 ### 🔧 개발 가이드
 
-- **[SCHEMA_UPDATES_NEEDED.md](./SCHEMA_UPDATES_NEEDED.md)** - 데이터베이스 스키마 변경사항
-  - Prisma 스키마 업데이트 필요 사항
-  - 모델별 변경 내역
-  - 마이그레이션 순서
-    - 인증/세션/관리자용 등 최신 엔드포인트 반영
+- **[DATABASE_SCHEMA_ANALYSIS.md](./DATABASE_SCHEMA_ANALYSIS.md)** - 데이터베이스 최종 분석 문서
+  - Prisma 모델/관계/인덱스
+  - 삭제 정책과 운영 리스크
+  - 마이그레이션 현황과 권장 작업
 
 - **[QUICK_FIX_GUIDE.md](./QUICK_FIX_GUIDE.md)** - 즉시 해결 방법
   - 컴파일 오류 해결
@@ -99,12 +98,12 @@ cd ../../apps/web && npm run dev    # 터미널 2
 
 - **Backend**: NestJS + Prisma + PostgreSQL + Socket.io
 - **Frontend**: Next.js 14 + React + TailwindCSS + Zustand
-- **Auth**: JWT + OAuth2 (Google, Discord)
+- **Auth**: JWT + Discord OAuth2
 - **External APIs**: Riot Games API, Discord Bot
 
 ### 주요 기능 (11개 모듈)
 
-1. ✅ **인증 시스템** - Google, Discord, Email/Password
+1. ✅ **인증 시스템** - Discord, Email/Password
 2. ✅ **Riot API 통합** - 계정 인증, 티어 동기화
 3. ✅ **Room 시스템** - 방 생성/관리, 실시간 채팅
 4. ✅ **Auction 시스템** - 티어별 골드, 실시간 입찰
@@ -147,7 +146,7 @@ nexus/
 │           ├── hooks/    # React hooks ✅
 │           └── components/ # UI 컴포넌트 🚧
 ├── packages/
-│   └── database/         # Prisma schema ⚠️
+│   └── database/         # Prisma schema
 └── docs/                 # 문서 (이 폴더)
 ```
 
@@ -164,9 +163,9 @@ nexus/
 
 ### ⏳ 진행 중
 
-- **우선순위 1**: Prisma 스키마 업데이트 ([SCHEMA_UPDATES_NEEDED.md](./SCHEMA_UPDATES_NEEDED.md))
-- **우선순위 2**: 프론트엔드 컴포넌트 개발
-- **우선순위 3**: 통합 테스트
+- **우선순위 1**: 프론트엔드 컴포넌트 개발
+- **우선순위 2**: 통합 테스트
+- **우선순위 3**: 배포/운영 문서 정리
 
 ### ❌ 미완료
 
@@ -190,9 +189,9 @@ nexus/
 
 → [QUICK_FIX_GUIDE.md](./QUICK_FIX_GUIDE.md)
 
-### 데이터베이스 변경
+### 데이터베이스 구조
 
-→ [SCHEMA_UPDATES_NEEDED.md](./SCHEMA_UPDATES_NEEDED.md)
+→ [DATABASE_SCHEMA_ANALYSIS.md](./DATABASE_SCHEMA_ANALYSIS.md)
 
 ### Riot API 설정
 
@@ -207,7 +206,7 @@ nexus/
 ## 🤝 개발 워크플로우
 
 1. **[SETUP_GUIDE.md](./SETUP_GUIDE.md)** 따라 개발 환경 설정
-2. **[SCHEMA_UPDATES_NEEDED.md](./SCHEMA_UPDATES_NEEDED.md)** 참고하여 DB 스키마 업데이트
+2. **[DATABASE_SCHEMA_ANALYSIS.md](./DATABASE_SCHEMA_ANALYSIS.md)** 참고하여 DB 구조 확인
 3. **[API_REFERENCE.md](./API_REFERENCE.md)** 보면서 API 통합
 4. **[QUICK_FIX_GUIDE.md](./QUICK_FIX_GUIDE.md)** 참고하여 문제 해결
 

@@ -9,7 +9,7 @@
   - `apps/api/src/main.ts`에서 시크릿 콘솔 출력 전부 제거
   - `.env` 로딩 결과는 `NODE_ENV !== 'production'` 조건으로만 출력
   - 프로덕션 로거를 `["error", "warn"]`으로 제한
-  - `google.strategy.ts`, `discord.strategy.ts`에서 clientID/profile/user console.log 전부 제거
+  - `discord.strategy.ts`에서 clientID/profile/user console.log 전부 제거
   - NestJS Logger 사용으로 전환 (에러만 로깅)
 
 - [x] Phase 1-2: Rate Limiting 실제 적용
@@ -23,8 +23,8 @@
   - 프로덕션에서는 stack trace 숨김, 알 수 없는 예외는 일반 메시지 반환
 
 - [x] Phase 1-4: OAuth 콜백 에러 메시지 일반화
-  - Google/Discord 로그인 콜백: `error=auth_failed` 일반 메시지로 통일
-  - Discord/Google 계정 연동 콜백: `error=link_failed` 일반 메시지로 통일
+  - Discord 로그인 콜백: `error=auth_failed` 일반 메시지로 통일
+  - Discord 계정 연동 콜백: `error=link_failed` 일반 메시지로 통일
   - console.error → NestJS Logger 전환
   - Strategy 파일 내 profile/user JSON 로깅 제거
 
@@ -72,7 +72,7 @@
 
 - JWT + Refresh Token 인증 (httpOnly 쿠키)
 - bcrypt 비밀번호 해싱 (salt rounds 12)
-- OAuth (Google, Discord) 통합
+- Discord OAuth 통합
 - Role 기반 접근 제어 (Guards)
 - Helmet 기본 보안 헤더
 - CORS 설정

@@ -222,7 +222,7 @@
 
 ## 💡 참고 문서
 
-- [SCHEMA_UPDATES_NEEDED.md](./SCHEMA_UPDATES_NEEDED.md) - 스키마 변경사항
+- [DATABASE_SCHEMA_ANALYSIS.md](./DATABASE_SCHEMA_ANALYSIS.md) - DB 최종 분석 문서
 - [QUICK_FIX_GUIDE.md](./QUICK_FIX_GUIDE.md) - 빠른 해결 가이드
 - [API_REFERENCE.md](./API_REFERENCE.md) - API 명세
 - [DESIGN_SYSTEM.md](./DESIGN_SYSTEM.md) - 디자인 시스템
