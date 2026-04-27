@@ -3,6 +3,7 @@
 ## 📋 개요
 
 Project Nexus는 Riot Games API를 사용하여 다음 기능을 제공합니다:
+
 - 소환사 계정 인증
 - 티어/랭크 동기화
 - Tournament Code 생성 (커스텀 게임)
@@ -21,12 +22,20 @@ Project Nexus는 Riot Games API를 사용하여 다음 기능을 제공합니다
 5. `.env` 파일에 추가:
    ```env
    RIOT_API_KEY="RGAPI-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+   RIOT_MATCH_RATE_LIMIT_MAX=70
+   RIOT_MATCH_RATE_LIMIT_WINDOW_SECONDS=120
+   RIOT_MATCH_REQUEST_DELAY_MS=1350
+   RIOT_MATCH_BACKGROUND_RATE_LIMIT_MAX=15
+   RIOT_MATCH_BACKGROUND_REQUEST_DELAY_MS=8000
    ```
 
 **제한사항:**
+
 - 유효기간: 24시간
 - Rate Limit: 20 requests/second, 100 requests/2 minutes
 - 개발 목적으로만 사용 가능
+
+Project Nexus는 전적 검색용 foreground 예산과 자동 매치 캐시 로더용 background 예산을 분리합니다. 개발 키 기준 기본값은 전적 검색 2분당 최대 70회, 자동 로더 2분당 최대 15회이며 자동 로더는 요청 간 최소 8초를 기다립니다. 운영 키를 발급받으면 `RIOT_MATCH_RATE_LIMIT_*`, `RIOT_MATCH_BACKGROUND_*`, `MATCH_FETCH_*_LIMIT` 값을 올려 처리량을 확장할 수 있습니다.
 
 ### Production Key (프로덕션용)
 
@@ -39,6 +48,7 @@ Project Nexus는 Riot Games API를 사용하여 다음 기능을 제공합니다
 4. 승인 후 Production API Key 발급
 
 **혜택:**
+
 - 무제한 유효기간
 - 높은 Rate Limit
 - Tournament API 사용 가능 (별도 신청)
@@ -64,12 +74,14 @@ Tournament Code를 생성하려면 **별도 승인**이 필요합니다.
 커스텀 게임을 공식 매치로 인식하게 하는 고유 코드:
 
 **기능:**
+
 - 게임 설정 강제 (드래프트 모드, 블라인드 픽 등)
 - 매치 결과 자동 수집
 - Spectator 설정
 - 팀 배정 고정
 
 **제한사항:**
+
 - 반드시 사전 생성된 코드 사용
 - 5v5 Summoner's Rift만 지원
 - 대기열 매칭 불가 (초대만 가능)
@@ -91,6 +103,7 @@ Tournament Code를 생성하려면 **별도 승인**이 필요합니다.
 ```
 
 **프로세스:**
+
 1. 유저가 소환사 이름 입력
 2. 백엔드가 Riot API로 계정 조회
 3. 유저가 특정 소환사 아이콘으로 변경
@@ -103,6 +116,7 @@ Tournament Code를 생성하려면 **별도 승인**이 필요합니다.
 **Endpoint:** `POST /api/riot/sync/:accountId`
 
 자동으로 다음 정보 업데이트:
+
 - 솔로랭크 티어
 - 자유랭크 티어
 - 승/패 기록
@@ -115,12 +129,14 @@ Tournament Code를 생성하려면 **별도 승인**이 필요합니다.
 **Endpoint:** `POST /api/matches/:roomId/bracket`
 
 **프로세스:**
+
 1. 방의 모든 참가자 Riot 계정 확인
 2. 팀 배정 (경매 또는 드래프트 결과)
 3. Tournament Code 생성
 4. 각 매치에 코드 할당
 
 **Tournament Provider 설정 (1회만 실행):**
+
 ```typescript
 // apps/api/src/modules/riot/riot.service.ts
 async createTournamentProvider() {
@@ -141,6 +157,7 @@ async createTournamentProvider() {
 ```
 
 **Tournament Code 생성:**
+
 ```typescript
 async createTournamentCode(matchId: string, teamData: any) {
   const code = await this.riotApi.post('/tournament/v4/codes', {
@@ -161,6 +178,7 @@ async createTournamentCode(matchId: string, teamData: any) {
 **Callback Endpoint:** `POST /api/riot/tournament-callback`
 
 Riot이 게임 종료 시 자동으로 호출:
+
 ```json
 {
   "gameId": 5123456789,
@@ -178,12 +196,14 @@ Riot이 게임 종료 시 자동으로 호출:
 ## 📡 API Rate Limits
 
 ### Development Key
+
 ```
 20 requests / 1 second
 100 requests / 2 minutes
 ```
 
 ### Production Key (예시)
+
 ```
 500 requests / 10 seconds
 30,000 requests / 10 minutes
@@ -216,25 +236,32 @@ private async callRiotApi(endpoint: string) {
 ## 🌐 API Endpoints
 
 ### Account-v1
+
 ```
 GET /riot/account/v1/accounts/by-riot-id/{gameName}/{tagLine}
 ```
+
 - 소환사 기본 정보 조회
 
 ### Summoner-v4
+
 ```
 GET /lol/summoner/v4/summoners/by-puuid/{puuid}
 GET /lol/summoner/v4/summoners/{summonerId}
 ```
+
 - 소환사 상세 정보
 
 ### League-v4
+
 ```
 GET /lol/league/v4/entries/by-summoner/{summonerId}
 ```
+
 - 랭크 정보 (솔로랭크, 자유랭크)
 
 ### Tournament-v4 (Production Only)
+
 ```
 POST /lol/tournament/v4/providers
 POST /lol/tournament/v4/tournaments
@@ -243,9 +270,11 @@ GET /lol/match/v5/matches/by-tournament-code/{tournamentCode}/ids
 ```
 
 ### Match-v5
+
 ```
 GET /lol/match/v5/matches/{matchId}
 ```
+
 - 매치 상세 정보 (Tournament Code 사용 시)
 
 ---
@@ -260,6 +289,7 @@ https://ddragon.leagueoflegends.com/cdn/{version}/img/champion/{championName}.pn
 ```
 
 **구현 예시:**
+
 ```typescript
 // apps/api/src/modules/riot/riot.service.ts
 async getChampionData() {
@@ -297,6 +327,7 @@ async getChampionData() {
 ## 🧪 테스트
 
 ### 1. 개발 환경 테스트
+
 ```bash
 # Riot API 연결 테스트
 curl -X GET "https://kr.api.riotgames.com/lol/summoner/v4/summoners/by-name/Hide%20on%20bush" \
@@ -304,6 +335,7 @@ curl -X GET "https://kr.api.riotgames.com/lol/summoner/v4/summoners/by-name/Hide
 ```
 
 ### 2. 계정 인증 테스트
+
 ```bash
 # Postman/Insomnia 사용
 POST http://localhost:4000/api/riot/verify

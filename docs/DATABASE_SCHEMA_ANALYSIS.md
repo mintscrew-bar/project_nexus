@@ -303,19 +303,25 @@ Cascade가 적극적으로 사용된다.
    - `AdminAuditLog.adminId`가 cascade라 관리자 계정 삭제 시 감사 로그도 삭제된다.
    - 운영 감사가 중요하면 계정 삭제 정책과 함께 재검토해야 한다.
 
-6. 스키마 변경 방식이 혼재되어 보인다.
-   - 문서에는 `db push` 선호가 언급되어 있고, 실제 migrations는 3개만 존재한다.
-   - 운영 DB에서는 마이그레이션 이력과 실제 스키마 drift 관리 방식을 명확히 해야 한다.
+6. 개발과 운영의 스키마 반영 방식이 다르다.
+   - 개발 compose는 `migrate deploy`를 먼저 시도하고 실패 시 `db push --accept-data-loss`로 fallback한다.
+   - 운영 DB에서는 fallback 없이 `migrate deploy`가 통과하도록 migration history와 drift를 관리해야 한다.
 
 ## 마이그레이션 현황
 
-현재 `packages/database/prisma/migrations`에는 다음 migration 파일만 있다.
+현재 `packages/database/prisma/migrations`에는 다음 migration 파일이 있다.
 
+- `20260101_initial_schema`
 - `20260214_add_rooms_bracket_format`
 - `20260415_add_clan_officer_permissions`
 - `20260417_add_match_stats_recent_games`
 
-스키마 전체 규모에 비해 migration 수가 적다. 개발 중 `prisma db push`를 주로 사용한 것으로 보이며, 운영 환경에서 재현 가능한 schema migration history가 필요한 경우에는 baseline migration 생성과 drift 점검 절차가 필요하다.
+`20260101_initial_schema`는 빈 DB에서 전체 기본 스키마를 생성하는 baseline migration이다. 이후 3개 migration이 기존 증분 변경 사항을 순서대로 적용한다.
+
+검증 기준:
+
+- 빈 DB에서 `prisma migrate deploy`가 4개 migration을 순서대로 적용해야 한다.
+- 적용 후 `prisma migrate diff --from-url <db> --to-schema-datamodel prisma/schema.prisma --exit-code`가 `No difference detected`를 반환해야 한다.
 
 ## 권장 작업
 
@@ -331,7 +337,7 @@ Cascade가 적극적으로 사용된다.
 - Riot match id 조회가 있으면 `Match.riotMatchId` index/unique 검토
 - Lab/통계 쿼리 실제 실행계획 기준으로 `MatchParticipant` 복합 인덱스 추가 검토
 - JSON 내부 검색이 생긴 필드에 GIN index 적용 여부 검토
-- migration baseline과 `db push`/`migrate deploy` 운영 정책 정리
+- 운영 배포에서는 `db push` fallback 없이 `migrate deploy`만 사용하도록 배포 스크립트 정리
 
 우선순위 낮음:
 

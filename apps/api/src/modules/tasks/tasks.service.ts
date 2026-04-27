@@ -48,44 +48,7 @@ export class TasksService {
   private readonly rankedSeededSlotCap: number;
   private readonly rankedSeededStaleHours: number;
   private readonly rankedSeededInitialBackfillLimit: number;
-  private readonly matchFetchConfigs: QueueGroupConfig[] = [
-    {
-      name: "ranked",
-      queueIds: [420, 440],
-      limit: 25,
-      staleHours: 6,
-      includeNexusUsers: true,
-      fetchedAtField: "rankedFetchedAt",
-      lastMatchIdField: "rankedLastMatchId",
-    },
-    {
-      name: "normal",
-      queueIds: [400, 430],
-      limit: 15,
-      staleHours: 12,
-      includeNexusUsers: true,
-      fetchedAtField: "normalFetchedAt",
-      lastMatchIdField: "normalLastMatchId",
-    },
-    {
-      name: "aram",
-      queueIds: [450],
-      limit: 7,
-      staleHours: 24,
-      includeNexusUsers: true,
-      fetchedAtField: "aramFetchedAt",
-      lastMatchIdField: "aramLastMatchId",
-    },
-    {
-      name: "custom",
-      queueIds: [0],
-      limit: 3,
-      staleHours: 24,
-      includeNexusUsers: false,
-      fetchedAtField: "customFetchedAt",
-      lastMatchIdField: "customLastMatchId",
-    },
-  ];
+  private readonly matchFetchConfigs: QueueGroupConfig[];
 
   constructor(
     private readonly configService: ConfigService,
@@ -106,8 +69,58 @@ export class TasksService {
     );
     this.rankedSeededInitialBackfillLimit = this.getPositiveIntConfig(
       "MATCH_FETCH_RANKED_SEEDED_INITIAL_BACKFILL_LIMIT",
-      100,
+      25,
     );
+    this.matchFetchConfigs = [
+      {
+        name: "ranked",
+        queueIds: [420, 440],
+        limit: this.getPositiveIntConfig("MATCH_FETCH_RANKED_LIMIT", 5),
+        staleHours: this.getPositiveIntConfig(
+          "MATCH_FETCH_RANKED_STALE_HOURS",
+          6,
+        ),
+        includeNexusUsers: true,
+        fetchedAtField: "rankedFetchedAt",
+        lastMatchIdField: "rankedLastMatchId",
+      },
+      {
+        name: "normal",
+        queueIds: [400, 430],
+        limit: this.getPositiveIntConfig("MATCH_FETCH_NORMAL_LIMIT", 3),
+        staleHours: this.getPositiveIntConfig(
+          "MATCH_FETCH_NORMAL_STALE_HOURS",
+          12,
+        ),
+        includeNexusUsers: true,
+        fetchedAtField: "normalFetchedAt",
+        lastMatchIdField: "normalLastMatchId",
+      },
+      {
+        name: "aram",
+        queueIds: [450],
+        limit: this.getPositiveIntConfig("MATCH_FETCH_ARAM_LIMIT", 2),
+        staleHours: this.getPositiveIntConfig(
+          "MATCH_FETCH_ARAM_STALE_HOURS",
+          24,
+        ),
+        includeNexusUsers: true,
+        fetchedAtField: "aramFetchedAt",
+        lastMatchIdField: "aramLastMatchId",
+      },
+      {
+        name: "custom",
+        queueIds: [0],
+        limit: this.getPositiveIntConfig("MATCH_FETCH_CUSTOM_LIMIT", 1),
+        staleHours: this.getPositiveIntConfig(
+          "MATCH_FETCH_CUSTOM_STALE_HOURS",
+          24,
+        ),
+        includeNexusUsers: false,
+        fetchedAtField: "customFetchedAt",
+        lastMatchIdField: "customLastMatchId",
+      },
+    ];
   }
 
   private getPositiveIntConfig(key: string, fallback: number): number {
@@ -228,6 +241,8 @@ export class TasksService {
         undefined,
         3,
         seasonStart,
+        undefined,
+        "background",
       );
 
       if (ids.length === 0) {
@@ -309,8 +324,7 @@ export class TasksService {
     }
 
     for (const matchId of orderedNewIds.reverse()) {
-      await this.riotMatchService.getMatchById(matchId);
-      await new Promise((resolve) => setTimeout(resolve, 150));
+      await this.riotMatchService.getMatchById(matchId, 3, "background");
     }
 
     return {
@@ -457,6 +471,47 @@ export class TasksService {
   /**
    * KnownPuuid 기반 Riot 매치 사전 수집 — 30분마다 실행
    */
+  private async seedKnownPuuidsFromLinkedRiotAccounts(): Promise<number> {
+    const rows = await this.prisma.$queryRaw<Array<{ puuid: string }>>`
+      INSERT INTO "known_puuids" (
+        "puuid",
+        "gameName",
+        "tagLine",
+        "priority",
+        "isNexusUser",
+        "createdAt",
+        "updatedAt"
+      )
+      SELECT
+        ra."puuid",
+        ra."gameName",
+        ra."tagLine",
+        10,
+        true,
+        NOW(),
+        NOW()
+      FROM "riot_accounts" ra
+      WHERE ra."puuid" IS NOT NULL
+        AND ra."puuid" <> ''
+      ON CONFLICT ("puuid") DO UPDATE
+      SET
+        "gameName" = COALESCE(EXCLUDED."gameName", "known_puuids"."gameName"),
+        "tagLine" = COALESCE(EXCLUDED."tagLine", "known_puuids"."tagLine"),
+        "priority" = GREATEST("known_puuids"."priority", EXCLUDED."priority"),
+        "isNexusUser" = true,
+        "updatedAt" = NOW()
+      RETURNING "puuid"
+    `;
+
+    if (rows.length > 0) {
+      this.logger.log(
+        `KnownPuuid linked account seed upserted ${rows.length} row(s)`,
+      );
+    }
+
+    return rows.length;
+  }
+
   @Cron("*/30 * * * *")
   async handleMatchFetch(): Promise<void> {
     const lockKey = "tasks:match-fetch";
@@ -468,6 +523,7 @@ export class TasksService {
     }
 
     try {
+      await this.seedKnownPuuidsFromLinkedRiotAccounts();
       for (const config of this.matchFetchConfigs) {
         await this.processMatchFetchGroup(config);
       }
@@ -479,6 +535,8 @@ export class TasksService {
   }
 
   async runMatchFetch(queueGroup?: MatchFetchQueueGroup): Promise<void> {
+    await this.seedKnownPuuidsFromLinkedRiotAccounts();
+
     const targets = queueGroup
       ? this.matchFetchConfigs.filter((config) => config.name === queueGroup)
       : this.matchFetchConfigs;

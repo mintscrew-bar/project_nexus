@@ -2,11 +2,11 @@
 
 ## 사전 요구사항
 
-| 도구 | 버전 |
-|------|------|
-| Node.js | 20 이상 |
-| pnpm | 8 이상 (`npm install -g pnpm`) |
-| Docker & Docker Compose | PostgreSQL + Redis 실행용 |
+| 도구                    | 버전                           |
+| ----------------------- | ------------------------------ |
+| Node.js                 | 20 이상                        |
+| pnpm                    | 8 이상 (`npm install -g pnpm`) |
+| Docker & Docker Compose | PostgreSQL + Redis 실행용      |
 
 ### 필요한 외부 계정
 
@@ -46,6 +46,17 @@ DISCORD_GUILD_ID=
 
 # Riot
 RIOT_API_KEY=
+RIOT_MATCH_RATE_LIMIT_MAX=70
+RIOT_MATCH_RATE_LIMIT_WINDOW_SECONDS=120
+RIOT_MATCH_REQUEST_DELAY_MS=1350
+RIOT_MATCH_BACKGROUND_RATE_LIMIT_MAX=15
+RIOT_MATCH_BACKGROUND_REQUEST_DELAY_MS=8000
+MATCH_FETCH_RANKED_LIMIT=5
+MATCH_FETCH_NORMAL_LIMIT=3
+MATCH_FETCH_ARAM_LIMIT=2
+MATCH_FETCH_CUSTOM_LIMIT=1
+MATCH_FETCH_RANKED_SEEDED_SLOT_CAP=2
+MATCH_FETCH_RANKED_SEEDED_INITIAL_BACKFILL_LIMIT=25
 
 # DB / Redis (Docker 기본값 그대로 두면 됨)
 DATABASE_URL=postgresql://nexus:nexus_password@localhost:5432/nexus?schema=public

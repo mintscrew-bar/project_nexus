@@ -1375,7 +1375,8 @@ export class LabStatsService {
       .map(([position, agg]) => {
         const currentWinRate =
           agg.currentGames > 0 ? agg.currentWins / agg.currentGames : 0;
-        const prevWinRate = agg.prevGames > 0 ? agg.prevWins / agg.prevGames : 0;
+        const prevWinRate =
+          agg.prevGames > 0 ? agg.prevWins / agg.prevGames : 0;
         const currentPickRate =
           currentGames > 0 ? agg.currentGames / (currentGames * 10) : 0;
         const prevPickRate =
@@ -1387,7 +1388,8 @@ export class LabStatsService {
           deltaWinRate: Math.round((currentWinRate - prevWinRate) * 1000) / 10,
           currentPickRate: Math.round(currentPickRate * 10000) / 100,
           prevPickRate: Math.round(prevPickRate * 10000) / 100,
-          deltaPickRate: Math.round((currentPickRate - prevPickRate) * 10000) / 100,
+          deltaPickRate:
+            Math.round((currentPickRate - prevPickRate) * 10000) / 100,
           currentGames: agg.currentGames,
           prevGames: agg.prevGames,
           confidenceLevel: getConfidenceLevel(
@@ -1398,7 +1400,8 @@ export class LabStatsService {
       .filter((row) => row.currentGames >= 5 && row.prevGames >= 5)
       .sort(
         (a, b) =>
-          Math.abs(b.deltaWinRate) + Math.abs(b.deltaPickRate) * 0.3 -
+          Math.abs(b.deltaWinRate) +
+          Math.abs(b.deltaPickRate) * 0.3 -
           (Math.abs(a.deltaWinRate) + Math.abs(a.deltaPickRate) * 0.3),
       );
 
@@ -1450,7 +1453,11 @@ export class LabStatsService {
         score: number;
         matched: boolean;
       }> = [
-        { type: "TEAMFIGHT", score: (mage + tank) / 5, matched: mage + tank >= 3 },
+        {
+          type: "TEAMFIGHT",
+          score: (mage + tank) / 5,
+          matched: mage + tank >= 3,
+        },
         {
           type: "SPLIT_PUSH",
           score: (fighter + assassin) / 5,
@@ -1476,10 +1483,12 @@ export class LabStatsService {
         "EARLY_AGGRO",
         "TANK_LINE",
       ];
-      const target = (matched.length > 0 ? matched : evaluations).sort((a, b) => {
-        if (b.score !== a.score) return b.score - a.score;
-        return order.indexOf(a.type) - order.indexOf(b.type);
-      });
+      const target = (matched.length > 0 ? matched : evaluations).sort(
+        (a, b) => {
+          if (b.score !== a.score) return b.score - a.score;
+          return order.indexOf(a.type) - order.indexOf(b.type);
+        },
+      );
       return target[0].type;
     };
     const compositionLabel: Record<LabCompositionType, string> = {
@@ -1527,10 +1536,12 @@ export class LabStatsService {
       .map(([type, agg]) => {
         const currentWinRate =
           agg.currentGames > 0 ? agg.currentWins / agg.currentGames : 0;
-        const prevWinRate = agg.prevGames > 0 ? agg.prevWins / agg.prevGames : 0;
+        const prevWinRate =
+          agg.prevGames > 0 ? agg.prevWins / agg.prevGames : 0;
         const currentPickRate =
           currentTeams > 0 ? agg.currentGames / currentTeams : 0;
-        const prevPickRate = previousTeams > 0 ? agg.prevGames / previousTeams : 0;
+        const prevPickRate =
+          previousTeams > 0 ? agg.prevGames / previousTeams : 0;
         return {
           type,
           label: compositionLabel[type],
@@ -1539,7 +1550,8 @@ export class LabStatsService {
           deltaWinRate: Math.round((currentWinRate - prevWinRate) * 1000) / 10,
           currentPickRate: Math.round(currentPickRate * 10000) / 100,
           prevPickRate: Math.round(prevPickRate * 10000) / 100,
-          deltaPickRate: Math.round((currentPickRate - prevPickRate) * 10000) / 100,
+          deltaPickRate:
+            Math.round((currentPickRate - prevPickRate) * 10000) / 100,
           currentGames: agg.currentGames,
           prevGames: agg.prevGames,
           confidenceLevel: getConfidenceLevel(
@@ -1550,7 +1562,8 @@ export class LabStatsService {
       .filter((row) => row.currentGames >= 5 && row.prevGames >= 5)
       .sort(
         (a, b) =>
-          Math.abs(b.deltaPickRate) + Math.abs(b.deltaWinRate) * 0.5 -
+          Math.abs(b.deltaPickRate) +
+          Math.abs(b.deltaWinRate) * 0.5 -
           (Math.abs(a.deltaPickRate) + Math.abs(a.deltaWinRate) * 0.5),
       );
 
@@ -1764,7 +1777,7 @@ export class LabStatsService {
         ),
         aggregateCustomMatchStats(this.prisma, {
           period,
-          position: normalizedPosition,
+          position: normalizedPosition ?? undefined,
           groupBy: "champion",
           minGames,
           dateField: "completedAt",
@@ -2868,21 +2881,21 @@ export class LabStatsService {
     const normalized = Array.from(byUser.values())
       .filter((row) => row.games >= 3)
       .map((row) => {
-      const games = row.games;
-      const wins = row.wins;
-      const winRate = games > 0 ? wins / games : 0;
-      return {
-        userId: row.userId,
-        username: row.username,
-        soldPrice: row.soldPriceSum / Math.max(row.games, 1),
-        games,
-        wins,
-        winRate,
-        avgKda: row.kdaSum / Math.max(row.games, 1),
-        avgDamageShare: row.damageShareSum / Math.max(row.games, 1),
-        perGame: row.perGame,
-      };
-    });
+        const games = row.games;
+        const wins = row.wins;
+        const winRate = games > 0 ? wins / games : 0;
+        return {
+          userId: row.userId,
+          username: row.username,
+          soldPrice: row.soldPriceSum / Math.max(row.games, 1),
+          games,
+          wins,
+          winRate,
+          avgKda: row.kdaSum / Math.max(row.games, 1),
+          avgDamageShare: row.damageShareSum / Math.max(row.games, 1),
+          perGame: row.perGame,
+        };
+      });
 
     const percentile01 = (values: number[], value: number): number => {
       if (values.length <= 1) return 1;
@@ -2995,7 +3008,9 @@ export class LabStatsService {
     const quarterZScores = quarterResidualRows.map(
       (r) => r.efficiency / residualSafe,
     );
-    const fallbackZScores = withResidual.map((r) => r.efficiency / residualSafe);
+    const fallbackZScores = withResidual.map(
+      (r) => r.efficiency / residualSafe,
+    );
     const quarterIqr = computeIqr(quarterZScores);
     const fallbackIqr = computeIqr(fallbackZScores);
     const useQuarterCalibration =
@@ -3252,7 +3267,8 @@ export class LabStatsService {
       .slice(0, 5)
       .map(toLeader);
 
-    const roleFormUsersRaw = withIndex.map((row): AuctionRoleFormUser | null => {
+    const roleFormUsersRaw = withIndex.map(
+      (row): AuctionRoleFormUser | null => {
         const games = [...(gamePerformanceByUser.get(row.userId) ?? [])];
         const positionMap = new Map<
           string,
@@ -3298,7 +3314,9 @@ export class LabStatsService {
           .sort((a, b) => b.games - a.games);
 
         const primary = positions[0] ?? null;
-        const offRoles = positions.filter((p) => p.position !== primary?.position);
+        const offRoles = positions.filter(
+          (p) => p.position !== primary?.position,
+        );
         const offRoleTotals = offRoles.reduce(
           (acc, p) => ({
             games: acc.games + p.games,
@@ -3312,7 +3330,8 @@ export class LabStatsService {
           primary && offRoleTotals.games >= 3
             ? {
                 winRateDelta:
-                  primary.winRate - offRoleTotals.winsWeighted / offRoleTotals.games,
+                  primary.winRate -
+                  offRoleTotals.winsWeighted / offRoleTotals.games,
                 deathRateDelta:
                   (offRoleTotals.deathsWeighted / offRoleTotals.games -
                     primary.avgDeaths) /
@@ -3328,12 +3347,16 @@ export class LabStatsService {
           positions.reduce((sum, p) => sum + p.avgPerformance, 0) /
           Math.max(positions.length, 1);
         const perfVariance =
-          positions.reduce((sum, p) => sum + (p.avgPerformance - perfMean) ** 2, 0) /
-          Math.max(positions.length, 1);
+          positions.reduce(
+            (sum, p) => sum + (p.avgPerformance - perfMean) ** 2,
+            0,
+          ) / Math.max(positions.length, 1);
         const perfStdDev = Math.sqrt(perfVariance);
         const coverage = activeRoles / 5;
         const consistency = Math.max(0, 1 - perfStdDev / 0.2);
-        const versatilityScore = Math.round((coverage * 0.55 + consistency * 0.45) * 100);
+        const versatilityScore = Math.round(
+          (coverage * 0.55 + consistency * 0.45) * 100,
+        );
         const confidence: "insufficient" | "low" | "moderate" | "high" =
           row.games >= 20
             ? "high"
@@ -3356,7 +3379,8 @@ export class LabStatsService {
             offRolePenalty === null
               ? null
               : {
-                  winRateDelta: Math.round(offRolePenalty.winRateDelta * 10000) / 10000,
+                  winRateDelta:
+                    Math.round(offRolePenalty.winRateDelta * 10000) / 10000,
                   deathRateDelta:
                     Math.round(offRolePenalty.deathRateDelta * 10000) / 10000,
                   performanceDelta:
@@ -3372,7 +3396,8 @@ export class LabStatsService {
             avgPerformance: Math.round(p.avgPerformance * 10000) / 10000,
           })),
         };
-      });
+      },
+    );
     const roleFormUsers: AuctionRoleFormUser[] = roleFormUsersRaw
       .filter((u): u is AuctionRoleFormUser => u !== null)
       .sort((a, b) => b.totalGames - a.totalGames);
@@ -4130,6 +4155,7 @@ export class LabStatsService {
        AND tt."teamKey" = COALESCE(mp."teamId", CONCAT('__WIN__:', mp."win"::text))
       WHERE m."completedAt" IS NOT NULL
         AND mp."championId" = ${championId}
+        AND mp."userId" IS NOT NULL
       GROUP BY mp."userId"
     `);
 
@@ -4157,7 +4183,7 @@ export class LabStatsService {
       return empty;
     }
 
-    const userIds = championRows.map((r) => r.userId);
+    const userIds = championRows.map((r) => r.userId).filter(Boolean);
     const [users, auctionRows] = await Promise.all([
       this.prisma.user.findMany({
         where: { id: { in: userIds } },
@@ -4198,7 +4224,7 @@ export class LabStatsService {
         )
         SELECT
           mp."userId" AS "userId",
-          ROUND(AVG(ae."soldPrice"), 2)::float AS "avgSoldPrice"
+          ROUND(AVG(ae."soldPrice")::numeric, 2)::float AS "avgSoldPrice"
         FROM "match_participants" mp
         INNER JOIN "matches" m ON m."id" = mp."matchId"
         INNER JOIN auction_entries ae
@@ -4756,7 +4782,9 @@ export class LabStatsService {
         const avgKda = agg.totalKda / agg.games;
         const avgDamage = agg.totalDamage / agg.games;
         const confidence = getConfidenceLevel(agg.games);
-        const denom = position ? (posGames.get(position) ?? 1) : totalGames || 1;
+        const denom = position
+          ? (posGames.get(position) ?? 1)
+          : totalGames || 1;
         const pickRate = agg.games / denom;
         const lastMatchCreatedAt = agg.maxGameCreation
           ? new Date(agg.maxGameCreation)

@@ -137,11 +137,20 @@ export interface TeamDto {
   };
 }
 
+type RiotMatchRequestPriority = "foreground" | "background";
+
 @Injectable()
 export class RiotMatchService {
   private readonly logger = new Logger(RiotMatchService.name);
   private readonly apiKey: string;
   private readonly baseUrl = "https://asia.api.riotgames.com";
+  private readonly matchRateLimitMax: number;
+  private readonly matchRateLimitWindowSeconds: number;
+  private readonly matchRequestDelayMs: number;
+  private readonly backgroundMatchRateLimitMax: number;
+  private readonly backgroundMatchRequestDelayMs: number;
+  private lastMatchRequestAt = 0;
+  private lastBackgroundMatchRequestAt = 0;
 
   // In-memory cache for match data (matches don't change after the game ends)
   private readonly matchCache = new Map<
@@ -164,6 +173,26 @@ export class RiotMatchService {
     if (!this.apiKey) {
       this.logger.warn("RIOT_API_KEY not configured");
     }
+    this.matchRateLimitMax = this.getPositiveIntConfig(
+      "RIOT_MATCH_RATE_LIMIT_MAX",
+      70,
+    );
+    this.matchRateLimitWindowSeconds = this.getPositiveIntConfig(
+      "RIOT_MATCH_RATE_LIMIT_WINDOW_SECONDS",
+      120,
+    );
+    this.matchRequestDelayMs = this.getPositiveIntConfig(
+      "RIOT_MATCH_REQUEST_DELAY_MS",
+      1350,
+    );
+    this.backgroundMatchRateLimitMax = this.getPositiveIntConfig(
+      "RIOT_MATCH_BACKGROUND_RATE_LIMIT_MAX",
+      15,
+    );
+    this.backgroundMatchRequestDelayMs = this.getPositiveIntConfig(
+      "RIOT_MATCH_BACKGROUND_REQUEST_DELAY_MS",
+      8000,
+    );
 
     // 만료된 in-memory 캐시 엔트리를 1시간마다 정리 (메모리 누수 방지)
     setInterval(
@@ -190,6 +219,61 @@ export class RiotMatchService {
       },
       60 * 60 * 1000,
     ); // 1시간마다
+  }
+
+  private getPositiveIntConfig(key: string, fallback: number): number {
+    const raw = this.configService.get<string>(key);
+    if (!raw) return fallback;
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      this.logger.warn(`Invalid config ${key}=${raw}, fallback=${fallback}`);
+      return fallback;
+    }
+    return Math.floor(parsed);
+  }
+
+  private async waitForMatchRateLimit(
+    priority: RiotMatchRequestPriority,
+  ): Promise<void> {
+    const isBackground = priority === "background";
+    const key = isBackground
+      ? "riot:rl:match:background"
+      : "riot:rl:match:foreground";
+    const limit = isBackground
+      ? this.backgroundMatchRateLimitMax
+      : this.matchRateLimitMax;
+    const delayMs = isBackground
+      ? this.backgroundMatchRequestDelayMs
+      : this.matchRequestDelayMs;
+    const lastRequestAt = isBackground
+      ? this.lastBackgroundMatchRequestAt
+      : this.lastMatchRequestAt;
+
+    const elapsed = Date.now() - lastRequestAt;
+    if (elapsed < delayMs) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs - elapsed));
+    }
+
+    const rl = await this.redis.checkRateLimit(
+      key,
+      limit,
+      this.matchRateLimitWindowSeconds,
+    );
+
+    if (!rl.allowed) {
+      const waitMs = rl.resetIn * 1000 + 500;
+      this.logger.warn(
+        `Riot Match API ${priority} local limit reached (${limit}/${this.matchRateLimitWindowSeconds}s), waiting ${waitMs}ms`,
+      );
+      await new Promise((resolve) => setTimeout(resolve, waitMs));
+      return this.waitForMatchRateLimit(priority);
+    }
+
+    if (isBackground) {
+      this.lastBackgroundMatchRequestAt = Date.now();
+    } else {
+      this.lastMatchRequestAt = Date.now();
+    }
   }
 
   private async waitForRateLimit(
@@ -303,7 +387,11 @@ export class RiotMatchService {
   /**
    * Get match data by match ID (with in-memory cache + 429 retry)
    */
-  async getMatchById(matchId: string, retries = 3): Promise<MatchDto | null> {
+  async getMatchById(
+    matchId: string,
+    retries = 3,
+    priority: RiotMatchRequestPriority = "foreground",
+  ): Promise<MatchDto | null> {
     if (!this.apiKey) {
       this.logger.error("RIOT_API_KEY not configured");
       return null;
@@ -338,11 +426,7 @@ export class RiotMatchService {
 
       this.logger.log(`Fetching match data: ${matchId}`);
 
-      // match-v5: 2000 req/10s 사전 체크 — 429 이전에 로컬에서 제어
-      const rl = await this.redis.checkRateLimit("riot:rl:match", 2000, 10);
-      if (!rl.allowed) {
-        await new Promise((r) => setTimeout(r, rl.resetIn * 1000 + 200));
-      }
+      await this.waitForMatchRateLimit(priority);
 
       const response = await axios.get<MatchDto>(url, {
         headers: {
@@ -380,7 +464,9 @@ export class RiotMatchService {
           const result = this.eventEmitter.emit("riot.match.cached", {
             matchId,
           });
-          this.logger.log(`Emitted riot.match.cached for ${matchId} (received=${result})`);
+          this.logger.log(
+            `Emitted riot.match.cached for ${matchId} (received=${result})`,
+          );
           return this.propagateKnownPuuids(matchData);
         })
         .catch((e: any) =>
@@ -397,7 +483,7 @@ export class RiotMatchService {
       if (error.response?.status === 429) {
         if (retries > 0) {
           await this.waitForRateLimit(error.response.headers["retry-after"]);
-          return this.getMatchById(matchId, retries - 1);
+          return this.getMatchById(matchId, retries - 1, priority);
         }
         this.logger.error(
           `Rate limit exhausted for match ${matchId}, skipping`,
@@ -420,7 +506,7 @@ export class RiotMatchService {
           `Riot API ${error.response.status} for ${matchId}, retrying (${retries} left)...`,
         );
         await new Promise((resolve) => setTimeout(resolve, 800));
-        return this.getMatchById(matchId, retries - 1);
+        return this.getMatchById(matchId, retries - 1, priority);
       }
 
       if (!error.response && retries > 0) {
@@ -429,7 +515,7 @@ export class RiotMatchService {
           `Network error for match ${matchId}, retrying (${retries} left)...`,
         );
         await new Promise((resolve) => setTimeout(resolve, 1000));
-        return this.getMatchById(matchId, retries - 1);
+        return this.getMatchById(matchId, retries - 1, priority);
       }
 
       this.logger.error(`Error fetching match ${matchId}:`, error.message);
@@ -590,6 +676,7 @@ export class RiotMatchService {
     retries = 3,
     startTime?: number, // Unix seconds
     endTime?: number, // Unix seconds
+    priority: RiotMatchRequestPriority = "foreground",
   ): Promise<string[]> {
     if (!this.apiKey) {
       this.logger.error("RIOT_API_KEY not configured");
@@ -629,11 +716,7 @@ export class RiotMatchService {
 
       this.logger.log(`Fetching match IDs for PUUID: ${puuid}`);
 
-      // match-v5: 2000 req/10s 사전 체크
-      const rl = await this.redis.checkRateLimit("riot:rl:match", 2000, 10);
-      if (!rl.allowed) {
-        await new Promise((r) => setTimeout(r, rl.resetIn * 1000 + 200));
-      }
+      await this.waitForMatchRateLimit(priority);
 
       const response = await axios.get<string[]>(url, {
         headers: {
@@ -664,6 +747,7 @@ export class RiotMatchService {
             retries - 1,
             startTime,
             endTime,
+            priority,
           );
         }
         this.logger.error(
@@ -686,6 +770,7 @@ export class RiotMatchService {
           retries - 1,
           startTime,
           endTime,
+          priority,
         );
       }
 
@@ -709,23 +794,29 @@ export class RiotMatchService {
     count: number = 20,
     queueId?: number,
     start: number = 0,
+    priority: RiotMatchRequestPriority = "foreground",
   ): Promise<MatchDto[]> {
     const matchIds = await this.getMatchIdsByPuuid(
       puuid,
       start,
       count,
       queueId,
+      undefined,
+      3,
+      undefined,
+      undefined,
+      priority,
     );
 
     if (matchIds.length === 0) {
       return [];
     }
 
-    // match-v5: 2,000 req/10s — getMatchById 내부 Redis checkRateLimit이 스로틀 담당
+    // getMatchById 내부 로컬 limiter가 foreground/background 예산을 분리한다.
     const matches: MatchDto[] = [];
 
     for (const matchId of matchIds) {
-      const match = await this.getMatchById(matchId);
+      const match = await this.getMatchById(matchId, 3, priority);
       if (match !== null) {
         matches.push(match);
       }

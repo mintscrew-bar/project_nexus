@@ -7,6 +7,7 @@ import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/auth-store";
 import { useLabStore, type LabPeriod } from "@/stores/lab-store";
 import { adminApi } from "@/lib/api-client";
+import { toast } from "@/stores/toast-store";
 import { Badge, LoadingSpinner } from "@/components/ui";
 import { ArrowRight, FlaskConical, Info, RefreshCw, ShieldAlert } from "lucide-react";
 
@@ -87,6 +88,14 @@ export default function LabLayoutClient({ children }: { children: React.ReactNod
     onSuccess: () => {
       // 모든 lab 관련 쿼리 무효화해 새 데이터 로드
       void queryClient.invalidateQueries({ queryKey: ["lab"] });
+      toast.success("Lab 스냅샷 재계산이 완료되었습니다.");
+    },
+    onError: (error: any) => {
+      if (error?.response?.status === 429) {
+        toast.warning("재계산 요청이 너무 잦습니다. 잠시 후 다시 시도해 주세요.");
+        return;
+      }
+      toast.error("Lab 스냅샷 재계산에 실패했습니다.");
     },
   });
 

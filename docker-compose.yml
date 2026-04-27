@@ -38,7 +38,7 @@ services:
     restart: unless-stopped
     command: >
       sh -c "
-        pnpm install &&
+        CI=true pnpm install --frozen-lockfile &&
         pnpm --filter @nexus/database db:generate &&
         (pnpm --filter @nexus/database db:migrate:deploy || pnpm --filter @nexus/database db:push:accept) &&
         pnpm --filter @nexus/types build &&

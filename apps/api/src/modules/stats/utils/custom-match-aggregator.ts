@@ -91,9 +91,9 @@ export async function aggregateCustomMatchStats(
         COALESCE(SUM(mp."kills"), 0)::float AS kills,
         COALESCE(SUM(mp."deaths"), 0)::float AS deaths,
         COALESCE(SUM(mp."assists"), 0)::float AS assists,
-        ROUND(AVG((mp."kills" + mp."assists")::float / GREATEST(mp."deaths", 1)), 4)::float AS "avgKda",
-        ROUND(AVG(mp."totalDamageDealtToChampions"), 2)::float AS "avgDamage",
-        ROUND(AVG(mp."goldEarned"), 2)::float AS "avgGold"
+        ROUND(AVG((mp."kills" + mp."assists")::float / GREATEST(mp."deaths", 1))::numeric, 4)::float AS "avgKda",
+        ROUND(AVG(mp."totalDamageDealtToChampions")::numeric, 2)::float AS "avgDamage",
+        ROUND(AVG(mp."goldEarned")::numeric, 2)::float AS "avgGold"
       FROM "match_participants" mp
       INNER JOIN "matches" m ON m."id" = mp."matchId"
       ${whereSql}
@@ -143,9 +143,9 @@ export async function aggregateCustomMatchStats(
         COALESCE(SUM(mp."kills"), 0)::float AS kills,
         COALESCE(SUM(mp."deaths"), 0)::float AS deaths,
         COALESCE(SUM(mp."assists"), 0)::float AS assists,
-        ROUND(AVG((mp."kills" + mp."assists")::float / GREATEST(mp."deaths", 1)), 4)::float AS "avgKda",
-        ROUND(AVG(mp."totalDamageDealtToChampions"), 2)::float AS "avgDamage",
-        ROUND(AVG(mp."goldEarned"), 2)::float AS "avgGold"
+        ROUND(AVG((mp."kills" + mp."assists")::float / GREATEST(mp."deaths", 1))::numeric, 4)::float AS "avgKda",
+        ROUND(AVG(mp."totalDamageDealtToChampions")::numeric, 2)::float AS "avgDamage",
+        ROUND(AVG(mp."goldEarned")::numeric, 2)::float AS "avgGold"
       FROM "match_participants" mp
       INNER JOIN "matches" m ON m."id" = mp."matchId"
       ${whereSql}
@@ -194,9 +194,9 @@ export async function aggregateCustomMatchStats(
       COALESCE(SUM(mp."kills"), 0)::float AS kills,
       COALESCE(SUM(mp."deaths"), 0)::float AS deaths,
       COALESCE(SUM(mp."assists"), 0)::float AS assists,
-      ROUND(AVG((mp."kills" + mp."assists")::float / GREATEST(mp."deaths", 1)), 4)::float AS "avgKda",
-      ROUND(AVG(mp."totalDamageDealtToChampions"), 2)::float AS "avgDamage",
-      ROUND(AVG(mp."goldEarned"), 2)::float AS "avgGold"
+      ROUND(AVG((mp."kills" + mp."assists")::float / GREATEST(mp."deaths", 1))::numeric, 4)::float AS "avgKda",
+      ROUND(AVG(mp."totalDamageDealtToChampions")::numeric, 2)::float AS "avgDamage",
+      ROUND(AVG(mp."goldEarned")::numeric, 2)::float AS "avgGold"
     FROM "match_participants" mp
     INNER JOIN "matches" m ON m."id" = mp."matchId"
     ${whereSql}
