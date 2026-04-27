@@ -8,7 +8,7 @@ import {
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { RedisService } from "../redis/redis.service";
-import { RiotMatchService } from "../riot/riot-match.service";
+import { MatchDto, RiotMatchService } from "../riot/riot-match.service";
 import { RiotService } from "../riot/riot.service";
 import { getChampionKoreanName } from "@nexus/types";
 import {
@@ -2155,12 +2155,78 @@ export class StatsService {
   async getRankedChampionStats(gameName: string, tagLine: string) {
     const found = await this.findUserByRiotAccount(gameName, tagLine);
     if (!found) {
-      return [];
+      // 미등록 소환사: Riot match-v5에서 즉석 계산 (최근 랭크 20게임)
+      const summonerInfo = await this.riotService.getSummonerByRiotId(
+        gameName,
+        tagLine,
+      );
+      const matches = await this.riotMatchService.getMatchHistoryByPuuid(
+        summonerInfo.puuid,
+        20,
+        420, // RANKED_SOLO_5x5
+      );
+      return this.computeChampionStatsFromMatches(matches, summonerInfo.puuid);
     }
     const response = await this.getChampionStatsCacheByUserId(
       found.userId,
       "ranked",
     );
     return response.stats;
+  }
+
+  private computeChampionStatsFromMatches(
+    matches: MatchDto[],
+    puuid: string,
+  ): Array<{
+    championId: number;
+    championName: string;
+    games: number;
+    wins: number;
+    losses: number;
+    kills: number;
+    deaths: number;
+    assists: number;
+  }> {
+    const map = new Map<
+      number,
+      {
+        championId: number;
+        championName: string;
+        games: number;
+        wins: number;
+        losses: number;
+        kills: number;
+        deaths: number;
+        assists: number;
+      }
+    >();
+
+    for (const match of matches) {
+      const p = match.info.participants.find((x) => x.puuid === puuid);
+      if (!p) continue;
+
+      const existing = map.get(p.championId);
+      if (existing) {
+        existing.games++;
+        if (p.win) existing.wins++;
+        else existing.losses++;
+        existing.kills += p.kills;
+        existing.deaths += p.deaths;
+        existing.assists += p.assists;
+      } else {
+        map.set(p.championId, {
+          championId: p.championId,
+          championName: p.championName,
+          games: 1,
+          wins: p.win ? 1 : 0,
+          losses: p.win ? 0 : 1,
+          kills: p.kills,
+          deaths: p.deaths,
+          assists: p.assists,
+        });
+      }
+    }
+
+    return Array.from(map.values()).sort((a, b) => b.games - a.games);
   }
 }
