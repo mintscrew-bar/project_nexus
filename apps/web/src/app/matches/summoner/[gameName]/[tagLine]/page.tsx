@@ -182,7 +182,7 @@ export default function SummonerStatsPage() {
   });
 
   // Nexus 유저 ID 조회
-  const { data: nexusUser } = useQuery({
+  const { data: nexusUser, isFetched: nexusUserFetched } = useQuery({
     queryKey: ["nexusUser", gameName, tagLine],
     queryFn: () => statsApi.findUserByRiotAccount(gameName, tagLine),
     staleTime: 5 * 60 * 1000,
@@ -227,7 +227,7 @@ export default function SummonerStatsPage() {
     queryKey: ["rankedChampionStats", gameName, tagLine],
     queryFn: () => statsApi.getRankedChampionStats(gameName, tagLine),
     staleTime: 10 * 60 * 1000,
-    enabled: !!gameName && !!tagLine && !nexusUserId && champStatTab === "ranked",
+    enabled: !!gameName && !!tagLine && !!summoner && nexusUserFetched && !nexusUserId && champStatTab === "ranked",
   });
 
   const { data: nexusRanking } = useQuery({

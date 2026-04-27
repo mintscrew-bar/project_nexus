@@ -267,7 +267,11 @@ export class RiotService {
         gameName: string;
         tagLine: string;
       }>(url);
-    } catch (error) {
+    } catch (error: any) {
+      // account-v1은 존재하지 않는 계정에 404 대신 400을 반환하는 케이스가 있음
+      if (error instanceof BadRequestException) {
+        throw new NotFoundException("Summoner not found");
+      }
       this.logger.warn("getSummonerByRiotId failed", { gameName, tagLine });
       throw error;
     }
