@@ -7,7 +7,8 @@ import {
   OnGatewayConnection,
   OnGatewayDisconnect,
 } from "@nestjs/websockets";
-import { Inject, forwardRef, OnModuleDestroy } from "@nestjs/common";
+import { Inject, forwardRef, OnModuleDestroy, Logger } from "@nestjs/common";
+import { Cron } from "@nestjs/schedule";
 import { ShutdownService } from "../common/shutdown.service";
 import { OnEvent } from "@nestjs/event-emitter";
 import { Server, Socket } from "socket.io";
@@ -708,6 +709,44 @@ export class RoomGateway
         "[RoomGateway] Discord 음성 상태 업데이트 처리 오류:",
         error,
       );
+    }
+  }
+
+  // ========================================
+  // Scheduled Cleanup
+  // ========================================
+
+  private readonly gatewayLogger = new Logger(RoomGateway.name);
+
+  /** 매 5분마다 소켓 없는 좀비 참가자를 DB에서 제거한다 */
+  @Cron("*/5 * * * *")
+  async cleanupZombieParticipants() {
+    try {
+      const waitingRooms = await this.roomService.getWaitingRoomsWithParticipants();
+      for (const room of waitingRooms) {
+        // 활성 소켓이 없는 참가자 = 좀비
+        const zombies = room.participants.filter(
+          (p) => !this.userSockets.has(p.userId),
+        );
+        if (zombies.length === 0) continue;
+
+        this.gatewayLogger.debug(
+          `[Cleanup] Room ${room.id}: ${zombies.length}명 좀비 제거`,
+        );
+
+        for (const zombie of zombies) {
+          try {
+            await this.roomService.leaveRoom(zombie.userId, room.id);
+          } catch (_) {
+            // 이미 제거됐거나 방이 삭제된 경우 무시
+          }
+        }
+
+        // 방 상태 변경을 방 목록 구독자에게 알림 (삭제됐으면 remove로 폴백)
+        this.broadcastRoomDelta("update", room.id);
+      }
+    } catch (error) {
+      this.gatewayLogger.error("[Cleanup] 좀비 참가자 정리 실패:", error);
     }
   }
 

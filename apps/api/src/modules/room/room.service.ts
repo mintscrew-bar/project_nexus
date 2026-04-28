@@ -299,6 +299,19 @@ export class RoomService {
     });
   }
 
+  /** WAITING 상태 방과 참가자 목록 조회 (좀비 정리용) */
+  async getWaitingRoomsWithParticipants() {
+    return this.prisma.room.findMany({
+      where: { status: RoomStatus.WAITING },
+      select: {
+        id: true,
+        participants: {
+          select: { userId: true },
+        },
+      },
+    });
+  }
+
   /** 방 상태만 빠르게 조회 (disconnect 등 경량 체크용) */
   async getRoomStatus(roomId: string): Promise<RoomStatus | null> {
     const room = await this.prisma.room.findUnique({
