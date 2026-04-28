@@ -95,9 +95,12 @@ pnpm compose:down
 ### Production Deployment
 
 ```bash
-# 서버에서
-./scripts/deploy.sh
+cp .env.production.example .env.production
+pnpm compose:prod:config
+pnpm compose:prod:up
 ```
+
+운영 배포는 `docker-compose.prod.yml`을 사용합니다. API 컨테이너는 시작 전에 `prisma migrate deploy`만 실행하며, 운영 DB에는 `prisma db push`를 사용하지 않습니다. 자세한 절차는 [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md)를 참고하세요.
 
 ## Environment Variables
 

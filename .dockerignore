@@ -7,9 +7,10 @@ node_modules
 **/.next
 **/coverage
 **/*.log
-.env
-.env.*
+**/.env
+**/.env.*
 !.env.example
+!.env.production.example
 README.md
 CHANGELOG.md
 docs/

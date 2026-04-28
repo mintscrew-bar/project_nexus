@@ -1173,10 +1173,11 @@ export const statsApi = {
   getLabChampionDetail: async (
     championId: number,
     period: "30d" | "90d" | "all" = "30d",
+    source: "custom" | "ranked-community" | "ranked-meta" = "custom",
   ) => {
     const response = await apiClient.get(
       `/stats/lab/champions/${championId}`,
-      { params: { period } },
+      { params: { period, source } },
     );
     return response.data;
   },
@@ -1185,6 +1186,7 @@ export const statsApi = {
     period?: "30d" | "90d" | "all";
     position?: "TOP" | "JUNGLE" | "MID" | "ADC" | "SUPPORT";
     includeLowSample?: boolean;
+    source?: "custom" | "ranked-community" | "ranked-meta";
   }) => {
     const response = await apiClient.get("/stats/lab/champions", {
       params,
@@ -1192,9 +1194,13 @@ export const statsApi = {
     return response.data;
   },
 
-  getLabChampionMastery: async (championId: number) => {
+  getLabChampionMastery: async (
+    championId: number,
+    source: "custom" | "ranked-community" | "ranked-meta" = "custom",
+  ) => {
     const response = await apiClient.get(
       `/stats/lab/champions/${championId}/mastery`,
+      { params: { source } },
     );
     return response.data;
   },

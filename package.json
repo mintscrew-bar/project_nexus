@@ -18,10 +18,15 @@
     "db:push": "turbo db:push",
     "db:migrate": "turbo db:migrate",
     "db:studio": "pnpm --filter @nexus/database studio",
-    "compose:up": "docker compose up --build",
-    "compose:down": "docker compose down --remove-orphans",
-    "compose:logs:api": "docker compose logs --tail=120 api",
-    "compose:logs:web": "docker compose logs --tail=120 web"
+    "compose:up": "docker compose -f docker-compose.dev.yml up --build",
+    "compose:down": "docker compose -f docker-compose.dev.yml down --remove-orphans",
+    "compose:logs:api": "docker compose -f docker-compose.dev.yml logs --tail=120 api",
+    "compose:logs:web": "docker compose -f docker-compose.dev.yml logs --tail=120 web",
+    "compose:prod:config": "docker compose --env-file .env.production -f docker-compose.prod.yml config",
+    "compose:prod:up": "docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build",
+    "compose:prod:down": "docker compose --env-file .env.production -f docker-compose.prod.yml down",
+    "compose:prod:logs:api": "docker compose --env-file .env.production -f docker-compose.prod.yml logs --tail=120 api",
+    "compose:prod:logs:web": "docker compose --env-file .env.production -f docker-compose.prod.yml logs --tail=120 web"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",

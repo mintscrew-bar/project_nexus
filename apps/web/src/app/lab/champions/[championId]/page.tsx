@@ -10,37 +10,67 @@ import {
   labQueryOptions,
   type ChampionDetailResponse,
   type ChampionMasteryResponse,
+  type LabDataSource,
 } from "@/lib/lab-queries";
-import { getChampionIconById, getItemIcon } from "@/components/matches/match-utils";
+import { getChampionIconById, getItemIcon, getSummonerSpellIcon } from "@/components/matches/match-utils";
 import { formatRate } from "@/lib/lab-format";
 import {
   Badge, Card, CardContent, CardDescription, CardHeader, CardTitle, LoadingSpinner,
 } from "@/components/ui";
 import { TrendChart } from "@/components/lab/charts/TrendChart";
 import { PositionPie } from "@/components/lab/charts/PositionPie";
+import { LabConfidenceBadge, LabDataSourceBadge } from "@/components/lab/shared/LabSourceBadge";
 import { ArrowLeft, Crown, Medal } from "lucide-react";
+
+const SOURCE_OPTIONS: Array<{ key: LabDataSource; label: string; hint: string }> = [
+  { key: "custom", label: "내전", hint: "Nexus 내전" },
+  { key: "ranked-community", label: "랭크", hint: "등록 유저 랭크" },
+  { key: "ranked-meta", label: "랭크 메타", hint: "고티어 시딩" },
+];
+
+function getDetailConfidence(detail?: ChampionDetailResponse) {
+  if (!detail) return undefined;
+  const topPosition = [...detail.positions].sort((a, b) => b.games - a.games)[0];
+  return topPosition?.confidenceLevel ?? (
+    detail.totals.games >= 30 ? "high" : detail.totals.games >= 15 ? "moderate" : detail.totals.games >= 5 ? "low" : "insufficient"
+  );
+}
 
 export default function ChampionDetailPage() {
   const params = useParams<{ championId: string }>();
   const searchParams = useSearchParams();
-  const { user, isAuthenticated, isLoading: authLoading } = useAuthStore();
+  const { isAuthenticated, isLoading: authLoading } = useAuthStore();
   const { period: storePeriod } = useLabStore();
-  const isAdmin = user?.role === "ADMIN";
-  const canFetch = !authLoading && isAuthenticated && isAdmin;
+  const canFetch = !authLoading && isAuthenticated;
 
   const urlPeriod = searchParams.get("period") as LabPeriod | null;
   const activePeriod: LabPeriod =
     urlPeriod && ["30d", "90d", "all"].includes(urlPeriod) ? urlPeriod : storePeriod;
+  const urlSource = searchParams.get("source") as LabDataSource | null;
+  const activeSource: LabDataSource =
+    urlSource && SOURCE_OPTIONS.some((source) => source.key === urlSource)
+      ? urlSource
+      : "custom";
 
   const championId = Number(params.championId);
 
   const { data: detail, isLoading: detailLoading, isError: detailError } = useQuery<ChampionDetailResponse>({
-    ...labQueryOptions.championDetail(championId, activePeriod),
+    ...labQueryOptions.championDetail(championId, activePeriod, activeSource),
     enabled: canFetch && championId > 0,
   });
 
   const { data: mastery, isLoading: masteryLoading } = useQuery<ChampionMasteryResponse>({
-    ...labQueryOptions.championMastery(championId),
+    ...labQueryOptions.championMastery(championId, activeSource),
+    enabled: canFetch && championId > 0,
+  });
+
+  const { data: customDetail } = useQuery<ChampionDetailResponse>({
+    ...labQueryOptions.championDetail(championId, activePeriod, "custom"),
+    enabled: canFetch && championId > 0,
+  });
+
+  const { data: rankedDetail } = useQuery<ChampionDetailResponse>({
+    ...labQueryOptions.championDetail(championId, activePeriod, "ranked-community"),
     enabled: canFetch && championId > 0,
   });
 
@@ -60,7 +90,7 @@ export default function ChampionDetailPage() {
     <div className="space-y-6">
       {/* 브레드크럼 */}
       <Link
-        href={`/lab/champions?period=${activePeriod}`}
+        href={`/lab/champions?period=${activePeriod}&source=${activeSource}`}
         className="inline-flex items-center gap-1.5 text-sm text-text-tertiary hover:text-text-primary"
       >
         <ArrowLeft className="h-4 w-4" />
@@ -73,9 +103,30 @@ export default function ChampionDetailPage() {
           <Image src={getChampionIconById(detail.championId)} alt={detail.championNameKorean} fill className="object-cover" unoptimized />
         </div>
         <div>
-          <h1 className="text-2xl font-bold text-text-primary">{detail.championNameKorean}</h1>
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-2xl font-bold text-text-primary">{detail.championNameKorean}</h1>
+            <LabDataSourceBadge source={detail.dataSource} />
+            <LabConfidenceBadge confidence={getDetailConfidence(detail)} games={detail.totals.games} />
+          </div>
           <p className="text-sm text-text-tertiary">{detail.championName}</p>
         </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        {SOURCE_OPTIONS.map((source) => (
+          <Link
+            key={source.key}
+            href={`/lab/champions/${championId}?period=${activePeriod}&source=${source.key}`}
+            className={`rounded-xl px-3 py-2 text-xs font-semibold transition-colors ${
+              activeSource === source.key
+                ? "bg-accent-primary/20 text-accent-primary"
+                : "bg-bg-secondary/80 text-text-secondary hover:bg-bg-elevated"
+            }`}
+            title={source.hint}
+          >
+            {source.label}
+          </Link>
+        ))}
       </div>
 
       {/* 기간 요약 통계 */}
@@ -94,6 +145,49 @@ export default function ChampionDetailPage() {
         </div>
       </div>
 
+      <Card className="border-white/10 bg-bg-secondary/80">
+        <CardHeader>
+          <CardTitle className="text-base">내전 ↔ 랭크 비교</CardTitle>
+          <CardDescription>같은 챔피언의 Nexus 내전과 등록 유저 랭크 표본을 나란히 봅니다.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-3 md:grid-cols-2">
+            {[
+              { label: "내전", source: "custom" as const, data: customDetail },
+              { label: "랭크", source: "ranked-community" as const, data: rankedDetail },
+            ].map((entry) => (
+              <div key={entry.label} className="rounded-xl border border-white/10 bg-bg-primary/50 p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-xs font-semibold text-text-secondary">{entry.label}</p>
+                  <LabDataSourceBadge source={entry.source} />
+                  <LabConfidenceBadge confidence={getDetailConfidence(entry.data)} games={entry.data?.totals.games} />
+                </div>
+                {entry.data ? (
+                  <div className="mt-2 grid grid-cols-3 gap-3 text-sm">
+                    <div>
+                      <p className="text-xs text-text-tertiary">게임</p>
+                      <p className="font-bold text-text-primary">{entry.data.totals.games}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-text-tertiary">승률</p>
+                      <p className="font-bold text-accent-success">{formatRate(entry.data.totals.winRate)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-text-tertiary">주 포지션</p>
+                      <p className="font-bold text-text-primary">
+                        {[...entry.data.positions].sort((a, b) => b.games - a.games)[0]?.position ?? "-"}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="mt-2 text-sm text-text-secondary">표본이 없습니다.</p>
+                )}
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* 추이 + 포지션 분포 */}
       <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
         <Card className="border-white/10 bg-bg-secondary/80">
@@ -107,6 +201,50 @@ export default function ChampionDetailPage() {
       </div>
 
       {/* 빌드 + 룬 */}
+      <Card className="border-white/10 bg-bg-secondary/80">
+        <CardHeader>
+          <CardTitle className="text-base">코어 빌드 TOP 5</CardTitle>
+          <CardDescription>최종 인벤토리·스펠·핵심 룬 조합 기준</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {detail.topBuilds.length === 0 ? (
+            <p className="text-sm text-text-secondary">조건을 만족하는 코어 빌드가 없습니다.</p>
+          ) : (
+            detail.topBuilds.map((build) => (
+              <div
+                key={`${build.coreItems.join("-")}-${build.boots ?? "none"}-${build.summonerSpellIds.join("-")}-${build.keystonePerk}`}
+                className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-white/10 bg-bg-primary/50 px-3 py-2"
+              >
+                <div className="flex items-center gap-2">
+                  {build.coreItems.map((itemId) => (
+                    <div key={itemId} className="relative h-8 w-8 overflow-hidden rounded-md border border-white/10">
+                      <Image src={getItemIcon(itemId)} alt={`item-${itemId}`} fill className="object-cover" unoptimized />
+                    </div>
+                  ))}
+                  {build.boots ? (
+                    <div className="relative h-8 w-8 overflow-hidden rounded-md border border-white/10 opacity-80">
+                      <Image src={getItemIcon(build.boots)} alt={`boots-${build.boots}`} fill className="object-cover" unoptimized />
+                    </div>
+                  ) : null}
+                </div>
+                <div className="flex items-center gap-1">
+                  {build.summonerSpellIds.map((spellId) => (
+                    <div key={spellId} className="relative h-7 w-7 overflow-hidden rounded-md border border-white/10">
+                      <Image src={getSummonerSpellIcon(spellId)} alt={`spell-${spellId}`} fill className="object-cover" unoptimized />
+                    </div>
+                  ))}
+                  <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-full bg-bg-primary/70 px-1 text-xs text-text-tertiary">
+                    {build.keystonePerk}
+                  </span>
+                </div>
+                <p className="text-xs text-text-secondary">{build.games}게임</p>
+                <p className="text-sm font-semibold text-accent-success">{formatRate(build.winRate)}</p>
+              </div>
+            ))
+          )}
+        </CardContent>
+      </Card>
+
       <div className="grid gap-4 xl:grid-cols-2">
         <Card className="border-white/10 bg-bg-secondary/80">
           <CardHeader>

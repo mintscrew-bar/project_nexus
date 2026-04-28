@@ -36,11 +36,10 @@ function StatItem({ label, value, hint }: { label: string; value: string; hint: 
 }
 
 export default function LabMetaPage() {
-  const { user, isAuthenticated, isLoading: authLoading } = useAuthStore();
+  const { isAuthenticated, isLoading: authLoading } = useAuthStore();
   const { period: activePeriod } = useLabStore();
   const queryClient = useQueryClient();
-  const isAdmin = user?.role === "ADMIN";
-  const canFetch = !authLoading && isAuthenticated && isAdmin;
+  const canFetch = !authLoading && isAuthenticated;
 
   const { data: overview, isLoading: overviewLoading, isError: overviewError } = useQuery<LabOverview>({
     ...labQueryOptions.overview(), enabled: canFetch,

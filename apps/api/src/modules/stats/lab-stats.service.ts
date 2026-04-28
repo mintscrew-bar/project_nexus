@@ -11,7 +11,10 @@ import {
   tierScore,
 } from "@nexus/types";
 import { getChampionKoreanName } from "@nexus/types";
-import { aggregateCustomMatchStats } from "./utils/custom-match-aggregator";
+import {
+  aggregateCustomMatchStats,
+  type MatchStatsSource,
+} from "./utils/custom-match-aggregator";
 
 // ─── Lab Redis 캐시 키 네임스페이스 ───
 
@@ -89,10 +92,24 @@ export interface LabChampionRuneComboRow {
   wilsonLower: number;
 }
 
+export interface LabChampionBuildRow {
+  coreItems: number[];
+  boots: number | null;
+  summonerSpellIds: [number, number];
+  primaryStyle: number;
+  subStyle: number;
+  keystonePerk: number;
+  games: number;
+  wins: number;
+  winRate: number;
+  wilsonLower: number;
+}
+
 export interface LabChampionDetailResponse {
   championId: number;
   championName: string;
   championNameKorean: string;
+  dataSource: LabStatsDataSource;
   period: "30d" | "90d" | "all";
   totals: {
     games: number;
@@ -102,6 +119,7 @@ export interface LabChampionDetailResponse {
   winrateTrend: LabChampionWinrateTrendPoint[]; // 데이터 포인트 3개 미만이면 빈 배열
   trendInsufficient: boolean;
   positions: LabChampionPositionRow[];
+  topBuilds: LabChampionBuildRow[]; // 최대 5, 타임라인 구매 순서 우선/없으면 최종 인벤토리 기반
   topItemCombos: LabChampionItemComboRow[]; // 최대 5
   topRuneCombos: LabChampionRuneComboRow[]; // 최대 3
 }
@@ -115,6 +133,9 @@ export interface LabChampionMasteryCriteria {
 }
 
 export type LabChampionMasteryBadge = "커뮤니티 인증" | "고평가" | "기준 완화";
+export type LabChampionMasteryBadgeWithDerived =
+  | LabChampionMasteryBadge
+  | "양쪽 장인";
 
 export interface LabChampionMasteryEntry {
   rank: number;
@@ -139,13 +160,14 @@ export interface LabChampionMasteryEntry {
   nexusWinRate: number;
   nexusGlobalRank: number | null;
   avgSoldPrice: number | null;
-  badges: LabChampionMasteryBadge[];
+  badges: LabChampionMasteryBadgeWithDerived[];
 }
 
 export interface LabChampionMasteryResponse {
   championId: number;
   championName: string;
   championNameKorean: string;
+  dataSource: LabStatsDataSource;
   appliedCriteria: LabChampionMasteryCriteria;
   totalUniquePlayersOnChamp: number;
   qualifiedCount: number;
@@ -440,8 +462,20 @@ export interface LabChampionListRow {
 }
 
 type Period = "30d" | "90d" | "all";
+export type LabStatsDataSource = MatchStatsSource | "ranked-meta";
 const PERIODS: Period[] = ["30d", "90d", "all"];
 const POSITIONS = ["TOP", "JUNGLE", "MID", "ADC", "SUPPORT", null] as const;
+
+// 챔피언 스냅샷 집계 대상 소스 — 내전과 외부 ranked 매치를 분리해 따로 집계.
+const SNAPSHOT_SOURCES: Array<Exclude<MatchStatsSource, "all">> = [
+  "custom",
+  "ranked-community",
+];
+export const LAB_STATS_DATA_SOURCES: LabStatsDataSource[] = [
+  "custom",
+  "ranked-community",
+  "ranked-meta",
+];
 
 // ─── 최소 게임 수 임계값 ───
 
@@ -449,6 +483,9 @@ const MIN_GAMES_CHAMPION = 5;
 const MIN_GAMES_SYNERGY = 3;
 const MIN_GAMES_COUNTER = 3;
 const MASTERY_TOP_LIMIT = 50;
+const BOOT_ITEM_IDS = new Set([
+  1001, 3006, 3009, 3020, 3111, 3117, 3158, 3170, 3047, 3110, 2422,
+]);
 
 @Injectable()
 export class LabStatsService {
@@ -479,6 +516,16 @@ export class LabStatsService {
     return new Date(Date.now() - days * 24 * 60 * 60 * 1000);
   }
 
+  private getMatchSourceFilter(source: MatchStatsSource): Prisma.Sql {
+    if (source === "custom") {
+      return Prisma.sql`AND m."roomId" IS NOT NULL`;
+    }
+    if (source === "ranked-community") {
+      return Prisma.sql`AND m."roomId" IS NULL AND m."riotMatchId" IS NOT NULL`;
+    }
+    return Prisma.empty;
+  }
+
   // ─── 스냅샷 집계 (야간 cron에서 호출) ───
 
   /**
@@ -499,109 +546,129 @@ export class LabStatsService {
     });
     const currentPatchVersion = latestPatch?.patchVersion ?? null;
 
-    for (const period of PERIODS) {
-      const periodFilter = this.getPeriodFilter(period);
+    // source × period × position 매트릭스로 집계 — 내전과 외부 ranked를 별도 행으로 저장.
+    for (const source of SNAPSHOT_SOURCES) {
+      // SQL WHERE 분기 — aggregator의 buildSourceFilter와 동일한 의미여야 한다.
+      const sourceFilterSql =
+        source === "custom"
+          ? Prisma.sql`AND m."roomId" IS NOT NULL`
+          : Prisma.sql`AND m."roomId" IS NULL AND m."riotMatchId" IS NOT NULL`;
 
-      // 해당 기간 전체 매치 수 계산 (픽률 분모)
-      const totalMatchesResult = await this.prisma.$queryRaw<
-        { count: bigint }[]
-      >(Prisma.sql`
-        SELECT COUNT(DISTINCT mp."matchId")::bigint AS count
-        FROM "match_participants" mp
-        INNER JOIN "matches" m ON m."id" = mp."matchId"
-        WHERE m."completedAt" IS NOT NULL
-          ${periodFilter ? Prisma.sql`AND m."completedAt" >= ${periodFilter}` : Prisma.empty}
-      `);
-      const totalMatches = Number(totalMatchesResult[0]?.count ?? 0);
+      let perSourceUpserted = 0;
 
-      if (totalMatches === 0) {
-        this.logger.log(`챔피언 스냅샷 [${period}]: 매치 없음, 건너뜀`);
-        continue;
-      }
+      for (const period of PERIODS) {
+        const periodFilter = this.getPeriodFilter(period);
 
-      // 밴 횟수 집계 (전체 기간용)
-      const banCountsResult = await this.prisma.$queryRaw<
-        { championId: number; banCount: bigint }[]
-      >(Prisma.sql`
-        SELECT
-          ban_id::int AS "championId",
-          COUNT(*)::bigint AS "banCount"
-        FROM (
-          SELECT jsonb_array_elements(mts."bans")::int AS ban_id
-          FROM "match_team_stats" mts
-          INNER JOIN "matches" m ON m."id" = mts."matchId"
+        // 해당 기간/소스 전체 매치 수 계산 (픽률 분모)
+        const totalMatchesResult = await this.prisma.$queryRaw<
+          { count: bigint }[]
+        >(Prisma.sql`
+          SELECT COUNT(DISTINCT mp."matchId")::bigint AS count
+          FROM "match_participants" mp
+          INNER JOIN "matches" m ON m."id" = mp."matchId"
           WHERE m."completedAt" IS NOT NULL
+            ${sourceFilterSql}
             ${periodFilter ? Prisma.sql`AND m."completedAt" >= ${periodFilter}` : Prisma.empty}
-        ) bans
-        WHERE ban_id > 0
-        GROUP BY ban_id
-      `);
-      const banCounts = new Map(
-        banCountsResult.map((row) => [row.championId, Number(row.banCount)]),
-      );
+        `);
+        const totalMatches = Number(totalMatchesResult[0]?.count ?? 0);
 
-      for (const position of POSITIONS) {
-        const rows = await aggregateCustomMatchStats(this.prisma, {
-          period,
-          position,
-          groupBy: "champion",
-          minGames: MIN_GAMES_CHAMPION,
-          dateField: "completedAt",
-        });
+        if (totalMatches === 0) {
+          this.logger.log(
+            `챔피언 스냅샷 [${source}/${period}]: 매치 없음, 건너뜀`,
+          );
+          continue;
+        }
 
-        for (const row of rows) {
-          const games = row.games;
-          const wins = row.wins;
-          const pickRate =
-            position === null
-              ? games / (totalMatches * 10) // 전체: 매치당 10명
-              : games / totalMatches; // 포지션별: 매치당 해당 포지션 1명
-          const banCount = banCounts.get(row.championId) ?? 0;
-          const banRate = banCount / totalMatches;
-          const wl = wilsonLower(wins, games);
+        // 밴 횟수 집계 (해당 source/기간) — 외부 ranked는 bans 데이터 없을 수 있어
+        // 결과가 비어 있어도 정상.
+        const banCountsResult = await this.prisma.$queryRaw<
+          { championId: number; banCount: bigint }[]
+        >(Prisma.sql`
+          SELECT
+            ban_id::int AS "championId",
+            COUNT(*)::bigint AS "banCount"
+          FROM (
+            SELECT jsonb_array_elements(mts."bans")::int AS ban_id
+            FROM "match_team_stats" mts
+            INNER JOIN "matches" m ON m."id" = mts."matchId"
+            WHERE m."completedAt" IS NOT NULL
+              ${sourceFilterSql}
+              ${periodFilter ? Prisma.sql`AND m."completedAt" >= ${periodFilter}` : Prisma.empty}
+          ) bans
+          WHERE ban_id > 0
+          GROUP BY ban_id
+        `);
+        const banCounts = new Map(
+          banCountsResult.map((row) => [row.championId, Number(row.banCount)]),
+        );
 
-          await this.prisma.labChampionSnapshot.upsert({
-            where: {
-              period_patchVersion_championId_position: {
-                period,
-                patchVersion: currentPatchVersion ?? "",
-                championId: row.championId,
-                position: position ?? "",
-              },
-            },
-            create: {
-              period,
-              patchVersion: currentPatchVersion,
-              championId: row.championId,
-              position,
-              games,
-              wins,
-              avgKda: row.avgKda,
-              avgDamage: row.avgDamage,
-              avgGold: row.avgGold,
-              pickRate,
-              banRate,
-              wilsonLower: wl,
-            },
-            update: {
-              games,
-              wins,
-              avgKda: row.avgKda,
-              avgDamage: row.avgDamage,
-              avgGold: row.avgGold,
-              pickRate,
-              banRate,
-              wilsonLower: wl,
-              computedAt: new Date(),
-            },
+        for (const position of POSITIONS) {
+          const rows = await aggregateCustomMatchStats(this.prisma, {
+            period,
+            position,
+            groupBy: "champion",
+            minGames: MIN_GAMES_CHAMPION,
+            dateField: "completedAt",
+            source,
           });
 
-          totalUpserted++;
+          for (const row of rows) {
+            const games = row.games;
+            const wins = row.wins;
+            const pickRate =
+              position === null
+                ? games / (totalMatches * 10) // 전체: 매치당 10명
+                : games / totalMatches; // 포지션별: 매치당 해당 포지션 1명
+            const banCount = banCounts.get(row.championId) ?? 0;
+            const banRate = banCount / totalMatches;
+            const wl = wilsonLower(wins, games);
+
+            await this.prisma.labChampionSnapshot.upsert({
+              where: {
+                source_period_patchVersion_championId_position: {
+                  source,
+                  period,
+                  patchVersion: currentPatchVersion ?? "",
+                  championId: row.championId,
+                  position: position ?? "",
+                },
+              },
+              create: {
+                source,
+                period,
+                patchVersion: currentPatchVersion,
+                championId: row.championId,
+                position,
+                games,
+                wins,
+                avgKda: row.avgKda,
+                avgDamage: row.avgDamage,
+                avgGold: row.avgGold,
+                pickRate,
+                banRate,
+                wilsonLower: wl,
+              },
+              update: {
+                games,
+                wins,
+                avgKda: row.avgKda,
+                avgDamage: row.avgDamage,
+                avgGold: row.avgGold,
+                pickRate,
+                banRate,
+                wilsonLower: wl,
+                computedAt: new Date(),
+              },
+            });
+
+            totalUpserted++;
+            perSourceUpserted++;
+          }
         }
       }
 
       this.logger.log(
-        `챔피언 스냅샷 [${period}] 완료: ${totalUpserted}건 upsert`,
+        `챔피언 스냅샷 [${source}] 완료: ${perSourceUpserted}건 upsert`,
       );
     }
 
@@ -641,6 +708,7 @@ export class LabStatsService {
           AND a."id" < b."id"
         INNER JOIN "matches" m ON m."id" = a."matchId"
         WHERE m."completedAt" IS NOT NULL
+          AND m."roomId" IS NOT NULL
           ${periodFilter ? Prisma.sql`AND m."completedAt" >= ${periodFilter}` : Prisma.empty}
         GROUP BY 1, 2
         HAVING COUNT(*) >= ${MIN_GAMES_SYNERGY}
@@ -722,6 +790,7 @@ export class LabStatsService {
           )
         INNER JOIN "matches" m ON m."id" = a."matchId"
         WHERE m."completedAt" IS NOT NULL
+          AND m."roomId" IS NOT NULL
           ${periodFilter ? Prisma.sql`AND m."completedAt" >= ${periodFilter}` : Prisma.empty}
         GROUP BY a."championId", b."championId"
         HAVING COUNT(*) >= ${MIN_GAMES_COUNTER}
@@ -790,6 +859,7 @@ export class LabStatsService {
           AND a."position" = b."position"
         INNER JOIN "matches" m ON m."id" = a."matchId"
         WHERE m."completedAt" IS NOT NULL
+          AND m."roomId" IS NOT NULL
           AND a."position" IS NOT NULL
           AND a."position" <> ''
           AND a."position" <> 'UNKNOWN'
@@ -1046,9 +1116,10 @@ export class LabStatsService {
     const result: Record<string, any[]> = {};
 
     for (const position of positionList) {
-      // 스냅샷 우선 조회
+      // 스냅샷 우선 조회 — 메타 레이더는 내전 기준이 기본 (Step 4에서 source 파라미터화 예정).
       const snapshots = await this.prisma.labChampionSnapshot.findMany({
         where: {
+          source: "custom",
           period,
           position,
           games: { gte: MIN_GAMES_CHAMPION },
@@ -1670,25 +1741,69 @@ export class LabStatsService {
     period: Period = "30d",
     position?: string,
     includeLowSample = false,
+    dataSource: LabStatsDataSource = "custom",
   ): Promise<{
     period: Period;
     position: string | null;
     includeLowSample: boolean;
+    dataSource: LabStatsDataSource;
     source: "snapshot" | "realtime";
     champions: LabChampionListRow[];
   }> {
     const normalizedPosition = position?.trim() || null;
     const minGames = includeLowSample ? 1 : MIN_GAMES_CHAMPION;
     const cacheKey = this.labCacheKey(
-      `champions:${period}:${normalizedPosition ?? "all"}:${includeLowSample ? "all-samples" : "stable-only"}`,
+      `champions:${dataSource}:${period}:${normalizedPosition ?? "all"}:${includeLowSample ? "all-samples" : "stable-only"}`,
     );
     const cached = await this.redis.get(cacheKey);
     if (cached) return JSON.parse(cached);
+
+    if (dataSource === "ranked-meta") {
+      const rankedPeriod = period === "30d" ? "30d" : "current_patch";
+      const ranked = await this.getRankedChampionSnapshots(
+        rankedPeriod,
+        normalizedPosition ?? undefined,
+      );
+      const minRankedGames = includeLowSample ? 1 : MIN_GAMES_CHAMPION;
+      const champions = ranked.champions
+        .filter((row) => row.games >= minRankedGames)
+        .map((row) => {
+          const championName = String(row.championId);
+          return {
+            championId: row.championId,
+            championName,
+            championNameKorean: getChampionKoreanName(championName),
+            position: row.position,
+            games: row.games,
+            wins: row.wins,
+            losses: row.games - row.wins,
+            winRate: Math.round(row.winRate * 10000) / 10000,
+            pickRate: Math.round(row.pickRate * 10000) / 100,
+            banRate: 0,
+            avgKda: row.avgKda,
+            avgDamage: row.avgDamage,
+            avgGold: 0,
+            wilsonLower: Math.round(row.wilsonLower * 1000000) / 1000000,
+            confidenceLevel: getConfidenceLevel(row.games),
+          } satisfies LabChampionListRow;
+        });
+      const result = {
+        period,
+        position: normalizedPosition,
+        includeLowSample,
+        dataSource,
+        source: "snapshot" as const,
+        champions,
+      };
+      await this.redis.set(cacheKey, JSON.stringify(result), 1800);
+      return result;
+    }
 
     const snapshotRows = includeLowSample
       ? []
       : await this.prisma.labChampionSnapshot.findMany({
           where: {
+            source: dataSource,
             period,
             position: normalizedPosition,
             games: { gte: MIN_GAMES_CHAMPION },
@@ -1742,6 +1857,7 @@ export class LabStatsService {
         period,
         position: normalizedPosition,
         includeLowSample,
+        dataSource,
         source: "snapshot" as const,
         champions,
       };
@@ -1750,6 +1866,7 @@ export class LabStatsService {
     }
 
     const periodFilter = this.getPeriodFilter(period);
+    const sourceFilter = this.getMatchSourceFilter(dataSource);
     const [totalMatchesResult, banCountsResult, aggregateRows] =
       await Promise.all([
         this.prisma.$queryRaw<{ count: bigint }[]>(Prisma.sql`
@@ -1757,6 +1874,7 @@ export class LabStatsService {
           FROM "match_participants" mp
           INNER JOIN "matches" m ON m."id" = mp."matchId"
           WHERE m."completedAt" IS NOT NULL
+            ${sourceFilter}
             ${periodFilter ? Prisma.sql`AND m."completedAt" >= ${periodFilter}` : Prisma.empty}
         `),
         this.prisma.$queryRaw<{ championId: number; banCount: bigint }[]>(
@@ -1769,6 +1887,7 @@ export class LabStatsService {
               FROM "match_team_stats" mts
               INNER JOIN "matches" m ON m."id" = mts."matchId"
               WHERE m."completedAt" IS NOT NULL
+                ${sourceFilter}
                 ${periodFilter ? Prisma.sql`AND m."completedAt" >= ${periodFilter}` : Prisma.empty}
             ) bans
             WHERE ban_id > 0
@@ -1781,6 +1900,7 @@ export class LabStatsService {
           groupBy: "champion",
           minGames,
           dateField: "completedAt",
+          source: dataSource,
         }),
       ]);
 
@@ -1828,6 +1948,7 @@ export class LabStatsService {
       period,
       position: normalizedPosition,
       includeLowSample,
+      dataSource,
       source: "realtime" as const,
       champions,
     };
@@ -1847,14 +1968,59 @@ export class LabStatsService {
   async getChampionDetail(
     championId: number,
     period: Period = "30d",
+    dataSource: LabStatsDataSource = "custom",
   ): Promise<LabChampionDetailResponse | null> {
     const cacheKey = this.labCacheKey(
-      `champion:detail:${championId}:${period}`,
+      `champion:detail:${dataSource}:${championId}:${period}`,
     );
     const cached = await this.redis.get(cacheKey);
     if (cached) return JSON.parse(cached);
 
+    if (dataSource === "ranked-meta") {
+      const rankedPeriod = period === "30d" ? "30d" : "current_patch";
+      const ranked = await this.getRankedChampionSnapshots(rankedPeriod);
+      const rows = ranked.champions.filter((row) => row.championId === championId);
+      const totalRow = rows.find((row) => row.position === null) ?? rows[0];
+      if (!totalRow) return null;
+      const championName = String(championId);
+      const positions = rows
+        .filter((row) => row.position !== null)
+        .map((row) => ({
+          position: row.position as string,
+          games: row.games,
+          wins: row.wins,
+          winRate: Math.round(row.winRate * 10000) / 10000,
+          pickRateWithinChampion:
+            totalRow.games > 0
+              ? Math.round((row.games / totalRow.games) * 10000) / 10000
+              : 0,
+          wilsonLower: Math.round(row.wilsonLower * 1000000) / 1000000,
+          confidenceLevel: getConfidenceLevel(row.games),
+        }));
+      const result: LabChampionDetailResponse = {
+        championId,
+        championName,
+        championNameKorean: getChampionKoreanName(championName),
+        dataSource,
+        period,
+        totals: {
+          games: totalRow.games,
+          wins: totalRow.wins,
+          winRate: Math.round(totalRow.winRate * 10000) / 10000,
+        },
+        winrateTrend: [],
+        trendInsufficient: true,
+        positions,
+        topBuilds: [],
+        topItemCombos: [],
+        topRuneCombos: [],
+      };
+      await this.redis.set(cacheKey, JSON.stringify(result), 1800);
+      return result;
+    }
+
     const periodFilter = this.getPeriodFilter(period);
+    const sourceFilter = this.getMatchSourceFilter(dataSource);
 
     // 1) 총계 + 챔피언 이름 — 해당 기간 MatchParticipant 집계
     const totalsRows = await this.prisma.$queryRaw<
@@ -1872,6 +2038,7 @@ export class LabStatsService {
       INNER JOIN "matches" m ON m."id" = mp."matchId"
       WHERE mp."championId" = ${championId}
         AND m."completedAt" IS NOT NULL
+        ${sourceFilter}
         ${periodFilter ? Prisma.sql`AND m."completedAt" >= ${periodFilter}` : Prisma.empty}
     `);
 
@@ -1896,6 +2063,7 @@ export class LabStatsService {
       INNER JOIN "matches" m ON m."id" = mp."matchId"
       WHERE mp."championId" = ${championId}
         AND m."completedAt" IS NOT NULL
+        ${sourceFilter}
         ${periodFilter ? Prisma.sql`AND m."completedAt" >= ${periodFilter}` : Prisma.empty}
       GROUP BY DATE_TRUNC('week', m."completedAt")
       ORDER BY DATE_TRUNC('week', m."completedAt") ASC
@@ -1918,6 +2086,7 @@ export class LabStatsService {
     // 3) 포지션 분포 — 스냅샷 우선, 미스 시 실시간 집계
     const positionSnapshots = await this.prisma.labChampionSnapshot.findMany({
       where: {
+        source: dataSource,
         period,
         championId,
         position: { not: null },
@@ -1958,6 +2127,7 @@ export class LabStatsService {
         INNER JOIN "matches" m ON m."id" = mp."matchId"
         WHERE mp."championId" = ${championId}
           AND m."completedAt" IS NOT NULL
+          ${sourceFilter}
           ${periodFilter ? Prisma.sql`AND m."completedAt" >= ${periodFilter}` : Prisma.empty}
         GROUP BY mp."position"
       `);
@@ -1999,6 +2169,9 @@ export class LabStatsService {
         championId,
         match: {
           completedAt: periodFilter ? { gte: periodFilter } : { not: null },
+          ...(dataSource === "custom"
+            ? { roomId: { not: null } }
+            : { roomId: null, riotMatchId: { not: null } }),
         },
       },
       select: {
@@ -2010,9 +2183,26 @@ export class LabStatsService {
         item4: true,
         item5: true,
         item6: true,
+        summoner1Id: true,
+        summoner2Id: true,
         perks: true,
+        itemPurchaseOrder: true,
       },
     });
+
+    const buildCounter = new Map<
+      string,
+      {
+        coreItems: number[];
+        boots: number | null;
+        summonerSpellIds: [number, number];
+        primaryStyle: number;
+        subStyle: number;
+        keystonePerk: number;
+        games: number;
+        wins: number;
+      }
+    >();
 
     // 아이템 2-조합 집계 — 완성 아이템만, 정규화된 (low, high) 튜플
     const itemComboCounter = new Map<
@@ -2021,7 +2211,7 @@ export class LabStatsService {
     >();
 
     for (const p of participants) {
-      const itemsOnParticipant = [
+      const finalItemsOnParticipant = [
         p.item0,
         p.item1,
         p.item2,
@@ -2032,6 +2222,50 @@ export class LabStatsService {
       ]
         .filter((id) => id && completedItemIds.has(id))
         .filter((id, idx, arr) => arr.indexOf(id) === idx);
+      const purchasedItemsOnParticipant = this.extractPurchasedCompletedItems(
+        p.itemPurchaseOrder,
+        completedItemIds,
+      );
+      const itemsOnParticipant =
+        purchasedItemsOnParticipant.length >= 2
+          ? purchasedItemsOnParticipant
+          : finalItemsOnParticipant;
+      const runeTriplet = this.extractRuneTriplet(p.perks);
+      const boots = itemsOnParticipant.find((id) => BOOT_ITEM_IDS.has(id)) ?? null;
+      const coreItems = itemsOnParticipant
+        .filter((id) => !BOOT_ITEM_IDS.has(id))
+        .slice(0, 3);
+
+      if (coreItems.length >= 2 && runeTriplet) {
+        const spells = [p.summoner1Id, p.summoner2Id].sort((a, b) => a - b) as [
+          number,
+          number,
+        ];
+        const key = [
+          coreItems.join("-"),
+          boots ?? "none",
+          spells.join("-"),
+          runeTriplet.primaryStyle,
+          runeTriplet.subStyle,
+          runeTriplet.keystonePerk,
+        ].join("|");
+        const existing = buildCounter.get(key);
+        if (existing) {
+          existing.games += 1;
+          if (p.win) existing.wins += 1;
+        } else {
+          buildCounter.set(key, {
+            coreItems,
+            boots,
+            summonerSpellIds: spells,
+            primaryStyle: runeTriplet.primaryStyle,
+            subStyle: runeTriplet.subStyle,
+            keystonePerk: runeTriplet.keystonePerk,
+            games: 1,
+            wins: p.win ? 1 : 0,
+          });
+        }
+      }
 
       if (itemsOnParticipant.length < 2) continue;
 
@@ -2064,6 +2298,28 @@ export class LabStatsService {
         const winRate = entry.games > 0 ? entry.wins / entry.games : 0;
         return {
           itemIds: entry.itemIds,
+          games: entry.games,
+          wins: entry.wins,
+          winRate: Math.round(winRate * 10000) / 10000,
+          wilsonLower:
+            Math.round(wilsonLower(entry.wins, entry.games, 1.96) * 1000000) /
+            1000000,
+        };
+      })
+      .sort((a, b) => b.wilsonLower - a.wilsonLower)
+      .slice(0, 5);
+
+    const topBuilds: LabChampionBuildRow[] = Array.from(buildCounter.values())
+      .filter((entry) => entry.games >= 3)
+      .map((entry) => {
+        const winRate = entry.games > 0 ? entry.wins / entry.games : 0;
+        return {
+          coreItems: entry.coreItems,
+          boots: entry.boots,
+          summonerSpellIds: entry.summonerSpellIds,
+          primaryStyle: entry.primaryStyle,
+          subStyle: entry.subStyle,
+          keystonePerk: entry.keystonePerk,
           games: entry.games,
           wins: entry.wins,
           winRate: Math.round(winRate * 10000) / 10000,
@@ -2134,6 +2390,7 @@ export class LabStatsService {
       championId,
       championName,
       championNameKorean: getChampionKoreanName(championName),
+      dataSource,
       period,
       totals: {
         games: totalGames,
@@ -2143,6 +2400,7 @@ export class LabStatsService {
       winrateTrend,
       trendInsufficient,
       positions,
+      topBuilds,
       topItemCombos,
       topRuneCombos,
     };
@@ -4103,10 +4361,37 @@ export class LabStatsService {
 
   async getChampionMastery(
     championId: number,
+    dataSource: LabStatsDataSource = "custom",
+    includeCrossSourceBadge = true,
   ): Promise<LabChampionMasteryResponse> {
-    const cacheKey = this.labCacheKey(`champion:mastery:${championId}`);
-    const cached = await this.redis.get(cacheKey);
+    if (dataSource === "ranked-meta") {
+      const empty: LabChampionMasteryResponse = {
+        championId,
+        championName: String(championId),
+        championNameKorean: getChampionKoreanName(String(championId)),
+        dataSource,
+        appliedCriteria: {
+          minTier: "DIAMOND",
+          minRank: "II",
+          minGames: 10,
+          minWinRate: 0.4,
+          isRelaxed: false,
+        },
+        totalUniquePlayersOnChamp: 0,
+        qualifiedCount: 0,
+        insufficient: true,
+        masteries: [],
+      };
+      return empty;
+    }
+
+    const cacheKey = this.labCacheKey(
+      `champion:mastery:${dataSource}:${championId}`,
+    );
+    const cached = includeCrossSourceBadge ? await this.redis.get(cacheKey) : null;
     if (cached) return JSON.parse(cached);
+
+    const sourceFilter = this.getMatchSourceFilter(dataSource);
 
     const championRows = await this.prisma.$queryRaw<
       {
@@ -4127,6 +4412,9 @@ export class LabStatsService {
           SUM(mp."totalDamageDealtToChampions")::float AS "teamDamage",
           SUM(mp."visionScore")::float AS "teamVision"
         FROM "match_participants" mp
+        INNER JOIN "matches" m ON m."id" = mp."matchId"
+        WHERE m."completedAt" IS NOT NULL
+          ${sourceFilter}
         GROUP BY mp."matchId", COALESCE(mp."teamId", CONCAT('__WIN__:', mp."win"::text))
       )
       SELECT
@@ -4154,6 +4442,7 @@ export class LabStatsService {
         ON tt."matchId" = mp."matchId"
        AND tt."teamKey" = COALESCE(mp."teamId", CONCAT('__WIN__:', mp."win"::text))
       WHERE m."completedAt" IS NOT NULL
+        ${sourceFilter}
         AND mp."championId" = ${championId}
         AND mp."userId" IS NOT NULL
       GROUP BY mp."userId"
@@ -4167,6 +4456,7 @@ export class LabStatsService {
         championId,
         championName,
         championNameKorean: getChampionKoreanName(championName),
+        dataSource,
         appliedCriteria: {
           minTier: "DIAMOND",
           minRank: "II",
@@ -4179,7 +4469,9 @@ export class LabStatsService {
         insufficient: true,
         masteries: [],
       };
-      await this.redis.set(cacheKey, JSON.stringify(empty), 1800);
+      if (includeCrossSourceBadge) {
+        await this.redis.set(cacheKey, JSON.stringify(empty), 1800);
+      }
       return empty;
     }
 
@@ -4449,7 +4741,7 @@ export class LabStatsService {
         : null;
 
     const masteries: LabChampionMasteryEntry[] = topScored.map((row, idx) => {
-      const badges: LabChampionMasteryBadge[] = [];
+      const badges: LabChampionMasteryBadgeWithDerived[] = [];
       const highSoldPrice =
         typeof row.avgSoldPrice === "number" &&
         soldQ3 !== null &&
@@ -4488,10 +4780,30 @@ export class LabStatsService {
       };
     });
 
+    if (includeCrossSourceBadge) {
+      const oppositeSource: LabStatsDataSource =
+        dataSource === "custom" ? "ranked-community" : "custom";
+      const opposite = await this.getChampionMastery(
+        championId,
+        oppositeSource,
+        false,
+      );
+      const oppositeUserIds = new Set(opposite.masteries.map((row) => row.userId));
+      for (const entry of masteries) {
+        if (
+          oppositeUserIds.has(entry.userId) &&
+          !entry.badges.includes("양쪽 장인")
+        ) {
+          entry.badges.push("양쪽 장인");
+        }
+      }
+    }
+
     const result: LabChampionMasteryResponse = {
       championId,
       championName,
       championNameKorean: getChampionKoreanName(championName),
+      dataSource,
       appliedCriteria,
       totalUniquePlayersOnChamp,
       qualifiedCount: qualified.length,
@@ -4499,8 +4811,39 @@ export class LabStatsService {
       masteries,
     };
 
-    await this.redis.set(cacheKey, JSON.stringify(result), 1800);
+    if (includeCrossSourceBadge) {
+      await this.redis.set(cacheKey, JSON.stringify(result), 1800);
+    }
     return result;
+  }
+
+  private extractPurchasedCompletedItems(
+    itemPurchaseOrder: Prisma.JsonValue,
+    completedItemIds: Set<number>,
+  ): number[] {
+    if (!Array.isArray(itemPurchaseOrder)) return [];
+
+    return itemPurchaseOrder
+      .map((entry) => {
+        if (!entry || typeof entry !== "object") return null;
+        const itemId = Number((entry as { itemId?: unknown }).itemId);
+        const timestamp = Number((entry as { timestamp?: unknown }).timestamp ?? 0);
+
+        if (!Number.isInteger(itemId) || !completedItemIds.has(itemId)) {
+          return null;
+        }
+
+        return {
+          itemId,
+          timestamp: Number.isFinite(timestamp) ? timestamp : 0,
+        };
+      })
+      .filter(
+        (entry): entry is { itemId: number; timestamp: number } => entry !== null,
+      )
+      .sort((a, b) => a.timestamp - b.timestamp)
+      .map((entry) => entry.itemId)
+      .filter((id, index, array) => array.indexOf(id) === index);
   }
 
   /**

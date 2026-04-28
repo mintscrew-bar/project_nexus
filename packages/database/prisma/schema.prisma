@@ -436,6 +436,9 @@ model MatchParticipant {
   item6                       Int
   item7                       Int?
   perks                       Json
+  itemPurchaseOrder           Json?
+  skillOrder                  Json?
+  timelineExtractedAt         DateTime?
   champLevel                  Int
   largestKillingSpree         Int
   largestMultiKill            Int
@@ -1162,6 +1165,10 @@ enum AppealStatus {
 // 챔피언별 기간별 집계 캐시 — 야간 cron 갱신
 model LabChampionSnapshot {
   id           String   @id @default(cuid())
+  // 데이터 소스 분리 — 같은 챔피언/기간이라도 내전과 외부 ranked 매치는 별도 행으로 저장.
+  // 'custom'           = 내전 (matches.roomId IS NOT NULL)
+  // 'ranked-community' = 외부 ranked 매치 (roomId NULL & riotMatchId IS NOT NULL)
+  source       String   @default("custom")
   period       String   // '30d' | '90d' | 'all'
   patchVersion String?
   championId   Int
@@ -1176,9 +1183,9 @@ model LabChampionSnapshot {
   wilsonLower  Float    // Wilson score 하한 — 정렬/티어 기준
   computedAt   DateTime @default(now())
 
-  @@unique([period, patchVersion, championId, position])
-  @@index([period, championId])
-  @@index([period, position, wilsonLower])
+  @@unique([source, period, patchVersion, championId, position])
+  @@index([source, period, championId])
+  @@index([source, period, position, wilsonLower])
   @@map("lab_champion_snapshots")
 }
 

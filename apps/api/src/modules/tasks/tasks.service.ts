@@ -48,6 +48,8 @@ export class TasksService {
   private readonly rankedSeededSlotCap: number;
   private readonly rankedSeededStaleHours: number;
   private readonly rankedSeededInitialBackfillLimit: number;
+  private readonly riotMatchCacheCleanupEnabled: boolean;
+  private readonly riotMatchCacheTtlDays: number;
   private readonly matchFetchConfigs: QueueGroupConfig[];
 
   constructor(
@@ -70,6 +72,13 @@ export class TasksService {
     this.rankedSeededInitialBackfillLimit = this.getPositiveIntConfig(
       "MATCH_FETCH_RANKED_SEEDED_INITIAL_BACKFILL_LIMIT",
       25,
+    );
+    this.riotMatchCacheCleanupEnabled =
+      this.configService.get<string>("RIOT_MATCH_CACHE_CLEANUP_ENABLED") ===
+      "true";
+    this.riotMatchCacheTtlDays = this.getPositiveIntConfig(
+      "RIOT_MATCH_CACHE_TTL_DAYS",
+      14,
     );
     this.matchFetchConfigs = [
       {
@@ -653,6 +662,54 @@ export class TasksService {
       demotedCount: demoted.count,
       deletedCount: deleted.count,
     };
+  }
+
+  async runRiotMatchCacheCleanup(): Promise<{
+    deletedCount: number;
+    cutoff: Date;
+    enabled: boolean;
+  }> {
+    const cutoff = new Date(
+      Date.now() - this.riotMatchCacheTtlDays * 24 * 60 * 60 * 1000,
+    );
+
+    if (!this.riotMatchCacheCleanupEnabled) {
+      return { deletedCount: 0, cutoff, enabled: false };
+    }
+
+    const deleted = await this.prisma.$executeRaw`
+      DELETE FROM "riot_match_cache" rmc
+      WHERE rmc."gameEnd" < ${cutoff}
+        AND EXISTS (
+          SELECT 1
+          FROM "matches" m
+          WHERE m."riotMatchId" = rmc."matchId"
+        )
+    `;
+
+    return { deletedCount: Number(deleted), cutoff, enabled: true };
+  }
+
+  /**
+   * Riot raw match cache TTL cleanup - 매일 새벽 2시 20분.
+   *
+   * 기본 비활성화. 현재 개인 ranked/normal/aram 시즌 통계 재계산 일부가
+   * RiotMatchCache raw에 의존하므로, 정형 MatchParticipant 기반 재계산으로
+   * 완전히 전환한 뒤 RIOT_MATCH_CACHE_CLEANUP_ENABLED=true로 켠다.
+   */
+  @Cron("20 2 * * *")
+  async handleRiotMatchCacheCleanup(): Promise<void> {
+    try {
+      const result = await this.runRiotMatchCacheCleanup();
+      if (!result.enabled) return;
+      if (result.deletedCount > 0) {
+        this.logger.log(
+          `RiotMatchCache TTL 정리: ${result.deletedCount}건 삭제 (cutoff=${result.cutoff.toISOString()})`,
+        );
+      }
+    } catch (error) {
+      this.logger.error("RiotMatchCache TTL 정리 실패", error);
+    }
   }
 
   /**

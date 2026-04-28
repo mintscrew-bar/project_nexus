@@ -12,10 +12,24 @@ import {
 import { Throttle } from "@nestjs/throttler";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
-import { LabStatsService } from "./lab-stats.service";
+import {
+  LAB_STATS_DATA_SOURCES,
+  LabStatsService,
+  type LabStatsDataSource,
+} from "./lab-stats.service";
 import { StatsService } from "./stats.service";
 
 type Period = "30d" | "90d" | "all";
+
+function parseLabSource(source?: string): LabStatsDataSource {
+  const normalized = (source ?? "custom").trim();
+  if (LAB_STATS_DATA_SOURCES.includes(normalized as LabStatsDataSource)) {
+    return normalized as LabStatsDataSource;
+  }
+  throw new BadRequestException(
+    "source must be one of custom, ranked-community, ranked-meta",
+  );
+}
 
 // 랩 대시보드: 등록(인증) 유저 누구나 조회 가능.
 // 운영 작업(스냅샷 강제 재계산 등)은 admin.controller에서 별도 ADMIN 가드.
@@ -78,11 +92,17 @@ export class LabController {
     @Query("period") period: Period = "30d",
     @Query("position") position?: string,
     @Query("includeLowSample") includeLowSample?: string,
+    @Query("source") source?: string,
   ) {
     const includeLow = ["1", "true", "yes", "on"].includes(
       (includeLowSample ?? "").toLowerCase(),
     );
-    return this.labStatsService.getChampions(period, position, includeLow);
+    return this.labStatsService.getChampions(
+      period,
+      position,
+      includeLow,
+      parseLabSource(source),
+    );
   }
 
   /**
@@ -94,6 +114,7 @@ export class LabController {
   async getChampionDetail(
     @Param("championId") championIdParam: string,
     @Query("period") period: Period = "30d",
+    @Query("source") source?: string,
   ) {
     const championId = Number(championIdParam);
     if (!Number.isInteger(championId) || championId <= 0) {
@@ -103,6 +124,7 @@ export class LabController {
     const detail = await this.labStatsService.getChampionDetail(
       championId,
       period,
+      parseLabSource(source),
     );
     if (!detail) {
       throw new NotFoundException("Champion detail not found for this period");
@@ -117,13 +139,19 @@ export class LabController {
    */
   @Get("champions/:championId/mastery")
   @Throttle({ default: { limit: 30, ttl: 60000 } })
-  async getChampionMastery(@Param("championId") championIdParam: string) {
+  async getChampionMastery(
+    @Param("championId") championIdParam: string,
+    @Query("source") source?: string,
+  ) {
     const championId = Number(championIdParam);
     if (!Number.isInteger(championId) || championId <= 0) {
       throw new BadRequestException("championId must be a positive integer");
     }
 
-    return this.labStatsService.getChampionMastery(championId);
+    return this.labStatsService.getChampionMastery(
+      championId,
+      parseLabSource(source),
+    );
   }
 
   /**

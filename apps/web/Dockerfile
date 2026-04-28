@@ -22,6 +22,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # Next.js는 빌드 타임에 NEXT_PUBLIC_* 환경변수를 인라인하므로 ARG로 전달
 ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+RUN pnpm --filter @nexus/types build
 RUN pnpm --filter @nexus/web build
 
 # Production stage
@@ -43,6 +44,8 @@ COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next ./apps/web/.next
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/public ./apps/web/public
 COPY --from=builder /app/apps/web/package.json ./apps/web/
 COPY --from=builder /app/apps/web/next.config.mjs ./apps/web/
+COPY --from=builder /app/packages/types/dist ./node_modules/@nexus/types/dist
+COPY --from=builder /app/packages/types/package.json ./node_modules/@nexus/types/package.json
 
 USER nextjs
 

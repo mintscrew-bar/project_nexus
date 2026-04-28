@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/stores/auth-store";
 import { useLabStore } from "@/stores/lab-store";
-import { labQueryOptions, type ChampionListResponse } from "@/lib/lab-queries";
+import { labQueryOptions, type ChampionListResponse, type LabDataSource } from "@/lib/lab-queries";
 import {
   Card, CardContent, CardDescription, CardHeader, CardTitle, LoadingSpinner,
 } from "@/components/ui";
@@ -20,6 +20,12 @@ type Position = "ALL" | "TOP" | "JUNGLE" | "MID" | "ADC" | "SUPPORT";
 
 const VALID_SORTS: SortKey[] = ["winRate", "pickRate", "banRate"];
 const VALID_POSITIONS: Position[] = ["ALL", "TOP", "JUNGLE", "MID", "ADC", "SUPPORT"];
+const VALID_SOURCES: LabDataSource[] = ["custom", "ranked-community", "ranked-meta"];
+const SOURCE_LABELS: Record<LabDataSource, string> = {
+  custom: "내전",
+  "ranked-community": "랭크",
+  "ranked-meta": "랭크 메타",
+};
 
 /** 윌슨 하한 + 픽률 가중 점수로 S/A/B/C/D 티어 산정 */
 function computeTiers(champions: ChampionListResponse["champions"]) {
@@ -50,10 +56,9 @@ function computeTiers(champions: ChampionListResponse["champions"]) {
 }
 
 export default function LabChampionsPage() {
-  const { user, isAuthenticated, isLoading: authLoading } = useAuthStore();
+  const { isAuthenticated, isLoading: authLoading } = useAuthStore();
   const { period: activePeriod, position: storePosition, setPosition } = useLabStore();
-  const isAdmin = user?.role === "ADMIN";
-  const canFetch = !authLoading && isAuthenticated && isAdmin;
+  const canFetch = !authLoading && isAuthenticated;
 
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -66,6 +71,8 @@ export default function LabChampionsPage() {
   const includeLowSample = searchParams.get("lowSample") === "1";
   const urlPosition = searchParams.get("position") as Position | null;
   const activePosition = urlPosition && VALID_POSITIONS.includes(urlPosition) ? urlPosition : storePosition as Position;
+  const urlSource = searchParams.get("source") as LabDataSource | null;
+  const activeSource = urlSource && VALID_SOURCES.includes(urlSource) ? urlSource : "custom";
 
   /** URL param 한 항목만 바꾸고 push */
   function updateParam(key: string, value: string | null) {
@@ -91,6 +98,7 @@ export default function LabChampionsPage() {
       period: activePeriod,
       position: activePosition === "ALL" ? undefined : activePosition,
       includeLowSample,
+      source: activeSource,
     }),
     enabled: canFetch,
   });
@@ -131,7 +139,7 @@ export default function LabChampionsPage() {
             <span className="text-xs text-text-tertiary">스냅샷 미스 시 원본 집계</span>
           )}
           <Link
-            href={`/lab/champions/compare?period=${activePeriod}`}
+            href={`/lab/champions/compare?period=${activePeriod}&source=${activeSource}`}
             className="ml-auto flex items-center gap-1.5 rounded-lg bg-bg-primary/60 px-2.5 py-1.5 text-xs text-text-secondary transition-colors hover:bg-bg-elevated hover:text-text-primary"
           >
             <GitCompareArrows className="h-3.5 w-3.5" />
@@ -140,6 +148,22 @@ export default function LabChampionsPage() {
         </div>
       </CardHeader>
       <CardContent>
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          {VALID_SOURCES.map((source) => (
+            <button
+              key={source}
+              type="button"
+              onClick={() => updateParam("source", source === "custom" ? null : source)}
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+                activeSource === source
+                  ? "bg-accent-primary/20 text-accent-primary"
+                  : "bg-bg-primary/60 text-text-secondary hover:bg-bg-elevated"
+              }`}
+            >
+              {SOURCE_LABELS[source]}
+            </button>
+          ))}
+        </div>
         <ChampionFilters
           search={search}
           onSearchChange={handleSearchChange}
@@ -150,7 +174,7 @@ export default function LabChampionsPage() {
           position={activePosition}
           onPositionChange={handlePositionChange}
         />
-        <ChampionListTable rows={filteredRows} activePeriod={activePeriod} />
+        <ChampionListTable rows={filteredRows} activePeriod={activePeriod} activeSource={activeSource} />
       </CardContent>
     </Card>
   );

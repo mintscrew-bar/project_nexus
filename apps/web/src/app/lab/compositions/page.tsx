@@ -10,10 +10,9 @@ import { CounterCard } from "@/components/lab/compositions/CounterCard";
 import { CompositionTypesCard } from "@/components/lab/compositions/CompositionTypesCard";
 
 export default function LabCompositionsPage() {
-  const { user, isAuthenticated, isLoading: authLoading } = useAuthStore();
+  const { isAuthenticated, isLoading: authLoading } = useAuthStore();
   const { period: activePeriod } = useLabStore();
-  const isAdmin = user?.role === "ADMIN";
-  const canFetch = !authLoading && isAuthenticated && isAdmin;
+  const canFetch = !authLoading && isAuthenticated;
 
   // 챔피언 카탈로그 (시너지·카운터 셀렉트박스 공용)
   const { data: catalogResponse } = useQuery<ChampionListResponse>({

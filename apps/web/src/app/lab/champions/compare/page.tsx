@@ -11,6 +11,7 @@ import {
   labQueryOptions,
   type ChampionDetailResponse,
   type ChampionListResponse,
+  type LabDataSource,
 } from "@/lib/lab-queries";
 import { getChampionIconById } from "@/components/matches/match-utils";
 import { formatRate } from "@/lib/lab-format";
@@ -24,10 +25,9 @@ const MAX_COMPARE = 4;
 const COL_COLORS = ["#667EEA", "#0bc4e2", "#764BA2", "#ffa726"];
 
 export default function ChampionComparePage() {
-  const { user, isAuthenticated, isLoading: authLoading } = useAuthStore();
+  const { isAuthenticated, isLoading: authLoading } = useAuthStore();
   const { period: activePeriod } = useLabStore();
-  const isAdmin = user?.role === "ADMIN";
-  const canFetch = !authLoading && isAuthenticated && isAdmin;
+  const canFetch = !authLoading && isAuthenticated;
 
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -41,6 +41,11 @@ export default function ChampionComparePage() {
       .filter((n) => n > 0)
       .slice(0, MAX_COMPARE);
   }, [searchParams]);
+  const sourceParam = searchParams.get("source") as LabDataSource | null;
+  const activeSource: LabDataSource =
+    sourceParam && ["custom", "ranked-community", "ranked-meta"].includes(sourceParam)
+      ? sourceParam
+      : "custom";
 
   // 챔피언 추가 셀렉트 상태
   const [adding, setAdding] = useState(false);
@@ -69,7 +74,7 @@ export default function ChampionComparePage() {
 
   // 챔피언 카탈로그 (셀렉트박스용)
   const { data: catalogResponse } = useQuery<ChampionListResponse>({
-    ...labQueryOptions.champions({ period: activePeriod, includeLowSample: true }),
+    ...labQueryOptions.champions({ period: activePeriod, includeLowSample: true, source: activeSource }),
     enabled: canFetch,
   });
   const championCatalog = useMemo(
@@ -84,7 +89,7 @@ export default function ChampionComparePage() {
   const queries = championIds.map((id) =>
     // eslint-disable-next-line react-hooks/rules-of-hooks
     useQuery<ChampionDetailResponse>({
-      ...labQueryOptions.championDetail(id, activePeriod),
+      ...labQueryOptions.championDetail(id, activePeriod, activeSource),
       enabled: canFetch && id > 0,
     }),
   );
@@ -146,7 +151,7 @@ export default function ChampionComparePage() {
     <div className="space-y-6">
       {/* 브레드크럼 */}
       <Link
-        href={`/lab/champions?period=${activePeriod}`}
+        href={`/lab/champions?period=${activePeriod}&source=${activeSource}`}
         className="inline-flex items-center gap-1.5 text-sm text-text-tertiary hover:text-text-primary"
       >
         <ArrowLeft className="h-4 w-4" />
@@ -312,7 +317,7 @@ export default function ChampionComparePage() {
             return (
               <Link
                 key={id}
-                href={`/lab/champions/${id}?period=${activePeriod}`}
+                href={`/lab/champions/${id}?period=${activePeriod}&source=${activeSource}`}
                 className="flex items-center gap-2 rounded-xl border border-white/10 bg-bg-secondary/80 px-4 py-2 text-sm text-text-secondary transition-colors hover:bg-bg-elevated hover:text-text-primary"
               >
                 <div className="h-2 w-2 rounded-full" style={{ background: COL_COLORS[colIdx] }} />

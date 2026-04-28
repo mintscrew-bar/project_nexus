@@ -6,6 +6,16 @@ export type CustomMatchGroupBy =
   | "champion+position"
   | "user+champion";
 
+/**
+ * 데이터 소스 구분 — 같은 match_participants 테이블에 내전/외부 ranked가 섞여 있어
+ * 통계 집계 시 source 분리가 필수.
+ *
+ * - 'custom'           = 내전 (matches.roomId IS NOT NULL)
+ * - 'ranked-community' = 외부 ranked 매치 (roomId NULL & riotMatchId IS NOT NULL)
+ * - 'all'              = 분리 없이 전체 (기존 동작 유지용 — 새 호출은 자제)
+ */
+export type MatchStatsSource = "custom" | "ranked-community" | "all";
+
 type CustomAggregationClient = Pick<PrismaClient, "$queryRaw">;
 
 export interface AggregateCustomMatchStatsOptions {
@@ -16,6 +26,11 @@ export interface AggregateCustomMatchStatsOptions {
   groupBy: CustomMatchGroupBy;
   minGames?: number;
   dateField?: "createdAt" | "completedAt";
+  /**
+   * 데이터 소스. 미지정 시 'all' (호환용). 새 호출은 명시적으로 'custom' 또는
+   * 'ranked-community'를 지정해야 한다.
+   */
+  source?: MatchStatsSource;
 }
 
 export interface CustomMatchAggregateRow {
@@ -42,14 +57,27 @@ function getPeriodStart(period?: CustomMatchPeriod): Date | null {
   return new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 }
 
+function buildSourceFilter(source?: MatchStatsSource): Prisma.Sql {
+  // 소스 미지정 시 분리 없이 전체 (호환). 새 호출은 명시적으로 지정해야 함.
+  if (!source || source === "all") return Prisma.empty;
+  if (source === "custom") {
+    // 내전: roomId가 있는 매치 (Nexus 내부 토너먼트)
+    return Prisma.sql`AND m."roomId" IS NOT NULL`;
+  }
+  // ranked-community: 외부 ranked 매치 — roomId 없고 riotMatchId 있는 매치
+  return Prisma.sql`AND m."roomId" IS NULL AND m."riotMatchId" IS NOT NULL`;
+}
+
 function buildWhereSql(options: AggregateCustomMatchStatsOptions): Prisma.Sql {
   const dateField = options.dateField ?? "completedAt";
   const fromDate = options.fromDate ?? getPeriodStart(options.period);
   const dateColumn = Prisma.raw(`m."${dateField}"`);
+  const sourceFilter = buildSourceFilter(options.source);
 
   return Prisma.sql`
     WHERE ${dateColumn} IS NOT NULL
       ${fromDate ? Prisma.sql`AND ${dateColumn} >= ${fromDate}` : Prisma.empty}
+      ${sourceFilter}
       ${options.userId ? Prisma.sql`AND mp."userId" = ${options.userId}` : Prisma.empty}
       ${
         options.position === undefined

@@ -9,6 +9,8 @@ import { queryOptions } from "@tanstack/react-query";
 import { statsApi, riotApi } from "@/lib/api-client";
 import type { LabPeriod } from "@/stores/lab-store";
 
+export type LabDataSource = "custom" | "ranked-community" | "ranked-meta";
+
 // ─── 응답 타입 정의 ────────────────────────────────────────────────────────────
 
 export type LabOverview = {
@@ -163,6 +165,7 @@ export type ChampionListResponse = {
   period: LabPeriod;
   position: string | null;
   includeLowSample: boolean;
+  dataSource: LabDataSource;
   source: "snapshot" | "realtime";
   champions: Array<{
     championId: number;
@@ -469,6 +472,7 @@ export type ChampionDetailResponse = {
   championId: number;
   championName: string;
   championNameKorean: string;
+  dataSource: LabDataSource;
   period: LabPeriod;
   totals: { games: number; wins: number; winRate: number };
   winrateTrend: Array<{ weekStart: string; games: number; wins: number; winRate: number }>;
@@ -481,6 +485,18 @@ export type ChampionDetailResponse = {
     pickRateWithinChampion: number;
     wilsonLower: number;
     confidenceLevel: "low" | "moderate" | "high" | "insufficient";
+  }>;
+  topBuilds: Array<{
+    coreItems: number[];
+    boots: number | null;
+    summonerSpellIds: [number, number];
+    primaryStyle: number;
+    subStyle: number;
+    keystonePerk: number;
+    games: number;
+    wins: number;
+    winRate: number;
+    wilsonLower: number;
   }>;
   topItemCombos: Array<{
     itemIds: [number, number];
@@ -504,6 +520,7 @@ export type ChampionMasteryResponse = {
   championId: number;
   championName: string;
   championNameKorean: string;
+  dataSource: LabDataSource;
   appliedCriteria: {
     minTier: string;
     minRank: string;
@@ -532,7 +549,7 @@ export type ChampionMasteryResponse = {
     nexusWinRate: number;
     nexusGlobalRank: number | null;
     avgSoldPrice: number | null;
-    badges: Array<"커뮤니티 인증" | "고평가" | "기준 완화">;
+    badges: Array<"커뮤니티 인증" | "고평가" | "기준 완화" | "양쪽 장인">;
   }>;
 };
 
@@ -693,13 +710,14 @@ export const labQueryKeys = {
     period: LabPeriod;
     position?: string;
     includeLowSample?: boolean;
+    source?: LabDataSource;
   }) => ["lab", "champions", params] as const,
 
-  championDetail: (championId: number, period: LabPeriod) =>
-    ["lab", "champion", championId, "detail", period] as const,
+  championDetail: (championId: number, period: LabPeriod, source: LabDataSource = "custom") =>
+    ["lab", "champion", championId, "detail", period, source] as const,
 
-  championMastery: (championId: number) =>
-    ["lab", "champion", championId, "mastery"] as const,
+  championMastery: (championId: number, source: LabDataSource = "custom") =>
+    ["lab", "champion", championId, "mastery", source] as const,
 
   synergy: (params: { period: LabPeriod; championId?: number; limit?: number }) =>
     ["lab", "synergy", params] as const,
@@ -771,6 +789,7 @@ export const labQueryOptions = {
     period: LabPeriod;
     position?: string;
     includeLowSample?: boolean;
+    source?: LabDataSource;
   }) =>
     queryOptions<ChampionListResponse>({
       queryKey: labQueryKeys.champions(params),
@@ -779,24 +798,25 @@ export const labQueryOptions = {
           period: params.period,
           position: params.position as "TOP" | "JUNGLE" | "MID" | "ADC" | "SUPPORT" | undefined,
           includeLowSample: params.includeLowSample,
+          source: params.source,
         }) as Promise<ChampionListResponse>,
       staleTime: 30 * 60 * 1000,
     }),
 
-  championDetail: (championId: number, period: LabPeriod) =>
+  championDetail: (championId: number, period: LabPeriod, source: LabDataSource = "custom") =>
     queryOptions<ChampionDetailResponse>({
-      queryKey: labQueryKeys.championDetail(championId, period),
+      queryKey: labQueryKeys.championDetail(championId, period, source),
       queryFn: () =>
-        statsApi.getLabChampionDetail(championId, period) as Promise<ChampionDetailResponse>,
+        statsApi.getLabChampionDetail(championId, period, source) as Promise<ChampionDetailResponse>,
       staleTime: 30 * 60 * 1000,
       enabled: championId > 0,
     }),
 
-  championMastery: (championId: number) =>
+  championMastery: (championId: number, source: LabDataSource = "custom") =>
     queryOptions<ChampionMasteryResponse>({
-      queryKey: labQueryKeys.championMastery(championId),
+      queryKey: labQueryKeys.championMastery(championId, source),
       queryFn: () =>
-        statsApi.getLabChampionMastery(championId) as Promise<ChampionMasteryResponse>,
+        statsApi.getLabChampionMastery(championId, source) as Promise<ChampionMasteryResponse>,
       staleTime: 30 * 60 * 1000,
       enabled: championId > 0,
     }),

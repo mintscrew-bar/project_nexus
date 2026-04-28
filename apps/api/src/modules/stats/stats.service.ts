@@ -3,6 +3,7 @@ import {
   HttpException,
   HttpStatus,
   Injectable,
+  Logger,
   NotFoundException,
 } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
@@ -247,6 +248,8 @@ export interface LabOverview {
 
 @Injectable()
 export class StatsService {
+  private readonly logger = new Logger(StatsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
@@ -2103,7 +2106,166 @@ export class StatsService {
    * Get match timeline (item purchases, gold/CS/XP per minute)
    */
   async getMatchTimeline(matchId: string) {
-    return this.riotMatchService.getMatchTimeline(matchId);
+    const timeline = await this.riotMatchService.getMatchTimeline(matchId);
+    await this.persistMatchTimelineSummary(matchId, timeline);
+    return timeline;
+  }
+
+  private extractTimelineParticipantSummaries(timeline: any): Map<
+    string,
+    {
+      itemPurchaseOrder: Array<{
+        itemId: number;
+        minute: number;
+        timestamp: number;
+      }>;
+      skillOrder: Array<{
+        skillSlot: number;
+        levelUpType?: string;
+        minute: number;
+        timestamp: number;
+      }>;
+    }
+  > {
+    const participantPuuids: unknown = timeline?.metadata?.participants;
+    if (!Array.isArray(participantPuuids)) return new Map();
+
+    const byParticipantId = new Map<
+      number,
+      {
+        puuid: string;
+        itemPurchaseOrder: Array<{
+          itemId: number;
+          minute: number;
+          timestamp: number;
+        }>;
+        skillOrder: Array<{
+          skillSlot: number;
+          levelUpType?: string;
+          minute: number;
+          timestamp: number;
+        }>;
+      }
+    >();
+
+    participantPuuids.forEach((puuid, index) => {
+      if (typeof puuid === "string" && puuid.length > 0) {
+        byParticipantId.set(index + 1, {
+          puuid,
+          itemPurchaseOrder: [],
+          skillOrder: [],
+        });
+      }
+    });
+
+    const frames: unknown = timeline?.info?.frames;
+    if (!Array.isArray(frames)) return new Map();
+
+    for (const frame of frames) {
+      const events: unknown = frame?.events;
+      if (!Array.isArray(events)) continue;
+
+      for (const event of events) {
+        const participantId = Number(event?.participantId);
+        const summary = byParticipantId.get(participantId);
+        if (!summary) continue;
+
+        const timestamp = Number(event?.timestamp ?? 0);
+        const minute = Math.max(0, Math.floor(timestamp / 60000));
+
+        if (event?.type === "ITEM_PURCHASED") {
+          const itemId = Number(event?.itemId);
+          if (Number.isInteger(itemId) && itemId > 0) {
+            summary.itemPurchaseOrder.push({ itemId, minute, timestamp });
+          }
+        }
+
+        if (event?.type === "SKILL_LEVEL_UP") {
+          const skillSlot = Number(event?.skillSlot);
+          if (Number.isInteger(skillSlot) && skillSlot > 0) {
+            summary.skillOrder.push({
+              skillSlot,
+              levelUpType:
+                typeof event?.levelUpType === "string"
+                  ? event.levelUpType
+                  : undefined,
+              minute,
+              timestamp,
+            });
+          }
+        }
+      }
+    }
+
+    return new Map(
+      Array.from(byParticipantId.values()).map((summary) => [
+        summary.puuid,
+        {
+          itemPurchaseOrder: summary.itemPurchaseOrder,
+          skillOrder: summary.skillOrder,
+        },
+      ]),
+    );
+  }
+
+  private async persistMatchTimelineSummary(
+    requestedMatchId: string,
+    timeline: any,
+  ): Promise<void> {
+    if (!timeline) return;
+
+    const riotMatchId =
+      typeof timeline?.metadata?.matchId === "string"
+        ? timeline.metadata.matchId
+        : requestedMatchId;
+    const summaries = this.extractTimelineParticipantSummaries(timeline);
+    if (summaries.size === 0) return;
+
+    const match = await this.prisma.match.findFirst({
+      where: { riotMatchId },
+      select: {
+        id: true,
+        participants: {
+          select: {
+            id: true,
+            puuid: true,
+          },
+        },
+      },
+    });
+
+    if (!match) return;
+
+    const extractedAt = new Date();
+    const updates = match.participants
+      .map((participant) => {
+        if (!participant.puuid) return null;
+        const summary = summaries.get(participant.puuid);
+        if (!summary) return null;
+
+        return this.prisma.matchParticipant.update({
+          where: { id: participant.id },
+          data: {
+            itemPurchaseOrder:
+              summary.itemPurchaseOrder as unknown as Prisma.JsonArray,
+            skillOrder: summary.skillOrder as unknown as Prisma.JsonArray,
+            timelineExtractedAt: extractedAt,
+          },
+        });
+      })
+      .filter((update): update is NonNullable<typeof update> => update !== null);
+
+    if (updates.length === 0) return;
+
+    try {
+      await this.prisma.$transaction(updates);
+    } catch (error) {
+      this.logger.warn(
+        `Failed to persist timeline summary for ${riotMatchId}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
   }
 
   /**

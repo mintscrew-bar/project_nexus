@@ -10,10 +10,9 @@ import { OracleSubNav } from "@/components/lab/oracle/OracleSubNav";
 import { AuctionEfficiencyCard } from "@/components/lab/oracle/AuctionEfficiencyCard";
 
 export default function LabOracleAuctionPage() {
-  const { user, isAuthenticated, isLoading: authLoading } = useAuthStore();
+  const { isAuthenticated, isLoading: authLoading } = useAuthStore();
   const { period: activePeriod } = useLabStore();
-  const isAdmin = user?.role === "ADMIN";
-  const canFetch = !authLoading && isAuthenticated && isAdmin;
+  const canFetch = !authLoading && isAuthenticated;
 
   const { data: auctionData, isLoading: auctionLoading } = useQuery<AuctionEfficiencyResponse>({
     ...labQueryOptions.auctionEfficiency(activePeriod),

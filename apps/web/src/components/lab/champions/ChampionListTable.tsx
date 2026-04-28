@@ -5,6 +5,7 @@ import Link from "next/link";
 import { getChampionIconById } from "@/components/matches/match-utils";
 import { formatRate } from "@/lib/lab-format";
 import { Badge } from "@/components/ui";
+import { LabConfidenceBadge } from "@/components/lab/shared/LabSourceBadge";
 import { LabEmptyState } from "@/components/lab/shared/LabEmptyState";
 import { Download } from "lucide-react";
 
@@ -24,11 +25,12 @@ interface TieredChampion {
 interface Props {
   rows: TieredChampion[];
   activePeriod: string;
+  activeSource?: string;
 }
 
 /** 현재 행 목록을 CSV로 내보내기 */
 function downloadCsv(rows: TieredChampion[], period: string) {
-  const header = ["티어", "챔피언(한글)", "챔피언(영문)", "게임", "승률", "픽률", "밴률"].join(",");
+  const header = ["티어", "챔피언(한글)", "챔피언(영문)", "게임", "승률", "픽률", "밴률", "신뢰도"].join(",");
   const body = rows
     .map((r) =>
       [
@@ -39,6 +41,7 @@ function downloadCsv(rows: TieredChampion[], period: string) {
         (r.winRate * 100).toFixed(1) + "%",
         r.pickRate.toFixed(2) + "%",
         r.banRate.toFixed(2) + "%",
+        r.confidenceLevel,
       ].join(","),
     )
     .join("\n");
@@ -52,7 +55,7 @@ function downloadCsv(rows: TieredChampion[], period: string) {
   URL.revokeObjectURL(url);
 }
 
-export function ChampionListTable({ rows, activePeriod }: Props) {
+export function ChampionListTable({ rows, activePeriod, activeSource = "custom" }: Props) {
   if (rows.length === 0) {
     return <LabEmptyState level="insufficient" section="챔피언 목록" className="mt-4" />;
   }
@@ -82,6 +85,7 @@ export function ChampionListTable({ rows, activePeriod }: Props) {
               <th className="px-3 py-2 text-right">승률</th>
               <th className="px-3 py-2 text-right">픽률</th>
               <th className="px-3 py-2 text-right">밴률</th>
+              <th className="px-3 py-2 text-right">신뢰도</th>
             </tr>
           </thead>
           <tbody>
@@ -94,7 +98,7 @@ export function ChampionListTable({ rows, activePeriod }: Props) {
               >
                 <td className="px-3 py-2">
                   <Link
-                    href={`/lab/champions/${row.championId}?period=${activePeriod}`}
+                    href={`/lab/champions/${row.championId}?period=${activePeriod}&source=${activeSource}`}
                     className="flex items-center gap-2 text-left"
                   >
                     <div className="relative h-8 w-8 overflow-hidden rounded-lg border border-white/10">
@@ -120,6 +124,9 @@ export function ChampionListTable({ rows, activePeriod }: Props) {
                 <td className="px-3 py-2 text-right text-text-secondary">{formatRate(row.winRate)}</td>
                 <td className="px-3 py-2 text-right text-text-secondary">{row.pickRate.toFixed(2)}%</td>
                 <td className="px-3 py-2 text-right text-text-secondary">{row.banRate.toFixed(2)}%</td>
+                <td className="px-3 py-2 text-right">
+                  <LabConfidenceBadge confidence={row.confidenceLevel} games={row.games} />
+                </td>
               </tr>
             ))}
           </tbody>
@@ -131,7 +138,7 @@ export function ChampionListTable({ rows, activePeriod }: Props) {
         {rows.map((row) => (
           <Link
             key={row.championId}
-            href={`/lab/champions/${row.championId}?period=${activePeriod}`}
+            href={`/lab/champions/${row.championId}?period=${activePeriod}&source=${activeSource}`}
             className={`rounded-xl border border-white/10 bg-bg-secondary/40 p-3 transition-colors hover:bg-bg-elevated/60 ${
               row.confidenceLevel === "low" ? "opacity-80" : ""
             }`}
@@ -169,6 +176,9 @@ export function ChampionListTable({ rows, activePeriod }: Props) {
                 <p>게임</p>
                 <p className="font-semibold text-text-secondary">{row.games}</p>
               </div>
+            </div>
+            <div className="mt-2">
+              <LabConfidenceBadge confidence={row.confidenceLevel} games={row.games} />
             </div>
           </Link>
         ))}
