@@ -38,7 +38,7 @@ interface UserSettings {
 
 export default function SettingsPage() {
   const router = useRouter();
-  const { user, isAuthenticated, isLoading, logout, deleteAccount } = useAuthStore();
+  const { user, isAuthenticated, isLoading, logout, deleteAccount, fetchUser } = useAuthStore();
   const { champions, championMap, fetchChampions } = useDdragonStore();
   const { setTheme: setNextTheme } = useTheme();
   const { fetchAccounts, isIconVerified } = useRiotStore();
@@ -373,7 +373,13 @@ export default function SettingsPage() {
                           <Button
                             size="sm"
                             variant={hasRiot ? "outline" : "primary"}
-                            onClick={() => setShowRiotModal(true)}
+                            onClick={() => {
+                              if (hasRiot) {
+                                router.push("/profile");
+                                return;
+                              }
+                              setShowRiotModal(true);
+                            }}
                           >
                             {hasRiot ? "계정 관리" : isIconVerified ? "계속하기" : "연동하기"}
                           </Button>
@@ -468,7 +474,11 @@ export default function SettingsPage() {
               <AddAccountModal
                 isOpen={showRiotModal}
                 onClose={() => setShowRiotModal(false)}
-                onAccountAdded={() => { fetchAccounts(); setShowRiotModal(false); }}
+                onAccountAdded={() => {
+                  fetchAccounts();
+                  fetchUser();
+                  setShowRiotModal(false);
+                }}
               />
               </div>
             )}

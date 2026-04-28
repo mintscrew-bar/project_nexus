@@ -235,6 +235,8 @@ export default function ProfilePage() {
   const handleSetPrimary = async (accountId: string) => {
     try {
       await setPrimaryAccount(accountId);
+      await fetchUser();
+      fetchProfile();
       addToast('대표 계정이 변경되었습니다.', 'success');
     } catch {
       addToast('대표 계정 설정에 실패했습니다.', 'error');
@@ -245,6 +247,8 @@ export default function ProfilePage() {
     setSyncingAccountId(accountId);
     try {
       await syncAccount(accountId);
+      await fetchUser();
+      fetchProfile();
     } catch {
       addToast('계정 동기화에 실패했습니다.', 'error');
     } finally {
@@ -257,6 +261,7 @@ export default function ProfilePage() {
     try {
       await deleteAccount(accountId);
       addToast('계정이 삭제되었습니다.', 'success');
+      await fetchUser();
       fetchProfile();
     } catch {
       addToast('계정 삭제에 실패했습니다.', 'error');
@@ -379,6 +384,11 @@ export default function ProfilePage() {
   }
 
   const primary = profileData?.riotAccounts?.find((a: any) => a.isPrimary) || profileData?.riotAccounts?.[0];
+  const displayAccounts = accounts.length > 0
+    ? accounts
+    : (profileData?.riotAccounts?.length
+        ? profileData.riotAccounts
+        : user?.riotAccounts ?? []);
   const clan = profileData?.clanMemberships?.[0]?.clan;
   const preferredChampions = getPreferredChampionsByRole();
   const highlightChampionId = profileData?.settings?.highlightChampionId;
@@ -786,7 +796,7 @@ export default function ProfilePage() {
                 </Button>
               </CardHeader>
               <CardContent>
-                {accounts.length === 0 ? (
+                {displayAccounts.length === 0 ? (
                   <div className="text-center py-12">
                     <Shield className="h-12 w-12 mx-auto mb-4 text-text-tertiary" />
                     <p className="text-text-secondary mb-4">
@@ -801,7 +811,7 @@ export default function ProfilePage() {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {accounts.map((account) => (
+                    {displayAccounts.map((account: any) => (
                       <div
                         key={account.id}
                         className={`p-4 rounded-lg border-2 transition-all ${
@@ -1109,6 +1119,7 @@ export default function ProfilePage() {
         onClose={() => setShowAddModal(false)}
         onAccountAdded={() => {
           fetchAccounts();
+          fetchUser();
           fetchProfile();
           setShowAddModal(false);
         }}
@@ -1120,6 +1131,7 @@ export default function ProfilePage() {
         onClose={() => { setShowEditModal(false); setEditingAccount(null); }}
         onAccountUpdated={() => {
           fetchAccounts();
+          fetchUser();
           fetchProfile();
         }}
         account={editingAccount}
