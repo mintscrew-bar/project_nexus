@@ -11,23 +11,32 @@ import {
 } from "@nestjs/common";
 import { Throttle } from "@nestjs/throttler";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
-import { RolesGuard } from "../auth/guards/roles.guard";
-import { Roles } from "../auth/decorators/roles.decorator";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { LabStatsService } from "./lab-stats.service";
 import { StatsService } from "./stats.service";
-import { UserRole } from "@nexus/database";
 
 type Period = "30d" | "90d" | "all";
 
+// 랩 대시보드: 등록(인증) 유저 누구나 조회 가능.
+// 운영 작업(스냅샷 강제 재계산 등)은 admin.controller에서 별도 ADMIN 가드.
 @Controller("stats/lab")
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(UserRole.ADMIN)
+@UseGuards(JwtAuthGuard)
 export class LabController {
   constructor(
     private readonly labStatsService: LabStatsService,
     private readonly statsService: StatsService,
   ) {}
+
+  /**
+   * 랩 데이터 단계 조회
+   * 단계 0~4, 총 매치 수, 다음 단계까지 남은 게임 수, 마지막 스냅샷 시각.
+   * 등록 유저 누구나 호출 가능 (단계 해금 표시용).
+   */
+  @Get("data-phase")
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  async getDataPhase() {
+    return this.labStatsService.getDataPhase();
+  }
 
   /**
    * Task 9: 메타 레이더 개요

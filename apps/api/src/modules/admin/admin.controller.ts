@@ -370,16 +370,6 @@ export class AdminController {
   }
 
   /**
-   * Task 35: 현재 Lab 데이터 단계 조회
-   * 단계 0~4, 총 매치 수, 다음 단계까지 남은 게임 수, 마지막 스냅샷 시각 반환.
-   */
-  @Get("lab/data-phase")
-  @Roles(UserRole.ADMIN)
-  getLabDataPhase() {
-    return this.labTasksService.getLabDataPhase();
-  }
-
-  /**
    * Task 39: 외부 랭크 챔피언 스냅샷 수동 재계산 트리거
    * 고티어 시딩 유저 랭크 매치 → LabRankedChampionSnapshot 즉시 재계산
    */

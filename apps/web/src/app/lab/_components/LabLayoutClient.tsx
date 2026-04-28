@@ -6,7 +6,7 @@ import { useEffect } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/auth-store";
 import { useLabStore, type LabPeriod } from "@/stores/lab-store";
-import { adminApi } from "@/lib/api-client";
+import { adminApi, statsApi } from "@/lib/api-client";
 import { toast } from "@/stores/toast-store";
 import { Badge, LoadingSpinner } from "@/components/ui";
 import { ArrowRight, FlaskConical, Info, RefreshCw, ShieldAlert } from "lucide-react";
@@ -61,7 +61,8 @@ export default function LabLayoutClient({ children }: { children: React.ReactNod
   const { user, isAuthenticated, isLoading: authLoading } = useAuthStore();
   const { period: activePeriod, setPeriod } = useLabStore();
   const isAdmin = user?.role === "ADMIN";
-  const canFetch = !authLoading && isAuthenticated && isAdmin;
+  // 랩 조회는 등록 유저 누구나 가능. 운영(스냅샷 재계산 등)만 어드민 전용.
+  const canFetch = !authLoading && isAuthenticated;
 
   // URL → store 동기화
   useEffect(() => {
@@ -75,7 +76,7 @@ export default function LabLayoutClient({ children }: { children: React.ReactNod
 
   const { data: labDataPhase } = useQuery({
     queryKey: ["lab", "data-phase"] as const,
-    queryFn: () => adminApi.getLabDataPhase(),
+    queryFn: () => statsApi.getLabDataPhase(),
     staleTime: 5 * 60 * 1000,
     enabled: canFetch,
   });
@@ -119,16 +120,16 @@ export default function LabLayoutClient({ children }: { children: React.ReactNod
     );
   }
 
-  // 접근 권한 없음
-  if (!isAuthenticated || !isAdmin) {
+  // 비로그인 유저 차단 (랑크 데이터 활용을 위해 Riot 연동된 등록 유저만 진입)
+  if (!isAuthenticated) {
     return (
       <div className="mx-auto max-w-4xl px-4 py-16">
         <div className="flex items-start gap-4 rounded-2xl border border-accent-warning/20 bg-accent-warning/5 p-6">
           <ShieldAlert className="mt-0.5 h-5 w-5 text-accent-warning" />
           <div className="space-y-2">
-            <p className="text-lg font-semibold text-text-primary">Lab 접근 권한 필요</p>
+            <p className="text-lg font-semibold text-text-primary">로그인이 필요합니다</p>
             <p className="text-sm leading-6 text-text-secondary">
-              현재 Lab은 관리자 전용 연구 영역입니다. 접근 권한이 필요한 경우 운영진에게 요청해 주세요.
+              랩 대시보드는 등록 유저 전용입니다. 로그인 후 이용해 주세요.
             </p>
             <Link
               href="/"
@@ -148,13 +149,13 @@ export default function LabLayoutClient({ children }: { children: React.ReactNod
       {/* 히어로 — 타이틀 + 탭 + 기간 필터 */}
       <header className="border-b border-bg-tertiary">
         <div className="mx-auto max-w-7xl px-4 py-6 md:px-6 md:py-8">
-          {/* 상단: 제목 + 비공개 배지 */}
+          {/* 상단: 제목 + 상태 배지 */}
           <div className="mb-5 flex items-center gap-3">
             <FlaskConical className="h-5 w-5 text-accent-primary" />
             <h1 className="text-xl font-bold tracking-tight text-text-primary">
               실험실 연구 대시보드
             </h1>
-            <Badge variant="warning" size="sm">비공개 프리뷰</Badge>
+            <Badge variant="primary" size="sm">베타</Badge>
           </div>
 
           {/* 단계 + 탭 + 기간 */}
@@ -196,16 +197,18 @@ export default function LabLayoutClient({ children }: { children: React.ReactNod
               <span className="text-text-tertiary">
                 · 스냅샷 {relativeTime(labDataPhase?.snapshotLastComputedAt)}
               </span>
-              {/* 수동 재계산 버튼 */}
-              <button
-                type="button"
-                onClick={() => triggerRecompute()}
-                disabled={isRecomputing}
-                className="ml-auto flex items-center gap-1 rounded-lg bg-bg-primary/60 px-2 py-1 text-xs text-text-secondary transition-colors hover:bg-bg-elevated disabled:cursor-wait disabled:opacity-60"
-              >
-                <RefreshCw className={`h-3 w-3 ${isRecomputing ? "animate-spin" : ""}`} />
-                {isRecomputing ? "재계산 중..." : "지금 새로고침"}
-              </button>
+              {/* 수동 재계산 버튼 — 어드민 전용 */}
+              {isAdmin ? (
+                <button
+                  type="button"
+                  onClick={() => triggerRecompute()}
+                  disabled={isRecomputing}
+                  className="ml-auto flex items-center gap-1 rounded-lg bg-bg-primary/60 px-2 py-1 text-xs text-text-secondary transition-colors hover:bg-bg-elevated disabled:cursor-wait disabled:opacity-60"
+                >
+                  <RefreshCw className={`h-3 w-3 ${isRecomputing ? "animate-spin" : ""}`} />
+                  {isRecomputing ? "재계산 중..." : "지금 새로고침"}
+                </button>
+              ) : null}
             </div>
 
             {/* 탭 네비게이션 */}

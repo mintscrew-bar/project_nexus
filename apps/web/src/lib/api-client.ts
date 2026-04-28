@@ -1281,6 +1281,18 @@ export const statsApi = {
     return response.data;
   },
 
+  // 랩 데이터 단계 (등록 유저 누구나 조회 가능)
+  getLabDataPhase: async () => {
+    const response = await apiClient.get("/stats/lab/data-phase");
+    return response.data as {
+      phase: number;
+      totalMatches: number;
+      nextPhaseThreshold: number | null;
+      remainingUntilNextPhase: number | null;
+      snapshotLastComputedAt: string | null;
+    };
+  },
+
   getChampionStats: async (
     gameName: string,
     tagLine: string,
@@ -1437,16 +1449,6 @@ export const adminApi = {
   getMatchQueueStats: async () => {
     const response = await apiClient.get("/admin/matches/queue-stats");
     return response.data;
-  },
-  getLabDataPhase: async () => {
-    const response = await apiClient.get("/admin/lab/data-phase");
-    return response.data as {
-      phase: number;
-      totalMatches: number;
-      nextPhaseThreshold: number | null;
-      remainingUntilNextPhase: number | null;
-      snapshotLastComputedAt: string | null;
-    };
   },
   recomputeLabSnapshots: async () => {
     const response = await apiClient.post("/admin/lab/recompute-snapshots");
