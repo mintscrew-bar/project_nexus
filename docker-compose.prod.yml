@@ -66,6 +66,8 @@ services:
       dockerfile: apps/web/Dockerfile
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:?NEXT_PUBLIC_API_URL is required}
+        # Next.js rewrites destination — 컴포즈 내부 호스트명 사용
+        API_URL: http://api:4000
     image: nexus-web:latest
     container_name: nexus-web
     restart: unless-stopped
