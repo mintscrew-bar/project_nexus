@@ -13,6 +13,7 @@
 - **[SETUP_GUIDE.md](./setup/SETUP_GUIDE.md)**: 전체 개발 환경 설정 (필독)
 - **[RIOT_SETUP.md](./setup/RIOT_SETUP.md)**: Riot API 발급 및 설정
 - **[DEPLOYMENT.md](./setup/DEPLOYMENT.md)**: 배포 가이드
+- **[REMOTE_ACCESS.md](./setup/REMOTE_ACCESS.md)**: 서버 PC 원격 접속 및 집에서 작업하는 방법
 - **[lab_workflow.md](./setup/lab_workflow.md)**: Lab 기능 개발 워크플로우
 
 ### 🏗️ [Technical Specs](./technical/)
