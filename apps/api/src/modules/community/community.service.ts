@@ -11,6 +11,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { PostCategory } from "./community.types";
 import { NotificationService } from "../notification/notification.service";
 import { RedisService } from "../redis/redis.service";
+import { UserRole } from "@nexus/database";
 
 export interface CreatePostDto {
   title: string;
@@ -77,7 +78,12 @@ export class CommunityService {
     // 밴/임시제한 유저 글쓰기 차단
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { isBanned: true, isRestricted: true, restrictedUntil: true },
+      select: {
+        role: true,
+        isBanned: true,
+        isRestricted: true,
+        restrictedUntil: true,
+      },
     });
     if (user?.isBanned) {
       throw new ForbiddenException(
@@ -91,6 +97,15 @@ export class CommunityService {
     ) {
       throw new ForbiddenException(
         "임시 제한 상태에서는 게시글을 작성할 수 없습니다.",
+      );
+    }
+    if (
+      dto.category === PostCategory.NOTICE &&
+      user?.role !== UserRole.ADMIN &&
+      user?.role !== UserRole.MODERATOR
+    ) {
+      throw new ForbiddenException(
+        "공지 카테고리는 관리자 또는 모더레이터만 작성할 수 있습니다.",
       );
     }
 

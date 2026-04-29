@@ -28,7 +28,11 @@ import {
 
 type PostCategory = "NOTICE" | "FREE" | "TIP" | "QNA";
 
-const categories: { value: PostCategory; label: string; icon: React.ElementType }[] = [
+const categories: {
+  value: PostCategory;
+  label: string;
+  icon: React.ElementType;
+}[] = [
   { value: "FREE", label: "자유", icon: MessageCircle },
   { value: "TIP", label: "팁", icon: Lightbulb },
   { value: "QNA", label: "Q&A", icon: HelpCircle },
@@ -37,7 +41,7 @@ const categories: { value: PostCategory; label: string; icon: React.ElementType 
 
 export default function WritePostPage() {
   const router = useRouter();
-  const { isAuthenticated, isLoading: authLoading } = useAuthStore();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuthStore();
 
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
@@ -49,7 +53,15 @@ export default function WritePostPage() {
 
   // 태그 정규화: 소문자, 한글/영문/숫자만 허용, 최대 20자
   const normalizeTag = (val: string) =>
-    val.trim().toLowerCase().replace(/[^a-z0-9가-힣]/g, "").slice(0, 20);
+    val
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9가-힣]/g, "")
+      .slice(0, 20);
+  const canWriteNotice = user?.role === "ADMIN" || user?.role === "MODERATOR";
+  const visibleCategories = canWriteNotice
+    ? categories
+    : categories.filter((cat) => cat.value !== "NOTICE");
 
   const handleTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" || e.key === ",") {
@@ -148,7 +160,7 @@ export default function WritePostPage() {
               <div>
                 <Label>카테고리</Label>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2">
-                  {categories.map((cat) => {
+                  {visibleCategories.map((cat) => {
                     const Icon = cat.icon;
                     return (
                       <button
@@ -196,7 +208,12 @@ export default function WritePostPage() {
 
               {/* Tags */}
               <div>
-                <Label>태그 <span className="text-text-tertiary text-xs font-normal">(최대 5개, Enter 또는 쉼표로 추가)</span></Label>
+                <Label>
+                  태그{" "}
+                  <span className="text-text-tertiary text-xs font-normal">
+                    (최대 5개, Enter 또는 쉼표로 추가)
+                  </span>
+                </Label>
                 <div className="mt-1 flex flex-wrap gap-2 p-2 rounded-lg border border-bg-tertiary bg-bg-secondary min-h-[42px] focus-within:border-accent-primary/50 transition-colors">
                   {tags.map((tag) => (
                     <span
