@@ -372,6 +372,9 @@ model Match {
   tournamentCode String?
   riotMatchId    String?
   patchVersion   String?            // ex: "14.8" — 패치 임팩트 분석용
+  // Riot 큐 식별자 (외부 인제스트 매치). 420=솔랭, 440=자랭, 400=일반 드래프트, 430=일반 블라인드, 450=ARAM.
+  // 내부 토너먼트 매치는 NULL — roomId 기준으로 식별한다.
+  queueId        Int?
   gameDuration   Int?
   dataCollected  Boolean            @default(false)
   scheduledAt    DateTime?
@@ -392,6 +395,8 @@ model Match {
   @@index([teamAId])
   @@index([teamBId])
   @@index([status])
+  @@index([queueId])
+  @@index([completedAt])
   @@map("matches")
 }
 

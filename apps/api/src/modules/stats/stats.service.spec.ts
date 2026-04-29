@@ -358,58 +358,47 @@ describe("StatsService", () => {
   });
 
   describe("getChampionStatsCacheByUserId", () => {
-    it("랭크 캐시 계산 시 recentGames 요약을 함께 저장한다", async () => {
+    it("랭크 통계 계산 시 정형 MatchParticipant 행에서 recentGames를 산출한다", async () => {
       prisma.matchStatsCache.findUnique.mockResolvedValue(null);
       prisma.riotAccount.findMany.mockResolvedValue([{ puuid: "puuid-1" }]);
-      prisma.riotMatchCache.findMany.mockResolvedValue([
+      // 새 경로: riotMatchCache 풀스캔 대신 MatchParticipant를 puuid 기반으로 직접 조회
+      prisma.matchParticipant.findMany.mockResolvedValue([
         {
-          gameEnd: new Date("2026-04-17T12:00:00.000Z"),
-          data: {
-            info: {
-              participants: [
-                {
-                  puuid: "puuid-1",
-                  teamId: 100,
-                  championId: 103,
-                  championName: "Ahri",
-                  kills: 8,
-                  deaths: 2,
-                  assists: 10,
-                  totalDamageDealtToChampions: 24000,
-                  win: true,
-                },
-                {
-                  puuid: "ally-1",
-                  teamId: 100,
-                  totalDamageDealtToChampions: 16000,
-                },
-              ],
-            },
+          championId: 103,
+          championName: "Ahri",
+          kills: 8,
+          deaths: 2,
+          assists: 10,
+          riotTeamId: 100,
+          totalDamageDealtToChampions: 24000,
+          win: true,
+          match: {
+            completedAt: new Date("2026-04-17T12:00:00.000Z"),
+            createdAt: new Date("2026-04-17T12:30:00.000Z"),
+            participants: [
+              { riotTeamId: 100, totalDamageDealtToChampions: 24000 },
+              { riotTeamId: 100, totalDamageDealtToChampions: 16000 },
+              { riotTeamId: 200, totalDamageDealtToChampions: 30000 },
+            ],
           },
         },
         {
-          gameEnd: new Date("2026-04-16T12:00:00.000Z"),
-          data: {
-            info: {
-              participants: [
-                {
-                  puuid: "puuid-1",
-                  teamId: 200,
-                  championId: 103,
-                  championName: "Ahri",
-                  kills: 4,
-                  deaths: 4,
-                  assists: 6,
-                  totalDamageDealtToChampions: 18000,
-                  win: false,
-                },
-                {
-                  puuid: "ally-2",
-                  teamId: 200,
-                  totalDamageDealtToChampions: 22000,
-                },
-              ],
-            },
+          championId: 103,
+          championName: "Ahri",
+          kills: 4,
+          deaths: 4,
+          assists: 6,
+          riotTeamId: 200,
+          totalDamageDealtToChampions: 18000,
+          win: false,
+          match: {
+            completedAt: new Date("2026-04-16T12:00:00.000Z"),
+            createdAt: new Date("2026-04-16T12:30:00.000Z"),
+            participants: [
+              { riotTeamId: 200, totalDamageDealtToChampions: 18000 },
+              { riotTeamId: 200, totalDamageDealtToChampions: 22000 },
+              { riotTeamId: 100, totalDamageDealtToChampions: 30000 },
+            ],
           },
         },
       ]);

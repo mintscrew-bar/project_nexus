@@ -69,12 +69,14 @@ export class RiotMatchCacheIngestService {
     try {
       await this.prisma.$transaction(async (tx) => {
         // 외부 매치 — roomId/teamAId/teamBId 없음
+        // queueId는 stats 서비스가 큐 그룹(랭크/일반/ARAM) 필터에 사용한다.
         const match = await tx.match.create({
           data: {
             riotMatchId: matchId,
             status: "COMPLETED",
             gameDuration: data.info.gameDuration ?? null,
             patchVersion,
+            queueId: cache.queueId,
             completedAt,
             dataCollected: true,
           },

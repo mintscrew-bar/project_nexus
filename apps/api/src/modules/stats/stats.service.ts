@@ -498,63 +498,54 @@ export class StatsService {
     );
   }
 
-  private extractStatsFromRiotMatchCacheRows(
-    rows: Array<{ data: Prisma.JsonValue; gameEnd: Date }>,
-    puuidSet: Set<string>,
-  ): {
-    stats: RankedChampStat[];
-    matchCount: number;
-    recentGames: RecentGamesSnapshot;
-  } {
-    const participantRows = this.extractParticipantRowsFromRiotMatchCacheRows(
-      rows,
-      puuidSet,
-    );
-    return {
-      stats: this.aggregateParticipantRows(participantRows),
-      matchCount: participantRows.length,
-      recentGames: this.buildRecentGamesSnapshot(participantRows),
-    };
-  }
-
-  private extractParticipantRowsFromRiotMatchCacheRows(
-    rows: Array<{ data: Prisma.JsonValue; gameEnd: Date }>,
-    puuidSet: Set<string>,
+  /**
+   * 외부 ranked-cache에서 정규화된 MatchParticipant 행을 통계 행으로 변환.
+   * — 내부 매치는 normalizeCustomParticipantRows 사용. 외부는 teamId가 NULL이므로
+   *   riotTeamId(100/200)로 같은 팀 데미지를 계산한다.
+   */
+  private normalizeRankedParticipantRows(
+    rows: Array<{
+      championId: number;
+      championName: string;
+      kills: number;
+      deaths: number;
+      assists: number;
+      win: boolean;
+      riotTeamId: number | null;
+      totalDamageDealtToChampions: number;
+      match: {
+        completedAt: Date | null;
+        createdAt: Date;
+        participants: Array<{
+          riotTeamId: number | null;
+          totalDamageDealtToChampions: number;
+        }>;
+      };
+    }>,
   ): CacheParticipantRow[] {
-    const participantRows: CacheParticipantRow[] = [];
-
-    for (const row of rows) {
-      const match = row.data as any;
-      const participants = match?.info?.participants;
-      if (!Array.isArray(participants)) continue;
-
-      const participant = participants.find((p: any) => puuidSet.has(p.puuid));
-      if (!participant) continue;
-      const teamDamage = participants
-        .filter((p: any) => p.teamId === participant.teamId)
+    return rows.map((row) => {
+      const teamDamage = row.match.participants
+        .filter((p) => p.riotTeamId === row.riotTeamId)
         .reduce(
-          (sum: number, p: any) => sum + (p.totalDamageDealtToChampions ?? 0),
+          (sum, participant) => sum + participant.totalDamageDealtToChampions,
           0,
         );
 
-      participantRows.push({
-        championId: participant.championId,
-        championName: participant.championName,
-        kills: participant.kills ?? 0,
-        deaths: participant.deaths ?? 0,
-        assists: participant.assists ?? 0,
-        win: Boolean(participant.win),
-        playedAt: row.gameEnd,
+      return {
+        championId: row.championId,
+        championName: row.championName,
+        kills: row.kills,
+        deaths: row.deaths,
+        assists: row.assists,
+        win: row.win,
+        // 외부 매치는 completedAt(=gameEnd)이 항상 설정됨. 안전을 위해 createdAt 폴백.
+        playedAt: row.match.completedAt ?? row.match.createdAt,
         damageShare:
           teamDamage > 0
-            ? this.roundMetric(
-                (participant.totalDamageDealtToChampions ?? 0) / teamDamage,
-              )
+            ? this.roundMetric(row.totalDamageDealtToChampions / teamDamage)
             : 0,
-      });
-    }
-
-    return participantRows;
+      };
+    });
   }
 
   private normalizeCustomParticipantRows(
@@ -680,19 +671,10 @@ export class StatsService {
         recentGames: this.buildRecentGamesSnapshot(participantRows),
       };
     } else if (queueGroup === "all") {
+      // 'all' = 내부 토너먼트 + 외부 ranked/normal/aram 합산.
+      // 두 경로 모두 MatchParticipant 정형 테이블에서 직접 조회 (raw cache 풀스캔 제거).
       const linkedAccounts = await this.getLinkedAccounts(userId);
       const puuidSet = new Set(linkedAccounts.map((account) => account.puuid));
-
-      const riotRows = puuidSet.size
-        ? await this.prisma.riotMatchCache.findMany({
-            where: {
-              queueId: { in: [420, 440, 400, 430, 450] },
-              gameEnd: { gte: seasonStart },
-            },
-            select: { data: true, gameEnd: true },
-            orderBy: { gameEnd: "desc" },
-          })
-        : [];
 
       const customRows = await this.prisma.matchParticipant.findMany({
         where: {
@@ -731,11 +713,52 @@ export class StatsService {
         },
       });
 
-      const riotParticipantRows =
-        this.extractParticipantRowsFromRiotMatchCacheRows(riotRows, puuidSet);
+      // 외부 매치 — Match.queueId가 5개 큐 중 하나인 행. userId 인덱스로 즉시 조회됨.
+      const rankedRows = puuidSet.size
+        ? await this.prisma.matchParticipant.findMany({
+            where: {
+              userId,
+              match: {
+                roomId: null,
+                queueId: { in: [420, 440, 400, 430, 450] },
+                completedAt: { gte: seasonStart },
+              },
+            },
+            select: {
+              championId: true,
+              championName: true,
+              kills: true,
+              deaths: true,
+              assists: true,
+              riotTeamId: true,
+              totalDamageDealtToChampions: true,
+              win: true,
+              match: {
+                select: {
+                  completedAt: true,
+                  createdAt: true,
+                  participants: {
+                    select: {
+                      riotTeamId: true,
+                      totalDamageDealtToChampions: true,
+                    },
+                  },
+                },
+              },
+            },
+            orderBy: {
+              match: {
+                completedAt: "desc",
+              },
+            },
+          })
+        : [];
+
       const customParticipantRows =
         this.normalizeCustomParticipantRows(customRows);
-      const mergedRows = [...riotParticipantRows, ...customParticipantRows];
+      const rankedParticipantRows =
+        this.normalizeRankedParticipantRows(rankedRows);
+      const mergedRows = [...rankedParticipantRows, ...customParticipantRows];
 
       const knownPuuidRows = puuidSet.size
         ? await this.prisma.knownPuuid.findMany({
@@ -762,6 +785,7 @@ export class StatsService {
         recentGames: this.buildRecentGamesSnapshot(mergedRows),
       };
     } else {
+      // ranked / normal / aram — 외부 인제스트 매치만 대상.
       const linkedAccounts = await this.getLinkedAccounts(userId);
       const puuidSet = new Set(linkedAccounts.map((account) => account.puuid));
 
@@ -774,24 +798,47 @@ export class StatsService {
         };
       } else {
         const queueIds = this.queueGroupToQueueIds[queueGroup];
-        const rows = await this.prisma.riotMatchCache.findMany({
+
+        // 정형 테이블 직접 조회. (userId, match.queueId, completedAt) 모두 인덱스 적용.
+        const rows = await this.prisma.matchParticipant.findMany({
           where: {
-            queueId: { in: queueIds },
-            gameEnd: { gte: seasonStart },
+            userId,
+            match: {
+              roomId: null,
+              queueId: { in: queueIds },
+              completedAt: { gte: seasonStart },
+            },
           },
           select: {
-            data: true,
-            gameEnd: true,
+            championId: true,
+            championName: true,
+            kills: true,
+            deaths: true,
+            assists: true,
+            riotTeamId: true,
+            totalDamageDealtToChampions: true,
+            win: true,
+            match: {
+              select: {
+                completedAt: true,
+                createdAt: true,
+                participants: {
+                  select: {
+                    riotTeamId: true,
+                    totalDamageDealtToChampions: true,
+                  },
+                },
+              },
+            },
           },
           orderBy: {
-            gameEnd: "desc",
+            match: {
+              completedAt: "desc",
+            },
           },
         });
 
-        const riotResult = this.extractStatsFromRiotMatchCacheRows(
-          rows,
-          puuidSet,
-        );
+        const participantRows = this.normalizeRankedParticipantRows(rows);
 
         const knownPuuidRows = await this.prisma.knownPuuid.findMany({
           where: {
@@ -812,10 +859,10 @@ export class StatsService {
               : "aramFetchedAt";
 
         result = {
-          stats: riotResult.stats,
-          matchCount: riotResult.matchCount,
+          stats: this.aggregateParticipantRows(participantRows),
+          matchCount: participantRows.length,
           isPartial: knownPuuidRows.some((row) => row[fetchedField] == null),
-          recentGames: riotResult.recentGames,
+          recentGames: this.buildRecentGamesSnapshot(participantRows),
         };
       }
     }
