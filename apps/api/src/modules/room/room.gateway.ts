@@ -49,6 +49,11 @@ export class RoomGateway
   private readonly TYPING_TIMEOUT_MS = 3000; // 3 seconds
   // Guard against concurrent start-game calls (double-click, race)
   private startingRooms = new Set<string>();
+  // 새로고침/잠깐 끊김 보호용 grace 타이머 — key: `${userId}:${roomId}`
+  // 소켓 disconnect 즉시 leaveRoom을 호출하면 새로고침만 해도 방에서 빠지므로,
+  // 이 시간 안에 같은 방에 join-room이 다시 들어오면 leave를 취소한다.
+  private disconnectGraceTimers = new Map<string, NodeJS.Timeout>();
+  private readonly DISCONNECT_GRACE_MS = 30_000; // 30 seconds
 
   constructor(
     private readonly roomService: RoomService,
@@ -75,6 +80,11 @@ export class RoomGateway
     this.userSockets.clear();
     this.socketRooms.clear();
     this.startingRooms.clear();
+    // grace 타이머도 정리
+    for (const timer of this.disconnectGraceTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.disconnectGraceTimers.clear();
   }
 
   async handleConnection(client: AuthenticatedSocket) {
@@ -111,73 +121,89 @@ export class RoomGateway
   }
 
   async handleDisconnect(client: AuthenticatedSocket) {
-    if (client.userId) {
-      const sockets = this.userSockets.get(client.userId);
-      if (sockets) {
-        sockets.delete(client.id);
-        if (sockets.size === 0) {
-          this.userSockets.delete(client.userId);
-        }
-      }
+    if (!client.userId) return;
 
-      // Leave room if in one
-      const roomId = this.socketRooms.get(client.id);
-      if (roomId) {
-        let _autoLeft = false;
-        let shouldNotifyOthers = false;
+    const userId = client.userId;
+    const username = client.username;
 
-        try {
-          // Only auto-leave from DB while room is in lobby state.
-          // After game starts (e.g. DRAFT/IN_PROGRESS), navigation disconnects
-          // should not remove participants.
-          const status = await this.roomService.getRoomStatus(roomId);
-
-          // leaveRoom 내부에서도 상태를 다시 체크하므로 이중 안전장치
-          if (status === RoomStatus.WAITING) {
-            try {
-              await this.roomService.leaveRoom(client.userId!, roomId); // Assert client.userId is string
-              _autoLeft = true;
-              shouldNotifyOthers = true;
-            } catch (_leaveError: any) {
-              // leaveRoom 실패 (이미 나갔거나, 상태가 변경됨) — 무시
-            }
-          } else {
-            // 게임 진행 중에도 호스트가 나가면 다음 참가자에게 호스트 이양
-            try {
-              const newHostId = await this.roomService.transferActiveRoomHost(
-                roomId,
-                client.userId!,
-              );
-              if (newHostId) {
-                this.server.to(roomId).emit("host-changed", { newHostId });
-              }
-            } catch (_transferError) {
-              // 이양 실패는 best-effort — 무시
-            }
-          }
-        } catch (_error) {
-          // Room might already be deleted or user not in room, ignore
-        }
-
-        // 소켓 방은 항상 나가기 (DB 상태와 무관)
-        client.leave(roomId);
-        this.socketRooms.delete(client.id);
-
-        if (shouldNotifyOthers) {
-          // Notify others in the room
-          this.server.to(roomId).emit("user-left", {
-            userId: client.userId,
-            username: client.username,
-          });
-
-          // 참가자 수 변경 → 방 요약 delta 전송
-          this.broadcastRoomDelta("update", roomId);
-        }
-
-        // Clear typing status on disconnect
-        this.stopTyping(roomId, client.userId!); // Assert client.userId is string
+    const sockets = this.userSockets.get(userId);
+    if (sockets) {
+      sockets.delete(client.id);
+      if (sockets.size === 0) {
+        this.userSockets.delete(userId);
       }
     }
+
+    const roomId = this.socketRooms.get(client.id);
+    if (!roomId) return;
+
+    // 소켓 단위 정리는 즉시 (이미 끊긴 소켓이라 leave는 의미상 noop이지만 안전)
+    client.leave(roomId);
+    this.socketRooms.delete(client.id);
+    // 타이핑 상태도 즉시 해제 (재연결 시 알아서 다시 emit)
+    this.stopTyping(roomId, userId);
+
+    // 같은 방에 같은 유저의 다른 활성 소켓이 남아 있으면 (멀티탭 등)
+    // grace 발동 없이 종료. 다른 탭에서 그대로 방에 남아 있다고 보면 됨.
+    const remainingSockets = this.userSockets.get(userId);
+    const hasOtherSocketInSameRoom = !!remainingSockets && Array.from(remainingSockets).some(
+      (sid) => this.socketRooms.get(sid) === roomId,
+    );
+    if (hasOtherSocketInSameRoom) {
+      return;
+    }
+
+    // 새로고침/잠깐 끊김 대비 grace timer.
+    // DISCONNECT_GRACE_MS 안에 같은 방에 join-room이 다시 들어오면 leave 취소.
+    const graceKey = `${userId}:${roomId}`;
+    const existing = this.disconnectGraceTimers.get(graceKey);
+    if (existing) clearTimeout(existing);
+
+    const timer = setTimeout(async () => {
+      this.disconnectGraceTimers.delete(graceKey);
+
+      // grace 만료 시점에 같은 유저가 같은 방에 다시 연결돼 있으면 leave 취소.
+      const sockNow = this.userSockets.get(userId);
+      const reconnectedToSameRoom = !!sockNow && Array.from(sockNow).some(
+        (sid) => this.socketRooms.get(sid) === roomId,
+      );
+      if (reconnectedToSameRoom) return;
+
+      let shouldNotifyOthers = false;
+      try {
+        const status = await this.roomService.getRoomStatus(roomId);
+        if (status === RoomStatus.WAITING) {
+          try {
+            await this.roomService.leaveRoom(userId, roomId);
+            shouldNotifyOthers = true;
+          } catch {
+            // 이미 나갔거나 상태가 변경됨 — 무시
+          }
+        } else {
+          // 게임 진행 중에도 호스트가 30초 안에 안 돌아오면 다음 참가자에게 이양
+          try {
+            const newHostId = await this.roomService.transferActiveRoomHost(
+              roomId,
+              userId,
+            );
+            if (newHostId) {
+              this.server.to(roomId).emit("host-changed", { newHostId });
+            }
+          } catch {
+            // best-effort — 무시
+          }
+        }
+      } catch {
+        // 방이 이미 삭제되었거나 알 수 없는 상태 — 무시
+      }
+
+      if (shouldNotifyOthers) {
+        this.server.to(roomId).emit("user-left", { userId, username });
+        this.broadcastRoomDelta("update", roomId);
+      }
+    }, this.DISCONNECT_GRACE_MS);
+
+    this.disconnectGraceTimers.set(graceKey, timer);
   }
 
   // ========================================
@@ -277,6 +303,14 @@ export class RoomGateway
       client.join(data.roomId);
       this.socketRooms.set(client.id, data.roomId);
 
+      // 새로고침/재연결로 grace 진행 중이면 leave 예약 취소
+      const graceKey = `${client.userId}:${data.roomId}`;
+      const pendingLeave = this.disconnectGraceTimers.get(graceKey);
+      if (pendingLeave) {
+        clearTimeout(pendingLeave);
+        this.disconnectGraceTimers.delete(graceKey);
+      }
+
       // Notify others only for new joins (not for reconnects)
       if (isNewJoin) {
         client.to(data.roomId).emit("user-joined", {
@@ -317,6 +351,14 @@ export class RoomGateway
       }
 
       await this.roomService.leaveRoom(client.userId!, data.roomId); // Assert client.userId is string
+
+      // 명시적 나가기 시 grace 예약 취소
+      const graceKey = `${client.userId}:${data.roomId}`;
+      const pending = this.disconnectGraceTimers.get(graceKey);
+      if (pending) {
+        clearTimeout(pending);
+        this.disconnectGraceTimers.delete(graceKey);
+      }
 
       // Leave Socket.IO room
       client.leave(data.roomId);

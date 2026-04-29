@@ -240,12 +240,9 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
   },
 
   disconnectFromRoom: () => {
-    const currentRoom = get().currentRoom;
-    const roomId = currentRoom?.id; // roomId를 먼저 캡처
-
-    if (roomId) {
-      roomSocketHelpers.leaveRoom(roomId);
-    }
+    // 새로고침/페이지 이동에서도 호출되므로 socket leave-room을 명시적으로 보내지 않는다.
+    // 진짜 방 나가기는 leaveRoom() 메서드가 REST로 처리.
+    // 단순 disconnect 시 backend는 30초 grace 후에만 자동 leave 한다.
     roomSocketHelpers.offAllListeners();
     disconnectRoomSocket();
     set({ isConnected: false, currentRoom: null, participants: [], chatMessages: [], typingUsers: new Map() });
