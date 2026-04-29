@@ -6,10 +6,10 @@ module.exports = {
       name: "nexus-api",
       script: "dist/main.js",
 
-      // 클러스터 모드: CPU 코어 수에 맞춰 워커 프로세스 생성
-      // Docker 컨테이너 내에서는 할당된 CPU에 맞게 조절됨
-      instances: "max",
-      exec_mode: "cluster",
+      // Discord 봇과 cron 작업은 프로세스별로 실행되므로 기본은 단일 인스턴스.
+      // 수평 확장은 봇/cron을 별도 worker로 분리한 뒤 다시 검토한다.
+      instances: 1,
+      exec_mode: "fork",
 
       // 메모리 제한: 512MB 초과 시 자동 재시작
       max_memory_restart: "512M",
@@ -42,7 +42,7 @@ module.exports = {
       kill_timeout: 75000,
       listen_timeout: 10000,
 
-      // 무중단 재배포 (클러스터 모드에서 하나씩 재시작)
+      // PM2 ready 신호 대기
       wait_ready: true,
     },
   ],

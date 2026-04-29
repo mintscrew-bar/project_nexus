@@ -86,7 +86,7 @@ export default function LabOracleBalancePage() {
     return () => {
       mounted = false;
     };
-  }, [teamAIdsInUrl.join(","), teamBIdsInUrl.join(",")]);
+  }, [teamAIdsInUrl, teamBIdsInUrl]);
 
   useEffect(() => {
     if (!hydratedFromUrl) return;

@@ -2,7 +2,7 @@
 
 > 작성일: 2026-04-24
 > 목적: 현재 `/lab` 대시보드의 기능적·시각적 불편함을 단계적으로 해소
-> 연계 문서: [Lab 대시보드 구현 계획](./TODO_lab_dashboard.md), [디자인 시스템](./DESIGN_SYSTEM.md)
+> 연계 문서: [Lab 대시보드 구현 계획](./TODO_lab_dashboard.md), [디자인 시스템](../technical/DESIGN_SYSTEM.md)
 > 진행 기준: Opus가 분석 → Sonnet이 실행
 
 ---

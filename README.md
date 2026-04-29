@@ -50,47 +50,12 @@ nexus/
 
 ## Documentation
 
-For more detailed documentation, please see the files in the `docs` directory. This includes information on:
+상세한 프로젝트 설계 및 개발 가이드는 **[docs/README.md](./docs/README.md)**를 참조하세요.
 
-- Server Setup
-- Technical Plans
-- API and Tournament Setup
-- and more...
-
-## Getting Started
-
-### Prerequisites
-
-- Node.js 20+
-- pnpm 8+
-- Docker & Docker Compose
-
-### Development Setup
-
-```bash
-# 1. 환경 변수 설정
-cp .env.example .env
-# .env 파일 수정
-
-# 2. 전체 스택 실행 (web + api + postgres + redis)
-pnpm compose:up
-```
-
-`compose:up` 실행 시 API 컨테이너가 아래를 자동 수행합니다.
-- `pnpm install`
-- Prisma client generate
-- migration deploy 실패 시 `db push` fallback
-- API/Web dev 서버 기동
-
-중요:
-- `pnpm dev`와 `pnpm compose:up`을 동시에 실행하지 마세요. (포트 충돌로 `EADDRINUSE` 발생)
-- 포트가 이미 사용 중이면 `.env`에서 `API_HOST_PORT`, `WEB_HOST_PORT` 값을 변경하세요.
-
-정리:
-
-```bash
-pnpm compose:down
-```
+- **[Setup & Guides](./docs/setup/)**: 개발 환경 설정, Riot API 연동, 배포 가이드
+- **[Technical Specs](./docs/technical/)**: DB 스키마 분석, API/WebSocket 명세
+- **[Status & Issues](./docs/status/)**: 현재 개발 현황 및 알려진 이슈
+- **[Security](./docs/security/)**: 보안 보고서 및 개선 작업
 
 ### Production Deployment
 
@@ -100,7 +65,7 @@ pnpm compose:prod:config
 pnpm compose:prod:up
 ```
 
-운영 배포는 `docker-compose.prod.yml`을 사용합니다. API 컨테이너는 시작 전에 `prisma migrate deploy`만 실행하며, 운영 DB에는 `prisma db push`를 사용하지 않습니다. 자세한 절차는 [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md)를 참고하세요.
+운영 배포는 `docker-compose.prod.yml`을 사용합니다. API 컨테이너는 시작 전에 `prisma migrate deploy`만 실행하며, 운영 DB에는 `prisma db push`를 사용하지 않습니다. 자세한 절차는 **[docs/setup/DEPLOYMENT.md](./docs/setup/DEPLOYMENT.md)**를 참고하세요.
 
 ## Environment Variables
 

@@ -97,7 +97,7 @@ export default function LabOracleBanPage() {
     return () => {
       mounted = false;
     };
-  }, [modeInUrl, usersInUrl.join(","), teamAInUrl.join(","), teamBInUrl.join(",")]);
+  }, [modeInUrl, usersInUrl, teamAInUrl, teamBInUrl]);
 
   useEffect(() => {
     if (!hydratedFromUrl) return;

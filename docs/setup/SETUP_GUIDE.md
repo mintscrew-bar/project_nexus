@@ -194,7 +194,7 @@ project_nexus/
 
 ## 추가 문서
 
-- [API_REFERENCE.md](./API_REFERENCE.md) — REST 엔드포인트 명세
-- [WEBSOCKET_EVENTS.md](./WEBSOCKET_EVENTS.md) — WebSocket 이벤트 명세
-- [BETA_PUBLIC_TEST_PLAN.md](./BETA_PUBLIC_TEST_PLAN.md) — 베타 배포 체크리스트
+- [API_REFERENCE.md](../technical/API_REFERENCE.md) — REST 엔드포인트 명세
+- [WEBSOCKET_EVENTS.md](../technical/WEBSOCKET_EVENTS.md) — WebSocket 이벤트 명세
+- [BETA_PUBLIC_TEST_PLAN.md](../status/BETA_PUBLIC_TEST_PLAN.md) — 베타 배포 체크리스트
 - [RIOT_SETUP.md](./RIOT_SETUP.md) — Riot API 상세 설정

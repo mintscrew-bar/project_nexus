@@ -112,7 +112,12 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
 
     try {
       this.setupEventHandlers();
-      await this.registerCommands();
+      await this.registerCommands().catch((error) => {
+        console.warn(
+          "Discord slash command registration failed:",
+          error instanceof Error ? error.message : error,
+        );
+      });
       await this.client.login(token);
       console.log("Discord bot initialized successfully");
     } catch (error) {

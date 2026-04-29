@@ -47,7 +47,7 @@
 
 `/room`, `/auction`, `/snake-draft`, `/role-selection`, `/match`, `/clan`, `/dm`, `notification`, `/presence`
 
-→ 이벤트 명세: [WEBSOCKET_EVENTS.md](./WEBSOCKET_EVENTS.md)
+→ 이벤트 명세: [WEBSOCKET_EVENTS.md](../technical/WEBSOCKET_EVENTS.md)
 
 ---
 
@@ -90,7 +90,7 @@
 
 ### 보안
 
-→ [SECURITY_TODO.md](./SECURITY_TODO.md), [SYSTEM_VULNERABILITY_REPORT.md](./SYSTEM_VULNERABILITY_REPORT.md) 참조
+→ [SECURITY_TODO.md](../security/SECURITY_TODO.md), [SYSTEM_VULNERABILITY_REPORT.md](../security/SYSTEM_VULNERABILITY_REPORT.md) 참조
 
 ---
 
