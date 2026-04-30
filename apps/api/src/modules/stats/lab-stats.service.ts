@@ -2549,47 +2549,28 @@ export class LabStatsService {
       );
     }
 
-    const snapshotWhere: Prisma.LabSynergySnapshotWhereInput = {
-      period,
-      ...(normalizedChampionId
-        ? {
-            OR: [
-              { champ1Id: normalizedChampionId },
-              { champ2Id: normalizedChampionId },
-            ],
-          }
-        : {}),
-    };
-    const snapshots = await this.prisma.labSynergySnapshot.findMany({
-      where: snapshotWhere,
-      orderBy: { wilsonLower: "desc" },
-      take: normalizedLimit,
-    });
-
-    let rowsSource: "snapshot" | "realtime" = "snapshot";
-    let rows = snapshots.map((row) => ({
-      champ1Id: row.champ1Id,
-      champ2Id: row.champ2Id,
-      games: row.games,
-      wins: row.wins,
-      winRate: row.winRate,
-      wilsonLower: row.wilsonLower,
-    }));
-
-    // 스냅샷 미스 시 실시간 fallback
-    if (rows.length === 0) {
-      rowsSource = "realtime";
-      const realtimeRows = await this.prisma.$queryRaw<
-        {
-          champ1Id: number;
-          champ2Id: number;
-          games: bigint;
-          wins: bigint;
-        }[]
-      >(Prisma.sql`
+    const rowsSource: "snapshot" | "realtime" = "realtime";
+    const realtimeRows = await this.prisma.$queryRaw<
+      {
+        champ1Id: number;
+        champ2Id: number;
+        champ1Position: string | null;
+        champ2Position: string | null;
+        games: bigint;
+        wins: bigint;
+      }[]
+    >(Prisma.sql`
         SELECT
           LEAST(a."championId", b."championId") AS "champ1Id",
           GREATEST(a."championId", b."championId") AS "champ2Id",
+          CASE
+            WHEN a."championId" <= b."championId" THEN NULLIF(a."position", '')
+            ELSE NULLIF(b."position", '')
+          END AS "champ1Position",
+          CASE
+            WHEN a."championId" <= b."championId" THEN NULLIF(b."position", '')
+            ELSE NULLIF(a."position", '')
+          END AS "champ2Position",
           COUNT(*)::bigint AS "games",
           COUNT(*) FILTER (WHERE a."win" = true)::bigint AS "wins"
         FROM "match_participants" a
@@ -2602,31 +2583,40 @@ export class LabStatsService {
           AND a."id" < b."id"
         INNER JOIN "matches" m ON m."id" = a."matchId"
         WHERE m."completedAt" IS NOT NULL
+          ${sourceFilter}
           ${periodFilter ? Prisma.sql`AND m."completedAt" >= ${periodFilter}` : Prisma.empty}
           ${
             normalizedChampionId
               ? Prisma.sql`AND (a."championId" = ${normalizedChampionId} OR b."championId" = ${normalizedChampionId})`
               : Prisma.empty
           }
-        GROUP BY 1, 2
+          AND a."position" IS NOT NULL
+          AND b."position" IS NOT NULL
+          AND a."position" <> ''
+          AND b."position" <> ''
+          AND a."position" <> 'UNKNOWN'
+          AND b."position" <> 'UNKNOWN'
+        GROUP BY 1, 2, 3, 4
         HAVING COUNT(*) >= ${MIN_GAMES_SYNERGY}
-        ORDER BY COUNT(*) DESC
-        LIMIT ${normalizedLimit}
+        ORDER BY COUNT(*) FILTER (WHERE a."win" = true)::float / NULLIF(COUNT(*), 0) DESC,
+                 COUNT(*) DESC
+        LIMIT ${normalizedLimit * 3}
       `);
 
-      rows = realtimeRows.map((row) => {
-        const games = Number(row.games);
-        const wins = Number(row.wins);
-        return {
-          champ1Id: row.champ1Id,
-          champ2Id: row.champ2Id,
-          games,
-          wins,
-          winRate: games > 0 ? wins / games : 0,
-          wilsonLower: wilsonLower(wins, games),
-        };
-      });
-    }
+    const rows = realtimeRows.map((row) => {
+      const games = Number(row.games);
+      const wins = Number(row.wins);
+      return {
+        champ1Id: row.champ1Id,
+        champ2Id: row.champ2Id,
+        champ1Position: row.champ1Position,
+        champ2Position: row.champ2Position,
+        games,
+        wins,
+        winRate: games > 0 ? wins / games : 0,
+        wilsonLower: wilsonLower(wins, games),
+      };
+    });
 
     const championIds = Array.from(
       new Set(rows.flatMap((row) => [row.champ1Id, row.champ2Id])),
@@ -2652,39 +2642,65 @@ export class LabStatsService {
 
     const enriched: LabSynergyRow[] = rows
       .map((row) => {
-        const champ1Rate = championWinRateMap.get(row.champ1Id) ?? 0;
-        const champ2Rate = championWinRateMap.get(row.champ2Id) ?? 0;
-        const expectedWinRate = Math.min((champ1Rate * champ2Rate) / 0.5, 1);
+        const champ1Rate =
+          championWinRateMap.get(
+            `${row.champ1Id}:${row.champ1Position ?? "ALL"}`,
+          ) ?? 0.5;
+        const champ2Rate =
+          championWinRateMap.get(
+            `${row.champ2Id}:${row.champ2Position ?? "ALL"}`,
+          ) ?? 0.5;
+        const expectedWinRate = Math.max(
+          0.05,
+          Math.min((champ1Rate + champ2Rate) / 2, 0.95),
+        );
         const deltaWinRate = row.winRate - expectedWinRate;
         const isSynergyEffective =
           row.games >= 5 && row.wilsonLower > expectedWinRate;
+        const confidenceLevel = getConfidenceLevel(row.games);
         const champ1Name =
           championNameMap.get(row.champ1Id) ?? String(row.champ1Id);
         const champ2Name =
           championNameMap.get(row.champ2Id) ?? String(row.champ2Id);
+        const badges: LabSynergyRow["badges"] = [];
+        if (isSynergyEffective) badges.push("시너지 효과 있음");
+        if (row.games >= 20) badges.push("표본 충분");
+        else badges.push("주의 표본");
 
         return {
           champ1Id: row.champ1Id,
           champ2Id: row.champ2Id,
           champ1NameKorean: getChampionKoreanName(champ1Name),
           champ2NameKorean: getChampionKoreanName(champ2Name),
+          positions: [row.champ1Position, row.champ2Position].filter(
+            Boolean,
+          ) as string[],
           games: row.games,
           wins: row.wins,
           winRate: Math.round(row.winRate * 10000) / 10000,
           wilsonLower: Math.round(row.wilsonLower * 1000000) / 1000000,
           expectedWinRate: Math.round(expectedWinRate * 10000) / 10000,
           deltaWinRate: Math.round(deltaWinRate * 10000) / 10000,
-          confidenceLevel: getConfidenceLevel(row.games),
-          badges: isSynergyEffective ? ["시너지 효과 있음"] : [],
+          confidenceLevel,
+          badges,
         } satisfies LabSynergyRow;
       })
-      .sort((a, b) => b.wilsonLower - a.wilsonLower)
+      .sort((a, b) => {
+        const bScore = b.deltaWinRate * 0.7 + b.wilsonLower * 0.3;
+        const aScore = a.deltaWinRate * 0.7 + a.wilsonLower * 0.3;
+        return bScore - aScore;
+      })
       .slice(0, normalizedLimit);
 
     const result: LabSynergyResponse = {
       period,
       championId: normalizedChampionId,
+      dataSource: normalizedSource,
       source: rowsSource,
+      summary: {
+        totalPairs: rows.length,
+        minGames: MIN_GAMES_SYNERGY,
+      },
       rows: enriched,
     };
 

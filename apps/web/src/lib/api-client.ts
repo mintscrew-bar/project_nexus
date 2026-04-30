@@ -1209,6 +1209,7 @@ export const statsApi = {
     period?: "30d" | "90d" | "all";
     championId?: number;
     limit?: number;
+    source?: "custom" | "ranked-community" | "all";
   }) => {
     const response = await apiClient.get("/stats/lab/synergy", { params });
     return response.data;

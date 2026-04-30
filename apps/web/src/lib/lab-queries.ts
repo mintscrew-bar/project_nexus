@@ -187,12 +187,18 @@ export type ChampionListResponse = {
 export type SynergyResponse = {
   period: LabPeriod;
   championId: number | null;
+  dataSource: "custom" | "ranked-community" | "all";
   source: "snapshot" | "realtime";
+  summary: {
+    totalPairs: number;
+    minGames: number;
+  };
   rows: Array<{
     champ1Id: number;
     champ2Id: number;
     champ1NameKorean: string;
     champ2NameKorean: string;
+    positions: string[];
     games: number;
     wins: number;
     winRate: number;
@@ -200,7 +206,7 @@ export type SynergyResponse = {
     expectedWinRate: number;
     deltaWinRate: number;
     confidenceLevel: "low" | "moderate" | "high" | "insufficient";
-    badges: Array<"시너지 효과 있음">;
+    badges: Array<"시너지 효과 있음" | "표본 충분" | "주의 표본">;
   }>;
 };
 
@@ -721,7 +727,7 @@ export const labQueryKeys = {
   championMastery: (championId: number, source: LabDataSource = "custom") =>
     ["lab", "champion", championId, "mastery", source] as const,
 
-  synergy: (params: { period: LabPeriod; championId?: number; limit?: number }) =>
+  synergy: (params: { period: LabPeriod; championId?: number; limit?: number; source?: "custom" | "ranked-community" | "all" }) =>
     ["lab", "synergy", params] as const,
 
   counter: (params: {
@@ -823,7 +829,7 @@ export const labQueryOptions = {
       enabled: championId > 0,
     }),
 
-  synergy: (params: { period: LabPeriod; championId?: number; limit?: number }) =>
+  synergy: (params: { period: LabPeriod; championId?: number; limit?: number; source?: "custom" | "ranked-community" | "all" }) =>
     queryOptions<SynergyResponse>({
       queryKey: labQueryKeys.synergy(params),
       queryFn: () => statsApi.getLabSynergy(params) as Promise<SynergyResponse>,

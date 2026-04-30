@@ -17,6 +17,7 @@ import {
   LabStatsService,
   type LabStatsDataSource,
 } from "./lab-stats.service";
+import type { MatchStatsSource } from "./utils/custom-match-aggregator";
 import { StatsService } from "./stats.service";
 
 type Period = "30d" | "90d" | "all";
@@ -28,6 +29,16 @@ function parseLabSource(source?: string): LabStatsDataSource {
   }
   throw new BadRequestException(
     "source must be one of custom, ranked-community, ranked-meta",
+  );
+}
+
+function parseMatchStatsSource(source?: string): MatchStatsSource {
+  const normalized = (source ?? "custom").trim();
+  if (["custom", "ranked-community", "all"].includes(normalized)) {
+    return normalized as MatchStatsSource;
+  }
+  throw new BadRequestException(
+    "source must be one of custom, ranked-community, all",
   );
 }
 
@@ -164,6 +175,7 @@ export class LabController {
     @Query("period") period: Period = "30d",
     @Query("championId") championIdParam?: string,
     @Query("limit") limitParam?: string,
+    @Query("source") sourceParam?: string,
   ) {
     let championId: number | undefined;
     if (championIdParam !== undefined) {
@@ -181,7 +193,12 @@ export class LabController {
       }
     }
 
-    return this.labStatsService.getSynergy(period, championId, limit);
+    return this.labStatsService.getSynergy(
+      period,
+      championId,
+      limit,
+      parseMatchStatsSource(sourceParam),
+    );
   }
 
   /**
