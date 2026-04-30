@@ -235,21 +235,32 @@ export type LabCompositionType =
   | "SPLIT_PUSH"
   | "POKE"
   | "EARLY_AGGRO"
-  | "TANK_LINE";
+  | "TANK_LINE"
+  | "SCALING_CARRY";
 
 export interface LabCompositionRow {
   type: LabCompositionType;
   label: string;
+  description: string;
   games: number;
   wins: number;
   winRate: number;
+  wilsonLower: number;
   pickRate: number;
+  avgScore: number;
   avgGameDurationSec: number;
+  exampleChampions: Array<{
+    championId: number;
+    championNameKorean: string;
+    games: number;
+  }>;
+  reasons: string[];
   confidenceLevel: ConfidenceLevel;
 }
 
 export interface LabCompositionsResponse {
   period: Period;
+  dataSource: MatchStatsSource;
   source: "realtime";
   totalTeams: number;
   topTypes: LabCompositionRow[];
@@ -1624,6 +1635,7 @@ export class LabStatsService {
       POKE: "포킹",
       EARLY_AGGRO: "속공",
       TANK_LINE: "탱커라인",
+      SCALING_CARRY: "후반 캐리",
     };
     const compositionAgg = new Map<
       LabCompositionType,
@@ -2890,12 +2902,23 @@ export class LabStatsService {
 
   async getCompositions(
     period: Period = "30d",
+    source: MatchStatsSource = "custom",
   ): Promise<LabCompositionsResponse> {
-    const cacheKey = this.labCacheKey(`compositions:${period}`);
+    const normalizedSource: MatchStatsSource = [
+      "custom",
+      "ranked-community",
+      "all",
+    ].includes(source)
+      ? source
+      : "custom";
+    const cacheKey = this.labCacheKey(
+      `compositions:${period}:${normalizedSource}`,
+    );
     const cached = await this.redis.get(cacheKey);
     if (cached) return JSON.parse(cached);
 
     const periodFilter = this.getPeriodFilter(period);
+    const sourceFilter = this.getMatchSourceFilter(normalizedSource);
 
     const [championData, earlyAggroRows, teamRows] = await Promise.all([
       this.dataDragon.getChampionData("ko_KR"),
@@ -2909,6 +2932,7 @@ export class LabStatsService {
         FROM "match_participants" mp
         INNER JOIN "matches" m ON m."id" = mp."matchId"
         WHERE m."completedAt" IS NOT NULL
+          ${sourceFilter}
           AND m."gameDuration" IS NOT NULL
           AND m."gameDuration" < 1500
           ${periodFilter ? Prisma.sql`AND m."completedAt" >= ${periodFilter}` : Prisma.empty}
@@ -2933,15 +2957,18 @@ export class LabStatsService {
         FROM "match_participants" mp
         INNER JOIN "matches" m ON m."id" = mp."matchId"
         WHERE m."completedAt" IS NOT NULL
+          ${sourceFilter}
           ${periodFilter ? Prisma.sql`AND m."completedAt" >= ${periodFilter}` : Prisma.empty}
         GROUP BY mp."matchId", COALESCE(mp."teamId", CONCAT('__WIN__:', mp."win"::text))
       `),
     ]);
 
     const championTagsById = new Map<number, Set<string>>();
+    const championNameById = new Map<number, string>();
     for (const champion of Object.values(championData.data)) {
       const championId = Number(champion.key);
       if (!Number.isFinite(championId)) continue;
+      championNameById.set(championId, champion.name);
       const tags = Array.isArray((champion as { tags?: string[] }).tags)
         ? (champion as { tags?: string[] }).tags!
         : [];
@@ -2965,55 +2992,107 @@ export class LabStatsService {
       type: LabCompositionType;
       score: number;
       matched: boolean;
+      reasons: string[];
     };
 
     const classifyTeam = (
       championIds: number[],
       gameDurationSec: number | null,
-    ): LabCompositionType => {
+    ): {
+      type: LabCompositionType;
+      score: number;
+      reasons: string[];
+      championIds: number[];
+    } => {
       let mage = 0;
       let tank = 0;
       let fighter = 0;
       let assassin = 0;
       let marksman = 0;
       let earlyAggroCount = 0;
+      const typeChampionIds = new Map<LabCompositionType, Set<number>>([
+        ["TEAMFIGHT", new Set()],
+        ["SPLIT_PUSH", new Set()],
+        ["POKE", new Set()],
+        ["EARLY_AGGRO", new Set()],
+        ["TANK_LINE", new Set()],
+        ["SCALING_CARRY", new Set()],
+      ]);
 
       for (const championId of championIds) {
         const tags = championTagsById.get(championId) ?? new Set<string>();
-        if (tags.has("MAGE")) mage += 1;
-        if (tags.has("TANK")) tank += 1;
-        if (tags.has("FIGHTER")) fighter += 1;
-        if (tags.has("ASSASSIN")) assassin += 1;
-        if (tags.has("MARKSMAN")) marksman += 1;
-        if (earlyAggroChampionSet.has(championId)) earlyAggroCount += 1;
+        if (tags.has("MAGE")) {
+          mage += 1;
+          typeChampionIds.get("TEAMFIGHT")!.add(championId);
+          typeChampionIds.get("POKE")!.add(championId);
+          typeChampionIds.get("SCALING_CARRY")!.add(championId);
+        }
+        if (tags.has("TANK")) {
+          tank += 1;
+          typeChampionIds.get("TEAMFIGHT")!.add(championId);
+          typeChampionIds.get("TANK_LINE")!.add(championId);
+        }
+        if (tags.has("FIGHTER")) {
+          fighter += 1;
+          typeChampionIds.get("SPLIT_PUSH")!.add(championId);
+        }
+        if (tags.has("ASSASSIN")) {
+          assassin += 1;
+          typeChampionIds.get("SPLIT_PUSH")!.add(championId);
+          typeChampionIds.get("EARLY_AGGRO")!.add(championId);
+        }
+        if (tags.has("MARKSMAN")) {
+          marksman += 1;
+          typeChampionIds.get("POKE")!.add(championId);
+          typeChampionIds.get("SCALING_CARRY")!.add(championId);
+        }
+        if (earlyAggroChampionSet.has(championId)) {
+          earlyAggroCount += 1;
+          typeChampionIds.get("EARLY_AGGRO")!.add(championId);
+        }
       }
 
       const longRange = mage + marksman;
+      const shortGame = (gameDurationSec ?? 99999) < 1500;
       const evaluations: TeamCompositionEval[] = [
         {
           type: "TEAMFIGHT",
-          score: (mage + tank) / 5,
+          score: Math.min((mage + tank) / 4, 1),
           matched: mage + tank >= 3,
+          reasons: [`광역/전면전 태그 ${mage + tank}명`, `탱커 ${tank}명`],
         },
         {
           type: "SPLIT_PUSH",
-          score: (fighter + assassin) / 5,
+          score: Math.min((fighter + assassin) / 3, 1),
           matched: fighter + assassin >= 2,
+          reasons: [`사이드 운영 태그 ${fighter + assassin}명`],
         },
         {
           type: "POKE",
-          score: (longRange + Math.min(mage, 2)) / 7,
+          score: Math.min((longRange + Math.min(mage, 2)) / 5, 1),
           matched: mage >= 2 && longRange >= 3,
+          reasons: [`원거리/마법 피해 축 ${longRange}명`, `마법사 ${mage}명`],
         },
         {
           type: "EARLY_AGGRO",
-          score: earlyAggroCount / 5,
-          matched: earlyAggroCount >= 3 && (gameDurationSec ?? 99999) < 1500,
+          score: Math.min(earlyAggroCount / 3, 1) * (shortGame ? 1 : 0.75),
+          matched: earlyAggroCount >= 3 || (earlyAggroCount >= 2 && shortGame),
+          reasons: [
+            `초반 승리 경향 챔피언 ${earlyAggroCount}명`,
+            shortGame ? "짧은 경기 표본" : "일반 경기 길이",
+          ],
         },
         {
           type: "TANK_LINE",
-          score: tank / 5,
+          score: Math.min(tank / 3, 1),
           matched: tank >= 3,
+          reasons: [`탱커 태그 ${tank}명`],
+        },
+        {
+          type: "SCALING_CARRY",
+          score: Math.min((marksman + Math.max(mage - 1, 0)) / 3, 1),
+          matched: marksman >= 1 && mage >= 1 && !shortGame,
+          reasons: [`후반 딜러 축 ${marksman + mage}명`, "중후반 지향"],
         },
       ];
 
@@ -3031,7 +3110,12 @@ export class LabStatsService {
           return order.indexOf(a.type) - order.indexOf(b.type);
         },
       );
-      return target[0].type;
+      return {
+        type: target[0].type,
+        score: target[0].score,
+        reasons: target[0].reasons,
+        championIds: Array.from(typeChampionIds.get(target[0].type) ?? []),
+      };
     };
 
     const aggregate = new Map<
@@ -3039,6 +3123,9 @@ export class LabStatsService {
       {
         games: number;
         wins: number;
+        scoreSum: number;
+        reasons: Map<string, number>;
+        championCounts: Map<number, number>;
         durationSum: number;
         durationCount: number;
       }
@@ -3049,21 +3136,35 @@ export class LabStatsService {
       "POKE",
       "EARLY_AGGRO",
       "TANK_LINE",
+      "SCALING_CARRY",
     ];
     for (const type of allTypes) {
       aggregate.set(type, {
         games: 0,
         wins: 0,
+        scoreSum: 0,
+        reasons: new Map(),
+        championCounts: new Map(),
         durationSum: 0,
         durationCount: 0,
       });
     }
 
     for (const team of teamRows) {
-      const type = classifyTeam(team.championIds, team.gameDurationSec);
-      const bucket = aggregate.get(type)!;
+      const classified = classifyTeam(team.championIds, team.gameDurationSec);
+      const bucket = aggregate.get(classified.type)!;
       bucket.games += 1;
       if (team.win) bucket.wins += 1;
+      bucket.scoreSum += classified.score;
+      for (const reason of classified.reasons) {
+        bucket.reasons.set(reason, (bucket.reasons.get(reason) ?? 0) + 1);
+      }
+      for (const championId of classified.championIds) {
+        bucket.championCounts.set(
+          championId,
+          (bucket.championCounts.get(championId) ?? 0) + 1,
+        );
+      }
       if (
         typeof team.gameDurationSec === "number" &&
         team.gameDurationSec > 0
@@ -3079,6 +3180,15 @@ export class LabStatsService {
       POKE: "포킹",
       EARLY_AGGRO: "속공",
       TANK_LINE: "탱커라인",
+      SCALING_CARRY: "후반 캐리",
+    };
+    const descriptions: Record<LabCompositionType, string> = {
+      TEAMFIGHT: "광역 피해와 전면 교전에 강한 구성",
+      SPLIT_PUSH: "사이드 압박과 1:1/소규모 교전에 강한 구성",
+      POKE: "원거리 견제와 사전 체력 압박에 강한 구성",
+      EARLY_AGGRO: "초반 교전과 빠른 스노우볼에 강한 구성",
+      TANK_LINE: "앞라인 유지력과 진입 흡수에 강한 구성",
+      SCALING_CARRY: "중후반 딜러 보호와 성장 기대값이 높은 구성",
     };
 
     const totalTeams = teamRows.length;
@@ -3087,31 +3197,55 @@ export class LabStatsService {
         const bucket = aggregate.get(type)!;
         const winRate = bucket.games > 0 ? bucket.wins / bucket.games : 0;
         const pickRate = totalTeams > 0 ? bucket.games / totalTeams : 0;
+        const avgScore =
+          bucket.games > 0 ? bucket.scoreSum / bucket.games : 0;
         const avgGameDurationSec =
           bucket.durationCount > 0
             ? Math.round(bucket.durationSum / bucket.durationCount)
             : 0;
+        const exampleChampions = Array.from(bucket.championCounts.entries())
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 5)
+          .map(([championId, games]) => ({
+            championId,
+            championNameKorean:
+              championNameById.get(championId) ??
+              getChampionKoreanName(String(championId)),
+            games,
+          }));
+        const reasons = Array.from(bucket.reasons.entries())
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 3)
+          .map(([reason]) => reason);
         return {
           type,
           label: labels[type],
+          description: descriptions[type],
           games: bucket.games,
           wins: bucket.wins,
           winRate: Math.round(winRate * 10000) / 10000,
+          wilsonLower: Math.round(wilsonLower(bucket.wins, bucket.games) * 1000000) / 1000000,
           pickRate: Math.round(pickRate * 10000) / 10000,
+          avgScore: Math.round(avgScore * 10000) / 10000,
           avgGameDurationSec,
+          exampleChampions,
+          reasons,
           confidenceLevel: getConfidenceLevel(bucket.games),
         } satisfies LabCompositionRow;
       })
-      .sort((a, b) => b.winRate - a.winRate);
+      .sort((a, b) => {
+        return b.wilsonLower - a.wilsonLower;
+      });
 
     const result: LabCompositionsResponse = {
       period,
+      dataSource: normalizedSource,
       source: "realtime",
       totalTeams,
       topTypes: rows.slice(0, 3),
       rows,
       caveat:
-        "챔피언 태그 기반 근사 분류이며 실제 팀 전략과 차이가 있을 수 있습니다.",
+        "챔피언 태그와 경기 길이 기반 분류입니다. 실제 콜, 라인전 구도, 숙련도는 별도 해석이 필요합니다.",
     };
 
     await this.redis.set(cacheKey, JSON.stringify(result), 1800);

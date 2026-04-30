@@ -255,8 +255,14 @@ export class LabController {
    */
   @Get("compositions")
   @Throttle({ default: { limit: 30, ttl: 60000 } })
-  async getCompositions(@Query("period") period: Period = "30d") {
-    return this.labStatsService.getCompositions(period);
+  async getCompositions(
+    @Query("period") period: Period = "30d",
+    @Query("source") sourceParam?: string,
+  ) {
+    return this.labStatsService.getCompositions(
+      period,
+      parseMatchStatsSource(sourceParam),
+    );
   }
 
   /**

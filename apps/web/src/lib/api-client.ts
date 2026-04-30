@@ -1226,7 +1226,10 @@ export const statsApi = {
     return response.data;
   },
 
-  getLabCompositions: async (params?: { period?: "30d" | "90d" | "all" }) => {
+  getLabCompositions: async (params?: {
+    period?: "30d" | "90d" | "all";
+    source?: "custom" | "ranked-community" | "all";
+  }) => {
     const response = await apiClient.get("/stats/lab/compositions", { params });
     return response.data;
   },

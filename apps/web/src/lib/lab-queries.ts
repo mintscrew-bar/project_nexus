@@ -234,26 +234,37 @@ export type CounterResponse = {
 
 export type CompositionsResponse = {
   period: LabPeriod;
+  dataSource: "custom" | "ranked-community" | "all";
   source: "realtime";
   totalTeams: number;
   topTypes: Array<{
-    type: "TEAMFIGHT" | "SPLIT_PUSH" | "POKE" | "EARLY_AGGRO" | "TANK_LINE";
+    type: "TEAMFIGHT" | "SPLIT_PUSH" | "POKE" | "EARLY_AGGRO" | "TANK_LINE" | "SCALING_CARRY";
     label: string;
+    description: string;
     games: number;
     wins: number;
     winRate: number;
+    wilsonLower: number;
     pickRate: number;
+    avgScore: number;
     avgGameDurationSec: number;
+    exampleChampions: Array<{ championId: number; championNameKorean: string; games: number }>;
+    reasons: string[];
     confidenceLevel: "low" | "moderate" | "high" | "insufficient";
   }>;
   rows: Array<{
-    type: "TEAMFIGHT" | "SPLIT_PUSH" | "POKE" | "EARLY_AGGRO" | "TANK_LINE";
+    type: "TEAMFIGHT" | "SPLIT_PUSH" | "POKE" | "EARLY_AGGRO" | "TANK_LINE" | "SCALING_CARRY";
     label: string;
+    description: string;
     games: number;
     wins: number;
     winRate: number;
+    wilsonLower: number;
     pickRate: number;
+    avgScore: number;
     avgGameDurationSec: number;
+    exampleChampions: Array<{ championId: number; championNameKorean: string; games: number }>;
+    reasons: string[];
     confidenceLevel: "low" | "moderate" | "high" | "insufficient";
   }>;
   caveat: string;
@@ -738,7 +749,8 @@ export const labQueryKeys = {
     limit?: number;
   }) => ["lab", "counter", params] as const,
 
-  compositions: (period: LabPeriod) => ["lab", "compositions", period] as const,
+  compositions: (params: { period: LabPeriod; source?: "custom" | "ranked-community" | "all" }) =>
+    ["lab", "compositions", params] as const,
 
   auctionEfficiency: (period: LabPeriod) =>
     ["lab", "oracle", "auction-efficiency", period] as const,
@@ -849,10 +861,10 @@ export const labQueryOptions = {
       staleTime: 30 * 60 * 1000,
     }),
 
-  compositions: (period: LabPeriod) =>
+  compositions: (params: { period: LabPeriod; source?: "custom" | "ranked-community" | "all" }) =>
     queryOptions<CompositionsResponse>({
-      queryKey: labQueryKeys.compositions(period),
-      queryFn: () => statsApi.getLabCompositions({ period }) as Promise<CompositionsResponse>,
+      queryKey: labQueryKeys.compositions(params),
+      queryFn: () => statsApi.getLabCompositions(params) as Promise<CompositionsResponse>,
       staleTime: 30 * 60 * 1000,
     }),
 
