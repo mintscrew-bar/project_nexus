@@ -5,8 +5,10 @@ import { DataDragonService } from "./data-dragon.service";
 import { RiotTournamentService } from "./riot-tournament.service";
 import { RiotMatchService } from "./riot-match.service";
 import { RiotSpectatorService } from "./riot-spectator.service";
+import { DiscordModule } from "../discord/discord.module";
 
 @Module({
+  imports: [DiscordModule],
   controllers: [RiotController],
   providers: [
     RiotService,

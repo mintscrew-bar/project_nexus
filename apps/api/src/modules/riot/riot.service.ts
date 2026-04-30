@@ -10,6 +10,7 @@ import {
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../prisma/prisma.service";
 import { RedisService } from "../redis/redis.service";
+import { DiscordBotService } from "../discord/discord-bot.service";
 import { Role } from "@nexus/database";
 import axios from "axios";
 
@@ -133,6 +134,7 @@ export class RiotService {
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
+    private readonly discordBotService: DiscordBotService,
   ) {
     // Try both ConfigService and process.env
     this.apiKey =
@@ -619,6 +621,9 @@ export class RiotService {
       isNexusUser: true,
     });
     await this.enqueueStatsRecompute(userId, "account-linked");
+    await this.discordBotService.syncUserTierAndLineRoles(userId).catch(() => {
+      this.logger.warn(`Discord tier/line role sync failed (register): ${userId}`);
+    });
 
     // Clean up verification data
     await this.redis.del(`verify:${userId}`);
@@ -680,6 +685,9 @@ export class RiotService {
       isNexusUser: true,
     });
     await this.enqueueStatsRecompute(userId, "rank-sync");
+    await this.discordBotService.syncUserTierAndLineRoles(userId).catch(() => {
+      this.logger.warn(`Discord tier/line role sync failed (rank-sync): ${userId}`);
+    });
 
     return updated;
   }
@@ -759,10 +767,14 @@ export class RiotService {
       data: { isPrimary: false },
     });
 
-    return this.prisma.riotAccount.update({
+    const updated = await this.prisma.riotAccount.update({
       where: { id: riotAccountId },
       data: { isPrimary: true },
     });
+    await this.discordBotService.syncUserTierAndLineRoles(userId).catch(() => {
+      this.logger.warn(`Discord tier/line role sync failed (primary): ${userId}`);
+    });
+    return updated;
   }
 
   async deleteRiotAccount(
@@ -795,6 +807,9 @@ export class RiotService {
     }
 
     await this.prisma.riotAccount.delete({ where: { id: riotAccountId } });
+    await this.discordBotService.syncUserTierAndLineRoles(userId).catch(() => {
+      this.logger.warn(`Discord tier/line role sync failed (delete): ${userId}`);
+    });
   }
 
   async updateRiotAccountInfo(
@@ -859,6 +874,9 @@ export class RiotService {
         }
       }
     }
+    await this.discordBotService.syncUserTierAndLineRoles(userId).catch(() => {
+      this.logger.warn(`Discord tier/line role sync failed (update): ${userId}`);
+    });
 
     return this.prisma.riotAccount.findUnique({
       where: { id: riotAccountId },
