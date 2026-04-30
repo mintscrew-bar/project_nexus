@@ -47,7 +47,9 @@ export function TierGridCard({ tiers, activePeriod }: Props) {
                             unoptimized
                           />
                         </div>
-                        <span className="truncate text-text-secondary">{row.championId}</span>
+                        <span className="truncate text-text-secondary">
+                          {row.championNameKorean || row.championName || String(row.championId)}
+                        </span>
                       </div>
                       <Badge
                         variant={

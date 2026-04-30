@@ -181,6 +181,7 @@ export interface LabSynergyRow {
   champ2Id: number;
   champ1NameKorean: string;
   champ2NameKorean: string;
+  positions: string[];
   games: number;
   wins: number;
   winRate: number;
@@ -188,13 +189,18 @@ export interface LabSynergyRow {
   expectedWinRate: number;
   deltaWinRate: number;
   confidenceLevel: ConfidenceLevel;
-  badges: Array<"시너지 효과 있음">;
+  badges: Array<"시너지 효과 있음" | "표본 충분" | "주의 표본">;
 }
 
 export interface LabSynergyResponse {
   period: Period;
   championId: number | null;
+  dataSource: MatchStatsSource;
   source: "snapshot" | "realtime";
+  summary: {
+    totalPairs: number;
+    minGames: number;
+  };
   rows: LabSynergyRow[];
 }
 
@@ -1120,12 +1126,25 @@ export class LabStatsService {
     const result: Record<string, any[]> = {};
 
     for (const position of positionList) {
+      // 최신 배치 patchVersion 조회 — 동일 챔피언이 여러 패치버전으로 중복 노출되는 것 방지
+      const latestRow = await this.prisma.labChampionSnapshot.findFirst({
+        where: { source: "custom", period, position },
+        orderBy: { computedAt: "desc" },
+        select: { patchVersion: true },
+      });
+
+      if (!latestRow) {
+        result[position] = [];
+        continue;
+      }
+
       // 스냅샷 우선 조회 — 메타 레이더는 내전 기준이 기본 (Step 4에서 source 파라미터화 예정).
       const snapshots = await this.prisma.labChampionSnapshot.findMany({
         where: {
           source: "custom",
           period,
           position,
+          patchVersion: latestRow.patchVersion,
           games: { gte: MIN_GAMES_CHAMPION },
         },
         orderBy: { wilsonLower: "desc" },
@@ -1135,6 +1154,18 @@ export class LabStatsService {
         result[position] = [];
         continue;
       }
+
+      // 챔피언 이름 조회
+      const championIds = snapshots.map((s) => s.championId);
+      const nameRows = await this.prisma.$queryRaw<
+        { championId: number; championName: string }[]
+      >(Prisma.sql`
+        SELECT mp."championId", MIN(mp."championName") AS "championName"
+        FROM "match_participants" mp
+        WHERE mp."championId" IN (${Prisma.join(championIds)})
+        GROUP BY mp."championId"
+      `);
+      const nameMap = new Map(nameRows.map((r) => [r.championId, r.championName]));
 
       // 정규화를 위한 min/max 계산
       const wilsonValues = snapshots.map((s) => s.wilsonLower);
@@ -1151,9 +1182,12 @@ export class LabStatsService {
         const wilsonNorm = (s.wilsonLower - wMin) / wRange;
         const pickNorm = (s.pickRate - pMin) / pRange;
         const tierScore = 0.6 * wilsonNorm + 0.4 * pickNorm;
+        const championName = nameMap.get(s.championId) ?? String(s.championId);
 
         return {
           championId: s.championId,
+          championName,
+          championNameKorean: getChampionKoreanName(championName),
           games: s.games,
           wins: s.wins,
           winRate: s.games > 0 ? Math.round((s.wins / s.games) * 1000) / 10 : 0,
@@ -1828,17 +1862,28 @@ export class LabStatsService {
       return result;
     }
 
-    const snapshotRows = includeLowSample
-      ? []
-      : await this.prisma.labChampionSnapshot.findMany({
-          where: {
-            source: dataSource,
-            period,
-            position: normalizedPosition,
-            games: { gte: MIN_GAMES_CHAMPION },
-          },
-          orderBy: { wilsonLower: "desc" },
+    // 최신 배치 patchVersion 조회 — 동일 챔피언이 여러 패치버전으로 중복 노출되는 것 방지
+    const latestSnapshotRow = includeLowSample
+      ? null
+      : await this.prisma.labChampionSnapshot.findFirst({
+          where: { source: dataSource, period, position: normalizedPosition },
+          orderBy: { computedAt: "desc" },
+          select: { patchVersion: true },
         });
+
+    const snapshotRows =
+      includeLowSample || !latestSnapshotRow
+        ? []
+        : await this.prisma.labChampionSnapshot.findMany({
+            where: {
+              source: dataSource,
+              period,
+              position: normalizedPosition,
+              patchVersion: latestSnapshotRow.patchVersion,
+              games: { gte: MIN_GAMES_CHAMPION },
+            },
+            orderBy: { wilsonLower: "desc" },
+          });
 
     const championIds = snapshotRows.map((row) => row.championId);
     const championNames = new Map<number, string>();
@@ -2444,8 +2489,16 @@ export class LabStatsService {
     period: Period = "30d",
     championId?: number,
     limit = 50,
+    source: MatchStatsSource = "custom",
   ): Promise<LabSynergyResponse> {
     const normalizedLimit = Math.max(1, Math.min(100, Math.floor(limit)));
+    const normalizedSource: MatchStatsSource = [
+      "custom",
+      "ranked-community",
+      "all",
+    ].includes(source)
+      ? source
+      : "custom";
     const normalizedChampionId =
       typeof championId === "number" &&
       Number.isInteger(championId) &&
@@ -2453,33 +2506,47 @@ export class LabStatsService {
         ? championId
         : null;
     const cacheKey = this.labCacheKey(
-      `synergy:${period}:${normalizedChampionId ?? "all"}:${normalizedLimit}`,
+      `synergy:${period}:${normalizedSource}:${normalizedChampionId ?? "all"}:${normalizedLimit}`,
     );
     const cached = await this.redis.get(cacheKey);
     if (cached) return JSON.parse(cached);
 
     const periodFilter = this.getPeriodFilter(period);
+    const sourceFilter = this.getMatchSourceFilter(normalizedSource);
 
     // 챔피언 단일 승률 맵 (expected win rate 계산용)
     const championRates = await this.prisma.$queryRaw<
-      { championId: number; games: bigint; wins: bigint }[]
+      {
+        championId: number;
+        position: string | null;
+        games: bigint;
+        wins: bigint;
+      }[]
     >(Prisma.sql`
       SELECT
         mp."championId" AS "championId",
+        NULLIF(mp."position", '') AS "position",
         COUNT(*)::bigint AS "games",
         COUNT(*) FILTER (WHERE mp."win" = true)::bigint AS "wins"
       FROM "match_participants" mp
       INNER JOIN "matches" m ON m."id" = mp."matchId"
       WHERE m."completedAt" IS NOT NULL
+        ${sourceFilter}
         ${periodFilter ? Prisma.sql`AND m."completedAt" >= ${periodFilter}` : Prisma.empty}
-      GROUP BY mp."championId"
+        AND mp."position" IS NOT NULL
+        AND mp."position" <> ''
+        AND mp."position" <> 'UNKNOWN'
+      GROUP BY mp."championId", NULLIF(mp."position", '')
     `);
 
-    const championWinRateMap = new Map<number, number>();
+    const championWinRateMap = new Map<string, number>();
     for (const row of championRates) {
       const games = Number(row.games);
       const wins = Number(row.wins);
-      championWinRateMap.set(row.championId, games > 0 ? wins / games : 0);
+      championWinRateMap.set(
+        `${row.championId}:${row.position ?? "ALL"}`,
+        games > 0 ? wins / games : 0,
+      );
     }
 
     const snapshotWhere: Prisma.LabSynergySnapshotWhereInput = {

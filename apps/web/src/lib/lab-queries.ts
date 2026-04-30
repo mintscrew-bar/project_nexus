@@ -88,6 +88,8 @@ export type MetaRadarResponse = {
     string,
     Array<{
       championId: number;
+      championName: string;
+      championNameKorean: string;
       games: number;
       winRate: number;
       pickRate: number;

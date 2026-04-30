@@ -27,7 +27,7 @@ import { ArrowRight, ShieldAlert } from "lucide-react";
 // ─── 통계 인라인 항목 ───────────────────────────────────────────────────────────
 function StatItem({ label, value, hint }: { label: string; value: string; hint: string }) {
   return (
-    <div className="flex flex-col gap-0.5 px-4 py-3 first:pl-0">
+    <div className="flex flex-1 flex-col gap-0.5 px-4 py-3">
       <span className="text-xs text-text-tertiary">{label}</span>
       <span className="text-lg font-bold text-text-primary">{value}</span>
       <span className="text-xs text-text-tertiary">{hint}</span>
@@ -114,7 +114,7 @@ export default function LabMetaPage() {
   return (
     <div className="space-y-6">
       {/* 데이터셋 요약 통계 — 인라인 스트립 */}
-      <div className="flex flex-wrap divide-x divide-white/10 rounded-xl border border-white/10 bg-bg-secondary/80">
+      <div className="flex divide-x divide-white/10 overflow-hidden rounded-xl border border-white/10 bg-bg-secondary/80">
         <StatItem label="분석된 경기" value={overview.sample.matchesWithStats.toLocaleString()} hint={`참가자 ${overview.sample.participantRows.toLocaleString()}행`} />
         <StatItem label="최근 30일" value={`${overview.sample.recentMatches30d.toLocaleString()}경기`} hint={`경기당 ${avgParticipantsPerMatch.toFixed(1)}명`} />
         <StatItem label="플레이어 표본" value={overview.sample.playersInDataset.toLocaleString()} hint="내전 데이터 유저" />
