@@ -19,6 +19,22 @@ export function formatDelta(delta: number, decimals = 1): string {
   return `${sign}${delta.toFixed(decimals)}%p`;
 }
 
+/** Riot API 내부 gameVersion(16.9) → 공개 패치 표기(26.09) */
+export function formatPublicPatchVersion(patchVersion: string | null): string {
+  if (!patchVersion) return "";
+
+  const [majorRaw, minorRaw] = patchVersion.split(".");
+  const major = Number(majorRaw);
+  const minor = Number(minorRaw);
+
+  if (!Number.isFinite(major) || !Number.isFinite(minor)) {
+    return patchVersion;
+  }
+
+  const publicMajor = major >= 15 && major < 20 ? major + 10 : major;
+  return `${publicMajor}.${String(minor).padStart(2, "0")}`;
+}
+
 /** KDA: 4.5 / 2.1 / 6.3 */
 export function formatKda(kills: number, deaths: number, assists: number): string {
   return `${kills.toFixed(1)} / ${deaths.toFixed(1)} / ${assists.toFixed(1)}`;

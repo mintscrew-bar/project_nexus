@@ -484,6 +484,9 @@ const MIN_GAMES_CHAMPION = 5;
 const MIN_GAMES_SYNERGY = 3;
 const MIN_GAMES_COUNTER = 3;
 const MASTERY_TOP_LIMIT = 50;
+const PATCH_IMPACT_MIN_SAMPLE_GAMES = 100;
+const PATCH_IMPACT_MIN_CHAMPION_GAMES = 8;
+const PATCH_IMPACT_MIN_SHIFT_DELTA = 0.5;
 const BOOT_ITEM_IDS = new Set([
   1001, 3006, 3009, 3020, 3111, 3117, 3158, 3170, 3047, 3110, 2422,
 ]);
@@ -1235,7 +1238,8 @@ export class LabStatsService {
       FROM "matches"
       WHERE "patchVersion" IS NOT NULL
         AND "completedAt" IS NOT NULL
-      ORDER BY "patchVersion" DESC
+      ORDER BY SPLIT_PART("patchVersion", '.', 1)::int DESC,
+               SPLIT_PART("patchVersion", '.', 2)::int DESC
       LIMIT 2
     `);
 
@@ -1261,6 +1265,14 @@ export class LabStatsService {
 
     const currentPatch = patches[0].patchVersion;
     const previousPatch = patches[1].patchVersion;
+    const championData = await this.dataDragon.getChampionData("ko_KR");
+    const championNameKoById = new Map<number, string>();
+    for (const champion of Object.values(championData.data)) {
+      const championId = Number(champion.key);
+      if (Number.isFinite(championId)) {
+        championNameKoById.set(championId, champion.name);
+      }
+    }
 
     const rows = await this.prisma.$queryRaw<
       {
@@ -1280,7 +1292,7 @@ export class LabStatsService {
         INNER JOIN "matches" m ON m."id" = mp."matchId"
         WHERE m."patchVersion" = ${currentPatch}
         GROUP BY mp."championId", mp."championName"
-        HAVING COUNT(*) >= 3
+        HAVING COUNT(*) >= ${PATCH_IMPACT_MIN_CHAMPION_GAMES}
       ),
       prev_patch AS (
         SELECT mp."championId",
@@ -1290,7 +1302,7 @@ export class LabStatsService {
         INNER JOIN "matches" m ON m."id" = mp."matchId"
         WHERE m."patchVersion" = ${previousPatch}
         GROUP BY mp."championId"
-        HAVING COUNT(*) >= 3
+        HAVING COUNT(*) >= ${PATCH_IMPACT_MIN_CHAMPION_GAMES}
       )
       SELECT
         c."championId",
@@ -1317,18 +1329,23 @@ export class LabStatsService {
       return {
         championId: row.championId,
         championName: row.championName,
-        championNameKorean: getChampionKoreanName(row.championName),
+        championNameKorean:
+          championNameKoById.get(row.championId) ??
+          getChampionKoreanName(row.championName),
         currentWinRate: Math.round(currentWinRate * 1000) / 10,
         prevWinRate: Math.round(prevWinRate * 1000) / 10,
         deltaWinRate: Math.round(deltaWinRate * 1000) / 10,
         currentGames: Number(row.currentGames),
         prevGames: Number(row.prevGames),
+        confidenceLevel: getConfidenceLevel(
+          Math.min(Number(row.currentGames), Number(row.prevGames)),
+        ),
       };
     });
 
     impacts.sort((a, b) => b.deltaWinRate - a.deltaWinRate);
 
-    const [patchCounts, positionRows, earlyAggroRows, teamRows, championData] =
+    const [patchCounts, positionRows, earlyAggroRows, teamRows] =
       await Promise.all([
         this.prisma.$queryRaw<
           { patchVersion: string; games: bigint; teams: bigint }[]
@@ -1404,7 +1421,6 @@ export class LabStatsService {
             AND m."completedAt" IS NOT NULL
           GROUP BY m."patchVersion", mp."matchId", COALESCE(mp."teamId", CONCAT('__WIN__:', mp."win"::text))
         `),
-        this.dataDragon.getChampionData("ko_KR"),
       ]);
 
     const patchCountMap = new Map(
@@ -1470,6 +1486,11 @@ export class LabStatsService {
         };
       })
       .filter((row) => row.currentGames >= 5 && row.prevGames >= 5)
+      .filter(
+        (row) =>
+          Math.abs(row.deltaWinRate) >= PATCH_IMPACT_MIN_SHIFT_DELTA ||
+          Math.abs(row.deltaPickRate) >= PATCH_IMPACT_MIN_SHIFT_DELTA,
+      )
       .sort(
         (a, b) =>
           Math.abs(b.deltaWinRate) +
@@ -1632,6 +1653,11 @@ export class LabStatsService {
         };
       })
       .filter((row) => row.currentGames >= 5 && row.prevGames >= 5)
+      .filter(
+        (row) =>
+          Math.abs(row.deltaWinRate) >= PATCH_IMPACT_MIN_SHIFT_DELTA ||
+          Math.abs(row.deltaPickRate) >= PATCH_IMPACT_MIN_SHIFT_DELTA,
+      )
       .sort(
         (a, b) =>
           Math.abs(b.deltaPickRate) +
@@ -1652,7 +1678,9 @@ export class LabStatsService {
       nerfed: impacts.slice(-5).reverse(),
       positionShifts: positionShifts.slice(0, 5),
       compositionShifts: compositionShifts.slice(0, 5),
-      insufficient: false,
+      insufficient:
+        currentGames < PATCH_IMPACT_MIN_SAMPLE_GAMES ||
+        previousGames < PATCH_IMPACT_MIN_SAMPLE_GAMES,
     };
 
     await this.redis.set(cacheKey, JSON.stringify(result), 3600);

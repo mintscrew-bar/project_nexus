@@ -2,7 +2,11 @@
 
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { formatDelta, formatPosition } from "@/lib/lab-format";
+import {
+  formatDelta,
+  formatPosition,
+  formatPublicPatchVersion,
+} from "@/lib/lab-format";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui";
 import type { PatchImpactResponse } from "@/lib/lab-queries";
 
@@ -11,13 +15,20 @@ interface Props {
 }
 
 export function PatchImpactCard({ patchImpact }: Props) {
+  const currentPatchLabel = formatPublicPatchVersion(
+    patchImpact?.currentPatch ?? null,
+  );
+  const previousPatchLabel = formatPublicPatchVersion(
+    patchImpact?.previousPatch ?? null,
+  );
+
   return (
     <Card className="border-white/10 bg-bg-secondary/80">
       <CardHeader>
         <CardTitle>패치 임팩트</CardTitle>
         <CardDescription>
           {patchImpact?.currentPatch && patchImpact?.previousPatch
-            ? `${patchImpact.previousPatch} → ${patchImpact.currentPatch} 기준 내전 양상 변화`
+            ? `${previousPatchLabel} → ${currentPatchLabel} 기준 내전 양상 변화`
             : "패치 비교 데이터 준비 중"}
         </CardDescription>
         {patchImpact?.currentPatch && (
@@ -112,6 +123,7 @@ export function PatchImpactCard({ patchImpact }: Props) {
         </div>
         <p className="mt-3 text-xs text-text-tertiary">
           표본: 현재 {patchImpact?.sample.currentGames ?? 0}경기 / 이전 {patchImpact?.sample.previousGames ?? 0}경기
+          {patchImpact?.insufficient ? " · 표본 부족으로 해석 주의" : ""}
         </p>
       </CardContent>
     </Card>

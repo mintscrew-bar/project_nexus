@@ -89,6 +89,7 @@ export const CHAMPION_MAPPINGS: Record<string, string> = {
   "Maokai": "마오카이",
   "MasterYi": "마스터 이",
   "Milio": "밀리오",
+  "Mel": "멜",
   "MissFortune": "미스 포츈",
   "MonkeyKing": "오공",
   "Mordekaiser": "모데카이저",
@@ -129,7 +130,7 @@ export const CHAMPION_MAPPINGS: Record<string, string> = {
   "Shen": "쉔",
   "Shyvana": "쉬바나",
   "Singed": "신지드",
-  "Sion": "시온",
+  "Sion": "사이온",
   "Sivir": "시비르",
   "Skarner": "스카너",
   "Sona": "소나",
@@ -175,6 +176,8 @@ export const CHAMPION_MAPPINGS: Record<string, string> = {
   "Zilean": "질리언",
   "Zoe": "조이",
   "Zyra": "자이라",
+  "Ambessa": "암베사",
+  "Yunara": "유나라",
 };
 
 // ============================================
