@@ -106,6 +106,22 @@ export interface LabChampionBuildRow {
   wilsonLower: number;
 }
 
+export interface LabChampionPatchTrendPoint {
+  patch: string; // "14.8" 형식
+  games: number;
+  wins: number;
+  winRate: number;
+}
+
+export interface LabChampionPatchItemRow {
+  patch: string;
+  topItems: Array<{
+    itemId: number;
+    picks: number;
+    pickRate: number; // picks / 해당 패치 총 게임 수
+  }>;
+}
+
 export interface LabChampionDetailResponse {
   championId: number;
   championName: string;
@@ -119,6 +135,8 @@ export interface LabChampionDetailResponse {
   };
   winrateTrend: LabChampionWinrateTrendPoint[]; // 데이터 포인트 3개 미만이면 빈 배열
   trendInsufficient: boolean;
+  patchTrend: LabChampionPatchTrendPoint[]; // 패치별 승률 추이
+  patchItemTrend: LabChampionPatchItemRow[]; // 패치별 아이템 TOP 5
   positions: LabChampionPositionRow[];
   topBuilds: LabChampionBuildRow[]; // 최대 5, 타임라인 구매 순서 우선/없으면 최종 인벤토리 기반
   topItemCombos: LabChampionItemComboRow[]; // 최대 5
@@ -2096,6 +2114,8 @@ export class LabStatsService {
         },
         winrateTrend: [],
         trendInsufficient: true,
+        patchTrend: [],
+        patchItemTrend: [],
         positions,
         topBuilds: [],
         topItemCombos: [],
@@ -2168,6 +2188,115 @@ export class LabStatsService {
             winRate: games > 0 ? Math.round((wins / games) * 10000) / 10000 : 0,
           };
         });
+
+    // 2-b) 패치별 승률 추이
+    const patchWinRows = await this.prisma.$queryRaw<
+      { patch: string; games: bigint; wins: bigint }[]
+    >(Prisma.sql`
+      SELECT
+        m."patchVersion" AS patch,
+        COUNT(*)::bigint AS games,
+        COUNT(*) FILTER (WHERE mp."win" = true)::bigint AS wins
+      FROM "match_participants" mp
+      INNER JOIN "matches" m ON m."id" = mp."matchId"
+      WHERE mp."championId" = ${championId}
+        AND m."completedAt" IS NOT NULL
+        AND m."patchVersion" IS NOT NULL
+        ${sourceFilter}
+        ${periodFilter ? Prisma.sql`AND m."completedAt" >= ${periodFilter}` : Prisma.empty}
+      GROUP BY m."patchVersion"
+      ORDER BY
+        SPLIT_PART(m."patchVersion", '.', 1)::int ASC,
+        SPLIT_PART(m."patchVersion", '.', 2)::int ASC
+    `);
+
+    const patchTrend: LabChampionPatchTrendPoint[] = patchWinRows.map(
+      (row) => {
+        const games = Number(row.games);
+        const wins = Number(row.wins);
+        return {
+          patch: row.patch,
+          games,
+          wins,
+          winRate:
+            games > 0 ? Math.round((wins / games) * 10000) / 10000 : 0,
+        };
+      },
+    );
+
+    // 2-c) 패치별 아이템 TOP 5 — item0~6 LATERAL 언네스트 후 픽률 기준 집계
+    const patchItemRawRows = await this.prisma.$queryRaw<
+      { patch: string; itemId: number; picks: bigint; totalGames: bigint }[]
+    >(Prisma.sql`
+      WITH item_rows AS (
+        SELECT
+          m."patchVersion" AS patch,
+          mp."matchId",
+          unnested.item_id
+        FROM "match_participants" mp
+        INNER JOIN "matches" m ON m."id" = mp."matchId"
+        CROSS JOIN LATERAL (
+          VALUES
+            (mp."item0"), (mp."item1"), (mp."item2"),
+            (mp."item3"), (mp."item4"), (mp."item5"), (mp."item6")
+        ) AS unnested(item_id)
+        WHERE mp."championId" = ${championId}
+          AND m."completedAt" IS NOT NULL
+          AND m."patchVersion" IS NOT NULL
+          AND unnested.item_id > 0
+          ${sourceFilter}
+          ${periodFilter ? Prisma.sql`AND m."completedAt" >= ${periodFilter}` : Prisma.empty}
+      ),
+      patch_games AS (
+        SELECT patch, COUNT(DISTINCT "matchId")::bigint AS total_games
+        FROM item_rows
+        GROUP BY patch
+      ),
+      item_counts AS (
+        SELECT ir.patch, ir.item_id, COUNT(*)::bigint AS picks
+        FROM item_rows ir
+        GROUP BY ir.patch, ir.item_id
+      ),
+      ranked AS (
+        SELECT
+          ic.patch,
+          ic.item_id AS "itemId",
+          ic.picks,
+          pg.total_games AS "totalGames",
+          ROW_NUMBER() OVER (
+            PARTITION BY ic.patch ORDER BY ic.picks DESC
+          ) AS rn
+        FROM item_counts ic
+        INNER JOIN patch_games pg ON pg.patch = ic.patch
+        WHERE ic.picks >= 2
+      )
+      SELECT patch, "itemId", picks::bigint, "totalGames"::bigint
+      FROM ranked
+      WHERE rn <= 5
+      ORDER BY
+        SPLIT_PART(patch, '.', 1)::int ASC,
+        SPLIT_PART(patch, '.', 2)::int ASC,
+        picks DESC
+    `);
+
+    // 패치별로 그룹핑
+    const patchItemMap = new Map<string, LabChampionPatchItemRow["topItems"]>();
+    for (const row of patchItemRawRows) {
+      if (!patchItemMap.has(row.patch)) patchItemMap.set(row.patch, []);
+      const totalGames = Number(row.totalGames);
+      const picks = Number(row.picks);
+      patchItemMap.get(row.patch)!.push({
+        itemId: Number(row.itemId),
+        picks,
+        pickRate:
+          totalGames > 0
+            ? Math.round((picks / totalGames) * 10000) / 100
+            : 0,
+      });
+    }
+    const patchItemTrend: LabChampionPatchItemRow[] = Array.from(
+      patchItemMap.entries(),
+    ).map(([patch, topItems]) => ({ patch, topItems }));
 
     // 3) 포지션 분포 — 스냅샷 우선, 미스 시 실시간 집계
     const positionSnapshots = await this.prisma.labChampionSnapshot.findMany({
@@ -2485,6 +2614,8 @@ export class LabStatsService {
       },
       winrateTrend,
       trendInsufficient,
+      patchTrend,
+      patchItemTrend,
       positions,
       topBuilds,
       topItemCombos,
@@ -3208,9 +3339,7 @@ export class LabStatsService {
           .slice(0, 5)
           .map(([championId, games]) => ({
             championId,
-            championNameKorean:
-              championNameById.get(championId) ??
-              getChampionKoreanName(String(championId)),
+            championNameKorean: getChampionKoreanName(String(championId)),
             games,
           }));
         const reasons = Array.from(bucket.reasons.entries())

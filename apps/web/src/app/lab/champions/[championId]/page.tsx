@@ -19,6 +19,7 @@ import {
 } from "@/components/ui";
 import { TrendChart } from "@/components/lab/charts/TrendChart";
 import { PositionPie } from "@/components/lab/charts/PositionPie";
+import { PatchTrendCard } from "@/components/lab/charts/PatchTrendCard";
 import { LabConfidenceBadge, LabDataSourceBadge } from "@/components/lab/shared/LabSourceBadge";
 import { ArrowLeft, Crown, Medal } from "lucide-react";
 
@@ -199,6 +200,9 @@ export default function ChampionDetailPage() {
           <CardContent><PositionPie detail={detail} /></CardContent>
         </Card>
       </div>
+
+      {/* 패치 히스토리 */}
+      <PatchTrendCard detail={detail} />
 
       {/* 빌드 + 룬 */}
       <Card className="border-white/10 bg-bg-secondary/80">

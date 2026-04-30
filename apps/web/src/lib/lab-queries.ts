@@ -496,6 +496,11 @@ export type ChampionDetailResponse = {
   totals: { games: number; wins: number; winRate: number };
   winrateTrend: Array<{ weekStart: string; games: number; wins: number; winRate: number }>;
   trendInsufficient: boolean;
+  patchTrend: Array<{ patch: string; games: number; wins: number; winRate: number }>;
+  patchItemTrend: Array<{
+    patch: string;
+    topItems: Array<{ itemId: number; picks: number; pickRate: number }>;
+  }>;
   positions: Array<{
     position: string;
     games: number;
