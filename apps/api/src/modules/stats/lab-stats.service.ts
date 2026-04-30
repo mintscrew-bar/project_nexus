@@ -15,6 +15,7 @@ import {
   aggregateCustomMatchStats,
   type MatchStatsSource,
 } from "./utils/custom-match-aggregator";
+import { normalizeRiotPosition } from "../match/position-normalizer";
 
 // ─── Lab Redis 캐시 키 네임스페이스 ───
 
@@ -5024,6 +5025,9 @@ export class LabStatsService {
       puuid: string;
       championId: number;
       position: string | null;
+      individualPosition: string | null;
+      lane: string | null;
+      role: string | null;
       kills: number;
       deaths: number;
       assists: number;
@@ -5047,6 +5051,9 @@ export class LabStatsService {
         p.value->>'puuid'                                            AS "puuid",
         (p.value->>'championId')::int                               AS "championId",
         p.value->>'teamPosition'                                     AS "position",
+        p.value->>'individualPosition'                               AS "individualPosition",
+        p.value->>'lane'                                             AS "lane",
+        p.value->>'role'                                             AS "role",
         (p.value->>'kills')::int                                     AS "kills",
         (p.value->>'deaths')::int                                    AS "deaths",
         (p.value->>'assists')::int                                   AS "assists",
@@ -5080,7 +5087,13 @@ export class LabStatsService {
     >();
 
     for (const row of rows) {
-      const pos = row.position && row.position !== "" ? row.position : null;
+      const normalizedPosition = normalizeRiotPosition({
+        teamPosition: row.position,
+        individualPosition: row.individualPosition,
+        lane: row.lane,
+        role: row.role,
+      });
+      const pos = normalizedPosition !== "UNKNOWN" ? normalizedPosition : null;
       const kda =
         row.deaths === 0
           ? (row.kills + row.assists) * 1.0
@@ -5111,8 +5124,17 @@ export class LabStatsService {
     const totalGames = rows.length;
     const posGames = new Map<string, number>();
     for (const row of rows) {
-      if (row.position) {
-        posGames.set(row.position, (posGames.get(row.position) ?? 0) + 1);
+      const normalizedPosition = normalizeRiotPosition({
+        teamPosition: row.position,
+        individualPosition: row.individualPosition,
+        lane: row.lane,
+        role: row.role,
+      });
+      if (normalizedPosition !== "UNKNOWN") {
+        posGames.set(
+          normalizedPosition,
+          (posGames.get(normalizedPosition) ?? 0) + 1,
+        );
       }
     }
 

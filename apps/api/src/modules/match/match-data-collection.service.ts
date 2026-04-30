@@ -1,6 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { RiotMatchService, MatchDto } from "../riot/riot-match.service";
+import { normalizeRiotPosition } from "./position-normalizer";
 
 @Injectable()
 export class MatchDataCollectionService {
@@ -200,7 +201,7 @@ export class MatchDataCollectionService {
               riotTeamId: participant.teamId,
               championId: participant.championId,
               championName: participant.championName,
-              position: participant.teamPosition || "UNKNOWN",
+              position: normalizeRiotPosition(participant),
               summoner1Id: participant.summoner1Id,
               summoner2Id: participant.summoner2Id,
               kills: participant.kills,

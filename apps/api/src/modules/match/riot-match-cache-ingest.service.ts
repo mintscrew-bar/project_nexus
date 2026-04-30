@@ -3,6 +3,7 @@ import { OnEvent } from "@nestjs/event-emitter";
 import { Cron } from "@nestjs/schedule";
 import { PrismaService } from "../prisma/prisma.service";
 import type { MatchDto, ParticipantDto } from "../riot/riot-match.service";
+import { normalizeRiotPosition } from "./position-normalizer";
 
 /**
  * riot_match_cache → matches/match_participants 정규화 인제스트.
@@ -91,7 +92,7 @@ export class RiotMatchCacheIngestService {
             riotTeamId: p.teamId,
             championId: p.championId,
             championName: p.championName,
-            position: p.teamPosition || "UNKNOWN",
+            position: normalizeRiotPosition(p),
             summoner1Id: p.summoner1Id,
             summoner2Id: p.summoner2Id,
             kills: p.kills,
