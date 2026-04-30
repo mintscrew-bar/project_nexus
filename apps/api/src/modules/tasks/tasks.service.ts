@@ -692,10 +692,8 @@ export class TasksService {
 
   /**
    * Riot raw match cache TTL cleanup - 매일 새벽 2시 20분.
-   *
-   * 기본 비활성화. 현재 개인 ranked/normal/aram 시즌 통계 재계산 일부가
-   * RiotMatchCache raw에 의존하므로, 정형 MatchParticipant 기반 재계산으로
-   * 완전히 전환한 뒤 RIOT_MATCH_CACHE_CLEANUP_ENABLED=true로 켠다.
+   * 정형 MatchParticipant 인제스트가 완료된 row만 삭제 (EXISTS 조건).
+   * RIOT_MATCH_CACHE_CLEANUP_ENABLED=true 로 활성화.
    */
   @Cron("20 2 * * *")
   async handleRiotMatchCacheCleanup(): Promise<void> {
