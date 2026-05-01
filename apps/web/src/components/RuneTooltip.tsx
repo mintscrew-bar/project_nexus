@@ -5,8 +5,8 @@ import { createPortal } from "react-dom";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { getRuneKoreanName } from "@nexus/types";
+import { getDdragonVersion } from "@/lib/ddragon";
 
-const DDRAGON_VERSION = process.env.NEXT_PUBLIC_DDRAGON_VERSION || "16.7.1";
 const DDRAGON_BASE = "https://ddragon.leagueoflegends.com";
 
 interface RuneInfo {
@@ -24,16 +24,19 @@ let runeDataCache: RuneInfo[] | null = null;
 async function fetchRuneData(): Promise<RuneInfo[]> {
   if (runeDataCache) return runeDataCache;
 
+  // 백엔드에서 최신 DDragon 버전을 받아 사용 (패치 자동 적용)
+  const version = await getDdragonVersion();
+
   try {
     const response = await fetch(
-      `${DDRAGON_BASE}/cdn/${DDRAGON_VERSION}/data/ko_KR/runesReforged.json`
+      `${DDRAGON_BASE}/cdn/${version}/data/ko_KR/runesReforged.json`
     );
 
     if (!response.ok) {
       console.warn(`DDragon 룬 데이터 로드 실패: ${response.status}`);
       // 영문 폴백 시도
       const fallbackResponse = await fetch(
-        `${DDRAGON_BASE}/cdn/${DDRAGON_VERSION}/data/en_US/runesReforged.json`
+        `${DDRAGON_BASE}/cdn/${version}/data/en_US/runesReforged.json`
       );
       const styles: any[] = await fallbackResponse.json();
       const runes: RuneInfo[] = [];

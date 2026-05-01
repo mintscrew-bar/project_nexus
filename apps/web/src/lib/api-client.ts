@@ -1,4 +1,5 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
+import { getDdragonVersion } from "./ddragon";
 
 // 보이지 않는 유니코드 문자 제거 (복사-붙여넣기 시 포함되는 bidirectional formatting 등)
 const stripInvisibleChars = (str: string): string =>
@@ -477,9 +478,9 @@ export const matchApi = {
 
 // Riot API 관련 API
 export const riotApi = {
-  // 챔피언 목록 조회 (Data Dragon)
+  // 챔피언 목록 조회 (Data Dragon) — 백엔드 /stats/ddragon-version 으로 최신 패치 자동 추적
   getChampions: async () => {
-    const version = process.env.NEXT_PUBLIC_DDRAGON_VERSION || "16.2.1";
+    const version = await getDdragonVersion();
     const response = await fetch(
       `https://ddragon.leagueoflegends.com/cdn/${version}/data/ko_KR/champion.json`
     );

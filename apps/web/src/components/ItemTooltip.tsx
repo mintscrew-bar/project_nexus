@@ -5,8 +5,8 @@ import { createPortal } from "react-dom";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { getItemKoreanName } from "@nexus/types";
+import { getDdragonVersion } from "@/lib/ddragon";
 
-const DDRAGON_VERSION = process.env.NEXT_PUBLIC_DDRAGON_VERSION || "16.7.1";
 const DDRAGON_BASE = "https://ddragon.leagueoflegends.com";
 
 // 아이템 스탯 타입
@@ -75,16 +75,19 @@ let itemDataCache: Record<string, ItemInfo> | null = null;
 async function fetchItemData(): Promise<Record<string, ItemInfo>> {
   if (itemDataCache) return itemDataCache;
 
+  // 백엔드에서 최신 DDragon 버전을 받아 사용 (패치 자동 적용)
+  const version = await getDdragonVersion();
+
   try {
     const response = await fetch(
-      `${DDRAGON_BASE}/cdn/${DDRAGON_VERSION}/data/ko_KR/item.json`
+      `${DDRAGON_BASE}/cdn/${version}/data/ko_KR/item.json`
     );
 
     if (!response.ok) {
       console.warn(`DDragon 아이템 데이터 로드 실패: ${response.status}`);
       // 영문 폴백 시도
       const fallbackResponse = await fetch(
-        `${DDRAGON_BASE}/cdn/${DDRAGON_VERSION}/data/en_US/item.json`
+        `${DDRAGON_BASE}/cdn/${version}/data/en_US/item.json`
       );
       const json = await fallbackResponse.json();
       const data = (json.data || {}) as Record<string, ItemInfo>;
