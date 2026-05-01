@@ -653,12 +653,14 @@ export class AuthService {
         include: {
           authProviders: true,
           riotAccounts: {
-            where: { isPrimary: true },
+            // 과거 데이터 호환: primary 플래그가 false인 채로 남은 계정도 노출되도록
+            // 필터를 제거하고 isPrimary desc 정렬만 유지한다.
             include: {
               championPreferences: {
                 orderBy: { order: "asc" },
               },
             },
+            orderBy: [{ isPrimary: "desc" }, { verifiedAt: "desc" }],
           },
           clanMemberships: {
             include: {

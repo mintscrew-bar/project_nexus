@@ -742,7 +742,7 @@ export class RiotService {
   // ========================================
 
   async getUserRiotAccounts(userId: string) {
-    return this.prisma.riotAccount.findMany({
+    const accounts = await this.prisma.riotAccount.findMany({
       where: { userId },
       include: {
         championPreferences: {
@@ -751,6 +751,18 @@ export class RiotService {
       },
       orderBy: [{ isPrimary: "desc" }, { verifiedAt: "desc" }],
     });
+
+    // 자가 치유: 계정은 있는데 primary가 하나도 없는 경우 가장 최근 계정을 primary로 승격
+    if (accounts.length > 0 && !accounts.some((a) => a.isPrimary)) {
+      const target = accounts[0];
+      await this.prisma.riotAccount.update({
+        where: { id: target.id },
+        data: { isPrimary: true },
+      });
+      target.isPrimary = true;
+    }
+
+    return accounts;
   }
 
   async setPrimaryAccount(userId: string, riotAccountId: string) {
