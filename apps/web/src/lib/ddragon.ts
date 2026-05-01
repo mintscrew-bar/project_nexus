@@ -101,3 +101,61 @@ export function invalidateDdragonVersion(): void {
     }
   }
 }
+
+// ────────────────────────────────────────────────────────────
+// CDN URL 헬퍼 — 새 패치에서 추가된 룬/아이템/챔피언 이미지가
+// 로컬에 없을 때 폴백으로 사용
+// ────────────────────────────────────────────────────────────
+
+const DDRAGON_CDN = "https://ddragon.leagueoflegends.com/cdn";
+const COMMUNITY_DRAGON_PERK =
+  "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/perk-images";
+
+/**
+ * 룬 아이콘 CDN URL.
+ * - iconPath가 있으면(룬 메타데이터에서 가져온 경우) 공식 DDragon 사용
+ * - 없으면(rune ID 만 알 때) Community Dragon의 ID 기반 URL 사용
+ */
+export function runeIconUrl(opts: { iconPath?: string; runeId?: number }): string {
+  if (opts.iconPath) {
+    return `${DDRAGON_CDN}/img/${opts.iconPath}`;
+  }
+  // Community Dragon: ID 기반으로 안정적으로 접근 가능
+  return `${COMMUNITY_DRAGON_PERK}/${opts.runeId}.png`;
+}
+
+/** 아이템 아이콘 CDN URL */
+export function itemIconUrl(itemId: number, version: string): string {
+  return `${DDRAGON_CDN}/${version}/img/item/${itemId}.png`;
+}
+
+/** 챔피언 아이콘 CDN URL (key는 영문 키, 예: "Aatrox") */
+export function championIconUrl(championKey: string, version: string): string {
+  return `${DDRAGON_CDN}/${version}/img/champion/${championKey}.png`;
+}
+
+/** 소환사 주문 아이콘 CDN URL */
+export function summonerSpellIconUrl(spellName: string, version: string): string {
+  return `${DDRAGON_CDN}/${version}/img/spell/Summoner${spellName}.png`;
+}
+
+/** 룬 스타일(계열) 아이콘 CDN URL */
+export function runeStyleIconUrl(styleId: number): string {
+  return `${COMMUNITY_DRAGON_PERK}/${styleId}.png`;
+}
+
+/**
+ * <img onError> 핸들러 — 로컬 아이콘 로드 실패 시 CDN 으로 폴백
+ * 사용: <Image onError={fallbackTo(cdnUrl)} ... />
+ * 이미 한 번 폴백되면 무한 루프 방지를 위해 더 이상 핸들러 발동 안 함
+ */
+export function fallbackTo(
+  cdnUrl: string,
+): (e: React.SyntheticEvent<HTMLImageElement>) => void {
+  return (e) => {
+    const img = e.currentTarget;
+    if (img.dataset.fallbackUsed === "1") return;
+    img.dataset.fallbackUsed = "1";
+    img.src = cdnUrl;
+  };
+}

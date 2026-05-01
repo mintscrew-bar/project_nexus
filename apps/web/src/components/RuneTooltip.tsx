@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { getRuneKoreanName } from "@nexus/types";
-import { getDdragonVersion } from "@/lib/ddragon";
+import { getDdragonVersion, runeIconUrl, fallbackTo } from "@/lib/ddragon";
 
 const DDRAGON_BASE = "https://ddragon.leagueoflegends.com";
 
@@ -191,7 +191,8 @@ export function RuneTooltip({ runeId, children, className }: RuneTooltipProps) {
                   height={32}
                   className="rounded"
                   unoptimized
-                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                  // 로컬 파일이 없으면(신규 룬) DDragon 메타데이터의 icon 경로로 자동 폴백
+                  onError={fallbackTo(runeIconUrl({ iconPath: rune.icon, runeId }))}
                 />
                 <p className="font-semibold text-text-primary">{getRuneKoreanName(rune.name) || rune.name}</p>
               </div>

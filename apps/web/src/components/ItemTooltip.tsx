@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { getItemKoreanName } from "@nexus/types";
-import { getDdragonVersion } from "@/lib/ddragon";
+import { getDdragonVersion, itemIconUrl, fallbackTo } from "@/lib/ddragon";
 
 const DDRAGON_BASE = "https://ddragon.leagueoflegends.com";
 
@@ -127,12 +127,15 @@ export function ItemTooltip({ itemId, children, className }: ItemTooltipProps) {
   const [placement, setPlacement] = useState<"top" | "bottom">("top");
   const [alignment, setAlignment] = useState<"center" | "left" | "right">("center");
   const [isMounted, setIsMounted] = useState(false);
+  // CDN 폴백용 최신 패치 버전 (메모리 캐시되므로 한 번만 fetch)
+  const [version, setVersion] = useState<string>("");
   const containerRef = useRef<HTMLDivElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
 
   // 클라이언트 마운트 확인 (SSR 대비)
   useEffect(() => {
     setIsMounted(true);
+    getDdragonVersion().then(setVersion).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -239,6 +242,8 @@ export function ItemTooltip({ itemId, children, className }: ItemTooltipProps) {
                   height={32}
                   className="rounded"
                   unoptimized
+                  // 로컬에 없는 신규 아이템(예: 220012, 226660, 3168 등)은 CDN으로 자동 폴백
+                  onError={version ? fallbackTo(itemIconUrl(Number(itemId), version)) : undefined}
                 />
                 <div>
                   <p className="font-semibold text-text-primary">{getItemKoreanName(item.name) || item.name}</p>
