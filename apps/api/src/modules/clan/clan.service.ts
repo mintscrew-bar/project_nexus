@@ -1693,6 +1693,7 @@ export class ClanService {
             members: {
               select: {
                 id: true,
+                userId: true,
                 role: true,
               },
             },

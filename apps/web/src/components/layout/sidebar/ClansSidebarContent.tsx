@@ -23,7 +23,9 @@ interface Clan {
   logo: string | null;
   isRecruiting: boolean;
   maxMembers: number;
-  members: ClanMember[];
+  // /clans/my 는 members 배열을, /clans 목록은 _count.members 만 반환하므로 둘 다 옵셔널 처리
+  members?: ClanMember[];
+  _count?: { members: number };
 }
 
 const ROLE_LABEL: Record<string, string> = {
@@ -56,8 +58,9 @@ export function ClansSidebarContent() {
   }, [myClan]);
 
   // 내가 속한 클랜에서 내 역할 찾기
+  // getUserClan은 myRole을 응답에 함께 내려주므로 그것을 우선 사용
   const myRole = myClan && user
-    ? myClan.members.find((m) => m.userId === user.id)?.role
+    ? (myClan as any).myRole ?? myClan.members?.find((m) => m.userId === user.id)?.role
     : null;
 
   return (
@@ -96,7 +99,7 @@ export function ClansSidebarContent() {
                 <div className="flex items-center gap-2 mt-0.5">
                   <span className="text-xs text-text-tertiary flex items-center gap-1">
                     <Users className="h-3 w-3" />
-                    {myClan.members.length}/{myClan.maxMembers}
+                    {myClan._count?.members ?? myClan.members?.length ?? 0}/{myClan.maxMembers}
                   </span>
                   {myRole && (
                     <span className={cn(
@@ -178,7 +181,7 @@ export function ClansSidebarContent() {
                     [{clan.tag}] {clan.name}
                   </p>
                   <span className="text-[10px] text-text-tertiary">
-                    {clan.members.length}/{clan.maxMembers}명
+                    {clan._count?.members ?? clan.members?.length ?? 0}/{clan.maxMembers}명
                   </span>
                 </div>
                 <ChevronRight className="h-3 w-3 text-text-quaternary group-hover:text-accent-primary flex-shrink-0" />
