@@ -164,6 +164,8 @@ export default function ClansPage() {
   const [joiningClanId, setJoiningClanId] = useState<string | null>(null);
   // 초대 코드로 가입 모달 표시 여부
   const [showJoinByCodeModal, setShowJoinByCodeModal] = useState(false);
+  // 내 클랜 가입 여부 — 가입돼 있으면 만들기 버튼 숨김
+  const [hasMyClan, setHasMyClan] = useState<boolean | null>(null);
   const { addToast } = useToast();
 
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
@@ -188,6 +190,18 @@ export default function ClansPage() {
   useEffect(() => {
     fetchClans();
   }, [fetchClans]);
+
+  // 내 클랜 가입 여부 조회 (만들기 버튼 노출 조건)
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setHasMyClan(false);
+      return;
+    }
+    clanApi
+      .getMyClan()
+      .then((c) => setHasMyClan(!!c))
+      .catch(() => setHasMyClan(false));
+  }, [isAuthenticated]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -303,6 +317,17 @@ export default function ClansPage() {
                 >
                   <KeyRound className="h-4 w-4 mr-2" />
                   초대 코드
+                </Button>
+              )}
+
+              {/* 클랜 만들기 — 가입한 클랜 없을 때만 노출 */}
+              {isAuthenticated && hasMyClan === false && (
+                <Button
+                  variant="primary"
+                  onClick={() => router.push("/clans/create")}
+                >
+                  <Shield className="h-4 w-4 mr-2" />
+                  클랜 만들기
                 </Button>
               )}
             </div>
