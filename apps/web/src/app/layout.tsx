@@ -12,6 +12,25 @@ import {
 } from "@/lib/seo";
 
 const inter = Inter({ subsets: ["latin"] });
+const websiteJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  name: SITE_NAME,
+  alternateName: ["Nexus Lab", "넥서스", "롤 내전 Nexus"],
+  url: absoluteUrl("/"),
+  description: SITE_DESCRIPTION,
+  inLanguage: "ko-KR",
+  keywords: [
+    "롤 내전",
+    "롤 전적",
+    "롤 스크림",
+    "리그 오브 레전드 내전",
+    "내전 전적",
+    "스크림 관리",
+    "챔피언 통계",
+    "장인 빌드",
+  ],
+};
 
 export const metadata: Metadata = {
   metadataBase: getSiteUrl(),
@@ -97,6 +116,12 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ko" suppressHydrationWarning>
+      <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }}
+        />
+      </head>
       <body className={`${inter.className} font-sans min-h-screen flex flex-col`}>
         <Providers>
           <AppShell>{children}</AppShell>
