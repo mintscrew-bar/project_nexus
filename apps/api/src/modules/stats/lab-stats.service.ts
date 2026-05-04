@@ -627,7 +627,7 @@ export class LabStatsService {
             ban_id::int AS "championId",
             COUNT(*)::bigint AS "banCount"
           FROM (
-            SELECT jsonb_array_elements(mts."bans")::int AS ban_id
+            SELECT (jsonb_array_elements(mts."bans") ->> 'championId')::int AS ban_id
             FROM "match_team_stats" mts
             INNER JOIN "matches" m ON m."id" = mts."matchId"
             WHERE m."completedAt" IS NOT NULL
@@ -1994,7 +1994,7 @@ export class LabStatsService {
               ban_id::int AS "championId",
               COUNT(*)::bigint AS "banCount"
             FROM (
-              SELECT jsonb_array_elements(mts."bans")::int AS ban_id
+              SELECT (jsonb_array_elements(mts."bans") ->> 'championId')::int AS ban_id
               FROM "match_team_stats" mts
               INNER JOIN "matches" m ON m."id" = mts."matchId"
               WHERE m."completedAt" IS NOT NULL
@@ -2531,10 +2531,20 @@ export class LabStatsService {
       .sort((a, b) => b.wilsonLower - a.wilsonLower)
       .slice(0, 5);
 
-    const topBuilds: LabChampionBuildRow[] = Array.from(buildCounter.values())
-      .filter((entry) => entry.games >= 3)
+    // 코어 빌드: 승률 신뢰도(Wilson 60%) + 픽률(게임 수 40%) 종합 점수로 정렬
+    const buildEntries = Array.from(buildCounter.values()).filter(
+      (e) => e.games >= 3,
+    );
+    const buildMaxGames =
+      buildEntries.length > 0
+        ? Math.max(...buildEntries.map((e) => e.games))
+        : 1;
+    const topBuilds: LabChampionBuildRow[] = buildEntries
       .map((entry) => {
         const winRate = entry.games > 0 ? entry.wins / entry.games : 0;
+        const wl = wilsonLower(entry.wins, entry.games, 1.96);
+        const pickScore = entry.games / buildMaxGames;
+        const combinedScore = 0.6 * wl + 0.4 * pickScore;
         return {
           coreItems: entry.coreItems,
           boots: entry.boots,
@@ -2545,13 +2555,13 @@ export class LabStatsService {
           games: entry.games,
           wins: entry.wins,
           winRate: Math.round(winRate * 10000) / 10000,
-          wilsonLower:
-            Math.round(wilsonLower(entry.wins, entry.games, 1.96) * 1000000) /
-            1000000,
+          wilsonLower: Math.round(wl * 1000000) / 1000000,
+          combinedScore,
         };
       })
-      .sort((a, b) => b.wilsonLower - a.wilsonLower)
-      .slice(0, 5);
+      .sort((a, b) => b.combinedScore - a.combinedScore)
+      .slice(0, 5)
+      .map(({ combinedScore: _, ...rest }) => rest);
 
     // 룬 3-tuple 집계
     const runeComboCounter = new Map<

@@ -12,7 +12,7 @@ import {
   type ChampionMasteryResponse,
   type LabDataSource,
 } from "@/lib/lab-queries";
-import { getChampionIconById, getItemIcon, getSummonerSpellIcon } from "@/components/matches/match-utils";
+import { getChampionIconById, getItemIcon, getSummonerSpellIcon, getPerkIcon, getPerkName } from "@/components/matches/match-utils";
 import { formatRate } from "@/lib/lab-format";
 import {
   Badge, Card, CardContent, CardDescription, CardHeader, CardTitle, LoadingSpinner,
@@ -237,9 +237,12 @@ export default function ChampionDetailPage() {
                       <Image src={getSummonerSpellIcon(spellId)} alt={`spell-${spellId}`} fill className="object-cover" unoptimized />
                     </div>
                   ))}
-                  <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-full bg-bg-primary/70 px-1 text-xs text-text-tertiary">
-                    {build.keystonePerk}
-                  </span>
+                  <div
+                    className="relative h-7 w-7 overflow-hidden rounded-full border border-white/10 bg-bg-primary/70"
+                    title={getPerkName(build.keystonePerk)}
+                  >
+                    <Image src={getPerkIcon(build.keystonePerk)} alt={getPerkName(build.keystonePerk)} fill className="object-cover" unoptimized />
+                  </div>
                 </div>
                 <p className="text-xs text-text-secondary">{build.games}게임</p>
                 <p className="text-sm font-semibold text-accent-success">{formatRate(build.winRate)}</p>
@@ -294,11 +297,21 @@ export default function ChampionDetailPage() {
                   className="flex items-center justify-between rounded-lg border border-white/10 bg-bg-primary/50 px-3 py-2"
                 >
                   <div className="flex items-center gap-2">
-                    {[combo.keystonePerk, combo.primaryStyle, combo.subStyle].map((runeId) => (
-                      <span key={runeId} className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-bg-primary/70 text-xs text-text-tertiary">
-                        {runeId}
-                      </span>
+                    {/* 키스톤 (크게), 주 트리, 보조 트리 순서로 표시 */}
+                    {[
+                      { id: combo.keystonePerk, size: "h-8 w-8", label: "키스톤" },
+                      { id: combo.primaryStyle, size: "h-6 w-6", label: "주 트리" },
+                      { id: combo.subStyle, size: "h-6 w-6", label: "보조 트리" },
+                    ].map(({ id, size, label }) => (
+                      <div
+                        key={`${label}-${id}`}
+                        className={`relative ${size} overflow-hidden rounded-full border border-white/10 bg-bg-primary/70`}
+                        title={`${label}: ${getPerkName(id)}`}
+                      >
+                        <Image src={getPerkIcon(id)} alt={getPerkName(id)} fill className="object-cover" unoptimized />
+                      </div>
                     ))}
+                    <span className="text-xs text-text-tertiary">{getPerkName(combo.keystonePerk)}</span>
                   </div>
                   <p className="text-xs text-text-secondary">{combo.games}게임</p>
                   <p className="text-sm font-semibold text-accent-success">{formatRate(combo.winRate)}</p>

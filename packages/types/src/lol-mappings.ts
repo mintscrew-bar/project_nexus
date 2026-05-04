@@ -164,7 +164,7 @@ export const CHAMPION_MAPPINGS: Record<string, string> = {
   "Wukong": "우콩",
   "Xayah": "자야",
   "Xerath": "제라스",
-  "Xin": "신짜오",
+  "XinZhao": "신짜오",
   "Yasuo": "야스오",
   "Yone": "요네",
   "Yorick": "요릭",
@@ -178,6 +178,8 @@ export const CHAMPION_MAPPINGS: Record<string, string> = {
   "Zyra": "자이라",
   "Ambessa": "암베사",
   "Yunara": "유나라",
+  "Smolder": "스몰더",
+  "Aurora": "오로라",
 };
 
 // ============================================
