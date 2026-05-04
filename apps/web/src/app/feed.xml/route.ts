@@ -1,5 +1,8 @@
 import { absoluteUrl, SITE_DESCRIPTION, SITE_NAME } from "@/lib/seo";
 
+// 매 요청마다 서버에서 실행 (빌드 시 정적 생성 방지)
+export const dynamic = "force-dynamic";
+
 interface Post {
   id: string;
   title: string;
