@@ -131,6 +131,47 @@ export default function Home() {
         </div>
       </section>
 
+      <section className="px-6 pb-24 md:pb-32">
+        <div className="mx-auto max-w-6xl">
+          <div className="mb-10 max-w-3xl">
+            <h2 className="text-3xl md:text-4xl font-bold text-text-primary">
+              롤 내전, 전적, 스크림을 한 흐름으로 관리
+            </h2>
+            <p className="mt-4 text-base md:text-lg leading-relaxed text-text-secondary">
+              Nexus는 리그 오브 레전드 내전과 스크림을 운영하는 팀을 위해
+              참가자 모집, 팀 밸런싱, 경기 기록, 롤 전적 확인, 챔피언 통계
+              분석을 연결합니다.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <article className="rounded-lg border border-bg-tertiary bg-bg-secondary/50 p-6">
+              <h3 className="text-xl font-semibold text-text-primary">롤 내전 운영</h3>
+              <p className="mt-3 text-sm leading-relaxed text-text-secondary">
+                디스코드 기반 참가, 팀 구성, 경매 드래프트, 결과 기록까지
+                내전 진행에 필요한 과정을 한곳에서 처리합니다.
+              </p>
+            </article>
+
+            <article className="rounded-lg border border-bg-tertiary bg-bg-secondary/50 p-6">
+              <h3 className="text-xl font-semibold text-text-primary">롤 전적 분석</h3>
+              <p className="mt-3 text-sm leading-relaxed text-text-secondary">
+                내전 기록과 랭크 기록을 구분해 챔피언 승률, 포지션, KDA,
+                장인 빌드 흐름을 비교할 수 있습니다.
+              </p>
+            </article>
+
+            <article className="rounded-lg border border-bg-tertiary bg-bg-secondary/50 p-6">
+              <h3 className="text-xl font-semibold text-text-primary">롤 스크림 관리</h3>
+              <p className="mt-3 text-sm leading-relaxed text-text-secondary">
+                고정 팀, 클랜, 커뮤니티 스크림에서 반복되는 매칭과 기록
+                관리를 줄이고 다음 경기 준비에 집중할 수 있게 돕습니다.
+              </p>
+            </article>
+          </div>
+        </div>
+      </section>
+
     </main>
   );
 }

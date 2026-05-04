@@ -7,14 +7,14 @@ import LabLayoutClient from "./_components/LabLayoutClient";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Lab",
+  title: "롤 전적 랩",
   description:
-    "Nexus Lab에서 내전과 랭크를 구분한 챔피언 통계, 패치 변화, 조합 분석, 장인 빌드를 확인하세요.",
+    "Nexus Lab에서 롤 내전 전적과 랭크 기록을 구분한 챔피언 통계, 패치 변화, 조합 분석, 장인 빌드를 확인하세요.",
   alternates: {
     canonical: "/lab",
   },
   openGraph: {
-    title: "Nexus Lab - 챔피언 통계와 장인 빌드",
+    title: "Nexus Lab - 롤 전적, 챔피언 통계와 장인 빌드",
     description:
       "내전과 랭크 데이터를 나눠 보고, 챔피언별 통계와 빌드 흐름을 비교하는 Nexus 실험실입니다.",
     url: "/lab",
