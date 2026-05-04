@@ -34,6 +34,34 @@ const nextConfig = {
           },
         ],
       },
+      {
+        source:
+          "/:path(admin|api|auth|dashboard|profile|settings|role-selection|draft|auction)(.*)",
+        headers: [
+          {
+            key: "X-Robots-Tag",
+            value: "noindex, nofollow, noarchive",
+          },
+        ],
+      },
+      {
+        source: "/community/:path(write|bookmarks)(.*)",
+        headers: [
+          {
+            key: "X-Robots-Tag",
+            value: "noindex, nofollow, noarchive",
+          },
+        ],
+      },
+      {
+        source: "/clans/create",
+        headers: [
+          {
+            key: "X-Robots-Tag",
+            value: "noindex, nofollow, noarchive",
+          },
+        ],
+      },
     ];
   },
   async rewrites() {

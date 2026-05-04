@@ -3,14 +3,78 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 import { AppShell } from "@/components/layout/AppShell";
+import {
+  SITE_DESCRIPTION,
+  SITE_NAME,
+  SITE_TITLE,
+  absoluteUrl,
+  getSiteUrl,
+} from "@/lib/seo";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Project Nexus - LoL In-House Tournament",
-  description: "League of Legends 내전 토너먼트 플랫폼",
+  metadataBase: getSiteUrl(),
+  applicationName: SITE_NAME,
+  title: {
+    default: SITE_TITLE,
+    template: `%s | ${SITE_NAME}`,
+  },
+  description: SITE_DESCRIPTION,
+  keywords: [
+    "Nexus",
+    "넥서스",
+    "리그 오브 레전드",
+    "롤 내전",
+    "LOL 내전",
+    "챔피언 통계",
+    "장인 빌드",
+    "클랜",
+    "랭킹",
+  ],
+  authors: [{ name: SITE_NAME }],
+  creator: SITE_NAME,
+  publisher: SITE_NAME,
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    type: "website",
+    locale: "ko_KR",
+    url: "/",
+    siteName: SITE_NAME,
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    images: [
+      {
+        url: absoluteUrl("/images/nexus2.png"),
+        width: 1200,
+        height: 630,
+        alt: "Nexus",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    images: [absoluteUrl("/images/nexus2.png")],
+  },
   icons: {
     icon: "/icon.png",
+    apple: "/icon.png",
+  },
+  manifest: "/manifest.webmanifest",
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
   },
 };
 
