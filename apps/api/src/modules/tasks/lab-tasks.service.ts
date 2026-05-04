@@ -56,13 +56,20 @@ export class LabTasksService {
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
     // 1순위: 최근 30일 내전 참가 기록이 있는 유저의 RiotAccount
-    const activeUserIds = await this.prisma.$queryRaw<{ userId: string }[]>`
+    const activeUserIds = await this.prisma.$queryRaw<
+      { userId: string | null }[]
+    >`
       SELECT DISTINCT mp."userId"
       FROM "match_participants" mp
       INNER JOIN "matches" m ON m."id" = mp."matchId"
       WHERE COALESCE(m."completedAt", m."createdAt") >= ${thirtyDaysAgo}
+        AND mp."userId" IS NOT NULL
     `;
-    const activeUserIdSet = new Set(activeUserIds.map((row) => row.userId));
+    const activeUserIdSet = new Set(
+      activeUserIds
+        .map((row) => row.userId)
+        .filter((userId): userId is string => Boolean(userId)),
+    );
 
     // 활성 유저의 모든 RiotAccount (당일 미갱신만)
     const priorityAccounts = await this.prisma.riotAccount.findMany({

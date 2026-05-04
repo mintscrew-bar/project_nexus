@@ -1294,17 +1294,24 @@ export class LabStatsService {
     if (cached) return JSON.parse(cached);
 
     // 최근 2개 패치 버전 조회
-    const patches = await this.prisma.$queryRaw<
-      { patchVersion: string }[]
-    >(Prisma.sql`
-      SELECT DISTINCT "patchVersion"
-      FROM "matches"
-      WHERE "patchVersion" IS NOT NULL
-        AND "completedAt" IS NOT NULL
-      ORDER BY SPLIT_PART("patchVersion", '.', 1)::int DESC,
-               SPLIT_PART("patchVersion", '.', 2)::int DESC
+    const patches = await this.prisma.$queryRaw<{ patchVersion: string }[]>(
+      Prisma.sql`
+      WITH distinct_patches AS (
+        SELECT
+          "patchVersion",
+          SPLIT_PART("patchVersion", '.', 1)::int AS "majorVersion",
+          SPLIT_PART("patchVersion", '.', 2)::int AS "minorVersion"
+        FROM "matches"
+        WHERE "patchVersion" IS NOT NULL
+          AND "completedAt" IS NOT NULL
+        GROUP BY "patchVersion"
+      )
+      SELECT "patchVersion"
+      FROM distinct_patches
+      ORDER BY "majorVersion" DESC, "minorVersion" DESC
       LIMIT 2
-    `);
+    `,
+    );
 
     if (patches.length < 2) {
       const result = {
