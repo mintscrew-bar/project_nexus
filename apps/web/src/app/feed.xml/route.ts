@@ -5,7 +5,7 @@ interface Post {
   title: string;
   content: string;
   createdAt: string;
-  author: { id: string; nickname: string };
+  author: { id: string; username: string };
   category?: string;
 }
 
@@ -38,8 +38,8 @@ export async function GET() {
   let posts: Post[] = [];
   try {
     const res = await fetch(
-      `${apiUrl}/api/community/posts?limit=30&sort=latest`,
-      { next: { revalidate: 3600 } }, // 1시간 캐시
+      `${apiUrl}/api/community/posts?limit=30`,
+      { cache: "no-store" },
     );
     if (res.ok) {
       const data: PostListResponse | Post[] = await res.json();
@@ -65,7 +65,7 @@ export async function GET() {
       <description>${description}</description>
       <pubDate>${pubDate}</pubDate>
       <guid isPermaLink="true">${link}</guid>
-      <author>${escapeXml(post.author.nickname)}</author>
+      <author>${escapeXml(post.author.username)}</author>
     </item>`;
     })
     .join("");
