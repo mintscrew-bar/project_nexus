@@ -284,37 +284,78 @@ export default function ChampionDetailPage() {
 
         <Card className="border-white/10 bg-bg-secondary/80">
           <CardHeader>
-            <CardTitle className="text-base">최고 성과 룬 TOP 3</CardTitle>
-            <CardDescription>Wilson 하한 기준</CardDescription>
+            <CardTitle className="text-base">추천 룬 TOP 3</CardTitle>
+            <CardDescription>승률 + 픽률 종합 기준</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-2">
+          <CardContent className="space-y-3">
             {detail.topRuneCombos.length === 0 ? (
               <p className="text-sm text-text-secondary">조건을 만족하는 룬 조합이 없습니다.</p>
             ) : (
-              detail.topRuneCombos.map((combo) => (
+              detail.topRuneCombos.map((combo, idx) => (
                 <div
-                  key={`${combo.primaryStyle}-${combo.subStyle}-${combo.keystonePerk}`}
-                  className="flex items-center justify-between rounded-lg border border-white/10 bg-bg-primary/50 px-3 py-2"
+                  key={`${combo.primaryStyle}-${combo.subStyle}-${combo.keystonePerk}-${idx}`}
+                  className="rounded-lg border border-white/10 bg-bg-primary/50 px-3 py-3"
                 >
-                  <div className="flex items-center gap-2">
-                    {/* 키스톤 (크게), 주 트리, 보조 트리 순서로 표시 */}
-                    {[
-                      { id: combo.keystonePerk, size: "h-8 w-8", label: "키스톤" },
-                      { id: combo.primaryStyle, size: "h-6 w-6", label: "주 트리" },
-                      { id: combo.subStyle, size: "h-6 w-6", label: "보조 트리" },
-                    ].map(({ id, size, label }) => (
-                      <div
-                        key={`${label}-${id}`}
-                        className={`relative ${size} overflow-hidden rounded-full border border-white/10 bg-bg-primary/70`}
-                        title={`${label}: ${getPerkName(id)}`}
-                      >
-                        <Image src={getPerkIcon(id)} alt={getPerkName(id)} fill className="object-cover" unoptimized />
+                  <div className="flex items-start gap-4">
+                    {/* 주 트리 */}
+                    <div className="flex flex-col items-center gap-1.5">
+                      <div className="flex items-center gap-1.5">
+                        <div className="relative h-5 w-5 overflow-hidden rounded-full" title={getPerkName(combo.primaryStyle)}>
+                          <Image src={getPerkIcon(combo.primaryStyle)} alt={getPerkName(combo.primaryStyle)} fill className="object-cover" unoptimized />
+                        </div>
+                        <span className="text-[10px] font-semibold text-text-tertiary">{getPerkName(combo.primaryStyle)}</span>
                       </div>
-                    ))}
-                    <span className="text-xs text-text-tertiary">{getPerkName(combo.keystonePerk)}</span>
+                      <div className="flex items-center gap-1">
+                        {/* 키스톤은 크게 */}
+                        <div
+                          className="relative h-9 w-9 overflow-hidden rounded-full border border-white/20 bg-bg-primary/70"
+                          title={getPerkName(combo.keystonePerk)}
+                        >
+                          <Image src={getPerkIcon(combo.keystonePerk)} alt={getPerkName(combo.keystonePerk)} fill className="object-cover" unoptimized />
+                        </div>
+                        {/* 나머지 주 트리 룬 3개 */}
+                        {combo.primarySelections.slice(1).map((perkId) => (
+                          <div
+                            key={perkId}
+                            className="relative h-6 w-6 overflow-hidden rounded-full border border-white/10 bg-bg-primary/70"
+                            title={getPerkName(perkId)}
+                          >
+                            <Image src={getPerkIcon(perkId)} alt={getPerkName(perkId)} fill className="object-cover" unoptimized />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* 구분선 */}
+                    <div className="mt-5 h-8 w-px shrink-0 bg-white/10" />
+
+                    {/* 보조 트리 */}
+                    <div className="flex flex-col items-center gap-1.5">
+                      <div className="flex items-center gap-1.5">
+                        <div className="relative h-5 w-5 overflow-hidden rounded-full" title={getPerkName(combo.subStyle)}>
+                          <Image src={getPerkIcon(combo.subStyle)} alt={getPerkName(combo.subStyle)} fill className="object-cover" unoptimized />
+                        </div>
+                        <span className="text-[10px] font-semibold text-text-tertiary">{getPerkName(combo.subStyle)}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        {combo.subSelections.map((perkId) => (
+                          <div
+                            key={perkId}
+                            className="relative h-6 w-6 overflow-hidden rounded-full border border-white/10 bg-bg-primary/70"
+                            title={getPerkName(perkId)}
+                          >
+                            <Image src={getPerkIcon(perkId)} alt={getPerkName(perkId)} fill className="object-cover" unoptimized />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* 통계 */}
+                    <div className="ml-auto flex flex-col items-end gap-0.5">
+                      <p className="text-sm font-bold text-accent-success">{formatRate(combo.winRate)}</p>
+                      <p className="text-xs text-text-tertiary">{combo.games}게임</p>
+                    </div>
                   </div>
-                  <p className="text-xs text-text-secondary">{combo.games}게임</p>
-                  <p className="text-sm font-semibold text-accent-success">{formatRate(combo.winRate)}</p>
                 </div>
               ))
             )}

@@ -531,7 +531,9 @@ export type ChampionDetailResponse = {
   }>;
   topRuneCombos: Array<{
     primaryStyle: number;
+    primarySelections: number[];
     subStyle: number;
+    subSelections: number[];
     keystonePerk: number;
     games: number;
     wins: number;

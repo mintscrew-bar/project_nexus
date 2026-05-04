@@ -85,8 +85,10 @@ export interface LabChampionItemComboRow {
 
 export interface LabChampionRuneComboRow {
   primaryStyle: number;
+  primarySelections: number[]; // 주 트리 룬 4개 [키스톤, row2, row3, row4]
   subStyle: number;
-  keystonePerk: number;
+  subSelections: number[]; // 보조 트리 룬 2개
+  keystonePerk: number; // primarySelections[0] 와 동일 (하위 호환)
   games: number;
   wins: number;
   winRate: number;
@@ -2563,12 +2565,14 @@ export class LabStatsService {
       .slice(0, 5)
       .map(({ combinedScore: _, ...rest }) => rest);
 
-    // 룬 3-tuple 집계
+    // 룬 전체 페이지 집계 — 키: 주 트리 전체 선택 + 보조 트리 전체 선택
     const runeComboCounter = new Map<
       string,
       {
         primaryStyle: number;
+        primarySelections: number[];
         subStyle: number;
+        subSelections: number[];
         keystonePerk: number;
         games: number;
         wins: number;
@@ -2578,7 +2582,13 @@ export class LabStatsService {
     for (const p of participants) {
       const parsed = this.extractRuneTriplet(p.perks);
       if (!parsed) continue;
-      const key = `${parsed.primaryStyle}_${parsed.subStyle}_${parsed.keystonePerk}`;
+      // 전체 선택 기준으로 키 생성 — 동일한 룬 페이지끼리 묶임
+      const key = [
+        parsed.primaryStyle,
+        ...parsed.primarySelections,
+        parsed.subStyle,
+        ...parsed.subSelections,
+      ].join("_");
       const existing = runeComboCounter.get(key);
       if (existing) {
         existing.games += 1;
@@ -2586,7 +2596,9 @@ export class LabStatsService {
       } else {
         runeComboCounter.set(key, {
           primaryStyle: parsed.primaryStyle,
+          primarySelections: parsed.primarySelections,
           subStyle: parsed.subStyle,
+          subSelections: parsed.subSelections,
           keystonePerk: parsed.keystonePerk,
           games: 1,
           wins: p.win ? 1 : 0,
@@ -2594,26 +2606,34 @@ export class LabStatsService {
       }
     }
 
-    const topRuneCombos: LabChampionRuneComboRow[] = Array.from(
-      runeComboCounter.values(),
-    )
-      .filter((entry) => entry.games >= 3)
+    // 룬 콤보: 빌드와 동일하게 Wilson 하한(60%) + 픽률(40%) 종합 점수
+    const runeEntries = Array.from(runeComboCounter.values()).filter(
+      (e) => e.games >= 3,
+    );
+    const runeMaxGames =
+      runeEntries.length > 0 ? Math.max(...runeEntries.map((e) => e.games)) : 1;
+    const topRuneCombos: LabChampionRuneComboRow[] = runeEntries
       .map((entry) => {
         const winRate = entry.games > 0 ? entry.wins / entry.games : 0;
+        const wl = wilsonLower(entry.wins, entry.games, 1.96);
+        const pickScore = entry.games / runeMaxGames;
+        const combinedScore = 0.6 * wl + 0.4 * pickScore;
         return {
           primaryStyle: entry.primaryStyle,
+          primarySelections: entry.primarySelections,
           subStyle: entry.subStyle,
+          subSelections: entry.subSelections,
           keystonePerk: entry.keystonePerk,
           games: entry.games,
           wins: entry.wins,
           winRate: Math.round(winRate * 10000) / 10000,
-          wilsonLower:
-            Math.round(wilsonLower(entry.wins, entry.games, 1.96) * 1000000) /
-            1000000,
+          wilsonLower: Math.round(wl * 1000000) / 1000000,
+          combinedScore,
         };
       })
-      .sort((a, b) => b.wilsonLower - a.wilsonLower)
-      .slice(0, 3);
+      .sort((a, b) => b.combinedScore - a.combinedScore)
+      .slice(0, 3)
+      .map(({ combinedScore: _, ...rest }) => rest);
 
     const totalWinRate =
       totalGames > 0 ? Math.round((totalWins / totalGames) * 10000) / 10000 : 0;
@@ -5239,13 +5259,17 @@ export class LabStatsService {
   }
 
   /**
-   * Riot perks JSON에서 (primaryStyle, subStyle, keystonePerk)를 추출.
-   * 구조: { styles: [{ description: "primaryStyle", style: number, selections: [{ perk: number, ... }, ...] },
-   *                  { description: "subStyle", style: number, ... }] }
+   * Riot perks JSON에서 전체 룬 페이지 데이터를 추출한다.
+   * 구조: { styles: [
+   *   { description: "primaryStyle", style: 8000, selections: [{perk}, {perk}, {perk}, {perk}] },
+   *   { description: "subStyle",     style: 8200, selections: [{perk}, {perk}] }
+   * ]}
    */
   private extractRuneTriplet(perks: Prisma.JsonValue): {
     primaryStyle: number;
+    primarySelections: number[];
     subStyle: number;
+    subSelections: number[];
     keystonePerk: number;
   } | null {
     if (!perks || typeof perks !== "object") return null;
@@ -5253,12 +5277,11 @@ export class LabStatsService {
     if (!Array.isArray(styles) || styles.length < 2) return null;
 
     const primary = styles[0] as
-      | {
-          style?: number;
-          selections?: { perk?: number }[];
-        }
+      | { style?: number; selections?: { perk?: number }[] }
       | undefined;
-    const sub = styles[1] as { style?: number } | undefined;
+    const sub = styles[1] as
+      | { style?: number; selections?: { perk?: number }[] }
+      | undefined;
 
     const primaryStyle = primary?.style;
     const subStyle = sub?.style;
@@ -5272,7 +5295,14 @@ export class LabStatsService {
       return null;
     }
 
-    return { primaryStyle, subStyle, keystonePerk };
+    const primarySelections = (primary?.selections ?? [])
+      .map((s) => s.perk)
+      .filter((p): p is number => typeof p === "number");
+    const subSelections = (sub?.selections ?? [])
+      .map((s) => s.perk)
+      .filter((p): p is number => typeof p === "number");
+
+    return { primaryStyle, primarySelections, subStyle, subSelections, keystonePerk };
   }
 
   // ─── Task 35: Admin — 콜드스타트/데이터 단계 조회 ───
