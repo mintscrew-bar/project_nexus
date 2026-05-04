@@ -10,6 +10,7 @@ const publicRoutes = [
   { path: "/simulation", priority: 0.55, changeFrequency: "monthly" },
   { path: "/terms", priority: 0.2, changeFrequency: "yearly" },
   { path: "/privacy", priority: 0.2, changeFrequency: "yearly" },
+  { path: "/feed.xml", priority: 0.5, changeFrequency: "hourly" },
 ] as const;
 
 export default function sitemap(): MetadataRoute.Sitemap {

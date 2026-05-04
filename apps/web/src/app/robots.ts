@@ -32,6 +32,7 @@ export default function robots(): MetadataRoute.Robots {
         userAgent: "*",
         allow: [
           "/",
+          "/feed.xml",
           "/*.js",   // JS·CSS 파비콘 수집 허용 (Naver 권고)
           "/*.css",
           "/icons/",
@@ -44,6 +45,7 @@ export default function robots(): MetadataRoute.Robots {
         userAgent: "Yeti",
         allow: [
           "/",
+          "/feed.xml",
           "/*.js",
           "/*.css",
           "/icons/",
