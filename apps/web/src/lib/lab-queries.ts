@@ -107,6 +107,8 @@ export type MetaRadarResponse = {
 export type PatchImpactResponse = {
   currentPatch: string | null;
   previousPatch: string | null;
+  currentPatchLabel?: string | null;
+  previousPatchLabel?: string | null;
   sample: {
     currentGames: number;
     previousGames: number;

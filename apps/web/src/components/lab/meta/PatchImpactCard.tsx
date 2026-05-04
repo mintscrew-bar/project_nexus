@@ -15,12 +15,12 @@ interface Props {
 }
 
 export function PatchImpactCard({ patchImpact }: Props) {
-  const currentPatchLabel = formatPublicPatchVersion(
-    patchImpact?.currentPatch ?? null,
-  );
-  const previousPatchLabel = formatPublicPatchVersion(
-    patchImpact?.previousPatch ?? null,
-  );
+  const currentPatchLabel =
+    patchImpact?.currentPatchLabel ??
+    formatPublicPatchVersion(patchImpact?.currentPatch ?? null);
+  const previousPatchLabel =
+    patchImpact?.previousPatchLabel ??
+    formatPublicPatchVersion(patchImpact?.previousPatch ?? null);
 
   return (
     <Card className="border-white/10 bg-bg-secondary/80">

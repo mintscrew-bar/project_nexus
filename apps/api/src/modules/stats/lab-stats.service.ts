@@ -20,6 +20,22 @@ import { normalizeRiotPosition } from "../match/position-normalizer";
 // ─── Lab Redis 캐시 키 네임스페이스 ───
 
 const LAB_CACHE_PREFIX = "lab:";
+
+function formatPublicPatchVersion(patchVersion: string | null): string | null {
+  if (!patchVersion) return null;
+
+  const [majorRaw, minorRaw] = patchVersion.split(".");
+  const major = Number(majorRaw);
+  const minor = Number(minorRaw);
+
+  if (!Number.isFinite(major) || !Number.isFinite(minor)) {
+    return patchVersion;
+  }
+
+  const publicMajor = major >= 15 && major < 20 ? major + 10 : major;
+  return `${publicMajor}.${String(minor).padStart(2, "0")}`;
+}
+
 // ─── 타입 정의 ───
 
 export interface LabChampionSnapshotRow {
@@ -1256,6 +1272,8 @@ export class LabStatsService {
   async getPatchImpact(): Promise<{
     currentPatch: string | null;
     previousPatch: string | null;
+    currentPatchLabel: string | null;
+    previousPatchLabel: string | null;
     sample: {
       currentGames: number;
       previousGames: number;
@@ -1291,7 +1309,7 @@ export class LabStatsService {
     }>;
     insufficient: boolean;
   }> {
-    const cacheKey = this.labCacheKey("meta:patch-impact");
+    const cacheKey = this.labCacheKey("meta:patch-impact:v2");
     const cached = await this.redis.get(cacheKey);
     if (cached) return JSON.parse(cached);
 
@@ -1319,6 +1337,10 @@ export class LabStatsService {
       const result = {
         currentPatch: patches[0]?.patchVersion ?? null,
         previousPatch: null,
+        currentPatchLabel: formatPublicPatchVersion(
+          patches[0]?.patchVersion ?? null,
+        ),
+        previousPatchLabel: null,
         sample: {
           currentGames: 0,
           previousGames: 0,
@@ -1337,6 +1359,8 @@ export class LabStatsService {
 
     const currentPatch = patches[0].patchVersion;
     const previousPatch = patches[1].patchVersion;
+    const currentPatchLabel = formatPublicPatchVersion(currentPatch);
+    const previousPatchLabel = formatPublicPatchVersion(previousPatch);
     const championData = await this.dataDragon.getChampionData("ko_KR");
     const championNameKoById = new Map<number, string>();
     for (const champion of Object.values(championData.data)) {
@@ -1741,6 +1765,8 @@ export class LabStatsService {
     const result = {
       currentPatch,
       previousPatch,
+      currentPatchLabel,
+      previousPatchLabel,
       sample: {
         currentGames,
         previousGames,
