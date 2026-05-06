@@ -2362,22 +2362,9 @@ export class StatsService {
    * - 매치 상세는 5개씩 배치 순차 처리 (rate limit 보호)
    */
   async getRankedChampionStats(gameName: string, tagLine: string) {
-    const found = await this.findUserByRiotAccount(gameName, tagLine);
-    if (!found) {
-      // 미등록 소환사: Riot match-v5에서 즉석 계산 (최근 랭크 20게임)
-      const summonerInfo = await this.riotService.getSummonerByRiotId(
-        gameName,
-        tagLine,
-      );
-      const matches = await this.riotMatchService.getMatchHistoryByPuuid(
-        summonerInfo.puuid,
-        20,
-        420, // RANKED_SOLO_5x5
-      );
-      return this.computeChampionStatsFromMatches(matches, summonerInfo.puuid);
-    }
-    const response = await this.getChampionStatsCacheByUserId(
-      found.userId,
+    const response = await this.getChampionStatsCacheByRiotId(
+      gameName,
+      tagLine,
       "ranked",
     );
     return response.stats;
