@@ -18,6 +18,7 @@ import { SnakeDraftGateway } from "./snake-draft.gateway";
 import { AuthService } from "../auth/auth.service";
 import { AuctionService } from "../auction/auction.service";
 import { AuctionGateway } from "../auction/auction.gateway";
+import { RoleSelectionService } from "../role-selection/role-selection.service";
 import { DiscordVoiceService } from "../discord/discord-voice.service";
 import { RoomStatus, TeamMode } from "@nexus/database";
 
@@ -65,6 +66,8 @@ export class RoomGateway
     private readonly auctionService: AuctionService,
     @Inject(forwardRef(() => AuctionGateway))
     private readonly auctionGateway: AuctionGateway,
+    @Inject(forwardRef(() => RoleSelectionService))
+    private readonly roleSelectionService: RoleSelectionService,
     @Inject("DISCORD_VOICE_SERVICE")
     private readonly discordVoiceService: DiscordVoiceService,
   ) {}
@@ -271,7 +274,7 @@ export class RoomGateway
   @SubscribeMessage("join-room")
   async handleJoinRoom(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { roomId: string; password?: string },
+    @MessageBody() data: { roomId: string; password?: string; asSpectator?: boolean },
   ) {
     try {
       if (!client.userId) {
@@ -289,9 +292,9 @@ export class RoomGateway
       // If not a participant, join the room (add to DB)
       if (!isAlreadyParticipant) {
         room = await this.roomService.joinRoom(client.userId!, {
-          // Assert client.userId is string
           roomId: data.roomId,
           password: data.password,
+          asSpectator: data.asSpectator,
         });
         isNewJoin = true;
       } else {
@@ -325,6 +328,11 @@ export class RoomGateway
       // 신규 입장 시 참가자 수 변경 → 방 요약 delta 전송
       if (isNewJoin) {
         this.broadcastRoomDelta("update", data.roomId);
+      }
+
+      // 재접속 시 현재 진행 중인 게임 상태를 해당 클라이언트에게 복원
+      if (!isNewJoin) {
+        await this.emitCurrentGameStateToClient(client, data.roomId, room);
       }
 
       return {
@@ -700,6 +708,42 @@ export class RoomGateway
     }
   }
 
+  // 재접속한 클라이언트에게 현재 진행 중인 게임 상태를 개별 전송한다.
+  // 새로고침/렉으로 끊겼다 돌아온 참가자가 현재 화면으로 복귀할 수 있도록 한다.
+  private async emitCurrentGameStateToClient(
+    client: AuthenticatedSocket,
+    roomId: string,
+    room: any,
+  ): Promise<void> {
+    try {
+      const { status, teamMode } = room;
+
+      if (status === RoomStatus.DRAFT) {
+        // DRAFT 상태는 경매(AUCTION) 또는 스네이크 드래프트(SNAKE_DRAFT) 두 가지.
+        // teamMode로 구분한다.
+        if (teamMode === TeamMode.AUCTION) {
+          const auctionState = this.auctionService.getAuctionState(roomId);
+          if (auctionState) {
+            client.emit("auction-started", { roomId, state: auctionState });
+          }
+        } else {
+          const draftState = this.snakeDraftService.getDraftState(roomId);
+          if (draftState) {
+            client.emit("snake-draft-started", { roomId, state: draftState });
+          }
+        }
+      } else if (status === RoomStatus.ROLE_SELECTION) {
+        const roleData =
+          await this.roleSelectionService.getRoleSelectionData(roomId);
+        if (roleData) {
+          client.emit("role-selection-started", roleData);
+        }
+      }
+    } catch {
+      // 상태 복원 실패는 치명적이지 않으므로 조용히 무시
+    }
+  }
+
   private stopTyping(roomId: string, userId: string) {
     const roomTypingUsers = this.typingUsers.get(roomId);
     if (roomTypingUsers && roomTypingUsers.has(userId)) {
@@ -766,9 +810,17 @@ export class RoomGateway
     try {
       const waitingRooms = await this.roomService.getWaitingRoomsWithParticipants();
       for (const room of waitingRooms) {
-        // 활성 소켓이 없는 참가자 = 좀비
+        // /room 네임스페이스 소켓 기준이 아닌 Socket.IO room 멤버십 기준으로 판단.
+        // userSockets는 /room 네임스페이스만 추적하므로 다른 네임스페이스에
+        // 연결된 관전자를 좀비로 오인하는 문제를 방지한다.
+        const activeSockets = await this.server.in(room.id).fetchSockets();
+        const activeUserIds = new Set(
+          activeSockets
+            .map((s) => (s as any).userId as string | undefined)
+            .filter(Boolean),
+        );
         const zombies = room.participants.filter(
-          (p) => !this.userSockets.has(p.userId),
+          (p) => !activeUserIds.has(p.userId),
         );
         if (zombies.length === 0) continue;
 

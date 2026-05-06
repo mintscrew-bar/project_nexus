@@ -252,8 +252,21 @@ export class MatchDataCollectionService {
           });
         }
 
+        // 참가자 PUUID로 Riot 팀 ID(100/200) → Nexus 팀 ID 매핑을 역산한다.
+        // 토너먼트 코드로 만든 방이어도 블루/레드 사이드는 랜덤이므로
+        // teamA === 100 이라고 가정하면 안 된다.
+        const riotTeamToNexusTeam = new Map<number, string>();
+        for (const participant of matchData.info.participants) {
+          const userMapping = puuidToUser.get(participant.puuid);
+          if (userMapping && !riotTeamToNexusTeam.has(participant.teamId)) {
+            riotTeamToNexusTeam.set(participant.teamId, userMapping.teamId);
+          }
+        }
+
         for (const team of matchData.info.teams) {
-          const teamId = team.teamId === 100 ? match.teamAId : match.teamBId;
+          const teamId =
+            riotTeamToNexusTeam.get(team.teamId) ??
+            (team.teamId === 100 ? match.teamAId : match.teamBId); // 폴백
           await tx.matchTeamStats.create({
             data: {
               matchId,

@@ -905,6 +905,21 @@ export class AuctionService implements OnModuleInit {
           );
         }
 
+        // 트랜잭션 내에서 경매 대상 플레이어가 아직 미배정 상태인지 재검증.
+        // 외부 쿼리와 트랜잭션 사이에 낙찰이 완료되면 다른 플레이어를 가리킬 수 있다.
+        const stillUnassigned = await tx.roomParticipant.findFirst({
+          where: {
+            id: currentPlayer.id,
+            teamId: null,
+            isCaptain: false,
+          },
+        });
+        if (!stillUnassigned) {
+          throw new BadRequestException(
+            "경매 대상이 변경되었습니다. 다시 시도해주세요.",
+          );
+        }
+
         await tx.auctionBid.create({
           data: {
             roomId,
@@ -995,11 +1010,16 @@ export class AuctionService implements OnModuleInit {
       const soldPrice = state.currentHighestBid;
 
       // Atomic update: deduct budget, assign player, update participant
+      // 트랜잭션 내부에서 remainingBudget을 재조회해 stale read 방지
       await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+        const freshTeam = await tx.team.findUniqueOrThrow({
+          where: { id: team.id },
+          select: { remainingBudget: true },
+        });
         await tx.team.update({
           where: { id: team.id },
           data: {
-            remainingBudget: team.remainingBudget - soldPrice,
+            remainingBudget: freshTeam.remainingBudget - soldPrice,
           },
         });
 
