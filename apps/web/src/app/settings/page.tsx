@@ -86,6 +86,21 @@ export default function SettingsPage() {
     }
   }, [isAuthenticated, isLoading, router]);
 
+  useEffect(() => {
+    if (isLoading || !isAuthenticated || !user) return;
+
+    const shouldOpenOnboarding =
+      typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).get("onboarding") === "riot";
+    const hasRiot = Array.isArray(user.riotAccounts) && user.riotAccounts.length > 0;
+
+    if (shouldOpenOnboarding && !hasRiot) {
+      setActiveTab("accounts");
+      setShowRiotModal(true);
+      router.replace("/settings");
+    }
+  }, [isLoading, isAuthenticated, user, router]);
+
   // Fetch champions for highlight picker
   useEffect(() => {
     if (isAuthenticated) {
@@ -406,6 +421,13 @@ export default function SettingsPage() {
 
                     return (
                       <div className="space-y-1">
+                        {!hasRiot && (
+                          <div className="mb-4 p-3 bg-accent-primary/10 border border-accent-primary/30 rounded-lg">
+                            <p className="text-sm text-text-primary font-medium">처음 오셨다면 2단계부터 시작하세요.</p>
+                            <p className="text-xs text-text-secondary mt-1">소환사명 입력 → 아이콘 인증 → 주/부 역할과 선호 챔피언 선택 순서로 2~3분이면 완료됩니다.</p>
+                          </div>
+                        )}
+
                         {/* 전체 완료 배너 */}
                         {allDone && (
                           <div className="mb-4 p-3 bg-accent-success/10 border border-accent-success/30 rounded-lg flex items-center gap-2">

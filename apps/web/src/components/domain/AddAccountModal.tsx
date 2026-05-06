@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/Button';
 import { Label } from '@/components/ui/Label';
 import { useRiotStore } from '@/stores/riot-store';
 import { useDdragonStore, Champion } from '@/stores/ddragon-store';
-import { X, Loader2, AlertCircle, ArrowRight, ChevronDown } from 'lucide-react';
+import { X, Loader2, AlertCircle, ArrowRight, ChevronDown, Info } from 'lucide-react';
 import { ChampionSelector } from './ChampionSelector';
 import Image from 'next/image';
 import { useDdragonVersion } from '@/hooks/useDdragonVersion';
@@ -234,6 +234,19 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
     }
   };
 
+  const stepHint = () => {
+    switch (step) {
+      case 1:
+        return 'Riot ID는 게임 이름과 태그라인을 나눠서 입력합니다. 예: Hide on bush#KR1';
+      case 2:
+        return '본인 계정 확인을 위해 잠깐 아이콘을 바꿉니다. 인증이 끝나면 원래 아이콘으로 다시 바꿔도 됩니다.';
+      case 3:
+        return '역할과 선호 챔피언은 내전 팀 배정과 밸런싱에 사용됩니다. 처음 한 번만 설정하면 됩니다.';
+      default:
+        return '';
+    }
+  };
+
   return (
     <Modal isOpen={isOpen} onClose={handleClose} title={modalTitle()} size="lg" disableBackdropClose={step === 2}>
       {localError && (
@@ -245,12 +258,20 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
 
       <p className="text-text-secondary mb-4">{modalDescription()}</p>
 
+      <div className="mb-4 flex items-start gap-2 rounded-lg border border-accent-primary/25 bg-accent-primary/10 p-3">
+        <Info className="mt-0.5 h-4 w-4 flex-shrink-0 text-accent-primary" />
+        <p className="text-sm leading-5 text-text-secondary">{stepHint()}</p>
+      </div>
+
       {step === 1 && (
         <div className="space-y-4">
           <div>
-            <Label htmlFor="gameName" className="text-text-primary">
-              소환사 이름
-            </Label>
+            <div className="mb-1 flex items-center gap-1.5">
+              <Label htmlFor="gameName" className="text-text-primary">
+                소환사 이름
+              </Label>
+              <InlineHelp text="Riot ID에서 # 앞에 있는 이름입니다." />
+            </div>
             <Input
               id="gameName"
               value={gameName}
@@ -261,9 +282,12 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
             />
           </div>
           <div>
-            <Label htmlFor="tagLine" className="text-text-primary">
-              태그라인
-            </Label>
+            <div className="mb-1 flex items-center gap-1.5">
+              <Label htmlFor="tagLine" className="text-text-primary">
+                태그라인
+              </Label>
+              <InlineHelp text="Riot ID에서 # 뒤에 있는 값입니다. KR 서버 계정은 보통 KR1 형태입니다." />
+            </div>
             <Input
               id="tagLine"
               value={tagLine}
@@ -361,7 +385,10 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
           {/* ── 역할 선택: 버튼 그룹 ── */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label className="text-xs text-text-tertiary mb-1.5 block">주 역할</Label>
+              <div className="mb-1.5 flex items-center gap-1.5">
+                <Label className="text-xs text-text-tertiary">주 역할</Label>
+                <InlineHelp text="가장 자주 하거나 가장 자신 있는 포지션입니다. 팀 배정에서 우선 참고합니다." />
+              </div>
               <div className="flex gap-1.5">
                 {ROLES.map(r => (
                   <button
@@ -383,7 +410,10 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
               </div>
             </div>
             <div>
-              <Label className="text-xs text-text-tertiary mb-1.5 block">부 역할</Label>
+              <div className="mb-1.5 flex items-center gap-1.5">
+                <Label className="text-xs text-text-tertiary">부 역할</Label>
+                <InlineHelp text="주 역할을 못 가는 경우 참고할 대체 포지션입니다." />
+              </div>
               <div className="flex gap-1.5">
                 {ROLES.map(r => (
                   <button
@@ -409,6 +439,10 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
           {mainRole === subRole && (
             <p className="text-xs text-accent-danger">주 역할과 부 역할은 달라야 합니다.</p>
           )}
+
+          <div className="rounded-lg bg-bg-tertiary/70 px-3 py-2 text-xs leading-5 text-text-secondary">
+            주 역할과 부 역할은 각각 선호 챔피언을 최소 3개 선택해야 합니다. 최근에 자주 쓰는 챔피언 위주로 골라도 됩니다.
+          </div>
 
           {/* ── 아코디언 섹션: 주/부 역할 펼침, 나머지 접힘 ── */}
           <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
@@ -514,6 +548,24 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
         )}
       </div>
     </Modal>
+  );
+}
+
+function InlineHelp({ text }: { text: string }) {
+  return (
+    <span className="group relative inline-flex">
+      <button
+        type="button"
+        className="inline-flex h-4 w-4 items-center justify-center rounded-full text-text-tertiary transition-colors hover:text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-primary/40"
+        aria-label={text}
+        title={text}
+      >
+        <Info className="h-3.5 w-3.5" />
+      </button>
+      <span className="pointer-events-none absolute left-1/2 top-6 z-20 hidden w-56 -translate-x-1/2 rounded-lg border border-bg-tertiary bg-bg-elevated px-3 py-2 text-xs leading-5 text-text-secondary shadow-xl group-hover:block group-focus-within:block">
+        {text}
+      </span>
+    </span>
   );
 }
 
@@ -630,6 +682,11 @@ function RoleAccordionSection({
             </div>
           ) : (
             <>
+              <p className="mb-3 text-xs leading-5 text-text-tertiary">
+                {isRequired
+                  ? '필수 역할은 최소 3개를 선택해야 등록할 수 있습니다.'
+                  : '기타 역할은 선택 사항입니다. 가능한 챔피언이 있으면 추가해도 됩니다.'}
+              </p>
               <ChampionSelector
                 allChampions={champions}
                 selectedChampions={selectedChampions}

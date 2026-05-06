@@ -66,6 +66,16 @@ function AgreePageContent() {
       setAccessToken(accessToken);
       // 유저 정보 갱신
       await fetchUser();
+      const currentUser = useAuthStore.getState().user;
+      const hasRiotAccount =
+        Array.isArray(currentUser?.riotAccounts) &&
+        currentUser.riotAccounts.length > 0;
+
+      if (!hasRiotAccount) {
+        router.replace("/settings?onboarding=riot");
+        return;
+      }
+
       router.replace("/dashboard");
     } catch (err: any) {
       const msg = err?.response?.data?.message || "약관 동의 처리 중 오류가 발생했습니다.";

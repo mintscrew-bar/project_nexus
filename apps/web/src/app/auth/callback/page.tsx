@@ -28,6 +28,16 @@ function AuthCallbackContent() {
 
       // 사용자 정보 가져오기
       fetchUser().then(() => {
+        const currentUser = useAuthStore.getState().user;
+        const hasRiotAccount =
+          Array.isArray(currentUser?.riotAccounts) &&
+          currentUser.riotAccounts.length > 0;
+
+        if (!hasRiotAccount) {
+          router.push("/settings?onboarding=riot");
+          return;
+        }
+
         router.push("/dashboard");
       });
     } else {
