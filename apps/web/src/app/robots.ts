@@ -21,8 +21,6 @@ export default function robots(): MetadataRoute.Robots {
     "/community/write",
     "/community/bookmarks",
     "/clans/create",
-    "/lab",       // 로그인 필요 — 봇에게 노출 불필요
-    "/ranking",   // 로그인 필요
   ];
 
   return {
