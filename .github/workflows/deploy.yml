@@ -18,11 +18,11 @@ jobs:
 
       - name: 이미지 빌드
         run: |
-          docker compose -f docker-compose.prod.yml --env-file .env.production build --no-cache
+          docker compose -f docker-compose.prod.yml --env-file /home/haru/projects/nexus/.env.production build --no-cache
 
       - name: 컨테이너 재시작
         run: |
-          docker compose -f docker-compose.prod.yml --env-file .env.production up -d
+          docker compose -f docker-compose.prod.yml --env-file /home/haru/projects/nexus/.env.production up -d
 
       - name: 미사용 이미지 정리
         run: |
