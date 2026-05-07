@@ -35,6 +35,9 @@ export class MatchService {
   private discordBotService: any;
   private discordVoiceService: any;
 
+  // Tournament API 활성화 여부 — 환경변수 TOURNAMENT_API_ENABLED=true 로 제어
+  private readonly tournamentApiEnabled: boolean;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
@@ -51,6 +54,8 @@ export class MatchService {
   ) {
     this.discordBotService = discordBot;
     this.discordVoiceService = discordVoice;
+    this.tournamentApiEnabled =
+      this.configService.get<string>("TOURNAMENT_API_ENABLED") === "true";
   }
 
   // ========================================
@@ -63,8 +68,9 @@ export class MatchService {
       roomId,
     );
 
-    // Tournament API 미사용 — 토너먼트 코드 자동 생성 비활성화
-    // await this.autoGenerateCodesForRoom(roomId);
+    if (this.tournamentApiEnabled) {
+      await this.autoGenerateCodesForRoom(roomId);
+    }
 
     return bracket;
   }
@@ -409,10 +415,9 @@ export class MatchService {
       }
     }
 
-    // Tournament API 미사용 — 브래킷 진급 후 코드 생성 비활성화
-    // if (bracketAdvanced) {
-    //   await this.autoGenerateCodesForRoom(roomId);
-    // }
+    if (this.tournamentApiEnabled && bracketAdvanced) {
+      await this.autoGenerateCodesForRoom(roomId);
+    }
 
     // Send Discord match result notification
     try {
@@ -620,17 +625,18 @@ export class MatchService {
       }
     }
 
-    // Tournament API 미사용 — Riot 매치 데이터 수집 비활성화
-    // setImmediate(() => {
-    //   this.matchDataCollectionService
-    //     .collectMatchData(matchId)
-    //     .catch((error) => {
-    //       this.logger.error(
-    //         `Background match data collection failed for ${matchId}:`,
-    //         error,
-    //       );
-    //     });
-    // });
+    if (this.tournamentApiEnabled) {
+      setImmediate(() => {
+        this.matchDataCollectionService
+          .collectMatchData(matchId)
+          .catch((error) => {
+            this.logger.error(
+              `Background match data collection failed for ${matchId}:`,
+              error,
+            );
+          });
+      });
+    }
 
     // Update rankings for all participants (non-blocking)
     setImmediate(async () => {

@@ -21,6 +21,8 @@ export interface Match { // Exporting for use in other components
   scheduledTime?: string;
   tournamentCode?: string;
   bracketSection?: string; // "WB_R1", "WB_F", "LB_R1", "LB_F", "GF", etc.
+  mvpUserId?: string;
+  aceUserId?: string;
 }
 
 interface BracketViewProps {

@@ -474,6 +474,16 @@ export const matchApi = {
     });
     return response.data;
   },
+
+  submitVote: async (matchId: string, data: { votedForId: string; voteType: 'MVP' | 'ACE' }) => {
+    const response = await apiClient.post(`/matches/${matchId}/vote`, data);
+    return response.data;
+  },
+
+  getMatchVotes: async (matchId: string) => {
+    const response = await apiClient.get(`/matches/${matchId}/votes`);
+    return response.data;
+  },
 };
 
 // Riot API 관련 API
