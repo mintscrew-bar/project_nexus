@@ -626,12 +626,25 @@ export class MatchService {
     }
 
     if (this.tournamentApiEnabled) {
+      // Tournament API 활성화: 토너먼트 코드로 Riot 매치 ID 조회
       setImmediate(() => {
         this.matchDataCollectionService
           .collectMatchData(matchId)
           .catch((error) => {
             this.logger.error(
               `Background match data collection failed for ${matchId}:`,
+              error,
+            );
+          });
+      });
+    } else {
+      // Tournament API 비활성화: PUUID 크로스레퍼런스로 커스텀 게임 전적 수집
+      setImmediate(() => {
+        this.matchDataCollectionService
+          .collectMatchDataByPuuidCrossref(matchId)
+          .catch((error) => {
+            this.logger.error(
+              `[PuuidCrossref] Background 전적 수집 실패 matchId=${matchId}:`,
               error,
             );
           });

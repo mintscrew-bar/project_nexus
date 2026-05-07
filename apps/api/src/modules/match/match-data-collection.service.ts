@@ -319,6 +319,201 @@ export class MatchDataCollectionService {
   }
 
   /**
+   * Tournament API 없이 PUUID 교집합으로 커스텀 게임 매치 ID를 찾아 전적을 수집한다.
+   * 흐름: 참가자 PUUID 3명 → 각자 최근 커스텀 게임 목록(queue=0) → 교집합 matchId 확인 → ingest
+   */
+  async collectMatchDataByPuuidCrossref(
+    matchId: string,
+    attemptNumber = 1,
+  ): Promise<void> {
+    try {
+      this.logger.log(
+        `[PuuidCrossref] 커스텀 전적 수집 시작 matchId=${matchId} (시도 ${attemptNumber})`,
+      );
+
+      const match = await this.prisma.match.findUnique({
+        where: { id: matchId },
+        include: {
+          teamA: {
+            include: {
+              members: {
+                include: {
+                  user: {
+                    include: {
+                      riotAccounts: { where: { isPrimary: true }, take: 1 },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          teamB: {
+            include: {
+              members: {
+                include: {
+                  user: {
+                    include: {
+                      riotAccounts: { where: { isPrimary: true }, take: 1 },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (!match) {
+        this.logger.error(`[PuuidCrossref] 매치 없음: ${matchId}`);
+        return;
+      }
+
+      if (!match.teamA || !match.teamB) {
+        this.logger.warn(`[PuuidCrossref] 팀 미배정: ${matchId}`);
+        return;
+      }
+
+      // 참가자 PUUID 수집 (teamA + teamB)
+      const allMembers = [
+        ...match.teamA.members,
+        ...match.teamB.members,
+      ];
+      const puuidList = allMembers
+        .map((m) => m.user.riotAccounts[0]?.puuid)
+        .filter((p): p is string => Boolean(p));
+
+      if (puuidList.length < 2) {
+        this.logger.warn(
+          `[PuuidCrossref] Riot 계정 연동 유저 부족 (${puuidList.length}명), 수집 불가 matchId=${matchId}`,
+        );
+        return;
+      }
+
+      // 게임 종료 시각 기준 탐색 범위: 종료 90분 전 ~ 종료 15분 후 (Riot 처리 지연 고려)
+      const completedAt = match.completedAt ?? new Date();
+      const startTime = Math.floor(
+        (completedAt.getTime() - 90 * 60 * 1000) / 1000,
+      );
+      const endTime = Math.floor(
+        (completedAt.getTime() + 15 * 60 * 1000) / 1000,
+      );
+
+      // 크로스레퍼런스: 최대 3명 PUUID로 커스텀 게임 목록 조회 후 교집합
+      const CROSSREF_SAMPLE = Math.min(3, puuidList.length);
+      const matchIdSets: Set<string>[] = [];
+
+      for (let i = 0; i < CROSSREF_SAMPLE; i++) {
+        const ids = await this.riotMatchService.getMatchIdsByPuuid(
+          puuidList[i],
+          0,
+          10,
+          0, // queue=0: Custom Game
+          undefined,
+          3,
+          startTime,
+          endTime,
+          "background",
+        );
+        matchIdSets.push(new Set(ids));
+        this.logger.debug(
+          `[PuuidCrossref] puuid[${i}] 커스텀 게임 ${ids.length}개`,
+        );
+      }
+
+      // 교집합 계산
+      const [first, ...rest] = matchIdSets;
+      const intersection = Array.from(first).filter((id) =>
+        rest.every((s) => s.has(id)),
+      );
+
+      if (intersection.length === 0) {
+        this.logger.warn(
+          `[PuuidCrossref] 교집합 없음 (Riot 처리 중일 수 있음), 재시도 예약 matchId=${matchId}`,
+        );
+        await this.schedulePuuidCrossrefRetry(matchId, attemptNumber);
+        return;
+      }
+
+      // 교집합이 여러 개면 종료 시각 가장 가까운 것 선택 (실제로는 거의 1개)
+      const riotMatchId = intersection[0];
+      this.logger.log(
+        `[PuuidCrossref] Riot matchId 확인: ${riotMatchId} (교집합 ${intersection.length}개)`,
+      );
+
+      const matchData = await this.riotMatchService.getMatchById(
+        riotMatchId,
+        3,
+        "background",
+      );
+
+      if (!matchData) {
+        this.logger.error(
+          `[PuuidCrossref] 매치 데이터 조회 실패: ${riotMatchId}`,
+        );
+        await this.schedulePuuidCrossrefRetry(matchId, attemptNumber);
+        return;
+      }
+
+      // riotMatchId 저장 후 기존 saveMatchData 재사용
+      await this.prisma.match.update({
+        where: { id: matchId },
+        data: {
+          riotMatchId,
+          gameDuration: matchData.info.gameDuration ?? null,
+        },
+      });
+
+      await this.saveMatchData(matchId, match, matchData);
+
+      this.clearRetryTimer(`crossref:${matchId}`);
+      this.logger.log(
+        `[PuuidCrossref] 전적 수집 완료 matchId=${matchId} riotMatchId=${riotMatchId}`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `[PuuidCrossref] 전적 수집 오류 matchId=${matchId}:`,
+        error,
+      );
+      await this.schedulePuuidCrossrefRetry(matchId, attemptNumber);
+    }
+  }
+
+  /**
+   * PUUID 크로스레퍼런스 재시도 스케줄러 (최대 5회, 2분 간격)
+   */
+  private async schedulePuuidCrossrefRetry(
+    matchId: string,
+    attemptNumber: number,
+  ): Promise<void> {
+    const maxAttempts = 5;
+    const delayMs = 2 * 60 * 1000; // 2분
+    const timerKey = `crossref:${matchId}`;
+
+    if (attemptNumber >= maxAttempts) {
+      this.logger.error(
+        `[PuuidCrossref] 최대 재시도(${maxAttempts}회) 초과 matchId=${matchId}`,
+      );
+      this.clearRetryTimer(timerKey);
+      return;
+    }
+
+    if (this.retryTimers.has(timerKey)) {
+      return;
+    }
+
+    const nextAttempt = attemptNumber + 1;
+    this.logger.log(
+      `[PuuidCrossref] 재시도 예약 ${nextAttempt}/${maxAttempts} matchId=${matchId} (${delayMs / 1000}초 후)`,
+    );
+
+    const timer = setTimeout(async () => {
+      this.retryTimers.delete(timerKey);
+      await this.collectMatchDataByPuuidCrossref(matchId, nextAttempt);
+    }, delayMs);
+    this.retryTimers.set(timerKey, timer);
+  }
+
+  /**
    * Schedule a retry for data collection
    */
   private async scheduleRetry(
@@ -365,7 +560,9 @@ export class MatchDataCollectionService {
   }
 
   /**
-   * Collect data for all completed matches that don't have data yet
+   * 전적 미수집 완료 매치를 일괄 재처리한다.
+   * - tournamentCode 있음 → Tournament API 경로
+   * - tournamentCode 없음 → PUUID 크로스레퍼런스 경로
    */
   async collectPendingMatches(): Promise<void> {
     try {
@@ -373,10 +570,12 @@ export class MatchDataCollectionService {
         where: {
           status: "COMPLETED",
           riotMatchId: null,
-          tournamentCode: { not: null },
+          // roomId가 있는 내전 매치만 대상 (외부 인제스트 랭크 매치 제외)
+          roomId: { not: null },
         },
         select: {
           id: true,
+          tournamentCode: true,
         },
       });
 
@@ -385,9 +584,13 @@ export class MatchDataCollectionService {
       );
 
       for (const match of matches) {
-        await this.collectMatchData(match.id);
-        // Add delay between requests to avoid rate limiting
-        await new Promise((resolve) => setTimeout(resolve, 2000));
+        if (match.tournamentCode) {
+          await this.collectMatchData(match.id);
+        } else {
+          await this.collectMatchDataByPuuidCrossref(match.id);
+        }
+        // 연속 요청으로 rate limit 초과 방지
+        await new Promise((resolve) => setTimeout(resolve, 3000));
       }
     } catch (error) {
       this.logger.error("Error collecting pending matches:", error);
