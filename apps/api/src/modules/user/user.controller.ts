@@ -69,6 +69,15 @@ export class UserController {
     return this.userSettingsService.updateSettings(userId, data);
   }
 
+  /**
+   * POST /users/me/avatar/sync-discord
+   * 연결된 Discord 계정의 현재 프로필 사진으로 아바타를 강제 동기화한다.
+   */
+  @Post("me/avatar/sync-discord")
+  async syncDiscordAvatar(@CurrentUser("sub") userId: string) {
+    return this.userService.syncDiscordAvatar(userId);
+  }
+
   @Post("me/avatar")
   @UseInterceptors(FileInterceptor("avatar"))
   async uploadAvatar(

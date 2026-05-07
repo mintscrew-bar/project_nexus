@@ -4,11 +4,15 @@ import {
   ConflictException,
   BadRequestException,
 } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../prisma/prisma.service";
 
 @Injectable()
 export class UserService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly configService: ConfigService,
+  ) {}
 
   async findById(id: string) {
     const user = await this.prisma.user.findUnique({
@@ -218,6 +222,55 @@ export class UserService {
       select: { avatar: true },
     });
     return user?.avatar || null;
+  }
+
+  /**
+   * Discord 봇 토큰으로 현재 Discord 프로필 사진을 가져와 아바타를 갱신한다.
+   * 커스텀 업로드 아바타도 덮어쓴다 (사용자 명시 요청 시).
+   */
+  async syncDiscordAvatar(userId: string): Promise<{ avatarUrl: string }> {
+    // 유저의 Discord AuthProvider에서 providerId(Discord 유저 ID) 조회
+    const discordProvider = await this.prisma.authProvider.findFirst({
+      where: { userId, provider: "DISCORD" },
+      select: { providerId: true },
+    });
+
+    if (!discordProvider) {
+      throw new BadRequestException("연결된 Discord 계정이 없습니다.");
+    }
+
+    const botToken = this.configService.get<string>("DISCORD_BOT_TOKEN");
+    if (!botToken) {
+      throw new BadRequestException("Discord Bot 토큰이 설정되지 않았습니다.");
+    }
+
+    // Discord API로 최신 프로필 조회
+    const res = await fetch(
+      `https://discord.com/api/v10/users/${discordProvider.providerId}`,
+      { headers: { Authorization: `Bot ${botToken}` } },
+    );
+
+    if (!res.ok) {
+      throw new BadRequestException("Discord 프로필 조회에 실패했습니다.");
+    }
+
+    const profile = await res.json();
+
+    if (!profile.avatar) {
+      throw new BadRequestException(
+        "Discord 계정에 프로필 사진이 설정되어 있지 않습니다.",
+      );
+    }
+
+    const ext = profile.avatar.startsWith("a_") ? "gif" : "png";
+    const avatarUrl = `https://cdn.discordapp.com/avatars/${profile.id}/${profile.avatar}.${ext}`;
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { avatar: avatarUrl },
+    });
+
+    return { avatarUrl };
   }
 
   /**

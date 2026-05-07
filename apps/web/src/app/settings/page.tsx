@@ -10,7 +10,7 @@ import { Card, CardHeader, CardTitle, CardContent, Button, Label, LoadingSpinner
 import { useToast } from "@/components/ui/Toast";
 import { useTheme } from "next-themes";
 import Link from "next/link";
-import { Bell, Shield, Palette, LogOut, Check, Info, Search, X, Link as LinkIcon, AlertCircle, ExternalLink, ChevronRight } from "lucide-react";
+import { Bell, Shield, Palette, LogOut, Check, Info, Search, X, Link as LinkIcon, AlertCircle, ExternalLink, ChevronRight, RefreshCw, Loader2 } from "lucide-react";
 import { AddAccountModal } from "@/components/domain/AddAccountModal";
 import { useRiotStore } from "@/stores/riot-store";
 
@@ -57,6 +57,8 @@ export default function SettingsPage() {
   const [latestAppeal, setLatestAppeal] = useState<{ status: string; adminNote?: string; createdAt: string } | null>(null);
   const [championSearch, setChampionSearch] = useState("");
   const [showChampionPicker, setShowChampionPicker] = useState(false);
+  // Discord 아바타 동기화 상태
+  const [isSyncingAvatar, setIsSyncingAvatar] = useState(false);
 
   // Settings state
   const [settings, setSettings] = useState<UserSettings>({
@@ -167,6 +169,20 @@ export default function SettingsPage() {
   if (!isAuthenticated || !user) {
     return null;
   }
+
+  const handleSyncDiscordAvatar = async () => {
+    setIsSyncingAvatar(true);
+    try {
+      await userApi.syncDiscordAvatar();
+      await fetchUser();
+      addToast("Discord 프로필 사진으로 동기화되었습니다.", "success");
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || "동기화에 실패했습니다.";
+      addToast(msg, "error");
+    } finally {
+      setIsSyncingAvatar(false);
+    }
+  };
 
   const handleSettingChange = async (key: keyof UserSettings, value: boolean | string | null) => {
     const newSettings = { ...settings, [key]: value };
@@ -367,7 +383,20 @@ export default function SettingsPage() {
                         title: "Discord 연동",
                         desc: hasDiscord ? "연동 완료" : "로그인에 사용한 Discord 계정",
                         done: !!hasDiscord,
-                        action: hasDiscord ? null : (
+                        action: hasDiscord ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={handleSyncDiscordAvatar}
+                            disabled={isSyncingAvatar}
+                            className="flex items-center gap-1.5"
+                          >
+                            {isSyncingAvatar
+                              ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              : <RefreshCw className="h-3.5 w-3.5" />}
+                            사진 동기화
+                          </Button>
+                        ) : (
                           <Button size="sm" onClick={() => {
                             const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
                             window.location.href = `${apiUrl}/auth/link/discord`;

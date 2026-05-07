@@ -245,6 +245,11 @@ export const userApi = {
     return response.data;
   },
 
+  syncDiscordAvatar: async () => {
+    const response = await apiClient.post("/users/me/avatar/sync-discord");
+    return response.data as { avatarUrl: string };
+  },
+
   getStats: async () => {
     const response = await apiClient.get("/users/stats");
     return response.data;
@@ -1466,6 +1471,17 @@ export const adminApi = {
   getStats: async () => {
     const response = await apiClient.get("/admin/stats");
     return response.data;
+  },
+  getSystemStatus: async () => {
+    const response = await apiClient.get("/health");
+    return response.data as {
+      status: "ok" | "degraded";
+      timestamp: string;
+      services: {
+        database: { status: "healthy" | "unhealthy"; error?: string };
+        redis: { status: "healthy" | "unhealthy"; error?: string };
+      };
+    };
   },
   getMatchQueueStats: async () => {
     const response = await apiClient.get("/admin/matches/queue-stats");
