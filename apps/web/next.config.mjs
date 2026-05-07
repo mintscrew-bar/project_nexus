@@ -67,8 +67,9 @@ const nextConfig = {
   async rewrites() {
     return [
       {
-        // Proxy all /api requests to backend except routes handled by Next.js API handlers
-        source: "/api/:path((?!auth/refresh|auth/\\[...nextauth\\]).*)",
+        // Next.js Route Handler가 있는 경로 제외: auth/refresh, auth/login, auth/logout,
+        // auth/register, auth/me, auth/callback — 나머지는 NestJS 백엔드로 프록시
+        source: "/api/:path((?!auth/refresh|auth/login|auth/logout|auth/register|auth/me|auth/callback).*)",
         destination: `${process.env.API_URL || "http://localhost:4000"}/api/:path*`,
       },
       {

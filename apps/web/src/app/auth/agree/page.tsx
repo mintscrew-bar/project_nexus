@@ -34,6 +34,8 @@ function AgreePageContent() {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // 토큰 만료 감지 — 만료 시 agree 화면 대신 재로그인 안내 화면 표시
+  const [isTokenExpired, setIsTokenExpired] = useState(false);
 
   // 필수 항목이 모두 동의되었는지 확인
   const allRequiredChecked =
@@ -78,8 +80,14 @@ function AgreePageContent() {
 
       router.replace("/dashboard");
     } catch (err: any) {
+      const status = err?.response?.status;
       const msg = err?.response?.data?.message || "약관 동의 처리 중 오류가 발생했습니다.";
-      setError(msg);
+      // 401 또는 "만료" 문자 포함 → 토큰 만료 화면으로 전환
+      if (status === 401 || msg.includes("만료") || msg.includes("유효하지 않")) {
+        setIsTokenExpired(true);
+      } else {
+        setError(msg);
+      }
       setIsSubmitting(false);
     }
   };
@@ -92,17 +100,24 @@ function AgreePageContent() {
     );
   }
 
-  if (!pendingToken) {
+  if (!pendingToken || isTokenExpired) {
     return (
       <div className="flex min-h-screen items-center justify-center px-4">
-        <div className="text-center">
+        <div className="text-center max-w-sm">
           <AlertCircle className="h-10 w-10 text-red-400 mx-auto mb-3" />
-          <p className="text-text-primary font-semibold mb-1">유효하지 않은 접근입니다.</p>
-          <p className="text-sm text-text-tertiary mb-4">
-            소셜 로그인을 통해 다시 시도해주세요.
+          <p className="text-text-primary font-semibold mb-1">
+            {isTokenExpired ? "인증 시간이 만료되었습니다." : "유효하지 않은 접근입니다."}
           </p>
-          <Link href="/auth/login" className="text-sm text-accent-primary hover:underline">
-            로그인 페이지로 이동
+          <p className="text-sm text-text-tertiary mb-5">
+            {isTokenExpired
+              ? "약관 동의 페이지는 10분 내에 완료해야 합니다. Discord로 다시 로그인해 주세요."
+              : "소셜 로그인을 통해 다시 시도해주세요."}
+          </p>
+          <Link
+            href="/auth/login"
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-accent-primary text-white text-sm font-semibold rounded-xl hover:bg-accent-hover transition-colors"
+          >
+            다시 로그인하기
           </Link>
         </div>
       </div>
