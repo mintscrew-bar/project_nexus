@@ -11,6 +11,8 @@ jobs:
     name: Deploy to self-hosted
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: self-hosted
+    env:
+      NEXUS_ENV_FILE: /home/haru/projects/nexus/.env.production
 
     steps:
       - name: 코드 체크아웃
