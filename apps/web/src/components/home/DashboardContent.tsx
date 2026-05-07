@@ -446,7 +446,7 @@ function MyStatsCard({
                       return (
                         <div key={champ.championId} className="flex flex-col items-center gap-1.5">
                           <Image
-                            src={`/icons/champions/${champ.championId}.png`}
+                            src={`/icons/champions/${champ.championName}.png`}
                             alt={champ.championName}
                             width={40}
                             height={40}
