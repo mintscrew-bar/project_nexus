@@ -70,6 +70,10 @@ model User {
   reportsReceived     UserReport[]       @relation("ReportedUser")
   settings            UserSettings?
   statsRecomputeQueue StatsRecomputeQueue?
+  votesGiven          MatchVote[]        @relation("VoterUser")
+  votesReceived       MatchVote[]        @relation("VotedForUser")
+  mvpMatches          Match[]            @relation("MatchMVP")
+  aceMatches          Match[]            @relation("MatchACE")
 
   @@index([email])
   @@index([reputation])
@@ -364,6 +368,9 @@ model Match {
   teamAId        String?
   teamBId        String?
   winnerId       String?
+  // MVP: 이긴 팀 중 투표로 선정된 유저, ACE: 진 팀 중 투표로 선정된 유저
+  mvpUserId      String?
+  aceUserId      String?
   status         MatchStatus        @default(PENDING)
   matchNumber    Int?
   bracketRound   String?
@@ -384,10 +391,13 @@ model Match {
   updatedAt      DateTime           @updatedAt
   participants   MatchParticipant[]
   teamStats      MatchTeamStats[]
+  votes          MatchVote[]
   room           Room?              @relation(fields: [roomId], references: [id], onDelete: Cascade)
   teamA          Team?              @relation("TeamA", fields: [teamAId], references: [id])
   teamB          Team?              @relation("TeamB", fields: [teamBId], references: [id])
   winner         Team?              @relation("MatchWinner", fields: [winnerId], references: [id])
+  mvpUser        User?              @relation("MatchMVP", fields: [mvpUserId], references: [id])
+  aceUser        User?              @relation("MatchACE", fields: [aceUserId], references: [id])
   ratings        UserRating[]
   reports        UserReport[]
 
@@ -398,6 +408,24 @@ model Match {
   @@index([queueId])
   @@index([completedAt])
   @@map("matches")
+}
+
+model MatchVote {
+  id          String    @id @default(cuid())
+  matchId     String
+  voterId     String    // 투표한 유저
+  votedForId  String    // 투표 대상 유저
+  voteType    VoteType  // MVP | ACE
+  createdAt   DateTime  @default(now())
+
+  match       Match     @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  voter       User      @relation("VoterUser", fields: [voterId], references: [id], onDelete: Cascade)
+  votedFor    User      @relation("VotedForUser", fields: [votedForId], references: [id], onDelete: Cascade)
+
+  // 같은 매치에서 같은 타입 중복 투표 방지
+  @@unique([matchId, voterId, voteType])
+  @@index([matchId])
+  @@map("match_votes")
 }
 
 model MatchParticipant {
@@ -1157,6 +1185,11 @@ enum AdminAction {
   ANNOUNCEMENT_SEND
   APPEAL_APPROVE
   APPEAL_REJECT
+}
+
+enum VoteType {
+  MVP
+  ACE
 }
 
 enum AppealStatus {

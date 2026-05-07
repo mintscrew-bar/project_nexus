@@ -17,6 +17,7 @@ import {
   UserMatchesQueryDto,
   MatchHistoryQueryDto,
 } from "./dto/match-query.dto";
+import { VoteType } from "@nexus/database";
 
 @Controller("matches")
 @UseGuards(JwtAuthGuard)
@@ -142,6 +143,33 @@ export class MatchController {
     }
 
     return result;
+  }
+
+  // ========================================
+  // MVP / ACE 투표
+  // ========================================
+
+  @Post(":id/vote")
+  @HttpCode(HttpStatus.OK)
+  async submitVote(
+    @CurrentUser("sub") userId: string,
+    @Param("id") matchId: string,
+    @Body() body: { votedForId: string; voteType: VoteType },
+  ) {
+    return this.matchService.submitVote(
+      userId,
+      matchId,
+      body.votedForId,
+      body.voteType,
+    );
+  }
+
+  @Get(":id/votes")
+  async getMatchVotes(
+    @CurrentUser("sub") userId: string,
+    @Param("id") matchId: string,
+  ) {
+    return this.matchService.getMatchVotes(matchId, userId);
   }
 
   // ========================================

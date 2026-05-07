@@ -20,7 +20,7 @@ import { NotificationService } from "../notification/notification.service";
 import { MatchBracketService, Bracket } from "./match-bracket.service";
 import { MatchAdvancementService } from "./match-advancement.service";
 import { RankingService } from "../ranking/ranking.service";
-import { RoomStatus, MatchStatus, BracketType } from "@nexus/database";
+import { RoomStatus, MatchStatus, BracketType, VoteType } from "@nexus/database";
 import {
   getChampionKoreanName,
   getSummonerSpellKoreanName,
@@ -63,8 +63,8 @@ export class MatchService {
       roomId,
     );
 
-    // Auto-generate tournament codes for matches with both teams assigned
-    await this.autoGenerateCodesForRoom(roomId);
+    // Tournament API 미사용 — 토너먼트 코드 자동 생성 비활성화
+    // await this.autoGenerateCodesForRoom(roomId);
 
     return bracket;
   }
@@ -409,10 +409,10 @@ export class MatchService {
       }
     }
 
-    // Auto-generate tournament codes for newly-ready matches after advancement
-    if (bracketAdvanced) {
-      await this.autoGenerateCodesForRoom(roomId);
-    }
+    // Tournament API 미사용 — 브래킷 진급 후 코드 생성 비활성화
+    // if (bracketAdvanced) {
+    //   await this.autoGenerateCodesForRoom(roomId);
+    // }
 
     // Send Discord match result notification
     try {
@@ -620,18 +620,17 @@ export class MatchService {
       }
     }
 
-    // Start collecting match data in the background (non-blocking)
-    this.logger.log(`Scheduling match data collection for match ${matchId}`);
-    setImmediate(() => {
-      this.matchDataCollectionService
-        .collectMatchData(matchId)
-        .catch((error) => {
-          this.logger.error(
-            `Background match data collection failed for ${matchId}:`,
-            error,
-          );
-        });
-    });
+    // Tournament API 미사용 — Riot 매치 데이터 수집 비활성화
+    // setImmediate(() => {
+    //   this.matchDataCollectionService
+    //     .collectMatchData(matchId)
+    //     .catch((error) => {
+    //       this.logger.error(
+    //         `Background match data collection failed for ${matchId}:`,
+    //         error,
+    //       );
+    //     });
+    // });
 
     // Update rankings for all participants (non-blocking)
     setImmediate(async () => {
@@ -1066,6 +1065,142 @@ export class MatchService {
       },
       team: participant.team,
     }));
+  }
+
+  // ========================================
+  // MVP / ACE 투표
+  // ========================================
+
+  /**
+   * MVP(이긴 팀) 또는 ACE(진 팀) 투표 제출.
+   * 매치가 COMPLETED 상태여야 하며, 투표자는 해당 매치 참가자여야 한다.
+   * 투표 대상은 voteType에 맞는 팀(이긴 팀/진 팀) 소속이어야 한다.
+   */
+  async submitVote(
+    voterId: string,
+    matchId: string,
+    votedForId: string,
+    voteType: VoteType,
+  ) {
+    const match = await this.prisma.match.findUnique({
+      where: { id: matchId },
+      include: {
+        teamA: { include: { members: true } },
+        teamB: { include: { members: true } },
+      },
+    });
+
+    if (!match) throw new NotFoundException("Match not found");
+    if (match.status !== MatchStatus.COMPLETED) {
+      throw new BadRequestException("투표는 경기 종료 후에만 가능합니다.");
+    }
+    if (!match.winnerId) {
+      throw new BadRequestException("경기 결과가 아직 입력되지 않았습니다.");
+    }
+
+    // 투표자가 해당 매치 참가자인지 확인
+    const allMemberIds = [
+      ...(match.teamA?.members ?? []),
+      ...(match.teamB?.members ?? []),
+    ].map((m) => m.userId);
+
+    if (!allMemberIds.includes(voterId)) {
+      throw new ForbiddenException("해당 경기 참가자만 투표할 수 있습니다.");
+    }
+
+    // 투표 대상이 올바른 팀인지 확인
+    const loserId =
+      match.winnerId === match.teamAId ? match.teamBId : match.teamAId;
+    const winnerMembers = (
+      match.winnerId === match.teamAId ? match.teamA : match.teamB
+    )?.members ?? [];
+    const loserMembers = (
+      loserId === match.teamAId ? match.teamA : match.teamB
+    )?.members ?? [];
+
+    if (voteType === VoteType.MVP) {
+      const isWinnerMember = winnerMembers.some((m) => m.userId === votedForId);
+      if (!isWinnerMember) {
+        throw new BadRequestException("MVP는 이긴 팀 멤버만 선택할 수 있습니다.");
+      }
+    } else {
+      const isLoserMember = loserMembers.some((m) => m.userId === votedForId);
+      if (!isLoserMember) {
+        throw new BadRequestException("ACE는 진 팀 멤버만 선택할 수 있습니다.");
+      }
+    }
+
+    // 중복 투표 방지 (unique constraint 있지만 명확한 에러 메시지 제공)
+    const existing = await this.prisma.matchVote.findUnique({
+      where: { matchId_voterId_voteType: { matchId, voterId, voteType } },
+    });
+    if (existing) {
+      throw new BadRequestException("이미 투표하셨습니다.");
+    }
+
+    await this.prisma.matchVote.create({
+      data: { matchId, voterId, votedForId, voteType },
+    });
+
+    // 투표 집계 후 최다 득표자가 바뀌면 Match의 mvpUserId/aceUserId 갱신
+    await this.recalculateVoteWinner(matchId, voteType);
+
+    return { message: "투표가 완료되었습니다." };
+  }
+
+  /**
+   * 매치의 현재 투표 현황 조회.
+   * MVP/ACE 후보별 득표 수와 내 투표 여부를 반환한다.
+   */
+  async getMatchVotes(matchId: string, userId?: string) {
+    const votes = await this.prisma.matchVote.findMany({
+      where: { matchId },
+      include: {
+        votedFor: { select: { id: true, username: true, avatar: true } },
+      },
+    });
+
+    // 타입별 득표 집계
+    const tally = (type: VoteType) => {
+      const filtered = votes.filter((v) => v.voteType === type);
+      const counts: Record<string, { user: (typeof filtered)[0]["votedFor"]; count: number }> = {};
+      for (const v of filtered) {
+        const key = v.votedForId;
+        if (!counts[key]) counts[key] = { user: v.votedFor, count: 0 };
+        counts[key].count++;
+      }
+      return Object.values(counts).sort((a, b) => b.count - a.count);
+    };
+
+    return {
+      mvp: tally(VoteType.MVP),
+      ace: tally(VoteType.ACE),
+      myVotes: userId
+        ? {
+            mvp: votes.find((v) => v.voterId === userId && v.voteType === VoteType.MVP)?.votedForId ?? null,
+            ace: votes.find((v) => v.voterId === userId && v.voteType === VoteType.ACE)?.votedForId ?? null,
+          }
+        : null,
+    };
+  }
+
+  /** 투표 집계 후 최다 득표자를 Match에 반영 */
+  private async recalculateVoteWinner(matchId: string, voteType: VoteType) {
+    const votes = await this.prisma.matchVote.groupBy({
+      by: ["votedForId"],
+      where: { matchId, voteType },
+      _count: { votedForId: true },
+      orderBy: { _count: { votedForId: "desc" } },
+      take: 1,
+    });
+
+    if (votes.length === 0) return;
+    const topUserId = votes[0].votedForId;
+
+    await this.prisma.match.update({
+      where: { id: matchId },
+      data: voteType === VoteType.MVP ? { mvpUserId: topUserId } : { aceUserId: topUserId },
+    });
   }
 
   // ========================================
