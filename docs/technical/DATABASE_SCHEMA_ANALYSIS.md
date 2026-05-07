@@ -1,6 +1,7 @@
 # Database Schema Analysis
 
 작성일: 2026-04-27  
+최종 업데이트: 2026-05-07
 기준 파일: `packages/database/prisma/schema.prisma`
 
 ## 문서 상태
@@ -54,6 +55,45 @@ flowchart LR
   RiotCache[known_puuids / riot_match_cache] --> Stats[match_stats_cache]
   RiotCache --> Lab[lab_*_snapshots]
 ```
+
+## DB 연결/환경 변수
+
+Prisma datasource는 `packages/database/prisma/schema.prisma`의 `datasource db`에서 `env("DATABASE_URL")` 하나만 직접 참조한다. API 서버, Prisma CLI, seed/backfill 스크립트는 모두 이 값을 기준으로 PostgreSQL에 연결한다.
+
+| 변수 | 사용 위치 | 역할 | 예시/주의 |
+| --- | --- | --- | --- |
+| `DATABASE_URL` | Prisma datasource, API 서버, DB 스크립트 | PostgreSQL 접속 문자열 | `postgresql://nexus:nexus_password@localhost:5432/nexus?schema=public` |
+| `POSTGRES_USER` | `docker-compose.prod.yml` `postgres`, prod `api` | 운영 Postgres 계정명 및 API `DATABASE_URL` 조립 | 기본값 `nexus` |
+| `POSTGRES_PASSWORD` | `docker-compose.prod.yml` `postgres`, prod `api` | 운영 Postgres 비밀번호 | 운영 compose에서는 필수. `.env.production.example` 기준 긴 랜덤값 필요 |
+| `POSTGRES_DB` | `docker-compose.prod.yml` `postgres`, prod `api` | 운영 DB 이름 | 기본값 `nexus` |
+| `POSTGRES_HOST_PORT` | `docker-compose.dev.yml` | 개발 DB 호스트 포트 노출 | 기본 `5432`; 로컬 DB와 충돌하면 변경 |
+| `REDIS_URL` | API 서버, Riot 인증 상태, 큐/캐시 | DB는 아니지만 DB 파이프라인과 함께 필요한 Redis 접속 문자열 | dev `redis://localhost:6379`, compose 내부 `redis://redis:6379` |
+| `REDIS_HOST_PORT` | `docker-compose.dev.yml` | 개발 Redis 호스트 포트 노출 | 기본 `6379` |
+| `RIOT_MATCH_CACHE_CLEANUP_ENABLED` | API tasks/cleanup 계열 | `riot_match_cache` 정리 기능 on/off | 기본 `false`; 통계 재계산 안정화 전에는 보수적으로 유지 |
+| `RIOT_MATCH_CACHE_TTL_DAYS` | API tasks/cleanup 계열 | Riot 원본 매치 캐시 보관 기간 | 기본 `14`일 |
+
+환경별 연결 방식:
+
+| 환경 | DB 접속 | Redis 접속 | 스키마 반영 |
+| --- | --- | --- | --- |
+| 로컬 CLI | `.env` 또는 `packages/database/.env`의 `DATABASE_URL` | `.env`의 `REDIS_URL` | `pnpm --filter @nexus/database db:migrate` 또는 `db:push` |
+| 개발 compose | API 컨테이너에서 `postgres:5432`로 접속 | API 컨테이너에서 `redis:6379`로 접속 | `migrate deploy` 후 실패 시 `db:push:accept` fallback |
+| 운영 compose | `POSTGRES_*`로 `DATABASE_URL` 조립 | `redis://redis:6379` | 운영에서는 `migrate deploy`만 통과하도록 관리해야 함 |
+
+`@nexus/database` 패키지:
+
+- Prisma Client 생성: `pnpm --filter @nexus/database db:generate`
+- 마이그레이션 개발: `pnpm --filter @nexus/database db:migrate`
+- 마이그레이션 운영 적용: `pnpm --filter @nexus/database db:migrate:deploy`
+- 스키마 직접 반영: `pnpm --filter @nexus/database db:push`
+- 데이터 손실 승인 push: `pnpm --filter @nexus/database db:push:accept`
+- seed/backfill: `db:seed`, `db:seed-known-puuids`, `db:backfill-known-puuids`, `db:backfill-patch-version`
+
+주의:
+
+- `packages/database/prisma/schema.prisma`의 generator는 `binaryTargets = ["native", "linux-musl-openssl-3.0.x"]`를 사용한다. 로컬과 Alpine 기반 Docker 런타임을 모두 지원하기 위한 설정이다.
+- 운영 compose의 API 컨테이너는 `env_file`을 읽지만 `DATABASE_URL`과 `REDIS_URL`은 compose `environment`에서 다시 지정한다. 운영 DB 접속 정보는 `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`가 실제 기준이다.
+- `NEXT_PUBLIC_API_URL`, `JWT_*`, `DISCORD_*`, `RIOT_API_KEY`는 DB 연결 변수는 아니지만 인증/연동/수집 로직을 통해 DB 데이터 생성에 영향을 준다.
 
 ## 도메인별 테이블
 
@@ -240,6 +280,78 @@ flowchart LR
 - `Comment 1:N Comment` via `parent/replies`
 - `Post/Comment 1:N PostReport`
 
+## 핵심 모델 필드 빠른 참조
+
+이 섹션은 API 작업이나 운영 쿼리 작성 시 자주 확인하는 컬럼만 정리한다. 전체 필드 정의는 `schema.prisma`가 기준이다.
+
+### 사용자/인증
+
+| 모델 | 핵심 식별자 | 상태/운영 필드 | 시간 필드 | 메모 |
+| --- | --- | --- | --- | --- |
+| `User` | `id`, `email`, `username` | `role`, `status`, `reputation`, `isBanned`, `isRestricted`, `banUntil`, `restrictedUntil` | `createdAt`, `updatedAt`, `lastSeenAt`, `bannedAt` | 이메일은 nullable unique라 소셜 로그인 유저는 없을 수 있다. |
+| `AuthProvider` | `provider`, `providerId`, `userId` | `metadata` | `createdAt`, `updatedAt` | `provider + providerId`가 OAuth 계정 중복 방지 기준이다. |
+| `Session` | `refreshToken`, `userId` | `userAgent`, `ipAddress`, `expiresAt` | `createdAt` | refresh token은 DB unique로 관리된다. |
+| `UserSettings` | `userId` | `notify*`, `show*`, `allowFriendRequests`, `theme`, `highlightChampionId`, `highlightStatType` | `createdAt`, `updatedAt` | 설정 페이지와 공개 프로필 표시 조건의 기준이다. |
+
+### Riot/통계 수집
+
+| 모델 | 핵심 식별자 | 상태/운영 필드 | 시간 필드 | 메모 |
+| --- | --- | --- | --- | --- |
+| `RiotAccount` | `id`, `userId`, `puuid`, `gameName`, `tagLine` | `tier`, `rank`, `lp`, `peakTier`, `peakRank`, `mainRole`, `subRole`, `isPrimary` | `verifiedAt`, `lastSyncedAt`, `createdAt`, `updatedAt` | `puuid`와 `gameName + tagLine`이 unique다. |
+| `ChampionPreference` | `riotAccountId`, `role`, `championId` | `order` | `createdAt` | 역할별 선호 챔피언 순서를 저장한다. |
+| `KnownPuuid` | `puuid` | `priority`, `isNexusUser`, `ranked/normal/aram/customLastMatchId` | `ranked/normal/aram/customFetchedAt`, `createdAt`, `updatedAt` | 매치 수집 대상 큐 및 cursor 역할이다. |
+| `RiotMatchCache` | `matchId` | `data`, `queueId`, `patchVersion` | `gameEnd`, `createdAt` | Riot API 원본 JSON 보관소다. |
+| `MatchStatsCache` | `userId`, `queueGroup`, `season` | `stats`, `recentGames`, `matchCount`, `isPartial` | `computedAt` | 사용자 전적 화면의 읽기 캐시다. |
+| `StatsRecomputeQueue` | `userId` | `reason` | `queuedAt`, `lastSeenAt` | 통계 재계산 대기열이다. |
+
+### 룸/팀/경매
+
+| 모델 | 핵심 식별자 | 상태/운영 필드 | 시간 필드 | 메모 |
+| --- | --- | --- | --- | --- |
+| `Room` | `id`, `name`, `hostId` | `status`, `teamMode`, `maxParticipants`, `isPrivate`, `password`, `startingPoints`, `minBidIncrement`, `bidTimeLimit`, `pickTimeLimit`, `captainSelection`, `bracketFormat`, `discordGuildId`, `discordCategoryId` | `startedAt`, `completedAt`, `createdAt`, `updatedAt` | 내전방의 운영 상태를 담는 중심 테이블이다. |
+| `RoomParticipant` | `roomId`, `userId` | `role`, `isReady`, `isCaptain`, `teamId` | `joinedAt` | `roomId + userId` unique로 중복 입장을 막는다. |
+| `Team` | `id`, `roomId`, `captainId`, `name` | `color`, `initialBudget`, `remainingBudget`, `hasReceivedBonus` | `createdAt`, `updatedAt` | 경매 모드 예산 상태를 함께 가진다. |
+| `TeamMember` | `teamId`, `userId` | `assignedRole`, `soldPrice`, `pickOrder` | `joinedAt` | 최종 팀 배정 결과다. |
+| `SnakeDraftPick` | `roomId`, `teamId`, `userId` | `pickNumber` | `createdAt` | 드래프트 순서 기록이다. |
+| `AuctionBid` | `roomId`, `teamId`, `targetUserId` | `amount`, `isYuchal` | `createdAt` | `targetUserId`는 FK relation이 없는 논리 참조다. |
+
+### 매치/전적
+
+| 모델 | 핵심 식별자 | 상태/운영 필드 | 시간 필드 | 메모 |
+| --- | --- | --- | --- | --- |
+| `Match` | `id`, `roomId`, `teamAId`, `teamBId`, `riotMatchId` | `status`, `winnerId`, `mvpUserId`, `aceUserId`, `matchNumber`, `bracketRound`, `round`, `bracketType`, `tournamentCode`, `patchVersion`, `queueId`, `gameDuration`, `dataCollected` | `scheduledAt`, `startedAt`, `completedAt`, `createdAt`, `updatedAt` | 내부 내전과 외부 Riot 매치 헤더가 공존한다. |
+| `MatchVote` | `matchId`, `voterId`, `voteType` | `votedForId` | `createdAt` | 같은 매치/유저/투표타입 중복 투표를 unique로 막는다. |
+| `MatchParticipant` | `matchId`, `userId`, `teamId`, `puuid`, `riotTeamId` | `championId`, `championName`, `position`, `summoner*Id`, KDA/CS/골드/피해량/시야/아이템/룬/오브젝트/멀티킬/`win` | `createdAt`, `timelineExtractedAt` | `matchId + puuid` unique로 Riot 인제스트 멱등성을 보장한다. |
+| `MatchTeamStats` | `matchId`, `teamId` | `win`, 오브젝트 수, `first*`, `bans` | `createdAt` | 팀 단위 밴/오브젝트/승패 지표다. |
+
+### 커뮤니티/소셜/운영
+
+| 모델 | 핵심 식별자 | 상태/운영 필드 | 시간 필드 | 메모 |
+| --- | --- | --- | --- | --- |
+| `Post` | `id`, `authorId`, `category` | `title`, `content`, `views`, `isPinned`, `isEdited`, `isDeleted`, `isBlinded`, `deletedBy` | `createdAt`, `updatedAt`, `deletedAt` | 게시글 soft delete/blind 상태를 모두 가진다. |
+| `Comment` | `id`, `postId`, `authorId`, `parentId` | `content`, `isEdited`, `isDeleted`, `isBlinded`, `deletedBy` | `createdAt`, `updatedAt`, `deletedAt` | 대댓글은 self relation으로 표현한다. |
+| `PostReport` | `reporterId`, `postId`, `commentId` | `reason`, `description`, `status`, `reviewerNote` | `createdAt`, `reviewedAt` | `postId/commentId` 둘 다 nullable이므로 서비스 validation 필수다. |
+| `UserReport` | `reporterId`, `targetUserId`, `matchId`, `clanChatMessageId` | `reason`, `description`, `status`, `reviewerId`, `reviewerNote` | `createdAt`, `reviewedAt` | 사용자/클랜채팅/매치 관련 신고를 처리한다. |
+| `Friendship` | `userId`, `friendId` | `status` | `createdAt`, `updatedAt` | 친구/차단 관계 모두 같은 테이블에 저장한다. |
+| `Notification` | `userId`, `type` | `title`, `message`, `link`, `isRead`, `data` | `createdAt` | 알림 payload 확장은 `data Json`에 저장한다. |
+| `DirectMessage` | `senderId`, `receiverId` | `senderUsername`, `content`, `isRead` | `createdAt` | sender/receiver는 nullable이라 사용자 삭제 후 메시지 보존이 가능하다. |
+| `AdminAuditLog` | `adminId`, `action` | `targetType`, `targetId`, `details` | `createdAt` | 관리자 삭제 시 cascade되는 현재 정책에 주의한다. |
+| `Appeal` | `userId`, `status` | `reason`, `adminNote`, `reviewedBy` | `createdAt`, `updatedAt`, `reviewedAt` | 제재 이의신청 상태를 관리한다. |
+
+### 클랜/랭킹/Lab
+
+| 모델 | 핵심 식별자 | 상태/운영 필드 | 시간 필드 | 메모 |
+| --- | --- | --- | --- | --- |
+| `Clan` | `id`, `name`, `tag`, `ownerId` | `description`, `logo`, `isRecruiting`, `maxMembers`, `minTier`, `discord`, officer 권한 플래그 | `createdAt`, `updatedAt` | officer 권한은 Boolean 플래그로 세분화되어 있다. |
+| `ClanMember` | `clanId`, `userId` | `role` | `joinedAt` | `clanId + userId` unique다. |
+| `ClanInvitation` | `clanId`, `inviterId`, `inviteeId`, `inviteCode` | `type`, `status`, `resolvedBy` | `createdAt`, `expiresAt`, `resolvedAt` | 공개 초대코드와 지명 초대/가입 요청이 공존한다. |
+| `NexusRanking` | `userId` | `totalGames`, `wins`, `losses`, `winRate`, `globalRank`, `recentWins`, `recentLosses` | `updatedAt` | 전체 랭킹 projection이다. |
+| `ClanRanking` | `userId`, `clanId` | `totalGames`, `wins`, `losses`, `winRate`, `clanRank` | `updatedAt` | 클랜별 랭킹 projection이다. |
+| `LabChampionSnapshot` | `source`, `period`, `patchVersion`, `championId`, `position` | `games`, `wins`, `avgKda`, `avgDamage`, `avgGold`, `pickRate`, `banRate`, `wilsonLower` | `computedAt` | `source`로 custom/ranked-community를 분리한다. |
+| `LabSynergySnapshot` | `period`, `champ1Id`, `champ2Id` | `games`, `wins`, `winRate`, `wilsonLower` | `computedAt` | `champ1Id < champ2Id` 정규화 전제가 있다. |
+| `LabRankedChampionSnapshot` | `period`, `patchVersion`, `championId`, `position` | `games`, `wins`, `avgKda`, `avgDamage`, `pickRate`, `banRate`, `wilsonLower`, `confidence`, `lastMatchCreatedAt` | `computedAt` | 외부 고티어 랭크 기반 메타 캐시다. |
+| `LabCounterSnapshot` | `period`, `champId`, `vsChampId`, `position` | `games`, `wins`, `winRate`, `wilsonLower` | `computedAt` | 챔피언 상성 캐시다. |
+
 ## 삭제 정책 분석
 
 Cascade가 적극적으로 사용된다.
@@ -315,12 +427,16 @@ Cascade가 적극적으로 사용된다.
 - `20260214_add_rooms_bracket_format`
 - `20260415_add_clan_officer_permissions`
 - `20260417_add_match_stats_recent_games`
+- `20260428_add_lab_champion_snapshot_source`
+- `20260428_add_match_participant_timeline_summary`
+- `20260430_add_match_queue_id`
+- `20260507_add_match_vote_mvp_ace`
 
-`20260101_initial_schema`는 빈 DB에서 전체 기본 스키마를 생성하는 baseline migration이다. 이후 3개 migration이 기존 증분 변경 사항을 순서대로 적용한다.
+`20260101_initial_schema`는 빈 DB에서 전체 기본 스키마를 생성하는 baseline migration이다. 이후 migration들이 기존 증분 변경 사항을 순서대로 적용한다.
 
 검증 기준:
 
-- 빈 DB에서 `prisma migrate deploy`가 4개 migration을 순서대로 적용해야 한다.
+- 빈 DB에서 `prisma migrate deploy`가 모든 migration을 순서대로 적용해야 한다.
 - 적용 후 `prisma migrate diff --from-url <db> --to-schema-datamodel prisma/schema.prisma --exit-code`가 `No difference detected`를 반환해야 한다.
 
 ## 권장 작업
