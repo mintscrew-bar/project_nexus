@@ -98,10 +98,15 @@ export class AuthService {
         authProvider.userId,
       );
 
-      // 재로그인 시 사용자가 커스텀한 닉네임/아바타를 덮어쓰지 않음
+      // 재로그인 시 커스텀 아바타는 유지하되, Discord CDN URL이면 항상 최신으로 갱신
+      // (Discord는 프로필 사진 변경 시 이전 CDN 해시를 삭제하므로 갱신 필수)
       const updateData: Record<string, string> = {};
-      if (!authProvider.user.avatar && profile.avatar) {
-        updateData.avatar = profile.avatar;
+      if (profile.avatar) {
+        const current = authProvider.user.avatar ?? "";
+        const isDiscordAvatar = current.includes("cdn.discordapp.com");
+        if (!current || isDiscordAvatar) {
+          updateData.avatar = profile.avatar;
+        }
       }
 
       if (Object.keys(updateData).length > 0) {
@@ -820,7 +825,7 @@ export class AuthService {
           : profile.username,
       email: profile.email,
       avatar: profile.avatar
-        ? `https://cdn.discordapp.com/avatars/${profile.id}/${profile.avatar}.png`
+        ? `https://cdn.discordapp.com/avatars/${profile.id}/${profile.avatar}.${profile.avatar.startsWith("a_") ? "gif" : "png"}`
         : undefined,
     };
   }

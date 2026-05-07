@@ -45,8 +45,9 @@ export class DiscordStrategy extends PassportStrategy(Strategy, "discord") {
           (profile.discriminator !== "0"
             ? `${profile.username}#${profile.discriminator}`
             : profile.username),
+        // 애니메이션 아바타(해시 a_ 시작)는 .gif, 나머지는 .png
         avatar: profile.avatar
-          ? `https://cdn.discordapp.com/avatars/${profile.id}/${profile.avatar}.png`
+          ? `https://cdn.discordapp.com/avatars/${profile.id}/${profile.avatar}.${profile.avatar.startsWith("a_") ? "gif" : "png"}`
           : undefined,
         metadata: {
           accessToken,
