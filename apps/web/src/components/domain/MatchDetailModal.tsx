@@ -296,7 +296,7 @@ export function MatchDetailModal({
               <p className="text-sm text-text-secondary text-center py-2">
                 {!match.team1 || !match.team2
                   ? "팀이 확정되면 코드가 자동 생성됩니다."
-                  : "코드 생성 중..."}
+                  : "커스텀 게임을 생성하고 직접 입장해주세요."}
               </p>
             )}
             {copied && <p className="text-xs text-accent-success mt-2 text-center">코드가 복사되었습니다!</p>}
