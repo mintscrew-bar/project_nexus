@@ -26,6 +26,8 @@ ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 # 컨테이너간 통신 호스트명(default: api:4000)을 빌드 인자로 전달한다.
 ARG API_URL=http://api:4000
 ENV API_URL=${API_URL}
+# OOM 방지: Next.js 빌드는 메모리를 많이 소모하므로 힙 상한을 명시한다
+ENV NODE_OPTIONS=--max-old-space-size=3072
 RUN pnpm --filter @nexus/types build
 RUN pnpm --filter @nexus/web build
 
