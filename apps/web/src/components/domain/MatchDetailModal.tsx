@@ -86,7 +86,7 @@ export function MatchDetailModal({
       setFullMatch(details);
       setVoteData(votes);
     } catch {
-      // 투표 데이터 로드 실패는 조용히 처리
+      setVoteError('투표 정보를 불러올 수 없습니다.');
     } finally {
       setIsLoadingVotes(false);
     }
@@ -418,7 +418,7 @@ function VotePanels({
         currentUserId={currentUserId}
         getVoteCount={(id) => getVoteCount('MVP', id)}
         maxCount={maxCount('MVP')}
-        isSubmitting={submittingVote === 'MVP'}
+        isSubmitting={submittingVote !== null}
         onVote={onVote}
       />
       <VoteColumn
@@ -432,7 +432,7 @@ function VotePanels({
         currentUserId={currentUserId}
         getVoteCount={(id) => getVoteCount('ACE', id)}
         maxCount={maxCount('ACE')}
-        isSubmitting={submittingVote === 'ACE'}
+        isSubmitting={submittingVote !== null}
         onVote={onVote}
       />
     </div>

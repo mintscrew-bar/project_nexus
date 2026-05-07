@@ -20,7 +20,7 @@ import { NotificationService } from "../notification/notification.service";
 import { MatchBracketService, Bracket } from "./match-bracket.service";
 import { MatchAdvancementService } from "./match-advancement.service";
 import { RankingService } from "../ranking/ranking.service";
-import { RoomStatus, MatchStatus, BracketType, VoteType } from "@nexus/database";
+import { Prisma, RoomStatus, MatchStatus, BracketType, VoteType } from "@nexus/database";
 import {
   getChampionKoreanName,
   getSummonerSpellKoreanName,
@@ -1149,20 +1149,21 @@ export class MatchService {
       }
     }
 
-    // 중복 투표 방지 (unique constraint 있지만 명확한 에러 메시지 제공)
-    const existing = await this.prisma.matchVote.findUnique({
-      where: { matchId_voterId_voteType: { matchId, voterId, voteType } },
-    });
-    if (existing) {
-      throw new BadRequestException("이미 투표하셨습니다.");
+    // vote create + 집계 갱신을 트랜잭션으로 묶어 원자성 보장
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        await tx.matchVote.create({
+          data: { matchId, voterId, votedForId, voteType },
+        });
+        await this.recalculateVoteWinnerTx(tx, matchId, voteType);
+      });
+    } catch (err: any) {
+      // Prisma unique constraint 위반 (P2002) — 동시 요청으로 중복 투표 시도
+      if (err?.code === "P2002") {
+        throw new BadRequestException("이미 투표하셨습니다.");
+      }
+      throw err;
     }
-
-    await this.prisma.matchVote.create({
-      data: { matchId, voterId, votedForId, voteType },
-    });
-
-    // 투표 집계 후 최다 득표자가 바뀌면 Match의 mvpUserId/aceUserId 갱신
-    await this.recalculateVoteWinner(matchId, voteType);
 
     return { message: "투표가 완료되었습니다." };
   }
@@ -1203,23 +1204,33 @@ export class MatchService {
     };
   }
 
-  /** 투표 집계 후 최다 득표자를 Match에 반영 */
-  private async recalculateVoteWinner(matchId: string, voteType: VoteType) {
-    const votes = await this.prisma.matchVote.groupBy({
+  /** 투표 집계 후 최다 득표자를 Match에 반영 (트랜잭션 내부용) */
+  private async recalculateVoteWinnerTx(
+    tx: Prisma.TransactionClient,
+    matchId: string,
+    voteType: VoteType,
+  ) {
+    const votes = await tx.matchVote.groupBy({
       by: ["votedForId"],
       where: { matchId, voteType },
       _count: { votedForId: true },
-      orderBy: { _count: { votedForId: "desc" } },
+      // 동표 시 votedForId 오름차순으로 결정론적 선택
+      orderBy: [{ _count: { votedForId: "desc" } }, { votedForId: "asc" }],
       take: 1,
     });
 
     if (votes.length === 0) return;
     const topUserId = votes[0].votedForId;
 
-    await this.prisma.match.update({
+    await tx.match.update({
       where: { id: matchId },
       data: voteType === VoteType.MVP ? { mvpUserId: topUserId } : { aceUserId: topUserId },
     });
+  }
+
+  /** 트랜잭션 없이 독립 호출용 (외부에서 집계 재계산이 필요한 경우) */
+  private async recalculateVoteWinner(matchId: string, voteType: VoteType) {
+    await this.recalculateVoteWinnerTx(this.prisma, matchId, voteType);
   }
 
   // ========================================

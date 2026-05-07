@@ -389,13 +389,17 @@ export class MatchDataCollectionService {
         return;
       }
 
-      // 게임 종료 시각 기준 탐색 범위: 종료 90분 전 ~ 종료 15분 후 (Riot 처리 지연 고려)
+      // 탐색 시간 범위: 게임 시작 5분 전 ~ 종료 20분 후 (Riot API 처리 지연 고려)
+      // startedAt이 없으면 completedAt 기준 90분 전으로 fallback
       const completedAt = match.completedAt ?? new Date();
+      const startAnchor = (match as any).startedAt
+        ? new Date((match as any).startedAt)
+        : new Date(completedAt.getTime() - 90 * 60 * 1000);
       const startTime = Math.floor(
-        (completedAt.getTime() - 90 * 60 * 1000) / 1000,
+        (startAnchor.getTime() - 5 * 60 * 1000) / 1000,
       );
       const endTime = Math.floor(
-        (completedAt.getTime() + 15 * 60 * 1000) / 1000,
+        (completedAt.getTime() + 20 * 60 * 1000) / 1000,
       );
 
       // 크로스레퍼런스: 최대 3명 PUUID로 커스텀 게임 목록 조회 후 교집합
@@ -406,7 +410,7 @@ export class MatchDataCollectionService {
         const ids = await this.riotMatchService.getMatchIdsByPuuid(
           puuidList[i],
           0,
-          10,
+          20, // 최근 20개로 늘려 누락 방지 (기존 10개에서 증가)
           0, // queue=0: Custom Game
           undefined,
           3,
