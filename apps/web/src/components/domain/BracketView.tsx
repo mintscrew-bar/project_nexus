@@ -46,7 +46,7 @@ function MatchCard({ match, onMatchClick }: { match: Match; onMatchClick: (m: Ma
       className={`transition-all hover:border-accent-primary cursor-pointer ${getStatusColor(match.status)}`}
       onClick={() => onMatchClick(match)}
     >
-      <CardContent className="p-4">
+      <CardContent className="p-2.5 md:p-4">
         <div className="flex items-center justify-between mb-3">
           <span className="text-xs font-semibold text-text-secondary">
             매치 #{match.matchNumber}
@@ -124,9 +124,9 @@ function StandardBracket({ matches, rounds, onMatchClick }: BracketViewProps) {
 
   return (
     <div className="w-full overflow-x-auto">
-      <div className="flex gap-8 p-4 min-w-max">
+      <div className="flex gap-4 md:gap-8 p-2 md:p-4 min-w-max">
         {Array.from({ length: rounds }, (_, i) => i + 1).map(round => (
-          <div key={round} className="flex flex-col space-y-4 min-w-[280px]">
+          <div key={round} className="flex flex-col space-y-4 min-w-[200px] md:min-w-[280px]">
             <div className="text-center">
               <h3 className="text-lg font-bold text-text-primary flex items-center justify-center">
                 {round === rounds && <Trophy className="h-5 w-5 mr-2 text-accent-gold" />}
@@ -176,7 +176,7 @@ function DoubleEliminationBracket({ matches, onMatchClick }: { matches: Match[];
   const hasGF = !!bySec['GF']?.length;
 
   const renderSection = (section: string) => (
-    <div key={section} className="flex flex-col space-y-4 min-w-[280px]">
+    <div key={section} className="flex flex-col space-y-4 min-w-[200px] md:min-w-[280px]">
       <div className="text-center">
         <h3 className="text-base font-bold text-text-primary flex items-center justify-center gap-1">
           {section === 'GF' && <Trophy className="h-4 w-4 text-accent-gold" />}
@@ -201,7 +201,7 @@ function DoubleEliminationBracket({ matches, onMatchClick }: { matches: Match[];
             <Trophy className="h-4 w-4 text-accent-gold" />
             <h2 className="text-sm font-bold text-accent-gold uppercase tracking-wider">승자조 (Winners Bracket)</h2>
           </div>
-          <div className="flex gap-6 p-4 min-w-max">
+          <div className="flex gap-4 md:gap-6 p-2 md:p-4 min-w-max">
             {presentWB.map(renderSection)}
           </div>
         </div>
@@ -219,7 +219,7 @@ function DoubleEliminationBracket({ matches, onMatchClick }: { matches: Match[];
             <ShieldX className="h-4 w-4 text-accent-danger" />
             <h2 className="text-sm font-bold text-accent-danger uppercase tracking-wider">패자조 (Losers Bracket)</h2>
           </div>
-          <div className="flex gap-6 p-4 min-w-max">
+          <div className="flex gap-4 md:gap-6 p-2 md:p-4 min-w-max">
             {presentLB.map(renderSection)}
           </div>
         </div>

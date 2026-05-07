@@ -57,7 +57,7 @@ export function Modal({
 
   const modalContent = (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby={title ? 'modal-title' : undefined}
@@ -81,7 +81,7 @@ export function Modal({
         {(title || showCloseButton) && (
           <div className="flex items-center justify-between p-4 border-b border-bg-tertiary flex-shrink-0">
             {title && (
-              <h2 id="modal-title" className="text-xl font-semibold text-text-primary">
+              <h2 id="modal-title" className="text-base sm:text-xl font-semibold text-text-primary">
                 {title}
               </h2>
             )}

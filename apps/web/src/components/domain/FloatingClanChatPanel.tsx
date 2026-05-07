@@ -40,6 +40,8 @@ export function FloatingClanChatPanel() {
   // clan-store에서 미읽음 카운트 가져오기
   const unreadCount = useClanStore((s) => s.unreadCount);
 
+  // 모바일 감지
+  const [isMobile, setIsMobile] = useState(false);
   // 최소화 상태
   const [isMinimized, setIsMinimized] = useState(false);
   // 패널 높이 (드래그 리사이즈)
@@ -149,6 +151,13 @@ export function FloatingClanChatPanel() {
       .finally(() => setIsLoadingClan(false));
   };
 
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+
   // 클랜 채팅 창 열릴 때 내 클랜 정보 조회
   useEffect(() => {
     if (!isClanChatOpen || !isAuthenticated) return;
@@ -158,20 +167,20 @@ export function FloatingClanChatPanel() {
 
   if (!isClanChatOpen) return null;
 
-  // FriendsPanel(w-72=288px) 열림 상태에 따라 rightOffset 조정
-  // 패널이 닫혀있으면 오른쪽 끝(0px)부터, 열려있으면 패널 너비만큼 오프셋
+  // 모바일: 전체 너비 바텀시트 / 데스크탑: 320px 팝업
   const friendsPanelWidth = isFriendsPanelOpen ? 288 : 0;
-  // DM 플로팅 창이 열려있으면 추가 오프셋 (DM 창 320px + 간격 4px)
-  const rightOffset =
-    friendsPanelWidth + (floatingDmTarget ? 320 + 4 : 0);
+  const rightOffset = friendsPanelWidth + (floatingDmTarget ? 320 + 4 : 0);
+  const panelStyle = isMobile
+    ? { left: 0, right: 0, width: "100%" }
+    : { width: 320, right: rightOffset };
 
   return (
     <div
       className="fixed bottom-0 z-50 flex flex-col bg-bg-secondary border border-bg-tertiary rounded-t-xl shadow-2xl overflow-hidden transition-[right] duration-300"
-      style={{ width: 320, right: rightOffset }}
+      style={panelStyle}
     >
-      {/* 리사이즈 핸들 — 상단 테두리 위 투명 드래그 영역 */}
-      {!isMinimized && (
+      {/* 리사이즈 핸들 — 데스크탑 전용 드래그 영역 */}
+      {!isMinimized && !isMobile && (
         <div
           onMouseDown={handleResizeStart}
           className="absolute top-0 left-0 right-0 h-1.5 cursor-ns-resize z-10 hover:bg-accent-primary/20 transition-colors"
@@ -220,16 +229,19 @@ export function FloatingClanChatPanel() {
           </AnimatePresence>
         </div>
         <div className="flex items-center gap-0.5">
-          <button
-            onClick={() => setIsMinimized((v) => !v)}
-            className="p-1 rounded hover:bg-bg-elevated text-text-tertiary hover:text-text-primary transition-colors"
-            title={isMinimized ? "복원" : "최소화"}
-          >
-            <Minus className="w-3.5 h-3.5" />
-          </button>
+          {/* 최소화/복원 — 모바일에서는 숨김 */}
+          {!isMobile && (
+            <button
+              onClick={() => setIsMinimized((v) => !v)}
+              className="p-1.5 rounded hover:bg-bg-elevated text-text-tertiary hover:text-text-primary transition-colors"
+              title={isMinimized ? "복원" : "최소화"}
+            >
+              <Minus className="w-3.5 h-3.5" />
+            </button>
+          )}
           <button
             onClick={closeClanChat}
-            className="p-1 rounded hover:bg-bg-elevated text-text-tertiary hover:text-text-primary transition-colors"
+            className="p-1.5 rounded hover:bg-bg-elevated text-text-tertiary hover:text-text-primary transition-colors"
             title="닫기"
           >
             <X className="w-3.5 h-3.5" />
@@ -239,7 +251,7 @@ export function FloatingClanChatPanel() {
 
       {/* 채팅 본문 */}
       {!isMinimized && (
-        <div style={{ height: panelHeight }}>
+        <div className={isMobile ? "h-[60vh]" : ""} style={isMobile ? {} : { height: panelHeight }}>
           {isLoadingClan ? (
             <div className="flex items-center justify-center h-full">
               <div className="w-5 h-5 border-2 border-accent-primary/30 border-t-accent-primary rounded-full animate-spin" />

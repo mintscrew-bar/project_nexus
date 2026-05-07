@@ -1259,7 +1259,7 @@ export function FriendsPanel() {
 
       {/* Slide-in Panel */}
       <div
-        className={`fixed top-0 right-0 h-full w-72 bg-bg-secondary border-l border-bg-tertiary z-50 flex flex-col shadow-2xl transition-transform duration-300 ease-in-out ${
+        className={`fixed top-0 right-0 h-full w-full sm:w-72 bg-bg-secondary border-l border-bg-tertiary z-50 flex flex-col shadow-2xl transition-transform duration-300 ease-in-out ${
           isOpen ? "translate-x-0" : "translate-x-full"
         }`}
       >

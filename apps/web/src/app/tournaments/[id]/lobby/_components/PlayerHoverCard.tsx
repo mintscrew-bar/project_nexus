@@ -100,19 +100,23 @@ export function PlayerHoverCard({ participant, anchorRect, onOpenProfile, onMous
   const hasChampions = champions.length > 0;
 
   // fixed 포지셔닝: overflow-hidden 컨테이너 밖으로 탈출한다.
-  const TOOLTIP_W = 320;
+  // 화면 너비에 따라 카드 크기 조정 (모바일에서 화면 밖 이탈 방지)
   const TOOLTIP_OFFSET = 8;
+  const isMobileScreen = window.innerWidth < 640;
+  const TOOLTIP_W = isMobileScreen ? Math.min(288, window.innerWidth - 16) : 320;
   const spaceOnRight = window.innerWidth - anchorRect.right;
-  const left = spaceOnRight >= TOOLTIP_W + TOOLTIP_OFFSET
+  const rawLeft = spaceOnRight >= TOOLTIP_W + TOOLTIP_OFFSET
     ? anchorRect.right + TOOLTIP_OFFSET
     : anchorRect.left - TOOLTIP_W - TOOLTIP_OFFSET;
+  // 항상 화면 안에 유지
+  const left = Math.max(8, Math.min(rawLeft, window.innerWidth - TOOLTIP_W - 8));
   const top = Math.max(8, Math.min(anchorRect.top, window.innerHeight - 480));
   const showSkeleton = !isBot && statsLoading && repLoading;
 
   return createPortal(
     <div
-      className="fixed w-80 overflow-hidden bg-bg-elevated border border-bg-tertiary rounded-xl shadow-2xl z-[9999] animate-fade-in"
-      style={{ left, top }}
+      className="fixed overflow-hidden bg-bg-elevated border border-bg-tertiary rounded-xl shadow-2xl z-[9999] animate-fade-in"
+      style={{ left, top, width: TOOLTIP_W }}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
     >

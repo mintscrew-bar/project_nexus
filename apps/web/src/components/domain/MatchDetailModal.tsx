@@ -226,18 +226,18 @@ export function MatchDetailModal({
           </Alert>
         )}
 
-        <div className="grid grid-cols-2 gap-4 text-center">
-          <div className="p-4 bg-bg-tertiary rounded-lg">
-            <p className="font-bold text-lg text-text-primary">
+        <div className="grid grid-cols-2 gap-2 sm:gap-4 text-center">
+          <div className="p-2 sm:p-4 bg-bg-tertiary rounded-lg">
+            <p className="font-bold text-sm sm:text-lg text-text-primary truncate">
               {match.team1?.name || 'TBD'}
             </p>
-            <p className="text-sm text-text-secondary">Team 1</p>
+            <p className="text-xs sm:text-sm text-text-secondary">Team 1</p>
           </div>
-          <div className="p-4 bg-bg-tertiary rounded-lg">
-            <p className="font-bold text-lg text-text-primary">
+          <div className="p-2 sm:p-4 bg-bg-tertiary rounded-lg">
+            <p className="font-bold text-sm sm:text-lg text-text-primary truncate">
               {match.team2?.name || 'TBD'}
             </p>
-            <p className="text-sm text-text-secondary">Team 2</p>
+            <p className="text-xs sm:text-sm text-text-secondary">Team 2</p>
           </div>
         </div>
         
@@ -406,7 +406,7 @@ function VotePanels({
   const isCurrentUserParticipant = allMembers.some(m => m.user.id === currentUserId);
 
   return (
-    <div className="grid grid-cols-2 gap-3">
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
       <VoteColumn
         title="MVP"
         subtitle={winnerTeam?.name ?? '이긴 팀'}
