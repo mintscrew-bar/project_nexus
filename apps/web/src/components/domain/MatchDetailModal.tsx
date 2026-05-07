@@ -398,6 +398,13 @@ function VotePanels({
     return Math.max(1, ...(list?.map(v => v.count) ?? [0]));
   };
 
+  // 투표 자격: 이긴 팀/진 팀 어느 쪽이든 매치 참가자이면 모든 컬럼에 투표 가능
+  const allMembers = [
+    ...(fullMatch.teamA?.members ?? []),
+    ...(fullMatch.teamB?.members ?? []),
+  ];
+  const isCurrentUserParticipant = allMembers.some(m => m.user.id === currentUserId);
+
   return (
     <div className="grid grid-cols-2 gap-3">
       <VoteColumn
@@ -407,6 +414,7 @@ function VotePanels({
         members={winnerTeam?.members ?? []}
         voteType="MVP"
         votedForId={mvpVotedFor}
+        isParticipant={isCurrentUserParticipant}
         currentUserId={currentUserId}
         getVoteCount={(id) => getVoteCount('MVP', id)}
         maxCount={maxCount('MVP')}
@@ -420,6 +428,7 @@ function VotePanels({
         members={loserTeam?.members ?? []}
         voteType="ACE"
         votedForId={aceVotedFor}
+        isParticipant={isCurrentUserParticipant}
         currentUserId={currentUserId}
         getVoteCount={(id) => getVoteCount('ACE', id)}
         maxCount={maxCount('ACE')}
@@ -432,7 +441,7 @@ function VotePanels({
 
 function VoteColumn({
   title, subtitle, icon, members, voteType,
-  votedForId, currentUserId, getVoteCount, maxCount, isSubmitting, onVote,
+  votedForId, isParticipant, currentUserId, getVoteCount, maxCount, isSubmitting, onVote,
 }: {
   title: string;
   subtitle: string;
@@ -440,6 +449,7 @@ function VoteColumn({
   members: MatchMember[];
   voteType: 'MVP' | 'ACE';
   votedForId: string | null;
+  isParticipant: boolean;
   currentUserId?: string;
   getVoteCount: (userId: string) => number;
   maxCount: number;
@@ -447,7 +457,6 @@ function VoteColumn({
   onVote: (votedForId: string, voteType: 'MVP' | 'ACE') => void;
 }) {
   const hasVoted = votedForId !== null;
-  const isParticipant = members.some(m => m.user.id === currentUserId);
 
   return (
     <div className="bg-bg-tertiary rounded-lg p-3 space-y-2">
