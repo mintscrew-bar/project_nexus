@@ -56,7 +56,7 @@ export function CompactParticipantCard({
       {/* Ready status + actions */}
       <div className="flex items-center gap-1 flex-shrink-0">
         {!isSelf && !isFriend && !isSent && (
-          <button onClick={(e) => { e.stopPropagation(); handleAddFriend(p.userId); }} disabled={addingFriend === p.userId} className="opacity-0 group-hover:opacity-100 p-1 text-accent-primary hover:text-accent-hover rounded transition-all disabled:opacity-50" title="친구 추가">
+          <button onClick={(e) => { e.stopPropagation(); handleAddFriend(p.userId); }} disabled={addingFriend === p.userId} className="opacity-60 group-hover:opacity-100 p-1 text-accent-primary hover:text-accent-hover hover:bg-accent-primary/10 rounded transition-all disabled:opacity-30" title="친구 추가">
             <UserPlus className="h-3 w-3" />
           </button>
         )}
@@ -78,7 +78,7 @@ export function CompactParticipantCard({
           <X className="h-3.5 w-3.5 text-text-tertiary/50 flex-shrink-0" />
         )}
         {isCurrentUserHost && !isSelf && (
-          <button onClick={() => setKickTarget({ id: p.id, username: p.username })} className="opacity-0 group-hover:opacity-100 p-0.5 text-accent-danger hover:text-accent-danger/80 transition-opacity" title="강퇴">
+          <button onClick={() => setKickTarget({ id: p.id, username: p.username })} className="opacity-60 group-hover:opacity-100 p-0.5 text-accent-danger hover:text-accent-danger/80 hover:bg-accent-danger/10 rounded transition-all" title="강퇴">
             <UserMinus className="h-3 w-3" />
           </button>
         )}
