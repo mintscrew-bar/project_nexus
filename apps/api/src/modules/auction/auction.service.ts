@@ -762,6 +762,55 @@ export class AuctionService implements OnModuleInit {
     return this.captainPhases.get(roomId);
   }
 
+  /**
+   * 재연결 시 팀장 선정 단계 복원에 필요한 전체 페이로드를 반환한다.
+   * (mode, requiredCount, volunteers, timerEnd, participants, hostId)
+   */
+  async getCaptainSelectionPayload(roomId: string) {
+    const phase = this.captainPhases.get(roomId);
+    if (!phase) return null;
+
+    const room = await this.prisma.room.findUnique({
+      where: { id: roomId },
+      include: {
+        participants: {
+          where: { role: "PLAYER" },
+          include: {
+            user: {
+              include: { riotAccounts: { where: { isPrimary: true } } },
+            },
+          },
+        },
+      },
+    });
+    if (!room) return null;
+
+    const participants = room.participants.map((p) => {
+      const acc = p.user.riotAccounts[0];
+      return {
+        id: p.userId,
+        username: p.user.username,
+        avatar: p.user.avatar,
+        tier: acc?.tier,
+        rank: acc?.rank,
+        mmr: calculateTierScore(
+          acc?.tier || "UNRANKED",
+          acc?.rank || "",
+          acc?.lp || 0,
+        ),
+      };
+    });
+
+    return {
+      mode: phase.mode,
+      requiredCount: phase.requiredCount,
+      volunteers: phase.volunteers,
+      timerEnd: phase.timerEnd,
+      participants,
+      hostId: room.hostId,
+    };
+  }
+
   setCaptainPhaseTimerHandle(
     roomId: string,
     handle: ReturnType<typeof setTimeout>,

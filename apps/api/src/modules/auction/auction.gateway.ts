@@ -189,16 +189,22 @@ export class AuctionGateway
 
       if (captainPhase && !state) {
         // 팀장 선정 단계: 경매 아직 시작 안 됨
+        // 재연결 시에도 participants + hostId가 필요 (본인 식별 / 방장 식별 / UI 렌더)
+        const captainPayload = await this.auctionService
+          .getCaptainSelectionPayload(data.roomId)
+          .catch(() => null);
         return {
           success: true,
           state: null,
           teams: [],
           players: [],
-          captainSelectionPhase: {
+          captainSelectionPhase: captainPayload ?? {
             mode: captainPhase.mode,
             requiredCount: captainPhase.requiredCount,
             volunteers: captainPhase.volunteers,
             timerEnd: captainPhase.timerEnd,
+            participants: [],
+            hostId: null,
           },
         };
       }

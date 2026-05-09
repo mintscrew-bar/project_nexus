@@ -259,15 +259,24 @@ export default function AuctionRoomPage() {
     const { mode, requiredCount, volunteers, participants } = captainSelectionPhase;
     const isVolunteer = volunteers.includes(user?.id ?? '');
     const tooManyVolunteers = volunteers.length > requiredCount;
+    const meParticipant = (participants ?? []).find((p: any) => p.id === user?.id);
+    const volunteerParticipants = (participants ?? []).filter((p: any) => volunteers.includes(p.id));
+    const otherWaitingParticipants = (participants ?? []).filter(
+      (p: any) => p.id !== user?.id && !volunteers.includes(p.id),
+    );
+    const progressPct = Math.min(100, (volunteers.length / requiredCount) * 100);
+    // 자원자 부족 시 백엔드가 MMR로 자동 채움
+    const willBeFilledByMmr = !tooManyVolunteers && volunteers.length < requiredCount;
 
     return (
       <div className="flex-grow p-4 md:p-8">
         <div className="container mx-auto max-w-2xl">
+          {/* 헤더 */}
           <div className="mb-6 text-center">
             <h1 className="text-2xl font-bold text-text-primary mb-1">팀장 선정</h1>
             {mode === 'VOLUNTEER' && (
               <p className="text-text-secondary">
-                필요 팀장: <span className="font-bold text-accent-primary">{requiredCount}명</span>
+                필요 팀장 <span className="font-bold text-accent-primary">{requiredCount}명</span>
                 {captainSelectionPhase.timerEnd && (
                   <span className="ml-3 text-accent-warning font-mono text-lg">{volunteerTimer}초</span>
                 )}
@@ -275,75 +284,241 @@ export default function AuctionRoomPage() {
             )}
             {mode === 'MANUAL' && (
               <p className="text-text-secondary">
-                방장이 <span className="font-bold text-accent-primary">{requiredCount}명</span>의 팀장을 선택합니다
+                {isHost
+                  ? <>참가자 중 <span className="font-bold text-accent-primary">{requiredCount}명</span>의 팀장을 선택해주세요</>
+                  : <>방장이 <span className="font-bold text-accent-primary">{requiredCount}명</span>의 팀장을 선택하고 있습니다</>}
               </p>
             )}
           </div>
 
-          <div className="space-y-2 mb-6">
-            {(participants ?? []).map((p: any) => {
-              const isSelected = mode === 'MANUAL' ? selectedCaptains.includes(p.id) : volunteers.includes(p.id);
-              return (
-                <div
-                  key={p.id}
-                  className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${
-                    (mode === 'MANUAL' && isHost) || (mode === 'VOLUNTEER' && p.id === user?.id)
-                      ? 'cursor-pointer'
-                      : 'cursor-default'
-                  } ${
-                    isSelected ? 'border-accent-primary bg-accent-primary/10' : 'border-bg-tertiary bg-bg-secondary hover:border-bg-elevated'
-                  }`}
-                  onClick={() => {
-                    if (mode === 'MANUAL' && isHost) {
-                      setSelectedCaptains(prev =>
-                        prev.includes(p.id)
-                          ? prev.filter(id => id !== p.id)
-                          : prev.length < requiredCount ? [...prev, p.id] : prev
-                      );
-                    } else if (mode === 'VOLUNTEER' && p.id === user?.id) {
-                      volunteerAsCaptain(auctionId);
-                    }
-                  }}
-                >
-                  <div className="w-8 h-8 rounded-full bg-bg-elevated flex items-center justify-center text-sm font-bold text-text-primary flex-shrink-0">
-                    {p.username[0].toUpperCase()}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <span className="font-medium text-text-primary truncate block">{p.username}</span>
-                    {p.tier && <span className="text-xs text-text-tertiary">{p.tier} {p.rank} · MMR {p.mmr}</span>}
-                  </div>
-                  {isSelected && <Check className="w-4 h-4 text-accent-primary flex-shrink-0" />}
-                  {mode === 'VOLUNTEER' && p.id === user?.id && !isSelected && (
-                    <Hand className="w-4 h-4 text-text-tertiary flex-shrink-0" />
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
+          {/* ─── VOLUNTEER 모드 ─── */}
           {mode === 'VOLUNTEER' && (
-            <div className="space-y-3">
-              <p className="text-sm text-text-secondary text-center">
-                자원자: <span className={`font-bold ${tooManyVolunteers ? 'text-accent-warning' : 'text-accent-primary'}`}>{volunteers.length}</span>/{requiredCount}명
-                {tooManyVolunteers && ' — 초과! 방장이 선택합니다'}
-              </p>
-              <div className="flex gap-3 justify-center">
-                <Button
-                  onClick={() => finalizeVolunteers(auctionId, tooManyVolunteers ? selectedCaptains : undefined)}
-                  disabled={!isHost || (tooManyVolunteers && selectedCaptains.length !== requiredCount)}
-                >
-                  <Users className="w-4 h-4 mr-2" />
-                  {tooManyVolunteers ? `${selectedCaptains.length}/${requiredCount}명 선택 후 확정` : '지금 마감'}
-                </Button>
-              </div>
-            </div>
+            <>
+              {/* 1) 본인 액션 카드 — 가장 큰 시각 비중, 명시적 지원/취소 버튼 */}
+              {meParticipant && (
+                <Card className="mb-4">
+                  <CardContent className="p-5">
+                    <div className="flex items-center gap-4 mb-4">
+                      <div className={cn(
+                        'w-12 h-12 rounded-full flex items-center justify-center text-base font-bold flex-shrink-0 transition-colors',
+                        isVolunteer
+                          ? 'bg-accent-primary text-white'
+                          : 'bg-bg-elevated text-text-primary',
+                      )}>
+                        {meParticipant.username[0].toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-text-primary truncate">{meParticipant.username}</div>
+                        {meParticipant.tier && (
+                          <div className="text-xs text-text-tertiary">
+                            {meParticipant.tier} {meParticipant.rank} · MMR {meParticipant.mmr}
+                          </div>
+                        )}
+                        <div className={cn(
+                          'mt-1 text-xs font-medium',
+                          isVolunteer ? 'text-accent-success' : 'text-text-tertiary',
+                        )}>
+                          {isVolunteer ? '✓ 팀장 지원 완료' : '아직 지원하지 않음'}
+                        </div>
+                      </div>
+                    </div>
+                    <Button
+                      onClick={() => volunteerAsCaptain(auctionId)}
+                      variant={isVolunteer ? 'secondary' : 'primary'}
+                      className="w-full"
+                      size="lg"
+                    >
+                      {isVolunteer ? '지원 취소' : (
+                        <>
+                          <Hand className="w-4 h-4 mr-2" />
+                          팀장 지원하기
+                        </>
+                      )}
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* 2) 자원자 현황 — 진행 바 + 자원자 카드 (초과 시 방장 선택 영역) */}
+              <Card className="mb-4">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-semibold text-text-primary">자원자 현황</span>
+                    <span className={cn(
+                      'text-sm font-bold tabular-nums',
+                      tooManyVolunteers ? 'text-accent-warning' : 'text-accent-primary',
+                    )}>
+                      {volunteers.length}/{requiredCount}명
+                    </span>
+                  </div>
+                  <div className="h-1.5 bg-bg-tertiary rounded-full overflow-hidden mb-3">
+                    <div
+                      className={cn(
+                        'h-full transition-all',
+                        tooManyVolunteers ? 'bg-accent-warning' : 'bg-accent-primary',
+                      )}
+                      style={{ width: `${progressPct}%` }}
+                    />
+                  </div>
+                  {volunteerParticipants.length === 0 ? (
+                    <p className="text-xs text-text-tertiary text-center py-2">
+                      아직 자원한 사람이 없습니다.
+                    </p>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {volunteerParticipants.map((p: any) => {
+                        const isSelected = tooManyVolunteers && selectedCaptains.includes(p.id);
+                        const canHostSelect = tooManyVolunteers && isHost;
+                        return (
+                          <div
+                            key={p.id}
+                            className={cn(
+                              'flex items-center gap-2.5 p-2 rounded-lg border transition-all',
+                              canHostSelect ? 'cursor-pointer hover:border-accent-primary/50' : 'cursor-default',
+                              isSelected
+                                ? 'border-accent-primary bg-accent-primary/10'
+                                : 'border-bg-tertiary bg-bg-secondary',
+                            )}
+                            onClick={() => {
+                              if (!canHostSelect) return;
+                              setSelectedCaptains(prev =>
+                                prev.includes(p.id)
+                                  ? prev.filter(id => id !== p.id)
+                                  : prev.length < requiredCount ? [...prev, p.id] : prev
+                              );
+                            }}
+                          >
+                            <div className="w-7 h-7 rounded-full bg-accent-primary/20 text-accent-primary flex items-center justify-center text-xs font-bold flex-shrink-0">
+                              {p.username[0].toUpperCase()}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <span className="text-sm font-medium text-text-primary truncate block">{p.username}</span>
+                              {p.tier && <span className="text-[11px] text-text-tertiary">{p.tier} {p.rank}</span>}
+                            </div>
+                            {isSelected && <Check className="w-4 h-4 text-accent-primary flex-shrink-0" />}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {tooManyVolunteers && (
+                    <p className="text-xs text-accent-warning mt-3 text-center">
+                      {isHost
+                        ? `자원자가 초과되었습니다. ${requiredCount}명을 선택해 확정해주세요.`
+                        : '자원자가 초과되어 방장이 선택합니다.'}
+                    </p>
+                  )}
+                  {willBeFilledByMmr && volunteers.length > 0 && (
+                    <p className="text-xs text-text-tertiary mt-3 text-center">
+                      자원자가 부족하면 부족한 자리는 MMR 상위 참가자로 자동 채워집니다.
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* 3) 아직 미지원 참가자 (작은 칩) */}
+              {otherWaitingParticipants.length > 0 && (
+                <Card className="mb-4">
+                  <CardContent className="p-4">
+                    <div className="text-xs font-semibold text-text-tertiary uppercase tracking-wider mb-2">
+                      대기 중 ({otherWaitingParticipants.length})
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {otherWaitingParticipants.map((p: any) => (
+                        <div
+                          key={p.id}
+                          className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-bg-secondary text-xs text-text-secondary"
+                          title={p.tier ? `${p.username} · ${p.tier} ${p.rank}` : p.username}
+                        >
+                          <div className="w-4 h-4 rounded-full bg-bg-elevated flex items-center justify-center text-[9px] font-bold">
+                            {p.username[0].toUpperCase()}
+                          </div>
+                          <span className="truncate max-w-[120px]">{p.username}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </>
           )}
 
+          {/* ─── MANUAL 모드 ─── */}
           {mode === 'MANUAL' && (
+            <>
+              {isHost ? (
+                <div className="space-y-2 mb-6">
+                  {(participants ?? []).map((p: any) => {
+                    const isSelected = selectedCaptains.includes(p.id);
+                    return (
+                      <div
+                        key={p.id}
+                        className={cn(
+                          'flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all',
+                          isSelected
+                            ? 'border-accent-primary bg-accent-primary/10'
+                            : 'border-bg-tertiary bg-bg-secondary hover:border-accent-primary/50',
+                        )}
+                        onClick={() => {
+                          setSelectedCaptains(prev =>
+                            prev.includes(p.id)
+                              ? prev.filter(id => id !== p.id)
+                              : prev.length < requiredCount ? [...prev, p.id] : prev
+                          );
+                        }}
+                      >
+                        <div className="w-8 h-8 rounded-full bg-bg-elevated flex items-center justify-center text-sm font-bold text-text-primary flex-shrink-0">
+                          {p.username[0].toUpperCase()}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <span className="font-medium text-text-primary truncate block">{p.username}</span>
+                          {p.tier && <span className="text-xs text-text-tertiary">{p.tier} {p.rank} · MMR {p.mmr}</span>}
+                        </div>
+                        {isSelected && <Check className="w-4 h-4 text-accent-primary flex-shrink-0" />}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                /* 비방장: 대기 화면 */
+                <Card className="mb-6">
+                  <CardContent className="p-8 text-center">
+                    <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-accent-primary/10 mb-3">
+                      <Users className="w-6 h-6 text-accent-primary animate-pulse" />
+                    </div>
+                    <p className="text-text-primary font-medium mb-1">방장이 팀장을 선택 중입니다</p>
+                    <p className="text-sm text-text-tertiary">잠시만 기다려주세요...</p>
+                  </CardContent>
+                </Card>
+              )}
+            </>
+          )}
+
+          {/* 방장 마감/확정 버튼 */}
+          {mode === 'VOLUNTEER' && isHost && (
+            <div className="flex justify-center">
+              <Button
+                onClick={() => finalizeVolunteers(auctionId, tooManyVolunteers ? selectedCaptains : undefined)}
+                disabled={tooManyVolunteers && selectedCaptains.length !== requiredCount}
+                size="lg"
+              >
+                <Users className="w-4 h-4 mr-2" />
+                {tooManyVolunteers
+                  ? `${selectedCaptains.length}/${requiredCount}명 선택 후 확정`
+                  : volunteers.length === requiredCount
+                    ? '팀장 확정'
+                    : volunteers.length === 0
+                      ? 'MMR 자동 선정으로 시작'
+                      : `지금 마감 (부족분 MMR 자동)`}
+              </Button>
+            </div>
+          )}
+          {mode === 'MANUAL' && isHost && (
             <div className="flex justify-center">
               <Button
                 onClick={() => selectManualCaptains(auctionId, selectedCaptains)}
-                disabled={!isHost || selectedCaptains.length !== requiredCount}
+                disabled={selectedCaptains.length !== requiredCount}
+                size="lg"
               >
                 <Check className="w-4 h-4 mr-2" />
                 팀장 {selectedCaptains.length}/{requiredCount}명 확정
