@@ -34,11 +34,34 @@
 
 ## 핵심 인프라 (중간 작업량)
 
-- [ ] Task 5: 빌드를 GitHub-hosted runner로 이전
-  - 현재 self-hosted runner가 서버 본체에서 빌드 → 메모리/디스크 압박 + 빌드 실패 = 서버 셧다운
-  - 빌드는 GitHub Actions ubuntu-latest 에서 → ghcr.io 푸시 → self-hosted runner는 `docker pull && docker compose up -d` 만
-  - **위치**: `.github/workflows/ci.yml`, `deploy.yml`, `docker-compose.prod.yml` (이미지 참조)
-  - **효과**: 서버는 빌드 부하 0, 디스크 사용량 안정, 운영 영향 거의 없음
+- [ ] Task 5: 빌드를 GitHub-hosted runner로 이전 ★ **구조적 원인** — 최우선
+  - **현재 구조의 문제**:
+    - `deploy.yml` 이 self-hosted (= 운영 서버) 위에서 `docker compose build` 실행
+    - 매 빌드마다 nexus-api(~1.5GB) + nexus-web(~1GB) 이미지 layer 가 `/var/lib/containerd/...` 누적
+    - 기존 `docker image prune -f` 는 dangling layer 만 정리 → 옛 tagged 이미지 잔재는 안 지움 → 디스크 무한 누적
+    - Next.js 빌드는 메모리 1.5~2GB 스파이크 → swap 없으면 OOM-killer 발동 → sshd/tailscaled 사망 → 원격 복구 차단
+    - 빌드와 운영 컨테이너가 같은 disk/RAM 공유 → 빌드가 운영 죽임
+    - 2026-05-09 사고 = 디스크 I/O 에러(`mkdir ... input/output error`) → web/nginx 다운 → SSH 거부 → 원격 복구 불가 = 이 구조의 직접적 결과
+  - **변경 후 구조**:
+    ```
+    GitHub push
+        ↓
+    ci.yml (ubuntu-latest):  lint + test + Docker 이미지 빌드 + GHCR push
+        ↓
+    deploy.yml (self-hosted): docker compose pull + up -d 만
+    ```
+  - **변경 파일**:
+    1. `.github/workflows/ci.yml` — Docker buildx + GHCR 푸시 추가, `permissions: { packages: write }` 부여
+    2. `.github/workflows/deploy.yml` — `build` step 제거, `docker compose pull && up -d` 만
+    3. `docker-compose.prod.yml` — api/web 서비스에 `image: ghcr.io/mintscrew-bar/project_nexus/{api,web}:latest` 추가 (build 는 로컬 dev 폴백으로 유지)
+    4. (선택) `.github/workflows/ci.yml` 의 `docker/login-action@v3` + `docker/build-push-action@v5` 사용
+  - **효과**:
+    - 운영 서버 빌드 부하 0 (디스크/메모리 모두)
+    - 빌드 실패해도 운영 영향 0
+    - 디스크 누적 사라짐 (이미지는 GHCR 측에서 관리)
+    - GitHub-hosted runner 무료 (public repo 무제한, private 도 월 2,000분)
+    - GHCR 무료 (public package 무제한)
+  - **예상 작업 시간**: 30~60분 (워크플로우 작성 + GHCR 권한 + docker-compose 수정 + 첫 배포 검증)
 
 - [ ] Task 6: tailscaled 자동 재시작
   - Tailscale 데몬이 행 걸리면 SSH 못 함 = 원격 복구 채널 단절
