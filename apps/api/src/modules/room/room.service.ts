@@ -673,9 +673,28 @@ export class RoomService {
         );
       }
 
+      // 게임 진행 중에 호스트가 명시적으로 나갈 경우, 다음 실제 유저(또는 임의 참가자)에게 호스트 이양.
+      // 참가자 슬롯은 보존되지만 호스트 권한이 사라지면 방 운영(시작/강퇴/중단 등) 자체가 막힘.
+      let newHostId: string | null = null;
+      if (room.hostId === userId) {
+        const nextHost =
+          remainingParticipants.find(
+            (p: any) => !/^testbot_\d+$/.test(p.user?.username || ""),
+          ) ?? remainingParticipants[0];
+        if (nextHost) {
+          await this.prisma.room.update({
+            where: { id: roomId },
+            data: { hostId: nextHost.userId },
+          });
+          newHostId = nextHost.userId;
+        }
+      }
+
       return {
         message: "Left realtime session, participant preserved",
+        preserved: true,
         remainingRealCount: realRemaining.length,
+        newHostId,
       };
     }
 

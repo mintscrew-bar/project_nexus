@@ -191,6 +191,14 @@ export class RoomGateway
             );
             if (newHostId) {
               this.server.to(roomId).emit("host-changed", { newHostId });
+              // host-changed 만으로는 클라 currentRoom.hostId 가 갱신되지 않으므로
+              // 변경된 방 전체를 함께 푸시해 "방장" 배지/권한 UI 정합성 확보.
+              try {
+                const updatedRoom = await this.roomService.getRoomById(roomId);
+                this.server.to(roomId).emit("room-updated", updatedRoom);
+              } catch {
+                // 조회 실패 시 host-changed 만으로 폴백
+              }
             }
           } catch {
             // best-effort — 무시
@@ -358,7 +366,10 @@ export class RoomGateway
         return { error: "Unauthorized" };
       }
 
-      await this.roomService.leaveRoom(client.userId!, data.roomId); // Assert client.userId is string
+      const leaveResult: any = await this.roomService.leaveRoom(
+        client.userId!,
+        data.roomId,
+      ); // Assert client.userId is string
 
       // 명시적 나가기 시 grace 예약 취소
       const graceKey = `${client.userId}:${data.roomId}`;
@@ -372,11 +383,28 @@ export class RoomGateway
       client.leave(data.roomId);
       this.socketRooms.delete(client.id);
 
-      // Notify others
-      this.server.to(data.roomId).emit("user-left", {
-        userId: client.userId,
-        username: client.username,
-      });
+      // 참가자 슬롯이 보존된 경우(게임 진행 중)에는 다른 클라이언트에 user-left 알리지 않음.
+      // user-left 를 받으면 클라 화면에서 해당 참가자가 사라져 실제 DB 상태(보존됨)와 어긋남.
+      if (!leaveResult?.preserved) {
+        this.server.to(data.roomId).emit("user-left", {
+          userId: client.userId,
+          username: client.username,
+        });
+      }
+
+      // 호스트 이양이 발생했으면 변경된 방 데이터를 모두에게 푸시.
+      // host-changed 만 발행하면 클라 currentRoom.hostId 가 갱신되지 않아 "방장" 표시가 어긋남.
+      if (leaveResult?.newHostId) {
+        this.server.to(data.roomId).emit("host-changed", {
+          newHostId: leaveResult.newHostId,
+        });
+        try {
+          const updatedRoom = await this.roomService.getRoomById(data.roomId);
+          this.server.to(data.roomId).emit("room-updated", updatedRoom);
+        } catch {
+          // 방이 그 사이 삭제됐거나 조회 실패 — host-changed 만으로 fallback
+        }
+      }
 
       // Clear typing status when user explicitly leaves
       this.stopTyping(data.roomId, client.userId!); // Assert client.userId is string
@@ -384,7 +412,7 @@ export class RoomGateway
       // 퇴장 시 참가자 수 변경 → 방 요약 delta 전송
       this.broadcastRoomDelta("update", data.roomId);
 
-      return { success: true };
+      return { success: true, preserved: !!leaveResult?.preserved };
     } catch (error: any) {
       return { error: error.message };
     }
