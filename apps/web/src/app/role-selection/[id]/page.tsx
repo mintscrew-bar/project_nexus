@@ -6,7 +6,7 @@ import { useRoleSelectionStore } from "@/stores/role-selection-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { roomApi } from "@/lib/api-client";
 import { GameChatPanel } from "@/components/domain/GameChatPanel";
-import { LoadingSpinner, Badge, Avatar, Button } from "@/components/ui";
+import { LoadingSpinner, Badge, Avatar, Button, ConfirmModal } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
 import { Clock, Check, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -30,6 +30,7 @@ export default function RoleSelectionPage() {
   const { user } = useAuthStore();
   const hasRedirected = useRef(false);
   const [isAborting, setIsAborting] = useState(false);
+  const [isAbortConfirmOpen, setIsAbortConfirmOpen] = useState(false);
 
   const {
     room,
@@ -71,12 +72,10 @@ export default function RoleSelectionPage() {
     return () => clearTimeout(timer);
   }, [sessionAbortedAt, sessionAbortMessage, clearSessionAbort, addToast, router, roomId]);
 
-  const handleAbortToLobby = async () => {
-    const confirmed = window.confirm(
-      "현재 판을 종료하고 대기실로 돌아가시겠습니까? 이 판은 전적에 반영되지 않습니다.",
-    );
-    if (!confirmed) return;
+  const handleAbortToLobby = () => setIsAbortConfirmOpen(true);
 
+  const handleAbortConfirm = async () => {
+    setIsAbortConfirmOpen(false);
     setIsAborting(true);
     try {
       await roomApi.abortToLobby(roomId);
@@ -138,6 +137,17 @@ export default function RoleSelectionPage() {
 
   return (
     <div className="flex-grow p-4 md:p-8">
+      <ConfirmModal
+        isOpen={isAbortConfirmOpen}
+        onClose={() => setIsAbortConfirmOpen(false)}
+        onConfirm={handleAbortConfirm}
+        title="내전 종료"
+        message="현재 판을 종료하고 대기실로 돌아가시겠습니까? 이 판은 전적에 반영되지 않습니다."
+        confirmText="종료"
+        cancelText="취소"
+        variant="danger"
+        isLoading={isAborting}
+      />
       <div className="container mx-auto max-w-5xl">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">

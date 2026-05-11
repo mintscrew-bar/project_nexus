@@ -7,7 +7,7 @@ import { useAuthStore } from "@/stores/auth-store";
 import { roomApi } from "@/lib/api-client";
 import { AuctionBoard } from "@/components/domain";
 import { TierBadge } from "@/components/domain";
-import { LoadingSpinner, Badge, Button, Card, CardContent } from "@/components/ui";
+import { LoadingSpinner, Badge, Button, Card, CardContent, ConfirmModal } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
 import { GameChatPanel } from "@/components/domain/GameChatPanel";
 import { cn } from "@/lib/utils";
@@ -117,6 +117,7 @@ export default function AuctionRoomPage() {
   const [selectedCaptains, setSelectedCaptains] = useState<string[]>([]);
   const [volunteerTimer, setVolunteerTimer] = useState(0);
   const [isAborting, setIsAborting] = useState(false);
+  const [isAbortConfirmOpen, setIsAbortConfirmOpen] = useState(false);
   // 모바일 탭: "auction" | "players" | "log"
   const [mobileTab, setMobileTab] = useState<"auction" | "players" | "log">("auction");
   // 경매 완료 결과 화면 카운트다운
@@ -197,12 +198,10 @@ export default function AuctionRoomPage() {
     logEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [bidHistory.length]);
 
-  const handleAbortToLobby = async () => {
-    const confirmed = window.confirm(
-      "현재 판을 종료하고 대기실로 돌아가시겠습니까? 이 판은 전적에 반영되지 않습니다.",
-    );
-    if (!confirmed) return;
+  const handleAbortToLobby = () => setIsAbortConfirmOpen(true);
 
+  const handleAbortConfirm = async () => {
+    setIsAbortConfirmOpen(false);
     setIsAborting(true);
     try {
       await roomApi.abortToLobby(auctionId);
@@ -638,6 +637,17 @@ export default function AuctionRoomPage() {
 
   return (
     <div className="flex-grow p-4 md:p-6 relative">
+      <ConfirmModal
+        isOpen={isAbortConfirmOpen}
+        onClose={() => setIsAbortConfirmOpen(false)}
+        onConfirm={handleAbortConfirm}
+        title="내전 종료"
+        message="현재 판을 종료하고 대기실로 돌아가시겠습니까? 이 판은 전적에 반영되지 않습니다."
+        confirmText="종료"
+        cancelText="취소"
+        variant="danger"
+        isLoading={isAborting}
+      />
       {/* 상단 바 */}
       <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
         <Button
