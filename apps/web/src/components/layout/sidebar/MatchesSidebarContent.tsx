@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
 import { Search, Clock, User, Star, ChevronRight, Trophy } from 'lucide-react';
-import { riotApi } from '@/lib/api-client';
+import { riotApi, ensureValidToken } from '@/lib/api-client';
 import { useAuthStore } from '@/stores/auth-store';
 import { getTierImage } from '@/components/matches/match-utils';
 import Image from 'next/image';
@@ -31,17 +32,36 @@ interface RiotAccount {
 
 export function MatchesSidebarContent() {
   const router = useRouter();
-  const { isAuthenticated } = useAuthStore();
-  const [accounts, setAccounts] = useState<RiotAccount[]>([]);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const isLoading = useAuthStore((s) => s.isLoading);
+  const setUser = useAuthStore((s) => s.setUser);
   const [recentSearches, setRecentSearches] = useState<RecentSearch[]>([]);
 
-  // 내 연동 계정 불러오기
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    riotApi.getAccounts().then((data: RiotAccount[]) => {
-      setAccounts(data || []);
-    }).catch(() => {});
-  }, [isAuthenticated]);
+  // 내 연동 계정 — react-query 로 캐싱/중복호출 방지.
+  // 인증 초기화(isLoading) 완료 후, 그리고 access token 이 유효할 때만 호출하여
+  // 만료 토큰으로 인한 401 노이즈 방지.
+  const { data: accounts = [] } = useQuery<RiotAccount[]>({
+    queryKey: ["sidebar", "riotAccounts"],
+    queryFn: async () => {
+      // 토큰 미리 검증 → 만료/없음이면 호출 자체를 안 함 (401 노이즈 방지)
+      const token = await ensureValidToken();
+      if (!token) {
+        // refresh 도 실패한 상태 → 로컬 인증 상태 동기화
+        setUser(null);
+        return [];
+      }
+      try {
+        const data = await riotApi.getAccounts();
+        return data || [];
+      } catch (err: any) {
+        if (err?.response?.status === 401) setUser(null);
+        return [];
+      }
+    },
+    enabled: !isLoading && isAuthenticated,
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  });
 
   // 최근 검색 불러오기 (localStorage, matches 페이지와 동일한 키)
   useEffect(() => {

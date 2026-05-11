@@ -74,9 +74,9 @@ export interface NexusMatchHistory {
   matchId: string;
   match: {
     id: string;
-    teamA: { id: string; name: string };
-    teamB: { id: string; name: string };
-    winner: { id: string; name: string };
+    teamA: { id: string; name: string } | null;
+    teamB: { id: string; name: string } | null;
+    winner: { id: string; name: string } | null;
     completedAt: string;
   };
   participant: {
@@ -90,11 +90,12 @@ export interface NexusMatchHistory {
     kda: number;
     damage?: number;  // 내전 딜량 — 백엔드 totalDamageDealtToChampions (#23)
   };
+  // 참가자의 팀이 미배정(teamId=null)인 경우 null 가능
   team: {
     id: string;
     name: string;
     color: string;
-  };
+  } | null;
 }
 
 // ─── Queue Tabs ──────────────────────────────────────

@@ -72,9 +72,11 @@ function CommunityPageContent() {
   });
 
   // ── React Query: ALL 모드 — 4개 카테고리 병렬 조회 (대문 카드용) ──
+  // ⚠️ queryKey 에 "CARD" 마커를 넣어야 함. 안 그러면 단일 카테고리 query(현재 페이지=1)와
+  // key 가 충돌하여 단일 모드가 캐시된 Post[] 를 받고 feedData?.posts === undefined → "게시글 없음" 버그
   const categoryQueries = useQueries({
     queries: CATEGORY_KEYS.map((category) => ({
-      queryKey: ["communityPosts", category, apiSortBy, debouncedSearch, selectedTag, 1],
+      queryKey: ["communityPosts", "CARD", category, apiSortBy, debouncedSearch, selectedTag, 1],
       queryFn: async () => {
         const data = await communityApi.getPosts({
           category,

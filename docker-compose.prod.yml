@@ -31,10 +31,12 @@ services:
       retries: 10
 
   api:
+    # 운영: GHCR에서 pull. 로컬 dev 폴백용으로 build 섹션은 유지.
+    # 롤백 시: IMAGE_TAG=<commit-sha> docker compose -f docker-compose.prod.yml up -d
+    image: ghcr.io/mintscrew-bar/project_nexus/api:${IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: apps/api/Dockerfile
-    image: nexus-api:latest
     container_name: nexus-api
     restart: unless-stopped
     env_file:
@@ -63,6 +65,8 @@ services:
       start_period: 60s
 
   web:
+    # 운영: GHCR에서 pull. 로컬 dev 폴백용으로 build 섹션은 유지.
+    image: ghcr.io/mintscrew-bar/project_nexus/web:${IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: apps/web/Dockerfile
@@ -70,7 +74,6 @@ services:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:?NEXT_PUBLIC_API_URL is required}
         # Next.js rewrites destination — 컴포즈 내부 호스트명 사용
         API_URL: http://api:4000
-    image: nexus-web:latest
     container_name: nexus-web
     restart: unless-stopped
     environment:

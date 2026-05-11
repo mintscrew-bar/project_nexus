@@ -11,22 +11,56 @@ jobs:
     name: Deploy to self-hosted
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: self-hosted
-    timeout-minutes: 30
+    timeout-minutes: 15
     env:
       NEXUS_ENV_FILE: /home/haru/projects/nexus/.env.production
+      # 디스크 사용률이 이 값을 넘으면 배포 중단. 90% 면 약 5~10GB 여유 남는 시점.
+      DISK_USAGE_LIMIT: 90
 
     steps:
       - name: 코드 체크아웃
         uses: actions/checkout@v4
 
-      - name: 이미지 빌드
+      # 배포 전 디스크 게이트 — 디스크 풀로 CD 자체가 죽는 사고 방지.
+      # 한도 초과 시 배포를 abort 하고, 정리 명령을 에러 메시지에 노출.
+      - name: 디스크 여유 체크 (배포 전 게이트)
         run: |
-          docker compose -f docker-compose.prod.yml --env-file /home/haru/projects/nexus/.env.production build
+          USAGE=$(df --output=pcent / | tail -1 | tr -dc '0-9')
+          echo "현재 / 사용률: ${USAGE}% (한도: ${DISK_USAGE_LIMIT}%)"
+          df -h /
+          if [ "$USAGE" -ge "$DISK_USAGE_LIMIT" ]; then
+            echo "::error::디스크 사용률 ${USAGE}% ≥ ${DISK_USAGE_LIMIT}% — 배포 중단"
+            echo "::error::복구: docker builder prune -a -f && docker system prune -a -f"
+            exit 1
+          fi
+
+      # GHCR private 패키지 pull 권한. public 으로 바꾸면 이 단계는 생략 가능.
+      - name: GHCR 로그인
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      # 운영 서버에서는 더 이상 빌드하지 않음 — GHCR 에서 최신 이미지만 받음.
+      # api/web 만 명시적으로 pull (postgres/redis/nginx/cloudflared/kuma 는 docker.io 캐시 사용)
+      - name: 최신 이미지 pull
+        run: |
+          docker compose -f docker-compose.prod.yml --env-file /home/haru/projects/nexus/.env.production pull api web
 
       - name: 컨테이너 재시작
         run: |
           docker compose -f docker-compose.prod.yml --env-file /home/haru/projects/nexus/.env.production up -d
 
-      - name: 미사용 이미지 정리
+      # 강화된 정리. 배포 성공/실패와 무관하게 항상 실행.
+      # - image -a: 컨테이너가 안 쓰는 모든 image (옛 SHA 포함). 실행 중 컨테이너 image 는 자동 보호.
+      # - builder prune: BuildKit 빌드 캐시. 운영 서버에선 빌드 안 하지만 잔재/오염 방지 안전망.
+      # - container prune: 종료된 컨테이너 흔적.
+      - name: 미사용 리소스 정리
+        if: always()
         run: |
-          docker image prune -f
+          echo "=== 정리 전 ==="
+          docker system df
+          docker image prune -a -f
+          docker builder prune -a -f || true
+          docker container prune -f
+          echo "=== 정리 후 ==="
+          docker system df
+          df -h /

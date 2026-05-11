@@ -415,7 +415,7 @@ export default function UserStatsPage() {
                             {getChampionKoreanName(match.participant.championName)}
                           </p>
                           <p className="text-xs text-text-tertiary">
-                            {match.team.name}
+                            {match.team?.name ?? "팀 미배정"}
                           </p>
                         </div>
                       </div>
