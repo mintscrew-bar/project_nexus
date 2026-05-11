@@ -32,6 +32,13 @@ const stopLocalCountdown = () => {
   }
 };
 
+const getSecondsUntil = (timerEndAt?: number | null, fallbackMs?: number) => {
+  if (timerEndAt) {
+    return Math.max(0, Math.ceil((timerEndAt - Date.now()) / 1000));
+  }
+  return fallbackMs ? Math.ceil(fallbackMs / 1000) : 15;
+};
+
 interface TeamMember {
   id: string;
   userId: string;
@@ -62,6 +69,7 @@ interface RoleSelectionState {
   isConnected: boolean;
   isLoading: boolean;
   isCompleted: boolean;
+  navigationTarget: string | null;
   error: string | null;
   sessionAbortedAt: number | null;
   sessionAbortMessage: string | null;
@@ -78,6 +86,7 @@ export const useRoleSelectionStore = create<RoleSelectionState>((set) => ({
   isConnected: false,
   isLoading: true,
   isCompleted: false,
+  navigationTarget: null,
   error: null,
   sessionAbortedAt: null,
   sessionAbortMessage: null,
@@ -87,6 +96,7 @@ export const useRoleSelectionStore = create<RoleSelectionState>((set) => ({
       isLoading: true,
       error: null,
       isCompleted: false,
+      navigationTarget: null,
       sessionAbortedAt: null,
       sessionAbortMessage: null,
     });
@@ -99,9 +109,10 @@ export const useRoleSelectionStore = create<RoleSelectionState>((set) => ({
     const doJoin = (isReconnect = false) => {
       roleSelectionSocketHelpers.joinRoom(roomId).then((response: any) => {
         if (response?.success) {
-          const initialSeconds = response.timeRemaining
-            ? Math.ceil(response.timeRemaining / 1000)
-            : 15;
+          const initialSeconds = getSecondsUntil(
+            response.timerEndAt,
+            response.timeRemaining,
+          );
           set({
             room: response.room ?? null,
             timeRemaining: initialSeconds,
@@ -164,10 +175,14 @@ export const useRoleSelectionStore = create<RoleSelectionState>((set) => ({
       },
     );
 
-    roleSelectionSocketHelpers.onTimerTick((data: { timeRemaining: number }) => {
+    roleSelectionSocketHelpers.onTimerTick((data: { timeRemaining: number; timerEndAt?: number | null }) => {
       // 서버 5초 보정 tick 수신 시 로컬 카운트다운을 서버 값으로 재동기화
-      const syncedSeconds = Math.ceil(data.timeRemaining / 1000);
+      const syncedSeconds = getSecondsUntil(data.timerEndAt, data.timeRemaining);
       startLocalCountdown(syncedSeconds, set);
+    });
+
+    roleSelectionSocketHelpers.onRoleSelectionNavigation((data) => {
+      set({ navigationTarget: data.target });
     });
 
     roleSelectionSocketHelpers.onRoleSelectionCompleted(() => {
@@ -199,6 +214,7 @@ export const useRoleSelectionStore = create<RoleSelectionState>((set) => ({
       timeRemaining: 15,
       isLoading: false,
       isCompleted: false,
+      navigationTarget: null,
       error: null,
       sessionAbortedAt: null,
       sessionAbortMessage: null,

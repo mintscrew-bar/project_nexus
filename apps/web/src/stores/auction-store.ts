@@ -6,6 +6,8 @@ import {
   auctionSocketHelpers,
 } from '@/lib/socket-client';
 
+let bidErrorToken = 0;
+
 interface Player {
   id: string;
   username: string;
@@ -84,6 +86,7 @@ interface AuctionStoreState {
   sessionAbortMessage: string | null;
   /** 최근 낙찰 정보 (피드백 표시용, 일정 시간 후 자동 클리어) */
   lastSoldEvent: { playerName: string; teamName: string; price: number; timestamp: number } | null;
+  processedSoldPlayerIds: Set<string>;
 
   // REST API methods
   startAuction: (roomId: string) => Promise<void>;
@@ -186,6 +189,7 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
   sessionAbortedAt: null,
   sessionAbortMessage: null,
   lastSoldEvent: null,
+  processedSoldPlayerIds: new Set(),
 
   startAuction: async (roomId: string) => {
     set({ isLoading: true, error: null });
@@ -246,6 +250,10 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
       }));
     });
 
+    auctionSocketHelpers.onVolunteerFinalized(() => {
+      set({ captainSelectionPhase: null });
+    });
+
     auctionSocketHelpers.onCaptainsConfirmed(() => {
       set({ captainSelectionPhase: null });
     });
@@ -259,6 +267,7 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
         teams: data.teams ?? [],
         players: nextPlayers,
         captainSelectionPhase: null,
+        processedSoldPlayerIds: new Set(),
       });
     });
 
@@ -282,10 +291,12 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
     // bid-resolved에 teams/players가 없는 레거시 호환용으로만 동작
     auctionSocketHelpers.onPlayerSold((data: any) => {
       set((state) => {
-        // bid-resolved가 이미 lastSoldEvent를 설정했으면 중복 처리 스킵
-        if (state.lastSoldEvent && Date.now() - state.lastSoldEvent.timestamp < 2000) {
+        const playerId = data?.player?.id;
+        if (playerId && state.processedSoldPlayerIds.has(playerId)) {
           return state;
         }
+        const processedSoldPlayerIds = new Set(state.processedSoldPlayerIds);
+        if (playerId) processedSoldPlayerIds.add(playerId);
 
         const nextPlayers = data?.player
           ? state.players.filter((p) => p.id !== data.player.id)
@@ -300,6 +311,7 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
         return {
           teams: nextTeams,
           players: nextPlayers,
+          processedSoldPlayerIds,
           auctionState: state.auctionState
             ? normalizeAuctionState(state.auctionState, nextPlayers)
             : null,
@@ -359,6 +371,9 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
           updates.auctionState = normalizeAuctionState(data.state, nextPlayers);
         }
         if (data.sold && data.team) {
+          const processedSoldPlayerIds = new Set(state.processedSoldPlayerIds);
+          if (data.player?.id) processedSoldPlayerIds.add(data.player.id);
+          updates.processedSoldPlayerIds = processedSoldPlayerIds;
           updates.teams = nextTeams.map(t =>
             t.id === data.team.id ? { ...t, ...data.team } : t
           );
@@ -459,7 +474,21 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
         joinResponse?.error === "connect_timeout")
     ) {
       if ((get().auctionState || get().teams.length > 0) && socket?.connected) {
-        set({ isConnected: true, isLoading: false, error: null });
+        try {
+          const fallbackState = await auctionApi.getAuctionState(roomId);
+          if (fallbackState?.state) {
+            set((state) => ({
+              auctionState: normalizeAuctionState(fallbackState.state, state.players),
+              isConnected: true,
+              isLoading: false,
+              error: null,
+            }));
+          } else {
+            set({ isConnected: true, isLoading: false, error: null });
+          }
+        } catch {
+          set({ isConnected: true, isLoading: false, error: null });
+        }
         return;
       }
       joinResponse = await auctionSocketHelpers.joinAuction(roomId);
@@ -468,6 +497,7 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
     if (joinResponse?.success) {
       let nextPlayers = Array.isArray(joinResponse.players) ? joinResponse.players : [];
       let nextTeams = Array.isArray(joinResponse.teams) ? joinResponse.teams : [];
+      let nextAuctionState = joinResponse.state;
 
       if ((nextTeams.length === 0 || nextPlayers.length === 0) && joinResponse.state) {
         try {
@@ -475,20 +505,23 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
           const fallback = mapRoomFallbackData(room);
           if (nextTeams.length === 0) nextTeams = fallback.teams;
           if (nextPlayers.length === 0) nextPlayers = fallback.players;
+          const fallbackState = await auctionApi.getAuctionState(roomId);
+          if (fallbackState?.state) nextAuctionState = fallbackState.state;
         } catch (fallbackErr) {
           // 폴백 REST 호출 실패 — 소켓 페이로드 그대로 유지 (로그만 출력)
           console.error('[auction-store] REST fallback failed:', fallbackErr);
         }
       }
 
-      const nextState = normalizeAuctionState(joinResponse.state, nextPlayers);
+      const nextState = normalizeAuctionState(nextAuctionState, nextPlayers);
       const restoredPhase = joinResponse.captainSelectionPhase ?? null;
       set({
         players: nextPlayers,
         teams: nextTeams,
         auctionState: nextState,
-        captainSelectionPhase: restoredPhase,
-        isConnected: true,
+          captainSelectionPhase: restoredPhase,
+          processedSoldPlayerIds: new Set(),
+          isConnected: true,
         isLoading: false,
         error: null,
       });
@@ -521,6 +554,7 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
       sessionAbortedAt: null,
       sessionAbortMessage: null,
       lastSoldEvent: null,
+      processedSoldPlayerIds: new Set(),
     });
   },
 
@@ -533,10 +567,11 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
       const msg = response.error === 'bid_timeout'
         ? '입찰 요청 시간이 초과되었습니다.'
         : response.error;
+      const token = ++bidErrorToken;
       set({ error: msg });
       // Auto-clear bid error after 3 seconds (다른 에러로 교체된 경우엔 클리어 안 함)
       setTimeout(() => {
-        if (get().error === msg) set({ error: null });
+        if (bidErrorToken === token && get().error === msg) set({ error: null });
       }, 3000);
     }
   },

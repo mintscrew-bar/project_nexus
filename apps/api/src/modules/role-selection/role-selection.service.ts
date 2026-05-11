@@ -7,7 +7,7 @@ import {
   forwardRef,
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
-import { RoomStatus, Role } from "@nexus/database";
+import { Prisma, RoomStatus, Role } from "@nexus/database";
 import { MatchService } from "../match/match.service";
 
 const ROLE_SELECTION_TIME_MS = 15000; // 15 seconds (roles are auto-assigned by preference)
@@ -27,6 +27,29 @@ export class RoleSelectionService {
     @Inject(forwardRef(() => MatchService))
     private readonly matchService: MatchService,
   ) {}
+
+  /**
+   * 역할 동시 선택 충돌(P2034) 발생 시 직렬화 트랜잭션을 재시도한다.
+   */
+  private async runSerializableTx<T>(
+    fn: (tx: Prisma.TransactionClient) => Promise<T>,
+    maxRetries = 3,
+  ): Promise<T> {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        return await this.prisma.$transaction(fn, {
+          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+        });
+      } catch (error: any) {
+        if (error?.code === "P2034" && attempt < maxRetries) {
+          continue;
+        }
+        throw error;
+      }
+    }
+
+    throw new BadRequestException("트랜잭션 재시도 한도를 초과했습니다.");
+  }
 
   // ========================================
   // Role Selection Initialization
@@ -86,97 +109,104 @@ export class RoleSelectionService {
   // ========================================
 
   async selectRole(userId: string, roomId: string, role: Role) {
-    const room = await this.prisma.room.findUnique({
-      where: { id: roomId },
-      include: {
-        teams: {
-          include: {
-            members: {
-              include: {
-                user: true,
+    return this.runSerializableTx(async (tx) => {
+      const room = await tx.room.findUnique({
+        where: { id: roomId },
+        include: {
+          teams: {
+            include: {
+              members: {
+                include: {
+                  user: true,
+                },
               },
             },
           },
         },
-      },
-    });
+      });
 
-    if (!room) {
-      throw new NotFoundException("Room not found");
-    }
-
-    if (room.status !== RoomStatus.ROLE_SELECTION) {
-      throw new BadRequestException("Room is not in role selection phase");
-    }
-
-    // Find the user's team
-    let userTeam = null;
-    let userTeamMember = null;
-
-    for (const team of room.teams) {
-      const member = team.members.find(
-        (m: (typeof team.members)[number]) => m.userId === userId,
-      );
-      if (member) {
-        userTeam = team;
-        userTeamMember = member;
-        break;
+      if (!room) {
+        throw new NotFoundException("Room not found");
       }
-    }
 
-    if (!userTeam || !userTeamMember) {
-      throw new ForbiddenException("User is not a member of any team");
-    }
+      if (room.status !== RoomStatus.ROLE_SELECTION) {
+        throw new BadRequestException("Room is not in role selection phase");
+      }
 
-    // updateMany의 중첩 where로 원자적 체크+업데이트:
-    // 같은 팀에 이미 동일 역할을 가진 다른 멤버가 있으면 count=0 반환
-    const updateResult = await this.prisma.teamMember.updateMany({
-      where: {
-        id: userTeamMember.id,
-        team: {
-          members: {
-            none: {
-              assignedRole: role,
-              id: { not: userTeamMember.id },
+      // Find the user's team
+      let userTeam = null;
+      let userTeamMember = null;
+
+      for (const team of room.teams) {
+        const member = team.members.find(
+          (m: (typeof team.members)[number]) => m.userId === userId,
+        );
+        if (member) {
+          userTeam = team;
+          userTeamMember = member;
+          break;
+        }
+      }
+
+      if (!userTeam || !userTeamMember) {
+        throw new ForbiddenException("User is not a member of any team");
+      }
+
+      // Serializable 트랜잭션 안에서 체크+업데이트:
+      // 같은 팀에 이미 동일 역할을 가진 다른 멤버가 있으면 count=0 반환.
+      // 동시에 같은 역할을 고른 경우 한쪽 트랜잭션은 P2034로 재시도되고,
+      // 재시도 시 이미 선점된 역할이므로 count=0이 된다.
+      const updateResult = await tx.teamMember.updateMany({
+        where: {
+          id: userTeamMember.id,
+          team: {
+            members: {
+              none: {
+                assignedRole: role,
+                id: { not: userTeamMember.id },
+              },
             },
           },
         },
-      },
-      data: { assignedRole: role },
+        data: { assignedRole: role },
+      });
+
+      if (updateResult.count === 0) {
+        throw new BadRequestException(
+          `Role ${role} is already taken by another team member`,
+        );
+      }
+
+      // updateMany는 include를 지원하지 않으므로 업데이트 후 재조회
+      const updatedMember = await tx.teamMember.findUnique({
+        where: { id: userTeamMember.id },
+        include: { user: true },
+      });
+
+      if (!updatedMember) {
+        throw new NotFoundException("Team member not found after update");
+      }
+
+      // Check if all roles are selected against the same serialized snapshot
+      const allRolesSelected = await this.checkAllRolesSelected(roomId, tx);
+
+      return {
+        member: updatedMember,
+        teamId: userTeam.id,
+        allRolesSelected,
+      };
     });
-
-    if (updateResult.count === 0) {
-      throw new BadRequestException(
-        `Role ${role} is already taken by another team member`,
-      );
-    }
-
-    // updateMany는 include를 지원하지 않으므로 업데이트 후 재조회
-    const updatedMember = await this.prisma.teamMember.findUnique({
-      where: { id: userTeamMember.id },
-      include: { user: true },
-    });
-
-    if (!updatedMember) {
-      throw new NotFoundException("Team member not found after update");
-    }
-
-    // Check if all roles are selected
-    const allRolesSelected = await this.checkAllRolesSelected(roomId);
-
-    return {
-      member: updatedMember,
-      teamId: userTeam.id,
-      allRolesSelected,
-    };
   }
 
   // ========================================
   // Completion Check
   // ========================================
 
-  async checkAllRolesSelected(roomId: string): Promise<boolean> {
-    const room = await this.prisma.room.findUnique({
+  async checkAllRolesSelected(
+    roomId: string,
+    tx: Prisma.TransactionClient | PrismaService = this.prisma,
+  ): Promise<boolean> {
+    const room = await tx.room.findUnique({
       where: { id: roomId },
       include: {
         teams: {
@@ -478,6 +508,7 @@ export class RoleSelectionService {
     return {
       room,
       state,
+      timerEndAt: state?.timerEnd ?? null,
       timeRemaining,
     };
   }

@@ -30,4 +30,9 @@ export class ChatMessagesQueryDto {
   @Min(1, { message: "limit는 1 이상이어야 합니다." })
   @Max(100, { message: "limit는 100 이하여야 합니다." })
   limit?: number = 50;
+
+  @IsOptional()
+  @IsInt({ message: "offset는 정수여야 합니다." })
+  @Min(0, { message: "offset는 0 이상이어야 합니다." })
+  offset?: number = 0;
 }

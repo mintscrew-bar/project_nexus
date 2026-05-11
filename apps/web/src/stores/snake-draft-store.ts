@@ -122,6 +122,22 @@ export const useSnakeDraftStore = create<SnakeDraftStoreState>((set, get) => ({
       sessionAbortMessage: null,
     });
 
+    let isRefetchingDraftState = false;
+    const refetchDraftState = async () => {
+      if (isRefetchingDraftState) return;
+      isRefetchingDraftState = true;
+      try {
+        const fallback = await snakeDraftApi.getDraftState(roomId);
+        if (fallback?.state) {
+          set({ draftState: fallback.state, error: null });
+        }
+      } catch (err: any) {
+        set({ error: err.response?.data?.message || err.message || "Failed to sync draft state." });
+      } finally {
+        isRefetchingDraftState = false;
+      }
+    };
+
     snakeDraftSocketHelpers.onDraftStarted((data: DraftState) => {
       set({ draftState: data });
     });
@@ -133,7 +149,16 @@ export const useSnakeDraftStore = create<SnakeDraftStoreState>((set, get) => ({
       timerEnd: number;
     }) => {
       set((state) => {
-        if (!state.draftState) return state;
+        if (!state.draftState) {
+          void refetchDraftState();
+          return state;
+        }
+
+        const targetTeam = state.draftState.teams.find((team) => team.id === data.teamId);
+        if (!targetTeam || !data.player?.id) {
+          void refetchDraftState();
+          return state;
+        }
 
         const updatedTeams = state.draftState.teams.map((team) =>
           team.id === data.teamId

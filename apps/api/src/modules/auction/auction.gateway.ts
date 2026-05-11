@@ -334,6 +334,10 @@ export class AuctionGateway
 
   /** 팀장 확정 후 경매 시작 이벤트 발행 (room.gateway에서도 호출) */
   async emitCaptainsConfirmedAndStart(roomId: string, result: any) {
+    this.server.to(`room:${roomId}`).emit("volunteer-finalized", {
+      captainUserIds: result.captainUserIds,
+      teams: result.teams,
+    });
     this.server.to(`room:${roomId}`).emit("captains-confirmed", {
       captainUserIds: result.captainUserIds,
       teams: result.teams,
@@ -427,11 +431,6 @@ export class AuctionGateway
     );
     if (isSpectator) {
       return { error: "관전자는 입찰할 수 없습니다." };
-    }
-
-    // resolve 진행 중이면 입찰 차단
-    if (this.resolvingRooms.has(data.roomId)) {
-      return { error: "현재 낙찰 처리 중입니다. 잠시 후 다시 시도해주세요." };
     }
 
     try {
@@ -564,9 +563,15 @@ export class AuctionGateway
         return this._startRoleSelectionWithRetry(roomId, attempt + 1);
       }
       // 모든 재시도 실패 → 호스트에게 수동 시작 안내
+      const message =
+        "역할 선택 시작에 실패했습니다. 호스트가 소켓 이벤트 'retry-role-selection'을 전송해 재시도하세요.";
       this.server.to(`room:${roomId}`).emit("auction-error", {
-        error:
-          "역할 선택 시작에 실패했습니다. 호스트가 소켓 이벤트 'retry-role-selection'을 전송해 재시도하세요.",
+        error: message,
+        retryable: true,
+      });
+      this.roleSelectionGateway.emitRoleSelectionError(roomId, {
+        message,
+        error: message,
         retryable: true,
       });
     }
@@ -625,11 +630,13 @@ export class AuctionGateway
     this._cancelBotTimers(roomId);
 
     const candidates = await this.auctionService.getBotBidCandidates(roomId);
+    const minBid = state.currentHighestBid + state.bidIncrement;
 
     for (const bot of candidates) {
       if (bot.memberCount >= 5) continue;
       // Skip if this bot team is already leading.
       if (state.currentHighestBidder === bot.teamId) continue;
+      if (minBid > bot.availableToBid) continue;
 
       const delay = 2000 + Math.random() * 6000;
       const timerId = setTimeout(() => {
@@ -669,14 +676,11 @@ export class AuctionGateway
     // Avoid self-outbidding current highest bid.
     if (state.currentHighestBidder === bot.teamId) return;
 
-    const bidIncrement = 50;
+    const bidIncrement = state.bidIncrement;
     const minBid = state.currentHighestBid + bidIncrement;
 
     if (bot.memberCount >= 5) return;
     if (minBid > bot.availableToBid) return;
-
-    // resolve 진행 중이면 봇 입찰도 차단
-    if (this.resolvingRooms.has(roomId)) return;
 
     try {
       const newState = await this._withRoomBidLock(roomId, async () => {
@@ -764,6 +768,7 @@ export class AuctionGateway
       return;
     }
 
+    this._cancelBidResolve(roomId);
     this.emitTimerExpired(roomId);
     await this._resolveCurrentBidAndAdvance(roomId);
   }

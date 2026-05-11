@@ -1060,7 +1060,7 @@ export class RoomService {
   // Chat Messages
   // ========================================
 
-  async getChatMessages(roomId: string, limit = 50) {
+  async getChatMessages(roomId: string, limit = 50, offset = 0) {
     return this.prisma.chatMessage.findMany({
       where: { roomId },
       include: {
@@ -1074,6 +1074,7 @@ export class RoomService {
       },
       orderBy: { createdAt: "desc" },
       take: limit,
+      skip: offset,
     });
   }
 

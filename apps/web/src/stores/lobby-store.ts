@@ -178,13 +178,20 @@ export const useLobbyStore = create<LobbyStoreState>((set, get) => ({
     });
 
     // Listen for user join/leave events to update participant list
-    socket.on('user-joined', (data: { userId: string; username: string }) => {
+    socket.on('user-joined', (data: { userId: string; username: string; isReady?: boolean; participant?: Participant }) => {
       const currentRoom = get().room;
       if (currentRoom && !currentRoom.participants.some(p => p.userId === data.userId)) {
+        const participant = data.participant ?? {
+          id: data.userId,
+          userId: data.userId,
+          username: data.username,
+          isHost: false,
+          isReady: data.isReady ?? false,
+        };
         set({
           room: {
             ...currentRoom,
-            participants: [...currentRoom.participants, { id: data.userId, userId: data.userId, username: data.username, isHost: false, isReady: false }],
+            participants: [...currentRoom.participants, participant],
           },
         });
       }
@@ -257,11 +264,10 @@ export const useLobbyStore = create<LobbyStoreState>((set, get) => ({
     if (socket) {
       // roomId를 먼저 캡처 (room이 null이 되기 전에)
       const roomId = room?.id;
-      const roomStatus = room?.status;
 
-      // Emit leave-room before disconnecting for cleaner state management
-      // WAITING 상태일 때만 명시적으로 leave (다른 상태는 백엔드가 알아서 처리)
-      if (roomId && !options?.skipLeave && roomStatus === 'WAITING') {
+      // Emit leave-room for explicit exits. Active games preserve the DB participant slot,
+      // but still need immediate host transfer/socket cleanup instead of waiting for grace timeout.
+      if (roomId && !options?.skipLeave) {
         socket.emit('leave-room', { roomId });
       }
       socket.removeAllListeners();

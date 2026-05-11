@@ -23,13 +23,13 @@ export interface AuctionState {
   roomId: string;
   currentPlayerIndex: number;
   currentHighestBid: number;
-  currentHighestBidder: string | null;
+  currentHighestBidder: string | null; // teamId of the current leading bidder
   currentHighestBidderName?: string | null;
   timerEnd: number;
   yuchalCount: number;
   maxYuchalCycles: number;
   bidIncrement: number;
-  botCaptainIds: string[]; // testbot_* ?좎? ???紐⑸줉 (?먮룞 ?낆같??
+  botCaptainIds: string[]; // captain userIds whose usernames match testbot_*
 }
 
 export interface CaptainSelectionPhase {
@@ -257,7 +257,7 @@ export class AuctionService implements OnModuleInit {
       throw new BadRequestException("Room is not in auction mode");
     }
 
-    // Calculate number of teams (?뚯뒪?? 4紐??댁긽?대㈃ 理쒖냼 2? 蹂댁옣, ?ㅼ쟾 10紐낆씠硫?Math.floor)
+    // Calculate number of teams. Keep at least 2 teams for small test lobbies.
     if (room.participants.length < 4) {
       throw new BadRequestException("Auction mode requires at least 4 players");
     }
@@ -265,7 +265,7 @@ export class AuctionService implements OnModuleInit {
 
     const captainMode = room.captainSelection ?? TeamCaptainSelection.TIER;
 
-    // MANUAL / VOLUNTEER: ????좎젙 ?④퀎 吏꾩엯 (寃쎈ℓ ?쒖옉 蹂대쪟)
+    // MANUAL / VOLUNTEER enter captain selection first and defer auction start.
     if (captainMode === TeamCaptainSelection.MANUAL) {
       await this.prisma.room.update({
         where: { id: roomId },
@@ -339,7 +339,7 @@ export class AuctionService implements OnModuleInit {
       };
     }
 
-    // TIER (default): MMR ?먮룞 ?좎젙
+    // TIER (default): choose captains automatically by MMR.
     return this._startAuctionWithCaptains(hostId, roomId, room);
   }
 
@@ -380,7 +380,7 @@ export class AuctionService implements OnModuleInit {
       captainUserIds,
     );
 
-    const botCaptainIds = this._filterBotCaptains(
+    const botCaptainIds = await this._filterBotCaptains(
       captainUserIds,
       room.participants,
     );
@@ -582,7 +582,7 @@ export class AuctionService implements OnModuleInit {
       });
       captainUserIds = sorted.slice(0, numTeams).map((p) => p.userId);
     } else if (phase.volunteers.length <= numTeams) {
-      // ?먯썝??遺議?or ??留욎쓬: ?먯썝??紐⑤몢 ???+ ?섎㉧吏 MMR濡?梨꾩?
+      // Not enough volunteers or exactly enough: keep volunteers and fill the rest by MMR.
       const remaining = numTeams - phase.volunteers.length;
       captainUserIds = [...phase.volunteers];
       if (remaining > 0) {
@@ -609,7 +609,7 @@ export class AuctionService implements OnModuleInit {
         );
       }
     } else {
-      // ?먯썝??珥덇낵: 諛⑹옣??selectedUserIds 吏???꾩닔
+      // Too many volunteers: host must pick the final captain set.
       if (!selectedUserIds || selectedUserIds.length !== numTeams) {
         throw new BadRequestException(
           `Select exactly ${numTeams} captains from volunteers`,
@@ -636,7 +636,7 @@ export class AuctionService implements OnModuleInit {
       (p) => !captainUserIds.includes(p.userId),
     );
     const numTeamsFinal = teams.length;
-    const botCaptainIds = this._filterBotCaptains(
+    const botCaptainIds = await this._filterBotCaptains(
       captainUserIds,
       room.participants,
     );
@@ -716,7 +716,7 @@ export class AuctionService implements OnModuleInit {
     const nonCaptains = room.participants.filter(
       (p: any) => !userIds.includes(p.userId),
     );
-    const botCaptainIds = this._filterBotCaptains(userIds, room.participants);
+    const botCaptainIds = await this._filterBotCaptains(userIds, room.participants);
 
     const auctionState: AuctionState = {
       roomId,
@@ -866,12 +866,12 @@ export class AuctionService implements OnModuleInit {
       throw new ForbiddenException("Only captains can bid");
     }
 
-    // Timer expiration check ???쒕쾭 湲곗??쇰줈 ??대㉧ 留뚮즺 ?щ? ?뺤씤
+    // Timer expiration check based on server-side timerEnd.
     if (Date.now() > state.timerEnd) {
       throw new BadRequestException("Bidding time has expired");
     }
 
-    // Self-outbid prevention ???대? 理쒓퀬媛???? ?ㅼ떆 ?낆같 遺덇?
+    // currentHighestBidder stores a teamId, so compare with this captain's team id.
     if (state.currentHighestBidder === team.id) {
       throw new BadRequestException("You are already the highest bidder");
     }
@@ -1086,7 +1086,7 @@ export class AuctionService implements OnModuleInit {
         });
       });
 
-      // ?ㅼ쓬 ?좎닔濡??대룞 (DB 荑쇰━媛 ?붾┛ ?좎닔瑜??쒖쇅?섎?濡???긽 0踰덉씠 ?ㅼ쓬 ?좎닔)
+      // Move to the next available player.
       state.currentPlayerIndex = 0;
       state.currentHighestBid = 0;
       state.currentHighestBidder = null;
@@ -1216,7 +1216,7 @@ export class AuctionService implements OnModuleInit {
       data: { status: RoomStatus.DRAFT_COMPLETED },
     });
 
-    // Discord 遊? ? 援ъ꽦 ?꾨즺 ???蹂??뚯꽦梨꾨꼸 諛곗튂
+    // Discord bot: move each team to its voice channel after team composition is complete.
     try {
       if (this.discordVoiceService) {
         await this.discordVoiceService.handleTeamAssignment(roomId);
@@ -1341,7 +1341,7 @@ export class AuctionService implements OnModuleInit {
     return true;
   }
 
-  /** 寃쎈ℓ ?섏씠吏 珥덇린 濡쒕뱶?? ?꾩옱 teams + ?⑥? players 諛섑솚 */
+  /** Return current teams and remaining players for initial auction page load. */
   async getFullAuctionData(
     roomId: string,
   ): Promise<{ teams: any[]; players: any[] }> {
@@ -1424,25 +1424,43 @@ export class AuctionService implements OnModuleInit {
     return { teams, players };
   }
 
-  /** testbot_NN ?⑦꽩 ?좎? ?앸퀎 */
+  /** Detect bot users by the testbot_NN username pattern. */
   isBotUsername(username: string): boolean {
     return /^testbot_\d+$/.test(username);
   }
 
-  /** captainUserIds 以?遊뉗씤 userId留??꾪꽣 (participants 諛곗뿴?먯꽌 username 議고쉶) */
-  private _filterBotCaptains(
+  /** Filter bot captain userIds, fetching usernames if participants were not hydrated. */
+  private async _filterBotCaptains(
     captainUserIds: string[],
     participants: any[],
-  ): string[] {
-    return captainUserIds.filter((id) => {
+  ): Promise<string[]> {
+    const knownBotIds = captainUserIds.filter((id) => {
       const p = participants.find((p: any) => p.userId === id);
-      return p && this.isBotUsername(p.user?.username ?? "");
+      return p && this.isBotUsername(p.user?.username ?? p.username ?? "");
     });
+
+    const unresolvedIds = captainUserIds.filter((id) => {
+      const p = participants.find((p: any) => p.userId === id);
+      return !p?.user?.username && !p?.username;
+    });
+
+    if (unresolvedIds.length === 0) {
+      return knownBotIds;
+    }
+
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: unresolvedIds } },
+      select: { id: true, username: true },
+    });
+    const fetchedBotIds = users
+      .filter((user) => this.isBotUsername(user.username))
+      .map((user) => user.id);
+
+    return [...new Set([...knownBotIds, ...fetchedBotIds])];
   }
 
   /**
-   * 遊???λ뱾???낆같 ?꾨낫 ?뺣낫 諛섑솚
-   * gateway?먯꽌 bot ?먮룞 ?낆같 ?ㅼ?以꾨쭅???ъ슜
+   * Return bot bidding candidates for the gateway auto-bid loop.
    */
   async getBotBidCandidates(roomId: string): Promise<
     {

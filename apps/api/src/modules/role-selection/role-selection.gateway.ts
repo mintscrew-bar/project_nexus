@@ -193,8 +193,10 @@ export class RoleSelectionGateway
         // 5초 간격으로 서버 시간 보정 값 전송 (클라이언트는 로컬 카운트다운 사용)
         // timeRemaining > 0 일 때만 tick 전송 (0 이하면 resolve timer가 처리)
         if (timeRemaining > 0) {
+          const state = this.roleSelectionService.getRoleSelectionState(roomId);
           this.server.to(`room:${roomId}`).emit("timer-tick", {
             timeRemaining,
+            timerEndAt: state?.timerEnd ?? null,
           });
         }
       } catch (error) {
@@ -274,6 +276,10 @@ export class RoleSelectionGateway
       const room =
         await this.roleSelectionService.completeRoleSelection(roomId);
 
+      this.server.to(`room:${roomId}`).emit("role-selection-navigation", {
+        target: `/tournaments/${roomId}/bracket`,
+      });
+
       // Notify all clients
       this.server.to(`room:${roomId}`).emit("role-selection-completed", {
         room,
@@ -328,6 +334,10 @@ export class RoleSelectionGateway
 
     // Start the countdown timer
     this.startTimer(roomId);
+  }
+
+  emitRoleSelectionError(roomId: string, data: { message: string; error?: string; retryable?: boolean }) {
+    this.server.to(`room:${roomId}`).emit("role-selection-error", data);
   }
 
   emitSessionAborted(roomId: string, data: any) {

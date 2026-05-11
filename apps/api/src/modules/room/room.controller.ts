@@ -254,7 +254,11 @@ export class RoomController {
   ) {
     // 방 참여자만 채팅 메시지 조회 가능
     await this.roomService.assertParticipant(userId, roomId);
-    return this.roomService.getChatMessages(roomId, query.limit ?? 50);
+    return this.roomService.getChatMessages(
+      roomId,
+      query.limit ?? 50,
+      query.offset ?? 0,
+    );
   }
 
   @Post(":id/messages")

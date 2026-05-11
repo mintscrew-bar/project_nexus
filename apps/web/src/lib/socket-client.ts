@@ -381,6 +381,10 @@ export const auctionSocketHelpers = {
     auctionSocket?.on("volunteer-list-updated", callback);
   },
 
+  onVolunteerFinalized: (callback: (data: any) => void) => {
+    auctionSocket?.on("volunteer-finalized", callback);
+  },
+
   onCaptainsConfirmed: (callback: (data: any) => void) => {
     auctionSocket?.on("captains-confirmed", callback);
   },
@@ -442,6 +446,7 @@ export const auctionSocketHelpers = {
     auctionSocket?.off("timer-expired");
     auctionSocket?.off("captain-selection-phase");
     auctionSocket?.off("volunteer-list-updated");
+    auctionSocket?.off("volunteer-finalized");
     auctionSocket?.off("captains-confirmed");
     auctionSocket?.off("session-aborted");
   },
@@ -1178,11 +1183,15 @@ export const roleSelectionSocketHelpers = {
     roleSelectionSocket?.on("role-selection-completed", callback);
   },
 
+  onRoleSelectionNavigation: (callback: (data: { target: string }) => void) => {
+    roleSelectionSocket?.on("role-selection-navigation", callback);
+  },
+
   onRoleSelectionStarted: (callback: (data: any) => void) => {
     roleSelectionSocket?.on("role-selection-started", callback);
   },
 
-  onTimerTick: (callback: (data: { timeRemaining: number }) => void) => {
+  onTimerTick: (callback: (data: { timeRemaining: number; timerEndAt?: number | null }) => void) => {
     roleSelectionSocket?.on("timer-tick", callback);
   },
 
@@ -1197,6 +1206,7 @@ export const roleSelectionSocketHelpers = {
   offAllListeners: () => {
     roleSelectionSocket?.off("role-selected");
     roleSelectionSocket?.off("role-selection-completed");
+    roleSelectionSocket?.off("role-selection-navigation");
     roleSelectionSocket?.off("role-selection-started");
     roleSelectionSocket?.off("timer-tick");
     roleSelectionSocket?.off("role-selection-error");

@@ -382,6 +382,8 @@ export class SnakeDraftService {
 
     if (state.currentTeamIndex % state.numTeams === 0) {
       state.currentRound++;
+      // The generated pickOrder already encodes the rotating snake order.
+      // isReversing is kept as a round-boundary signal for clients/debugging.
       state.isReversing = !state.isReversing;
     }
 

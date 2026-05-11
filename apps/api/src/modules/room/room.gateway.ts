@@ -123,6 +123,29 @@ export class RoomGateway
     }
   }
 
+  private hasActiveSocketInRoom(userId: string, roomId: string): boolean {
+    const sockets = this.userSockets.get(userId);
+    if (!sockets) return false;
+
+    let hasActive = false;
+    for (const socketId of Array.from(sockets)) {
+      const socketRoomId = this.socketRooms.get(socketId);
+      if (!socketRoomId) {
+        sockets.delete(socketId);
+        continue;
+      }
+      if (socketRoomId === roomId) {
+        hasActive = true;
+      }
+    }
+
+    if (sockets.size === 0) {
+      this.userSockets.delete(userId);
+    }
+
+    return hasActive;
+  }
+
   async handleDisconnect(client: AuthenticatedSocket) {
     if (!client.userId) return;
 
@@ -148,11 +171,7 @@ export class RoomGateway
 
     // 같은 방에 같은 유저의 다른 활성 소켓이 남아 있으면 (멀티탭 등)
     // grace 발동 없이 종료. 다른 탭에서 그대로 방에 남아 있다고 보면 됨.
-    const remainingSockets = this.userSockets.get(userId);
-    const hasOtherSocketInSameRoom = !!remainingSockets && Array.from(remainingSockets).some(
-      (sid) => this.socketRooms.get(sid) === roomId,
-    );
-    if (hasOtherSocketInSameRoom) {
+    if (this.hasActiveSocketInRoom(userId, roomId)) {
       return;
     }
 
@@ -166,11 +185,7 @@ export class RoomGateway
       this.disconnectGraceTimers.delete(graceKey);
 
       // grace 만료 시점에 같은 유저가 같은 방에 다시 연결돼 있으면 leave 취소.
-      const sockNow = this.userSockets.get(userId);
-      const reconnectedToSameRoom = !!sockNow && Array.from(sockNow).some(
-        (sid) => this.socketRooms.get(sid) === roomId,
-      );
-      if (reconnectedToSameRoom) return;
+      if (this.hasActiveSocketInRoom(userId, roomId)) return;
 
       let shouldNotifyOthers = false;
       try {
@@ -324,14 +339,22 @@ export class RoomGateway
 
       // Notify others only for new joins (not for reconnects)
       if (isNewJoin) {
+        const joinedParticipant = room.participants.find(
+          (p: any) => p.userId === client.userId,
+        );
         client.to(data.roomId).emit("user-joined", {
           userId: client.userId,
           username: client.username,
+          isReady: joinedParticipant?.isReady ?? false,
+          participant: joinedParticipant,
         });
       }
 
-      // Broadcast updated room to all participants (including the joiner)
-      this.server.to(data.roomId).emit("room-updated", room);
+      // Broadcast room changes only for actual new joins. Reconnects receive the
+      // latest room in the ACK below and should not refresh every other client.
+      if (isNewJoin) {
+        this.server.to(data.roomId).emit("room-updated", room);
+      }
 
       // 신규 입장 시 참가자 수 변경 → 방 요약 delta 전송
       if (isNewJoin) {

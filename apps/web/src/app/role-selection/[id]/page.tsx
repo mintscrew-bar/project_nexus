@@ -37,6 +37,7 @@ export default function RoleSelectionPage() {
     isConnected,
     isLoading,
     isCompleted,
+    navigationTarget,
     error,
     connect,
     disconnect,
@@ -57,9 +58,9 @@ export default function RoleSelectionPage() {
     if (isCompleted) {
       hasRedirected.current = true;
       addToast("역할 선택 완료! 대진표로 이동합니다.", "success");
-      router.push(`/tournaments/${roomId}/bracket`);
+      router.push(navigationTarget ?? `/tournaments/${roomId}/bracket`);
     }
-  }, [isCompleted, roomId, router, addToast]);
+  }, [isCompleted, navigationTarget, roomId, router, addToast]);
 
   useEffect(() => {
     if (!sessionAbortedAt) return;

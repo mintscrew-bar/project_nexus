@@ -33,6 +33,10 @@ interface ChatMessage {
   createdAt: string;
 }
 
+interface LeaveRoomResponse {
+  preserved?: boolean;
+}
+
 interface RoomCreationData {
   name: string;
   maxParticipants: 10 | 15 | 20 | 30 | 40;
@@ -67,11 +71,11 @@ interface RoomStoreState {
   joinRoom: (roomId: string, password?: string) => Promise<void>;
   leaveRoom: (roomId: string) => Promise<void>;
   toggleReady: (roomId: string) => Promise<void>;
-  fetchChatMessages: (roomId: string) => Promise<void>;
+  fetchChatMessages: (roomId: string, options?: { offset?: number; append?: boolean }) => Promise<void>;
 
   // WebSocket methods
   connectToRoom: (roomId: string) => void;
-  disconnectFromRoom: () => void;
+  disconnectFromRoom: (options?: { preserveRoom?: boolean }) => void;
   sendChatMessage: (roomId: string, message: string) => void;
   setTypingStatus: (roomId: string, isTyping: boolean) => void;
 
@@ -132,9 +136,11 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
 
   leaveRoom: async (roomId: string) => {
     try {
-      await roomApi.leaveRoom(roomId);
-      set({ currentRoom: null });
-      get().disconnectFromRoom();
+      const result: LeaveRoomResponse = await roomApi.leaveRoom(roomId);
+      get().disconnectFromRoom({ preserveRoom: result?.preserved });
+      if (!result?.preserved) {
+        set({ currentRoom: null, participants: [] });
+      }
     } catch (err: any) {
       set({ error: err.response?.data?.message || err.message || "Failed to leave room." });
     }
@@ -148,10 +154,17 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
     }
   },
 
-  fetchChatMessages: async (roomId: string) => {
+  fetchChatMessages: async (roomId: string, options) => {
     try {
-      const messages = await roomApi.getChatMessages(roomId);
-      set({ chatMessages: messages });
+      const messages = await roomApi.getChatMessages(roomId, 50, options?.offset ?? 0);
+      set((state) => {
+        if (!options?.append) {
+          return { chatMessages: messages };
+        }
+        const seen = new Set(state.chatMessages.map((message) => message.id));
+        const olderMessages = messages.filter((message: ChatMessage) => !seen.has(message.id));
+        return { chatMessages: [...olderMessages, ...state.chatMessages] };
+      });
     } catch (err: any) {
       set({ error: err.message || "Failed to fetch chat messages." });
     }
@@ -176,10 +189,15 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
         set({ currentRoom: room });
       });
 
-      // Server emits { userId, username } for user-joined
-      roomSocketHelpers.onParticipantJoined((data: { userId: string; username: string }) => {
+      // Server emits { userId, username, isReady, participant } for user-joined
+      roomSocketHelpers.onParticipantJoined((data: { userId: string; username: string; isReady?: boolean; participant?: Participant }) => {
+        const participant = {
+          id: data.userId,
+          username: data.participant?.username ?? data.username,
+          isReady: data.participant?.isReady ?? data.isReady ?? false,
+        };
         set((state) => ({
-          participants: [...state.participants, { id: data.userId, username: data.username, isReady: false }],
+          participants: [...state.participants, participant],
         }));
       });
 
@@ -239,13 +257,19 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
     set({ isConnected: true });
   },
 
-  disconnectFromRoom: () => {
+  disconnectFromRoom: (options) => {
     // 새로고침/페이지 이동에서도 호출되므로 socket leave-room을 명시적으로 보내지 않는다.
     // 진짜 방 나가기는 leaveRoom() 메서드가 REST로 처리.
     // 단순 disconnect 시 backend는 30초 grace 후에만 자동 leave 한다.
     roomSocketHelpers.offAllListeners();
     disconnectRoomSocket();
-    set({ isConnected: false, currentRoom: null, participants: [], chatMessages: [], typingUsers: new Map() });
+    set({
+      isConnected: false,
+      currentRoom: options?.preserveRoom ? get().currentRoom : null,
+      participants: options?.preserveRoom ? get().participants : [],
+      chatMessages: options?.preserveRoom ? get().chatMessages : [],
+      typingUsers: new Map(),
+    });
   },
 
   sendChatMessage: (roomId: string, message: string) => {
