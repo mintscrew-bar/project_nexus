@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/auth-store";
 import { adminApi, appealApi } from "@/lib/api-client";
 import { useToast } from "@/components/ui/Toast";
@@ -66,34 +65,16 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
 ];
 
 export default function AdminPage() {
-  const router = useRouter();
-  const { user, isAuthenticated, isLoading: authLoading } = useAuthStore();
+  // 권한 가드는 admin/layout.tsx에서 처리 (미인증/USER → notFound)
+  const { user } = useAuthStore();
   const { addToast } = useToast();
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
 
   const isAdmin = user?.role === "ADMIN";
-  const isModerator = user?.role === "MODERATOR";
-  const hasAdminAccess = isAdmin || isModerator;
 
   const visibleTabs = isAdmin
     ? TABS
     : TABS.filter((tab) => MODERATOR_TABS.includes(tab.id));
-
-  useEffect(() => {
-    if (!authLoading) {
-      if (!isAuthenticated) router.push("/auth/login");
-      else if (!hasAdminAccess) router.push("/");
-    }
-  }, [authLoading, isAuthenticated, user, router, hasAdminAccess]);
-
-  if (authLoading || (!isAuthenticated && !authLoading)) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <LoadingSpinner />
-      </div>
-    );
-  }
-  if (!hasAdminAccess) return null;
 
   return (
     <div className="flex h-[calc(100vh-64px)]">
