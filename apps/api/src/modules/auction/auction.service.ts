@@ -38,6 +38,7 @@ export interface CaptainSelectionPhase {
   volunteers: string[]; // userId[]
   timerEnd: number | null;
   timerHandle: ReturnType<typeof setTimeout> | null;
+  hostId: string; // 재연결 시 방장 식별용 (직렬화 포함)
 }
 
 @Injectable()
@@ -272,6 +273,17 @@ export class AuctionService implements OnModuleInit {
         data: { status: RoomStatus.DRAFT },
       });
 
+      // MANUAL 모드도 Redis에 저장해야 재연결 시 복원 가능
+      const manualPhase: CaptainSelectionPhase = {
+        mode: TeamCaptainSelection.MANUAL,
+        requiredCount: numTeams,
+        volunteers: [],
+        timerEnd: null,
+        timerHandle: null,
+        hostId,
+      };
+      this._setCaptainPhase(roomId, manualPhase);
+
       return {
         captainSelectionPhase: {
           mode: TeamCaptainSelection.MANUAL,
@@ -311,6 +323,7 @@ export class AuctionService implements OnModuleInit {
         volunteers: [],
         timerEnd,
         timerHandle: null,
+        hostId,
       };
       this._setCaptainPhase(roomId, phase);
 

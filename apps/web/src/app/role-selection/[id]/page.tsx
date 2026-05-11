@@ -156,7 +156,7 @@ export default function RoleSelectionPage() {
               역할 선택
             </h1>
             <p className="text-text-secondary text-sm mt-1">
-              선호 포지션을 기반으로 역할이 자동 배정됩니다
+              원하는 포지션을 선택하세요. 시간 종료 시 선호 포지션으로 자동 배정됩니다.
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -306,7 +306,7 @@ export default function RoleSelectionPage() {
         {/* Bottom info */}
         <div className="mt-6 text-center">
           <p className="text-text-tertiary text-sm">
-            역할은 선호 포지션(주/부) 기반으로 자동 배정됩니다. 카운트다운 후 대진표로 이동합니다.
+            직접 선택하지 않으면 선호 포지션(주/부) 기준으로 자동 배정됩니다.
           </p>
         </div>
       </div>

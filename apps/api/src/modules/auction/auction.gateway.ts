@@ -204,7 +204,8 @@ export class AuctionGateway
             volunteers: captainPhase.volunteers,
             timerEnd: captainPhase.timerEnd,
             participants: [],
-            hostId: null,
+            // DB 조회 실패 시에도 인메모리 phase의 hostId로 방장 식별 가능
+            hostId: captainPhase.hostId ?? null,
           },
         };
       }

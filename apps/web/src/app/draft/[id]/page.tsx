@@ -102,7 +102,15 @@ export default function SnakeDraftPage() {
       <div className="flex-grow flex items-center justify-center">
         <div className="text-center">
           <p className="text-accent-danger mb-4">오류: {error}</p>
-          <p className="text-text-secondary">드래프트에 연결할 수 없습니다</p>
+          <p className="text-text-secondary mb-6">드래프트에 연결할 수 없습니다</p>
+          <div className="flex gap-3 justify-center">
+            <Button variant="primary" onClick={() => window.location.reload()}>
+              다시 시도
+            </Button>
+            <Button variant="secondary" onClick={() => router.push(`/tournaments/${draftId}/lobby`)}>
+              로비로 돌아가기
+            </Button>
+          </div>
         </div>
       </div>
     );

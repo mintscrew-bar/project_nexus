@@ -479,14 +479,33 @@ export default function AuctionRoomPage() {
                   })}
                 </div>
               ) : (
-                /* 비방장: 대기 화면 */
+                /* 비방장: 참가자 목록 표시 (방장 선택 중 상태 안내) */
                 <Card className="mb-6">
-                  <CardContent className="p-8 text-center">
-                    <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-accent-primary/10 mb-3">
-                      <Users className="w-6 h-6 text-accent-primary animate-pulse" />
+                  <CardContent className="p-5">
+                    <div className="flex items-center gap-2 mb-4">
+                      <Users className="w-4 h-4 text-accent-primary animate-pulse" />
+                      <p className="text-text-primary font-medium">방장이 팀장을 선택 중입니다</p>
                     </div>
-                    <p className="text-text-primary font-medium mb-1">방장이 팀장을 선택 중입니다</p>
-                    <p className="text-sm text-text-tertiary">잠시만 기다려주세요...</p>
+                    {(participants ?? []).length > 0 ? (
+                      <div className="space-y-1.5">
+                        {(participants ?? []).map((p: any) => (
+                          <div
+                            key={p.id}
+                            className="flex items-center gap-2.5 p-2 rounded-lg bg-bg-secondary"
+                          >
+                            <div className="w-7 h-7 rounded-full bg-bg-elevated flex items-center justify-center text-xs font-bold text-text-primary flex-shrink-0">
+                              {p.username[0].toUpperCase()}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <span className="text-sm font-medium text-text-primary truncate block">{p.username}</span>
+                              {p.tier && <span className="text-[11px] text-text-tertiary">{p.tier} {p.rank}</span>}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-text-tertiary text-center py-2">잠시만 기다려주세요...</p>
+                    )}
                   </CardContent>
                 </Card>
               )}
