@@ -112,7 +112,7 @@ export class UserService {
     };
   }
 
-  async getUserStats(userId: string, requesterId?: string) {
+  async getUserStats(userId: string, _requesterId?: string) {
     const teamMembers = await this.prisma.teamMember.findMany({
       where: { userId },
       include: {

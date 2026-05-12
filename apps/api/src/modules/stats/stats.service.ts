@@ -1718,7 +1718,7 @@ export class StatsService {
    */
   async getUserAuctionStats(
     userId: string,
-    requesterId?: string,
+    _requesterId?: string,
   ): Promise<AuctionStats> {
     const user = await this.getUserWithSettings(userId);
     if (!user) throw new NotFoundException("User not found");
@@ -1904,7 +1904,7 @@ export class StatsService {
    */
   async getUserPositionStats(
     userId: string,
-    requesterId?: string,
+    _requesterId?: string,
   ): Promise<PositionStats[]> {
     const user = await this.getUserWithSettings(userId);
     if (!user) throw new NotFoundException("User not found");
