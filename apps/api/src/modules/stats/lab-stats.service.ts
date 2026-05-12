@@ -636,25 +636,47 @@ export class LabStatsService {
           continue;
         }
 
-        // 밴 횟수 집계 (해당 source/기간) — 외부 ranked는 bans 데이터 없을 수 있어
-        // 결과가 비어 있어도 정상.
-        const banCountsResult = await this.prisma.$queryRaw<
-          { championId: number; banCount: bigint }[]
-        >(Prisma.sql`
-          SELECT
-            ban_id::int AS "championId",
-            COUNT(*)::bigint AS "banCount"
-          FROM (
-            SELECT (jsonb_array_elements(mts."bans") ->> 'championId')::int AS ban_id
-            FROM "match_team_stats" mts
-            INNER JOIN "matches" m ON m."id" = mts."matchId"
+        // 밴 횟수 집계
+        // - custom: match_team_stats.bans (Riot 토너먼트/크로스레프 수집 데이터)
+        // - ranked-community: match_team_stats가 없어 riot_match_cache.data.info.teams[].bans 직접 파싱
+        let banCountsResult: { championId: number; banCount: bigint }[];
+        if (source === "ranked-community") {
+          banCountsResult = await this.prisma.$queryRaw<
+            { championId: number; banCount: bigint }[]
+          >(Prisma.sql`
+            SELECT
+              (b.value->>'championId')::int AS "championId",
+              COUNT(*)::bigint AS "banCount"
+            FROM "matches" m
+            INNER JOIN "riot_match_cache" rmc ON rmc."matchId" = m."riotMatchId"
+            CROSS JOIN LATERAL jsonb_array_elements(rmc."data"->'info'->'teams') AS t(value)
+            CROSS JOIN LATERAL jsonb_array_elements(t.value->'bans') AS b(value)
             WHERE m."completedAt" IS NOT NULL
-              ${sourceFilterSql}
+              AND m."roomId" IS NULL
+              AND m."riotMatchId" IS NOT NULL
               ${periodFilter ? Prisma.sql`AND m."completedAt" >= ${periodFilter}` : Prisma.empty}
-          ) bans
-          WHERE ban_id > 0
-          GROUP BY ban_id
-        `);
+              AND (b.value->>'championId')::int > 0
+            GROUP BY (b.value->>'championId')::int
+          `);
+        } else {
+          banCountsResult = await this.prisma.$queryRaw<
+            { championId: number; banCount: bigint }[]
+          >(Prisma.sql`
+            SELECT
+              ban_id::int AS "championId",
+              COUNT(*)::bigint AS "banCount"
+            FROM (
+              SELECT (jsonb_array_elements(mts."bans") ->> 'championId')::int AS ban_id
+              FROM "match_team_stats" mts
+              INNER JOIN "matches" m ON m."id" = mts."matchId"
+              WHERE m."completedAt" IS NOT NULL
+                ${sourceFilterSql}
+                ${periodFilter ? Prisma.sql`AND m."completedAt" >= ${periodFilter}` : Prisma.empty}
+            ) bans
+            WHERE ban_id > 0
+            GROUP BY ban_id
+          `);
+        }
         const banCounts = new Map(
           banCountsResult.map((row) => [row.championId, Number(row.banCount)]),
         );
@@ -1907,7 +1929,7 @@ export class LabStatsService {
             losses: row.games - row.wins,
             winRate: Math.round(row.winRate * 10000) / 10000,
             pickRate: Math.round(row.pickRate * 10000) / 100,
-            banRate: 0,
+            banRate: Math.round(row.banRate * 10000) / 100,
             avgKda: row.avgKda,
             avgDamage: row.avgDamage,
             avgGold: 0,
@@ -5567,6 +5589,45 @@ export class LabStatsService {
       }
     }
 
+    // 전체 매치 수 (밴율 분모 — seeded PUUID가 참여한 고유 매치 수)
+    const totalMatchesResult = await this.prisma.$queryRaw<
+      { count: bigint }[]
+    >(Prisma.sql`
+      SELECT COUNT(DISTINCT rm."matchId")::bigint AS count
+      FROM "riot_match_cache" rm,
+           jsonb_array_elements(rm."data"->'info'->'participants') AS p(value)
+      WHERE rm."queueId" IN (420, 440)
+        ${timeFilter}
+        ${patchFilter}
+        AND p.value->>'puuid' = ANY(${puuidSet})
+    `);
+    const totalMatches = Number(totalMatchesResult[0]?.count ?? 0) || 1;
+
+    // 밴 카운트 집계 — riot_match_cache.data.info.teams[].bans 파싱
+    const banCountsResult = await this.prisma.$queryRaw<
+      { championId: number; banCount: bigint }[]
+    >(Prisma.sql`
+      SELECT
+        (b.value->>'championId')::int AS "championId",
+        COUNT(*)::bigint AS "banCount"
+      FROM "riot_match_cache" rm
+      CROSS JOIN LATERAL jsonb_array_elements(rm."data"->'info'->'teams') AS t(value)
+      CROSS JOIN LATERAL jsonb_array_elements(t.value->'bans') AS b(value)
+      WHERE rm."queueId" IN (420, 440)
+        ${timeFilter}
+        ${patchFilter}
+        AND EXISTS (
+          SELECT 1
+          FROM jsonb_array_elements(rm."data"->'info'->'participants') AS p(value)
+          WHERE p.value->>'puuid' = ANY(${puuidSet})
+        )
+        AND (b.value->>'championId')::int > 0
+      GROUP BY (b.value->>'championId')::int
+    `);
+    const banCounts = new Map(
+      banCountsResult.map((row) => [row.championId, Number(row.banCount)]),
+    );
+
     // 전체 표본 수(참가자 행 기준 분모)
     const totalGames = rows.length;
     const posGames = new Map<string, number>();
@@ -5598,6 +5659,7 @@ export class LabStatsService {
           ? (posGames.get(position) ?? 1)
           : totalGames || 1;
         const pickRate = agg.games / denom;
+        const banRate = (banCounts.get(championId) ?? 0) / totalMatches;
         const lastMatchCreatedAt = agg.maxGameCreation
           ? new Date(agg.maxGameCreation)
           : null;
@@ -5610,6 +5672,7 @@ export class LabStatsService {
           avgKda,
           avgDamage,
           pickRate,
+          banRate,
           wilsonLower: wilsonLower(agg.wins, agg.games),
           confidence,
           lastMatchCreatedAt,
@@ -5636,7 +5699,7 @@ export class LabStatsService {
                   avgKda: row.avgKda,
                   avgDamage: row.avgDamage,
                   pickRate: row.pickRate,
-                  banRate: 0,
+                  banRate: row.banRate,
                   wilsonLower: row.wilsonLower,
                   confidence: row.confidence,
                   lastMatchCreatedAt: row.lastMatchCreatedAt,
@@ -5662,6 +5725,7 @@ export class LabStatsService {
         avgKda,
         avgDamage,
         pickRate,
+        banRate,
         wilsonLower: wilson,
         confidence,
         lastMatchCreatedAt,
@@ -5691,7 +5755,7 @@ export class LabStatsService {
             avgDamage:
               (existing2.avgDamage * existing2.games + totalDamage) / newGames,
             pickRate,
-            banRate: 0,
+            banRate,
             wilsonLower: wilsonLower(newWins, newGames),
             confidence: getConfidenceLevel(newGames),
             lastMatchCreatedAt,
@@ -5710,7 +5774,7 @@ export class LabStatsService {
             avgKda,
             avgDamage,
             pickRate,
-            banRate: 0,
+            banRate,
             wilsonLower: wilson,
             confidence,
             lastMatchCreatedAt,
@@ -5756,6 +5820,7 @@ export class LabStatsService {
       avgKda: number;
       avgDamage: number;
       pickRate: number;
+      banRate: number;
       wilsonLower: number;
       confidence: string;
     }>;
@@ -5806,6 +5871,7 @@ export class LabStatsService {
         avgKda: r.avgKda,
         avgDamage: r.avgDamage,
         pickRate: r.pickRate,
+        banRate: r.banRate,
         wilsonLower: r.wilsonLower,
         confidence: r.confidence,
       })),
