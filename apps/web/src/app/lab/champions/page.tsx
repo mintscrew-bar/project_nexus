@@ -14,6 +14,7 @@ import { LabSourceBadge } from "@/components/lab/shared/LabSourceBadge";
 import { GitCompareArrows } from "lucide-react";
 import { ChampionFilters } from "@/components/lab/champions/ChampionFilters";
 import { ChampionListTable } from "@/components/lab/champions/ChampionListTable";
+import { AdSlotCard } from "@/components/ads/AdSlot";
 
 type SortKey = "winRate" | "pickRate" | "banRate";
 type Position = "ALL" | "TOP" | "JUNGLE" | "MID" | "ADC" | "SUPPORT";
@@ -129,7 +130,9 @@ export default function LabChampionsPage() {
   }
 
   return (
-    <Card className="border-white/10 bg-bg-secondary/80">
+    <div className="space-y-4">
+      <AdSlotCard slotKey="labTop" minHeight={100} />
+      <Card className="border-white/10 bg-bg-secondary/80">
       <CardHeader>
         <CardTitle>챔피언 분석 목록</CardTitle>
         <CardDescription>검색/정렬/포지션 필터로 챔피언 픽률·승률·밴률을 탐색합니다.</CardDescription>
@@ -176,6 +179,7 @@ export default function LabChampionsPage() {
         />
         <ChampionListTable rows={filteredRows} activePeriod={activePeriod} activeSource={activeSource} />
       </CardContent>
-    </Card>
+      </Card>
+    </div>
   );
 }

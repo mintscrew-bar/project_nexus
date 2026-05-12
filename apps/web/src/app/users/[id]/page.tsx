@@ -22,6 +22,7 @@ import {
   TabsTrigger,
   TabsContent,
 } from "@/components/ui";
+import { AdSlotCard } from "@/components/ads/AdSlot";
 import {
   Shield,
   Trophy,
@@ -1059,6 +1060,11 @@ export default function UserProfilePage() {
               )}
             </CardContent>
           </Card>
+
+          {/* 페이지 하단 광고 — 콘텐츠를 다 보고 난 뒤 노출 (UX 침해 최소) */}
+          <div className="mt-6">
+            <AdSlotCard slotKey="profileBottom" minHeight={120} />
+          </div>
         </div>
       </div>
     </div>

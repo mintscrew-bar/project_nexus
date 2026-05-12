@@ -7,6 +7,7 @@ import { useAuthStore } from "@/stores/auth-store";
 import { HeroBanner } from "@/components/home/HeroBanner";
 import { DiscordBanner } from "@/components/home/DiscordBanner";
 import { ErrorBoundary, Skeleton } from "@/components/ui";
+import { AdSlotCard } from "@/components/ads/AdSlot";
 
 // 대시보드 스켈레톤 — dynamic 청크 로드 중 빈 화면 방지
 function DashboardFallback() {
@@ -128,6 +129,13 @@ export default function Home() {
               당신은 게임만 하세요.
             </p>
           </div>
+        </div>
+      </section>
+
+      {/* 광고 슬롯 — features 와 운영 섹션 사이, 시각적 분리선 역할 겸함 */}
+      <section className="px-6 pb-8">
+        <div className="mx-auto max-w-4xl">
+          <AdSlotCard slotKey="landingMid" minHeight={120} />
         </div>
       </section>
 
