@@ -14,7 +14,9 @@ param(
     [string]$WslDistro = "Ubuntu",
     [string]$ProjectPath = "/home/haru/projects/nexus",
     [string]$ComposeFile = "docker-compose.prod.yml",
-    [string]$EnvFile = "/home/haru/projects/nexus/.env.production"
+    [string]$EnvFile = "/home/haru/projects/nexus/.env.production",
+    # DryRun: vhdx 탐지 + 알림만 수행, 실제 shutdown/compact 는 스킵 (다운타임 0)
+    [switch]$DryRun
 )
 
 $ErrorActionPreference = "Continue"
@@ -57,6 +59,15 @@ if (-not $vhdx) {
 $vhdxPath = $vhdx.FullName
 $sizeBefore = Get-VhdxSizeGB $vhdxPath
 Write-Host "  대상: $vhdxPath ($sizeBefore GB)"
+
+if ($DryRun) {
+    Write-Host "[DryRun] 실제 compact 는 건너뜁니다. 알림/탐지만 검증."
+    Send-Notify "🧪 **WSL 정비 DRY RUN** (실제 작업 없음)`n- vhdx: \`$sizeBefore GB\`"
+    Send-Notify "✅ **DRY RUN 완료** — webhook/스크립트 동작 정상"
+    Write-Host "`n=== DRY RUN 완료 ==="
+    Write-Host "vhdx: $sizeBefore GB (실제 compact 미실행)"
+    exit 0
+}
 
 Send-Notify "🔧 **WSL 정비 시작** (예상 다운타임 5~15분)`n- vhdx: \`$sizeBefore GB\`"
 
