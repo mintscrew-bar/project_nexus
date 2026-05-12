@@ -4,6 +4,7 @@ import React from "react";
 import { Card, CardHeader, CardTitle, CardContent, Button } from "@/components/ui";
 import { TierBadge } from "@/components/domain";
 import { Clock, Crown, Users } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface Player {
   id: string;
@@ -63,6 +64,16 @@ export function DraftBoard({
   const currentTeam = draftState.teams.find(t => t.id === draftState.currentTeamId);
   const isMyTurn = currentTeam?.captainId === currentUserId;
 
+  // 타이머 색상 — 10초 이하 경고, 5초 이하 위험
+  const timerColor =
+    timeLeft <= 5 ? "text-accent-danger" :
+    timeLeft <= 10 ? "text-accent-warning" :
+    "text-text-primary";
+
+  // 팀당 총 픽 슬롯: pickOrder에서 해당 팀 ID 등장 횟수 (팀장 제외 추가 픽 수)
+  const pickSlotsByTeam = (teamId: string) =>
+    draftState.pickOrder.filter(id => id === teamId).length;
+
   // Clear selection when turn changes or selected player was picked
   React.useEffect(() => {
     setSelectedPlayer(null);
@@ -101,11 +112,11 @@ export function DraftBoard({
         <CardContent className="pt-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <Clock className="h-8 w-8 text-accent-primary" />
+              <Clock className={cn("h-8 w-8", timeLeft <= 5 ? "text-accent-danger" : "text-accent-primary")} />
               <div>
                 <p className="text-sm text-text-secondary">픽 타이머</p>
-                <p className="text-3xl font-bold text-text-primary">
-                  {timeLeft}초
+                <p className={cn("text-3xl font-bold tabular-nums", timerColor)}>
+                  {timeLeft === 0 ? "자동 픽 중..." : `${timeLeft}초`}
                 </p>
               </div>
             </div>
@@ -150,44 +161,70 @@ export function DraftBoard({
             팀 구성
           </h2>
 
-          {draftState.teams.map((team) => (
-            <Card
-              key={team.id}
-              className={team.id === draftState.currentTeamId ? "ring-2 ring-accent-primary" : ""}
-            >
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <span className="flex items-center">
-                    {team.id === draftState.currentTeamId && (
-                      <Crown className="h-5 w-5 mr-2 text-accent-gold" />
-                    )}
-                    {team.name}
-                  </span>
-                  <span className="text-sm text-text-secondary">
-                    {team.members.length}명
-                  </span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {team.members.map((member) => (
-                    <div
-                      key={member.id}
-                      className="flex items-center justify-between bg-bg-tertiary p-2 rounded-lg"
-                    >
-                      <div className="flex items-center space-x-2">
-                        <span className="text-xl">{getPositionIcon(member.position)}</span>
-                        <span className="font-medium text-text-primary">
-                          {member.username}
+          {draftState.teams.map((team) => {
+            const isMyTeam = team.captainId === currentUserId ||
+              team.members.some(m => m.id === currentUserId);
+            const isCurrentTurn = team.id === draftState.currentTeamId;
+            const totalSlots = 1 + pickSlotsByTeam(team.id); // 팀장 + 추가 픽 수
+            const emptySlots = totalSlots - team.members.length;
+
+            return (
+              <Card
+                key={team.id}
+                className={cn(
+                  isCurrentTurn && "ring-2 ring-accent-primary",
+                  isMyTeam && !isCurrentTurn && "border-accent-primary/40",
+                )}
+              >
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <span className="flex items-center gap-2">
+                      {isCurrentTurn && <Crown className="h-5 w-5 text-accent-gold" />}
+                      {team.name}
+                      {isMyTeam && (
+                        <span className="text-xs font-normal px-1.5 py-0.5 bg-accent-primary/20 text-accent-primary rounded-md">
+                          내 팀
                         </span>
+                      )}
+                    </span>
+                    <span className="text-sm text-text-secondary">
+                      {team.members.length}/{totalSlots}명
+                    </span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {team.members.map((member) => (
+                      <div
+                        key={member.id}
+                        className="flex items-center justify-between bg-bg-tertiary p-2 rounded-lg"
+                      >
+                        <div className="flex items-center space-x-2">
+                          <span className="text-xl">{getPositionIcon(member.position)}</span>
+                          <span className="font-medium text-text-primary">
+                            {member.username}
+                          </span>
+                          {member.id === team.captainId && (
+                            <Crown className="h-3.5 w-3.5 text-accent-gold" />
+                          )}
+                        </div>
+                        {member.tier && <TierBadge tier={member.tier} size="sm" />}
                       </div>
-                      {member.tier && <TierBadge tier={member.tier} size="sm" />}
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                    ))}
+                    {/* 빈 슬롯 */}
+                    {Array.from({ length: emptySlots }).map((_, i) => (
+                      <div
+                        key={`empty-${i}`}
+                        className="flex items-center p-2 rounded-lg border border-dashed border-bg-tertiary"
+                      >
+                        <span className="text-sm text-text-muted">대기 중...</span>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
 
         {/* Available Players */}
