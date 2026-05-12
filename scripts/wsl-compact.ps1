@@ -15,6 +15,8 @@ param(
     [string]$ProjectPath = "/home/haru/projects/nexus",
     [string]$ComposeFile = "docker-compose.prod.yml",
     [string]$EnvFile = "/home/haru/projects/nexus/.env.production",
+    # Explicit vhdx path override. If empty, auto-detect.
+    [string]$VhdxPath = "",
     # DryRun: only verify detection + webhook, skip shutdown/compact (0 downtime).
     [switch]$DryRun
 )
@@ -40,22 +42,26 @@ function Get-VhdxSizeGB($path) {
 
 # 1) Find vhdx
 Write-Host "[1/6] Searching vhdx..."
-$vhdx = Get-ChildItem -Path "$env:LOCALAPPDATA\Packages\*\LocalState\ext4.vhdx" -ErrorAction SilentlyContinue |
-        Where-Object { $_.FullName -match $WslDistro -or $_.FullName -match "Canonical" } |
-        Select-Object -First 1
 
-if (-not $vhdx) {
-    $vhdx = Get-ChildItem -Path "$env:LOCALAPPDATA\Packages\*\LocalState\ext4.vhdx" -ErrorAction SilentlyContinue |
-            Select-Object -First 1
+if ($VhdxPath -and (Test-Path $VhdxPath)) {
+    $vhdxPath = $VhdxPath
+} else {
+    # Search both legacy (Store-installed Packages) and modern (wsl --install) locations.
+    $candidates = @()
+    $candidates += Get-ChildItem -Path "$env:LOCALAPPDATA\wsl\*\ext4.vhdx" -ErrorAction SilentlyContinue
+    $candidates += Get-ChildItem -Path "$env:LOCALAPPDATA\Packages\*\LocalState\ext4.vhdx" -ErrorAction SilentlyContinue
+
+    # Prefer match on distro name when possible (legacy paths contain "Ubuntu" / "Canonical").
+    $vhdx = $candidates | Where-Object { $_.FullName -match $WslDistro -or $_.FullName -match "Canonical" } | Select-Object -First 1
+    if (-not $vhdx) { $vhdx = $candidates | Select-Object -First 1 }
+
+    if (-not $vhdx) {
+        Write-Error "ext4.vhdx not found. Pass -VhdxPath explicitly."
+        Send-Notify "WSL compact FAILED: vhdx not found"
+        exit 1
+    }
+    $vhdxPath = $vhdx.FullName
 }
-
-if (-not $vhdx) {
-    Write-Error "ext4.vhdx not found. Check -WslDistro parameter."
-    Send-Notify "WSL compact FAILED: vhdx not found"
-    exit 1
-}
-
-$vhdxPath = $vhdx.FullName
 $sizeBefore = Get-VhdxSizeGB $vhdxPath
 Write-Host "  target: $vhdxPath ($sizeBefore GB)"
 
