@@ -97,7 +97,6 @@ interface ProfileUser {
     participations: number;
   };
   settings?: {
-    showMatchHistory: boolean;
     showRiotAccounts: boolean;
     showChampionStats: boolean;
     highlightChampionId: string | null;
@@ -431,7 +430,6 @@ export default function UserProfilePage() {
   const settings = profile.settings;
   const showRiot = settings?.showRiotAccounts !== false;
   const showChampStats = settings?.showChampionStats !== false;
-  const showMatchHist = settings?.showMatchHistory !== false;
   const highlightChampionId = settings?.highlightChampionId;
 
   return (
@@ -991,79 +989,77 @@ export default function UserProfilePage() {
         </div>
 
         {/* Recent Activity Section */}
-        {showMatchHist && (
-          <div className="mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <History className="h-5 w-5 text-accent-primary" />
-                  최근 활동
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {matchesLoading ? (
-                  <div className="space-y-3">
-                    {[1, 2, 3].map((i) => (
-                      <Skeleton key={i} className="h-16 w-full" />
-                    ))}
-                  </div>
-                ) : recentMatches.length > 0 ? (
-                  <div className="space-y-3">
-                    {recentMatches.map((match: any) => {
-                      const isWin = match.status === 'COMPLETED' && match.myTeamId && match.winner?.id === match.myTeamId;
-                      const isLoss = match.status === 'COMPLETED' && match.myTeamId && match.winner && match.winner.id !== match.myTeamId;
+        <div className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <History className="h-5 w-5 text-accent-primary" />
+                최근 활동
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {matchesLoading ? (
+                <div className="space-y-3">
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-16 w-full" />
+                  ))}
+                </div>
+              ) : recentMatches.length > 0 ? (
+                <div className="space-y-3">
+                  {recentMatches.map((match: any) => {
+                    const isWin = match.status === 'COMPLETED' && match.myTeamId && match.winner?.id === match.myTeamId;
+                    const isLoss = match.status === 'COMPLETED' && match.myTeamId && match.winner && match.winner.id !== match.myTeamId;
 
-                      return (
-                        <div
-                          key={match.id}
-                          className="flex items-center justify-between p-3 bg-bg-tertiary rounded-lg hover:bg-bg-elevated transition-colors cursor-pointer"
-                          onClick={() => router.push(`/matches/match/${match.id}`)}
-                        >
-                          <div className="flex items-center gap-3">
-                            {match.status === 'COMPLETED' && (
-                              <div className={`w-1 h-10 rounded-full ${isWin ? 'bg-accent-success' : isLoss ? 'bg-accent-danger' : 'bg-text-tertiary'}`} />
-                            )}
-                            <div className="text-sm">
-                              <p className="font-medium text-text-primary">
-                                {match.teamA?.name ?? "Team A"} vs{" "}
-                                {match.teamB?.name ?? "Team B"}
-                              </p>
-                              <p className="text-xs text-text-tertiary flex items-center gap-1">
-                                <Clock className="h-3 w-3" />
-                                {new Date(match.createdAt).toLocaleDateString("ko-KR")}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {match.status === 'COMPLETED' && match.myTeamId && (
-                              <Badge variant={isWin ? 'success' : 'danger'} size="sm">
-                                {isWin ? '승리' : '패배'}
-                              </Badge>
-                            )}
-                            {match.status !== 'COMPLETED' && (
-                              <Badge
-                                variant={match.status === "IN_PROGRESS" ? "primary" : "default"}
-                                size="sm"
-                              >
-                                {match.status === "IN_PROGRESS" ? "진행 중" : "대기"}
-                              </Badge>
-                            )}
+                    return (
+                      <div
+                        key={match.id}
+                        className="flex items-center justify-between p-3 bg-bg-tertiary rounded-lg hover:bg-bg-elevated transition-colors cursor-pointer"
+                        onClick={() => router.push(`/matches/match/${match.id}`)}
+                      >
+                        <div className="flex items-center gap-3">
+                          {match.status === 'COMPLETED' && (
+                            <div className={`w-1 h-10 rounded-full ${isWin ? 'bg-accent-success' : isLoss ? 'bg-accent-danger' : 'bg-text-tertiary'}`} />
+                          )}
+                          <div className="text-sm">
+                            <p className="font-medium text-text-primary">
+                              {match.teamA?.name ?? "Team A"} vs{" "}
+                              {match.teamB?.name ?? "Team B"}
+                            </p>
+                            <p className="text-xs text-text-tertiary flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              {new Date(match.createdAt).toLocaleDateString("ko-KR")}
+                            </p>
                           </div>
                         </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <EmptyState
-                    icon={History}
-                    title="활동 내역이 없습니다"
-                    description="아직 내전에 참여한 기록이 없습니다."
-                  />
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        )}
+                        <div className="flex items-center gap-2">
+                          {match.status === 'COMPLETED' && match.myTeamId && (
+                            <Badge variant={isWin ? 'success' : 'danger'} size="sm">
+                              {isWin ? '승리' : '패배'}
+                            </Badge>
+                          )}
+                          {match.status !== 'COMPLETED' && (
+                            <Badge
+                              variant={match.status === "IN_PROGRESS" ? "primary" : "default"}
+                              size="sm"
+                            >
+                              {match.status === "IN_PROGRESS" ? "진행 중" : "대기"}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <EmptyState
+                  icon={History}
+                  title="활동 내역이 없습니다"
+                  description="아직 내전에 참여한 기록이 없습니다."
+                />
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );

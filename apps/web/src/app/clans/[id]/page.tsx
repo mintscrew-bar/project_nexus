@@ -810,7 +810,7 @@ export default function ClanDetailPage() {
                             variant="ghost"
                             size="sm"
                             onClick={() =>
-                              router.push(`/profile/${member.user.id}`)
+                              router.push(`/users/${member.user.id}`)
                             }
                           >
                             프로필

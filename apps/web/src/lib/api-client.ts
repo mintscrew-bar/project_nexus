@@ -276,7 +276,6 @@ export const userApi = {
     notifyClanActivity?: boolean;
     notifySystem?: boolean;
     showOnlineStatus?: boolean;
-    showMatchHistory?: boolean;
     showRiotAccounts?: boolean;
     showChampionStats?: boolean;
     allowFriendRequests?: boolean;

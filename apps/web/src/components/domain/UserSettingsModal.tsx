@@ -16,7 +16,6 @@ interface UserSettings {
   notifyMatchResult: boolean;
   notifyClanActivity: boolean;
   showOnlineStatus: boolean;
-  showMatchHistory: boolean;
   allowFriendRequests: boolean;
   theme: string;
 }
@@ -39,7 +38,6 @@ export function UserSettingsModal({ isOpen, onClose }: UserSettingsModalProps) {
     notifyMatchResult: true,
     notifyClanActivity: true,
     showOnlineStatus: true,
-    showMatchHistory: true,
     allowFriendRequests: true,
     theme: "dark",
   });
@@ -57,7 +55,6 @@ export function UserSettingsModal({ isOpen, onClose }: UserSettingsModalProps) {
             notifyMatchResult: data.notifyMatchResult ?? true,
             notifyClanActivity: data.notifyClanActivity ?? true,
             showOnlineStatus: data.showOnlineStatus ?? true,
-            showMatchHistory: data.showMatchHistory ?? true,
             allowFriendRequests: data.allowFriendRequests ?? true,
             theme,
           });
@@ -209,18 +206,6 @@ export function UserSettingsModal({ isOpen, onClose }: UserSettingsModalProps) {
                       type="checkbox"
                       checked={settings.showOnlineStatus}
                       onChange={(e) => handleSettingChange("showOnlineStatus", e.target.checked)}
-                      className="w-5 h-5 accent-accent-primary cursor-pointer"
-                    />
-                  </div>
-                  <div className="flex items-center justify-between py-3 border-b border-bg-tertiary">
-                    <div>
-                      <p className="font-medium text-text-primary">전적 공개</p>
-                      <p className="text-sm text-text-secondary">내전 전적 공개 여부</p>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={settings.showMatchHistory}
-                      onChange={(e) => handleSettingChange("showMatchHistory", e.target.checked)}
                       className="w-5 h-5 accent-accent-primary cursor-pointer"
                     />
                   </div>

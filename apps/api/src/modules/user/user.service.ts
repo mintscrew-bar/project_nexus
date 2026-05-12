@@ -98,12 +98,6 @@ export class UserService {
       if (!user.settings.showRiotAccounts) {
         safeUser.riotAccounts = [];
       }
-      if (!user.settings.showMatchHistory) {
-        stats.gamesPlayed = 0;
-        stats.wins = 0;
-        stats.losses = 0;
-        stats.winRate = 0;
-      }
       if (!user.settings.showChampionStats) {
         safeUser.riotAccounts = safeUser.riotAccounts.map((acc: any) => ({
           ...acc,
@@ -119,23 +113,6 @@ export class UserService {
   }
 
   async getUserStats(userId: string, requesterId?: string) {
-    // Privacy check: if not the owner, verify showMatchHistory
-    if (requesterId && requesterId !== userId) {
-      const settings = await this.prisma.userSettings.findUnique({
-        where: { userId },
-        select: { showMatchHistory: true },
-      });
-      if (settings && !settings.showMatchHistory) {
-        return {
-          gamesPlayed: 0,
-          wins: 0,
-          losses: 0,
-          winRate: 0,
-          participations: 0,
-        };
-      }
-    }
-
     const teamMembers = await this.prisma.teamMember.findMany({
       where: { userId },
       include: {

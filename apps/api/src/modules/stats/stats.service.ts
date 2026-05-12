@@ -1384,7 +1384,6 @@ export class StatsService {
       include: {
         settings: {
           select: {
-            showMatchHistory: true,
             showChampionStats: true,
             showRiotAccounts: true,
           },
@@ -1703,13 +1702,12 @@ export class StatsService {
 
   private isPrivacyAllowed(
     settings: {
-      showMatchHistory?: boolean;
       showChampionStats?: boolean;
       showRiotAccounts?: boolean;
     } | null,
     requesterId: string,
     userId: string,
-    setting: "showMatchHistory" | "showChampionStats" | "showRiotAccounts",
+    setting: "showChampionStats" | "showRiotAccounts",
   ): boolean {
     if (requesterId === userId) return true;
     return !settings || settings[setting] !== false;
@@ -1724,25 +1722,6 @@ export class StatsService {
   ): Promise<AuctionStats> {
     const user = await this.getUserWithSettings(userId);
     if (!user) throw new NotFoundException("User not found");
-    if (
-      requesterId &&
-      !this.isPrivacyAllowed(
-        user.settings,
-        requesterId,
-        userId,
-        "showMatchHistory",
-      )
-    ) {
-      return {
-        captainCount: 0,
-        totalAuctions: 0,
-        totalSold: 0,
-        yuchalCount: 0,
-        avgSoldPrice: 0,
-        maxSoldPrice: 0,
-        titles: [],
-      };
-    }
 
     // 팀장 횟수
     const captainCount = await this.prisma.team.count({
@@ -1929,16 +1908,6 @@ export class StatsService {
   ): Promise<PositionStats[]> {
     const user = await this.getUserWithSettings(userId);
     if (!user) throw new NotFoundException("User not found");
-    if (
-      requesterId &&
-      !this.isPrivacyAllowed(
-        user.settings,
-        requesterId,
-        userId,
-        "showMatchHistory",
-      )
-    )
-      return [];
 
     // Get all match participants for this user
     const participants = await this.prisma.matchParticipant.findMany({

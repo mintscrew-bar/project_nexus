@@ -27,7 +27,6 @@ interface UserSettings {
   notifyClanActivity: boolean;
   notifySystem: boolean;
   showOnlineStatus: boolean;
-  showMatchHistory: boolean;
   showRiotAccounts: boolean;
   showChampionStats: boolean;
   allowFriendRequests: boolean;
@@ -72,7 +71,6 @@ export default function SettingsPage() {
     notifyClanActivity: true,
     notifySystem: true,
     showOnlineStatus: true,
-    showMatchHistory: true,
     showRiotAccounts: true,
     showChampionStats: true,
     allowFriendRequests: true,
@@ -138,7 +136,6 @@ export default function SettingsPage() {
             notifyClanActivity: data.notifyClanActivity ?? true,
             notifySystem: data.notifySystem ?? true,
             showOnlineStatus: data.showOnlineStatus ?? true,
-            showMatchHistory: data.showMatchHistory ?? true,
             showRiotAccounts: data.showRiotAccounts ?? true,
             showChampionStats: data.showChampionStats ?? true,
             allowFriendRequests: data.allowFriendRequests ?? true,
@@ -702,18 +699,6 @@ export default function SettingsPage() {
                           type="checkbox"
                           checked={settings.showOnlineStatus}
                           onChange={(e) => handleSettingChange("showOnlineStatus", e.target.checked)}
-                          className="w-5 h-5 accent-accent-primary cursor-pointer"
-                        />
-                      </div>
-                      <div className="flex items-center justify-between py-3 border-b border-bg-tertiary">
-                        <div>
-                          <p className="font-medium text-text-primary">전적 공개</p>
-                          <p className="text-sm text-text-secondary">내전 전적 및 최근 활동을 공개합니다</p>
-                        </div>
-                        <input
-                          type="checkbox"
-                          checked={settings.showMatchHistory}
-                          onChange={(e) => handleSettingChange("showMatchHistory", e.target.checked)}
                           className="w-5 h-5 accent-accent-primary cursor-pointer"
                         />
                       </div>

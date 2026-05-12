@@ -15,7 +15,6 @@ export interface UpdateSettingsDto {
 
   // Privacy settings
   showOnlineStatus?: boolean;
-  showMatchHistory?: boolean;
   showRiotAccounts?: boolean;
   showChampionStats?: boolean;
   allowFriendRequests?: boolean;

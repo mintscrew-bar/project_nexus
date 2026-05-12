@@ -48,10 +48,6 @@ export class UpdateSettingsDto {
 
   @IsOptional()
   @IsBoolean()
-  showMatchHistory?: boolean;
-
-  @IsOptional()
-  @IsBoolean()
   showRiotAccounts?: boolean;
 
   @IsOptional()

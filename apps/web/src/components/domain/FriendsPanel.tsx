@@ -309,7 +309,7 @@ function FriendItem({
         className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-bg-tertiary"
         onClick={(e) => {
           e.stopPropagation();
-          router.push(`/profile/${friendUser.id}`);
+          router.push(`/users/${friendUser.id}`);
         }}
         title="프로필"
       >
@@ -1470,7 +1470,7 @@ export function FriendsPanel() {
           ctx={ctx}
           onClose={() => setCtx(null)}
           onProfile={() => {
-            router.push(`/profile/${ctx.friendId}`);
+            router.push(`/users/${ctx.friendId}`);
           }}
           onNickname={() => setModal({ type: "nickname", friendship: ctx.friendship })}
           onMemo={() => setModal({ type: "memo", friendship: ctx.friendship })}
