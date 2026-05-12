@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Swords } from "lucide-react";
+import { ChevronDown, Swords } from "lucide-react";
 import { Exo_2 } from "next/font/google";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui";
@@ -111,7 +111,7 @@ export function HeroBanner({ isAuthenticated = false }: HeroBannerProps) {
     <section
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
-      className="relative flex flex-col items-center justify-center h-screen min-h-[600px] px-4 text-center overflow-hidden bg-bg-primary"
+      className="relative flex flex-col items-center justify-center h-[calc(100svh-80px)] min-h-[560px] px-4 text-center overflow-hidden bg-bg-primary"
     >
       {/* 레이어 1: 헥스 그리드 배경 — 마우스 패럴랙스 */}
       <div
@@ -188,6 +188,29 @@ export function HeroBanner({ isAuthenticated = false }: HeroBannerProps) {
           <path d="M28 42 L42 42 L42 28" stroke={INDIGO} strokeWidth="1.5" strokeOpacity="0.3" strokeLinecap="square" />
         </svg>
       </motion.div>
+
+      {/* 스크롤 인디케이터 — 다음 섹션 존재 신호 */}
+      <motion.button
+        type="button"
+        aria-label="아래로 스크롤"
+        onClick={() =>
+          window.scrollBy({ top: window.innerHeight - 80, behavior: "smooth" })
+        }
+        className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-1 text-text-secondary hover:text-text-primary transition-colors"
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 1.2, duration: 0.6 }}
+      >
+        <span className="text-[11px] tracking-[0.2em] uppercase opacity-70">
+          Scroll
+        </span>
+        <motion.span
+          animate={{ y: [0, 6, 0] }}
+          transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
+        >
+          <ChevronDown className="h-5 w-5" />
+        </motion.span>
+      </motion.button>
 
       {/* 레이어 4: 콘텐츠 */}
       <motion.div

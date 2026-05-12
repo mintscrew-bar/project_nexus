@@ -84,7 +84,7 @@ export default function Home() {
       </section>
 
       {/* Feature highlights */}
-      <section className="py-24 md:py-32 px-6">
+      <section id="features" className="py-24 md:py-32 px-6">
         <h2 className="text-3xl md:text-5xl font-bold text-center text-text-primary mb-16">
           엑셀로 하던 내전,{" "}
           <span
