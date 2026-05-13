@@ -3,6 +3,10 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 import { AppShell } from "@/components/layout/AppShell";
+import { GoogleAnalytics } from "@/components/analytics/GoogleAnalytics";
+import { PageViewTracker } from "@/components/analytics/PageViewTracker";
+import { ConsentBanner } from "@/components/analytics/ConsentBanner";
+import { Suspense } from "react";
 import {
   SITE_DESCRIPTION,
   SITE_NAME,
@@ -126,11 +130,17 @@ export default function RootLayout({
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }}
         />
+        <GoogleAnalytics />
       </head>
       <body className={`${inter.className} font-sans min-h-screen flex flex-col`}>
         <Providers>
           <AppShell>{children}</AppShell>
         </Providers>
+        {/* useSearchParams는 Suspense 경계 필요 */}
+        <Suspense fallback={null}>
+          <PageViewTracker />
+        </Suspense>
+        <ConsentBanner />
       </body>
     </html>
   );

@@ -22,6 +22,9 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # Next.js는 빌드 타임에 NEXT_PUBLIC_* 환경변수를 인라인하므로 ARG로 전달
 ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+# GA4 측정 ID — 빈 값이면 GoogleAnalytics 컴포넌트가 렌더를 건너뜀.
+ARG NEXT_PUBLIC_GA_ID
+ENV NEXT_PUBLIC_GA_ID=${NEXT_PUBLIC_GA_ID}
 # next.config.mjs의 rewrites도 빌드 타임에 평가되므로 API_URL도 ARG 필요.
 # 컨테이너간 통신 호스트명(default: api:4000)을 빌드 인자로 전달한다.
 ARG API_URL=http://api:4000
