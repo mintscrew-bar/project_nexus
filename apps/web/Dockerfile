@@ -32,7 +32,7 @@ ENV API_URL=${API_URL}
 # OOM 방지: Next.js 빌드는 메모리를 많이 소모하므로 힙 상한을 명시한다
 ENV NODE_OPTIONS=--max-old-space-size=3072
 RUN pnpm --filter @nexus/types build
-RUN pnpm --filter @nexus/web build
+RUN --network=host pnpm --filter @nexus/web build
 
 # Production stage
 FROM node:20-alpine AS runner
