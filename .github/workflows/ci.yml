@@ -67,13 +67,8 @@ jobs:
       - name: 코드 체크아웃
         uses: actions/checkout@v6
 
-      - name: QEMU 설정
-        uses: docker/setup-qemu-action@v3
-
       - name: Docker Buildx 설정
         uses: docker/setup-buildx-action@v3
-        with:
-          driver-opts: network=host
 
       - name: GHCR 로그인
         uses: docker/login-action@v3
@@ -88,7 +83,7 @@ jobs:
           context: .
           file: apps/api/Dockerfile
           push: true
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           tags: |
             ${{ env.IMAGE_PREFIX }}/api:latest
             ${{ env.IMAGE_PREFIX }}/api:${{ github.sha }}
@@ -102,7 +97,7 @@ jobs:
           context: .
           file: apps/web/Dockerfile
           push: true
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           build-args: |
             NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL }}
             NEXT_PUBLIC_GA_ID=${{ vars.NEXT_PUBLIC_GA_ID }}
