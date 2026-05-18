@@ -488,29 +488,17 @@ export class RiotService {
   // ========================================
 
   async registerRiotAccount(userId: string, dto: RegisterRiotAccountDto) {
-    // Check verification
-    const verificationData = await this.redis.get(`verify:${userId}`);
-    if (!verificationData) {
-      throw new BadRequestException("Please complete verification first");
-    }
+    // 아이콘 변경 인증 단계를 제거하고 닉네임/태그로 직접 puuid 조회 후 등록.
+    // 라이엇은 외부 OAuth 가 없어 100% 본인 확인이 불가하지만, puuid 유니크 제약으로
+    // 이중 등록(다른 유저가 이미 연동한 계정)은 막힘.
+    const summoner = await this.getSummonerByRiotId(dto.gameName, dto.tagLine);
 
-    const data = JSON.parse(verificationData);
-
-    // Verify icon and get summoner ID
-    const summoner = await this.request<{
-      id: string; // Encrypted summoner ID
-      profileIconId: number;
-    }>(`${this.baseUrl}/lol/summoner/v4/summoners/by-puuid/${data.puuid}`);
-
-    if (summoner.profileIconId !== data.requiredIconId) {
-      throw new BadRequestException("Profile icon verification failed");
-    }
-
-    // Get ranked info using PUUID (more reliable than summonerId)
-    const ranked = await this.getRankedInfoByPuuid(data.puuid);
-
-    // Use summoner ID from API response instead of Redis data
-    const summonerId = summoner.id;
+    // getSummonerByRiotId 는 UNRANKED 일 때 tier/rank 를 undefined 로 반환하므로 보정.
+    const ranked = {
+      tier: summoner.tier ?? "UNRANKED",
+      rank: summoner.rank ?? "",
+      lp: summoner.leaguePoints ?? 0,
+    };
 
     // Validate champion preferences (at least 3 per role)
     for (const role of [dto.mainRole, dto.subRole]) {
@@ -524,7 +512,7 @@ export class RiotService {
 
     // Check if account already exists
     const existing = await this.prisma.riotAccount.findUnique({
-      where: { puuid: data.puuid },
+      where: { puuid: summoner.puuid },
     });
 
     if (existing && existing.userId !== userId) {
@@ -553,11 +541,11 @@ export class RiotService {
 
     // Create or update Riot account
     const riotAccount = await this.prisma.riotAccount.upsert({
-      where: { puuid: data.puuid },
+      where: { puuid: summoner.puuid },
       update: {
-        gameName: data.gameName,
-        tagLine: data.tagLine,
-        summonerId: summonerId,
+        gameName: summoner.gameName,
+        tagLine: summoner.tagLine,
+        summonerId: summoner.summonerId,
         tier: ranked.tier,
         rank: ranked.rank,
         lp: ranked.lp,
@@ -571,10 +559,10 @@ export class RiotService {
       },
       create: {
         userId,
-        puuid: data.puuid,
-        gameName: data.gameName,
-        tagLine: data.tagLine,
-        summonerId: summonerId,
+        puuid: summoner.puuid,
+        gameName: summoner.gameName,
+        tagLine: summoner.tagLine,
+        summonerId: summoner.summonerId,
         tier: ranked.tier,
         rank: ranked.rank,
         lp: ranked.lp,
@@ -614,9 +602,9 @@ export class RiotService {
       });
     }
 
-    await this.upsertKnownPuuid(data.puuid, {
-      gameName: data.gameName,
-      tagLine: data.tagLine,
+    await this.upsertKnownPuuid(summoner.puuid, {
+      gameName: summoner.gameName,
+      tagLine: summoner.tagLine,
       priority: 10,
       isNexusUser: true,
     });
@@ -625,8 +613,8 @@ export class RiotService {
       this.logger.warn(`Discord tier/line role sync failed (register): ${userId}`);
     });
 
-    // Clean up verification data
-    await this.redis.del(`verify:${userId}`);
+    // 옛 아이콘 인증 흔적이 남아 있다면 청소(이전 버전에서 step2 진행 중이던 유저 대비).
+    await this.redis.del(`verify:${userId}`).catch(() => undefined);
 
     return this.prisma.riotAccount.findUnique({
       where: { id: riotAccount.id },

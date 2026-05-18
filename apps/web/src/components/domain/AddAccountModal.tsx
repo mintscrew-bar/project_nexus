@@ -8,7 +8,6 @@ import { useDdragonStore, Champion } from '@/stores/ddragon-store';
 import { X, Loader2, AlertCircle, ArrowRight, ChevronDown, Info } from 'lucide-react';
 import { ChampionSelector } from './ChampionSelector';
 import Image from 'next/image';
-import { useDdragonVersion } from '@/hooks/useDdragonVersion';
 
 // Define specific props for the new AddAccountModal
 interface AddAccountModalProps {
@@ -22,30 +21,24 @@ const ROLES: Role[] = ['TOP', 'JUNGLE', 'MID', 'ADC', 'SUPPORT'];
 
 export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountModalProps) {
   const {
-    startVerification,
-    checkVerification,
     registerAccount,
-    isVerifying,
     isLoading: storeLoading,
     error: storeError,
     reset: resetRiotStore,
     clearError: clearRiotStoreError,
-    isIconVerified,
-    verificationData: storeVerificationData,
   } = useRiotStore();
 
   const { champions, fetchChampions, isLoading: championsLoading } = useDdragonStore();
-  const ddragonVersion = useDdragonVersion();
 
-  const [step, setStep] = useState(1); // 1: Input, 2: Verify, 3: Role Selection
+  // step: 1=소환사 이름 입력, 3=역할/챔피언 선택 (옛 step 2 아이콘 인증은 제거)
+  const [step, setStep] = useState<1 | 3>(1);
   const [gameName, setGameName] = useState('');
   const [tagLine, setTagLine] = useState('');
   const [localError, setLocalError] = useState<string | null>(null);
-  const [verificationData, setVerificationData] = useState<{
+  // 등록 시 사용할 라이엇 ID 스냅샷 — step 1 통과 후 step 3 에서 그대로 전달
+  const [pendingRiotId, setPendingRiotId] = useState<{
     gameName: string;
     tagLine: string;
-    requiredIconId: number;
-    currentIconId: number;
   } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -63,32 +56,18 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
   useEffect(() => {
     if (isOpen) {
       fetchChampions();
-      if (isIconVerified && storeVerificationData) {
-        setStep(3);
-        setVerificationData({
-          gameName: storeVerificationData.gameName,
-          tagLine: storeVerificationData.tagLine,
-          requiredIconId: storeVerificationData.requiredIconId,
-          currentIconId: storeVerificationData.currentIconId,
-        });
-      }
     } else {
-      if (isIconVerified) {
-        setLocalError(null);
-        setIsSubmitting(false);
-      } else {
-        setStep(1);
-        setGameName('');
-        setTagLine('');
-        setLocalError(null);
-        setVerificationData(null);
-        setIsSubmitting(false);
-        setMainRole('MID');
-        setSubRole('ADC');
-        setChampionsByRole({ TOP: [], JUNGLE: [], MID: [], ADC: [], SUPPORT: [] });
-        setOpenSection('MID');
-        resetRiotStore();
-      }
+      setStep(1);
+      setGameName('');
+      setTagLine('');
+      setLocalError(null);
+      setPendingRiotId(null);
+      setIsSubmitting(false);
+      setMainRole('MID');
+      setSubRole('ADC');
+      setChampionsByRole({ TOP: [], JUNGLE: [], MID: [], ADC: [], SUPPORT: [] });
+      setOpenSection('MID');
+      resetRiotStore();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
@@ -103,50 +82,26 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
     clearRiotStoreError();
   };
 
-  const handleSummonerSubmit = async () => {
+  // step 1: 입력값 검증만 하고 바로 step 3 로 이동. 백엔드 소환사 존재 여부 검증은
+  // 최종 등록(registerAccount) 단계에서 puuid 조회 실패 시 명확한 에러로 표면화됨.
+  // 추가 라이엇 API 호출을 step 1 에서 미리 하지 않음으로써 단계를 단순화.
+  const handleSummonerSubmit = () => {
     handleClearError();
-    if (!gameName.trim() || !tagLine.trim()) {
+    // 사용자가 "이름#태그"를 통째로 한 칸에 붙여 넣은 경우를 살짝 구제
+    const cleanedGameName = gameName.replace(/^#/, '').trim();
+    const cleanedTagLine = tagLine.replace(/^#/, '').trim();
+    if (!cleanedGameName || !cleanedTagLine) {
       setLocalError('소환사 이름과 태그라인을 입력해주세요.');
       return;
     }
-    setIsSubmitting(true);
-    try {
-      const data = await startVerification(gameName.trim(), tagLine.trim());
-      setVerificationData(data);
-      setStep(2);
-    } catch (err: any) {
-      setLocalError(err.message || '소환사를 찾을 수 없거나 이미 연동된 계정입니다.');
-    } finally {
-      setIsSubmitting(false);
-    }
+    setPendingRiotId({ gameName: cleanedGameName, tagLine: cleanedTagLine });
+    setStep(3);
   };
 
   const handleGoBackToStep1 = () => {
     setStep(1);
-    setVerificationData(null);
+    setPendingRiotId(null);
     handleClearError();
-  };
-
-  const handleVerifyIcon = async () => {
-    handleClearError();
-    if (!verificationData) return;
-    setIsSubmitting(true);
-    try {
-      const checkResult = await checkVerification();
-      if (!checkResult.verified) {
-        setLocalError(
-          `아이콘이 아직 반영되지 않았습니다. ` +
-          `현재: #${checkResult.current} → 필요: #${checkResult.expected}\n` +
-          `Riot 서버에 변경사항이 반영되는 데 최대 5분이 걸릴 수 있습니다. 잠시 후 다시 시도해주세요.`
-        );
-        return;
-      }
-      setStep(3);
-    } catch (err: any) {
-      setLocalError(err.message || '인증 확인에 실패했습니다.');
-    } finally {
-      setIsSubmitting(false);
-    }
   };
 
   // 주/부 역할 변경 시 새 주 역할로 이동
@@ -192,11 +147,16 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
       setLocalError(`선호 챔피언을 역할별 최소 3개 선택해주세요. ${missing.join(', ')}`);
       return;
     }
+    if (!pendingRiotId) {
+      setLocalError('소환사 정보가 비어 있습니다. 처음부터 다시 시도해주세요.');
+      setStep(1);
+      return;
+    }
     setIsSubmitting(true);
     try {
       await registerAccount({
-        gameName: verificationData!.gameName,
-        tagLine: verificationData!.tagLine,
+        gameName: pendingRiotId.gameName,
+        tagLine: pendingRiotId.tagLine,
         mainRole: mainRole,
         subRole: subRole,
         championsByRole: championsByRole,
@@ -204,7 +164,11 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
       onAccountAdded();
       onClose();
     } catch (err: any) {
-      setLocalError(err.message || '계정 등록에 실패했습니다.');
+      // 백엔드 에러 메시지 우선 (axios "Request failed with status code 400" 대신 실제 사유 노출)
+      const msg = err?.response?.data?.message || err?.message;
+      setLocalError(
+        Array.isArray(msg) ? msg.join('\n') : (msg || '계정 등록에 실패했습니다.'),
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -214,13 +178,12 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
       setChampionsByRole(prev => ({ ...prev, [role]: selectedKeys }));
   };
 
-  const isLoading = isSubmitting || isVerifying || storeLoading;
+  const isLoading = isSubmitting || storeLoading;
 
   const modalTitle = () => {
     switch (step) {
-      case 1: return 'Riot 계정 추가 (1/3)';
-      case 2: return '아이콘 인증 (2/3)';
-      case 3: return '역할 및 챔피언 선택 (3/3)';
+      case 1: return 'Riot 계정 추가 (1/2)';
+      case 3: return '역할 및 챔피언 선택 (2/2)';
       default: return 'Riot 계정 추가';
     }
   };
@@ -228,7 +191,6 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
   const modalDescription = () => {
     switch (step) {
       case 1: return '소환사 이름과 태그라인을 입력하여 Riot 계정을 연동합니다.';
-      case 2: return 'Riot 클라이언트에서 아이콘을 변경하여 본인임을 인증합니다.';
       case 3: return '주로 플레이하는 역할과 선호 챔피언을 선택해주세요.';
       default: return '';
     }
@@ -238,8 +200,6 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
     switch (step) {
       case 1:
         return 'Riot ID는 게임 이름과 태그라인을 나눠서 입력합니다. 예: Hide on bush#KR1';
-      case 2:
-        return '본인 계정 확인을 위해 잠깐 아이콘을 바꿉니다. 인증이 끝나면 원래 아이콘으로 다시 바꿔도 됩니다.';
       case 3:
         return '역할과 선호 챔피언은 내전 팀 배정과 밸런싱에 사용됩니다. 처음 한 번만 설정하면 됩니다.';
       default:
@@ -248,7 +208,7 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title={modalTitle()} size="lg" disableBackdropClose={step === 2}>
+    <Modal isOpen={isOpen} onClose={handleClose} title={modalTitle()} size="lg">
       {localError && (
         <div className="mb-4 p-3 bg-accent-danger/10 border border-accent-danger rounded-lg flex items-center gap-2">
           <AlertCircle className="w-5 h-5 text-accent-danger" />
@@ -297,86 +257,6 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
               disabled={isLoading}
             />
           </div>
-        </div>
-      )}
-
-      {step === 2 && verificationData && (
-        <div className="space-y-4">
-          <p className="text-text-secondary">
-            <span className="font-bold text-accent-primary">
-              {verificationData.gameName}#{verificationData.tagLine}
-            </span>
-            님의 계정을 인증하려면 아래 단계를 따라주세요:
-          </p>
-
-          {/* Icon comparison display */}
-          <div className="flex items-center justify-center gap-6 py-4 bg-bg-tertiary rounded-lg">
-            <div className="text-center">
-              <p className="text-xs text-text-tertiary mb-2">현재 아이콘</p>
-              <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-bg-elevated mx-auto">
-                <Image
-                  src={`https://ddragon.leagueoflegends.com/cdn/${ddragonVersion}/img/profileicon/${verificationData.currentIconId}.png`}
-                  alt="현재 프로필 아이콘"
-                  width={64}
-                  height={64}
-                  className="w-full h-full object-cover"
-                  unoptimized
-                />
-              </div>
-              <p className="text-xs text-text-tertiary mt-1">#{verificationData.currentIconId}</p>
-            </div>
-            <ArrowRight className="w-6 h-6 text-text-tertiary flex-shrink-0" />
-            <div className="text-center">
-              <p className="text-xs text-accent-gold mb-2 font-semibold">변경할 아이콘</p>
-              <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-accent-gold ring-2 ring-accent-gold/30 mx-auto">
-                <Image
-                  src={`https://ddragon.leagueoflegends.com/cdn/${ddragonVersion}/img/profileicon/${verificationData.requiredIconId}.png`}
-                  alt="필요한 프로필 아이콘"
-                  width={64}
-                  height={64}
-                  className="w-full h-full object-cover"
-                  unoptimized
-                />
-              </div>
-              <p className="text-xs text-accent-gold mt-1 font-semibold">#{verificationData.requiredIconId}</p>
-            </div>
-          </div>
-
-          <div className="bg-bg-tertiary rounded-lg p-4 space-y-3">
-            <div className="flex items-start gap-3">
-              <span className="flex-shrink-0 w-6 h-6 bg-accent-primary text-white rounded-full flex items-center justify-center text-sm font-bold">
-                1
-              </span>
-              <p className="text-text-primary text-sm">
-                리그 오브 레전드 클라이언트를 실행하세요
-              </p>
-            </div>
-
-            <div className="flex items-start gap-3">
-              <span className="flex-shrink-0 w-6 h-6 bg-accent-primary text-white rounded-full flex items-center justify-center text-sm font-bold">
-                2
-              </span>
-              <p className="text-text-primary text-sm">
-                프로필 아이콘을 위에 표시된 <span className="font-bold text-accent-gold">노란색 테두리</span> 아이콘으로 변경하세요
-              </p>
-            </div>
-
-            <div className="flex items-start gap-3">
-              <span className="flex-shrink-0 w-6 h-6 bg-accent-primary text-white rounded-full flex items-center justify-center text-sm font-bold">
-                3
-              </span>
-              <p className="text-text-primary text-sm">
-                아래 &quot;인증 완료&quot; 버튼을 클릭하세요
-              </p>
-            </div>
-          </div>
-
-          <p className="text-xs text-text-tertiary text-center">
-            이 아이콘이 없다면 &apos;뒤로&apos;를 누르고 다시 시도하면 다른 아이콘이 지정됩니다.
-          </p>
-          <p className="text-xs text-accent-warning/80 text-center">
-            ⏱ 아이콘 변경 후 Riot 서버 반영까지 최대 5분이 걸릴 수 있습니다.
-          </p>
         </div>
       )}
 
@@ -517,27 +397,19 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
       )}
       
       <div className="flex justify-end gap-3 pt-4">
-        {step === 2 && (
+        {step === 3 && (
           <Button variant="outline" onClick={handleGoBackToStep1} disabled={isLoading}>
             뒤로
           </Button>
         )}
-        {(step === 1 || step === 3) && (
-          <Button variant="outline" onClick={step === 3 ? handleClose : onClose} disabled={isLoading}>
-            <X className="w-4 h-4 mr-2" />
-            취소
-          </Button>
-        )}
+        <Button variant="outline" onClick={step === 3 ? handleClose : onClose} disabled={isLoading}>
+          <X className="w-4 h-4 mr-2" />
+          취소
+        </Button>
         {step === 1 && (
           <Button onClick={handleSummonerSubmit} disabled={!gameName.trim() || !tagLine.trim() || isLoading}>
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             다음
-          </Button>
-        )}
-        {step === 2 && (
-          <Button onClick={handleVerifyIcon} disabled={isLoading}>
-            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            인증 완료
           </Button>
         )}
         {step === 3 && (

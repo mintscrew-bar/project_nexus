@@ -40,7 +40,7 @@ export default function SettingsPage() {
   const { user, isAuthenticated, isLoading, logout, deleteAccount, fetchUser } = useAuthStore();
   const { champions, championMap, fetchChampions } = useDdragonStore();
   const { setTheme: setNextTheme } = useTheme();
-  const { fetchAccounts, isIconVerified } = useRiotStore();
+  const { fetchAccounts } = useRiotStore();
   const [showRiotModal, setShowRiotModal] = useState(false);
   const { addToast } = useToast();
   const [activeTab, setActiveTab] = useState<SettingsTab>("notifications");
@@ -405,11 +405,8 @@ export default function SettingsPage() {
                         title: "Riot 계정 연동",
                         desc: hasRiot
                           ? `${primaryRiot.gameName}#${primaryRiot.tagLine}`
-                          : isIconVerified
-                            ? "아이콘 인증 완료 · 역할/챔피언 선택 남음"
-                            : "소환사명으로 계정 인증",
+                          : "소환사명으로 계정 인증",
                         done: !!hasRiot,
-                        inProgress: !hasRiot && isIconVerified,
                         action: (
                           <Button
                             size="sm"
@@ -422,7 +419,7 @@ export default function SettingsPage() {
                               setShowRiotModal(true);
                             }}
                           >
-                            {hasRiot ? "계정 관리" : isIconVerified ? "계속하기" : "연동하기"}
+                            {hasRiot ? "계정 관리" : "연동하기"}
                           </Button>
                         ),
                       },
