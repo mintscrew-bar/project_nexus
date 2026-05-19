@@ -695,6 +695,7 @@ export class MatchService {
       include: {
         teamA: {
           include: {
+            captain: { select: { id: true, username: true } },
             members: {
               include: {
                 user: {
@@ -710,6 +711,15 @@ export class MatchService {
                         tier: true,
                         rank: true,
                         mainRole: true,
+                        subRole: true,
+                        championPreferences: {
+                          orderBy: { order: "asc" },
+                          select: {
+                            role: true,
+                            championId: true,
+                            order: true,
+                          },
+                        },
                       },
                     },
                   },
@@ -720,6 +730,7 @@ export class MatchService {
         },
         teamB: {
           include: {
+            captain: { select: { id: true, username: true } },
             members: {
               include: {
                 user: {
@@ -735,6 +746,15 @@ export class MatchService {
                         tier: true,
                         rank: true,
                         mainRole: true,
+                        subRole: true,
+                        championPreferences: {
+                          orderBy: { order: "asc" },
+                          select: {
+                            role: true,
+                            championId: true,
+                            order: true,
+                          },
+                        },
                       },
                     },
                   },
@@ -779,6 +799,7 @@ export class MatchService {
             id: true,
             name: true,
             color: true,
+            captain: { select: { id: true, username: true } },
           },
         },
         teamB: {
@@ -786,6 +807,7 @@ export class MatchService {
             id: true,
             name: true,
             color: true,
+            captain: { select: { id: true, username: true } },
           },
         },
         winner: {
@@ -793,6 +815,7 @@ export class MatchService {
             id: true,
             name: true,
             color: true,
+            captain: { select: { id: true, username: true } },
           },
         },
       },

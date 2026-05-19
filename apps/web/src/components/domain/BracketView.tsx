@@ -8,6 +8,14 @@ interface Team {
   id: string;
   name: string;
   score?: number;
+  captain?: { id: string; username: string };
+}
+
+// "팀장닉 팀" 형태로 표시. 팀장 정보가 없으면 원래 name으로 폴백.
+export function getTeamDisplayName(team?: Team): string {
+  if (!team) return "TBD";
+  if (team.captain?.username) return `${team.captain.username} 팀`;
+  return team.name;
 }
 
 export interface Match { // Exporting for use in other components
@@ -71,7 +79,7 @@ function MatchCard({ match, onMatchClick }: { match: Match; onMatchClick: (m: Ma
         }`}>
           <div className="flex items-center space-x-2">
             {match.winner?.id === match.team1?.id && <Trophy className="h-4 w-4 text-accent-gold" />}
-            <span className="font-semibold text-text-primary">{match.team1?.name || "TBD"}</span>
+            <span className="font-semibold text-text-primary">{getTeamDisplayName(match.team1)}</span>
           </div>
           {match.team1?.score !== undefined && (
             <span className="text-lg font-bold text-text-primary">{match.team1.score}</span>
@@ -88,7 +96,7 @@ function MatchCard({ match, onMatchClick }: { match: Match; onMatchClick: (m: Ma
         }`}>
           <div className="flex items-center space-x-2">
             {match.winner?.id === match.team2?.id && <Trophy className="h-4 w-4 text-accent-gold" />}
-            <span className="font-semibold text-text-primary">{match.team2?.name || "TBD"}</span>
+            <span className="font-semibold text-text-primary">{getTeamDisplayName(match.team2)}</span>
           </div>
           {match.team2?.score !== undefined && (
             <span className="text-lg font-bold text-text-primary">{match.team2.score}</span>
