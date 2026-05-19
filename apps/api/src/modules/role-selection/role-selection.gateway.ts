@@ -140,6 +140,27 @@ export class RoleSelectionGateway
     }
   }
 
+  @SubscribeMessage("cancel-role")
+  async handleCancelRole(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() data: { roomId: string },
+  ) {
+    try {
+      if (!client.userId) {
+        return { error: "Unauthorized" };
+      }
+      const result = await this.roleSelectionService.cancelRole(client.userId, data.roomId);
+      this.server.to(`room:${data.roomId}`).emit("role-cancelled", {
+        userId: client.userId,
+        teamId: result.teamId,
+        memberId: result.memberId,
+      });
+      return { success: true };
+    } catch (error: any) {
+      return { error: error.message };
+    }
+  }
+
   @SubscribeMessage("select-role")
   async handleSelectRole(
     @ConnectedSocket() client: AuthenticatedSocket,
@@ -325,15 +346,64 @@ export class RoleSelectionGateway
   // ========================================
 
   async emitRoleSelectionStarted(roomId: string, _data: any) {
-    // Auto-assign roles by preference (mainRole → subRole → random) before notifying clients
-    await this.roleSelectionService.autoAssignRolesByPreference(roomId);
-
-    // Re-fetch data so clients receive the pre-assigned roles immediately
     const data = await this.roleSelectionService.getRoleSelectionData(roomId);
     this.server.to(`room:${roomId}`).emit("role-selection-started", data);
-
-    // Start the countdown timer
     this.startTimer(roomId);
+  }
+
+  @SubscribeMessage("extend-timer")
+  async handleExtendTimer(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() data: { roomId: string },
+  ) {
+    try {
+      if (!client.userId) {
+        return { error: "Unauthorized" };
+      }
+
+      const newTimerEnd = this.roleSelectionService.extendTimer(client.userId, data.roomId);
+
+      // 기존 resolve 타이머 재설정
+      this.stopTimer(data.roomId);
+      const timeRemaining = this.roleSelectionService.getTimeRemaining(data.roomId);
+
+      const interval = setInterval(() => {
+        try {
+          const remaining = this.roleSelectionService.getTimeRemaining(data.roomId);
+          if (remaining > 0) {
+            const state = this.roleSelectionService.getRoleSelectionState(data.roomId);
+            this.server.to(`room:${data.roomId}`).emit("timer-tick", {
+              timeRemaining: remaining,
+              timerEndAt: state?.timerEnd ?? null,
+            });
+          }
+        } catch {
+          this.stopTimer(data.roomId);
+        }
+      }, 5000);
+      this.roomTimers.set(data.roomId, interval);
+
+      const resolveTimeout = setTimeout(() => {
+        this.roomResolveTimers.delete(data.roomId);
+        const tickTimer = this.roomTimers.get(data.roomId);
+        if (tickTimer) {
+          clearInterval(tickTimer);
+          this.roomTimers.delete(data.roomId);
+        }
+        this.completeRoleSelection(data.roomId).catch(console.error);
+      }, Math.max(0, timeRemaining));
+      this.roomResolveTimers.set(data.roomId, resolveTimeout);
+
+      this.server.to(`room:${data.roomId}`).emit("timer-extended", {
+        timerEndAt: newTimerEnd,
+        timeRemaining,
+        extendedBy: client.username,
+      });
+
+      return { success: true, timerEndAt: newTimerEnd };
+    } catch (error: any) {
+      return { error: error.message };
+    }
   }
 
   emitRoleSelectionError(roomId: string, data: { message: string; error?: string; retryable?: boolean }) {

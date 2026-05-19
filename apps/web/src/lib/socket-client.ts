@@ -1175,6 +1175,42 @@ export const roleSelectionSocketHelpers = {
     });
   },
 
+  extendTimer: (roomId: string): Promise<any> => {
+    return new Promise<any>((resolve) => {
+      if (!roleSelectionSocket?.connected) {
+        resolve({ error: "소켓이 연결되어 있지 않습니다." });
+        return;
+      }
+      const timeout = setTimeout(() => resolve({ error: "timeout" }), 10000);
+      roleSelectionSocket.emit("extend-timer", { roomId }, (response: any) => {
+        clearTimeout(timeout);
+        resolve(response ?? {});
+      });
+    });
+  },
+
+  onTimerExtended: (callback: (data: { timerEndAt: number; timeRemaining: number; extendedBy: string }) => void) => {
+    roleSelectionSocket?.on("timer-extended", callback);
+  },
+
+  cancelRole: (roomId: string): Promise<any> => {
+    return new Promise<any>((resolve) => {
+      if (!roleSelectionSocket?.connected) {
+        resolve({ error: "소켓이 연결되어 있지 않습니다." });
+        return;
+      }
+      const timeout = setTimeout(() => resolve({ error: "timeout" }), 10000);
+      roleSelectionSocket.emit("cancel-role", { roomId }, (response: any) => {
+        clearTimeout(timeout);
+        resolve(response ?? {});
+      });
+    });
+  },
+
+  onRoleCancelled: (callback: (data: { userId: string; teamId: string; memberId: string }) => void) => {
+    roleSelectionSocket?.on("role-cancelled", callback);
+  },
+
   onRoleSelected: (callback: (data: any) => void) => {
     roleSelectionSocket?.on("role-selected", callback);
   },
@@ -1205,10 +1241,12 @@ export const roleSelectionSocketHelpers = {
 
   offAllListeners: () => {
     roleSelectionSocket?.off("role-selected");
+    roleSelectionSocket?.off("role-cancelled");
     roleSelectionSocket?.off("role-selection-completed");
     roleSelectionSocket?.off("role-selection-navigation");
     roleSelectionSocket?.off("role-selection-started");
     roleSelectionSocket?.off("timer-tick");
+    roleSelectionSocket?.off("timer-extended");
     roleSelectionSocket?.off("role-selection-error");
     roleSelectionSocket?.off("session-aborted");
   },

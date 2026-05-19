@@ -10,7 +10,8 @@ import { PrismaService } from "../prisma/prisma.service";
 import { Prisma, RoomStatus, Role } from "@nexus/database";
 import { MatchService } from "../match/match.service";
 
-const ROLE_SELECTION_TIME_MS = 15000; // 15 seconds (roles are auto-assigned by preference)
+const ROLE_SELECTION_TIME_MS = 60000; // 60초 기본 시간
+const EXTENSION_TIME_MS = 15000;     // 인당 1회 15초 연장
 
 export interface RoleSelectionState {
   roomId: string;
@@ -21,6 +22,8 @@ export interface RoleSelectionState {
 @Injectable()
 export class RoleSelectionService {
   private roleSelectionStates = new Map<string, RoleSelectionState>();
+  // roomId → 연장을 사용한 userId Set
+  private extendedUsers = new Map<string, Set<string>>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -107,6 +110,23 @@ export class RoleSelectionService {
   // ========================================
   // Role Selection
   // ========================================
+
+  async cancelRole(userId: string, roomId: string) {
+    const member = await this.prisma.teamMember.findFirst({
+      where: { userId, team: { roomId } },
+    });
+    if (!member) {
+      throw new ForbiddenException("User is not a member of any team");
+    }
+    if (!member.assignedRole) {
+      throw new BadRequestException("선택된 역할이 없습니다.");
+    }
+    await this.prisma.teamMember.update({
+      where: { id: member.id },
+      data: { assignedRole: null },
+    });
+    return { memberId: member.id, teamId: member.teamId };
+  }
 
   async selectRole(userId: string, roomId: string, role: Role) {
     return this.runSerializableTx(async (tx) => {
@@ -462,6 +482,31 @@ export class RoleSelectionService {
 
   clearRoleSelectionState(roomId: string): void {
     this.roleSelectionStates.delete(roomId);
+    this.extendedUsers.delete(roomId);
+  }
+
+  // 인당 1회 15초 연장. 반환값: 새 timerEnd (ms)
+  extendTimer(userId: string, roomId: string): number {
+    const state = this.roleSelectionStates.get(roomId);
+    if (!state) {
+      throw new BadRequestException("역할 선택 세션이 없습니다.");
+    }
+
+    if (!this.extendedUsers.has(roomId)) {
+      this.extendedUsers.set(roomId, new Set());
+    }
+    const extended = this.extendedUsers.get(roomId)!;
+    if (extended.has(userId)) {
+      throw new BadRequestException("이미 연장 기회를 사용했습니다.");
+    }
+
+    extended.add(userId);
+    state.timerEnd += EXTENSION_TIME_MS;
+    return state.timerEnd;
+  }
+
+  hasExtended(userId: string, roomId: string): boolean {
+    return this.extendedUsers.get(roomId)?.has(userId) ?? false;
   }
 
   getTimeRemaining(roomId: string): number {

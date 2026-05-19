@@ -8,7 +8,7 @@ import { roomApi } from "@/lib/api-client";
 import { GameChatPanel } from "@/components/domain/GameChatPanel";
 import { LoadingSpinner, Badge, Avatar, Button, ConfirmModal } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
-import { Clock, Check, Users } from "lucide-react";
+import { Clock, Check, Users, TimerReset } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const ROLES = ["TOP", "JUNGLE", "MID", "ADC", "SUPPORT"] as const;
@@ -43,6 +43,9 @@ export default function RoleSelectionPage() {
     connect,
     disconnect,
     selectRole,
+    cancelRole,
+    extendTimer,
+    hasExtended,
     sessionAbortedAt,
     sessionAbortMessage,
     clearSessionAbort,
@@ -99,6 +102,23 @@ export default function RoleSelectionPage() {
     }
   };
 
+  const handleCancelRole = async () => {
+    try {
+      await cancelRole(roomId);
+    } catch (err: any) {
+      addToast(err.message || "역할 취소에 실패했습니다.", "error");
+    }
+  };
+
+  const handleExtendTimer = async () => {
+    try {
+      await extendTimer(roomId);
+      addToast("시간이 15초 연장됐습니다.", "success");
+    } catch (err: any) {
+      addToast(err.message || "시간 연장에 실패했습니다.", "error");
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex-grow flex items-center justify-center">
@@ -129,9 +149,9 @@ export default function RoleSelectionPage() {
   }
 
   const timerColor =
-    timeRemaining <= 5
+    timeRemaining <= 10
       ? "text-accent-danger"
-      : timeRemaining <= 10
+      : timeRemaining <= 20
         ? "text-accent-warning"
         : "text-accent-primary";
 
@@ -171,6 +191,19 @@ export default function RoleSelectionPage() {
             <Badge variant={isConnected ? "success" : "danger"}>
               {isConnected ? "● 연결됨" : "● 연결 끊김"}
             </Badge>
+            <button
+              onClick={handleExtendTimer}
+              disabled={hasExtended || !isConnected}
+              className={cn(
+                "flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium border transition-all",
+                hasExtended
+                  ? "bg-bg-tertiary text-text-muted border-bg-tertiary cursor-not-allowed opacity-50"
+                  : "bg-accent-primary/10 text-accent-primary border-accent-primary/30 hover:bg-accent-primary/20"
+              )}
+            >
+              <TimerReset className="h-4 w-4" />
+              {hasExtended ? "연장 사용됨" : "+15초"}
+            </button>
             <div className="flex items-center gap-2 bg-bg-secondary border border-bg-tertiary rounded-xl px-4 py-2">
               <Clock className={cn("h-5 w-5", timerColor)} />
               <span className={cn("text-2xl font-bold tabular-nums", timerColor)}>
@@ -276,12 +309,19 @@ export default function RoleSelectionPage() {
                               return (
                                 <button
                                   key={role}
-                                  onClick={() => !isMyCurrentRole && handleSelectRole(role)}
-                                  disabled={takenByOther || isMyCurrentRole || !isConnected}
+                                  onClick={() => {
+                                    if (isMyCurrentRole) {
+                                      handleCancelRole();
+                                    } else if (!takenByOther) {
+                                      handleSelectRole(role);
+                                    }
+                                  }}
+                                  disabled={takenByOther && !isMyCurrentRole || !isConnected}
+                                  title={isMyCurrentRole ? "클릭해서 취소" : undefined}
                                   className={cn(
                                     "flex-1 flex flex-col items-center gap-0.5 py-2 rounded-lg text-xs font-medium transition-all",
                                     isMyCurrentRole
-                                      ? "bg-accent-primary/20 text-accent-primary border border-accent-primary/30 ring-1 ring-accent-primary/20"
+                                      ? "bg-accent-primary/20 text-accent-primary border border-accent-primary/30 ring-1 ring-accent-primary/20 hover:bg-accent-danger/20 hover:text-accent-danger hover:border-accent-danger/30"
                                       : takenByOther
                                         ? "bg-bg-tertiary/50 text-text-muted cursor-not-allowed opacity-40"
                                         : "bg-bg-tertiary hover:bg-bg-elevated hover:scale-105 active:scale-95 cursor-pointer text-text-primary"

@@ -73,16 +73,19 @@ interface RoleSelectionState {
   error: string | null;
   sessionAbortedAt: number | null;
   sessionAbortMessage: string | null;
+  hasExtended: boolean;
 
   connect: (roomId: string) => void;
   disconnect: () => void;
   selectRole: (roomId: string, role: string) => Promise<void>;
+  cancelRole: (roomId: string) => Promise<void>;
+  extendTimer: (roomId: string) => Promise<void>;
   clearSessionAbort: () => void;
 }
 
 export const useRoleSelectionStore = create<RoleSelectionState>((set) => ({
   room: null,
-  timeRemaining: 15,
+  timeRemaining: 60,
   isConnected: false,
   isLoading: true,
   isCompleted: false,
@@ -90,6 +93,7 @@ export const useRoleSelectionStore = create<RoleSelectionState>((set) => ({
   error: null,
   sessionAbortedAt: null,
   sessionAbortMessage: null,
+  hasExtended: false,
 
   connect: (roomId: string) => {
     set({
@@ -176,9 +180,29 @@ export const useRoleSelectionStore = create<RoleSelectionState>((set) => ({
     );
 
     roleSelectionSocketHelpers.onTimerTick((data: { timeRemaining: number; timerEndAt?: number | null }) => {
-      // 서버 5초 보정 tick 수신 시 로컬 카운트다운을 서버 값으로 재동기화
       const syncedSeconds = getSecondsUntil(data.timerEndAt, data.timeRemaining);
       startLocalCountdown(syncedSeconds, set);
+    });
+
+    roleSelectionSocketHelpers.onTimerExtended((data: { timerEndAt: number; timeRemaining: number; extendedBy: string }) => {
+      const syncedSeconds = getSecondsUntil(data.timerEndAt, data.timeRemaining);
+      startLocalCountdown(syncedSeconds, set);
+    });
+
+    roleSelectionSocketHelpers.onRoleCancelled((data: { userId: string; teamId: string; memberId: string }) => {
+      set((state) => {
+        if (!state.room) return state;
+        const updatedTeams = state.room.teams.map((team) => {
+          if (team.id !== data.teamId) return team;
+          return {
+            ...team,
+            members: team.members.map((m) =>
+              m.id === data.memberId ? { ...m, assignedRole: null } : m,
+            ),
+          };
+        });
+        return { room: { ...state.room, teams: updatedTeams } };
+      });
     });
 
     roleSelectionSocketHelpers.onRoleSelectionNavigation((data) => {
@@ -211,13 +235,14 @@ export const useRoleSelectionStore = create<RoleSelectionState>((set) => ({
     set({
       isConnected: false,
       room: null,
-      timeRemaining: 15,
+      timeRemaining: 60,
       isLoading: false,
       isCompleted: false,
       navigationTarget: null,
       error: null,
       sessionAbortedAt: null,
       sessionAbortMessage: null,
+      hasExtended: false,
     });
   },
 
@@ -227,6 +252,21 @@ export const useRoleSelectionStore = create<RoleSelectionState>((set) => ({
       set({ error: response.error });
       throw new Error(response.error);
     }
+  },
+
+  cancelRole: async (roomId: string) => {
+    const response = await roleSelectionSocketHelpers.cancelRole(roomId);
+    if (response?.error) {
+      throw new Error(response.error);
+    }
+  },
+
+  extendTimer: async (roomId: string) => {
+    const response = await roleSelectionSocketHelpers.extendTimer(roomId);
+    if (response?.error) {
+      throw new Error(response.error);
+    }
+    set({ hasExtended: true });
   },
 
   clearSessionAbort: () => {
