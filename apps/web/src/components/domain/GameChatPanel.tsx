@@ -11,9 +11,13 @@ interface GameChatPanelProps {
   roomId: string;
   /** true on the final stage (bracket) — triggers full socket cleanup on unmount */
   isFinalStage?: boolean;
+  /** "floating": 우측 하단 토글 버튼 (기본). "inline": 부모 컨테이너 안에 직접 렌더링 */
+  variant?: "floating" | "inline";
+  /** inline 모드용 추가 className */
+  className?: string;
 }
 
-export function GameChatPanel({ roomId, isFinalStage }: GameChatPanelProps) {
+export function GameChatPanel({ roomId, isFinalStage, variant = "floating", className }: GameChatPanelProps) {
   const [isOpen, setIsOpen] = useState(false);
   const { messages, isConnected, connect, disconnect, sendMessage } =
     useChatStore();
@@ -28,6 +32,29 @@ export function GameChatPanel({ roomId, isFinalStage }: GameChatPanelProps) {
       disconnect();
     };
   }, [roomId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // inline 모드: 토글 없이 항상 표시
+  if (variant === "inline") {
+    return (
+      <div className={cn("flex flex-col bg-bg-secondary border border-bg-tertiary rounded-xl overflow-hidden", className)}>
+        <div className="flex items-center gap-2 px-3 py-2 bg-bg-tertiary/50 border-b border-bg-tertiary flex-shrink-0">
+          <MessageSquare className="h-4 w-4 text-accent-primary" />
+          <span className="font-semibold text-text-primary text-sm">채팅</span>
+          <span className={cn(
+            "w-1.5 h-1.5 rounded-full",
+            isConnected ? "bg-accent-success" : "bg-accent-danger",
+          )} />
+        </div>
+        <ChatBox
+          messages={messages}
+          onSendMessage={sendMessage}
+          currentUserId={user?.id}
+          disabled={!isConnected}
+          className="flex-1 rounded-none border-0"
+        />
+      </div>
+    );
+  }
 
   // Track unread messages when panel is closed
   useEffect(() => {

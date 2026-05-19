@@ -11,17 +11,40 @@ import { LoadingSpinner, Badge, Button, Card, CardContent, ConfirmModal } from "
 import { useToast } from "@/components/ui/Toast";
 import { GameChatPanel } from "@/components/domain/GameChatPanel";
 import { cn } from "@/lib/utils";
-import { Users, Hand, Check, Coins, ScrollText, Gavel } from "lucide-react";
+import { Users, Hand, Check, Coins, ScrollText, Gavel, MessageSquare, Maximize2 } from "lucide-react";
+import { Modal } from "@/components/ui/Modal";
 
 /** 대기 선수 목록 (데스크톱 사이드바 & 모바일 탭에서 공유) */
-function PlayersList({ players, currentPlayerId }: { players: any[]; currentPlayerId?: string }) {
+function PlayersList({
+  players,
+  currentPlayerId,
+  onExpand,
+  compact = false,
+}: {
+  players: any[];
+  currentPlayerId?: string;
+  onExpand?: () => void;
+  compact?: boolean;
+}) {
   return (
-    <>
-      <h3 className="text-sm font-semibold text-text-primary mb-3 flex items-center gap-1.5">
-        <Users className="w-4 h-4" />
-        대기 선수 ({players.length})
-      </h3>
-      <div className="space-y-1.5 max-h-[calc(100vh-220px)] overflow-y-auto">
+    <div className="h-full flex flex-col min-h-0">
+      <div className="flex items-center justify-between mb-2 flex-shrink-0">
+        <h3 className="text-sm font-semibold text-text-primary flex items-center gap-1.5">
+          <Users className="w-4 h-4" />
+          대기 선수 ({players.length})
+        </h3>
+        {onExpand && (
+          <button
+            onClick={onExpand}
+            className="text-text-tertiary hover:text-text-primary p-1 rounded-md hover:bg-bg-tertiary transition-colors"
+            title="전체 보기"
+          >
+            <Maximize2 className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
+      <div className={cn("flex-1 min-h-0 overflow-y-auto", compact ? "space-y-1" : "space-y-1.5")}>
+
         {players.length === 0 ? (
           <p className="text-xs text-text-tertiary text-center py-4">모든 선수가 배정되었습니다</p>
         ) : (
@@ -58,19 +81,19 @@ function PlayersList({ players, currentPlayerId }: { players: any[]; currentPlay
           })
         )}
       </div>
-    </>
+    </div>
   );
 }
 
 /** 입찰 로그 (데스크톱 사이드바 & 모바일 탭에서 공유) */
 function BidLog({ bidHistory, logEndRef }: { bidHistory: any[]; logEndRef: React.RefObject<HTMLDivElement> }) {
   return (
-    <>
-      <h3 className="text-sm font-semibold text-text-primary mb-3 flex items-center gap-1.5">
+    <div className="h-full flex flex-col min-h-0">
+      <h3 className="text-sm font-semibold text-text-primary mb-2 flex items-center gap-1.5 flex-shrink-0">
         <ScrollText className="w-4 h-4" />
         입찰 내역
       </h3>
-      <div className="space-y-1 max-h-[calc(100vh-220px)] overflow-y-auto">
+      <div className="flex-1 min-h-0 overflow-y-auto space-y-1">
         {bidHistory.length === 0 ? (
           <p className="text-xs text-text-tertiary text-center py-4">아직 입찰이 없습니다</p>
         ) : (
@@ -102,7 +125,7 @@ function BidLog({ bidHistory, logEndRef }: { bidHistory: any[]; logEndRef: React
         )}
         <div ref={logEndRef} />
       </div>
-    </>
+    </div>
   );
 }
 
@@ -118,10 +141,12 @@ export default function AuctionRoomPage() {
   const [volunteerTimer, setVolunteerTimer] = useState(0);
   const [isAborting, setIsAborting] = useState(false);
   const [isAbortConfirmOpen, setIsAbortConfirmOpen] = useState(false);
-  // 모바일 탭: "auction" | "players" | "log"
-  const [mobileTab, setMobileTab] = useState<"auction" | "players" | "log">("auction");
+  // 모바일 탭: "auction" | "players" | "log" | "chat"
+  const [mobileTab, setMobileTab] = useState<"auction" | "players" | "log" | "chat">("auction");
   // 경매 완료 결과 화면 카운트다운
   const [completeCountdown, setCompleteCountdown] = useState<number | null>(null);
+  // 대기 선수 전체 보기 모달
+  const [playersModalOpen, setPlayersModalOpen] = useState(false);
 
   const {
     auctionState,
@@ -704,8 +729,9 @@ export default function AuctionRoomPage() {
         <div className="lg:hidden flex rounded-lg bg-bg-secondary p-1 mb-4 gap-1">
           {([
             { key: "auction" as const, label: "경매", icon: Gavel },
-            { key: "players" as const, label: "대기선수", icon: Users },
-            { key: "log" as const, label: "입찰로그", icon: ScrollText },
+            { key: "players" as const, label: "대기", icon: Users },
+            { key: "log" as const, label: "로그", icon: ScrollText },
+            { key: "chat" as const, label: "채팅", icon: MessageSquare },
           ]).map(({ key, label, icon: Icon }) => (
             <button
               key={key}
@@ -723,19 +749,29 @@ export default function AuctionRoomPage() {
           ))}
         </div>
 
-        {/* ── 데스크톱: 3컬럼 레이아웃 (lg 이상) ── */}
-        <div className="hidden lg:grid lg:grid-cols-[240px_1fr_280px] gap-4">
-          {/* 좌측: 남은 선수 목록 */}
-          <div>
-            <Card>
-              <CardContent className="p-3">
-                <PlayersList players={players} currentPlayerId={auctionState.currentPlayer?.id} />
+        {/* ── 데스크톱: 3컬럼 레이아웃 (lg 이상). 좌·우 사이드바는 뷰포트 높이 기준 ── */}
+        <div className="hidden lg:grid lg:grid-cols-[260px_1fr_300px] gap-4 lg:h-[calc(100vh-180px)]">
+          {/* 좌측: 상단 대기선수(50%) + 하단 채팅(50%) */}
+          <div className="flex flex-col gap-3 min-h-0">
+            <Card className="flex-1 min-h-0">
+              <CardContent className="p-3 h-full">
+                <PlayersList
+                  players={players}
+                  currentPlayerId={auctionState.currentPlayer?.id}
+                  onExpand={() => setPlayersModalOpen(true)}
+                  compact
+                />
               </CardContent>
             </Card>
+            <GameChatPanel
+              roomId={auctionId}
+              variant="inline"
+              className="flex-1 min-h-0"
+            />
           </div>
 
-          {/* 중앙: 경매 메인 */}
-          <div>
+          {/* 중앙: 경매 메인 — 컨텐츠가 길어지면 스크롤 */}
+          <div className="overflow-y-auto pr-1">
             <AuctionBoard
               auctionState={auctionState}
               teams={teams}
@@ -748,13 +784,11 @@ export default function AuctionRoomPage() {
           </div>
 
           {/* 우측: 입찰 로그 */}
-          <div>
-            <Card>
-              <CardContent className="p-3">
-                <BidLog bidHistory={bidHistory} logEndRef={logEndRef} />
-              </CardContent>
-            </Card>
-          </div>
+          <Card className="h-full min-h-0">
+            <CardContent className="p-3 h-full">
+              <BidLog bidHistory={bidHistory} logEndRef={logEndRef} />
+            </CardContent>
+          </Card>
         </div>
 
         {/* ── 모바일: 탭 컨텐츠 (lg 미만) ── */}
@@ -780,10 +814,17 @@ export default function AuctionRoomPage() {
           )}
           {mobileTab === "log" && (
             <Card>
-              <CardContent className="p-3">
+              <CardContent className="p-3 h-[60vh]">
                 <BidLog bidHistory={bidHistory} logEndRef={logEndRef} />
               </CardContent>
             </Card>
+          )}
+          {mobileTab === "chat" && (
+            <GameChatPanel
+              roomId={auctionId}
+              variant="inline"
+              className="h-[60vh]"
+            />
           )}
         </div>
       </div>
@@ -805,8 +846,20 @@ export default function AuctionRoomPage() {
         <div className="lg:hidden h-36" />
       )}
 
-      {/* 채팅 패널 (플로팅) */}
-      <GameChatPanel roomId={auctionId} />
+      {/* 대기 선수 전체 보기 모달 */}
+      <Modal
+        isOpen={playersModalOpen}
+        onClose={() => setPlayersModalOpen(false)}
+        title={`대기 선수 (${players.length}명)`}
+        size="lg"
+      >
+        <div className="h-[60vh]">
+          <PlayersList
+            players={players}
+            currentPlayerId={auctionState.currentPlayer?.id}
+          />
+        </div>
+      </Modal>
     </div>
   );
 }
