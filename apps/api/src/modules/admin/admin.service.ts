@@ -320,6 +320,17 @@ export class AdminService {
           banUntil: true,
           createdAt: true,
           authProviders: { select: { provider: true } },
+          riotAccounts: {
+            select: {
+              id: true,
+              gameName: true,
+              tagLine: true,
+              tier: true,
+              rank: true,
+              isPrimary: true,
+            },
+            orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }],
+          },
           _count: { select: { reportsReceived: true } },
         },
         orderBy: { createdAt: "desc" },

@@ -36,6 +36,7 @@ import {
   AlertTriangle,
   Database,
   RefreshCw,
+  ChevronDown,
 } from "lucide-react";
 
 type Tab =
@@ -531,6 +532,14 @@ interface AdminUser {
   restrictedUntil: string | null;
   createdAt: string;
   authProviders: { provider: string }[];
+  riotAccounts: {
+    id: string;
+    gameName: string;
+    tagLine: string;
+    tier: string;
+    rank: string;
+    isPrimary: boolean;
+  }[];
   _count: { reportsReceived: number };
 }
 
@@ -547,6 +556,57 @@ const BAN_REASONS = [
   { value: "OTHER", label: "직접 입력" },
 ] as const;
 
+
+// 등록된 라이엇 계정 표시 — 주 계정만 노출, 추가 계정은 드롭다운으로 펼침
+function RiotAccountsCell({ accounts }: { accounts: AdminUser["riotAccounts"] }) {
+  const [open, setOpen] = useState(false);
+
+  if (!accounts || accounts.length === 0) {
+    return <span className="text-xs text-text-muted">-</span>;
+  }
+
+  // 주 계정 우선, 없으면 첫 번째
+  const primary = accounts.find((a) => a.isPrimary) ?? accounts[0];
+  const others = accounts.filter((a) => a.id !== primary.id);
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => others.length > 0 && setOpen((v) => !v)}
+        className={`inline-flex items-center gap-1 text-xs ${
+          others.length > 0 ? "hover:text-accent-primary cursor-pointer" : "cursor-default"
+        } text-text-primary`}
+      >
+        <span className="font-medium">
+          {primary.gameName}#{primary.tagLine}
+        </span>
+        {others.length > 0 && (
+          <span className="flex items-center gap-0.5 text-text-muted">
+            <span className="text-[10px]">+{others.length}</span>
+            <ChevronDown className={`h-3 w-3 transition-transform ${open ? "rotate-180" : ""}`} />
+          </span>
+        )}
+      </button>
+      {open && others.length > 0 && (
+        <>
+          {/* 바깥 클릭 시 닫힘 */}
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute left-0 top-full mt-1 z-20 min-w-[180px] rounded-lg border border-bg-tertiary bg-bg-secondary shadow-lg py-1">
+            {others.map((acc) => (
+              <div key={acc.id} className="px-3 py-1.5 text-xs text-text-primary hover:bg-bg-tertiary/50">
+                <span className="font-medium">{acc.gameName}#{acc.tagLine}</span>
+                <span className="ml-2 text-text-muted">
+                  {acc.tier}{acc.rank ? ` ${acc.rank}` : ""}
+                </span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 function UsersTab({ addToast, currentUserId }: { addToast: (msg: string, type: "success" | "error") => void; currentUserId?: string }) {
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -681,6 +741,7 @@ function UsersTab({ addToast, currentUserId }: { addToast: (msg: string, type: "
                 <thead>
                   <tr className="border-b border-bg-tertiary text-text-muted">
                     <th className="text-left px-4 py-3 font-medium">유저</th>
+                    <th className="text-left px-4 py-3 font-medium">롤 닉</th>
                     <th className="text-left px-4 py-3 font-medium">상태</th>
                     <th className="text-left px-4 py-3 font-medium">신고</th>
                     <th className="text-left px-4 py-3 font-medium">권한</th>
@@ -696,6 +757,9 @@ function UsersTab({ addToast, currentUserId }: { addToast: (msg: string, type: "
                           {u.id === currentUserId && <span className="ml-1 text-[10px] text-accent-primary">(나)</span>}
                           <p className="text-xs text-text-muted">{u.email ?? "-"}</p>
                         </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <RiotAccountsCell accounts={u.riotAccounts} />
                       </td>
                       <td className="px-4 py-3">
                         {u.isBanned ? (

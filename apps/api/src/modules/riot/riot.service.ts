@@ -517,7 +517,7 @@ export class RiotService {
 
     if (existing && existing.userId !== userId) {
       throw new BadRequestException(
-        "This Riot account is already linked to another user",
+        "이미 다른 유저가 등록한 라이엇 계정입니다.",
       );
     }
 
