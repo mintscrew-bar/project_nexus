@@ -33,7 +33,20 @@ export function GameChatPanel({ roomId, isFinalStage, variant = "floating", clas
     };
   }, [roomId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // inline 모드: 토글 없이 항상 표시
+  // Track unread messages when panel is closed
+  useEffect(() => {
+    if (!isOpen && messages.length > prevCountRef.current) {
+      setUnread((u) => u + (messages.length - prevCountRef.current));
+    }
+    prevCountRef.current = messages.length;
+  }, [messages.length, isOpen]);
+
+  // Clear unread when panel opens
+  useEffect(() => {
+    if (isOpen) setUnread(0);
+  }, [isOpen]);
+
+  // inline 모드: 토글 없이 항상 표시 (hooks 호출 이후로 분기)
   if (variant === "inline") {
     return (
       <div className={cn("flex flex-col bg-bg-secondary border border-bg-tertiary rounded-xl overflow-hidden", className)}>
@@ -55,19 +68,6 @@ export function GameChatPanel({ roomId, isFinalStage, variant = "floating", clas
       </div>
     );
   }
-
-  // Track unread messages when panel is closed
-  useEffect(() => {
-    if (!isOpen && messages.length > prevCountRef.current) {
-      setUnread((u) => u + (messages.length - prevCountRef.current));
-    }
-    prevCountRef.current = messages.length;
-  }, [messages.length, isOpen]);
-
-  // Clear unread when panel opens
-  useEffect(() => {
-    if (isOpen) setUnread(0);
-  }, [isOpen]);
 
   return (
     <>
