@@ -323,6 +323,7 @@ export default function RiotMatchList({
                             <ItemTooltip itemId={String(item)}>
                               <Image
                                 src={getItemIcon(item)}
+                                unoptimized
                                 alt="item"
                                 width={32}
                                 height={32}
@@ -339,6 +340,7 @@ export default function RiotMatchList({
                           <ItemTooltip itemId={String(participant.item6)}>
                             <Image
                               src={getItemIcon(participant.item6)}
+                                unoptimized
                               alt="trinket"
                               width={32}
                               height={32}
@@ -353,6 +355,7 @@ export default function RiotMatchList({
                           <ItemTooltip itemId={String(participant.item7)}>
                             <Image
                               src={getItemIcon(participant.item7)}
+                                unoptimized
                               alt="quest"
                               width={32}
                               height={32}
@@ -425,6 +428,7 @@ export default function RiotMatchList({
                             <ItemTooltip itemId={String(item)}>
                               <Image
                                 src={getItemIcon(item)}
+                                unoptimized
                                 alt="item"
                                 width={20}
                                 height={20}
@@ -440,6 +444,7 @@ export default function RiotMatchList({
                           <ItemTooltip itemId={String(participant.item6)}>
                             <Image
                               src={getItemIcon(participant.item6)}
+                                unoptimized
                               alt="trinket"
                               width={20}
                               height={20}
@@ -682,6 +687,7 @@ export default function RiotMatchList({
                                       <ItemTooltip itemId={String(item)}>
                                         <Image
                                           src={getItemIcon(item)}
+                                unoptimized
                                           alt="item"
                                           width={24}
                                           height={24}
@@ -697,6 +703,7 @@ export default function RiotMatchList({
                                     <ItemTooltip itemId={String(p.item7)}>
                                       <Image
                                         src={getItemIcon(p.item7)}
+                                unoptimized
                                         alt="quest"
                                         width={24}
                                         height={24}
@@ -824,6 +831,7 @@ export default function RiotMatchList({
                                         <ItemTooltip key={i} itemId={String(itemId)}>
                                           <Image
                                             src={getItemIcon(itemId)}
+                                unoptimized
                                             alt={`item ${itemId}`}
                                             width={28}
                                             height={28}
@@ -849,6 +857,7 @@ export default function RiotMatchList({
                                   <ItemTooltip itemId={String(item)}>
                                     <Image
                                       src={getItemIcon(item)}
+                                unoptimized
                                       alt="item"
                                       width={48}
                                       height={48}
@@ -866,6 +875,7 @@ export default function RiotMatchList({
                                 <ItemTooltip itemId={String(participant.item7)}>
                                   <Image
                                     src={getItemIcon(participant.item7)}
+                                unoptimized
                                     alt="quest"
                                     width={48}
                                     height={48}
