@@ -72,7 +72,7 @@ export class DiscordController {
   @Get("guild-links/me")
   @UseGuards(JwtAuthGuard)
   async getMyGuildLinks(@CurrentUser("sub") userId: string) {
-    const guilds = await this.discordService.getActiveGuildLinksForUser(userId);
+    const guilds = await this.discordService.getGuildLinksForUser(userId);
 
     return {
       home: {

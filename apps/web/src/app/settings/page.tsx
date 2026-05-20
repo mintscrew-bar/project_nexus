@@ -6,11 +6,11 @@ import { useAuthStore } from "@/stores/auth-store";
 import { userApi, statsApi, appealApi, discordApi } from "@/lib/api-client";
 import { useDdragonStore } from "@/stores/ddragon-store";
 import { ChampionImage } from "@/components/ChampionImage";
-import { Card, CardHeader, CardTitle, CardContent, Button, Label, LoadingSpinner, ConfirmModal } from "@/components/ui";
+import { Card, CardHeader, CardTitle, CardContent, Button, Label, LoadingSpinner, ConfirmModal, Badge } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
 import { useTheme } from "next-themes";
 import Link from "next/link";
-import { Bell, Shield, Palette, LogOut, Check, Info, Search, X, Link as LinkIcon, AlertCircle, ExternalLink, ChevronRight, RefreshCw, Loader2 } from "lucide-react";
+import { Bell, Shield, Palette, LogOut, Check, Info, Search, X, Link as LinkIcon, AlertCircle, ExternalLink, ChevronRight, RefreshCw, Loader2, Server } from "lucide-react";
 import { AddAccountModal } from "@/components/domain/AddAccountModal";
 import { useRiotStore } from "@/stores/riot-store";
 
@@ -34,6 +34,35 @@ interface UserSettings {
   highlightStatType: string | null;
   theme: string;
 }
+
+interface DiscordGuildLink {
+  guildId: string;
+  guildName: string | null;
+  status: "PENDING" | "ACTIVE" | "DISABLED";
+  activatedAt: string | null;
+  createdAt: string;
+}
+
+const DISCORD_GUILD_STATUS_META: Record<
+  DiscordGuildLink["status"],
+  { label: string; variant: "secondary" | "success" | "danger"; description: string }
+> = {
+  PENDING: {
+    label: "승인 대기",
+    variant: "secondary",
+    description: "관리자 승인 후 방 생성 서버로 선택할 수 있습니다.",
+  },
+  ACTIVE: {
+    label: "활성",
+    variant: "success",
+    description: "방 생성 시 이 서버를 선택할 수 있습니다.",
+  },
+  DISABLED: {
+    label: "비활성",
+    variant: "danger",
+    description: "현재 이 서버에서는 내전 채널을 만들 수 없습니다.",
+  },
+};
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -60,6 +89,9 @@ export default function SettingsPage() {
   const [isSyncingAvatar, setIsSyncingAvatar] = useState(false);
   // 봇 서버 추가 진행 상태
   const [isAddingBot, setIsAddingBot] = useState(false);
+  const [discordGuildLinks, setDiscordGuildLinks] = useState<DiscordGuildLink[]>([]);
+  const [isLoadingGuildLinks, setIsLoadingGuildLinks] = useState(false);
+  const [guildLinksError, setGuildLinksError] = useState<string | null>(null);
 
   // Settings state
   const [settings, setSettings] = useState<UserSettings>({
@@ -157,6 +189,33 @@ export default function SettingsPage() {
     }
   }, [isAuthenticated, setNextTheme]);
 
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    let isMounted = true;
+    setIsLoadingGuildLinks(true);
+    setGuildLinksError(null);
+
+    discordApi.getMyGuildLinks()
+      .then((data) => {
+        if (!isMounted) return;
+        setDiscordGuildLinks(data.guilds);
+      })
+      .catch(() => {
+        if (!isMounted) return;
+        setGuildLinksError("연동 서버 목록을 불러오지 못했습니다.");
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsLoadingGuildLinks(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isAuthenticated]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center flex-grow">
@@ -192,6 +251,21 @@ export default function SettingsPage() {
       const msg = err?.response?.data?.message || "봇 추가 링크 생성에 실패했습니다.";
       addToast(msg, "error");
       setIsAddingBot(false);
+    }
+  };
+
+  const handleRefreshGuildLinks = async () => {
+    setIsLoadingGuildLinks(true);
+    setGuildLinksError(null);
+
+    try {
+      const data = await discordApi.getMyGuildLinks();
+      setDiscordGuildLinks(data.guilds);
+    } catch {
+      setGuildLinksError("연동 서버 목록을 불러오지 못했습니다.");
+      addToast("연동 서버 목록을 불러오지 못했습니다.", "error");
+    } finally {
+      setIsLoadingGuildLinks(false);
     }
   };
 
@@ -384,6 +458,85 @@ export default function SettingsPage() {
                     {isAddingBot ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : null}
                     봇 추가하기
                   </Button>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <CardTitle>연동한 Discord 서버</CardTitle>
+                      <p className="text-sm text-text-secondary mt-1">
+                        승인 상태를 확인하고, 활성 서버는 방 생성 시 선택할 수 있습니다.
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleRefreshGuildLinks}
+                      disabled={isLoadingGuildLinks}
+                      className="shrink-0"
+                    >
+                      <RefreshCw className={`h-4 w-4 ${isLoadingGuildLinks ? "animate-spin" : ""}`} />
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {isLoadingGuildLinks ? (
+                    <div className="flex justify-center py-8">
+                      <LoadingSpinner />
+                    </div>
+                  ) : guildLinksError ? (
+                    <div className="p-3 bg-accent-danger/10 border border-accent-danger/20 rounded-lg text-sm text-accent-danger">
+                      {guildLinksError}
+                    </div>
+                  ) : discordGuildLinks.length === 0 ? (
+                    <div className="p-4 bg-bg-tertiary/50 border border-bg-elevated rounded-lg">
+                      <p className="text-sm text-text-primary font-medium">아직 연동한 서버가 없습니다.</p>
+                      <p className="text-xs text-text-secondary mt-1">
+                        봇 추가 후 관리자 승인이 완료되면 방 생성 화면에서 해당 서버를 선택할 수 있습니다.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {discordGuildLinks.map((guild) => {
+                        const statusMeta = DISCORD_GUILD_STATUS_META[guild.status];
+                        const statusDate = guild.status === "ACTIVE" && guild.activatedAt
+                          ? guild.activatedAt
+                          : guild.createdAt;
+
+                        return (
+                          <div
+                            key={guild.guildId}
+                            className="flex items-start gap-3 p-3 bg-bg-tertiary/50 border border-bg-elevated rounded-lg"
+                          >
+                            <div className="w-10 h-10 rounded-lg bg-bg-elevated flex items-center justify-center shrink-0">
+                              <Server className="h-5 w-5 text-accent-primary" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <p className="font-medium text-text-primary truncate">
+                                  {guild.guildName || "이름 미확인 서버"}
+                                </p>
+                                <Badge variant={statusMeta.variant} size="sm">
+                                  {statusMeta.label}
+                                </Badge>
+                              </div>
+                              <p className="text-xs text-text-tertiary font-mono mt-1 truncate">
+                                {guild.guildId}
+                              </p>
+                              <p className="text-xs text-text-secondary mt-2">
+                                {statusMeta.description}
+                              </p>
+                              <p className="text-[11px] text-text-tertiary mt-1">
+                                {new Date(statusDate).toLocaleDateString("ko-KR")}
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 

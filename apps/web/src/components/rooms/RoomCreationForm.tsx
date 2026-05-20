@@ -17,6 +17,7 @@ type TeamMode = "AUCTION" | "SNAKE_DRAFT";
 type DiscordGuildOption = {
   guildId: string;
   guildName: string | null;
+  status: "PENDING" | "ACTIVE" | "DISABLED";
 };
 
 const TEAM_MODES: { value: TeamMode; label: string; description: string; icon: React.ReactNode }[] = [
@@ -79,7 +80,7 @@ export function RoomCreationForm({ onCancel, onRoomCreated }: RoomCreationFormPr
     discordApi.getMyGuildLinks()
       .then((data) => {
         if (!isMounted) return;
-        setDiscordGuilds(data.guilds);
+        setDiscordGuilds(data.guilds.filter((guild) => guild.status === "ACTIVE"));
       })
       .catch(() => {
         if (!isMounted) return;

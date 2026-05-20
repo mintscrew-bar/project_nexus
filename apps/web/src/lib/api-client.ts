@@ -501,7 +501,13 @@ export const discordApi = {
 
   getMyGuildLinks: async (): Promise<{
     home: { guildId: string | null; guildName: string };
-    guilds: Array<{ guildId: string; guildName: string | null }>;
+    guilds: Array<{
+      guildId: string;
+      guildName: string | null;
+      status: "PENDING" | "ACTIVE" | "DISABLED";
+      activatedAt: string | null;
+      createdAt: string;
+    }>;
   }> => {
     const response = await apiClient.get("/discord/guild-links/me");
     return response.data;

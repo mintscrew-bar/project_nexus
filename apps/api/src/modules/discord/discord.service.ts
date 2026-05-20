@@ -62,13 +62,16 @@ export class DiscordService {
     });
   }
 
-  async getActiveGuildLinksForUser(ownerId: string) {
+  async getGuildLinksForUser(ownerId: string) {
     return this.prisma.discordGuildLink.findMany({
-      where: { ownerId, status: "ACTIVE" },
+      where: { ownerId },
       orderBy: [{ activatedAt: "desc" }, { createdAt: "desc" }],
       select: {
         guildId: true,
         guildName: true,
+        status: true,
+        activatedAt: true,
+        createdAt: true,
       },
     });
   }
