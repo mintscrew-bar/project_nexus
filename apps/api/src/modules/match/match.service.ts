@@ -695,7 +695,6 @@ export class MatchService {
       include: {
         teamA: {
           include: {
-            captain: { select: { id: true, username: true } },
             members: {
               include: {
                 user: {
@@ -711,15 +710,6 @@ export class MatchService {
                         tier: true,
                         rank: true,
                         mainRole: true,
-                        subRole: true,
-                        championPreferences: {
-                          orderBy: { order: "asc" },
-                          select: {
-                            role: true,
-                            championId: true,
-                            order: true,
-                          },
-                        },
                       },
                     },
                   },
@@ -730,7 +720,6 @@ export class MatchService {
         },
         teamB: {
           include: {
-            captain: { select: { id: true, username: true } },
             members: {
               include: {
                 user: {
@@ -746,15 +735,6 @@ export class MatchService {
                         tier: true,
                         rank: true,
                         mainRole: true,
-                        subRole: true,
-                        championPreferences: {
-                          orderBy: { order: "asc" },
-                          select: {
-                            role: true,
-                            championId: true,
-                            order: true,
-                          },
-                        },
                       },
                     },
                   },
@@ -936,37 +916,54 @@ export class MatchService {
    * Get match details with participant stats
    */
   async getMatchDetails(matchId: string) {
-    const match = await this.prisma.match.findUnique({
-      where: { id: matchId },
-      include: {
-        teamA: {
-          include: {
-            members: {
-              include: {
-                user: {
-                  select: {
-                    id: true,
-                    username: true,
-                    avatar: true,
+    // 라인별 로스터/호버 툴팁용 멤버 정보 select — 팀장, 배정 라인, 주 라이엇 계정의
+    // 티어/주·부라인/선호 챔피언까지 포함한다.
+    const memberInclude = {
+      members: {
+        include: {
+          user: {
+            select: {
+              id: true,
+              username: true,
+              avatar: true,
+              riotAccounts: {
+                where: { isPrimary: true },
+                select: {
+                  gameName: true,
+                  tagLine: true,
+                  tier: true,
+                  rank: true,
+                  mainRole: true,
+                  subRole: true,
+                  championPreferences: {
+                    orderBy: { order: "asc" as const },
+                    select: {
+                      role: true,
+                      championId: true,
+                      order: true,
+                    },
                   },
                 },
               },
             },
           },
         },
+      },
+    };
+
+    const match = await this.prisma.match.findUnique({
+      where: { id: matchId },
+      include: {
+        teamA: {
+          include: {
+            captain: { select: { id: true, username: true } },
+            ...memberInclude,
+          },
+        },
         teamB: {
           include: {
-            members: {
-              include: {
-                user: {
-                  select: {
-                    id: true,
-                    username: true,
-                    avatar: true,
-                  },
-                },
-              },
-            },
+            captain: { select: { id: true, username: true } },
+            ...memberInclude,
           },
         },
         participants: {
