@@ -2,8 +2,12 @@ import { Module, OnModuleInit } from "@nestjs/common";
 import { DiscordService } from "./discord.service";
 import { DiscordBotService } from "./discord-bot.service";
 import { DiscordVoiceService } from "./discord-voice.service";
+import { DiscordController } from "./discord.controller";
+import { AuthModule } from "../auth/auth.module";
 
 @Module({
+  imports: [AuthModule],
+  controllers: [DiscordController],
   providers: [DiscordService, DiscordBotService, DiscordVoiceService],
   exports: [DiscordService, DiscordBotService, DiscordVoiceService],
 })

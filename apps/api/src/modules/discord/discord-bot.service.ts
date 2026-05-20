@@ -184,6 +184,11 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
     this.client.on("interactionCreate", this.handleInteraction.bind(this));
     this.client.on("guildMemberAdd", this.handleGuildMemberAdd.bind(this));
 
+    // ─── 멀티 길드 라이프사이클 ───
+    // 봇이 외부 길드에 추가/제거될 때 DiscordGuildLink 상태를 동기화한다.
+    this.client.on("guildCreate", this.handleGuildCreate.bind(this));
+    this.client.on("guildDelete", this.handleGuildDelete.bind(this));
+
     // ─── 음성채널 입/퇴장 감지 ───
     // 유저가 음성채널에 입장하거나 퇴장할 때마다 해당 채널이
     // Nexus 방의 Lobby 채널인지 DB에서 조회하고, 맞으면 내부 이벤트 발행
@@ -193,6 +198,47 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
   private async handleGuildMemberAdd(member: GuildMember) {
     if (member.user.bot) return;
     console.log(`[DiscordBot] 신규 멤버 입장: ${member.user.tag}`);
+  }
+
+  /**
+   * 봇이 외부 길드에 추가됨. OAuth 흐름으로 미리 만들어둔 PENDING 링크가 있으면
+   * 길드 이름을 갱신한다. 링크가 없으면(우리 흐름 외 무단 초대) 휴면 — 아무 동작 안 함.
+   */
+  private async handleGuildCreate(guild: { id: string; name: string }) {
+    try {
+      const link = await this.prisma.discordGuildLink.findUnique({
+        where: { guildId: guild.id },
+      });
+      if (!link) {
+        console.log(
+          `[DiscordBot] 미등록 길드에 추가됨(휴면): ${guild.name} (${guild.id})`,
+        );
+        return;
+      }
+      await this.prisma.discordGuildLink.update({
+        where: { guildId: guild.id },
+        data: { guildName: guild.name },
+      });
+      console.log(`[DiscordBot] 길드 연동 확인: ${guild.name} (${guild.id})`);
+    } catch (err: any) {
+      console.warn(`[DiscordBot] guildCreate 처리 실패: ${err?.message}`);
+    }
+  }
+
+  /**
+   * 봇이 외부 길드에서 추방/제거됨. 해당 링크를 DISABLED로 표시해
+   * 더 이상 그 길드에 채널을 만들지 않도록 한다.
+   */
+  private async handleGuildDelete(guild: { id: string }) {
+    try {
+      await this.prisma.discordGuildLink.updateMany({
+        where: { guildId: guild.id, status: { not: "DISABLED" } },
+        data: { status: "DISABLED" },
+      });
+      console.log(`[DiscordBot] 길드 연동 해제(DISABLED): ${guild.id}`);
+    } catch (err: any) {
+      console.warn(`[DiscordBot] guildDelete 처리 실패: ${err?.message}`);
+    }
   }
 
   /**
