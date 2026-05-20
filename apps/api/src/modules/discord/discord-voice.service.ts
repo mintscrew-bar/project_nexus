@@ -49,6 +49,39 @@ export class DiscordVoiceService {
     return /^testbot_\d+$/.test(username);
   }
 
+  /**
+   * 방에 묶인 디스코드 길드 ID를 해석한다.
+   * 멀티 길드 지원: Room.discordGuildId 가 있으면 그 길드를, 없으면 기존 홈 서버
+   * (env DISCORD_GUILD_ID)로 폴백한다. 둘 다 없으면 null.
+   */
+  private async resolveRoomGuildId(roomId: string): Promise<string | null> {
+    const room = await this.prisma.room.findUnique({
+      where: { id: roomId },
+      select: { discordGuildId: true },
+    });
+    return (
+      room?.discordGuildId ||
+      this.configService.get<string>("DISCORD_GUILD_ID") ||
+      null
+    );
+  }
+
+  /**
+   * 채널 ID로부터 소속 길드 ID를 해석한다. RoomDiscordChannel → Room.discordGuildId
+   * 순으로 찾고, 없으면 홈 서버(env)로 폴백한다.
+   */
+  private async resolveChannelGuildId(channelId: string): Promise<string | null> {
+    const link = await this.prisma.roomDiscordChannel.findUnique({
+      where: { channelId },
+      select: { room: { select: { discordGuildId: true } } },
+    });
+    return (
+      link?.room?.discordGuildId ||
+      this.configService.get<string>("DISCORD_GUILD_ID") ||
+      null
+    );
+  }
+
   // ========================================
   // Channel Creation
   // ========================================
@@ -62,7 +95,7 @@ export class DiscordVoiceService {
     teamChannels: Array<{ teamName: string; channelId: string }>;
     lobbyChannelId?: string;
   }> {
-    const guildId = this.configService.get("DISCORD_GUILD_ID");
+    const guildId = await this.resolveRoomGuildId(roomId);
     if (!guildId) {
       throw new BadRequestException("Discord guild not configured");
     }
@@ -213,7 +246,7 @@ export class DiscordVoiceService {
     discordUserId: string,
     teamChannelId: string,
   ): Promise<boolean> {
-    const guildId = this.configService.get("DISCORD_GUILD_ID");
+    const guildId = await this.resolveChannelGuildId(teamChannelId);
     if (!guildId) {
       this.logger.warn("Discord guild not configured, skipping voice move");
       return false;
@@ -330,7 +363,7 @@ export class DiscordVoiceService {
       discordChannels?: { channelId: string; teamName?: string | null }[];
     },
   ): Promise<void> {
-    const guildId = this.configService.get("DISCORD_GUILD_ID");
+    const guildId = await this.resolveRoomGuildId(roomId);
     if (!guildId) {
       return;
     }
@@ -414,7 +447,7 @@ export class DiscordVoiceService {
   // ========================================
 
   async updateRoomChannels(roomId: string, newNumTeams: number): Promise<void> {
-    const guildId = this.configService.get("DISCORD_GUILD_ID");
+    const guildId = await this.resolveRoomGuildId(roomId);
     if (!guildId) return;
 
     const room = await this.prisma.room.findUnique({
@@ -502,7 +535,7 @@ export class DiscordVoiceService {
    * 방 이름 변경 시 Discord 카테고리 이름 동기화
    */
   async updateCategoryName(roomId: string, newRoomName: string): Promise<void> {
-    const guildId = this.configService.get("DISCORD_GUILD_ID");
+    const guildId = await this.resolveRoomGuildId(roomId);
     if (!guildId) return;
 
     const room = await this.prisma.room.findUnique({
@@ -535,7 +568,7 @@ export class DiscordVoiceService {
   // ========================================
 
   async sendChannelMessage(channelId: string, message: string): Promise<void> {
-    const guildId = this.configService.get("DISCORD_GUILD_ID");
+    const guildId = await this.resolveChannelGuildId(channelId);
     if (!guildId) {
       return;
     }
@@ -553,7 +586,7 @@ export class DiscordVoiceService {
   }
 
   async getUsersInVoiceChannel(channelId: string): Promise<string[]> {
-    const guildId = this.configService.get("DISCORD_GUILD_ID");
+    const guildId = await this.resolveChannelGuildId(channelId);
     if (!guildId) {
       return [];
     }
@@ -620,7 +653,7 @@ export class DiscordVoiceService {
   async validateVoicePresence(
     roomId: string,
   ): Promise<{ valid: boolean; missingUsernames: string[] }> {
-    const guildId = this.configService.get("DISCORD_GUILD_ID");
+    const guildId = await this.resolveRoomGuildId(roomId);
     if (!guildId) {
       // Discord 미설정 시 검증 스킵 (항상 통과)
       return { valid: true, missingUsernames: [] };
@@ -778,6 +811,7 @@ export class DiscordVoiceService {
   async findAndAssignLobbyChannel(
     maxParticipants: number,
   ): Promise<string | null> {
+    // 전역 "내전 대기실"은 홈 서버 전용 개념(방 컨텍스트 없음)이라 홈 길드(env) 고정.
     const guildId = this.configService.get("DISCORD_GUILD_ID");
     const lobbyChannelName =
       this.configService.get("DISCORD_LOBBY_CHANNEL_NAME") || "내전 대기실";
@@ -847,6 +881,7 @@ export class DiscordVoiceService {
    * @returns 성공 여부
    */
   async assignCaptainRole(discordUserId: string): Promise<boolean> {
+    // 주장 역할은 넥서스 홈 서버의 디스코드 Role이라 홈 길드(env) 고정.
     const guildId = this.configService.get("DISCORD_GUILD_ID");
     const captainRoleName =
       this.configService.get("DISCORD_CAPTAIN_ROLE_NAME") || "팀장";
@@ -897,6 +932,7 @@ export class DiscordVoiceService {
    * @param discordUserId 디스코드 유저 ID
    */
   async removeCaptainRole(discordUserId: string): Promise<void> {
+    // 주장 역할은 넥서스 홈 서버의 디스코드 Role이라 홈 길드(env) 고정.
     const guildId = this.configService.get("DISCORD_GUILD_ID");
     const captainRoleName =
       this.configService.get("DISCORD_CAPTAIN_ROLE_NAME") || "팀장";
@@ -1026,6 +1062,8 @@ export class DiscordVoiceService {
    */
   @Cron("0 4 * * *")
   async cleanupStaleEmptyRoomChannels(): Promise<void> {
+    // TODO(multi-guild): 현재는 홈 길드만 청소. 멀티 길드 도입 시 바인딩된 모든
+    // 길드를 순회하도록 확장 필요.
     const guildId = this.configService.get("DISCORD_GUILD_ID");
     if (!guildId || !this.isDiscordReady()) return;
 
