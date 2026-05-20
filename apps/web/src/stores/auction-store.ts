@@ -134,6 +134,10 @@ function normalizeAuctionState(rawState: any, players: Player[]): AuctionState |
   };
 }
 
+function getAuctionPlayerName(player: any): string {
+  return player?.username ?? player?.user?.username ?? player?.name ?? '???';
+}
+
 function mapRoomFallbackData(room: any): { teams: Team[]; players: Player[] } {
   const teams: Team[] = Array.isArray(room?.teams)
     ? room.teams.map((team: any) => ({
@@ -379,7 +383,7 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
           );
           // 낙찰 피드백 정보 저장 (5초 후 자동 클리어)
           const soldEvent = {
-            playerName: data.player?.username ?? '???',
+            playerName: getAuctionPlayerName(data.player),
             teamName: data.team?.name ?? '???',
             price: data.price ?? 0,
             timestamp: Date.now(),

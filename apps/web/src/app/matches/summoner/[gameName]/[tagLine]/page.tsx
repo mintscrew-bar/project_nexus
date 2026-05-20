@@ -241,7 +241,7 @@ export default function SummonerStatsPage() {
   const REFRESH_COOLDOWN_SEC = 30; // 갱신 쿨다운 30초
 
   const handleRefresh = async () => {
-    if (refreshCooldown > 0) return;
+    if (isRefreshing || refreshCooldown > 0) return;
     setIsRefreshing(true);
     try {
       if (nexusUserId) {
@@ -265,7 +265,11 @@ export default function SummonerStatsPage() {
         });
       }, 1000);
     } catch (err: any) {
-      addToast("데이터 새로고침에 실패했습니다.", "error");
+      if (err?.response?.status === 429) {
+        addToast("새로고침 요청이 너무 많습니다. 잠시 후 다시 시도해주세요.", "warning");
+      } else {
+        addToast("데이터 새로고침에 실패했습니다.", "error");
+      }
     } finally {
       setIsRefreshing(false);
     }

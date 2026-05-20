@@ -625,11 +625,13 @@ export class StatsService {
         fromDate: seasonStart,
         groupBy: "champion",
         dateField: "createdAt",
+        source: "custom",
       });
       const rows = await this.prisma.matchParticipant.findMany({
         where: {
           userId,
           match: {
+            roomId: { not: null },
             createdAt: {
               gte: seasonStart,
             },
@@ -680,6 +682,7 @@ export class StatsService {
         where: {
           userId,
           match: {
+            roomId: { not: null },
             createdAt: {
               gte: seasonStart,
             },

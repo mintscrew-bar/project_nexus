@@ -168,6 +168,28 @@ export class AuctionService implements OnModuleInit {
       );
   }
 
+  private _mapAuctionParticipant(participant: any) {
+    const acc = participant?.user?.riotAccounts?.[0];
+    return {
+      id: participant?.userId ?? participant?.user?.id ?? participant?.id,
+      participantId: participant?.id,
+      userId: participant?.userId ?? participant?.user?.id,
+      username:
+        participant?.user?.username ?? participant?.username ?? "Unknown",
+      avatar: participant?.user?.avatar ?? participant?.avatar,
+      tier: acc?.tier ?? "UNRANKED",
+      rank: acc?.rank,
+      mainRole: acc?.mainRole,
+      subRole: acc?.subRole,
+      mmr: calculateTierScore(
+        acc?.tier || "UNRANKED",
+        acc?.rank || "",
+        acc?.lp || 0,
+      ),
+      position: participant?.assignedRole ?? acc?.mainRole ?? "FLEX",
+    };
+  }
+
   /** 팀장 선정 단계를 인메모리 + Redis에 저장 (timerHandle 제외) */
   private _setCaptainPhase(roomId: string, phase: CaptainSelectionPhase): void {
     this.captainPhases.set(roomId, phase);
@@ -1112,7 +1134,7 @@ export class AuctionService implements OnModuleInit {
 
       return {
         sold: true,
-        player: currentPlayer,
+        player: this._mapAuctionParticipant(currentPlayer),
         team,
         price: soldPrice,
       };
@@ -1138,7 +1160,10 @@ export class AuctionService implements OnModuleInit {
         state.timerEnd = Date.now() + this.getBaseBidTimerMs();
         // 유찰 상태 변경을 Redis에 동기화
         this._setAuctionState(roomId, state);
-        return { sold: false, player: currentPlayer };
+        return {
+          sold: false,
+          player: this._mapAuctionParticipant(currentPlayer),
+        };
       }
 
       // Simulation rule: otherwise force-assign to incomplete team with highest budget.
@@ -1195,7 +1220,7 @@ export class AuctionService implements OnModuleInit {
 
       return {
         sold: true,
-        player: currentPlayer,
+        player: this._mapAuctionParticipant(currentPlayer),
         team: targetTeam,
         price: 0,
       };

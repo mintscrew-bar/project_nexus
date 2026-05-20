@@ -31,6 +31,13 @@ async function bootstrap() {
 
   const configService = app.get(ConfigService);
 
+  // Cloudflared/nginx 뒤에서 실제 클라이언트 IP를 사용해야
+  // 전역 Throttler가 프록시 컨테이너 IP 하나로 모든 사용자를 묶지 않는다.
+  const httpAdapter = app.getHttpAdapter().getInstance();
+  if (typeof httpAdapter.set === "function") {
+    httpAdapter.set("trust proxy", true);
+  }
+
   app.use(cookieParser());
 
   // Security Headers 강화 (CSP + HSTS 포함)

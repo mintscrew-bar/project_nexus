@@ -1038,7 +1038,12 @@ export class MatchService {
     offset: number = 0,
   ) {
     const matches = await this.prisma.matchParticipant.findMany({
-      where: { userId },
+      where: {
+        userId,
+        match: {
+          roomId: { not: null },
+        },
+      },
       include: {
         match: {
           include: {
