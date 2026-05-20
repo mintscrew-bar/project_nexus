@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRoomStore } from "@/stores/room-store";
 import { useRouter } from "next/navigation";
-import { Users, Lock, Unlock, Gavel, ListOrdered, Trophy, Info, GitBranch, AlertTriangle } from "lucide-react";
+import { Users, Lock, Unlock, Gavel, ListOrdered, Trophy, Info, GitBranch, AlertTriangle, Server } from "lucide-react";
 import Link from "next/link";
+import { discordApi } from "@/lib/api-client";
 
 interface RoomCreationFormProps {
   onCancel: () => void;
@@ -12,6 +13,11 @@ interface RoomCreationFormProps {
 }
 
 type TeamMode = "AUCTION" | "SNAKE_DRAFT";
+
+type DiscordGuildOption = {
+  guildId: string;
+  guildName: string | null;
+};
 
 const TEAM_MODES: { value: TeamMode; label: string; description: string; icon: React.ReactNode }[] = [
   {
@@ -46,6 +52,10 @@ export function RoomCreationForm({ onCancel, onRoomCreated }: RoomCreationFormPr
   const [password, setPassword] = useState("");
   const [allowSpectators, setAllowSpectators] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [selectedDiscordGuildId, setSelectedDiscordGuildId] = useState("");
+  const [discordGuilds, setDiscordGuilds] = useState<DiscordGuildOption[]>([]);
+  const [isLoadingGuilds, setIsLoadingGuilds] = useState(false);
+  const [guildLoadError, setGuildLoadError] = useState<string | null>(null);
 
   // 경매 설정
   const [startingPoints, setStartingPoints] = useState(1000);
@@ -59,6 +69,33 @@ export function RoomCreationForm({ onCancel, onRoomCreated }: RoomCreationFormPr
 
   // 브래킷 포맷 (4/8팀 전용)
   const [useDoubleElim, setUseDoubleElim] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    setIsLoadingGuilds(true);
+    setGuildLoadError(null);
+
+    discordApi.getMyGuildLinks()
+      .then((data) => {
+        if (!isMounted) return;
+        setDiscordGuilds(data.guilds);
+      })
+      .catch(() => {
+        if (!isMounted) return;
+        setDiscordGuilds([]);
+        setGuildLoadError("연동 서버 목록을 불러오지 못했습니다. 넥서스 서버로는 생성할 수 있습니다.");
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsLoadingGuilds(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -76,6 +113,7 @@ export function RoomCreationForm({ onCancel, onRoomCreated }: RoomCreationFormPr
       teamMode: teamMode,
       password: isPrivate ? password : undefined,
       allowSpectators: allowSpectators,
+      discordGuildId: selectedDiscordGuildId || undefined,
       // Auction settings
       startingPoints,
       minBidIncrement,
@@ -102,6 +140,9 @@ export function RoomCreationForm({ onCancel, onRoomCreated }: RoomCreationFormPr
   };
 
   const selectedPlayerOption = PLAYER_OPTIONS.find(opt => opt.value === maxParticipants);
+  const selectedDiscordServerLabel = selectedDiscordGuildId
+    ? discordGuilds.find((guild) => guild.guildId === selectedDiscordGuildId)?.guildName || "연동 Discord 서버"
+    : "넥서스 서버";
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -123,6 +164,37 @@ export function RoomCreationForm({ onCancel, onRoomCreated }: RoomCreationFormPr
           />
           <p className="text-text-tertiary text-xs mt-1">{name.length}/50자</p>
         </div>
+      </div>
+
+      {/* Discord 서버 선택 */}
+      <div>
+        <label htmlFor="discordGuildId" className="block text-text-primary text-sm font-semibold mb-2">
+          <Server className="w-4 h-4 inline mr-2" />
+          Discord 서버
+        </label>
+        <select
+          id="discordGuildId"
+          value={selectedDiscordGuildId}
+          onChange={(e) => setSelectedDiscordGuildId(e.target.value)}
+          className="w-full input"
+          disabled={isLoadingGuilds}
+        >
+          <option value="">넥서스 서버</option>
+          {discordGuilds.map((guild) => (
+            <option key={guild.guildId} value={guild.guildId}>
+              {guild.guildName || `Discord 서버 (${guild.guildId})`}
+            </option>
+          ))}
+        </select>
+        {isLoadingGuilds ? (
+          <p className="text-text-tertiary text-xs mt-1">연동 서버 목록을 불러오는 중입니다.</p>
+        ) : guildLoadError ? (
+          <p className="text-accent-danger text-xs mt-1">{guildLoadError}</p>
+        ) : (
+          <p className="text-text-tertiary text-xs mt-1">
+            선택한 서버에 내전 음성 채널이 생성됩니다.
+          </p>
+        )}
       </div>
 
       {/* 참가 인원 */}
@@ -414,6 +486,10 @@ export function RoomCreationForm({ onCancel, onRoomCreated }: RoomCreationFormPr
            •{" "}
           <span>
             {allowSpectators ? "관전 허용" : "관전 비허용"}
+          </span>
+          {" "}•{" "}
+          <span className="font-semibold text-text-primary">
+            {selectedDiscordServerLabel}
           </span>
         </div>
       </div>

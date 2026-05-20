@@ -69,6 +69,20 @@ export class DiscordController {
     return { url };
   }
 
+  @Get("guild-links/me")
+  @UseGuards(JwtAuthGuard)
+  async getMyGuildLinks(@CurrentUser("sub") userId: string) {
+    const guilds = await this.discordService.getActiveGuildLinksForUser(userId);
+
+    return {
+      home: {
+        guildId: this.configService.get<string>("DISCORD_GUILD_ID") || null,
+        guildName: "넥서스 서버",
+      },
+      guilds,
+    };
+  }
+
   /**
    * Discord가 봇 설치 후 리다이렉트하는 콜백. guild_id와 state를 받아
    * 해당 길드를 유저에게 PENDING으로 바인딩한 뒤 웹 설정 페이지로 보낸다.

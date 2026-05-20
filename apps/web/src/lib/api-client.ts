@@ -318,6 +318,7 @@ export const roomApi = {
     teamMode: "AUCTION" | "SNAKE_DRAFT";
     password?: string;
     allowSpectators?: boolean;
+    discordGuildId?: string;
     startingPoints?: number;
     minBidIncrement?: number;
     bidTimeLimit?: number;
@@ -495,6 +496,14 @@ export const discordApi = {
   // "내 디스코드 서버에 봇 추가" OAuth 설치 URL 발급
   getGuildInstallUrl: async (): Promise<{ url: string }> => {
     const response = await apiClient.get("/discord/guild-link/install-url");
+    return response.data;
+  },
+
+  getMyGuildLinks: async (): Promise<{
+    home: { guildId: string | null; guildName: string };
+    guilds: Array<{ guildId: string; guildName: string | null }>;
+  }> => {
+    const response = await apiClient.get("/discord/guild-links/me");
     return response.data;
   },
 };

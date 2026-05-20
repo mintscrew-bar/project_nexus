@@ -113,6 +113,13 @@ describe("RoomService", () => {
       // ADMIN은 authProvider, riotAccount 조회 없이 바로 방 생성
       expect(prisma.authProvider.findFirst).not.toHaveBeenCalled();
       expect(prisma.riotAccount.findFirst).not.toHaveBeenCalled();
+      expect(prisma.room.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            discordGuildId: null,
+          }),
+        }),
+      );
     });
 
     it("유효하지 않은 maxParticipants이면 BadRequestException을 던진다", async () => {
@@ -121,6 +128,56 @@ describe("RoomService", () => {
       await expect(
         service.createRoom("host-admin", { ...baseDto, maxParticipants: 7 }),
       ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe("createRoom — Discord 서버 선택", () => {
+    beforeEach(() => {
+      shutdownService.isShuttingDown.mockReturnValue(false);
+      prisma.user.findUnique.mockResolvedValue({ role: "ADMIN" });
+    });
+
+    it("선택한 길드가 본인 ACTIVE 링크이면 해당 guildId로 방을 생성한다", async () => {
+      prisma.discordGuildLink.findFirst.mockResolvedValue({
+        guildId: "guild-active",
+      });
+      prisma.room.create.mockResolvedValue({ id: "room-1", name: "테스트 방" });
+
+      await expect(
+        service.createRoom("host-admin", {
+          ...baseDto,
+          discordGuildId: "guild-active",
+        }),
+      ).resolves.toBeDefined();
+
+      expect(prisma.discordGuildLink.findFirst).toHaveBeenCalledWith({
+        where: {
+          ownerId: "host-admin",
+          guildId: "guild-active",
+          status: "ACTIVE",
+        },
+        select: { guildId: true },
+      });
+      expect(prisma.room.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            discordGuildId: "guild-active",
+          }),
+        }),
+      );
+    });
+
+    it("선택한 길드가 본인 ACTIVE 링크가 아니면 방 생성을 거절한다", async () => {
+      prisma.discordGuildLink.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.createRoom("host-admin", {
+          ...baseDto,
+          discordGuildId: "guild-not-owned",
+        }),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(prisma.room.create).not.toHaveBeenCalled();
     });
   });
 });

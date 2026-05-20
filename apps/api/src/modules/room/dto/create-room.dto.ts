@@ -41,6 +41,11 @@ export class CreateRoomDto {
   @IsBoolean()
   allowSpectators?: boolean;
 
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  discordGuildId?: string;
+
   // ── Auction 설정 ──
   @IsOptional()
   @IsInt()

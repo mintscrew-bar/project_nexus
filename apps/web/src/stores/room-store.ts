@@ -43,6 +43,7 @@ interface RoomCreationData {
   teamMode: "AUCTION" | "SNAKE_DRAFT";
   password?: string;
   allowSpectators?: boolean;
+  discordGuildId?: string;
   // Auction settings
   startingPoints?: number;
   minBidIncrement?: number;

@@ -26,6 +26,7 @@ export interface CreateRoomDto {
   maxParticipants: number;
   teamMode: TeamMode;
   allowSpectators?: boolean;
+  discordGuildId?: string;
 
   // Auction Settings
   startingPoints?: number;
@@ -162,15 +163,26 @@ export class RoomService {
       hashedPassword = await bcrypt.hash(dto.password, 10);
     }
 
-    // 멀티 길드: 클라이언트가 보낸 guildId는 신뢰하지 않는다(임의 길드 주입 방지).
-    // 호스트가 활성화(ACTIVE)한 디스코드 길드 바인딩이 있으면 그 길드에 방을 만들고,
-    // 없으면 null → 보이스 서비스가 홈 서버(env)로 폴백한다.
-    const activeGuildLink = await this.prisma.discordGuildLink.findFirst({
-      where: { ownerId: hostId, status: "ACTIVE" },
-      orderBy: { activatedAt: "desc" },
-      select: { guildId: true },
-    });
-    const resolvedDiscordGuildId = activeGuildLink?.guildId ?? null;
+    // null means Nexus home server; explicit guild IDs must belong to the host.
+    let resolvedDiscordGuildId: string | null = null;
+    if (dto.discordGuildId) {
+      const activeGuildLink = await this.prisma.discordGuildLink.findFirst({
+        where: {
+          ownerId: hostId,
+          guildId: dto.discordGuildId,
+          status: "ACTIVE",
+        },
+        select: { guildId: true },
+      });
+
+      if (!activeGuildLink) {
+        throw new BadRequestException(
+          "DISCORD_GUILD_NOT_ALLOWED::선택한 Discord 서버를 사용할 수 없습니다.",
+        );
+      }
+
+      resolvedDiscordGuildId = activeGuildLink.guildId;
+    }
 
     // Create room
     const room = await this.prisma.room.create({
