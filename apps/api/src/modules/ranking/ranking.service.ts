@@ -14,9 +14,15 @@ export class RankingService {
    */
   async updateRanking(userId: string): Promise<void> {
     try {
-      // Get all match participants for this user
+      // Nexus 랭킹은 내전만 반영한다. 외부 Riot 인제스트 매치도
+      // match_participants.userId에 매핑될 수 있으므로 roomId로 분리한다.
       const participants = await this.prisma.matchParticipant.findMany({
-        where: { userId },
+        where: {
+          userId,
+          match: {
+            roomId: { not: null },
+          },
+        },
         select: { win: true, createdAt: true },
         orderBy: { createdAt: "desc" },
       });
@@ -81,14 +87,19 @@ export class RankingService {
   /**
    * Update clan-specific ranking for a user.
    * Since rooms don't have a clanId field, clan ranking uses the same
-   * global stats (all matches) to rank members within each clan.
+   * Nexus custom-match stats to rank members within each clan.
    */
   private async updateClanRanking(
     userId: string,
     clanId: string,
   ): Promise<void> {
     const participants = await this.prisma.matchParticipant.findMany({
-      where: { userId },
+      where: {
+        userId,
+        match: {
+          roomId: { not: null },
+        },
+      },
       select: { win: true },
     });
 
@@ -272,18 +283,36 @@ export class RankingService {
    * Recalculate all rankings (admin/cron)
    */
   async recalculateAllRankings(): Promise<{ processed: number }> {
-    // Get all users who have participated in matches (외부 인제스트 매치는 userId NULL → 제외)
-    const users = await this.prisma.matchParticipant.findMany({
-      where: { userId: { not: null } },
-      select: { userId: true },
-      distinct: ["userId"],
-    });
+    // 기존에 외부 인제스트 매치로 오염된 ranking row도 0으로 재계산되도록
+    // 현재 랭킹 테이블 사용자와 내전 참여자를 모두 대상으로 삼는다.
+    const [customParticipants, existingRankings] = await Promise.all([
+      this.prisma.matchParticipant.findMany({
+        where: {
+          userId: { not: null },
+          match: {
+            roomId: { not: null },
+          },
+        },
+        select: { userId: true },
+        distinct: ["userId"],
+      }),
+      this.prisma.nexusRanking.findMany({
+        select: { userId: true },
+      }),
+    ]);
 
-    this.logger.log(`Recalculating rankings for ${users.length} users...`);
+    const userIds = Array.from(
+      new Set(
+        [...customParticipants, ...existingRankings]
+          .map(({ userId }) => userId)
+          .filter((userId): userId is string => Boolean(userId)),
+      ),
+    );
+
+    this.logger.log(`Recalculating rankings for ${userIds.length} users...`);
 
     let processed = 0;
-    for (const { userId } of users) {
-      if (!userId) continue;
+    for (const userId of userIds) {
       await this.updateRanking(userId);
       processed++;
     }

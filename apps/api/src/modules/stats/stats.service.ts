@@ -1845,9 +1845,15 @@ export class StatsService {
     )
       return [];
 
-    // Get all match participants for this user
+    // Nexus 내전 통계만 집계한다. 외부 Riot 인제스트 매치는 같은 테이블에
+    // userId가 매핑될 수 있으므로 반드시 roomId로 분리해야 한다.
     const participants = await this.prisma.matchParticipant.findMany({
-      where: { userId },
+      where: {
+        userId,
+        match: {
+          roomId: { not: null },
+        },
+      },
       select: {
         championId: true,
         championName: true,
@@ -1912,9 +1918,15 @@ export class StatsService {
     const user = await this.getUserWithSettings(userId);
     if (!user) throw new NotFoundException("User not found");
 
-    // Get all match participants for this user
+    // Nexus 내전 통계만 집계한다. 외부 Riot 인제스트 매치는 같은 테이블에
+    // userId가 매핑될 수 있으므로 반드시 roomId로 분리해야 한다.
     const participants = await this.prisma.matchParticipant.findMany({
-      where: { userId },
+      where: {
+        userId,
+        match: {
+          roomId: { not: null },
+        },
+      },
       select: {
         position: true,
         kills: true,

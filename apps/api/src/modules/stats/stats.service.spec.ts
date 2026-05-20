@@ -121,6 +121,24 @@ describe("StatsService", () => {
       expect(result[0]).toHaveProperty("championNameKorean");
     });
 
+    it("외부 Riot 인제스트 매치를 제외하고 Nexus 내전만 조회한다", async () => {
+      prisma.user.findUnique.mockResolvedValue(mockUser);
+      prisma.matchParticipant.findMany.mockResolvedValue([]);
+
+      await service.getUserChampionStats(userId);
+
+      expect(prisma.matchParticipant.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            userId,
+            match: {
+              roomId: { not: null },
+            },
+          },
+        }),
+      );
+    });
+
     it("championNameKorean이 getChampionKoreanName('Ahri') 결과와 일치한다", async () => {
       prisma.user.findUnique.mockResolvedValue(mockUser);
       prisma.matchParticipant.findMany.mockResolvedValue([
@@ -293,6 +311,32 @@ describe("StatsService", () => {
       // 매핑이 없으면 getChampionKoreanName이 원래 영문명을 반환
       expect(result[0].championNameKorean).toBe(
         getChampionKoreanName("UnknownChamp"),
+      );
+    });
+  });
+
+  describe("getUserPositionStats", () => {
+    const userId = "user-1";
+
+    it("외부 Riot 인제스트 매치를 제외하고 Nexus 내전만 조회한다", async () => {
+      prisma.user.findUnique.mockResolvedValue({
+        id: userId,
+        username: "테스터",
+        settings: null,
+      });
+      prisma.matchParticipant.findMany.mockResolvedValue([]);
+
+      await service.getUserPositionStats(userId);
+
+      expect(prisma.matchParticipant.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            userId,
+            match: {
+              roomId: { not: null },
+            },
+          },
+        }),
       );
     });
   });
