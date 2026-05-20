@@ -74,6 +74,7 @@ model User {
   votesReceived       MatchVote[]        @relation("VotedForUser")
   mvpMatches          Match[]            @relation("MatchMVP")
   aceMatches          Match[]            @relation("MatchACE")
+  discordGuildLinks   DiscordGuildLink[] @relation("DiscordGuildLinkOwner")
 
   @@index([email])
   @@index([reputation])
@@ -281,6 +282,27 @@ model RoomDiscordChannel {
 
   @@index([roomId])
   @@map("room_discord_channels")
+}
+
+// 멀티 길드 지원: 넥서스 봇을 외부 디스코드 서버에 연동한 기록.
+// guildId 1개당 1행(소유권/활성화 상태). Room.discordGuildId는 ACTIVE 링크에서 도출.
+model DiscordGuildLink {
+  id          String                 @id @default(cuid())
+  guildId     String                 @unique
+  guildName   String?
+  ownerId     String
+  clanId      String?
+  status      DiscordGuildLinkStatus @default(PENDING)
+  activatedAt DateTime?
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+  owner       User                   @relation("DiscordGuildLinkOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  clan        Clan?                  @relation(fields: [clanId], references: [id], onDelete: SetNull)
+
+  @@index([ownerId])
+  @@index([clanId])
+  @@index([status])
+  @@map("discord_guild_links")
 }
 
 model Team {
@@ -551,6 +573,7 @@ model Clan {
   invitations   ClanInvitation[]
   members       ClanMember[]
   clanRankings  ClanRanking[]
+  discordGuildLinks DiscordGuildLink[]
   owner         User               @relation("ClanOwner", fields: [ownerId], references: [id])
 
   @@index([ownerId])
@@ -1072,6 +1095,12 @@ enum RoomParticipantRole {
 enum DiscordChannelType {
   VOICE
   TEXT
+}
+
+enum DiscordGuildLinkStatus {
+  PENDING // 신청/봇 추가됨, 활성화 전 (휴면)
+  ACTIVE // 승인 + 활성화 완료 — 채널 생성 가능
+  DISABLED // 봇 추방 또는 관리자 비활성화
 }
 
 enum BracketType {
