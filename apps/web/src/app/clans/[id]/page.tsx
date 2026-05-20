@@ -3,7 +3,8 @@ import { absoluteUrl, SITE_NAME } from "@/lib/seo";
 import ClanDetailClient from "./_ClanDetailClient";
 
 interface Props {
-  params: { id: string };
+  // Next.js 15: 동적 라우트 params 는 Promise 로 전달됨 → await 필요
+  params: Promise<{ id: string }>;
 }
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
@@ -17,7 +18,7 @@ async function fetchClan(id: string) {
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { id } = params;
+  const { id } = await params;
 
   try {
     const clan = await fetchClan(id);
@@ -49,7 +50,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function ClanDetailPage({ params }: Props) {
-  const { id } = params;
+  const { id } = await params;
   let jsonLd: object | null = null;
 
   try {

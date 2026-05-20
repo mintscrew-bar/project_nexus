@@ -3,7 +3,8 @@ import { absoluteUrl, SITE_NAME } from "@/lib/seo";
 import PostDetailClient from "./_PostDetailClient";
 
 interface Props {
-  params: { id: string };
+  // Next.js 15: 동적 라우트 params 는 Promise 로 전달됨 → await 필요
+  params: Promise<{ id: string }>;
 }
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
@@ -17,7 +18,7 @@ async function fetchPost(id: string) {
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { id } = params;
+  const { id } = await params;
 
   try {
     const post = await fetchPost(id);
@@ -52,7 +53,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function PostDetailPage({ params }: Props) {
-  const { id } = params;
+  const { id } = await params;
   let jsonLd: object | null = null;
 
   try {
