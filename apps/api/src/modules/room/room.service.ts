@@ -264,12 +264,10 @@ export class RoomService {
     // Send Discord notification (if bot is configured)
     try {
       if (this.discordBotService) {
-        const guildId = this.configService.get("DISCORD_GUILD_ID");
-        const channelId = this.configService.get(
-          "DISCORD_NOTIFICATION_CHANNEL_ID",
-        );
+        const notificationTarget =
+          await this.discordVoiceService?.getRoomNotificationTarget?.(room.id);
 
-        if (guildId && channelId) {
+        if (notificationTarget) {
           const embed = this.discordBotService.buildRoomCreatedEmbed(
             room.name,
             room.host.username,
@@ -277,8 +275,8 @@ export class RoomService {
           );
 
           await this.discordBotService.sendEmbedNotification(
-            guildId,
-            channelId,
+            notificationTarget.guildId,
+            notificationTarget.channelId,
             embed,
           );
         }
@@ -1335,7 +1333,7 @@ export class RoomService {
       if (this.discordVoiceService) {
         await Promise.all(
           captainDiscordIds.map((providerId: string) =>
-            this.discordVoiceService.removeCaptainRole(providerId),
+            this.discordVoiceService.removeCaptainRole(roomId, providerId),
           ),
         );
         await this.discordVoiceService.moveAllToLobby(roomId);
@@ -1451,7 +1449,7 @@ export class RoomService {
       if (this.discordVoiceService) {
         await Promise.all(
           captainDiscordIds.map((providerId: string) =>
-            this.discordVoiceService.removeCaptainRole(providerId),
+            this.discordVoiceService.removeCaptainRole(roomId, providerId),
           ),
         );
         await this.discordVoiceService.moveAllToLobby(roomId);

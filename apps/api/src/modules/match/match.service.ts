@@ -58,6 +58,23 @@ export class MatchService {
       this.configService.get<string>("TOURNAMENT_API_ENABLED") === "true";
   }
 
+  private async sendRoomEmbedNotification(
+    roomId: string,
+    embed: any,
+  ): Promise<void> {
+    if (!this.discordBotService) return;
+
+    const notificationTarget =
+      await this.discordVoiceService?.getRoomNotificationTarget?.(roomId);
+    if (!notificationTarget) return;
+
+    await this.discordBotService.sendEmbedNotification(
+      notificationTarget.guildId,
+      notificationTarget.channelId,
+      embed,
+    );
+  }
+
   // ========================================
   // Bracket Generation (delegated to MatchBracketService)
   // ========================================
@@ -155,24 +172,13 @@ export class MatchService {
     // Send Discord notification
     try {
       if (this.discordBotService) {
-        const guildId = this.configService.get("DISCORD_GUILD_ID");
-        const channelId = this.configService.get(
-          "DISCORD_NOTIFICATION_CHANNEL_ID",
+        const embed = this.discordBotService.buildMatchStartEmbed(
+          match.teamA!.name,
+          match.teamB!.name,
+          tournamentCode,
         );
 
-        if (guildId && channelId) {
-          const embed = this.discordBotService.buildMatchStartEmbed(
-            match.teamA!.name,
-            match.teamB!.name,
-            tournamentCode,
-          );
-
-          await this.discordBotService.sendEmbedNotification(
-            guildId,
-            channelId,
-            embed,
-          );
-        }
+        await this.sendRoomEmbedNotification(match.room.id, embed);
       }
     } catch (error) {
       this.logger.warn(
@@ -422,32 +428,21 @@ export class MatchService {
     // Send Discord match result notification
     try {
       if (this.discordBotService) {
-        const guildId = this.configService.get("DISCORD_GUILD_ID");
-        const channelId = this.configService.get(
-          "DISCORD_NOTIFICATION_CHANNEL_ID",
+        const winner =
+          winnerId === updatedMatch.teamAId
+            ? updatedMatch.teamA
+            : updatedMatch.teamB;
+        const loser =
+          winnerId === updatedMatch.teamAId
+            ? updatedMatch.teamB
+            : updatedMatch.teamA;
+
+        const embed = this.discordBotService.buildMatchResultEmbed(
+          winner?.name ?? "TBD",
+          loser?.name ?? "TBD",
         );
 
-        if (guildId && channelId) {
-          const winner =
-            winnerId === updatedMatch.teamAId
-              ? updatedMatch.teamA
-              : updatedMatch.teamB;
-          const loser =
-            winnerId === updatedMatch.teamAId
-              ? updatedMatch.teamB
-              : updatedMatch.teamA;
-
-          const embed = this.discordBotService.buildMatchResultEmbed(
-            winner?.name ?? "TBD",
-            loser?.name ?? "TBD",
-          );
-
-          await this.discordBotService.sendEmbedNotification(
-            guildId,
-            channelId,
-            embed,
-          );
-        }
+        await this.sendRoomEmbedNotification(roomId, embed);
       }
     } catch (error) {
       this.logger.warn(
@@ -578,23 +573,14 @@ export class MatchService {
         // Send Discord tournament completion notification
         try {
           if (this.discordBotService) {
-            const guildId = this.configService.get("DISCORD_GUILD_ID");
-            const channelId = this.configService.get(
-              "DISCORD_NOTIFICATION_CHANNEL_ID",
-            );
-
-            if (guildId && channelId && roomData.matches[0]?.winner) {
+            if (roomData.matches[0]?.winner) {
               const embed =
                 this.discordBotService.buildTournamentCompletedEmbed(
                   roomData.name,
                   roomData.matches[0].winner.name,
                 );
 
-              await this.discordBotService.sendEmbedNotification(
-                guildId,
-                channelId,
-                embed,
-              );
+              await this.sendRoomEmbedNotification(roomId, embed);
             }
           }
         } catch (error) {

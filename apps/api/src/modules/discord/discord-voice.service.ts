@@ -66,6 +66,45 @@ export class DiscordVoiceService {
     );
   }
 
+  async getRoomNotificationTarget(
+    roomId: string,
+  ): Promise<{ guildId: string; channelId: string } | null> {
+    const room = await this.prisma.room.findUnique({
+      where: { id: roomId },
+      select: {
+        discordGuildId: true,
+        discordChannels: {
+          where: { teamName: "Lobby" },
+          select: { channelId: true },
+          take: 1,
+        },
+      },
+    });
+    if (!room) return null;
+
+    const guildId =
+      room.discordGuildId ||
+      this.configService.get<string>("DISCORD_GUILD_ID") ||
+      null;
+    if (!guildId) return null;
+
+    const lobbyChannelId = room.discordChannels?.[0]?.channelId;
+    if (lobbyChannelId) {
+      return { guildId, channelId: lobbyChannelId };
+    }
+
+    if (!room.discordGuildId) {
+      const fallbackChannelId = this.configService.get<string>(
+        "DISCORD_NOTIFICATION_CHANNEL_ID",
+      );
+      if (fallbackChannelId) {
+        return { guildId, channelId: fallbackChannelId };
+      }
+    }
+
+    return null;
+  }
+
   /**
    * 채널 ID로부터 소속 길드 ID를 해석한다. RoomDiscordChannel → Room.discordGuildId
    * 순으로 찾고, 없으면 홈 서버(env)로 폴백한다.
@@ -877,12 +916,15 @@ export class DiscordVoiceService {
 
   /**
    * 팀장에게 디스코드 역할 부여
+   * @param roomId 방 ID
    * @param discordUserId 디스코드 유저 ID
    * @returns 성공 여부
    */
-  async assignCaptainRole(discordUserId: string): Promise<boolean> {
-    // 주장 역할은 넥서스 홈 서버의 디스코드 Role이라 홈 길드(env) 고정.
-    const guildId = this.configService.get("DISCORD_GUILD_ID");
+  async assignCaptainRole(
+    roomId: string,
+    discordUserId: string,
+  ): Promise<boolean> {
+    const guildId = await this.resolveRoomGuildId(roomId);
     const captainRoleName =
       this.configService.get("DISCORD_CAPTAIN_ROLE_NAME") || "팀장";
 
@@ -929,11 +971,14 @@ export class DiscordVoiceService {
 
   /**
    * 팀장 역할 제거
+   * @param roomId 방 ID
    * @param discordUserId 디스코드 유저 ID
    */
-  async removeCaptainRole(discordUserId: string): Promise<void> {
-    // 주장 역할은 넥서스 홈 서버의 디스코드 Role이라 홈 길드(env) 고정.
-    const guildId = this.configService.get("DISCORD_GUILD_ID");
+  async removeCaptainRole(
+    roomId: string,
+    discordUserId: string,
+  ): Promise<void> {
+    const guildId = await this.resolveRoomGuildId(roomId);
     const captainRoleName =
       this.configService.get("DISCORD_CAPTAIN_ROLE_NAME") || "팀장";
 

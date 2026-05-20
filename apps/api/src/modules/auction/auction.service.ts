@@ -524,6 +524,7 @@ export class AuctionService implements OnModuleInit {
             });
             if (discordProvider) {
               await this.discordVoiceService.assignCaptainRole(
+                roomId,
                 discordProvider.providerId,
               );
             }

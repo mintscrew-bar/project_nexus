@@ -150,6 +150,7 @@ export class SnakeDraftService {
 
             if (discordProvider) {
               await this.discordVoiceService.assignCaptainRole(
+                roomId,
                 discordProvider.providerId,
               );
             }
