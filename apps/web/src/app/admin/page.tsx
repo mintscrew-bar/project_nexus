@@ -47,7 +47,8 @@ type Tab =
   | "rooms"
   | "chatlogs"
   | "announcements"
-  | "appeals";
+  | "appeals"
+  | "discord";
 
 // MODERATOR가 접근 가능한 탭
 const MODERATOR_TABS: Tab[] = ["dashboard", "reports", "community", "chatlogs", "appeals"];
@@ -62,6 +63,7 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: "chatlogs", label: "채팅 로그", icon: <MessageSquare className="h-4 w-4" /> },
   { id: "announcements", label: "공지 발송", icon: <Megaphone className="h-4 w-4" /> },
   { id: "appeals", label: "이의신청", icon: <Sword className="h-4 w-4" /> },
+  { id: "discord", label: "디스코드 연동", icon: <MessageSquare className="h-4 w-4" /> },
 ];
 
 export default function AdminPage() {
@@ -113,6 +115,7 @@ export default function AdminPage() {
         {activeTab === "chatlogs" && <ChatLogsTab />}
         {activeTab === "announcements" && <AnnouncementsTab addToast={addToast} />}
         {activeTab === "appeals" && <AppealsTab addToast={addToast} />}
+        {activeTab === "discord" && <DiscordGuildLinksTab addToast={addToast} />}
       </main>
     </div>
   );
@@ -2006,6 +2009,146 @@ function AppealsTab({ addToast }: { addToast: (msg: string, type: "success" | "e
           </div>
         </Modal>
       )}
+    </div>
+  );
+}
+
+// ── 디스코드 길드 연동 (멀티 길드) ────────────────────────────────────────────
+
+interface DiscordGuildLink {
+  id: string;
+  guildId: string;
+  guildName: string | null;
+  status: "PENDING" | "ACTIVE" | "DISABLED";
+  activatedAt: string | null;
+  createdAt: string;
+  owner: { id: string; username: string; avatar: string | null } | null;
+  clan: { id: string; name: string; tag: string } | null;
+}
+
+const GUILD_STATUS_META: Record<
+  DiscordGuildLink["status"],
+  { label: string; variant: "default" | "secondary" | "danger" | "success" }
+> = {
+  PENDING: { label: "승인 대기", variant: "secondary" },
+  ACTIVE: { label: "활성", variant: "success" },
+  DISABLED: { label: "비활성", variant: "danger" },
+};
+
+function DiscordGuildLinksTab({ addToast }: { addToast: (msg: string, type: "success" | "error") => void }) {
+  const [links, setLinks] = useState<DiscordGuildLink[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
+
+  const fetchLinks = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await adminApi.getDiscordGuildLinks();
+      setLinks(data);
+    } catch {
+      addToast("길드 연동 목록 로드 실패", "error");
+    } finally {
+      setLoading(false);
+    }
+  }, [addToast]);
+
+  useEffect(() => { fetchLinks(); }, [fetchLinks]);
+
+  const handleApprove = async (link: DiscordGuildLink) => {
+    setUpdatingId(link.id);
+    try {
+      await adminApi.approveDiscordGuildLink(link.id);
+      setLinks((prev) => prev.map((l) => l.id === link.id ? { ...l, status: "ACTIVE", activatedAt: new Date().toISOString() } : l));
+      addToast(`${link.guildName || link.guildId} 승인 완료`, "success");
+    } catch {
+      addToast("승인 실패", "error");
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const handleDisable = async (link: DiscordGuildLink) => {
+    setUpdatingId(link.id);
+    try {
+      await adminApi.disableDiscordGuildLink(link.id);
+      setLinks((prev) => prev.map((l) => l.id === link.id ? { ...l, status: "DISABLED" } : l));
+      addToast(`${link.guildName || link.guildId} 비활성화`, "success");
+    } catch {
+      addToast("비활성화 실패", "error");
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold text-text-primary">디스코드 길드 연동</h2>
+        <Button size="sm" variant="outline" onClick={fetchLinks}>
+          <RefreshCw className="h-4 w-4" />
+        </Button>
+      </div>
+      <p className="text-sm text-text-muted">
+        유저가 봇을 자신의 디스코드 서버에 추가하면 &quot;승인 대기&quot;로 등록됩니다. 승인하면 해당 서버에서 내전 채널이 생성됩니다.
+      </p>
+
+      <Card>
+        <CardContent className="p-0">
+          {loading ? (
+            <div className="flex justify-center py-12"><LoadingSpinner /></div>
+          ) : links.length === 0 ? (
+            <p className="text-center text-text-muted py-12 text-sm">연동된 길드가 없습니다.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-bg-tertiary text-text-muted">
+                    <th className="text-left px-4 py-3 font-medium">서버</th>
+                    <th className="text-left px-4 py-3 font-medium">소유자</th>
+                    <th className="text-left px-4 py-3 font-medium">클랜</th>
+                    <th className="text-left px-4 py-3 font-medium">상태</th>
+                    <th className="text-left px-4 py-3 font-medium">액션</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {links.map((link) => {
+                    const meta = GUILD_STATUS_META[link.status];
+                    return (
+                      <tr key={link.id} className="border-b border-bg-tertiary/50 hover:bg-bg-tertiary/30">
+                        <td className="px-4 py-3">
+                          <span className="font-medium text-text-primary">{link.guildName || "(이름 미확인)"}</span>
+                          <p className="text-xs text-text-muted font-mono">{link.guildId}</p>
+                        </td>
+                        <td className="px-4 py-3 text-text-secondary">{link.owner?.username ?? "-"}</td>
+                        <td className="px-4 py-3 text-text-secondary">
+                          {link.clan ? `[${link.clan.tag}] ${link.clan.name}` : "-"}
+                        </td>
+                        <td className="px-4 py-3">
+                          <Badge variant={meta.variant} className="text-[10px]">{meta.label}</Badge>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex gap-1">
+                            {link.status !== "ACTIVE" && (
+                              <Button size="sm" variant="outline" disabled={updatingId === link.id} onClick={() => handleApprove(link)}>
+                                <CheckCircle className="h-3.5 w-3.5 mr-1" />승인
+                              </Button>
+                            )}
+                            {link.status !== "DISABLED" && (
+                              <Button size="sm" variant="danger" disabled={updatingId === link.id} onClick={() => handleDisable(link)}>
+                                <Ban className="h-3.5 w-3.5 mr-1" />비활성
+                              </Button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

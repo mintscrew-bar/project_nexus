@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/auth-store";
-import { userApi, statsApi, appealApi } from "@/lib/api-client";
+import { userApi, statsApi, appealApi, discordApi } from "@/lib/api-client";
 import { useDdragonStore } from "@/stores/ddragon-store";
 import { ChampionImage } from "@/components/ChampionImage";
 import { Card, CardHeader, CardTitle, CardContent, Button, Label, LoadingSpinner, ConfirmModal } from "@/components/ui";
@@ -58,6 +58,8 @@ export default function SettingsPage() {
   const [showChampionPicker, setShowChampionPicker] = useState(false);
   // Discord 아바타 동기화 상태
   const [isSyncingAvatar, setIsSyncingAvatar] = useState(false);
+  // 봇 서버 추가 진행 상태
+  const [isAddingBot, setIsAddingBot] = useState(false);
 
   // Settings state
   const [settings, setSettings] = useState<UserSettings>({
@@ -178,6 +180,18 @@ export default function SettingsPage() {
       addToast(msg, "error");
     } finally {
       setIsSyncingAvatar(false);
+    }
+  };
+
+  const handleAddBotToServer = async () => {
+    setIsAddingBot(true);
+    try {
+      const { url } = await discordApi.getGuildInstallUrl();
+      window.location.href = url;
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || "봇 추가 링크 생성에 실패했습니다.";
+      addToast(msg, "error");
+      setIsAddingBot(false);
     }
   };
 
@@ -357,6 +371,21 @@ export default function SettingsPage() {
                     </div>
                   </div>
                 )}
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>내 디스코드 서버에 봇 추가</CardTitle>
+                  <p className="text-sm text-text-secondary mt-1">
+                    봇을 내 서버에 추가하면, 그 서버에서 내전 음성 채널이 자동 생성됩니다. (관리자 승인 후 활성화)
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  <Button onClick={handleAddBotToServer} disabled={isAddingBot}>
+                    {isAddingBot ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : null}
+                    봇 추가하기
+                  </Button>
+                </CardContent>
+              </Card>
 
               <Card>
                 <CardHeader>

@@ -491,6 +491,14 @@ export const matchApi = {
 };
 
 // Riot API 관련 API
+export const discordApi = {
+  // "내 디스코드 서버에 봇 추가" OAuth 설치 URL 발급
+  getGuildInstallUrl: async (): Promise<{ url: string }> => {
+    const response = await apiClient.get("/discord/guild-link/install-url");
+    return response.data;
+  },
+};
+
 export const riotApi = {
   // 챔피언 목록 조회 (Data Dragon) — 백엔드 /stats/ddragon-version 으로 최신 패치 자동 추적
   getChampions: async () => {
@@ -1525,6 +1533,19 @@ export const adminApi = {
   },
   unrestrictUser: async (userId: string) => {
     const response = await apiClient.post(`/admin/users/${userId}/unrestrict`);
+    return response.data;
+  },
+  // Discord 길드 연동 (멀티 길드)
+  getDiscordGuildLinks: async () => {
+    const response = await apiClient.get("/admin/discord/guild-links");
+    return response.data;
+  },
+  approveDiscordGuildLink: async (id: string) => {
+    const response = await apiClient.patch(`/admin/discord/guild-links/${id}/approve`);
+    return response.data;
+  },
+  disableDiscordGuildLink: async (id: string) => {
+    const response = await apiClient.patch(`/admin/discord/guild-links/${id}/disable`);
     return response.data;
   },
   // Reports

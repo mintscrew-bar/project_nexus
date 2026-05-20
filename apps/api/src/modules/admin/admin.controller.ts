@@ -380,4 +380,24 @@ export class AdminController {
     const result = await this.labTasksService.runRankedChampionSnapshot();
     return { ok: true, ...result };
   }
+
+  // ── Discord 길드 연동 (멀티 길드) ──────────────────────────────────────────
+
+  @Get("discord/guild-links")
+  @Roles(UserRole.ADMIN)
+  getDiscordGuildLinks() {
+    return this.adminService.getDiscordGuildLinks();
+  }
+
+  @Patch("discord/guild-links/:id/approve")
+  @Roles(UserRole.ADMIN)
+  approveDiscordGuildLink(@Param("id") id: string, @Request() req: any) {
+    return this.adminService.approveDiscordGuildLink(id, req.user.sub);
+  }
+
+  @Patch("discord/guild-links/:id/disable")
+  @Roles(UserRole.ADMIN)
+  disableDiscordGuildLink(@Param("id") id: string, @Request() req: any) {
+    return this.adminService.disableDiscordGuildLink(id, req.user.sub);
+  }
 }

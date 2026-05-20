@@ -1324,4 +1324,60 @@ export class AdminService {
       return updated;
     });
   }
+
+  // ── Discord 길드 연동 (멀티 길드) ──────────────────────────────────────────
+
+  async getDiscordGuildLinks() {
+    return this.prisma.discordGuildLink.findMany({
+      orderBy: [{ status: "asc" }, { createdAt: "desc" }],
+      include: {
+        owner: { select: { id: true, username: true, avatar: true } },
+        clan: { select: { id: true, name: true, tag: true } },
+      },
+    });
+  }
+
+  async approveDiscordGuildLink(linkId: string, requesterId: string) {
+    const link = await this.prisma.discordGuildLink.findUnique({
+      where: { id: linkId },
+    });
+    if (!link) throw new NotFoundException("길드 연동을 찾을 수 없습니다.");
+
+    const result = await this.prisma.discordGuildLink.update({
+      where: { id: linkId },
+      data: { status: "ACTIVE", activatedAt: new Date() },
+    });
+
+    await this.logAction(
+      requesterId,
+      AdminAction.DISCORD_GUILD_LINK,
+      "discord_guild_link",
+      linkId,
+      { guildId: link.guildId, action: "approve" },
+    );
+
+    return result;
+  }
+
+  async disableDiscordGuildLink(linkId: string, requesterId: string) {
+    const link = await this.prisma.discordGuildLink.findUnique({
+      where: { id: linkId },
+    });
+    if (!link) throw new NotFoundException("길드 연동을 찾을 수 없습니다.");
+
+    const result = await this.prisma.discordGuildLink.update({
+      where: { id: linkId },
+      data: { status: "DISABLED" },
+    });
+
+    await this.logAction(
+      requesterId,
+      AdminAction.DISCORD_GUILD_LINK,
+      "discord_guild_link",
+      linkId,
+      { guildId: link.guildId, action: "disable" },
+    );
+
+    return result;
+  }
 }
