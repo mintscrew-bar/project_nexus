@@ -1069,6 +1069,7 @@ export class LabStatsService {
       FROM "match_participants" mp
       INNER JOIN "matches" m ON m."id" = mp."matchId"
       WHERE m."completedAt" IS NOT NULL
+        AND m."roomId" IS NOT NULL
         ${periodFilter ? Prisma.sql`AND m."completedAt" >= ${periodFilter}` : Prisma.empty}
     `);
 
@@ -1099,6 +1100,7 @@ export class LabStatsService {
         FROM "match_participants" mp
         INNER JOIN "matches" m ON m."id" = mp."matchId"
         WHERE m."completedAt" >= ${sevenDaysAgo}
+          AND m."roomId" IS NOT NULL
       `),
       this.prisma.$queryRaw<{ count: bigint }[]>(Prisma.sql`
         SELECT COUNT(DISTINCT mp."matchId")::bigint AS count
@@ -1106,6 +1108,7 @@ export class LabStatsService {
         INNER JOIN "matches" m ON m."id" = mp."matchId"
         WHERE m."completedAt" >= ${twentyOneDaysAgo}
           AND m."completedAt" < ${eightDaysAgo}
+          AND m."roomId" IS NOT NULL
       `),
     ]);
 
@@ -1134,6 +1137,7 @@ export class LabStatsService {
         FROM "match_participants" mp
         INNER JOIN "matches" m ON m."id" = mp."matchId"
         WHERE m."completedAt" >= ${sevenDaysAgo}
+          AND m."roomId" IS NOT NULL
         GROUP BY mp."championId", mp."championName"
       ),
       prev AS (
@@ -1143,6 +1147,7 @@ export class LabStatsService {
         INNER JOIN "matches" m ON m."id" = mp."matchId"
         WHERE m."completedAt" >= ${twentyOneDaysAgo}
           AND m."completedAt" < ${eightDaysAgo}
+          AND m."roomId" IS NOT NULL
         GROUP BY mp."championId"
       )
       SELECT
@@ -1346,6 +1351,7 @@ export class LabStatsService {
         FROM "matches"
         WHERE "patchVersion" IS NOT NULL
           AND "completedAt" IS NOT NULL
+          AND "roomId" IS NOT NULL
         GROUP BY "patchVersion"
       )
       SELECT "patchVersion"
@@ -1409,6 +1415,7 @@ export class LabStatsService {
         FROM "match_participants" mp
         INNER JOIN "matches" m ON m."id" = mp."matchId"
         WHERE m."patchVersion" = ${currentPatch}
+          AND m."roomId" IS NOT NULL
         GROUP BY mp."championId", mp."championName"
         HAVING COUNT(*) >= ${PATCH_IMPACT_MIN_CHAMPION_GAMES}
       ),
@@ -1419,6 +1426,7 @@ export class LabStatsService {
         FROM "match_participants" mp
         INNER JOIN "matches" m ON m."id" = mp."matchId"
         WHERE m."patchVersion" = ${previousPatch}
+          AND m."roomId" IS NOT NULL
         GROUP BY mp."championId"
         HAVING COUNT(*) >= ${PATCH_IMPACT_MIN_CHAMPION_GAMES}
       )
@@ -1476,6 +1484,7 @@ export class LabStatsService {
           INNER JOIN "match_participants" mp ON mp."matchId" = m."id"
           WHERE m."patchVersion" IN (${currentPatch}, ${previousPatch})
             AND m."completedAt" IS NOT NULL
+            AND m."roomId" IS NOT NULL
           GROUP BY m."patchVersion"
         `),
         this.prisma.$queryRaw<
@@ -1495,6 +1504,7 @@ export class LabStatsService {
           INNER JOIN "matches" m ON m."id" = mp."matchId"
           WHERE m."patchVersion" IN (${currentPatch}, ${previousPatch})
             AND m."completedAt" IS NOT NULL
+            AND m."roomId" IS NOT NULL
             AND mp."position" IS NOT NULL
             AND mp."position" <> ''
             AND mp."position" <> 'UNKNOWN'
@@ -1511,6 +1521,7 @@ export class LabStatsService {
           INNER JOIN "matches" m ON m."id" = mp."matchId"
           WHERE m."patchVersion" IN (${currentPatch}, ${previousPatch})
             AND m."completedAt" IS NOT NULL
+            AND m."roomId" IS NOT NULL
             AND m."gameDuration" IS NOT NULL
             AND m."gameDuration" < 1500
           GROUP BY mp."championId"
@@ -1537,6 +1548,7 @@ export class LabStatsService {
           INNER JOIN "matches" m ON m."id" = mp."matchId"
           WHERE m."patchVersion" IN (${currentPatch}, ${previousPatch})
             AND m."completedAt" IS NOT NULL
+            AND m."roomId" IS NOT NULL
           GROUP BY m."patchVersion", mp."matchId", COALESCE(mp."teamId", CONCAT('__WIN__:', mp."win"::text))
         `),
       ]);
@@ -1830,6 +1842,7 @@ export class LabStatsService {
       FROM "match_team_stats" mts
       INNER JOIN "matches" m ON m."id" = mts."matchId"
       WHERE m."completedAt" IS NOT NULL
+        AND m."roomId" IS NOT NULL
         ${periodFilter ? Prisma.sql`AND m."completedAt" >= ${periodFilter}` : Prisma.empty}
     `);
     const totalMatches = Number(totalMatchesResult[0]?.count ?? 0);
@@ -1858,6 +1871,7 @@ export class LabStatsService {
         FROM "match_team_stats" mts
         INNER JOIN "matches" m ON m."id" = mts."matchId"
         WHERE m."completedAt" IS NOT NULL
+          AND m."roomId" IS NOT NULL
           ${periodFilter ? Prisma.sql`AND m."completedAt" >= ${periodFilter}` : Prisma.empty}
       ) mts
       WHERE ban_id > 0
@@ -3023,6 +3037,7 @@ export class LabStatsService {
           ${normalizedPosition ? Prisma.sql`AND a."position" = b."position"` : Prisma.empty}
         INNER JOIN "matches" m ON m."id" = a."matchId"
         WHERE m."completedAt" IS NOT NULL
+          AND m."roomId" IS NOT NULL
           ${periodFilter ? Prisma.sql`AND m."completedAt" >= ${periodFilter}` : Prisma.empty}
           ${normalizedChampionId ? Prisma.sql`AND a."championId" = ${normalizedChampionId}` : Prisma.empty}
           ${normalizedVsChampionId ? Prisma.sql`AND b."championId" = ${normalizedVsChampionId}` : Prisma.empty}
@@ -4256,6 +4271,7 @@ export class LabStatsService {
         ON tt."matchId" = mp."matchId"
        AND tt."teamKey" = COALESCE(mp."teamId", CONCAT('__WIN__:', mp."win"::text))
       WHERE m."completedAt" IS NOT NULL
+        AND m."roomId" IS NOT NULL
         AND mp."userId" IN (${Prisma.join(allUsers)})
       ORDER BY mp."userId" ASC, m."completedAt" DESC
     `);
@@ -4350,6 +4366,7 @@ export class LabStatsService {
       FROM "match_participants" mp
       INNER JOIN "matches" m ON m."id" = mp."matchId"
       WHERE m."completedAt" IS NOT NULL
+        AND m."roomId" IS NOT NULL
         AND mp."userId" IN (${Prisma.join(allUsers)})
       GROUP BY mp."matchId", COALESCE(mp."teamId", CONCAT('__WIN__:', mp."win"::text))
       HAVING COUNT(*) >= 1
@@ -4525,6 +4542,7 @@ export class LabStatsService {
       FROM "match_participants" mp
       INNER JOIN "matches" m ON m."id" = mp."matchId"
       WHERE m."completedAt" IS NOT NULL
+        AND m."roomId" IS NOT NULL
         AND mp."userId" IN (${Prisma.join(targetUsersGlobal)})
       GROUP BY mp."userId", mp."championId"
       HAVING COUNT(*) >= 3
@@ -4550,6 +4568,7 @@ export class LabStatsService {
         FROM "match_participants" mp
         INNER JOIN "matches" m ON m."id" = mp."matchId"
         WHERE m."completedAt" IS NOT NULL
+          AND m."roomId" IS NOT NULL
           AND mp."userId" IN (${Prisma.join(targetUsersGlobal)})
       )
       SELECT
@@ -4579,6 +4598,7 @@ export class LabStatsService {
         lcs."pickRate" AS "pickRate"
       FROM "lab_champion_snapshots" lcs
       WHERE lcs."period" = ${period}
+        AND lcs."source" = 'custom'
         AND lcs."position" IS NULL
         ${
           championIds.length > 0
@@ -5373,7 +5393,10 @@ export class LabStatsService {
     const THRESHOLDS = [0, 10, 30, 100, 300];
 
     const totalMatches = await this.prisma.match.count({
-      where: { completedAt: { not: null } },
+      where: {
+        roomId: { not: null },
+        completedAt: { not: null },
+      },
     });
 
     let phase = 0;
@@ -5390,6 +5413,7 @@ export class LabStatsService {
 
     // 가장 최근 스냅샷 computedAt
     const latestSnapshot = await this.prisma.labChampionSnapshot.findFirst({
+      where: { source: "custom" },
       orderBy: { computedAt: "desc" },
       select: { computedAt: true },
     });
@@ -5919,6 +5943,7 @@ export class LabStatsService {
     // 매치별 completedAt, win을 가져와 KST 기준으로 요일/시간 분해
     const matches = await this.prisma.match.findMany({
       where: {
+        roomId: { not: null },
         completedAt: {
           not: null,
           ...(periodFilter ? { gte: periodFilter } : {}),
@@ -6115,6 +6140,7 @@ export class LabStatsService {
       WHERE a."userId" = ${userAId}
         AND b."userId" = ${userBId}
         AND m."completedAt" IS NOT NULL
+        AND m."roomId" IS NOT NULL
       ORDER BY m."completedAt" DESC
     `;
 

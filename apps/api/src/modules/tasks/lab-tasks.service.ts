@@ -63,6 +63,7 @@ export class LabTasksService {
       FROM "match_participants" mp
       INNER JOIN "matches" m ON m."id" = mp."matchId"
       WHERE COALESCE(m."completedAt", m."createdAt") >= ${thirtyDaysAgo}
+        AND m."roomId" IS NOT NULL
         AND mp."userId" IS NOT NULL
     `;
     const activeUserIdSet = new Set(

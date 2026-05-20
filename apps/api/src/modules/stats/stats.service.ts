@@ -1411,21 +1411,38 @@ export class StatsService {
     ] = await Promise.all([
       this.prisma.matchParticipant.groupBy({
         by: ["matchId"],
+        where: {
+          match: {
+            roomId: { not: null },
+          },
+        },
       }),
-      this.prisma.matchParticipant.count(),
+      this.prisma.matchParticipant.count({
+        where: {
+          match: {
+            roomId: { not: null },
+          },
+        },
+      }),
       this.prisma.$queryRaw<{ count: bigint }[]>(Prisma.sql`
-        SELECT COUNT(DISTINCT "userId")::bigint AS count
-        FROM "match_participants"
+        SELECT COUNT(DISTINCT mp."userId")::bigint AS count
+        FROM "match_participants" mp
+        INNER JOIN "matches" m ON m."id" = mp."matchId"
+        WHERE m."roomId" IS NOT NULL
       `),
       this.prisma.$queryRaw<{ count: bigint }[]>(Prisma.sql`
-        SELECT COUNT(DISTINCT "championId")::bigint AS count
-        FROM "match_participants"
+        SELECT COUNT(DISTINCT mp."championId")::bigint AS count
+        FROM "match_participants" mp
+        INNER JOIN "matches" m ON m."id" = mp."matchId"
+        WHERE m."roomId" IS NOT NULL
       `),
       this.prisma.$queryRaw<{ count: bigint }[]>(Prisma.sql`
         SELECT COUNT(*)::bigint AS count
         FROM (
-          SELECT unnest(ARRAY["item0", "item1", "item2", "item3", "item4", "item5", "item6"]) AS item_id
-          FROM "match_participants"
+          SELECT unnest(ARRAY[mp."item0", mp."item1", mp."item2", mp."item3", mp."item4", mp."item5", mp."item6"]) AS item_id
+          FROM "match_participants" mp
+          INNER JOIN "matches" m ON m."id" = mp."matchId"
+          WHERE m."roomId" IS NOT NULL
         ) items
         WHERE item_id > 0
       `),
@@ -1434,6 +1451,7 @@ export class StatsService {
         FROM "match_participants" mp
         INNER JOIN "matches" m ON m."id" = mp."matchId"
         WHERE COALESCE(m."completedAt", m."createdAt") >= NOW() - INTERVAL '30 days'
+          AND m."roomId" IS NOT NULL
       `),
       this.prisma.$queryRaw<
         {
@@ -1448,19 +1466,21 @@ export class StatsService {
         }[]
       >(Prisma.sql`
         SELECT
-          "position",
+          mp."position",
           COUNT(*)::bigint AS games,
-          ROUND((AVG(CASE WHEN "win" THEN 1.0 ELSE 0.0 END) * 100)::numeric, 1)::float AS "winRate",
-          ROUND(AVG("kills")::numeric, 1)::float AS "avgKills",
-          ROUND(AVG("deaths")::numeric, 1)::float AS "avgDeaths",
-          ROUND(AVG("assists")::numeric, 1)::float AS "avgAssists",
-          ROUND(AVG("totalDamageDealtToChampions")::numeric, 0)::float AS "avgDamage",
-          ROUND(AVG("goldEarned")::numeric, 0)::float AS "avgGold"
-        FROM "match_participants"
-        WHERE "position" IS NOT NULL
-          AND "position" <> ''
-          AND "position" <> 'UNKNOWN'
-        GROUP BY "position"
+          ROUND((AVG(CASE WHEN mp."win" THEN 1.0 ELSE 0.0 END) * 100)::numeric, 1)::float AS "winRate",
+          ROUND(AVG(mp."kills")::numeric, 1)::float AS "avgKills",
+          ROUND(AVG(mp."deaths")::numeric, 1)::float AS "avgDeaths",
+          ROUND(AVG(mp."assists")::numeric, 1)::float AS "avgAssists",
+          ROUND(AVG(mp."totalDamageDealtToChampions")::numeric, 0)::float AS "avgDamage",
+          ROUND(AVG(mp."goldEarned")::numeric, 0)::float AS "avgGold"
+        FROM "match_participants" mp
+        INNER JOIN "matches" m ON m."id" = mp."matchId"
+        WHERE m."roomId" IS NOT NULL
+          AND mp."position" IS NOT NULL
+          AND mp."position" <> ''
+          AND mp."position" <> 'UNKNOWN'
+        GROUP BY mp."position"
         ORDER BY COUNT(*) DESC
       `),
       this.prisma.$queryRaw<
@@ -1475,15 +1495,17 @@ export class StatsService {
         }[]
       >(Prisma.sql`
         SELECT
-          "championId",
-          "championName",
+          mp."championId",
+          mp."championName",
           COUNT(*)::bigint AS games,
-          ROUND((AVG(CASE WHEN "win" THEN 1.0 ELSE 0.0 END) * 100)::numeric, 1)::float AS "winRate",
-          ROUND(AVG("kills")::numeric, 1)::float AS "avgKills",
-          ROUND(AVG("deaths")::numeric, 1)::float AS "avgDeaths",
-          ROUND(AVG("assists")::numeric, 1)::float AS "avgAssists"
-        FROM "match_participants"
-        GROUP BY "championId", "championName"
+          ROUND((AVG(CASE WHEN mp."win" THEN 1.0 ELSE 0.0 END) * 100)::numeric, 1)::float AS "winRate",
+          ROUND(AVG(mp."kills")::numeric, 1)::float AS "avgKills",
+          ROUND(AVG(mp."deaths")::numeric, 1)::float AS "avgDeaths",
+          ROUND(AVG(mp."assists")::numeric, 1)::float AS "avgAssists"
+        FROM "match_participants" mp
+        INNER JOIN "matches" m ON m."id" = mp."matchId"
+        WHERE m."roomId" IS NOT NULL
+        GROUP BY mp."championId", mp."championName"
         HAVING COUNT(*) >= 3
         ORDER BY COUNT(*) DESC, "winRate" DESC
         LIMIT 12
@@ -1501,9 +1523,11 @@ export class StatsService {
           COUNT(DISTINCT "userId")::bigint AS "uniqueUsers"
         FROM (
           SELECT
-            "userId",
-            unnest(ARRAY["item0", "item1", "item2", "item3", "item4", "item5", "item6"]) AS item_id
-          FROM "match_participants"
+            mp."userId",
+            unnest(ARRAY[mp."item0", mp."item1", mp."item2", mp."item3", mp."item4", mp."item5", mp."item6"]) AS item_id
+          FROM "match_participants" mp
+          INNER JOIN "matches" m ON m."id" = mp."matchId"
+          WHERE m."roomId" IS NOT NULL
         ) items
         WHERE item_id > 0
         GROUP BY item_id
@@ -1534,7 +1558,9 @@ export class StatsService {
             AVG(CASE WHEN mp."win" THEN 1.0 ELSE 0.0 END) * 100 AS "winRate",
             AVG((mp."kills" + mp."assists")::float / GREATEST(mp."deaths", 1)) AS "avgKda"
           FROM "match_participants" mp
+          INNER JOIN "matches" m ON m."id" = mp."matchId"
           INNER JOIN "users" u ON u."id" = mp."userId"
+          WHERE m."roomId" IS NOT NULL
           GROUP BY mp."userId", u."username", u."avatar", mp."championId", mp."championName"
           HAVING COUNT(*) >= 4
         ),
