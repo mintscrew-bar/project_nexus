@@ -8,6 +8,7 @@ import { HeroBanner } from "@/components/home/HeroBanner";
 import { DiscordBanner } from "@/components/home/DiscordBanner";
 import { ErrorBoundary, Skeleton } from "@/components/ui";
 import { AdSlotCard } from "@/components/ads/AdSlot";
+import { OnboardingGuideModal } from "@/components/OnboardingGuideModal";
 
 // 대시보드 스켈레톤 — dynamic 청크 로드 중 빈 화면 방지
 function DashboardFallback() {
@@ -60,6 +61,8 @@ export default function HomeClient() {
   if (isAuthenticated) {
     return (
       <div className="flex-grow animate-fade-in">
+        {/* 신규 유저 첫 방문 온보딩 가이드 (localStorage로 1회 노출) */}
+        <OnboardingGuideModal />
         <HeroBanner isAuthenticated />
         <div className="container mx-auto max-w-7xl space-y-5 p-4 md:p-6">
           {/* 대시보드 개별 컴포넌트 crash가 전체 페이지를 다운시키지 않도록 보호 */}
