@@ -25,6 +25,7 @@ describe("RoomService", () => {
       user: { findUnique: jest.fn() },
       authProvider: { findFirst: jest.fn() },
       riotAccount: { findFirst: jest.fn() },
+      discordGuildLink: { findFirst: jest.fn().mockResolvedValue(null) },
       room: { create: jest.fn() },
     };
 
