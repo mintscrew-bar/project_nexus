@@ -5,13 +5,46 @@ import { Button } from '@/components/ui/Button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/Alert';
 import { Badge } from '@/components/ui/Badge';
 import { Loader2, Swords, Trophy, Copy, ShieldCheck, AlertCircle, Radio, Star, Sword } from 'lucide-react';
-import { Match } from './BracketView';
+import { Match, getTeamDisplayName } from './BracketView';
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuthStore } from '@/stores/auth-store';
 import { matchApi } from '@/lib/api-client';
+import { ChampionIcon, PositionIcon, POSITION_LABELS } from '@/app/tournaments/[id]/lobby/_components/icons';
+import { TierBadge } from '@/components/domain/TierBadge';
+
+type LaneKey = 'TOP' | 'JUNGLE' | 'MID' | 'ADC' | 'SUPPORT';
+const LANES: LaneKey[] = ['TOP', 'JUNGLE', 'MID', 'ADC', 'SUPPORT'];
+
+// 서버에서 들어오는 다양한 표기를 표준 5개 라인으로 정규화
+function normalizeLane(role?: string | null): LaneKey | null {
+  if (!role) return null;
+  const r = role.toUpperCase();
+  if (r === 'TOP') return 'TOP';
+  if (r === 'JUNGLE') return 'JUNGLE';
+  if (r === 'MID' || r === 'MIDDLE') return 'MID';
+  if (r === 'ADC' || r === 'BOTTOM') return 'ADC';
+  if (r === 'SUPPORT' || r === 'UTILITY') return 'SUPPORT';
+  return null;
+}
+
+interface RiotInfo {
+  gameName: string;
+  tagLine: string;
+  tier?: string;
+  rank?: string;
+  mainRole?: string | null;
+  subRole?: string | null;
+  championPreferences?: Array<{ role: string; championId: string; order: number }>;
+}
 
 interface MatchMember {
-  user: { id: string; username: string; avatar?: string | null };
+  assignedRole?: string | null;
+  user: {
+    id: string;
+    username: string;
+    avatar?: string | null;
+    riotAccounts?: RiotInfo[];
+  };
 }
 
 interface VoteCandidate {
@@ -26,8 +59,8 @@ interface VoteData {
 }
 
 interface FullMatchDetails {
-  teamA?: { id: string; name: string; members: MatchMember[] };
-  teamB?: { id: string; name: string; members: MatchMember[] };
+  teamA?: { id: string; name: string; captain?: { id: string; username: string }; members: MatchMember[] };
+  teamB?: { id: string; name: string; captain?: { id: string; username: string }; members: MatchMember[] };
   winnerId?: string;
 }
 
@@ -92,15 +125,15 @@ export function MatchDetailModal({
     }
   }, []);
 
-  // COMPLETED 매치 열릴 때 투표 데이터 로드
+  // 매치 열릴 때마다 라인별 멤버 데이터 로드 (모든 상태). COMPLETED일 때만 투표 정보도 함께.
   useEffect(() => {
-    if (isOpen && match?.status === 'COMPLETED') {
+    if (isOpen && match?.id) {
       setIsLoadingVotes(true);
       setVoteData(null);
       setFullMatch(null);
       fetchVoteData(match.id);
     }
-  }, [isOpen, match?.id, match?.status, fetchVoteData]);
+  }, [isOpen, match?.id, fetchVoteData]);
 
   const handleVote = async (votedForId: string, voteType: 'MVP' | 'ACE') => {
     if (!match) return;
@@ -194,7 +227,7 @@ export function MatchDetailModal({
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={`매치 #${match.matchNumber} 상세 정보`} size="md">
       <p className="text-text-secondary mb-4">
-        {match.team1?.name || 'TBD'} vs {match.team2?.name || 'TBD'}
+        {getTeamDisplayName(match.team1)} vs {getTeamDisplayName(match.team2)}
       </p>
 
       <div className="py-4 space-y-4">
@@ -226,27 +259,21 @@ export function MatchDetailModal({
           </Alert>
         )}
 
-        <div className="grid grid-cols-2 gap-2 sm:gap-4 text-center">
-          <div className="p-2 sm:p-4 bg-bg-tertiary rounded-lg">
-            <p className="font-bold text-sm sm:text-lg text-text-primary truncate">
-              {match.team1?.name || 'TBD'}
-            </p>
-            <p className="text-xs sm:text-sm text-text-secondary">Team 1</p>
-          </div>
-          <div className="p-2 sm:p-4 bg-bg-tertiary rounded-lg">
-            <p className="font-bold text-sm sm:text-lg text-text-primary truncate">
-              {match.team2?.name || 'TBD'}
-            </p>
-            <p className="text-xs sm:text-sm text-text-secondary">Team 2</p>
-          </div>
-        </div>
-        
+        {/* 라인별 멤버 테이블 — 팀A vs 팀B */}
+        <LaneRoster
+          teamA={fullMatch?.teamA}
+          teamB={fullMatch?.teamB}
+          fallbackTeam1Name={getTeamDisplayName(match.team1)}
+          fallbackTeam2Name={getTeamDisplayName(match.team2)}
+          winnerId={fullMatch?.winnerId}
+        />
+
         {match.status === 'COMPLETED' && match.winner && (
            <Alert variant="success">
               <Trophy className="h-4 w-4" />
               <AlertTitle>경기 종료</AlertTitle>
               <AlertDescription>
-                승자: <span className="font-bold">{match.winner.name}</span>
+                승자: <span className="font-bold">{getTeamDisplayName(match.winner)}</span>
               </AlertDescription>
           </Alert>
         )}
@@ -335,14 +362,14 @@ export function MatchDetailModal({
                 onClick={() => handleReport(match.team1!.id)}
                 disabled={isReporting}
               >
-                {isReporting ? <Loader2 className="h-4 w-4 animate-spin"/> : `${match.team1!.name} 승리`}
+                {isReporting ? <Loader2 className="h-4 w-4 animate-spin"/> : `${getTeamDisplayName(match.team1)} 승리`}
               </Button>
               <Button
                 variant="outline"
                 onClick={() => handleReport(match.team2!.id)}
                 disabled={isReporting}
               >
-                {isReporting ? <Loader2 className="h-4 w-4 animate-spin"/> : `${match.team2!.name} 승리`}
+                {isReporting ? <Loader2 className="h-4 w-4 animate-spin"/> : `${getTeamDisplayName(match.team2)} 승리`}
               </Button>
             </div>
             {reportError && (
@@ -409,7 +436,7 @@ function VotePanels({
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
       <VoteColumn
         title="MVP"
-        subtitle={winnerTeam?.name ?? '이긴 팀'}
+        subtitle={winnerTeam ? getTeamDisplayName({ id: winnerTeam.id, name: winnerTeam.name, captain: winnerTeam.captain }) : '이긴 팀'}
         icon={<Trophy className="h-4 w-4 text-accent-gold" />}
         members={winnerTeam?.members ?? []}
         voteType="MVP"
@@ -423,7 +450,7 @@ function VotePanels({
       />
       <VoteColumn
         title="ACE"
-        subtitle={loserTeam?.name ?? '진 팀'}
+        subtitle={loserTeam ? getTeamDisplayName({ id: loserTeam.id, name: loserTeam.name, captain: loserTeam.captain }) : '진 팀'}
         icon={<Sword className="h-4 w-4 text-text-secondary" />}
         members={loserTeam?.members ?? []}
         voteType="ACE"
@@ -518,6 +545,172 @@ function VoteColumn({
       )}
       {isParticipant && !hasVoted && (
         <p className="text-xs text-text-tertiary text-center pt-1">클릭하여 투표</p>
+      )}
+    </div>
+  );
+}
+
+// ========================================
+// LaneRoster — 라인별 (TOP/JUNGLE/MID/ADC/SUPPORT) 양팀 선수 표
+// 호버 시 닉#태그 + 티어 + 주라인 + 주라인 선호 챔피언을 툴팁으로 표시
+// ========================================
+
+function LaneRoster({
+  teamA,
+  teamB,
+  fallbackTeam1Name,
+  fallbackTeam2Name,
+  winnerId,
+}: {
+  teamA?: FullMatchDetails['teamA'];
+  teamB?: FullMatchDetails['teamB'];
+  fallbackTeam1Name: string;
+  fallbackTeam2Name: string;
+  winnerId?: string;
+}) {
+  // 라인별로 멤버를 분류. assignedRole이 없거나 알 수 없으면 'UNASSIGNED' 버킷에 모음.
+  const groupByLane = (members?: MatchMember[]) => {
+    const map = new Map<LaneKey | 'UNASSIGNED', MatchMember[]>();
+    for (const m of members ?? []) {
+      const lane = normalizeLane(m.assignedRole) ?? 'UNASSIGNED';
+      if (!map.has(lane)) map.set(lane, []);
+      map.get(lane)!.push(m);
+    }
+    return map;
+  };
+
+  const aByLane = groupByLane(teamA?.members);
+  const bByLane = groupByLane(teamB?.members);
+
+  const teamADisplay = teamA ? getTeamDisplayName({ id: teamA.id, name: teamA.name, captain: teamA.captain }) : fallbackTeam1Name;
+  const teamBDisplay = teamB ? getTeamDisplayName({ id: teamB.id, name: teamB.name, captain: teamB.captain }) : fallbackTeam2Name;
+  const isAWinner = winnerId && teamA && winnerId === teamA.id;
+  const isBWinner = winnerId && teamB && winnerId === teamB.id;
+
+  return (
+    <div className="rounded-lg overflow-hidden border border-bg-tertiary">
+      {/* 헤더: 팀명 */}
+      <div className="grid grid-cols-[60px_1fr_28px_1fr] sm:grid-cols-[72px_1fr_36px_1fr] bg-bg-tertiary">
+        <div className="px-2 py-2" />
+        <div className={`px-2 py-2 text-center text-xs sm:text-sm font-bold truncate ${isAWinner ? 'text-accent-gold' : 'text-text-primary'}`}>
+          {isAWinner && <Trophy className="inline h-3 w-3 mr-1" />}
+          {teamADisplay}
+        </div>
+        <div className="px-1 py-2 text-center text-[10px] text-text-tertiary">vs</div>
+        <div className={`px-2 py-2 text-center text-xs sm:text-sm font-bold truncate ${isBWinner ? 'text-accent-gold' : 'text-text-primary'}`}>
+          {isBWinner && <Trophy className="inline h-3 w-3 mr-1" />}
+          {teamBDisplay}
+        </div>
+      </div>
+
+      {/* 라인별 행 */}
+      {LANES.map((lane) => {
+        const aMembers = aByLane.get(lane) ?? [];
+        const bMembers = bByLane.get(lane) ?? [];
+        if (aMembers.length === 0 && bMembers.length === 0) return null;
+        return (
+          <div key={lane} className="grid grid-cols-[60px_1fr_28px_1fr] sm:grid-cols-[72px_1fr_36px_1fr] border-t border-bg-tertiary items-stretch">
+            <div className="flex items-center justify-center px-2 py-2 bg-bg-tertiary/50">
+              <span className="flex items-center gap-1 text-[11px] sm:text-xs font-medium text-text-secondary">
+                <PositionIcon position={lane} className="!w-3.5 !h-3.5" />
+                <span className="hidden sm:inline">{POSITION_LABELS[lane]}</span>
+              </span>
+            </div>
+            <div className="px-2 py-1.5">
+              {aMembers.map((m) => <PlayerCell key={m.user.id} member={m} />)}
+            </div>
+            <div className="flex items-center justify-center text-[10px] text-text-tertiary">vs</div>
+            <div className="px-2 py-1.5">
+              {bMembers.map((m) => <PlayerCell key={m.user.id} member={m} />)}
+            </div>
+          </div>
+        );
+      })}
+
+      {/* 라인 미배정 멤버는 별도 푸터로 노출 */}
+      {(aByLane.get('UNASSIGNED')?.length || bByLane.get('UNASSIGNED')?.length) ? (
+        <div className="grid grid-cols-[60px_1fr_28px_1fr] sm:grid-cols-[72px_1fr_36px_1fr] border-t border-bg-tertiary items-stretch">
+          <div className="flex items-center justify-center px-2 py-2 bg-bg-tertiary/50 text-[10px] text-text-tertiary">미배정</div>
+          <div className="px-2 py-1.5">
+            {(aByLane.get('UNASSIGNED') ?? []).map((m) => <PlayerCell key={m.user.id} member={m} />)}
+          </div>
+          <div />
+          <div className="px-2 py-1.5">
+            {(bByLane.get('UNASSIGNED') ?? []).map((m) => <PlayerCell key={m.user.id} member={m} />)}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+// 한 명의 선수 셀 — 호버하면 상세 툴팁
+function PlayerCell({ member }: { member: MatchMember }) {
+  const [hovered, setHovered] = useState(false);
+  const ref = React.useRef<HTMLDivElement>(null);
+  const riot = member.user.riotAccounts?.[0];
+
+  return (
+    <div
+      ref={ref}
+      className="relative flex items-center gap-1.5 py-0.5 cursor-default"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      <div className="w-5 h-5 rounded-full bg-bg-tertiary overflow-hidden flex-shrink-0">
+        {member.user.avatar ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={member.user.avatar} alt={member.user.username} className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-[10px] font-bold text-text-tertiary">
+            {member.user.username.charAt(0).toUpperCase()}
+          </div>
+        )}
+      </div>
+      <span className="text-xs text-text-primary truncate">{member.user.username}</span>
+
+      {hovered && riot && <PlayerInlineTooltip member={member} />}
+    </div>
+  );
+}
+
+// 호버 시 표시되는 작은 툴팁: 닉#태그 + 티어 + 주라인 + 주라인 선호 챔피언
+function PlayerInlineTooltip({ member }: { member: MatchMember }) {
+  const riot = member.user.riotAccounts?.[0];
+  if (!riot) return null;
+  const mainRole = riot.mainRole || null;
+  const mainRoleChamps = (riot.championPreferences || [])
+    .filter((cp) => cp.role === mainRole)
+    .sort((a, b) => a.order - b.order)
+    .slice(0, 5);
+
+  return (
+    <div className="absolute left-0 top-full mt-1 z-50 w-60 rounded-lg border border-bg-tertiary bg-bg-elevated shadow-xl p-2.5 pointer-events-none">
+      <p className="text-xs font-bold text-text-primary truncate">
+        {riot.gameName}<span className="text-text-tertiary font-normal">#{riot.tagLine}</span>
+      </p>
+      <p className="text-[10px] text-text-tertiary mb-2">@{member.user.username}</p>
+      <div className="flex items-center gap-2 mb-2">
+        {riot.tier && <TierBadge tier={riot.tier} rank={riot.rank || undefined} size="sm" showIcon />}
+        {mainRole && (
+          <span className="flex items-center gap-1 text-[10px] text-text-secondary">
+            <PositionIcon position={mainRole} className="!w-3 !h-3" />
+            <span>{POSITION_LABELS[mainRole] || mainRole}</span>
+            <span className="text-accent-primary font-semibold">주</span>
+          </span>
+        )}
+      </div>
+      {mainRoleChamps.length > 0 ? (
+        <div>
+          <p className="text-[9px] font-semibold text-text-tertiary uppercase tracking-wider mb-1">주라인 선호 챔피언</p>
+          <div className="flex items-center gap-1">
+            {mainRoleChamps.map((cp) => (
+              <ChampionIcon key={cp.championId} championId={cp.championId} size={24} />
+            ))}
+          </div>
+        </div>
+      ) : (
+        <p className="text-[10px] text-text-tertiary italic">등록된 선호 챔피언이 없습니다</p>
       )}
     </div>
   );

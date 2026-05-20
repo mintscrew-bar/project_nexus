@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { useMatchStore } from "@/stores/match-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { roomApi, matchApi } from "@/lib/api-client";
-import { BracketView, Match, MatchDetailModal, VictoryScreen, GameChatPanel } from "@/components/domain";
+import { BracketView, Match, MatchDetailModal, VictoryScreen, GameChatPanel, getTeamDisplayName } from "@/components/domain";
 import { LoadingSpinner, Badge, Button } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
 import { ArrowLeft, RefreshCw, Trophy } from "lucide-react";
@@ -149,13 +149,13 @@ export default function BracketPage() {
     id: m.id,
     round: m.round || 1,
     matchNumber: m.matchNumber || index + 1,
-    team1: m.teamA ? { id: m.teamA.id, name: m.teamA.name, score: m.teamA.score } : undefined,
-    team2: m.teamB ? { id: m.teamB.id, name: m.teamB.name, score: m.teamB.score } : undefined,
+    team1: m.teamA ? { id: m.teamA.id, name: m.teamA.name, score: m.teamA.score, captain: m.teamA.captain } : undefined,
+    team2: m.teamB ? { id: m.teamB.id, name: m.teamB.name, score: m.teamB.score, captain: m.teamB.captain } : undefined,
     winner: m.winnerId
       ? (m.teamA?.id === m.winnerId && m.teamA
-        ? { id: m.teamA.id, name: m.teamA.name }
+        ? { id: m.teamA.id, name: m.teamA.name, captain: m.teamA.captain }
         : m.teamB?.id === m.winnerId && m.teamB
-          ? { id: m.teamB.id, name: m.teamB.name }
+          ? { id: m.teamB.id, name: m.teamB.name, captain: m.teamB.captain }
           : undefined)
       : undefined,
     status: m.status as 'PENDING' | 'IN_PROGRESS' | 'COMPLETED',
@@ -265,7 +265,7 @@ export default function BracketPage() {
           <div className="bg-gradient-to-r from-accent-gold/20 to-accent-gold/5 border border-accent-gold/30 rounded-xl p-6 mb-6 text-center">
             <Trophy className="h-12 w-12 text-accent-gold mx-auto mb-3" />
             <h2 className="text-2xl font-bold text-accent-gold mb-1">우승</h2>
-            <p className="text-3xl font-bold text-text-primary">{tournamentWinner.name}</p>
+            <p className="text-3xl font-bold text-text-primary">{getTeamDisplayName(tournamentWinner)}</p>
           </div>
         )}
 

@@ -10,6 +10,7 @@ interface Team {
   id: string;
   name: string;
   score?: number;
+  captain?: { id: string; username: string };
   members?: Array<{
     id: string;
     username: string;
