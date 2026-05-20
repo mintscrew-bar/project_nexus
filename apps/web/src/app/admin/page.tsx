@@ -2060,8 +2060,8 @@ function DiscordGuildLinksTab({ addToast }: { addToast: (msg: string, type: "suc
       await adminApi.approveDiscordGuildLink(link.id);
       setLinks((prev) => prev.map((l) => l.id === link.id ? { ...l, status: "ACTIVE", activatedAt: new Date().toISOString() } : l));
       addToast(`${link.guildName || link.guildId} 승인 완료`, "success");
-    } catch {
-      addToast("승인 실패", "error");
+    } catch (err: any) {
+      addToast(err?.response?.data?.message || "승인 실패", "error");
     } finally {
       setUpdatingId(null);
     }

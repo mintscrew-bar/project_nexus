@@ -4,9 +4,10 @@ import { AdminService } from "./admin.service";
 import { PrismaModule } from "../prisma/prisma.module";
 import { RoomModule } from "../room/room.module";
 import { TasksModule } from "../tasks/tasks.module";
+import { DiscordModule } from "../discord/discord.module";
 
 @Module({
-  imports: [PrismaModule, forwardRef(() => RoomModule), TasksModule],
+  imports: [PrismaModule, forwardRef(() => RoomModule), TasksModule, DiscordModule],
   controllers: [AdminController],
   providers: [AdminService],
   exports: [AdminService],

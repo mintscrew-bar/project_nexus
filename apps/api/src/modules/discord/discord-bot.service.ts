@@ -226,6 +226,35 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
+   * 길드 활성화(승인) 전 봇이 실제로 그 길드에 있고 채널 운영 권한을 가졌는지 검증한다.
+   * - inGuild: 봇이 해당 길드 멤버인지
+   * - hasManageChannels: 카테고리/음성채널 생성·삭제 권한
+   * - hasMoveMembers: 음성채널 간 이동 권한
+   */
+  async verifyGuildPermissions(guildId: string): Promise<{
+    inGuild: boolean;
+    hasManageChannels: boolean;
+    hasMoveMembers: boolean;
+    guildName?: string;
+  }> {
+    try {
+      const guild = await this.client.guilds.fetch(guildId);
+      const me = await guild.members.fetchMe();
+      return {
+        inGuild: true,
+        hasManageChannels: me.permissions.has(
+          PermissionFlagsBits.ManageChannels,
+        ),
+        hasMoveMembers: me.permissions.has(PermissionFlagsBits.MoveMembers),
+        guildName: guild.name,
+      };
+    } catch {
+      // fetch 실패 = 봇이 길드에 없음(추방되었거나 초대 안 됨)
+      return { inGuild: false, hasManageChannels: false, hasMoveMembers: false };
+    }
+  }
+
+  /**
    * 봇이 외부 길드에서 추방/제거됨. 해당 링크를 DISABLED로 표시해
    * 더 이상 그 길드에 채널을 만들지 않도록 한다.
    */

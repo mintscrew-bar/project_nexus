@@ -7,6 +7,7 @@ import {
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../prisma/prisma.service";
 import { UserRole, AdminAction } from "@nexus/database";
+import { DiscordBotService } from "../discord/discord-bot.service";
 
 const MAX_LIMIT = 100;
 
@@ -34,6 +35,7 @@ export class AdminService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
+    private readonly discordBotService: DiscordBotService,
   ) {}
 
   private readonly seededHighTierPriority = 7;
@@ -1343,9 +1345,35 @@ export class AdminService {
     });
     if (!link) throw new NotFoundException("길드 연동을 찾을 수 없습니다.");
 
+    // 활성화 전 봇이 실제로 그 길드에 있고 채널 운영 권한을 가졌는지 검증.
+    const perms = await this.discordBotService.verifyGuildPermissions(
+      link.guildId,
+    );
+    if (!perms.inGuild) {
+      throw new BadRequestException(
+        "봇이 해당 디스코드 서버에 없습니다. 서버에 봇을 먼저 초대해주세요.",
+      );
+    }
+    if (!perms.hasManageChannels || !perms.hasMoveMembers) {
+      const missing = [
+        !perms.hasManageChannels ? "채널 관리" : null,
+        !perms.hasMoveMembers ? "멤버 이동" : null,
+      ]
+        .filter(Boolean)
+        .join(", ");
+      throw new BadRequestException(
+        `봇에게 필요한 권한이 없습니다: ${missing}. 서버 역할 설정에서 권한을 부여한 뒤 다시 시도해주세요.`,
+      );
+    }
+
     const result = await this.prisma.discordGuildLink.update({
       where: { id: linkId },
-      data: { status: "ACTIVE", activatedAt: new Date() },
+      data: {
+        status: "ACTIVE",
+        activatedAt: new Date(),
+        // 검증 과정에서 확인한 최신 길드명 반영
+        ...(perms.guildName ? { guildName: perms.guildName } : {}),
+      },
     });
 
     await this.logAction(
