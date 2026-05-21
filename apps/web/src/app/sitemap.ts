@@ -18,7 +18,6 @@ const staticRoutes = [
   { path: "/community", priority: 0.65, changeFrequency: "daily" },
   { path: "/matches", priority: 0.6, changeFrequency: "daily" },
   { path: "/tournaments", priority: 0.6, changeFrequency: "weekly" },
-  { path: "/simulation", priority: 0.55, changeFrequency: "monthly" },
   { path: "/terms", priority: 0.2, changeFrequency: "yearly" },
   { path: "/privacy", priority: 0.2, changeFrequency: "yearly" },
   { path: "/feed.xml", priority: 0.5, changeFrequency: "hourly" },

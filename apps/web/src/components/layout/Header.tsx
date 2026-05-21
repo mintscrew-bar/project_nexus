@@ -9,7 +9,7 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { UserMenu } from '@/components/UserMenu';
 import { MobileMenu } from '@/components/MobileMenu';
 import { DiscordIcon } from '@/components/icons/DiscordIcon';
-import { Users, Shield, FlaskConical } from 'lucide-react';
+import { Users, Shield } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth-store';
 import { useFriendStore } from '@/stores/friend-store';
 import { NEXUS_DISCORD_INVITE_URL } from '@/lib/constants';
@@ -98,20 +98,6 @@ export function Header() {
         {/* 어드민/모더레이터 전용 링크: 마운트 후에만 표시하여 hydration 불일치 방지 */}
         {clientIsAuthenticated && (clientUser?.role === 'ADMIN' || clientUser?.role === 'MODERATOR') && (
           <>
-            {clientUser?.role === 'ADMIN' && (
-              <Link
-                href="/simulation"
-                className={cn(
-                  'p-2 rounded-lg transition-colors duration-150',
-                  pathname.startsWith('/simulation')
-                    ? 'bg-accent-primary/10 text-accent-primary'
-                    : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary'
-                )}
-                title="시뮬레이션"
-              >
-                <FlaskConical className="h-5 w-5" />
-              </Link>
-            )}
             <Link
               href="/admin"
               className={cn(
