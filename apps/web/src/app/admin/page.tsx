@@ -80,21 +80,21 @@ export default function AdminPage() {
     : TABS.filter((tab) => MODERATOR_TABS.includes(tab.id));
 
   return (
-    <div className="flex h-[calc(100vh-64px)]">
-      {/* 사이드바 */}
-      <aside className="w-48 flex-shrink-0 border-r border-bg-tertiary bg-bg-secondary flex flex-col">
-        <div className="flex items-center gap-2 px-4 py-4 border-b border-bg-tertiary">
+    <div className="flex flex-col md:flex-row h-[calc(100vh-64px)]">
+      {/* 사이드바 — 모바일에서는 상단 가로 스크롤 탭바, 데스크톱에서는 세로 사이드바 */}
+      <aside className="md:w-48 flex-shrink-0 border-b md:border-b-0 md:border-r border-bg-tertiary bg-bg-secondary flex flex-col">
+        <div className="hidden md:flex items-center gap-2 px-4 py-4 border-b border-bg-tertiary">
           <Shield className="h-5 w-5 text-accent-primary" />
           <span className="font-bold text-text-primary text-sm">관리자 패널</span>
         </div>
-        <nav className="flex-1 py-2">
+        <nav className="flex md:flex-col md:flex-1 overflow-x-auto md:overflow-x-visible py-1 md:py-2">
           {visibleTabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors ${
+              className={`flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors whitespace-nowrap flex-shrink-0 md:w-full ${
                 activeTab === tab.id
-                  ? "bg-accent-primary/10 text-accent-primary font-medium"
+                  ? "bg-accent-primary/10 text-accent-primary font-medium border-b-2 md:border-b-0 border-accent-primary"
                   : "text-text-secondary hover:bg-bg-tertiary hover:text-text-primary"
               }`}
             >
@@ -106,7 +106,7 @@ export default function AdminPage() {
       </aside>
 
       {/* 메인 콘텐츠 */}
-      <main className="flex-1 overflow-y-auto p-6">
+      <main className="flex-1 overflow-y-auto p-4 md:p-6">
         {activeTab === "dashboard" && <DashboardTab addToast={addToast} />}
         {activeTab === "users" && <UsersTab addToast={addToast} currentUserId={user?.id} />}
         {activeTab === "reports" && <ReportsTab addToast={addToast} />}
@@ -128,11 +128,11 @@ function StatCard({ icon, label, value, sub }: { icon: React.ReactNode; label: s
   return (
     <Card>
       <CardContent className="p-4 flex items-center gap-3">
-        <div className="text-accent-primary">{icon}</div>
-        <div>
-          <p className="text-text-muted text-xs">{label}</p>
+        <div className="text-accent-primary flex-shrink-0">{icon}</div>
+        <div className="min-w-0">
+          <p className="text-text-muted text-xs truncate">{label}</p>
           <p className="text-xl font-bold text-text-primary">{value.toLocaleString()}</p>
-          {sub && <p className="text-[10px] text-text-muted">{sub}</p>}
+          {sub && <p className="text-[10px] text-text-muted truncate">{sub}</p>}
         </div>
       </CardContent>
     </Card>
