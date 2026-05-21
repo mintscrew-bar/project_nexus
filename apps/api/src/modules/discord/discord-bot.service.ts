@@ -250,7 +250,11 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
       };
     } catch {
       // fetch 실패 = 봇이 길드에 없음(추방되었거나 초대 안 됨)
-      return { inGuild: false, hasManageChannels: false, hasMoveMembers: false };
+      return {
+        inGuild: false,
+        hasManageChannels: false,
+        hasMoveMembers: false,
+      };
     }
   }
 
@@ -569,7 +573,9 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
     await interaction.deferReply({ ephemeral: true });
 
     if (!interaction.guild) {
-      await interaction.editReply("❌ 서버 안에서만 사용할 수 있는 명령어입니다.");
+      await interaction.editReply(
+        "❌ 서버 안에서만 사용할 수 있는 명령어입니다.",
+      );
       return;
     }
 
@@ -612,7 +618,8 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
       this.configService.get("DISCORD_MAIN_LINE_ROLE_PREFIX") || "주라인-";
     const subLinePrefix =
       this.configService.get("DISCORD_SUB_LINE_ROLE_PREFIX") || "부라인-";
-    const tierPrefix = this.configService.get("DISCORD_TIER_ROLE_PREFIX") || "티어-";
+    const tierPrefix =
+      this.configService.get("DISCORD_TIER_ROLE_PREFIX") || "티어-";
 
     const roleColorByName = new Map<string, `#${string}`>([
       [memberRoleName, "#7F8C8D"],
@@ -736,7 +743,9 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
     const modal = new ModalBuilder()
       .setCustomId(VERIFY_MODAL_ID)
       .setTitle("Nexus 인증")
-      .addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(input));
+      .addComponents(
+        new ActionRowBuilder<TextInputBuilder>().addComponents(input),
+      );
 
     await interaction.showModal(modal);
   }
@@ -749,7 +758,9 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
     await interaction.deferReply({ ephemeral: true });
 
     if (!interaction.guild) {
-      await interaction.editReply("❌ 서버 안에서만 사용할 수 있는 인증입니다.");
+      await interaction.editReply(
+        "❌ 서버 안에서만 사용할 수 있는 인증입니다.",
+      );
       return;
     }
 
@@ -791,7 +802,9 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
       );
     });
 
-    await interaction.editReply("✅ 인증 완료! 이제 서버 채널을 이용할 수 있습니다.");
+    await interaction.editReply(
+      "✅ 인증 완료! 이제 서버 채널을 이용할 수 있습니다.",
+    );
   }
 
   private async assignMemberAccessRole(
@@ -820,9 +833,7 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
     }
 
     if (role.position >= botMember.roles.highest.position) {
-      throw new Error(
-        `bot role must be higher than target role: ${role.name}`,
-      );
+      throw new Error(`bot role must be higher than target role: ${role.name}`);
     }
 
     await member.roles.add(role, "Nexus member access role");
@@ -846,7 +857,7 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
   ): boolean {
     return Boolean(
       interaction.memberPermissions?.has(PermissionFlagsBits.Administrator) ||
-        interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild),
+      interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild),
     );
   }
 
@@ -924,7 +935,9 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
       new EmbedBuilder()
         .setColor(Colors.Blue)
         .setTitle(
-          chunks.length === 1 ? title : `${title} (${index + 1}/${chunks.length})`,
+          chunks.length === 1
+            ? title
+            : `${title} (${index + 1}/${chunks.length})`,
         )
         .setDescription(chunk)
         .setFooter({
@@ -1971,7 +1984,8 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
       this.configService.get("DISCORD_MAIN_LINE_ROLE_PREFIX") || "주라인-";
     const subLinePrefix =
       this.configService.get("DISCORD_SUB_LINE_ROLE_PREFIX") || "부라인-";
-    const tierPrefix = this.configService.get("DISCORD_TIER_ROLE_PREFIX") || "티어-";
+    const tierPrefix =
+      this.configService.get("DISCORD_TIER_ROLE_PREFIX") || "티어-";
 
     const desiredRoleNames = new Set<string>();
     if (primaryAccount.mainRole) {
