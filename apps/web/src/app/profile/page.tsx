@@ -478,67 +478,66 @@ export default function ProfilePage() {
 
                 {/* Meta info row — 2-column grid with tier/role emphasis */}
                 <div className="space-y-4">
-                  {/* 주라인 & 티어 그리드 */}
-                  {primary && (
-                    <div className="grid grid-cols-2 gap-6">
-                      {/* 왼쪽: 주라인 */}
-                      <div className="flex items-center gap-3">
-                        {primary.mainRole && (
-                          <div className="flex items-center gap-2 px-3 py-2 bg-accent-primary/10 rounded-lg border border-accent-primary/30">
-                            <Gamepad2 className="h-5 w-5 text-accent-primary flex-shrink-0" />
-                            <div className="text-sm font-medium text-text-primary">
-                              {ROLE_LABELS[primary.mainRole] ?? primary.mainRole}
-                              {primary.subRole && (
-                                <span className="text-text-tertiary ml-1">/ {ROLE_LABELS[primary.subRole] ?? primary.subRole}</span>
-                              )}
-                            </div>
+                  {/* 주라인 & 티어 — 데이터 있는 것만 flex-wrap으로 표시 */}
+                  {primary && (primary.mainRole || primary.tier) && (
+                    <div className="flex flex-wrap items-center gap-4">
+                      {primary.mainRole && (
+                        <div className="flex items-center gap-2 px-3 py-2 bg-accent-primary/10 rounded-lg border border-accent-primary/30">
+                          <Gamepad2 className="h-5 w-5 text-accent-primary flex-shrink-0" />
+                          <div className="text-sm font-medium text-text-primary">
+                            {ROLE_LABELS[primary.mainRole] ?? primary.mainRole}
+                            {primary.subRole && (
+                              <span className="text-text-tertiary ml-1">/ {ROLE_LABELS[primary.subRole] ?? primary.subRole}</span>
+                            )}
                           </div>
-                        )}
-                      </div>
-
-                      {/* 오른쪽: 솔로/자유 랭크 티어 */}
-                      <div className="flex flex-col gap-2 text-right">
-                        {primary.tier && (
-                          <div className="flex items-center justify-end gap-2">
-                            <TierBadge tier={primary.tier} size="md" />
-                            <div className="text-sm">
-                              {primary.rank && <span className="font-medium text-text-primary">{primary.rank}</span>}
-                              {primary.lp && <span className="text-text-secondary ml-1">{primary.lp}LP</span>}
-                            </div>
+                        </div>
+                      )}
+                      {primary.tier && (
+                        <div className="flex items-center gap-2">
+                          <TierBadge tier={primary.tier} size="md" />
+                          <div className="text-sm">
+                            {primary.rank && <span className="font-medium text-text-primary">{primary.rank}</span>}
+                            {primary.lp && <span className="text-text-secondary ml-1">{primary.lp}LP</span>}
                           </div>
-                        )}
-                      </div>
+                        </div>
+                      )}
                     </div>
                   )}
 
-                  {/* 아래: 게임명 · 최고 티어 · 가입일 */}
-                  <div className="flex items-center gap-2 text-xs text-text-tertiary">
-                    <StatusSelector
-                      currentStatus={myStatus}
-                      onStatusChange={(status) => setStatus(status)}
-                    />
+                  {/* 아래: 게임명 · 최고 티어 · 가입일 — 모바일에서 2줄 */}
+                  <div className="flex flex-col gap-1.5 text-xs text-text-tertiary">
+                    {/* 첫째 줄: 상태 · 게임명 · 태그 */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <StatusSelector
+                        currentStatus={myStatus}
+                        onStatusChange={(status) => setStatus(status)}
+                      />
+                      {primary && (
+                        <>
+                          <span className="font-medium text-text-primary">{primary.gameName}</span>
+                          <span>#{primary.tagLine}</span>
+                        </>
+                      )}
+                      {highlightChampionId && (
+                        <>
+                          <span>·</span>
+                          <ChampionImage championKey={getChampionKey(highlightChampionId)} size={14} className="rounded" />
+                          <span className="text-accent-gold">{getChampionName(highlightChampionId)}</span>
+                        </>
+                      )}
+                    </div>
+                    {/* 둘째 줄: 최고 티어 · 가입일 */}
                     {primary && (
-                      <>
-                        <span className="font-medium text-text-primary">{primary.gameName}</span>
-                        <span>#{primary.tagLine}</span>
-                        <span>·</span>
+                      <div className="flex items-center gap-2 flex-wrap">
                         {primary.peakTier && (
                           <>
-                            <span>최고 {primary.peakTier}</span>
-                            {primary.peakRank && <span>{primary.peakRank}</span>}
+                            <span>최고 {primary.peakTier}{primary.peakRank ? ` ${primary.peakRank}` : ''}</span>
                             <span>·</span>
                           </>
                         )}
                         <Calendar className="h-3 w-3 flex-shrink-0" />
                         <span>{new Date(profileData?.createdAt || user.createdAt).toLocaleDateString('ko-KR')} 가입</span>
-                      </>
-                    )}
-                    {highlightChampionId && (
-                      <>
-                        <span>·</span>
-                        <ChampionImage championKey={getChampionKey(highlightChampionId)} size={14} className="rounded" />
-                        <span className="text-accent-gold">{getChampionName(highlightChampionId)}</span>
-                      </>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -571,7 +570,7 @@ export default function ProfilePage() {
         {(preferredChampions.length > 0 || championStats.length > 0 || rankedChampStats.length > 0) && (
           <Card className="mb-6">
             <CardContent className="p-6 md:p-8">
-              <Tabs defaultValue="auto-stats">
+              <Tabs defaultValue={championStats.length > 0 ? 'auto-stats' : preferredChampions.length > 0 ? 'preferred' : 'ranked'}>
                 <TabsList className="mb-6">
                   {championStats.length > 0 && (
                     <TabsTrigger value="auto-stats">
@@ -821,8 +820,8 @@ export default function ProfilePage() {
                         } cursor-pointer`}
                         onClick={() => selectAccount(account)}
                       >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-3 min-w-0 flex-1">
                             {/* Primary Star */}
                             <button
                               onClick={(e) => {
@@ -831,7 +830,7 @@ export default function ProfilePage() {
                                   handleSetPrimary(account.id);
                                 }
                               }}
-                              className={`p-1 rounded transition-colors ${
+                              className={`p-1 rounded transition-colors flex-shrink-0 ${
                                 account.isPrimary
                                   ? 'text-accent-gold'
                                   : 'text-text-tertiary hover:text-accent-gold'
@@ -845,27 +844,27 @@ export default function ProfilePage() {
                             </button>
 
                             {/* Account Info */}
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <span className="font-bold text-text-primary">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="font-bold text-text-primary truncate">
                                   {account.gameName}
                                 </span>
-                                <span className="text-text-tertiary">
+                                <span className="text-text-tertiary flex-shrink-0">
                                   #{account.tagLine}
                                 </span>
                                 {account.isPrimary && (
-                                  <Badge variant="primary" size="sm">
+                                  <Badge variant="primary" size="sm" className="flex-shrink-0">
                                     대표
                                   </Badge>
                                 )}
                               </div>
-                              <div className="flex items-center gap-2 mt-1">
+                              <div className="flex items-center flex-wrap gap-x-2 gap-y-1 mt-1">
                                 <TierBadge tier={account.tier} size="sm" />
                                 <span className="text-sm text-text-secondary">
                                   {account.rank} • {account.lp} LP
                                 </span>
                                 {account.peakTier && (
-                                  <span className="text-xs text-text-tertiary ml-1">
+                                  <span className="text-xs text-text-tertiary">
                                     (최고 <span className="text-accent-gold">{account.peakTier} {account.peakRank || ''}</span>)
                                   </span>
                                 )}
@@ -879,7 +878,7 @@ export default function ProfilePage() {
                           </div>
 
                           {/* Action Buttons */}
-                          <div className="flex items-center gap-1">
+                          <div className="flex items-center gap-1 flex-shrink-0">
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
