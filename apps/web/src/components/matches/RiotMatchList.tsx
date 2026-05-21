@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { statsApi } from "@/lib/api-client";
 import {
@@ -9,8 +9,8 @@ import {
   getQueueTypeName,
   getSummonerSpellName,
   calculateTimeAgo,
-  getItemIcon,
 } from "./match-utils";
+import { getDdragonVersion, itemIconUrl, runeIconUrl, fallbackTo } from "@/lib/ddragon";
 import { ItemTooltip } from "@/components/ItemTooltip";
 import { RuneTooltip } from "@/components/RuneTooltip";
 import {
@@ -56,6 +56,11 @@ export default function RiotMatchList({
   const [statsSubTabs, setStatsSubTabs] = useState<Map<string, 'combat' | 'farm' | 'vision'>>(new Map());
   const [timelineData, setTimelineData] = useState<Map<string, any>>(new Map());
   const [timelineLoading, setTimelineLoading] = useState<Set<string>>(new Set());
+  // 아이템 아이콘 CDN 폴백용 ddragon 버전 (패치 자동 추적, ~1h 캐시)
+  const [ddragonVersion, setDdragonVersion] = useState<string>("");
+  useEffect(() => {
+    getDdragonVersion().then(setDdragonVersion).catch(() => {});
+  }, []);
 
   const {
     data: riotMatchPages,
@@ -284,7 +289,8 @@ export default function RiotMatchList({
                         {participant.perks?.styles?.[0]?.selections?.[0]?.perk && (
                           <RuneTooltip runeId={participant.perks.styles[0].selections[0].perk}>
                             <Image
-                              src={`/icons/perks/${participant.perks.styles[0].selections[0].perk}.png`}
+                              src={runeIconUrl({ runeId: participant.perks.styles[0].selections[0].perk })}
+                                unoptimized
                               alt="keystone"
                               width={14}
                               height={14}
@@ -322,13 +328,13 @@ export default function RiotMatchList({
                           {item !== 0 && (
                             <ItemTooltip itemId={String(item)}>
                               <Image
-                                src={getItemIcon(item)}
+                                src={"/icons/items/" + item + ".png"}
                                 unoptimized
                                 alt="item"
                                 width={32}
                                 height={32}
                                 className="w-full h-full rounded-md"
-                                onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                onError={ddragonVersion ? fallbackTo(itemIconUrl(item, ddragonVersion)) : undefined}
                               />
                             </ItemTooltip>
                           )}
@@ -339,13 +345,13 @@ export default function RiotMatchList({
                         {participant.item6 !== 0 && (
                           <ItemTooltip itemId={String(participant.item6)}>
                             <Image
-                              src={getItemIcon(participant.item6)}
+                              src={"/icons/items/" + participant.item6 + ".png"}
                                 unoptimized
                               alt="trinket"
                               width={32}
                               height={32}
                               className="w-full h-full rounded-full"
-                              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                              onError={ddragonVersion ? fallbackTo(itemIconUrl(participant.item6, ddragonVersion)) : undefined}
                             />
                           </ItemTooltip>
                         )}
@@ -354,13 +360,13 @@ export default function RiotMatchList({
                         <div className="w-6 h-6 lg:w-8 lg:h-8 rounded-md bg-bg-tertiary border border-amber-500/40">
                           <ItemTooltip itemId={String(participant.item7)}>
                             <Image
-                              src={getItemIcon(participant.item7)}
+                              src={"/icons/items/" + participant.item7 + ".png"}
                                 unoptimized
                               alt="quest"
                               width={32}
                               height={32}
                               className="w-full h-full rounded-md"
-                              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                              onError={ddragonVersion ? fallbackTo(itemIconUrl(participant.item7, ddragonVersion)) : undefined}
                             />
                           </ItemTooltip>
                         </div>
@@ -427,13 +433,13 @@ export default function RiotMatchList({
                           {item !== 0 && (
                             <ItemTooltip itemId={String(item)}>
                               <Image
-                                src={getItemIcon(item)}
+                                src={"/icons/items/" + item + ".png"}
                                 unoptimized
                                 alt="item"
                                 width={20}
                                 height={20}
                                 className="w-full h-full rounded"
-                                onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                onError={ddragonVersion ? fallbackTo(itemIconUrl(item, ddragonVersion)) : undefined}
                               />
                             </ItemTooltip>
                           )}
@@ -443,13 +449,13 @@ export default function RiotMatchList({
                         {participant.item6 !== 0 && (
                           <ItemTooltip itemId={String(participant.item6)}>
                             <Image
-                              src={getItemIcon(participant.item6)}
+                              src={"/icons/items/" + participant.item6 + ".png"}
                                 unoptimized
                               alt="trinket"
                               width={20}
                               height={20}
                               className="w-full h-full rounded-full"
-                              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                              onError={ddragonVersion ? fallbackTo(itemIconUrl(participant.item6, ddragonVersion)) : undefined}
                             />
                           </ItemTooltip>
                         )}
@@ -602,7 +608,8 @@ export default function RiotMatchList({
                                     {p.perks?.styles?.[0]?.selections?.[0]?.perk && (
                                       <RuneTooltip runeId={p.perks.styles[0].selections[0].perk}>
                                         <Image
-                                          src={`/icons/perks/${p.perks.styles[0].selections[0].perk}.png`}
+                                          src={runeIconUrl({ runeId: p.perks.styles[0].selections[0].perk })}
+                                unoptimized
                                           alt="primary rune"
                                           width={20}
                                           height={20}
@@ -614,7 +621,8 @@ export default function RiotMatchList({
                                     {p.perks?.styles?.[1]?.style && (
                                       <RuneTooltip runeId={p.perks.styles[1].style}>
                                         <Image
-                                          src={`/icons/perks/${p.perks.styles[1].style}.png`}
+                                          src={runeIconUrl({ runeId: p.perks.styles[1].style })}
+                                unoptimized
                                           alt="secondary rune"
                                           width={14}
                                           height={14}
@@ -686,13 +694,13 @@ export default function RiotMatchList({
                                     {item !== 0 && (
                                       <ItemTooltip itemId={String(item)}>
                                         <Image
-                                          src={getItemIcon(item)}
+                                          src={"/icons/items/" + item + ".png"}
                                 unoptimized
                                           alt="item"
                                           width={24}
                                           height={24}
                                           className={`w-full h-full ${idx === 6 ? 'rounded-full' : 'rounded'}`}
-                                          onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                          onError={ddragonVersion ? fallbackTo(itemIconUrl(item, ddragonVersion)) : undefined}
                                         />
                                       </ItemTooltip>
                                     )}
@@ -702,13 +710,13 @@ export default function RiotMatchList({
                                   <div className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 rounded bg-bg-primary border border-amber-500/40">
                                     <ItemTooltip itemId={String(p.item7)}>
                                       <Image
-                                        src={getItemIcon(p.item7)}
+                                        src={"/icons/items/" + p.item7 + ".png"}
                                 unoptimized
                                         alt="quest"
                                         width={24}
                                         height={24}
                                         className="w-full h-full rounded"
-                                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                        onError={ddragonVersion ? fallbackTo(itemIconUrl(p.item7, ddragonVersion)) : undefined}
                                       />
                                     </ItemTooltip>
                                   </div>
@@ -738,7 +746,8 @@ export default function RiotMatchList({
                                 />
                                 {p.perks?.styles?.[0]?.selections?.[0]?.perk && (
                                   <Image
-                                    src={`/icons/perks/${p.perks.styles[0].selections[0].perk}.png`}
+                                    src={runeIconUrl({ runeId: p.perks.styles[0].selections[0].perk })}
+                                unoptimized
                                     alt="rune"
                                     width={16}
                                     height={16}
@@ -830,13 +839,13 @@ export default function RiotMatchList({
                                       {byMinute.get(min)!.map((itemId, i) => (
                                         <ItemTooltip key={i} itemId={String(itemId)}>
                                           <Image
-                                            src={getItemIcon(itemId)}
+                                            src={"/icons/items/" + itemId + ".png"}
                                 unoptimized
                                             alt={`item ${itemId}`}
                                             width={28}
                                             height={28}
                                             className="w-7 h-7 rounded border border-bg-tertiary/80"
-                                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                            onError={ddragonVersion ? fallbackTo(itemIconUrl(itemId, ddragonVersion)) : undefined}
                                           />
                                         </ItemTooltip>
                                       ))}
@@ -856,13 +865,13 @@ export default function RiotMatchList({
                                 {item !== 0 ? (
                                   <ItemTooltip itemId={String(item)}>
                                     <Image
-                                      src={getItemIcon(item)}
+                                      src={"/icons/items/" + item + ".png"}
                                 unoptimized
                                       alt="item"
                                       width={48}
                                       height={48}
                                       className={`w-12 h-12 ${idx === 6 ? 'rounded-full' : 'rounded'} border-2 border-bg-elevated`}
-                                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                      onError={ddragonVersion ? fallbackTo(itemIconUrl(item, ddragonVersion)) : undefined}
                                     />
                                   </ItemTooltip>
                                 ) : (
@@ -874,13 +883,13 @@ export default function RiotMatchList({
                               <div className="rounded bg-bg-tertiary">
                                 <ItemTooltip itemId={String(participant.item7)}>
                                   <Image
-                                    src={getItemIcon(participant.item7)}
+                                    src={"/icons/items/" + participant.item7 + ".png"}
                                 unoptimized
                                     alt="quest"
                                     width={48}
                                     height={48}
                                     className="w-12 h-12 rounded border-2 border-amber-500/40"
-                                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                    onError={ddragonVersion ? fallbackTo(itemIconUrl(participant.item7, ddragonVersion)) : undefined}
                                   />
                                 </ItemTooltip>
                               </div>
@@ -905,12 +914,12 @@ export default function RiotMatchList({
                                       {primaryStyle?.style && (
                                         <RuneTooltip runeId={primaryStyle.style}>
                                           <Image
-                                            src={`/icons/perks/${primaryStyle.style}.png`}
+                                            src={runeIconUrl({ runeId: primaryStyle.style })}
+                                unoptimized
                                             alt="primary style"
                                             width={28}
                                             height={28}
                                             className="w-7 h-7 opacity-60"
-                                            unoptimized
                                             onError={(e) => { e.currentTarget.style.display = 'none'; }}
                                           />
                                         </RuneTooltip>
@@ -919,12 +928,12 @@ export default function RiotMatchList({
                                       {primaryStyle?.selections?.map((sel: any, i: number) => (
                                         <RuneTooltip key={sel.perk} runeId={sel.perk}>
                                           <Image
-                                            src={`/icons/perks/${sel.perk}.png`}
+                                            src={runeIconUrl({ runeId: sel.perk })}
+                                unoptimized
                                             alt={`perk ${sel.perk}`}
                                             width={i === 0 ? 36 : 24}
                                             height={i === 0 ? 36 : 24}
                                             className={`${i === 0 ? 'w-9 h-9' : 'w-6 h-6'} rounded-full bg-bg-tertiary`}
-                                            unoptimized
                                             onError={(e) => { e.currentTarget.style.display = 'none'; }}
                                           />
                                         </RuneTooltip>
@@ -940,12 +949,12 @@ export default function RiotMatchList({
                                         {secondaryStyle.style && (
                                           <RuneTooltip runeId={secondaryStyle.style}>
                                             <Image
-                                              src={`/icons/perks/${secondaryStyle.style}.png`}
+                                              src={runeIconUrl({ runeId: secondaryStyle.style })}
+                                unoptimized
                                               alt="secondary style"
                                               width={24}
                                               height={24}
                                               className="w-6 h-6 opacity-60"
-                                              unoptimized
                                               onError={(e) => { e.currentTarget.style.display = 'none'; }}
                                             />
                                           </RuneTooltip>
@@ -953,12 +962,12 @@ export default function RiotMatchList({
                                         {secondaryStyle.selections?.map((sel: any) => (
                                           <RuneTooltip key={sel.perk} runeId={sel.perk}>
                                             <Image
-                                              src={`/icons/perks/${sel.perk}.png`}
+                                              src={runeIconUrl({ runeId: sel.perk })}
+                                unoptimized
                                               alt={`perk ${sel.perk}`}
                                               width={24}
                                               height={24}
                                               className="w-6 h-6 rounded-full bg-bg-tertiary"
-                                              unoptimized
                                               onError={(e) => { e.currentTarget.style.display = 'none'; }}
                                             />
                                           </RuneTooltip>
@@ -975,12 +984,12 @@ export default function RiotMatchList({
                                         {[statPerks.offense, statPerks.flex, statPerks.defense].map((perkId: number, i: number) => perkId ? (
                                           <RuneTooltip key={i} runeId={perkId}>
                                             <Image
-                                              src={`/icons/perks/${perkId}.png`}
+                                              src={runeIconUrl({ runeId: perkId })}
+                                unoptimized
                                               alt={`stat shard ${perkId}`}
                                               width={20}
                                               height={20}
                                               className="w-5 h-5 rounded-full bg-bg-tertiary"
-                                              unoptimized
                                               onError={(e) => { e.currentTarget.style.display = 'none'; }}
                                             />
                                           </RuneTooltip>
