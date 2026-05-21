@@ -919,7 +919,7 @@ export class AuctionService implements OnModuleInit {
       );
     }
 
-    // Keep reserve budget for remaining roster slots (simulation parity).
+    // Keep reserve budget for remaining roster slots.
     const slotsNeeded = Math.max(0, 5 - team._count.members);
     const reserveAmount = Math.max(0, (slotsNeeded - 1) * bidIncrement);
     const availableToBid = Math.max(0, team.remainingBudget - reserveAmount);
@@ -1152,7 +1152,7 @@ export class AuctionService implements OnModuleInit {
         (t: any) => t.remainingBudget >= bidIncrement,
       );
 
-      // Simulation rule: if someone can still bid and cycle not exhausted, keep same player.
+      // If someone can still bid and the cycle is not exhausted, keep the same player.
       if (nextYuchalCount < state.maxYuchalCycles && anyCanBid) {
         state.yuchalCount = nextYuchalCount;
         state.currentHighestBid = 0;
@@ -1167,7 +1167,7 @@ export class AuctionService implements OnModuleInit {
         };
       }
 
-      // Simulation rule: otherwise force-assign to incomplete team with highest budget.
+      // Otherwise force-assign to the incomplete team with the highest budget.
       const targetTeamPool =
         incompleteTeams.length > 0 ? incompleteTeams : room.teams;
       const targetTeam = [...targetTeamPool].sort(

@@ -53,7 +53,7 @@ const INITIAL_RED: TeamSlot[] = [
   { position: "SUP", state: "empty" },
 ];
 
-// 입찰 경쟁 시뮬레이션 — 화면에 떠오르는 입찰 알림들
+// 입찰 경쟁 연출 — 화면에 떠오르는 입찰 알림들
 interface BidEvent {
   id: number;
   team: "blue" | "red";
