@@ -18,8 +18,15 @@ interface PostListResponse {
 
 // HTML 태그 및 마크다운 제거 후 plain text 요약 반환
 function toPlainText(raw: string, maxLength = 200): string {
-  return raw
-    .replace(/<[^>]+>/g, "")
+  // 중첩 태그(<<a>script>) 우회를 막기 위해 더 이상 매칭되지 않을 때까지 반복 제거
+  let text = raw;
+  let prev: string;
+  do {
+    prev = text;
+    text = text.replace(/<[^>]+>/g, "");
+  } while (text !== prev);
+
+  return text
     .replace(/[#*`~>\-_[\]]/g, "")
     .trim()
     .slice(0, maxLength);

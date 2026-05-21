@@ -222,7 +222,8 @@ export class RoleSelectionGateway
         }
       } catch (error) {
         console.error(
-          `[RoleSelection] Timer tick error for room ${roomId}:`,
+          "[RoleSelection] Timer tick error for room %s:",
+          roomId,
           error,
         );
         this.stopTimer(roomId);
@@ -248,7 +249,8 @@ export class RoleSelectionGateway
 
       this.completeRoleSelection(roomId).catch((error) => {
         console.error(
-          `[RoleSelection] Resolve-timer completion failed for room ${roomId}:`,
+          "[RoleSelection] Resolve-timer completion failed for room %s:",
+          roomId,
           error,
         );
       });
@@ -313,7 +315,8 @@ export class RoleSelectionGateway
         this.matchGateway.emitBracketGenerated(roomId, { bracket: matches });
       } catch (bracketError) {
         console.error(
-          `[RoleSelection] Failed to emit bracket-generated for room ${roomId}:`,
+          "[RoleSelection] Failed to emit bracket-generated for room %s:",
+          roomId,
           bracketError,
         );
         // bracket 페이지로 이동 후 클라이언트가 직접 조회하므로 치명적이지 않음

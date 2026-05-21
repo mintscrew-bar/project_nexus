@@ -397,6 +397,12 @@ export class RiotMatchService {
       return null;
     }
 
+    // matchId는 외부 입력이 axios URL에 삽입되므로 형식 검증으로 SSRF 차단
+    if (!/^[A-Z0-9]{2,10}_\d+$/.test(matchId)) {
+      this.logger.warn(`잘못된 matchId 형식 거부: ${matchId}`);
+      return null;
+    }
+
     // 1. In-memory cache (fastest)
     const cached = this.matchCache.get(matchId);
     if (cached && cached.expires > Date.now()) {
@@ -569,6 +575,13 @@ export class RiotMatchService {
   async getMatchTimeline(matchId: string, retries = 3): Promise<any> {
     if (!this.apiKey) {
       this.logger.error("RIOT_API_KEY not configured");
+      return null;
+    }
+
+    // matchId는 경로 파라미터로 외부에서 주입되어 axios URL에 직접 삽입되므로,
+    // Riot 매치 ID 형식(예: KR_1234567890)만 허용해 SSRF를 차단한다.
+    if (!/^[A-Z0-9]{2,10}_\d+$/.test(matchId)) {
+      this.logger.warn(`잘못된 matchId 형식 거부: ${matchId}`);
       return null;
     }
 

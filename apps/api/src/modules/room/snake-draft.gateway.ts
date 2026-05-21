@@ -467,7 +467,8 @@ export class SnakeDraftGateway
         }
       } catch (error) {
         console.error(
-          `[SnakeDraft] Auto-pick error for room ${roomId}:`,
+          "[SnakeDraft] Auto-pick error for room %s:",
+          roomId,
           error,
         );
       } finally {

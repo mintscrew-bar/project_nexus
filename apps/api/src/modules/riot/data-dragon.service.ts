@@ -97,6 +97,17 @@ export class DataDragonService {
   ) {}
 
   /**
+   * locale 화이트리스트 검증
+   *
+   * locale은 쿼리 파라미터로 외부에서 주입되어 axios URL에 직접 삽입되므로,
+   * `xx_XX` 형식(예: ko_KR, en_US)만 허용해 SSRF/경로 조작을 차단한다.
+   * 형식에 맞지 않으면 기본값(ko_KR)으로 폴백한다.
+   */
+  private sanitizeLocale(locale: string): string {
+    return /^[a-z]{2}_[A-Z]{2}$/.test(locale) ? locale : "ko_KR";
+  }
+
+  /**
    * Redis 버전 캐시 무효화 (강제 갱신 시 사용)
    */
   async invalidateVersionCache(): Promise<void> {
@@ -140,6 +151,7 @@ export class DataDragonService {
    * 챔피언 데이터 가져오기
    */
   async getChampionData(locale: string = "ko_KR"): Promise<ChampionData> {
+    locale = this.sanitizeLocale(locale);
     const version = await this.getLatestVersion();
     const cacheKey = `ddragon:champions:${version}:${locale}`;
 
@@ -172,6 +184,7 @@ export class DataDragonService {
    * 아이템 데이터 가져오기
    */
   async getItemData(locale: string = "ko_KR"): Promise<ItemData> {
+    locale = this.sanitizeLocale(locale);
     const version = await this.getLatestVersion();
     const cacheKey = `ddragon:items:${version}:${locale}`;
 

@@ -47,6 +47,27 @@ const DATA_URI_PATTERN =
  * @param input - 새니타이즈할 원본 문자열
  * @returns 위험 요소가 제거된 안전한 문자열
  */
+/**
+ * 패턴을 더 이상 매칭되지 않을 때까지 반복 치환한다.
+ *
+ * 단일 치환은 `<scr<script>ipt>` 같은 중첩 페이로드를 한 번만 제거해
+ * `<script>`가 다시 살아나는 우회를 허용한다. 결과가 안정될 때까지
+ * 반복해 이런 다중 문자(중첩) 우회를 차단한다.
+ */
+function replaceUntilStable(
+  input: string,
+  pattern: RegExp,
+  replacement: string,
+): string {
+  let prev: string;
+  let result = input;
+  do {
+    prev = result;
+    result = result.replace(pattern, replacement);
+  } while (result !== prev);
+  return result;
+}
+
 export function sanitizeHtml(input: string): string {
   if (!input || typeof input !== "string") {
     return input;
@@ -55,16 +76,16 @@ export function sanitizeHtml(input: string): string {
   let sanitized = input;
 
   // 1단계: 위험한 태그 제거 (script, iframe, object, embed, form, base, meta, link)
-  sanitized = sanitized.replace(DANGEROUS_TAGS_PATTERN, "");
+  sanitized = replaceUntilStable(sanitized, DANGEROUS_TAGS_PATTERN, "");
 
   // 2단계: javascript: 프로토콜 URI 제거
-  sanitized = sanitized.replace(JAVASCRIPT_URI_PATTERN, "");
+  sanitized = replaceUntilStable(sanitized, JAVASCRIPT_URI_PATTERN, "");
 
   // 3단계: data: URI 제거 (base64 스크립트 삽입 방지)
-  sanitized = sanitized.replace(DATA_URI_PATTERN, "");
+  sanitized = replaceUntilStable(sanitized, DATA_URI_PATTERN, "");
 
   // 4단계: on* 이벤트 핸들러 속성 제거 (onclick, onload 등)
-  sanitized = sanitized.replace(EVENT_HANDLER_PATTERN, "");
+  sanitized = replaceUntilStable(sanitized, EVENT_HANDLER_PATTERN, "");
 
   return sanitized;
 }
@@ -83,11 +104,11 @@ export function stripAllHtml(input: string): string {
     return input;
   }
 
-  // 모든 HTML 태그 제거
-  let sanitized = input.replace(/<[^>]*>/g, "");
+  // 모든 HTML 태그 제거 (중첩 우회 방지를 위해 안정될 때까지 반복)
+  let sanitized = replaceUntilStable(input, /<[^>]*>/g, "");
 
   // javascript: 프로토콜 제거
-  sanitized = sanitized.replace(/javascript\s*:/gi, "");
+  sanitized = replaceUntilStable(sanitized, /javascript\s*:/gi, "");
 
   return sanitized;
 }

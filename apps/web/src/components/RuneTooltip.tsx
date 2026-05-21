@@ -70,11 +70,14 @@ async function fetchRuneData(): Promise<RuneInfo[]> {
 
 // HTML 태그 제거
 function cleanDesc(html: string): string {
-  return html
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<[^>]*>/g, "")
-    .replace(/&nbsp;/g, " ")
-    .trim();
+  let text = html.replace(/<br\s*\/?>/gi, "\n");
+  // 중첩 태그 우회를 막기 위해 안정될 때까지 반복 제거
+  let prev: string;
+  do {
+    prev = text;
+    text = text.replace(/<[^>]*>/g, "");
+  } while (text !== prev);
+  return text.replace(/&nbsp;/g, " ").trim();
 }
 
 interface RuneTooltipProps {

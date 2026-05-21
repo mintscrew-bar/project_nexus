@@ -149,7 +149,8 @@ export class AuctionService implements OnModuleInit {
       )
       .catch((e) =>
         console.warn(
-          `[AuctionService] Redis 경매 상태 저장 실패 (${roomId}):`,
+          "[AuctionService] Redis 경매 상태 저장 실패 (%s):",
+          roomId,
           e,
         ),
       );
@@ -162,7 +163,8 @@ export class AuctionService implements OnModuleInit {
       .del(AuctionService.AUCTION_STATE_KEY(roomId))
       .catch((e) =>
         console.warn(
-          `[AuctionService] Redis 경매 상태 삭제 실패 (${roomId}):`,
+          "[AuctionService] Redis 경매 상태 삭제 실패 (%s):",
+          roomId,
           e,
         ),
       );
@@ -202,7 +204,8 @@ export class AuctionService implements OnModuleInit {
       )
       .catch((e) =>
         console.warn(
-          `[AuctionService] Redis 팀장 단계 저장 실패 (${roomId}):`,
+          "[AuctionService] Redis 팀장 단계 저장 실패 (%s):",
+          roomId,
           e,
         ),
       );
@@ -220,7 +223,8 @@ export class AuctionService implements OnModuleInit {
       .del(AuctionService.CAPTAIN_PHASE_KEY(roomId))
       .catch((e) =>
         console.warn(
-          `[AuctionService] Redis 팀장 단계 삭제 실패 (${roomId}):`,
+          "[AuctionService] Redis 팀장 단계 삭제 실패 (%s):",
+          roomId,
           e,
         ),
       );

@@ -6,6 +6,7 @@ import {
   Optional,
   Inject,
 } from "@nestjs/common";
+import { randomInt } from "crypto";
 import { PrismaService } from "../prisma/prisma.service";
 import { RoomStatus, TeamMode, TeamCaptainSelection } from "@nexus/database";
 import { Prisma } from "@prisma/client";
@@ -234,8 +235,12 @@ export class SnakeDraftService {
         .slice(0, numTeams);
     }
 
-    // Default to RANDOM
-    const shuffled = [...participants].sort(() => Math.random() - 0.5);
+    // Default to RANDOM — 암호학적 난수로 Fisher-Yates 셔플(예측 불가능성 보장)
+    const shuffled = [...participants];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = randomInt(i + 1);
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
     return shuffled.slice(0, numTeams);
   }
 
@@ -320,9 +325,8 @@ export class SnakeDraftService {
       throw new BadRequestException("No players available");
     }
 
-    const randomIndex = Math.floor(
-      Math.random() * state.availablePlayers.length,
-    );
+    // 자동 픽 대상도 암호학적 난수로 선택(예측 불가능성 보장)
+    const randomIndex = randomInt(state.availablePlayers.length);
     const targetPlayerId = state.availablePlayers[randomIndex];
 
     const currentTeamId = state.pickOrder[state.currentTeamIndex];

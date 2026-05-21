@@ -6,6 +6,10 @@ on:
     types: [completed]
     branches: [main]
 
+# 최소 권한 원칙: 워크플로우 전체에 읽기 권한만 부여
+permissions:
+  contents: read
+
 jobs:
   deploy:
     name: Deploy to self-hosted

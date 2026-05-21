@@ -272,6 +272,11 @@ export class UserService {
    * - reason 최대 1000자 검증
    */
   async submitAppeal(userId: string, reason: string) {
+    // 파라미터 변조 방어: reason은 반드시 문자열이어야 한다.
+    // (배열/객체를 전달해 length·trim 검증을 우회하는 타입 혼동 공격 차단)
+    if (typeof reason !== "string") {
+      throw new BadRequestException("이의신청 사유 형식이 올바르지 않습니다.");
+    }
     if (!reason || reason.trim().length === 0) {
       throw new BadRequestException("이의신청 사유를 입력해주세요.");
     }

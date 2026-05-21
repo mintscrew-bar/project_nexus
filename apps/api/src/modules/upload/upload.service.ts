@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
-import { join } from "path";
+import { basename, join } from "path";
 import { unlink, open } from "fs/promises";
 
 /** 이미지 포맷 매직 바이트 시그니처 목록 */
@@ -27,7 +27,13 @@ export class UploadService {
   private readonly uploadDir = join(__dirname, "..", "..", "..", "uploads");
 
   getFilePath(filename: string): string {
-    return join(this.uploadDir, filename);
+    // 경로 조작 방어: 디렉터리 구분자/상위 경로(..)를 제거하기 위해
+    // basename으로 순수 파일명만 추출한 뒤, 업로드 디렉터리 하위로만 결합한다.
+    const safeName = basename(filename);
+    if (safeName !== filename || safeName === ".." || safeName === ".") {
+      throw new BadRequestException("잘못된 파일명입니다.");
+    }
+    return join(this.uploadDir, safeName);
   }
 
   getFileUrl(filename: string): string {

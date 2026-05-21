@@ -103,7 +103,17 @@ export class AuthService {
       const updateData: Record<string, string> = {};
       if (profile.avatar) {
         const current = authProvider.user.avatar ?? "";
-        const isDiscordAvatar = current.includes("cdn.discordapp.com");
+        // 부분 문자열 매칭(cdn.discordapp.com.evil.com 우회)을 막기 위해
+        // URL 호스트명을 파싱해 정확히 Discord CDN 도메인인지 확인한다.
+        let isDiscordAvatar = false;
+        try {
+          const host = new URL(current).hostname.toLowerCase();
+          isDiscordAvatar =
+            host === "cdn.discordapp.com" || host.endsWith(".discordapp.com");
+        } catch {
+          // URL 파싱 실패(빈 값/상대경로 등)는 Discord 아바타가 아님
+          isDiscordAvatar = false;
+        }
         if (!current || isDiscordAvatar) {
           updateData.avatar = profile.avatar;
         }
