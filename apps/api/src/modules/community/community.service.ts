@@ -105,7 +105,7 @@ export class CommunityService {
       user?.role !== UserRole.MODERATOR
     ) {
       throw new ForbiddenException(
-        "공지 카테고리는 관리자 또는 모더레이터만 작성할 수 있습니다.",
+        "공지 카테고리는 관리자 또는 매니저만 작성할 수 있습니다.",
       );
     }
 

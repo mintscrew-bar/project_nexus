@@ -1095,7 +1095,7 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
             user.role === "ADMIN"
               ? "관리자"
               : user.role === "MODERATOR"
-                ? "모더레이터"
+                ? "매니저"
                 : "유저",
           inline: true,
         },

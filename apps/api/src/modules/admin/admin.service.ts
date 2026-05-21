@@ -493,6 +493,15 @@ export class AdminService {
     });
     if (!user) throw new NotFoundException("유저를 찾을 수 없습니다.");
 
+    // 매니저(MODERATOR)는 일반 유저만 제재 가능 — 관리자/다른 매니저 제재 차단(권한 에스컬레이션 방지)
+    const requester = await this.prisma.user.findUnique({
+      where: { id: requesterId },
+      select: { role: true },
+    });
+    if (requester?.role === UserRole.MODERATOR && user.role !== UserRole.USER) {
+      throw new ForbiddenException("매니저는 일반 유저만 제재할 수 있습니다.");
+    }
+
     const restrictedUntilDate = validateFutureDate(
       restrictedUntil,
       "restrictedUntil",

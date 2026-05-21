@@ -101,9 +101,10 @@ export class AdminController {
     };
   }
 
-  // ── Users (ADMIN only) ──────────────────────────────────────────────────────
+  // ── Users ────────────────────────────────────────────────────────────────
+  // 조회 및 제재(restrict/unrestrict)는 ADMIN + MODERATOR(매니저), 밴/역할변경은 ADMIN 전용
   @Get("users")
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.MODERATOR)
   getUsers(@Query() query: AdminPageQueryDto) {
     return this.adminService.getUsers({
       page: query.page,
@@ -144,7 +145,7 @@ export class AdminController {
   }
 
   @Post("users/:id/restrict")
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.MODERATOR)
   restrictUser(
     @Param("id") targetUserId: string,
     @Body("restrictedUntil") restrictedUntil: string,
@@ -158,7 +159,7 @@ export class AdminController {
   }
 
   @Post("users/:id/unrestrict")
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.MODERATOR)
   unrestrictUser(@Param("id") targetUserId: string, @Request() req: any) {
     return this.adminService.unrestrictUser(targetUserId, req.user.sub);
   }

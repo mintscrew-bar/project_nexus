@@ -284,10 +284,14 @@ export class UserService {
     // 유저 상태 확인 — 밴 또는 임시제재 상태여야 제출 가능
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { isBanned: true, isRestricted: true },
+      select: { isBanned: true, isRestricted: true, restrictedUntil: true },
     });
     if (!user) throw new NotFoundException("유저를 찾을 수 없습니다.");
-    if (!user.isBanned && !user.isRestricted) {
+    // 제재는 기한이 지나면 자동 해제되므로, 기한이 남은 제재만 이의신청 대상으로 인정
+    const restrictionActive =
+      user.isRestricted &&
+      (!user.restrictedUntil || user.restrictedUntil > new Date());
+    if (!user.isBanned && !restrictionActive) {
       throw new BadRequestException(
         "밴 또는 임시제재 상태에서만 이의신청이 가능합니다.",
       );

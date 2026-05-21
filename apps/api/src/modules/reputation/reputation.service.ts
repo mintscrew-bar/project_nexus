@@ -403,9 +403,14 @@ export class ReputationService {
     // 이미 밴/제한 중인 유저는 중복 처리 생략
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { isBanned: true, isRestricted: true },
+      select: { isBanned: true, isRestricted: true, restrictedUntil: true },
     });
-    if (!user || user.isBanned || user.isRestricted) return;
+    if (!user) return;
+    // 제재는 기한이 지나면 효력 없음 — 만료된 제재는 활성으로 간주하지 않음
+    const restrictionActive =
+      user.isRestricted &&
+      (!user.restrictedUntil || user.restrictedUntil > new Date());
+    if (user.isBanned || restrictionActive) return;
 
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
 

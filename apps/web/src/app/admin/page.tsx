@@ -51,8 +51,8 @@ type Tab =
   | "appeals"
   | "discord";
 
-// MODERATOR가 접근 가능한 탭
-const MODERATOR_TABS: Tab[] = ["dashboard", "reports", "community", "chatlogs", "appeals"];
+// MODERATOR(매니저)가 접근 가능한 탭 — 유저 관리는 제재 권한용으로 포함(밴/역할변경 UI는 ADMIN만 노출)
+const MODERATOR_TABS: Tab[] = ["dashboard", "users", "reports", "community", "chatlogs", "appeals"];
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: "dashboard", label: "대시보드", icon: <Activity className="h-4 w-4" /> },
@@ -108,7 +108,7 @@ export default function AdminPage() {
       {/* 메인 콘텐츠 */}
       <main className="flex-1 overflow-y-auto p-4 md:p-6">
         {activeTab === "dashboard" && <DashboardTab addToast={addToast} />}
-        {activeTab === "users" && <UsersTab addToast={addToast} currentUserId={user?.id} />}
+        {activeTab === "users" && <UsersTab addToast={addToast} currentUserId={user?.id} isAdmin={isAdmin} />}
         {activeTab === "reports" && <ReportsTab addToast={addToast} />}
         {activeTab === "community" && <CommunityTab addToast={addToast} />}
         {activeTab === "clans" && <ClansTab addToast={addToast} />}
@@ -546,7 +546,7 @@ interface AdminUser {
   _count: { reportsReceived: number };
 }
 
-const ROLE_LABELS: Record<UserRole, string> = { USER: "일반", MODERATOR: "모더레이터", ADMIN: "관리자" };
+const ROLE_LABELS: Record<UserRole, string> = { USER: "일반", MODERATOR: "매니저", ADMIN: "관리자" };
 const ROLE_VARIANTS: Record<UserRole, "default" | "secondary" | "danger"> = { USER: "default", MODERATOR: "secondary", ADMIN: "danger" };
 
 const BAN_REASONS = [
@@ -611,7 +611,7 @@ function RiotAccountsCell({ accounts }: { accounts: AdminUser["riotAccounts"] })
   );
 }
 
-function UsersTab({ addToast, currentUserId }: { addToast: (msg: string, type: "success" | "error") => void; currentUserId?: string }) {
+function UsersTab({ addToast, currentUserId, isAdmin }: { addToast: (msg: string, type: "success" | "error") => void; currentUserId?: string; isAdmin: boolean }) {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -779,7 +779,8 @@ function UsersTab({ addToast, currentUserId }: { addToast: (msg: string, type: "
                         ) : "없음"}
                       </td>
                       <td className="px-4 py-3">
-                        {u.id === currentUserId ? (
+                        {/* 권한 변경은 ADMIN만 가능. 매니저에게는 배지로만 표시 */}
+                        {!isAdmin || u.id === currentUserId ? (
                           <Badge variant={ROLE_VARIANTS[u.role]}>{ROLE_LABELS[u.role]}</Badge>
                         ) : updatingId === u.id ? (
                           <LoadingSpinner />
@@ -790,7 +791,7 @@ function UsersTab({ addToast, currentUserId }: { addToast: (msg: string, type: "
                             className="px-2 py-1 rounded bg-bg-tertiary text-text-primary text-xs focus:outline-none cursor-pointer"
                           >
                             <option value="USER">일반</option>
-                            <option value="MODERATOR">모더레이터</option>
+                            <option value="MODERATOR">매니저</option>
                             <option value="ADMIN">관리자</option>
                           </select>
                         )}
@@ -798,7 +799,8 @@ function UsersTab({ addToast, currentUserId }: { addToast: (msg: string, type: "
                       <td className="px-4 py-3">
                         {u.id !== currentUserId && (
                           <div className="flex gap-1">
-                            {u.isBanned ? (
+                            {/* 밴/밴해제는 ADMIN 전용. 매니저는 제재만 가능 */}
+                            {isAdmin && (u.isBanned ? (
                               <Button size="sm" variant="outline" onClick={() => handleUnban(u)} disabled={updatingId === u.id}>
                                 <CheckCircle className="h-3.5 w-3.5 mr-1" />밴해제
                               </Button>
@@ -806,7 +808,7 @@ function UsersTab({ addToast, currentUserId }: { addToast: (msg: string, type: "
                               <Button size="sm" variant="danger" onClick={() => setBanModal(u)}>
                                 <Ban className="h-3.5 w-3.5 mr-1" />밴
                               </Button>
-                            )}
+                            ))}
                             {u.isRestricted ? (
                               <Button size="sm" variant="outline" onClick={() => handleUnrestrict(u)} disabled={updatingId === u.id}>
                                 해제
