@@ -328,13 +328,13 @@ export default function RiotMatchList({
                           {item !== 0 && (
                             <ItemTooltip itemId={String(item)}>
                               <Image
-                                src={"/icons/items/" + item + ".png"}
+                                src={ddragonVersion ? itemIconUrl(item, ddragonVersion) : "/icons/items/" + item + ".png"}
                                 unoptimized
                                 alt="item"
                                 width={32}
                                 height={32}
                                 className="w-full h-full rounded-md"
-                                onError={ddragonVersion ? fallbackTo(itemIconUrl(item, ddragonVersion)) : undefined}
+                                onError={fallbackTo("/icons/items/" + item + ".png")}
                               />
                             </ItemTooltip>
                           )}
@@ -345,13 +345,13 @@ export default function RiotMatchList({
                         {participant.item6 !== 0 && (
                           <ItemTooltip itemId={String(participant.item6)}>
                             <Image
-                              src={"/icons/items/" + participant.item6 + ".png"}
+                              src={ddragonVersion ? itemIconUrl(participant.item6, ddragonVersion) : "/icons/items/" + participant.item6 + ".png"}
                                 unoptimized
                               alt="trinket"
                               width={32}
                               height={32}
                               className="w-full h-full rounded-full"
-                              onError={ddragonVersion ? fallbackTo(itemIconUrl(participant.item6, ddragonVersion)) : undefined}
+                              onError={fallbackTo("/icons/items/" + participant.item6 + ".png")}
                             />
                           </ItemTooltip>
                         )}
@@ -360,13 +360,13 @@ export default function RiotMatchList({
                         <div className="w-6 h-6 lg:w-8 lg:h-8 rounded-md bg-bg-tertiary border border-amber-500/40">
                           <ItemTooltip itemId={String(participant.item7)}>
                             <Image
-                              src={"/icons/items/" + participant.item7 + ".png"}
+                              src={ddragonVersion ? itemIconUrl(participant.item7, ddragonVersion) : "/icons/items/" + participant.item7 + ".png"}
                                 unoptimized
                               alt="quest"
                               width={32}
                               height={32}
                               className="w-full h-full rounded-md"
-                              onError={ddragonVersion ? fallbackTo(itemIconUrl(participant.item7, ddragonVersion)) : undefined}
+                              onError={fallbackTo("/icons/items/" + participant.item7 + ".png")}
                             />
                           </ItemTooltip>
                         </div>
@@ -433,13 +433,13 @@ export default function RiotMatchList({
                           {item !== 0 && (
                             <ItemTooltip itemId={String(item)}>
                               <Image
-                                src={"/icons/items/" + item + ".png"}
+                                src={ddragonVersion ? itemIconUrl(item, ddragonVersion) : "/icons/items/" + item + ".png"}
                                 unoptimized
                                 alt="item"
                                 width={20}
                                 height={20}
                                 className="w-full h-full rounded"
-                                onError={ddragonVersion ? fallbackTo(itemIconUrl(item, ddragonVersion)) : undefined}
+                                onError={fallbackTo("/icons/items/" + item + ".png")}
                               />
                             </ItemTooltip>
                           )}
@@ -449,13 +449,13 @@ export default function RiotMatchList({
                         {participant.item6 !== 0 && (
                           <ItemTooltip itemId={String(participant.item6)}>
                             <Image
-                              src={"/icons/items/" + participant.item6 + ".png"}
+                              src={ddragonVersion ? itemIconUrl(participant.item6, ddragonVersion) : "/icons/items/" + participant.item6 + ".png"}
                                 unoptimized
                               alt="trinket"
                               width={20}
                               height={20}
                               className="w-full h-full rounded-full"
-                              onError={ddragonVersion ? fallbackTo(itemIconUrl(participant.item6, ddragonVersion)) : undefined}
+                              onError={fallbackTo("/icons/items/" + participant.item6 + ".png")}
                             />
                           </ItemTooltip>
                         )}
@@ -694,13 +694,13 @@ export default function RiotMatchList({
                                     {item !== 0 && (
                                       <ItemTooltip itemId={String(item)}>
                                         <Image
-                                          src={"/icons/items/" + item + ".png"}
+                                          src={ddragonVersion ? itemIconUrl(item, ddragonVersion) : "/icons/items/" + item + ".png"}
                                 unoptimized
                                           alt="item"
                                           width={24}
                                           height={24}
                                           className={`w-full h-full ${idx === 6 ? 'rounded-full' : 'rounded'}`}
-                                          onError={ddragonVersion ? fallbackTo(itemIconUrl(item, ddragonVersion)) : undefined}
+                                          onError={fallbackTo("/icons/items/" + item + ".png")}
                                         />
                                       </ItemTooltip>
                                     )}
@@ -710,13 +710,13 @@ export default function RiotMatchList({
                                   <div className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 rounded bg-bg-primary border border-amber-500/40">
                                     <ItemTooltip itemId={String(p.item7)}>
                                       <Image
-                                        src={"/icons/items/" + p.item7 + ".png"}
+                                        src={ddragonVersion ? itemIconUrl(p.item7, ddragonVersion) : "/icons/items/" + p.item7 + ".png"}
                                 unoptimized
                                         alt="quest"
                                         width={24}
                                         height={24}
                                         className="w-full h-full rounded"
-                                        onError={ddragonVersion ? fallbackTo(itemIconUrl(p.item7, ddragonVersion)) : undefined}
+                                        onError={fallbackTo("/icons/items/" + p.item7 + ".png")}
                                       />
                                     </ItemTooltip>
                                   </div>
@@ -839,13 +839,13 @@ export default function RiotMatchList({
                                       {byMinute.get(min)!.map((itemId, i) => (
                                         <ItemTooltip key={i} itemId={String(itemId)}>
                                           <Image
-                                            src={"/icons/items/" + itemId + ".png"}
+                                            src={ddragonVersion ? itemIconUrl(itemId, ddragonVersion) : "/icons/items/" + itemId + ".png"}
                                 unoptimized
                                             alt={`item ${itemId}`}
                                             width={28}
                                             height={28}
                                             className="w-7 h-7 rounded border border-bg-tertiary/80"
-                                            onError={ddragonVersion ? fallbackTo(itemIconUrl(itemId, ddragonVersion)) : undefined}
+                                            onError={fallbackTo("/icons/items/" + itemId + ".png")}
                                           />
                                         </ItemTooltip>
                                       ))}
@@ -865,13 +865,13 @@ export default function RiotMatchList({
                                 {item !== 0 ? (
                                   <ItemTooltip itemId={String(item)}>
                                     <Image
-                                      src={"/icons/items/" + item + ".png"}
+                                      src={ddragonVersion ? itemIconUrl(item, ddragonVersion) : "/icons/items/" + item + ".png"}
                                 unoptimized
                                       alt="item"
                                       width={48}
                                       height={48}
                                       className={`w-12 h-12 ${idx === 6 ? 'rounded-full' : 'rounded'} border-2 border-bg-elevated`}
-                                      onError={ddragonVersion ? fallbackTo(itemIconUrl(item, ddragonVersion)) : undefined}
+                                      onError={fallbackTo("/icons/items/" + item + ".png")}
                                     />
                                   </ItemTooltip>
                                 ) : (
@@ -883,13 +883,13 @@ export default function RiotMatchList({
                               <div className="rounded bg-bg-tertiary">
                                 <ItemTooltip itemId={String(participant.item7)}>
                                   <Image
-                                    src={"/icons/items/" + participant.item7 + ".png"}
+                                    src={ddragonVersion ? itemIconUrl(participant.item7, ddragonVersion) : "/icons/items/" + participant.item7 + ".png"}
                                 unoptimized
                                     alt="quest"
                                     width={48}
                                     height={48}
                                     className="w-12 h-12 rounded border-2 border-amber-500/40"
-                                    onError={ddragonVersion ? fallbackTo(itemIconUrl(participant.item7, ddragonVersion)) : undefined}
+                                    onError={fallbackTo("/icons/items/" + participant.item7 + ".png")}
                                   />
                                 </ItemTooltip>
                               </div>
