@@ -1407,31 +1407,43 @@ function CommunityPostsTab({ addToast }: { addToast: (msg: string, type: "succes
             <p className="text-center text-text-muted py-12">게시글이 없습니다.</p>
           ) : (
             <>
-              {/* 모바일: 카드형 목록 (가로 스크롤 없이 세로 스택) */}
+              {/* 모바일: 가로 한 줄 압축형 (제목+작성자 한 줄, 아이콘 버튼) */}
               <div className="md:hidden divide-y divide-bg-tertiary/50">
                 {posts.map((post) => (
-                  <div key={post.id} className="p-4 space-y-2">
-                    <div className="flex items-start gap-1.5">
-                      {post.isPinned && (
-                        <Pin className="h-4 w-4 text-accent-primary flex-shrink-0 mt-0.5" />
-                      )}
-                      <span className="font-medium text-text-primary break-words">
+                  <div key={post.id} className="flex items-center gap-2 px-3 py-2.5">
+                    {post.isPinned && (
+                      <Pin className="h-3.5 w-3.5 text-accent-primary flex-shrink-0" />
+                    )}
+                    {/* 제목 + 작성자/날짜 한 줄 */}
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-text-primary">
                         {post.title}
-                      </span>
+                      </p>
+                      <p className="truncate text-xs text-text-muted">
+                        {post.author.username} · 댓글 {post._count.comments} · ♥ {post._count.likes} ·{" "}
+                        {new Date(post.createdAt).toLocaleDateString("ko-KR")}
+                      </p>
                     </div>
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-muted">
-                      <span className="text-text-secondary">{post.author.username}</span>
-                      <span>댓글 {post._count.comments} · 좋아요 {post._count.likes}</span>
-                      <span>{new Date(post.createdAt).toLocaleDateString("ko-KR")}</span>
-                    </div>
-                    <div className="flex gap-2 pt-1">
-                      <Button size="sm" variant="outline" className="flex-1" onClick={() => handlePin(post)}>
-                        <Pin className="h-3.5 w-3.5 mr-1" />{post.isPinned ? "고정 해제" : "고정"}
-                      </Button>
-                      <Button size="sm" variant="danger" onClick={() => handleDelete(post)}>
-                        <Trash2 className="h-3.5 w-3.5 mr-1" />삭제
-                      </Button>
-                    </div>
+                    {/* 아이콘 액션 버튼 */}
+                    <button
+                      onClick={() => handlePin(post)}
+                      className={cn(
+                        "flex-shrink-0 rounded-md p-2 transition-colors",
+                        post.isPinned
+                          ? "text-accent-primary bg-accent-primary/10"
+                          : "text-text-muted hover:text-text-primary hover:bg-bg-tertiary",
+                      )}
+                      aria-label={post.isPinned ? "고정 해제" : "고정"}
+                    >
+                      <Pin className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(post)}
+                      className="flex-shrink-0 rounded-md p-2 text-accent-danger hover:bg-accent-danger/10 transition-colors"
+                      aria-label="삭제"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
                   </div>
                 ))}
               </div>
