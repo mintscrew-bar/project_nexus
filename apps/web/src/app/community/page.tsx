@@ -183,6 +183,35 @@ function CommunityPageContent() {
     <div className="flex-grow p-4 md:p-6 animate-fade-in">
       <div className="container mx-auto max-w-5xl">
 
+        {/* ── 모바일 전용 게시판 칩 내비 (사이드바가 md 미만에서 숨겨지므로 전체/게시판 전환 제공) ── */}
+        <div className="md:hidden -mx-4 mb-3 flex gap-1.5 overflow-x-auto px-4 pb-1 scrollbar-none">
+          <button
+            onClick={() => setSelectedCategory("ALL")}
+            className={cn(
+              "flex-shrink-0 rounded-full px-3 py-1.5 text-sm font-medium transition-colors",
+              isAllMode
+                ? "bg-accent-primary text-white"
+                : "bg-bg-tertiary text-text-secondary hover:text-text-primary",
+            )}
+          >
+            전체
+          </button>
+          {boards.map((board) => (
+            <button
+              key={board.id}
+              onClick={() => setSelectedCategory(board.slug)}
+              className={cn(
+                "flex-shrink-0 rounded-full px-3 py-1.5 text-sm font-medium transition-colors",
+                selectedCategory === board.slug
+                  ? "bg-accent-primary text-white"
+                  : "bg-bg-tertiary text-text-secondary hover:text-text-primary",
+              )}
+            >
+              {board.name}
+            </button>
+          ))}
+        </div>
+
         {/* ── 카테고리 헤더 (단일 카테고리 선택 시) ── */}
         {categoryTitle && CategoryIcon && (
           <div className="flex items-center gap-2 mb-4">
