@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useAuthStore } from "@/stores/auth-store";
 import { adminApi, appealApi } from "@/lib/api-client";
 import { BoardsTab } from "@/components/admin/BoardsTab";
+import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/Toast";
 import {
   Card,
@@ -45,7 +46,6 @@ type Tab =
   | "users"
   | "reports"
   | "community"
-  | "boards"
   | "clans"
   | "rooms"
   | "chatlogs"
@@ -61,7 +61,6 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: "users", label: "유저 관리", icon: <Users className="h-4 w-4" /> },
   { id: "reports", label: "신고 관리", icon: <Flag className="h-4 w-4" /> },
   { id: "community", label: "커뮤니티", icon: <BookOpen className="h-4 w-4" /> },
-  { id: "boards", label: "게시판 관리", icon: <BookOpen className="h-4 w-4" /> },
   { id: "clans", label: "클랜 관리", icon: <Shield className="h-4 w-4" /> },
   { id: "rooms", label: "방 관리", icon: <Home className="h-4 w-4" /> },
   { id: "chatlogs", label: "채팅 로그", icon: <MessageSquare className="h-4 w-4" /> },
@@ -113,8 +112,7 @@ export default function AdminPage() {
         {activeTab === "dashboard" && <DashboardTab addToast={addToast} />}
         {activeTab === "users" && <UsersTab addToast={addToast} currentUserId={user?.id} isAdmin={isAdmin} />}
         {activeTab === "reports" && <ReportsTab addToast={addToast} />}
-        {activeTab === "community" && <CommunityTab addToast={addToast} />}
-        {activeTab === "boards" && <BoardsTab addToast={addToast} />}
+        {activeTab === "community" && <CommunityTab addToast={addToast} isAdmin={isAdmin} />}
         {activeTab === "clans" && <ClansTab addToast={addToast} />}
         {activeTab === "rooms" && <RoomsTab addToast={addToast} />}
         {activeTab === "chatlogs" && <ChatLogsTab />}
@@ -1295,7 +1293,52 @@ interface AdminPost {
   _count: { comments: number; likes: number };
 }
 
-function CommunityTab({ addToast }: { addToast: (msg: string, type: "success" | "error") => void }) {
+/**
+ * 커뮤니티 관리 탭 — 게시글 관리 + 게시판 관리를 서브탭으로 통합.
+ * 게시판 관리는 ADMIN 전용이라 관리자에게만 서브탭을 노출한다.
+ */
+function CommunityTab({
+  addToast,
+  isAdmin,
+}: {
+  addToast: (msg: string, type: "success" | "error") => void;
+  isAdmin: boolean;
+}) {
+  const [subTab, setSubTab] = useState<"posts" | "boards">("posts");
+
+  const subTabs: { id: "posts" | "boards"; label: string }[] = [
+    { id: "posts", label: "게시글" },
+    ...(isAdmin ? [{ id: "boards" as const, label: "게시판" }] : []),
+  ];
+
+  return (
+    <div className="space-y-4">
+      {/* 서브탭 네비게이션 */}
+      <div className="flex gap-1 border-b border-border">
+        {subTabs.map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setSubTab(t.id)}
+            className={cn(
+              "px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px",
+              subTab === t.id
+                ? "border-accent-primary text-accent-primary"
+                : "border-transparent text-text-secondary hover:text-text-primary",
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {subTab === "posts" && <CommunityPostsTab addToast={addToast} />}
+      {subTab === "boards" && isAdmin && <BoardsTab addToast={addToast} />}
+    </div>
+  );
+}
+
+/** 게시글 관리 (검색/고정/삭제) */
+function CommunityPostsTab({ addToast }: { addToast: (msg: string, type: "success" | "error") => void }) {
   const [posts, setPosts] = useState<AdminPost[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
