@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import { useAuthStore } from "@/stores/auth-store";
 import { communityApi } from "@/lib/api-client";
+import { resolveBoardIcon } from "@/lib/board-icons";
 import {
   Card,
   CardContent,
@@ -71,7 +72,15 @@ interface Post {
   id: string;
   title: string;
   content: string;
-  category: PostCategory;
+  category: PostCategory | null;
+  board?: {
+    id: string;
+    slug: string;
+    name: string;
+    fullName: string | null;
+    iconName: string | null;
+    color: string | null;
+  } | null;
   views: number;
   isPinned: boolean;
   isEdited: boolean;
@@ -401,7 +410,19 @@ export default function PostDetailClient() {
   }
 
   const isAuthor = user?.id === post.author.id;
-  const config = categoryConfig[post.category];
+  // 게시판(board) 정보 우선, 없으면 레거시 category, 둘 다 없으면 기본값 — null 안전
+  const legacyConfig = post.category ? categoryConfig[post.category] : undefined;
+  const config = post.board
+    ? {
+        label: post.board.name,
+        icon: resolveBoardIcon(post.board.iconName),
+        color: post.board.color ?? "text-text-secondary",
+      }
+    : (legacyConfig ?? {
+        label: "게시판",
+        icon: MessageCircle,
+        color: "text-text-secondary",
+      });
   const CategoryIcon = config.icon;
 
   return (

@@ -894,6 +894,7 @@ export class CommunityService {
         include: {
           post: {
             include: {
+              board: true,
               author: { select: { id: true, username: true, avatar: true } },
               _count: { select: { comments: true, likes: true } },
             },

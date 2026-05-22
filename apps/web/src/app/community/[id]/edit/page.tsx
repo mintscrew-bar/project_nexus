@@ -92,7 +92,8 @@ export default function EditPostPage() {
 
         setTitle(post.title);
         setContent(post.content);
-        setCategory(post.category);
+        // 레거시 category가 있을 때만 설정 (커스텀 게시판 글은 null)
+        if (post.category) setCategory(post.category);
         // 기존 태그 불러오기
         if (post.tags && Array.isArray(post.tags)) {
           setTags(post.tags.map((t: any) => t.tag?.name ?? t.name ?? "").filter(Boolean));

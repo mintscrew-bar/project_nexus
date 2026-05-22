@@ -31,7 +31,8 @@ type PostCategory = "NOTICE" | "FREE" | "TIP" | "QNA";
 interface BookmarkedPost {
   id: string;
   title: string;
-  category: PostCategory;
+  category: PostCategory | null;
+  board?: { name: string; color: string | null } | null;
   views: number;
   createdAt: string;
   author: {
@@ -180,7 +181,12 @@ export default function BookmarksPage() {
           <>
             <div className="space-y-3">
               {posts.map((post) => {
-                const catConfig = categoryConfig[post.category];
+                // 게시판 우선, 없으면 레거시 category, 둘 다 없으면 기본값 — null 안전
+                const catConfig = post.board
+                  ? { label: post.board.name, color: post.board.color ?? "text-text-secondary" }
+                  : (post.category
+                      ? categoryConfig[post.category]
+                      : { label: "게시판", color: "text-text-secondary" });
                 return (
                   <Card
                     key={post.id}
