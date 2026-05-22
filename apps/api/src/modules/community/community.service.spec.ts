@@ -11,12 +11,14 @@ import { CommunityService } from "./community.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { NotificationService } from "../notification/notification.service";
 import { RedisService } from "../redis/redis.service";
+import { BoardService } from "../board/board.service";
 
 describe("CommunityService", () => {
   let service: CommunityService;
   let prisma: any;
   let redis: any;
   let notification: any;
+  let board: any;
 
   beforeEach(async () => {
     prisma = {
@@ -52,12 +54,25 @@ describe("CommunityService", () => {
       notifyReply: jest.fn().mockResolvedValue(undefined),
     };
 
+    // 기본 게시판 mock — getBySlug/assertCanWrite 모두 활성 게시판 반환
+    const defaultBoard = {
+      id: "board-1",
+      slug: "general",
+      isActive: true,
+      writeRole: null,
+    };
+    board = {
+      getBySlug: jest.fn().mockResolvedValue(defaultBoard),
+      assertCanWrite: jest.fn().mockResolvedValue(defaultBoard),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CommunityService,
         { provide: PrismaService, useValue: prisma },
         { provide: NotificationService, useValue: notification },
         { provide: RedisService, useValue: redis },
+        { provide: BoardService, useValue: board },
       ],
     }).compile();
 
