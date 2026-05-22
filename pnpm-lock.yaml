@@ -25,6 +25,7 @@ overrides:
   picomatch@<3: ^2.3.2
   picomatch@>=4.0.0 <4.0.4: ^4.0.4
   path-to-regexp@>=8.0.0 <8.4.0: ^8.4.2
+  uuid@<11.1.1: ^11.1.1
 
 importers:
 
@@ -7874,7 +7875,7 @@ packages:
       preact-render-to-string: 5.2.6(preact@10.28.2)
       react: 18.3.1
       react-dom: 18.3.1(react@18.3.1)
-      uuid: 8.3.2
+      uuid: 11.1.1
     dev: false
 
   /next-themes@0.4.6(react-dom@18.3.1)(react@18.3.1):
@@ -10316,8 +10317,8 @@ packages:
     engines: {node: '>= 0.4.0'}
     dev: false
 
-  /uuid@8.3.2:
-    resolution: {integrity: sha512-+NYs2QeMWy+GWFOEm9xnn6HCDp0l7QBD7ml8zLUmJ+93Q5NF0NocErnwkTkXVFNiX3/fpC6afS8Dhb/gz7R7eg==}
+  /uuid@11.1.1:
+    resolution: {integrity: sha512-vIYxrBCC/N/K+Js3qSN88go7kIfNPssr/hHCesKCQNAjmgvYS2oqr69kIufEG+O4+PfezOH4EbIeHCfFov8ZgQ==}
     hasBin: true
     dev: false
 
