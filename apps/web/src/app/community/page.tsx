@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useTransition } from "react";
+import { Suspense, useEffect, useTransition, useRef, useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useQueries } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/auth-store";
@@ -18,6 +18,84 @@ import {
 import { PostRow } from "@/components/community/PostRow";
 import { CategoryCard } from "@/components/community/CategoryCard";
 import { PostListFilters } from "@/components/community/PostListFilters";
+
+/**
+ * 모바일 전용 게시판 칩 내비.
+ * 스크롤바를 숨긴 대신, 더 스크롤할 수 있는 방향에만 가장자리 페이드를 띄워
+ * "옆에 더 있다"는 신호를 준다.
+ */
+function MobileBoardChips({
+  boards,
+  selectedCategory,
+  isAllMode,
+  onSelect,
+}: {
+  boards: Board[];
+  selectedCategory: string;
+  isAllMode: boolean;
+  onSelect: (slug: string) => void;
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [edges, setEdges] = useState({ left: false, right: false });
+
+  const updateEdges = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setEdges({
+      left: el.scrollLeft > 4,
+      right: el.scrollLeft + el.clientWidth < el.scrollWidth - 4,
+    });
+  }, []);
+
+  useEffect(() => {
+    updateEdges();
+    const el = scrollRef.current;
+    if (!el) return;
+    el.addEventListener("scroll", updateEdges, { passive: true });
+    window.addEventListener("resize", updateEdges);
+    return () => {
+      el.removeEventListener("scroll", updateEdges);
+      window.removeEventListener("resize", updateEdges);
+    };
+  }, [updateEdges, boards.length]);
+
+  const chips = [{ slug: "ALL", name: "전체" }, ...boards];
+
+  return (
+    <div className="md:hidden relative -mx-4 mb-4">
+      <div
+        ref={scrollRef}
+        className="flex gap-2 overflow-x-auto px-4 scrollbar-none"
+      >
+        {chips.map((b) => {
+          const active =
+            b.slug === "ALL" ? isAllMode : selectedCategory === b.slug;
+          return (
+            <button
+              key={b.slug}
+              onClick={() => onSelect(b.slug)}
+              className={cn(
+                "flex-shrink-0 whitespace-nowrap rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors",
+                active
+                  ? "border-accent-primary bg-accent-primary text-white"
+                  : "border-bg-elevated bg-transparent text-text-secondary hover:border-text-tertiary hover:text-text-primary",
+              )}
+            >
+              {b.name}
+            </button>
+          );
+        })}
+      </div>
+      {/* 좌/우 페이드 — 더 스크롤할 수 있는 쪽에만 표시 */}
+      {edges.left && (
+        <div className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-bg-primary to-transparent" />
+      )}
+      {edges.right && (
+        <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-bg-primary to-transparent" />
+      )}
+    </div>
+  );
+}
 
 /** useSearchParams를 사용하므로 Suspense 내부에서 렌더 */
 function CommunityPageContent() {
@@ -184,26 +262,12 @@ function CommunityPageContent() {
       <div className="container mx-auto max-w-5xl">
 
         {/* ── 모바일 전용 게시판 칩 내비 (사이드바가 md 미만에서 숨겨지므로 전체/게시판 전환 제공) ── */}
-        <div className="md:hidden -mx-4 mb-4 flex gap-2 overflow-x-auto px-4 scrollbar-none">
-          {[{ slug: "ALL", name: "전체" }, ...boards].map((b) => {
-            const active =
-              b.slug === "ALL" ? isAllMode : selectedCategory === b.slug;
-            return (
-              <button
-                key={b.slug}
-                onClick={() => setSelectedCategory(b.slug)}
-                className={cn(
-                  "flex-shrink-0 whitespace-nowrap rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors",
-                  active
-                    ? "border-accent-primary bg-accent-primary text-white"
-                    : "border-bg-elevated bg-transparent text-text-secondary hover:border-text-tertiary hover:text-text-primary",
-                )}
-              >
-                {b.name}
-              </button>
-            );
-          })}
-        </div>
+        <MobileBoardChips
+          boards={boards}
+          selectedCategory={selectedCategory}
+          isAllMode={isAllMode}
+          onSelect={setSelectedCategory}
+        />
 
         {/* ── 카테고리 헤더 (단일 카테고리 선택 시) ── */}
         {categoryTitle && CategoryIcon && (
