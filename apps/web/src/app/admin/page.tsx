@@ -1406,48 +1406,80 @@ function CommunityPostsTab({ addToast }: { addToast: (msg: string, type: "succes
           ) : posts.length === 0 ? (
             <p className="text-center text-text-muted py-12">게시글이 없습니다.</p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-bg-tertiary text-text-muted">
-                    <th className="text-left px-4 py-3 font-medium">제목</th>
-                    <th className="text-left px-4 py-3 font-medium">작성자</th>
-                    <th className="text-left px-4 py-3 font-medium">댓글/좋아요</th>
-                    <th className="text-left px-4 py-3 font-medium">날짜</th>
-                    <th className="text-left px-4 py-3 font-medium">액션</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {posts.map((post) => (
-                    <tr key={post.id} className="border-b border-bg-tertiary/50 hover:bg-bg-tertiary/30">
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-1.5">
-                          {post.isPinned && <Pin className="h-3.5 w-3.5 text-accent-primary" />}
-                          <span className="font-medium text-text-primary truncate max-w-64">{post.title}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-text-secondary">{post.author.username}</td>
-                      <td className="px-4 py-3 text-text-muted text-xs">
-                        댓글 {post._count.comments} · 좋아요 {post._count.likes}
-                      </td>
-                      <td className="px-4 py-3 text-text-muted text-xs">
-                        {new Date(post.createdAt).toLocaleDateString("ko-KR")}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex gap-1">
-                          <Button size="sm" variant="outline" onClick={() => handlePin(post)}>
-                            <Pin className="h-3.5 w-3.5 mr-1" />{post.isPinned ? "해제" : "고정"}
-                          </Button>
-                          <Button size="sm" variant="danger" onClick={() => handleDelete(post)}>
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </td>
+            <>
+              {/* 모바일: 카드형 목록 (가로 스크롤 없이 세로 스택) */}
+              <div className="md:hidden divide-y divide-bg-tertiary/50">
+                {posts.map((post) => (
+                  <div key={post.id} className="p-4 space-y-2">
+                    <div className="flex items-start gap-1.5">
+                      {post.isPinned && (
+                        <Pin className="h-4 w-4 text-accent-primary flex-shrink-0 mt-0.5" />
+                      )}
+                      <span className="font-medium text-text-primary break-words">
+                        {post.title}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-muted">
+                      <span className="text-text-secondary">{post.author.username}</span>
+                      <span>댓글 {post._count.comments} · 좋아요 {post._count.likes}</span>
+                      <span>{new Date(post.createdAt).toLocaleDateString("ko-KR")}</span>
+                    </div>
+                    <div className="flex gap-2 pt-1">
+                      <Button size="sm" variant="outline" className="flex-1" onClick={() => handlePin(post)}>
+                        <Pin className="h-3.5 w-3.5 mr-1" />{post.isPinned ? "고정 해제" : "고정"}
+                      </Button>
+                      <Button size="sm" variant="danger" onClick={() => handleDelete(post)}>
+                        <Trash2 className="h-3.5 w-3.5 mr-1" />삭제
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* 데스크톱: 테이블 */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-bg-tertiary text-text-muted">
+                      <th className="text-left px-4 py-3 font-medium">제목</th>
+                      <th className="text-left px-4 py-3 font-medium">작성자</th>
+                      <th className="text-left px-4 py-3 font-medium">댓글/좋아요</th>
+                      <th className="text-left px-4 py-3 font-medium">날짜</th>
+                      <th className="text-left px-4 py-3 font-medium">액션</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {posts.map((post) => (
+                      <tr key={post.id} className="border-b border-bg-tertiary/50 hover:bg-bg-tertiary/30">
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-1.5">
+                            {post.isPinned && <Pin className="h-3.5 w-3.5 text-accent-primary" />}
+                            <span className="font-medium text-text-primary truncate max-w-64">{post.title}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-text-secondary">{post.author.username}</td>
+                        <td className="px-4 py-3 text-text-muted text-xs">
+                          댓글 {post._count.comments} · 좋아요 {post._count.likes}
+                        </td>
+                        <td className="px-4 py-3 text-text-muted text-xs">
+                          {new Date(post.createdAt).toLocaleDateString("ko-KR")}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex gap-1">
+                            <Button size="sm" variant="outline" onClick={() => handlePin(post)}>
+                              <Pin className="h-3.5 w-3.5 mr-1" />{post.isPinned ? "해제" : "고정"}
+                            </Button>
+                            <Button size="sm" variant="danger" onClick={() => handleDelete(post)}>
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
           <Pagination page={page} totalPages={totalPages} onChange={setPage} />
         </CardContent>
