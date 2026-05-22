@@ -3,11 +3,24 @@
 export type PostCategory = "NOTICE" | "FREE" | "TIP" | "QNA";
 export type SortOption = "newest" | "popular" | "views" | "comments";
 
+/** 게시글에 포함되는 게시판 요약 정보 */
+export interface PostBoard {
+  id: string;
+  slug: string;
+  name: string;
+  fullName: string | null;
+  iconName: string | null;
+  color: string | null;
+}
+
 export interface Post {
   id: string;
   title: string;
   content: string;
-  category: PostCategory;
+  /** 레거시 카테고리 (nullable — 커스텀 게시판 글은 null) */
+  category: PostCategory | null;
+  /** 소속 게시판 (신규) */
+  board?: PostBoard | null;
   views: number;
   isPinned: boolean;
   createdAt: string;

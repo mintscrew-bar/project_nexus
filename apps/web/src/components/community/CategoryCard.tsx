@@ -2,37 +2,30 @@
 
 import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui";
-import { Megaphone, MessageCircle, Lightbulb, HelpCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { type Post, type PostCategory, CATEGORY_META, formatDate } from "./community-types";
+import { type Post, formatDate } from "./community-types";
+import { type Board } from "@/lib/api-client";
+import { resolveBoardIcon } from "@/lib/board-icons";
 import { useCommunityStore } from "@/stores/community-store";
 
-// 카테고리 아이콘 컴포넌트 매핑
-const CATEGORY_ICONS: Record<PostCategory, React.ElementType> = {
-  NOTICE: Megaphone,
-  FREE: MessageCircle,
-  TIP: Lightbulb,
-  QNA: HelpCircle,
-};
-
 interface CategoryCardProps {
-  category: PostCategory;
+  board: Board;
   posts: Post[];
   totalCount: number;
   isLoading?: boolean;
 }
 
-/** ALL 모드 2x2 그리드의 카테고리별 카드 위젯 */
+/** ALL 모드 그리드의 게시판별 카드 위젯 */
 export function CategoryCard({
-  category,
+  board,
   posts,
   totalCount,
   isLoading = false,
 }: CategoryCardProps) {
   const router = useRouter();
   const setSelectedCategory = useCommunityStore((s) => s.setSelectedCategory);
-  const meta = CATEGORY_META[category];
-  const Icon = CATEGORY_ICONS[category];
+  const Icon = resolveBoardIcon(board.iconName);
+  const title = board.fullName ?? board.name;
 
   // 최대 5개 표시
   const displayPosts = posts.slice(0, 5);
@@ -42,14 +35,14 @@ export function CategoryCard({
       {/* 카드 헤더 */}
       <div className="bg-bg-tertiary border-b border-bg-elevated px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Icon className={cn("h-4 w-4", meta.color)} />
-          <h2 className="text-sm font-semibold text-text-primary">{meta.fullLabel}</h2>
+          <Icon className={cn("h-4 w-4", board.color ?? "text-text-secondary")} />
+          <h2 className="text-sm font-semibold text-text-primary">{title}</h2>
           {totalCount > 0 && (
             <span className="text-xs text-text-tertiary">{totalCount}개</span>
           )}
         </div>
         <button
-          onClick={() => setSelectedCategory(category)}
+          onClick={() => setSelectedCategory(board.slug)}
           className="text-xs text-text-tertiary hover:text-accent-primary transition-colors"
         >
           더보기 →

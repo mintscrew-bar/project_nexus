@@ -5,31 +5,21 @@ import { Eye, Heart, Pin } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   type Post,
-  type PostCategory,
-  CATEGORY_META,
   formatDate,
 } from "./community-types";
-import { Megaphone, MessageCircle, Lightbulb, HelpCircle } from "lucide-react";
-
-// 카테고리 아이콘 컴포넌트 매핑
-const CATEGORY_ICONS: Record<PostCategory, React.ElementType> = {
-  NOTICE: Megaphone,
-  FREE: MessageCircle,
-  TIP: Lightbulb,
-  QNA: HelpCircle,
-};
+import { resolveBoardIcon } from "@/lib/board-icons";
 
 interface PostRowProps {
   post: Post;
-  /** ALL 모드에서 카테고리 아이콘 표시 여부 */
+  /** ALL 모드에서 게시판 아이콘 표시 여부 */
   showCategoryIcon?: boolean;
 }
 
-/** 단일 카테고리 모드 테이블 행 컴포넌트 */
+/** 단일 게시판 모드 테이블 행 컴포넌트 */
 export function PostRow({ post, showCategoryIcon = false }: PostRowProps) {
   const router = useRouter();
-  const meta = CATEGORY_META[post.category];
-  const CatIcon = CATEGORY_ICONS[post.category];
+  const CatIcon = resolveBoardIcon(post.board?.iconName);
+  const catColor = post.board?.color ?? "text-text-secondary";
   const commentCount = post._count?.comments || 0;
 
   return (
@@ -46,7 +36,7 @@ export function PostRow({ post, showCategoryIcon = false }: PostRowProps) {
           <Pin className="h-3.5 w-3.5 text-accent-primary flex-shrink-0" />
         )}
         {showCategoryIcon && (
-          <CatIcon className={cn("h-3.5 w-3.5 flex-shrink-0", meta.color)} />
+          <CatIcon className={cn("h-3.5 w-3.5 flex-shrink-0", catColor)} />
         )}
         <h3
           className={cn(

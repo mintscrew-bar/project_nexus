@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/auth-store";
-import { communityApi } from "@/lib/api-client";
+import { communityApi, boardApi, type Board } from "@/lib/api-client";
 import {
   Card,
   CardContent,
@@ -24,20 +24,21 @@ import {
   HelpCircle,
   X,
   Tag,
+  MessagesSquare,
 } from "lucide-react";
 
-type PostCategory = "NOTICE" | "FREE" | "TIP" | "QNA";
+// 게시판 iconName(lucide) → 컴포넌트 매핑. 미지정/미등록은 기본 아이콘.
+const ICON_MAP: Record<string, React.ElementType> = {
+  Megaphone,
+  MessageCircle,
+  Lightbulb,
+  HelpCircle,
+};
+const resolveIcon = (name?: string | null): React.ElementType =>
+  (name && ICON_MAP[name]) || MessagesSquare;
 
-const categories: {
-  value: PostCategory;
-  label: string;
-  icon: React.ElementType;
-}[] = [
-  { value: "FREE", label: "자유", icon: MessageCircle },
-  { value: "TIP", label: "팁", icon: Lightbulb },
-  { value: "QNA", label: "Q&A", icon: HelpCircle },
-  { value: "NOTICE", label: "공지", icon: Megaphone },
-];
+// 권한 서열 — 값이 클수록 상위
+const ROLE_RANK: Record<string, number> = { USER: 0, MODERATOR: 1, ADMIN: 2 };
 
 export default function WritePostPage() {
   const router = useRouter();
@@ -45,7 +46,8 @@ export default function WritePostPage() {
 
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
-  const [category, setCategory] = useState<PostCategory>("FREE");
+  const [boards, setBoards] = useState<Board[]>([]);
+  const [boardId, setBoardId] = useState<string>("");
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -58,10 +60,11 @@ export default function WritePostPage() {
       .toLowerCase()
       .replace(/[^a-z0-9가-힣]/g, "")
       .slice(0, 20);
-  const canWriteNotice = user?.role === "ADMIN" || user?.role === "MODERATOR";
-  const visibleCategories = canWriteNotice
-    ? categories
-    : categories.filter((cat) => cat.value !== "NOTICE");
+  // 유저 권한으로 글쓰기 가능한 게시판만 노출 (writeRole 충족)
+  const userRank = ROLE_RANK[user?.role ?? "USER"] ?? 0;
+  const visibleBoards = boards.filter(
+    (b) => !b.writeRole || userRank >= (ROLE_RANK[b.writeRole] ?? 0),
+  );
 
   const handleTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" || e.key === ",") {
@@ -82,6 +85,24 @@ export default function WritePostPage() {
     }
   }, [isAuthenticated, authLoading, router]);
 
+  // 게시판 목록 로드 + 기본 선택(첫 작성 가능 게시판)
+  useEffect(() => {
+    boardApi
+      .list()
+      .then((data) => {
+        setBoards(data);
+        const writable = data.filter(
+          (b) => !b.writeRole || userRank >= (ROLE_RANK[b.writeRole] ?? 0),
+        );
+        // 자유게시판(free) 우선, 없으면 첫 작성 가능 게시판
+        const def =
+          writable.find((b) => b.slug === "free") ?? writable[0];
+        if (def) setBoardId((prev) => prev || def.id);
+      })
+      .catch(() => setError("게시판 목록을 불러오지 못했습니다."));
+    // userRank는 user 변경 시에만 바뀌므로 의존성에 포함
+  }, [userRank]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -93,6 +114,10 @@ export default function WritePostPage() {
       setError("내용을 입력해주세요.");
       return;
     }
+    if (!boardId) {
+      setError("게시판을 선택해주세요.");
+      return;
+    }
 
     setIsSubmitting(true);
     setError(null);
@@ -101,7 +126,7 @@ export default function WritePostPage() {
       const post = await communityApi.createPost({
         title: title.trim(),
         content: content.trim(),
-        category,
+        boardId,
         tags: tags.length > 0 ? tags : undefined,
       });
       router.push(`/community/${post.id}`);
@@ -156,25 +181,25 @@ export default function WritePostPage() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Category */}
+              {/* 게시판 선택 */}
               <div>
-                <Label>카테고리</Label>
+                <Label>게시판</Label>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2">
-                  {visibleCategories.map((cat) => {
-                    const Icon = cat.icon;
+                  {visibleBoards.map((board) => {
+                    const Icon = resolveIcon(board.iconName);
                     return (
                       <button
-                        key={cat.value}
+                        key={board.id}
                         type="button"
-                        onClick={() => setCategory(cat.value)}
+                        onClick={() => setBoardId(board.id)}
                         className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 transition-colors ${
-                          category === cat.value
+                          boardId === board.id
                             ? "border-accent-primary bg-accent-primary/10 text-accent-primary"
                             : "border-bg-tertiary bg-bg-tertiary hover:border-accent-primary/50"
                         }`}
                       >
                         <Icon className="h-4 w-4" />
-                        <span className="font-medium">{cat.label}</span>
+                        <span className="font-medium">{board.name}</span>
                       </button>
                     );
                   })}

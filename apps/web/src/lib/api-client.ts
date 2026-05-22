@@ -826,6 +826,8 @@ export const clanApi = {
 export const communityApi = {
   getPosts: async (params?: {
     category?: string;
+    boardId?: string;
+    boardSlug?: string;
     limit?: number;
     offset?: number;
     sortBy?: string;
@@ -844,7 +846,8 @@ export const communityApi = {
   createPost: async (data: {
     title: string;
     content: string;
-    category: "NOTICE" | "FREE" | "TIP" | "QNA";
+    boardId?: string;
+    category?: "NOTICE" | "FREE" | "TIP" | "QNA";
     tags?: string[];
   }) => {
     const response = await apiClient.post("/community/posts", data);
@@ -963,6 +966,67 @@ export const communityApi = {
 
   reportComment: async (commentId: string, data: { reason: string; description: string }) => {
     const response = await apiClient.post("/community/reports", { commentId, ...data });
+    return response.data;
+  },
+};
+
+// 게시판(Board) 타입
+export interface Board {
+  id: string;
+  slug: string;
+  name: string;
+  fullName: string | null;
+  description: string | null;
+  iconName: string | null;
+  color: string | null;
+  order: number;
+  isActive: boolean;
+  isHidden: boolean;
+  writeRole: "USER" | "MODERATOR" | "ADMIN" | null;
+  createdAt: string;
+  updatedAt: string;
+  _count?: { posts: number };
+}
+
+export interface BoardInput {
+  name: string;
+  slug?: string;
+  fullName?: string | null;
+  description?: string | null;
+  iconName?: string | null;
+  color?: string | null;
+  order?: number;
+  writeRole?: "USER" | "MODERATOR" | "ADMIN" | null;
+  isActive?: boolean;
+  isHidden?: boolean;
+}
+
+// 게시판 API
+export const boardApi = {
+  // 공개: 활성 게시판 목록
+  list: async (): Promise<Board[]> => {
+    const response = await apiClient.get("/boards");
+    return response.data;
+  },
+  // 관리자: 전체 목록 (숨김/비활성 포함, 글 수 포함)
+  listForAdmin: async (): Promise<Board[]> => {
+    const response = await apiClient.get("/boards/admin");
+    return response.data;
+  },
+  create: async (data: BoardInput): Promise<Board> => {
+    const response = await apiClient.post("/boards", data);
+    return response.data;
+  },
+  update: async (id: string, data: Partial<BoardInput>): Promise<Board> => {
+    const response = await apiClient.patch(`/boards/${id}`, data);
+    return response.data;
+  },
+  remove: async (id: string) => {
+    const response = await apiClient.delete(`/boards/${id}`);
+    return response.data;
+  },
+  reorder: async (items: Array<{ id: string; order: number }>) => {
+    const response = await apiClient.patch("/boards/admin/reorder", { items });
     return response.data;
   },
 };

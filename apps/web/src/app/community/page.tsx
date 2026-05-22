@@ -5,29 +5,19 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useQueries } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/auth-store";
 import { useCommunityStore } from "@/stores/community-store";
-import { communityApi } from "@/lib/api-client";
+import { communityApi, boardApi, type Board } from "@/lib/api-client";
 import { useDebounce } from "@/hooks/useDebounce";
 import { Card, CardContent, EmptyState, PostCardSkeleton } from "@/components/ui";
-import { Megaphone, MessageCircle, Lightbulb, HelpCircle, Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { MessageCircle, Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { resolveBoardIcon } from "@/lib/board-icons";
 import {
-  CATEGORY_KEYS,
-  CATEGORY_META,
   POSTS_PER_PAGE,
   type Post,
-  type PostCategory,
 } from "@/components/community/community-types";
 import { PostRow } from "@/components/community/PostRow";
 import { CategoryCard } from "@/components/community/CategoryCard";
 import { PostListFilters } from "@/components/community/PostListFilters";
-
-// 카테고리 아이콘 컴포넌트 매핑
-const CATEGORY_ICONS: Record<PostCategory, React.ElementType> = {
-  NOTICE: Megaphone,
-  FREE: MessageCircle,
-  TIP: Lightbulb,
-  QNA: HelpCircle,
-};
 
 /** useSearchParams를 사용하므로 Suspense 내부에서 렌더 */
 function CommunityPageContent() {
@@ -45,11 +35,20 @@ function CommunityPageContent() {
   const setSelectedCategory = useCommunityStore((s) => s.setSelectedCategory);
   const setCurrentPage = useCommunityStore((s) => s.setCurrentPage);
 
-  // URL ?category=, ?tag= 파라미터로 스토어 초기화 (마운트 1회)
+  // ── React Query: 게시판 목록 (5분 캐시) ──
+  const { data: boards = [] } = useQuery({
+    queryKey: ["boards"],
+    queryFn: () => boardApi.list(),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // URL ?board=<slug> / 레거시 ?category=<ENUM> / ?tag= 파라미터로 스토어 초기화 (마운트 1회)
   useEffect(() => {
-    const catParam = searchParams.get("category")?.toUpperCase();
-    if (catParam && CATEGORY_KEYS.includes(catParam as PostCategory)) {
-      setSelectedCategory(catParam as PostCategory);
+    const boardParam =
+      searchParams.get("board") ?? searchParams.get("category");
+    if (boardParam) {
+      // enum/slug 모두 소문자 슬러그로 정규화 (예: NOTICE → notice)
+      setSelectedCategory(boardParam.toLowerCase());
     }
     const tagParam = searchParams.get("tag");
     if (tagParam) {
@@ -75,11 +74,11 @@ function CommunityPageContent() {
   // ⚠️ queryKey 에 "CARD" 마커를 넣어야 함. 안 그러면 단일 카테고리 query(현재 페이지=1)와
   // key 가 충돌하여 단일 모드가 캐시된 Post[] 를 받고 feedData?.posts === undefined → "게시글 없음" 버그
   const categoryQueries = useQueries({
-    queries: CATEGORY_KEYS.map((category) => ({
-      queryKey: ["communityPosts", "CARD", category, apiSortBy, debouncedSearch, selectedTag, 1],
+    queries: boards.map((board) => ({
+      queryKey: ["communityPosts", "CARD", board.slug, apiSortBy, debouncedSearch, selectedTag, 1],
       queryFn: async () => {
         const data = await communityApi.getPosts({
-          category,
+          boardSlug: board.slug,
           limit: 10,
           sortBy: apiSortBy,
           search: debouncedSearch || undefined,
@@ -117,7 +116,7 @@ function CommunityPageContent() {
     queryKey: ["communityPosts", selectedCategory, apiSortBy, debouncedSearch, selectedTag, currentPage],
     queryFn: async () => {
       const data = await communityApi.getPosts({
-        category: selectedCategory as PostCategory,
+        boardSlug: selectedCategory,
         limit: POSTS_PER_PAGE,
         offset: (currentPage - 1) * POSTS_PER_PAGE,
         sortBy: apiSortBy,
@@ -168,16 +167,17 @@ function CommunityPageContent() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  // 현재 선택된 카테고리 제목 (단일 카테고리 모드용)
-  const categoryTitle = !isAllMode
-    ? CATEGORY_META[selectedCategory as PostCategory]?.fullLabel
+  // 현재 선택된 게시판 (단일 게시판 모드용)
+  const selectedBoard = !isAllMode
+    ? boards.find((b) => b.slug === selectedCategory)
     : null;
-  const CategoryIcon = !isAllMode
-    ? CATEGORY_ICONS[selectedCategory as PostCategory]
+  const categoryTitle = selectedBoard
+    ? (selectedBoard.fullName ?? selectedBoard.name)
     : null;
-  const categoryColor = !isAllMode
-    ? CATEGORY_META[selectedCategory as PostCategory]?.color
+  const CategoryIcon = selectedBoard
+    ? resolveBoardIcon(selectedBoard.iconName)
     : null;
+  const categoryColor = selectedBoard?.color ?? null;
 
   return (
     <div className="flex-grow p-4 md:p-6 animate-fade-in">
@@ -216,10 +216,10 @@ function CommunityPageContent() {
             {/* 2x2 카테고리 카드 그리드 (검색 중이 아닐 때만) */}
             {!debouncedSearch && !selectedTag && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {CATEGORY_KEYS.map((category, idx) => (
+                {boards.map((board, idx) => (
                   <CategoryCard
-                    key={category}
-                    category={category}
+                    key={board.id}
+                    board={board}
                     posts={categoryQueries[idx]?.data ?? []}
                     totalCount={categoryQueries[idx]?.data?.length ?? 0}
                     isLoading={categoryQueries[idx]?.isLoading ?? false}

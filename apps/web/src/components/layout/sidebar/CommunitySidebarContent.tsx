@@ -4,29 +4,19 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import {
-  Plus, Bookmark, Flame,
-  Megaphone, MessageCircle, Lightbulb, HelpCircle, LayoutList,
+  Plus, Bookmark, Flame, LayoutList,
 } from 'lucide-react';
-import { communityApi } from '@/lib/api-client';
+import { communityApi, boardApi } from '@/lib/api-client';
 import { useAuthStore } from '@/stores/auth-store';
 import { useCommunityStore } from '@/stores/community-store';
 import { cn } from '@/lib/utils';
-import type { PostCategory } from '@/components/community/community-types';
-
-// 카테고리 메타 정보
-const CATEGORY_META: Record<PostCategory, { label: string; icon: React.ElementType; color: string }> = {
-  NOTICE: { label: '공지사항', icon: Megaphone,       color: 'text-accent-danger'  },
-  FREE:   { label: '자유게시판', icon: MessageCircle,  color: 'text-text-secondary' },
-  TIP:    { label: '팁 & 노하우', icon: Lightbulb,    color: 'text-accent-gold'    },
-  QNA:    { label: 'Q&A',         icon: HelpCircle,   color: 'text-accent-primary' },
-};
-
-const CATEGORY_KEYS: PostCategory[] = ['NOTICE', 'FREE', 'TIP', 'QNA'];
+import { resolveBoardIcon } from '@/lib/board-icons';
+import type { PostBoard } from '@/components/community/community-types';
 
 interface HotPost {
   id: string;
   title: string;
-  category: PostCategory;
+  board?: PostBoard | null;
   _count?: { likes: number; comments: number };
 }
 
@@ -35,6 +25,13 @@ export function CommunitySidebarContent() {
   const { isAuthenticated } = useAuthStore();
   const selectedCategory = useCommunityStore((s) => s.selectedCategory);
   const setSelectedCategory = useCommunityStore((s) => s.setSelectedCategory);
+
+  // 게시판 목록 (동적)
+  const { data: boards = [] } = useQuery({
+    queryKey: ['boards'],
+    queryFn: () => boardApi.list(),
+    staleTime: 5 * 60 * 1000,
+  });
 
   // 인기글 TOP 5
   const { data: hotPostsData } = useQuery({
@@ -49,9 +46,9 @@ export function CommunitySidebarContent() {
 
   const hotPosts = hotPostsData ?? [];
 
-  // 카테고리 클릭 핸들러: store 업데이트 + 커뮤니티 메인 경로가 아니면 이동
-  const handleCategoryClick = (category: PostCategory | 'ALL') => {
-    setSelectedCategory(category);
+  // 게시판 클릭 핸들러: store 업데이트 (슬러그 또는 'ALL')
+  const handleCategoryClick = (slug: string) => {
+    setSelectedCategory(slug);
   };
 
   const isOnCommunityMain = pathname === '/community';
@@ -106,15 +103,15 @@ export function CommunitySidebarContent() {
           카테고리
         </h2>
         <div className="space-y-0.5">
-          {CATEGORY_KEYS.map((key) => {
-            const meta = CATEGORY_META[key];
-            const Icon = meta.icon;
-            const isActive = isOnCommunityMain && selectedCategory === key;
+          {boards.map((board) => {
+            const Icon = resolveBoardIcon(board.iconName);
+            const color = board.color ?? 'text-text-secondary';
+            const isActive = isOnCommunityMain && selectedCategory === board.slug;
 
             return isOnCommunityMain ? (
               <button
-                key={key}
-                onClick={() => handleCategoryClick(key)}
+                key={board.id}
+                onClick={() => handleCategoryClick(board.slug)}
                 className={cn(
                   'flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors w-full text-left',
                   isActive
@@ -122,17 +119,17 @@ export function CommunitySidebarContent() {
                     : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary'
                 )}
               >
-                <Icon className={cn('h-4 w-4', isActive ? 'text-accent-primary' : meta.color)} />
-                <span>{meta.label}</span>
+                <Icon className={cn('h-4 w-4', isActive ? 'text-accent-primary' : color)} />
+                <span>{board.name}</span>
               </button>
             ) : (
               <Link
-                key={key}
-                href={`/community?category=${key}`}
+                key={board.id}
+                href={`/community?board=${board.slug}`}
                 className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-text-secondary hover:text-text-primary hover:bg-bg-tertiary transition-colors"
               >
-                <Icon className={cn('h-4 w-4', meta.color)} />
-                <span>{meta.label}</span>
+                <Icon className={cn('h-4 w-4', color)} />
+                <span>{board.name}</span>
               </Link>
             );
           })}
@@ -173,9 +170,8 @@ export function CommunitySidebarContent() {
           </div>
           <div className="space-y-0.5">
             {hotPosts.map((post, idx) => {
-              const meta = CATEGORY_META[post.category];
-              const CatIcon = meta?.icon ?? MessageCircle;
-              const catColor = meta?.color ?? 'text-text-secondary';
+              const CatIcon = resolveBoardIcon(post.board?.iconName);
+              const catColor = post.board?.color ?? 'text-text-secondary';
               return (
                 <Link
                   key={post.id}

@@ -1,15 +1,16 @@
 import { create } from "zustand";
-import type { PostCategory, SortOption } from "@/components/community/community-types";
+import type { SortOption } from "@/components/community/community-types";
 
 interface CommunityStoreState {
-  selectedCategory: PostCategory | "ALL";
+  // 선택된 게시판 슬러그 ("ALL"이면 전체) — 동적 게시판 도입으로 enum→슬러그 문자열
+  selectedCategory: string;
   selectedTag: string;
   searchQuery: string;
   sortBy: SortOption;
   currentPage: number;
 
-  // 카테고리 변경 → 페이지 1로 리셋
-  setSelectedCategory: (category: PostCategory | "ALL") => void;
+  // 게시판(카테고리) 변경 → 페이지 1로 리셋
+  setSelectedCategory: (category: string) => void;
   // 태그 변경 → 페이지 1로 리셋
   setSelectedTag: (tag: string) => void;
   // 검색어 변경 → 페이지 1로 리셋

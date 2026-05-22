@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import Image from "next/image";
 import { useAuthStore } from "@/stores/auth-store";
 import { adminApi, appealApi } from "@/lib/api-client";
+import { BoardsTab } from "@/components/admin/BoardsTab";
 import { useToast } from "@/components/ui/Toast";
 import {
   Card,
@@ -44,6 +45,7 @@ type Tab =
   | "users"
   | "reports"
   | "community"
+  | "boards"
   | "clans"
   | "rooms"
   | "chatlogs"
@@ -59,6 +61,7 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: "users", label: "유저 관리", icon: <Users className="h-4 w-4" /> },
   { id: "reports", label: "신고 관리", icon: <Flag className="h-4 w-4" /> },
   { id: "community", label: "커뮤니티", icon: <BookOpen className="h-4 w-4" /> },
+  { id: "boards", label: "게시판 관리", icon: <BookOpen className="h-4 w-4" /> },
   { id: "clans", label: "클랜 관리", icon: <Shield className="h-4 w-4" /> },
   { id: "rooms", label: "방 관리", icon: <Home className="h-4 w-4" /> },
   { id: "chatlogs", label: "채팅 로그", icon: <MessageSquare className="h-4 w-4" /> },
@@ -111,6 +114,7 @@ export default function AdminPage() {
         {activeTab === "users" && <UsersTab addToast={addToast} currentUserId={user?.id} isAdmin={isAdmin} />}
         {activeTab === "reports" && <ReportsTab addToast={addToast} />}
         {activeTab === "community" && <CommunityTab addToast={addToast} />}
+        {activeTab === "boards" && <BoardsTab addToast={addToast} />}
         {activeTab === "clans" && <ClansTab addToast={addToast} />}
         {activeTab === "rooms" && <RoomsTab addToast={addToast} />}
         {activeTab === "chatlogs" && <ChatLogsTab />}
