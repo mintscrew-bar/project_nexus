@@ -9,6 +9,9 @@ import {
   HttpStatus,
 } from "@nestjs/common";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { RolesGuard } from "../auth/guards/roles.guard";
+import { Roles } from "../auth/decorators/roles.decorator";
+import { UserRole } from "@nexus/database";
 import { RankingService } from "./ranking.service";
 import { RankingQueryDto } from "./dto/ranking-query.dto";
 
@@ -44,10 +47,11 @@ export class RankingController {
   }
 
   /**
-   * 전체 랭킹 재계산 (관리자용)
+   * 전체 랭킹 재계산 (관리자 전용)
    */
   @Post("recalculate")
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
   @HttpCode(HttpStatus.OK)
   async recalculateAllRankings() {
     return this.rankingService.recalculateAllRankings();
