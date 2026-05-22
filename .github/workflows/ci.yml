@@ -10,6 +10,11 @@ on:
 permissions:
   contents: read
 
+# Node20 액션 deprecation 대응: 아직 Node24 네이티브 버전이 없는 JS 액션
+# (예: pnpm/action-setup@v4)을 Node24로 강제 실행. 2026-06-02부터 기본 동작.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   ci:
     name: Lint / Build / Test
@@ -25,7 +30,7 @@ jobs:
           version: 8.15.0
 
       - name: Node.js 22 설정
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: pnpm
