@@ -184,32 +184,25 @@ function CommunityPageContent() {
       <div className="container mx-auto max-w-5xl">
 
         {/* ── 모바일 전용 게시판 칩 내비 (사이드바가 md 미만에서 숨겨지므로 전체/게시판 전환 제공) ── */}
-        <div className="md:hidden -mx-4 mb-3 flex gap-1.5 overflow-x-auto px-4 pb-1 scrollbar-none">
-          <button
-            onClick={() => setSelectedCategory("ALL")}
-            className={cn(
-              "flex-shrink-0 rounded-full px-3 py-1.5 text-sm font-medium transition-colors",
-              isAllMode
-                ? "bg-accent-primary text-white"
-                : "bg-bg-tertiary text-text-secondary hover:text-text-primary",
-            )}
-          >
-            전체
-          </button>
-          {boards.map((board) => (
-            <button
-              key={board.id}
-              onClick={() => setSelectedCategory(board.slug)}
-              className={cn(
-                "flex-shrink-0 rounded-full px-3 py-1.5 text-sm font-medium transition-colors",
-                selectedCategory === board.slug
-                  ? "bg-accent-primary text-white"
-                  : "bg-bg-tertiary text-text-secondary hover:text-text-primary",
-              )}
-            >
-              {board.name}
-            </button>
-          ))}
+        <div className="md:hidden -mx-4 mb-4 flex gap-2 overflow-x-auto px-4 scrollbar-none">
+          {[{ slug: "ALL", name: "전체" }, ...boards].map((b) => {
+            const active =
+              b.slug === "ALL" ? isAllMode : selectedCategory === b.slug;
+            return (
+              <button
+                key={b.slug}
+                onClick={() => setSelectedCategory(b.slug)}
+                className={cn(
+                  "flex-shrink-0 whitespace-nowrap rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors",
+                  active
+                    ? "border-accent-primary bg-accent-primary text-white"
+                    : "border-bg-elevated bg-transparent text-text-secondary hover:border-text-tertiary hover:text-text-primary",
+                )}
+              >
+                {b.name}
+              </button>
+            );
+          })}
         </div>
 
         {/* ── 카테고리 헤더 (단일 카테고리 선택 시) ── */}
