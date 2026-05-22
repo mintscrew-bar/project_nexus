@@ -12,6 +12,16 @@ export class ListPostsQueryDto {
   })
   category?: PostCategory;
 
+  /** 게시판 id 필터 (신규) */
+  @IsOptional()
+  @IsString()
+  boardId?: string;
+
+  /** 게시판 slug 필터 (신규) */
+  @IsOptional()
+  @IsString()
+  boardSlug?: string;
+
   @IsOptional()
   @IsString()
   search?: string;

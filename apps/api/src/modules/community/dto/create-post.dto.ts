@@ -29,8 +29,15 @@ export class CreatePostDto {
   @MaxLength(10000, { message: "내용은 10,000자를 초과할 수 없습니다." })
   content: string;
 
+  /** 소속 게시판 id (신규). boardId 또는 category 중 하나는 필수 */
+  @IsOptional()
+  @IsString()
+  boardId?: string;
+
+  /** 레거시 카테고리 (하위호환). boardId가 없을 때 게시판 매핑에 사용 */
+  @IsOptional()
   @IsEnum(PostCategory, { message: "유효한 카테고리를 선택해주세요." })
-  category: PostCategory;
+  category?: PostCategory;
 
   @IsOptional()
   @IsArray()

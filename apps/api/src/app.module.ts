@@ -21,6 +21,7 @@ import { RiotModule } from "./modules/riot/riot.module";
 import { DiscordModule } from "./modules/discord/discord.module";
 import { ClanModule } from "./modules/clan/clan.module";
 import { CommunityModule } from "./modules/community/community.module";
+import { BoardModule } from "./modules/board/board.module";
 import { ReputationModule } from "./modules/reputation/reputation.module";
 import { FriendModule } from "./modules/friend/friend.module";
 import { PresenceModule } from "./modules/presence/presence.module";
@@ -93,6 +94,7 @@ const projectRoot = resolve(apiRoot, "../..");
     DiscordModule,
     ClanModule,
     CommunityModule,
+    BoardModule,
     ReputationModule,
     FriendModule,
     PresenceModule,

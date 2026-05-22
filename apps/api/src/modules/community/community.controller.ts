@@ -63,6 +63,8 @@ export class CommunityController {
   async listPosts(@Query() query: ListPostsQueryDto) {
     return this.communityService.listPosts({
       category: query.category,
+      boardId: query.boardId,
+      boardSlug: query.boardSlug,
       search: query.search,
       authorId: query.authorId,
       tag: query.tag,

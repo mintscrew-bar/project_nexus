@@ -11,12 +11,28 @@ import { PrismaService } from "../prisma/prisma.service";
 import { PostCategory } from "./community.types";
 import { NotificationService } from "../notification/notification.service";
 import { RedisService } from "../redis/redis.service";
+import { BoardService } from "../board/board.service";
 import { UserRole } from "@nexus/database";
+
+/**
+ * 기본 게시판 슬러그 → 레거시 PostCategory enum 매핑.
+ * boardId 도입 후에도 category 컬럼을 스냅샷으로 채워 하위호환을 유지한다.
+ * 커스텀 게시판은 대응 enum이 없으므로 null.
+ */
+const SLUG_TO_CATEGORY: Record<string, PostCategory> = {
+  notice: PostCategory.NOTICE,
+  free: PostCategory.FREE,
+  tip: PostCategory.TIP,
+  qna: PostCategory.QNA,
+};
 
 export interface CreatePostDto {
   title: string;
   content: string;
-  category: PostCategory;
+  /** 소속 게시판 id (신규 — 우선). 없으면 category로 폴백 매핑 */
+  boardId?: string;
+  /** 레거시 카테고리 (하위호환) */
+  category?: PostCategory;
   tags?: string[]; // 태그명 배열 (소문자 정규화)
 }
 
@@ -68,6 +84,7 @@ export class CommunityService {
     private readonly prisma: PrismaService,
     private readonly notificationService: NotificationService,
     private readonly redis: RedisService,
+    private readonly boardService: BoardService,
   ) {}
 
   // ========================================
@@ -99,15 +116,25 @@ export class CommunityService {
         "임시 제한 상태에서는 게시글을 작성할 수 없습니다.",
       );
     }
-    if (
-      dto.category === PostCategory.NOTICE &&
-      user?.role !== UserRole.ADMIN &&
-      user?.role !== UserRole.MODERATOR
-    ) {
-      throw new ForbiddenException(
-        "공지 카테고리는 관리자 또는 매니저만 작성할 수 있습니다.",
-      );
+    // 게시판 결정: boardId 우선, 없으면 레거시 category를 slug로 매핑해 폴백
+    let boardId = dto.boardId ?? null;
+    if (!boardId && dto.category) {
+      const slug = dto.category.toLowerCase();
+      const board = await this.boardService.getBySlug(slug);
+      boardId = board?.id ?? null;
     }
+    if (!boardId) {
+      throw new BadRequestException("게시판을 선택해주세요.");
+    }
+
+    // 게시판 존재/활성 + 글쓰기 권한(writeRole) 검증
+    const board = await this.boardService.assertCanWrite(
+      boardId,
+      user?.role ?? UserRole.USER,
+    );
+    // 레거시 category 스냅샷 (기본 게시판이면 enum, 커스텀이면 null)
+    const categorySnapshot: PostCategory | null =
+      SLUG_TO_CATEGORY[board.slug] ?? null;
 
     // Rate limit 체크 (10분에 3회 제한)
     const rateLimitKey = `post_ratelimit:${userId}`;
@@ -131,10 +158,12 @@ export class CommunityService {
       data: {
         title: dto.title.trim(),
         content: dto.content.trim(),
-        category: dto.category,
+        boardId,
+        category: categorySnapshot,
         authorId: userId,
       },
       include: {
+        board: true,
         author: {
           select: {
             id: true,
@@ -209,6 +238,7 @@ export class CommunityService {
     const post = await this.prisma.post.findFirst({
       where: { id: postId, isDeleted: false },
       include: {
+        board: true,
         author: {
           select: {
             id: true,
@@ -324,6 +354,8 @@ export class CommunityService {
 
   async listPosts(filters?: {
     category?: PostCategory;
+    boardId?: string; // 게시판 id 필터 (신규)
+    boardSlug?: string; // 게시판 slug 필터 (신규)
     search?: string;
     authorId?: string;
     tag?: string; // 태그 필터
@@ -334,7 +366,14 @@ export class CommunityService {
   }) {
     const where: any = { isDeleted: false };
 
-    if (filters?.category) {
+    // 게시판 필터: boardId 우선 → boardSlug → 레거시 category 순
+    if (filters?.boardId) {
+      where.boardId = filters.boardId;
+    } else if (filters?.boardSlug) {
+      const board = await this.boardService.getBySlug(filters.boardSlug);
+      // 존재하지 않는 슬러그면 빈 결과를 위해 매칭 불가 조건 설정
+      where.boardId = board?.id ?? "__no_such_board__";
+    } else if (filters?.category) {
       where.category = filters.category;
     }
 
@@ -373,6 +412,7 @@ export class CommunityService {
       this.prisma.post.findMany({
         where,
         include: {
+          board: true,
           author: {
             select: {
               id: true,
