@@ -664,11 +664,49 @@ model ClanActivityLog {
   @@map("clan_activity_logs")
 }
 
+/// 동적 게시판: 관리자가 추가/수정/삭제할 수 있는 커뮤니티 게시판.
+/// 기존 PostCategory enum을 대체하며, slug로 enum 값과 호환된다(notice/free/tip/qna).
+model Board {
+  id          String    @id @default(cuid())
+  /// URL/식별용 슬러그 (소문자). 기본 게시판은 enum 값과 1:1 대응
+  slug        String    @unique
+  /// 표시 이름 (예: "자유")
+  name        String
+  /// 전체 이름 (예: "자유게시판"). 없으면 name 사용
+  fullName    String?
+  /// 게시판 설명
+  description String?
+  /// lucide 아이콘 이름 (예: "MessageCircle")
+  iconName    String?
+  /// Tailwind 색상 클래스 (예: "text-text-secondary")
+  color       String?
+  /// 정렬 순서 (작을수록 앞)
+  order       Int       @default(0)
+  /// 활성/비활성 (비활성 시 글쓰기·노출 제한)
+  isActive    Boolean   @default(true)
+  /// 일시 숨김 (목록에서 감추되 데이터 보존)
+  isHidden    Boolean   @default(false)
+  /// soft delete
+  isDeleted   Boolean   @default(false)
+  /// 글쓰기 최소 권한. null이면 모든 유저 작성 가능. 지정 시 해당 역할 이상만 작성
+  writeRole   UserRole?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  posts       Post[]
+
+  @@index([isDeleted, isHidden, isActive, order])
+  @@map("boards")
+}
+
 model Post {
   id        String         @id @default(cuid())
   title     String
   content   String
-  category  PostCategory
+  /// 레거시 카테고리 enum — boardId 도입 후 스냅샷/하위호환용으로 보존(nullable)
+  category  PostCategory?
+  /// 소속 게시판 FK. 게시판 삭제 시 글은 보존하기 위해 SetNull
+  boardId   String?
+  board     Board?         @relation(fields: [boardId], references: [id], onDelete: SetNull)
   authorId  String
   views     Int            @default(0)
   isPinned  Boolean        @default(false)
@@ -687,6 +725,7 @@ model Post {
   author    User           @relation(fields: [authorId], references: [id], onDelete: Cascade)
 
   @@index([category, isPinned, createdAt])
+  @@index([boardId, isPinned, createdAt])
   @@index([authorId])
   @@map("posts")
 }
