@@ -13,7 +13,7 @@ import { useToast } from "@/components/ui/Toast";
 import {
   Users, X, MessageSquare, Settings,
   UserCog,
-  ArrowLeft, Shield, Swords, Volume2, VolumeX,
+  ArrowLeft, Shield, Swords, Volume2, VolumeX, Share2,
 } from "lucide-react";
 import Link from "next/link";
 import { friendApi, adminApi, roomApi } from "@/lib/api-client";
@@ -45,6 +45,24 @@ export default function TournamentLobbyPage() {
   const [mobileTab, setMobileTab] = useState<string>("participants");
   const hasRedirected = useRef(false);
   const hoverCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // 내전 방 링크 공유 — 로비 URL을 클립보드에 복사 (붙여넣으면 OG 카드로 표시됨)
+  const handleShare = useCallback(async () => {
+    const shareUrl = `${window.location.origin}/tournaments/${roomId}/lobby`;
+    try {
+      // 모바일 등 네이티브 공유 시트 우선 사용, 미지원 시 클립보드 복사
+      if (navigator.share) {
+        await navigator.share({ title: room?.name ?? "롤 내전 방", url: shareUrl });
+        return;
+      }
+      await navigator.clipboard.writeText(shareUrl);
+      addToast("내전 방 링크를 복사했습니다.", "success");
+    } catch (e: any) {
+      // 사용자가 공유 시트를 취소한 경우는 무시
+      if (e?.name === "AbortError") return;
+      addToast("링크 복사에 실패했습니다.", "error");
+    }
+  }, [roomId, room?.name, addToast]);
 
   const scheduleHoverClose = useCallback(() => {
     if (hoverCloseTimer.current) clearTimeout(hoverCloseTimer.current);
@@ -266,6 +284,13 @@ export default function TournamentLobbyPage() {
 
             {/* Right: setting buttons */}
             <div className="flex items-center gap-2 flex-shrink-0">
+              <button
+                onClick={handleShare}
+                className="p-2 rounded-lg hover:bg-bg-tertiary transition-colors text-text-secondary hover:text-text-primary"
+                title="내전 방 링크 공유"
+              >
+                <Share2 className="h-5 w-5" />
+              </button>
               <button
                 onClick={() => setIsUserSettingsModalOpen(true)}
                 className="p-2 rounded-lg hover:bg-bg-tertiary transition-colors text-text-secondary hover:text-text-primary"

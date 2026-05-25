@@ -90,6 +90,25 @@ export class RoomController {
     return this.roomService.getRoomById(id);
   }
 
+  // 링크 공유용 경량 요약 — 비로그인 OG 크롤러(디스코드·카카오 등)가 읽어가는 엔드포인트.
+  // 민감정보 없이 카드에 필요한 최소 필드만 노출한다.
+  @Get(":id/share")
+  @Public()
+  async getRoomShareInfo(@Param("id") id: string) {
+    const room = await this.roomService.getRoomSummary(id);
+    if (!room) return null;
+    return {
+      id: room.id,
+      name: room.name,
+      teamMode: room.teamMode,
+      status: room.status,
+      isPrivate: room.isPrivate,
+      maxParticipants: room.maxParticipants,
+      participantCount: room.participants?.length ?? 0,
+      hostName: room.host?.username ?? null,
+    };
+  }
+
   @Put(":id")
   async updateRoom(
     @CurrentUser("sub") userId: string,
