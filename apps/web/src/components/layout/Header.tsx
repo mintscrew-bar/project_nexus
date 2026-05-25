@@ -53,7 +53,7 @@ export function Header() {
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
 
   return (
-    <header className="bg-bg-secondary border-b border-bg-tertiary px-4 py-3 flex justify-between items-center z-50 sticky top-0">
+    <header className="bg-bg-secondary border-b border-bg-tertiary px-3 py-2 md:px-4 md:py-3 flex justify-between items-center z-50 sticky top-0">
       {/* Left: Logo + Mobile Menu */}
       <div className="flex items-center gap-2">
         <MobileMenu />
@@ -84,7 +84,7 @@ export function Header() {
       </nav>
 
       {/* Right: Friends + Theme Toggle + Auth */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-1.5 md:gap-3">
         <a
           href={NEXUS_DISCORD_INVITE_URL}
           target="_blank"
