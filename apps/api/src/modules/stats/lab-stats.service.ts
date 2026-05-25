@@ -1867,7 +1867,7 @@ export class LabStatsService {
         SUM(CASE WHEN mts."win" THEN 1 ELSE 0 END)::bigint AS "banTeamWins"
       FROM (
         SELECT mts."matchId", mts."teamId", mts."win",
-               jsonb_array_elements(mts."bans")::int AS ban_id
+               (jsonb_array_elements(mts."bans") ->> 'championId')::int AS ban_id
         FROM "match_team_stats" mts
         INNER JOIN "matches" m ON m."id" = mts."matchId"
         WHERE m."completedAt" IS NOT NULL
