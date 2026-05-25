@@ -25,7 +25,7 @@ export default function TournamentsPage() {
       <div className="container mx-auto animate-fade-in">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
           <div>
-            <h1 className="text-3xl font-bold text-text-primary">내전 방 목록</h1>
+            <h1 className="text-3xl font-bold text-text-primary">롤 내전 방 목록</h1>
             <p className="text-text-secondary mt-1">참여할 내전 방을 선택하거나 새로 만들어보세요</p>
           </div>
           <Button onClick={() => setIsCreatingRoom(true)}>

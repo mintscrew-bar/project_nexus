@@ -2,16 +2,16 @@ import type { Metadata } from "next";
 import { absoluteUrl } from "@/lib/seo";
 
 export const metadata: Metadata = {
-  title: "토너먼트",
+  title: "롤 내전 방 모집·참여",
   description:
-    "Nexus 토너먼트 일정과 결과를 확인하세요. 내전 팀들이 참가하는 공식 대회를 한눈에 볼 수 있습니다.",
+    "롤 내전 방을 찾고 참여하세요. 경매·스네이크 드래프트로 팀을 구성하는 리그 오브 레전드 내전 모집 목록을 Nexus에서 한눈에 확인할 수 있습니다.",
   alternates: {
     canonical: absoluteUrl("/tournaments"),
   },
   openGraph: {
-    title: "토너먼트 | Nexus",
+    title: "롤 내전 방 모집·참여 | Nexus",
     description:
-      "롤 내전 팀 토너먼트 일정과 결과. 팀 등록부터 대진표까지 Nexus에서 관리합니다.",
+      "지금 열린 롤 내전 방을 확인하고 참여하세요. 경매·스네이크 드래프트로 팀을 짜는 내전 모집을 Nexus에서.",
     url: absoluteUrl("/tournaments"),
   },
 };
