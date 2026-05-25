@@ -212,8 +212,8 @@ export default function BracketPage() {
               <ArrowLeft className="h-5 w-5 text-text-secondary" />
             </Link>
             <div>
-              <h1 className="text-3xl font-bold text-text-primary flex items-center gap-2">
-                <Trophy className="h-8 w-8 text-accent-gold" />
+              <h1 className="text-2xl md:text-3xl font-bold text-text-primary flex items-center gap-2">
+                <Trophy className="h-6 w-6 md:h-8 md:w-8 text-accent-gold" />
                 대진표
               </h1>
               <p className="text-text-secondary mt-1">
@@ -242,19 +242,19 @@ export default function BracketPage() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-4">
             <p className="text-sm text-text-secondary mb-1">총 경기</p>
-            <p className="text-2xl font-bold text-text-primary">{totalMatches}</p>
+            <p className="text-xl md:text-2xl font-bold text-text-primary">{totalMatches}</p>
           </div>
           <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-4">
             <p className="text-sm text-text-secondary mb-1">완료된 경기</p>
-            <p className="text-2xl font-bold text-accent-success">{completedMatches}</p>
+            <p className="text-xl md:text-2xl font-bold text-accent-success">{completedMatches}</p>
           </div>
           <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-4">
             <p className="text-sm text-text-secondary mb-1">진행 중</p>
-            <p className="text-2xl font-bold text-accent-primary">{inProgressMatches}</p>
+            <p className="text-xl md:text-2xl font-bold text-accent-primary">{inProgressMatches}</p>
           </div>
           <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-4">
             <p className="text-sm text-text-secondary mb-1">진행률</p>
-            <p className="text-2xl font-bold text-accent-gold">
+            <p className="text-xl md:text-2xl font-bold text-accent-gold">
               {totalMatches > 0 ? Math.round((completedMatches / totalMatches) * 100) : 0}%
             </p>
           </div>
@@ -264,8 +264,8 @@ export default function BracketPage() {
         {tournamentWinner && (
           <div className="bg-gradient-to-r from-accent-gold/20 to-accent-gold/5 border border-accent-gold/30 rounded-xl p-6 mb-6 text-center">
             <Trophy className="h-12 w-12 text-accent-gold mx-auto mb-3" />
-            <h2 className="text-2xl font-bold text-accent-gold mb-1">우승</h2>
-            <p className="text-3xl font-bold text-text-primary">{getTeamDisplayName(tournamentWinner)}</p>
+            <h2 className="text-xl md:text-2xl font-bold text-accent-gold mb-1">우승</h2>
+            <p className="text-2xl md:text-3xl font-bold text-text-primary">{getTeamDisplayName(tournamentWinner)}</p>
           </div>
         )}
 

@@ -206,7 +206,7 @@ export default function RoleSelectionPage() {
             </button>
             <div className="flex items-center gap-2 bg-bg-secondary border border-bg-tertiary rounded-xl px-4 py-2">
               <Clock className={cn("h-5 w-5", timerColor)} />
-              <span className={cn("text-2xl font-bold tabular-nums", timerColor)}>
+              <span className={cn("text-xl md:text-2xl font-bold tabular-nums", timerColor)}>
                 {Math.floor(timeRemaining / 60)}:{String(timeRemaining % 60).padStart(2, "0")}
               </span>
             </div>

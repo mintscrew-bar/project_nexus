@@ -156,7 +156,7 @@ export default function SnakeDraftPage() {
 
       <div className="container mx-auto">
         <div className="mb-6 animate-fade-in">
-          <h1 className="text-3xl font-bold text-text-primary mb-2">
+          <h1 className="text-2xl md:text-3xl font-bold text-text-primary mb-2">
             스네이크 드래프트
           </h1>
           <p className="text-text-secondary">

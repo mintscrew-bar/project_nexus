@@ -54,7 +54,7 @@ export default function RankingPage() {
         <div className="container mx-auto px-4 py-6">
           <div className="flex items-center gap-3 mb-4">
             <Trophy className="h-8 w-8 text-accent-gold" />
-            <h1 className="text-3xl font-bold text-text-primary">랭킹</h1>
+            <h1 className="text-2xl md:text-3xl font-bold text-text-primary">랭킹</h1>
           </div>
           <p className="text-text-secondary">
             Nexus 내전 기록 기반 랭킹 (최소 10판 이상)

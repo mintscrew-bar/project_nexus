@@ -115,7 +115,7 @@ export function DraftBoard({
               <Clock className={cn("h-8 w-8", timeLeft <= 5 ? "text-accent-danger" : "text-accent-primary")} />
               <div>
                 <p className="text-sm text-text-secondary">픽 타이머</p>
-                <p className={cn("text-3xl font-bold tabular-nums", timerColor)}>
+                <p className={cn("text-2xl md:text-3xl font-bold tabular-nums", timerColor)}>
                   {timeLeft === 0 ? "자동 픽 중..." : `${timeLeft}초`}
                 </p>
               </div>
@@ -156,7 +156,7 @@ export function DraftBoard({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Teams */}
         <div className="space-y-4">
-          <h2 className="text-2xl font-bold text-text-primary flex items-center">
+          <h2 className="text-xl md:text-2xl font-bold text-text-primary flex items-center">
             <Users className="h-6 w-6 mr-2" />
             팀 구성
           </h2>
@@ -229,7 +229,7 @@ export function DraftBoard({
 
         {/* Available Players */}
         <div>
-          <h2 className="text-2xl font-bold text-text-primary mb-4">
+          <h2 className="text-xl md:text-2xl font-bold text-text-primary mb-4">
             선택 가능한 플레이어 ({draftState.availablePlayers.length})
           </h2>
 

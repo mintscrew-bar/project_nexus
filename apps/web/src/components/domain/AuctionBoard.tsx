@@ -286,7 +286,7 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
             {/* 2줄: 타이머 + 최고입찰가 + 최고입찰자 */}
             <div className="flex items-center gap-3">
               <div className={cn(
-                "text-2xl font-bold flex-shrink-0",
+                "text-xl md:text-2xl font-bold flex-shrink-0",
                 timeLeft <= 5 ? "text-accent-danger animate-pulse" : "text-accent-primary",
               )}>
                 {timeLeft}초
@@ -330,7 +330,7 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
                 />
 
                 <div className="flex-1">
-                  <h2 className="text-2xl font-bold text-text-primary mb-2">
+                  <h2 className="text-xl md:text-2xl font-bold text-text-primary mb-2">
                     {auctionState.currentPlayer.username}
                   </h2>
                   <div className="flex items-center gap-3 mb-3">
@@ -353,7 +353,7 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
                   <p className="text-sm text-text-tertiary mb-1">남은 시간</p>
                   <div
                     className={cn(
-                      "text-4xl font-bold",
+                      "text-3xl md:text-4xl font-bold",
                       timeLeft <= 5
                         ? "text-accent-danger animate-pulse"
                         : "text-accent-primary",
@@ -378,7 +378,7 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
                     </p>
                     <div className="flex items-center gap-2">
                       <Coins className="w-5 h-5 text-accent-gold" />
-                      <p className="text-2xl font-bold text-accent-gold">
+                      <p className="text-xl md:text-2xl font-bold text-accent-gold">
                         {auctionState.currentHighestBid.toLocaleString()}G
                       </p>
                     </div>
@@ -486,7 +486,7 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
               <p className="text-xs text-text-tertiary mb-1">입찰가</p>
               <p
                 className={cn(
-                  "text-3xl font-bold",
+                  "text-2xl md:text-3xl font-bold",
                   accumulatedBid > 0 ? "text-accent-gold" : "text-text-tertiary",
                 )}
               >

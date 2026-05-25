@@ -28,7 +28,7 @@ function LoginPageContent() {
           <div className="flex justify-center mb-6">
             <Logo size="xl" />
           </div>
-          <h1 className="text-4xl font-bold mb-2">
+          <h1 className="text-3xl md:text-4xl font-bold mb-2">
             <span className="text-text-primary">Project</span>{" "}
             <span className="text-accent-primary">Nexus</span>
           </h1>

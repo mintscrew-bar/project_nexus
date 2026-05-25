@@ -168,7 +168,7 @@ export default function StatsPage() {
           <div className="flex items-center justify-center mb-6">
             <Target className="h-16 w-16 text-accent-primary" />
           </div>
-          <h1 className="text-4xl md:text-5xl font-bold text-text-primary mb-4">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-text-primary mb-4">
             전적 검색
           </h1>
           <p className="text-lg text-text-secondary mb-8 max-w-2xl mx-auto">
