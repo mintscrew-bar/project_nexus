@@ -231,7 +231,7 @@ export function HeroBanner({ isAuthenticated = false }: HeroBannerProps) {
 
         {/* 타이틀 */}
         <motion.h1
-          className={`${exo2.className} text-6xl md:text-8xl font-bold mb-5 tracking-wider`}
+          className={`${exo2.className} text-5xl sm:text-6xl md:text-8xl font-bold mb-5 tracking-wider`}
           variants={itemVariants}
         >
           <span
@@ -244,7 +244,7 @@ export function HeroBanner({ isAuthenticated = false }: HeroBannerProps) {
 
         {/* 서브타이틀 */}
         <motion.p
-          className="text-lg md:text-xl text-text-secondary mb-10 leading-relaxed"
+          className="text-base sm:text-lg md:text-xl text-text-secondary mb-8 md:mb-10 leading-relaxed"
           variants={itemVariants}
         >
           솔랭 억까에 지쳤다면?<br className="sm:hidden" />{" "}

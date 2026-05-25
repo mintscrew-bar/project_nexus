@@ -18,8 +18,8 @@ export default function LandingContent() {
       </section>
 
       {/* Feature highlights */}
-      <section id="features" className="py-24 md:py-32 px-6">
-        <h2 className="text-3xl md:text-5xl font-bold text-center text-text-primary mb-16">
+      <section id="features" className="py-16 md:py-32 px-6">
+        <h2 className="text-2xl sm:text-3xl md:text-5xl font-bold text-center text-text-primary mb-10 md:mb-16">
           엑셀로 하던 내전,{" "}
           <span
             className="bg-clip-text text-transparent"
@@ -29,35 +29,35 @@ export default function LandingContent() {
           </span>
           {" "}됐잖아요.
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-10 max-w-6xl mx-auto">
-          <div className="group flex flex-col items-center text-center p-8 md:p-10 rounded-2xl bg-bg-secondary/50 border border-bg-tertiary hover:border-violet-500/30 transition-all duration-300 hover:scale-[1.02]">
-            <div className="text-6xl md:text-7xl mb-6">🎯</div>
-            <h3 className="text-2xl md:text-3xl font-bold text-text-primary mb-3">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-10 max-w-6xl mx-auto">
+          <div className="group flex flex-col items-center text-center p-6 md:p-10 rounded-2xl bg-bg-secondary/50 border border-bg-tertiary hover:border-violet-500/30 transition-all duration-300 hover:scale-[1.02]">
+            <div className="text-5xl md:text-7xl mb-4 md:mb-6">🎯</div>
+            <h3 className="text-xl sm:text-2xl md:text-3xl font-bold text-text-primary mb-3">
               경매 드래프트
             </h3>
-            <p className="text-lg text-text-secondary leading-relaxed">
+            <p className="text-base md:text-lg text-text-secondary leading-relaxed">
               팀 구성부터가 이미 게임입니다. 경매 시작.<br className="hidden md:block" />
               팀장님, 그 포인트로 얘를 산다구요?
             </p>
           </div>
 
-          <div className="group flex flex-col items-center text-center p-8 md:p-10 rounded-2xl bg-bg-secondary/50 border border-bg-tertiary hover:border-violet-500/30 transition-all duration-300 hover:scale-[1.02]">
-            <div className="text-6xl md:text-7xl mb-6">⚖️</div>
-            <h3 className="text-2xl md:text-3xl font-bold text-text-primary mb-3">
+          <div className="group flex flex-col items-center text-center p-6 md:p-10 rounded-2xl bg-bg-secondary/50 border border-bg-tertiary hover:border-violet-500/30 transition-all duration-300 hover:scale-[1.02]">
+            <div className="text-5xl md:text-7xl mb-4 md:mb-6">⚖️</div>
+            <h3 className="text-xl sm:text-2xl md:text-3xl font-bold text-text-primary mb-3">
               자동 밸런싱
             </h3>
-            <p className="text-lg text-text-secondary leading-relaxed">
+            <p className="text-base md:text-lg text-text-secondary leading-relaxed">
               한쪽만 터지는 내전은<br className="hidden md:block" />
               이제 그만할 때 됐잖아요.
             </p>
           </div>
 
-          <div className="group flex flex-col items-center text-center p-8 md:p-10 rounded-2xl bg-bg-secondary/50 border border-bg-tertiary hover:border-violet-500/30 transition-all duration-300 hover:scale-[1.02]">
-            <div className="text-6xl md:text-7xl mb-6">🎮</div>
-            <h3 className="text-2xl md:text-3xl font-bold text-text-primary mb-3">
+          <div className="group flex flex-col items-center text-center p-6 md:p-10 rounded-2xl bg-bg-secondary/50 border border-bg-tertiary hover:border-violet-500/30 transition-all duration-300 hover:scale-[1.02]">
+            <div className="text-5xl md:text-7xl mb-4 md:mb-6">🎮</div>
+            <h3 className="text-xl sm:text-2xl md:text-3xl font-bold text-text-primary mb-3">
               Discord 연동
             </h3>
-            <p className="text-lg text-text-secondary leading-relaxed">
+            <p className="text-base md:text-lg text-text-secondary leading-relaxed">
               음성 이동, 결과 기록, 전부 &lsquo;딸깍&rsquo;.<br className="hidden md:block" />
               당신은 게임만 하세요.
             </p>
@@ -72,13 +72,13 @@ export default function LandingContent() {
         </div>
       </section>
 
-      <section className="px-6 pb-24 md:pb-32">
+      <section className="px-6 pb-16 md:pb-32">
         <div className="mx-auto max-w-6xl">
-          <div className="mb-10 max-w-3xl">
-            <h2 className="text-3xl md:text-4xl font-bold text-text-primary">
+          <div className="mb-8 md:mb-10 max-w-3xl">
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-text-primary">
               롤 내전, 전적, 스크림을 한 흐름으로 관리
             </h2>
-            <p className="mt-4 text-base md:text-lg leading-relaxed text-text-secondary">
+            <p className="mt-4 text-sm md:text-lg leading-relaxed text-text-secondary">
               Nexus는 리그 오브 레전드 내전과 스크림을 운영하는 팀을 위해
               참가자 모집, 팀 밸런싱, 경기 기록, 롤 전적 확인, 챔피언 통계
               분석을 연결합니다.
