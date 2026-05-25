@@ -3,7 +3,7 @@
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth-store';
 import { Avatar } from './ui/Avatar';
-import { LogOut, User, Settings, ChevronDown, Trophy } from 'lucide-react';
+import { LogOut, User, Settings, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
 import { useState, useRef, useEffect } from 'react';
 
@@ -80,14 +80,6 @@ export function UserMenu() {
             >
               <User className="h-4 w-4" />
               <span>프로필</span>
-            </Link>
-            <Link
-              href="/ranking"
-              onClick={() => setIsOpen(false)}
-              className="flex items-center gap-3 px-3 py-2 text-text-secondary hover:text-text-primary hover:bg-bg-tertiary rounded-lg transition-colors"
-            >
-              <Trophy className="h-4 w-4" />
-              <span>랭킹</span>
             </Link>
             <Link
               href="/settings"

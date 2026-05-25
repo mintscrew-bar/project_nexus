@@ -17,6 +17,7 @@ import { NEXUS_DISCORD_INVITE_URL } from '@/lib/constants';
 const navItems = [
   { href: '/tournaments', label: '내전' },
   { href: '/matches', label: '내전 전적' },
+  { href: '/ranking', label: '랭킹' },
   { href: '/clans', label: '클랜' },
   { href: '/community', label: '커뮤니티' },
 ];
