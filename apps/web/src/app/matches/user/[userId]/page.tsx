@@ -249,7 +249,7 @@ export default function UserStatsPage() {
             {/* User Info */}
             <div className="flex-grow">
               <div className="flex items-center gap-3 mb-2 flex-wrap">
-                <h1 className="text-3xl font-bold text-text-primary">
+                <h1 className="text-2xl md:text-3xl font-bold text-text-primary">
                   {user.username}
                 </h1>
                 {primaryAccount && (

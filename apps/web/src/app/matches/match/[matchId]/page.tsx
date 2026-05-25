@@ -1121,13 +1121,13 @@ export default function MatchDetailsPage() {
               </div>
 
               {/* Score */}
-              <div className="flex-shrink-0 px-8 text-center">
+              <div className="flex-shrink-0 px-4 md:px-8 text-center">
                 <div className="flex items-center gap-3">
-                  <span className="text-4xl font-black" style={{ color: TEAM_A_COLOR }}>
+                  <span className="text-3xl md:text-4xl font-black" style={{ color: TEAM_A_COLOR }}>
                     {aggA.kills}
                   </span>
-                  <span className="text-2xl text-text-tertiary font-light">-</span>
-                  <span className="text-4xl font-black" style={{ color: TEAM_B_COLOR }}>
+                  <span className="text-xl md:text-2xl text-text-tertiary font-light">-</span>
+                  <span className="text-3xl md:text-4xl font-black" style={{ color: TEAM_B_COLOR }}>
                     {aggB.kills}
                   </span>
                 </div>
