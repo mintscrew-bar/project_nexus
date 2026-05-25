@@ -28,8 +28,10 @@ const NOINDEX = { index: false, follow: false } as const;
 export async function generateMetadata({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }): Promise<Metadata> {
+  const { id } = await params;
+
   // 방 정보를 못 가져오면(삭제·종료 등) 일반 내전 메타데이터로 폴백
   const fallback: Metadata = {
     title: "롤 내전 방",
@@ -38,7 +40,7 @@ export async function generateMetadata({
   };
 
   try {
-    const res = await fetch(`${API_BASE}/api/room/${params.id}/share`, {
+    const res = await fetch(`${API_BASE}/api/room/${id}/share`, {
       // 휘발성 데이터 — 짧게 캐시해 크롤러 반복 호출 부담만 덜어준다
       next: { revalidate: 30 },
     });
@@ -53,7 +55,7 @@ export async function generateMetadata({
     const description = `${headcount} · ${label}${
       room.hostName ? ` · 방장 ${room.hostName}` : ""
     } — 지금 Nexus에서 롤 내전에 참여하세요.`;
-    const url = absoluteUrl(`/tournaments/${params.id}/lobby`);
+    const url = absoluteUrl(`/tournaments/${id}/lobby`);
     const cardTitle = `[${label}] ${room.name}`;
 
     return {
