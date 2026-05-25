@@ -101,7 +101,8 @@ export function Header() {
             <Link
               href="/admin"
               className={cn(
-                'p-2 rounded-lg transition-colors duration-150',
+                // 모바일에서는 햄버거 메뉴로 이동 → 데스크톱에서만 노출
+                'hidden md:inline-flex p-2 rounded-lg transition-colors duration-150',
                 pathname.startsWith('/admin')
                   ? 'bg-accent-primary/10 text-accent-primary'
                   : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary'
@@ -132,7 +133,10 @@ export function Header() {
             )}
           </button>
         )}
-        <ThemeToggle />
+        {/* 테마 토글: 모바일에서는 햄버거 메뉴로 이동 → 데스크톱에서만 노출 */}
+        <div className="hidden md:block">
+          <ThemeToggle />
+        </div>
         <UserMenu />
       </div>
     </header>

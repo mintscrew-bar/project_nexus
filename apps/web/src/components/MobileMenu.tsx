@@ -1,10 +1,11 @@
 'use client';
 
 import { cn } from '@/lib/utils';
-import { X, Menu, Home, Swords, Trophy, Users, MessageSquare, Settings, User, FlaskConical, ExternalLink } from 'lucide-react';
+import { X, Menu, Home, Swords, Trophy, Users, MessageSquare, Settings, User, FlaskConical, ExternalLink, Shield, Moon, Sun } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
+import { useTheme } from 'next-themes';
 import { Logo } from './Logo';
 import { DiscordIcon } from './icons/DiscordIcon';
 import { NEXUS_DISCORD_INVITE_URL } from '@/lib/constants';
@@ -18,7 +19,11 @@ export function MobileMenu({ className }: MobileMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
   const { user } = useAuthStore();
+  const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
+
+  // 관리자/모더레이터 여부 (마운트 후에만 확정 → hydration 불일치 방지)
+  const isStaff = mounted && (user?.role === 'ADMIN' || user?.role === 'MODERATOR');
 
   // Close menu on route change
   useEffect(() => {
@@ -152,6 +157,52 @@ export function MobileMenu({ className }: MobileMenuProps) {
                   </Link>
                 </li>
               ))}
+            </ul>
+          </div>
+
+          <div>
+            <h3 className="text-xs font-semibold text-text-tertiary uppercase tracking-wider mb-2 px-3">
+              환경설정
+            </h3>
+            <ul className="space-y-1">
+              {/* 테마 토글 — 헤더에서 모바일 한정으로 이곳으로 이동 */}
+              {mounted && (
+                <li>
+                  <button
+                    onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
+                    className="flex w-full items-center justify-between gap-3 px-3 py-2.5 rounded-lg text-text-secondary hover:text-text-primary hover:bg-bg-tertiary transition-colors"
+                  >
+                    <span className="flex items-center gap-3">
+                      {resolvedTheme === 'dark' ? (
+                        <Sun className="h-5 w-5" />
+                      ) : (
+                        <Moon className="h-5 w-5" />
+                      )}
+                      <span className="font-medium">
+                        {resolvedTheme === 'dark' ? '라이트 모드' : '다크 모드'}
+                      </span>
+                    </span>
+                  </button>
+                </li>
+              )}
+              {/* 관리자 패널 — 관리자/모더레이터만 노출 (헤더에서 이동) */}
+              {isStaff && (
+                <li>
+                  <Link
+                    href="/admin"
+                    onClick={() => setIsOpen(false)}
+                    className={cn(
+                      'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors',
+                      isActive('/admin')
+                        ? 'bg-accent-primary/10 text-accent-primary'
+                        : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary'
+                    )}
+                  >
+                    <Shield className="h-5 w-5" />
+                    <span className="font-medium">관리자 패널</span>
+                  </Link>
+                </li>
+              )}
             </ul>
           </div>
 
