@@ -164,21 +164,21 @@ export default function StatsPage() {
     <div className="min-h-screen bg-bg-primary">
       {/* Hero Section */}
       <div className="bg-gradient-to-b from-accent-primary/10 to-bg-primary border-b border-bg-tertiary">
-        <div className="container mx-auto px-4 py-16 text-center">
-          <div className="flex items-center justify-center mb-6">
-            <Target className="h-16 w-16 text-accent-primary" />
+        <div className="container mx-auto px-4 py-8 md:py-16 text-center">
+          <div className="flex items-center justify-center mb-4 md:mb-6">
+            <Target className="h-12 w-12 md:h-16 md:w-16 text-accent-primary" />
           </div>
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-text-primary mb-4">
+          <h1 className="text-2xl sm:text-4xl md:text-5xl font-bold text-text-primary mb-3 md:mb-4">
             전적 검색
           </h1>
-          <p className="text-lg text-text-secondary mb-8 max-w-2xl mx-auto">
+          <p className="text-sm md:text-lg text-text-secondary mb-6 md:mb-8 max-w-2xl mx-auto">
             소환사 전적을 검색하고 상세한 통계를 확인하세요
           </p>
 
           {/* Search Bar */}
           <div className="max-w-2xl mx-auto">
             {/* Search Type Tabs */}
-            <div className="flex gap-2 mb-4 justify-center">
+            <div className="flex flex-wrap gap-2 mb-4 justify-center">
               <button
                 onClick={() => {
                   setSearchType("summoner");
@@ -233,7 +233,7 @@ export default function StatsPage() {
                       setShowDropdown(true);
                     }
                   }}
-                  className="pl-10 h-14 text-lg"
+                  className="pl-10 h-12 md:h-14 text-base md:text-lg"
                 />
 
                 {/* Search Results Dropdown */}
@@ -288,7 +288,7 @@ export default function StatsPage() {
               <Button
                 onClick={handleSearch}
                 size="lg"
-                className="h-14 px-8"
+                className="h-12 md:h-14 px-5 md:px-8 text-base md:text-lg"
               >
                 검색
               </Button>
@@ -305,7 +305,7 @@ export default function StatsPage() {
       </div>
 
       {/* Content Section */}
-      <div className="container mx-auto px-4 py-12">
+      <div className="container mx-auto px-4 py-8 md:py-12">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-6xl mx-auto">
           {/* Recent Searches */}
           <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-6">
