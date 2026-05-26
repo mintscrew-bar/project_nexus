@@ -89,7 +89,7 @@ export default function AdminPage() {
           <Shield className="h-5 w-5 text-accent-primary" />
           <span className="font-bold text-text-primary text-sm">관리자 패널</span>
         </div>
-        <nav className="flex md:flex-col md:flex-1 overflow-x-auto md:overflow-x-visible py-1 md:py-2">
+        <nav className="flex md:flex-col md:flex-1 overflow-x-auto md:overflow-x-visible scrollbar-none py-1 md:py-2">
           {visibleTabs.map((tab) => (
             <button
               key={tab.id}

@@ -288,11 +288,13 @@ export default function ClansPage() {
               </Button>
             </form>
 
-            <div className="flex flex-wrap gap-2">
+            {/* 모바일: 2열 균등 그리드 / 데스크톱: 인라인 */}
+            <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
               {/* 정렬 드롭다운 */}
               <Dropdown
+                className="w-full sm:w-auto"
                 trigger={
-                  <Button variant="secondary" className="gap-1">
+                  <Button variant="secondary" className="gap-1 w-full sm:w-auto justify-between sm:justify-center">
                     {SORT_LABELS[sortOption]}
                     <ChevronDown className="h-3 w-3" />
                   </Button>
@@ -304,6 +306,7 @@ export default function ClansPage() {
               <Button
                 variant={showRecruitingOnly ? "primary" : "secondary"}
                 onClick={() => setShowRecruitingOnly(!showRecruitingOnly)}
+                className="w-full sm:w-auto"
               >
                 <UserCheck className="h-4 w-4 mr-2" />
                 모집 중만
@@ -314,6 +317,7 @@ export default function ClansPage() {
                 <Button
                   variant="secondary"
                   onClick={() => setShowJoinByCodeModal(true)}
+                  className="w-full sm:w-auto"
                 >
                   <KeyRound className="h-4 w-4 mr-2" />
                   초대 코드
@@ -325,6 +329,7 @@ export default function ClansPage() {
                 <Button
                   variant="primary"
                   onClick={() => router.push("/clans/create")}
+                  className="w-full sm:w-auto"
                 >
                   <Shield className="h-4 w-4 mr-2" />
                   클랜 만들기
