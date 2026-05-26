@@ -13,6 +13,14 @@ import { RedisService } from "../redis/redis.service";
 import { DiscordBotService } from "../discord/discord-bot.service";
 import { Role } from "@nexus/database";
 import axios from "axios";
+import {
+  getPeakTierUpdate,
+  isApexTier,
+  isHigherTier,
+  RANKED_DIVISIONS,
+  RANKED_TIERS,
+  toStoredPeakTier,
+} from "./riot-rank.util";
 
 // 승인된 API key 메서드별 레이트 리밋 (limit / windowSeconds)
 const RIOT_RATE_LIMITS: Record<string, { limit: number; windowSeconds: number }> = {
@@ -80,19 +88,6 @@ export const DIVISION_POINTS: Record<string, number> = {
 // 플레이어의 총 포인트 계산 (팀 밸런싱용)
 export function calculatePlayerPoints(tier: string, division: string): number {
   return (TIER_POINTS[tier] || 0) + (DIVISION_POINTS[division] || 0);
-}
-
-// 현재 티어가 기존 최고 티어보다 높은지 비교
-function isHigherTier(
-  currentTier: string,
-  currentRank: string,
-  peakTier: string | null,
-  peakRank: string | null,
-): boolean {
-  if (!peakTier) return true;
-  const currentPoints = calculatePlayerPoints(currentTier, currentRank);
-  const peakPoints = calculatePlayerPoints(peakTier, peakRank || "IV");
-  return currentPoints > peakPoints;
 }
 
 export interface RegisterRiotAccountDto {
@@ -198,6 +193,40 @@ export class RiotService {
         queuedAt: new Date(),
       },
     });
+  }
+
+  private normalizeManualPeakTier(
+    peakTier?: string,
+    peakRank?: string,
+  ): { peakTier: string; peakRank: string } | null {
+    if (!peakTier) {
+      if (peakRank) {
+        throw new BadRequestException(
+          "최고 티어를 선택한 뒤 디비전을 입력해주세요.",
+        );
+      }
+      return null;
+    }
+
+    const tier = peakTier.trim().toUpperCase();
+    if (!RANKED_TIERS.includes(tier as (typeof RANKED_TIERS)[number])) {
+      throw new BadRequestException("유효한 최고 티어를 선택해주세요.");
+    }
+
+    if (isApexTier(tier)) {
+      return toStoredPeakTier(tier, "");
+    }
+
+    const rank = (peakRank || "").trim().toUpperCase();
+    if (
+      !RANKED_DIVISIONS.includes(
+        rank as (typeof RANKED_DIVISIONS)[number],
+      )
+    ) {
+      throw new BadRequestException("최고 티어의 디비전을 선택해주세요.");
+    }
+
+    return toStoredPeakTier(tier, rank);
   }
 
   private async request<T>(url: string): Promise<T> {
@@ -488,6 +517,8 @@ export class RiotService {
   // ========================================
 
   async registerRiotAccount(userId: string, dto: RegisterRiotAccountDto) {
+    const manualPeak = this.normalizeManualPeakTier(dto.peakTier, dto.peakRank);
+
     // 아이콘 변경 인증 단계를 제거하고 닉네임/태그로 직접 puuid 조회 후 등록.
     // 라이엇은 외부 OAuth 가 없어 100% 본인 확인이 불가하지만, puuid 유니크 제약으로
     // 이중 등록(다른 유저가 이미 연동한 계정)은 막힘.
@@ -527,17 +558,34 @@ export class RiotService {
       data: { isPrimary: false },
     });
 
-    // 사용자 입력 peakTier vs 현재 티어 중 높은 값 사용
-    const inputPeakTier = dto.peakTier || ranked.tier;
-    const inputPeakRank = dto.peakRank || ranked.rank;
-    const useCurrentAsPeak = isHigherTier(
-      ranked.tier,
-      ranked.rank,
-      inputPeakTier,
-      inputPeakRank,
-    );
-    const finalPeakTier = useCurrentAsPeak ? ranked.tier : inputPeakTier;
-    const finalPeakRank = useCurrentAsPeak ? ranked.rank : inputPeakRank;
+    let finalPeak: { peakTier: string | null; peakRank: string | null } =
+      existing?.peakTier && existing.peakTier.toUpperCase() !== "UNRANKED"
+        ? toStoredPeakTier(existing.peakTier, existing.peakRank)
+        : { peakTier: null, peakRank: null };
+
+    if (
+      manualPeak &&
+      isHigherTier(
+        manualPeak.peakTier,
+        manualPeak.peakRank,
+        finalPeak.peakTier,
+        finalPeak.peakRank,
+      )
+    ) {
+      finalPeak = manualPeak;
+    }
+
+    if (
+      ranked.tier !== "UNRANKED" &&
+      isHigherTier(
+        ranked.tier,
+        ranked.rank,
+        finalPeak.peakTier,
+        finalPeak.peakRank,
+      )
+    ) {
+      finalPeak = toStoredPeakTier(ranked.tier, ranked.rank);
+    }
 
     // Create or update Riot account
     const riotAccount = await this.prisma.riotAccount.upsert({
@@ -549,8 +597,8 @@ export class RiotService {
         tier: ranked.tier,
         rank: ranked.rank,
         lp: ranked.lp,
-        peakTier: finalPeakTier,
-        peakRank: finalPeakRank,
+        peakTier: finalPeak.peakTier,
+        peakRank: finalPeak.peakRank,
         mainRole: dto.mainRole,
         subRole: dto.subRole,
         isPrimary: true,
@@ -566,8 +614,8 @@ export class RiotService {
         tier: ranked.tier,
         rank: ranked.rank,
         lp: ranked.lp,
-        peakTier: finalPeakTier,
-        peakRank: finalPeakRank,
+        peakTier: finalPeak.peakTier,
+        peakRank: finalPeak.peakRank,
         mainRole: dto.mainRole,
         subRole: dto.subRole,
         isPrimary: true,
@@ -646,14 +694,12 @@ export class RiotService {
     const ranked = await this.getRankedInfoByPuuid(account.puuid);
 
     // 현재 티어가 최고 티어보다 높으면 peakTier 갱신
-    const peakUpdate = isHigherTier(
+    const peakUpdate = getPeakTierUpdate(
       ranked.tier,
       ranked.rank,
       account.peakTier,
       account.peakRank,
-    )
-      ? { peakTier: ranked.tier, peakRank: ranked.rank }
-      : {};
+    );
 
     const updated = await this.prisma.riotAccount.update({
       where: { id: riotAccountId },
@@ -838,19 +884,19 @@ export class RiotService {
       throw new BadRequestException("주 역할과 부 역할은 동일할 수 없습니다");
     }
 
-    // peakTier는 기존보다 높을 때만 갱신 (절대 내려가지 않음)
     let peakUpdate = {};
     if (dto.peakTier !== undefined) {
-      if (
-        isHigherTier(
-          dto.peakTier,
-          dto.peakRank || "IV",
+      const manualPeak = this.normalizeManualPeakTier(dto.peakTier, dto.peakRank);
+      if (manualPeak) {
+        peakUpdate = getPeakTierUpdate(
+          manualPeak.peakTier,
+          manualPeak.peakRank,
           account.peakTier,
           account.peakRank,
-        )
-      ) {
-        peakUpdate = { peakTier: dto.peakTier, peakRank: dto.peakRank || "IV" };
+        );
       }
+    } else if (dto.peakRank !== undefined) {
+      this.normalizeManualPeakTier(dto.peakTier, dto.peakRank);
     }
 
     await this.prisma.riotAccount.update({

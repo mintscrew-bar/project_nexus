@@ -3,6 +3,7 @@ import { Cron } from "@nestjs/schedule";
 import { PrismaService } from "../prisma/prisma.service";
 import { RedisService } from "../redis/redis.service";
 import { LabStatsService } from "../stats/lab-stats.service";
+import { getPeakTierUpdate } from "../riot/riot-rank.util";
 
 @Injectable()
 export class LabTasksService {
@@ -83,6 +84,8 @@ export class LabTasksService {
         puuid: true,
         gameName: true,
         tagLine: true,
+        peakTier: true,
+        peakRank: true,
       },
       take: 2000,
     });
@@ -104,6 +107,8 @@ export class LabTasksService {
               puuid: true,
               gameName: true,
               tagLine: true,
+              peakTier: true,
+              peakRank: true,
             },
             orderBy: { lastSyncedAt: "asc" },
             take: remaining,
@@ -145,13 +150,21 @@ export class LabTasksService {
           const soloQ = entries.find(
             (e: any) => e.queueType === "RANKED_SOLO_5x5",
           );
+          const tier = soloQ?.tier ?? "UNRANKED";
+          const rank = soloQ?.rank ?? "";
 
           await this.prisma.riotAccount.update({
             where: { id: account.id },
             data: {
-              tier: soloQ?.tier ?? "UNRANKED",
-              rank: soloQ?.rank ?? "",
+              tier,
+              rank,
               lp: soloQ?.leaguePoints ?? 0,
+              ...getPeakTierUpdate(
+                tier,
+                rank,
+                account.peakTier,
+                account.peakRank,
+              ),
               lastSyncedAt: new Date(),
             },
           });

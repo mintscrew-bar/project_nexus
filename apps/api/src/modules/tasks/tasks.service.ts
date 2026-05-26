@@ -5,6 +5,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { DataDragonService } from "../riot/data-dragon.service";
 import { RiotMatchService } from "../riot/riot-match.service";
 import { RiotService } from "../riot/riot.service";
+import { getPeakTierUpdate } from "../riot/riot-rank.util";
 import { RedisService } from "../redis/redis.service";
 import { StatsService } from "../stats/stats.service";
 
@@ -816,6 +817,8 @@ export class TasksService {
           puuid: true,
           gameName: true,
           tagLine: true,
+          peakTier: true,
+          peakRank: true,
         },
         take: 50,
       });
@@ -849,13 +852,21 @@ export class TasksService {
           const soloQ = entries.find(
             (e: any) => e.queueType === "RANKED_SOLO_5x5",
           );
+          const tier = soloQ?.tier ?? "UNRANKED";
+          const rank = soloQ?.rank ?? "";
 
           await this.prisma.riotAccount.update({
             where: { id: account.id },
             data: {
-              tier: soloQ?.tier ?? "UNRANKED",
-              rank: soloQ?.rank ?? "",
+              tier,
+              rank,
               lp: soloQ?.leaguePoints ?? 0,
+              ...getPeakTierUpdate(
+                tier,
+                rank,
+                account.peakTier,
+                account.peakRank,
+              ),
               lastSyncedAt: new Date(),
             },
           });

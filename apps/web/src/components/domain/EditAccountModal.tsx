@@ -6,10 +6,12 @@ import { useRiotStore, RiotAccount } from '@/stores/riot-store';
 import { useDdragonStore, Champion } from '@/stores/ddragon-store';
 import { X, Loader2, AlertCircle, ChevronDown } from 'lucide-react';
 import { ChampionSelector } from './ChampionSelector';
+import { PeakTierSelector } from './PeakTierSelector';
 import Image from 'next/image';
 
 type Role = 'TOP' | 'JUNGLE' | 'MID' | 'ADC' | 'SUPPORT';
 const ROLES: Role[] = ['TOP', 'JUNGLE', 'MID', 'ADC', 'SUPPORT'];
+const APEX_TIERS = new Set(['MASTER', 'GRANDMASTER', 'CHALLENGER']);
 
 // 포지션 아이콘 / 한글명 매핑
 const POSITION_ICON_MAP: Record<string, string> = {
@@ -42,6 +44,9 @@ export function EditAccountModal({ isOpen, onClose, onAccountUpdated, account }:
   const [expandedSections, setExpandedSections] = useState<Set<Role>>(new Set());
   const [localError, setLocalError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [step, setStep] = useState<1 | 2>(1);
+  const [peakTier, setPeakTier] = useState('');
+  const [peakRank, setPeakRank] = useState('');
 
   // account가 바뀌거나 모달이 열릴 때 초기값 세팅
   useEffect(() => {
@@ -49,8 +54,12 @@ export function EditAccountModal({ isOpen, onClose, onAccountUpdated, account }:
       fetchChampions();
       const main = (account.mainRole as Role) || 'MID';
       const sub = (account.subRole as Role) || 'ADC';
+      const initialPeakTier = account.peakTier && account.peakTier !== 'UNRANKED' ? account.peakTier : '';
       setMainRole(main);
       setSubRole(sub);
+      setStep(1);
+      setPeakTier(initialPeakTier);
+      setPeakRank(initialPeakTier && !APEX_TIERS.has(initialPeakTier) ? account.peakRank || 'IV' : '');
       clearError();
       setLocalError(null);
 
@@ -100,7 +109,13 @@ export function EditAccountModal({ isOpen, onClose, onAccountUpdated, account }:
     setLocalError(null);
     setIsSubmitting(true);
     try {
-      await updateAccount(account.id, { mainRole, subRole, championsByRole });
+      await updateAccount(account.id, {
+        mainRole,
+        subRole,
+        championsByRole,
+        peakTier: peakTier || undefined,
+        peakRank: peakTier ? peakRank || undefined : undefined,
+      });
       onAccountUpdated();
       onClose();
     } catch (err: any) {
@@ -140,7 +155,7 @@ export function EditAccountModal({ isOpen, onClose, onAccountUpdated, account }:
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={`계정 수정 — ${account.gameName}#${account.tagLine}`}
+      title={`계정 수정 (${step}/2) — ${account.gameName}#${account.tagLine}`}
       size="lg"
     >
       {localError && (
@@ -151,10 +166,23 @@ export function EditAccountModal({ isOpen, onClose, onAccountUpdated, account }:
       )}
 
       <p className="text-text-secondary mb-4">
-        역할과 선호 챔피언을 수정할 수 있습니다. 주/부 역할별 최소 3개씩 선택해주세요.
+        {step === 1
+          ? '과거 시즌에 달성한 최고 티어가 있으면 입력해주세요.'
+          : '역할과 선호 챔피언을 수정할 수 있습니다. 주/부 역할별 최소 3개씩 선택해주세요.'}
       </p>
 
-      <div className="space-y-4">
+      {step === 1 && (
+        <PeakTierSelector
+          peakTier={peakTier}
+          peakRank={peakRank}
+          onTierChange={setPeakTier}
+          onRankChange={setPeakRank}
+          disabled={isLoading}
+          allowEmpty={!account.peakTier || account.peakTier === 'UNRANKED'}
+        />
+      )}
+
+      {step === 2 && <div className="space-y-4">
         {/* ── 역할 선택: 버튼 그룹 ── */}
         <div className="grid grid-cols-2 gap-3">
           <div>
@@ -256,17 +284,28 @@ export function EditAccountModal({ isOpen, onClose, onAccountUpdated, account }:
             />
           ))}
         </div>
-      </div>
+      </div>}
 
       <div className="flex justify-end gap-3 pt-4">
+        {step === 2 && (
+          <Button variant="outline" onClick={() => setStep(1)} disabled={isLoading}>
+            뒤로
+          </Button>
+        )}
         <Button variant="outline" onClick={onClose} disabled={isLoading}>
           <X className="w-4 h-4 mr-2" />
           취소
         </Button>
-        <Button onClick={handleSubmit} disabled={isLoading || !canSubmit}>
-          {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          저장
-        </Button>
+        {step === 1 ? (
+          <Button onClick={() => setStep(2)} disabled={isLoading}>
+            다음
+          </Button>
+        ) : (
+          <Button onClick={handleSubmit} disabled={isLoading || !canSubmit}>
+            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            저장
+          </Button>
+        )}
       </div>
     </Modal>
   );

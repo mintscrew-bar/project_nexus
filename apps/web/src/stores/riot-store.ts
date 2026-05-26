@@ -56,7 +56,13 @@ interface RiotStoreState {
   syncAccount: (accountId: string) => Promise<void>;
   selectAccount: (account: RiotAccount | null) => void;
   updateChampions: (accountId: string, role: string, championIds: string[]) => Promise<void>;
-  updateAccount: (accountId: string, data: { mainRole: string; subRole: string; championsByRole?: Record<string, string[]> }) => Promise<void>;
+  updateAccount: (accountId: string, data: {
+    mainRole: string;
+    subRole: string;
+    championsByRole?: Record<string, string[]>;
+    peakTier?: string;
+    peakRank?: string;
+  }) => Promise<void>;
   deleteAccount: (accountId: string) => Promise<void>;
 
   // Actions - Verification Flow
@@ -255,7 +261,13 @@ export const useRiotStore = create<RiotStoreState>()(
     }
   },
 
-  updateAccount: async (accountId: string, data: { mainRole: string; subRole: string; championsByRole?: Record<string, string[]> }) => {
+  updateAccount: async (accountId: string, data: {
+    mainRole: string;
+    subRole: string;
+    championsByRole?: Record<string, string[]>;
+    peakTier?: string;
+    peakRank?: string;
+  }) => {
     set({ isLoading: true, error: null });
     try {
       const updated = await riotApi.updateAccount(accountId, data);

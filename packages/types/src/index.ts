@@ -63,6 +63,8 @@ export interface RiotAccount {
   tier: string;
   rank: string;
   lp: number;
+  peakTier?: string | null;
+  peakRank?: string | null;
   mmrPoints: number;
   isPrimary: boolean;
   verifiedAt: string | null;

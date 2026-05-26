@@ -1,13 +1,5 @@
-import {
-  IsString,
-  IsNotEmpty,
-  IsOptional,
-  IsEnum,
-  IsObject,
-  IsIn,
-  MaxLength,
-} from "class-validator";
 import { Transform } from "class-transformer";
+import { IsEnum, IsIn, IsObject, IsOptional } from "class-validator";
 import { Role } from "@nexus/database";
 import { RANKED_DIVISIONS, RANKED_TIERS } from "../riot-rank.util";
 
@@ -17,19 +9,12 @@ function optionalUppercase({ value }: { value: unknown }): unknown {
   return normalized || undefined;
 }
 
-/**
- * 라이엇 계정 등록 DTO
- */
-export class RegisterRiotAccountDto {
-  @IsString()
-  @IsNotEmpty({ message: "게임 닉네임을 입력해주세요." })
-  @MaxLength(50)
-  gameName: string;
+export class UpdateRiotAccountDto {
+  @IsEnum(Role, { message: "유효한 주 포지션을 선택해주세요." })
+  mainRole: Role;
 
-  @IsString()
-  @IsNotEmpty({ message: "태그라인을 입력해주세요." })
-  @MaxLength(10)
-  tagLine: string;
+  @IsEnum(Role, { message: "유효한 부 포지션을 선택해주세요." })
+  subRole: Role;
 
   @Transform(optionalUppercase)
   @IsOptional()
@@ -43,14 +28,7 @@ export class RegisterRiotAccountDto {
   })
   peakRank?: string;
 
-  @IsEnum(Role, { message: "유효한 주 포지션을 선택해주세요." })
-  mainRole: Role;
-
-  @IsEnum(Role, { message: "유효한 부 포지션을 선택해주세요." })
-  subRole: Role;
-
+  @IsOptional()
   @IsObject()
-  championsByRole: {
-    [key in Role]?: string[];
-  };
+  championsByRole?: Record<string, string[]>;
 }

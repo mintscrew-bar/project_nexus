@@ -7,6 +7,7 @@ import { useRiotStore } from '@/stores/riot-store';
 import { useDdragonStore, Champion } from '@/stores/ddragon-store';
 import { X, Loader2, AlertCircle, ArrowRight, ChevronDown, Info } from 'lucide-react';
 import { ChampionSelector } from './ChampionSelector';
+import { PeakTierSelector } from './PeakTierSelector';
 import Image from 'next/image';
 
 // Define specific props for the new AddAccountModal
@@ -30,8 +31,8 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
 
   const { champions, fetchChampions, isLoading: championsLoading } = useDdragonStore();
 
-  // step: 1=소환사 이름 입력, 3=역할/챔피언 선택 (옛 step 2 아이콘 인증은 제거)
-  const [step, setStep] = useState<1 | 3>(1);
+  // step: Riot ID -> 과거 최고 티어(선택) -> 역할/챔피언
+  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [gameName, setGameName] = useState('');
   const [tagLine, setTagLine] = useState('');
   const [localError, setLocalError] = useState<string | null>(null);
@@ -41,6 +42,8 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
     tagLine: string;
   } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [peakTier, setPeakTier] = useState('');
+  const [peakRank, setPeakRank] = useState('');
 
   // 역할 & 챔피언 선택 상태
   const [mainRole, setMainRole] = useState<Role>('MID');
@@ -63,6 +66,8 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
       setLocalError(null);
       setPendingRiotId(null);
       setIsSubmitting(false);
+      setPeakTier('');
+      setPeakRank('');
       setMainRole('MID');
       setSubRole('ADC');
       setChampionsByRole({ TOP: [], JUNGLE: [], MID: [], ADC: [], SUPPORT: [] });
@@ -95,12 +100,26 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
       return;
     }
     setPendingRiotId({ gameName: cleanedGameName, tagLine: cleanedTagLine });
-    setStep(3);
+    setStep(2);
   };
 
   const handleGoBackToStep1 = () => {
     setStep(1);
     setPendingRiotId(null);
+    handleClearError();
+  };
+
+  const handleGoBack = () => {
+    if (step === 3) {
+      setStep(2);
+      handleClearError();
+      return;
+    }
+    handleGoBackToStep1();
+  };
+
+  const handleGoToRoleSelection = () => {
+    setStep(3);
     handleClearError();
   };
 
@@ -160,6 +179,8 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
         mainRole: mainRole,
         subRole: subRole,
         championsByRole: championsByRole,
+        peakTier: peakTier || undefined,
+        peakRank: peakTier ? peakRank || undefined : undefined,
       });
       onAccountAdded();
       onClose();
@@ -182,8 +203,9 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
 
   const modalTitle = () => {
     switch (step) {
-      case 1: return 'Riot 계정 추가 (1/2)';
-      case 3: return '역할 및 챔피언 선택 (2/2)';
+      case 1: return 'Riot 계정 추가 (1/3)';
+      case 2: return '최고 티어 입력 (2/3)';
+      case 3: return '역할 및 챔피언 선택 (3/3)';
       default: return 'Riot 계정 추가';
     }
   };
@@ -191,6 +213,7 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
   const modalDescription = () => {
     switch (step) {
       case 1: return '소환사 이름과 태그라인을 입력하여 Riot 계정을 연동합니다.';
+      case 2: return '과거 시즌에 달성한 최고 티어가 있으면 입력해주세요.';
       case 3: return '주로 플레이하는 역할과 선호 챔피언을 선택해주세요.';
       default: return '';
     }
@@ -200,6 +223,8 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
     switch (step) {
       case 1:
         return 'Riot ID는 게임 이름과 태그라인을 나눠서 입력합니다. 예: Hide on bush#KR1';
+      case 2:
+        return '입력은 선택 사항입니다. 등록 후 계정 수정에서도 추가할 수 있습니다.';
       case 3:
         return '역할과 선호 챔피언은 내전 팀 배정과 밸런싱에 사용됩니다. 처음 한 번만 설정하면 됩니다.';
       default:
@@ -395,10 +420,20 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
           </div>
         </div>
       )}
-      
+
+      {step === 2 && (
+        <PeakTierSelector
+          peakTier={peakTier}
+          peakRank={peakRank}
+          onTierChange={setPeakTier}
+          onRankChange={setPeakRank}
+          disabled={isLoading}
+        />
+      )}
+
       <div className="flex justify-end gap-3 pt-4">
-        {step === 3 && (
-          <Button variant="outline" onClick={handleGoBackToStep1} disabled={isLoading}>
+        {(step === 2 || step === 3) && (
+          <Button variant="outline" onClick={handleGoBack} disabled={isLoading}>
             뒤로
           </Button>
         )}
@@ -409,6 +444,11 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
         {step === 1 && (
           <Button onClick={handleSummonerSubmit} disabled={!gameName.trim() || !tagLine.trim() || isLoading}>
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            다음
+          </Button>
+        )}
+        {step === 2 && (
+          <Button onClick={handleGoToRoleSelection} disabled={isLoading}>
             다음
           </Button>
         )}
