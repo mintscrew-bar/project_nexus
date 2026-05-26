@@ -1,7 +1,14 @@
 import type { MetadataRoute } from "next";
 import { absoluteUrl } from "@/lib/seo";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+export const dynamic = "force-dynamic";
+
+const API_BASE =
+  process.env.API_URL ??
+  process.env.NEXT_PUBLIC_API_URL ??
+  "http://localhost:4000";
+const SITEMAP_REVALIDATE_SECONDS = 3600;
+const COMMUNITY_PAGE_SIZE = 100;
 
 const staticRoutes = [
   { path: "/", priority: 1, changeFrequency: "weekly" },
@@ -16,18 +23,59 @@ const staticRoutes = [
   { path: "/feed.xml", priority: 0.5, changeFrequency: "hourly" },
 ] as const;
 
+interface CommunityPost {
+  id: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+interface CommunityPostsResponse {
+  posts?: CommunityPost[];
+  total?: number;
+}
+
+interface Clan {
+  id: string;
+  updatedAt?: string;
+}
+
+function toLastModified(value?: string): Date | undefined {
+  if (!value) return undefined;
+
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? undefined : date;
+}
+
 async function fetchCommunityPosts(): Promise<MetadataRoute.Sitemap> {
   try {
-    const res = await fetch(`${API_BASE}/api/community?page=1&limit=100&sort=latest`, {
-      next: { revalidate: 3600 },
-    });
-    if (!res.ok) return [];
-    const data = await res.json();
-    const posts: Array<{ id: string; createdAt?: string; updatedAt?: string }> =
-      data.posts ?? data ?? [];
+    const posts: CommunityPost[] = [];
+    let offset = 0;
+    let total: number | undefined;
+
+    do {
+      const params = new URLSearchParams({
+        limit: String(COMMUNITY_PAGE_SIZE),
+        offset: String(offset),
+        sortBy: "latest",
+      });
+      const res = await fetch(`${API_BASE}/api/community/posts?${params}`, {
+        next: { revalidate: SITEMAP_REVALIDATE_SECONDS },
+      });
+      if (!res.ok) return [];
+
+      const data: CommunityPostsResponse = await res.json();
+      const page = data.posts ?? [];
+      posts.push(...page);
+      total = data.total;
+      offset += page.length;
+
+      if (page.length === 0) break;
+    } while (total !== undefined && offset < total);
+
     return posts.map((post) => ({
       url: absoluteUrl(`/community/${post.id}`),
-      lastModified: post.updatedAt ? new Date(post.updatedAt) : new Date(),
+      lastModified:
+        toLastModified(post.updatedAt) ?? toLastModified(post.createdAt),
       changeFrequency: "weekly",
       priority: 0.6,
     }));
@@ -38,16 +86,15 @@ async function fetchCommunityPosts(): Promise<MetadataRoute.Sitemap> {
 
 async function fetchClans(): Promise<MetadataRoute.Sitemap> {
   try {
-    const res = await fetch(`${API_BASE}/api/clans?page=1&limit=100`, {
-      next: { revalidate: 3600 },
+    const res = await fetch(`${API_BASE}/api/clans`, {
+      next: { revalidate: SITEMAP_REVALIDATE_SECONDS },
     });
     if (!res.ok) return [];
-    const data = await res.json();
-    const clans: Array<{ id: string; updatedAt?: string }> =
-      data.clans ?? data ?? [];
+    const data: Clan[] | { clans?: Clan[] } = await res.json();
+    const clans = Array.isArray(data) ? data : (data.clans ?? []);
     return clans.map((clan) => ({
       url: absoluteUrl(`/clans/${clan.id}`),
-      lastModified: clan.updatedAt ? new Date(clan.updatedAt) : new Date(),
+      lastModified: toLastModified(clan.updatedAt),
       changeFrequency: "weekly",
       priority: 0.65,
     }));
@@ -57,11 +104,8 @@ async function fetchClans(): Promise<MetadataRoute.Sitemap> {
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const now = new Date();
-
   const staticEntries: MetadataRoute.Sitemap = staticRoutes.map((route) => ({
     url: absoluteUrl(route.path),
-    lastModified: now,
     changeFrequency: route.changeFrequency,
     priority: route.priority,
   }));
