@@ -10,8 +10,8 @@ import { userApi, matchApi, statsApi } from '@/lib/api-client';
 import { AddAccountModal } from '@/components/domain/AddAccountModal';
 import { EditAccountModal } from '@/components/domain/EditAccountModal';
 import { ChampionImage } from '@/components/ChampionImage';
-import { LoadingSpinner, Card, CardHeader, CardTitle, CardContent, Badge, Button, Skeleton, EmptyState, ConfirmModal, StatusSelector, Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui';
-import { Star, Plus, RefreshCw, Shield, Trophy, TrendingUp, Loader2, Gamepad2, Target, History, Clock, Calendar, Settings, User, BarChart3, Pencil, Trash2, Swords, ChevronUp, Gavel, Camera, Check, X } from 'lucide-react';
+import { LoadingSpinner, Card, CardHeader, CardTitle, CardContent, Badge, Button, Skeleton, EmptyState, ConfirmModal, StatusSelector, Tabs, TabsList, TabsTrigger, TabsContent, Dropdown } from '@/components/ui';
+import { Star, Plus, RefreshCw, Shield, Trophy, TrendingUp, Loader2, Gamepad2, Target, History, Clock, Calendar, Settings, User, BarChart3, Pencil, Trash2, Swords, ChevronUp, Gavel, Camera, Check, X, MoreVertical } from 'lucide-react';
 import { TierBadge } from '@/components/domain/TierBadge';
 import { useToast } from '@/components/ui/Toast';
 import { usePresence } from '@/hooks/usePresence';
@@ -845,11 +845,12 @@ export default function ProfilePage() {
 
                             {/* Account Info */}
                             <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-2 min-w-0">
-                                <span className="font-bold text-text-primary truncate">
+                              <div className="flex items-center gap-2 min-w-0 overflow-hidden">
+                                {/* 이름은 항상 전체 노출(축약 안 함), 공간이 부족하면 태그가 먼저 가려짐 */}
+                                <span className="font-bold text-text-primary whitespace-nowrap flex-shrink-0">
                                   {account.gameName}
                                 </span>
-                                <span className="text-text-tertiary flex-shrink-0">
+                                <span className="text-text-tertiary truncate min-w-0">
                                   #{account.tagLine}
                                 </span>
                                 {account.isPrimary && (
@@ -858,13 +859,14 @@ export default function ProfilePage() {
                                   </Badge>
                                 )}
                               </div>
-                              <div className="flex items-center flex-wrap gap-x-2 gap-y-1 mt-1">
+                              {/* 티어·랭크·LP는 한 줄 유지(줄바꿈 X), '(최고…)'만 공간 부족 시 축약 */}
+                              <div className="flex items-center gap-2 mt-1 min-w-0">
                                 <TierBadge tier={account.tier} size="sm" />
-                                <span className="text-sm text-text-secondary">
+                                <span className="text-sm text-text-secondary whitespace-nowrap flex-shrink-0">
                                   {account.rank} • {account.lp} LP
                                 </span>
                                 {account.peakTier && (
-                                  <span className="text-xs text-text-tertiary">
+                                  <span className="text-xs text-text-tertiary truncate min-w-0">
                                     (최고 <span className="text-accent-gold">{account.peakTier} {account.peakRank || ''}</span>)
                                   </span>
                                 )}
@@ -877,8 +879,8 @@ export default function ProfilePage() {
                             </div>
                           </div>
 
-                          {/* Action Buttons */}
-                          <div className="flex items-center gap-1 flex-shrink-0">
+                          {/* Action Buttons — 데스크톱: 인라인 / 모바일: 케밥(...) 메뉴로 묶어 이름 공간 확보 */}
+                          <div className="hidden sm:flex items-center gap-1 flex-shrink-0">
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -920,6 +922,54 @@ export default function ProfilePage() {
                                 <Trash2 className="h-4 w-4 text-text-secondary hover:text-accent-danger" />
                               )}
                             </button>
+                          </div>
+
+                          {/* 모바일 전용 케밥 메뉴 */}
+                          <div
+                            className="sm:hidden flex-shrink-0"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Dropdown
+                              align="right"
+                              trigger={
+                                <button
+                                  className="p-2 hover:bg-bg-elevated rounded-lg transition-colors"
+                                  title="계정 관리"
+                                >
+                                  {(syncingAccountId === account.id || deletingAccountId === account.id) ? (
+                                    <Loader2 className="h-5 w-5 animate-spin text-text-secondary" />
+                                  ) : (
+                                    <MoreVertical className="h-5 w-5 text-text-secondary" />
+                                  )}
+                                </button>
+                              }
+                              items={[
+                                {
+                                  key: 'sync',
+                                  label: '티어 동기화',
+                                  icon: <RefreshCw className="h-4 w-4" />,
+                                  disabled: syncingAccountId === account.id,
+                                  onClick: () => handleSync(account.id),
+                                },
+                                {
+                                  key: 'edit',
+                                  label: '계정 수정',
+                                  icon: <Pencil className="h-4 w-4" />,
+                                  onClick: () => {
+                                    setEditingAccount(account);
+                                    setShowEditModal(true);
+                                  },
+                                },
+                                {
+                                  key: 'delete',
+                                  label: '계정 삭제',
+                                  icon: <Trash2 className="h-4 w-4" />,
+                                  danger: true,
+                                  disabled: deletingAccountId === account.id,
+                                  onClick: () => setConfirmDeleteId(account.id),
+                                },
+                              ]}
+                            />
                           </div>
                         </div>
                       </div>

@@ -82,6 +82,16 @@
   body {
     @apply antialiased bg-bg-primary text-text-primary; /* Use new semantic colors */
   }
+
+  /* 모바일 전역 축소:
+     Tailwind 크기 단위(text-*, p-*, gap-* 등)는 rem 기반이므로
+     루트 폰트를 줄이면 폰트와 여백이 함께 비례 축소된다.
+     데스크톱(>=640px)은 16px 그대로 유지. */
+  @media (max-width: 639px) {
+    html {
+      font-size: 15px;
+    }
+  }
 }
 
 @layer components {
