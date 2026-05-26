@@ -96,7 +96,7 @@ export function MobileMenu({ className }: MobileMenuProps) {
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-bg-tertiary">
           <Link href="/" className="flex items-center gap-2" onClick={() => setIsOpen(false)}>
-            <Logo className="h-8 w-auto" />
+            <Logo size="sm" variant="icon-only" />
             <span className="text-xl font-bold text-text-primary">Nexus</span>
           </Link>
           <button
