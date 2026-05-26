@@ -248,8 +248,8 @@ export function RoomList() {
         </div>
       </div>
 
-      {/* Second row filters */}
-      <div className="flex flex-wrap items-center gap-3">
+      {/* Second row filters — 모바일: 세로로 쌓아 좌측 정렬 / 데스크톱: 한 줄 배치 */}
+      <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3">
         {/* Mode Filter */}
         <div className="flex items-center gap-2">
           <span className="text-sm text-text-secondary">모드:</span>
@@ -299,9 +299,9 @@ export function RoomList() {
         </label>
 
         {/* Sort Options */}
-        <div className="flex items-center gap-2 ml-auto">
-          <ArrowUpDown className="h-4 w-4 text-text-tertiary" />
-          <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2 sm:ml-auto">
+          <ArrowUpDown className="h-4 w-4 text-text-tertiary flex-shrink-0" />
+          <div className="flex items-center gap-1 flex-wrap">
             {sortOptions.map((option) => (
               <button
                 key={option.value}
