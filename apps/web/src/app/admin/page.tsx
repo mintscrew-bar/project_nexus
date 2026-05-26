@@ -742,7 +742,7 @@ function UsersTab({ addToast, currentUserId, isAdmin }: { addToast: (msg: string
             <div className="flex justify-center py-12"><LoadingSpinner /></div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full min-w-[680px] text-sm">
                 <thead>
                   <tr className="border-b border-bg-tertiary text-text-muted">
                     <th className="text-left px-4 py-3 font-medium">유저</th>
@@ -1069,7 +1069,7 @@ function ReportsTab({ addToast }: { addToast: (msg: string, type: "success" | "e
             <p className="text-center text-text-muted py-12">신고가 없습니다.</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full min-w-[680px] text-sm">
                 <thead>
                   <tr className="border-b border-bg-tertiary text-text-muted">
                     <th className="text-left px-4 py-3 font-medium">신고자</th>
@@ -1450,7 +1450,7 @@ function CommunityPostsTab({ addToast }: { addToast: (msg: string, type: "succes
 
               {/* 데스크톱: 테이블 */}
               <div className="hidden md:block overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full min-w-[680px] text-sm">
                   <thead>
                     <tr className="border-b border-bg-tertiary text-text-muted">
                       <th className="text-left px-4 py-3 font-medium">제목</th>
@@ -1570,7 +1570,7 @@ function ClansTab({ addToast }: { addToast: (msg: string, type: "success" | "err
             <p className="text-center text-text-muted py-12">클랜이 없습니다.</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full min-w-[680px] text-sm">
                 <thead>
                   <tr className="border-b border-bg-tertiary text-text-muted">
                     <th className="text-left px-4 py-3 font-medium">클랜명</th>
@@ -1684,7 +1684,7 @@ function RoomsTab({ addToast }: { addToast: (msg: string, type: "success" | "err
             <p className="text-center text-text-muted py-12">방이 없습니다.</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full min-w-[680px] text-sm">
                 <thead>
                   <tr className="border-b border-bg-tertiary text-text-muted">
                     <th className="text-left px-4 py-3 font-medium">방 이름</th>
@@ -1871,7 +1871,7 @@ function ChatLogsTab() {
             <p className="text-center text-text-muted py-12">채팅 로그가 없습니다.</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full min-w-[680px] text-sm">
                 <thead>
                   <tr className="border-b border-bg-tertiary text-text-muted">
                     <th className="text-left px-4 py-3 font-medium w-40">시간</th>
@@ -2257,7 +2257,7 @@ function DiscordGuildLinksTab({ addToast }: { addToast: (msg: string, type: "suc
             <p className="text-center text-text-muted py-12 text-sm">연동된 길드가 없습니다.</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full min-w-[680px] text-sm">
                 <thead>
                   <tr className="border-b border-bg-tertiary text-text-muted">
                     <th className="text-left px-4 py-3 font-medium">서버</th>

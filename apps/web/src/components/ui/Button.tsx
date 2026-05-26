@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 
 const buttonVariants = cva(
   // Base styles
-  'inline-flex items-center justify-center font-medium rounded-lg transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-bg-primary',
+  'inline-flex items-center justify-center whitespace-nowrap font-medium rounded-lg transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-bg-primary',
   {
     variants: {
       variant: {
