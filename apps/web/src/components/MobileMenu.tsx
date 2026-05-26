@@ -89,12 +89,12 @@ export function MobileMenu({ className }: MobileMenuProps) {
       {/* Drawer */}
       <div
         className={cn(
-          'fixed top-0 left-0 bottom-0 w-72 bg-bg-secondary border-r border-bg-tertiary z-50 transform transition-transform duration-300 ease-out',
+          'fixed top-0 left-0 bottom-0 w-72 bg-bg-secondary border-r border-bg-tertiary z-50 flex flex-col transform transition-transform duration-300 ease-out',
           isOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-bg-tertiary">
+        <div className="flex items-center justify-between p-4 border-b border-bg-tertiary flex-shrink-0">
           <Link href="/" className="flex items-center gap-2" onClick={() => setIsOpen(false)}>
             <Logo size="sm" variant="icon-only" />
             <span className="text-xl font-bold text-text-primary">Nexus</span>
@@ -108,8 +108,8 @@ export function MobileMenu({ className }: MobileMenuProps) {
           </button>
         </div>
 
-        {/* Navigation */}
-        <nav className="p-4 space-y-6">
+        {/* Navigation — 내용이 화면보다 길 때 스크롤 */}
+        <nav className="flex-1 overflow-y-auto p-4 space-y-6">
           <div>
             <h3 className="text-xs font-semibold text-text-tertiary uppercase tracking-wider mb-2 px-3">
               메뉴
