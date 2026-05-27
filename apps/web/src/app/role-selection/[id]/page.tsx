@@ -8,7 +8,7 @@ import { roomApi } from "@/lib/api-client";
 import { GameChatPanel } from "@/components/domain/GameChatPanel";
 import { LoadingSpinner, Badge, Avatar, Button, ConfirmModal } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
-import { Clock, Check, Users, TimerReset } from "lucide-react";
+import { Clock, Check, TimerReset } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const ROLES = ["TOP", "JUNGLE", "MID", "ADC", "SUPPORT"] as const;
@@ -156,7 +156,7 @@ export default function RoleSelectionPage() {
         : "text-accent-primary";
 
   return (
-    <div className="flex-grow p-4 md:p-8">
+    <div className="flex-grow p-4 md:p-6">
       <ConfirmModal
         isOpen={isAbortConfirmOpen}
         onClose={() => setIsAbortConfirmOpen(false)}
@@ -170,7 +170,7 @@ export default function RoleSelectionPage() {
       />
       <div className="container mx-auto max-w-5xl">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col gap-4 mb-5 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-text-primary">
               역할 선택
@@ -179,7 +179,7 @@ export default function RoleSelectionPage() {
               원하는 포지션을 선택하세요. 시간 종료 시 선호 포지션으로 자동 배정됩니다.
             </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 lg:justify-end">
             <Button
               variant="danger"
               size="sm"
@@ -195,7 +195,7 @@ export default function RoleSelectionPage() {
               onClick={handleExtendTimer}
               disabled={hasExtended || !isConnected}
               className={cn(
-                "flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium border transition-all",
+                "flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border transition-colors",
                 hasExtended
                   ? "bg-bg-tertiary text-text-muted border-bg-tertiary cursor-not-allowed opacity-50"
                   : "bg-accent-primary/10 text-accent-primary border-accent-primary/30 hover:bg-accent-primary/20"
@@ -204,7 +204,7 @@ export default function RoleSelectionPage() {
               <TimerReset className="h-4 w-4" />
               {hasExtended ? "연장 사용됨" : "+15초"}
             </button>
-            <div className="flex items-center gap-2 bg-bg-secondary border border-bg-tertiary rounded-xl px-4 py-2">
+            <div className="flex items-center gap-2 bg-bg-secondary border border-bg-tertiary rounded-lg px-4 py-2">
               <Clock className={cn("h-5 w-5", timerColor)} />
               <span className={cn("text-xl md:text-2xl font-bold tabular-nums", timerColor)}>
                 {Math.floor(timeRemaining / 60)}:{String(timeRemaining % 60).padStart(2, "0")}
@@ -220,7 +220,7 @@ export default function RoleSelectionPage() {
         )}
 
         {/* Teams */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {room.teams.map((team) => {
             const isMyTeam = team.members.some((m) => m.userId === user?.id);
             const takenRoles = team.members
@@ -235,16 +235,18 @@ export default function RoleSelectionPage() {
                 key={team.id}
                 className={cn(
                   "bg-bg-secondary border rounded-xl overflow-hidden",
-                  isMyTeam ? "border-accent-primary" : "border-bg-tertiary"
+                  isMyTeam ? "border-accent-primary/40" : "border-bg-tertiary"
                 )}
               >
                 {/* Team Header */}
                 <div className={cn(
                   "px-5 py-3 flex items-center justify-between",
-                  isMyTeam ? "bg-accent-primary/10" : "bg-bg-tertiary/50"
+                  isMyTeam ? "bg-accent-primary/5" : "bg-bg-tertiary/20"
                 )}>
                   <div className="flex items-center gap-2">
-                    <Users className="h-5 w-5 text-text-secondary" />
+                    {team.color && (
+                      <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: team.color }} />
+                    )}
                     <h2 className="font-bold text-text-primary">{team.name}</h2>
                     {isMyTeam && (
                       <Badge variant="primary" size="sm">내 팀</Badge>
@@ -256,7 +258,7 @@ export default function RoleSelectionPage() {
                 </div>
 
                 {/* Members + Role Selection */}
-                <div className="p-4 space-y-3">
+                <div className="p-3 space-y-2.5">
                   {team.members.map((member) => {
                     const memberRole = member.assignedRole as Role | null;
                     const isMe = member.userId === user?.id;
@@ -264,8 +266,8 @@ export default function RoleSelectionPage() {
                     return (
                       <div key={member.id} className="space-y-2">
                         <div className={cn(
-                          "flex items-center gap-3 p-3 rounded-lg",
-                          isMe ? "bg-accent-primary/5 border border-accent-primary/20" : "bg-bg-tertiary"
+                          "flex items-center gap-3 px-3 py-2.5 rounded-lg border",
+                          isMe ? "bg-accent-primary/5 border-accent-primary/20" : "bg-bg-tertiary/60 border-transparent"
                         )}>
                           <Avatar
                             src={member.user.avatar}
@@ -299,7 +301,7 @@ export default function RoleSelectionPage() {
 
                         {/* Role buttons - 내 팀원이면 역할 변경 가능 (자동 배정 후에도) */}
                         {isMe && (
-                          <div className="flex gap-1.5 pl-11">
+                          <div className="grid grid-cols-5 gap-1.5">
                             {ROLES.map((role) => {
                               const takenByOther = team.members.some(
                                 (m) => m.assignedRole === role && m.userId !== user?.id
@@ -319,12 +321,12 @@ export default function RoleSelectionPage() {
                                   disabled={takenByOther && !isMyCurrentRole || !isConnected}
                                   title={isMyCurrentRole ? "클릭해서 취소" : undefined}
                                   className={cn(
-                                    "flex-1 flex flex-col items-center gap-0.5 py-2 rounded-lg text-xs font-medium transition-all",
+                                    "flex flex-col items-center gap-0.5 py-2 rounded-lg border text-xs font-medium transition-colors",
                                     isMyCurrentRole
-                                      ? "bg-accent-primary/20 text-accent-primary border border-accent-primary/30 ring-1 ring-accent-primary/20 hover:bg-accent-danger/20 hover:text-accent-danger hover:border-accent-danger/30"
+                                      ? "bg-accent-primary/10 text-accent-primary border-accent-primary/40"
                                       : takenByOther
-                                        ? "bg-bg-tertiary/50 text-text-muted cursor-not-allowed opacity-40"
-                                        : "bg-bg-tertiary hover:bg-bg-elevated hover:scale-105 active:scale-95 cursor-pointer text-text-primary"
+                                        ? "bg-bg-tertiary/40 text-text-muted border-transparent cursor-not-allowed opacity-40"
+                                        : "bg-bg-tertiary/60 border-transparent hover:bg-bg-elevated cursor-pointer text-text-primary"
                                   )}
                                 >
                                   <span className="text-lg">{meta.icon}</span>
@@ -344,7 +346,7 @@ export default function RoleSelectionPage() {
         </div>
 
         {/* Bottom info */}
-        <div className="mt-6 text-center">
+        <div className="mt-5 rounded-lg border border-bg-tertiary bg-bg-secondary/50 px-4 py-3 text-center">
           <p className="text-text-tertiary text-sm">
             직접 선택하지 않으면 선호 포지션(주/부) 기준으로 자동 배정됩니다.
           </p>

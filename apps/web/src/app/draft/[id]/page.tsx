@@ -128,7 +128,7 @@ export default function SnakeDraftPage() {
   }
 
   return (
-    <div className="flex-grow p-4 md:p-8 relative">
+    <div className="flex-grow p-4 md:p-6">
       <ConfirmModal
         isOpen={isAbortConfirmOpen}
         onClose={() => setIsAbortConfirmOpen(false)}
@@ -140,28 +140,29 @@ export default function SnakeDraftPage() {
         variant="danger"
         isLoading={isAborting}
       />
-      <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
-        <Button
-          variant="danger"
-          size="sm"
-          isLoading={isAborting}
-          onClick={handleAbortToLobby}
-        >
-          내전 종료
-        </Button>
-        <Badge variant={isConnected ? 'success' : 'danger'}>
-          {isConnected ? '● 연결됨' : '● 연결 끊김'}
-        </Badge>
-      </div>
-
-      <div className="container mx-auto">
-        <div className="mb-6 animate-fade-in">
-          <h1 className="text-2xl md:text-3xl font-bold text-text-primary mb-2">
-            스네이크 드래프트
-          </h1>
-          <p className="text-text-secondary">
-            Room ID: <span className="text-accent-primary font-mono">{draftId}</span>
-          </p>
+      <div className="container mx-auto max-w-6xl">
+        <div className="mb-5 flex flex-col gap-4 animate-fade-in sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold text-text-primary mb-1">
+              스네이크 드래프트
+            </h1>
+            <p className="text-sm text-text-secondary">
+              차례가 되면 영입할 플레이어를 선택하세요.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Badge variant={isConnected ? 'success' : 'danger'}>
+              {isConnected ? '● 연결됨' : '● 연결 끊김'}
+            </Badge>
+            <Button
+              variant="danger"
+              size="sm"
+              isLoading={isAborting}
+              onClick={handleAbortToLobby}
+            >
+              내전 종료
+            </Button>
+          </div>
         </div>
 
         <DraftBoard

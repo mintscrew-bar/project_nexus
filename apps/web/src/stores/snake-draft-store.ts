@@ -19,6 +19,7 @@ interface Team {
   id: string;
   name: string;
   captainId: string;
+  color?: string | null;
   members: Player[];
 }
 

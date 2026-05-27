@@ -466,6 +466,7 @@ export class SnakeDraftService {
       id: t.id,
       name: t.name,
       captainId: t.captainId,
+      color: t.color,
       members: t.members.map((m: any) => {
         const acc = m.user?.riotAccounts?.[0];
         return {

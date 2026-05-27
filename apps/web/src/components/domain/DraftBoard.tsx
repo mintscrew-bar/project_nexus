@@ -19,6 +19,7 @@ interface Team {
   id: string;
   name: string;
   captainId: string;
+  color?: string | null;
   members: Player[];
 }
 
@@ -106,13 +107,13 @@ export function DraftBoard({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Draft Status Header */}
-      <Card className="bg-gradient-to-r from-bg-secondary to-bg-tertiary">
-        <CardContent className="pt-6">
+      <Card className="overflow-hidden p-0">
+        <CardContent className="p-5">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <Clock className={cn("h-8 w-8", timeLeft <= 5 ? "text-accent-danger" : "text-accent-primary")} />
+            <div className="flex items-center gap-3">
+              <Clock className={cn("h-6 w-6", timeLeft <= 5 ? "text-accent-danger" : "text-text-secondary")} />
               <div>
                 <p className="text-sm text-text-secondary">픽 타이머</p>
                 <p className={cn("text-2xl md:text-3xl font-bold tabular-nums", timerColor)}>
@@ -124,12 +125,14 @@ export function DraftBoard({
             {currentTeam && (
               <div className="text-right">
                 <p className="text-sm text-text-secondary">현재 픽 순서</p>
-                <p className="text-xl font-bold text-accent-primary">
-                  <Crown className="inline h-5 w-5 mr-1" />
+                <p className="flex items-center justify-end gap-2 text-lg font-semibold text-text-primary">
+                  {currentTeam.color && (
+                    <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: currentTeam.color }} />
+                  )}
                   {currentTeam.name}
                 </p>
                 {isMyTurn && (
-                  <p className="text-sm text-accent-success mt-1">당신의 차례입니다!</p>
+                  <p className="text-sm text-accent-primary mt-1">내 차례</p>
                 )}
               </div>
             )}
@@ -153,11 +156,11 @@ export function DraftBoard({
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Teams */}
-        <div className="space-y-4">
-          <h2 className="text-xl md:text-2xl font-bold text-text-primary flex items-center">
-            <Users className="h-6 w-6 mr-2" />
+        <div className="space-y-3">
+          <h2 className="text-lg font-semibold text-text-primary flex items-center">
+            <Users className="h-5 w-5 mr-2 text-text-secondary" />
             팀 구성
           </h2>
 
@@ -172,14 +175,17 @@ export function DraftBoard({
               <Card
                 key={team.id}
                 className={cn(
-                  isCurrentTurn && "ring-2 ring-accent-primary",
+                  "overflow-hidden p-0",
+                  isCurrentTurn && "border-accent-primary/50",
                   isMyTeam && !isCurrentTurn && "border-accent-primary/40",
                 )}
               >
-                <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
+                <CardHeader className="mb-0 border-b border-bg-tertiary bg-bg-tertiary/20 px-4 py-3">
+                  <CardTitle className="flex items-center justify-between text-base">
                     <span className="flex items-center gap-2">
-                      {isCurrentTurn && <Crown className="h-5 w-5 text-accent-gold" />}
+                      {team.color && (
+                        <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: team.color }} />
+                      )}
                       {team.name}
                       {isMyTeam && (
                         <span className="text-xs font-normal px-1.5 py-0.5 bg-accent-primary/20 text-accent-primary rounded-md">
@@ -192,12 +198,12 @@ export function DraftBoard({
                     </span>
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
+                <CardContent className="p-3">
+                  <div className="space-y-1.5">
                     {team.members.map((member) => (
                       <div
                         key={member.id}
-                        className="flex items-center justify-between bg-bg-tertiary p-2 rounded-lg"
+                        className="flex items-center justify-between rounded-md bg-bg-tertiary/60 px-2.5 py-2"
                       >
                         <div className="flex items-center space-x-2">
                           <span className="text-xl">{getPositionIcon(member.position)}</span>
@@ -215,7 +221,7 @@ export function DraftBoard({
                     {Array.from({ length: emptySlots }).map((_, i) => (
                       <div
                         key={`empty-${i}`}
-                        className="flex items-center p-2 rounded-lg border border-dashed border-bg-tertiary"
+                        className="flex items-center rounded-md border border-dashed border-bg-tertiary/80 px-2.5 py-2"
                       >
                         <span className="text-sm text-text-muted">대기 중...</span>
                       </div>
@@ -229,27 +235,27 @@ export function DraftBoard({
 
         {/* Available Players */}
         <div>
-          <h2 className="text-xl md:text-2xl font-bold text-text-primary mb-4">
+          <h2 className="text-lg font-semibold text-text-primary mb-3">
             선택 가능한 플레이어 ({draftState.availablePlayers.length})
           </h2>
 
-          <Card>
-            <CardContent className="pt-4">
-              <div className="space-y-2 max-h-[600px] overflow-y-auto">
+          <Card className="overflow-hidden p-0">
+            <CardContent className="p-3">
+              <div className="space-y-1.5 max-h-[600px] overflow-y-auto">
                 {draftState.availablePlayers.map((player) => (
                   <button
                     key={player.id}
                     onClick={() => setSelectedPlayer(player.id)}
                     disabled={!isMyTurn || disabled}
-                    className={`w-full flex items-center justify-between p-3 rounded-lg transition-all ${
+                    className={cn(
+                      "w-full flex items-center justify-between rounded-lg border px-3 py-2.5 transition-colors",
                       selectedPlayer === player.id
-                        ? "bg-accent-primary text-white ring-2 ring-accent-hover"
-                        : "bg-bg-tertiary hover:bg-bg-elevated"
-                    } ${
+                        ? "border-accent-primary/40 bg-accent-primary/10 text-text-primary"
+                        : "border-transparent bg-bg-tertiary/60 hover:bg-bg-elevated",
                       !isMyTurn || disabled
                         ? "opacity-50 cursor-not-allowed"
-                        : "hover:scale-[1.02] cursor-pointer"
-                    }`}
+                        : "cursor-pointer",
+                    )}
                   >
                     <div className="flex items-center space-x-3">
                       <span className="text-2xl">{getPositionIcon(player.position)}</span>
@@ -262,7 +268,7 @@ export function DraftBoard({
                     </div>
                     <div className="flex items-center gap-1.5 flex-shrink-0">
                       {player.mmr !== undefined && (
-                        <span className={`text-xs font-mono font-semibold ${selectedPlayer === player.id ? "text-white/80" : "text-text-muted"}`}>
+                        <span className="text-xs font-mono font-semibold text-text-muted">
                           {player.mmr}
                         </span>
                       )}
@@ -270,7 +276,6 @@ export function DraftBoard({
                         <TierBadge
                           tier={player.tier}
                           size="sm"
-                          className={selectedPlayer === player.id ? "opacity-90" : ""}
                         />
                       )}
                     </div>
