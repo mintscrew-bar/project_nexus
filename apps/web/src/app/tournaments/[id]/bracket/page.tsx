@@ -271,12 +271,20 @@ export default function BracketPage() {
 
         {/* Bracket View */}
         {bracketMatches.length > 0 ? (
-          <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-4">
+          <div className="overflow-hidden rounded-xl border border-bg-tertiary bg-bg-secondary">
+            <div className="border-b border-bg-tertiary bg-bg-tertiary/30 px-4 py-3">
+              <div className="flex items-center gap-2 text-sm font-bold text-text-primary">
+                <Trophy className="h-4 w-4 text-accent-gold" />
+                토너먼트 브래킷
+              </div>
+            </div>
+            <div className="bg-[linear-gradient(to_right,rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[size:28px_28px] p-3 md:p-4">
             <BracketView
               matches={bracketMatches}
               rounds={rounds}
               onMatchClick={handleMatchClick}
             />
+            </div>
           </div>
         ) : (
           <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-12 text-center">
