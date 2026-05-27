@@ -92,30 +92,13 @@ export function LobbyParticipantsList({
 
       {isManualTeamMode && (
         <div className="mb-4 rounded-xl border border-bg-tertiary bg-bg-tertiary/25 p-3">
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <div>
-              <p className="text-sm font-semibold text-text-primary">팀 선택</p>
-              <p className="text-xs text-text-tertiary">
-                팀을 이동하면 준비가 해제됩니다. 빈자리가 없으면 대기석을 이용하세요.
-              </p>
-            </div>
-            {currentUserParticipant?.teamId && !currentUserIsSpectator && (
-              <button
-                type="button"
-                onClick={() =>
-                  selectTeam(
-                    null,
-                    (err) => addToast(err, "error"),
-                    () => addToast("대기석으로 이동했습니다.", "info"),
-                  )
-                }
-                className="rounded-md bg-bg-tertiary px-2 py-1 text-xs text-text-secondary hover:bg-bg-elevated"
-              >
-                대기석으로 이동
-              </button>
-            )}
+          <div className="mb-3">
+            <p className="text-sm font-semibold text-text-primary">팀 선택</p>
+            <p className="text-xs text-text-tertiary">
+              팀을 이동하면 준비가 해제됩니다. 선택한 팀 카드에서 '팀 나가기'로 대기석으로 돌아올 수 있어요.
+            </p>
           </div>
-          <div className="grid gap-2 sm:grid-cols-2">
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {manualTeams.map((team: any) => {
               const members = players.filter((player: any) => player.teamId === team.id);
               const selected = currentUserParticipant?.teamId === team.id;
@@ -149,21 +132,32 @@ export function LobbyParticipantsList({
                   </div>
                   <button
                     type="button"
-                    disabled={currentUserIsSpectator || selected || full}
+                    // 선택된 팀이면 '팀 나가기'로 동작 → 이동/나가기 동선을 카드 한 곳에 통일
+                    disabled={currentUserIsSpectator || (!selected && full)}
                     onClick={() =>
-                      selectTeam(
-                        team.id,
-                        (err) => addToast(err, "error"),
-                        () =>
-                          addToast(
-                            `${team.name}을 선택했습니다. 준비 상태를 확인해주세요.`,
-                            "success",
-                          ),
-                      )
+                      selected
+                        ? selectTeam(
+                            null,
+                            (err) => addToast(err, "error"),
+                            () => addToast("대기석으로 이동했습니다.", "info"),
+                          )
+                        : selectTeam(
+                            team.id,
+                            (err) => addToast(err, "error"),
+                            () =>
+                              addToast(
+                                `${team.name}을 선택했습니다. 준비 상태를 확인해주세요.`,
+                                "success",
+                              ),
+                          )
                     }
-                    className="w-full rounded-md bg-bg-tertiary px-2 py-1.5 text-xs font-medium text-text-secondary hover:bg-bg-elevated disabled:cursor-not-allowed disabled:opacity-50"
+                    className={`w-full rounded-md px-2 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                      selected
+                        ? "bg-accent-primary/15 text-accent-primary hover:bg-accent-primary/25"
+                        : "bg-bg-tertiary text-text-secondary hover:bg-bg-elevated"
+                    }`}
                   >
-                    {selected ? "선택됨" : full ? "가득 참" : "이 팀으로 이동"}
+                    {selected ? "팀 나가기" : full ? "가득 참" : "이 팀으로 이동"}
                   </button>
                 </div>
               );
