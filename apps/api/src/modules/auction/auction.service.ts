@@ -1631,13 +1631,14 @@ export class AuctionService implements OnModuleInit {
   }
 
   private getTeamColor(index: number): string {
+    // 인디고+골드 다크 테마에 맞춘 부드러운 모던 팔레트 (Tailwind 400 톤)
     const colors = [
-      "#3B82F6", // Blue
-      "#EF4444", // Red
-      "#10B981", // Green
-      "#F59E0B", // Yellow
-      "#8B5CF6", // Purple
-      "#EC4899", // Pink
+      "#60A5FA", // Blue
+      "#F87171", // Coral
+      "#34D399", // Emerald
+      "#FBBF24", // Amber
+      "#A78BFA", // Violet
+      "#F472B6", // Pink
     ];
     return colors[index % colors.length];
   }
