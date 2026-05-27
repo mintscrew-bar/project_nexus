@@ -61,7 +61,7 @@ export function Sidebar() {
   const isGuideRoute = pathname === '/guide';
 
   return (
-    <aside className="w-64 bg-bg-secondary border-r border-bg-tertiary p-4 hidden md:block flex-shrink-0 overflow-y-auto">
+    <aside className="w-64 bg-bg-secondary border-r border-bg-tertiary p-4 hidden md:block flex-shrink-0 sticky top-16 self-start h-[calc(100vh-4rem)] overflow-y-auto">
       {/* 페이지별 맞춤 사이드바 */}
       {isMatchesRoute ? (
         <MatchesSidebarContent />
