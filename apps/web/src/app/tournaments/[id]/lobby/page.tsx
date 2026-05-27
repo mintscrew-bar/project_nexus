@@ -97,7 +97,11 @@ export default function TournamentLobbyPage() {
     setIsAddingBot(true);
     try {
       // 남은 자리를 한 번에 채운다 (15인 이상 내전 테스트 시 클릭 반복 방지)
-      const remaining = Math.max(1, room.maxParticipants - totalPlayers);
+      // players 선언보다 이 콜백이 위에 있어 room.participants 로 직접 계산한다.
+      const playerCount = room.participants.filter(
+        (p: any) => p.role !== "SPECTATOR",
+      ).length;
+      const remaining = Math.max(1, room.maxParticipants - playerCount);
       const { addedCount } = await adminApi.addBotToRoom(room.id, remaining);
       // 방 데이터 재조회 후 로비 store에 직접 반영
       const updated = await roomApi.getRoom(room.id);
@@ -108,7 +112,7 @@ export default function TournamentLobbyPage() {
     } finally {
       setIsAddingBot(false);
     }
-  }, [room, totalPlayers, addToast]);
+  }, [room, addToast]);
 
   // connect/disconnect는 zustand 스토어 함수로 참조가 안정적이므로 dependency에서 제외
   useEffect(() => {

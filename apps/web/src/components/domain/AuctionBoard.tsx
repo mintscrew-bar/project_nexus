@@ -421,12 +421,16 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
             const budget = getTeamBudget(team);
             const isMine = team.captainId === currentUserId;
             const isHighest = team.id === auctionState.currentHighestBidder || team.captainId === auctionState.currentHighestBidder;
+            // 팀장 포함 5명이면 만석 — 더 이상 입찰에 참여할 수 없음을 시각적으로 표시
+            const isFull = (team.members?.length ?? 0) >= 5;
             return (
               <div
                 key={team.id}
                 className={cn(
                   "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors",
-                  isMine
+                  isFull
+                    ? "border-bg-tertiary bg-bg-tertiary/40 opacity-50"
+                    : isMine
                     ? "border-accent-primary/40 bg-accent-primary/10"
                     : isHighest
                     ? "border-accent-gold/40 bg-accent-gold/10"
@@ -436,19 +440,30 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
                 {team.color && (
                   <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: team.color }} />
                 )}
-                <span className={cn("truncate max-w-[60px]", isMine ? "text-accent-primary" : "text-text-secondary")}>
+                <span className={cn(
+                  "truncate max-w-[60px]",
+                  isFull ? "text-text-muted line-through" : isMine ? "text-accent-primary" : "text-text-secondary",
+                )}>
                   {team.name}
                 </span>
-                <span className={cn(
-                  "font-bold flex items-center gap-0.5",
-                  budget === 0 ? "text-accent-danger" : "text-accent-gold",
-                )}>
-                  <Coins className="w-3 h-3" />
-                  {budget.toLocaleString()}
-                </span>
-                <span className="text-text-muted">
-                  ({(team.members?.length ?? 0)}/5)
-                </span>
+                {isFull ? (
+                  <span className="font-bold px-1.5 py-0.5 rounded bg-text-muted/20 text-text-muted">
+                    꽉 참
+                  </span>
+                ) : (
+                  <>
+                    <span className={cn(
+                      "font-bold flex items-center gap-0.5",
+                      budget === 0 ? "text-accent-danger" : "text-accent-gold",
+                    )}>
+                      <Coins className="w-3 h-3" />
+                      {budget.toLocaleString()}
+                    </span>
+                    <span className="text-text-muted">
+                      ({(team.members?.length ?? 0)}/5)
+                    </span>
+                  </>
+                )}
               </div>
             );
           })}
@@ -578,10 +593,14 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
         {sortedTeams.map((team) => {
           const members = team.members ?? [];
           const teamBudget = getTeamBudget(team);
+          const isFull = members.length >= 5;
           return (
             <Card
               key={team.id}
-              className={cn(team.captainId === currentUserId && "border-accent-primary")}
+              className={cn(
+                team.captainId === currentUserId && "border-accent-primary",
+                isFull && "opacity-60",
+              )}
             >
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-4">
@@ -590,6 +609,12 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
                       <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: team.color }} />
                     )}
                     <h3 className="text-lg font-semibold text-text-primary">{team.name}</h3>
+                    {/* 만석 팀 — 더 이상 입찰 불가 */}
+                    {isFull && (
+                      <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-accent-success/15 text-accent-success border border-accent-success/30">
+                        꽉 참
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-1 px-2 py-1 bg-accent-gold/20 rounded-lg border border-accent-gold/30">
                     <Coins className="h-4 w-4 text-accent-gold" />
@@ -639,8 +664,9 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
           const members = team.members ?? [];
           const teamBudget = getTeamBudget(team);
           const isExpanded = expandedTeamIds.has(team.id);
+          const isFull = members.length >= 5;
           return (
-            <div key={team.id} className={cn("rounded-xl border overflow-hidden", team.captainId === currentUserId ? "border-accent-primary" : "border-bg-tertiary")}>
+            <div key={team.id} className={cn("rounded-xl border overflow-hidden", team.captainId === currentUserId ? "border-accent-primary" : "border-bg-tertiary", isFull && "opacity-60")}>
               {/* 아코디언 헤더 — 항상 표시 */}
               <button
                 onClick={() => toggleTeam(team.id)}
@@ -650,7 +676,13 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
                   <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: team.color }} />
                 )}
                 <span className="font-semibold text-sm text-text-primary">{team.name}</span>
-                <span className="text-xs text-text-muted">({members.length}/5)</span>
+                {isFull ? (
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-accent-success/15 text-accent-success border border-accent-success/30">
+                    꽉 참
+                  </span>
+                ) : (
+                  <span className="text-xs text-text-muted">({members.length}/5)</span>
+                )}
                 <div className="ml-auto flex items-center gap-1.5">
                   <Coins className="w-3.5 h-3.5 text-accent-gold" />
                   <span className={cn("font-bold text-xs", teamBudget === 0 ? "text-accent-danger" : "text-accent-gold")}>
