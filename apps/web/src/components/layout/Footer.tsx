@@ -8,6 +8,9 @@ export function Footer() {
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
           <p>&copy; {new Date().getFullYear()} Project Nexus</p>
           <nav className="flex gap-4">
+            <Link href="/guide" className="hover:text-text-secondary transition-colors duration-150">
+              이용 가이드
+            </Link>
             <Link href="/community" className="hover:text-text-secondary transition-colors duration-150">
               커뮤니티
             </Link>
