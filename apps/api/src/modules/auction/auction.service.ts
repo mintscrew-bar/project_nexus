@@ -1232,6 +1232,84 @@ export class AuctionService implements OnModuleInit {
     }
   }
 
+  /**
+   * 미완성 팀(팀장 포함 5명 미만)이 정확히 하나만 남았을 때,
+   * 남은 미배정 플레이어 전원을 그 팀에 0원으로 자동 배정한다.
+   *
+   * 경쟁 상대가 없으면 경매를 더 진행할 이유가 없으므로(마지막 한 팀이 다 받아감),
+   * 한 명씩 최소입찰/유찰을 반복하지 않고 한 번에 채운다.
+   * 게이트웨이가 player-sold 를 순차 emit 할 수 있도록 배정 내역을 반환한다.
+   * 미완성 팀이 둘 이상이면(=아직 경쟁 가능) 빈 배열을 반환해 경매를 계속한다.
+   */
+  async autoAssignToLastTeam(
+    roomId: string,
+  ): Promise<{ player: any; team: any; price: number }[]> {
+    const room = await this.prisma.room.findUnique({
+      where: { id: roomId },
+      include: {
+        participants: {
+          where: { role: "PLAYER", isCaptain: false, teamId: null },
+          include: {
+            user: {
+              include: {
+                riotAccounts: { where: { isPrimary: true } },
+              },
+            },
+          },
+          orderBy: { joinedAt: "asc" },
+        },
+        teams: {
+          include: {
+            _count: { select: { members: true } },
+          },
+        },
+      },
+    });
+    if (!room) return [];
+
+    const maxTeamSize = 5;
+    const incompleteTeams = room.teams.filter(
+      (t: any) => t._count.members < maxTeamSize,
+    );
+    // 미완성 팀이 정확히 하나일 때만 자동 배정 (둘 이상이면 경매 계속)
+    if (incompleteTeams.length !== 1) return [];
+    if (room.participants.length === 0) return [];
+
+    const targetTeam = incompleteTeams[0];
+
+    // 남은 플레이어 전원을 한 트랜잭션으로 배정 (부분 배정 방지)
+    await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      for (const participant of room.participants) {
+        await tx.teamMember.create({
+          data: {
+            teamId: targetTeam.id,
+            userId: participant.userId,
+            soldPrice: 0,
+          },
+        });
+        await tx.roomParticipant.update({
+          where: { id: participant.id },
+          data: { teamId: targetTeam.id },
+        });
+        await tx.auctionBid.create({
+          data: {
+            roomId,
+            teamId: targetTeam.id,
+            targetUserId: participant.userId,
+            amount: 0,
+            isYuchal: true,
+          },
+        });
+      }
+    });
+
+    return room.participants.map((participant: any) => ({
+      player: this._mapAuctionParticipant(participant),
+      team: targetTeam,
+      price: 0,
+    }));
+  }
+
   // ========================================
   // Auction Completion
   // ========================================

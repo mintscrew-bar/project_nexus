@@ -816,6 +816,30 @@ export class AuctionGateway
             this.emitPlayerUnsold(roomId, { player: result.player });
           }
 
+          // 미완성 팀이 하나만 남으면 남은 인원을 그 팀에 자동 배정
+          // (경쟁이 없으므로 마지막 한 팀이 전부 받아감 → 경매 조기 종료)
+          const autoAssigned =
+            await this.auctionService.autoAssignToLastTeam(roomId);
+          if (autoAssigned.length > 0) {
+            this._cancelBotTimers(roomId);
+            for (const assigned of autoAssigned) {
+              this.emitPlayerSold(roomId, {
+                player: assigned.player,
+                team: assigned.team,
+                price: assigned.price,
+              });
+            }
+            // 자동 배정 후 갱신된 팀/플레이어 상태를 한 번 더 브로드캐스트
+            const afterAuto =
+              await this.auctionService.getFullAuctionData(roomId);
+            this.server.to(`room:${roomId}`).emit("bid-resolved", {
+              ...result,
+              state: this.auctionService.getAuctionState(roomId) ?? null,
+              teams: afterAuto.teams,
+              players: afterAuto.players,
+            });
+          }
+
           const isComplete =
             await this.auctionService.checkAuctionComplete(roomId);
 
