@@ -58,3 +58,8 @@ docker-compose.override.yml
 
 # Windows artifacts
 nul
+
+# Actions Runner & Backups
+actions-runner/
+actions-runner.bak.*
+C:/
