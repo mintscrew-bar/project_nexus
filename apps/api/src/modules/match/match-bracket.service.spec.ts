@@ -6,6 +6,14 @@ import {
   ForbiddenException,
   NotFoundException,
 } from "@nestjs/common";
+import { randomInt } from "crypto";
+
+jest.mock("crypto", () => ({
+  ...jest.requireActual("crypto"),
+  randomInt: jest.fn(),
+}));
+
+const mockedRandomInt = randomInt as unknown as jest.Mock<number, [number]>;
 
 const makeTeam = (id: string, memberCount = 5) => ({
   id,
@@ -24,6 +32,7 @@ describe("MatchBracketService", () => {
   };
 
   beforeEach(async () => {
+    mockedRandomInt.mockImplementation(() => 0);
     prisma = {
       room: {
         findUnique: jest.fn(),
@@ -187,6 +196,25 @@ describe("MatchBracketService", () => {
       expect(round2).toHaveLength(1);
       expect(round2[0].teamAId).toBeUndefined();
       expect(round2[0].teamBId).toBeUndefined();
+    });
+
+    it("대진 생성 전에 팀 순서를 랜덤으로 섞는다", async () => {
+      mockedRandomInt
+        .mockReturnValueOnce(0)
+        .mockReturnValueOnce(0)
+        .mockReturnValueOnce(0);
+      setupRoom(4);
+
+      const bracket = await service.generateBracket("host-1", "room-1");
+
+      const round1Pairs = bracket.matches
+        .filter((m) => m.round === 1)
+        .map((m) => [m.teamAId, m.teamBId].sort());
+
+      expect(round1Pairs).toEqual([
+        ["team-1", "team-2"],
+        ["team-0", "team-3"],
+      ]);
     });
   });
 

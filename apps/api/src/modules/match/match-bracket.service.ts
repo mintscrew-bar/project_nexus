@@ -8,6 +8,7 @@ import {
 import { PrismaService } from "../prisma/prisma.service";
 import { Prisma } from "@prisma/client";
 import { RoomStatus, MatchStatus, BracketType } from "@nexus/database";
+import { randomInt } from "crypto";
 
 export interface BracketMatch {
   id: string;
@@ -107,26 +108,27 @@ export class MatchBracketService {
 
     let bracket: Bracket;
     const isDoubleElim = room.bracketFormat === BracketType.DOUBLE_ELIMINATION;
+    const shuffledTeams = this.shuffleTeams(room.teams);
 
     switch (teamCount) {
       case 2:
-        bracket = this.generateSingleMatch(room.teams);
+        bracket = this.generateSingleMatch(shuffledTeams);
         break;
       case 3:
       case 5:
       case 6:
       case 7:
-        bracket = this.generateRoundRobin(room.teams);
+        bracket = this.generateRoundRobin(shuffledTeams);
         break;
       case 4:
         bracket = isDoubleElim
-          ? this.generateDoubleElimination4(room.teams)
-          : this.generateSingleElimination(room.teams);
+          ? this.generateDoubleElimination4(shuffledTeams)
+          : this.generateSingleElimination(shuffledTeams);
         break;
       case 8:
         bracket = isDoubleElim
-          ? this.generateDoubleElimination8(room.teams)
-          : this.generatePowerOf2Elimination(room.teams);
+          ? this.generateDoubleElimination8(shuffledTeams)
+          : this.generatePowerOf2Elimination(shuffledTeams);
         break;
       default:
         throw new BadRequestException(
@@ -527,6 +529,18 @@ export class MatchBracketService {
       teamAId: swap ? teamB.id : teamA.id,
       teamBId: swap ? teamA.id : teamB.id,
     };
+  }
+
+  private shuffleTeams<T>(teams: T[]): T[] {
+    const shuffled = [...teams];
+    for (let index = shuffled.length - 1; index > 0; index--) {
+      const swapIndex = randomInt(index + 1);
+      [shuffled[index], shuffled[swapIndex]] = [
+        shuffled[swapIndex],
+        shuffled[index],
+      ];
+    }
+    return shuffled;
   }
 
   /**

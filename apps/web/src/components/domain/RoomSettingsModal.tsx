@@ -10,6 +10,9 @@ import { Loader2, Users, Lock, Unlock, Gavel, ListOrdered, Trophy, Info, Eye, Ey
 import { RoomSettingsDto, useLobbyStore } from '@/stores/lobby-store';
 
 type TeamMode = "AUCTION" | "SNAKE_DRAFT" | "AUTO_BALANCE" | "MANUAL_TEAM";
+type TeamCaptainSelection = "RANDOM" | "TIER" | "MANUAL" | "VOLUNTEER";
+type AuctionCaptainSelection = "TIER" | "MANUAL" | "VOLUNTEER";
+type SnakeCaptainSelection = "RANDOM" | "TIER";
 
 interface RoomSettingsModalProps {
   isOpen: boolean;
@@ -25,7 +28,7 @@ interface RoomSettingsModalProps {
     minBidIncrement?: number;
     bidTimeLimit?: number;
     pickTimeLimit?: number;
-    captainSelection?: "RANDOM" | "TIER";
+    captainSelection?: TeamCaptainSelection;
     bracketFormat?: string;
   };
 }
@@ -58,12 +61,26 @@ const TEAM_MODES: { value: TeamMode; label: string; description: string; icon: R
 ];
 
 const PLAYER_OPTIONS = [
-  { value: 10, label: "10명", description: "5 vs 5" },
-  { value: 15, label: "15명", description: "3팀 리그전" },
-  { value: 20, label: "20명", description: "4팀 토너먼트" },
-  { value: 30, label: "30명", description: "6팀 리그전" },
-  { value: 40, label: "40명", description: "8팀 토너먼트" },
+  { value: 10, label: "10명", description: "5 vs 5", teams: 2, format: "단판", supportsDE: false },
+  { value: 15, label: "15명", description: "3팀 리그전", teams: 3, format: "리그전", supportsDE: false },
+  { value: 20, label: "20명", description: "4팀 토너먼트", teams: 4, format: "준결승+결승", supportsDE: true },
+  { value: 30, label: "30명", description: "6팀 리그전", teams: 6, format: "리그전", supportsDE: false },
+  { value: 40, label: "40명", description: "8팀 토너먼트", teams: 8, format: "8강+4강+결승", supportsDE: true },
 ];
+
+const toAuctionCaptainSelection = (
+  value?: TeamCaptainSelection,
+): AuctionCaptainSelection => (
+  value === "MANUAL" || value === "VOLUNTEER" || value === "TIER"
+    ? value
+    : "TIER"
+);
+
+const toSnakeCaptainSelection = (
+  value?: TeamCaptainSelection,
+): SnakeCaptainSelection => (
+  value === "TIER" ? "TIER" : "RANDOM"
+);
 
 export function RoomSettingsModal({ isOpen, onClose, room }: RoomSettingsModalProps) {
   const { updateRoomSettings } = useLobbyStore();
@@ -83,13 +100,19 @@ export function RoomSettingsModal({ isOpen, onClose, room }: RoomSettingsModalPr
 
   // Snake draft settings
   const [pickTimeLimit, setPickTimeLimit] = useState(room.pickTimeLimit ?? 60);
-  const [captainSelection, setCaptainSelection] = useState<"RANDOM" | "TIER">(room.captainSelection ?? "RANDOM");
+  const [snakeCaptainSelection, setSnakeCaptainSelection] = useState<SnakeCaptainSelection>(
+    toSnakeCaptainSelection(room.captainSelection),
+  );
+  const [auctionCaptainSelection, setAuctionCaptainSelection] = useState<AuctionCaptainSelection>(
+    toAuctionCaptainSelection(room.captainSelection),
+  );
 
   // Bracket format
   const [useDoubleElim, setUseDoubleElim] = useState(room.bracketFormat === 'DOUBLE_ELIMINATION');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const selectedPlayerOption = PLAYER_OPTIONS.find((option) => option.value === maxParticipants);
   const resetsManualTeamSetup =
     (room.teamMode === "MANUAL_TEAM" || teamMode === "MANUAL_TEAM") &&
     (room.teamMode !== teamMode || room.maxParticipants !== maxParticipants);
@@ -106,7 +129,8 @@ export function RoomSettingsModal({ isOpen, onClose, room }: RoomSettingsModalPr
       setMinBidIncrement(room.minBidIncrement ?? 50);
       setBidTimeLimit(room.bidTimeLimit ?? 30);
       setPickTimeLimit(room.pickTimeLimit ?? 60);
-      setCaptainSelection(room.captainSelection ?? "RANDOM");
+      setSnakeCaptainSelection(toSnakeCaptainSelection(room.captainSelection));
+      setAuctionCaptainSelection(toAuctionCaptainSelection(room.captainSelection));
       setUseDoubleElim(room.bracketFormat === 'DOUBLE_ELIMINATION');
       setError(null);
     }
@@ -125,8 +149,12 @@ export function RoomSettingsModal({ isOpen, onClose, room }: RoomSettingsModalPr
         minBidIncrement,
         bidTimeLimit,
         pickTimeLimit,
-        captainSelection,
-        bracketFormat: [4, 8].includes(Math.floor(maxParticipants / 5))
+        captainSelection: teamMode === "AUCTION"
+          ? auctionCaptainSelection
+          : teamMode === "SNAKE_DRAFT"
+            ? snakeCaptainSelection
+            : undefined,
+        bracketFormat: selectedPlayerOption?.supportsDE
           ? (useDoubleElim ? 'DOUBLE_ELIMINATION' : 'SINGLE_ELIMINATION')
           : undefined,
       };
@@ -187,29 +215,37 @@ export function RoomSettingsModal({ isOpen, onClose, room }: RoomSettingsModalPr
                     ? "border-accent-primary bg-accent-primary/10"
                     : "border-bg-tertiary hover:border-bg-elevated bg-bg-tertiary/50"
                 }`}
-              >
+                >
                 <div className="font-bold text-text-primary text-sm">{option.label}</div>
                 <div className="text-xs text-text-secondary">{option.description}</div>
+                <div className="text-xs text-accent-primary mt-1">{option.format}</div>
               </button>
             ))}
           </div>
         </div>
 
         {/* 더블 일리미네이션 (4/8팀 전용) */}
-        {[20, 40].includes(maxParticipants) && (
+        {selectedPlayerOption?.supportsDE && (
           <div className="p-3 bg-bg-tertiary/50 rounded-lg border border-bg-elevated">
             <label className="flex items-center justify-between cursor-pointer" onClick={() => setUseDoubleElim(v => !v)}>
               <div className="flex items-center gap-2">
                 <GitBranch className="w-4 h-4 text-accent-primary" />
                 <div>
                   <div className="text-text-primary text-sm font-medium">더블 일리미네이션</div>
-                  <div className="text-text-secondary text-xs">패자도 패자조에서 재도전 가능</div>
+                  <div className="text-text-secondary text-xs">패자도 패자조에서 재도전 가능 (총 경기 수 증가)</div>
                 </div>
               </div>
               <div className={`w-10 h-5 rounded-full transition-colors ${useDoubleElim ? "bg-accent-primary" : "bg-bg-elevated"}`}>
                 <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform mt-0.5 ${useDoubleElim ? "translate-x-5" : "translate-x-0.5"}`} />
               </div>
             </label>
+            {useDoubleElim && (
+              <p className="text-xs text-accent-primary mt-2">
+                {selectedPlayerOption.teams === 4
+                  ? "4팀 DE: 승자조(3경기) + 패자조(2경기) + 그랜드파이널(1경기) = 총 6경기"
+                  : "8팀 DE: 승자조(7경기) + 패자조(6경기) + 그랜드파이널(1경기) = 총 14경기"}
+              </p>
+            )}
           </div>
         )}
 
@@ -293,6 +329,29 @@ export function RoomSettingsModal({ isOpen, onClose, room }: RoomSettingsModalPr
                 <option value={60}>60초</option>
               </select>
             </div>
+
+            <div>
+              <Label className="text-xs">팀장 선정 방식</Label>
+              <select
+                value={auctionCaptainSelection}
+                onChange={(e) => setAuctionCaptainSelection(e.target.value as AuctionCaptainSelection)}
+                className="w-full p-2 border rounded-md bg-bg-secondary text-sm mt-1"
+              >
+                <option value="TIER">자동 (MMR 기준 상위 N명)</option>
+                <option value="MANUAL">방장 직접 지명</option>
+                <option value="VOLUNTEER">자원 모집 (30초 타이머)</option>
+              </select>
+              {auctionCaptainSelection === "VOLUNTEER" && (
+                <p className="text-xs text-text-tertiary mt-1">
+                  경매 시작 시 30초 동안 자원자를 모집합니다. 방장은 조기 마감할 수 있습니다.
+                </p>
+              )}
+              {auctionCaptainSelection === "MANUAL" && (
+                <p className="text-xs text-text-tertiary mt-1">
+                  경매 시작 전 방장이 참가자 중 팀장을 직접 지명합니다.
+                </p>
+              )}
+            </div>
           </div>
         )}
 
@@ -307,8 +366,8 @@ export function RoomSettingsModal({ isOpen, onClose, room }: RoomSettingsModalPr
             <div>
               <Label className="text-xs">팀장 선정 방식</Label>
               <select
-                value={captainSelection}
-                onChange={(e) => setCaptainSelection(e.target.value as "RANDOM" | "TIER")}
+                value={snakeCaptainSelection}
+                onChange={(e) => setSnakeCaptainSelection(e.target.value as SnakeCaptainSelection)}
                 className="w-full p-2 border rounded-md bg-bg-secondary text-sm mt-1"
               >
                 <option value="RANDOM">랜덤 선정</option>
@@ -396,11 +455,20 @@ export function RoomSettingsModal({ isOpen, onClose, room }: RoomSettingsModalPr
         {/* 요약 */}
         <div className="p-3 bg-accent-primary/5 rounded-lg border border-accent-primary/20">
           <div className="text-xs text-text-secondary">
-            <span className="font-semibold text-text-primary">{maxParticipants}명</span>
+            <span className="font-semibold text-text-primary">{selectedPlayerOption?.label ?? `${maxParticipants}명`}</span>
+            {selectedPlayerOption && <> ({selectedPlayerOption.description})</>}
             {" • "}
             <span className="font-semibold text-text-primary">
               {TEAM_MODES.find(m => m.value === teamMode)?.label}
             </span>
+            {selectedPlayerOption?.supportsDE && (
+              <>
+                {" • "}
+                <span className={useDoubleElim ? "text-accent-primary font-semibold" : ""}>
+                  {useDoubleElim ? "더블 일리미네이션" : "싱글 일리미네이션"}
+                </span>
+              </>
+            )}
             {" • "}
             <span className={isPrivate ? "text-accent-gold" : "text-accent-success"}>
               {isPrivate ? "비공개" : "공개"}

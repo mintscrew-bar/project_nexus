@@ -52,7 +52,7 @@ interface Room {
   minBidIncrement?: number;
   bidTimeLimit?: number;
   pickTimeLimit?: number;
-  captainSelection?: "RANDOM" | "TIER";
+  captainSelection?: "RANDOM" | "TIER" | "MANUAL" | "VOLUNTEER";
   bracketFormat?: string;
 }
 
@@ -77,7 +77,7 @@ export interface RoomSettingsDto {
   bidTimeLimit?: number;
   // Snake draft settings
   pickTimeLimit?: number;
-  captainSelection?: "RANDOM" | "TIER";
+  captainSelection?: "RANDOM" | "TIER" | "MANUAL" | "VOLUNTEER";
   // Bracket format
   bracketFormat?: string;
 }
