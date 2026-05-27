@@ -225,19 +225,22 @@ export class RoomService {
     rankedPlayers: AutoBalancePlayer[],
     teamCount: number,
   ): AutoBalanceAssignment[] {
-    const candidates = new Map<
-      string,
-      {
-        assignments: AutoBalanceAssignment[];
-        spread: number;
-        rolePenalty: number;
-        quality: number;
-      }
-    >();
+    // 튜닝 상수
+    const MAX_ATTEMPTS = 100; // 1단계 랜덤 분배 시도 상한
+    const MIN_DISTINCT = 12; // 스프레드 근방 후보가 이만큼 모이면 조기 종료
+    const SPREAD_SLACK = 100; // 최저 MMR 스프레드 + 이 값 이내를 "근방"으로 간주
+    const ROLE_PENALTY_WEIGHT = 100; // 강제 오프롤 1건 ≈ MMR 1~3티어 가치
 
-    // Distribute one player from each MMR band to each team, then choose among
-    // near-optimal random candidates using MMR and preferred-role coverage.
-    for (let attempt = 0; attempt < 300; attempt++) {
+    // ── 1단계(저비용): 밴드 분배로 후보를 만들되 MMR 스프레드만 계산한다.
+    //   역할 페널티(팀당 5! 완전탐색)는 여기서 돌리지 않고, 2단계에서
+    //   스프레드 근방까지 살아남은 소수 후보에 대해서만 계산한다.
+    const seen = new Map<
+      string,
+      { assignments: AutoBalanceAssignment[]; spread: number }
+    >();
+    let bestSpread = Number.POSITIVE_INFINITY;
+
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
       const assignments = Array.from({ length: teamCount }, () => ({
         score: 0,
         players: [] as AutoBalancePlayer[],
@@ -258,28 +261,40 @@ export class RoomService {
       }
 
       const signature = this.getAssignmentSignature(assignments);
+      // 동일 구성은 다양성 카운트가 부풀지 않도록 건너뛴다.
+      if (seen.has(signature)) continue;
+
       const scores = assignments.map((assignment) => assignment.score);
       const spread = Math.max(...scores) - Math.min(...scores);
-      const rolePenalty = this.getAssignmentRolePenalty(assignments);
-      candidates.set(signature, {
-        assignments,
-        spread,
-        rolePenalty,
-        // A forced off-role is worth roughly one to three divisions of MMR.
-        quality: spread + rolePenalty * 100,
-      });
+      seen.set(signature, { assignments, spread });
+      if (spread < bestSpread) bestSpread = spread;
+
+      // 조기 종료: 최저 스프레드 근방 후보가 충분히 모이면 더 돌 필요 없음.
+      const nearBestCount = [...seen.values()].filter(
+        (candidate) => candidate.spread <= bestSpread + SPREAD_SLACK,
+      ).length;
+      if (nearBestCount >= MIN_DISTINCT) break;
     }
 
-    const rankedCandidates = [...candidates.entries()].sort(
-      ([, left], [, right]) =>
-        left.quality - right.quality || left.spread - right.spread,
+    // ── 2단계(고비용): 스프레드 근방 후보에 한해서만 역할 페널티를 계산해
+    //   품질을 매기고, 최적 근방에서 랜덤으로 골라 팀 구성 다양성을 유지한다.
+    const finalists = [...seen.values()]
+      .filter((candidate) => candidate.spread <= bestSpread + SPREAD_SLACK)
+      .map((candidate) => ({
+        assignments: candidate.assignments,
+        spread: candidate.spread,
+        quality:
+          candidate.spread +
+          this.getAssignmentRolePenalty(candidate.assignments) *
+            ROLE_PENALTY_WEIGHT,
+      }))
+      .sort((left, right) => left.quality - right.quality || left.spread - right.spread);
+
+    const bestQuality = finalists[0].quality;
+    const pool = finalists.filter(
+      (candidate) => candidate.quality <= bestQuality + ROLE_PENALTY_WEIGHT,
     );
-    const bestQuality = rankedCandidates[0][1].quality;
-    const pool = rankedCandidates.filter(
-      ([, candidate]) => candidate.quality <= bestQuality + 100,
-    );
-    const [, chosen] = pool[randomInt(pool.length)];
-    return chosen.assignments;
+    return pool[randomInt(pool.length)].assignments;
   }
 
   // Transform room data to flatten participant info for frontend
