@@ -96,17 +96,19 @@ export default function TournamentLobbyPage() {
     if (!room) return;
     setIsAddingBot(true);
     try {
-      await adminApi.addBotToRoom(room.id, 1);
+      // 남은 자리를 한 번에 채운다 (15인 이상 내전 테스트 시 클릭 반복 방지)
+      const remaining = Math.max(1, room.maxParticipants - totalPlayers);
+      const { addedCount } = await adminApi.addBotToRoom(room.id, remaining);
       // 방 데이터 재조회 후 로비 store에 직접 반영
       const updated = await roomApi.getRoom(room.id);
       useLobbyStore.setState({ room: updated });
-      addToast("봇을 추가했습니다.", "success");
+      addToast(`봇 ${addedCount}명을 추가했습니다.`, "success");
     } catch (e: any) {
       addToast(e?.response?.data?.message ?? "봇 추가에 실패했습니다.", "error");
     } finally {
       setIsAddingBot(false);
     }
-  }, [room, addToast]);
+  }, [room, totalPlayers, addToast]);
 
   // connect/disconnect는 zustand 스토어 함수로 참조가 안정적이므로 dependency에서 제외
   useEffect(() => {
@@ -447,9 +449,9 @@ export default function TournamentLobbyPage() {
                   onClick={handleAddBot}
                   disabled={isAddingBot}
                   className="px-4 py-2.5 text-sm font-medium rounded-lg border border-bg-tertiary text-text-secondary hover:text-text-primary hover:bg-bg-tertiary transition-colors disabled:opacity-50"
-                  title="봇 1명 추가 (어드민 전용)"
+                  title="남은 자리를 봇으로 모두 채움 (어드민 전용)"
                 >
-                  {isAddingBot ? "추가 중..." : `봇 추가 (${room.maxParticipants - totalPlayers}자리 남음)`}
+                  {isAddingBot ? "추가 중..." : `봇 채우기 (${room.maxParticipants - totalPlayers}자리 남음)`}
                 </button>
               )}
               {isCurrentUserHost && room.status === 'WAITING' && (

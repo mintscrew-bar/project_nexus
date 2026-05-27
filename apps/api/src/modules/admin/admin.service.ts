@@ -1201,8 +1201,10 @@ export class AdminService {
       const toAdd = Math.min(count, available);
       const existingBotIds = new Set(room.participants.map((p) => p.userId));
 
-      // 필요한 봇보다 여유 있게 확보 (최대 9개)
-      const bots = await this.ensureBotUsers(Math.min(9, currentCount + toAdd));
+      // 필요한 봇보다 여유 있게 확보 (방 최대 인원 40명 → 호스트 제외 최대 39봇)
+      const bots = await this.ensureBotUsers(
+        Math.min(39, currentCount + toAdd),
+      );
 
       const newBots = bots
         .filter((b) => !existingBotIds.has(b.id))
