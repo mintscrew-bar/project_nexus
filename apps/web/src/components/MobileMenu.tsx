@@ -1,7 +1,7 @@
 'use client';
 
 import { cn } from '@/lib/utils';
-import { X, Menu, Home, Swords, Trophy, Users, MessageSquare, Settings, User, FlaskConical, ExternalLink, Shield, Moon, Sun } from 'lucide-react';
+import { X, Menu, Home, Swords, Trophy, Users, MessageSquare, Settings, User, FlaskConical, ExternalLink, Shield, Moon, Sun, BookOpen } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
@@ -52,6 +52,7 @@ export function MobileMenu({ className }: MobileMenuProps) {
     { href: '/matches', label: '내전 전적', icon: Trophy },
     { href: '/clans', label: '클랜', icon: Users },
     { href: '/community', label: '커뮤니티', icon: MessageSquare },
+    { href: '/guide', label: '가이드', icon: BookOpen },
   ];
   const visibleNavItems =
     mounted && user?.role === 'ADMIN'
