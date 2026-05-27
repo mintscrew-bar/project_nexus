@@ -6,10 +6,10 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
 import { Switch } from '@/components/ui/Switch';
-import { Loader2, Users, Lock, Unlock, Gavel, ListOrdered, Trophy, Info, Eye, EyeOff, GitBranch } from 'lucide-react';
+import { Loader2, Users, Lock, Unlock, Gavel, ListOrdered, Trophy, Info, Eye, EyeOff, GitBranch, Scale, ArrowLeftRight } from 'lucide-react';
 import { RoomSettingsDto, useLobbyStore } from '@/stores/lobby-store';
 
-type TeamMode = "AUCTION" | "SNAKE_DRAFT";
+type TeamMode = "AUCTION" | "SNAKE_DRAFT" | "AUTO_BALANCE" | "MANUAL_TEAM";
 
 interface RoomSettingsModalProps {
   isOpen: boolean;
@@ -42,6 +42,18 @@ const TEAM_MODES: { value: TeamMode; label: string; description: string; icon: R
     label: "스네이크 드래프트",
     description: "팀장이 번갈아가며 선수를 선택",
     icon: <ListOrdered className="w-4 h-4" />,
+  },
+  {
+    value: "AUTO_BALANCE",
+    label: "자동 밸런스",
+    description: "티어·LP와 선호 포지션 기준 자동 팀 구성",
+    icon: <Scale className="w-4 h-4" />,
+  },
+  {
+    value: "MANUAL_TEAM",
+    label: "자유 팀 선택",
+    description: "참가자가 로비에서 직접 팀 선택",
+    icon: <ArrowLeftRight className="w-4 h-4" />,
   },
 ];
 

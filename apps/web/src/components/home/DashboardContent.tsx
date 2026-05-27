@@ -88,7 +88,8 @@ const POSITION_LABEL: Record<string, string> = {
 const TEAM_MODE_LABEL: Record<string, string> = {
   AUCTION: "경매",
   SNAKE_DRAFT: "스네이크",
-  AUTO: "자동",
+  AUTO_BALANCE: "자동 밸런스",
+  MANUAL_TEAM: "자유 팀 선택",
 };
 
 const CATEGORY_CONFIG = {

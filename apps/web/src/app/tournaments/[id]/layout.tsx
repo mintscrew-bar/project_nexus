@@ -10,7 +10,7 @@ const SHARE_IMAGE = absoluteUrl("/images/nexus2.png");
 type RoomShareInfo = {
   id: string;
   name: string;
-  teamMode: "AUCTION" | "SNAKE_DRAFT";
+  teamMode: "AUCTION" | "SNAKE_DRAFT" | "AUTO_BALANCE" | "MANUAL_TEAM";
   status: string;
   isPrivate: boolean;
   maxParticipants: number;
@@ -19,7 +19,16 @@ type RoomShareInfo = {
 };
 
 function modeLabel(mode: RoomShareInfo["teamMode"]): string {
-  return mode === "AUCTION" ? "경매 내전" : "스네이크 드래프트 내전";
+  switch (mode) {
+    case "AUCTION":
+      return "경매 내전";
+    case "SNAKE_DRAFT":
+      return "스네이크 드래프트 내전";
+    case "AUTO_BALANCE":
+      return "자동 밸런스 내전";
+    case "MANUAL_TEAM":
+      return "자유 팀 선택 내전";
+  }
 }
 
 // 룸은 휘발성이라 검색 색인은 막되(noindex) 디스코드·카카오 공유 카드는 동작시킨다.

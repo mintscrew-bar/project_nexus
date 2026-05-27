@@ -315,7 +315,7 @@ export const roomApi = {
   createRoom: async (data: {
     name: string;
     maxParticipants: number;
-    teamMode: "AUCTION" | "SNAKE_DRAFT";
+    teamMode: "AUCTION" | "SNAKE_DRAFT" | "AUTO_BALANCE" | "MANUAL_TEAM";
     password?: string;
     allowSpectators?: boolean;
     discordGuildId?: string;

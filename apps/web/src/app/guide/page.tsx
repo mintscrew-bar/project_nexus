@@ -2,7 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import {
   Gavel,
+  ListOrdered,
   Scale,
+  ArrowLeftRight,
+  Users,
+  CheckCircle2,
   MessageSquare,
   Bot,
   Trophy,
@@ -12,6 +16,7 @@ import {
 } from "lucide-react";
 import { absoluteUrl } from "@/lib/seo";
 import { NEXUS_DISCORD_INVITE_URL } from "@/lib/constants";
+import { GUIDE_TOC } from "@/lib/guide-toc";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 기능 가이드 — SEO + 소개형 랜딩
@@ -21,16 +26,16 @@ import { NEXUS_DISCORD_INVITE_URL } from "@/lib/constants";
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const metadata: Metadata = {
-  title: "롤 내전 사이트 사용법 — 경매·자동 밸런싱·디스코드 봇 가이드",
+  title: "롤 내전 사용법 — 경매·스네이크·자동 밸런스·자유 팀 선택 가이드",
   description:
-    "롤 내전을 경매 드래프트와 자동 밸런싱으로 운영하고, 디스코드 봇으로 음성 자동 이동·결과 기록까지 자동화하는 방법. Nexus의 내전 기능과 초기 세팅을 한눈에 정리한 가이드입니다.",
+    "Nexus에서 방을 만들고 경매, 스네이크 드래프트, 자동 밸런스, 자유 팀 선택으로 팀을 구성한 뒤 역할 선택과 디스코드 연동까지 진행하는 방법을 안내합니다.",
   alternates: {
     canonical: absoluteUrl("/guide"),
   },
   openGraph: {
     title: "롤 내전 사이트 사용법 — Nexus 기능 가이드",
     description:
-      "경매 드래프트·자동 밸런싱·디스코드 봇 연동까지, 롤 내전을 제대로 운영하는 방법을 Nexus 가이드에서 확인하세요.",
+      "방 생성부터 네 가지 팀 구성 방식, 역할 선택, 디스코드 봇 연동까지 Nexus 내전 진행 방법을 확인하세요.",
     url: absoluteUrl("/guide"),
   },
 };
@@ -39,11 +44,19 @@ export const metadata: Metadata = {
 const faqItems = [
   {
     q: "롤 내전 사이트 Nexus는 무엇인가요?",
-    a: "Nexus는 리그 오브 레전드 내전을 경매 드래프트·스네이크 드래프트로 팀을 구성하고, 자동 밸런싱과 디스코드 봇 연동으로 진행·기록까지 자동화하는 롤 내전 운영 사이트입니다.",
+    a: "Nexus는 경매, 스네이크 드래프트, 자동 밸런스, 자유 팀 선택으로 내전 팀을 구성하고 역할 선택, 디스코드 음성 이동, 결과 기록까지 진행할 수 있는 롤 내전 운영 사이트입니다.",
   },
   {
     q: "내전 팀은 어떻게 구성하나요?",
-    a: "경매 드래프트(팀장이 포인트로 선수를 입찰)와 스네이크 드래프트 두 가지 방식을 지원합니다. 티어 기반 자동 밸런싱으로 양 팀 전력을 맞출 수도 있습니다.",
+    a: "방을 만들 때 경매 드래프트, 스네이크 드래프트, 자동 밸런스, 자유 팀 선택 중 하나를 고릅니다. 자동 밸런스는 티어·LP와 선호 포지션으로 자동 편성하고, 자유 팀 선택은 참가자가 로비에서 직접 팀으로 이동합니다.",
+  },
+  {
+    q: "자동 밸런스와 자유 팀 선택은 언제 시작할 수 있나요?",
+    a: "두 모드는 설정한 정원이 모두 차고 모든 플레이어가 준비되어야 시작할 수 있습니다. 자유 팀 선택은 추가로 모든 참가자가 팀을 고르고 각 팀에 5명씩 배정되어야 합니다.",
+  },
+  {
+    q: "팀을 정한 다음에는 무엇을 하나요?",
+    a: "어떤 팀 구성 방식을 선택해도 팀 확정 후 역할 선택 화면으로 이동합니다. 각 팀원은 겹치지 않는 라인을 선택하며, 시간이 끝날 때까지 선택하지 않으면 선호 포지션을 기준으로 자동 배정됩니다.",
   },
   {
     q: "디스코드 봇은 어떻게 추가하나요?",
@@ -79,14 +92,14 @@ export default function GuidePage() {
         <header className="mb-12 md:mb-16">
           <p className="text-sm font-medium text-accent-primary mb-2">기능 가이드</p>
           <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-text-primary leading-tight">
-            롤 내전, 엑셀·눈치 게임 없이
-            <br className="hidden sm:block" /> 경매·자동 밸런싱·디스코드 봇으로
+            내전 방 만들기부터 팀 구성,
+            <br className="hidden sm:block" /> 역할 선택과 경기 시작까지
           </h1>
           <p className="mt-4 text-sm md:text-lg text-text-secondary leading-relaxed">
-            Nexus는 리그 오브 레전드 내전을 운영하는 팀을 위한 롤 내전 사이트입니다.
-            경매 드래프트로 팀을 짜고, 티어 기반 자동 밸런싱으로 전력을 맞추고,
-            디스코드 봇으로 음성 이동과 결과 기록까지 자동화합니다. 아래에서
-            기능별 사용법과 초기 세팅을 확인하세요.
+            방장은 인원과 팀 구성 방식을 선택해 방을 만들고, 참가자는 로비에서
+            준비한 뒤 팀 구성과 역할 선택을 진행합니다. 경매, 스네이크 드래프트,
+            자동 밸런스, 자유 팀 선택 중 상황에 맞는 방식을 고르는 방법과
+            디스코드 연동 절차를 순서대로 확인하세요.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <Link
@@ -107,58 +120,179 @@ export default function GuidePage() {
           </div>
         </header>
 
-        {/* ── 경매 드래프트 ── */}
+        {/* ── 목차 (앵커 이동) — 모바일 전용. 데스크톱은 좌측 사이드바가 담당 ── */}
+        <nav
+          aria-label="가이드 목차"
+          className="md:hidden mb-8 rounded-xl border border-bg-tertiary bg-bg-secondary/50 p-4"
+        >
+          <p className="text-xs font-semibold text-text-tertiary uppercase tracking-wider mb-3">
+            목차
+          </p>
+          <ul className="flex flex-wrap gap-2">
+            {GUIDE_TOC.map((item) => (
+              <li key={item.id}>
+                <a
+                  href={`#${item.id}`}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-tertiary hover:bg-accent-primary/15 hover:text-accent-primary text-sm text-text-secondary font-medium transition-colors"
+                >
+                  {item.label}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+
+        {/* ── 방 만들기와 로비 준비 ── */}
         <GuideSection
-          icon={<Gavel className="h-6 w-6" />}
-          title="경매 드래프트로 팀 구성"
+          id="start"
+          icon={<Users className="h-6 w-6" />}
+          title="방 만들기와 로비 준비"
         >
           <p>
-            <strong className="text-text-primary">롤 내전 경매</strong>는 팀장이 정해진
-            포인트로 참가자를 입찰해 팀을 꾸리는 방식입니다. 누구를 얼마에 데려올지
-            결정하는 순간부터가 이미 게임입니다. 실시간 입찰·타이머·자동 입찰을
-            지원해, 단순 추첨보다 훨씬 몰입감 있는 팀 구성이 가능합니다.
+            <Link href="/tournaments" className="text-accent-primary hover:underline">내전 방</Link>
+            {" "}목록에서 새 방을 만들거나 기존 방에 입장합니다. 방 생성 시 참가 인원,
+            팀 구성 방식, 공개 여부, 관전 허용 여부와 디스코드 서버 연동을 정할 수 있습니다.
           </p>
-          <ul className="mt-3 space-y-1.5 list-disc pl-5 text-text-secondary">
-            <li>팀장별 포인트 한도 내 실시간 입찰</li>
-            <li>입찰 타이머와 자동 입찰로 빠른 진행</li>
-            <li>경매 결과 그대로 팀 확정 → 바로 경기</li>
-          </ul>
-          <SectionLink href="/tournaments" label="경매 내전 방 만들기" />
+          <ol className="mt-4 space-y-3">
+            <SetupStep n={1} title="방 생성 설정">
+              인원과 대진 방식, 아래의 팀 구성 방식 중 하나를 고릅니다. 필요하면
+              비밀번호, 관전 허용, 승인된 디스코드 서버도 설정합니다.
+            </SetupStep>
+            <SetupStep n={2} title="참가와 준비">
+              참가자는 플레이어로 참여해 준비 상태를 켭니다. 관전 허용 방에서는
+              관전자로 전환할 수 있으며, 관전자는 팀 구성에 포함되지 않습니다.
+            </SetupStep>
+            <SetupStep n={3} title="방장이 내전 시작">
+              준비 상태와 선택한 모드의 시작 조건을 충족하면 방장이 시작합니다.
+              디스코드 음성 연동 방은 준비한 참가자가 음성 채널에 들어와 있어야 합니다.
+            </SetupStep>
+          </ol>
         </GuideSection>
 
-        {/* ── 스네이크 드래프트 / 자동 밸런싱 ── */}
+        {/* ── 팀 구성 방식 선택 ── */}
         <GuideSection
+          id="team-modes"
           icon={<Scale className="h-6 w-6" />}
-          title="스네이크 드래프트 · 자동 밸런싱"
+          title="팀 구성 방식 선택"
         >
           <p>
-            경매가 부담스럽다면 <strong className="text-text-primary">스네이크 드래프트</strong>로
-            순서대로 선수를 지명하거나, <strong className="text-text-primary">티어 기반 자동 밸런싱</strong>으로
-            양 팀 전력을 자동으로 맞출 수 있습니다. 한쪽만 터지는 내전은 이제 그만.
+            방장이 원하는 진행 방식에 따라 네 가지 모드 중 하나를 선택합니다.
+            방장은 로비의 방 설정에서도 시작 전까지 팀 구성 방식을 바꿀 수 있습니다.
+          </p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <ModeCard
+              icon={<Gavel className="h-5 w-5" />}
+              title="경매 드래프트"
+              summary="팀장이 포인트로 입찰"
+            >
+              시작 포인트, 최소 입찰 단위, 제한 시간과 팀장 선정 방식을 설정합니다.
+            </ModeCard>
+            <ModeCard
+              icon={<ListOrdered className="h-5 w-5" />}
+              title="스네이크 드래프트"
+              summary="팀장이 번갈아 선수 지명"
+            >
+              팀장 선정 방식과 픽 제한 시간을 정하고 순서에 맞춰 직접 선택합니다.
+            </ModeCard>
+            <ModeCard
+              icon={<Scale className="h-5 w-5" />}
+              title="자동 밸런스"
+              summary="티어·LP와 선호 포지션으로 자동 편성"
+            >
+              설정한 인원이 모두 참가하고 준비한 뒤 시작하면 팀이 바로 편성됩니다.
+            </ModeCard>
+            <ModeCard
+              icon={<ArrowLeftRight className="h-5 w-5" />}
+              title="자유 팀 선택"
+              summary="참가자가 로비에서 직접 이동"
+            >
+              참가자가 원하는 팀을 고르며, 모든 팀에 5명씩 채워야 시작할 수 있습니다.
+            </ModeCard>
+          </div>
+          <SectionLink href="/tournaments" label="내전 방 둘러보기" />
+        </GuideSection>
+
+        {/* ── 경매 / 스네이크 이용법 ── */}
+        <GuideSection
+          id="draft"
+          icon={<Gavel className="h-6 w-6" />}
+          title="경매 · 스네이크 드래프트 진행 방법"
+        >
+          <div className="grid gap-5 md:grid-cols-2">
+            <ProcessBlock title="경매 드래프트">
+              <li>방장이 고른 방식에 따라 팀장이 자동 선정되거나 직접 지정·자원 모집됩니다.</li>
+              <li>팀장은 현재 선수, 남은 시간, 최고 입찰가와 사용 가능한 포인트를 확인합니다.</li>
+              <li>증액 버튼으로 입찰 금액을 정해 입찰합니다. 남은 빈자리를 위한 예비 포인트는 사용할 수 없습니다.</li>
+              <li>모든 선수가 배정되면 역할 선택 화면으로 이동합니다.</li>
+            </ProcessBlock>
+            <ProcessBlock title="스네이크 드래프트">
+              <li>선정된 팀장들이 표시된 픽 순서에 따라 번갈아 선택합니다.</li>
+              <li>내 차례가 되면 선택 가능한 플레이어를 고르고 선택 확정을 누릅니다.</li>
+              <li>제한 시간 내 선택하지 않으면 자동 진행될 수 있으므로 타이머를 확인합니다.</li>
+              <li>픽이 끝나면 역할 선택 화면으로 이동합니다.</li>
+            </ProcessBlock>
+          </div>
+        </GuideSection>
+
+        {/* ── 자동 / 자유 팀 선택 이용법 ── */}
+        <GuideSection
+          id="quick-team"
+          icon={<ArrowLeftRight className="h-6 w-6" />}
+          title="자동 밸런스 · 자유 팀 선택 진행 방법"
+        >
+          <div className="grid gap-5 md:grid-cols-2">
+            <ProcessBlock title="자동 밸런스">
+              <li>설정한 플레이어 정원이 모두 찰 때까지 참가자를 모읍니다.</li>
+              <li>모든 플레이어가 준비하면 방장이 시작합니다.</li>
+              <li>티어·LP 점수와 주/부 선호 포지션을 고려해 팀이 자동 편성됩니다.</li>
+              <li>편성 직후 역할 선택 화면에서 최종 라인을 정합니다.</li>
+            </ProcessBlock>
+            <ProcessBlock title="자유 팀 선택">
+              <li>플레이어는 로비의 팀 편성에서 원하는 팀의 <strong>이 팀으로 이동</strong>을 누릅니다.</li>
+              <li>팀을 바꾸려면 <strong>대기석으로 이동</strong> 후 빈자리가 있는 다른 팀을 선택합니다.</li>
+              <li>모든 자리가 차고 각 팀에 5명씩 배정된 상태에서 모두 준비합니다.</li>
+              <li>방장이 시작하면 확정된 구성으로 역할 선택을 진행합니다.</li>
+            </ProcessBlock>
+          </div>
+        </GuideSection>
+
+        {/* ── 역할 선택 ── */}
+        <GuideSection
+          id="roles"
+          icon={<CheckCircle2 className="h-6 w-6" />}
+          title="역할 선택과 대진 진행"
+        >
+          <p>
+            네 가지 팀 구성 방식 모두 팀이 확정되면 역할 선택으로 이어집니다.
+            각 팀원은 탑, 정글, 미드, 원딜, 서포터 중 아직 팀원이 선택하지 않은
+            역할을 선택합니다.
           </p>
           <ul className="mt-3 space-y-1.5 list-disc pl-5 text-text-secondary">
-            <li>스네이크 방식 순차 지명으로 공정한 팀 분배</li>
-            <li>티어·포지션을 고려한 자동 밸런싱</li>
-            <li>역할(라인) 선택까지 한 흐름으로 진행</li>
+            <li>선택한 역할을 다시 누르면 취소하고 다른 역할로 바꿀 수 있습니다.</li>
+            <li>시간이 더 필요하면 참가자마다 한 번씩 <strong>+15초</strong>를 사용할 수 있습니다.</li>
+            <li>시간 내 선택하지 않은 역할은 선호 포지션을 기준으로 자동 배정됩니다.</li>
+            <li>역할 선택이 완료되면 대진표로 이동해 경기를 진행합니다.</li>
           </ul>
-          <SectionLink href="/tournaments" label="내전 방 둘러보기" />
         </GuideSection>
 
         {/* ── 디스코드 연동 ── */}
         <GuideSection
+          id="discord"
           icon={<MessageSquare className="h-6 w-6" />}
           title="디스코드 연동"
         >
           <p>
-            Nexus는 디스코드 계정으로 로그인하고, 내전 진행을 디스코드와 연결합니다.
-            팀이 확정되면 음성 채널 자동 이동, 경기 결과 기록까지 디스코드에서
-            &lsquo;딸깍&rsquo; 처리됩니다. 운영자는 진행에, 참가자는 게임에만 집중하세요.
+            방 생성 시 승인된 디스코드 서버를 고르면 내전용 음성 채널을 함께 사용할
+            수 있습니다. 준비한 플레이어가 로비 음성 채널에 참가한 뒤 시작하면,
+            팀이 확정되는 시점에 각 팀 음성 채널로 자동 이동됩니다. 경기 완료 후에는
+            결과 기록도 연동됩니다.
           </p>
           <SectionLink href="/auth/login" label="Discord로 시작하기" />
         </GuideSection>
 
         {/* ── 디스코드 봇 추가 및 초기 세팅 ── */}
         <GuideSection
+          id="bot-setup"
           icon={<Bot className="h-6 w-6" />}
           title="디스코드 내전 봇 추가 방법 · 초기 세팅"
         >
@@ -189,6 +323,7 @@ export default function GuidePage() {
 
         {/* ── 전적 · 클랜 · 랭킹 ── */}
         <GuideSection
+          id="stats"
           icon={<BarChart3 className="h-6 w-6" />}
           title="내전 전적 · 클랜 · 랭킹"
         >
@@ -209,7 +344,7 @@ export default function GuidePage() {
         </GuideSection>
 
         {/* ── FAQ ── */}
-        <section className="mt-12 md:mt-16">
+        <section id="faq" className="mt-12 md:mt-16 scroll-mt-20 md:scroll-mt-24">
           <h2 className="text-xl md:text-2xl font-bold text-text-primary mb-5">자주 묻는 질문</h2>
           <div className="space-y-3">
             {faqItems.map((item) => (
@@ -232,7 +367,7 @@ export default function GuidePage() {
             지금 바로 롤 내전을 시작하세요
           </h2>
           <p className="mt-2 text-sm md:text-base text-text-secondary">
-            경매 드래프트와 자동 밸런싱으로 제대로 된 한 판.
+            네 가지 팀 구성 방식 중 모임에 맞는 방식을 골라 진행하세요.
           </p>
           <div className="mt-5 flex flex-wrap gap-3 justify-center">
             <Link
@@ -259,16 +394,22 @@ export default function GuidePage() {
 
 // ── 섹션 래퍼 ──
 function GuideSection({
+  id,
   icon,
   title,
   children,
 }: {
+  id: string;
   icon: React.ReactNode;
   title: string;
   children: React.ReactNode;
 }) {
   return (
-    <section className="py-6 md:py-8 border-t border-bg-tertiary first-of-type:border-t-0">
+    <section
+      id={id}
+      // sticky 헤더(top-0)에 앵커 제목이 가려지지 않도록 스크롤 여백 확보
+      className="py-6 md:py-8 border-t border-bg-tertiary first-of-type:border-t-0 scroll-mt-20 md:scroll-mt-24"
+    >
       <h2 className="flex items-center gap-2.5 text-lg md:text-2xl font-bold text-text-primary mb-3">
         <span className="text-accent-primary">{icon}</span>
         {title}
@@ -290,6 +431,48 @@ function SectionLink({ href, label }: { href: string; label: string }) {
       {label}
       <ArrowRight className="h-3.5 w-3.5" />
     </Link>
+  );
+}
+
+// ── 팀 구성 방식 카드 ──
+function ModeCard({
+  icon,
+  title,
+  summary,
+  children,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  summary: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-xl border border-bg-tertiary bg-bg-secondary/50 p-4">
+      <div className="flex items-center gap-2 text-text-primary">
+        <span className="text-accent-primary">{icon}</span>
+        <h3 className="font-semibold">{title}</h3>
+      </div>
+      <p className="mt-2 text-sm font-medium text-text-primary">{summary}</p>
+      <p className="mt-1 text-sm text-text-secondary">{children}</p>
+    </div>
+  );
+}
+
+// ── 모드별 진행 순서 ──
+function ProcessBlock({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-xl border border-bg-tertiary bg-bg-secondary/50 p-4">
+      <h3 className="font-semibold text-text-primary mb-3">{title}</h3>
+      <ol className="space-y-2 list-decimal pl-5 text-sm text-text-secondary">
+        {children}
+      </ol>
+    </div>
   );
 }
 

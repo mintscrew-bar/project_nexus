@@ -13,7 +13,7 @@ interface Room {
   maxParticipants: number;
   isPrivate: boolean;
   status: 'WAITING' | 'IN_PROGRESS' | 'COMPLETED' | 'DRAFT' | 'DRAFT_COMPLETED' | 'TEAM_SELECTION' | 'ROLE_SELECTION';
-  teamMode: 'AUCTION' | 'SNAKE_DRAFT';
+  teamMode: 'AUCTION' | 'SNAKE_DRAFT' | 'AUTO_BALANCE' | 'MANUAL_TEAM';
   createdAt: string;
   minTier?: string;
   maxTier?: string;
@@ -33,6 +33,10 @@ const getModeLabel = (mode: string): string => {
       return '경매';
     case 'SNAKE_DRAFT':
       return '스네이크 드래프트';
+    case 'AUTO_BALANCE':
+      return '자동 밸런스';
+    case 'MANUAL_TEAM':
+      return '자유 팀 선택';
     default:
       return mode;
   }

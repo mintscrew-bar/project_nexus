@@ -7,7 +7,7 @@ import { ConfigService } from "@nestjs/config";
 import { RoomService } from "./room.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { ShutdownService } from "../common/shutdown.service";
-import { TeamMode } from "@nexus/database";
+import { RoomStatus, TeamMode } from "@nexus/database";
 
 describe("RoomService", () => {
   let service: RoomService;
@@ -26,7 +26,28 @@ describe("RoomService", () => {
       authProvider: { findFirst: jest.fn() },
       riotAccount: { findFirst: jest.fn() },
       discordGuildLink: { findFirst: jest.fn().mockResolvedValue(null) },
-      room: { create: jest.fn() },
+      room: {
+        create: jest.fn(),
+        findUnique: jest.fn(),
+        update: jest.fn(),
+      },
+      roomParticipant: {
+        findFirst: jest.fn(),
+        count: jest.fn(),
+        update: jest.fn(),
+        updateMany: jest.fn(),
+      },
+      snakeDraftPick: { deleteMany: jest.fn() },
+      auctionBid: { deleteMany: jest.fn() },
+      team: {
+        create: jest.fn(),
+        update: jest.fn(),
+        deleteMany: jest.fn(),
+      },
+      teamMember: { createMany: jest.fn() },
+      $transaction: jest.fn(async (callback: (tx: any) => unknown) =>
+        callback(prisma),
+      ),
     };
 
     shutdownService = {
@@ -178,6 +199,161 @@ describe("RoomService", () => {
       ).rejects.toThrow(BadRequestException);
 
       expect(prisma.room.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("자유 팀 선택", () => {
+    it("플레이어가 팀을 선택하면 준비 상태를 해제하고 팀을 갱신한다", async () => {
+      prisma.room.findUnique
+        .mockResolvedValueOnce({
+          id: "room-1",
+          teamMode: TeamMode.MANUAL_TEAM,
+          status: RoomStatus.WAITING,
+          teams: [{ id: "team-1" }],
+        })
+        .mockResolvedValueOnce({
+          id: "room-1",
+          hostId: "host-1",
+          participants: [],
+          teams: [],
+        });
+      prisma.roomParticipant.findFirst.mockResolvedValue({
+        id: "participant-1",
+        role: "PLAYER",
+        teamId: null,
+      });
+      prisma.roomParticipant.count.mockResolvedValue(2);
+
+      await service.selectManualTeam("user-1", "room-1", "team-1");
+
+      expect(prisma.roomParticipant.update).toHaveBeenCalledWith({
+        where: { id: "participant-1" },
+        data: { teamId: "team-1", isCaptain: false, isReady: false },
+      });
+    });
+
+    it("각 팀이 채워지면 팀 멤버를 확정하고 역할 선택 직전 상태로 전환한다", async () => {
+      const participants = Array.from({ length: 10 }, (_, index) => ({
+        id: `participant-${index}`,
+        userId: `user-${index}`,
+        teamId: index < 5 ? "team-1" : "team-2",
+      }));
+      prisma.room.findUnique
+        .mockResolvedValueOnce({
+          id: "room-1",
+          hostId: "user-0",
+          maxParticipants: 10,
+          status: RoomStatus.WAITING,
+          teamMode: TeamMode.MANUAL_TEAM,
+          participants,
+          teams: [{ id: "team-1" }, { id: "team-2" }],
+        })
+        .mockResolvedValueOnce({
+          id: "room-1",
+          hostId: "user-0",
+          participants: [],
+          teams: [],
+        });
+
+      await service.finalizeManualTeams("user-0", "room-1");
+
+      expect(prisma.teamMember.createMany).toHaveBeenCalledTimes(2);
+      expect(prisma.room.update).toHaveBeenCalledWith({
+        where: { id: "room-1" },
+        data: { status: RoomStatus.DRAFT_COMPLETED },
+      });
+      expect(prisma.$transaction).toHaveBeenCalledWith(
+        expect.any(Function),
+        expect.objectContaining({ isolationLevel: "Serializable" }),
+      );
+    });
+  });
+
+  describe("자동 밸런스", () => {
+    it("팀 멤버를 편성하고 역할 선택 직전 상태로 전환한다", async () => {
+      const participants = Array.from({ length: 10 }, (_, index) => ({
+        userId: `user-${index}`,
+        id: `participant-${index}`,
+        user: {
+          riotAccounts: [{ tier: "GOLD", rank: "I", lp: 0 }],
+        },
+      }));
+      prisma.room.findUnique
+        .mockResolvedValueOnce({
+          id: "room-1",
+          hostId: "host-1",
+          maxParticipants: 10,
+          status: RoomStatus.WAITING,
+          teamMode: TeamMode.AUTO_BALANCE,
+          participants,
+        })
+        .mockResolvedValueOnce({
+          id: "room-1",
+          hostId: "host-1",
+          participants: [],
+          teams: [],
+        });
+      prisma.team.create
+        .mockResolvedValueOnce({ id: "team-1" })
+        .mockResolvedValueOnce({ id: "team-2" });
+
+      await service.createAutoBalancedTeams("host-1", "room-1");
+
+      expect(prisma.teamMember.createMany).toHaveBeenCalledTimes(2);
+      expect(prisma.room.update).toHaveBeenCalledWith({
+        where: { id: "room-1" },
+        data: { status: RoomStatus.DRAFT_COMPLETED },
+      });
+    });
+
+    it("모든 팀 자리가 차지 않으면 편성을 시작하지 않는다", async () => {
+      prisma.room.findUnique.mockResolvedValue({
+        id: "room-1",
+        hostId: "host-1",
+        maxParticipants: 10,
+        status: RoomStatus.WAITING,
+        teamMode: TeamMode.AUTO_BALANCE,
+        participants: [{ userId: "user-1", user: { riotAccounts: [] } }],
+      });
+
+      await expect(
+        service.createAutoBalancedTeams("host-1", "room-1"),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(prisma.team.create).not.toHaveBeenCalled();
+    });
+
+    it("선호 포지션이 고르게 배정된 팀의 패널티가 더 낮다", () => {
+      const players = [
+        ["a", "TOP"],
+        ["b", "JUNGLE"],
+        ["c", "MID"],
+        ["d", "ADC"],
+        ["e", "SUPPORT"],
+        ["f", "TOP"],
+        ["g", "JUNGLE"],
+        ["h", "MID"],
+        ["i", "ADC"],
+        ["j", "SUPPORT"],
+      ].map(([userId, mainRole]) => ({
+        participant: { id: `participant-${userId}`, userId },
+        score: 1000,
+        mainRole,
+        subRole: null,
+      }));
+      const balanced = [
+        { score: 5000, players: players.slice(0, 5) },
+        { score: 5000, players: players.slice(5) },
+      ];
+      const conflicted = [
+        { score: 5000, players: [players[0], ...players.slice(5, 9)] },
+        { score: 5000, players: [...players.slice(1, 5), players[9]] },
+      ];
+
+      expect((service as any).getAssignmentRolePenalty(balanced)).toBe(0);
+      expect(
+        (service as any).getAssignmentRolePenalty(conflicted),
+      ).toBeGreaterThan(0);
     });
   });
 });

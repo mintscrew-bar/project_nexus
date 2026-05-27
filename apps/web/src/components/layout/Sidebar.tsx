@@ -11,6 +11,7 @@ import { Skeleton } from '@/components/ui';
 import { MatchesSidebarContent } from './sidebar/MatchesSidebarContent';
 import { CommunitySidebarContent } from './sidebar/CommunitySidebarContent';
 import { ClansSidebarContent } from './sidebar/ClansSidebarContent';
+import { GuideSidebarContent } from './sidebar/GuideSidebarContent';
 
 interface Room {
   id: string;
@@ -57,6 +58,7 @@ export function Sidebar() {
   const isMatchesRoute = pathname.startsWith('/matches');
   const isCommunityRoute = pathname.startsWith('/community');
   const isClansRoute = pathname.startsWith('/clans');
+  const isGuideRoute = pathname === '/guide';
 
   return (
     <aside className="w-64 bg-bg-secondary border-r border-bg-tertiary p-4 hidden md:block flex-shrink-0 overflow-y-auto">
@@ -67,6 +69,8 @@ export function Sidebar() {
         <CommunitySidebarContent />
       ) : isClansRoute ? (
         <ClansSidebarContent />
+      ) : isGuideRoute ? (
+        <GuideSidebarContent />
       ) : (
         <>
           {/* Quick Actions */}
@@ -152,7 +156,15 @@ export function Sidebar() {
                           <span>{room.currentParticipants || 0}/{room.maxParticipants}</span>
                         </div>
                         <span className="text-text-quaternary">•</span>
-                        <span>{room.teamMode === 'AUCTION' ? '경매' : '스네이크'}</span>
+                        <span>
+                          {room.teamMode === 'AUCTION'
+                            ? '경매'
+                            : room.teamMode === 'SNAKE_DRAFT'
+                              ? '스네이크'
+                              : room.teamMode === 'AUTO_BALANCE'
+                                ? '자동 밸런스'
+                                : '자유 팀 선택'}
+                        </span>
                       </div>
                     </Link>
                   ))}

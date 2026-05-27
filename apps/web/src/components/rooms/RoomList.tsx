@@ -8,10 +8,10 @@ import { useDebounce } from "@/hooks/useDebounce";
 import { useKeyboardShortcutsContext } from "@/components/KeyboardShortcuts";
 import { RoomCard } from "@/components/domain";
 import { EmptyState, Badge, Input, RoomCardSkeleton } from "@/components/ui";
-import { RefreshCcw, Home, Search, Users, Clock, CheckCircle, Gavel, ListOrdered, X, ArrowUpDown, Calendar, TrendingUp } from "lucide-react";
+import { RefreshCcw, Home, Search, Users, Clock, CheckCircle, Gavel, ListOrdered, X, ArrowUpDown, Calendar, TrendingUp, Scale, ArrowLeftRight } from "lucide-react";
 
 type StatusFilter = "ALL" | "WAITING" | "IN_PROGRESS" | "COMPLETED";
-type ModeFilter = "ALL" | "AUCTION" | "SNAKE_DRAFT";
+type ModeFilter = "ALL" | "AUCTION" | "SNAKE_DRAFT" | "AUTO_BALANCE" | "MANUAL_TEAM";
 type SortOption = "newest" | "oldest" | "mostPlayers" | "leastPlayers";
 
 const IN_PROGRESS_STATUSES = new Set([
@@ -284,6 +284,28 @@ export function RoomList() {
           >
             <ListOrdered className="h-3 w-3" />
             스네이크
+          </button>
+          <button
+            onClick={() => setModeFilter("AUTO_BALANCE")}
+            className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors flex items-center gap-1 ${
+              modeFilter === "AUTO_BALANCE"
+                ? "bg-accent-primary/20 text-accent-primary"
+                : "bg-bg-tertiary text-text-secondary hover:bg-bg-elevated"
+            }`}
+          >
+            <Scale className="h-3 w-3" />
+            자동 밸런스
+          </button>
+          <button
+            onClick={() => setModeFilter("MANUAL_TEAM")}
+            className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors flex items-center gap-1 ${
+              modeFilter === "MANUAL_TEAM"
+                ? "bg-accent-primary/20 text-accent-primary"
+                : "bg-bg-tertiary text-text-secondary hover:bg-bg-elevated"
+            }`}
+          >
+            <ArrowLeftRight className="h-3 w-3" />
+            자유 팀 선택
           </button>
         </div>
 

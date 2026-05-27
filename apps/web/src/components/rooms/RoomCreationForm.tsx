@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRoomStore } from "@/stores/room-store";
 import { useRouter } from "next/navigation";
-import { Users, Lock, Unlock, Gavel, ListOrdered, Trophy, Info, GitBranch, AlertTriangle, Server } from "lucide-react";
+import { Users, Lock, Unlock, Gavel, ListOrdered, Trophy, Info, GitBranch, AlertTriangle, Server, Scale, ArrowLeftRight } from "lucide-react";
 import Link from "next/link";
 import { discordApi } from "@/lib/api-client";
 
@@ -12,7 +12,7 @@ interface RoomCreationFormProps {
   onRoomCreated?: (roomId: string) => void;
 }
 
-type TeamMode = "AUCTION" | "SNAKE_DRAFT";
+type TeamMode = "AUCTION" | "SNAKE_DRAFT" | "AUTO_BALANCE" | "MANUAL_TEAM";
 
 type DiscordGuildOption = {
   guildId: string;
@@ -32,6 +32,18 @@ const TEAM_MODES: { value: TeamMode; label: string; description: string; icon: R
     label: "스네이크 드래프트",
     description: "팀장이 번갈아가며 선수를 선택합니다 (1-2-2-2-1 순서)",
     icon: <ListOrdered className="w-5 h-5" />,
+  },
+  {
+    value: "AUTO_BALANCE",
+    label: "자동 밸런스",
+    description: "참가자 티어·LP와 선호 포지션을 고려해 팀을 자동 구성합니다",
+    icon: <Scale className="w-5 h-5" />,
+  },
+  {
+    value: "MANUAL_TEAM",
+    label: "자유 팀 선택",
+    description: "로비에서 참가자가 원하는 팀으로 직접 이동해 팀을 구성합니다",
+    icon: <ArrowLeftRight className="w-5 h-5" />,
   },
 ];
 

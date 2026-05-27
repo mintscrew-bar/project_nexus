@@ -27,6 +27,8 @@ interface Participant {
   avatar?: string | null;
   isHost: boolean;
   isReady: boolean;
+  isCaptain?: boolean;
+  teamId?: string | null;
   role?: "PLAYER" | "SPECTATOR";
   riotAccount?: RiotAccount | null;
   // Discord 음성채널 참가 여부 (Lobby 채널 기준)
@@ -41,8 +43,9 @@ interface Room {
   maxParticipants: number;
   isPrivate: boolean;
   status: "WAITING" | "IN_PROGRESS" | "COMPLETED" | "DRAFT" | "DRAFT_COMPLETED" | "TEAM_SELECTION" | "ROLE_SELECTION";
-  teamMode: "AUCTION" | "SNAKE_DRAFT";
+  teamMode: "AUCTION" | "SNAKE_DRAFT" | "AUTO_BALANCE" | "MANUAL_TEAM";
   participants: Participant[];
+  teams?: { id: string; name: string; color?: string | null }[];
   // Extended settings
   allowSpectators?: boolean;
   startingPoints?: number;
@@ -66,7 +69,7 @@ export interface RoomSettingsDto {
   name?: string;
   password?: string | null;
   maxParticipants?: number;
-  teamMode?: "AUCTION" | "SNAKE_DRAFT";
+  teamMode?: "AUCTION" | "SNAKE_DRAFT" | "AUTO_BALANCE" | "MANUAL_TEAM";
   allowSpectators?: boolean;
   // Auction settings
   startingPoints?: number;
@@ -102,6 +105,7 @@ interface LobbyStoreState {
   updateRoomSettings: (roomId: string, settings: RoomSettingsDto) => Promise<void>;
   kickParticipant: (roomId: string, participantId: string) => Promise<void>;
   toggleSpectator: (onError?: (msg: string) => void) => void;
+  selectTeam: (teamId: string | null, onError?: (msg: string) => void) => void;
 }
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
@@ -339,6 +343,17 @@ export const useLobbyStore = create<LobbyStoreState>((set, get) => ({
     const { socket, room } = get();
     if (socket && room) {
       socket.emit('toggle-spectator', { roomId: room.id }, (response: any) => {
+        if (response && response.error && onError) {
+          onError(response.error);
+        }
+      });
+    }
+  },
+
+  selectTeam: (teamId, onError) => {
+    const { socket, room } = get();
+    if (socket && room) {
+      socket.emit('select-team', { roomId: room.id, teamId }, (response: any) => {
         if (response && response.error && onError) {
           onError(response.error);
         }

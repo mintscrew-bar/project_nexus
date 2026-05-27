@@ -14,7 +14,7 @@ interface Room {
   maxParticipants: number;
   isPrivate: boolean;
   status: "WAITING" | "IN_PROGRESS" | "COMPLETED" | "DRAFT" | "DRAFT_COMPLETED" | "ROLE_SELECTION" | "TEAM_SELECTION";
-  teamMode: "AUCTION" | "SNAKE_DRAFT";
+  teamMode: "AUCTION" | "SNAKE_DRAFT" | "AUTO_BALANCE" | "MANUAL_TEAM";
   createdAt: string;
   participants?: any[];
 }
@@ -40,7 +40,7 @@ interface LeaveRoomResponse {
 interface RoomCreationData {
   name: string;
   maxParticipants: 10 | 15 | 20 | 30 | 40;
-  teamMode: "AUCTION" | "SNAKE_DRAFT";
+  teamMode: "AUCTION" | "SNAKE_DRAFT" | "AUTO_BALANCE" | "MANUAL_TEAM";
   password?: string;
   allowSpectators?: boolean;
   discordGuildId?: string;

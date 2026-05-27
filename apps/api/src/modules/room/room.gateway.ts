@@ -19,6 +19,7 @@ import { AuthService } from "../auth/auth.service";
 import { AuctionService } from "../auction/auction.service";
 import { AuctionGateway } from "../auction/auction.gateway";
 import { RoleSelectionService } from "../role-selection/role-selection.service";
+import { RoleSelectionGateway } from "../role-selection/role-selection.gateway";
 import { DiscordVoiceService } from "../discord/discord-voice.service";
 import { RoomStatus, TeamMode } from "@nexus/database";
 
@@ -68,6 +69,8 @@ export class RoomGateway
     private readonly auctionGateway: AuctionGateway,
     @Inject(forwardRef(() => RoleSelectionService))
     private readonly roleSelectionService: RoleSelectionService,
+    @Inject(forwardRef(() => RoleSelectionGateway))
+    private readonly roleSelectionGateway: RoleSelectionGateway,
     @Inject("DISCORD_VOICE_SERVICE")
     private readonly discordVoiceService: DiscordVoiceService,
   ) {}
@@ -297,7 +300,8 @@ export class RoomGateway
   @SubscribeMessage("join-room")
   async handleJoinRoom(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { roomId: string; password?: string; asSpectator?: boolean },
+    @MessageBody()
+    data: { roomId: string; password?: string; asSpectator?: boolean },
   ) {
     try {
       if (!client.userId) {
@@ -494,11 +498,33 @@ export class RoomGateway
         userId: client.userId,
         newRole: result.newRole,
       });
+      this.server.to(data.roomId).emit("room-updated", result.room);
 
       // 관전자↔플레이어 전환 → 방 요약 delta 전송
       this.broadcastRoomDelta("update", data.roomId);
 
       return { success: true, newRole: result.newRole };
+    } catch (error: any) {
+      return { error: error.message };
+    }
+  }
+
+  @SubscribeMessage("select-team")
+  async handleSelectTeam(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() data: { roomId: string; teamId: string | null },
+  ) {
+    try {
+      if (!client.userId) {
+        return { error: "Unauthorized" };
+      }
+      const room = await this.roomService.selectManualTeam(
+        client.userId,
+        data.roomId,
+        data.teamId,
+      );
+      this.server.to(data.roomId).emit("room-updated", room);
+      return { success: true, room };
     } catch (error: any) {
       return { error: error.message };
     }
@@ -612,6 +638,30 @@ export class RoomGateway
             emitError,
           );
         }
+      } else if (room.teamMode === TeamMode.AUTO_BALANCE) {
+        result = await this.roomService.createAutoBalancedTeams(
+          client.userId!,
+          data.roomId,
+        );
+        const roleData = await this.roleSelectionService.startRoleSelection(
+          data.roomId,
+        );
+        await this.roleSelectionGateway.emitRoleSelectionStarted(
+          data.roomId,
+          roleData,
+        );
+      } else if (room.teamMode === TeamMode.MANUAL_TEAM) {
+        result = await this.roomService.finalizeManualTeams(
+          client.userId!,
+          data.roomId,
+        );
+        const roleData = await this.roleSelectionService.startRoleSelection(
+          data.roomId,
+        );
+        await this.roleSelectionGateway.emitRoleSelectionStarted(
+          data.roomId,
+          roleData,
+        );
       }
 
       coreStartSucceeded = true;
@@ -859,7 +909,8 @@ export class RoomGateway
   @Cron("*/5 * * * *")
   async cleanupZombieParticipants() {
     try {
-      const waitingRooms = await this.roomService.getWaitingRoomsWithParticipants();
+      const waitingRooms =
+        await this.roomService.getWaitingRoomsWithParticipants();
       for (const room of waitingRooms) {
         // /room 네임스페이스 소켓 기준이 아닌 Socket.IO room 멤버십 기준으로 판단.
         // userSockets는 /room 네임스페이스만 추적하므로 다른 네임스페이스에

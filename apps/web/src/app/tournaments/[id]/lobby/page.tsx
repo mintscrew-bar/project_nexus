@@ -28,7 +28,7 @@ export default function TournamentLobbyPage() {
   const router = useRouter();
   const roomId = params.id as string;
 
-  const { connect, disconnect, room, isConnected, error, gameStarting, messages, setReady, startGame, sendMessage, kickParticipant, toggleSpectator } = useLobbyStore();
+  const { connect, disconnect, room, isConnected, error, gameStarting, messages, setReady, startGame, sendMessage, kickParticipant, toggleSpectator, selectTeam } = useLobbyStore();
   const { user: currentUser } = useAuthStore();
   const { addToast } = useToast();
   const { friends, fetchFriends } = useFriendStore();
@@ -125,7 +125,13 @@ export default function TournamentLobbyPage() {
     if (gameStarting) {
       hasRedirected.current = true;
       disconnect({ skipLeave: true });
-      router.push(room.teamMode === "AUCTION" ? `/auction/${room.id}` : `/draft/${room.id}`);
+      router.push(
+        room.teamMode === "AUCTION"
+          ? `/auction/${room.id}`
+          : room.teamMode === "SNAKE_DRAFT"
+            ? `/draft/${room.id}`
+            : `/role-selection/${room.id}`,
+      );
       return;
     }
     if (room.status === 'DRAFT' || room.status === 'TEAM_SELECTION') {
@@ -195,7 +201,13 @@ export default function TournamentLobbyPage() {
   const emptySlots = Math.max(0, room.maxParticipants - totalPlayers);
   const readyPercent = totalPlayers > 0 ? (readyCount / totalPlayers) * 100 : 0;
 
-  const teamModeLabel = room.teamMode === "AUCTION" ? "경매" : "스네이크";
+  const teamModeLabel = room.teamMode === "AUCTION"
+    ? "경매"
+    : room.teamMode === "SNAKE_DRAFT"
+      ? "스네이크"
+      : room.teamMode === "AUTO_BALANCE"
+        ? "자동 밸런스"
+        : "자유 팀 선택";
   const bracketLabel = room.bracketFormat === "SINGLE_ELIMINATION" ? "싱글 엘리미네이션"
     : room.bracketFormat === "DOUBLE_ELIMINATION" ? "더블 엘리미네이션"
     : room.bracketFormat === "ROUND_ROBIN" ? "라운드 로빈" : room.bracketFormat || "미정";
@@ -206,6 +218,28 @@ export default function TournamentLobbyPage() {
   const allInVoice = !hasDiscordVoice || room.participants
     .filter((p: any) => p.isReady && !/^testbot_\d+$/.test(p.username))
     .every((p: any) => p.inVoice !== false);
+  const allPlayersAssigned =
+    room.teamMode !== "MANUAL_TEAM" ||
+    players.every((p: any) => Boolean(p.teamId));
+  const requiresFullTeams =
+    room.teamMode === "AUTO_BALANCE" || room.teamMode === "MANUAL_TEAM";
+  const hasFullRoster =
+    !requiresFullTeams || totalPlayers === room.maxParticipants;
+  const manualTeamsFilled =
+    room.teamMode !== "MANUAL_TEAM" ||
+    ((room.teams?.length ?? 0) > 0 &&
+      room.teams!.every(
+        (team: any) =>
+          players.filter((player: any) => player.teamId === team.id).length ===
+          5,
+      ));
+  const canStart =
+    allPlayersReady &&
+    allPlayersAssigned &&
+    hasFullRoster &&
+    manualTeamsFilled &&
+    totalPlayers >= (room.teamMode === "AUCTION" ? 4 : 2) &&
+    allInVoice;
 
   const participantsList = (
     <LobbyParticipantsList
@@ -226,6 +260,7 @@ export default function TournamentLobbyPage() {
       handleAddFriend={handleAddFriend}
       setKickTarget={setKickTarget}
       toggleSpectator={toggleSpectator}
+      selectTeam={selectTeam}
       addToast={addToast}
     />
   );
@@ -369,7 +404,7 @@ export default function TournamentLobbyPage() {
               <div className="px-5 py-3 border-b border-bg-tertiary flex items-center justify-between">
                 <h2 className="font-bold text-text-primary flex items-center gap-2">
                   <Users className="h-5 w-5 text-text-secondary" />
-                  참가자
+                  {room.teamMode === "MANUAL_TEAM" ? "팀 편성" : "참가자"}
                   <span className="text-sm font-normal text-text-tertiary">{totalPlayers}/{room.maxParticipants}</span>
                 </h2>
               </div>
@@ -398,7 +433,8 @@ export default function TournamentLobbyPage() {
               <div className="px-4 pt-3 flex-shrink-0">
                 <TabsList className="w-full">
                   <TabsTrigger value="participants" className="flex-1 justify-center">
-                    <Users className="h-4 w-4 mr-1.5" />참가자 ({totalPlayers})
+                    <Users className="h-4 w-4 mr-1.5" />
+                    {room.teamMode === "MANUAL_TEAM" ? "팀 편성" : "참가자"} ({totalPlayers})
                   </TabsTrigger>
                   <TabsTrigger value="chat" className="flex-1 justify-center relative">
                     <MessageSquare className="h-4 w-4 mr-1.5" />채팅
@@ -461,11 +497,11 @@ export default function TournamentLobbyPage() {
               {isCurrentUserHost && room.status === 'WAITING' && (
                 <button
                   className={`px-6 py-2.5 font-bold rounded-lg transition-all text-sm text-white ${
-                    allPlayersReady && totalPlayers >= (room.teamMode === 'AUCTION' ? 4 : 2) && allInVoice
+                    canStart
                       ? 'bg-accent-success hover:bg-accent-success/90 animate-glow-success'
                       : 'bg-accent-success/50 cursor-not-allowed opacity-60'
                   }`}
-                  disabled={!allPlayersReady || totalPlayers < (room.teamMode === 'AUCTION' ? 4 : 2) || !allInVoice}
+                  disabled={!canStart}
                   onClick={() => startGame((err) => {
                     // 음성채널 미참가 유저가 있는 경우 구체적인 메시지 표시
                     if (err.missingVoiceUsers && err.missingVoiceUsers.length > 0) {
@@ -480,6 +516,12 @@ export default function TournamentLobbyPage() {
                   title={
                     room.teamMode === 'AUCTION' && totalPlayers < 4
                       ? '경매 모드는 최소 4명이 필요합니다'
+                      : !hasFullRoster
+                      ? '이 모드는 모든 팀 자리가 채워져야 시작할 수 있습니다'
+                      : !allPlayersAssigned
+                      ? '모든 플레이어가 팀을 선택해야 합니다'
+                      : !manualTeamsFilled
+                      ? '각 팀에 5명씩 배정해야 합니다'
                       : hasDiscordVoice && !allInVoice
                       ? '음성채널에 참가하지 않은 유저가 있습니다'
                       : undefined

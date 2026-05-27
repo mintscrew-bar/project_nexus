@@ -19,6 +19,8 @@ import {
 } from "@nexus/database";
 import { Prisma } from "@prisma/client";
 import * as bcrypt from "bcrypt";
+import { randomInt } from "crypto";
+import { calculateTierScore } from "../common/tier-score.util";
 
 export interface CreateRoomDto {
   name: string;
@@ -45,6 +47,21 @@ export interface JoinRoomDto {
   roomId: string;
   password?: string;
   asSpectator?: boolean;
+}
+
+interface AutoBalancePlayer {
+  participant: {
+    id: string;
+    userId: string;
+  };
+  score: number;
+  mainRole: string | null;
+  subRole: string | null;
+}
+
+interface AutoBalanceAssignment {
+  score: number;
+  players: AutoBalancePlayer[];
 }
 
 @Injectable()
@@ -87,6 +104,184 @@ export class RoomService {
     throw new BadRequestException("트랜잭션 재시도 한도를 초과했습니다.");
   }
 
+  private readonly teamColors = [
+    "#60A5FA",
+    "#F87171",
+    "#34D399",
+    "#FBBF24",
+    "#A78BFA",
+    "#F472B6",
+    "#22D3EE",
+    "#FB923C",
+  ];
+
+  private async createManualTeamSlots(
+    tx: Prisma.TransactionClient,
+    roomId: string,
+    hostId: string,
+    maxParticipants: number,
+  ) {
+    const numTeams = Math.floor(maxParticipants / 5);
+    for (let index = 0; index < numTeams; index++) {
+      await tx.team.create({
+        data: {
+          roomId,
+          captainId: hostId,
+          name: `Team ${index + 1}`,
+          color: this.teamColors[index % this.teamColors.length],
+        },
+      });
+    }
+  }
+
+  private async clearTeamSetup(
+    tx: Prisma.TransactionClient,
+    roomId: string,
+    resetReady = false,
+  ) {
+    await tx.roomParticipant.updateMany({
+      where: { roomId },
+      data: {
+        teamId: null,
+        isCaptain: false,
+        ...(resetReady && { isReady: false }),
+      },
+    });
+    await tx.snakeDraftPick.deleteMany({ where: { roomId } });
+    await tx.auctionBid.deleteMany({ where: { roomId } });
+    await tx.team.deleteMany({ where: { roomId } });
+  }
+
+  private shuffle<T>(items: T[]): T[] {
+    const shuffled = [...items];
+    for (let index = shuffled.length - 1; index > 0; index--) {
+      const swapIndex = randomInt(index + 1);
+      [shuffled[index], shuffled[swapIndex]] = [
+        shuffled[swapIndex],
+        shuffled[index],
+      ];
+    }
+    return shuffled;
+  }
+
+  private getAssignmentSignature(assignments: AutoBalanceAssignment[]) {
+    return assignments
+      .map((assignment) =>
+        assignment.players
+          .map((player) => player.participant.userId)
+          .sort()
+          .join(","),
+      )
+      .sort()
+      .join("|");
+  }
+
+  private getTeamRolePenalty(players: AutoBalancePlayer[]) {
+    const roles = ["TOP", "JUNGLE", "MID", "ADC", "SUPPORT"];
+    let minimumPenalty = Number.POSITIVE_INFINITY;
+
+    const visit = (
+      playerIndex: number,
+      availableRoles: string[],
+      penalty: number,
+    ) => {
+      if (penalty >= minimumPenalty) return;
+      if (playerIndex === players.length) {
+        minimumPenalty = penalty;
+        return;
+      }
+
+      const player = players[playerIndex];
+      for (const role of availableRoles) {
+        const rolePenalty =
+          player.mainRole === role
+            ? 0
+            : player.subRole === role
+              ? 1
+              : player.mainRole || player.subRole
+                ? 3
+                : 1;
+        visit(
+          playerIndex + 1,
+          availableRoles.filter((availableRole) => availableRole !== role),
+          penalty + rolePenalty,
+        );
+      }
+    };
+
+    visit(0, roles, 0);
+    return minimumPenalty;
+  }
+
+  private getAssignmentRolePenalty(assignments: AutoBalanceAssignment[]) {
+    return assignments.reduce(
+      (penalty, assignment) =>
+        penalty + this.getTeamRolePenalty(assignment.players),
+      0,
+    );
+  }
+
+  private chooseAutoBalancedAssignments(
+    rankedPlayers: AutoBalancePlayer[],
+    teamCount: number,
+  ): AutoBalanceAssignment[] {
+    const candidates = new Map<
+      string,
+      {
+        assignments: AutoBalanceAssignment[];
+        spread: number;
+        rolePenalty: number;
+        quality: number;
+      }
+    >();
+
+    // Distribute one player from each MMR band to each team, then choose among
+    // near-optimal random candidates using MMR and preferred-role coverage.
+    for (let attempt = 0; attempt < 300; attempt++) {
+      const assignments = Array.from({ length: teamCount }, () => ({
+        score: 0,
+        players: [] as AutoBalancePlayer[],
+      }));
+
+      for (let offset = 0; offset < rankedPlayers.length; offset += teamCount) {
+        const band = this.shuffle(
+          rankedPlayers.slice(offset, offset + teamCount),
+        );
+        const destinations = this.shuffle(assignments).sort(
+          (left, right) => left.score - right.score,
+        );
+
+        for (let index = 0; index < band.length; index++) {
+          destinations[index].players.push(band[index]);
+          destinations[index].score += band[index].score;
+        }
+      }
+
+      const signature = this.getAssignmentSignature(assignments);
+      const scores = assignments.map((assignment) => assignment.score);
+      const spread = Math.max(...scores) - Math.min(...scores);
+      const rolePenalty = this.getAssignmentRolePenalty(assignments);
+      candidates.set(signature, {
+        assignments,
+        spread,
+        rolePenalty,
+        // A forced off-role is worth roughly one to three divisions of MMR.
+        quality: spread + rolePenalty * 100,
+      });
+    }
+
+    const rankedCandidates = [...candidates.entries()].sort(
+      ([, left], [, right]) =>
+        left.quality - right.quality || left.spread - right.spread,
+    );
+    const bestQuality = rankedCandidates[0][1].quality;
+    const pool = rankedCandidates.filter(
+      ([, candidate]) => candidate.quality <= bestQuality + 100,
+    );
+    const [, chosen] = pool[randomInt(pool.length)];
+    return chosen.assignments;
+  }
+
   // Transform room data to flatten participant info for frontend
   private transformRoomData(room: any) {
     if (!room) return room;
@@ -100,6 +295,8 @@ export class RoomService {
         avatar: p.user?.avatar || null,
         isHost: p.userId === room.hostId,
         isReady: p.isReady,
+        isCaptain: p.isCaptain,
+        teamId: p.teamId,
         role: p.role,
         riotAccount: p.user?.riotAccounts?.[0] || null,
       })),
@@ -236,6 +433,17 @@ export class RoomService {
       },
     });
 
+    if (dto.teamMode === TeamMode.MANUAL_TEAM) {
+      await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+        await this.createManualTeamSlots(
+          tx,
+          room.id,
+          hostId,
+          dto.maxParticipants,
+        );
+      });
+    }
+
     // Discord 봇 연동: 팀별 음성채널 생성
     try {
       if (this.discordVoiceService) {
@@ -289,7 +497,9 @@ export class RoomService {
       );
     }
 
-    return this.transformRoomData(room);
+    return dto.teamMode === TeamMode.MANUAL_TEAM
+      ? this.getRoomById(room.id)
+      : this.transformRoomData(room);
   }
 
   /**
@@ -432,6 +642,8 @@ export class RoomService {
   private readonly validTeamModes = new Set<TeamMode>([
     "SNAKE_DRAFT",
     "AUCTION",
+    "AUTO_BALANCE",
+    "MANUAL_TEAM",
   ]);
 
   async listRooms(filters?: {
@@ -613,7 +825,14 @@ export class RoomService {
 
       await tx.roomParticipant.update({
         where: { id: participant.id },
-        data: { role: nextRole, isReady: false },
+        data: {
+          role: nextRole,
+          isReady: false,
+          ...(nextRole === "SPECTATOR" && {
+            teamId: null,
+            isCaptain: false,
+          }),
+        },
       });
 
       return nextRole;
@@ -905,6 +1124,28 @@ export class RoomService {
       data,
     });
 
+    const nextTeamMode = updates.teamMode ?? room.teamMode;
+    const manualSetupChanged =
+      (room.teamMode === TeamMode.MANUAL_TEAM ||
+        nextTeamMode === TeamMode.MANUAL_TEAM) &&
+      ((updates.teamMode !== undefined && updates.teamMode !== room.teamMode) ||
+        (updates.maxParticipants !== undefined &&
+          updates.maxParticipants !== room.maxParticipants));
+
+    if (manualSetupChanged) {
+      await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+        await this.clearTeamSetup(tx, roomId, true);
+        if (nextTeamMode === TeamMode.MANUAL_TEAM) {
+          await this.createManualTeamSlots(
+            tx,
+            roomId,
+            room.hostId,
+            updates.maxParticipants ?? room.maxParticipants,
+          );
+        }
+      });
+    }
+
     // Discord 봇 채널 동기화
     if (this.discordVoiceService) {
       // 인원 변경 → 팀 채널 수 조정
@@ -1008,6 +1249,250 @@ export class RoomService {
     );
   }
 
+  async selectManualTeam(
+    userId: string,
+    roomId: string,
+    teamId: string | null,
+  ) {
+    await this.runSerializableTx(async (tx) => {
+      const room = await tx.room.findUnique({
+        where: { id: roomId },
+        include: { teams: true },
+      });
+      if (!room) {
+        throw new NotFoundException("Room not found");
+      }
+      if (
+        room.teamMode !== TeamMode.MANUAL_TEAM ||
+        room.status !== RoomStatus.WAITING
+      ) {
+        throw new BadRequestException(
+          "자유 팀 선택 모드의 대기실에서만 팀을 이동할 수 있습니다.",
+        );
+      }
+
+      const participant = await tx.roomParticipant.findFirst({
+        where: { roomId, userId },
+      });
+      if (!participant || participant.role !== "PLAYER") {
+        throw new BadRequestException("플레이어만 팀을 선택할 수 있습니다.");
+      }
+
+      if (teamId) {
+        if (!room.teams.some((team) => team.id === teamId)) {
+          throw new BadRequestException("유효하지 않은 팀입니다.");
+        }
+        if (participant.teamId !== teamId) {
+          const memberCount = await tx.roomParticipant.count({
+            where: { roomId, teamId, role: "PLAYER" },
+          });
+          if (memberCount >= 5) {
+            throw new BadRequestException("선택한 팀은 이미 가득 찼습니다.");
+          }
+        }
+      }
+
+      await tx.roomParticipant.update({
+        where: { id: participant.id },
+        data: { teamId, isCaptain: false, isReady: false },
+      });
+    });
+
+    return this.getRoomById(roomId);
+  }
+
+  async createAutoBalancedTeams(hostId: string, roomId: string) {
+    const room = await this.prisma.room.findUnique({
+      where: { id: roomId },
+      include: {
+        participants: {
+          where: { role: "PLAYER" },
+          include: {
+            user: {
+              include: {
+                riotAccounts: {
+                  where: { isPrimary: true },
+                  take: 1,
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!room) {
+      throw new NotFoundException("Room not found");
+    }
+    if (room.hostId !== hostId || room.teamMode !== TeamMode.AUTO_BALANCE) {
+      throw new ForbiddenException("자동 밸런스 팀 구성을 시작할 수 없습니다.");
+    }
+    if (room.status !== RoomStatus.WAITING) {
+      throw new BadRequestException("Room has already started");
+    }
+    if (room.participants.length !== room.maxParticipants) {
+      throw new BadRequestException(
+        "자동 밸런스 모드는 모든 팀 자리가 채워져야 시작할 수 있습니다.",
+      );
+    }
+
+    const configuredTeamCount = Math.floor(room.maxParticipants / 5);
+    const teamCount = configuredTeamCount;
+    const rankedPlayers = room.participants
+      .map((participant) => {
+        const account = participant.user.riotAccounts[0];
+        return {
+          participant,
+          score: calculateTierScore(
+            account?.tier || "UNRANKED",
+            account?.rank || "",
+            account?.lp || 0,
+          ),
+          mainRole: account?.mainRole ?? null,
+          subRole: account?.subRole ?? null,
+        };
+      })
+      .sort((a, b) => b.score - a.score);
+    const assignments = this.chooseAutoBalancedAssignments(
+      rankedPlayers,
+      teamCount,
+    );
+
+    await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      await this.clearTeamSetup(tx, roomId);
+      for (let index = 0; index < assignments.length; index++) {
+        const assignment = assignments[index];
+        const captain = assignment.players[0]?.participant;
+        if (!captain) continue;
+        const team = await tx.team.create({
+          data: {
+            roomId,
+            captainId: captain.userId,
+            name: `Team ${index + 1}`,
+            color: this.teamColors[index % this.teamColors.length],
+          },
+        });
+        await tx.roomParticipant.updateMany({
+          where: {
+            roomId,
+            userId: { in: assignment.players.map((p) => p.participant.userId) },
+          },
+          data: { teamId: team.id },
+        });
+        await tx.roomParticipant.updateMany({
+          where: { roomId, userId: captain.userId },
+          data: { isCaptain: true },
+        });
+        await tx.teamMember.createMany({
+          data: assignment.players.map((player) => ({
+            teamId: team.id,
+            userId: player.participant.userId,
+          })),
+        });
+      }
+      await tx.room.update({
+        where: { id: roomId },
+        data: { status: RoomStatus.DRAFT_COMPLETED },
+      });
+    });
+
+    await this.moveAssignedTeamsToVoice(roomId);
+    return this.getRoomById(roomId);
+  }
+
+  async finalizeManualTeams(hostId: string, roomId: string) {
+    await this.runSerializableTx(async (tx) => {
+      const room = await tx.room.findUnique({
+        where: { id: roomId },
+        include: {
+          participants: { where: { role: "PLAYER" } },
+          teams: true,
+        },
+      });
+      if (!room) {
+        throw new NotFoundException("Room not found");
+      }
+      if (room.hostId !== hostId || room.teamMode !== TeamMode.MANUAL_TEAM) {
+        throw new ForbiddenException("자유 팀 구성을 확정할 수 없습니다.");
+      }
+      if (room.status !== RoomStatus.WAITING) {
+        throw new BadRequestException("Room has already started");
+      }
+      if (room.participants.length !== room.maxParticipants) {
+        throw new BadRequestException(
+          "자유 팀 선택 모드는 모든 팀 자리가 채워져야 시작할 수 있습니다.",
+        );
+      }
+      if (room.participants.some((participant) => !participant.teamId)) {
+        throw new BadRequestException(
+          "모든 플레이어가 팀을 선택한 뒤 시작해주세요.",
+        );
+      }
+
+      const teamsWithPlayers = room.teams
+        .map((team) => ({
+          team,
+          players: room.participants.filter(
+            (participant) => participant.teamId === team.id,
+          ),
+        }))
+        .filter((entry) => entry.players.length > 0);
+      if (
+        teamsWithPlayers.length !== room.teams.length ||
+        teamsWithPlayers.some((entry) => entry.players.length !== 5)
+      ) {
+        throw new BadRequestException(
+          "모든 팀에 플레이어 5명씩 배정한 뒤 시작해주세요.",
+        );
+      }
+
+      await tx.roomParticipant.updateMany({
+        where: { roomId },
+        data: { isCaptain: false },
+      });
+      const usedTeamIds = teamsWithPlayers.map((entry) => entry.team.id);
+      await tx.team.deleteMany({
+        where: { roomId, id: { notIn: usedTeamIds } },
+      });
+      for (const entry of teamsWithPlayers) {
+        const captain =
+          entry.players.find((player) => player.userId === hostId) ??
+          entry.players[0];
+        await tx.team.update({
+          where: { id: entry.team.id },
+          data: { captainId: captain.userId },
+        });
+        await tx.roomParticipant.update({
+          where: { id: captain.id },
+          data: { isCaptain: true },
+        });
+        await tx.teamMember.createMany({
+          data: entry.players.map((player) => ({
+            teamId: entry.team.id,
+            userId: player.userId,
+          })),
+        });
+      }
+      await tx.room.update({
+        where: { id: roomId },
+        data: { status: RoomStatus.DRAFT_COMPLETED },
+      });
+    });
+
+    await this.moveAssignedTeamsToVoice(roomId);
+    return this.getRoomById(roomId);
+  }
+
+  private async moveAssignedTeamsToVoice(roomId: string) {
+    if (!this.discordVoiceService) return;
+    try {
+      await this.discordVoiceService.handleTeamAssignment(roomId);
+    } catch (error) {
+      this.logger.warn(
+        `Discord team voice assignment failed for room ${roomId}: ${String(error)}`,
+      );
+    }
+  }
+
   // ========================================
   // Game Start
   // ========================================
@@ -1045,6 +1530,30 @@ export class RoomService {
     // Minimum 2 players required
     if (room.participants.length < 2) {
       throw new BadRequestException("At least 2 players required to start");
+    }
+
+    if (
+      (room.teamMode === TeamMode.AUTO_BALANCE ||
+        room.teamMode === TeamMode.MANUAL_TEAM) &&
+      room.participants.length !== room.maxParticipants
+    ) {
+      throw new BadRequestException(
+        "이 모드는 모든 팀 자리가 채워져야 시작할 수 있습니다.",
+      );
+    }
+
+    if (room.teamMode === TeamMode.MANUAL_TEAM) {
+      if (room.participants.some((participant) => !participant.teamId)) {
+        throw new BadRequestException(
+          "모든 플레이어가 팀을 선택한 뒤 시작해주세요.",
+        );
+      }
+      if (
+        new Set(room.participants.map((participant) => participant.teamId))
+          .size < 2
+      ) {
+        throw new BadRequestException("최소 두 팀에 플레이어가 있어야 합니다.");
+      }
     }
 
     if (this.discordVoiceService) {
@@ -1099,14 +1608,16 @@ export class RoomService {
 
   async rollbackToWaiting(roomId: string) {
     await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      await tx.roomParticipant.updateMany({
-        where: { roomId },
-        data: { teamId: null, isCaptain: false, isReady: false },
-      });
-
-      await tx.snakeDraftPick.deleteMany({ where: { roomId } });
-      await tx.auctionBid.deleteMany({ where: { roomId } });
-      await tx.team.deleteMany({ where: { roomId } });
+      const room = await tx.room.findUnique({ where: { id: roomId } });
+      await this.clearTeamSetup(tx, roomId, true);
+      if (room?.teamMode === TeamMode.MANUAL_TEAM) {
+        await this.createManualTeamSlots(
+          tx,
+          roomId,
+          room.hostId,
+          room.maxParticipants,
+        );
+      }
 
       await tx.room.update({
         where: { id: roomId },
@@ -1231,7 +1742,6 @@ export class RoomService {
       this.prisma.roomParticipant.deleteMany({ where: { roomId } }),
       this.prisma.room.delete({ where: { id: roomId } }),
     ]);
-
     return { message: "Room closed" };
   }
 
@@ -1316,6 +1826,15 @@ export class RoomService {
       await tx.team.deleteMany({
         where: { roomId },
       });
+
+      if (room.teamMode === TeamMode.MANUAL_TEAM) {
+        await this.createManualTeamSlots(
+          tx,
+          roomId,
+          room.hostId,
+          room.maxParticipants,
+        );
+      }
 
       // 방 상태를 WAITING으로 리셋
       await tx.room.update({
@@ -1434,6 +1953,15 @@ export class RoomService {
       await tx.team.deleteMany({
         where: { roomId },
       });
+
+      if (room.teamMode === TeamMode.MANUAL_TEAM) {
+        await this.createManualTeamSlots(
+          tx,
+          roomId,
+          room.hostId,
+          room.maxParticipants,
+        );
+      }
 
       await tx.room.update({
         where: { id: roomId },

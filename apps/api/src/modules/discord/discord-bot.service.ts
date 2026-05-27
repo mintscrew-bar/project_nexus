@@ -1231,7 +1231,13 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
                   ? "🎯"
                   : "⚔️";
       const modeText =
-        room.teamMode === "AUCTION" ? "경매" : "스네이크 드래프트";
+        room.teamMode === "AUCTION"
+          ? "경매"
+          : room.teamMode === "SNAKE_DRAFT"
+            ? "스네이크 드래프트"
+            : room.teamMode === "AUTO_BALANCE"
+              ? "자동 밸런스"
+              : "자유 팀 선택";
       const lockIcon = room.isPrivate ? "🔒" : "🔓";
 
       embed.addFields({

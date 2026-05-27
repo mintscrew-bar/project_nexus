@@ -115,7 +115,10 @@ export class RoomController {
     @Param("id") id: string,
     @Body() updates: Partial<CreateRoomDto>,
   ) {
-    return this.roomService.updateRoomSettings(userId, id, updates);
+    const room = await this.roomService.updateRoomSettings(userId, id, updates);
+    this.roomGateway.notifyRoomUpdate(id, "room-updated", room);
+    this.roomGateway.broadcastRoomDelta("update", id);
+    return room;
   }
 
   // ========================================

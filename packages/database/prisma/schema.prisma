@@ -1117,6 +1117,8 @@ enum RoomStatus {
 enum TeamMode {
   SNAKE_DRAFT
   AUCTION
+  AUTO_BALANCE
+  MANUAL_TEAM
 }
 
 enum TeamCaptainSelection {
