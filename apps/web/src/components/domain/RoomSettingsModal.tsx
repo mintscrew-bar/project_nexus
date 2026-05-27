@@ -46,13 +46,13 @@ const TEAM_MODES: { value: TeamMode; label: string; description: string; icon: R
   {
     value: "AUTO_BALANCE",
     label: "자동 밸런스",
-    description: "티어·LP와 선호 포지션 기준 자동 팀 구성",
+    description: "정원 충족 후 티어·LP와 선호 포지션 기준 자동 편성",
     icon: <Scale className="w-4 h-4" />,
   },
   {
     value: "MANUAL_TEAM",
     label: "자유 팀 선택",
-    description: "참가자가 로비에서 직접 팀 선택",
+    description: "로비에서 직접 선택, 팀당 5명 필요",
     icon: <ArrowLeftRight className="w-4 h-4" />,
   },
 ];
@@ -90,6 +90,9 @@ export function RoomSettingsModal({ isOpen, onClose, room }: RoomSettingsModalPr
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const resetsManualTeamSetup =
+    (room.teamMode === "MANUAL_TEAM" || teamMode === "MANUAL_TEAM") &&
+    (room.teamMode !== teamMode || room.maxParticipants !== maxParticipants);
 
   useEffect(() => {
     if (isOpen) {
@@ -233,7 +236,7 @@ export function RoomSettingsModal({ isOpen, onClose, room }: RoomSettingsModalPr
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="font-semibold text-text-primary text-sm">{mode.label}</div>
-                  <div className="text-xs text-text-secondary truncate">{mode.description}</div>
+                  <div className="text-xs text-text-secondary leading-snug">{mode.description}</div>
                 </div>
               </button>
             ))}
@@ -408,6 +411,17 @@ export function RoomSettingsModal({ isOpen, onClose, room }: RoomSettingsModalPr
             </span>
           </div>
         </div>
+
+        {resetsManualTeamSetup && (
+          <div className="p-3 bg-accent-warning/10 rounded-lg border border-accent-warning/30">
+            <p className="text-sm font-medium text-accent-warning">
+              저장하면 현재 팀 선택과 준비 상태가 초기화됩니다.
+            </p>
+            <p className="mt-1 text-xs text-text-secondary">
+              자유 팀 선택 모드 또는 참가 인원이 바뀌면 새 팀 슬롯으로 다시 편성해야 합니다.
+            </p>
+          </div>
+        )}
 
         {error && (
           <div className="p-3 bg-accent-danger/10 border border-accent-danger/20 rounded-lg">

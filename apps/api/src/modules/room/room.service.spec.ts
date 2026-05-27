@@ -203,6 +203,25 @@ describe("RoomService", () => {
   });
 
   describe("자유 팀 선택", () => {
+    it("대기석에 있는 플레이어는 준비할 수 없다", async () => {
+      prisma.roomParticipant.findFirst.mockResolvedValue({
+        id: "participant-1",
+        role: "PLAYER",
+        teamId: null,
+        isReady: false,
+        room: {
+          teamMode: TeamMode.MANUAL_TEAM,
+          status: RoomStatus.WAITING,
+        },
+      });
+
+      await expect(service.toggleReady("user-1", "room-1")).rejects.toThrow(
+        "팀을 선택한 뒤 준비해주세요.",
+      );
+
+      expect(prisma.roomParticipant.update).not.toHaveBeenCalled();
+    });
+
     it("플레이어가 팀을 선택하면 준비 상태를 해제하고 팀을 갱신한다", async () => {
       prisma.room.findUnique
         .mockResolvedValueOnce({

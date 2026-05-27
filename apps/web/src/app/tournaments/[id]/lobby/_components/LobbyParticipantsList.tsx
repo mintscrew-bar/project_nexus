@@ -22,7 +22,11 @@ interface LobbyParticipantsListProps {
   handleAddFriend: (userId: string) => void;
   setKickTarget: (value: { id: string; username: string } | null) => void;
   toggleSpectator: (onError?: (message: string) => void) => void;
-  selectTeam: (teamId: string | null, onError?: (message: string) => void) => void;
+  selectTeam: (
+    teamId: string | null,
+    onError?: (message: string) => void,
+    onSuccess?: () => void,
+  ) => void;
   addToast: (message: string, type: "success" | "error" | "info" | "warning") => void;
 }
 
@@ -92,13 +96,19 @@ export function LobbyParticipantsList({
             <div>
               <p className="text-sm font-semibold text-text-primary">팀 선택</p>
               <p className="text-xs text-text-tertiary">
-                팀이 꽉 찼으면 대기석으로 나온 뒤 다른 팀을 선택하세요.
+                팀을 이동하면 준비가 해제됩니다. 빈자리가 없으면 대기석을 이용하세요.
               </p>
             </div>
             {currentUserParticipant?.teamId && !currentUserIsSpectator && (
               <button
                 type="button"
-                onClick={() => selectTeam(null, (err) => addToast(err, "error"))}
+                onClick={() =>
+                  selectTeam(
+                    null,
+                    (err) => addToast(err, "error"),
+                    () => addToast("대기석으로 이동했습니다.", "info"),
+                  )
+                }
                 className="rounded-md bg-bg-tertiary px-2 py-1 text-xs text-text-secondary hover:bg-bg-elevated"
               >
                 대기석으로 이동
@@ -140,7 +150,17 @@ export function LobbyParticipantsList({
                   <button
                     type="button"
                     disabled={currentUserIsSpectator || selected || full}
-                    onClick={() => selectTeam(team.id, (err) => addToast(err, "error"))}
+                    onClick={() =>
+                      selectTeam(
+                        team.id,
+                        (err) => addToast(err, "error"),
+                        () =>
+                          addToast(
+                            `${team.name}을 선택했습니다. 준비 상태를 확인해주세요.`,
+                            "success",
+                          ),
+                      )
+                    }
                     className="w-full rounded-md bg-bg-tertiary px-2 py-1.5 text-xs font-medium text-text-secondary hover:bg-bg-elevated disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {selected ? "선택됨" : full ? "가득 참" : "이 팀으로 이동"}

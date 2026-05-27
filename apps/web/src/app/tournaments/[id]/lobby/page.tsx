@@ -240,6 +240,46 @@ export default function TournamentLobbyPage() {
     manualTeamsFilled &&
     totalPlayers >= (room.teamMode === "AUCTION" ? 4 : 2) &&
     allInVoice;
+  const needsManualTeamSelection =
+    room.teamMode === "MANUAL_TEAM" &&
+    !currentUserIsSpectator &&
+    !currentUserParticipant?.teamId &&
+    !currentUserIsReady;
+  const directModeRequirements = [
+    {
+      label: `정원 ${totalPlayers}/${room.maxParticipants}`,
+      complete: hasFullRoster,
+    },
+    ...(room.teamMode === "MANUAL_TEAM"
+      ? [
+          { label: "전원 팀 선택", complete: allPlayersAssigned },
+          { label: "팀당 5명", complete: manualTeamsFilled },
+        ]
+      : []),
+    {
+      label: `준비 ${readyCount}/${totalPlayers}`,
+      complete: allPlayersReady,
+    },
+  ];
+  const startBlockedMessage = !hasFullRoster
+    ? "설정한 정원이 모두 참가해야 시작할 수 있습니다."
+    : !allPlayersAssigned
+      ? "모든 플레이어가 팀을 선택해야 합니다."
+      : !manualTeamsFilled
+        ? "각 팀에 5명씩 배정해야 합니다."
+        : !allPlayersReady
+          ? "모든 플레이어가 준비해야 합니다."
+          : hasDiscordVoice && !allInVoice
+            ? "음성채널에 참가하지 않은 유저가 있습니다."
+            : undefined;
+
+  const handleReadyToggle = () => {
+    if (needsManualTeamSelection) {
+      addToast("먼저 들어갈 팀을 선택해주세요.", "warning");
+      return;
+    }
+    setReady(!currentUserIsReady, (message) => addToast(message, "error"));
+  };
 
   const participantsList = (
     <LobbyParticipantsList
@@ -372,18 +412,20 @@ export default function TournamentLobbyPage() {
             </div>
             {room.status !== 'DRAFT_COMPLETED' && !currentUserIsSpectator && (
               <button
-                className={`px-4 py-1.5 text-sm font-bold rounded-lg transition-all duration-200 flex-shrink-0 ${
+                className={`hidden lg:block px-4 py-1.5 text-sm font-bold rounded-lg transition-all duration-200 flex-shrink-0 ${
                   currentUserIsReady
                     ? 'bg-bg-tertiary text-text-secondary hover:bg-bg-elevated'
                     : 'bg-accent-primary hover:bg-accent-hover text-white'
-                }`}
-                onClick={() => setReady(!currentUserIsReady)}
+                } disabled:cursor-not-allowed disabled:opacity-50`}
+                disabled={needsManualTeamSelection}
+                title={needsManualTeamSelection ? "먼저 팀을 선택해주세요." : undefined}
+                onClick={handleReadyToggle}
               >
                 {currentUserIsReady ? "준비 취소" : "준비하기"}
               </button>
             )}
             {room.status !== 'DRAFT_COMPLETED' && currentUserIsSpectator && (
-              <span className="px-4 py-1.5 text-sm font-medium rounded-lg bg-bg-tertiary text-text-muted flex-shrink-0">
+              <span className="hidden lg:block px-4 py-1.5 text-sm font-medium rounded-lg bg-bg-tertiary text-text-muted flex-shrink-0">
                 관전 중
               </span>
             )}
@@ -394,6 +436,46 @@ export default function TournamentLobbyPage() {
             )}
           </div>
         </div>
+
+        {requiresFullTeams && room.status === "WAITING" && (
+          <div className="bg-bg-secondary border-b border-bg-tertiary px-4 py-3 lg:px-6">
+            <div className="container mx-auto rounded-xl border border-accent-primary/20 bg-accent-primary/5 px-4 py-3">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-text-primary">
+                    {room.teamMode === "AUTO_BALANCE"
+                      ? "자동 밸런스 진행 조건"
+                      : "자유 팀 선택 진행 조건"}
+                  </p>
+                  <p className="mt-0.5 text-xs text-text-secondary">
+                    {room.teamMode === "AUTO_BALANCE"
+                      ? "정원과 준비가 완료되면 티어·LP 및 선호 포지션 기준으로 팀을 편성하고 역할 선택으로 이동합니다."
+                      : "팀 카드를 선택해 이동하세요. 팀을 바꾸면 준비 상태가 해제되며, 모든 팀을 5명씩 채운 뒤 시작합니다."}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {directModeRequirements.map((requirement) => (
+                    <span
+                      key={requirement.label}
+                      className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
+                        requirement.complete
+                          ? "border-accent-success/30 bg-accent-success/10 text-accent-success"
+                          : "border-bg-elevated bg-bg-tertiary text-text-secondary"
+                      }`}
+                    >
+                      {requirement.complete ? "완료" : "대기"} {requirement.label}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              {needsManualTeamSelection && (
+                <p className="mt-2 text-xs font-medium text-accent-warning">
+                  준비하려면 먼저 원하는 팀을 선택하세요.
+                </p>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* ═══ Main Content: Desktop 2-col / Mobile Tabs ═══ */}
         <div className="flex-1 min-h-0 overflow-hidden">
@@ -462,10 +544,15 @@ export default function TournamentLobbyPage() {
                     currentUserIsReady
                       ? 'bg-bg-tertiary text-text-secondary hover:bg-bg-elevated'
                       : 'bg-accent-primary hover:bg-accent-hover text-white'
-                  }`}
-                  onClick={() => setReady(!currentUserIsReady)}
+                  } disabled:cursor-not-allowed disabled:opacity-50`}
+                  disabled={needsManualTeamSelection}
+                  onClick={handleReadyToggle}
                 >
-                  {currentUserIsReady ? "준비 취소" : "준비하기"}
+                  {needsManualTeamSelection
+                    ? "팀 선택 필요"
+                    : currentUserIsReady
+                      ? "준비 취소"
+                      : "준비하기"}
                 </button>
               )}
               {room.status !== 'DRAFT_COMPLETED' && currentUserIsSpectator && (
@@ -516,15 +603,7 @@ export default function TournamentLobbyPage() {
                   title={
                     room.teamMode === 'AUCTION' && totalPlayers < 4
                       ? '경매 모드는 최소 4명이 필요합니다'
-                      : !hasFullRoster
-                      ? '이 모드는 모든 팀 자리가 채워져야 시작할 수 있습니다'
-                      : !allPlayersAssigned
-                      ? '모든 플레이어가 팀을 선택해야 합니다'
-                      : !manualTeamsFilled
-                      ? '각 팀에 5명씩 배정해야 합니다'
-                      : hasDiscordVoice && !allInVoice
-                      ? '음성채널에 참가하지 않은 유저가 있습니다'
-                      : undefined
+                      : startBlockedMessage
                   }
                 >
                   내전 시작

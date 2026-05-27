@@ -105,7 +105,11 @@ interface LobbyStoreState {
   updateRoomSettings: (roomId: string, settings: RoomSettingsDto) => Promise<void>;
   kickParticipant: (roomId: string, participantId: string) => Promise<void>;
   toggleSpectator: (onError?: (msg: string) => void) => void;
-  selectTeam: (teamId: string | null, onError?: (msg: string) => void) => void;
+  selectTeam: (
+    teamId: string | null,
+    onError?: (msg: string) => void,
+    onSuccess?: () => void,
+  ) => void;
 }
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
@@ -350,12 +354,14 @@ export const useLobbyStore = create<LobbyStoreState>((set, get) => ({
     }
   },
 
-  selectTeam: (teamId, onError) => {
+  selectTeam: (teamId, onError, onSuccess) => {
     const { socket, room } = get();
     if (socket && room) {
       socket.emit('select-team', { roomId: room.id, teamId }, (response: any) => {
         if (response && response.error && onError) {
           onError(response.error);
+        } else if (response?.success) {
+          onSuccess?.();
         }
       });
     }

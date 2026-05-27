@@ -1219,6 +1219,14 @@ export class RoomService {
   async toggleReady(userId: string, roomId: string) {
     const participant = await this.prisma.roomParticipant.findFirst({
       where: { roomId, userId },
+      include: {
+        room: {
+          select: {
+            teamMode: true,
+            status: true,
+          },
+        },
+      },
     });
 
     if (!participant) {
@@ -1228,6 +1236,15 @@ export class RoomService {
     // 관전자는 레디 불가
     if (participant.role === "SPECTATOR") {
       throw new BadRequestException("관전자는 준비 상태를 변경할 수 없습니다.");
+    }
+
+    if (
+      participant.room.teamMode === TeamMode.MANUAL_TEAM &&
+      participant.room.status === RoomStatus.WAITING &&
+      !participant.teamId &&
+      !participant.isReady
+    ) {
+      throw new BadRequestException("팀을 선택한 뒤 준비해주세요.");
     }
 
     const updated = await this.prisma.roomParticipant.update({

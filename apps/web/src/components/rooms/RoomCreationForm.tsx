@@ -36,13 +36,13 @@ const TEAM_MODES: { value: TeamMode; label: string; description: string; icon: R
   {
     value: "AUTO_BALANCE",
     label: "자동 밸런스",
-    description: "참가자 티어·LP와 선호 포지션을 고려해 팀을 자동 구성합니다",
+    description: "정원이 모두 차면 티어·LP와 선호 포지션으로 팀을 자동 구성합니다",
     icon: <Scale className="w-5 h-5" />,
   },
   {
     value: "MANUAL_TEAM",
     label: "자유 팀 선택",
-    description: "로비에서 참가자가 원하는 팀으로 직접 이동해 팀을 구성합니다",
+    description: "로비에서 직접 이동하며, 모든 팀을 5명씩 채우면 시작할 수 있습니다",
     icon: <ArrowLeftRight className="w-5 h-5" />,
   },
 ];
