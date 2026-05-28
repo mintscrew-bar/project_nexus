@@ -28,14 +28,14 @@ import { GUIDE_TOC } from "@/lib/guide-toc";
 export const metadata: Metadata = {
   title: "롤 내전 사용법 — 경매·스네이크·자동 밸런스·자유 팀 선택 가이드",
   description:
-    "Nexus에서 방을 만들고 경매, 스네이크 드래프트, 자동 밸런스, 자유 팀 선택으로 팀을 구성한 뒤 역할 선택과 디스코드 연동까지 진행하는 방법을 안내합니다.",
+    "Nexus에서 방을 만들고 경매, 스네이크 드래프트, 자동 밸런스, 자유 팀 선택으로 팀을 구성한 뒤 역할 선택, 대진표, 디스코드 봇 명령어까지 진행하는 방법을 안내합니다.",
   alternates: {
     canonical: absoluteUrl("/guide"),
   },
   openGraph: {
     title: "롤 내전 사이트 사용법 — Nexus 기능 가이드",
     description:
-      "방 생성부터 네 가지 팀 구성 방식, 역할 선택, 디스코드 봇 연동까지 Nexus 내전 진행 방법을 확인하세요.",
+      "방 생성부터 네 가지 팀 구성 방식, 역할 선택, 대진표, 디스코드 봇 연동과 명령어까지 Nexus 내전 진행 방법을 확인하세요.",
     url: absoluteUrl("/guide"),
   },
 };
@@ -59,8 +59,16 @@ const faqItems = [
     a: "어떤 팀 구성 방식을 선택해도 팀 확정 후 역할 선택 화면으로 이동합니다. 각 팀원은 겹치지 않는 라인을 선택하며, 시간이 끝날 때까지 선택하지 않으면 선호 포지션을 기준으로 자동 배정됩니다.",
   },
   {
+    q: "대진표는 어떻게 만들어지나요?",
+    a: "역할 선택이 끝나면 대진표로 이동합니다. 4팀·8팀 토너먼트는 팀 순서를 한 번 랜덤으로 섞어 첫 라운드 매칭을 만들고, 싱글 또는 더블 엘리미네이션 방식에 맞춰 다음 라운드가 자동으로 이어집니다.",
+  },
+  {
     q: "디스코드 봇은 어떻게 추가하나요?",
     a: "설정 페이지의 '내 디스코드 서버에 봇 추가'에서 봇을 설치하고 관리자 승인을 받으면, 방 생성 시 해당 서버를 선택해 내전 음성 채널 자동 생성과 결과 기록을 사용할 수 있습니다.",
+  },
+  {
+    q: "디스코드 봇 명령어는 어디서 확인하나요?",
+    a: "디스코드 서버에서 /nexus help를 입력하면 명령어 도움말을 볼 수 있습니다. 계정 연동은 /nexus link, 진행 중인 방과 대진표 확인은 /nexus rooms, /nexus bracket을 사용합니다.",
   },
   {
     q: "내전 전적도 볼 수 있나요?",
@@ -99,7 +107,7 @@ export default function GuidePage() {
             방장은 인원과 팀 구성 방식을 선택해 방을 만들고, 참가자는 로비에서
             준비한 뒤 팀 구성과 역할 선택을 진행합니다. 경매, 스네이크 드래프트,
             자동 밸런스, 자유 팀 선택 중 상황에 맞는 방식을 고르는 방법과
-            디스코드 연동 절차를 순서대로 확인하세요.
+            디스코드 연동·봇 명령어를 순서대로 확인하세요.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <Link
@@ -155,7 +163,7 @@ export default function GuidePage() {
           </p>
           <ol className="mt-4 space-y-3">
             <SetupStep n={1} title="방 생성 설정">
-              인원과 대진 방식, 아래의 팀 구성 방식 중 하나를 고릅니다. 필요하면
+              인원, 대진 방식, 아래의 팀 구성 방식 중 하나를 고릅니다. 필요하면
               비밀번호, 관전 허용, 승인된 디스코드 서버도 설정합니다.
             </SetupStep>
             <SetupStep n={2} title="참가와 준비">
@@ -199,14 +207,14 @@ export default function GuidePage() {
               title="자동 밸런스"
               summary="티어·LP와 선호 포지션으로 자동 편성"
             >
-              설정한 인원이 모두 참가하고 준비한 뒤 시작하면 팀이 바로 편성됩니다.
+              설정한 인원이 모두 참가하고 준비한 뒤 시작하면 밸런스와 랜덤성을 함께 고려해 팀이 바로 편성됩니다.
             </ModeCard>
             <ModeCard
               icon={<ArrowLeftRight className="h-5 w-5" />}
               title="자유 팀 선택"
               summary="참가자가 로비에서 직접 이동"
             >
-              참가자가 원하는 팀을 고르며, 모든 팀에 5명씩 채워야 시작할 수 있습니다.
+              참가자가 팀 카드로 직접 이동하며, 모든 팀에 5명씩 채워야 시작할 수 있습니다.
             </ModeCard>
           </div>
           <SectionLink href="/tournaments" label="내전 방 둘러보기" />
@@ -244,12 +252,13 @@ export default function GuidePage() {
             <ProcessBlock title="자동 밸런스">
               <li>설정한 플레이어 정원이 모두 찰 때까지 참가자를 모읍니다.</li>
               <li>모든 플레이어가 준비하면 방장이 시작합니다.</li>
-              <li>티어·LP 점수와 주/부 선호 포지션을 고려해 팀이 자동 편성됩니다.</li>
+              <li>티어·LP 점수와 주/부 선호 포지션을 고려하되, 같은 조합이 반복되지 않도록 랜덤성도 함께 반영합니다.</li>
               <li>편성 직후 역할 선택 화면에서 최종 라인을 정합니다.</li>
             </ProcessBlock>
             <ProcessBlock title="자유 팀 선택">
               <li>플레이어는 로비의 팀 편성에서 원하는 팀의 <strong>이 팀으로 이동</strong>을 누릅니다.</li>
-              <li>팀을 바꾸려면 <strong>대기석으로 이동</strong> 후 빈자리가 있는 다른 팀을 선택합니다.</li>
+              <li>팀이 꽉 차면 더 들어갈 수 없습니다. 팀을 바꾸려면 <strong>팀 나가기</strong>로 대기석에 돌아온 뒤 빈자리가 있는 다른 팀을 선택합니다.</li>
+              <li>팀을 이동하면 준비 상태가 해제되므로, 최종 팀을 고른 뒤 다시 준비합니다.</li>
               <li>모든 자리가 차고 각 팀에 5명씩 배정된 상태에서 모두 준비합니다.</li>
               <li>방장이 시작하면 확정된 구성으로 역할 선택을 진행합니다.</li>
             </ProcessBlock>
@@ -260,7 +269,7 @@ export default function GuidePage() {
         <GuideSection
           id="roles"
           icon={<CheckCircle2 className="h-6 w-6" />}
-          title="역할 선택과 대진 진행"
+          title="역할 선택"
         >
           <p>
             네 가지 팀 구성 방식 모두 팀이 확정되면 역할 선택으로 이어집니다.
@@ -271,7 +280,26 @@ export default function GuidePage() {
             <li>선택한 역할을 다시 누르면 취소하고 다른 역할로 바꿀 수 있습니다.</li>
             <li>시간이 더 필요하면 참가자마다 한 번씩 <strong>+15초</strong>를 사용할 수 있습니다.</li>
             <li>시간 내 선택하지 않은 역할은 선호 포지션을 기준으로 자동 배정됩니다.</li>
-            <li>역할 선택이 완료되면 대진표로 이동해 경기를 진행합니다.</li>
+            <li>역할 선택이 완료되면 대진표로 이동합니다.</li>
+          </ul>
+        </GuideSection>
+
+        {/* ── 대진표 ── */}
+        <GuideSection
+          id="bracket"
+          icon={<Trophy className="h-6 w-6" />}
+          title="대진표와 경기 진행"
+        >
+          <p>
+            역할 선택이 끝나면 대진표 화면으로 이동합니다. 대진표에서는 각 경기의
+            진행 상태, 승자, 다음 라운드 흐름을 확인하고 방장이 경기를 시작하거나
+            결과를 입력할 수 있습니다.
+          </p>
+          <ul className="mt-3 space-y-1.5 list-disc pl-5 text-text-secondary">
+            <li>4팀·8팀 토너먼트는 대진 생성 시 팀 순서를 한 번 랜덤으로 섞어 첫 라운드 매칭을 만듭니다.</li>
+            <li>싱글 엘리미네이션은 승자가 다음 라운드로 올라가는 흐름을 연결선으로 확인할 수 있습니다.</li>
+            <li>더블 엘리미네이션은 승자조와 패자조, 그랜드파이널 흐름을 나누어 확인할 수 있습니다.</li>
+            <li>3팀·5팀·6팀·7팀 방은 리그전 방식으로 모든 팀이 서로 한 번씩 경기합니다.</li>
           </ul>
         </GuideSection>
 
@@ -319,6 +347,76 @@ export default function GuidePage() {
             </SetupStep>
           </ol>
           <SectionLink href="/settings" label="설정에서 봇 추가하기" />
+        </GuideSection>
+
+        {/* ── 디스코드 봇 명령어 ── */}
+        <GuideSection
+          id="bot-commands"
+          icon={<Bot className="h-6 w-6" />}
+          title="디스코드 봇 명령어 사용법"
+        >
+          <p>
+            봇이 추가된 서버에서는 채팅창에 <code className="rounded bg-bg-tertiary px-1.5 py-0.5 text-text-primary">/nexus</code>
+            를 입력한 뒤 필요한 하위 명령어를 고르면 됩니다. 처음에는{" "}
+            <code className="rounded bg-bg-tertiary px-1.5 py-0.5 text-text-primary">/nexus help</code>
+            로 전체 도움말을 확인하세요.
+          </p>
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            <CommandCard command="/nexus help" title="명령어 도움말">
+              사용할 수 있는 Nexus 봇 명령어를 디스코드 안에서 확인합니다.
+            </CommandCard>
+            <CommandCard command="/nexus link" title="계정 연동">
+              디스코드 계정을 Nexus 계정과 연결합니다. 연동 후 프로필, 통계, 방 정보를 봇에서 확인할 수 있습니다.
+            </CommandCard>
+            <CommandCard command="/nexus profile [@유저]" title="프로필 확인">
+              내 프로필 또는 멘션한 유저의 Riot 계정 정보를 확인합니다.
+            </CommandCard>
+            <CommandCard command="/nexus rooms" title="활성 방 목록">
+              대기 중, 역할 선택 중, 진행 중인 내전 방 목록을 확인합니다.
+            </CommandCard>
+            <CommandCard command="/nexus team" title="현재 팀 정보">
+              내가 참가 중인 방의 팀 구성과 팀원 정보를 확인합니다.
+            </CommandCard>
+            <CommandCard command="/nexus auction" title="경매 상태">
+              경매 방에 참가 중일 때 현재 경매 진행 상황을 확인합니다.
+            </CommandCard>
+            <CommandCard command="/nexus match" title="현재 매치">
+              현재 진행 중인 경기 정보를 확인합니다.
+            </CommandCard>
+            <CommandCard command="/nexus bracket" title="대진표 확인">
+              참가 중인 방의 대진표와 라운드 진행 상황을 확인합니다.
+            </CommandCard>
+            <CommandCard command="/nexus stats" title="내 통계">
+              내 내전 기록과 주요 통계를 확인합니다.
+            </CommandCard>
+            <CommandCard command="/nexus leaderboard" title="리더보드">
+              티어와 LP 기준 상위 10명 랭킹을 확인합니다.
+            </CommandCard>
+            <CommandCard command="/nexus clan" title="클랜 정보">
+              내가 속한 클랜 정보를 확인합니다.
+            </CommandCard>
+          </div>
+          <div className="mt-5 rounded-xl border border-bg-tertiary bg-bg-secondary/50 p-4">
+            <h3 className="font-semibold text-text-primary">서버 관리자용 명령어</h3>
+            <ul className="mt-3 space-y-2 text-sm text-text-secondary">
+              <li>
+                <code className="rounded bg-bg-tertiary px-1.5 py-0.5 text-text-primary">/nexus rules</code>
+                {" "}서버 규칙 작성 모달을 열고 봇 메시지로 게시합니다.
+              </li>
+              <li>
+                <code className="rounded bg-bg-tertiary px-1.5 py-0.5 text-text-primary">/nexus verify</code>
+                {" "}Nexus 서버 기본 역할을 받아 채널 접근 권한을 엽니다.
+              </li>
+              <li>
+                <code className="rounded bg-bg-tertiary px-1.5 py-0.5 text-text-primary">/nexus setuproles</code>
+                {" "}티어, 주라인, 부라인, 기본 역할을 자동 생성합니다.
+              </li>
+              <li>
+                <code className="rounded bg-bg-tertiary px-1.5 py-0.5 text-text-primary">/nexus setupverifypanel</code>
+                {" "}현재 채널에 Riot ID 인증 패널을 게시합니다.
+              </li>
+            </ul>
+          </div>
         </GuideSection>
 
         {/* ── 전적 · 클랜 · 랭킹 ── */}
@@ -472,6 +570,27 @@ function ProcessBlock({
       <ol className="space-y-2 list-decimal pl-5 text-sm text-text-secondary">
         {children}
       </ol>
+    </div>
+  );
+}
+
+// ── 디스코드 봇 명령어 카드 ──
+function CommandCard({
+  command,
+  title,
+  children,
+}: {
+  command: string;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-xl border border-bg-tertiary bg-bg-secondary/50 p-4">
+      <code className="inline-flex rounded-lg bg-bg-tertiary px-2 py-1 text-sm font-semibold text-accent-primary">
+        {command}
+      </code>
+      <h3 className="mt-3 font-semibold text-text-primary">{title}</h3>
+      <p className="mt-1 text-sm text-text-secondary">{children}</p>
     </div>
   );
 }

@@ -1015,6 +1015,7 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
             "`/nexus rules` - 서버 규칙 게시 (관리자)",
             "`/nexus verify` - 서버 기본 역할 받기",
             "`/nexus setuproles` - 티어/라인 역할 자동 생성 (관리자)",
+            "`/nexus setupverifypanel` - 인증 패널 게시 (관리자)",
           ].join("\n"),
         },
         {
