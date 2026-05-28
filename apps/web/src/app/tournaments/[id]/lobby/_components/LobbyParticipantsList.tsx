@@ -95,7 +95,7 @@ export function LobbyParticipantsList({
           <div className="mb-3">
             <p className="text-sm font-semibold text-text-primary">팀 선택</p>
             <p className="text-xs text-text-tertiary">
-              팀을 이동하면 준비가 해제됩니다. 선택한 팀 카드에서 '팀 나가기'로 대기석으로 돌아올 수 있어요.
+              팀을 이동하면 준비가 해제됩니다. 선택한 팀 카드에서 「팀 나가기」로 대기석으로 돌아올 수 있어요.
             </p>
           </div>
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
