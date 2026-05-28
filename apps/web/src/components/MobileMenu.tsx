@@ -68,7 +68,7 @@ export function MobileMenu({ className }: MobileMenuProps) {
   const isActive = (href: string) => pathname === href || (href !== '/' && pathname.startsWith(href));
 
   return (
-    <div className={cn('md:hidden', className)}>
+    <div className={cn('lg:hidden', className)}>
       {/* Menu Button */}
       <button
         onClick={() => setIsOpen(true)}

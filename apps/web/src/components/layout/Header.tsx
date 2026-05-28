@@ -64,8 +64,8 @@ export function Header() {
         </Link>
       </div>
 
-      {/* Center: Navigation (hidden on mobile) */}
-      <nav className="flex-grow justify-center hidden md:flex">
+      {/* Center: Navigation (hidden below lg to avoid wrapping around tablet widths) */}
+      <nav className="flex-grow justify-center hidden lg:flex">
         <ul className="flex space-x-1">
           {visibleNavItems.map((item) => (
             <li key={item.href}>
@@ -91,7 +91,7 @@ export function Header() {
           href={NEXUS_DISCORD_INVITE_URL}
           target="_blank"
           rel="noopener noreferrer"
-          className="hidden rounded-lg p-2 text-[#8EA1FF] transition-colors duration-150 hover:bg-[#5865F2]/10 hover:text-[#C7D2FE] md:inline-flex"
+          className="hidden rounded-lg p-2 text-[#8EA1FF] transition-colors duration-150 hover:bg-[#5865F2]/10 hover:text-[#C7D2FE] lg:inline-flex"
           title="Discord 커뮤니티"
           aria-label="Discord 커뮤니티"
         >
@@ -104,7 +104,7 @@ export function Header() {
               href="/admin"
               className={cn(
                 // 모바일에서는 햄버거 메뉴로 이동 → 데스크톱에서만 노출
-                'hidden md:inline-flex p-2 rounded-lg transition-colors duration-150',
+                'hidden lg:inline-flex p-2 rounded-lg transition-colors duration-150',
                 pathname.startsWith('/admin')
                   ? 'bg-accent-primary/10 text-accent-primary'
                   : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary'
@@ -136,7 +136,7 @@ export function Header() {
           </button>
         )}
         {/* 테마 토글: 모바일에서는 햄버거 메뉴로 이동 → 데스크톱에서만 노출 */}
-        <div className="hidden md:block">
+        <div className="hidden lg:block">
           <ThemeToggle />
         </div>
         <UserMenu />
