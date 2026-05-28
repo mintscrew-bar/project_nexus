@@ -250,8 +250,13 @@ export class MatchAdvancementService {
           });
         }
         if (lbNextMatches.length > 0) {
-          const target =
-            lbNextMatches[Math.floor(lbIdx / 2)] ?? lbNextMatches[0];
+          // LB_R1 → 다음 LB 라운드는 1:1 대응이다.
+          //  - 4팀: LB_R1(1) → LB_F(1)
+          //  - 8팀: LB_R1(2) → LB_R2(2), 각 LB_R1 승자는 같은 인덱스의
+          //    LB_R2 매치에서 WB 준결승 패자와 만난다.
+          // 기존 floor(lbIdx/2)는 8팀에서 LB_R1[1] 승자를 LB_R2[0]에 덮어써
+          // 유실시키는 버그였다.
+          const target = lbNextMatches[lbIdx] ?? lbNextMatches[0];
           if (target) {
             await setTeam(target.id, true, winnerId);
           } else {

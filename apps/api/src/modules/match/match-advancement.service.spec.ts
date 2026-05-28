@@ -166,6 +166,37 @@ describe("MatchAdvancementService", () => {
       });
     });
 
+    it("8팀 LB_R1[1] 승자는 LB_R2[1] teamA에 배정된다 (LB_R1→LB_R2 1:1)", async () => {
+      // 형제 조회(LB_R1) → LB_R2 조회 순서로 findMany가 호출된다.
+      prisma.match.findMany
+        .mockResolvedValueOnce([
+          { id: "lbr1-0", matchNumber: 8 },
+          { id: "lbr1-1", matchNumber: 9 },
+        ])
+        .mockResolvedValueOnce([
+          { id: "lbr2-0", matchNumber: 10 },
+          { id: "lbr2-1", matchNumber: 11 },
+        ]);
+
+      await service.advanceDoubleElimination(
+        "room-1",
+        "lbr1-1",
+        "LB_R1",
+        "lb-winner",
+        "lb-loser",
+      );
+
+      // 버그였다면 lbr2-0에 덮어썼을 것 → 반드시 lbr2-1 teamA여야 한다.
+      expect(prisma.match.update).toHaveBeenCalledWith({
+        where: { id: "lbr2-1" },
+        data: { teamAId: "lb-winner" },
+      });
+      expect(prisma.match.update).not.toHaveBeenCalledWith({
+        where: { id: "lbr2-0" },
+        data: { teamAId: "lb-winner" },
+      });
+    });
+
     it("LB_F 승자는 GF teamB에 배정된다", async () => {
       prisma.match.findMany.mockResolvedValue([
         { id: "match-1", matchNumber: 1 },
