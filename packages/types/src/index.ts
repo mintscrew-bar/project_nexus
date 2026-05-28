@@ -233,3 +233,10 @@ export {
 } from './stats-utils';
 
 export type { ConfidenceLevel } from './stats-utils';
+
+export {
+  getDoubleElimFeeders,
+  FEEDER_SOURCE_LABEL,
+} from './bracket-topology';
+
+export type { BracketSlot, FeederTarget, MatchFeeders } from './bracket-topology';

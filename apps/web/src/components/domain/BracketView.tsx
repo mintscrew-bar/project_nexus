@@ -2,7 +2,7 @@
 
 import React from "react";
 import { cn } from "@/lib/utils";
-import { getDoubleElimFeeders } from "@/lib/bracket-topology";
+import { getDoubleElimFeeders } from "@nexus/types";
 import { CheckCircle2, CircleDashed, Clock3, Trophy, Swords, ShieldX } from "lucide-react";
 
 interface Team {
@@ -493,9 +493,10 @@ function DoubleEliminationBracket({ matches, onMatchClick }: { matches: Match[];
 
   return (
     <div className="w-full overflow-x-auto">
-      <div ref={containerRef} className="relative min-w-max space-y-6">
-        {/* 연결선 SVG (카드 뒤에 깔림) */}
-        <svg className="pointer-events-none absolute inset-0 -z-10 h-full w-full" aria-hidden>
+      {/* isolate로 자체 stacking context 생성 → svg(z-0)는 보드 위·카드(z-10) 아래에 안전히 깔린다. */}
+      <div ref={containerRef} className="relative isolate min-w-max space-y-6">
+        {/* 연결선 SVG (카드 뒤, 보드 위) */}
+        <svg className="pointer-events-none absolute inset-0 z-0 h-full w-full" aria-hidden>
           {edges.map((edge) => (
             <path
               key={edge.id}
@@ -515,7 +516,7 @@ function DoubleEliminationBracket({ matches, onMatchClick }: { matches: Match[];
 
         {/* Winners Bracket */}
         {presentWB.length > 0 && (
-          <div>
+          <div className="relative z-10">
             <div className="flex items-center gap-2 px-4 mb-3">
               <Trophy className="h-4 w-4 text-accent-gold" />
               <h2 className="text-sm font-bold text-accent-gold uppercase tracking-wider">승자조 (Winners Bracket)</h2>
@@ -535,7 +536,7 @@ function DoubleEliminationBracket({ matches, onMatchClick }: { matches: Match[];
 
         {/* Losers Bracket */}
         {presentLB.length > 0 && (
-          <div>
+          <div className="relative z-10">
             <div className="flex items-center gap-2 px-4 mb-3">
               <ShieldX className="h-4 w-4 text-accent-danger" />
               <h2 className="text-sm font-bold text-accent-danger uppercase tracking-wider">패자조 (Losers Bracket)</h2>
@@ -552,7 +553,7 @@ function DoubleEliminationBracket({ matches, onMatchClick }: { matches: Match[];
         {hasGF && (
           <>
             <div className="border-t border-bg-tertiary mx-4" />
-            <div className="flex justify-center p-4">
+            <div className="relative z-10 flex justify-center p-4">
               {renderSection('GF', { tree: false, index: 0, count: 1 })}
             </div>
           </>
