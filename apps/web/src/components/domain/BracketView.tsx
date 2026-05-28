@@ -2,6 +2,7 @@
 
 import React from "react";
 import { cn } from "@/lib/utils";
+import { getDoubleElimFeeders } from "@/lib/bracket-topology";
 import { CheckCircle2, CircleDashed, Clock3, Trophy, Swords, ShieldX } from "lucide-react";
 
 interface Team {
@@ -112,14 +113,18 @@ function TeamSlot({
 function MatchCard({
   match,
   onMatchClick,
+  innerRef,
 }: {
   match: Match;
   onMatchClick: (m: Match) => void;
+  // 연결선 오버레이가 카드 위치를 측정하기 위한 ref 콜백 (DE 전용)
+  innerRef?: (el: HTMLButtonElement | null) => void;
 }) {
   const status = getMatchStatus(match);
 
   return (
     <button
+      ref={innerRef}
       type="button"
       className={cn(
         "group relative w-[250px] shrink-0 rounded-lg border bg-bg-secondary/95 p-3 text-left shadow-lg shadow-black/10 transition-all hover:-translate-y-0.5 hover:border-accent-primary/70 hover:shadow-xl md:w-[286px]",
@@ -341,7 +346,103 @@ function DoubleEliminationBracket({ matches, onMatchClick }: { matches: Match[];
     Math.max(1, ...presentWB.map((s) => bySec[s]?.length || 1)),
   );
 
-  // tree=true(승자조)면 연결선 트리, false(패자조·그랜드파이널)면 연결선 없이 카드만.
+  // ── 연결선 오버레이: 카드 위치를 측정해 토폴로지대로 SVG 선을 그린다.
+  //   승자조 내부 진출선은 CSS 트리(BracketCell)가 이미 그리므로 SVG는
+  //   (1) 패자조 진출선, (2) 패자 하강선, (3) 밴드를 넘는 결승행 선만 그린다.
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const cardRefs = React.useRef(new Map<string, HTMLElement>());
+  const [positions, setPositions] = React.useState<
+    Record<string, { x: number; y: number; w: number; h: number }>
+  >({});
+
+  const registerCard = React.useCallback(
+    (key: string) => (el: HTMLButtonElement | null) => {
+      if (el) cardRefs.current.set(key, el);
+      else cardRefs.current.delete(key);
+    },
+    [],
+  );
+
+  React.useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const measure = () => {
+      const crect = container.getBoundingClientRect();
+      const next: Record<string, { x: number; y: number; w: number; h: number }> = {};
+      cardRefs.current.forEach((el, key) => {
+        const r = el.getBoundingClientRect();
+        next[key] = {
+          x: r.left - crect.left,
+          y: r.top - crect.top,
+          w: r.width,
+          h: r.height,
+        };
+      });
+      setPositions(next);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(container);
+    window.addEventListener("resize", measure);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [matches]);
+
+  // 토폴로지 + 측정 위치로 그릴 연결선 목록을 만든다.
+  const edges = React.useMemo(() => {
+    const counts: Record<string, number> = {};
+    Object.keys(bySec).forEach((s) => (counts[s] = bySec[s].length));
+    const list: {
+      id: string;
+      d: string;
+      kind: "winner" | "loser";
+    }[] = [];
+
+    Object.entries(bySec).forEach(([section, sectionMatches]) => {
+      sectionMatches.forEach((_, index) => {
+        const feeders = getDoubleElimFeeders(section, index, counts);
+        const src = positions[`${section}:${index}`];
+        if (!src) return;
+
+        const addEdge = (
+          target: { section: string; slotIndex: number } | null,
+          kind: "winner" | "loser",
+        ) => {
+          if (!target) return;
+          const tgt = positions[`${target.section}:${target.slotIndex}`];
+          if (!tgt) return;
+          const sx = src.x + src.w;
+          const sy = src.y + src.h / 2;
+          const tx = tgt.x;
+          const ty = tgt.y + tgt.h / 2;
+          const midX = Math.max(sx + 14, (sx + tx) / 2);
+          list.push({
+            id: `${section}:${index}-${kind}`,
+            d: `M ${sx} ${sy} H ${midX} V ${ty} H ${tx}`,
+            kind,
+          });
+        };
+
+        // 승자조 내부(WB→WB) 진출선은 CSS 트리가 담당하므로 SVG에서 제외.
+        if (
+          feeders.winner &&
+          !(
+            (section === "WB_R1" || section === "WB_R2") &&
+            feeders.winner.section.startsWith("WB")
+          )
+        ) {
+          addEdge(feeders.winner, "winner");
+        }
+        addEdge(feeders.loser, "loser");
+      });
+    });
+    return list;
+  }, [bySec, positions]);
+
+  // tree=true(승자조)면 CSS 연결선 트리, false(패자조·GF)면 카드만. 모든 카드는
+  // 연결선 측정을 위해 registerCard로 ref를 등록한다.
   const renderSection = (
     section: string,
     opts: { tree: boolean; index: number; count: number },
@@ -367,14 +468,23 @@ function DoubleEliminationBracket({ matches, onMatchClick }: { matches: Match[];
               isFirstColumn={opts.index === 0}
               isLastColumn={opts.index === opts.count - 1}
             >
-              <MatchCard match={match} onMatchClick={onMatchClick} />
+              <MatchCard
+                match={match}
+                onMatchClick={onMatchClick}
+                innerRef={registerCard(`${section}:${index}`)}
+              />
             </BracketCell>
           ))}
         </div>
       ) : (
         <div className="flex min-h-[188px] flex-col justify-around gap-5">
-          {bySec[section]?.map(match => (
-            <MatchCard key={match.id} match={match} onMatchClick={onMatchClick} />
+          {bySec[section]?.map((match, index) => (
+            <MatchCard
+              key={match.id}
+              match={match}
+              onMatchClick={onMatchClick}
+              innerRef={registerCard(`${section}:${index}`)}
+            />
           ))}
         </div>
       )}
@@ -382,51 +492,72 @@ function DoubleEliminationBracket({ matches, onMatchClick }: { matches: Match[];
   );
 
   return (
-    <div className="w-full overflow-x-auto space-y-6">
-      {/* Winners Bracket */}
-      {presentWB.length > 0 && (
-        <div>
-          <div className="flex items-center gap-2 px-4 mb-3">
-            <Trophy className="h-4 w-4 text-accent-gold" />
-            <h2 className="text-sm font-bold text-accent-gold uppercase tracking-wider">승자조 (Winners Bracket)</h2>
-          </div>
-          <div className="flex min-w-max p-2 md:p-4">
-            {presentWB.map((section, index) =>
-              renderSection(section, { tree: true, index, count: presentWB.length }),
-            )}
-          </div>
-        </div>
-      )}
+    <div className="w-full overflow-x-auto">
+      <div ref={containerRef} className="relative min-w-max space-y-6">
+        {/* 연결선 SVG (카드 뒤에 깔림) */}
+        <svg className="pointer-events-none absolute inset-0 -z-10 h-full w-full" aria-hidden>
+          {edges.map((edge) => (
+            <path
+              key={edge.id}
+              d={edge.d}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              className={
+                edge.kind === "winner"
+                  ? "text-accent-primary/45"
+                  : "text-accent-danger/40"
+              }
+              strokeDasharray={edge.kind === "loser" ? "5 4" : undefined}
+            />
+          ))}
+        </svg>
 
-      {/* Divider */}
-      {presentLB.length > 0 && (
-        <div className="border-t border-dashed border-bg-tertiary mx-4" />
-      )}
+        {/* Winners Bracket */}
+        {presentWB.length > 0 && (
+          <div>
+            <div className="flex items-center gap-2 px-4 mb-3">
+              <Trophy className="h-4 w-4 text-accent-gold" />
+              <h2 className="text-sm font-bold text-accent-gold uppercase tracking-wider">승자조 (Winners Bracket)</h2>
+            </div>
+            <div className="flex min-w-max p-2 md:p-4">
+              {presentWB.map((section, index) =>
+                renderSection(section, { tree: true, index, count: presentWB.length }),
+              )}
+            </div>
+          </div>
+        )}
 
-      {/* Losers Bracket */}
-      {presentLB.length > 0 && (
-        <div>
-          <div className="flex items-center gap-2 px-4 mb-3">
-            <ShieldX className="h-4 w-4 text-accent-danger" />
-            <h2 className="text-sm font-bold text-accent-danger uppercase tracking-wider">패자조 (Losers Bracket)</h2>
-          </div>
-          <div className="flex min-w-max gap-6 p-2 md:gap-8 md:p-4">
-            {presentLB.map((section, index) =>
-              renderSection(section, { tree: false, index, count: presentLB.length }),
-            )}
-          </div>
-        </div>
-      )}
+        {/* Divider */}
+        {presentLB.length > 0 && (
+          <div className="border-t border-dashed border-bg-tertiary mx-4" />
+        )}
 
-      {/* Grand Final */}
-      {hasGF && (
-        <>
-          <div className="border-t border-bg-tertiary mx-4" />
-          <div className="flex justify-center p-4">
-            {renderSection('GF', { tree: false, index: 0, count: 1 })}
+        {/* Losers Bracket */}
+        {presentLB.length > 0 && (
+          <div>
+            <div className="flex items-center gap-2 px-4 mb-3">
+              <ShieldX className="h-4 w-4 text-accent-danger" />
+              <h2 className="text-sm font-bold text-accent-danger uppercase tracking-wider">패자조 (Losers Bracket)</h2>
+            </div>
+            <div className="flex min-w-max gap-6 p-2 md:gap-8 md:p-4">
+              {presentLB.map((section, index) =>
+                renderSection(section, { tree: false, index, count: presentLB.length }),
+              )}
+            </div>
           </div>
-        </>
-      )}
+        )}
+
+        {/* Grand Final */}
+        {hasGF && (
+          <>
+            <div className="border-t border-bg-tertiary mx-4" />
+            <div className="flex justify-center p-4">
+              {renderSection('GF', { tree: false, index: 0, count: 1 })}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }
