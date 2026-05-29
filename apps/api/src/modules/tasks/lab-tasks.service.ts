@@ -150,6 +150,9 @@ export class LabTasksService {
           const soloQ = entries.find(
             (e: any) => e.queueType === "RANKED_SOLO_5x5",
           );
+          const flexQ = entries.find(
+            (e: any) => e.queueType === "RANKED_FLEX_SR",
+          );
           const tier = soloQ?.tier ?? "UNRANKED";
           const rank = soloQ?.rank ?? "";
 
@@ -159,6 +162,13 @@ export class LabTasksService {
               tier,
               rank,
               lp: soloQ?.leaguePoints ?? 0,
+              soloWins: soloQ?.wins ?? 0,
+              soloLosses: soloQ?.losses ?? 0,
+              flexTier: flexQ?.tier ?? "UNRANKED",
+              flexRank: flexQ?.rank ?? "",
+              flexLp: flexQ?.leaguePoints ?? 0,
+              flexWins: flexQ?.wins ?? 0,
+              flexLosses: flexQ?.losses ?? 0,
               ...getPeakTierUpdate(
                 tier,
                 rank,

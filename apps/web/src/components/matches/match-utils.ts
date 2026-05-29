@@ -13,6 +13,14 @@ export interface SummonerData {
   leaguePoints?: number;
   wins?: number;
   losses?: number;
+  // 자유랭크 시즌 정보 (UNRANKED 면 tier="UNRANKED")
+  flex?: {
+    tier: string;
+    rank: string;
+    lp: number;
+    wins: number;
+    losses: number;
+  };
 }
 
 export interface MatchParticipant {

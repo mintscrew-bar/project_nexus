@@ -281,6 +281,8 @@ export class RiotService {
       leaguePoints: rankedInfo.lp,
       wins: rankedInfo.wins,
       losses: rankedInfo.losses,
+      // 자유랭크 시즌 정보 (UNRANKED 면 tier="UNRANKED")
+      flex: rankedInfo.flex,
     };
 
     // 캐시 저장 (2분)
@@ -301,25 +303,25 @@ export class RiotService {
       }>
     >(`${this.baseUrl}/lol/league/v4/entries/by-puuid/${puuid}`);
 
-    const soloQueue = leagues.find((l) => l.queueType === "RANKED_SOLO_5x5");
-
-    if (!soloQueue) {
+    const pick = (queueType: string) => {
+      const entry = leagues.find((l) => l.queueType === queueType);
+      if (!entry) {
+        return { tier: "UNRANKED", rank: "", lp: 0, wins: 0, losses: 0 };
+      }
       return {
-        tier: "UNRANKED",
-        rank: "",
-        lp: 0,
-        wins: 0,
-        losses: 0,
+        tier: entry.tier,
+        rank: entry.rank,
+        lp: entry.leaguePoints,
+        wins: entry.wins,
+        losses: entry.losses,
       };
-    }
-
-    return {
-      tier: soloQueue.tier,
-      rank: soloQueue.rank,
-      lp: soloQueue.leaguePoints,
-      wins: soloQueue.wins,
-      losses: soloQueue.losses,
     };
+
+    const solo = pick("RANKED_SOLO_5x5");
+    const flex = pick("RANKED_FLEX_SR");
+
+    // 솔로 필드는 평면으로 유지(기존 호출처 호환), 자유랭크는 flex로 추가 반환
+    return { ...solo, flex };
   }
 
   async getRankedInfo(summonerId: string) {
@@ -483,6 +485,17 @@ export class RiotService {
       lp: summoner.leaguePoints ?? 0,
     };
 
+    // entries 시즌 누적 승/패 (솔로) + 자유랭크 전체
+    const season = {
+      soloWins: summoner.wins ?? 0,
+      soloLosses: summoner.losses ?? 0,
+      flexTier: summoner.flex?.tier ?? "UNRANKED",
+      flexRank: summoner.flex?.rank ?? "",
+      flexLp: summoner.flex?.lp ?? 0,
+      flexWins: summoner.flex?.wins ?? 0,
+      flexLosses: summoner.flex?.losses ?? 0,
+    };
+
     // Validate champion preferences (at least 3 per role)
     for (const role of [dto.mainRole, dto.subRole]) {
       const champions = dto.championsByRole[role] || [];
@@ -549,6 +562,7 @@ export class RiotService {
         tier: ranked.tier,
         rank: ranked.rank,
         lp: ranked.lp,
+        ...season,
         peakTier: finalPeak.peakTier,
         peakRank: finalPeak.peakRank,
         mainRole: dto.mainRole,
@@ -566,6 +580,7 @@ export class RiotService {
         tier: ranked.tier,
         rank: ranked.rank,
         lp: ranked.lp,
+        ...season,
         peakTier: finalPeak.peakTier,
         peakRank: finalPeak.peakRank,
         mainRole: dto.mainRole,
@@ -659,6 +674,13 @@ export class RiotService {
         tier: ranked.tier,
         rank: ranked.rank,
         lp: ranked.lp,
+        soloWins: ranked.wins,
+        soloLosses: ranked.losses,
+        flexTier: ranked.flex.tier,
+        flexRank: ranked.flex.rank,
+        flexLp: ranked.flex.lp,
+        flexWins: ranked.flex.wins,
+        flexLosses: ranked.flex.losses,
         ...peakUpdate,
         lastSyncedAt: new Date(),
       },

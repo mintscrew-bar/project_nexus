@@ -164,6 +164,15 @@ model RiotAccount {
   tier                String               @default("UNRANKED")
   rank                String               @default("")
   lp                  Int                  @default(0)
+  // 솔로랭크 시즌 누적 승/패 (league-v4 entries에서 동기화)
+  soloWins            Int                  @default(0)
+  soloLosses          Int                  @default(0)
+  // 자유랭크 5v5 현재값 + 시즌 누적 승/패
+  flexTier            String               @default("UNRANKED")
+  flexRank            String               @default("")
+  flexLp              Int                  @default(0)
+  flexWins            Int                  @default(0)
+  flexLosses          Int                  @default(0)
   peakTier            String?
   peakRank            String?
   mainRole            Role?

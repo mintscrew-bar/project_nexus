@@ -642,6 +642,34 @@ export default function SummonerStatsPage() {
                   <Badge variant="secondary">언랭</Badge>
                 )}
 
+                {/* 자유 랭크 (UNRANKED 가 아닐 때만) */}
+                {summoner.flex && summoner.flex.tier !== "UNRANKED" && (
+                  <div className="flex items-center gap-2 sm:gap-3 bg-bg-tertiary rounded-lg p-2 sm:p-3">
+                    {getTierImage(summoner.flex.tier) && (
+                      <Image
+                        src={getTierImage(summoner.flex.tier)!}
+                        alt={summoner.flex.tier}
+                        width={48}
+                        height={48}
+                        className="w-8 h-8 sm:w-12 sm:h-12"
+                      />
+                    )}
+                    <div>
+                      <p className="text-[10px] sm:text-xs text-text-tertiary mb-0.5">자유 랭크</p>
+                      <p className="font-bold text-sm sm:text-base text-text-primary">
+                        {summoner.flex.tier} {summoner.flex.rank}
+                      </p>
+                      <p className="text-[10px] sm:text-xs text-text-tertiary">
+                        {(() => {
+                          const total = summoner.flex.wins + summoner.flex.losses;
+                          const wr = total > 0 ? Math.round((summoner.flex.wins / total) * 100) : 0;
+                          return `${summoner.flex.wins}승 ${summoner.flex.losses}패 · ${wr}%`;
+                        })()}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 {nexusUserId && nexusRanking ? (
                   <div className="bg-bg-tertiary rounded-lg p-2 sm:p-3">
                     <p className="text-[10px] sm:text-xs text-text-tertiary mb-0.5 sm:mb-1 flex items-center gap-1">

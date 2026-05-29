@@ -30,10 +30,10 @@
 
 ### B. 전체 승률/티어 — entries 기반
 
-- [ ] Task 3: `getRankedInfoByPuuid`(`riot.service.ts:340`)가 솔로 + 자유랭크를 함께 반환
-- [ ] Task 4: `RiotAccount`에 `soloWins/soloLosses/flexTier/flexRank/flexLp/flexWins/flexLosses` 추가 (스키마는 `migrate deploy`)
-- [ ] Task 5: 등록·동기화·3시 크론(`lab-tasks.service.ts:138`, 이미 entries 호출 중)에서 solo+flex 승/패 저장 — 추가 호출 0
-- [ ] Task 6: 전적 헤더/프로필 승률을 ingest 표본 대신 `entries` 시즌 누적으로 표시
+- [x] Task 3: `getRankedInfoByPuuid`가 솔로(평면 유지) + 자유랭크(`flex`)를 함께 반환
+- [x] Task 4: `RiotAccount`에 `soloWins/soloLosses/flexTier/flexRank/flexLp/flexWins/flexLosses` 추가 + 마이그레이션(`20260529_add_riot_account_season_records`). **운영 반영은 `migrate deploy` 필요**
+- [x] Task 5: 등록(`registerRiotAccount`)·동기화(`syncRankedInfo`)·3시 크론(`lab-tasks.service.ts`)에서 solo+flex 승/패 저장 — 추가 호출 0
+- [x] Task 6: 전적 검색 헤더 솔로 승률은 이미 entries 기반(정확) + 자유랭크 카드 추가 표시. (RecentStatsSummary 도넛은 "최근 N판" 폼 지표로 유지 — Task 12에서 라벨 명시 예정. 자기 `/profile` 페이지 내전 통계는 별개)
 
 ### C. 챔피언 숙련도 — champion-mastery-v4
 
