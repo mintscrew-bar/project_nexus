@@ -60,7 +60,7 @@
 
 ### F. 예산 회수 (Lab 보류 후속)
 
-- [ ] Task 19: `tasks.service.ts` `matchFetchConfigs` 백그라운드 대량 ingest 크론 비활성화 → 남은 예산을 전적 검색·챔피언 누적에 할당 (Lab UI는 유지)
+- [x] Task 19: `handleMatchFetch`(*/30 대량 ingest)·`handleHighTierSeeding`을 `MATCH_FETCH_ENABLED` env로 게이트(기본 비활성). 되살리려면 `MATCH_FETCH_ENABLED=true`. 수동 트리거(`runMatchFetch`)·Lab UI·recompute 크론은 유지
 
 ---
 

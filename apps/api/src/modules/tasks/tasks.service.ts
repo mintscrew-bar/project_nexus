@@ -51,6 +51,7 @@ export class TasksService {
   private readonly rankedSeededInitialBackfillLimit: number;
   private readonly riotMatchCacheCleanupEnabled: boolean;
   private readonly riotMatchCacheTtlDays: number;
+  private readonly matchFetchEnabled: boolean;
   private readonly matchFetchConfigs: QueueGroupConfig[];
 
   constructor(
@@ -81,6 +82,11 @@ export class TasksService {
       "RIOT_MATCH_CACHE_TTL_DAYS",
       14,
     );
+    // 대량 매치 ingest는 Lab 보류로 소비자가 사라져 기본 비활성.
+    // 퍼스널 키 예산을 전적 검색·챔피언 시즌 스캔에 몰아주기 위함.
+    // 되살리려면 MATCH_FETCH_ENABLED=true.
+    this.matchFetchEnabled =
+      this.configService.get<string>("MATCH_FETCH_ENABLED") === "true";
     this.matchFetchConfigs = [
       {
         name: "ranked",
@@ -524,6 +530,11 @@ export class TasksService {
 
   @Cron("*/30 * * * *")
   async handleMatchFetch(): Promise<void> {
+    // Lab 보류로 대량 ingest 비활성 (기본). 예산은 전적 검색·챔피언 스캔에 할당.
+    if (!this.matchFetchEnabled) {
+      return;
+    }
+
     const lockKey = "tasks:match-fetch";
     const lockToken = await this.redis.acquireLock(lockKey, 25 * 60 * 1000);
 
@@ -561,6 +572,11 @@ export class TasksService {
    */
   @Cron("0 5 */3 * *")
   async handleHighTierSeeding(): Promise<void> {
+    // 시딩은 대량 ingest 파이프라인 전용 — ingest 비활성 시 무의미하므로 동반 중단.
+    if (!this.matchFetchEnabled) {
+      return;
+    }
+
     try {
       const result = await this.runHighTierSeeding();
       if (result.skipped) {
