@@ -1,4 +1,5 @@
 import { Test, TestingModule } from "@nestjs/testing";
+import { ConfigService } from "@nestjs/config";
 import { StatsService } from "./stats.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { RedisService } from "../redis/redis.service";
@@ -70,6 +71,7 @@ describe("StatsService", () => {
         { provide: RedisService, useValue: redis },
         { provide: RiotMatchService, useValue: riotMatchService },
         { provide: RiotService, useValue: riotService },
+        { provide: ConfigService, useValue: { get: jest.fn(() => undefined) } },
       ],
     }).compile();
 

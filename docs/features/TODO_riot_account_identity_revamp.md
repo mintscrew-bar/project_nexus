@@ -46,7 +46,7 @@
 - [ ] Task 10: 첫 검색 = 매치 ID 1콜 + 최근 N판만 즉시 집계, 나머지 시즌 매치는 **저속 background 큐**로 스캔 ("수집 중" 표시)
 - [ ] Task 11: 챔피언 집계 결과를 **영구 테이블에 누적**, `KnownPuuid.rankedLastMatchId` 이후 신규만 증분
 - [ ] Task 12: 외부인/부분 집계는 "최근 N판 기준" 임을 UI에 명시 (시즌 전체 아님)
-- [ ] Task 13: "시즌" 정의를 달력 연도(`stats.service.ts:269`) → Riot 실제 시즌/스플릿 경계로 교정
+- [x] Task 13: "시즌" 정의를 설정형으로 — `RIOT_SEASON_START`(스플릿 시작일)·`RIOT_SEASON_LABEL`(시즌 키) env. 미설정 시 기존 동작(연도/1월1일) 유지
 
 ### E. 동시 검색 대비 (여러 명이 동시에 전적 검색)
 

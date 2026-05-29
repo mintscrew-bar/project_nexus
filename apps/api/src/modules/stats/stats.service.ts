@@ -6,6 +6,7 @@ import {
   Logger,
   NotFoundException,
 } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { RedisService } from "../redis/redis.service";
@@ -255,6 +256,7 @@ export class StatsService {
     private readonly redis: RedisService,
     private readonly riotMatchService: RiotMatchService,
     private readonly riotService: RiotService,
+    private readonly configService: ConfigService,
   ) {}
 
   private readonly queueGroupToQueueIds: Record<
@@ -266,11 +268,23 @@ export class StatsService {
     aram: [450],
   };
 
+  // 시즌 라벨 — 캐시/집계 키로 사용. env 미설정 시 현재 연도(기존 동작 유지).
+  // 예: RIOT_SEASON_LABEL="2026-S1"
   private getCurrentSeason(): string {
+    const label = this.configService.get<string>("RIOT_SEASON_LABEL");
+    if (label && label.trim()) return label.trim();
     return String(new Date().getUTCFullYear());
   }
 
+  // 시즌(스플릿) 시작일 — 이 시점 이후 매치만 집계. env로 실제 스플릿 시작일 지정.
+  // 미설정 시 현재 연도 1월 1일(기존 동작 유지). 예: RIOT_SEASON_START="2026-01-08"
   private getSeasonStartDate(): Date {
+    const raw = this.configService.get<string>("RIOT_SEASON_START");
+    if (raw && raw.trim()) {
+      const parsed = new Date(raw.trim());
+      if (!Number.isNaN(parsed.getTime())) return parsed;
+      this.logger.warn(`Invalid RIOT_SEASON_START=${raw}, falling back to Jan 1`);
+    }
     return new Date(Date.UTC(new Date().getUTCFullYear(), 0, 1, 0, 0, 0, 0));
   }
 
