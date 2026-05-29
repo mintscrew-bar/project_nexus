@@ -4,6 +4,7 @@ import { EventEmitter2 } from "@nestjs/event-emitter";
 import axios from "axios";
 import { PrismaService } from "../prisma/prisma.service";
 import { RedisService } from "../redis/redis.service";
+import { RiotRateLimiterService } from "./riot-rate-limiter.service";
 
 // Riot Match-V5 API Response Types
 export interface MatchDto {
@@ -168,6 +169,7 @@ export class RiotMatchService {
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly rateLimiter: RiotRateLimiterService,
   ) {
     this.apiKey = this.configService.get("RIOT_API_KEY") || "";
     if (!this.apiKey) {
@@ -266,6 +268,16 @@ export class RiotMatchService {
         `Riot Match API ${priority} local limit reached (${limit}/${this.matchRateLimitWindowSeconds}s), waiting ${waitMs}ms`,
       );
       await new Promise((resolve) => setTimeout(resolve, waitMs));
+      return this.waitForMatchRateLimit(priority);
+    }
+
+    // 전역 예산(퍼스널 키 100/2분·20/1초) — 모든 Riot 호출이 공유하는 권위 캡.
+    // 로컬 분리 캡을 통과해도 전역 예산이 없으면 생길 때까지 대기한다.
+    const acquired = await this.rateLimiter.acquireWaiting();
+    if (!acquired) {
+      this.logger.warn(
+        `Riot 전역 예산 대기 한도 초과 (${priority}), 재시도`,
+      );
       return this.waitForMatchRateLimit(priority);
     }
 

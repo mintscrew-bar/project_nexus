@@ -25,8 +25,8 @@
 
 ### A. 선결 — 전역 레이트 캡 (0순위)
 
-- [ ] Task 1: 모든 Riot 호출(account/summoner/league/match)이 공유하는 **전역 토큰버킷(100/2분, 20/1초)** 구현. 그룹별 캡 위에 전역 합산 캡을 얹는다.
-- [ ] Task 2: `RIOT_RATE_LIMITS` 값을 퍼스널 키 실측 기준으로 재조정 (또는 전역 캡으로 단일화)
+- [x] Task 1: 모든 Riot 호출(account/summoner/league/match/spectator)이 공유하는 **전역 토큰버킷(100/2분, 20/1초)** 구현. `RiotRateLimiterService` + Redis Lua 듀얼 윈도우. 인터랙티브는 짧게 대기 후 429, 매치 fetch는 예산 생길 때까지 대기.
+- [x] Task 2: `RiotService.request`의 프로덕션 키 기준 `RIOT_RATE_LIMITS`/그룹 매핑 제거 → 전역 캡으로 단일화
 
 ### B. 전체 승률/티어 — entries 기반
 

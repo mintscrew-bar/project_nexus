@@ -1,6 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import axios from "axios";
+import { RiotRateLimiterService } from "./riot-rate-limiter.service";
 
 // Spectator-V5 API Response Types
 export interface CurrentGameParticipant {
@@ -50,7 +51,10 @@ export class RiotSpectatorService {
   private readonly apiKey: string;
   private readonly baseUrl: string;
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly rateLimiter: RiotRateLimiterService,
+  ) {
     this.apiKey = this.configService.get("RIOT_API_KEY") || "";
     const region = this.configService.get("RIOT_REGION") || "kr";
     this.baseUrl = `https://${region}.api.riotgames.com`;
@@ -73,6 +77,9 @@ export class RiotSpectatorService {
       const url = `${this.baseUrl}/lol/spectator/v5/active-games/by-summoner/${puuid}`;
 
       this.logger.log(`Fetching active game for PUUID: ${puuid}`);
+
+      // 전역 예산 공유 (라이브 게임 폴링이 잦아 검색·매치 fetch 예산을 잠식하지 않게)
+      await this.rateLimiter.acquireInteractive();
 
       const response = await axios.get<CurrentGameInfo>(url, {
         headers: {

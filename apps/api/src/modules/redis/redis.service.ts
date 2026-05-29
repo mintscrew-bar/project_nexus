@@ -160,4 +160,52 @@ export class RedisService implements OnModuleDestroy {
       resetIn: ttl > 0 ? ttl : windowSeconds,
     };
   }
+
+  // 두 고정 윈도우(예: 초당/분당)를 동시에 만족해야만 토큰을 소비하는 원자적 레이트 리밋.
+  // Lua 스크립트로 처리해 "한 윈도우는 통과했는데 다른 윈도우에서 막혀 카운터만 증가"하는
+  // 오버카운트를 방지한다. 두 윈도우가 모두 여유 있을 때만 양쪽을 함께 INCR한다.
+  // 반환: allowed=소비 성공 여부, retryAfterMs=막혔다면 가장 빨리 풀리는 윈도우의 잔여 ms.
+  private readonly dualWindowScript = `
+    local s = tonumber(redis.call('GET', KEYS[1])) or 0
+    local l = tonumber(redis.call('GET', KEYS[2])) or 0
+    local limitShort = tonumber(ARGV[1])
+    local limitLong = tonumber(ARGV[2])
+    local winShortMs = tonumber(ARGV[3])
+    local winLongMs = tonumber(ARGV[4])
+    if s >= limitShort then
+      local ttl = redis.call('PTTL', KEYS[1])
+      if ttl < 0 then ttl = winShortMs end
+      return {0, ttl}
+    end
+    if l >= limitLong then
+      local ttl = redis.call('PTTL', KEYS[2])
+      if ttl < 0 then ttl = winLongMs end
+      return {0, ttl}
+    end
+    if redis.call('INCR', KEYS[1]) == 1 then redis.call('PEXPIRE', KEYS[1], winShortMs) end
+    if redis.call('INCR', KEYS[2]) == 1 then redis.call('PEXPIRE', KEYS[2], winLongMs) end
+    return {1, 0}
+  `;
+
+  async consumeDualWindow(
+    keyShort: string,
+    keyLong: string,
+    limitShort: number,
+    limitLong: number,
+    windowShortSeconds: number,
+    windowLongSeconds: number,
+  ): Promise<{ allowed: boolean; retryAfterMs: number }> {
+    const result = (await this.client.eval(
+      this.dualWindowScript,
+      2,
+      keyShort,
+      keyLong,
+      String(limitShort),
+      String(limitLong),
+      String(windowShortSeconds * 1000),
+      String(windowLongSeconds * 1000),
+    )) as [number, number];
+
+    return { allowed: result[0] === 1, retryAfterMs: result[1] };
+  }
 }
