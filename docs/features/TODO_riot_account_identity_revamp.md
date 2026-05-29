@@ -48,9 +48,19 @@
 - [ ] Task 12: 외부인/부분 집계는 "최근 N판 기준" 임을 UI에 명시 (시즌 전체 아님)
 - [ ] Task 13: "시즌" 정의를 달력 연도(`stats.service.ts:269`) → Riot 실제 시즌/스플릿 경계로 교정
 
-### E. 예산 회수 (Lab 보류 후속)
+### E. 동시 검색 대비 (여러 명이 동시에 전적 검색)
 
-- [ ] Task 14: `tasks.service.ts` `matchFetchConfigs` 백그라운드 대량 ingest 크론 비활성화 → 남은 예산을 전적 검색·챔피언 누적에 할당 (Lab UI는 유지)
+> 현재 단일 인스턴스(`ecosystem.config.js` `instances:1`)라 매치 리미터가 동시 요청을 한 줄로 직렬화함 → "동시 429"는 안 나지만, 우선순위·중복제거가 없음.
+
+- [ ] Task 14: foreground 비차단 원칙 — 검색자에겐 캐시/부분 통계 즉시 반환 + "수집 중", 라이브 예산은 "최근 N판"에만 소량 사용
+- [ ] Task 15: 깊은 시즌 스캔은 전부 background 큐로 (foreground 줄 진입 금지). 한 명의 풀스캔이 다른 검색을 굶기지 않게
+- [ ] Task 16: single-flight 코얼레싱 — 같은 matchId / 같은 puuid 스캔이 진행 중이면 후속 요청은 올라타기 (인기 소환사 동시 검색 중복 fetch 제거)
+- [ ] Task 17: background 누적 큐 라운드로빈 — 유저별 공평 분배로 단일 깊은 스캔의 독점 방지
+- [ ] Task 18: (확장 대비, 후순위) 매치 리미터 간격을 인메모리(`lastMatchRequestAt`) → Redis로 이전. 현재 `instances:1`이라 미발생, 클러스터 전환 시 필수
+
+### F. 예산 회수 (Lab 보류 후속)
+
+- [ ] Task 19: `tasks.service.ts` `matchFetchConfigs` 백그라운드 대량 ingest 크론 비활성화 → 남은 예산을 전적 검색·챔피언 누적에 할당 (Lab UI는 유지)
 
 ---
 
