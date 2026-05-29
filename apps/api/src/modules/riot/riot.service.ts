@@ -324,6 +324,104 @@ export class RiotService {
     return { ...solo, flex };
   }
 
+  // ========================================
+  // Champion Mastery (champion-mastery-v4)
+  // ========================================
+
+  // puuid의 전체 챔피언 숙련도 조회 (platform 라우팅 = kr). 전역 레이트 캡 적용.
+  async getChampionMasteryByPuuid(puuid: string): Promise<
+    Array<{
+      championId: number;
+      championLevel: number;
+      championPoints: number;
+      lastPlayTime: number;
+    }>
+  > {
+    return this.request<
+      Array<{
+        championId: number;
+        championLevel: number;
+        championPoints: number;
+        lastPlayTime: number;
+      }>
+    >(
+      `${this.baseUrl}/lol/champion-mastery/v4/champion-masteries/by-puuid/${puuid}`,
+    );
+  }
+
+  // 등록 계정의 숙련도를 최신화 (전체 교체). Riot 호출 실패는 등록/동기화를 막지 않도록 흡수.
+  async syncChampionMastery(
+    riotAccountId: string,
+    puuid: string,
+  ): Promise<void> {
+    let masteries;
+    try {
+      masteries = await this.getChampionMasteryByPuuid(puuid);
+    } catch (error) {
+      this.logger.warn(`숙련도 동기화 실패 (${puuid}): ${error}`);
+      return;
+    }
+
+    const rows = masteries.map((m) => ({
+      riotAccountId,
+      championId: m.championId,
+      championPoints: m.championPoints ?? 0,
+      championLevel: m.championLevel ?? 0,
+      lastPlayTime: m.lastPlayTime ? new Date(m.lastPlayTime) : null,
+    }));
+
+    // 전체 교체: 기존 행 삭제 후 일괄 삽입 (멱등)
+    await this.prisma.$transaction([
+      this.prisma.championMastery.deleteMany({ where: { riotAccountId } }),
+      ...(rows.length > 0
+        ? [this.prisma.championMastery.createMany({ data: rows })]
+        : []),
+    ]);
+  }
+
+  // 소환사 숙련도 조회 — 등록 계정이면 DB, 아니면 라이브 조회 후 Redis 캐시(1시간).
+  // championId 기준 내림차순(포인트) 정렬해 반환.
+  async getChampionMasteryForSummoner(
+    gameName: string,
+    tagLine: string,
+  ): Promise<
+    Array<{ championId: number; championPoints: number; championLevel: number }>
+  > {
+    const summoner = await this.getSummonerByRiotId(gameName, tagLine);
+    const puuid: string = summoner.puuid;
+
+    const account = await this.prisma.riotAccount.findUnique({
+      where: { puuid },
+      select: { id: true },
+    });
+
+    if (account) {
+      const rows = await this.prisma.championMastery.findMany({
+        where: { riotAccountId: account.id },
+        orderBy: { championPoints: "desc" },
+        select: { championId: true, championPoints: true, championLevel: true },
+      });
+      if (rows.length > 0) return rows;
+    }
+
+    // 미등록 계정(또는 아직 동기화 안 된 경우) — 라이브 조회 + 캐시
+    const cacheKey = `riot:mastery:${puuid}`;
+    const cached = await this.redis.get(cacheKey);
+    if (cached) return JSON.parse(cached);
+
+    const masteries = await this.getChampionMasteryByPuuid(puuid);
+    const result = masteries
+      .map((m) => ({
+        championId: m.championId,
+        championPoints: m.championPoints ?? 0,
+        championLevel: m.championLevel ?? 0,
+      }))
+      .sort((a, b) => b.championPoints - a.championPoints);
+
+    await this.redis.set(cacheKey, JSON.stringify(result), 3600);
+    return result;
+  }
+
   async getRankedInfo(summonerId: string) {
     const leagues = await this.request<
       Array<{
@@ -617,6 +715,9 @@ export class RiotService {
       });
     }
 
+    // 숙련도 최초 수집 (실패해도 등록 자체는 성공 처리)
+    await this.syncChampionMastery(riotAccount.id, summoner.puuid);
+
     await this.upsertKnownPuuid(summoner.puuid, {
       gameName: summoner.gameName,
       tagLine: summoner.tagLine,
@@ -685,6 +786,9 @@ export class RiotService {
         lastSyncedAt: new Date(),
       },
     });
+
+    // 숙련도 최신화 (실패해도 동기화 자체는 성공 처리)
+    await this.syncChampionMastery(riotAccountId, account.puuid);
 
     await this.upsertKnownPuuid(account.puuid, {
       gameName: account.gameName,

@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { riotApi, matchApi, statsApi, rankingApi } from "@/lib/api-client";
 import { Button, Badge, Skeleton } from "@/components/ui";
@@ -236,6 +236,29 @@ export default function SummonerStatsPage() {
     staleTime: 5 * 60 * 1000,
     enabled: !!nexusUserId,
   });
+
+  // 챔피언 숙련도 (championId → 포인트/레벨)
+  const { data: masteryList } = useQuery({
+    queryKey: ["championMastery", gameName, tagLine],
+    queryFn: () => riotApi.getSummonerMastery(gameName, tagLine),
+    staleTime: 10 * 60 * 1000,
+    retry: false,
+    enabled: !!summoner,
+  });
+
+  const masteryById = useMemo(() => {
+    const map = new Map<number, { championPoints: number; championLevel: number }>();
+    (masteryList ?? []).forEach((m) =>
+      map.set(m.championId, { championPoints: m.championPoints, championLevel: m.championLevel }),
+    );
+    return map;
+  }, [masteryList]);
+
+  const formatMasteryPoints = (points: number): string => {
+    if (points >= 1_000_000) return `${(points / 1_000_000).toFixed(1)}M`;
+    if (points >= 1000) return `${Math.round(points / 1000)}K`;
+    return String(points);
+  };
 
 
   const REFRESH_COOLDOWN_SEC = 30; // 갱신 쿨다운 30초
@@ -852,8 +875,20 @@ export default function SummonerStatsPage() {
                               onError={(e) => { e.currentTarget.style.display = 'none'; }}
                             />
                             <div>
-                              <p className="font-semibold text-text-primary text-sm">
+                              <p className="font-semibold text-text-primary text-sm flex items-center gap-1.5">
                                 {getChampionKoreanName(stat.championName)}
+                                {(() => {
+                                  const m = masteryById.get(stat.championId);
+                                  if (!m || m.championPoints <= 0) return null;
+                                  return (
+                                    <span
+                                      className="inline-flex items-center gap-0.5 rounded bg-accent-primary/15 px-1.5 py-0.5 text-[10px] font-bold text-accent-primary"
+                                      title={`숙련도 ${m.championLevel}레벨 · ${m.championPoints.toLocaleString()}점`}
+                                    >
+                                      M{m.championLevel} · {formatMasteryPoints(m.championPoints)}
+                                    </span>
+                                  );
+                                })()}
                               </p>
                               <p className="text-xs text-text-tertiary">
                                 {stat.games}게임 · {stat.wins}승 {stat.losses}패

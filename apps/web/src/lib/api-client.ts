@@ -606,6 +606,18 @@ export const riotApi = {
     );
     return response.data as { isLive: boolean; gameInfo?: any };
   },
+
+  // 챔피언 숙련도 조회 (champion-mastery-v4)
+  getSummonerMastery: async (gameName: string, tagLine: string) => {
+    const response = await apiClient.get(
+      `/riot/summoner/${encodeURIComponent(stripInvisibleChars(gameName))}/${encodeURIComponent(stripInvisibleChars(tagLine))}/mastery`
+    );
+    return response.data as Array<{
+      championId: number;
+      championPoints: number;
+      championLevel: number;
+    }>;
+  },
 };
 
 // 클랜 관련 API

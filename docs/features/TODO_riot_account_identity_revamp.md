@@ -37,8 +37,8 @@
 
 ### C. 챔피언 숙련도 — champion-mastery-v4
 
-- [ ] Task 7: `champion-masteries/by-puuid/{puuid}` fetch + `ChampionMastery` 테이블 신설 (포인트/레벨/lastPlayTime)
-- [ ] Task 8: 챔프 통계 카드에 숙련 포인트/레벨 배지 표시
+- [x] Task 7: `champion-masteries/by-puuid/{puuid}` fetch(전역 캡 적용) + `ChampionMastery` 테이블 신설(마이그레이션 `20260529_add_champion_mastery`). 등록·수동 sync 시 전체 교체 저장. 미등록 소환사는 라이브+Redis 캐시(1h) 조회 엔드포인트(`/riot/summoner/:gameName/:tagLine/mastery`)
+- [x] Task 8: 전적 검색 챔피언 통계 카드에 숙련 레벨/포인트 배지 표시 (championId 매칭). **운영 DB는 migrate deploy 필요**
 
 ### D. 챔피언 시즌 통계 — 증분 누적
 

@@ -142,6 +142,16 @@ export class RiotController {
     return this.riotService.getSummonerByRiotId(gameName, tagLine);
   }
 
+  @Get("summoner/:gameName/:tagLine/mastery")
+  @Public()
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
+  async getSummonerMastery(
+    @Param("gameName") gameName: string,
+    @Param("tagLine") tagLine: string,
+  ) {
+    return this.riotService.getChampionMasteryForSummoner(gameName, tagLine);
+  }
+
   // ============================================
   // Data Dragon Endpoints (Public)
   // ============================================

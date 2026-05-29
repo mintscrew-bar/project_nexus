@@ -183,12 +183,29 @@ model RiotAccount {
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
   championPreferences ChampionPreference[]
+  championMasteries   ChampionMastery[]
   user                User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([gameName, tagLine])
   @@index([userId])
   @@index([puuid])
   @@map("riot_accounts")
+}
+
+// 챔피언 숙련도 (champion-mastery-v4). 등록 계정 동기화 시 전체 챔프 저장.
+model ChampionMastery {
+  id             String      @id @default(cuid())
+  riotAccountId  String
+  championId     Int
+  championPoints Int         @default(0)
+  championLevel  Int         @default(0)
+  lastPlayTime   DateTime?
+  updatedAt      DateTime    @updatedAt
+  riotAccount    RiotAccount @relation(fields: [riotAccountId], references: [id], onDelete: Cascade)
+
+  @@unique([riotAccountId, championId])
+  @@index([riotAccountId])
+  @@map("champion_masteries")
 }
 
 model ChampionPreference {
