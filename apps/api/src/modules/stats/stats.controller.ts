@@ -167,6 +167,16 @@ export class StatsController {
     );
   }
 
+  // 챔피언 시즌 누적 통계 (등록 무관, puuid 기준). 오래됐으면 background 스캔 큐잉.
+  @Get("summoner/:gameName/:tagLine/champion-season")
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
+  async getChampionSeasonStats(
+    @Param("gameName") gameName: string,
+    @Param("tagLine") tagLine: string,
+  ) {
+    return this.statsService.getChampionSeasonStats(gameName, tagLine, "ranked");
+  }
+
   @Get("fetch-status/:userId")
   @Throttle({ default: { limit: 20, ttl: 60000 } })
   async getFetchStatus(@Param("userId") userId: string) {

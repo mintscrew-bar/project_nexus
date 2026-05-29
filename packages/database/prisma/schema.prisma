@@ -192,6 +192,45 @@ model RiotAccount {
   @@map("riot_accounts")
 }
 
+// 챔피언별 시즌 누적 통계 (match-v5 스캔 집계). puuid 기준이라 미등록 소환사도 누적.
+// 스캔마다 전체 교체(멱등). 매치는 DB 영구 캐시라 재스캔 시 신규분만 API 소모.
+model ChampionSeasonStat {
+  id         String   @id @default(cuid())
+  puuid      String
+  season     String
+  queueGroup String // "ranked" | "normal" | "aram"
+  championId Int
+  championName String @default("")
+  games      Int      @default(0)
+  wins       Int      @default(0)
+  kills      Int      @default(0)
+  deaths     Int      @default(0)
+  assists    Int      @default(0)
+  updatedAt  DateTime @updatedAt
+
+  @@unique([puuid, season, queueGroup, championId])
+  @@index([puuid, season, queueGroup])
+  @@map("champion_season_stats")
+}
+
+// 챔피언 시즌 스캔 진행 상태 — "수집 중" 표시·재스캔 쓰로틀·background 큐 역할.
+model ChampionScanState {
+  id           String    @id @default(cuid())
+  puuid        String
+  season       String
+  queueGroup   String
+  status       String    @default("idle") // idle | queued | scanning | done | error
+  priority     Int       @default(0) // 등록 유저 > 자주 검색 > 1회성
+  scannedCount Int       @default(0)
+  lastScanAt   DateTime?
+  requestedAt  DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([puuid, season, queueGroup])
+  @@index([status, priority, requestedAt])
+  @@map("champion_scan_states")
+}
+
 // 챔피언 숙련도 (champion-mastery-v4). 등록 계정 동기화 시 전체 챔프 저장.
 model ChampionMastery {
   id             String      @id @default(cuid())

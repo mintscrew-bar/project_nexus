@@ -42,10 +42,10 @@
 
 ### D. 챔피언 시즌 통계 — 증분 누적
 
-- [ ] Task 9: 챔피언 통계 경로에서 `findUserByRiotAccount` 의존 제거 → **등록 여부 무관** puuid만으로 생성
-- [ ] Task 10: 첫 검색 = 매치 ID 1콜 + 최근 N판만 즉시 집계, 나머지 시즌 매치는 **저속 background 큐**로 스캔 ("수집 중" 표시)
-- [ ] Task 11: 챔피언 집계 결과를 **영구 테이블에 누적**, `KnownPuuid.rankedLastMatchId` 이후 신규만 증분
-- [ ] Task 12: 외부인/부분 집계는 "최근 N판 기준" 임을 UI에 명시 (시즌 전체 아님)
+- [x] Task 9: 새 `champion-season` 엔드포인트는 `findUserByRiotAccount` 의존 없이 **puuid만으로** 동작 (등록 무관). ranked 그룹(type="ranked"=솔로+자유)
+- [x] Task 10: 즉시 20판은 기존 RecentStatsSummary가 담당. 사이드바 랭크 탭은 시즌 누적 + 2분 크론 background 스캔(`handleChampionSeasonScan`, 틱당 2건). 프론트 "수집 중" 폴링(5s) 표시
+- [x] Task 11: `ChampionSeasonStat`(puuid+시즌+큐+championId)에 누적, 스캔마다 전체 교체(멱등). 매치 DB 캐시 우선이라 재스캔은 신규분만 API 소모. 깊이 최대 100판. 상태는 `ChampionScanState`
+- [x] Task 12: 랭크 탭 배너에 "랭크 시즌 누적 통계 (최근 100판 기준)" / 수집 중 메시지 명시
 - [x] Task 13: "시즌" 정의를 설정형으로 — `RIOT_SEASON_START`(스플릿 시작일)·`RIOT_SEASON_LABEL`(시즌 키) env. 미설정 시 기존 동작(연도/1월1일) 유지
 
 ### E. 동시 검색 대비 (여러 명이 동시에 전적 검색)

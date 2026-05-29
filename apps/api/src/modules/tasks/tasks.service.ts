@@ -1001,4 +1001,21 @@ export class TasksService {
       this.logger.error("신고 기록 만료 삭제 실패", error);
     }
   }
+
+  /**
+   * 챔피언 시즌 통계 background 스캔 처리 - 2분마다 소량씩
+   * 전적 검색 시 큐잉된 puuid를 우선순위/요청순으로 스캔.
+   * 퍼스널 키 예산을 잠식하지 않게 틱당 2건만 처리(매치는 대부분 DB 캐시 히트).
+   */
+  @Cron("*/2 * * * *")
+  async handleChampionSeasonScan(): Promise<void> {
+    try {
+      const processed = await this.statsService.processChampionScanQueue(2);
+      if (processed > 0) {
+        this.logger.log(`챔피언 시즌 스캔 처리: ${processed}건`);
+      }
+    } catch (error) {
+      this.logger.error("챔피언 시즌 스캔 처리 실패", error);
+    }
+  }
 }

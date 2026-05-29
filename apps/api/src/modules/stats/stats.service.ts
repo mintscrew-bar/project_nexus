@@ -2449,4 +2449,245 @@ export class StatsService {
 
     return Array.from(map.values()).sort((a, b) => b.games - a.games);
   }
+
+  // ========================================
+  // 챔피언 시즌 통계 — 증분 누적 (match-v5 스캔)
+  // ========================================
+
+  private readonly MAX_SEASON_SCAN = 100; // puuid당 최대 스캔 깊이
+  private readonly SEASON_RESCAN_THROTTLE_MS = 30 * 60 * 1000; // 재스캔 최소 간격
+
+  // 누적된 챔피언 시즌 통계를 반환하고, 오래됐으면 background 스캔을 큐에 넣는다.
+  // 현재 ranked 그룹만 지원(type="ranked" = 솔로+자유).
+  async getChampionSeasonStats(
+    gameName: string,
+    tagLine: string,
+    queueGroup: "ranked" = "ranked",
+    options?: { priority?: number },
+  ) {
+    const summoner = await this.riotService.getSummonerByRiotId(
+      gameName,
+      tagLine,
+    );
+    const puuid: string = summoner.puuid;
+    const season = this.getCurrentSeason();
+
+    const [rows, state] = await Promise.all([
+      this.prisma.championSeasonStat.findMany({
+        where: { puuid, season, queueGroup },
+        orderBy: { games: "desc" },
+      }),
+      this.prisma.championScanState.findUnique({
+        where: {
+          puuid_season_queueGroup: { puuid, season, queueGroup },
+        },
+      }),
+    ]);
+
+    const now = Date.now();
+    const isIdleStatus =
+      !state ||
+      state.status === "idle" ||
+      state.status === "done" ||
+      state.status === "error";
+    const throttleElapsed =
+      !state?.lastScanAt ||
+      now - state.lastScanAt.getTime() > this.SEASON_RESCAN_THROTTLE_MS;
+    const shouldEnqueue = isIdleStatus && throttleElapsed;
+
+    if (shouldEnqueue) {
+      await this.enqueueChampionScan(
+        puuid,
+        season,
+        queueGroup,
+        options?.priority ?? 0,
+      );
+    }
+
+    const stats = rows.map((r) => ({
+      championId: r.championId,
+      championName: r.championName,
+      championNameKorean: getChampionKoreanName(r.championName),
+      games: r.games,
+      wins: r.wins,
+      losses: r.games - r.wins,
+      kills: r.kills,
+      deaths: r.deaths,
+      assists: r.assists,
+    }));
+
+    return {
+      queueGroup,
+      season,
+      stats,
+      // 큐에 넣었으면 즉시 queued로 보고(프론트 "수집 중" 표시)
+      status: shouldEnqueue ? "queued" : (state?.status ?? "queued"),
+      scannedCount: state?.scannedCount ?? 0,
+      lastScanAt: state?.lastScanAt ?? null,
+    };
+  }
+
+  private async enqueueChampionScan(
+    puuid: string,
+    season: string,
+    queueGroup: string,
+    priority: number,
+  ): Promise<void> {
+    await this.prisma.championScanState.upsert({
+      where: { puuid_season_queueGroup: { puuid, season, queueGroup } },
+      create: {
+        puuid,
+        season,
+        queueGroup,
+        status: "queued",
+        priority,
+        requestedAt: new Date(),
+      },
+      update: {
+        status: "queued",
+        // 더 높은 우선순위 요청이 오면 승격
+        priority: { set: priority },
+        requestedAt: new Date(),
+      },
+    });
+  }
+
+  // background 워커가 호출: 큐에 쌓인 스캔을 우선순위/요청순으로 처리.
+  async processChampionScanQueue(limit = 2): Promise<number> {
+    const queued = await this.prisma.championScanState.findMany({
+      where: { status: "queued" },
+      orderBy: [{ priority: "desc" }, { requestedAt: "asc" }],
+      take: limit,
+    });
+
+    let processed = 0;
+    for (const job of queued) {
+      try {
+        await this.prisma.championScanState.update({
+          where: { id: job.id },
+          data: { status: "scanning" },
+        });
+        await this.scanChampionSeasonForPuuid(
+          job.puuid,
+          job.season,
+          job.queueGroup,
+        );
+        processed++;
+      } catch (error) {
+        this.logger.warn(
+          `챔피언 시즌 스캔 실패 (${job.puuid}/${job.queueGroup}): ${error}`,
+        );
+        await this.prisma.championScanState
+          .update({
+            where: { id: job.id },
+            data: { status: "error", lastScanAt: new Date() },
+          })
+          .catch(() => undefined);
+      }
+    }
+    return processed;
+  }
+
+  // 한 puuid의 ranked 시즌 매치(최대 MAX_SEASON_SCAN)를 스캔해 챔피언 통계를 전체 교체.
+  // 매치는 DB 캐시 우선이라 재스캔 시 신규분만 Riot API 예산을 소모한다.
+  private async scanChampionSeasonForPuuid(
+    puuid: string,
+    season: string,
+    queueGroup: string,
+  ): Promise<void> {
+    const seasonStartSec = Math.floor(
+      this.getSeasonStartDate().getTime() / 1000,
+    );
+
+    // ranked = 솔로+자유 (type="ranked"). 시즌 시작 이후 최신 매치 ID.
+    const matchIds = await this.riotMatchService.getMatchIdsByPuuid(
+      puuid,
+      0,
+      this.MAX_SEASON_SCAN,
+      undefined,
+      "ranked",
+      3,
+      seasonStartSec,
+      undefined,
+      "background",
+    );
+
+    const agg = new Map<
+      number,
+      {
+        championId: number;
+        championName: string;
+        games: number;
+        wins: number;
+        kills: number;
+        deaths: number;
+        assists: number;
+      }
+    >();
+
+    for (const matchId of matchIds) {
+      const match = await this.riotMatchService.getMatchById(
+        matchId,
+        3,
+        "background",
+      );
+      if (!match) continue;
+      // 방어적 큐 필터 (솔로 420 / 자유 440)
+      if (![420, 440].includes(match.info?.queueId ?? 0)) continue;
+
+      const p = match.info.participants.find((x) => x.puuid === puuid);
+      if (!p) continue;
+
+      const cur = agg.get(p.championId) ?? {
+        championId: p.championId,
+        championName: p.championName,
+        games: 0,
+        wins: 0,
+        kills: 0,
+        deaths: 0,
+        assists: 0,
+      };
+      cur.games++;
+      if (p.win) cur.wins++;
+      cur.kills += p.kills;
+      cur.deaths += p.deaths;
+      cur.assists += p.assists;
+      agg.set(p.championId, cur);
+    }
+
+    const rows = Array.from(agg.values());
+
+    // 전체 교체(멱등): 기존 행 삭제 후 일괄 삽입 + 상태 갱신
+    await this.prisma.$transaction([
+      this.prisma.championSeasonStat.deleteMany({
+        where: { puuid, season, queueGroup },
+      }),
+      ...(rows.length > 0
+        ? [
+            this.prisma.championSeasonStat.createMany({
+              data: rows.map((r) => ({
+                puuid,
+                season,
+                queueGroup,
+                championId: r.championId,
+                championName: r.championName,
+                games: r.games,
+                wins: r.wins,
+                kills: r.kills,
+                deaths: r.deaths,
+                assists: r.assists,
+              })),
+            }),
+          ]
+        : []),
+      this.prisma.championScanState.update({
+        where: { puuid_season_queueGroup: { puuid, season, queueGroup } },
+        data: {
+          status: "done",
+          scannedCount: matchIds.length,
+          lastScanAt: new Date(),
+        },
+      }),
+    ]);
+  }
 }

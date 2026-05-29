@@ -182,7 +182,7 @@ export default function SummonerStatsPage() {
   });
 
   // Nexus 유저 ID 조회
-  const { data: nexusUser, isFetched: nexusUserFetched } = useQuery({
+  const { data: nexusUser } = useQuery({
     queryKey: ["nexusUser", gameName, tagLine],
     queryFn: () => statsApi.findUserByRiotAccount(gameName, tagLine),
     staleTime: 5 * 60 * 1000,
@@ -220,14 +220,19 @@ export default function SummonerStatsPage() {
     enabled: !!gameName && !!tagLine && !!nexusUserId && !!currentQueueGroup,
   });
 
+  // 랭크 챔피언 시즌 누적 통계 (등록 무관, background 스캔). 수집 중이면 폴링.
   const {
-    data: legacyRankedChampionStats = [],
-    isLoading: isLoadingLegacyRankedStats,
-  } = useQuery<any[]>({
-    queryKey: ["rankedChampionStats", gameName, tagLine],
-    queryFn: () => statsApi.getRankedChampionStats(gameName, tagLine),
-    staleTime: 10 * 60 * 1000,
-    enabled: !!gameName && !!tagLine && !!summoner && nexusUserFetched && !nexusUserId && champStatTab === "ranked",
+    data: championSeasonData,
+    isLoading: isLoadingSeasonStats,
+  } = useQuery({
+    queryKey: ["championSeasonStats", gameName, tagLine],
+    queryFn: () => statsApi.getChampionSeasonStats(gameName, tagLine),
+    staleTime: 60 * 1000,
+    enabled: !!gameName && !!tagLine && !!summoner && champStatTab === "ranked",
+    refetchInterval: (query) => {
+      const s = query.state.data?.status;
+      return s === "queued" || s === "scanning" ? 5000 : false;
+    },
   });
 
   const { data: nexusRanking } = useQuery({
@@ -448,29 +453,47 @@ export default function SummonerStatsPage() {
         { key: "ranked", label: "랭크" },
         { key: "nexus", label: "Nexus" },
       ];
-  const fallbackRankedStats = !nexusUserId && champStatTab === "ranked" ? legacyRankedChampionStats : [];
-  const resolvedStats = champStatTab === "nexus"
+  // 랭크 탭은 시즌 누적(등록 무관) 사용. 수집 중이면 폴링하며 "수집 중" 표시.
+  const isSeasonScanning =
+    championSeasonData?.status === "queued" ||
+    championSeasonData?.status === "scanning";
+  const resolvedStats = champStatTab === "ranked"
+    ? (championSeasonData?.stats ?? [])
+    : champStatTab === "nexus"
     ? championStats
     : nexusUserId
     ? (championStatsCache?.stats ?? [])
-    : fallbackRankedStats;
+    : [];
   const currentMatchCount =
-    champStatTab === "nexus"
+    champStatTab === "ranked"
+      ? (championSeasonData?.scannedCount ?? 0)
+      : champStatTab === "nexus"
       ? championStats.reduce((sum, stat) => sum + stat.games, 0)
-      : !nexusUserId && champStatTab === "ranked"
-      ? legacyRankedChampionStats.reduce((sum: number, stat: any) => sum + stat.games, 0)
       : (championStatsCache?.matchCount ?? queueStatus?.matchCount ?? 0);
   const currentComputedAt =
-    champStatTab === "nexus" ? null : (championStatsCache?.computedAt ?? queueStatus?.computedAt ?? null);
-  const isCurrentPartial = champStatTab === "nexus" ? false : (championStatsCache?.isPartial ?? queueStatus?.isPartial ?? false);
+    champStatTab === "ranked"
+      ? (championSeasonData?.lastScanAt ?? null)
+      : champStatTab === "nexus"
+      ? null
+      : (championStatsCache?.computedAt ?? queueStatus?.computedAt ?? null);
+  const isCurrentPartial =
+    champStatTab === "ranked"
+      ? isSeasonScanning
+      : champStatTab === "nexus"
+      ? false
+      : (championStatsCache?.isPartial ?? queueStatus?.isPartial ?? false);
   const currentFetchedAt =
-    champStatTab === "nexus" ? null : (queueStatus?.fetchedAt ?? null);
+    champStatTab === "nexus" || champStatTab === "ranked"
+      ? null
+      : (queueStatus?.fetchedAt ?? null);
   const isChampionTabLoading =
-    champStatTab === "nexus"
+    champStatTab === "ranked"
+      ? (isLoadingSeasonStats && !championSeasonData)
+      : champStatTab === "nexus"
       ? false
       : nexusUserId
       ? (isLoadingChampionStats || isFetchingChampionStats)
-      : (champStatTab === "ranked" && isLoadingLegacyRankedStats);
+      : false;
 
   return (
     <div className="min-h-screen bg-bg-primary">
@@ -781,7 +804,33 @@ export default function SummonerStatsPage() {
                 </div>
               </div>
 
-              {champStatTab !== "nexus" && nexusUserId && (
+              {/* 랭크 탭: 시즌 누적(최근 100판) 상태 배너 — 등록 무관 표시 */}
+              {champStatTab === "ranked" && (
+                <div className={`mb-4 rounded-lg border px-3 py-2 text-xs ${
+                  isSeasonScanning
+                    ? "border-amber-500/30 bg-amber-500/10 text-amber-200"
+                    : "border-bg-tertiary bg-bg-tertiary/40 text-text-secondary"
+                }`}>
+                  <div className="flex items-center gap-2">
+                    {isSeasonScanning ? (
+                      <AlertCircle className="h-3.5 w-3.5 flex-shrink-0 animate-pulse" />
+                    ) : (
+                      <Clock3 className="h-3.5 w-3.5 flex-shrink-0" />
+                    )}
+                    <span>
+                      {isSeasonScanning
+                        ? "전적을 수집 중입니다. 잠시 후 자동으로 갱신됩니다."
+                        : "랭크 시즌 누적 통계 (최근 100판 기준)"}
+                    </span>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-text-tertiary">
+                    <span>마지막 수집: {formatRelativeTime(currentComputedAt)}</span>
+                    <span>{currentMatchCount}게임 집계</span>
+                  </div>
+                </div>
+              )}
+
+              {champStatTab !== "nexus" && champStatTab !== "ranked" && nexusUserId && (
                 <div className={`mb-4 rounded-lg border px-3 py-2 text-xs ${
                   isCurrentPartial
                     ? "border-amber-500/30 bg-amber-500/10 text-amber-200"
@@ -817,7 +866,9 @@ export default function SummonerStatsPage() {
               {(() => {
                 const stats = resolvedStats;
                 const emptyMsg =
-                  champStatTab === "nexus"
+                  champStatTab === "ranked" && isSeasonScanning
+                    ? "전적 수집 중입니다… 잠시만 기다려주세요"
+                    : champStatTab === "nexus"
                     ? "Nexus 챔피언 통계가 없습니다"
                     : "해당 큐 챔피언 통계가 없습니다";
 

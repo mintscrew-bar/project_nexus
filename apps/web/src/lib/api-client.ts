@@ -1484,6 +1484,31 @@ export const statsApi = {
     return response.data;
   },
 
+  // 챔피언 시즌 누적 통계 (등록 무관, background 스캔)
+  getChampionSeasonStats: async (gameName: string, tagLine: string) => {
+    const response = await apiClient.get(
+      `/stats/summoner/${encodeURIComponent(stripInvisibleChars(gameName))}/${encodeURIComponent(stripInvisibleChars(tagLine))}/champion-season`
+    );
+    return response.data as {
+      queueGroup: string;
+      season: string;
+      stats: Array<{
+        championId: number;
+        championName: string;
+        championNameKorean?: string;
+        games: number;
+        wins: number;
+        losses: number;
+        kills: number;
+        deaths: number;
+        assists: number;
+      }>;
+      status: "idle" | "queued" | "scanning" | "done" | "error";
+      scannedCount: number;
+      lastScanAt: string | null;
+    };
+  },
+
   getSummonerRiotMatches: async (
     gameName: string,
     tagLine: string,
