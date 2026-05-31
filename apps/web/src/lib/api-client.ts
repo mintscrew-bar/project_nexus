@@ -22,6 +22,7 @@ export const getAccessToken = () => accessToken;
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
   withCredentials: true, // 쿠키 전송 (refresh token)
+  timeout: 15000, // 15초 — 연결 자체가 끊겼을 때 무한 hang 방지
   headers: {
     "Content-Type": "application/json",
   },
@@ -177,7 +178,7 @@ export const authApi = {
     const refreshResponse = await axios.post(
       `${API_BASE_URL}/auth/refresh`,
       {},
-      { withCredentials: true }
+      { withCredentials: true, timeout: 15000 }
     );
     const newToken = refreshResponse.data.accessToken;
     if (!newToken) throw new Error("No access token in refresh response");

@@ -61,13 +61,6 @@ function loadUserFromStorage(): User | null {
   }
 }
 
-function hasSessionHint(): boolean {
-  try {
-    return localStorage.getItem(HINT_KEY) === "1";
-  } catch {
-    return false;
-  }
-}
 
 function clearUserFromStorage() {
   try {
@@ -100,22 +93,22 @@ export const useAuthStore = create<AuthState>((set) => ({
 
       try {
         // refresh token으로 access token을 먼저 발급받은 뒤 /auth/me 조회
-        // - sessionStorage 캐시 있음: 이 탭에서 로그인 확인됨 → 8초
-        // - localStorage 힌트 있음: 다른 탭/이전 세션에서 로그인한 적 있음 → 8초
-        // - 둘 다 없음: 비로그인 가능성 높음 → 5초 (서버 응답 기다림)
-        const likelyLoggedIn = Boolean(cachedUser) || hasSessionHint();
-        const timeoutMs = likelyLoggedIn ? 8000 : 5000;
-        const timeout = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("auth_timeout")), timeoutMs)
-        );
-        const user = await Promise.race([authApi.initSession(), timeout]);
+        // 타임아웃 없음: 비로그인 유저는 쿠키가 없어 Next.js 라우트에서 즉시 401 반환
+        // (쿠키 있는 로그인 유저는 서버가 느려도 타임아웃으로 강제 로그아웃되면 안 됨)
+        const user = await authApi.initSession();
         saveUserToStorage(user);
         set({ user, isAuthenticated: true });
-      } catch {
-        // 로그인 안 됐거나 세션 만료 (정상 케이스)
-        clearUserFromStorage();
-        set({ user: null, isAuthenticated: false });
-        setAccessToken(null);
+      } catch (err: any) {
+        // 네트워크 에러와 인증 실패를 구분:
+        // - 401/403: 진짜 로그아웃 (세션 만료, 쿠키 없음) → 정리
+        // - 기타: 서버 일시 오류 → 캐시된 유저 유지, 로그아웃 처리 안 함
+        const status = err?.response?.status;
+        if (!status || status === 401 || status === 403) {
+          clearUserFromStorage();
+          set({ user: null, isAuthenticated: false });
+          setAccessToken(null);
+        }
+        // 500, 네트워크 에러 등: isLoading만 해제하고 로그인 상태 유지 시도
       } finally {
         set({ isLoading: false });
         _initPromise = null;
