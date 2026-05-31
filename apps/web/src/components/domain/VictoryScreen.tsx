@@ -43,30 +43,33 @@ function generateParticles(count: number) {
 const RANK_STYLES = [
   {
     icon: Crown,
-    iconClass: "w-5 h-5",
+    iconClass: "w-4 h-4",
     badgeBg: "bg-accent-gold/20",
     textColor: "text-accent-gold",
+    rankTextColor: "text-accent-gold",
     rowBg: "bg-gradient-to-r from-accent-gold/10 via-accent-gold/5 to-transparent border-accent-gold/35",
     memberChip: "bg-accent-gold/12 text-accent-gold/80 border border-accent-gold/20",
-    label: "1st",
+    label: "1등",
   },
   {
     icon: Medal,
-    iconClass: "w-5 h-5",
+    iconClass: "w-4 h-4",
     badgeBg: "bg-gray-400/15",
     textColor: "text-gray-300",
+    rankTextColor: "text-gray-300",
     rowBg: "bg-gray-400/8 border-gray-500/25",
     memberChip: "bg-bg-elevated text-text-secondary",
-    label: "2nd",
+    label: "2등",
   },
   {
     icon: Medal,
     iconClass: "w-4 h-4",
     badgeBg: "bg-orange-500/15",
     textColor: "text-orange-400",
+    rankTextColor: "text-orange-400",
     rowBg: "bg-orange-500/8 border-orange-500/25",
     memberChip: "bg-bg-elevated text-text-secondary",
-    label: "3rd",
+    label: "3등",
   },
 ];
 
@@ -75,6 +78,7 @@ const DEFAULT_RANK_STYLE = {
   iconClass: "",
   badgeBg: "bg-bg-elevated",
   textColor: "text-text-tertiary",
+  rankTextColor: "text-text-secondary",
   rowBg: "bg-bg-tertiary/30 border-bg-elevated/80",
   memberChip: "bg-bg-elevated text-text-tertiary",
   label: "",
@@ -250,12 +254,17 @@ export function VictoryScreen({
                   <div className="absolute inset-0 bg-gradient-to-t from-bg-secondary/50 to-transparent" />
 
                   <div className="relative px-6 py-5">
-                    <div className="flex items-center justify-center gap-1.5 mb-3">
+                    <div className="flex items-center justify-center gap-2 mb-3">
                       <Crown className="w-4 h-4 text-accent-gold" />
                       <span className="text-[10px] font-extrabold text-accent-gold/75 uppercase tracking-[0.25em]">
                         Champion
                       </span>
                       <Crown className="w-4 h-4 text-accent-gold" />
+                    </div>
+                    <div className="flex justify-center mb-1">
+                      <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-accent-gold/20 border border-accent-gold/35 text-accent-gold text-sm font-black tracking-wide">
+                        🏆 1등
+                      </span>
                     </div>
 
                     <h2 className="text-3xl font-black text-center bg-gradient-to-r from-yellow-300 via-accent-gold to-yellow-400 bg-clip-text text-transparent mb-2 tracking-tight">
@@ -338,15 +347,20 @@ export function VictoryScreen({
                     >
                       {/* 팀 헤더 행 */}
                       <div className="flex items-center gap-3 px-4 py-3">
-                        {/* 순위 배지 */}
-                        <div
-                          className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${style.badgeBg} ${style.textColor}`}
-                        >
-                          {RankIcon ? (
-                            <RankIcon className={style.iconClass} />
-                          ) : (
-                            <span className="text-xs font-bold">{idx + 1}</span>
-                          )}
+                        {/* 순위 배지: 아이콘 + 등수 텍스트 */}
+                        <div className="flex-shrink-0 flex items-center gap-1.5 min-w-[3.5rem]">
+                          <div
+                            className={`w-7 h-7 rounded-full flex items-center justify-center ${style.badgeBg} ${style.textColor}`}
+                          >
+                            {RankIcon ? (
+                              <RankIcon className={style.iconClass} />
+                            ) : (
+                              <span className="text-xs font-black">{idx + 1}</span>
+                            )}
+                          </div>
+                          <span className={`text-sm font-black tabular-nums ${style.rankTextColor}`}>
+                            {style.label || `${idx + 1}등`}
+                          </span>
                         </div>
 
                         {/* 팀명 */}
