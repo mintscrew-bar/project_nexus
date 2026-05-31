@@ -72,7 +72,7 @@ export function DraftBoard({
   // Calculate time remaining
   React.useEffect(() => {
     const interval = setInterval(() => {
-      const remaining = Math.max(0, Math.floor((draftState.timerEnd - Date.now()) / 1000));
+      const remaining = Math.max(0, Math.ceil((draftState.timerEnd - Date.now()) / 1000));
       setTimeLeft(remaining);
     }, 100);
 

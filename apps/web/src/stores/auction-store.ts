@@ -340,13 +340,9 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
       }));
     });
 
-    auctionSocketHelpers.onTimerUpdate((data: { timeLeft: number }) => {
-      set((state) => ({
-        auctionState: state.auctionState
-          ? { ...state.auctionState, timerEnd: Date.now() + data.timeLeft * 1000 }
-          : null,
-      }));
-    });
+    // timer-update는 무시 — timerEnd는 initial state·new-bid에서 절대값으로 설정됨.
+    // 정수 timeLeft로 재계산하면 최대 1초 drift가 발생해 표시가 오락가락하는 문제 있음.
+    auctionSocketHelpers.onTimerUpdate((_data: { timeLeft: number }) => { /* no-op */ });
 
     auctionSocketHelpers.onBidResolved((data: {
       sold: boolean;

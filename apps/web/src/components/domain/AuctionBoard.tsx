@@ -172,9 +172,10 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
   const [timeLeft, setTimeLeft] = useState(0);
   React.useEffect(() => {
     const interval = setInterval(() => {
+      // Math.ceil: 9.1초 남았을 때 "9" 아닌 "10" 표시 — 숫자가 느리게 내려가는 자연스러운 카운트다운
       const remaining = Math.max(
         0,
-        Math.floor((auctionState.timerEnd - Date.now()) / 1000),
+        Math.ceil((auctionState.timerEnd - Date.now()) / 1000),
       );
       setTimeLeft(remaining);
     }, 100);

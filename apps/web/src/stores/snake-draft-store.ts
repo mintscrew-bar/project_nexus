@@ -196,13 +196,9 @@ export const useSnakeDraftStore = create<SnakeDraftStoreState>((set, get) => ({
       }));
     });
 
-    snakeDraftSocketHelpers.onTimerUpdate((data: { timeLeft: number }) => {
-      set((state) => ({
-        draftState: state.draftState
-          ? { ...state.draftState, timerEnd: Date.now() + data.timeLeft * 1000 }
-          : null,
-      }));
-    });
+    // timer-update는 무시 — timerEnd는 next-pick/initial state에서 절대값으로 설정됨.
+    // 정수 timeLeft 재계산 시 최대 1초 drift로 표시가 오락가락하는 문제 있음.
+    snakeDraftSocketHelpers.onTimerUpdate((_data: { timeLeft: number }) => { /* no-op */ });
 
     snakeDraftSocketHelpers.onDraftState((data: DraftState) => {
       set({ draftState: data });
