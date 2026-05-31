@@ -131,14 +131,18 @@ export function PlayerHoverCard({ participant, anchorRect, onOpenProfile, onMous
           </div>
         </div>
         <div className="mb-3 pb-3 border-b border-bg-tertiary">
-          {/* gameName이 있을 때만 라이엇 닉네임 표시, 없으면 username으로 fallback */}
           {riot?.gameName ? (
             <>
               <p className="text-sm font-bold text-text-primary truncate">{riot.gameName}<span className="text-text-tertiary font-normal">#{riot.tagLine}</span></p>
-              <p className="text-xs text-text-tertiary truncate">@{participant.username} · {formatPeakTier(riot)}</p>
+              <p className="text-xs text-text-tertiary truncate">@{participant.username}</p>
             </>
           ) : (
             <p className="text-sm font-bold text-text-primary truncate">{participant.username}</p>
+          )}
+          {riot?.peakTier && (
+            <p className="text-[11px] text-text-tertiary mt-0.5">
+              Peak <span className="font-semibold text-text-secondary">{riot.peakTier}{riot.peakRank ? ` ${riot.peakRank}` : ""}</span>
+            </p>
           )}
         </div>
       {hasRoles && (
