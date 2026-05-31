@@ -64,6 +64,8 @@ interface AuctionBoardProps {
   className?: string;
   /** 모바일에서 입찰 패널을 숨김 (하단 고정 패널로 분리 시) */
   hideBidPanel?: boolean;
+  /** 팀 그리드를 숨김 (데스크톱 3열 레이아웃에서 팀을 외부 사이드 컬럼으로 분리할 때) */
+  hideTeams?: boolean;
 }
 
 const POSITION_LABELS: Record<string, string> = {
@@ -103,6 +105,7 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
   bidHistory = [],
   className,
   hideBidPanel = false,
+  hideTeams = false,
 }) => {
   const sortedTeams = useMemo(
     () =>
@@ -609,25 +612,27 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
         </Card>
       )}
 
-      {/* ── 팀 상세 — 데스크톱: 접기/펼치기, 모바일: 개별 아코디언 ── */}
-      <div>
-        <button
-          onClick={() => setTeamsExpanded((prev) => !prev)}
-          className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-bg-secondary hover:bg-bg-tertiary transition-colors mb-2"
-        >
-          <span className="text-sm font-semibold text-text-secondary">
-            팀 구성 ({sortedTeams.length}팀)
-          </span>
-          {teamsExpanded ? (
-            <ChevronUp className="w-4 h-4 text-text-muted" />
-          ) : (
-            <ChevronDown className="w-4 h-4 text-text-muted" />
-          )}
-        </button>
-      </div>
+      {/* ── 팀 상세 — 데스크톱: 접기/펼치기, 모바일: 개별 아코디언 (hideTeams=true 시 숨김) ── */}
+      {!hideTeams && (
+        <div>
+          <button
+            onClick={() => setTeamsExpanded((prev) => !prev)}
+            className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-bg-secondary hover:bg-bg-tertiary transition-colors mb-2"
+          >
+            <span className="text-sm font-semibold text-text-secondary">
+              팀 구성 ({sortedTeams.length}팀)
+            </span>
+            {teamsExpanded ? (
+              <ChevronUp className="w-4 h-4 text-text-muted" />
+            ) : (
+              <ChevronDown className="w-4 h-4 text-text-muted" />
+            )}
+          </button>
+        </div>
+      )}
 
-      {/* 데스크톱: 기존 그리드 (lg 이상) */}
-      {teamsExpanded && <div className="hidden lg:grid grid-cols-2 gap-3">
+      {/* 데스크톱: 기존 그리드 (lg 이상, hideTeams=false 일 때만) */}
+      {!hideTeams && teamsExpanded && <div className="hidden lg:grid grid-cols-2 gap-3">
         {sortedTeams.map((team) => {
           const members = team.members ?? [];
           const teamBudget = getTeamBudget(team);
@@ -712,8 +717,8 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
       )}
       <PlayerProfileModal userId={profileUserId} onClose={() => setProfileUserId(null)} />
 
-      {/* 모바일: 개별 팀 아코디언 (lg 미만) */}
-      {teamsExpanded && <div className="lg:hidden space-y-2">
+      {/* 모바일: 개별 팀 아코디언 (lg 미만, hideTeams=false 일 때만) */}
+      {!hideTeams && teamsExpanded && <div className="lg:hidden space-y-2">
         {sortedTeams.map((team) => {
           const members = team.members ?? [];
           const teamBudget = getTeamBudget(team);

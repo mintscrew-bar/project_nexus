@@ -1,13 +1,12 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { useAuction } from "@/hooks/useAuction";
 import { useAuthStore } from "@/stores/auth-store";
 import { roomApi } from "@/lib/api-client";
-import { AuctionBoard } from "@/components/domain";
-import { TierBadge } from "@/components/domain";
-import { LoadingSpinner, Badge, Button, Card, CardContent, ConfirmModal } from "@/components/ui";
+import { AuctionBoard, TierBadge, PlayerHoverCard, PlayerProfileModal } from "@/components/domain";
+import { LoadingSpinner, Badge, Button, Card, CardContent, ConfirmModal, Avatar } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
 import { GameChatPanel } from "@/components/domain/GameChatPanel";
 import { cn } from "@/lib/utils";
@@ -126,6 +125,234 @@ function BidLog({ bidHistory, logEndRef }: { bidHistory: any[]; logEndRef: React
         <div ref={logEndRef} />
       </div>
     </div>
+  );
+}
+
+/** LoL형 레이아웃 — 좌/우 팀 사이드 컬럼 */
+function TeamSideColumn({
+  teams,
+  currentUserId,
+  auctionState,
+}: {
+  teams: any[];
+  currentUserId?: string;
+  auctionState: any;
+}) {
+  const [hoveredPlayer, setHoveredPlayer] = useState<{ player: any; rect: DOMRect } | null>(null);
+  const [profileUserId, setProfileUserId] = useState<string | null>(null);
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const cancelHoverClose = useCallback(() => {
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+  }, []);
+
+  const scheduleHoverClose = useCallback(() => {
+    hoverTimerRef.current = setTimeout(() => setHoveredPlayer(null), 80);
+  }, []);
+
+  return (
+    <div className="h-full overflow-y-auto space-y-2 pr-0.5">
+      {teams.map((team) => {
+        const members = team.members ?? [];
+        const budget = team.remainingGold ?? team.remainingBudget ?? 0;
+        const isMine =
+          team.captainId === currentUserId ||
+          members.some((m: any) => m.id === currentUserId);
+        const isCurrentBidder =
+          auctionState?.currentHighestBidder === team.id ||
+          auctionState?.currentHighestBidder === team.captainId;
+        const isFull = members.length >= 5;
+
+        return (
+          <Card
+            key={team.id}
+            className={cn(
+              "p-0 overflow-hidden",
+              isCurrentBidder && "border-accent-gold/50 shadow-sm shadow-accent-gold/10",
+              isMine && !isCurrentBidder && "border-accent-primary/40",
+            )}
+          >
+            <div
+              className={cn(
+                "flex items-center gap-2 px-3 py-2 border-b border-bg-tertiary/70",
+                isCurrentBidder ? "bg-accent-gold/10" : "bg-bg-tertiary/20",
+              )}
+            >
+              {team.color && (
+                <div
+                  className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: team.color }}
+                />
+              )}
+              <span
+                className={cn(
+                  "font-semibold text-sm flex-1 truncate",
+                  isMine ? "text-accent-primary" : "text-text-primary",
+                )}
+              >
+                {team.name}
+              </span>
+              {isFull ? (
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-accent-success/15 text-accent-success border border-accent-success/30 flex-shrink-0">
+                  꽉 참
+                </span>
+              ) : (
+                <div className="flex items-center gap-0.5 flex-shrink-0">
+                  <Coins className="w-3 h-3 text-accent-gold" />
+                  <span
+                    className={cn(
+                      "text-xs font-bold",
+                      budget === 0
+                        ? "text-accent-danger"
+                        : isCurrentBidder
+                        ? "text-accent-gold"
+                        : "text-text-secondary",
+                    )}
+                  >
+                    {budget.toLocaleString()}G
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <div className="p-1.5 space-y-1">
+              {members.map((member: any, idx: number) => {
+                const isCaptain = member.id === team.captainId;
+                return (
+                  <div
+                    key={member.id}
+                    className={cn(
+                      "flex items-center gap-1.5 px-2 py-1.5 rounded cursor-default",
+                      isCaptain ? "bg-accent-gold/10" : "bg-bg-tertiary/60",
+                    )}
+                    onMouseEnter={(e) => {
+                      cancelHoverClose();
+                      setHoveredPlayer({ player: member, rect: e.currentTarget.getBoundingClientRect() });
+                    }}
+                    onMouseLeave={scheduleHoverClose}
+                  >
+                    <span className="text-[10px] text-text-tertiary w-4 text-center flex-shrink-0">
+                      {isCaptain ? "C" : idx}
+                    </span>
+                    <Avatar
+                      src={member.avatar}
+                      alt={member.username}
+                      fallback={member.username[0]}
+                      size="sm"
+                    />
+                    <span className="text-xs font-medium text-text-primary truncate flex-1">
+                      {member.username}
+                    </span>
+                    <TierBadge tier={member.tier} size="sm" showIcon={false} />
+                  </div>
+                );
+              })}
+              {Array.from({ length: Math.max(0, 5 - members.length) }).map((_, i) => (
+                <div
+                  key={`empty-${i}`}
+                  className="flex items-center gap-1.5 px-2 py-1.5 rounded border border-dashed border-bg-tertiary/60"
+                >
+                  <span className="text-[10px] text-text-muted w-4 text-center">{members.length + i}</span>
+                  <span className="text-xs text-text-muted">빈 슬롯</span>
+                </div>
+              ))}
+            </div>
+          </Card>
+        );
+      })}
+
+      {hoveredPlayer && (
+        <PlayerHoverCard
+          participant={{
+            userId: hoveredPlayer.player.id,
+            username: hoveredPlayer.player.username,
+            avatar: hoveredPlayer.player.avatar,
+            riotAccount:
+              hoveredPlayer.player.tier && hoveredPlayer.player.tier !== "UNRANKED"
+                ? {
+                    tier: hoveredPlayer.player.tier,
+                    rank: hoveredPlayer.player.rank,
+                    mainRole: hoveredPlayer.player.mainRole,
+                    subRole: hoveredPlayer.player.subRole,
+                  }
+                : null,
+            clanMemberships: [],
+          }}
+          anchorRect={hoveredPlayer.rect}
+          onOpenProfile={(userId) => {
+            setProfileUserId(userId);
+            setHoveredPlayer(null);
+          }}
+          onMouseEnter={cancelHoverClose}
+          onMouseLeave={scheduleHoverClose}
+        />
+      )}
+      <PlayerProfileModal userId={profileUserId} onClose={() => setProfileUserId(null)} />
+    </div>
+  );
+}
+
+/** 중앙 하단 정보 탭 (입찰 내역 | 대기 선수 | 채팅) */
+function CenterInfoTabs({
+  bidHistory,
+  players,
+  currentPlayerId,
+  roomId,
+  logEndRef,
+  onExpandPlayers,
+}: {
+  bidHistory: any[];
+  players: any[];
+  currentPlayerId?: string;
+  roomId: string;
+  logEndRef: React.RefObject<HTMLDivElement>;
+  onExpandPlayers: () => void;
+}) {
+  const [tab, setTab] = useState<"log" | "players" | "chat">("log");
+
+  return (
+    <Card className="flex-1 min-h-0">
+      <CardContent className="p-2.5 h-full flex flex-col">
+        <div className="flex gap-1 mb-2 flex-shrink-0 bg-bg-secondary rounded-lg p-0.5">
+          {[
+            { key: "log" as const, label: "입찰 내역", Icon: ScrollText },
+            { key: "players" as const, label: `대기 ${players.length}`, Icon: Users },
+            { key: "chat" as const, label: "채팅", Icon: MessageSquare },
+          ].map(({ key, label, Icon }) => (
+            <button
+              key={key}
+              onClick={() => setTab(key)}
+              className={cn(
+                "flex-1 flex items-center justify-center gap-1 py-1.5 rounded-md text-xs font-medium transition-colors",
+                tab === key
+                  ? "bg-bg-primary text-accent-primary shadow-sm"
+                  : "text-text-tertiary hover:text-text-secondary",
+              )}
+            >
+              <Icon className="w-3.5 h-3.5" />
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className="flex-1 min-h-0">
+          {/* 탭 전환 시 언마운트 방지 (스크롤 위치 보존) */}
+          <div className={cn("h-full", tab !== "log" && "hidden")}>
+            <BidLog bidHistory={bidHistory} logEndRef={logEndRef} />
+          </div>
+          <div className={cn("h-full", tab !== "players" && "hidden")}>
+            <PlayersList
+              players={players}
+              currentPlayerId={currentPlayerId}
+              onExpand={onExpandPlayers}
+              compact
+            />
+          </div>
+          {tab === "chat" && (
+            <GameChatPanel roomId={roomId} variant="inline" className="h-full" />
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -679,6 +906,20 @@ export default function AuctionRoomPage() {
     auctionState.currentHighestBidder === myTeam?.id
   );
 
+  // ── LoL형 레이아웃: 팀 정렬 후 좌우 균등 분할 ──
+  const sortedTeamsForLayout = useMemo(
+    () =>
+      [...teams].sort((a: any, b: any) => {
+        const oa = a.name.match(/\d+/) ? Number(a.name.match(/\d+/)![0]) : Infinity;
+        const ob = b.name.match(/\d+/) ? Number(b.name.match(/\d+/)![0]) : Infinity;
+        if (oa !== ob) return oa - ob;
+        return a.name.localeCompare(b.name);
+      }),
+    [teams],
+  );
+  const leftTeams = sortedTeamsForLayout.slice(0, Math.ceil(sortedTeamsForLayout.length / 2));
+  const rightTeams = sortedTeamsForLayout.slice(Math.ceil(sortedTeamsForLayout.length / 2));
+
   return (
     <div className="flex-grow p-4 md:p-6 relative">
       <ConfirmModal
@@ -749,46 +990,46 @@ export default function AuctionRoomPage() {
           ))}
         </div>
 
-        {/* ── 데스크톱: 3컬럼 레이아웃 (lg 이상). 좌·우 사이드바는 뷰포트 높이 기준 ── */}
-        <div className="hidden lg:grid lg:grid-cols-[260px_1fr_300px] gap-4 lg:h-[calc(100vh-180px)]">
-          {/* 좌측: 상단 대기선수(50%) + 하단 채팅(50%) */}
-          <div className="flex flex-col gap-3 min-h-0">
-            <Card className="flex-1 min-h-0">
-              <CardContent className="p-3 h-full">
-                <PlayersList
-                  players={players}
-                  currentPlayerId={auctionState.currentPlayer?.id}
-                  onExpand={() => setPlayersModalOpen(true)}
-                  compact
-                />
-              </CardContent>
-            </Card>
-            <GameChatPanel
-              roomId={auctionId}
-              variant="inline"
-              className="flex-1 min-h-0"
-            />
-          </div>
+        {/* ── 데스크톱: LoL형 3열 레이아웃 (좌팀 | 중앙경매 | 우팀) ── */}
+        {/* overflow-hidden으로 페이지 스크롤 방지 — 스크롤은 각 컬럼 내부에서만 */}
+        <div className="hidden lg:grid lg:grid-cols-[260px_1fr_260px] gap-3 overflow-hidden" style={{ height: 'calc(100vh - 160px)' }}>
+          {/* 좌측: 팀 첫 절반 */}
+          <TeamSideColumn
+            teams={leftTeams}
+            currentUserId={user?.id}
+            auctionState={auctionState}
+          />
 
-          {/* 중앙: 경매 메인 — 컨텐츠가 길어지면 스크롤 */}
-          <div className="overflow-y-auto pr-1">
-            <AuctionBoard
-              auctionState={auctionState}
-              teams={teams}
-              players={players}
-              currentUserId={user?.id}
-              onPlaceBid={placeBid}
-              disabled={!isConnected}
+          {/* 중앙: 경매 메인 (팀 그리드 제외) + 하단 정보 탭 */}
+          <div className="flex flex-col gap-3 min-h-0 overflow-hidden">
+            <div className="flex-shrink-0">
+              <AuctionBoard
+                auctionState={auctionState}
+                teams={teams}
+                players={players}
+                currentUserId={user?.id}
+                onPlaceBid={placeBid}
+                disabled={!isConnected}
+                bidHistory={bidHistory}
+                hideTeams
+              />
+            </div>
+            <CenterInfoTabs
               bidHistory={bidHistory}
+              players={players}
+              currentPlayerId={auctionState.currentPlayer?.id}
+              roomId={auctionId}
+              logEndRef={logEndRef}
+              onExpandPlayers={() => setPlayersModalOpen(true)}
             />
           </div>
 
-          {/* 우측: 입찰 로그 */}
-          <Card className="h-full min-h-0">
-            <CardContent className="p-3 h-full">
-              <BidLog bidHistory={bidHistory} logEndRef={logEndRef} />
-            </CardContent>
-          </Card>
+          {/* 우측: 팀 나머지 절반 */}
+          <TeamSideColumn
+            teams={rightTeams}
+            currentUserId={user?.id}
+            auctionState={auctionState}
+          />
         </div>
 
         {/* ── 모바일: 탭 컨텐츠 (lg 미만) ── */}
