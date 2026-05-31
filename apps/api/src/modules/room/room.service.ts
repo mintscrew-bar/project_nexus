@@ -543,6 +543,24 @@ export class RoomService {
     });
   }
 
+  /** 비WAITING 상태 방 목록 조회 (좀비 방 정리용) */
+  async getNonWaitingRooms() {
+    return this.prisma.room.findMany({
+      where: { status: { not: RoomStatus.WAITING } },
+      select: { id: true, status: true },
+    });
+  }
+
+  /** 호스트 검증 없이 방을 강제 삭제한다 (내부 cleanup 전용) */
+  async forceDeleteRoom(roomId: string) {
+    if (this.discordVoiceService) {
+      await this.discordVoiceService.deleteRoomChannels(roomId).catch((e: any) => {
+        this.logger.warn(`[Room] Discord channel cleanup failed for room ${roomId}: ${e?.message}`);
+      });
+    }
+    await this.prisma.room.delete({ where: { id: roomId } });
+  }
+
   /** WAITING 상태 방과 참가자 목록 조회 (좀비 정리용) */
   async getWaitingRoomsWithParticipants() {
     return this.prisma.room.findMany({

@@ -221,6 +221,18 @@ export class RoomGateway
           } catch {
             // best-effort — 무시
           }
+
+          // 비WAITING 방에서 30초 후에도 모든 게임 네임스페이스에 소켓이 없으면
+          // 방이 완전히 버려진 것으로 판단해 삭제한다.
+          const hasAnySockets = await this.hasActiveSocketsAnyNamespace(roomId);
+          if (!hasAnySockets) {
+            try {
+              await this.roomService.forceDeleteRoom(roomId);
+              this.broadcastRoomDelta("remove", roomId);
+            } catch {
+              // 이미 삭제되었거나 오류 — 무시
+            }
+          }
         }
       } catch {
         // 방이 이미 삭제되었거나 알 수 없는 상태 — 무시
@@ -905,10 +917,11 @@ export class RoomGateway
 
   private readonly gatewayLogger = new Logger(RoomGateway.name);
 
-  /** 매 5분마다 소켓 없는 좀비 참가자를 DB에서 제거한다 */
+  /** 매 5분마다 소켓 없는 좀비 참가자 및 버려진 비WAITING 방을 정리한다 */
   @Cron("*/5 * * * *")
   async cleanupZombieParticipants() {
     try {
+      // ── WAITING 방: /room 소켓이 없는 좀비 참가자 제거
       const waitingRooms =
         await this.roomService.getWaitingRoomsWithParticipants();
       for (const room of waitingRooms) {
@@ -941,9 +954,39 @@ export class RoomGateway
         // 방 상태 변경을 방 목록 구독자에게 알림 (삭제됐으면 remove로 폴백)
         this.broadcastRoomDelta("update", room.id);
       }
+
+      // ── 비WAITING 방: 모든 게임 네임스페이스에 소켓이 없으면 방 삭제
+      // grace timer(30초)가 이미 처리하지만 혹시 놓친 좀비 방을 5분 단위로 보정한다.
+      const nonWaitingRooms = await this.roomService.getNonWaitingRooms();
+      for (const room of nonWaitingRooms) {
+        const hasAnySockets = await this.hasActiveSocketsAnyNamespace(room.id);
+        if (hasAnySockets) continue;
+
+        this.gatewayLogger.debug(
+          `[Cleanup] Non-WAITING room ${room.id} (${room.status}): 소켓 없음 → 방 삭제`,
+        );
+        try {
+          await this.roomService.forceDeleteRoom(room.id);
+          this.broadcastRoomDelta("remove", room.id);
+        } catch {
+          // 이미 삭제됐거나 오류 무시
+        }
+      }
     } catch (error) {
       this.gatewayLogger.error("[Cleanup] 좀비 참가자 정리 실패:", error);
     }
+  }
+
+  /** 모든 게임 네임스페이스(/room·/auction·/snake-draft·/role-selection)에서
+   *  해당 방에 연결된 소켓이 하나라도 있으면 true를 반환한다. */
+  private async hasActiveSocketsAnyNamespace(roomId: string): Promise<boolean> {
+    const [roomSockets, hasAuction, hasDraft, hasRole] = await Promise.all([
+      this.server.in(roomId).fetchSockets(),
+      this.auctionGateway.hasActiveSocketsForRoom(roomId),
+      this.snakeDraftGateway.hasActiveSocketsForRoom(roomId),
+      this.roleSelectionGateway.hasActiveSocketsForRoom(roomId),
+    ]);
+    return roomSockets.length > 0 || hasAuction || hasDraft || hasRole;
   }
 
   // ========================================

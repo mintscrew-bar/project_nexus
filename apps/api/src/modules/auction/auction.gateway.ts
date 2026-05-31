@@ -938,4 +938,10 @@ export class AuctionGateway
       }
     }
   }
+
+  /** /auction 네임스페이스 기준으로 해당 방에 활성 소켓이 있는지 확인 (좀비 방 정리용) */
+  async hasActiveSocketsForRoom(roomId: string): Promise<boolean> {
+    const sockets = await this.server.in(`room:${roomId}`).fetchSockets();
+    return sockets.length > 0;
+  }
 }
