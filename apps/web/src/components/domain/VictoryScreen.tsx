@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useRef, useMemo } from "react";
-import { Trophy, Medal, Crown, ArrowRight, LogOut } from "lucide-react";
+import { Trophy, Crown, ArrowRight, LogOut, Swords, Medal } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui";
 import { roomApi } from "@/lib/api-client";
@@ -14,6 +14,11 @@ interface TeamStanding {
   losses: number;
 }
 
+interface TeamMember {
+  id: string;
+  username: string;
+}
+
 interface VictoryScreenProps {
   standings: TeamStanding[];
   roomId: string;
@@ -21,19 +26,59 @@ interface VictoryScreenProps {
   autoRedirectSeconds?: number;
 }
 
-// 컨페티 파티클 데이터 생성
 function generateParticles(count: number) {
   return Array.from({ length: count }, (_, i) => ({
     id: i,
     x: Math.random() * 100,
-    delay: Math.random() * 2,
-    duration: 2 + Math.random() * 3,
-    size: 4 + Math.random() * 6,
-    color: ["#0bc4e2", "#c89b3c", "#00c853", "#ffa726", "#f0f0f0"][
-      Math.floor(Math.random() * 5)
+    delay: Math.random() * 2.5,
+    duration: 2.5 + Math.random() * 3,
+    size: 5 + Math.random() * 7,
+    color: ["#c89b3c", "#0bc4e2", "#00c853", "#ffa726", "#ffffff", "#a855f7"][
+      Math.floor(Math.random() * 6)
     ],
+    rotation: Math.random() * 360,
   }));
 }
+
+const RANK_STYLES = [
+  {
+    icon: Crown,
+    iconClass: "w-5 h-5",
+    badgeBg: "bg-accent-gold/20",
+    textColor: "text-accent-gold",
+    rowBg: "bg-gradient-to-r from-accent-gold/10 via-accent-gold/5 to-transparent border-accent-gold/35",
+    memberChip: "bg-accent-gold/12 text-accent-gold/80 border border-accent-gold/20",
+    label: "1st",
+  },
+  {
+    icon: Medal,
+    iconClass: "w-5 h-5",
+    badgeBg: "bg-gray-400/15",
+    textColor: "text-gray-300",
+    rowBg: "bg-gray-400/8 border-gray-500/25",
+    memberChip: "bg-bg-elevated text-text-secondary",
+    label: "2nd",
+  },
+  {
+    icon: Medal,
+    iconClass: "w-4 h-4",
+    badgeBg: "bg-orange-500/15",
+    textColor: "text-orange-400",
+    rowBg: "bg-orange-500/8 border-orange-500/25",
+    memberChip: "bg-bg-elevated text-text-secondary",
+    label: "3rd",
+  },
+];
+
+const DEFAULT_RANK_STYLE = {
+  icon: null,
+  iconClass: "",
+  badgeBg: "bg-bg-elevated",
+  textColor: "text-text-tertiary",
+  rowBg: "bg-bg-tertiary/30 border-bg-elevated/80",
+  memberChip: "bg-bg-elevated text-text-tertiary",
+  label: "",
+};
 
 export function VictoryScreen({
   standings,
@@ -44,27 +89,57 @@ export function VictoryScreen({
   const router = useRouter();
   const [countdown, setCountdown] = useState(autoRedirectSeconds);
   const [isReturning, setIsReturning] = useState(false);
-  const lobbyUrl = `/tournaments/${roomId}/lobby`;
+  const [teamMembers, setTeamMembers] = useState<Record<string, TeamMember[]>>({});
   const hasNavigated = useRef(false);
+  const particles = useMemo(() => generateParticles(50), []);
+  const lobbyUrl = `/tournaments/${roomId}/lobby`;
 
-  // 컨페티 파티클 (첫 렌더 시 한 번만 생성)
-  const particles = useMemo(() => generateParticles(30), []);
+  // 방 데이터에서 팀 멤버 조회
+  useEffect(() => {
+    roomApi.getRoom(roomId)
+      .then((room: any) => {
+        const memberMap: Record<string, TeamMember[]> = {};
 
-  // 방 상태를 WAITING으로 리셋한 뒤 로비로 이동하는 공통 함수
+        // teams 배열에서 직접 멤버 추출
+        if (room.teams?.length > 0) {
+          for (const team of room.teams) {
+            if (!team.id) continue;
+            const members: TeamMember[] = (team.members ?? [])
+              .map((m: any) => ({
+                id: m.userId ?? m.user?.id ?? m.id,
+                username: m.user?.username ?? m.username,
+              }))
+              .filter((m: TeamMember) => m.username);
+            if (members.length > 0) {
+              memberMap[team.id] = members;
+            }
+          }
+        }
+
+        // teams가 없으면 participants의 teamId로 그룹화
+        if (Object.keys(memberMap).length === 0 && room.participants?.length > 0) {
+          for (const p of room.participants) {
+            if (!p.teamId || !p.username) continue;
+            if (!memberMap[p.teamId]) memberMap[p.teamId] = [];
+            memberMap[p.teamId].push({ id: p.userId, username: p.username });
+          }
+        }
+
+        setTeamMembers(memberMap);
+      })
+      .catch(() => {});
+  }, [roomId]);
+
   const navigateToLobby = async () => {
     if (hasNavigated.current || isReturning) return;
     hasNavigated.current = true;
     setIsReturning(true);
     try {
       await roomApi.returnToLobby(roomId);
-    } catch (err) {
-      // 다른 유저가 먼저 리셋했거나, 이미 WAITING인 경우 무시
-      console.warn(
-        "[VictoryScreen] returnToLobby failed (may already be reset):",
-        err
-      );
+    } catch {
+      // 이미 리셋됐거나 WAITING 상태이면 무시
     }
-    if (onClose) onClose();
+    onClose?.();
     router.push(lobbyUrl);
   };
 
@@ -79,48 +154,12 @@ export function VictoryScreen({
         return prev - 1;
       });
     }, 1000);
-
     return () => clearInterval(timer);
-  }, [router, lobbyUrl]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const winner = standings[0];
-
-  // 순위별 메달 스타일
-  const getRankStyle = (index: number) => {
-    switch (index) {
-      case 0:
-        return {
-          icon: <Crown className="w-5 h-5" />,
-          color: "text-accent-gold",
-          bg: "bg-accent-gold/10 border-accent-gold/40",
-          label: "1st",
-        };
-      case 1:
-        return {
-          icon: <Medal className="w-5 h-5" />,
-          color: "text-gray-300",
-          bg: "bg-gray-400/10 border-gray-400/30",
-          label: "2nd",
-        };
-      case 2:
-        return {
-          icon: <Medal className="w-4 h-4" />,
-          color: "text-orange-400",
-          bg: "bg-orange-500/10 border-orange-500/30",
-          label: "3rd",
-        };
-      default:
-        return {
-          icon: null,
-          color: "text-text-tertiary",
-          bg: "bg-bg-tertiary border-bg-elevated",
-          label: `${index + 1}th`,
-        };
-    }
-  };
-
-  // 카운트다운 진행률
   const progress = countdown / autoRedirectSeconds;
+  const totalGamesInTournament = standings.reduce((acc, s) => acc + s.wins, 0);
 
   return (
     <AnimatePresence>
@@ -128,193 +167,255 @@ export function VictoryScreen({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50"
+        className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center z-50 p-4"
       >
-        {/* 컨페티 파티클 배경 */}
+        {/* 컨페티 */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           {particles.map((p) => (
             <motion.div
               key={p.id}
-              initial={{ y: -20, x: `${p.x}vw`, opacity: 1 }}
-              animate={{ y: "110vh", opacity: 0 }}
+              initial={{ y: -30, x: `${p.x}vw`, opacity: 1, rotate: 0 }}
+              animate={{ y: "110vh", opacity: [1, 1, 0], rotate: p.rotation * 3 }}
               transition={{
                 duration: p.duration,
                 delay: p.delay,
                 repeat: Infinity,
                 ease: "linear",
               }}
-              className="absolute rounded-full"
-              style={{
-                width: p.size,
-                height: p.size,
-                backgroundColor: p.color,
-              }}
+              className="absolute rounded-sm"
+              style={{ width: p.size, height: p.size * 0.6, backgroundColor: p.color }}
             />
           ))}
         </div>
 
         {/* 메인 카드 */}
         <motion.div
-          initial={{ scale: 0.9, opacity: 0, y: 20 }}
+          initial={{ scale: 0.88, opacity: 0, y: 24 }}
           animate={{ scale: 1, opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-          className="relative bg-bg-secondary border border-bg-tertiary rounded-xl max-w-xl w-full mx-4 shadow-2xl overflow-hidden"
+          transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+          className="relative bg-bg-secondary border border-bg-tertiary rounded-2xl w-full max-w-2xl shadow-[0_32px_80px_rgba(0,0,0,0.6)] overflow-hidden max-h-[92vh] flex flex-col"
         >
-          {/* 상단 골드 글로우 라인 */}
-          <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-accent-gold to-transparent" />
+          {/* 상단 골드 라인 */}
+          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-accent-gold to-transparent" />
 
-          {/* 헤더 영역 */}
-          <div className="relative px-6 pt-8 pb-6">
-            {/* 트로피 아이콘 */}
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{
-                delay: 0.2,
-                type: "spring",
-                stiffness: 200,
-                damping: 12,
-              }}
-              className="flex justify-center mb-4"
-            >
-              <div className="relative">
-                <div className="w-16 h-16 rounded-full bg-accent-gold/15 border border-accent-gold/30 flex items-center justify-center">
-                  <Trophy className="w-8 h-8 text-accent-gold" />
+          {/* 스크롤 가능한 본문 */}
+          <div className="overflow-y-auto flex-1 scrollbar-thin">
+
+            {/* ── 헤더 ── */}
+            <div className="px-8 pt-8 pb-4 text-center">
+              <motion.div
+                initial={{ scale: 0, rotate: -15 }}
+                animate={{ scale: 1, rotate: 0 }}
+                transition={{ delay: 0.15, type: "spring", stiffness: 180, damping: 11 }}
+                className="flex justify-center mb-4"
+              >
+                <div className="relative">
+                  <div className="w-16 h-16 rounded-full bg-accent-gold/15 border border-accent-gold/30 flex items-center justify-center">
+                    <Trophy className="w-8 h-8 text-accent-gold" />
+                  </div>
+                  <div className="absolute inset-0 rounded-full bg-accent-gold/8 animate-ping" />
                 </div>
-                {/* 글로우 이펙트 */}
-                <div className="absolute inset-0 w-16 h-16 rounded-full bg-accent-gold/10 animate-ping" />
-              </div>
-            </motion.div>
+              </motion.div>
 
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-              className="text-center"
-            >
-              <h1 className="text-2xl font-bold text-text-primary mb-1">
-                토너먼트 종료
-              </h1>
-              <p className="text-sm text-text-secondary">
-                모든 경기가 완료되었습니다
-              </p>
-            </motion.div>
-          </div>
-
-          {/* 우승팀 하이라이트 */}
-          {winner && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 }}
-              className="mx-6 mb-5"
-            >
-              <div className="relative bg-gradient-to-b from-accent-gold/10 to-transparent border border-accent-gold/25 rounded-lg p-5 text-center">
-                <div className="flex items-center justify-center gap-2 mb-2">
-                  <Crown className="w-5 h-5 text-accent-gold" />
-                  <span className="text-xs font-semibold text-accent-gold/80 uppercase tracking-wider">
-                    Champion
-                  </span>
-                  <Crown className="w-5 h-5 text-accent-gold" />
-                </div>
-                <h2 className="text-2xl font-bold bg-gradient-to-r from-accent-gold to-accent-primary bg-clip-text text-transparent">
-                  {winner.teamName}
-                </h2>
-                <p className="text-sm text-text-secondary mt-1">
-                  <span className="text-accent-success font-semibold">
-                    {winner.wins}승
-                  </span>
-                  <span className="mx-1 text-text-muted">/</span>
-                  <span className="text-accent-danger font-semibold">
-                    {winner.losses}패
-                  </span>
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.25 }}
+              >
+                <p className="text-xs font-bold text-accent-gold/70 uppercase tracking-[0.2em] mb-1">
+                  Tournament Complete
                 </p>
-              </div>
-            </motion.div>
-          )}
+                <h1 className="text-2xl font-extrabold text-text-primary">
+                  토너먼트 종료
+                </h1>
+                {totalGamesInTournament > 0 && (
+                  <p className="text-sm text-text-secondary mt-1">
+                    총 {totalGamesInTournament}경기 · {standings.length}팀 참가
+                  </p>
+                )}
+              </motion.div>
+            </div>
 
-          {/* 최종 순위 */}
-          <div className="px-6 mb-5">
-            <h3 className="text-sm font-semibold text-text-tertiary uppercase tracking-wider mb-3">
-              최종 순위
-            </h3>
-            <div className="space-y-2">
-              {standings.map((team, index) => {
-                const rank = getRankStyle(index);
-                return (
-                  <motion.div
-                    key={team.teamId}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.5 + index * 0.08 }}
-                    className={`flex items-center justify-between px-4 py-3 rounded-lg border transition-all ${rank.bg}`}
-                  >
-                    <div className="flex items-center gap-3">
-                      {/* 순위 뱃지 */}
-                      <div
-                        className={`flex items-center justify-center w-8 h-8 rounded-full ${
-                          index === 0
-                            ? "bg-accent-gold/20"
-                            : "bg-bg-tertiary"
-                        } ${rank.color}`}
-                      >
-                        {rank.icon || (
-                          <span className="text-xs font-bold">
-                            {rank.label}
+            {/* ── 우승팀 하이라이트 ── */}
+            {winner && (
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.35 }}
+                className="mx-6 mb-5"
+              >
+                <div className="relative rounded-xl overflow-hidden border border-accent-gold/30">
+                  {/* 배경 그라디언트 */}
+                  <div className="absolute inset-0 bg-gradient-to-br from-accent-gold/15 via-accent-gold/8 to-transparent" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-bg-secondary/50 to-transparent" />
+
+                  <div className="relative px-6 py-5">
+                    <div className="flex items-center justify-center gap-1.5 mb-3">
+                      <Crown className="w-4 h-4 text-accent-gold" />
+                      <span className="text-[10px] font-extrabold text-accent-gold/75 uppercase tracking-[0.25em]">
+                        Champion
+                      </span>
+                      <Crown className="w-4 h-4 text-accent-gold" />
+                    </div>
+
+                    <h2 className="text-3xl font-black text-center bg-gradient-to-r from-yellow-300 via-accent-gold to-yellow-400 bg-clip-text text-transparent mb-2 tracking-tight">
+                      {winner.teamName}
+                    </h2>
+
+                    <div className="flex items-center justify-center gap-3 mb-4 text-sm">
+                      <span className="text-accent-success font-bold text-base">
+                        {winner.wins}승
+                      </span>
+                      <span className="w-px h-4 bg-text-muted/30" />
+                      <span className="text-accent-danger font-semibold">
+                        {winner.losses}패
+                      </span>
+                      {winner.wins + winner.losses > 0 && (
+                        <>
+                          <span className="w-px h-4 bg-text-muted/30" />
+                          <span className="text-text-secondary">
+                            승률{" "}
+                            <span className="text-accent-success font-semibold">
+                              {Math.round((winner.wins / (winner.wins + winner.losses)) * 100)}%
+                            </span>
                           </span>
-                        )}
+                        </>
+                      )}
+                    </div>
+
+                    {/* 우승팀 멤버 */}
+                    {teamMembers[winner.teamId]?.length > 0 ? (
+                      <div className="flex flex-wrap justify-center gap-1.5">
+                        {teamMembers[winner.teamId].map((m) => (
+                          <span
+                            key={m.id}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-accent-gold/15 border border-accent-gold/25 text-accent-gold text-xs font-semibold"
+                          >
+                            {m.username}
+                          </span>
+                        ))}
                       </div>
-                      {/* 팀 정보 */}
-                      <div>
-                        <span
-                          className={`font-semibold ${
-                            index === 0
-                              ? "text-accent-gold"
-                              : "text-text-primary"
-                          }`}
+                    ) : (
+                      /* 멤버 로딩 중 스켈레톤 */
+                      <div className="flex justify-center gap-1.5">
+                        {[5, 4, 6, 5, 4].map((w, i) => (
+                          <div
+                            key={i}
+                            className={`h-6 w-${w * 2} rounded-full bg-accent-gold/10 animate-pulse`}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* ── 최종 순위 ── */}
+            <div className="px-6 pb-6">
+              <div className="flex items-center gap-2 mb-3">
+                <Swords className="w-3.5 h-3.5 text-text-tertiary" />
+                <h3 className="text-[10px] font-extrabold text-text-tertiary uppercase tracking-[0.2em]">
+                  최종 순위
+                </h3>
+              </div>
+
+              <div className="space-y-2">
+                {standings.map((team, idx) => {
+                  const style = RANK_STYLES[idx] ?? DEFAULT_RANK_STYLE;
+                  const RankIcon = style.icon;
+                  const members = teamMembers[team.teamId] ?? [];
+                  const total = team.wins + team.losses;
+                  const winRate = total > 0 ? (team.wins / total) * 100 : 0;
+
+                  return (
+                    <motion.div
+                      key={team.teamId}
+                      initial={{ opacity: 0, x: -14 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.45 + idx * 0.07 }}
+                      className={`rounded-xl border overflow-hidden ${style.rowBg}`}
+                    >
+                      {/* 팀 헤더 행 */}
+                      <div className="flex items-center gap-3 px-4 py-3">
+                        {/* 순위 배지 */}
+                        <div
+                          className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${style.badgeBg} ${style.textColor}`}
                         >
+                          {RankIcon ? (
+                            <RankIcon className={style.iconClass} />
+                          ) : (
+                            <span className="text-xs font-bold">{idx + 1}</span>
+                          )}
+                        </div>
+
+                        {/* 팀명 */}
+                        <span className={`flex-1 font-bold text-sm truncate ${style.textColor}`}>
                           {team.teamName}
                         </span>
+
+                        {/* 승률 바 + 전적 */}
+                        <div className="flex items-center gap-3 flex-shrink-0">
+                          {total > 0 && (
+                            <div className="hidden sm:flex items-center w-20">
+                              <div className="flex-1 h-1.5 bg-bg-elevated rounded-full overflow-hidden">
+                                <div
+                                  className="h-full rounded-full bg-accent-success transition-all duration-700"
+                                  style={{ width: `${winRate}%` }}
+                                />
+                              </div>
+                            </div>
+                          )}
+                          <div className="flex items-center gap-1 text-xs font-mono">
+                            <span className="text-accent-success font-bold">{team.wins}W</span>
+                            <span className="text-text-muted">·</span>
+                            <span className="text-accent-danger">{team.losses}L</span>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                    {/* 전적 */}
-                    <div className="flex items-center gap-2 text-sm">
-                      <span className="text-accent-success font-mono font-semibold">
-                        {team.wins}W
-                      </span>
-                      <span className="text-text-muted">-</span>
-                      <span className="text-accent-danger font-mono font-semibold">
-                        {team.losses}L
-                      </span>
-                    </div>
-                  </motion.div>
-                );
-              })}
+
+                      {/* 멤버 행 */}
+                      {members.length > 0 && (
+                        <div className="px-4 pb-2.5 flex flex-wrap gap-1.5">
+                          {members.map((m) => (
+                            <span
+                              key={m.id}
+                              className={`text-[11px] px-2 py-0.5 rounded-full ${style.memberChip}`}
+                            >
+                              {m.username}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </motion.div>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
-          {/* 하단 액션 영역 */}
-          <div className="border-t border-bg-tertiary px-6 py-5">
-            {/* 카운트다운 프로그레스 */}
-            <div className="mb-4">
-              <div className="flex items-center justify-between text-xs text-text-tertiary mb-2">
-                <span>자동 로비 이동</span>
-                <span className="font-mono">{countdown}초</span>
+          {/* ── 푸터 (고정) ── */}
+          <div className="flex-shrink-0 border-t border-bg-tertiary bg-bg-secondary px-6 py-4">
+            {/* 카운트다운 바 */}
+            <div className="mb-3.5">
+              <div className="flex items-center justify-between text-xs text-text-tertiary mb-1.5">
+                <span>자동으로 로비로 이동</span>
+                <span className="font-mono tabular-nums">{countdown}초</span>
               </div>
               <div className="w-full h-1 bg-bg-tertiary rounded-full overflow-hidden">
                 <motion.div
                   className="h-full bg-accent-primary rounded-full"
                   initial={{ width: "100%" }}
                   animate={{ width: `${progress * 100}%` }}
-                  transition={{ duration: 0.8, ease: "linear" }}
+                  transition={{ duration: 0.9, ease: "linear" }}
                 />
               </div>
             </div>
 
-            {/* 버튼들 */}
+            {/* 버튼 */}
             <div className="flex gap-3">
               <Button
-                onClick={() => navigateToLobby()}
+                onClick={navigateToLobby}
                 variant="primary"
                 size="md"
                 fullWidth
