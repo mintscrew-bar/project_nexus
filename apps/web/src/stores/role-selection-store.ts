@@ -182,7 +182,13 @@ export const useRoleSelectionStore = create<RoleSelectionState>((set) => ({
 
     roleSelectionSocketHelpers.onTimerTick((data: { timeRemaining: number; timerEndAt?: number | null }) => {
       const syncedSeconds = getSecondsUntil(data.timerEndAt, data.timeRemaining);
-      startLocalCountdown(syncedSeconds, set);
+      if (localCountdownInterval) {
+        // 인터벌 실행 중: 값만 보정 (재시작하면 최대 2초 stall 발생)
+        set((state: any) => ({ ...state, timeRemaining: syncedSeconds }));
+      } else if (syncedSeconds > 0) {
+        // 인터벌이 0에 도달해 자동 종료된 경우에만 재시작
+        startLocalCountdown(syncedSeconds, set);
+      }
     });
 
     roleSelectionSocketHelpers.onTimerExtended((data: { timerEndAt: number; timeRemaining: number; extendedBy: string }) => {
