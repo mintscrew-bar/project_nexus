@@ -1,11 +1,13 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRoleSelectionStore } from "@/stores/role-selection-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { roomApi } from "@/lib/api-client";
 import { GameChatPanel } from "@/components/domain/GameChatPanel";
+import { PlayerHoverCard } from "@/components/domain/PlayerHoverCard";
+import { PlayerProfileModal } from "@/components/domain/PlayerProfileModal";
 import { LoadingSpinner, Badge, Avatar, Button, ConfirmModal } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
 import { Clock, Check, TimerReset } from "lucide-react";
@@ -31,6 +33,17 @@ export default function RoleSelectionPage() {
   const hasRedirected = useRef(false);
   const [isAborting, setIsAborting] = useState(false);
   const [isAbortConfirmOpen, setIsAbortConfirmOpen] = useState(false);
+  const [hoveredMember, setHoveredMember] = useState<{ participant: any; rect: DOMRect } | null>(null);
+  const [profileUserId, setProfileUserId] = useState<string | null>(null);
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const cancelHoverClose = useCallback(() => {
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+  }, []);
+
+  const scheduleHoverClose = useCallback(() => {
+    hoverTimerRef.current = setTimeout(() => setHoveredMember(null), 80);
+  }, []);
 
   const {
     room,
@@ -265,10 +278,20 @@ export default function RoleSelectionPage() {
 
                     return (
                       <div key={member.id} className="space-y-2">
-                        <div className={cn(
-                          "flex items-center gap-3 px-3 py-2.5 rounded-lg border",
-                          isMe ? "bg-accent-primary/5 border-accent-primary/20" : "bg-bg-tertiary/60 border-transparent"
-                        )}>
+                        <div
+                          className={cn(
+                            "flex items-center gap-3 px-3 py-2.5 rounded-lg border cursor-default",
+                            isMe ? "bg-accent-primary/5 border-accent-primary/20" : "bg-bg-tertiary/60 border-transparent"
+                          )}
+                          onMouseEnter={(e) => {
+                            cancelHoverClose();
+                            setHoveredMember({
+                              participant: { userId: member.userId, username: member.user.username, avatar: member.user.avatar, clanMemberships: [] },
+                              rect: e.currentTarget.getBoundingClientRect(),
+                            });
+                          }}
+                          onMouseLeave={scheduleHoverClose}
+                        >
                           <Avatar
                             src={member.user.avatar}
                             alt={member.user.username}
@@ -355,6 +378,16 @@ export default function RoleSelectionPage() {
 
       {/* 채팅 패널 (플로팅) */}
       <GameChatPanel roomId={roomId} />
+      {hoveredMember && (
+        <PlayerHoverCard
+          participant={hoveredMember.participant}
+          anchorRect={hoveredMember.rect}
+          onOpenProfile={(userId) => { setProfileUserId(userId); setHoveredMember(null); }}
+          onMouseEnter={cancelHoverClose}
+          onMouseLeave={scheduleHoverClose}
+        />
+      )}
+      <PlayerProfileModal userId={profileUserId} onClose={() => setProfileUserId(null)} />
     </div>
   );
 }

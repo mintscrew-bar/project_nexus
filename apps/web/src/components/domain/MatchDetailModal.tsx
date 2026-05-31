@@ -11,6 +11,8 @@ import { useAuthStore } from '@/stores/auth-store';
 import { matchApi } from '@/lib/api-client';
 import { ChampionIcon, PositionIcon, POSITION_LABELS } from '@/app/tournaments/[id]/lobby/_components/icons';
 import { TierBadge } from '@/components/domain/TierBadge';
+import { PlayerHoverCard } from '@/components/domain/PlayerHoverCard';
+import { PlayerProfileModal } from '@/components/domain/PlayerProfileModal';
 
 type LaneKey = 'TOP' | 'JUNGLE' | 'MID' | 'ADC' | 'SUPPORT';
 const LANES: LaneKey[] = ['TOP', 'JUNGLE', 'MID', 'ADC', 'SUPPORT'];
@@ -109,6 +111,7 @@ export function MatchDetailModal({
   const [isLoadingVotes, setIsLoadingVotes] = useState(false);
   const [submittingVote, setSubmittingVote] = useState<'MVP' | 'ACE' | null>(null);
   const [voteError, setVoteError] = useState<string | null>(null);
+  const [profileUserId, setProfileUserId] = useState<string | null>(null);
 
   const fetchVoteData = useCallback(async (matchId: string) => {
     try {
@@ -266,6 +269,7 @@ export function MatchDetailModal({
           fallbackTeam1Name={getTeamDisplayName(match.team1)}
           fallbackTeam2Name={getTeamDisplayName(match.team2)}
           winnerId={fullMatch?.winnerId}
+          onOpenProfile={setProfileUserId}
         />
 
         {match.status === 'COMPLETED' && match.winner && (
@@ -388,6 +392,7 @@ export function MatchDetailModal({
           닫기
         </Button>
       </div>
+      <PlayerProfileModal userId={profileUserId} onClose={() => setProfileUserId(null)} />
     </Modal>
   );
 }
@@ -561,12 +566,14 @@ function LaneRoster({
   fallbackTeam1Name,
   fallbackTeam2Name,
   winnerId,
+  onOpenProfile,
 }: {
   teamA?: FullMatchDetails['teamA'];
   teamB?: FullMatchDetails['teamB'];
   fallbackTeam1Name: string;
   fallbackTeam2Name: string;
   winnerId?: string;
+  onOpenProfile: (userId: string) => void;
 }) {
   // 라인별로 멤버를 분류. assignedRole이 없거나 알 수 없으면 'UNASSIGNED' 버킷에 모음.
   const groupByLane = (members?: MatchMember[]) => {
@@ -617,11 +624,11 @@ function LaneRoster({
               </span>
             </div>
             <div className="px-2 py-1.5">
-              {aMembers.map((m) => <PlayerCell key={m.user.id} member={m} />)}
+              {aMembers.map((m) => <PlayerCell key={m.user.id} member={m} onOpenProfile={onOpenProfile} />)}
             </div>
             <div className="flex items-center justify-center text-[10px] text-text-tertiary">vs</div>
             <div className="px-2 py-1.5">
-              {bMembers.map((m) => <PlayerCell key={m.user.id} member={m} />)}
+              {bMembers.map((m) => <PlayerCell key={m.user.id} member={m} onOpenProfile={onOpenProfile} />)}
             </div>
           </div>
         );
@@ -632,11 +639,11 @@ function LaneRoster({
         <div className="grid grid-cols-[60px_1fr_28px_1fr] sm:grid-cols-[72px_1fr_36px_1fr] border-t border-bg-tertiary items-stretch">
           <div className="flex items-center justify-center px-2 py-2 bg-bg-tertiary/50 text-[10px] text-text-tertiary">미배정</div>
           <div className="px-2 py-1.5">
-            {(aByLane.get('UNASSIGNED') ?? []).map((m) => <PlayerCell key={m.user.id} member={m} />)}
+            {(aByLane.get('UNASSIGNED') ?? []).map((m) => <PlayerCell key={m.user.id} member={m} onOpenProfile={onOpenProfile} />)}
           </div>
           <div />
           <div className="px-2 py-1.5">
-            {(bByLane.get('UNASSIGNED') ?? []).map((m) => <PlayerCell key={m.user.id} member={m} />)}
+            {(bByLane.get('UNASSIGNED') ?? []).map((m) => <PlayerCell key={m.user.id} member={m} onOpenProfile={onOpenProfile} />)}
           </div>
         </div>
       ) : null}
@@ -644,74 +651,50 @@ function LaneRoster({
   );
 }
 
-// 한 명의 선수 셀 — 호버하면 상세 툴팁
-function PlayerCell({ member }: { member: MatchMember }) {
-  const [hovered, setHovered] = useState(false);
-  const ref = React.useRef<HTMLDivElement>(null);
-  const riot = member.user.riotAccounts?.[0];
+// 한 명의 선수 셀 — 호버하면 PlayerHoverCard 표시
+function PlayerCell({ member, onOpenProfile }: { member: MatchMember; onOpenProfile: (userId: string) => void }) {
+  const [hoveredRect, setHoveredRect] = useState<DOMRect | null>(null);
+  const hoverTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const cancelHoverClose = () => { if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current); };
+  const scheduleHoverClose = () => { hoverTimerRef.current = setTimeout(() => setHoveredRect(null), 80); };
+
+  const participant = {
+    userId: member.user.id,
+    username: member.user.username,
+    avatar: member.user.avatar,
+    riotAccount: member.user.riotAccounts?.[0] ?? null,
+    clanMemberships: [],
+  };
 
   return (
-    <div
-      ref={ref}
-      className="relative flex items-center gap-1.5 py-0.5 cursor-default"
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
-      <div className="w-5 h-5 rounded-full bg-bg-tertiary overflow-hidden flex-shrink-0">
-        {member.user.avatar ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={member.user.avatar} alt={member.user.username} className="w-full h-full object-cover" />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-[10px] font-bold text-text-tertiary">
-            {member.user.username.charAt(0).toUpperCase()}
-          </div>
-        )}
-      </div>
-      <span className="text-xs text-text-primary truncate">{member.user.username}</span>
-
-      {hovered && riot && <PlayerInlineTooltip member={member} />}
-    </div>
-  );
-}
-
-// 호버 시 표시되는 작은 툴팁: 닉#태그 + 티어 + 주라인 + 주라인 선호 챔피언
-function PlayerInlineTooltip({ member }: { member: MatchMember }) {
-  const riot = member.user.riotAccounts?.[0];
-  if (!riot) return null;
-  const mainRole = riot.mainRole || null;
-  const mainRoleChamps = (riot.championPreferences || [])
-    .filter((cp) => cp.role === mainRole)
-    .sort((a, b) => a.order - b.order)
-    .slice(0, 5);
-
-  return (
-    <div className="absolute left-0 top-full mt-1 z-50 w-60 rounded-lg border border-bg-tertiary bg-bg-elevated shadow-xl p-2.5 pointer-events-none">
-      <p className="text-xs font-bold text-text-primary truncate">
-        {riot.gameName}<span className="text-text-tertiary font-normal">#{riot.tagLine}</span>
-      </p>
-      <p className="text-[10px] text-text-tertiary mb-2">@{member.user.username}</p>
-      <div className="flex items-center gap-2 mb-2">
-        {riot.tier && <TierBadge tier={riot.tier} rank={riot.rank || undefined} size="sm" showIcon />}
-        {mainRole && (
-          <span className="flex items-center gap-1 text-[10px] text-text-secondary">
-            <PositionIcon position={mainRole} className="!w-3 !h-3" />
-            <span>{POSITION_LABELS[mainRole] || mainRole}</span>
-            <span className="text-accent-primary font-semibold">주</span>
-          </span>
-        )}
-      </div>
-      {mainRoleChamps.length > 0 ? (
-        <div>
-          <p className="text-[9px] font-semibold text-text-tertiary uppercase tracking-wider mb-1">주라인 선호 챔피언</p>
-          <div className="flex items-center gap-1">
-            {mainRoleChamps.map((cp) => (
-              <ChampionIcon key={cp.championId} championId={cp.championId} size={24} />
-            ))}
-          </div>
+    <>
+      <div
+        className="relative flex items-center gap-1.5 py-0.5 cursor-default"
+        onMouseEnter={(e) => { cancelHoverClose(); setHoveredRect(e.currentTarget.getBoundingClientRect()); }}
+        onMouseLeave={scheduleHoverClose}
+      >
+        <div className="w-5 h-5 rounded-full bg-bg-tertiary overflow-hidden flex-shrink-0">
+          {member.user.avatar ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={member.user.avatar} alt={member.user.username} className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-[10px] font-bold text-text-tertiary">
+              {member.user.username.charAt(0).toUpperCase()}
+            </div>
+          )}
         </div>
-      ) : (
-        <p className="text-[10px] text-text-tertiary italic">등록된 선호 챔피언이 없습니다</p>
+        <span className="text-xs text-text-primary truncate">{member.user.username}</span>
+      </div>
+      {hoveredRect && (
+        <PlayerHoverCard
+          participant={participant}
+          anchorRect={hoveredRect}
+          onOpenProfile={(userId) => { setHoveredRect(null); onOpenProfile(userId); }}
+          onMouseEnter={cancelHoverClose}
+          onMouseLeave={scheduleHoverClose}
+        />
       )}
-    </div>
+    </>
   );
 }

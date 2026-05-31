@@ -11,3 +11,5 @@ export * from './MatchDetailModal';
 export * from './VictoryScreen';
 export * from './UserProfile';
 export * from './ClanChat';
+export * from './PlayerHoverCard';
+export * from './PlayerProfileModal';

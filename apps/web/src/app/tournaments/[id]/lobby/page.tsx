@@ -17,8 +17,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { friendApi, adminApi, roomApi } from "@/lib/api-client";
-import { PlayerHoverCard } from "./_components/PlayerHoverCard";
-import { PlayerProfileModal } from "./_components/PlayerProfileModal";
+import { PlayerHoverCard } from "@/components/domain/PlayerHoverCard";
+import { PlayerProfileModal } from "@/components/domain/PlayerProfileModal";
 import { LobbyParticipantsList } from "./_components/LobbyParticipantsList";
 import { LobbyErrorState } from "./_components/LobbyErrorState";
 

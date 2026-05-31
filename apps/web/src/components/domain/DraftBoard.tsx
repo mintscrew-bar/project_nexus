@@ -1,8 +1,10 @@
 "use client";
 
-import React from "react";
+import React, { useCallback, useRef, useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent, Button } from "@/components/ui";
 import { TierBadge } from "@/components/domain";
+import { PlayerHoverCard } from "@/components/domain/PlayerHoverCard";
+import { PlayerProfileModal } from "@/components/domain/PlayerProfileModal";
 import { Clock, Crown, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -50,6 +52,22 @@ export function DraftBoard({
   const [timeLeft, setTimeLeft] = React.useState(0);
   const [selectedPlayer, setSelectedPlayer] = React.useState<string | null>(null);
   const [isPicking, setIsPicking] = React.useState(false);
+  const [hoveredPlayer, setHoveredPlayer] = useState<{ player: Player; rect: DOMRect } | null>(null);
+  const [profileUserId, setProfileUserId] = useState<string | null>(null);
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const cancelHoverClose = useCallback(() => {
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+  }, []);
+
+  const scheduleHoverClose = useCallback(() => {
+    hoverTimerRef.current = setTimeout(() => setHoveredPlayer(null), 80);
+  }, []);
+
+  const handlePlayerHover = useCallback((player: Player, el: HTMLElement) => {
+    cancelHoverClose();
+    setHoveredPlayer({ player, rect: el.getBoundingClientRect() });
+  }, [cancelHoverClose]);
 
   // Calculate time remaining
   React.useEffect(() => {
@@ -107,7 +125,7 @@ export function DraftBoard({
   };
 
   return (
-    <div className="space-y-4">
+    <>
       {/* Draft Status Header */}
       <Card className="overflow-hidden p-0">
         <CardContent className="p-5">
@@ -203,7 +221,9 @@ export function DraftBoard({
                     {team.members.map((member) => (
                       <div
                         key={member.id}
-                        className="flex items-center justify-between rounded-md bg-bg-tertiary/60 px-2.5 py-2"
+                        className="flex items-center justify-between rounded-md bg-bg-tertiary/60 px-2.5 py-2 cursor-default"
+                        onMouseEnter={(e) => handlePlayerHover(member, e.currentTarget)}
+                        onMouseLeave={scheduleHoverClose}
                       >
                         <div className="flex items-center space-x-2">
                           <span className="text-xl">{getPositionIcon(member.position)}</span>
@@ -247,6 +267,8 @@ export function DraftBoard({
                     key={player.id}
                     onClick={() => setSelectedPlayer(player.id)}
                     disabled={!isMyTurn || disabled}
+                    onMouseEnter={(e) => handlePlayerHover(player, e.currentTarget)}
+                    onMouseLeave={scheduleHoverClose}
                     className={cn(
                       "w-full flex items-center justify-between rounded-lg border px-3 py-2.5 transition-colors",
                       selectedPlayer === player.id
@@ -311,6 +333,23 @@ export function DraftBoard({
           </Card>
         </div>
       </div>
-    </div>
+      {hoveredPlayer && (
+      <PlayerHoverCard
+        participant={{
+          userId: hoveredPlayer.player.id,
+          username: hoveredPlayer.player.username,
+          riotAccount: hoveredPlayer.player.tier && hoveredPlayer.player.tier !== "UNRANKED"
+            ? { tier: hoveredPlayer.player.tier, rank: hoveredPlayer.player.rank, mainRole: hoveredPlayer.player.position }
+            : null,
+          clanMemberships: [],
+        }}
+        anchorRect={hoveredPlayer.rect}
+        onOpenProfile={(userId) => { setProfileUserId(userId); setHoveredPlayer(null); }}
+        onMouseEnter={cancelHoverClose}
+        onMouseLeave={scheduleHoverClose}
+      />
+    )}
+      <PlayerProfileModal userId={profileUserId} onClose={() => setProfileUserId(null)} />
+    </>
   );
 }

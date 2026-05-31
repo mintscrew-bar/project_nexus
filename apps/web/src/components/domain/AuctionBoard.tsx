@@ -3,6 +3,8 @@
 import React, { useMemo, useState, useCallback, useRef, useEffect } from "react";
 import { Card, CardContent, Button, Badge, Avatar } from "@/components/ui";
 import { TierBadge } from "./TierBadge";
+import { PlayerHoverCard } from "./PlayerHoverCard";
+import { PlayerProfileModal } from "./PlayerProfileModal";
 import { cn } from "@/lib/utils";
 import { Coins, AlertTriangle, ChevronDown, ChevronUp } from "lucide-react";
 
@@ -78,6 +80,19 @@ const parseTeamOrder = (name: string): number => {
   return m ? Number(m[0]) : Number.MAX_SAFE_INTEGER;
 };
 
+/** Player 객체를 PlayerHoverCard가 받는 participant 형태로 변환 */
+function toHoverParticipant(player: Player) {
+  return {
+    userId: player.id,
+    username: player.username,
+    avatar: player.avatar,
+    riotAccount: player.tier && player.tier !== "UNRANKED"
+      ? { tier: player.tier, rank: player.rank, mainRole: player.mainRole, subRole: player.subRole }
+      : null,
+    clanMemberships: [],
+  };
+}
+
 export const AuctionBoard: React.FC<AuctionBoardProps> = ({
   auctionState,
   teams,
@@ -122,6 +137,23 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
   const availableBudget = Math.max(0, myBudget - reserveAmount);
   const totalBid = auctionState.currentHighestBid + accumulatedBid;
   const canPlaceBid = accumulatedBid > 0 && totalBid <= availableBudget && !isBidding;
+
+  const [hoveredPlayer, setHoveredPlayer] = useState<{ player: Player; rect: DOMRect } | null>(null);
+  const [profileUserId, setProfileUserId] = useState<string | null>(null);
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const cancelHoverClose = useCallback(() => {
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+  }, []);
+
+  const scheduleHoverClose = useCallback(() => {
+    hoverTimerRef.current = setTimeout(() => setHoveredPlayer(null), 80);
+  }, []);
+
+  const handlePlayerHover = useCallback((player: Player, el: HTMLElement) => {
+    cancelHoverClose();
+    setHoveredPlayer({ player, rect: el.getBoundingClientRect() });
+  }, [cancelHoverClose]);
 
   const [teamsExpanded, setTeamsExpanded] = useState(true);
   // 모바일 아코디언: 개별 팀 접기/펼치기 (lg 미만에서만 사용)
@@ -636,7 +668,12 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
                     members.map((player, idx) => {
                       const isCaptain = player.id === team.captainId;
                       return (
-                        <div key={player.id} className={cn("flex items-center gap-2 px-2 py-1.5 rounded", isCaptain ? "bg-accent-gold/5" : "bg-bg-tertiary/60")}>
+                        <div
+                          key={player.id}
+                          className={cn("flex items-center gap-2 px-2 py-1.5 rounded cursor-default", isCaptain ? "bg-accent-gold/5" : "bg-bg-tertiary/60")}
+                          onMouseEnter={(e) => handlePlayerHover(player, e.currentTarget)}
+                          onMouseLeave={scheduleHoverClose}
+                        >
                           <span className="text-xs text-text-tertiary w-4 text-center flex-shrink-0">{isCaptain ? "C" : idx}</span>
                           <Avatar src={player.avatar} alt={player.username} fallback={player.username[0]} size="sm" />
                           <div className="flex-1 min-w-0">
@@ -663,6 +700,17 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
           );
         })}
       </div>}
+
+      {hoveredPlayer && (
+        <PlayerHoverCard
+          participant={toHoverParticipant(hoveredPlayer.player)}
+          anchorRect={hoveredPlayer.rect}
+          onOpenProfile={(userId) => { setProfileUserId(userId); setHoveredPlayer(null); }}
+          onMouseEnter={cancelHoverClose}
+          onMouseLeave={scheduleHoverClose}
+        />
+      )}
+      <PlayerProfileModal userId={profileUserId} onClose={() => setProfileUserId(null)} />
 
       {/* 모바일: 개별 팀 아코디언 (lg 미만) */}
       {teamsExpanded && <div className="lg:hidden space-y-2">
@@ -706,7 +754,12 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
                     members.map((player, idx) => {
                       const isCaptain = player.id === team.captainId;
                       return (
-                        <div key={player.id} className={cn("flex items-center gap-2 p-1.5 rounded text-sm", isCaptain ? "bg-accent-gold/10 border border-accent-gold/30" : "bg-bg-tertiary")}>
+                        <div
+                          key={player.id}
+                          className={cn("flex items-center gap-2 p-1.5 rounded text-sm cursor-default", isCaptain ? "bg-accent-gold/10 border border-accent-gold/30" : "bg-bg-tertiary")}
+                          onMouseEnter={(e) => handlePlayerHover(player, e.currentTarget)}
+                          onMouseLeave={scheduleHoverClose}
+                        >
                           <span className="text-[10px] text-text-tertiary w-3 text-center flex-shrink-0">{isCaptain ? "C" : idx}</span>
                           <Avatar src={player.avatar} alt={player.username} fallback={player.username[0]} size="sm" />
                           <span className="font-medium text-text-primary truncate flex-1">{player.username}</span>
