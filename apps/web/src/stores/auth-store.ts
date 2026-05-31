@@ -29,8 +29,13 @@ interface AuthState {
 // → 새로고침 시 헤더에 유저 이름이 즉시 표시됨 (플래시 방지)
 // → sessionStorage 사용: 탭/브라우저 종료 시 자동 삭제되어 공유 PC 안전
 // → role 필드 제외: 캐시된 role로 admin 메뉴가 잠시 노출되는 문제 방지
+//
+// localStorage 세션 힌트 (HINT_KEY): 민감 정보 없는 로그인 여부 플래그
+// → 새 탭에서도 "로그인한 적 있음"을 알 수 있어 timeout을 길게 유지
+// → 로그아웃 시 함께 삭제
 // ============================================================
 const STORAGE_KEY = "nexus_auth_user";
+const HINT_KEY = "nexus_session";
 
 function saveUserToStorage(user: User) {
   try {
@@ -42,6 +47,8 @@ function saveUserToStorage(user: User) {
         avatar: user.avatar,
       })
     );
+    // 새 탭에서도 timeout을 길게 쓰기 위한 힌트 (민감 정보 없음)
+    localStorage.setItem(HINT_KEY, "1");
   } catch {}
 }
 
@@ -54,11 +61,19 @@ function loadUserFromStorage(): User | null {
   }
 }
 
+function hasSessionHint(): boolean {
+  try {
+    return localStorage.getItem(HINT_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
 function clearUserFromStorage() {
   try {
     sessionStorage.removeItem(STORAGE_KEY);
-    // 기존 localStorage 캐시가 남아있을 수 있으므로 정리
     localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(HINT_KEY);
   } catch {}
 }
 
@@ -85,8 +100,11 @@ export const useAuthStore = create<AuthState>((set) => ({
 
       try {
         // refresh token으로 access token을 먼저 발급받은 뒤 /auth/me 조회
-        // 캐시된 유저 없으면 비로그인 가능성 높음 → 타임아웃 짧게 (2초)
-        const timeoutMs = cachedUser ? 5000 : 2000;
+        // - sessionStorage 캐시 있음: 이 탭에서 로그인 확인됨 → 8초
+        // - localStorage 힌트 있음: 다른 탭/이전 세션에서 로그인한 적 있음 → 8초
+        // - 둘 다 없음: 비로그인 가능성 높음 → 5초 (서버 응답 기다림)
+        const likelyLoggedIn = Boolean(cachedUser) || hasSessionHint();
+        const timeoutMs = likelyLoggedIn ? 8000 : 5000;
         const timeout = new Promise<never>((_, reject) =>
           setTimeout(() => reject(new Error("auth_timeout")), timeoutMs)
         );

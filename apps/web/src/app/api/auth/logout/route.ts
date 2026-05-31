@@ -22,9 +22,15 @@ export async function POST(request: NextRequest) {
     console.error('Logout error:', error);
   }
 
-  // Always clear the refresh token cookie
+  // refresh_token 쿠키 삭제 — 세팅 시 path: '/api/auth'를 사용했으므로 동일하게 명시해야 실제로 삭제됨
   const response = NextResponse.json({ message: 'Logged out successfully' });
-  response.cookies.delete('refresh_token');
+  response.cookies.set('refresh_token', '', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: 0,
+    path: '/api/auth',
+  });
 
   return response;
 }
