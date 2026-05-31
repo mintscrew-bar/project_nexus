@@ -222,17 +222,6 @@ export class RoomGateway
             // best-effort — 무시
           }
 
-          // 비WAITING 방에서 30초 후에도 모든 게임 네임스페이스에 소켓이 없으면
-          // 방이 완전히 버려진 것으로 판단해 삭제한다.
-          const hasAnySockets = await this.hasActiveSocketsAnyNamespace(roomId);
-          if (!hasAnySockets) {
-            try {
-              await this.roomService.forceDeleteRoom(roomId);
-              this.broadcastRoomDelta("remove", roomId);
-            } catch {
-              // 이미 삭제되었거나 오류 — 무시
-            }
-          }
         }
       } catch {
         // 방이 이미 삭제되었거나 알 수 없는 상태 — 무시
@@ -318,6 +307,37 @@ export class RoomGateway
     try {
       if (!client.userId) {
         return { error: "Unauthorized" };
+      }
+
+      // 다른 방에 소켓이 연결돼 있으면 먼저 정리한다.
+      // (방을 명시적으로 나가지 않고 바로 다른 방에 join-room을 보낼 때 발생하는
+      //  "한 사람이 여러 방에 동시 존재" 현상 방지)
+      const previousRoomId = this.socketRooms.get(client.id);
+      if (previousRoomId && previousRoomId !== data.roomId) {
+        client.leave(previousRoomId);
+        this.socketRooms.delete(client.id);
+
+        // 이전 방의 grace 타이머가 남아 있으면 취소 (새 방으로 이동했으므로 불필요)
+        const prevGraceKey = `${client.userId}:${previousRoomId}`;
+        const prevPending = this.disconnectGraceTimers.get(prevGraceKey);
+        if (prevPending) {
+          clearTimeout(prevPending);
+          this.disconnectGraceTimers.delete(prevGraceKey);
+        }
+
+        // WAITING 방이면 즉시 퇴장 처리 (슬롯 해제 + 방 목록 갱신)
+        try {
+          const prevStatus = await this.roomService.getRoomStatus(previousRoomId);
+          if (prevStatus === RoomStatus.WAITING) {
+            await this.roomService.leaveRoom(client.userId!, previousRoomId);
+            this.server
+              .to(previousRoomId)
+              .emit("user-left", { userId: client.userId, username: client.username });
+            this.broadcastRoomDelta("update", previousRoomId);
+          }
+        } catch {
+          // 이전 방이 이미 삭제됐거나 오류 — 무시
+        }
       }
 
       // First, check if user is already a participant
@@ -917,11 +937,10 @@ export class RoomGateway
 
   private readonly gatewayLogger = new Logger(RoomGateway.name);
 
-  /** 매 5분마다 소켓 없는 좀비 참가자 및 버려진 비WAITING 방을 정리한다 */
+  /** 매 5분마다 소켓 없는 좀비 참가자를 DB에서 제거한다 */
   @Cron("*/5 * * * *")
   async cleanupZombieParticipants() {
     try {
-      // ── WAITING 방: /room 소켓이 없는 좀비 참가자 제거
       const waitingRooms =
         await this.roomService.getWaitingRoomsWithParticipants();
       for (const room of waitingRooms) {
@@ -955,38 +974,9 @@ export class RoomGateway
         this.broadcastRoomDelta("update", room.id);
       }
 
-      // ── 비WAITING 방: 모든 게임 네임스페이스에 소켓이 없으면 방 삭제
-      // grace timer(30초)가 이미 처리하지만 혹시 놓친 좀비 방을 5분 단위로 보정한다.
-      const nonWaitingRooms = await this.roomService.getNonWaitingRooms();
-      for (const room of nonWaitingRooms) {
-        const hasAnySockets = await this.hasActiveSocketsAnyNamespace(room.id);
-        if (hasAnySockets) continue;
-
-        this.gatewayLogger.debug(
-          `[Cleanup] Non-WAITING room ${room.id} (${room.status}): 소켓 없음 → 방 삭제`,
-        );
-        try {
-          await this.roomService.forceDeleteRoom(room.id);
-          this.broadcastRoomDelta("remove", room.id);
-        } catch {
-          // 이미 삭제됐거나 오류 무시
-        }
-      }
     } catch (error) {
       this.gatewayLogger.error("[Cleanup] 좀비 참가자 정리 실패:", error);
     }
-  }
-
-  /** 모든 게임 네임스페이스(/room·/auction·/snake-draft·/role-selection)에서
-   *  해당 방에 연결된 소켓이 하나라도 있으면 true를 반환한다. */
-  private async hasActiveSocketsAnyNamespace(roomId: string): Promise<boolean> {
-    const [roomSockets, hasAuction, hasDraft, hasRole] = await Promise.all([
-      this.server.in(roomId).fetchSockets(),
-      this.auctionGateway.hasActiveSocketsForRoom(roomId),
-      this.snakeDraftGateway.hasActiveSocketsForRoom(roomId),
-      this.roleSelectionGateway.hasActiveSocketsForRoom(roomId),
-    ]);
-    return roomSockets.length > 0 || hasAuction || hasDraft || hasRole;
   }
 
   // ========================================
