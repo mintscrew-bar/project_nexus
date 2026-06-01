@@ -160,10 +160,20 @@ function TeamSideColumn({
                       <RoleIcon role={member.mainRole} />
                       <RoleIcon role={member.subRole} dim />
                     </div>
-                    {/* xl 이상에서만 티어 배지 표시 */}
-                    <span className="hidden shrink-0 xl:inline-flex">
-                      <TierBadge tier={member.tier} rank={member.rank} size="sm" />
-                    </span>
+                    {/* lg: 티어 아이콘만, xl+: 풀 배지 */}
+                    {(() => {
+                      const t = member.tier.toUpperCase();
+                      const url = `/icons/tiers/${t.toLowerCase()}.png`;
+                      return (
+                        <>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={url} alt={t} width={18} height={18} className="shrink-0 object-contain xl:hidden" />
+                          <span className="hidden shrink-0 xl:inline-flex">
+                            <TierBadge tier={member.tier} rank={member.rank} size="sm" />
+                          </span>
+                        </>
+                      );
+                    })()}
                   </div>
                 );
               })}
