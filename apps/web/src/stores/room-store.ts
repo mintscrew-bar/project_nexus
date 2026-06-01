@@ -11,6 +11,7 @@ interface Room {
   id: string;
   name: string;
   hostId: string;
+  host?: { id: string; username: string; avatar?: string };
   maxParticipants: number;
   isPrivate: boolean;
   status: "WAITING" | "IN_PROGRESS" | "COMPLETED" | "DRAFT" | "DRAFT_COMPLETED" | "ROLE_SELECTION" | "TEAM_SELECTION";

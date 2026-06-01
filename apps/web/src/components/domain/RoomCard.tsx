@@ -10,6 +10,7 @@ interface Room {
   name: string;
   hostId: string;
   hostName?: string;
+  host?: { id: string; username: string; avatar?: string };
   maxParticipants: number;
   isPrivate: boolean;
   status: 'WAITING' | 'IN_PROGRESS' | 'COMPLETED' | 'DRAFT' | 'DRAFT_COMPLETED' | 'TEAM_SELECTION' | 'ROLE_SELECTION';
@@ -82,7 +83,7 @@ export const RoomCard: React.FC<RoomCardProps> = ({ room, currentUserId, onClick
               {room.isPrivate && <span className="text-accent-warning">🔒</span>}
             </div>
             <p className="text-sm text-text-secondary">
-              방장: {room.hostName || `User ${room.hostId.slice(0, 8)}`}
+              방장: {room.host?.username || room.hostName || `User ${room.hostId.slice(0, 8)}`}
             </p>
           </div>
           {getStatusBadge(room.status)}
