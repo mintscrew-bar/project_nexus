@@ -44,6 +44,16 @@ function PlayersList({
   onExpand?: () => void;
   compact?: boolean;
 }) {
+  const [hoveredPlayer, setHoveredPlayer] = useState<{ player: any; rect: DOMRect } | null>(null);
+  const [profileUserId, setProfileUserId] = useState<string | null>(null);
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cancelHoverClose = useCallback(() => {
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+  }, []);
+  const scheduleHoverClose = useCallback(() => {
+    hoverTimerRef.current = setTimeout(() => setHoveredPlayer(null), 80);
+  }, []);
+
   return (
     <div className="h-full flex flex-col min-h-0">
       {/* compact 모드에서는 카드 헤더가 대신하므로 내부 헤더 생략 */}
@@ -78,11 +88,17 @@ function PlayersList({
                   <div
                     key={player.id}
                     className={cn(
-                      "flex items-center gap-1.5 rounded px-1.5 py-1 transition-colors",
+                      "flex items-center gap-1.5 rounded px-1.5 py-1 transition-colors cursor-pointer",
                       isCurrentTarget
                         ? "bg-accent-primary/15 ring-1 ring-accent-primary/40"
                         : "bg-bg-secondary hover:bg-bg-tertiary",
                     )}
+                    onMouseEnter={(e) => {
+                      cancelHoverClose();
+                      setHoveredPlayer({ player, rect: e.currentTarget.getBoundingClientRect() });
+                    }}
+                    onMouseLeave={scheduleHoverClose}
+                    onClick={() => setProfileUserId(player.id)}
                   >
                     <span className="w-3.5 shrink-0 text-center text-[9px] text-text-muted">
                       {idx + 1}
@@ -94,6 +110,12 @@ function PlayersList({
                     <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-text-primary">
                       {player.username}
                     </span>
+                    {(player.mainRole || player.subRole) && (
+                      <span className="flex shrink-0 items-center gap-0.5">
+                        {player.mainRole && <RoleIcon role={player.mainRole} />}
+                        {player.subRole && <RoleIcon role={player.subRole} dim />}
+                      </span>
+                    )}
                   </div>
                 );
               })}
@@ -111,11 +133,17 @@ function PlayersList({
               return (
                 <div
                   key={player.id}
-                  className={`flex items-center gap-2 p-2 rounded-lg transition-colors ${
+                  className={`flex items-center gap-2 p-2 rounded-lg transition-colors cursor-pointer ${
                     isCurrentTarget
                       ? "bg-accent-primary/10 border border-accent-primary/30"
                       : "bg-bg-secondary hover:bg-bg-tertiary"
                   }`}
+                  onMouseEnter={(e) => {
+                    cancelHoverClose();
+                    setHoveredPlayer({ player, rect: e.currentTarget.getBoundingClientRect() });
+                  }}
+                  onMouseLeave={scheduleHoverClose}
+                  onClick={() => setProfileUserId(player.id)}
                 >
                   <span className="text-[10px] text-text-tertiary w-4 text-center flex-shrink-0">
                     {idx + 1}
@@ -132,6 +160,12 @@ function PlayersList({
                       {player.mmr !== undefined && (
                         <span className="text-[10px] font-mono text-text-muted">{player.mmr}</span>
                       )}
+                      {(player.mainRole || player.subRole) && (
+                        <span className="flex items-center gap-0.5 ml-auto">
+                          {player.mainRole && <RoleIcon role={player.mainRole} />}
+                          {player.subRole && <RoleIcon role={player.subRole} dim />}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -139,6 +173,28 @@ function PlayersList({
             })
           )}
         </div>
+      )}
+
+      {/* 호버 카드 */}
+      {hoveredPlayer && (
+        <PlayerHoverCard
+          participant={{
+            userId: hoveredPlayer.player.id,
+            username: hoveredPlayer.player.username,
+            avatar: hoveredPlayer.player.avatar,
+            riotAccount: hoveredPlayer.player.tier && hoveredPlayer.player.tier !== "UNRANKED"
+              ? { tier: hoveredPlayer.player.tier, rank: hoveredPlayer.player.rank, mainRole: hoveredPlayer.player.mainRole, subRole: hoveredPlayer.player.subRole }
+              : null,
+            clanMemberships: [],
+          }}
+          anchorRect={hoveredPlayer.rect}
+          onMouseEnter={cancelHoverClose}
+          onMouseLeave={scheduleHoverClose}
+          onOpenProfile={() => { setProfileUserId(hoveredPlayer.player.id); setHoveredPlayer(null); }}
+        />
+      )}
+      {profileUserId && (
+        <PlayerProfileModal userId={profileUserId} onClose={() => setProfileUserId(null)} />
       )}
     </div>
   );

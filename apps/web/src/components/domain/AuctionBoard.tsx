@@ -77,6 +77,31 @@ const POSITION_LABELS: Record<string, string> = {
   FLEX: "플렉스",
 };
 
+const ROLE_ICON: Record<string, string> = {
+  TOP: '/icons/positions/position-top.svg',
+  JUNGLE: '/icons/positions/position-jungle.svg',
+  MID: '/icons/positions/position-middle.svg',
+  MIDDLE: '/icons/positions/position-middle.svg',
+  ADC: '/icons/positions/position-bottom.svg',
+  BOTTOM: '/icons/positions/position-bottom.svg',
+  SUPPORT: '/icons/positions/position-utility.svg',
+  UTILITY: '/icons/positions/position-utility.svg',
+};
+
+function RoleIcon({ role, dim, size = 16 }: { role?: string | null; dim?: boolean; size?: number }) {
+  if (!role) return null;
+  const url = ROLE_ICON[role.toUpperCase()];
+  if (!url) return null;
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={url} alt={role} width={size} height={size}
+      className={cn("object-contain brightness-0 invert", dim && "opacity-40")}
+      style={{ width: size, height: size }}
+    />
+  );
+}
+
 const parseTeamOrder = (name: string): number => {
   const m = name.match(/\d+/);
   return m ? Number(m[0]) : Number.MAX_SAFE_INTEGER;
@@ -357,7 +382,12 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
           )}>
             <CardContent className="p-0">
               {/* 상단: 선수 정보 + 타이머 */}
-              <div className="flex items-center gap-5 p-6">
+              <div
+                className="flex items-center gap-5 p-6 cursor-pointer"
+                onMouseEnter={(e) => handlePlayerHover(auctionState.currentPlayer!, e.currentTarget)}
+                onMouseLeave={scheduleHoverClose}
+                onClick={() => setProfileUserId(auctionState.currentPlayer!.id)}
+              >
                 <Avatar
                   src={auctionState.currentPlayer.avatar}
                   alt={auctionState.currentPlayer.username}
@@ -375,9 +405,17 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
                       tier={auctionState.currentPlayer.tier}
                       rank={auctionState.currentPlayer.rank}
                     />
-                    <Badge variant="primary">
-                      {getPlayerPosition(auctionState.currentPlayer)}
-                    </Badge>
+                    {/* 주라인 + 부라인 아이콘 */}
+                    {(auctionState.currentPlayer.mainRole || auctionState.currentPlayer.subRole) ? (
+                      <div className="flex items-center gap-1">
+                        <RoleIcon role={auctionState.currentPlayer.mainRole} size={20} />
+                        <RoleIcon role={auctionState.currentPlayer.subRole} size={16} dim />
+                      </div>
+                    ) : (
+                      <Badge variant="primary">
+                        {getPlayerPosition(auctionState.currentPlayer)}
+                      </Badge>
+                    )}
                     {auctionState.currentPlayer.mmr !== undefined && (
                       <span className="text-xs font-mono font-semibold text-text-muted">
                         MMR {auctionState.currentPlayer.mmr}
