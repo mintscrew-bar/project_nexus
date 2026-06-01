@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { AuctionBoard } from "@/components/domain/AuctionBoard";
 import { Avatar, Button, Card } from "@/components/ui";
 import { TierBadge } from "@/components/domain/TierBadge";
-import { cn } from "@/lib/utils";
+import { cn, getTierIcon } from "@/lib/utils";
 import { Coins, PackageOpen, Gavel, Users, MessageSquare, Shield } from "lucide-react";
 
 const currentUserId = "captain-1";
@@ -160,7 +160,11 @@ function TeamSideColumn({
                       <RoleIcon role={member.mainRole} />
                       <RoleIcon role={member.subRole} dim />
                     </div>
-                    <TierBadge tier={member.tier} rank={member.rank} size="sm" showIcon={false} />
+                    {/* lg: 아이콘만, xl+: 풀 배지 */}
+                    <span className="shrink-0 text-sm xl:hidden">{getTierIcon(member.tier)}</span>
+                    <span className="hidden shrink-0 xl:inline-flex">
+                      <TierBadge tier={member.tier} rank={member.rank} size="sm" />
+                    </span>
                   </div>
                 );
               })}
@@ -217,7 +221,7 @@ function CenterBottomPanel({ players }: { players: typeof mockPlayers }) {
                   {player.mainRole} / {player.subRole} · MMR {player.mmr}
                 </p>
               </div>
-              <TierBadge tier={player.tier} rank={player.rank} size="sm" showIcon={false} />
+              <TierBadge tier={player.tier} rank={player.rank} size="sm" />
             </div>
           ))}
         </div>
@@ -426,7 +430,7 @@ export default function TestAuctionPage() {
                           <RoleIcon role={m.mainRole} />
                           <RoleIcon role={m.subRole} dim />
                         </div>
-                        <TierBadge tier={m.tier} rank={m.rank} size="sm" showIcon={false} />
+                        <TierBadge tier={m.tier} rank={m.rank} size="sm" />
                       </div>
                     ))}
                   </div>
@@ -449,7 +453,7 @@ export default function TestAuctionPage() {
                       <p className="truncate text-sm font-semibold text-text-primary">{p.username}</p>
                       <p className="truncate text-xs text-text-tertiary">{p.mainRole} / {p.subRole} · MMR {p.mmr}</p>
                     </div>
-                    <TierBadge tier={p.tier} rank={p.rank} size="sm" showIcon={false} />
+                    <TierBadge tier={p.tier} rank={p.rank} size="sm" />
                   </div>
                 ))}
               </div>

@@ -9,7 +9,7 @@ import { AuctionBoard, TierBadge, PlayerHoverCard, PlayerProfileModal } from "@/
 import { LoadingSpinner, Badge, Button, Card, CardContent, ConfirmModal, Avatar } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
 import { GameChatPanel } from "@/components/domain/GameChatPanel";
-import { cn } from "@/lib/utils";
+import { cn, getTierIcon } from "@/lib/utils";
 import { Users, Hand, Check, Coins, ScrollText, Gavel, MessageSquare, Maximize2 } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 
@@ -253,7 +253,11 @@ function TeamSideColumn({
                       <RoleIcon role={mainRole} />
                       <RoleIcon role={subRole} dim />
                     </div>
-                    <TierBadge tier={member.tier} size="sm" showIcon={false} />
+                    {/* lg: 아이콘만, xl+: 풀 배지 */}
+                    <span className="shrink-0 text-sm xl:hidden">{getTierIcon(member.tier)}</span>
+                    <span className="hidden shrink-0 xl:inline-flex">
+                      <TierBadge tier={member.tier} rank={member.rank} size="sm" />
+                    </span>
                   </div>
                 );
               })}
