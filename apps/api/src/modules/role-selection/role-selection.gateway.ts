@@ -27,8 +27,8 @@ interface AuthenticatedSocket extends Socket {
     origin: process.env.APP_URL || "http://localhost:3000",
     credentials: true,
   },
-  pingInterval: 10000,
-  pingTimeout: 5000,
+  pingInterval: 25000,
+  pingTimeout: 20000,
   maxHttpBufferSize: 1e4,
 })
 export class RoleSelectionGateway
@@ -149,7 +149,10 @@ export class RoleSelectionGateway
       if (!client.userId) {
         return { error: "Unauthorized" };
       }
-      const result = await this.roleSelectionService.cancelRole(client.userId, data.roomId);
+      const result = await this.roleSelectionService.cancelRole(
+        client.userId,
+        data.roomId,
+      );
       this.server.to(`room:${data.roomId}`).emit("role-cancelled", {
         userId: client.userId,
         teamId: result.teamId,
@@ -364,17 +367,26 @@ export class RoleSelectionGateway
         return { error: "Unauthorized" };
       }
 
-      const newTimerEnd = this.roleSelectionService.extendTimer(client.userId, data.roomId);
+      const newTimerEnd = this.roleSelectionService.extendTimer(
+        client.userId,
+        data.roomId,
+      );
 
       // 기존 resolve 타이머 재설정
       this.stopTimer(data.roomId);
-      const timeRemaining = this.roleSelectionService.getTimeRemaining(data.roomId);
+      const timeRemaining = this.roleSelectionService.getTimeRemaining(
+        data.roomId,
+      );
 
       const interval = setInterval(() => {
         try {
-          const remaining = this.roleSelectionService.getTimeRemaining(data.roomId);
+          const remaining = this.roleSelectionService.getTimeRemaining(
+            data.roomId,
+          );
           if (remaining > 0) {
-            const state = this.roleSelectionService.getRoleSelectionState(data.roomId);
+            const state = this.roleSelectionService.getRoleSelectionState(
+              data.roomId,
+            );
             this.server.to(`room:${data.roomId}`).emit("timer-tick", {
               timeRemaining: remaining,
               timerEndAt: state?.timerEnd ?? null,
@@ -386,15 +398,18 @@ export class RoleSelectionGateway
       }, 5000);
       this.roomTimers.set(data.roomId, interval);
 
-      const resolveTimeout = setTimeout(() => {
-        this.roomResolveTimers.delete(data.roomId);
-        const tickTimer = this.roomTimers.get(data.roomId);
-        if (tickTimer) {
-          clearInterval(tickTimer);
-          this.roomTimers.delete(data.roomId);
-        }
-        this.completeRoleSelection(data.roomId).catch(console.error);
-      }, Math.max(0, timeRemaining));
+      const resolveTimeout = setTimeout(
+        () => {
+          this.roomResolveTimers.delete(data.roomId);
+          const tickTimer = this.roomTimers.get(data.roomId);
+          if (tickTimer) {
+            clearInterval(tickTimer);
+            this.roomTimers.delete(data.roomId);
+          }
+          this.completeRoleSelection(data.roomId).catch(console.error);
+        },
+        Math.max(0, timeRemaining),
+      );
       this.roomResolveTimers.set(data.roomId, resolveTimeout);
 
       this.server.to(`room:${data.roomId}`).emit("timer-extended", {
@@ -409,7 +424,10 @@ export class RoleSelectionGateway
     }
   }
 
-  emitRoleSelectionError(roomId: string, data: { message: string; error?: string; retryable?: boolean }) {
+  emitRoleSelectionError(
+    roomId: string,
+    data: { message: string; error?: string; retryable?: boolean },
+  ) {
     this.server.to(`room:${roomId}`).emit("role-selection-error", data);
   }
 
@@ -418,5 +436,4 @@ export class RoleSelectionGateway
     this.completingRooms.delete(roomId);
     this.server.to(`room:${roomId}`).emit("session-aborted", data);
   }
-
 }

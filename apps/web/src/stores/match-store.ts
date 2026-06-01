@@ -148,15 +148,13 @@ export const useMatchStore = create<MatchStoreState>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const result = await matchApi.startMatch(matchId);
-      set({
-        currentMatch: result,
-        isLoading: false
-      });
+      set({ currentMatch: result, isLoading: false });
     } catch (error: any) {
       set({
         error: error.response?.data?.message || '매치 시작에 실패했습니다',
-        isLoading: false
+        isLoading: false,
       });
+      throw error; // bracket 페이지의 catch 블록이 toast를 표시할 수 있도록 재전파
     }
   },
 
@@ -249,6 +247,18 @@ export const useMatchStore = create<MatchStoreState>((set, get) => ({
       set(state => ({
         roomMatches: state.roomMatches.map(m =>
           m.id === data.matchId ? { ...m, tournamentCode: data.code } : m
+        ),
+      }));
+    });
+
+    // 매치 시작 이벤트 — 서버가 bracket 룸에도 브로드캐스트하므로 여기서 수신 가능
+    matchSocketHelpers.onMatchStarted((data: { matchId: string; tournamentCode?: string }) => {
+      if (!data.matchId) return; // connectToMatch 쪽 payload는 matchId 없음
+      set(state => ({
+        roomMatches: state.roomMatches.map(m =>
+          m.id === data.matchId
+            ? { ...m, status: 'IN_PROGRESS' as const, tournamentCode: data.tournamentCode ?? m.tournamentCode }
+            : m
         ),
       }));
     });

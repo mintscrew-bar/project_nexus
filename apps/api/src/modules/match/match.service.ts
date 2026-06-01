@@ -20,7 +20,13 @@ import { NotificationService } from "../notification/notification.service";
 import { MatchBracketService, Bracket } from "./match-bracket.service";
 import { MatchAdvancementService } from "./match-advancement.service";
 import { RankingService } from "../ranking/ranking.service";
-import { Prisma, RoomStatus, MatchStatus, BracketType, VoteType } from "@nexus/database";
+import {
+  Prisma,
+  RoomStatus,
+  MatchStatus,
+  BracketType,
+  VoteType,
+} from "@nexus/database";
 import {
   getChampionKoreanName,
   getSummonerSpellKoreanName,
@@ -131,7 +137,9 @@ export class MatchService {
 
     // 토너먼트 코드 발급은 내부(roomId 있는) 매치에만 적용 — 외부 인제스트 매치는 해당 없음
     if (!match.room) {
-      throw new BadRequestException("Tournament code requires an internal match");
+      throw new BadRequestException(
+        "Tournament code requires an internal match",
+      );
     }
 
     if (match.room.hostId !== hostId) {
@@ -198,7 +206,11 @@ export class MatchService {
 
       await Promise.all(
         allParticipants.map((userId) =>
-          this.notificationService.notifyMatchStarting(userId, matchId, roomName),
+          this.notificationService.notifyMatchStarting(
+            userId,
+            matchId,
+            roomName,
+          ),
         ),
       );
     } catch (error) {
@@ -267,7 +279,9 @@ export class MatchService {
 
     // 매치 시작은 내부(roomId 있는) 매치에만 적용 — 외부 인제스트 매치는 시작 개념이 없음
     if (!match.room) {
-      throw new BadRequestException("Cannot start an external (ingested) match");
+      throw new BadRequestException(
+        "Cannot start an external (ingested) match",
+      );
     }
 
     if (match.room.hostId !== hostId) {
@@ -593,9 +607,8 @@ export class MatchService {
         // Move all participants back to lobby voice channel
         try {
           if (this.discordVoiceService) {
-            const moveResult = await this.discordVoiceService.moveAllToLobby(
-              roomId,
-            );
+            const moveResult =
+              await this.discordVoiceService.moveAllToLobby(roomId);
             this.logger.log(
               `Moved participants to lobby for room ${roomId}: ${moveResult.success} success, ${moveResult.failed} failed`,
             );
@@ -1141,17 +1154,18 @@ export class MatchService {
     // 투표 대상이 올바른 팀인지 확인
     const loserId =
       match.winnerId === match.teamAId ? match.teamBId : match.teamAId;
-    const winnerMembers = (
-      match.winnerId === match.teamAId ? match.teamA : match.teamB
-    )?.members ?? [];
-    const loserMembers = (
-      loserId === match.teamAId ? match.teamA : match.teamB
-    )?.members ?? [];
+    const winnerMembers =
+      (match.winnerId === match.teamAId ? match.teamA : match.teamB)?.members ??
+      [];
+    const loserMembers =
+      (loserId === match.teamAId ? match.teamA : match.teamB)?.members ?? [];
 
     if (voteType === VoteType.MVP) {
       const isWinnerMember = winnerMembers.some((m) => m.userId === votedForId);
       if (!isWinnerMember) {
-        throw new BadRequestException("MVP는 이긴 팀 멤버만 선택할 수 있습니다.");
+        throw new BadRequestException(
+          "MVP는 이긴 팀 멤버만 선택할 수 있습니다.",
+        );
       }
     } else {
       const isLoserMember = loserMembers.some((m) => m.userId === votedForId);
@@ -1194,7 +1208,10 @@ export class MatchService {
     // 타입별 득표 집계
     const tally = (type: VoteType) => {
       const filtered = votes.filter((v) => v.voteType === type);
-      const counts: Record<string, { user: (typeof filtered)[0]["votedFor"]; count: number }> = {};
+      const counts: Record<
+        string,
+        { user: (typeof filtered)[0]["votedFor"]; count: number }
+      > = {};
       for (const v of filtered) {
         const key = v.votedForId;
         if (!counts[key]) counts[key] = { user: v.votedFor, count: 0 };
@@ -1208,8 +1225,14 @@ export class MatchService {
       ace: tally(VoteType.ACE),
       myVotes: userId
         ? {
-            mvp: votes.find((v) => v.voterId === userId && v.voteType === VoteType.MVP)?.votedForId ?? null,
-            ace: votes.find((v) => v.voterId === userId && v.voteType === VoteType.ACE)?.votedForId ?? null,
+            mvp:
+              votes.find(
+                (v) => v.voterId === userId && v.voteType === VoteType.MVP,
+              )?.votedForId ?? null,
+            ace:
+              votes.find(
+                (v) => v.voterId === userId && v.voteType === VoteType.ACE,
+              )?.votedForId ?? null,
           }
         : null,
     };
@@ -1235,7 +1258,10 @@ export class MatchService {
 
     await tx.match.update({
       where: { id: matchId },
-      data: voteType === VoteType.MVP ? { mvpUserId: topUserId } : { aceUserId: topUserId },
+      data:
+        voteType === VoteType.MVP
+          ? { mvpUserId: topUserId }
+          : { aceUserId: topUserId },
     });
   }
 

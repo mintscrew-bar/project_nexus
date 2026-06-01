@@ -100,8 +100,8 @@ export class MatchController {
   ) {
     const result = await this.matchService.startMatch(userId, matchId);
 
-    // Emit match start to all clients watching the match
-    this.matchGateway.emitMatchStarted(matchId, {
+    // Emit match start to all clients watching the match and the bracket room
+    await this.matchGateway.emitMatchStarted(matchId, {
       tournamentCode: result.tournamentCode ?? undefined,
     });
 

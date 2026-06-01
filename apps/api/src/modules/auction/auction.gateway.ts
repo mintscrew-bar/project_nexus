@@ -26,8 +26,8 @@ interface AuthenticatedSocket extends Socket {
     origin: process.env.APP_URL || "http://localhost:3000",
     credentials: true,
   },
-  pingInterval: 10000,
-  pingTimeout: 5000,
+  pingInterval: 25000,
+  pingTimeout: 20000,
   maxHttpBufferSize: 1e4,
 })
 export class AuctionGateway
@@ -938,5 +938,4 @@ export class AuctionGateway
       }
     }
   }
-
 }

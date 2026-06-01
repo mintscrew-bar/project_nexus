@@ -22,8 +22,8 @@ interface AuthenticatedSocket extends Socket {
     origin: process.env.APP_URL || "http://localhost:3000",
     credentials: true,
   },
-  pingInterval: 10000,
-  pingTimeout: 5000,
+  pingInterval: 25000,
+  pingTimeout: 20000,
   maxHttpBufferSize: 1e4,
 })
 export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
@@ -128,8 +128,22 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
   // Emit Events (called from service or controller)
   // ========================================
 
-  emitMatchStarted(matchId: string, data: { tournamentCode?: string }) {
+  async emitMatchStarted(matchId: string, data: { tournamentCode?: string }) {
+    // 매치 개별 방에 알림
     this.server.to(`match:${matchId}`).emit("match-started", data);
+
+    // 대진표 방에도 알림 — bracket 뷰 상태를 IN_PROGRESS로 갱신
+    try {
+      const match = await this.matchService.findById(matchId);
+      if (match?.roomId) {
+        this.server.to(`bracket:${match.roomId}`).emit("match-started", {
+          matchId,
+          tournamentCode: data.tournamentCode,
+        });
+      }
+    } catch {
+      // Best-effort: bracket view can fallback to REST polling
+    }
   }
 
   async emitMatchResult(matchId: string, data: { winnerId: string }) {

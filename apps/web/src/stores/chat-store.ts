@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { connectRoomSocket, disconnectRoomSocket } from '@/lib/socket-client';
+import { connectRoomSocket } from '@/lib/socket-client';
 import { roomApi } from '@/lib/api-client';
 import type { Socket } from 'socket.io-client';
 
@@ -130,7 +130,8 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
     disconnectHandler = null;
     socketRef = null;
 
-    disconnectRoomSocket();
+    // room-store와 소켓을 공유하므로 실제 disconnect는 하지 않는다.
+    // room-store가 소켓 생명주기를 관리한다.
     set({ messages: [], roomId: null, isConnected: false, isLoadingHistory: false });
   },
 

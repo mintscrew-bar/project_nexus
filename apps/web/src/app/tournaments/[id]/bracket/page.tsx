@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useMatchStore } from "@/stores/match-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { roomApi, matchApi } from "@/lib/api-client";
@@ -88,14 +88,14 @@ export default function BracketPage() {
     setLiveStatus(null); // Clear live status when modal closes
   };
 
-  const handleRefreshLiveStatus = async (matchId: string) => {
+  const handleRefreshLiveStatus = useCallback(async (matchId: string) => {
     try {
       const status = await matchApi.getLiveStatus(matchId);
       setLiveStatus(status);
     } catch {
       addToast("라이브 상태 새로고침에 실패했습니다.", "error");
     }
-  };
+  }, [addToast]);
 
   const handleStartMatch = async (matchId: string) => {
     try {

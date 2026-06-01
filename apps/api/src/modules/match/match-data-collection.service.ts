@@ -374,10 +374,7 @@ export class MatchDataCollectionService {
       }
 
       // 참가자 PUUID 수집 (teamA + teamB)
-      const allMembers = [
-        ...match.teamA.members,
-        ...match.teamB.members,
-      ];
+      const allMembers = [...match.teamA.members, ...match.teamB.members];
       const puuidList = allMembers
         .map((m) => m.user.riotAccounts[0]?.puuid)
         .filter((p): p is string => Boolean(p));
