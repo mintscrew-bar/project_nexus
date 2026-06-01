@@ -559,6 +559,19 @@ export class RoomService {
     });
   }
 
+  /** COMPLETED 상태이면서 참가자가 남아있는 방 목록 반환 (좀비 정리용) */
+  async getCompletedRoomsWithParticipants() {
+    return this.prisma.room.findMany({
+      where: { status: RoomStatus.COMPLETED },
+      select: {
+        id: true,
+        participants: {
+          select: { userId: true },
+        },
+      },
+    });
+  }
+
   /** 방 상태만 빠르게 조회 (disconnect 등 경량 체크용) */
   async getRoomStatus(roomId: string): Promise<RoomStatus | null> {
     const room = await this.prisma.room.findUnique({

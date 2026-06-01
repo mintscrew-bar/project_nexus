@@ -285,8 +285,15 @@ export default function RoleSelectionPage() {
                           )}
                           onMouseEnter={(e) => {
                             cancelHoverClose();
+                            const riot = member.user.riotAccounts?.[0] ?? null;
                             setHoveredMember({
-                              participant: { userId: member.userId, username: member.user.username, avatar: member.user.avatar, clanMemberships: [] },
+                              participant: {
+                                userId: member.userId,
+                                username: member.user.username,
+                                avatar: member.user.avatar,
+                                riotAccount: riot,
+                                clanMemberships: [],
+                              },
                               rect: e.currentTarget.getBoundingClientRect(),
                             });
                           }}

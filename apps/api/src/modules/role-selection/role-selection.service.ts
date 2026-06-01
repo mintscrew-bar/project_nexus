@@ -11,7 +11,7 @@ import { Prisma, RoomStatus, Role } from "@nexus/database";
 import { MatchService } from "../match/match.service";
 
 const ROLE_SELECTION_TIME_MS = 60000; // 60초 기본 시간
-const EXTENSION_TIME_MS = 15000;     // 인당 1회 15초 연장
+const EXTENSION_TIME_MS = 15000; // 인당 1회 15초 연장
 
 export interface RoleSelectionState {
   roomId: string;
@@ -533,6 +533,22 @@ export class RoleSelectionService {
                     id: true,
                     username: true,
                     avatar: true,
+                    riotAccounts: {
+                      select: {
+                        gameName: true,
+                        tagLine: true,
+                        tier: true,
+                        rank: true,
+                        peakTier: true,
+                        peakRank: true,
+                        mainRole: true,
+                        subRole: true,
+                        championPreferences: {
+                          select: { role: true, championId: true, order: true },
+                        },
+                      },
+                      take: 1,
+                    },
                   },
                 },
               },

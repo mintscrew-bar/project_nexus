@@ -33,11 +33,28 @@ const stopLocalCountdown = () => {
 };
 
 const getSecondsUntil = (timerEndAt?: number | null, fallbackMs?: number) => {
+  // 서버 계산 잔여 ms를 우선 사용 — 클라이언트 시계 오차(clock skew)에 독립적
+  if (fallbackMs) {
+    return Math.ceil(fallbackMs / 1000);
+  }
+  // timerEndAt은 클라이언트 시계에 의존하므로 fallbackMs가 없을 때만 사용
   if (timerEndAt) {
     return Math.max(0, Math.ceil((timerEndAt - Date.now()) / 1000));
   }
-  return fallbackMs ? Math.ceil(fallbackMs / 1000) : 15;
+  return 15;
 };
+
+interface RiotAccount {
+  gameName: string | null;
+  tagLine: string | null;
+  tier: string | null;
+  rank: string | null;
+  peakTier: string | null;
+  peakRank: string | null;
+  mainRole: string | null;
+  subRole: string | null;
+  championPreferences: { role: string; championId: string; order: number }[];
+}
 
 interface TeamMember {
   id: string;
@@ -47,6 +64,7 @@ interface TeamMember {
     id: string;
     username: string;
     avatar?: string | null;
+    riotAccounts?: RiotAccount[];
   };
 }
 

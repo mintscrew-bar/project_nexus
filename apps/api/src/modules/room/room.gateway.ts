@@ -34,8 +34,8 @@ interface AuthenticatedSocket extends Socket {
     credentials: true,
   },
   namespace: "/room",
-  pingInterval: 10000,
-  pingTimeout: 5000,
+  pingInterval: 25000,
+  pingTimeout: 20000,
   maxHttpBufferSize: 1e4,
 })
 export class RoomGateway
@@ -193,7 +193,8 @@ export class RoomGateway
       let shouldNotifyOthers = false;
       try {
         const status = await this.roomService.getRoomStatus(roomId);
-        if (status === RoomStatus.WAITING) {
+        if (status === RoomStatus.WAITING || status === RoomStatus.COMPLETED) {
+          // WAITING/COMPLETED 상태: 실제로 참가자 제거
           try {
             await this.roomService.leaveRoom(userId, roomId);
             shouldNotifyOthers = true;
@@ -221,7 +222,6 @@ export class RoomGateway
           } catch {
             // best-effort — 무시
           }
-
         }
       } catch {
         // 방이 이미 삭제되었거나 알 수 없는 상태 — 무시
@@ -327,12 +327,14 @@ export class RoomGateway
 
         // WAITING 방이면 즉시 퇴장 처리 (슬롯 해제 + 방 목록 갱신)
         try {
-          const prevStatus = await this.roomService.getRoomStatus(previousRoomId);
+          const prevStatus =
+            await this.roomService.getRoomStatus(previousRoomId);
           if (prevStatus === RoomStatus.WAITING) {
             await this.roomService.leaveRoom(client.userId!, previousRoomId);
-            this.server
-              .to(previousRoomId)
-              .emit("user-left", { userId: client.userId, username: client.username });
+            this.server.to(previousRoomId).emit("user-left", {
+              userId: client.userId,
+              username: client.username,
+            });
             this.broadcastRoomDelta("update", previousRoomId);
           }
         } catch {
@@ -941,9 +943,12 @@ export class RoomGateway
   @Cron("*/5 * * * *")
   async cleanupZombieParticipants() {
     try {
-      const waitingRooms =
-        await this.roomService.getWaitingRoomsWithParticipants();
-      for (const room of waitingRooms) {
+      const [waitingRooms, completedRooms] = await Promise.all([
+        this.roomService.getWaitingRoomsWithParticipants(),
+        this.roomService.getCompletedRoomsWithParticipants(),
+      ]);
+      const roomsToCheck = [...waitingRooms, ...completedRooms];
+      for (const room of roomsToCheck) {
         // /room 네임스페이스 소켓 기준이 아닌 Socket.IO room 멤버십 기준으로 판단.
         // userSockets는 /room 네임스페이스만 추적하므로 다른 네임스페이스에
         // 연결된 관전자를 좀비로 오인하는 문제를 방지한다.
@@ -973,7 +978,6 @@ export class RoomGateway
         // 방 상태 변경을 방 목록 구독자에게 알림 (삭제됐으면 remove로 폴백)
         this.broadcastRoomDelta("update", room.id);
       }
-
     } catch (error) {
       this.gatewayLogger.error("[Cleanup] 좀비 참가자 정리 실패:", error);
     }
