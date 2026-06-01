@@ -248,8 +248,8 @@ function TeamSideColumn({
                     <span className="min-w-0 flex-1 truncate text-xs font-medium text-text-primary">
                       {member.username}
                     </span>
-                    {/* 주라인 아이콘 (밝게) + 부라인 아이콘 (흐리게) */}
-                    <div className="flex shrink-0 items-center gap-0.5">
+                    {/* 주라인 아이콘 (밝게) + 부라인 아이콘 (흐리게) — xl 이상에서만 표시 */}
+                    <div className="hidden shrink-0 items-center gap-0.5 xl:flex">
                       <RoleIcon role={mainRole} />
                       <RoleIcon role={subRole} dim />
                     </div>
@@ -984,7 +984,7 @@ export default function AuctionRoomPage() {
         </div>
 
         {/* ── 데스크톱: LoL형 3열 레이아웃 (좌팀 | 중앙경매 | 우팀) ── */}
-        <div className="hidden min-h-0 flex-1 gap-3 lg:grid lg:grid-rows-1 lg:grid-cols-[260px_minmax(0,1fr)_260px] xl:grid-cols-[280px_minmax(0,1fr)_280px]">
+        <div className="hidden min-h-0 flex-1 gap-3 lg:grid lg:grid-rows-1 lg:grid-cols-[180px_minmax(0,1fr)_180px] xl:grid-cols-[220px_minmax(0,1fr)_220px] 2xl:grid-cols-[260px_minmax(0,1fr)_260px]">
           {/* 좌측: 팀 첫 절반 */}
           <TeamSideColumn
             teams={leftTeams}

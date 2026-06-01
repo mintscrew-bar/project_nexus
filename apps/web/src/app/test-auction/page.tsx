@@ -156,7 +156,7 @@ function TeamSideColumn({
                     <span className="min-w-0 flex-1 truncate text-xs font-medium text-text-primary">
                       {member.username}
                     </span>
-                    <div className="flex shrink-0 items-center gap-0.5">
+                    <div className="hidden shrink-0 items-center gap-0.5 xl:flex">
                       <RoleIcon role={member.mainRole} />
                       <RoleIcon role={member.subRole} dim />
                     </div>
@@ -340,7 +340,7 @@ export default function TestAuctionPage() {
           </div>
         </div>
 
-        <div className="grid min-h-0 flex-1 grid-rows-1 gap-3 lg:grid-cols-[260px_minmax(0,1fr)_260px] xl:grid-cols-[280px_minmax(0,1fr)_280px]">
+        <div className="grid min-h-0 flex-1 grid-rows-1 gap-3 lg:grid-cols-[180px_minmax(0,1fr)_180px] xl:grid-cols-[220px_minmax(0,1fr)_220px] 2xl:grid-cols-[260px_minmax(0,1fr)_260px]">
           <TeamSideColumn teams={leftTeams} currentHighestBidder={highestBidder} />
 
           <div className="flex min-h-0 flex-col gap-3 overflow-hidden">
