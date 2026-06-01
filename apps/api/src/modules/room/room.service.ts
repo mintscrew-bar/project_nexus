@@ -920,10 +920,12 @@ export class RoomService {
       throw new BadRequestException("Not in room");
     }
 
-    // During active game phases (not WAITING), keep participant slot so user can re-enter.
-    // This prevents accidental removal during network disconnects or page navigation.
-    // Exception: if only bots remain, clean up immediately.
-    if (room.status !== RoomStatus.WAITING) {
+    // COMPLETED 상태는 게임이 완전히 끝난 상태이므로 슬롯 보존 없이 실제 퇴장 처리.
+    // PLAYING/DRAFT 등 진행 중인 단계에서만 슬롯을 보존해 재접속을 허용한다.
+    if (
+      room.status !== RoomStatus.WAITING &&
+      room.status !== RoomStatus.COMPLETED
+    ) {
       const remainingParticipants = room.participants.filter(
         (p: (typeof room.participants)[number]) => p.userId !== userId,
       );
@@ -999,6 +1001,8 @@ export class RoomService {
         /^testbot_\d+$/.test(p.user?.username || ""),
       );
 
+    const username = participant.user?.username ?? "";
+
     // If no participants left, delete the room regardless of status (prevents zombie rooms)
     if (remainingCount === 0) {
       // Clean up Discord channels (category + lobby + team channels) before deleting
@@ -1014,7 +1018,7 @@ export class RoomService {
       await this.prisma.room.delete({
         where: { id: roomId },
       });
-      return { message: "Room deleted (no participants)" };
+      return { message: "Room deleted (no participants)", username, roomDeleted: true };
     }
 
     // If only bots remain, delete room immediately
@@ -1031,10 +1035,11 @@ export class RoomService {
       await this.prisma.room.delete({
         where: { id: roomId },
       });
-      return { message: "Room deleted (only bots remaining)" };
+      return { message: "Room deleted (only bots remaining)", username, roomDeleted: true };
     }
 
     // If host leaves but others remain, transfer host to next real (non-bot) participant
+    let newHostId: string | null = null;
     if (room.hostId === userId && remainingCount > 0) {
       const nextHost =
         remainingParticipants.find(
@@ -1045,11 +1050,11 @@ export class RoomService {
           where: { id: roomId },
           data: { hostId: nextHost.userId },
         });
-        return { message: "Left room, host transferred" };
+        newHostId = nextHost.userId;
       }
     }
 
-    return { message: "Left room successfully" };
+    return { message: "Left room successfully", username, newHostId };
   }
 
   /**
@@ -1590,7 +1595,6 @@ export class RoomService {
     if (!allReady) {
       throw new BadRequestException("Not all players are ready");
     }
-
 
     if (
       (room.teamMode === TeamMode.AUTO_BALANCE ||

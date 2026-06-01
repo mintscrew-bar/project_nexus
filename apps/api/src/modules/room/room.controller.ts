@@ -154,7 +154,24 @@ export class RoomController {
     @CurrentUser("sub") userId: string,
     @Param("id") roomId: string,
   ) {
-    return this.roomService.leaveRoom(userId, roomId);
+    const result: any = await this.roomService.leaveRoom(userId, roomId);
+
+    // 슬롯이 보존되지 않은 경우(실제 퇴장)에만 소켓으로 브로드캐스트.
+    // 게임 진행 중 보존(preserved=true)이면 클라에 user-left를 보내지 않는다.
+    if (!result?.preserved && !result?.roomDeleted) {
+      this.roomGateway.notifyRoomUpdate(roomId, "user-left", {
+        userId,
+        username: result?.username ?? "",
+      });
+      if (result?.newHostId) {
+        this.roomGateway.notifyRoomUpdate(roomId, "host-changed", {
+          newHostId: result.newHostId,
+        });
+      }
+      this.roomGateway.broadcastRoomDelta("update", roomId);
+    }
+
+    return result;
   }
 
   @Delete(":id")
