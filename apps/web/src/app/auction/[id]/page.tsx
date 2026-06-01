@@ -276,66 +276,42 @@ function TeamSideColumn({
 }
 
 /** 중앙 하단 정보 탭 (입찰 내역 | 대기 선수 | 채팅) */
-function CenterInfoTabs({
-  bidHistory,
+/** 데스크톱 중앙 하단 패널 — 매물(2fr) + 채팅(1fr) 병렬 배치 */
+function CenterBottomPanel({
   players,
   currentPlayerId,
   roomId,
-  logEndRef,
   onExpandPlayers,
 }: {
-  bidHistory: any[];
   players: any[];
   currentPlayerId?: string;
   roomId: string;
-  logEndRef: React.RefObject<HTMLDivElement>;
   onExpandPlayers: () => void;
 }) {
-  const [tab, setTab] = useState<"log" | "players" | "chat">("log");
-
   return (
-    <Card className="flex-1 min-h-0">
-      <CardContent className="p-2.5 h-full flex flex-col">
-        <div className="flex gap-1 mb-2 flex-shrink-0 bg-bg-secondary rounded-lg p-0.5">
-          {[
-            { key: "log" as const, label: "입찰 내역", Icon: ScrollText },
-            { key: "players" as const, label: `대기 ${players.length}`, Icon: Users },
-            { key: "chat" as const, label: "채팅", Icon: MessageSquare },
-          ].map(({ key, label, Icon }) => (
-            <button
-              key={key}
-              onClick={() => setTab(key)}
-              className={cn(
-                "flex-1 flex items-center justify-center gap-1 py-1.5 rounded-md text-xs font-medium transition-colors",
-                tab === key
-                  ? "bg-bg-primary text-accent-primary shadow-sm"
-                  : "text-text-tertiary hover:text-text-secondary",
-              )}
-            >
-              <Icon className="w-3.5 h-3.5" />
-              {label}
-            </button>
-          ))}
+    <div className="grid min-h-0 grid-cols-[2fr_1fr] gap-3">
+      {/* 남은 매물 */}
+      <Card className="flex min-h-0 flex-col overflow-hidden p-0">
+        <div className="flex h-10 shrink-0 items-center gap-2 border-b border-bg-tertiary/70 bg-bg-tertiary/20 px-3">
+          <Users className="h-3.5 w-3.5 text-accent-primary" />
+          <span className="flex-1 text-sm font-semibold text-text-primary">남은 매물</span>
+          <span className="rounded bg-bg-elevated px-1.5 py-0.5 text-[10px] font-bold text-text-tertiary">
+            {players.length}
+          </span>
         </div>
-        <div className="flex-1 min-h-0">
-          {/* 탭 전환 시 언마운트 방지 (스크롤 위치 보존) */}
-          <div className={cn("h-full", tab !== "log" && "hidden")}>
-            <BidLog bidHistory={bidHistory} logEndRef={logEndRef} />
-          </div>
-          <div className={cn("h-full", tab !== "players" && "hidden")}>
-            <PlayersList
-              players={players}
-              currentPlayerId={currentPlayerId}
-              onExpand={onExpandPlayers}
-              compact
-            />
-          </div>
-          {tab === "chat" && (
-            <GameChatPanel roomId={roomId} variant="inline" className="h-full" />
-          )}
+        <div className="min-h-0 flex-1 overflow-hidden">
+          <PlayersList
+            players={players}
+            currentPlayerId={currentPlayerId}
+            onExpand={onExpandPlayers}
+            compact
+          />
         </div>
-      </CardContent>
-    </Card>
+      </Card>
+
+      {/* 채팅 */}
+      <GameChatPanel roomId={roomId} variant="inline" className="min-h-0" />
+    </div>
   );
 }
 
@@ -1003,12 +979,10 @@ export default function AuctionRoomPage() {
                 hideTeams
               />
             </div>
-            <CenterInfoTabs
-              bidHistory={bidHistory}
+            <CenterBottomPanel
               players={players}
               currentPlayerId={auctionState.currentPlayer?.id}
               roomId={auctionId}
-              logEndRef={logEndRef}
               onExpandPlayers={() => setPlayersModalOpen(true)}
             />
           </div>
