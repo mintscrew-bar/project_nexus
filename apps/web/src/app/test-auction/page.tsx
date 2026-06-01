@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { AuctionBoard } from "@/components/domain/AuctionBoard";
 import { Avatar, Button, Card } from "@/components/ui";
 import { TierBadge } from "@/components/domain/TierBadge";
-import { cn, getTierIcon } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { Coins, PackageOpen, Gavel, Users, MessageSquare, Shield } from "lucide-react";
 
 const currentUserId = "captain-1";
@@ -160,8 +160,7 @@ function TeamSideColumn({
                       <RoleIcon role={member.mainRole} />
                       <RoleIcon role={member.subRole} dim />
                     </div>
-                    {/* lg: 아이콘만, xl+: 풀 배지 */}
-                    <span className="shrink-0 text-sm xl:hidden">{getTierIcon(member.tier)}</span>
+                    {/* xl 이상에서만 티어 배지 표시 */}
                     <span className="hidden shrink-0 xl:inline-flex">
                       <TierBadge tier={member.tier} rank={member.rank} size="sm" />
                     </span>
