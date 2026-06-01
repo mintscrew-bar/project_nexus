@@ -9,6 +9,25 @@ import { Coins, PackageOpen } from "lucide-react";
 
 const currentUserId = "captain-1";
 
+const ROLE_ICON: Record<string, string> = {
+  TOP: '/icons/positions/position-top.svg',
+  JUNGLE: '/icons/positions/position-jungle.svg',
+  MID: '/icons/positions/position-middle.svg',
+  MIDDLE: '/icons/positions/position-middle.svg',
+  ADC: '/icons/positions/position-bottom.svg',
+  BOTTOM: '/icons/positions/position-bottom.svg',
+  SUPPORT: '/icons/positions/position-utility.svg',
+  UTILITY: '/icons/positions/position-utility.svg',
+};
+
+function RoleIcon({ role, dim }: { role?: string; dim?: boolean }) {
+  if (!role) return null;
+  const url = ROLE_ICON[role.toUpperCase()];
+  if (!url) return null;
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={url} alt={role} className="h-3.5 w-3.5 shrink-0 brightness-0 invert" style={{ opacity: dim ? 0.35 : 0.8 }} />;
+}
+
 const mockPlayers = [
   { id: "p1", username: "Nexon", tier: "MASTER", rank: "I", mmr: 1830, mainRole: "MID", subRole: "ADC" },
   { id: "p2", username: "Kira", tier: "DIAMOND", rank: "IV", mmr: 1640, mainRole: "ADC", subRole: "MID" },
@@ -83,7 +102,10 @@ function TeamSideColumn({
   currentHighestBidder: string | null;
 }) {
   return (
-    <div className="flex h-full flex-col gap-3 overflow-y-auto">
+    <div
+      className="grid h-full gap-3 overflow-y-auto"
+      style={{ gridTemplateRows: `repeat(${teams.length}, minmax(210px, 1fr))` }}
+    >
       {teams.map((team) => {
         const isMine = team.captainId === currentUserId;
         const isHighest = currentHighestBidder === team.id || currentHighestBidder === team.captainId;
@@ -92,14 +114,14 @@ function TeamSideColumn({
           <Card
             key={team.id}
             className={cn(
-              "shrink-0 overflow-hidden p-0",
+              "flex min-h-0 flex-col overflow-hidden p-0",
               isHighest && "border-accent-gold/50 shadow-sm shadow-accent-gold/10",
               isMine && !isHighest && "border-accent-primary/40",
             )}
           >
             <div
               className={cn(
-                "flex h-10 items-center gap-2 border-b border-bg-tertiary/70 px-3",
+                "flex h-10 shrink-0 items-center gap-2 border-b border-bg-tertiary/70 px-3",
                 isHighest ? "bg-accent-gold/10" : "bg-bg-tertiary/20",
               )}
             >
@@ -115,7 +137,7 @@ function TeamSideColumn({
               </div>
             </div>
 
-            <div className="flex flex-col gap-1 p-1.5">
+            <div className="grid flex-1 grid-rows-5 gap-1 p-1.5">
               {team.members.map((member, idx) => {
                 const isCaptain = member.id === team.captainId;
 
@@ -123,7 +145,7 @@ function TeamSideColumn({
                   <div
                     key={member.id}
                     className={cn(
-                      "flex h-7 items-center gap-1.5 rounded px-2",
+                      "flex min-h-0 items-center gap-1.5 rounded px-2",
                       isCaptain ? "bg-accent-gold/10" : "bg-bg-tertiary/60",
                     )}
                   >
@@ -134,6 +156,10 @@ function TeamSideColumn({
                     <span className="min-w-0 flex-1 truncate text-xs font-medium text-text-primary">
                       {member.username}
                     </span>
+                    <div className="flex shrink-0 items-center gap-0.5">
+                      <RoleIcon role={member.mainRole} />
+                      <RoleIcon role={member.subRole} dim />
+                    </div>
                     <TierBadge tier={member.tier} rank={member.rank} size="sm" showIcon={false} />
                   </div>
                 );
@@ -142,7 +168,7 @@ function TeamSideColumn({
               {Array.from({ length: Math.max(0, 5 - team.members.length) }).map((_, idx) => (
                 <div
                   key={`empty-${idx}`}
-                  className="flex h-7 items-center gap-1.5 rounded border border-dashed border-bg-tertiary/60 px-2"
+                  className="flex min-h-0 items-center gap-1.5 rounded border border-dashed border-bg-tertiary/60 px-2"
                 >
                   <span className="w-4 shrink-0 text-center text-[10px] text-text-muted">
                     {team.members.length + idx}

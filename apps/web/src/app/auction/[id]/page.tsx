@@ -13,6 +13,25 @@ import { cn } from "@/lib/utils";
 import { Users, Hand, Check, Coins, ScrollText, Gavel, MessageSquare, Maximize2 } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 
+const ROLE_ICON: Record<string, string> = {
+  TOP: '/icons/positions/position-top.svg',
+  JUNGLE: '/icons/positions/position-jungle.svg',
+  MID: '/icons/positions/position-middle.svg',
+  MIDDLE: '/icons/positions/position-middle.svg',
+  ADC: '/icons/positions/position-bottom.svg',
+  BOTTOM: '/icons/positions/position-bottom.svg',
+  SUPPORT: '/icons/positions/position-utility.svg',
+  UTILITY: '/icons/positions/position-utility.svg',
+};
+
+function RoleIcon({ role, dim }: { role?: string; dim?: boolean }) {
+  if (!role) return null;
+  const url = ROLE_ICON[role.toUpperCase()];
+  if (!url) return null;
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={url} alt={role} className="h-3.5 w-3.5 shrink-0 brightness-0 invert" style={{ opacity: dim ? 0.35 : 0.8 }} />;
+}
+
 /** 대기 선수 목록 (데스크톱 사이드바 & 모바일 탭에서 공유) */
 function PlayersList({
   players,
@@ -151,7 +170,11 @@ function TeamSideColumn({
   }, []);
 
   return (
-    <div className="flex h-full flex-col gap-3 overflow-y-auto">
+    /* 팀 수에 따라 균등 분할, 최소 210px 보장 — 넘치면 사이드 스크롤 */
+    <div
+      className="grid h-full gap-3 overflow-y-auto"
+      style={{ gridTemplateRows: `repeat(${teams.length}, minmax(210px, 1fr))` }}
+    >
       {teams.map((team) => {
         const members = team.members ?? [];
         const budget = team.remainingGold ?? team.remainingBudget ?? 0;
@@ -167,7 +190,7 @@ function TeamSideColumn({
           <Card
             key={team.id}
             className={cn(
-              "shrink-0 overflow-hidden p-0",
+              "flex min-h-0 flex-col overflow-hidden p-0",
               isCurrentBidder && "border-accent-gold/50 shadow-sm shadow-accent-gold/10",
               isMine && !isCurrentBidder && "border-accent-primary/40",
             )}
@@ -175,7 +198,7 @@ function TeamSideColumn({
             {/* 팀 헤더 */}
             <div
               className={cn(
-                "flex h-10 items-center gap-2 border-b border-bg-tertiary/70 px-3",
+                "flex h-10 shrink-0 items-center gap-2 border-b border-bg-tertiary/70 px-3",
                 isCurrentBidder ? "bg-accent-gold/10" : "bg-bg-tertiary/20",
               )}
             >
@@ -199,15 +222,17 @@ function TeamSideColumn({
               )}
             </div>
 
-            {/* 멤버 슬롯 — h-7 고정 높이로 예측 가능한 카드 크기 */}
-            <div className="flex flex-col gap-1 p-1.5">
+            {/* 멤버 슬롯 — 카드 높이를 5등분해서 공간을 최대한 활용 */}
+            <div className="grid flex-1 grid-rows-5 gap-1 p-1.5">
               {members.map((member: any, idx: number) => {
                 const isCaptain = member.id === team.captainId;
+                const mainRole = member.assignedRole || member.mainRole;
+                const subRole = member.subRole;
                 return (
                   <div
                     key={member.id}
                     className={cn(
-                      "flex h-7 cursor-default items-center gap-1.5 rounded px-2",
+                      "flex min-h-0 cursor-default items-center gap-1.5 rounded px-2",
                       isCaptain ? "bg-accent-gold/10" : "bg-bg-tertiary/60",
                     )}
                     onMouseEnter={(e) => {
@@ -223,6 +248,11 @@ function TeamSideColumn({
                     <span className="min-w-0 flex-1 truncate text-xs font-medium text-text-primary">
                       {member.username}
                     </span>
+                    {/* 주라인 아이콘 (밝게) + 부라인 아이콘 (흐리게) */}
+                    <div className="flex shrink-0 items-center gap-0.5">
+                      <RoleIcon role={mainRole} />
+                      <RoleIcon role={subRole} dim />
+                    </div>
                     <TierBadge tier={member.tier} size="sm" showIcon={false} />
                   </div>
                 );
@@ -230,7 +260,7 @@ function TeamSideColumn({
               {Array.from({ length: Math.max(0, 5 - members.length) }).map((_, i) => (
                 <div
                   key={`empty-${i}`}
-                  className="flex h-7 items-center gap-1.5 rounded border border-dashed border-bg-tertiary/60 px-2"
+                  className="flex min-h-0 items-center gap-1.5 rounded border border-dashed border-bg-tertiary/60 px-2"
                 >
                   <span className="w-4 shrink-0 text-center text-[10px] text-text-muted">{members.length + i}</span>
                   <span className="text-xs text-text-muted">빈 슬롯</span>
