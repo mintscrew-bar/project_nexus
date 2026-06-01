@@ -449,6 +449,18 @@ export default function AuctionRoomPage() {
     logEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [bidHistory.length]);
 
+  // ── LoL형 레이아웃: 팀 정렬 후 좌우 균등 분할 (훅 규칙: early return 이전에 선언) ──
+  const sortedTeamsForLayout = useMemo(
+    () =>
+      [...teams].sort((a: any, b: any) => {
+        const oa = a.name.match(/\d+/) ? Number(a.name.match(/\d+/)![0]) : Infinity;
+        const ob = b.name.match(/\d+/) ? Number(b.name.match(/\d+/)![0]) : Infinity;
+        if (oa !== ob) return oa - ob;
+        return a.name.localeCompare(b.name);
+      }),
+    [teams],
+  );
+
   const handleAbortToLobby = () => setIsAbortConfirmOpen(true);
 
   const handleAbortConfirm = async () => {
@@ -905,17 +917,6 @@ export default function AuctionRoomPage() {
     auctionState.currentHighestBidder === myTeam?.id
   );
 
-  // ── LoL형 레이아웃: 팀 정렬 후 좌우 균등 분할 ──
-  const sortedTeamsForLayout = useMemo(
-    () =>
-      [...teams].sort((a: any, b: any) => {
-        const oa = a.name.match(/\d+/) ? Number(a.name.match(/\d+/)![0]) : Infinity;
-        const ob = b.name.match(/\d+/) ? Number(b.name.match(/\d+/)![0]) : Infinity;
-        if (oa !== ob) return oa - ob;
-        return a.name.localeCompare(b.name);
-      }),
-    [teams],
-  );
   const leftTeams = sortedTeamsForLayout.slice(0, Math.ceil(sortedTeamsForLayout.length / 2));
   const rightTeams = sortedTeamsForLayout.slice(Math.ceil(sortedTeamsForLayout.length / 2));
 
