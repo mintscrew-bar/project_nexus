@@ -283,7 +283,9 @@ export class StatsService {
     if (raw && raw.trim()) {
       const parsed = new Date(raw.trim());
       if (!Number.isNaN(parsed.getTime())) return parsed;
-      this.logger.warn(`Invalid RIOT_SEASON_START=${raw}, falling back to Jan 1`);
+      this.logger.warn(
+        `Invalid RIOT_SEASON_START=${raw}, falling back to Jan 1`,
+      );
     }
     return new Date(Date.UTC(new Date().getUTCFullYear(), 0, 1, 0, 0, 0, 0));
   }
@@ -2324,7 +2326,9 @@ export class StatsService {
           },
         });
       })
-      .filter((update): update is NonNullable<typeof update> => update !== null);
+      .filter(
+        (update): update is NonNullable<typeof update> => update !== null,
+      );
 
     if (updates.length === 0) return;
 

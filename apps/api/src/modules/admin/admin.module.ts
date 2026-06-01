@@ -7,7 +7,12 @@ import { TasksModule } from "../tasks/tasks.module";
 import { DiscordModule } from "../discord/discord.module";
 
 @Module({
-  imports: [PrismaModule, forwardRef(() => RoomModule), TasksModule, DiscordModule],
+  imports: [
+    PrismaModule,
+    forwardRef(() => RoomModule),
+    TasksModule,
+    DiscordModule,
+  ],
   controllers: [AdminController],
   providers: [AdminService],
   exports: [AdminService],

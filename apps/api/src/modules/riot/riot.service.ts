@@ -180,11 +180,7 @@ export class RiotService {
     }
 
     const rank = (peakRank || "").trim().toUpperCase();
-    if (
-      !RANKED_DIVISIONS.includes(
-        rank as (typeof RANKED_DIVISIONS)[number],
-      )
-    ) {
+    if (!RANKED_DIVISIONS.includes(rank as (typeof RANKED_DIVISIONS)[number])) {
       throw new BadRequestException("최고 티어의 디비전을 선택해주세요.");
     }
 
@@ -213,9 +209,7 @@ export class RiotService {
         throw new NotFoundException("Summoner not found");
       }
       if (error.response?.status === 401 || error.response?.status === 403) {
-        throw new ForbiddenException(
-          "Riot API key is invalid or expired",
-        );
+        throw new ForbiddenException("Riot API key is invalid or expired");
       }
       if (error.response?.status === 429) {
         throw new HttpException(
@@ -726,7 +720,9 @@ export class RiotService {
     });
     await this.enqueueStatsRecompute(userId, "account-linked");
     await this.discordBotService.syncUserTierAndLineRoles(userId).catch(() => {
-      this.logger.warn(`Discord tier/line role sync failed (register): ${userId}`);
+      this.logger.warn(
+        `Discord tier/line role sync failed (register): ${userId}`,
+      );
     });
 
     // 옛 아이콘 인증 흔적이 남아 있다면 청소(이전 버전에서 step2 진행 중이던 유저 대비).
@@ -798,7 +794,9 @@ export class RiotService {
     });
     await this.enqueueStatsRecompute(userId, "rank-sync");
     await this.discordBotService.syncUserTierAndLineRoles(userId).catch(() => {
-      this.logger.warn(`Discord tier/line role sync failed (rank-sync): ${userId}`);
+      this.logger.warn(
+        `Discord tier/line role sync failed (rank-sync): ${userId}`,
+      );
     });
 
     return updated;
@@ -896,7 +894,9 @@ export class RiotService {
       data: { isPrimary: true },
     });
     await this.discordBotService.syncUserTierAndLineRoles(userId).catch(() => {
-      this.logger.warn(`Discord tier/line role sync failed (primary): ${userId}`);
+      this.logger.warn(
+        `Discord tier/line role sync failed (primary): ${userId}`,
+      );
     });
     return updated;
   }
@@ -932,7 +932,9 @@ export class RiotService {
 
     await this.prisma.riotAccount.delete({ where: { id: riotAccountId } });
     await this.discordBotService.syncUserTierAndLineRoles(userId).catch(() => {
-      this.logger.warn(`Discord tier/line role sync failed (delete): ${userId}`);
+      this.logger.warn(
+        `Discord tier/line role sync failed (delete): ${userId}`,
+      );
     });
   }
 
@@ -964,7 +966,10 @@ export class RiotService {
 
     let peakUpdate = {};
     if (dto.peakTier !== undefined) {
-      const manualPeak = this.normalizeManualPeakTier(dto.peakTier, dto.peakRank);
+      const manualPeak = this.normalizeManualPeakTier(
+        dto.peakTier,
+        dto.peakRank,
+      );
       if (manualPeak) {
         peakUpdate = getPeakTierUpdate(
           manualPeak.peakTier,
@@ -999,7 +1004,9 @@ export class RiotService {
       }
     }
     await this.discordBotService.syncUserTierAndLineRoles(userId).catch(() => {
-      this.logger.warn(`Discord tier/line role sync failed (update): ${userId}`);
+      this.logger.warn(
+        `Discord tier/line role sync failed (update): ${userId}`,
+      );
     });
 
     return this.prisma.riotAccount.findUnique({

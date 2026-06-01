@@ -275,9 +275,7 @@ export class RiotMatchService {
     // 로컬 분리 캡을 통과해도 전역 예산이 없으면 생길 때까지 대기한다.
     const acquired = await this.rateLimiter.acquireWaiting();
     if (!acquired) {
-      this.logger.warn(
-        `Riot 전역 예산 대기 한도 초과 (${priority}), 재시도`,
-      );
+      this.logger.warn(`Riot 전역 예산 대기 한도 초과 (${priority}), 재시도`);
       return this.waitForMatchRateLimit(priority);
     }
 

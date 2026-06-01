@@ -1239,7 +1239,9 @@ export class LabStatsService {
         WHERE mp."championId" IN (${Prisma.join(championIds)})
         GROUP BY mp."championId"
       `);
-      const nameMap = new Map(nameRows.map((r) => [r.championId, r.championName]));
+      const nameMap = new Map(
+        nameRows.map((r) => [r.championId, r.championName]),
+      );
 
       // 정규화를 위한 min/max 계산
       const wilsonValues = snapshots.map((s) => s.wilsonLower);
@@ -2154,7 +2156,9 @@ export class LabStatsService {
     if (dataSource === "ranked-meta") {
       const rankedPeriod = period === "30d" ? "30d" : "current_patch";
       const ranked = await this.getRankedChampionSnapshots(rankedPeriod);
-      const rows = ranked.champions.filter((row) => row.championId === championId);
+      const rows = ranked.champions.filter(
+        (row) => row.championId === championId,
+      );
       const totalRow = rows.find((row) => row.position === null) ?? rows[0];
       if (!totalRow) return null;
       const championName = String(championId);
@@ -2281,19 +2285,16 @@ export class LabStatsService {
         SPLIT_PART(m."patchVersion", '.', 2)::int ASC
     `);
 
-    const patchTrend: LabChampionPatchTrendPoint[] = patchWinRows.map(
-      (row) => {
-        const games = Number(row.games);
-        const wins = Number(row.wins);
-        return {
-          patch: row.patch,
-          games,
-          wins,
-          winRate:
-            games > 0 ? Math.round((wins / games) * 10000) / 10000 : 0,
-        };
-      },
-    );
+    const patchTrend: LabChampionPatchTrendPoint[] = patchWinRows.map((row) => {
+      const games = Number(row.games);
+      const wins = Number(row.wins);
+      return {
+        patch: row.patch,
+        games,
+        wins,
+        winRate: games > 0 ? Math.round((wins / games) * 10000) / 10000 : 0,
+      };
+    });
 
     // 2-c) 패치별 아이템 TOP 5 — item0~6 LATERAL 언네스트 후 픽률 기준 집계
     const patchItemRawRows = await this.prisma.$queryRaw<
@@ -2360,9 +2361,7 @@ export class LabStatsService {
         itemId: Number(row.itemId),
         picks,
         pickRate:
-          totalGames > 0
-            ? Math.round((picks / totalGames) * 10000) / 100
-            : 0,
+          totalGames > 0 ? Math.round((picks / totalGames) * 10000) / 100 : 0,
       });
     }
     const patchItemTrend: LabChampionPatchItemRow[] = Array.from(
@@ -2517,7 +2516,8 @@ export class LabStatsService {
           ? purchasedItemsOnParticipant
           : finalItemsOnParticipant;
       const runeTriplet = this.extractRuneTriplet(p.perks);
-      const boots = itemsOnParticipant.find((id) => BOOT_ITEM_IDS.has(id)) ?? null;
+      const boots =
+        itemsOnParticipant.find((id) => BOOT_ITEM_IDS.has(id)) ?? null;
       const coreItems = itemsOnParticipant
         .filter((id) => !BOOT_ITEM_IDS.has(id))
         .slice(0, 3);
@@ -3428,8 +3428,7 @@ export class LabStatsService {
         const bucket = aggregate.get(type)!;
         const winRate = bucket.games > 0 ? bucket.wins / bucket.games : 0;
         const pickRate = totalTeams > 0 ? bucket.games / totalTeams : 0;
-        const avgScore =
-          bucket.games > 0 ? bucket.scoreSum / bucket.games : 0;
+        const avgScore = bucket.games > 0 ? bucket.scoreSum / bucket.games : 0;
         const avgGameDurationSec =
           bucket.durationCount > 0
             ? Math.round(bucket.durationSum / bucket.durationCount)
@@ -3453,7 +3452,9 @@ export class LabStatsService {
           games: bucket.games,
           wins: bucket.wins,
           winRate: Math.round(winRate * 10000) / 10000,
-          wilsonLower: Math.round(wilsonLower(bucket.wins, bucket.games) * 1000000) / 1000000,
+          wilsonLower:
+            Math.round(wilsonLower(bucket.wins, bucket.games) * 1000000) /
+            1000000,
           pickRate: Math.round(pickRate * 10000) / 10000,
           avgScore: Math.round(avgScore * 10000) / 10000,
           avgGameDurationSec,
@@ -4868,7 +4869,9 @@ export class LabStatsService {
     const cacheKey = this.labCacheKey(
       `champion:mastery:${dataSource}:${championId}`,
     );
-    const cached = includeCrossSourceBadge ? await this.redis.get(cacheKey) : null;
+    const cached = includeCrossSourceBadge
+      ? await this.redis.get(cacheKey)
+      : null;
     if (cached) return JSON.parse(cached);
 
     const sourceFilter = this.getMatchSourceFilter(dataSource);
@@ -5268,7 +5271,9 @@ export class LabStatsService {
         oppositeSource,
         false,
       );
-      const oppositeUserIds = new Set(opposite.masteries.map((row) => row.userId));
+      const oppositeUserIds = new Set(
+        opposite.masteries.map((row) => row.userId),
+      );
       for (const entry of masteries) {
         if (
           oppositeUserIds.has(entry.userId) &&
@@ -5307,7 +5312,9 @@ export class LabStatsService {
       .map((entry) => {
         if (!entry || typeof entry !== "object") return null;
         const itemId = Number((entry as { itemId?: unknown }).itemId);
-        const timestamp = Number((entry as { timestamp?: unknown }).timestamp ?? 0);
+        const timestamp = Number(
+          (entry as { timestamp?: unknown }).timestamp ?? 0,
+        );
 
         if (!Number.isInteger(itemId) || !completedItemIds.has(itemId)) {
           return null;
@@ -5319,7 +5326,8 @@ export class LabStatsService {
         };
       })
       .filter(
-        (entry): entry is { itemId: number; timestamp: number } => entry !== null,
+        (entry): entry is { itemId: number; timestamp: number } =>
+          entry !== null,
       )
       .sort((a, b) => a.timestamp - b.timestamp)
       .map((entry) => entry.itemId)
@@ -5370,7 +5378,13 @@ export class LabStatsService {
       .map((s) => s.perk)
       .filter((p): p is number => typeof p === "number");
 
-    return { primaryStyle, primarySelections, subStyle, subSelections, keystonePerk };
+    return {
+      primaryStyle,
+      primarySelections,
+      subStyle,
+      subSelections,
+      keystonePerk,
+    };
   }
 
   // ─── Task 35: Admin — 콜드스타트/데이터 단계 조회 ───

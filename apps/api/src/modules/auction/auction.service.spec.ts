@@ -21,7 +21,9 @@ describe("AuctionService", () => {
       team: {
         findFirst: jest.fn(),
         findUnique: jest.fn(),
-        findUniqueOrThrow: jest.fn().mockResolvedValue({ remainingBudget: 1000 }),
+        findUniqueOrThrow: jest
+          .fn()
+          .mockResolvedValue({ remainingBudget: 1000 }),
         update: jest.fn(),
       },
       teamMember: {

@@ -112,9 +112,7 @@ export class DiscordController {
       return res.redirect(`${appUrl}/settings?discord_guild=pending`);
     } catch (error: any) {
       this.logger.error(`디스코드 길드 연동 실패: ${error.message}`);
-      return res.redirect(
-        `${appUrl}/settings?discord_guild=error`,
-      );
+      return res.redirect(`${appUrl}/settings?discord_guild=error`);
     }
   }
 }

@@ -382,6 +382,32 @@
   display: none; /* Chrome/Safari */
 }
 
+/* Victory modal scrollbar: inset from rounded corners */
+.victory-scroll {
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--color-bg-elevated)) transparent;
+}
+
+.victory-scroll::-webkit-scrollbar {
+  width: 10px;
+}
+
+.victory-scroll::-webkit-scrollbar-track {
+  background: transparent;
+  margin-block: 12px;
+}
+
+.victory-scroll::-webkit-scrollbar-thumb {
+  background: rgb(var(--color-bg-elevated));
+  border: 3px solid #0f1117;
+  border-radius: 9999px;
+}
+
+.victory-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--color-text-tertiary));
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 8px;

@@ -174,7 +174,11 @@ export class StatsController {
     @Param("gameName") gameName: string,
     @Param("tagLine") tagLine: string,
   ) {
-    return this.statsService.getChampionSeasonStats(gameName, tagLine, "ranked");
+    return this.statsService.getChampionSeasonStats(
+      gameName,
+      tagLine,
+      "ranked",
+    );
   }
 
   @Get("fetch-status/:userId")
