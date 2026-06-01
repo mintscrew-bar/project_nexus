@@ -1845,9 +1845,12 @@ export class RoomService {
       );
     }
 
-    // 호스트만 로비 복귀 가능
-    if (room.hostId !== requesterId) {
-      throw new ForbiddenException("호스트만 로비로 복귀시킬 수 있습니다.");
+    // 참가자이기만 하면 누구나 복귀 가능 (결과창 카운트다운/버튼 클릭 시 선착순 처리)
+    const isParticipant = room.participants.some(
+      (p: (typeof room.participants)[number]) => p.userId === requesterId,
+    );
+    if (!isParticipant) {
+      throw new ForbiddenException("방 참가자만 로비로 복귀시킬 수 있습니다.");
     }
 
     // Discord 팀장 역할 정리용
