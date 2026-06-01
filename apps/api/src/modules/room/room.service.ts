@@ -288,7 +288,10 @@ export class RoomService {
           this.getAssignmentRolePenalty(candidate.assignments) *
             ROLE_PENALTY_WEIGHT,
       }))
-      .sort((left, right) => left.quality - right.quality || left.spread - right.spread);
+      .sort(
+        (left, right) =>
+          left.quality - right.quality || left.spread - right.spread,
+      );
 
     const bestQuality = finalists[0].quality;
     const pool = finalists.filter(
@@ -623,12 +626,41 @@ export class RoomService {
               },
             },
             members: {
-              include: {
+              select: {
+                id: true,
+                userId: true,
+                assignedRole: true,
+                pickOrder: true,
+                soldPrice: true,
+                joinedAt: true,
                 user: {
                   select: {
                     id: true,
                     username: true,
                     avatar: true,
+                    riotAccounts: {
+                      where: { isPrimary: true },
+                      select: {
+                        gameName: true,
+                        tagLine: true,
+                        tier: true,
+                        rank: true,
+                        peakTier: true,
+                        peakRank: true,
+                        mainRole: true,
+                        subRole: true,
+                        championPreferences: {
+                          select: {
+                            role: true,
+                            championId: true,
+                            order: true,
+                          },
+                          orderBy: { order: "asc" },
+                          take: 15,
+                        },
+                      },
+                      take: 1,
+                    },
                   },
                 },
               },
@@ -1559,10 +1591,6 @@ export class RoomService {
       throw new BadRequestException("Not all players are ready");
     }
 
-    // Minimum 2 players required
-    if (room.participants.length < 2) {
-      throw new BadRequestException("At least 2 players required to start");
-    }
 
     if (
       (room.teamMode === TeamMode.AUTO_BALANCE ||
