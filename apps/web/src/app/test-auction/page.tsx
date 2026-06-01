@@ -340,7 +340,7 @@ export default function TestAuctionPage() {
           </div>
         </div>
 
-        <div className="grid min-h-0 flex-1 items-stretch gap-3 lg:grid-cols-[260px_minmax(0,1fr)_260px] xl:grid-cols-[280px_minmax(0,1fr)_280px]">
+        <div className="grid min-h-0 flex-1 grid-rows-1 gap-3 lg:grid-cols-[260px_minmax(0,1fr)_260px] xl:grid-cols-[280px_minmax(0,1fr)_280px]">
           <TeamSideColumn teams={leftTeams} currentHighestBidder={highestBidder} />
 
           <div className="flex min-h-0 flex-col gap-3 overflow-hidden">

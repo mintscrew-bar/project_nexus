@@ -984,7 +984,7 @@ export default function AuctionRoomPage() {
         </div>
 
         {/* ── 데스크톱: LoL형 3열 레이아웃 (좌팀 | 중앙경매 | 우팀) ── */}
-        <div className="hidden min-h-0 flex-1 items-stretch gap-3 lg:grid lg:grid-cols-[260px_minmax(0,1fr)_260px] xl:grid-cols-[280px_minmax(0,1fr)_280px]">
+        <div className="hidden min-h-0 flex-1 gap-3 lg:grid lg:grid-rows-1 lg:grid-cols-[260px_minmax(0,1fr)_260px] xl:grid-cols-[280px_minmax(0,1fr)_280px]">
           {/* 좌측: 팀 첫 절반 */}
           <TeamSideColumn
             teams={leftTeams}
