@@ -5,7 +5,7 @@ import { AuctionBoard } from "@/components/domain/AuctionBoard";
 import { Avatar, Button, Card } from "@/components/ui";
 import { TierBadge } from "@/components/domain/TierBadge";
 import { cn } from "@/lib/utils";
-import { Coins, PackageOpen } from "lucide-react";
+import { Coins, PackageOpen, Gavel, Users, MessageSquare, Shield } from "lucide-react";
 
 const currentUserId = "captain-1";
 
@@ -317,21 +317,51 @@ function TestBidPanel({
   );
 }
 
+const MOBILE_TABS = [
+  { key: "auction" as const, label: "경매", icon: Gavel },
+  { key: "teams"   as const, label: "팀",   icon: Shield },
+  { key: "players" as const, label: "매물",  icon: Users },
+  { key: "chat"    as const, label: "채팅",  icon: MessageSquare },
+];
+
+const auctionState = (highestBid: number, highestBidder: string | null, highestBidderName: string, timerEnd: number) => ({
+  currentPlayer: mockPlayers[0],
+  currentPlayerIndex: 0,
+  currentHighestBid: highestBid,
+  currentHighestBidder: highestBidder,
+  currentHighestBidderName: highestBidderName,
+  timerEnd,
+  status: "IN_PROGRESS" as const,
+  yuchalCount: 1,
+  maxYuchalCycles: 3,
+  bidIncrement: 50,
+});
+
 export default function TestAuctionPage() {
   const timerEnd = useMemo(() => Date.now() + 25_000, []);
   const [highestBid, setHighestBid] = useState(350);
   const [highestBidder, setHighestBidder] = useState<string | null>("team-1");
   const [highestBidderName, setHighestBidderName] = useState("Haru");
+  const [mobileTab, setMobileTab] = useState<"auction" | "teams" | "players" | "chat">("auction");
   const leftTeams = mockTeams.slice(0, Math.ceil(mockTeams.length / 2));
   const rightTeams = mockTeams.slice(Math.ceil(mockTeams.length / 2));
+
+  const onPlaceBid = (amount: number) => {
+    setHighestBid(amount);
+    setHighestBidder("team-1");
+    setHighestBidderName("Haru");
+  };
+
+  const state = auctionState(highestBid, highestBidder, highestBidderName, timerEnd);
 
   return (
     <main className="h-full overflow-hidden bg-bg-primary p-4">
       <div className="mx-auto flex h-full max-w-[1720px] flex-col">
-        <div className="mb-3 flex h-12 shrink-0 items-end justify-between">
+        {/* 헤더 */}
+        <div className="mb-3 flex h-12 shrink-0 items-center justify-between">
           <div>
             <h1 className="text-xl font-bold text-text-primary">경매 테스트</h1>
-            <p className="text-xs text-text-tertiary">좌팀 · 중앙 경매 · 우팀 · 남은 매물</p>
+            <p className="hidden text-xs text-text-tertiary lg:block">좌팀 · 중앙 경매 · 우팀 · 남은 매물</p>
           </div>
           <div className="hidden items-center gap-2 text-xs text-text-tertiary lg:flex">
             <span>현재 매물</span>
@@ -340,49 +370,133 @@ export default function TestAuctionPage() {
           </div>
         </div>
 
-        <div className="grid min-h-0 flex-1 grid-rows-1 gap-3 lg:grid-cols-[180px_minmax(0,1fr)_180px] xl:grid-cols-[220px_minmax(0,1fr)_220px] 2xl:grid-cols-[260px_minmax(0,1fr)_260px]">
+        {/* ── 모바일 탭바 (lg 미만) ── */}
+        <div className="mb-3 flex shrink-0 gap-1 rounded-lg bg-bg-secondary p-1 lg:hidden">
+          {MOBILE_TABS.map(({ key, label, icon: Icon }) => (
+            <button
+              key={key}
+              onClick={() => setMobileTab(key)}
+              className={cn(
+                "flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-2 text-xs font-medium transition-colors",
+                mobileTab === key
+                  ? "bg-bg-primary text-accent-primary shadow-sm"
+                  : "text-text-tertiary hover:text-text-secondary",
+              )}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* ── 모바일 컨텐츠 (lg 미만) ── */}
+        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto lg:hidden">
+          {mobileTab === "auction" && (
+            <>
+              <AuctionBoard
+                auctionState={state}
+                teams={mockTeams}
+                players={mockPlayers}
+                currentUserId={currentUserId}
+                bidHistory={mockBidHistory}
+                hideTeams
+                onPlaceBid={onPlaceBid}
+              />
+            </>
+          )}
+          {mobileTab === "teams" && (
+            <div className="space-y-3">
+              {mockTeams.map((team) => (
+                <Card key={team.id} className="overflow-hidden p-0">
+                  <div className="flex h-10 items-center gap-2 border-b border-bg-tertiary/70 bg-bg-tertiary/20 px-3">
+                    <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: team.color }} />
+                    <span className="flex-1 text-sm font-semibold text-text-primary">{team.name}</span>
+                    <div className="flex items-center gap-0.5">
+                      <Coins className="h-3 w-3 text-accent-gold" />
+                      <span className="text-xs font-bold text-text-secondary">{team.remainingGold.toLocaleString()}G</span>
+                    </div>
+                  </div>
+                  <div className="p-2 space-y-1">
+                    {team.members.map((m, idx) => (
+                      <div key={m.id} className={cn("flex h-8 items-center gap-2 rounded px-2", m.id === team.captainId ? "bg-accent-gold/10" : "bg-bg-tertiary/60")}>
+                        <span className="w-4 text-center text-[10px] text-text-tertiary">{m.id === team.captainId ? "C" : idx}</span>
+                        <Avatar src={undefined} alt={m.username} fallback={m.username[0]} size="sm" />
+                        <span className="flex-1 truncate text-xs font-medium text-text-primary">{m.username}</span>
+                        <div className="flex items-center gap-0.5">
+                          <RoleIcon role={m.mainRole} />
+                          <RoleIcon role={m.subRole} dim />
+                        </div>
+                        <TierBadge tier={m.tier} rank={m.rank} size="sm" showIcon={false} />
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
+          {mobileTab === "players" && (
+            <Card className="flex min-h-0 flex-1 flex-col overflow-hidden p-0">
+              <div className="flex h-10 shrink-0 items-center gap-2 border-b border-bg-tertiary/70 bg-bg-tertiary/20 px-3">
+                <PackageOpen className="h-3.5 w-3.5 text-accent-primary" />
+                <span className="flex-1 text-sm font-semibold text-text-primary">남은 매물</span>
+              </div>
+              <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto p-2">
+                {mockPlayers.slice(1).map((p, idx) => (
+                  <div key={p.id} className="flex items-center gap-3 rounded-lg bg-bg-tertiary/70 px-3 py-2">
+                    <span className="w-5 text-center text-xs font-semibold text-text-tertiary">{idx + 1}</span>
+                    <Avatar src={undefined} alt={p.username} fallback={p.username[0]} size="sm" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-text-primary">{p.username}</p>
+                      <p className="truncate text-xs text-text-tertiary">{p.mainRole} / {p.subRole} · MMR {p.mmr}</p>
+                    </div>
+                    <TierBadge tier={p.tier} rank={p.rank} size="sm" showIcon={false} />
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+          {mobileTab === "chat" && (
+            <Card className="flex min-h-0 flex-1 flex-col overflow-hidden p-0">
+              <div className="flex h-10 shrink-0 items-center gap-2 border-b border-bg-tertiary/70 bg-bg-tertiary/20 px-3">
+                <MessageSquare className="h-3.5 w-3.5 text-accent-primary" />
+                <span className="text-sm font-semibold text-text-primary">채팅</span>
+              </div>
+              <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
+                {mockChatMessages.map((msg) => (
+                  <div key={msg.id} className="flex flex-col gap-0.5">
+                    <span className="text-[11px] font-semibold" style={{ color: msg.color }}>{msg.username}</span>
+                    <span className="text-xs text-text-secondary">{msg.text}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="shrink-0 border-t border-bg-tertiary/70 p-2">
+                <div className="flex h-9 items-center rounded bg-bg-tertiary/60 px-3 text-xs text-text-muted">메시지 입력...</div>
+              </div>
+            </Card>
+          )}
+        </div>
+
+        {/* ── 데스크톱 3열 (lg 이상) ── */}
+        <div className="hidden min-h-0 flex-1 grid-rows-1 gap-3 lg:grid lg:grid-cols-[180px_minmax(0,1fr)_180px] xl:grid-cols-[220px_minmax(0,1fr)_220px] 2xl:grid-cols-[260px_minmax(0,1fr)_260px]">
           <TeamSideColumn teams={leftTeams} currentHighestBidder={highestBidder} />
 
           <div className="flex min-h-0 flex-col gap-3 overflow-hidden">
             <div className="shrink-0">
               <AuctionBoard
-                auctionState={{
-                  currentPlayer: mockPlayers[0],
-                  currentPlayerIndex: 0,
-                  currentHighestBid: highestBid,
-                  currentHighestBidder: highestBidder,
-                  currentHighestBidderName: highestBidderName,
-                  timerEnd,
-                  status: "IN_PROGRESS",
-                  yuchalCount: 1,
-                  maxYuchalCycles: 3,
-                  bidIncrement: 50,
-                }}
+                auctionState={state}
                 teams={mockTeams}
                 players={mockPlayers}
                 currentUserId={currentUserId}
                 bidHistory={mockBidHistory}
                 hideTeams
                 hideBidPanel
-                onPlaceBid={(amount) => {
-                  setHighestBid(amount);
-                  setHighestBidder("team-1");
-                  setHighestBidderName("Haru");
-                }}
+                onPlaceBid={onPlaceBid}
               />
             </div>
-
-            <div className="flex-1 min-h-0">
+            <div className="min-h-0 flex-1">
               <CenterBottomPanel players={mockPlayers} />
             </div>
-            <TestBidPanel
-              highestBid={highestBid}
-              onPlaceBid={(amount) => {
-                setHighestBid(amount);
-                setHighestBidder("team-1");
-                setHighestBidderName("Haru");
-              }}
-            />
+            <TestBidPanel highestBid={highestBid} onPlaceBid={onPlaceBid} />
           </div>
 
           <TeamSideColumn teams={rightTeams} currentHighestBidder={highestBidder} />
