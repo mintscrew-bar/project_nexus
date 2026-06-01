@@ -170,7 +170,7 @@ function CenterBottomPanel({ players }: { players: typeof mockPlayers }) {
   const remaining = players.slice(1);
 
   return (
-    <div className="grid min-h-0 grid-cols-[2fr_1fr] gap-3">
+    <div className="grid h-full min-h-0 grid-cols-[2fr_1fr] gap-3">
       {/* 남은 매물 */}
       <Card className="flex min-h-0 flex-col overflow-hidden p-0">
         <div className="flex h-10 shrink-0 items-center gap-2 border-b border-bg-tertiary/70 bg-bg-tertiary/20 px-3">
@@ -300,7 +300,7 @@ export default function TestAuctionPage() {
   const rightTeams = mockTeams.slice(Math.ceil(mockTeams.length / 2));
 
   return (
-    <main className="h-screen overflow-hidden bg-bg-primary p-4">
+    <main className="h-full overflow-hidden bg-bg-primary p-4">
       <div className="mx-auto flex h-full max-w-[1720px] flex-col">
         <div className="mb-3 flex h-12 shrink-0 items-end justify-between">
           <div>
@@ -317,7 +317,7 @@ export default function TestAuctionPage() {
         <div className="grid min-h-0 flex-1 items-stretch gap-3 lg:grid-cols-[260px_minmax(0,1fr)_260px] xl:grid-cols-[280px_minmax(0,1fr)_280px]">
           <TeamSideColumn teams={leftTeams} currentHighestBidder={highestBidder} />
 
-          <div className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] gap-3 overflow-hidden">
+          <div className="flex min-h-0 flex-col gap-3 overflow-hidden">
             <div className="shrink-0">
               <AuctionBoard
                 auctionState={{
@@ -346,7 +346,9 @@ export default function TestAuctionPage() {
               />
             </div>
 
-            <CenterBottomPanel players={mockPlayers} />
+            <div className="flex-1 min-h-0">
+              <CenterBottomPanel players={mockPlayers} />
+            </div>
             <TestBidPanel
               highestBid={highestBid}
               onPlaceBid={(amount) => {
