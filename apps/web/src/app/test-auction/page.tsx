@@ -167,8 +167,8 @@ function TeamSideColumn({
                       return (
                         <>
                           {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={url} alt={t} width={18} height={18} className="shrink-0 object-contain xl:hidden" />
-                          <span className="hidden shrink-0 xl:inline-flex">
+                          <img src={url} alt={t} width={18} height={18} className="shrink-0 object-contain 2xl:hidden" />
+                          <span className="hidden shrink-0 2xl:inline-flex">
                             <TierBadge tier={member.tier} rank={member.rank} size="sm" />
                           </span>
                         </>
