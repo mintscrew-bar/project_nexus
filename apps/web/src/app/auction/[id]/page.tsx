@@ -151,7 +151,10 @@ function TeamSideColumn({
   }, []);
 
   return (
-    <div className="h-full overflow-y-auto space-y-2 pr-0.5">
+    <div
+      className="grid h-full gap-3 overflow-hidden"
+      style={{ gridTemplateRows: `repeat(${teams.length}, minmax(0, 1fr))` }}
+    >
       {teams.map((team) => {
         const members = team.members ?? [];
         const budget = team.remainingGold ?? team.remainingBudget ?? 0;
@@ -167,62 +170,47 @@ function TeamSideColumn({
           <Card
             key={team.id}
             className={cn(
-              "p-0 overflow-hidden",
+              "flex min-h-0 flex-col overflow-hidden p-0",
               isCurrentBidder && "border-accent-gold/50 shadow-sm shadow-accent-gold/10",
               isMine && !isCurrentBidder && "border-accent-primary/40",
             )}
           >
+            {/* 팀 헤더 */}
             <div
               className={cn(
-                "flex items-center gap-2 px-3 py-2 border-b border-bg-tertiary/70",
+                "flex h-11 shrink-0 items-center gap-2 border-b border-bg-tertiary/70 px-3",
                 isCurrentBidder ? "bg-accent-gold/10" : "bg-bg-tertiary/20",
               )}
             >
               {team.color && (
-                <div
-                  className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                  style={{ backgroundColor: team.color }}
-                />
+                <div className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: team.color }} />
               )}
-              <span
-                className={cn(
-                  "font-semibold text-sm flex-1 truncate",
-                  isMine ? "text-accent-primary" : "text-text-primary",
-                )}
-              >
+              <span className={cn("min-w-0 flex-1 truncate text-sm font-semibold", isMine ? "text-accent-primary" : "text-text-primary")}>
                 {team.name}
               </span>
               {isFull ? (
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-accent-success/15 text-accent-success border border-accent-success/30 flex-shrink-0">
+                <span className="shrink-0 rounded-full border border-accent-success/30 bg-accent-success/15 px-1.5 py-0.5 text-[10px] text-accent-success">
                   꽉 참
                 </span>
               ) : (
-                <div className="flex items-center gap-0.5 flex-shrink-0">
-                  <Coins className="w-3 h-3 text-accent-gold" />
-                  <span
-                    className={cn(
-                      "text-xs font-bold",
-                      budget === 0
-                        ? "text-accent-danger"
-                        : isCurrentBidder
-                        ? "text-accent-gold"
-                        : "text-text-secondary",
-                    )}
-                  >
+                <div className="flex shrink-0 items-center gap-0.5">
+                  <Coins className="h-3 w-3 text-accent-gold" />
+                  <span className={cn("text-xs font-bold", budget === 0 ? "text-accent-danger" : isCurrentBidder ? "text-accent-gold" : "text-text-secondary")}>
                     {budget.toLocaleString()}G
                   </span>
                 </div>
               )}
             </div>
 
-            <div className="p-1.5 space-y-1">
+            {/* 멤버 슬롯 — 5행 균등 분할 */}
+            <div className="grid flex-1 grid-rows-5 gap-1 p-1.5">
               {members.map((member: any, idx: number) => {
                 const isCaptain = member.id === team.captainId;
                 return (
                   <div
                     key={member.id}
                     className={cn(
-                      "flex items-center gap-1.5 px-2 py-1.5 rounded cursor-default",
+                      "flex min-h-0 cursor-default items-center gap-1.5 rounded px-2",
                       isCaptain ? "bg-accent-gold/10" : "bg-bg-tertiary/60",
                     )}
                     onMouseEnter={(e) => {
@@ -231,16 +219,11 @@ function TeamSideColumn({
                     }}
                     onMouseLeave={scheduleHoverClose}
                   >
-                    <span className="text-[10px] text-text-tertiary w-4 text-center flex-shrink-0">
+                    <span className="w-4 shrink-0 text-center text-[10px] text-text-tertiary">
                       {isCaptain ? "C" : idx}
                     </span>
-                    <Avatar
-                      src={member.avatar}
-                      alt={member.username}
-                      fallback={member.username[0]}
-                      size="sm"
-                    />
-                    <span className="text-xs font-medium text-text-primary truncate flex-1">
+                    <Avatar src={member.avatar} alt={member.username} fallback={member.username[0]} size="sm" />
+                    <span className="min-w-0 flex-1 truncate text-xs font-medium text-text-primary">
                       {member.username}
                     </span>
                     <TierBadge tier={member.tier} size="sm" showIcon={false} />
@@ -250,9 +233,9 @@ function TeamSideColumn({
               {Array.from({ length: Math.max(0, 5 - members.length) }).map((_, i) => (
                 <div
                   key={`empty-${i}`}
-                  className="flex items-center gap-1.5 px-2 py-1.5 rounded border border-dashed border-bg-tertiary/60"
+                  className="flex min-h-0 items-center gap-1.5 rounded border border-dashed border-bg-tertiary/60 px-2"
                 >
-                  <span className="text-[10px] text-text-muted w-4 text-center">{members.length + i}</span>
+                  <span className="w-4 shrink-0 text-center text-[10px] text-text-muted">{members.length + i}</span>
                   <span className="text-xs text-text-muted">빈 슬롯</span>
                 </div>
               ))}
@@ -921,7 +904,7 @@ export default function AuctionRoomPage() {
   const rightTeams = sortedTeamsForLayout.slice(Math.ceil(sortedTeamsForLayout.length / 2));
 
   return (
-    <div className="flex-grow p-4 md:p-6 relative">
+    <div className="flex flex-grow flex-col overflow-hidden p-4">
       <ConfirmModal
         isOpen={isAbortConfirmOpen}
         onClose={() => setIsAbortConfirmOpen(false)}
@@ -933,41 +916,48 @@ export default function AuctionRoomPage() {
         variant="danger"
         isLoading={isAborting}
       />
-      {/* 상단 바 */}
-      <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
-        <Button
-          variant="danger"
-          size="sm"
-          isLoading={isAborting}
-          onClick={handleAbortToLobby}
-        >
-          <span className="hidden sm:inline">내전 종료</span>
-          <span className="sm:hidden">종료</span>
-        </Button>
-        <Badge variant={isConnected ? 'success' : 'danger'} className="hidden sm:inline-flex">
-          {isConnected ? '● 연결됨' : '● 연결 끊김'}
-        </Badge>
-      </div>
 
-      <div className="container mx-auto">
-        {/* 입찰 에러 */}
+      <div className="mx-auto flex w-full max-w-[1720px] flex-1 flex-col min-h-0">
+        {/* 헤더 */}
+        <div className="mb-3 flex h-12 shrink-0 items-center justify-between">
+          <div>
+            <h1 className="text-xl font-bold text-text-primary">
+              경매 진행 중
+              <span className="text-sm font-normal text-text-secondary ml-2">
+                ({players.length}명 남음)
+              </span>
+            </h1>
+          </div>
+          <div className="flex items-center gap-2">
+            {error && auctionState && (
+              <span className="hidden sm:inline text-xs text-accent-danger animate-fade-in">
+                {error}
+              </span>
+            )}
+            <Badge variant={isConnected ? 'success' : 'danger'} className="hidden sm:inline-flex">
+              {isConnected ? '● 연결됨' : '● 연결 끊김'}
+            </Badge>
+            <Button
+              variant="danger"
+              size="sm"
+              isLoading={isAborting}
+              onClick={handleAbortToLobby}
+            >
+              <span className="hidden sm:inline">내전 종료</span>
+              <span className="sm:hidden">종료</span>
+            </Button>
+          </div>
+        </div>
+
+        {/* 모바일 입찰 에러 */}
         {error && auctionState && (
-          <div className="mb-3 p-2.5 bg-accent-danger/10 border border-accent-danger/30 rounded-lg text-sm text-accent-danger text-center animate-fade-in">
+          <div className="sm:hidden mb-3 p-2.5 bg-accent-danger/10 border border-accent-danger/30 rounded-lg text-sm text-accent-danger text-center animate-fade-in">
             {error}
           </div>
         )}
-        {/* 헤더 */}
-        <div className="mb-4 animate-fade-in">
-          <h1 className="text-xl lg:text-2xl font-bold text-text-primary">
-            경매 진행 중
-            <span className="text-sm lg:text-base font-normal text-text-secondary ml-2">
-              ({players.length}명 남음)
-            </span>
-          </h1>
-        </div>
 
         {/* ── 모바일 탭 네비게이션 (lg 미만) ── */}
-        <div className="lg:hidden flex rounded-lg bg-bg-secondary p-1 mb-4 gap-1">
+        <div className="lg:hidden flex shrink-0 rounded-lg bg-bg-secondary p-1 mb-3 gap-1">
           {([
             { key: "auction" as const, label: "경매", icon: Gavel },
             { key: "players" as const, label: "대기", icon: Users },
@@ -991,8 +981,7 @@ export default function AuctionRoomPage() {
         </div>
 
         {/* ── 데스크톱: LoL형 3열 레이아웃 (좌팀 | 중앙경매 | 우팀) ── */}
-        {/* overflow-hidden으로 페이지 스크롤 방지 — 스크롤은 각 컬럼 내부에서만 */}
-        <div className="hidden lg:grid lg:grid-cols-[260px_1fr_260px] gap-3 overflow-hidden" style={{ height: 'calc(100vh - 160px)' }}>
+        <div className="hidden min-h-0 flex-1 items-stretch gap-3 lg:grid lg:grid-cols-[260px_minmax(0,1fr)_260px] xl:grid-cols-[280px_minmax(0,1fr)_280px]">
           {/* 좌측: 팀 첫 절반 */}
           <TeamSideColumn
             teams={leftTeams}
@@ -1000,9 +989,9 @@ export default function AuctionRoomPage() {
             auctionState={auctionState}
           />
 
-          {/* 중앙: 경매 메인 (팀 그리드 제외) + 하단 정보 탭 */}
-          <div className="flex flex-col gap-3 min-h-0 overflow-hidden">
-            <div className="flex-shrink-0">
+          {/* 중앙: 경매 메인 + 하단 정보 탭 */}
+          <div className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-3 overflow-hidden">
+            <div className="shrink-0">
               <AuctionBoard
                 auctionState={auctionState}
                 teams={teams}
@@ -1033,7 +1022,7 @@ export default function AuctionRoomPage() {
         </div>
 
         {/* ── 모바일: 탭 컨텐츠 (lg 미만) ── */}
-        <div className="lg:hidden">
+        <div className="flex-1 min-h-0 overflow-auto lg:hidden">
           {mobileTab === "auction" && (
             <AuctionBoard
               auctionState={auctionState}
