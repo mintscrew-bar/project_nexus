@@ -109,7 +109,9 @@ export class DiscordVoiceService {
    * 채널 ID로부터 소속 길드 ID를 해석한다. RoomDiscordChannel → Room.discordGuildId
    * 순으로 찾고, 없으면 홈 서버(env)로 폴백한다.
    */
-  private async resolveChannelGuildId(channelId: string): Promise<string | null> {
+  private async resolveChannelGuildId(
+    channelId: string,
+  ): Promise<string | null> {
     const link = await this.prisma.roomDiscordChannel.findUnique({
       where: { channelId },
       select: { room: { select: { discordGuildId: true } } },
@@ -512,9 +514,8 @@ export class DiscordVoiceService {
           a: (typeof room.discordChannels)[number],
           b: (typeof room.discordChannels)[number],
         ) => {
-          const numA = parseInt(a.teamName?.replace("Team ", "") || "0", 10);
-          const numB = parseInt(b.teamName?.replace("Team ", "") || "0", 10);
-          return numA - numB;
+          // 생성 시각 기준 정렬 (팀명이 팀장명으로 바뀌어도 순서 유지)
+          return (a.createdAt?.getTime?.() ?? 0) - (b.createdAt?.getTime?.() ?? 0);
         },
       );
     const currentNumTeams = existingTeamChannels.length;
@@ -567,6 +568,52 @@ export class DiscordVoiceService {
           `Removed team channel "${ch.teamName}" for room ${roomId}`,
         );
       }
+    }
+  }
+
+  /**
+   * 팀 확정 후 Discord 음성채널 이름을 팀장명 기준으로 일괄 갱신
+   * teams: [{ id, name, captainId }] — auction.service에서 생성된 순서대로 전달
+   */
+  async renameTeamChannels(
+    roomId: string,
+    teams: Array<{ id: string; name: string }>,
+  ): Promise<void> {
+    const guildId = await this.resolveRoomGuildId(roomId);
+    if (!guildId) return;
+
+    // DB에서 팀 채널 목록 조회 (Lobby 제외, 생성순 정렬)
+    const discordChannels = await this.prisma.roomDiscordChannel.findMany({
+      where: { roomId, teamName: { not: "Lobby" } },
+      orderBy: { createdAt: "asc" },
+    });
+
+    if (!discordChannels.length) return;
+
+    try {
+      const guild = await this.client.guilds.fetch(guildId);
+
+      for (let i = 0; i < Math.min(teams.length, discordChannels.length); i++) {
+        const team = teams[i];
+        const ch = discordChannels[i];
+        const newDisplayName = `┊ ${team.name}`;
+
+        // Discord 채널명 변경
+        const channel = await guild.channels.fetch(ch.channelId).catch(() => null);
+        if (channel) {
+          await channel.setName(newDisplayName);
+        }
+
+        // DB teamName을 team.name으로 업데이트 (매칭 키 동기화)
+        await this.prisma.roomDiscordChannel.update({
+          where: { id: ch.id },
+          data: { teamName: team.name },
+        });
+      }
+
+      this.logger.log(`Renamed Discord team channels for room ${roomId}`);
+    } catch (error: any) {
+      this.logger.warn(`Failed to rename team channels for room ${roomId}: ${error.message}`);
     }
   }
 

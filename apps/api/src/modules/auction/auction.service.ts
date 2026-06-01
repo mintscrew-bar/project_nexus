@@ -481,7 +481,7 @@ export class AuctionService implements OnModuleInit {
             return tx.team.create({
               data: {
                 roomId,
-                name: `Team ${index + 1}`,
+                name: `${captain.user.username} 팀`,
                 captainId: captain.userId,
                 color: this.getTeamColor(index),
                 initialBudget,
@@ -521,6 +521,7 @@ export class AuctionService implements OnModuleInit {
 
     try {
       if (this.discordVoiceService) {
+        // 캡틴 역할 배정
         await Promise.all(
           captainParticipants.map(async (captain: any) => {
             const discordProvider = await this.prisma.authProvider.findFirst({
@@ -533,6 +534,12 @@ export class AuctionService implements OnModuleInit {
               );
             }
           }),
+        );
+
+        // 팀장명 기준으로 음성채널 이름 일괄 갱신
+        await this.discordVoiceService.renameTeamChannels(
+          roomId,
+          teams.map((t) => ({ id: t.id, name: t.name })),
         );
       }
     } catch (error) {
@@ -756,7 +763,10 @@ export class AuctionService implements OnModuleInit {
     const nonCaptains = room.participants.filter(
       (p: any) => !userIds.includes(p.userId),
     );
-    const botCaptainIds = await this._filterBotCaptains(userIds, room.participants);
+    const botCaptainIds = await this._filterBotCaptains(
+      userIds,
+      room.participants,
+    );
 
     const auctionState: AuctionState = {
       roomId,
