@@ -151,10 +151,7 @@ function TeamSideColumn({
   }, []);
 
   return (
-    <div
-      className="grid h-full gap-3 overflow-hidden"
-      style={{ gridTemplateRows: `repeat(${teams.length}, minmax(0, 1fr))` }}
-    >
+    <div className="flex h-full flex-col gap-3 overflow-y-auto">
       {teams.map((team) => {
         const members = team.members ?? [];
         const budget = team.remainingGold ?? team.remainingBudget ?? 0;
@@ -170,7 +167,7 @@ function TeamSideColumn({
           <Card
             key={team.id}
             className={cn(
-              "flex min-h-0 flex-col overflow-hidden p-0",
+              "shrink-0 overflow-hidden p-0",
               isCurrentBidder && "border-accent-gold/50 shadow-sm shadow-accent-gold/10",
               isMine && !isCurrentBidder && "border-accent-primary/40",
             )}
@@ -178,7 +175,7 @@ function TeamSideColumn({
             {/* 팀 헤더 */}
             <div
               className={cn(
-                "flex h-11 shrink-0 items-center gap-2 border-b border-bg-tertiary/70 px-3",
+                "flex h-10 items-center gap-2 border-b border-bg-tertiary/70 px-3",
                 isCurrentBidder ? "bg-accent-gold/10" : "bg-bg-tertiary/20",
               )}
             >
@@ -202,15 +199,15 @@ function TeamSideColumn({
               )}
             </div>
 
-            {/* 멤버 슬롯 — 5행 균등 분할 */}
-            <div className="grid flex-1 grid-rows-5 gap-1 p-1.5">
+            {/* 멤버 슬롯 — h-7 고정 높이로 예측 가능한 카드 크기 */}
+            <div className="flex flex-col gap-1 p-1.5">
               {members.map((member: any, idx: number) => {
                 const isCaptain = member.id === team.captainId;
                 return (
                   <div
                     key={member.id}
                     className={cn(
-                      "flex min-h-0 cursor-default items-center gap-1.5 rounded px-2",
+                      "flex h-7 cursor-default items-center gap-1.5 rounded px-2",
                       isCaptain ? "bg-accent-gold/10" : "bg-bg-tertiary/60",
                     )}
                     onMouseEnter={(e) => {
@@ -233,7 +230,7 @@ function TeamSideColumn({
               {Array.from({ length: Math.max(0, 5 - members.length) }).map((_, i) => (
                 <div
                   key={`empty-${i}`}
-                  className="flex min-h-0 items-center gap-1.5 rounded border border-dashed border-bg-tertiary/60 px-2"
+                  className="flex h-7 items-center gap-1.5 rounded border border-dashed border-bg-tertiary/60 px-2"
                 >
                   <span className="w-4 shrink-0 text-center text-[10px] text-text-muted">{members.length + i}</span>
                   <span className="text-xs text-text-muted">빈 슬롯</span>

@@ -129,7 +129,7 @@ export default function RootLayout({
         />
         <GoogleAnalytics />
       </head>
-      <body className={`${inter.className} font-sans min-h-screen flex flex-col`}>
+      <body className={`${inter.className} font-sans h-screen flex flex-col overflow-hidden`}>
         <Providers>
           <AppShell>{children}</AppShell>
         </Providers>
