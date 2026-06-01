@@ -288,7 +288,7 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
   }, [auctionState.currentPlayer?.id]);
 
   return (
-    <div className={cn("space-y-4", className)}>
+    <div className={cn("flex flex-col gap-4", className)}>
       {auctionState.currentPlayer && (
         <>
           {/* ── 모바일 compact sticky 헤더 (lg 미만) ── */}
