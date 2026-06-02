@@ -144,14 +144,13 @@ export function MatchRpsFlow({
         <div className="mx-auto mt-2 flex h-24 w-24 items-center justify-center rounded-full bg-bg-tertiary/60 overflow-hidden">
           <AnimatePresence mode="wait">
             <motion.span
-              key={hand ?? (anim === "countdown" ? "shake" : submitted ? "ready" : "idle")}
+              key={hand ?? "hidden"}
               initial={hand ? { scale: 0.3, rotate: -20, opacity: 0 } : false}
-              animate={anim === "countdown" ? { y: [0, -16, 0] } : { scale: 1, rotate: 0, opacity: 1 }}
-              transition={anim === "countdown"
-                ? { duration: 0.55, repeat: Infinity, ease: "easeInOut" }
-                : { type: "spring", stiffness: 320, damping: 20 }}
+              animate={{ scale: 1, rotate: 0, opacity: 1 }}
+              transition={{ type: "spring", stiffness: 320, damping: 20 }}
               className="text-5xl">
-              {hand ? HAND[hand].emoji : submitted ? "✊" : "❔"}
+              {/* 공개 전(대기·카운트다운)엔 항상 ❔로 가림. 카운트 끝나면 실제 손 공개 */}
+              {hand ? HAND[hand].emoji : "❔"}
             </motion.span>
           </AnimatePresence>
         </div>
