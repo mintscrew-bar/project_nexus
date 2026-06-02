@@ -67,6 +67,9 @@ export function MatchRpsFlow({
   const [anim, setAnim] = useState<"idle" | "countdown" | "revealed" | "tie">("idle");
   const [count, setCount] = useState(0);
   const lastSeq = useRef<number>(-1);
+  // 광클 방지: 서버 응답 오기 전 버튼 즉시 비활성화
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isChoosingSide, setIsChoosingSide] = useState(false);
 
   // 새 reveal 도착 → 카운트다운 후 공개
   useEffect(() => {
@@ -91,6 +94,12 @@ export function MatchRpsFlow({
     }, 550);
     return () => clearInterval(id);
   }, [reveal]);
+
+  // phase가 바뀌거나 submitted 목록이 초기화되면(무승부 재경기 등) 제출 상태 리셋
+  useEffect(() => {
+    setIsSubmitting(false);
+    setIsChoosingSide(false);
+  }, [rps.phase, rps.submitted.length]);
 
   const amCaptainA = currentUserId === rps.captainAId;
   const amCaptainB = currentUserId === rps.captainBId;
@@ -227,8 +236,15 @@ export function MatchRpsFlow({
           amCaptain && !iSubmitted ? (
             <div className="flex gap-3">
               {HANDS.map((h) => (
-                <motion.button key={h} whileTap={{ scale: 0.9 }} whileHover={{ y: -3 }} onClick={() => onSubmit(h)}
-                  className="flex flex-col items-center gap-1 px-5 py-2.5 rounded-xl bg-bg-tertiary hover:bg-bg-elevated transition-colors">
+                <motion.button key={h}
+                  whileTap={isSubmitting ? {} : { scale: 0.9 }}
+                  whileHover={isSubmitting ? {} : { y: -3 }}
+                  disabled={isSubmitting}
+                  onClick={() => { setIsSubmitting(true); onSubmit(h); }}
+                  className={cn(
+                    "flex flex-col items-center gap-1 px-5 py-2.5 rounded-xl transition-colors",
+                    isSubmitting ? "bg-bg-tertiary opacity-50 cursor-not-allowed" : "bg-bg-tertiary hover:bg-bg-elevated",
+                  )}>
                   <span className="text-3xl">{HAND[h].emoji}</span>
                   <span className="text-sm font-medium text-text-primary">{HAND[h].label}</span>
                 </motion.button>
@@ -248,10 +264,24 @@ export function MatchRpsFlow({
         {showSide && (
           amWinnerCaptain ? (
             <motion.div initial={{ y: 12, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="flex gap-3">
-              <motion.button whileTap={{ scale: 0.94 }} whileHover={{ y: -2 }} onClick={() => onChooseSide("blue")}
-                className="px-7 py-2.5 rounded-xl font-bold text-white bg-blue-500 hover:bg-blue-600 transition-colors">블루 진영</motion.button>
-              <motion.button whileTap={{ scale: 0.94 }} whileHover={{ y: -2 }} onClick={() => onChooseSide("red")}
-                className="px-7 py-2.5 rounded-xl font-bold text-white bg-red-500 hover:bg-red-600 transition-colors">레드 진영</motion.button>
+              <motion.button
+                whileTap={isChoosingSide ? {} : { scale: 0.94 }}
+                whileHover={isChoosingSide ? {} : { y: -2 }}
+                disabled={isChoosingSide}
+                onClick={() => { setIsChoosingSide(true); onChooseSide("blue"); }}
+                className={cn("px-7 py-2.5 rounded-xl font-bold text-white transition-colors",
+                  isChoosingSide ? "bg-blue-500 opacity-50 cursor-not-allowed" : "bg-blue-500 hover:bg-blue-600")}>
+                블루 진영
+              </motion.button>
+              <motion.button
+                whileTap={isChoosingSide ? {} : { scale: 0.94 }}
+                whileHover={isChoosingSide ? {} : { y: -2 }}
+                disabled={isChoosingSide}
+                onClick={() => { setIsChoosingSide(true); onChooseSide("red"); }}
+                className={cn("px-7 py-2.5 rounded-xl font-bold text-white transition-colors",
+                  isChoosingSide ? "bg-red-500 opacity-50 cursor-not-allowed" : "bg-red-500 hover:bg-red-600")}>
+                레드 진영
+              </motion.button>
             </motion.div>
           ) : (
             <p className="text-sm font-bold text-text-secondary animate-pulse">{winnerTeam?.name ?? "승자"} 진영 선택 중...</p>

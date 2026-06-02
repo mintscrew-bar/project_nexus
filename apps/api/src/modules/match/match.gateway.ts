@@ -274,15 +274,22 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const loser = winner === state.teamAId ? state.teamBId : state.teamAId;
     const blueSideTeamId = side === "blue" ? winner : loser;
 
-    // 진영 저장 먼저 — 실패하면 매치를 시작하지 않고 중단(재시도 가능). 저장 실패를 숨기지 않는다.
+    // await 전에 즉시 phase를 잠금 — 광클 시 중복 실행 방지
+    state.phase = "done";
+    state.blueSideTeamId = blueSideTeamId;
+
+    // 진영 저장 먼저 — 실패하면 phase를 side로 복원 후 재선택 허용
     try {
       await this.matchService.setBlueSide(matchId, blueSideTeamId);
     } catch {
+      // 저장 실패 시 phase 복원
+      state.phase = "side";
+      state.blueSideTeamId = undefined;
       this.server.to(`match:${matchId}`).emit("rps:error", {
         matchId,
         error: "진영 저장에 실패했습니다. 다시 선택해주세요.",
       });
-      // phase는 side 유지 → 승자 팀장이 재선택 가능, 타임아웃 재무장
+      // 타임아웃 재무장
       this.armRpsTimer(matchId, this.RPS_SIDE_TIMEOUT, () => {
         const s = this.rpsStates.get(matchId);
         if (!s || s.phase !== "side") return;
@@ -290,9 +297,6 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
       });
       return;
     }
-
-    state.blueSideTeamId = blueSideTeamId;
-    state.phase = "done";
 
     this.server.to(`match:${matchId}`).emit("rps:done", {
       matchId,
@@ -391,6 +395,10 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
     if (!["rock", "paper", "scissors"].includes(data.hand)) {
       return { success: false, error: "잘못된 입력입니다." };
+    }
+    // 이미 제출한 팀장의 중복 제출 방지 (광클)
+    if (state.submissions.has(client.userId)) {
+      return { success: false, error: "이미 제출하셨습니다." };
     }
 
     state.submissions.set(client.userId, data.hand);
