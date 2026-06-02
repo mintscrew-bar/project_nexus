@@ -27,7 +27,8 @@ export default function BracketPage() {
     sessionAbortedAt, sessionAbortMessage, clearSessionAbort,
   } = useMatchStore();
 
-  const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
+  // ID만 저장 — 실제 매치 객체는 bracketMatches에서 파생 (WebSocket 업데이트 자동 반영)
+  const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAborting, setIsAborting] = useState(false);
   const [isHost, setIsHost] = useState(false);
@@ -68,11 +69,10 @@ export default function BracketPage() {
   };
 
   const handleMatchClick = async (match: Match) => {
-    setSelectedMatch(match);
+    setSelectedMatchId(match.id);
     setIsModalOpen(true);
-    setLiveStatus(null); // Reset previous live status
+    setLiveStatus(null);
 
-    // Fetch live status if match is in progress
     if (match.status === 'IN_PROGRESS') {
       try {
         const status = await matchApi.getLiveStatus(match.id);
@@ -85,8 +85,8 @@ export default function BracketPage() {
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
-    setSelectedMatch(null);
-    setLiveStatus(null); // Clear live status when modal closes
+    setSelectedMatchId(null);
+    setLiveStatus(null);
   };
 
   const handleRefreshLiveStatus = useCallback(async (matchId: string) => {
@@ -101,10 +101,7 @@ export default function BracketPage() {
   const handleStartMatch = async (matchId: string) => {
     try {
       await startMatch(matchId);
-      const updatedMatch = roomMatches.find(m => m.id === matchId);
-      if (updatedMatch && selectedMatch) {
-        setSelectedMatch({ ...selectedMatch, status: 'IN_PROGRESS' as const });
-      }
+      // roomMatches가 WebSocket으로 자동 업데이트되므로 selectedMatch 수동 갱신 불필요
     } catch (error: any) {
       addToast(error?.response?.data?.message || "매치 시작에 실패했습니다.", "error");
     }
@@ -165,6 +162,9 @@ export default function BracketPage() {
     bracketSection: m.bracketRound || undefined,
   }));
 
+  // bracketMatches에서 selectedMatch 파생 — roomMatches WebSocket 업데이트 시 자동 반영
+  const selectedMatch = bracketMatches.find(m => m.id === selectedMatchId) ?? null;
+
   // 가위바위보 소집(rps:invite) — 호스트가 매치 시작 시 상대 팀장 모달 자동 오픈
   const bracketMatchesRef = useRef(bracketMatches);
   bracketMatchesRef.current = bracketMatches;
@@ -172,9 +172,10 @@ export default function BracketPage() {
     const socket = connectMatchSocket();
     if (!socket) return;
     const onInvite = (data: { matchId?: string }) => {
-      const m = bracketMatchesRef.current.find((bm) => bm.id === data?.matchId);
+      if (!data?.matchId) return;
+      const m = bracketMatchesRef.current.find((bm) => bm.id === data.matchId);
       if (m) {
-        setSelectedMatch(m);
+        setSelectedMatchId(m.id);
         setIsModalOpen(true);
       }
     };
