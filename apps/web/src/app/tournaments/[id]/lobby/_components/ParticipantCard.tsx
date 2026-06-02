@@ -70,12 +70,12 @@ export function ParticipantCard({
       </div>
       <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
         {!isSelf && !isFriend && !isSent && (
-          <button onClick={(e) => { e.stopPropagation(); handleAddFriend(p.userId); }} disabled={addingFriend === p.userId} className="opacity-60 group-hover:opacity-100 p-1.5 text-accent-primary hover:text-accent-hover hover:bg-accent-primary/10 rounded-md transition-all disabled:opacity-30" title="친구 추가">
-            <UserPlus className="h-4 w-4" />
+          <button onClick={(e) => { e.stopPropagation(); handleAddFriend(p.userId); }} disabled={addingFriend === p.userId} className="opacity-60 group-hover:opacity-100 p-2 text-accent-primary hover:text-accent-hover hover:bg-accent-primary/10 rounded-md transition-all disabled:opacity-30" title="친구 추가">
+            <UserPlus className="h-5 w-5" />
           </button>
         )}
-        {!isSelf && isSent && <span className="p-1.5 text-text-tertiary" title="친구 요청됨"><CheckCircle className="h-4 w-4" /></span>}
-        {!isSelf && isFriend && <span className="p-1.5 text-accent-success" title="친구"><Check className="h-4 w-4" /></span>}
+        {!isSelf && isSent && <span className="p-2 text-text-tertiary" title="친구 요청됨"><CheckCircle className="h-5 w-5" /></span>}
+        {!isSelf && isFriend && <span className="p-2 text-accent-success" title="친구"><Check className="h-5 w-5" /></span>}
         {/* Discord 음성채널 참가 상태 뱃지 (inVoice가 정의된 경우만 표시) */}
         {p.inVoice !== undefined && (
           p.inVoice ? (
@@ -98,8 +98,8 @@ export function ParticipantCard({
           </span>
         )}
         {isCurrentUserHost && !isSelf && (
-          <button onClick={() => setKickTarget({ id: p.id, username: p.username })} className="opacity-60 group-hover:opacity-100 p-1 text-accent-danger hover:text-accent-danger/80 hover:bg-accent-danger/10 rounded-md transition-all" title="강퇴">
-            <UserMinus className="h-4 w-4" />
+          <button onClick={() => setKickTarget({ id: p.id, username: p.username })} className="opacity-60 group-hover:opacity-100 p-2 text-accent-danger hover:text-accent-danger/80 hover:bg-accent-danger/10 rounded-md transition-all" title="강퇴">
+            <UserMinus className="h-5 w-5" />
           </button>
         )}
       </div>

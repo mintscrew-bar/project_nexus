@@ -306,14 +306,14 @@ function FriendItem({
 
       {/* Hover action button */}
       <button
-        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-bg-tertiary"
+        className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded hover:bg-bg-tertiary"
         onClick={(e) => {
           e.stopPropagation();
           router.push(`/users/${friendUser.id}`);
         }}
         title="프로필"
       >
-        <ExternalLink className="w-3.5 h-3.5 text-text-tertiary" />
+        <ExternalLink className="w-4 h-4 text-text-tertiary" />
       </button>
 
       {/* Hover tooltip */}
@@ -408,20 +408,20 @@ function CategorySection({
         </button>
         {canRename && (
           <button
-            className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-bg-elevated transition-opacity"
+            className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-bg-elevated transition-opacity"
             onClick={onRename}
             title="이름 변경"
           >
-            <Edit3 className="w-3 h-3 text-text-tertiary" />
+            <Edit3 className="w-3.5 h-3.5 text-text-tertiary" />
           </button>
         )}
         {canDelete && (
           <button
-            className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-bg-elevated transition-opacity"
+            className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-bg-elevated transition-opacity"
             onClick={onDelete}
             title="카테고리 삭제"
           >
-            <Trash2 className="w-3 h-3 text-text-tertiary" />
+            <Trash2 className="w-3.5 h-3.5 text-text-tertiary" />
           </button>
         )}
       </div>

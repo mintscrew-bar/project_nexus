@@ -56,30 +56,30 @@ export function CompactParticipantCard({
       {/* Ready status + actions */}
       <div className="flex items-center gap-1 flex-shrink-0">
         {!isSelf && !isFriend && !isSent && (
-          <button onClick={(e) => { e.stopPropagation(); handleAddFriend(p.userId); }} disabled={addingFriend === p.userId} className="opacity-60 group-hover:opacity-100 p-1 text-accent-primary hover:text-accent-hover hover:bg-accent-primary/10 rounded transition-all disabled:opacity-30" title="친구 추가">
-            <UserPlus className="h-3 w-3" />
+          <button onClick={(e) => { e.stopPropagation(); handleAddFriend(p.userId); }} disabled={addingFriend === p.userId} className="opacity-60 group-hover:opacity-100 p-1.5 text-accent-primary hover:text-accent-hover hover:bg-accent-primary/10 rounded transition-all disabled:opacity-30" title="친구 추가">
+            <UserPlus className="h-4 w-4" />
           </button>
         )}
         {/* Discord 음성채널 참가 상태 뱃지 (inVoice가 정의된 경우만 표시) */}
         {p.inVoice !== undefined && (
           p.inVoice ? (
             <span title="음성채널 참가 중" className="flex items-center">
-              <Volume2 className="h-3.5 w-3.5 text-green-400 flex-shrink-0" />
+              <Volume2 className="h-4 w-4 text-green-400 flex-shrink-0" />
             </span>
           ) : (
             <span title="음성채널 미참가" className="flex items-center">
-              <VolumeX className="h-3.5 w-3.5 text-text-tertiary/50 flex-shrink-0" />
+              <VolumeX className="h-4 w-4 text-text-tertiary/50 flex-shrink-0" />
             </span>
           )
         )}
         {p.isReady ? (
-          <Check className="h-3.5 w-3.5 text-accent-success flex-shrink-0" />
+          <Check className="h-4 w-4 text-accent-success flex-shrink-0" />
         ) : (
-          <X className="h-3.5 w-3.5 text-text-tertiary/50 flex-shrink-0" />
+          <X className="h-4 w-4 text-text-tertiary/50 flex-shrink-0" />
         )}
         {isCurrentUserHost && !isSelf && (
-          <button onClick={() => setKickTarget({ id: p.id, username: p.username })} className="opacity-60 group-hover:opacity-100 p-0.5 text-accent-danger hover:text-accent-danger/80 hover:bg-accent-danger/10 rounded transition-all" title="강퇴">
-            <UserMinus className="h-3 w-3" />
+          <button onClick={() => setKickTarget({ id: p.id, username: p.username })} className="opacity-60 group-hover:opacity-100 p-1.5 text-accent-danger hover:text-accent-danger/80 hover:bg-accent-danger/10 rounded transition-all" title="강퇴">
+            <UserMinus className="h-4 w-4" />
           </button>
         )}
       </div>

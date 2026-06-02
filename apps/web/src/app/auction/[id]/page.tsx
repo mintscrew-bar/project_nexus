@@ -66,10 +66,10 @@ function PlayersList({
           {onExpand && (
             <button
               onClick={onExpand}
-              className="text-text-tertiary hover:text-text-primary p-1 rounded-md hover:bg-bg-tertiary transition-colors"
+              className="text-text-tertiary hover:text-text-primary p-1.5 rounded-md hover:bg-bg-tertiary transition-colors"
               title="전체 보기"
             >
-              <Maximize2 className="w-3.5 h-3.5" />
+              <Maximize2 className="w-4 h-4" />
             </button>
           )}
         </div>
@@ -437,10 +437,10 @@ function CenterBottomPanel({
           </span>
           <button
             onClick={onExpandPlayers}
-            className="ml-1 rounded p-1 text-text-tertiary transition-colors hover:bg-bg-tertiary hover:text-text-primary"
+            className="ml-1 rounded p-1.5 text-text-tertiary transition-colors hover:bg-bg-tertiary hover:text-text-primary"
             title="전체 보기"
           >
-            <Maximize2 className="h-3.5 w-3.5" />
+            <Maximize2 className="h-4 w-4" />
           </button>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto">

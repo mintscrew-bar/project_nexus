@@ -715,7 +715,7 @@ export default function PostDetailClient() {
                                 title="댓글 신고"
                                 className="opacity-0 group-hover:opacity-100 transition-opacity text-text-tertiary hover:text-red-400 ml-1"
                               >
-                                <Flag className="h-3 w-3" />
+                                <Flag className="h-4 w-4" />
                               </button>
                             )}
                           </div>
@@ -767,7 +767,7 @@ export default function PostDetailClient() {
                             disabled={isSubmittingReply || !replyText.trim()}
                             className="px-3 py-2 bg-accent-primary text-white rounded-lg text-sm disabled:opacity-50"
                           >
-                            <Send className="h-3 w-3" />
+                            <Send className="h-4 w-4" />
                           </button>
                           <button
                             type="button"
@@ -840,13 +840,13 @@ export default function PostDetailClient() {
                                         onClick={() => handleStartEditComment(reply)}
                                         className="text-text-tertiary hover:text-accent-primary ml-1"
                                       >
-                                        <Edit className="h-3 w-3" />
+                                        <Edit className="h-4 w-4" />
                                       </button>
                                       <button
                                         onClick={() => setDeleteCommentId(reply.id)}
                                         className="text-text-tertiary hover:text-accent-danger ml-1"
                                       >
-                                        <Trash2 className="h-3 w-3" />
+                                        <Trash2 className="h-4 w-4" />
                                       </button>
                                     </>
                                   ) : isAuthenticated && (
@@ -855,7 +855,7 @@ export default function PostDetailClient() {
                                       title="댓글 신고"
                                       className="opacity-0 group-hover:opacity-100 transition-opacity text-text-tertiary hover:text-red-400 ml-1"
                                     >
-                                      <Flag className="h-3 w-3" />
+                                      <Flag className="h-4 w-4" />
                                     </button>
                                   )}
                                 </div>

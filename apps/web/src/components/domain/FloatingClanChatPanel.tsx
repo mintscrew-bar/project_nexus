@@ -236,7 +236,7 @@ export function FloatingClanChatPanel() {
               className="p-1.5 rounded hover:bg-bg-elevated text-text-tertiary hover:text-text-primary transition-colors"
               title={isMinimized ? "복원" : "최소화"}
             >
-              <Minus className="w-3.5 h-3.5" />
+              <Minus className="w-4 h-4" />
             </button>
           )}
           <button
@@ -244,7 +244,7 @@ export function FloatingClanChatPanel() {
             className="p-1.5 rounded hover:bg-bg-elevated text-text-tertiary hover:text-text-primary transition-colors"
             title="닫기"
           >
-            <X className="w-3.5 h-3.5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
       </motion.div>
