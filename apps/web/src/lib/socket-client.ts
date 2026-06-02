@@ -706,6 +706,8 @@ export const matchSocketHelpers = {
   // ACK 타임아웃: 응답이 없으면 일정 시간 후 실패로 resolve (Promise 영구 대기 방지)
   rpsStart: (matchId: string): Promise<any> =>
     emitMatchWithAck("rps:start", { matchId }),
+  rpsCaptainReady: (matchId: string): Promise<any> =>
+    emitMatchWithAck("rps:captain-ready", { matchId }),
   rpsSubmit: (matchId: string, hand: "rock" | "paper" | "scissors"): Promise<any> =>
     emitMatchWithAck("rps:submit", { matchId, hand }),
   rpsChooseSide: (matchId: string, side: "blue" | "red"): Promise<any> =>
@@ -722,6 +724,9 @@ export const matchSocketHelpers = {
   onRpsInvite: (callback: (data: any) => void) => {
     matchSocket?.on("rps:invite", callback);
   },
+  onRpsReadyState: (callback: (data: any) => void) => {
+    matchSocket?.on("rps:ready-state", callback);
+  },
 
   offAllListeners: () => {
     matchSocket?.off("bracket-generated");
@@ -736,6 +741,7 @@ export const matchSocketHelpers = {
     matchSocket?.off("rps:reveal");
     matchSocket?.off("rps:done");
     matchSocket?.off("rps:invite");
+    matchSocket?.off("rps:ready-state");
     matchSocket?.off("rps:error");
   },
 };

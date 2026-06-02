@@ -31,6 +31,16 @@ interface RpsState {
   blueSideTeamId?: string;
 }
 
+// 양 팀장 준비 완료 대기 상태
+interface RpsReadyEntry {
+  captainAId: string;
+  captainBId: string;
+  hostId: string;
+  teamAId: string;
+  teamBId: string;
+  readyIds: Set<string>;
+}
+
 @WebSocketGateway({
   namespace: "/match",
   cors: {
@@ -50,6 +60,8 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private readonly rpsTimers = new Map<string, NodeJS.Timeout>();
   private readonly RPS_THROW_TIMEOUT = 30000; // 팀장 미제출 시 자동 랜덤
   private readonly RPS_SIDE_TIMEOUT = 30000; // 진영 미선택 시 자동 랜덤
+  // 양 팀장 준비 완료 대기 (RPS 시작 전)
+  private readonly rpsReadyStates = new Map<string, RpsReadyEntry>();
 
   constructor(
     private readonly authService: AuthService,
@@ -99,6 +111,17 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const rps = this.rpsStates.get(data.matchId);
       if (rps) {
         client.emit("rps:state", this.rpsStatePayload(rps));
+      }
+
+      // 준비 대기 상태가 있으면 전달
+      const readyEntry = this.rpsReadyStates.get(data.matchId);
+      if (readyEntry) {
+        client.emit("rps:ready-state", {
+          matchId: data.matchId,
+          captainAId: readyEntry.captainAId,
+          captainBId: readyEntry.captainBId,
+          readyIds: Array.from(readyEntry.readyIds),
+        });
       }
 
       return {
@@ -322,14 +345,105 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
     setTimeout(() => this.rpsStates.delete(matchId), 60000);
   }
 
-  // 호스트가 매치 시작 → 가위바위보 단계 개시
+  // RPS 실제 시작 (내부 공통 로직)
+  private async doRpsStart(matchId: string, ctx: {
+    hostId: string | null; teamAId: string | null; teamBId: string | null;
+    captainAId: string | null; captainBId: string | null;
+  }) {
+    const state: RpsState = {
+      matchId,
+      teamAId: ctx.teamAId ?? "",
+      teamBId: ctx.teamBId ?? "",
+      captainAId: ctx.captainAId ?? "",
+      captainBId: ctx.captainBId ?? "",
+      hostId: ctx.hostId ?? "",
+      phase: "throw",
+      submissions: new Map(),
+    };
+    this.rpsStates.set(matchId, state);
+    this.broadcastRpsState(state);
+
+    // 모든 참가자에게 모달 오픈 유도
+    const match = await this.matchService.findById(matchId).catch(() => null);
+    if (match?.roomId) {
+      this.server.to(`bracket:${match.roomId}`).emit("rps:invite", { matchId });
+    }
+
+    this.armRpsThrowTimeout(matchId);
+  }
+
+  // 양 팀장이 준비 완료하면 RPS 자동 시작 (기존 호스트 버튼 대체)
+  @SubscribeMessage("rps:captain-ready")
+  async handleRpsCaptainReady(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() data: { matchId: string },
+  ) {
+    try {
+      // 이미 RPS 진행 중이면 중복 처리 방지
+      const existing = this.rpsStates.get(data.matchId);
+      if (existing && existing.phase !== "done") {
+        return { success: false, error: "이미 가위바위보가 진행 중입니다." };
+      }
+
+      const ctx = await this.matchService.getRpsContext(data.matchId);
+      if (ctx.status !== "PENDING") {
+        return { success: false, error: "이미 시작된 매치입니다." };
+      }
+      if (!ctx.captainAId || !ctx.captainBId || !ctx.teamAId || !ctx.teamBId) {
+        return { success: false, error: "양 팀 팀장이 확정돼야 합니다." };
+      }
+      if (!client.userId || (client.userId !== ctx.captainAId && client.userId !== ctx.captainBId)) {
+        return { success: false, error: "팀장만 준비할 수 있습니다." };
+      }
+
+      // 준비 상태 토글
+      let entry = this.rpsReadyStates.get(data.matchId);
+      if (!entry) {
+        entry = {
+          captainAId: ctx.captainAId,
+          captainBId: ctx.captainBId,
+          hostId: ctx.hostId ?? "",
+          teamAId: ctx.teamAId,
+          teamBId: ctx.teamBId,
+          readyIds: new Set(),
+        };
+        this.rpsReadyStates.set(data.matchId, entry);
+      }
+
+      if (entry.readyIds.has(client.userId)) {
+        entry.readyIds.delete(client.userId);
+      } else {
+        entry.readyIds.add(client.userId);
+      }
+
+      // 준비 상태 브로드캐스트
+      this.server.to(`match:${data.matchId}`).emit("rps:ready-state", {
+        matchId: data.matchId,
+        captainAId: entry.captainAId,
+        captainBId: entry.captainBId,
+        readyIds: Array.from(entry.readyIds),
+      });
+
+      // 양쪽 모두 준비 완료 → 자동 시작
+      if (entry.readyIds.has(entry.captainAId) && entry.readyIds.has(entry.captainBId)) {
+        this.rpsReadyStates.delete(data.matchId);
+        await this.doRpsStart(data.matchId, ctx);
+      }
+
+      return { success: true };
+    } catch (error: any) {
+      return { success: false, error: error?.message || "준비 처리 실패" };
+    }
+  }
+
+  // (폴백) 호스트가 매치 시작 → 가위바위보 단계 개시
   @SubscribeMessage("rps:start")
   async handleRpsStart(
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() data: { matchId: string },
   ) {
     try {
-      // 이미 진행 중이면 새로 만들지 않고 현재 상태만 다시 알림 (중복 클릭/다중 탭/재요청 방어)
+      // 이미 진행 중이면 새로 만들지 않고 현재 상태만 다시 알림
       const existing = this.rpsStates.get(data.matchId);
       if (existing && existing.phase !== "done") {
         this.broadcastRpsState(existing);
@@ -347,30 +461,8 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
         return { success: false, error: "양 팀과 팀장이 확정돼야 합니다." };
       }
 
-      const state: RpsState = {
-        matchId: data.matchId,
-        teamAId: ctx.teamAId,
-        teamBId: ctx.teamBId,
-        captainAId: ctx.captainAId,
-        captainBId: ctx.captainBId,
-        hostId: ctx.hostId,
-        phase: "throw",
-        submissions: new Map(),
-      };
-      this.rpsStates.set(data.matchId, state);
-      this.broadcastRpsState(state);
-
-      // 다른 팀장 소집 — 대진표 방에 알림(모달 자동 오픈 유도)
-      const match = await this.matchService
-        .findById(data.matchId)
-        .catch(() => null);
-      if (match?.roomId) {
-        this.server
-          .to(`bracket:${match.roomId}`)
-          .emit("rps:invite", { matchId: data.matchId });
-      }
-
-      this.armRpsThrowTimeout(data.matchId);
+      this.rpsReadyStates.delete(data.matchId);
+      await this.doRpsStart(data.matchId, ctx);
       return { success: true };
     } catch (error: any) {
       return { success: false, error: error?.message || "가위바위보 시작 실패" };

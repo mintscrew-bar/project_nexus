@@ -15,6 +15,7 @@ import { ChampionIcon, PositionIcon, POSITION_LABELS } from '@/app/tournaments/[
 import { TierBadge } from '@/components/domain/TierBadge';
 import { PlayerHoverCard } from '@/components/domain/PlayerHoverCard';
 import { PlayerProfileModal } from '@/components/domain/PlayerProfileModal';
+import { cn } from '@/lib/utils';
 
 type LaneKey = 'TOP' | 'JUNGLE' | 'MID' | 'ADC' | 'SUPPORT';
 const LANES: LaneKey[] = ['TOP', 'JUNGLE', 'MID', 'ADC', 'SUPPORT'];
@@ -119,12 +120,19 @@ export function MatchDetailModal({
   const [rpsReveal, setRpsReveal] = useState<RpsRevealData | null>(null);
   const [rpsError, setRpsError] = useState<string | null>(null);
   const rpsSeqRef = useRef(0);
+  // 양 팀장 준비 대기 상태
+  const [rpsReadyState, setRpsReadyState] = useState<{
+    captainAId: string;
+    captainBId: string;
+    readyIds: string[];
+  } | null>(null);
 
   // 매치가 바뀌면 모든 매치별 상태 초기화 (이전 매치의 RPS·오류 등이 새 매치에 잔존하는 버그 방지)
   useEffect(() => {
     setRps(null);
     setRpsReveal(null);
     setRpsError(null);
+    setRpsReadyState(null);
     rpsSeqRef.current = 0;
     setReportError(null);
     setVoteError(null);
@@ -154,13 +162,18 @@ export function MatchDetailModal({
         setTimeout(() => setRpsError(null), 4000);
       }
     };
+    const onReadyState = (data: any) => {
+      if (data?.matchId === matchId) setRpsReadyState(data);
+    };
     socket.on('rps:state', onState);
     socket.on('rps:reveal', onReveal);
     socket.on('rps:error', onError);
+    socket.on('rps:ready-state', onReadyState);
     return () => {
       socket.off('rps:state', onState);
       socket.off('rps:reveal', onReveal);
       socket.off('rps:error', onError);
+      socket.off('rps:ready-state', onReadyState);
       socket.emit('leave-match', { matchId });
     };
   }, [isOpen, match?.id]);
@@ -420,30 +433,63 @@ export function MatchDetailModal({
           </div>
         )}
 
-        {canManageMatch && match.status === 'PENDING' && !rpsActive && match.team1 && match.team2 && (
-          <div className="pt-4 border-t border-bg-tertiary">
-            <Button
-              className="w-full"
-              onClick={async () => {
-                setIsStarting(true);
-                try {
-                  // 가위바위보 진영 결정 시작 (서버가 진영 확정 후 매치를 IN_PROGRESS로 시작)
-                  const res = await matchSocketHelpers.rpsStart(match.id);
-                  if (res && res.success === false) {
-                    // 소켓 실패 시 기존 HTTP 시작으로 폴백
-                    await onStartMatch(match.id);
-                  }
-                } finally {
-                  setIsStarting(false);
-                }
-              }}
-              disabled={isStarting}
-            >
-              {isStarting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Swords className="mr-2 h-4 w-4" />}
-              매치 시작 (가위바위보)
-            </Button>
-          </div>
-        )}
+        {match.status === 'PENDING' && !rpsActive && match.team1 && match.team2 && (() => {
+          const captainAId = rpsReadyState?.captainAId ?? match.team1.captain?.id;
+          const captainBId = rpsReadyState?.captainBId ?? match.team2.captain?.id;
+          const isCaptain = !!(user?.id && (user.id === captainAId || user.id === captainBId));
+          const isReady = isCaptain && !!(user?.id && rpsReadyState?.readyIds.includes(user.id));
+          const aReady = captainAId ? (rpsReadyState?.readyIds.includes(captainAId) ?? false) : false;
+          const bReady = captainBId ? (rpsReadyState?.readyIds.includes(captainBId) ?? false) : false;
+          return (
+            <div className="pt-4 border-t border-bg-tertiary space-y-3">
+              <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+                <Swords className="h-4 w-4 text-accent-primary" />
+                진영 결정 준비
+              </h3>
+              <div className="grid grid-cols-2 gap-2">
+                {([
+                  { team: match.team1, ready: aReady },
+                  { team: match.team2, ready: bReady },
+                ] as const).map(({ team, ready }) => (
+                  <div key={team.id} className={cn(
+                    "flex flex-col items-center gap-1 py-3 rounded-xl border transition-colors",
+                    ready ? "border-accent-success bg-accent-success/10" : "border-bg-tertiary bg-bg-secondary",
+                  )}>
+                    <span className="text-xs font-semibold text-text-primary truncate max-w-[90%]">{team.name}</span>
+                    <span className="text-xl">{ready ? "✅" : "⏳"}</span>
+                    <span className={cn("text-xs", ready ? "text-accent-success font-medium" : "text-text-tertiary")}>
+                      {ready ? "준비 완료" : "대기 중"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              {isCaptain ? (
+                <Button
+                  className="w-full"
+                  variant={isReady ? "secondary" : "primary"}
+                  onClick={async () => {
+                    setIsStarting(true);
+                    try {
+                      await matchSocketHelpers.rpsCaptainReady(match.id);
+                    } finally {
+                      setIsStarting(false);
+                    }
+                  }}
+                  disabled={isStarting}
+                >
+                  {isStarting
+                    ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    : isReady
+                      ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      : <Swords className="mr-2 h-4 w-4" />}
+                  {isReady ? "상대 팀장 대기 중..." : "준비 완료"}
+                </Button>
+              ) : (
+                <p className="text-xs text-text-tertiary text-center">팀장만 준비할 수 있습니다</p>
+              )}
+            </div>
+          );
+        })()}
 
         {canManageMatch && match.status === 'IN_PROGRESS' && (
           <div className="pt-4 border-t border-bg-tertiary">
