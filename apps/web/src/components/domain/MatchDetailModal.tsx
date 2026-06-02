@@ -297,8 +297,11 @@ export function MatchDetailModal({
     return `${minutes}:${secs.toString().padStart(2, '0')}`;
   };
   
-  // Only host can report match results and generate tournament codes
-  const canManageMatch = isHost;
+  // 호스트 또는 양 팀 팀장이 결과 보고 가능
+  const isCaptainOfMatch =
+    !!(user?.id && match.team1?.captain?.id && user.id === match.team1.captain.id) ||
+    !!(user?.id && match.team2?.captain?.id && user.id === match.team2.captain.id);
+  const canManageMatch = isHost || isCaptainOfMatch;
 
   // 가위바위보 진행 중 여부 + 팀(A/B) 매핑
   const rpsActive = !!rps && match.status === 'PENDING';

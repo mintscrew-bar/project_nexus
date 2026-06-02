@@ -341,8 +341,14 @@ export class MatchService {
       );
     }
 
-    if (match.room.hostId !== hostId) {
-      throw new ForbiddenException("Only host can report match result");
+    const captainAId = match.teamA?.captainId;
+    const captainBId = match.teamB?.captainId;
+    const isAuthorized =
+      match.room.hostId === hostId ||
+      (captainAId && captainAId === hostId) ||
+      (captainBId && captainBId === hostId);
+    if (!isAuthorized) {
+      throw new ForbiddenException("호스트 또는 팀장만 결과를 보고할 수 있습니다.");
     }
 
     if (match.status !== MatchStatus.IN_PROGRESS) {
