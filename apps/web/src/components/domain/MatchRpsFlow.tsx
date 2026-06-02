@@ -202,13 +202,21 @@ export function MatchRpsFlow({
         <Panel team={teamA} isA />
         <div className="flex items-center text-lg font-black text-text-tertiary">VS</div>
         <Panel team={teamB} isA={false} />
+        {/* 카운트다운: 뒤 패널 dim(고정) + 숫자만 강조(박자마다 팝). 끝나면 dim 해제 */}
         <AnimatePresence>
           {anim === "countdown" && (
+            <motion.div key="rps-dim" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="pointer-events-none absolute -inset-2 z-10 rounded-2xl bg-bg-primary/75 backdrop-blur-[2px]" />
+          )}
+        </AnimatePresence>
+        <AnimatePresence mode="popLayout">
+          {anim === "countdown" && (
             <motion.div key={count}
-              initial={{ scale: 0.4, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 1.8, opacity: 0 }}
+              initial={{ scale: 0.4, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 1.6, opacity: 0 }}
               transition={{ type: "spring", stiffness: 300, damping: 16 }}
-              className="pointer-events-none absolute inset-0 flex items-center justify-center">
-              <span className="text-6xl md:text-7xl drop-shadow-xl">{COUNT_EMOJI[count]}</span>
+              className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
+              <span className="text-7xl md:text-8xl drop-shadow-2xl">{COUNT_EMOJI[count]}</span>
             </motion.div>
           )}
         </AnimatePresence>
