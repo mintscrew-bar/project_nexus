@@ -215,7 +215,7 @@ export function MobileMenu({ className }: MobileMenuProps) {
               href={NEXUS_DISCORD_INVITE_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center justify-between rounded-lg border border-[#5865F2]/20 bg-[#5865F2]/10 px-3 py-3 text-[#C7D2FE] transition-colors hover:bg-[#5865F2]/20"
+              className="flex items-center justify-between rounded-lg border border-[#5865F2]/30 bg-[#5865F2]/10 px-3 py-3 font-medium text-[#5865F2] transition-colors hover:bg-[#5865F2]/20 dark:border-[#5865F2]/20 dark:text-[#C7D2FE]"
             >
               <span className="flex items-center gap-3">
                 <DiscordIcon className="h-5 w-5" />

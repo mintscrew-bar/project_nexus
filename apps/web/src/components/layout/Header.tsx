@@ -91,11 +91,12 @@ export function Header() {
           href={NEXUS_DISCORD_INVITE_URL}
           target="_blank"
           rel="noopener noreferrer"
-          className="hidden rounded-lg p-2 text-[#8EA1FF] transition-colors duration-150 hover:bg-[#5865F2]/10 hover:text-[#C7D2FE] lg:inline-flex"
+          className="hidden items-center gap-2 rounded-lg border border-[#5865F2]/30 bg-[#5865F2]/10 px-3 py-2 text-sm font-semibold text-[#5865F2] transition-colors duration-150 hover:bg-[#5865F2]/20 dark:border-[#5865F2]/20 dark:text-[#8EA1FF] dark:hover:text-[#C7D2FE] lg:inline-flex"
           title="Discord 커뮤니티"
           aria-label="Discord 커뮤니티"
         >
           <DiscordIcon className="h-5 w-5" />
+          <span>Discord</span>
         </a>
         {/* 어드민/모더레이터 전용 링크: 마운트 후에만 표시하여 hydration 불일치 방지 */}
         {clientIsAuthenticated && (clientUser?.role === 'ADMIN' || clientUser?.role === 'MODERATOR') && (
