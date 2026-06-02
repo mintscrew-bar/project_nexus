@@ -6,12 +6,14 @@ import {
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../prisma/prisma.service";
+import { DiscordAdminAlertService } from "../discord/discord-admin-alert.service";
 
 @Injectable()
 export class UserService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
+    private readonly adminAlerts: DiscordAdminAlertService,
   ) {}
 
   async findById(id: string) {
@@ -289,7 +291,12 @@ export class UserService {
     // 유저 상태 확인 — 밴 또는 임시제재 상태여야 제출 가능
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { isBanned: true, isRestricted: true, restrictedUntil: true },
+      select: {
+        username: true,
+        isBanned: true,
+        isRestricted: true,
+        restrictedUntil: true,
+      },
     });
     if (!user) throw new NotFoundException("유저를 찾을 수 없습니다.");
     // 제재는 기한이 지나면 자동 해제되므로, 기한이 남은 제재만 이의신청 대상으로 인정
@@ -310,9 +317,16 @@ export class UserService {
       throw new ConflictException("이미 심사 중인 이의신청이 있습니다.");
     }
 
-    return this.prisma.appeal.create({
+    const appeal = await this.prisma.appeal.create({
       data: { userId, reason: reason.trim() },
     });
+    await this.adminAlerts.notifyAppealSubmitted({
+      appealId: appeal.id,
+      userId,
+      username: user.username,
+    });
+
+    return appeal;
   }
 
   /**

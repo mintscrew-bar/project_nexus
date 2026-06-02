@@ -3,13 +3,24 @@ import { DiscordService } from "./discord.service";
 import { DiscordBotService } from "./discord-bot.service";
 import { DiscordVoiceService } from "./discord-voice.service";
 import { DiscordController } from "./discord.controller";
+import { DiscordAdminAlertService } from "./discord-admin-alert.service";
 import { AuthModule } from "../auth/auth.module";
 
 @Module({
   imports: [AuthModule],
   controllers: [DiscordController],
-  providers: [DiscordService, DiscordBotService, DiscordVoiceService],
-  exports: [DiscordService, DiscordBotService, DiscordVoiceService],
+  providers: [
+    DiscordService,
+    DiscordBotService,
+    DiscordVoiceService,
+    DiscordAdminAlertService,
+  ],
+  exports: [
+    DiscordService,
+    DiscordBotService,
+    DiscordVoiceService,
+    DiscordAdminAlertService,
+  ],
 })
 export class DiscordModule implements OnModuleInit {
   constructor(

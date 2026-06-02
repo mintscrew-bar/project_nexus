@@ -8,6 +8,7 @@ import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../prisma/prisma.service";
 import { UserRole, AdminAction } from "@nexus/database";
 import { DiscordBotService } from "../discord/discord-bot.service";
+import { DiscordAdminAlertService } from "../discord/discord-admin-alert.service";
 
 const MAX_LIMIT = 100;
 
@@ -36,6 +37,7 @@ export class AdminService {
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
     private readonly discordBotService: DiscordBotService,
+    private readonly adminAlerts: DiscordAdminAlertService,
   ) {}
 
   private readonly seededHighTierPriority = 7;
@@ -1118,6 +1120,19 @@ export class AdminService {
       name: room.name,
     });
 
+    const admin = await this.prisma.user.findUnique({
+      where: { id: adminId },
+      select: { username: true },
+    });
+    await this.adminAlerts.notifyAdminOperation({
+      operation: "ROOM_CLOSE",
+      adminId,
+      adminName: admin?.username,
+      targetType: "room",
+      targetId: roomId,
+      summary: `관리자가 방을 강제 종료했습니다: ${room.name}`,
+    });
+
     return result;
   }
 
@@ -1179,7 +1194,7 @@ export class AdminService {
 
   /** 방에 봇을 count명 추가. 이미 있는 봇은 스킵, maxParticipants 초과하지 않음 */
   async addBotToRoom(roomId: string, adminId: string, count: number = 1) {
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       const room = await tx.room.findUnique({
         where: { id: roomId },
         include: {
@@ -1237,6 +1252,27 @@ export class AdminService {
 
       return { addedCount: newBots.length, participants: updatedParticipants };
     });
+
+    const [admin, room] = await Promise.all([
+      this.prisma.user.findUnique({
+        where: { id: adminId },
+        select: { username: true },
+      }),
+      this.prisma.room.findUnique({
+        where: { id: roomId },
+        select: { name: true },
+      }),
+    ]);
+    await this.adminAlerts.notifyAdminOperation({
+      operation: "ROOM_ADD_BOT",
+      adminId,
+      adminName: admin?.username,
+      targetType: "room",
+      targetId: roomId,
+      summary: `관리자가 방에 테스트 봇 ${result.addedCount}명을 추가했습니다: ${room?.name ?? roomId}`,
+    });
+
+    return result;
   }
 
   // ── Appeals (이의신청) ────────────────────────────────────────────────────
@@ -1364,14 +1400,37 @@ export class AdminService {
   async approveDiscordGuildLink(linkId: string, requesterId: string) {
     const link = await this.prisma.discordGuildLink.findUnique({
       where: { id: linkId },
+      include: { owner: { select: { id: true, username: true } } },
     });
     if (!link) throw new NotFoundException("길드 연동을 찾을 수 없습니다.");
 
     // 활성화 전 봇이 실제로 그 길드에 있고 채널 운영 권한을 가졌는지 검증.
-    const perms = await this.discordBotService.verifyGuildPermissions(
-      link.guildId,
-    );
+    const requester = await this.prisma.user.findUnique({
+      where: { id: requesterId },
+      select: { username: true },
+    });
+    const perms = await this.discordBotService
+      .verifyGuildPermissions(link.guildId)
+      .catch(async (error: any) => {
+        await this.adminAlerts.notifyDiscordGuildPermissionFailure({
+          linkId,
+          guildId: link.guildId,
+          guildName: link.guildName,
+          requesterId,
+          requesterName: requester?.username,
+          reason: `권한 검증 중 오류가 발생했습니다: ${error?.message ?? error}`,
+        });
+        throw error;
+      });
     if (!perms.inGuild) {
+      await this.adminAlerts.notifyDiscordGuildPermissionFailure({
+        linkId,
+        guildId: link.guildId,
+        guildName: link.guildName,
+        requesterId,
+        requesterName: requester?.username,
+        reason: "봇이 해당 Discord 서버에 없습니다.",
+      });
       throw new BadRequestException(
         "봇이 해당 디스코드 서버에 없습니다. 서버에 봇을 먼저 초대해주세요.",
       );
@@ -1383,6 +1442,15 @@ export class AdminService {
       ]
         .filter(Boolean)
         .join(", ");
+      await this.adminAlerts.notifyDiscordGuildPermissionFailure({
+        linkId,
+        guildId: link.guildId,
+        guildName: perms.guildName ?? link.guildName,
+        requesterId,
+        requesterName: requester?.username,
+        reason: "봇에게 필요한 권한이 없습니다.",
+        missingPermissions: missing,
+      });
       throw new BadRequestException(
         `봇에게 필요한 권한이 없습니다: ${missing}. 서버 역할 설정에서 권한을 부여한 뒤 다시 시도해주세요.`,
       );

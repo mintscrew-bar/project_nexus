@@ -200,6 +200,21 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
     console.log(`[DiscordBot] 신규 멤버 입장: ${member.user.tag}`);
   }
 
+  private async sendAdminLifecycleAlert(message: string) {
+    const guildId =
+      this.configService.get<string>("ADMIN_ALERT_DISCORD_GUILD_ID") ||
+      this.configService.get<string>("DISCORD_GUILD_ID");
+    const channelId =
+      this.configService.get<string>("ADMIN_ALERT_DISCORD_APPROVAL_CHANNEL_ID") ||
+      this.configService.get<string>("ADMIN_ALERT_DISCORD_SECURITY_CHANNEL_ID") ||
+      this.configService.get<string>("ADMIN_ALERT_DISCORD_CHANNEL_ID");
+
+    if (!guildId || !channelId) return;
+    await this.sendNotification(guildId, channelId, message).catch((err: any) =>
+      console.warn(`[DiscordBot] 관리자 라이프사이클 알림 실패: ${err?.message}`),
+    );
+  }
+
   /**
    * 봇이 외부 길드에 추가됨. OAuth 흐름으로 미리 만들어둔 PENDING 링크가 있으면
    * 길드 이름을 갱신한다. 링크가 없으면(우리 흐름 외 무단 초대) 휴면 — 아무 동작 안 함.
@@ -212,6 +227,14 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
       if (!link) {
         console.log(
           `[DiscordBot] 미등록 길드에 추가됨(휴면): ${guild.name} (${guild.id})`,
+        );
+        await this.sendAdminLifecycleAlert(
+          [
+            "**Discord 봇이 미등록 서버에 추가됨**",
+            "승인 링크가 없으므로 이 서버는 Nexus 방 생성에 사용할 수 없습니다.",
+            `- 길드명: ${guild.name}`,
+            `- 길드 ID: ${guild.id}`,
+          ].join("\n"),
         );
         return;
       }

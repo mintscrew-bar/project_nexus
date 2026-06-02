@@ -7,6 +7,7 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { ReportReason, ReportStatus } from "../community/community.types";
+import { DiscordAdminAlertService } from "../discord/discord-admin-alert.service";
 
 export interface SubmitRatingDto {
   targetUserId: string;
@@ -28,7 +29,10 @@ export interface SubmitReportDto {
 
 @Injectable()
 export class ReputationService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly adminAlerts: DiscordAdminAlertService,
+  ) {}
 
   // ========================================
   // Rating System
@@ -289,6 +293,16 @@ export class ReputationService {
 
     // Check if user should be auto-banned (multiple reports)
     await this.checkAutoModeration(dto.targetUserId);
+
+    await this.adminAlerts.notifyReportSubmitted({
+      reportId: report.id,
+      reportType: "USER",
+      reporterId: report.reporter.id,
+      reporterName: report.reporter.username,
+      targetId: report.target.id,
+      targetName: report.target.username,
+      reason: report.reason,
+    });
 
     return report;
   }

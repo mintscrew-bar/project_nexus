@@ -13,6 +13,7 @@ import { NotificationService } from "../notification/notification.service";
 import { RedisService } from "../redis/redis.service";
 import { BoardService } from "../board/board.service";
 import { UserRole } from "@nexus/database";
+import { DiscordAdminAlertService } from "../discord/discord-admin-alert.service";
 
 /**
  * 기본 게시판 슬러그 → 레거시 PostCategory enum 매핑.
@@ -85,6 +86,7 @@ export class CommunityService {
     private readonly notificationService: NotificationService,
     private readonly redis: RedisService,
     private readonly boardService: BoardService,
+    private readonly adminAlerts: DiscordAdminAlertService,
   ) {}
 
   // ========================================
@@ -1052,6 +1054,21 @@ export class CommunityService {
         reason: dto.reason,
         description: dto.description,
       },
+      include: {
+        reporter: { select: { id: true, username: true } },
+        post: { select: { id: true, title: true } },
+        comment: { select: { id: true, postId: true } },
+      },
+    });
+
+    await this.adminAlerts.notifyReportSubmitted({
+      reportId: report.id,
+      reportType: dto.postId ? "POST" : "COMMENT",
+      reporterId: report.reporter.id,
+      reporterName: report.reporter.username,
+      targetId: report.post?.id ?? report.comment?.id,
+      targetName: report.post?.title ?? undefined,
+      reason: report.reason,
     });
 
     // 신고 누적 자동 블라인드: 해당 게시글/댓글의 신고 횟수가 3건 이상이면 자동 블라인드 처리

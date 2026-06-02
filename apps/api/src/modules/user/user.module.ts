@@ -3,9 +3,10 @@ import { UserController } from "./user.controller";
 import { UserService } from "./user.service";
 import { UserSettingsService } from "./user-settings.service";
 import { UploadModule } from "../upload/upload.module";
+import { DiscordModule } from "../discord/discord.module";
 
 @Module({
-  imports: [UploadModule],
+  imports: [UploadModule, DiscordModule],
   controllers: [UserController],
   providers: [UserService, UserSettingsService],
   exports: [UserService, UserSettingsService],

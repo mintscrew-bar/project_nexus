@@ -5,9 +5,16 @@ import { NotificationModule } from "../notification/notification.module";
 import { RedisModule } from "../redis/redis.module";
 import { UploadModule } from "../upload/upload.module";
 import { BoardModule } from "../board/board.module";
+import { DiscordModule } from "../discord/discord.module";
 
 @Module({
-  imports: [NotificationModule, RedisModule, UploadModule, BoardModule],
+  imports: [
+    NotificationModule,
+    RedisModule,
+    UploadModule,
+    BoardModule,
+    DiscordModule,
+  ],
   controllers: [CommunityController],
   providers: [CommunityService],
   exports: [CommunityService],

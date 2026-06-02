@@ -13,6 +13,7 @@ import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { AuthService } from "../auth/auth.service";
 import { DiscordService } from "./discord.service";
+import { DiscordAdminAlertService } from "./discord-admin-alert.service";
 
 // 봇이 외부 길드에서 필요한 권한 비트필드:
 // VIEW_CHANNEL(1024) + SEND_MESSAGES(2048) + CONNECT(1048576) +
@@ -30,6 +31,7 @@ export class DiscordController {
     private readonly configService: ConfigService,
     private readonly authService: AuthService,
     private readonly discordService: DiscordService,
+    private readonly adminAlerts: DiscordAdminAlertService,
   ) {}
 
   /**
@@ -107,7 +109,15 @@ export class DiscordController {
         GUILD_LINK_PURPOSE,
       );
 
-      await this.discordService.linkGuild(userId, guildId);
+      const link = await this.discordService.linkGuild(userId, guildId);
+      await this.adminAlerts.notifyDiscordGuildApprovalPending({
+        linkId: link.id,
+        guildId: link.guildId,
+        guildName: link.guildName,
+        ownerId: link.ownerId,
+        ownerName: link.owner?.username,
+        status: link.status,
+      });
 
       return res.redirect(`${appUrl}/settings?discord_guild=pending`);
     } catch (error: any) {

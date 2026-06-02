@@ -51,14 +51,27 @@ export class DiscordService {
 
   /**
    * OAuth 봇 설치 후 캡처한 길드를 유저에게 PENDING 상태로 바인딩한다.
-   * 이미 존재하는 길드면 소유자만 갱신하고 상태(승인 여부)는 유지한다.
+   * 이미 ACTIVE인 길드라도 소유자가 바뀌면 재승인 전까지 사용할 수 없도록 PENDING으로 내린다.
    * 활성화(PENDING→ACTIVE)는 관리자 승인 단계에서 처리.
    */
   async linkGuild(ownerId: string, guildId: string, guildName?: string) {
+    const existing = await this.prisma.discordGuildLink.findUnique({
+      where: { guildId },
+      select: { ownerId: true },
+    });
+    const ownerChanged = !!existing && existing.ownerId !== ownerId;
+
     return this.prisma.discordGuildLink.upsert({
       where: { guildId },
-      update: { ownerId, ...(guildName ? { guildName } : {}) },
+      update: {
+        ownerId,
+        ...(guildName ? { guildName } : {}),
+        ...(ownerChanged ? { status: "PENDING", activatedAt: null } : {}),
+      },
       create: { guildId, ownerId, guildName, status: "PENDING" },
+      include: {
+        owner: { select: { id: true, username: true } },
+      },
     });
   }
 
