@@ -426,7 +426,7 @@ function CenterBottomPanel({
   onExpandPlayers: () => void;
 }) {
   return (
-    <div className="grid min-h-0 grid-cols-[2fr_1fr] gap-3">
+    <div className="grid min-h-0 h-full grid-cols-[2fr_1fr] gap-3">
       {/* 남은 매물 */}
       <Card className="flex min-h-0 flex-col overflow-hidden p-0">
         <div className="flex h-10 shrink-0 items-center gap-2 border-b border-bg-tertiary/70 bg-bg-tertiary/20 px-3">

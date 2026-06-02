@@ -49,7 +49,7 @@ export function GameChatPanel({ roomId, isFinalStage, variant = "floating", clas
   // inline 모드: 토글 없이 항상 표시 (hooks 호출 이후로 분기)
   if (variant === "inline") {
     return (
-      <div className={cn("flex flex-col bg-bg-secondary border border-bg-tertiary rounded-xl overflow-hidden", className)}>
+      <div className={cn("flex flex-col h-full min-h-0 bg-bg-secondary border border-bg-tertiary rounded-xl overflow-hidden", className)}>
         <div className="flex items-center gap-2 px-3 py-2 bg-bg-tertiary/50 border-b border-bg-tertiary flex-shrink-0">
           <MessageSquare className="h-4 w-4 text-accent-primary" />
           <span className="font-semibold text-text-primary text-sm">채팅</span>
