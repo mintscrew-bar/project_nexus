@@ -5,6 +5,7 @@ import { Card, CardHeader, CardTitle, CardContent, Button } from "@/components/u
 import { TierBadge } from "@/components/domain";
 import { PlayerHoverCard } from "@/components/domain/PlayerHoverCard";
 import { PlayerProfileModal } from "@/components/domain/PlayerProfileModal";
+import { PositionIcon } from "@/app/tournaments/[id]/lobby/_components/icons";
 import { Clock, Crown, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -98,19 +99,6 @@ export function DraftBoard({
     setSelectedPlayer(null);
     setIsPicking(false);
   }, [draftState.currentTeamId]);
-
-  // Get position icon
-  const getPositionIcon = (position?: string): string => {
-    if (!position) return "❓";
-    switch (position.toLowerCase()) {
-      case "top": return "⚔️";
-      case "jungle": return "🌲";
-      case "mid": return "⭐";
-      case "adc": return "🏹";
-      case "support": return "🛡️";
-      default: return "❓";
-    }
-  };
 
   const handlePickPlayer = async () => {
     if (selectedPlayer && !disabled && isMyTurn && !isPicking) {
@@ -226,7 +214,9 @@ export function DraftBoard({
                         onMouseLeave={scheduleHoverClose}
                       >
                         <div className="flex items-center space-x-2">
-                          <span className="text-xl">{getPositionIcon(member.position)}</span>
+                          <span className="inline-flex w-5 justify-center">
+                            <PositionIcon position={(member.position ?? "").toUpperCase()} />
+                          </span>
                           <span className="font-medium text-text-primary">
                             {member.username}
                           </span>
@@ -280,7 +270,9 @@ export function DraftBoard({
                     )}
                   >
                     <div className="flex items-center space-x-3">
-                      <span className="text-2xl">{getPositionIcon(player.position)}</span>
+                      <span className="inline-flex w-6 justify-center">
+                        <PositionIcon position={(player.position ?? "").toUpperCase()} className="!w-5 !h-5" />
+                      </span>
                       <div className="text-left">
                         <p className="font-semibold">{player.username}</p>
                         {player.position && (

@@ -8,6 +8,7 @@ import { roomApi } from "@/lib/api-client";
 import { GameChatPanel } from "@/components/domain/GameChatPanel";
 import { PlayerHoverCard } from "@/components/domain/PlayerHoverCard";
 import { PlayerProfileModal } from "@/components/domain/PlayerProfileModal";
+import { PositionIcon } from "@/app/tournaments/[id]/lobby/_components/icons";
 import { LoadingSpinner, Badge, Avatar, Button, ConfirmModal } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
 import { Clock, Check, TimerReset } from "lucide-react";
@@ -316,7 +317,7 @@ export default function RoleSelectionPage() {
                           </div>
                           {memberRole ? (
                             <div className="flex items-center gap-1.5 px-2.5 py-1 bg-accent-success/10 rounded-md">
-                              <span>{ROLE_META[memberRole]?.icon}</span>
+                              <PositionIcon position={memberRole} />
                               <span className="text-xs font-bold text-accent-success">
                                 {ROLE_META[memberRole]?.label}
                               </span>
@@ -359,7 +360,7 @@ export default function RoleSelectionPage() {
                                         : "bg-bg-tertiary/60 border-transparent hover:bg-bg-elevated cursor-pointer text-text-primary"
                                   )}
                                 >
-                                  <span className="text-lg">{meta.icon}</span>
+                                  <PositionIcon position={role} className="!w-5 !h-5" />
                                   <span>{meta.label}</span>
                                 </button>
                               );
