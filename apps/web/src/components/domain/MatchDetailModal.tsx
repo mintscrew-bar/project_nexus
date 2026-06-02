@@ -117,6 +117,7 @@ export function MatchDetailModal({
   // 가위바위보 진영 결정
   const [rps, setRps] = useState<RpsStateData | null>(null);
   const [rpsReveal, setRpsReveal] = useState<RpsRevealData | null>(null);
+  const [rpsError, setRpsError] = useState<string | null>(null);
   const rpsSeqRef = useRef(0);
 
   // 모달이 PENDING 매치에 열려 있는 동안 /match 룸에 합류해 가위바위보 이벤트 수신
@@ -135,11 +136,19 @@ export function MatchDetailModal({
         setRpsReveal({ ...data, seq: ++rpsSeqRef.current });
       }
     };
+    const onError = (data: any) => {
+      if (data?.matchId === matchId) {
+        setRpsError(data?.error || '오류가 발생했습니다.');
+        setTimeout(() => setRpsError(null), 4000);
+      }
+    };
     socket.on('rps:state', onState);
     socket.on('rps:reveal', onReveal);
+    socket.on('rps:error', onError);
     return () => {
       socket.off('rps:state', onState);
       socket.off('rps:reveal', onReveal);
+      socket.off('rps:error', onError);
       socket.emit('leave-match', { matchId });
     };
   }, [isOpen, match?.id]);
@@ -298,6 +307,9 @@ export function MatchDetailModal({
               onSubmit={(hand: RpsHand) => { void matchSocketHelpers.rpsSubmit(match.id, hand); }}
               onChooseSide={(side) => { void matchSocketHelpers.rpsChooseSide(match.id, side); }}
             />
+            {rpsError && (
+              <p className="mt-2 text-center text-sm text-accent-danger">{rpsError}</p>
+            )}
           </div>
         )}
 

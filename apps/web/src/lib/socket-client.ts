@@ -588,6 +588,31 @@ export const snakeDraftSocketHelpers = {
 };
 
 // Match Socket 헬퍼 함수
+// /match emit + ACK 타임아웃 헬퍼 (응답 없으면 timeout 실패로 resolve)
+function emitMatchWithAck(
+  event: string,
+  payload: unknown,
+  timeoutMs = 10000,
+): Promise<any> {
+  return new Promise((resolve) => {
+    if (!matchSocket) return resolve({ success: false, error: "no_socket" });
+    let settled = false;
+    const done = (v: any) => {
+      if (settled) return;
+      settled = true;
+      resolve(v);
+    };
+    const timer = setTimeout(
+      () => done({ success: false, error: "timeout" }),
+      timeoutMs,
+    );
+    matchSocket.emit(event, payload, (res: any) => {
+      clearTimeout(timer);
+      done(res ?? {});
+    });
+  });
+}
+
 export const matchSocketHelpers = {
   joinMatch: (matchId: string) => {
     matchSocket?.emit("join-match", { matchId });
@@ -678,21 +703,13 @@ export const matchSocketHelpers = {
   },
 
   // ── 가위바위보 진영 결정 ──
+  // ACK 타임아웃: 응답이 없으면 일정 시간 후 실패로 resolve (Promise 영구 대기 방지)
   rpsStart: (matchId: string): Promise<any> =>
-    new Promise((resolve) => {
-      if (!matchSocket) return resolve({ success: false, error: "no_socket" });
-      matchSocket.emit("rps:start", { matchId }, (res: any) => resolve(res ?? {}));
-    }),
+    emitMatchWithAck("rps:start", { matchId }),
   rpsSubmit: (matchId: string, hand: "rock" | "paper" | "scissors"): Promise<any> =>
-    new Promise((resolve) => {
-      if (!matchSocket) return resolve({ success: false, error: "no_socket" });
-      matchSocket.emit("rps:submit", { matchId, hand }, (res: any) => resolve(res ?? {}));
-    }),
+    emitMatchWithAck("rps:submit", { matchId, hand }),
   rpsChooseSide: (matchId: string, side: "blue" | "red"): Promise<any> =>
-    new Promise((resolve) => {
-      if (!matchSocket) return resolve({ success: false, error: "no_socket" });
-      matchSocket.emit("rps:choose-side", { matchId, side }, (res: any) => resolve(res ?? {}));
-    }),
+    emitMatchWithAck("rps:choose-side", { matchId, side }),
   onRpsState: (callback: (data: any) => void) => {
     matchSocket?.on("rps:state", callback);
   },
@@ -719,6 +736,7 @@ export const matchSocketHelpers = {
     matchSocket?.off("rps:reveal");
     matchSocket?.off("rps:done");
     matchSocket?.off("rps:invite");
+    matchSocket?.off("rps:error");
   },
 };
 

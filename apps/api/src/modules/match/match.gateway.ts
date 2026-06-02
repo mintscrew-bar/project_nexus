@@ -266,20 +266,33 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   private async finalizeRpsSide(matchId: string, side: "blue" | "red") {
     const state = this.rpsStates.get(matchId);
-    if (!state || state.phase === "done" || !state.winnerTeamId) return;
+    // side 단계에서만 확정 (done/throw에서 중복 호출 방지)
+    if (!state || state.phase !== "side" || !state.winnerTeamId) return;
     this.clearRpsTimer(matchId);
 
     const winner = state.winnerTeamId;
     const loser = winner === state.teamAId ? state.teamBId : state.teamAId;
     const blueSideTeamId = side === "blue" ? winner : loser;
-    state.blueSideTeamId = blueSideTeamId;
-    state.phase = "done";
 
+    // 진영 저장 먼저 — 실패하면 매치를 시작하지 않고 중단(재시도 가능). 저장 실패를 숨기지 않는다.
     try {
       await this.matchService.setBlueSide(matchId, blueSideTeamId);
     } catch {
-      // best-effort
+      this.server.to(`match:${matchId}`).emit("rps:error", {
+        matchId,
+        error: "진영 저장에 실패했습니다. 다시 선택해주세요.",
+      });
+      // phase는 side 유지 → 승자 팀장이 재선택 가능, 타임아웃 재무장
+      this.armRpsTimer(matchId, this.RPS_SIDE_TIMEOUT, () => {
+        const s = this.rpsStates.get(matchId);
+        if (!s || s.phase !== "side") return;
+        void this.finalizeRpsSide(matchId, Math.random() < 0.5 ? "blue" : "red");
+      });
+      return;
     }
+
+    state.blueSideTeamId = blueSideTeamId;
+    state.phase = "done";
 
     this.server.to(`match:${matchId}`).emit("rps:done", {
       matchId,
@@ -289,14 +302,16 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
     });
     this.broadcastRpsState(state);
 
-    // 진영 확정 → 매치 시작(IN_PROGRESS + 토너먼트 코드). 서버가 호스트 권한으로 실행.
+    // 진영 확정·저장 완료 → 매치 시작(IN_PROGRESS + 토너먼트 코드). 서버가 호스트 권한으로 실행.
+    // 주: setBlueSide와 startMatch는 외부 호출(Riot/Discord)을 포함해 단일 트랜잭션이 어려움.
+    // 진영은 이미 저장됐으므로 startMatch 실패 시 호스트가 재시작해도 진영은 유지된다.
     try {
       const result = await this.matchService.startMatch(state.hostId, matchId);
       await this.emitMatchStarted(matchId, {
         tournamentCode: result?.tournamentCode ?? undefined,
       });
     } catch {
-      // 이미 시작됐거나 실패 — best-effort
+      // 이미 시작됐거나 실패 — best-effort (진영은 저장됨)
     }
 
     // 상태 정리(지연)
@@ -310,6 +325,13 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @MessageBody() data: { matchId: string },
   ) {
     try {
+      // 이미 진행 중이면 새로 만들지 않고 현재 상태만 다시 알림 (중복 클릭/다중 탭/재요청 방어)
+      const existing = this.rpsStates.get(data.matchId);
+      if (existing && existing.phase !== "done") {
+        this.broadcastRpsState(existing);
+        return { success: true, alreadyRunning: true };
+      }
+
       const ctx = await this.matchService.getRpsContext(data.matchId);
       if (!client.userId || client.userId !== ctx.hostId) {
         return { success: false, error: "호스트만 시작할 수 있습니다." };
