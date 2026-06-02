@@ -12,6 +12,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { NotificationService } from "../notification/notification.service";
 import { RedisService } from "../redis/redis.service";
 import { BoardService } from "../board/board.service";
+import { DiscordAdminAlertService } from "../discord/discord-admin-alert.service";
 
 describe("CommunityService", () => {
   let service: CommunityService;
@@ -73,6 +74,16 @@ describe("CommunityService", () => {
         { provide: NotificationService, useValue: notification },
         { provide: RedisService, useValue: redis },
         { provide: BoardService, useValue: board },
+        {
+          provide: DiscordAdminAlertService,
+          useValue: {
+            notifyReportSubmitted: jest.fn().mockResolvedValue(undefined),
+            notifyAppealSubmitted: jest.fn().mockResolvedValue(undefined),
+            notifyAdminOperation: jest.fn().mockResolvedValue(undefined),
+            notifyDiscordGuildApprovalPending: jest.fn().mockResolvedValue(undefined),
+            notifyDiscordGuildPermissionFailure: jest.fn().mockResolvedValue(undefined),
+          },
+        },
       ],
     }).compile();
 
@@ -418,7 +429,13 @@ describe("CommunityService", () => {
 
     it("신고 수가 5개 미만이면 게시글을 블라인드하지 않는다", async () => {
       prisma.postReport.findFirst.mockResolvedValue(null);
-      prisma.postReport.create.mockResolvedValue({ id: "report-1" });
+      prisma.postReport.create.mockResolvedValue({
+        id: "report-1",
+        reason: "SPAM",
+        reporter: { id: userId, username: "reporter" },
+        post: { id: "post-1", title: "제목" },
+        comment: null,
+      });
       prisma.postReport.count.mockResolvedValue(4); // 4건 < 5건
 
       await service.reportContent(userId, { ...baseReport, postId: "post-1" });
@@ -428,7 +445,13 @@ describe("CommunityService", () => {
 
     it("신고 수가 5개 이상이면 게시글을 자동 블라인드한다", async () => {
       prisma.postReport.findFirst.mockResolvedValue(null);
-      prisma.postReport.create.mockResolvedValue({ id: "report-1" });
+      prisma.postReport.create.mockResolvedValue({
+        id: "report-1",
+        reason: "SPAM",
+        reporter: { id: userId, username: "reporter" },
+        post: { id: "post-1", title: "제목" },
+        comment: null,
+      });
       prisma.postReport.count.mockResolvedValue(5); // 임계값 도달
       prisma.post.updateMany.mockResolvedValue({ count: 1 });
 
@@ -442,7 +465,13 @@ describe("CommunityService", () => {
 
     it("신고 수가 5개 이상이면 댓글을 자동 블라인드한다", async () => {
       prisma.postReport.findFirst.mockResolvedValue(null);
-      prisma.postReport.create.mockResolvedValue({ id: "report-1" });
+      prisma.postReport.create.mockResolvedValue({
+        id: "report-1",
+        reason: "SPAM",
+        reporter: { id: userId, username: "reporter" },
+        post: { id: "post-1", title: "제목" },
+        comment: null,
+      });
       prisma.postReport.count.mockResolvedValue(6); // 임계값 초과
       prisma.comment.updateMany.mockResolvedValue({ count: 1 });
 
