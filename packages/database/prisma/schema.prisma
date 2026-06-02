@@ -464,6 +464,9 @@ model Match {
   round          Int?
   bracketType    BracketType?
   tournamentCode String?
+  // 진영(블루/레드) — 매치 시작 시 양 팀장 가위바위보로 결정. 이 팀이 블루 사이드,
+  // 나머지(teamA/teamB 중)가 레드. 관계 없이 팀 id만 보관(표시·안내용). 미설정이면 진영 미정.
+  blueSideTeamId String?
   riotMatchId    String?
   patchVersion   String?            // ex: "14.8" — 패치 임팩트 분석용
   // Riot 큐 식별자 (외부 인제스트 매치). 420=솔랭, 440=자랭, 400=일반 드래프트, 430=일반 블라인드, 450=ARAM.
