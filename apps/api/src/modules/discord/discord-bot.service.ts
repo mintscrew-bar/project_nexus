@@ -1503,6 +1503,13 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
     const statusEmoji = match.status === "PENDING" ? "⏳" : "⚔️";
     const statusText = match.status === "PENDING" ? "대기 중" : "진행 중";
 
+    // 진영(블루/레드) — blueSideTeamId 기준(미설정이면 teamA=블루 기본)
+    const blueIsA = match.blueSideTeamId
+      ? match.blueSideTeamId === match.teamA?.id
+      : true;
+    const teamAEmoji = blueIsA ? "🔵" : "🔴";
+    const teamBEmoji = blueIsA ? "🔴" : "🔵";
+
     const embed = new EmbedBuilder()
       .setColor(match.status === "IN_PROGRESS" ? Colors.Red : Colors.Yellow)
       .setTitle(`${statusEmoji} 매치 정보`)
@@ -1511,7 +1518,7 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
       )
       .addFields(
         {
-          name: `🔵 ${match.teamA?.name ?? "TBD"}`,
+          name: `${teamAEmoji} ${match.teamA?.name ?? "TBD"}`,
           value:
             match.teamA?.members
               .map((m: { user: { username: string } }) => m.user.username)
@@ -1524,7 +1531,7 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
           inline: true,
         },
         {
-          name: `🔴 ${match.teamB?.name ?? "TBD"}`,
+          name: `${teamBEmoji} ${match.teamB?.name ?? "TBD"}`,
           value:
             match.teamB?.members
               .map((m: { user: { username: string } }) => m.user.username)
@@ -2082,21 +2089,26 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
       .setTimestamp();
   }
 
+  // blueName/redName: 가위바위보로 정해진 진영 기준(blueSideTeamId). 호출부에서 정렬해 전달.
   buildMatchStartEmbed(
-    teamAName: string,
-    teamBName: string,
+    blueName: string,
+    redName: string,
     tournamentCode?: string,
   ) {
     const embed = new EmbedBuilder()
       .setColor(Colors.Red)
       .setTitle("⚔️ 매치 시작!")
-      .setDescription(`**${teamAName}** vs **${teamBName}**`)
+      .setDescription(`🔵 **${blueName}**  vs  🔴 **${redName}**`)
+      .addFields(
+        { name: "🔵 블루 진영", value: blueName, inline: true },
+        { name: "🔴 레드 진영", value: redName, inline: true },
+      )
       .setTimestamp();
 
     if (tournamentCode) {
       embed.addFields({
         name: "🎮 토너먼트 코드",
-        value: `\`${tournamentCode}\``,
+        value: `\`${tournamentCode}\`\n*커스텀 게임에서 블루/레드 진영에 맞게 입장하세요*`,
       });
     }
 

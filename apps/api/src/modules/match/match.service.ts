@@ -180,9 +180,15 @@ export class MatchService {
     // Send Discord notification
     try {
       if (this.discordBotService) {
+        // 진영 정렬: blueSideTeamId 기준(미설정이면 teamA=블루 기본)
+        const blueIsA = match.blueSideTeamId
+          ? match.blueSideTeamId === match.teamA!.id
+          : true;
+        const blueName = blueIsA ? match.teamA!.name : match.teamB!.name;
+        const redName = blueIsA ? match.teamB!.name : match.teamA!.name;
         const embed = this.discordBotService.buildMatchStartEmbed(
-          match.teamA!.name,
-          match.teamB!.name,
+          blueName,
+          redName,
           tournamentCode,
         );
 
