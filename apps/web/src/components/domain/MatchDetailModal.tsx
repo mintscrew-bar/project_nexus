@@ -120,6 +120,18 @@ export function MatchDetailModal({
   const [rpsError, setRpsError] = useState<string | null>(null);
   const rpsSeqRef = useRef(0);
 
+  // 매치가 바뀌면 모든 매치별 상태 초기화 (이전 매치의 RPS·오류 등이 새 매치에 잔존하는 버그 방지)
+  useEffect(() => {
+    setRps(null);
+    setRpsReveal(null);
+    setRpsError(null);
+    rpsSeqRef.current = 0;
+    setReportError(null);
+    setVoteError(null);
+    setIsStarting(false);
+    setIsReporting(false);
+  }, [match?.id]);
+
   // 모달이 PENDING 매치에 열려 있는 동안 /match 룸에 합류해 가위바위보 이벤트 수신
   useEffect(() => {
     if (!isOpen || !match?.id) return;
