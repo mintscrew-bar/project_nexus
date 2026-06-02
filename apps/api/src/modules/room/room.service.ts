@@ -1439,6 +1439,11 @@ export class RoomService {
       teamCount,
     );
 
+    // 팀장명 기준 네이밍용 userId→username 맵 (AutoBalancePlayer.participant엔 username이 없음)
+    const usernameByUserId = new Map(
+      room.participants.map((p) => [p.userId, p.user.username]),
+    );
+
     await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       await this.clearTeamSetup(tx, roomId);
       for (let index = 0; index < assignments.length; index++) {
@@ -1449,7 +1454,8 @@ export class RoomService {
           data: {
             roomId,
             captainId: captain.userId,
-            name: `Team ${index + 1}`,
+            // 경매와 동일하게 팀장명 기준 네이밍 (v1.2.0 '팀명=팀장명' 일관성)
+            name: `${usernameByUserId.get(captain.userId) ?? `Team ${index + 1}`} 팀`,
             color: this.teamColors[index % this.teamColors.length],
           },
         });

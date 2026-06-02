@@ -100,7 +100,8 @@ export class SnakeDraftService {
             return tx.team.create({
               data: {
                 roomId,
-                name: `Team ${index + 1}`,
+                // 경매·자동밸런스와 동일하게 팀장명 기준 네이밍 (v1.2.0 일관성)
+                name: `${captain.user.username} 팀`,
                 captainId: captain.userId,
                 color: this.getTeamColor(index),
                 members: {
