@@ -509,6 +509,10 @@ export class TasksService {
       FROM "riot_accounts" ra
       WHERE ra."puuid" IS NOT NULL
         AND ra."puuid" <> ''
+        -- admin 테스트 봇 제외: 가짜 puuid(bot_puuid_*)·tagLine 'BOT'은
+        -- Riot match-v5에서 400만 유발하므로 ingest 대상에서 원천 차단.
+        AND ra."puuid" NOT LIKE 'bot_puuid_%'
+        AND ra."tagLine" IS DISTINCT FROM 'BOT'
       ON CONFLICT ("puuid") DO UPDATE
       SET
         "gameName" = COALESCE(EXCLUDED."gameName", "known_puuids"."gameName"),
