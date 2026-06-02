@@ -753,6 +753,48 @@ export class MatchService {
     return match;
   }
 
+  /**
+   * 가위바위보 진영 결정에 필요한 매치 컨텍스트 (팀/팀장/호스트/상태).
+   */
+  async getRpsContext(matchId: string) {
+    const match = await this.prisma.match.findUnique({
+      where: { id: matchId },
+      select: {
+        teamAId: true,
+        teamBId: true,
+        status: true,
+        blueSideTeamId: true,
+        teamA: { select: { captainId: true, name: true } },
+        teamB: { select: { captainId: true, name: true } },
+        room: { select: { hostId: true } },
+      },
+    });
+    if (!match) {
+      throw new NotFoundException("Match not found");
+    }
+    return {
+      teamAId: match.teamAId,
+      teamBId: match.teamBId,
+      teamAName: match.teamA?.name ?? null,
+      teamBName: match.teamB?.name ?? null,
+      captainAId: match.teamA?.captainId ?? null,
+      captainBId: match.teamB?.captainId ?? null,
+      hostId: match.room?.hostId ?? null,
+      status: match.status,
+      blueSideTeamId: match.blueSideTeamId,
+    };
+  }
+
+  /**
+   * 진영(블루 사이드) 팀 저장. 가위바위보 결과로 호출.
+   */
+  async setBlueSide(matchId: string, blueSideTeamId: string) {
+    await this.prisma.match.update({
+      where: { id: matchId },
+      data: { blueSideTeamId },
+    });
+  }
+
   async getRoomMatches(roomId: string) {
     return this.prisma.match.findMany({
       where: { roomId },
