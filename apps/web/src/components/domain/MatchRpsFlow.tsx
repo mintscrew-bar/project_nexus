@@ -240,7 +240,6 @@ export function MatchRpsFlow({
             </p>
           )
         )}
-        {anim === "countdown" && <p className="text-text-secondary font-medium">✊ ✊</p>}
         {anim === "tie" && (
           <motion.p initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
             className="text-xl font-black text-text-primary">비겼습니다!</motion.p>
