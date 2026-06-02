@@ -6,9 +6,11 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/Alert';
 import { Badge } from '@/components/ui/Badge';
 import { Loader2, Swords, Trophy, Copy, ShieldCheck, AlertCircle, Radio, Star, Sword } from 'lucide-react';
 import { Match, getTeamDisplayName } from './BracketView';
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuthStore } from '@/stores/auth-store';
 import { matchApi } from '@/lib/api-client';
+import { connectMatchSocket, matchSocketHelpers } from '@/lib/socket-client';
+import { MatchRpsFlow, type RpsStateData, type RpsRevealData, type RpsHand } from './MatchRpsFlow';
 import { ChampionIcon, PositionIcon, POSITION_LABELS } from '@/app/tournaments/[id]/lobby/_components/icons';
 import { TierBadge } from '@/components/domain/TierBadge';
 import { PlayerHoverCard } from '@/components/domain/PlayerHoverCard';
@@ -112,6 +114,43 @@ export function MatchDetailModal({
   const [submittingVote, setSubmittingVote] = useState<'MVP' | 'ACE' | null>(null);
   const [voteError, setVoteError] = useState<string | null>(null);
   const [profileUserId, setProfileUserId] = useState<string | null>(null);
+  // 가위바위보 진영 결정
+  const [rps, setRps] = useState<RpsStateData | null>(null);
+  const [rpsReveal, setRpsReveal] = useState<RpsRevealData | null>(null);
+  const rpsSeqRef = useRef(0);
+
+  // 모달이 PENDING 매치에 열려 있는 동안 /match 룸에 합류해 가위바위보 이벤트 수신
+  useEffect(() => {
+    if (!isOpen || !match?.id) return;
+    const socket = connectMatchSocket();
+    if (!socket) return;
+    const matchId = match.id;
+    socket.emit('join-match', { matchId });
+
+    const onState = (data: any) => {
+      if (data?.matchId === matchId) setRps(data as RpsStateData);
+    };
+    const onReveal = (data: any) => {
+      if (data?.matchId === matchId) {
+        setRpsReveal({ ...data, seq: ++rpsSeqRef.current });
+      }
+    };
+    socket.on('rps:state', onState);
+    socket.on('rps:reveal', onReveal);
+    return () => {
+      socket.off('rps:state', onState);
+      socket.off('rps:reveal', onReveal);
+      socket.emit('leave-match', { matchId });
+    };
+  }, [isOpen, match?.id]);
+
+  // 매치가 시작(IN_PROGRESS)되면 가위바위보 상태 정리
+  useEffect(() => {
+    if (match?.status && match.status !== 'PENDING') {
+      setRps(null);
+      setRpsReveal(null);
+    }
+  }, [match?.status]);
 
   const fetchVoteData = useCallback(async (matchId: string) => {
     try {
@@ -227,6 +266,14 @@ export function MatchDetailModal({
   // Only host can report match results and generate tournament codes
   const canManageMatch = isHost;
 
+  // 가위바위보 진행 중 여부 + 팀(A/B) 매핑
+  const rpsActive = !!rps && match.status === 'PENDING';
+  const teamNameById = (id: string) =>
+    match.team1?.id === id ? getTeamDisplayName(match.team1)
+      : match.team2?.id === id ? getTeamDisplayName(match.team2) : '팀';
+  const rpsTeamA = rps ? { id: rps.teamAId, name: teamNameById(rps.teamAId), color: null } : null;
+  const rpsTeamB = rps ? { id: rps.teamBId, name: teamNameById(rps.teamBId), color: null } : null;
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={`매치 #${match.matchNumber} 상세 정보`} size="md">
       <p className="text-text-secondary mb-4">
@@ -238,6 +285,21 @@ export function MatchDetailModal({
           <span className="text-sm font-medium text-text-secondary">상태</span>
           {getStatusBadge(match.status)}
         </div>
+
+        {/* 가위바위보 진영 결정 */}
+        {rpsActive && rps && rpsTeamA && rpsTeamB && (
+          <div className="rounded-xl border border-bg-tertiary bg-bg-secondary/40 p-3">
+            <MatchRpsFlow
+              rps={rps}
+              reveal={rpsReveal}
+              currentUserId={user?.id}
+              teamA={rpsTeamA}
+              teamB={rpsTeamB}
+              onSubmit={(hand: RpsHand) => { void matchSocketHelpers.rpsSubmit(match.id, hand); }}
+              onChooseSide={(side) => { void matchSocketHelpers.rpsChooseSide(match.id, side); }}
+            />
+          </div>
+        )}
 
         {/* Live Game Status */}
         {match.status === 'IN_PROGRESS' && liveStatus?.isLive && (
@@ -311,7 +373,7 @@ export function MatchDetailModal({
           </div>
         )}
 
-        {match.status !== 'COMPLETED' && (
+        {match.status !== 'COMPLETED' && !rpsActive && (
           <div>
             <h3 className="text-md font-semibold mb-2 text-text-primary">토너먼트 코드</h3>
             {match.tournamentCode ? (
@@ -334,14 +396,19 @@ export function MatchDetailModal({
           </div>
         )}
 
-        {canManageMatch && match.status === 'PENDING' && match.team1 && match.team2 && (
+        {canManageMatch && match.status === 'PENDING' && !rpsActive && match.team1 && match.team2 && (
           <div className="pt-4 border-t border-bg-tertiary">
             <Button
               className="w-full"
               onClick={async () => {
                 setIsStarting(true);
                 try {
-                  await onStartMatch(match.id);
+                  // 가위바위보 진영 결정 시작 (서버가 진영 확정 후 매치를 IN_PROGRESS로 시작)
+                  const res = await matchSocketHelpers.rpsStart(match.id);
+                  if (res && res.success === false) {
+                    // 소켓 실패 시 기존 HTTP 시작으로 폴백
+                    await onStartMatch(match.id);
+                  }
                 } finally {
                   setIsStarting(false);
                 }
@@ -349,7 +416,7 @@ export function MatchDetailModal({
               disabled={isStarting}
             >
               {isStarting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Swords className="mr-2 h-4 w-4" />}
-              매치 시작
+              매치 시작 (가위바위보)
             </Button>
           </div>
         )}

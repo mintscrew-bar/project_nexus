@@ -677,6 +677,35 @@ export const matchSocketHelpers = {
     matchSocket?.on("session-aborted", callback);
   },
 
+  // ── 가위바위보 진영 결정 ──
+  rpsStart: (matchId: string): Promise<any> =>
+    new Promise((resolve) => {
+      if (!matchSocket) return resolve({ success: false, error: "no_socket" });
+      matchSocket.emit("rps:start", { matchId }, (res: any) => resolve(res ?? {}));
+    }),
+  rpsSubmit: (matchId: string, hand: "rock" | "paper" | "scissors"): Promise<any> =>
+    new Promise((resolve) => {
+      if (!matchSocket) return resolve({ success: false, error: "no_socket" });
+      matchSocket.emit("rps:submit", { matchId, hand }, (res: any) => resolve(res ?? {}));
+    }),
+  rpsChooseSide: (matchId: string, side: "blue" | "red"): Promise<any> =>
+    new Promise((resolve) => {
+      if (!matchSocket) return resolve({ success: false, error: "no_socket" });
+      matchSocket.emit("rps:choose-side", { matchId, side }, (res: any) => resolve(res ?? {}));
+    }),
+  onRpsState: (callback: (data: any) => void) => {
+    matchSocket?.on("rps:state", callback);
+  },
+  onRpsReveal: (callback: (data: any) => void) => {
+    matchSocket?.on("rps:reveal", callback);
+  },
+  onRpsDone: (callback: (data: any) => void) => {
+    matchSocket?.on("rps:done", callback);
+  },
+  onRpsInvite: (callback: (data: any) => void) => {
+    matchSocket?.on("rps:invite", callback);
+  },
+
   offAllListeners: () => {
     matchSocket?.off("bracket-generated");
     matchSocket?.off("match-started");
@@ -686,6 +715,10 @@ export const matchSocketHelpers = {
     matchSocket?.off("tournament-completed");
     matchSocket?.off("tournament-code-generated");
     matchSocket?.off("session-aborted");
+    matchSocket?.off("rps:state");
+    matchSocket?.off("rps:reveal");
+    matchSocket?.off("rps:done");
+    matchSocket?.off("rps:invite");
   },
 };
 

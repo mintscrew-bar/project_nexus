@@ -1,10 +1,11 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useMatchStore } from "@/stores/match-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { roomApi, matchApi } from "@/lib/api-client";
+import { connectMatchSocket } from "@/lib/socket-client";
 import { BracketView, Match, MatchDetailModal, VictoryScreen, GameChatPanel, getTeamDisplayName } from "@/components/domain";
 import { LoadingSpinner, Badge, Button } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
@@ -163,6 +164,23 @@ export default function BracketPage() {
     tournamentCode: m.tournamentCode,
     bracketSection: m.bracketRound || undefined,
   }));
+
+  // 가위바위보 소집(rps:invite) — 호스트가 매치 시작 시 상대 팀장 모달 자동 오픈
+  const bracketMatchesRef = useRef(bracketMatches);
+  bracketMatchesRef.current = bracketMatches;
+  useEffect(() => {
+    const socket = connectMatchSocket();
+    if (!socket) return;
+    const onInvite = (data: { matchId?: string }) => {
+      const m = bracketMatchesRef.current.find((bm) => bm.id === data?.matchId);
+      if (m) {
+        setSelectedMatch(m);
+        setIsModalOpen(true);
+      }
+    };
+    socket.on('rps:invite', onInvite);
+    return () => { socket.off('rps:invite', onInvite); };
+  }, []);
 
   // Get tournament status
   const completedMatches = bracketMatches.filter(m => m.status === 'COMPLETED').length;
