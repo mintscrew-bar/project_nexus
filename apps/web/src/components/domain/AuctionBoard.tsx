@@ -134,11 +134,13 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
 }) => {
   const sortedTeams = useMemo(
     () =>
-      [...teams].sort((a, b) => {
-        const oa = parseTeamOrder(a.name);
-        const ob = parseTeamOrder(b.name);
+      [...(teams ?? [])].sort((a, b) => {
+        const na = String(a?.name ?? "");
+        const nb = String(b?.name ?? "");
+        const oa = parseTeamOrder(na);
+        const ob = parseTeamOrder(nb);
         if (oa !== ob) return oa - ob;
-        return a.name.localeCompare(b.name);
+        return na.localeCompare(nb);
       }),
     [teams],
   );

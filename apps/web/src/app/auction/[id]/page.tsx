@@ -553,13 +553,18 @@ export default function AuctionRoomPage() {
   }, [bidHistory.length]);
 
   // ── LoL형 레이아웃: 팀 정렬 후 좌우 균등 분할 (훅 규칙: early return 이전에 선언) ──
+  // 방어: teams/이름이 null·undefined여도 절대 throw하지 않게 (비정상 방 상태에서 페이지 전체 크래시 방지)
   const sortedTeamsForLayout = useMemo(
     () =>
-      [...teams].sort((a: any, b: any) => {
-        const oa = a.name.match(/\d+/) ? Number(a.name.match(/\d+/)![0]) : Infinity;
-        const ob = b.name.match(/\d+/) ? Number(b.name.match(/\d+/)![0]) : Infinity;
+      [...(teams ?? [])].sort((a: any, b: any) => {
+        const na = String(a?.name ?? "");
+        const nb = String(b?.name ?? "");
+        const ma = na.match(/\d+/);
+        const mb = nb.match(/\d+/);
+        const oa = ma ? Number(ma[0]) : Infinity;
+        const ob = mb ? Number(mb[0]) : Infinity;
         if (oa !== ob) return oa - ob;
-        return a.name.localeCompare(b.name);
+        return na.localeCompare(nb);
       }),
     [teams],
   );
@@ -929,12 +934,14 @@ export default function AuctionRoomPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            {teams
+            {(teams ?? [])
               .slice()
               .sort((a, b) => {
-                const oa = a.name.match(/\d+/) ? Number(a.name.match(/\d+/)![0]) : Infinity;
-                const ob = b.name.match(/\d+/) ? Number(b.name.match(/\d+/)![0]) : Infinity;
-                return oa - ob || a.name.localeCompare(b.name);
+                const na = String(a?.name ?? "");
+                const nb = String(b?.name ?? "");
+                const oa = na.match(/\d+/) ? Number(na.match(/\d+/)![0]) : Infinity;
+                const ob = nb.match(/\d+/) ? Number(nb.match(/\d+/)![0]) : Infinity;
+                return oa - ob || na.localeCompare(nb);
               })
               .map((team) => {
                 const members = (team as any).members ?? [];
