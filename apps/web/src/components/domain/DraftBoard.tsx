@@ -52,7 +52,7 @@ export function DraftBoard({
   const [timeLeft, setTimeLeft] = React.useState(0);
   const [selectedPlayer, setSelectedPlayer] = React.useState<string | null>(null);
   const [isPicking, setIsPicking] = React.useState(false);
-  const [hoveredPlayer, setHoveredPlayer] = useState<{ player: Player; rect: DOMRect } | null>(null);
+  const [hoveredPlayer, setHoveredPlayer] = useState<{ userId: string; rect: DOMRect } | null>(null);
   const [profileUserId, setProfileUserId] = useState<string | null>(null);
   // 모바일(<lg)에서 매물/팀 탭 전환
   const [mobileTab, setMobileTab] = useState<"pool" | "teams">("pool");
@@ -63,12 +63,14 @@ export function DraftBoard({
   }, []);
 
   const scheduleHoverClose = useCallback(() => {
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
     hoverTimerRef.current = setTimeout(() => setHoveredPlayer(null), 80);
   }, []);
 
-  const handlePlayerHover = useCallback((player: Player, el: HTMLElement) => {
+  const handlePlayerHover = useCallback((userId: string, el: HTMLElement) => {
     cancelHoverClose();
-    setHoveredPlayer({ player, rect: el.getBoundingClientRect() });
+    const rect = el.getBoundingClientRect();
+    hoverTimerRef.current = setTimeout(() => setHoveredPlayer({ userId, rect }), 300);
   }, [cancelHoverClose]);
 
   // Calculate time remaining
@@ -166,7 +168,7 @@ export function DraftBoard({
             <div
               key={member.id}
               className="flex items-center justify-between rounded-lg bg-bg-tertiary/50 px-2.5 py-2 cursor-default"
-              onMouseEnter={(e) => handlePlayerHover(member, e.currentTarget)}
+              onMouseEnter={(e) => handlePlayerHover(member.id, e.currentTarget)}
               onMouseLeave={scheduleHoverClose}
             >
               <div className="flex items-center gap-2 min-w-0">
@@ -210,7 +212,7 @@ export function DraftBoard({
             key={player.id}
             onClick={() => setSelectedPlayer(player.id)}
             disabled={!isMyTurn || disabled}
-            onMouseEnter={(e) => handlePlayerHover(player, e.currentTarget)}
+            onMouseEnter={(e) => handlePlayerHover(player.id, e.currentTarget)}
             onMouseLeave={scheduleHoverClose}
             className={cn(
               "w-full flex items-center justify-between rounded-lg border px-3 py-2.5 transition-colors text-left",
@@ -350,16 +352,9 @@ export function DraftBoard({
 
       {hoveredPlayer && (
         <PlayerHoverCard
-          participant={{
-            userId: hoveredPlayer.player.id,
-            username: hoveredPlayer.player.username,
-            riotAccount: hoveredPlayer.player.tier && hoveredPlayer.player.tier !== "UNRANKED"
-              ? { tier: hoveredPlayer.player.tier, rank: hoveredPlayer.player.rank, mainRole: hoveredPlayer.player.position }
-              : null,
-            clanMemberships: [],
-          }}
+          userId={hoveredPlayer.userId}
           anchorRect={hoveredPlayer.rect}
-          onOpenProfile={(userId) => { setProfileUserId(userId); setHoveredPlayer(null); }}
+          onOpenProfile={(uid) => { setProfileUserId(uid); setHoveredPlayer(null); }}
           onMouseEnter={cancelHoverClose}
           onMouseLeave={scheduleHoverClose}
         />

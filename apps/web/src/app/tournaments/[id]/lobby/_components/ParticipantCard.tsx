@@ -23,7 +23,7 @@ export function ParticipantCard({
   const handleMouseEnter = () => {
     cancelHoverClose?.();
     if (cardRef.current) {
-      setHoveredPlayer({ id: p.id, rect: cardRef.current.getBoundingClientRect(), participant: p });
+      setHoveredPlayer({ id: p.userId ?? p.id, rect: cardRef.current.getBoundingClientRect() });
     }
   };
 

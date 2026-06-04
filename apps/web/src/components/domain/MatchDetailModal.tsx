@@ -793,25 +793,24 @@ function LaneRoster({
 
 // 한 명의 선수 셀 — 호버하면 PlayerHoverCard 표시
 function PlayerCell({ member, onOpenProfile }: { member: MatchMember; onOpenProfile: (userId: string) => void }) {
-  const [hoveredRect, setHoveredRect] = useState<DOMRect | null>(null);
+  const [hovered, setHovered] = useState<DOMRect | null>(null);
   const hoverTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const cancelHoverClose = () => { if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current); };
-  const scheduleHoverClose = () => { hoverTimerRef.current = setTimeout(() => setHoveredRect(null), 80); };
-
-  const participant = {
-    userId: member.user.id,
-    username: member.user.username,
-    avatar: member.user.avatar,
-    riotAccount: member.user.riotAccounts?.[0] ?? null,
-    clanMemberships: [],
+  const scheduleHoverClose = () => {
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+    hoverTimerRef.current = setTimeout(() => setHovered(null), 80);
   };
 
   return (
     <>
       <div
         className="relative flex items-center gap-1.5 py-0.5 cursor-default"
-        onMouseEnter={(e) => { cancelHoverClose(); setHoveredRect(e.currentTarget.getBoundingClientRect()); }}
+        onMouseEnter={(e) => {
+          cancelHoverClose();
+          const rect = e.currentTarget.getBoundingClientRect();
+          hoverTimerRef.current = setTimeout(() => setHovered(rect), 300);
+        }}
         onMouseLeave={scheduleHoverClose}
       >
         <div className="w-5 h-5 rounded-full bg-bg-tertiary overflow-hidden flex-shrink-0">
@@ -826,11 +825,11 @@ function PlayerCell({ member, onOpenProfile }: { member: MatchMember; onOpenProf
         </div>
         <span className="text-xs text-text-primary truncate">{member.user.username}</span>
       </div>
-      {hoveredRect && (
+      {hovered && (
         <PlayerHoverCard
-          participant={participant}
-          anchorRect={hoveredRect}
-          onOpenProfile={(userId) => { setHoveredRect(null); onOpenProfile(userId); }}
+          userId={member.user.id}
+          anchorRect={hovered}
+          onOpenProfile={(uid) => { setHovered(null); onOpenProfile(uid); }}
           onMouseEnter={cancelHoverClose}
           onMouseLeave={scheduleHoverClose}
         />

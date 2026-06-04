@@ -155,4 +155,9 @@ export class UserController {
   ) {
     return this.userService.getUserStats(id, requesterId);
   }
+
+  @Get(":id/hover-profile")
+  async getHoverProfile(@Param("id") id: string) {
+    return this.userService.getHoverProfile(id);
+  }
 }

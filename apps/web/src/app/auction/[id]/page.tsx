@@ -44,15 +44,21 @@ function PlayersList({
   onExpand?: () => void;
   compact?: boolean;
 }) {
-  const [hoveredPlayer, setHoveredPlayer] = useState<{ player: any; rect: DOMRect } | null>(null);
+  const [hoveredPlayer, setHoveredPlayer] = useState<{ userId: string; rect: DOMRect } | null>(null);
   const [profileUserId, setProfileUserId] = useState<string | null>(null);
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cancelHoverClose = useCallback(() => {
     if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
   }, []);
   const scheduleHoverClose = useCallback(() => {
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
     hoverTimerRef.current = setTimeout(() => setHoveredPlayer(null), 80);
   }, []);
+  const handleHover = useCallback((userId: string, el: HTMLElement) => {
+    cancelHoverClose();
+    const rect = el.getBoundingClientRect();
+    hoverTimerRef.current = setTimeout(() => setHoveredPlayer({ userId, rect }), 300);
+  }, [cancelHoverClose]);
 
   return (
     <div className="h-full flex flex-col min-h-0">
@@ -93,10 +99,7 @@ function PlayersList({
                         ? "bg-accent-primary/15 ring-1 ring-accent-primary/40"
                         : "bg-bg-secondary hover:bg-bg-tertiary",
                     )}
-                    onMouseEnter={(e) => {
-                      cancelHoverClose();
-                      setHoveredPlayer({ player, rect: e.currentTarget.getBoundingClientRect() });
-                    }}
+                    onMouseEnter={(e) => handleHover(player.id, e.currentTarget)}
                     onMouseLeave={scheduleHoverClose}
                     onClick={() => setProfileUserId(player.id)}
                   >
@@ -138,10 +141,7 @@ function PlayersList({
                       ? "bg-accent-primary/10 border border-accent-primary/30"
                       : "bg-bg-secondary hover:bg-bg-tertiary"
                   }`}
-                  onMouseEnter={(e) => {
-                    cancelHoverClose();
-                    setHoveredPlayer({ player, rect: e.currentTarget.getBoundingClientRect() });
-                  }}
+                  onMouseEnter={(e) => handleHover(player.id, e.currentTarget)}
                   onMouseLeave={scheduleHoverClose}
                   onClick={() => setProfileUserId(player.id)}
                 >
@@ -178,19 +178,11 @@ function PlayersList({
       {/* 호버 카드 */}
       {hoveredPlayer && (
         <PlayerHoverCard
-          participant={{
-            userId: hoveredPlayer.player.id,
-            username: hoveredPlayer.player.username,
-            avatar: hoveredPlayer.player.avatar,
-            riotAccount: hoveredPlayer.player.tier && hoveredPlayer.player.tier !== "UNRANKED"
-              ? { tier: hoveredPlayer.player.tier, rank: hoveredPlayer.player.rank, mainRole: hoveredPlayer.player.mainRole, subRole: hoveredPlayer.player.subRole }
-              : null,
-            clanMemberships: [],
-          }}
+          userId={hoveredPlayer.userId}
           anchorRect={hoveredPlayer.rect}
           onMouseEnter={cancelHoverClose}
           onMouseLeave={scheduleHoverClose}
-          onOpenProfile={() => { setProfileUserId(hoveredPlayer.player.id); setHoveredPlayer(null); }}
+          onOpenProfile={(uid) => { setProfileUserId(uid); setHoveredPlayer(null); }}
         />
       )}
       {profileUserId && (
@@ -254,7 +246,7 @@ function TeamSideColumn({
   currentUserId?: string;
   auctionState: any;
 }) {
-  const [hoveredPlayer, setHoveredPlayer] = useState<{ player: any; rect: DOMRect } | null>(null);
+  const [hoveredPlayer, setHoveredPlayer] = useState<{ userId: string; rect: DOMRect } | null>(null);
   const [profileUserId, setProfileUserId] = useState<string | null>(null);
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -263,8 +255,15 @@ function TeamSideColumn({
   }, []);
 
   const scheduleHoverClose = useCallback(() => {
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
     hoverTimerRef.current = setTimeout(() => setHoveredPlayer(null), 80);
   }, []);
+
+  const handleHover = useCallback((userId: string, el: HTMLElement) => {
+    cancelHoverClose();
+    const rect = el.getBoundingClientRect();
+    hoverTimerRef.current = setTimeout(() => setHoveredPlayer({ userId, rect }), 300);
+  }, [cancelHoverClose]);
 
   return (
     /* 팀 수에 따라 균등 분할, 최소 210px 보장 — 넘치면 사이드 스크롤 */
@@ -332,10 +331,7 @@ function TeamSideColumn({
                       "flex min-h-0 cursor-default items-center gap-1.5 rounded px-2",
                       isCaptain ? "bg-accent-gold/10" : "bg-bg-tertiary/60",
                     )}
-                    onMouseEnter={(e) => {
-                      cancelHoverClose();
-                      setHoveredPlayer({ player: member, rect: e.currentTarget.getBoundingClientRect() });
-                    }}
+                    onMouseEnter={(e) => handleHover(member.id, e.currentTarget)}
                     onMouseLeave={scheduleHoverClose}
                   >
                     <span className="w-4 shrink-0 text-center text-[10px] text-text-tertiary">
@@ -383,26 +379,9 @@ function TeamSideColumn({
 
       {hoveredPlayer && (
         <PlayerHoverCard
-          participant={{
-            userId: hoveredPlayer.player.id,
-            username: hoveredPlayer.player.username,
-            avatar: hoveredPlayer.player.avatar,
-            riotAccount:
-              hoveredPlayer.player.tier && hoveredPlayer.player.tier !== "UNRANKED"
-                ? {
-                    tier: hoveredPlayer.player.tier,
-                    rank: hoveredPlayer.player.rank,
-                    mainRole: hoveredPlayer.player.mainRole,
-                    subRole: hoveredPlayer.player.subRole,
-                  }
-                : null,
-            clanMemberships: [],
-          }}
+          userId={hoveredPlayer.userId}
           anchorRect={hoveredPlayer.rect}
-          onOpenProfile={(userId) => {
-            setProfileUserId(userId);
-            setHoveredPlayer(null);
-          }}
+          onOpenProfile={(uid) => { setProfileUserId(uid); setHoveredPlayer(null); }}
           onMouseEnter={cancelHoverClose}
           onMouseLeave={scheduleHoverClose}
         />

@@ -449,6 +449,28 @@ export const userApi = {
     return response.data;
   },
 
+  getHoverProfile: async (userId: string): Promise<{
+    username: string;
+    avatar: string | null;
+    riotAccount: {
+      gameName: string;
+      tagLine: string;
+      tier: string;
+      rank: string;
+      peakTier: string | null;
+      peakRank: string | null;
+      mainRole: string | null;
+      subRole: string | null;
+      championPreferences: { role: string; championId: string; order: number }[];
+    } | null;
+    clan: { name: string; tag: string | null } | null;
+    stats: { wins: number; losses: number; winRate: number };
+    reputation: { overallAverage: number; totalRatings: number };
+  }> => {
+    const response = await apiClient.get(`/users/${userId}/hover-profile`);
+    return response.data;
+  },
+
   getSettings: async () => {
     const response = await apiClient.get("/users/settings");
     return response.data;

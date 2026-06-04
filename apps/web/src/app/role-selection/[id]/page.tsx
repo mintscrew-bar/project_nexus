@@ -34,7 +34,7 @@ export default function RoleSelectionPage() {
   const hasRedirected = useRef(false);
   const [isAborting, setIsAborting] = useState(false);
   const [isAbortConfirmOpen, setIsAbortConfirmOpen] = useState(false);
-  const [hoveredMember, setHoveredMember] = useState<{ participant: any; rect: DOMRect } | null>(null);
+  const [hoveredMember, setHoveredMember] = useState<{ userId: string; rect: DOMRect } | null>(null);
   const [profileUserId, setProfileUserId] = useState<string | null>(null);
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -43,8 +43,15 @@ export default function RoleSelectionPage() {
   }, []);
 
   const scheduleHoverClose = useCallback(() => {
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
     hoverTimerRef.current = setTimeout(() => setHoveredMember(null), 80);
   }, []);
+
+  const handleMemberHover = useCallback((userId: string, el: HTMLElement) => {
+    cancelHoverClose();
+    const rect = el.getBoundingClientRect();
+    hoverTimerRef.current = setTimeout(() => setHoveredMember({ userId, rect }), 300);
+  }, [cancelHoverClose]);
 
   const {
     room,
@@ -284,20 +291,7 @@ export default function RoleSelectionPage() {
                             "flex items-center gap-3 px-3 py-2.5 rounded-lg border cursor-default",
                             isMe ? "bg-accent-primary/5 border-accent-primary/20" : "bg-bg-tertiary/60 border-transparent"
                           )}
-                          onMouseEnter={(e) => {
-                            cancelHoverClose();
-                            const riot = member.user.riotAccounts?.[0] ?? null;
-                            setHoveredMember({
-                              participant: {
-                                userId: member.userId,
-                                username: member.user.username,
-                                avatar: member.user.avatar,
-                                riotAccount: riot,
-                                clanMemberships: [],
-                              },
-                              rect: e.currentTarget.getBoundingClientRect(),
-                            });
-                          }}
+                          onMouseEnter={(e) => handleMemberHover(member.userId, e.currentTarget)}
                           onMouseLeave={scheduleHoverClose}
                         >
                           <Avatar
@@ -388,9 +382,9 @@ export default function RoleSelectionPage() {
       <GameChatPanel roomId={roomId} />
       {hoveredMember && (
         <PlayerHoverCard
-          participant={hoveredMember.participant}
+          userId={hoveredMember.userId}
           anchorRect={hoveredMember.rect}
-          onOpenProfile={(userId) => { setProfileUserId(userId); setHoveredMember(null); }}
+          onOpenProfile={(uid) => { setProfileUserId(uid); setHoveredMember(null); }}
           onMouseEnter={cancelHoverClose}
           onMouseLeave={scheduleHoverClose}
         />

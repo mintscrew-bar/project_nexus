@@ -10,14 +10,15 @@ import { RoomSettingsModal } from "@/components/domain/RoomSettingsModal";
 import { UserSettingsModal } from "@/components/domain/UserSettingsModal";
 import { ConfirmModal, Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
-import { useShallow } from "zustand/shallow";
+import { shallow } from "zustand/shallow";
 import {
   Users, X, MessageSquare, Settings,
   UserCog,
   ArrowLeft, Shield, Swords, Volume2, VolumeX, Share2, LogOut, CheckCircle2, Clock3,
 } from "lucide-react";
 import Link from "next/link";
-import { friendApi, adminApi, roomApi, ensureValidToken } from "@/lib/api-client";
+import { friendApi, adminApi, roomApi, userApi, ensureValidToken } from "@/lib/api-client";
+import { useQueryClient } from "@tanstack/react-query";
 import { PlayerHoverCard } from "@/components/domain/PlayerHoverCard";
 import { PlayerProfileModal } from "@/components/domain/PlayerProfileModal";
 import { LobbyParticipantsList } from "./_components/LobbyParticipantsList";
@@ -39,7 +40,7 @@ export default function TournamentLobbyPage() {
   const {
     connect, disconnect, room, isConnected, error, gameStarting,
     setReady, startGame, kickParticipant, toggleSpectator, selectTeam
-  } = useLobbyStore(useShallow(state => ({
+  } = useLobbyStore(state => ({
     connect: state.connect,
     disconnect: state.disconnect,
     room: state.room,
@@ -51,7 +52,7 @@ export default function TournamentLobbyPage() {
     kickParticipant: state.kickParticipant,
     toggleSpectator: state.toggleSpectator,
     selectTeam: state.selectTeam,
-  })));
+  }), shallow);
 
   // 채팅 메시지와 발송 함수는 따로 분리 (채팅이 올라올 때 전체 로비 UI 리렌더링 방지)
   const messages = useLobbyStore(state => state.messages);
@@ -59,17 +60,20 @@ export default function TournamentLobbyPage() {
 
   const currentUser = useAuthStore(state => state.user);
   const { addToast } = useToast(); // useToast internally might already be optimized or use context
-  const { friends, fetchFriends } = useFriendStore(useShallow(state => ({
+  const { friends, fetchFriends } = useFriendStore(state => ({
     friends: state.friends,
     fetchFriends: state.fetchFriends,
-  })));
+  }), shallow);
+
+  const queryClient = useQueryClient();
+  const prefetchedRef = useRef(false);
 
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isUserSettingsModalOpen, setIsUserSettingsModalOpen] = useState(false);
   const [kickTarget, setKickTarget] = useState<{ id: string; username: string } | null>(null);
   const [isKicking, setIsKicking] = useState(false);
   const [isAddingBot, setIsAddingBot] = useState(false);
-  const [hoveredPlayer, setHoveredPlayer] = useState<{ id: string; rect: DOMRect; participant: any } | null>(null);
+  const [hoveredPlayer, setHoveredPlayer] = useState<{ id: string; rect: DOMRect } | null>(null);
   const [profileUserId, setProfileUserId] = useState<string | null>(null);
   const [addingFriend, setAddingFriend] = useState<string | null>(null);
   const [sentFriendIds, setSentFriendIds] = useState<Set<string>>(new Set());
@@ -310,6 +314,22 @@ export default function TournamentLobbyPage() {
   const players = room.participants.filter((p: any) => p.role !== "SPECTATOR");
   const spectators = room.participants.filter((p: any) => p.role === "SPECTATOR");
 
+  // 참가자 hover-profile 선제 로드 — 첫 렌더 이후 150ms 간격으로 순차 prefetch
+  useEffect(() => {
+    if (prefetchedRef.current || !players.length) return;
+    prefetchedRef.current = true;
+    players.forEach((p: any, i: number) => {
+      const uid = p.userId ?? p.id;
+      setTimeout(() => {
+        queryClient.prefetchQuery({
+          queryKey: ["hoverProfile", uid],
+          queryFn: () => userApi.getHoverProfile(uid),
+          staleTime: 10 * 60 * 1000,
+        });
+      }, i * 150);
+    });
+  }, [players, queryClient]);
+
   const readyCount = players.filter((p: any) => p.isReady).length;
   const totalPlayers = players.length;
   const allPlayersReady = totalPlayers > 0 && readyCount === totalPlayers;
@@ -470,12 +490,9 @@ export default function TournamentLobbyPage() {
       {/* 참가자 호버 툴팁 — overflow-hidden 탈출을 위해 페이지 최상위에서 렌더링 */}
       {hoveredPlayer && (
         <PlayerHoverCard
-          participant={hoveredPlayer.participant}
+          userId={hoveredPlayer.id}
           anchorRect={hoveredPlayer.rect}
-          onOpenProfile={(userId) => {
-            setProfileUserId(userId);
-            setHoveredPlayer(null);
-          }}
+          onOpenProfile={(uid) => { setProfileUserId(uid); setHoveredPlayer(null); }}
           onMouseEnter={cancelHoverClose}
           onMouseLeave={scheduleHoverClose}
         />
@@ -662,11 +679,11 @@ export default function TournamentLobbyPage() {
         )}
 
         {/* ═══ Main Content: Desktop 2-col / Mobile Tabs ═══ */}
-        <div className="flex-1 min-h-0 overflow-hidden">
+        <div className="min-h-0 flex-1 basis-0 overflow-hidden">
           {/* Desktop layout (lg+) */}
-          <div className="hidden lg:flex h-full container mx-auto px-6 py-4 gap-4">
+          <div className="container mx-auto hidden h-full min-h-0 gap-4 px-6 py-4 lg:flex">
             {/* Participants: 2/3 */}
-            <section className="flex-[2] min-w-0 bg-bg-secondary border border-bg-tertiary rounded-xl flex flex-col overflow-hidden">
+            <section className="flex min-h-0 min-w-0 flex-[2] flex-col overflow-hidden rounded-xl border border-bg-tertiary bg-bg-secondary">
               <div className="px-5 py-3 border-b border-bg-tertiary flex items-center justify-between">
                 <h2 className="font-bold text-text-primary flex items-center gap-2">
                   <Users className="h-5 w-5 text-text-secondary" />
@@ -674,28 +691,28 @@ export default function TournamentLobbyPage() {
                   <span className="text-sm font-normal text-text-tertiary">{totalPlayers}/{room.maxParticipants}</span>
                 </h2>
               </div>
-              <div className="flex-1 overflow-y-auto p-4">
+              <div className="min-h-0 flex-1 basis-0 overflow-y-auto p-4">
                 {participantsList}
               </div>
             </section>
 
             {/* Chat: 1/3 */}
-            <section className="flex-[1] min-w-0 bg-bg-secondary border border-bg-tertiary rounded-xl flex flex-col overflow-hidden">
+            <section className="flex min-h-0 min-w-0 flex-[1] flex-col overflow-hidden rounded-xl border border-bg-tertiary bg-bg-secondary">
               <div className="px-5 py-3 border-b border-bg-tertiary">
                 <h2 className="font-bold text-text-primary flex items-center gap-2">
                   <MessageSquare className="h-5 w-5 text-text-secondary" />
                   채팅
                 </h2>
               </div>
-              <div className="flex-1 min-h-0 overflow-hidden">
+              <div className="min-h-0 flex-1 basis-0 overflow-hidden">
                 {chatPanel}
               </div>
             </section>
           </div>
 
           {/* Mobile layout (< lg) */}
-          <div className="lg:hidden flex flex-col h-full">
-            <Tabs defaultValue="participants" value={mobileTab} onValueChange={setMobileTab} className="flex flex-col h-full">
+          <div className="flex h-full min-h-0 flex-col lg:hidden">
+            <Tabs defaultValue="participants" value={mobileTab} onValueChange={setMobileTab} className="flex h-full min-h-0 flex-col overflow-hidden">
               <div className="px-4 pt-3 flex-shrink-0">
                 <TabsList className="w-full">
                   <TabsTrigger value="participants" className="flex-1 justify-center">
@@ -707,10 +724,10 @@ export default function TournamentLobbyPage() {
                   </TabsTrigger>
                 </TabsList>
               </div>
-              <TabsContent value="participants" className="flex-1 overflow-y-auto p-4">
+              <TabsContent value="participants" className="min-h-0 flex-1 basis-0 overflow-y-auto p-4">
                 {participantsList}
               </TabsContent>
-              <TabsContent value="chat" className="flex flex-1 min-h-0 overflow-hidden p-4">
+              <TabsContent value="chat" className="flex min-h-0 flex-1 basis-0 overflow-hidden p-4">
                 {chatPanel}
               </TabsContent>
             </Tabs>

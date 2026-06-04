@@ -7,6 +7,7 @@ import {
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../prisma/prisma.service";
 import { DiscordAdminAlertService } from "../discord/discord-admin-alert.service";
+import { ReputationService } from "../reputation/reputation.service";
 
 @Injectable()
 export class UserService {
@@ -14,6 +15,7 @@ export class UserService {
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
     private readonly adminAlerts: DiscordAdminAlertService,
+    private readonly reputationService: ReputationService,
   ) {}
 
   async findById(id: string) {
@@ -153,6 +155,65 @@ export class UserService {
       losses,
       winRate: wins + losses > 0 ? (wins / (wins + losses)) * 100 : 0,
       participations: teamMembers.length,
+    };
+  }
+
+  async getHoverProfile(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        username: true,
+        avatar: true,
+        riotAccounts: {
+          where: { isPrimary: true },
+          select: {
+            gameName: true,
+            tagLine: true,
+            tier: true,
+            rank: true,
+            peakTier: true,
+            peakRank: true,
+            mainRole: true,
+            subRole: true,
+            championPreferences: {
+              orderBy: { order: "asc" },
+              select: { role: true, championId: true, order: true },
+            },
+          },
+        },
+        clanMemberships: {
+          take: 1,
+          select: {
+            clan: { select: { name: true, tag: true } },
+          },
+        },
+      },
+    });
+
+    if (!user) throw new NotFoundException("User not found");
+
+    const [stats, reputation] = await Promise.all([
+      this.getUserStats(userId),
+      this.reputationService.getUserReputationStats(userId),
+    ]);
+
+    const riot = user.riotAccounts[0] ?? null;
+    const clan = user.clanMemberships[0]?.clan ?? null;
+
+    return {
+      username: user.username,
+      avatar: user.avatar,
+      riotAccount: riot,
+      clan,
+      stats: {
+        wins: stats.wins,
+        losses: stats.losses,
+        winRate: stats.winRate,
+      },
+      reputation: {
+        overallAverage: reputation.overallAverage,
+        totalRatings: reputation.totalRatings,
+      },
     };
   }
 

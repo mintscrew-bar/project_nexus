@@ -85,10 +85,11 @@ export const useAuthStore = create<AuthState>((set) => ({
     _initPromise = (async () => {
       set({ isLoading: true });
 
-      // 캐시된 유저가 있으면 즉시 헤더에 표시 (isAuthenticated는 false 유지)
+      // 캐시된 유저가 있으면 게임 룸 재연결처럼 현재 상태를 유지한다.
+      // 서버/네트워크가 일시적으로 불안정해도 즉시 로그아웃 UI로 튕기지 않게 한다.
       const cachedUser = loadUserFromStorage();
       if (cachedUser) {
-        set({ user: cachedUser });
+        set({ user: cachedUser, isAuthenticated: true });
       }
 
       try {
@@ -101,14 +102,16 @@ export const useAuthStore = create<AuthState>((set) => ({
       } catch (err: any) {
         // 네트워크 에러와 인증 실패를 구분:
         // - 401/403: 진짜 로그아웃 (세션 만료, 쿠키 없음) → 정리
-        // - 기타: 서버 일시 오류 → 캐시된 유저 유지, 로그아웃 처리 안 함
+        // - 기타/응답 없음: 서버 일시 오류 → 기존 상태 유지, 로그아웃 처리 안 함
         const status = err?.response?.status;
-        if (!status || status === 401 || status === 403) {
+        if (status === 401 || status === 403) {
           clearUserFromStorage();
           set({ user: null, isAuthenticated: false });
           setAccessToken(null);
+        } else if (cachedUser) {
+          set({ user: cachedUser, isAuthenticated: true });
         }
-        // 500, 네트워크 에러 등: isLoading만 해제하고 로그인 상태 유지 시도
+        // 500, 네트워크 에러 등: isLoading만 해제하고 로그인 상태 유지
       } finally {
         set({ isLoading: false });
         _initPromise = null;

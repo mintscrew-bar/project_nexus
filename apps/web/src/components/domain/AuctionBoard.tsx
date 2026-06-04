@@ -1,12 +1,14 @@
 "use client";
 
 import React, { useMemo, useState, useCallback, useRef, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, Button, Badge, Avatar } from "@/components/ui";
 import { TierBadge } from "./TierBadge";
 import { PlayerHoverCard } from "./PlayerHoverCard";
 import { PlayerProfileModal } from "./PlayerProfileModal";
 import { cn } from "@/lib/utils";
 import { Coins, AlertTriangle, ChevronDown, ChevronUp } from "lucide-react";
+import { userApi } from "@/lib/api-client";
 
 interface Player {
   id: string;
@@ -107,19 +109,6 @@ const parseTeamOrder = (name: string): number => {
   return m ? Number(m[0]) : Number.MAX_SAFE_INTEGER;
 };
 
-/** Player 객체를 PlayerHoverCard가 받는 participant 형태로 변환 */
-function toHoverParticipant(player: Player) {
-  return {
-    userId: player.id,
-    username: player.username,
-    avatar: player.avatar,
-    riotAccount: player.tier && player.tier !== "UNRANKED"
-      ? { tier: player.tier, rank: player.rank, mainRole: player.mainRole, subRole: player.subRole }
-      : null,
-    clanMemberships: [],
-  };
-}
-
 export const AuctionBoard: React.FC<AuctionBoardProps> = ({
   auctionState,
   teams,
@@ -168,21 +157,42 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
   const totalBid = auctionState.currentHighestBid + accumulatedBid;
   const canPlaceBid = accumulatedBid > 0 && totalBid <= availableBudget && !isBidding;
 
-  const [hoveredPlayer, setHoveredPlayer] = useState<{ player: Player; rect: DOMRect } | null>(null);
+  const [hoveredPlayer, setHoveredPlayer] = useState<{ userId: string; rect: DOMRect } | null>(null);
   const [profileUserId, setProfileUserId] = useState<string | null>(null);
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const queryClient = useQueryClient();
+
+  // 참가자 전원의 hover-profile을 입장 시점에 150ms 간격으로 미리 로드
+  const prefetchedRef = useRef(false);
+  const players = _players;
+  useEffect(() => {
+    if (prefetchedRef.current || !players.length) return;
+    prefetchedRef.current = true;
+    players.forEach((player, i) => {
+      setTimeout(() => {
+        queryClient.prefetchQuery({
+          queryKey: ["hoverProfile", player.id],
+          queryFn: () => userApi.getHoverProfile(player.id),
+          staleTime: 10 * 60 * 1000,
+        });
+      }, i * 150);
+    });
+  }, [players, queryClient]);
 
   const cancelHoverClose = useCallback(() => {
     if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
   }, []);
 
   const scheduleHoverClose = useCallback(() => {
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
     hoverTimerRef.current = setTimeout(() => setHoveredPlayer(null), 80);
   }, []);
 
-  const handlePlayerHover = useCallback((player: Player, el: HTMLElement) => {
+  // 300ms 대기 후 카드 표시 — 마우스 스쳐 지나가는 경우 불필요한 표시 방지
+  const handlePlayerHover = useCallback((userId: string, el: HTMLElement) => {
     cancelHoverClose();
-    setHoveredPlayer({ player, rect: el.getBoundingClientRect() });
+    const rect = el.getBoundingClientRect();
+    hoverTimerRef.current = setTimeout(() => setHoveredPlayer({ userId, rect }), 300);
   }, [cancelHoverClose]);
 
   const [teamsExpanded, setTeamsExpanded] = useState(true);
@@ -386,7 +396,7 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
               {/* 상단: 선수 정보 + 타이머 */}
               <div
                 className="flex items-center gap-5 p-6 cursor-pointer"
-                onMouseEnter={(e) => handlePlayerHover(auctionState.currentPlayer!, e.currentTarget)}
+                onMouseEnter={(e) => handlePlayerHover(auctionState.currentPlayer!.id, e.currentTarget)}
                 onMouseLeave={scheduleHoverClose}
                 onClick={() => setProfileUserId(auctionState.currentPlayer!.id)}
               >
@@ -717,7 +727,7 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
                         <div
                           key={player.id}
                           className={cn("flex items-center gap-2 px-2 py-1.5 rounded cursor-default", isCaptain ? "bg-accent-gold/5" : "bg-bg-tertiary/60")}
-                          onMouseEnter={(e) => handlePlayerHover(player, e.currentTarget)}
+                          onMouseEnter={(e) => handlePlayerHover(player.id, e.currentTarget)}
                           onMouseLeave={scheduleHoverClose}
                         >
                           <span className="text-xs text-text-tertiary w-4 text-center flex-shrink-0">{isCaptain ? "C" : idx}</span>
@@ -749,9 +759,9 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
 
       {hoveredPlayer && (
         <PlayerHoverCard
-          participant={toHoverParticipant(hoveredPlayer.player)}
+          userId={hoveredPlayer.userId}
           anchorRect={hoveredPlayer.rect}
-          onOpenProfile={(userId) => { setProfileUserId(userId); setHoveredPlayer(null); }}
+          onOpenProfile={(uid) => { setProfileUserId(uid); setHoveredPlayer(null); }}
           onMouseEnter={cancelHoverClose}
           onMouseLeave={scheduleHoverClose}
         />
@@ -803,7 +813,7 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
                         <div
                           key={player.id}
                           className={cn("flex items-center gap-2 p-1.5 rounded text-sm cursor-default", isCaptain ? "bg-accent-gold/10 border border-accent-gold/30" : "bg-bg-tertiary")}
-                          onMouseEnter={(e) => handlePlayerHover(player, e.currentTarget)}
+                          onMouseEnter={(e) => handlePlayerHover(player.id, e.currentTarget)}
                           onMouseLeave={scheduleHoverClose}
                         >
                           <span className="text-[10px] text-text-tertiary w-3 text-center flex-shrink-0">{isCaptain ? "C" : idx}</span>

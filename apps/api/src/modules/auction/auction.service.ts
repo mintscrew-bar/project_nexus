@@ -389,7 +389,7 @@ export class AuctionService implements OnModuleInit {
   // ========================================
 
   private async _startAuctionWithCaptains(
-    hostId: string,
+    _hostId: string,
     roomId: string,
     room: any,
   ) {
@@ -1530,6 +1530,11 @@ export class AuctionService implements OnModuleInit {
         rank: acc?.rank,
         mainRole: acc?.mainRole,
         subRole: acc?.subRole,
+        gameName: acc?.gameName,
+        tagLine: acc?.tagLine,
+        peakTier: acc?.peakTier,
+        peakRank: acc?.peakRank,
+        championPreferences: acc?.championPreferences ?? [],
         mmr: calculateTierScore(
           acc?.tier || "UNRANKED",
           acc?.rank || "",

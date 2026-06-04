@@ -55,25 +55,6 @@ const RANK_COLORS = [
   "text-orange-400",
 ];
 
-function toHoverParticipant(member: TeamMember) {
-  return {
-    id: member.id,
-    userId: member.userId ?? member.id,
-    username: member.username,
-    avatar: member.avatar ?? null,
-    riotAccount: member.gameName ? {
-      gameName: member.gameName,
-      tagLine: member.tagLine,
-      tier: member.tier,
-      rank: member.rank,
-      peakTier: member.peakTier,
-      peakRank: member.peakRank,
-      mainRole: member.mainRole ?? member.assignedRole,
-      subRole: member.subRole,
-      championPreferences: member.championPreferences ?? [],
-    } : null,
-  };
-}
 
 function MemberRow({
   member,
@@ -148,7 +129,7 @@ export function VictoryScreen({
   const [countdown, setCountdown] = useState(autoRedirectSeconds);
   const [isReturning, setIsReturning] = useState(false);
   const [teamMembers, setTeamMembers] = useState<Record<string, TeamMember[]>>(preloadedMembers ?? {});
-  const [hoveredPlayer, setHoveredPlayer] = useState<{ id: string; rect: DOMRect; participant: any } | null>(null);
+  const [hoveredPlayer, setHoveredPlayer] = useState<{ userId: string; rect: DOMRect } | null>(null);
   const hasNavigated = useRef(false);
   const hoverCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -165,11 +146,8 @@ export function VictoryScreen({
 
   const showMemberHover = useCallback((member: TeamMember, rect: DOMRect) => {
     cancelHoverClose();
-    setHoveredPlayer({
-      id: member.userId ?? member.id,
-      rect,
-      participant: toHoverParticipant(member),
-    });
+    const uid = member.userId ?? member.id;
+    hoverCloseTimer.current = setTimeout(() => setHoveredPlayer({ userId: uid, rect }), 300);
   }, [cancelHoverClose]);
 
   useEffect(() => {
@@ -261,12 +239,9 @@ export function VictoryScreen({
       >
         {hoveredPlayer && (
           <PlayerHoverCard
-            participant={hoveredPlayer.participant}
+            userId={hoveredPlayer.userId}
             anchorRect={hoveredPlayer.rect}
-            onOpenProfile={(userId) => {
-              setHoveredPlayer(null);
-              router.push(`/users/${userId}`);
-            }}
+            onOpenProfile={(uid) => { setHoveredPlayer(null); router.push(`/users/${uid}`); }}
             onMouseEnter={cancelHoverClose}
             onMouseLeave={scheduleHoverClose}
           />

@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import { usePresenceStore, type UserStatus } from "@/stores/presence-store";
 import { useAuthStore } from "@/stores/auth-store";
-import { useShallow } from "zustand/shallow";
+import { shallow } from "zustand/shallow";
 
 // 5분 비활동 시 자리비움으로 전환 (Discord와 동일)
 const IDLE_TIMEOUT_MS = 5 * 60 * 1000;
@@ -26,7 +26,7 @@ export function usePresence() {
     setStatus,
     fetchFriendsStatuses,
     getFriendStatus,
-  } = usePresenceStore(useShallow(state => ({
+  } = usePresenceStore(state => ({
     myStatus: state.myStatus,
     friendStatuses: state.friendStatuses,
     isConnected: state.isConnected,
@@ -37,7 +37,7 @@ export function usePresence() {
     setStatus: state.setStatus,
     fetchFriendsStatuses: state.fetchFriendsStatuses,
     getFriendStatus: state.getFriendStatus,
-  })));
+  }), shallow);
 
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentStatusRef = useRef<"ONLINE" | "AWAY">("ONLINE");
