@@ -35,38 +35,28 @@ const shouldBlockRefreshRetry = (error: unknown) => {
   return !status || status === 401 || status === 403 || status === 429;
 };
 
-// 리프레시 토큰까지 거부(401/403) = 세션 진짜 만료 (429/네트워크 오류는 제외)
-const isSessionDeadError = (error: unknown) => {
+// 리프레시 토큰까지 거부(401/403) = 현재 토큰으로는 인증 불가.
+// 단, 게임 룸 재연결처럼 화면의 로그인 상태는 유지하고 네트워크 연결만 정리한다.
+const isAuthUnavailableError = (error: unknown) => {
   if (!axios.isAxiosError(error)) return false;
   const status = error.response?.status;
   return status === 401 || status === 403;
 };
 
-// 회로차단기: 세션 만료 시 한 번만 깨끗이 로그아웃하고 모든 재시도/소켓 재연결 루프를 끊는다.
-// (이게 없으면 isAuthenticated가 true로 남아 usePresence가 connect()를 무한 반복 → 요청 폭주)
-let sessionExpiredHandled = false;
-async function handleSessionExpired() {
-  if (sessionExpiredHandled) return;
-  sessionExpiredHandled = true;
+// 회로차단기: 인증 불가 상태에서는 토큰만 정리하고 재시도 폭주를 끊는다.
+// 명시적 로그아웃이 아닌 이상 auth store/user cache는 건드리지 않는다.
+// 이미 연결된 게임/룸 소켓은 유지한다. 게임 룸처럼 실시간 연결을 최대한 보존하기 위함이다.
+let authUnavailableHandled = false;
+async function handleAuthUnavailable() {
+  if (authUnavailableHandled) return;
+  authUnavailableHandled = true;
   setAccessToken(null); // 토큰 정리 + proactive 예약 해제
   refreshPromise = null;
   try {
-    const { disconnectAllSockets } = await import("./socket-client");
-    disconnectAllSockets();
-  } catch {
-    // best-effort
-  }
-  try {
     const { useAuthStore } = await import("@/stores/auth-store");
-    useAuthStore.setState({ user: null, isAuthenticated: false, isLoading: false });
+    useAuthStore.setState({ isLoading: false });
   } catch {
     // best-effort
-  }
-  if (
-    typeof window !== "undefined" &&
-    !window.location.pathname.startsWith("/auth")
-  ) {
-    window.location.href = "/auth/login";
   }
 }
 
@@ -129,7 +119,7 @@ async function proactiveRefresh() {
     }
     setAccessToken(newToken); // 메모리 갱신 + 다음 주기 재예약
   } catch {
-    // 세션 만료(401/403)는 refreshAccessToken 내부 회로차단기가 로그아웃 처리.
+    // 인증 불가(401/403)는 refreshAccessToken 내부 회로차단기가 토큰만 정리한다.
     // 일시 오류면 쿨다운 후 재시도 (토큰이 아직 남아있을 때만).
     if (accessToken) {
       proactiveRefreshTimer = setTimeout(
@@ -144,7 +134,7 @@ export const setAccessToken = (token: string | null) => {
   accessToken = token;
   if (token) {
     refreshRetryBlockedUntil = 0;
-    sessionExpiredHandled = false; // 재로그인 시 회로차단기 리셋
+    authUnavailableHandled = false; // 재인증 성공 시 회로차단기 리셋
     scheduleProactiveRefresh(token); // 만료 전 자동 갱신 예약
   } else {
     clearProactiveRefresh(); // 로그아웃 — 예약 정리
@@ -228,7 +218,7 @@ apiClient.interceptors.response.use(
       } catch (refreshError) {
         // 갱신 실패 — 인증 상태만 초기화하고 리다이렉트는 하지 않음
         // (protected pages가 useAuthStore를 통해 자체적으로 /auth/login으로 리다이렉트함)
-        accessToken = null;
+        setAccessToken(null);
         refreshPromise = null;
         return Promise.reject(refreshError);
       }
@@ -263,9 +253,9 @@ async function refreshAccessToken(): Promise<string> {
     if (shouldBlockRefreshRetry(error)) {
       blockRefreshRetry();
     }
-    // 리프레시 토큰 거부(401/403) → 세션 종료 처리(루프 차단 + 로그아웃)
-    if (isSessionDeadError(error)) {
-      void handleSessionExpired();
+    // 리프레시 토큰 거부(401/403) → 연결만 정리하고 UI 로그인 상태는 유지
+    if (isAuthUnavailableError(error)) {
+      void handleAuthUnavailable();
     }
     throw error;
   }
@@ -293,7 +283,7 @@ export async function ensureValidToken(minValidityMs = 30_000): Promise<string |
       refreshPromise = null;
       return newToken;
     } catch {
-      accessToken = null;
+      setAccessToken(null);
       refreshPromise = null;
       return null;
     }
@@ -329,7 +319,7 @@ export async function ensureValidToken(minValidityMs = 30_000): Promise<string |
     refreshPromise = null;
     return newToken;
   } catch {
-    accessToken = null;
+    setAccessToken(null);
     refreshPromise = null;
     return null;
   }
@@ -351,7 +341,7 @@ export const authApi = {
     } finally {
       // 순환 참조 방지: 동적 import로 socket-client 접근
       import("./socket-client").then(({ disconnectAllSockets }) => disconnectAllSockets()).catch(() => {});
-      accessToken = null;
+      setAccessToken(null);
       // 리다이렉트는 호출자(auth-store)에서 처리 — 상태 정리가 먼저 완료되도록
     }
   },

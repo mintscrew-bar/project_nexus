@@ -5,6 +5,7 @@ import {
   disconnectSnakeDraftSocket,
   snakeDraftSocketHelpers,
 } from '@/lib/socket-client';
+import { useLobbyStore } from '@/stores/lobby-store';
 
 interface Player {
   id: string;
@@ -238,8 +239,10 @@ export const useSnakeDraftStore = create<SnakeDraftStoreState>((set, get) => ({
       set({ isConnected: true });
       const response = await snakeDraftSocketHelpers.joinDraft(roomId);
       if (response?.success && response.state) {
+        useLobbyStore.getState().disconnect({ skipLeave: true });
         set({ draftState: response.state, isLoading: false, error: null });
       } else if (response?.success) {
+        useLobbyStore.getState().disconnect({ skipLeave: true });
         set({ isConnected: true, isLoading: false, error: null });
       } else {
         set({
@@ -290,6 +293,7 @@ export const useSnakeDraftStore = create<SnakeDraftStoreState>((set, get) => ({
     }
 
     set({ isConnected: true, isLoading: false });
+    useLobbyStore.getState().disconnect({ skipLeave: true });
   },
 
   disconnectFromDraft: () => {

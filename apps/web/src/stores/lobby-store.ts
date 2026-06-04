@@ -239,6 +239,16 @@ export const useLobbyStore = create<LobbyStoreState>((set, get) => ({
       }
     });
 
+    socket.on('participant-team-changed', (data: { userId: string; teamId: string | null }) => {
+      const currentRoom = get().room;
+      if (currentRoom) {
+        const updatedParticipants = currentRoom.participants.map(p =>
+          p.userId === data.userId ? { ...p, teamId: data.teamId, isReady: false } : p
+        );
+        set({ room: { ...currentRoom, participants: updatedParticipants } });
+      }
+    });
+
     socket.on('voice-status-changed', (data: { userId: string; inVoice: boolean }) => {
       const currentRoom = get().room;
       if (currentRoom) {
@@ -247,6 +257,18 @@ export const useLobbyStore = create<LobbyStoreState>((set, get) => ({
         );
         set({ room: { ...currentRoom, participants: updatedParticipants } });
       }
+    });
+
+    socket.on('room-left', () => {
+      socket.removeAllListeners();
+      socket.disconnect();
+      set({
+        socket: null,
+        room: null,
+        messages: [],
+        error: '로비에서 나갔습니다.',
+        isConnected: false,
+      });
     });
 
     socket.on('new-message', (message: ChatMessage) => {

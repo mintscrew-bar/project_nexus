@@ -101,10 +101,11 @@ export const useAuthStore = create<AuthState>((set) => ({
         set({ user, isAuthenticated: true });
       } catch (err: any) {
         // 네트워크 에러와 인증 실패를 구분:
-        // - 401/403: 진짜 로그아웃 (세션 만료, 쿠키 없음) → 정리
+        // - 401/403 + 캐시 없음: 비로그인 상태로 정리
+        // - 401/403 + 캐시 있음: 기존 로그인 화면 유지 후 다음 재시도에 맡김
         // - 기타/응답 없음: 서버 일시 오류 → 기존 상태 유지, 로그아웃 처리 안 함
         const status = err?.response?.status;
-        if (status === 401 || status === 403) {
+        if ((status === 401 || status === 403) && !cachedUser) {
           clearUserFromStorage();
           set({ user: null, isAuthenticated: false });
           setAccessToken(null);

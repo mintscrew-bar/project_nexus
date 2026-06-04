@@ -17,8 +17,7 @@ import {
   ArrowLeft, Shield, Swords, Volume2, VolumeX, Share2, LogOut, CheckCircle2, Clock3,
 } from "lucide-react";
 import Link from "next/link";
-import { friendApi, adminApi, roomApi, userApi, ensureValidToken } from "@/lib/api-client";
-import { useQueryClient } from "@tanstack/react-query";
+import { friendApi, adminApi, roomApi, ensureValidToken } from "@/lib/api-client";
 import { PlayerHoverCard } from "@/components/domain/PlayerHoverCard";
 import { PlayerProfileModal } from "@/components/domain/PlayerProfileModal";
 import { LobbyParticipantsList } from "./_components/LobbyParticipantsList";
@@ -27,7 +26,40 @@ import { LobbyErrorState } from "./_components/LobbyErrorState";
 const STAGE_TRANSITION_MAX_ATTEMPTS = 12;
 const STAGE_TRANSITION_RETRY_DELAY_MS = 750;
 const STAGE_TRANSITION_MIN_TOKEN_TTL_MS = 2 * 60 * 1000;
-const LOBBY_TOKEN_KEEPALIVE_INTERVAL_MS = 60 * 1000;
+const STAGE_HANDOFF_LOBBY_CLEANUP_DELAY_MS = 15 * 1000;
+
+const getTeamModeStagePath = (room: {
+  id: string;
+  teamMode: "AUCTION" | "SNAKE_DRAFT" | "AUTO_BALANCE" | "MANUAL_TEAM";
+}) => {
+  if (room.teamMode === "AUCTION") return `/auction/${room.id}`;
+  if (room.teamMode === "SNAKE_DRAFT") return `/draft/${room.id}`;
+  return `/role-selection/${room.id}`;
+};
+
+const getRoomStagePath = (room: {
+  id: string;
+  status?: string;
+  teamMode: "AUCTION" | "SNAKE_DRAFT" | "AUTO_BALANCE" | "MANUAL_TEAM";
+}) => {
+  if (room.status === "IN_PROGRESS") {
+    return `/tournaments/${room.id}/bracket`;
+  }
+
+  if (room.status === "ROLE_SELECTION" || room.status === "DRAFT_COMPLETED") {
+    return `/role-selection/${room.id}`;
+  }
+
+  if (room.status === "DRAFT" || room.status === "TEAM_SELECTION") {
+    return getTeamModeStagePath(room);
+  }
+
+  if (!room.status) {
+    return getTeamModeStagePath(room);
+  }
+
+  return null;
+};
 
 /* ─── Main Page ─── */
 export default function TournamentLobbyPage() {
@@ -64,9 +96,6 @@ export default function TournamentLobbyPage() {
     friends: state.friends,
     fetchFriends: state.fetchFriends,
   }), shallow);
-
-  const queryClient = useQueryClient();
-  const prefetchedRef = useRef(false);
 
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isUserSettingsModalOpen, setIsUserSettingsModalOpen] = useState(false);
@@ -152,8 +181,10 @@ export default function TournamentLobbyPage() {
       if (token) {
         hasRedirected.current = true;
         clearTransitionRetry();
-        disconnect({ skipLeave: true });
         router.push(target);
+        setTimeout(() => {
+          useLobbyStore.getState().disconnect({ skipLeave: true });
+        }, STAGE_HANDOFF_LOBBY_CLEANUP_DELAY_MS);
         return;
       }
 
@@ -165,10 +196,13 @@ export default function TournamentLobbyPage() {
       }
 
       if (state.attempts >= STAGE_TRANSITION_MAX_ATTEMPTS) {
-        hasRedirected.current = true;
-        addToast("세션 확인에 실패했습니다. 다시 로그인해주세요.", "error");
-        disconnect({ skipLeave: true });
-        router.push("/auth/login");
+        transitionState.current = {
+          target: null,
+          attempts: 0,
+          inFlight: false,
+          notified: false,
+        };
+        addToast("세션 확인이 지연되고 있습니다. 로비 연결은 유지됩니다.", "error");
         return;
       }
 
@@ -179,27 +213,9 @@ export default function TournamentLobbyPage() {
     };
 
     void attemptTransition();
-  }, [addToast, clearTransitionRetry, disconnect, router]);
+  }, [addToast, clearTransitionRetry, router]);
 
   useEffect(() => { if (currentUser?.id) fetchFriends(); }, [currentUser?.id, fetchFriends]);
-
-  useEffect(() => {
-    if (!currentUser?.id) return;
-
-    let interval: ReturnType<typeof setInterval> | null = null;
-    const startDelay = Math.floor(Math.random() * 10_000);
-    const timer = setTimeout(() => {
-      void ensureValidToken(STAGE_TRANSITION_MIN_TOKEN_TTL_MS);
-      interval = setInterval(() => {
-        void ensureValidToken(STAGE_TRANSITION_MIN_TOKEN_TTL_MS);
-      }, LOBBY_TOKEN_KEEPALIVE_INTERVAL_MS);
-    }, startDelay);
-
-    return () => {
-      clearTimeout(timer);
-      if (interval) clearInterval(interval);
-    };
-  }, [currentUser?.id]);
 
   const friendUserIds = new Set(friends.map((f) => f.userId === currentUser?.id ? f.friendId : f.userId));
 
@@ -243,6 +259,7 @@ export default function TournamentLobbyPage() {
     if (roomId) connect(roomId);
     return () => {
       clearTransitionRetry();
+      if (hasRedirected.current) return;
       disconnect();
     };
   }, [roomId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -250,29 +267,15 @@ export default function TournamentLobbyPage() {
   useEffect(() => {
     if (hasRedirected.current || !room) return;
     if (gameStarting) {
-      navigateToGameStage(
-        room.teamMode === "AUCTION"
-          ? `/auction/${room.id}`
-          : room.teamMode === "SNAKE_DRAFT"
-            ? `/draft/${room.id}`
-            : `/role-selection/${room.id}`,
-      );
-      return;
-    }
-    if (room.status === 'DRAFT' || room.status === 'TEAM_SELECTION') {
-      navigateToGameStage(room.teamMode === "AUCTION" ? `/auction/${room.id}` : `/draft/${room.id}`);
-      return;
-    }
-    if (room.status === 'ROLE_SELECTION') {
-      navigateToGameStage(`/role-selection/${room.id}`);
+      navigateToGameStage(getTeamModeStagePath(room));
       return;
     }
     // IN_PROGRESS인 경우에만 bracket으로 리다이렉트.
     // COMPLETED는 returnToLobby API 호출 후 WAITING으로 리셋되어 오기 때문에
     // 여기서 리다이렉트하면 무한 루프가 발생한다.
-    if (room.status === 'IN_PROGRESS') {
-      navigateToGameStage(`/tournaments/${room.id}/bracket`);
-    }
+    if (room.status === "COMPLETED" || room.status === "WAITING") return;
+    const target = getRoomStagePath(room);
+    if (target) navigateToGameStage(target);
   }, [gameStarting, room, navigateToGameStage]);
 
   /* ─── Loading / Error States ─── */
@@ -313,22 +316,6 @@ export default function TournamentLobbyPage() {
   // 플레이어와 관전자 분리
   const players = room.participants.filter((p: any) => p.role !== "SPECTATOR");
   const spectators = room.participants.filter((p: any) => p.role === "SPECTATOR");
-
-  // 참가자 hover-profile 선제 로드 — 첫 렌더 이후 150ms 간격으로 순차 prefetch
-  useEffect(() => {
-    if (prefetchedRef.current || !players.length) return;
-    prefetchedRef.current = true;
-    players.forEach((p: any, i: number) => {
-      const uid = p.userId ?? p.id;
-      setTimeout(() => {
-        queryClient.prefetchQuery({
-          queryKey: ["hoverProfile", uid],
-          queryFn: () => userApi.getHoverProfile(uid),
-          staleTime: 10 * 60 * 1000,
-        });
-      }, i * 150);
-    });
-  }, [players, queryClient]);
 
   const readyCount = players.filter((p: any) => p.isReady).length;
   const totalPlayers = players.length;

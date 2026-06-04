@@ -1380,7 +1380,7 @@ export class RoomService {
       });
     });
 
-    return this.getRoomById(roomId);
+    return { teamId };
   }
 
   async createAutoBalancedTeams(hostId: string, roomId: string) {

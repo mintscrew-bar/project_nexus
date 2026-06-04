@@ -261,14 +261,6 @@ export class RoomController {
     });
     // 방 목록의 참가자 수도 갱신
     this.roomGateway.broadcastRoomDelta("update", roomId);
-    // 전체 방 데이터도 한 번 더 push (클라이언트가 participant-kicked 만 받고도
-    // 자체적으로 처리하지만, 안전하게 room-updated 도 함께 발행)
-    try {
-      const updatedRoom = await this.roomService.getRoomById(roomId);
-      this.roomGateway.notifyRoomUpdate(roomId, "room-updated", updatedRoom);
-    } catch {
-      // 방이 비어 삭제됐을 수 있음 — 무시
-    }
     return result;
   }
 

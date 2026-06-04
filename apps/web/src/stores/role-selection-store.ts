@@ -4,9 +4,13 @@ import {
   disconnectRoleSelectionSocket,
   roleSelectionSocketHelpers,
 } from "@/lib/socket-client";
+import { useLobbyStore } from "@/stores/lobby-store";
 
 // 로컬 카운트다운 인터벌 (서버 5초 tick 사이에 매초 감소)
 let localCountdownInterval: ReturnType<typeof setInterval> | null = null;
+let roleSelectionJoinRetryTimer: ReturnType<typeof setTimeout> | null = null;
+const ROLE_SELECTION_JOIN_RETRY_DELAY_MS = 500;
+const ROLE_SELECTION_JOIN_MAX_ATTEMPTS = 8;
 
 const startLocalCountdown = (initialSeconds: number, setFn: (fn: (s: any) => any) => void) => {
   if (localCountdownInterval) {
@@ -29,6 +33,13 @@ const stopLocalCountdown = () => {
   if (localCountdownInterval) {
     clearInterval(localCountdownInterval);
     localCountdownInterval = null;
+  }
+};
+
+const clearJoinRetryTimer = () => {
+  if (roleSelectionJoinRetryTimer) {
+    clearTimeout(roleSelectionJoinRetryTimer);
+    roleSelectionJoinRetryTimer = null;
   }
 };
 
@@ -115,6 +126,7 @@ export const useRoleSelectionStore = create<RoleSelectionState>((set) => ({
   hasExtended: false,
 
   connect: (roomId: string) => {
+    clearJoinRetryTimer();
     set({
       isLoading: true,
       error: null,
@@ -129,9 +141,10 @@ export const useRoleSelectionStore = create<RoleSelectionState>((set) => ({
     socket?.off('connect');
     socket?.off('disconnect');
 
-    const doJoin = (isReconnect = false) => {
+    const doJoin = (isReconnect = false, attempt = 1) => {
       roleSelectionSocketHelpers.joinRoom(roomId).then((response: any) => {
         if (response?.success) {
+          useLobbyStore.getState().disconnect({ skipLeave: true });
           const initialSeconds = getSecondsUntil(
             response.timerEndAt,
             response.timeRemaining,
@@ -147,6 +160,17 @@ export const useRoleSelectionStore = create<RoleSelectionState>((set) => ({
           startLocalCountdown(initialSeconds, set);
         } else {
           const errorMsg = response?.error || "Failed to join role selection room.";
+          const shouldRetry =
+            !isReconnect &&
+            attempt < ROLE_SELECTION_JOIN_MAX_ATTEMPTS &&
+            errorMsg === "Room is not in role selection phase";
+          if (shouldRetry) {
+            roleSelectionJoinRetryTimer = setTimeout(
+              () => doJoin(false, attempt + 1),
+              ROLE_SELECTION_JOIN_RETRY_DELAY_MS,
+            );
+            return;
+          }
           const displayMsg =
             errorMsg === "join_timeout" || errorMsg === "connect_timeout"
               ? "서버 연결에 실패했습니다. 새로고침 해주세요."
@@ -159,6 +183,13 @@ export const useRoleSelectionStore = create<RoleSelectionState>((set) => ({
           }
         }
       }).catch(() => {
+        if (!isReconnect && attempt < ROLE_SELECTION_JOIN_MAX_ATTEMPTS) {
+          roleSelectionJoinRetryTimer = setTimeout(
+            () => doJoin(false, attempt + 1),
+            ROLE_SELECTION_JOIN_RETRY_DELAY_MS,
+          );
+          return;
+        }
         if (isReconnect) {
           set({ isConnected: false, isLoading: false });
         } else {
@@ -254,6 +285,7 @@ export const useRoleSelectionStore = create<RoleSelectionState>((set) => ({
   },
 
   disconnect: () => {
+    clearJoinRetryTimer();
     stopLocalCountdown();
     roleSelectionSocketHelpers.offAllListeners();
     disconnectRoleSelectionSocket();

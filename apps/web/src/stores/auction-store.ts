@@ -5,6 +5,7 @@ import {
   disconnectAuctionSocket,
   auctionSocketHelpers,
 } from '@/lib/socket-client';
+import { useLobbyStore } from '@/stores/lobby-store';
 
 let bidErrorToken = 0;
 
@@ -431,6 +432,7 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
       set({ isConnected: true, sessionAbortedAt: null, sessionAbortMessage: null });
       const response = await auctionSocketHelpers.joinAuction(roomId);
       if (response?.success) {
+        useLobbyStore.getState().disconnect({ skipLeave: true });
         const currentState = get();
         const nextPlayers = Array.isArray(response.players) && response.players.length > 0
           ? response.players
@@ -495,6 +497,7 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
     }
 
     if (joinResponse?.success) {
+      useLobbyStore.getState().disconnect({ skipLeave: true });
       let nextPlayers = Array.isArray(joinResponse.players) ? joinResponse.players : [];
       let nextTeams = Array.isArray(joinResponse.teams) ? joinResponse.teams : [];
       let nextAuctionState = joinResponse.state;
