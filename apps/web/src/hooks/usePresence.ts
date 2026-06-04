@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { usePresenceStore, type UserStatus } from "@/stores/presence-store";
 import { useAuthStore } from "@/stores/auth-store";
+import { useShallow } from "zustand/shallow";
 
 // 5분 비활동 시 자리비움으로 전환 (Discord와 동일)
 const IDLE_TIMEOUT_MS = 5 * 60 * 1000;
@@ -12,7 +13,8 @@ const IDLE_TIMEOUT_MS = 5 * 60 * 1000;
  * Automatically connects when user is authenticated
  */
 export function usePresence() {
-  const { isAuthenticated } = useAuthStore();
+  const isAuthenticated = useAuthStore(state => state.isAuthenticated);
+  
   const {
     myStatus,
     friendStatuses,
@@ -24,7 +26,18 @@ export function usePresence() {
     setStatus,
     fetchFriendsStatuses,
     getFriendStatus,
-  } = usePresenceStore();
+  } = usePresenceStore(useShallow(state => ({
+    myStatus: state.myStatus,
+    friendStatuses: state.friendStatuses,
+    isConnected: state.isConnected,
+    isLoading: state.isLoading,
+    isManualOffline: state.isManualOffline,
+    connect: state.connect,
+    disconnect: state.disconnect,
+    setStatus: state.setStatus,
+    fetchFriendsStatuses: state.fetchFriendsStatuses,
+    getFriendStatus: state.getFriendStatus,
+  })));
 
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentStatusRef = useRef<"ONLINE" | "AWAY">("ONLINE");
@@ -113,7 +126,6 @@ export function usePresence() {
  * Hook for getting a specific friend's status
  */
 export function useFriendStatus(friendId: string): UserStatus {
-  const { friendStatuses } = usePresenceStore();
-  const friend = friendStatuses.get(friendId);
-  return friend?.status || "OFFLINE";
+  const status = usePresenceStore(state => state.friendStatuses.get(friendId)?.status);
+  return status || "OFFLINE";
 }

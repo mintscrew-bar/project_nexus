@@ -10,6 +10,7 @@ import { RoomSettingsModal } from "@/components/domain/RoomSettingsModal";
 import { UserSettingsModal } from "@/components/domain/UserSettingsModal";
 import { ConfirmModal, Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
+import { useShallow } from "zustand/shallow";
 import {
   Users, X, MessageSquare, Settings,
   UserCog,
@@ -33,10 +34,35 @@ export default function TournamentLobbyPage() {
   const router = useRouter();
   const roomId = params.id as string;
 
-  const { connect, disconnect, room, isConnected, error, gameStarting, messages, setReady, startGame, sendMessage, kickParticipant, toggleSpectator, selectTeam } = useLobbyStore();
-  const { user: currentUser } = useAuthStore();
-  const { addToast } = useToast();
-  const { friends, fetchFriends } = useFriendStore();
+  // Zustand Selector Optimization
+  // 분산형 셀렉터를 사용하여 불필요한 리렌더링 방지
+  const {
+    connect, disconnect, room, isConnected, error, gameStarting,
+    setReady, startGame, kickParticipant, toggleSpectator, selectTeam
+  } = useLobbyStore(useShallow(state => ({
+    connect: state.connect,
+    disconnect: state.disconnect,
+    room: state.room,
+    isConnected: state.isConnected,
+    error: state.error,
+    gameStarting: state.gameStarting,
+    setReady: state.setReady,
+    startGame: state.startGame,
+    kickParticipant: state.kickParticipant,
+    toggleSpectator: state.toggleSpectator,
+    selectTeam: state.selectTeam,
+  })));
+
+  // 채팅 메시지와 발송 함수는 따로 분리 (채팅이 올라올 때 전체 로비 UI 리렌더링 방지)
+  const messages = useLobbyStore(state => state.messages);
+  const sendMessage = useLobbyStore(state => state.sendMessage);
+
+  const currentUser = useAuthStore(state => state.user);
+  const { addToast } = useToast(); // useToast internally might already be optimized or use context
+  const { friends, fetchFriends } = useFriendStore(useShallow(state => ({
+    friends: state.friends,
+    fetchFriends: state.fetchFriends,
+  })));
 
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isUserSettingsModalOpen, setIsUserSettingsModalOpen] = useState(false);
@@ -454,7 +480,7 @@ export default function TournamentLobbyPage() {
           onMouseLeave={scheduleHoverClose}
         />
       )}
-      <div className="flex flex-col flex-grow min-h-0">
+      <div className="flex flex-col h-full min-h-0">
         {/* ═══ Room Header ═══ */}
         <header className="bg-bg-secondary border-b border-bg-tertiary px-4 py-3 lg:px-6">
           <div className="container mx-auto flex items-center justify-between gap-4">

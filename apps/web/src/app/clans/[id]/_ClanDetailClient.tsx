@@ -384,9 +384,10 @@ export default function ClanDetailClient() {
   const params = useParams();
   const router = useRouter();
   const clanId = params.id as string;
-  const { user, isAuthenticated } = useAuthStore();
+  const user = useAuthStore(state => state.user);
+  const isAuthenticated = useAuthStore(state => state.isAuthenticated);
   // presence-store에서 온라인 상태 조회
-  const { getFriendStatus } = usePresenceStore();
+  const getFriendStatus = usePresenceStore(state => state.getFriendStatus);
 
   const [clan, setClan] = useState<Clan | null>(null);
   const [isLoading, setIsLoading] = useState(true);

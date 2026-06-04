@@ -219,7 +219,7 @@ export default function BracketPage() {
   }
 
   return (
-    <div className="flex-grow p-4 md:p-8">
+    <div className="h-full p-4 md:p-8 overflow-y-auto">
       <div className="container mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">

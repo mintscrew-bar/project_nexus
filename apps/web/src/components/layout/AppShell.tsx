@@ -3,6 +3,7 @@
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useAuthStore } from '@/stores/auth-store';
+import { cn } from '@/lib/utils';
 import { Header } from './Header';
 import { Sidebar } from './Sidebar';
 import { Footer } from './Footer';
@@ -34,6 +35,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // mounted 전에는 false로 처리하여 SSR HTML과 일치시킴
   const isLandingFullscreen = pathname === '/' && mounted && !isAuthenticated;
 
+  // 푸터 숨김 라우트 (대시보드성 페이지들: 자체적인 액션바나 스크롤 관리가 필요한 경우)
+  const isDashboardRoute =
+    pathname.includes('/lobby') ||
+    pathname.startsWith('/auction/') ||
+    pathname.startsWith('/draft/') ||
+    pathname.startsWith('/role-selection/') ||
+    pathname.endsWith('/bracket');
+
   if (isAuthRoute || isLandingFullscreen) {
     return <>{children}</>;
   }
@@ -42,11 +51,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <>
       <Header />
-      <main className="flex flex-grow">
+      <main className="flex flex-grow min-h-0">
         <Sidebar />
-        <div className="flex flex-col flex-grow overflow-auto bg-bg-primary">
-          {children}
-          <Footer />
+        <div className="flex flex-col flex-grow min-h-0 bg-bg-primary overflow-hidden">
+          {/* 
+            - isDashboardRoute: 페이지 전체가 viewport에 맞게 고정되어야 함 (h-full)
+            - 일반 페이지: 내용에 따라 전체 스크롤 가능 (overflow-auto)
+          */}
+          <div className={cn(
+            "flex-1 flex flex-col min-h-0",
+            isDashboardRoute ? "overflow-hidden" : "overflow-auto"
+          )}>
+            {children}
+            {!isDashboardRoute && <Footer />}
+          </div>
         </div>
       </main>
       <FriendsPanel />

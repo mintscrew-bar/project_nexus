@@ -539,4 +539,24 @@ export class FriendService {
       pendingOutgoingCount: sentCount,
     };
   }
+
+  /**
+   * 유저의 모든 수락된 친구 ID 목록을 효율적으로 조회한다. (Presence 브로드캐스트용)
+   */
+  async getAcceptedFriendIds(userId: string): Promise<string[]> {
+    const friendships = await this.prisma.friendship.findMany({
+      where: {
+        OR: [
+          { userId, status: FriendshipStatus.ACCEPTED },
+          { friendId: userId, status: FriendshipStatus.ACCEPTED },
+        ],
+      },
+      select: {
+        userId: true,
+        friendId: true,
+      },
+    });
+
+    return friendships.map((f) => (f.userId === userId ? f.friendId : f.userId));
+  }
 }

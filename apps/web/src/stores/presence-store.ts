@@ -9,7 +9,7 @@ import {
 
 export type UserStatus = "ONLINE" | "OFFLINE" | "AWAY";
 
-const FRIEND_STATUS_FETCH_INTERVAL_MS = 30_000;
+const FRIEND_STATUS_FETCH_INTERVAL_MS = 300_000; // 5분으로 연장 (푸시 기반 시스템이 메인이므로 폴백 용도로만 사용)
 
 let friendsStatusesRequest: Promise<void> | null = null;
 let lastFriendsStatusesFetchedAt = 0;

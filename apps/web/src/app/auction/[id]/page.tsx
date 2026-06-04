@@ -1031,7 +1031,7 @@ export default function AuctionRoomPage() {
   const rightTeams = sortedTeamsForLayout.slice(Math.ceil(sortedTeamsForLayout.length / 2));
 
   return (
-    <div className="flex flex-grow flex-col overflow-hidden p-4">
+    <div className="flex h-full flex-col overflow-hidden p-4">
       <ConfirmModal
         isOpen={isAbortConfirmOpen}
         onClose={() => setIsAbortConfirmOpen(false)}
