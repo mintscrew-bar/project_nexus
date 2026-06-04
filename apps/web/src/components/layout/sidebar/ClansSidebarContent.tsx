@@ -1,6 +1,5 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
@@ -9,6 +8,7 @@ import { clanApi } from '@/lib/api-client';
 import { useAuthStore } from '@/stores/auth-store';
 import { useClanStore } from '@/stores/clan-store';
 import { cn } from '@/lib/utils';
+import { useQuery } from '@tanstack/react-query';
 
 interface ClanMember {
   id: string;
@@ -37,28 +37,32 @@ const ROLE_LABEL: Record<string, string> = {
 export function ClansSidebarContent() {
   const { user, isAuthenticated } = useAuthStore();
   const router = useRouter();
-  const [myClan, setMyClan] = useState<Clan | null | undefined>(undefined); // undefined = 로딩 중
-  const [recruitingClans, setRecruitingClans] = useState<Clan[]>([]);
 
   // clan-store에서 미읽음 카운트 가져오기
   const unreadCount = useClanStore((s) => s.unreadCount);
 
   // 내 클랜 조회
-  useEffect(() => {
-    if (!isAuthenticated) { setMyClan(null); return; }
-    clanApi.getMyClan().then(setMyClan).catch(() => setMyClan(null));
-  }, [isAuthenticated]);
+  const { data: myClan } = useQuery<Clan | null>({
+    queryKey: ['sidebar', 'myClan'],
+    queryFn: () => clanApi.getMyClan().catch(() => null),
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    enabled: isAuthenticated,
+  });
 
   // 모집 중인 클랜 TOP3 (내 클랜 없을 때)
-  useEffect(() => {
-    if (myClan) return;
-    clanApi.getClans({ isRecruiting: true }).then((data: Clan[]) => {
-      setRecruitingClans((data || []).slice(0, 3));
-    }).catch(() => {});
-  }, [myClan]);
+  const { data: recruitingClans = [] } = useQuery<Clan[]>({
+    queryKey: ['sidebar', 'recruitingClans'],
+    queryFn: async () => {
+      const data = await clanApi.getClans({ isRecruiting: true });
+      return (data || []).slice(0, 3);
+    },
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    enabled: isAuthenticated && !myClan,
+  });
 
   // 내가 속한 클랜에서 내 역할 찾기
-  // getUserClan은 myRole을 응답에 함께 내려주므로 그것을 우선 사용
   const myRole = myClan && user
     ? (myClan as any).myRole ?? myClan.members?.find((m) => m.userId === user.id)?.role
     : null;

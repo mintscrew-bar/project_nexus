@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Plus, Swords, Users, Trophy, Clock, ChevronRight } from 'lucide-react';
@@ -8,6 +7,7 @@ import { cn } from '@/lib/utils';
 import { roomApi } from '@/lib/api-client';
 import { useAuthStore } from '@/stores/auth-store';
 import { Skeleton } from '@/components/ui';
+import { useQuery } from '@tanstack/react-query';
 import { MatchesSidebarContent } from './sidebar/MatchesSidebarContent';
 import { CommunitySidebarContent } from './sidebar/CommunitySidebarContent';
 import { ClansSidebarContent } from './sidebar/ClansSidebarContent';
@@ -26,26 +26,16 @@ interface Room {
 export function Sidebar() {
   const pathname = usePathname();
   const { isAuthenticated } = useAuthStore();
-  const [recentRooms, setRecentRooms] = useState<Room[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      fetchRecentRooms();
-    }
-  }, [isAuthenticated]);
-
-  const fetchRecentRooms = async () => {
-    setIsLoading(true);
-    try {
-      const rooms = await roomApi.getRooms({ status: 'WAITING' });
-      setRecentRooms(rooms.slice(0, 5));
-    } catch (error) {
-      console.error('Failed to fetch rooms:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const { data: roomsData, isLoading } = useQuery({
+    queryKey: ['sidebar', 'recentRooms'],
+    queryFn: () => roomApi.getRooms({ status: 'WAITING' }),
+    staleTime: 3 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    enabled: isAuthenticated,
+    select: (data: any) => (Array.isArray(data) ? data : (data?.rooms ?? [])).slice(0, 5),
+  });
+  const recentRooms: Room[] = roomsData ?? [];
 
   // 홈(/) 경로에서는 사이드바 숨김
   if (pathname === '/') {

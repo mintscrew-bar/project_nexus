@@ -60,6 +60,7 @@ export function MatchesSidebarContent() {
     },
     enabled: !isLoading && isAuthenticated,
     staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
     retry: false,
   });
 

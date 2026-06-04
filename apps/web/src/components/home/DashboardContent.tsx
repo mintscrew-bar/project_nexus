@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { useAuthStore } from "@/stores/auth-store";
@@ -812,77 +813,85 @@ export function DashboardContent() {
   const { user, isAuthenticated } = useAuthStore();
   const { primaryAccount, fetchAccounts } = useRiotStore();
 
-  const [userStats, setUserStats] = useState<UserStats | null>(null);
-  const [rooms, setRooms] = useState<Room[]>([]);
-  const [popularPosts, setPopularPosts] = useState<Post[]>([]);
-  const [noticePosts, setNoticePosts] = useState<Post[]>([]);
-  const [championStats, setChampionStats] = useState<ChampionStat[]>([]);
-  const [positionStats, setPositionStats] = useState<PositionStat[]>([]);
-  const [isDataLoading, setIsDataLoading] = useState(true);
-
-  const fetchAll = useCallback(async () => {
-    // user.id가 없으면 로딩 상태 해제 후 종료 (무한 스켈레톤 방지)
-    if (!user?.id) {
-      setIsDataLoading(false);
-      return;
-    }
-
-    setIsDataLoading(true);
-    fetchAccounts();
-
-    const [statsResult, roomsResult, postsResult, noticeResult, champResult, posResult] =
-      await Promise.allSettled([
-        userApi.getStats(),
-        roomApi.getRooms({ status: "WAITING" }),
-        communityApi.getPosts({ limit: 20 }),
-        communityApi.getPosts({ category: "NOTICE", limit: 5 }),
-        statsApi.getUserChampionStats(user.id),
-        statsApi.getUserPositionStats(user.id),
-      ]);
-
-    if (statsResult.status === "fulfilled") setUserStats(statsResult.value);
-
-    if (roomsResult.status === "fulfilled") {
-      const data = roomsResult.value;
-      const list = Array.isArray(data) ? data : (data?.rooms ?? data?.data ?? []);
-      setRooms(list.slice(0, 6));
-    }
-
-    if (postsResult.status === "fulfilled") {
-      const data = postsResult.value;
-      const arr = Array.isArray(data) ? data : (data?.posts ?? []);
-      const sorted = [...arr].sort(
-        (a: Post, b: Post) => (b._count?.likes || 0) - (a._count?.likes || 0)
-      );
-      setPopularPosts(sorted.slice(0, 5));
-    }
-
-    if (noticeResult.status === "fulfilled") {
-      const data = noticeResult.value;
-      const arr = Array.isArray(data) ? data : (data?.posts ?? []);
-      setNoticePosts(arr.slice(0, 5));
-    }
-
-    if (champResult.status === "fulfilled") {
-      const data = champResult.value;
-      const list = Array.isArray(data) ? data : (data?.stats ?? data?.data ?? []);
-      setChampionStats(list.slice(0, 3));
-    }
-
-    if (posResult.status === "fulfilled") {
-      const data = posResult.value;
-      const list = Array.isArray(data) ? data : (data?.stats ?? data?.data ?? []);
-      setPositionStats(list.slice(0, 3));
-    }
-
-    setIsDataLoading(false);
-  }, [user?.id, fetchAccounts]);
-
+  // 로그인 직후 riot 계정 목록 1회 동기화
   useEffect(() => {
-    if (isAuthenticated) {
-      fetchAll();
-    }
-  }, [isAuthenticated, fetchAll]);
+    if (isAuthenticated) fetchAccounts();
+  }, [isAuthenticated, fetchAccounts]);
+
+  const enabled = isAuthenticated && !!user?.id;
+
+  const { data: userStats = null } = useQuery<UserStats | null>({
+    queryKey: ["dashboard", "userStats"],
+    queryFn: () => userApi.getStats(),
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    enabled,
+  });
+
+  const { data: rooms = [] } = useQuery<Room[]>({
+    queryKey: ["dashboard", "rooms"],
+    queryFn: async () => {
+      const data = await roomApi.getRooms({ status: "WAITING" });
+      const list = Array.isArray(data) ? data : (data?.rooms ?? data?.data ?? []);
+      return list.slice(0, 6);
+    },
+    staleTime: 2 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    enabled,
+  });
+
+  const { data: popularPosts = [] } = useQuery<Post[]>({
+    queryKey: ["dashboard", "popularPosts"],
+    queryFn: async () => {
+      const data = await communityApi.getPosts({ limit: 20 });
+      const arr = Array.isArray(data) ? data : (data?.posts ?? []);
+      return [...arr].sort((a: Post, b: Post) => (b._count?.likes || 0) - (a._count?.likes || 0)).slice(0, 5);
+    },
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    enabled,
+  });
+
+  const { data: noticePosts = [] } = useQuery<Post[]>({
+    queryKey: ["dashboard", "noticePosts"],
+    queryFn: async () => {
+      const data = await communityApi.getPosts({ category: "NOTICE", limit: 5 });
+      const arr = Array.isArray(data) ? data : (data?.posts ?? []);
+      return arr.slice(0, 5);
+    },
+    staleTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    enabled,
+  });
+
+  const { data: championStats = [] } = useQuery<ChampionStat[]>({
+    queryKey: ["dashboard", "championStats", user?.id],
+    queryFn: async () => {
+      const data = await statsApi.getUserChampionStats(user!.id);
+      const list = Array.isArray(data) ? data : (data?.stats ?? data?.data ?? []);
+      return list.slice(0, 3);
+    },
+    staleTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    enabled,
+  });
+
+  const { data: positionStats = [] } = useQuery<PositionStat[]>({
+    queryKey: ["dashboard", "positionStats", user?.id],
+    queryFn: async () => {
+      const data = await statsApi.getUserPositionStats(user!.id);
+      const list = Array.isArray(data) ? data : (data?.stats ?? data?.data ?? []);
+      return list.slice(0, 3);
+    },
+    staleTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    enabled,
+  });
+
+  // 6개 쿼리 중 하나라도 로딩 중이면 스켈레톤 표시
+  const isDataLoading = enabled && (
+    userStats === null && rooms.length === 0 && popularPosts.length === 0
+  );
 
   if (isDataLoading) {
     return <DashboardSkeleton />;
