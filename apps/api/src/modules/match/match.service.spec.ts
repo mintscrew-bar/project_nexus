@@ -101,6 +101,35 @@ describe("MatchService", () => {
     service = module.get<MatchService>(MatchService);
   });
 
+  describe("getRpsContext", () => {
+    it("봇 캡틴 여부와 username을 포함해 반환한다", async () => {
+      prisma.match.findUnique.mockResolvedValue({
+        teamAId: "team-a",
+        teamBId: "team-b",
+        status: "PENDING",
+        blueSideTeamId: null,
+        teamA: {
+          captainId: "captain-a",
+          name: "팀A",
+          captain: { id: "captain-a", username: "testbot_12" },
+        },
+        teamB: {
+          captainId: "captain-b",
+          name: "팀B",
+          captain: { id: "captain-b", username: "real_user" },
+        },
+        room: { hostId: "host-1" },
+      });
+
+      const result = await service.getRpsContext("match-1");
+
+      expect(result.captainAUsername).toBe("testbot_12");
+      expect(result.captainBUsername).toBe("real_user");
+      expect(result.captainAIsBot).toBe(true);
+      expect(result.captainBIsBot).toBe(false);
+    });
+  });
+
   // ============================================================
   // getUserMatchHistory — 한글 필드 포함 검증
   // ============================================================

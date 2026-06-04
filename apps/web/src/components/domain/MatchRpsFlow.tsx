@@ -17,6 +17,8 @@ export interface RpsStateData {
   teamBId: string;
   captainAId: string;
   captainBId: string;
+  captainAIsBot?: boolean;
+  captainBIsBot?: boolean;
   submitted: string[];
   winnerTeamId: string | null;
   blueSideTeamId: string | null;
@@ -149,6 +151,9 @@ export function MatchRpsFlow({
           {team.color && <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: team.color }} />}
           <span className="font-bold text-text-primary text-sm truncate">{team.name}</span>
           {isMe && <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent-primary/20 text-accent-primary">나</span>}
+          {((isA ? rps.captainAIsBot : rps.captainBIsBot) ?? false) && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-bg-elevated text-text-secondary">봇</span>
+          )}
         </div>
         <div className="mx-auto mt-2 flex h-24 w-24 items-center justify-center rounded-full bg-bg-tertiary/60 overflow-hidden">
           <AnimatePresence mode="wait">

@@ -24,6 +24,8 @@ interface RpsState {
   teamBId: string;
   captainAId: string;
   captainBId: string;
+  captainAIsBot: boolean;
+  captainBIsBot: boolean;
   hostId: string;
   phase: "throw" | "side" | "done";
   submissions: Map<string, RpsHand>; // userId(팀장) -> 낸 손 (현재 라운드)
@@ -38,6 +40,8 @@ interface RpsReadyEntry {
   hostId: string;
   teamAId: string;
   teamBId: string;
+  captainAIsBot: boolean;
+  captainBIsBot: boolean;
   readyIds: Set<string>;
 }
 
@@ -113,15 +117,22 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
         client.emit("rps:state", this.rpsStatePayload(rps));
       }
 
-      // 준비 대기 상태가 있으면 전달
-      const readyEntry = this.rpsReadyStates.get(data.matchId);
-      if (readyEntry) {
-        client.emit("rps:ready-state", {
-          matchId: data.matchId,
-          captainAId: readyEntry.captainAId,
-          captainBId: readyEntry.captainBId,
-          readyIds: Array.from(readyEntry.readyIds),
-        });
+      if (match.status === "PENDING" && !rps) {
+        const ctx = await this.matchService.getRpsContext(data.matchId);
+        if (ctx.captainAId && ctx.captainBId && ctx.teamAId && ctx.teamBId) {
+          const entry = this.ensureRpsReadyEntry(data.matchId, ctx);
+          this.emitRpsReadyState(data.matchId, entry);
+
+          if (
+            entry.readyIds.has(entry.captainAId) &&
+            entry.readyIds.has(entry.captainBId)
+          ) {
+            this.rpsReadyStates.delete(data.matchId);
+            if (!this.rpsStates.has(data.matchId)) {
+              await this.doRpsStart(data.matchId, ctx);
+            }
+          }
+        }
       }
 
       return {
@@ -186,6 +197,8 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
       teamBId: state.teamBId,
       captainAId: state.captainAId,
       captainBId: state.captainBId,
+      captainAIsBot: state.captainAIsBot,
+      captainBIsBot: state.captainBIsBot,
       submitted: Array.from(state.submissions.keys()), // 누가 냈는지만 (손 내용은 공개 전 비공개)
       winnerTeamId: state.winnerTeamId ?? null,
       blueSideTeamId: state.blueSideTeamId ?? null,
@@ -215,6 +228,107 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
     return (["rock", "paper", "scissors"] as RpsHand[])[
       Math.floor(Math.random() * 3)
     ];
+  }
+
+  private ensureRpsReadyEntry(
+    matchId: string,
+    ctx: {
+      hostId: string | null;
+      teamAId: string | null;
+      teamBId: string | null;
+      captainAId: string | null;
+      captainBId: string | null;
+      captainAIsBot?: boolean;
+      captainBIsBot?: boolean;
+    },
+  ) {
+    let entry = this.rpsReadyStates.get(matchId);
+    if (!entry) {
+      entry = {
+        captainAId: ctx.captainAId ?? "",
+        captainBId: ctx.captainBId ?? "",
+        hostId: ctx.hostId ?? "",
+        teamAId: ctx.teamAId ?? "",
+        teamBId: ctx.teamBId ?? "",
+        captainAIsBot: !!ctx.captainAIsBot,
+        captainBIsBot: !!ctx.captainBIsBot,
+        readyIds: new Set(),
+      };
+      this.rpsReadyStates.set(matchId, entry);
+    } else {
+      entry.captainAId = ctx.captainAId ?? entry.captainAId;
+      entry.captainBId = ctx.captainBId ?? entry.captainBId;
+      entry.hostId = ctx.hostId ?? entry.hostId;
+      entry.teamAId = ctx.teamAId ?? entry.teamAId;
+      entry.teamBId = ctx.teamBId ?? entry.teamBId;
+      entry.captainAIsBot = !!ctx.captainAIsBot;
+      entry.captainBIsBot = !!ctx.captainBIsBot;
+    }
+
+    if (entry.captainAIsBot && entry.captainAId) {
+      entry.readyIds.add(entry.captainAId);
+    }
+    if (entry.captainBIsBot && entry.captainBId) {
+      entry.readyIds.add(entry.captainBId);
+    }
+
+    return entry;
+  }
+
+  private emitRpsReadyState(matchId: string, entry: RpsReadyEntry) {
+    this.server.to(`match:${matchId}`).emit("rps:ready-state", {
+      matchId,
+      captainAId: entry.captainAId,
+      captainBId: entry.captainBId,
+      readyIds: Array.from(entry.readyIds),
+      captainAIsBot: entry.captainAIsBot,
+      captainBIsBot: entry.captainBIsBot,
+    });
+  }
+
+  private async autoAdvanceBotRpsThrow(matchId: string) {
+    const state = this.rpsStates.get(matchId);
+    if (!state || state.phase !== "throw") return;
+
+    let changed = false;
+    if (!state.submissions.has(state.captainAId) && state.captainAIsBot) {
+      state.submissions.set(state.captainAId, this.rpsRandomHand());
+      changed = true;
+    }
+    if (!state.submissions.has(state.captainBId) && state.captainBIsBot) {
+      state.submissions.set(state.captainBId, this.rpsRandomHand());
+      changed = true;
+    }
+
+    if (changed) {
+      this.broadcastRpsState(state);
+    }
+
+    if (
+      state.submissions.has(state.captainAId) &&
+      state.submissions.has(state.captainBId)
+    ) {
+      this.resolveRpsRound(matchId);
+      return;
+    }
+
+    this.armRpsThrowTimeout(matchId);
+  }
+
+  private async autoChooseBotSide(matchId: string) {
+    const state = this.rpsStates.get(matchId);
+    if (!state || state.phase !== "side" || !state.winnerTeamId) return;
+
+    const winnerIsBot =
+      state.winnerTeamId === state.teamAId
+        ? state.captainAIsBot
+        : state.captainBIsBot;
+    if (!winnerIsBot) return;
+
+    await this.finalizeRpsSide(
+      matchId,
+      Math.random() < 0.5 ? "blue" : "red",
+    );
   }
 
   // a가 b를 이기면 1, 지면 -1, 비기면 0
@@ -278,6 +392,15 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
       winnerTeamId: state.winnerTeamId,
     });
     this.broadcastRpsState(state);
+
+    const winnerIsBot =
+      state.winnerTeamId === state.teamAId
+        ? state.captainAIsBot
+        : state.captainBIsBot;
+    if (winnerIsBot) {
+      void this.autoChooseBotSide(matchId);
+      return;
+    }
 
     // 진영 미선택 시 자동 랜덤
     this.armRpsTimer(matchId, this.RPS_SIDE_TIMEOUT, () => {
@@ -349,6 +472,7 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private async doRpsStart(matchId: string, ctx: {
     hostId: string | null; teamAId: string | null; teamBId: string | null;
     captainAId: string | null; captainBId: string | null;
+    captainAIsBot?: boolean; captainBIsBot?: boolean;
   }) {
     const state: RpsState = {
       matchId,
@@ -356,6 +480,8 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
       teamBId: ctx.teamBId ?? "",
       captainAId: ctx.captainAId ?? "",
       captainBId: ctx.captainBId ?? "",
+      captainAIsBot: !!ctx.captainAIsBot,
+      captainBIsBot: !!ctx.captainBIsBot,
       hostId: ctx.hostId ?? "",
       phase: "throw",
       submissions: new Map(),
@@ -369,7 +495,7 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.server.to(`bracket:${match.roomId}`).emit("rps:invite", { matchId });
     }
 
-    this.armRpsThrowTimeout(matchId);
+    await this.autoAdvanceBotRpsThrow(matchId);
   }
 
   // 양 팀장이 준비 완료하면 RPS 자동 시작 (기존 호스트 버튼 대체)
@@ -397,18 +523,7 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
       }
 
       // 준비 상태 토글
-      let entry = this.rpsReadyStates.get(data.matchId);
-      if (!entry) {
-        entry = {
-          captainAId: ctx.captainAId,
-          captainBId: ctx.captainBId,
-          hostId: ctx.hostId ?? "",
-          teamAId: ctx.teamAId,
-          teamBId: ctx.teamBId,
-          readyIds: new Set(),
-        };
-        this.rpsReadyStates.set(data.matchId, entry);
-      }
+      const entry = this.ensureRpsReadyEntry(data.matchId, ctx);
 
       if (entry.readyIds.has(client.userId)) {
         entry.readyIds.delete(client.userId);
@@ -417,12 +532,7 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
       }
 
       // 준비 상태 브로드캐스트
-      this.server.to(`match:${data.matchId}`).emit("rps:ready-state", {
-        matchId: data.matchId,
-        captainAId: entry.captainAId,
-        captainBId: entry.captainBId,
-        readyIds: Array.from(entry.readyIds),
-      });
+      this.emitRpsReadyState(data.matchId, entry);
 
       // 양쪽 모두 준비 완료 → 자동 시작
       if (entry.readyIds.has(entry.captainAId) && entry.readyIds.has(entry.captainBId)) {

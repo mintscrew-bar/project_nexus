@@ -776,8 +776,20 @@ export class MatchService {
         teamBId: true,
         status: true,
         blueSideTeamId: true,
-        teamA: { select: { captainId: true, name: true } },
-        teamB: { select: { captainId: true, name: true } },
+        teamA: {
+          select: {
+            captainId: true,
+            name: true,
+            captain: { select: { id: true, username: true } },
+          },
+        },
+        teamB: {
+          select: {
+            captainId: true,
+            name: true,
+            captain: { select: { id: true, username: true } },
+          },
+        },
         room: { select: { hostId: true } },
       },
     });
@@ -791,6 +803,10 @@ export class MatchService {
       teamBName: match.teamB?.name ?? null,
       captainAId: match.teamA?.captainId ?? null,
       captainBId: match.teamB?.captainId ?? null,
+      captainAUsername: match.teamA?.captain?.username ?? null,
+      captainBUsername: match.teamB?.captain?.username ?? null,
+      captainAIsBot: /^testbot_\d+$/.test(match.teamA?.captain?.username ?? ""),
+      captainBIsBot: /^testbot_\d+$/.test(match.teamB?.captain?.username ?? ""),
       hostId: match.room?.hostId ?? null,
       status: match.status,
       blueSideTeamId: match.blueSideTeamId,

@@ -618,10 +618,10 @@ export default function AuctionRoomPage() {
     const willBeFilledByMmr = !tooManyVolunteers && volunteers.length < requiredCount;
 
     return (
-      <div className="flex-grow p-4 md:p-8">
-        <div className="container mx-auto max-w-2xl">
+      <div className="flex-grow min-h-0 p-4 md:p-8">
+        <div className="container mx-auto flex h-[calc(100vh-6rem)] max-w-4xl min-h-[520px] flex-col">
           {/* 헤더 */}
-          <div className="mb-6 text-center">
+          <div className="mb-4 flex-shrink-0 text-center">
             <h1 className="text-2xl font-bold text-text-primary mb-1">팀장 선정</h1>
             {mode === 'VOLUNTEER' && (
               <p className="text-text-secondary">
@@ -640,8 +640,9 @@ export default function AuctionRoomPage() {
             )}
           </div>
 
-          {/* ─── VOLUNTEER 모드 ─── */}
-          {mode === 'VOLUNTEER' && (
+          <div className="min-h-0 flex-1 overflow-y-auto pr-1 pb-4">
+            {/* ─── VOLUNTEER 모드 ─── */}
+            {mode === 'VOLUNTEER' && (
             <>
               {/* 1) 본인 액션 카드 — 가장 큰 시각 비중, 명시적 지원/취소 버튼 */}
               {meParticipant && (
@@ -714,7 +715,7 @@ export default function AuctionRoomPage() {
                       아직 자원한 사람이 없습니다.
                     </p>
                   ) : (
-                    <div className="space-y-1.5">
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                       {volunteerParticipants.map((p: any) => {
                         const isSelected = tooManyVolunteers && selectedCaptains.includes(p.id);
                         const canHostSelect = tooManyVolunteers && isHost;
@@ -772,7 +773,7 @@ export default function AuctionRoomPage() {
                     <div className="text-xs font-semibold text-text-tertiary uppercase tracking-wider mb-2">
                       대기 중 ({otherWaitingParticipants.length})
                     </div>
-                    <div className="flex flex-wrap gap-1.5">
+                    <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
                       {otherWaitingParticipants.map((p: any) => (
                         <div
                           key={p.id}
@@ -792,11 +793,11 @@ export default function AuctionRoomPage() {
             </>
           )}
 
-          {/* ─── MANUAL 모드 ─── */}
-          {mode === 'MANUAL' && (
+            {/* ─── MANUAL 모드 ─── */}
+            {mode === 'MANUAL' && (
             <>
               {isHost ? (
-                <div className="space-y-2 mb-6">
+                <div className="mb-6 grid grid-cols-1 gap-2 sm:grid-cols-2">
                   {(participants ?? []).map((p: any) => {
                     const isSelected = selectedCaptains.includes(p.id);
                     return (
@@ -837,7 +838,7 @@ export default function AuctionRoomPage() {
                       <p className="text-text-primary font-medium">방장이 팀장을 선택 중입니다</p>
                     </div>
                     {(participants ?? []).length > 0 ? (
-                      <div className="space-y-1.5">
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                         {(participants ?? []).map((p: any) => (
                           <div
                             key={p.id}
@@ -860,37 +861,44 @@ export default function AuctionRoomPage() {
                 </Card>
               )}
             </>
-          )}
+            )}
+          </div>
 
           {/* 방장 마감/확정 버튼 */}
-          {mode === 'VOLUNTEER' && isHost && (
-            <div className="flex justify-center">
-              <Button
-                onClick={() => finalizeVolunteers(auctionId, tooManyVolunteers ? selectedCaptains : undefined)}
-                disabled={tooManyVolunteers && selectedCaptains.length !== requiredCount}
-                size="lg"
-              >
-                <Users className="w-4 h-4 mr-2" />
-                {tooManyVolunteers
-                  ? `${selectedCaptains.length}/${requiredCount}명 선택 후 확정`
-                  : volunteers.length === requiredCount
-                    ? '팀장 확정'
-                    : volunteers.length === 0
-                      ? 'MMR 자동 선정으로 시작'
-                      : `지금 마감 (부족분 MMR 자동)`}
-              </Button>
-            </div>
-          )}
-          {mode === 'MANUAL' && isHost && (
-            <div className="flex justify-center">
-              <Button
-                onClick={() => selectManualCaptains(auctionId, selectedCaptains)}
-                disabled={selectedCaptains.length !== requiredCount}
-                size="lg"
-              >
-                <Check className="w-4 h-4 mr-2" />
-                팀장 {selectedCaptains.length}/{requiredCount}명 확정
-              </Button>
+          {(mode === 'VOLUNTEER' || mode === 'MANUAL') && isHost && (
+            <div className="flex-shrink-0 border-t border-bg-tertiary bg-bg-primary/95 px-1 pt-4 backdrop-blur">
+              {mode === 'VOLUNTEER' && (
+                <div className="flex justify-center">
+                  <Button
+                    onClick={() => finalizeVolunteers(auctionId, tooManyVolunteers ? selectedCaptains : undefined)}
+                    disabled={tooManyVolunteers && selectedCaptains.length !== requiredCount}
+                    size="lg"
+                    className="w-full sm:w-auto"
+                  >
+                    <Users className="w-4 h-4 mr-2" />
+                    {tooManyVolunteers
+                      ? `${selectedCaptains.length}/${requiredCount}명 선택 후 확정`
+                      : volunteers.length === requiredCount
+                        ? '팀장 확정'
+                        : volunteers.length === 0
+                          ? 'MMR 자동 선정으로 시작'
+                          : `지금 마감 (부족분 MMR 자동)`}
+                  </Button>
+                </div>
+              )}
+              {mode === 'MANUAL' && (
+                <div className="flex justify-center">
+                  <Button
+                    onClick={() => selectManualCaptains(auctionId, selectedCaptains)}
+                    disabled={selectedCaptains.length !== requiredCount}
+                    size="lg"
+                    className="w-full sm:w-auto"
+                  >
+                    <Check className="w-4 h-4 mr-2" />
+                    팀장 {selectedCaptains.length}/{requiredCount}명 확정
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </div>

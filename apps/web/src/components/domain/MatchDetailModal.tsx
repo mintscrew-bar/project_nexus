@@ -125,6 +125,8 @@ export function MatchDetailModal({
     captainAId: string;
     captainBId: string;
     readyIds: string[];
+    captainAIsBot?: boolean;
+    captainBIsBot?: boolean;
   } | null>(null);
 
   // 매치가 바뀌면 모든 매치별 상태 초기화 (이전 매치의 RPS·오류 등이 새 매치에 잔존하는 버그 방지)
@@ -488,7 +490,11 @@ export function MatchDetailModal({
                   {isReady ? "상대 팀장 대기 중..." : "준비 완료"}
                 </Button>
               ) : (
-                <p className="text-xs text-text-tertiary text-center">팀장만 준비할 수 있습니다</p>
+                <p className="text-xs text-text-tertiary text-center">
+                  {rpsReadyState?.captainAIsBot || rpsReadyState?.captainBIsBot
+                    ? "봇은 자동으로 준비하고 가위바위보에 참여합니다"
+                    : "팀장만 준비할 수 있습니다"}
+                </p>
               )}
             </div>
           );

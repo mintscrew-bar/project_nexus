@@ -1,14 +1,12 @@
 "use client";
 
 import React, { useMemo, useState, useCallback, useRef, useEffect } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, Button, Badge, Avatar } from "@/components/ui";
 import { TierBadge } from "./TierBadge";
 import { PlayerHoverCard } from "./PlayerHoverCard";
 import { PlayerProfileModal } from "./PlayerProfileModal";
 import { cn } from "@/lib/utils";
 import { Coins, AlertTriangle, ChevronDown, ChevronUp } from "lucide-react";
-import { userApi } from "@/lib/api-client";
 
 interface Player {
   id: string;
@@ -160,24 +158,6 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
   const [hoveredPlayer, setHoveredPlayer] = useState<{ userId: string; rect: DOMRect } | null>(null);
   const [profileUserId, setProfileUserId] = useState<string | null>(null);
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const queryClient = useQueryClient();
-
-  // 참가자 전원의 hover-profile을 입장 시점에 150ms 간격으로 미리 로드
-  const prefetchedRef = useRef(false);
-  const players = _players;
-  useEffect(() => {
-    if (prefetchedRef.current || !players.length) return;
-    prefetchedRef.current = true;
-    players.forEach((player, i) => {
-      setTimeout(() => {
-        queryClient.prefetchQuery({
-          queryKey: ["hoverProfile", player.id],
-          queryFn: () => userApi.getHoverProfile(player.id),
-          staleTime: 10 * 60 * 1000,
-        });
-      }, i * 150);
-    });
-  }, [players, queryClient]);
 
   const cancelHoverClose = useCallback(() => {
     if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
@@ -409,27 +389,28 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
                 />
 
                 <div className="flex-1 min-w-0">
-                  <h2 className="text-2xl font-bold text-text-primary mb-2 truncate">
+                  <h2 className="text-3xl font-bold text-text-primary mb-2 truncate">
                     {auctionState.currentPlayer.username}
                   </h2>
-                  <div className="flex items-center gap-2.5 flex-wrap">
+                  <div className="flex items-center gap-3 flex-wrap">
                     <TierBadge
                       tier={auctionState.currentPlayer.tier}
                       rank={auctionState.currentPlayer.rank}
+                      size="md"
                     />
                     {/* 주라인 + 부라인 아이콘 */}
                     {(auctionState.currentPlayer.mainRole || auctionState.currentPlayer.subRole) ? (
                       <div className="flex items-center gap-1">
-                        <RoleIcon role={auctionState.currentPlayer.mainRole} size={20} />
-                        <RoleIcon role={auctionState.currentPlayer.subRole} size={16} dim />
+                        <RoleIcon role={auctionState.currentPlayer.mainRole} size={22} />
+                        <RoleIcon role={auctionState.currentPlayer.subRole} size={18} dim />
                       </div>
                     ) : (
-                      <Badge variant="primary">
+                      <Badge variant="primary" className="text-sm px-3 py-1.5">
                         {getPlayerPosition(auctionState.currentPlayer)}
                       </Badge>
                     )}
                     {auctionState.currentPlayer.mmr !== undefined && (
-                      <span className="text-xs font-mono font-semibold text-text-muted">
+                      <span className="text-sm font-mono font-semibold text-text-muted">
                         MMR {auctionState.currentPlayer.mmr}
                       </span>
                     )}
@@ -528,11 +509,11 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
                 {team.color && (
                   <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: team.color }} />
                 )}
-                <span className={cn(
-                  "truncate max-w-[60px]",
-                  isFull ? "text-text-muted line-through" : isMine ? "text-accent-primary" : "text-text-secondary",
-                )}>
-                  {team.name}
+                    <span className={cn(
+                      "truncate max-w-[72px] text-sm",
+                      isFull ? "text-text-muted line-through" : isMine ? "text-accent-primary" : "text-text-secondary",
+                    )}>
+                      {team.name}
                 </span>
                 {isFull ? (
                   <span className="font-bold px-1.5 py-0.5 rounded bg-text-muted/20 text-text-muted">
@@ -730,14 +711,14 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
                           onMouseEnter={(e) => handlePlayerHover(player.id, e.currentTarget)}
                           onMouseLeave={scheduleHoverClose}
                         >
-                          <span className="text-xs text-text-tertiary w-4 text-center flex-shrink-0">{isCaptain ? "C" : idx}</span>
+                          <span className="text-sm text-text-tertiary w-5 text-center flex-shrink-0">{isCaptain ? "C" : idx}</span>
                           <Avatar src={player.avatar} alt={player.username} fallback={player.username[0]} size="sm" />
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-text-primary truncate">{player.username}</p>
-                            <p className="text-xs text-text-secondary">{getPlayerPosition(player)}</p>
+                            <p className="text-base font-semibold text-text-primary truncate">{player.username}</p>
+                            <p className="text-sm text-text-secondary">{getPlayerPosition(player)}</p>
                           </div>
                           <div className="flex items-center gap-1.5 flex-shrink-0">
-                            {player.mmr !== undefined && <span className="text-[10px] font-mono text-text-muted">{player.mmr}</span>}
+                            {player.mmr !== undefined && <span className="text-xs font-mono text-text-muted">{player.mmr}</span>}
                             <TierBadge tier={player.tier} size="sm" showIcon={false} />
                           </div>
                         </div>
@@ -816,9 +797,9 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
                           onMouseEnter={(e) => handlePlayerHover(player.id, e.currentTarget)}
                           onMouseLeave={scheduleHoverClose}
                         >
-                          <span className="text-[10px] text-text-tertiary w-3 text-center flex-shrink-0">{isCaptain ? "C" : idx}</span>
+                          <span className="text-xs text-text-tertiary w-4 text-center flex-shrink-0">{isCaptain ? "C" : idx}</span>
                           <Avatar src={player.avatar} alt={player.username} fallback={player.username[0]} size="sm" />
-                          <span className="font-medium text-text-primary truncate flex-1">{player.username}</span>
+                          <span className="font-semibold text-text-primary truncate flex-1 text-sm">{player.username}</span>
                           <TierBadge tier={player.tier} size="sm" showIcon={false} />
                         </div>
                       );
