@@ -1831,7 +1831,7 @@ export class RoomService {
   /**
    * 토너먼트 완료(COMPLETED) 후 방 상태를 WAITING으로 리셋하여 로비로 복귀시킨다.
    * abortActiveSession과 달리 호스트가 아니어도 호출 가능하며,
-   * COMPLETED 상태에서만 동작한다.
+   * 이미 WAITING으로 복귀된 경우에는 중복 호출도 성공으로 처리한다.
    */
   async returnToLobby(requesterId: string, roomId: string) {
     const room = await this.prisma.room.findUnique({
@@ -1857,19 +1857,28 @@ export class RoomService {
       throw new NotFoundException("Room not found");
     }
 
-    // COMPLETED 상태에서만 로비 복귀 허용
-    if (room.status !== RoomStatus.COMPLETED) {
-      throw new BadRequestException(
-        `Room is not in COMPLETED state (current: ${room.status}). Use abort-to-lobby for active sessions.`,
-      );
-    }
-
     // 참가자이기만 하면 누구나 복귀 가능 (결과창 카운트다운/버튼 클릭 시 선착순 처리)
     const isParticipant = room.participants.some(
       (p: (typeof room.participants)[number]) => p.userId === requesterId,
     );
     if (!isParticipant) {
       throw new ForbiddenException("방 참가자만 로비로 복귀시킬 수 있습니다.");
+    }
+
+    // 여러 참가자의 결과 화면 카운트다운이 동시에 끝날 수 있으므로,
+    // 첫 요청이 이미 WAITING으로 돌려놓은 경우 중복 호출은 성공으로 본다.
+    if (room.status === RoomStatus.WAITING) {
+      return {
+        message: "Room already returned to lobby",
+        room: await this.getRoomById(roomId),
+      };
+    }
+
+    // COMPLETED 상태에서만 로비 복귀 허용
+    if (room.status !== RoomStatus.COMPLETED) {
+      throw new BadRequestException(
+        `Room is not in COMPLETED state (current: ${room.status}). Use abort-to-lobby for active sessions.`,
+      );
     }
 
     // Discord 팀장 역할 정리용

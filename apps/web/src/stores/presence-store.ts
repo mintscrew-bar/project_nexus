@@ -9,6 +9,11 @@ import {
 
 export type UserStatus = "ONLINE" | "OFFLINE" | "AWAY";
 
+const FRIEND_STATUS_FETCH_INTERVAL_MS = 30_000;
+
+let friendsStatusesRequest: Promise<void> | null = null;
+let lastFriendsStatusesFetchedAt = 0;
+
 interface FriendStatus {
   id: string;
   username: string;
@@ -48,6 +53,11 @@ export const usePresenceStore = create<PresenceStoreState>((set, get) => ({
     const socket = connectPresenceSocket();
     if (!socket) return;
 
+    if (get().isConnected && socket.connected) {
+      void get().fetchFriendsStatuses();
+      return;
+    }
+
     // Clear existing listeners to prevent duplication
     presenceSocketHelpers.offAllListeners();
 
@@ -81,7 +91,7 @@ export const usePresenceStore = create<PresenceStoreState>((set, get) => ({
     socket.on('disconnect', () => set({ isConnected: false }));
 
     // Fetch initial friend statuses
-    get().fetchFriendsStatuses();
+    void get().fetchFriendsStatuses();
   },
 
   disconnect: () => {
@@ -114,27 +124,47 @@ export const usePresenceStore = create<PresenceStoreState>((set, get) => ({
   },
 
   fetchFriendsStatuses: async () => {
-    set({ isLoading: true });
-    try {
-      const friends = await presenceApi.getFriendsStatuses();
-      const statusMap = new Map<string, FriendStatus>();
-
-      for (const friend of friends) {
-        statusMap.set(friend.id, {
-          id: friend.id,
-          username: friend.username,
-          avatar: friend.avatar,
-          status: friend.status as UserStatus,
-          lastSeenAt: friend.lastSeenAt,
-        });
-      }
-
-      set({ friendStatuses: statusMap, isLoading: false });
-    } catch (error) {
-      // 백그라운드 조회 — 재연결마다 호출되므로 실패해도 토스트로 스팸하지 않는다(콘솔만).
-      console.error("Failed to fetch friends statuses:", error);
-      set({ isLoading: false });
+    const now = Date.now();
+    if (friendsStatusesRequest) {
+      return friendsStatusesRequest;
     }
+    if (now - lastFriendsStatusesFetchedAt < FRIEND_STATUS_FETCH_INTERVAL_MS) {
+      return;
+    }
+
+    set({ isLoading: true });
+    friendsStatusesRequest = (async () => {
+      try {
+        const friends = await presenceApi.getFriendsStatuses();
+        const statusMap = new Map<string, FriendStatus>();
+
+        for (const friend of friends) {
+          statusMap.set(friend.id, {
+            id: friend.id,
+            username: friend.username,
+            avatar: friend.avatar,
+            status: friend.status as UserStatus,
+            lastSeenAt: friend.lastSeenAt,
+          });
+        }
+
+        lastFriendsStatusesFetchedAt = Date.now();
+        set({ friendStatuses: statusMap });
+      } catch (error: any) {
+        // 백그라운드 조회 — 재연결마다 호출되므로 실패해도 토스트로 스팸하지 않는다(콘솔만).
+        console.error("Failed to fetch friends statuses:", error);
+        lastFriendsStatusesFetchedAt = Date.now();
+        const status = error?.response?.status;
+        if (status === 401 || status === 403) {
+          set({ friendStatuses: new Map() });
+        }
+      } finally {
+        set({ isLoading: false });
+        friendsStatusesRequest = null;
+      }
+    })();
+
+    return friendsStatusesRequest;
   },
 
   getFriendStatus: (friendId: string) => {

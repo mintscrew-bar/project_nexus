@@ -33,18 +33,23 @@ export async function POST(request: NextRequest) {
     const responseData = (backendResponse as any)._parsedBody;
 
     if (!backendResponse.ok) {
-      // Clear the invalid refresh token cookie (must match path used when setting)
       const response = NextResponse.json(
         { message: responseData.message || "Token refresh failed" },
         { status: backendResponse.status },
       );
-      response.cookies.set("refresh_token", "", {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        maxAge: 0,
-        path: "/api/auth",
-      });
+
+      // 401/403만 실제 세션 무효로 간주한다.
+      // 429/5xx 같은 일시 오류에서 쿠키를 지우면 정상 유저가 강제 로그아웃된다.
+      if (backendResponse.status === 401 || backendResponse.status === 403) {
+        response.cookies.set("refresh_token", "", {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "lax",
+          maxAge: 0,
+          path: "/api/auth",
+        });
+      }
+
       return response;
     }
 

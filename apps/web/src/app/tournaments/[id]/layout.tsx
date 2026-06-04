@@ -49,7 +49,7 @@ export async function generateMetadata({
   };
 
   try {
-    const res = await fetch(`${API_BASE}/api/room/${id}/share`, {
+    const res = await fetch(`${API_BASE}/api/rooms/${id}/share`, {
       // 휘발성 데이터 — 짧게 캐시해 크롤러 반복 호출 부담만 덜어준다
       next: { revalidate: 30 },
     });

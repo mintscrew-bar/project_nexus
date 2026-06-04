@@ -13,14 +13,19 @@ import { useToast } from "@/components/ui/Toast";
 import {
   Users, X, MessageSquare, Settings,
   UserCog,
-  ArrowLeft, Shield, Swords, Volume2, VolumeX, Share2,
+  ArrowLeft, Shield, Swords, Volume2, VolumeX, Share2, LogOut, CheckCircle2, Clock3,
 } from "lucide-react";
 import Link from "next/link";
-import { friendApi, adminApi, roomApi } from "@/lib/api-client";
+import { friendApi, adminApi, roomApi, ensureValidToken } from "@/lib/api-client";
 import { PlayerHoverCard } from "@/components/domain/PlayerHoverCard";
 import { PlayerProfileModal } from "@/components/domain/PlayerProfileModal";
 import { LobbyParticipantsList } from "./_components/LobbyParticipantsList";
 import { LobbyErrorState } from "./_components/LobbyErrorState";
+
+const STAGE_TRANSITION_MAX_ATTEMPTS = 12;
+const STAGE_TRANSITION_RETRY_DELAY_MS = 750;
+const STAGE_TRANSITION_MIN_TOKEN_TTL_MS = 2 * 60 * 1000;
+const LOBBY_TOKEN_KEEPALIVE_INTERVAL_MS = 60 * 1000;
 
 /* ─── Main Page ─── */
 export default function TournamentLobbyPage() {
@@ -45,6 +50,13 @@ export default function TournamentLobbyPage() {
   const [mobileTab, setMobileTab] = useState<string>("participants");
   const hasRedirected = useRef(false);
   const hoverCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const transitionRetryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const transitionState = useRef({
+    target: null as string | null,
+    attempts: 0,
+    inFlight: false,
+    notified: false,
+  });
 
   // 내전 방 링크 공유 — 로비 URL을 클립보드에 복사 (붙여넣으면 OG 카드로 표시됨)
   const handleShare = useCallback(async () => {
@@ -75,7 +87,89 @@ export default function TournamentLobbyPage() {
     hoverCloseTimer.current = null;
   }, []);
 
+  const clearTransitionRetry = useCallback(() => {
+    if (!transitionRetryTimer.current) return;
+    clearTimeout(transitionRetryTimer.current);
+    transitionRetryTimer.current = null;
+  }, []);
+
+  const navigateToGameStage = useCallback((target: string) => {
+    if (hasRedirected.current) return;
+
+    const current = transitionState.current;
+    if (current.target === target && (current.inFlight || current.attempts > 0)) {
+      return;
+    }
+
+    clearTransitionRetry();
+    transitionState.current = {
+      target,
+      attempts: 0,
+      inFlight: false,
+      notified: false,
+    };
+
+    const attemptTransition = async () => {
+      const state = transitionState.current;
+      if (hasRedirected.current || state.target !== target || state.inFlight) {
+        return;
+      }
+
+      state.inFlight = true;
+      state.attempts += 1;
+
+      const token = await ensureValidToken(STAGE_TRANSITION_MIN_TOKEN_TTL_MS).catch(() => null);
+      if (token) {
+        hasRedirected.current = true;
+        clearTransitionRetry();
+        disconnect({ skipLeave: true });
+        router.push(target);
+        return;
+      }
+
+      state.inFlight = false;
+
+      if (!state.notified && state.attempts >= 3) {
+        state.notified = true;
+        addToast("세션 확인 중입니다. 잠시 후 자동으로 이동합니다.", "warning");
+      }
+
+      if (state.attempts >= STAGE_TRANSITION_MAX_ATTEMPTS) {
+        hasRedirected.current = true;
+        addToast("세션 확인에 실패했습니다. 다시 로그인해주세요.", "error");
+        disconnect({ skipLeave: true });
+        router.push("/auth/login");
+        return;
+      }
+
+      transitionRetryTimer.current = setTimeout(
+        attemptTransition,
+        STAGE_TRANSITION_RETRY_DELAY_MS,
+      );
+    };
+
+    void attemptTransition();
+  }, [addToast, clearTransitionRetry, disconnect, router]);
+
   useEffect(() => { if (currentUser?.id) fetchFriends(); }, [currentUser?.id, fetchFriends]);
+
+  useEffect(() => {
+    if (!currentUser?.id) return;
+
+    let interval: ReturnType<typeof setInterval> | null = null;
+    const startDelay = Math.floor(Math.random() * 10_000);
+    const timer = setTimeout(() => {
+      void ensureValidToken(STAGE_TRANSITION_MIN_TOKEN_TTL_MS);
+      interval = setInterval(() => {
+        void ensureValidToken(STAGE_TRANSITION_MIN_TOKEN_TTL_MS);
+      }, LOBBY_TOKEN_KEEPALIVE_INTERVAL_MS);
+    }, startDelay);
+
+    return () => {
+      clearTimeout(timer);
+      if (interval) clearInterval(interval);
+    };
+  }, [currentUser?.id]);
 
   const friendUserIds = new Set(friends.map((f) => f.userId === currentUser?.id ? f.friendId : f.userId));
 
@@ -117,15 +211,16 @@ export default function TournamentLobbyPage() {
   // connect/disconnect는 zustand 스토어 함수로 참조가 안정적이므로 dependency에서 제외
   useEffect(() => {
     if (roomId) connect(roomId);
-    return () => { disconnect(); };
+    return () => {
+      clearTransitionRetry();
+      disconnect();
+    };
   }, [roomId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (hasRedirected.current || !room) return;
     if (gameStarting) {
-      hasRedirected.current = true;
-      disconnect({ skipLeave: true });
-      router.push(
+      navigateToGameStage(
         room.teamMode === "AUCTION"
           ? `/auction/${room.id}`
           : room.teamMode === "SNAKE_DRAFT"
@@ -135,26 +230,20 @@ export default function TournamentLobbyPage() {
       return;
     }
     if (room.status === 'DRAFT' || room.status === 'TEAM_SELECTION') {
-      hasRedirected.current = true;
-      disconnect({ skipLeave: true });
-      router.push(room.teamMode === "AUCTION" ? `/auction/${room.id}` : `/draft/${room.id}`);
+      navigateToGameStage(room.teamMode === "AUCTION" ? `/auction/${room.id}` : `/draft/${room.id}`);
       return;
     }
     if (room.status === 'ROLE_SELECTION') {
-      hasRedirected.current = true;
-      disconnect({ skipLeave: true });
-      router.push(`/role-selection/${room.id}`);
+      navigateToGameStage(`/role-selection/${room.id}`);
       return;
     }
     // IN_PROGRESS인 경우에만 bracket으로 리다이렉트.
     // COMPLETED는 returnToLobby API 호출 후 WAITING으로 리셋되어 오기 때문에
     // 여기서 리다이렉트하면 무한 루프가 발생한다.
     if (room.status === 'IN_PROGRESS') {
-      hasRedirected.current = true;
-      disconnect({ skipLeave: true });
-      router.push(`/tournaments/${room.id}/bracket`);
+      navigateToGameStage(`/tournaments/${room.id}/bracket`);
     }
-  }, [gameStarting, room, router, disconnect]);
+  }, [gameStarting, room, navigateToGameStage]);
 
   /* ─── Loading / Error States ─── */
   if (!isConnected && !error) {
@@ -198,8 +287,17 @@ export default function TournamentLobbyPage() {
   const readyCount = players.filter((p: any) => p.isReady).length;
   const totalPlayers = players.length;
   const allPlayersReady = totalPlayers > 0 && readyCount === totalPlayers;
+  const pendingReadyPlayers = players.filter((p: any) => !p.isReady);
+  const pendingReadyCount = pendingReadyPlayers.length;
+  const pendingReadyPreview = pendingReadyPlayers
+    .slice(0, 3)
+    .map((p: any) => p.riotAccount?.gameName ?? p.username)
+    .join(", ");
+  const pendingReadyExtra =
+    pendingReadyPlayers.length > 3
+      ? ` 외 ${pendingReadyPlayers.length - 3}명`
+      : "";
   const emptySlots = Math.max(0, room.maxParticipants - totalPlayers);
-  const readyPercent = totalPlayers > 0 ? (readyCount / totalPlayers) * 100 : 0;
 
   const teamModeLabel = room.teamMode === "AUCTION"
     ? "경매"
@@ -272,6 +370,16 @@ export default function TournamentLobbyPage() {
           : hasDiscordVoice && !allInVoice
             ? "음성채널에 참가하지 않은 유저가 있습니다."
             : undefined;
+  const readyBarStatus = canStart
+    ? "시작 가능"
+    : allPlayersReady
+      ? "준비 완료"
+      : `${pendingReadyCount}명 대기`;
+  const readyBarHint = canStart
+    ? "준비와 음성채널 확인이 완료되었습니다."
+    : pendingReadyPlayers.length > 0
+      ? `대기: ${pendingReadyPreview}${pendingReadyExtra}`
+      : startBlockedMessage ?? "플레이어 입장을 기다리는 중입니다.";
 
   const handleReadyToggle = () => {
     if (needsManualTeamSelection) {
@@ -279,6 +387,22 @@ export default function TournamentLobbyPage() {
       return;
     }
     setReady(!currentUserIsReady, (message) => addToast(message, "error"));
+  };
+
+  const handleLeaveLobby = async () => {
+    if (!room?.id) {
+      disconnect();
+      router.push('/tournaments');
+      return;
+    }
+
+    try {
+      await roomApi.leaveRoom(room.id);
+      disconnect({ skipLeave: true });
+    } catch {
+      disconnect();
+    }
+    router.push('/tournaments');
   };
 
   const participantsList = (
@@ -307,7 +431,12 @@ export default function TournamentLobbyPage() {
 
   /* ─── Chat Panel ─── */
   const chatPanel = (
-    <ChatBox messages={messages} onSendMessage={sendMessage} currentUserId={currentUser?.id} className="h-full" />
+    <ChatBox
+      messages={messages}
+      onSendMessage={sendMessage}
+      currentUserId={currentUser?.id}
+      className="h-full min-h-0 overflow-hidden"
+    />
   );
 
   return (
@@ -332,11 +461,12 @@ export default function TournamentLobbyPage() {
             {/* Left: back + room info */}
             <div className="flex items-center gap-3 min-w-0">
               <button
-                onClick={() => { disconnect(); router.push('/tournaments'); }}
-                className="p-2 rounded-lg hover:bg-bg-tertiary transition-colors flex-shrink-0"
+                onClick={handleLeaveLobby}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-bg-tertiary bg-bg-tertiary/60 px-2.5 py-2 text-xs font-semibold text-text-secondary transition-colors hover:bg-bg-elevated hover:text-text-primary flex-shrink-0"
                 title="로비 나가기"
               >
-                <ArrowLeft className="h-5 w-5 text-text-secondary" />
+                <ArrowLeft className="h-4 w-4" />
+                <span className="hidden sm:inline">로비 나가기</span>
               </button>
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -393,47 +523,75 @@ export default function TournamentLobbyPage() {
         </header>
 
         {/* ═══ Ready Progress Bar ═══ */}
-        <div className="bg-bg-secondary/80 border-b border-bg-tertiary px-4 py-2.5 lg:px-6">
-          <div className="container mx-auto flex items-center gap-4">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-xs font-medium text-text-secondary">준비 현황</span>
-                <span className="text-xs font-bold text-text-primary">
-                  {readyCount}/{totalPlayers}
-                  {allPlayersReady && <span className="ml-1 text-accent-success">✓ 전원 준비 완료</span>}
+        <div className={`border-b px-4 py-3 lg:px-6 ${
+          canStart
+            ? "border-accent-success/30 bg-accent-success/10"
+            : "border-bg-tertiary bg-bg-secondary/90"
+        }`}>
+          <div className="container mx-auto flex flex-col gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg ${
+                  canStart
+                    ? "bg-accent-success text-white"
+                    : "bg-bg-tertiary text-accent-primary"
+                }`}>
+                  {canStart ? <CheckCircle2 className="h-5 w-5" /> : <Clock3 className="h-5 w-5" />}
+                </div>
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <span className="text-sm font-bold text-text-primary">준비 현황</span>
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${
+                      canStart
+                        ? "bg-accent-success text-white"
+                        : "bg-bg-tertiary text-text-secondary"
+                    }`}>
+                      {readyBarStatus}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 truncate text-xs text-text-secondary">{readyBarHint}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-shrink-0">
+                <span className="rounded-lg bg-bg-tertiary px-3 py-1.5 text-center text-xs font-semibold text-text-secondary">
+                  전체 {totalPlayers}
+                </span>
+                <span className="rounded-lg bg-accent-success/10 px-3 py-1.5 text-center text-xs font-semibold text-accent-success">
+                  준비 {readyCount}
+                </span>
+                <span className="rounded-lg bg-bg-tertiary px-3 py-1.5 text-center text-xs font-semibold text-text-secondary">
+                  대기 {pendingReadyCount}
                 </span>
               </div>
-              <div className="h-2 bg-bg-tertiary rounded-full overflow-hidden">
-                <div
-                  className={`h-full rounded-full transition-all duration-500 animate-progress-fill ${allPlayersReady ? 'bg-accent-success' : 'bg-accent-primary'}`}
-                  style={{ width: `${readyPercent}%` }}
-                />
-              </div>
             </div>
-            {room.status !== 'DRAFT_COMPLETED' && !currentUserIsSpectator && (
-              <button
-                className={`hidden lg:block px-4 py-1.5 text-sm font-bold rounded-lg transition-all duration-200 flex-shrink-0 ${
-                  currentUserIsReady
-                    ? 'bg-bg-tertiary text-text-secondary hover:bg-bg-elevated'
-                    : 'bg-accent-primary hover:bg-accent-hover text-white'
-                } disabled:cursor-not-allowed disabled:opacity-50`}
-                disabled={needsManualTeamSelection}
-                title={needsManualTeamSelection ? "먼저 팀을 선택해주세요." : undefined}
-                onClick={handleReadyToggle}
-              >
-                {currentUserIsReady ? "준비 취소" : "준비하기"}
-              </button>
-            )}
-            {room.status !== 'DRAFT_COMPLETED' && currentUserIsSpectator && (
-              <span className="hidden lg:block px-4 py-1.5 text-sm font-medium rounded-lg bg-bg-tertiary text-text-muted flex-shrink-0">
-                관전 중
-              </span>
-            )}
-            {room.status === 'DRAFT_COMPLETED' && (
-              <Link href={`/tournaments/${room.id}/bracket`} className="px-4 py-1.5 text-sm font-bold rounded-lg bg-accent-success hover:bg-accent-success/90 text-white flex-shrink-0">
-                대진표 보기
-              </Link>
-            )}
+            <div
+              className="grid h-4 gap-1"
+              style={{
+                gridTemplateColumns: `repeat(${Math.max(totalPlayers, 1)}, minmax(0, 1fr))`,
+              }}
+              aria-label={`준비 ${readyCount}명, 대기 ${pendingReadyCount}명`}
+            >
+              {totalPlayers > 0 ? (
+                players.map((player: any) => {
+                  const playerName = player.riotAccount?.gameName ?? player.username;
+                  return (
+                    <div
+                      key={player.id}
+                      title={`${playerName}: ${player.isReady ? "준비 완료" : "대기 중"}`}
+                      className={`rounded-sm transition-colors ${
+                        player.isReady
+                          ? canStart
+                            ? "bg-accent-success"
+                            : "bg-accent-primary"
+                          : "bg-bg-elevated ring-1 ring-inset ring-bg-tertiary"
+                      }`}
+                    />
+                  );
+                })
+              ) : (
+                <div className="rounded-sm bg-bg-elevated ring-1 ring-inset ring-bg-tertiary" />
+              )}
+            </div>
           </div>
         </div>
 
@@ -503,7 +661,7 @@ export default function TournamentLobbyPage() {
                   채팅
                 </h2>
               </div>
-              <div className="flex-1 min-h-0">
+              <div className="flex-1 min-h-0 overflow-hidden">
                 {chatPanel}
               </div>
             </section>
@@ -526,7 +684,7 @@ export default function TournamentLobbyPage() {
               <TabsContent value="participants" className="flex-1 overflow-y-auto p-4">
                 {participantsList}
               </TabsContent>
-              <TabsContent value="chat" className="flex-1 min-h-0 p-4">
+              <TabsContent value="chat" className="flex flex-1 min-h-0 overflow-hidden p-4">
                 {chatPanel}
               </TabsContent>
             </Tabs>
@@ -535,17 +693,17 @@ export default function TournamentLobbyPage() {
 
         {/* ═══ Sticky Bottom Action Bar ═══ */}
         <footer className="bg-bg-secondary border-t border-bg-tertiary px-4 py-3 lg:px-6 flex-shrink-0">
-          <div className="container mx-auto flex items-center justify-between gap-3">
-            {/* Mobile: ready button */}
-            <div className="lg:hidden">
+          <div className="container mx-auto flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               {room.status !== 'DRAFT_COMPLETED' && !currentUserIsSpectator && (
                 <button
-                  className={`px-4 py-2 text-sm font-bold rounded-lg transition-all ${
+                  className={`inline-flex min-h-11 items-center justify-center rounded-lg px-5 py-2.5 text-sm font-bold transition-all ${
                     currentUserIsReady
-                      ? 'bg-bg-tertiary text-text-secondary hover:bg-bg-elevated'
+                      ? 'border border-bg-elevated bg-bg-tertiary text-text-primary hover:bg-bg-elevated'
                       : 'bg-accent-primary hover:bg-accent-hover text-white'
                   } disabled:cursor-not-allowed disabled:opacity-50`}
                   disabled={needsManualTeamSelection}
+                  title={needsManualTeamSelection ? "먼저 팀을 선택해주세요." : undefined}
                   onClick={handleReadyToggle}
                 >
                   {needsManualTeamSelection
@@ -556,26 +714,31 @@ export default function TournamentLobbyPage() {
                 </button>
               )}
               {room.status !== 'DRAFT_COMPLETED' && currentUserIsSpectator && (
-                <span className="px-4 py-2 text-sm font-medium rounded-lg bg-bg-tertiary text-text-muted">
+                <span className="inline-flex min-h-11 items-center justify-center rounded-lg bg-bg-tertiary px-5 py-2.5 text-sm font-medium text-text-muted">
                   관전 중
                 </span>
               )}
+              {room.status === 'DRAFT_COMPLETED' && (
+                <Link href={`/tournaments/${room.id}/bracket`} className="inline-flex min-h-11 items-center justify-center rounded-lg bg-accent-success px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-accent-success/90">
+                  대진표 보기
+                </Link>
+              )}
+              <button
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-accent-danger/40 bg-accent-danger/10 px-5 py-2.5 text-sm font-bold text-accent-danger transition-colors hover:bg-accent-danger/20"
+                onClick={handleLeaveLobby}
+              >
+                <LogOut className="h-4 w-4" />
+                로비 나가기
+              </button>
             </div>
 
-            <button
-              className="px-5 py-2.5 bg-bg-tertiary hover:bg-bg-elevated text-text-primary font-medium rounded-lg transition-colors text-sm"
-              onClick={() => { disconnect(); router.push('/tournaments'); }}
-            >
-              로비 나가기
-            </button>
-
-            <div className="flex items-center gap-3">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
               {/* 어드민 전용: 봇 추가 버튼 */}
               {currentUser?.role === 'ADMIN' && room.status === 'WAITING' && totalPlayers < room.maxParticipants && (
                 <button
                   onClick={handleAddBot}
                   disabled={isAddingBot}
-                  className="px-4 py-2.5 text-sm font-medium rounded-lg border border-bg-tertiary text-text-secondary hover:text-text-primary hover:bg-bg-tertiary transition-colors disabled:opacity-50"
+                  className="inline-flex min-h-11 items-center justify-center rounded-lg border border-bg-tertiary px-4 py-2.5 text-sm font-medium text-text-secondary transition-colors hover:bg-bg-tertiary hover:text-text-primary disabled:opacity-50"
                   title="남은 자리를 봇으로 모두 채움 (어드민 전용)"
                 >
                   {isAddingBot ? "추가 중..." : `봇 채우기 (${room.maxParticipants - totalPlayers}자리 남음)`}
@@ -583,7 +746,7 @@ export default function TournamentLobbyPage() {
               )}
               {isCurrentUserHost && room.status === 'WAITING' && (
                 <button
-                  className={`px-6 py-2.5 font-bold rounded-lg transition-all text-sm text-white ${
+                  className={`inline-flex min-h-11 items-center justify-center rounded-lg px-6 py-2.5 text-sm font-bold text-white transition-all ${
                     canStart
                       ? 'bg-accent-success hover:bg-accent-success/90 animate-glow-success'
                       : 'bg-accent-success/50 cursor-not-allowed opacity-60'

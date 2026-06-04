@@ -8,6 +8,7 @@ import {
   HttpCode,
   HttpStatus,
 } from "@nestjs/common";
+import { Throttle } from "@nestjs/throttler";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { PresenceService } from "./presence.service";
@@ -22,12 +23,14 @@ export class PresenceController {
   ) {}
 
   @Get("me")
+  @Throttle({ default: { limit: 120, ttl: 60000 } })
   @UseGuards(JwtAuthGuard)
   async getMyStatus(@CurrentUser("sub") userId: string) {
     return this.presenceService.getUserStatus(userId);
   }
 
   @Put("me")
+  @Throttle({ default: { limit: 120, ttl: 60000 } })
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
   async updateMyStatus(
@@ -49,6 +52,7 @@ export class PresenceController {
   }
 
   @Get("friends")
+  @Throttle({ default: { limit: 300, ttl: 60000 } })
   @UseGuards(JwtAuthGuard)
   async getFriendsStatuses(@CurrentUser("sub") userId: string) {
     return this.presenceService.getFriendsStatuses(userId);

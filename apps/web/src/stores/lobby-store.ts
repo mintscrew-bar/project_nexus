@@ -1,6 +1,7 @@
 import { create } from 'zustand';
-import { io, Socket } from 'socket.io-client';
-import { roomApi, getAccessToken } from '@/lib/api-client';
+import type { Socket } from 'socket.io-client';
+import { roomApi } from '@/lib/api-client';
+import { createAuthenticatedSocket } from '@/lib/socket-client';
 
 // Placeholder Types - should eventually come from @nexus/types
 interface ChampionPreference {
@@ -112,8 +113,6 @@ interface LobbyStoreState {
   ) => void;
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-
 export const useLobbyStore = create<LobbyStoreState>((set, get) => ({
   socket: null,
   room: null,
@@ -133,15 +132,7 @@ export const useLobbyStore = create<LobbyStoreState>((set, get) => ({
       set({ socket: null });
     }
 
-    const socket = io(`${API_URL}/room`, {
-      auth: (cb) => cb({ token: getAccessToken() }),
-      transports: ['websocket'],
-      reconnection: true,
-      reconnectionAttempts: Infinity,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 10000,
-      randomizationFactor: 0.5,
-    });
+    const socket = createAuthenticatedSocket("/room", "Lobby Room");
 
     socket.on('connect', () => {
       set({ isConnected: true, error: null });

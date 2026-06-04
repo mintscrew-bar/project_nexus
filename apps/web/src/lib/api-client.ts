@@ -11,12 +11,159 @@ const API_BASE_URL = "/api";
 // 토큰 저장소 (메모리 기반, 필요시 localStorage로 변경 가능)
 let accessToken: string | null = null;
 let refreshPromise: Promise<string> | null = null;
+let refreshRetryBlockedUntil = 0;
+
+const REFRESH_RETRY_COOLDOWN_MS = 30_000;
+
+const isRefreshRetryBlocked = () => Date.now() < refreshRetryBlockedUntil;
+
+const blockRefreshRetry = () => {
+  refreshRetryBlockedUntil = Date.now() + REFRESH_RETRY_COOLDOWN_MS;
+};
+
+const createRefreshBlockedError = () => {
+  const error = new Error("Token refresh is temporarily blocked") as Error & {
+    response: { status: number };
+  };
+  error.response = { status: 429 };
+  return error;
+};
+
+const shouldBlockRefreshRetry = (error: unknown) => {
+  if (!axios.isAxiosError(error)) return true;
+  const status = error.response?.status;
+  return !status || status === 401 || status === 403 || status === 429;
+};
+
+// 리프레시 토큰까지 거부(401/403) = 세션 진짜 만료 (429/네트워크 오류는 제외)
+const isSessionDeadError = (error: unknown) => {
+  if (!axios.isAxiosError(error)) return false;
+  const status = error.response?.status;
+  return status === 401 || status === 403;
+};
+
+// 회로차단기: 세션 만료 시 한 번만 깨끗이 로그아웃하고 모든 재시도/소켓 재연결 루프를 끊는다.
+// (이게 없으면 isAuthenticated가 true로 남아 usePresence가 connect()를 무한 반복 → 요청 폭주)
+let sessionExpiredHandled = false;
+async function handleSessionExpired() {
+  if (sessionExpiredHandled) return;
+  sessionExpiredHandled = true;
+  setAccessToken(null); // 토큰 정리 + proactive 예약 해제
+  refreshPromise = null;
+  try {
+    const { disconnectAllSockets } = await import("./socket-client");
+    disconnectAllSockets();
+  } catch {
+    // best-effort
+  }
+  try {
+    const { useAuthStore } = await import("@/stores/auth-store");
+    useAuthStore.setState({ user: null, isAuthenticated: false, isLoading: false });
+  } catch {
+    // best-effort
+  }
+  if (
+    typeof window !== "undefined" &&
+    !window.location.pathname.startsWith("/auth")
+  ) {
+    window.location.href = "/auth/login";
+  }
+}
+
+// ── Proactive refresh ──────────────────────────────────────
+// access token(기본 15분)이 만료되기 전에 백그라운드에서 미리 갱신해
+// 메모리 토큰이 항상 살아있게 한다.
+// 단계 전환(로비 → 경매/드래프트 등)에서 새 namespace 소켓이 인증할 때
+// 네트워크 왕복 없이 즉시 유효 토큰을 받게 되어 "전환 직후 연결 끊김"이 사라진다.
+let proactiveRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+const PROACTIVE_REFRESH_LEAD_MS = 60_000; // 만료 1분 전 갱신
+
+const clearProactiveRefresh = () => {
+  if (proactiveRefreshTimer) {
+    clearTimeout(proactiveRefreshTimer);
+    proactiveRefreshTimer = null;
+  }
+};
+
+// 토큰 exp를 디코드해 "만료 1분 전" 갱신을 예약한다.
+const scheduleProactiveRefresh = (token: string) => {
+  clearProactiveRefresh();
+  if (typeof window === "undefined") return; // SSR에서는 예약하지 않음
+
+  let delay: number;
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    delay = payload.exp * 1000 - Date.now() - PROACTIVE_REFRESH_LEAD_MS;
+  } catch {
+    return; // 디코드 실패 시 예약 생략 (reactive refresh가 처리)
+  }
+  // 이미 만료 1분 이내면 거의 즉시 갱신
+  if (delay < 1_000) delay = 1_000;
+
+  proactiveRefreshTimer = setTimeout(() => void proactiveRefresh(), delay);
+};
+
+// 예약된 백그라운드 갱신 실행. 성공 시 setAccessToken이 다음 주기를 자동 재예약한다.
+async function proactiveRefresh() {
+  if (!accessToken) return; // 로그아웃됨 — 중단
+  if (isRefreshRetryBlocked()) {
+    // 쿨다운 중 — 쿨다운이 끝난 뒤 다시 시도
+    proactiveRefreshTimer = setTimeout(
+      () => void proactiveRefresh(),
+      REFRESH_RETRY_COOLDOWN_MS,
+    );
+    return;
+  }
+
+  try {
+    let newToken: string;
+    if (refreshPromise) {
+      newToken = await refreshPromise;
+    } else {
+      refreshPromise = refreshAccessToken();
+      try {
+        newToken = await refreshPromise;
+      } finally {
+        refreshPromise = null;
+      }
+    }
+    setAccessToken(newToken); // 메모리 갱신 + 다음 주기 재예약
+  } catch {
+    // 세션 만료(401/403)는 refreshAccessToken 내부 회로차단기가 로그아웃 처리.
+    // 일시 오류면 쿨다운 후 재시도 (토큰이 아직 남아있을 때만).
+    if (accessToken) {
+      proactiveRefreshTimer = setTimeout(
+        () => void proactiveRefresh(),
+        REFRESH_RETRY_COOLDOWN_MS,
+      );
+    }
+  }
+}
 
 export const setAccessToken = (token: string | null) => {
   accessToken = token;
+  if (token) {
+    refreshRetryBlockedUntil = 0;
+    sessionExpiredHandled = false; // 재로그인 시 회로차단기 리셋
+    scheduleProactiveRefresh(token); // 만료 전 자동 갱신 예약
+  } else {
+    clearProactiveRefresh(); // 로그아웃 — 예약 정리
+  }
 };
 
 export const getAccessToken = () => accessToken;
+
+// 백그라운드 탭에서는 브라우저가 setTimeout을 throttle/freeze하므로 proactive 타이머가
+// 늦게 뜰 수 있다. 탭이 다시 보이는 순간 토큰을 즉시 보충해, 오래 기다린 로비에서
+// 돌아와 바로 "내전 시작"을 눌러도 세션이 항상 살아있도록 한다.
+// (ensureValidToken은 만료 임박 시에만 갱신하고, 갱신되면 proactive 타이머도 재예약된다.)
+if (typeof document !== "undefined") {
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && accessToken) {
+      void ensureValidToken();
+    }
+  });
+}
 
 // Axios 인스턴스 생성
 export const apiClient = axios.create({
@@ -49,15 +196,22 @@ apiClient.interceptors.response.use(
       _retry?: boolean;
     };
 
+    const requestUrl = originalRequest.url ?? "";
+
     // 401 에러이고, 아직 재시도하지 않은 경우
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    if (
+      error.response?.status === 401 &&
+      !originalRequest._retry &&
+      !requestUrl.includes("/auth/refresh") &&
+      !isRefreshRetryBlocked()
+    ) {
       originalRequest._retry = true;
 
       try {
         // 이미 갱신 중인 요청이 있으면 대기
         if (refreshPromise) {
           const newToken = await refreshPromise;
-          accessToken = newToken;
+          setAccessToken(newToken);
           originalRequest.headers.Authorization = `Bearer ${newToken}`;
           return apiClient(originalRequest);
         }
@@ -67,7 +221,7 @@ apiClient.interceptors.response.use(
         const newToken = await refreshPromise;
         refreshPromise = null;
 
-        accessToken = newToken;
+        setAccessToken(newToken);
         originalRequest.headers.Authorization = `Bearer ${newToken}`;
 
         return apiClient(originalRequest);
@@ -86,6 +240,10 @@ apiClient.interceptors.response.use(
 
 // Access Token 갱신 함수
 async function refreshAccessToken(): Promise<string> {
+  if (isRefreshRetryBlocked()) {
+    throw createRefreshBlockedError();
+  }
+
   try {
     const response = await axios.post(
       `${API_BASE_URL}/auth/refresh`,
@@ -102,20 +260,51 @@ async function refreshAccessToken(): Promise<string> {
 
     return newToken;
   } catch (error) {
-    throw new Error("Failed to refresh token");
+    if (shouldBlockRefreshRetry(error)) {
+      blockRefreshRetry();
+    }
+    // 리프레시 토큰 거부(401/403) → 세션 종료 처리(루프 차단 + 로그아웃)
+    if (isSessionDeadError(error)) {
+      void handleSessionExpired();
+    }
+    throw error;
   }
 }
 
 // 소켓 인증용: JWT 만료 여부 확인 후 필요 시 갱신하여 유효한 토큰 반환
-export async function ensureValidToken(): Promise<string | null> {
-  if (!accessToken) return null;
+export async function ensureValidToken(minValidityMs = 30_000): Promise<string | null> {
+  if (!accessToken) {
+    if (isRefreshRetryBlocked()) return null;
+
+    if (refreshPromise) {
+      try {
+        const newToken = await refreshPromise;
+        setAccessToken(newToken);
+        return newToken;
+      } catch {
+        return null;
+      }
+    }
+
+    refreshPromise = refreshAccessToken();
+    try {
+      const newToken = await refreshPromise;
+      setAccessToken(newToken);
+      refreshPromise = null;
+      return newToken;
+    } catch {
+      accessToken = null;
+      refreshPromise = null;
+      return null;
+    }
+  }
 
   try {
     // JWT payload 디코드 (서명 검증 없이 만료 시간만 확인)
     const payload = JSON.parse(atob(accessToken.split('.')[1]));
     const expiresAt = payload.exp * 1000;
-    // 만료 30초 전부터 미리 갱신
-    if (Date.now() < expiresAt - 30_000) {
+    // 필요한 최소 유효시간을 만족하면 기존 토큰 사용
+    if (Date.now() < expiresAt - minValidityMs) {
       return accessToken;
     }
   } catch {
@@ -126,7 +315,7 @@ export async function ensureValidToken(): Promise<string | null> {
   if (refreshPromise) {
     try {
       const newToken = await refreshPromise;
-      accessToken = newToken;
+      setAccessToken(newToken);
       return newToken;
     } catch {
       return null;
@@ -136,7 +325,7 @@ export async function ensureValidToken(): Promise<string | null> {
   refreshPromise = refreshAccessToken();
   try {
     const newToken = await refreshPromise;
-    accessToken = newToken;
+    setAccessToken(newToken);
     refreshPromise = null;
     return newToken;
   } catch {
@@ -175,13 +364,12 @@ export const authApi = {
   // 세션 초기화: refresh token으로 access token을 먼저 얻은 뒤 /auth/me 조회
   // 이렇게 하면 /auth/me 호출 시 401이 발생하지 않음
   initSession: async () => {
-    const refreshResponse = await axios.post(
-      `${API_BASE_URL}/auth/refresh`,
-      {},
-      { withCredentials: true, timeout: 15000 }
-    );
-    const newToken = refreshResponse.data.accessToken;
-    if (!newToken) throw new Error("No access token in refresh response");
+    if (!refreshPromise) {
+      refreshPromise = refreshAccessToken();
+    }
+    const newToken = await refreshPromise.finally(() => {
+      refreshPromise = null;
+    });
     setAccessToken(newToken);
     const meResponse = await apiClient.get("/auth/me");
     return meResponse.data;

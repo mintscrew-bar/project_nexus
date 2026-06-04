@@ -214,9 +214,9 @@ export class AuthController {
   // Token Management
   // ========================================
 
-  // 토큰 갱신: 1분에 10회까지
+  // 토큰 갱신: 내전 단계 전환 시 여러 탭/플레이어가 동시에 갱신해도 세션이 끊기지 않게 여유를 둔다.
   @Post("refresh")
-  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @Throttle({ default: { limit: 300, ttl: 60000 } })
   @UseGuards(JwtRefreshGuard)
   async refresh(@Req() req: Request, @Res() res: Response) {
     try {

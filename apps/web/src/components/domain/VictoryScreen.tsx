@@ -216,7 +216,7 @@ export function VictoryScreen({
     if (hasNavigated.current || isReturning) return;
     hasNavigated.current = true;
     setIsReturning(true);
-    try { await roomApi.returnToLobby(roomId); } catch { /* 무시 — 호스트만 가능, 비호스트는 그냥 이동 */ }
+    try { await roomApi.returnToLobby(roomId); } catch { /* 이미 복귀 처리됐거나 방 상태가 바뀐 경우에도 이동은 계속 */ }
     onClose?.();
     router.push(`/tournaments/${roomId}/lobby`);
   };

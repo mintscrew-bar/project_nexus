@@ -49,6 +49,45 @@ let dmSocket: Socket | null = null;
 let roleSelectionSocket: Socket | null = null;
 
 const SOCKET_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+const SOCKET_AUTH_MIN_TOKEN_TTL_MS = 2 * 60 * 1000;
+const SOCKET_AUTH_MAX_ATTEMPTS = 12;
+const SOCKET_AUTH_RETRY_DELAY_MS = 750;
+
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const getSocketAuthPayload = async () => {
+  for (let attempt = 1; attempt <= SOCKET_AUTH_MAX_ATTEMPTS; attempt += 1) {
+    const token = await ensureValidToken(SOCKET_AUTH_MIN_TOKEN_TTL_MS).catch(
+      () => null,
+    );
+    if (token) {
+      return { token };
+    }
+    if (attempt < SOCKET_AUTH_MAX_ATTEMPTS) {
+      await wait(SOCKET_AUTH_RETRY_DELAY_MS);
+    }
+  }
+  return { token: null };
+};
+
+export const createAuthenticatedSocket = (namespace: string, label: string) => {
+  const socket = io(`${SOCKET_URL}${namespace}`, {
+    auth: async (cb) => cb(await getSocketAuthPayload()),
+    transports: ["websocket"],
+    reconnection: true,
+    reconnectionAttempts: Infinity,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 10000,
+    randomizationFactor: 0.5,
+    timeout: 20000,
+  });
+
+  socket.on("connect_error", (error) => {
+    console.error(`${label} Socket Connect Error:`, error.message);
+  });
+
+  return socket;
+};
 
 // Room Socket 참조 (connect 없이 기존 인스턴스 조회)
 export const getRoomSocket = () => roomSocket;
@@ -63,20 +102,7 @@ export const connectRoomSocket = () => {
     roomSocket = null;
   }
 
-  roomSocket = io(`${SOCKET_URL}/room`, {
-    // Re-evaluate token for each connection/reconnection attempt.
-    auth: async (cb) => cb({ token: await ensureValidToken() }),
-    transports: ["websocket"],
-    reconnection: true,
-    reconnectionAttempts: Infinity,
-    reconnectionDelay: 1000,
-    reconnectionDelayMax: 10000,
-    randomizationFactor: 0.5,
-  });
-
-  roomSocket.on("connect_error", (error) => {
-    console.error("Room Socket Connect Error:", error.message);
-  });
+  roomSocket = createAuthenticatedSocket("/room", "Room");
 
   return roomSocket;
 };
@@ -95,20 +121,7 @@ export const connectAuctionSocket = () => {
     auctionSocket = null;
   }
 
-  auctionSocket = io(`${SOCKET_URL}/auction`, {
-    // Re-evaluate token for each connection/reconnection attempt.
-    auth: async (cb) => cb({ token: await ensureValidToken() }),
-    transports: ["websocket"],
-    reconnection: true,
-    reconnectionAttempts: Infinity,
-    reconnectionDelay: 1000,
-    reconnectionDelayMax: 10000,
-    randomizationFactor: 0.5,
-  });
-
-  auctionSocket.on("connect_error", (error) => {
-    console.error("Auction Socket Connect Error:", error.message);
-  });
+  auctionSocket = createAuthenticatedSocket("/auction", "Auction");
 
   auctionSocket.on("error", (error) => {
     console.error("Auction Socket Error:", error);
@@ -129,19 +142,7 @@ export const connectSnakeDraftSocket = () => {
     snakeDraftSocket = null;
   }
 
-  snakeDraftSocket = io(`${SOCKET_URL}/snake-draft`, {
-    auth: async (cb) => cb({ token: await ensureValidToken() }),
-    transports: ["websocket"],
-    reconnection: true,
-    reconnectionAttempts: Infinity,
-    reconnectionDelay: 1000,
-    reconnectionDelayMax: 10000,
-    randomizationFactor: 0.5,
-  });
-
-  snakeDraftSocket.on("connect_error", (error) => {
-    console.error("Snake Draft Socket Connect Error:", error.message);
-  });
+  snakeDraftSocket = createAuthenticatedSocket("/snake-draft", "Snake Draft");
 
   return snakeDraftSocket;
 };
@@ -158,19 +159,7 @@ export const connectMatchSocket = () => {
     matchSocket = null;
   }
 
-  matchSocket = io(`${SOCKET_URL}/match`, {
-    auth: async (cb) => cb({ token: await ensureValidToken() }),
-    transports: ["websocket"],
-    reconnection: true,
-    reconnectionAttempts: Infinity,
-    reconnectionDelay: 1000,
-    reconnectionDelayMax: 10000,
-    randomizationFactor: 0.5,
-  });
-
-  matchSocket.on("connect_error", (error) => {
-    console.error("Match Socket Connect Error:", error.message);
-  });
+  matchSocket = createAuthenticatedSocket("/match", "Match");
 
   return matchSocket;
 };
@@ -183,19 +172,7 @@ export const connectClanSocket = () => {
     clanSocket = null;
   }
 
-  clanSocket = io(`${SOCKET_URL}/clan`, {
-    auth: async (cb) => cb({ token: await ensureValidToken() }),
-    transports: ["websocket"],
-    reconnection: true,
-    reconnectionAttempts: Infinity,
-    reconnectionDelay: 1000,
-    reconnectionDelayMax: 10000,
-    randomizationFactor: 0.5,
-  });
-
-  clanSocket.on("connect_error", (error) => {
-    console.error("Clan Socket Connect Error:", error.message);
-  });
+  clanSocket = createAuthenticatedSocket("/clan", "Clan");
 
   return clanSocket;
 };
@@ -754,19 +731,7 @@ export const connectPresenceSocket = () => {
     presenceSocket = null;
   }
 
-  presenceSocket = io(`${SOCKET_URL}/presence`, {
-    auth: async (cb) => cb({ token: await ensureValidToken() }),
-    transports: ["websocket"],
-    reconnection: true,
-    reconnectionAttempts: Infinity,
-    reconnectionDelay: 1000,
-    reconnectionDelayMax: 10000,
-    randomizationFactor: 0.5,
-  });
-
-  presenceSocket.on("connect_error", (error) => {
-    console.error("Presence Socket Connect Error:", error.message);
-  });
+  presenceSocket = createAuthenticatedSocket("/presence", "Presence");
 
   return presenceSocket;
 };
@@ -916,19 +881,7 @@ export const connectNotificationSocket = () => {
     notificationSocket = null;
   }
 
-  notificationSocket = io(`${SOCKET_URL}/notification`, {
-    auth: async (cb) => cb({ token: await ensureValidToken() }),
-    transports: ["websocket"],
-    reconnection: true,
-    reconnectionAttempts: Infinity,
-    reconnectionDelay: 1000,
-    reconnectionDelayMax: 10000,
-    randomizationFactor: 0.5,
-  });
-
-  notificationSocket.on("connect_error", (error) => {
-    console.error("Notification Socket Connect Error:", error.message);
-  });
+  notificationSocket = createAuthenticatedSocket("/notification", "Notification");
 
   return notificationSocket;
 };
@@ -966,19 +919,7 @@ export const connectDmSocket = () => {
     dmSocket = null;
   }
 
-  dmSocket = io(`${SOCKET_URL}/dm`, {
-    auth: async (cb) => cb({ token: await ensureValidToken() }),
-    transports: ["websocket"],
-    reconnection: true,
-    reconnectionAttempts: Infinity,
-    reconnectionDelay: 1000,
-    reconnectionDelayMax: 10000,
-    randomizationFactor: 0.5,
-  });
-
-  dmSocket.on("connect_error", (error) => {
-    console.error("DM Socket Connect Error:", error.message);
-  });
+  dmSocket = createAuthenticatedSocket("/dm", "DM");
 
   return dmSocket;
 };
@@ -1154,19 +1095,7 @@ export const connectRoleSelectionSocket = () => {
     roleSelectionSocket = null;
   }
 
-  roleSelectionSocket = io(`${SOCKET_URL}/role-selection`, {
-    auth: async (cb) => cb({ token: await ensureValidToken() }),
-    transports: ["websocket"],
-    reconnection: true,
-    reconnectionAttempts: Infinity,
-    reconnectionDelay: 1000,
-    reconnectionDelayMax: 10000,
-    randomizationFactor: 0.5,
-  });
-
-  roleSelectionSocket.on("connect_error", (error) => {
-    console.error("Role Selection Socket Connect Error:", error.message);
-  });
+  roleSelectionSocket = createAuthenticatedSocket("/role-selection", "Role Selection");
 
   return roleSelectionSocket;
 };

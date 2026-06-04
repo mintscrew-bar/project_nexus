@@ -7,8 +7,7 @@ import {
   OnGatewayConnection,
   OnGatewayDisconnect,
 } from "@nestjs/websockets";
-import { Inject, forwardRef, OnModuleDestroy, Logger } from "@nestjs/common";
-import { Cron } from "@nestjs/schedule";
+import { Inject, forwardRef, OnModuleDestroy } from "@nestjs/common";
 import { ShutdownService } from "../common/shutdown.service";
 import { OnEvent } from "@nestjs/event-emitter";
 import { Server, Socket } from "socket.io";
@@ -51,11 +50,6 @@ export class RoomGateway
   private readonly TYPING_TIMEOUT_MS = 3000; // 3 seconds
   // Guard against concurrent start-game calls (double-click, race)
   private startingRooms = new Set<string>();
-  // 새로고침/잠깐 끊김 보호용 grace 타이머 — key: `${userId}:${roomId}`
-  // 소켓 disconnect 즉시 leaveRoom을 호출하면 새로고침만 해도 방에서 빠지므로,
-  // 이 시간 안에 같은 방에 join-room이 다시 들어오면 leave를 취소한다.
-  private disconnectGraceTimers = new Map<string, NodeJS.Timeout>();
-  private readonly DISCONNECT_GRACE_MS = 30_000; // 30 seconds
 
   constructor(
     private readonly roomService: RoomService,
@@ -86,11 +80,6 @@ export class RoomGateway
     this.userSockets.clear();
     this.socketRooms.clear();
     this.startingRooms.clear();
-    // grace 타이머도 정리
-    for (const timer of this.disconnectGraceTimers.values()) {
-      clearTimeout(timer);
-    }
-    this.disconnectGraceTimers.clear();
   }
 
   async handleConnection(client: AuthenticatedSocket) {
@@ -126,35 +115,10 @@ export class RoomGateway
     }
   }
 
-  private hasActiveSocketInRoom(userId: string, roomId: string): boolean {
-    const sockets = this.userSockets.get(userId);
-    if (!sockets) return false;
-
-    let hasActive = false;
-    for (const socketId of Array.from(sockets)) {
-      const socketRoomId = this.socketRooms.get(socketId);
-      if (!socketRoomId) {
-        sockets.delete(socketId);
-        continue;
-      }
-      if (socketRoomId === roomId) {
-        hasActive = true;
-      }
-    }
-
-    if (sockets.size === 0) {
-      this.userSockets.delete(userId);
-    }
-
-    return hasActive;
-  }
-
   async handleDisconnect(client: AuthenticatedSocket) {
     if (!client.userId) return;
 
     const userId = client.userId;
-    const username = client.username;
-
     const sockets = this.userSockets.get(userId);
     if (sockets) {
       sockets.delete(client.id);
@@ -171,69 +135,6 @@ export class RoomGateway
     this.socketRooms.delete(client.id);
     // 타이핑 상태도 즉시 해제 (재연결 시 알아서 다시 emit)
     this.stopTyping(roomId, userId);
-
-    // 같은 방에 같은 유저의 다른 활성 소켓이 남아 있으면 (멀티탭 등)
-    // grace 발동 없이 종료. 다른 탭에서 그대로 방에 남아 있다고 보면 됨.
-    if (this.hasActiveSocketInRoom(userId, roomId)) {
-      return;
-    }
-
-    // 새로고침/잠깐 끊김 대비 grace timer.
-    // DISCONNECT_GRACE_MS 안에 같은 방에 join-room이 다시 들어오면 leave 취소.
-    const graceKey = `${userId}:${roomId}`;
-    const existing = this.disconnectGraceTimers.get(graceKey);
-    if (existing) clearTimeout(existing);
-
-    const timer = setTimeout(async () => {
-      this.disconnectGraceTimers.delete(graceKey);
-
-      // grace 만료 시점에 같은 유저가 같은 방에 다시 연결돼 있으면 leave 취소.
-      if (this.hasActiveSocketInRoom(userId, roomId)) return;
-
-      let shouldNotifyOthers = false;
-      try {
-        const status = await this.roomService.getRoomStatus(roomId);
-        if (status === RoomStatus.WAITING || status === RoomStatus.COMPLETED) {
-          // WAITING/COMPLETED 상태: 실제로 참가자 제거
-          try {
-            await this.roomService.leaveRoom(userId, roomId);
-            shouldNotifyOthers = true;
-          } catch {
-            // 이미 나갔거나 상태가 변경됨 — 무시
-          }
-        } else {
-          // 게임 진행 중에도 호스트가 30초 안에 안 돌아오면 다음 참가자에게 이양
-          try {
-            const newHostId = await this.roomService.transferActiveRoomHost(
-              roomId,
-              userId,
-            );
-            if (newHostId) {
-              this.server.to(roomId).emit("host-changed", { newHostId });
-              // host-changed 만으로는 클라 currentRoom.hostId 가 갱신되지 않으므로
-              // 변경된 방 전체를 함께 푸시해 "방장" 배지/권한 UI 정합성 확보.
-              try {
-                const updatedRoom = await this.roomService.getRoomById(roomId);
-                this.server.to(roomId).emit("room-updated", updatedRoom);
-              } catch {
-                // 조회 실패 시 host-changed 만으로 폴백
-              }
-            }
-          } catch {
-            // best-effort — 무시
-          }
-        }
-      } catch {
-        // 방이 이미 삭제되었거나 알 수 없는 상태 — 무시
-      }
-
-      if (shouldNotifyOthers) {
-        this.server.to(roomId).emit("user-left", { userId, username });
-        this.broadcastRoomDelta("update", roomId);
-      }
-    }, this.DISCONNECT_GRACE_MS);
-
-    this.disconnectGraceTimers.set(graceKey, timer);
   }
 
   // ========================================
@@ -317,14 +218,6 @@ export class RoomGateway
         client.leave(previousRoomId);
         this.socketRooms.delete(client.id);
 
-        // 이전 방의 grace 타이머가 남아 있으면 취소 (새 방으로 이동했으므로 불필요)
-        const prevGraceKey = `${client.userId}:${previousRoomId}`;
-        const prevPending = this.disconnectGraceTimers.get(prevGraceKey);
-        if (prevPending) {
-          clearTimeout(prevPending);
-          this.disconnectGraceTimers.delete(prevGraceKey);
-        }
-
         // WAITING 방이면 즉시 퇴장 처리 (슬롯 해제 + 방 목록 갱신)
         try {
           const prevStatus =
@@ -366,14 +259,6 @@ export class RoomGateway
       // Join Socket.IO room
       client.join(data.roomId);
       this.socketRooms.set(client.id, data.roomId);
-
-      // 새로고침/재연결로 grace 진행 중이면 leave 예약 취소
-      const graceKey = `${client.userId}:${data.roomId}`;
-      const pendingLeave = this.disconnectGraceTimers.get(graceKey);
-      if (pendingLeave) {
-        clearTimeout(pendingLeave);
-        this.disconnectGraceTimers.delete(graceKey);
-      }
 
       // Notify others only for new joins (not for reconnects)
       if (isNewJoin) {
@@ -431,14 +316,6 @@ export class RoomGateway
         client.userId!,
         data.roomId,
       ); // Assert client.userId is string
-
-      // 명시적 나가기 시 grace 예약 취소
-      const graceKey = `${client.userId}:${data.roomId}`;
-      const pending = this.disconnectGraceTimers.get(graceKey);
-      if (pending) {
-        clearTimeout(pending);
-        this.disconnectGraceTimers.delete(graceKey);
-      }
 
       // Leave Socket.IO room
       client.leave(data.roomId);
@@ -930,56 +807,6 @@ export class RoomGateway
         "[RoomGateway] Discord 음성 상태 업데이트 처리 오류:",
         error,
       );
-    }
-  }
-
-  // ========================================
-  // Scheduled Cleanup
-  // ========================================
-
-  private readonly gatewayLogger = new Logger(RoomGateway.name);
-
-  /** 매 5분마다 소켓 없는 좀비 참가자를 DB에서 제거한다 */
-  @Cron("*/5 * * * *")
-  async cleanupZombieParticipants() {
-    try {
-      const [waitingRooms, completedRooms] = await Promise.all([
-        this.roomService.getWaitingRoomsWithParticipants(),
-        this.roomService.getCompletedRoomsWithParticipants(),
-      ]);
-      const roomsToCheck = [...waitingRooms, ...completedRooms];
-      for (const room of roomsToCheck) {
-        // /room 네임스페이스 소켓 기준이 아닌 Socket.IO room 멤버십 기준으로 판단.
-        // userSockets는 /room 네임스페이스만 추적하므로 다른 네임스페이스에
-        // 연결된 관전자를 좀비로 오인하는 문제를 방지한다.
-        const activeSockets = await this.server.in(room.id).fetchSockets();
-        const activeUserIds = new Set(
-          activeSockets
-            .map((s) => (s as any).userId as string | undefined)
-            .filter(Boolean),
-        );
-        const zombies = room.participants.filter(
-          (p) => !activeUserIds.has(p.userId),
-        );
-        if (zombies.length === 0) continue;
-
-        this.gatewayLogger.debug(
-          `[Cleanup] Room ${room.id}: ${zombies.length}명 좀비 제거`,
-        );
-
-        for (const zombie of zombies) {
-          try {
-            await this.roomService.leaveRoom(zombie.userId, room.id);
-          } catch (_) {
-            // 이미 제거됐거나 방이 삭제된 경우 무시
-          }
-        }
-
-        // 방 상태 변경을 방 목록 구독자에게 알림 (삭제됐으면 remove로 폴백)
-        this.broadcastRoomDelta("update", room.id);
-      }
-    } catch (error) {
-      this.gatewayLogger.error("[Cleanup] 좀비 참가자 정리 실패:", error);
     }
   }
 

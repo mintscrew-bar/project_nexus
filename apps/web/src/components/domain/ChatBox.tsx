@@ -68,12 +68,12 @@ export const ChatBox: React.FC<ChatBoxProps> = ({
   };
 
   return (
-    <div className={cn('flex flex-col h-full bg-bg-secondary rounded-lg', className)}>
+    <div className={cn('flex h-full min-h-0 flex-col overflow-hidden bg-bg-secondary rounded-lg', className)}>
       {/* Messages Container */}
       <div
         ref={scrollContainerRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto p-4 space-y-3"
+        className="min-h-0 flex-1 overflow-y-auto p-4 space-y-3"
       >
         {messages.length === 0 ? (
           <div className="flex items-center justify-center h-full">
@@ -83,15 +83,15 @@ export const ChatBox: React.FC<ChatBoxProps> = ({
           messages.map((msg) => {
             const isOwn = msg.userId === currentUserId;
             return (
-              <div key={msg.id} className={cn('flex gap-3 animate-fade-in', isOwn && 'flex-row-reverse')}>
+              <div key={msg.id} className={cn('flex min-w-0 gap-3 animate-fade-in', isOwn && 'flex-row-reverse')}>
                 <Avatar src={msg.avatar} alt={msg.username || '?'} fallback={msg.username?.[0] || '?'} size="sm" />
-                <div className={cn('flex-1 max-w-[70%]', isOwn && 'flex flex-col items-end')}>
-                  <div className="flex items-baseline gap-2 mb-1">
+                <div className={cn('min-w-0 flex-1 max-w-[70%]', isOwn && 'flex flex-col items-end')}>
+                  <div className="flex max-w-full items-baseline gap-2 mb-1">
                     <span className="text-sm font-medium text-text-primary">{msg.username || '알 수 없음'}</span>
                     <span className="text-xs text-text-tertiary">{getRelativeTime(msg.createdAt)}</span>
                   </div>
                   <div className={cn('px-4 py-2 rounded-lg break-words', isOwn ? 'bg-accent-primary text-white' : 'bg-bg-tertiary text-text-primary')}>
-                    <p className="text-sm">{msg.message}</p>
+                    <p className="whitespace-pre-wrap text-sm">{msg.message}</p>
                   </div>
                 </div>
               </div>
@@ -115,14 +115,14 @@ export const ChatBox: React.FC<ChatBoxProps> = ({
       )}
 
       {/* Input Form */}
-      <div className="border-t border-bg-tertiary p-3">
-        <form onSubmit={handleSubmit} className="flex gap-2">
+      <div className="flex-shrink-0 border-t border-bg-tertiary p-3">
+        <form onSubmit={handleSubmit} className="flex min-w-0 gap-2">
           <Input
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             placeholder={disabled ? '채팅이 비활성화되었습니다' : '메시지를 입력하세요...'}
             disabled={disabled}
-            className="flex-1"
+            className="min-w-0 flex-1"
             maxLength={500}
           />
           <button
