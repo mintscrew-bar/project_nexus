@@ -80,28 +80,28 @@ export function PlayerProfileModal({ userId, onClose }: PlayerProfileModalProps)
   const { data: profile, isLoading: profileLoading, isError } = useQuery({
     queryKey: ["userProfile", userId],
     queryFn: () => userApi.getProfile(userId!),
-    staleTime: 60_000,
+    staleTime: 5 * 60 * 1000,
     enabled: Boolean(userId),
   });
 
   const { data: stats } = useQuery({
     queryKey: ["userStats", userId],
     queryFn: () => userApi.getUserStats(userId!),
-    staleTime: 60_000,
+    staleTime: 5 * 60 * 1000,
     enabled: Boolean(userId),
   });
 
   const { data: rep } = useQuery({
     queryKey: ["reputationStats", userId],
     queryFn: () => reputationApi.getUserStats(userId!),
-    staleTime: 60_000,
+    staleTime: 5 * 60 * 1000,
     enabled: Boolean(userId),
   });
 
   const { data: history } = useQuery({
     queryKey: ["matchHistory", userId, 5],
     queryFn: () => matchApi.getUserMatchHistory(userId!, 5, 0),
-    staleTime: 60_000,
+    staleTime: 5 * 60 * 1000,
     enabled: Boolean(userId),
   });
 

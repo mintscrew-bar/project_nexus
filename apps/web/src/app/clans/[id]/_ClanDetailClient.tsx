@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useState, useCallback } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import { motion } from "framer-motion";
@@ -156,28 +157,18 @@ interface AnnouncementSectionProps {
 }
 
 function AnnouncementSection({ clanId, canPost }: AnnouncementSectionProps) {
-  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [newContent, setNewContent] = useState("");
   const [isPosting, setIsPosting] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const { addToast } = useToast();
+  const queryClient = useQueryClient();
 
-  const fetchAnnouncements = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const data = await clanApi.getAnnouncements(clanId);
-      setAnnouncements(data);
-    } catch {
-      // 공지사항 로드 실패 시 조용히 처리 (빈 배열 유지)
-    } finally {
-      setIsLoading(false);
-    }
-  }, [clanId]);
-
-  useEffect(() => {
-    fetchAnnouncements();
-  }, [fetchAnnouncements]);
+  const { data: announcements = [], isLoading } = useQuery<Announcement[]>({
+    queryKey: ["clanAnnouncements", clanId],
+    queryFn: () => clanApi.getAnnouncements(clanId),
+    staleTime: 3 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
 
   const handlePost = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -188,7 +179,7 @@ function AnnouncementSection({ clanId, canPost }: AnnouncementSectionProps) {
       addToast("공지사항이 작성되었습니다.", "success");
       setNewContent("");
       setShowForm(false);
-      fetchAnnouncements();
+      queryClient.invalidateQueries({ queryKey: ["clanAnnouncements", clanId] });
     } catch (err: any) {
       addToast(err.response?.data?.message || "공지 작성에 실패했습니다.", "error");
     } finally {
@@ -200,7 +191,7 @@ function AnnouncementSection({ clanId, canPost }: AnnouncementSectionProps) {
     try {
       await clanApi.deleteAnnouncement(clanId, announcementId);
       addToast("공지사항이 삭제되었습니다.", "info");
-      setAnnouncements((prev) => prev.filter((a) => a.id !== announcementId));
+      queryClient.invalidateQueries({ queryKey: ["clanAnnouncements", clanId] });
     } catch {
       addToast("공지 삭제에 실패했습니다.", "error");
     }

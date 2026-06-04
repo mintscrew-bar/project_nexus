@@ -1,5 +1,6 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
 import {
   useState,
   useEffect,
@@ -625,30 +626,26 @@ function AddFriendModal({ onClose }: { onClose: () => void }) {
   const { addToast } = useToast();
   const { fetchFriends } = useFriendStore();
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<{ id: string; username: string; avatar: string | null }[]>([]);
-  const [searching, setSearching] = useState(false);
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [sentIds, setSentIds] = useState<Set<string>>(new Set());
-  const searchTimer = useRef<ReturnType<typeof setTimeout>>();
+  const debounceTimer = useRef<ReturnType<typeof setTimeout>>();
 
-  const doSearch = useCallback(async (q: string) => {
-    if (q.trim().length < 2) { setResults([]); return; }
-    setSearching(true);
-    try {
-      const data = await statsApi.searchUsers(q.trim(), 8);
-      const list = Array.isArray(data) ? data : (data?.users ?? []);
-      setResults(list);
-    } catch {
-      setResults([]);
-    } finally {
-      setSearching(false);
-    }
-  }, []);
-
+  // 400ms debounce
   useEffect(() => {
-    clearTimeout(searchTimer.current);
-    searchTimer.current = setTimeout(() => doSearch(query), 400);
-    return () => clearTimeout(searchTimer.current);
-  }, [query, doSearch]);
+    clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(() => setDebouncedQuery(query), 400);
+    return () => clearTimeout(debounceTimer.current);
+  }, [query]);
+
+  const { data: results = [], isFetching: searching } = useQuery<{ id: string; username: string; avatar: string | null }[]>({
+    queryKey: ["friendSearch", debouncedQuery],
+    queryFn: async () => {
+      const data = await statsApi.searchUsers(debouncedQuery.trim(), 8);
+      return Array.isArray(data) ? data : (data?.users ?? []);
+    },
+    staleTime: 60 * 1000,
+    enabled: debouncedQuery.trim().length >= 2,
+  });
 
   const handleSend = async (userId: string) => {
     try {

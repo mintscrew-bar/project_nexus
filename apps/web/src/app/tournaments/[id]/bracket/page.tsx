@@ -2,6 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useMatchStore } from "@/stores/match-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { roomApi, matchApi } from "@/lib/api-client";
@@ -31,8 +32,18 @@ export default function BracketPage() {
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAborting, setIsAborting] = useState(false);
-  const [isHost, setIsHost] = useState(false);
   const [liveStatus, setLiveStatus] = useState<any>(null);
+
+  // host 여부 — 브래킷 세션 중 변경되지 않으므로 1회만 조회
+  const { data: isHost = false } = useQuery({
+    queryKey: ["bracketHost", roomId, user?.id],
+    queryFn: async () => {
+      const room = await roomApi.getRoom(roomId);
+      return room.hostId === user!.id;
+    },
+    staleTime: Infinity,
+    enabled: Boolean(roomId && user),
+  });
 
   // fetchRoomMatches/connectToBracket/disconnect는 zustand 스토어 함수로 참조가 안정적이므로 dependency에서 제외
   useEffect(() => {
@@ -46,15 +57,6 @@ export default function BracketPage() {
     };
   }, [roomId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Host 여부 확인 (user 변경 시에만)
-  useEffect(() => {
-    if (!roomId || !user) return;
-    roomApi.getRoom(roomId).then((room) => {
-      if (room.hostId === user.id) {
-        setIsHost(true);
-      }
-    }).catch(() => {});
-  }, [roomId, user]);
 
   useEffect(() => {
     if (!sessionAbortedAt) return;
