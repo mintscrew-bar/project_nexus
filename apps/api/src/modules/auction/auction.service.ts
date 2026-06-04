@@ -6,6 +6,7 @@
   Optional,
   Inject,
   OnModuleInit,
+  Logger,
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { RedisService } from "../redis/redis.service";
@@ -43,6 +44,7 @@ export interface CaptainSelectionPhase {
 
 @Injectable()
 export class AuctionService implements OnModuleInit {
+  private readonly logger = new Logger(AuctionService.name);
   /** 인메모리 경매 상태 (빠른 동기 접근용) — Redis와 동기화됨 */
   private auctionStates = new Map<string, AuctionState>();
   /** 인메모리 주장 선정 단계 (빠른 동기 접근용) — Redis와 동기화됨 */
@@ -1187,6 +1189,18 @@ export class AuctionService implements OnModuleInit {
       const targetTeam = [...targetTeamPool].sort(
         (a, b) => b.remainingBudget - a.remainingBudget,
       )[0];
+
+      // 방어: 배정할 팀이 하나도 없으면(teams 비어있는 비정상 상태) 크래시 대신 유찰 처리.
+      // 팀이 0개인 경매는 정상 진행 불가 → 타이머 만료 시 throw로 전체가 멈추던 버그 방지.
+      if (!targetTeam) {
+        this.logger.error(
+          `[Auction] resolveCurrentBid: 배정 가능한 팀이 없음(teams 비어있음) room=${roomId} — 유찰 처리`,
+        );
+        return {
+          sold: false,
+          player: this._mapAuctionParticipant(currentPlayer),
+        };
+      }
 
       await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         if (targetTeam.remainingBudget === 0 && !targetTeam.hasReceivedBonus) {
