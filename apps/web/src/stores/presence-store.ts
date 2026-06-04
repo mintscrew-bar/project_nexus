@@ -131,7 +131,7 @@ export const usePresenceStore = create<PresenceStoreState>((set, get) => ({
 
       set({ friendStatuses: statusMap, isLoading: false });
     } catch (error) {
-      toast.error("친구 상태를 불러오지 못했습니다.");
+      // 백그라운드 조회 — 재연결마다 호출되므로 실패해도 토스트로 스팸하지 않는다(콘솔만).
       console.error("Failed to fetch friends statuses:", error);
       set({ isLoading: false });
     }
