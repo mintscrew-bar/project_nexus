@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueries } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/auth-store";
 import { useLabStore } from "@/stores/lab-store";
 import {
@@ -85,14 +85,13 @@ export default function ChampionComparePage() {
     [catalogResponse],
   );
 
-  // 각 챔피언 상세 조회
-  const queries = championIds.map((id) =>
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    useQuery<ChampionDetailResponse>({
+  // 각 챔피언 상세 조회 — useQueries로 hooks 규칙 준수
+  const queries = useQueries({
+    queries: championIds.map((id) => ({
       ...labQueryOptions.championDetail(id, activePeriod, activeSource),
       enabled: canFetch && id > 0,
-    }),
-  );
+    })),
+  }) as ReturnType<typeof useQuery<ChampionDetailResponse>>[];
 
   const isLoading = queries.some((q) => q.isLoading);
 

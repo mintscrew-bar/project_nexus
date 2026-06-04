@@ -172,11 +172,12 @@ export default function SummonerStatsPage() {
   }, []);
 
   // 라이브 게임 조회 (30초 폴링)
+  // staleTime을 폴링 간격과 동일하게 설정 — 탭 복귀 시 중복 요청 방지
   const { data: liveGameData } = useQuery({
     queryKey: ["liveGame", gameName, tagLine],
     queryFn: () => riotApi.getLiveGame(gameName, tagLine),
-    staleTime: 0,
-    refetchInterval: 30_000, // 30초마다 갱신
+    staleTime: 30_000,
+    refetchInterval: 30_000,
     retry: false,
     enabled: !!summoner,
   });
