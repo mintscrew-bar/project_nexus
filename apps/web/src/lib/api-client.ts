@@ -14,6 +14,8 @@ let refreshPromise: Promise<string> | null = null;
 let refreshRetryBlockedUntil = 0;
 
 const REFRESH_RETRY_COOLDOWN_MS = 30_000;
+const AUTH_USER_STORAGE_KEY = "nexus_auth_user";
+const AUTH_HINT_KEY = "nexus_session";
 
 const isRefreshRetryBlocked = () => Date.now() < refreshRetryBlockedUntil;
 
@@ -43,18 +45,41 @@ const isAuthUnavailableError = (error: unknown) => {
   return status === 401 || status === 403;
 };
 
-// 회로차단기: 인증 불가 상태에서는 토큰만 정리하고 재시도 폭주를 끊는다.
-// 명시적 로그아웃이 아닌 이상 auth store/user cache는 건드리지 않는다.
-// 이미 연결된 게임/룸 소켓은 유지한다. 게임 룸처럼 실시간 연결을 최대한 보존하기 위함이다.
+function clearCachedAuthState() {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.removeItem(AUTH_USER_STORAGE_KEY);
+    localStorage.removeItem(AUTH_USER_STORAGE_KEY);
+    localStorage.removeItem(AUTH_HINT_KEY);
+  } catch {
+    // best-effort
+  }
+}
+
+// 회로차단기: refresh token이 401/403으로 거부되면 세션이 무효한 상태다.
+// cached user와 상시 소켓을 같이 정리해 refresh/presence/socket 재시도 루프를 끊는다.
 let authUnavailableHandled = false;
 async function handleAuthUnavailable() {
   if (authUnavailableHandled) return;
   authUnavailableHandled = true;
   setAccessToken(null); // 토큰 정리 + proactive 예약 해제
   refreshPromise = null;
+  clearCachedAuthState();
+
+  try {
+    const { disconnectAllSockets } = await import("./socket-client");
+    disconnectAllSockets();
+  } catch {
+    // best-effort
+  }
+
   try {
     const { useAuthStore } = await import("@/stores/auth-store");
-    useAuthStore.setState({ isLoading: false });
+    useAuthStore.setState({
+      user: null,
+      isAuthenticated: false,
+      isLoading: false,
+    });
   } catch {
     // best-effort
   }
@@ -264,7 +289,7 @@ async function refreshAccessToken(): Promise<string> {
 // 소켓 인증용: JWT 만료 여부 확인 후 필요 시 갱신하여 유효한 토큰 반환
 export async function ensureValidToken(minValidityMs = 30_000): Promise<string | null> {
   if (!accessToken) {
-    if (isRefreshRetryBlocked()) return null;
+    if (authUnavailableHandled || isRefreshRetryBlocked()) return null;
 
     if (refreshPromise) {
       try {
