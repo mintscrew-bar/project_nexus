@@ -1279,7 +1279,7 @@ export const reputationApi = {
     communicationRating: number;
     comment?: string;
   }) => {
-    const response = await apiClient.post("/reputation/rate", data);
+    const response = await apiClient.post("/reputation/ratings", data);
     return response.data;
   },
 

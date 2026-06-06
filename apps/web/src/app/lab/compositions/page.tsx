@@ -11,8 +11,8 @@ import { CompositionTypesCard } from "@/components/lab/compositions/CompositionT
 
 export default function LabCompositionsPage() {
   const { isAuthenticated, isLoading: authLoading } = useAuthStore();
-  const { period: activePeriod } = useLabStore();
-  const canFetch = !authLoading && isAuthenticated;
+  const { period: activePeriod, statsEnabled } = useLabStore();
+  const canFetch = !authLoading && isAuthenticated && statsEnabled;
 
   // 챔피언 카탈로그 (시너지·카운터 셀렉트박스 공용)
   const { data: catalogResponse } = useQuery<ChampionListResponse>({

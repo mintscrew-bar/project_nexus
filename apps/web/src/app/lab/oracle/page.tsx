@@ -11,8 +11,8 @@ import { AuctionEfficiencyCard } from "@/components/lab/oracle/AuctionEfficiency
 
 export default function LabOracleAuctionPage() {
   const { isAuthenticated, isLoading: authLoading } = useAuthStore();
-  const { period: activePeriod } = useLabStore();
-  const canFetch = !authLoading && isAuthenticated;
+  const { period: activePeriod, statsEnabled } = useLabStore();
+  const canFetch = !authLoading && isAuthenticated && statsEnabled;
 
   const { data: auctionData, isLoading: auctionLoading } = useQuery<AuctionEfficiencyResponse>({
     ...labQueryOptions.auctionEfficiency(activePeriod),

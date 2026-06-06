@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Loader2 } from "lucide-react";
 import { matchApi } from "@/lib/api-client";
 import { Badge } from "@/components/ui";
 import type { MatchQuickFillOption, UserSearchResult } from "./types";
@@ -46,10 +47,12 @@ export function RecentMatchQuickFill({
   onPick: (option: MatchQuickFillOption) => void;
   title?: string;
 }) {
-  const { data, isLoading } = useQuery({
+  const [enabled, setEnabled] = useState(false);
+  const { data, isFetching, refetch } = useQuery({
     queryKey: ["lab", "oracle", "quick-fill", "recent-matches"],
     queryFn: () => matchApi.getUserMatches({ limit: 6 }) as Promise<RawMatch[]>,
     staleTime: 60 * 1000,
+    enabled,
   });
 
   const options = useMemo<MatchQuickFillOption[]>(() => {
@@ -75,9 +78,27 @@ export function RecentMatchQuickFill({
       .filter((o) => o.teamA.length > 0 || o.teamB.length > 0);
   }, [data]);
 
-  if (isLoading) {
+  const handleLoad = async () => {
+    setEnabled(true);
+    await refetch();
+  };
+
+  if (!enabled) {
     return (
-      <div className="rounded-xl border border-white/10 bg-bg-primary/40 px-3 py-2 text-xs text-text-tertiary">
+      <button
+        type="button"
+        onClick={() => { void handleLoad(); }}
+        className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-bg-primary/40 px-3 py-2 text-xs text-text-tertiary transition-colors hover:bg-bg-elevated"
+      >
+        최근 경기 불러오기
+      </button>
+    );
+  }
+
+  if (isFetching && !data) {
+    return (
+      <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-bg-primary/40 px-3 py-2 text-xs text-text-tertiary">
+        <Loader2 className="h-3.5 w-3.5 animate-spin" />
         최근 경기 목록을 불러오는 중...
       </div>
     );
@@ -93,7 +114,17 @@ export function RecentMatchQuickFill({
 
   return (
     <div className="space-y-2 rounded-xl border border-white/10 bg-bg-primary/40 p-3">
-      <p className="text-xs font-semibold text-text-secondary">{title}</p>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs font-semibold text-text-secondary">{title}</p>
+        <button
+          type="button"
+          onClick={() => { void handleLoad(); }}
+          className="text-[11px] text-text-tertiary transition-colors hover:text-text-secondary"
+          disabled={isFetching}
+        >
+          다시 불러오기
+        </button>
+      </div>
       <div className="grid gap-2">
         {options.map((option) => (
           <button

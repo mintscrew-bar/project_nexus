@@ -8,6 +8,7 @@ import {
 import { PrismaService } from "../prisma/prisma.service";
 import { ReportReason, ReportStatus } from "../community/community.types";
 import { DiscordAdminAlertService } from "../discord/discord-admin-alert.service";
+import { MatchStatus } from "@nexus/database";
 
 export interface SubmitRatingDto {
   targetUserId: string;
@@ -67,6 +68,10 @@ export class ReputationService {
 
     if (!match) {
       throw new NotFoundException("Match not found");
+    }
+
+    if (match.status !== MatchStatus.COMPLETED) {
+      throw new BadRequestException("완료된 매치만 평가할 수 있습니다.");
     }
 
     // Verify both users were in the match

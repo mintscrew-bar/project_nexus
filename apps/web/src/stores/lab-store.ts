@@ -8,9 +8,11 @@ type LabCacheKey = "meta" | "champions" | "compositions" | "oracle" | "global";
 interface LabStoreState {
   period: LabPeriod;
   position: LabPosition;
+  statsEnabled: boolean;
   cacheVersion: Record<LabCacheKey, number>;
   setPeriod: (period: LabPeriod) => void;
   setPosition: (position: LabPosition) => void;
+  setStatsEnabled: (enabled: boolean) => void;
   invalidateTabCache: (tab: LabCacheKey) => void;
   invalidateAllCaches: () => void;
 }
@@ -26,9 +28,11 @@ const initialCacheVersion: Record<LabCacheKey, number> = {
 export const useLabStore = create<LabStoreState>((set) => ({
   period: "30d",
   position: "ALL",
+  statsEnabled: false,
   cacheVersion: initialCacheVersion,
   setPeriod: (period) => set({ period }),
   setPosition: (position) => set({ position }),
+  setStatsEnabled: (enabled) => set({ statsEnabled: enabled }),
   invalidateTabCache: (tab) =>
     set((state) => ({
       cacheVersion: {

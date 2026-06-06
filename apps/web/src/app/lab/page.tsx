@@ -22,7 +22,7 @@ import { PatchImpactCard } from "@/components/lab/meta/PatchImpactCard";
 import { TierGridCard } from "@/components/lab/meta/TierGridCard";
 import { PlayPatternsCard } from "@/components/lab/meta/PlayPatternsCard";
 import { ChampionSignalsCard } from "@/components/lab/meta/ChampionSignalsCard";
-import { ArrowRight, ShieldAlert } from "lucide-react";
+import { ArrowRight, ShieldAlert, Loader2 } from "lucide-react";
 
 // ─── 통계 인라인 항목 ───────────────────────────────────────────────────────────
 function StatItem({ label, value, hint }: { label: string; value: string; hint: string }) {
@@ -37,9 +37,9 @@ function StatItem({ label, value, hint }: { label: string; value: string; hint: 
 
 export default function LabMetaPage() {
   const { isAuthenticated, isLoading: authLoading } = useAuthStore();
-  const { period: activePeriod } = useLabStore();
+  const { period: activePeriod, statsEnabled, setStatsEnabled } = useLabStore();
   const queryClient = useQueryClient();
-  const canFetch = !authLoading && isAuthenticated;
+  const canFetch = !authLoading && isAuthenticated && statsEnabled;
 
   const { data: overview, isLoading: overviewLoading, isError: overviewError } = useQuery<LabOverview>({
     ...labQueryOptions.overview(), enabled: canFetch,
@@ -94,6 +94,27 @@ export default function LabMetaPage() {
   }, [rankedSnapshots, metaRadar]);
 
   const loading = canFetch && (overviewLoading || metaRadarLoading);
+
+  if (!statsEnabled) {
+    return (
+      <div className="space-y-6">
+        <div className="rounded-2xl border border-white/10 bg-bg-secondary/70 p-6">
+          <p className="text-sm font-semibold text-text-primary">실험실 통계는 기본 비활성화되어 있습니다.</p>
+          <p className="mt-1 text-sm text-text-secondary">
+            필요할 때만 데이터를 불러오도록 설정했습니다. 아래 버튼을 눌러 통계를 로드하세요.
+          </p>
+          <button
+            type="button"
+            onClick={() => setStatsEnabled(true)}
+            className="mt-4 inline-flex items-center gap-2 rounded-lg bg-accent-primary/20 px-3 py-2 text-sm font-semibold text-accent-primary transition-colors hover:bg-accent-primary/30"
+          >
+            <Loader2 className="h-4 w-4" />
+            통계 불러오기
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return <div className="flex min-h-[40vh] items-center justify-center"><LoadingSpinner /></div>;

@@ -7,6 +7,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { Swords } from "lucide-react";
 import { userApi } from "@/lib/api-client";
+import { useLabStore } from "@/stores/lab-store";
 import { labQueryOptions, type HeadToHeadResponse } from "@/lib/lab-queries";
 import { getChampionIconById } from "@/components/matches/match-utils";
 import { formatKda, formatPosition } from "@/lib/lab-format";
@@ -47,6 +48,7 @@ export default function LabOracleHeadToHeadPage() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const { statsEnabled } = useLabStore();
 
   const userAIdInUrl = useMemo(() => searchParams.get("userA"), [searchParams]);
   const userBIdInUrl = useMemo(() => searchParams.get("userB"), [searchParams]);
@@ -89,7 +91,7 @@ export default function LabOracleHeadToHeadPage() {
 
   const { data, isLoading, isError } = useQuery<HeadToHeadResponse>({
     ...labQueryOptions.headToHead(userA?.userId ?? "", userB?.userId ?? ""),
-    enabled: Boolean(userA) && Boolean(userB) && userA?.userId !== userB?.userId,
+    enabled: statsEnabled && Boolean(userA) && Boolean(userB) && userA?.userId !== userB?.userId,
   });
 
   const hasResult = Boolean(data);

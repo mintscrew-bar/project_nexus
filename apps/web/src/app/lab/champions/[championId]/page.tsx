@@ -41,8 +41,8 @@ export default function ChampionDetailPage() {
   const params = useParams<{ championId: string }>();
   const searchParams = useSearchParams();
   const { isAuthenticated, isLoading: authLoading } = useAuthStore();
-  const { period: storePeriod } = useLabStore();
-  const canFetch = !authLoading && isAuthenticated;
+  const { period: storePeriod, statsEnabled } = useLabStore();
+  const canFetch = !authLoading && isAuthenticated && statsEnabled;
 
   const urlPeriod = searchParams.get("period") as LabPeriod | null;
   const activePeriod: LabPeriod =

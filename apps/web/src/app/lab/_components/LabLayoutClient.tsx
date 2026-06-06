@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect } from "react";
-import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
+import { useQueryClient, useMutation } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/auth-store";
 import { useLabStore, type LabPeriod } from "@/stores/lab-store";
-import { adminApi, statsApi } from "@/lib/api-client";
+import { adminApi } from "@/lib/api-client";
 import { toast } from "@/stores/toast-store";
 import { Badge, LoadingSpinner } from "@/components/ui";
 import { ArrowRight, FlaskConical, Info, RefreshCw, ShieldAlert } from "lucide-react";
@@ -42,28 +42,14 @@ const LAB_TABS = [
   { href: "/lab/oracle", label: "오라클" },
 ];
 
-/** 타임스탬프 → "N분 전 / N시간 전 / N일 전" 표기 */
-function relativeTime(isoStr: string | null | undefined): string {
-  if (!isoStr) return "없음";
-  const diff = Date.now() - new Date(isoStr).getTime();
-  const min = Math.floor(diff / 60_000);
-  if (min < 1) return "방금 전";
-  if (min < 60) return `${min}분 전`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}시간 전`;
-  return `${Math.floor(hr / 24)}일 전`;
-}
-
 export default function LabLayoutClient({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { user, isAuthenticated, isLoading: authLoading } = useAuthStore();
-  const { period: activePeriod, setPeriod } = useLabStore();
+  const { period: activePeriod, statsEnabled, setPeriod, setStatsEnabled } = useLabStore();
   const isAdmin = user?.role === "ADMIN";
   // 랩 조회는 등록 유저 누구나 가능. 운영(스냅샷 재계산 등)만 어드민 전용.
-  const canFetch = !authLoading && isAuthenticated;
-
   // URL → store 동기화
   useEffect(() => {
     const fromUrl = searchParams.get("period") as LabPeriod | null;
@@ -73,15 +59,7 @@ export default function LabLayoutClient({ children }: { children: React.ReactNod
   }, [searchParams, activePeriod, setPeriod]);
 
   const queryClient = useQueryClient();
-
-  const { data: labDataPhase } = useQuery({
-    queryKey: ["lab", "data-phase"] as const,
-    queryFn: () => statsApi.getLabDataPhase(),
-    staleTime: 5 * 60 * 1000,
-    enabled: canFetch,
-  });
-
-  const currentPhase = labDataPhase?.phase ?? 0;
+  const currentPhase = statsEnabled ? 4 : 0;
 
   // 수동 스냅샷 재계산
   const { mutate: triggerRecompute, isPending: isRecomputing } = useMutation({
@@ -187,16 +165,16 @@ export default function LabLayoutClient({ children }: { children: React.ReactNod
                 </div>
                 <Info className="ml-1 h-3 w-3 text-text-tertiary group-hover:text-text-secondary" />
               </div>
-              <span className="text-text-tertiary">총 {labDataPhase?.totalMatches ?? 0}경기</span>
-              {typeof labDataPhase?.remainingUntilNextPhase === "number" && labDataPhase.remainingUntilNextPhase > 0 ? (
-                <span className="text-text-tertiary">
-                  · 다음 단계까지 {labDataPhase.remainingUntilNextPhase}경기
-                </span>
-              ) : null}
-              {/* 스냅샷 신선도 */}
               <span className="text-text-tertiary">
-                · 스냅샷 {relativeTime(labDataPhase?.snapshotLastComputedAt)}
+                {statsEnabled ? "통계 조회 켜짐" : "통계 조회 중지"}
               </span>
+              <button
+                type="button"
+                onClick={() => setStatsEnabled(!statsEnabled)}
+                className="rounded-lg bg-bg-primary/60 px-2 py-1 text-xs text-text-secondary transition-colors hover:bg-bg-elevated"
+              >
+                {statsEnabled ? "통계 끄기" : "통계 불러오기"}
+              </button>
               {/* 수동 재계산 버튼 — 어드민 전용 */}
               {isAdmin ? (
                 <button
@@ -252,10 +230,9 @@ export default function LabLayoutClient({ children }: { children: React.ReactNod
                 {LAB_TABS.filter((tab) => !isTabUnlocked(tab.href)).map((tab) => {
                   const required = LAB_TAB_MIN_PHASE[tab.href] ?? 0;
                   const threshold = LAB_PHASE_MATCH_THRESHOLD[required] ?? 0;
-                  const current = labDataPhase?.totalMatches ?? 0;
                   return (
                     <span key={tab.href} className="mr-3">
-                      {tab.label}: {threshold}경기 필요 (현재 {current}경기, {Math.max(threshold - current, 0)}경기 부족)
+                      {tab.label}: {threshold}경기 필요 (현재 0경기, {threshold}경기 부족)
                     </span>
                   );
                 })}

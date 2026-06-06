@@ -58,8 +58,8 @@ function computeTiers(champions: ChampionListResponse["champions"]) {
 
 export default function LabChampionsPage() {
   const { isAuthenticated, isLoading: authLoading } = useAuthStore();
-  const { period: activePeriod, position: storePosition, setPosition } = useLabStore();
-  const canFetch = !authLoading && isAuthenticated;
+  const { period: activePeriod, position: storePosition, statsEnabled, setPosition } = useLabStore();
+  const canFetch = !authLoading && isAuthenticated && statsEnabled;
 
   const router = useRouter();
   const searchParams = useSearchParams();

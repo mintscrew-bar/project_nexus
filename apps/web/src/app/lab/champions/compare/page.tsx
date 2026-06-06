@@ -26,8 +26,8 @@ const COL_COLORS = ["#667EEA", "#0bc4e2", "#764BA2", "#ffa726"];
 
 export default function ChampionComparePage() {
   const { isAuthenticated, isLoading: authLoading } = useAuthStore();
-  const { period: activePeriod } = useLabStore();
-  const canFetch = !authLoading && isAuthenticated;
+  const { period: activePeriod, statsEnabled } = useLabStore();
+  const canFetch = !authLoading && isAuthenticated && statsEnabled;
 
   const router = useRouter();
   const searchParams = useSearchParams();

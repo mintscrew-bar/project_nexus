@@ -8,7 +8,7 @@ import { Loader2, Swords, Trophy, Copy, ShieldCheck, AlertCircle, Radio, Star, S
 import { Match, getTeamDisplayName } from './BracketView';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuthStore } from '@/stores/auth-store';
-import { matchApi } from '@/lib/api-client';
+import { matchApi, reputationApi } from '@/lib/api-client';
 import { connectMatchSocket, matchSocketHelpers } from '@/lib/socket-client';
 import { MatchRpsFlow, type RpsStateData, type RpsRevealData, type RpsHand } from './MatchRpsFlow';
 import { ChampionIcon, PositionIcon, POSITION_LABELS } from '@/app/tournaments/[id]/lobby/_components/icons';
@@ -63,6 +63,20 @@ interface VoteData {
   myVotes: { mvp: string | null; ace: string | null } | null;
 }
 
+type RatingForm = {
+  skillRating: number;
+  attitudeRating: number;
+  communicationRating: number;
+  comment: string;
+};
+
+const DEFAULT_RATING_FORM: RatingForm = {
+  skillRating: 5,
+  attitudeRating: 5,
+  communicationRating: 5,
+  comment: '',
+};
+
 interface FullMatchDetails {
   teamA?: { id: string; name: string; captain?: { id: string; username: string }; members: MatchMember[] };
   teamB?: { id: string; name: string; captain?: { id: string; username: string }; members: MatchMember[] };
@@ -114,6 +128,11 @@ export function MatchDetailModal({
   const [isLoadingVotes, setIsLoadingVotes] = useState(false);
   const [submittingVote, setSubmittingVote] = useState<'MVP' | 'ACE' | null>(null);
   const [voteError, setVoteError] = useState<string | null>(null);
+  const [ratingTargetId, setRatingTargetId] = useState<string | null>(null);
+  const [ratingForm, setRatingForm] = useState<RatingForm>(DEFAULT_RATING_FORM);
+  const [submittingRating, setSubmittingRating] = useState(false);
+  const [ratingError, setRatingError] = useState<string | null>(null);
+  const [ratingSubmittedIds, setRatingSubmittedIds] = useState<Set<string>>(new Set());
   const [profileUserId, setProfileUserId] = useState<string | null>(null);
   // 가위바위보 진영 결정
   const [rps, setRps] = useState<RpsStateData | null>(null);
@@ -138,6 +157,11 @@ export function MatchDetailModal({
     rpsSeqRef.current = 0;
     setReportError(null);
     setVoteError(null);
+    setRatingTargetId(null);
+    setRatingForm(DEFAULT_RATING_FORM);
+    setSubmittingRating(false);
+    setRatingError(null);
+    setRatingSubmittedIds(new Set());
     setIsStarting(false);
     setIsReporting(false);
   }, [match?.id]);
@@ -225,6 +249,37 @@ export function MatchDetailModal({
       setVoteError(err?.response?.data?.message || '투표에 실패했습니다.');
     } finally {
       setSubmittingVote(null);
+    }
+  };
+
+  const handleSubmitRating = async () => {
+    if (!match || !ratingTargetId) return;
+    setSubmittingRating(true);
+    setRatingError(null);
+    try {
+      await reputationApi.rateUser({
+        targetUserId: ratingTargetId,
+        matchId: match.id,
+        skillRating: ratingForm.skillRating,
+        attitudeRating: ratingForm.attitudeRating,
+        communicationRating: ratingForm.communicationRating,
+        comment: ratingForm.comment.trim() || undefined,
+      });
+      setRatingSubmittedIds((prev) => new Set(prev).add(ratingTargetId));
+      setRatingTargetId(null);
+      setRatingForm(DEFAULT_RATING_FORM);
+    } catch (err: any) {
+      const status = err?.response?.status;
+      if (status === 409) {
+        setRatingSubmittedIds((prev) => new Set(prev).add(ratingTargetId));
+      }
+      setRatingError(
+        status === 409
+          ? '이미 이 유저를 평가했습니다.'
+          : err?.response?.data?.message || '평점 저장에 실패했습니다.',
+      );
+    } finally {
+      setSubmittingRating(false);
     }
   };
 
@@ -415,6 +470,24 @@ export function MatchDetailModal({
           </div>
         )}
 
+        {match.status === 'COMPLETED' && fullMatch && (
+          <RatingPanel
+            fullMatch={fullMatch}
+            currentUserId={user?.id}
+            selectedUserId={ratingTargetId}
+            form={ratingForm}
+            submittedIds={ratingSubmittedIds}
+            isSubmitting={submittingRating}
+            error={ratingError}
+            onSelect={(targetId) => {
+              setRatingTargetId(targetId);
+              setRatingError(null);
+            }}
+            onChange={setRatingForm}
+            onSubmit={handleSubmitRating}
+          />
+        )}
+
         {match.status !== 'COMPLETED' && !rpsActive && (
           <div>
             <h3 className="text-md font-semibold mb-2 text-text-primary">토너먼트 코드</h3>
@@ -540,6 +613,192 @@ export function MatchDetailModal({
       </div>
       <PlayerProfileModal userId={profileUserId} onClose={() => setProfileUserId(null)} />
     </Modal>
+  );
+}
+
+// ========================================
+// RatingPanel — 매치 참가자 상호 평점 UI
+// ========================================
+
+function RatingPanel({
+  fullMatch,
+  currentUserId,
+  selectedUserId,
+  form,
+  submittedIds,
+  isSubmitting,
+  error,
+  onSelect,
+  onChange,
+  onSubmit,
+}: {
+  fullMatch: FullMatchDetails;
+  currentUserId?: string;
+  selectedUserId: string | null;
+  form: RatingForm;
+  submittedIds: Set<string>;
+  isSubmitting: boolean;
+  error: string | null;
+  onSelect: (userId: string) => void;
+  onChange: (form: RatingForm) => void;
+  onSubmit: () => void;
+}) {
+  const allMembers = [
+    ...(fullMatch.teamA?.members ?? []),
+    ...(fullMatch.teamB?.members ?? []),
+  ];
+  const isCurrentUserParticipant = allMembers.some((member) => member.user.id === currentUserId);
+  const rateableMembers = allMembers.filter((member) => member.user.id !== currentUserId);
+  const selectedMember = rateableMembers.find((member) => member.user.id === selectedUserId) ?? null;
+  const selectedAlreadySubmitted = !!selectedUserId && submittedIds.has(selectedUserId);
+
+  return (
+    <div className="pt-4 border-t border-bg-tertiary space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="text-md font-semibold text-text-primary flex items-center gap-2">
+          <Star className="h-4 w-4 text-accent-gold" />
+          참가자 평점
+        </h3>
+        <Badge variant="secondary" size="sm">매치 기록</Badge>
+      </div>
+
+      {!isCurrentUserParticipant ? (
+        <p className="rounded-lg bg-bg-tertiary px-3 py-2 text-center text-xs text-text-tertiary">
+          참가자만 평점을 남길 수 있습니다.
+        </p>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {rateableMembers.map(({ user: member }) => {
+              const isSelected = selectedUserId === member.id;
+              const isSubmitted = submittedIds.has(member.id);
+
+              return (
+                <button
+                  key={member.id}
+                  type="button"
+                  className={cn(
+                    "min-w-0 rounded-lg border px-2 py-2 text-left transition-colors",
+                    isSelected
+                      ? "border-accent-gold bg-accent-gold/10"
+                      : "border-bg-tertiary bg-bg-secondary hover:bg-bg-tertiary",
+                  )}
+                  onClick={() => onSelect(member.id)}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate text-xs font-medium text-text-primary">{member.username}</span>
+                    {isSubmitted && <span className="text-[10px] font-semibold text-accent-success">완료</span>}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {selectedMember ? (
+            <div className="rounded-lg bg-bg-tertiary p-3 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-text-primary">{selectedMember.user.username}</p>
+                  <p className="text-xs text-text-tertiary">1점부터 5점까지 선택</p>
+                </div>
+                {selectedAlreadySubmitted && <Badge variant="success" size="sm">평가 완료</Badge>}
+              </div>
+
+              <div className="space-y-2">
+                <RatingRow
+                  label="실력"
+                  value={form.skillRating}
+                  disabled={selectedAlreadySubmitted || isSubmitting}
+                  onChange={(value) => onChange({ ...form, skillRating: value })}
+                />
+                <RatingRow
+                  label="태도"
+                  value={form.attitudeRating}
+                  disabled={selectedAlreadySubmitted || isSubmitting}
+                  onChange={(value) => onChange({ ...form, attitudeRating: value })}
+                />
+                <RatingRow
+                  label="소통"
+                  value={form.communicationRating}
+                  disabled={selectedAlreadySubmitted || isSubmitting}
+                  onChange={(value) => onChange({ ...form, communicationRating: value })}
+                />
+              </div>
+
+              <textarea
+                value={form.comment}
+                maxLength={500}
+                disabled={selectedAlreadySubmitted || isSubmitting}
+                onChange={(event) => onChange({ ...form, comment: event.target.value })}
+                placeholder="선택 사항 메모"
+                className="min-h-[72px] w-full resize-none rounded-lg border border-bg-secondary bg-bg-primary px-3 py-2 text-sm text-text-primary placeholder:text-text-tertiary focus:border-accent-primary focus:outline-none disabled:opacity-60"
+              />
+
+              {error && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+
+              <Button
+                type="button"
+                className="w-full"
+                size="sm"
+                variant="gold"
+                disabled={selectedAlreadySubmitted || isSubmitting}
+                onClick={onSubmit}
+              >
+                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Star className="mr-2 h-4 w-4" />}
+                평점 저장
+              </Button>
+            </div>
+          ) : (
+            <p className="rounded-lg bg-bg-tertiary px-3 py-2 text-center text-xs text-text-tertiary">
+              평점을 남길 참가자를 선택하세요.
+            </p>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function RatingRow({
+  label,
+  value,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  disabled: boolean;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="w-10 text-xs font-medium text-text-secondary">{label}</span>
+      <div className="flex items-center gap-1">
+        {[1, 2, 3, 4, 5].map((score) => {
+          const isActive = score <= value;
+          return (
+            <button
+              key={score}
+              type="button"
+              className={cn(
+                "flex h-8 w-8 items-center justify-center rounded-md transition-colors disabled:cursor-not-allowed disabled:opacity-60",
+                isActive ? "text-accent-gold hover:bg-accent-gold/10" : "text-text-tertiary hover:bg-bg-secondary",
+              )}
+              aria-label={`${label} ${score}점`}
+              disabled={disabled}
+              onClick={() => onChange(score)}
+            >
+              <Star className={cn("h-4 w-4", isActive && "fill-current")} />
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
