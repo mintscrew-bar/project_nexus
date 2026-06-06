@@ -20,22 +20,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(data, { status: backendResponse.status });
     }
 
-    // Get the refresh token from the backend's Set-Cookie header
+    // Get the encrypted refresh cookie value from the backend's Set-Cookie header
     const setCookieHeader = backendResponse.headers.get('set-cookie');
-    let refreshToken: string | null = null;
+    let refreshCookieValue: string | null = null;
 
     if (setCookieHeader) {
       const match = setCookieHeader.match(/refresh_token=([^;]+)/);
       if (match) {
-        refreshToken = match[1];
+        refreshCookieValue = match[1];
       }
     }
 
     const response = NextResponse.json(data);
 
-    // Set the refresh token cookie on the frontend domain
-    if (refreshToken) {
-      response.cookies.set('refresh_token', refreshToken, {
+    // Set the encrypted refresh cookie on the frontend domain
+    if (refreshCookieValue) {
+      response.cookies.set('refresh_token', refreshCookieValue, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',

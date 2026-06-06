@@ -10,9 +10,18 @@ import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
 import { AuthProviderType } from "@nexus/database";
 import * as bcrypt from "bcrypt";
-import { randomUUID } from "crypto";
+import {
+  createCipheriv,
+  createDecipheriv,
+  createHash,
+  randomBytes,
+  randomUUID,
+} from "crypto";
 import { PrismaService } from "../prisma/prisma.service";
 import { RedisService } from "../redis/redis.service";
+
+const REFRESH_COOKIE_PREFIX = "v2";
+const REFRESH_TOKEN_HASH_PREFIX = "sha256:";
 
 export interface OAuthProfile {
   provider: "discord";
@@ -438,6 +447,87 @@ export class AuthService {
   // Token Management
   // ========================================
 
+  private getRefreshCookieKey(): Buffer {
+    const secret =
+      this.configService.get<string>("REFRESH_COOKIE_SECRET") ||
+      this.configService.get<string>("JWT_REFRESH_SECRET");
+
+    if (!secret) {
+      throw new UnauthorizedException("Refresh token encryption is not configured");
+    }
+
+    return createHash("sha256").update(secret).digest();
+  }
+
+  private sealSensitiveValue(value: string): string {
+    const iv = randomBytes(12);
+    const cipher = createCipheriv(
+      "aes-256-gcm",
+      this.getRefreshCookieKey(),
+      iv,
+    );
+    const encrypted = Buffer.concat([
+      cipher.update(value, "utf8"),
+      cipher.final(),
+    ]);
+    const tag = cipher.getAuthTag();
+
+    return [
+      REFRESH_COOKIE_PREFIX,
+      iv.toString("base64url"),
+      tag.toString("base64url"),
+      encrypted.toString("base64url"),
+    ].join(".");
+  }
+
+  private unsealSensitiveValue(value: string): string | null {
+    const parts = value.split(".");
+    if (parts[0] !== REFRESH_COOKIE_PREFIX || parts.length !== 4) {
+      return null;
+    }
+
+    try {
+      const [, iv, tag, encrypted] = parts;
+      const decipher = createDecipheriv(
+        "aes-256-gcm",
+        this.getRefreshCookieKey(),
+        Buffer.from(iv, "base64url"),
+      );
+      decipher.setAuthTag(Buffer.from(tag, "base64url"));
+      return Buffer.concat([
+        decipher.update(Buffer.from(encrypted, "base64url")),
+        decipher.final(),
+      ]).toString("utf8");
+    } catch {
+      return null;
+    }
+  }
+
+  createRefreshCookieValue(refreshToken: string): string {
+    return this.sealSensitiveValue(refreshToken);
+  }
+
+  readRefreshTokenCookie(cookieValue?: string | null): string | null {
+    if (!cookieValue) return null;
+
+    const parts = cookieValue.split(".");
+    if (parts[0] !== REFRESH_COOKIE_PREFIX) {
+      return cookieValue; // legacy plaintext refresh-token cookie
+    }
+
+    return this.unsealSensitiveValue(cookieValue);
+  }
+
+  shouldUpgradeRefreshCookie(cookieValue?: string | null): boolean {
+    return !!cookieValue && !cookieValue.startsWith(`${REFRESH_COOKIE_PREFIX}.`);
+  }
+
+  private hashRefreshToken(refreshToken: string): string {
+    return `${REFRESH_TOKEN_HASH_PREFIX}${createHash("sha256")
+      .update(refreshToken)
+      .digest("base64url")}`;
+  }
+
   /**
    * Check if user is banned/restricted before issuing tokens.
    * Call this before generateTokens for OAuth flows.
@@ -518,11 +608,11 @@ export class AuthService {
       }),
     ]);
 
-    // Store refresh token in database
+    // Store only a one-way hash; the raw refresh token lives only in the HTTP-only cookie.
     await this.prisma.session.create({
       data: {
         userId: user.id,
-        refreshToken,
+        refreshToken: this.hashRefreshToken(refreshToken),
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
       },
     });
@@ -530,12 +620,27 @@ export class AuthService {
     return { accessToken, refreshToken };
   }
 
-  async refreshTokens(userId: string, refreshToken: string) {
+  async refreshTokens(userId: string, refreshToken?: string | null) {
+    if (!refreshToken) {
+      throw new UnauthorizedException("Missing refresh token");
+    }
+
+    const refreshTokenHash = this.hashRefreshToken(refreshToken);
+    let usedLegacyPlaintextSession = false;
+
     // Validate session (DB read only — no rotation)
-    const session = await this.prisma.session.findUnique({
-      where: { refreshToken },
+    let session = await this.prisma.session.findUnique({
+      where: { refreshToken: refreshTokenHash },
       include: { user: true },
     });
+
+    if (!session) {
+      session = await this.prisma.session.findUnique({
+        where: { refreshToken },
+        include: { user: true },
+      });
+      usedLegacyPlaintextSession = !!session;
+    }
 
     if (!session || session.userId !== userId) {
       throw new UnauthorizedException("Invalid refresh token");
@@ -562,6 +667,13 @@ export class AuthService {
       throw new UnauthorizedException("Account is restricted");
     }
 
+    if (usedLegacyPlaintextSession) {
+      await this.prisma.session.update({
+        where: { id: session.id },
+        data: { refreshToken: refreshTokenHash },
+      });
+    }
+
     // Issue a new access token only — refresh token stays the same.
     // No session rotation means: no race condition with multiple tabs,
     // no unnecessary DB writes on every page refresh.
@@ -580,11 +692,20 @@ export class AuthService {
     return { accessToken };
   }
 
-  async logout(userId: string, refreshToken?: string, accessToken?: string) {
+  async logout(
+    userId: string,
+    refreshToken?: string | null,
+    accessToken?: string,
+  ) {
     if (refreshToken) {
       // Delete specific session
       await this.prisma.session.deleteMany({
-        where: { userId, refreshToken },
+        where: {
+          userId,
+          refreshToken: {
+            in: [this.hashRefreshToken(refreshToken), refreshToken],
+          },
+        },
       });
     } else {
       // Delete all sessions for user
@@ -713,7 +834,7 @@ export class AuthService {
     const code = randomUUID();
     await this.redis.set(
       `oauth_code:${code}`,
-      JSON.stringify(tokens),
+      this.sealSensitiveValue(JSON.stringify(tokens)),
       60, // 60초 유효 — 충분히 짧아 탈취 위험 최소화
     );
     return code;
@@ -735,7 +856,8 @@ export class AuthService {
     }
     // 단회용 — 조회 즉시 삭제하여 재사용 방지
     await this.redis.del(key);
-    return JSON.parse(data);
+    const unsealed = this.unsealSensitiveValue(data) ?? data;
+    return JSON.parse(unsealed);
   }
 
   // ========================================

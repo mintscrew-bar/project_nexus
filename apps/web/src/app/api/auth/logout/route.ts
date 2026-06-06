@@ -4,7 +4,7 @@ const API_URL = process.env.API_URL || 'http://localhost:4000';
 
 export async function POST(request: NextRequest) {
   const authHeader = request.headers.get('authorization');
-  const refreshToken = request.cookies.get('refresh_token')?.value;
+  const refreshCookieValue = request.cookies.get('refresh_token')?.value;
 
   try {
     // Call backend logout if we have an auth header
@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
         headers: {
           'Authorization': authHeader,
           'Content-Type': 'application/json',
-          ...(refreshToken ? { 'Cookie': `refresh_token=${refreshToken}` } : {}),
+          ...(refreshCookieValue ? { 'Cookie': `refresh_token=${refreshCookieValue}` } : {}),
         },
       });
     }

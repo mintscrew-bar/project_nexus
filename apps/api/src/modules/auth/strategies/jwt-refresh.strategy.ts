@@ -3,17 +3,17 @@ import { ConfigService } from "@nestjs/config";
 import { PassportStrategy } from "@nestjs/passport";
 import { Request } from "express";
 import { ExtractJwt, Strategy } from "passport-jwt";
-import { TokenPayload } from "../auth.service";
+import { AuthService, TokenPayload } from "../auth.service";
 
 @Injectable()
 export class JwtRefreshStrategy extends PassportStrategy(
   Strategy,
   "jwt-refresh",
 ) {
-  constructor(private readonly configService: ConfigService) {
+  constructor(configService: ConfigService, authService: AuthService) {
     const extractor = (req: Request) => {
       try {
-        return req?.cookies?.refresh_token;
+        return authService.readRefreshTokenCookie(req?.cookies?.refresh_token);
       } catch (_e) {
         return null;
       }

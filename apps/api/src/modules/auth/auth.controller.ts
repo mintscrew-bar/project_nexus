@@ -15,7 +15,7 @@ import {
 import { ConfigService } from "@nestjs/config";
 import { AuthGuard } from "@nestjs/passport";
 import { Throttle } from "@nestjs/throttler";
-import { Request, Response } from "express";
+import { CookieOptions, Request, Response } from "express";
 import { AuthService } from "./auth.service";
 import { LoginDto, RegisterDto } from "./dto";
 import { CurrentUser } from "./decorators/current-user.decorator";
@@ -31,6 +31,24 @@ export class AuthController {
     private readonly configService: ConfigService,
   ) {}
 
+  private getRefreshCookieOptions(): CookieOptions {
+    return {
+      httpOnly: true,
+      secure: this.configService.get("NODE_ENV") === "production",
+      sameSite: "lax",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      path: "/api/auth",
+    };
+  }
+
+  private setRefreshTokenCookie(res: Response, refreshToken: string) {
+    res.cookie(
+      "refresh_token",
+      this.authService.createRefreshCookieValue(refreshToken),
+      this.getRefreshCookieOptions(),
+    );
+  }
+
   // ========================================
   // Email Registration & Login
   // ========================================
@@ -42,14 +60,7 @@ export class AuthController {
   async register(@Body() dto: RegisterDto, @Res() res: Response) {
     const tokens = await this.authService.register(dto);
 
-    // Set refresh token as HTTP-only cookie
-    res.cookie("refresh_token", tokens.refreshToken, {
-      httpOnly: true,
-      secure: this.configService.get("NODE_ENV") === "production",
-      sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-      path: "/api/auth",
-    });
+    this.setRefreshTokenCookie(res, tokens.refreshToken);
 
     return res.json({
       accessToken: tokens.accessToken,
@@ -72,13 +83,7 @@ export class AuthController {
       "unknown";
     const tokens = await this.authService.login(dto, ip);
 
-    res.cookie("refresh_token", tokens.refreshToken, {
-      httpOnly: true,
-      secure: this.configService.get("NODE_ENV") === "production",
-      sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-      path: "/api/auth",
-    });
+    this.setRefreshTokenCookie(res, tokens.refreshToken);
 
     return res.json({
       accessToken: tokens.accessToken,
@@ -167,13 +172,7 @@ export class AuthController {
     const user = await this.authService.getUserById(userId);
     const tokens = await this.authService.generateTokens(user);
 
-    res.cookie("refresh_token", tokens.refreshToken, {
-      httpOnly: true,
-      secure: this.configService.get("NODE_ENV") === "production",
-      sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-      path: "/api/auth",
-    });
+    this.setRefreshTokenCookie(res, tokens.refreshToken);
 
     return res.json({
       accessToken: tokens.accessToken,
@@ -198,14 +197,7 @@ export class AuthController {
     }
     const tokens = await this.authService.exchangeOAuthCode(code);
 
-    // refresh_token은 HTTP-only 쿠키로 설정
-    res.cookie("refresh_token", tokens.refreshToken, {
-      httpOnly: true,
-      secure: this.configService.get("NODE_ENV") === "production",
-      sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-      path: "/api/auth",
-    });
+    this.setRefreshTokenCookie(res, tokens.refreshToken);
 
     return res.json({ accessToken: tokens.accessToken });
   }
@@ -221,12 +213,22 @@ export class AuthController {
   async refresh(@Req() req: Request, @Res() res: Response) {
     try {
       const user = req.user as any;
-      const refreshToken = req.cookies?.refresh_token;
+      const refreshCookieValue = req.cookies?.refresh_token;
+      const refreshToken = this.authService.readRefreshTokenCookie(
+        refreshCookieValue,
+      );
 
       const { accessToken } = await this.authService.refreshTokens(
         user.sub,
         refreshToken,
       );
+
+      if (
+        refreshToken &&
+        this.authService.shouldUpgradeRefreshCookie(refreshCookieValue)
+      ) {
+        this.setRefreshTokenCookie(res, refreshToken);
+      }
 
       // Refresh token은 교체하지 않음 — 같은 토큰을 쿠키에 유지
       return res.json({ accessToken });
@@ -245,7 +247,9 @@ export class AuthController {
     @Req() req: Request,
     @Res() res: Response,
   ) {
-    const refreshToken = req.cookies?.refresh_token;
+    const refreshToken = this.authService.readRefreshTokenCookie(
+      req.cookies?.refresh_token,
+    );
     // Authorization 헤더에서 access token 추출 — 블랙리스트 등록용
     const authHeader = req.headers["authorization"] as string | undefined;
     const accessToken = authHeader?.startsWith("Bearer ")

@@ -3,9 +3,9 @@ import { NextRequest, NextResponse } from "next/server";
 const API_URL = process.env.API_URL || "http://localhost:4000";
 
 export async function POST(request: NextRequest) {
-  const refreshToken = request.cookies.get("refresh_token")?.value;
+  const refreshCookieValue = request.cookies.get("refresh_token")?.value;
 
-  if (!refreshToken) {
+  if (!refreshCookieValue) {
     return NextResponse.json({ message: "No refresh token" }, { status: 401 });
   }
 
@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Cookie: `refresh_token=${refreshToken}`,
+        Cookie: `refresh_token=${refreshCookieValue}`,
       },
       credentials: "include",
     });
@@ -53,22 +53,22 @@ export async function POST(request: NextRequest) {
       return response;
     }
 
-    // Get the new refresh token from the backend's Set-Cookie header
+    // Get the encrypted refresh cookie value from the backend's Set-Cookie header
     const setCookieHeader = backendResponse.headers.get("set-cookie");
-    let newRefreshToken: string | null = null;
+    let newRefreshCookieValue: string | null = null;
 
     if (setCookieHeader) {
       const match = setCookieHeader.match(/refresh_token=([^;]+)/);
       if (match) {
-        newRefreshToken = match[1];
+        newRefreshCookieValue = match[1];
       }
     }
 
     const response = NextResponse.json(responseData);
 
-    // Set the new refresh token cookie on the frontend domain
-    if (newRefreshToken) {
-      response.cookies.set("refresh_token", newRefreshToken, {
+    // Set the encrypted refresh cookie on the frontend domain
+    if (newRefreshCookieValue) {
+      response.cookies.set("refresh_token", newRefreshCookieValue, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",
