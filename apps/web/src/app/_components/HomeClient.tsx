@@ -25,10 +25,17 @@ const DashboardContent = dynamic(
 
 // 비로그인 랜딩(landing)은 page.tsx에서 서버 컴포넌트로 렌더해 prop으로 주입한다.
 // → 미인증/로딩/SSR 시 그대로 출력되므로 검색봇이 랜딩 본문을 HTML로 읽을 수 있다.
-export default function HomeClient({ landing }: { landing: React.ReactNode }) {
+// contentSections는 로그인 후에도 랜딩 섹션(Features, Workflow, Resources)을 보여주기 위한 prop이다.
+export default function HomeClient({
+  landing,
+  contentSections,
+}: {
+  landing: React.ReactNode;
+  contentSections: React.ReactNode;
+}) {
   const { isAuthenticated } = useAuthStore();
 
-  // 인증 상태 → HeroBanner(전폭) + 대시보드 콘텐츠
+  // 인증 상태 → HeroBanner(전폭) + 대시보드 위젯 + 랜딩 콘텐츠 섹션
   if (isAuthenticated) {
     return (
       <div className="flex-grow animate-fade-in">
@@ -41,6 +48,8 @@ export default function HomeClient({ landing }: { landing: React.ReactNode }) {
             <DashboardContent />
           </ErrorBoundary>
         </div>
+        {/* 랜딩과 동일한 콘텐츠 섹션 — 로그인 후에도 서비스 소개 콘텐츠를 유지 */}
+        {contentSections}
       </div>
     );
   }

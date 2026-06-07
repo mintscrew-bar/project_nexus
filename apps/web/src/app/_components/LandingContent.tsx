@@ -129,15 +129,11 @@ const landingNavLinks = [
   { href: "/community", label: "커뮤니티" },
 ];
 
-export default function LandingContent() {
+// 로그인 후에도 재사용 가능한 랜딩 콘텐츠 섹션들 (서버 컴포넌트)
+export function LandingContentSections() {
   return (
-    <main className="flex min-h-screen flex-col bg-bg-primary">
-      <LandingHeader />
-
-      {/* 히어로 배너 — 궤도 + 파티클 + Framer Motion */}
-      <HeroBanner />
-
-      {/* Discord 배너 — 히어로 바로 아래 */}
+    <>
+      {/* Discord 배너 */}
       <section className="px-6 py-6">
         <div className="max-w-6xl mx-auto">
           <DiscordBanner />
@@ -308,32 +304,48 @@ export default function LandingContent() {
         </div>
       </section>
 
-      <footer className="border-t border-bg-tertiary bg-bg-secondary px-6 py-8">
-        <div className="mx-auto flex max-w-6xl flex-col gap-5 text-sm text-text-tertiary">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div>
-              <p className="font-semibold text-text-secondary">Project Nexus</p>
-              <p className="mt-1 text-xs leading-relaxed">
-                롤 내전 운영, 전적 기록, 스크림 준비를 돕는 커뮤니티 플랫폼입니다.
-              </p>
-            </div>
-            <nav className="flex flex-wrap gap-x-4 gap-y-2">
-              {footerLinks.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className="hover:text-text-secondary transition-colors"
-                >
-                  {link.label}
-                </Link>
-              ))}
-            </nav>
+      <LandingFooter />
+    </>
+  );
+}
+
+export function LandingFooter() {
+  return (
+    <footer className="border-t border-bg-tertiary bg-bg-secondary px-6 py-8">
+      <div className="mx-auto flex max-w-6xl flex-col gap-5 text-sm text-text-tertiary">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="font-semibold text-text-secondary">Project Nexus</p>
+            <p className="mt-1 text-xs leading-relaxed">
+              롤 내전 운영, 전적 기록, 스크림 준비를 돕는 커뮤니티 플랫폼입니다.
+            </p>
           </div>
-          <p className="text-xs leading-relaxed text-text-tertiary/70">
-            Project Nexus isn&apos;t endorsed by Riot Games and doesn&apos;t reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. League of Legends and Riot Games are trademarks or registered trademarks of Riot Games, Inc.
-          </p>
+          <nav className="flex flex-wrap gap-x-4 gap-y-2">
+            {footerLinks.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="hover:text-text-secondary transition-colors"
+              >
+                {link.label}
+              </Link>
+            ))}
+          </nav>
         </div>
-      </footer>
+        <p className="text-xs leading-relaxed text-text-tertiary/70">
+          Project Nexus isn&apos;t endorsed by Riot Games and doesn&apos;t reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. League of Legends and Riot Games are trademarks or registered trademarks of Riot Games, Inc.
+        </p>
+      </div>
+    </footer>
+  );
+}
+
+export default function LandingContent() {
+  return (
+    <main className="flex min-h-screen flex-col bg-bg-primary">
+      <LandingHeader />
+      <HeroBanner />
+      <LandingContentSections />
     </main>
   );
 }
