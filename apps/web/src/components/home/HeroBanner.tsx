@@ -113,7 +113,7 @@ export function HeroBanner({ isAuthenticated = false }: HeroBannerProps) {
       <section
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
-        className="relative flex items-center justify-center h-[180px] sm:h-[210px] md:h-[260px] lg:h-[280px] px-4 overflow-hidden bg-bg-primary"
+        className="relative flex flex-col items-center justify-center h-[calc(100svh-80px)] min-h-[560px] px-4 text-center overflow-hidden bg-bg-primary"
       >
         {/* 헥스 그리드 배경 */}
         <div ref={hexGridRef} className="absolute inset-0 pointer-events-none" style={{ willChange: "transform" }}>
@@ -141,43 +141,59 @@ export function HeroBanner({ isAuthenticated = false }: HeroBannerProps) {
           />
         </div>
 
-        {/* 콘텐츠 — 세로 중앙 정렬 */}
+        {/* 콘텐츠 — 랜딩과 동일한 세로 레이아웃, CTA만 로그인 후 버전 */}
         <motion.div
-          className="relative z-10 flex flex-col items-center text-center gap-3 md:gap-4"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, ease: "easeOut" }}
+          className="relative z-10 max-w-3xl mx-auto"
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
         >
-          <div className="flex items-center gap-3">
-            <Logo size="sm" variant="icon-only" />
+          <motion.div
+            className="flex justify-center mb-6"
+            initial={{ scale: 0.7, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 0.5, ease: "easeOut" }}
+          >
+            <Logo size="xl" variant="icon-only" />
+          </motion.div>
+
+          <motion.h1
+            className={`${exo2.className} text-5xl sm:text-6xl md:text-8xl font-bold mb-5 tracking-wider`}
+            variants={itemVariants}
+          >
             <span
-              className={`${exo2.className} text-3xl md:text-4xl lg:text-5xl font-bold tracking-wider bg-clip-text text-transparent`}
+              className="bg-clip-text text-transparent"
               style={{ backgroundImage: `linear-gradient(135deg, ${INDIGO}, ${PURPLE})` }}
             >
               NEXUS
             </span>
-          </div>
+          </motion.h1>
 
-          <p className="text-sm md:text-base text-text-secondary">
-            솔랭 억까에 지쳤다면?{" "}
+          <motion.p
+            className="text-base sm:text-lg md:text-xl text-text-secondary mb-8 md:mb-10 leading-relaxed"
+            variants={itemVariants}
+          >
+            솔랭 억까에 지쳤다면?<br className="sm:hidden" />{" "}
             <span className="text-text-primary">여기서 제대로 된 한 판.</span>
-          </p>
+          </motion.p>
 
-          <Link href="/tournaments">
-            <button
-              className="group relative inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold text-white overflow-hidden transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
-              style={{
-                background: `linear-gradient(135deg, ${INDIGO}, ${PURPLE})`,
-                boxShadow: `0 0 16px ${rgba(INDIGO_RGB, 0.3)}`,
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.boxShadow = `0 0 28px ${rgba(INDIGO_RGB, 0.5)}`; }}
-              onMouseLeave={(e) => { e.currentTarget.style.boxShadow = `0 0 16px ${rgba(INDIGO_RGB, 0.3)}`; }}
-            >
-              <span className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
-              <Swords className="h-3.5 w-3.5" />
-              내전 참가하기
-            </button>
-          </Link>
+          <motion.div className="flex justify-center" variants={itemVariants}>
+            <Link href="/tournaments">
+              <button
+                className="group relative inline-flex items-center gap-2.5 px-8 py-3.5 rounded-xl text-base font-semibold text-white overflow-hidden transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+                style={{
+                  background: `linear-gradient(135deg, ${INDIGO}, ${PURPLE})`,
+                  boxShadow: `0 0 24px ${rgba(INDIGO_RGB, 0.3)}`,
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.boxShadow = `0 0 36px ${rgba(INDIGO_RGB, 0.5)}`; }}
+                onMouseLeave={(e) => { e.currentTarget.style.boxShadow = `0 0 24px ${rgba(INDIGO_RGB, 0.3)}`; }}
+              >
+                <span className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
+                <Swords className="h-4 w-4" />
+                내전 참가하기
+              </button>
+            </Link>
+          </motion.div>
         </motion.div>
       </section>
     );
