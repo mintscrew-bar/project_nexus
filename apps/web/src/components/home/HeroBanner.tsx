@@ -107,6 +107,82 @@ export function HeroBanner({ isAuthenticated = false }: HeroBannerProps) {
   });
   const hexPoints = hexVertices.map((v) => `${v.x},${v.y}`).join(" ");
 
+  // 로그인 후 — 컴팩트 배너 (높이 고정, 핵심 요소만)
+  if (isAuthenticated) {
+    return (
+      <section
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
+        className="relative flex items-center justify-center h-[160px] md:h-[180px] px-4 overflow-hidden bg-bg-primary"
+      >
+        {/* 헥스 그리드 배경 */}
+        <div ref={hexGridRef} className="absolute inset-0 pointer-events-none" style={{ willChange: "transform" }}>
+          <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <pattern id="hex-grid-auth" width="56" height="100" patternUnits="userSpaceOnUse" patternTransform="scale(1.2)">
+                <polygon points="28,2 51,16 51,44 28,58 5,44 5,16" fill="none" stroke={INDIGO} strokeWidth="0.5" strokeOpacity="0.05" />
+              </pattern>
+            </defs>
+            <rect width="100%" height="100%" fill="url(#hex-grid-auth)" />
+          </svg>
+        </div>
+
+        {/* 중심 글로우 */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div
+            ref={glowRef}
+            className="absolute rounded-full"
+            style={{
+              width: 360,
+              height: 360,
+              background: `radial-gradient(circle, ${rgba(INDIGO_RGB, 0.1)} 0%, ${rgba(INDIGO_RGB, 0.03)} 50%, transparent 70%)`,
+              willChange: "transform",
+            }}
+          />
+        </div>
+
+        {/* 콘텐츠 — 로고 + 타이틀 + CTA 가로 배치 */}
+        <motion.div
+          className="relative z-10 flex flex-col sm:flex-row items-center gap-4 sm:gap-8"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
+        >
+          <div className="flex items-center gap-3">
+            <Logo size="sm" variant="icon-only" />
+            <span
+              className={`${exo2.className} text-2xl md:text-3xl font-bold tracking-wider bg-clip-text text-transparent`}
+              style={{ backgroundImage: `linear-gradient(135deg, ${INDIGO}, ${PURPLE})` }}
+            >
+              NEXUS
+            </span>
+          </div>
+
+          <p className="hidden sm:block text-sm text-text-secondary">
+            솔랭 억까에 지쳤다면?{" "}
+            <span className="text-text-primary">여기서 제대로 된 한 판.</span>
+          </p>
+
+          <Link href="/tournaments">
+            <button
+              className="group relative inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white overflow-hidden transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+              style={{
+                background: `linear-gradient(135deg, ${INDIGO}, ${PURPLE})`,
+                boxShadow: `0 0 16px ${rgba(INDIGO_RGB, 0.3)}`,
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.boxShadow = `0 0 28px ${rgba(INDIGO_RGB, 0.5)}`; }}
+              onMouseLeave={(e) => { e.currentTarget.style.boxShadow = `0 0 16px ${rgba(INDIGO_RGB, 0.3)}`; }}
+            >
+              <span className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
+              <Swords className="h-3.5 w-3.5" />
+              내전 참가하기
+            </button>
+          </Link>
+        </motion.div>
+      </section>
+    );
+  }
+
   return (
     <section
       onMouseMove={handleMouseMove}
@@ -253,45 +329,25 @@ export function HeroBanner({ isAuthenticated = false }: HeroBannerProps) {
 
         {/* CTA */}
         <motion.div className="flex flex-col sm:flex-row gap-3 justify-center" variants={itemVariants}>
-          {isAuthenticated ? (
-            <Link href="/tournaments">
-              <button
-                className="group relative inline-flex items-center gap-2.5 px-8 py-3.5 rounded-xl text-base font-semibold text-white overflow-hidden transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
-                style={{
-                  background: `linear-gradient(135deg, ${INDIGO}, ${PURPLE})`,
-                  boxShadow: `0 0 24px ${rgba(INDIGO_RGB, 0.3)}`,
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.boxShadow = `0 0 36px ${rgba(INDIGO_RGB, 0.5)}`; }}
-                onMouseLeave={(e) => { e.currentTarget.style.boxShadow = `0 0 24px ${rgba(INDIGO_RGB, 0.3)}`; }}
-              >
-                <span className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
-                <Swords className="h-4 w-4" />
-                내전 참가하기
-              </button>
-            </Link>
-          ) : (
-            <>
-              <Link href="/auth/login">
-                <button
-                  className="group relative inline-flex items-center gap-2.5 px-8 py-3.5 rounded-xl text-base font-semibold text-white overflow-hidden transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
-                  style={{
-                    background: `linear-gradient(135deg, ${INDIGO}, ${PURPLE})`,
-                    boxShadow: `0 0 24px ${rgba(INDIGO_RGB, 0.3)}`,
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.boxShadow = `0 0 36px ${rgba(INDIGO_RGB, 0.5)}`; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.boxShadow = `0 0 24px ${rgba(INDIGO_RGB, 0.3)}`; }}
-                >
-                  <span className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
-                  Discord로 시작하기
-                </button>
-              </Link>
-              <Link href="/tournaments">
-                <Button variant="secondary" size="lg" className="w-full sm:w-auto">
-                  자세히 알아보기
-                </Button>
-              </Link>
-            </>
-          )}
+          <Link href="/auth/login">
+            <button
+              className="group relative inline-flex items-center gap-2.5 px-8 py-3.5 rounded-xl text-base font-semibold text-white overflow-hidden transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+              style={{
+                background: `linear-gradient(135deg, ${INDIGO}, ${PURPLE})`,
+                boxShadow: `0 0 24px ${rgba(INDIGO_RGB, 0.3)}`,
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.boxShadow = `0 0 36px ${rgba(INDIGO_RGB, 0.5)}`; }}
+              onMouseLeave={(e) => { e.currentTarget.style.boxShadow = `0 0 24px ${rgba(INDIGO_RGB, 0.3)}`; }}
+            >
+              <span className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
+              Discord로 시작하기
+            </button>
+          </Link>
+          <Link href="/tournaments">
+            <Button variant="secondary" size="lg" className="w-full sm:w-auto">
+              자세히 알아보기
+            </Button>
+          </Link>
         </motion.div>
       </motion.div>
     </section>
