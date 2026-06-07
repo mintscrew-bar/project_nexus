@@ -113,7 +113,7 @@ export function HeroBanner({ isAuthenticated = false }: HeroBannerProps) {
       <section
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
-        className="relative flex items-center justify-center h-[160px] md:h-[180px] px-4 overflow-hidden bg-bg-primary"
+        className="relative flex items-center justify-center h-[180px] sm:h-[210px] md:h-[260px] lg:h-[280px] px-4 overflow-hidden bg-bg-primary"
       >
         {/* 헥스 그리드 배경 */}
         <div ref={hexGridRef} className="absolute inset-0 pointer-events-none" style={{ willChange: "transform" }}>
@@ -141,9 +141,9 @@ export function HeroBanner({ isAuthenticated = false }: HeroBannerProps) {
           />
         </div>
 
-        {/* 콘텐츠 — 로고 + 타이틀 + CTA 가로 배치 */}
+        {/* 콘텐츠 — 세로 중앙 정렬 */}
         <motion.div
-          className="relative z-10 flex flex-col sm:flex-row items-center gap-4 sm:gap-8"
+          className="relative z-10 flex flex-col items-center text-center gap-3 md:gap-4"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: "easeOut" }}
@@ -151,21 +151,21 @@ export function HeroBanner({ isAuthenticated = false }: HeroBannerProps) {
           <div className="flex items-center gap-3">
             <Logo size="sm" variant="icon-only" />
             <span
-              className={`${exo2.className} text-2xl md:text-3xl font-bold tracking-wider bg-clip-text text-transparent`}
+              className={`${exo2.className} text-3xl md:text-4xl lg:text-5xl font-bold tracking-wider bg-clip-text text-transparent`}
               style={{ backgroundImage: `linear-gradient(135deg, ${INDIGO}, ${PURPLE})` }}
             >
               NEXUS
             </span>
           </div>
 
-          <p className="hidden sm:block text-sm text-text-secondary">
+          <p className="text-sm md:text-base text-text-secondary">
             솔랭 억까에 지쳤다면?{" "}
             <span className="text-text-primary">여기서 제대로 된 한 판.</span>
           </p>
 
           <Link href="/tournaments">
             <button
-              className="group relative inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white overflow-hidden transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+              className="group relative inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold text-white overflow-hidden transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
               style={{
                 background: `linear-gradient(135deg, ${INDIGO}, ${PURPLE})`,
                 boxShadow: `0 0 16px ${rgba(INDIGO_RGB, 0.3)}`,
