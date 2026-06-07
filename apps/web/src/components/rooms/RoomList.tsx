@@ -33,6 +33,8 @@ export function RoomList() {
   const router = useRouter();
   const { rooms, isLoading, error, fetchRooms, subscribeToRoomList, unsubscribeFromRoomList } = useRoomStore();
   const currentUserId = useAuthStore((state) => state.user?.id);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const authLoading = useAuthStore((state) => state.isLoading);
   const { setSearchRef } = useKeyboardShortcutsContext();
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -121,18 +123,33 @@ export function RoomList() {
     };
   }, [rooms]);
 
-  // fetchRooms, subscribeToRoomList, unsubscribeFromRoomList는 zustand 스토어 함수로 참조가 안정적이므로 dependency에서 제외
+  // fetchRooms는 공개 REST 목록이므로 로그인 여부와 무관하게 한 번 가져온다.
   useEffect(() => {
-    // Initial fetch
     fetchRooms();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Subscribe to real-time updates
+  // room socket은 인증 필수이므로 로그인 확정 후에만 실시간 업데이트를 구독한다.
+  useEffect(() => {
+    if (authLoading || !isAuthenticated) {
+      unsubscribeFromRoomList();
+      return;
+    }
+
     subscribeToRoomList();
 
     return () => {
       unsubscribeFromRoomList();
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [authLoading, isAuthenticated, subscribeToRoomList, unsubscribeFromRoomList]);
+
+  const handleRoomClick = (roomId: string) => {
+    if (!isAuthenticated) {
+      const redirect = encodeURIComponent(`/tournaments/${roomId}/lobby`);
+      router.push(`/auth/login?redirect=${redirect}`);
+      return;
+    }
+    router.push(`/tournaments/${roomId}/lobby`);
+  };
 
   if (isLoading && rooms.length === 0) {
     return (
@@ -373,7 +390,7 @@ export function RoomList() {
               key={room.id}
               room={room}
               currentUserId={currentUserId}
-              onClick={() => router.push(`/tournaments/${room.id}/lobby`)}
+              onClick={() => handleRoomClick(room.id)}
             />
           ))}
         </div>

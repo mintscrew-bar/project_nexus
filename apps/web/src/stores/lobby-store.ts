@@ -124,7 +124,11 @@ export const useLobbyStore = create<LobbyStoreState>((set, get) => ({
   connect: (roomId, password?) => {
     const existingSocket = get().socket;
     // reconnect 시도 중이거나 이미 연결된 경우 중복 연결 방지
-    if (existingSocket?.connected || existingSocket?.active) return;
+    if (
+      existingSocket?.connected ||
+      existingSocket?.active ||
+      (existingSocket as any)?.__nexusPreparing
+    ) return;
     // Clean up stale disconnected socket
     if (existingSocket) {
       existingSocket.removeAllListeners();

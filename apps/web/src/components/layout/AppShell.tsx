@@ -13,7 +13,7 @@ import { FloatingClanChatPanel } from '@/components/domain/FloatingClanChatPanel
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { isAuthenticated, isLoading } = useAuthStore();
+  const { isAuthenticated } = useAuthStore();
 
   // ---------------------------------------------------------------
   // Hydration 불일치 방지:
@@ -30,10 +30,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // /auth/* 라우트 → 풀스크린 (셸 없음)
   const isAuthRoute = pathname.startsWith('/auth');
 
-  // / 라우트에서 마운트 후 미인증 or 로딩 중 → 풀스크린 랜딩/로딩
-  // 인증 시에는 Header + 콘텐츠 구조로 렌더 (사이드바는 Sidebar에서 자체 숨김)
-  // mounted 전에는 false로 처리하여 SSR HTML과 일치시킴
-  const isLandingFullscreen = pathname === '/' && mounted && !isAuthenticated;
+  // / 라우트의 비로그인 랜딩은 자체 정적 헤더/푸터를 가진다.
+  // SSR과 첫 hydration 렌더에서도 앱 헤더를 감싸지 않아 공개 랜딩 HTML이 중복 탐색을 만들지 않게 한다.
+  // 인증 상태가 확정된 뒤에는 Header + 대시보드 구조로 전환한다.
+  const isLandingFullscreen = pathname === '/' && (!mounted || !isAuthenticated);
 
   // 푸터 숨김 라우트 (대시보드성 페이지들: 자체적인 액션바나 스크롤 관리가 필요한 경우)
   const isDashboardRoute =

@@ -6,6 +6,15 @@ import { useAuthStore } from "@/stores/auth-store";
 import { Logo } from "@/components/Logo";
 import { AlertCircle, X } from "lucide-react";
 
+const POST_LOGIN_REDIRECT_KEY = "nexus_post_login_redirect";
+
+function sanitizeRedirect(value: string | null) {
+  if (!value) return null;
+  if (!value.startsWith("/") || value.startsWith("//")) return null;
+  if (value.startsWith("/api/") || value.startsWith("/auth/")) return null;
+  return value;
+}
+
 function LoginPageContent() {
   const searchParams = useSearchParams();
   const { loginWithDiscord, isLoading } = useAuthStore();
@@ -18,6 +27,11 @@ function LoginPageContent() {
       setError(decodeURIComponent(errorParam));
       // URL에서 에러 파라미터 제거
       window.history.replaceState({}, "", "/auth/login");
+    }
+
+    const redirect = sanitizeRedirect(searchParams.get("redirect"));
+    if (redirect) {
+      sessionStorage.setItem(POST_LOGIN_REDIRECT_KEY, redirect);
     }
   }, [searchParams]);
 

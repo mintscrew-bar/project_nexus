@@ -7,7 +7,13 @@ export function Footer() {
         {/* 상단: 저작권 + 링크 */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
           <p>&copy; {new Date().getFullYear()} Project Nexus</p>
-          <nav className="flex gap-4">
+          <nav className="flex flex-wrap justify-center gap-x-4 gap-y-2 sm:justify-end">
+            <Link href="/about" className="hover:text-text-secondary transition-colors duration-150">
+              서비스 소개
+            </Link>
+            <Link href="/resources" className="hover:text-text-secondary transition-colors duration-150">
+              자료실
+            </Link>
             <Link href="/guide" className="hover:text-text-secondary transition-colors duration-150">
               이용 가이드
             </Link>

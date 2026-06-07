@@ -55,6 +55,22 @@ const SOCKET_AUTH_RETRY_DELAY_MS = 750;
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+type ManagedSocket = Socket & {
+  __nexusPreparing?: boolean;
+  __nexusClosed?: boolean;
+  __nexusLastConnectError?: {
+    label: string;
+    message: string;
+    transport?: string;
+    at: number;
+  };
+};
+
+const isReusableSocket = (socket: Socket | null) => {
+  const managed = socket as ManagedSocket | null;
+  return !!socket && (socket.connected || socket.active || !!managed?.__nexusPreparing);
+};
+
 const getSocketAuthPayload = async () => {
   for (let attempt = 1; attempt <= SOCKET_AUTH_MAX_ATTEMPTS; attempt += 1) {
     const token = await ensureValidToken(SOCKET_AUTH_MIN_TOKEN_TTL_MS).catch(
@@ -72,18 +88,42 @@ const getSocketAuthPayload = async () => {
 
 export const createAuthenticatedSocket = (namespace: string, label: string) => {
   const socket = io(`${SOCKET_URL}${namespace}`, {
+    autoConnect: false,
     auth: async (cb) => cb(await getSocketAuthPayload()),
-    transports: ["websocket"],
+    transports: ["polling", "websocket"],
+    upgrade: true,
+    withCredentials: true,
     reconnection: true,
     reconnectionAttempts: Infinity,
     reconnectionDelay: 1000,
     reconnectionDelayMax: 10000,
     randomizationFactor: 0.5,
     timeout: 20000,
-  });
+  }) as ManagedSocket;
+
+  socket.__nexusPreparing = true;
+
+  const disconnect = socket.disconnect.bind(socket);
+  socket.disconnect = (() => {
+    socket.__nexusClosed = true;
+    socket.__nexusPreparing = false;
+    return disconnect();
+  }) as Socket["disconnect"];
 
   socket.on("connect_error", (error) => {
-    console.error(`${label} Socket Connect Error:`, error.message);
+    socket.__nexusLastConnectError = {
+      label,
+      message: error.message,
+      transport: socket.io.engine?.transport?.name,
+      at: Date.now(),
+    };
+  });
+
+  void getSocketAuthPayload().then((auth) => {
+    socket.__nexusPreparing = false;
+    if (socket.__nexusClosed || socket.connected || socket.active) return;
+    if (!auth.token) return;
+    socket.connect();
   });
 
   return socket;
@@ -95,7 +135,7 @@ export const getRoomSocket = () => roomSocket;
 // Room Socket 연결
 export const connectRoomSocket = () => {
   // Reuse existing instance if still connected, connecting, or reconnecting.
-  if (roomSocket?.connected || roomSocket?.active) return roomSocket;
+  if (isReusableSocket(roomSocket)) return roomSocket;
   // Clean up stale disconnected socket before creating a new one.
   if (roomSocket) {
     roomSocket.removeAllListeners();
@@ -114,7 +154,7 @@ export const connectRoomSocket = () => {
 // ============================================================
 export const connectAuctionSocket = () => {
   // Reuse existing instance if still connected, connecting, or reconnecting.
-  if (auctionSocket?.connected || auctionSocket?.active) return auctionSocket;
+  if (isReusableSocket(auctionSocket)) return auctionSocket;
   // Clean up stale disconnected socket before creating a new one.
   if (auctionSocket) {
     auctionSocket.removeAllListeners();
@@ -136,7 +176,7 @@ export const connectAuctionSocket = () => {
 // 해제 시점: 드래프트 완료 또는 방 퇴장 시 useSnakeDraftStore.disconnectFromDraft() 호출
 // ============================================================
 export const connectSnakeDraftSocket = () => {
-  if (snakeDraftSocket?.connected || snakeDraftSocket?.active) return snakeDraftSocket;
+  if (isReusableSocket(snakeDraftSocket)) return snakeDraftSocket;
   if (snakeDraftSocket) {
     snakeDraftSocket.removeAllListeners();
     snakeDraftSocket = null;
@@ -153,7 +193,7 @@ export const connectSnakeDraftSocket = () => {
 // 해제 시점: 토너먼트 완료 또는 방 퇴장 시 disconnectMatchSocket() 호출
 // ============================================================
 export const connectMatchSocket = () => {
-  if (matchSocket?.connected || matchSocket?.active) return matchSocket;
+  if (isReusableSocket(matchSocket)) return matchSocket;
   if (matchSocket) {
     matchSocket.removeAllListeners();
     matchSocket = null;
@@ -166,7 +206,7 @@ export const connectMatchSocket = () => {
 
 // Clan Socket 연결
 export const connectClanSocket = () => {
-  if (clanSocket?.connected || clanSocket?.active) return clanSocket;
+  if (isReusableSocket(clanSocket)) return clanSocket;
   if (clanSocket) {
     clanSocket.removeAllListeners();
     clanSocket = null;
@@ -725,7 +765,7 @@ export const matchSocketHelpers = {
 
 // Presence Socket 연결
 export const connectPresenceSocket = () => {
-  if (presenceSocket?.connected || presenceSocket?.active) return presenceSocket;
+  if (isReusableSocket(presenceSocket)) return presenceSocket;
   if (presenceSocket) {
     presenceSocket.removeAllListeners();
     presenceSocket = null;
@@ -875,7 +915,7 @@ export const clanSocketHelpers = {
 
 // Notification Socket 연결
 export const connectNotificationSocket = () => {
-  if (notificationSocket?.connected || notificationSocket?.active) return notificationSocket;
+  if (isReusableSocket(notificationSocket)) return notificationSocket;
   if (notificationSocket) {
     notificationSocket.removeAllListeners();
     notificationSocket = null;
@@ -910,7 +950,7 @@ export const disconnectNotificationSocket = () => {
 
 // DM Socket 연결
 export const connectDmSocket = () => {
-  if (dmSocket?.connected || dmSocket?.active) return dmSocket;
+  if (isReusableSocket(dmSocket)) return dmSocket;
 
   // 기존 소켓 정리
   if (dmSocket) {
@@ -1089,7 +1129,7 @@ export const disconnectClanSocket = () => {
 // 해제 시점: 역할 선택 완료 또는 세션 중단 시 useRoleSelectionStore.disconnect() 호출
 // ============================================================
 export const connectRoleSelectionSocket = () => {
-  if (roleSelectionSocket?.connected || roleSelectionSocket?.active) return roleSelectionSocket;
+  if (isReusableSocket(roleSelectionSocket)) return roleSelectionSocket;
   if (roleSelectionSocket) {
     roleSelectionSocket.removeAllListeners();
     roleSelectionSocket = null;

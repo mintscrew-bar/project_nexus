@@ -20,6 +20,7 @@ const navItems = [
   { href: '/ranking', label: '랭킹' },
   { href: '/clans', label: '클랜' },
   { href: '/community', label: '커뮤니티' },
+  { href: '/resources', label: '자료실' },
   { href: '/guide', label: '가이드' },
 ];
 

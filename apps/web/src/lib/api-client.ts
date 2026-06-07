@@ -190,6 +190,17 @@ export const apiClient = axios.create({
   },
 });
 
+// 공개 API는 인증 토큰 주입/refresh 재시도와 분리한다.
+// 비로그인 방 목록처럼 누구나 볼 수 있는 데이터가 세션 복구 실패에 휘말리지 않게 한다.
+const publicApiClient = axios.create({
+  baseURL: API_BASE_URL,
+  withCredentials: false,
+  timeout: 15000,
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
+
 // 요청 인터셉터: Access Token 추가
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
@@ -529,12 +540,12 @@ export const roomApi = {
     status?: string;
     maxSize?: number;
   }) => {
-    const response = await apiClient.get("/rooms", { params });
+    const response = await publicApiClient.get("/rooms", { params });
     return response.data;
   },
 
   getRoom: async (roomId: string) => {
-    const response = await apiClient.get(`/rooms/${roomId}`);
+    const response = await publicApiClient.get(`/rooms/${roomId}`);
     return response.data;
   },
 

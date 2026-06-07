@@ -256,7 +256,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
     });
     socket.on('disconnect', () => set({ isConnected: false }));
 
-    set({ isConnected: true });
+    set({ isConnected: socket.connected });
   },
 
   disconnectFromRoom: (options) => {

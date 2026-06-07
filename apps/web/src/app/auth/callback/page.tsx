@@ -5,6 +5,16 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { setAccessToken } from "@/lib/api-client";
 import { useAuthStore } from "@/stores/auth-store";
 
+const POST_LOGIN_REDIRECT_KEY = "nexus_post_login_redirect";
+
+function takeStoredRedirect() {
+  const value = sessionStorage.getItem(POST_LOGIN_REDIRECT_KEY);
+  sessionStorage.removeItem(POST_LOGIN_REDIRECT_KEY);
+  if (!value || !value.startsWith("/") || value.startsWith("//")) return null;
+  if (value.startsWith("/api/") || value.startsWith("/auth/")) return null;
+  return value;
+}
+
 function AuthCallbackContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -29,6 +39,7 @@ function AuthCallbackContent() {
       // 사용자 정보 가져오기
       fetchUser().then(() => {
         const currentUser = useAuthStore.getState().user;
+        const redirect = takeStoredRedirect();
         const hasRiotAccount =
           Array.isArray(currentUser?.riotAccounts) &&
           currentUser.riotAccounts.length > 0;
@@ -38,7 +49,7 @@ function AuthCallbackContent() {
           return;
         }
 
-        router.push("/dashboard");
+        router.push(redirect ?? "/dashboard");
       });
     } else {
       router.push("/auth/login");

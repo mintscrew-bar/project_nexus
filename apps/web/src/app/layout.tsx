@@ -6,6 +6,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { GoogleAnalytics } from "@/components/analytics/GoogleAnalytics";
 import { PageViewTracker } from "@/components/analytics/PageViewTracker";
 import { ConsentBanner } from "@/components/analytics/ConsentBanner";
+import { AdSenseScript } from "@/components/ads/AdSenseScript";
 import { Suspense } from "react";
 import {
   SITE_DESCRIPTION,
@@ -119,11 +120,6 @@ export default function RootLayout({
     <html lang="ko" suppressHydrationWarning>
       <head suppressHydrationWarning>
         <script
-          async
-          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9854590549377922"
-          crossOrigin="anonymous"
-        />
-        <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }}
         />
@@ -138,6 +134,7 @@ export default function RootLayout({
           <PageViewTracker />
         </Suspense>
         <ConsentBanner />
+        <AdSenseScript />
       </body>
     </html>
   );

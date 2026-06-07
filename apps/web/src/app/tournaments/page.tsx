@@ -1,24 +1,38 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { RoomList } from "@/components/rooms/RoomList";
 import { RoomCreationForm } from "@/components/rooms/RoomCreationForm";
 import { Button, Modal } from "@/components/ui";
 import { useKeyboardShortcutsContext } from "@/components/KeyboardShortcuts";
 import { Plus } from "lucide-react";
+import { useAuthStore } from "@/stores/auth-store";
 
 export default function TournamentsPage() {
+  const router = useRouter();
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
   const { setActionHandler } = useKeyboardShortcutsContext();
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const authLoading = useAuthStore((state) => state.isLoading);
+
+  const openRoomCreation = useCallback(() => {
+    if (authLoading) return;
+    if (!isAuthenticated) {
+      router.push("/auth/login?redirect=/tournaments");
+      return;
+    }
+    setIsCreatingRoom(true);
+  }, [authLoading, isAuthenticated, router]);
 
   // Register "n" key to open room creation modal
   useEffect(() => {
-    const handler = () => setIsCreatingRoom(true);
+    const handler = () => openRoomCreation();
     setActionHandler(handler);
     return () => {
       setActionHandler(null);
     };
-  }, [setActionHandler]);
+  }, [setActionHandler, openRoomCreation]);
 
   return (
     <div className="flex-grow p-4 md:p-8">
@@ -28,7 +42,7 @@ export default function TournamentsPage() {
             <h1 className="text-2xl md:text-3xl font-bold text-text-primary">롤 내전 방 목록</h1>
             <p className="text-sm md:text-base text-text-secondary mt-1">참여할 내전 방을 선택하거나 새로 만들어보세요</p>
           </div>
-          <Button onClick={() => setIsCreatingRoom(true)}>
+          <Button onClick={openRoomCreation}>
             <Plus className="h-5 w-5 mr-2" />
             방 생성
           </Button>
