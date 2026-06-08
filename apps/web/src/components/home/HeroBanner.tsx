@@ -113,7 +113,7 @@ export function HeroBanner({ isAuthenticated = false }: HeroBannerProps) {
       <section
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
-        className="relative flex flex-col items-center justify-center h-[calc(100svh-80px)] min-h-[560px] px-4 text-center overflow-hidden bg-bg-primary"
+        className="relative flex flex-col items-center justify-center h-[400px] md:h-[440px] px-4 text-center overflow-hidden bg-bg-primary"
       >
         {/* 헥스 그리드 배경 */}
         <div ref={hexGridRef} className="absolute inset-0 pointer-events-none" style={{ willChange: "transform" }}>
