@@ -304,7 +304,6 @@ export function LandingContentSections() {
         </div>
       </section>
 
-      <LandingFooter />
     </>
   );
 }
@@ -346,6 +345,7 @@ export default function LandingContent() {
       <LandingHeader />
       <HeroBanner />
       <LandingContentSections />
+      <LandingFooter />
     </main>
   );
 }
