@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { absoluteUrl, SITE_DESCRIPTION, SITE_NAME, SITE_TITLE } from "@/lib/seo";
 import HomeClient from "./_components/HomeClient";
-import LandingContent, { LandingContentSections, LandingFooter } from "./_components/LandingContent";
+import LandingContent, { LandingContentSections } from "./_components/LandingContent";
 
 export const metadata: Metadata = {
   title: {
@@ -24,12 +24,7 @@ export default function HomePage() {
   return (
     <HomeClient
       landing={<LandingContent />}
-      contentSections={
-        <>
-          <LandingContentSections />
-          <LandingFooter />
-        </>
-      }
+      contentSections={<LandingContentSections />}
     />
   );
 }
