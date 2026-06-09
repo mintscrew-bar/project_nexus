@@ -192,7 +192,7 @@ export function RoomList() {
       {/* Filters */}
       <div className="flex flex-col lg:flex-row gap-4">
         {/* Search */}
-        <div className="relative flex-grow max-w-md">
+        <div className="relative w-full lg:max-w-md lg:flex-grow">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-tertiary" />
           <Input
             ref={searchInputRef}
@@ -214,7 +214,7 @@ export function RoomList() {
         </div>
 
         {/* Status Filter Tabs */}
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 lg:flex-wrap lg:overflow-visible lg:pb-0">
           <button
             onClick={() => setStatusFilter("ALL")}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
@@ -268,7 +268,7 @@ export function RoomList() {
       {/* Second row filters — 모바일: 세로로 쌓아 좌측 정렬 / 데스크톱: 한 줄 배치 */}
       <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3">
         {/* Mode Filter */}
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
           <span className="text-sm text-text-secondary">모드:</span>
           <button
             onClick={() => setModeFilter("ALL")}
@@ -338,7 +338,7 @@ export function RoomList() {
         </label>
 
         {/* Sort Options */}
-        <div className="flex items-center gap-2 sm:ml-auto">
+        <div className="flex min-w-0 flex-wrap items-center gap-2 sm:ml-auto">
           <ArrowUpDown className="h-4 w-4 text-text-tertiary flex-shrink-0" />
           <div className="flex items-center gap-1 flex-wrap">
             {sortOptions.map((option) => (

@@ -306,7 +306,7 @@ export function RoomCreationForm({ onCancel, onRoomCreated }: RoomCreationFormPr
             경매 설정
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="block text-text-secondary text-xs mb-1">시작 포인트</label>
               <select
@@ -411,7 +411,7 @@ export function RoomCreationForm({ onCancel, onRoomCreated }: RoomCreationFormPr
       )}
       
       {/* 상세 설정 */}
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6">
         {/* 비공개 설정 */}
         <div className="p-4 bg-bg-tertiary/50 rounded-lg border border-bg-elevated">
           <label className="flex items-center justify-between cursor-pointer">
@@ -539,18 +539,18 @@ export function RoomCreationForm({ onCancel, onRoomCreated }: RoomCreationFormPr
       })()}
 
       {/* 버튼 */}
-      <div className="flex justify-end gap-3 pt-2">
+      <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
         <button
           type="button"
           onClick={onCancel}
-          className="px-6 py-2.5 bg-bg-tertiary hover:bg-bg-elevated text-text-primary font-semibold rounded-lg transition-colors"
+          className="w-full px-6 py-2.5 bg-bg-tertiary hover:bg-bg-elevated text-text-primary font-semibold rounded-lg transition-colors sm:w-auto"
           disabled={isLoading}
         >
           취소
         </button>
         <button
           type="submit"
-          className="px-6 py-2.5 bg-accent-primary hover:bg-accent-hover text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          className="flex w-full items-center justify-center gap-2 px-6 py-2.5 bg-accent-primary hover:bg-accent-hover text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed sm:w-auto"
           disabled={isLoading}
         >
           {isLoading ? (

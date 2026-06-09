@@ -8,7 +8,7 @@ import { useAuthStore } from "@/stores/auth-store";
 import { roomApi, matchApi } from "@/lib/api-client";
 import { connectMatchSocket } from "@/lib/socket-client";
 import { BracketView, Match, MatchDetailModal, VictoryScreen, GameChatPanel, getTeamDisplayName } from "@/components/domain";
-import { LoadingSpinner, Badge, Button } from "@/components/ui";
+import { LoadingSpinner, Badge, Button, ConfirmModal } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
 import { ArrowLeft, RefreshCw, Trophy } from "lucide-react";
 import Link from "next/link";
@@ -32,6 +32,7 @@ export default function BracketPage() {
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAborting, setIsAborting] = useState(false);
+  const [isAbortConfirmOpen, setIsAbortConfirmOpen] = useState(false);
   const [liveStatus, setLiveStatus] = useState<any>(null);
 
   // host 여부 — 브래킷 세션 중 변경되지 않으므로 1회만 조회
@@ -118,12 +119,10 @@ export default function BracketPage() {
     }
   };
 
-  const handleAbortToLobby = async () => {
-    const confirmed = window.confirm(
-      "현재 판을 종료하고 대기실로 돌아가시겠습니까? 이 판은 전적에 반영되지 않습니다.",
-    );
-    if (!confirmed) return;
+  const handleAbortToLobby = () => setIsAbortConfirmOpen(true);
 
+  const handleAbortConfirm = async () => {
+    setIsAbortConfirmOpen(false);
     setIsAborting(true);
     try {
       await roomApi.abortToLobby(roomId);
@@ -222,28 +221,40 @@ export default function BracketPage() {
 
   return (
     <div className="h-full p-4 md:p-8 overflow-y-auto">
+      <ConfirmModal
+        isOpen={isAbortConfirmOpen}
+        onClose={() => setIsAbortConfirmOpen(false)}
+        onConfirm={handleAbortConfirm}
+        title="내전 종료"
+        message="현재 판을 종료하고 대기실로 돌아가시겠습니까? 이 판은 전적에 반영되지 않습니다."
+        confirmText="종료"
+        cancelText="취소"
+        variant="danger"
+        isLoading={isAborting}
+      />
       <div className="container mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-4">
+        <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex min-w-0 items-center gap-3 sm:gap-4">
             <Link
               href={`/tournaments/${roomId}/lobby`}
-              className="p-2 rounded-lg hover:bg-bg-tertiary transition-colors"
+              className="shrink-0 rounded-lg p-2 transition-colors hover:bg-bg-tertiary"
+              aria-label="로비로 돌아가기"
             >
               <ArrowLeft className="h-5 w-5 text-text-secondary" />
             </Link>
-            <div>
-              <h1 className="text-2xl md:text-3xl font-bold text-text-primary flex items-center gap-2">
+            <div className="min-w-0">
+              <h1 className="flex items-center gap-2 text-2xl font-bold text-text-primary md:text-3xl">
                 <Trophy className="h-6 w-6 md:h-8 md:w-8 text-accent-gold" />
                 대진표
               </h1>
-              <p className="text-text-secondary mt-1">
-                Room ID: <span className="font-mono text-accent-primary">{roomId.slice(0, 8)}</span>
+              <p className="mt-1 truncate text-text-secondary">
+                방 ID: <span className="font-mono text-accent-primary">{roomId.slice(0, 8)}</span>
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 lg:justify-end">
             <Button
               variant="danger"
               size="sm"

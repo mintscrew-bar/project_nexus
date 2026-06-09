@@ -1646,19 +1646,20 @@ function RoomsTab({ addToast }: { addToast: (msg: string, type: "success" | "err
   useEffect(() => { fetchRooms(); }, [fetchRooms]);
 
   const handleClose = async (room: AdminRoom) => {
-    if (!confirm(`"${room.name}" 방을 강제 종료하시겠습니까?`)) return;
+    if (!confirm(`"${room.name}" 방을 삭제하시겠습니까? 참가자는 방에서 제거됩니다.`)) return;
     try {
       await adminApi.closeRoom(room.id);
-      setRooms((prev) => prev.map((r) => r.id === room.id ? { ...r, status: "CLOSED" } : r));
-      addToast("방 종료 완료", "success");
+      setRooms((prev) => prev.filter((r) => r.id !== room.id));
+      setTotal((prev) => Math.max(0, prev - 1));
+      addToast("방 삭제 완료", "success");
     } catch {
-      addToast("방 종료 실패", "error");
+      addToast("방 삭제 실패", "error");
     }
   };
 
-  const STATUS_LABELS: Record<string, string> = { WAITING: "대기", IN_PROGRESS: "진행중", COMPLETED: "완료", CLOSED: "종료" };
+  const STATUS_LABELS: Record<string, string> = { WAITING: "대기", IN_PROGRESS: "진행중", COMPLETED: "완료" };
   const STATUS_VARIANTS: Record<string, "default" | "secondary" | "danger"> = {
-    WAITING: "secondary", IN_PROGRESS: "default", COMPLETED: "default", CLOSED: "danger",
+    WAITING: "secondary", IN_PROGRESS: "default", COMPLETED: "default",
   };
 
   return (
@@ -1710,11 +1711,10 @@ function RoomsTab({ addToast }: { addToast: (msg: string, type: "success" | "err
                         {new Date(room.createdAt).toLocaleDateString("ko-KR")}
                       </td>
                       <td className="px-4 py-3">
-                        {room.status !== "CLOSED" && room.status !== "COMPLETED" && (
-                          <Button size="sm" variant="danger" onClick={() => handleClose(room)}>
-                            <XCircle className="h-3.5 w-3.5 mr-1" />강제종료
-                          </Button>
-                        )}
+                        <Button size="sm" variant="danger" onClick={() => handleClose(room)}>
+                          <XCircle className="h-3.5 w-3.5 mr-1" />
+                          {room.status === "COMPLETED" ? "삭제" : "강제종료"}
+                        </Button>
                       </td>
                     </tr>
                   ))}

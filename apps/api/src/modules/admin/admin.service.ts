@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Logger,
   NotFoundException,
   BadRequestException,
   ForbiddenException,
@@ -9,6 +10,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { UserRole, AdminAction } from "@nexus/database";
 import { DiscordBotService } from "../discord/discord-bot.service";
 import { DiscordAdminAlertService } from "../discord/discord-admin-alert.service";
+import { DiscordVoiceService } from "../discord/discord-voice.service";
 
 const MAX_LIMIT = 100;
 
@@ -33,11 +35,14 @@ function validateFutureDate(dateStr: string, fieldName: string): Date {
 
 @Injectable()
 export class AdminService {
+  private readonly logger = new Logger(AdminService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
     private readonly discordBotService: DiscordBotService,
     private readonly adminAlerts: DiscordAdminAlertService,
+    private readonly discordVoiceService: DiscordVoiceService,
   ) {}
 
   private readonly seededHighTierPriority = 7;
@@ -1102,15 +1107,37 @@ export class AdminService {
   }
 
   async closeRoom(roomId: string, adminId: string) {
-    const room = await this.prisma.room.findUnique({ where: { id: roomId } });
+    const room = await this.prisma.room.findUnique({
+      where: { id: roomId },
+      include: {
+        participants: { select: { id: true } },
+        discordChannels: { select: { channelId: true, teamName: true } },
+      },
+    });
     if (!room) throw new NotFoundException("방을 찾을 수 없습니다.");
 
-    // CANCELLED 상태로 변경 — 참가자들에게 세션 종료를 알림
-    const result = await this.prisma.room.update({
-      where: { id: roomId },
-      data: { status: "COMPLETED" as any, completedAt: new Date() },
-      select: { id: true, name: true, status: true },
-    });
+    await this.discordVoiceService
+      .deleteRoomChannels(roomId, false, {
+        discordCategoryId: room.discordCategoryId,
+        discordChannels: room.discordChannels,
+      })
+      .catch((error: any) => {
+        this.logger.warn(
+          `[Admin] Discord channel cleanup failed for room ${roomId}: ${error?.message}`,
+        );
+      });
+
+    await this.prisma.$transaction([
+      this.prisma.roomParticipant.deleteMany({ where: { roomId } }),
+      this.prisma.room.delete({ where: { id: roomId } }),
+    ]);
+
+    const result = {
+      id: room.id,
+      name: room.name,
+      status: room.status,
+      deleted: true,
+    };
 
     // ⚠️ 인메모리 상태(경매/드래프트/역할선택)는 서비스 의존성 순환 문제로
     // 직접 정리 불가. 인메모리 상태는 다음 접근 시 roomId 기반으로 무효화되거나,
@@ -1118,6 +1145,9 @@ export class AdminService {
 
     await this.logAction(adminId, AdminAction.ROOM_CLOSE, "room", roomId, {
       name: room.name,
+      previousStatus: room.status,
+      participantCount: room.participants.length,
+      deleted: true,
     });
 
     const admin = await this.prisma.user.findUnique({
@@ -1130,7 +1160,7 @@ export class AdminService {
       adminName: admin?.username,
       targetType: "room",
       targetId: roomId,
-      summary: `관리자가 방을 강제 종료했습니다: ${room.name}`,
+      summary: `관리자가 방을 삭제했습니다: ${room.name}`,
     });
 
     return result;

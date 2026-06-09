@@ -290,8 +290,16 @@ export class AdminController {
 
   @Post("rooms/:id/close")
   @Roles(UserRole.ADMIN)
-  closeRoom(@Param("id") roomId: string, @Request() req: any) {
-    return this.adminService.closeRoom(roomId, req.user.sub);
+  async closeRoom(@Param("id") roomId: string, @Request() req: any) {
+    const result = await this.adminService.closeRoom(roomId, req.user.sub);
+
+    try {
+      await this.roomGateway.broadcastRoomDelta("remove", roomId);
+    } catch (error) {
+      console.error("[Admin] Failed to broadcast room removal:", error);
+    }
+
+    return result;
   }
 
   // ── Test Bots (ADMIN only) ─────────────────────────────────────────────────
