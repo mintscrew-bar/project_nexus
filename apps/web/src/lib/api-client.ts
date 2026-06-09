@@ -1320,7 +1320,7 @@ export const reputationApi = {
     reason: "TOXICITY" | "AFK" | "GRIEFING" | "CHEATING" | "OTHER";
     description: string;
   }) => {
-    const response = await apiClient.post("/reputation/report", data);
+    const response = await apiClient.post("/reputation/reports", data);
     return response.data;
   },
 
