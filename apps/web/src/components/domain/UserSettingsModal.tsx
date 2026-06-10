@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import { useAuthStore } from "@/stores/auth-store";
 import { userApi } from "@/lib/api-client";
+import { getStoredThemePreference, isPersistedTheme } from "@/hooks/usePersistentTheme";
 import { Modal, Button, LoadingSpinner, StatusSelector } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
 import { usePresence } from "@/hooks/usePresence";
@@ -49,7 +50,9 @@ export function UserSettingsModal({ isOpen, onClose }: UserSettingsModalProps) {
       setSettingsLoading(true);
       userApi.getSettings()
         .then((data) => {
-          const theme = data.theme ?? "dark";
+          const serverTheme = isPersistedTheme(data.theme) ? data.theme : "dark";
+          const storedTheme = getStoredThemePreference();
+          const theme = storedTheme ?? serverTheme;
           setSettings({
             notifyMatchStart: data.notifyMatchStart ?? true,
             notifyMatchResult: data.notifyMatchResult ?? true,
@@ -58,8 +61,13 @@ export function UserSettingsModal({ isOpen, onClose }: UserSettingsModalProps) {
             allowFriendRequests: data.allowFriendRequests ?? true,
             theme,
           });
-          // 서버에 저장된 테마를 클라이언트에도 동기화
+          // 브라우저에 명시적으로 저장된 테마가 있으면 서버의 오래된 기본값보다 우선한다.
           setNextTheme(theme);
+          if (storedTheme && storedTheme !== serverTheme) {
+            void userApi.updateSettings({ theme: storedTheme }).catch((error) => {
+              console.error("Theme settings sync error:", error);
+            });
+          }
         })
         .catch((err) => {
           console.error("Failed to fetch settings:", err);

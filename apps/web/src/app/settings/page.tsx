@@ -9,6 +9,7 @@ import { ChampionImage } from "@/components/ChampionImage";
 import { Card, CardHeader, CardTitle, CardContent, Button, Label, LoadingSpinner, ConfirmModal, Badge } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
 import { useTheme } from "next-themes";
+import { getStoredThemePreference, isPersistedTheme } from "@/hooks/usePersistentTheme";
 import Link from "next/link";
 import { Bell, Shield, Palette, LogOut, Check, Info, Search, X, Link as LinkIcon, AlertCircle, ExternalLink, ChevronRight, RefreshCw, Loader2, Server } from "lucide-react";
 import { AddAccountModal } from "@/components/domain/AddAccountModal";
@@ -158,7 +159,9 @@ export default function SettingsPage() {
     if (isAuthenticated) {
       userApi.getSettings()
         .then((data) => {
-          const savedTheme = data.theme ?? "dark";
+          const serverTheme = isPersistedTheme(data.theme) ? data.theme : "dark";
+          const storedTheme = getStoredThemePreference();
+          const savedTheme = storedTheme ?? serverTheme;
           setSettings({
             notifyFriendRequest: data.notifyFriendRequest ?? true,
             notifyFriendAccepted: data.notifyFriendAccepted ?? true,
@@ -177,8 +180,13 @@ export default function SettingsPage() {
             highlightStatType: data.highlightStatType ?? null,
             theme: savedTheme,
           });
-          // 백엔드에 저장된 테마를 next-themes에 동기화
+          // 브라우저에 명시적으로 저장된 테마가 있으면 서버의 오래된 기본값보다 우선한다.
           setNextTheme(savedTheme);
+          if (storedTheme && storedTheme !== serverTheme) {
+            void userApi.updateSettings({ theme: storedTheme }).catch((error) => {
+              console.error("Theme settings sync error:", error);
+            });
+          }
         })
         .catch((err) => {
           console.error("Failed to fetch settings:", err);

@@ -1,17 +1,10 @@
 "use client";
 
-import { useTheme } from "next-themes";
-import { useEffect, useState } from "react";
+import { usePersistentTheme } from "@/hooks/usePersistentTheme";
 import { Moon, Sun } from "lucide-react"; // Assuming lucide-react is installed for icons
 
 export function ThemeToggle() {
-  const [mounted, setMounted] = useState(false);
-  const { resolvedTheme, setTheme } = useTheme();
-
-  // useEffect only runs on the client, so now we can safely show the UI
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const { mounted, resolvedTheme, toggleTheme } = usePersistentTheme();
 
   if (!mounted) {
     return null;
@@ -20,7 +13,7 @@ export function ThemeToggle() {
   return (
     <button
       className="flex items-center justify-center p-2 rounded-md hover:bg-bg-tertiary"
-      onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
+      onClick={toggleTheme}
       aria-label="Toggle theme"
     >
       {resolvedTheme === "dark" ? (

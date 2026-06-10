@@ -5,11 +5,11 @@ import { X, Menu, Home, Swords, Trophy, Users, MessageSquare, Settings, User, Fl
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
-import { useTheme } from 'next-themes';
 import { Logo } from './Logo';
 import { DiscordIcon } from './icons/DiscordIcon';
 import { NEXUS_DISCORD_INVITE_URL } from '@/lib/constants';
 import { useAuthStore } from '@/stores/auth-store';
+import { usePersistentTheme } from '@/hooks/usePersistentTheme';
 
 interface MobileMenuProps {
   className?: string;
@@ -19,7 +19,7 @@ export function MobileMenu({ className }: MobileMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
   const { user } = useAuthStore();
-  const { resolvedTheme, setTheme } = useTheme();
+  const { resolvedTheme, toggleTheme } = usePersistentTheme();
   const [mounted, setMounted] = useState(false);
 
   // 관리자/모더레이터 여부 (마운트 후에만 확정 → hydration 불일치 방지)
@@ -171,7 +171,7 @@ export function MobileMenu({ className }: MobileMenuProps) {
               {mounted && (
                 <li>
                   <button
-                    onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
+                    onClick={toggleTheme}
                     className="flex w-full items-center justify-between gap-3 px-3 py-2.5 rounded-lg text-text-secondary hover:text-text-primary hover:bg-bg-tertiary transition-colors"
                   >
                     <span className="flex items-center gap-3">
