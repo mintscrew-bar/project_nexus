@@ -217,7 +217,7 @@ export function RoomList() {
         <div className="flex items-center gap-2 overflow-x-auto pb-1 lg:flex-wrap lg:overflow-visible lg:pb-0">
           <button
             onClick={() => setStatusFilter("ALL")}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
+            className={`shrink-0 whitespace-nowrap px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
               statusFilter === "ALL"
                 ? "bg-accent-primary text-white"
                 : "bg-bg-tertiary text-text-secondary hover:bg-bg-elevated"
@@ -228,7 +228,7 @@ export function RoomList() {
           </button>
           <button
             onClick={() => setStatusFilter("WAITING")}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
+            className={`shrink-0 whitespace-nowrap px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
               statusFilter === "WAITING"
                 ? "bg-accent-primary text-white"
                 : "bg-bg-tertiary text-text-secondary hover:bg-bg-elevated"
@@ -240,7 +240,7 @@ export function RoomList() {
           </button>
           <button
             onClick={() => setStatusFilter("IN_PROGRESS")}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
+            className={`shrink-0 whitespace-nowrap px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
               statusFilter === "IN_PROGRESS"
                 ? "bg-accent-primary text-white"
                 : "bg-bg-tertiary text-text-secondary hover:bg-bg-elevated"
@@ -252,7 +252,7 @@ export function RoomList() {
           </button>
           <button
             onClick={() => setStatusFilter("COMPLETED")}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
+            className={`shrink-0 whitespace-nowrap px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
               statusFilter === "COMPLETED"
                 ? "bg-accent-primary text-white"
                 : "bg-bg-tertiary text-text-secondary hover:bg-bg-elevated"
