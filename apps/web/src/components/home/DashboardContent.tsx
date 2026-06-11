@@ -252,20 +252,20 @@ function BannerCarousel() {
         </div>
       ))}
 
-      {/* 좌우 화살표 — 모바일에서 숨김 (콘텐츠와 겹침 방지) */}
+      {/* 좌우 화살표 — 좁은 폭에서는 콘텐츠와 겹치므로 데스크톱에서만 노출 */}
       <button
         onClick={() => goTo((current - 1 + TOTAL_SLIDES) % TOTAL_SLIDES)}
         aria-label="이전 슬라이드"
-        className="hidden sm:block absolute left-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/5 text-white/50 hover:bg-white/10 hover:text-white transition-all z-20 backdrop-blur-sm"
+        className="hidden lg:block absolute left-3 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-white/5 text-white/45 hover:bg-white/10 hover:text-white transition-all z-20 backdrop-blur-sm"
       >
-        <ChevronLeft className="h-4 w-4" />
+        <ChevronLeft className="h-3.5 w-3.5" />
       </button>
       <button
         onClick={() => goTo((current + 1) % TOTAL_SLIDES)}
         aria-label="다음 슬라이드"
-        className="hidden sm:block absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/5 text-white/50 hover:bg-white/10 hover:text-white transition-all z-20 backdrop-blur-sm"
+        className="hidden lg:block absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-white/5 text-white/45 hover:bg-white/10 hover:text-white transition-all z-20 backdrop-blur-sm"
       >
-        <ChevronRight className="h-4 w-4" />
+        <ChevronRight className="h-3.5 w-3.5" />
       </button>
 
       {/* 닷 네비게이션 — 터치 영역 확대 (시각 6px, 터치 44px) */}
@@ -280,8 +280,8 @@ function BannerCarousel() {
           >
             <span
               className={cn(
-                "block h-1.5 rounded-full transition-all duration-500",
-                i === current ? "w-8 bg-white" : "w-1.5 bg-white/30"
+                "block rounded-full transition-all duration-500",
+                i === current ? "h-1.5 w-6 bg-white" : "h-1.5 w-1.5 bg-white/30"
               )}
             />
           </button>

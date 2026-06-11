@@ -149,16 +149,16 @@ export function HeroBanner({ isAuthenticated = false }: HeroBannerProps) {
           animate="visible"
         >
           <motion.div
-            className="flex justify-center mb-6"
+            className="flex justify-center mb-4"
             initial={{ scale: 0.7, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ duration: 0.5, ease: "easeOut" }}
           >
-            <Logo size="xl" variant="icon-only" />
+            <Logo size="lg" variant="icon-only" />
           </motion.div>
 
           <motion.h1
-            className={`${exo2.className} text-5xl sm:text-6xl md:text-8xl font-bold mb-5 tracking-wider`}
+            className={`${exo2.className} text-4xl sm:text-5xl md:text-7xl font-bold mb-4 tracking-wider`}
             variants={itemVariants}
           >
             <span
@@ -170,7 +170,7 @@ export function HeroBanner({ isAuthenticated = false }: HeroBannerProps) {
           </motion.h1>
 
           <motion.p
-            className="text-base sm:text-lg md:text-xl text-text-secondary mb-8 md:mb-10 leading-relaxed"
+            className="text-sm sm:text-base md:text-lg text-text-secondary mb-6 md:mb-8 leading-relaxed"
             variants={itemVariants}
           >
             솔랭 억까에 지쳤다면?<br className="sm:hidden" />{" "}
@@ -180,7 +180,7 @@ export function HeroBanner({ isAuthenticated = false }: HeroBannerProps) {
           <motion.div className="flex justify-center" variants={itemVariants}>
             <Link href="/tournaments">
               <button
-                className="group relative inline-flex items-center gap-2.5 px-8 py-3.5 rounded-xl text-base font-semibold text-white overflow-hidden transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+                className="group relative inline-flex items-center gap-2 px-6 py-3 rounded-lg text-sm font-semibold text-white overflow-hidden transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
                 style={{
                   background: `linear-gradient(135deg, ${INDIGO}, ${PURPLE})`,
                   boxShadow: `0 0 24px ${rgba(INDIGO_RGB, 0.3)}`,
@@ -313,17 +313,17 @@ export function HeroBanner({ isAuthenticated = false }: HeroBannerProps) {
       >
         {/* 로고 */}
         <motion.div
-          className="flex justify-center mb-6"
+          className="flex justify-center mb-4"
           initial={{ scale: 0.7, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ duration: 0.5, ease: "easeOut" }}
         >
-          <Logo size="xl" variant="icon-only" />
+          <Logo size="lg" variant="icon-only" />
         </motion.div>
 
         {/* 타이틀 */}
         <motion.h1
-          className={`${exo2.className} text-5xl sm:text-6xl md:text-8xl font-bold mb-5 tracking-wider`}
+          className={`${exo2.className} text-4xl sm:text-5xl md:text-7xl font-bold mb-4 tracking-wider`}
           variants={itemVariants}
         >
           <span
@@ -336,7 +336,7 @@ export function HeroBanner({ isAuthenticated = false }: HeroBannerProps) {
 
         {/* 서브타이틀 */}
         <motion.p
-          className="text-base sm:text-lg md:text-xl text-text-secondary mb-8 md:mb-10 leading-relaxed"
+          className="text-sm sm:text-base md:text-lg text-text-secondary mb-6 md:mb-8 leading-relaxed"
           variants={itemVariants}
         >
           솔랭 억까에 지쳤다면?<br className="sm:hidden" />{" "}
@@ -347,7 +347,7 @@ export function HeroBanner({ isAuthenticated = false }: HeroBannerProps) {
         <motion.div className="flex flex-col sm:flex-row gap-3 justify-center" variants={itemVariants}>
           <Link href="/auth/login">
             <button
-              className="group relative inline-flex items-center gap-2.5 px-8 py-3.5 rounded-xl text-base font-semibold text-white overflow-hidden transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+              className="group relative inline-flex items-center gap-2 px-6 py-3 rounded-lg text-sm font-semibold text-white overflow-hidden transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
               style={{
                 background: `linear-gradient(135deg, ${INDIGO}, ${PURPLE})`,
                 boxShadow: `0 0 24px ${rgba(INDIGO_RGB, 0.3)}`,
@@ -360,7 +360,7 @@ export function HeroBanner({ isAuthenticated = false }: HeroBannerProps) {
             </button>
           </Link>
           <Link href="/tournaments">
-            <Button variant="secondary" size="lg" className="w-full sm:w-auto">
+            <Button variant="secondary" size="md" className="w-full sm:w-auto">
               자세히 알아보기
             </Button>
           </Link>
