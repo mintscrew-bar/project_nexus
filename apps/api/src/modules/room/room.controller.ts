@@ -156,9 +156,14 @@ export class RoomController {
   ) {
     const result: any = await this.roomService.leaveRoom(userId, roomId);
 
+    if (result?.roomDeleted) {
+      this.roomGateway.broadcastRoomDelta("remove", roomId);
+      return result;
+    }
+
     // 슬롯이 보존되지 않은 경우(실제 퇴장)에만 소켓으로 브로드캐스트.
     // 게임 진행 중 보존(preserved=true)이면 클라에 user-left를 보내지 않는다.
-    if (!result?.preserved && !result?.roomDeleted) {
+    if (!result?.preserved) {
       this.roomGateway.notifyRoomUpdate(roomId, "user-left", {
         userId,
         username: result?.username ?? "",
@@ -167,6 +172,12 @@ export class RoomController {
         this.roomGateway.notifyRoomUpdate(roomId, "host-changed", {
           newHostId: result.newHostId,
         });
+        try {
+          const updatedRoom = await this.roomService.getRoomById(roomId);
+          this.roomGateway.notifyRoomUpdate(roomId, "room-updated", updatedRoom);
+        } catch {
+          // The room may have been deleted between leave handling and refresh.
+        }
       }
       this.roomGateway.broadcastRoomDelta("update", roomId);
     }
