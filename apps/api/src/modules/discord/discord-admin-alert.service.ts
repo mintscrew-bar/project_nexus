@@ -186,9 +186,9 @@ export class DiscordAdminAlertService {
     adminId: string;
     adminName?: string | null;
   }) {
-    return this.send("OPERATION", {
-      title: "관리자 알림 테스트",
-      message: "Discord 관리자 알림 테스트 메시지입니다.",
+    return this.send("APPROVAL", {
+      title: "Discord 권한 인증 알림 테스트",
+      message: "Discord 권한 인증 채널 테스트 메시지입니다.",
       fields: {
         "실행자": params.adminName
           ? `${params.adminName} (${params.adminId})`
