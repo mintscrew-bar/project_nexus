@@ -398,6 +398,13 @@ export class AdminController {
     return this.adminService.getDiscordGuildLinks();
   }
 
+  @Post("discord/test-alert")
+  @Roles(UserRole.ADMIN)
+  @Throttle({ default: { limit: 5, ttl: 600000 } })
+  sendDiscordTestAlert(@Request() req: any) {
+    return this.adminService.sendDiscordTestAlert(req.user.sub);
+  }
+
   @Patch("discord/guild-links/:id/approve")
   @Roles(UserRole.ADMIN)
   approveDiscordGuildLink(@Param("id") id: string, @Request() req: any) {

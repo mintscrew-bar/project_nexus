@@ -2196,6 +2196,7 @@ function DiscordGuildLinksTab({ addToast }: { addToast: (msg: string, type: "suc
   const [links, setLinks] = useState<DiscordGuildLink[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [sendingTestAlert, setSendingTestAlert] = useState(false);
 
   const fetchLinks = useCallback(async () => {
     setLoading(true);
@@ -2237,13 +2238,36 @@ function DiscordGuildLinksTab({ addToast }: { addToast: (msg: string, type: "suc
     }
   };
 
+  const handleSendTestAlert = async () => {
+    setSendingTestAlert(true);
+    try {
+      await adminApi.sendDiscordTestAlert();
+      addToast("Discord 테스트 알림을 전송했습니다.", "success");
+    } catch (err: any) {
+      addToast(err?.response?.data?.message || "Discord 테스트 알림 전송 실패", "error");
+    } finally {
+      setSendingTestAlert(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-lg font-semibold text-text-primary">디스코드 길드 연동</h2>
-        <Button size="sm" variant="outline" onClick={fetchLinks}>
-          <RefreshCw className="h-4 w-4" />
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleSendTestAlert}
+            isLoading={sendingTestAlert}
+          >
+            <MessageSquare className="h-4 w-4 mr-1" />
+            테스트 알림
+          </Button>
+          <Button size="sm" variant="outline" onClick={fetchLinks}>
+            <RefreshCw className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
       <p className="text-sm text-text-muted">
         유저가 봇을 자신의 디스코드 서버에 추가하면 &quot;승인 대기&quot;로 등록됩니다. 승인하면 해당 서버에서 내전 채널이 생성됩니다.

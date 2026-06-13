@@ -43,7 +43,10 @@ export class DiscordAdminAlertService {
     return `${this.getAppUrl()}${link.startsWith("/") ? link : `/${link}`}`;
   }
 
-  private async send(channel: AdminAlertChannel, payload: AlertPayload) {
+  private async send(
+    channel: AdminAlertChannel,
+    payload: AlertPayload,
+  ): Promise<boolean> {
     const guildId =
       this.configService.get<string>("ADMIN_ALERT_DISCORD_GUILD_ID") ||
       this.configService.get<string>("DISCORD_GUILD_ID");
@@ -55,7 +58,7 @@ export class DiscordAdminAlertService {
       this.logger.warn(
         `Admin alert skipped: missing guild/channel config for ${channel}`,
       );
-      return;
+      return false;
     }
 
     const fields = Object.entries(payload.fields ?? {})
@@ -75,11 +78,12 @@ export class DiscordAdminAlertService {
       .slice(0, 1900);
 
     try {
-      await this.discordBotService.sendNotification(guildId, channelId, message);
+      return this.discordBotService.sendNotification(guildId, channelId, message);
     } catch (error: any) {
       this.logger.warn(
         `Admin alert failed (${channel}): ${error?.message ?? error}`,
       );
+      return false;
     }
   }
 
@@ -163,7 +167,7 @@ export class DiscordAdminAlertService {
     targetId?: string;
     summary?: string;
   }) {
-    await this.send("OPERATION", {
+    return this.send("OPERATION", {
       title: "관리자 민감 작업",
       message: params.summary || "관리자 작업이 수행되었습니다.",
       fields: {
@@ -173,6 +177,23 @@ export class DiscordAdminAlertService {
           : params.adminId,
         "대상 유형": params.targetType,
         "대상 ID": params.targetId,
+      },
+      link: "/admin",
+    });
+  }
+
+  async notifyTestAlert(params: {
+    adminId: string;
+    adminName?: string | null;
+  }) {
+    return this.send("OPERATION", {
+      title: "관리자 알림 테스트",
+      message: "Discord 관리자 알림 테스트 메시지입니다.",
+      fields: {
+        "실행자": params.adminName
+          ? `${params.adminName} (${params.adminId})`
+          : params.adminId,
+        "전송 시각": new Date().toISOString(),
       },
       link: "/admin",
     });

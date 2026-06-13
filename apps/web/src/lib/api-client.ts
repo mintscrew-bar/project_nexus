@@ -1893,6 +1893,10 @@ export const adminApi = {
     const response = await apiClient.get("/admin/discord/guild-links");
     return response.data;
   },
+  sendDiscordTestAlert: async () => {
+    const response = await apiClient.post("/admin/discord/test-alert");
+    return response.data as { ok: boolean };
+  },
   approveDiscordGuildLink: async (id: string) => {
     const response = await apiClient.patch(`/admin/discord/guild-links/${id}/approve`);
     return response.data;

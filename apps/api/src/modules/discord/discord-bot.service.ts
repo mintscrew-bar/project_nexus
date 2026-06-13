@@ -129,15 +129,16 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
   async onModuleInit() {
     const token = this.configService.get("DISCORD_BOT_TOKEN");
     const clientId = this.configService.get("DISCORD_CLIENT_ID");
-    const guildId = this.configService.get("DISCORD_GUILD_ID");
+    const guildId =
+      this.configService.get("DISCORD_GUILD_ID") ||
+      this.configService.get("ADMIN_ALERT_DISCORD_GUILD_ID");
 
     if (
       !token ||
       !clientId ||
-      !guildId ||
       token.includes("your-") ||
       clientId.includes("your-") ||
-      guildId.includes("your-")
+      guildId?.includes("your-")
     ) {
       console.warn(
         "Discord bot not properly configured, skipping bot initialization",
@@ -1975,13 +1976,20 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
     return false;
   }
 
-  async sendNotification(guildId: string, channelId: string, message: string) {
+  async sendNotification(
+    guildId: string,
+    channelId: string,
+    message: string,
+  ): Promise<boolean> {
     const guild = await this.client.guilds.fetch(guildId);
     const channel = await guild.channels.fetch(channelId);
 
     if (channel?.isTextBased()) {
       await channel.send(message);
+      return true;
     }
+
+    return false;
   }
 
   async sendEmbedNotification(

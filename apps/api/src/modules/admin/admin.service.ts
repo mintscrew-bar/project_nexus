@@ -1427,6 +1427,26 @@ export class AdminService {
     });
   }
 
+  async sendDiscordTestAlert(adminId: string) {
+    const admin = await this.prisma.user.findUnique({
+      where: { id: adminId },
+      select: { username: true },
+    });
+
+    const sent = await this.adminAlerts.notifyTestAlert({
+      adminId,
+      adminName: admin?.username,
+    });
+
+    if (!sent) {
+      throw new BadRequestException(
+        "Discord 관리자 알림 전송에 실패했습니다. 봇/길드/채널 환경변수와 봇 권한을 확인해주세요.",
+      );
+    }
+
+    return { ok: true };
+  }
+
   async approveDiscordGuildLink(linkId: string, requesterId: string) {
     const link = await this.prisma.discordGuildLink.findUnique({
       where: { id: linkId },
