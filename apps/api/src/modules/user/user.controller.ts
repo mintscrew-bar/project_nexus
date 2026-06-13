@@ -140,12 +140,9 @@ export class UserController {
   // 동적 경로 (정적 경로 이후)
   // ========================================
 
-  @Get(":id")
-  async getProfile(
-    @CurrentUser("sub") requesterId: string,
-    @Param("id") id: string,
-  ) {
-    return this.userService.getProfile(id, requesterId);
+  @Get(":id/hover-profile")
+  async getHoverProfile(@Param("id") id: string) {
+    return this.userService.getHoverProfile(id);
   }
 
   @Get(":id/stats")
@@ -156,8 +153,11 @@ export class UserController {
     return this.userService.getUserStats(id, requesterId);
   }
 
-  @Get(":id/hover-profile")
-  async getHoverProfile(@Param("id") id: string) {
-    return this.userService.getHoverProfile(id);
+  @Get(":id")
+  async getProfile(
+    @CurrentUser("sub") requesterId: string,
+    @Param("id") id: string,
+  ) {
+    return this.userService.getProfile(id, requesterId);
   }
 }
