@@ -18,7 +18,9 @@ interface Room {
   name: string;
   hostUser: { username: string };
   maxParticipants: number;
-  currentParticipants: number;
+  currentParticipants?: number;
+  participantCount?: number;
+  participants?: Array<{ id: string }>;
   teamMode: string;
   status: string;
 }
@@ -49,6 +51,8 @@ export function Sidebar() {
   const isCommunityRoute = pathname.startsWith('/community');
   const isClansRoute = pathname.startsWith('/clans');
   const isGuideRoute = pathname === '/guide';
+  const getParticipantCount = (room: Room) =>
+    room.participantCount ?? room.participants?.length ?? room.currentParticipants ?? 0;
 
   return (
     <aside className="w-64 bg-bg-secondary border-r border-bg-tertiary p-4 hidden md:block flex-shrink-0 sticky top-16 self-start h-[calc(100vh-4rem)] overflow-y-auto">
@@ -143,7 +147,7 @@ export function Sidebar() {
                       <div className="flex items-center gap-2 text-xs text-text-tertiary">
                         <div className="flex items-center gap-1">
                           <Users className="h-3 w-3" />
-                          <span>{room.currentParticipants || 0}/{room.maxParticipants}</span>
+                          <span>{getParticipantCount(room)}/{room.maxParticipants}</span>
                         </div>
                         <span className="text-text-quaternary">•</span>
                         <span>
