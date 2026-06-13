@@ -18,7 +18,7 @@ export function CompactParticipantCard({
   const handleMouseEnter = () => {
     cancelHoverClose?.();
     if (compactRef.current) {
-      setHoveredPlayer({ id: p.id, rect: compactRef.current.getBoundingClientRect(), participant: p });
+      setHoveredPlayer({ id: p.userId ?? p.id, rect: compactRef.current.getBoundingClientRect(), participant: p });
     }
   };
 
