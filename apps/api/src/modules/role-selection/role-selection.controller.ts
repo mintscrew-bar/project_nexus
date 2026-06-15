@@ -7,6 +7,7 @@ import {
   UseGuards,
   ForbiddenException,
 } from "@nestjs/common";
+import { Throttle } from "@nestjs/throttler";
 import { RoleSelectionService } from "./role-selection.service";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
@@ -33,6 +34,7 @@ export class RoleSelectionController {
   }
 
   @Get(":roomId")
+  @Throttle({ default: { limit: 600, ttl: 60000 } })
   async getRoleSelectionData(@Param("roomId") roomId: string) {
     return this.roleSelectionService.getRoleSelectionData(roomId);
   }

@@ -9,6 +9,7 @@ import {
   HttpCode,
   HttpStatus,
 } from "@nestjs/common";
+import { Throttle } from "@nestjs/throttler";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { MatchService } from "./match.service";
@@ -62,6 +63,7 @@ export class MatchController {
   }
 
   @Get("bracket/:roomId")
+  @Throttle({ default: { limit: 600, ttl: 60000 } })
   async getRoomMatches(@Param("roomId") roomId: string) {
     return this.matchService.getRoomMatches(roomId);
   }
@@ -71,6 +73,7 @@ export class MatchController {
   // ========================================
 
   @Get(":id")
+  @Throttle({ default: { limit: 600, ttl: 60000 } })
   async findOne(@Param("id") id: string) {
     return this.matchService.findById(id);
   }

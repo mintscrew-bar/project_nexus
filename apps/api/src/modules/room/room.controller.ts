@@ -14,6 +14,7 @@ import {
   Inject,
   forwardRef,
 } from "@nestjs/common";
+import { Throttle } from "@nestjs/throttler";
 import { RoomService } from "./room.service";
 import { CreateRoomDto, ListRoomsQueryDto, ChatMessagesQueryDto } from "./dto";
 import { SnakeDraftService } from "./snake-draft.service";
@@ -67,6 +68,7 @@ export class RoomController {
 
   @Get()
   @Public()
+  @Throttle({ default: { limit: 600, ttl: 60000 } })
   async listRooms(@Query() query: ListRoomsQueryDto) {
     try {
       return await this.roomService.listRooms({
@@ -86,6 +88,7 @@ export class RoomController {
 
   @Get(":id")
   @Public()
+  @Throttle({ default: { limit: 600, ttl: 60000 } })
   async getRoom(@Param("id") id: string) {
     return this.roomService.getRoomById(id);
   }
@@ -94,6 +97,7 @@ export class RoomController {
   // 민감정보 없이 카드에 필요한 최소 필드만 노출한다.
   @Get(":id/share")
   @Public()
+  @Throttle({ default: { limit: 600, ttl: 60000 } })
   async getRoomShareInfo(@Param("id") id: string) {
     const room = await this.roomService.getRoomSummary(id);
     if (!room) return null;
@@ -174,7 +178,11 @@ export class RoomController {
         });
         try {
           const updatedRoom = await this.roomService.getRoomById(roomId);
-          this.roomGateway.notifyRoomUpdate(roomId, "room-updated", updatedRoom);
+          this.roomGateway.notifyRoomUpdate(
+            roomId,
+            "room-updated",
+            updatedRoom,
+          );
         } catch {
           // The room may have been deleted between leave handling and refresh.
         }

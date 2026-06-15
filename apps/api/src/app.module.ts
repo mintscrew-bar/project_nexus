@@ -6,7 +6,7 @@ import {
 } from "@nestjs/common";
 import { APP_GUARD } from "@nestjs/core";
 import { ConfigModule } from "@nestjs/config";
-import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler";
+import { ThrottlerModule } from "@nestjs/throttler";
 import { ScheduleModule } from "@nestjs/schedule";
 import { ServeStaticModule } from "@nestjs/serve-static";
 import { EventEmitterModule } from "@nestjs/event-emitter";
@@ -39,6 +39,7 @@ import { ShutdownService } from "./modules/common/shutdown.service";
 import { PrismaService } from "./modules/prisma/prisma.service";
 import { HealthController } from "./health.controller";
 import { RiotTournamentService } from "./modules/riot/riot-tournament.service";
+import { AuthAwareThrottlerGuard } from "./common/guards/auth-aware-throttler.guard";
 
 // dist/에서 실행되므로 상위 디렉토리로 이동하여 .env 파일 경로 설정
 const apiRoot = resolve(__dirname, "..");
@@ -106,8 +107,8 @@ const projectRoot = resolve(apiRoot, "../..");
   ],
   controllers: [HealthController],
   providers: [
-    // ThrottlerGuard 글로벌 등록 — 모든 HTTP 엔드포인트에 Rate Limiting 적용
-    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    // 인증된 요청은 사용자별로, 익명 요청은 IP별로 Rate Limiting 적용
+    { provide: APP_GUARD, useClass: AuthAwareThrottlerGuard },
   ],
 })
 export class AppModule implements OnModuleInit, OnApplicationShutdown {
