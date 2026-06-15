@@ -5,6 +5,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import {
   Client,
   ChannelType,
+  Guild,
   PermissionFlagsBits,
   VoiceChannel,
   Role as DiscordRole,
@@ -47,6 +48,27 @@ export class DiscordVoiceService {
 
   private shouldSkipBotUsername(username: string): boolean {
     return /^testbot_\d+$/.test(username);
+  }
+
+  private async deleteGuildChannel(
+    guild: Guild,
+    channelId: string,
+    deletedChannelIds: Set<string>,
+    failures: string[],
+  ) {
+    try {
+      const channel = await guild.channels.fetch(channelId).catch(() => null);
+      if (channel) {
+        await channel.delete();
+      }
+      deletedChannelIds.add(channelId);
+    } catch (error: any) {
+      const message = error?.message ?? String(error);
+      failures.push(`${channelId}: ${message}`);
+      this.logger.warn(
+        `Failed to delete Discord channel ${channelId}: ${message}`,
+      );
+    }
   }
 
   /**
@@ -404,6 +426,10 @@ export class DiscordVoiceService {
       discordChannels?: { channelId: string; teamName?: string | null }[];
     },
   ): Promise<void> {
+    if (!this.isDiscordReady()) {
+      throw new Error("Discord client is not ready");
+    }
+
     const guildId = await this.resolveRoomGuildId(roomId);
     if (!guildId) {
       return;
@@ -427,6 +453,10 @@ export class DiscordVoiceService {
 
     try {
       const guild = await this.client.guilds.fetch(guildId);
+      const channelRecords = new Map<
+        string,
+        { channelId: string; teamName?: string | null }
+      >();
 
       const channelsToDelete = keepLobby
         ? room.discordChannels.filter(
@@ -435,29 +465,67 @@ export class DiscordVoiceService {
           )
         : room.discordChannels;
 
-      // Delete child channels first (Discord does NOT auto-delete them with category)
-      for (const ch of channelsToDelete) {
-        try {
-          const channel = await guild.channels
-            .fetch(ch.channelId)
-            .catch(() => null);
-          if (channel) await channel.delete();
-        } catch {
-          // Channel may already be deleted, continue
-        }
+      for (const channel of channelsToDelete) {
+        channelRecords.set(channel.channelId, channel);
       }
 
       if (!keepLobby) {
-        // Delete the category itself
-        try {
-          const category = await guild.channels
-            .fetch(room.discordCategoryId)
-            .catch(() => null);
-          if (category) await category.delete();
-        } catch {
-          // Category may already be deleted
+        const guildChannels = await guild.channels.fetch();
+        for (const channel of guildChannels.values()) {
+          const maybeChild = channel as {
+            id?: string;
+            parentId?: string | null;
+          } | null;
+          if (
+            maybeChild?.id &&
+            maybeChild.parentId === room.discordCategoryId &&
+            !channelRecords.has(maybeChild.id)
+          ) {
+            channelRecords.set(maybeChild.id, {
+              channelId: maybeChild.id,
+              teamName: null,
+            });
+          }
         }
+      }
 
+      const deletedChannelIds = new Set<string>();
+      const failures: string[] = [];
+
+      // Delete child channels first (Discord does NOT auto-delete them with category)
+      for (const ch of channelRecords.values()) {
+        await this.deleteGuildChannel(
+          guild,
+          ch.channelId,
+          deletedChannelIds,
+          failures,
+        );
+      }
+
+      let categoryDeleted = false;
+      if (!keepLobby) {
+        // Delete the category itself
+        await this.deleteGuildChannel(
+          guild,
+          room.discordCategoryId,
+          deletedChannelIds,
+          failures,
+        );
+        categoryDeleted = deletedChannelIds.has(room.discordCategoryId);
+      }
+
+      // Clean up DB records for deleted channels
+      if (deletedChannelIds.size > 0) {
+        await this.prisma.roomDiscordChannel.deleteMany({
+          where: {
+            roomId,
+            channelId: { in: [...deletedChannelIds] },
+            ...(keepLobby ? { teamName: { not: "Lobby" } } : {}),
+          },
+        });
+      }
+
+      if (!keepLobby && categoryDeleted) {
         // Clear discordCategoryId in DB
         await this.prisma.room
           .update({
@@ -467,19 +535,18 @@ export class DiscordVoiceService {
           .catch(() => {}); // Room may already be deleted
       }
 
-      // Clean up DB records for deleted channels
-      await this.prisma.roomDiscordChannel.deleteMany({
-        where: {
-          roomId,
-          ...(keepLobby ? { teamName: { not: "Lobby" } } : {}),
-        },
-      });
+      if (failures.length > 0) {
+        throw new Error(
+          `Failed to delete ${failures.length} Discord channel(s): ${failures.join("; ")}`,
+        );
+      }
 
       this.logger.log(
         `Deleted Discord channels for room ${roomId} (keepLobby=${keepLobby})`,
       );
     } catch (error) {
       this.logger.error(`Failed to delete channels for room ${roomId}:`, error);
+      throw error;
     }
   }
 
@@ -515,7 +582,9 @@ export class DiscordVoiceService {
           b: (typeof room.discordChannels)[number],
         ) => {
           // 생성 시각 기준 정렬 (팀명이 팀장명으로 바뀌어도 순서 유지)
-          return (a.createdAt?.getTime?.() ?? 0) - (b.createdAt?.getTime?.() ?? 0);
+          return (
+            (a.createdAt?.getTime?.() ?? 0) - (b.createdAt?.getTime?.() ?? 0)
+          );
         },
       );
     const currentNumTeams = existingTeamChannels.length;
@@ -599,7 +668,9 @@ export class DiscordVoiceService {
         const newDisplayName = `┊ ${team.name}`;
 
         // Discord 채널명 변경
-        const channel = await guild.channels.fetch(ch.channelId).catch(() => null);
+        const channel = await guild.channels
+          .fetch(ch.channelId)
+          .catch(() => null);
         if (channel) {
           await channel.setName(newDisplayName);
         }
@@ -613,7 +684,9 @@ export class DiscordVoiceService {
 
       this.logger.log(`Renamed Discord team channels for room ${roomId}`);
     } catch (error: any) {
-      this.logger.warn(`Failed to rename team channels for room ${roomId}: ${error.message}`);
+      this.logger.warn(
+        `Failed to rename team channels for room ${roomId}: ${error.message}`,
+      );
     }
   }
 

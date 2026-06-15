@@ -1118,16 +1118,10 @@ export class AdminService {
     });
     if (!room) throw new NotFoundException("방을 찾을 수 없습니다.");
 
-    await this.discordVoiceService
-      .deleteRoomChannels(roomId, false, {
-        discordCategoryId: room.discordCategoryId,
-        discordChannels: room.discordChannels,
-      })
-      .catch((error: any) => {
-        this.logger.warn(
-          `[Admin] Discord channel cleanup failed for room ${roomId}: ${error?.message}`,
-        );
-      });
+    await this.discordVoiceService.deleteRoomChannels(roomId, false, {
+      discordCategoryId: room.discordCategoryId,
+      discordChannels: room.discordChannels,
+    });
 
     await this.roomService.deleteRoomData(roomId);
 

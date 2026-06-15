@@ -559,17 +559,11 @@ export class SnakeDraftService {
       return false;
     }
 
-    try {
-      if (this.discordVoiceService) {
-        await this.discordVoiceService
-          .deleteRoomChannels(roomId, false, {
-            discordCategoryId: room.discordCategoryId,
-            discordChannels: room.discordChannels,
-          })
-          .catch(() => {});
-      }
-    } catch {
-      // Ignore Discord cleanup failures for zombie-room cleanup.
+    if (this.discordVoiceService) {
+      await this.discordVoiceService.deleteRoomChannels(roomId, false, {
+        discordCategoryId: room.discordCategoryId,
+        discordChannels: room.discordChannels,
+      });
     }
 
     await this.prisma.room.delete({ where: { id: roomId } });

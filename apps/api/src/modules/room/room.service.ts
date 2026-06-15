@@ -1008,13 +1008,7 @@ export class RoomService {
 
       if (allRemainingAreBots || remainingParticipants.length === 0) {
         if (this.discordVoiceService) {
-          await this.discordVoiceService
-            .deleteRoomChannels(roomId)
-            .catch((e: any) => {
-              this.logger.warn(
-                `[Room] Discord channel cleanup failed for room ${roomId}: ${e?.message}`,
-              );
-            });
+          await this.discordVoiceService.deleteRoomChannels(roomId);
         }
         await this.deleteRoomData(roomId);
         return { message: "Room deleted (only bots remaining)" };
@@ -1076,13 +1070,7 @@ export class RoomService {
     if (remainingCount === 0) {
       // Clean up Discord channels (category + lobby + team channels) before deleting
       if (this.discordVoiceService) {
-        await this.discordVoiceService
-          .deleteRoomChannels(roomId)
-          .catch((e: any) => {
-            this.logger.warn(
-              `[Room] Discord channel cleanup failed for room ${roomId}: ${e?.message}`,
-            );
-          });
+        await this.discordVoiceService.deleteRoomChannels(roomId);
       }
       await this.deleteRoomData(roomId);
       return {
@@ -1095,13 +1083,7 @@ export class RoomService {
     // If only bots remain, delete room immediately
     if (allRemainingAreBots) {
       if (this.discordVoiceService) {
-        await this.discordVoiceService
-          .deleteRoomChannels(roomId)
-          .catch((e: any) => {
-            this.logger.warn(
-              `[Room] Discord channel cleanup failed for room ${roomId}: ${e?.message}`,
-            );
-          });
+        await this.discordVoiceService.deleteRoomChannels(roomId);
       }
       await this.deleteRoomData(roomId);
       return {
@@ -1871,13 +1853,7 @@ export class RoomService {
 
     // Clean up Discord channels (Discord auto-removes users from deleted channels)
     if (this.discordVoiceService) {
-      await this.discordVoiceService
-        .deleteRoomChannels(roomId)
-        .catch((e: any) => {
-          this.logger.warn(
-            `[Room] Discord channel cleanup failed for room ${roomId}: ${e?.message}`,
-          );
-        });
+      await this.discordVoiceService.deleteRoomChannels(roomId);
     }
 
     await this.deleteRoomData(roomId);
