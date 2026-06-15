@@ -26,7 +26,7 @@ interface AuthenticatedSocket extends Socket {
   pingInterval: 25000,
   pingTimeout: 20000,
   maxHttpBufferSize: 1e4,
-  transports: ["websocket"],
+  transports: ["websocket", "polling"],
 })
 export class DmGateway
   implements OnGatewayConnection, OnGatewayDisconnect, OnModuleDestroy
