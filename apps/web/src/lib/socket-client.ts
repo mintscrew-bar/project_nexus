@@ -90,8 +90,8 @@ export const createAuthenticatedSocket = (namespace: string, label: string) => {
   const socket = io(`${SOCKET_URL}${namespace}`, {
     autoConnect: false,
     auth: async (cb) => cb(await getSocketAuthPayload()),
-    transports: ["polling", "websocket"],
-    upgrade: true,
+    transports: ["websocket"],
+    upgrade: false,
     withCredentials: true,
     reconnection: true,
     reconnectionAttempts: Infinity,

@@ -26,6 +26,7 @@ interface AuthenticatedSocket extends Socket {
   pingInterval: 25000,
   pingTimeout: 20000,
   maxHttpBufferSize: 1e4,
+  transports: ["websocket"],
 })
 export class ClanGateway
   implements OnGatewayConnection, OnGatewayDisconnect, OnModuleDestroy
