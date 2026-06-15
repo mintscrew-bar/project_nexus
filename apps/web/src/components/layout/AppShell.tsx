@@ -42,8 +42,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     pathname.startsWith('/draft/') ||
     pathname.startsWith('/role-selection/') ||
     pathname.endsWith('/bracket');
-  const hideFooter = isDashboardRoute || pathname.startsWith('/matches');
-
   if (isAuthRoute || isLandingFullscreen) {
     return <>{children}</>;
   }
@@ -63,8 +61,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             "flex-1 flex flex-col min-h-0",
             isDashboardRoute ? "overflow-hidden" : "overflow-auto"
           )}>
-            {children}
-            {!hideFooter && <Footer />}
+            {isDashboardRoute ? children : <div className="flex-shrink-0">{children}</div>}
+            {!isDashboardRoute && <Footer />}
           </div>
         </div>
       </main>
