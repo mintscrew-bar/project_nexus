@@ -124,6 +124,11 @@ function makeError(message, detail) {
   return err;
 }
 
+function formatBody(body) {
+  if (!body) return "";
+  return ` body=${JSON.stringify(body).slice(0, 500)}`;
+}
+
 function signToken(user) {
   const secret = process.env.JWT_ACCESS_SECRET;
   if (!secret) {
@@ -297,7 +302,7 @@ async function closeRoom(roomId, hostToken) {
     expectOk: false,
   }).catch((error) => ({ ok: false, status: 0, body: error.message }));
   if (!res.ok) {
-    console.warn(`cleanup failed room=${roomId}: status=${res.status}`);
+    console.warn(`cleanup failed room=${roomId}: status=${res.status}${formatBody(res.body)}`);
   }
 }
 

@@ -11,6 +11,7 @@ import { UserRole, AdminAction } from "@nexus/database";
 import { DiscordBotService } from "../discord/discord-bot.service";
 import { DiscordAdminAlertService } from "../discord/discord-admin-alert.service";
 import { DiscordVoiceService } from "../discord/discord-voice.service";
+import { RoomService } from "../room/room.service";
 
 const MAX_LIMIT = 100;
 
@@ -43,6 +44,7 @@ export class AdminService {
     private readonly discordBotService: DiscordBotService,
     private readonly adminAlerts: DiscordAdminAlertService,
     private readonly discordVoiceService: DiscordVoiceService,
+    private readonly roomService: RoomService,
   ) {}
 
   private readonly seededHighTierPriority = 7;
@@ -1127,10 +1129,7 @@ export class AdminService {
         );
       });
 
-    await this.prisma.$transaction([
-      this.prisma.roomParticipant.deleteMany({ where: { roomId } }),
-      this.prisma.room.delete({ where: { id: roomId } }),
-    ]);
+    await this.roomService.deleteRoomData(roomId);
 
     const result = {
       id: room.id,

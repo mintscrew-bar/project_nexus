@@ -152,6 +152,64 @@ export class RoomService {
     await tx.team.deleteMany({ where: { roomId } });
   }
 
+  async deleteRoomData(roomId: string) {
+    await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      const matches = await tx.match.findMany({
+        where: { roomId },
+        select: { id: true },
+      });
+      const teams = await tx.team.findMany({
+        where: { roomId },
+        select: { id: true },
+      });
+
+      const matchIds = matches.map((match) => match.id);
+      const teamIds = teams.map((team) => team.id);
+
+      if (matchIds.length > 0) {
+        await tx.userReport.updateMany({
+          where: { matchId: { in: matchIds } },
+          data: { matchId: null },
+        });
+        await tx.userRating.deleteMany({
+          where: { matchId: { in: matchIds } },
+        });
+        await tx.matchVote.deleteMany({
+          where: { matchId: { in: matchIds } },
+        });
+        await tx.matchTeamStats.deleteMany({
+          where: { matchId: { in: matchIds } },
+        });
+        await tx.matchParticipant.deleteMany({
+          where: { matchId: { in: matchIds } },
+        });
+      }
+
+      await tx.match.deleteMany({ where: { roomId } });
+      await tx.snakeDraftPick.deleteMany({ where: { roomId } });
+      await tx.auctionBid.deleteMany({ where: { roomId } });
+
+      if (teamIds.length > 0) {
+        await tx.teamMember.deleteMany({
+          where: { teamId: { in: teamIds } },
+        });
+      }
+
+      await tx.roomParticipant.updateMany({
+        where: { roomId },
+        data: { teamId: null },
+      });
+      await tx.roomParticipant.deleteMany({ where: { roomId } });
+      await tx.roomDiscordChannel.deleteMany({ where: { roomId } });
+      await tx.chatMessage.updateMany({
+        where: { roomId },
+        data: { roomId: null },
+      });
+      await tx.team.deleteMany({ where: { roomId } });
+      await tx.room.delete({ where: { id: roomId } });
+    });
+  }
+
   private shuffle<T>(items: T[]): T[] {
     const shuffled = [...items];
     for (let index = shuffled.length - 1; index > 0; index--) {
@@ -958,9 +1016,7 @@ export class RoomService {
               );
             });
         }
-        await this.prisma.room.delete({
-          where: { id: roomId },
-        });
+        await this.deleteRoomData(roomId);
         return { message: "Room deleted (only bots remaining)" };
       }
 
@@ -1028,10 +1084,12 @@ export class RoomService {
             );
           });
       }
-      await this.prisma.room.delete({
-        where: { id: roomId },
-      });
-      return { message: "Room deleted (no participants)", username, roomDeleted: true };
+      await this.deleteRoomData(roomId);
+      return {
+        message: "Room deleted (no participants)",
+        username,
+        roomDeleted: true,
+      };
     }
 
     // If only bots remain, delete room immediately
@@ -1045,10 +1103,12 @@ export class RoomService {
             );
           });
       }
-      await this.prisma.room.delete({
-        where: { id: roomId },
-      });
-      return { message: "Room deleted (only bots remaining)", username, roomDeleted: true };
+      await this.deleteRoomData(roomId);
+      return {
+        message: "Room deleted (only bots remaining)",
+        username,
+        roomDeleted: true,
+      };
     }
 
     // If host leaves but others remain, transfer host to next real (non-bot) participant
@@ -1820,11 +1880,7 @@ export class RoomService {
         });
     }
 
-    // 참가자 삭제 + 방 삭제를 원자적으로 처리 (chat messages preserved via onDelete: SetNull)
-    await this.prisma.$transaction([
-      this.prisma.roomParticipant.deleteMany({ where: { roomId } }),
-      this.prisma.room.delete({ where: { id: roomId } }),
-    ]);
+    await this.deleteRoomData(roomId);
     return { message: "Room closed" };
   }
 

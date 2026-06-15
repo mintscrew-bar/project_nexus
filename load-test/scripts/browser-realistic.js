@@ -145,6 +145,11 @@ function makeError(message, detail) {
   return err;
 }
 
+function formatBody(body) {
+  if (!body) return "";
+  return ` body=${JSON.stringify(body).slice(0, 500)}`;
+}
+
 function signToken(user) {
   const secret = process.env.JWT_ACCESS_SECRET;
   if (!secret) throw new Error("JWT_ACCESS_SECRET이 필요합니다.");
@@ -272,12 +277,18 @@ async function ensureBotUsers(prisma, count) {
 
 async function closeRoom(roomId, hostToken) {
   if (!roomId || config.keepRooms) return;
+  if (!hostToken) {
+    console.warn(`cleanup skipped room=${roomId}: missing host token`);
+    return;
+  }
   const res = await api(`/api/rooms/${roomId}`, {
     method: "DELETE",
     token: hostToken,
     expectOk: false,
   }).catch((error) => ({ ok: false, status: 0, body: error.message }));
-  if (!res.ok) console.warn(`cleanup failed room=${roomId}: status=${res.status}`);
+  if (!res.ok) {
+    console.warn(`cleanup failed room=${roomId}: status=${res.status}${formatBody(res.body)}`);
+  }
 }
 
 async function loginBrowser(browser, user, roomId) {
@@ -465,6 +476,7 @@ async function main() {
   });
   const sessions = [];
   let roomId = null;
+  let hostToken = null;
   const metrics = {
     login: [],
     ready: [],
@@ -476,6 +488,7 @@ async function main() {
   try {
     const users = await ensureBotUsers(prisma, config.count);
     const host = users[0];
+    hostToken = host.token;
     const created = await api("/api/rooms", {
       method: "POST",
       token: host.token,
@@ -519,9 +532,7 @@ async function main() {
       await session.context.close().catch(() => {});
     }
     await browser.close().catch(() => {});
-    if (sessions[0]) {
-      await closeRoom(roomId, sessions[0].user.token);
-    }
+    await closeRoom(roomId, hostToken);
     await prisma.$disconnect();
   }
 }

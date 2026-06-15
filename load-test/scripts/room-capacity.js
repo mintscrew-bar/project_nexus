@@ -103,6 +103,11 @@ function makeError(message, detail) {
   return err;
 }
 
+function formatBody(body) {
+  if (!body) return "";
+  return ` body=${JSON.stringify(body).slice(0, 500)}`;
+}
+
 async function api(pathname, options = {}) {
   const start = Date.now();
   const headers = {
@@ -264,7 +269,7 @@ async function cleanupRoom(roomId, adminToken) {
     console.warn(`cleanup failed room=${roomId}: ${err.message}`);
   });
   if (res && !res.ok) {
-    console.warn(`cleanup failed room=${roomId}: status=${res.status}`);
+    console.warn(`cleanup failed room=${roomId}: status=${res.status}${formatBody(res.body)}`);
   }
 }
 
