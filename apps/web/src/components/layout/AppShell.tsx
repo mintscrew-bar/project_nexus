@@ -42,6 +42,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     pathname.startsWith('/draft/') ||
     pathname.startsWith('/role-selection/') ||
     pathname.endsWith('/bracket');
+  const hideFooter = isDashboardRoute || pathname.startsWith('/matches');
 
   if (isAuthRoute || isLandingFullscreen) {
     return <>{children}</>;
@@ -63,7 +64,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             isDashboardRoute ? "overflow-hidden" : "overflow-auto"
           )}>
             {children}
-            {!isDashboardRoute && <Footer />}
+            {!hideFooter && <Footer />}
           </div>
         </div>
       </main>
