@@ -9,6 +9,7 @@
     "http:stress": "node scripts/http-load.js --stress",
     "room:capacity": "node scripts/room-capacity.js",
     "room:realistic": "node scripts/room-realistic.js",
+    "room:concurrent": "node scripts/room-concurrent.js",
     "socket:chat": "node scripts/socket-load.js"
   },
   "devDependencies": {

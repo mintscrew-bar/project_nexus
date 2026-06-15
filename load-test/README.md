@@ -91,7 +91,37 @@ npm run room:realistic -- --count=20 --skip-rps
 npm run room:realistic -- --count=40 --rps-matches=4
 ```
 
-### 5. 브라우저 실제 흐름 테스트
+### 5. 동시 다중 방 부하 테스트
+```bash
+npm run room:concurrent -- --rooms=2
+npm run room:concurrent -- --rooms=3
+npm run room:concurrent -- --rooms=4
+```
+- 2~4개 방을 동시에(Promise.allSettled) 생성해 서버 동시성 확인
+- 방마다 인원수 랜덤(10/15/20/30/40), 팀 모드 랜덤(AUTO_BALANCE/AUCTION/SNAKE_DRAFT/MANUAL_TEAM)
+- 봇 슬롯 격리: 방 간 봇 충돌 없음 (concbot_001~, concbot_041~, ...)
+- AUTO_BALANCE: 역할선택 + 브래킷 + RPS 풀 플로우
+- 나머지 모드: 게임 시작까지 확인 (모드별 봇 로직 미구현)
+
+필수 환경:
+```bash
+DATABASE_URL=...
+JWT_ACCESS_SECRET=...
+```
+
+옵션:
+```bash
+# 반복 실행
+npm run room:concurrent -- --rooms=3 --repeat=5
+
+# 방 생성 후 삭제 생략
+npm run room:concurrent -- --rooms=4 --keep-rooms
+
+# RPS 생략
+npm run room:concurrent -- --rooms=2 --skip-rps
+```
+
+### 6. 브라우저 실제 흐름 테스트
 ```bash
 npm install
 npx playwright install chromium
