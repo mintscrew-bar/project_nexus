@@ -175,6 +175,7 @@ model RiotAccount {
   flexLosses          Int                  @default(0)
   peakTier            String?
   peakRank            String?
+  peakLp              Int?
   mainRole            Role?
   subRole             Role?
   isPrimary           Boolean              @default(false)

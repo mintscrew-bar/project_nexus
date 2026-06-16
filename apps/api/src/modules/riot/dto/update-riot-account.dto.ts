@@ -1,5 +1,5 @@
 import { Transform } from "class-transformer";
-import { IsEnum, IsIn, IsObject, IsOptional } from "class-validator";
+import { IsEnum, IsIn, IsInt, IsObject, IsOptional, Max, Min } from "class-validator";
 import { Role } from "@nexus/database";
 import { RANKED_DIVISIONS, RANKED_TIERS } from "../riot-rank.util";
 
@@ -27,6 +27,12 @@ export class UpdateRiotAccountDto {
     message: "유효한 최고 티어 디비전을 선택해주세요.",
   })
   peakRank?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(9999)
+  peakLp?: number;
 
   @IsOptional()
   @IsObject()

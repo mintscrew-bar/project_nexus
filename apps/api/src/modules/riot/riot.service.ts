@@ -56,6 +56,7 @@ export interface RegisterRiotAccountDto {
   tagLine: string;
   peakTier?: string;
   peakRank?: string;
+  peakLp?: number;
   mainRole: Role;
   subRole: Role;
   championsByRole: {
@@ -615,10 +616,14 @@ export class RiotService {
       data: { isPrimary: false },
     });
 
+    const APEX_TIERS_SET = new Set(["MASTER", "GRANDMASTER", "CHALLENGER"]);
+
     let finalPeak: { peakTier: string | null; peakRank: string | null } =
       existing?.peakTier && existing.peakTier.toUpperCase() !== "UNRANKED"
         ? toStoredPeakTier(existing.peakTier, existing.peakRank)
         : { peakTier: null, peakRank: null };
+    // manualPeak가 LP를 보유한 기록인지 추적
+    let finalPeakLp: number | null = existing?.peakLp ?? null;
 
     if (
       manualPeak &&
@@ -630,6 +635,10 @@ export class RiotService {
       )
     ) {
       finalPeak = manualPeak;
+      // 수동 입력 peakLp: 마스터 이상 티어일 때만 적용
+      finalPeakLp = APEX_TIERS_SET.has(manualPeak.peakTier)
+        ? (dto.peakLp ?? null)
+        : null;
     }
 
     if (
@@ -642,6 +651,8 @@ export class RiotService {
       )
     ) {
       finalPeak = toStoredPeakTier(ranked.tier, ranked.rank);
+      // 현재 랭크가 최고 기록으로 올라가면 LP 초기화 (수동 입력값 아님)
+      finalPeakLp = null;
     }
 
     // Create or update Riot account
@@ -657,6 +668,7 @@ export class RiotService {
         ...season,
         peakTier: finalPeak.peakTier,
         peakRank: finalPeak.peakRank,
+        peakLp: finalPeakLp,
         mainRole: dto.mainRole,
         subRole: dto.subRole,
         isPrimary: true,
@@ -675,6 +687,7 @@ export class RiotService {
         ...season,
         peakTier: finalPeak.peakTier,
         peakRank: finalPeak.peakRank,
+        peakLp: finalPeakLp,
         mainRole: dto.mainRole,
         subRole: dto.subRole,
         isPrimary: true,
@@ -946,6 +959,7 @@ export class RiotService {
       subRole: Role;
       peakTier?: string;
       peakRank?: string;
+      peakLp?: number;
       championsByRole?: { [key in Role]?: string[] };
     },
   ) {
@@ -964,7 +978,8 @@ export class RiotService {
       throw new BadRequestException("주 역할과 부 역할은 동일할 수 없습니다");
     }
 
-    let peakUpdate = {};
+    const APEX_TIERS_UPDATE = new Set(["MASTER", "GRANDMASTER", "CHALLENGER"]);
+    let peakUpdate: Record<string, unknown> = {};
     if (dto.peakTier !== undefined) {
       const manualPeak = this.normalizeManualPeakTier(
         dto.peakTier,
@@ -977,6 +992,12 @@ export class RiotService {
           account.peakTier,
           account.peakRank,
         );
+        // 마스터 이상 수동 입력 시 peakLp 저장, 그 외 초기화
+        if (APEX_TIERS_UPDATE.has(manualPeak.peakTier)) {
+          peakUpdate = { ...peakUpdate, peakLp: dto.peakLp ?? null };
+        } else {
+          peakUpdate = { ...peakUpdate, peakLp: null };
+        }
       }
     } else if (dto.peakRank !== undefined) {
       this.normalizeManualPeakTier(dto.peakTier, dto.peakRank);

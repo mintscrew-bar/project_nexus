@@ -44,6 +44,7 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [peakTier, setPeakTier] = useState('');
   const [peakRank, setPeakRank] = useState('');
+  const [peakLp, setPeakLp] = useState<number | null>(null);
 
   // 역할 & 챔피언 선택 상태
   const [mainRole, setMainRole] = useState<Role>('MID');
@@ -181,6 +182,7 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
         championsByRole: championsByRole,
         peakTier: peakTier || undefined,
         peakRank: peakTier ? peakRank || undefined : undefined,
+        peakLp: peakTier && ["MASTER","GRANDMASTER","CHALLENGER"].includes(peakTier) ? peakLp ?? undefined : undefined,
       });
       onAccountAdded();
       onClose();
@@ -427,6 +429,8 @@ export function AddAccountModal({ isOpen, onClose, onAccountAdded }: AddAccountM
           peakRank={peakRank}
           onTierChange={setPeakTier}
           onRankChange={setPeakRank}
+          peakLp={peakLp}
+          onLpChange={setPeakLp}
           disabled={isLoading}
         />
       )}

@@ -21,6 +21,7 @@ export interface RiotAccount {
   lp: number;
   peakTier?: string;
   peakRank?: string;
+  peakLp?: number;
   mainRole: string;
   subRole: string;
   isPrimary: boolean;
@@ -62,6 +63,7 @@ interface RiotStoreState {
     championsByRole?: Record<string, string[]>;
     peakTier?: string;
     peakRank?: string;
+    peakLp?: number;
   }) => Promise<void>;
   deleteAccount: (accountId: string) => Promise<void>;
 
@@ -76,6 +78,7 @@ interface RiotStoreState {
     championsByRole: Record<string, string[]>;
     peakTier?: string;
     peakRank?: string;
+    peakLp?: number;
   }) => Promise<void>;
 
   // Actions - Utility
@@ -267,6 +270,7 @@ export const useRiotStore = create<RiotStoreState>()(
     championsByRole?: Record<string, string[]>;
     peakTier?: string;
     peakRank?: string;
+    peakLp?: number;
   }) => {
     set({ isLoading: true, error: null });
     try {

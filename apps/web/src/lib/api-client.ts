@@ -483,8 +483,10 @@ export const userApi = {
       tagLine: string;
       tier: string;
       rank: string;
+      lp: number;
       peakTier: string | null;
       peakRank: string | null;
+      peakLp: number | null;
       mainRole: string | null;
       subRole: string | null;
       championPreferences: { role: string; championId: string; order: number }[];
@@ -820,6 +822,7 @@ export const riotApi = {
     championsByRole?: Record<string, string[]>;
     peakTier?: string;
     peakRank?: string;
+    peakLp?: number;
   }) => {
     const response = await apiClient.put(`/riot/accounts/${accountId}`, data);
     return response.data;

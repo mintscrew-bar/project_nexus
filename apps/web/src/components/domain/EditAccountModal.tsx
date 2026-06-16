@@ -47,6 +47,7 @@ export function EditAccountModal({ isOpen, onClose, onAccountUpdated, account }:
   const [step, setStep] = useState<1 | 2>(1);
   const [peakTier, setPeakTier] = useState('');
   const [peakRank, setPeakRank] = useState('');
+  const [peakLp, setPeakLp] = useState<number | null>(null);
 
   // account가 바뀌거나 모달이 열릴 때 초기값 세팅
   useEffect(() => {
@@ -60,6 +61,7 @@ export function EditAccountModal({ isOpen, onClose, onAccountUpdated, account }:
       setStep(1);
       setPeakTier(initialPeakTier);
       setPeakRank(initialPeakTier && !APEX_TIERS.has(initialPeakTier) ? account.peakRank || 'IV' : '');
+      setPeakLp((account as any).peakLp ?? null);
       clearError();
       setLocalError(null);
 
@@ -115,6 +117,7 @@ export function EditAccountModal({ isOpen, onClose, onAccountUpdated, account }:
         championsByRole,
         peakTier: peakTier || undefined,
         peakRank: peakTier ? peakRank || undefined : undefined,
+        peakLp: peakTier && APEX_TIERS.has(peakTier) ? peakLp ?? undefined : undefined,
       });
       onAccountUpdated();
       onClose();
@@ -175,8 +178,10 @@ export function EditAccountModal({ isOpen, onClose, onAccountUpdated, account }:
         <PeakTierSelector
           peakTier={peakTier}
           peakRank={peakRank}
+          peakLp={peakLp}
           onTierChange={setPeakTier}
           onRankChange={setPeakRank}
+          onLpChange={setPeakLp}
           disabled={isLoading}
           allowEmpty={!account.peakTier || account.peakTier === 'UNRANKED'}
         />

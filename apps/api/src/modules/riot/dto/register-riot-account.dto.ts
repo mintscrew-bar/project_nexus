@@ -3,9 +3,12 @@ import {
   IsNotEmpty,
   IsOptional,
   IsEnum,
+  IsInt,
   IsObject,
   IsIn,
+  Max,
   MaxLength,
+  Min,
 } from "class-validator";
 import { Transform } from "class-transformer";
 import { Role } from "@nexus/database";
@@ -42,6 +45,12 @@ export class RegisterRiotAccountDto {
     message: "유효한 최고 티어 디비전을 선택해주세요.",
   })
   peakRank?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(9999)
+  peakLp?: number;
 
   @IsEnum(Role, { message: "유효한 주 포지션을 선택해주세요." })
   mainRole: Role;

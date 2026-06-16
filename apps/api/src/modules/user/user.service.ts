@@ -171,8 +171,10 @@ export class UserService {
             tagLine: true,
             tier: true,
             rank: true,
+            lp: true,
             peakTier: true,
             peakRank: true,
+            peakLp: true,
             mainRole: true,
             subRole: true,
             championPreferences: {
