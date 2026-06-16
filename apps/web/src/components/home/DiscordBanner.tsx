@@ -132,7 +132,7 @@ export function DiscordBanner() {
         </div>
 
         {/* 중앙 — 멘트 */}
-        <div className="flex-1 text-center md:text-left">
+        <div className="md:flex-1 text-center md:text-left">
           {/* 타이틀 — 모바일에서 폰트 축소 */}
           <p
             className="text-base sm:text-xl md:text-3xl font-bold text-white mb-1.5 md:mb-2 transition-all duration-500 ease-out"

@@ -86,8 +86,8 @@ export function StatsBanner({ isActive = true }: { isActive?: boolean }) {
     >
       {/* ── 배경: 좌우 분할 (좌 60% 어두운 인디고, 우 40% 약간 밝은 인디고) ── */}
       <div className="absolute inset-0 flex">
-        <div className="w-[60%]" style={{ background: BG_LEFT }} />
-        <div className="w-[40%]" style={{ background: BG_RIGHT }} />
+        <div className="w-full md:w-[60%]" style={{ background: BG_LEFT }} />
+        <div className="hidden md:block w-[40%]" style={{ background: BG_RIGHT }} />
       </div>
 
       {/* 좌측 배경 장식 — 미니 차트 실루엣 (우측 하단, 희미하게) */}
@@ -155,7 +155,7 @@ export function StatsBanner({ isActive = true }: { isActive?: boolean }) {
 
         {/* ── 좌측 60% — 타이틀 영역 ── */}
         {/* 좌측 — 타이틀 영역 (모바일: 전체 너비, 패딩 축소) */}
-        <div className="w-full md:w-[60%] flex flex-col justify-center px-[5%] py-[5%] md:px-[7%] flex-1 md:flex-none">
+        <div className="w-full md:w-[60%] flex flex-col justify-center px-[5%] py-[5%] md:px-[7%] h-full md:h-auto">
           {/* UPDATE 뱃지 */}
           <span
             className="inline-block w-fit px-3 py-1 rounded-full text-[11px] font-bold tracking-wider mb-1.5 md:mb-3"
