@@ -19,7 +19,7 @@ const ROOT = path.resolve(__dirname, "../..");
 const VALID_COUNTS = [10, 15, 20, 30, 40];
 
 // 테스트 대상 팀 모드
-const TEAM_MODES = ["AUTO_BALANCE", "SNAKE_DRAFT", "AUCTION", "MANUAL_TEAM"];
+const TEAM_MODES = ["AUTO_BALANCE", "SNAKE_DRAFT", "AUCTION"];
 
 // AUTO_BALANCE만 역할선택~RPS 풀 플로우를 지원함
 const FULL_FLOW_MODES = new Set(["AUTO_BALANCE"]);
@@ -111,6 +111,7 @@ const config = {
   ),
   keepRooms: hasFlag("keep-rooms") || process.env.KEEP_ROOMS === "1",
   skipRps: hasFlag("skip-rps") || process.env.SKIP_RPS === "1",
+  skipStart: hasFlag("skip-start") || process.env.SKIP_START === "1",
 };
 
 function parseRoomsCount(raw) {
@@ -449,7 +450,7 @@ async function runRoom(prisma, roomIndex, botSlotOffset, teamMode, count, iterat
       method: "POST",
       token: host.token,
       body: {
-        name: `[concurrent-load] ${label} ${new Date().toISOString()}`,
+        name: `[cl] r${roomIndex + 1} ${teamMode.slice(0,4)} ${count}p #${iteration}`,
         maxParticipants: count,
         teamMode,
         bracketFormat,
@@ -464,6 +465,20 @@ async function runRoom(prisma, roomIndex, botSlotOffset, teamMode, count, iterat
 
     await readyAll(roomId, users, roomSockets, metrics);
     console.log(`  [${label}] 전원 준비 완료`);
+
+    if (config.skipStart) {
+      return {
+        ok: true,
+        label,
+        roomId,
+        teamMode,
+        count,
+        isFullFlow: false,
+        totalMs: Date.now() - startedAt,
+        startGameMs: 0,
+        metrics,
+      };
+    }
 
     const startGameAt = Date.now();
     await emitAck(roomSockets[0], "start-game", { roomId }, 25000);
