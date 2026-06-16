@@ -301,15 +301,9 @@ function HoverCardPreview({ p }: { p: typeof MOCK_PROFILES[number] }) {
 
           {/* 이름 + 클랜 + 티어 */}
           <div className="min-w-0 flex-1 pt-0.5">
-            <p className="truncate text-sm font-black leading-tight text-white">
-              {hasRiot ? (
-                <>{p.gameName}<span className="font-medium text-zinc-600"> #{p.tagLine}</span></>
-              ) : p.username}
-            </p>
-
-            {/* @유저네임 + 클랜 태그 */}
-            <div className="mt-0.5 flex items-center gap-1.5">
-              <p className="text-[11px] text-zinc-500">@{p.username}</p>
+            {/* 디스코드 닉네임 (메인) + 클랜 태그 */}
+            <div className="flex items-center gap-1.5">
+              <p className="truncate text-sm font-black leading-tight text-white">{p.username}</p>
               {p.clan?.tag && (
                 <span
                   className="shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-black leading-none"
@@ -319,6 +313,13 @@ function HoverCardPreview({ p }: { p: typeof MOCK_PROFILES[number] }) {
                 </span>
               )}
             </div>
+
+            {/* 롤 닉네임 (서브) */}
+            {hasRiot && (
+              <p className="mt-0.5 text-[11px] text-zinc-500">
+                {p.gameName}<span className="text-zinc-600"> #{p.tagLine}</span>
+              </p>
+            )}
 
             {/* 현재 티어 */}
             {hasTier && (
