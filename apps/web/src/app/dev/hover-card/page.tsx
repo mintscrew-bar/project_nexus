@@ -126,21 +126,7 @@ const MOCK_PROFILES: Array<{
   },
 ];
 
-function getTierTheme(tier?: string | null): { accent: string } {
-  switch (tier) {
-    case "CHALLENGER":  return { accent: "#F59E0B" };
-    case "GRANDMASTER": return { accent: "#F43F5E" };
-    case "MASTER":      return { accent: "#A855F7" };
-    case "DIAMOND":     return { accent: "#22D3EE" };
-    case "PLATINUM":    return { accent: "#2DD4BF" };
-    case "EMERALD":     return { accent: "#10B981" };
-    case "GOLD":        return { accent: "#F59E0B" };
-    case "SILVER":      return { accent: "#94A3B8" };
-    case "BRONZE":      return { accent: "#F97316" };
-    case "IRON":        return { accent: "#78716C" };
-    default:            return { accent: "#6366F1" };
-  }
-}
+const ACCENT = "#667EEA";
 
 function formatOne(value: number) {
   return value.toFixed(1).replace(/\.0$/, "");
@@ -258,7 +244,6 @@ function RatingStars({ value }: { value: number }) {
 }
 
 function HoverCardPreview({ p }: { p: typeof MOCK_PROFILES[number] }) {
-  const theme = getTierTheme(p.tier);
   const hasRiot = !!p.gameName;
   const hasChampions = p.champions.length > 0;
   const isApexTier = p.tier && ["MASTER", "GRANDMASTER", "CHALLENGER"].includes(p.tier);
@@ -278,8 +263,8 @@ function HoverCardPreview({ p }: { p: typeof MOCK_PROFILES[number] }) {
     <div
       className="w-[300px] overflow-hidden rounded-[18px] bg-[#101010] text-white shadow-[0_32px_70px_rgba(0,0,0,0.82)]"
       style={{
-        border: `1px solid ${theme.accent}66`,
-        boxShadow: `0 32px 70px rgba(0,0,0,0.82), 0 0 0 1px ${theme.accent}18`,
+        border: `1px solid ${ACCENT}66`,
+        boxShadow: `0 32px 70px rgba(0,0,0,0.82), 0 0 0 1px ${ACCENT}18`,
       }}
     >
       {/* 헤더 */}
@@ -288,7 +273,7 @@ function HoverCardPreview({ p }: { p: typeof MOCK_PROFILES[number] }) {
           {/* 아바타 원형 + 티어 링 */}
           <div
             className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-full bg-[#171717]"
-            style={{ border: `2px solid ${hasTier ? theme.accent + "88" : "rgba(255,255,255,0.14)"}` }}
+            style={{ border: `2px solid ${hasTier ? ACCENT + "88" : "rgba(255,255,255,0.14)"}` }}
           >
             {p.avatar ? (
               <Image src={p.avatar} alt={p.username} fill className="object-cover" unoptimized />
@@ -307,7 +292,7 @@ function HoverCardPreview({ p }: { p: typeof MOCK_PROFILES[number] }) {
               {p.clan?.tag && (
                 <span
                   className="shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-black leading-none"
-                  style={{ color: theme.accent, backgroundColor: `${theme.accent}22` }}
+                  style={{ color: ACCENT, backgroundColor: `${ACCENT}22` }}
                 >
                   {p.clan.tag}
                 </span>
@@ -324,7 +309,7 @@ function HoverCardPreview({ p }: { p: typeof MOCK_PROFILES[number] }) {
             {/* 현재 티어 */}
             {hasTier && (
               <div className="mt-1.5 flex items-center gap-1.5">
-                <span className="text-sm font-black" style={{ color: theme.accent }}>
+                <span className="text-sm font-black" style={{ color: ACCENT }}>
                   {TIER_KO[p.tier!] ?? p.tier}
                   {!isApexTier && p.rank ? ` ${p.rank}` : ""}
                 </span>
@@ -410,7 +395,7 @@ function HoverCardPreview({ p }: { p: typeof MOCK_PROFILES[number] }) {
         <button
           type="button"
           className="group flex w-full items-center justify-center gap-1.5 rounded-xl py-3 text-xs font-black text-white transition-all hover:brightness-110"
-          style={{ background: `linear-gradient(135deg, ${theme.accent}CC, ${theme.accent}88)` }}
+          style={{ background: `linear-gradient(135deg, ${ACCENT}CC, ${ACCENT}88)` }}
         >
           프로필 보기
           <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />

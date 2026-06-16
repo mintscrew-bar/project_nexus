@@ -15,21 +15,7 @@ interface PlayerHoverCardProps {
   onMouseLeave: () => void;
 }
 
-function getTierTheme(tier?: string | null): { accent: string } {
-  switch (tier) {
-    case "CHALLENGER":  return { accent: "#F59E0B" };
-    case "GRANDMASTER": return { accent: "#F43F5E" };
-    case "MASTER":      return { accent: "#A855F7" };
-    case "DIAMOND":     return { accent: "#22D3EE" };
-    case "PLATINUM":    return { accent: "#2DD4BF" };
-    case "EMERALD":     return { accent: "#10B981" };
-    case "GOLD":        return { accent: "#F59E0B" };
-    case "SILVER":      return { accent: "#94A3B8" };
-    case "BRONZE":      return { accent: "#F97316" };
-    case "IRON":        return { accent: "#78716C" };
-    default:            return { accent: "#6366F1" };
-  }
-}
+const ACCENT = "#667EEA"; // 사이트 메인 accent (로고 인디고)
 
 const TIER_KO: Record<string, string> = {
   CHALLENGER: "챌린저", GRANDMASTER: "그랜드마스터", MASTER: "마스터",
@@ -200,7 +186,6 @@ export function PlayerHoverCard({ userId, anchorRect, onOpenProfile, onMouseEnte
 
   const isActualBot = data ? /^testbot_\d+$/.test(data.username) : false;
   const riot = data?.riotAccount ?? null;
-  const theme = getTierTheme(riot?.tier);
 
   const champions = [...(riot?.championPreferences ?? [])].sort((a, b) => a.order - b.order);
   const mainRole = riot?.mainRole ?? null;
@@ -229,8 +214,8 @@ export function PlayerHoverCard({ userId, anchorRect, onOpenProfile, onMouseEnte
       className="fixed z-[9999] max-h-[calc(100vh-16px)] overflow-y-auto rounded-[18px] bg-[#101010] text-white shadow-[0_32px_70px_rgba(0,0,0,0.82)] animate-fade-in"
       style={{
         left, top, width: TOOLTIP_W,
-        border: `1px solid ${theme.accent}66`,
-        boxShadow: `0 32px 70px rgba(0,0,0,0.82), 0 0 0 1px ${theme.accent}18`,
+        border: `1px solid ${ACCENT}66`,
+        boxShadow: `0 32px 70px rgba(0,0,0,0.82), 0 0 0 1px ${ACCENT}18`,
       }}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
@@ -246,7 +231,7 @@ export function PlayerHoverCard({ userId, anchorRect, onOpenProfile, onMouseEnte
               {/* 아바타 — 원형 + 티어 링 */}
               <div
                 className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-full bg-[#171717]"
-                style={{ border: `2px solid ${hasTier ? theme.accent + "88" : "rgba(255,255,255,0.14)"}` }}
+                style={{ border: `2px solid ${hasTier ? ACCENT + "88" : "rgba(255,255,255,0.14)"}` }}
               >
                 {data.avatar ? (
                   <Image src={data.avatar} alt={data.username} fill className="object-cover" unoptimized />
@@ -265,7 +250,7 @@ export function PlayerHoverCard({ userId, anchorRect, onOpenProfile, onMouseEnte
                   {data.clan?.tag && (
                     <span
                       className="shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-black leading-none"
-                      style={{ color: theme.accent, backgroundColor: `${theme.accent}22` }}
+                      style={{ color: ACCENT, backgroundColor: `${ACCENT}22` }}
                     >
                       {data.clan.tag}
                     </span>
@@ -282,7 +267,7 @@ export function PlayerHoverCard({ userId, anchorRect, onOpenProfile, onMouseEnte
                 {/* 현재 티어 */}
                 {hasTier && (
                   <div className="mt-1.5 flex items-center gap-1.5">
-                    <span className="text-sm font-black" style={{ color: theme.accent }}>
+                    <span className="text-sm font-black" style={{ color: ACCENT }}>
                       {TIER_KO[riot!.tier] ?? riot!.tier}
                       {!isApexTier && riot?.rank ? ` ${riot.rank}` : ""}
                     </span>
@@ -380,7 +365,7 @@ export function PlayerHoverCard({ userId, anchorRect, onOpenProfile, onMouseEnte
                 type="button"
                 onClick={() => onOpenProfile(userId)}
                 className="group flex w-full items-center justify-center gap-1.5 rounded-xl py-3 text-xs font-black text-white transition-all hover:brightness-110"
-                style={{ background: `linear-gradient(135deg, ${theme.accent}CC, ${theme.accent}88)` }}
+                style={{ background: `linear-gradient(135deg, ${ACCENT}CC, ${ACCENT}88)` }}
               >
                 프로필 보기
                 <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
