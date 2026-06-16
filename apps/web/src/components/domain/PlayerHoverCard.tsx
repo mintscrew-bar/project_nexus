@@ -17,6 +17,12 @@ interface PlayerHoverCardProps {
 
 const ACCENT = "#667EEA"; // 사이트 메인 accent (로고 인디고)
 
+const TIER_COLOR: Record<string, string> = {
+  CHALLENGER: "#F59E0B", GRANDMASTER: "#F43F5E", MASTER: "#A855F7",
+  DIAMOND: "#22D3EE", PLATINUM: "#2DD4BF", EMERALD: "#10B981",
+  GOLD: "#EAB308", SILVER: "#94A3B8", BRONZE: "#F97316", IRON: "#78716C",
+};
+
 const TIER_KO: Record<string, string> = {
   CHALLENGER: "챌린저", GRANDMASTER: "그랜드마스터", MASTER: "마스터",
   DIAMOND: "다이아몬드", PLATINUM: "플래티넘", EMERALD: "에메랄드",
@@ -267,7 +273,7 @@ export function PlayerHoverCard({ userId, anchorRect, onOpenProfile, onMouseEnte
                 {/* 현재 티어 */}
                 {hasTier && (
                   <div className="mt-1.5 flex items-center gap-1.5">
-                    <span className="text-sm font-black" style={{ color: ACCENT }}>
+                    <span className="text-sm font-black" style={{ color: TIER_COLOR[riot!.tier] ?? ACCENT }}>
                       {TIER_KO[riot!.tier] ?? riot!.tier}
                       {!isApexTier && riot?.rank ? ` ${riot.rank}` : ""}
                     </span>

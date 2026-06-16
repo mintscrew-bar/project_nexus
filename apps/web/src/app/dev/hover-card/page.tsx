@@ -128,6 +128,12 @@ const MOCK_PROFILES: Array<{
 
 const ACCENT = "#667EEA";
 
+const TIER_COLOR: Record<string, string> = {
+  CHALLENGER: "#F59E0B", GRANDMASTER: "#F43F5E", MASTER: "#A855F7",
+  DIAMOND: "#22D3EE", PLATINUM: "#2DD4BF", EMERALD: "#10B981",
+  GOLD: "#EAB308", SILVER: "#94A3B8", BRONZE: "#F97316", IRON: "#78716C",
+};
+
 function formatOne(value: number) {
   return value.toFixed(1).replace(/\.0$/, "");
 }
@@ -309,7 +315,7 @@ function HoverCardPreview({ p }: { p: typeof MOCK_PROFILES[number] }) {
             {/* 현재 티어 */}
             {hasTier && (
               <div className="mt-1.5 flex items-center gap-1.5">
-                <span className="text-sm font-black" style={{ color: ACCENT }}>
+                <span className="text-sm font-black" style={{ color: TIER_COLOR[p.tier!] ?? ACCENT }}>
                   {TIER_KO[p.tier!] ?? p.tier}
                   {!isApexTier && p.rank ? ` ${p.rank}` : ""}
                 </span>
