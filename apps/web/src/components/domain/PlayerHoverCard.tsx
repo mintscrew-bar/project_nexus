@@ -292,20 +292,6 @@ export function PlayerHoverCard({ userId, anchorRect, onOpenProfile, onMouseEnte
           </div>
 
           <div className="space-y-2.5 px-4 pb-4">
-            {/* ── 승률 / KDA / 신뢰도 ── */}
-            {!isActualBot && (
-              <div className="space-y-2">
-                <div className="grid grid-cols-2 gap-2">
-                  <WinRateStatCard wins={data.stats.wins} losses={data.stats.losses} />
-                  <KdaStatCard kda={data.kda} />
-                </div>
-                <ReputationStatCard
-                  value={data.reputation.overallAverage}
-                  count={data.reputation.totalRatings}
-                />
-              </div>
-            )}
-
             {/* ── 선호 라인 ── */}
             {(mainRole || subRole) && (
               <div className="flex items-center gap-2">
@@ -323,6 +309,14 @@ export function PlayerHoverCard({ userId, anchorRect, onOpenProfile, onMouseEnte
                     <span className="rounded bg-[#262626] px-1 text-[9px] font-black text-zinc-600">부</span>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* ── 승률 / KDA ── */}
+            {!isActualBot && (
+              <div className="grid grid-cols-2 gap-2">
+                <WinRateStatCard wins={data.stats.wins} losses={data.stats.losses} />
+                <KdaStatCard kda={data.kda} />
               </div>
             )}
 
@@ -353,6 +347,14 @@ export function PlayerHoverCard({ userId, anchorRect, onOpenProfile, onMouseEnte
                   })}
                 </div>
               </div>
+            )}
+
+            {/* ── 신뢰도 ── */}
+            {!isActualBot && (
+              <ReputationStatCard
+                value={data.reputation.overallAverage}
+                count={data.reputation.totalRatings}
+              />
             )}
 
             {!riot && (

@@ -334,15 +334,6 @@ function HoverCardPreview({ p }: { p: typeof MOCK_PROFILES[number] }) {
       </div>
 
       <div className="px-4 pb-4 space-y-2.5">
-        {/* 승률 / KDA / 신뢰도 */}
-        <div className="space-y-2">
-          <div className="grid grid-cols-2 gap-2">
-            <WinRateStatCard wins={p.wins} losses={p.losses} />
-            <KdaStatCard kda={p.kda} />
-          </div>
-          <ReputationStatCard value={p.rating} count={p.ratingCount} />
-        </div>
-
         {/* 선호 라인 */}
         {(p.mainRole || p.subRole) && (
           <div className="flex items-center gap-2">
@@ -362,6 +353,12 @@ function HoverCardPreview({ p }: { p: typeof MOCK_PROFILES[number] }) {
             )}
           </div>
         )}
+
+        {/* 승률 / KDA */}
+        <div className="grid grid-cols-2 gap-2">
+          <WinRateStatCard wins={p.wins} losses={p.losses} />
+          <KdaStatCard kda={p.kda} />
+        </div>
 
         {/* 선호 챔피언 */}
         {hasChampions && (
@@ -387,6 +384,9 @@ function HoverCardPreview({ p }: { p: typeof MOCK_PROFILES[number] }) {
             </div>
           </div>
         )}
+
+        {/* 신뢰도 */}
+        <ReputationStatCard value={p.rating} count={p.ratingCount} />
 
         {!hasRiot && (
           <p className="text-xs italic text-zinc-500">등록된 라이엇 계정이 없습니다</p>
