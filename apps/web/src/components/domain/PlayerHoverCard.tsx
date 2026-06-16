@@ -142,10 +142,20 @@ export function PlayerHoverCard({ userId, anchorRect, onOpenProfile, onMouseEnte
               <div className="min-w-0 flex-1">
                 {riot ? (
                   <>
-                    <p className="truncate text-sm font-bold leading-tight text-text-primary">
-                      {riot.gameName}
-                      <span className="font-normal text-text-muted">#{riot.tagLine}</span>
-                    </p>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <p className="truncate text-sm font-bold leading-tight text-text-primary">
+                        {riot.gameName}
+                        <span className="font-normal text-text-muted">#{riot.tagLine}</span>
+                      </p>
+                      {data.clan?.tag && (
+                        <span
+                          className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold leading-none"
+                          style={{ color: theme.accent, backgroundColor: `${theme.accent}22` }}
+                        >
+                          {data.clan.tag}
+                        </span>
+                      )}
+                    </div>
                     <p className="mt-0.5 truncate text-[11px] text-text-tertiary">@{data.username}</p>
                   </>
                 ) : (
@@ -154,7 +164,7 @@ export function PlayerHoverCard({ userId, anchorRect, onOpenProfile, onMouseEnte
               </div>
             </div>
 
-            {/* 전적 + 신뢰도 + 클랜 */}
+            {/* 전적 + 신뢰도 */}
             {!isActualBot && (
               <div className="mb-3 space-y-2.5 rounded-xl bg-bg-secondary p-3">
                 <WinRateBar wins={data.stats.wins} losses={data.stats.losses} />
@@ -167,16 +177,8 @@ export function PlayerHoverCard({ userId, anchorRect, onOpenProfile, onMouseEnte
                       <span className="text-text-muted">({data.reputation.totalRatings})</span>
                     </span>
                   </div>
-              )}
-              {data.clan && (
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-text-tertiary">클랜</span>
-                  <span className="truncate text-xs font-medium" style={{ color: theme.accent }}>
-                    {data.clan.tag ? `[${data.clan.tag}] ` : ""}{data.clan.name}
-                  </span>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
             )}
 
             {/* 포지션 */}
