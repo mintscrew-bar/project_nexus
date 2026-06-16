@@ -239,7 +239,7 @@ function BannerCarousel() {
   return (
     // 고정 높이로 모든 슬라이드 크기 통일 — 모바일부터 데스크톱까지 반응형
     <div
-      className="relative h-[430px] sm:h-[430px] md:h-[420px] lg:h-[400px] xl:h-[380px] rounded-2xl overflow-hidden"
+      className="relative w-full aspect-video max-h-[430px] rounded-2xl overflow-hidden"
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
