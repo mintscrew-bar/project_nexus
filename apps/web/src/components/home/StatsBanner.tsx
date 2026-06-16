@@ -155,7 +155,7 @@ export function StatsBanner({ isActive = true }: { isActive?: boolean }) {
 
         {/* ── 좌측 60% — 타이틀 영역 ── */}
         {/* 좌측 — 타이틀 영역 (모바일: 전체 너비, 패딩 축소) */}
-        <div className="w-full md:w-[60%] flex flex-col justify-center px-4 md:px-10 py-3 md:py-10">
+        <div className="w-full md:w-[60%] flex flex-col justify-center px-[5%] py-[5%] md:px-[7%]">
           {/* UPDATE 뱃지 */}
           <span
             className="inline-block w-fit px-3 py-1 rounded-full text-[11px] font-bold tracking-wider mb-1.5 md:mb-3"
@@ -205,7 +205,7 @@ export function StatsBanner({ isActive = true }: { isActive?: boolean }) {
         </div>
 
         {/* ── 우측 — 스탯 패널 (모바일에서 숨김) ── */}
-        <div className="hidden md:flex w-full md:w-[40%] flex-col justify-center px-5 md:px-8 py-5 md:py-10">
+        <div className="hidden md:flex w-full md:w-[40%] flex-col justify-center px-[4%] py-[5%] md:px-[6%]">
           {/* 시즌 헤더 */}
           <p className="text-[10px] text-white/30 tracking-wider font-bold mb-4 uppercase">
             이번 시즌
