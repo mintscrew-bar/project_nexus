@@ -31,6 +31,7 @@ const MOCK_PROFILES: Array<{
   champions: Array<{ role: string; ids: string[] }>;
   wins: number;
   losses: number;
+  kda: { kills: number; deaths: number; assists: number } | null;
   rating: number;
   ratingCount: number;
   clan: { tag: string; name: string } | null;
@@ -54,6 +55,7 @@ const MOCK_PROFILES: Array<{
     ],
     wins: 48,
     losses: 39,
+    kda: { kills: 5.2, deaths: 3.1, assists: 7.8 },
     rating: 4.2,
     ratingCount: 17,
     clan: { tag: "NXS", name: "Nexus 공식" },
@@ -77,6 +79,7 @@ const MOCK_PROFILES: Array<{
     ],
     wins: 102,
     losses: 98,
+    kda: { kills: 3.8, deaths: 4.2, assists: 6.1 },
     rating: 3.8,
     ratingCount: 42,
     clan: null,
@@ -98,6 +101,7 @@ const MOCK_PROFILES: Array<{
     ],
     wins: 312,
     losses: 198,
+    kda: { kills: 8.1, deaths: 2.3, assists: 9.4 },
     rating: 5,
     ratingCount: 289,
     clan: { tag: "T1", name: "T1 공식" },
@@ -115,6 +119,7 @@ const MOCK_PROFILES: Array<{
     champions: [],
     wins: 0,
     losses: 0,
+    kda: null,
     rating: 0,
     ratingCount: 0,
     clan: null,
@@ -296,9 +301,21 @@ function HoverCardPreview({ p }: { p: typeof MOCK_PROFILES[number] }) {
           </div>
         )}
 
-        {/* 전적 + 신뢰도 */}
+        {/* 전적 + KDA + 신뢰도 */}
         <div className="rounded-xl bg-bg-secondary p-3 space-y-2">
-          <WinRateBar wins={p.wins} losses={p.losses} />
+          <div className="flex items-center gap-3">
+            <div className="flex-1">
+              <WinRateBar wins={p.wins} losses={p.losses} />
+            </div>
+            {p.kda && (
+              <div className="shrink-0 text-right">
+                <p className="text-sm font-bold text-text-primary">
+                  {p.kda.kills} / <span className="text-rose-400">{p.kda.deaths}</span> / {p.kda.assists}
+                </p>
+                <p className="text-[10px] text-text-muted">평균 KDA</p>
+              </div>
+            )}
+          </div>
           {p.ratingCount > 0 && (
             <div className="flex items-center justify-between">
               <span className="text-xs text-text-tertiary">신뢰도</span>

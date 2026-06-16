@@ -493,6 +493,7 @@ export const userApi = {
     } | null;
     clan: { name: string; tag: string | null } | null;
     stats: { wins: number; losses: number; winRate: number };
+    kda: { kills: number; deaths: number; assists: number; games: number } | null;
     reputation: { overallAverage: number; totalRatings: number };
   }> => {
     const response = await apiClient.get(`/users/${userId}/hover-profile`);

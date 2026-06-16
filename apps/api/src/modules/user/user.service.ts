@@ -194,13 +194,30 @@ export class UserService {
 
     if (!user) throw new NotFoundException("User not found");
 
-    const [stats, reputation] = await Promise.all([
+    const [stats, reputation, kdaAgg] = await Promise.all([
       this.getUserStats(userId),
       this.reputationService.getUserReputationStats(userId),
+      // 내전 참여 기록(teamId 있는 것)에서 KDA 집계
+      this.prisma.matchParticipant.aggregate({
+        where: { userId, teamId: { not: null } },
+        _avg: { kills: true, deaths: true, assists: true },
+        _count: { id: true },
+      }),
     ]);
 
     const riot = user.riotAccounts[0] ?? null;
     const clan = user.clanMemberships[0]?.clan ?? null;
+
+    const kdaGames = kdaAgg._count.id;
+    const kda =
+      kdaGames > 0
+        ? {
+            kills: Math.round((kdaAgg._avg.kills ?? 0) * 10) / 10,
+            deaths: Math.round((kdaAgg._avg.deaths ?? 0) * 10) / 10,
+            assists: Math.round((kdaAgg._avg.assists ?? 0) * 10) / 10,
+            games: kdaGames,
+          }
+        : null;
 
     return {
       username: user.username,
@@ -212,6 +229,7 @@ export class UserService {
         losses: stats.losses,
         winRate: stats.winRate,
       },
+      kda,
       reputation: {
         overallAverage: reputation.overallAverage,
         totalRatings: reputation.totalRatings,

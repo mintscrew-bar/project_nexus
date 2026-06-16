@@ -257,10 +257,22 @@ export function PlayerHoverCard({ userId, anchorRect, onOpenProfile, onMouseEnte
               </div>
             )}
 
-            {/* ── 전적 + 신뢰도 ── */}
+            {/* ── 전적 + KDA + 신뢰도 ── */}
             {!isActualBot && (
               <div className="rounded-xl bg-bg-secondary p-3 space-y-2">
-                <WinRateBar wins={data.stats.wins} losses={data.stats.losses} />
+                <div className="flex items-center gap-3">
+                  <div className="flex-1">
+                    <WinRateBar wins={data.stats.wins} losses={data.stats.losses} />
+                  </div>
+                  {data.kda && (
+                    <div className="shrink-0 text-right">
+                      <p className="text-sm font-bold text-text-primary">
+                        {data.kda.kills} / <span className="text-rose-400">{data.kda.deaths}</span> / {data.kda.assists}
+                      </p>
+                      <p className="text-[10px] text-text-muted">평균 KDA</p>
+                    </div>
+                  )}
+                </div>
                 {data.reputation.totalRatings > 0 && (
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-text-tertiary">신뢰도</span>
