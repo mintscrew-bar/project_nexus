@@ -110,7 +110,7 @@ export function DiscordBanner() {
       {/* 메인 컨텐츠 */}
       <div
         ref={containerRef}
-        className="relative z-10 flex flex-col md:flex-row items-center gap-2 md:gap-10 h-full py-[5%] px-[5%] md:px-[8%]"
+        className="relative z-10 flex flex-col md:flex-row items-center justify-center md:justify-start gap-2 md:gap-10 h-full py-[5%] px-[5%] md:px-[8%]"
       >
         {/* 왼쪽 — Nexus 로고 (모바일에서 숨김 — 높이 180px에서 공간 부족) */}
         <div

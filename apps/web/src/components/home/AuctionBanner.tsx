@@ -149,7 +149,7 @@ export function AuctionBanner({ isActive = true }: { isActive?: boolean }) {
       <div className="relative z-10 flex flex-col md:flex-row h-full">
 
         {/* ── 좌측 — DRAFT 뱃지 + 큰 후크 + 입찰가 (모바일: 전체 너비) ── */}
-        <div className="flex flex-col justify-center px-[5%] py-[5%] md:px-[6%] w-full md:w-[54%] shrink-0">
+        <div className="flex flex-col justify-center px-[5%] py-[5%] md:px-[6%] w-full md:w-[54%] flex-1 md:flex-none">
           {/* DRAFT 뱃지 */}
           <span
             className="inline-block w-fit px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider mb-2 md:mb-2.5"

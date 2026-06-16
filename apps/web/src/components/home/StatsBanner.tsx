@@ -155,7 +155,7 @@ export function StatsBanner({ isActive = true }: { isActive?: boolean }) {
 
         {/* ── 좌측 60% — 타이틀 영역 ── */}
         {/* 좌측 — 타이틀 영역 (모바일: 전체 너비, 패딩 축소) */}
-        <div className="w-full md:w-[60%] flex flex-col justify-center px-[5%] py-[5%] md:px-[7%]">
+        <div className="w-full md:w-[60%] flex flex-col justify-center px-[5%] py-[5%] md:px-[7%] flex-1 md:flex-none">
           {/* UPDATE 뱃지 */}
           <span
             className="inline-block w-fit px-3 py-1 rounded-full text-[11px] font-bold tracking-wider mb-1.5 md:mb-3"
