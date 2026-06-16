@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { HeroBanner } from "@/components/home/HeroBanner";
-import { DiscordBanner } from "@/components/home/DiscordBanner";
+import { LandingBannerCarousel } from "@/components/home/LandingBannerCarousel";
 import { AdSlotCard } from "@/components/ads/AdSlot";
 
 const featureCards: Array<{
@@ -133,10 +133,10 @@ const landingNavLinks = [
 export function LandingContentSections() {
   return (
     <>
-      {/* Discord 배너 */}
+      {/* 배너 캐러셀 */}
       <section className="px-6 py-6">
-        <div className="max-w-6xl mx-auto">
-          <DiscordBanner />
+        <div className="mx-auto max-w-6xl">
+          <LandingBannerCarousel />
         </div>
       </section>
 

@@ -9,6 +9,7 @@ import { useRiotStore, type RiotAccount } from "@/stores/riot-store";
 import { DiscordBanner } from "@/components/home/DiscordBanner";
 import { AuctionBanner } from "@/components/home/AuctionBanner";
 import { StatsBanner } from "@/components/home/StatsBanner";
+import { CreatorBanner } from "@/components/home/CreatorBanner";
 import { userApi, roomApi, communityApi, statsApi } from "@/lib/api-client";
 import { Card, CardContent, Button, Skeleton, ErrorBoundary } from "@/components/ui";
 import { TierBadge } from "@/components/domain/TierBadge";
@@ -169,7 +170,7 @@ function GlassCard({
 // ─────────────────────────────────────────────────────────────────────────────
 
 // 배너 슬라이드 총 개수 — 각각 전용 컴포넌트로 렌더링
-const TOTAL_SLIDES = 3;
+const TOTAL_SLIDES = 4;
 
 function BannerCarousel() {
   const [current, setCurrent] = useState(0);
@@ -224,15 +225,21 @@ function BannerCarousel() {
   // 슬라이드 목록 — 모든 슬라이드를 렌더링하되 현재만 보이게 (페이드 전환)
   // isActive prop으로 활성 슬라이드에서만 애니메이션 시작
   const slides = [
-    <AuctionBanner key="auction" isActive={current === 0} />,
-    <StatsBanner key="stats" isActive={current === 1} />,
+    <CreatorBanner
+      key="creator"
+      className="h-full aspect-auto"
+      isActive={current === 0}
+      priority
+    />,
+    <AuctionBanner key="auction" isActive={current === 1} />,
+    <StatsBanner key="stats" isActive={current === 2} />,
     <DiscordBanner key="discord" />,
   ];
 
   return (
     // 고정 높이로 모든 슬라이드 크기 통일 — 모바일부터 데스크톱까지 반응형
     <div
-      className="relative h-[220px] sm:h-[250px] md:h-[300px] lg:h-[320px] rounded-2xl overflow-hidden"
+      className="relative h-[430px] sm:h-[430px] md:h-[420px] lg:h-[400px] xl:h-[380px] rounded-2xl overflow-hidden"
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
@@ -281,7 +288,7 @@ function BannerCarousel() {
             <span
               className={cn(
                 "block rounded-full transition-all duration-500",
-                i === current ? "h-1.5 w-6 bg-white" : "h-1.5 w-1.5 bg-white/30"
+                i === current ? "h-1.5 w-6 bg-violet-500" : "h-1.5 w-1.5 bg-white/50"
               )}
             />
           </button>
