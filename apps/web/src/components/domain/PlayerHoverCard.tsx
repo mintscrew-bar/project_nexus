@@ -145,31 +145,16 @@ export function PlayerHoverCard({ userId, anchorRect, onOpenProfile, onMouseEnte
           <div className="px-4 pt-4 pb-3">
             <div className="flex items-start gap-3">
 
-              {/* 아바타 — 원형 + 티어 링 + 디비전 배지 */}
-              <div className="relative flex-shrink-0">
-                <div
-                  className="relative h-16 w-16 overflow-hidden rounded-full"
-                  style={{ border: `2px solid ${hasTier ? theme.accent + "70" : "rgba(255,255,255,0.1)"}` }}
-                >
-                  {data.avatar ? (
-                    <Image src={data.avatar} alt={data.username} fill className="object-cover" unoptimized />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center bg-bg-tertiary">
-                      <Users className="h-8 w-8 text-text-tertiary" />
-                    </div>
-                  )}
-                </div>
-                {/* 디비전 배지 (마스터 이하만) */}
-                {hasTier && !isApexTier && riot?.rank && (
-                  <div
-                    className="absolute -bottom-1 left-1/2 -translate-x-1/2 rounded-full px-1.5 py-px text-[9px] font-bold leading-none"
-                    style={{
-                      color: theme.accent,
-                      backgroundColor: "var(--color-bg-elevated)",
-                      border: `1px solid ${theme.accent}50`,
-                    }}
-                  >
-                    {riot.rank}
+              {/* 아바타 — 원형 + 티어 링 */}
+              <div
+                className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-full"
+                style={{ border: `2px solid ${hasTier ? theme.accent + "70" : "rgba(255,255,255,0.1)"}` }}
+              >
+                {data.avatar ? (
+                  <Image src={data.avatar} alt={data.username} fill className="object-cover" unoptimized />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center bg-bg-tertiary">
+                    <Users className="h-8 w-8 text-text-tertiary" />
                   </div>
                 )}
               </div>
@@ -195,23 +180,27 @@ export function PlayerHoverCard({ userId, anchorRect, onOpenProfile, onMouseEnte
 
                 <p className="mt-0.5 text-[11px] text-text-tertiary">@{data.username}</p>
 
-                {/* 티어 인라인 */}
+                {/* 현재 티어 */}
                 {hasTier && (
                   <div className="mt-1.5 flex items-center gap-1.5">
-                    <span className="text-xs font-bold" style={{ color: theme.accent }}>
+                    <span className="text-sm font-bold" style={{ color: theme.accent }}>
                       {TIER_KO[riot!.tier] ?? riot!.tier}
                       {!isApexTier && riot?.rank ? ` ${riot.rank}` : ""}
                     </span>
-                    <span className="text-[11px] text-text-muted">
-                      {riot?.lp != null ? `${riot.lp} LP` : ""}
-                    </span>
-                    {riot?.peakTier && riot.peakTier !== riot.tier && (
-                      <span className="text-[10px] text-text-muted/60">
-                        · 최고 {TIER_KO[riot.peakTier] ?? riot.peakTier}
-                        {riot.peakRank && !["MASTER","GRANDMASTER","CHALLENGER"].includes(riot.peakTier) ? ` ${riot.peakRank}` : ""}
-                        {riot.peakLp != null && ["MASTER","GRANDMASTER","CHALLENGER"].includes(riot.peakTier) ? ` ${riot.peakLp}LP` : ""}
-                      </span>
+                    {riot?.lp != null && (
+                      <span className="text-xs font-semibold text-text-secondary">{riot.lp} LP</span>
                     )}
+                  </div>
+                )}
+                {/* 최고 티어 */}
+                {riot?.peakTier && riot.peakTier !== "UNRANKED" && (
+                  <div className="mt-0.5 flex items-center gap-1">
+                    <span className="text-[10px] text-text-muted">최고</span>
+                    <span className="text-[11px] font-semibold text-text-secondary">
+                      {TIER_KO[riot.peakTier] ?? riot.peakTier}
+                      {riot.peakRank && !["MASTER","GRANDMASTER","CHALLENGER"].includes(riot.peakTier) ? ` ${riot.peakRank}` : ""}
+                      {riot.peakLp != null && ["MASTER","GRANDMASTER","CHALLENGER"].includes(riot.peakTier) ? ` ${riot.peakLp}LP` : ""}
+                    </span>
                   </div>
                 )}
               </div>

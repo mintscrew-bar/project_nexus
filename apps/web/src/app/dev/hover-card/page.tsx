@@ -190,30 +190,16 @@ function HoverCardPreview({ p }: { p: typeof MOCK_PROFILES[number] }) {
       {/* 헤더 */}
       <div className="px-4 pt-4 pb-3">
         <div className="flex items-start gap-3">
-          {/* 아바타 원형 + 티어 링 + 디비전 배지 */}
-          <div className="relative flex-shrink-0">
-            <div
-              className="relative h-16 w-16 overflow-hidden rounded-full"
-              style={{ border: `2px solid ${hasTier ? theme.accent + "70" : "rgba(255,255,255,0.1)"}` }}
-            >
-              {p.avatar ? (
-                <Image src={p.avatar} alt={p.username} fill className="object-cover" unoptimized />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center bg-bg-tertiary">
-                  <Users className="h-8 w-8 text-text-tertiary" />
-                </div>
-              )}
-            </div>
-            {hasTier && !isApexTier && p.rank && (
-              <div
-                className="absolute -bottom-1 left-1/2 -translate-x-1/2 rounded-full px-1.5 py-px text-[9px] font-bold leading-none"
-                style={{
-                  color: theme.accent,
-                  backgroundColor: "var(--color-bg-elevated)",
-                  border: `1px solid ${theme.accent}50`,
-                }}
-              >
-                {p.rank}
+          {/* 아바타 원형 + 티어 링 */}
+          <div
+            className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-full"
+            style={{ border: `2px solid ${hasTier ? theme.accent + "70" : "rgba(255,255,255,0.1)"}` }}
+          >
+            {p.avatar ? (
+              <Image src={p.avatar} alt={p.username} fill className="object-cover" unoptimized />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center bg-bg-tertiary">
+                <Users className="h-8 w-8 text-text-tertiary" />
               </div>
             )}
           </div>
@@ -237,22 +223,27 @@ function HoverCardPreview({ p }: { p: typeof MOCK_PROFILES[number] }) {
             </div>
             <p className="mt-0.5 text-[11px] text-text-tertiary">@{p.username}</p>
 
+            {/* 현재 티어 */}
             {hasTier && (
-              <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
-                <span className="text-xs font-bold" style={{ color: theme.accent }}>
+              <div className="mt-1.5 flex items-center gap-1.5">
+                <span className="text-sm font-bold" style={{ color: theme.accent }}>
                   {TIER_KO[p.tier!] ?? p.tier}
                   {!isApexTier && p.rank ? ` ${p.rank}` : ""}
                 </span>
                 {p.lp != null && (
-                  <span className="text-[11px] text-text-muted">{p.lp} LP</span>
+                  <span className="text-xs font-semibold text-text-secondary">{p.lp} LP</span>
                 )}
-                {p.peakTier && p.peakTier !== p.tier && (
-                  <span className="text-[10px] text-text-muted/60">
-                    · 최고 {TIER_KO[p.peakTier] ?? p.peakTier}
-                    {p.peakRank && !["MASTER","GRANDMASTER","CHALLENGER"].includes(p.peakTier) ? ` ${p.peakRank}` : ""}
-                    {p.peakLp != null && ["MASTER","GRANDMASTER","CHALLENGER"].includes(p.peakTier) ? ` ${p.peakLp}LP` : ""}
-                  </span>
-                )}
+              </div>
+            )}
+            {/* 최고 티어 */}
+            {p.peakTier && p.peakTier !== "UNRANKED" && (
+              <div className="mt-0.5 flex items-center gap-1">
+                <span className="text-[10px] text-text-muted">최고</span>
+                <span className="text-[11px] font-semibold text-text-secondary">
+                  {TIER_KO[p.peakTier] ?? p.peakTier}
+                  {p.peakRank && !["MASTER","GRANDMASTER","CHALLENGER"].includes(p.peakTier) ? ` ${p.peakRank}` : ""}
+                  {p.peakLp != null && ["MASTER","GRANDMASTER","CHALLENGER"].includes(p.peakTier) ? ` ${p.peakLp}LP` : ""}
+                </span>
               </div>
             )}
           </div>
