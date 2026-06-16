@@ -129,7 +129,7 @@ export function PlayerHoverCard({ userId, anchorRect, onOpenProfile, onMouseEnte
 
   return createPortal(
     <div
-      className="fixed z-[9999] overflow-hidden rounded-2xl bg-bg-elevated shadow-[0_32px_64px_rgba(0,0,0,0.7)] animate-fade-in"
+      className="fixed z-[9999] overflow-hidden rounded-2xl bg-bg-primary shadow-[0_32px_64px_rgba(0,0,0,0.8)] animate-fade-in"
       style={{
         left, top, width: TOOLTIP_W,
         border: `1px solid ${theme.accent}35`,

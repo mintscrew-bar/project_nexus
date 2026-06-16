@@ -184,7 +184,7 @@ function HoverCardPreview({ p }: { p: typeof MOCK_PROFILES[number] }) {
 
   return (
     <div
-      className="w-[300px] overflow-hidden rounded-2xl bg-bg-elevated shadow-[0_32px_64px_rgba(0,0,0,0.7)]"
+      className="w-[300px] overflow-hidden rounded-2xl bg-bg-primary shadow-[0_32px_64px_rgba(0,0,0,0.8)]"
       style={{ border: `1px solid ${theme.accent}35` }}
     >
       {/* 헤더 */}
