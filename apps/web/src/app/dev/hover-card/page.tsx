@@ -168,7 +168,7 @@ function HoverCardPreview({ p }: { p: typeof MOCK_PROFILES[number] }) {
     <div className="w-[300px] overflow-hidden rounded-2xl border border-white/8 bg-bg-elevated shadow-[0_32px_64px_rgba(0,0,0,0.7)]">
       {/* 아이덴티티 */}
       <div className="px-4 pb-3 pt-4">
-        <div className="mb-3 flex items-center gap-3">
+        <div className="mb-3 flex items-center gap-3 rounded-xl bg-bg-secondary px-3 py-2.5">
           <div className="relative h-14 w-14 flex-shrink-0 overflow-hidden rounded-xl border border-white/8 shadow-lg">
             <div className="flex h-full w-full items-center justify-center bg-bg-tertiary">
               <Users className="h-7 w-7 text-text-tertiary" />

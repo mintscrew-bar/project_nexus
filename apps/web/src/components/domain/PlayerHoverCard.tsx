@@ -127,7 +127,7 @@ export function PlayerHoverCard({ userId, anchorRect, onOpenProfile, onMouseEnte
         <>
           {/* 아이덴티티 영역 */}
           <div className="px-4 pb-3 pt-4">
-            <div className="flex items-center gap-3 mb-3">
+            <div className="mb-3 flex items-center gap-3 rounded-xl bg-bg-secondary px-3 py-2.5">
               {/* 아바타 */}
               <div className="relative h-14 w-14 flex-shrink-0 overflow-hidden rounded-xl border border-white/8 shadow-lg">
                 {data.avatar ? (
@@ -139,7 +139,7 @@ export function PlayerHoverCard({ userId, anchorRect, onOpenProfile, onMouseEnte
                 )}
               </div>
 
-                <div className="min-w-0 flex-1">
+              <div className="min-w-0 flex-1">
                 {riot ? (
                   <>
                     <p className="truncate text-sm font-bold leading-tight text-text-primary">
