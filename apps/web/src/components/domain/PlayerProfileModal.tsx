@@ -6,15 +6,11 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Activity,
-  BarChart3,
   CalendarDays,
   Flag,
   Loader2,
-  Medal,
-  ShieldCheck,
   Swords,
   Star,
-  Trophy,
   TrendingUp,
   Users,
   X,
@@ -91,15 +87,15 @@ function formatTimeAgo(value?: string) {
   return `${Math.floor(hours / 24)}일 전`;
 }
 
-function formatLp(value?: number | null) {
-  return typeof value === "number" ? `${value} LP` : "LP 없음";
-}
-
 function formatTier(riot: any) {
   if (!riot?.tier) return "UNRANKED";
   const isApex = ["MASTER", "GRANDMASTER", "CHALLENGER"].includes(riot.tier);
   const tier = TIER_KO[riot.tier] ?? riot.tier;
   return `${tier}${riot.rank && !isApex ? ` ${riot.rank}` : ""}`;
+}
+
+function getKdaRatio(kills = 0, deaths = 0, assists = 0) {
+  return deaths === 0 ? kills + assists : (kills + assists) / deaths;
 }
 
 function formatDamage(value?: number | null) {
@@ -110,10 +106,6 @@ function formatDamage(value?: number | null) {
 
 function formatOneDecimal(value: number) {
   return value.toFixed(1).replace(/\.0$/, "");
-}
-
-function getKdaRatio(kills = 0, deaths = 0, assists = 0) {
-  return deaths === 0 ? kills + assists : (kills + assists) / deaths;
 }
 
 function getRecentMetrics(matches: any[]) {
@@ -172,19 +164,19 @@ function WinRateSparkline({ matches }: { matches: any[] }) {
     return <div className="h-7 w-14" />;
   }
 
-  const width = 56;
-  const height = 28;
-  const innerWidth = 44;
+  const width = 46;
+  const height = 22;
+  const innerWidth = 34;
   const xStart = 6;
   const points = outcomes.map((won, index) => {
     const x = outcomes.length === 1 ? width / 2 : xStart + (index * innerWidth) / (outcomes.length - 1);
-    const y = won ? 8 : 21;
+    const y = won ? 6 : 16;
     return { x, y, won };
   });
   const pointPath = points.map((point) => `${point.x},${point.y}`).join(" ");
 
   return (
-    <div className="h-7 w-14" title="최근 경기 승패 흐름">
+    <div className="h-5 w-11 opacity-70" title="최근 경기 승패 흐름">
       <svg viewBox={`0 0 ${width} ${height}`} className="h-full w-full" role="img" aria-label="최근 승패 그래프">
         <polyline
           points={pointPath}
@@ -192,7 +184,7 @@ function WinRateSparkline({ matches }: { matches: any[] }) {
           stroke="rgb(125, 211, 252)"
           strokeLinecap="round"
           strokeLinejoin="round"
-          strokeWidth="2.4"
+          strokeWidth="2"
         />
       </svg>
     </div>
@@ -222,33 +214,6 @@ function RatingStars({ value }: { value: number }) {
   );
 }
 
-function DetailMetric({
-  label,
-  value,
-  detail,
-  icon: Icon,
-  accentColor,
-}: {
-  label: string;
-  value: string;
-  detail?: string;
-  icon?: ElementType;
-  accentColor?: string;
-}) {
-  return (
-    <div className="rounded-xl bg-[#101010] p-3">
-      <div className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-zinc-500">
-        {Icon && <Icon className="h-3.5 w-3.5" />}
-        {label}
-      </div>
-      <p className="truncate text-base font-black leading-none text-white" style={accentColor ? { color: accentColor } : undefined}>
-        {value}
-      </p>
-      {detail && <p className="mt-1 truncate text-xs text-zinc-500">{detail}</p>}
-    </div>
-  );
-}
-
 function SummaryChip({
   icon: Icon,
   label,
@@ -265,16 +230,20 @@ function SummaryChip({
   valueClassName?: string;
 }) {
   return (
-    <div className="rounded-xl bg-[#181818] p-3">
-      <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-zinc-500">
+    <div className="flex min-h-[104px] flex-col justify-between rounded-xl bg-[#181818] p-4">
+      <div className="flex h-5 items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-zinc-500">
         <Icon className="h-3.5 w-3.5" />
         {label}
       </div>
-      <div className="mt-2 flex items-end justify-between gap-2">
-        <p className={`min-w-0 text-lg font-black leading-none ${valueClassName}`}>{value}</p>
-        {side && <div className="shrink-0">{side}</div>}
+      <div className="pt-3">
+        <div className="flex items-end justify-between gap-3">
+          <p className={`min-w-0 text-[24px] font-black leading-none tracking-[-0.01em] ${valueClassName}`}>
+            {value}
+          </p>
+          {side && <div className="shrink-0 translate-y-0.5">{side}</div>}
+        </div>
+        {detail && <p className="mt-2 truncate text-xs font-semibold leading-none text-zinc-500">{detail}</p>}
       </div>
-      {detail && <p className="mt-1 truncate text-xs text-zinc-500">{detail}</p>}
     </div>
   );
 }
@@ -368,7 +337,6 @@ export function PlayerProfileModal({ userId, onClose }: PlayerProfileModalProps)
   const gamesPlayed = stats?.gamesPlayed ?? wins + losses;
   const participations = stats?.participations ?? 0;
   const winRate = Math.round(stats?.winRate ?? 0);
-  const accent = TIER_COLOR[riot?.tier ?? ""] ?? ACCENT;
 
   return (
     <Modal
@@ -395,13 +363,7 @@ export function PlayerProfileModal({ userId, onClose }: PlayerProfileModalProps)
 
       {!profileLoading && !isError && profile && (
         <div className="space-y-4">
-          <section
-            className="rounded-[18px] bg-[#101010] p-4"
-            style={{
-              border: `1px solid ${ACCENT}66`,
-              boxShadow: `0 0 0 1px ${ACCENT}18`,
-            }}
-          >
+          <section className="px-1 pt-1 sm:px-2">
             <div className="flex justify-end gap-2">
                 {!isMe && (
                   <button
@@ -508,7 +470,7 @@ export function PlayerProfileModal({ userId, onClose }: PlayerProfileModalProps)
               </div>
           </section>
 
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <div className="grid gap-3 sm:grid-cols-3">
             <SummaryChip
               icon={Swords}
               label="전적"
@@ -524,104 +486,21 @@ export function PlayerProfileModal({ userId, onClose }: PlayerProfileModalProps)
               valueClassName={winRate >= 50 ? "text-sky-300" : "text-rose-300"}
             />
             <SummaryChip
-              icon={ShieldCheck}
-              label="신뢰도"
-              value={`${(rep?.overallAverage ?? 0).toFixed(1)} / 5`}
-              detail={`${rep?.totalRatings ?? 0}개 평가`}
+              icon={Activity}
+              label="최근 KDA"
+              value={recent.games > 0 ? recent.avgKda.toFixed(2) : "-"}
+              detail={
+                recent.games > 0
+                  ? `${formatOneDecimal(recent.avgKills)} / ${formatOneDecimal(recent.avgDeaths)} / ${formatOneDecimal(recent.avgAssists)}`
+                  : "최근 기록 없음"
+              }
             />
-            <SummaryChip
-              icon={Trophy}
-              label="피크 티어"
-              value={formatPeakTier(riot)}
-              detail={formatLp(riot?.peakLp)}
-            />
-          </div>
-
-          <div className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
-            <section className="rounded-xl bg-[#181818] p-4">
-              <div className="mb-4 flex items-center gap-2">
-                <Medal className="h-4 w-4" style={{ color: accent }} />
-                <h3 className="text-sm font-black text-white">랭크 & 내전 요약</h3>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <DetailMetric
-                  icon={Trophy}
-                  label="현재 티어"
-                  value={formatTier(riot)}
-                  detail={formatLp(riot?.lp)}
-                  accentColor={accent}
-                />
-                <DetailMetric
-                  icon={Swords}
-                  label="내전 참여"
-                  value={`${participations}회`}
-                  detail={`${gamesPlayed}경기 집계`}
-                />
-                <DetailMetric
-                  icon={TrendingUp}
-                  label="최근 승률"
-                  value={recent.games > 0 ? `${recent.winRate}%` : "-"}
-                  detail={recent.games > 0 ? `최근 ${recent.games}경기 ${recent.wins}승` : "최근 기록 없음"}
-                  accentColor={recent.winRate >= 50 ? "#7DD3FC" : "#FDA4AF"}
-                />
-                <DetailMetric
-                  icon={Activity}
-                  label="최근 KDA"
-                  value={recent.games > 0 ? recent.avgKda.toFixed(2) : "-"}
-                  detail={
-                    recent.games > 0
-                      ? `${formatOneDecimal(recent.avgKills)} / ${formatOneDecimal(recent.avgDeaths)} / ${formatOneDecimal(recent.avgAssists)}`
-                      : "최근 기록 없음"
-                  }
-                />
-              </div>
-            </section>
-
-            <section className="rounded-xl bg-[#181818] p-4">
-              <div className="mb-4 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <Star className="h-4 w-4 text-yellow-400" />
-                  <h3 className="text-sm font-black text-white">신뢰도 상세</h3>
-                </div>
-                <span className="text-xs text-zinc-600">{rep?.totalRatings ?? 0}개 평가</span>
-              </div>
-              <div className="mb-4 flex items-center justify-between rounded-xl bg-[#101010] p-3">
-                <div>
-                  <p className="text-xs font-semibold text-zinc-500">종합 평가</p>
-                  <div className="mt-1">
-                    <RatingStars value={rep?.overallAverage ?? 0} />
-                  </div>
-                </div>
-                <p className="text-2xl font-black text-white">{(rep?.overallAverage ?? 0).toFixed(1)}</p>
-              </div>
-              <div className="space-y-3">
-                <RepBar label="실력" value={rep?.averageSkill ?? 0} />
-                <RepBar label="태도" value={rep?.averageAttitude ?? 0} />
-                <RepBar label="소통" value={rep?.averageCommunication ?? 0} />
-              </div>
-            </section>
           </div>
 
           <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
             <section className="rounded-xl bg-[#181818] p-4">
               <div className="mb-4 flex items-center justify-between">
                 <h3 className="text-sm font-black text-white">포지션 및 선호 챔피언</h3>
-                {(mainRole || subRole) && (
-                  <div className="flex items-center gap-2">
-                    {mainRole && (
-                      <span className="inline-flex items-center gap-1.5 rounded-lg bg-[#1a1a1a] px-2.5 py-1.5 text-xs font-bold text-white">
-                        <PositionIcon position={mainRole} />
-                        {POSITION_LABELS[mainRole] || mainRole} 주
-                      </span>
-                    )}
-                    {subRole && (
-                      <span className="inline-flex items-center gap-1.5 rounded-lg bg-[#1a1a1a] px-2.5 py-1.5 text-xs font-semibold text-zinc-400">
-                        <PositionIcon position={subRole} opacity={0.7} />
-                        {POSITION_LABELS[subRole] || subRole} 부
-                      </span>
-                    )}
-                  </div>
-                )}
               </div>
 
               {!mainRole && !subRole && (
@@ -659,31 +538,26 @@ export function PlayerProfileModal({ userId, onClose }: PlayerProfileModalProps)
             </section>
 
             <section className="rounded-xl bg-[#181818] p-4">
-              <div className="mb-4 flex items-center gap-2">
-                <BarChart3 className="h-4 w-4 text-violet-400" />
-                <h3 className="text-sm font-black text-white">최근 경기 지표</h3>
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <Star className="h-4 w-4 text-yellow-400" />
+                  <h3 className="text-sm font-black text-white">신뢰도 상세</h3>
+                </div>
+                <span className="text-xs text-zinc-600">{rep?.totalRatings ?? 0}개 평가</span>
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <DetailMetric
-                  label="최근 전적"
-                  value={recent.games > 0 ? `${recent.wins}승 ${recent.games - recent.wins}패` : "-"}
-                  detail={recent.games > 0 ? `${recent.games}경기 기준` : "기록 없음"}
-                />
-                <DetailMetric
-                  label="평균 피해량"
-                  value={recent.games > 0 ? formatDamage(Math.round(recent.avgDamage)) : "-"}
-                  detail="챔피언 대상"
-                />
-                <DetailMetric
-                  label="평균 킬"
-                  value={recent.games > 0 ? formatOneDecimal(recent.avgKills) : "-"}
-                  detail="최근 경기 평균"
-                />
-                <DetailMetric
-                  label="평균 데스"
-                  value={recent.games > 0 ? formatOneDecimal(recent.avgDeaths) : "-"}
-                  detail="낮을수록 안정적"
-                />
+              <div className="mb-4 flex items-center justify-between rounded-xl bg-[#101010] p-3">
+                <div>
+                  <p className="text-xs font-semibold text-zinc-500">종합 평가</p>
+                  <div className="mt-1">
+                    <RatingStars value={rep?.overallAverage ?? 0} />
+                  </div>
+                </div>
+                <p className="text-2xl font-black text-white">{(rep?.overallAverage ?? 0).toFixed(1)}</p>
+              </div>
+              <div className="space-y-3">
+                <RepBar label="실력" value={rep?.averageSkill ?? 0} />
+                <RepBar label="태도" value={rep?.averageAttitude ?? 0} />
+                <RepBar label="소통" value={rep?.averageCommunication ?? 0} />
               </div>
             </section>
           </div>

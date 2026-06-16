@@ -25,6 +25,8 @@ const ROLE_LABELS: Record<string, string> = {
   SUPPORT: '서포터',
 };
 
+const PROFILE_ACCENT = '#667EEA';
+
 export default function ProfilePage() {
   const router = useRouter();
   const { user, isAuthenticated, isLoading: authLoading, fetchUser } = useAuthStore();
@@ -397,8 +399,8 @@ export default function ProfilePage() {
     <div className="flex-grow p-4 md:p-8">
       <div className="container mx-auto max-w-6xl">
         {/* Profile Hero Section */}
-        <Card className="mb-6">
-          <CardContent className="p-6 md:p-8">
+        <Card className="mb-6 overflow-hidden rounded-[18px] border-[#667EEA]/40 bg-[#101010] text-white shadow-[0_32px_70px_rgba(0,0,0,0.45)]">
+          <CardContent className="p-4 md:p-5">
             {profileLoading && !profileData ? (
               <div className="flex flex-col md:flex-row items-start gap-6">
                 <Skeleton className="w-24 h-24 md:w-28 md:h-28 rounded-full flex-shrink-0" />
@@ -409,10 +411,13 @@ export default function ProfilePage() {
                 </div>
               </div>
             ) : (
-            <div className="flex flex-col md:flex-row items-start gap-6">
+            <div className="flex flex-col gap-5 md:flex-row md:items-start">
               {/* Avatar - 항상 클릭하여 변경 가능 */}
               <div className="flex-shrink-0 relative group cursor-pointer" onClick={() => avatarInputRef.current?.click()}>
-                <div className="w-24 h-24 md:w-28 md:h-28 rounded-full bg-bg-tertiary flex items-center justify-center overflow-hidden relative">
+                <div
+                  className="relative flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-[#171717] md:h-24 md:w-24"
+                  style={{ border: `2px solid ${PROFILE_ACCENT}88` }}
+                >
                   {(avatarPreview || user.avatar) ? (
                     <Image
                       src={avatarPreview || user.avatar!}
@@ -429,7 +434,7 @@ export default function ProfilePage() {
                       <LoadingSpinner size="sm" />
                     </div>
                   )}
-                  <div className="absolute inset-0 rounded-full bg-black/0 group-hover:bg-black/50 flex items-center justify-center transition-colors">
+                  <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/0 transition-colors group-hover:bg-black/50">
                     <Camera className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
                   </div>
                 </div>
@@ -443,34 +448,40 @@ export default function ProfilePage() {
               </div>
 
               {/* Info */}
-              <div className="flex-1 min-w-0">
+              <div className="min-w-0 flex-1 pt-1">
                 {/* 닉네임 */}
-                <div className="flex items-center gap-3 mb-2 group/name">
+                <div className="mb-2 flex items-center gap-2 group/name">
                   <div className="inline-flex items-center gap-1.5">
                     <input
                       value={editUsername}
                       onChange={(e) => handleUsernameChange(e.target.value)}
                       style={{ width: `${Math.max([...editUsername].reduce((w, c) => w + (/[\uac00-\ud7af\u3000-\u9fff]/.test(c) ? 2 : 1), 0), 4) + 1}ch` }}
-                      className="text-2xl md:text-3xl font-bold text-text-primary bg-transparent border-b border-transparent hover:border-bg-elevated focus:border-accent-primary focus:outline-none transition-colors"
+                      className="bg-transparent text-xl font-black leading-tight text-white border-b border-transparent transition-colors hover:border-zinc-700 focus:border-accent-primary focus:outline-none md:text-2xl"
                       placeholder="사용자 이름"
                     />
                     <Pencil className="h-4 w-4 text-text-tertiary opacity-0 group-hover/name:opacity-100 transition-opacity pointer-events-none flex-shrink-0" />
                   </div>
                   {clan && (
-                    <Badge variant="primary" size="sm" className="cursor-pointer" onClick={() => router.push(`/clans/${clan.id}`)}>
-                      [{clan.tag}] {clan.name}
+                    <Badge
+                      variant="primary"
+                      size="sm"
+                      className="cursor-pointer rounded-md border-0 px-2 py-1 text-xs font-black"
+                      style={{ color: PROFILE_ACCENT, backgroundColor: `${PROFILE_ACCENT}22` }}
+                      onClick={() => router.push(`/clans/${clan.id}`)}
+                    >
+                      {clan.tag}
                     </Badge>
                   )}
                 </div>
 
                 {/* 자기소개 */}
-                <div className="inline-flex items-start gap-1.5 group/bio max-w-2xl mb-3">
+                <div className="mb-3 inline-flex max-w-2xl items-start gap-1.5 group/bio">
                   <textarea
                     value={editBio}
                     onChange={(e) => handleBioChange(e.target.value)}
                     rows={1}
                     style={{ width: `${Math.max([...(editBio || '')].reduce((w, c) => w + (/[\uac00-\ud7af\u3000-\u9fff]/.test(c) ? 2 : 1), 0), 18) + 2}ch`, maxWidth: '100%' }}
-                    className="text-text-secondary bg-transparent border-b border-transparent hover:border-bg-elevated focus:border-accent-primary focus:outline-none transition-colors text-sm resize-none placeholder:text-text-tertiary placeholder:italic"
+                    className="resize-none bg-transparent text-sm text-zinc-500 border-b border-transparent transition-colors placeholder:text-zinc-600 placeholder:italic hover:border-zinc-700 focus:border-accent-primary focus:outline-none"
                     placeholder="자기소개를 입력하세요"
                   />
                   <Pencil className="h-3.5 w-3.5 mt-1 text-text-tertiary opacity-0 group-hover/bio:opacity-100 transition-opacity pointer-events-none flex-shrink-0" />
@@ -480,14 +491,14 @@ export default function ProfilePage() {
                 <div className="space-y-4">
                   {/* 주라인 & 티어 — 데이터 있는 것만 flex-wrap으로 표시 */}
                   {primary && (primary.mainRole || primary.tier) && (
-                    <div className="flex flex-wrap items-center gap-4">
+                    <div className="flex flex-wrap items-center gap-2">
                       {primary.mainRole && (
-                        <div className="flex items-center gap-2 px-3 py-2 bg-accent-primary/10 rounded-lg border border-accent-primary/30">
-                          <Gamepad2 className="h-5 w-5 text-accent-primary flex-shrink-0" />
-                          <div className="text-sm font-medium text-text-primary">
+                        <div className="flex items-center gap-2 rounded-lg bg-[#1a1a1a] px-3 py-2">
+                          <Gamepad2 className="h-4 w-4 flex-shrink-0 text-zinc-400" />
+                          <div className="text-sm font-semibold text-white">
                             {ROLE_LABELS[primary.mainRole] ?? primary.mainRole}
                             {primary.subRole && (
-                              <span className="text-text-tertiary ml-1">/ {ROLE_LABELS[primary.subRole] ?? primary.subRole}</span>
+                              <span className="ml-1 text-zinc-500">/ {ROLE_LABELS[primary.subRole] ?? primary.subRole}</span>
                             )}
                           </div>
                         </div>
@@ -505,7 +516,7 @@ export default function ProfilePage() {
                   )}
 
                   {/* 아래: 게임명 · 최고 티어 · 가입일 — 모바일에서 2줄 */}
-                  <div className="flex flex-col gap-1.5 text-xs text-text-tertiary">
+                  <div className="flex flex-col gap-1.5 text-xs text-zinc-600">
                     {/* 첫째 줄: 상태 · 게임명 · 태그 */}
                     <div className="flex items-center gap-2 flex-wrap">
                       <StatusSelector
@@ -514,7 +525,7 @@ export default function ProfilePage() {
                       />
                       {primary && (
                         <>
-                          <span className="font-medium text-text-primary">{primary.gameName}</span>
+                          <span className="font-medium text-zinc-300">{primary.gameName}</span>
                           <span>#{primary.tagLine}</span>
                         </>
                       )}

@@ -56,6 +56,8 @@ const ROLE_LABELS: Record<string, string> = {
   SUPPORT: "서포터",
 };
 
+const PROFILE_ACCENT = "#667EEA";
+
 interface ProfileUser {
   id: string;
   username: string;
@@ -437,12 +439,15 @@ export default function UserProfilePage() {
     <div className="flex-grow p-4 md:p-8">
       <div className="container mx-auto max-w-6xl">
         {/* Profile Hero Section */}
-        <Card className="mb-6">
-          <CardContent className="p-6 md:p-8">
-            <div className="flex flex-col md:flex-row items-start gap-6">
+        <Card className="mb-6 overflow-hidden rounded-[18px] border-[#667EEA]/40 bg-[#101010] text-white shadow-[0_32px_70px_rgba(0,0,0,0.45)]">
+          <CardContent className="p-4 md:p-5">
+            <div className="flex flex-col gap-5 md:flex-row md:items-start">
               {/* Avatar */}
               <div className="flex-shrink-0 relative">
-                <div className="w-24 h-24 md:w-28 md:h-28 rounded-full bg-bg-tertiary flex items-center justify-center overflow-hidden relative">
+                <div
+                  className="relative flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-[#171717] md:h-24 md:w-24"
+                  style={{ border: `2px solid ${PROFILE_ACCENT}88` }}
+                >
                   {profile.avatar ? (
                     <Image
                       src={profile.avatar}
@@ -465,27 +470,28 @@ export default function UserProfilePage() {
               </div>
 
               {/* Info */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-3 mb-2">
-                  <h1 className="text-2xl md:text-3xl font-bold text-text-primary">
+              <div className="min-w-0 flex-1 pt-1">
+                <div className="mb-2 flex items-center gap-2">
+                  <h1 className="text-xl font-black leading-tight text-white md:text-2xl">
                     {profile.username}
                   </h1>
                   {clan && (
                     <Badge
                       variant="primary"
                       size="sm"
-                      className="cursor-pointer"
+                      className="cursor-pointer rounded-md border-0 px-2 py-1 text-xs font-black"
+                      style={{ color: PROFILE_ACCENT, backgroundColor: `${PROFILE_ACCENT}22` }}
                       onClick={() => router.push(`/clans/${clan.id}`)}
                     >
-                      [{clan.tag}] {clan.name}
+                      {clan.tag}
                     </Badge>
                   )}
                 </div>
 
                 {/* Bio */}
-                <p className="text-text-secondary mb-3 max-w-2xl">
+                <p className="mb-3 max-w-2xl text-sm text-zinc-500">
                   {profile.bio || (
-                    <span className="text-text-tertiary italic">
+                    <span className="text-zinc-600 italic">
                       자기소개가 없습니다.
                     </span>
                   )}
@@ -495,42 +501,38 @@ export default function UserProfilePage() {
                 <div className="space-y-4">
                   {/* 주라인 & 티어 그리드 */}
                   {primary && (
-                    <div className="grid grid-cols-2 gap-6">
+                    <div className="flex flex-wrap items-center gap-2">
                       {/* 왼쪽: 주라인 */}
-                      <div className="flex items-center gap-3">
                         {primary.mainRole && (
-                          <div className="flex items-center gap-2 px-3 py-2 bg-accent-primary/10 rounded-lg border border-accent-primary/30">
-                            <Gamepad2 className="h-5 w-5 text-accent-primary flex-shrink-0" />
-                            <div className="text-sm font-medium text-text-primary">
+                          <div className="flex items-center gap-2 rounded-lg bg-[#1a1a1a] px-3 py-2">
+                            <Gamepad2 className="h-4 w-4 flex-shrink-0 text-zinc-400" />
+                            <div className="text-sm font-semibold text-white">
                               {ROLE_LABELS[primary.mainRole] ?? primary.mainRole}
                               {primary.subRole && (
-                                <span className="text-text-tertiary ml-1">/ {ROLE_LABELS[primary.subRole] ?? primary.subRole}</span>
+                                <span className="ml-1 text-zinc-500">/ {ROLE_LABELS[primary.subRole] ?? primary.subRole}</span>
                               )}
                             </div>
                           </div>
                         )}
-                      </div>
 
                       {/* 오른쪽: 솔로/자유 랭크 티어 */}
-                      <div className="flex flex-col gap-2 text-right">
                         {primary.tier && (
-                          <div className="flex items-center justify-end gap-2">
+                          <div className="flex items-center gap-2">
                             <TierBadge tier={primary.tier} size="md" />
                             <div className="text-sm">
-                              {primary.rank && <span className="font-medium text-text-primary">{primary.rank}</span>}
-                              {primary.lp && <span className="text-text-secondary ml-1">{primary.lp}LP</span>}
+                              {primary.rank && <span className="font-medium text-white">{primary.rank}</span>}
+                              {primary.lp && <span className="ml-1 text-zinc-400">{primary.lp}LP</span>}
                             </div>
                           </div>
                         )}
-                      </div>
                     </div>
                   )}
 
                   {/* 아래: 게임명 · 최고 티어 · 평판 · 가입일 */}
-                  <div className="flex items-center gap-2 text-xs text-text-tertiary flex-wrap">
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-600">
                     {primary && (
                       <>
-                        <span className="font-medium text-text-primary">{primary.gameName}</span>
+                        <span className="font-medium text-zinc-300">{primary.gameName}</span>
                         <span>#{primary.tagLine}</span>
                         <span>·</span>
                         {primary.peakTier && (
