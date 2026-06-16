@@ -78,8 +78,8 @@ export const metadata: Metadata = {
     images: [
       {
         url: absoluteUrl("/images/og-banner.png"),
-        width: 1536,
-        height: 1024,
+        width: 1731,
+        height: 909,
         alt: "Nexus - 내전 운영의 모든 것",
       },
     ],
