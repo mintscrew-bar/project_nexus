@@ -10,6 +10,7 @@ import { Footer } from './Footer';
 import { FriendsPanel } from '@/components/domain/FriendsPanel';
 import { FloatingDmPanel } from '@/components/domain/FloatingDmPanel';
 import { FloatingClanChatPanel } from '@/components/domain/FloatingClanChatPanel';
+import { CreatorPromoStrip } from './CreatorPromoStrip';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -42,6 +43,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     pathname.startsWith('/draft/') ||
     pathname.startsWith('/role-selection/') ||
     pathname.endsWith('/bracket');
+  const showCreatorPromo = pathname !== '/' && !isDashboardRoute;
+
   if (isAuthRoute || isLandingFullscreen) {
     return <>{children}</>;
   }
@@ -53,7 +56,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <main className="flex flex-grow min-h-0">
         <Sidebar />
         <div className="flex flex-col flex-grow min-h-0 bg-bg-primary overflow-hidden">
-          {/* 
+          {showCreatorPromo && <CreatorPromoStrip />}
+          {/*
             - isDashboardRoute: 페이지 전체가 viewport에 맞게 고정되어야 함 (h-full)
             - 일반 페이지: 내용에 따라 전체 스크롤 가능 (overflow-auto)
           */}
