@@ -143,10 +143,6 @@ export function PlayerHoverCard({ userId, anchorRect, onOpenProfile, onMouseEnte
                 {riot ? (
                   <>
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <p className="truncate text-sm font-bold leading-tight text-text-primary">
-                        {riot.gameName}
-                        <span className="font-normal text-text-muted">#{riot.tagLine}</span>
-                      </p>
                       {data.clan?.tag && (
                         <span
                           className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold leading-none"
@@ -155,6 +151,10 @@ export function PlayerHoverCard({ userId, anchorRect, onOpenProfile, onMouseEnte
                           {data.clan.tag}
                         </span>
                       )}
+                      <p className="truncate text-sm font-bold leading-tight text-text-primary">
+                        {riot.gameName}
+                        <span className="font-normal text-text-muted">#{riot.tagLine}</span>
+                      </p>
                     </div>
                     <p className="mt-0.5 truncate text-[11px] text-text-tertiary">@{data.username}</p>
                   </>

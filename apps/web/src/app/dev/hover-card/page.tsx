@@ -178,10 +178,6 @@ function HoverCardPreview({ p }: { p: typeof MOCK_PROFILES[number] }) {
             {hasRiot ? (
               <>
                 <div className="flex items-center gap-1.5 flex-wrap">
-                  <p className="truncate text-sm font-bold leading-tight text-text-primary">
-                    {p.gameName}
-                    <span className="font-normal text-text-muted">#{p.tagLine}</span>
-                  </p>
                   {p.clan?.tag && (
                     <span
                       className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold leading-none"
@@ -190,6 +186,10 @@ function HoverCardPreview({ p }: { p: typeof MOCK_PROFILES[number] }) {
                       {p.clan.tag}
                     </span>
                   )}
+                  <p className="truncate text-sm font-bold leading-tight text-text-primary">
+                    {p.gameName}
+                    <span className="font-normal text-text-muted">#{p.tagLine}</span>
+                  </p>
                 </div>
                 <p className="mt-0.5 truncate text-[11px] text-text-tertiary">@{p.username}</p>
               </>
