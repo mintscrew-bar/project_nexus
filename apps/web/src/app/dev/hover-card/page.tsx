@@ -37,7 +37,7 @@ const MOCK_PROFILES: Array<{
     tagLine: "진혁",
     username: "mintscrew",
     peakTier: "DIAMOND",
-    avatar: "https://cdn.discordapp.com/embed/avatars/0.png",
+    avatar: null,
     mainRole: "TOP",
     subRole: "JUNGLE",
     champions: [
@@ -167,23 +167,9 @@ function HoverCardPreview({ p }: { p: typeof MOCK_PROFILES[number] }) {
   return (
     <div className="w-[300px] overflow-hidden rounded-2xl border border-white/8 bg-bg-elevated shadow-[0_32px_64px_rgba(0,0,0,0.7)]">
       {/* 아이덴티티 */}
-      <div className="relative overflow-hidden pb-3 pt-4">
-        {/* 블러 배경 */}
-        {p.avatar && (
-          <>
-            <Image
-              src={p.avatar}
-              alt=""
-              fill
-              className="object-cover scale-110 blur-xl opacity-30"
-              unoptimized
-              aria-hidden
-            />
-            <div className="absolute inset-0 bg-gradient-to-b from-black/30 to-bg-primary/80" />
-          </>
-        )}
-        <div className="relative mb-3 flex items-center gap-3 px-4">
-          <div className="relative h-14 w-14 flex-shrink-0 overflow-hidden rounded-xl border border-white/15 shadow-lg">
+      <div className="px-4 pb-3 pt-4">
+        <div className="mb-3 flex items-center gap-3">
+          <div className="relative h-14 w-14 flex-shrink-0 overflow-hidden rounded-xl border border-white/8 shadow-lg">
             {p.avatar ? (
               <Image src={p.avatar} alt={p.username} fill className="object-cover" unoptimized />
             ) : (
@@ -209,7 +195,7 @@ function HoverCardPreview({ p }: { p: typeof MOCK_PROFILES[number] }) {
                     <span className="font-normal text-text-muted">#{p.tagLine}</span>
                   </p>
                 </div>
-                <p className="mt-0.5 truncate text-[11px] text-text-tertiary/80">@{p.username}</p>
+                <p className="mt-0.5 truncate text-[11px] text-text-tertiary">@{p.username}</p>
               </>
             ) : (
               <p className="truncate text-sm font-bold text-text-primary">{p.username}</p>
@@ -218,10 +204,8 @@ function HoverCardPreview({ p }: { p: typeof MOCK_PROFILES[number] }) {
         </div>
 
         {!hasRiot && (
-          <p className="mb-3 px-4 text-xs italic text-text-muted">등록된 라이엇 계정이 없습니다</p>
+          <p className="mb-3 text-xs italic text-text-muted">등록된 라이엇 계정이 없습니다</p>
         )}
-      </div>
-      <div className="px-4">
 
         {/* 티어 + 최고티어 */}
         {p.tier && (
