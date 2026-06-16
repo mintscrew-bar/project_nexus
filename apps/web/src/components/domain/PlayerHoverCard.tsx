@@ -126,10 +126,24 @@ export function PlayerHoverCard({ userId, anchorRect, onOpenProfile, onMouseEnte
       ) : data ? (
         <>
           {/* 아이덴티티 영역 */}
-          <div className="px-4 pb-3 pt-4">
-            <div className="flex items-center gap-3 mb-3">
+          <div className="relative overflow-hidden pb-3 pt-4">
+            {/* 블러 배경 — 아바타를 확대·블러해서 배경으로 */}
+            {data.avatar && (
+              <>
+                <Image
+                  src={data.avatar}
+                  alt=""
+                  fill
+                  className="object-cover scale-110 blur-xl opacity-30"
+                  unoptimized
+                  aria-hidden
+                />
+                <div className="absolute inset-0 bg-gradient-to-b from-black/30 to-bg-primary/80" />
+              </>
+            )}
+            <div className="relative flex items-center gap-3 px-4 mb-3">
               {/* 아바타 */}
-              <div className="relative h-14 w-14 flex-shrink-0 overflow-hidden rounded-xl border border-white/8 shadow-lg">
+              <div className="relative h-14 w-14 flex-shrink-0 overflow-hidden rounded-xl border border-white/15 shadow-lg">
                 {data.avatar ? (
                   <Image src={data.avatar} alt={data.username} fill className="object-cover" unoptimized />
                 ) : (
@@ -156,13 +170,15 @@ export function PlayerHoverCard({ userId, anchorRect, onOpenProfile, onMouseEnte
                         <span className="font-normal text-text-muted">#{riot.tagLine}</span>
                       </p>
                     </div>
-                    <p className="mt-0.5 truncate text-[11px] text-text-tertiary">@{data.username}</p>
+                    <p className="mt-0.5 truncate text-[11px] text-text-tertiary/80">@{data.username}</p>
                   </>
                 ) : (
                   <p className="text-sm font-bold text-text-primary truncate">{data.username}</p>
                 )}
               </div>
             </div>
+          </div>
+          <div className="px-4">
 
             {/* 전적 + 신뢰도 */}
             {!isActualBot && (
