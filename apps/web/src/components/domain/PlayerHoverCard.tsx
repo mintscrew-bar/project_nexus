@@ -203,15 +203,15 @@ export function PlayerHoverCard({ userId, anchorRect, onOpenProfile, onMouseEnte
 
             {/* 선호 챔피언 */}
             {rolesToShow.length > 0 && hasChampions && (
-              <div className="mb-3">
-                <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-text-muted">선호 챔피언</p>
+              <div className="mb-3 rounded-lg bg-bg-secondary px-3 py-2.5">
+                <p className="mb-2 text-[10px] font-medium text-text-muted">선호 챔피언</p>
                 <div className="space-y-1.5">
                   {rolesToShow.map((role) => {
                     const champs = champsByRole[role] ?? [];
                     if (!champs.length) return null;
                     return (
                       <div key={role} className="flex items-center gap-2">
-                        <PositionIcon position={role} className="!h-3 !w-3 flex-shrink-0 opacity-40" />
+                        <PositionIcon position={role} className="!h-3.5 !w-3.5 flex-shrink-0 opacity-50" />
                         <div className="flex items-center gap-1">
                           {champs.slice(0, 5).map((id, i) => <ChampionIcon key={i} championId={id} size={28} />)}
                         </div>
