@@ -278,7 +278,8 @@ export class AuctionService implements OnModuleInit {
       throw new ForbiddenException("Only host can start auction");
     }
 
-    if (room.status !== RoomStatus.WAITING) {
+    // startGame()이 WAITING → DRAFT로 원자 전환 후 호출되므로 DRAFT도 수용
+    if (room.status !== RoomStatus.WAITING && room.status !== RoomStatus.DRAFT) {
       throw new BadRequestException("Room already started");
     }
 
@@ -1132,8 +1133,9 @@ export class AuctionService implements OnModuleInit {
           },
         });
 
+        // teamId: null 조건 — 동시 낙찰 처리 중복 배정 방지 (P2025 → 트랜잭션 롤백)
         await tx.roomParticipant.update({
-          where: { id: currentPlayer.id },
+          where: { id: currentPlayer.id, teamId: null },
           data: { teamId: team.id },
         });
       });
@@ -1221,8 +1223,9 @@ export class AuctionService implements OnModuleInit {
           },
         });
 
+        // teamId: null 조건 — 유찰 자동배정 중 동시 처리 방지
         await tx.roomParticipant.update({
-          where: { id: currentPlayer.id },
+          where: { id: currentPlayer.id, teamId: null },
           data: { teamId: targetTeam.id },
         });
 
@@ -1311,8 +1314,9 @@ export class AuctionService implements OnModuleInit {
             soldPrice: 0,
           },
         });
+        // teamId: null 조건 — 마무리 배정 중 이미 배정된 참가자 중복 방지
         await tx.roomParticipant.update({
-          where: { id: participant.id },
+          where: { id: participant.id, teamId: null },
           data: { teamId: targetTeam.id },
         });
         await tx.auctionBid.create({

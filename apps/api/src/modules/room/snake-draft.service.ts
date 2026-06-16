@@ -67,7 +67,8 @@ export class SnakeDraftService {
       throw new ForbiddenException("Only host can start draft");
     }
 
-    if (room.status !== RoomStatus.WAITING) {
+    // startGame()이 WAITING → DRAFT로 원자 전환 후 호출되므로 DRAFT도 수용
+    if (room.status !== RoomStatus.WAITING && room.status !== RoomStatus.DRAFT) {
       throw new BadRequestException("Room already started");
     }
 
@@ -365,13 +366,15 @@ export class SnakeDraftService {
     });
 
     await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      await tx.teamMember.create({
-        data: { teamId, userId: targetPlayerId, pickOrder: pickNumber },
+      // teamId: null 조건 — 트랜잭션 안에서 재검증해 동시 픽/자동픽 중복 배정 방지
+      // 이미 배정된 경우 Prisma P2025(RecordNotFound)를 던져 트랜잭션 롤백
+      await tx.roomParticipant.update({
+        where: { id: participant.id, teamId: null },
+        data: { teamId },
       });
 
-      await tx.roomParticipant.update({
-        where: { id: participant.id },
-        data: { teamId },
+      await tx.teamMember.create({
+        data: { teamId, userId: targetPlayerId, pickOrder: pickNumber },
       });
 
       await tx.snakeDraftPick.create({

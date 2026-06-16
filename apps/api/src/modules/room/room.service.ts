@@ -1450,7 +1450,8 @@ export class RoomService {
     if (room.hostId !== hostId || room.teamMode !== TeamMode.AUTO_BALANCE) {
       throw new ForbiddenException("자동 밸런스 팀 구성을 시작할 수 없습니다.");
     }
-    if (room.status !== RoomStatus.WAITING) {
+    // startGame()이 WAITING → DRAFT로 원자 전환 후 호출되므로 DRAFT도 수용
+    if (room.status !== RoomStatus.WAITING && room.status !== RoomStatus.DRAFT) {
       throw new BadRequestException("Room has already started");
     }
     if (room.participants.length !== room.maxParticipants) {
@@ -1544,7 +1545,8 @@ export class RoomService {
       if (room.hostId !== hostId || room.teamMode !== TeamMode.MANUAL_TEAM) {
         throw new ForbiddenException("자유 팀 구성을 확정할 수 없습니다.");
       }
-      if (room.status !== RoomStatus.WAITING) {
+      // startGame()이 WAITING → DRAFT로 원자 전환 후 호출되므로 DRAFT도 수용
+      if (room.status !== RoomStatus.WAITING && room.status !== RoomStatus.DRAFT) {
         throw new BadRequestException("Room has already started");
       }
       if (room.participants.length !== room.maxParticipants) {
@@ -1693,14 +1695,16 @@ export class RoomService {
       }
     }
 
-    // Mark game as started (actual status transition to DRAFT/TEAM_SELECTION
-    // is handled by the specific module: snake-draft or auction service)
-    await this.prisma.room.update({
-      where: { id: roomId },
-      data: {
-        startedAt: new Date(),
-      },
+    // 검증을 통과한 즉시 WAITING → DRAFT로 원자적 상태 전환.
+    // updateMany의 WHERE 조건이 DB 레벨 게이트 역할을 해서
+    // 동시 startGame 요청 중 두 번째는 count=0으로 걸러진다.
+    const claimed = await this.prisma.room.updateMany({
+      where: { id: roomId, status: RoomStatus.WAITING },
+      data: { startedAt: new Date(), status: RoomStatus.DRAFT },
     });
+    if (claimed.count === 0) {
+      throw new BadRequestException("이미 게임 시작 처리 중입니다.");
+    }
 
     return {
       success: true,
