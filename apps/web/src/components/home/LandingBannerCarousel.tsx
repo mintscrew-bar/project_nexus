@@ -3,10 +3,12 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { CreatorBanner } from "@/components/home/CreatorBanner";
+import { AuctionBanner } from "@/components/home/AuctionBanner";
+import { StatsBanner } from "@/components/home/StatsBanner";
 import { DiscordBanner } from "@/components/home/DiscordBanner";
 import { cn } from "@/lib/utils";
 
-const TOTAL_SLIDES = 2;
+const TOTAL_SLIDES = 4;
 
 export function LandingBannerCarousel() {
   const [current, setCurrent] = useState(0);
@@ -49,6 +51,8 @@ export function LandingBannerCarousel() {
 
   const slides = [
     <CreatorBanner key="creator" className="h-full aspect-auto" isActive={current === 0} priority />,
+    <AuctionBanner key="auction" isActive={current === 1} />,
+    <StatsBanner key="stats" isActive={current === 2} />,
     <DiscordBanner key="discord" />,
   ];
 
