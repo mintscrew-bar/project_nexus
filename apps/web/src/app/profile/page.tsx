@@ -630,7 +630,7 @@ export default function ProfilePage() {
                           ? ((champ.kills + champ.assists) / champ.deaths).toFixed(2)
                           : 'Perfect';
                         return (
-                          <div key={champ.championId} className="flex items-center gap-3 bg-bg-tertiary rounded-lg p-3">
+                          <div key={champ.championId} className="flex items-center gap-3 bg-bg-tertiary border border-bg-elevated rounded-lg p-3">
                             <div className="relative">
                               <ChampionImage
                                 championKey={champ.championName || getChampionKey(String(champ.championId))}
@@ -672,7 +672,7 @@ export default function ProfilePage() {
                         </div>
                         <div className="flex flex-wrap gap-3">
                           {champs.map(({ championId }) => (
-                            <div key={championId} className="flex items-center gap-2 bg-bg-tertiary rounded-lg px-3 py-2">
+                            <div key={championId} className="flex items-center gap-2 bg-bg-tertiary border border-bg-elevated rounded-lg px-3 py-2">
                               <ChampionImage
                                 championKey={getChampionKey(championId)}
                                 size={32}
@@ -699,7 +699,7 @@ export default function ProfilePage() {
                           ? ((champ.kills + champ.assists) / champ.deaths).toFixed(2)
                           : 'Perfect';
                         return (
-                          <div key={champ.championName} className="flex items-center gap-3 bg-bg-tertiary rounded-lg p-3">
+                          <div key={champ.championName} className="flex items-center gap-3 bg-bg-tertiary border border-bg-elevated rounded-lg p-3">
                             <div className="relative">
                               <ChampionImage
                                 championKey={champ.championName}

@@ -59,7 +59,8 @@ export function TabsList({ children, className }: TabsListProps) {
   return (
     <div
       className={cn(
-        'flex gap-1 p-1 bg-bg-tertiary rounded-lg',
+        'flex gap-1 p-1 rounded-lg',
+        'bg-bg-tertiary border border-bg-elevated',
         className
       )}
       role="tablist"
@@ -95,8 +96,8 @@ export function TabsTrigger({
         'px-4 py-2 text-sm font-medium rounded-md transition-all duration-200',
         'focus:outline-none focus:ring-2 focus:ring-accent-primary focus:ring-offset-2 focus:ring-offset-bg-tertiary',
         isActive
-          ? 'bg-bg-secondary text-text-primary shadow-sm'
-          : 'text-text-secondary hover:text-text-primary hover:bg-bg-elevated',
+          ? 'bg-bg-secondary text-accent-primary font-semibold shadow-sm border border-bg-elevated'
+          : 'text-text-secondary hover:text-text-primary hover:bg-bg-elevated/60',
         disabled && 'opacity-50 cursor-not-allowed',
         className
       )}
