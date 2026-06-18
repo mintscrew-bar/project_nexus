@@ -439,13 +439,13 @@ export default function UserProfilePage() {
     <div className="flex-grow p-4 md:p-8">
       <div className="container mx-auto max-w-6xl">
         {/* Profile Hero Section */}
-        <Card className="mb-6 overflow-hidden rounded-[18px] border-[#667EEA]/40 bg-[#101010] text-white shadow-[0_32px_70px_rgba(0,0,0,0.45)]">
+        <Card className="mb-6 overflow-hidden rounded-[18px] border-accent-primary/30 bg-bg-secondary shadow-lg">
           <CardContent className="p-4 md:p-5">
             <div className="flex flex-col gap-5 md:flex-row md:items-start">
               {/* Avatar */}
               <div className="flex-shrink-0 relative">
                 <div
-                  className="relative flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-[#171717] md:h-24 md:w-24"
+                  className="relative flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-bg-tertiary md:h-24 md:w-24"
                   style={{ border: `2px solid ${PROFILE_ACCENT}88` }}
                 >
                   {profile.avatar ? (
@@ -472,7 +472,7 @@ export default function UserProfilePage() {
               {/* Info */}
               <div className="min-w-0 flex-1 pt-1">
                 <div className="mb-2 flex items-center gap-2">
-                  <h1 className="text-xl font-black leading-tight text-white md:text-2xl">
+                  <h1 className="text-xl font-black leading-tight text-text-primary md:text-2xl">
                     {profile.username}
                   </h1>
                   {clan && (
@@ -489,9 +489,9 @@ export default function UserProfilePage() {
                 </div>
 
                 {/* Bio */}
-                <p className="mb-3 max-w-2xl text-sm text-zinc-500">
+                <p className="mb-3 max-w-2xl text-sm text-text-secondary">
                   {profile.bio || (
-                    <span className="text-zinc-600 italic">
+                    <span className="text-text-tertiary italic">
                       자기소개가 없습니다.
                     </span>
                   )}
@@ -504,12 +504,12 @@ export default function UserProfilePage() {
                     <div className="flex flex-wrap items-center gap-2">
                       {/* 왼쪽: 주라인 */}
                         {primary.mainRole && (
-                          <div className="flex items-center gap-2 rounded-lg bg-[#1a1a1a] px-3 py-2">
-                            <Gamepad2 className="h-4 w-4 flex-shrink-0 text-zinc-400" />
-                            <div className="text-sm font-semibold text-white">
+                          <div className="flex items-center gap-2 rounded-lg bg-bg-tertiary border border-bg-elevated px-3 py-2">
+                            <Gamepad2 className="h-4 w-4 flex-shrink-0 text-text-secondary" />
+                            <div className="text-sm font-semibold text-text-primary">
                               {ROLE_LABELS[primary.mainRole] ?? primary.mainRole}
                               {primary.subRole && (
-                                <span className="ml-1 text-zinc-500">/ {ROLE_LABELS[primary.subRole] ?? primary.subRole}</span>
+                                <span className="ml-1 text-text-tertiary">/ {ROLE_LABELS[primary.subRole] ?? primary.subRole}</span>
                               )}
                             </div>
                           </div>
@@ -520,8 +520,8 @@ export default function UserProfilePage() {
                           <div className="flex items-center gap-2">
                             <TierBadge tier={primary.tier} size="md" />
                             <div className="text-sm">
-                              {primary.rank && <span className="font-medium text-white">{primary.rank}</span>}
-                              {primary.lp && <span className="ml-1 text-zinc-400">{primary.lp}LP</span>}
+                              {primary.rank && <span className="font-medium text-text-primary">{primary.rank}</span>}
+                              {primary.lp && <span className="ml-1 text-text-secondary">{primary.lp}LP</span>}
                             </div>
                           </div>
                         )}
@@ -529,10 +529,10 @@ export default function UserProfilePage() {
                   )}
 
                   {/* 아래: 게임명 · 최고 티어 · 평판 · 가입일 */}
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-600">
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-text-tertiary">
                     {primary && (
                       <>
-                        <span className="font-medium text-zinc-300">{primary.gameName}</span>
+                        <span className="font-medium text-text-secondary">{primary.gameName}</span>
                         <span>#{primary.tagLine}</span>
                         <span>·</span>
                         {primary.peakTier && (
