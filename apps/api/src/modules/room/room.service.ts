@@ -559,14 +559,28 @@ export class RoomService {
             room.maxParticipants,
             room.teamMode,
             room.isPrivate,
+            1, // 방장 1명
           );
 
-          await this.discordBotService.sendEmbedNotification(
+          const messageId = await this.discordBotService.sendEmbedNotification(
             notificationTarget.guildId,
             notificationTarget.channelId,
             embed,
             components,
           );
+
+          if (messageId) {
+            this.discordBotService.storeRoomNotification(room.id, {
+              guildId: notificationTarget.guildId,
+              channelId: notificationTarget.channelId,
+              messageId,
+              roomName: room.name,
+              hostName: room.host.username,
+              maxPlayers: room.maxParticipants,
+              teamMode: room.teamMode,
+              isPrivate: room.isPrivate,
+            });
+          }
         }
       }
     } catch (error) {
@@ -902,7 +916,17 @@ export class RoomService {
       return room.id;
     });
 
-    return this.getRoomById(joinedRoomId);
+    const roomData = await this.getRoomById(joinedRoomId);
+
+    // WAITING 중 참가자 변동 → Discord 알림 embed 업데이트
+    if (this.discordBotService) {
+      const playerCount = (roomData as any).participants?.filter(
+        (p: any) => p.role === 'PLAYER',
+      ).length ?? 0;
+      this.discordBotService.updateRoomNotification(joinedRoomId, playerCount).catch(() => {});
+    }
+
+    return roomData;
   }
 
   /** PLAYER ↔ SPECTATOR 역할 전환 */
@@ -1072,11 +1096,11 @@ export class RoomService {
 
     // If no participants left, delete the room regardless of status (prevents zombie rooms)
     if (remainingCount === 0) {
-      // Clean up Discord channels (category + lobby + team channels) before deleting
       if (this.discordVoiceService) {
         await this.discordVoiceService.deleteRoomChannels(roomId);
       }
       await this.deleteRoomData(roomId);
+      this.discordBotService?.clearRoomNotification(roomId);
       return {
         message: "Room deleted (no participants)",
         username,
@@ -1090,6 +1114,7 @@ export class RoomService {
         await this.discordVoiceService.deleteRoomChannels(roomId);
       }
       await this.deleteRoomData(roomId);
+      this.discordBotService?.clearRoomNotification(roomId);
       return {
         message: "Room deleted (only bots remaining)",
         username,
@@ -1111,6 +1136,14 @@ export class RoomService {
         });
         newHostId = nextHost.userId;
       }
+    }
+
+    // 퇴장 후 남은 PLAYER 수로 Discord 알림 업데이트
+    if (this.discordBotService) {
+      const remainingPlayerCount = remainingParticipants.filter(
+        (p: any) => p.role === 'PLAYER',
+      ).length;
+      this.discordBotService.updateRoomNotification(roomId, remainingPlayerCount).catch(() => {});
     }
 
     return { message: "Left room successfully", username, newHostId };

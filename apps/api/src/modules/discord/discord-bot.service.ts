@@ -102,11 +102,24 @@ const DISCORD_TIER_ROLE_KEYS = [
   "UNRANKED",
 ];
 
+interface RoomNotifEntry {
+  guildId: string;
+  channelId: string;
+  messageId: string;
+  roomName: string;
+  hostName: string;
+  maxPlayers: number;
+  teamMode: string;
+  isPrivate: boolean;
+}
+
 @Injectable()
 export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
   private client: Client;
   private rest: REST;
   private voiceService: DiscordVoiceService | null = null;
+  // 방 생성 알림 메시지 참조 (roomId → 메시지 정보), 재시작 시 초기화됨
+  private readonly roomNotifMap = new Map<string, RoomNotifEntry>();
 
   constructor(
     private readonly configService: ConfigService,
@@ -2003,16 +2016,43 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
     channelId: string,
     embed: EmbedBuilder,
     components?: ActionRowBuilder<ButtonBuilder>[],
-  ) {
+  ): Promise<string | null> {
     const guild = await this.client.guilds.fetch(guildId);
     const channel = await guild.channels.fetch(channelId);
 
     if (channel?.isTextBased()) {
-      await channel.send({
+      const message = await channel.send({
         embeds: [embed],
         ...(components?.length ? { components } : {}),
       });
+      return message.id;
     }
+    return null;
+  }
+
+  storeRoomNotification(roomId: string, entry: RoomNotifEntry) {
+    this.roomNotifMap.set(roomId, entry);
+  }
+
+  async updateRoomNotification(roomId: string, currentPlayers: number): Promise<void> {
+    const notif = this.roomNotifMap.get(roomId);
+    if (!notif) return;
+    try {
+      const guild = await this.client.guilds.fetch(notif.guildId);
+      const channel = await guild.channels.fetch(notif.channelId);
+      if (!channel?.isTextBased()) return;
+      const message = await channel.messages.fetch(notif.messageId);
+      const { embed, components } = this.buildRoomCreatedEmbed(
+        roomId, notif.roomName, notif.hostName, notif.maxPlayers, notif.teamMode, notif.isPrivate, currentPlayers,
+      );
+      await message.edit({ embeds: [embed], components });
+    } catch (err: any) {
+      console.warn(`[DiscordBot] 방 알림 업데이트 실패 (${roomId}): ${err?.message}`);
+    }
+  }
+
+  clearRoomNotification(roomId: string) {
+    this.roomNotifMap.delete(roomId);
   }
 
   async syncUserTierAndLineRoles(userId: string): Promise<void> {
@@ -2109,6 +2149,7 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
     maxPlayers: number,
     teamMode: string,
     isPrivate: boolean,
+    currentPlayers: number = 0,
   ): { embed: EmbedBuilder; components: ActionRowBuilder<ButtonBuilder>[] } {
     const appUrl =
       this.configService.get("APP_URL") || "https://labs-nexus.com";
@@ -2137,7 +2178,7 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
       .addFields(
         { name: "👑 방장", value: hostName, inline: true },
         { name: "🎮 모드", value: modeLabel, inline: true },
-        { name: "👥 인원", value: `0 / ${maxPlayers}명`, inline: true },
+        { name: "👥 인원", value: `${currentPlayers} / ${maxPlayers}명`, inline: true },
       )
       .setTimestamp();
 
