@@ -1140,9 +1140,7 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
               ? "관리자"
               : user.role === "MODERATOR"
                 ? "매니저"
-                : user.role === "STREAMER"
-                  ? "스트리머"
-                  : "유저",
+                : "유저",
           inline: true,
         },
         {
@@ -2004,12 +2002,16 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
     guildId: string,
     channelId: string,
     embed: EmbedBuilder,
+    components?: ActionRowBuilder<ButtonBuilder>[],
   ) {
     const guild = await this.client.guilds.fetch(guildId);
     const channel = await guild.channels.fetch(channelId);
 
     if (channel?.isTextBased()) {
-      await channel.send({ embeds: [embed] });
+      await channel.send({
+        embeds: [embed],
+        ...(components?.length ? { components } : {}),
+      });
     }
   }
 
@@ -2101,19 +2103,52 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
   // ========================================
 
   buildRoomCreatedEmbed(
+    roomId: string,
     roomName: string,
     hostName: string,
     maxPlayers: number,
-  ) {
-    return new EmbedBuilder()
-      .setColor(Colors.Green)
-      .setTitle("🎮 새 내전방 생성!")
-      .setDescription(`**${roomName}** 방이 생성되었습니다.`)
+    teamMode: string,
+    isPrivate: boolean,
+  ): { embed: EmbedBuilder; components: ActionRowBuilder<ButtonBuilder>[] } {
+    const appUrl = this.configService.get("APP_URL") || "https://labs-nexus.com";
+
+    const MODE_LABEL: Record<string, string> = {
+      AUCTION: "경매 드래프트",
+      SNAKE_DRAFT: "스네이크 드래프트",
+      AUTO_BALANCE: "자동 밸런스",
+      MANUAL_TEAM: "자유 팀 선택",
+    };
+    const MODE_EMOJI: Record<string, string> = {
+      AUCTION: "💰",
+      SNAKE_DRAFT: "🐍",
+      AUTO_BALANCE: "⚖️",
+      MANUAL_TEAM: "🤝",
+    };
+
+    const modeLabel = MODE_LABEL[teamMode] ?? teamMode;
+    const modeEmoji = MODE_EMOJI[teamMode] ?? "🎮";
+    const lockEmoji = isPrivate ? " 🔒" : "";
+
+    const embed = new EmbedBuilder()
+      .setColor(0x667eea)
+      .setTitle(`${modeEmoji} 내전 방 생성됨`)
+      .setDescription(`**${roomName}**${lockEmoji}`)
       .addFields(
-        { name: "👑 호스트", value: hostName, inline: true },
-        { name: "👥 정원", value: `${maxPlayers}명`, inline: true },
+        { name: "👑 방장", value: hostName, inline: true },
+        { name: "🎮 모드", value: modeLabel, inline: true },
+        { name: "👥 인원", value: `0 / ${maxPlayers}명`, inline: true },
       )
       .setTimestamp();
+
+    const button = new ButtonBuilder()
+      .setLabel("방 참가하기")
+      .setStyle(ButtonStyle.Link)
+      .setURL(`${appUrl}/tournaments/${roomId}/lobby`)
+      .setEmoji("🚀");
+
+    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(button);
+
+    return { embed, components: [row] };
   }
 
   buildAuctionStartEmbed(roomName: string, teams: string[]) {

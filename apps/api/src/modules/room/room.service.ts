@@ -552,16 +552,20 @@ export class RoomService {
           await this.discordVoiceService?.getRoomNotificationTarget?.(room.id);
 
         if (notificationTarget) {
-          const embed = this.discordBotService.buildRoomCreatedEmbed(
+          const { embed, components } = this.discordBotService.buildRoomCreatedEmbed(
+            room.id,
             room.name,
             room.host.username,
             room.maxParticipants,
+            room.teamMode,
+            room.isPrivate,
           );
 
           await this.discordBotService.sendEmbedNotification(
             notificationTarget.guildId,
             notificationTarget.channelId,
             embed,
+            components,
           );
         }
       }
