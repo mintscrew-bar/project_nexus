@@ -57,145 +57,209 @@ const STREAMER_PLATFORM_LABELS: Record<StreamerPlatform, string> = {
   YOUTUBE: '유튜브',
 };
 
-function StreamerRegistrationCard({
-  profile,
-  onSaved,
-  addToast,
+// 플랫폼별 인라인 편집 행
+function StreamerRow({
+  entry,
+  isNew,
+  usedPlatforms,
+  onSave,
+  onDelete,
+  onCancel,
 }: {
-  profile?: StreamerProfile | null;
-  onSaved: () => Promise<void>;
-  addToast: (message: string, type: 'success' | 'error') => void;
+  entry: StreamerProfile | null;
+  isNew: boolean;
+  usedPlatforms: StreamerPlatform[];
+  onSave: (data: { platform: StreamerPlatform; channelUrl: string; channelName?: string }) => Promise<void>;
+  onDelete: (platform: StreamerPlatform) => Promise<void>;
+  onCancel?: () => void;
 }) {
-  const [editing, setEditing] = useState(!profile);
-  const [platform, setPlatform] = useState<StreamerPlatform>(profile?.platform ?? 'CHZZK');
-  const [channelUrl, setChannelUrl] = useState(profile?.channelUrl ?? '');
-  const [channelName, setChannelName] = useState(profile?.channelName ?? '');
+  const availablePlatforms = STREAMER_PLATFORM_OPTIONS.filter(
+    (opt) => !usedPlatforms.includes(opt.value) || opt.value === entry?.platform,
+  );
+  const [editing, setEditing] = useState(isNew);
+  const [platform, setPlatform] = useState<StreamerPlatform>(
+    entry?.platform ?? availablePlatforms[0]?.value ?? 'CHZZK',
+  );
+  const [channelUrl, setChannelUrl] = useState(entry?.channelUrl ?? '');
+  const [channelName, setChannelName] = useState(entry?.channelName ?? '');
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    setPlatform(profile?.platform ?? 'CHZZK');
-    setChannelUrl(profile?.channelUrl ?? '');
-    setChannelName(profile?.channelName ?? '');
-    setEditing(!profile);
-  }, [profile]);
-
-  const selectedPlatform = STREAMER_PLATFORM_OPTIONS.find((option) => option.value === platform) ?? STREAMER_PLATFORM_OPTIONS[0];
+  const selectedOpt = STREAMER_PLATFORM_OPTIONS.find((o) => o.value === platform) ?? STREAMER_PLATFORM_OPTIONS[0];
 
   const handleSave = async () => {
-    if (!channelUrl.trim()) {
-      addToast('방송 채널 주소를 입력해주세요.', 'error');
-      return;
-    }
-
+    if (!channelUrl.trim()) return;
     setSaving(true);
     try {
-      await userApi.upsertStreamerProfile({
-        platform,
-        channelUrl: channelUrl.trim(),
-        channelName: channelName.trim() || undefined,
-      });
-      await onSaved();
+      await onSave({ platform, channelUrl: channelUrl.trim(), channelName: channelName.trim() || undefined });
       setEditing(false);
-      addToast('스트리머 태그가 저장되었습니다.', 'success');
-    } catch (error: any) {
-      const message = error?.response?.data?.message;
-      addToast(Array.isArray(message) ? message[0] : message || '스트리머 등록에 실패했습니다.', 'error');
     } finally {
       setSaving(false);
     }
   };
 
-  const handleRemove = async () => {
-    if (!confirm('streamer 태그를 제거할까요?')) return;
-
+  const handleDelete = async () => {
+    if (!entry || !confirm(`${STREAMER_PLATFORM_LABELS[entry.platform]} 채널을 제거할까요?`)) return;
     setSaving(true);
     try {
-      await userApi.deleteStreamerProfile();
-      await onSaved();
-      setEditing(true);
-      addToast('streamer 태그를 제거했습니다.', 'success');
-    } catch {
-      addToast('streamer 태그 제거에 실패했습니다.', 'error');
+      await onDelete(entry.platform);
     } finally {
       setSaving(false);
+    }
+  };
+
+  if (!editing) {
+    return (
+      <div className="flex items-center gap-3 rounded-lg bg-bg-tertiary/50 px-3 py-2.5">
+        <span className="w-16 flex-shrink-0 text-xs font-bold text-text-secondary">
+          {STREAMER_PLATFORM_LABELS[entry!.platform]}
+        </span>
+        <a
+          href={entry!.channelUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="min-w-0 flex-1 truncate text-sm font-semibold text-accent-primary hover:underline"
+        >
+          {entry!.channelName || entry!.channelUrl}
+        </a>
+        <div className="flex flex-shrink-0 gap-1">
+          <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setEditing(true)}>
+            수정
+          </Button>
+          <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-accent-danger hover:text-accent-danger" onClick={handleDelete} disabled={saving}>
+            삭제
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid gap-2 rounded-lg bg-bg-tertiary/50 p-2.5 sm:grid-cols-[120px_1fr_140px_auto]">
+      <select
+        value={platform}
+        onChange={(e) => setPlatform(e.target.value as StreamerPlatform)}
+        disabled={!isNew}
+        className="rounded-lg border border-bg-tertiary bg-bg-primary px-3 py-2 text-sm font-semibold text-text-primary outline-none focus:border-accent-primary disabled:opacity-60"
+      >
+        {availablePlatforms.map((opt) => (
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
+        ))}
+      </select>
+      <input
+        value={channelUrl}
+        onChange={(e) => setChannelUrl(e.target.value)}
+        placeholder={selectedOpt.placeholder}
+        className="min-w-0 rounded-lg border border-bg-tertiary bg-bg-primary px-3 py-2 text-sm text-text-primary outline-none placeholder:text-text-tertiary focus:border-accent-primary"
+      />
+      <input
+        value={channelName}
+        onChange={(e) => setChannelName(e.target.value)}
+        placeholder="채널명 (선택)"
+        className="min-w-0 rounded-lg border border-bg-tertiary bg-bg-primary px-3 py-2 text-sm text-text-primary outline-none placeholder:text-text-tertiary focus:border-accent-primary"
+      />
+      <div className="flex gap-1.5">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-9 px-2"
+          onClick={() => { if (isNew && onCancel) { onCancel(); } else { setEditing(false); } }}
+          disabled={saving}
+        >
+          취소
+        </Button>
+        <Button size="sm" className="h-9 px-3" onClick={handleSave} disabled={saving || !channelUrl.trim()}>
+          {saving ? '저장 중' : '저장'}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function StreamerRegistrationCard({
+  profiles,
+  onSaved,
+  addToast,
+}: {
+  profiles: StreamerProfile[];
+  onSaved: () => Promise<void>;
+  addToast: (message: string, type: 'success' | 'error') => void;
+}) {
+  const [addingNew, setAddingNew] = useState(false);
+
+  const usedPlatforms = profiles.map((p) => p.platform);
+  // 3개 플랫폼이 모두 등록됐으면 추가 버튼 숨김
+  const canAdd = profiles.length < 3 && !addingNew;
+
+  const handleSave = async (data: { platform: StreamerPlatform; channelUrl: string; channelName?: string }) => {
+    try {
+      await userApi.upsertStreamerProfile(data);
+      await onSaved();
+      setAddingNew(false);
+      addToast('스트리머 채널이 저장되었습니다.', 'success');
+    } catch (error: any) {
+      const message = error?.response?.data?.message;
+      addToast(Array.isArray(message) ? message[0] : message || '저장에 실패했습니다.', 'error');
+      throw error;
+    }
+  };
+
+  const handleDelete = async (platform: StreamerPlatform) => {
+    try {
+      await userApi.deleteStreamerProfile(platform);
+      await onSaved();
+      addToast('채널을 제거했습니다.', 'success');
+    } catch {
+      addToast('채널 제거에 실패했습니다.', 'error');
+      throw new Error();
     }
   };
 
   return (
     <Card className="mb-6 overflow-hidden rounded-[16px] border-accent-gold/25 bg-bg-secondary">
       <CardContent className="p-4 md:p-5">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="gold" className="gap-1 rounded-md px-2 py-1 text-xs font-black">
-                <Radio className="h-3.5 w-3.5" />
-                streamer
-              </Badge>
-              <span className="text-sm font-bold text-text-primary">방송 채널</span>
-              {profile && !editing && (
-                <span className="text-xs text-text-tertiary">{STREAMER_PLATFORM_LABELS[profile.platform]}</span>
-              )}
-            </div>
-            {profile && !editing ? (
-              <a
-                href={profile.channelUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="mt-2 inline-flex max-w-full items-center gap-1.5 text-sm font-semibold text-accent-primary hover:underline"
-              >
-                <span className="truncate">{profile.channelName || profile.channelUrl}</span>
-                <ExternalLink className="h-3.5 w-3.5 flex-shrink-0" />
-              </a>
-            ) : (
-              <p className="mt-2 text-xs text-text-muted">치지직, SOOP, 유튜브 채널을 등록할 수 있습니다.</p>
-            )}
+        <div className="mb-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Badge variant="gold" className="gap-1 rounded-md px-2 py-1 text-xs font-black">
+              <Radio className="h-3.5 w-3.5" />
+              streamer
+            </Badge>
+            <span className="text-sm font-bold text-text-primary">방송 채널</span>
+            <span className="text-xs text-text-tertiary">{profiles.length}/3</span>
           </div>
+          {canAdd && (
+            <Button variant="outline" size="sm" className="h-7 gap-1 px-2.5 text-xs" onClick={() => setAddingNew(true)}>
+              <Plus className="h-3.5 w-3.5" />
+              채널 추가
+            </Button>
+          )}
+        </div>
 
-          {profile && !editing ? (
-            <div className="flex flex-shrink-0 gap-2">
-              <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
-                수정
-              </Button>
-              <Button variant="ghost" size="sm" onClick={handleRemove} disabled={saving}>
-                제거
-              </Button>
-            </div>
-          ) : (
-            <div className="grid w-full gap-2 lg:max-w-2xl lg:grid-cols-[130px_1fr_150px_auto]">
-              <select
-                value={platform}
-                onChange={(e) => setPlatform(e.target.value as StreamerPlatform)}
-                className="rounded-lg border border-bg-tertiary bg-bg-tertiary px-3 py-2 text-sm font-semibold text-text-primary outline-none focus:border-accent-primary"
-              >
-                {STREAMER_PLATFORM_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-              <input
-                value={channelUrl}
-                onChange={(e) => setChannelUrl(e.target.value)}
-                placeholder={selectedPlatform.placeholder}
-                className="min-w-0 rounded-lg border border-bg-tertiary bg-bg-tertiary px-3 py-2 text-sm text-text-primary outline-none placeholder:text-text-tertiary focus:border-accent-primary"
-              />
-              <input
-                value={channelName}
-                onChange={(e) => setChannelName(e.target.value)}
-                placeholder="채널명"
-                className="min-w-0 rounded-lg border border-bg-tertiary bg-bg-tertiary px-3 py-2 text-sm text-text-primary outline-none placeholder:text-text-tertiary focus:border-accent-primary"
-              />
-              <div className="flex gap-2">
-                {profile && (
-                  <Button variant="ghost" size="sm" onClick={() => setEditing(false)} disabled={saving}>
-                    취소
-                  </Button>
-                )}
-                <Button size="sm" onClick={handleSave} disabled={saving}>
-                  {saving ? '저장 중' : '저장'}
-                </Button>
-              </div>
-            </div>
+        {profiles.length === 0 && !addingNew && (
+          <p className="text-xs text-text-muted">치지직, SOOP, 유튜브 채널을 등록하면 프로필에 streamer 태그가 표시됩니다.</p>
+        )}
+
+        <div className="flex flex-col gap-2">
+          {profiles.map((profile) => (
+            <StreamerRow
+              key={profile.platform}
+              entry={profile}
+              isNew={false}
+              usedPlatforms={usedPlatforms}
+              onSave={handleSave}
+              onDelete={handleDelete}
+            />
+          ))}
+          {addingNew && (
+            <StreamerRow
+              entry={null}
+              isNew={true}
+              usedPlatforms={usedPlatforms}
+              onSave={handleSave}
+              onDelete={handleDelete}
+              onCancel={() => setAddingNew(false)}
+            />
           )}
         </div>
       </CardContent>
@@ -671,7 +735,7 @@ export default function ProfilePage() {
   const highlightChampionId = profileData?.settings?.highlightChampionId;
   const recent = getRecentMetrics(recentMatches);
   const stats = profileData?.stats ?? user?.stats ?? null;
-  const streamerProfile = profileData?.streamerProfile ?? null;
+  const streamerProfiles: StreamerProfile[] = profileData?.streamerProfiles ?? [];
 
   return (
     <div className="flex-grow p-4 md:p-8">
@@ -750,8 +814,8 @@ export default function ProfilePage() {
                       {clan.tag}
                     </Badge>
                   )}
-                  {streamerProfile && (
-                    <a href={streamerProfile.channelUrl} target="_blank" rel="noreferrer">
+                  {streamerProfiles.length > 0 && (
+                    <a href={streamerProfiles[0].channelUrl} target="_blank" rel="noreferrer">
                       <Badge variant="gold" size="sm" className="rounded-md px-2 py-1 text-xs font-black">
                         streamer
                       </Badge>
@@ -866,7 +930,7 @@ export default function ProfilePage() {
         </Card>
 
         <StreamerRegistrationCard
-          profile={streamerProfile}
+          profiles={streamerProfiles}
           onSaved={fetchProfile}
           addToast={addToast}
         />

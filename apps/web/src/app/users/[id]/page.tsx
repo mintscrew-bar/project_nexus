@@ -195,12 +195,12 @@ interface ProfileUser {
     highlightChampionId: string | null;
     highlightStatType: string | null;
   } | null;
-  streamerProfile?: {
+  streamerProfiles?: {
     platform: "CHZZK" | "SOOP" | "YOUTUBE";
     channelUrl: string;
     channelName: string | null;
     isActive?: boolean;
-  } | null;
+  }[];
 }
 
 type FriendshipStatus =
@@ -594,8 +594,8 @@ export default function UserProfilePage() {
                       {clan.tag}
                     </Badge>
                   )}
-                  {profile.streamerProfile && (
-                    <a href={profile.streamerProfile.channelUrl} target="_blank" rel="noreferrer">
+                  {(profile.streamerProfiles ?? []).length > 0 && (
+                    <a href={profile.streamerProfiles![0].channelUrl} target="_blank" rel="noreferrer">
                       <Badge variant="gold" size="sm" className="rounded-md px-2 py-1 text-xs font-black">
                         streamer
                       </Badge>

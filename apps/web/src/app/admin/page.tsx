@@ -556,7 +556,7 @@ interface AdminUser {
     rank: string;
     isPrimary: boolean;
   }[];
-  streamerProfile?: StreamerProfileSummary | null;
+  streamerProfiles?: StreamerProfileSummary[];
   _count: { reportsReceived: number };
 }
 
@@ -869,7 +869,7 @@ function UsersTab({ addToast, currentUserId, isAdmin }: { addToast: (msg: string
                                 <Bot className="h-3 w-3" />봇
                               </Badge>
                             )}
-                            {u.streamerProfile?.isActive && (
+                            {(u.streamerProfiles ?? []).some((p) => p.isActive) && (
                               <Badge variant="gold" className="text-[10px]">
                                 streamer
                               </Badge>

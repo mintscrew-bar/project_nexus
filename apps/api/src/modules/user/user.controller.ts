@@ -26,6 +26,7 @@ import {
   UpsertStreamerProfileDto,
 } from "./dto";
 import { UploadService } from "../upload/upload.service";
+import { StreamerPlatform } from "@nexus/database";
 
 @Controller("users")
 @UseGuards(JwtAuthGuard)
@@ -74,9 +75,9 @@ export class UserController {
     return this.userSettingsService.updateSettings(userId, data);
   }
 
-  @Get("me/streamer-profile")
-  async getMyStreamerProfile(@CurrentUser("sub") userId: string) {
-    return this.userService.getStreamerProfile(userId);
+  @Get("me/streamer-profiles")
+  async getMyStreamerProfiles(@CurrentUser("sub") userId: string) {
+    return this.userService.getStreamerProfiles(userId);
   }
 
   @Put("me/streamer-profile")
@@ -87,9 +88,12 @@ export class UserController {
     return this.userService.upsertStreamerProfile(userId, data);
   }
 
-  @Delete("me/streamer-profile")
-  async deleteMyStreamerProfile(@CurrentUser("sub") userId: string) {
-    return this.userService.deleteStreamerProfile(userId);
+  @Delete("me/streamer-profile/:platform")
+  async deleteMyStreamerProfile(
+    @CurrentUser("sub") userId: string,
+    @Param("platform") platform: StreamerPlatform,
+  ) {
+    return this.userService.deleteStreamerProfile(userId, platform);
   }
 
   /**

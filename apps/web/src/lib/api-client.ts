@@ -478,9 +478,9 @@ export const userApi = {
     return response.data as { avatarUrl: string };
   },
 
-  getStreamerProfile: async () => {
-    const response = await apiClient.get("/users/me/streamer-profile");
-    return response.data as StreamerProfile | null;
+  getStreamerProfiles: async () => {
+    const response = await apiClient.get("/users/me/streamer-profiles");
+    return response.data as StreamerProfile[];
   },
 
   upsertStreamerProfile: async (data: {
@@ -492,8 +492,10 @@ export const userApi = {
     return response.data as StreamerProfile;
   },
 
-  deleteStreamerProfile: async () => {
-    const response = await apiClient.delete("/users/me/streamer-profile");
+  deleteStreamerProfile: async (platform: StreamerPlatform) => {
+    const response = await apiClient.delete(
+      `/users/me/streamer-profile/${platform}`,
+    );
     return response.data as { success: boolean };
   },
 
@@ -524,7 +526,7 @@ export const userApi = {
       championPreferences: { role: string; championId: string; order: number }[];
     } | null;
     clan: { name: string; tag: string | null } | null;
-    streamerProfile: Pick<StreamerProfile, "platform" | "channelUrl" | "channelName" | "isActive"> | null;
+    streamerProfiles: Pick<StreamerProfile, "platform" | "channelUrl" | "channelName" | "isActive">[];
     stats: { wins: number; losses: number; winRate: number };
     kda: { kills: number; deaths: number; assists: number; games: number } | null;
     reputation: { overallAverage: number; totalRatings: number };

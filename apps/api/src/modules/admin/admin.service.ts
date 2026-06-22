@@ -397,7 +397,7 @@ export class AdminService {
             },
             orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }],
           },
-          streamerProfile: {
+          streamerProfiles: {
             select: {
               platform: true,
               channelUrl: true,

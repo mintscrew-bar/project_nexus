@@ -74,7 +74,7 @@ export class UserService {
           },
         },
         settings: true,
-        streamerProfile: true,
+        streamerProfiles: true,
         _count: {
           select: {
             roomParticipations: true,
@@ -118,9 +118,10 @@ export class UserService {
       }
     }
 
-    if (safeUser.streamerProfile && !safeUser.streamerProfile.isActive) {
-      safeUser.streamerProfile = null;
-    }
+    // 비활성화된 플랫폼 제거
+    safeUser.streamerProfiles = (safeUser.streamerProfiles ?? []).filter(
+      (p: any) => p.isActive,
+    );
 
     return {
       ...safeUser,
@@ -201,7 +202,7 @@ export class UserService {
             clan: { select: { name: true, tag: true } },
           },
         },
-        streamerProfile: {
+        streamerProfiles: {
           select: {
             platform: true,
             channelUrl: true,
@@ -244,9 +245,9 @@ export class UserService {
       avatar: user.avatar,
       riotAccount: riot,
       clan,
-      streamerProfile: user.streamerProfile?.isActive
-        ? user.streamerProfile
-        : null,
+      streamerProfiles: (user.streamerProfiles ?? []).filter(
+        (p: any) => p.isActive,
+      ),
       stats: {
         wins: stats.wins,
         losses: stats.losses,
@@ -260,9 +261,10 @@ export class UserService {
     };
   }
 
-  async getStreamerProfile(userId: string) {
-    return this.prisma.streamerProfile.findUnique({
+  async getStreamerProfiles(userId: string) {
+    return this.prisma.streamerProfile.findMany({
       where: { userId },
+      orderBy: { createdAt: "asc" },
     });
   }
 
@@ -307,8 +309,21 @@ export class UserService {
 
     const channelName = data.channelName?.trim() || null;
 
-    return this.prisma.streamerProfile.upsert({
+    // 플랫폼당 1개 제한, 최대 3개 (플랫폼 3종이 전부이므로 자연스럽게 제한됨)
+    const existing = await this.prisma.streamerProfile.count({
       where: { userId },
+    });
+    const hasSamePlatform = await this.prisma.streamerProfile.findUnique({
+      where: { userId_platform: { userId, platform: data.platform } },
+    });
+    if (!hasSamePlatform && existing >= 3) {
+      throw new BadRequestException(
+        "스트리머 채널은 최대 3개까지 등록할 수 있습니다.",
+      );
+    }
+
+    return this.prisma.streamerProfile.upsert({
+      where: { userId_platform: { userId, platform: data.platform } },
       create: {
         userId,
         platform: data.platform,
@@ -317,7 +332,6 @@ export class UserService {
         isActive: true,
       },
       update: {
-        platform: data.platform,
         channelUrl,
         channelName,
         isActive: true,
@@ -325,9 +339,9 @@ export class UserService {
     });
   }
 
-  async deleteStreamerProfile(userId: string) {
-    await this.prisma.streamerProfile.deleteMany({
-      where: { userId },
+  async deleteStreamerProfile(userId: string, platform: StreamerPlatform) {
+    await this.prisma.streamerProfile.delete({
+      where: { userId_platform: { userId, platform } },
     });
 
     return { success: true };
