@@ -1,4 +1,13 @@
-import { IsIn, IsInt, IsOptional, IsString, Max, Min } from "class-validator";
+import { UserRole } from "@nexus/database";
+import {
+  IsEnum,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+} from "class-validator";
 
 // 공통 관리자 목록 페이지네이션
 export class AdminPageQueryDto {
@@ -16,6 +25,16 @@ export class AdminPageQueryDto {
   @IsOptional()
   @IsString()
   search?: string;
+
+  @IsOptional()
+  @IsIn(["users", "bots", "all"], {
+    message: "kind는 users, bots, all 중 하나여야 합니다.",
+  })
+  kind?: "users" | "bots" | "all";
+
+  @IsOptional()
+  @IsEnum(UserRole, { message: "유효한 권한 값을 선택해주세요." })
+  role?: UserRole;
 }
 
 // 신고 목록 조회

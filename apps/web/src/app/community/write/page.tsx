@@ -38,7 +38,12 @@ const resolveIcon = (name?: string | null): React.ElementType =>
   (name && ICON_MAP[name]) || MessagesSquare;
 
 // 권한 서열 — 값이 클수록 상위
-const ROLE_RANK: Record<string, number> = { USER: 0, MODERATOR: 1, ADMIN: 2 };
+const ROLE_RANK: Record<string, number> = {
+  USER: 0,
+  STREAMER: 1,
+  MODERATOR: 2,
+  ADMIN: 3,
+};
 
 export default function WritePostPage() {
   const router = useRouter();

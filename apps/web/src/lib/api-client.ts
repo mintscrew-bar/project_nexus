@@ -1235,7 +1235,7 @@ export interface Board {
   order: number;
   isActive: boolean;
   isHidden: boolean;
-  writeRole: "USER" | "MODERATOR" | "ADMIN" | null;
+  writeRole: "USER" | "STREAMER" | "MODERATOR" | "ADMIN" | null;
   createdAt: string;
   updatedAt: string;
   _count?: { posts: number };
@@ -1249,7 +1249,7 @@ export interface BoardInput {
   iconName?: string | null;
   color?: string | null;
   order?: number;
-  writeRole?: "USER" | "MODERATOR" | "ADMIN" | null;
+  writeRole?: "USER" | "STREAMER" | "MODERATOR" | "ADMIN" | null;
   isActive?: boolean;
   isHidden?: boolean;
 }
@@ -1868,11 +1868,17 @@ export const adminApi = {
     return response.data;
   },
   // Users
-  getUsers: async (params?: { page?: number; limit?: number; search?: string }) => {
+  getUsers: async (params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    kind?: "users" | "bots" | "all";
+    role?: "USER" | "STREAMER" | "MODERATOR" | "ADMIN";
+  }) => {
     const response = await apiClient.get("/admin/users", { params });
     return response.data;
   },
-  updateUserRole: async (userId: string, role: "USER" | "MODERATOR" | "ADMIN") => {
+  updateUserRole: async (userId: string, role: "USER" | "STREAMER" | "MODERATOR" | "ADMIN") => {
     const response = await apiClient.patch(`/admin/users/${userId}/role`, { role });
     return response.data;
   },

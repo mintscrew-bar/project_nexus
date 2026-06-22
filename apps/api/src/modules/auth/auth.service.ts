@@ -36,7 +36,7 @@ export interface TokenPayload {
   sub: string; // User ID
   email?: string;
   username: string;
-  role: string; // UserRole: USER | MODERATOR | ADMIN
+  role: string; // UserRole: USER | STREAMER | MODERATOR | ADMIN
 }
 
 export interface RegisterDto {
@@ -453,7 +453,9 @@ export class AuthService {
       this.configService.get<string>("JWT_REFRESH_SECRET");
 
     if (!secret) {
-      throw new UnauthorizedException("Refresh token encryption is not configured");
+      throw new UnauthorizedException(
+        "Refresh token encryption is not configured",
+      );
     }
 
     return createHash("sha256").update(secret).digest();
@@ -519,7 +521,9 @@ export class AuthService {
   }
 
   shouldUpgradeRefreshCookie(cookieValue?: string | null): boolean {
-    return !!cookieValue && !cookieValue.startsWith(`${REFRESH_COOKIE_PREFIX}.`);
+    return (
+      !!cookieValue && !cookieValue.startsWith(`${REFRESH_COOKIE_PREFIX}.`)
+    );
   }
 
   private hashRefreshToken(refreshToken: string): string {

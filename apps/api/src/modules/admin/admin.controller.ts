@@ -110,6 +110,8 @@ export class AdminController {
       page: query.page,
       limit: query.limit,
       search: query.search,
+      kind: query.kind,
+      role: query.role,
     });
   }
 

@@ -7,7 +7,7 @@ import {
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../prisma/prisma.service";
-import { UserRole, AdminAction } from "@nexus/database";
+import { UserRole, AdminAction, Prisma } from "@nexus/database";
 import { DiscordBotService } from "../discord/discord-bot.service";
 import { DiscordAdminAlertService } from "../discord/discord-admin-alert.service";
 import { DiscordVoiceService } from "../discord/discord-voice.service";
@@ -300,19 +300,73 @@ export class AdminService {
 
   // ── Users ─────────────────────────────────────────────────────────────────
 
-  async getUsers(params: { page: number; limit: number; search?: string }) {
+  private getTestBotWhere(): Prisma.UserWhereInput {
+    return {
+      OR: [
+        { username: { startsWith: "testbot_" } },
+        { email: { endsWith: "@nexus.test" } },
+        {
+          riotAccounts: {
+            some: {
+              puuid: { startsWith: "bot_puuid_" },
+            },
+          },
+        },
+      ],
+    };
+  }
+
+  private isTestBotUser(user: {
+    username?: string | null;
+    email?: string | null;
+    riotAccounts?: Array<{ puuid?: string | null }>;
+  }): boolean {
+    return (
+      user.username?.startsWith("testbot_") ||
+      user.email?.endsWith("@nexus.test") ||
+      user.riotAccounts?.some((account) =>
+        account.puuid?.startsWith("bot_puuid_"),
+      ) ||
+      false
+    );
+  }
+
+  async getUsers(params: {
+    page: number;
+    limit: number;
+    search?: string;
+    kind?: "users" | "bots" | "all";
+    role?: UserRole;
+  }) {
     const { page, search } = params;
     const limit = clampLimit(params.limit);
     const skip = (page - 1) * limit;
+    const kind = params.kind ?? "users";
 
-    const where = search
-      ? {
-          OR: [
-            { username: { contains: search, mode: "insensitive" as const } },
-            { email: { contains: search, mode: "insensitive" as const } },
-          ],
-        }
-      : {};
+    const filters: Prisma.UserWhereInput[] = [];
+    const botWhere = this.getTestBotWhere();
+
+    if (kind === "bots") {
+      filters.push(botWhere);
+    } else if (kind === "users") {
+      filters.push({ NOT: botWhere });
+    }
+
+    if (params.role) {
+      filters.push({ role: params.role });
+    }
+
+    if (search) {
+      filters.push({
+        OR: [
+          { username: { contains: search, mode: "insensitive" as const } },
+          { email: { contains: search, mode: "insensitive" as const } },
+        ],
+      });
+    }
+
+    const where: Prisma.UserWhereInput =
+      filters.length > 0 ? { AND: filters } : {};
 
     const [users, total] = await Promise.all([
       this.prisma.user.findMany({
@@ -336,6 +390,7 @@ export class AdminService {
               id: true,
               gameName: true,
               tagLine: true,
+              puuid: true,
               tier: true,
               rank: true,
               isPrimary: true,
@@ -351,7 +406,17 @@ export class AdminService {
       this.prisma.user.count({ where }),
     ]);
 
-    return { users, total, page, limit };
+    return {
+      users: users.map((user) => ({
+        ...user,
+        isBot: this.isTestBotUser(user),
+      })),
+      total,
+      page,
+      limit,
+      kind,
+      role: params.role ?? "all",
+    };
   }
 
   async updateUserRole(
@@ -359,6 +424,10 @@ export class AdminService {
     role: UserRole,
     requesterId: string,
   ) {
+    if (!Object.values(UserRole).includes(role)) {
+      throw new BadRequestException("유효한 권한 값을 선택해주세요.");
+    }
+
     if (targetUserId === requesterId)
       throw new BadRequestException("자신의 권한은 변경할 수 없습니다.");
 

@@ -206,13 +206,19 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
       this.configService.get<string>("ADMIN_ALERT_DISCORD_GUILD_ID") ||
       this.configService.get<string>("DISCORD_GUILD_ID");
     const channelId =
-      this.configService.get<string>("ADMIN_ALERT_DISCORD_APPROVAL_CHANNEL_ID") ||
-      this.configService.get<string>("ADMIN_ALERT_DISCORD_SECURITY_CHANNEL_ID") ||
+      this.configService.get<string>(
+        "ADMIN_ALERT_DISCORD_APPROVAL_CHANNEL_ID",
+      ) ||
+      this.configService.get<string>(
+        "ADMIN_ALERT_DISCORD_SECURITY_CHANNEL_ID",
+      ) ||
       this.configService.get<string>("ADMIN_ALERT_DISCORD_CHANNEL_ID");
 
     if (!guildId || !channelId) return;
     await this.sendNotification(guildId, channelId, message).catch((err: any) =>
-      console.warn(`[DiscordBot] 관리자 라이프사이클 알림 실패: ${err?.message}`),
+      console.warn(
+        `[DiscordBot] 관리자 라이프사이클 알림 실패: ${err?.message}`,
+      ),
     );
   }
 
@@ -1134,7 +1140,9 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
               ? "관리자"
               : user.role === "MODERATOR"
                 ? "매니저"
-                : "유저",
+                : user.role === "STREAMER"
+                  ? "스트리머"
+                  : "유저",
           inline: true,
         },
         {

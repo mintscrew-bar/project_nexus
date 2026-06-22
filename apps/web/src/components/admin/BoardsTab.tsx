@@ -42,9 +42,17 @@ const emptyForm: BoardInput = {
 
 const WRITE_ROLE_OPTIONS = [
   { value: "ALL", label: "모든 유저" },
+  { value: "STREAMER", label: "스트리머 이상" },
   { value: "MODERATOR", label: "매니저 이상" },
   { value: "ADMIN", label: "관리자만" },
 ];
+
+const WRITE_ROLE_LABELS: Record<NonNullable<Board["writeRole"]>, string> = {
+  USER: "유저+",
+  STREAMER: "스트리머+",
+  MODERATOR: "매니저+",
+  ADMIN: "관리자",
+};
 
 export function BoardsTab({ addToast }: { addToast: AddToast }) {
   const [boards, setBoards] = useState<Board[]>([]);
@@ -223,7 +231,7 @@ export function BoardsTab({ addToast }: { addToast: AddToast }) {
                   {board.writeRole && (
                     <Badge variant="warning" className="gap-1">
                       <Lock className="h-3 w-3" />
-                      {board.writeRole === "ADMIN" ? "관리자" : "매니저+"}
+                      {WRITE_ROLE_LABELS[board.writeRole]}
                     </Badge>
                   )}
                   {!board.isActive && <Badge variant="default">비활성</Badge>}

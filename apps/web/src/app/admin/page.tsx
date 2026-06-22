@@ -39,6 +39,7 @@ import {
   Database,
   RefreshCw,
   ChevronDown,
+  Bot,
 } from "lucide-react";
 
 type Tab =
@@ -524,11 +525,14 @@ function DashboardTab({ addToast }: { addToast: (msg: string, type: "success" | 
 
 // ── 유저 관리 ─────────────────────────────────────────────────────────────────
 
-type UserRole = "USER" | "MODERATOR" | "ADMIN";
+type UserRole = "USER" | "STREAMER" | "MODERATOR" | "ADMIN";
+type UserKindFilter = "users" | "bots" | "all";
+type UserRoleFilter = "all" | UserRole;
 interface AdminUser {
   id: string;
   username: string;
   email: string | null;
+  isBot?: boolean;
   role: UserRole;
   isBanned: boolean;
   banReason: string | null;
@@ -541,6 +545,7 @@ interface AdminUser {
     id: string;
     gameName: string;
     tagLine: string;
+    puuid?: string;
     tier: string;
     rank: string;
     isPrimary: boolean;
@@ -548,8 +553,30 @@ interface AdminUser {
   _count: { reportsReceived: number };
 }
 
-const ROLE_LABELS: Record<UserRole, string> = { USER: "일반", MODERATOR: "매니저", ADMIN: "관리자" };
-const ROLE_VARIANTS: Record<UserRole, "default" | "secondary" | "danger"> = { USER: "default", MODERATOR: "secondary", ADMIN: "danger" };
+const ROLE_LABELS: Record<UserRole, string> = {
+  USER: "일반",
+  STREAMER: "스트리머",
+  MODERATOR: "매니저",
+  ADMIN: "관리자",
+};
+const ROLE_VARIANTS: Record<UserRole, "default" | "primary" | "secondary" | "danger" | "gold"> = {
+  USER: "default",
+  STREAMER: "gold",
+  MODERATOR: "secondary",
+  ADMIN: "danger",
+};
+const USER_KIND_FILTERS: Array<{ value: UserKindFilter; label: string }> = [
+  { value: "users", label: "일반 유저" },
+  { value: "bots", label: "테스트 봇" },
+  { value: "all", label: "전체" },
+];
+const USER_ROLE_FILTERS: Array<{ value: UserRoleFilter; label: string }> = [
+  { value: "all", label: "전체 권한" },
+  { value: "USER", label: "일반" },
+  { value: "STREAMER", label: "스트리머" },
+  { value: "MODERATOR", label: "매니저" },
+  { value: "ADMIN", label: "관리자" },
+];
 
 const BAN_REASONS = [
   { value: "욕설/비매너", label: "욕설/비매너" },
@@ -617,6 +644,8 @@ function UsersTab({ addToast, currentUserId, isAdmin }: { addToast: (msg: string
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
+  const [kind, setKind] = useState<UserKindFilter>("users");
+  const [roleFilter, setRoleFilter] = useState<UserRoleFilter>("all");
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [loading, setLoading] = useState(true);
@@ -633,7 +662,13 @@ function UsersTab({ addToast, currentUserId, isAdmin }: { addToast: (msg: string
   const fetchUsers = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await adminApi.getUsers({ page, limit, search: search || undefined });
+      const data = await adminApi.getUsers({
+        page,
+        limit,
+        search: search || undefined,
+        kind,
+        role: roleFilter === "all" ? undefined : roleFilter,
+      });
       setUsers(data.users);
       setTotal(data.total);
     } catch {
@@ -641,7 +676,7 @@ function UsersTab({ addToast, currentUserId, isAdmin }: { addToast: (msg: string
     } finally {
       setLoading(false);
     }
-  }, [page, search, addToast]);
+  }, [page, search, kind, roleFilter, addToast]);
 
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
 
@@ -723,8 +758,13 @@ function UsersTab({ addToast, currentUserId, isAdmin }: { addToast: (msg: string
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-text-primary">유저 관리</h2>
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <h2 className="text-lg font-semibold text-text-primary">유저 관리</h2>
+          <p className="mt-1 text-xs text-text-muted">
+            테스트용 봇과 실제 가입 유저를 분리해서 확인합니다.
+          </p>
+        </div>
         <form onSubmit={(e) => { e.preventDefault(); setSearch(searchInput); setPage(1); }} className="flex gap-2">
           <input
             type="text" value={searchInput}
@@ -734,6 +774,57 @@ function UsersTab({ addToast, currentUserId, isAdmin }: { addToast: (msg: string
           />
           <Button type="submit" size="sm" variant="outline"><Search className="h-4 w-4" /></Button>
         </form>
+      </div>
+      <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
+        <div className="flex flex-wrap gap-2">
+          <div className="inline-flex w-fit rounded-lg border border-bg-tertiary bg-bg-secondary p-1">
+            {USER_KIND_FILTERS.map((filter) => (
+              <button
+                key={filter.value}
+                type="button"
+                onClick={() => {
+                  setKind(filter.value);
+                  setPage(1);
+                }}
+                className={cn(
+                  "rounded-md px-3 py-1.5 text-xs font-semibold transition-colors",
+                  kind === filter.value
+                    ? "bg-accent-primary text-white"
+                    : "text-text-secondary hover:bg-bg-tertiary hover:text-text-primary",
+                )}
+              >
+                {filter.label}
+              </button>
+            ))}
+          </div>
+          <div className="inline-flex w-fit rounded-lg border border-bg-tertiary bg-bg-secondary p-1">
+            {USER_ROLE_FILTERS.map((filter) => (
+              <button
+                key={filter.value}
+                type="button"
+                onClick={() => {
+                  setRoleFilter(filter.value);
+                  setPage(1);
+                }}
+                className={cn(
+                  "rounded-md px-3 py-1.5 text-xs font-semibold transition-colors",
+                  roleFilter === filter.value
+                    ? "bg-bg-tertiary text-text-primary"
+                    : "text-text-secondary hover:bg-bg-tertiary hover:text-text-primary",
+                )}
+              >
+                {filter.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <p className="text-xs text-text-muted">
+          {USER_KIND_FILTERS.find((filter) => filter.value === kind)?.label}
+          {" · "}
+          {USER_ROLE_FILTERS.find((filter) => filter.value === roleFilter)?.label}
+          {" "}
+          {total.toLocaleString()}명
+        </p>
       </div>
 
       <Card>
@@ -754,12 +845,28 @@ function UsersTab({ addToast, currentUserId, isAdmin }: { addToast: (msg: string
                   </tr>
                 </thead>
                 <tbody>
-                  {users.map((u) => (
+                  {users.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="px-4 py-12 text-center text-sm text-text-muted">
+                        조건에 맞는 {kind === "bots" ? "테스트 봇" : "유저"}가 없습니다.
+                      </td>
+                    </tr>
+                  ) : users.map((u) => {
+                    const canModerateUser = isAdmin || u.role === "USER";
+
+                    return (
                     <tr key={u.id} className="border-b border-bg-tertiary/50 hover:bg-bg-tertiary/30">
                       <td className="px-4 py-3">
                         <div>
-                          <span className="font-medium text-text-primary">{u.username}</span>
-                          {u.id === currentUserId && <span className="ml-1 text-[10px] text-accent-primary">(나)</span>}
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="font-medium text-text-primary">{u.username}</span>
+                            {u.isBot && (
+                              <Badge variant="secondary" className="inline-flex items-center gap-1 text-[10px]">
+                                <Bot className="h-3 w-3" />봇
+                              </Badge>
+                            )}
+                            {u.id === currentUserId && <span className="text-[10px] text-accent-primary">(나)</span>}
+                          </div>
                           <p className="text-xs text-text-muted">{u.email ?? "-"}</p>
                         </div>
                       </td>
@@ -793,13 +900,14 @@ function UsersTab({ addToast, currentUserId, isAdmin }: { addToast: (msg: string
                             className="px-2 py-1 rounded bg-bg-tertiary text-text-primary text-xs focus:outline-none cursor-pointer"
                           >
                             <option value="USER">일반</option>
+                            <option value="STREAMER">스트리머</option>
                             <option value="MODERATOR">매니저</option>
                             <option value="ADMIN">관리자</option>
                           </select>
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        {u.id !== currentUserId && (
+                        {u.id !== currentUserId && canModerateUser && (
                           <div className="flex gap-1">
                             {/* 밴/밴해제는 ADMIN 전용. 매니저는 제재만 가능 */}
                             {isAdmin && (u.isBanned ? (
@@ -824,7 +932,8 @@ function UsersTab({ addToast, currentUserId, isAdmin }: { addToast: (msg: string
                         )}
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
