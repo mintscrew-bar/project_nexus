@@ -559,7 +559,7 @@ export class RoomService {
             room.maxParticipants,
             room.teamMode,
             room.isPrivate,
-            1, // 방장 1명
+            [room.host.username], // 방 생성 시 방장 1명
           );
 
           const messageId = await this.discordBotService.sendEmbedNotification(
@@ -920,10 +920,10 @@ export class RoomService {
 
     // WAITING 중 참가자 변동 → Discord 알림 embed 업데이트
     if (this.discordBotService) {
-      const playerCount = (roomData as any).participants?.filter(
-        (p: any) => p.role === 'PLAYER',
-      ).length ?? 0;
-      this.discordBotService.updateRoomNotification(joinedRoomId, playerCount).catch(() => {});
+      const playerNames: string[] = ((roomData as any).participants ?? [])
+        .filter((p: any) => p.role === 'PLAYER')
+        .map((p: any) => p.user?.username ?? p.username ?? '');
+      this.discordBotService.updateRoomNotification(joinedRoomId, playerNames).catch(() => {});
     }
 
     return roomData;
@@ -1138,12 +1138,12 @@ export class RoomService {
       }
     }
 
-    // 퇴장 후 남은 PLAYER 수로 Discord 알림 업데이트
+    // 퇴장 후 남은 PLAYER 명단으로 Discord 알림 업데이트
     if (this.discordBotService) {
-      const remainingPlayerCount = remainingParticipants.filter(
-        (p: any) => p.role === 'PLAYER',
-      ).length;
-      this.discordBotService.updateRoomNotification(roomId, remainingPlayerCount).catch(() => {});
+      const remainingPlayerNames: string[] = remainingParticipants
+        .filter((p: any) => p.role === 'PLAYER')
+        .map((p: any) => p.user?.username ?? '');
+      this.discordBotService.updateRoomNotification(roomId, remainingPlayerNames).catch(() => {});
     }
 
     return { message: "Left room successfully", username, newHostId };

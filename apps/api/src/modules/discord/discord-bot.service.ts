@@ -2034,7 +2034,7 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
     this.roomNotifMap.set(roomId, entry);
   }
 
-  async updateRoomNotification(roomId: string, currentPlayers: number): Promise<void> {
+  async updateRoomNotification(roomId: string, participants: string[]): Promise<void> {
     const notif = this.roomNotifMap.get(roomId);
     if (!notif) return;
     try {
@@ -2043,7 +2043,7 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
       if (!channel?.isTextBased()) return;
       const message = await channel.messages.fetch(notif.messageId);
       const { embed, components } = this.buildRoomCreatedEmbed(
-        roomId, notif.roomName, notif.hostName, notif.maxPlayers, notif.teamMode, notif.isPrivate, currentPlayers,
+        roomId, notif.roomName, notif.hostName, notif.maxPlayers, notif.teamMode, notif.isPrivate, participants,
       );
       await message.edit({ embeds: [embed], components });
     } catch (err: any) {
@@ -2149,7 +2149,7 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
     maxPlayers: number,
     teamMode: string,
     isPrivate: boolean,
-    currentPlayers: number = 0,
+    participants: string[] = [],
   ): { embed: EmbedBuilder; components: ActionRowBuilder<ButtonBuilder>[] } {
     const appUrl =
       this.configService.get("APP_URL") || "https://labs-nexus.com";
@@ -2170,6 +2170,11 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
     const modeLabel = MODE_LABEL[teamMode] ?? teamMode;
     const modeEmoji = MODE_EMOJI[teamMode] ?? "🎮";
     const lockEmoji = isPrivate ? " 🔒" : "";
+    const currentPlayers = participants.length;
+
+    const memberList = participants.length > 0
+      ? participants.map((name) => `· ${name}`).join("\n")
+      : "없음";
 
     const embed = new EmbedBuilder()
       .setColor(0x667eea)
@@ -2179,6 +2184,7 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
         { name: "👑 방장", value: hostName, inline: true },
         { name: "🎮 모드", value: modeLabel, inline: true },
         { name: "👥 인원", value: `${currentPlayers} / ${maxPlayers}명`, inline: true },
+        { name: "참가자", value: memberList, inline: false },
       )
       .setTimestamp();
 
