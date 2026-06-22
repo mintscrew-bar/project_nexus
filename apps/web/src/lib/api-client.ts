@@ -453,6 +453,18 @@ export interface StreamerProfile {
   updatedAt?: string;
 }
 
+export interface StreamerLink {
+  id: string;
+  userId?: string;
+  label: string;
+  url: string;
+  imageUrl: string | null;
+  order: number;
+  isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export const userApi = {
   getProfile: async (userId: string) => {
     const response = await apiClient.get(`/users/${userId}`);
@@ -499,6 +511,47 @@ export const userApi = {
     return response.data as { success: boolean };
   },
 
+  getStreamerLinks: async () => {
+    const response = await apiClient.get("/users/me/streamer-links");
+    return response.data as StreamerLink[];
+  },
+
+  createStreamerLink: async (data: {
+    label: string;
+    url: string;
+    order?: number;
+  }) => {
+    const response = await apiClient.post("/users/me/streamer-links", data);
+    return response.data as StreamerLink;
+  },
+
+  updateStreamerLink: async (
+    linkId: string,
+    data: { label: string; url: string; order?: number },
+  ) => {
+    const response = await apiClient.patch(
+      `/users/me/streamer-links/${linkId}`,
+      data,
+    );
+    return response.data as StreamerLink;
+  },
+
+  uploadStreamerLinkImage: async (linkId: string, file: File) => {
+    const formData = new FormData();
+    formData.append("image", file);
+    const response = await apiClient.post(
+      `/users/me/streamer-links/${linkId}/image`,
+      formData,
+      { headers: { "Content-Type": "multipart/form-data" } },
+    );
+    return response.data as StreamerLink;
+  },
+
+  deleteStreamerLink: async (linkId: string) => {
+    const response = await apiClient.delete(`/users/me/streamer-links/${linkId}`);
+    return response.data as { success: boolean };
+  },
+
   getStats: async () => {
     const response = await apiClient.get("/users/stats");
     return response.data;
@@ -527,6 +580,7 @@ export const userApi = {
     } | null;
     clan: { name: string; tag: string | null } | null;
     streamerProfiles: Pick<StreamerProfile, "platform" | "channelUrl" | "channelName" | "isActive">[];
+    streamerLinks: Pick<StreamerLink, "id" | "label" | "url" | "imageUrl" | "order" | "isActive">[];
     stats: { wins: number; losses: number; winRate: number };
     kda: { kills: number; deaths: number; assists: number; games: number } | null;
     reputation: { overallAverage: number; totalRatings: number };

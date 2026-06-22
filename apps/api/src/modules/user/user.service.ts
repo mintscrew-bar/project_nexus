@@ -9,12 +9,14 @@ import { StreamerPlatform } from "@nexus/database";
 import { PrismaService } from "../prisma/prisma.service";
 import { DiscordAdminAlertService } from "../discord/discord-admin-alert.service";
 import { ReputationService } from "../reputation/reputation.service";
+import { UploadService } from "../upload/upload.service";
 
 const STREAMER_PLATFORM_HOSTS: Record<StreamerPlatform, string[]> = {
   CHZZK: ["chzzk.naver.com"],
   SOOP: ["sooplive.co.kr", "afreecatv.com"],
   YOUTUBE: ["youtube.com", "youtu.be"],
 };
+const MAX_STREAMER_LINKS = 12;
 
 @Injectable()
 export class UserService {
@@ -23,6 +25,7 @@ export class UserService {
     private readonly configService: ConfigService,
     private readonly adminAlerts: DiscordAdminAlertService,
     private readonly reputationService: ReputationService,
+    private readonly uploadService: UploadService,
   ) {}
 
   async findById(id: string) {
@@ -75,6 +78,10 @@ export class UserService {
         },
         settings: true,
         streamerProfiles: true,
+        streamerLinks: {
+          where: { isActive: true },
+          orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+        },
         _count: {
           select: {
             roomParticipations: true,
@@ -210,6 +217,18 @@ export class UserService {
             isActive: true,
           },
         },
+        streamerLinks: {
+          where: { isActive: true },
+          orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+          select: {
+            id: true,
+            label: true,
+            url: true,
+            imageUrl: true,
+            order: true,
+            isActive: true,
+          },
+        },
       },
     });
 
@@ -248,6 +267,7 @@ export class UserService {
       streamerProfiles: (user.streamerProfiles ?? []).filter(
         (p: any) => p.isActive,
       ),
+      streamerLinks: user.streamerLinks ?? [],
       stats: {
         wins: stats.wins,
         losses: stats.losses,
@@ -345,6 +365,179 @@ export class UserService {
     });
 
     return { success: true };
+  }
+
+  async getStreamerLinks(userId: string) {
+    return this.prisma.streamerLink.findMany({
+      where: { userId, isActive: true },
+      orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+    });
+  }
+
+  async createStreamerLink(
+    userId: string,
+    data: { label: string; url: string; order?: number },
+  ) {
+    await this.assertCanManageStreamerExtras(userId);
+
+    const count = await this.prisma.streamerLink.count({
+      where: { userId, isActive: true },
+    });
+    if (count >= MAX_STREAMER_LINKS) {
+      throw new BadRequestException(
+        `추가 링크는 최대 ${MAX_STREAMER_LINKS}개까지 등록할 수 있습니다.`,
+      );
+    }
+
+    const label = this.normalizeStreamerLinkLabel(data.label);
+    const url = this.normalizeGenericUrl(data.url, "링크 주소");
+
+    return this.prisma.streamerLink.create({
+      data: {
+        userId,
+        label,
+        url,
+        order: data.order ?? count,
+      },
+    });
+  }
+
+  async updateStreamerLink(
+    userId: string,
+    linkId: string,
+    data: { label: string; url: string; order?: number },
+  ) {
+    await this.assertCanManageStreamerExtras(userId);
+
+    const existing = await this.prisma.streamerLink.findFirst({
+      where: { id: linkId, userId },
+      select: { id: true },
+    });
+    if (!existing) {
+      throw new NotFoundException("스트리머 링크를 찾을 수 없습니다.");
+    }
+
+    return this.prisma.streamerLink.update({
+      where: { id: linkId },
+      data: {
+        label: this.normalizeStreamerLinkLabel(data.label),
+        url: this.normalizeGenericUrl(data.url, "링크 주소"),
+        order: data.order ?? 0,
+        isActive: true,
+      },
+    });
+  }
+
+  async updateStreamerLinkImage(
+    userId: string,
+    linkId: string,
+    imageUrl: string,
+  ) {
+    await this.assertCanManageStreamerExtras(userId);
+
+    const existing = await this.prisma.streamerLink.findFirst({
+      where: { id: linkId, userId },
+    });
+    if (!existing) {
+      await this.deleteUploadedUrl(imageUrl).catch(() => null);
+      throw new NotFoundException("스트리머 링크를 찾을 수 없습니다.");
+    }
+
+    if (existing.imageUrl && existing.imageUrl !== imageUrl) {
+      await this.deleteUploadedUrl(existing.imageUrl).catch(() => null);
+    }
+
+    return this.prisma.streamerLink.update({
+      where: { id: linkId },
+      data: { imageUrl },
+    });
+  }
+
+  async deleteStreamerLink(userId: string, linkId: string) {
+    const existing = await this.prisma.streamerLink.findFirst({
+      where: { id: linkId, userId },
+    });
+    if (!existing) {
+      throw new NotFoundException("스트리머 링크를 찾을 수 없습니다.");
+    }
+
+    await this.prisma.streamerLink.delete({ where: { id: linkId } });
+    if (existing.imageUrl) {
+      await this.deleteUploadedUrl(existing.imageUrl).catch(() => null);
+    }
+
+    return { success: true };
+  }
+
+  private async assertCanManageStreamerExtras(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        isBanned: true,
+        isRestricted: true,
+        restrictedUntil: true,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException("User not found");
+    }
+    if (user.isBanned) {
+      throw new BadRequestException(
+        "밴 상태에서는 스트리머 링크를 관리할 수 없습니다.",
+      );
+    }
+
+    const restrictionActive =
+      user.isRestricted &&
+      (!user.restrictedUntil || user.restrictedUntil > new Date());
+    if (restrictionActive) {
+      throw new BadRequestException(
+        "제재 상태에서는 스트리머 링크를 관리할 수 없습니다.",
+      );
+    }
+  }
+
+  private normalizeStreamerLinkLabel(label: string): string {
+    const trimmed = label.trim();
+    if (!trimmed) {
+      throw new BadRequestException("링크 이름을 입력해주세요.");
+    }
+    if (trimmed.length > 40) {
+      throw new BadRequestException("링크 이름은 40자 이하여야 합니다.");
+    }
+    return trimmed;
+  }
+
+  private normalizeGenericUrl(rawUrl: string, fieldName: string): string {
+    const trimmed = rawUrl.trim();
+    if (!trimmed) {
+      throw new BadRequestException(`${fieldName}를 입력해주세요.`);
+    }
+
+    const withProtocol = /^https?:\/\//i.test(trimmed)
+      ? trimmed
+      : `https://${trimmed}`;
+
+    let url: URL;
+    try {
+      url = new URL(withProtocol);
+    } catch {
+      throw new BadRequestException(`유효한 ${fieldName}를 입력해주세요.`);
+    }
+
+    if (url.protocol !== "https:" && url.protocol !== "http:") {
+      throw new BadRequestException(`유효한 ${fieldName}를 입력해주세요.`);
+    }
+
+    url.hash = "";
+    return url.toString();
+  }
+
+  private async deleteUploadedUrl(url: string) {
+    if (!url.startsWith("/uploads/")) return;
+    await this.uploadService.deleteFile(url.replace("/uploads/", ""));
   }
 
   private normalizeStreamerChannelUrl(rawUrl: string): string {

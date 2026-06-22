@@ -24,6 +24,7 @@ import {
   UpdateSettingsDto,
   UpdateProfileDto,
   UpsertStreamerProfileDto,
+  UpsertStreamerLinkDto,
 } from "./dto";
 import { UploadService } from "../upload/upload.service";
 import { StreamerPlatform } from "@nexus/database";
@@ -94,6 +95,52 @@ export class UserController {
     @Param("platform") platform: StreamerPlatform,
   ) {
     return this.userService.deleteStreamerProfile(userId, platform);
+  }
+
+  @Get("me/streamer-links")
+  async getMyStreamerLinks(@CurrentUser("sub") userId: string) {
+    return this.userService.getStreamerLinks(userId);
+  }
+
+  @Post("me/streamer-links")
+  async createMyStreamerLink(
+    @CurrentUser("sub") userId: string,
+    @Body() data: UpsertStreamerLinkDto,
+  ) {
+    return this.userService.createStreamerLink(userId, data);
+  }
+
+  @Patch("me/streamer-links/:linkId")
+  async updateMyStreamerLink(
+    @CurrentUser("sub") userId: string,
+    @Param("linkId") linkId: string,
+    @Body() data: UpsertStreamerLinkDto,
+  ) {
+    return this.userService.updateStreamerLink(userId, linkId, data);
+  }
+
+  @Delete("me/streamer-links/:linkId")
+  async deleteMyStreamerLink(
+    @CurrentUser("sub") userId: string,
+    @Param("linkId") linkId: string,
+  ) {
+    return this.userService.deleteStreamerLink(userId, linkId);
+  }
+
+  @Post("me/streamer-links/:linkId/image")
+  @UseInterceptors(FileInterceptor("image"))
+  async uploadMyStreamerLinkImage(
+    @CurrentUser("sub") userId: string,
+    @Param("linkId") linkId: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) {
+      throw new BadRequestException("파일이 업로드되지 않았습니다.");
+    }
+
+    await this.uploadService.validateMimeType(file);
+    const imageUrl = this.uploadService.getFileUrl(file.filename);
+    return this.userService.updateStreamerLinkImage(userId, linkId, imageUrl);
   }
 
   /**

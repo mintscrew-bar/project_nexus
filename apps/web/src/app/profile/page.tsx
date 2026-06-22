@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { useAuthStore } from '@/stores/auth-store';
 import { useRiotStore } from '@/stores/riot-store';
 import { useDdragonStore } from '@/stores/ddragon-store';
-import { userApi, matchApi, statsApi, reputationApi, type StreamerPlatform, type StreamerProfile } from '@/lib/api-client';
+import { userApi, matchApi, statsApi, reputationApi, type StreamerPlatform, type StreamerProfile, type StreamerLink } from '@/lib/api-client';
 import { AddAccountModal } from '@/components/domain/AddAccountModal';
 import { EditAccountModal } from '@/components/domain/EditAccountModal';
 import { ChampionImage } from '@/components/ChampionImage';
@@ -260,6 +260,247 @@ function StreamerRegistrationCard({
               onDelete={handleDelete}
               onCancel={() => setAddingNew(false)}
             />
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function StreamerLinkRow({
+  link,
+  isNew,
+  order,
+  onSave,
+  onDelete,
+  onCancel,
+  addToast,
+}: {
+  link: StreamerLink | null;
+  isNew: boolean;
+  order: number;
+  onSave: (
+    linkId: string | null,
+    data: { label: string; url: string; order: number },
+    image?: File | null,
+  ) => Promise<void>;
+  onDelete: (linkId: string) => Promise<void>;
+  onCancel?: () => void;
+  addToast: (message: string, type: 'success' | 'error') => void;
+}) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [editing, setEditing] = useState(isNew);
+  const [label, setLabel] = useState(link?.label ?? '');
+  const [url, setUrl] = useState(link?.url ?? '');
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(link?.imageUrl ?? null);
+  const [saving, setSaving] = useState(false);
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!file.type.match(/^image\/(jpeg|jpg|png|gif|webp)$/)) {
+      addToast('지원하지 않는 이미지 형식입니다. (jpg, png, gif, webp만 가능)', 'error');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      addToast('이미지 크기는 5MB 이하여야 합니다.', 'error');
+      return;
+    }
+    setImageFile(file);
+    setPreviewUrl(URL.createObjectURL(file));
+  };
+
+  const handleSave = async () => {
+    if (!label.trim() || !url.trim()) {
+      addToast('링크 이름과 주소를 입력해주세요.', 'error');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await onSave(link?.id ?? null, { label: label.trim(), url: url.trim(), order }, imageFile);
+      setEditing(false);
+      setImageFile(null);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!editing && link) {
+    return (
+      <div className="flex items-center gap-3 rounded-lg bg-bg-tertiary/50 px-3 py-2.5">
+        <div className="relative h-12 w-16 flex-shrink-0 overflow-hidden rounded-md bg-bg-primary">
+          {link.imageUrl ? (
+            <Image src={link.imageUrl} alt={link.label} fill className="object-cover" unoptimized />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center">
+              <ExternalLink className="h-4 w-4 text-text-tertiary" />
+            </div>
+          )}
+        </div>
+        <a href={link.url} target="_blank" rel="noreferrer" className="min-w-0 flex-1">
+          <p className="truncate text-sm font-bold text-text-primary">{link.label}</p>
+          <p className="truncate text-xs text-text-tertiary">{link.url}</p>
+        </a>
+        <div className="flex flex-shrink-0 gap-1">
+          <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setEditing(true)}>
+            수정
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 text-xs text-accent-danger hover:text-accent-danger"
+            onClick={() => onDelete(link.id)}
+          >
+            삭제
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid gap-2 rounded-lg bg-bg-tertiary/50 p-2.5 lg:grid-cols-[96px_150px_1fr_auto]">
+      <button
+        type="button"
+        onClick={() => fileRef.current?.click()}
+        className="relative h-16 overflow-hidden rounded-lg border border-bg-tertiary bg-bg-primary text-text-tertiary transition-colors hover:border-accent-primary hover:text-text-primary"
+      >
+        {previewUrl ? (
+          <Image src={previewUrl} alt="링크 이미지" fill className="object-cover" unoptimized />
+        ) : (
+          <span className="flex h-full w-full items-center justify-center">
+            <Camera className="h-5 w-5" />
+          </span>
+        )}
+      </button>
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+        onChange={handleFileChange}
+        className="hidden"
+      />
+      <input
+        value={label}
+        onChange={(e) => setLabel(e.target.value)}
+        placeholder="링크 이름"
+        className="min-w-0 rounded-lg border border-bg-tertiary bg-bg-primary px-3 py-2 text-sm text-text-primary outline-none placeholder:text-text-tertiary focus:border-accent-primary"
+      />
+      <input
+        value={url}
+        onChange={(e) => setUrl(e.target.value)}
+        placeholder="https://discord.gg/..."
+        className="min-w-0 rounded-lg border border-bg-tertiary bg-bg-primary px-3 py-2 text-sm text-text-primary outline-none placeholder:text-text-tertiary focus:border-accent-primary"
+      />
+      <div className="flex gap-1.5">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-9 px-2"
+          onClick={() => { if (isNew && onCancel) { onCancel(); } else { setEditing(false); } }}
+          disabled={saving}
+        >
+          취소
+        </Button>
+        <Button size="sm" className="h-9 px-3" onClick={handleSave} disabled={saving}>
+          {saving ? '저장 중' : '저장'}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function StreamerLinksCard({
+  links,
+  onSaved,
+  addToast,
+}: {
+  links: StreamerLink[];
+  onSaved: () => Promise<void>;
+  addToast: (message: string, type: 'success' | 'error') => void;
+}) {
+  const [addingNew, setAddingNew] = useState(false);
+  const canAdd = links.length < 12 && !addingNew;
+
+  const handleSave = async (
+    linkId: string | null,
+    data: { label: string; url: string; order: number },
+    image?: File | null,
+  ) => {
+    try {
+      const saved = linkId
+        ? await userApi.updateStreamerLink(linkId, data)
+        : await userApi.createStreamerLink(data);
+      if (image) {
+        await userApi.uploadStreamerLinkImage(saved.id, image);
+      }
+      await onSaved();
+      setAddingNew(false);
+      addToast('링크가 저장되었습니다.', 'success');
+    } catch (error: any) {
+      const message = error?.response?.data?.message;
+      addToast(Array.isArray(message) ? message[0] : message || '링크 저장에 실패했습니다.', 'error');
+      throw error;
+    }
+  };
+
+  const handleDelete = async (linkId: string) => {
+    if (!confirm('링크를 삭제할까요?')) return;
+    try {
+      await userApi.deleteStreamerLink(linkId);
+      await onSaved();
+      addToast('링크를 삭제했습니다.', 'success');
+    } catch {
+      addToast('링크 삭제에 실패했습니다.', 'error');
+    }
+  };
+
+  return (
+    <Card className="mb-6 overflow-hidden rounded-[16px] border-bg-tertiary bg-bg-secondary">
+      <CardContent className="p-4 md:p-5">
+        <div className="mb-3 flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-bold text-text-primary">추가 링크</span>
+              <span className="text-xs text-text-tertiary">{links.length}/12</span>
+            </div>
+            <p className="mt-1 text-xs text-text-muted">디스코드 채널, 공지, 팬카페처럼 방송에 필요한 링크를 이미지 카드로 추가합니다.</p>
+          </div>
+          {canAdd && (
+            <Button variant="outline" size="sm" className="h-7 gap-1 px-2.5 text-xs" onClick={() => setAddingNew(true)}>
+              <Plus className="h-3.5 w-3.5" />
+              링크 추가
+            </Button>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-2">
+          {links.map((link, index) => (
+            <StreamerLinkRow
+              key={link.id}
+              link={link}
+              isNew={false}
+              order={index}
+              onSave={handleSave}
+              onDelete={handleDelete}
+              addToast={addToast}
+            />
+          ))}
+          {addingNew && (
+            <StreamerLinkRow
+              link={null}
+              isNew={true}
+              order={links.length}
+              onSave={handleSave}
+              onDelete={handleDelete}
+              onCancel={() => setAddingNew(false)}
+              addToast={addToast}
+            />
+          )}
+          {links.length === 0 && !addingNew && (
+            <p className="rounded-lg bg-bg-tertiary/40 px-3 py-4 text-xs text-text-muted">아직 추가 링크가 없습니다.</p>
           )}
         </div>
       </CardContent>
@@ -736,6 +977,7 @@ export default function ProfilePage() {
   const recent = getRecentMetrics(recentMatches);
   const stats = profileData?.stats ?? user?.stats ?? null;
   const streamerProfiles: StreamerProfile[] = profileData?.streamerProfiles ?? [];
+  const streamerLinks: StreamerLink[] = profileData?.streamerLinks ?? [];
 
   return (
     <div className="flex-grow p-4 md:p-8">
@@ -931,6 +1173,12 @@ export default function ProfilePage() {
 
         <StreamerRegistrationCard
           profiles={streamerProfiles}
+          onSaved={fetchProfile}
+          addToast={addToast}
+        />
+
+        <StreamerLinksCard
+          links={streamerLinks}
           onSaved={fetchProfile}
           addToast={addToast}
         />

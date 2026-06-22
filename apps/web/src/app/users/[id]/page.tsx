@@ -44,6 +44,7 @@ import {
   Star,
   Gavel,
   Activity,
+  ExternalLink,
   type LucideIcon,
 } from "lucide-react";
 import { TierBadge } from "@/components/domain/TierBadge";
@@ -199,6 +200,14 @@ interface ProfileUser {
     platform: "CHZZK" | "SOOP" | "YOUTUBE";
     channelUrl: string;
     channelName: string | null;
+    isActive?: boolean;
+  }[];
+  streamerLinks?: {
+    id: string;
+    label: string;
+    url: string;
+    imageUrl: string | null;
+    order: number;
     isActive?: boolean;
   }[];
 }
@@ -611,6 +620,30 @@ export default function UserProfilePage() {
                     </span>
                   )}
                 </p>
+                {(profile.streamerLinks ?? []).length > 0 && (
+                  <div className="mb-3 flex flex-wrap gap-2">
+                    {profile.streamerLinks!.slice(0, 4).map((link) => (
+                      <a
+                        key={link.id}
+                        href={link.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex min-w-0 max-w-[220px] items-center gap-2 rounded-lg border border-bg-elevated bg-bg-tertiary px-2.5 py-2 transition-colors hover:border-accent-primary"
+                      >
+                        <span className="relative h-8 w-10 flex-shrink-0 overflow-hidden rounded bg-bg-primary">
+                          {link.imageUrl ? (
+                            <Image src={link.imageUrl} alt={link.label} fill className="object-cover" unoptimized />
+                          ) : (
+                            <span className="flex h-full w-full items-center justify-center">
+                              <ExternalLink className="h-3.5 w-3.5 text-text-tertiary" />
+                            </span>
+                          )}
+                        </span>
+                        <span className="truncate text-xs font-bold text-text-primary">{link.label}</span>
+                      </a>
+                    ))}
+                  </div>
+                )}
 
                 {/* Meta info row — 2-column grid with tier/role emphasis */}
                 <div className="space-y-4">
