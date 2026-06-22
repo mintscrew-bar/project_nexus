@@ -140,6 +140,11 @@ export interface TeamDto {
 
 type RiotMatchRequestPriority = "foreground" | "background";
 
+interface GetMatchByIdOptions {
+  emitCacheEvent?: boolean;
+  propagateKnownPuuids?: boolean;
+}
+
 @Injectable()
 export class RiotMatchService {
   private readonly logger = new Logger(RiotMatchService.name);
@@ -401,6 +406,7 @@ export class RiotMatchService {
     matchId: string,
     retries = 3,
     priority: RiotMatchRequestPriority = "foreground",
+    options: GetMatchByIdOptions = {},
   ): Promise<MatchDto | null> {
     if (!this.apiKey) {
       this.logger.error("RIOT_API_KEY not configured");
@@ -463,6 +469,8 @@ export class RiotMatchService {
       const queueId = matchData.info?.queueId ?? 0;
       const gameEndTs = matchData.info?.gameEndTimestamp ?? Date.now();
       const patchVersion = this.parsePatchVersion(matchData.info?.gameVersion);
+      const emitCacheEvent = options.emitCacheEvent ?? true;
+      const propagateKnownPuuids = options.propagateKnownPuuids ?? true;
       void this.prisma.riotMatchCache
         .upsert({
           where: { matchId },
@@ -475,15 +483,20 @@ export class RiotMatchService {
           },
           update: {}, // 이미 존재하면 덮어쓰지 않음
         })
-        .then(() => {
+        .then(async () => {
           // 캐시 저장 완료 → 정규화 ingest 트리거 (RiotMatchCacheIngestService가 listen)
-          const result = this.eventEmitter.emit("riot.match.cached", {
-            matchId,
-          });
-          this.logger.log(
-            `Emitted riot.match.cached for ${matchId} (received=${result})`,
-          );
-          return this.propagateKnownPuuids(matchData);
+          if (emitCacheEvent) {
+            const result = this.eventEmitter.emit("riot.match.cached", {
+              matchId,
+            });
+            this.logger.log(
+              `Emitted riot.match.cached for ${matchId} (received=${result})`,
+            );
+          }
+
+          if (propagateKnownPuuids) {
+            await this.propagateKnownPuuids(matchData);
+          }
         })
         .catch((e: any) =>
           this.logger.warn(`DB cache write failed for ${matchId}: ${e}`),
@@ -499,7 +512,7 @@ export class RiotMatchService {
       if (error.response?.status === 429) {
         if (retries > 0) {
           await this.waitForRateLimit(error.response.headers["retry-after"]);
-          return this.getMatchById(matchId, retries - 1, priority);
+          return this.getMatchById(matchId, retries - 1, priority, options);
         }
         this.logger.error(
           `Rate limit exhausted for match ${matchId}, skipping`,
@@ -522,7 +535,7 @@ export class RiotMatchService {
           `Riot API ${error.response.status} for ${matchId}, retrying (${retries} left)...`,
         );
         await new Promise((resolve) => setTimeout(resolve, 800));
-        return this.getMatchById(matchId, retries - 1, priority);
+        return this.getMatchById(matchId, retries - 1, priority, options);
       }
 
       if (!error.response && retries > 0) {
@@ -531,7 +544,7 @@ export class RiotMatchService {
           `Network error for match ${matchId}, retrying (${retries} left)...`,
         );
         await new Promise((resolve) => setTimeout(resolve, 1000));
-        return this.getMatchById(matchId, retries - 1, priority);
+        return this.getMatchById(matchId, retries - 1, priority, options);
       }
 
       this.logger.error(`Error fetching match ${matchId}:`, error.message);
@@ -707,7 +720,7 @@ export class RiotMatchService {
     }
 
     // Redis 캐시 확인 (3분 TTL)
-    const cacheKey = `riot:matchids:${puuid}:${start}:${count}:${queueId ?? "all"}:${type ?? "all"}:${startTime ?? 0}`;
+    const cacheKey = `riot:matchids:${puuid}:${start}:${count}:${queueId ?? "all"}:${type ?? "all"}:${startTime ?? 0}:${endTime ?? 0}`;
     const cached = await this.redis.get(cacheKey);
     if (cached) {
       return JSON.parse(cached);

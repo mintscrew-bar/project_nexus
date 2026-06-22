@@ -3,6 +3,25 @@ import { PrismaService } from "../prisma/prisma.service";
 import { RiotMatchService, MatchDto } from "../riot/riot-match.service";
 import { normalizeRiotPosition } from "./position-normalizer";
 
+type CrossrefExpectedMember = {
+  puuid: string;
+  userId: string;
+  teamId: string;
+};
+
+type CrossrefCandidateScore = {
+  matchId: string;
+  matchData: MatchDto;
+  score: number;
+  valid: boolean;
+  sampleHits: number;
+  matchedPuuidCount: number;
+  expectedPuuidCount: number;
+  teamAlignedCount: number;
+  timeDeltaMs: number | null;
+  reasons: string[];
+};
+
 @Injectable()
 export class MatchDataCollectionService {
   private readonly logger = new Logger(MatchDataCollectionService.name);
@@ -12,6 +31,191 @@ export class MatchDataCollectionService {
     private readonly prisma: PrismaService,
     private readonly riotMatchService: RiotMatchService,
   ) {}
+
+  private buildExpectedMembers(match: any): CrossrefExpectedMember[] {
+    const expectedMembers: CrossrefExpectedMember[] = [];
+    const seenPuuids = new Set<string>();
+
+    const collect = (members: any[] = [], teamId?: string | null) => {
+      if (!teamId) return;
+
+      for (const member of members) {
+        const puuid = member.user?.riotAccounts?.[0]?.puuid;
+        if (!puuid || seenPuuids.has(puuid)) continue;
+
+        seenPuuids.add(puuid);
+        expectedMembers.push({
+          puuid,
+          userId: member.userId,
+          teamId,
+        });
+      }
+    };
+
+    collect(match.teamA?.members, match.teamAId ?? match.teamA?.id);
+    collect(match.teamB?.members, match.teamBId ?? match.teamB?.id);
+
+    return expectedMembers;
+  }
+
+  private selectCrossrefSampleMembers(
+    members: CrossrefExpectedMember[],
+    maxSamples = 6,
+  ): CrossrefExpectedMember[] {
+    const byTeam = new Map<string, CrossrefExpectedMember[]>();
+    for (const member of members) {
+      const teamMembers = byTeam.get(member.teamId) ?? [];
+      teamMembers.push(member);
+      byTeam.set(member.teamId, teamMembers);
+    }
+
+    const selected: CrossrefExpectedMember[] = [];
+    let index = 0;
+    while (selected.length < Math.min(maxSamples, members.length)) {
+      let added = false;
+      for (const teamMembers of byTeam.values()) {
+        const member = teamMembers[index];
+        if (!member) continue;
+
+        selected.push(member);
+        added = true;
+        if (selected.length >= maxSamples) break;
+      }
+
+      if (!added) break;
+      index++;
+    }
+
+    return selected;
+  }
+
+  private getRiotMatchEndMs(matchData: MatchDto): number | null {
+    if (matchData.info.gameEndTimestamp) {
+      return matchData.info.gameEndTimestamp;
+    }
+
+    if (matchData.info.gameStartTimestamp && matchData.info.gameDuration) {
+      return (
+        matchData.info.gameStartTimestamp + matchData.info.gameDuration * 1000
+      );
+    }
+
+    return null;
+  }
+
+  private scoreCrossrefCandidate(
+    matchId: string,
+    sampleHits: number,
+    sampleSize: number,
+    match: any,
+    expectedMembers: CrossrefExpectedMember[],
+    matchData: MatchDto,
+    completedAt: Date,
+  ): CrossrefCandidateScore {
+    const expectedByPuuid = new Map(
+      expectedMembers.map((member) => [member.puuid, member]),
+    );
+    const teamAId = match.teamAId ?? match.teamA?.id;
+    const teamBId = match.teamBId ?? match.teamB?.id;
+
+    let matchedPuuidCount = 0;
+    let blueToA = 0;
+    let blueToB = 0;
+    let redToA = 0;
+    let redToB = 0;
+
+    for (const participant of matchData.info.participants) {
+      const expected = expectedByPuuid.get(participant.puuid);
+      if (!expected) continue;
+
+      matchedPuuidCount++;
+      if (participant.teamId === 100) {
+        if (expected.teamId === teamAId) blueToA++;
+        if (expected.teamId === teamBId) blueToB++;
+      }
+      if (participant.teamId === 200) {
+        if (expected.teamId === teamAId) redToA++;
+        if (expected.teamId === teamBId) redToB++;
+      }
+    }
+
+    const expectedPuuidCount = expectedMembers.length;
+    const requiredMatchedCount =
+      expectedPuuidCount <= 2
+        ? expectedPuuidCount
+        : Math.max(3, Math.ceil(expectedPuuidCount * 0.7));
+    const teamAlignedCount = Math.max(blueToA + redToB, blueToB + redToA);
+    const teamAlignmentRatio =
+      matchedPuuidCount > 0 ? teamAlignedCount / matchedPuuidCount : 0;
+    const matchedRatio =
+      expectedPuuidCount > 0 ? matchedPuuidCount / expectedPuuidCount : 0;
+    const queueId = matchData.info.queueId;
+    const queueOk = queueId === 0;
+    const endMs = this.getRiotMatchEndMs(matchData);
+    const timeDeltaMs = endMs ? Math.abs(endMs - completedAt.getTime()) : null;
+    const timeOk = timeDeltaMs === null || timeDeltaMs <= 2 * 60 * 60 * 1000;
+    const teamOk = matchedPuuidCount < 4 || teamAlignmentRatio >= 0.75;
+
+    const reasons: string[] = [];
+    if (!queueOk) reasons.push(`queueId=${queueId}`);
+    if (matchedPuuidCount < requiredMatchedCount) {
+      reasons.push(`matched=${matchedPuuidCount}/${expectedPuuidCount}`);
+    }
+    if (!teamOk) {
+      reasons.push(
+        `teamAligned=${teamAlignedCount}/${Math.max(matchedPuuidCount, 1)}`,
+      );
+    }
+    if (!timeOk && timeDeltaMs !== null) {
+      reasons.push(`timeDeltaMin=${Math.round(timeDeltaMs / 60000)}`);
+    }
+
+    const timeScore =
+      timeDeltaMs === null
+        ? 0
+        : Math.max(0, 20 - Math.floor(timeDeltaMs / (10 * 60 * 1000)) * 2);
+    const score =
+      matchedRatio * 100 +
+      teamAlignmentRatio * 45 +
+      (sampleHits / Math.max(sampleSize, 1)) * 25 +
+      (queueOk ? 25 : 0) +
+      timeScore;
+
+    return {
+      matchId,
+      matchData,
+      score,
+      valid:
+        queueOk &&
+        matchedPuuidCount >= requiredMatchedCount &&
+        teamOk &&
+        timeOk,
+      sampleHits,
+      matchedPuuidCount,
+      expectedPuuidCount,
+      teamAlignedCount,
+      timeDeltaMs,
+      reasons,
+    };
+  }
+
+  private formatCrossrefCandidate(candidate: CrossrefCandidateScore): string {
+    const timeDelta =
+      candidate.timeDeltaMs === null
+        ? "unknown"
+        : `${Math.round(candidate.timeDeltaMs / 60000)}m`;
+    const reason =
+      candidate.reasons.length > 0 ? ` ${candidate.reasons.join(",")}` : "";
+
+    return `${candidate.matchId} score=${candidate.score.toFixed(
+      1,
+    )} hits=${candidate.sampleHits} matched=${candidate.matchedPuuidCount}/${
+      candidate.expectedPuuidCount
+    } team=${candidate.teamAlignedCount}/${Math.max(
+      candidate.matchedPuuidCount,
+      1,
+    )} delta=${timeDelta}${reason}`;
+  }
 
   /**
    * Collect and save match data from Riot API
@@ -107,7 +311,15 @@ export class MatchDataCollectionService {
       this.logger.log(`Found Riot match ID: ${riotMatchId}`);
 
       // Fetch match data
-      const matchData = await this.riotMatchService.getMatchById(riotMatchId);
+      const matchData = await this.riotMatchService.getMatchById(
+        riotMatchId,
+        3,
+        "foreground",
+        {
+          emitCacheEvent: false,
+          propagateKnownPuuids: false,
+        },
+      );
 
       if (!matchData) {
         this.logger.error(`Failed to fetch match data for ${riotMatchId}`);
@@ -374,14 +586,11 @@ export class MatchDataCollectionService {
       }
 
       // 참가자 PUUID 수집 (teamA + teamB)
-      const allMembers = [...match.teamA.members, ...match.teamB.members];
-      const puuidList = allMembers
-        .map((m) => m.user.riotAccounts[0]?.puuid)
-        .filter((p): p is string => Boolean(p));
+      const expectedMembers = this.buildExpectedMembers(match);
 
-      if (puuidList.length < 2) {
+      if (expectedMembers.length < 2) {
         this.logger.warn(
-          `[PuuidCrossref] Riot 계정 연동 유저 부족 (${puuidList.length}명), 수집 불가 matchId=${matchId}`,
+          `[PuuidCrossref] Riot 계정 연동 유저 부족 (${expectedMembers.length}명), 수집 불가 matchId=${matchId}`,
         );
         return;
       }
@@ -399,13 +608,14 @@ export class MatchDataCollectionService {
         (completedAt.getTime() + 20 * 60 * 1000) / 1000,
       );
 
-      // 크로스레퍼런스: 최대 3명 PUUID로 커스텀 게임 목록 조회 후 교집합
-      const CROSSREF_SAMPLE = Math.min(3, puuidList.length);
-      const matchIdSets: Set<string>[] = [];
+      // 크로스레퍼런스: 양 팀에서 샘플을 고르게 뽑아 후보 matchId를 수집한다.
+      // 후보는 저장 전 전체 참가자/팀/시간 검증을 다시 통과해야 한다.
+      const sampleMembers = this.selectCrossrefSampleMembers(expectedMembers);
+      const candidateHitCounts = new Map<string, number>();
 
-      for (let i = 0; i < CROSSREF_SAMPLE; i++) {
+      for (let i = 0; i < sampleMembers.length; i++) {
         const ids = await this.riotMatchService.getMatchIdsByPuuid(
-          puuidList[i],
+          sampleMembers[i].puuid,
           0,
           20, // 최근 20개로 늘려 누락 방지 (기존 10개에서 증가)
           0, // queue=0: Custom Game
@@ -415,45 +625,98 @@ export class MatchDataCollectionService {
           endTime,
           "background",
         );
-        matchIdSets.push(new Set(ids));
+        for (const id of new Set(ids)) {
+          candidateHitCounts.set(id, (candidateHitCounts.get(id) ?? 0) + 1);
+        }
         this.logger.debug(
           `[PuuidCrossref] puuid[${i}] 커스텀 게임 ${ids.length}개`,
         );
       }
 
-      // 교집합 계산
-      const [first, ...rest] = matchIdSets;
-      const intersection = Array.from(first).filter((id) =>
-        rest.every((s) => s.has(id)),
-      );
+      const minCandidateHits =
+        sampleMembers.length <= 2 ? sampleMembers.length : 3;
+      const candidates = Array.from(candidateHitCounts.entries())
+        .filter(([, hits]) => hits >= minCandidateHits)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10)
+        .map(([candidateMatchId, sampleHits]) => ({
+          matchId: candidateMatchId,
+          sampleHits,
+        }));
 
-      if (intersection.length === 0) {
+      if (candidates.length === 0) {
         this.logger.warn(
-          `[PuuidCrossref] 교집합 없음 (Riot 처리 중일 수 있음), 재시도 예약 matchId=${matchId}`,
+          `[PuuidCrossref] 유효 후보 없음 (Riot 처리 중일 수 있음), 재시도 예약 matchId=${matchId}`,
         );
         await this.schedulePuuidCrossrefRetry(matchId, attemptNumber);
         return;
       }
 
-      // 교집합이 여러 개면 종료 시각 가장 가까운 것 선택 (실제로는 거의 1개)
-      const riotMatchId = intersection[0];
+      const evaluatedCandidates: CrossrefCandidateScore[] = [];
+      for (const candidate of candidates) {
+        const candidateData = await this.riotMatchService.getMatchById(
+          candidate.matchId,
+          3,
+          "background",
+          {
+            emitCacheEvent: false,
+            propagateKnownPuuids: false,
+          },
+        );
+
+        if (!candidateData) {
+          this.logger.warn(
+            `[PuuidCrossref] 후보 매치 상세 조회 실패: ${candidate.matchId}`,
+          );
+          continue;
+        }
+
+        evaluatedCandidates.push(
+          this.scoreCrossrefCandidate(
+            candidate.matchId,
+            candidate.sampleHits,
+            sampleMembers.length,
+            match,
+            expectedMembers,
+            candidateData,
+            completedAt,
+          ),
+        );
+      }
+
+      const validCandidates = evaluatedCandidates
+        .filter((candidate) => candidate.valid)
+        .sort((a, b) => {
+          if (b.score !== a.score) return b.score - a.score;
+          return (
+            (a.timeDeltaMs ?? Number.MAX_SAFE_INTEGER) -
+            (b.timeDeltaMs ?? Number.MAX_SAFE_INTEGER)
+          );
+        });
+
+      if (validCandidates.length === 0) {
+        const summary =
+          evaluatedCandidates.length > 0
+            ? evaluatedCandidates
+                .map((candidate) => this.formatCrossrefCandidate(candidate))
+                .join(" | ")
+            : "no detailed candidates";
+        this.logger.warn(
+          `[PuuidCrossref] 검증 통과 후보 없음 matchId=${matchId}: ${summary}`,
+        );
+        await this.schedulePuuidCrossrefRetry(matchId, attemptNumber);
+        return;
+      }
+
+      const bestCandidate = validCandidates[0];
+      const riotMatchId = bestCandidate.matchId;
+      const matchData = bestCandidate.matchData;
+
       this.logger.log(
-        `[PuuidCrossref] Riot matchId 확인: ${riotMatchId} (교집합 ${intersection.length}개)`,
+        `[PuuidCrossref] Riot matchId 확정: ${this.formatCrossrefCandidate(
+          bestCandidate,
+        )}`,
       );
-
-      const matchData = await this.riotMatchService.getMatchById(
-        riotMatchId,
-        3,
-        "background",
-      );
-
-      if (!matchData) {
-        this.logger.error(
-          `[PuuidCrossref] 매치 데이터 조회 실패: ${riotMatchId}`,
-        );
-        await this.schedulePuuidCrossrefRetry(matchId, attemptNumber);
-        return;
-      }
 
       // riotMatchId 저장 후 기존 saveMatchData 재사용
       await this.prisma.match.update({
