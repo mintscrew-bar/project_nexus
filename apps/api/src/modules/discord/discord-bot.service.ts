@@ -2160,39 +2160,31 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
       AUTO_BALANCE: "자동 밸런스",
       MANUAL_TEAM: "자유 팀 선택",
     };
-    const MODE_EMOJI: Record<string, string> = {
-      AUCTION: "💰",
-      SNAKE_DRAFT: "🐍",
-      AUTO_BALANCE: "⚖️",
-      MANUAL_TEAM: "🤝",
-    };
 
     const modeLabel = MODE_LABEL[teamMode] ?? teamMode;
-    const modeEmoji = MODE_EMOJI[teamMode] ?? "🎮";
-    const lockEmoji = isPrivate ? " 🔒" : "";
+    const lockSuffix = isPrivate ? "  ·  비공개" : "";
     const currentPlayers = participants.length;
 
     const memberList = participants.length > 0
-      ? participants.map((name) => `· ${name}`).join("\n")
-      : "없음";
+      ? participants.map((name) => `╸ ${name}`).join("\n")
+      : "—";
 
     const embed = new EmbedBuilder()
       .setColor(0x667eea)
-      .setTitle(`${modeEmoji} 내전 방 생성됨`)
-      .setDescription(`**${roomName}**${lockEmoji}`)
+      .setTitle("내전 모집")
+      .setDescription(`### ${roomName}${lockSuffix}`)
       .addFields(
-        { name: "👑 방장", value: hostName, inline: true },
-        { name: "🎮 모드", value: modeLabel, inline: true },
-        { name: "👥 인원", value: `${currentPlayers} / ${maxPlayers}명`, inline: true },
+        { name: "방장", value: hostName, inline: true },
+        { name: "모드", value: modeLabel, inline: true },
+        { name: "인원", value: `${currentPlayers} / ${maxPlayers}`, inline: true },
         { name: "참가자", value: memberList, inline: false },
       )
       .setTimestamp();
 
     const button = new ButtonBuilder()
-      .setLabel("방 참가하기")
+      .setLabel("참가하기")
       .setStyle(ButtonStyle.Link)
-      .setURL(`${appUrl}/tournaments/${roomId}/lobby`)
-      .setEmoji("🚀");
+      .setURL(`${appUrl}/tournaments/${roomId}/lobby`);
 
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(button);
 
