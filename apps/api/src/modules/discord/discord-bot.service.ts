@@ -2110,7 +2110,8 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
     teamMode: string,
     isPrivate: boolean,
   ): { embed: EmbedBuilder; components: ActionRowBuilder<ButtonBuilder>[] } {
-    const appUrl = this.configService.get("APP_URL") || "https://labs-nexus.com";
+    const appUrl =
+      this.configService.get("APP_URL") || "https://labs-nexus.com";
 
     const MODE_LABEL: Record<string, string> = {
       AUCTION: "경매 드래프트",

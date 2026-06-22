@@ -397,6 +397,14 @@ export class AdminService {
             },
             orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }],
           },
+          streamerProfile: {
+            select: {
+              platform: true,
+              channelUrl: true,
+              channelName: true,
+              isActive: true,
+            },
+          },
           _count: { select: { reportsReceived: true } },
         },
         orderBy: { createdAt: "desc" },

@@ -525,9 +525,15 @@ function DashboardTab({ addToast }: { addToast: (msg: string, type: "success" | 
 
 // ── 유저 관리 ─────────────────────────────────────────────────────────────────
 
-type UserRole = "USER" | "STREAMER" | "MODERATOR" | "ADMIN";
+type UserRole = "USER" | "MODERATOR" | "ADMIN";
 type UserKindFilter = "users" | "bots" | "all";
 type UserRoleFilter = "all" | UserRole;
+type StreamerProfileSummary = {
+  platform: "CHZZK" | "SOOP" | "YOUTUBE";
+  channelUrl: string;
+  channelName: string | null;
+  isActive: boolean;
+};
 interface AdminUser {
   id: string;
   username: string;
@@ -550,18 +556,17 @@ interface AdminUser {
     rank: string;
     isPrimary: boolean;
   }[];
+  streamerProfile?: StreamerProfileSummary | null;
   _count: { reportsReceived: number };
 }
 
 const ROLE_LABELS: Record<UserRole, string> = {
   USER: "일반",
-  STREAMER: "스트리머",
   MODERATOR: "매니저",
   ADMIN: "관리자",
 };
 const ROLE_VARIANTS: Record<UserRole, "default" | "primary" | "secondary" | "danger" | "gold"> = {
   USER: "default",
-  STREAMER: "gold",
   MODERATOR: "secondary",
   ADMIN: "danger",
 };
@@ -573,7 +578,6 @@ const USER_KIND_FILTERS: Array<{ value: UserKindFilter; label: string }> = [
 const USER_ROLE_FILTERS: Array<{ value: UserRoleFilter; label: string }> = [
   { value: "all", label: "전체 권한" },
   { value: "USER", label: "일반" },
-  { value: "STREAMER", label: "스트리머" },
   { value: "MODERATOR", label: "매니저" },
   { value: "ADMIN", label: "관리자" },
 ];
@@ -865,6 +869,11 @@ function UsersTab({ addToast, currentUserId, isAdmin }: { addToast: (msg: string
                                 <Bot className="h-3 w-3" />봇
                               </Badge>
                             )}
+                            {u.streamerProfile?.isActive && (
+                              <Badge variant="gold" className="text-[10px]">
+                                streamer
+                              </Badge>
+                            )}
                             {u.id === currentUserId && <span className="text-[10px] text-accent-primary">(나)</span>}
                           </div>
                           <p className="text-xs text-text-muted">{u.email ?? "-"}</p>
@@ -900,7 +909,6 @@ function UsersTab({ addToast, currentUserId, isAdmin }: { addToast: (msg: string
                             className="px-2 py-1 rounded bg-bg-tertiary text-text-primary text-xs focus:outline-none cursor-pointer"
                           >
                             <option value="USER">일반</option>
-                            <option value="STREAMER">스트리머</option>
                             <option value="MODERATOR">매니저</option>
                             <option value="ADMIN">관리자</option>
                           </select>

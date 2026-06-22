@@ -6,14 +6,14 @@ import Image from 'next/image';
 import { useAuthStore } from '@/stores/auth-store';
 import { useRiotStore } from '@/stores/riot-store';
 import { useDdragonStore } from '@/stores/ddragon-store';
-import { userApi, matchApi, statsApi, reputationApi } from '@/lib/api-client';
+import { userApi, matchApi, statsApi, reputationApi, type StreamerPlatform, type StreamerProfile } from '@/lib/api-client';
 import { AddAccountModal } from '@/components/domain/AddAccountModal';
 import { EditAccountModal } from '@/components/domain/EditAccountModal';
 import { ChampionImage } from '@/components/ChampionImage';
 import { PositionIcon, POSITION_LABELS } from '@/app/tournaments/[id]/lobby/_components/icons';
 import { getChampionIcon } from '@/components/matches/match-utils';
 import { LoadingSpinner, Card, CardHeader, CardTitle, CardContent, Badge, Button, Skeleton, EmptyState, ConfirmModal, StatusSelector, Tabs, TabsList, TabsTrigger, TabsContent, Dropdown } from '@/components/ui';
-import { Star, Plus, RefreshCw, Shield, TrendingUp, Loader2, History, Clock, Settings, User, BarChart3, Pencil, Trash2, Swords, Gavel, Camera, Check, X, MoreVertical, Activity, Calendar, Trophy, Target, type LucideIcon } from 'lucide-react';
+import { Star, Plus, RefreshCw, Shield, TrendingUp, Loader2, History, Clock, Settings, User, BarChart3, Pencil, Trash2, Swords, Gavel, Camera, Check, X, MoreVertical, Activity, Calendar, Trophy, Target, Radio, ExternalLink, type LucideIcon } from 'lucide-react';
 import { TierBadge } from '@/components/domain/TierBadge';
 import { useToast } from '@/components/ui/Toast';
 import { usePresence } from '@/hooks/usePresence';
@@ -28,6 +28,180 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 const PROFILE_ACCENT = '#667EEA';
+
+const STREAMER_PLATFORM_OPTIONS: Array<{
+  value: StreamerPlatform;
+  label: string;
+  placeholder: string;
+}> = [
+  {
+    value: 'CHZZK',
+    label: '치지직',
+    placeholder: 'https://chzzk.naver.com/...',
+  },
+  {
+    value: 'SOOP',
+    label: 'SOOP',
+    placeholder: 'https://ch.sooplive.co.kr/...',
+  },
+  {
+    value: 'YOUTUBE',
+    label: '유튜브',
+    placeholder: 'https://www.youtube.com/@...',
+  },
+];
+
+const STREAMER_PLATFORM_LABELS: Record<StreamerPlatform, string> = {
+  CHZZK: '치지직',
+  SOOP: 'SOOP',
+  YOUTUBE: '유튜브',
+};
+
+function StreamerRegistrationCard({
+  profile,
+  onSaved,
+  addToast,
+}: {
+  profile?: StreamerProfile | null;
+  onSaved: () => Promise<void>;
+  addToast: (message: string, type: 'success' | 'error') => void;
+}) {
+  const [editing, setEditing] = useState(!profile);
+  const [platform, setPlatform] = useState<StreamerPlatform>(profile?.platform ?? 'CHZZK');
+  const [channelUrl, setChannelUrl] = useState(profile?.channelUrl ?? '');
+  const [channelName, setChannelName] = useState(profile?.channelName ?? '');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setPlatform(profile?.platform ?? 'CHZZK');
+    setChannelUrl(profile?.channelUrl ?? '');
+    setChannelName(profile?.channelName ?? '');
+    setEditing(!profile);
+  }, [profile]);
+
+  const selectedPlatform = STREAMER_PLATFORM_OPTIONS.find((option) => option.value === platform) ?? STREAMER_PLATFORM_OPTIONS[0];
+
+  const handleSave = async () => {
+    if (!channelUrl.trim()) {
+      addToast('방송 채널 주소를 입력해주세요.', 'error');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await userApi.upsertStreamerProfile({
+        platform,
+        channelUrl: channelUrl.trim(),
+        channelName: channelName.trim() || undefined,
+      });
+      await onSaved();
+      setEditing(false);
+      addToast('스트리머 태그가 저장되었습니다.', 'success');
+    } catch (error: any) {
+      const message = error?.response?.data?.message;
+      addToast(Array.isArray(message) ? message[0] : message || '스트리머 등록에 실패했습니다.', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRemove = async () => {
+    if (!confirm('streamer 태그를 제거할까요?')) return;
+
+    setSaving(true);
+    try {
+      await userApi.deleteStreamerProfile();
+      await onSaved();
+      setEditing(true);
+      addToast('streamer 태그를 제거했습니다.', 'success');
+    } catch {
+      addToast('streamer 태그 제거에 실패했습니다.', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Card className="mb-6 overflow-hidden rounded-[16px] border-accent-gold/25 bg-bg-secondary">
+      <CardContent className="p-4 md:p-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="gold" className="gap-1 rounded-md px-2 py-1 text-xs font-black">
+                <Radio className="h-3.5 w-3.5" />
+                streamer
+              </Badge>
+              <span className="text-sm font-bold text-text-primary">방송 채널</span>
+              {profile && !editing && (
+                <span className="text-xs text-text-tertiary">{STREAMER_PLATFORM_LABELS[profile.platform]}</span>
+              )}
+            </div>
+            {profile && !editing ? (
+              <a
+                href={profile.channelUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-2 inline-flex max-w-full items-center gap-1.5 text-sm font-semibold text-accent-primary hover:underline"
+              >
+                <span className="truncate">{profile.channelName || profile.channelUrl}</span>
+                <ExternalLink className="h-3.5 w-3.5 flex-shrink-0" />
+              </a>
+            ) : (
+              <p className="mt-2 text-xs text-text-muted">치지직, SOOP, 유튜브 채널을 등록할 수 있습니다.</p>
+            )}
+          </div>
+
+          {profile && !editing ? (
+            <div className="flex flex-shrink-0 gap-2">
+              <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+                수정
+              </Button>
+              <Button variant="ghost" size="sm" onClick={handleRemove} disabled={saving}>
+                제거
+              </Button>
+            </div>
+          ) : (
+            <div className="grid w-full gap-2 lg:max-w-2xl lg:grid-cols-[130px_1fr_150px_auto]">
+              <select
+                value={platform}
+                onChange={(e) => setPlatform(e.target.value as StreamerPlatform)}
+                className="rounded-lg border border-bg-tertiary bg-bg-tertiary px-3 py-2 text-sm font-semibold text-text-primary outline-none focus:border-accent-primary"
+              >
+                {STREAMER_PLATFORM_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <input
+                value={channelUrl}
+                onChange={(e) => setChannelUrl(e.target.value)}
+                placeholder={selectedPlatform.placeholder}
+                className="min-w-0 rounded-lg border border-bg-tertiary bg-bg-tertiary px-3 py-2 text-sm text-text-primary outline-none placeholder:text-text-tertiary focus:border-accent-primary"
+              />
+              <input
+                value={channelName}
+                onChange={(e) => setChannelName(e.target.value)}
+                placeholder="채널명"
+                className="min-w-0 rounded-lg border border-bg-tertiary bg-bg-tertiary px-3 py-2 text-sm text-text-primary outline-none placeholder:text-text-tertiary focus:border-accent-primary"
+              />
+              <div className="flex gap-2">
+                {profile && (
+                  <Button variant="ghost" size="sm" onClick={() => setEditing(false)} disabled={saving}>
+                    취소
+                  </Button>
+                )}
+                <Button size="sm" onClick={handleSave} disabled={saving}>
+                  {saving ? '저장 중' : '저장'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 // ─── 헬퍼 함수 ───────────────────────────────────────────────
 
@@ -497,6 +671,7 @@ export default function ProfilePage() {
   const highlightChampionId = profileData?.settings?.highlightChampionId;
   const recent = getRecentMetrics(recentMatches);
   const stats = profileData?.stats ?? user?.stats ?? null;
+  const streamerProfile = profileData?.streamerProfile ?? null;
 
   return (
     <div className="flex-grow p-4 md:p-8">
@@ -574,6 +749,13 @@ export default function ProfilePage() {
                     >
                       {clan.tag}
                     </Badge>
+                  )}
+                  {streamerProfile && (
+                    <a href={streamerProfile.channelUrl} target="_blank" rel="noreferrer">
+                      <Badge variant="gold" size="sm" className="rounded-md px-2 py-1 text-xs font-black">
+                        streamer
+                      </Badge>
+                    </a>
                   )}
                 </div>
 
@@ -682,6 +864,12 @@ export default function ProfilePage() {
             )}
           </CardContent>
         </Card>
+
+        <StreamerRegistrationCard
+          profile={streamerProfile}
+          onSaved={fetchProfile}
+          addToast={addToast}
+        />
 
         {/* ── 요약 스탯 칩 (전적/승률/KDA) ── */}
         {stats && (

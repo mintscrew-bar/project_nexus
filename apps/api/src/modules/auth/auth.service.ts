@@ -36,7 +36,7 @@ export interface TokenPayload {
   sub: string; // User ID
   email?: string;
   username: string;
-  role: string; // UserRole: USER | STREAMER | MODERATOR | ADMIN
+  role: string; // UserRole: USER | MODERATOR | ADMIN
 }
 
 export interface RegisterDto {

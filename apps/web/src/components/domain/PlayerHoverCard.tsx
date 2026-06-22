@@ -253,6 +253,11 @@ export function PlayerHoverCard({ userId, anchorRect, onOpenProfile, onMouseEnte
                 {/* 디스코드 닉네임 (메인) + 클랜 태그 */}
                 <div className="flex items-center gap-1.5">
                   <p className="truncate text-sm font-black leading-tight text-white">{data.username}</p>
+                  {data.streamerProfile && (
+                    <span className="shrink-0 rounded-md bg-yellow-400/15 px-1.5 py-0.5 text-[10px] font-black leading-none text-yellow-300">
+                      streamer
+                    </span>
+                  )}
                   {data.clan?.tag && (
                     <span
                       className="shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-black leading-none"

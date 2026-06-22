@@ -34,7 +34,7 @@ export interface User {
   updatedAt: string;
 }
 
-export type UserRole = "USER" | "STREAMER" | "MODERATOR" | "ADMIN";
+export type UserRole = "USER" | "MODERATOR" | "ADMIN";
 
 export interface UserProfile extends User {
   riotAccounts: RiotAccount[];

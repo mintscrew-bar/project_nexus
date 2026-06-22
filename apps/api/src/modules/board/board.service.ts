@@ -13,9 +13,8 @@ import { UpdateBoardDto } from "./dto/update-board.dto";
 /** UserRole 권한 서열 — 값이 클수록 상위 권한 */
 const ROLE_RANK: Record<UserRole, number> = {
   USER: 0,
-  STREAMER: 1,
-  MODERATOR: 2,
-  ADMIN: 3,
+  MODERATOR: 1,
+  ADMIN: 2,
 };
 
 @Injectable()

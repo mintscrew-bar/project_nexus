@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Patch,
+  Put,
   Post,
   Delete,
   Body,
@@ -19,7 +20,11 @@ import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { UserService } from "./user.service";
 import { UserSettingsService } from "./user-settings.service";
-import { UpdateSettingsDto, UpdateProfileDto } from "./dto";
+import {
+  UpdateSettingsDto,
+  UpdateProfileDto,
+  UpsertStreamerProfileDto,
+} from "./dto";
 import { UploadService } from "../upload/upload.service";
 
 @Controller("users")
@@ -67,6 +72,24 @@ export class UserController {
     @Body() data: UpdateSettingsDto,
   ) {
     return this.userSettingsService.updateSettings(userId, data);
+  }
+
+  @Get("me/streamer-profile")
+  async getMyStreamerProfile(@CurrentUser("sub") userId: string) {
+    return this.userService.getStreamerProfile(userId);
+  }
+
+  @Put("me/streamer-profile")
+  async upsertMyStreamerProfile(
+    @CurrentUser("sub") userId: string,
+    @Body() data: UpsertStreamerProfileDto,
+  ) {
+    return this.userService.upsertStreamerProfile(userId, data);
+  }
+
+  @Delete("me/streamer-profile")
+  async deleteMyStreamerProfile(@CurrentUser("sub") userId: string) {
+    return this.userService.deleteStreamerProfile(userId);
   }
 
   /**

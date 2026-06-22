@@ -9,16 +9,10 @@ import { UserRole } from "@nexus/database";
 import { ROLES_KEY } from "../decorators/roles.decorator";
 import { PrismaService } from "../../prisma/prisma.service";
 
-// ADMIN은 운영 권한을 모두 포함하고, STREAMER는 일반 유저 권한을 포함함.
+// ADMIN은 MODERATOR 권한을 포함함.
 const ROLE_HIERARCHY: Record<string, UserRole[]> = {
-  [UserRole.ADMIN]: [
-    UserRole.ADMIN,
-    UserRole.MODERATOR,
-    UserRole.STREAMER,
-    UserRole.USER,
-  ],
+  [UserRole.ADMIN]: [UserRole.ADMIN, UserRole.MODERATOR, UserRole.USER],
   [UserRole.MODERATOR]: [UserRole.MODERATOR, UserRole.USER],
-  [UserRole.STREAMER]: [UserRole.STREAMER, UserRole.USER],
   [UserRole.USER]: [UserRole.USER],
 };
 

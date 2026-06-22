@@ -42,14 +42,12 @@ const emptyForm: BoardInput = {
 
 const WRITE_ROLE_OPTIONS = [
   { value: "ALL", label: "모든 유저" },
-  { value: "STREAMER", label: "스트리머 이상" },
   { value: "MODERATOR", label: "매니저 이상" },
   { value: "ADMIN", label: "관리자만" },
 ];
 
 const WRITE_ROLE_LABELS: Record<NonNullable<Board["writeRole"]>, string> = {
   USER: "유저+",
-  STREAMER: "스트리머+",
   MODERATOR: "매니저+",
   ADMIN: "관리자",
 };

@@ -5,9 +5,16 @@ import {
   BadRequestException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { StreamerPlatform } from "@nexus/database";
 import { PrismaService } from "../prisma/prisma.service";
 import { DiscordAdminAlertService } from "../discord/discord-admin-alert.service";
 import { ReputationService } from "../reputation/reputation.service";
+
+const STREAMER_PLATFORM_HOSTS: Record<StreamerPlatform, string[]> = {
+  CHZZK: ["chzzk.naver.com"],
+  SOOP: ["sooplive.co.kr", "afreecatv.com"],
+  YOUTUBE: ["youtube.com", "youtu.be"],
+};
 
 @Injectable()
 export class UserService {
@@ -67,6 +74,7 @@ export class UserService {
           },
         },
         settings: true,
+        streamerProfile: true,
         _count: {
           select: {
             roomParticipations: true,
@@ -108,6 +116,10 @@ export class UserService {
           championPreferences: [],
         }));
       }
+    }
+
+    if (safeUser.streamerProfile && !safeUser.streamerProfile.isActive) {
+      safeUser.streamerProfile = null;
     }
 
     return {
@@ -189,6 +201,14 @@ export class UserService {
             clan: { select: { name: true, tag: true } },
           },
         },
+        streamerProfile: {
+          select: {
+            platform: true,
+            channelUrl: true,
+            channelName: true,
+            isActive: true,
+          },
+        },
       },
     });
 
@@ -224,6 +244,9 @@ export class UserService {
       avatar: user.avatar,
       riotAccount: riot,
       clan,
+      streamerProfile: user.streamerProfile?.isActive
+        ? user.streamerProfile
+        : null,
       stats: {
         wins: stats.wins,
         losses: stats.losses,
@@ -235,6 +258,128 @@ export class UserService {
         totalRatings: reputation.totalRatings,
       },
     };
+  }
+
+  async getStreamerProfile(userId: string) {
+    return this.prisma.streamerProfile.findUnique({
+      where: { userId },
+    });
+  }
+
+  async upsertStreamerProfile(
+    userId: string,
+    data: {
+      platform: StreamerPlatform;
+      channelUrl: string;
+      channelName?: string;
+    },
+  ) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        isBanned: true,
+        isRestricted: true,
+        restrictedUntil: true,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException("User not found");
+    }
+    if (user.isBanned) {
+      throw new BadRequestException(
+        "밴 상태에서는 스트리머 등록을 할 수 없습니다.",
+      );
+    }
+
+    const restrictionActive =
+      user.isRestricted &&
+      (!user.restrictedUntil || user.restrictedUntil > new Date());
+    if (restrictionActive) {
+      throw new BadRequestException(
+        "제재 상태에서는 스트리머 등록을 할 수 없습니다.",
+      );
+    }
+
+    const channelUrl = this.normalizeStreamerChannelUrl(data.channelUrl);
+    this.assertStreamerPlatformUrl(data.platform, channelUrl);
+
+    const channelName = data.channelName?.trim() || null;
+
+    return this.prisma.streamerProfile.upsert({
+      where: { userId },
+      create: {
+        userId,
+        platform: data.platform,
+        channelUrl,
+        channelName,
+        isActive: true,
+      },
+      update: {
+        platform: data.platform,
+        channelUrl,
+        channelName,
+        isActive: true,
+      },
+    });
+  }
+
+  async deleteStreamerProfile(userId: string) {
+    await this.prisma.streamerProfile.deleteMany({
+      where: { userId },
+    });
+
+    return { success: true };
+  }
+
+  private normalizeStreamerChannelUrl(rawUrl: string): string {
+    const trimmed = rawUrl.trim();
+    if (!trimmed) {
+      throw new BadRequestException("방송 채널 주소를 입력해주세요.");
+    }
+
+    const withProtocol = /^https?:\/\//i.test(trimmed)
+      ? trimmed
+      : `https://${trimmed}`;
+
+    let url: URL;
+    try {
+      url = new URL(withProtocol);
+    } catch {
+      throw new BadRequestException("유효한 방송 채널 주소를 입력해주세요.");
+    }
+
+    if (url.protocol !== "https:" && url.protocol !== "http:") {
+      throw new BadRequestException("유효한 방송 채널 주소를 입력해주세요.");
+    }
+
+    url.hash = "";
+    return url.toString();
+  }
+
+  private assertStreamerPlatformUrl(
+    platform: StreamerPlatform,
+    channelUrl: string,
+  ) {
+    const url = new URL(channelUrl);
+    const hostname = url.hostname.toLowerCase().replace(/^www\./, "");
+    const allowedHosts = STREAMER_PLATFORM_HOSTS[platform] ?? [];
+
+    const isAllowed = allowedHosts.some(
+      (host) => hostname === host || hostname.endsWith(`.${host}`),
+    );
+
+    if (!isAllowed) {
+      const labels: Record<StreamerPlatform, string> = {
+        CHZZK: "치지직",
+        SOOP: "SOOP",
+        YOUTUBE: "유튜브",
+      };
+      throw new BadRequestException(
+        `${labels[platform]} 채널 주소를 입력해주세요.`,
+      );
+    }
   }
 
   async updateProfile(

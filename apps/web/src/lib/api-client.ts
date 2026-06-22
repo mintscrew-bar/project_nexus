@@ -440,6 +440,19 @@ export const authApi = {
 };
 
 // 유저 관련 API
+export type StreamerPlatform = "CHZZK" | "SOOP" | "YOUTUBE";
+
+export interface StreamerProfile {
+  id?: string;
+  userId?: string;
+  platform: StreamerPlatform;
+  channelUrl: string;
+  channelName: string | null;
+  isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export const userApi = {
   getProfile: async (userId: string) => {
     const response = await apiClient.get(`/users/${userId}`);
@@ -463,6 +476,25 @@ export const userApi = {
   syncDiscordAvatar: async () => {
     const response = await apiClient.post("/users/me/avatar/sync-discord");
     return response.data as { avatarUrl: string };
+  },
+
+  getStreamerProfile: async () => {
+    const response = await apiClient.get("/users/me/streamer-profile");
+    return response.data as StreamerProfile | null;
+  },
+
+  upsertStreamerProfile: async (data: {
+    platform: StreamerPlatform;
+    channelUrl: string;
+    channelName?: string;
+  }) => {
+    const response = await apiClient.put("/users/me/streamer-profile", data);
+    return response.data as StreamerProfile;
+  },
+
+  deleteStreamerProfile: async () => {
+    const response = await apiClient.delete("/users/me/streamer-profile");
+    return response.data as { success: boolean };
   },
 
   getStats: async () => {
@@ -492,6 +524,7 @@ export const userApi = {
       championPreferences: { role: string; championId: string; order: number }[];
     } | null;
     clan: { name: string; tag: string | null } | null;
+    streamerProfile: Pick<StreamerProfile, "platform" | "channelUrl" | "channelName" | "isActive"> | null;
     stats: { wins: number; losses: number; winRate: number };
     kda: { kills: number; deaths: number; assists: number; games: number } | null;
     reputation: { overallAverage: number; totalRatings: number };
@@ -1235,7 +1268,7 @@ export interface Board {
   order: number;
   isActive: boolean;
   isHidden: boolean;
-  writeRole: "USER" | "STREAMER" | "MODERATOR" | "ADMIN" | null;
+  writeRole: "USER" | "MODERATOR" | "ADMIN" | null;
   createdAt: string;
   updatedAt: string;
   _count?: { posts: number };
@@ -1249,7 +1282,7 @@ export interface BoardInput {
   iconName?: string | null;
   color?: string | null;
   order?: number;
-  writeRole?: "USER" | "STREAMER" | "MODERATOR" | "ADMIN" | null;
+  writeRole?: "USER" | "MODERATOR" | "ADMIN" | null;
   isActive?: boolean;
   isHidden?: boolean;
 }
@@ -1873,12 +1906,12 @@ export const adminApi = {
     limit?: number;
     search?: string;
     kind?: "users" | "bots" | "all";
-    role?: "USER" | "STREAMER" | "MODERATOR" | "ADMIN";
+    role?: "USER" | "MODERATOR" | "ADMIN";
   }) => {
     const response = await apiClient.get("/admin/users", { params });
     return response.data;
   },
-  updateUserRole: async (userId: string, role: "USER" | "STREAMER" | "MODERATOR" | "ADMIN") => {
+  updateUserRole: async (userId: string, role: "USER" | "MODERATOR" | "ADMIN") => {
     const response = await apiClient.patch(`/admin/users/${userId}/role`, { role });
     return response.data;
   },

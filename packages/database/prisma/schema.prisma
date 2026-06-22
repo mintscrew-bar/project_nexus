@@ -69,6 +69,7 @@ model User {
   reportsSubmitted    UserReport[]       @relation("ReporterUser")
   reportsReceived     UserReport[]       @relation("ReportedUser")
   settings            UserSettings?
+  streamerProfile     StreamerProfile?
   statsRecomputeQueue StatsRecomputeQueue?
   votesGiven          MatchVote[]        @relation("VoterUser")
   votesReceived       MatchVote[]        @relation("VotedForUser")
@@ -152,6 +153,23 @@ model UserSettings {
   user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("user_settings")
+}
+
+model StreamerProfile {
+  id          String           @id @default(cuid())
+  userId      String           @unique
+  platform    StreamerPlatform
+  channelUrl  String
+  channelName String?
+  isActive    Boolean          @default(true)
+  settings    Json?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([platform])
+  @@index([isActive])
+  @@map("streamer_profiles")
 }
 
 model RiotAccount {
@@ -1149,9 +1167,14 @@ model Appeal {
 
 enum UserRole {
   USER
-  STREAMER
   MODERATOR
   ADMIN
+}
+
+enum StreamerPlatform {
+  CHZZK
+  SOOP
+  YOUTUBE
 }
 
 enum UserStatus {
