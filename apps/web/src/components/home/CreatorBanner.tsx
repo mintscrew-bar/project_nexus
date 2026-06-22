@@ -36,7 +36,7 @@ export function CreatorBanner({
         fill
         priority={priority}
         sizes="(max-width: 768px) 100vw, 1180px"
-        className="object-contain object-center"
+        className="object-cover object-center"
       />
     </a>
   );
