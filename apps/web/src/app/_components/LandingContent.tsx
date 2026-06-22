@@ -117,6 +117,7 @@ const footerLinks = [
   { href: "/resources", label: "자료실" },
   { href: "/guide", label: "이용 가이드" },
   { href: "/community", label: "커뮤니티" },
+  { href: "/contact", label: "문의" },
   { href: "/privacy", label: "개인정보처리방침" },
   { href: "/terms", label: "이용약관" },
 ];
@@ -125,6 +126,7 @@ const landingNavLinks = [
   { href: "/about", label: "소개" },
   { href: "/resources", label: "자료실" },
   { href: "/guide", label: "가이드" },
+  { href: "/contact", label: "문의" },
   { href: "/tournaments", label: "내전방" },
   { href: "/community", label: "커뮤니티" },
 ];

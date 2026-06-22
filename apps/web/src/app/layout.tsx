@@ -8,6 +8,7 @@ import { PageViewTracker } from "@/components/analytics/PageViewTracker";
 import { ConsentBanner } from "@/components/analytics/ConsentBanner";
 import { AdSenseScript } from "@/components/ads/AdSenseScript";
 import { Suspense } from "react";
+import { ADSENSE_CLIENT } from "@/lib/adsense";
 import {
   SITE_DESCRIPTION,
   SITE_NAME,
@@ -97,6 +98,7 @@ export const metadata: Metadata = {
   manifest: "/manifest.webmanifest",
   other: {
     "naver-site-verification": "799f4d82676fc5d3b1292100b8bfa7edefb7d593",
+    "google-adsense-account": ADSENSE_CLIENT,
   },
   robots: {
     index: true,
@@ -124,6 +126,7 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }}
         />
         <GoogleAnalytics />
+        <AdSenseScript />
       </head>
       <body className={`${inter.className} font-sans h-screen flex flex-col overflow-hidden`}>
         <Providers>
@@ -134,7 +137,6 @@ export default function RootLayout({
           <PageViewTracker />
         </Suspense>
         <ConsentBanner />
-        <AdSenseScript />
       </body>
     </html>
   );

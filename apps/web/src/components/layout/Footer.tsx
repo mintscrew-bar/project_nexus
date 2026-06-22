@@ -20,6 +20,9 @@ export function Footer() {
             <Link href="/community" className="hover:text-text-secondary transition-colors duration-150">
               커뮤니티
             </Link>
+            <Link href="/contact" className="hover:text-text-secondary transition-colors duration-150">
+              문의
+            </Link>
             <Link href="/privacy" className="hover:text-text-secondary transition-colors duration-150">
               개인정보처리방침
             </Link>

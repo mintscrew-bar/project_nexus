@@ -1,7 +1,14 @@
 import Link from "next/link";
+import type { Metadata } from "next";
+import { absoluteUrl } from "@/lib/seo";
 
-export const metadata = {
-  title: "개인정보처리방침 | Project Nexus",
+export const metadata: Metadata = {
+  title: "개인정보처리방침",
+  description:
+    "Nexus가 수집하는 개인정보 항목, 이용 목적, 보유 기간, 외부 서비스 연동, 이용자 권리와 문의 방법을 안내합니다.",
+  alternates: {
+    canonical: absoluteUrl("/privacy"),
+  },
 };
 
 export default function PrivacyPage() {

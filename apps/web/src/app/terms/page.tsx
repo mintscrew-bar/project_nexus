@@ -1,7 +1,14 @@
 import Link from "next/link";
+import type { Metadata } from "next";
+import { absoluteUrl } from "@/lib/seo";
 
-export const metadata = {
-  title: "이용약관 | Project Nexus",
+export const metadata: Metadata = {
+  title: "이용약관",
+  description:
+    "Nexus 내전 매칭, 클랜, 커뮤니티, 채팅 기능 이용 조건과 사용자 의무, 신고와 제재 기준을 안내합니다.",
+  alternates: {
+    canonical: absoluteUrl("/terms"),
+  },
 };
 
 export default function TermsPage() {
