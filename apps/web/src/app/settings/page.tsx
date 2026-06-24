@@ -122,6 +122,21 @@ export default function SettingsPage() {
   }, [isAuthenticated, isLoading, router]);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const tab = new URLSearchParams(window.location.search).get("tab");
+    if (
+      tab === "accounts" ||
+      tab === "notifications" ||
+      tab === "privacy" ||
+      tab === "appearance" ||
+      tab === "about"
+    ) {
+      setActiveTab(tab);
+    }
+  }, []);
+
+  useEffect(() => {
     if (isLoading || !isAuthenticated || !user) return;
 
     const shouldOpenOnboarding =

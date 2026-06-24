@@ -14,6 +14,7 @@ const staticRoutes = [
   { path: "/", priority: 1, changeFrequency: "weekly" },
   // lab은 아직 비공개 — 공개 전까지 사이트맵·robots에서 제외 (크롤 예산을 내전 페이지에 집중)
   { path: "/about", priority: 0.75, changeFrequency: "monthly" },
+  { path: "/partners", priority: 0.75, changeFrequency: "monthly" },
   { path: "/resources", priority: 0.8, changeFrequency: "monthly" },
   { path: "/guide", priority: 0.85, changeFrequency: "monthly" },
   { path: "/contact", priority: 0.45, changeFrequency: "yearly" },

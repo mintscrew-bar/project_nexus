@@ -3,6 +3,19 @@
 @tailwind utilities;
 
 @layer base {
+  @font-face {
+    font-family: "MemomentKkukkkuk";
+    src:
+      url("https://cdn.jsdelivr.net/gh/woffz/b3@main/memomentKkukKkuk/memomentKkukKkuk.woff2") format("woff2"),
+      local("Memoment Kkukkkuk"),
+      local("MemomentKkukkkuk"),
+      local("메모먼트 꾹꾹체"),
+      local("메모먼트꾹꾹체");
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+  }
+
   :root { /* Light Theme (Placeholder - Dark is Primary) */
     /* Background Colors */
     --color-bg-primary: 240 240 240; /* Light equivalent */
