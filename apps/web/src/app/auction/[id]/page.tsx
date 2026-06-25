@@ -1176,16 +1176,16 @@ export default function AuctionRoomPage() {
         <MobileBidPanel
           auctionState={auctionState}
           myTeam={myTeam!}
-          currentUserId={user?.id}
           isAlreadyHighest={isAlreadyHighest}
           isConnected={isConnected}
           onPlaceBid={placeBid}
+          onFocusAuction={() => setMobileTab("auction")}
         />
       )}
 
       {/* 모바일에서 하단 입찰 패널이 있을 때 여백 확보 */}
       {isCaptainTurn && auctionState.currentPlayer && (
-        <div className="lg:hidden h-36" />
+        <div className="lg:hidden h-48" />
       )}
 
       {/* 대기 선수 전체 보기 모달 */}
@@ -1210,20 +1210,21 @@ export default function AuctionRoomPage() {
 function MobileBidPanel({
   auctionState,
   myTeam,
-  currentUserId,
   isAlreadyHighest,
   isConnected,
   onPlaceBid,
+  onFocusAuction,
 }: {
   auctionState: any;
   myTeam: any;
-  currentUserId?: string;
   isAlreadyHighest: boolean;
   isConnected: boolean;
   onPlaceBid: (amount: number) => void | Promise<void>;
+  onFocusAuction?: () => void;
 }) {
   const [accBid, setAccBid] = useState(0);
   const [isBidding, setIsBidding] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(0);
 
   const bidIncrement = auctionState.bidIncrement ?? 50;
   const bidSteps = [bidIncrement, bidIncrement * 2, bidIncrement * 5];
@@ -1234,6 +1235,7 @@ function MobileBidPanel({
   const availableBudget = Math.max(0, budget - reserveAmount);
   const totalBid = auctionState.currentHighestBid + accBid;
   const canBid = accBid > 0 && totalBid <= availableBudget && !isBidding;
+  const currentPlayer = auctionState.currentPlayer;
 
   // 매물 전환 시 리셋
   React.useEffect(() => { setAccBid(0); }, [auctionState.currentPlayer?.id]);
@@ -1242,6 +1244,12 @@ function MobileBidPanel({
     const max = Math.max(0, availableBudget - auctionState.currentHighestBid);
     setAccBid((prev) => Math.min(prev, max));
   }, [auctionState.currentHighestBid, availableBudget]);
+  React.useEffect(() => {
+    const interval = setInterval(() => {
+      setTimeLeft(Math.max(0, Math.ceil((auctionState.timerEnd - Date.now()) / 1000)));
+    }, 100);
+    return () => clearInterval(interval);
+  }, [auctionState.timerEnd]);
 
   const addToBid = (inc: number) => {
     setAccBid((prev) => {
@@ -1261,9 +1269,55 @@ function MobileBidPanel({
     }
   };
 
+  if (!currentPlayer) return null;
+
   return (
     <div className="lg:hidden fixed bottom-0 left-0 right-0 z-30 bg-bg-primary/95 backdrop-blur-sm border-t border-bg-tertiary px-4 py-3 safe-area-pb">
-      {/* 1줄: 예산 + 입찰가 디스플레이 */}
+      {/* 1줄: 현재 매물 + 타이머 */}
+      <div className="mb-2 flex items-center gap-2 rounded-lg border border-bg-tertiary bg-bg-secondary px-2.5 py-2">
+        <Avatar
+          src={currentPlayer.avatar}
+          alt={currentPlayer.username}
+          fallback={currentPlayer.username?.[0] ?? "?"}
+          size="sm"
+          className="shrink-0 ring-1 ring-accent-primary/40"
+        />
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 items-center gap-1.5">
+            <span className="truncate text-sm font-bold text-text-primary">
+              {currentPlayer.username}
+            </span>
+            {currentPlayer.tier && (
+              <span className="shrink-0 text-[10px] font-semibold text-text-tertiary">
+                {currentPlayer.tier}
+              </span>
+            )}
+          </div>
+          <p className="truncate text-[11px] text-text-secondary">
+            최고가 {auctionState.currentHighestBid.toLocaleString()}G
+            {auctionState.currentHighestBidderName ? ` · ${auctionState.currentHighestBidderName}` : ""}
+          </p>
+        </div>
+        {onFocusAuction && (
+          <button
+            type="button"
+            onClick={onFocusAuction}
+            className="shrink-0 rounded-md border border-bg-tertiary px-2 py-1 text-[11px] font-semibold text-text-secondary"
+          >
+            경매 보기
+          </button>
+        )}
+        <div
+          className={cn(
+            "min-w-10 shrink-0 text-right text-lg font-bold tabular-nums",
+            timeLeft <= 5 ? "text-accent-danger" : "text-text-primary",
+          )}
+        >
+          {timeLeft}s
+        </div>
+      </div>
+
+      {/* 2줄: 예산 + 입찰가 디스플레이 */}
       <div className="flex items-center justify-between mb-2">
         <span className="text-xs text-text-tertiary">
           예산 <span className="text-accent-gold font-bold">{availableBudget.toLocaleString()}G</span>
@@ -1282,7 +1336,7 @@ function MobileBidPanel({
         </div>
       ) : (
         <>
-          {/* 2줄: 증액 버튼 + 초기화 + 입찰 */}
+          {/* 3줄: 증액 버튼 + 초기화 + 입찰 */}
           <div className="flex items-center gap-2">
             {bidSteps.map((inc) => (
               <Button

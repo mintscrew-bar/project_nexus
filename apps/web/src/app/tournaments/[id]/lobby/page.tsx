@@ -12,9 +12,9 @@ import { ConfirmModal, Tabs, TabsList, TabsTrigger, TabsContent } from "@/compon
 import { useToast } from "@/components/ui/Toast";
 import { shallow } from "zustand/shallow";
 import {
-  Users, X, MessageSquare, Settings,
+  Users, MessageSquare, Settings,
   UserCog,
-  ArrowLeft, Shield, Swords, Volume2, VolumeX, Share2, LogOut, CheckCircle2, Clock3,
+  ArrowLeft, Shield, Swords, Share2, CheckCircle2, Clock3,
 } from "lucide-react";
 import Link from "next/link";
 import { friendApi, adminApi, roomApi, ensureValidToken } from "@/lib/api-client";
@@ -364,12 +364,14 @@ export default function TournamentLobbyPage() {
           players.filter((player: any) => player.teamId === team.id).length ===
           5,
       ));
+  const minStartPlayers = room.teamMode === "AUCTION" ? 4 : 2;
+  const hasMinimumPlayers = totalPlayers >= minStartPlayers;
   const canStart =
     allPlayersReady &&
     allPlayersAssigned &&
     hasFullRoster &&
     manualTeamsFilled &&
-    totalPlayers >= (room.teamMode === "AUCTION" ? 4 : 2) &&
+    hasMinimumPlayers &&
     allInVoice;
   const needsManualTeamSelection =
     room.teamMode === "MANUAL_TEAM" &&
@@ -394,6 +396,8 @@ export default function TournamentLobbyPage() {
   ];
   const startBlockedMessage = !hasFullRoster
     ? "설정한 정원이 모두 참가해야 시작할 수 있습니다."
+    : !hasMinimumPlayers
+      ? `${teamModeLabel} 모드는 최소 ${minStartPlayers}명이 필요합니다.`
     : !allPlayersAssigned
       ? "모든 플레이어가 팀을 선택해야 합니다."
       : !manualTeamsFilled
@@ -753,13 +757,6 @@ export default function TournamentLobbyPage() {
                   대진표 보기
                 </Link>
               )}
-              <button
-                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-accent-danger/40 bg-accent-danger/10 px-5 py-2.5 text-sm font-bold text-accent-danger transition-colors hover:bg-accent-danger/20"
-                onClick={handleLeaveLobby}
-              >
-                <LogOut className="h-4 w-4" />
-                로비 나가기
-              </button>
             </div>
 
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
@@ -775,32 +772,35 @@ export default function TournamentLobbyPage() {
                 </button>
               )}
               {isCurrentUserHost && room.status === 'WAITING' && (
-                <button
-                  className={`inline-flex min-h-11 items-center justify-center rounded-lg px-6 py-2.5 text-sm font-bold text-white transition-all ${
-                    canStart
-                      ? 'bg-accent-success hover:bg-accent-success/90 animate-glow-success'
-                      : 'bg-accent-success/50 cursor-not-allowed opacity-60'
-                  }`}
-                  disabled={!canStart}
-                  onClick={() => startGame((err) => {
-                    // 음성채널 미참가 유저가 있는 경우 구체적인 메시지 표시
-                    if (err.missingVoiceUsers && err.missingVoiceUsers.length > 0) {
-                      addToast(
-                        `음성채널 미참가: ${err.missingVoiceUsers.join(', ')}`,
-                        'error'
-                      );
-                    } else {
-                      addToast(err.message, 'error');
-                    }
-                  })}
-                  title={
-                    room.teamMode === 'AUCTION' && totalPlayers < 4
-                      ? '경매 모드는 최소 4명이 필요합니다'
-                      : startBlockedMessage
-                  }
-                >
-                  내전 시작
-                </button>
+                <div className="flex flex-col gap-1.5 sm:items-end">
+                  {!canStart && startBlockedMessage && (
+                    <p className="max-w-[280px] text-xs font-medium text-accent-warning sm:text-right">
+                      {startBlockedMessage}
+                    </p>
+                  )}
+                  <button
+                    className={`inline-flex min-h-11 items-center justify-center rounded-lg px-6 py-2.5 text-sm font-bold text-white transition-all ${
+                      canStart
+                        ? 'bg-accent-success hover:bg-accent-success/90 animate-glow-success'
+                        : 'bg-accent-success/50 cursor-not-allowed opacity-60'
+                    }`}
+                    disabled={!canStart}
+                    onClick={() => startGame((err) => {
+                      // 음성채널 미참가 유저가 있는 경우 구체적인 메시지 표시
+                      if (err.missingVoiceUsers && err.missingVoiceUsers.length > 0) {
+                        addToast(
+                          `음성채널 미참가: ${err.missingVoiceUsers.join(', ')}`,
+                          'error'
+                        );
+                      } else {
+                        addToast(err.message, 'error');
+                      }
+                    })}
+                    title={startBlockedMessage}
+                  >
+                    내전 시작
+                  </button>
+                </div>
               )}
               {!isCurrentUserHost && room.status === 'WAITING' && (
                 <p className="text-text-tertiary text-xs hidden sm:block">방장이 내전을 시작할 때까지 대기 중...</p>
