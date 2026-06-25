@@ -175,6 +175,15 @@ export default function RoleSelectionPage() {
       : timeRemaining <= 20
         ? "text-accent-warning"
         : "text-accent-primary";
+  const myTeam = room.teams.find((team) =>
+    team.members.some((member) => member.userId === user?.id),
+  );
+  const myMember = myTeam?.members.find((member) => member.userId === user?.id);
+  const selectedRole = myMember?.assignedRole as Role | null;
+  const myTeamTakenRoles = myTeam?.members
+    .filter((member) => member.assignedRole)
+    .map((member) => member.assignedRole as Role) ?? [];
+  const myTeamOpenRoles = ROLES.filter((role) => !myTeamTakenRoles.includes(role));
 
   return (
     <div className="flex-grow p-4 md:p-6">
@@ -240,6 +249,56 @@ export default function RoleSelectionPage() {
           </div>
         )}
 
+        {myTeam && (
+          <section className="mb-4 rounded-xl border border-accent-primary/30 bg-accent-primary/5 px-4 py-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-wide text-accent-primary">
+                  내 선택
+                </p>
+                <div className="mt-1 flex flex-wrap items-center gap-2">
+                  <span className="text-base font-bold text-text-primary">
+                    {selectedRole ? `${ROLE_META[selectedRole]?.label} 선택됨` : "아직 선택하지 않았습니다"}
+                  </span>
+                  {selectedRole && (
+                    <span className="inline-flex items-center gap-1 rounded-md bg-accent-success/10 px-2 py-1 text-xs font-bold text-accent-success">
+                      <PositionIcon position={selectedRole} />
+                      완료
+                    </span>
+                  )}
+                </div>
+                <p className="mt-1 text-xs text-text-secondary">
+                  {selectedRole
+                    ? "바꾸려면 내 카드에서 다른 포지션을 선택하세요."
+                    : "아래 내 카드에서 원하는 포지션을 선택하세요."}
+                </p>
+              </div>
+              <div className="sm:text-right">
+                <p className="text-xs font-medium text-text-tertiary">
+                  {myTeam.name} 남은 포지션
+                </p>
+                <div className="mt-1 flex flex-wrap gap-1.5 sm:justify-end">
+                  {myTeamOpenRoles.length > 0 ? (
+                    myTeamOpenRoles.map((role) => (
+                      <span
+                        key={role}
+                        className="inline-flex items-center gap-1 rounded-md border border-bg-tertiary bg-bg-secondary px-2 py-1 text-xs font-semibold text-text-secondary"
+                      >
+                        <PositionIcon position={role} />
+                        {ROLE_META[role]?.label}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="rounded-md bg-accent-success/10 px-2 py-1 text-xs font-semibold text-accent-success">
+                      전원 선택 완료
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+
         {/* Teams */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {room.teams.map((team) => {
@@ -289,7 +348,11 @@ export default function RoleSelectionPage() {
                         <div
                           className={cn(
                             "flex items-center gap-3 px-3 py-2.5 rounded-lg border cursor-default",
-                            isMe ? "bg-accent-primary/5 border-accent-primary/20" : "bg-bg-tertiary/60 border-transparent"
+                            isMe && !memberRole
+                              ? "bg-accent-warning/10 border-accent-warning/35"
+                              : isMe
+                                ? "bg-accent-primary/5 border-accent-primary/20"
+                                : "bg-bg-tertiary/60 border-transparent"
                           )}
                           onMouseEnter={(e) => handleMemberHover(member.userId, e.currentTarget)}
                           onMouseLeave={scheduleHoverClose}

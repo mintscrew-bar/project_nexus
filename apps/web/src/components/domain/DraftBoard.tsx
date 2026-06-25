@@ -86,6 +86,10 @@ export function DraftBoard({
   // Find current picking team
   const currentTeam = draftState.teams.find(t => t.id === draftState.currentTeamId);
   const isMyTurn = currentTeam?.captainId === currentUserId;
+  const totalPicks = draftState.pickOrder.length;
+  const progressPercent = totalPicks > 0
+    ? Math.min(100, (draftState.currentPickIndex / totalPicks) * 100)
+    : 0;
 
   // 타이머 색상 — 10초 이하 경고, 5초 이하 위험
   const timerColor =
@@ -306,13 +310,13 @@ export function DraftBoard({
         <div className="mt-4">
           <div className="flex justify-between text-xs text-text-secondary mb-1">
             <span>드래프트 진행도</span>
-            <span>{draftState.currentPickIndex} / {draftState.pickOrder.length}</span>
+            <span>{draftState.currentPickIndex} / {totalPicks}</span>
           </div>
           <div className="h-2 bg-bg-primary rounded-full overflow-hidden">
             <div
               className="h-full bg-accent-primary transition-all duration-300"
               style={{
-                width: `${(draftState.currentPickIndex / draftState.pickOrder.length) * 100}%`
+                width: `${progressPercent}%`
               }}
             />
           </div>

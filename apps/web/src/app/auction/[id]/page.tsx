@@ -264,12 +264,13 @@ function TeamSideColumn({
     const rect = el.getBoundingClientRect();
     hoverTimerRef.current = setTimeout(() => setHoveredPlayer({ userId, rect }), 300);
   }, [cancelHoverClose]);
+  const dense = teams.length >= 4;
 
   return (
-    /* 팀 수에 따라 균등 분할, 최소 210px 보장 — 넘치면 사이드 스크롤 */
+    /* 팀 수에 따라 균등 분할. 다팀 방은 dense 행 높이로 압축하고, 넘치면 사이드 스크롤 */
     <div
-      className="grid h-full gap-3 overflow-y-auto"
-      style={{ gridTemplateRows: `repeat(${teams.length}, minmax(210px, 1fr))` }}
+      className={cn("grid h-full overflow-y-auto", dense ? "gap-2" : "gap-3")}
+      style={{ gridTemplateRows: `repeat(${teams.length}, minmax(${dense ? 168 : 210}px, 1fr))` }}
     >
       {teams.map((team) => {
         const members = team.members ?? [];
@@ -294,7 +295,8 @@ function TeamSideColumn({
             {/* 팀 헤더 */}
             <div
               className={cn(
-                "flex h-10 shrink-0 items-center gap-2 border-b border-bg-tertiary/70 px-3",
+                "flex shrink-0 items-center gap-2 border-b border-bg-tertiary/70",
+                dense ? "h-9 px-2.5" : "h-10 px-3",
                 isCurrentBidder ? "bg-accent-gold/10" : "bg-bg-tertiary/20",
               )}
             >
@@ -319,7 +321,7 @@ function TeamSideColumn({
             </div>
 
             {/* 멤버 슬롯 — 카드 높이를 5등분해서 공간을 최대한 활용 */}
-            <div className="grid flex-1 grid-rows-5 gap-1 p-1.5">
+            <div className={cn("grid flex-1 grid-rows-5", dense ? "gap-0.5 p-1" : "gap-1 p-1.5")}>
               {members.map((member: any, idx: number) => {
                 const isCaptain = member.id === team.captainId;
                 const mainRole = member.assignedRole || member.mainRole;
@@ -329,6 +331,7 @@ function TeamSideColumn({
                     key={member.id}
                     className={cn(
                       "flex min-h-0 cursor-default items-center gap-1.5 rounded px-2",
+                      dense && "gap-1 px-1.5",
                       isCaptain ? "bg-accent-gold/10" : "bg-bg-tertiary/60",
                     )}
                     onMouseEnter={(e) => handleHover(member.id, e.currentTarget)}
@@ -369,7 +372,7 @@ function TeamSideColumn({
                   className="flex min-h-0 items-center gap-1.5 rounded border border-dashed border-bg-tertiary/60 px-2"
                 >
                   <span className="w-4 shrink-0 text-center text-[10px] text-text-muted">{members.length + i}</span>
-                  <span className="text-xs text-text-muted">빈 슬롯</span>
+                  <span className={cn("text-xs text-text-muted", dense && "sr-only")}>빈 슬롯</span>
                 </div>
               ))}
             </div>
@@ -613,6 +616,26 @@ export default function AuctionRoomPage() {
     const otherWaitingParticipants = (participants ?? []).filter(
       (p: any) => p.id !== user?.id && !volunteers.includes(p.id),
     );
+    const selectedCaptainParticipants = (participants ?? []).filter((p: any) =>
+      selectedCaptains.includes(p.id),
+    );
+    const selectedCaptainSummary = selectedCaptainParticipants
+      .map((p: any) => p.username)
+      .join(", ");
+    const volunteerConfirmSummary = volunteerParticipants
+      .slice(0, requiredCount)
+      .map((p: any) => p.username)
+      .join(", ");
+    const captainFooterSummary =
+      mode === "MANUAL" || tooManyVolunteers
+        ? selectedCaptainSummary
+          ? `확정 대상: ${selectedCaptainSummary}`
+          : `${requiredCount}명을 선택해야 확정할 수 있습니다.`
+        : volunteers.length === 0
+          ? "지원자 없이 MMR 상위 참가자로 자동 선정합니다."
+          : volunteers.length < requiredCount
+            ? `현재 지원: ${volunteerConfirmSummary} · 부족분은 MMR로 자동 선정`
+            : `확정 대상: ${volunteerConfirmSummary}`;
     const progressPct = Math.min(100, (volunteers.length / requiredCount) * 100);
     // 자원자 부족 시 백엔드가 MMR로 자동 채움
     const willBeFilledByMmr = !tooManyVolunteers && volunteers.length < requiredCount;
@@ -867,6 +890,9 @@ export default function AuctionRoomPage() {
           {/* 방장 마감/확정 버튼 */}
           {(mode === 'VOLUNTEER' || mode === 'MANUAL') && isHost && (
             <div className="flex-shrink-0 border-t border-bg-tertiary bg-bg-primary/95 px-1 pt-4 backdrop-blur">
+              <p className="mx-auto mb-3 max-w-xl truncate text-center text-xs font-medium text-text-secondary">
+                {captainFooterSummary}
+              </p>
               {mode === 'VOLUNTEER' && (
                 <div className="flex justify-center">
                   <Button
