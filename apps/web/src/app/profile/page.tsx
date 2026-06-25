@@ -361,17 +361,17 @@ function StreamerLinkRow({
   }
 
   return (
-    <div className="grid gap-2 rounded-lg bg-bg-tertiary/50 p-2.5 lg:grid-cols-[96px_150px_1fr_auto]">
+    <div className="flex items-center gap-2 rounded-lg bg-bg-tertiary/50 p-2.5">
       <button
         type="button"
         onClick={() => fileRef.current?.click()}
-        className="relative h-16 overflow-hidden rounded-lg border border-bg-tertiary bg-bg-primary text-text-tertiary transition-colors hover:border-accent-primary hover:text-text-primary"
+        className="relative h-9 w-9 shrink-0 overflow-hidden rounded-lg border border-bg-tertiary bg-bg-primary text-text-tertiary transition-colors hover:border-accent-primary hover:text-text-primary"
       >
         {previewUrl ? (
           <Image src={previewUrl} alt="링크 이미지" fill className="object-cover" unoptimized />
         ) : (
           <span className="flex h-full w-full items-center justify-center">
-            <Camera className="h-5 w-5" />
+            <Camera className="h-4 w-4" />
           </span>
         )}
       </button>
@@ -386,15 +386,15 @@ function StreamerLinkRow({
         value={label}
         onChange={(e) => setLabel(e.target.value)}
         placeholder="링크 이름"
-        className="min-w-0 rounded-lg border border-bg-tertiary bg-bg-primary px-3 py-2 text-sm text-text-primary outline-none placeholder:text-text-tertiary focus:border-accent-primary"
+        className="w-36 shrink-0 rounded-lg border border-bg-tertiary bg-bg-primary px-3 py-2 text-sm text-text-primary outline-none placeholder:text-text-tertiary focus:border-accent-primary"
       />
       <input
         value={url}
         onChange={(e) => setUrl(e.target.value)}
         placeholder="https://discord.gg/..."
-        className="min-w-0 rounded-lg border border-bg-tertiary bg-bg-primary px-3 py-2 text-sm text-text-primary outline-none placeholder:text-text-tertiary focus:border-accent-primary"
+        className="min-w-0 flex-1 rounded-lg border border-bg-tertiary bg-bg-primary px-3 py-2 text-sm text-text-primary outline-none placeholder:text-text-tertiary focus:border-accent-primary"
       />
-      <div className="flex gap-1.5">
+      <div className="flex shrink-0 gap-1.5">
         <Button
           variant="ghost"
           size="sm"
