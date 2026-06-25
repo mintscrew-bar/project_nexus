@@ -54,7 +54,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <>
       <Header />
       <main className="flex flex-grow min-h-0">
-        <Sidebar />
+        {!isDashboardRoute && <Sidebar />}
         <div className="flex flex-col flex-grow min-h-0 bg-bg-primary overflow-hidden">
           {showCreatorPromo && <CreatorPromoStrip />}
           {/*

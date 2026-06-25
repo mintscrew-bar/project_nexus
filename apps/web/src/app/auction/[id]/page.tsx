@@ -236,8 +236,8 @@ function BidLog({ bidHistory, logEndRef }: { bidHistory: any[]; logEndRef: React
   );
 }
 
-/** LoL형 레이아웃 — 좌/우 팀 사이드 컬럼 */
-function TeamSideColumn({
+/** 방송/운영용 팀 요약 패널 — 팀장, 예산, 5인 슬롯을 압축 표시 */
+function TeamSummaryPanel({
   teams,
   currentUserId,
   auctionState,
@@ -264,121 +264,150 @@ function TeamSideColumn({
     const rect = el.getBoundingClientRect();
     hoverTimerRef.current = setTimeout(() => setHoveredPlayer({ userId, rect }), 300);
   }, [cancelHoverClose]);
-  const dense = teams.length >= 4;
 
   return (
-    /* 팀 수에 따라 균등 분할. 다팀 방은 dense 행 높이로 압축하고, 넘치면 사이드 스크롤 */
-    <div
-      className={cn("grid h-full overflow-y-auto", dense ? "gap-2" : "gap-3")}
-      style={{ gridTemplateRows: `repeat(${teams.length}, minmax(${dense ? 168 : 210}px, 1fr))` }}
-    >
-      {teams.map((team) => {
-        const members = team.members ?? [];
-        const budget = team.remainingGold ?? team.remainingBudget ?? 0;
-        const isMine =
-          team.captainId === currentUserId ||
-          members.some((m: any) => m.id === currentUserId);
-        const isCurrentBidder =
-          auctionState?.currentHighestBidder === team.id ||
-          auctionState?.currentHighestBidder === team.captainId;
-        const isFull = members.length >= 5;
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
+      <div className="mb-2 flex h-10 shrink-0 items-center justify-between rounded-lg border border-bg-tertiary bg-bg-secondary px-3">
+        <div className="flex items-center gap-1.5">
+          <Users className="h-3.5 w-3.5 text-accent-primary" />
+          <span className="text-sm font-semibold text-text-primary">팀 요약</span>
+        </div>
+        <span className="rounded bg-bg-elevated px-1.5 py-0.5 text-[10px] font-bold text-text-tertiary">
+          {teams.length}
+        </span>
+      </div>
 
-        return (
+      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+        {teams.map((team) => {
+          const members = team.members ?? [];
+          const budget = team.remainingGold ?? team.remainingBudget ?? 0;
+          const captain = members.find((m: any) => m.id === team.captainId);
+          const captainName = captain?.username ?? team.captainName ?? team.name;
+          const isMine =
+            team.captainId === currentUserId ||
+            members.some((m: any) => m.id === currentUserId);
+          const isCurrentBidder =
+            auctionState?.currentHighestBidder === team.id ||
+            auctionState?.currentHighestBidder === team.captainId;
+          const isFull = members.length >= 5;
+
+          return (
           <Card
             key={team.id}
             className={cn(
-              "flex min-h-0 flex-col overflow-hidden p-0",
+              "overflow-hidden p-0",
               isCurrentBidder && "border-accent-gold/50 shadow-sm shadow-accent-gold/10",
               isMine && !isCurrentBidder && "border-accent-primary/40",
+              isFull && "opacity-80",
             )}
           >
-            {/* 팀 헤더 */}
             <div
               className={cn(
-                "flex shrink-0 items-center gap-2 border-b border-bg-tertiary/70",
-                dense ? "h-9 px-2.5" : "h-10 px-3",
+                "flex items-center gap-2 border-b border-bg-tertiary/70 px-3 py-2.5",
                 isCurrentBidder ? "bg-accent-gold/10" : "bg-bg-tertiary/20",
               )}
             >
-              {team.color && (
-                <div className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: team.color }} />
-              )}
-              <span className={cn("min-w-0 flex-1 truncate text-sm font-semibold", isMine ? "text-accent-primary" : "text-text-primary")}>
-                {team.name}
-              </span>
-              {isFull ? (
-                <span className="shrink-0 rounded-full border border-accent-success/30 bg-accent-success/15 px-1.5 py-0.5 text-[10px] text-accent-success">
-                  꽉 참
+              <div
+                className="relative shrink-0"
+                onMouseEnter={(e) => captain && handleHover(captain.id, e.currentTarget)}
+                onMouseLeave={scheduleHoverClose}
+                onClick={() => captain && setProfileUserId(captain.id)}
+              >
+                <Avatar
+                  src={captain?.avatar}
+                  alt={captainName}
+                  fallback={captainName?.[0] ?? "?"}
+                  size="sm"
+                  className={cn(
+                    "cursor-pointer",
+                    isCurrentBidder ? "ring-2 ring-accent-gold/60" : "ring-1 ring-bg-elevated",
+                  )}
+                />
+                <span className="absolute -bottom-1 -right-1 rounded bg-accent-gold px-1 text-[9px] font-bold text-bg-primary">
+                  C
                 </span>
-              ) : (
-                <div className="flex shrink-0 items-center gap-0.5">
-                  <Coins className="h-3 w-3 text-accent-gold" />
-                  <span className={cn("text-xs font-bold", budget === 0 ? "text-accent-danger" : isCurrentBidder ? "text-accent-gold" : "text-text-secondary")}>
-                    {budget.toLocaleString()}G
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex min-w-0 items-center gap-1.5">
+                  {team.color && (
+                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: team.color }} />
+                  )}
+                  <span className={cn("truncate text-sm font-bold", isMine ? "text-accent-primary" : "text-text-primary")}>
+                    {captainName}
                   </span>
+                  {isCurrentBidder && (
+                    <span className="shrink-0 rounded bg-accent-gold/15 px-1.5 py-0.5 text-[10px] font-bold text-accent-gold">
+                      최고
+                    </span>
+                  )}
                 </div>
-              )}
+                <p className="truncate text-[11px] text-text-tertiary">
+                  {team.name} · {members.length}/5
+                </p>
+              </div>
+              <div className="shrink-0 text-right">
+                <div className={cn("flex items-center justify-end gap-0.5 text-xs font-bold", budget === 0 ? "text-accent-danger" : "text-accent-gold")}>
+                  <Coins className="h-3 w-3" />
+                  {budget.toLocaleString()}
+                </div>
+                <p className="text-[10px] text-text-muted">{isFull ? "만석" : `${5 - members.length}자리`}</p>
+              </div>
             </div>
 
-            {/* 멤버 슬롯 — 카드 높이를 5등분해서 공간을 최대한 활용 */}
-            <div className={cn("grid flex-1 grid-rows-5", dense ? "gap-0.5 p-1" : "gap-1 p-1.5")}>
-              {members.map((member: any, idx: number) => {
+            <div className="grid grid-cols-5 gap-1 p-2">
+              {Array.from({ length: 5 }).map((_, idx) => {
+                const member = members[idx];
+                if (!member) {
+                  return (
+                    <div key={`empty-${idx}`} className="min-w-0 rounded-lg border border-dashed border-bg-tertiary/70 bg-bg-tertiary/20 px-1 py-1.5 text-center">
+                      <div className="mx-auto h-8 w-8 rounded-full bg-bg-elevated/70" />
+                      <p className="mt-1 truncate text-[10px] text-text-muted">빈 슬롯</p>
+                    </div>
+                  );
+                }
                 const isCaptain = member.id === team.captainId;
-                const mainRole = member.assignedRole || member.mainRole;
-                const subRole = member.subRole;
+                const tier = String(member.tier ?? "").toUpperCase();
+                const tierIcon = tier && tier !== "UNRANKED" ? `/icons/tiers/${tier.toLowerCase()}.png` : null;
                 return (
                   <div
                     key={member.id}
                     className={cn(
-                      "flex min-h-0 cursor-default items-center gap-1.5 rounded px-2",
-                      dense && "gap-1 px-1.5",
-                      isCaptain ? "bg-accent-gold/10" : "bg-bg-tertiary/60",
+                      "min-w-0 cursor-pointer rounded-lg border px-1 py-1.5 text-center transition-colors hover:bg-bg-elevated",
+                      isCaptain ? "border-accent-gold/30 bg-accent-gold/10" : "border-transparent bg-bg-tertiary/50",
                     )}
                     onMouseEnter={(e) => handleHover(member.id, e.currentTarget)}
                     onMouseLeave={scheduleHoverClose}
+                    onClick={() => setProfileUserId(member.id)}
                   >
-                    <span className="w-4 shrink-0 text-center text-[10px] text-text-tertiary">
-                      {isCaptain ? "C" : idx}
-                    </span>
-                    <Avatar src={member.avatar} alt={member.username} fallback={member.username[0]} size="sm" />
-                    <span className="min-w-0 flex-1 truncate text-xs font-medium text-text-primary">
-                      {member.username}
-                    </span>
-                    {/* 주라인 아이콘 (밝게) + 부라인 아이콘 (흐리게) — xl 이상에서만 표시 */}
-                    <div className="hidden shrink-0 items-center gap-0.5 xl:flex">
-                      <RoleIcon role={mainRole} />
-                      <RoleIcon role={subRole} dim />
+                    <div className="relative mx-auto h-8 w-8">
+                      <Avatar src={member.avatar} alt={member.username} fallback={member.username[0]} size="sm" />
+                      {isCaptain && (
+                        <span className="absolute -bottom-1 -right-1 rounded bg-accent-gold px-1 text-[9px] font-bold text-bg-primary">
+                          C
+                        </span>
+                      )}
                     </div>
-                    {/* lg: 티어 아이콘만, xl+: 풀 배지 */}
-                    {(() => {
-                      const t = (member.tier ?? '').toUpperCase();
-                      const url = `/icons/tiers/${t.toLowerCase()}.png`;
-                      return t && t !== 'UNRANKED' ? (
+                    <div className="mt-1 flex min-w-0 items-center justify-center gap-0.5">
+                      {tierIcon ? (
                         <>
                           {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={url} alt={t} width={18} height={18} className="shrink-0 object-contain 2xl:hidden" />
-                          <span className="hidden shrink-0 2xl:inline-flex">
-                            <TierBadge tier={member.tier} rank={member.rank} size="sm" />
-                          </span>
+                          <img src={tierIcon} alt={tier} width={12} height={12} className="shrink-0 object-contain" />
                         </>
-                      ) : null;
-                    })()}
+                      ) : (
+                        <span className="h-3 w-3 shrink-0 rounded-full bg-bg-elevated" />
+                      )}
+                      <span className="min-w-0 truncate text-[10px] font-medium text-text-secondary">
+                        {member.username}
+                      </span>
+                    </div>
                   </div>
                 );
               })}
-              {Array.from({ length: Math.max(0, 5 - members.length) }).map((_, i) => (
-                <div
-                  key={`empty-${i}`}
-                  className="flex min-h-0 items-center gap-1.5 rounded border border-dashed border-bg-tertiary/60 px-2"
-                >
-                  <span className="w-4 shrink-0 text-center text-[10px] text-text-muted">{members.length + i}</span>
-                  <span className={cn("text-xs text-text-muted", dense && "sr-only")}>빈 슬롯</span>
-                </div>
-              ))}
             </div>
           </Card>
-        );
-      })}
+          );
+        })}
+      </div>
 
       {hoveredPlayer && (
         <PlayerHoverCard
@@ -394,49 +423,39 @@ function TeamSideColumn({
   );
 }
 
-/** 중앙 하단 정보 탭 (입찰 내역 | 대기 선수 | 채팅) */
-/** 데스크톱 중앙 하단 패널 — 매물(2fr) + 채팅(1fr) 병렬 배치 */
-function CenterBottomPanel({
+/** 데스크톱 우측 남은 매물 패널 */
+function RemainingPlayersPanel({
   players,
   currentPlayerId,
-  roomId,
   onExpandPlayers,
 }: {
   players: any[];
   currentPlayerId?: string;
-  roomId: string;
   onExpandPlayers: () => void;
 }) {
   return (
-    <div className="grid min-h-0 h-full grid-cols-[2fr_1fr] gap-3">
-      {/* 남은 매물 */}
-      <Card className="flex min-h-0 flex-col overflow-hidden p-0">
-        <div className="flex h-10 shrink-0 items-center gap-2 border-b border-bg-tertiary/70 bg-bg-tertiary/20 px-3">
-          <Users className="h-3.5 w-3.5 text-accent-primary" />
-          <span className="flex-1 text-sm font-semibold text-text-primary">남은 매물</span>
-          <span className="rounded bg-bg-elevated px-1.5 py-0.5 text-[10px] font-bold text-text-tertiary">
-            {players.length}
-          </span>
-          <button
-            onClick={onExpandPlayers}
-            className="ml-1 rounded p-1.5 text-text-tertiary transition-colors hover:bg-bg-tertiary hover:text-text-primary"
-            title="전체 보기"
-          >
-            <Maximize2 className="h-4 w-4" />
-          </button>
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          <PlayersList
-            players={players}
-            currentPlayerId={currentPlayerId}
-            compact
-          />
-        </div>
-      </Card>
-
-      {/* 채팅 */}
-      <GameChatPanel roomId={roomId} variant="inline" className="min-h-0" />
-    </div>
+    <Card className="flex min-h-0 flex-col overflow-hidden p-0">
+      <div className="flex h-10 shrink-0 items-center gap-2 border-b border-bg-tertiary/70 bg-bg-tertiary/20 px-3">
+        <Users className="h-3.5 w-3.5 text-accent-primary" />
+        <span className="flex-1 text-sm font-semibold text-text-primary">남은 매물</span>
+        <span className="rounded bg-bg-elevated px-1.5 py-0.5 text-[10px] font-bold text-text-tertiary">
+          {players.length}
+        </span>
+        <button
+          onClick={onExpandPlayers}
+          className="ml-1 rounded p-1.5 text-text-tertiary transition-colors hover:bg-bg-tertiary hover:text-text-primary"
+          title="전체 보기"
+        >
+          <Maximize2 className="h-4 w-4" />
+        </button>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto p-2">
+        <PlayersList
+          players={players}
+          currentPlayerId={currentPlayerId}
+        />
+      </div>
+    </Card>
   );
 }
 
@@ -1040,9 +1059,6 @@ export default function AuctionRoomPage() {
     auctionState.currentHighestBidder === myTeam?.id
   );
 
-  const leftTeams = sortedTeamsForLayout.slice(0, Math.ceil(sortedTeamsForLayout.length / 2));
-  const rightTeams = sortedTeamsForLayout.slice(Math.ceil(sortedTeamsForLayout.length / 2));
-
   return (
     <div className="flex h-full flex-col overflow-hidden p-4">
       <ConfirmModal
@@ -1120,18 +1136,19 @@ export default function AuctionRoomPage() {
           ))}
         </div>
 
-        {/* ── 데스크톱: LoL형 3열 레이아웃 (좌팀 | 중앙경매 | 우팀) ── */}
-        <div className="hidden min-h-0 flex-1 gap-3 lg:grid lg:grid-rows-1 lg:grid-cols-[180px_minmax(0,1fr)_180px] xl:grid-cols-[220px_minmax(0,1fr)_220px] 2xl:grid-cols-[260px_minmax(0,1fr)_260px]">
-          {/* 좌측: 팀 첫 절반 */}
-          <TeamSideColumn
-            teams={leftTeams}
-            currentUserId={user?.id}
-            auctionState={auctionState}
-          />
+        {/* ── 데스크톱: 팀 요약 | 경매 | 남은 매물 ── */}
+        <div className="hidden min-h-0 flex-1 gap-3 lg:grid lg:grid-rows-1 lg:grid-cols-[300px_minmax(0,1fr)_280px] xl:grid-cols-[340px_minmax(0,1fr)_320px] 2xl:grid-cols-[380px_minmax(0,1fr)_360px]">
+          <div className="grid min-h-0 grid-rows-[minmax(0,1fr)_260px] gap-3 overflow-hidden">
+            <TeamSummaryPanel
+              teams={sortedTeamsForLayout}
+              currentUserId={user?.id}
+              auctionState={auctionState}
+            />
+            <GameChatPanel roomId={auctionId} variant="inline" className="min-h-0" />
+          </div>
 
-          {/* 중앙: 경매 메인 + 하단 정보 탭 */}
-          <div className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-3 overflow-hidden">
-            <div className="shrink-0">
+          <div className="min-h-0 overflow-y-auto pr-1">
+            <div className="min-h-full">
               <AuctionBoard
                 auctionState={auctionState}
                 teams={teams}
@@ -1143,19 +1160,12 @@ export default function AuctionRoomPage() {
                 hideTeams
               />
             </div>
-            <CenterBottomPanel
-              players={players}
-              currentPlayerId={auctionState.currentPlayer?.id}
-              roomId={auctionId}
-              onExpandPlayers={() => setPlayersModalOpen(true)}
-            />
           </div>
 
-          {/* 우측: 팀 나머지 절반 */}
-          <TeamSideColumn
-            teams={rightTeams}
-            currentUserId={user?.id}
-            auctionState={auctionState}
+          <RemainingPlayersPanel
+            players={players}
+            currentPlayerId={auctionState.currentPlayer?.id}
+            onExpandPlayers={() => setPlayersModalOpen(true)}
           />
         </div>
 
