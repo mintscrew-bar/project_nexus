@@ -496,11 +496,11 @@ export default function TournamentLobbyPage() {
             <div className="flex items-center gap-3 min-w-0">
               <button
                 onClick={handleLeaveLobby}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-bg-tertiary bg-bg-tertiary/60 px-2.5 py-2 text-xs font-semibold text-text-secondary transition-colors hover:bg-bg-elevated hover:text-text-primary flex-shrink-0"
-                title="로비 나가기"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-red-500/40 bg-red-500/10 px-2.5 py-2 text-xs font-semibold text-red-400 transition-colors hover:bg-red-500/20 hover:text-red-300 flex-shrink-0"
+                title="방 나가기"
               >
                 <ArrowLeft className="h-4 w-4" />
-                <span className="hidden sm:inline">로비 나가기</span>
+                <span className="hidden sm:inline">방 나가기</span>
               </button>
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
