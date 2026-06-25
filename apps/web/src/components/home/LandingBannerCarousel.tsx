@@ -58,7 +58,7 @@ export function LandingBannerCarousel() {
 
   return (
     <div
-      className="relative w-full aspect-[3/2] max-h-[430px] rounded-2xl overflow-hidden"
+      className="relative aspect-[3/2] w-full overflow-hidden rounded-2xl"
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >

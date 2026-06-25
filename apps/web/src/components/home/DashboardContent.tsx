@@ -237,9 +237,9 @@ function BannerCarousel() {
   ];
 
   return (
-    // 고정 높이로 모든 슬라이드 크기 통일 — 모바일부터 데스크톱까지 반응형
+    // 모든 배너는 3:2 고정 비율로 통일 — 새 배너 추가 시 1536x1024 기준
     <div
-      className="relative w-full aspect-[4/3] sm:aspect-video max-h-[430px] rounded-2xl overflow-hidden"
+      className="relative aspect-[3/2] w-full overflow-hidden rounded-2xl"
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
