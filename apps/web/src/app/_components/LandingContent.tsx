@@ -16,7 +16,6 @@ import {
   Users,
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
-import { HeroBanner } from "@/components/home/HeroBanner";
 import { LandingBannerCarousel } from "@/components/home/LandingBannerCarousel";
 import { AdSlotCard } from "@/components/ads/AdSlot";
 
@@ -132,15 +131,17 @@ const landingNavLinks = [
 ];
 
 // 로그인 후에도 재사용 가능한 랜딩 콘텐츠 섹션들 (서버 컴포넌트)
-export function LandingContentSections() {
+export function LandingContentSections({ showBanner = true }: { showBanner?: boolean }) {
   return (
     <>
       {/* 배너 캐러셀 */}
-      <section className="px-6 py-6">
-        <div className="mx-auto max-w-6xl">
-          <LandingBannerCarousel />
-        </div>
-      </section>
+      {showBanner && (
+        <section className="px-6 py-6">
+          <div className="mx-auto max-w-6xl">
+            <LandingBannerCarousel />
+          </div>
+        </section>
+      )}
 
       <section id="features" className="py-16 md:py-32 px-6">
         <h2 className="text-2xl sm:text-3xl md:text-5xl font-bold text-center text-text-primary mb-10 md:mb-16">
@@ -345,7 +346,6 @@ export default function LandingContent() {
   return (
     <main className="flex min-h-screen flex-col bg-bg-primary">
       <LandingHeader />
-      <HeroBanner />
       <LandingContentSections />
       <LandingFooter />
     </main>

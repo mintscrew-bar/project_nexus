@@ -154,6 +154,7 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
   const availableBudget = Math.max(0, myBudget - reserveAmount);
   const totalBid = auctionState.currentHighestBid + accumulatedBid;
   const canPlaceBid = accumulatedBid > 0 && totalBid <= availableBudget && !isBidding;
+  const shouldDockBidPanel = hideTeams && !hideBidPanel;
 
   const [hoveredPlayer, setHoveredPlayer] = useState<{ userId: string; rect: DOMRect } | null>(null);
   const [profileUserId, setProfileUserId] = useState<string | null>(null);
@@ -545,7 +546,12 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
 
       {/* 비캡틴/관전자 관전 안내 */}
       {!isCurrentUserTurn && auctionState.currentPlayer && !hideBidPanel && (
-        <div className="py-3 px-4 rounded-lg bg-bg-secondary border border-bg-tertiary text-center text-sm text-text-secondary">
+        <div
+          className={cn(
+            "py-3 px-4 rounded-lg bg-bg-secondary border border-bg-tertiary text-center text-sm text-text-secondary",
+            shouldDockBidPanel && "sticky bottom-0 z-20 mt-auto bg-bg-secondary/95 shadow-[0_-18px_44px_rgba(0,0,0,0.28)] backdrop-blur",
+          )}
+        >
           {currentTeam
             ? "다른 팀의 입찰 차례입니다. 경매를 관전 중입니다."
             : "관전 모드 — 팀장만 입찰에 참여할 수 있습니다."}
@@ -553,7 +559,12 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
       )}
 
       {isCurrentUserTurn && auctionState.currentPlayer && !hideBidPanel && (
-        <Card className="overflow-hidden p-0">
+        <Card
+          className={cn(
+            "overflow-hidden p-0",
+            shouldDockBidPanel && "sticky bottom-0 z-20 mt-auto border-accent-primary/20 bg-bg-secondary/95 shadow-[0_-18px_44px_rgba(0,0,0,0.32)] backdrop-blur",
+          )}
+        >
           <CardContent className="p-5">
             <div className="flex items-center justify-between mb-4">
               <p className="text-sm text-text-tertiary">

@@ -1148,18 +1148,17 @@ export default function AuctionRoomPage() {
           </div>
 
           <div className="min-h-0 overflow-y-auto pr-1">
-            <div className="min-h-full">
-              <AuctionBoard
-                auctionState={auctionState}
-                teams={teams}
-                players={players}
-                currentUserId={user?.id}
-                onPlaceBid={placeBid}
-                disabled={!isConnected}
-                bidHistory={bidHistory}
-                hideTeams
-              />
-            </div>
+            <AuctionBoard
+              auctionState={auctionState}
+              teams={teams}
+              players={players}
+              currentUserId={user?.id}
+              onPlaceBid={placeBid}
+              disabled={!isConnected}
+              bidHistory={bidHistory}
+              hideTeams
+              className="min-h-full"
+            />
           </div>
 
           <RemainingPlayersPanel

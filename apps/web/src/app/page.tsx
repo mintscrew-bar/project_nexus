@@ -24,7 +24,7 @@ export default function HomePage() {
   return (
     <HomeClient
       landing={<LandingContent />}
-      contentSections={<LandingContentSections />}
+      contentSections={<LandingContentSections showBanner={false} />}
     />
   );
 }

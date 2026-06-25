@@ -38,30 +38,30 @@ function WinRateStatCard({ wins, losses }: { wins: number; losses: number }) {
   const rate = total > 0 ? Math.round((wins / total) * 100) : 0;
   const tone =
     total === 0
-      ? { text: "text-zinc-500" }
+      ? { text: "text-text-muted" }
       : rate >= 60
-        ? { text: "text-emerald-300" }
+        ? { text: "text-accent-success" }
         : rate >= 50
-          ? { text: "text-sky-300" }
-          : { text: "text-rose-300" };
+          ? { text: "text-accent-info" }
+          : { text: "text-accent-danger" };
 
   return (
-    <section className="flex min-h-[96px] flex-col rounded-xl bg-[#181818] p-3">
+    <section className="flex min-h-[96px] flex-col rounded-xl border border-bg-tertiary bg-bg-secondary p-3">
       <div className="flex h-4 items-center justify-between">
-        <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-zinc-500">
+        <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-text-tertiary">
           <TrendingUp className="h-3.5 w-3.5" />
           승률
         </div>
-        <span className="text-[10px] text-zinc-600">{total > 0 ? `${total}게임` : "전적 없음"}</span>
+        <span className="text-[10px] text-text-muted">{total > 0 ? `${total}게임` : "전적 없음"}</span>
       </div>
 
       <p className={`mt-3 text-center text-[30px] font-black leading-none tracking-[-0.01em] ${tone.text}`}>
         {total > 0 ? `${rate}%` : "-"}
       </p>
-      <p className="mt-2 text-center text-[11px] font-bold leading-none text-zinc-400">
+      <p className="mt-2 text-center text-[11px] font-bold leading-none text-text-secondary">
         {total > 0 ? (
           <>
-            {wins}승 <span className="text-zinc-600">{losses}패</span>
+            {wins}승 <span className="text-text-muted">{losses}패</span>
           </>
         ) : (
           "전적 없음"
@@ -79,25 +79,25 @@ function KdaStatCard({
   const ratio = kda ? (kda.kills + kda.assists) / Math.max(kda.deaths, 1) : null;
 
   return (
-    <section className="flex min-h-[96px] flex-col rounded-xl bg-[#181818] p-3">
+    <section className="flex min-h-[96px] flex-col rounded-xl border border-bg-tertiary bg-bg-secondary p-3">
       <div className="flex h-4 items-center justify-between">
-        <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-zinc-500">
+        <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-text-tertiary">
           <Activity className="h-3.5 w-3.5" />
           KDA
         </div>
-        <span className="text-[10px] font-bold leading-none text-emerald-300">
+        <span className="text-[10px] font-bold leading-none text-accent-success">
           평균
         </span>
       </div>
 
-      <p className="mt-3 text-center text-[30px] font-black leading-none tracking-[-0.01em] text-white">
+      <p className="mt-3 text-center text-[30px] font-black leading-none tracking-[-0.01em] text-text-primary">
         {ratio ? ratio.toFixed(2) : "-"}
       </p>
-      <p className="mt-2 text-center text-[11px] font-bold leading-none text-zinc-400">
+      <p className="mt-2 text-center text-[11px] font-bold leading-none text-text-secondary">
         {kda ? (
           <>
             {formatOne(kda.kills)} /{" "}
-            <span className="text-rose-400">{formatOne(kda.deaths)}</span> /{" "}
+            <span className="text-accent-danger">{formatOne(kda.deaths)}</span> /{" "}
             {formatOne(kda.assists)}
           </>
         ) : (
@@ -105,7 +105,7 @@ function KdaStatCard({
         )}
       </p>
       {kda?.games ? (
-        <p className="mt-1 text-[10px] text-zinc-600">{kda.games}게임 기준</p>
+        <p className="mt-1 text-[10px] text-text-muted">{kda.games}게임 기준</p>
       ) : null}
     </section>
   );
@@ -119,13 +119,13 @@ function ReputationStatCard({
   count: number;
 }) {
   return (
-    <section className="rounded-xl bg-[#181818] p-3">
+    <section className="rounded-xl border border-bg-tertiary bg-bg-secondary p-3">
       <div className="mb-2 flex items-center justify-between">
-        <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-zinc-500">
+        <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-text-tertiary">
           <ShieldCheck className="h-3.5 w-3.5" />
           신뢰도
         </div>
-        <span className="text-[10px] text-zinc-600">
+        <span className="text-[10px] text-text-muted">
           {count > 0 ? `${count}개 평가` : "평가 없음"}
         </span>
       </div>
@@ -133,12 +133,12 @@ function ReputationStatCard({
       {count > 0 ? (
         <div className="flex items-center justify-between">
           <RatingStars value={value} />
-          <span className="text-base font-black text-white">
+          <span className="text-base font-black text-text-primary">
             {value.toFixed(1)}
           </span>
         </div>
       ) : (
-        <p className="text-sm font-semibold text-zinc-500">아직 받은 평가가 없습니다</p>
+        <p className="text-sm font-semibold text-text-tertiary">아직 받은 평가가 없습니다</p>
       )}
     </section>
   );
@@ -148,7 +148,7 @@ function RatingStars({ value }: { value: number }) {
   const rounded = Math.max(0, Math.min(5, Math.round(value)));
   return (
     <span className="text-sm text-yellow-400">
-      {"★".repeat(rounded)}<span className="text-zinc-700">{"★".repeat(5 - rounded)}</span>
+      {"★".repeat(rounded)}<span className="text-text-muted/40">{"★".repeat(5 - rounded)}</span>
     </span>
   );
 }
@@ -217,11 +217,9 @@ export function PlayerHoverCard({ userId, anchorRect, onOpenProfile, onMouseEnte
 
   return createPortal(
     <div
-      className="fixed z-[9999] max-h-[calc(100vh-16px)] overflow-y-auto rounded-[18px] bg-[#101010] text-white shadow-[0_32px_70px_rgba(0,0,0,0.82)] animate-fade-in"
+      className="fixed z-[9999] max-h-[calc(100vh-16px)] overflow-y-auto rounded-[18px] border border-accent-primary/40 bg-bg-primary text-text-primary shadow-[0_32px_70px_rgba(0,0,0,0.30)] animate-fade-in dark:shadow-[0_32px_70px_rgba(0,0,0,0.82)]"
       style={{
         left, top, width: TOOLTIP_W,
-        border: `1px solid ${ACCENT}66`,
-        boxShadow: `0 32px 70px rgba(0,0,0,0.82), 0 0 0 1px ${ACCENT}18`,
       }}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
@@ -236,14 +234,14 @@ export function PlayerHoverCard({ userId, anchorRect, onOpenProfile, onMouseEnte
 
               {/* 아바타 — 원형 + 티어 링 */}
               <div
-                className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-full bg-[#171717]"
-                style={{ border: `2px solid ${hasTier ? ACCENT + "88" : "rgba(255,255,255,0.14)"}` }}
+                className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-full bg-bg-tertiary"
+                style={{ border: `2px solid ${hasTier ? ACCENT + "88" : "rgb(var(--color-bg-elevated))"}` }}
               >
                 {data.avatar ? (
                   <Image src={data.avatar} alt={data.username} fill className="object-cover" unoptimized />
                 ) : (
-                  <div className="flex h-full w-full items-center justify-center bg-[#171717]">
-                    <Users className="h-8 w-8 text-zinc-500" />
+                  <div className="flex h-full w-full items-center justify-center bg-bg-tertiary">
+                    <Users className="h-8 w-8 text-text-tertiary" />
                   </div>
                 )}
               </div>
@@ -252,9 +250,9 @@ export function PlayerHoverCard({ userId, anchorRect, onOpenProfile, onMouseEnte
               <div className="min-w-0 flex-1 pt-0.5">
                 {/* 디스코드 닉네임 (메인) + 클랜 태그 */}
                 <div className="flex items-center gap-1.5">
-                  <p className="truncate text-sm font-black leading-tight text-white">{data.username}</p>
+                  <p className="truncate text-sm font-black leading-tight text-text-primary">{data.username}</p>
                   {(data.streamerProfiles ?? []).length > 0 && (
-                    <span className="shrink-0 rounded-md bg-yellow-400/15 px-1.5 py-0.5 text-[10px] font-black leading-none text-yellow-300">
+                    <span className="shrink-0 rounded-md bg-yellow-400/15 px-1.5 py-0.5 text-[10px] font-black leading-none text-yellow-700 dark:text-yellow-300">
                       streamer
                     </span>
                   )}
@@ -270,8 +268,8 @@ export function PlayerHoverCard({ userId, anchorRect, onOpenProfile, onMouseEnte
 
                 {/* 롤 닉네임 (서브) */}
                 {riot && (
-                  <p className="mt-0.5 text-[11px] text-zinc-500">
-                    {riot.gameName}<span className="text-zinc-600"> #{riot.tagLine}</span>
+                  <p className="mt-0.5 text-[11px] text-text-tertiary">
+                    {riot.gameName}<span className="text-text-muted"> #{riot.tagLine}</span>
                   </p>
                 )}
 
@@ -283,15 +281,15 @@ export function PlayerHoverCard({ userId, anchorRect, onOpenProfile, onMouseEnte
                       {!isApexTier && riot?.rank ? ` ${riot.rank}` : ""}
                     </span>
                     {riot?.lp != null && (
-                      <span className="text-xs font-bold text-zinc-200">{riot.lp} LP</span>
+                      <span className="text-xs font-bold text-text-secondary">{riot.lp} LP</span>
                     )}
                   </div>
                 )}
                 {/* 최고 티어 */}
                 {riot?.peakTier && riot.peakTier !== "UNRANKED" && (
                   <div className="mt-0.5 flex items-center gap-1">
-                    <span className="text-[10px] text-zinc-600">최고</span>
-                    <span className="text-[11px] font-semibold text-zinc-400">
+                    <span className="text-[10px] text-text-muted">최고</span>
+                    <span className="text-[11px] font-semibold text-text-secondary">
                       {TIER_KO[riot.peakTier] ?? riot.peakTier}
                       {riot.peakRank && !["MASTER","GRANDMASTER","CHALLENGER"].includes(riot.peakTier) ? ` ${riot.peakRank}` : ""}
                       {riot.peakLp != null && ["MASTER","GRANDMASTER","CHALLENGER"].includes(riot.peakTier) ? ` ${riot.peakLp}LP` : ""}
@@ -307,17 +305,17 @@ export function PlayerHoverCard({ userId, anchorRect, onOpenProfile, onMouseEnte
             {(mainRole || subRole) && (
               <div className="flex items-center gap-2">
                 {mainRole && (
-                  <div className="flex items-center gap-1.5 rounded-lg bg-[#1a1a1a] px-2.5 py-1.5">
-                    <PositionIcon position={mainRole} className="!h-4 !w-4" />
-                    <span className="text-xs font-bold text-white">{POSITION_LABELS[mainRole] || mainRole}</span>
-                    <span className="rounded bg-[#262626] px-1 text-[9px] font-black text-zinc-600">주</span>
+                  <div className="flex items-center gap-1.5 rounded-lg border border-bg-tertiary bg-bg-secondary px-2.5 py-1.5">
+                    <PositionIcon position={mainRole} className="!h-4 !w-4 !invert-0 dark:!invert" />
+                    <span className="text-xs font-bold text-text-primary">{POSITION_LABELS[mainRole] || mainRole}</span>
+                    <span className="rounded bg-bg-tertiary px-1 text-[9px] font-black text-text-muted">주</span>
                   </div>
                 )}
                 {subRole && (
-                  <div className="flex items-center gap-1.5 rounded-lg bg-[#1a1a1a] px-2.5 py-1.5">
-                    <PositionIcon position={subRole} className="!h-4 !w-4" opacity={0.6} />
-                    <span className="text-xs font-semibold text-zinc-400">{POSITION_LABELS[subRole] || subRole}</span>
-                    <span className="rounded bg-[#262626] px-1 text-[9px] font-black text-zinc-600">부</span>
+                  <div className="flex items-center gap-1.5 rounded-lg border border-bg-tertiary bg-bg-secondary px-2.5 py-1.5">
+                    <PositionIcon position={subRole} className="!h-4 !w-4 !invert-0 dark:!invert" opacity={0.6} />
+                    <span className="text-xs font-semibold text-text-secondary">{POSITION_LABELS[subRole] || subRole}</span>
+                    <span className="rounded bg-bg-tertiary px-1 text-[9px] font-black text-text-muted">부</span>
                   </div>
                 )}
               </div>
@@ -333,8 +331,8 @@ export function PlayerHoverCard({ userId, anchorRect, onOpenProfile, onMouseEnte
 
             {/* ── 선호 챔피언 ── */}
             {hasChampions && (
-              <div className="rounded-xl bg-[#181818] px-3 py-3">
-                <p className="mb-2 text-[10px] font-medium text-zinc-600">선호 챔피언</p>
+              <div className="rounded-xl border border-bg-tertiary bg-bg-secondary px-3 py-3">
+                <p className="mb-2 text-[10px] font-medium text-text-muted">선호 챔피언</p>
                 <div className="space-y-2">
                   {rolesToShow.map((role) => {
                     const champs = champsByRole[role] ?? [];
@@ -343,9 +341,9 @@ export function PlayerHoverCard({ userId, anchorRect, onOpenProfile, onMouseEnte
                     return (
                       <div key={role} className="flex items-center gap-2">
                         <div className="flex w-12 shrink-0 items-center gap-1">
-                          <PositionIcon position={role} className="!h-3.5 !w-3.5 opacity-70" />
+                          <PositionIcon position={role} className="!h-3.5 !w-3.5 !invert-0 opacity-70 dark:!invert" />
                           {label && (
-                            <span className="text-[9px] font-black text-zinc-500">{label}</span>
+                            <span className="text-[9px] font-black text-text-tertiary">{label}</span>
                           )}
                         </div>
                         <div className="flex items-center gap-1">
@@ -369,7 +367,7 @@ export function PlayerHoverCard({ userId, anchorRect, onOpenProfile, onMouseEnte
             )}
 
             {!riot && (
-              <p className="text-xs italic text-zinc-500">등록된 라이엇 계정이 없습니다</p>
+              <p className="text-xs italic text-text-tertiary">등록된 라이엇 계정이 없습니다</p>
             )}
 
             {/* ── 프로필 보기 버튼 ── */}
