@@ -14,6 +14,18 @@ import { cn } from "@/lib/utils";
 /** 클랜 대표색 기본값 (앱 로고 인디고와 동일) */
 export const DEFAULT_CLAN_ACCENT = "#667EEA";
 
+/** 대표색 프리셋 팔레트 (생성·설정 페이지 공용) */
+export const CLAN_ACCENT_PRESETS = [
+  "#667EEA",
+  "#F43F5E",
+  "#F59E0B",
+  "#10B981",
+  "#22D3EE",
+  "#A855F7",
+  "#EC4899",
+  "#64748B",
+];
+
 /** 태그에서 이니셜 1~2글자 추출 (영문/숫자만) */
 function getInitials(tag: string): string {
   const cleaned = (tag || "").replace(/[^A-Za-z0-9]/g, "").toUpperCase();

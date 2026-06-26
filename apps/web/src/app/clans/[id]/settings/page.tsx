@@ -3,9 +3,14 @@
 // Task 19: 활동 로그 섹션 (한글 변환, 색상 코딩, 커서 페이지네이션)
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
+import {
+  ClanEmblem,
+  DEFAULT_CLAN_ACCENT,
+  CLAN_ACCENT_PRESETS,
+} from "@/components/domain/ClanEmblem";
 import { useAuthStore } from "@/stores/auth-store";
 import { clanApi, statsApi } from "@/lib/api-client";
 import { useDebounce } from "@/hooks/useDebounce";
@@ -40,6 +45,8 @@ import {
   Activity,
   Sparkles,
   UserRoundPlus,
+  ImagePlus,
+  Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -83,6 +90,8 @@ interface Clan {
   tag: string;
   description: string | null;
   logo: string | null;
+  banner: string | null;
+  accentColor: string | null;
   ownerId: string;
   isRecruiting: boolean;
   maxMembers: number;
@@ -212,6 +221,13 @@ export default function ClanSettingsPage() {
   const [isRecruiting, setIsRecruiting] = useState(false);
   const [minTier, setMinTier] = useState("");
   const [maxMembers, setMaxMembers] = useState("50");
+  // 정체성: 대표색 + 로고/배너(즉시 업로드)
+  const [accentColor, setAccentColor] = useState(DEFAULT_CLAN_ACCENT);
+  const [uploadingImage, setUploadingImage] = useState<"logo" | "banner" | null>(
+    null,
+  );
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const bannerInputRef = useRef<HTMLInputElement>(null);
   const [officerCanManageSettings, setOfficerCanManageSettings] = useState(true);
   const [officerCanManageMembers, setOfficerCanManageMembers] = useState(true);
   const [officerCanManageAnnouncements, setOfficerCanManageAnnouncements] = useState(true);
@@ -290,6 +306,7 @@ export default function ClanSettingsPage() {
       setIsRecruiting(data.isRecruiting);
       setMinTier(data.minTier || "");
       setMaxMembers(String(data.maxMembers ?? 50));
+      setAccentColor(data.accentColor || DEFAULT_CLAN_ACCENT);
       setOfficerCanManageSettings(data.officerCanManageSettings);
       setOfficerCanManageMembers(data.officerCanManageMembers);
       setOfficerCanManageAnnouncements(data.officerCanManageAnnouncements);
@@ -403,6 +420,7 @@ export default function ClanSettingsPage() {
         isRecruiting?: boolean;
         minTier?: string;
         maxMembers?: number;
+        accentColor?: string;
         officerCanManageSettings?: boolean;
         officerCanManageMembers?: boolean;
         officerCanManageAnnouncements?: boolean;
@@ -411,6 +429,7 @@ export default function ClanSettingsPage() {
         description: description.trim() || undefined,
         discord: discord.trim() || undefined,
         isRecruiting,
+        accentColor,
       };
 
       if (isOwner) {
@@ -437,6 +456,34 @@ export default function ClanSettingsPage() {
       addToast(err.response?.data?.message || "수정에 실패했습니다.", "error");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  // 로고/배너 이미지 즉시 업로드 (선택 즉시 반영)
+  const handleImageUpload = async (
+    kind: "logo" | "banner",
+    file: File | null | undefined,
+  ) => {
+    if (!file) return;
+    setUploadingImage(kind);
+    try {
+      if (kind === "logo") {
+        await clanApi.uploadClanLogo(clanId, file);
+      } else {
+        await clanApi.uploadClanBanner(clanId, file);
+      }
+      addToast(
+        kind === "logo" ? "로고가 변경되었습니다." : "배너가 변경되었습니다.",
+        "success",
+      );
+      fetchClan();
+    } catch (err: any) {
+      addToast(
+        err.response?.data?.message || "이미지 업로드에 실패했습니다.",
+        "error",
+      );
+    } finally {
+      setUploadingImage(null);
     }
   };
 
@@ -722,6 +769,117 @@ export default function ClanSettingsPage() {
                 {!canManageSettings && (
                   <div className="rounded-lg border border-bg-elevated bg-bg-secondary px-3 py-3 text-sm text-text-tertiary">
                     현재 이 클랜에서는 임원이 클랜 정보 수정 권한을 갖고 있지 않습니다.
+                  </div>
+                )}
+
+                {/* ── 정체성: 배너 / 엠블럼 / 대표색 ── */}
+                {canManageSettings && clan && (
+                  <div className="overflow-hidden rounded-lg border border-bg-elevated">
+                    {/* 배너 */}
+                    <div
+                      onClick={() => bannerInputRef.current?.click()}
+                      className="relative h-28 w-full cursor-pointer bg-bg-tertiary"
+                    >
+                      {clan.banner ? (
+                        <Image
+                          src={clan.banner}
+                          alt="배너"
+                          fill
+                          className="object-cover"
+                          unoptimized
+                        />
+                      ) : (
+                        <span className="absolute inset-0 flex items-center justify-center gap-1.5 text-xs text-text-tertiary">
+                          <ImagePlus className="h-4 w-4" /> 배너 추가 (선택)
+                        </span>
+                      )}
+                      {uploadingImage === "banner" && (
+                        <span className="absolute inset-0 flex items-center justify-center bg-black/40">
+                          <Loader2 className="h-5 w-5 animate-spin text-white" />
+                        </span>
+                      )}
+                    </div>
+
+                    {/* 엠블럼 + 안내 */}
+                    <div className="-mt-8 flex items-center gap-3 px-4">
+                      <div
+                        onClick={() => logoInputRef.current?.click()}
+                        className="relative cursor-pointer"
+                      >
+                        <ClanEmblem
+                          tag={clan.tag}
+                          logo={clan.logo}
+                          accentColor={accentColor}
+                          size={56}
+                          rounded="rounded-xl"
+                          className="ring-2 ring-bg-secondary"
+                        />
+                        <span className="absolute -bottom-1 -right-1 rounded-full bg-accent-primary p-1">
+                          {uploadingImage === "logo" ? (
+                            <Loader2 className="h-3 w-3 animate-spin text-white" />
+                          ) : (
+                            <ImagePlus className="h-3 w-3 text-white" />
+                          )}
+                        </span>
+                      </div>
+                      <p className="pt-7 text-xs text-text-tertiary">
+                        엠블럼·배너를 눌러 이미지를 변경하세요. 대표색은 저장 시 반영됩니다.
+                      </p>
+                    </div>
+
+                    {/* 대표색 팔레트 */}
+                    <div className="flex flex-wrap items-center gap-2 px-4 pb-4 pt-3">
+                      <span className="text-[10px] text-text-tertiary">대표색</span>
+                      {CLAN_ACCENT_PRESETS.map((c) => (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => setAccentColor(c)}
+                          aria-label={`대표색 ${c}`}
+                          className={cn(
+                            "h-6 w-6 rounded-full border-2 transition-transform hover:scale-110",
+                            accentColor.toUpperCase() === c
+                              ? "border-text-primary"
+                              : "border-transparent",
+                          )}
+                          style={{ backgroundColor: c }}
+                        />
+                      ))}
+                      <label className="relative h-6 w-6 cursor-pointer overflow-hidden rounded-full border border-bg-elevated">
+                        <input
+                          type="color"
+                          value={accentColor}
+                          onChange={(e) => setAccentColor(e.target.value)}
+                          className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                          aria-label="커스텀 대표색"
+                        />
+                        <span
+                          className="flex h-full w-full items-center justify-center text-[9px] font-black text-white"
+                          style={{ backgroundColor: accentColor }}
+                        >
+                          +
+                        </span>
+                      </label>
+                    </div>
+
+                    <input
+                      ref={logoInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) =>
+                        handleImageUpload("logo", e.target.files?.[0])
+                      }
+                    />
+                    <input
+                      ref={bannerInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) =>
+                        handleImageUpload("banner", e.target.files?.[0])
+                      }
+                    />
                   </div>
                 )}
 

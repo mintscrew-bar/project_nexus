@@ -15,19 +15,11 @@ import {
 } from "@/components/ui";
 import { ArrowLeft, Shield, Plus, ImagePlus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { ClanEmblem, DEFAULT_CLAN_ACCENT } from "@/components/domain/ClanEmblem";
-
-/** 대표색 프리셋 팔레트 */
-const ACCENT_PRESETS = [
-  "#667EEA",
-  "#F43F5E",
-  "#F59E0B",
-  "#10B981",
-  "#22D3EE",
-  "#A855F7",
-  "#EC4899",
-  "#64748B",
-];
+import {
+  ClanEmblem,
+  DEFAULT_CLAN_ACCENT,
+  CLAN_ACCENT_PRESETS,
+} from "@/components/domain/ClanEmblem";
 
 // ========================================
 // 캐릭터 카운터 색상 계산 헬퍼
@@ -255,7 +247,7 @@ export default function CreateClanPage() {
                 {/* 대표색 팔레트 */}
                 <div className="flex flex-wrap items-center gap-2 px-4 pb-4 pt-3">
                   <span className="text-[10px] text-text-tertiary">대표색</span>
-                  {ACCENT_PRESETS.map((c) => (
+                  {CLAN_ACCENT_PRESETS.map((c) => (
                     <button
                       key={c}
                       type="button"

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from 'react';
+import type { ElementType, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { useAuthStore } from '@/stores/auth-store';
@@ -15,7 +16,7 @@ import { getChampionIcon } from '@/components/matches/match-utils';
 import { LoadingSpinner, Card, CardHeader, CardTitle, CardContent, Badge, Button, Skeleton, EmptyState, ConfirmModal, StatusSelector, Tabs, TabsList, TabsTrigger, TabsContent, Dropdown } from '@/components/ui';
 import { Star, Plus, RefreshCw, Shield, TrendingUp, Loader2, History, Clock, Settings, User, BarChart3, Pencil, Trash2, Swords, Gavel, Camera, Check, X, MoreVertical, Activity, Calendar, Trophy, Target, Radio, ExternalLink } from 'lucide-react';
 import { TierBadge } from '@/components/domain/TierBadge';
-import { ReputationSummary, SummaryChip, WinRateSparkline } from '@/components/domain/ProfileStats';
+import { RatingStars, ReputationSummary, WinRateSparkline } from '@/components/domain/ProfileStats';
 import { useToast } from '@/components/ui/Toast';
 import { usePresence } from '@/hooks/usePresence';
 import { getChampionKoreanName, searchChampionsByQuery } from '@nexus/types';
@@ -543,6 +544,40 @@ function formatTimeAgo(value?: string) {
   return `${Math.floor(hours / 24)}일 전`;
 }
 
+function clampRating(value?: number | null) {
+  return Math.max(0, Math.min(5, Number(value || 0)));
+}
+
+function ProfileOverviewStat({
+  icon: Icon,
+  label,
+  value,
+  detail,
+  valueClassName = 'text-text-primary',
+  side,
+}: {
+  icon: ElementType;
+  label: string;
+  value: string;
+  detail: string;
+  valueClassName?: string;
+  side?: ReactNode;
+}) {
+  return (
+    <div className="rounded-lg border border-bg-tertiary bg-bg-primary/70 px-4 py-3">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-text-tertiary">
+          <Icon className="h-3.5 w-3.5" />
+          {label}
+        </div>
+        {side && <div className="shrink-0">{side}</div>}
+      </div>
+      <p className={`text-2xl font-black leading-none ${valueClassName}`}>{value}</p>
+      <p className="mt-2 truncate text-xs font-semibold text-text-tertiary">{detail}</p>
+    </div>
+  );
+}
+
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -927,202 +962,251 @@ export default function ProfilePage() {
   const stats = profileData?.stats ?? user?.stats ?? null;
   const streamerProfiles: StreamerProfile[] = profileData?.streamerProfiles ?? [];
   const streamerLinks: StreamerLink[] = profileData?.streamerLinks ?? [];
+  const gamesPlayed = stats?.gamesPlayed ?? 0;
+  const wins = stats?.wins ?? 0;
+  const losses = stats?.losses ?? 0;
+  const winRate = gamesPlayed > 0 ? Number(stats?.winRate ?? 0) : 0;
+  const reputationAverage = clampRating(rep?.overallAverage);
+  const reputationCount = rep?.totalRatings ?? 0;
 
   return (
     <div className="flex-grow p-4 md:p-8">
       <div className="container mx-auto max-w-6xl">
-        {/* Profile Hero Section */}
-        <Card className="mb-4 overflow-hidden rounded-lg border-bg-tertiary bg-bg-secondary p-0 shadow-sm">
-          <CardContent className="p-4 md:p-5">
-            {profileLoading && !profileData ? (
-              <div className="flex flex-col md:flex-row items-start gap-6">
-                <Skeleton className="w-24 h-24 md:w-28 md:h-28 rounded-full flex-shrink-0" />
-                <div className="flex-1 space-y-3">
-                  <Skeleton className="h-8 w-48" />
-                  <Skeleton className="h-4 w-72" />
-                  <Skeleton className="h-4 w-56" />
-                </div>
-              </div>
-            ) : (
-            <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-              <div className="flex min-w-0 flex-1 flex-col gap-4 sm:flex-row sm:items-start">
-              {/* Avatar - 항상 클릭하여 변경 가능 */}
-              <div className="flex-shrink-0 relative group cursor-pointer" onClick={() => avatarInputRef.current?.click()}>
-                <div
-                  className="relative flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-bg-tertiary md:h-24 md:w-24"
-                  style={{ border: `2px solid ${PROFILE_ACCENT}88` }}
-                >
-                  {(avatarPreview || user.avatar) ? (
-                    <Image
-                      src={avatarPreview || user.avatar!}
-                      alt={user.username}
-                      fill
-                      className="object-cover"
-                      unoptimized
-                    />
-                  ) : (
-                    <User className="h-12 w-12 text-text-tertiary" />
-                  )}
-                  {isUploadingAvatar && (
-                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                      <LoadingSpinner size="sm" />
-                    </div>
-                  )}
-                  <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/0 transition-colors group-hover:bg-black/50">
-                    <Camera className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+        <section className="mb-6 grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
+          <Card className="overflow-hidden rounded-lg border-bg-tertiary bg-bg-secondary p-0 shadow-sm">
+            <CardContent className="p-5 md:p-6">
+              {profileLoading && !profileData ? (
+                <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
+                  <Skeleton className="h-24 w-24 flex-shrink-0 rounded-full" />
+                  <div className="flex-1 space-y-3">
+                    <Skeleton className="h-8 w-48" />
+                    <Skeleton className="h-4 w-72" />
+                    <Skeleton className="h-4 w-56" />
                   </div>
                 </div>
-                <input
-                  ref={avatarInputRef}
-                  type="file"
-                  accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
-                  onChange={handleAvatarChange}
-                  className="hidden"
+              ) : (
+                <div className="flex flex-col gap-6">
+                  <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="flex min-w-0 flex-1 flex-col gap-4 sm:flex-row sm:items-start">
+                      <div className="group relative flex-shrink-0 cursor-pointer" onClick={() => avatarInputRef.current?.click()}>
+                        <div
+                          className="relative flex h-24 w-24 items-center justify-center overflow-hidden rounded-full bg-bg-tertiary"
+                          style={{ border: `2px solid ${PROFILE_ACCENT}88` }}
+                        >
+                          {(avatarPreview || user.avatar) ? (
+                            <Image
+                              src={avatarPreview || user.avatar!}
+                              alt={user.username}
+                              fill
+                              className="object-cover"
+                              unoptimized
+                            />
+                          ) : (
+                            <User className="h-12 w-12 text-text-tertiary" />
+                          )}
+                          {isUploadingAvatar && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                              <LoadingSpinner size="sm" />
+                            </div>
+                          )}
+                          <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/0 transition-colors group-hover:bg-black/50">
+                            <Camera className="h-6 w-6 text-white opacity-0 transition-opacity group-hover:opacity-100" />
+                          </div>
+                        </div>
+                        <input
+                          ref={avatarInputRef}
+                          type="file"
+                          accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                          onChange={handleAvatarChange}
+                          className="hidden"
+                        />
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="mb-2 flex flex-wrap items-center gap-2 group/name">
+                          <div className="inline-flex min-w-0 items-center gap-1.5">
+                            <input
+                              value={editUsername}
+                              onChange={(e) => handleUsernameChange(e.target.value)}
+                              style={{ width: `${Math.max([...editUsername].reduce((w, c) => w + (/[\uac00-\ud7af\u3000-\u9fff]/.test(c) ? 2 : 1), 0), 4) + 1}ch` }}
+                              className="max-w-full bg-transparent text-2xl font-black leading-tight text-text-primary border-b border-transparent transition-colors hover:border-text-muted focus:border-accent-primary focus:outline-none md:text-3xl"
+                              placeholder="사용자 이름"
+                            />
+                            <Pencil className="h-4 w-4 flex-shrink-0 text-text-tertiary opacity-0 transition-opacity group-hover/name:opacity-100" />
+                          </div>
+                          {clan && (
+                            <Badge
+                              variant="primary"
+                              size="sm"
+                              className="cursor-pointer rounded-md border-0 px-2 py-1 text-xs font-black"
+                              style={{ color: PROFILE_ACCENT, backgroundColor: `${PROFILE_ACCENT}22` }}
+                              onClick={() => router.push(`/clans/${clan.id}`)}
+                            >
+                              {clan.tag}
+                            </Badge>
+                          )}
+                          {streamerProfiles.length > 0 && (
+                            <a href={streamerProfiles[0].channelUrl} target="_blank" rel="noreferrer">
+                              <Badge variant="gold" size="sm" className="rounded-md px-2 py-1 text-xs font-black">
+                                streamer
+                              </Badge>
+                            </a>
+                          )}
+                        </div>
+
+                        <div className="mb-4 inline-flex w-full max-w-2xl items-start gap-1.5 group/bio">
+                          <textarea
+                            value={editBio}
+                            onChange={(e) => handleBioChange(e.target.value)}
+                            rows={1}
+                            style={{ width: `${Math.max([...(editBio || '')].reduce((w, c) => w + (/[\uac00-\ud7af\u3000-\u9fff]/.test(c) ? 2 : 1), 0), 18) + 2}ch`, maxWidth: '100%' }}
+                            className="resize-none bg-transparent text-sm text-text-secondary border-b border-transparent transition-colors placeholder:text-text-tertiary placeholder:italic hover:border-text-muted focus:border-accent-primary focus:outline-none"
+                            placeholder="자기소개를 입력하세요"
+                          />
+                          <Pencil className="mt-1 h-3.5 w-3.5 flex-shrink-0 text-text-tertiary opacity-0 transition-opacity group-hover/bio:opacity-100" />
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2">
+                          {primary?.mainRole && (
+                            <div className="flex items-center gap-1.5 rounded-lg border border-bg-elevated bg-bg-tertiary px-2.5 py-1.5">
+                              <PositionIcon position={primary.mainRole} className="!h-4 !w-4" />
+                              <span className="text-xs font-bold text-text-primary">{POSITION_LABELS[primary.mainRole] ?? ROLE_LABELS[primary.mainRole] ?? primary.mainRole}</span>
+                              <span className="rounded bg-bg-elevated px-1 text-[9px] font-black text-text-tertiary">주</span>
+                            </div>
+                          )}
+                          {primary?.subRole && (
+                            <div className="flex items-center gap-1.5 rounded-lg border border-bg-elevated bg-bg-tertiary px-2.5 py-1.5">
+                              <PositionIcon position={primary.subRole} className="!h-4 !w-4" opacity={0.6} />
+                              <span className="text-xs font-semibold text-text-secondary">{POSITION_LABELS[primary.subRole] ?? ROLE_LABELS[primary.subRole] ?? primary.subRole}</span>
+                              <span className="rounded bg-bg-elevated px-1 text-[9px] font-black text-text-tertiary">부</span>
+                            </div>
+                          )}
+                          {primary?.tier && (
+                            <div className="flex items-center gap-2 rounded-lg border border-bg-elevated bg-bg-tertiary px-2.5 py-1.5">
+                              <TierBadge tier={primary.tier} size="md" />
+                              <span className="text-sm font-semibold text-text-primary">
+                                {primary.rank}{primary.lp ? ` ${primary.lp}LP` : ''}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex w-full flex-shrink-0 flex-wrap gap-2 sm:w-auto lg:justify-end">
+                      {profileDirty && (
+                        <Button size="sm" onClick={handleSaveProfile} isLoading={isSaving}>
+                          <Check className="h-4 w-4 mr-1" />
+                          저장
+                        </Button>
+                      )}
+                      {user?.id && (
+                        <Button variant="ghost" size="sm" onClick={() => router.push(`/users/${user.id}`)}>
+                          내 공개 프로필 →
+                        </Button>
+                      )}
+                      <Button variant="ghost" size="sm" onClick={() => router.push('/settings')}>
+                        <Settings className="h-4 w-4 mr-1" />
+                        설정
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-bg-tertiary pt-4 text-xs text-text-tertiary">
+                    <StatusSelector
+                      currentStatus={myStatus}
+                      onStatusChange={(status) => setStatus(status)}
+                    />
+                    {primary && (
+                      <>
+                        <span className="font-semibold text-text-secondary">{primary.gameName}</span>
+                        <span>#{primary.tagLine}</span>
+                      </>
+                    )}
+                    {primary?.peakTier && (
+                      <span>최고 {primary.peakTier}{primary.peakRank ? ` ${primary.peakRank}` : ''}</span>
+                    )}
+                    {highlightChampionId && (
+                      <span className="inline-flex items-center gap-1 text-accent-gold">
+                        <ChampionImage championKey={getChampionKey(highlightChampionId)} size={14} className="rounded" />
+                        {getChampionName(highlightChampionId)}
+                      </span>
+                    )}
+                    <span className="inline-flex items-center gap-1">
+                      <Calendar className="h-3 w-3 flex-shrink-0" />
+                      {new Date(profileData?.createdAt || user.createdAt).toLocaleDateString('ko-KR')} 가입
+                    </span>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="overflow-hidden rounded-lg border-bg-tertiary bg-bg-secondary p-0 shadow-sm">
+            <CardContent className="p-5 md:p-6">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-sm font-black text-text-primary">프로필 요약</h2>
+                  <p className="mt-1 text-xs text-text-tertiary">내전 기준 핵심 지표</p>
+                </div>
+                {reputationCount > 0 && <RatingStars value={reputationAverage} className="text-base" />}
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+                <ProfileOverviewStat
+                  icon={Swords}
+                  label="전적"
+                  value={`${wins}승 ${losses}패`}
+                  detail={`${gamesPlayed}게임 · 참여 ${stats?.participations ?? 0}회`}
+                />
+                <ProfileOverviewStat
+                  icon={TrendingUp}
+                  label="승률"
+                  value={gamesPlayed > 0 ? `${winRate.toFixed(0)}%` : '-'}
+                  detail={gamesPlayed > 0 ? `${wins}승 ${losses}패` : '전적 없음'}
+                  side={recentMatches.length > 0 ? <WinRateSparkline matches={recentMatches} /> : undefined}
+                  valueClassName={winRate >= 50 ? 'text-accent-success' : 'text-accent-danger'}
+                />
+                <ProfileOverviewStat
+                  icon={Activity}
+                  label="최근 KDA"
+                  value={recent.games > 0 ? recent.avgKda.toFixed(2) : '-'}
+                  detail={
+                    recent.games > 0
+                      ? `${recent.avgKills.toFixed(1)} / ${recent.avgDeaths.toFixed(1)} / ${recent.avgAssists.toFixed(1)}`
+                      : '최근 기록 없음'
+                  }
                 />
               </div>
 
-              {/* Info */}
-              <div className="min-w-0 flex-1 pt-1">
-                {/* 닉네임 */}
-                <div className="mb-2 flex flex-wrap items-center gap-2 group/name">
-                  <div className="inline-flex items-center gap-1.5">
-                    <input
-                      value={editUsername}
-                      onChange={(e) => handleUsernameChange(e.target.value)}
-                      style={{ width: `${Math.max([...editUsername].reduce((w, c) => w + (/[\uac00-\ud7af\u3000-\u9fff]/.test(c) ? 2 : 1), 0), 4) + 1}ch` }}
-                      className="bg-transparent text-xl font-black leading-tight text-text-primary border-b border-transparent transition-colors hover:border-text-muted focus:border-accent-primary focus:outline-none md:text-2xl"
-                      placeholder="사용자 이름"
-                    />
-                    <Pencil className="h-4 w-4 text-text-tertiary opacity-0 group-hover/name:opacity-100 transition-opacity pointer-events-none flex-shrink-0" />
+              <div className="mt-4 rounded-lg border border-bg-tertiary bg-bg-primary/70 px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-text-tertiary">
+                    <Star className="h-3.5 w-3.5 text-accent-gold" />
+                    평판
                   </div>
-                  {clan && (
-                    <Badge
-                      variant="primary"
-                      size="sm"
-                      className="cursor-pointer rounded-md border-0 px-2 py-1 text-xs font-black"
-                      style={{ color: PROFILE_ACCENT, backgroundColor: `${PROFILE_ACCENT}22` }}
-                      onClick={() => router.push(`/clans/${clan.id}`)}
-                    >
-                      {clan.tag}
-                    </Badge>
-                  )}
-                  {streamerProfiles.length > 0 && (
-                    <a href={streamerProfiles[0].channelUrl} target="_blank" rel="noreferrer">
-                      <Badge variant="gold" size="sm" className="rounded-md px-2 py-1 text-xs font-black">
-                        streamer
-                      </Badge>
-                    </a>
-                  )}
+                  <span className="text-xs font-semibold text-text-tertiary">
+                    {reputationCount > 0 ? `${reputationCount}개 평가` : '평가 없음'}
+                  </span>
                 </div>
-
-                {/* 자기소개 */}
-                <div className="mb-3 inline-flex max-w-2xl items-start gap-1.5 group/bio">
-                  <textarea
-                    value={editBio}
-                    onChange={(e) => handleBioChange(e.target.value)}
-                    rows={1}
-                    style={{ width: `${Math.max([...(editBio || '')].reduce((w, c) => w + (/[\uac00-\ud7af\u3000-\u9fff]/.test(c) ? 2 : 1), 0), 18) + 2}ch`, maxWidth: '100%' }}
-                    className="resize-none bg-transparent text-sm text-text-secondary border-b border-transparent transition-colors placeholder:text-text-tertiary placeholder:italic hover:border-text-muted focus:border-accent-primary focus:outline-none"
-                    placeholder="자기소개를 입력하세요"
-                  />
-                  <Pencil className="h-3.5 w-3.5 mt-1 text-text-tertiary opacity-0 group-hover/bio:opacity-100 transition-opacity pointer-events-none flex-shrink-0" />
-                </div>
-
-                {/* Meta info row — 2-column grid with tier/role emphasis */}
-                <div className="space-y-4">
-                  {/* 주라인 & 티어 — 데이터 있는 것만 flex-wrap으로 표시 */}
-                  {primary && (primary.mainRole || primary.tier) && (
-                    <div className="flex flex-wrap items-center gap-2">
-                      {primary.mainRole && (
-                        <div className="flex items-center gap-1.5 rounded-lg bg-bg-tertiary border border-bg-elevated px-2.5 py-1.5">
-                          <PositionIcon position={primary.mainRole} className="!h-4 !w-4" />
-                          <span className="text-xs font-bold text-text-primary">{POSITION_LABELS[primary.mainRole] ?? ROLE_LABELS[primary.mainRole] ?? primary.mainRole}</span>
-                          <span className="rounded bg-bg-elevated px-1 text-[9px] font-black text-text-tertiary">주</span>
-                        </div>
-                      )}
-                      {primary.subRole && (
-                        <div className="flex items-center gap-1.5 rounded-lg bg-bg-tertiary border border-bg-elevated px-2.5 py-1.5">
-                          <PositionIcon position={primary.subRole} className="!h-4 !w-4" opacity={0.6} />
-                          <span className="text-xs font-semibold text-text-secondary">{POSITION_LABELS[primary.subRole] ?? ROLE_LABELS[primary.subRole] ?? primary.subRole}</span>
-                          <span className="rounded bg-bg-elevated px-1 text-[9px] font-black text-text-tertiary">부</span>
-                        </div>
-                      )}
-                      {primary.tier && (
-                        <div className="flex items-center gap-2">
-                          <TierBadge tier={primary.tier} size="md" />
-                          <div className="text-sm">
-                            {primary.rank && <span className="font-medium text-text-primary">{primary.rank}</span>}
-                            {primary.lp && <span className="text-text-secondary ml-1">{primary.lp}LP</span>}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* 아래: 게임명 · 최고 티어 · 가입일 — 모바일에서 2줄 */}
-                  <div className="flex flex-col gap-1.5 text-xs text-text-tertiary">
-                    {/* 첫째 줄: 상태 · 게임명 · 태그 */}
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <StatusSelector
-                        currentStatus={myStatus}
-                        onStatusChange={(status) => setStatus(status)}
-                      />
-                      {primary && (
-                        <>
-                          <span className="font-medium text-text-secondary">{primary.gameName}</span>
-                          <span>#{primary.tagLine}</span>
-                        </>
-                      )}
-                      {highlightChampionId && (
-                        <>
-                          <span>·</span>
-                          <ChampionImage championKey={getChampionKey(highlightChampionId)} size={14} className="rounded" />
-                          <span className="text-accent-gold">{getChampionName(highlightChampionId)}</span>
-                        </>
-                      )}
-                    </div>
-                    {/* 둘째 줄: 최고 티어 · 가입일 */}
-                    {primary && (
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {primary.peakTier && (
-                          <>
-                            <span>최고 {primary.peakTier}{primary.peakRank ? ` ${primary.peakRank}` : ''}</span>
-                            <span>·</span>
-                          </>
-                        )}
-                        <Calendar className="h-3 w-3 flex-shrink-0" />
-                        <span>{new Date(profileData?.createdAt || user.createdAt).toLocaleDateString('ko-KR')} 가입</span>
-                      </div>
-                    )}
+                <div className="mt-3 flex items-end justify-between gap-3">
+                  <div>
+                    <p className="text-2xl font-black leading-none text-text-primary">{reputationAverage.toFixed(1)}</p>
+                    <p className="mt-2 text-xs font-semibold text-text-tertiary">5점 만점</p>
                   </div>
+                  <RatingStars value={reputationAverage} className="text-base" />
                 </div>
               </div>
-              </div>
+            </CardContent>
+          </Card>
+        </section>
 
-              {/* 저장 / 공개 프로필 / 설정 버튼 */}
-              <div className="flex w-full flex-shrink-0 flex-wrap gap-2 sm:w-auto lg:justify-end">
-                {profileDirty && (
-                  <Button size="sm" onClick={handleSaveProfile} isLoading={isSaving}>
-                    <Check className="h-4 w-4 mr-1" />
-                    저장
-                  </Button>
-                )}
-                {user?.id && (
-                  <Button variant="ghost" size="sm" onClick={() => router.push(`/users/${user.id}`)}>
-                    내 공개 프로필 →
-                  </Button>
-                )}
-                <Button variant="ghost" size="sm" onClick={() => router.push('/settings')}>
-                  <Settings className="h-4 w-4 mr-1" />
-                  설정
-                </Button>
-              </div>
-            </div>
-            )}
-          </CardContent>
-        </Card>
+        <div className="mb-3">
+          <h2 className="text-sm font-black text-text-primary">프로필 관리</h2>
+          <p className="mt-1 text-xs text-text-tertiary">방송 채널과 외부 링크는 공개 프로필에 표시됩니다.</p>
+        </div>
 
-        <div className="mb-6 grid gap-4 lg:grid-cols-2">
+        <section className="mb-6 grid gap-4 xl:grid-cols-[380px_minmax(0,1fr)]">
           <StreamerRegistrationCard
             profiles={streamerProfiles}
             onSaved={fetchProfile}
@@ -1134,37 +1218,7 @@ export default function ProfilePage() {
             onSaved={fetchProfile}
             addToast={addToast}
           />
-        </div>
-
-        {/* ── 요약 스탯 칩 (전적/승률/KDA) ── */}
-        {stats && (
-          <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <SummaryChip
-              icon={Activity}
-              label="전적"
-              value={`${stats.wins ?? 0}승 ${stats.losses ?? 0}패`}
-              detail={`${stats.gamesPlayed ?? 0}게임 · 참여 ${stats.participations ?? 0}회`}
-            />
-            <SummaryChip
-              icon={TrendingUp}
-              label="승률"
-              value={(stats.gamesPlayed ?? 0) > 0 ? `${Number(stats.winRate).toFixed(0)}%` : "-"}
-              detail={(stats.gamesPlayed ?? 0) > 0 ? `${stats.wins}승 ${stats.losses}패` : "전적 없음"}
-              side={recentMatches.length > 0 ? <WinRateSparkline matches={recentMatches} /> : undefined}
-              valueClassName={(stats.winRate ?? 0) >= 50 ? "text-accent-success" : "text-accent-danger"}
-            />
-            <SummaryChip
-              icon={Activity}
-              label="최근 KDA"
-              value={recent.games > 0 ? recent.avgKda.toFixed(2) : "-"}
-              detail={
-                recent.games > 0
-                  ? `${recent.avgKills.toFixed(1)} / ${recent.avgDeaths.toFixed(1)} / ${recent.avgAssists.toFixed(1)}`
-                  : "최근 기록 없음"
-              }
-            />
-          </div>
-        )}
+        </section>
 
         {/* Champions Tabbed Section */}
         {(preferredChampions.length > 0 || championStats.length > 0 || rankedChampStats.length > 0) && (
