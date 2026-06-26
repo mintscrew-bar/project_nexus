@@ -32,6 +32,13 @@ import {
   DEFAULT_CLAN_ACCENT,
 } from "@/components/domain/ClanEmblem";
 import {
+  PositionIcon,
+  POSITION_LABELS,
+} from "@/app/tournaments/[id]/lobby/_components/icons";
+import { cn } from "@/lib/utils";
+
+const RECRUIT_ROLE_OPTIONS = ["TOP", "JUNGLE", "MID", "ADC", "SUPPORT"];
+import {
   Shield,
   Crown,
   Users,
@@ -154,6 +161,133 @@ function getRoleBadge(role: string) {
     default:
       return null;
   }
+}
+
+// ─────────────────────────────────────────────────────────────
+// 컴포넌트: 모집 공고 섹션 (모집 포지션 인라인 편집)
+// ─────────────────────────────────────────────────────────────
+interface RecruitmentSectionProps {
+  clanId: string;
+  isRecruiting: boolean;
+  minTier: string | null;
+  recruitRoles: string[];
+  canManageSettings: boolean;
+  onUpdated: () => void;
+}
+
+function RecruitmentSection({
+  clanId,
+  isRecruiting,
+  minTier,
+  recruitRoles,
+  canManageSettings,
+  onUpdated,
+}: RecruitmentSectionProps) {
+  const { addToast } = useToast();
+  const [roles, setRoles] = useState<string[]>(recruitRoles);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // 원본과 비교해 변경 여부 판단
+  const dirty =
+    roles.length !== recruitRoles.length ||
+    roles.some((r) => !recruitRoles.includes(r));
+
+  const toggleRole = (role: string) => {
+    setRoles((prev) =>
+      prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role],
+    );
+  };
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      await clanApi.updateClan(clanId, { recruitRoles: roles });
+      addToast("모집 포지션이 저장되었습니다.", "success");
+      onUpdated();
+    } catch (err: any) {
+      addToast(err.response?.data?.message || "저장에 실패했습니다.", "error");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <UserPlus className="h-5 w-5" />
+          모집 공고
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4 text-sm">
+        {/* 모집 상태 + 최소 티어 */}
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant={isRecruiting ? "success" : "default"} size="sm">
+            {isRecruiting ? "모집 중" : "모집 안 함"}
+          </Badge>
+          {minTier && (
+            <Badge variant="default" size="sm">
+              최소 {minTier}
+            </Badge>
+          )}
+        </div>
+
+        {/* 모집 포지션 */}
+        <div>
+          <p className="mb-2 text-xs font-semibold text-text-tertiary">
+            모집 포지션
+          </p>
+          {canManageSettings ? (
+            <div className="flex flex-wrap items-center gap-2">
+              {RECRUIT_ROLE_OPTIONS.map((role) => {
+                const active = roles.includes(role);
+                return (
+                  <button
+                    key={role}
+                    type="button"
+                    onClick={() => toggleRole(role)}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors",
+                      active
+                        ? "border-accent-primary bg-accent-primary/10 text-accent-primary"
+                        : "border-bg-elevated bg-bg-tertiary text-text-tertiary hover:text-text-secondary",
+                    )}
+                  >
+                    <PositionIcon position={role} className="!h-3.5 !w-3.5" />
+                    {POSITION_LABELS[role] || role}
+                  </button>
+                );
+              })}
+            </div>
+          ) : roles.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-2">
+              {roles.map((role) => (
+                <span
+                  key={role}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-bg-tertiary px-2.5 py-1.5 text-xs font-medium text-text-secondary"
+                >
+                  <PositionIcon position={role} className="!h-3.5 !w-3.5" />
+                  {POSITION_LABELS[role] || role}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <p className="text-text-tertiary">
+              지정된 모집 포지션이 없습니다.
+            </p>
+          )}
+        </div>
+
+        {canManageSettings && dirty && (
+          <div className="flex justify-end">
+            <Button size="sm" onClick={handleSave} isLoading={isSaving}>
+              모집 포지션 저장
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -500,6 +634,8 @@ export default function ClanDetailClient() {
   const canPost =
     isMember &&
     (isOwner || (isOfficer && clan.officerCanManageAnnouncements));
+  const canManageSettings =
+    isOwner || (isOfficer && clan.officerCanManageSettings);
 
   // 멤버를 역할 순서로 정렬 (OWNER → OFFICER → MEMBER)
   const sortedMembers = clan.members.slice().sort((a, b) => {
@@ -741,6 +877,16 @@ export default function ClanDetailClient() {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* 모집 공고 — 모집 포지션·최소 티어, OWNER/OFFICER 인라인 편집 */}
+              <RecruitmentSection
+                clanId={clanId}
+                isRecruiting={clan.isRecruiting}
+                minTier={clan.minTier}
+                recruitRoles={clan.recruitRoles ?? []}
+                canManageSettings={canManageSettings}
+                onUpdated={fetchClan}
+              />
 
               {/* 공지사항 — 멤버에게만 표시 */}
               {isMember && (
