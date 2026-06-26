@@ -16,7 +16,7 @@ import { getChampionIcon } from '@/components/matches/match-utils';
 import { LoadingSpinner, Card, CardHeader, CardTitle, CardContent, Badge, Button, Skeleton, EmptyState, ConfirmModal, StatusSelector, Tabs, TabsList, TabsTrigger, TabsContent, Dropdown } from '@/components/ui';
 import { Star, Plus, RefreshCw, Shield, TrendingUp, Loader2, History, Clock, Settings, User, BarChart3, Pencil, Trash2, Swords, Gavel, Camera, Check, X, MoreVertical, Activity, Calendar, Trophy, Target, Radio, ExternalLink } from 'lucide-react';
 import { TierBadge } from '@/components/domain/TierBadge';
-import { RatingStars, ReputationSummary, WinRateSparkline } from '@/components/domain/ProfileStats';
+import { RatingStars, WinRateSparkline } from '@/components/domain/ProfileStats';
 import { useToast } from '@/components/ui/Toast';
 import { usePresence } from '@/hooks/usePresence';
 import { getChampionKoreanName, searchChampionsByQuery } from '@nexus/types';
@@ -1430,9 +1430,9 @@ export default function ProfilePage() {
           </Card>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className={`grid grid-cols-1 gap-6 ${positionStats.length > 0 ? 'lg:grid-cols-3' : 'lg:grid-cols-1'}`}>
           {/* Riot Accounts Section */}
-          <div className="lg:col-span-2">
+          <div className={positionStats.length > 0 ? 'lg:col-span-2' : ''}>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
@@ -1635,30 +1635,8 @@ export default function ProfilePage() {
           </div>
 
           {/* Stats Section */}
-          <div className="lg:col-span-1 space-y-6">
-            {/* 평판 카드 */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Star className="h-5 w-5 text-accent-gold" />
-                  평판
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {rep ? (
-                  <ReputationSummary stats={rep} />
-                ) : (
-                  <div className="space-y-3">
-                    <Skeleton className="h-4 w-full" />
-                    <Skeleton className="h-4 w-full" />
-                    <Skeleton className="h-4 w-full" />
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* 포지션별 통계 */}
-            {positionStats.length > 0 && (
+          {positionStats.length > 0 && (
+            <div className="lg:col-span-1">
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -1692,8 +1670,8 @@ export default function ProfilePage() {
                   })}
                 </CardContent>
               </Card>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Recent Activity Section */}

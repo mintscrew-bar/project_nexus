@@ -27,6 +27,11 @@ import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
 import { ConfirmModal } from "@/components/ui/Modal";
 import {
+  ClanEmblem,
+  ClanTag,
+  DEFAULT_CLAN_ACCENT,
+} from "@/components/domain/ClanEmblem";
+import {
   Shield,
   Crown,
   Users,
@@ -94,6 +99,9 @@ interface Clan {
   tag: string;
   description: string | null;
   logo: string | null;
+  banner: string | null;
+  accentColor: string | null;
+  recruitRoles: string[];
   ownerId: string;
   isRecruiting: boolean;
   maxMembers: number;
@@ -503,39 +511,65 @@ export default function ClanDetailClient() {
     <>
       <div className="flex-grow p-4 md:p-8 animate-fade-in">
         <div className="container mx-auto max-w-4xl">
-          {/* ── 클랜 헤더 카드 ── */}
-          <Card className="mb-6">
-            <CardContent className="p-6">
-              <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
-                {/* 클랜 로고 */}
-                <div className="w-24 h-24 rounded-xl bg-bg-tertiary flex items-center justify-center overflow-hidden relative flex-shrink-0">
-                  {clan.logo ? (
-                    <Image
-                      src={clan.logo}
-                      alt={clan.name}
-                      fill
-                      className="object-cover"
-                      unoptimized
-                    />
-                  ) : (
-                    <Shield className="h-12 w-12 text-text-tertiary" />
-                  )}
-                </div>
+          {/* ── 클랜 헤더 카드 (배너 + 엠블럼 + 대표색) ── */}
+          <Card className="mb-6 overflow-hidden">
+            {/* 배너: 이미지 또는 대표색 그라디언트 */}
+            <div
+              className="relative h-32 w-full bg-bg-tertiary md:h-40"
+              style={
+                clan.banner
+                  ? undefined
+                  : {
+                      background: `linear-gradient(135deg, ${
+                        clan.accentColor || DEFAULT_CLAN_ACCENT
+                      }44, ${clan.accentColor || DEFAULT_CLAN_ACCENT}0d)`,
+                    }
+              }
+            >
+              {clan.banner && (
+                <Image
+                  src={clan.banner}
+                  alt={`${clan.name} 배너`}
+                  fill
+                  className="object-cover"
+                  unoptimized
+                />
+              )}
+              {/* 하단 가독성 그라디언트 */}
+              <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-bg-secondary to-transparent" />
+            </div>
+
+            <CardContent className="p-6 pt-0">
+              <div className="-mt-12 flex flex-col gap-6 md:flex-row md:items-end">
+                {/* 엠블럼 */}
+                <ClanEmblem
+                  tag={clan.tag}
+                  logo={clan.logo}
+                  accentColor={clan.accentColor}
+                  size={96}
+                  rounded="rounded-2xl"
+                  className="ring-4 ring-bg-secondary"
+                />
 
                 {/* 클랜 정보 */}
-                <div className="flex-grow">
-                  <div className="flex items-center gap-3 flex-wrap">
+                <div className="flex-grow md:pb-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <ClanTag
+                      tag={clan.tag}
+                      accentColor={clan.accentColor}
+                      size="md"
+                    />
                     <h1 className="text-2xl font-bold text-text-primary">
-                      [{clan.tag}] {clan.name}
+                      {clan.name}
                     </h1>
                     {clan.isRecruiting && (
                       <Badge variant="success">모집 중</Badge>
                     )}
                   </div>
-                  <p className="text-text-secondary mt-2">
+                  <p className="mt-2 text-text-secondary">
                     {clan.description || "클랜 소개가 없습니다."}
                   </p>
-                  <div className="flex items-center gap-4 mt-3 text-sm text-text-tertiary">
+                  <div className="mt-3 flex items-center gap-4 text-sm text-text-tertiary">
                     <span className="flex items-center gap-1">
                       <Users className="h-4 w-4" />
                       {clan.members.length}/{clan.maxMembers} 멤버
@@ -560,7 +594,7 @@ export default function ClanDetailClient() {
                 </div>
 
                 {/* 액션 버튼 영역 */}
-                <div className="flex flex-col gap-2 w-full md:w-auto">
+                <div className="flex w-full flex-col gap-2 md:w-auto md:pb-1">
                   {isMember ? (
                     <>
                       {canManage && (
