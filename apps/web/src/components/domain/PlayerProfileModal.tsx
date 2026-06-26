@@ -324,6 +324,12 @@ export function PlayerProfileModal({ userId, onClose }: PlayerProfileModalProps)
     }
   };
 
+  // 공개 프로필(page.tsx)과 동일한 privacy 설정 반영
+  // showRiotAccounts: false → Riot 계정·티어 숨김 / showChampionStats: false → 선호 챔피언 숨김
+  const settings = profile?.settings;
+  const showRiot = settings?.showRiotAccounts !== false;
+  const showChampStats = settings?.showChampionStats !== false;
+
   const riot = getPrimaryRiot(profile);
   const mainRole = riot?.mainRole || null;
   const subRole = riot?.subRole || null;
@@ -389,7 +395,7 @@ export function PlayerProfileModal({ userId, onClose }: PlayerProfileModalProps)
               <div className="mt-2 flex flex-col gap-4 sm:flex-row sm:items-start">
                 <div
                   className="relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-full bg-[#171717] sm:h-24 sm:w-24"
-                  style={{ border: `2px solid ${riot?.tier && riot.tier !== "UNRANKED" ? ACCENT + "88" : "rgba(255,255,255,0.14)"}` }}
+                  style={{ border: `2px solid ${showRiot && riot?.tier && riot.tier !== "UNRANKED" ? ACCENT + "88" : "rgba(255,255,255,0.14)"}` }}
                 >
                   {profile.avatar ? (
                     <Image src={profile.avatar} alt={profile.username} fill className="object-cover" unoptimized />
@@ -415,13 +421,13 @@ export function PlayerProfileModal({ userId, onClose }: PlayerProfileModalProps)
                     )}
                   </div>
 
-                  {riot && (
+                  {showRiot && riot && (
                     <p className="mt-1 text-sm text-zinc-500">
                       {riot.gameName}<span className="text-zinc-600"> #{riot.tagLine}</span>
                     </p>
                   )}
 
-                  {riot?.tier && riot.tier !== "UNRANKED" && (
+                  {showRiot && riot?.tier && riot.tier !== "UNRANKED" && (
                     <div className="mt-2 flex flex-wrap items-center gap-2">
                       <span className="text-lg font-black" style={{ color: TIER_COLOR[riot.tier] ?? ACCENT }}>
                         {formatTier(riot)}
@@ -432,7 +438,7 @@ export function PlayerProfileModal({ userId, onClose }: PlayerProfileModalProps)
                     </div>
                   )}
 
-                  {riot?.peakTier && riot.peakTier !== "UNRANKED" && (
+                  {showRiot && riot?.peakTier && riot.peakTier !== "UNRANKED" && (
                     <div className="mt-1 flex flex-wrap items-center gap-1.5">
                       <span className="text-xs text-zinc-600">최고</span>
                       <span className="text-xs font-semibold text-zinc-400">
@@ -506,7 +512,9 @@ export function PlayerProfileModal({ userId, onClose }: PlayerProfileModalProps)
               {!mainRole && !subRole && (
                 <p className="text-sm text-zinc-500">등록된 포지션이 없습니다</p>
               )}
-              {championGroups.length > 0 ? (
+              {!showChampStats ? (
+                <p className="text-sm text-zinc-500">선호 챔피언을 비공개로 설정했습니다</p>
+              ) : championGroups.length > 0 ? (
                 <div className="space-y-2">
                   {championGroups.map((group) => (
                     <div key={group.role} className="rounded-xl bg-[#101010] p-3">

@@ -6,7 +6,7 @@ PlayerProfileModal과 /users/[id] 공개 프로필 페이지 간 데이터·UX·
 
 ## Tasks
 
-- [ ] Task 1: 평판 필드명 버그 수정 (`/profile` 페이지)
+- [x] Task 1: 평판 필드명 버그 수정 (`/profile` 페이지)
   - `rep.skill` → `rep.averageSkill`
   - `rep.manner` → `rep.averageAttitude`
   - `rep.communication` → `rep.averageCommunication`
@@ -14,7 +14,7 @@ PlayerProfileModal과 /users/[id] 공개 프로필 페이지 간 데이터·UX·
   - 파일: `apps/web/src/app/profile/page.tsx` (line 1643~1647)
   - **현재 평판 항상 0으로 표시되는 실제 버그**
 
-- [ ] Task 2: 모달에서 privacy 설정 반영
+- [x] Task 2: 모달에서 privacy 설정 반영
   - `showRiotAccounts` false 시 Riot 계정·티어 숨김
   - `showChampionStats` false 시 선호 챔피언 숨김
   - 파일: `apps/web/src/components/domain/PlayerProfileModal.tsx`
