@@ -34,7 +34,7 @@ PlayerProfileModal과 /users/[id] 공개 프로필 페이지 간 데이터·UX·
   - 현재 60군데 이상 하드코딩, 라이트모드 대응 불가
   - 파일: `apps/web/src/components/domain/PlayerProfileModal.tsx`
 
-- [ ] Task 6: RepBar / SummaryChip / WinRateSparkline 공통 컴포넌트로 추출
+- [x] Task 6: RepBar / SummaryChip / WinRateSparkline 공통 컴포넌트로 추출
   - 현재 모달·`/profile`·`/users/[id]` 3곳에 각각 별도 구현
   - `src/components/domain/` 또는 `src/components/ui/` 하위로 분리
   - 높이(min-h-[104px] vs min-h-[96px]), 색상, 정렬이 제각각

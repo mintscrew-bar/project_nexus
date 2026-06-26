@@ -45,9 +45,9 @@ import {
   Gavel,
   Activity,
   ExternalLink,
-  type LucideIcon,
 } from "lucide-react";
 import { TierBadge } from "@/components/domain/TierBadge";
+import { RepBar, SummaryChip, WinRateSparkline } from "@/components/domain/ProfileStats";
 import { useToast } from "@/components/ui/Toast";
 import { getChampionKoreanName, searchChampionsByQuery } from "@nexus/types";
 
@@ -87,66 +87,6 @@ function formatTimeAgo(value?: string) {
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours}시간 전`;
   return `${Math.floor(hours / 24)}일 전`;
-}
-
-// ─── 서브 컴포넌트 ──────────────────────────────────────────
-
-function WinRateSparkline({ matches }: { matches: any[] }) {
-  const outcomes = matches.slice(0, 6).reverse().map((m) => Boolean(m.participant?.win));
-  if (outcomes.length === 0) return <div className="h-5 w-10" />;
-  const width = 40; const height = 20; const xStart = 4; const innerWidth = 32;
-  const points = outcomes.map((won, i) => ({
-    x: outcomes.length === 1 ? width / 2 : xStart + (i * innerWidth) / (outcomes.length - 1),
-    y: won ? 5 : 15,
-    won,
-  }));
-  return (
-    <div className="h-5 w-10 opacity-70">
-      <svg viewBox={`0 0 ${width} ${height}`} className="h-full w-full">
-        <polyline
-          points={points.map((p) => `${p.x},${p.y}`).join(" ")}
-          fill="none" stroke="rgb(125,211,252)"
-          strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8"
-        />
-      </svg>
-    </div>
-  );
-}
-
-function SummaryChip({
-  icon: Icon, label, value, detail, side, valueClassName = "text-text-primary",
-}: {
-  icon: LucideIcon; label: string; value: string;
-  detail?: string; side?: React.ReactNode; valueClassName?: string;
-}) {
-  return (
-    <div className="flex min-h-[96px] flex-col justify-between rounded-xl bg-bg-tertiary border border-bg-elevated p-4">
-      <div className="flex h-5 items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-text-tertiary">
-        <Icon className="h-3.5 w-3.5" />
-        {label}
-      </div>
-      <div className="pt-2">
-        <div className="flex items-end justify-between gap-2">
-          <p className={`text-[22px] font-black leading-none tracking-tight ${valueClassName}`}>{value}</p>
-          {side && <div className="shrink-0 translate-y-0.5">{side}</div>}
-        </div>
-        {detail && <p className="mt-1.5 truncate text-xs font-semibold text-text-tertiary">{detail}</p>}
-      </div>
-    </div>
-  );
-}
-
-function RepBar({ label, value }: { label: string; value: number }) {
-  const v = Math.max(0, Math.min(5, value || 0));
-  return (
-    <div className="flex items-center gap-3">
-      <span className="w-8 text-xs font-semibold text-text-tertiary">{label}</span>
-      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-bg-elevated">
-        <div className="h-full rounded-full bg-accent-primary" style={{ width: `${(v / 5) * 100}%` }} />
-      </div>
-      <span className="w-7 text-right text-xs font-bold text-text-primary">{v.toFixed(1)}</span>
-    </div>
-  );
 }
 
 interface ProfileUser {

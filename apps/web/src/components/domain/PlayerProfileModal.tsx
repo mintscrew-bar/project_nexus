@@ -2,7 +2,6 @@
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import type { ElementType, ReactNode } from "react";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -18,6 +17,7 @@ import {
   X,
 } from "lucide-react";
 import { LoadingSpinner, Modal } from "@/components/ui";
+import { RatingStars, RepBar, SummaryChip, WinRateSparkline } from "@/components/domain/ProfileStats";
 import { matchApi, reputationApi, userApi } from "@/lib/api-client";
 import { useAuthStore } from "@/stores/auth-store";
 import { getChampionIcon } from "@/components/matches/match-utils";
@@ -157,104 +157,6 @@ function getChampionGroups(champions: any[], mainRole?: string | null, subRole?:
     role,
     champions: grouped.get(role) || [],
   }));
-}
-
-function getRecentWinOutcomes(matches: any[]) {
-  return matches
-    .slice(0, 6)
-    .reverse()
-    .map((match) => Boolean(match.participant?.win));
-}
-
-function WinRateSparkline({ matches }: { matches: any[] }) {
-  const outcomes = getRecentWinOutcomes(matches);
-
-  if (outcomes.length === 0) {
-    return <div className="h-7 w-14" />;
-  }
-
-  const width = 46;
-  const height = 22;
-  const innerWidth = 34;
-  const xStart = 6;
-  const points = outcomes.map((won, index) => {
-    const x = outcomes.length === 1 ? width / 2 : xStart + (index * innerWidth) / (outcomes.length - 1);
-    const y = won ? 6 : 16;
-    return { x, y, won };
-  });
-  const pointPath = points.map((point) => `${point.x},${point.y}`).join(" ");
-
-  return (
-    <div className="h-5 w-11 opacity-70" title="최근 경기 승패 흐름">
-      <svg viewBox={`0 0 ${width} ${height}`} className="h-full w-full" role="img" aria-label="최근 승패 그래프">
-        <polyline
-          points={pointPath}
-          fill="none"
-          stroke="rgb(125, 211, 252)"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth="2"
-        />
-      </svg>
-    </div>
-  );
-}
-
-function RepBar({ label, value }: { label: string; value: number }) {
-  const safeValue = Math.max(0, Math.min(5, value || 0));
-  return (
-    <div className="flex items-center gap-3">
-      <span className="w-10 text-xs font-semibold text-text-secondary">{label}</span>
-      <div className="h-2 flex-1 overflow-hidden rounded-full bg-bg-elevated">
-        <div className="h-full rounded-full bg-accent-primary" style={{ width: `${(safeValue / 5) * 100}%` }} />
-      </div>
-      <span className="w-8 text-right text-xs font-bold text-text-primary">{safeValue.toFixed(1)}</span>
-    </div>
-  );
-}
-
-function RatingStars({ value }: { value: number }) {
-  const rounded = Math.max(0, Math.min(5, Math.round(value || 0)));
-  return (
-    <span className="text-sm text-accent-gold">
-      {"★".repeat(rounded)}
-      <span className="text-text-muted">{"★".repeat(5 - rounded)}</span>
-    </span>
-  );
-}
-
-function SummaryChip({
-  icon: Icon,
-  label,
-  value,
-  detail,
-  side,
-  valueClassName = "text-text-primary",
-}: {
-  icon: ElementType;
-  label: string;
-  value: string;
-  detail?: string;
-  side?: ReactNode;
-  valueClassName?: string;
-}) {
-  return (
-    <div className="flex min-h-[104px] flex-col justify-between rounded-xl bg-bg-secondary p-4">
-      <div className="flex h-5 items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-text-tertiary">
-        <Icon className="h-3.5 w-3.5" />
-        {label}
-      </div>
-      <div className="pt-3">
-        <div className="flex items-end justify-between gap-3">
-          <p className={`min-w-0 text-[24px] font-black leading-none tracking-[-0.01em] ${valueClassName}`}>
-            {value}
-          </p>
-          {side && <div className="shrink-0 translate-y-0.5">{side}</div>}
-        </div>
-        {detail && <p className="mt-2 truncate text-xs font-semibold leading-none text-text-tertiary">{detail}</p>}
-      </div>
-    </div>
-  );
 }
 
 function getPrimaryRiot(profile: any) {
@@ -626,7 +528,7 @@ export function PlayerProfileModal({ userId, onClose }: PlayerProfileModalProps)
                 <div>
                   <p className="text-xs font-semibold text-text-tertiary">종합 평가</p>
                   <div className="mt-1">
-                    <RatingStars value={rep?.overallAverage ?? 0} />
+                    <RatingStars value={rep?.overallAverage ?? 0} className="text-sm" />
                   </div>
                 </div>
                 <p className="text-2xl font-black text-text-primary">{(rep?.overallAverage ?? 0).toFixed(1)}</p>
