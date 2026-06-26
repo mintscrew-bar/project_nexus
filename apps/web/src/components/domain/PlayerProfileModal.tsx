@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import type { ElementType, ReactNode } from "react";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -261,6 +262,7 @@ function getPrimaryRiot(profile: any) {
 }
 
 export function PlayerProfileModal({ userId, onClose }: PlayerProfileModalProps) {
+  const router = useRouter();
   const { data: profile, isLoading: profileLoading, isError } = useQuery({
     queryKey: ["userProfile", userId],
     queryFn: () => userApi.getProfile(userId!),
@@ -428,12 +430,19 @@ export function PlayerProfileModal({ userId, onClose }: PlayerProfileModalProps)
                       {profile.username}
                     </h2>
                     {clan?.tag && (
-                      <span
-                        className="shrink-0 rounded-md px-2 py-1 text-xs font-black leading-none"
+                      <button
+                        type="button"
+                        onClick={() => {
+                          // 모달을 닫고 클랜 상세 페이지로 이동
+                          onClose();
+                          router.push(`/clans/${clan.id}`);
+                        }}
+                        title={`${clan.name ?? clan.tag} 클랜 보기`}
+                        className="shrink-0 cursor-pointer rounded-md px-2 py-1 text-xs font-black leading-none transition-opacity hover:opacity-80"
                         style={{ color: ACCENT, backgroundColor: `${ACCENT}22` }}
                       >
                         {clan.tag}
-                      </span>
+                      </button>
                     )}
                     {/* 스트리머 채널 배지 — 플랫폼별 채널 링크 */}
                     {streamerProfiles.map((sp: any, i: number) => (

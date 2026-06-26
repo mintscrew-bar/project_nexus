@@ -39,6 +39,6 @@ PlayerProfileModal과 /users/[id] 공개 프로필 페이지 간 데이터·UX·
   - `src/components/domain/` 또는 `src/components/ui/` 하위로 분리
   - 높이(min-h-[104px] vs min-h-[96px]), 색상, 정렬이 제각각
 
-- [ ] Task 7: 모달 클랜 클릭 → 클랜 페이지 이동 추가
+- [x] Task 7: 모달 클랜 클릭 → 클랜 페이지 이동 추가
   - 공개 프로필은 `/clans/${clan.id}` 이동 가능, 모달은 태그만 텍스트 표시
   - 파일: `apps/web/src/components/domain/PlayerProfileModal.tsx` (line 408~413)
