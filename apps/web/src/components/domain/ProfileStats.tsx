@@ -20,6 +20,108 @@ function getRecentWinOutcomes(matches: any[]): boolean[] {
     .map((match) => Boolean(match.participant?.win));
 }
 
+interface ProfileBaseStats {
+  gamesPlayed?: number | null;
+  wins?: number | null;
+  losses?: number | null;
+  participations?: number | null;
+}
+
+interface RankedChampionStat {
+  games?: number | null;
+  wins?: number | null;
+  losses?: number | null;
+  kills?: number | null;
+  deaths?: number | null;
+  assists?: number | null;
+}
+
+interface StatAggregate {
+  games: number;
+  wins: number;
+  losses: number;
+  kills: number;
+  deaths: number;
+  assists: number;
+}
+
+function numberOrZero(value: unknown) {
+  return Number.isFinite(Number(value)) ? Number(value) : 0;
+}
+
+function aggregateRecentMatches(matches: any[]) {
+  return matches.reduce<Pick<StatAggregate, "games" | "kills" | "deaths" | "assists">>(
+    (acc, match) => {
+      const participant = match.participant ?? {};
+      acc.games += 1;
+      acc.kills += numberOrZero(participant.kills);
+      acc.deaths += numberOrZero(participant.deaths);
+      acc.assists += numberOrZero(participant.assists);
+      return acc;
+    },
+    { games: 0, kills: 0, deaths: 0, assists: 0 },
+  );
+}
+
+function aggregateRankedChampions(champions: RankedChampionStat[]) {
+  return champions.reduce<StatAggregate>(
+    (acc, champion) => {
+      const games = numberOrZero(champion.games);
+      const wins = numberOrZero(champion.wins);
+      const losses = champion.losses == null ? Math.max(0, games - wins) : numberOrZero(champion.losses);
+      acc.games += games;
+      acc.wins += wins;
+      acc.losses += losses;
+      acc.kills += numberOrZero(champion.kills);
+      acc.deaths += numberOrZero(champion.deaths);
+      acc.assists += numberOrZero(champion.assists);
+      return acc;
+    },
+    { games: 0, wins: 0, losses: 0, kills: 0, deaths: 0, assists: 0 },
+  );
+}
+
+export function getCombinedProfileMetrics({
+  stats,
+  recentMatches,
+  rankedChampStats,
+}: {
+  stats?: ProfileBaseStats | null;
+  recentMatches: any[];
+  rankedChampStats: RankedChampionStat[];
+}) {
+  const customGames = numberOrZero(stats?.gamesPlayed);
+  const customWins = numberOrZero(stats?.wins);
+  const customLosses = numberOrZero(stats?.losses);
+  const ranked = aggregateRankedChampions(rankedChampStats);
+  const recent = aggregateRecentMatches(recentMatches);
+
+  const games = customGames + ranked.games;
+  const wins = customWins + ranked.wins;
+  const losses = customLosses + ranked.losses;
+  const winRate = games > 0 ? Math.round((wins / games) * 100) : 0;
+
+  const kdaGames = recent.games + ranked.games;
+  const kills = recent.kills + ranked.kills;
+  const deaths = recent.deaths + ranked.deaths;
+  const assists = recent.assists + ranked.assists;
+
+  return {
+    games,
+    wins,
+    losses,
+    winRate,
+    customGames,
+    rankedGames: ranked.games,
+    participations: numberOrZero(stats?.participations),
+    kdaGames,
+    avgKills: kdaGames > 0 ? kills / kdaGames : 0,
+    avgDeaths: kdaGames > 0 ? deaths / kdaGames : 0,
+    avgAssists: kdaGames > 0 ? assists / kdaGames : 0,
+    avgKda: kdaGames > 0 ? (deaths === 0 ? kills + assists : (kills + assists) / deaths) : 0,
+  };
+}
+
 /** 최근 경기 승패 흐름 스파크라인 */
 export function WinRateSparkline({ matches }: { matches: any[] }) {
   const outcomes = getRecentWinOutcomes(matches);

@@ -16,7 +16,7 @@ import { getChampionIcon } from '@/components/matches/match-utils';
 import { LoadingSpinner, Card, CardHeader, CardTitle, CardContent, Badge, Button, Skeleton, EmptyState, ConfirmModal, StatusSelector, Tabs, TabsList, TabsTrigger, TabsContent, Dropdown } from '@/components/ui';
 import { Star, Plus, RefreshCw, Shield, TrendingUp, Loader2, History, Clock, Settings, User, BarChart3, Pencil, Trash2, Swords, Gavel, Camera, Check, X, MoreVertical, Activity, Calendar, Trophy, Target, Radio, ExternalLink } from 'lucide-react';
 import { TierBadge } from '@/components/domain/TierBadge';
-import { RatingStars, WinRateSparkline } from '@/components/domain/ProfileStats';
+import { RatingStars, WinRateSparkline, getCombinedProfileMetrics } from '@/components/domain/ProfileStats';
 import { PreferredChampionPanel, RankedChampionPanel } from '@/components/domain/ProfileChampionPanels';
 import { useToast } from '@/components/ui/Toast';
 import { usePresence } from '@/hooks/usePresence';
@@ -519,22 +519,6 @@ function StreamerLinksCard({
 
 // ─── 헬퍼 함수 ───────────────────────────────────────────────
 
-function getRecentMetrics(matches: any[]) {
-  const games = matches.length;
-  const wins = matches.filter((m) => m.participant?.win).length;
-  const kills = matches.reduce((s, m) => s + (m.participant?.kills ?? 0), 0);
-  const deaths = matches.reduce((s, m) => s + (m.participant?.deaths ?? 0), 0);
-  const assists = matches.reduce((s, m) => s + (m.participant?.assists ?? 0), 0);
-  return {
-    games,
-    winRate: games > 0 ? Math.round((wins / games) * 100) : 0,
-    avgKda: games > 0 ? (deaths === 0 ? kills + assists : (kills + assists) / deaths) : 0,
-    avgKills: games > 0 ? kills / games : 0,
-    avgDeaths: games > 0 ? deaths / games : 0,
-    avgAssists: games > 0 ? assists / games : 0,
-  };
-}
-
 function formatTimeAgo(value?: string) {
   if (!value) return "";
   const diff = Date.now() - new Date(value).getTime();
@@ -746,7 +730,7 @@ export default function ProfilePage() {
     if (!primary?.gameName || !primary?.tagLine) return;
     try {
       const data = await statsApi.getRankedChampionStats(primary.gameName, primary.tagLine);
-      setRankedChampStats((data || []).slice(0, 5));
+      setRankedChampStats(data || []);
     } catch {
       // Not critical
     }
@@ -959,14 +943,10 @@ export default function ProfilePage() {
   const clan = profileData?.clanMemberships?.[0]?.clan;
   const preferredChampions = getPreferredChampionsByRole();
   const highlightChampionId = profileData?.settings?.highlightChampionId;
-  const recent = getRecentMetrics(recentMatches);
   const stats = profileData?.stats ?? user?.stats ?? null;
   const streamerProfiles: StreamerProfile[] = profileData?.streamerProfiles ?? [];
   const streamerLinks: StreamerLink[] = profileData?.streamerLinks ?? [];
-  const gamesPlayed = stats?.gamesPlayed ?? 0;
-  const wins = stats?.wins ?? 0;
-  const losses = stats?.losses ?? 0;
-  const winRate = gamesPlayed > 0 ? Number(stats?.winRate ?? 0) : 0;
+  const combined = getCombinedProfileMetrics({ stats, recentMatches, rankedChampStats });
   const reputationAverage = clampRating(rep?.overallAverage);
   const reputationCount = rep?.totalRatings ?? 0;
 
@@ -1148,7 +1128,7 @@ export default function ProfilePage() {
               <div className="mb-4 flex items-center justify-between gap-3">
                 <div>
                   <h2 className="text-sm font-black text-text-primary">프로필 요약</h2>
-                  <p className="mt-1 text-xs text-text-tertiary">내전 기준 핵심 지표</p>
+                  <p className="mt-1 text-xs text-text-tertiary">내전+랭크 합산 지표</p>
                 </div>
                 {reputationCount > 0 && <RatingStars value={reputationAverage} className="text-base" />}
               </div>
@@ -1156,26 +1136,26 @@ export default function ProfilePage() {
               <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
                 <ProfileOverviewStat
                   icon={Swords}
-                  label="전적"
-                  value={`${wins}승 ${losses}패`}
-                  detail={`${gamesPlayed}게임 · 참여 ${stats?.participations ?? 0}회`}
+                  label="통합 전적"
+                  value={`${combined.wins}승 ${combined.losses}패`}
+                  detail={`내전 ${combined.customGames} · 랭크 ${combined.rankedGames}`}
                 />
                 <ProfileOverviewStat
                   icon={TrendingUp}
-                  label="승률"
-                  value={gamesPlayed > 0 ? `${winRate.toFixed(0)}%` : '-'}
-                  detail={gamesPlayed > 0 ? `${wins}승 ${losses}패` : '전적 없음'}
+                  label="통합 승률"
+                  value={combined.games > 0 ? `${combined.winRate}%` : '-'}
+                  detail={combined.games > 0 ? `${combined.games}게임 기준` : '전적 없음'}
                   side={recentMatches.length > 0 ? <WinRateSparkline matches={recentMatches} /> : undefined}
-                  valueClassName={winRate >= 50 ? 'text-accent-success' : 'text-accent-danger'}
+                  valueClassName={combined.winRate >= 50 ? 'text-accent-success' : 'text-accent-danger'}
                 />
                 <ProfileOverviewStat
                   icon={Activity}
-                  label="최근 KDA"
-                  value={recent.games > 0 ? recent.avgKda.toFixed(2) : '-'}
+                  label="통합 KDA"
+                  value={combined.kdaGames > 0 ? combined.avgKda.toFixed(2) : '-'}
                   detail={
-                    recent.games > 0
-                      ? `${recent.avgKills.toFixed(1)} / ${recent.avgDeaths.toFixed(1)} / ${recent.avgAssists.toFixed(1)}`
-                      : '최근 기록 없음'
+                    combined.kdaGames > 0
+                      ? `${combined.avgKills.toFixed(1)} / ${combined.avgDeaths.toFixed(1)} / ${combined.avgAssists.toFixed(1)}`
+                      : '기록 없음'
                   }
                 />
               </div>

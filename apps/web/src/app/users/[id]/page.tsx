@@ -47,7 +47,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { TierBadge } from "@/components/domain/TierBadge";
-import { ReputationSummary, SummaryChip, WinRateSparkline } from "@/components/domain/ProfileStats";
+import { ReputationSummary, SummaryChip, WinRateSparkline, getCombinedProfileMetrics } from "@/components/domain/ProfileStats";
 import { PreferredChampionPanel, RankedChampionPanel } from "@/components/domain/ProfileChampionPanels";
 import { useToast } from "@/components/ui/Toast";
 import { getChampionKoreanName, searchChampionsByQuery } from "@nexus/types";
@@ -63,22 +63,6 @@ const ROLE_LABELS: Record<string, string> = {
 const PROFILE_ACCENT = "#667EEA";
 
 // ─── 헬퍼 함수 ───────────────────────────────────────────────
-
-function getRecentMetrics(matches: any[]) {
-  const games = matches.length;
-  const wins = matches.filter((m) => m.participant?.win).length;
-  const kills = matches.reduce((s, m) => s + (m.participant?.kills ?? 0), 0);
-  const deaths = matches.reduce((s, m) => s + (m.participant?.deaths ?? 0), 0);
-  const assists = matches.reduce((s, m) => s + (m.participant?.assists ?? 0), 0);
-  return {
-    games,
-    winRate: games > 0 ? Math.round((wins / games) * 100) : 0,
-    avgKda: games > 0 ? (deaths === 0 ? kills + assists : (kills + assists) / deaths) : 0,
-    avgKills: games > 0 ? kills / games : 0,
-    avgDeaths: games > 0 ? deaths / games : 0,
-    avgAssists: games > 0 ? assists / games : 0,
-  };
-}
 
 function formatTimeAgo(value?: string) {
   if (!value) return "";
@@ -266,7 +250,7 @@ export default function UserProfilePage() {
     if (!primary?.gameName || !primary?.tagLine) return;
     try {
       const data = await statsApi.getRankedChampionStats(primary.gameName, primary.tagLine);
-      setRankedChampStats((data || []).slice(0, 5));
+      setRankedChampStats(data || []);
     } catch {
       // Not critical
     }
@@ -491,7 +475,11 @@ export default function UserProfilePage() {
   const showRiot = settings?.showRiotAccounts !== false;
   const showChampStats = settings?.showChampionStats !== false;
   const highlightChampionId = settings?.highlightChampionId;
-  const recent = getRecentMetrics(recentMatches);
+  const combined = getCombinedProfileMetrics({
+    stats: profile.stats,
+    recentMatches,
+    rankedChampStats,
+  });
 
   return (
     <div className="flex-grow p-4 md:p-8">
@@ -704,26 +692,26 @@ export default function UserProfilePage() {
         <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
           <SummaryChip
             icon={Swords}
-            label="전적"
-            value={`${profile.stats.wins}승 ${profile.stats.losses}패`}
-            detail={`${profile.stats.gamesPlayed}게임 · 참여 ${profile.stats.participations}회`}
+            label="통합 전적"
+            value={`${combined.wins}승 ${combined.losses}패`}
+            detail={`내전 ${combined.customGames} · 랭크 ${combined.rankedGames}`}
           />
           <SummaryChip
             icon={TrendingUp}
-            label="승률"
-            value={profile.stats.gamesPlayed > 0 ? `${profile.stats.winRate.toFixed(0)}%` : "-"}
-            detail={profile.stats.gamesPlayed > 0 ? `${profile.stats.wins}승 ${profile.stats.losses}패` : "전적 없음"}
+            label="통합 승률"
+            value={combined.games > 0 ? `${combined.winRate}%` : "-"}
+            detail={combined.games > 0 ? `${combined.games}게임 기준` : "전적 없음"}
             side={recentMatches.length > 0 ? <WinRateSparkline matches={recentMatches} /> : undefined}
-            valueClassName={profile.stats.winRate >= 50 ? "text-accent-success" : "text-accent-danger"}
+            valueClassName={combined.winRate >= 50 ? "text-accent-success" : "text-accent-danger"}
           />
           <SummaryChip
             icon={Activity}
-            label="최근 KDA"
-            value={recent.games > 0 ? recent.avgKda.toFixed(2) : "-"}
+            label="통합 KDA"
+            value={combined.kdaGames > 0 ? combined.avgKda.toFixed(2) : "-"}
             detail={
-              recent.games > 0
-                ? `${recent.avgKills.toFixed(1)} / ${recent.avgDeaths.toFixed(1)} / ${recent.avgAssists.toFixed(1)}`
-                : "최근 기록 없음"
+              combined.kdaGames > 0
+                ? `${combined.avgKills.toFixed(1)} / ${combined.avgDeaths.toFixed(1)} / ${combined.avgAssists.toFixed(1)}`
+                : "기록 없음"
             }
           />
         </div>
