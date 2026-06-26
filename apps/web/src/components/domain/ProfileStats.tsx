@@ -161,20 +161,18 @@ export function SummaryChip({
   valueClassName?: string;
 }) {
   return (
-    <div className="flex min-h-[104px] flex-col justify-between rounded-xl border border-bg-elevated bg-bg-secondary p-4">
-      <div className="flex h-5 items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-text-tertiary">
-        <Icon className="h-3.5 w-3.5" />
-        {label}
-      </div>
-      <div className="pt-3">
-        <div className="flex items-end justify-between gap-3">
-          <p className={`min-w-0 text-[24px] font-black leading-none tracking-normal ${valueClassName}`}>
-            {value}
-          </p>
-          {side && <div className="shrink-0 translate-y-0.5">{side}</div>}
+    <div className="flex min-h-[96px] items-center justify-between gap-4 rounded-lg border border-bg-tertiary bg-bg-secondary px-4 py-3">
+      <div className="min-w-0">
+        <div className="mb-3 flex h-5 items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-text-tertiary">
+          <Icon className="h-3.5 w-3.5" />
+          {label}
         </div>
+        <p className={`min-w-0 text-[24px] font-black leading-none tracking-normal ${valueClassName}`}>
+          {value}
+        </p>
         {detail && <p className="mt-2 truncate text-xs font-semibold leading-none text-text-tertiary">{detail}</p>}
       </div>
+      {side && <div className="shrink-0">{side}</div>}
     </div>
   );
 }

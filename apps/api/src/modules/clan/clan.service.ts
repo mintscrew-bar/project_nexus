@@ -26,6 +26,10 @@ export interface CreateClanDto {
   isRecruiting: boolean;
   minTier?: string;
   discord?: string;
+  logo?: string;
+  banner?: string;
+  accentColor?: string;
+  recruitRoles?: string[];
 }
 
 export interface UpdateClanDto {
@@ -35,6 +39,10 @@ export interface UpdateClanDto {
   minTier?: string | null;
   maxMembers?: number;
   discord?: string | null;
+  logo?: string | null;
+  banner?: string | null;
+  accentColor?: string | null;
+  recruitRoles?: string[];
   officerCanManageSettings?: boolean;
   officerCanManageMembers?: boolean;
   officerCanManageAnnouncements?: boolean;
@@ -156,6 +164,10 @@ export class ClanService {
         isRecruiting: dto.isRecruiting,
         minTier: dto.minTier,
         discord: dto.discord,
+        logo: dto.logo,
+        banner: dto.banner,
+        accentColor: dto.accentColor,
+        recruitRoles: dto.recruitRoles ?? [],
         members: {
           create: {
             userId: ownerId,
@@ -367,6 +379,16 @@ export class ClanService {
       ...(dto.maxMembers !== undefined ? { maxMembers: dto.maxMembers } : {}),
       ...(dto.discord !== undefined
         ? { discord: dto.discord?.trim() || null }
+        : {}),
+      ...(dto.logo !== undefined ? { logo: dto.logo?.trim() || null } : {}),
+      ...(dto.banner !== undefined
+        ? { banner: dto.banner?.trim() || null }
+        : {}),
+      ...(dto.accentColor !== undefined
+        ? { accentColor: dto.accentColor?.trim() || null }
+        : {}),
+      ...(dto.recruitRoles !== undefined
+        ? { recruitRoles: dto.recruitRoles }
         : {}),
     };
 

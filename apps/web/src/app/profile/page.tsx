@@ -218,7 +218,7 @@ function StreamerRegistrationCard({
   };
 
   return (
-    <Card className="mb-6 overflow-hidden rounded-[16px] border-accent-gold/25 bg-bg-secondary">
+    <Card className="overflow-hidden rounded-lg border-accent-gold/25 bg-bg-secondary p-0">
       <CardContent className="p-4 md:p-5">
         <div className="mb-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -459,7 +459,7 @@ function StreamerLinksCard({
   };
 
   return (
-    <Card className="mb-6 overflow-hidden rounded-[16px] border-bg-tertiary bg-bg-secondary">
+    <Card className="overflow-hidden rounded-lg border-bg-tertiary bg-bg-secondary p-0">
       <CardContent className="p-4 md:p-5">
         <div className="mb-3 flex items-center justify-between">
           <div>
@@ -926,7 +926,7 @@ export default function ProfilePage() {
     <div className="flex-grow p-4 md:p-8">
       <div className="container mx-auto max-w-6xl">
         {/* Profile Hero Section */}
-        <Card className="mb-6 overflow-hidden rounded-[18px] border-accent-primary/30 bg-bg-secondary shadow-lg">
+        <Card className="mb-4 overflow-hidden rounded-lg border-bg-tertiary bg-bg-secondary p-0 shadow-sm">
           <CardContent className="p-4 md:p-5">
             {profileLoading && !profileData ? (
               <div className="flex flex-col md:flex-row items-start gap-6">
@@ -938,7 +938,8 @@ export default function ProfilePage() {
                 </div>
               </div>
             ) : (
-            <div className="flex flex-col gap-5 md:flex-row md:items-start">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+              <div className="flex min-w-0 flex-1 flex-col gap-4 sm:flex-row sm:items-start">
               {/* Avatar - 항상 클릭하여 변경 가능 */}
               <div className="flex-shrink-0 relative group cursor-pointer" onClick={() => avatarInputRef.current?.click()}>
                 <div
@@ -977,7 +978,7 @@ export default function ProfilePage() {
               {/* Info */}
               <div className="min-w-0 flex-1 pt-1">
                 {/* 닉네임 */}
-                <div className="mb-2 flex items-center gap-2 group/name">
+                <div className="mb-2 flex flex-wrap items-center gap-2 group/name">
                   <div className="inline-flex items-center gap-1.5">
                     <input
                       value={editUsername}
@@ -1090,9 +1091,10 @@ export default function ProfilePage() {
                   </div>
                 </div>
               </div>
+              </div>
 
               {/* 저장 / 공개 프로필 / 설정 버튼 */}
-              <div className="flex-shrink-0 flex gap-2">
+              <div className="flex w-full flex-shrink-0 flex-wrap gap-2 sm:w-auto lg:justify-end">
                 {profileDirty && (
                   <Button size="sm" onClick={handleSaveProfile} isLoading={isSaving}>
                     <Check className="h-4 w-4 mr-1" />
@@ -1114,21 +1116,23 @@ export default function ProfilePage() {
           </CardContent>
         </Card>
 
-        <StreamerRegistrationCard
-          profiles={streamerProfiles}
-          onSaved={fetchProfile}
-          addToast={addToast}
-        />
+        <div className="mb-6 grid gap-4 lg:grid-cols-2">
+          <StreamerRegistrationCard
+            profiles={streamerProfiles}
+            onSaved={fetchProfile}
+            addToast={addToast}
+          />
 
-        <StreamerLinksCard
-          links={streamerLinks}
-          onSaved={fetchProfile}
-          addToast={addToast}
-        />
+          <StreamerLinksCard
+            links={streamerLinks}
+            onSaved={fetchProfile}
+            addToast={addToast}
+          />
+        </div>
 
         {/* ── 요약 스탯 칩 (전적/승률/KDA) ── */}
         {stats && (
-          <div className="mb-6 grid grid-cols-3 gap-3">
+          <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
             <SummaryChip
               icon={Activity}
               label="전적"

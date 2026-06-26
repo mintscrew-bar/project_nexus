@@ -496,9 +496,10 @@ export default function UserProfilePage() {
     <div className="flex-grow p-4 md:p-8">
       <div className="container mx-auto max-w-6xl">
         {/* Profile Hero Section */}
-        <Card className="mb-6 overflow-hidden rounded-[18px] border-accent-primary/30 bg-bg-secondary shadow-lg">
+        <Card className="mb-4 overflow-hidden rounded-lg border-bg-tertiary bg-bg-secondary p-0 shadow-sm">
           <CardContent className="p-4 md:p-5">
-            <div className="flex flex-col gap-5 md:flex-row md:items-start">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+              <div className="flex min-w-0 flex-1 flex-col gap-4 sm:flex-row sm:items-start">
               {/* Avatar */}
               <div className="flex-shrink-0 relative">
                 <div
@@ -528,7 +529,7 @@ export default function UserProfilePage() {
 
               {/* Info */}
               <div className="min-w-0 flex-1 pt-1">
-                <div className="mb-2 flex items-center gap-2">
+                <div className="mb-2 flex flex-wrap items-center gap-2">
                   <h1 className="text-xl font-black leading-tight text-text-primary md:text-2xl">
                     {profile.username}
                   </h1>
@@ -662,10 +663,11 @@ export default function UserProfilePage() {
                   </div>
                 </div>
               </div>
+              </div>
 
               {/* Social Buttons */}
               {isAuthenticated && currentUser?.id !== userId && (
-                <div className="flex gap-2 flex-shrink-0">
+                <div className="flex w-full flex-shrink-0 flex-wrap gap-2 sm:w-auto lg:justify-end">
                   <Button
                     variant={friendBtn.variant}
                     size="sm"
@@ -698,7 +700,7 @@ export default function UserProfilePage() {
         </Card>
 
         {/* ── 요약 스탯 칩 (전적/승률/KDA) ── */}
-        <div className="mb-6 grid grid-cols-3 gap-3">
+        <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
           <SummaryChip
             icon={Swords}
             label="전적"

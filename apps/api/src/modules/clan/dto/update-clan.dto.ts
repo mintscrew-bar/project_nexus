@@ -4,9 +4,13 @@ import {
   IsOptional,
   IsBoolean,
   IsInt,
+  IsArray,
+  IsIn,
+  Matches,
   Min,
   Max,
 } from "class-validator";
+import { CLAN_RECRUIT_ROLES, CLAN_ACCENT_COLOR_REGEX } from "./create-clan.dto";
 
 /**
  * 클랜 정보 수정 DTO
@@ -56,4 +60,33 @@ export class UpdateClanDto {
   @IsString()
   @MaxLength(200)
   discord?: string;
+
+  /** 클랜 로고 이미지 URL */
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  logo?: string;
+
+  /** 상세 페이지 히어로 배너 이미지 URL */
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  banner?: string;
+
+  /** 클랜 대표색 (#RRGGBB) */
+  @IsOptional()
+  @IsString()
+  @Matches(CLAN_ACCENT_COLOR_REGEX, {
+    message: "대표색은 #RRGGBB 형식이어야 합니다.",
+  })
+  accentColor?: string;
+
+  /** 모집 중인 포지션 목록 */
+  @IsOptional()
+  @IsArray()
+  @IsIn(CLAN_RECRUIT_ROLES, {
+    each: true,
+    message: "모집 포지션 값이 올바르지 않습니다.",
+  })
+  recruitRoles?: string[];
 }
