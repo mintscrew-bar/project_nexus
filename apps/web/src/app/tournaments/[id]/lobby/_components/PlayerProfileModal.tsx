@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { CalendarDays, Users } from "lucide-react";
 import { TierBadge } from "@/components/domain/TierBadge";
 import { ReputationSummary } from "@/components/domain/ProfileStats";
+import { ClanTag } from "@/components/domain/ClanEmblem";
 import { LoadingSpinner, Modal } from "@/components/ui";
 import { matchApi, reputationApi, userApi } from "@/lib/api-client";
 import { getChampionIcon } from "@/components/matches/match-utils";
@@ -135,7 +136,12 @@ export function PlayerProfileModal({ userId, onClose }: PlayerProfileModalProps)
               </div>
               <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-text-tertiary">
                 <span>@{profile.username}</span>
-                {clan && <span className="rounded bg-accent-primary/10 px-2 py-0.5 text-accent-primary">[{clan.tag}] {clan.name}</span>}
+                {clan && (
+                  <span className="inline-flex items-center gap-1">
+                    <ClanTag tag={clan.tag} accentColor={(clan as { accentColor?: string | null }).accentColor} />
+                    {clan.name}
+                  </span>
+                )}
                 <span className="inline-flex items-center gap-1"><CalendarDays className="h-3 w-3" />{formatJoinDate(profile.createdAt)}</span>
               </div>
             </div>

@@ -1226,7 +1226,7 @@ export default function ProfilePage() {
           <Card className="mb-6">
             <CardContent className="p-6 md:p-8">
               <Tabs defaultValue={championStats.length > 0 ? 'auto-stats' : preferredChampions.length > 0 ? 'preferred' : 'ranked'}>
-                <TabsList className="mb-6">
+                <TabsList className="mb-6 flex-wrap">
                   {championStats.length > 0 && (
                     <TabsTrigger value="auto-stats">
                       <BarChart3 className="h-4 w-4 mr-2" />

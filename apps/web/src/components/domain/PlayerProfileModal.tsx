@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { LoadingSpinner, Modal } from "@/components/ui";
 import { ReputationSummary, SummaryChip, WinRateSparkline } from "@/components/domain/ProfileStats";
+import { ClanTag } from "@/components/domain/ClanEmblem";
 import { matchApi, reputationApi, userApi } from "@/lib/api-client";
 import { useAuthStore } from "@/stores/auth-store";
 import { getChampionIcon } from "@/components/matches/match-utils";
@@ -332,19 +333,16 @@ export function PlayerProfileModal({ userId, onClose }: PlayerProfileModalProps)
                       {profile.username}
                     </h2>
                     {clan?.tag && (
-                      <button
-                        type="button"
+                      <ClanTag
+                        tag={clan.tag}
+                        accentColor={clan.accentColor}
+                        title={`${clan.name ?? clan.tag} 클랜 보기`}
                         onClick={() => {
                           // 모달을 닫고 클랜 상세 페이지로 이동
                           onClose();
                           router.push(`/clans/${clan.id}`);
                         }}
-                        title={`${clan.name ?? clan.tag} 클랜 보기`}
-                        className="shrink-0 cursor-pointer rounded-md px-2 py-1 text-xs font-black leading-none transition-opacity hover:opacity-80"
-                        style={{ color: ACCENT, backgroundColor: `${ACCENT}22` }}
-                      >
-                        {clan.tag}
-                      </button>
+                      />
                     )}
                     {/* 스트리머 채널 배지 — 플랫폼별 채널 링크 */}
                     {streamerProfiles.map((sp: any, i: number) => (
