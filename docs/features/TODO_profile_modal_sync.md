@@ -29,7 +29,7 @@ PlayerProfileModal과 /users/[id] 공개 프로필 페이지 간 데이터·UX·
   - 공개 프로필 line 606~628 참고
   - 파일: `apps/web/src/components/domain/PlayerProfileModal.tsx`
 
-- [ ] Task 5: 모달 테마 토큰화 (하드코딩 다크 제거)
+- [x] Task 5: 모달 테마 토큰화 (하드코딩 다크 제거)
   - `bg-[#101010]`, `bg-[#181818]`, `text-white`, `zinc-*` → `bg-bg-*`, `text-text-*` 토큰으로 교체
   - 현재 60군데 이상 하드코딩, 라이트모드 대응 불가
   - 파일: `apps/web/src/components/domain/PlayerProfileModal.tsx`

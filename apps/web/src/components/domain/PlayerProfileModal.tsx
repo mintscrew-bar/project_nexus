@@ -204,11 +204,11 @@ function RepBar({ label, value }: { label: string; value: number }) {
   const safeValue = Math.max(0, Math.min(5, value || 0));
   return (
     <div className="flex items-center gap-3">
-      <span className="w-10 text-xs font-semibold text-zinc-400">{label}</span>
-      <div className="h-2 flex-1 overflow-hidden rounded-full bg-zinc-800">
-        <div className="h-full rounded-full bg-violet-500" style={{ width: `${(safeValue / 5) * 100}%` }} />
+      <span className="w-10 text-xs font-semibold text-text-secondary">{label}</span>
+      <div className="h-2 flex-1 overflow-hidden rounded-full bg-bg-elevated">
+        <div className="h-full rounded-full bg-accent-primary" style={{ width: `${(safeValue / 5) * 100}%` }} />
       </div>
-      <span className="w-8 text-right text-xs font-bold text-white">{safeValue.toFixed(1)}</span>
+      <span className="w-8 text-right text-xs font-bold text-text-primary">{safeValue.toFixed(1)}</span>
     </div>
   );
 }
@@ -216,9 +216,9 @@ function RepBar({ label, value }: { label: string; value: number }) {
 function RatingStars({ value }: { value: number }) {
   const rounded = Math.max(0, Math.min(5, Math.round(value || 0)));
   return (
-    <span className="text-sm text-yellow-400">
+    <span className="text-sm text-accent-gold">
       {"★".repeat(rounded)}
-      <span className="text-zinc-700">{"★".repeat(5 - rounded)}</span>
+      <span className="text-text-muted">{"★".repeat(5 - rounded)}</span>
     </span>
   );
 }
@@ -229,7 +229,7 @@ function SummaryChip({
   value,
   detail,
   side,
-  valueClassName = "text-white",
+  valueClassName = "text-text-primary",
 }: {
   icon: ElementType;
   label: string;
@@ -239,8 +239,8 @@ function SummaryChip({
   valueClassName?: string;
 }) {
   return (
-    <div className="flex min-h-[104px] flex-col justify-between rounded-xl bg-[#181818] p-4">
-      <div className="flex h-5 items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-zinc-500">
+    <div className="flex min-h-[104px] flex-col justify-between rounded-xl bg-bg-secondary p-4">
+      <div className="flex h-5 items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-text-tertiary">
         <Icon className="h-3.5 w-3.5" />
         {label}
       </div>
@@ -251,7 +251,7 @@ function SummaryChip({
           </p>
           {side && <div className="shrink-0 translate-y-0.5">{side}</div>}
         </div>
-        {detail && <p className="mt-2 truncate text-xs font-semibold leading-none text-zinc-500">{detail}</p>}
+        {detail && <p className="mt-2 truncate text-xs font-semibold leading-none text-text-tertiary">{detail}</p>}
       </div>
     </div>
   );
@@ -368,7 +368,7 @@ export function PlayerProfileModal({ userId, onClose }: PlayerProfileModalProps)
       onClose={onClose}
       size="full"
       showCloseButton={false}
-      className="max-w-5xl overflow-hidden rounded-[18px] border-[#667EEA]/40 bg-[#101010] text-white shadow-[0_32px_70px_rgba(0,0,0,0.82)]"
+      className="max-w-5xl overflow-hidden rounded-[18px] border-accent-primary/40 bg-bg-primary text-text-primary shadow-[0_32px_70px_rgba(0,0,0,0.82)]"
     >
       {profileLoading && (
         <div className="flex min-h-[360px] items-center justify-center">
@@ -394,7 +394,7 @@ export function PlayerProfileModal({ userId, onClose }: PlayerProfileModalProps)
                     type="button"
                     onClick={openReport}
                     title="이 유저 신고"
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-[#1a1a1a] px-3 py-1.5 text-xs font-semibold text-zinc-400 transition-colors hover:text-red-300"
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-bg-tertiary px-3 py-1.5 text-xs font-semibold text-text-secondary transition-colors hover:text-accent-danger"
                   >
                     <Flag className="h-3.5 w-3.5" />
                     신고
@@ -404,7 +404,7 @@ export function PlayerProfileModal({ userId, onClose }: PlayerProfileModalProps)
                   type="button"
                   onClick={onClose}
                   aria-label="프로필 닫기"
-                  className="rounded-lg bg-[#1a1a1a] p-1.5 text-zinc-400 transition-colors hover:text-white"
+                  className="rounded-lg bg-bg-tertiary p-1.5 text-text-secondary transition-colors hover:text-text-primary"
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -412,21 +412,21 @@ export function PlayerProfileModal({ userId, onClose }: PlayerProfileModalProps)
 
               <div className="mt-2 flex flex-col gap-4 sm:flex-row sm:items-start">
                 <div
-                  className="relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-full bg-[#171717] sm:h-24 sm:w-24"
-                  style={{ border: `2px solid ${showRiot && riot?.tier && riot.tier !== "UNRANKED" ? ACCENT + "88" : "rgba(255,255,255,0.14)"}` }}
+                  className="relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-full bg-bg-tertiary sm:h-24 sm:w-24"
+                  style={{ border: `2px solid ${showRiot && riot?.tier && riot.tier !== "UNRANKED" ? ACCENT + "88" : "rgb(var(--color-bg-elevated))"}` }}
                 >
                   {profile.avatar ? (
                     <Image src={profile.avatar} alt={profile.username} fill className="object-cover" unoptimized />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center">
-                      <Users className="h-9 w-9 text-zinc-500" />
+                      <Users className="h-9 w-9 text-text-tertiary" />
                     </div>
                   )}
                 </div>
 
                 <div className="min-w-0 flex-1 pt-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="truncate text-xl font-black leading-tight text-white sm:text-2xl">
+                    <h2 className="truncate text-xl font-black leading-tight text-text-primary sm:text-2xl">
                       {profile.username}
                     </h2>
                     {clan?.tag && (
@@ -452,7 +452,7 @@ export function PlayerProfileModal({ userId, onClose }: PlayerProfileModalProps)
                         target="_blank"
                         rel="noreferrer"
                         title={sp.channelName || sp.channelUrl}
-                        className="inline-flex shrink-0 items-center gap-1 rounded-md bg-amber-400/15 px-2 py-1 text-xs font-black leading-none text-amber-300 transition-colors hover:bg-amber-400/25"
+                        className="inline-flex shrink-0 items-center gap-1 rounded-md bg-accent-gold/15 px-2 py-1 text-xs font-black leading-none text-accent-gold transition-colors hover:bg-accent-gold/25"
                       >
                         {STREAMER_PLATFORM_LABELS[sp.platform] || sp.platform}
                       </a>
@@ -461,7 +461,7 @@ export function PlayerProfileModal({ userId, onClose }: PlayerProfileModalProps)
 
                   {/* 자기소개 — 공개 프로필과 동일하게 유저명 아래 노출 */}
                   {profile.bio && (
-                    <p className="mt-1.5 max-w-xl text-sm text-zinc-400">{profile.bio}</p>
+                    <p className="mt-1.5 max-w-xl text-sm text-text-secondary">{profile.bio}</p>
                   )}
 
                   {/* 스트리머 추가 링크 카드 — 썸네일 + 라벨 */}
@@ -473,26 +473,26 @@ export function PlayerProfileModal({ userId, onClose }: PlayerProfileModalProps)
                           href={link.url}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex min-w-0 max-w-[220px] items-center gap-2 rounded-lg bg-[#1a1a1a] px-2.5 py-2 transition-colors hover:bg-[#222]"
+                          className="inline-flex min-w-0 max-w-[220px] items-center gap-2 rounded-lg bg-bg-tertiary px-2.5 py-2 transition-colors hover:bg-bg-elevated"
                         >
-                          <span className="relative h-8 w-10 flex-shrink-0 overflow-hidden rounded bg-[#101010]">
+                          <span className="relative h-8 w-10 flex-shrink-0 overflow-hidden rounded bg-bg-primary">
                             {link.imageUrl ? (
                               <Image src={link.imageUrl} alt={link.label} fill className="object-cover" unoptimized />
                             ) : (
                               <span className="flex h-full w-full items-center justify-center">
-                                <ExternalLink className="h-3.5 w-3.5 text-zinc-500" />
+                                <ExternalLink className="h-3.5 w-3.5 text-text-tertiary" />
                               </span>
                             )}
                           </span>
-                          <span className="truncate text-xs font-bold text-white">{link.label}</span>
+                          <span className="truncate text-xs font-bold text-text-primary">{link.label}</span>
                         </a>
                       ))}
                     </div>
                   )}
 
                   {showRiot && riot && (
-                    <p className="mt-1 text-sm text-zinc-500">
-                      {riot.gameName}<span className="text-zinc-600"> #{riot.tagLine}</span>
+                    <p className="mt-1 text-sm text-text-tertiary">
+                      {riot.gameName}<span className="text-text-muted"> #{riot.tagLine}</span>
                     </p>
                   )}
 
@@ -502,15 +502,15 @@ export function PlayerProfileModal({ userId, onClose }: PlayerProfileModalProps)
                         {formatTier(riot)}
                       </span>
                       {riot.lp != null && (
-                        <span className="text-sm font-bold text-zinc-200">{riot.lp} LP</span>
+                        <span className="text-sm font-bold text-text-primary">{riot.lp} LP</span>
                       )}
                     </div>
                   )}
 
                   {showRiot && riot?.peakTier && riot.peakTier !== "UNRANKED" && (
                     <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                      <span className="text-xs text-zinc-600">최고</span>
-                      <span className="text-xs font-semibold text-zinc-400">
+                      <span className="text-xs text-text-muted">최고</span>
+                      <span className="text-xs font-semibold text-text-secondary">
                         {formatPeakTier(riot)}
                         {riot.peakLp != null && ["MASTER", "GRANDMASTER", "CHALLENGER"].includes(riot.peakTier) ? ` ${riot.peakLp}LP` : ""}
                       </span>
@@ -521,22 +521,22 @@ export function PlayerProfileModal({ userId, onClose }: PlayerProfileModalProps)
                     {(mainRole || subRole) && (
                       <>
                         {mainRole && (
-                          <div className="flex items-center gap-1.5 rounded-lg bg-[#1a1a1a] px-2.5 py-1.5">
+                          <div className="flex items-center gap-1.5 rounded-lg bg-bg-tertiary px-2.5 py-1.5">
                             <PositionIcon position={mainRole} className="!h-4 !w-4" />
-                            <span className="text-xs font-bold text-white">{POSITION_LABELS[mainRole] || mainRole}</span>
-                            <span className="rounded bg-[#262626] px-1 text-[9px] font-black text-zinc-600">주</span>
+                            <span className="text-xs font-bold text-text-primary">{POSITION_LABELS[mainRole] || mainRole}</span>
+                            <span className="rounded bg-bg-elevated px-1 text-[9px] font-black text-text-muted">주</span>
                           </div>
                         )}
                         {subRole && (
-                          <div className="flex items-center gap-1.5 rounded-lg bg-[#1a1a1a] px-2.5 py-1.5">
+                          <div className="flex items-center gap-1.5 rounded-lg bg-bg-tertiary px-2.5 py-1.5">
                             <PositionIcon position={subRole} className="!h-4 !w-4" opacity={0.6} />
-                            <span className="text-xs font-semibold text-zinc-400">{POSITION_LABELS[subRole] || subRole}</span>
-                            <span className="rounded bg-[#262626] px-1 text-[9px] font-black text-zinc-600">부</span>
+                            <span className="text-xs font-semibold text-text-secondary">{POSITION_LABELS[subRole] || subRole}</span>
+                            <span className="rounded bg-bg-elevated px-1 text-[9px] font-black text-text-muted">부</span>
                           </div>
                         )}
                       </>
                     )}
-                    <span className="inline-flex items-center gap-1 text-xs text-zinc-600">
+                    <span className="inline-flex items-center gap-1 text-xs text-text-muted">
                       <CalendarDays className="h-3 w-3" />
                       {formatJoinDate(profile.createdAt)}
                     </span>
@@ -558,7 +558,7 @@ export function PlayerProfileModal({ userId, onClose }: PlayerProfileModalProps)
               value={`${winRate}%`}
               detail={gamesPlayed > 0 ? `${wins}승 ${losses}패` : "전적 없음"}
               side={<WinRateSparkline matches={recentMatches} />}
-              valueClassName={winRate >= 50 ? "text-sky-300" : "text-rose-300"}
+              valueClassName={winRate >= 50 ? "text-accent-success" : "text-accent-danger"}
             />
             <SummaryChip
               icon={Activity}
@@ -573,34 +573,34 @@ export function PlayerProfileModal({ userId, onClose }: PlayerProfileModalProps)
           </div>
 
           <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
-            <section className="rounded-xl bg-[#181818] p-4">
+            <section className="rounded-xl bg-bg-secondary p-4">
               <div className="mb-4 flex items-center justify-between">
-                <h3 className="text-sm font-black text-white">포지션 및 선호 챔피언</h3>
+                <h3 className="text-sm font-black text-text-primary">포지션 및 선호 챔피언</h3>
               </div>
 
               {!mainRole && !subRole && (
-                <p className="text-sm text-zinc-500">등록된 포지션이 없습니다</p>
+                <p className="text-sm text-text-tertiary">등록된 포지션이 없습니다</p>
               )}
               {!showChampStats ? (
-                <p className="text-sm text-zinc-500">선호 챔피언을 비공개로 설정했습니다</p>
+                <p className="text-sm text-text-tertiary">선호 챔피언을 비공개로 설정했습니다</p>
               ) : championGroups.length > 0 ? (
                 <div className="space-y-2">
                   {championGroups.map((group) => (
-                    <div key={group.role} className="rounded-xl bg-[#101010] p-3">
+                    <div key={group.role} className="rounded-xl bg-bg-primary p-3">
                       <div className="mb-2 flex items-center justify-between">
-                        <span className="inline-flex items-center gap-1.5 text-xs font-bold text-white">
+                        <span className="inline-flex items-center gap-1.5 text-xs font-bold text-text-primary">
                           <PositionIcon position={group.role} />
                           {POSITION_LABELS[group.role] || group.role}
-                          {group.role === mainRole && <span className="text-zinc-500">주</span>}
-                          {group.role === subRole && <span className="text-zinc-500">부</span>}
+                          {group.role === mainRole && <span className="text-text-tertiary">주</span>}
+                          {group.role === subRole && <span className="text-text-tertiary">부</span>}
                         </span>
-                        <span className="text-[10px] font-semibold text-zinc-600">{group.champions.length}개</span>
+                        <span className="text-[10px] font-semibold text-text-muted">{group.champions.length}개</span>
                       </div>
                       <div className="flex flex-wrap gap-2">
                         {group.champions.map((champion: any, index: number) => (
                           <div key={`${group.role}-${champion.championId}-${index}`} className="relative">
                             <ChampionIcon championId={champion.championId} size={34} />
-                            <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-black px-1 text-[9px] font-black text-zinc-300 ring-1 ring-white/10">
+                            <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-bg-primary px-1 text-[9px] font-black text-text-primary ring-1 ring-bg-elevated">
                               {champion.order ?? index + 1}
                             </span>
                           </div>
@@ -610,26 +610,26 @@ export function PlayerProfileModal({ userId, onClose }: PlayerProfileModalProps)
                   ))}
                 </div>
               ) : (
-                <span className="text-sm text-zinc-500">등록된 선호 챔피언이 없습니다</span>
+                <span className="text-sm text-text-tertiary">등록된 선호 챔피언이 없습니다</span>
               )}
             </section>
 
-            <section className="rounded-xl bg-[#181818] p-4">
+            <section className="rounded-xl bg-bg-secondary p-4">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
-                  <Star className="h-4 w-4 text-yellow-400" />
-                  <h3 className="text-sm font-black text-white">신뢰도 상세</h3>
+                  <Star className="h-4 w-4 text-accent-gold" />
+                  <h3 className="text-sm font-black text-text-primary">신뢰도 상세</h3>
                 </div>
-                <span className="text-xs text-zinc-600">{rep?.totalRatings ?? 0}개 평가</span>
+                <span className="text-xs text-text-muted">{rep?.totalRatings ?? 0}개 평가</span>
               </div>
-              <div className="mb-4 flex items-center justify-between rounded-xl bg-[#101010] p-3">
+              <div className="mb-4 flex items-center justify-between rounded-xl bg-bg-primary p-3">
                 <div>
-                  <p className="text-xs font-semibold text-zinc-500">종합 평가</p>
+                  <p className="text-xs font-semibold text-text-tertiary">종합 평가</p>
                   <div className="mt-1">
                     <RatingStars value={rep?.overallAverage ?? 0} />
                   </div>
                 </div>
-                <p className="text-2xl font-black text-white">{(rep?.overallAverage ?? 0).toFixed(1)}</p>
+                <p className="text-2xl font-black text-text-primary">{(rep?.overallAverage ?? 0).toFixed(1)}</p>
               </div>
               <div className="space-y-3">
                 <RepBar label="실력" value={rep?.averageSkill ?? 0} />
@@ -639,17 +639,17 @@ export function PlayerProfileModal({ userId, onClose }: PlayerProfileModalProps)
             </section>
           </div>
 
-          <section className="rounded-xl bg-[#181818] p-4">
+          <section className="rounded-xl bg-bg-secondary p-4">
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-sm font-black text-white">최근 5경기</h3>
-              <span className="text-xs text-zinc-600">내전 기록</span>
+              <h3 className="text-sm font-black text-text-primary">최근 5경기</h3>
+              <span className="text-xs text-text-muted">내전 기록</span>
             </div>
             {recentMatches.length > 0 ? (
               <div className="grid gap-2 md:grid-cols-2">
                 {recentMatches.slice(0, 5).map((match: any) => {
                   const participant = match.participant || {};
                   return (
-                  <div key={match.matchId} className="rounded-xl bg-[#101010] p-3">
+                  <div key={match.matchId} className="rounded-xl bg-bg-primary p-3">
                     <div className="flex items-center gap-3">
                     <Image
                       src={getChampionIcon(participant.championName)}
@@ -660,29 +660,29 @@ export function PlayerProfileModal({ userId, onClose }: PlayerProfileModalProps)
                       unoptimized
                     />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-bold text-white">
+                      <p className="truncate text-sm font-bold text-text-primary">
                         {participant.kills ?? 0}/{participant.deaths ?? 0}/{participant.assists ?? 0} · {participant.championNameKorean || participant.championName || "챔피언"}
                       </p>
-                      <p className="text-xs text-zinc-600">
+                      <p className="text-xs text-text-muted">
                         {POSITION_LABELS[participant.position] || participant.position || "포지션 미상"} · {match.team?.name || "팀 미상"} · {formatTimeAgo(match.match?.completedAt || match.match?.createdAt)}
                       </p>
                     </div>
-                    <span className={`rounded-md px-2 py-1 text-xs font-black ${participant.win ? "bg-emerald-400/10 text-emerald-300" : "bg-rose-400/10 text-rose-300"}`}>
+                    <span className={`rounded-md px-2 py-1 text-xs font-black ${participant.win ? "bg-accent-success/10 text-accent-success" : "bg-accent-danger/10 text-accent-danger"}`}>
                       {participant.win ? "승" : "패"}
                     </span>
                   </div>
                     <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-                      <div className="rounded-lg bg-[#181818] px-2 py-1.5">
-                        <p className="text-[10px] text-zinc-600">KDA</p>
-                        <p className="text-xs font-black text-white">{getKdaRatio(participant.kills, participant.deaths, participant.assists).toFixed(2)}</p>
+                      <div className="rounded-lg bg-bg-secondary px-2 py-1.5">
+                        <p className="text-[10px] text-text-muted">KDA</p>
+                        <p className="text-xs font-black text-text-primary">{getKdaRatio(participant.kills, participant.deaths, participant.assists).toFixed(2)}</p>
                       </div>
-                      <div className="rounded-lg bg-[#181818] px-2 py-1.5">
-                        <p className="text-[10px] text-zinc-600">피해량</p>
-                        <p className="text-xs font-black text-white">{formatDamage(participant.damage)}</p>
+                      <div className="rounded-lg bg-bg-secondary px-2 py-1.5">
+                        <p className="text-[10px] text-text-muted">피해량</p>
+                        <p className="text-xs font-black text-text-primary">{formatDamage(participant.damage)}</p>
                       </div>
-                      <div className="rounded-lg bg-[#181818] px-2 py-1.5">
-                        <p className="text-[10px] text-zinc-600">상대</p>
-                        <p className="truncate text-xs font-black text-white">
+                      <div className="rounded-lg bg-bg-secondary px-2 py-1.5">
+                        <p className="text-[10px] text-text-muted">상대</p>
+                        <p className="truncate text-xs font-black text-text-primary">
                           {match.match?.teamA?.id === match.team?.id ? match.match?.teamB?.name : match.match?.teamA?.name}
                         </p>
                       </div>
@@ -692,7 +692,7 @@ export function PlayerProfileModal({ userId, onClose }: PlayerProfileModalProps)
                 })}
               </div>
             ) : (
-              <p className="rounded-xl bg-[#101010] py-8 text-center text-sm text-zinc-500">최근 경기 없음</p>
+              <p className="rounded-xl bg-bg-primary py-8 text-center text-sm text-text-tertiary">최근 경기 없음</p>
             )}
           </section>
 
@@ -723,7 +723,7 @@ export function PlayerProfileModal({ userId, onClose }: PlayerProfileModalProps)
                     <button
                       type="button"
                       onClick={() => setReportOpen(false)}
-                      className="rounded-lg bg-accent-primary px-4 py-2 text-sm text-white hover:bg-accent-hover"
+                      className="rounded-lg bg-accent-primary px-4 py-2 text-sm text-text-primary hover:bg-accent-hover"
                     >
                       확인
                     </button>
@@ -790,7 +790,7 @@ export function PlayerProfileModal({ userId, onClose }: PlayerProfileModalProps)
                         type="button"
                         onClick={handleSubmitReport}
                         disabled={isSubmittingReport || !reportDescription.trim()}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-red-500 px-3 py-2 text-sm text-white hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-red-500 px-3 py-2 text-sm text-text-primary hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         {isSubmittingReport && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                         {isSubmittingReport ? "신고 중..." : "신고하기"}
