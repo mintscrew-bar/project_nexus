@@ -1640,11 +1640,11 @@ export default function ProfilePage() {
               <CardContent className="space-y-3">
                 {rep ? (
                   <>
-                    <RepBar label="실력" value={rep.skill ?? 0} />
-                    <RepBar label="태도" value={rep.manner ?? 0} />
-                    <RepBar label="소통" value={rep.communication ?? 0} />
+                    <RepBar label="실력" value={rep.averageSkill ?? 0} />
+                    <RepBar label="태도" value={rep.averageAttitude ?? 0} />
+                    <RepBar label="소통" value={rep.averageCommunication ?? 0} />
                     <p className="mt-2 text-right text-xs text-text-tertiary">
-                      총 {rep.totalVotes ?? 0}명이 평가
+                      총 {rep.totalRatings ?? 0}명이 평가
                     </p>
                   </>
                 ) : (
