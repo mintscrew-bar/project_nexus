@@ -4,6 +4,10 @@
 > 방향: 클랜을 "채팅되는 모임"에서 "정체성과 모집이 살아있는 팀"으로.
 > 선행 작업: `TODO_clan_improvement.md`(Task 1~23, 소셜 셸 완료)
 > ※ 경쟁 주체화(클랜전·클랜 리더보드)는 이번 범위에서 **제외**. 별도 트랙으로 후속.
+>
+> **진행 완료: Task 1~14 전체 (2026-06-26).** api/web 빌드·린트 그린.
+> ⚠️ 배포 전 `pnpm --filter @nexus/database db:migrate:deploy` 필수
+> (Clan.banner/accentColor/recruitRoles/lastActiveAt 컬럼 — 이 호스트 DB 미연결로 코드/SQL만 준비됨).
 
 ---
 
@@ -78,7 +82,7 @@
 
 - [x] Task 12: 멤버 탭 카드 polish — 포지션 아이콘·티어 배지·가입일, 역할별 그룹핑
 - [x] Task 13: 앱 전반 클랜 태그 표기 `ClanTag`로 통일(프로필 모달·공개 프로필·로비 모달 교체. 자기 클랜 헤더 `[tag] name` 텍스트 표기는 유지)
-- [ ] Task 14: 전체 빌드·린트 검증 + 문서 마무리
+- [x] Task 14: 전체 빌드·린트 검증 + 문서 마무리 (api nest build·web next build·lint 모두 통과)
 
 ---
 
