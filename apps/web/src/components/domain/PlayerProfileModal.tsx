@@ -7,6 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   Activity,
   CalendarDays,
+  ExternalLink,
   Flag,
   Loader2,
   Swords,
@@ -37,6 +38,13 @@ const REPORT_REASONS: { value: ReportReason; label: string }[] = [
 ];
 
 const ACCENT = "#667EEA";
+
+// 스트리머 플랫폼 표시 라벨
+const STREAMER_PLATFORM_LABELS: Record<string, string> = {
+  CHZZK: "치지직",
+  SOOP: "숲",
+  YOUTUBE: "유튜브",
+};
 
 const TIER_COLOR: Record<string, string> = {
   CHALLENGER: "#F59E0B",
@@ -330,6 +338,14 @@ export function PlayerProfileModal({ userId, onClose }: PlayerProfileModalProps)
   const showRiot = settings?.showRiotAccounts !== false;
   const showChampStats = settings?.showChampionStats !== false;
 
+  // 스트리머 정보 — 활성 채널 배지 + 추가 링크 카드 (공개 프로필과 동일)
+  const streamerProfiles = (profile?.streamerProfiles ?? []).filter(
+    (s: any) => s.isActive !== false,
+  );
+  const streamerLinks = [...(profile?.streamerLinks ?? [])]
+    .filter((s: any) => s.isActive !== false)
+    .sort((a: any, b: any) => a.order - b.order);
+
   const riot = getPrimaryRiot(profile);
   const mainRole = riot?.mainRole || null;
   const subRole = riot?.subRole || null;
@@ -419,7 +435,51 @@ export function PlayerProfileModal({ userId, onClose }: PlayerProfileModalProps)
                         {clan.tag}
                       </span>
                     )}
+                    {/* 스트리머 채널 배지 — 플랫폼별 채널 링크 */}
+                    {streamerProfiles.map((sp: any, i: number) => (
+                      <a
+                        key={`${sp.platform}-${i}`}
+                        href={sp.channelUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        title={sp.channelName || sp.channelUrl}
+                        className="inline-flex shrink-0 items-center gap-1 rounded-md bg-amber-400/15 px-2 py-1 text-xs font-black leading-none text-amber-300 transition-colors hover:bg-amber-400/25"
+                      >
+                        {STREAMER_PLATFORM_LABELS[sp.platform] || sp.platform}
+                      </a>
+                    ))}
                   </div>
+
+                  {/* 자기소개 — 공개 프로필과 동일하게 유저명 아래 노출 */}
+                  {profile.bio && (
+                    <p className="mt-1.5 max-w-xl text-sm text-zinc-400">{profile.bio}</p>
+                  )}
+
+                  {/* 스트리머 추가 링크 카드 — 썸네일 + 라벨 */}
+                  {streamerLinks.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {streamerLinks.slice(0, 4).map((link: any) => (
+                        <a
+                          key={link.id}
+                          href={link.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex min-w-0 max-w-[220px] items-center gap-2 rounded-lg bg-[#1a1a1a] px-2.5 py-2 transition-colors hover:bg-[#222]"
+                        >
+                          <span className="relative h-8 w-10 flex-shrink-0 overflow-hidden rounded bg-[#101010]">
+                            {link.imageUrl ? (
+                              <Image src={link.imageUrl} alt={link.label} fill className="object-cover" unoptimized />
+                            ) : (
+                              <span className="flex h-full w-full items-center justify-center">
+                                <ExternalLink className="h-3.5 w-3.5 text-zinc-500" />
+                              </span>
+                            )}
+                          </span>
+                          <span className="truncate text-xs font-bold text-white">{link.label}</span>
+                        </a>
+                      ))}
+                    </div>
+                  )}
 
                   {showRiot && riot && (
                     <p className="mt-1 text-sm text-zinc-500">

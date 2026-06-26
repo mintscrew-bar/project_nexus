@@ -20,11 +20,11 @@ PlayerProfileModal과 /users/[id] 공개 프로필 페이지 간 데이터·UX·
   - 파일: `apps/web/src/components/domain/PlayerProfileModal.tsx`
   - 참고: 공개 프로필 `page.tsx` line 550~551 로직
 
-- [ ] Task 3: 모달에 bio(자기소개) 추가
+- [x] Task 3: 모달에 bio(자기소개) 추가
   - 공개 프로필은 `profile.bio` 표시, 모달은 누락
   - 파일: `apps/web/src/components/domain/PlayerProfileModal.tsx`
 
-- [ ] Task 4: 모달에 스트리머 정보 추가
+- [x] Task 4: 모달에 스트리머 정보 추가
   - `streamerProfiles` (채널 링크 배지), `streamerLinks` (추가 링크 카드) 표시
   - 공개 프로필 line 606~628 참고
   - 파일: `apps/web/src/components/domain/PlayerProfileModal.tsx`
