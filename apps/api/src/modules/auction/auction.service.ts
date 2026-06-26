@@ -15,9 +15,11 @@ import { RoomStatus, TeamCaptainSelection, TeamMode } from "@nexus/database";
 import { calculateTierScore } from "../common/tier-score.util";
 
 const BONUS_GOLD = 500;
-const DEFAULT_BID_TIME_SECONDS = 10;
+const DEFAULT_BID_TIME_SECONDS = 30;
 const BID_EXTENSION_SECONDS = 5;
-const MAX_BID_TIME_SECONDS = 10;
+const BID_EXTENSION_THRESHOLD_SECONDS = 5;
+const MIN_BID_TIME_SECONDS = 5;
+const MAX_BID_TIME_SECONDS = 120;
 const DEFAULT_BID_INCREMENT = 50;
 
 export interface AuctionState {
@@ -232,17 +234,35 @@ export class AuctionService implements OnModuleInit {
       );
   }
 
-  private getBaseBidTimerMs(): number {
-    return DEFAULT_BID_TIME_SECONDS * 1000;
+  private getBidTimeLimitSeconds(room?: { bidTimeLimit?: number | null }): number {
+    const configured =
+      typeof room?.bidTimeLimit === "number"
+        ? room.bidTimeLimit
+        : DEFAULT_BID_TIME_SECONDS;
+
+    return Math.min(
+      MAX_BID_TIME_SECONDS,
+      Math.max(MIN_BID_TIME_SECONDS, configured),
+    );
   }
 
-  private getExtendedBidTimerEnd(currentTimerEnd: number): number {
+  private getBaseBidTimerMs(room?: { bidTimeLimit?: number | null }): number {
+    return this.getBidTimeLimitSeconds(room) * 1000;
+  }
+
+  private getExtendedBidTimerEnd(
+    currentTimerEnd: number,
+    room?: { bidTimeLimit?: number | null },
+  ): number {
     const now = Date.now();
     const remainingMs = Math.max(0, currentTimerEnd - now);
-    const extendedMs = Math.min(
-      MAX_BID_TIME_SECONDS * 1000,
-      remainingMs + BID_EXTENSION_SECONDS * 1000,
-    );
+    const extensionThresholdMs = BID_EXTENSION_THRESHOLD_SECONDS * 1000;
+    if (remainingMs > extensionThresholdMs) {
+      return currentTimerEnd;
+    }
+
+    const maxBidTimerMs = this.getBaseBidTimerMs(room);
+    const extendedMs = Math.min(maxBidTimerMs, BID_EXTENSION_SECONDS * 1000);
     return now + extendedMs;
   }
 
@@ -433,7 +453,7 @@ export class AuctionService implements OnModuleInit {
       currentHighestBid: 0,
       currentHighestBidder: null,
       currentHighestBidderName: null,
-      timerEnd: Date.now() + this.getBaseBidTimerMs(),
+      timerEnd: Date.now() + this.getBaseBidTimerMs(room),
       yuchalCount: 0,
       maxYuchalCycles: numTeams,
       bidIncrement: room.minBidIncrement || DEFAULT_BID_INCREMENT,
@@ -697,7 +717,7 @@ export class AuctionService implements OnModuleInit {
       currentHighestBid: 0,
       currentHighestBidder: null,
       currentHighestBidderName: null,
-      timerEnd: Date.now() + this.getBaseBidTimerMs(),
+      timerEnd: Date.now() + this.getBaseBidTimerMs(room),
       yuchalCount: 0,
       maxYuchalCycles: numTeamsFinal,
       bidIncrement: room.minBidIncrement || DEFAULT_BID_INCREMENT,
@@ -777,7 +797,7 @@ export class AuctionService implements OnModuleInit {
       currentHighestBid: 0,
       currentHighestBidder: null,
       currentHighestBidderName: null,
-      timerEnd: Date.now() + this.getBaseBidTimerMs(),
+      timerEnd: Date.now() + this.getBaseBidTimerMs(room),
       yuchalCount: 0,
       maxYuchalCycles: numTeams,
       bidIncrement: room.minBidIncrement || DEFAULT_BID_INCREMENT,
@@ -1037,7 +1057,7 @@ export class AuctionService implements OnModuleInit {
     state.currentHighestBid = amount;
     state.currentHighestBidder = team.id;
     state.currentHighestBidderName = team.captain.username;
-    state.timerEnd = this.getExtendedBidTimerEnd(state.timerEnd);
+    state.timerEnd = this.getExtendedBidTimerEnd(state.timerEnd, room);
     state.yuchalCount = 0;
 
     // 입찰 상태 변경을 Redis에 동기화
@@ -1145,7 +1165,7 @@ export class AuctionService implements OnModuleInit {
       state.currentHighestBid = 0;
       state.currentHighestBidder = null;
       state.currentHighestBidderName = null;
-      state.timerEnd = Date.now() + this.getBaseBidTimerMs();
+      state.timerEnd = 0;
       state.yuchalCount = 0;
 
       // 낙찰 후 초기화된 상태를 Redis에 동기화
@@ -1176,7 +1196,7 @@ export class AuctionService implements OnModuleInit {
         state.currentHighestBid = 0;
         state.currentHighestBidder = null;
         state.currentHighestBidderName = null;
-        state.timerEnd = Date.now() + this.getBaseBidTimerMs();
+        state.timerEnd = 0;
         // 유찰 상태 변경을 Redis에 동기화
         this._setAuctionState(roomId, state);
         return {
@@ -1244,7 +1264,7 @@ export class AuctionService implements OnModuleInit {
       state.currentHighestBid = 0;
       state.currentHighestBidder = null;
       state.currentHighestBidderName = null;
-      state.timerEnd = Date.now() + this.getBaseBidTimerMs();
+      state.timerEnd = 0;
       state.yuchalCount = 0;
 
       // 강제배정 후 초기화된 상태를 Redis에 동기화
@@ -1385,6 +1405,20 @@ export class AuctionService implements OnModuleInit {
 
   getAuctionState(roomId: string): AuctionState | undefined {
     return this.auctionStates.get(roomId);
+  }
+
+  async restartBidTimer(roomId: string): Promise<AuctionState | null> {
+    const state = this.auctionStates.get(roomId);
+    if (!state) return null;
+
+    const room = await this.prisma.room.findUnique({
+      where: { id: roomId },
+      select: { bidTimeLimit: true },
+    });
+
+    state.timerEnd = Date.now() + this.getBaseBidTimerMs(room ?? undefined);
+    this._setAuctionState(roomId, state);
+    return state;
   }
 
   /** 해당 유저가 방의 호스트인지 확인 */

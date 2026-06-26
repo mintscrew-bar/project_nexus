@@ -61,6 +61,7 @@ export class AuctionGateway
   // Redis 분산 락 TTL: 입찰 처리는 통상 100ms 이내이므로 5초면 충분
   private readonly BID_LOCK_TTL_MS = 5000;
   private readonly BID_LOCK_RETRY_DELAY_MS = 50;
+  private readonly NEXT_ITEM_DELAY_MS = 900;
 
   constructor(
     private readonly authService: AuthService,
@@ -71,6 +72,19 @@ export class AuctionGateway
     private readonly roleSelectionGateway: RoleSelectionGateway,
     @Optional() private readonly redisService?: RedisService,
   ) {}
+
+  private withServerNow<T extends Record<string, any> | null | undefined>(
+    state: T,
+  ): T {
+    if (!state) return state;
+    return { ...state, serverNow: Date.now() } as T;
+  }
+
+  private async waitForNextItemDelay(): Promise<void> {
+    await new Promise((resolve) =>
+      setTimeout(resolve, this.NEXT_ITEM_DELAY_MS),
+    );
+  }
 
   onModuleDestroy() {
     // 서버 종료 시 모든 타이머 정리
@@ -222,7 +236,7 @@ export class AuctionGateway
         );
         return {
           success: true,
-          state,
+          state: this.withServerNow(state),
           teams,
           players,
           captainSelectionPhase: null,
@@ -234,7 +248,7 @@ export class AuctionGateway
         );
         return {
           success: true,
-          state,
+          state: this.withServerNow(state),
           teams: [],
           players: [],
           captainSelectionPhase: null,
@@ -347,7 +361,7 @@ export class AuctionGateway
     this.server.to(`room:${roomId}`).emit("auction-started", {
       teams: result.teams,
       players: result.players,
-      auctionState: result.auctionState,
+      auctionState: this.withServerNow(result.auctionState),
     });
     if (result.auctionState?.timerEnd) {
       this._scheduleBidResolve(roomId, result.auctionState.timerEnd);
@@ -456,6 +470,7 @@ export class AuctionGateway
         username: client.username,
         amount: data.amount,
         timerEnd: state.timerEnd,
+        serverNow: Date.now(),
         timestamp: new Date().toISOString(),
       });
       this._scheduleBidResolve(data.roomId, state.timerEnd);
@@ -503,7 +518,10 @@ export class AuctionGateway
   // ========================================
 
   emitAuctionStarted(roomId: string, data: any) {
-    this.server.to(`room:${roomId}`).emit("auction-started", data);
+    this.server.to(`room:${roomId}`).emit("auction-started", {
+      ...data,
+      auctionState: this.withServerNow(data?.auctionState ?? data?.state),
+    });
     if (data?.auctionState?.timerEnd) {
       this._scheduleBidResolve(roomId, data.auctionState.timerEnd);
     }
@@ -513,6 +531,16 @@ export class AuctionGateway
         `[Auction] _scheduleBotBids failed for room ${roomId}:`,
         e?.message,
       );
+    });
+  }
+
+  emitAuctionItemStarted(
+    roomId: string,
+    data: { state: any; teams: any[]; players: any[] },
+  ) {
+    this.server.to(`room:${roomId}`).emit("auction-item-started", {
+      ...data,
+      state: this.withServerNow(data.state),
     });
   }
 
@@ -527,7 +555,10 @@ export class AuctionGateway
     this.server.to(`room:${roomId}`).emit("player-sold", data);
   }
 
-  emitPlayerUnsold(roomId: string, data: { player: any }) {
+  emitPlayerUnsold(
+    roomId: string,
+    data: { player: any; yuchalCount?: number },
+  ) {
     this.server.to(`room:${roomId}`).emit("player-unsold", data);
   }
 
@@ -698,6 +729,7 @@ export class AuctionGateway
         username: botUsername,
         amount: minBid,
         timerEnd: newState.timerEnd,
+        serverNow: Date.now(),
         timestamp: new Date().toISOString(),
       });
       this._scheduleBidResolve(roomId, newState.timerEnd);
@@ -800,10 +832,24 @@ export class AuctionGateway
           this._cancelBidResolve(roomId);
 
           const result = await this.auctionService.resolveCurrentBid(roomId);
-          const state = this.auctionService.getAuctionState(roomId) ?? null;
+
+          // 미완성 팀이 하나만 남으면 남은 인원을 그 팀에 자동 배정
+          // (경쟁이 없으므로 마지막 한 팀이 전부 받아감 → 경매 조기 종료)
+          const autoAssigned =
+            await this.auctionService.autoAssignToLastTeam(roomId);
+          if (autoAssigned.length > 0) {
+            this._cancelBotTimers(roomId);
+          }
+
           const { teams, players } =
             await this.auctionService.getFullAuctionData(roomId);
-          const payload = { ...result, state, teams, players };
+          const isComplete = players.length === 0;
+          const payload = {
+            ...result,
+            teams,
+            players,
+            nextItemPending: !isComplete,
+          };
 
           this.server.to(`room:${roomId}`).emit("bid-resolved", payload);
 
@@ -814,35 +860,20 @@ export class AuctionGateway
               price: result.price ?? 0,
             });
           } else if (!result.sold && result.player) {
-            this.emitPlayerUnsold(roomId, { player: result.player });
-          }
-
-          // 미완성 팀이 하나만 남으면 남은 인원을 그 팀에 자동 배정
-          // (경쟁이 없으므로 마지막 한 팀이 전부 받아감 → 경매 조기 종료)
-          const autoAssigned =
-            await this.auctionService.autoAssignToLastTeam(roomId);
-          if (autoAssigned.length > 0) {
-            this._cancelBotTimers(roomId);
-            for (const assigned of autoAssigned) {
-              this.emitPlayerSold(roomId, {
-                player: assigned.player,
-                team: assigned.team,
-                price: assigned.price,
-              });
-            }
-            // 자동 배정 후 갱신된 팀/플레이어 상태를 한 번 더 브로드캐스트
-            const afterAuto =
-              await this.auctionService.getFullAuctionData(roomId);
-            this.server.to(`room:${roomId}`).emit("bid-resolved", {
-              ...result,
-              state: this.auctionService.getAuctionState(roomId) ?? null,
-              teams: afterAuto.teams,
-              players: afterAuto.players,
+            const latestState = this.auctionService.getAuctionState(roomId);
+            this.emitPlayerUnsold(roomId, {
+              player: result.player,
+              yuchalCount: latestState?.yuchalCount ?? 0,
             });
           }
 
-          const isComplete =
-            await this.auctionService.checkAuctionComplete(roomId);
+          for (const assigned of autoAssigned) {
+            this.emitPlayerSold(roomId, {
+              player: assigned.player,
+              team: assigned.team,
+              price: assigned.price,
+            });
+          }
 
           if (isComplete) {
             this._cancelBotTimers(roomId);
@@ -861,10 +892,8 @@ export class AuctionGateway
               return payload;
             }
 
-            const finalData =
-              await this.auctionService.getFullAuctionData(roomId);
             this.server.to(`room:${roomId}`).emit("auction-complete", {
-              teams: finalData.teams,
+              teams,
             });
 
             await this._startRoleSelectionWithRetry(roomId);
@@ -872,8 +901,16 @@ export class AuctionGateway
             return payload;
           }
 
-          if (state) {
-            this._scheduleBidResolve(roomId, state.timerEnd);
+          await this.waitForNextItemDelay();
+          const nextState = await this.auctionService.restartBidTimer(roomId);
+
+          if (nextState) {
+            this.emitAuctionItemStarted(roomId, {
+              state: nextState,
+              teams,
+              players,
+            });
+            this._scheduleBidResolve(roomId, nextState.timerEnd);
             this._scheduleBotBids(roomId).catch((e) => {
               console.warn(
                 `[Auction] _scheduleBotBids failed for room ${roomId}:`,

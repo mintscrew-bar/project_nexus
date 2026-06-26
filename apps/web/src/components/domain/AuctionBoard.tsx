@@ -188,17 +188,20 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
     });
   }, []);
   const [timeLeft, setTimeLeft] = useState(0);
+  const calculateTimeLeft = useCallback(
+    () =>
+      Math.max(0, Math.ceil((auctionState.timerEnd - Date.now()) / 1000)),
+    [auctionState.timerEnd],
+  );
+
   React.useEffect(() => {
+    setTimeLeft(calculateTimeLeft());
     const interval = setInterval(() => {
       // Math.ceil: 9.1초 남았을 때 "9" 아닌 "10" 표시 — 숫자가 느리게 내려가는 자연스러운 카운트다운
-      const remaining = Math.max(
-        0,
-        Math.ceil((auctionState.timerEnd - Date.now()) / 1000),
-      );
-      setTimeLeft(remaining);
+      setTimeLeft(calculateTimeLeft());
     }, 100);
     return () => clearInterval(interval);
-  }, [auctionState.timerEnd]);
+  }, [calculateTimeLeft]);
 
   // 경매 대상 선수가 바뀔 때만 accumulated 리셋 (다른 사람 입찰 시에는 유지)
   React.useEffect(() => {

@@ -841,7 +841,10 @@ export class RoomGateway
         if (teamMode === TeamMode.AUCTION) {
           const auctionState = this.auctionService.getAuctionState(roomId);
           if (auctionState) {
-            client.emit("auction-started", { roomId, state: auctionState });
+            client.emit("auction-started", {
+              roomId,
+              state: { ...auctionState, serverNow: Date.now() },
+            });
           }
         } else {
           const draftState = this.snakeDraftService.getDraftState(roomId);

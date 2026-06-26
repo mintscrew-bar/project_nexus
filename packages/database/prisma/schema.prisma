@@ -662,6 +662,10 @@ model Clan {
   tag           String             @unique
   description   String?
   logo          String?
+  banner        String?
+  accentColor   String?
+  recruitRoles  String[]
+  lastActiveAt  DateTime?
   ownerId       String
   isRecruiting  Boolean            @default(true)
   maxMembers    Int                @default(50)
@@ -684,6 +688,8 @@ model Clan {
 
   @@index([ownerId])
   @@index([isRecruiting])
+  @@index([minTier])
+  @@index([lastActiveAt])
   @@map("clans")
 }
 

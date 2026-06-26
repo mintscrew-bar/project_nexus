@@ -31,6 +31,6 @@ export class AuctionController {
     if (!state) {
       return { error: "Auction not started" };
     }
-    return { state };
+    return { state: { ...state, serverNow: Date.now() } };
   }
 }

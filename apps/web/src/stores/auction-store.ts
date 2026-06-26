@@ -117,6 +117,17 @@ function resolveCurrentPlayer(rawState: any, players: Player[]): Player | null {
   return players[idx] ?? players[0] ?? null;
 }
 
+function normalizeTimerEnd(rawState: any): number {
+  const timerEnd =
+    typeof rawState?.timerEnd === 'number' ? rawState.timerEnd : Date.now();
+
+  if (typeof rawState?.serverNow === 'number') {
+    return Date.now() + Math.max(0, timerEnd - rawState.serverNow);
+  }
+
+  return timerEnd;
+}
+
 function normalizeAuctionState(rawState: any, players: Player[]): AuctionState | null {
   if (!rawState) return null;
 
@@ -127,7 +138,7 @@ function normalizeAuctionState(rawState: any, players: Player[]): AuctionState |
     currentHighestBid: typeof rawState.currentHighestBid === 'number' ? rawState.currentHighestBid : 0,
     currentHighestBidder: rawState.currentHighestBidder ?? null,
     currentHighestBidderName: rawState.currentHighestBidderName ?? null,
-    timerEnd: typeof rawState.timerEnd === 'number' ? rawState.timerEnd : Date.now(),
+    timerEnd: normalizeTimerEnd(rawState),
     yuchalCount: typeof rawState.yuchalCount === 'number' ? rawState.yuchalCount : 0,
     maxYuchalCycles: typeof rawState.maxYuchalCycles === 'number' ? rawState.maxYuchalCycles : 0,
     bidIncrement: typeof rawState.bidIncrement === 'number' ? rawState.bidIncrement : 50,
@@ -276,7 +287,37 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
       });
     });
 
-    auctionSocketHelpers.onNewBid((data: { userId: string; username: string; amount: number; timerEnd: number }) => {
+    auctionSocketHelpers.onAuctionItemStarted((data: any) => {
+      set((state) => {
+        const nextPlayers = Array.isArray(data.players) ? data.players : state.players;
+        const nextTeams = Array.isArray(data.teams) ? data.teams : state.teams;
+        const nextState = normalizeAuctionState(
+          data.auctionState ?? data.state ?? null,
+          nextPlayers,
+        );
+        const nextPlayerName = nextState?.currentPlayer?.username;
+
+        return {
+          players: nextPlayers,
+          teams: nextTeams,
+          auctionState: nextState,
+          bidHistory: nextPlayerName
+            ? [
+                ...state.bidHistory,
+                {
+                  username: '',
+                  amount: 0,
+                  timestamp: Date.now(),
+                  playerLabel: nextPlayerName,
+                  isSeparator: true,
+                },
+              ]
+            : state.bidHistory,
+        };
+      });
+    });
+
+    auctionSocketHelpers.onNewBid((data: { userId: string; username: string; amount: number; timerEnd: number; serverNow?: number }) => {
       set((state) => ({
         auctionState: state.auctionState
           ? {
@@ -284,7 +325,7 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
               currentHighestBid: data.amount,
               currentHighestBidder: (data as any).teamId ?? data.userId,
               currentHighestBidderName: data.username ?? null,
-              timerEnd: data.timerEnd,
+              timerEnd: normalizeTimerEnd(data),
             }
           : null,
         bidHistory: [...state.bidHistory, { username: data.username, amount: data.amount, timestamp: Date.now() }],
@@ -327,7 +368,10 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
     auctionSocketHelpers.onPlayerUnsold((data: { player: Player; yuchalCount: number }) => {
       set((state) => ({
         auctionState: state.auctionState
-          ? { ...state.auctionState, yuchalCount: data.yuchalCount }
+          ? {
+              ...state.auctionState,
+              yuchalCount: data.yuchalCount ?? state.auctionState.yuchalCount,
+            }
           : null,
       }));
     });
@@ -368,16 +412,15 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
           updates.teams = data.teams;
         }
 
-        if (data.state) {
-          updates.auctionState = normalizeAuctionState(data.state, nextPlayers);
-        }
         if (data.sold && data.team) {
           const processedSoldPlayerIds = new Set(state.processedSoldPlayerIds);
           if (data.player?.id) processedSoldPlayerIds.add(data.player.id);
           updates.processedSoldPlayerIds = processedSoldPlayerIds;
-          updates.teams = nextTeams.map(t =>
-            t.id === data.team.id ? { ...t, ...data.team } : t
-          );
+          if (!Array.isArray(data.teams)) {
+            updates.teams = nextTeams.map(t =>
+              t.id === data.team.id ? { ...t, ...data.team } : t
+            );
+          }
           // 낙찰 피드백 정보 저장 (5초 후 자동 클리어)
           const soldEvent = {
             playerName: getAuctionPlayerName(data.player),
@@ -392,22 +435,6 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
               set({ lastSoldEvent: null });
             }
           }, 5000);
-        }
-
-        // 다음 선수 구분 마커 삽입
-        const nextPlayerName = data.state?.currentPlayer?.username
-          ?? data.nextPlayer?.username;
-        if (nextPlayerName) {
-          updates.bidHistory = [
-            ...state.bidHistory,
-            {
-              username: '',
-              amount: 0,
-              timestamp: Date.now(),
-              playerLabel: nextPlayerName,
-              isSeparator: true,
-            },
-          ];
         }
 
         return { ...state, ...updates };

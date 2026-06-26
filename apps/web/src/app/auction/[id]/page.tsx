@@ -1279,12 +1279,18 @@ function MobileBidPanel({
     const max = Math.max(0, availableBudget - auctionState.currentHighestBid);
     setAccBid((prev) => Math.min(prev, max));
   }, [auctionState.currentHighestBid, availableBudget]);
+  const calculateTimeLeft = React.useCallback(
+    () =>
+      Math.max(0, Math.ceil((auctionState.timerEnd - Date.now()) / 1000)),
+    [auctionState.timerEnd],
+  );
   React.useEffect(() => {
+    setTimeLeft(calculateTimeLeft());
     const interval = setInterval(() => {
-      setTimeLeft(Math.max(0, Math.ceil((auctionState.timerEnd - Date.now()) / 1000)));
+      setTimeLeft(calculateTimeLeft());
     }, 100);
     return () => clearInterval(interval);
-  }, [auctionState.timerEnd]);
+  }, [calculateTimeLeft]);
 
   const addToBid = (inc: number) => {
     setAccBid((prev) => {

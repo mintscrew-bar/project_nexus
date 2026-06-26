@@ -58,6 +58,10 @@ describe("AuctionService", () => {
     service = module.get<AuctionService>(AuctionService);
   });
 
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   describe("placeBid", () => {
     const roomId = "room-1";
     const userId = "user-1";
@@ -135,12 +139,15 @@ describe("AuctionService", () => {
     });
 
     it("입찰이 성공하면 DB에 기록하고 상태를 업데이트한다", async () => {
+      const now = 1_700_000_000_000;
+      jest.spyOn(Date, "now").mockReturnValue(now);
+
       const state: AuctionState = {
         roomId,
         currentPlayerIndex: 0,
         currentHighestBid: 500,
         currentHighestBidder: "other-team",
-        timerEnd: Date.now() + 10000,
+        timerEnd: now + 10000,
         yuchalCount: 0,
         maxYuchalCycles: 1,
         bidIncrement: 100,
@@ -157,7 +164,11 @@ describe("AuctionService", () => {
             ],
           });
         }
-        return Promise.resolve({ id: roomId, minBidIncrement: 100 });
+        return Promise.resolve({
+          id: roomId,
+          minBidIncrement: 100,
+          bidTimeLimit: 30,
+        });
       });
 
       prisma.team.findFirst.mockResolvedValue({
@@ -176,6 +187,54 @@ describe("AuctionService", () => {
       expect(prisma.auctionBid.create).toHaveBeenCalled();
       expect(result.currentHighestBid).toBe(bidAmount);
       expect(result.currentHighestBidder).toBe(teamId);
+      expect(result.timerEnd).toBe(now + 10000);
+    });
+
+    it("마감 임박 입찰이면 타이머를 연장한다", async () => {
+      const now = 1_700_000_000_000;
+      jest.spyOn(Date, "now").mockReturnValue(now);
+
+      const state: AuctionState = {
+        roomId,
+        currentPlayerIndex: 0,
+        currentHighestBid: 500,
+        currentHighestBidder: "other-team",
+        timerEnd: now + 3000,
+        yuchalCount: 0,
+        maxYuchalCycles: 1,
+        bidIncrement: 100,
+        botCaptainIds: [],
+      };
+      (service as any).auctionStates.set(roomId, state);
+
+      prisma.room.findUnique.mockImplementation(({ include }: any) => {
+        if (include?.participants) {
+          return Promise.resolve({
+            id: roomId,
+            participants: [
+              { id: "p1", userId: "user-p1", user: { username: "Player1" } },
+            ],
+          });
+        }
+        return Promise.resolve({
+          id: roomId,
+          minBidIncrement: 100,
+          bidTimeLimit: 30,
+        });
+      });
+
+      prisma.team.findFirst.mockResolvedValue({
+        id: teamId,
+        remainingBudget: 1000,
+        _count: { members: 0 },
+        captain: { username: "Captain1" },
+      });
+      prisma.team.findUnique.mockResolvedValue({ remainingBudget: 1000 });
+      prisma.teamMember.count.mockResolvedValue(0);
+
+      const result = await service.placeBid(userId, roomId, 600);
+
+      expect(result.timerEnd).toBe(now + 5000);
     });
   });
 
@@ -197,8 +256,12 @@ describe("AuctionService", () => {
     });
 
     it("낙찰자가 있으면 DB에 기록하고 상태를 초기화한다 (Sold)", async () => {
+      const now = 1_700_000_000_000;
+      jest.spyOn(Date, "now").mockReturnValue(now);
+
       prisma.room.findUnique.mockResolvedValue({
         id: roomId,
+        bidTimeLimit: 30,
         participants: [{ id: "p1", userId: "user-p1" }],
         teams: [],
       });
@@ -219,6 +282,33 @@ describe("AuctionService", () => {
       const state = (service as any).auctionStates.get(roomId);
       expect(state.currentHighestBid).toBe(0);
       expect(state.currentHighestBidder).toBeNull();
+      expect(state.timerEnd).toBe(0);
+    });
+
+    it("다음 매물 시작 시 방 설정 시간으로 타이머를 재시작한다", async () => {
+      const now = 1_700_000_000_000;
+      jest.spyOn(Date, "now").mockReturnValue(now);
+
+      (service as any).auctionStates.set(roomId, {
+        roomId,
+        currentPlayerIndex: 0,
+        currentHighestBid: 0,
+        currentHighestBidder: null,
+        timerEnd: 0,
+        yuchalCount: 0,
+        maxYuchalCycles: 2,
+        bidIncrement: 100,
+        botCaptainIds: [],
+      });
+
+      prisma.room.findUnique.mockResolvedValue({
+        id: roomId,
+        bidTimeLimit: 30,
+      });
+
+      const state = await service.restartBidTimer(roomId);
+
+      expect(state?.timerEnd).toBe(now + 30000);
     });
 
     it("입찰자가 없으면 유찰 카운트를 올리고 재경매한다 (Yuchal - Re-auction)", async () => {

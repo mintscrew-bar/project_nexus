@@ -32,11 +32,11 @@
 |------|------|------|
 | `banner` | `String?` | 상세 페이지 히어로 배경 이미지 URL |
 | `accentColor` | `String?` | 클랜 대표 색(hex). 태그 배지·엠블럼 fallback·히어로에 적용. 기본값은 앱 accent(#667EEA) |
-| `recruitMessage` | `String?` | 모집 공고문(설명과 별개, 모집 어필용). `@MaxLength(1000)` |
 | `recruitRoles` | `String[]` | 모집 중인 포지션(TOP/JUNGLE/MID/ADC/SUPPORT) |
 | `lastActiveAt` | `DateTime?` | 활동성 정렬용. 채팅·가입·공지 등 이벤트 시 갱신(무거운 집계 회피용 경량 신호) |
 
 - `logo`(기존)·`minTier`(기존)는 그대로 활용. 이번에 **DTO 연결**해서 실제 설정 가능하게 함.
+- **모집 공고는 기존 `description` 하나로 통일** (별도 `recruitMessage` 두지 않음). 모집 어필도 description에서 작성.
 - 인덱스: `@@index([minTier])`, `@@index([lastActiveAt])` 추가 검토.
 - **마이그레이션**: 이 호스트는 운영 상주 → `dev compose` 금지. 스키마 반영은 `prisma migrate deploy`로. (참고: 메모리 `dev_compose_kills_prod`)
 
@@ -56,8 +56,8 @@
 
 ### Phase 1 — 정체성 기반 (데이터·업로드·공통 컴포넌트)
 
-- [ ] Task 1: 스키마 확장 (`Clan.banner`/`accentColor`/`recruitMessage`/`recruitRoles`/`lastActiveAt`) + 인덱스, `migrate deploy` 반영
-- [ ] Task 2: 백엔드 — create/update DTO에 `logo`/`banner`/`accentColor`/`recruitMessage`/`recruitRoles` 추가, 검증(hex 형식·포지션 enum·길이)
+- [x] Task 1: 스키마 확장 (`Clan.banner`/`accentColor`/`recruitRoles`/`lastActiveAt`) + 인덱스, 마이그레이션 SQL 작성 (DB 반영은 배포 시 `migrate deploy` — 이 호스트에서 DB 미연결)
+- [ ] Task 2: 백엔드 — create/update DTO에 `logo`/`banner`/`accentColor`/`recruitRoles` 추가, 검증(hex 형식·포지션 enum·길이)
 - [ ] Task 3: 백엔드 — 클랜 로고/배너 업로드 엔드포인트(`upload.service` 재사용, `canManageSettings` 권한)
 - [ ] Task 4: 프론트 공통 컴포넌트 `ClanEmblem`/`ClanTag` 신설(로고 fallback 이니셜 + `accentColor`)
 
@@ -72,7 +72,7 @@
 - [ ] Task 8: 백엔드 — `listClans` 필터 확장(`minTier`·`recruitRoles`) + 정렬 '활동순'(`lastActiveAt`) 추가, `lastActiveAt` 갱신 훅(채팅/가입/공지)
 - [ ] Task 9: 브라우저 필터 UI — 최소 티어 필터, 모집 포지션 필터, '활동순' 정렬 옵션
 - [ ] Task 10: 클랜 카드 정보 강화 — `accentColor` 적용, 최소 티어·모집 포지션 배지, 활동성 표시, `ClanEmblem` 적용
-- [ ] Task 11: 상세 정보 탭 '모집 공고' 섹션 — `recruitMessage` + 모집 포지션 표시, OWNER/OFFICER 인라인 편집
+- [ ] Task 11: 상세 정보 탭 '모집 공고' 섹션 — `description` + 모집 포지션·최소 티어 표시, OWNER/OFFICER 인라인 편집
 
 ### Phase 4 — 멤버 정체성 + 마무리
 

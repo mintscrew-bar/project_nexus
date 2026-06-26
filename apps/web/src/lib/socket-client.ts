@@ -361,6 +361,10 @@ export const auctionSocketHelpers = {
     auctionSocket?.on("auction-started", callback);
   },
 
+  onAuctionItemStarted: (callback: (data: any) => void) => {
+    auctionSocket?.on("auction-item-started", callback);
+  },
+
   onNewBid: (callback: (data: any) => void) => {
     auctionSocket?.on("bid-placed", callback);  // ✅ Fixed: new-bid → bid-placed
   },
@@ -454,6 +458,7 @@ export const auctionSocketHelpers = {
 
   offAllListeners: () => {
     auctionSocket?.off("auction-started");
+    auctionSocket?.off("auction-item-started");
     auctionSocket?.off("bid-placed");
     auctionSocket?.off("player-sold");
     auctionSocket?.off("player-unsold");
