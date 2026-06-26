@@ -39,6 +39,10 @@ interface Clan {
   tag: string;
   description: string | null;
   logo: string | null;
+  banner: string | null;
+  accentColor: string | null;
+  recruitRoles: string[];
+  lastActiveAt: string | null;
   isRecruiting: boolean;
   maxMembers: number;
   minTier: string | null;
@@ -77,6 +81,19 @@ const TIER_FILTER_OPTIONS = [
 
 // 모집 포지션 필터 옵션
 const RECRUIT_ROLE_OPTIONS = ["TOP", "JUNGLE", "MID", "ADC", "SUPPORT"];
+
+// 활동성 상대 시간 (카드 표시용)
+function formatActiveAgo(value: string | null): string | null {
+  if (!value) return null;
+  const diff = Date.now() - new Date(value).getTime();
+  const minutes = Math.floor(diff / 60_000);
+  if (minutes < 60) return "방금 활동";
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}시간 전 활동`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}일 전 활동`;
+  return null;
+}
 
 // ─────────────────────────────────────────────────────────────
 // 클랜 카드 스켈레톤
@@ -482,6 +499,8 @@ export default function ClansPage() {
                   100
                 );
 
+                const activeAgo = formatActiveAgo(clan.lastActiveAt);
+
                 return (
                   <Card
                     key={clan.id}
@@ -489,42 +508,62 @@ export default function ClansPage() {
                     onClick={() => router.push(`/clans/${clan.id}`)}
                     className="cursor-pointer relative overflow-hidden hover:scale-[1.02] hover:shadow-lg transition-all duration-200"
                   >
-                    {/* 모집 상태 리본 배지 */}
+                    {/* 정체성 띠: 배너 이미지 또는 대표색 그라디언트 */}
                     <div
-                      className={cn(
-                        "absolute top-3 right-3 text-xs font-bold px-2 py-0.5 rounded-full",
-                        clan.isRecruiting && !isFull
-                          ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-                          : "bg-red-500/20 text-red-400 border border-red-500/30"
-                      )}
+                      className="relative h-12 w-full bg-bg-tertiary"
+                      style={
+                        clan.banner
+                          ? undefined
+                          : {
+                              background: `linear-gradient(135deg, ${
+                                clan.accentColor || "#667EEA"
+                              }44, ${clan.accentColor || "#667EEA"}0d)`,
+                            }
+                      }
                     >
-                      {clan.isRecruiting && !isFull ? "모집 중" : "정원 마감"}
+                      {clan.banner && (
+                        <Image
+                          src={clan.banner}
+                          alt=""
+                          fill
+                          className="object-cover"
+                          unoptimized
+                        />
+                      )}
+                      {/* 모집 상태 리본 배지 */}
+                      <div
+                        className={cn(
+                          "absolute top-2 right-2 text-xs font-bold px-2 py-0.5 rounded-full",
+                          clan.isRecruiting && !isFull
+                            ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                            : "bg-red-500/20 text-red-400 border border-red-500/30"
+                        )}
+                      >
+                        {clan.isRecruiting && !isFull ? "모집 중" : "정원 마감"}
+                      </div>
                     </div>
 
                     <CardContent className="p-4">
-                      <div className="flex items-start gap-4">
-                        <div className="w-14 h-14 rounded-lg bg-bg-tertiary flex items-center justify-center flex-shrink-0 overflow-hidden relative">
-                          {clan.logo ? (
-                            <Image
-                              src={clan.logo}
-                              alt={clan.name}
-                              fill
-                              className="object-cover"
-                              unoptimized
-                            />
-                          ) : (
-                            <Shield className="h-7 w-7 text-text-tertiary" />
-                          )}
-                        </div>
-                        <div className="flex-grow min-w-0 pr-14">
-                          {/* 태그 배지 공간 확보 */}
-                          <p className="font-semibold text-text-primary truncate">
-                            [{clan.tag}] {clan.name}
-                          </p>
+                      <div className="-mt-9 flex items-start gap-3">
+                        <ClanEmblem
+                          tag={clan.tag}
+                          logo={clan.logo}
+                          accentColor={clan.accentColor}
+                          size={56}
+                          rounded="rounded-xl"
+                          className="ring-2 ring-bg-secondary"
+                        />
+                        <div className="min-w-0 flex-grow pt-9">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <ClanTag tag={clan.tag} accentColor={clan.accentColor} />
+                            <p className="font-semibold text-text-primary truncate">
+                              {clan.name}
+                            </p>
+                          </div>
                           <p className="text-sm text-text-secondary mt-1 line-clamp-2">
                             {clan.description || "클랜 소개가 없습니다."}
                           </p>
-                          <div className="flex items-center gap-3 mt-2 text-xs text-text-tertiary">
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-xs text-text-tertiary">
                             <span className="flex items-center gap-1">
                               <Users className="h-3 w-3" />
                               {memberCount}/{clan.maxMembers}
@@ -539,7 +578,31 @@ export default function ClansPage() {
                                 {clan.minTier}+
                               </Badge>
                             )}
+                            {activeAgo && (
+                              <span className="flex items-center gap-1">
+                                <span className="h-1.5 w-1.5 rounded-full bg-accent-success" />
+                                {activeAgo}
+                              </span>
+                            )}
                           </div>
+                          {/* 모집 포지션 */}
+                          {clan.isRecruiting && clan.recruitRoles?.length > 0 && (
+                            <div className="mt-2 flex flex-wrap items-center gap-1">
+                              {clan.recruitRoles.map((role) => (
+                                <span
+                                  key={role}
+                                  title={POSITION_LABELS[role] || role}
+                                  className="inline-flex items-center gap-1 rounded-md bg-bg-tertiary px-1.5 py-0.5 text-[10px] font-medium text-text-secondary"
+                                >
+                                  <PositionIcon
+                                    position={role}
+                                    className="!h-3 !w-3"
+                                  />
+                                  {POSITION_LABELS[role] || role}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </div>
 
