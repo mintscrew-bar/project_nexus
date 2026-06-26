@@ -8,13 +8,18 @@ import {
   Param,
   Query,
   UseGuards,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
   HttpCode,
   HttpStatus,
 } from "@nestjs/common";
+import { FileInterceptor } from "@nestjs/platform-express";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { Public } from "../auth/decorators/public.decorator";
 import { ClanService } from "./clan.service";
+import { UploadService } from "../upload/upload.service";
 import {
   CreateClanDto,
   UpdateClanDto,
@@ -36,6 +41,7 @@ export class ClanController {
   constructor(
     private readonly clanService: ClanService,
     private readonly clanGateway: ClanGateway,
+    private readonly uploadService: UploadService,
   ) {}
 
   // ========================================
@@ -93,6 +99,56 @@ export class ClanController {
     this.clanGateway.emitClanUpdated(clanId, result);
 
     return result;
+  }
+
+  /**
+   * 클랜 로고 이미지 업로드. 검증 후 URL을 클랜 logo에 반영한다.
+   * 권한은 updateClan(canManageSettings)에서 검사.
+   */
+  @Post(":id/logo")
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(FileInterceptor("image"))
+  async uploadClanLogo(
+    @CurrentUser("sub") userId: string,
+    @Param("id") clanId: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    const url = await this.storeClanImage(file);
+    const result = await this.clanService.updateClan(userId, clanId, {
+      logo: url,
+    });
+    this.clanGateway.emitClanUpdated(clanId, result);
+    return { logo: url };
+  }
+
+  /**
+   * 클랜 배너 이미지 업로드. 상세 페이지 히어로 배경으로 사용.
+   */
+  @Post(":id/banner")
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(FileInterceptor("image"))
+  async uploadClanBanner(
+    @CurrentUser("sub") userId: string,
+    @Param("id") clanId: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    const url = await this.storeClanImage(file);
+    const result = await this.clanService.updateClan(userId, clanId, {
+      banner: url,
+    });
+    this.clanGateway.emitClanUpdated(clanId, result);
+    return { banner: url };
+  }
+
+  /** 업로드 파일 매직넘버 검증 후 정적 URL 반환 (공통) */
+  private async storeClanImage(
+    file: Express.Multer.File | undefined,
+  ): Promise<string> {
+    if (!file) {
+      throw new BadRequestException("이미지 파일이 업로드되지 않았습니다.");
+    }
+    await this.uploadService.validateMimeType(file);
+    return this.uploadService.getFileUrl(file.filename);
   }
 
   @Delete(":id")

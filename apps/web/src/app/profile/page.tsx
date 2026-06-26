@@ -220,7 +220,7 @@ function StreamerRegistrationCard({
   return (
     <Card className="overflow-hidden rounded-lg border-accent-gold/25 bg-bg-secondary p-0">
       <CardContent className="p-4 md:p-5">
-        <div className="mb-3 flex items-center justify-between">
+        <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2">
             <Badge variant="gold" className="gap-1 rounded-md px-2 py-1 text-xs font-black">
               <Radio className="h-3.5 w-3.5" />
@@ -238,7 +238,10 @@ function StreamerRegistrationCard({
         </div>
 
         {profiles.length === 0 && !addingNew && (
-          <p className="text-xs text-text-muted">치지직, SOOP, 유튜브 채널을 등록하면 프로필에 streamer 태그가 표시됩니다.</p>
+          <div className="rounded-lg border border-dashed border-bg-elevated bg-bg-tertiary/40 px-3 py-4">
+            <p className="text-sm font-bold text-text-primary">방송 채널을 연결하면 streamer 태그가 표시됩니다.</p>
+            <p className="mt-1 text-xs text-text-muted">치지직, SOOP, 유튜브 채널을 최대 3개까지 등록할 수 있습니다.</p>
+          </div>
         )}
 
         <div className="flex flex-col gap-2">
@@ -330,7 +333,7 @@ function StreamerLinkRow({
 
   if (!editing && link) {
     return (
-      <div className="flex items-center gap-3 rounded-lg bg-bg-tertiary/50 px-3 py-2.5">
+      <div className="flex flex-col gap-3 rounded-lg bg-bg-tertiary/50 px-3 py-2.5 sm:flex-row sm:items-center">
         <div className="relative h-12 w-16 flex-shrink-0 overflow-hidden rounded-md bg-bg-primary">
           {link.imageUrl ? (
             <Image src={link.imageUrl} alt={link.label} fill className="object-cover" unoptimized />
@@ -344,7 +347,7 @@ function StreamerLinkRow({
           <p className="truncate text-sm font-bold text-text-primary">{link.label}</p>
           <p className="truncate text-xs text-text-tertiary">{link.url}</p>
         </a>
-        <div className="flex flex-shrink-0 gap-1">
+        <div className="flex flex-shrink-0 justify-end gap-1">
           <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setEditing(true)}>
             수정
           </Button>
@@ -362,11 +365,11 @@ function StreamerLinkRow({
   }
 
   return (
-    <div className="flex items-center gap-2 rounded-lg bg-bg-tertiary/50 p-2.5">
+    <div className="grid gap-2 rounded-lg bg-bg-tertiary/50 p-2.5 sm:grid-cols-[40px_minmax(120px,160px)_1fr_auto] sm:items-center">
       <button
         type="button"
         onClick={() => fileRef.current?.click()}
-        className="relative h-9 w-9 shrink-0 overflow-hidden rounded-lg border border-bg-tertiary bg-bg-primary text-text-tertiary transition-colors hover:border-accent-primary hover:text-text-primary"
+        className="relative h-12 w-full shrink-0 overflow-hidden rounded-lg border border-bg-tertiary bg-bg-primary text-text-tertiary transition-colors hover:border-accent-primary hover:text-text-primary sm:h-9 sm:w-9"
       >
         {previewUrl ? (
           <Image src={previewUrl} alt="링크 이미지" fill className="object-cover" unoptimized />
@@ -387,7 +390,7 @@ function StreamerLinkRow({
         value={label}
         onChange={(e) => setLabel(e.target.value)}
         placeholder="링크 이름"
-        className="w-36 shrink-0 rounded-lg border border-bg-tertiary bg-bg-primary px-3 py-2 text-sm text-text-primary outline-none placeholder:text-text-tertiary focus:border-accent-primary"
+        className="w-full rounded-lg border border-bg-tertiary bg-bg-primary px-3 py-2 text-sm text-text-primary outline-none placeholder:text-text-tertiary focus:border-accent-primary"
       />
       <input
         value={url}
@@ -395,7 +398,7 @@ function StreamerLinkRow({
         placeholder="https://discord.gg/..."
         className="min-w-0 flex-1 rounded-lg border border-bg-tertiary bg-bg-primary px-3 py-2 text-sm text-text-primary outline-none placeholder:text-text-tertiary focus:border-accent-primary"
       />
-      <div className="flex shrink-0 gap-1.5">
+      <div className="flex shrink-0 justify-end gap-1.5">
         <Button
           variant="ghost"
           size="sm"
@@ -461,7 +464,7 @@ function StreamerLinksCard({
   return (
     <Card className="overflow-hidden rounded-lg border-bg-tertiary bg-bg-secondary p-0">
       <CardContent className="p-4 md:p-5">
-        <div className="mb-3 flex items-center justify-between">
+        <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <div className="flex items-center gap-2">
               <span className="text-sm font-bold text-text-primary">추가 링크</span>
@@ -501,7 +504,10 @@ function StreamerLinksCard({
             />
           )}
           {links.length === 0 && !addingNew && (
-            <p className="rounded-lg bg-bg-tertiary/40 px-3 py-4 text-xs text-text-muted">아직 추가 링크가 없습니다.</p>
+            <div className="rounded-lg border border-dashed border-bg-elevated bg-bg-tertiary/40 px-3 py-4">
+              <p className="text-sm font-bold text-text-primary">디스코드, 공지, 팬카페 링크를 모아둘 수 있습니다.</p>
+              <p className="mt-1 text-xs text-text-muted">각 링크마다 작은 이미지를 붙여 공개 프로필에서 더 잘 보이게 만들 수 있습니다.</p>
+            </div>
           )}
         </div>
       </CardContent>

@@ -58,7 +58,7 @@
 
 - [x] Task 1: 스키마 확장 (`Clan.banner`/`accentColor`/`recruitRoles`/`lastActiveAt`) + 인덱스, 마이그레이션 SQL 작성 (DB 반영은 배포 시 `migrate deploy` — 이 호스트에서 DB 미연결)
 - [x] Task 2: 백엔드 — create/update DTO에 `logo`/`banner`/`accentColor`/`recruitRoles` 추가, 검증(hex 형식·포지션 enum·길이)
-- [ ] Task 3: 백엔드 — 클랜 로고/배너 업로드 엔드포인트(`upload.service` 재사용, `canManageSettings` 권한)
+- [x] Task 3: 백엔드 — 클랜 로고/배너 업로드 엔드포인트(`upload.service` 재사용, `canManageSettings` 권한)
 - [ ] Task 4: 프론트 공통 컴포넌트 `ClanEmblem`/`ClanTag` 신설(로고 fallback 이니셜 + `accentColor`)
 
 ### Phase 2 — 생성·설정·상세 UI
