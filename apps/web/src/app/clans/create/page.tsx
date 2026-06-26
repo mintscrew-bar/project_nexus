@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { useAuthStore } from "@/stores/auth-store";
 import { clanApi } from "@/lib/api-client";
 import {
@@ -12,8 +13,21 @@ import {
   Button,
   Skeleton,
 } from "@/components/ui";
-import { ArrowLeft, Shield, Plus } from "lucide-react";
+import { ArrowLeft, Shield, Plus, ImagePlus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ClanEmblem, DEFAULT_CLAN_ACCENT } from "@/components/domain/ClanEmblem";
+
+/** 대표색 프리셋 팔레트 */
+const ACCENT_PRESETS = [
+  "#667EEA",
+  "#F43F5E",
+  "#F59E0B",
+  "#10B981",
+  "#22D3EE",
+  "#A855F7",
+  "#EC4899",
+  "#64748B",
+];
 
 // ========================================
 // 캐릭터 카운터 색상 계산 헬퍼
@@ -42,6 +56,33 @@ export default function CreateClanPage() {
   const [isRecruiting, setIsRecruiting] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // 정체성: 대표색 + 로고/배너 파일(생성 후 업로드)
+  const [accentColor, setAccentColor] = useState(DEFAULT_CLAN_ACCENT);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [bannerFile, setBannerFile] = useState<File | null>(null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const bannerInputRef = useRef<HTMLInputElement>(null);
+
+  // 파일 → 미리보기 object URL (변경 시 이전 URL 정리)
+  const logoPreview = useMemo(
+    () => (logoFile ? URL.createObjectURL(logoFile) : null),
+    [logoFile],
+  );
+  const bannerPreview = useMemo(
+    () => (bannerFile ? URL.createObjectURL(bannerFile) : null),
+    [bannerFile],
+  );
+  useEffect(() => {
+    return () => {
+      if (logoPreview) URL.revokeObjectURL(logoPreview);
+    };
+  }, [logoPreview]);
+  useEffect(() => {
+    return () => {
+      if (bannerPreview) URL.revokeObjectURL(bannerPreview);
+    };
+  }, [bannerPreview]);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -81,7 +122,16 @@ export default function CreateClanPage() {
         tag: tag.trim().toUpperCase(),
         description: description.trim() || undefined,
         isRecruiting,
+        accentColor:
+          accentColor !== DEFAULT_CLAN_ACCENT ? accentColor : undefined,
       });
+      // 클랜 생성 후 이미지 업로드 (id 필요). 이미지 실패는 치명적이지 않으므로 무시.
+      if (logoFile) {
+        await clanApi.uploadClanLogo(clan.id, logoFile).catch(() => null);
+      }
+      if (bannerFile) {
+        await clanApi.uploadClanBanner(clan.id, bannerFile).catch(() => null);
+      }
       router.push(`/clans/${clan.id}`);
     } catch (err: any) {
       setError(
@@ -137,15 +187,123 @@ export default function CreateClanPage() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
-              {/* 실시간 태그 프리뷰 */}
-              <div className="bg-bg-tertiary border border-bg-elevated rounded-lg p-4 text-center">
-                <p className="text-[10px] text-text-tertiary uppercase tracking-wider mb-1.5">
-                  미리보기
-                </p>
-                <p className="text-lg font-bold text-text-primary">
-                  {tagPreview}
-                </p>
+              {/* 정체성 미리보기 + 편집 (배너 / 엠블럼 / 대표색) */}
+              <div className="overflow-hidden rounded-lg border border-bg-elevated">
+                {/* 배너 */}
+                <div
+                  onClick={() => bannerInputRef.current?.click()}
+                  className="relative h-28 w-full cursor-pointer bg-bg-tertiary"
+                >
+                  {bannerPreview ? (
+                    <Image
+                      src={bannerPreview}
+                      alt="배너 미리보기"
+                      fill
+                      className="object-cover"
+                      unoptimized
+                    />
+                  ) : (
+                    <span className="absolute inset-0 flex items-center justify-center gap-1.5 text-xs text-text-tertiary">
+                      <ImagePlus className="h-4 w-4" /> 배너 추가 (선택)
+                    </span>
+                  )}
+                  {bannerPreview && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setBannerFile(null);
+                        if (bannerInputRef.current)
+                          bannerInputRef.current.value = "";
+                      }}
+                      className="absolute right-2 top-2 rounded-md bg-black/60 p-1 text-white hover:bg-black/80"
+                      aria-label="배너 제거"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                {/* 엠블럼 + 태그 프리뷰 */}
+                <div className="-mt-8 flex items-center gap-3 px-4 pt-0">
+                  <div
+                    onClick={() => logoInputRef.current?.click()}
+                    className="relative cursor-pointer"
+                  >
+                    <ClanEmblem
+                      tag={tag.trim() || "TAG"}
+                      logo={logoPreview}
+                      accentColor={accentColor}
+                      size={56}
+                      rounded="rounded-xl"
+                      className="ring-2 ring-bg-secondary"
+                    />
+                    <span className="absolute -bottom-1 -right-1 rounded-full bg-accent-primary p-1">
+                      <ImagePlus className="h-3 w-3 text-white" />
+                    </span>
+                  </div>
+                  <div className="min-w-0 pt-7">
+                    <p className="text-[10px] uppercase tracking-wider text-text-tertiary">
+                      미리보기
+                    </p>
+                    <p className="truncate text-lg font-bold text-text-primary">
+                      {tagPreview}
+                    </p>
+                  </div>
+                </div>
+
+                {/* 대표색 팔레트 */}
+                <div className="flex flex-wrap items-center gap-2 px-4 pb-4 pt-3">
+                  <span className="text-[10px] text-text-tertiary">대표색</span>
+                  {ACCENT_PRESETS.map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setAccentColor(c)}
+                      aria-label={`대표색 ${c}`}
+                      className={cn(
+                        "h-6 w-6 rounded-full border-2 transition-transform hover:scale-110",
+                        accentColor.toUpperCase() === c
+                          ? "border-text-primary"
+                          : "border-transparent",
+                      )}
+                      style={{ backgroundColor: c }}
+                    />
+                  ))}
+                  {/* 커스텀 색상 */}
+                  <label className="relative h-6 w-6 cursor-pointer overflow-hidden rounded-full border border-bg-elevated">
+                    <input
+                      type="color"
+                      value={accentColor}
+                      onChange={(e) => setAccentColor(e.target.value)}
+                      className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                      aria-label="커스텀 대표색"
+                    />
+                    <span
+                      className="flex h-full w-full items-center justify-center text-[9px] font-black text-white"
+                      style={{ backgroundColor: accentColor }}
+                    >
+                      +
+                    </span>
+                  </label>
+                </div>
               </div>
+
+              {/* 숨김 파일 입력 */}
+              <input
+                ref={logoInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => setLogoFile(e.target.files?.[0] ?? null)}
+              />
+              <input
+                ref={bannerInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => setBannerFile(e.target.files?.[0] ?? null)}
+              />
 
               {/* 클랜 이름 — Floating label */}
               <div className="relative">

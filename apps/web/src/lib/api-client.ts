@@ -977,6 +977,9 @@ export const clanApi = {
     tag: string;
     description?: string;
     isRecruiting?: boolean;
+    minTier?: string;
+    accentColor?: string;
+    recruitRoles?: string[];
   }) => {
     const response = await apiClient.post("/clans", data);
     return response.data;
@@ -991,6 +994,8 @@ export const clanApi = {
       maxMembers?: number;
       minTier?: string;
       discord?: string;
+      accentColor?: string;
+      recruitRoles?: string[];
       officerCanManageSettings?: boolean;
       officerCanManageMembers?: boolean;
       officerCanManageAnnouncements?: boolean;
@@ -999,6 +1004,26 @@ export const clanApi = {
   ) => {
     const response = await apiClient.patch(`/clans/${clanId}`, data);
     return response.data;
+  },
+
+  /** 클랜 로고 업로드 → { logo } 반환 */
+  uploadClanLogo: async (clanId: string, file: File) => {
+    const formData = new FormData();
+    formData.append("image", file);
+    const response = await apiClient.post(`/clans/${clanId}/logo`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return response.data as { logo: string };
+  },
+
+  /** 클랜 배너 업로드 → { banner } 반환 */
+  uploadClanBanner: async (clanId: string, file: File) => {
+    const formData = new FormData();
+    formData.append("image", file);
+    const response = await apiClient.post(`/clans/${clanId}/banner`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return response.data as { banner: string };
   },
 
   deleteClan: async (clanId: string) => {
