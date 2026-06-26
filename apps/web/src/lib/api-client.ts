@@ -956,6 +956,7 @@ export const clanApi = {
     search?: string;
     isRecruiting?: boolean;
     minTier?: string;
+    recruitRoles?: string;
     sort?: string;
   }) => {
     const response = await apiClient.get("/clans", { params });

@@ -27,6 +27,11 @@ import {
   KeyRound,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  PositionIcon,
+  POSITION_LABELS,
+} from "@/app/tournaments/[id]/lobby/_components/icons";
+import { ClanEmblem, ClanTag } from "@/components/domain/ClanEmblem";
 
 interface Clan {
   id: string;
@@ -49,12 +54,29 @@ interface Clan {
 }
 
 // 정렬 옵션
-type SortOption = "latest" | "members" | "ranking";
+type SortOption = "latest" | "members" | "active";
 const SORT_LABELS: Record<SortOption, string> = {
   latest: "최신순",
   members: "멤버 수순",
-  ranking: "랭킹순",
+  active: "활동순",
 };
+
+// 최소 티어 필터 옵션
+const TIER_FILTER_OPTIONS = [
+  "IRON",
+  "BRONZE",
+  "SILVER",
+  "GOLD",
+  "PLATINUM",
+  "EMERALD",
+  "DIAMOND",
+  "MASTER",
+  "GRANDMASTER",
+  "CHALLENGER",
+];
+
+// 모집 포지션 필터 옵션
+const RECRUIT_ROLE_OPTIONS = ["TOP", "JUNGLE", "MID", "ADC", "SUPPORT"];
 
 // ─────────────────────────────────────────────────────────────
 // 클랜 카드 스켈레톤
@@ -160,6 +182,8 @@ export default function ClansPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showRecruitingOnly, setShowRecruitingOnly] = useState(false);
   const [sortOption, setSortOption] = useState<SortOption>("latest");
+  const [minTierFilter, setMinTierFilter] = useState("");
+  const [recruitRoleFilter, setRecruitRoleFilter] = useState<string[]>([]);
   // 가입/요청 중인 클랜 ID (버튼 로딩 상태 관리)
   const [joiningClanId, setJoiningClanId] = useState<string | null>(null);
   // 초대 코드로 가입 모달 표시 여부
@@ -177,6 +201,10 @@ export default function ClansPage() {
       const data = await clanApi.getClans({
         search: debouncedSearchQuery || undefined,
         isRecruiting: showRecruitingOnly || undefined,
+        minTier: minTierFilter || undefined,
+        recruitRoles: recruitRoleFilter.length
+          ? recruitRoleFilter.join(",")
+          : undefined,
         sort: sortOption,
       });
       setClans(data);
@@ -185,7 +213,20 @@ export default function ClansPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [debouncedSearchQuery, showRecruitingOnly, sortOption]);
+  }, [
+    debouncedSearchQuery,
+    showRecruitingOnly,
+    minTierFilter,
+    recruitRoleFilter,
+    sortOption,
+  ]);
+
+  // 모집 포지션 토글
+  const toggleRecruitRole = (role: string) => {
+    setRecruitRoleFilter((prev) =>
+      prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role],
+    );
+  };
 
   useEffect(() => {
     fetchClans();
@@ -266,6 +307,16 @@ export default function ClansPage() {
     onClick: () => setSortOption(key),
   }));
 
+  // 최소 티어 필터 드롭다운 ("제한 없음" + 티어 목록)
+  const tierItems: DropdownItem[] = [
+    { key: "all", label: "전체 티어", onClick: () => setMinTierFilter("") },
+    ...TIER_FILTER_OPTIONS.map((tier) => ({
+      key: tier,
+      label: `${tier}+`,
+      onClick: () => setMinTierFilter(tier),
+    })),
+  ];
+
   return (
     <>
       <div className="flex-grow p-4 md:p-6 animate-fade-in">
@@ -303,6 +354,22 @@ export default function ClansPage() {
                 align="right"
               />
 
+              {/* 최소 티어 필터 드롭다운 */}
+              <Dropdown
+                className="w-full sm:w-auto"
+                trigger={
+                  <Button
+                    variant={minTierFilter ? "primary" : "secondary"}
+                    className="gap-1 w-full sm:w-auto justify-between sm:justify-center"
+                  >
+                    {minTierFilter ? `${minTierFilter}+` : "티어"}
+                    <ChevronDown className="h-3 w-3" />
+                  </Button>
+                }
+                items={tierItems}
+                align="right"
+              />
+
               <Button
                 variant={showRecruitingOnly ? "primary" : "secondary"}
                 onClick={() => setShowRecruitingOnly(!showRecruitingOnly)}
@@ -336,6 +403,41 @@ export default function ClansPage() {
                 </Button>
               )}
             </div>
+          </div>
+
+          {/* 모집 포지션 필터 토글 */}
+          <div className="mb-6 flex flex-wrap items-center gap-2">
+            <span className="text-xs font-semibold text-text-tertiary">
+              모집 포지션
+            </span>
+            {RECRUIT_ROLE_OPTIONS.map((role) => {
+              const active = recruitRoleFilter.includes(role);
+              return (
+                <button
+                  key={role}
+                  type="button"
+                  onClick={() => toggleRecruitRole(role)}
+                  className={cn(
+                    "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors",
+                    active
+                      ? "border-accent-primary bg-accent-primary/10 text-accent-primary"
+                      : "border-bg-elevated bg-bg-tertiary text-text-tertiary hover:text-text-secondary",
+                  )}
+                >
+                  <PositionIcon position={role} className="!h-3.5 !w-3.5" />
+                  {POSITION_LABELS[role] || role}
+                </button>
+              );
+            })}
+            {recruitRoleFilter.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setRecruitRoleFilter([])}
+                className="text-xs text-text-tertiary underline hover:text-text-secondary"
+              >
+                초기화
+              </button>
+            )}
           </div>
 
           {/* 에러 */}

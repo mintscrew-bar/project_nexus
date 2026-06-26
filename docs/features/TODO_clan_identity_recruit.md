@@ -70,7 +70,7 @@
 ### Phase 3 — 모집 강화
 
 - [x] Task 8: 백엔드 — `listClans` 필터 확장(`minTier`·`recruitRoles`) + 정렬 '활동순'(`lastActiveAt`) 추가, `lastActiveAt` 갱신 훅(채팅/가입/공지)
-- [ ] Task 9: 브라우저 필터 UI — 최소 티어 필터, 모집 포지션 필터, '활동순' 정렬 옵션
+- [x] Task 9: 브라우저 필터 UI — 최소 티어 필터, 모집 포지션 필터, '활동순' 정렬 옵션
 - [ ] Task 10: 클랜 카드 정보 강화 — `accentColor` 적용, 최소 티어·모집 포지션 배지, 활동성 표시, `ClanEmblem` 적용
 - [ ] Task 11: 상세 정보 탭 '모집 공고' 섹션 — `description` + 모집 포지션·최소 티어 표시, OWNER/OFFICER 인라인 편집
 
