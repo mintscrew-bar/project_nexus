@@ -15,7 +15,7 @@ import { getChampionIcon } from '@/components/matches/match-utils';
 import { LoadingSpinner, Card, CardHeader, CardTitle, CardContent, Badge, Button, Skeleton, EmptyState, ConfirmModal, StatusSelector, Tabs, TabsList, TabsTrigger, TabsContent, Dropdown } from '@/components/ui';
 import { Star, Plus, RefreshCw, Shield, TrendingUp, Loader2, History, Clock, Settings, User, BarChart3, Pencil, Trash2, Swords, Gavel, Camera, Check, X, MoreVertical, Activity, Calendar, Trophy, Target, Radio, ExternalLink } from 'lucide-react';
 import { TierBadge } from '@/components/domain/TierBadge';
-import { RepBar, SummaryChip, WinRateSparkline } from '@/components/domain/ProfileStats';
+import { ReputationSummary, SummaryChip, WinRateSparkline } from '@/components/domain/ProfileStats';
 import { useToast } from '@/components/ui/Toast';
 import { usePresence } from '@/hooks/usePresence';
 import { getChampionKoreanName, searchChampionsByQuery } from '@nexus/types';
@@ -1580,16 +1580,9 @@ export default function ProfilePage() {
                   평판
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent>
                 {rep ? (
-                  <>
-                    <RepBar label="실력" value={rep.averageSkill ?? 0} />
-                    <RepBar label="태도" value={rep.averageAttitude ?? 0} />
-                    <RepBar label="소통" value={rep.averageCommunication ?? 0} />
-                    <p className="mt-2 text-right text-xs text-text-tertiary">
-                      총 {rep.totalRatings ?? 0}명이 평가
-                    </p>
-                  </>
+                  <ReputationSummary stats={rep} />
                 ) : (
                   <div className="space-y-3">
                     <Skeleton className="h-4 w-full" />

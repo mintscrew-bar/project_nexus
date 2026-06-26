@@ -47,7 +47,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { TierBadge } from "@/components/domain/TierBadge";
-import { RepBar, SummaryChip, WinRateSparkline } from "@/components/domain/ProfileStats";
+import { ReputationSummary, SummaryChip, WinRateSparkline } from "@/components/domain/ProfileStats";
 import { useToast } from "@/components/ui/Toast";
 import { getChampionKoreanName, searchChampionsByQuery } from "@nexus/types";
 
@@ -1044,30 +1044,13 @@ export default function UserProfilePage() {
             {rep && (
               <Card>
                 <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="flex items-center gap-2">
-                      <Star className="h-5 w-5 text-accent-gold" fill="currentColor" />
-                      신뢰도
-                    </CardTitle>
-                    <span className="text-xs text-text-tertiary">{rep.totalRatings ?? 0}개 평가</span>
-                  </div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Star className="h-5 w-5 text-accent-gold" fill="currentColor" />
+                    신뢰도
+                  </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between rounded-xl bg-bg-tertiary border border-bg-elevated p-3">
-                    <div>
-                      <p className="text-xs text-text-tertiary">종합 평가</p>
-                      <p className="mt-1 text-2xl font-black text-text-primary">{(rep.overallAverage ?? 0).toFixed(1)}</p>
-                    </div>
-                    <span className="text-xl text-accent-gold">
-                      {"★".repeat(Math.round(Math.max(0, Math.min(5, rep.overallAverage ?? 0))))}
-                      <span className="text-text-muted">{"★".repeat(5 - Math.round(Math.max(0, Math.min(5, rep.overallAverage ?? 0))))}</span>
-                    </span>
-                  </div>
-                  <div className="space-y-3">
-                    <RepBar label="실력" value={rep.averageSkill ?? 0} />
-                    <RepBar label="태도" value={rep.averageAttitude ?? 0} />
-                    <RepBar label="소통" value={rep.averageCommunication ?? 0} />
-                  </div>
+                <CardContent>
+                  <ReputationSummary stats={rep} />
                 </CardContent>
               </Card>
             )}

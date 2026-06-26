@@ -336,7 +336,12 @@ function DashboardTab({ addToast }: { addToast: (msg: string, type: "success" | 
     <div className="space-y-6">
       <h2 className="text-lg font-semibold text-text-primary">대시보드</h2>
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-        <StatCard icon={<Users className="h-5 w-5" />} label="전체 유저" value={stats.totalUsers} />
+        <StatCard
+          icon={<Users className="h-5 w-5" />}
+          label="가입 유저"
+          value={stats.totalUsers}
+          sub={stats.botUsers ? `봇 ${stats.botUsers.toLocaleString()}명 제외` : undefined}
+        />
         <StatCard icon={<Home className="h-5 w-5" />} label="전체 방" value={stats.totalRooms} />
         <StatCard icon={<Activity className="h-5 w-5" />} label="활성 방" value={stats.activeRooms} />
         <StatCard icon={<Sword className="h-5 w-5" />} label="전체 매치" value={stats.totalMatches} />

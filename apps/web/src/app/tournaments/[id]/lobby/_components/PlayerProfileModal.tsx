@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useQuery } from "@tanstack/react-query";
 import { CalendarDays, Users } from "lucide-react";
 import { TierBadge } from "@/components/domain/TierBadge";
+import { ReputationSummary } from "@/components/domain/ProfileStats";
 import { LoadingSpinner, Modal } from "@/components/ui";
 import { matchApi, reputationApi, userApi } from "@/lib/api-client";
 import { getChampionIcon } from "@/components/matches/match-utils";
@@ -48,19 +49,6 @@ function formatTimeAgo(value?: string) {
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours}시간 전`;
   return `${Math.floor(hours / 24)}일 전`;
-}
-
-function RepBar({ label, value }: { label: string; value: number }) {
-  const safeValue = Math.max(0, Math.min(5, value || 0));
-  return (
-    <div className="flex items-center gap-3">
-      <span className="w-10 text-xs text-text-secondary">{label}</span>
-      <div className="h-2 flex-1 overflow-hidden rounded-full bg-bg-secondary">
-        <div className="h-full rounded-full bg-accent-primary" style={{ width: `${(safeValue / 5) * 100}%` }} />
-      </div>
-      <span className="w-8 text-right text-xs font-semibold text-text-primary">{safeValue.toFixed(1)}</span>
-    </div>
-  );
 }
 
 function SummaryChip({ label, value }: { label: string; value: string }) {
@@ -156,17 +144,13 @@ export function PlayerProfileModal({ userId, onClose }: PlayerProfileModalProps)
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             <SummaryChip label="전적" value={`${stats?.wins ?? 0}승 ${stats?.losses ?? 0}패`} />
             <SummaryChip label="승률" value={`${Math.round(stats?.winRate ?? 0)}%`} />
-            <SummaryChip label="신뢰도" value={`${(rep?.overallAverage ?? 0).toFixed(1)} / 5`} />
+            <SummaryChip label="참여" value={`${stats?.participations ?? 0}회`} />
             <SummaryChip label="피크 티어" value={formatPeakTier(riot)} />
           </div>
 
           <section className="rounded-lg bg-bg-tertiary p-3">
-            <h3 className="mb-3 text-sm font-bold text-text-primary">신뢰도 세부</h3>
-            <div className="space-y-2">
-              <RepBar label="실력" value={rep?.averageSkill ?? 0} />
-              <RepBar label="태도" value={rep?.averageAttitude ?? 0} />
-              <RepBar label="소통" value={rep?.averageCommunication ?? 0} />
-            </div>
+            <h3 className="mb-3 text-sm font-bold text-text-primary">신뢰도</h3>
+            <ReputationSummary stats={rep} />
           </section>
 
           <section className="rounded-lg bg-bg-tertiary p-3">

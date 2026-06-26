@@ -17,7 +17,7 @@ import {
   X,
 } from "lucide-react";
 import { LoadingSpinner, Modal } from "@/components/ui";
-import { RatingStars, RepBar, SummaryChip, WinRateSparkline } from "@/components/domain/ProfileStats";
+import { ReputationSummary, SummaryChip, WinRateSparkline } from "@/components/domain/ProfileStats";
 import { matchApi, reputationApi, userApi } from "@/lib/api-client";
 import { useAuthStore } from "@/stores/auth-store";
 import { getChampionIcon } from "@/components/matches/match-utils";
@@ -517,27 +517,11 @@ export function PlayerProfileModal({ userId, onClose }: PlayerProfileModalProps)
             </section>
 
             <section className="rounded-xl bg-bg-secondary p-4">
-              <div className="mb-4 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <Star className="h-4 w-4 text-accent-gold" />
-                  <h3 className="text-sm font-black text-text-primary">신뢰도 상세</h3>
-                </div>
-                <span className="text-xs text-text-muted">{rep?.totalRatings ?? 0}개 평가</span>
+              <div className="mb-4 flex items-center gap-2">
+                <Star className="h-4 w-4 text-accent-gold" />
+                <h3 className="text-sm font-black text-text-primary">신뢰도</h3>
               </div>
-              <div className="mb-4 flex items-center justify-between rounded-xl bg-bg-primary p-3">
-                <div>
-                  <p className="text-xs font-semibold text-text-tertiary">종합 평가</p>
-                  <div className="mt-1">
-                    <RatingStars value={rep?.overallAverage ?? 0} className="text-sm" />
-                  </div>
-                </div>
-                <p className="text-2xl font-black text-text-primary">{(rep?.overallAverage ?? 0).toFixed(1)}</p>
-              </div>
-              <div className="space-y-3">
-                <RepBar label="실력" value={rep?.averageSkill ?? 0} />
-                <RepBar label="태도" value={rep?.averageAttitude ?? 0} />
-                <RepBar label="소통" value={rep?.averageCommunication ?? 0} />
-              </div>
+              <ReputationSummary stats={rep} />
             </section>
           </div>
 

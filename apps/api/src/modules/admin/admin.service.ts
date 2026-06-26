@@ -88,8 +88,12 @@ export class AdminService {
   // ── Stats ─────────────────────────────────────────────────────────────────
 
   async getStats() {
+    // 테스트 봇은 실제 이용자 수에서 제외한다 (대시보드 "전체 유저"는 봇 미포함)
+    const botWhere = this.getTestBotWhere();
+
     const [
       totalUsers,
+      botUsers,
       totalRooms,
       activeRooms,
       totalMatches,
@@ -97,7 +101,8 @@ export class AdminService {
       pendingPostReports,
       totalClans,
     ] = await Promise.all([
-      this.prisma.user.count(),
+      this.prisma.user.count({ where: { NOT: botWhere } }),
+      this.prisma.user.count({ where: botWhere }),
       this.prisma.room.count(),
       this.prisma.room.count({
         where: { status: { in: ["WAITING", "IN_PROGRESS"] } },
@@ -110,6 +115,7 @@ export class AdminService {
 
     return {
       totalUsers,
+      botUsers,
       totalRooms,
       activeRooms,
       totalMatches,
