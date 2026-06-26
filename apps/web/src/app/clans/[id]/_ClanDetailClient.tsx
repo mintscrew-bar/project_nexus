@@ -35,9 +35,21 @@ import {
   PositionIcon,
   POSITION_LABELS,
 } from "@/app/tournaments/[id]/lobby/_components/icons";
+import { TierBadge } from "@/components/domain/TierBadge";
 import { cn } from "@/lib/utils";
 
 const RECRUIT_ROLE_OPTIONS = ["TOP", "JUNGLE", "MID", "ADC", "SUPPORT"];
+
+/** 가입일 표기 (YYYY.MM.DD) */
+function formatJoinedDate(value: string): string {
+  return new Date(value)
+    .toLocaleDateString("ko-KR", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    })
+    .replace(/\.$/, "");
+}
 import {
   Shield,
   Crown,
@@ -919,75 +931,115 @@ export default function ClanDetailClient() {
                           ? "ring-2 ring-accent-primary"
                           : "";
 
+                      // 역할 그룹 헤더 (운영진 / 멤버) — 카테고리 전환 시 노출
+                      const category =
+                        member.role === "MEMBER" ? "member" : "leader";
+                      const prevCategory =
+                        index === 0
+                          ? null
+                          : sortedMembers[index - 1].role === "MEMBER"
+                          ? "member"
+                          : "leader";
+                      const showHeader = category !== prevCategory;
+                      const groupCount =
+                        category === "leader"
+                          ? sortedMembers.filter((m) => m.role !== "MEMBER")
+                              .length
+                          : sortedMembers.filter((m) => m.role === "MEMBER")
+                              .length;
+
+                      const riot = member.user.riotAccounts?.[0];
+
                       return (
-                        <motion.div
-                          key={member.id}
-                          initial={{ opacity: 0, y: 8 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: index * 0.03 }}
-                          className="flex items-center justify-between p-4 hover:bg-bg-tertiary/50 transition-colors"
-                        >
-                          <div className="flex items-center gap-3">
-                            {/* 아바타 + 온라인 상태 인디케이터 */}
-                            <div className="relative">
-                              <div
-                                className={`w-10 h-10 rounded-full bg-bg-tertiary overflow-hidden ${ringClass}`}
-                              >
-                                {member.user.avatar ? (
-                                  <Image
-                                    src={member.user.avatar}
-                                    alt={member.user.username}
-                                    width={40}
-                                    height={40}
-                                    className="object-cover"
-                                    unoptimized
-                                  />
-                                ) : (
-                                  <div className="w-full h-full flex items-center justify-center">
-                                    <Users className="h-5 w-5 text-text-tertiary" />
-                                  </div>
+                        <div key={member.id}>
+                          {showHeader && (
+                            <div className="flex items-center gap-2 bg-bg-tertiary/40 px-4 py-1.5 text-[11px] font-bold uppercase tracking-wide text-text-tertiary">
+                              {category === "leader" ? "운영진" : "멤버"}
+                              <span className="text-text-muted">
+                                {groupCount}
+                              </span>
+                            </div>
+                          )}
+                          <motion.div
+                            initial={{ opacity: 0, y: 8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: Math.min(index, 12) * 0.02 }}
+                            className="flex items-center justify-between gap-3 p-4 hover:bg-bg-tertiary/50 transition-colors"
+                          >
+                            <div className="flex min-w-0 items-center gap-3">
+                              {/* 아바타 + 온라인 상태 인디케이터 */}
+                              <div className="relative flex-shrink-0">
+                                <div
+                                  className={`w-10 h-10 rounded-full bg-bg-tertiary overflow-hidden ${ringClass}`}
+                                >
+                                  {member.user.avatar ? (
+                                    <Image
+                                      src={member.user.avatar}
+                                      alt={member.user.username}
+                                      width={40}
+                                      height={40}
+                                      className="object-cover"
+                                      unoptimized
+                                    />
+                                  ) : (
+                                    <div className="w-full h-full flex items-center justify-center">
+                                      <Users className="h-5 w-5 text-text-tertiary" />
+                                    </div>
+                                  )}
+                                </div>
+                                {/* 온라인 상태 인디케이터 (친구인 경우) */}
+                                {presenceStatus && (
+                                  <span className="absolute bottom-0 right-0">
+                                    <StatusIndicator
+                                      status={onlineStatus}
+                                      size="sm"
+                                    />
+                                  </span>
                                 )}
                               </div>
-                              {/* 온라인 상태 인디케이터 (친구인 경우) */}
-                              {presenceStatus && (
-                                <span className="absolute bottom-0 right-0">
-                                  <StatusIndicator
-                                    status={onlineStatus}
-                                    size="sm"
-                                  />
-                                </span>
-                              )}
-                            </div>
 
-                            {/* 유저명 + 역할 배지 */}
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <p className="font-medium text-text-primary">
-                                  {member.user.username}
-                                </p>
-                                {getRoleBadge(member.role)}
+                              {/* 유저명 + 역할 + 라이엇 정보 */}
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2">
+                                  {riot?.mainRole && (
+                                    <PositionIcon
+                                      position={riot.mainRole}
+                                      className="!h-4 !w-4 flex-shrink-0"
+                                    />
+                                  )}
+                                  <p className="truncate font-medium text-text-primary">
+                                    {member.user.username}
+                                  </p>
+                                  {getRoleBadge(member.role)}
+                                </div>
+                                <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-text-tertiary">
+                                  {riot && (
+                                    <span className="truncate">
+                                      {riot.gameName}#{riot.tagLine}
+                                    </span>
+                                  )}
+                                  {riot?.tier && (
+                                    <TierBadge tier={riot.tier} size="sm" />
+                                  )}
+                                  <span className="text-text-muted">
+                                    {formatJoinedDate(member.joinedAt)} 가입
+                                  </span>
+                                </div>
                               </div>
-                              {member.user.riotAccounts?.[0] && (
-                                <p className="text-xs text-text-tertiary">
-                                  {member.user.riotAccounts[0].gameName}#
-                                  {member.user.riotAccounts[0].tagLine}
-                                  {member.user.riotAccounts[0].tier &&
-                                    ` · ${member.user.riotAccounts[0].tier}`}
-                                </p>
-                              )}
                             </div>
-                          </div>
 
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() =>
-                              router.push(`/users/${member.user.id}`)
-                            }
-                          >
-                            프로필
-                          </Button>
-                        </motion.div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="flex-shrink-0"
+                              onClick={() =>
+                                router.push(`/users/${member.user.id}`)
+                              }
+                            >
+                              프로필
+                            </Button>
+                          </motion.div>
+                        </div>
                       );
                     })}
                   </div>

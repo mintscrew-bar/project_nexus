@@ -17,6 +17,7 @@ import { LoadingSpinner, Card, CardHeader, CardTitle, CardContent, Badge, Button
 import { Star, Plus, RefreshCw, Shield, TrendingUp, Loader2, History, Clock, Settings, User, BarChart3, Pencil, Trash2, Swords, Gavel, Camera, Check, X, MoreVertical, Activity, Calendar, Trophy, Target, Radio, ExternalLink } from 'lucide-react';
 import { TierBadge } from '@/components/domain/TierBadge';
 import { RatingStars, WinRateSparkline } from '@/components/domain/ProfileStats';
+import { PreferredChampionPanel, RankedChampionPanel } from '@/components/domain/ProfileChampionPanels';
 import { useToast } from '@/components/ui/Toast';
 import { usePresence } from '@/hooks/usePresence';
 import { getChampionKoreanName, searchChampionsByQuery } from '@nexus/types';
@@ -1308,69 +1309,18 @@ export default function ProfilePage() {
                 {/* 선호 포지션 탭 */}
                 {preferredChampions.length > 0 && (
                   <TabsContent value="preferred" className="space-y-4">
-                    {preferredChampions.map(({ role, champions: champs }) => (
-                      <div key={role}>
-                        <div className="flex items-center gap-2 mb-2">
-                          <Badge variant="default" size="sm">{ROLE_LABELS[role] ?? role}</Badge>
-                        </div>
-                        <div className="flex flex-wrap gap-3">
-                          {champs.map(({ championId }) => (
-                            <div key={championId} className="flex items-center gap-2 bg-bg-tertiary border border-bg-elevated rounded-lg px-3 py-2">
-                              <ChampionImage
-                                championKey={getChampionKey(championId)}
-                                size={32}
-                                className="rounded-md"
-                              />
-                              <span className="text-sm font-medium text-text-primary">
-                                {getChampionName(championId)}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
+                    <PreferredChampionPanel
+                      groups={preferredChampions}
+                      getChampionKey={getChampionKey}
+                      getChampionName={getChampionName}
+                    />
                   </TabsContent>
                 )}
 
                 {/* 랭크 모스트 탭 */}
                 {rankedChampStats.length > 0 && (
                   <TabsContent value="ranked" className="space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-                      {rankedChampStats.map((champ: any, idx: number) => {
-                        const winRate = champ.games > 0 ? ((champ.wins / champ.games) * 100).toFixed(0) : '0';
-                        const kda = champ.deaths > 0
-                          ? ((champ.kills + champ.assists) / champ.deaths).toFixed(2)
-                          : 'Perfect';
-                        return (
-                          <div key={champ.championName} className="flex items-center gap-3 bg-bg-tertiary border border-bg-elevated rounded-lg p-3">
-                            <div className="relative">
-                              <ChampionImage
-                                championKey={champ.championName}
-                                size={40}
-                                className="rounded-md"
-                              />
-                              {idx === 0 && (
-                                <div className="absolute -top-1 -right-1 bg-accent-gold text-bg-primary text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
-                                  1
-                                </div>
-                              )}
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <p className="text-sm font-medium text-text-primary truncate">
-                                {getChampionKoreanName(champ.championName)}
-                              </p>
-                              <div className="flex items-center gap-2 text-xs text-text-tertiary">
-                                <span>{champ.games}게임</span>
-                                <span className={Number(winRate) >= 50 ? 'text-accent-success' : 'text-accent-danger'}>
-                                  {winRate}%
-                                </span>
-                                <span>{kda} KDA</span>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
+                    <RankedChampionPanel champions={rankedChampStats} />
                   </TabsContent>
                 )}
               </Tabs>
