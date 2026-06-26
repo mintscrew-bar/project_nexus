@@ -20,6 +20,11 @@ export class ListClansQueryDto {
   @IsString()
   minTier?: string;
 
+  /** 모집 포지션 필터 (CSV, 예: "TOP,JUNGLE") */
+  @IsOptional()
+  @IsString()
+  recruitRoles?: string;
+
   @IsOptional()
   @IsString()
   sort?: string;

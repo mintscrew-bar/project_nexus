@@ -64,6 +64,13 @@ export class ClanController {
       search: query.search,
       isRecruiting: query.isRecruiting,
       minTier: query.minTier,
+      // CSV("TOP,JUNGLE") → 배열. 빈 값은 제거.
+      recruitRoles: query.recruitRoles
+        ? query.recruitRoles
+            .split(",")
+            .map((r) => r.trim().toUpperCase())
+            .filter(Boolean)
+        : undefined,
       sort: query.sort,
     });
   }

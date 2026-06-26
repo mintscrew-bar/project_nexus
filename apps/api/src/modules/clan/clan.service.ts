@@ -259,7 +259,8 @@ export class ClanService {
     search?: string;
     isRecruiting?: boolean;
     minTier?: string;
-    sort?: string; // 'latest' | 'members' | 'ranking'
+    recruitRoles?: string[];
+    sort?: string; // 'latest' | 'members' | 'active'
   }) {
     const where: any = {};
 
@@ -278,13 +279,18 @@ export class ClanService {
       where.minTier = filters.minTier;
     }
 
+    // 모집 포지션: 지정한 포지션 중 하나라도 모집 중인 클랜
+    if (filters?.recruitRoles && filters.recruitRoles.length > 0) {
+      where.recruitRoles = { hasSome: filters.recruitRoles };
+    }
+
     // 정렬 기준 설정
     let orderBy: any = { createdAt: "desc" };
     if (filters?.sort === "members") {
       orderBy = { members: { _count: "desc" } };
-    } else if (filters?.sort === "ranking") {
-      // 랭킹 기준 정렬 (clanRankings 승률 평균 - 간략화)
-      orderBy = { createdAt: "desc" }; // 추후 집계 컬럼 추가 시 변경
+    } else if (filters?.sort === "active") {
+      // 활동순: 최근 활동(lastActiveAt) 우선, 미활동(null)은 뒤로
+      orderBy = { lastActiveAt: { sort: "desc", nulls: "last" } };
     }
 
     return this.prisma.clan.findMany({
@@ -295,6 +301,10 @@ export class ClanService {
         tag: true,
         description: true,
         logo: true,
+        banner: true,
+        accentColor: true,
+        recruitRoles: true,
+        lastActiveAt: true,
         isRecruiting: true,
         maxMembers: true,
         minTier: true,
@@ -777,6 +787,9 @@ export class ClanService {
         },
       },
     });
+
+    // 채팅은 활동 로그를 남기지 않으므로 활동성만 별도로 갱신
+    await this.touchClanActivity(clanId);
 
     return message;
   }
@@ -1651,6 +1664,15 @@ export class ClanService {
         details: details as any,
       },
     });
+    // 로그가 남는 모든 이벤트는 활동성 신호로도 반영
+    await this.touchClanActivity(clanId);
+  }
+
+  /** 클랜 활동성(lastActiveAt) 갱신 — 활동순 정렬/탐색용 경량 신호. 실패는 무시. */
+  private async touchClanActivity(clanId: string): Promise<void> {
+    await this.prisma.clan
+      .update({ where: { id: clanId }, data: { lastActiveAt: new Date() } })
+      .catch(() => undefined);
   }
 
   async getActivityLogs(
