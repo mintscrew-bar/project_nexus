@@ -3,9 +3,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Radio } from "lucide-react";
-import { NEXUS_DISCORD_INVITE_URL } from "@/lib/constants";
 
-const BANNER_IMAGE = "/images/banners/creator-recruit-banner.png";
+const BANNER_IMAGE = "/images/banners/streamer-clan-recruit-characters-v3.png";
 
 export function CreatorPromoStrip() {
   return (
@@ -21,34 +20,21 @@ export function CreatorPromoStrip() {
 
       <div className="relative z-10 mx-auto flex max-w-7xl flex-col gap-2 px-4 py-2.5 sm:flex-row sm:items-center sm:justify-between md:px-6">
         <div className="flex min-w-0 items-center gap-3">
-          <span className="hidden h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border border-cyan-300/25 bg-cyan-300/10 text-cyan-200 sm:flex">
-            <Radio className="h-4 w-4 text-violet-700" />
+          <span className="hidden h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border border-violet-300/30 bg-violet-300/15 text-violet-700 sm:flex">
+            <Radio className="h-4 w-4" />
           </span>
-          <div className="min-w-0">
-            <p className="truncate text-sm font-black text-zinc-950">
-              내전 운영, 더 쉽고 재밌게! NEXUS가 도와드릴게요
-            </p>
-          </div>
+          <p className="truncate text-sm font-black text-zinc-950">
+            NEXUS와 함께 성장할 스트리머, 클랜을 찾고 있어요
+          </p>
         </div>
 
-        <div className="flex flex-shrink-0 items-center gap-2">
-          <a
-            href={NEXUS_DISCORD_INVITE_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-violet-500"
-          >
-            시작하기
-            <ArrowRight className="h-3.5 w-3.5" />
-          </a>
-          <Link
-            href="/tournaments?create=true"
-            className="hidden items-center gap-1.5 rounded-lg border border-violet-200 bg-white/70 px-3 py-1.5 text-xs font-semibold text-violet-800 transition-colors hover:bg-white sm:inline-flex"
-          >
-            방 만들기
-            <ArrowRight className="h-3.5 w-3.5" />
-          </Link>
-        </div>
+        <Link
+          href="/partners"
+          className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-violet-500"
+        >
+          자세히 보기
+          <ArrowRight className="h-3.5 w-3.5" />
+        </Link>
       </div>
     </aside>
   );
