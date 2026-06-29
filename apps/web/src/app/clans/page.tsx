@@ -479,15 +479,16 @@ export default function ClansPage() {
               description={
                 searchQuery
                   ? "검색 조건에 맞는 클랜이 없습니다."
-                  : "첫 번째 클랜을 만들어보세요!"
+                  : isAuthenticated
+                  ? "첫 번째 클랜을 만들어보세요!"
+                  : "로그인하면 클랜을 만들거나 가입할 수 있어요."
               }
               action={
-                isAuthenticated
-                  ? {
-                      label: "클랜 만들기",
-                      onClick: () => router.push("/clans/create"),
-                    }
-                  : undefined
+                searchQuery
+                  ? { label: "검색 초기화", onClick: () => setSearchQuery("") }
+                  : isAuthenticated
+                  ? { label: "클랜 만들기", onClick: () => router.push("/clans/create") }
+                  : { label: "로그인하기", onClick: () => router.push("/auth/login") }
               }
             />
           ) : (

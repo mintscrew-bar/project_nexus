@@ -26,12 +26,12 @@
   - `/terms`, `/privacy` 실제 경로로 연결
   - 파일: `apps/web/src/app/auth/login/page.tsx`
 
-- [ ] Task 5: [P2] 쿠키 배너 모바일 UX 개선
+- [x] Task 5: [P2] 쿠키 배너 모바일 UX 개선
   - 하단 고정 쿠키 배너가 모바일에서 카드 하단 정보·CTA를 가림
   - 배너 높이 축소 또는 페이지별 `pb-safe` padding 적용
   - 파일: `apps/web/src/components/analytics/ConsentBanner.tsx`
 
-- [ ] Task 6: [P2] 커뮤니티/클랜 빈 상태 개선
+- [x] Task 6: [P2] 커뮤니티/클랜 빈 상태 개선
   - 커뮤니티 카테고리 빈 섹션, 클랜 설명 없는 카드 → 서비스가 비어 보임
   - 빈 상태 CTA, 운영 공지 샘플, 작성 유도 UI 추가
   - 파일: `apps/web/src/app/community/page.tsx`, `apps/web/src/app/clans/page.tsx`

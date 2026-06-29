@@ -334,7 +334,9 @@ function CommunityPageContent() {
                   description={
                     debouncedSearch || selectedTag
                       ? "다른 검색어나 태그로 시도해보세요."
-                      : "첫 번째 게시글을 작성해보세요!"
+                      : isAuthenticated
+                      ? "첫 번째 게시글을 작성해보세요!"
+                      : "로그인하면 게시글을 작성할 수 있어요."
                   }
                   action={
                     selectedTag
@@ -343,7 +345,7 @@ function CommunityPageContent() {
                       ? { label: "검색어 초기화", onClick: () => useCommunityStore.getState().setSearchQuery("") }
                       : isAuthenticated
                       ? { label: "글쓰기", onClick: () => router.push("/community/write") }
-                      : undefined
+                      : { label: "로그인하기", onClick: () => router.push("/auth/login") }
                   }
                 />
               ) : (
@@ -375,7 +377,9 @@ function CommunityPageContent() {
                 description={
                   debouncedSearch || selectedTag
                     ? "다른 검색어나 태그로 시도해보세요."
-                    : "첫 번째 게시글을 작성해보세요!"
+                    : isAuthenticated
+                    ? "첫 번째 게시글을 작성해보세요!"
+                    : "로그인하면 게시글을 작성할 수 있어요."
                 }
                 action={
                   selectedTag
@@ -384,7 +388,7 @@ function CommunityPageContent() {
                     ? { label: "검색어 초기화", onClick: () => useCommunityStore.getState().setSearchQuery("") }
                     : isAuthenticated
                     ? { label: "글쓰기", onClick: () => router.push("/community/write") }
-                    : undefined
+                    : { label: "로그인하기", onClick: () => router.push("/auth/login") }
                 }
               />
             ) : (
