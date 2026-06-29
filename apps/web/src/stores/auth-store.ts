@@ -92,10 +92,18 @@ export const useAuthStore = create<AuthState>((set) => ({
         set({ user: cachedUser, isAuthenticated: true });
       }
 
+      // 로그인 힌트도 캐시도 없으면 비로그인 확정 — refresh 호출 불필요
+      const hasSessionHint = (() => {
+        try { return !!localStorage.getItem(HINT_KEY); } catch { return false; }
+      })();
+      if (!hasSessionHint && !cachedUser) {
+        set({ isLoading: false });
+        _initPromise = null;
+        return;
+      }
+
       try {
         // refresh token으로 access token을 먼저 발급받은 뒤 /auth/me 조회
-        // 타임아웃 없음: 비로그인 유저는 쿠키가 없어 Next.js 라우트에서 즉시 401 반환
-        // (쿠키 있는 로그인 유저는 서버가 느려도 타임아웃으로 강제 로그아웃되면 안 됨)
         const user = await authApi.initSession();
         saveUserToStorage(user);
         set({ user, isAuthenticated: true });
