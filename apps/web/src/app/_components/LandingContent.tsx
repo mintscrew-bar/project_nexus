@@ -134,6 +134,39 @@ const landingNavLinks = [
 export function LandingContentSections({ showBanner = true }: { showBanner?: boolean }) {
   return (
     <>
+      {/* 모바일 전용 히어로 — 배너보다 먼저 핵심 가치와 CTA를 노출 */}
+      {showBanner && (
+        <section className="md:hidden px-6 pt-8 pb-4">
+          <h1 className="text-3xl font-extrabold text-text-primary leading-tight">
+            롤 내전 운영의{" "}
+            <span
+              className="bg-clip-text text-transparent"
+              style={{ backgroundImage: "linear-gradient(135deg, #8b5cf6, #6366f1, #d946ef)" }}
+            >
+              모든 것
+            </span>
+            , Nexus
+          </h1>
+          <p className="mt-3 text-sm leading-relaxed text-text-secondary">
+            팀 구성, 경매 드래프트, 전적 기록까지 — 디스코드 채팅 없이 한 화면에서.
+          </p>
+          <div className="mt-5 flex gap-3">
+            <Link
+              href="/auth/login"
+              className="rounded-lg bg-accent-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent-hover"
+            >
+              무료로 시작하기
+            </Link>
+            <Link
+              href="/tournaments"
+              className="rounded-lg border border-bg-tertiary bg-bg-secondary px-4 py-2.5 text-sm font-semibold text-text-secondary transition-colors hover:text-text-primary"
+            >
+              내전방 보기
+            </Link>
+          </div>
+        </section>
+      )}
+
       {/* 배너 캐러셀 */}
       {showBanner && (
         <section className="px-6 py-6">

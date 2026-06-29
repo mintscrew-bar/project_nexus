@@ -7,7 +7,7 @@ export function AdSenseScript() {
       src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADSENSE_CLIENT}`}
       async
       crossOrigin="anonymous"
-      data-cfasync="false"
+
     />
   );
 }

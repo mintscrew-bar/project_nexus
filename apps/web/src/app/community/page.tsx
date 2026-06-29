@@ -269,12 +269,14 @@ function CommunityPageContent() {
           onSelect={setSelectedCategory}
         />
 
-        {/* ── 카테고리 헤더 (단일 카테고리 선택 시) ── */}
-        {categoryTitle && CategoryIcon && (
+        {/* ── 카테고리 헤더 ── */}
+        {categoryTitle && CategoryIcon ? (
           <div className="flex items-center gap-2 mb-4">
             <CategoryIcon className={cn("h-5 w-5", categoryColor)} />
             <h1 className="text-lg font-bold text-text-primary">{categoryTitle}</h1>
           </div>
+        ) : (
+          <h1 className="sr-only">커뮤니티</h1>
         )}
 
         {/* ── 검색/정렬/태그 필터바 ── */}

@@ -338,6 +338,7 @@ export default function ClansPage() {
     <>
       <div className="flex-grow p-4 md:p-6 animate-fade-in">
         <div className="container mx-auto max-w-5xl">
+          <h1 className="sr-only">클랜 브라우저</h1>
           {/* 검색 & 필터 */}
           <div className="flex flex-col sm:flex-row gap-4 mb-6">
             <form onSubmit={handleSearch} className="flex-grow flex gap-2">

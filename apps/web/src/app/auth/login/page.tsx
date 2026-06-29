@@ -103,11 +103,11 @@ function LoginPageContent() {
             <div className="text-center text-xs text-text-tertiary">
               <p>
                 로그인하면{" "}
-                <a href="#" className="text-accent-primary hover:underline">
+                <a href="/terms" className="text-accent-primary hover:underline">
                   이용약관
                 </a>
                 과{" "}
-                <a href="#" className="text-accent-primary hover:underline">
+                <a href="/privacy" className="text-accent-primary hover:underline">
                   개인정보 처리방침
                 </a>
                 에 동의하는 것으로 간주됩니다.
