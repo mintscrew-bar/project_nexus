@@ -55,6 +55,22 @@ export class LabTasksService {
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const dailyLimit = this.getPositiveIntEnv(
+      "RIOT_TIER_REFRESH_DAILY_LIMIT",
+      500,
+    );
+    const chunkSize = this.getPositiveIntEnv(
+      "RIOT_TIER_REFRESH_CHUNK_SIZE",
+      5,
+    );
+    const chunkDelayMs = this.getPositiveIntEnv(
+      "RIOT_TIER_REFRESH_CHUNK_DELAY_MS",
+      6_000,
+    );
+    const nonBotRiotAccountWhere = {
+      puuid: { not: { startsWith: "bot_puuid_" } },
+      tagLine: { not: "BOT" },
+    };
 
     // 1순위: 최근 30일 내전 참가 기록이 있는 유저의 RiotAccount
     const activeUserIds = await this.prisma.$queryRaw<
@@ -76,6 +92,7 @@ export class LabTasksService {
     // 활성 유저의 모든 RiotAccount (당일 미갱신만)
     const priorityAccounts = await this.prisma.riotAccount.findMany({
       where: {
+        ...nonBotRiotAccountWhere,
         userId: { in: Array.from(activeUserIdSet) },
         OR: [{ lastSyncedAt: null }, { lastSyncedAt: { lt: todayStart } }],
       },
@@ -87,15 +104,16 @@ export class LabTasksService {
         peakTier: true,
         peakRank: true,
       },
-      take: 2000,
+      take: dailyLimit,
     });
 
     // 2순위: 나머지 계정 (lastSyncedAt 가장 오래된 순, 남은 할당량)
-    const remaining = Math.max(0, 3000 - priorityAccounts.length);
+    const remaining = Math.max(0, dailyLimit - priorityAccounts.length);
     const rollingAccounts =
       remaining > 0
         ? await this.prisma.riotAccount.findMany({
             where: {
+              ...nonBotRiotAccountWhere,
               userId: { notIn: Array.from(activeUserIdSet) },
               OR: [
                 { lastSyncedAt: null },
@@ -122,14 +140,12 @@ export class LabTasksService {
     }
 
     this.logger.log(
-      `RiotTierRefreshTask 시작: 1순위 ${priorityAccounts.length}건, 2순위 ${rollingAccounts.length}건`,
+      `RiotTierRefreshTask 시작: 1순위 ${priorityAccounts.length}건, 2순위 ${rollingAccounts.length}건, chunk=${chunkSize}, delay=${chunkDelayMs}ms`,
     );
 
     let synced = 0;
     let failed = 0;
 
-    // 50명씩 청크로 나눠 처리 — HIGH 그룹 20,000 req/10s 기준 동시 50건은 여유로움
-    const chunkSize = 50;
     for (let i = 0; i < allAccounts.length; i += chunkSize) {
       const chunk = allAccounts.slice(i, i + chunkSize);
 
@@ -189,9 +205,8 @@ export class LabTasksService {
         }
       }
 
-      // 청크 사이 2초 대기 — Redis rate check가 없으므로 최소 간격 유지
       if (i + chunkSize < allAccounts.length) {
-        await new Promise((r) => setTimeout(r, 2_000));
+        await this.sleep(chunkDelayMs);
       }
     }
 
@@ -200,6 +215,15 @@ export class LabTasksService {
     );
 
     return { synced, failed, total: allAccounts.length };
+  }
+
+  private getPositiveIntEnv(name: string, fallback: number): number {
+    const parsed = Number.parseInt(process.env[name] ?? "", 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   // ─── Task 8: LabSnapshotTask — 매일 새벽 4시 ───

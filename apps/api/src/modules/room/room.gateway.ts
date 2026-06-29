@@ -285,7 +285,8 @@ export class RoomGateway
     roomId: string,
   ) {
     try {
-      if (!this.server.sockets.adapter.rooms.get(this.ROOM_LIST_CHANNEL)?.size) {
+      const adapterRooms = this.server?.sockets?.adapter?.rooms;
+      if (!adapterRooms?.get(this.ROOM_LIST_CHANNEL)?.size) {
         return;
       }
 
