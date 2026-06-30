@@ -177,6 +177,30 @@ export class UserController {
     return { avatarUrl };
   }
 
+  @Post("me/profile-banner")
+  @UseInterceptors(FileInterceptor("banner"))
+  async uploadProfileBanner(
+    @CurrentUser("sub") userId: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) {
+      throw new BadRequestException("?뚯씪???낅줈?쒕릺吏 ?딆븯?듬땲??");
+    }
+
+    await this.uploadService.validateMimeType(file);
+
+    const oldBannerUrl = await this.userService.getProfileBannerUrl(userId);
+    if (oldBannerUrl && oldBannerUrl.startsWith("/uploads/")) {
+      const oldFilename = oldBannerUrl.replace("/uploads/", "");
+      await this.uploadService.deleteFile(oldFilename);
+    }
+
+    const profileBannerUrl = this.uploadService.getFileUrl(file.filename);
+    await this.userService.updateProfileBanner(userId, profileBannerUrl);
+
+    return { profileBannerUrl };
+  }
+
   /**
    * DELETE /users/me
    * 회원 탈퇴: 현재 로그인한 유저의 계정을 삭제한다.

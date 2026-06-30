@@ -79,6 +79,7 @@ interface ProfileUser {
   username: string;
   bio: string | null;
   avatar: string | null;
+  profileBanner: string | null;
   createdAt: string;
   reputationScore: number | null;
   riotAccounts: Array<{
@@ -486,6 +487,27 @@ export default function UserProfilePage() {
       <div className="container mx-auto max-w-6xl">
         {/* Profile Hero Section */}
         <Card className="mb-4 overflow-hidden rounded-lg border-bg-tertiary bg-bg-secondary p-0 shadow-sm">
+          <div
+            className="relative h-28 w-full bg-bg-tertiary md:h-36"
+            style={
+              profile.profileBanner
+                ? undefined
+                : {
+                    background: `linear-gradient(135deg, ${PROFILE_ACCENT}44, ${PROFILE_ACCENT}0d)`,
+                  }
+            }
+          >
+            {profile.profileBanner && (
+              <Image
+                src={profile.profileBanner}
+                alt={`${profile.username} 프로필 배경`}
+                fill
+                className="pointer-events-none object-cover"
+                unoptimized
+              />
+            )}
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-bg-secondary to-transparent" />
+          </div>
           <CardContent className="p-4 md:p-5">
             <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
               <div className="flex min-w-0 flex-1 flex-col gap-4 sm:flex-row sm:items-start">

@@ -340,7 +340,7 @@ export default function ClansPage() {
         <div className="container mx-auto max-w-5xl">
           <h1 className="sr-only">클랜 브라우저</h1>
           {/* 검색 & 필터 */}
-          <div className="flex flex-col sm:flex-row gap-4 mb-6">
+          <div className="flex flex-col gap-3 mb-6">
             <form onSubmit={handleSearch} className="flex-grow flex gap-2">
               <div className="relative flex-grow">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-tertiary" />
@@ -358,7 +358,7 @@ export default function ClansPage() {
             </form>
 
             {/* 모바일: 2열 균등 그리드 / 데스크톱: 인라인 */}
-            <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
+            <div className="grid grid-cols-2 sm:flex sm:flex-row sm:flex-wrap gap-2">
               {/* 정렬 드롭다운 */}
               <Dropdown
                 className="w-full sm:w-auto"
@@ -467,7 +467,7 @@ export default function ClansPage() {
 
           {/* 스켈레톤 로딩 */}
           {isLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {Array.from({ length: 6 }).map((_, i) => (
                 <ClanCardSkeleton key={i} />
               ))}
@@ -492,7 +492,7 @@ export default function ClansPage() {
               }
             />
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 stagger-children">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 stagger-children">
               {clans.map((clan) => {
                 const memberCount = clan._count.members;
                 const isFull = memberCount >= clan.maxMembers;
@@ -512,7 +512,7 @@ export default function ClansPage() {
                   >
                     {/* 정체성 띠: 배너 이미지 또는 대표색 그라디언트 */}
                     <div
-                      className="relative h-12 w-full bg-bg-tertiary"
+                      className="relative h-24 w-full bg-bg-tertiary"
                       style={
                         clan.banner
                           ? undefined

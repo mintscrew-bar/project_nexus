@@ -485,6 +485,15 @@ export const userApi = {
     return response.data;
   },
 
+  uploadProfileBanner: async (file: File) => {
+    const formData = new FormData();
+    formData.append("banner", file);
+    const response = await apiClient.post("/users/me/profile-banner", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return response.data as { profileBannerUrl: string };
+  },
+
   syncDiscordAvatar: async () => {
     const response = await apiClient.post("/users/me/avatar/sync-discord");
     return response.data as { avatarUrl: string };
