@@ -679,15 +679,15 @@ export default function ClanDetailClient() {
                   src={clan.banner}
                   alt={`${clan.name} 배너`}
                   fill
-                  className="object-cover"
+                  className="pointer-events-none object-cover"
                   unoptimized
                 />
               )}
               {/* 하단 가독성 그라디언트 */}
-              <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-bg-secondary to-transparent" />
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-bg-secondary to-transparent" />
             </div>
 
-            <CardContent className="p-6 pt-0">
+            <CardContent className="relative z-10 p-6 pt-0">
               <div className="-mt-12 flex flex-col gap-6 md:flex-row md:items-end">
                 {/* 엠블럼 */}
                 <ClanEmblem
@@ -742,7 +742,7 @@ export default function ClanDetailClient() {
                 </div>
 
                 {/* 액션 버튼 영역 */}
-                <div className="flex w-full flex-col gap-2 md:w-auto md:pb-1">
+                <div className="relative z-20 flex w-full flex-col gap-2 md:w-auto md:pb-1">
                   {isMember ? (
                     <>
                       {canManage && (
