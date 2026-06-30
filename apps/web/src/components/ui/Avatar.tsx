@@ -2,7 +2,9 @@
 
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+
+const DEFAULT_AVATAR_SRC = '/images/N-avatar.png';
 
 interface AvatarProps {
   src?: string | null;
@@ -16,12 +18,16 @@ interface AvatarProps {
 export function Avatar({
   src,
   alt = 'Avatar',
-  fallback,
   size = 'md',
   status,
   className,
 }: AvatarProps) {
   const [imageError, setImageError] = useState(false);
+  const normalizedSrc = src?.trim() || null;
+
+  useEffect(() => {
+    setImageError(false);
+  }, [normalizedSrc]);
 
   const sizeStyles = {
     sm: 'h-8 w-8 text-xs',
@@ -44,12 +50,6 @@ export function Avatar({
     xl: 'h-4 w-4',
   };
 
-  const getFallbackText = () => {
-    if (fallback) return fallback.slice(0, 2).toUpperCase();
-    if (alt) return alt.slice(0, 2).toUpperCase();
-    return '??';
-  };
-
   return (
     <div className={cn('relative inline-flex', className)}>
       <div
@@ -58,9 +58,9 @@ export function Avatar({
           sizeStyles[size]
         )}
       >
-        {src && !imageError ? (
+        {normalizedSrc && !imageError ? (
           <Image
-            src={src}
+            src={normalizedSrc}
             alt={alt}
             fill
             sizes={
@@ -73,7 +73,18 @@ export function Avatar({
             onError={() => setImageError(true)}
           />
         ) : (
-          <span>{getFallbackText()}</span>
+          <Image
+            src={DEFAULT_AVATAR_SRC}
+            alt={alt}
+            fill
+            sizes={
+              size === 'sm' ? '32px' :
+              size === 'md' ? '40px' :
+              size === 'lg' ? '48px' :
+              '64px'
+            }
+            className="object-cover"
+          />
         )}
       </div>
       {status && (

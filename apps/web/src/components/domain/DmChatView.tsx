@@ -1,12 +1,12 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import Image from 'next/image';
 import { useAuthStore } from '@/stores/auth-store';
 import { useDmStore, DirectMessage } from '@/stores/dm-store';
 import { dmApi } from '@/lib/api-client';
 import { dmSocketHelpers } from '@/lib/socket-client';
 import { cn } from '@/lib/utils';
+import { Avatar } from '@/components/ui';
 import { Send, Loader2 } from 'lucide-react';
 
 interface Props {
@@ -245,21 +245,13 @@ export function DmChatView({ otherUserId, otherUsername, otherAvatar }: Props) {
               {!isMine && (
                 <div className="w-6 flex-shrink-0">
                   {showAvatar && (
-                    <div className="w-6 h-6 rounded-full bg-bg-tertiary flex items-center justify-center overflow-hidden">
-                      {otherAvatar ? (
-                        <Image
-                          src={otherAvatar}
-                          alt=""
-                          width={24}
-                          height={24}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <span className="text-[10px] font-bold text-text-muted">
-                          {otherUsername[0]?.toUpperCase()}
-                        </span>
-                      )}
-                    </div>
+                    <Avatar
+                      src={otherAvatar}
+                      alt={otherUsername}
+                      fallback={otherUsername}
+                      size="sm"
+                      className="[&>div]:h-6 [&>div]:w-6 [&>div]:text-[10px]"
+                    />
                   )}
                 </div>
               )}
