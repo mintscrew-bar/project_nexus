@@ -5,6 +5,7 @@ interface User {
   id: string;
   username: string;
   avatar: string | null;
+  profileBanner?: string | null;
   email?: string;
   role: 'USER' | 'MODERATOR' | 'ADMIN';
   [key: string]: any;
@@ -45,6 +46,7 @@ function saveUserToStorage(user: User) {
         id: user.id,
         username: user.username,
         avatar: user.avatar,
+        profileBanner: user.profileBanner,
       })
     );
     // 새 탭에서도 timeout을 길게 쓰기 위한 힌트 (민감 정보 없음)

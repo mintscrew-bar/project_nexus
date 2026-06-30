@@ -27,6 +27,7 @@ export interface User {
   username: string;
   discriminator: string;
   avatar: string | null;
+  profileBanner?: string | null;
   email?: string;
   nickname?: string;
   role: UserRole;

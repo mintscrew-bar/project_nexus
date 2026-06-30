@@ -603,8 +603,11 @@ export default function ProfilePage() {
   const [editBio, setEditBio] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [isUploadingBanner, setIsUploadingBanner] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [bannerPreview, setBannerPreview] = useState<string | null>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
+  const bannerInputRef = useRef<HTMLInputElement>(null);
   const [profileDirty, setProfileDirty] = useState(false);
 
   const fetchProfile = useCallback(async () => {
@@ -689,6 +692,41 @@ export default function ProfilePage() {
     } finally {
       setIsUploadingAvatar(false);
       if (avatarInputRef.current) avatarInputRef.current.value = "";
+    }
+  };
+
+  const handleBannerChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.match(/^image\/(jpeg|jpg|png|gif|webp)$/)) {
+      addToast("지원하지 않는 이미지 형식입니다. (jpg, png, gif, webp만 가능)", "error");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      addToast("이미지 크기는 5MB 이하여야 합니다.", "error");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => setBannerPreview(event.target?.result as string);
+    reader.readAsDataURL(file);
+
+    setIsUploadingBanner(true);
+    try {
+      const response = await userApi.uploadProfileBanner(file);
+      if (response.profileBannerUrl) {
+        setBannerPreview(response.profileBannerUrl);
+      }
+      await fetchUser();
+      await fetchProfile();
+      addToast("프로필 배경이 변경되었습니다.", "success");
+    } catch {
+      addToast("프로필 배경 업로드에 실패했습니다.", "error");
+      setBannerPreview(null);
+    } finally {
+      setIsUploadingBanner(false);
+      if (bannerInputRef.current) bannerInputRef.current.value = "";
     }
   };
 
@@ -946,6 +984,7 @@ export default function ProfilePage() {
   const stats = profileData?.stats ?? user?.stats ?? null;
   const streamerProfiles: StreamerProfile[] = profileData?.streamerProfiles ?? [];
   const streamerLinks: StreamerLink[] = profileData?.streamerLinks ?? [];
+  const profileBanner = bannerPreview || profileData?.profileBanner || user?.profileBanner || null;
   const combined = getCombinedProfileMetrics({ stats, recentMatches, rankedChampStats });
   const reputationAverage = clampRating(rep?.overallAverage);
   const reputationCount = rep?.totalRatings ?? 0;
@@ -955,6 +994,45 @@ export default function ProfilePage() {
       <div className="container mx-auto max-w-6xl">
         <section className="mb-6 grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
           <Card className="overflow-hidden rounded-lg border-bg-tertiary bg-bg-secondary p-0 shadow-sm">
+            <div
+              className="relative h-28 w-full bg-bg-tertiary md:h-36"
+              style={
+                profileBanner
+                  ? undefined
+                  : {
+                      background: `linear-gradient(135deg, ${PROFILE_ACCENT}44, ${PROFILE_ACCENT}0d)`,
+                    }
+              }
+            >
+              {profileBanner && (
+                <Image
+                  src={profileBanner}
+                  alt="프로필 배경"
+                  fill
+                  className="pointer-events-none object-cover"
+                  unoptimized
+                />
+              )}
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-bg-secondary to-transparent" />
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="absolute right-3 top-3 z-10 gap-1.5 bg-bg-secondary/90 backdrop-blur"
+                onClick={() => bannerInputRef.current?.click()}
+                disabled={isUploadingBanner}
+              >
+                {isUploadingBanner ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+                배경 변경
+              </Button>
+              <input
+                ref={bannerInputRef}
+                type="file"
+                accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                onChange={handleBannerChange}
+                className="hidden"
+              />
+            </div>
             <CardContent className="p-5 md:p-6">
               {profileLoading && !profileData ? (
                 <div className="flex flex-col gap-5 sm:flex-row sm:items-start">

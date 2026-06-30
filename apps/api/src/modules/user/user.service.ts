@@ -184,6 +184,7 @@ export class UserService {
       select: {
         username: true,
         avatar: true,
+        profileBanner: true,
         riotAccounts: {
           where: { isPrimary: true },
           select: {
@@ -262,6 +263,7 @@ export class UserService {
     return {
       username: user.username,
       avatar: user.avatar,
+      profileBanner: user.profileBanner,
       riotAccount: riot,
       clan,
       streamerProfiles: (user.streamerProfiles ?? []).filter(
@@ -628,12 +630,27 @@ export class UserService {
     });
   }
 
+  async updateProfileBanner(userId: string, profileBannerUrl: string) {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: { profileBanner: profileBannerUrl },
+    });
+  }
+
   async getAvatarUrl(userId: string): Promise<string | null> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { avatar: true },
     });
     return user?.avatar || null;
+  }
+
+  async getProfileBannerUrl(userId: string): Promise<string | null> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { profileBanner: true },
+    });
+    return user?.profileBanner || null;
   }
 
   /**
