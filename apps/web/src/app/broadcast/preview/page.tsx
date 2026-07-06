@@ -8,8 +8,8 @@ import {
   MatchScene,
   IdleScene,
 } from "../[token]/_components/scenes";
-import { AuctionLiveView } from "../[token]/_components/AuctionLiveView";
-import type { BroadcastAuctionState } from "../[token]/_live/useBroadcastAuction";
+import { AuctionBoardView } from "../[token]/_components/AuctionBoardView";
+import type { BroadcastAuctionData } from "../[token]/_live/useBroadcastAuction";
 
 /**
  * /broadcast/preview — 방송 오버레이 디자인 확인용 목업 프리뷰(백엔드 불필요).
@@ -128,40 +128,41 @@ const SNAP: Record<string, any> = {
   },
 };
 
-const MOCK_AUCTION_LIVE: BroadcastAuctionState = {
+const MOCK_PLAYERS = [
+  { id: "p1", username: "다이아왕", tier: "DIAMOND", position: "MID" },
+  { id: "p2", username: "정글러킹", tier: "PLATINUM", position: "JUNGLE" },
+  { id: "p3", username: "탑신병자", tier: "GOLD", position: "TOP" },
+  { id: "p4", username: "원딜장인", tier: "PLATINUM", position: "ADC" },
+];
+
+const MOCK_AUCTION_LIVE: BroadcastAuctionData = {
   connected: true,
   status: "IN_PROGRESS",
   captainPhase: null,
-  current: {
-    player: { id: "p1", username: "다이아왕", tier: "DIAMOND", avatar: null },
-    bid: 320,
-    bidderTeamId: "teamA",
-    bidderName: "블루장",
-    timerEnd: Date.now() + 9000,
-    clockOffset: 0,
-  },
   teams: [TEAM_BLUE, TEAM_RED],
-  remainingCount: 6,
-  feed: [
+  players: MOCK_PLAYERS,
+  auctionState: {
+    currentPlayer: MOCK_PLAYERS[0],
+    currentPlayerIndex: 0,
+    currentHighestBid: 320,
+    currentHighestBidder: "teamA",
+    currentHighestBidderName: "블루 웨이브",
+    timerEnd: Date.now() + 9000,
+    status: "IN_PROGRESS",
+    yuchalCount: 0,
+    maxYuchalCycles: 2,
+    bidIncrement: 10,
+  },
+  bidHistory: [
     {
-      id: "1",
-      type: "bid",
-      teamName: "블루 웨이브",
-      teamColor: "#3B82F6",
-      amount: 320,
-      ts: 0,
+      username: "다이아왕",
+      amount: 0,
+      timestamp: 0,
+      playerLabel: "다이아왕",
+      isSeparator: true,
     },
-    {
-      id: "2",
-      type: "sold",
-      playerName: "미드갓",
-      teamName: "레드 스톰",
-      teamColor: "#EF4444",
-      amount: 180,
-      ts: 0,
-    },
-    { id: "3", type: "unsold", playerName: "정글러킹", ts: 0 },
-    { id: "4", type: "info", text: "▶ 다이아왕 매물 시작", ts: 0 },
+    { username: "레드 스톰", amount: 280, timestamp: 1 },
+    { username: "블루 웨이브", amount: 320, timestamp: 2 },
   ],
 };
 
@@ -185,7 +186,7 @@ export default function BroadcastPreviewPage() {
   ) : isMatch ? (
     <MatchScene snapshot={snapshot} />
   ) : sceneKey === "auction" ? (
-    <AuctionLiveView state={MOCK_AUCTION_LIVE} accent={ACCENT} />
+    <AuctionBoardView data={MOCK_AUCTION_LIVE} />
   ) : (
     <RoomScene snapshot={snapshot} />
   );

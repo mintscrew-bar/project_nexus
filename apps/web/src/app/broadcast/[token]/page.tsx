@@ -7,12 +7,7 @@ import { broadcastApi } from "@/lib/api-client";
 import { connectBroadcastSocket } from "@/lib/socket-client";
 import { BroadcastShell } from "./_components/BroadcastShell";
 import { LowerThird } from "./_components/LowerThird";
-import {
-  RoomScene,
-  MatchScene,
-  IdleScene,
-  accentOf,
-} from "./_components/scenes";
+import { RoomScene, MatchScene, IdleScene } from "./_components/scenes";
 import { BroadcastAuctionLive } from "./_components/BroadcastAuctionLive";
 
 /**
@@ -90,12 +85,8 @@ export default function BroadcastPage() {
   ) : scene === "match" ? (
     <MatchScene snapshot={snapshot} />
   ) : status === "AUCTION" && token && roomId ? (
-    // 경매 단계는 정적 스냅샷 대신 라이브 소켓 구독으로 전 과정 중계
-    <BroadcastAuctionLive
-      token={token}
-      roomId={roomId}
-      accent={accentOf(snapshot)}
-    />
+    // 경매 단계는 정적 스냅샷 대신 기존 경매 화면(AuctionBoard)을 라이브로 중계
+    <BroadcastAuctionLive token={token} roomId={roomId} />
   ) : (
     <RoomScene snapshot={snapshot} />
   );

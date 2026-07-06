@@ -5,60 +5,30 @@ import { connectBroadcastAuctionSocket } from "@/lib/socket-client";
 
 /**
  * 방송 오버레이용 라이브 경매 구독 훅(read-only).
- * 기존 /auction 게이트웨이의 라이브 이벤트(입찰/낙찰/유찰/타이머)를 그대로
- * 구독해 방송 표시 상태로 정리한다. 참가자 스토어와 독립(액션 없음).
+ * 기존 /auction 게이트웨이의 라이브 이벤트를 그대로 구독해, 기존 참가자
+ * 경매 화면(AuctionBoard)이 기대하는 형태(auctionState/teams/players/bidHistory)로
+ * 정리한다. 액션(입찰)은 없음 — 화면만 그대로 살려 방송에 띄운다.
  */
 
-export interface AuctionFeedEntry {
-  id: string;
-  type: "sold" | "unsold" | "bid" | "info";
-  playerName?: string;
-  teamName?: string;
-  teamColor?: string;
-  amount?: number;
-  text?: string;
-  ts: number;
-}
-
-export interface BroadcastAuctionState {
+export interface BroadcastAuctionData {
   connected: boolean;
   status: "WAITING" | "IN_PROGRESS" | "COMPLETED" | null;
   captainPhase: any | null;
-  current: {
-    player: any | null;
-    bid: number;
-    bidderTeamId: string | null;
-    bidderName: string | null;
-    timerEnd: number | null;
-    clockOffset: number; // serverNow - localNow (드리프트 보정)
-  };
+  auctionState: any | null;
   teams: any[];
-  remainingCount: number;
-  feed: AuctionFeedEntry[];
+  players: any[];
+  bidHistory: any[];
 }
 
-const EMPTY: BroadcastAuctionState = {
+const EMPTY: BroadcastAuctionData = {
   connected: false,
   status: null,
   captainPhase: null,
-  current: {
-    player: null,
-    bid: 0,
-    bidderTeamId: null,
-    bidderName: null,
-    timerEnd: null,
-    clockOffset: 0,
-  },
+  auctionState: null,
   teams: [],
-  remainingCount: 0,
-  feed: [],
+  players: [],
+  bidHistory: [],
 };
-
-let feedSeq = 0;
-const pushFeed = (
-  feed: AuctionFeedEntry[],
-  entry: Omit<AuctionFeedEntry, "id" | "ts">,
-) => [{ ...entry, id: `f${++feedSeq}`, ts: Date.now() }, ...feed].slice(0, 6);
 
 const resolvePlayer = (state: any, players: any[]) => {
   if (state?.currentPlayer?.id) return state.currentPlayer;
@@ -69,16 +39,30 @@ const resolvePlayer = (state: any, players: any[]) => {
   return players?.[idx] ?? null;
 };
 
-const teamName = (teams: any[], id: string | null) =>
-  teams.find((t) => t.id === id)?.name ?? "";
-const teamColor = (teams: any[], id: string | null) =>
-  teams.find((t) => t.id === id)?.color ?? undefined;
+// 서버 상태 → AuctionBoard가 기대하는 auctionState. timerEnd는 로컬 시각으로 보정.
+const normalizeState = (s: any, players: any[]): any | null => {
+  if (!s) return null;
+  const offset = typeof s.serverNow === "number" ? s.serverNow - Date.now() : 0;
+  return {
+    currentPlayer: resolvePlayer(s, players),
+    currentPlayerIndex:
+      typeof s.currentPlayerIndex === "number" ? s.currentPlayerIndex : 0,
+    currentHighestBid: s.currentHighestBid ?? 0,
+    currentHighestBidder: s.currentHighestBidder ?? null,
+    currentHighestBidderName: s.currentHighestBidderName ?? null,
+    timerEnd: typeof s.timerEnd === "number" ? s.timerEnd - offset : 0,
+    status: s.status ?? "IN_PROGRESS",
+    yuchalCount: s.yuchalCount ?? 0,
+    maxYuchalCycles: s.maxYuchalCycles ?? 0,
+    bidIncrement: s.bidIncrement ?? 50,
+  };
+};
 
 export function useBroadcastAuction(
   token: string | undefined,
   roomId: string | undefined,
-): BroadcastAuctionState {
-  const [state, setState] = useState<BroadcastAuctionState>(EMPTY);
+): BroadcastAuctionData {
+  const [data, setData] = useState<BroadcastAuctionData>(EMPTY);
   const socketRef = useRef<ReturnType<
     typeof connectBroadcastAuctionSocket
   > | null>(null);
@@ -88,174 +72,145 @@ export function useBroadcastAuction(
     const socket = connectBroadcastAuctionSocket(token);
     socketRef.current = socket;
 
-    const offsetFrom = (data: any) =>
-      typeof data?.serverNow === "number" ? data.serverNow - Date.now() : 0;
-
     const join = () => {
       socket.emit("join-room", { roomId }, (ack: any) => {
         if (!ack?.success) return;
         const players = ack.players ?? [];
-        const s = ack.state ?? null;
-        setState((prev) => ({
+        setData((prev) => ({
           ...prev,
           connected: true,
           status:
-            s?.status ?? (ack.captainSelectionPhase ? "WAITING" : prev.status),
+            ack.state?.status ??
+            (ack.captainSelectionPhase ? "WAITING" : prev.status),
           captainPhase: ack.captainSelectionPhase ?? null,
           teams: ack.teams ?? [],
-          remainingCount: players.length,
-          current: {
-            player: resolvePlayer(s, players),
-            bid: s?.currentHighestBid ?? 0,
-            bidderTeamId: s?.currentHighestBidder ?? null,
-            bidderName: s?.currentHighestBidderName ?? null,
-            timerEnd: s?.timerEnd ?? null,
-            clockOffset: offsetFrom(s),
-          },
+          players,
+          auctionState: normalizeState(ack.state, players),
         }));
       });
     };
 
     socket.on("connect", () => {
-      setState((p) => ({ ...p, connected: true }));
+      setData((p) => ({ ...p, connected: true }));
       join();
     });
-    socket.on("disconnect", () =>
-      setState((p) => ({ ...p, connected: false })),
-    );
+    socket.on("disconnect", () => setData((p) => ({ ...p, connected: false })));
     if (socket.connected) join();
 
     // 팀장 선정 단계
-    socket.on("captain-selection-phase", (data: any) =>
-      setState((p) => ({ ...p, captainPhase: data, status: "WAITING" })),
+    socket.on("captain-selection-phase", (d: any) =>
+      setData((p) => ({ ...p, captainPhase: d, status: "WAITING" })),
     );
-    socket.on("volunteer-list-updated", (data: any) =>
-      setState((p) => ({
+    socket.on("volunteer-list-updated", (d: any) =>
+      setData((p) => ({
         ...p,
         captainPhase: p.captainPhase
-          ? { ...p.captainPhase, volunteers: data.volunteers }
+          ? { ...p.captainPhase, volunteers: d.volunteers }
           : p.captainPhase,
       })),
     );
     socket.on("captains-confirmed", () =>
-      setState((p) => ({ ...p, captainPhase: null })),
+      setData((p) => ({ ...p, captainPhase: null })),
     );
 
     // 경매 시작 / 다음 매물
-    const applyItem = (data: any, isStart: boolean) =>
-      setState((prev) => {
-        const players = Array.isArray(data.players) ? data.players : [];
-        const teams = Array.isArray(data.teams) ? data.teams : prev.teams;
-        const s = data.auctionState ?? data.state ?? null;
-        const player = resolvePlayer(s, players);
+    const applyItem = (d: any, isStart: boolean) =>
+      setData((prev) => {
+        const players = Array.isArray(d.players) ? d.players : prev.players;
+        const teams = Array.isArray(d.teams) ? d.teams : prev.teams;
+        const st = normalizeState(d.auctionState ?? d.state ?? null, players);
+        const nextPlayerName = st?.currentPlayer?.username;
         return {
           ...prev,
           status: "IN_PROGRESS",
           captainPhase: null,
           teams,
-          remainingCount: players.length,
-          current: {
-            player,
-            bid: s?.currentHighestBid ?? 0,
-            bidderTeamId: s?.currentHighestBidder ?? null,
-            bidderName: s?.currentHighestBidderName ?? null,
-            timerEnd: s?.timerEnd ?? null,
-            clockOffset: offsetFrom(s),
-          },
-          feed:
-            !isStart && player?.username
-              ? pushFeed(prev.feed, {
-                  type: "info",
-                  text: `▶ ${player.username} 매물 시작`,
-                })
-              : prev.feed,
+          players,
+          auctionState: st,
+          bidHistory:
+            !isStart && nextPlayerName
+              ? [
+                  ...prev.bidHistory,
+                  {
+                    username: "",
+                    amount: 0,
+                    timestamp: Date.now(),
+                    playerLabel: nextPlayerName,
+                    isSeparator: true,
+                  },
+                ]
+              : prev.bidHistory,
         };
       });
 
-    socket.on("auction-started", (data: any) => applyItem(data, true));
-    socket.on("auction-item-started", (data: any) => applyItem(data, false));
+    socket.on("auction-started", (d: any) => applyItem(d, true));
+    socket.on("auction-item-started", (d: any) => applyItem(d, false));
 
     // 입찰
-    socket.on("bid-placed", (data: any) =>
-      setState((prev) => ({
-        ...prev,
-        current: {
-          ...prev.current,
-          bid: data.amount,
-          bidderTeamId: data.teamId ?? prev.current.bidderTeamId,
-          bidderName: data.username ?? prev.current.bidderName,
-          timerEnd: data.timerEnd ?? prev.current.timerEnd,
-          clockOffset: offsetFrom(data),
-        },
-        feed: pushFeed(prev.feed, {
-          type: "bid",
-          teamName: teamName(prev.teams, data.teamId),
-          teamColor: teamColor(prev.teams, data.teamId),
-          amount: data.amount,
-        }),
-      })),
-    );
-
-    // 낙찰
-    socket.on("player-sold", (data: any) =>
-      setState((prev) => {
-        const teams = Array.isArray(data?.teams)
-          ? data.teams
-          : data?.team
-            ? prev.teams.map((t) =>
-                t.id === data.team.id ? { ...t, ...data.team } : t,
-              )
-            : prev.teams;
+    socket.on("bid-placed", (d: any) =>
+      setData((prev) => {
+        const offset =
+          typeof d.serverNow === "number" ? d.serverNow - Date.now() : 0;
         return {
           ...prev,
-          teams,
-          remainingCount: Math.max(0, prev.remainingCount - 1),
-          current: {
-            ...prev.current,
-            player: null,
-            bid: 0,
-            bidderTeamId: null,
-            bidderName: null,
-          },
-          feed: pushFeed(prev.feed, {
-            type: "sold",
-            playerName: data?.player?.username,
-            teamName: data?.team?.name ?? teamName(teams, data?.team?.id),
-            teamColor: data?.team?.color ?? teamColor(teams, data?.team?.id),
-            amount: data?.price,
-          }),
+          auctionState: prev.auctionState
+            ? {
+                ...prev.auctionState,
+                currentHighestBid: d.amount,
+                currentHighestBidder:
+                  d.teamId ?? prev.auctionState.currentHighestBidder,
+                currentHighestBidderName:
+                  d.username ?? prev.auctionState.currentHighestBidderName,
+                timerEnd:
+                  typeof d.timerEnd === "number"
+                    ? d.timerEnd - offset
+                    : prev.auctionState.timerEnd,
+              }
+            : prev.auctionState,
+          bidHistory: [
+            ...prev.bidHistory,
+            { username: d.username, amount: d.amount, timestamp: Date.now() },
+          ],
         };
       }),
     );
 
+    // 낙찰
+    socket.on("player-sold", (d: any) =>
+      setData((prev) => {
+        const teams = Array.isArray(d?.teams)
+          ? d.teams
+          : d?.team
+            ? prev.teams.map((t) =>
+                t.id === d.team.id ? { ...t, ...d.team } : t,
+              )
+            : prev.teams;
+        const players = d?.player
+          ? prev.players.filter((p) => p.id !== d.player.id)
+          : prev.players;
+        return { ...prev, teams, players };
+      }),
+    );
+
     // 유찰
-    socket.on("player-unsold", (data: any) =>
-      setState((prev) => ({
+    socket.on("player-unsold", (d: any) =>
+      setData((prev) => ({
         ...prev,
-        current: {
-          ...prev.current,
-          player: null,
-          bid: 0,
-          bidderTeamId: null,
-          bidderName: null,
-        },
-        feed: pushFeed(prev.feed, {
-          type: "unsold",
-          playerName: data?.player?.username,
-        }),
+        players: d?.player
+          ? prev.players.filter((p) => p.id !== d.player.id)
+          : prev.players,
       })),
     );
 
-    // 타이머 갱신(서버 500ms 주기)
-    socket.on("timer-update", (data: any) =>
-      setState((prev) =>
-        typeof data?.timeLeft === "number"
+    // 타이머 갱신(서버 500ms 주기) — timeLeft(초)로 로컬 timerEnd 재계산
+    socket.on("timer-update", (d: any) =>
+      setData((prev) =>
+        prev.auctionState && typeof d?.timeLeft === "number"
           ? {
               ...prev,
-              current: {
-                ...prev.current,
-                timerEnd:
-                  Date.now() + prev.current.clockOffset + data.timeLeft * 1000,
+              auctionState: {
+                ...prev.auctionState,
+                timerEnd: Date.now() + d.timeLeft * 1000,
               },
             }
           : prev,
@@ -263,11 +218,12 @@ export function useBroadcastAuction(
     );
 
     socket.on("auction-complete", () =>
-      setState((prev) => ({
+      setData((prev) => ({
         ...prev,
         status: "COMPLETED",
-        current: { ...prev.current, player: null, timerEnd: null },
-        feed: pushFeed(prev.feed, { type: "info", text: "경매 종료" }),
+        auctionState: prev.auctionState
+          ? { ...prev.auctionState, status: "COMPLETED" }
+          : prev.auctionState,
       })),
     );
 
@@ -279,5 +235,5 @@ export function useBroadcastAuction(
     };
   }, [token, roomId]);
 
-  return state;
+  return data;
 }

@@ -1,21 +1,19 @@
 "use client";
 
 import { useBroadcastAuction } from "../_live/useBroadcastAuction";
-import { AuctionLiveView } from "./AuctionLiveView";
+import { AuctionBoardView } from "./AuctionBoardView";
 
 /**
  * 라이브 경매 방송 컨테이너 — 방송 토큰으로 /auction을 read-only 구독하고
- * 프레젠테이션 뷰에 상태를 주입한다. (프리뷰는 AuctionLiveView에 목업 직접 주입)
+ * 기존 참가자 경매 화면(AuctionBoard)을 그대로 방송에 띄운다(입찰 컨트롤 없음).
  */
 export function BroadcastAuctionLive({
   token,
   roomId,
-  accent,
 }: {
   token: string;
   roomId: string;
-  accent?: string;
 }) {
-  const state = useBroadcastAuction(token, roomId);
-  return <AuctionLiveView state={state} accent={accent} />;
+  const data = useBroadcastAuction(token, roomId);
+  return <AuctionBoardView data={data} />;
 }
