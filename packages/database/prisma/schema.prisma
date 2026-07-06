@@ -29,6 +29,12 @@ model User {
   banReason           String?
   bannedAt            DateTime?
   banUntil            DateTime?
+  // 방송 오버레이(OBS): 스트리머당 1개 read-only 토큰(hash 저장, 원문은 발급 응답에서만 노출).
+  // OBS에 한 번 등록해두면 오버레이가 이 유저의 활성 방을 자동 추종한다.
+  broadcastTokenHash      String?        @unique
+  broadcastTokenCreatedAt DateTime?
+  // 수동 오버라이드: 호스트가 "이 방 송출 중"으로 지정한 방. 없으면 최근 활성 방 자동 선택.
+  broadcastLiveRoomId     String?
   adminAuditLogs      AdminAuditLog[]    @relation("AdminAuditLogs")
   reviewedAppeals     Appeal[]           @relation("AppealReviewer")
   appeals             Appeal[]           @relation("UserAppeals")
@@ -319,9 +325,7 @@ model Room {
   discordCategoryId String?
   startedAt         DateTime?
   completedAt       DateTime?
-  // 방송 오버레이: 읽기전용 토큰(hash 저장, 원문은 생성 응답에서만 노출) + 호스트가 중계 중인 경기
-  broadcastTokenHash      String?
-  broadcastTokenCreatedAt DateTime?
+  // 방송 오버레이: 호스트가 중계 중인 경기(방송 토큰은 User로 이동 — per-streamer 단일 토큰)
   broadcastFocusMatchId   String?
   createdAt         DateTime              @default(now())
   updatedAt         DateTime              @updatedAt
@@ -337,7 +341,6 @@ model Room {
   @@index([status])
   @@index([isPrivate])
   @@index([createdAt])
-  @@index([broadcastTokenHash])
   @@map("rooms")
 }
 
