@@ -211,7 +211,7 @@ apiClient.interceptors.request.use(
   },
   (error) => {
     return Promise.reject(error);
-  }
+  },
 );
 
 // 응답 인터셉터: 토큰 갱신 처리
@@ -261,7 +261,7 @@ apiClient.interceptors.response.use(
     }
 
     return Promise.reject(error);
-  }
+  },
 );
 
 // Access Token 갱신 함수
@@ -276,7 +276,7 @@ async function refreshAccessToken(): Promise<string> {
       {},
       {
         withCredentials: true,
-      }
+      },
     );
 
     const { accessToken: newToken } = response.data;
@@ -298,7 +298,9 @@ async function refreshAccessToken(): Promise<string> {
 }
 
 // 소켓 인증용: JWT 만료 여부 확인 후 필요 시 갱신하여 유효한 토큰 반환
-export async function ensureValidToken(minValidityMs = 30_000): Promise<string | null> {
+export async function ensureValidToken(
+  minValidityMs = 30_000,
+): Promise<string | null> {
   if (!accessToken) {
     if (authUnavailableHandled || isRefreshRetryBlocked()) return null;
 
@@ -327,7 +329,7 @@ export async function ensureValidToken(minValidityMs = 30_000): Promise<string |
 
   try {
     // JWT payload 디코드 (서명 검증 없이 만료 시간만 확인)
-    const payload = JSON.parse(atob(accessToken.split('.')[1]));
+    const payload = JSON.parse(atob(accessToken.split(".")[1]));
     const expiresAt = payload.exp * 1000;
     // 필요한 최소 유효시간을 만족하면 기존 토큰 사용
     if (Date.now() < expiresAt - minValidityMs) {
@@ -376,7 +378,9 @@ export const authApi = {
       console.error("Logout error:", error);
     } finally {
       // 순환 참조 방지: 동적 import로 socket-client 접근
-      import("./socket-client").then(({ disconnectAllSockets }) => disconnectAllSockets()).catch(() => {});
+      import("./socket-client")
+        .then(({ disconnectAllSockets }) => disconnectAllSockets())
+        .catch(() => {});
       setAccessToken(null);
       // 리다이렉트는 호출자(auth-store)에서 처리 — 상태 정리가 먼저 완료되도록
     }
@@ -548,7 +552,9 @@ export const userApi = {
   },
 
   deleteStreamerLink: async (linkId: string) => {
-    const response = await apiClient.delete(`/users/me/streamer-links/${linkId}`);
+    const response = await apiClient.delete(
+      `/users/me/streamer-links/${linkId}`,
+    );
     return response.data as { success: boolean };
   },
 
@@ -562,7 +568,9 @@ export const userApi = {
     return response.data;
   },
 
-  getHoverProfile: async (userId: string): Promise<{
+  getHoverProfile: async (
+    userId: string,
+  ): Promise<{
     username: string;
     avatar: string | null;
     riotAccount: {
@@ -576,13 +584,28 @@ export const userApi = {
       peakLp: number | null;
       mainRole: string | null;
       subRole: string | null;
-      championPreferences: { role: string; championId: string; order: number }[];
+      championPreferences: {
+        role: string;
+        championId: string;
+        order: number;
+      }[];
     } | null;
     clan: { name: string; tag: string | null } | null;
-    streamerProfiles: Pick<StreamerProfile, "platform" | "channelUrl" | "channelName" | "isActive">[];
-    streamerLinks: Pick<StreamerLink, "id" | "label" | "url" | "imageUrl" | "order" | "isActive">[];
+    streamerProfiles: Pick<
+      StreamerProfile,
+      "platform" | "channelUrl" | "channelName" | "isActive"
+    >[];
+    streamerLinks: Pick<
+      StreamerLink,
+      "id" | "label" | "url" | "imageUrl" | "order" | "isActive"
+    >[];
     stats: { wins: number; losses: number; winRate: number };
-    kda: { kills: number; deaths: number; assists: number; games: number } | null;
+    kda: {
+      kills: number;
+      deaths: number;
+      assists: number;
+      games: number;
+    } | null;
     reputation: { overallAverage: number; totalRatings: number };
   }> => {
     const response = await apiClient.get(`/users/${userId}/hover-profile`);
@@ -625,45 +648,65 @@ export const userApi = {
   },
 };
 
-// 방 관련 API
-// 방송 오버레이 (OBS) — 스냅샷은 공개(토큰 인증), 토큰 관리는 호스트(인증) API
+// 방송 오버레이 (OBS)
+// - 토큰은 스트리머(유저)당 1개. OBS에 한 번 등록하면 활성 방을 자동 추종.
+// - 스냅샷은 공개(토큰 인증), 토큰 관리는 로그인 본인, 송출 제어는 방 호스트.
 export const broadcastApi = {
   // OBS 브라우저 소스용 읽기전용 스냅샷
   getSnapshot: async (
     token: string,
     params?: { scene?: string; matchId?: string },
   ) => {
-    const response = await publicApiClient.get(
-      `/broadcast/${token}/snapshot`,
-      { params },
-    );
+    const response = await publicApiClient.get(`/broadcast/${token}/snapshot`, {
+      params,
+    });
     return response.data;
   },
-  // 호스트: 방송 링크 생성(없을 때만 토큰 발급), 재생성, 비활성화
-  createToken: async (roomId: string) => {
-    const response = await apiClient.post(`/rooms/${roomId}/broadcast-token`);
+  // 내 방송 토큰 상태(존재 여부/발급 시각) — 원문은 노출 안 됨
+  getToken: async () => {
+    const response = await apiClient.get(`/broadcast/token`);
+    return response.data as { exists: boolean; createdAt: string | null };
+  },
+  // 토큰 발급(없을 때만 원문 반환)
+  createToken: async () => {
+    const response = await apiClient.post(`/broadcast/token`);
     return response.data as {
       exists: boolean;
       createdAt: string | null;
       token: string | null;
     };
   },
-  rotateToken: async (roomId: string) => {
-    const response = await apiClient.post(
-      `/rooms/${roomId}/broadcast-token/rotate`,
-    );
-    return response.data as { exists: boolean; createdAt: string; token: string };
+  // 토큰 재생성(기존 무효화 후 새 원문 반환)
+  rotateToken: async () => {
+    const response = await apiClient.post(`/broadcast/token/rotate`);
+    return response.data as {
+      exists: boolean;
+      createdAt: string;
+      token: string;
+    };
   },
-  revokeToken: async (roomId: string) => {
-    const response = await apiClient.delete(`/rooms/${roomId}/broadcast-token`);
-    return response.data;
+  // 토큰 비활성화
+  revokeToken: async () => {
+    const response = await apiClient.delete(`/broadcast/token`);
+    return response.data as { ok: boolean };
+  },
+  // 로비 방송 상태: 토큰 발급 여부 + 이 방 고정 송출 여부 (호스트)
+  getLiveState: async (roomId: string) => {
+    const response = await apiClient.get(`/rooms/${roomId}/broadcast-live`);
+    return response.data as { hasToken: boolean; pinned: boolean };
+  },
+  // "이 방 고정 송출" 토글 (호스트)
+  setLive: async (roomId: string, live: boolean) => {
+    const response = await apiClient.patch(`/rooms/${roomId}/broadcast-live`, {
+      live,
+    });
+    return response.data as { pinned: boolean };
   },
   // 호스트: 중계 중인 경기(focus) 설정/해제
   setFocus: async (roomId: string, matchId: string | null) => {
-    const response = await apiClient.patch(
-      `/rooms/${roomId}/broadcast-focus`,
-      { matchId },
-    );
+    const response = await apiClient.patch(`/rooms/${roomId}/broadcast-focus`, {
+      matchId,
+    });
     return response.data as { focusMatchId: string | null };
   },
 };
@@ -700,7 +743,7 @@ export const roomApi = {
     const response = await apiClient.post("/rooms", data);
     return response.data;
   },
-  
+
   update: async (roomId: string, data: any) => {
     const response = await apiClient.put(`/rooms/${roomId}`, data);
     return response.data;
@@ -724,9 +767,7 @@ export const roomApi = {
   },
 
   toggleSpectator: async (roomId: string) => {
-    const response = await apiClient.post(
-      `/rooms/${roomId}/toggle-spectator`,
-    );
+    const response = await apiClient.post(`/rooms/${roomId}/toggle-spectator`);
     return response.data;
   },
 
@@ -736,7 +777,9 @@ export const roomApi = {
   },
 
   kick: async (roomId: string, participantId: string) => {
-    const response = await apiClient.delete(`/rooms/${roomId}/participants/${participantId}`);
+    const response = await apiClient.delete(
+      `/rooms/${roomId}/participants/${participantId}`,
+    );
     return response.data;
   },
 
@@ -780,9 +823,12 @@ export const auctionApi = {
 // Snake Draft 관련 API
 export const snakeDraftApi = {
   startDraft: async (roomId: string, captainSelection: "RANDOM" | "TIER") => {
-    const response = await apiClient.post(`/rooms/${roomId}/snake-draft/start`, {
-      captainSelection,
-    });
+    const response = await apiClient.post(
+      `/rooms/${roomId}/snake-draft/start`,
+      {
+        captainSelection,
+      },
+    );
     return response.data;
   },
 
@@ -801,7 +847,11 @@ export const snakeDraftApi = {
 
 // 매치/토너먼트 관련 API
 export const matchApi = {
-  getUserMatches: async (params?: { status?: string; limit?: number; offset?: number }) => {
+  getUserMatches: async (params?: {
+    status?: string;
+    limit?: number;
+    offset?: number;
+  }) => {
     const response = await apiClient.get("/matches/my", { params });
     return response.data;
   },
@@ -827,13 +877,15 @@ export const matchApi = {
   },
 
   generateTournamentCode: async (matchId: string) => {
-    const response = await apiClient.post(`/matches/${matchId}/tournament-code`);
+    const response = await apiClient.post(
+      `/matches/${matchId}/tournament-code`,
+    );
     return response.data;
   },
 
   reportResult: async (
     matchId: string,
-    data: { winnerId: string; statsJson?: any }
+    data: { winnerId: string; statsJson?: any },
   ) => {
     const response = await apiClient.post(`/matches/${matchId}/result`, data);
     return response.data;
@@ -844,14 +896,21 @@ export const matchApi = {
     return response.data;
   },
 
-  getUserMatchHistory: async (userId: string, limit: number = 20, offset: number = 0) => {
+  getUserMatchHistory: async (
+    userId: string,
+    limit: number = 20,
+    offset: number = 0,
+  ) => {
     const response = await apiClient.get(`/matches/user/${userId}/history`, {
       params: { limit, offset },
     });
     return response.data;
   },
 
-  submitVote: async (matchId: string, data: { votedForId: string; voteType: 'MVP' | 'ACE' }) => {
+  submitVote: async (
+    matchId: string,
+    data: { votedForId: string; voteType: "MVP" | "ACE" },
+  ) => {
     const response = await apiClient.post(`/matches/${matchId}/vote`, data);
     return response.data;
   },
@@ -890,7 +949,7 @@ export const riotApi = {
   getChampions: async () => {
     const version = await getDdragonVersion();
     const response = await fetch(
-      `https://ddragon.leagueoflegends.com/cdn/${version}/data/ko_KR/champion.json`
+      `https://ddragon.leagueoflegends.com/cdn/${version}/data/ko_KR/champion.json`,
     );
     const data = await response.json();
     return { data: data.data, version: data.version };
@@ -905,7 +964,10 @@ export const riotApi = {
 
   // 인증 시작
   startVerification: async (gameName: string, tagLine: string) => {
-    const response = await apiClient.post("/riot/verify/start", { gameName, tagLine });
+    const response = await apiClient.post("/riot/verify/start", {
+      gameName,
+      tagLine,
+    });
     return response.data;
   },
 
@@ -940,22 +1002,32 @@ export const riotApi = {
   },
 
   // 챔피언 선호도 업데이트
-  updateChampions: async (accountId: string, role: string, championIds: string[]) => {
-    const response = await apiClient.put(`/riot/accounts/${accountId}/champions/${role}`, {
-      championIds,
-    });
+  updateChampions: async (
+    accountId: string,
+    role: string,
+    championIds: string[],
+  ) => {
+    const response = await apiClient.put(
+      `/riot/accounts/${accountId}/champions/${role}`,
+      {
+        championIds,
+      },
+    );
     return response.data;
   },
 
   // 계정 정보 수정 (역할, 챔피언)
-  updateAccount: async (accountId: string, data: {
-    mainRole: string;
-    subRole: string;
-    championsByRole?: Record<string, string[]>;
-    peakTier?: string;
-    peakRank?: string;
-    peakLp?: number;
-  }) => {
+  updateAccount: async (
+    accountId: string,
+    data: {
+      mainRole: string;
+      subRole: string;
+      championsByRole?: Record<string, string[]>;
+      peakTier?: string;
+      peakRank?: string;
+      peakLp?: number;
+    },
+  ) => {
     const response = await apiClient.put(`/riot/accounts/${accountId}`, data);
     return response.data;
   },
@@ -967,14 +1039,16 @@ export const riotApi = {
 
   // 소환사 정보 조회
   getSummoner: async (gameName: string, tagLine: string) => {
-    const response = await apiClient.get(`/riot/summoner/${encodeURIComponent(stripInvisibleChars(gameName))}/${encodeURIComponent(stripInvisibleChars(tagLine))}`);
+    const response = await apiClient.get(
+      `/riot/summoner/${encodeURIComponent(stripInvisibleChars(gameName))}/${encodeURIComponent(stripInvisibleChars(tagLine))}`,
+    );
     return response.data;
   },
 
   // 라이브 게임 조회 (Spectator-V5)
   getLiveGame: async (gameName: string, tagLine: string) => {
     const response = await apiClient.get(
-      `/riot/summoner/${encodeURIComponent(stripInvisibleChars(gameName))}/${encodeURIComponent(stripInvisibleChars(tagLine))}/live`
+      `/riot/summoner/${encodeURIComponent(stripInvisibleChars(gameName))}/${encodeURIComponent(stripInvisibleChars(tagLine))}/live`,
     );
     return response.data as { isLive: boolean; gameInfo?: any };
   },
@@ -982,7 +1056,7 @@ export const riotApi = {
   // 챔피언 숙련도 조회 (champion-mastery-v4)
   getSummonerMastery: async (gameName: string, tagLine: string) => {
     const response = await apiClient.get(
-      `/riot/summoner/${encodeURIComponent(stripInvisibleChars(gameName))}/${encodeURIComponent(stripInvisibleChars(tagLine))}/mastery`
+      `/riot/summoner/${encodeURIComponent(stripInvisibleChars(gameName))}/${encodeURIComponent(stripInvisibleChars(tagLine))}/mastery`,
     );
     return response.data as Array<{
       championId: number;
@@ -1043,7 +1117,7 @@ export const clanApi = {
       officerCanManageMembers?: boolean;
       officerCanManageAnnouncements?: boolean;
       officerCanManageInvitations?: boolean;
-    }
+    },
   ) => {
     const response = await apiClient.patch(`/clans/${clanId}`, data);
     return response.data;
@@ -1086,26 +1160,34 @@ export const clanApi = {
 
   kickMember: async (clanId: string, userId: string) => {
     // 컨트롤러: DELETE /clans/:id/members/:memberId
-    const response = await apiClient.delete(`/clans/${clanId}/members/${userId}`);
+    const response = await apiClient.delete(
+      `/clans/${clanId}/members/${userId}`,
+    );
     return response.data;
   },
 
   updateMemberRole: async (
     clanId: string,
     userId: string,
-    role: "OWNER" | "OFFICER" | "MEMBER"
+    role: "OWNER" | "OFFICER" | "MEMBER",
   ) => {
-    const response = await apiClient.patch(`/clans/${clanId}/members/${userId}/role`, {
-      role,
-    });
+    const response = await apiClient.patch(
+      `/clans/${clanId}/members/${userId}/role`,
+      {
+        role,
+      },
+    );
     return response.data;
   },
 
   transferOwnership: async (clanId: string, newOwnerId: string) => {
     // 컨트롤러: POST /clans/:id/transfer-ownership
-    const response = await apiClient.post(`/clans/${clanId}/transfer-ownership`, {
-      newOwnerId,
-    });
+    const response = await apiClient.post(
+      `/clans/${clanId}/transfer-ownership`,
+      {
+        newOwnerId,
+      },
+    );
     return response.data;
   },
 
@@ -1266,14 +1348,18 @@ export const communityApi = {
 
   updatePost: async (
     postId: string,
-    data: { title?: string; content?: string; tags?: string[] }
+    data: { title?: string; content?: string; tags?: string[] },
   ) => {
     const response = await apiClient.patch(`/community/posts/${postId}`, data);
     return response.data;
   },
 
-  getPopularTags: async (limit = 20): Promise<{ name: string; count: number }[]> => {
-    const response = await apiClient.get("/community/tags/popular", { params: { limit } });
+  getPopularTags: async (
+    limit = 20,
+  ): Promise<{ name: string; count: number }[]> => {
+    const response = await apiClient.get("/community/tags/popular", {
+      params: { limit },
+    });
     return response.data;
   },
 
@@ -1297,8 +1383,14 @@ export const communityApi = {
     return response.data;
   },
 
-  createComment: async (postId: string, data: { content: string; parentId?: string }) => {
-    const response = await apiClient.post(`/community/posts/${postId}/comments`, data);
+  createComment: async (
+    postId: string,
+    data: { content: string; parentId?: string },
+  ) => {
+    const response = await apiClient.post(
+      `/community/posts/${postId}/comments`,
+      data,
+    );
     return response.data;
   },
 
@@ -1329,53 +1421,83 @@ export const communityApi = {
     return response.data;
   },
 
-  getCommentLikedStatus: async (commentIds: string[]): Promise<Record<string, boolean>> => {
-    const response = await apiClient.post("/community/comments/liked-status", { commentIds });
+  getCommentLikedStatus: async (
+    commentIds: string[],
+  ): Promise<Record<string, boolean>> => {
+    const response = await apiClient.post("/community/comments/liked-status", {
+      commentIds,
+    });
     return response.data;
   },
 
   likeComment: async (commentId: string) => {
-    const response = await apiClient.post(`/community/comments/${commentId}/like`);
+    const response = await apiClient.post(
+      `/community/comments/${commentId}/like`,
+    );
     return response.data;
   },
 
   unlikeComment: async (commentId: string) => {
-    const response = await apiClient.delete(`/community/comments/${commentId}/like`);
+    const response = await apiClient.delete(
+      `/community/comments/${commentId}/like`,
+    );
     return response.data;
   },
 
   hasLikedComment: async (commentId: string) => {
-    const response = await apiClient.get(`/community/comments/${commentId}/liked`);
+    const response = await apiClient.get(
+      `/community/comments/${commentId}/liked`,
+    );
     return response.data;
   },
 
   bookmarkPost: async (postId: string) => {
-    const response = await apiClient.post(`/community/posts/${postId}/bookmark`);
+    const response = await apiClient.post(
+      `/community/posts/${postId}/bookmark`,
+    );
     return response.data;
   },
 
   unbookmarkPost: async (postId: string) => {
-    const response = await apiClient.delete(`/community/posts/${postId}/bookmark`);
+    const response = await apiClient.delete(
+      `/community/posts/${postId}/bookmark`,
+    );
     return response.data;
   },
 
   hasBookmarkedPost: async (postId: string) => {
-    const response = await apiClient.get(`/community/posts/${postId}/bookmarked`);
+    const response = await apiClient.get(
+      `/community/posts/${postId}/bookmarked`,
+    );
     return response.data;
   },
 
   getBookmarks: async (limit = 20, offset = 0) => {
-    const response = await apiClient.get("/community/bookmarks", { params: { limit, offset } });
+    const response = await apiClient.get("/community/bookmarks", {
+      params: { limit, offset },
+    });
     return response.data;
   },
 
-  reportPost: async (postId: string, data: { reason: string; description: string }) => {
-    const response = await apiClient.post("/community/reports", { postId, ...data });
+  reportPost: async (
+    postId: string,
+    data: { reason: string; description: string },
+  ) => {
+    const response = await apiClient.post("/community/reports", {
+      postId,
+      ...data,
+    });
     return response.data;
   },
 
-  reportComment: async (commentId: string, data: { reason: string; description: string }) => {
-    const response = await apiClient.post("/community/reports", { commentId, ...data });
+  reportComment: async (
+    commentId: string,
+    data: { reason: string; description: string },
+  ) => {
+    const response = await apiClient.post("/community/reports", {
+      commentId,
+      ...data,
+    });
     return response.data;
   },
 };
@@ -1456,13 +1578,18 @@ export const reputationApi = {
   },
 
   getUserRatings: async (userId: string, limit = 10) => {
-    const response = await apiClient.get(`/reputation/users/${userId}/ratings`, {
-      params: { limit },
-    });
+    const response = await apiClient.get(
+      `/reputation/users/${userId}/ratings`,
+      {
+        params: { limit },
+      },
+    );
     return response.data;
   },
 
-  getUserStats: async (userId: string): Promise<{
+  getUserStats: async (
+    userId: string,
+  ): Promise<{
     totalRatings: number;
     averageSkill: number;
     averageAttitude: number;
@@ -1508,9 +1635,12 @@ export const reputationApi = {
 
   reviewReport: async (
     reportId: string,
-    data: { status: "APPROVED" | "REJECTED"; reviewNotes?: string }
+    data: { status: "APPROVED" | "REJECTED"; reviewNotes?: string },
   ) => {
-    const response = await apiClient.post(`/reputation/admin/reports/${reportId}/review`, data);
+    const response = await apiClient.post(
+      `/reputation/admin/reports/${reportId}/review`,
+      data,
+    );
     return response.data;
   },
 
@@ -1553,17 +1683,23 @@ export const friendApi = {
   },
 
   acceptRequest: async (friendshipId: string) => {
-    const response = await apiClient.post(`/friends/requests/${friendshipId}/accept`);
+    const response = await apiClient.post(
+      `/friends/requests/${friendshipId}/accept`,
+    );
     return response.data;
   },
 
   rejectRequest: async (friendshipId: string) => {
-    const response = await apiClient.post(`/friends/requests/${friendshipId}/reject`);
+    const response = await apiClient.post(
+      `/friends/requests/${friendshipId}/reject`,
+    );
     return response.data;
   },
 
   cancelRequest: async (friendshipId: string) => {
-    const response = await apiClient.delete(`/friends/requests/${friendshipId}`);
+    const response = await apiClient.delete(
+      `/friends/requests/${friendshipId}`,
+    );
     return response.data;
   },
 
@@ -1636,7 +1772,9 @@ export const notificationApi = {
   },
 
   markAsRead: async (notificationId: string) => {
-    const response = await apiClient.post(`/notifications/${notificationId}/read`);
+    const response = await apiClient.post(
+      `/notifications/${notificationId}/read`,
+    );
     return response.data;
   },
 
@@ -1687,10 +1825,9 @@ export const statsApi = {
     period: "30d" | "90d" | "all" = "30d",
     source: "custom" | "ranked-community" | "ranked-meta" = "custom",
   ) => {
-    const response = await apiClient.get(
-      `/stats/lab/champions/${championId}`,
-      { params: { period, source } },
-    );
+    const response = await apiClient.get(`/stats/lab/champions/${championId}`, {
+      params: { period, source },
+    });
     return response.data;
   },
 
@@ -1746,15 +1883,23 @@ export const statsApi = {
     return response.data;
   },
 
-  getLabAuctionEfficiency: async (params?: { period?: "30d" | "90d" | "all" }) => {
-    const response = await apiClient.get("/stats/lab/oracle/auction-efficiency", {
-      params,
-    });
+  getLabAuctionEfficiency: async (params?: {
+    period?: "30d" | "90d" | "all";
+  }) => {
+    const response = await apiClient.get(
+      "/stats/lab/oracle/auction-efficiency",
+      {
+        params,
+      },
+    );
     return response.data;
   },
 
   getLabBalanceScore: async (data: { teamA: string[]; teamB: string[] }) => {
-    const response = await apiClient.post("/stats/lab/oracle/balance-score", data);
+    const response = await apiClient.post(
+      "/stats/lab/oracle/balance-score",
+      data,
+    );
     return response.data;
   },
 
@@ -1839,19 +1984,27 @@ export const statsApi = {
     userId: string,
     queueGroup: "ranked" | "normal" | "aram" | "custom" | "all" = "ranked",
   ) => {
-    const response = await apiClient.post(`/stats/refresh/${userId}`, undefined, {
-      params: { queueGroup },
-    });
+    const response = await apiClient.post(
+      `/stats/refresh/${userId}`,
+      undefined,
+      {
+        params: { queueGroup },
+      },
+    );
     return response.data;
   },
 
   getUserChampionStats: async (userId: string) => {
-    const response = await apiClient.get(`/stats/user/${userId}/champion-stats`);
+    const response = await apiClient.get(
+      `/stats/user/${userId}/champion-stats`,
+    );
     return response.data;
   },
 
   getUserPositionStats: async (userId: string) => {
-    const response = await apiClient.get(`/stats/user/${userId}/position-stats`);
+    const response = await apiClient.get(
+      `/stats/user/${userId}/position-stats`,
+    );
     return response.data;
   },
 
@@ -1877,7 +2030,7 @@ export const statsApi = {
   // 랭크 챔피언 통계 — 시즌 전체 집계 (DB 캐시 활용, 백엔드가 모든 페이징 처리)
   getRankedChampionStats: async (gameName: string, tagLine: string) => {
     const response = await apiClient.get(
-      `/stats/summoner/${encodeURIComponent(stripInvisibleChars(gameName))}/${encodeURIComponent(stripInvisibleChars(tagLine))}/ranked-champion-stats`
+      `/stats/summoner/${encodeURIComponent(stripInvisibleChars(gameName))}/${encodeURIComponent(stripInvisibleChars(tagLine))}/ranked-champion-stats`,
     );
     return response.data;
   },
@@ -1885,7 +2038,7 @@ export const statsApi = {
   // 챔피언 시즌 누적 통계 (등록 무관, background 스캔)
   getChampionSeasonStats: async (gameName: string, tagLine: string) => {
     const response = await apiClient.get(
-      `/stats/summoner/${encodeURIComponent(stripInvisibleChars(gameName))}/${encodeURIComponent(stripInvisibleChars(tagLine))}/champion-season`
+      `/stats/summoner/${encodeURIComponent(stripInvisibleChars(gameName))}/${encodeURIComponent(stripInvisibleChars(tagLine))}/champion-season`,
     );
     return response.data as {
       queueGroup: string;
@@ -1912,13 +2065,13 @@ export const statsApi = {
     tagLine: string,
     count: number = 20,
     queueId?: number,
-    start: number = 0
+    start: number = 0,
   ) => {
     const response = await apiClient.get(
       `/stats/summoner/${encodeURIComponent(stripInvisibleChars(gameName))}/${encodeURIComponent(stripInvisibleChars(tagLine))}/matches`,
       {
         params: { count, queueId, start },
-      }
+      },
     );
     return response.data;
   },
@@ -1926,7 +2079,7 @@ export const statsApi = {
   getUserRiotMatches: async (
     userId: string,
     count: number = 20,
-    queueId?: number
+    queueId?: number,
   ) => {
     const response = await apiClient.get(`/stats/user/${userId}/riot-matches`, {
       params: { count, queueId },
@@ -1936,7 +2089,7 @@ export const statsApi = {
 
   getMatchTimeline: async (matchId: string) => {
     const response = await apiClient.get(
-      `/stats/match/${encodeURIComponent(matchId)}/timeline`
+      `/stats/match/${encodeURIComponent(matchId)}/timeline`,
     );
     return response.data;
   },
@@ -1948,7 +2101,9 @@ export const statsApi = {
 
   // DDragon 최신 버전 조회 — 프로필 아이콘 URL 생성에 사용
   getDdragonVersion: async (): Promise<string> => {
-    const response = await apiClient.get<{ version: string }>("/stats/ddragon-version");
+    const response = await apiClient.get<{ version: string }>(
+      "/stats/ddragon-version",
+    );
     return response.data.version;
   },
 };
@@ -1965,7 +2120,11 @@ export const rankingApi = {
     return response.data;
   },
 
-  getClanRanking: async (clanId: string, page: number = 1, limit: number = 50) => {
+  getClanRanking: async (
+    clanId: string,
+    page: number = 1,
+    limit: number = 50,
+  ) => {
     const response = await apiClient.get(`/ranking/clan/${clanId}`, {
       params: { page, limit },
     });
@@ -2010,18 +2169,32 @@ export const adminApi = {
   },
   recomputeLabSnapshots: async () => {
     const response = await apiClient.post("/admin/lab/recompute-snapshots");
-    return response.data as { champion: number; synergy: number; counter: number };
+    return response.data as {
+      champion: number;
+      synergy: number;
+      counter: number;
+    };
   },
-  triggerMatchFetch: async (queueGroup?: "ranked" | "normal" | "aram" | "custom") => {
-    const response = await apiClient.post("/admin/matches/trigger-fetch", undefined, {
-      params: queueGroup ? { queueGroup } : undefined,
-    });
+  triggerMatchFetch: async (
+    queueGroup?: "ranked" | "normal" | "aram" | "custom",
+  ) => {
+    const response = await apiClient.post(
+      "/admin/matches/trigger-fetch",
+      undefined,
+      {
+        params: queueGroup ? { queueGroup } : undefined,
+      },
+    );
     return response.data;
   },
   recomputeMatchStats: async (params: { userId?: string; puuid?: string }) => {
-    const response = await apiClient.post("/admin/matches/recompute-stats", undefined, {
-      params,
-    });
+    const response = await apiClient.post(
+      "/admin/matches/recompute-stats",
+      undefined,
+      {
+        params,
+      },
+    );
     return response.data;
   },
   // Users
@@ -2035,12 +2208,20 @@ export const adminApi = {
     const response = await apiClient.get("/admin/users", { params });
     return response.data;
   },
-  updateUserRole: async (userId: string, role: "USER" | "MODERATOR" | "ADMIN") => {
-    const response = await apiClient.patch(`/admin/users/${userId}/role`, { role });
+  updateUserRole: async (
+    userId: string,
+    role: "USER" | "MODERATOR" | "ADMIN",
+  ) => {
+    const response = await apiClient.patch(`/admin/users/${userId}/role`, {
+      role,
+    });
     return response.data;
   },
   banUser: async (userId: string, reason: string, banUntil?: string) => {
-    const response = await apiClient.post(`/admin/users/${userId}/ban`, { reason, banUntil });
+    const response = await apiClient.post(`/admin/users/${userId}/ban`, {
+      reason,
+      banUntil,
+    });
     return response.data;
   },
   unbanUser: async (userId: string) => {
@@ -2048,7 +2229,9 @@ export const adminApi = {
     return response.data;
   },
   restrictUser: async (userId: string, restrictedUntil: string) => {
-    const response = await apiClient.post(`/admin/users/${userId}/restrict`, { restrictedUntil });
+    const response = await apiClient.post(`/admin/users/${userId}/restrict`, {
+      restrictedUntil,
+    });
     return response.data;
   },
   unrestrictUser: async (userId: string) => {
@@ -2065,34 +2248,66 @@ export const adminApi = {
     return response.data as { ok: boolean };
   },
   approveDiscordGuildLink: async (id: string) => {
-    const response = await apiClient.patch(`/admin/discord/guild-links/${id}/approve`);
+    const response = await apiClient.patch(
+      `/admin/discord/guild-links/${id}/approve`,
+    );
     return response.data;
   },
   disableDiscordGuildLink: async (id: string) => {
-    const response = await apiClient.patch(`/admin/discord/guild-links/${id}/disable`);
+    const response = await apiClient.patch(
+      `/admin/discord/guild-links/${id}/disable`,
+    );
     return response.data;
   },
   // Reports
-  getReports: async (params?: { page?: number; limit?: number; status?: string; category?: string }) => {
+  getReports: async (params?: {
+    page?: number;
+    limit?: number;
+    status?: string;
+    category?: string;
+  }) => {
     const response = await apiClient.get("/admin/reports", { params });
     return response.data;
   },
-  reviewReport: async (reportId: string, status: "APPROVED" | "REJECTED", reviewerNote: string, category?: string) => {
-    const response = await apiClient.patch(`/admin/reports/${reportId}/review`, { status, reviewerNote, category });
+  reviewReport: async (
+    reportId: string,
+    status: "APPROVED" | "REJECTED",
+    reviewerNote: string,
+    category?: string,
+  ) => {
+    const response = await apiClient.patch(
+      `/admin/reports/${reportId}/review`,
+      { status, reviewerNote, category },
+    );
     return response.data;
   },
   // Announcements
   sendAnnouncement: async (title: string, message: string, link?: string) => {
-    const response = await apiClient.post("/admin/announcements", { title, message, link });
+    const response = await apiClient.post("/admin/announcements", {
+      title,
+      message,
+      link,
+    });
     return response.data;
   },
   // Chat Logs
-  getChatLogs: async (params?: { page?: number; limit?: number; category?: string; roomName?: string; userId?: string; search?: string }) => {
+  getChatLogs: async (params?: {
+    page?: number;
+    limit?: number;
+    category?: string;
+    roomName?: string;
+    userId?: string;
+    search?: string;
+  }) => {
     const response = await apiClient.get("/admin/chat-logs", { params });
     return response.data;
   },
   // Community
-  getPosts: async (params?: { page?: number; limit?: number; search?: string }) => {
+  getPosts: async (params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+  }) => {
     const response = await apiClient.get("/admin/posts", { params });
     return response.data;
   },
@@ -2101,7 +2316,9 @@ export const adminApi = {
     return response.data;
   },
   pinPost: async (postId: string, isPinned: boolean) => {
-    const response = await apiClient.patch(`/admin/posts/${postId}/pin`, { isPinned });
+    const response = await apiClient.patch(`/admin/posts/${postId}/pin`, {
+      isPinned,
+    });
     return response.data;
   },
   deleteComment: async (commentId: string) => {
@@ -2109,7 +2326,11 @@ export const adminApi = {
     return response.data;
   },
   // Clans
-  getClans: async (params?: { page?: number; limit?: number; search?: string }) => {
+  getClans: async (params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+  }) => {
     const response = await apiClient.get("/admin/clans", { params });
     return response.data;
   },
@@ -2118,7 +2339,11 @@ export const adminApi = {
     return response.data;
   },
   // Rooms
-  getRooms: async (params?: { page?: number; limit?: number; status?: string }) => {
+  getRooms: async (params?: {
+    page?: number;
+    limit?: number;
+    status?: string;
+  }) => {
     const response = await apiClient.get("/admin/rooms", { params });
     return response.data;
   },
@@ -2127,7 +2352,9 @@ export const adminApi = {
     return response.data;
   },
   addBotToRoom: async (roomId: string, count = 1) => {
-    const response = await apiClient.post(`/admin/rooms/${roomId}/add-bot`, { count });
+    const response = await apiClient.post(`/admin/rooms/${roomId}/add-bot`, {
+      count,
+    });
     return response.data as { addedCount: number; participants: any[] };
   },
   seedHighTiers: async () => {
@@ -2187,9 +2414,15 @@ export const appealApi = {
   },
 
   /** 이의신청 처리 (승인/거절) */
-  review: async (appealId: string, status: "APPROVED" | "REJECTED", adminNote?: string) => {
-    const response = await apiClient.patch(`/admin/appeals/${appealId}/review`, { status, adminNote });
+  review: async (
+    appealId: string,
+    status: "APPROVED" | "REJECTED",
+    adminNote?: string,
+  ) => {
+    const response = await apiClient.patch(
+      `/admin/appeals/${appealId}/review`,
+      { status, adminNote },
+    );
     return response.data;
   },
 };
-

@@ -7,7 +7,7 @@ import { broadcastApi } from "@/lib/api-client";
 import { connectBroadcastSocket } from "@/lib/socket-client";
 import { BroadcastShell } from "./_components/BroadcastShell";
 import { LowerThird } from "./_components/LowerThird";
-import { RoomScene, MatchScene } from "./_components/scenes";
+import { RoomScene, MatchScene, IdleScene } from "./_components/scenes";
 
 /**
  * /broadcast/[token] — OBS 브라우저 소스용 읽기전용 방송 오버레이.
@@ -78,12 +78,13 @@ export default function BroadcastPage() {
     return <div className="fixed inset-0 bg-transparent" />;
   }
 
-  const sceneNode =
-    scene === "match" ? (
-      <MatchScene snapshot={snapshot} />
-    ) : (
-      <RoomScene snapshot={snapshot} />
-    );
+  const sceneNode = snapshot.idle ? (
+    <IdleScene snapshot={snapshot} />
+  ) : scene === "match" ? (
+    <MatchScene snapshot={snapshot} />
+  ) : (
+    <RoomScene snapshot={snapshot} />
+  );
 
   return (
     <BroadcastShell

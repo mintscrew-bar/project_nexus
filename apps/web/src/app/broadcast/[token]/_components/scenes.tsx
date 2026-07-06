@@ -28,6 +28,38 @@ export function accentOf(snapshot: any): string {
   return snapshot?.theme?.accentColor || DEFAULT_ACCENT;
 }
 
+// ─── Idle 화면 (활성 방 없음 — 스트리머만 브랜딩) ────────────────
+export function IdleScene({ snapshot }: { snapshot: any }) {
+  const accent = accentOf(snapshot);
+  const theme = snapshot?.theme;
+  const title = theme?.clanName || snapshot?.streamer?.name || "NEXUS";
+
+  return (
+    <div className="flex h-full w-full flex-col items-center justify-center px-24 text-center">
+      {theme?.logo && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={theme.logo}
+          alt=""
+          className="mb-8 h-28 w-28 rounded-2xl object-cover"
+        />
+      )}
+      <p
+        className="mb-4 text-2xl font-black uppercase tracking-[0.3em]"
+        style={{ color: accent }}
+      >
+        {title}
+      </p>
+      <h1 className="text-[64px] font-black leading-tight text-white drop-shadow-[0_4px_24px_rgba(0,0,0,0.6)]">
+        곧 방송을 시작합니다
+      </h1>
+      <p className="mt-8 text-3xl font-semibold text-white/50">
+        방을 준비하는 중입니다
+      </p>
+    </div>
+  );
+}
+
 // ─── 대기 화면 ────────────────────────────────────────────────
 export function WaitingScene({ snapshot }: { snapshot: any }) {
   const accent = accentOf(snapshot);
@@ -91,7 +123,9 @@ export function AuctionScene({ snapshot }: { snapshot: any }) {
               {team.name}
             </p>
             <p className="mb-4 text-xl font-bold" style={{ color: accent }}>
-              잔여 {team.remainingBudget?.toLocaleString?.() ?? team.remainingBudget}P
+              잔여{" "}
+              {team.remainingBudget?.toLocaleString?.() ?? team.remainingBudget}
+              P
             </p>
             <div className="flex flex-col gap-2 overflow-hidden">
               {(team.members ?? []).slice(0, 6).map((m: any) => (
@@ -161,7 +195,9 @@ export function MatchScene({ snapshot }: { snapshot: any }) {
   if (!match) {
     return (
       <div className="flex h-full w-full items-center justify-center">
-        <p className="text-4xl font-bold text-white/40">중계할 경기가 없습니다</p>
+        <p className="text-4xl font-bold text-white/40">
+          중계할 경기가 없습니다
+        </p>
       </div>
     );
   }
@@ -169,20 +205,31 @@ export function MatchScene({ snapshot }: { snapshot: any }) {
   const blueWin = done && match.winnerId && match.winnerId === match.blue?.id;
   const redWin = done && match.winnerId && match.winnerId === match.red?.id;
   const roundLabel =
-    match.bracketRound || (match.round != null ? `${match.round}라운드` : "경기");
+    match.bracketRound ||
+    (match.round != null ? `${match.round}라운드` : "경기");
 
   return (
     // 상단 안전영역: 하단은 롤 HUD/미니맵과 충돌하므로 비움
     <div className="flex w-full justify-center pt-10">
       <div className="flex items-stretch gap-5">
-        <TeamPlate team={match.blue} side="BLUE" win={!!blueWin} lose={!!redWin} />
+        <TeamPlate
+          team={match.blue}
+          side="BLUE"
+          win={!!blueWin}
+          lose={!!redWin}
+        />
         <div className="flex flex-col items-center justify-center rounded-2xl bg-black/72 px-6 py-3">
           <span className="text-2xl font-black text-white/80">VS</span>
           <span className="mt-1 whitespace-nowrap text-sm font-bold text-white/50">
             {roundLabel} · {statusLabel(match.status)}
           </span>
         </div>
-        <TeamPlate team={match.red} side="RED" win={!!redWin} lose={!!blueWin} />
+        <TeamPlate
+          team={match.red}
+          side="RED"
+          win={!!redWin}
+          lose={!!blueWin}
+        />
       </div>
     </div>
   );

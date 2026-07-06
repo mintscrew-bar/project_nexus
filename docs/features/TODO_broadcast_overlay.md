@@ -42,10 +42,12 @@
 - **OBS 1920×1080 고정 캔버스**. 반응형 페이지가 아니라 고정 stage + 내부 scale.
 - 배경 **투명 기본**, `?bg=opaque`면 풀씬 배경.
 
-### 토큰
-- `Room.broadcastTokenHash`(평문 저장 금지, hash 비교) + `Room.broadcastTokenCreatedAt`.
-- 호스트가 "방송 링크 생성" → lazy 생성. 원문 토큰은 **생성 응답에서 한 번만** 내려줌.
-- "링크 재생성" = 새 hash로 교체(= 기존 revoke).
+### 토큰 (2026-07-07: per-room → **per-user** 전환)
+- **스트리머(유저)당 단일 토큰**: `User.broadcastTokenHash`(hash 저장) + `User.broadcastTokenCreatedAt`.
+- 스트리머가 **설정 > 방송**에서 1회 발급 → OBS 브라우저 소스에 한 번 등록. 원문은 **발급 응답에서 한 번만** 내려줌.
+- 오버레이는 그 유저의 **활성 방을 자동 추종**: `User.broadcastLiveRoomId`(수동 고정) → 없으면 내가 호스트인 최근 미종료 방. 활성 방 없으면 브랜딩 idle 화면.
+- 로비는 링크 관리 대신 **"이 방 고정 송출"** 토글(동시 다중 방 대비)만 제공(`PATCH /rooms/:id/broadcast-live`).
+- 엔드포인트: `GET/POST /broadcast/token`, `POST /broadcast/token/rotate`, `DELETE /broadcast/token`(모두 로그인 본인).
 
 ### 소켓 (read-only)
 - 신규 namespace 안 만들고 **기존 게이트웨이에 read-only join** 추가. broadcast 토큰 소켓은 **구독만**, 모든 액션 `@SubscribeMessage` emit 차단.
@@ -127,8 +129,8 @@ BroadcastShell
 ## Tasks
 
 ### Phase 0 — Broadcast 인프라
-- [x] Task 1: 스키마 — `Room.broadcastTokenHash`/`broadcastTokenCreatedAt`/`broadcastFocusMatchId` + 마이그레이션 SQL
-- [x] Task 2: 백엔드 — 토큰 생성/재생성(`POST /rooms/:id/broadcast-token`, `.../rotate`, 호스트만, hash 저장·원문 1회 응답)
+- [x] Task 1: 스키마 — 방송 토큰 **User 귀속**(`User.broadcastTokenHash`/`broadcastTokenCreatedAt`/`broadcastLiveRoomId`) + `Room.broadcastFocusMatchId` + 마이그레이션 SQL (per-room 컬럼 제거)
+- [x] Task 2: 백엔드 — **per-user** 토큰 생성/재생성/폐기(`GET/POST/DELETE /broadcast/token`, `POST /broadcast/token/rotate`, 로그인 본인, hash 저장·원문 1회) + 활성 방 자동 해석 + "이 방 고정 송출"(`PATCH /rooms/:id/broadcast-live`)
 - [x] Task 3: 백엔드 — `GET /broadcast/:token/snapshot?scene=&matchId=` (토큰 검증, scene별 + 공통 룸/토너먼트 요약 포함)
 - [x] Task 4: 백엔드 — 기존 게이트웨이 read-only 토큰 join(액션 emit 차단) + `bracket:${roomId}` 구독 경로
 - [x] Task 5: 프론트 — AppShell `/broadcast` 조건부 우회
@@ -141,7 +143,7 @@ BroadcastShell
 - [x] Task 8: Waiting scene (방 제목·모집 현황·준비 상태)
 - [~] Task 9: Auction scene — **스냅샷 기반**(팀/예산/멤버) 구현. 라이브 현재매물/입찰(auction 게이트웨이 read-only join)은 후속.
 - [ ] Task 10: **실제 스트리머 1명 OBS 테스트** — 파이프라인 검증 후 다음 Phase 진행
-- [x] (추가) 호스트 "방송 링크" 모달 — 로비에서 토큰 생성/재생성/비활성화 + scene별 링크 복사
+- [x] (추가) 방송 토큰 UI — **설정 > 방송 탭**에서 발급/재생성/폐기 + scene별 링크 복사, 로비는 "이 방 고정 송출" 토글 + idle 화면(활성 방 없음)
 
 ### Phase 3 — Match Scene
 - [~] Task 11: 고정 matchId 표시 — **MatchScene(좌우 플레이트 + 상태 칩, `blueSideTeamId` 진영색, 상단 앵커) 구현.** HUD 데드존 미세조정·연출은 후속.
