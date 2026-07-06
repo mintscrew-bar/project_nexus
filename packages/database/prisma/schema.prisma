@@ -319,6 +319,10 @@ model Room {
   discordCategoryId String?
   startedAt         DateTime?
   completedAt       DateTime?
+  // 방송 오버레이: 읽기전용 토큰(hash 저장, 원문은 생성 응답에서만 노출) + 호스트가 중계 중인 경기
+  broadcastTokenHash      String?
+  broadcastTokenCreatedAt DateTime?
+  broadcastFocusMatchId   String?
   createdAt         DateTime              @default(now())
   updatedAt         DateTime              @updatedAt
   chatMessages      ChatMessage[]
@@ -333,6 +337,7 @@ model Room {
   @@index([status])
   @@index([isPrivate])
   @@index([createdAt])
+  @@index([broadcastTokenHash])
   @@map("rooms")
 }
 
