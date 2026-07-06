@@ -7,7 +7,13 @@ import { broadcastApi } from "@/lib/api-client";
 import { connectBroadcastSocket } from "@/lib/socket-client";
 import { BroadcastShell } from "./_components/BroadcastShell";
 import { LowerThird } from "./_components/LowerThird";
-import { RoomScene, MatchScene, IdleScene } from "./_components/scenes";
+import {
+  RoomScene,
+  MatchScene,
+  IdleScene,
+  accentOf,
+} from "./_components/scenes";
+import { BroadcastAuctionLive } from "./_components/BroadcastAuctionLive";
 
 /**
  * /broadcast/[token] — OBS 브라우저 소스용 읽기전용 방송 오버레이.
@@ -78,10 +84,18 @@ export default function BroadcastPage() {
     return <div className="fixed inset-0 bg-transparent" />;
   }
 
+  const status = snapshot?.room?.status;
   const sceneNode = snapshot.idle ? (
     <IdleScene snapshot={snapshot} />
   ) : scene === "match" ? (
     <MatchScene snapshot={snapshot} />
+  ) : status === "AUCTION" && token && roomId ? (
+    // 경매 단계는 정적 스냅샷 대신 라이브 소켓 구독으로 전 과정 중계
+    <BroadcastAuctionLive
+      token={token}
+      roomId={roomId}
+      accent={accentOf(snapshot)}
+    />
   ) : (
     <RoomScene snapshot={snapshot} />
   );

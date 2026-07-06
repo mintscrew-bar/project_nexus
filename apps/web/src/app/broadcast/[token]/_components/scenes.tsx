@@ -15,8 +15,7 @@ const CUT = 18;
 const clipLeft = `polygon(0 0, 100% 0, calc(100% - ${CUT}px) 100%, 0 100%)`; // 오른쪽 아래 슬랜트
 const clipRight = `polygon(${CUT}px 0, 100% 0, 100% 100%, 0 100%)`; // 왼쪽 아래 슬랜트
 const clipBanner = `polygon(0 0, 100% 0, calc(100% - ${CUT}px) 100%, ${CUT}px 100%)`; // 양쪽 아래
-const clipHex =
-  "polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%)";
+const clipHex = "polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%)";
 const PANEL_BG =
   "linear-gradient(135deg, rgba(12,12,18,0.94), rgba(22,22,32,0.84))";
 

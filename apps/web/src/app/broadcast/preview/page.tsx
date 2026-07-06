@@ -8,6 +8,8 @@ import {
   MatchScene,
   IdleScene,
 } from "../[token]/_components/scenes";
+import { AuctionLiveView } from "../[token]/_components/AuctionLiveView";
+import type { BroadcastAuctionState } from "../[token]/_live/useBroadcastAuction";
 
 /**
  * /broadcast/preview — 방송 오버레이 디자인 확인용 목업 프리뷰(백엔드 불필요).
@@ -82,7 +84,10 @@ const common = (status: string) => ({
 });
 
 const SNAP: Record<string, any> = {
-  waiting: { ...common("WAITING"), room: { ...common("WAITING").room, participantCount: 6 } },
+  waiting: {
+    ...common("WAITING"),
+    room: { ...common("WAITING").room, participantCount: 6 },
+  },
   auction: common("AUCTION"),
   match: {
     ...common("IN_PROGRESS"),
@@ -112,12 +117,57 @@ const SNAP: Record<string, any> = {
       red: TEAM_RED,
     },
   },
-  idle: { idle: true, scene: "room", room: null, theme: THEME, streamer: { name: "스트리머" }, teams: [], focusMatchId: null },
+  idle: {
+    idle: true,
+    scene: "room",
+    room: null,
+    theme: THEME,
+    streamer: { name: "스트리머" },
+    teams: [],
+    focusMatchId: null,
+  },
+};
+
+const MOCK_AUCTION_LIVE: BroadcastAuctionState = {
+  connected: true,
+  status: "IN_PROGRESS",
+  captainPhase: null,
+  current: {
+    player: { id: "p1", username: "다이아왕", tier: "DIAMOND", avatar: null },
+    bid: 320,
+    bidderTeamId: "teamA",
+    bidderName: "블루장",
+    timerEnd: Date.now() + 9000,
+    clockOffset: 0,
+  },
+  teams: [TEAM_BLUE, TEAM_RED],
+  remainingCount: 6,
+  feed: [
+    {
+      id: "1",
+      type: "bid",
+      teamName: "블루 웨이브",
+      teamColor: "#3B82F6",
+      amount: 320,
+      ts: 0,
+    },
+    {
+      id: "2",
+      type: "sold",
+      playerName: "미드갓",
+      teamName: "레드 스톰",
+      teamColor: "#EF4444",
+      amount: 180,
+      ts: 0,
+    },
+    { id: "3", type: "unsold", playerName: "정글러킹", ts: 0 },
+    { id: "4", type: "info", text: "▶ 다이아왕 매물 시작", ts: 0 },
+  ],
 };
 
 const SCENES: { key: string; label: string }[] = [
   { key: "waiting", label: "대기" },
-  { key: "auction", label: "경매" },
+  { key: "auction", label: "경매(라이브)" },
   { key: "match", label: "경기 중계" },
   { key: "matchDone", label: "경기 종료(승팀)" },
   { key: "idle", label: "Idle(방 없음)" },
@@ -134,6 +184,8 @@ export default function BroadcastPreviewPage() {
     <IdleScene snapshot={snapshot} />
   ) : isMatch ? (
     <MatchScene snapshot={snapshot} />
+  ) : sceneKey === "auction" ? (
+    <AuctionLiveView state={MOCK_AUCTION_LIVE} accent={ACCENT} />
   ) : (
     <RoomScene snapshot={snapshot} />
   );

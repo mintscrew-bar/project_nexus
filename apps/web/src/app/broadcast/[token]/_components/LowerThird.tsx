@@ -32,8 +32,7 @@ export function LowerThird({ snapshot }: { snapshot: any }) {
               alt=""
               className="h-11 w-11 object-cover"
               style={{
-                clipPath:
-                  "polygon(15% 0, 100% 0, 85% 100%, 0 100%)",
+                clipPath: "polygon(15% 0, 100% 0, 85% 100%, 0 100%)",
               }}
             />
           ) : (
