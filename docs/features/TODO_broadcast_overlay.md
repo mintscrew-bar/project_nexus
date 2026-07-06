@@ -3,6 +3,8 @@
 > 작성일: 2026-06-30
 > 코드네임: **Broadcast Overlay** (사용자 노출 문구: "방송 화면 링크" / "방송용 오버레이")
 > 내부 명칭으로 "스트리머 모드"보다 Broadcast Overlay를 사용한다.
+>
+> **진행(2026-07-06, 브랜치):** Phase 0 인프라 완료(스키마·토큰·스냅샷·read-only 소켓·AppShell 우회·1920×1080 셸), Phase 1 lower-third 완료, Phase 2 Room Scene(Waiting + 스냅샷 기반 Auction) + 호스트 방송링크 모달, Phase 3 MatchScene·focus 백엔드 기본형. api/web 빌드·린트 그린. **남음: Task 10 실사용 검증, 라이브 auction 배관, Result Toast, Bracket/Result/Break, 전환 연출, 호스트 "이 경기 중계" UI.**
 
 ---
 
@@ -137,12 +139,13 @@ BroadcastShell
 
 ### Phase 2 — Room Scene  ← **검증 게이트**
 - [x] Task 8: Waiting scene (방 제목·모집 현황·준비 상태)
-- [ ] Task 9: Auction scene (`AuctionBoard` `displayMode="overlay"` 재사용, 컨트롤 제거, 중앙=현재 선수 최대)
+- [~] Task 9: Auction scene — **스냅샷 기반**(팀/예산/멤버) 구현. 라이브 현재매물/입찰(auction 게이트웨이 read-only join)은 후속.
 - [ ] Task 10: **실제 스트리머 1명 OBS 테스트** — 파이프라인 검증 후 다음 Phase 진행
+- [x] (추가) 호스트 "방송 링크" 모달 — 로비에서 토큰 생성/재생성/비활성화 + scene별 링크 복사
 
 ### Phase 3 — Match Scene
-- [ ] Task 11: 고정 matchId 표시(좌우 플레이트 + 상태 칩, `blueSideTeamId` 진영색, HUD 데드존 앵커)
-- [ ] Task 12: 호스트 추종 — `Room.broadcastFocusMatchId` + `PATCH /rooms/:id/broadcast-focus` + `broadcast-focus-updated` 구독, matchId 없을 때 추종/자동선택
+- [~] Task 11: 고정 matchId 표시 — **MatchScene(좌우 플레이트 + 상태 칩, `blueSideTeamId` 진영색, 상단 앵커) 구현.** HUD 데드존 미세조정·연출은 후속.
+- [x] Task 12(백엔드): `Room.broadcastFocusMatchId` + `PATCH /rooms/:id/broadcast-focus` + `broadcast-focus-updated` emit. 프론트 추종(스냅샷 매치 해석)도 반영. 호스트 "이 경기 중계" UI(Task 13)는 후속.
 - [ ] Task 13: 호스트 측 "이 경기 중계" UI (방 관리/대진 화면에서 focus 설정 + 고정 링크 복사)
 - [ ] Task 14: 종료 시 승팀 강조 + Focus 전환(상단 바만) 연출
 
