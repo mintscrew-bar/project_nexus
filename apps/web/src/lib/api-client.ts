@@ -626,6 +626,48 @@ export const userApi = {
 };
 
 // 방 관련 API
+// 방송 오버레이 (OBS) — 스냅샷은 공개(토큰 인증), 토큰 관리는 호스트(인증) API
+export const broadcastApi = {
+  // OBS 브라우저 소스용 읽기전용 스냅샷
+  getSnapshot: async (
+    token: string,
+    params?: { scene?: string; matchId?: string },
+  ) => {
+    const response = await publicApiClient.get(
+      `/broadcast/${token}/snapshot`,
+      { params },
+    );
+    return response.data;
+  },
+  // 호스트: 방송 링크 생성(없을 때만 토큰 발급), 재생성, 비활성화
+  createToken: async (roomId: string) => {
+    const response = await apiClient.post(`/rooms/${roomId}/broadcast-token`);
+    return response.data as {
+      exists: boolean;
+      createdAt: string | null;
+      token: string | null;
+    };
+  },
+  rotateToken: async (roomId: string) => {
+    const response = await apiClient.post(
+      `/rooms/${roomId}/broadcast-token/rotate`,
+    );
+    return response.data as { exists: boolean; createdAt: string; token: string };
+  },
+  revokeToken: async (roomId: string) => {
+    const response = await apiClient.delete(`/rooms/${roomId}/broadcast-token`);
+    return response.data;
+  },
+  // 호스트: 중계 중인 경기(focus) 설정/해제
+  setFocus: async (roomId: string, matchId: string | null) => {
+    const response = await apiClient.patch(
+      `/rooms/${roomId}/broadcast-focus`,
+      { matchId },
+    );
+    return response.data as { focusMatchId: string | null };
+  },
+};
+
 export const roomApi = {
   getRooms: async (params?: {
     mode?: string;

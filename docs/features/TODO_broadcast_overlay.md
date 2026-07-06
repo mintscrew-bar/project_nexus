@@ -129,14 +129,14 @@ BroadcastShell
 - [x] Task 2: 백엔드 — 토큰 생성/재생성(`POST /rooms/:id/broadcast-token`, `.../rotate`, 호스트만, hash 저장·원문 1회 응답)
 - [x] Task 3: 백엔드 — `GET /broadcast/:token/snapshot?scene=&matchId=` (토큰 검증, scene별 + 공통 룸/토너먼트 요약 포함)
 - [x] Task 4: 백엔드 — 기존 게이트웨이 read-only 토큰 join(액션 emit 차단) + `bracket:${roomId}` 구독 경로
-- [ ] Task 5: 프론트 — AppShell `/broadcast` 조건부 우회
-- [ ] Task 6: 프론트 — `BroadcastShell` (1920×1080 고정 캔버스, 투명/`?bg=opaque`, **레이어 구조 확정**: Theme / Transition / Current Scene / Persistent Overlay)
+- [x] Task 5: 프론트 — AppShell `/broadcast` 조건부 우회
+- [x] Task 6: 프론트 — `BroadcastShell` (1920×1080 고정 캔버스, 투명/`?bg=opaque`, **레이어 구조 확정**: Theme / Transition / Current Scene / Persistent Overlay)
 
 ### Phase 1 — Lower-third (0순위)
-- [ ] Task 7: 영구 상태 띠 — "내전 진행 중 · 8/10 · 경매 단계 · [클랜색/엠블럼]". 모든 scene 공통, Persistent Overlay에 상주
+- [x] Task 7: 영구 상태 띠 — "내전 진행 중 · 8/10 · 경매 단계 · [클랜색/엠블럼]". 모든 scene 공통, Persistent Overlay에 상주
 
 ### Phase 2 — Room Scene  ← **검증 게이트**
-- [ ] Task 8: Waiting scene (방 제목·모집 현황·준비 상태)
+- [x] Task 8: Waiting scene (방 제목·모집 현황·준비 상태)
 - [ ] Task 9: Auction scene (`AuctionBoard` `displayMode="overlay"` 재사용, 컨트롤 제거, 중앙=현재 선수 최대)
 - [ ] Task 10: **실제 스트리머 1명 OBS 테스트** — 파이프라인 검증 후 다음 Phase 진행
 

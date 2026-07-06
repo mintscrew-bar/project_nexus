@@ -204,6 +204,26 @@ export const connectMatchSocket = () => {
   return matchSocket;
 };
 
+/**
+ * 방송 오버레이(OBS)용 read-only /match 소켓.
+ * 로그인 JWT가 아니라 방송 토큰으로 인증한다(백엔드가 토큰 검증 → read-only 연결).
+ * 전역 싱글턴을 쓰지 않고 호출자가 직접 수명 관리(페이지 언마운트 시 disconnect).
+ */
+export const connectBroadcastSocket = (broadcastToken: string) => {
+  return io(`${SOCKET_URL}/match`, {
+    autoConnect: true,
+    auth: { token: broadcastToken },
+    transports: ["websocket", "polling"],
+    upgrade: false,
+    withCredentials: false,
+    reconnection: true,
+    reconnectionAttempts: Infinity,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 10000,
+    timeout: 20000,
+  });
+};
+
 // Clan Socket 연결
 export const connectClanSocket = () => {
   if (isReusableSocket(clanSocket)) return clanSocket;
