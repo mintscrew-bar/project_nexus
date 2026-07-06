@@ -1253,6 +1253,35 @@ export class RoomService {
     return { ok: true };
   }
 
+  /** 호스트가 방송 중계 중인 경기(focus)를 설정/해제. 호스트만. */
+  async setBroadcastFocus(
+    userId: string,
+    roomId: string,
+    matchId: string | null,
+  ) {
+    const room = await this.prisma.room.findUnique({
+      where: { id: roomId },
+      select: { id: true, hostId: true },
+    });
+    if (!room) throw new NotFoundException("방을 찾을 수 없습니다.");
+    if (room.hostId !== userId) {
+      throw new ForbiddenException("호스트만 중계 경기를 설정할 수 있습니다.");
+    }
+    // matchId가 있으면 이 방의 경기인지 검증
+    if (matchId) {
+      const match = await this.prisma.match.findFirst({
+        where: { id: matchId, roomId },
+        select: { id: true },
+      });
+      if (!match) throw new NotFoundException("경기를 찾을 수 없습니다.");
+    }
+    await this.prisma.room.update({
+      where: { id: roomId },
+      data: { broadcastFocusMatchId: matchId },
+    });
+    return { focusMatchId: matchId };
+  }
+
   /** 원문 토큰으로 방 id를 찾는다(방송 스냅샷/소켓 인증용). 없으면 null. */
   async findRoomIdByBroadcastToken(token: string): Promise<string | null> {
     if (!token) return null;

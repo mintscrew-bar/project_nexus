@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Put,
+  Patch,
   Delete,
   Body,
   Param,
@@ -157,6 +158,23 @@ export class RoomController {
     @Param("id") id: string,
   ) {
     return this.roomService.revokeBroadcastToken(userId, id);
+  }
+
+  // 호스트가 중계 중인 경기(focus) 설정/해제 → 방송 소켓에 알림
+  @Patch(":id/broadcast-focus")
+  @HttpCode(HttpStatus.OK)
+  async setBroadcastFocus(
+    @CurrentUser("sub") userId: string,
+    @Param("id") id: string,
+    @Body() body: { matchId: string | null },
+  ) {
+    const result = await this.roomService.setBroadcastFocus(
+      userId,
+      id,
+      body?.matchId ?? null,
+    );
+    this.matchGateway.emitBroadcastFocus(id, result.focusMatchId);
+    return result;
   }
 
   // ========================================
