@@ -8,7 +8,6 @@ import {
   Inject,
   Logger,
 } from "@nestjs/common";
-import { createHash, randomBytes } from "crypto";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../prisma/prisma.service";
 import { ShutdownService } from "../common/shutdown.service";
@@ -553,15 +552,16 @@ export class RoomService {
           await this.discordVoiceService?.getRoomNotificationTarget?.(room.id);
 
         if (notificationTarget) {
-          const { embed, components } = this.discordBotService.buildRoomCreatedEmbed(
-            room.id,
-            room.name,
-            room.host.username,
-            room.maxParticipants,
-            room.teamMode,
-            room.isPrivate,
-            [room.host.username], // 방 생성 시 방장 1명
-          );
+          const { embed, components } =
+            this.discordBotService.buildRoomCreatedEmbed(
+              room.id,
+              room.name,
+              room.host.username,
+              room.maxParticipants,
+              room.teamMode,
+              room.isPrivate,
+              [room.host.username], // 방 생성 시 방장 1명
+            );
 
           const messageId = await this.discordBotService.sendEmbedNotification(
             notificationTarget.guildId,
@@ -922,9 +922,11 @@ export class RoomService {
     // WAITING 중 참가자 변동 → Discord 알림 embed 업데이트
     if (this.discordBotService) {
       const playerNames: string[] = ((roomData as any).participants ?? [])
-        .filter((p: any) => p.role === 'PLAYER')
-        .map((p: any) => p.user?.username ?? p.username ?? '');
-      this.discordBotService.updateRoomNotification(joinedRoomId, playerNames).catch(() => {});
+        .filter((p: any) => p.role === "PLAYER")
+        .map((p: any) => p.user?.username ?? p.username ?? "");
+      this.discordBotService
+        .updateRoomNotification(joinedRoomId, playerNames)
+        .catch(() => {});
     }
 
     return roomData;
@@ -1142,9 +1144,11 @@ export class RoomService {
     // 퇴장 후 남은 PLAYER 명단으로 Discord 알림 업데이트
     if (this.discordBotService) {
       const remainingPlayerNames: string[] = remainingParticipants
-        .filter((p: any) => p.role === 'PLAYER')
-        .map((p: any) => p.user?.username ?? '');
-      this.discordBotService.updateRoomNotification(roomId, remainingPlayerNames).catch(() => {});
+        .filter((p: any) => p.role === "PLAYER")
+        .map((p: any) => p.user?.username ?? "");
+      this.discordBotService
+        .updateRoomNotification(roomId, remainingPlayerNames)
+        .catch(() => {});
     }
 
     return { message: "Left room successfully", username, newHostId };
@@ -1191,66 +1195,57 @@ export class RoomService {
 
   // ── 방송 오버레이 토큰 ──────────────────────────────────────
   // 원문 토큰은 저장하지 않고 sha256 hash만 저장한다. 원문은 생성 응답에서 1회만 노출.
-  private hashBroadcastToken(token: string): string {
-    return createHash("sha256").update(token).digest("hex");
-  }
-
   /**
-   * 방송 링크 토큰 생성/재생성. 호스트만 가능.
-   * - 이미 존재하고 rotate=false면 원문 복구가 불가하므로 존재 여부만 반환.
-   * - rotate=true(재생성)면 기존 토큰을 무효화하고 새 토큰을 반환.
+   * "이 방 고정 송출" 토글. 호스트만.
+   * 방송 토큰은 유저에 귀속되고 기본은 최근 활성 방 자동 추종이라,
+   * 동시에 여러 방을 열었을 때 어느 방을 송출할지 명시하는 수동 오버라이드다.
+   * - live=true: 유저의 broadcastLiveRoomId를 이 방으로 지정
+   * - live=false: 현재 이 방을 가리킬 때만 해제(다른 방을 가리키면 건드리지 않음)
    */
-  async createBroadcastToken(userId: string, roomId: string, rotate = false) {
-    const room = await this.prisma.room.findUnique({
-      where: { id: roomId },
-      select: {
-        id: true,
-        hostId: true,
-        broadcastTokenHash: true,
-        broadcastTokenCreatedAt: true,
-      },
-    });
-    if (!room) throw new NotFoundException("방을 찾을 수 없습니다.");
-    if (room.hostId !== userId) {
-      throw new ForbiddenException("호스트만 방송 링크를 관리할 수 있습니다.");
-    }
-
-    if (room.broadcastTokenHash && !rotate) {
-      // 원문은 복구 불가 — 이미 활성화됨만 알림
-      return {
-        exists: true,
-        createdAt: room.broadcastTokenCreatedAt,
-        token: null as string | null,
-      };
-    }
-
-    const token = randomBytes(24).toString("base64url");
-    const createdAt = new Date();
-    await this.prisma.room.update({
-      where: { id: roomId },
-      data: {
-        broadcastTokenHash: this.hashBroadcastToken(token),
-        broadcastTokenCreatedAt: createdAt,
-      },
-    });
-    return { exists: true, createdAt, token };
-  }
-
-  /** 방송 링크 비활성화. 호스트만 가능. */
-  async revokeBroadcastToken(userId: string, roomId: string) {
+  async setBroadcastLiveRoom(userId: string, roomId: string, live: boolean) {
     const room = await this.prisma.room.findUnique({
       where: { id: roomId },
       select: { id: true, hostId: true },
     });
     if (!room) throw new NotFoundException("방을 찾을 수 없습니다.");
     if (room.hostId !== userId) {
-      throw new ForbiddenException("호스트만 방송 링크를 관리할 수 있습니다.");
+      throw new ForbiddenException("호스트만 방송 송출을 제어할 수 있습니다.");
     }
-    await this.prisma.room.update({
-      where: { id: roomId },
-      data: { broadcastTokenHash: null, broadcastTokenCreatedAt: null },
+
+    if (live) {
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: { broadcastLiveRoomId: roomId },
+      });
+      return { pinned: true };
+    }
+
+    // 다른 방으로 이미 옮겨갔다면 그대로 두고, 이 방을 가리킬 때만 해제
+    await this.prisma.user.updateMany({
+      where: { id: userId, broadcastLiveRoomId: roomId },
+      data: { broadcastLiveRoomId: null },
     });
-    return { ok: true };
+    return { pinned: false };
+  }
+
+  /** 로비 방송 상태: 토큰 발급 여부 + 이 방이 고정 송출 중인지. 호스트만. */
+  async getBroadcastLiveState(userId: string, roomId: string) {
+    const room = await this.prisma.room.findUnique({
+      where: { id: roomId },
+      select: { hostId: true },
+    });
+    if (!room) throw new NotFoundException("방을 찾을 수 없습니다.");
+    if (room.hostId !== userId) {
+      throw new ForbiddenException("호스트만 방송 상태를 조회할 수 있습니다.");
+    }
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { broadcastTokenHash: true, broadcastLiveRoomId: true },
+    });
+    return {
+      hasToken: !!user?.broadcastTokenHash,
+      pinned: user?.broadcastLiveRoomId === roomId,
+    };
   }
 
   /** 호스트가 방송 중계 중인 경기(focus)를 설정/해제. 호스트만. */
@@ -1280,16 +1275,6 @@ export class RoomService {
       data: { broadcastFocusMatchId: matchId },
     });
     return { focusMatchId: matchId };
-  }
-
-  /** 원문 토큰으로 방 id를 찾는다(방송 스냅샷/소켓 인증용). 없으면 null. */
-  async findRoomIdByBroadcastToken(token: string): Promise<string | null> {
-    if (!token) return null;
-    const room = await this.prisma.room.findFirst({
-      where: { broadcastTokenHash: this.hashBroadcastToken(token) },
-      select: { id: true },
-    });
-    return room?.id ?? null;
   }
 
   async updateRoomSettings(
@@ -1592,7 +1577,10 @@ export class RoomService {
       throw new ForbiddenException("자동 밸런스 팀 구성을 시작할 수 없습니다.");
     }
     // startGame()이 WAITING → DRAFT로 원자 전환 후 호출되므로 DRAFT도 수용
-    if (room.status !== RoomStatus.WAITING && room.status !== RoomStatus.DRAFT) {
+    if (
+      room.status !== RoomStatus.WAITING &&
+      room.status !== RoomStatus.DRAFT
+    ) {
       throw new BadRequestException("Room has already started");
     }
     if (room.participants.length !== room.maxParticipants) {
@@ -1687,7 +1675,10 @@ export class RoomService {
         throw new ForbiddenException("자유 팀 구성을 확정할 수 없습니다.");
       }
       // startGame()이 WAITING → DRAFT로 원자 전환 후 호출되므로 DRAFT도 수용
-      if (room.status !== RoomStatus.WAITING && room.status !== RoomStatus.DRAFT) {
+      if (
+        room.status !== RoomStatus.WAITING &&
+        room.status !== RoomStatus.DRAFT
+      ) {
         throw new BadRequestException("Room has already started");
       }
       if (room.participants.length !== room.maxParticipants) {

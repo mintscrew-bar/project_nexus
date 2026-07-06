@@ -1,20 +1,79 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
+import { randomBytes } from "crypto";
 import { PrismaService } from "../prisma/prisma.service";
-import { RoomService } from "../room/room.service";
+import {
+  hashBroadcastToken,
+  activeRoomIdForUser,
+} from "./broadcast-resolve.util";
 
 export type BroadcastScene = "room" | "match" | "bracket" | "result" | "break";
 
 /**
- * 방송 오버레이 스냅샷 서비스.
- * OBS 브라우저 소스가 최초 접속 시 현재 상태를 hydrate 하는 용도(read-only).
- * 이후 실시간 변경은 소켓 델타로 반영한다.
+ * 방송 오버레이 서비스.
+ * - 스트리머당 단일 read-only 토큰 발급/관리(hash 저장).
+ * - OBS 브라우저 소스가 접속 시 현재 상태를 hydrate 하는 스냅샷 제공(read-only).
+ *   토큰은 유저에 귀속되고, 오버레이는 그 유저의 활성 방을 자동 추종한다.
  */
 @Injectable()
 export class BroadcastService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly roomService: RoomService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
+
+  /**
+   * 방송 토큰 발급/재생성. 로그인 유저 본인 것만.
+   * - 이미 있고 rotate=false면 원문 복구 불가라 존재 여부만 반환.
+   * - rotate=true면 기존 토큰을 무효화하고 새 토큰 반환.
+   */
+  async createToken(userId: string, rotate = false) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { broadcastTokenHash: true, broadcastTokenCreatedAt: true },
+    });
+    if (!user) throw new NotFoundException("유저를 찾을 수 없습니다.");
+
+    if (user.broadcastTokenHash && !rotate) {
+      return {
+        exists: true,
+        createdAt: user.broadcastTokenCreatedAt,
+        token: null as string | null,
+      };
+    }
+
+    const token = randomBytes(24).toString("base64url");
+    const createdAt = new Date();
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        broadcastTokenHash: hashBroadcastToken(token),
+        broadcastTokenCreatedAt: createdAt,
+      },
+    });
+    return { exists: true, createdAt, token };
+  }
+
+  /** 방송 토큰 현재 상태(존재 여부/발급 시각). 원문은 노출하지 않는다. */
+  async getTokenStatus(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { broadcastTokenHash: true, broadcastTokenCreatedAt: true },
+    });
+    return {
+      exists: !!user?.broadcastTokenHash,
+      createdAt: user?.broadcastTokenCreatedAt ?? null,
+    };
+  }
+
+  /** 방송 토큰 비활성화. 송출 오버라이드도 함께 해제. */
+  async revokeToken(userId: string) {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        broadcastTokenHash: null,
+        broadcastTokenCreatedAt: null,
+        broadcastLiveRoomId: null,
+      },
+    });
+    return { ok: true };
+  }
 
   /** 팀 요약 공통 형태 */
   private teamSummary(team: any) {
@@ -57,13 +116,72 @@ export class BroadcastService {
     };
   }
 
+  /** 클랜 → 방송 테마(엠블럼/배너/강조색). 클랜 없으면 null. */
+  private clanTheme(clan: any) {
+    if (!clan) return null;
+    return {
+      accentColor: clan.accentColor ?? null,
+      logo: clan.logo ?? null,
+      banner: clan.banner ?? null,
+      clanName: clan.name,
+      clanTag: clan.tag,
+    };
+  }
+
   async getSnapshot(
     token: string,
     scene: BroadcastScene = "room",
     matchId?: string,
   ) {
-    const roomId = await this.roomService.findRoomIdByBroadcastToken(token);
-    if (!roomId) throw new NotFoundException("유효하지 않은 방송 링크입니다.");
+    // 토큰 → 스트리머(유저). 무효한 토큰만 에러; 활성 방이 없는 건 정상(대기 상태).
+    const streamer = token
+      ? await this.prisma.user.findUnique({
+          where: { broadcastTokenHash: hashBroadcastToken(token) },
+          select: {
+            id: true,
+            username: true,
+            broadcastLiveRoomId: true,
+            clanMemberships: {
+              take: 1,
+              select: {
+                clan: {
+                  select: {
+                    name: true,
+                    tag: true,
+                    accentColor: true,
+                    logo: true,
+                    banner: true,
+                  },
+                },
+              },
+            },
+          },
+        })
+      : null;
+    if (!streamer)
+      throw new NotFoundException("유효하지 않은 방송 링크입니다.");
+
+    const streamerTheme = this.clanTheme(
+      streamer.clanMemberships?.[0]?.clan ?? null,
+    );
+
+    const roomId = await activeRoomIdForUser(
+      this.prisma,
+      streamer.id,
+      streamer.broadcastLiveRoomId,
+    );
+    // 송출할 활성 방이 없으면 브랜딩된 대기(idle) 스냅샷 반환
+    if (!roomId) {
+      return {
+        idle: true,
+        scene,
+        room: null,
+        theme: streamerTheme,
+        streamer: { name: streamer.username },
+        teams: [],
+        focusMatchId: null,
+      };
+    }
 
     const room = await this.prisma.room.findUnique({
       where: { id: roomId },
@@ -136,15 +254,7 @@ export class BroadcastService {
         maxParticipants: room.maxParticipants,
         hostName: room.host?.username ?? null,
       },
-      theme: clan
-        ? {
-            accentColor: clan.accentColor ?? null,
-            logo: clan.logo ?? null,
-            banner: clan.banner ?? null,
-            clanName: clan.name,
-            clanTag: clan.tag,
-          }
-        : null,
+      theme: this.clanTheme(clan),
       teams: (room.teams ?? []).map((t: any) => this.teamSummary(t)),
       focusMatchId: room.broadcastFocusMatchId ?? null,
       scene,
@@ -153,7 +263,9 @@ export class BroadcastService {
     if (scene === "match") {
       // 우선순위: URL matchId → 방 focus → 진행 중 경기 → null
       const resolvedId =
-        matchId || room.broadcastFocusMatchId || (await this.firstLiveMatchId(roomId));
+        matchId ||
+        room.broadcastFocusMatchId ||
+        (await this.firstLiveMatchId(roomId));
       const match = resolvedId
         ? await this.prisma.match.findFirst({
             where: { id: resolvedId, roomId },

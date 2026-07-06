@@ -7,11 +7,11 @@ import {
   ConnectedSocket,
   MessageBody,
 } from "@nestjs/websockets";
-import { createHash } from "crypto";
 import { Server, Socket } from "socket.io";
 import { AuthService } from "../auth/auth.service";
 import { MatchService } from "./match.service";
 import { PrismaService } from "../prisma/prisma.service";
+import { resolveBroadcastRoomId } from "../broadcast/broadcast-resolve.util";
 
 interface AuthenticatedSocket extends Socket {
   userId?: string;
@@ -79,15 +79,9 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly prisma: PrismaService,
   ) {}
 
-  /** 방송 토큰(원문) → roomId. read-only 방송 연결 인증용. */
-  private async resolveBroadcastRoom(token: string): Promise<string | null> {
-    if (!token) return null;
-    const hash = createHash("sha256").update(token).digest("hex");
-    const room = await this.prisma.room.findFirst({
-      where: { broadcastTokenHash: hash },
-      select: { id: true },
-    });
-    return room?.id ?? null;
+  /** 방송 토큰(원문) → 현재 송출 중인 roomId. read-only 방송 연결 인증용. */
+  private resolveBroadcastRoom(token: string): Promise<string | null> {
+    return resolveBroadcastRoomId(this.prisma, token);
   }
 
   async handleConnection(client: AuthenticatedSocket) {
@@ -363,10 +357,7 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
         : state.captainBIsBot;
     if (!winnerIsBot) return;
 
-    await this.finalizeRpsSide(
-      matchId,
-      Math.random() < 0.5 ? "blue" : "red",
-    );
+    await this.finalizeRpsSide(matchId, Math.random() < 0.5 ? "blue" : "red");
   }
 
   // a가 b를 이기면 1, 지면 -1, 비기면 0
@@ -477,7 +468,10 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.armRpsTimer(matchId, this.RPS_SIDE_TIMEOUT, () => {
         const s = this.rpsStates.get(matchId);
         if (!s || s.phase !== "side") return;
-        void this.finalizeRpsSide(matchId, Math.random() < 0.5 ? "blue" : "red");
+        void this.finalizeRpsSide(
+          matchId,
+          Math.random() < 0.5 ? "blue" : "red",
+        );
       });
       return;
     }
@@ -507,11 +501,18 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   // RPS 실제 시작 (내부 공통 로직)
-  private async doRpsStart(matchId: string, ctx: {
-    hostId: string | null; teamAId: string | null; teamBId: string | null;
-    captainAId: string | null; captainBId: string | null;
-    captainAIsBot?: boolean; captainBIsBot?: boolean;
-  }) {
+  private async doRpsStart(
+    matchId: string,
+    ctx: {
+      hostId: string | null;
+      teamAId: string | null;
+      teamBId: string | null;
+      captainAId: string | null;
+      captainBId: string | null;
+      captainAIsBot?: boolean;
+      captainBIsBot?: boolean;
+    },
+  ) {
     const state: RpsState = {
       matchId,
       teamAId: ctx.teamAId ?? "",
@@ -556,7 +557,10 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
       if (!ctx.captainAId || !ctx.captainBId || !ctx.teamAId || !ctx.teamBId) {
         return { success: false, error: "양 팀 팀장이 확정돼야 합니다." };
       }
-      if (!client.userId || (client.userId !== ctx.captainAId && client.userId !== ctx.captainBId)) {
+      if (
+        !client.userId ||
+        (client.userId !== ctx.captainAId && client.userId !== ctx.captainBId)
+      ) {
         return { success: false, error: "팀장만 준비할 수 있습니다." };
       }
 
@@ -573,7 +577,10 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.emitRpsReadyState(data.matchId, entry);
 
       // 양쪽 모두 준비 완료 → 자동 시작
-      if (entry.readyIds.has(entry.captainAId) && entry.readyIds.has(entry.captainBId)) {
+      if (
+        entry.readyIds.has(entry.captainAId) &&
+        entry.readyIds.has(entry.captainBId)
+      ) {
         this.rpsReadyStates.delete(data.matchId);
         await this.doRpsStart(data.matchId, ctx);
       }
@@ -613,7 +620,10 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
       await this.doRpsStart(data.matchId, ctx);
       return { success: true };
     } catch (error: any) {
-      return { success: false, error: error?.message || "가위바위보 시작 실패" };
+      return {
+        success: false,
+        error: error?.message || "가위바위보 시작 실패",
+      };
     }
   }
 

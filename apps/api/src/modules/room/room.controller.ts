@@ -130,34 +130,24 @@ export class RoomController {
   // Broadcast Overlay (방송 오버레이)
   // ========================================
 
-  // 방송 링크 생성 (없으면 생성, 있으면 존재 여부만 반환 — 원문 복구 불가)
-  @Post(":id/broadcast-token")
-  @HttpCode(HttpStatus.OK)
-  async createBroadcastToken(
+  // 로비 방송 상태 조회(토큰 발급 여부 + 이 방 고정 송출 여부) — 호스트만
+  @Get(":id/broadcast-live")
+  async getBroadcastLiveState(
     @CurrentUser("sub") userId: string,
     @Param("id") id: string,
   ) {
-    return this.roomService.createBroadcastToken(userId, id, false);
+    return this.roomService.getBroadcastLiveState(userId, id);
   }
 
-  // 방송 링크 재생성 (기존 무효화 후 새 토큰 발급)
-  @Post(":id/broadcast-token/rotate")
+  // "이 방 고정 송출" 토글 — 호스트만
+  @Patch(":id/broadcast-live")
   @HttpCode(HttpStatus.OK)
-  async rotateBroadcastToken(
+  async setBroadcastLiveRoom(
     @CurrentUser("sub") userId: string,
     @Param("id") id: string,
+    @Body() body: { live: boolean },
   ) {
-    return this.roomService.createBroadcastToken(userId, id, true);
-  }
-
-  // 방송 링크 비활성화
-  @Delete(":id/broadcast-token")
-  @HttpCode(HttpStatus.OK)
-  async revokeBroadcastToken(
-    @CurrentUser("sub") userId: string,
-    @Param("id") id: string,
-  ) {
-    return this.roomService.revokeBroadcastToken(userId, id);
+    return this.roomService.setBroadcastLiveRoom(userId, id, !!body?.live);
   }
 
   // 호스트가 중계 중인 경기(focus) 설정/해제 → 방송 소켓에 알림
