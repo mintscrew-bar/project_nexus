@@ -20,6 +20,7 @@ import { MatchModule } from "./modules/match/match.module";
 import { RiotModule } from "./modules/riot/riot.module";
 import { DiscordModule } from "./modules/discord/discord.module";
 import { ClanModule } from "./modules/clan/clan.module";
+import { BroadcastModule } from "./modules/broadcast/broadcast.module";
 import { CommunityModule } from "./modules/community/community.module";
 import { BoardModule } from "./modules/board/board.module";
 import { ReputationModule } from "./modules/reputation/reputation.module";
@@ -94,6 +95,7 @@ const projectRoot = resolve(apiRoot, "../..");
     StatsModule,
     DiscordModule,
     ClanModule,
+    BroadcastModule,
     CommunityModule,
     BoardModule,
     ReputationModule,
