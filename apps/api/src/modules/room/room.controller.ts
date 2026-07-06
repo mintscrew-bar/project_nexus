@@ -126,6 +126,40 @@ export class RoomController {
   }
 
   // ========================================
+  // Broadcast Overlay (방송 오버레이)
+  // ========================================
+
+  // 방송 링크 생성 (없으면 생성, 있으면 존재 여부만 반환 — 원문 복구 불가)
+  @Post(":id/broadcast-token")
+  @HttpCode(HttpStatus.OK)
+  async createBroadcastToken(
+    @CurrentUser("sub") userId: string,
+    @Param("id") id: string,
+  ) {
+    return this.roomService.createBroadcastToken(userId, id, false);
+  }
+
+  // 방송 링크 재생성 (기존 무효화 후 새 토큰 발급)
+  @Post(":id/broadcast-token/rotate")
+  @HttpCode(HttpStatus.OK)
+  async rotateBroadcastToken(
+    @CurrentUser("sub") userId: string,
+    @Param("id") id: string,
+  ) {
+    return this.roomService.createBroadcastToken(userId, id, true);
+  }
+
+  // 방송 링크 비활성화
+  @Delete(":id/broadcast-token")
+  @HttpCode(HttpStatus.OK)
+  async revokeBroadcastToken(
+    @CurrentUser("sub") userId: string,
+    @Param("id") id: string,
+  ) {
+    return this.roomService.revokeBroadcastToken(userId, id);
+  }
+
+  // ========================================
   // Room Actions
   // ========================================
 

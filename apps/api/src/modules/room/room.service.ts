@@ -8,6 +8,7 @@ import {
   Inject,
   Logger,
 } from "@nestjs/common";
+import { createHash, randomBytes } from "crypto";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../prisma/prisma.service";
 import { ShutdownService } from "../common/shutdown.service";
@@ -1187,6 +1188,80 @@ export class RoomService {
   // ========================================
   // Room Settings
   // ========================================
+
+  // ── 방송 오버레이 토큰 ──────────────────────────────────────
+  // 원문 토큰은 저장하지 않고 sha256 hash만 저장한다. 원문은 생성 응답에서 1회만 노출.
+  private hashBroadcastToken(token: string): string {
+    return createHash("sha256").update(token).digest("hex");
+  }
+
+  /**
+   * 방송 링크 토큰 생성/재생성. 호스트만 가능.
+   * - 이미 존재하고 rotate=false면 원문 복구가 불가하므로 존재 여부만 반환.
+   * - rotate=true(재생성)면 기존 토큰을 무효화하고 새 토큰을 반환.
+   */
+  async createBroadcastToken(userId: string, roomId: string, rotate = false) {
+    const room = await this.prisma.room.findUnique({
+      where: { id: roomId },
+      select: {
+        id: true,
+        hostId: true,
+        broadcastTokenHash: true,
+        broadcastTokenCreatedAt: true,
+      },
+    });
+    if (!room) throw new NotFoundException("방을 찾을 수 없습니다.");
+    if (room.hostId !== userId) {
+      throw new ForbiddenException("호스트만 방송 링크를 관리할 수 있습니다.");
+    }
+
+    if (room.broadcastTokenHash && !rotate) {
+      // 원문은 복구 불가 — 이미 활성화됨만 알림
+      return {
+        exists: true,
+        createdAt: room.broadcastTokenCreatedAt,
+        token: null as string | null,
+      };
+    }
+
+    const token = randomBytes(24).toString("base64url");
+    const createdAt = new Date();
+    await this.prisma.room.update({
+      where: { id: roomId },
+      data: {
+        broadcastTokenHash: this.hashBroadcastToken(token),
+        broadcastTokenCreatedAt: createdAt,
+      },
+    });
+    return { exists: true, createdAt, token };
+  }
+
+  /** 방송 링크 비활성화. 호스트만 가능. */
+  async revokeBroadcastToken(userId: string, roomId: string) {
+    const room = await this.prisma.room.findUnique({
+      where: { id: roomId },
+      select: { id: true, hostId: true },
+    });
+    if (!room) throw new NotFoundException("방을 찾을 수 없습니다.");
+    if (room.hostId !== userId) {
+      throw new ForbiddenException("호스트만 방송 링크를 관리할 수 있습니다.");
+    }
+    await this.prisma.room.update({
+      where: { id: roomId },
+      data: { broadcastTokenHash: null, broadcastTokenCreatedAt: null },
+    });
+    return { ok: true };
+  }
+
+  /** 원문 토큰으로 방 id를 찾는다(방송 스냅샷/소켓 인증용). 없으면 null. */
+  async findRoomIdByBroadcastToken(token: string): Promise<string | null> {
+    if (!token) return null;
+    const room = await this.prisma.room.findFirst({
+      where: { broadcastTokenHash: this.hashBroadcastToken(token) },
+      select: { id: true },
+    });
+    return room?.id ?? null;
+  }
 
   async updateRoomSettings(
     userId: string,

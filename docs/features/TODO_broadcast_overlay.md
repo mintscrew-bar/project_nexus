@@ -126,7 +126,7 @@ BroadcastShell
 
 ### Phase 0 — Broadcast 인프라
 - [x] Task 1: 스키마 — `Room.broadcastTokenHash`/`broadcastTokenCreatedAt`/`broadcastFocusMatchId` + 마이그레이션 SQL
-- [ ] Task 2: 백엔드 — 토큰 생성/재생성(`POST /rooms/:id/broadcast-token`, `.../rotate`, 호스트만, hash 저장·원문 1회 응답)
+- [x] Task 2: 백엔드 — 토큰 생성/재생성(`POST /rooms/:id/broadcast-token`, `.../rotate`, 호스트만, hash 저장·원문 1회 응답)
 - [ ] Task 3: 백엔드 — `GET /broadcast/:token/snapshot?scene=&matchId=` (토큰 검증, scene별 + 공통 룸/토너먼트 요약 포함)
 - [ ] Task 4: 백엔드 — 기존 게이트웨이 read-only 토큰 join(액션 emit 차단) + `bracket:${roomId}` 구독 경로
 - [ ] Task 5: 프론트 — AppShell `/broadcast` 조건부 우회
