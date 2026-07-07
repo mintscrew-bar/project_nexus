@@ -397,7 +397,10 @@ export function MatchScene({ snapshot }: { snapshot: any }) {
 // ─── Room Scene 스위치 (방 status 자동 추종) ────────────────────
 export function RoomScene({ snapshot }: { snapshot: any }) {
   const status = snapshot?.room?.status;
-  if (status === "AUCTION") return <AuctionScene snapshot={snapshot} />;
+  const teamMode = snapshot?.room?.teamMode;
+  if (status === "AUCTION" || (status === "DRAFT" && teamMode === "AUCTION")) {
+    return <AuctionScene snapshot={snapshot} />;
+  }
   // WAITING 및 그 외 단계는 우선 대기 화면으로 폴백 (드래프트/역할선택 세부는 후속)
   return <WaitingScene snapshot={snapshot} />;
 }

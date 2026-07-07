@@ -26,9 +26,9 @@ const THEME = {
   clanTag: "NX",
 };
 
-const mkMembers = (names: [string, number][]) =>
+const mkMembers = (names: [string, number][], offset = 0) =>
   names.map(([username, soldPrice], i) => ({
-    userId: `u${i}`,
+    userId: `u${offset + i}`,
     username,
     avatar: null,
     assignedRole: null,
@@ -65,14 +65,38 @@ const TEAM_RED = {
     ["로밍메타", 150],
     ["와드요정", 100],
     ["막타학살", 200],
-  ]),
+  ], 5),
 };
+
+const TEAM_COLORS = ["#3B82F6", "#EF4444", "#10B981", "#F59E0B", "#EC4899", "#06B6D4"];
+
+const makePreviewTeam = (index: number) => ({
+  id: `team${index + 1}`,
+  name: `${index + 1}팀`,
+  color: TEAM_COLORS[index % TEAM_COLORS.length],
+  captainId: `m${index}-0`,
+  initialBudget: 1000,
+  remainingBudget: 1000 - index * 80,
+  members: Array.from({ length: index % 3 === 0 ? 4 : 3 }).map((_, slot) => ({
+    userId: `m${index}-${slot}`,
+    username: slot === 0 ? `${index + 1}팀장` : `선수${index + 1}-${slot}`,
+    avatar: null,
+    assignedRole: null,
+    soldPrice: slot === 0 ? null : 100 + slot * 20,
+    tier: ["DIAMOND", "PLATINUM", "GOLD", "EMERALD"][slot % 4],
+  })),
+});
+
+const MULTI_TEAMS = Array.from({ length: 6 }).map((_, index) =>
+  makePreviewTeam(index),
+);
 
 const common = (status: string) => ({
   room: {
     id: "room1",
     name: "제1회 넥서스 내전 리그",
     status,
+    teamMode: status === "DRAFT" ? "AUCTION" : "SNAKE_DRAFT",
     participantCount: 10,
     maxParticipants: 10,
     hostName: "스트리머",
@@ -88,7 +112,16 @@ const SNAP: Record<string, any> = {
     ...common("WAITING"),
     room: { ...common("WAITING").room, participantCount: 6 },
   },
-  auction: common("AUCTION"),
+  auction: common("DRAFT"),
+  auctionMulti: {
+    ...common("DRAFT"),
+    room: {
+      ...common("DRAFT").room,
+      participantCount: 30,
+      maxParticipants: 30,
+    },
+    teams: MULTI_TEAMS,
+  },
   match: {
     ...common("IN_PROGRESS"),
     match: {
@@ -166,9 +199,34 @@ const MOCK_AUCTION_LIVE: BroadcastAuctionData = {
   ],
 };
 
+const MOCK_AUCTION_MULTI: BroadcastAuctionData = {
+  ...MOCK_AUCTION_LIVE,
+  teams: MULTI_TEAMS,
+  players: [
+    { id: "mp1", username: "경매대상", tier: "EMERALD", position: "JUNGLE" },
+    { id: "mp2", username: "남은선수1", tier: "DIAMOND", position: "MID" },
+    { id: "mp3", username: "남은선수2", tier: "PLATINUM", position: "ADC" },
+    { id: "mp4", username: "남은선수3", tier: "GOLD", position: "TOP" },
+    { id: "mp5", username: "남은선수4", tier: "EMERALD", position: "SUPPORT" },
+  ],
+  auctionState: {
+    ...MOCK_AUCTION_LIVE.auctionState,
+    currentPlayer: { id: "mp1", username: "경매대상", tier: "EMERALD", position: "JUNGLE" },
+    currentHighestBid: 460,
+    currentHighestBidder: "team4",
+    currentHighestBidderName: "4팀",
+    maxYuchalCycles: 6,
+  },
+  bidHistory: [
+    { username: "2팀", amount: 360, timestamp: 1 },
+    { username: "4팀", amount: 460, timestamp: 2 },
+  ],
+};
+
 const SCENES: { key: string; label: string }[] = [
   { key: "waiting", label: "대기" },
   { key: "auction", label: "경매(라이브)" },
+  { key: "auctionMulti", label: "경매(6팀)" },
   { key: "match", label: "경기 중계" },
   { key: "matchDone", label: "경기 종료(승팀)" },
   { key: "idle", label: "Idle(방 없음)" },
@@ -178,15 +236,24 @@ export default function BroadcastPreviewPage() {
   const [sceneKey, setSceneKey] = useState("auction");
   const [bg, setBg] = useState<"transparent" | "opaque">("opaque");
 
-  const snapshot = SNAP[sceneKey];
+  const snapshot = SNAP[sceneKey] ?? SNAP.auction;
   const isMatch = sceneKey === "match" || sceneKey === "matchDone";
+  const auctionLive: BroadcastAuctionData = {
+    ...(sceneKey === "auctionMulti" ? MOCK_AUCTION_MULTI : MOCK_AUCTION_LIVE),
+    auctionState: {
+      ...(sceneKey === "auctionMulti"
+        ? MOCK_AUCTION_MULTI.auctionState
+        : MOCK_AUCTION_LIVE.auctionState),
+      timerEnd: Date.now() + 9000,
+    },
+  };
 
   const sceneNode = snapshot.idle ? (
     <IdleScene snapshot={snapshot} />
   ) : isMatch ? (
     <MatchScene snapshot={snapshot} />
-  ) : sceneKey === "auction" ? (
-    <AuctionBoardView data={MOCK_AUCTION_LIVE} />
+  ) : sceneKey === "auction" || sceneKey === "auctionMulti" ? (
+    <AuctionBoardView data={auctionLive} />
   ) : (
     <RoomScene snapshot={snapshot} />
   );

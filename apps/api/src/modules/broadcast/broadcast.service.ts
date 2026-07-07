@@ -189,6 +189,7 @@ export class BroadcastService {
         id: true,
         name: true,
         status: true,
+        teamMode: true,
         maxParticipants: true,
         broadcastFocusMatchId: true,
         host: {
@@ -250,6 +251,7 @@ export class BroadcastService {
         id: room.id,
         name: room.name,
         status: room.status,
+        teamMode: room.teamMode,
         participantCount: room._count.participants,
         maxParticipants: room.maxParticipants,
         hostName: room.host?.username ?? null,

@@ -20,11 +20,11 @@ export default function BroadcastPage() {
   const queryClient = useQueryClient();
 
   const token = params.token as string;
-  const scene = (search.get("scene") ?? "room") as string;
-  const bg = (search.get("bg") === "opaque" ? "opaque" : "transparent") as
+  const scene = (search?.get("scene") ?? "room") as string;
+  const bg = (search?.get("bg") === "opaque" ? "opaque" : "transparent") as
     | "opaque"
     | "transparent";
-  const matchId = search.get("matchId") ?? undefined;
+  const matchId = search?.get("matchId") ?? undefined;
 
   const queryKey = useMemo(
     () => ["broadcastSnapshot", token, scene, matchId],
@@ -41,6 +41,10 @@ export default function BroadcastPage() {
   });
 
   const roomId = snapshot?.room?.id as string | undefined;
+  const status = snapshot?.room?.status;
+  const teamMode = snapshot?.room?.teamMode;
+  const isAuctionRoom =
+    status === "AUCTION" || (status === "DRAFT" && teamMode === "AUCTION");
 
   // 방송 소켓: bracket 룸 구독 → 경기 시작/결과/focus 변경 시 즉시 스냅샷 갱신
   useEffect(() => {
@@ -79,12 +83,11 @@ export default function BroadcastPage() {
     return <div className="fixed inset-0 bg-transparent" />;
   }
 
-  const status = snapshot?.room?.status;
   const sceneNode = snapshot.idle ? (
     <IdleScene snapshot={snapshot} />
   ) : scene === "match" ? (
     <MatchScene snapshot={snapshot} />
-  ) : status === "AUCTION" && token && roomId ? (
+  ) : isAuctionRoom && token && roomId ? (
     // 경매 단계는 정적 스냅샷 대신 기존 경매 화면(AuctionBoard)을 라이브로 중계
     <BroadcastAuctionLive token={token} roomId={roomId} />
   ) : (

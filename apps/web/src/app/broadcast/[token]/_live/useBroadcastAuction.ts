@@ -63,6 +63,7 @@ export function useBroadcastAuction(
   roomId: string | undefined,
 ): BroadcastAuctionData {
   const [data, setData] = useState<BroadcastAuctionData>(EMPTY);
+  const processedSoldPlayerIdsRef = useRef<Set<string>>(new Set());
   const socketRef = useRef<ReturnType<
     typeof connectBroadcastAuctionSocket
   > | null>(null);
@@ -71,6 +72,7 @@ export function useBroadcastAuction(
     if (!token || !roomId) return;
     const socket = connectBroadcastAuctionSocket(token);
     socketRef.current = socket;
+    processedSoldPlayerIdsRef.current = new Set();
 
     const join = () => {
       socket.emit("join-room", { roomId }, (ack: any) => {
@@ -114,12 +116,13 @@ export function useBroadcastAuction(
     );
 
     // 경매 시작 / 다음 매물
-    const applyItem = (d: any, isStart: boolean) =>
+    const applyItemWithHistory = (d: any, isStart: boolean) =>
       setData((prev) => {
         const players = Array.isArray(d.players) ? d.players : prev.players;
         const teams = Array.isArray(d.teams) ? d.teams : prev.teams;
         const st = normalizeState(d.auctionState ?? d.state ?? null, players);
         const nextPlayerName = st?.currentPlayer?.username;
+        if (isStart) processedSoldPlayerIdsRef.current = new Set();
         return {
           ...prev,
           status: "IN_PROGRESS",
@@ -127,8 +130,9 @@ export function useBroadcastAuction(
           teams,
           players,
           auctionState: st,
-          bidHistory:
-            !isStart && nextPlayerName
+          bidHistory: isStart
+            ? []
+            : nextPlayerName
               ? [
                   ...prev.bidHistory,
                   {
@@ -143,8 +147,10 @@ export function useBroadcastAuction(
         };
       });
 
-    socket.on("auction-started", (d: any) => applyItem(d, true));
-    socket.on("auction-item-started", (d: any) => applyItem(d, false));
+    socket.on("auction-started", (d: any) => applyItemWithHistory(d, true));
+    socket.on("auction-item-started", (d: any) =>
+      applyItemWithHistory(d, false),
+    );
 
     // 입찰
     socket.on("bid-placed", (d: any) =>
@@ -175,9 +181,30 @@ export function useBroadcastAuction(
       }),
     );
 
+    // 낙찰/유찰 확정: 서버가 최신 teams/players를 함께 보내므로 이 이벤트를 기준으로 목록 동기화.
+    socket.on("bid-resolved", (d: any) =>
+      setData((prev) => {
+        const players = Array.isArray(d?.players) ? d.players : prev.players;
+        const teams = Array.isArray(d?.teams) ? d.teams : prev.teams;
+        if (d?.sold && d?.player?.id) {
+          processedSoldPlayerIdsRef.current.add(d.player.id);
+        }
+        return {
+          ...prev,
+          teams,
+          players,
+        };
+      }),
+    );
+
     // 낙찰
     socket.on("player-sold", (d: any) =>
       setData((prev) => {
+        const playerId = d?.player?.id;
+        if (playerId && processedSoldPlayerIdsRef.current.has(playerId)) {
+          return prev;
+        }
+        if (playerId) processedSoldPlayerIdsRef.current.add(playerId);
         const teams = Array.isArray(d?.teams)
           ? d.teams
           : d?.team
@@ -196,26 +223,20 @@ export function useBroadcastAuction(
     socket.on("player-unsold", (d: any) =>
       setData((prev) => ({
         ...prev,
-        players: d?.player
-          ? prev.players.filter((p) => p.id !== d.player.id)
-          : prev.players,
+        auctionState: prev.auctionState
+          ? {
+              ...prev.auctionState,
+              yuchalCount:
+                typeof d?.yuchalCount === "number"
+                  ? d.yuchalCount
+                  : prev.auctionState.yuchalCount,
+            }
+          : prev.auctionState,
       })),
     );
 
-    // 타이머 갱신(서버 500ms 주기) — timeLeft(초)로 로컬 timerEnd 재계산
-    socket.on("timer-update", (d: any) =>
-      setData((prev) =>
-        prev.auctionState && typeof d?.timeLeft === "number"
-          ? {
-              ...prev,
-              auctionState: {
-                ...prev.auctionState,
-                timerEnd: Date.now() + d.timeLeft * 1000,
-              },
-            }
-          : prev,
-      ),
-    );
+    // 타이머는 serverNow 기준 timerEnd로 보정한 뒤 AuctionBoard가 로컬에서 계산한다.
+    socket.on("timer-update", () => {});
 
     socket.on("auction-complete", () =>
       setData((prev) => ({
