@@ -110,7 +110,7 @@ export class BroadcastService {
       bracketRound: match.bracketRound ?? null,
       matchNumber: match.matchNumber ?? null,
       winnerId: match.winnerId ?? null,
-      blueSideTeamId: blueId,
+      blueSideTeamId: match.blueSideTeamId ?? null,
       blue: this.teamSummary(blueId === match.teamBId ? teamB : teamA),
       red: this.teamSummary(blueId === match.teamBId ? teamA : teamB),
     };

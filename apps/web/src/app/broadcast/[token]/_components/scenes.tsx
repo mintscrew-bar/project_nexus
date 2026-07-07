@@ -349,10 +349,12 @@ function BracketMatchCard({
   match,
   accent,
   focused,
+  connectRight = false,
 }: {
   match: any;
   accent: string;
   focused: boolean;
+  connectRight?: boolean;
 }) {
   const blue = match?.blue ?? null;
   const red = match?.red ?? null;
@@ -362,38 +364,48 @@ function BracketMatchCard({
   const redWin = winnerId && winnerId === red?.id;
 
   return (
-    <div
-      className="border-y px-4 py-3"
-      style={{
-        borderColor: focused ? accent : "rgba(255,255,255,0.1)",
-        background: focused ? "rgba(255,255,255,0.055)" : "rgba(5,6,10,0.58)",
-      }}
-    >
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <span className="text-xs font-black uppercase tracking-[0.28em] text-white/34">
-          Match {match?.matchNumber ?? "-"}
-        </span>
+    <div className="relative">
+      {connectRight && (
         <span
-          className="text-[11px] font-black uppercase tracking-[0.18em]"
-          style={{ color: hasSides ? "#86EFAC" : "#F6C945" }}
-        >
-          {rpsStatusOf(match)}
-        </span>
-      </div>
+          className="absolute left-full top-1/2 h-px w-10 -translate-y-1/2 bg-white/14"
+          aria-hidden="true"
+        />
+      )}
+      <div
+        className="h-[132px] border-y px-4 py-3"
+        style={{
+          borderColor: focused ? accent : "rgba(255,255,255,0.1)",
+          background: focused
+            ? "rgba(255,255,255,0.06)"
+            : "rgba(5,6,10,0.62)",
+        }}
+      >
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <span className="text-xs font-black uppercase tracking-[0.28em] text-white/34">
+            Match {match?.matchNumber ?? "-"}
+          </span>
+          <span
+            className="text-[11px] font-black uppercase tracking-[0.18em]"
+            style={{ color: hasSides ? "#86EFAC" : "#F6C945" }}
+          >
+            {rpsStatusOf(match)}
+          </span>
+        </div>
 
-      <div className="grid gap-2">
-        <BracketTeamRow
-          team={blue}
-          side={hasSides ? "BLUE" : "A"}
-          color="#3B82F6"
-          win={!!blueWin}
-        />
-        <BracketTeamRow
-          team={red}
-          side={hasSides ? "RED" : "B"}
-          color="#EF4444"
-          win={!!redWin}
-        />
+        <div className="grid gap-2">
+          <BracketTeamRow
+            team={blue}
+            side={hasSides ? "BLUE" : "A"}
+            color="#3B82F6"
+            win={!!blueWin}
+          />
+          <BracketTeamRow
+            team={red}
+            side={hasSides ? "RED" : "B"}
+            color="#EF4444"
+            win={!!redWin}
+          />
+        </div>
       </div>
     </div>
   );
@@ -466,11 +478,17 @@ export function BracketScene({ snapshot }: { snapshot: any }) {
             </p>
           </div>
         ) : (
-          <div className="grid min-h-0 flex-1 auto-cols-fr grid-flow-col gap-6 overflow-hidden">
-            {rounds.map((round) => {
+          <div
+            className="grid min-h-0 flex-1 gap-10 overflow-hidden"
+            style={{
+              gridTemplateColumns: `repeat(${rounds.length}, minmax(0, 1fr))`,
+            }}
+          >
+            {rounds.map((round, roundIndex) => {
               const roundMatches = matches.filter(
                 (match) => (match.round ?? 1) === round,
               );
+              const isLastRound = roundIndex === rounds.length - 1;
               const label =
                 roundMatches[0]?.bracketRound ??
                 (roundMatches.length === 1 ? "결승" : `${round}라운드`);
@@ -485,13 +503,20 @@ export function BracketScene({ snapshot }: { snapshot: any }) {
                       {roundMatches.length} MATCH
                     </span>
                   </div>
-                  <div className="grid flex-1 content-center gap-4">
+                  <div
+                    className={
+                      roundMatches.length > 1
+                        ? "flex flex-1 flex-col justify-around gap-6"
+                        : "flex flex-1 flex-col justify-center"
+                    }
+                  >
                     {roundMatches.map((match) => (
                       <BracketMatchCard
                         key={match.id}
                         match={match}
                         accent={accent}
                         focused={match.id === focusMatchId}
+                        connectRight={!isLastRound}
                       />
                     ))}
                   </div>
