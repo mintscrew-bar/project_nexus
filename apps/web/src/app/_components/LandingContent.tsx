@@ -18,6 +18,7 @@ import {
 import { Logo } from "@/components/Logo";
 import { LandingBannerCarousel } from "@/components/home/LandingBannerCarousel";
 import { AdSlotCard } from "@/components/ads/AdSlot";
+import { LandingMobileNav } from "./LandingMobileNav";
 
 const featureCards: Array<{
   icon: LucideIcon;
@@ -399,9 +400,9 @@ function LandingHeader() {
 
         <nav
           aria-label="랜딩 페이지 주요 메뉴"
-          className="min-w-0 flex-1 overflow-x-auto scrollbar-none"
+          className="hidden min-w-0 flex-1 md:block"
         >
-          <div className="flex min-w-max items-center justify-start gap-1 px-1 md:justify-center">
+          <div className="flex items-center justify-center gap-1 px-1">
             {landingNavLinks.map((link) => (
               <Link
                 key={link.href}
@@ -414,12 +415,16 @@ function LandingHeader() {
           </div>
         </nav>
 
-        <Link
-          href="/auth/login"
-          className="flex-shrink-0 rounded-lg bg-accent-primary px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-accent-hover md:px-4"
-        >
-          시작하기
-        </Link>
+        <div className="flex flex-1 items-center justify-end gap-2 md:flex-none">
+          <Link
+            href="/auth/login"
+            className="flex-shrink-0 rounded-lg bg-accent-primary px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-accent-hover md:px-4"
+          >
+            시작하기
+          </Link>
+          {/* 모바일 전용 햄버거 — 데스크톱 nav가 숨겨지는 <md에서 전체 링크 노출 */}
+          <LandingMobileNav links={landingNavLinks} />
+        </div>
       </div>
     </header>
   );
