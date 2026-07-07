@@ -180,9 +180,9 @@ function BroadcastTransition({
           100% { opacity: 0; }
         }
         @keyframes nexus-transition-sweep {
-          0% { transform: translateX(-120%) skewX(-14deg); }
-          46% { transform: translateX(6%) skewX(-14deg); }
-          100% { transform: translateX(126%) skewX(-14deg); }
+          0% { transform: translateX(-100%); }
+          46% { transform: translateX(0); }
+          100% { transform: translateX(100%); }
         }
         @keyframes nexus-transition-mark {
           0% { opacity: 0; transform: translateY(12px); }
@@ -205,18 +205,17 @@ function BroadcastTransition({
         }}
       />
       <div
-        className="absolute inset-y-0 left-0 w-[72%] bg-black/88"
+        className="absolute inset-y-0 left-0 w-full bg-black/82"
         style={{
-          clipPath: "polygon(0 0, 82% 0, 100% 100%, 0 100%)",
           animation: "nexus-transition-sweep 1200ms cubic-bezier(.76,0,.18,1) both",
         }}
       />
       <div
-        className="absolute inset-y-0 left-0 w-[16px]"
+        className="absolute left-0 right-0 top-1/2 h-px"
         style={{
-          background: toneColor,
-          boxShadow: `0 0 54px ${toneColor}`,
-          animation: "nexus-transition-sweep 1200ms cubic-bezier(.76,0,.18,1) both",
+          background: `linear-gradient(90deg, transparent, ${toneColor}, transparent)`,
+          boxShadow: `0 0 24px ${toneColor}66`,
+          animation: "nexus-transition-fade 1200ms ease both",
         }}
       />
       <div
@@ -224,45 +223,42 @@ function BroadcastTransition({
         style={{ animation: "nexus-transition-mark 1200ms ease both" }}
       >
         <div
-          className="relative grid grid-cols-[124px_auto] items-center gap-10 px-14 py-12"
+          className="relative grid w-[1180px] grid-cols-[auto_minmax(0,1fr)] items-center gap-9 px-10 py-9"
           style={{
             background:
-              "linear-gradient(135deg, rgba(2,2,6,0.96), rgba(10,10,16,0.9))",
+              "linear-gradient(90deg, rgba(2,2,6,0), rgba(2,2,6,0.96) 14%, rgba(10,10,16,0.94) 86%, rgba(2,2,6,0))",
             borderTop: `1px solid ${toneColor}88`,
             borderBottom: "1px solid rgba(255,255,255,0.12)",
-            boxShadow: `0 32px 90px rgba(0,0,0,0.58), 0 0 70px ${toneColor}22`,
-            clipPath: "polygon(28px 0, 100% 0, calc(100% - 28px) 100%, 0 100%)",
+            boxShadow: "0 28px 90px rgba(0,0,0,0.62)",
           }}
         >
           <span
-            className="absolute inset-y-0 left-0 w-2"
+            className="absolute left-0 right-0 top-0 h-px"
             style={{
-              background: toneColor,
-              boxShadow: `0 0 28px ${toneColor}`,
+              background: `linear-gradient(90deg, transparent, ${toneColor}, transparent)`,
             }}
           />
           <div
-            className="flex h-32 w-32 items-center justify-center border text-5xl font-black text-white"
+            className="flex h-20 w-20 items-center justify-center border-y text-3xl font-black text-white"
             style={{
               borderColor: `${toneColor}aa`,
-              boxShadow: `0 0 58px ${toneColor}55`,
-              background: "rgba(5,5,9,0.82)",
+              background: "rgba(5,5,9,0.54)",
             }}
           >
             NX
           </div>
           <div>
             <p
-              className="text-base font-black uppercase tracking-[0.5em]"
+              className="text-sm font-black uppercase tracking-[0.46em]"
               style={{ color: toneColor }}
             >
               {eyebrow}
             </p>
-            <h2 className="mt-4 text-[86px] font-black uppercase leading-none tracking-normal text-white">
+            <h2 className="mt-3 text-[72px] font-black uppercase leading-none tracking-normal text-white">
               {label}
             </h2>
             {subLabel && (
-              <p className="mt-4 text-3xl font-black text-white/60">
+              <p className="mt-3 text-2xl font-black text-white/58">
                 {subLabel}
               </p>
             )}
