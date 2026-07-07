@@ -232,6 +232,53 @@ const SCENES: { key: string; label: string }[] = [
   { key: "idle", label: "Idle(방 없음)" },
 ];
 
+const PREVIEW_TRANSITIONS: Record<
+  string,
+  {
+    label: string;
+    subLabel?: string;
+    eyebrow?: string;
+    tone?: "phase" | "match" | "result";
+  }
+> = {
+  waiting: {
+    label: "WAITING ROOM",
+    subLabel: "내전 대기",
+    eyebrow: "ROOM STATUS",
+    tone: "phase",
+  },
+  auction: {
+    label: "AUCTION DRAFT",
+    subLabel: "경매 드래프트",
+    eyebrow: "NEXT PHASE",
+    tone: "phase",
+  },
+  auctionMulti: {
+    label: "AUCTION DRAFT",
+    subLabel: "멀티팀 경매",
+    eyebrow: "NEXT PHASE",
+    tone: "phase",
+  },
+  match: {
+    label: "MATCH READY",
+    subLabel: "경기 전환",
+    eyebrow: "MATCH STATUS",
+    tone: "match",
+  },
+  matchDone: {
+    label: "RESULT",
+    subLabel: "경기 결과",
+    eyebrow: "RESULT CONFIRMED",
+    tone: "result",
+  },
+  idle: {
+    label: "STANDBY",
+    subLabel: "방송 대기",
+    eyebrow: "NEXUS LIVE",
+    tone: "phase",
+  },
+};
+
 export default function BroadcastPreviewPage() {
   const [sceneKey, setSceneKey] = useState("auction");
   const [bg, setBg] = useState<"transparent" | "opaque">("opaque");
@@ -304,6 +351,8 @@ export default function BroadcastPreviewPage() {
         theme={snapshot.theme}
         scene={sceneNode}
         persistent={<LowerThird snapshot={snapshot} />}
+        transitionKey={sceneKey}
+        transition={PREVIEW_TRANSITIONS[sceneKey]}
       />
     </div>
   );

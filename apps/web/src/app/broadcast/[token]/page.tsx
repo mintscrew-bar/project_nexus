@@ -10,6 +10,86 @@ import { LowerThird } from "./_components/LowerThird";
 import { RoomScene, MatchScene, IdleScene } from "./_components/scenes";
 import { BroadcastAuctionLive } from "./_components/BroadcastAuctionLive";
 
+const SCENE_TRANSITIONS: Record<
+  string,
+  {
+    label: string;
+    subLabel?: string;
+    eyebrow?: string;
+    tone?: "phase" | "match" | "result";
+  }
+> = {
+  idle: {
+    label: "STANDBY",
+    subLabel: "방송 대기",
+    eyebrow: "NEXUS LIVE",
+    tone: "phase",
+  },
+  waiting: {
+    label: "WAITING ROOM",
+    subLabel: "내전 대기",
+    eyebrow: "ROOM STATUS",
+    tone: "phase",
+  },
+  auction: {
+    label: "AUCTION DRAFT",
+    subLabel: "경매 드래프트",
+    eyebrow: "NEXT PHASE",
+    tone: "phase",
+  },
+  "role-selection": {
+    label: "ROLE SELECTION",
+    subLabel: "포지션 선택",
+    eyebrow: "NEXT PHASE",
+    tone: "phase",
+  },
+  draft: {
+    label: "DRAFT PHASE",
+    subLabel: "드래프트 진행",
+    eyebrow: "NEXT PHASE",
+    tone: "phase",
+  },
+  match: {
+    label: "MATCH READY",
+    subLabel: "경기 전환",
+    eyebrow: "MATCH STATUS",
+    tone: "match",
+  },
+  result: {
+    label: "RESULT",
+    subLabel: "경기 결과",
+    eyebrow: "RESULT CONFIRMED",
+    tone: "result",
+  },
+};
+
+function sceneKeyOf({
+  idle,
+  scene,
+  status,
+  teamMode,
+  isAuctionRoom,
+  matchStatus,
+}: {
+  idle?: boolean;
+  scene: string;
+  status?: string;
+  teamMode?: string;
+  isAuctionRoom: boolean;
+  matchStatus?: string;
+}) {
+  if (idle) return "idle";
+  if (scene === "match") {
+    return matchStatus === "COMPLETED" ? "result" : "match";
+  }
+  if (isAuctionRoom) return "auction";
+  if (status === "ROLE_SELECTION" || status === "ROLE_SELECT") {
+    return "role-selection";
+  }
+  if (status === "DRAFT" && teamMode !== "AUCTION") return "draft";
+  return "waiting";
+}
+
 /**
  * /broadcast/[token] — OBS 브라우저 소스용 읽기전용 방송 오버레이.
  * 로그인 불필요(토큰 인증). 스냅샷 hydrate + 소켓 이벤트로 갱신.
@@ -45,6 +125,16 @@ export default function BroadcastPage() {
   const teamMode = snapshot?.room?.teamMode;
   const isAuctionRoom =
     status === "AUCTION" || (status === "DRAFT" && teamMode === "AUCTION");
+  const broadcastSceneKey = sceneKeyOf({
+    idle: snapshot?.idle,
+    scene,
+    status,
+    teamMode,
+    isAuctionRoom,
+    matchStatus: snapshot?.match?.status,
+  });
+  const transition =
+    SCENE_TRANSITIONS[broadcastSceneKey] ?? SCENE_TRANSITIONS.waiting;
 
   // 방송 소켓: bracket 룸 구독 → 경기 시작/결과/focus 변경 시 즉시 스냅샷 갱신
   useEffect(() => {
@@ -100,6 +190,8 @@ export default function BroadcastPage() {
       theme={snapshot.theme}
       scene={sceneNode}
       persistent={<LowerThird snapshot={snapshot} />}
+      transitionKey={broadcastSceneKey}
+      transition={transition}
     />
   );
 }
