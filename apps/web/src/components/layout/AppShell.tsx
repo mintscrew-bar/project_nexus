@@ -31,6 +31,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // /auth/* 라우트 → 풀스크린 (셸 없음)
   const isAuthRoute = pathname.startsWith('/auth');
 
+  // /broadcast/* → OBS 방송 오버레이. 네비/사이드바/헤더 없이 children만 (자체 고정 캔버스).
+  const isBroadcastRoute = pathname.startsWith('/broadcast');
+
   // / 라우트의 비로그인 랜딩은 자체 정적 헤더/푸터를 가진다.
   // SSR과 첫 hydration 렌더에서도 앱 헤더를 감싸지 않아 공개 랜딩 HTML이 중복 탐색을 만들지 않게 한다.
   // 인증 상태가 확정된 뒤에는 Header + 대시보드 구조로 전환한다.
@@ -45,7 +48,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     pathname.endsWith('/bracket');
   const showCreatorPromo = pathname !== '/' && !isDashboardRoute;
 
-  if (isAuthRoute || isLandingFullscreen) {
+  if (isAuthRoute || isLandingFullscreen || isBroadcastRoute) {
     return <>{children}</>;
   }
 

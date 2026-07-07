@@ -14,7 +14,7 @@ import { shallow } from "zustand/shallow";
 import {
   Users, MessageSquare, Settings,
   UserCog,
-  ArrowLeft, Shield, Swords, Share2, CheckCircle2, Clock3,
+  ArrowLeft, Shield, Swords, Share2, CheckCircle2, Clock3, Radio,
 } from "lucide-react";
 import Link from "next/link";
 import { friendApi, adminApi, roomApi, ensureValidToken } from "@/lib/api-client";
@@ -22,6 +22,7 @@ import { PlayerHoverCard } from "@/components/domain/PlayerHoverCard";
 import { PlayerProfileModal } from "@/components/domain/PlayerProfileModal";
 import { LobbyParticipantsList } from "./_components/LobbyParticipantsList";
 import { LobbyErrorState } from "./_components/LobbyErrorState";
+import { BroadcastLinkModal } from "./_components/BroadcastLinkModal";
 
 const STAGE_TRANSITION_MAX_ATTEMPTS = 12;
 const STAGE_TRANSITION_RETRY_DELAY_MS = 750;
@@ -99,6 +100,7 @@ export default function TournamentLobbyPage() {
 
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isUserSettingsModalOpen, setIsUserSettingsModalOpen] = useState(false);
+  const [isBroadcastModalOpen, setIsBroadcastModalOpen] = useState(false);
   const [kickTarget, setKickTarget] = useState<{ id: string; username: string } | null>(null);
   const [isKicking, setIsKicking] = useState(false);
   const [isAddingBot, setIsAddingBot] = useState(false);
@@ -545,6 +547,15 @@ export default function TournamentLobbyPage() {
               </button>
               {isCurrentUserHost && (
                 <button
+                  onClick={() => setIsBroadcastModalOpen(true)}
+                  className="p-2 rounded-lg hover:bg-bg-tertiary transition-colors text-text-secondary hover:text-text-primary"
+                  title="방송용 오버레이 링크"
+                >
+                  <Radio className="h-5 w-5" />
+                </button>
+              )}
+              {isCurrentUserHost && (
+                <button
                   onClick={() => setIsSettingsModalOpen(true)}
                   className="p-2 rounded-lg hover:bg-bg-tertiary transition-colors text-text-secondary hover:text-text-primary"
                   title="방 설정"
@@ -832,6 +843,14 @@ export default function TournamentLobbyPage() {
         isLoading={isKicking}
       />
       <UserSettingsModal isOpen={isUserSettingsModalOpen} onClose={() => setIsUserSettingsModalOpen(false)} />
+
+      {isCurrentUserHost && (
+        <BroadcastLinkModal
+          isOpen={isBroadcastModalOpen}
+          onClose={() => setIsBroadcastModalOpen(false)}
+          roomId={room.id}
+        />
+      )}
       <PlayerProfileModal userId={profileUserId} onClose={() => setProfileUserId(null)} />
     </>
   );

@@ -552,15 +552,16 @@ export class RoomService {
           await this.discordVoiceService?.getRoomNotificationTarget?.(room.id);
 
         if (notificationTarget) {
-          const { embed, components } = this.discordBotService.buildRoomCreatedEmbed(
-            room.id,
-            room.name,
-            room.host.username,
-            room.maxParticipants,
-            room.teamMode,
-            room.isPrivate,
-            [room.host.username], // 방 생성 시 방장 1명
-          );
+          const { embed, components } =
+            this.discordBotService.buildRoomCreatedEmbed(
+              room.id,
+              room.name,
+              room.host.username,
+              room.maxParticipants,
+              room.teamMode,
+              room.isPrivate,
+              [room.host.username], // 방 생성 시 방장 1명
+            );
 
           const messageId = await this.discordBotService.sendEmbedNotification(
             notificationTarget.guildId,
@@ -921,9 +922,11 @@ export class RoomService {
     // WAITING 중 참가자 변동 → Discord 알림 embed 업데이트
     if (this.discordBotService) {
       const playerNames: string[] = ((roomData as any).participants ?? [])
-        .filter((p: any) => p.role === 'PLAYER')
-        .map((p: any) => p.user?.username ?? p.username ?? '');
-      this.discordBotService.updateRoomNotification(joinedRoomId, playerNames).catch(() => {});
+        .filter((p: any) => p.role === "PLAYER")
+        .map((p: any) => p.user?.username ?? p.username ?? "");
+      this.discordBotService
+        .updateRoomNotification(joinedRoomId, playerNames)
+        .catch(() => {});
     }
 
     return roomData;
@@ -1141,9 +1144,11 @@ export class RoomService {
     // 퇴장 후 남은 PLAYER 명단으로 Discord 알림 업데이트
     if (this.discordBotService) {
       const remainingPlayerNames: string[] = remainingParticipants
-        .filter((p: any) => p.role === 'PLAYER')
-        .map((p: any) => p.user?.username ?? '');
-      this.discordBotService.updateRoomNotification(roomId, remainingPlayerNames).catch(() => {});
+        .filter((p: any) => p.role === "PLAYER")
+        .map((p: any) => p.user?.username ?? "");
+      this.discordBotService
+        .updateRoomNotification(roomId, remainingPlayerNames)
+        .catch(() => {});
     }
 
     return { message: "Left room successfully", username, newHostId };
@@ -1187,6 +1192,90 @@ export class RoomService {
   // ========================================
   // Room Settings
   // ========================================
+
+  // ── 방송 오버레이 토큰 ──────────────────────────────────────
+  // 원문 토큰은 저장하지 않고 sha256 hash만 저장한다. 원문은 생성 응답에서 1회만 노출.
+  /**
+   * "이 방 고정 송출" 토글. 호스트만.
+   * 방송 토큰은 유저에 귀속되고 기본은 최근 활성 방 자동 추종이라,
+   * 동시에 여러 방을 열었을 때 어느 방을 송출할지 명시하는 수동 오버라이드다.
+   * - live=true: 유저의 broadcastLiveRoomId를 이 방으로 지정
+   * - live=false: 현재 이 방을 가리킬 때만 해제(다른 방을 가리키면 건드리지 않음)
+   */
+  async setBroadcastLiveRoom(userId: string, roomId: string, live: boolean) {
+    const room = await this.prisma.room.findUnique({
+      where: { id: roomId },
+      select: { id: true, hostId: true },
+    });
+    if (!room) throw new NotFoundException("방을 찾을 수 없습니다.");
+    if (room.hostId !== userId) {
+      throw new ForbiddenException("호스트만 방송 송출을 제어할 수 있습니다.");
+    }
+
+    if (live) {
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: { broadcastLiveRoomId: roomId },
+      });
+      return { pinned: true };
+    }
+
+    // 다른 방으로 이미 옮겨갔다면 그대로 두고, 이 방을 가리킬 때만 해제
+    await this.prisma.user.updateMany({
+      where: { id: userId, broadcastLiveRoomId: roomId },
+      data: { broadcastLiveRoomId: null },
+    });
+    return { pinned: false };
+  }
+
+  /** 로비 방송 상태: 토큰 발급 여부 + 이 방이 고정 송출 중인지. 호스트만. */
+  async getBroadcastLiveState(userId: string, roomId: string) {
+    const room = await this.prisma.room.findUnique({
+      where: { id: roomId },
+      select: { hostId: true },
+    });
+    if (!room) throw new NotFoundException("방을 찾을 수 없습니다.");
+    if (room.hostId !== userId) {
+      throw new ForbiddenException("호스트만 방송 상태를 조회할 수 있습니다.");
+    }
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { broadcastTokenHash: true, broadcastLiveRoomId: true },
+    });
+    return {
+      hasToken: !!user?.broadcastTokenHash,
+      pinned: user?.broadcastLiveRoomId === roomId,
+    };
+  }
+
+  /** 호스트가 방송 중계 중인 경기(focus)를 설정/해제. 호스트만. */
+  async setBroadcastFocus(
+    userId: string,
+    roomId: string,
+    matchId: string | null,
+  ) {
+    const room = await this.prisma.room.findUnique({
+      where: { id: roomId },
+      select: { id: true, hostId: true },
+    });
+    if (!room) throw new NotFoundException("방을 찾을 수 없습니다.");
+    if (room.hostId !== userId) {
+      throw new ForbiddenException("호스트만 중계 경기를 설정할 수 있습니다.");
+    }
+    // matchId가 있으면 이 방의 경기인지 검증
+    if (matchId) {
+      const match = await this.prisma.match.findFirst({
+        where: { id: matchId, roomId },
+        select: { id: true },
+      });
+      if (!match) throw new NotFoundException("경기를 찾을 수 없습니다.");
+    }
+    await this.prisma.room.update({
+      where: { id: roomId },
+      data: { broadcastFocusMatchId: matchId },
+    });
+    return { focusMatchId: matchId };
+  }
 
   async updateRoomSettings(
     userId: string,
@@ -1488,7 +1577,10 @@ export class RoomService {
       throw new ForbiddenException("자동 밸런스 팀 구성을 시작할 수 없습니다.");
     }
     // startGame()이 WAITING → DRAFT로 원자 전환 후 호출되므로 DRAFT도 수용
-    if (room.status !== RoomStatus.WAITING && room.status !== RoomStatus.DRAFT) {
+    if (
+      room.status !== RoomStatus.WAITING &&
+      room.status !== RoomStatus.DRAFT
+    ) {
       throw new BadRequestException("Room has already started");
     }
     if (room.participants.length !== room.maxParticipants) {
@@ -1583,7 +1675,10 @@ export class RoomService {
         throw new ForbiddenException("자유 팀 구성을 확정할 수 없습니다.");
       }
       // startGame()이 WAITING → DRAFT로 원자 전환 후 호출되므로 DRAFT도 수용
-      if (room.status !== RoomStatus.WAITING && room.status !== RoomStatus.DRAFT) {
+      if (
+        room.status !== RoomStatus.WAITING &&
+        room.status !== RoomStatus.DRAFT
+      ) {
         throw new BadRequestException("Room has already started");
       }
       if (room.participants.length !== room.maxParticipants) {

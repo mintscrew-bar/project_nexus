@@ -9,10 +9,10 @@
  */
 
 import { X, Minus } from "lucide-react";
-import Image from "next/image";
 import { useFriendStore } from "@/stores/friend-store";
 import { useDmStore } from "@/stores/dm-store";
 import { DmChatView } from "@/components/domain/DmChatView";
+import { Avatar } from "@/components/ui";
 import { useState, useEffect } from "react";
 
 export function FloatingDmPanel() {
@@ -52,21 +52,13 @@ export function FloatingDmPanel() {
       {/* 헤더 */}
       <div className="flex items-center justify-between px-3 py-2.5 border-b border-bg-tertiary bg-bg-secondary/95 backdrop-blur-sm">
         <div className="flex items-center gap-2 min-w-0">
-          <div className="w-7 h-7 rounded-full bg-bg-tertiary overflow-hidden flex-shrink-0">
-            {floatingDmTarget.avatar ? (
-              <Image
-                src={floatingDmTarget.avatar}
-                alt=""
-                width={28}
-                height={28}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-[10px] font-bold text-text-muted">
-                {floatingDmTarget.username[0]?.toUpperCase()}
-              </div>
-            )}
-          </div>
+          <Avatar
+            src={floatingDmTarget.avatar}
+            alt={floatingDmTarget.username}
+            fallback={floatingDmTarget.username}
+            size="sm"
+            className="[&>div]:h-7 [&>div]:w-7 [&>div]:text-[10px]"
+          />
           <span className="font-semibold text-text-primary text-sm truncate">
             {floatingDmTarget.username}
           </span>

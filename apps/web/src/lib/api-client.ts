@@ -634,6 +634,69 @@ export const userApi = {
   },
 };
 
+// 방송 오버레이 (OBS)
+// - 토큰은 스트리머(유저)당 1개. OBS에 한 번 등록하면 활성 방을 자동 추종.
+// - 스냅샷은 공개(토큰 인증), 토큰 관리는 로그인 본인, 송출 제어는 방 호스트.
+export const broadcastApi = {
+  // OBS 브라우저 소스용 읽기전용 스냅샷
+  getSnapshot: async (
+    token: string,
+    params?: { scene?: string; matchId?: string },
+  ) => {
+    const response = await publicApiClient.get(`/broadcast/${token}/snapshot`, {
+      params,
+    });
+    return response.data;
+  },
+  // 내 방송 토큰 상태(존재 여부/발급 시각) — 원문은 노출 안 됨
+  getToken: async () => {
+    const response = await apiClient.get(`/broadcast/token`);
+    return response.data as { exists: boolean; createdAt: string | null };
+  },
+  // 토큰 발급(없을 때만 원문 반환)
+  createToken: async () => {
+    const response = await apiClient.post(`/broadcast/token`);
+    return response.data as {
+      exists: boolean;
+      createdAt: string | null;
+      token: string | null;
+    };
+  },
+  // 토큰 재생성(기존 무효화 후 새 원문 반환)
+  rotateToken: async () => {
+    const response = await apiClient.post(`/broadcast/token/rotate`);
+    return response.data as {
+      exists: boolean;
+      createdAt: string;
+      token: string;
+    };
+  },
+  // 토큰 비활성화
+  revokeToken: async () => {
+    const response = await apiClient.delete(`/broadcast/token`);
+    return response.data as { ok: boolean };
+  },
+  // 로비 방송 상태: 토큰 발급 여부 + 이 방 고정 송출 여부 (호스트)
+  getLiveState: async (roomId: string) => {
+    const response = await apiClient.get(`/rooms/${roomId}/broadcast-live`);
+    return response.data as { hasToken: boolean; pinned: boolean };
+  },
+  // "이 방 고정 송출" 토글 (호스트)
+  setLive: async (roomId: string, live: boolean) => {
+    const response = await apiClient.patch(`/rooms/${roomId}/broadcast-live`, {
+      live,
+    });
+    return response.data as { pinned: boolean };
+  },
+  // 호스트: 중계 중인 경기(focus) 설정/해제
+  setFocus: async (roomId: string, matchId: string | null) => {
+    const response = await apiClient.patch(`/rooms/${roomId}/broadcast-focus`, {
+      matchId,
+    });
+    return response.data as { focusMatchId: string | null };
+  },
+};
+
 // 방 관련 API
 export const roomApi = {
   getRooms: async (params?: {

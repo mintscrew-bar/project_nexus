@@ -14,10 +14,15 @@ import { AuctionService } from "./auction.service";
 import { RoleSelectionService } from "../role-selection/role-selection.service";
 import { RoleSelectionGateway } from "../role-selection/role-selection.gateway";
 import { RedisService } from "../redis/redis.service";
+import { PrismaService } from "../prisma/prisma.service";
+import { resolveBroadcastRoomId } from "../broadcast/broadcast-resolve.util";
 
 interface AuthenticatedSocket extends Socket {
   userId?: string;
   username?: string;
+  // 방송 오버레이(read-only) 연결. 액션 불가(userId 없음), 자기 방 구독만.
+  isBroadcast?: boolean;
+  broadcastRoomId?: string;
 }
 
 @WebSocketGateway({
@@ -70,6 +75,7 @@ export class AuctionGateway
     private readonly roleSelectionService: RoleSelectionService,
     @Inject(forwardRef(() => RoleSelectionGateway))
     private readonly roleSelectionGateway: RoleSelectionGateway,
+    private readonly prisma: PrismaService,
     @Optional() private readonly redisService?: RedisService,
   ) {}
 
@@ -124,15 +130,25 @@ export class AuctionGateway
         return;
       }
 
-      const payload = await this.authService.validateToken(token);
+      const payload = await this.authService
+        .validateToken(token)
+        .catch(() => null);
 
-      if (!payload) {
-        client.disconnect();
+      if (payload) {
+        client.userId = payload.sub;
+        client.username = payload.username;
         return;
       }
 
-      client.userId = payload.sub;
-      client.username = payload.username;
+      // JWT가 아니면 방송 토큰(read-only) 경로 — 자기 방 라이브 구독만 허용
+      const broadcastRoomId = await resolveBroadcastRoomId(this.prisma, token);
+      if (broadcastRoomId) {
+        client.isBroadcast = true;
+        client.broadcastRoomId = broadcastRoomId;
+        return;
+      }
+
+      client.disconnect();
     } catch (_error) {
       client.disconnect();
     }
@@ -167,6 +183,11 @@ export class AuctionGateway
     @MessageBody() data: { roomId: string },
   ) {
     try {
+      // 방송(read-only) 연결은 자기 방만 구독 가능
+      if (client.isBroadcast && data.roomId !== client.broadcastRoomId) {
+        return { success: false, error: "Forbidden" };
+      }
+
       // 방 참여자 검증 — 비참여자의 실시간 이벤트 구독 차단
       if (client.userId) {
         const isParticipant = await this.auctionService.isRoomParticipant(
@@ -226,7 +247,8 @@ export class AuctionGateway
       }
 
       // Only schedule bid resolve if timer hasn't expired yet
-      if (state && state.timerEnd > Date.now()) {
+      // (방송 read-only 연결은 서버측 타이머를 건드리지 않는다)
+      if (!client.isBroadcast && state && state.timerEnd > Date.now()) {
         this._scheduleBidResolve(data.roomId, state.timerEnd);
       }
 

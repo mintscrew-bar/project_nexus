@@ -10,10 +10,15 @@ import {
 import { Server, Socket } from "socket.io";
 import { AuthService } from "../auth/auth.service";
 import { MatchService } from "./match.service";
+import { PrismaService } from "../prisma/prisma.service";
+import { resolveBroadcastRoomId } from "../broadcast/broadcast-resolve.util";
 
 interface AuthenticatedSocket extends Socket {
   userId?: string;
   username?: string;
+  // 방송 오버레이(read-only) 연결. 액션 불가, 자기 방 구독만 허용.
+  isBroadcast?: boolean;
+  broadcastRoomId?: string;
 }
 
 // ── 가위바위보 진영 결정 ──
@@ -71,7 +76,13 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
   constructor(
     private readonly authService: AuthService,
     private readonly matchService: MatchService,
+    private readonly prisma: PrismaService,
   ) {}
+
+  /** 방송 토큰(원문) → 현재 송출 중인 roomId. read-only 방송 연결 인증용. */
+  private resolveBroadcastRoom(token: string): Promise<string | null> {
+    return resolveBroadcastRoomId(this.prisma, token);
+  }
 
   async handleConnection(client: AuthenticatedSocket) {
     try {
@@ -84,15 +95,25 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
         return;
       }
 
-      const payload = await this.authService.validateToken(token);
+      const payload = await this.authService
+        .validateToken(token)
+        .catch(() => null);
 
-      if (!payload) {
-        client.disconnect();
+      if (payload) {
+        client.userId = payload.sub;
+        client.username = payload.username;
         return;
       }
 
-      client.userId = payload.sub;
-      client.username = payload.username;
+      // JWT가 아니면 방송 토큰(read-only) 경로를 시도한다.
+      const broadcastRoomId = await this.resolveBroadcastRoom(token);
+      if (broadcastRoomId) {
+        client.isBroadcast = true;
+        client.broadcastRoomId = broadcastRoomId;
+        return;
+      }
+
+      client.disconnect();
     } catch (_error) {
       client.disconnect();
     }
@@ -108,9 +129,14 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @MessageBody() data: { matchId: string },
   ) {
     try {
-      client.join(`match:${data.matchId}`);
-
       const match = await this.matchService.findById(data.matchId);
+
+      // 방송 연결은 자기 방 경기만 구독 가능
+      if (client.isBroadcast && match?.roomId !== client.broadcastRoomId) {
+        return { success: false, error: "Forbidden" };
+      }
+
+      client.join(`match:${data.matchId}`);
 
       // 진행 중인 가위바위보가 있으면 현재 상태를 이 클라이언트에 전달
       const rps = this.rpsStates.get(data.matchId);
@@ -118,7 +144,8 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
         client.emit("rps:state", this.rpsStatePayload(rps));
       }
 
-      if (match.status === "PENDING" && !rps) {
+      // 방송(read-only) 연결은 RPS 준비/시작 같은 부작용을 트리거하지 않는다.
+      if (!client.isBroadcast && match.status === "PENDING" && !rps) {
         const ctx = await this.matchService.getRpsContext(data.matchId);
         if (ctx.captainAId && ctx.captainBId && ctx.teamAId && ctx.teamBId) {
           const entry = this.ensureRpsReadyEntry(data.matchId, ctx);
@@ -162,6 +189,10 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @MessageBody() data: { roomId: string },
   ) {
     try {
+      // 방송 연결은 자기 방만 구독 가능
+      if (client.isBroadcast && client.broadcastRoomId !== data.roomId) {
+        return { success: false, error: "Forbidden" };
+      }
       client.join(`bracket:${data.roomId}`);
 
       const matches = await this.matchService.getRoomMatches(data.roomId);
@@ -326,10 +357,7 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
         : state.captainBIsBot;
     if (!winnerIsBot) return;
 
-    await this.finalizeRpsSide(
-      matchId,
-      Math.random() < 0.5 ? "blue" : "red",
-    );
+    await this.finalizeRpsSide(matchId, Math.random() < 0.5 ? "blue" : "red");
   }
 
   // a가 b를 이기면 1, 지면 -1, 비기면 0
@@ -440,7 +468,10 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.armRpsTimer(matchId, this.RPS_SIDE_TIMEOUT, () => {
         const s = this.rpsStates.get(matchId);
         if (!s || s.phase !== "side") return;
-        void this.finalizeRpsSide(matchId, Math.random() < 0.5 ? "blue" : "red");
+        void this.finalizeRpsSide(
+          matchId,
+          Math.random() < 0.5 ? "blue" : "red",
+        );
       });
       return;
     }
@@ -470,11 +501,18 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   // RPS 실제 시작 (내부 공통 로직)
-  private async doRpsStart(matchId: string, ctx: {
-    hostId: string | null; teamAId: string | null; teamBId: string | null;
-    captainAId: string | null; captainBId: string | null;
-    captainAIsBot?: boolean; captainBIsBot?: boolean;
-  }) {
+  private async doRpsStart(
+    matchId: string,
+    ctx: {
+      hostId: string | null;
+      teamAId: string | null;
+      teamBId: string | null;
+      captainAId: string | null;
+      captainBId: string | null;
+      captainAIsBot?: boolean;
+      captainBIsBot?: boolean;
+    },
+  ) {
     const state: RpsState = {
       matchId,
       teamAId: ctx.teamAId ?? "",
@@ -519,7 +557,10 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
       if (!ctx.captainAId || !ctx.captainBId || !ctx.teamAId || !ctx.teamBId) {
         return { success: false, error: "양 팀 팀장이 확정돼야 합니다." };
       }
-      if (!client.userId || (client.userId !== ctx.captainAId && client.userId !== ctx.captainBId)) {
+      if (
+        !client.userId ||
+        (client.userId !== ctx.captainAId && client.userId !== ctx.captainBId)
+      ) {
         return { success: false, error: "팀장만 준비할 수 있습니다." };
       }
 
@@ -536,7 +577,10 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.emitRpsReadyState(data.matchId, entry);
 
       // 양쪽 모두 준비 완료 → 자동 시작
-      if (entry.readyIds.has(entry.captainAId) && entry.readyIds.has(entry.captainBId)) {
+      if (
+        entry.readyIds.has(entry.captainAId) &&
+        entry.readyIds.has(entry.captainBId)
+      ) {
         this.rpsReadyStates.delete(data.matchId);
         await this.doRpsStart(data.matchId, ctx);
       }
@@ -576,7 +620,10 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
       await this.doRpsStart(data.matchId, ctx);
       return { success: true };
     } catch (error: any) {
-      return { success: false, error: error?.message || "가위바위보 시작 실패" };
+      return {
+        success: false,
+        error: error?.message || "가위바위보 시작 실패",
+      };
     }
   }
 
@@ -682,6 +729,13 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   emitBracketGenerated(roomId: string, data: { bracket: any }) {
     this.server.to(`bracket:${roomId}`).emit("bracket-generated", data);
+  }
+
+  /** 방송 오버레이: 호스트가 중계 중인 경기(focus) 변경 알림. */
+  emitBroadcastFocus(roomId: string, matchId: string | null) {
+    this.server
+      .to(`bracket:${roomId}`)
+      .emit("broadcast-focus-updated", { matchId });
   }
 
   emitBracketUpdate(roomId: string, data: { matches: any[] }) {

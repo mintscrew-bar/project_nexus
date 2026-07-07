@@ -4,9 +4,9 @@ import { ensureValidToken } from "./api-client";
 // 방 목록 delta update 타입
 // type: 'add' — 새 방 추가, 'update' — 기존 방 갱신, 'remove' — 방 삭제
 export type RoomListDelta =
-  | { type: 'add'; room: any }
-  | { type: 'update'; room: any }
-  | { type: 'remove'; roomId: string };
+  | { type: "add"; room: any }
+  | { type: "update"; room: any }
+  | { type: "remove"; roomId: string };
 
 // is-typing 이벤트 debounce 유틸 — contextKey별 독립 관리
 const debounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -68,7 +68,10 @@ type ManagedSocket = Socket & {
 
 const isReusableSocket = (socket: Socket | null) => {
   const managed = socket as ManagedSocket | null;
-  return !!socket && (socket.connected || socket.active || !!managed?.__nexusPreparing);
+  return (
+    !!socket &&
+    (socket.connected || socket.active || !!managed?.__nexusPreparing)
+  );
 };
 
 const getSocketAuthPayload = async () => {
@@ -204,6 +207,42 @@ export const connectMatchSocket = () => {
   return matchSocket;
 };
 
+/**
+ * 방송 오버레이(OBS)용 read-only /match 소켓.
+ * 로그인 JWT가 아니라 방송 토큰으로 인증한다(백엔드가 토큰 검증 → read-only 연결).
+ * 전역 싱글턴을 쓰지 않고 호출자가 직접 수명 관리(페이지 언마운트 시 disconnect).
+ */
+const connectBroadcastNamespace = (
+  namespace: string,
+  broadcastToken: string,
+) => {
+  return io(`${SOCKET_URL}${namespace}`, {
+    autoConnect: true,
+    auth: { token: broadcastToken },
+    transports: ["websocket", "polling"],
+    upgrade: false,
+    withCredentials: false,
+    reconnection: true,
+    reconnectionAttempts: Infinity,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 10000,
+    timeout: 20000,
+  });
+};
+
+export const connectBroadcastSocket = (broadcastToken: string) =>
+  connectBroadcastNamespace("/match", broadcastToken);
+
+// 방송 오버레이 라이브 구독용(read-only) 소켓 — 단계별 네임스페이스
+export const connectBroadcastAuctionSocket = (broadcastToken: string) =>
+  connectBroadcastNamespace("/auction", broadcastToken);
+
+export const connectBroadcastRoleSocket = (broadcastToken: string) =>
+  connectBroadcastNamespace("/role-selection", broadcastToken);
+
+export const connectBroadcastDraftSocket = (broadcastToken: string) =>
+  connectBroadcastNamespace("/snake-draft", broadcastToken);
+
 // Clan Socket 연결
 export const connectClanSocket = () => {
   if (isReusableSocket(clanSocket)) return clanSocket;
@@ -275,7 +314,9 @@ export const roomSocketHelpers = {
     roomSocket?.on("new-message", callback);
   },
 
-  onUserTyping: (callback: (data: { userId: string; username: string }) => void) => {
+  onUserTyping: (
+    callback: (data: { userId: string; username: string }) => void,
+  ) => {
     roomSocket?.on("user-typing", callback);
   },
 
@@ -366,7 +407,7 @@ export const auctionSocketHelpers = {
   },
 
   onNewBid: (callback: (data: any) => void) => {
-    auctionSocket?.on("bid-placed", callback);  // ✅ Fixed: new-bid → bid-placed
+    auctionSocket?.on("bid-placed", callback); // ✅ Fixed: new-bid → bid-placed
   },
 
   onPlayerSold: (callback: (data: any) => void) => {
@@ -386,11 +427,11 @@ export const auctionSocketHelpers = {
   },
 
   onBidResolved: (callback: (data: any) => void) => {
-    auctionSocket?.on("bid-resolved", callback);  // ✅ Added: missing event
+    auctionSocket?.on("bid-resolved", callback); // ✅ Added: missing event
   },
 
   onTimerExpired: (callback: (data: any) => void) => {
-    auctionSocket?.on("timer-expired", callback);  // ✅ Added: missing event
+    auctionSocket?.on("timer-expired", callback); // ✅ Added: missing event
   },
 
   // Captain selection events
@@ -420,7 +461,10 @@ export const auctionSocketHelpers = {
         resolve({ error: "소켓이 연결되어 있지 않습니다." });
         return;
       }
-      const timeout = setTimeout(() => resolve({ error: "volunteer_timeout" }), 10000);
+      const timeout = setTimeout(
+        () => resolve({ error: "volunteer_timeout" }),
+        10000,
+      );
       auctionSocket.emit("volunteer-captain", { roomId }, (response: any) => {
         clearTimeout(timeout);
         resolve(response ?? {});
@@ -428,17 +472,27 @@ export const auctionSocketHelpers = {
     });
   },
 
-  finalizeVolunteers: (roomId: string, selectedUserIds?: string[]): Promise<any> => {
+  finalizeVolunteers: (
+    roomId: string,
+    selectedUserIds?: string[],
+  ): Promise<any> => {
     return new Promise((resolve) => {
       if (!auctionSocket?.connected) {
         resolve({ error: "소켓이 연결되어 있지 않습니다." });
         return;
       }
-      const timeout = setTimeout(() => resolve({ error: "finalize_timeout" }), 10000);
-      auctionSocket.emit("finalize-volunteers", { roomId, selectedUserIds }, (response: any) => {
-        clearTimeout(timeout);
-        resolve(response ?? {});
-      });
+      const timeout = setTimeout(
+        () => resolve({ error: "finalize_timeout" }),
+        10000,
+      );
+      auctionSocket.emit(
+        "finalize-volunteers",
+        { roomId, selectedUserIds },
+        (response: any) => {
+          clearTimeout(timeout);
+          resolve(response ?? {});
+        },
+      );
     });
   },
 
@@ -448,11 +502,18 @@ export const auctionSocketHelpers = {
         resolve({ error: "소켓이 연결되어 있지 않습니다." });
         return;
       }
-      const timeout = setTimeout(() => resolve({ error: "select_timeout" }), 10000);
-      auctionSocket.emit("select-manual-captains", { roomId, userIds }, (response: any) => {
-        clearTimeout(timeout);
-        resolve(response ?? {});
-      });
+      const timeout = setTimeout(
+        () => resolve({ error: "select_timeout" }),
+        10000,
+      );
+      auctionSocket.emit(
+        "select-manual-captains",
+        { roomId, userIds },
+        (response: any) => {
+          clearTimeout(timeout);
+          resolve(response ?? {});
+        },
+      );
     });
   },
 
@@ -495,10 +556,14 @@ export const snakeDraftSocketHelpers = {
           done({ success: false, error: "join_timeout" });
         }, 15000);
 
-        snakeDraftSocket?.emit("join-draft-room", { roomId }, (response: any) => {
-          clearTimeout(ackTimeout);
-          done(response ?? {});
-        });
+        snakeDraftSocket?.emit(
+          "join-draft-room",
+          { roomId },
+          (response: any) => {
+            clearTimeout(ackTimeout);
+            done(response ?? {});
+          },
+        );
       };
 
       if (snakeDraftSocket.connected) {
@@ -549,14 +614,10 @@ export const snakeDraftSocketHelpers = {
       const timeout = setTimeout(() => {
         resolve({ error: "state_timeout" });
       }, 10000);
-      snakeDraftSocket.emit(
-        "get-draft-state",
-        { roomId },
-        (response: any) => {
-          clearTimeout(timeout);
-          resolve(response ?? {});
-        },
-      );
+      snakeDraftSocket.emit("get-draft-state", { roomId }, (response: any) => {
+        clearTimeout(timeout);
+        resolve(response ?? {});
+      });
     });
   },
 
@@ -730,8 +791,10 @@ export const matchSocketHelpers = {
     emitMatchWithAck("rps:start", { matchId }),
   rpsCaptainReady: (matchId: string): Promise<any> =>
     emitMatchWithAck("rps:captain-ready", { matchId }),
-  rpsSubmit: (matchId: string, hand: "rock" | "paper" | "scissors"): Promise<any> =>
-    emitMatchWithAck("rps:submit", { matchId, hand }),
+  rpsSubmit: (
+    matchId: string,
+    hand: "rock" | "paper" | "scissors",
+  ): Promise<any> => emitMatchWithAck("rps:submit", { matchId, hand }),
   rpsChooseSide: (matchId: string, side: "blue" | "red"): Promise<any> =>
     emitMatchWithAck("rps:choose-side", { matchId, side }),
   onRpsState: (callback: (data: any) => void) => {
@@ -783,7 +846,10 @@ export const connectPresenceSocket = () => {
 
 // Presence Socket 헬퍼 함수
 export const presenceSocketHelpers = {
-  setStatus: (status: "ONLINE" | "AWAY", callback?: (response: any) => void) => {
+  setStatus: (
+    status: "ONLINE" | "AWAY",
+    callback?: (response: any) => void,
+  ) => {
     presenceSocket?.emit("set-status", { status }, callback);
   },
 
@@ -799,7 +865,13 @@ export const presenceSocketHelpers = {
     presenceSocket?.emit("unsubscribe-friend", { friendId });
   },
 
-  onFriendStatusChanged: (callback: (data: { userId: string; status: string; lastSeenAt: string }) => void) => {
+  onFriendStatusChanged: (
+    callback: (data: {
+      userId: string;
+      status: string;
+      lastSeenAt: string;
+    }) => void,
+  ) => {
     presenceSocket?.on("friend-status-changed", callback);
   },
 
@@ -871,7 +943,9 @@ export const clanSocketHelpers = {
     clanSocket?.on("ownership-transferred", callback);
   },
 
-  onUserTyping: (callback: (data: { userId: string; username: string }) => void) => {
+  onUserTyping: (
+    callback: (data: { userId: string; username: string }) => void,
+  ) => {
     clanSocket?.on("user-typing", callback);
   },
 
@@ -926,7 +1000,10 @@ export const connectNotificationSocket = () => {
     notificationSocket = null;
   }
 
-  notificationSocket = createAuthenticatedSocket("/notification", "Notification");
+  notificationSocket = createAuthenticatedSocket(
+    "/notification",
+    "Notification",
+  );
 
   return notificationSocket;
 };
@@ -970,7 +1047,11 @@ export const connectDmSocket = () => {
 };
 
 export const dmSocketHelpers = {
-  sendMessage: (receiverId: string, content: string, callback?: (ack: any) => void) => {
+  sendMessage: (
+    receiverId: string,
+    content: string,
+    callback?: (ack: any) => void,
+  ) => {
     dmSocket?.emit("send-dm", { receiverId, content }, callback);
   },
 
@@ -993,11 +1074,15 @@ export const dmSocketHelpers = {
     dmSocket?.off("new-dm", callback);
   },
 
-  onUserTyping: (callback: (data: { userId: string; username: string }) => void) => {
+  onUserTyping: (
+    callback: (data: { userId: string; username: string }) => void,
+  ) => {
     dmSocket?.on("dm-typing", callback);
   },
 
-  offUserTyping: (callback: (data: { userId: string; username: string }) => void) => {
+  offUserTyping: (
+    callback: (data: { userId: string; username: string }) => void,
+  ) => {
     dmSocket?.off("dm-typing", callback);
   },
 
@@ -1028,7 +1113,7 @@ export const dmSocketHelpers = {
 export const disconnectDmSocket = () => {
   // dm-typing-* 접두사 타이머 정리 — 연결 해제 후 불필요한 emit 방지
   debounceTimers.forEach((timer, key) => {
-    if (key.startsWith('dm-typing-')) {
+    if (key.startsWith("dm-typing-")) {
       clearTimeout(timer);
       debounceTimers.delete(key);
     }
@@ -1079,7 +1164,7 @@ export const disconnectAllSockets = () => {
 export const disconnectRoomSocket = () => {
   // room-typing-* 접두사 타이머 정리 — 연결 해제 후 불필요한 emit 방지
   debounceTimers.forEach((timer, key) => {
-    if (key.startsWith('room-typing-')) {
+    if (key.startsWith("room-typing-")) {
       clearTimeout(timer);
       debounceTimers.delete(key);
     }
@@ -1091,16 +1176,16 @@ export const disconnectRoomSocket = () => {
 
 export const disconnectAuctionSocket = () => {
   auctionSocketHelpers.offAllListeners();
-  auctionSocket?.off('connect');
-  auctionSocket?.off('disconnect');
+  auctionSocket?.off("connect");
+  auctionSocket?.off("disconnect");
   auctionSocket?.disconnect();
   auctionSocket = null;
 };
 
 export const disconnectSnakeDraftSocket = () => {
   snakeDraftSocketHelpers.offAllListeners();
-  snakeDraftSocket?.off('connect');
-  snakeDraftSocket?.off('disconnect');
+  snakeDraftSocket?.off("connect");
+  snakeDraftSocket?.off("disconnect");
   snakeDraftSocket?.disconnect();
   snakeDraftSocket = null;
 };
@@ -1114,7 +1199,7 @@ export const disconnectMatchSocket = () => {
 export const disconnectClanSocket = () => {
   // clan-typing-* 접두사 타이머 정리 — 연결 해제 후 불필요한 emit 방지
   debounceTimers.forEach((timer, key) => {
-    if (key.startsWith('clan-typing-')) {
+    if (key.startsWith("clan-typing-")) {
       clearTimeout(timer);
       debounceTimers.delete(key);
     }
@@ -1140,7 +1225,10 @@ export const connectRoleSelectionSocket = () => {
     roleSelectionSocket = null;
   }
 
-  roleSelectionSocket = createAuthenticatedSocket("/role-selection", "Role Selection");
+  roleSelectionSocket = createAuthenticatedSocket(
+    "/role-selection",
+    "Role Selection",
+  );
 
   return roleSelectionSocket;
 };
@@ -1199,10 +1287,14 @@ export const roleSelectionSocketHelpers = {
       const timeout = setTimeout(() => {
         resolve({ error: "role_selection_timeout" });
       }, 15000);
-      roleSelectionSocket.emit("select-role", { roomId, role }, (response: any) => {
-        clearTimeout(timeout);
-        resolve(response ?? {});
-      });
+      roleSelectionSocket.emit(
+        "select-role",
+        { roomId, role },
+        (response: any) => {
+          clearTimeout(timeout);
+          resolve(response ?? {});
+        },
+      );
     });
   },
 
@@ -1220,7 +1312,13 @@ export const roleSelectionSocketHelpers = {
     });
   },
 
-  onTimerExtended: (callback: (data: { timerEndAt: number; timeRemaining: number; extendedBy: string }) => void) => {
+  onTimerExtended: (
+    callback: (data: {
+      timerEndAt: number;
+      timeRemaining: number;
+      extendedBy: string;
+    }) => void,
+  ) => {
     roleSelectionSocket?.on("timer-extended", callback);
   },
 
@@ -1238,7 +1336,13 @@ export const roleSelectionSocketHelpers = {
     });
   },
 
-  onRoleCancelled: (callback: (data: { userId: string; teamId: string; memberId: string }) => void) => {
+  onRoleCancelled: (
+    callback: (data: {
+      userId: string;
+      teamId: string;
+      memberId: string;
+    }) => void,
+  ) => {
     roleSelectionSocket?.on("role-cancelled", callback);
   },
 
@@ -1258,7 +1362,12 @@ export const roleSelectionSocketHelpers = {
     roleSelectionSocket?.on("role-selection-started", callback);
   },
 
-  onTimerTick: (callback: (data: { timeRemaining: number; timerEndAt?: number | null }) => void) => {
+  onTimerTick: (
+    callback: (data: {
+      timeRemaining: number;
+      timerEndAt?: number | null;
+    }) => void,
+  ) => {
     roleSelectionSocket?.on("timer-tick", callback);
   },
 
@@ -1285,8 +1394,8 @@ export const roleSelectionSocketHelpers = {
 
 export const disconnectRoleSelectionSocket = () => {
   roleSelectionSocketHelpers.offAllListeners();
-  roleSelectionSocket?.off('connect');
-  roleSelectionSocket?.off('disconnect');
+  roleSelectionSocket?.off("connect");
+  roleSelectionSocket?.off("disconnect");
   roleSelectionSocket?.disconnect();
   roleSelectionSocket = null;
 };

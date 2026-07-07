@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Put,
+  Patch,
   Delete,
   Body,
   Param,
@@ -123,6 +124,47 @@ export class RoomController {
     this.roomGateway.notifyRoomUpdate(id, "room-updated", room);
     this.roomGateway.broadcastRoomDelta("update", id);
     return room;
+  }
+
+  // ========================================
+  // Broadcast Overlay (방송 오버레이)
+  // ========================================
+
+  // 로비 방송 상태 조회(토큰 발급 여부 + 이 방 고정 송출 여부) — 호스트만
+  @Get(":id/broadcast-live")
+  async getBroadcastLiveState(
+    @CurrentUser("sub") userId: string,
+    @Param("id") id: string,
+  ) {
+    return this.roomService.getBroadcastLiveState(userId, id);
+  }
+
+  // "이 방 고정 송출" 토글 — 호스트만
+  @Patch(":id/broadcast-live")
+  @HttpCode(HttpStatus.OK)
+  async setBroadcastLiveRoom(
+    @CurrentUser("sub") userId: string,
+    @Param("id") id: string,
+    @Body() body: { live: boolean },
+  ) {
+    return this.roomService.setBroadcastLiveRoom(userId, id, !!body?.live);
+  }
+
+  // 호스트가 중계 중인 경기(focus) 설정/해제 → 방송 소켓에 알림
+  @Patch(":id/broadcast-focus")
+  @HttpCode(HttpStatus.OK)
+  async setBroadcastFocus(
+    @CurrentUser("sub") userId: string,
+    @Param("id") id: string,
+    @Body() body: { matchId: string | null },
+  ) {
+    const result = await this.roomService.setBroadcastFocus(
+      userId,
+      id,
+      body?.matchId ?? null,
+    );
+    this.matchGateway.emitBroadcastFocus(id, result.focusMatchId);
+    return result;
   }
 
   // ========================================

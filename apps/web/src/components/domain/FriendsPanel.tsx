@@ -9,7 +9,6 @@ import {
   type DragEvent,
 } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import {
   X,
   Search,
@@ -38,7 +37,7 @@ import { usePresenceStore } from "@/stores/presence-store";
 import { useLobbyStore } from "@/stores/lobby-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { useToast } from "@/components/ui/Toast";
-import { StatusIndicator } from "@/components/ui";
+import { Avatar, StatusIndicator } from "@/components/ui";
 import { useDmStore } from "@/stores/dm-store";
 import { connectDmSocket, dmSocketHelpers } from "@/lib/socket-client";
 import { Shield } from "lucide-react";
@@ -170,21 +169,12 @@ function HoverTooltip({
       style={{ minWidth: 200 }}
     >
       <div className="flex items-center gap-3 mb-2">
-        <div className="relative w-10 h-10 rounded-full bg-bg-tertiary overflow-hidden flex-shrink-0">
-          {friendship.user.avatar || friendship.friend.avatar ? (
-            <Image
-              src={(friendship.friend?.avatar || friendship.user.avatar)!}
-              alt={username}
-              fill
-              className="object-cover"
-              unoptimized
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <Users className="w-5 h-5 text-text-tertiary" />
-            </div>
-          )}
-        </div>
+        <Avatar
+          src={friendship.friend?.avatar || friendship.user.avatar}
+          alt={username}
+          fallback={username}
+          size="md"
+        />
         <div className="min-w-0">
           <p className="font-semibold text-text-primary text-sm truncate">{username}</p>
           {meta.nickname && (
@@ -274,22 +264,12 @@ function FriendItem({
             {unread > 99 ? '99+' : unread}
           </span>
         )}
-        <div className="w-8 h-8 rounded-full bg-bg-tertiary overflow-hidden">
-          {friendUser.avatar ? (
-            <Image
-              src={friendUser.avatar}
-              alt={displayName}
-              width={32}
-              height={32}
-              className="w-full h-full object-cover"
-              unoptimized
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <User className="w-4 h-4 text-text-tertiary" />
-            </div>
-          )}
-        </div>
+        <Avatar
+          src={friendUser.avatar}
+          alt={displayName}
+          fallback={displayName}
+          size="sm"
+        />
         <span
           className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-bg-secondary
             ${status?.status === "ONLINE" ? "bg-accent-success" : status?.status === "AWAY" ? "bg-accent-gold" : "bg-text-tertiary/40"}
@@ -684,15 +664,7 @@ function AddFriendModal({ onClose }: { onClose: () => void }) {
         )}
         {!searching && results.map((u) => (
           <div key={u.id} className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-bg-tertiary transition-colors">
-            <div className="w-8 h-8 rounded-full bg-bg-tertiary overflow-hidden flex-shrink-0">
-              {u.avatar ? (
-                <Image src={u.avatar} alt={u.username} width={32} height={32} className="object-cover" unoptimized />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <User className="w-4 h-4 text-text-tertiary" />
-                </div>
-              )}
-            </div>
+            <Avatar src={u.avatar} alt={u.username} fallback={u.username} size="sm" />
             <span className="flex-1 text-sm text-text-primary truncate">{u.username}</span>
             <button
               disabled={sentIds.has(u.id)}
@@ -895,21 +867,12 @@ function ConversationList({
           onClick={() => onOpenChat(conv.user.id)}
           className="w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-bg-elevated/60 transition-colors text-left"
         >
-          <div className="w-8 h-8 rounded-full bg-bg-tertiary overflow-hidden flex-shrink-0">
-            {conv.user.avatar ? (
-              <Image
-                src={conv.user.avatar}
-                alt=""
-                width={32}
-                height={32}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-xs font-bold text-text-muted">
-                {conv.user.username[0]?.toUpperCase()}
-              </div>
-            )}
-          </div>
+          <Avatar
+            src={conv.user.avatar}
+            alt={conv.user.username}
+            fallback={conv.user.username}
+            size="sm"
+          />
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium text-text-primary truncate">
@@ -956,15 +919,7 @@ function PendingList({ currentUserId }: { currentUserId: string }) {
 
   const UserRow = ({ user, avatar, action }: { user: { id: string; username: string; avatar: string | null }; avatar: string | null; action: React.ReactNode }) => (
     <div className="flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-bg-elevated transition-colors">
-      <div className="w-8 h-8 rounded-full bg-bg-tertiary overflow-hidden flex-shrink-0">
-        {avatar ? (
-          <Image src={avatar} alt={user.username} width={32} height={32} className="object-cover" unoptimized />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <User className="w-4 h-4 text-text-tertiary" />
-          </div>
-        )}
-      </div>
+      <Avatar src={avatar} alt={user.username} fallback={user.username} size="sm" />
       <span className="flex-1 text-sm font-medium text-text-primary truncate">{user.username}</span>
       {action}
     </div>
