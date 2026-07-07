@@ -349,12 +349,12 @@ function BracketMatchCard({
   match,
   accent,
   focused,
-  connectRight = false,
+  compact = false,
 }: {
   match: any;
   accent: string;
   focused: boolean;
-  connectRight?: boolean;
+  compact?: boolean;
 }) {
   const blue = match?.blue ?? null;
   const red = match?.red ?? null;
@@ -364,35 +364,39 @@ function BracketMatchCard({
   const redWin = winnerId && winnerId === red?.id;
 
   return (
-    <div className="relative">
-      {connectRight && (
-        <span
-          className="absolute left-full top-1/2 h-px w-10 -translate-y-1/2 bg-white/14"
-          aria-hidden="true"
-        />
-      )}
+    <div className="relative min-w-0">
       <div
-        className="h-[132px] border-y px-4 py-3"
+        className={
+          compact
+            ? "h-[96px] border px-3 py-2.5"
+            : "h-[118px] border px-4 py-3"
+        }
         style={{
           borderColor: focused ? accent : "rgba(255,255,255,0.1)",
           background: focused
-            ? "rgba(255,255,255,0.06)"
-            : "rgba(5,6,10,0.62)",
+            ? "linear-gradient(135deg, rgba(139,92,246,0.22), rgba(5,6,10,0.72))"
+            : "rgba(5,6,10,0.58)",
         }}
       >
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <span className="text-xs font-black uppercase tracking-[0.28em] text-white/34">
-            Match {match?.matchNumber ?? "-"}
+        <div
+          className={
+            compact
+              ? "mb-2 flex items-center justify-between gap-2"
+              : "mb-3 flex items-center justify-between gap-3"
+          }
+        >
+          <span className="text-[11px] font-black uppercase tracking-[0.24em] text-white/34">
+            M{match?.matchNumber ?? "-"}
           </span>
           <span
-            className="text-[11px] font-black uppercase tracking-[0.18em]"
+            className="text-[10px] font-black uppercase tracking-[0.14em]"
             style={{ color: hasSides ? "#86EFAC" : "#F6C945" }}
           >
             {rpsStatusOf(match)}
           </span>
         </div>
 
-        <div className="grid gap-2">
+        <div className={compact ? "grid gap-1.5" : "grid gap-2"}>
           <BracketTeamRow
             team={blue}
             side={hasSides ? "BLUE" : "A"}
@@ -424,7 +428,7 @@ function BracketTeamRow({
 }) {
   return (
     <div
-      className="grid grid-cols-[52px_minmax(0,1fr)_42px] items-center gap-3"
+      className="grid grid-cols-[42px_minmax(0,1fr)_34px] items-center gap-2"
       style={{ opacity: team ? 1 : 0.38 }}
     >
       <span
@@ -433,7 +437,7 @@ function BracketTeamRow({
       >
         {side}
       </span>
-      <span className="truncate text-base font-black text-white">
+      <span className="truncate text-sm font-black text-white">
         {team?.name ?? "미정"}
       </span>
       {win && (
@@ -445,12 +449,216 @@ function BracketTeamRow({
   );
 }
 
+const SECTION_LABELS: Record<string, string> = {
+  WB_R1: "UPPER R1",
+  WB_R2: "UPPER R2",
+  WB_F: "UPPER FINAL",
+  LB_R1: "LOWER R1",
+  LB_R2: "LOWER R2",
+  LB_SEMI: "LOWER SEMI",
+  LB_F: "LOWER FINAL",
+  GF: "GRAND FINALS",
+};
+
+function sectionMatches(matches: any[], section: string) {
+  return matches
+    .filter((match) => match.bracketSection === section)
+    .sort((a, b) => Number(a.matchNumber ?? 0) - Number(b.matchNumber ?? 0));
+}
+
+function BoardColumn({
+  title,
+  matches,
+  accent,
+  focusMatchId,
+  className = "",
+}: {
+  title: string;
+  matches: any[];
+  accent: string;
+  focusMatchId?: string | null;
+  className?: string;
+}) {
+  return (
+    <section className={`min-w-0 ${className}`}>
+      <div className="mb-3 flex items-center justify-between border-b border-white/14 pb-2">
+        <p className="text-xs font-black uppercase tracking-[0.24em] text-white/50">
+          {title}
+        </p>
+        <span className="text-[10px] font-black text-white/24">
+          {matches.length || "-"}
+        </span>
+      </div>
+      <div className="grid gap-3">
+        {matches.length > 0 ? (
+          matches.map((match) => (
+            <BracketMatchCard
+              key={match.id}
+              match={match}
+              accent={accent}
+              focused={match.id === focusMatchId}
+              compact
+            />
+          ))
+        ) : (
+          <div className="flex h-[96px] items-center border border-white/8 px-3 text-sm font-black text-white/26">
+            대기
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function DoubleElimBoard({
+  matches,
+  accent,
+  focusMatchId,
+}: {
+  matches: any[];
+  accent: string;
+  focusMatchId?: string | null;
+}) {
+  const upper = ["WB_R1", "WB_R2", "WB_F"];
+  const lower = ["LB_R1", "LB_R2", "LB_SEMI", "LB_F"];
+  const grandFinal = sectionMatches(matches, "GF")[0] ?? null;
+
+  return (
+    <div
+      className="relative min-h-0 flex-1 overflow-hidden border border-white/10 px-9 py-7"
+      style={{
+        background:
+          "radial-gradient(circle at 18% 14%, rgba(139,92,246,0.18), transparent 34%), linear-gradient(135deg, rgba(20,12,34,0.92), rgba(4,5,10,0.96) 58%, rgba(20,12,34,0.84))",
+      }}
+    >
+      <div className="pointer-events-none absolute inset-x-10 top-[46%] h-px bg-white/12" />
+      <div className="pointer-events-none absolute right-[365px] top-[28%] h-[36%] w-px bg-white/14" />
+      <div className="pointer-events-none absolute right-[320px] top-[46%] h-px w-12 bg-white/14" />
+
+      <div className="relative grid h-full grid-cols-[minmax(0,1fr)_330px] gap-10">
+        <div className="grid min-h-0 grid-rows-[1fr_1fr] gap-7">
+          <div className="min-h-0">
+            <div className="mb-4 flex items-end justify-between">
+              <p className="text-2xl font-black uppercase tracking-[0.06em] text-white/82">
+                Upper
+              </p>
+              <p className="text-[11px] font-black uppercase tracking-[0.26em] text-white/28">
+                Winner Bracket
+              </p>
+            </div>
+            <div className="grid grid-cols-3 gap-5">
+              {upper.map((section) => (
+                <BoardColumn
+                  key={section}
+                  title={SECTION_LABELS[section]}
+                  matches={sectionMatches(matches, section)}
+                  accent={accent}
+                  focusMatchId={focusMatchId}
+                />
+              ))}
+            </div>
+          </div>
+
+          <div className="min-h-0">
+            <div className="mb-4 flex items-end justify-between">
+              <p className="text-2xl font-black uppercase tracking-[0.06em] text-white/82">
+                Lower
+              </p>
+              <p className="text-[11px] font-black uppercase tracking-[0.26em] text-white/28">
+                Elimination Bracket
+              </p>
+            </div>
+            <div className="grid grid-cols-4 gap-5">
+              {lower.map((section) => (
+                <BoardColumn
+                  key={section}
+                  title={SECTION_LABELS[section]}
+                  matches={sectionMatches(matches, section)}
+                  accent={accent}
+                  focusMatchId={focusMatchId}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <section className="flex min-h-0 flex-col justify-center">
+          <div className="mb-5 border-b border-white/14 pb-4">
+            <p className="text-3xl font-black uppercase tracking-[0.04em] text-white">
+              Grand Finals
+            </p>
+            <p className="mt-2 text-xs font-black uppercase tracking-[0.28em] text-white/34">
+              Final Stage
+            </p>
+          </div>
+          {grandFinal ? (
+            <BracketMatchCard
+              match={grandFinal}
+              accent={accent}
+              focused={grandFinal.id === focusMatchId}
+            />
+          ) : (
+            <div className="grid gap-3">
+              <div className="border border-white/10 px-4 py-4 text-base font-black text-white/42">
+                승자조 경기 승자
+              </div>
+              <div className="border border-white/10 px-4 py-4 text-base font-black text-white/42">
+                패자조 최종 승자
+              </div>
+            </div>
+          )}
+        </section>
+      </div>
+    </div>
+  );
+}
+
+function SingleElimBoard({
+  matches,
+  accent,
+  focusMatchId,
+}: {
+  matches: any[];
+  accent: string;
+  focusMatchId?: string | null;
+}) {
+  const rounds = [...new Set(matches.map((match) => match.round ?? 1))].sort(
+    (a, b) => Number(a) - Number(b),
+  );
+
+  return (
+    <div
+      className="grid min-h-0 flex-1 gap-8 border border-white/10 bg-black/28 px-7 py-6"
+      style={{ gridTemplateColumns: `repeat(${rounds.length}, minmax(0, 1fr))` }}
+    >
+      {rounds.map((round) => {
+        const roundMatches = matches.filter((match) => (match.round ?? 1) === round);
+        const label =
+          roundMatches[0]?.bracketRound ??
+          (roundMatches.length === 1 ? "GRAND FINALS" : `ROUND ${round}`);
+        return (
+          <BoardColumn
+            key={round}
+            title={label}
+            matches={roundMatches}
+            accent={accent}
+            focusMatchId={focusMatchId}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
 export function BracketScene({ snapshot }: { snapshot: any }) {
   const accent = accentOf(snapshot);
   const matches: any[] = snapshot?.matches ?? [];
   const focusMatchId = snapshot?.focusMatchId ?? null;
-  const rounds = [...new Set(matches.map((match) => match.round ?? 1))].sort(
-    (a, b) => Number(a) - Number(b),
+  const isDoubleElim = matches.some(
+    (match) =>
+      match.bracketType === "DOUBLE_ELIMINATION" ||
+      String(match.bracketSection ?? "").startsWith("LB") ||
+      match.bracketSection === "GF",
   );
 
   return (
@@ -458,8 +666,10 @@ export function BracketScene({ snapshot }: { snapshot: any }) {
       <div className="flex h-full w-full flex-col px-24 py-24">
         <div className="mb-8 flex items-end justify-between">
           <div>
-            <HudLabel color={accent}>TOURNAMENT BRACKET</HudLabel>
-            <h1 className="mt-3 text-6xl font-black text-white">대진표</h1>
+            <HudLabel color={accent}>PLAYOFFS</HudLabel>
+            <h1 className="mt-2 text-[72px] font-black uppercase leading-none text-white">
+              Bracket
+            </h1>
           </div>
           <div className="text-right">
             <p className="text-sm font-black uppercase tracking-[0.28em] text-white/34">
@@ -478,52 +688,19 @@ export function BracketScene({ snapshot }: { snapshot: any }) {
             </p>
           </div>
         ) : (
-          <div
-            className="grid min-h-0 flex-1 gap-10 overflow-hidden"
-            style={{
-              gridTemplateColumns: `repeat(${rounds.length}, minmax(0, 1fr))`,
-            }}
-          >
-            {rounds.map((round, roundIndex) => {
-              const roundMatches = matches.filter(
-                (match) => (match.round ?? 1) === round,
-              );
-              const isLastRound = roundIndex === rounds.length - 1;
-              const label =
-                roundMatches[0]?.bracketRound ??
-                (roundMatches.length === 1 ? "결승" : `${round}라운드`);
-
-              return (
-                <section key={round} className="flex min-w-0 flex-col">
-                  <div className="mb-4 flex items-center justify-between border-b border-white/10 pb-3">
-                    <p className="text-sm font-black uppercase tracking-[0.28em] text-white/42">
-                      {label}
-                    </p>
-                    <span className="text-xs font-black text-white/28">
-                      {roundMatches.length} MATCH
-                    </span>
-                  </div>
-                  <div
-                    className={
-                      roundMatches.length > 1
-                        ? "flex flex-1 flex-col justify-around gap-6"
-                        : "flex flex-1 flex-col justify-center"
-                    }
-                  >
-                    {roundMatches.map((match) => (
-                      <BracketMatchCard
-                        key={match.id}
-                        match={match}
-                        accent={accent}
-                        focused={match.id === focusMatchId}
-                        connectRight={!isLastRound}
-                      />
-                    ))}
-                  </div>
-                </section>
-              );
-            })}
-          </div>
+          isDoubleElim ? (
+            <DoubleElimBoard
+              matches={matches}
+              accent={accent}
+              focusMatchId={focusMatchId}
+            />
+          ) : (
+            <SingleElimBoard
+              matches={matches}
+              accent={accent}
+              focusMatchId={focusMatchId}
+            />
+          )
         )}
       </div>
     </StageFrame>
