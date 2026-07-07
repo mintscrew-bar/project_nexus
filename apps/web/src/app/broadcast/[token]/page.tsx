@@ -12,6 +12,7 @@ import {
   MatchScene,
   IdleScene,
   BracketScene,
+  RoleSelectionScene,
 } from "./_components/scenes";
 import { BroadcastAuctionLive } from "./_components/BroadcastAuctionLive";
 
@@ -194,6 +195,8 @@ export default function BroadcastPage() {
   ) : isAuctionRoom && token && roomId ? (
     // 경매 단계는 정적 스냅샷 대신 기존 경매 화면(AuctionBoard)을 라이브로 중계
     <BroadcastAuctionLive token={token} roomId={roomId} />
+  ) : broadcastSceneKey === "role-selection" ? (
+    <RoleSelectionScene snapshot={snapshot} />
   ) : (
     <RoomScene snapshot={snapshot} />
   );
@@ -203,7 +206,7 @@ export default function BroadcastPage() {
       bg={bg}
       theme={snapshot.theme}
       scene={sceneNode}
-      persistent={<LowerThird snapshot={snapshot} />}
+      persistent={scene === "match" ? null : <LowerThird snapshot={snapshot} />}
       transitionKey={broadcastSceneKey}
       transition={transition}
     />

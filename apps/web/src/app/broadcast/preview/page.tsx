@@ -8,6 +8,7 @@ import {
   MatchScene,
   IdleScene,
   BracketScene,
+  RoleSelectionScene,
 } from "../[token]/_components/scenes";
 import { AuctionBoardView } from "../[token]/_components/AuctionBoardView";
 import type { BroadcastAuctionData } from "../[token]/_live/useBroadcastAuction";
@@ -92,6 +93,14 @@ const MULTI_TEAMS = Array.from({ length: 6 }).map((_, index) =>
   makePreviewTeam(index),
 );
 
+const withPartialAssignedRoles = (team: any, roles: Array<string | null>) => ({
+  ...team,
+  members: (team.members ?? []).map((member: any, index: number) => ({
+    ...member,
+    assignedRole: roles[index] ?? null,
+  })),
+});
+
 const common = (status: string) => ({
   room: {
     id: "room1",
@@ -123,6 +132,13 @@ const SNAP: Record<string, any> = {
     },
     teams: MULTI_TEAMS,
   },
+  roleSelect: {
+    ...common("ROLE_SELECTION"),
+    teams: [
+      withPartialAssignedRoles(TEAM_BLUE, ["MID", "JUNGLE", null, "SUPPORT", null]),
+      withPartialAssignedRoles(TEAM_RED, ["TOP", null, "ADC", null, "SUPPORT"]),
+    ],
+  },
   match: {
     ...common("IN_PROGRESS"),
     match: {
@@ -133,11 +149,181 @@ const SNAP: Record<string, any> = {
       matchNumber: 1,
       winnerId: null,
       blueSideTeamId: "teamA",
+      blueScore: 1,
+      redScore: 0,
       blue: TEAM_BLUE,
       red: TEAM_RED,
     },
   },
   bracket: {
+    ...common("IN_PROGRESS"),
+    focusMatchId: "m5",
+    matches: [
+      {
+        id: "m1",
+        status: "COMPLETED",
+        round: 1,
+        bracketRound: "WB_R1",
+        bracketType: "DOUBLE_ELIMINATION",
+        matchNumber: 1,
+        winnerId: "teamA",
+        blueSideTeamId: "teamA",
+        blue: TEAM_BLUE,
+        red: TEAM_RED,
+      },
+      {
+        id: "m2",
+        status: "COMPLETED",
+        round: 1,
+        bracketRound: "WB_R1",
+        bracketType: "DOUBLE_ELIMINATION",
+        matchNumber: 2,
+        winnerId: "team3",
+        blueSideTeamId: "team3",
+        blue: MULTI_TEAMS[2],
+        red: MULTI_TEAMS[3],
+      },
+      {
+        id: "m3",
+        status: "PENDING",
+        round: 2,
+        bracketRound: "WB_F",
+        bracketType: "DOUBLE_ELIMINATION",
+        matchNumber: 1,
+        winnerId: null,
+        blueSideTeamId: null,
+        blue: TEAM_BLUE,
+        red: MULTI_TEAMS[2],
+      },
+      {
+        id: "m4",
+        status: "COMPLETED",
+        round: 1,
+        bracketRound: "LB_R1",
+        bracketType: "DOUBLE_ELIMINATION",
+        matchNumber: 1,
+        winnerId: "teamB",
+        blueSideTeamId: "teamB",
+        blue: TEAM_RED,
+        red: MULTI_TEAMS[3],
+      },
+      {
+        id: "m5",
+        status: "PENDING",
+        round: 2,
+        bracketRound: "LB_F",
+        bracketType: "DOUBLE_ELIMINATION",
+        matchNumber: 1,
+        winnerId: null,
+        blueSideTeamId: null,
+        blue: TEAM_RED,
+        red: null,
+      },
+      {
+        id: "m6",
+        status: "PENDING",
+        round: 3,
+        bracketRound: "GF",
+        bracketType: "DOUBLE_ELIMINATION",
+        matchNumber: 1,
+        winnerId: null,
+        blueSideTeamId: null,
+        blue: null,
+        red: null,
+      },
+    ],
+  },
+  bracketSingle: {
+    ...common("IN_PROGRESS"),
+    focusMatchId: "s6",
+    matches: [
+      {
+        id: "s1",
+        status: "COMPLETED",
+        round: 1,
+        bracketRound: "ROUND 1",
+        bracketType: "SINGLE_ELIMINATION",
+        matchNumber: 1,
+        winnerId: "teamA",
+        blueSideTeamId: "teamA",
+        blue: TEAM_BLUE,
+        red: TEAM_RED,
+      },
+      {
+        id: "s2",
+        status: "COMPLETED",
+        round: 1,
+        bracketRound: "ROUND 1",
+        bracketType: "SINGLE_ELIMINATION",
+        matchNumber: 2,
+        winnerId: "team3",
+        blueSideTeamId: "team3",
+        blue: MULTI_TEAMS[2],
+        red: MULTI_TEAMS[3],
+      },
+      {
+        id: "s3",
+        status: "COMPLETED",
+        round: 1,
+        bracketRound: "ROUND 1",
+        bracketType: "SINGLE_ELIMINATION",
+        matchNumber: 3,
+        winnerId: "team5",
+        blueSideTeamId: "team5",
+        blue: MULTI_TEAMS[4],
+        red: MULTI_TEAMS[5],
+      },
+      {
+        id: "s4",
+        status: "COMPLETED",
+        round: 1,
+        bracketRound: "ROUND 1",
+        bracketType: "SINGLE_ELIMINATION",
+        matchNumber: 4,
+        winnerId: "team2",
+        blueSideTeamId: "team1",
+        blue: MULTI_TEAMS[0],
+        red: MULTI_TEAMS[1],
+      },
+      {
+        id: "s5",
+        status: "COMPLETED",
+        round: 2,
+        bracketRound: "SEMI FINAL",
+        bracketType: "SINGLE_ELIMINATION",
+        matchNumber: 1,
+        winnerId: "teamA",
+        blueSideTeamId: "teamA",
+        blue: TEAM_BLUE,
+        red: MULTI_TEAMS[2],
+      },
+      {
+        id: "s6",
+        status: "PENDING",
+        round: 2,
+        bracketRound: "SEMI FINAL",
+        bracketType: "SINGLE_ELIMINATION",
+        matchNumber: 2,
+        winnerId: null,
+        blueSideTeamId: null,
+        blue: MULTI_TEAMS[4],
+        red: MULTI_TEAMS[1],
+      },
+      {
+        id: "s7",
+        status: "PENDING",
+        round: 3,
+        bracketRound: "GRAND FINALS",
+        bracketType: "SINGLE_ELIMINATION",
+        matchNumber: 1,
+        winnerId: null,
+        blueSideTeamId: null,
+        blue: TEAM_BLUE,
+        red: null,
+      },
+    ],
+  },
+  bracketDouble: {
     ...common("IN_PROGRESS"),
     focusMatchId: "m5",
     matches: [
@@ -306,7 +492,9 @@ const SCENES: { key: string; label: string }[] = [
   { key: "waiting", label: "대기" },
   { key: "auction", label: "경매(라이브)" },
   { key: "auctionMulti", label: "경매(6팀)" },
-  { key: "bracket", label: "대진표" },
+  { key: "roleSelect", label: "역할선택" },
+  { key: "bracketSingle", label: "일반 대진표" },
+  { key: "bracketDouble", label: "더블 일리미네이션" },
   { key: "match", label: "경기 중계" },
   { key: "matchDone", label: "경기 종료(승팀)" },
   { key: "idle", label: "Idle(방 없음)" },
@@ -339,9 +527,27 @@ const PREVIEW_TRANSITIONS: Record<
     eyebrow: "NEXT PHASE",
     tone: "phase",
   },
+  roleSelect: {
+    label: "ROLE SELECTION",
+    subLabel: "포지션 선택",
+    eyebrow: "NEXT PHASE",
+    tone: "phase",
+  },
   bracket: {
     label: "BRACKET",
     subLabel: "대진표",
+    eyebrow: "TOURNAMENT",
+    tone: "phase",
+  },
+  bracketSingle: {
+    label: "SINGLE BRACKET",
+    subLabel: "일반 대진표",
+    eyebrow: "TOURNAMENT",
+    tone: "phase",
+  },
+  bracketDouble: {
+    label: "DOUBLE ELIMINATION",
+    subLabel: "더블 일리미네이션",
     eyebrow: "TOURNAMENT",
     tone: "phase",
   },
@@ -383,12 +589,16 @@ export default function BroadcastPreviewPage() {
 
   const sceneNode = snapshot.idle ? (
     <IdleScene snapshot={snapshot} />
-  ) : sceneKey === "bracket" ? (
+  ) : sceneKey === "bracket" ||
+    sceneKey === "bracketSingle" ||
+    sceneKey === "bracketDouble" ? (
     <BracketScene snapshot={snapshot} />
   ) : isMatch ? (
     <MatchScene snapshot={snapshot} />
   ) : sceneKey === "auction" || sceneKey === "auctionMulti" ? (
     <AuctionBoardView data={auctionLive} />
+  ) : sceneKey === "roleSelect" ? (
+    <RoleSelectionScene snapshot={snapshot} />
   ) : (
     <RoomScene snapshot={snapshot} />
   );
@@ -438,7 +648,7 @@ export default function BroadcastPreviewPage() {
         bg={bg}
         theme={snapshot.theme}
         scene={sceneNode}
-        persistent={<LowerThird snapshot={snapshot} />}
+        persistent={isMatch ? null : <LowerThird snapshot={snapshot} />}
         transitionKey={sceneKey}
         transition={PREVIEW_TRANSITIONS[sceneKey]}
       />

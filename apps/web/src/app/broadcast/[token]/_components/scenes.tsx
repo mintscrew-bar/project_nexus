@@ -9,6 +9,19 @@ import type { ReactNode } from "react";
 
 const DEFAULT_ACCENT = "#8B5CF6";
 
+const broadcastBgCss = `
+@keyframes nexus-live-bg-pan {
+  0% { transform: translate3d(-3%, -2%, 0) scale(1.04); }
+  50% { transform: translate3d(3%, 2%, 0) scale(1.08); }
+  100% { transform: translate3d(-3%, -2%, 0) scale(1.04); }
+}
+@keyframes nexus-live-scan {
+  0% { transform: translateX(-22%); opacity: 0.18; }
+  50% { opacity: 0.34; }
+  100% { transform: translateX(22%); opacity: 0.18; }
+}
+`;
+
 const STATUS_LABELS: Record<string, string> = {
   WAITING: "대기 중",
   AUCTION: "경매 중",
@@ -64,17 +77,45 @@ function StageFrame({
   showTopRule?: boolean;
 }) {
   return (
-    <div className="relative h-full w-full overflow-hidden text-white">
+    <div className="relative h-full w-full overflow-hidden bg-[#05070d] text-white">
+      <style>{broadcastBgCss}</style>
+      <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+        <div
+          className="absolute -inset-[12%]"
+          style={{
+            animation: "nexus-live-bg-pan 16s ease-in-out infinite",
+            background:
+              "radial-gradient(circle at 18% 20%, rgba(0,177,255,0.18), transparent 28%), radial-gradient(circle at 76% 28%, rgba(245,158,11,0.14), transparent 24%), radial-gradient(circle at 54% 82%, rgba(139,92,246,0.18), transparent 32%), linear-gradient(135deg, #061018 0%, #070812 45%, #120816 100%)",
+          }}
+        />
+        <div
+          className="absolute inset-0 opacity-[0.08]"
+          style={{
+            backgroundImage:
+              "linear-gradient(rgba(255,255,255,0.12) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.12) 1px, transparent 1px)",
+            backgroundSize: "56px 56px",
+          }}
+        />
+        <div
+          className="absolute -inset-y-20 left-0 w-full"
+          style={{
+            animation: "nexus-live-scan 9s ease-in-out infinite",
+            background:
+              "linear-gradient(100deg, transparent 0%, rgba(0,177,255,0.08) 36%, rgba(255,255,255,0.07) 50%, rgba(245,158,11,0.06) 64%, transparent 100%)",
+          }}
+        />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,transparent_0%,rgba(0,0,0,0.42)_72%,rgba(0,0,0,0.72)_100%)]" />
+      </div>
       {showTopRule && (
         <div
-          className="absolute left-24 right-24 top-24 h-px"
+          className="absolute left-24 right-24 top-24 z-10 h-px"
           style={{
             background: `linear-gradient(90deg, transparent, ${accent}aa, transparent)`,
           }}
         />
       )}
-      <div className="absolute bottom-28 left-24 right-24 h-px bg-white/8" />
-      {children}
+      <div className="absolute bottom-28 left-24 right-24 z-10 h-px bg-white/8" />
+      <div className="relative z-10 h-full w-full">{children}</div>
     </div>
   );
 }
@@ -230,50 +271,85 @@ export function AuctionScene({ snapshot }: { snapshot: any }) {
   );
 }
 
-function TeamPlate({
+// 롤 관전 오버레이용: 상단 게임 점수창 양옆에 붙는 팀 플랭크
+function MatchFlank({
   team,
   side,
+  score,
   win,
   lose,
+  align,
 }: {
   team: any;
   side: "BLUE" | "RED";
+  score: number;
   win: boolean;
   lose: boolean;
+  align: "left" | "right";
 }) {
   const sideColor = side === "BLUE" ? "#3B82F6" : "#EF4444";
   const teamColor = team?.color || sideColor;
+  const right = align === "right";
 
-  return (
-    <div
-      className="min-w-[500px] border-y px-8 py-5 transition-all duration-500"
-      style={{
-        borderColor: win ? teamColor : "rgba(255,255,255,0.12)",
-        opacity: lose ? 0.42 : 1,
-        filter: lose ? "grayscale(0.7)" : "none",
-        background: "rgba(5,6,10,0.72)",
-      }}
+  const bar = (
+    <span
+      className="h-16 w-1.5 shrink-0 rounded-full"
+      style={{ background: sideColor, boxShadow: `0 0 18px ${sideColor}` }}
+    />
+  );
+  const scoreEl = (
+    <span
+      className="text-[64px] font-black tabular-nums leading-none"
+      style={{ color: win ? teamColor : "#FFFFFF" }}
     >
-      <div className="mb-2 flex items-center gap-3">
-        <span
-          className="h-2.5 w-2.5 rounded-full"
-          style={{ background: sideColor }}
-        />
-        <span className="text-xs font-black uppercase tracking-[0.34em] text-white/38">
+      {score}
+    </span>
+  );
+  const info = (
+    <div className={right ? "min-w-0 text-right" : "min-w-0 text-left"}>
+      <div
+        className="flex items-center gap-2"
+        style={{ justifyContent: right ? "flex-end" : "flex-start" }}
+      >
+        <span className="text-[11px] font-black uppercase tracking-[0.34em] text-white/45">
           {side} SIDE
         </span>
         {win && (
           <span
-            className="text-xs font-black uppercase tracking-[0.24em]"
+            className="text-[11px] font-black uppercase tracking-[0.24em]"
             style={{ color: teamColor }}
           >
             WIN
           </span>
         )}
       </div>
-      <p className="truncate text-[46px] font-black leading-none text-white">
+      <p className="max-w-[440px] truncate text-[34px] font-black leading-tight text-white">
         {team?.name ?? "미정"}
       </p>
+    </div>
+  );
+
+  return (
+    <div
+      className="flex items-center gap-5 transition-all duration-500"
+      style={{
+        opacity: lose ? 0.45 : 1,
+        filter: lose ? "grayscale(0.65)" : "none",
+      }}
+    >
+      {right ? (
+        <>
+          {info}
+          {scoreEl}
+          {bar}
+        </>
+      ) : (
+        <>
+          {bar}
+          {scoreEl}
+          {info}
+        </>
+      )}
     </div>
   );
 }
@@ -284,7 +360,7 @@ export function MatchScene({ snapshot }: { snapshot: any }) {
 
   if (!match) {
     return (
-      <StageFrame accent={accent}>
+      <StageFrame accent={accent} showTopRule={false}>
         <div className="flex h-full w-full items-center justify-center">
           <p className="text-4xl font-black uppercase tracking-widest text-white/30">
             No Live Match
@@ -297,52 +373,282 @@ export function MatchScene({ snapshot }: { snapshot: any }) {
   const done = match.status === "COMPLETED";
   const blueWin = done && match.winnerId && match.winnerId === match.blue?.id;
   const redWin = done && match.winnerId && match.winnerId === match.red?.id;
+  // 시리즈 스코어 필드가 있으면 사용, 없으면 승패 기반 폴백
+  const blueScore = match.blueScore ?? (blueWin ? 1 : 0);
+  const redScore = match.redScore ?? (redWin ? 1 : 0);
   const roundLabel =
-    match.bracketRound ||
-    (match.round != null ? `${match.round}라운드` : "경기");
+    match.bracketRound || (match.round != null ? `${match.round}라운드` : "경기");
 
   return (
-    <StageFrame accent={accent} showTopRule={false}>
-      <div className="flex w-full justify-center pt-10">
-        <div className="flex items-center gap-6">
-          <TeamPlate
+    // 롤 관전 위에 합성되는 오버레이라 배경 없이 투명하게 띄운다.
+    <div className="relative h-full w-full text-white">
+      {/* 상단: 게임 점수창 양옆 플랭킹 — 중앙(게임 점수·타이머)은 비운다 */}
+      <div className="absolute inset-x-0 top-7 flex justify-center">
+        <div className="flex items-center gap-[600px]">
+          <MatchFlank
             team={match.blue}
             side="BLUE"
+            score={blueScore}
             win={!!blueWin}
             lose={!!redWin}
+            align="right"
           />
-
-          <div className="flex min-w-[160px] flex-col items-center">
-            <span className="text-xs font-black uppercase tracking-[0.34em] text-white/38">
-              {roundLabel}
-            </span>
-            <span className="mt-2 text-5xl font-black italic leading-none text-white">
-              VS
-            </span>
-            <span
-              className="mt-2 text-xs font-black uppercase tracking-[0.28em]"
-              style={{ color: done ? "#9CA3AF" : "#F87171" }}
-            >
-              {done ? "FINAL" : "LIVE"}
-            </span>
-          </div>
-
-          <TeamPlate
+          <MatchFlank
             team={match.red}
             side="RED"
+            score={redScore}
             win={!!redWin}
             lose={!!blueWin}
+            align="left"
           />
+        </div>
+      </div>
+
+      {/* 라운드/경기 캡션 — 상단 중앙, 게임 점수창 아래 (위치는 조정 가능) */}
+      <div className="absolute inset-x-0 top-[150px] flex justify-center">
+        <div className="flex items-center gap-3 border-y border-white/12 bg-black/60 px-6 py-2 backdrop-blur">
+          <span className="text-sm font-black uppercase tracking-[0.3em] text-white/72">
+            {roundLabel}
+          </span>
+          {match.matchNumber != null && (
+            <>
+              <span className="text-white/20">·</span>
+              <span className="text-sm font-black uppercase tracking-[0.2em] text-white/40">
+                Match {match.matchNumber}
+              </span>
+            </>
+          )}
+          <span className="text-white/20">·</span>
+          <span
+            className="text-sm font-black uppercase tracking-[0.28em]"
+            style={{ color: done ? "#9CA3AF" : "#F87171" }}
+          >
+            {done ? "Final" : "Live"}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const ROLE_ORDER = ["TOP", "JUNGLE", "MID", "ADC", "SUPPORT"];
+const ROLE_NAMES: Record<string, string> = {
+  TOP: "TOP",
+  JUNGLE: "JGL",
+  MID: "MID",
+  MIDDLE: "MID",
+  ADC: "ADC",
+  BOTTOM: "ADC",
+  SUPPORT: "SUP",
+  UTILITY: "SUP",
+};
+
+const ROLE_ICON: Record<string, string> = {
+  TOP: "/icons/positions/position-top.svg",
+  JUNGLE: "/icons/positions/position-jungle.svg",
+  MID: "/icons/positions/position-middle.svg",
+  ADC: "/icons/positions/position-bottom.svg",
+  SUPPORT: "/icons/positions/position-utility.svg",
+};
+
+function roleKeyOf(member: any) {
+  const role = String(member?.assignedRole ?? "").toUpperCase();
+  if (role === "MIDDLE") return "MID";
+  if (role === "BOTTOM") return "ADC";
+  if (role === "UTILITY") return "SUPPORT";
+  return role || null;
+}
+
+function RoleChoice({
+  role,
+  selected,
+  taken,
+}: {
+  role: string;
+  selected: boolean;
+  taken: boolean;
+}) {
+  return (
+    <div
+      className={`flex h-12 flex-col items-center justify-center gap-1 border text-[10px] font-black uppercase ${
+        selected
+          ? "border-violet-300 bg-violet-300/14 text-violet-100"
+          : taken
+          ? "border-white/5 bg-white/[0.025] text-white/22"
+          : "border-white/10 bg-white/[0.055] text-white/68"
+      }`}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={ROLE_ICON[role]}
+        alt=""
+        width={18}
+        height={18}
+        className={`brightness-0 invert ${selected ? "opacity-95" : "opacity-45"}`}
+      />
+      <span>{ROLE_NAMES[role]}</span>
+    </div>
+  );
+}
+
+function RoleSelectionTeam({ team, accent }: { team: any; accent: string }) {
+  const members: any[] = team?.members ?? [];
+  const color = team?.color ?? accent;
+  const takenRoles = members.map(roleKeyOf).filter(Boolean);
+
+  return (
+    <section
+      className="min-w-0 overflow-hidden border bg-black/38"
+      style={{ borderColor: `${color}55` }}
+    >
+      <div
+        className="flex items-center justify-between border-b border-white/10 px-5 py-3"
+        style={{ background: `${color}12` }}
+      >
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="h-3 w-3 shrink-0" style={{ background: color }} />
+          <p className="truncate text-xl font-black text-white">
+            {team?.name ?? "팀"}
+          </p>
+        </div>
+        <span className="text-xs font-black text-white/42">
+          {takenRoles.length}/{members.length || 5} 선택 완료
+        </span>
+      </div>
+
+      <div className="grid gap-3 p-4">
+        {members.slice(0, 5).map((member) => {
+          const memberRole = roleKeyOf(member);
+          return (
+            <div key={member.id ?? member.userId ?? member.username} className="grid gap-1.5">
+              <div className="flex items-center gap-3 border bg-white/[0.035] px-3 py-2.5 border-white/8">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-sm font-black text-white">
+                  {member.avatar ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={member.avatar}
+                      alt=""
+                      className="h-8 w-8 rounded-full object-cover"
+                    />
+                  ) : (
+                    member.username?.[0] ?? "?"
+                  )}
+                </div>
+                <p className="min-w-0 flex-1 truncate text-base font-black text-white">
+                  {member.username}
+                </p>
+                {memberRole ? (
+                  <span className="border border-emerald-300/30 bg-emerald-300/10 px-2 py-1 text-xs font-black text-emerald-200">
+                    {ROLE_NAMES[memberRole]} 선택됨
+                  </span>
+                ) : (
+                  <span className="border border-white/10 bg-black/24 px-2 py-1 text-xs font-black text-white/34">
+                    미선택
+                  </span>
+                )}
+              </div>
+              <div className="grid grid-cols-5 gap-1.5">
+                {ROLE_ORDER.map((role) => (
+                  <RoleChoice
+                    key={role}
+                    role={role}
+                    selected={memberRole === role}
+                    taken={memberRole !== role && takenRoles.includes(role)}
+                  />
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+export function RoleSelectionScene({ snapshot }: { snapshot: any }) {
+  const accent = accentOf(snapshot);
+  const teams: any[] = snapshot?.teams ?? [];
+  const assigned = teams.reduce(
+    (sum, team) =>
+      sum +
+      (team.members ?? []).filter((member: any) => Boolean(member.assignedRole))
+        .length,
+    0,
+  );
+  const total = teams.reduce(
+    (sum, team) => sum + Math.max((team.members ?? []).length, 5),
+    0,
+  );
+  const progress = Math.max(0, Math.min(100, (assigned / Math.max(total, 1)) * 100));
+
+  return (
+    <StageFrame accent={accent}>
+      <div className="flex h-full w-full flex-col px-24 py-24">
+        <div className="mb-8 flex items-end justify-between">
+          <div>
+            <HudLabel color={accent}>ROLE SELECTION</HudLabel>
+            <h1 className="mt-2 text-[68px] font-black uppercase leading-none text-white">
+              역할 선택
+            </h1>
+            <p className="mt-3 text-lg font-black text-white/42">
+              원하는 포지션을 선택하세요. 선택된 포지션은 팀 내에서 잠깁니다.
+            </p>
+          </div>
+          <div className="w-[360px] text-right">
+            <p className="text-sm font-black uppercase tracking-[0.28em] text-white/34">
+              Locked
+            </p>
+            <p className="mt-1 text-4xl font-black text-white">
+              {assigned}/{total}
+            </p>
+            <div className="mt-3 h-1.5 bg-white/10">
+              <div
+                className="h-full"
+                style={{ width: `${progress}%`, background: accent }}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div
+          className="grid min-h-0 flex-1 content-center gap-5"
+          style={{
+            gridTemplateColumns: `repeat(${Math.min(Math.max(teams.length, 1), 2)}, minmax(0, 1fr))`,
+          }}
+        >
+          {teams.map((team) => (
+            <RoleSelectionTeam
+              key={team.id ?? team.name}
+              team={team}
+              accent={accent}
+            />
+          ))}
         </div>
       </div>
     </StageFrame>
   );
 }
 
-function rpsStatusOf(match: any) {
-  if (match?.status === "COMPLETED") return "완료";
-  if (match?.blueSideTeamId) return "진영 결정 완료";
-  return "RPS 대기";
+function bracketStatusOf(match: any) {
+  if (match?.status === "COMPLETED") {
+    return {
+      label: "FINAL",
+      color: "#FDE68A",
+      background: "rgba(253,230,138,0.1)",
+    };
+  }
+  if (match?.blueSideTeamId) {
+    return {
+      label: "SIDE SET",
+      color: "#86EFAC",
+      background: "rgba(134,239,172,0.1)",
+    };
+  }
+  return {
+    label: "RPS WAIT",
+    color: "#F6C945",
+    background: "rgba(246,201,69,0.1)",
+  };
 }
 
 function BracketMatchCard({
@@ -350,11 +656,13 @@ function BracketMatchCard({
   accent,
   focused,
   compact = false,
+  dense = false,
 }: {
   match: any;
   accent: string;
   focused: boolean;
   compact?: boolean;
+  dense?: boolean;
 }) {
   const blue = match?.blue ?? null;
   const red = match?.red ?? null;
@@ -362,52 +670,63 @@ function BracketMatchCard({
   const winnerId = match?.winnerId;
   const blueWin = winnerId && winnerId === blue?.id;
   const redWin = winnerId && winnerId === red?.id;
+  const status = bracketStatusOf(match);
 
   return (
     <div className="relative min-w-0">
       <div
         className={
-          compact
-            ? "h-[96px] border px-3 py-2.5"
-            : "h-[118px] border px-4 py-3"
+          dense
+            ? "h-[84px] overflow-hidden border-y px-3 py-2"
+            : compact
+            ? "h-[108px] overflow-hidden border-y px-3.5 py-2.5"
+            : "h-[128px] overflow-hidden border-y px-4 py-3.5"
         }
         style={{
-          borderColor: focused ? accent : "rgba(255,255,255,0.1)",
+          borderColor: focused ? accent : "rgba(255,255,255,0.22)",
           background: focused
-            ? "linear-gradient(135deg, rgba(139,92,246,0.22), rgba(5,6,10,0.72))"
-            : "rgba(5,6,10,0.58)",
+            ? "linear-gradient(90deg, rgba(139,92,246,0.18), rgba(5,6,10,0.42))"
+            : "rgba(5,6,10,0.28)",
         }}
       >
         <div
           className={
-            compact
-              ? "mb-2 flex items-center justify-between gap-2"
+            dense
+              ? "mb-1.5 flex h-[14px] items-center justify-between gap-2"
+              : compact
+              ? "mb-2.5 flex items-center justify-between gap-2"
               : "mb-3 flex items-center justify-between gap-3"
           }
         >
-          <span className="text-[11px] font-black uppercase tracking-[0.24em] text-white/34">
+          <span className="text-[11px] font-black uppercase tracking-[0.18em] text-white/44">
             M{match?.matchNumber ?? "-"}
           </span>
           <span
-            className="text-[10px] font-black uppercase tracking-[0.14em]"
-            style={{ color: hasSides ? "#86EFAC" : "#F6C945" }}
+            className="text-[10px] font-black uppercase tracking-[0.08em]"
+            style={{
+              color: status.color,
+            }}
           >
-            {rpsStatusOf(match)}
+            {status.label}
           </span>
         </div>
 
-        <div className={compact ? "grid gap-1.5" : "grid gap-2"}>
+        <div className={dense ? "grid gap-1" : compact ? "grid gap-2" : "grid gap-2.5"}>
           <BracketTeamRow
             team={blue}
             side={hasSides ? "BLUE" : "A"}
             color="#3B82F6"
             win={!!blueWin}
+            pending={!blue || !hasSides}
+            dense={dense}
           />
           <BracketTeamRow
             team={red}
             side={hasSides ? "RED" : "B"}
             color="#EF4444"
             win={!!redWin}
+            pending={!red || !hasSides}
+            dense={dense}
           />
         </div>
       </div>
@@ -420,28 +739,46 @@ function BracketTeamRow({
   side,
   color,
   win,
+  pending,
+  dense = false,
 }: {
   team: any;
   side: string;
   color: string;
   win: boolean;
+  pending: boolean;
+  dense?: boolean;
 }) {
   return (
     <div
-      className="grid grid-cols-[42px_minmax(0,1fr)_34px] items-center gap-2"
+      className={
+        dense
+          ? "grid h-[26px] grid-cols-[30px_minmax(0,1fr)_30px] items-center gap-1.5"
+          : "grid h-[30px] grid-cols-[36px_minmax(0,1fr)_36px] items-center gap-2"
+      }
       style={{ opacity: team ? 1 : 0.38 }}
     >
       <span
-        className="text-[11px] font-black uppercase tracking-[0.16em]"
-        style={{ color }}
+        className={
+          dense
+            ? "text-[11px] font-black uppercase tracking-[0.08em]"
+            : "text-[12px] font-black uppercase tracking-[0.08em]"
+        }
+        style={{ color: pending ? "rgba(255,255,255,0.38)" : color }}
       >
         {side}
       </span>
-      <span className="truncate text-sm font-black text-white">
+      <span
+        className={
+          dense
+            ? "truncate text-[15px] font-black leading-none text-white"
+            : "truncate text-[18px] font-black leading-none text-white"
+        }
+      >
         {team?.name ?? "미정"}
       </span>
       {win && (
-        <span className="text-right text-[11px] font-black uppercase text-amber-300">
+        <span className="text-right text-[12px] font-black uppercase text-amber-300">
           WIN
         </span>
       )}
@@ -460,10 +797,100 @@ const SECTION_LABELS: Record<string, string> = {
   GF: "GRAND FINALS",
 };
 
+type BracketLine = {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  viaX?: number;
+};
+
 function sectionMatches(matches: any[], section: string) {
   return matches
-    .filter((match) => match.bracketSection === section)
+    .filter((match) => (match.bracketSection ?? match.bracketRound) === section)
     .sort((a, b) => Number(a.matchNumber ?? 0) - Number(b.matchNumber ?? 0));
+}
+
+function roundMatches(matches: any[], round: number) {
+  return matches
+    .filter((match) => Number(match.round ?? 1) === round)
+    .sort((a, b) => Number(a.matchNumber ?? 0) - Number(b.matchNumber ?? 0));
+}
+
+function BracketLines({ lines }: { lines: BracketLine[] }) {
+  return (
+    <svg
+      className="pointer-events-none absolute inset-0 h-full w-full"
+      viewBox="0 0 100 100"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      {lines.map((line, index) => (
+        <path
+          key={`${line.x1}-${line.y1}-${line.x2}-${line.y2}-${index}`}
+          d={
+            line.viaX == null
+              ? `M ${line.x1} ${line.y1} H ${line.x2} V ${line.y2}`
+              : `M ${line.x1} ${line.y1} H ${line.viaX} V ${line.y2} H ${line.x2}`
+          }
+          fill="none"
+          stroke="rgba(255,255,255,0.34)"
+          strokeWidth="2"
+          vectorEffect="non-scaling-stroke"
+        />
+      ))}
+    </svg>
+  );
+}
+
+function BracketSlot({
+  match,
+  accent,
+  focusMatchId,
+  x,
+  y,
+  width = 25,
+  dense = false,
+}: {
+  match?: any;
+  accent: string;
+  focusMatchId?: string | null;
+  x: number;
+  y: number;
+  width?: number;
+  dense?: boolean;
+}) {
+  return (
+    <div
+      className="absolute"
+      style={{
+        left: `${x}%`,
+        top: `${y}%`,
+        width: `${width}%`,
+        transform: "translateY(-50%)",
+      }}
+    >
+      {match ? (
+        <BracketMatchCard
+          match={match}
+          accent={accent}
+          focused={match.id === focusMatchId}
+          compact
+          dense={dense}
+        />
+      ) : (
+        <div
+          className={
+            dense
+              ? "flex h-[84px] items-center overflow-hidden border-y border-white/14 px-3 text-sm font-black text-white/26"
+              : "flex h-[108px] items-center border-y border-white/14 px-3 text-sm font-black text-white/26"
+          }
+        >
+          대기
+        </div>
+      )}
+    </div>
+  );
 }
 
 function BoardColumn({
@@ -501,7 +928,7 @@ function BoardColumn({
             />
           ))
         ) : (
-          <div className="flex h-[96px] items-center border border-white/8 px-3 text-sm font-black text-white/26">
+          <div className="flex h-[108px] items-center border-y border-white/14 px-3 text-sm font-black text-white/26">
             대기
           </div>
         )}
@@ -521,94 +948,219 @@ function DoubleElimBoard({
 }) {
   const upper = ["WB_R1", "WB_R2", "WB_F"];
   const lower = ["LB_R1", "LB_R2", "LB_SEMI", "LB_F"];
+  const wbRoundOne = sectionMatches(matches, "WB_R1");
+  const wbRoundTwo = sectionMatches(matches, "WB_R2");
+  const upperFinal =
+    sectionMatches(matches, "WB_F")[0] ??
+    wbRoundTwo[0] ??
+    null;
+  const lowerRoundOne =
+    sectionMatches(matches, "LB_R1")[0] ??
+    sectionMatches(matches, "LB_R2")[0] ??
+    null;
+  const lowerFinal =
+    sectionMatches(matches, "LB_F")[0] ??
+    sectionMatches(matches, "LB_SEMI")[0] ??
+    null;
   const grandFinal = sectionMatches(matches, "GF")[0] ?? null;
+  const canUseTree =
+    wbRoundOne.length <= 2 &&
+    matches.length <= 8 &&
+    (upperFinal || lowerFinal || grandFinal);
+  const upperFirst = wbRoundOne[0] ?? wbRoundTwo[0] ?? null;
+  const upperSecond = wbRoundOne[1] ?? wbRoundTwo[1] ?? null;
+  const champion =
+    grandFinal && grandFinal.winnerId === grandFinal.blue?.id
+      ? grandFinal.blue
+      : grandFinal && grandFinal.winnerId === grandFinal.red?.id
+      ? grandFinal.red
+      : null;
 
   return (
     <div
-      className="relative min-h-0 flex-1 overflow-hidden border border-white/10 px-9 py-7"
+      className="relative min-h-0 flex-1 overflow-hidden border border-white/10 px-8 py-7"
       style={{
         background:
           "radial-gradient(circle at 18% 14%, rgba(139,92,246,0.18), transparent 34%), linear-gradient(135deg, rgba(20,12,34,0.92), rgba(4,5,10,0.96) 58%, rgba(20,12,34,0.84))",
       }}
     >
-      <div className="pointer-events-none absolute inset-x-10 top-[46%] h-px bg-white/12" />
-      <div className="pointer-events-none absolute right-[365px] top-[28%] h-[36%] w-px bg-white/14" />
-      <div className="pointer-events-none absolute right-[320px] top-[46%] h-px w-12 bg-white/14" />
-
-      <div className="relative grid h-full grid-cols-[minmax(0,1fr)_330px] gap-10">
-        <div className="grid min-h-0 grid-rows-[1fr_1fr] gap-7">
-          <div className="min-h-0">
-            <div className="mb-4 flex items-end justify-between">
-              <p className="text-2xl font-black uppercase tracking-[0.06em] text-white/82">
-                Upper
-              </p>
-              <p className="text-[11px] font-black uppercase tracking-[0.26em] text-white/28">
-                Winner Bracket
-              </p>
-            </div>
-            <div className="grid grid-cols-3 gap-5">
-              {upper.map((section) => (
-                <BoardColumn
-                  key={section}
-                  title={SECTION_LABELS[section]}
-                  matches={sectionMatches(matches, section)}
-                  accent={accent}
-                  focusMatchId={focusMatchId}
-                />
-              ))}
-            </div>
-          </div>
-
-          <div className="min-h-0">
-            <div className="mb-4 flex items-end justify-between">
-              <p className="text-2xl font-black uppercase tracking-[0.06em] text-white/82">
-                Lower
-              </p>
-              <p className="text-[11px] font-black uppercase tracking-[0.26em] text-white/28">
-                Elimination Bracket
-              </p>
-            </div>
-            <div className="grid grid-cols-4 gap-5">
-              {lower.map((section) => (
-                <BoardColumn
-                  key={section}
-                  title={SECTION_LABELS[section]}
-                  matches={sectionMatches(matches, section)}
-                  accent={accent}
-                  focusMatchId={focusMatchId}
-                />
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <section className="flex min-h-0 flex-col justify-center">
-          <div className="mb-5 border-b border-white/14 pb-4">
-            <p className="text-3xl font-black uppercase tracking-[0.04em] text-white">
-              Grand Finals
+      {canUseTree ? (
+        <>
+          <div className="absolute left-8 top-6 z-10 flex items-end gap-5">
+            <p className="text-[38px] font-black uppercase leading-none tracking-normal text-white">
+              Bracket Stage
             </p>
-            <p className="mt-2 text-xs font-black uppercase tracking-[0.28em] text-white/34">
-              Final Stage
+            <p className="mb-1 text-xs font-black uppercase tracking-[0.3em] text-white/34">
+              Double Elimination
             </p>
           </div>
-          {grandFinal ? (
-            <BracketMatchCard
-              match={grandFinal}
-              accent={accent}
-              focused={grandFinal.id === focusMatchId}
-            />
-          ) : (
-            <div className="grid gap-3">
-              <div className="border border-white/10 px-4 py-4 text-base font-black text-white/42">
-                승자조 경기 승자
+          <div className="absolute left-8 top-[13%] z-10">
+            <p className="text-sm font-black uppercase tracking-[0.18em] text-red-300">
+              Upper Bracket
+            </p>
+          </div>
+          <div className="absolute left-8 top-[57%] z-10">
+            <p className="text-sm font-black uppercase tracking-[0.18em] text-red-300">
+              Lower Bracket
+            </p>
+          </div>
+
+          <BracketLines
+            lines={[
+              { x1: 25, y1: 25, x2: 26, y2: 35 },
+              { x1: 25, y1: 45, x2: 26, y2: 35 },
+              { x1: 48, y1: 35, x2: 52, y2: 43, viaX: 50 },
+              { x1: 25, y1: 70, x2: 26, y2: 70 },
+              { x1: 48, y1: 70, x2: 52, y2: 57, viaX: 50 },
+              { x1: 74, y1: 50, x2: 75, y2: 50 },
+            ]}
+          />
+
+          <BracketSlot
+            match={upperFirst}
+            accent={accent}
+            focusMatchId={focusMatchId}
+            x={3}
+            y={25}
+            width={22}
+            dense
+          />
+          <BracketSlot
+            match={upperSecond}
+            accent={accent}
+            focusMatchId={focusMatchId}
+            x={3}
+            y={45}
+            width={22}
+            dense
+          />
+          <BracketSlot
+            match={upperFinal}
+            accent={accent}
+            focusMatchId={focusMatchId}
+            x={26}
+            y={35}
+            width={22}
+            dense
+          />
+          <BracketSlot
+            match={lowerRoundOne}
+            accent={accent}
+            focusMatchId={focusMatchId}
+            x={3}
+            y={70}
+            width={22}
+            dense
+          />
+          <BracketSlot
+            match={lowerFinal}
+            accent={accent}
+            focusMatchId={focusMatchId}
+            x={26}
+            y={70}
+            width={22}
+            dense
+          />
+          <BracketSlot
+            match={grandFinal}
+            accent={accent}
+            focusMatchId={focusMatchId}
+            x={52}
+            y={50}
+            width={22}
+            dense
+          />
+          <div className="absolute left-[75%] top-1/2 w-[19%] -translate-y-1/2 border border-red-400/50 bg-red-500/10 px-4 py-5 text-center">
+            <p className="text-sm font-black uppercase tracking-[0.2em] text-red-300">
+              Champion
+            </p>
+            <p className="mt-2 truncate text-xl font-black text-white">
+              {champion?.name ?? "승자"}
+            </p>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="pointer-events-none absolute inset-x-10 top-[46%] h-px bg-white/12" />
+          <div className="pointer-events-none absolute right-[365px] top-[28%] h-[36%] w-px bg-white/14" />
+          <div className="pointer-events-none absolute right-[320px] top-[46%] h-px w-12 bg-white/14" />
+
+          <div className="relative grid h-full grid-cols-[minmax(0,1fr)_330px] gap-10">
+            <div className="grid min-h-0 grid-rows-[1fr_1fr] gap-7">
+              <div className="min-h-0">
+                <div className="mb-4 flex items-end justify-between">
+                  <p className="text-2xl font-black uppercase tracking-[0.06em] text-white/82">
+                    Upper
+                  </p>
+                  <p className="text-[11px] font-black uppercase tracking-[0.26em] text-white/28">
+                    Winner Bracket
+                  </p>
+                </div>
+                <div className="grid grid-cols-3 gap-5">
+                  {upper.map((section) => (
+                    <BoardColumn
+                      key={section}
+                      title={SECTION_LABELS[section]}
+                      matches={sectionMatches(matches, section)}
+                      accent={accent}
+                      focusMatchId={focusMatchId}
+                    />
+                  ))}
+                </div>
               </div>
-              <div className="border border-white/10 px-4 py-4 text-base font-black text-white/42">
-                패자조 최종 승자
+
+              <div className="min-h-0">
+                <div className="mb-4 flex items-end justify-between">
+                  <p className="text-2xl font-black uppercase tracking-[0.06em] text-white/82">
+                    Lower
+                  </p>
+                  <p className="text-[11px] font-black uppercase tracking-[0.26em] text-white/28">
+                    Elimination Bracket
+                  </p>
+                </div>
+                <div className="grid grid-cols-4 gap-5">
+                  {lower.map((section) => (
+                    <BoardColumn
+                      key={section}
+                      title={SECTION_LABELS[section]}
+                      matches={sectionMatches(matches, section)}
+                      accent={accent}
+                      focusMatchId={focusMatchId}
+                    />
+                  ))}
+                </div>
               </div>
             </div>
-          )}
-        </section>
-      </div>
+
+            <section className="flex min-h-0 flex-col justify-center">
+              <div className="mb-5 border-b border-white/14 pb-4">
+                <p className="text-3xl font-black uppercase tracking-[0.04em] text-white">
+                  Grand Finals
+                </p>
+                <p className="mt-2 text-xs font-black uppercase tracking-[0.28em] text-white/34">
+                  Final Stage
+                </p>
+              </div>
+              {grandFinal ? (
+                <BracketMatchCard
+                  match={grandFinal}
+                  accent={accent}
+                  focused={grandFinal.id === focusMatchId}
+                />
+              ) : (
+                <div className="grid gap-3">
+                  <div className="border border-white/10 px-4 py-4 text-base font-black text-white/42">
+                    승자조 경기 승자
+                  </div>
+                  <div className="border border-white/10 px-4 py-4 text-base font-black text-white/42">
+                    패자조 최종 승자
+                  </div>
+                </div>
+              )}
+            </section>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -625,6 +1177,105 @@ function SingleElimBoard({
   const rounds = [...new Set(matches.map((match) => match.round ?? 1))].sort(
     (a, b) => Number(a) - Number(b),
   );
+  const roundOne = roundMatches(matches, Number(rounds[0] ?? 1));
+  const roundTwo = roundMatches(matches, Number(rounds[1] ?? 2));
+  const finalRound = roundMatches(matches, Number(rounds[2] ?? 3));
+  const canUseTree =
+    rounds.length <= 3 &&
+    roundOne.length <= 4 &&
+    roundTwo.length <= 2 &&
+    matches.length <= 7;
+
+  if (canUseTree) {
+    return (
+      <div
+        className="relative min-h-0 flex-1 overflow-hidden border border-white/10 px-8 py-7"
+        style={{
+          background:
+            "radial-gradient(circle at 18% 14%, rgba(139,92,246,0.18), transparent 34%), linear-gradient(135deg, rgba(20,12,34,0.9), rgba(4,5,10,0.96) 58%, rgba(18,12,30,0.82))",
+        }}
+      >
+        <div className="absolute left-8 top-7 z-10">
+          <p className="text-2xl font-black uppercase tracking-[0.06em] text-white/82">
+            Single Elimination
+          </p>
+          <p className="mt-1 text-[11px] font-black uppercase tracking-[0.26em] text-white/28">
+            Winners advance through the bracket
+          </p>
+        </div>
+        <div className="absolute right-8 top-7 z-10 text-right">
+          <p className="text-3xl font-black uppercase tracking-[0.04em] text-white">
+            Finals
+          </p>
+          <p className="mt-2 text-xs font-black uppercase tracking-[0.28em] text-white/34">
+            Final Stage
+          </p>
+        </div>
+
+        <BracketLines
+          lines={[
+            { x1: 26, y1: 22, x2: 31, y2: 34 },
+            { x1: 26, y1: 46, x2: 31, y2: 34 },
+            { x1: 56, y1: 34, x2: 67, y2: 50 },
+            { x1: 26, y1: 64, x2: 31, y2: 74 },
+            { x1: 26, y1: 86, x2: 31, y2: 74 },
+            { x1: 56, y1: 74, x2: 67, y2: 50 },
+          ]}
+        />
+
+        <BracketSlot
+          match={roundOne[0]}
+          accent={accent}
+          focusMatchId={focusMatchId}
+          x={2}
+          y={22}
+        />
+        <BracketSlot
+          match={roundOne[1]}
+          accent={accent}
+          focusMatchId={focusMatchId}
+          x={2}
+          y={46}
+        />
+        <BracketSlot
+          match={roundOne[2]}
+          accent={accent}
+          focusMatchId={focusMatchId}
+          x={2}
+          y={64}
+        />
+        <BracketSlot
+          match={roundOne[3]}
+          accent={accent}
+          focusMatchId={focusMatchId}
+          x={2}
+          y={86}
+        />
+        <BracketSlot
+          match={roundTwo[0]}
+          accent={accent}
+          focusMatchId={focusMatchId}
+          x={31}
+          y={34}
+        />
+        <BracketSlot
+          match={roundTwo[1]}
+          accent={accent}
+          focusMatchId={focusMatchId}
+          x={31}
+          y={74}
+        />
+        <BracketSlot
+          match={finalRound[0] ?? roundTwo[0]}
+          accent={accent}
+          focusMatchId={focusMatchId}
+          x={67}
+          y={50}
+          width={28}
+        />
+      </div>
+    );
+  }
 
   return (
     <div
@@ -655,15 +1306,19 @@ export function BracketScene({ snapshot }: { snapshot: any }) {
   const matches: any[] = snapshot?.matches ?? [];
   const focusMatchId = snapshot?.focusMatchId ?? null;
   const isDoubleElim = matches.some(
-    (match) =>
-      match.bracketType === "DOUBLE_ELIMINATION" ||
-      String(match.bracketSection ?? "").startsWith("LB") ||
-      match.bracketSection === "GF",
+    (match) => {
+      const section = String(match.bracketSection ?? match.bracketRound ?? "");
+      return (
+        match.bracketType === "DOUBLE_ELIMINATION" ||
+        section.startsWith("LB") ||
+        section === "GF"
+      );
+    },
   );
 
   return (
     <StageFrame accent={accent}>
-      <div className="flex h-full w-full flex-col px-24 py-24">
+      <div className="flex h-full w-full flex-col px-16 py-16">
         <div className="mb-8 flex items-end justify-between">
           <div>
             <HudLabel color={accent}>PLAYOFFS</HudLabel>

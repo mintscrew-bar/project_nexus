@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Avatar } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import type { BroadcastAuctionData } from "../_live/useBroadcastAuction";
@@ -32,15 +32,31 @@ const ROLE_LABELS: Record<string, string> = {
   UTILITY: "SUP",
 };
 
-const stageBg =
-  "radial-gradient(circle at 50% 24%, rgba(139,92,246,0.18), transparent 34%), linear-gradient(180deg, rgba(18,18,24,0.98), rgba(7,7,10,0.98))";
+const liveBgCss = `
+@keyframes nexus-live-bg-pan {
+  0% { transform: translate3d(-3%, -2%, 0) scale(1.04); }
+  50% { transform: translate3d(3%, 2%, 0) scale(1.08); }
+  100% { transform: translate3d(-3%, -2%, 0) scale(1.04); }
+}
+@keyframes nexus-live-scan {
+  0% { transform: translateX(-22%); opacity: 0.18; }
+  50% { opacity: 0.34; }
+  100% { transform: translateX(22%); opacity: 0.18; }
+}
+`;
 
 const glass =
-  "border border-white/10 bg-black/42 shadow-[0_18px_60px_rgba(0,0,0,0.45)] backdrop-blur";
+  "border border-white/12 bg-black/36 shadow-[0_18px_60px_rgba(0,0,0,0.38)] backdrop-blur";
 const API_ORIGIN = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000")
   .replace(/\/api$/, "")
   .replace(/\/$/, "");
-const DEFAULT_AVATAR_SRC = "/images/N-avatar.png";
+// 무프로필 placeholder — 다크 무채색 N 마크. 렌더 크기에 맞는 걸 써서 다운스케일 뭉개짐을 줄인다.
+const AVATAR_PLACEHOLDER = {
+  sm: "/images/placeholders/non-avatar-64.png", // 멤버 슬롯 등 ~48px 이하
+  md: "/images/placeholders/non-avatar-128.png", // LOT 초상화 등 ~128px
+  lg: "/images/placeholders/non-avatar-256.png", // 대형/기본
+} as const;
+const DEFAULT_AVATAR_SRC = AVATAR_PLACEHOLDER.lg;
 
 const userIdOf = (value: any) => value?.id ?? value?.userId;
 
@@ -54,16 +70,19 @@ const roleLabel = (role?: string | null) => {
   return ROLE_LABELS[role.toUpperCase()] ?? role.toUpperCase();
 };
 
-const normalizeAvatarSrc = (src?: string | null) => {
+const normalizeAvatarSrc = (
+  src?: string | null,
+  fallback: string = DEFAULT_AVATAR_SRC,
+) => {
   const value = src?.trim();
-  if (!value) return DEFAULT_AVATAR_SRC;
+  if (!value) return fallback;
   if (/^(https?:|data:|blob:)/i.test(value)) return value;
   if (value.startsWith("/uploads/")) return `${API_ORIGIN}${value}`;
   if (value.startsWith("/")) return value;
   if (/^[\w.-]+\.(?:png|jpe?g|gif|webp|avif)$/i.test(value)) {
     return `${API_ORIGIN}/uploads/${value}`;
   }
-  return DEFAULT_AVATAR_SRC;
+  return fallback;
 };
 
 const parseTeamOrder = (name: string): number => {
@@ -101,12 +120,14 @@ function PlayerPortrait({
   src,
   alt,
   className,
+  placeholder = DEFAULT_AVATAR_SRC,
 }: {
   src?: string | null;
   alt: string;
   className?: string;
+  placeholder?: string;
 }) {
-  const normalizedSrc = normalizeAvatarSrc(src);
+  const normalizedSrc = normalizeAvatarSrc(src, placeholder);
 
   return (
     // eslint-disable-next-line @next/next/no-img-element
@@ -115,8 +136,8 @@ function PlayerPortrait({
       alt={alt}
       className={cn("object-cover", className)}
       onError={(event) => {
-        if (event.currentTarget.src.endsWith(DEFAULT_AVATAR_SRC)) return;
-        event.currentTarget.src = DEFAULT_AVATAR_SRC;
+        if (event.currentTarget.src.endsWith(placeholder)) return;
+        event.currentTarget.src = placeholder;
       }}
     />
   );
@@ -270,7 +291,7 @@ function TeamCard({
               >
                 <div className={cn("relative h-8 w-8", !stretch && "mx-auto")}>
                   <Avatar
-                    src={normalizeAvatarSrc(member.avatar)}
+                    src={normalizeAvatarSrc(member.avatar, AVATAR_PLACEHOLDER.sm)}
                     alt={member.username}
                     fallback={member.username?.[0] ?? "?"}
                     size="sm"
@@ -325,33 +346,35 @@ function MultiTeamBoard({
   const columns = teams.length <= 4 ? "grid-cols-2" : "grid-cols-2";
 
   return (
-    <section className="flex min-h-0 flex-col overflow-hidden px-2 py-1">
-      <div className="mb-5 flex shrink-0 items-center justify-between px-1">
-        <div>
-          <p className="text-xs font-black uppercase tracking-[0.32em] text-violet-200">
-            Team Board
-          </p>
-          <h3 className="mt-1 text-2xl font-black text-white">
-            팀 현황
-          </h3>
-        </div>
-        <span className="rounded bg-white/8 px-3 py-1 text-sm font-black text-white/55">
-          {teams.length} Teams
-        </span>
-      </div>
+    <section className="flex min-h-0 flex-col py-1">
+      {/* 입찰(최고가) 팀 강조 애니메이션 — 글로우 대신 미세한 움직임 */}
+      <style>{`
+        @keyframes nexus-lead-badge {
+          0%, 100% { transform: scale(1); opacity: 0.8; }
+          50% { transform: scale(1.14); opacity: 1; }
+        }
+        @keyframes nexus-lead-bar {
+          0% { background-position: 200% 0; }
+          100% { background-position: -200% 0; }
+        }
+      `}</style>
       <div
         className={cn(
-          "grid min-h-0 flex-1 content-center gap-4 overflow-hidden",
+          "grid min-h-0 flex-1 content-center gap-6",
           columns,
         )}
       >
         {teams.map((team, index) => (
-          <CompactTeamCard
+          <div
             key={team.id ?? index}
-            team={team}
-            auctionState={auctionState}
-            index={index}
-          />
+            className={cn("min-w-0", index % 2 === 1 && "translate-y-5")}
+          >
+            <CompactTeamCard
+              team={team}
+              auctionState={auctionState}
+              index={index}
+            />
+          </div>
         ))}
       </div>
     </section>
@@ -376,89 +399,179 @@ function CompactTeamCard({
   const captain = members.find((m: any) => userIdOf(m) === team.captainId);
   const captainName = captain?.username ?? team.captainName ?? team.name;
 
+  // 리더 팀이 한 번 "또잉!" 튀는 스프링 바운스.
+  // - 실제 입찰(최고가 변동) 시마다
+  // - preview/오버레이엔 입찰 이벤트가 없으니 화면이 뜰 때(마운트) 한 번도
+  const cardRef = useRef<HTMLDivElement>(null);
+  const prevBidRef = useRef<number | undefined>(undefined);
+  const mountedRef = useRef(false);
+  useEffect(() => {
+    const bid = auctionState?.currentHighestBid;
+    const changed = bid !== prevBidRef.current;
+    prevBidRef.current = bid;
+    const first = !mountedRef.current;
+    mountedRef.current = true;
+
+    if (!isCurrentBidder || !cardRef.current?.animate) return;
+    if (!first && !changed) return; // 마운트 이후엔 실제 입찰 변동시에만
+
+    const play = () =>
+      cardRef.current?.animate(
+        [
+          {
+            transform: "scale(1)",
+            boxShadow: "0 4px 20px rgba(0,0,0,0.3)",
+            easing: "cubic-bezier(0.22, 0.8, 0.3, 1)", // 떠오르는 구간
+            offset: 0,
+          },
+          {
+            transform: "scale(1.05)",
+            boxShadow: "0 28px 60px rgba(0,0,0,0.5)",
+            easing: "linear", // 정점 유지
+            offset: 0.18,
+          },
+          {
+            transform: "scale(1.05)",
+            boxShadow: "0 28px 60px rgba(0,0,0,0.5)",
+            easing: "cubic-bezier(0.4, 0, 0.3, 1)", // 내려가는 구간
+            offset: 0.66,
+          },
+          {
+            transform: "scale(1)",
+            boxShadow: "0 4px 20px rgba(0,0,0,0.3)",
+            offset: 1,
+          },
+        ],
+        { duration: 850 },
+      );
+
+    if (first) {
+      // 씬 전환 암전이 걷힌 뒤 보이도록 약간 지연
+      const t = setTimeout(play, 480);
+      return () => clearTimeout(t);
+    }
+    play();
+  }, [auctionState?.currentHighestBid, isCurrentBidder]);
+
   return (
     <div
+      ref={cardRef}
       className={cn(
-        "min-w-0 rounded-xl border p-3",
-        isCurrentBidder
-          ? "border-amber-300/60 bg-amber-300/[0.055] shadow-[0_0_24px_rgba(245,158,11,0.16)]"
-          : "border-white/8 bg-white/[0.032]",
+        "relative min-w-0 overflow-hidden rounded-lg shadow-[0_4px_20px_rgba(0,0,0,0.3)]",
       )}
+      style={{
+        background: `linear-gradient(135deg, ${color}10 0%, transparent 50%), rgba(8,8,14,0.94)`,
+        border: isCurrentBidder
+          ? "1px solid rgba(245,158,11,0.55)"
+          : `1px solid ${color}20`,
+      }}
     >
-      <div className="mb-3 flex items-center gap-2">
-        <span
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded text-xs font-black text-black"
-          style={{ backgroundColor: color }}
-        >
-          {index + 1}
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="flex min-w-0 items-center gap-2">
-            <p className="truncate text-sm font-black text-white">
-              {captainName}
-            </p>
-            {isCurrentBidder && (
-              <span className="rounded bg-amber-300 px-1.5 py-0.5 text-[9px] font-black text-black">
-                TOP
-              </span>
-            )}
-          </div>
-          <p className="truncate text-[10px] font-bold text-white/35">
-            {team.name}
-          </p>
-        </div>
-        <div className="text-right">
-          <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/30">
-            Gold
-          </p>
-          <p className="text-sm font-black tabular-nums text-amber-300">
-            {budget.toLocaleString()}
-          </p>
-        </div>
-      </div>
+      {/* 팀 컬러 상단 줄 — 입찰 팀은 앰버 라인이 좌우로 흐름 */}
+      <div
+        className="absolute inset-x-0 top-0 h-[2px]"
+        style={
+          isCurrentBidder
+            ? {
+                background:
+                  "linear-gradient(90deg, rgba(245,158,11,0) 0%, rgba(245,158,11,0.95) 50%, rgba(245,158,11,0) 100%)",
+                backgroundSize: "200% 100%",
+                animation: "nexus-lead-bar 2.2s linear infinite",
+              }
+            : { background: `linear-gradient(90deg, ${color}bb, ${color}00)` }
+        }
+      />
 
-      <div className="grid grid-cols-5 gap-1">
-        {Array.from({ length: 5 }).map((_, slotIndex) => {
-          const member = members[slotIndex];
-          const isCaptain = member && userIdOf(member) === team.captainId;
-          const tierIcon = tierIconUrl(member?.tier);
-
-          return (
-            <div
-              key={member ? userIdOf(member) ?? slotIndex : `empty-${slotIndex}`}
-              className={cn(
-                "flex h-12 min-w-0 items-center justify-center rounded-lg border bg-black/22",
-                member ? "border-white/10" : "border-dashed border-white/8",
-                isCaptain && "border-amber-300/55",
-              )}
-              title={member?.username}
-            >
-              {member ? (
-                <div className="relative">
-                  {tierIcon ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={tierIcon}
-                      alt=""
-                      width={22}
-                      height={22}
-                      className="object-contain"
-                    />
-                  ) : (
-                    <span className="text-xs font-black text-white/70">
-                      {member.username?.[0] ?? "?"}
-                    </span>
-                  )}
-                  {isCaptain && (
-                    <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-amber-300" />
-                  )}
-                </div>
-              ) : (
-                <span className="h-2 w-2 rounded-full bg-white/10" />
+      <div className="px-1.5 pb-3 pt-3.5">
+        <div className="mb-2.5 flex items-center gap-2.5">
+          <span
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-xs font-black text-black"
+            style={{ background: color }}
+          >
+            {index + 1}
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="flex min-w-0 items-center gap-2">
+              <p className="truncate text-sm font-black text-white">
+                {captainName}
+              </p>
+              {isCurrentBidder && (
+                <span
+                  className="rounded bg-amber-300/18 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-[0.1em] text-amber-300"
+                  style={{ animation: "nexus-lead-badge 1.1s ease-in-out infinite" }}
+                >
+                  LEAD
+                </span>
               )}
             </div>
-          );
-        })}
+            <p className="truncate text-[10px] font-semibold text-white/30">
+              {team.name} · {members.length}/5
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-[8px] font-black uppercase tracking-[0.2em] text-white/25">
+              Gold
+            </p>
+            <p className="text-sm font-black tabular-nums text-amber-300">
+              {budget.toLocaleString()}
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-5 gap-2.5">
+          {Array.from({ length: 5 }).map((_, slotIndex) => {
+            const member = members[slotIndex];
+            const isCaptain = member && userIdOf(member) === team.captainId;
+            const tierIcon = tierIconUrl(member?.tier);
+
+            return (
+              <div
+                key={member ? userIdOf(member) ?? slotIndex : `empty-${slotIndex}`}
+                className={cn(
+                  "grid h-[78px] min-w-0 place-items-center rounded-md px-1 py-2",
+                  member
+                    ? isCaptain
+                      ? "bg-amber-300/8 ring-1 ring-amber-300/30"
+                      : "bg-white/[0.04] ring-1 ring-white/[0.07]"
+                    : "border border-dashed border-white/[0.06]",
+                )}
+              >
+                {member ? (
+                  <>
+                    <div className="relative h-10 w-10">
+                      <PlayerPortrait
+                        src={member.avatar}
+                        alt={member.username ?? "member"}
+                        placeholder={AVATAR_PLACEHOLDER.sm}
+                        className="h-10 w-10 rounded-full ring-1 ring-white/16"
+                      />
+                      {isCaptain && (
+                        <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-amber-300 shadow-[0_0_6px_rgba(245,158,11,0.7)]" />
+                      )}
+                      {tierIcon && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={tierIcon}
+                          alt=""
+                          width={14}
+                          height={14}
+                          className="absolute -bottom-0.5 -right-0.5 rounded-full bg-black/70"
+                        />
+                      )}
+                    </div>
+                    <span className="mt-1.5 w-full truncate text-center text-[10px] font-black leading-none text-white/88">
+                      {member.username}
+                    </span>
+                    <span className="sr-only">
+                        {member.username}
+                      </span>
+                  </>
+                ) : (
+                  <span className="h-1.5 w-1.5 rounded-full bg-white/12" />
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
@@ -475,6 +588,8 @@ function CurrentLot({
 }) {
   const player = auctionState.currentPlayer;
   const [timeLeft, setTimeLeft] = useState(0);
+  // 카운트다운 각 초마다 "딱!" 하고 튀는 플래시 상태
+  const [tick, setTick] = useState(false);
 
   useEffect(() => {
     const update = () =>
@@ -485,6 +600,17 @@ function CurrentLot({
     const interval = setInterval(update, 100);
     return () => clearInterval(interval);
   }, [auctionState.timerEnd]);
+
+  // 남은 시간(정수 초)이 바뀔 때마다 짧게 플래시를 켰다 끈다 → 초 단위로 반짝
+  useEffect(() => {
+    if (timeLeft <= 0 || timeLeft > 5) {
+      setTick(false);
+      return;
+    }
+    setTick(true);
+    const t = setTimeout(() => setTick(false), 200);
+    return () => clearTimeout(t);
+  }, [timeLeft]);
 
   const bidderTeam = teams.find(
     (team) =>
@@ -504,217 +630,196 @@ function CurrentLot({
   return (
     <section
       className={cn(
-        "relative min-h-0 overflow-hidden rounded-2xl",
-        compact && "self-start",
-        glass,
+        "relative min-h-0 overflow-hidden rounded-lg border border-white/10 bg-black/44 shadow-[0_20px_70px_rgba(0,0,0,0.42)]",
       )}
     >
-      <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(139,92,246,0.22),transparent_45%),radial-gradient(circle_at_80%_20%,rgba(245,158,11,0.18),transparent_28%)]" />
+      <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(139,92,246,0.24),transparent_46%),radial-gradient(circle_at_78%_18%,rgba(245,158,11,0.22),transparent_30%)]" />
+      <div className="absolute inset-x-0 top-0 h-1 bg-violet-400/80" />
       <div
         className={cn(
           "relative grid",
           compact ? "grid-rows-[auto_auto]" : "h-full grid-rows-[1fr_auto]",
         )}
       >
-        <div
-          className={cn(
-            "grid min-h-0 items-start",
-            compact
-              ? "grid-cols-[minmax(0,1fr)_150px] gap-4 p-5"
-              : "grid-cols-[minmax(0,1fr)_260px] gap-8 p-8",
-          )}
-        >
-          <div className="min-w-0">
-            <div className={cn("flex items-center gap-4", compact ? "mb-4" : "mb-6")}>
-              <div className="relative">
+        {compact ? (
+          <div className="flex flex-col gap-4 p-7">
+            {/* 윗줄: 포트레이트 + [이름·타이머·뱃지] */}
+            <div className="flex min-w-0 items-center gap-5">
+              <div className="relative shrink-0">
                 <PlayerPortrait
                   src={player?.avatar}
                   alt={player?.username ?? "player"}
-                  className={cn(
-                    "rounded-2xl border border-white/10 ring-2 ring-violet-400/80",
-                    compact ? "h-20 w-20" : "h-28 w-28",
-                  )}
+                  placeholder={AVATAR_PLACEHOLDER.md}
+                  className="h-24 w-24 rounded-full ring-2 ring-violet-400/70"
                 />
-                <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 rounded bg-violet-400 px-2 py-0.5 text-[11px] font-black text-black">
+                <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-violet-400 px-2 py-0.5 text-[10px] font-black text-black">
                   LOT
                 </span>
               </div>
-              <div className="min-w-0">
-                <p
-                  className={cn(
-                    "mb-1 font-black uppercase tracking-[0.35em] text-violet-300",
-                    compact ? "text-xs" : "text-sm",
-                  )}
-                >
-                  Current Player
-                </p>
-                <h1
-                  className={cn(
-                    "truncate font-black leading-none tracking-normal text-white",
-                    compact ? "text-5xl" : "text-7xl",
-                  )}
-                >
-                  {player?.username ?? "대기 중"}
-                </h1>
-                <div
-                  className={cn(
-                    "flex flex-wrap items-center",
-                    compact ? "mt-3 gap-2" : "mt-4 gap-3",
-                  )}
-                >
+              <div className="min-w-0 flex-1">
+                {/* 이름 + 타이머 한 줄 */}
+                <div className="flex min-w-0 items-center gap-3">
+                  <h1 className="min-w-0 flex-1 truncate text-5xl font-black leading-none text-white">
+                    {player?.username ?? "대기 중"}
+                  </h1>
                   <span
                     className={cn(
-                      "flex items-center gap-2 rounded-full bg-white/10 font-black text-white",
-                      compact ? "px-3 py-1 text-sm" : "px-4 py-1.5 text-base",
+                      "flex shrink-0 items-baseline gap-0.5 rounded-xl px-4 py-2 font-black tabular-nums leading-none ring-1 transition-all duration-150 will-change-transform",
+                      timerDanger
+                        ? tick
+                          ? "scale-110 bg-red-500/70 text-white ring-red-300/90 shadow-[0_0_46px_rgba(239,68,68,0.8)]"
+                          : "scale-100 bg-red-500/20 text-red-300 ring-red-400/50 shadow-[0_0_18px_rgba(239,68,68,0.32)]"
+                        : "bg-violet-500/30 text-white ring-violet-300/60 shadow-[0_0_26px_rgba(139,92,246,0.4)]",
                     )}
                   >
+                    <span className="text-5xl">{timeLeft}</span>
+                    <span className="text-lg opacity-70">s</span>
+                  </span>
+                </div>
+                {/* 뱃지 */}
+                <div className="mt-3 flex items-center gap-2">
+                  <span className="flex shrink-0 items-center gap-1.5 rounded bg-white/[0.07] px-2.5 py-1 text-sm font-black text-white ring-1 ring-white/10">
                     {tierIcon && (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={tierIcon}
-                        alt=""
-                        width={compact ? 18 : 22}
-                        height={compact ? 18 : 22}
-                      />
+                      <img src={tierIcon} alt="" width={15} height={15} />
                     )}
                     {player?.tier ?? "UNRANKED"}
                   </span>
                   {mainRole && (
-                    <span
-                      className={cn(
-                        "flex items-center gap-2 rounded-full bg-violet-500/24 font-black text-violet-100",
-                        compact ? "px-3 py-1 text-sm" : "px-4 py-1.5 text-base",
-                      )}
-                    >
+                    <span className="flex shrink-0 items-center gap-1.5 rounded bg-violet-500/15 px-2.5 py-1 text-sm font-black text-violet-100 ring-1 ring-violet-300/25">
                       <RoleIcon role={player?.mainRole ?? player?.position} />
                       {mainRole}
                     </span>
                   )}
                   {subRole && (
-                    <span className="rounded-full bg-white/8 px-3 py-1 text-sm font-bold text-white/55">
+                    <span className="shrink-0 rounded bg-white/[0.04] px-2.5 py-1 text-sm font-bold text-white/50 ring-1 ring-white/8">
                       {subRole}
                     </span>
                   )}
                 </div>
               </div>
             </div>
-
-            <div
-              className={cn(
-                "grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)]",
-                compact ? "gap-3" : "gap-4",
-              )}
-            >
-              <div
-                className={cn(
-                  "rounded-xl border border-amber-300/20 bg-black/36",
-                  compact ? "px-4 py-3" : "px-5 py-4",
-                )}
-              >
-                <p className="text-xs font-black uppercase tracking-[0.28em] text-white/40">
-                  Current Bid
+            {/* 아랫줄: 금액 + 리딩팀 */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-md bg-black/36 px-4 py-3.5 ring-1 ring-amber-300/22">
+                <p className="text-[11px] font-black uppercase tracking-[0.2em] text-white/40">Current Bid</p>
+                <div className="mt-1.5 flex items-end gap-1.5">
+                  <span className="text-5xl font-black tabular-nums leading-none text-amber-300">
+                    {(auctionState.currentHighestBid ?? 0).toLocaleString()}
+                  </span>
+                  <span className="mb-0.5 text-lg font-black text-amber-300/60">G</span>
+                </div>
+              </div>
+              <div className="rounded-md bg-black/30 px-4 py-3.5 ring-1 ring-white/8">
+                <p className="text-[11px] font-black uppercase tracking-[0.2em] text-white/40">Leading Team</p>
+                <div className="mt-1.5 flex min-w-0 items-center gap-2">
+                  {bidderTeam?.color && (
+                    <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: bidderTeam.color }} />
+                  )}
+                  <span className="truncate text-3xl font-black text-white">{bidderName}</span>
+                </div>
+              </div>
+            </div>
+            {auctionState.yuchalCount > 0 && (
+              <p className="rounded bg-amber-300/10 px-2 py-1 text-xs font-black text-amber-200">
+                유찰 {auctionState.yuchalCount}/{auctionState.maxYuchalCycles}
+              </p>
+            )}
+          </div>
+        ) : (
+          <div
+            className={cn(
+              "grid min-h-0 items-start",
+              "grid-cols-[minmax(0,1fr)_260px] gap-8 p-8",
+            )}
+          >
+          <div className="min-w-0">
+            <div className="mb-6 flex items-center gap-4">
+              <div className="relative shrink-0">
+                <PlayerPortrait
+                  src={player?.avatar}
+                  alt={player?.username ?? "player"}
+                  placeholder={AVATAR_PLACEHOLDER.md}
+                  className="h-28 w-28 rounded-full ring-2 ring-violet-400/70"
+                />
+                <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-violet-400 px-2 py-0.5 text-[11px] font-black text-black">
+                  LOT
+                </span>
+              </div>
+              <div className="min-w-0">
+                <p className="mb-1 text-sm font-black uppercase tracking-[0.35em] text-violet-300">
+                  Current Player
                 </p>
+                <h1 className="truncate text-7xl font-black leading-none text-white">
+                  {player?.username ?? "대기 중"}
+                  </h1>
+                  <div className="mt-4 flex flex-wrap items-center gap-3">
+                    <span className="flex items-center gap-2 rounded-md bg-white/[0.07] px-4 py-1.5 text-base font-black text-white ring-1 ring-white/10">
+                      {tierIcon && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={tierIcon} alt="" width={22} height={22} />
+                      )}
+                      {player?.tier ?? "UNRANKED"}
+                    </span>
+                  {mainRole && (
+                    <span className="flex items-center gap-2 rounded-md bg-violet-500/15 px-4 py-1.5 text-base font-black text-violet-100 ring-1 ring-violet-300/25">
+                      <RoleIcon role={player?.mainRole ?? player?.position} />
+                      {mainRole}
+                    </span>
+                  )}
+                  {subRole && (
+                    <span className="rounded-md bg-white/[0.04] px-3 py-1 text-sm font-bold text-white/50 ring-1 ring-white/8">
+                      {subRole}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="rounded-md bg-black/36 px-5 py-4 ring-1 ring-amber-300/25">
+                <p className="text-xs font-black uppercase tracking-[0.28em] text-white/40">Current Bid</p>
                 <div className="mt-2 flex items-end gap-3">
-                  <span
-                    className={cn(
-                      "font-black tabular-nums leading-none text-amber-300",
-                      compact ? "text-5xl" : "text-6xl",
-                    )}
-                  >
+                  <span className="text-6xl font-black tabular-nums leading-none text-amber-300">
                     {(auctionState.currentHighestBid ?? 0).toLocaleString()}
                   </span>
                   <span className="mb-1 text-xl font-black text-amber-300/60">G</span>
                 </div>
               </div>
-              <div
-                className={cn(
-                  "rounded-xl border border-white/10 bg-black/30",
-                  compact ? "px-4 py-3" : "px-5 py-4",
-                )}
-              >
-                <p className="text-xs font-black uppercase tracking-[0.28em] text-white/40">
-                  Leading Team
-                </p>
-                <div className={cn("flex min-w-0 items-center gap-3", compact ? "mt-2" : "mt-3")}>
+              <div className="rounded-md bg-black/30 px-5 py-4 ring-1 ring-white/8">
+                <p className="text-xs font-black uppercase tracking-[0.28em] text-white/40">Leading Team</p>
+                <div className="mt-3 flex min-w-0 items-center gap-3">
                   {bidderTeam?.color && (
-                    <span
-                      className="h-4 w-4 shrink-0 rounded-full"
-                      style={{ backgroundColor: bidderTeam.color }}
-                    />
+                    <span className="h-4 w-4 shrink-0 rounded-full" style={{ backgroundColor: bidderTeam.color }} />
                   )}
-                  <span
-                    className={cn(
-                      "truncate font-black text-white",
-                      compact ? "text-2xl" : "text-3xl",
-                    )}
-                  >
-                    {bidderName}
-                  </span>
+                  <span className="truncate text-3xl font-black text-white">{bidderName}</span>
                 </div>
               </div>
             </div>
           </div>
-
-          {compact ? (
+          <div className="flex flex-col items-center justify-center border-y border-white/12 bg-black/24">
+            <p className="mb-4 text-xs font-black uppercase tracking-[0.32em] text-white/38">
+              Time Left
+            </p>
             <div
               className={cn(
-                "rounded-xl border bg-black/40 px-4 py-3",
+                "flex h-44 w-44 items-center justify-center rounded-full border-[10px] bg-black/42",
                 timerDanger
-                  ? "border-rose-400/55 shadow-[0_0_32px_rgba(244,63,94,0.22)]"
-                  : "border-white/10 shadow-[0_0_28px_rgba(139,92,246,0.14)]",
+                  ? "border-rose-500 text-rose-400 shadow-[0_0_46px_rgba(244,63,94,0.38)]"
+                  : "border-violet-400 text-white shadow-[0_0_46px_rgba(139,92,246,0.25)]",
               )}
             >
-              <p className="text-[10px] font-black uppercase tracking-[0.28em] text-white/38">
-                Time
-              </p>
-              <div className="mt-2 flex items-end gap-1">
-                <span
-                  className={cn(
-                    "text-6xl font-black tabular-nums leading-none",
-                    timerDanger ? "text-rose-400" : "text-white",
-                  )}
-                >
-                  {timeLeft}
-                </span>
-                <span className="mb-1 text-sm font-black text-white/32">sec</span>
-              </div>
-              <div
-                className={cn(
-                  "mt-3 h-1.5 rounded-full",
-                  timerDanger ? "bg-rose-400" : "bg-violet-400",
-                )}
-              />
-              {auctionState.yuchalCount > 0 && (
-                <p className="mt-3 rounded bg-amber-300/14 px-2 py-1 text-xs font-black text-amber-200">
-                  유찰 {auctionState.yuchalCount}/{auctionState.maxYuchalCycles}
-                </p>
-              )}
+              <span className="text-8xl font-black tabular-nums leading-none">
+                {timeLeft}
+              </span>
             </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center rounded-2xl border border-white/10 bg-black/38">
-              <p className="mb-4 text-xs font-black uppercase tracking-[0.32em] text-white/38">
-                Time Left
+            {auctionState.yuchalCount > 0 && (
+              <p className="mt-5 rounded bg-amber-300/14 px-3 py-1 text-sm font-black text-amber-200">
+                유찰 {auctionState.yuchalCount}/{auctionState.maxYuchalCycles}
               </p>
-              <div
-                className={cn(
-                  "flex h-44 w-44 items-center justify-center rounded-full border-[10px] bg-black/42",
-                  timerDanger
-                    ? "border-rose-500 text-rose-400 shadow-[0_0_46px_rgba(244,63,94,0.38)]"
-                    : "border-violet-400 text-white shadow-[0_0_46px_rgba(139,92,246,0.25)]",
-                )}
-              >
-                <span className="text-8xl font-black tabular-nums leading-none">
-                  {timeLeft}
-                </span>
-              </div>
-              {auctionState.yuchalCount > 0 && (
-                <p className="mt-5 rounded bg-amber-300/14 px-3 py-1 text-sm font-black text-amber-200">
-                  유찰 {auctionState.yuchalCount}/{auctionState.maxYuchalCycles}
-                </p>
-              )}
-            </div>
-          )}
+            )}
+          </div>
         </div>
+        )}
 
         {!compact && <CurrentLotTeamStrip teams={teams} />}
       </div>
@@ -823,24 +928,23 @@ function BroadcastHeader({
   const totalSlots = teams.length * 5;
 
   return (
-    <header className="flex h-20 shrink-0 items-center justify-between rounded-2xl border border-white/10 bg-black/50 px-7 backdrop-blur">
-      <div className="flex items-center gap-5">
-        <div className="rounded bg-violet-500 px-4 py-2 text-2xl font-black text-white">
+    <header className="flex h-14 shrink-0 items-center justify-between border-b border-white/10 bg-black/50 px-7 backdrop-blur">
+      <div className="flex items-center gap-4">
+        <div className="border border-violet-300/35 bg-violet-500/60 px-3 py-1.5 text-lg font-black text-white">
           NX
         </div>
-        <div>
-          <div className="flex items-center gap-2">
-            <span
-              className={cn(
-                "h-2.5 w-2.5 rounded-full",
-                connected ? "bg-rose-500 shadow-[0_0_12px_#f43f5e]" : "bg-amber-300",
-              )}
-            />
-            <span className="text-xs font-black uppercase tracking-[0.35em] text-rose-300">
-              Live Auction
-            </span>
-          </div>
-          <h2 className="mt-1 text-2xl font-black tracking-tight text-white">
+        <div className="flex items-center gap-2.5">
+          <span
+            className={cn(
+              "h-2 w-2 rounded-full",
+              connected ? "bg-rose-500 shadow-[0_0_10px_#f43f5e]" : "bg-amber-300",
+            )}
+          />
+          <span className="text-[11px] font-black uppercase tracking-[0.35em] text-rose-300">
+            Live Auction
+          </span>
+          <span className="text-white/20">·</span>
+          <h2 className="text-base font-black tracking-tight text-white/80">
             경매 드래프트
           </h2>
         </div>
@@ -861,7 +965,7 @@ function HeaderStat({ label, value }: { label: string; value: number | string })
       <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/35">
         {label}
       </p>
-      <p className="mt-1 text-3xl font-black tabular-nums text-white">{value}</p>
+      <p className="mt-0.5 text-2xl font-black tabular-nums text-white">{value}</p>
     </div>
   );
 }
@@ -888,7 +992,7 @@ function BottomDeck({
           : "h-40 grid-cols-[minmax(0,1fr)_520px]",
       )}
     >
-      <div className={cn("min-w-0 rounded-2xl", compact ? "px-4 py-3" : "px-5 py-4", glass)}>
+      <div className={cn("min-w-0", compact ? "px-4 py-3" : "px-5 py-4", glass)}>
         <div className={cn("flex items-center justify-between", compact ? "mb-2" : "mb-3")}>
           <p
             className={cn(
@@ -916,9 +1020,9 @@ function BottomDeck({
               <div
                 key={playerId ?? index}
                 className={cn(
-                  "flex items-center gap-2 rounded-xl border bg-white/[0.045] px-3",
-                  compact ? "h-[72px] min-w-[116px]" : "h-20 min-w-[148px]",
-                  active ? "border-violet-300" : "border-white/8",
+                  "flex items-center gap-2 border bg-white/[0.04] px-3",
+                  compact ? "h-14 min-w-[116px]" : "h-16 min-w-[148px]",
+                  active ? "border-violet-300 bg-violet-300/[0.08]" : "border-white/10",
                 )}
               >
                 <span className="text-xs font-black tabular-nums text-white/30">
@@ -947,7 +1051,7 @@ function BottomDeck({
         </div>
       </div>
 
-      <div className={cn("rounded-2xl", compact ? "px-4 py-3" : "px-5 py-4", glass)}>
+      <div className={cn(compact ? "px-4 py-3" : "px-5 py-4", glass)}>
         <p
           className={cn(
             "font-black uppercase tracking-[0.28em] text-amber-200",
@@ -970,8 +1074,8 @@ function BottomDeck({
             recentBids.slice(0, compact ? 3 : 5).map((bid, index) => (
               <div
                 key={`${bid.timestamp}-${index}`}
-                className={cn(
-                  "grid items-center gap-2 rounded-lg bg-black/34 px-3",
+              className={cn(
+                  "grid items-center gap-2 border border-white/10 bg-black/28 px-3",
                   compact
                     ? "grid-cols-[minmax(0,1fr)_72px] py-1.5"
                     : "grid-cols-[minmax(0,1fr)_110px] py-2",
@@ -1011,12 +1115,13 @@ function MultiAuxDeck({
   currentPlayerId?: string;
   bidHistory: any[];
 }) {
-  const recentBids = bidHistory.filter((entry) => !entry.isSeparator).slice(-5).reverse();
+  // 최신순(위가 최신). 영역보다 많으면 영역 안에서 스크롤되도록 넉넉히 보관.
+  const recentBids = bidHistory.filter((entry) => !entry.isSeparator).slice(-40).reverse();
 
   return (
-    <section className="grid gap-4 px-1">
-      <div>
-        <div className="mb-2 flex items-center justify-between px-1">
+    <section className="flex min-h-0 flex-1 flex-col gap-4 px-1">
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="mb-2 flex shrink-0 items-center justify-between px-1">
           <p className="text-xs font-black uppercase tracking-[0.28em] text-violet-200">
             Pool
           </p>
@@ -1024,19 +1129,19 @@ function MultiAuxDeck({
             {players.length} left
           </span>
         </div>
-        <div className="grid grid-cols-2 gap-2.5">
-          {players.slice(0, 4).map((player, index) => {
+        <div className="grid min-h-0 flex-1 auto-rows-max grid-cols-2 content-start gap-2.5 overflow-y-auto rounded-md bg-white/[0.02] p-1.5 ring-1 ring-white/[0.05] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {players.map((player, index) => {
             const playerId = userIdOf(player);
             const active = playerId === currentPlayerId;
             const tierIcon = tierIconUrl(player.tier);
             return (
               <div
                 key={playerId ?? index}
-                className={cn(
-                  "grid h-11 min-w-0 grid-cols-[18px_18px_minmax(0,1fr)] items-center gap-2 rounded-lg border px-2.5",
+              className={cn(
+                  "grid h-10 min-w-0 grid-cols-[18px_18px_minmax(0,1fr)] items-center gap-2 rounded-md px-2.5",
                   active
-                    ? "border-violet-300/85 bg-violet-300/[0.08]"
-                    : "border-white/8 bg-white/[0.028]",
+                    ? "bg-violet-300/[0.09] ring-1 ring-violet-300/50"
+                    : "bg-white/[0.03] ring-1 ring-white/[0.07]",
                 )}
               >
                 <span className="text-[10px] font-black tabular-nums text-white/28">
@@ -1057,23 +1162,23 @@ function MultiAuxDeck({
         </div>
       </div>
 
-      <div className="border-t border-white/8 pt-4">
-        <div className="mb-2 flex items-center justify-between px-1">
+      <div className="flex min-h-0 flex-1 flex-col border-t border-white/8 pt-4">
+        <div className="mb-2 flex shrink-0 items-center justify-between px-1">
           <p className="text-xs font-black uppercase tracking-[0.28em] text-amber-200">
             Bid Log
           </p>
           <span className="text-xs font-black text-white/28">recent</span>
         </div>
         {recentBids.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-white/10 py-5 text-center text-xs font-bold text-white/35">
+          <div className="flex min-h-0 flex-1 items-center justify-center rounded-md border border-dashed border-white/10 text-center text-xs font-bold text-white/35">
             아직 입찰 없음
           </div>
         ) : (
-          <div className="grid gap-1.5">
+          <div className="grid min-h-0 flex-1 content-start gap-1.5 overflow-y-auto rounded-md bg-white/[0.02] p-1.5 ring-1 ring-white/[0.05] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {recentBids.map((bid, index) => (
               <div
                 key={`${bid.timestamp}-${index}`}
-                className="grid grid-cols-[minmax(0,1fr)_88px] items-center gap-2 rounded-lg bg-black/24 px-2.5 py-2"
+                className="grid grid-cols-[minmax(0,1fr)_88px] items-center gap-2 rounded-md bg-white/[0.03] px-2.5 py-2 ring-1 ring-white/[0.06]"
               >
                 <span className="min-w-0 truncate text-sm font-black text-white">
                   {bid.username}
@@ -1098,18 +1203,46 @@ export function AuctionBoardView({ data }: { data: BroadcastAuctionData }) {
 
   return (
     <div
-      className="flex h-full w-full flex-col gap-5 overflow-hidden px-10 pb-36 pt-8 text-white"
-      style={{ background: stageBg }}
+      className="relative flex h-full w-full flex-col gap-5 overflow-hidden bg-[#05070d] px-10 pb-36 pt-8 text-white"
     >
-      {auctionState ? (
-        <>
+      <style>{liveBgCss}</style>
+      <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+        <div
+          className="absolute -inset-[12%]"
+          style={{
+            animation: "nexus-live-bg-pan 16s ease-in-out infinite",
+            background:
+              "radial-gradient(circle at 18% 20%, rgba(0,177,255,0.18), transparent 28%), radial-gradient(circle at 76% 28%, rgba(245,158,11,0.14), transparent 24%), radial-gradient(circle at 54% 82%, rgba(139,92,246,0.18), transparent 32%), linear-gradient(135deg, #061018 0%, #070812 45%, #120816 100%)",
+          }}
+        />
+        <div
+          className="absolute inset-0 opacity-[0.08]"
+          style={{
+            backgroundImage:
+              "linear-gradient(rgba(255,255,255,0.12) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.12) 1px, transparent 1px)",
+            backgroundSize: "56px 56px",
+          }}
+        />
+        <div
+          className="absolute -inset-y-20 left-0 w-full"
+          style={{
+            animation: "nexus-live-scan 9s ease-in-out infinite",
+            background:
+              "linear-gradient(100deg, transparent 0%, rgba(0,177,255,0.08) 36%, rgba(255,255,255,0.07) 50%, rgba(245,158,11,0.06) 64%, transparent 100%)",
+          }}
+        />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,transparent_0%,rgba(0,0,0,0.42)_72%,rgba(0,0,0,0.72)_100%)]" />
+      </div>
+      <div className="relative z-10 flex min-h-0 flex-1 flex-col gap-5">
+        {auctionState ? (
+          <>
           <BroadcastHeader
             teams={sortedTeams}
             players={players}
             connected={data.connected}
           />
 
-          <main className="grid min-h-0 flex-1 grid-cols-[520px_minmax(0,1fr)] gap-6">
+          <main className="grid min-h-0 flex-1 grid-cols-[600px_minmax(0,1fr)] gap-5">
             <div className="flex min-h-0 flex-col gap-4">
               <CurrentLot auctionState={auctionState} teams={sortedTeams} compact />
               <MultiAuxDeck
@@ -1120,31 +1253,32 @@ export function AuctionBoardView({ data }: { data: BroadcastAuctionData }) {
             </div>
             <MultiTeamBoard teams={sortedTeams} auctionState={auctionState} />
           </main>
-        </>
-      ) : (
-        <div
-          className={cn(
-            "flex min-h-0 flex-1 flex-col items-center justify-center gap-5 rounded-2xl",
-            glass,
-          )}
-        >
-          <span className="text-5xl font-black uppercase tracking-[0.24em] text-white/60">
-            {status === "WAITING" || captainPhase
-              ? "팀장 선정 중"
-              : "경매 준비 중"}
-          </span>
-          {captainPhase && (
-            <span className="text-2xl font-black text-violet-200">
-              지원자 {captainPhase.volunteers?.length ?? 0}명
+          </>
+        ) : (
+          <div
+            className={cn(
+              "flex min-h-0 flex-1 flex-col items-center justify-center gap-5",
+              glass,
+            )}
+          >
+            <span className="text-5xl font-black uppercase tracking-[0.24em] text-white/60">
+              {status === "WAITING" || captainPhase
+                ? "팀장 선정 중"
+                : "경매 준비 중"}
             </span>
-          )}
-          {!data.connected && (
-            <span className="text-lg font-black text-amber-200">
-              경매 서버에 연결 중
-            </span>
-          )}
-        </div>
-      )}
+            {captainPhase && (
+              <span className="text-2xl font-black text-violet-200">
+                지원자 {captainPhase.volunteers?.length ?? 0}명
+              </span>
+            )}
+            {!data.connected && (
+              <span className="text-lg font-black text-amber-200">
+                경매 서버에 연결 중
+              </span>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
