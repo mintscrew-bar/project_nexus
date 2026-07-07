@@ -57,18 +57,22 @@ function HudRule({ color }: { color: string }) {
 function StageFrame({
   children,
   accent,
+  showTopRule = true,
 }: {
   children: ReactNode;
   accent: string;
+  showTopRule?: boolean;
 }) {
   return (
     <div className="relative h-full w-full overflow-hidden text-white">
-      <div
-        className="absolute left-24 right-24 top-24 h-px"
-        style={{
-          background: `linear-gradient(90deg, transparent, ${accent}aa, transparent)`,
-        }}
-      />
+      {showTopRule && (
+        <div
+          className="absolute left-24 right-24 top-24 h-px"
+          style={{
+            background: `linear-gradient(90deg, transparent, ${accent}aa, transparent)`,
+          }}
+        />
+      )}
       <div className="absolute bottom-28 left-24 right-24 h-px bg-white/8" />
       {children}
     </div>
@@ -298,7 +302,7 @@ export function MatchScene({ snapshot }: { snapshot: any }) {
     (match.round != null ? `${match.round}라운드` : "경기");
 
   return (
-    <StageFrame accent={accent}>
+    <StageFrame accent={accent} showTopRule={false}>
       <div className="flex w-full justify-center pt-10">
         <div className="flex items-center gap-6">
           <TeamPlate
