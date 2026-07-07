@@ -55,14 +55,19 @@ export function BroadcastShell({
   const [displayScene, setDisplayScene] = useState(scene);
   const [transitionActive, setTransitionActive] = useState(false);
   const currentKeyRef = useRef(transitionKey);
+  const latestSceneRef = useRef(scene);
   const timersRef = useRef<Array<ReturnType<typeof setTimeout>>>([]);
 
   useEffect(() => {
+    latestSceneRef.current = scene;
     if (!transitionKey || currentKeyRef.current === transitionKey) {
       setDisplayScene(scene);
       currentKeyRef.current = transitionKey;
-      return;
     }
+  }, [scene, transitionKey]);
+
+  useEffect(() => {
+    if (!transitionKey || currentKeyRef.current === transitionKey) return;
 
     timersRef.current.forEach(clearTimeout);
     timersRef.current = [];
@@ -70,17 +75,17 @@ export function BroadcastShell({
 
     timersRef.current.push(
       setTimeout(() => {
-        setDisplayScene(scene);
+        setDisplayScene(latestSceneRef.current);
         currentKeyRef.current = transitionKey;
-      }, 360),
-      setTimeout(() => setTransitionActive(false), 860),
+      }, 460),
+      setTimeout(() => setTransitionActive(false), 1200),
     );
 
     return () => {
       timersRef.current.forEach(clearTimeout);
       timersRef.current = [];
     };
-  }, [scene, transitionKey]);
+  }, [transitionKey]);
 
   return (
     <div
@@ -180,51 +185,51 @@ function BroadcastTransition({
         }
       `}</style>
       <div
-        className="absolute inset-0 bg-black/72"
-        style={{ animation: "nexus-transition-fade 860ms ease both" }}
+        className="absolute inset-0 bg-black/82"
+        style={{ animation: "nexus-transition-fade 1200ms ease both" }}
       />
       <div
-        className="absolute inset-y-0 left-0 w-[62%] bg-black/78"
+        className="absolute inset-y-0 left-0 w-[72%] bg-black/88"
         style={{
           clipPath: "polygon(0 0, 82% 0, 100% 100%, 0 100%)",
-          animation: "nexus-transition-sweep 860ms cubic-bezier(.76,0,.18,1) both",
+          animation: "nexus-transition-sweep 1200ms cubic-bezier(.76,0,.18,1) both",
         }}
       />
       <div
-        className="absolute inset-y-0 left-0 w-[12px]"
+        className="absolute inset-y-0 left-0 w-[16px]"
         style={{
           background: toneColor,
-          boxShadow: `0 0 34px ${toneColor}`,
-          animation: "nexus-transition-sweep 860ms cubic-bezier(.76,0,.18,1) both",
+          boxShadow: `0 0 54px ${toneColor}`,
+          animation: "nexus-transition-sweep 1200ms cubic-bezier(.76,0,.18,1) both",
         }}
       />
       <div
         className="absolute inset-0 flex items-center justify-center"
-        style={{ animation: "nexus-transition-mark 860ms ease both" }}
+        style={{ animation: "nexus-transition-mark 1200ms ease both" }}
       >
-        <div className="grid grid-cols-[96px_auto] items-center gap-8">
+        <div className="grid grid-cols-[124px_auto] items-center gap-10">
           <div
-            className="flex h-24 w-24 items-center justify-center border text-4xl font-black text-white"
+            className="flex h-32 w-32 items-center justify-center border text-5xl font-black text-white"
             style={{
               borderColor: `${toneColor}aa`,
-              boxShadow: `0 0 38px ${toneColor}44`,
-              background: "rgba(5,5,9,0.72)",
+              boxShadow: `0 0 58px ${toneColor}55`,
+              background: "rgba(5,5,9,0.82)",
             }}
           >
             NX
           </div>
           <div>
             <p
-              className="text-sm font-black uppercase tracking-[0.46em]"
+              className="text-base font-black uppercase tracking-[0.5em]"
               style={{ color: toneColor }}
             >
               {eyebrow}
             </p>
-            <h2 className="mt-3 text-[64px] font-black uppercase leading-none tracking-normal text-white">
+            <h2 className="mt-4 text-[86px] font-black uppercase leading-none tracking-normal text-white">
               {label}
             </h2>
             {subLabel && (
-              <p className="mt-3 text-2xl font-black text-white/54">
+              <p className="mt-4 text-3xl font-black text-white/60">
                 {subLabel}
               </p>
             )}
