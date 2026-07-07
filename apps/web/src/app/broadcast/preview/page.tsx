@@ -7,6 +7,7 @@ import {
   RoomScene,
   MatchScene,
   IdleScene,
+  BracketScene,
 } from "../[token]/_components/scenes";
 import { AuctionBoardView } from "../[token]/_components/AuctionBoardView";
 import type { BroadcastAuctionData } from "../[token]/_live/useBroadcastAuction";
@@ -136,6 +137,45 @@ const SNAP: Record<string, any> = {
       red: TEAM_RED,
     },
   },
+  bracket: {
+    ...common("IN_PROGRESS"),
+    focusMatchId: "m2",
+    matches: [
+      {
+        id: "m1",
+        status: "COMPLETED",
+        round: 1,
+        bracketRound: "4강",
+        matchNumber: 1,
+        winnerId: "teamA",
+        blueSideTeamId: "teamA",
+        blue: TEAM_BLUE,
+        red: TEAM_RED,
+      },
+      {
+        id: "m2",
+        status: "PENDING",
+        round: 1,
+        bracketRound: "4강",
+        matchNumber: 2,
+        winnerId: null,
+        blueSideTeamId: null,
+        blue: MULTI_TEAMS[2],
+        red: MULTI_TEAMS[3],
+      },
+      {
+        id: "m3",
+        status: "PENDING",
+        round: 2,
+        bracketRound: "결승",
+        matchNumber: 1,
+        winnerId: null,
+        blueSideTeamId: null,
+        blue: TEAM_BLUE,
+        red: null,
+      },
+    ],
+  },
   matchDone: {
     ...common("IN_PROGRESS"),
     match: {
@@ -227,6 +267,7 @@ const SCENES: { key: string; label: string }[] = [
   { key: "waiting", label: "대기" },
   { key: "auction", label: "경매(라이브)" },
   { key: "auctionMulti", label: "경매(6팀)" },
+  { key: "bracket", label: "대진표" },
   { key: "match", label: "경기 중계" },
   { key: "matchDone", label: "경기 종료(승팀)" },
   { key: "idle", label: "Idle(방 없음)" },
@@ -257,6 +298,12 @@ const PREVIEW_TRANSITIONS: Record<
     label: "AUCTION DRAFT",
     subLabel: "멀티팀 경매",
     eyebrow: "NEXT PHASE",
+    tone: "phase",
+  },
+  bracket: {
+    label: "BRACKET",
+    subLabel: "대진표",
+    eyebrow: "TOURNAMENT",
     tone: "phase",
   },
   match: {
@@ -297,6 +344,8 @@ export default function BroadcastPreviewPage() {
 
   const sceneNode = snapshot.idle ? (
     <IdleScene snapshot={snapshot} />
+  ) : sceneKey === "bracket" ? (
+    <BracketScene snapshot={snapshot} />
   ) : isMatch ? (
     <MatchScene snapshot={snapshot} />
   ) : sceneKey === "auction" || sceneKey === "auctionMulti" ? (

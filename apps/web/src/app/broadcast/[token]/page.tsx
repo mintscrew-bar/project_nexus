@@ -7,7 +7,12 @@ import { broadcastApi } from "@/lib/api-client";
 import { connectBroadcastSocket } from "@/lib/socket-client";
 import { BroadcastShell } from "./_components/BroadcastShell";
 import { LowerThird } from "./_components/LowerThird";
-import { RoomScene, MatchScene, IdleScene } from "./_components/scenes";
+import {
+  RoomScene,
+  MatchScene,
+  IdleScene,
+  BracketScene,
+} from "./_components/scenes";
 import { BroadcastAuctionLive } from "./_components/BroadcastAuctionLive";
 
 const SCENE_TRANSITIONS: Record<
@@ -49,6 +54,12 @@ const SCENE_TRANSITIONS: Record<
     eyebrow: "NEXT PHASE",
     tone: "phase",
   },
+  bracket: {
+    label: "BRACKET",
+    subLabel: "대진표",
+    eyebrow: "TOURNAMENT",
+    tone: "phase",
+  },
   match: {
     label: "MATCH READY",
     subLabel: "경기 전환",
@@ -79,6 +90,7 @@ function sceneKeyOf({
   matchStatus?: string;
 }) {
   if (idle) return "idle";
+  if (scene === "bracket") return "bracket";
   if (scene === "match") {
     return matchStatus === "COMPLETED" ? "result" : "match";
   }
@@ -175,6 +187,8 @@ export default function BroadcastPage() {
 
   const sceneNode = snapshot.idle ? (
     <IdleScene snapshot={snapshot} />
+  ) : scene === "bracket" ? (
+    <BracketScene snapshot={snapshot} />
   ) : scene === "match" ? (
     <MatchScene snapshot={snapshot} />
   ) : isAuctionRoom && token && roomId ? (

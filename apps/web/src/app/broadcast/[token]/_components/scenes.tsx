@@ -339,6 +339,172 @@ export function MatchScene({ snapshot }: { snapshot: any }) {
   );
 }
 
+function rpsStatusOf(match: any) {
+  if (match?.status === "COMPLETED") return "완료";
+  if (match?.blueSideTeamId) return "진영 결정 완료";
+  return "RPS 대기";
+}
+
+function BracketMatchCard({
+  match,
+  accent,
+  focused,
+}: {
+  match: any;
+  accent: string;
+  focused: boolean;
+}) {
+  const blue = match?.blue ?? null;
+  const red = match?.red ?? null;
+  const hasSides = !!match?.blueSideTeamId;
+  const winnerId = match?.winnerId;
+  const blueWin = winnerId && winnerId === blue?.id;
+  const redWin = winnerId && winnerId === red?.id;
+
+  return (
+    <div
+      className="border-y px-4 py-3"
+      style={{
+        borderColor: focused ? accent : "rgba(255,255,255,0.1)",
+        background: focused ? "rgba(255,255,255,0.055)" : "rgba(5,6,10,0.58)",
+      }}
+    >
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <span className="text-xs font-black uppercase tracking-[0.28em] text-white/34">
+          Match {match?.matchNumber ?? "-"}
+        </span>
+        <span
+          className="text-[11px] font-black uppercase tracking-[0.18em]"
+          style={{ color: hasSides ? "#86EFAC" : "#F6C945" }}
+        >
+          {rpsStatusOf(match)}
+        </span>
+      </div>
+
+      <div className="grid gap-2">
+        <BracketTeamRow
+          team={blue}
+          side={hasSides ? "BLUE" : "A"}
+          color="#3B82F6"
+          win={!!blueWin}
+        />
+        <BracketTeamRow
+          team={red}
+          side={hasSides ? "RED" : "B"}
+          color="#EF4444"
+          win={!!redWin}
+        />
+      </div>
+    </div>
+  );
+}
+
+function BracketTeamRow({
+  team,
+  side,
+  color,
+  win,
+}: {
+  team: any;
+  side: string;
+  color: string;
+  win: boolean;
+}) {
+  return (
+    <div
+      className="grid grid-cols-[52px_minmax(0,1fr)_42px] items-center gap-3"
+      style={{ opacity: team ? 1 : 0.38 }}
+    >
+      <span
+        className="text-[11px] font-black uppercase tracking-[0.16em]"
+        style={{ color }}
+      >
+        {side}
+      </span>
+      <span className="truncate text-base font-black text-white">
+        {team?.name ?? "미정"}
+      </span>
+      {win && (
+        <span className="text-right text-[11px] font-black uppercase text-amber-300">
+          WIN
+        </span>
+      )}
+    </div>
+  );
+}
+
+export function BracketScene({ snapshot }: { snapshot: any }) {
+  const accent = accentOf(snapshot);
+  const matches: any[] = snapshot?.matches ?? [];
+  const focusMatchId = snapshot?.focusMatchId ?? null;
+  const rounds = [...new Set(matches.map((match) => match.round ?? 1))].sort(
+    (a, b) => Number(a) - Number(b),
+  );
+
+  return (
+    <StageFrame accent={accent}>
+      <div className="flex h-full w-full flex-col px-24 py-24">
+        <div className="mb-8 flex items-end justify-between">
+          <div>
+            <HudLabel color={accent}>TOURNAMENT BRACKET</HudLabel>
+            <h1 className="mt-3 text-6xl font-black text-white">대진표</h1>
+          </div>
+          <div className="text-right">
+            <p className="text-sm font-black uppercase tracking-[0.28em] text-white/34">
+              Side Selection
+            </p>
+            <p className="mt-2 text-2xl font-black text-white/58">
+              RPS 현황 포함
+            </p>
+          </div>
+        </div>
+
+        {matches.length === 0 ? (
+          <div className="flex flex-1 items-center justify-center border-y border-white/10">
+            <p className="text-3xl font-black text-white/32">
+              대진표가 아직 생성되지 않았습니다
+            </p>
+          </div>
+        ) : (
+          <div className="grid min-h-0 flex-1 auto-cols-fr grid-flow-col gap-6 overflow-hidden">
+            {rounds.map((round) => {
+              const roundMatches = matches.filter(
+                (match) => (match.round ?? 1) === round,
+              );
+              const label =
+                roundMatches[0]?.bracketRound ??
+                (roundMatches.length === 1 ? "결승" : `${round}라운드`);
+
+              return (
+                <section key={round} className="flex min-w-0 flex-col">
+                  <div className="mb-4 flex items-center justify-between border-b border-white/10 pb-3">
+                    <p className="text-sm font-black uppercase tracking-[0.28em] text-white/42">
+                      {label}
+                    </p>
+                    <span className="text-xs font-black text-white/28">
+                      {roundMatches.length} MATCH
+                    </span>
+                  </div>
+                  <div className="grid flex-1 content-center gap-4">
+                    {roundMatches.map((match) => (
+                      <BracketMatchCard
+                        key={match.id}
+                        match={match}
+                        accent={accent}
+                        focused={match.id === focusMatchId}
+                      />
+                    ))}
+                  </div>
+                </section>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </StageFrame>
+  );
+}
+
 export function RoomScene({ snapshot }: { snapshot: any }) {
   const status = snapshot?.room?.status;
   const teamMode = snapshot?.room?.teamMode;
