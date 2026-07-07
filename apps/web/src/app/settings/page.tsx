@@ -204,14 +204,14 @@ export default function SettingsPage() {
 
   // Fetch champions for highlight picker
   useEffect(() => {
-    if (isAuthenticated) {
+    if (!isLoading && isAuthenticated && user) {
       fetchChampions();
     }
-  }, [isAuthenticated, fetchChampions]);
+  }, [isLoading, isAuthenticated, user, fetchChampions]);
 
   // 밴/제재 상태일 때 최근 이의신청 조회
   useEffect(() => {
-    if (isAuthenticated && user && (user.isBanned || user.isRestricted)) {
+    if (!isLoading && isAuthenticated && user && (user.isBanned || user.isRestricted)) {
       appealApi
         .getLatest()
         .then((data) => {
@@ -219,14 +219,23 @@ export default function SettingsPage() {
         })
         .catch(() => {}); // 이의신청 없어도 에러 무시
     }
-  }, [isAuthenticated, user]);
+  }, [isLoading, isAuthenticated, user]);
 
   // Fetch settings
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isLoading || !isAuthenticated || !user) {
+      if (!isLoading) setSettingsLoading(false);
+      return;
+    }
+
+    let isMounted = true;
+
+    setSettingsLoading(true);
+
       userApi
         .getSettings()
         .then((data) => {
+          if (!isMounted) return;
           const serverTheme = isPersistedTheme(data.theme)
             ? data.theme
             : "dark";
@@ -264,13 +273,25 @@ export default function SettingsPage() {
           console.error("Failed to fetch settings:", err);
         })
         .finally(() => {
-          setSettingsLoading(false);
+          if (isMounted) {
+            setSettingsLoading(false);
+          }
         });
-    }
-  }, [isAuthenticated, setNextTheme]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isLoading, isAuthenticated, user, setNextTheme]);
 
   useEffect(() => {
-    if (!isAuthenticated) return;
+    if (isLoading || !isAuthenticated || !user) {
+      if (!isLoading) {
+        setDiscordGuildLinks([]);
+        setIsLoadingGuildLinks(false);
+        setGuildLinksError(null);
+      }
+      return;
+    }
 
     let isMounted = true;
     setIsLoadingGuildLinks(true);
@@ -295,7 +316,7 @@ export default function SettingsPage() {
     return () => {
       isMounted = false;
     };
-  }, [isAuthenticated]);
+  }, [isLoading, isAuthenticated, user]);
 
   if (isLoading) {
     return (

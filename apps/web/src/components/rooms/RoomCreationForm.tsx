@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Users, Lock, Unlock, Gavel, ListOrdered, Trophy, Info, GitBranch, AlertTriangle, Server, Scale, ArrowLeftRight } from "lucide-react";
 import Link from "next/link";
 import { discordApi } from "@/lib/api-client";
+import { useAuthStore } from "@/stores/auth-store";
 
 interface RoomCreationFormProps {
   onCancel: () => void;
@@ -58,6 +59,7 @@ const PLAYER_OPTIONS = [
 export function RoomCreationForm({ onCancel, onRoomCreated }: RoomCreationFormProps) {
   const router = useRouter();
   const { createRoom, isLoading, error } = useRoomStore();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuthStore();
   const [name, setName] = useState("");
   const [maxParticipants, setMaxParticipants] = useState(10);
   const [teamMode, setTeamMode] = useState<TeamMode>("AUCTION");
@@ -84,6 +86,13 @@ export function RoomCreationForm({ onCancel, onRoomCreated }: RoomCreationFormPr
   const [useDoubleElim, setUseDoubleElim] = useState(false);
 
   useEffect(() => {
+    if (authLoading || !isAuthenticated || !user) {
+      setDiscordGuilds([]);
+      setIsLoadingGuilds(false);
+      setGuildLoadError(null);
+      return;
+    }
+
     let isMounted = true;
 
     setIsLoadingGuilds(true);
@@ -108,7 +117,7 @@ export function RoomCreationForm({ onCancel, onRoomCreated }: RoomCreationFormPr
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [authLoading, isAuthenticated, user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
