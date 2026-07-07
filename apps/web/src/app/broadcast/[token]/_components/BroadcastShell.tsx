@@ -77,7 +77,7 @@ export function BroadcastShell({
       setTimeout(() => {
         setDisplayScene(latestSceneRef.current);
         currentKeyRef.current = transitionKey;
-      }, 460),
+      }, 650),
       setTimeout(() => setTransitionActive(false), 1200),
     );
 
@@ -123,7 +123,15 @@ export function BroadcastShell({
         )}
 
         {/* Current Scene */}
-        <div className="absolute inset-0">{displayScene}</div>
+        <div
+          className="absolute inset-0 transition-[filter,opacity] duration-300"
+          style={{
+            filter: transitionActive ? "brightness(0.42) blur(2px)" : "none",
+            opacity: transitionActive ? 0.72 : 1,
+          }}
+        >
+          {displayScene}
+        </div>
 
         {/* Scene Transition */}
         <BroadcastTransition
@@ -167,8 +175,8 @@ function BroadcastTransition({
       <style>{`
         @keyframes nexus-transition-fade {
           0% { opacity: 0; }
-          16% { opacity: 1; }
-          72% { opacity: 1; }
+          12% { opacity: 1; }
+          78% { opacity: 1; }
           100% { opacity: 0; }
         }
         @keyframes nexus-transition-sweep {
@@ -185,8 +193,16 @@ function BroadcastTransition({
         }
       `}</style>
       <div
-        className="absolute inset-0 bg-black/82"
+        className="absolute inset-0 bg-black/90"
         style={{ animation: "nexus-transition-fade 1200ms ease both" }}
+      />
+      <div
+        className="absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(circle at 50% 50%, rgba(0,0,0,0.18), rgba(0,0,0,0.84) 62%)",
+          animation: "nexus-transition-fade 1200ms ease both",
+        }}
       />
       <div
         className="absolute inset-y-0 left-0 w-[72%] bg-black/88"
@@ -207,7 +223,24 @@ function BroadcastTransition({
         className="absolute inset-0 flex items-center justify-center"
         style={{ animation: "nexus-transition-mark 1200ms ease both" }}
       >
-        <div className="grid grid-cols-[124px_auto] items-center gap-10">
+        <div
+          className="relative grid grid-cols-[124px_auto] items-center gap-10 px-14 py-12"
+          style={{
+            background:
+              "linear-gradient(135deg, rgba(2,2,6,0.96), rgba(10,10,16,0.9))",
+            borderTop: `1px solid ${toneColor}88`,
+            borderBottom: "1px solid rgba(255,255,255,0.12)",
+            boxShadow: `0 32px 90px rgba(0,0,0,0.58), 0 0 70px ${toneColor}22`,
+            clipPath: "polygon(28px 0, 100% 0, calc(100% - 28px) 100%, 0 100%)",
+          }}
+        >
+          <span
+            className="absolute inset-y-0 left-0 w-2"
+            style={{
+              background: toneColor,
+              boxShadow: `0 0 28px ${toneColor}`,
+            }}
+          />
           <div
             className="flex h-32 w-32 items-center justify-center border text-5xl font-black text-white"
             style={{
