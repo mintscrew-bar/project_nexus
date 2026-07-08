@@ -17,12 +17,59 @@ import { broadcastApi } from "@/lib/api-client";
  * OBS 브라우저 소스에 한 번 등록해두면 내가 만든 방을 자동 추종한다.
  * 토큰은 hash 저장이라 원문 복구 불가 → 발급/재생성 시에만 링크를 보여준다.
  */
-const SCENE_PRESETS: { key: string; label: string; scene: string }[] = [
-  { key: "control", label: "컨트롤 모드", scene: "control" },
-  { key: "room", label: "방 상태 자동", scene: "room" },
-  { key: "bracket", label: "대진표", scene: "bracket" },
-  { key: "match", label: "경기 중계", scene: "match" },
+const SCENE_PRESETS: {
+  key: string;
+  label: string;
+  scene: string;
+  recommended?: boolean;
+  desc: string;
+}[] = [
+  {
+    key: "control",
+    label: "컨트롤 모드",
+    scene: "control",
+    recommended: true,
+    desc: "OBS에 이 링크 하나만 등록하세요. 조작 패널·외부 장비(스트림덱 등)로 대기·경매·대진표·경기 장면을 실시간 전환합니다. 대부분 이거 하나면 충분합니다.",
+  },
+  {
+    key: "room",
+    label: "방 상태 자동",
+    scene: "room",
+    desc: "방의 진행 단계(대기 → 경매/드래프트 → 역할 선택)를 자동으로 따라가며 표시합니다. 조작 없이 방송하고 싶을 때 쓰세요.",
+  },
+  {
+    key: "bracket",
+    label: "대진표",
+    scene: "bracket",
+    desc: "토너먼트 대진표만 고정으로 띄웁니다. 경기 사이 브레이크 화면이나 별도 소스로 항상 대진표를 보여줄 때 유용합니다.",
+  },
+  {
+    key: "match",
+    label: "경기 중계",
+    scene: "match",
+    desc: "현재 진행 중인 경기(진영·팀)를 띄웁니다. 특정 경기를 고정하려면 로비의 방송 버튼에서 중계 경기를 지정하세요.",
+  },
 ];
+
+// 외부 조작 토큰 webhook 프리셋 — 컨트롤 모드 OBS 소스의 장면을 바꾸는 명령
+const CONTROL_SCENE_PRESETS: { scene: string; label: string; desc: string }[] =
+  [
+    {
+      scene: "auto",
+      label: "auto (자동)",
+      desc: "방 진행 단계에 맞춰 장면을 자동 전환합니다.",
+    },
+    {
+      scene: "bracket",
+      label: "bracket (대진표)",
+      desc: "대진표 화면으로 고정합니다.",
+    },
+    {
+      scene: "match",
+      label: "match (경기)",
+      desc: "현재 중계 경기 화면으로 고정합니다.",
+    },
+  ];
 
 export function BroadcastTokenSection() {
   const { addToast } = useToast();
@@ -173,6 +220,25 @@ export function BroadcastTokenSection() {
           매번 바꿀 필요가 없습니다.
         </p>
 
+        {/* OBS 등록 방법 — 항상 노출되는 사용 가이드 */}
+        <div className="rounded-lg border border-bg-elevated bg-bg-tertiary/60 p-3 text-xs text-text-secondary">
+          <p className="mb-1 font-semibold text-text-primary">OBS 등록 방법</p>
+          <ol className="list-decimal space-y-0.5 pl-4">
+            <li>OBS → 소스 → + → <b>브라우저</b> 추가</li>
+            <li>
+              아래에서 원하는 링크를 <b>복사</b>해 URL에 붙여넣기
+            </li>
+            <li>
+              너비 <b>1920</b> / 높이 <b>1080</b> 입력 후 확인
+            </li>
+          </ol>
+          <p className="mt-1.5 text-text-tertiary">
+            어떤 링크를 써야 할지 모르겠으면 <b>컨트롤 모드</b> 하나만
+            등록하세요. 나머지는 특정 화면만 따로 띄우고 싶을 때 쓰는
+            선택지입니다.
+          </p>
+        </div>
+
         {loading ? (
           <div className="flex items-center justify-center py-8 text-text-tertiary">
             <Loader2 className="h-6 w-6 animate-spin" />
@@ -197,14 +263,27 @@ export function BroadcastTokenSection() {
                 {SCENE_PRESETS.map((p) => (
                   <div
                     key={p.key}
-                    className="flex items-center justify-between gap-3 rounded-lg border border-bg-elevated bg-bg-tertiary px-3 py-2"
+                    className="flex items-start justify-between gap-3 rounded-lg border border-bg-elevated bg-bg-tertiary px-3 py-2.5"
                   >
-                    <span className="text-sm font-medium text-text-primary">
-                      {p.label}
-                    </span>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-sm font-medium text-text-primary">
+                          {p.label}
+                        </span>
+                        {p.recommended && (
+                          <span className="rounded bg-accent-primary/15 px-1.5 py-0.5 text-[10px] font-bold text-accent-primary">
+                            추천
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-0.5 text-xs leading-relaxed text-text-tertiary">
+                        {p.desc}
+                      </p>
+                    </div>
                     <Button
                       size="sm"
                       variant="secondary"
+                      className="flex-shrink-0"
                       onClick={() => copy(p.scene)}
                     >
                       <Copy className="mr-1 h-3.5 w-3.5" />
@@ -266,6 +345,13 @@ export function BroadcastTokenSection() {
                   Stream Deck, Ulanzi 브릿지, 자동화 스크립트에서 방송 장면만
                   바꾸는 제한 토큰입니다. OBS 출력 토큰과 별도입니다.
                 </p>
+                <p className="mt-1.5 text-xs text-text-tertiary">
+                  <b className="text-text-secondary">사용법:</b> 위{" "}
+                  <b>컨트롤 모드</b> 링크를 OBS에 띄워둔 상태에서, 아래 명령을
+                  장비 버튼(또는 스크립트)에 등록하면 그 소스의 장면이 즉시
+                  바뀝니다. 각 버튼을 누르면 해당 명령의 POST 요청 예시가
+                  복사됩니다.
+                </p>
               </div>
 
               {!controlExists && !controlToken ? (
@@ -281,16 +367,27 @@ export function BroadcastTokenSection() {
                 <div className="space-y-2">
                   {controlToken ? (
                     <div className="grid gap-2 sm:grid-cols-3">
-                      {["auto", "bracket", "match"].map((scene) => (
-                        <Button
-                          key={scene}
-                          size="sm"
-                          variant="secondary"
-                          onClick={() => copyControlWebhook(scene)}
+                      {CONTROL_SCENE_PRESETS.map((p) => (
+                        <div
+                          key={p.scene}
+                          className="flex flex-col gap-1.5 rounded-lg border border-bg-elevated bg-bg-tertiary/60 p-2.5"
                         >
-                          <Copy className="mr-1 h-3.5 w-3.5" />
-                          {scene}
-                        </Button>
+                          <span className="text-xs font-medium text-text-primary">
+                            {p.label}
+                          </span>
+                          <p className="text-[11px] leading-relaxed text-text-tertiary">
+                            {p.desc}
+                          </p>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            className="mt-auto"
+                            onClick={() => copyControlWebhook(p.scene)}
+                          >
+                            <Copy className="mr-1 h-3.5 w-3.5" />
+                            명령 복사
+                          </Button>
+                        </div>
                       ))}
                     </div>
                   ) : (
