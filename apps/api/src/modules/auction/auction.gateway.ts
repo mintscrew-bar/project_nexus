@@ -246,11 +246,7 @@ export class AuctionGateway
         };
       }
 
-      // Only schedule bid resolve if timer hasn't expired yet
-      // (방송 read-only 연결은 서버측 타이머를 건드리지 않는다)
-      if (!client.isBroadcast && state && state.timerEnd > Date.now()) {
-        this._scheduleBidResolve(data.roomId, state.timerEnd);
-      }
+      this._ensureBidResolveScheduled(data.roomId, state);
 
       try {
         const { teams, players } = await this.auctionService.getFullAuctionData(
@@ -809,6 +805,25 @@ export class AuctionGateway
       }
     }, 500);
     this.timerUpdateIntervals.set(roomId, updateInterval);
+  }
+
+  private _ensureBidResolveScheduled(
+    roomId: string,
+    state: { timerEnd?: number | null } | null | undefined,
+  ): void {
+    if (!state?.timerEnd) return;
+
+    if (state.timerEnd > Date.now()) {
+      this._scheduleBidResolve(roomId, state.timerEnd);
+      return;
+    }
+
+    void this._handleBidTimerExpired(roomId).catch((error) => {
+      console.error(
+        `[Auction] Failed to recover expired timer for room ${roomId}:`,
+        error,
+      );
+    });
   }
 
   private async _handleBidTimerExpired(roomId: string): Promise<void> {
