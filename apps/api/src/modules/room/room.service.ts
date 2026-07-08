@@ -457,46 +457,40 @@ export class RoomService {
       resolvedDiscordGuildId = activeGuildLink.guildId;
     }
 
-    // Create room
-    const room = await this.prisma.room.create({
-      data: {
-        name: dto.name,
-        hostId,
-        password: hashedPassword,
-        maxParticipants: dto.maxParticipants,
-        isPrivate: !!dto.password,
-        teamMode: dto.teamMode,
-        allowSpectators: dto.allowSpectators ?? true,
-        discordGuildId: resolvedDiscordGuildId,
+    // 방(Room) + 자유 팀 슬롯을 하나의 트랜잭션으로 묶는다.
+    // 슬롯 생성 등 중간 단계에서 예외가 나면 Room까지 통째로 롤백돼
+    // "방 생성 실패"인데 orphan 방만 남는 상황을 막는다.
+    const room = await this.prisma.$transaction(
+      async (tx: Prisma.TransactionClient) => {
+        const created = await tx.room.create({
+          data: {
+            name: dto.name,
+            hostId,
+            password: hashedPassword,
+            maxParticipants: dto.maxParticipants,
+            isPrivate: !!dto.password,
+            teamMode: dto.teamMode,
+            allowSpectators: dto.allowSpectators ?? true,
+            discordGuildId: resolvedDiscordGuildId,
 
-        // Draft settings
-        startingPoints: dto.startingPoints,
-        minBidIncrement: dto.minBidIncrement,
-        bidTimeLimit: dto.bidTimeLimit,
-        pickTimeLimit: dto.pickTimeLimit,
-        captainSelection: dto.captainSelection,
-        ...(dto.bracketFormat && { bracketFormat: dto.bracketFormat }),
+            // Draft settings
+            startingPoints: dto.startingPoints,
+            minBidIncrement: dto.minBidIncrement,
+            bidTimeLimit: dto.bidTimeLimit,
+            pickTimeLimit: dto.pickTimeLimit,
+            captainSelection: dto.captainSelection,
+            ...(dto.bracketFormat && { bracketFormat: dto.bracketFormat }),
 
-        participants: {
-          create: {
-            userId: hostId,
-            role: "PLAYER",
-            isReady: true,
+            participants: {
+              create: {
+                userId: hostId,
+                role: "PLAYER",
+                isReady: true,
+              },
+            },
           },
-        },
-      },
-      include: {
-        host: {
-          select: {
-            id: true,
-            username: true,
-            avatar: true,
-            reputation: true,
-          },
-        },
-        participants: {
           include: {
-            user: {
+            host: {
               select: {
                 id: true,
                 username: true,
@@ -504,21 +498,33 @@ export class RoomService {
                 reputation: true,
               },
             },
+            participants: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    username: true,
+                    avatar: true,
+                    reputation: true,
+                  },
+                },
+              },
+            },
           },
-        },
-      },
-    });
+        });
 
-    if (dto.teamMode === TeamMode.MANUAL_TEAM) {
-      await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-        await this.createManualTeamSlots(
-          tx,
-          room.id,
-          hostId,
-          dto.maxParticipants,
-        );
-      });
-    }
+        if (dto.teamMode === TeamMode.MANUAL_TEAM) {
+          await this.createManualTeamSlots(
+            tx,
+            created.id,
+            hostId,
+            dto.maxParticipants,
+          );
+        }
+
+        return created;
+      },
+    );
 
     // Discord 봇 연동: 팀별 음성채널 생성
     try {
