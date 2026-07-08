@@ -32,6 +32,7 @@ export class CreateClanDto {
   @Transform(({ value }) => stripAllHtml(value))
   @IsString()
   @IsNotEmpty({ message: "클랜 이름을 입력해주세요." })
+  @MinLength(2, { message: "클랜 이름은 최소 2자 이상이어야 합니다." })
   @MaxLength(50, { message: "클랜 이름은 50자를 초과할 수 없습니다." })
   name: string;
 
