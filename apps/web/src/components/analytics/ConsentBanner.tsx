@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 const STORAGE_KEY = "nexus_consent"; // "granted" | "denied"
 
@@ -10,21 +11,28 @@ const STORAGE_KEY = "nexus_consent"; // "granted" | "denied"
 // "거부" 시 denied 유지 → GA 스크립트는 로드되지만 ping만 보내고 식별 정보 미수집.
 // 모바일: 배너 높이만큼 body에 padding-bottom을 주입해 콘텐츠 가림 방지.
 export function ConsentBanner() {
+  const pathname = usePathname();
   const [visible, setVisible] = useState(false);
   const bannerRef = useRef<HTMLDivElement>(null);
+  const isBroadcastRoute = pathname?.startsWith("/broadcast");
 
   useEffect(() => {
+    if (isBroadcastRoute) {
+      setVisible(false);
+      return;
+    }
+
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (!saved) setVisible(true);
     } catch {
       // localStorage 차단 환경 — 배너 표시 안 함
     }
-  }, []);
+  }, [isBroadcastRoute]);
 
   // 배너 높이를 body padding-bottom에 반영 → 하단 콘텐츠 가림 방지
   useEffect(() => {
-    if (!visible) {
+    if (!visible || isBroadcastRoute) {
       document.body.style.paddingBottom = "";
       return;
     }
@@ -39,7 +47,7 @@ export function ConsentBanner() {
       window.removeEventListener("resize", update);
       document.body.style.paddingBottom = "";
     };
-  }, [visible]);
+  }, [visible, isBroadcastRoute]);
 
   const decide = (granted: boolean) => {
     try {
@@ -57,7 +65,7 @@ export function ConsentBanner() {
     setVisible(false);
   };
 
-  if (!visible) return null;
+  if (!visible || isBroadcastRoute) return null;
 
   return (
     <div
