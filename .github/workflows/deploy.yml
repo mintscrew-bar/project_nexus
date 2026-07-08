@@ -18,6 +18,7 @@ jobs:
     timeout-minutes: 15
     env:
       NEXUS_ENV_FILE: /home/haru/projects/nexus/.env.production
+      IMAGE_TAG: ${{ github.event.workflow_run.head_sha }}
       # 디스크 사용률이 이 값을 넘으면 배포 중단. 90% 면 약 5~10GB 여유 남는 시점.
       DISK_USAGE_LIMIT: 90
 
@@ -53,6 +54,7 @@ jobs:
           DISCORD_GUILD_CALLBACK_URL=${{ secrets.DISCORD_GUILD_CALLBACK_URL }}
           WEB_HOST_PORT=${{ secrets.WEB_HOST_PORT }}
           API_HOST_PORT=${{ secrets.API_HOST_PORT }}
+          API_BIND_HOST=${{ secrets.API_BIND_HOST }}
           POSTGRES_USER=${{ secrets.POSTGRES_USER }}
           POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
           POSTGRES_DB=${{ secrets.POSTGRES_DB }}

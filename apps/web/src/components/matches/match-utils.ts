@@ -280,7 +280,7 @@ export function getSummonerSpellName(spellId: number): string {
     21: "Barrier",
     30: "PoroRecall",
     31: "PoroThrow",
-    32: "Mark",
+    32: "Snowball",
     39: "UltBook",
     54: "Summoner_UltBookSmitePlaceholder",
     55: "Summoner_UltBookFlashPlaceholder",
