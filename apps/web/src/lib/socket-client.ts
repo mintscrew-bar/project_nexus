@@ -218,6 +218,8 @@ const connectBroadcastNamespace = (
 ) => {
   return io(`${SOCKET_URL}${namespace}`, {
     autoConnect: true,
+    forceNew: true,
+    multiplex: false,
     auth: { token: broadcastToken },
     transports: ["websocket", "polling"],
     upgrade: false,
