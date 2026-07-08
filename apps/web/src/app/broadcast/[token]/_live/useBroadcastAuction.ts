@@ -31,7 +31,12 @@ const EMPTY: BroadcastAuctionData = {
 };
 
 const resolvePlayer = (state: any, players: any[]) => {
-  if (state?.currentPlayer?.id) return state.currentPlayer;
+  if (
+    state?.currentPlayer?.id &&
+    players?.some((player) => player?.id === state.currentPlayer.id)
+  ) {
+    return state.currentPlayer;
+  }
   const idx =
     typeof state?.currentPlayerIndex === "number"
       ? state.currentPlayerIndex
@@ -58,6 +63,9 @@ const normalizeState = (s: any, players: any[]): any | null => {
   };
 };
 
+const renormalizeExistingState = (state: any, players: any[]) =>
+  state ? normalizeState(state, players) : null;
+
 export function useBroadcastAuction(
   token: string | undefined,
   roomId: string | undefined,
@@ -77,7 +85,6 @@ export function useBroadcastAuction(
     const join = () => {
       socket.emit("join-room", { roomId }, (ack: any) => {
         if (!ack?.success) return;
-        const players = ack.players ?? [];
         setData((prev) => ({
           ...prev,
           connected: true,
@@ -85,9 +92,14 @@ export function useBroadcastAuction(
             ack.state?.status ??
             (ack.captainSelectionPhase ? "WAITING" : prev.status),
           captainPhase: ack.captainSelectionPhase ?? null,
-          teams: ack.teams ?? [],
-          players,
-          auctionState: normalizeState(ack.state, players),
+          teams: Array.isArray(ack.teams) ? ack.teams : prev.teams,
+          players: Array.isArray(ack.players) ? ack.players : prev.players,
+          auctionState: ack.state
+            ? normalizeState(
+                ack.state,
+                Array.isArray(ack.players) ? ack.players : prev.players,
+              )
+            : prev.auctionState,
         }));
       });
     };
@@ -193,6 +205,7 @@ export function useBroadcastAuction(
           ...prev,
           teams,
           players,
+          auctionState: renormalizeExistingState(prev.auctionState, players),
         };
       }),
     );
@@ -215,7 +228,12 @@ export function useBroadcastAuction(
         const players = d?.player
           ? prev.players.filter((p) => p.id !== d.player.id)
           : prev.players;
-        return { ...prev, teams, players };
+        return {
+          ...prev,
+          teams,
+          players,
+          auctionState: renormalizeExistingState(prev.auctionState, players),
+        };
       }),
     );
 
@@ -238,9 +256,10 @@ export function useBroadcastAuction(
     // 타이머는 serverNow 기준 timerEnd로 보정한 뒤 AuctionBoard가 로컬에서 계산한다.
     socket.on("timer-update", () => {});
 
-    socket.on("auction-complete", () =>
+    socket.on("auction-complete", (d: any) =>
       setData((prev) => ({
         ...prev,
+        teams: Array.isArray(d?.teams) ? d.teams : prev.teams,
         status: "COMPLETED",
         auctionState: prev.auctionState
           ? { ...prev.auctionState, status: "COMPLETED" }
