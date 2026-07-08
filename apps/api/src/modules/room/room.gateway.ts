@@ -10,7 +10,7 @@ import {
 import { Inject, forwardRef, OnModuleDestroy } from "@nestjs/common";
 import { ShutdownService } from "../common/shutdown.service";
 import { OnEvent } from "@nestjs/event-emitter";
-import { Server, Socket } from "socket.io";
+import { Namespace, Server, Socket } from "socket.io";
 import { RoomService } from "./room.service";
 import { SnakeDraftService } from "./snake-draft.service";
 import { SnakeDraftGateway } from "./snake-draft.gateway";
@@ -42,7 +42,7 @@ export class RoomGateway
   implements OnGatewayConnection, OnGatewayDisconnect, OnModuleDestroy
 {
   @WebSocketServer()
-  server: Server;
+  server: Server | Namespace;
 
   private userSockets = new Map<string, Set<string>>(); // userId -> Set<socketId>
   private socketRooms = new Map<string, string>(); // socketId -> roomId
@@ -95,6 +95,23 @@ export class RoomGateway
     return `${roomId}:${userId}`;
   }
 
+  private getSocketById(socketId: string): AuthenticatedSocket | undefined {
+    const sockets = (this.server as any)?.sockets;
+
+    if (sockets instanceof Map) {
+      return sockets.get(socketId) as AuthenticatedSocket | undefined;
+    }
+
+    return sockets?.sockets?.get?.(socketId) as AuthenticatedSocket | undefined;
+  }
+
+  private getAdapterRooms(): Map<string, Set<string>> | undefined {
+    const namespaceAdapterRooms = (this.server as any)?.adapter?.rooms;
+    if (namespaceAdapterRooms) return namespaceAdapterRooms;
+
+    return (this.server as any)?.sockets?.adapter?.rooms;
+  }
+
   private trackRoomSocket(roomId: string, userId: string, socketId: string) {
     const key = this.getRoomUserSocketKey(roomId, userId);
     if (!this.roomUserSockets.has(key)) {
@@ -131,9 +148,7 @@ export class RoomGateway
     if (!sockets) return;
 
     for (const socketId of [...sockets]) {
-      const socket = this.server.sockets.sockets.get(socketId) as
-        | AuthenticatedSocket
-        | undefined;
+      const socket = this.getSocketById(socketId);
       if (socketId !== options?.skipRoomLeftForSocketId) {
         socket?.emit("room-left", { roomId });
       }
@@ -285,7 +300,7 @@ export class RoomGateway
     roomId: string,
   ) {
     try {
-      const adapterRooms = this.server?.sockets?.adapter?.rooms;
+      const adapterRooms = this.getAdapterRooms();
       if (!adapterRooms?.get(this.ROOM_LIST_CHANNEL)?.size) {
         return;
       }
@@ -399,9 +414,9 @@ export class RoomGateway
     } catch (error: any) {
       console.error(
         `[Room] join-room error for user ${client.userId}:`,
-        error.message,
+        error?.stack || error?.message || error,
       );
-      return { error: error.message };
+      return { error: error?.message || "Failed to join room." };
     }
   }
 
