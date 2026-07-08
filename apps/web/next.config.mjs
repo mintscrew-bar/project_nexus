@@ -37,7 +37,7 @@ const nextConfig = {
       },
       {
         source:
-          "/:path(admin|api|auth|dashboard|profile|settings|role-selection|draft|auction)(.*)",
+          "/:path(admin|api|auth|dashboard|profile|settings|role-selection|draft|auction|lab)(.*)",
         headers: [
           {
             key: "X-Robots-Tag",

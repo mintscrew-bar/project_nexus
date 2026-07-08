@@ -10,6 +10,12 @@ export const metadata: Metadata = {
   title: "롤 전적 랩",
   description:
     "Nexus Lab에서 롤 내전 전적과 랭크 기록을 구분한 챔피언 통계, 패치 변화, 조합 분석, 장인 빌드를 확인하세요.",
+  // 아직 비공개(보류) — 검색 색인 금지. 공개 시 이 robots 블록 제거.
+  robots: {
+    index: false,
+    follow: false,
+    googleBot: { index: false, follow: false },
+  },
   alternates: {
     canonical: "/lab",
   },
