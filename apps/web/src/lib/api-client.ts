@@ -651,7 +651,12 @@ export const broadcastApi = {
   // 내 방송 토큰 상태(존재 여부/발급 시각) — 원문은 노출 안 됨
   getToken: async () => {
     const response = await apiClient.get(`/broadcast/token`);
-    return response.data as { exists: boolean; createdAt: string | null };
+    return response.data as {
+      exists: boolean;
+      createdAt: string | null;
+      controlExists: boolean;
+      controlCreatedAt: string | null;
+    };
   },
   // 토큰 발급(없을 때만 원문 반환)
   createToken: async () => {
@@ -676,6 +681,39 @@ export const broadcastApi = {
     const response = await apiClient.delete(`/broadcast/token`);
     return response.data as { ok: boolean };
   },
+  createControlToken: async () => {
+    const response = await apiClient.post(`/broadcast/control-token`);
+    return response.data as {
+      exists: boolean;
+      createdAt: string | null;
+      token: string | null;
+    };
+  },
+  rotateControlToken: async () => {
+    const response = await apiClient.post(`/broadcast/control-token/rotate`);
+    return response.data as {
+      exists: boolean;
+      createdAt: string;
+      token: string;
+    };
+  },
+  revokeControlToken: async () => {
+    const response = await apiClient.delete(`/broadcast/control-token`);
+    return response.data as { ok: boolean };
+  },
+  getControl: async () => {
+    const response = await apiClient.get(`/broadcast/control`);
+    return response.data as {
+      scene: BroadcastControlScene;
+      lowerThirdVisible: boolean;
+      announcement: string | null;
+      roomId: string | null;
+    };
+  },
+  updateControl: async (body: Partial<BroadcastControlState>) => {
+    const response = await apiClient.patch(`/broadcast/control`, body);
+    return response.data as BroadcastControlState & { roomId: string | null };
+  },
   // 로비 방송 상태: 토큰 발급 여부 + 이 방 고정 송출 여부 (호스트)
   getLiveState: async (roomId: string) => {
     const response = await apiClient.get(`/rooms/${roomId}/broadcast-live`);
@@ -695,6 +733,23 @@ export const broadcastApi = {
     });
     return response.data as { focusMatchId: string | null };
   },
+};
+
+export type BroadcastControlScene =
+  | "auto"
+  | "idle"
+  | "room"
+  | "auction"
+  | "role-selection"
+  | "bracket"
+  | "match"
+  | "result"
+  | "break";
+
+export type BroadcastControlState = {
+  scene: BroadcastControlScene;
+  lowerThirdVisible: boolean;
+  announcement: string | null;
 };
 
 // 방 관련 API

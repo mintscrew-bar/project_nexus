@@ -64,7 +64,7 @@ const nextConfig = {
       },
       {
         source:
-          "/:path(admin|api|auth|dashboard|profile|settings|role-selection|draft|auction|lab)(.*)",
+          "/:path(admin|api|auth|dashboard|profile|settings|role-selection|draft|auction|lab|broadcast-control)(.*)",
         headers: [
           {
             key: "X-Robots-Tag",

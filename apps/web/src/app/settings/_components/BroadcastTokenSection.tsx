@@ -18,7 +18,8 @@ import { broadcastApi } from "@/lib/api-client";
  * 토큰은 hash 저장이라 원문 복구 불가 → 발급/재생성 시에만 링크를 보여준다.
  */
 const SCENE_PRESETS: { key: string; label: string; scene: string }[] = [
-  { key: "room", label: "전체(자동 추종)", scene: "room" },
+  { key: "control", label: "컨트롤 모드", scene: "control" },
+  { key: "room", label: "방 상태 자동", scene: "room" },
   { key: "bracket", label: "대진표", scene: "bracket" },
   { key: "match", label: "경기 중계", scene: "match" },
 ];
@@ -28,7 +29,9 @@ export function BroadcastTokenSection() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [exists, setExists] = useState(false);
+  const [controlExists, setControlExists] = useState(false);
   const [token, setToken] = useState<string | null>(null);
+  const [controlToken, setControlToken] = useState<string | null>(null);
 
   // 마운트 시 토큰 상태만 조회(발급은 하지 않음 — 원문은 발급 시에만 노출)
   useEffect(() => {
@@ -38,6 +41,7 @@ export function BroadcastTokenSection() {
       .then((res) => {
         if (!alive) return;
         setExists(res.exists);
+        setControlExists(res.controlExists);
       })
       .catch(() => addToast("방송 토큰 상태를 불러오지 못했습니다.", "error"))
       .finally(() => alive && setLoading(false));
@@ -79,10 +83,54 @@ export function BroadcastTokenSection() {
     try {
       await broadcastApi.revokeToken();
       setToken(null);
+      setControlToken(null);
       setExists(false);
+      setControlExists(false);
       addToast("방송 토큰을 비활성화했습니다.", "info");
     } catch {
       addToast("비활성화에 실패했습니다.", "error");
+    } finally {
+      setBusy(false);
+    }
+  }, [addToast]);
+
+  const createControlToken = useCallback(async () => {
+    setBusy(true);
+    try {
+      const res = await broadcastApi.createControlToken();
+      setControlExists(res.exists);
+      setControlToken(res.token);
+      addToast("방송 조작 토큰을 발급했습니다.", "success");
+    } catch {
+      addToast("조작 토큰 발급에 실패했습니다.", "error");
+    } finally {
+      setBusy(false);
+    }
+  }, [addToast]);
+
+  const rotateControlToken = useCallback(async () => {
+    setBusy(true);
+    try {
+      const res = await broadcastApi.rotateControlToken();
+      setControlExists(true);
+      setControlToken(res.token);
+      addToast("새 방송 조작 토큰을 발급했습니다.", "success");
+    } catch {
+      addToast("조작 토큰 재생성에 실패했습니다.", "error");
+    } finally {
+      setBusy(false);
+    }
+  }, [addToast]);
+
+  const revokeControlToken = useCallback(async () => {
+    setBusy(true);
+    try {
+      await broadcastApi.revokeControlToken();
+      setControlToken(null);
+      setControlExists(false);
+      addToast("방송 조작 토큰을 비활성화했습니다.", "info");
+    } catch {
+      addToast("조작 토큰 비활성화에 실패했습니다.", "error");
     } finally {
       setBusy(false);
     }
@@ -96,6 +144,18 @@ export function BroadcastTokenSection() {
       addToast("OBS 브라우저 소스용 링크를 복사했습니다.", "success");
     },
     [token, addToast],
+  );
+
+  const copyControlWebhook = useCallback(
+    async (scene: string) => {
+      if (!controlToken) return;
+      const url = `${window.location.origin}/api/broadcast/control/${controlToken}/action`;
+      await navigator.clipboard.writeText(
+        `POST ${url}\nContent-Type: application/json\n\n{"scene":"${scene}"}`,
+      );
+      addToast("외부 장비용 webhook 예시를 복사했습니다.", "success");
+    },
+    [controlToken, addToast],
   );
 
   return (
@@ -159,6 +219,10 @@ export function BroadcastTokenSection() {
                   </code>{" "}
                   를 붙이세요.
                 </p>
+                <p className="text-xs text-text-tertiary">
+                  컨트롤 모드는 별도 조작 패널이나 외부 장비 명령에 따라 한 OBS
+                  소스 안에서 장면을 전환합니다.
+                </p>
               </div>
             )}
 
@@ -192,6 +256,72 @@ export function BroadcastTokenSection() {
                 </Button>
               </div>
             )}
+
+            <div className="space-y-3 border-t border-bg-tertiary pt-4">
+              <div>
+                <p className="text-sm font-bold text-text-primary">
+                  외부 조작 토큰
+                </p>
+                <p className="mt-1 text-xs text-text-tertiary">
+                  Stream Deck, Ulanzi 브릿지, 자동화 스크립트에서 방송 장면만
+                  바꾸는 제한 토큰입니다. OBS 출력 토큰과 별도입니다.
+                </p>
+              </div>
+
+              {!controlExists && !controlToken ? (
+                <Button size="sm" variant="secondary" onClick={createControlToken} disabled={busy}>
+                  {busy ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Radio className="mr-2 h-4 w-4" />
+                  )}
+                  조작 토큰 발급
+                </Button>
+              ) : (
+                <div className="space-y-2">
+                  {controlToken ? (
+                    <div className="grid gap-2 sm:grid-cols-3">
+                      {["auto", "bracket", "match"].map((scene) => (
+                        <Button
+                          key={scene}
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => copyControlWebhook(scene)}
+                        >
+                          <Copy className="mr-1 h-3.5 w-3.5" />
+                          {scene}
+                        </Button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="rounded-lg border border-bg-elevated bg-bg-tertiary p-3 text-sm text-text-secondary">
+                      조작 토큰이 활성화되어 있습니다. 원문은 다시 표시할 수
+                      없으니 분실했다면 재생성하세요.
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between">
+                    <button
+                      type="button"
+                      onClick={revokeControlToken}
+                      disabled={busy}
+                      className="text-xs text-text-tertiary hover:text-accent-danger disabled:opacity-40"
+                    >
+                      조작 토큰 비활성화
+                    </button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={rotateControlToken}
+                      disabled={busy}
+                    >
+                      <RefreshCw className="mr-1 h-3.5 w-3.5" />
+                      조작 토큰 재생성
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
           </>
         )}
       </CardContent>

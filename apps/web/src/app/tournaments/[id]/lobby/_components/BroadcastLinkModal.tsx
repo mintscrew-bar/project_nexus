@@ -113,13 +113,15 @@ export function BroadcastLinkModal({ isOpen, onClose, roomId }: Props) {
               </Button>
             </div>
 
-            <p className="text-xs text-text-tertiary">
-              링크 관리·씬별 주소는{" "}
-              <Link href="/settings?tab=broadcast" className="underline">
-                설정 &gt; 방송
+            <div className="flex flex-wrap items-center gap-3 text-xs text-text-tertiary">
+              <Link href="/broadcast-control" className="underline">
+                방송 조작 패널 열기
               </Link>
-              에서 확인하세요.
-            </p>
+              <span>·</span>
+              <Link href="/settings?tab=broadcast" className="underline">
+                링크·토큰 관리
+              </Link>
+            </div>
           </div>
         )}
       </div>

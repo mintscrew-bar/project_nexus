@@ -3,16 +3,24 @@ import {
   Get,
   Post,
   Delete,
+  Patch,
   Param,
+  Body,
   Query,
   UseGuards,
   HttpCode,
   HttpStatus,
 } from "@nestjs/common";
+import { Throttle } from "@nestjs/throttler";
 import { Public } from "../auth/decorators/public.decorator";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { BroadcastService, BroadcastScene } from "./broadcast.service";
+import {
+  BroadcastControlActionDto,
+  UpdateBroadcastControlDto,
+} from "./dto/broadcast-control.dto";
+import { MatchGateway } from "../match/match.gateway";
 
 /**
  * 방송 오버레이 엔드포인트.
@@ -21,7 +29,10 @@ import { BroadcastService, BroadcastScene } from "./broadcast.service";
  */
 @Controller("broadcast")
 export class BroadcastController {
-  constructor(private readonly broadcastService: BroadcastService) {}
+  constructor(
+    private readonly broadcastService: BroadcastService,
+    private readonly matchGateway: MatchGateway,
+  ) {}
 
   // ── 스트리머 토큰 관리 (로그인 필요) ──
 
@@ -56,6 +67,67 @@ export class BroadcastController {
     return this.broadcastService.revokeToken(userId);
   }
 
+  // ── 조작 패널/외부 장비용 컨트롤 토큰 ──
+
+  @Post("control-token")
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async createControlToken(@CurrentUser("sub") userId: string) {
+    return this.broadcastService.createControlToken(userId, false);
+  }
+
+  @Post("control-token/rotate")
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async rotateControlToken(@CurrentUser("sub") userId: string) {
+    return this.broadcastService.createControlToken(userId, true);
+  }
+
+  @Delete("control-token")
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async revokeControlToken(@CurrentUser("sub") userId: string) {
+    return this.broadcastService.revokeControlToken(userId);
+  }
+
+  // ── 로그인 조작 패널 ──
+
+  @Get("control")
+  @UseGuards(JwtAuthGuard)
+  async getControlState(@CurrentUser("sub") userId: string) {
+    return this.broadcastService.getControlState(userId);
+  }
+
+  @Patch("control")
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async updateControlState(
+    @CurrentUser("sub") userId: string,
+    @Body() body: UpdateBroadcastControlDto,
+  ) {
+    const result = await this.broadcastService.updateControlState(userId, body);
+    this.matchGateway.emitBroadcastControl(result.roomId, result);
+    return result;
+  }
+
+  // ── Stream Deck / Ulanzi bridge 등 외부 장비용 webhook ──
+
+  @Post("control/:controlToken/action")
+  @Public()
+  @Throttle({ default: { limit: 120, ttl: 60000 } })
+  @HttpCode(HttpStatus.OK)
+  async controlAction(
+    @Param("controlToken") controlToken: string,
+    @Body() body: BroadcastControlActionDto,
+  ) {
+    const result = await this.broadcastService.updateControlStateByToken(
+      controlToken,
+      body,
+    );
+    this.matchGateway.emitBroadcastControl(result.roomId, result);
+    return { ok: true, ...result };
+  }
+
   // ── 공개 스냅샷 (OBS) ──
 
   @Get(":token/snapshot")
@@ -67,6 +139,7 @@ export class BroadcastController {
   ) {
     const validScenes: BroadcastScene[] = [
       "room",
+      "control",
       "match",
       "bracket",
       "result",

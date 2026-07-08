@@ -738,6 +738,12 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
       .emit("broadcast-focus-updated", { matchId });
   }
 
+  /** 방송 오버레이: 조작 패널/외부 장비에서 출력 상태 변경. */
+  emitBroadcastControl(roomId: string | null, data: Record<string, unknown>) {
+    if (!roomId) return;
+    this.server.to(`bracket:${roomId}`).emit("broadcast-control-updated", data);
+  }
+
   emitBracketUpdate(roomId: string, data: { matches: any[] }) {
     this.server.to(`bracket:${roomId}`).emit("bracket-updated", data);
   }

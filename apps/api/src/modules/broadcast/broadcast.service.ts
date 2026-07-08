@@ -5,8 +5,19 @@ import {
   hashBroadcastToken,
   activeRoomIdForUser,
 } from "./broadcast-resolve.util";
+import {
+  BROADCAST_CONTROL_SCENES,
+  BroadcastControlScene,
+  UpdateBroadcastControlDto,
+} from "./dto/broadcast-control.dto";
 
-export type BroadcastScene = "room" | "match" | "bracket" | "result" | "break";
+export type BroadcastScene =
+  | "control"
+  | "room"
+  | "match"
+  | "bracket"
+  | "result"
+  | "break";
 
 /**
  * 방송 오버레이 서비스.
@@ -54,11 +65,18 @@ export class BroadcastService {
   async getTokenStatus(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { broadcastTokenHash: true, broadcastTokenCreatedAt: true },
+      select: {
+        broadcastTokenHash: true,
+        broadcastTokenCreatedAt: true,
+        broadcastControlTokenHash: true,
+        broadcastControlTokenCreatedAt: true,
+      },
     });
     return {
       exists: !!user?.broadcastTokenHash,
       createdAt: user?.broadcastTokenCreatedAt ?? null,
+      controlExists: !!user?.broadcastControlTokenHash,
+      controlCreatedAt: user?.broadcastControlTokenCreatedAt ?? null,
     };
   }
 
@@ -69,10 +87,141 @@ export class BroadcastService {
       data: {
         broadcastTokenHash: null,
         broadcastTokenCreatedAt: null,
+        broadcastControlTokenHash: null,
+        broadcastControlTokenCreatedAt: null,
         broadcastLiveRoomId: null,
+        broadcastScene: "auto",
+        broadcastLowerThirdVisible: true,
+        broadcastAnnouncement: null,
       },
     });
     return { ok: true };
+  }
+
+  /** 외부 장비/보조 패널용 컨트롤 토큰. OBS 출력 토큰과 별도로 회전/폐기한다. */
+  async createControlToken(userId: string, rotate = false) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        broadcastControlTokenHash: true,
+        broadcastControlTokenCreatedAt: true,
+      },
+    });
+    if (!user) throw new NotFoundException("유저를 찾을 수 없습니다.");
+
+    if (user.broadcastControlTokenHash && !rotate) {
+      return {
+        exists: true,
+        createdAt: user.broadcastControlTokenCreatedAt,
+        token: null as string | null,
+      };
+    }
+
+    const token = randomBytes(24).toString("base64url");
+    const createdAt = new Date();
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        broadcastControlTokenHash: hashBroadcastToken(token),
+        broadcastControlTokenCreatedAt: createdAt,
+      },
+    });
+    return { exists: true, createdAt, token };
+  }
+
+  async revokeControlToken(userId: string) {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        broadcastControlTokenHash: null,
+        broadcastControlTokenCreatedAt: null,
+      },
+    });
+    return { ok: true };
+  }
+
+  private normalizeControlScene(value?: string | null): BroadcastControlScene {
+    return BROADCAST_CONTROL_SCENES.includes(value as BroadcastControlScene)
+      ? (value as BroadcastControlScene)
+      : "auto";
+  }
+
+  private controlState(user: {
+    broadcastScene?: string | null;
+    broadcastLowerThirdVisible?: boolean | null;
+    broadcastAnnouncement?: string | null;
+  }) {
+    return {
+      scene: this.normalizeControlScene(user.broadcastScene),
+      lowerThirdVisible: user.broadcastLowerThirdVisible ?? true,
+      announcement: user.broadcastAnnouncement ?? null,
+    };
+  }
+
+  private cleanAnnouncement(value: string | null | undefined) {
+    if (value == null) return null;
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+
+  async getControlState(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        broadcastLiveRoomId: true,
+        broadcastScene: true,
+        broadcastLowerThirdVisible: true,
+        broadcastAnnouncement: true,
+      },
+    });
+    if (!user) throw new NotFoundException("유저를 찾을 수 없습니다.");
+    const roomId = await activeRoomIdForUser(
+      this.prisma,
+      userId,
+      user.broadcastLiveRoomId,
+    );
+    return { ...this.controlState(user), roomId };
+  }
+
+  async updateControlState(userId: string, dto: UpdateBroadcastControlDto) {
+    const data: Record<string, unknown> = {};
+    if (dto.scene !== undefined) data.broadcastScene = dto.scene;
+    if (dto.lowerThirdVisible !== undefined) {
+      data.broadcastLowerThirdVisible = dto.lowerThirdVisible;
+    }
+    if (dto.announcement !== undefined) {
+      data.broadcastAnnouncement = this.cleanAnnouncement(dto.announcement);
+    }
+
+    const user = await this.prisma.user.update({
+      where: { id: userId },
+      data,
+      select: {
+        broadcastLiveRoomId: true,
+        broadcastScene: true,
+        broadcastLowerThirdVisible: true,
+        broadcastAnnouncement: true,
+      },
+    });
+    const roomId = await activeRoomIdForUser(
+      this.prisma,
+      userId,
+      user.broadcastLiveRoomId,
+    );
+    return { ...this.controlState(user), roomId };
+  }
+
+  async updateControlStateByToken(
+    controlToken: string,
+    dto: UpdateBroadcastControlDto,
+  ) {
+    const user = await this.prisma.user.findUnique({
+      where: { broadcastControlTokenHash: hashBroadcastToken(controlToken) },
+      select: { id: true },
+    });
+    if (!user)
+      throw new NotFoundException("유효하지 않은 방송 조작 토큰입니다.");
+    return this.updateControlState(user.id, dto);
   }
 
   /** 팀 요약 공통 형태 */
@@ -132,7 +281,7 @@ export class BroadcastService {
 
   async getSnapshot(
     token: string,
-    scene: BroadcastScene = "room",
+    scene: BroadcastScene = "control",
     matchId?: string,
   ) {
     // 토큰 → 스트리머(유저). 무효한 토큰만 에러; 활성 방이 없는 건 정상(대기 상태).
@@ -143,6 +292,9 @@ export class BroadcastService {
             id: true,
             username: true,
             broadcastLiveRoomId: true,
+            broadcastScene: true,
+            broadcastLowerThirdVisible: true,
+            broadcastAnnouncement: true,
             clanMemberships: {
               take: 1,
               select: {
@@ -163,6 +315,9 @@ export class BroadcastService {
     if (!streamer)
       throw new NotFoundException("유효하지 않은 방송 링크입니다.");
 
+    const control = this.controlState(streamer);
+    const effectiveScene =
+      scene === "control" ? this.resolveControlledScene(control.scene) : scene;
     const streamerTheme = this.clanTheme(
       streamer.clanMemberships?.[0]?.clan ?? null,
     );
@@ -181,6 +336,7 @@ export class BroadcastService {
         theme: streamerTheme,
         streamer: { name: streamer.username },
         teams: [],
+        broadcast: control,
         focusMatchId: null,
       };
     }
@@ -261,10 +417,11 @@ export class BroadcastService {
       theme: this.clanTheme(clan),
       teams: (room.teams ?? []).map((t: any) => this.teamSummary(t)),
       focusMatchId: room.broadcastFocusMatchId ?? null,
-      scene,
+      broadcast: control,
+      scene: effectiveScene,
     };
 
-    if (scene === "match") {
+    if (effectiveScene === "match" || effectiveScene === "result") {
       // 우선순위: URL matchId → 방 focus → 진행 중 경기 → null
       const resolvedId =
         matchId ||
@@ -290,7 +447,7 @@ export class BroadcastService {
       return { ...common, match: this.matchDetail(match, teamById) };
     }
 
-    if (scene === "bracket" || scene === "result") {
+    if (effectiveScene === "bracket") {
       const matches = await this.prisma.match.findMany({
         where: { roomId },
         orderBy: [{ round: "asc" }, { matchNumber: "asc" }],
@@ -315,6 +472,14 @@ export class BroadcastService {
 
     // scene === "room" | "break": 공통(팀/참가자/상태)만으로 대기·경매·전환 렌더 가능
     return common;
+  }
+
+  private resolveControlledScene(scene: BroadcastControlScene): BroadcastScene {
+    if (scene === "bracket" || scene === "match" || scene === "result") {
+      return scene;
+    }
+    if (scene === "break") return "break";
+    return "room";
   }
 
   /** 진행 중(IN_PROGRESS) 경기 중 첫 번째 id. */

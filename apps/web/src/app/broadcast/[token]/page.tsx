@@ -91,7 +91,12 @@ function sceneKeyOf({
   matchStatus?: string;
 }) {
   if (idle) return "idle";
+  if (scene === "idle" || scene === "break") return "idle";
   if (scene === "bracket") return "bracket";
+  if (scene === "auction") return "auction";
+  if (scene === "role-selection") return "role-selection";
+  if (scene === "result") return "result";
+  if (scene === "room") return "waiting";
   if (scene === "match") {
     return matchStatus === "COMPLETED" ? "result" : "match";
   }
@@ -113,7 +118,7 @@ export default function BroadcastPage() {
   const queryClient = useQueryClient();
 
   const token = params.token as string;
-  const scene = (search?.get("scene") ?? "room") as string;
+  const scene = (search?.get("scene") ?? "control") as string;
   const bg = (search?.get("bg") === "opaque" ? "opaque" : "transparent") as
     | "opaque"
     | "transparent";
@@ -136,11 +141,15 @@ export default function BroadcastPage() {
   const roomId = snapshot?.room?.id as string | undefined;
   const status = snapshot?.room?.status;
   const teamMode = snapshot?.room?.teamMode;
+  const controlledScene =
+    scene === "control" ? snapshot?.broadcast?.scene ?? "auto" : scene;
   const isAuctionRoom =
-    status === "AUCTION" || (status === "DRAFT" && teamMode === "AUCTION");
+    controlledScene === "auction" ||
+    (controlledScene === "auto" &&
+      (status === "AUCTION" || (status === "DRAFT" && teamMode === "AUCTION")));
   const broadcastSceneKey = sceneKeyOf({
     idle: snapshot?.idle,
-    scene,
+    scene: controlledScene,
     status,
     teamMode,
     isAuctionRoom,
@@ -164,6 +173,7 @@ export default function BroadcastPage() {
     socket.on("bracket-generated", refetch);
     socket.on("bracket-updated", refetch);
     socket.on("broadcast-focus-updated", refetch);
+    socket.on("broadcast-control-updated", refetch);
 
     return () => {
       socket.off("connect", subscribe);
@@ -186,29 +196,50 @@ export default function BroadcastPage() {
     return <div className="fixed inset-0 bg-transparent" />;
   }
 
-  const sceneNode = snapshot.idle ? (
+  const sceneNode = snapshot.idle || controlledScene === "idle" || controlledScene === "break" ? (
     <IdleScene snapshot={snapshot} />
-  ) : scene === "bracket" ? (
+  ) : controlledScene === "bracket" ? (
     <BracketScene snapshot={snapshot} />
-  ) : scene === "match" ? (
+  ) : controlledScene === "match" || controlledScene === "result" ? (
     <MatchScene snapshot={snapshot} />
   ) : isAuctionRoom && token && roomId ? (
     // 경매 단계는 정적 스냅샷 대신 기존 경매 화면(AuctionBoard)을 라이브로 중계
     <BroadcastAuctionLive token={token} roomId={roomId} />
-  ) : broadcastSceneKey === "role-selection" ? (
+  ) : controlledScene === "role-selection" || broadcastSceneKey === "role-selection" ? (
     <RoleSelectionScene snapshot={snapshot} />
   ) : (
     <RoomScene snapshot={snapshot} />
   );
+
+  const persistent =
+    snapshot?.broadcast?.lowerThirdVisible === false || controlledScene === "match"
+      ? null
+      : (
+          <>
+            <LowerThird snapshot={snapshot} />
+            <BroadcastAnnouncement text={snapshot?.broadcast?.announcement} />
+          </>
+        );
 
   return (
     <BroadcastShell
       bg={bg}
       theme={snapshot.theme}
       scene={sceneNode}
-      persistent={scene === "match" ? null : <LowerThird snapshot={snapshot} />}
+      persistent={persistent}
       transitionKey={broadcastSceneKey}
       transition={transition}
     />
+  );
+}
+
+function BroadcastAnnouncement({ text }: { text?: string | null }) {
+  if (!text) return null;
+  return (
+    <div className="pointer-events-none absolute left-24 right-24 top-24 flex justify-center">
+      <div className="max-w-[1280px] border-y border-white/18 bg-black/72 px-8 py-4 text-center text-2xl font-black text-white shadow-[0_20px_80px_rgba(0,0,0,0.42)]">
+        {text}
+      </div>
+    </div>
   );
 }
