@@ -1,4 +1,27 @@
 /** @ts-check */
+
+// XSS/서드파티 스크립트 리스크 완화용 CSP.
+// 우선 Report-Only로 시작 — 실제 차단은 하지 않고 위반만 콘솔/리포트로 수집해
+// 광고(AdSense)·분석(GA)·폰트·소켓 등 누락 도메인을 파악한 뒤 강제(enforce) 전환한다.
+const cspReportOnly = [
+  "default-src 'self'",
+  // Next.js 인라인 스크립트 + AdSense/GA 로더 (초기엔 unsafe-inline/eval 허용, 이후 nonce화 검토)
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://pagead2.googlesyndication.com https://*.googlesyndication.com https://googleads.g.doubleclick.net https://adservice.google.com https://www.googletagmanager.com https://www.google-analytics.com https://*.google.com",
+  // 폰트 CDN(jsdelivr)·구글 폰트 + Tailwind/런타임 인라인 스타일
+  "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com",
+  "font-src 'self' data: https://cdn.jsdelivr.net https://fonts.gstatic.com",
+  // 이미지: 업로드/디스코드/ddragon/광고 픽셀 등 다양 → https 전반 허용
+  "img-src 'self' data: blob: https:",
+  // API REST + Socket.IO(ws/wss) + GA/AdSense 비콘
+  "connect-src 'self' ws: wss: https://www.google-analytics.com https://*.google-analytics.com https://region1.google-analytics.com https://pagead2.googlesyndication.com https://*.googlesyndication.com https://*.google.com",
+  // AdSense iframe
+  "frame-src https://googleads.g.doubleclick.net https://tpc.googlesyndication.com https://*.googlesyndication.com https://*.google.com",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'none'",
+].join("; ");
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -32,6 +55,10 @@ const nextConfig = {
           {
             key: "Permissions-Policy",
             value: "camera=(), microphone=(), geolocation=()",
+          },
+          {
+            key: "Content-Security-Policy-Report-Only",
+            value: cspReportOnly,
           },
         ],
       },
