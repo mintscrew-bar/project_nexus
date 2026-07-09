@@ -36,11 +36,13 @@ export function ParticipantCard({
     >
       <div className="flex items-center gap-3 flex-1 min-w-0">
         <div className="relative w-10 h-10 rounded-full bg-bg-elevated overflow-hidden flex-shrink-0">
-          {p.avatar ? (
-            <Image src={p.avatar} alt={p.username} fill className="object-cover" unoptimized />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center"><Users className="h-5 w-5 text-text-tertiary" /></div>
-          )}
+          <Image
+            src={p.avatar || "/images/placeholders/non-avatar-128.png"}
+            alt={p.username}
+            fill
+            className="object-cover"
+            unoptimized
+          />
         </div>
         <div className="flex flex-col min-w-0 flex-1">
           <div className="flex items-center gap-1.5 mb-0.5">

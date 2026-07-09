@@ -2,7 +2,7 @@
 
 import { useRef } from "react";
 import Image from "next/image";
-import { Check, Crown, UserMinus, UserPlus, Users, Volume2, VolumeX, X } from "lucide-react";
+import { Check, Crown, UserMinus, UserPlus, Volume2, VolumeX, X } from "lucide-react";
 import { TierBadge } from "@/components/domain/TierBadge";
 import { PositionIcon } from "./icons";
 
@@ -31,11 +31,13 @@ export function CompactParticipantCard({
     >
       {/* Avatar */}
       <div className="relative w-7 h-7 rounded-full bg-bg-elevated overflow-hidden flex-shrink-0">
-        {p.avatar ? (
-          <Image src={p.avatar} alt={p.username} fill className="object-cover" unoptimized />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center"><Users className="h-3 w-3 text-text-tertiary" /></div>
-        )}
+        <Image
+          src={p.avatar || "/images/placeholders/non-avatar-64.png"}
+          alt={p.username}
+          fill
+          className="object-cover"
+          unoptimized
+        />
       </div>
 
       {/* Name + tier + position */}
