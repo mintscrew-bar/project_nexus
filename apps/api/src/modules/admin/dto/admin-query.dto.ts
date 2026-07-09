@@ -35,6 +35,24 @@ export class AdminPageQueryDto {
   @IsOptional()
   @IsEnum(UserRole, { message: "유효한 권한 값을 선택해주세요." })
   role?: UserRole;
+
+  @IsOptional()
+  @IsIn(["normal", "banned", "restricted", "reported", "streamer", "no-riot"], {
+    message: "statusFilter가 유효하지 않습니다.",
+  })
+  statusFilter?:
+    | "normal"
+    | "banned"
+    | "restricted"
+    | "reported"
+    | "streamer"
+    | "no-riot";
+
+  @IsOptional()
+  @IsIn(["online", "offline", "away"], {
+    message: "presence가 유효하지 않습니다.",
+  })
+  presence?: "online" | "offline" | "away";
 }
 
 // 신고 목록 조회

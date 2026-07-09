@@ -7,13 +7,18 @@ import {
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../prisma/prisma.service";
-import { UserRole, AdminAction, Prisma } from "@nexus/database";
+import { UserRole, UserStatus, AdminAction, Prisma } from "@nexus/database";
 import { DiscordBotService } from "../discord/discord-bot.service";
 import { DiscordAdminAlertService } from "../discord/discord-admin-alert.service";
 import { DiscordVoiceService } from "../discord/discord-voice.service";
 import { RoomService } from "../room/room.service";
 
 const MAX_LIMIT = 100;
+const PRESENCE_STATUS_MAP = {
+  online: UserStatus.ONLINE,
+  offline: UserStatus.OFFLINE,
+  away: UserStatus.AWAY,
+} as const;
 
 function clampLimit(limit: number): number {
   return Math.min(Math.max(1, limit), MAX_LIMIT);
@@ -343,6 +348,14 @@ export class AdminService {
     search?: string;
     kind?: "users" | "bots" | "all";
     role?: UserRole;
+    statusFilter?:
+      | "normal"
+      | "banned"
+      | "restricted"
+      | "reported"
+      | "streamer"
+      | "no-riot";
+    presence?: "online" | "offline" | "away";
   }) {
     const { page, search } = params;
     const limit = clampLimit(params.limit);
@@ -360,6 +373,31 @@ export class AdminService {
 
     if (params.role) {
       filters.push({ role: params.role });
+    }
+
+    if (params.presence) {
+      filters.push({ status: PRESENCE_STATUS_MAP[params.presence] });
+    }
+
+    switch (params.statusFilter) {
+      case "normal":
+        filters.push({ isBanned: false, isRestricted: false });
+        break;
+      case "banned":
+        filters.push({ isBanned: true });
+        break;
+      case "restricted":
+        filters.push({ isRestricted: true });
+        break;
+      case "reported":
+        filters.push({ reportsReceived: { some: {} } });
+        break;
+      case "streamer":
+        filters.push({ streamerProfiles: { some: { isActive: true } } });
+        break;
+      case "no-riot":
+        filters.push({ riotAccounts: { none: {} } });
+        break;
     }
 
     if (search) {
@@ -383,6 +421,8 @@ export class AdminService {
           email: true,
           avatar: true,
           role: true,
+          status: true,
+          lastSeenAt: true,
           reputation: true,
           isRestricted: true,
           restrictedUntil: true,

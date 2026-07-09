@@ -2116,6 +2116,8 @@ export const adminApi = {
     search?: string;
     kind?: "users" | "bots" | "all";
     role?: "USER" | "MODERATOR" | "ADMIN";
+    statusFilter?: "normal" | "banned" | "restricted" | "reported" | "streamer" | "no-riot";
+    presence?: "online" | "offline" | "away";
   }) => {
     const response = await apiClient.get("/admin/users", { params });
     return response.data;

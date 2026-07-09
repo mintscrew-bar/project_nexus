@@ -112,6 +112,8 @@ export class AdminController {
       search: query.search,
       kind: query.kind,
       role: query.role,
+      statusFilter: query.statusFilter,
+      presence: query.presence,
     });
   }
 
