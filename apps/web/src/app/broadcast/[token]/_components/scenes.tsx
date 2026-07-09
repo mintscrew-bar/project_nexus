@@ -584,17 +584,13 @@ function RoleSelectionTeam({ team, accent }: { team: any; accent: string }) {
           return (
             <div key={member.id ?? member.userId ?? member.username} className="grid gap-1.5">
               <div className="flex items-center gap-3 border bg-white/[0.035] px-3 py-2.5 border-white/8">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-sm font-black text-white">
-                  {member.avatar ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={member.avatar}
-                      alt=""
-                      className="h-8 w-8 rounded-full object-cover"
-                    />
-                  ) : (
-                    member.username?.[0] ?? "?"
-                  )}
+                <div className="h-8 w-8 shrink-0 overflow-hidden rounded-full bg-white/10">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={member.avatar || "/images/placeholders/non-avatar-64.png"}
+                    alt=""
+                    className="h-8 w-8 rounded-full object-cover"
+                  />
                 </div>
                 <p className="min-w-0 flex-1 truncate text-base font-black text-white">
                   {member.username}
