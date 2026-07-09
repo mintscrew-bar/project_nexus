@@ -315,9 +315,19 @@ export class MatchService {
       },
     });
 
+    await this.prisma.room.update({
+      where: { id: match.room.id },
+      data: { broadcastFocusMatchId: matchId },
+    });
+
     this.logger.log(`Match ${matchId} started by host ${hostId}`);
 
-    return { message: "Match started", tournamentCode: match.tournamentCode };
+    return {
+      message: "Match started",
+      tournamentCode: match.tournamentCode,
+      matchId,
+      roomId: match.room.id,
+    };
   }
 
   async reportMatchResult(hostId: string, matchId: string, winnerId: string) {
@@ -401,6 +411,11 @@ export class MatchService {
     if (!roomId) {
       throw new BadRequestException("Internal match required for reporting");
     }
+
+    await this.prisma.room.update({
+      where: { id: roomId },
+      data: { broadcastFocusMatchId: matchId },
+    });
 
     // Advance winner to next round (delegated to MatchAdvancementService)
     let bracketAdvanced = false;

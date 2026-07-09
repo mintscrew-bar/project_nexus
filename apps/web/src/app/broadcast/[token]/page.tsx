@@ -172,6 +172,8 @@ export default function BroadcastPage() {
     socket.on("match-result", refetch);
     socket.on("bracket-generated", refetch);
     socket.on("bracket-updated", refetch);
+    socket.on("bracket-complete", refetch);
+    socket.on("tournament-completed", refetch);
     socket.on("broadcast-focus-updated", refetch);
     socket.on("broadcast-control-updated", refetch);
 

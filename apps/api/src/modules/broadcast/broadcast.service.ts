@@ -19,6 +19,10 @@ export type BroadcastScene =
   | "result"
   | "break";
 
+const RESULT_SCENE_MS = 12_000;
+const BRACKET_SCENE_AFTER_RESULT_MS = 45_000;
+const BRACKET_SCENE_AFTER_MATCH_START_MS = 8_000;
+
 /**
  * 방송 오버레이 서비스.
  * - 스트리머당 단일 read-only 토큰 발급/관리(hash 저장).
@@ -333,8 +337,6 @@ export class BroadcastService {
       throw new NotFoundException("유효하지 않은 방송 링크입니다.");
 
     const control = this.controlState(streamer);
-    const effectiveScene =
-      scene === "control" ? this.resolveControlledScene(control.scene) : scene;
     const streamerTheme = this.clanTheme(
       streamer.clanMemberships?.[0]?.clan ?? null,
     );
@@ -348,7 +350,7 @@ export class BroadcastService {
     if (!roomId) {
       return {
         idle: true,
-        scene,
+        scene: scene === "control" ? "idle" : scene,
         room: null,
         theme: streamerTheme,
         streamer: { name: streamer.username },
@@ -434,6 +436,13 @@ export class BroadcastService {
 
     const clan = room.host?.clanMemberships?.[0]?.clan ?? null;
     const teamById = new Map((room.teams ?? []).map((t: any) => [t.id, t]));
+    const effectiveScene =
+      scene === "control"
+        ? await this.resolveControlledScene(control.scene, room.id, {
+            status: room.status,
+            teamMode: room.teamMode,
+          })
+        : scene;
 
     const common = {
       room: {
@@ -464,7 +473,9 @@ export class BroadcastService {
       const resolvedId =
         matchId ||
         room.broadcastFocusMatchId ||
-        (await this.firstLiveMatchId(roomId));
+        (effectiveScene === "result"
+          ? await this.latestCompletedMatchId(roomId)
+          : await this.firstLiveMatchId(roomId));
       const match = resolvedId
         ? await this.prisma.match.findFirst({
             where: { id: resolvedId, roomId },
@@ -512,21 +523,85 @@ export class BroadcastService {
     return common;
   }
 
-  private resolveControlledScene(scene: BroadcastControlScene): BroadcastScene {
+  private async resolveControlledScene(
+    scene: BroadcastControlScene,
+    roomId: string,
+    room: { status?: string | null; teamMode?: string | null },
+  ): Promise<BroadcastScene> {
     if (scene === "bracket" || scene === "match" || scene === "result") {
       return scene;
     }
     if (scene === "break") return "break";
+    if (scene === "idle") return "break";
+    if (scene !== "auto") return "room";
+
+    if (room.status === "COMPLETED") return "result";
+
+    const [latestCompleted, liveMatch] = await Promise.all([
+      this.latestCompletedMatch(roomId),
+      this.firstLiveMatch(roomId),
+    ]);
+    if (latestCompleted?.completedAt) {
+      const elapsed = Date.now() - latestCompleted.completedAt.getTime();
+      if (elapsed <= RESULT_SCENE_MS) return "result";
+    }
+
+    if (liveMatch) {
+      if (
+        liveMatch.startedAt &&
+        Date.now() - liveMatch.startedAt.getTime() <=
+          BRACKET_SCENE_AFTER_MATCH_START_MS
+      ) {
+        return "bracket";
+      }
+      return "match";
+    }
+
+    if (
+      latestCompleted?.completedAt &&
+      Date.now() - latestCompleted.completedAt.getTime() <=
+        BRACKET_SCENE_AFTER_RESULT_MS
+    ) {
+      return "bracket";
+    }
+
+    if (await this.hasBracket(roomId)) return "bracket";
+
     return "room";
   }
 
   /** 진행 중(IN_PROGRESS) 경기 중 첫 번째 id. */
   private async firstLiveMatchId(roomId: string): Promise<string | null> {
-    const m = await this.prisma.match.findFirst({
+    const m = await this.firstLiveMatch(roomId);
+    return m?.id ?? null;
+  }
+
+  private async firstLiveMatch(roomId: string) {
+    return this.prisma.match.findFirst({
       where: { roomId, status: "IN_PROGRESS" },
       orderBy: [{ round: "asc" }, { matchNumber: "asc" }],
+      select: { id: true, startedAt: true },
+    });
+  }
+
+  private async latestCompletedMatch(roomId: string) {
+    return this.prisma.match.findFirst({
+      where: { roomId, status: "COMPLETED", completedAt: { not: null } },
+      orderBy: { completedAt: "desc" },
+      select: { id: true, completedAt: true },
+    });
+  }
+
+  private async latestCompletedMatchId(roomId: string): Promise<string | null> {
+    const match = await this.latestCompletedMatch(roomId);
+    return match?.id ?? null;
+  }
+
+  private async hasBracket(roomId: string): Promise<boolean> {
+    const match = await this.prisma.match.findFirst({
+      where: { roomId },
       select: { id: true },
     });
-    return m?.id ?? null;
+    return !!match;
   }
 }

@@ -107,6 +107,12 @@ export class MatchController {
     await this.matchGateway.emitMatchStarted(matchId, {
       tournamentCode: result.tournamentCode ?? undefined,
     });
+    if (result.roomId) {
+      this.matchGateway.emitBroadcastFocus(result.roomId, matchId);
+      this.matchGateway.emitBroadcastControl(result.roomId, {
+        focusMatchId: matchId,
+      });
+    }
 
     return result;
   }
@@ -126,6 +132,11 @@ export class MatchController {
 
     // Emit match result to all clients
     this.matchGateway.emitMatchResult(matchId, { winnerId: body.winnerId });
+    if (result.roomId) {
+      this.matchGateway.emitBroadcastControl(result.roomId, {
+        focusMatchId: matchId,
+      });
+    }
 
     // If bracket advanced (e.g. semi-final → finals), emit updated bracket
     if (result.bracketAdvanced && result.roomId) {

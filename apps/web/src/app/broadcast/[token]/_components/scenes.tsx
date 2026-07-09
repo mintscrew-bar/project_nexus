@@ -521,42 +521,91 @@ function roleKeyOf(member: any) {
   return role || null;
 }
 
-function RoleChoice({
+function filledRoleCount(members: any[]) {
+  const roles = new Set<string>();
+  for (const member of members) {
+    const role = roleKeyOf(member);
+    if (role && ROLE_ORDER.includes(role)) roles.add(role);
+  }
+  return roles.size;
+}
+
+function RoleSlot({
   role,
-  selected,
-  taken,
+  member,
+  compact = false,
 }: {
   role: string;
-  selected: boolean;
-  taken: boolean;
+  member?: any;
+  compact?: boolean;
 }) {
   return (
     <div
-      className={`flex h-12 flex-col items-center justify-center gap-1 border text-[10px] font-black uppercase ${
-        selected
-          ? "border-violet-300 bg-violet-300/14 text-violet-100"
-          : taken
-          ? "border-white/5 bg-white/[0.025] text-white/22"
-          : "border-white/10 bg-white/[0.055] text-white/68"
-      }`}
+      className={`grid min-w-0 ${compact ? "grid-cols-[44px_minmax(0,1fr)]" : "grid-cols-[52px_minmax(0,1fr)]"} items-center border bg-white/[0.035] ${
+        compact ? "gap-2 px-2.5 py-2" : "gap-3 px-3.5 py-3"
+      } border-white/8`}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={ROLE_ICON[role]}
-        alt=""
-        width={18}
-        height={18}
-        className={`brightness-0 invert ${selected ? "opacity-95" : "opacity-45"}`}
-      />
-      <span>{ROLE_NAMES[role]}</span>
+      <div className="flex items-center gap-2">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={ROLE_ICON[role]}
+          alt=""
+          width={compact ? 16 : 20}
+          height={compact ? 16 : 20}
+          className={`brightness-0 invert ${member ? "opacity-90" : "opacity-28"}`}
+        />
+        <span className={`font-black uppercase text-white/62 ${compact ? "text-[10px]" : "text-xs"}`}>
+          {ROLE_NAMES[role]}
+        </span>
+      </div>
+
+      {member ? (
+        <div className="flex min-w-0 items-center gap-2.5">
+          <div className={`${compact ? "h-7 w-7" : "h-9 w-9"} shrink-0 overflow-hidden rounded-full bg-white/10`}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={member.avatar || "/images/placeholders/non-avatar-64.png"}
+              alt=""
+              className={`${compact ? "h-7 w-7" : "h-9 w-9"} rounded-full object-cover`}
+            />
+          </div>
+          <p className={`min-w-0 flex-1 truncate font-black text-white ${compact ? "text-sm" : "text-base"}`}>
+            {member.username}
+          </p>
+        </div>
+      ) : (
+        <p className={`truncate font-black uppercase tracking-[0.12em] text-white/24 ${compact ? "text-[10px]" : "text-xs"}`}>
+          Waiting
+        </p>
+      )}
     </div>
   );
 }
 
-function RoleSelectionTeam({ team, accent }: { team: any; accent: string }) {
+function RoleSelectionTeam({
+  team,
+  accent,
+  compact = false,
+}: {
+  team: any;
+  accent: string;
+  compact?: boolean;
+}) {
   const members: any[] = team?.members ?? [];
   const color = team?.color ?? accent;
-  const takenRoles = members.map(roleKeyOf).filter(Boolean);
+  const memberByRole = new Map<string, any>();
+  const waitingMembers: any[] = [];
+
+  for (const member of members) {
+    const role = roleKeyOf(member);
+    if (role && ROLE_ORDER.includes(role) && !memberByRole.has(role)) {
+      memberByRole.set(role, member);
+    } else {
+      waitingMembers.push(member);
+    }
+  }
+
+  const filledRoles = ROLE_ORDER.filter((role) => memberByRole.has(role));
 
   return (
     <section
@@ -564,7 +613,7 @@ function RoleSelectionTeam({ team, accent }: { team: any; accent: string }) {
       style={{ borderColor: `${color}55` }}
     >
       <div
-        className="flex items-center justify-between border-b border-white/10 px-5 py-3"
+        className={`flex items-center justify-between border-b border-white/10 px-5 ${compact ? "py-2" : "py-3"}`}
         style={{ background: `${color}12` }}
       >
         <div className="flex min-w-0 items-center gap-3">
@@ -574,50 +623,32 @@ function RoleSelectionTeam({ team, accent }: { team: any; accent: string }) {
           </p>
         </div>
         <span className="text-xs font-black text-white/42">
-          {takenRoles.length}/{members.length || 5} 선택 완료
+          {filledRoles.length}/5 선택 완료
         </span>
       </div>
 
-      <div className="grid gap-3 p-4">
-        {members.slice(0, 5).map((member) => {
-          const memberRole = roleKeyOf(member);
-          return (
-            <div key={member.id ?? member.userId ?? member.username} className="grid gap-1.5">
-              <div className="flex items-center gap-3 border bg-white/[0.035] px-3 py-2.5 border-white/8">
-                <div className="h-8 w-8 shrink-0 overflow-hidden rounded-full bg-white/10">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={member.avatar || "/images/placeholders/non-avatar-64.png"}
-                    alt=""
-                    className="h-8 w-8 rounded-full object-cover"
-                  />
-                </div>
-                <p className="min-w-0 flex-1 truncate text-base font-black text-white">
-                  {member.username}
-                </p>
-                {memberRole ? (
-                  <span className="border border-emerald-300/30 bg-emerald-300/10 px-2 py-1 text-xs font-black text-emerald-200">
-                    {ROLE_NAMES[memberRole]} 선택됨
-                  </span>
-                ) : (
-                  <span className="border border-white/10 bg-black/24 px-2 py-1 text-xs font-black text-white/34">
-                    미선택
-                  </span>
-                )}
-              </div>
-              <div className="grid grid-cols-5 gap-1.5">
-                {ROLE_ORDER.map((role) => (
-                  <RoleChoice
-                    key={role}
-                    role={role}
-                    selected={memberRole === role}
-                    taken={memberRole !== role && takenRoles.includes(role)}
-                  />
-                ))}
-              </div>
-            </div>
-          );
-        })}
+      <div className={`grid ${compact ? "gap-2 p-3" : "gap-3 p-4"}`}>
+        {ROLE_ORDER.map((role) => (
+          <RoleSlot
+            key={role}
+            role={role}
+            member={memberByRole.get(role)}
+            compact={compact}
+          />
+        ))}
+
+        {waitingMembers.length > 0 && (
+          <div className="flex min-w-0 flex-wrap gap-1.5 border-t border-white/10 pt-2">
+            {waitingMembers.map((member) => (
+              <span
+                key={member.id ?? member.userId ?? member.username}
+                className="max-w-[150px] truncate border border-white/10 bg-black/20 px-2 py-1 text-[10px] font-black text-white/36"
+              >
+                {member.username}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );
@@ -627,22 +658,19 @@ export function RoleSelectionScene({ snapshot }: { snapshot: any }) {
   const accent = accentOf(snapshot);
   const teams: any[] = snapshot?.teams ?? [];
   const assigned = teams.reduce(
-    (sum, team) =>
-      sum +
-      (team.members ?? []).filter((member: any) => Boolean(member.assignedRole))
-        .length,
+    (sum, team) => sum + filledRoleCount(team.members ?? []),
     0,
   );
-  const total = teams.reduce(
-    (sum, team) => sum + Math.max((team.members ?? []).length, 5),
-    0,
-  );
+  const total = teams.length * ROLE_ORDER.length;
   const progress = Math.max(0, Math.min(100, (assigned / Math.max(total, 1)) * 100));
+  const teamColumns = Math.min(Math.max(teams.length, 1), 4);
+  const compactTeams =
+    teams.length > 2 || teams.some((team) => (team.members ?? []).length >= 5);
 
   return (
     <StageFrame accent={accent}>
-      <div className="flex h-full w-full flex-col px-24 py-24">
-        <div className="mb-8 flex items-end justify-between">
+      <div className={`flex h-full w-full flex-col px-24 ${compactTeams ? "py-14" : "py-24"}`}>
+        <div className={`${compactTeams ? "mb-5" : "mb-8"} flex items-end justify-between`}>
           <div>
             <HudLabel color={accent}>ROLE SELECTION</HudLabel>
             <h1 className="mt-2 text-[68px] font-black uppercase leading-none text-white">
@@ -669,9 +697,9 @@ export function RoleSelectionScene({ snapshot }: { snapshot: any }) {
         </div>
 
         <div
-          className="grid min-h-0 flex-1 content-center gap-5"
+          className={`grid min-h-0 flex-1 content-center ${compactTeams ? "gap-3" : "gap-5"}`}
           style={{
-            gridTemplateColumns: `repeat(${Math.min(Math.max(teams.length, 1), 2)}, minmax(0, 1fr))`,
+            gridTemplateColumns: `repeat(${teamColumns}, minmax(0, 1fr))`,
           }}
         >
           {teams.map((team) => (
@@ -679,6 +707,7 @@ export function RoleSelectionScene({ snapshot }: { snapshot: any }) {
               key={team.id ?? team.name}
               team={team}
               accent={accent}
+              compact={compactTeams}
             />
           ))}
         </div>
@@ -1364,14 +1393,7 @@ export function BracketScene({ snapshot }: { snapshot: any }) {
   const matches: any[] = snapshot?.matches ?? [];
   const focusMatchId = snapshot?.focusMatchId ?? null;
   const isDoubleElim = matches.some(
-    (match) => {
-      const section = String(match.bracketSection ?? match.bracketRound ?? "");
-      return (
-        match.bracketType === "DOUBLE_ELIMINATION" ||
-        section.startsWith("LB") ||
-        section === "GF"
-      );
-    },
+    (match) => match.bracketType === "DOUBLE_ELIMINATION",
   );
 
   return (
