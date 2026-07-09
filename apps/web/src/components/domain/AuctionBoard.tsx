@@ -344,7 +344,9 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
             <div className="flex items-center gap-3">
               <div className={cn(
                 "text-xl md:text-2xl font-bold flex-shrink-0",
-                timeLeft <= 5 ? "text-accent-danger animate-pulse" : "text-text-primary",
+                timeLeft <= 5
+                  ? "text-accent-danger animate-pulse [text-shadow:0_0_14px_rgba(239,68,68,0.8)]"
+                  : "text-text-primary",
               )}>
                 {timeLeft}초
               </div>
@@ -425,9 +427,9 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
                 <div className="flex flex-col items-center flex-shrink-0">
                   <div
                     className={cn(
-                      "text-5xl font-bold tabular-nums leading-none",
+                      "text-5xl font-bold tabular-nums leading-none transition-[text-shadow] duration-200",
                       timeLeft <= 5
-                        ? "text-accent-danger animate-pulse"
+                        ? "text-accent-danger animate-pulse [text-shadow:0_0_22px_rgba(239,68,68,0.8),0_0_8px_rgba(239,68,68,0.6)]"
                         : "text-text-primary",
                     )}
                   >

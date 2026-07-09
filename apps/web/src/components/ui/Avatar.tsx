@@ -4,7 +4,14 @@ import { cn } from '@/lib/utils';
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
 
-const DEFAULT_AVATAR_SRC = '/images/N-avatar.png';
+// 프로필 없는 사용자 기본 이미지 — 방송용과 동일한 무채색 non-avatar.
+// 렌더 크기에 맞는 걸 써서 다운스케일 뭉개짐을 줄인다.
+const PLACEHOLDER_BY_SIZE: Record<'sm' | 'md' | 'lg' | 'xl', string> = {
+  sm: '/images/placeholders/non-avatar-64.png',
+  md: '/images/placeholders/non-avatar-64.png',
+  lg: '/images/placeholders/non-avatar-128.png',
+  xl: '/images/placeholders/non-avatar-128.png',
+};
 
 interface AvatarProps {
   src?: string | null;
@@ -74,7 +81,7 @@ export function Avatar({
           />
         ) : (
           <Image
-            src={DEFAULT_AVATAR_SRC}
+            src={PLACEHOLDER_BY_SIZE[size]}
             alt={alt}
             fill
             sizes={
