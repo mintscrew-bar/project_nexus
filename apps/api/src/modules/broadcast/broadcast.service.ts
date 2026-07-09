@@ -172,13 +172,14 @@ export class BroadcastService {
     if (!roomId) return null;
     const room = await this.prisma.room.findUnique({
       where: { id: roomId },
-      select: { id: true, name: true, status: true },
+      select: { id: true, name: true, status: true, broadcastFocusMatchId: true },
     });
     return room
       ? {
           id: room.id,
           name: room.name,
           status: room.status,
+          focusMatchId: room.broadcastFocusMatchId ?? null,
         }
       : null;
   }
@@ -200,7 +201,12 @@ export class BroadcastService {
       user.broadcastLiveRoomId,
     );
     const room = await this.controlRoomSummary(roomId);
-    return { ...this.controlState(user), roomId, room };
+    return {
+      ...this.controlState(user),
+      roomId,
+      room,
+      focusMatchId: room?.focusMatchId ?? null,
+    };
   }
 
   async updateControlState(userId: string, dto: UpdateBroadcastControlDto) {
@@ -229,7 +235,12 @@ export class BroadcastService {
       user.broadcastLiveRoomId,
     );
     const room = await this.controlRoomSummary(roomId);
-    return { ...this.controlState(user), roomId, room };
+    return {
+      ...this.controlState(user),
+      roomId,
+      room,
+      focusMatchId: room?.focusMatchId ?? null,
+    };
   }
 
   async updateControlStateByToken(

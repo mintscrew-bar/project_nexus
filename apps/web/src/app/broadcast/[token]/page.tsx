@@ -141,15 +141,25 @@ export default function BroadcastPage() {
   const roomId = snapshot?.room?.id as string | undefined;
   const status = snapshot?.room?.status;
   const teamMode = snapshot?.room?.teamMode;
-  const controlledScene =
+  const controlScene =
     scene === "control" ? snapshot?.broadcast?.scene ?? "auto" : scene;
+  const snapshotScene = (snapshot?.scene ?? controlScene) as string;
   const isAuctionRoom =
-    controlledScene === "auction" ||
-    (controlledScene === "auto" &&
+    controlScene === "auction" ||
+    (controlScene === "auto" &&
       (status === "AUCTION" || (status === "DRAFT" && teamMode === "AUCTION")));
+  const isRoleSelectionRoom =
+    controlScene === "role-selection" ||
+    (controlScene === "auto" &&
+      (status === "ROLE_SELECTION" || status === "ROLE_SELECT"));
+  const displayScene = isAuctionRoom
+    ? "auction"
+    : isRoleSelectionRoom
+    ? "role-selection"
+    : snapshotScene;
   const broadcastSceneKey = sceneKeyOf({
     idle: snapshot?.idle,
-    scene: controlledScene,
+    scene: displayScene,
     status,
     teamMode,
     isAuctionRoom,
@@ -198,23 +208,23 @@ export default function BroadcastPage() {
     return <div className="fixed inset-0 bg-transparent" />;
   }
 
-  const sceneNode = snapshot.idle || controlledScene === "idle" || controlledScene === "break" ? (
+  const sceneNode = snapshot.idle || displayScene === "idle" || displayScene === "break" ? (
     <IdleScene snapshot={snapshot} />
-  ) : controlledScene === "bracket" ? (
+  ) : displayScene === "bracket" ? (
     <BracketScene snapshot={snapshot} />
-  ) : controlledScene === "match" || controlledScene === "result" ? (
+  ) : displayScene === "match" || displayScene === "result" ? (
     <MatchScene snapshot={snapshot} />
   ) : isAuctionRoom && token && roomId ? (
     // 경매 단계는 정적 스냅샷 대신 기존 경매 화면(AuctionBoard)을 라이브로 중계
     <BroadcastAuctionLive token={token} roomId={roomId} />
-  ) : controlledScene === "role-selection" || broadcastSceneKey === "role-selection" ? (
+  ) : isRoleSelectionRoom || broadcastSceneKey === "role-selection" ? (
     <RoleSelectionScene snapshot={snapshot} />
   ) : (
     <RoomScene snapshot={snapshot} />
   );
 
   const persistent =
-    snapshot?.broadcast?.lowerThirdVisible === false || controlledScene === "match"
+    snapshot?.broadcast?.lowerThirdVisible === false || displayScene === "match"
       ? null
       : (
           <>

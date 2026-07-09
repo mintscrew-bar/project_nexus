@@ -709,6 +709,7 @@ export const broadcastApi = {
       announcement: string | null;
       roomId: string | null;
       room: BroadcastControlRoom | null;
+      focusMatchId: string | null;
     };
   },
   updateControl: async (body: Partial<BroadcastControlState>) => {
@@ -716,6 +717,7 @@ export const broadcastApi = {
     return response.data as BroadcastControlState & {
       roomId: string | null;
       room: BroadcastControlRoom | null;
+      focusMatchId: string | null;
     };
   },
   // 로비 방송 상태: 토큰 발급 여부 + 이 방 고정 송출 여부 (호스트)
@@ -760,6 +762,7 @@ export type BroadcastControlRoom = {
   id: string;
   name: string;
   status: string;
+  focusMatchId?: string | null;
 };
 
 // 방 관련 API

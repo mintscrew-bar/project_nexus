@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import {
   broadcastApi,
+  matchApi,
   type BroadcastControlRoom,
   type BroadcastControlScene,
   type BroadcastControlState,
@@ -90,6 +91,17 @@ const SCENES: Array<{
   },
 ];
 
+type ControlMatch = {
+  id: string;
+  round?: number | null;
+  matchNumber?: number | null;
+  bracketRound?: string | null;
+  status: "PENDING" | "IN_PROGRESS" | "COMPLETED" | string;
+  teamA?: { id: string; name: string } | null;
+  teamB?: { id: string; name: string } | null;
+  winnerId?: string | null;
+};
+
 function BroadcastControlLoading() {
   return (
     <main className="flex min-h-[60vh] items-center justify-center">
@@ -110,8 +122,10 @@ function BroadcastControlContent() {
     (BroadcastControlState & {
       roomId: string | null;
       room: BroadcastControlRoom | null;
+      focusMatchId: string | null;
     }) | null
   >(null);
+  const [matches, setMatches] = useState<ControlMatch[]>([]);
   const [tokenState, setTokenState] = useState<{
     exists: boolean;
     controlExists: boolean;
@@ -125,6 +139,7 @@ function BroadcastControlContent() {
     BroadcastControlState & {
       roomId: string | null;
       room: BroadcastControlRoom | null;
+      focusMatchId: string | null;
     }
   >(
     () => ({
@@ -137,6 +152,7 @@ function BroadcastControlContent() {
         name: "제1회 넥서스 내전 리그",
         status: "AUCTION",
       },
+      focusMatchId: "preview-match-1",
     }),
     [],
   );
@@ -148,15 +164,22 @@ function BroadcastControlContent() {
     [activeScene],
   );
 
-  const load = async (options?: { silent?: boolean }) => {
+  const load = async (options?: { silent?: boolean; includeToken?: boolean }) => {
     if (!options?.silent) setLoading(true);
     try {
+      const includeToken = options?.includeToken ?? !options?.silent;
       const [res, token] = await Promise.all([
         broadcastApi.getControl(),
-        broadcastApi.getToken(),
+        includeToken ? broadcastApi.getToken() : Promise.resolve(null),
       ]);
       setState(res);
-      setTokenState(token);
+      if (token) setTokenState(token);
+      if (res.roomId) {
+        const roomMatches = await matchApi.getBracket(res.roomId);
+        setMatches(roomMatches as ControlMatch[]);
+      } else {
+        setMatches([]);
+      }
       if (!announcementDirtyRef.current) {
         setAnnouncementDraft(res.announcement ?? "");
       }
@@ -172,6 +195,24 @@ function BroadcastControlContent() {
   useEffect(() => {
     if (previewMode) {
       setState(previewState);
+      setMatches([
+        {
+          id: "preview-match-1",
+          round: 1,
+          matchNumber: 1,
+          status: "IN_PROGRESS",
+          teamA: { id: "team-a", name: "Blue Team" },
+          teamB: { id: "team-b", name: "Red Team" },
+        },
+        {
+          id: "preview-match-2",
+          round: 1,
+          matchNumber: 2,
+          status: "PENDING",
+          teamA: { id: "team-c", name: "Team C" },
+          teamB: { id: "team-d", name: "Team D" },
+        },
+      ]);
       setAnnouncementDraft(previewState.announcement ?? "");
       return;
     }
@@ -217,6 +258,72 @@ function BroadcastControlContent() {
       setSaving(false);
     }
   };
+
+  const focusMatch = async (match: ControlMatch) => {
+    if (!displayState?.roomId) return;
+    const nextScene: BroadcastControlScene =
+      match.status === "COMPLETED" ? "result" : "match";
+    setSaving(true);
+    try {
+      if (previewMode) {
+        setState((prev) => ({
+          ...(prev ?? previewState),
+          scene: nextScene,
+          focusMatchId: match.id,
+        }));
+        return;
+      }
+      const [, res] = await Promise.all([
+        broadcastApi.setFocus(displayState.roomId, match.id),
+        broadcastApi.updateControl({ scene: nextScene }),
+      ]);
+      setState({ ...res, focusMatchId: match.id });
+    } catch {
+      addToast("중계 경기 변경에 실패했습니다.", "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const maxRound = useMemo(
+    () => Math.max(...matches.map((match) => Number(match.round ?? 0)), 0),
+    [matches],
+  );
+
+  const stageLabel = (match: ControlMatch) => {
+    const section = String(match.bracketRound ?? "");
+    if (section === "GF" || section.includes("FINAL")) return "결승";
+    if (section === "WB_F") return "승자조 결승";
+    if (section === "LB_F") return "패자조 결승";
+    if (section.startsWith("WB")) return "승자조";
+    if (section.startsWith("LB")) return "패자조";
+
+    const round = Number(match.round ?? 0);
+    if (!round || !maxRound) return "경기";
+    if (round === maxRound) return "결승";
+    if (round === maxRound - 1) return "4강";
+    if (round === maxRound - 2) return "8강";
+    if (round === maxRound - 3) return "16강";
+    return `${round}라운드`;
+  };
+
+  const matchLabel = (match: ControlMatch) => {
+    const left = match.teamA?.name ?? "TBD";
+    const right = match.teamB?.name ?? "TBD";
+    return `${left} vs ${right}`;
+  };
+
+  const matchRoundLabel = (match: ControlMatch) =>
+    match.matchNumber != null
+      ? `경기 ${match.matchNumber}`
+      : match.round != null
+      ? `${match.round}라운드`
+      : "토너먼트";
+
+  const focusedMatch = useMemo(
+    () => matches.find((match) => match.id === displayState?.focusMatchId) ?? null,
+    [matches, displayState?.focusMatchId],
+  );
 
   if (!previewMode && (authLoading || (isAuthenticated && loading))) {
     return (
@@ -366,6 +473,66 @@ function BroadcastControlContent() {
                 </button>
               );
             })}
+          </div>
+
+          <div className="mt-3 border-t border-bg-elevated pt-3">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <p className="text-xs font-bold text-text-secondary">중계 경기</p>
+              <span className="text-[11px] font-bold text-text-tertiary">
+                {matches.length} 경기
+              </span>
+            </div>
+            <div className="mb-2 rounded-lg border border-bg-elevated bg-bg-tertiary px-3 py-2">
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-text-tertiary">
+                현재 중계 중
+              </p>
+              {focusedMatch && (
+                <p className="mt-1 text-[11px] font-bold text-accent-primary">
+                  {stageLabel(focusedMatch)} · {matchRoundLabel(focusedMatch)} · {focusedMatch.status}
+                </p>
+              )}
+              <p className="mt-0.5 truncate text-xs font-black text-text-primary">
+                {focusedMatch ? matchLabel(focusedMatch) : "선택된 경기 없음"}
+              </p>
+            </div>
+            {displayState?.roomId && matches.length > 0 ? (
+              <div className="grid max-h-56 gap-2 overflow-y-auto pr-1">
+                {matches.map((match) => {
+                  const focused = displayState.focusMatchId === match.id;
+                  return (
+                    <div
+                      key={match.id}
+                      className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-lg border px-3 py-2 ${
+                        focused
+                          ? "border-accent-primary bg-accent-primary/10"
+                          : "border-bg-elevated bg-bg-tertiary"
+                      }`}
+                    >
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-bold uppercase text-text-tertiary">
+                          {stageLabel(match)} · {matchRoundLabel(match)} · {match.status}
+                        </p>
+                        <p className="mt-0.5 truncate text-xs font-black text-text-primary">
+                          {matchLabel(match)}
+                        </p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant={focused ? "secondary" : "primary"}
+                        onClick={() => focusMatch(match)}
+                        disabled={saving || focused}
+                      >
+                        {focused ? "현재 중계 중" : "경기 전환"}
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="rounded-lg border border-bg-elevated bg-bg-tertiary px-3 py-3 text-xs font-bold text-text-tertiary">
+                활성 방의 대진표가 생성되면 중계할 경기를 선택할 수 있습니다.
+              </div>
+            )}
           </div>
         </div>
 
