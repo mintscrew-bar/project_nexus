@@ -87,7 +87,7 @@ export class DiscordController {
 
   /**
    * Discord가 봇 설치 후 리다이렉트하는 콜백. guild_id와 state를 받아
-   * 해당 길드를 유저에게 PENDING으로 바인딩한 뒤 웹 설정 페이지로 보낸다.
+   * 해당 길드를 유저에게 바인딩(자동 승인=ACTIVE)한 뒤 웹 설정 페이지로 보낸다.
    * (브라우저 리다이렉트라 JWT 헤더 없음 — state 토큰으로 본인 확인)
    */
   @Get("guild-link/callback")
@@ -119,7 +119,7 @@ export class DiscordController {
         status: link.status,
       });
 
-      return res.redirect(`${appUrl}/settings?discord_guild=pending`);
+      return res.redirect(`${appUrl}/settings?discord_guild=active`);
     } catch (error: any) {
       this.logger.error(`디스코드 길드 연동 실패: ${error.message}`);
       return res.redirect(`${appUrl}/settings?discord_guild=error`);

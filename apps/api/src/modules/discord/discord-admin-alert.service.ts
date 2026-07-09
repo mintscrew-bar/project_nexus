@@ -96,8 +96,9 @@ export class DiscordAdminAlertService {
     status: string;
   }) {
     await this.send("APPROVAL", {
-      title: "Discord 봇 승인 대기",
-      message: "새 Discord 서버 연동 요청이 등록되었습니다.",
+      title: "Discord 서버 연동됨 (자동 승인)",
+      message:
+        "새 Discord 서버가 자동 승인되었습니다. 문제가 있으면 관리자 페이지에서 취소(비활성화)하세요.",
       fields: {
         "링크 ID": params.linkId,
         "길드 ID": params.guildId,
