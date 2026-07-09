@@ -57,8 +57,10 @@ export function Avatar({
     xl: 'h-4 w-4',
   };
 
+  // 바깥 래퍼도 rounded-full — className으로 넘어온 ring/border가 원형으로 그려지도록
+  // (없으면 링이 사각형으로 초상화를 감싼다)
   return (
-    <div className={cn('relative inline-flex', className)}>
+    <div className={cn('relative inline-flex rounded-full', className)}>
       <div
         className={cn(
           'relative rounded-full bg-bg-tertiary flex items-center justify-center font-medium text-text-primary overflow-hidden flex-shrink-0',
