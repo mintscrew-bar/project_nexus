@@ -526,23 +526,6 @@ export class RoomService {
       },
     );
 
-    // 명시적으로 호스트 Discord 서버를 선택한 방인데 봇이 그 서버에 없으면
-    // 방을 유지할 수 없다 → 방금 만든 방을 삭제하고 에러로 알린다.
-    if (resolvedDiscordGuildId && this.discordBotService?.verifyGuildPermissions) {
-      // 일시 오류(null)로 방을 지우면 안 되므로, 봇 부재가 "확실할 때"만 삭제한다.
-      const perms = await this.discordBotService
-        .verifyGuildPermissions(resolvedDiscordGuildId)
-        .catch(() => null);
-      if (perms && !perms.inGuild) {
-        await this.prisma.room
-          .delete({ where: { id: room.id } })
-          .catch(() => {});
-        throw new BadRequestException(
-          "DISCORD_BOT_NOT_IN_GUILD::봇이 선택한 Discord 서버에 없어 방을 만들 수 없습니다. 서버에 봇을 초대한 뒤 다시 시도해주세요.",
-        );
-      }
-    }
-
     // Discord 봇 연동: 팀별 음성채널 생성
     try {
       if (this.discordVoiceService) {

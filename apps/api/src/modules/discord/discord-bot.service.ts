@@ -302,16 +302,15 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * 봇이 외부 길드에서 추방/제거됨. 해당 링크를 DISABLED로 표시해
-   * 더 이상 그 길드에 채널을 만들지 않도록 한다.
+   * 봇이 외부 길드에서 추방/제거됨. 봇이 없는 연동은 삭제한다(재설치하면 새로 자동 승인).
+   * 단, 관리자가 취소(DISABLED)한 기록은 남겨 재설치해도 자동 재활성화되지 않게 한다.
    */
   private async handleGuildDelete(guild: { id: string }) {
     try {
-      await this.prisma.discordGuildLink.updateMany({
+      await this.prisma.discordGuildLink.deleteMany({
         where: { guildId: guild.id, status: { not: "DISABLED" } },
-        data: { status: "DISABLED" },
       });
-      console.log(`[DiscordBot] 길드 연동 해제(DISABLED): ${guild.id}`);
+      console.log(`[DiscordBot] 길드 연동 삭제(봇 추방): ${guild.id}`);
     } catch (err: any) {
       console.warn(`[DiscordBot] guildDelete 처리 실패: ${err?.message}`);
     }

@@ -1549,16 +1549,20 @@ export class AdminService {
         throw error;
       });
     if (!perms.inGuild) {
+      // 봇이 서버에 없는 연동은 유지할 이유가 없으므로 삭제한다.
+      await this.prisma.discordGuildLink
+        .delete({ where: { id: linkId } })
+        .catch(() => {});
       await this.adminAlerts.notifyDiscordGuildPermissionFailure({
         linkId,
         guildId: link.guildId,
         guildName: link.guildName,
         requesterId,
         requesterName: requester?.username,
-        reason: "봇이 해당 Discord 서버에 없습니다.",
+        reason: "봇이 해당 Discord 서버에 없어 연동을 삭제했습니다.",
       });
       throw new BadRequestException(
-        "봇이 해당 디스코드 서버에 없습니다. 서버에 봇을 먼저 초대해주세요.",
+        "봇이 해당 디스코드 서버에 없어 연동을 삭제했습니다. 서버에 봇을 다시 초대한 뒤 재설치해주세요.",
       );
     }
     if (!perms.hasManageChannels || !perms.hasMoveMembers) {
