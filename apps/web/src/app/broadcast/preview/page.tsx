@@ -101,6 +101,15 @@ const withPartialAssignedRoles = (team: any, roles: Array<string | null>) => ({
   })),
 });
 
+const WAITING_PARTICIPANTS = Array.from({ length: 30 }).map((_, index) => ({
+  userId: `p${index + 1}`,
+  username: ["다이아왕", "미드갓", "정글러킹", "서포터장인", "원딜에이스"][
+    index % 5
+  ],
+  isReady: index % 3 !== 1,
+  isCaptain: index === 0 || index === 5,
+}));
+
 const common = (status: string) => ({
   room: {
     id: "room1",
@@ -110,6 +119,7 @@ const common = (status: string) => ({
     participantCount: 10,
     maxParticipants: 10,
     hostName: "스트리머",
+    participants: WAITING_PARTICIPANTS,
   },
   theme: THEME,
   teams: [TEAM_BLUE, TEAM_RED],
@@ -120,7 +130,12 @@ const common = (status: string) => ({
 const SNAP: Record<string, any> = {
   waiting: {
     ...common("WAITING"),
-    room: { ...common("WAITING").room, participantCount: 6 },
+    room: {
+      ...common("WAITING").room,
+      participantCount: WAITING_PARTICIPANTS.length,
+      maxParticipants: WAITING_PARTICIPANTS.length,
+      participants: WAITING_PARTICIPANTS,
+    },
   },
   auction: common("DRAFT"),
   auctionMulti: {

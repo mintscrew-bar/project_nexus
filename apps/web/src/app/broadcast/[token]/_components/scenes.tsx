@@ -168,40 +168,102 @@ export function WaitingScene({ snapshot }: { snapshot: any }) {
   const room = snapshot?.room ?? {};
   const count = room.participantCount ?? 0;
   const max = room.maxParticipants ?? 10;
+  const participants: any[] = room.participants ?? [];
   const progress = Math.max(0, Math.min(100, (count / Math.max(max, 1)) * 100));
+  const participantColumns =
+    participants.length > 36
+      ? "grid-cols-8"
+      : participants.length > 25
+        ? "grid-cols-6"
+        : "grid-cols-5";
+  const participantCell =
+    participants.length > 36
+      ? "gap-1 px-2 py-1.5 text-[11px]"
+      : participants.length > 25
+        ? "gap-1.5 px-2.5 py-2 text-xs"
+        : "gap-2 px-3 py-2.5 text-sm";
+  const badgeText =
+    participants.length > 36
+      ? "text-[8px]"
+      : participants.length > 25
+        ? "text-[9px]"
+        : "text-[10px]";
 
   return (
     <StageFrame accent={accent}>
-      <div className="grid h-full w-full grid-cols-[minmax(0,1fr)_420px] items-center gap-16 px-28">
-        <div className="min-w-0">
-          <HudLabel color={accent}>WAITING ROOM</HudLabel>
-          <h1 className="mt-6 max-w-[1180px] text-[82px] font-black leading-[0.96] tracking-normal text-white">
-            {room.name ?? "내전 대기 중"}
-          </h1>
-          <HudRule color={accent} />
-          <p className="text-2xl font-black uppercase tracking-[0.32em] text-white/38">
-            Nexus Custom Match
-          </p>
+      <div className="flex h-full w-full flex-col justify-center gap-12 px-28 py-24">
+        <div className="grid w-full grid-cols-[minmax(0,1fr)_420px] items-center gap-16">
+          <div className="min-w-0">
+            <HudLabel color={accent}>WAITING ROOM</HudLabel>
+            <h1 className="mt-6 max-w-[1180px] text-[82px] font-black leading-[0.96] tracking-normal text-white">
+              {room.name ?? "내전 대기 중"}
+            </h1>
+            <HudRule color={accent} />
+            <p className="text-2xl font-black uppercase tracking-[0.32em] text-white/38">
+              Nexus Custom Match
+            </p>
+          </div>
+
+          <div className="border-y border-white/12 py-9">
+            <HudLabel color={accent}>PLAYERS</HudLabel>
+            <div className="mt-5 flex items-end gap-4">
+              <span className="text-[132px] font-black leading-none text-white">
+                {count}
+              </span>
+              <span className="mb-4 text-[44px] font-black leading-none text-white/35">
+                / {max}
+              </span>
+            </div>
+            <div className="mt-7 h-2 bg-white/10">
+              <div
+                className="h-full"
+                style={{ width: `${progress}%`, background: accent }}
+              />
+            </div>
+            <p className="mt-5 text-lg font-black text-white/44">모이는 중</p>
+          </div>
         </div>
 
-        <div className="border-y border-white/12 py-9">
-          <HudLabel color={accent}>PLAYERS</HudLabel>
-          <div className="mt-5 flex items-end gap-4">
-            <span className="text-[132px] font-black leading-none text-white">
-              {count}
-            </span>
-            <span className="mb-4 text-[44px] font-black leading-none text-white/35">
-              / {max}
-            </span>
+        {participants.length > 0 && (
+          <div className="border-y border-white/10 py-6">
+            <div className="mb-4 flex items-center justify-between">
+              <HudLabel color={accent}>WAITING PLAYERS</HudLabel>
+              <p className="text-sm font-black uppercase tracking-[0.28em] text-white/32">
+                {participants.length} Players
+              </p>
+            </div>
+            <div className={`grid ${participantColumns} gap-2.5`}>
+              {participants.map((participant, index) => (
+                <div
+                  key={participant.userId ?? index}
+                  className={`flex min-w-0 items-center border-l border-white/12 bg-white/[0.035] ${participantCell}`}
+                >
+                  <span className="w-5 shrink-0 text-xs font-black text-white/28">
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate font-black text-white/84">
+                    {participant.username ?? "대기자"}
+                  </span>
+                  {participant.isCaptain && (
+                    <span
+                      className={`shrink-0 font-black uppercase ${badgeText}`}
+                      style={{ color: accent }}
+                    >
+                      CAP
+                    </span>
+                  )}
+                  {participant.isReady && !participant.isCaptain && (
+                    <span
+                      className={`shrink-0 font-black uppercase text-emerald-300 ${badgeText}`}
+                    >
+                      READY
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
-          <div className="mt-7 h-2 bg-white/10">
-            <div
-              className="h-full"
-              style={{ width: `${progress}%`, background: accent }}
-            />
-          </div>
-          <p className="mt-5 text-lg font-black text-white/44">모이는 중</p>
-        </div>
+        )}
       </div>
     </StageFrame>
   );

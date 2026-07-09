@@ -369,7 +369,21 @@ export class BroadcastService {
             },
           },
         },
-        _count: { select: { participants: true } },
+        participants: {
+          where: { role: "PLAYER" },
+          orderBy: { joinedAt: "asc" },
+          select: {
+            userId: true,
+            isReady: true,
+            isCaptain: true,
+            user: {
+              select: {
+                username: true,
+                avatar: true,
+              },
+            },
+          },
+        },
         teams: {
           select: {
             id: true,
@@ -410,9 +424,16 @@ export class BroadcastService {
         name: room.name,
         status: room.status,
         teamMode: room.teamMode,
-        participantCount: room._count.participants,
+        participantCount: room.participants.length,
         maxParticipants: room.maxParticipants,
         hostName: room.host?.username ?? null,
+        participants: (room.participants ?? []).map((p: any) => ({
+          userId: p.userId,
+          username: p.user?.username ?? null,
+          avatar: p.user?.avatar ?? null,
+          isReady: p.isReady,
+          isCaptain: p.isCaptain,
+        })),
       },
       theme: this.clanTheme(clan),
       teams: (room.teams ?? []).map((t: any) => this.teamSummary(t)),

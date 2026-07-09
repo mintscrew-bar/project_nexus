@@ -408,6 +408,9 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
       state.submissions = new Map();
       this.broadcastRpsState(state);
       this.armRpsThrowTimeout(matchId);
+      setTimeout(() => {
+        void this.autoAdvanceBotRpsThrow(matchId);
+      }, 900);
       return;
     }
 
