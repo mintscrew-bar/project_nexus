@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { openBroadcastControlWindow } from "@/lib/open-broadcast-control";
 import { Radio, Loader2, ExternalLink, Pin } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui";
@@ -114,9 +115,13 @@ export function BroadcastLinkModal({ isOpen, onClose, roomId }: Props) {
             </div>
 
             <div className="flex flex-wrap items-center gap-3 text-xs text-text-tertiary">
-              <Link href="/broadcast-control" className="underline">
+              <button
+                type="button"
+                onClick={() => openBroadcastControlWindow()}
+                className="underline"
+              >
                 방송 조작 패널 열기
-              </Link>
+              </button>
               <span>·</span>
               <Link href="/settings?tab=broadcast" className="underline">
                 링크·토큰 관리

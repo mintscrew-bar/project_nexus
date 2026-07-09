@@ -708,11 +708,15 @@ export const broadcastApi = {
       lowerThirdVisible: boolean;
       announcement: string | null;
       roomId: string | null;
+      room: BroadcastControlRoom | null;
     };
   },
   updateControl: async (body: Partial<BroadcastControlState>) => {
     const response = await apiClient.patch(`/broadcast/control`, body);
-    return response.data as BroadcastControlState & { roomId: string | null };
+    return response.data as BroadcastControlState & {
+      roomId: string | null;
+      room: BroadcastControlRoom | null;
+    };
   },
   // 로비 방송 상태: 토큰 발급 여부 + 이 방 고정 송출 여부 (호스트)
   getLiveState: async (roomId: string) => {
@@ -750,6 +754,12 @@ export type BroadcastControlState = {
   scene: BroadcastControlScene;
   lowerThirdVisible: boolean;
   announcement: string | null;
+};
+
+export type BroadcastControlRoom = {
+  id: string;
+  name: string;
+  status: string;
 };
 
 // 방 관련 API

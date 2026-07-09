@@ -11,6 +11,7 @@ import {
 } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
 import { broadcastApi } from "@/lib/api-client";
+import { openBroadcastControlWindow } from "@/lib/open-broadcast-control";
 
 /**
  * 방송 토큰(OBS 오버레이) 관리 — 스트리머당 1개.
@@ -251,15 +252,14 @@ export function BroadcastTokenSection() {
               띄워 OBS 옆에 두고 쓰세요.
             </p>
           </div>
-          <a
-            href="/broadcast-control"
-            target="_blank"
-            rel="noopener noreferrer"
+          <button
+            type="button"
+            onClick={() => openBroadcastControlWindow()}
             className="inline-flex flex-shrink-0 items-center justify-center whitespace-nowrap rounded-lg bg-accent-primary px-3 py-1.5 text-sm font-medium text-white transition-colors duration-150 hover:bg-accent-hover focus:outline-none focus:ring-2 focus:ring-accent-primary focus:ring-offset-2 focus:ring-offset-bg-primary"
           >
             <ExternalLink className="mr-1 h-3.5 w-3.5" />
             조작 패널 열기
-          </a>
+          </button>
         </div>
 
         {loading ? (
