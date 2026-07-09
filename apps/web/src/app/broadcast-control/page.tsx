@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   BadgeInfo,
@@ -90,7 +90,15 @@ const SCENES: Array<{
   },
 ];
 
-export default function BroadcastControlPage() {
+function BroadcastControlLoading() {
+  return (
+    <main className="flex min-h-[60vh] items-center justify-center">
+      <Loader2 className="h-8 w-8 animate-spin text-accent-primary" />
+    </main>
+  );
+}
+
+function BroadcastControlContent() {
   const { addToast } = useToast();
   const { isAuthenticated, isLoading: authLoading } = useAuthStore();
   const searchParams = useSearchParams();
@@ -212,9 +220,7 @@ export default function BroadcastControlPage() {
 
   if (!previewMode && (authLoading || (isAuthenticated && loading))) {
     return (
-      <main className="flex min-h-[60vh] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-accent-primary" />
-      </main>
+      <BroadcastControlLoading />
     );
   }
 
@@ -425,5 +431,13 @@ export default function BroadcastControlPage() {
         </aside>
       </section>
     </main>
+  );
+}
+
+export default function BroadcastControlPage() {
+  return (
+    <Suspense fallback={<BroadcastControlLoading />}>
+      <BroadcastControlContent />
+    </Suspense>
   );
 }
