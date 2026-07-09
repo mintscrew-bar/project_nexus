@@ -1,6 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { notFound } from "next/navigation";
+import { LoadingSpinner } from "@/components/ui";
+import { useAuthStore } from "@/stores/auth-store";
 import { BroadcastShell } from "../[token]/_components/BroadcastShell";
 import { LowerThird } from "../[token]/_components/LowerThird";
 import {
@@ -587,8 +590,24 @@ const PREVIEW_TRANSITIONS: Record<
 };
 
 export default function BroadcastPreviewPage() {
+  const { user, isAuthenticated, isLoading } = useAuthStore();
+  const isProduction = process.env.NODE_ENV === "production";
+  const hasPreviewAccess = user?.role === "ADMIN" || user?.role === "MODERATOR";
+
   const [sceneKey, setSceneKey] = useState("auction");
   const [bg, setBg] = useState<"transparent" | "opaque">("opaque");
+
+  if (isProduction && isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-neutral-950">
+        <LoadingSpinner />
+      </div>
+    );
+  }
+
+  if (isProduction && (!isAuthenticated || !hasPreviewAccess)) {
+    notFound();
+  }
 
   const snapshot = SNAP[sceneKey] ?? SNAP.auction;
   const isMatch = sceneKey === "match" || sceneKey === "matchDone";

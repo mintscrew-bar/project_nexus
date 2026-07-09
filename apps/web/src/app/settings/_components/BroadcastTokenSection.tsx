@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Copy, RefreshCw, Radio, Loader2 } from "lucide-react";
+import { Copy, RefreshCw, Radio, Loader2, SlidersHorizontal, ExternalLink } from "lucide-react";
 import {
   Card,
   CardHeader,
@@ -237,6 +237,29 @@ export function BroadcastTokenSection() {
             등록하세요. 나머지는 특정 화면만 따로 띄우고 싶을 때 쓰는
             선택지입니다.
           </p>
+        </div>
+
+        {/* 웹 조작 패널 바로가기 — OBS 옆에 새 창으로 띄워두고 장면을 전환한다 */}
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-accent-primary/30 bg-accent-primary/5 p-3">
+          <div className="min-w-0">
+            <p className="flex items-center gap-1.5 text-sm font-bold text-text-primary">
+              <SlidersHorizontal className="h-4 w-4 text-accent-primary" />
+              방송 조작 패널
+            </p>
+            <p className="mt-0.5 text-xs text-text-tertiary">
+              경기 중 장면 전환·하단바·공지를 여기서 조작합니다. 새 창으로
+              띄워 OBS 옆에 두고 쓰세요.
+            </p>
+          </div>
+          <a
+            href="/broadcast-control"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex flex-shrink-0 items-center justify-center whitespace-nowrap rounded-lg bg-accent-primary px-3 py-1.5 text-sm font-medium text-white transition-colors duration-150 hover:bg-accent-hover focus:outline-none focus:ring-2 focus:ring-accent-primary focus:ring-offset-2 focus:ring-offset-bg-primary"
+          >
+            <ExternalLink className="mr-1 h-3.5 w-3.5" />
+            조작 패널 열기
+          </a>
         </div>
 
         {loading ? (
