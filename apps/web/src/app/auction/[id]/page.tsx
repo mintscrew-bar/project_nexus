@@ -359,8 +359,8 @@ function TeamSummaryPanel({
                 const member = members[idx];
                 if (!member) {
                   return (
-                    <div key={`empty-${idx}`} className="min-w-0 rounded-lg border border-dashed border-bg-tertiary/70 bg-bg-tertiary/20 px-1 py-1.5 text-center">
-                      <div className="mx-auto h-8 w-8 rounded-full bg-bg-elevated/70" />
+                    <div key={`empty-${idx}`} className="min-w-0 px-1 py-1.5 text-center">
+                      <div className="mx-auto h-8 w-8 rounded-full border border-dashed border-bg-tertiary/70 bg-bg-tertiary/20" />
                       <p className="mt-1 truncate text-[10px] text-text-muted">빈 슬롯</p>
                     </div>
                   );
@@ -371,16 +371,19 @@ function TeamSummaryPanel({
                 return (
                   <div
                     key={member.id}
-                    className={cn(
-                      "min-w-0 cursor-pointer rounded-lg border px-1 py-1.5 text-center transition-colors hover:bg-bg-elevated",
-                      isCaptain ? "border-accent-gold/30 bg-accent-gold/10" : "border-transparent bg-bg-tertiary/50",
-                    )}
+                    className="min-w-0 cursor-pointer rounded-lg px-1 py-1.5 text-center transition-colors hover:bg-bg-elevated/60"
                     onMouseEnter={(e) => handleHover(member.id, e.currentTarget)}
                     onMouseLeave={scheduleHoverClose}
                     onClick={() => setProfileUserId(member.id)}
                   >
                     <div className="relative mx-auto h-8 w-8">
-                      <Avatar src={member.avatar} alt={member.username} fallback={member.username[0]} size="sm" />
+                      <Avatar
+                        src={member.avatar}
+                        alt={member.username}
+                        fallback={member.username[0]}
+                        size="sm"
+                        className={cn(isCaptain ? "ring-2 ring-accent-gold/60" : "ring-1 ring-bg-elevated")}
+                      />
                       {isCaptain && (
                         <span className="absolute -bottom-1 -right-1 rounded bg-accent-gold px-1 text-[9px] font-bold text-bg-primary">
                           C
