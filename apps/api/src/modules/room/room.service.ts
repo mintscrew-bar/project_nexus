@@ -587,6 +587,11 @@ export class RoomService {
               teamMode: room.teamMode,
               isPrivate: room.isPrivate,
             });
+          } else {
+            // 대상은 찾았으나 전송 실패 — 채널이 없거나 텍스트 채널이 아님(봇 권한 포함)
+            this.logger.warn(
+              `[RoomNotify] room ${room.id}: 임베드 전송 실패 (guild=${notificationTarget.guildId} channel=${notificationTarget.channelId}) — 채널 미존재/텍스트 아님/권한 확인`,
+            );
           }
         }
       }

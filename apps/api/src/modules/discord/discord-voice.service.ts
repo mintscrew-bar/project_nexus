@@ -104,26 +104,36 @@ export class DiscordVoiceService {
     });
     if (!room) return null;
 
-    const guildId =
-      room.discordGuildId ||
-      this.configService.get<string>("DISCORD_GUILD_ID") ||
-      null;
-    if (!guildId) return null;
+    const homeGuildId =
+      this.configService.get<string>("DISCORD_GUILD_ID") || null;
+    const guildId = room.discordGuildId || homeGuildId || null;
+    if (!guildId) {
+      this.logger.warn(
+        `[RoomNotify] room ${roomId}: guildId 없음(room.discordGuildId·DISCORD_GUILD_ID 모두 미설정) → 알림 스킵`,
+      );
+      return null;
+    }
+
+    // "내전 모집" 알림은 발견·참가용이라 중앙 모집 채널로 보낸다.
+    // 홈 서버(멀티길드 아님)일 때만 중앙 채널을 쓰고, 없으면 방 대기실 채널로 폴백.
+    const isHomeGuild = !room.discordGuildId || room.discordGuildId === homeGuildId;
+    if (isHomeGuild) {
+      const centralChannelId = this.configService.get<string>(
+        "DISCORD_NOTIFICATION_CHANNEL_ID",
+      );
+      if (centralChannelId) {
+        return { guildId, channelId: centralChannelId };
+      }
+    }
 
     const lobbyChannelId = room.discordChannels?.[0]?.channelId;
     if (lobbyChannelId) {
       return { guildId, channelId: lobbyChannelId };
     }
 
-    if (!room.discordGuildId) {
-      const fallbackChannelId = this.configService.get<string>(
-        "DISCORD_NOTIFICATION_CHANNEL_ID",
-      );
-      if (fallbackChannelId) {
-        return { guildId, channelId: fallbackChannelId };
-      }
-    }
-
+    this.logger.warn(
+      `[RoomNotify] room ${roomId}: 중앙 채널(DISCORD_NOTIFICATION_CHANNEL_ID) 미설정 & 대기실 채널 없음 → 알림 스킵`,
+    );
     return null;
   }
 
