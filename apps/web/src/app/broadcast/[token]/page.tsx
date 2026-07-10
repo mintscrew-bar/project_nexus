@@ -11,6 +11,7 @@ import {
   RoomScene,
   MatchScene,
   IdleScene,
+  BreakScene,
   BracketScene,
   RoleSelectionScene,
 } from "./_components/scenes";
@@ -29,6 +30,12 @@ const SCENE_TRANSITIONS: Record<
     label: "STANDBY",
     subLabel: "방송 대기",
     eyebrow: "NEXUS LIVE",
+    tone: "phase",
+  },
+  break: {
+    label: "BREAK",
+    subLabel: "잠시 휴식",
+    eyebrow: "BE RIGHT BACK",
     tone: "phase",
   },
   waiting: {
@@ -91,7 +98,8 @@ function sceneKeyOf({
   matchStatus?: string;
 }) {
   if (idle) return "idle";
-  if (scene === "idle" || scene === "break") return "idle";
+  if (scene === "idle") return "idle";
+  if (scene === "break") return "break";
   if (scene === "bracket") return "bracket";
   if (scene === "auction") return "auction";
   if (scene === "role-selection") return "role-selection";
@@ -194,6 +202,24 @@ export default function BroadcastPage() {
     };
   }, [token, roomId, queryClient, queryKey]);
 
+  // auto 모드의 시간 기반 장면 전환(결과 12초, 시작 직후 대진표 8초 등)은
+  // 5초 폴링만으로는 최대 5초까지 늦어진다. 서버가 알려준 전환 시각에 맞춰 즉시 갱신한다.
+  const sceneNextChangeAt = snapshot?.sceneNextChangeAt as
+    | number
+    | null
+    | undefined;
+  useEffect(() => {
+    if (!sceneNextChangeAt) return;
+    const delay = sceneNextChangeAt - Date.now();
+    if (delay <= 0) return;
+    // 서버 경계를 확실히 넘긴 뒤 요청되도록 약간의 여유를 둔다.
+    const timer = setTimeout(
+      () => queryClient.invalidateQueries({ queryKey }),
+      delay + 150,
+    );
+    return () => clearTimeout(timer);
+  }, [sceneNextChangeAt, queryClient, queryKey]);
+
   if (isError) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-transparent">
@@ -208,8 +234,10 @@ export default function BroadcastPage() {
     return <div className="fixed inset-0 bg-transparent" />;
   }
 
-  const sceneNode = snapshot.idle || displayScene === "idle" || displayScene === "break" ? (
+  const sceneNode = snapshot.idle || displayScene === "idle" ? (
     <IdleScene snapshot={snapshot} />
+  ) : displayScene === "break" ? (
+    <BreakScene snapshot={snapshot} />
   ) : displayScene === "bracket" ? (
     <BracketScene snapshot={snapshot} />
   ) : displayScene === "match" || displayScene === "result" ? (

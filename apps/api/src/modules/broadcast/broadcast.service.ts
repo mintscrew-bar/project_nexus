@@ -17,6 +17,7 @@ export type BroadcastScene =
   | "match"
   | "bracket"
   | "result"
+  | "idle"
   | "break";
 
 const RESULT_SCENE_MS = 12_000;
@@ -447,13 +448,14 @@ export class BroadcastService {
 
     const clan = room.host?.clanMemberships?.[0]?.clan ?? null;
     const teamById = new Map((room.teams ?? []).map((t: any) => [t.id, t]));
-    const effectiveScene =
+    const resolved =
       scene === "control"
         ? await this.resolveControlledScene(control.scene, room.id, {
             status: room.status,
             teamMode: room.teamMode,
           })
-        : scene;
+        : { scene, nextChangeAt: null as number | null };
+    const effectiveScene = resolved.scene;
 
     const common = {
       room: {
@@ -477,6 +479,8 @@ export class BroadcastService {
       focusMatchId: room.broadcastFocusMatchId ?? null,
       broadcast: control,
       scene: effectiveScene,
+      // auto 모드의 시간 기반 전환 시각(epoch ms). 오버레이가 이 시점에 맞춰 갱신한다.
+      sceneNextChangeAt: resolved.nextChangeAt,
     };
 
     if (effectiveScene === "match" || effectiveScene === "result") {
@@ -534,51 +538,68 @@ export class BroadcastService {
     return common;
   }
 
+  /**
+   * control 모드의 실제 출력 장면을 결정한다.
+   * auto일 때는 경기 진행 상태 + 경과 시간으로 자동 전환하며,
+   * 시간 기반 구간은 `nextChangeAt`(다음 전환 시각, epoch ms)을 함께 돌려준다.
+   * 오버레이가 폴링(5초)만으로 기다리지 않고 그 시각에 정확히 갱신할 수 있게 하기 위함.
+   */
   private async resolveControlledScene(
     scene: BroadcastControlScene,
     roomId: string,
     room: { status?: string | null; teamMode?: string | null },
-  ): Promise<BroadcastScene> {
-    if (scene === "bracket" || scene === "match" || scene === "result") {
-      return scene;
-    }
-    if (scene === "break") return "break";
-    if (scene === "idle") return "break";
-    if (scene !== "auto") return "room";
+  ): Promise<{ scene: BroadcastScene; nextChangeAt: number | null }> {
+    const fixed = (value: BroadcastScene) => ({
+      scene: value,
+      nextChangeAt: null,
+    });
 
-    if (room.status === "COMPLETED") return "result";
+    if (scene === "bracket" || scene === "match" || scene === "result") {
+      return fixed(scene);
+    }
+    // 대기(idle)와 휴식(break)은 서로 다른 화면이다.
+    if (scene === "break") return fixed("break");
+    if (scene === "idle") return fixed("idle");
+    if (scene !== "auto") return fixed("room");
+
+    if (room.status === "COMPLETED") return fixed("result");
 
     const [latestCompleted, liveMatch] = await Promise.all([
       this.latestCompletedMatch(roomId),
       this.firstLiveMatch(roomId),
     ]);
+    const now = Date.now();
+
     if (latestCompleted?.completedAt) {
-      const elapsed = Date.now() - latestCompleted.completedAt.getTime();
-      if (elapsed <= RESULT_SCENE_MS) return "result";
+      const resultUntil =
+        latestCompleted.completedAt.getTime() + RESULT_SCENE_MS;
+      if (now <= resultUntil) {
+        return { scene: "result", nextChangeAt: resultUntil };
+      }
     }
 
     if (liveMatch) {
-      if (
-        liveMatch.startedAt &&
-        Date.now() - liveMatch.startedAt.getTime() <=
-          BRACKET_SCENE_AFTER_MATCH_START_MS
-      ) {
-        return "bracket";
+      if (liveMatch.startedAt) {
+        const bracketUntil =
+          liveMatch.startedAt.getTime() + BRACKET_SCENE_AFTER_MATCH_START_MS;
+        if (now <= bracketUntil) {
+          return { scene: "bracket", nextChangeAt: bracketUntil };
+        }
       }
-      return "match";
+      return fixed("match");
     }
 
-    if (
-      latestCompleted?.completedAt &&
-      Date.now() - latestCompleted.completedAt.getTime() <=
-        BRACKET_SCENE_AFTER_RESULT_MS
-    ) {
-      return "bracket";
+    if (latestCompleted?.completedAt) {
+      const bracketUntil =
+        latestCompleted.completedAt.getTime() + BRACKET_SCENE_AFTER_RESULT_MS;
+      if (now <= bracketUntil) {
+        return { scene: "bracket", nextChangeAt: bracketUntil };
+      }
     }
 
-    if (await this.hasBracket(roomId)) return "bracket";
+    if (await this.hasBracket(roomId)) return fixed("bracket");
 
-    return "room";
+    return fixed("room");
   }
 
   /** 진행 중(IN_PROGRESS) 경기 중 첫 번째 id. */

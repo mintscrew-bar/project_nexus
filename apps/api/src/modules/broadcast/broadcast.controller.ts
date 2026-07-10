@@ -143,6 +143,7 @@ export class BroadcastController {
       "match",
       "bracket",
       "result",
+      "idle",
       "break",
     ];
     const resolvedScene = validScenes.includes(scene as BroadcastScene)

@@ -163,6 +163,50 @@ export function IdleScene({ snapshot }: { snapshot: any }) {
   );
 }
 
+/** 경기 사이 휴식(브레이크) 화면 — 대기(Idle)와 구분되는 별도 장면. */
+export function BreakScene({ snapshot }: { snapshot: any }) {
+  const accent = accentOf(snapshot);
+  const theme = snapshot?.theme;
+  const title = theme?.clanName || snapshot?.room?.name || "NEXUS";
+
+  return (
+    <StageFrame accent={accent}>
+      <div className="flex h-full w-full items-center px-28">
+        <div className="w-full max-w-[1320px]">
+          <div className="mb-8 flex items-center gap-5">
+            {theme?.logo ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={theme.logo}
+                alt=""
+                className="h-16 w-16 rounded-sm object-cover"
+              />
+            ) : (
+              <div
+                className="flex h-16 w-16 items-center justify-center border-y text-2xl font-black"
+                style={{ borderColor: accent }}
+              >
+                NX
+              </div>
+            )}
+            <div>
+              <HudLabel color={accent}>BREAK TIME</HudLabel>
+              <p className="mt-2 text-2xl font-black text-white/72">{title}</p>
+            </div>
+          </div>
+          <HudRule color={accent} />
+          <h1 className="text-[86px] font-black leading-[0.96] tracking-normal text-white">
+            잠시 후 계속됩니다
+          </h1>
+          <p className="mt-8 text-2xl font-black uppercase tracking-[0.34em] text-white/36">
+            Be Right Back
+          </p>
+        </div>
+      </div>
+    </StageFrame>
+  );
+}
+
 export function WaitingScene({ snapshot }: { snapshot: any }) {
   const accent = accentOf(snapshot);
   const room = snapshot?.room ?? {};
