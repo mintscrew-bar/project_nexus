@@ -7,7 +7,18 @@ import {
 import { randomUUID } from "crypto";
 import { dirname, join, posix } from "path";
 import { mkdir, unlink, writeFile } from "fs/promises";
-import sharp from "sharp";
+import type { Sharp, SharpOptions } from "sharp";
+
+// sharp는 런타임에 `module.exports = Sharp` 형태의 CommonJS로 로드되지만,
+// TS는 패키지의 ESM 선언(dist/index.d.mts)을 집어 default export가 있는 것처럼 취급한다.
+// tsconfig에 esModuleInterop이 없어 `import sharp from "sharp"`는 `sharp_1.default`로
+// 컴파일되고, 실제 모듈에는 `.default`가 없어 런타임에 undefined가 된다.
+// 따라서 런타임 실체를 직접 require하고 타입만 명시한다.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const sharp = require("sharp") as (
+  input?: Buffer,
+  options?: SharpOptions,
+) => Sharp;
 
 type UploadDriver = "local" | "r2";
 
@@ -240,7 +251,9 @@ export class UploadService {
 
     try {
       const url = new URL(key);
-      const publicBase = this.publicBaseUrl ? new URL(this.publicBaseUrl) : null;
+      const publicBase = this.publicBaseUrl
+        ? new URL(this.publicBaseUrl)
+        : null;
       if (publicBase && url.origin === publicBase.origin) {
         const basePath = publicBase.pathname.replace(/\/+$/, "");
         key =
