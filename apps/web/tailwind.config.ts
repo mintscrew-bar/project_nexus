@@ -141,6 +141,9 @@ const config: Config = {
       // 반응형 브레이크포인트 추가
       screens: {
         'xs': '475px',
+        // 헤더 데스크톱 네비가 줄바꿈 없이 들어가는 최소 너비.
+        // 이 미만에서는 햄버거(MobileMenu)로 전환한다.
+        'nav': '1321px',
       },
       // Transition duration (성능 최적화)
       transitionDuration: {

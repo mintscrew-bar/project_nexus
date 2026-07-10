@@ -66,7 +66,7 @@ export function Header() {
       </div>
 
       {/* Center: Navigation (kept compact until wide desktop to avoid crowding) */}
-      <nav className="hidden min-w-0 flex-1 justify-center min-[1321px]:flex">
+      <nav className="hidden min-w-0 flex-1 justify-center nav:flex">
         <ul className="flex space-x-1">
           {visibleNavItems.map((item) => (
             <li key={item.href}>
@@ -92,7 +92,7 @@ export function Header() {
           href={NEXUS_DISCORD_INVITE_URL}
           target="_blank"
           rel="noopener noreferrer"
-          className="hidden items-center gap-2 rounded-lg border border-[#5865F2]/30 bg-[#5865F2]/10 px-3 py-2 text-sm font-semibold text-[#5865F2] transition-colors duration-150 hover:bg-[#5865F2]/20 dark:border-[#5865F2]/20 dark:text-[#8EA1FF] dark:hover:text-[#C7D2FE] min-[1321px]:inline-flex"
+          className="hidden items-center gap-2 rounded-lg border border-[#5865F2]/30 bg-[#5865F2]/10 px-3 py-2 text-sm font-semibold text-[#5865F2] transition-colors duration-150 hover:bg-[#5865F2]/20 dark:border-[#5865F2]/20 dark:text-[#8EA1FF] dark:hover:text-[#C7D2FE] nav:inline-flex"
           title="Discord 커뮤니티"
           aria-label="Discord 커뮤니티"
         >
@@ -106,7 +106,7 @@ export function Header() {
               href="/admin"
               className={cn(
                 // 좁은 데스크톱까지는 햄버거 메뉴로 이동 → 넓은 데스크톱에서만 노출
-                'hidden min-[1321px]:inline-flex p-2 rounded-lg transition-colors duration-150',
+                'hidden nav:inline-flex p-2 rounded-lg transition-colors duration-150',
                 pathname.startsWith('/admin')
                   ? 'bg-accent-primary/10 text-accent-primary'
                   : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary'
@@ -138,7 +138,7 @@ export function Header() {
           </button>
         )}
         {/* 테마 토글: 좁은 데스크톱까지는 햄버거 메뉴로 이동 → 넓은 데스크톱에서만 노출 */}
-        <div className="hidden min-[1321px]:block">
+        <div className="hidden nav:block">
           <ThemeToggle />
         </div>
         <UserMenu />
