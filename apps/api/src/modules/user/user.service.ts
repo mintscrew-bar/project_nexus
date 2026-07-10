@@ -538,8 +538,8 @@ export class UserService {
   }
 
   private async deleteUploadedUrl(url: string) {
-    if (!url.startsWith("/uploads/")) return;
-    await this.uploadService.deleteFile(url.replace("/uploads/", ""));
+    if (!this.uploadService.isManagedUrl(url)) return;
+    await this.uploadService.deleteFile(url);
   }
 
   private normalizeStreamerChannelUrl(rawUrl: string): string {

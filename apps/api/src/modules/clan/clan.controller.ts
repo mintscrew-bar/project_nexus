@@ -19,7 +19,7 @@ import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { Public } from "../auth/decorators/public.decorator";
 import { ClanService } from "./clan.service";
-import { UploadService } from "../upload/upload.service";
+import { UploadImageOptions, UploadService } from "../upload/upload.service";
 import {
   CreateClanDto,
   UpdateClanDto,
@@ -120,7 +120,13 @@ export class ClanController {
     @Param("id") clanId: string,
     @UploadedFile() file: Express.Multer.File,
   ) {
-    const url = await this.storeClanImage(file);
+    const url = await this.storeClanImage(file, {
+      directory: "clans/logos",
+      maxWidth: 512,
+      maxHeight: 512,
+      quality: 84,
+      fit: "cover",
+    });
     const result = await this.clanService.updateClan(userId, clanId, {
       logo: url,
     });
@@ -139,7 +145,12 @@ export class ClanController {
     @Param("id") clanId: string,
     @UploadedFile() file: Express.Multer.File,
   ) {
-    const url = await this.storeClanImage(file);
+    const url = await this.storeClanImage(file, {
+      directory: "clans/banners",
+      maxWidth: 2000,
+      maxHeight: 800,
+      quality: 82,
+    });
     const result = await this.clanService.updateClan(userId, clanId, {
       banner: url,
     });
@@ -150,12 +161,12 @@ export class ClanController {
   /** 업로드 파일 매직넘버 검증 후 정적 URL 반환 (공통) */
   private async storeClanImage(
     file: Express.Multer.File | undefined,
+    options: UploadImageOptions,
   ): Promise<string> {
     if (!file) {
       throw new BadRequestException("이미지 파일이 업로드되지 않았습니다.");
     }
-    await this.uploadService.validateMimeType(file);
-    return this.uploadService.getFileUrl(file.filename);
+    return this.uploadService.uploadImage(file, options);
   }
 
   @Delete(":id")

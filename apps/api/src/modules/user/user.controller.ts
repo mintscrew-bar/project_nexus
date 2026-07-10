@@ -138,8 +138,12 @@ export class UserController {
       throw new BadRequestException("파일이 업로드되지 않았습니다.");
     }
 
-    await this.uploadService.validateMimeType(file);
-    const imageUrl = this.uploadService.getFileUrl(file.filename);
+    const imageUrl = await this.uploadService.uploadImage(file, {
+      directory: "streamer-links",
+      maxWidth: 512,
+      maxHeight: 512,
+      quality: 82,
+    });
     return this.userService.updateStreamerLinkImage(userId, linkId, imageUrl);
   }
 
@@ -162,16 +166,18 @@ export class UserController {
       throw new BadRequestException("파일이 업로드되지 않았습니다.");
     }
 
-    // 클라이언트 MIME 헤더가 아닌 바이너리 매직 넘버로 실제 포맷 검증
-    await this.uploadService.validateMimeType(file);
-
     const oldAvatarUrl = await this.userService.getAvatarUrl(userId);
-    if (oldAvatarUrl && oldAvatarUrl.startsWith("/uploads/")) {
-      const oldFilename = oldAvatarUrl.replace("/uploads/", "");
-      await this.uploadService.deleteFile(oldFilename);
+    if (oldAvatarUrl && this.uploadService.isManagedUrl(oldAvatarUrl)) {
+      await this.uploadService.deleteFile(oldAvatarUrl);
     }
 
-    const avatarUrl = this.uploadService.getFileUrl(file.filename);
+    const avatarUrl = await this.uploadService.uploadImage(file, {
+      directory: "avatars",
+      maxWidth: 512,
+      maxHeight: 512,
+      quality: 84,
+      fit: "cover",
+    });
     await this.userService.updateAvatar(userId, avatarUrl);
 
     return { avatarUrl };
@@ -184,18 +190,20 @@ export class UserController {
     @UploadedFile() file: Express.Multer.File,
   ) {
     if (!file) {
-      throw new BadRequestException("?뚯씪???낅줈?쒕릺吏 ?딆븯?듬땲??");
+      throw new BadRequestException("파일이 업로드되지 않았습니다.");
     }
-
-    await this.uploadService.validateMimeType(file);
 
     const oldBannerUrl = await this.userService.getProfileBannerUrl(userId);
-    if (oldBannerUrl && oldBannerUrl.startsWith("/uploads/")) {
-      const oldFilename = oldBannerUrl.replace("/uploads/", "");
-      await this.uploadService.deleteFile(oldFilename);
+    if (oldBannerUrl && this.uploadService.isManagedUrl(oldBannerUrl)) {
+      await this.uploadService.deleteFile(oldBannerUrl);
     }
 
-    const profileBannerUrl = this.uploadService.getFileUrl(file.filename);
+    const profileBannerUrl = await this.uploadService.uploadImage(file, {
+      directory: "profile-banners",
+      maxWidth: 2000,
+      maxHeight: 800,
+      quality: 82,
+    });
     await this.userService.updateProfileBanner(userId, profileBannerUrl);
 
     return { profileBannerUrl };

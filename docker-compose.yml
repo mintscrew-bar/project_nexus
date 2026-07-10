@@ -44,6 +44,8 @@ services:
       REDIS_URL: redis://redis:6379
     ports:
       - "${API_HOST_PORT:-4000}:4000"
+    volumes:
+      - uploads_data:/app/uploads
     depends_on:
       postgres:
         condition: service_healthy
@@ -66,6 +68,7 @@ services:
       dockerfile: apps/web/Dockerfile
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:?NEXT_PUBLIC_API_URL is required}
+        NEXT_PUBLIC_UPLOADS_BASE_URL: ${NEXT_PUBLIC_UPLOADS_BASE_URL:-}
     image: nexus-web:latest
     container_name: nexus-web
     restart: unless-stopped
@@ -73,6 +76,7 @@ services:
       NODE_ENV: production
       API_URL: http://api:4000
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+      NEXT_PUBLIC_UPLOADS_BASE_URL: ${NEXT_PUBLIC_UPLOADS_BASE_URL:-}
       NEXTAUTH_URL: ${NEXTAUTH_URL}
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?NEXTAUTH_SECRET is required}
       DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID}
@@ -86,3 +90,4 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  uploads_data:

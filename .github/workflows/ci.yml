@@ -109,6 +109,7 @@ jobs:
           platforms: linux/amd64
           build-args: |
             NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL }}
+            NEXT_PUBLIC_UPLOADS_BASE_URL=${{ vars.NEXT_PUBLIC_UPLOADS_BASE_URL }}
             NEXT_PUBLIC_GA_ID=${{ vars.NEXT_PUBLIC_GA_ID }}
             API_URL=http://api:4000
           tags: |

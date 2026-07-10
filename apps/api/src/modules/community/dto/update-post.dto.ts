@@ -5,9 +5,13 @@ import {
   MaxLength,
   IsArray,
   ArrayMaxSize,
+  IsIn,
+  IsObject,
 } from "class-validator";
 import { Transform } from "class-transformer";
 import { sanitizeHtml, stripAllHtml } from "@/common/utils/sanitize";
+
+const CONTENT_FORMATS = ["MARKDOWN", "RICHTEXT"] as const;
 
 /**
  * 게시글 수정 DTO
@@ -28,6 +32,16 @@ export class UpdatePostDto {
   @IsNotEmpty({ message: "내용은 공백일 수 없습니다." })
   @MaxLength(10000, { message: "내용은 10,000자를 초과할 수 없습니다." })
   content?: string;
+
+  /** 본문 저장 방식. 미지정 시 기존 값을 유지 */
+  @IsOptional()
+  @IsIn(CONTENT_FORMATS)
+  contentFormat?: (typeof CONTENT_FORMATS)[number];
+
+  /** RICHTEXT 게시글의 Tiptap JSON 문서 */
+  @IsOptional()
+  @IsObject({ message: "본문 JSON 형식이 올바르지 않습니다." })
+  contentJson?: Record<string, unknown>;
 
   @IsOptional()
   @IsArray()

@@ -1,6 +1,7 @@
 // 커뮤니티 공통 타입, 상수, 유틸 모음
 
 export type PostCategory = "NOTICE" | "FREE" | "TIP" | "QNA";
+export type PostContentFormat = "MARKDOWN" | "RICHTEXT";
 export type SortOption = "newest" | "popular" | "views" | "comments";
 
 /** 게시글에 포함되는 게시판 요약 정보 */
@@ -17,6 +18,8 @@ export interface Post {
   id: string;
   title: string;
   content: string;
+  contentFormat?: PostContentFormat;
+  contentJson?: unknown;
   /** 레거시 카테고리 (nullable — 커스텀 게시판 글은 null) */
   category: PostCategory | null;
   /** 소속 게시판 (신규) */

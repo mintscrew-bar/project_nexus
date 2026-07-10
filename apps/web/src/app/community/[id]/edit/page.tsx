@@ -15,7 +15,8 @@ import {
   LoadingSpinner,
   Skeleton,
 } from "@/components/ui";
-import { MarkdownEditor } from "@/components/community/MarkdownEditor";
+import { RichTextEditor } from "@/components/community/RichTextEditor";
+import { isRichTextDocument, type RichTextDocument } from "@/lib/rich-text";
 import { useToast } from "@/components/ui/Toast";
 import {
   ArrowLeft,
@@ -46,6 +47,8 @@ export default function EditPostPage() {
 
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
+  const [contentJson, setContentJson] = useState<RichTextDocument | null>(null);
+  const [isContentEmpty, setIsContentEmpty] = useState(true);
   const [category, setCategory] = useState<PostCategory>("FREE");
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
@@ -92,6 +95,7 @@ export default function EditPostPage() {
 
         setTitle(post.title);
         setContent(post.content);
+        setContentJson(isRichTextDocument(post.contentJson) ? post.contentJson : null);
         // 레거시 category가 있을 때만 설정 (커스텀 게시판 글은 null)
         if (post.category) setCategory(post.category);
         // 기존 태그 불러오기
@@ -118,7 +122,7 @@ export default function EditPostPage() {
       setError("제목을 입력해주세요.");
       return;
     }
-    if (!content.trim()) {
+    if (isContentEmpty || !contentJson) {
       setError("내용을 입력해주세요.");
       return;
     }
@@ -129,7 +133,9 @@ export default function EditPostPage() {
     try {
       await communityApi.updatePost(postId, {
         title: title.trim(),
-        content: content.trim(),
+        content: content.trim() || "이미지 게시글",
+        contentFormat: "RICHTEXT",
+        contentJson,
         tags,
       });
       addToast("게시글이 수정되었습니다.", "success");
@@ -226,9 +232,14 @@ export default function EditPostPage() {
               <div>
                 <Label>내용</Label>
                 <div className="mt-1">
-                  <MarkdownEditor
-                    value={content}
-                    onChange={setContent}
+                  <RichTextEditor
+                    value={contentJson}
+                    fallbackMarkdown={content}
+                    onChange={({ json, text, isEmpty }) => {
+                      setContentJson(json);
+                      setContent(text);
+                      setIsContentEmpty(isEmpty);
+                    }}
                     height={400}
                   />
                 </div>

@@ -22,6 +22,25 @@ const cspReportOnly = [
   "frame-ancestors 'none'",
 ].join("; ");
 
+const uploadRemotePattern = (() => {
+  const value =
+    process.env.NEXT_PUBLIC_UPLOADS_BASE_URL ||
+    process.env.UPLOAD_PUBLIC_BASE_URL ||
+    process.env.R2_PUBLIC_BASE_URL;
+  if (!value) return null;
+
+  try {
+    const url = new URL(value);
+    return {
+      protocol: url.protocol.replace(":", ""),
+      hostname: url.hostname,
+      ...(url.port && { port: url.port }),
+    };
+  } catch {
+    return null;
+  }
+})();
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -42,6 +61,7 @@ const nextConfig = {
         hostname: "localhost",
         port: "4000",
       },
+      ...(uploadRemotePattern ? [uploadRemotePattern] : []),
     ],
   },
   async headers() {

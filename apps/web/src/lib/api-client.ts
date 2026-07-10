@@ -1354,6 +1354,8 @@ export const communityApi = {
   createPost: async (data: {
     title: string;
     content: string;
+    contentFormat?: "MARKDOWN" | "RICHTEXT";
+    contentJson?: unknown;
     boardId?: string;
     category?: "NOTICE" | "FREE" | "TIP" | "QNA";
     tags?: string[];
@@ -1364,7 +1366,13 @@ export const communityApi = {
 
   updatePost: async (
     postId: string,
-    data: { title?: string; content?: string; tags?: string[] }
+    data: {
+      title?: string;
+      content?: string;
+      contentFormat?: "MARKDOWN" | "RICHTEXT";
+      contentJson?: unknown;
+      tags?: string[];
+    }
   ) => {
     const response = await apiClient.patch(`/community/posts/${postId}`, data);
     return response.data;

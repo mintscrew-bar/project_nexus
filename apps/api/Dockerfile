@@ -42,8 +42,8 @@ RUN npm install -g pm2
 
 WORKDIR /app
 
-# 로그 디렉토리 생성
-RUN mkdir -p /app/logs
+# 로그/업로드 디렉토리 생성
+RUN mkdir -p /app/logs /app/uploads
 
 ENV NODE_ENV=production
 

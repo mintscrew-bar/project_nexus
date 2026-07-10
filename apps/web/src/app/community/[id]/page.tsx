@@ -10,7 +10,7 @@ interface Props {
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
 async function fetchPost(id: string) {
-  const res = await fetch(`${API_BASE}/api/community/${id}`, {
+  const res = await fetch(`${API_BASE}/api/community/posts/${id}`, {
     next: { revalidate: 60 },
   });
   if (!res.ok) return null;

@@ -827,9 +827,14 @@ model Board {
 }
 
 model Post {
-  id        String         @id @default(cuid())
-  title     String
-  content   String
+  id            String            @id @default(cuid())
+  title         String
+  /// 검색/목록/SEO용 플레인 텍스트. 기존 마크다운 게시글은 원문 마크다운을 유지한다.
+  content       String
+  /// 본문 저장 방식. 기존 데이터는 MARKDOWN, 새 리치텍스트 글은 RICHTEXT.
+  contentFormat PostContentFormat @default(MARKDOWN)
+  /// RICHTEXT 게시글의 Tiptap JSON 문서. MARKDOWN 게시글은 null.
+  contentJson   Json?
   /// 레거시 카테고리 enum — boardId 도입 후 스냅샷/하위호환용으로 보존(nullable)
   category  PostCategory?
   /// 소속 게시판 FK. 게시판 삭제 시 글은 보존하기 위해 SetNull
@@ -1328,6 +1333,11 @@ enum PostCategory {
   FREE
   TIP
   QNA
+}
+
+enum PostContentFormat {
+  MARKDOWN
+  RICHTEXT
 }
 
 enum PostReportReason {

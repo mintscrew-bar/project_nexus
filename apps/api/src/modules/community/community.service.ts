@@ -12,7 +12,7 @@ import { PostCategory } from "./community.types";
 import { NotificationService } from "../notification/notification.service";
 import { RedisService } from "../redis/redis.service";
 import { BoardService } from "../board/board.service";
-import { UserRole } from "@nexus/database";
+import { PostContentFormat, Prisma, UserRole } from "@nexus/database";
 import { DiscordAdminAlertService } from "../discord/discord-admin-alert.service";
 
 /**
@@ -30,6 +30,8 @@ const SLUG_TO_CATEGORY: Record<string, PostCategory> = {
 export interface CreatePostDto {
   title: string;
   content: string;
+  contentFormat?: "MARKDOWN" | "RICHTEXT";
+  contentJson?: unknown;
   /** 소속 게시판 id (신규 — 우선). 없으면 category로 폴백 매핑 */
   boardId?: string;
   /** 레거시 카테고리 (하위호환) */
@@ -40,6 +42,8 @@ export interface CreatePostDto {
 export interface UpdatePostDto {
   title?: string;
   content?: string;
+  contentFormat?: "MARKDOWN" | "RICHTEXT";
+  contentJson?: unknown;
   tags?: string[];
 }
 
@@ -77,6 +81,34 @@ const BANNED_WORDS = [
 function containsBannedWord(text: string): boolean {
   const lower = text.toLowerCase();
   return BANNED_WORDS.some((word) => lower.includes(word));
+}
+
+const RICH_TEXT_JSON_MAX_BYTES = 200_000;
+
+function normalizeRichTextJson(value: unknown): Prisma.InputJsonValue {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new BadRequestException("본문 JSON 형식이 올바르지 않습니다.");
+  }
+
+  const root = value as { type?: unknown };
+  if (root.type !== "doc") {
+    throw new BadRequestException("본문 JSON 형식이 올바르지 않습니다.");
+  }
+
+  const serialized = JSON.stringify(value);
+  if (serialized.length > RICH_TEXT_JSON_MAX_BYTES) {
+    throw new BadRequestException("본문 데이터가 너무 큽니다.");
+  }
+
+  return JSON.parse(serialized) as Prisma.InputJsonValue;
+}
+
+function resolveContentFormat(
+  contentFormat?: "MARKDOWN" | "RICHTEXT",
+): PostContentFormat {
+  return contentFormat === PostContentFormat.RICHTEXT
+    ? PostContentFormat.RICHTEXT
+    : PostContentFormat.MARKDOWN;
 }
 
 @Injectable()
@@ -149,8 +181,15 @@ export class CommunityService {
       );
     }
 
+    const content = dto.content.trim();
+    const contentFormat = resolveContentFormat(dto.contentFormat);
+    const contentJson =
+      contentFormat === PostContentFormat.RICHTEXT
+        ? normalizeRichTextJson(dto.contentJson)
+        : undefined;
+
     // 금칙어 검사: 제목 + 내용 모두 검사
-    if (containsBannedWord(dto.title) || containsBannedWord(dto.content)) {
+    if (containsBannedWord(dto.title) || containsBannedWord(content)) {
       throw new BadRequestException(
         "금칙어가 포함된 게시글은 작성할 수 없습니다.",
       );
@@ -159,7 +198,9 @@ export class CommunityService {
     const post = await this.prisma.post.create({
       data: {
         title: dto.title.trim(),
-        content: dto.content.trim(),
+        content,
+        contentFormat,
+        ...(contentJson ? { contentJson } : {}),
         boardId,
         category: categorySnapshot,
         authorId: userId,
@@ -296,8 +337,10 @@ export class CommunityService {
     if (post.isBlinded && !isAdmin) {
       return {
         ...post,
+        contentFormat: PostContentFormat.MARKDOWN,
         content:
           "[블라인드 처리된 게시글입니다. 신고에 의해 임시조치되었습니다.]",
+        contentJson: null,
         comments: post.comments.map((c: (typeof post.comments)[number]) => ({
           ...c,
           content: c.isBlinded ? "[블라인드 처리된 댓글입니다]" : c.content,
@@ -442,6 +485,7 @@ export class CommunityService {
           ...post,
           title: "[블라인드 처리된 게시글]",
           content: "",
+          contentJson: null,
         };
       }
       return post;
@@ -463,23 +507,39 @@ export class CommunityService {
       throw new ForbiddenException("You can only edit your own posts");
     }
 
+    const content = dto.content?.trim();
+    const contentFormat =
+      dto.contentFormat !== undefined
+        ? resolveContentFormat(dto.contentFormat)
+        : undefined;
+
     // 금칙어 검사 (수정 시에도 적용)
     if (
       (dto.title && containsBannedWord(dto.title)) ||
-      (dto.content && containsBannedWord(dto.content))
+      (content && containsBannedWord(content))
     ) {
       throw new BadRequestException(
         "금칙어가 포함된 게시글은 작성할 수 없습니다.",
       );
     }
 
+    const data: Prisma.PostUpdateInput = {
+      isEdited: true,
+    };
+
+    if (dto.title !== undefined) data.title = dto.title.trim();
+    if (content !== undefined) data.content = content;
+    if (contentFormat !== undefined) {
+      data.contentFormat = contentFormat;
+      data.contentJson =
+        contentFormat === PostContentFormat.RICHTEXT
+          ? normalizeRichTextJson(dto.contentJson)
+          : Prisma.DbNull;
+    }
+
     const updated = await this.prisma.post.update({
       where: { id: postId },
-      data: {
-        title: dto.title?.trim(),
-        content: dto.content?.trim(),
-        isEdited: true,
-      },
+      data,
     });
 
     // 태그 동기화: 배열이 전달된 경우에만 교체

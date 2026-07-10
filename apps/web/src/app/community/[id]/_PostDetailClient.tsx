@@ -17,6 +17,8 @@ import {
 import { useToast } from "@/components/ui/Toast";
 import { ConfirmModal } from "@/components/ui/Modal";
 import { MarkdownViewer } from "@/components/community/MarkdownViewer";
+import { RichTextViewer } from "@/components/community/RichTextViewer";
+import type { PostContentFormat, RichTextDocument } from "@/lib/rich-text";
 import {
   ArrowLeft,
   Eye,
@@ -72,6 +74,8 @@ interface Post {
   id: string;
   title: string;
   content: string;
+  contentFormat?: PostContentFormat;
+  contentJson?: RichTextDocument | null;
   category: PostCategory | null;
   board?: {
     id: string;
@@ -505,7 +509,11 @@ export default function PostDetailClient() {
               </div>
             ) : (
               <div className="prose prose-invert max-w-none mb-6">
-                <MarkdownViewer content={post.content} />
+                {post.contentFormat === "RICHTEXT" && post.contentJson ? (
+                  <RichTextViewer content={post.contentJson} />
+                ) : (
+                  <MarkdownViewer content={post.content} />
+                )}
               </div>
             )}
 

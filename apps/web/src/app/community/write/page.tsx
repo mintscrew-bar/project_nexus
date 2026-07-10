@@ -14,7 +14,8 @@ import {
   Label,
   Skeleton,
 } from "@/components/ui";
-import { MarkdownEditor } from "@/components/community/MarkdownEditor";
+import { RichTextEditor } from "@/components/community/RichTextEditor";
+import type { RichTextDocument } from "@/lib/rich-text";
 import {
   ArrowLeft,
   Send,
@@ -50,6 +51,8 @@ export default function WritePostPage() {
 
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
+  const [contentJson, setContentJson] = useState<RichTextDocument | null>(null);
+  const [isContentEmpty, setIsContentEmpty] = useState(true);
   const [boards, setBoards] = useState<Board[]>([]);
   const [boardId, setBoardId] = useState<string>("");
   const [tags, setTags] = useState<string[]>([]);
@@ -114,7 +117,7 @@ export default function WritePostPage() {
       setError("제목을 입력해주세요.");
       return;
     }
-    if (!content.trim()) {
+    if (isContentEmpty || !contentJson) {
       setError("내용을 입력해주세요.");
       return;
     }
@@ -129,7 +132,9 @@ export default function WritePostPage() {
     try {
       const post = await communityApi.createPost({
         title: title.trim(),
-        content: content.trim(),
+        content: content.trim() || "이미지 게시글",
+        contentFormat: "RICHTEXT",
+        contentJson,
         boardId,
         tags: tags.length > 0 ? tags : undefined,
       });
@@ -227,9 +232,12 @@ export default function WritePostPage() {
               <div>
                 <Label>내용</Label>
                 <div className="mt-1">
-                  <MarkdownEditor
-                    value={content}
-                    onChange={setContent}
+                  <RichTextEditor
+                    onChange={({ json, text, isEmpty }) => {
+                      setContentJson(json);
+                      setContent(text);
+                      setIsContentEmpty(isEmpty);
+                    }}
                     height={400}
                   />
                 </div>

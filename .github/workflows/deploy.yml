@@ -49,6 +49,7 @@ jobs:
           CORS_ORIGINS=${{ secrets.CORS_ORIGINS }}
           NEXTAUTH_URL=${{ secrets.NEXTAUTH_URL }}
           NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }}
+          NEXT_PUBLIC_UPLOADS_BASE_URL=${{ secrets.NEXT_PUBLIC_UPLOADS_BASE_URL }}
           DISCORD_CALLBACK_URL=${{ secrets.DISCORD_CALLBACK_URL }}
           DISCORD_LINK_CALLBACK_URL=${{ secrets.DISCORD_LINK_CALLBACK_URL }}
           DISCORD_GUILD_CALLBACK_URL=${{ secrets.DISCORD_GUILD_CALLBACK_URL }}
@@ -86,6 +87,13 @@ jobs:
           DISCORD_CAPTAIN_ROLE_NAME=${{ secrets.DISCORD_CAPTAIN_ROLE_NAME }}
           RIOT_MATCH_CACHE_CLEANUP_ENABLED=${{ secrets.RIOT_MATCH_CACHE_CLEANUP_ENABLED }}
           RIOT_MATCH_CACHE_TTL_DAYS=${{ secrets.RIOT_MATCH_CACHE_TTL_DAYS }}
+          UPLOAD_DRIVER=${{ secrets.UPLOAD_DRIVER }}
+          UPLOAD_PUBLIC_BASE_URL=${{ secrets.UPLOAD_PUBLIC_BASE_URL }}
+          R2_ACCOUNT_ID=${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID=${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY=${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET=${{ secrets.R2_BUCKET }}
+          R2_ENDPOINT=${{ secrets.R2_ENDPOINT }}
           CLOUDFLARE_TUNNEL_TOKEN=${{ secrets.CLOUDFLARE_TUNNEL_TOKEN }}
           EOF
           chmod 600 /home/haru/projects/nexus/.env.production

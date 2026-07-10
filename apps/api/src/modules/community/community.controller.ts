@@ -372,10 +372,12 @@ export class CommunityController {
     if (!file) {
       throw new BadRequestException("이미지 파일이 업로드되지 않았습니다.");
     }
-    // 클라이언트 MIME 헤더가 아닌 바이너리 매직 넘버로 실제 포맷 검증
-    await this.uploadService.validateMimeType(file);
-    // API 서버 기준 정적 파일 URL 반환 (ServeStaticModule이 /uploads 서빙)
-    const url = this.uploadService.getFileUrl(file.filename);
+    const url = await this.uploadService.uploadImage(file, {
+      directory: "community",
+      maxWidth: 2000,
+      maxHeight: 2000,
+      quality: 82,
+    });
     return { url };
   }
 }
