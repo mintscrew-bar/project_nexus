@@ -17,6 +17,7 @@ import {
   BreakScene,
   BracketScene,
   RoleSelectionScene,
+  TeamRevealScene,
 } from "./_components/scenes";
 import { BroadcastAuctionLive } from "./_components/BroadcastAuctionLive";
 import { BroadcastSnakeDraftLive } from "./_components/BroadcastSnakeDraftLive";
@@ -66,6 +67,12 @@ const SCENE_TRANSITIONS: Record<
     eyebrow: "NEXT PHASE",
     tone: "phase",
   },
+  teams: {
+    label: "TEAMS LOCKED",
+    subLabel: "팀 확정",
+    eyebrow: "ROSTER REVEAL",
+    tone: "phase",
+  },
   bracket: {
     label: "BRACKET",
     subLabel: "대진표",
@@ -108,6 +115,7 @@ function sceneKeyOf({
   if (scene === "auction") return "auction";
   if (scene === "role-selection") return "role-selection";
   if (scene === "draft") return "draft";
+  if (scene === "teams") return "teams";
   if (scene === "result") return "result";
   if (scene === "room") return "waiting";
   if (scene === "match") {
@@ -116,6 +124,7 @@ function sceneKeyOf({
   if (isAuctionRoom) return "auction";
   if (status === "ROLE_SELECTION") return "role-selection";
   if (status === "DRAFT" && teamMode !== "AUCTION") return "draft";
+  if (status === "DRAFT_COMPLETED") return "teams";
   return "waiting";
 }
 
@@ -167,12 +176,17 @@ export default function BroadcastPage() {
   const isRoleSelectionRoom =
     controlScene === "role-selection" ||
     (controlScene === "auto" && status === "ROLE_SELECTION");
+  // 팀 확정 직후(DRAFT_COMPLETED) — 자동배정/수동편성 모드의 유일한 팀 소개 구간
+  const isTeamRevealRoom =
+    controlScene === "auto" && status === "DRAFT_COMPLETED";
   const displayScene = isAuctionRoom
     ? "auction"
     : isSnakeDraftRoom
     ? "draft"
     : isRoleSelectionRoom
     ? "role-selection"
+    : isTeamRevealRoom
+    ? "teams"
     : snapshotScene;
   const broadcastSceneKey = sceneKeyOf({
     idle: snapshot?.idle,
@@ -282,6 +296,8 @@ export default function BroadcastPage() {
   ) : isSnakeDraftRoom && token && roomId ? (
     // 스네이크 드래프트도 /snake-draft 게이트웨이를 read-only 구독해 라이브 중계
     <BroadcastSnakeDraftLive token={token} roomId={roomId} snapshot={snapshot} />
+  ) : displayScene === "teams" ? (
+    <TeamRevealScene snapshot={snapshot} />
   ) : isRoleSelectionRoom || broadcastSceneKey === "role-selection" ? (
     <RoleSelectionScene snapshot={snapshot} />
   ) : (

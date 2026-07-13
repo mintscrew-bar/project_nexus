@@ -12,9 +12,12 @@ import {
   IdleScene,
   BracketScene,
   RoleSelectionScene,
+  TeamRevealScene,
 } from "../[token]/_components/scenes";
 import { AuctionBoardView } from "../[token]/_components/AuctionBoardView";
 import type { BroadcastAuctionData } from "../[token]/_live/useBroadcastAuction";
+import { SnakeDraftBoardView } from "../[token]/_components/SnakeDraftBoardView";
+import type { BroadcastSnakeDraftData } from "../[token]/_live/useBroadcastSnakeDraft";
 
 /**
  * /broadcast/preview — 방송 오버레이 디자인 확인용 목업 프리뷰(백엔드 불필요).
@@ -442,6 +445,57 @@ const SNAP: Record<string, any> = {
     teams: [],
     focusMatchId: null,
   },
+  snakeDraft: {
+    ...common("DRAFT"),
+    room: { ...common("DRAFT").room, teamMode: "SNAKE_DRAFT" },
+  },
+  teamReveal: {
+    ...common("DRAFT_COMPLETED"),
+    room: { ...common("DRAFT_COMPLETED").room, teamMode: "AUTO_BALANCE" },
+  },
+};
+
+/** 스네이크 드래프트 프리뷰 — 3픽 진행된 중반 상태 */
+const MOCK_SNAKE_DRAFT: BroadcastSnakeDraftData = {
+  connected: true,
+  status: "IN_PROGRESS",
+  teams: [
+    {
+      id: "teamA",
+      name: "블루 웨이브",
+      color: "#3B82F6",
+      captainId: "u0",
+      members: [
+        { id: "u0", username: "다이아왕", tier: "DIAMOND", rank: "2" },
+        { id: "u1", username: "미드갓", tier: "PLATINUM", rank: "1" },
+      ],
+    },
+    {
+      id: "teamB",
+      name: "레드 스톰",
+      color: "#EF4444",
+      captainId: "u5",
+      members: [
+        { id: "u5", username: "탑솔러", tier: "EMERALD", rank: "3" },
+        { id: "u6", username: "갱킹장인", tier: "GOLD", rank: "1" },
+      ],
+    },
+  ],
+  availablePlayers: [
+    { id: "a1", username: "서포터장인", tier: "PLATINUM", rank: "4" },
+    { id: "a2", username: "원딜에이스", tier: "GOLD", rank: "2" },
+    { id: "a3", username: "로밍메타", tier: "EMERALD", rank: "1" },
+    { id: "a4", username: "와드요정", tier: "SILVER", rank: "1" },
+    { id: "a5", username: "막타학살", tier: "GOLD", rank: "3" },
+    { id: "a6", username: "정글차이", tier: "DIAMOND", rank: "4" },
+  ],
+  pickOrder: ["teamA", "teamB", "teamB", "teamA"],
+  currentTeamId: "teamB",
+  timerEnd: Date.now() + 23_000,
+  lastPick: {
+    teamId: "teamA",
+    player: { id: "u1", username: "미드갓", tier: "PLATINUM", rank: "1" },
+  },
 };
 
 const MOCK_PLAYERS = [
@@ -510,6 +564,8 @@ const SCENES: { key: string; label: string }[] = [
   { key: "waiting", label: "대기" },
   { key: "auction", label: "경매(라이브)" },
   { key: "auctionMulti", label: "경매(6팀)" },
+  { key: "snakeDraft", label: "스네이크 드래프트" },
+  { key: "teamReveal", label: "팀 확정" },
   { key: "roleSelect", label: "역할선택" },
   { key: "bracketSingle", label: "일반 대진표" },
   { key: "bracketDouble", label: "더블 일리미네이션" },
@@ -549,6 +605,18 @@ const PREVIEW_TRANSITIONS: Record<
     label: "ROLE SELECTION",
     subLabel: "포지션 선택",
     eyebrow: "NEXT PHASE",
+    tone: "phase",
+  },
+  snakeDraft: {
+    label: "DRAFT PHASE",
+    subLabel: "스네이크 드래프트",
+    eyebrow: "NEXT PHASE",
+    tone: "phase",
+  },
+  teamReveal: {
+    label: "TEAMS LOCKED",
+    subLabel: "팀 확정",
+    eyebrow: "ROSTER REVEAL",
     tone: "phase",
   },
   bracket: {
@@ -631,6 +699,13 @@ export default function BroadcastPreviewPage() {
     <MatchScene snapshot={snapshot} />
   ) : sceneKey === "auction" || sceneKey === "auctionMulti" ? (
     <AuctionBoardView data={auctionLive} />
+  ) : sceneKey === "snakeDraft" ? (
+    <SnakeDraftBoardView
+      draft={{ ...MOCK_SNAKE_DRAFT, timerEnd: Date.now() + 23_000 }}
+      snapshot={snapshot}
+    />
+  ) : sceneKey === "teamReveal" ? (
+    <TeamRevealScene snapshot={snapshot} />
   ) : sceneKey === "roleSelect" ? (
     <RoleSelectionScene snapshot={snapshot} />
   ) : (

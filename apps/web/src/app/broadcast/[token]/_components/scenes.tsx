@@ -1486,6 +1486,109 @@ export function BracketScene({ snapshot }: { snapshot: any }) {
   );
 }
 
+function RevealMemberRow({
+  member,
+  teamColor,
+  isCaptain,
+}: {
+  member: any;
+  teamColor: string;
+  isCaptain: boolean;
+}) {
+  return (
+    <div className="flex h-14 items-center justify-between border border-white/12 bg-white/[0.05] px-4">
+      <div className="flex min-w-0 items-center gap-3">
+        <div className="h-9 w-9 shrink-0 overflow-hidden rounded-full bg-white/10">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={member.avatar || "/images/placeholders/non-avatar-64.png"}
+            alt=""
+            className="h-9 w-9 rounded-full object-cover"
+          />
+        </div>
+        <p className="truncate text-xl font-bold text-white">
+          {member.username}
+          {isCaptain && (
+            <span className="ml-2 text-sm font-black" style={{ color: teamColor }}>
+              C
+            </span>
+          )}
+        </p>
+      </div>
+      <div className="ml-3 flex flex-shrink-0 items-center gap-3">
+        {member.soldPrice != null && (
+          <span className="text-base font-black" style={{ color: teamColor }}>
+            {member.soldPrice}P
+          </span>
+        )}
+        <span className="text-base font-black text-white/50">
+          {member.tier ?? "–"}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 팀 공개(reveal) 장면 — 팀 확정(DRAFT_COMPLETED) 시점의 최종 로스터 소개.
+ * 자동배정/수동편성 모드에서는 드래프트 과정이 없어 이 장면이 유일한 팀 소개다.
+ * 경매 방이면 낙찰가를 함께 표시한다.
+ */
+export function TeamRevealScene({ snapshot }: { snapshot: any }) {
+  const accent = accentOf(snapshot);
+  const teams: any[] = snapshot?.teams ?? [];
+  const roomName = snapshot?.room?.name ?? "";
+
+  return (
+    <StageFrame accent={accent}>
+      <div className="flex h-full w-full flex-col px-24 pb-36 pt-16">
+        <div className="flex items-end justify-between gap-8">
+          <div className="min-w-0">
+            <HudLabel color={accent}>TEAMS LOCKED IN</HudLabel>
+            <p className="mt-2 truncate text-5xl font-black">{roomName}</p>
+          </div>
+          <p className="flex-shrink-0 text-3xl font-black text-white/45">
+            {teams.length} TEAMS
+          </p>
+        </div>
+
+        <HudRule color={accent} />
+
+        <div className="flex min-h-0 flex-1 gap-6">
+          {teams.map((team) => {
+            const teamColor = team.color || accent;
+            // 팀장을 맨 위로 정렬해 소개 순서를 고정한다
+            const members = [...(team.members ?? [])].sort((a, b) =>
+              a.userId === team.captainId ? -1 : b.userId === team.captainId ? 1 : 0,
+            );
+            return (
+              <div
+                key={team.id}
+                className="flex min-w-0 flex-1 flex-col border border-white/12 bg-black/45 px-7 py-6"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="h-8 w-1.5 flex-shrink-0" style={{ background: teamColor }} />
+                  <p className="truncate text-3xl font-black">{team.name}</p>
+                </div>
+                <div className="mt-5 flex flex-1 flex-col gap-2.5">
+                  {members.map((member) => (
+                    <RevealMemberRow
+                      key={member.userId}
+                      member={member}
+                      teamColor={teamColor}
+                      isCaptain={member.userId === team.captainId}
+                    />
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </StageFrame>
+  );
+}
+
 export function RoomScene({ snapshot }: { snapshot: any }) {
   const status = snapshot?.room?.status;
   const teamMode = snapshot?.room?.teamMode;
