@@ -2033,7 +2033,10 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
     this.roomNotifMap.set(roomId, entry);
   }
 
-  async updateRoomNotification(roomId: string, participants: string[]): Promise<void> {
+  async updateRoomNotification(
+    roomId: string,
+    participants: string[],
+  ): Promise<void> {
     const notif = this.roomNotifMap.get(roomId);
     if (!notif) return;
     try {
@@ -2042,11 +2045,19 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
       if (!channel?.isTextBased()) return;
       const message = await channel.messages.fetch(notif.messageId);
       const { embed, components } = this.buildRoomCreatedEmbed(
-        roomId, notif.roomName, notif.hostName, notif.maxPlayers, notif.teamMode, notif.isPrivate, participants,
+        roomId,
+        notif.roomName,
+        notif.hostName,
+        notif.maxPlayers,
+        notif.teamMode,
+        notif.isPrivate,
+        participants,
       );
       await message.edit({ embeds: [embed], components });
     } catch (err: any) {
-      console.warn(`[DiscordBot] 방 알림 업데이트 실패 (${roomId}): ${err?.message}`);
+      console.warn(
+        `[DiscordBot] 방 알림 업데이트 실패 (${roomId}): ${err?.message}`,
+      );
     }
   }
 
@@ -2164,9 +2175,10 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
     const lockSuffix = isPrivate ? "  ·  비공개" : "";
     const currentPlayers = participants.length;
 
-    const memberList = participants.length > 0
-      ? participants.map((name) => `╸ ${name}`).join("\n")
-      : "—";
+    const memberList =
+      participants.length > 0
+        ? participants.map((name) => `╸ ${name}`).join("\n")
+        : "—";
 
     const embed = new EmbedBuilder()
       .setColor(0x667eea)
@@ -2175,7 +2187,11 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
       .addFields(
         { name: "방장", value: hostName, inline: true },
         { name: "모드", value: modeLabel, inline: true },
-        { name: "인원", value: `${currentPlayers} / ${maxPlayers}`, inline: true },
+        {
+          name: "인원",
+          value: `${currentPlayers} / ${maxPlayers}`,
+          inline: true,
+        },
         { name: "참가자", value: memberList, inline: false },
       )
       .setTimestamp();

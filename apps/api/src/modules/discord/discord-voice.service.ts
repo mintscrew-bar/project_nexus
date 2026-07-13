@@ -116,7 +116,8 @@ export class DiscordVoiceService {
 
     // "내전 모집" 알림은 발견·참가용이라 중앙 모집 채널로 보낸다.
     // 홈 서버(멀티길드 아님)일 때만 중앙 채널을 쓰고, 없으면 방 대기실 채널로 폴백.
-    const isHomeGuild = !room.discordGuildId || room.discordGuildId === homeGuildId;
+    const isHomeGuild =
+      !room.discordGuildId || room.discordGuildId === homeGuildId;
     if (isHomeGuild) {
       const centralChannelId = this.configService.get<string>(
         "DISCORD_NOTIFICATION_CHANNEL_ID",

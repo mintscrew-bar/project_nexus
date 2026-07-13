@@ -234,7 +234,9 @@ export class AuctionService implements OnModuleInit {
       );
   }
 
-  private getBidTimeLimitSeconds(room?: { bidTimeLimit?: number | null }): number {
+  private getBidTimeLimitSeconds(room?: {
+    bidTimeLimit?: number | null;
+  }): number {
     const configured =
       typeof room?.bidTimeLimit === "number"
         ? room.bidTimeLimit
@@ -299,7 +301,10 @@ export class AuctionService implements OnModuleInit {
     }
 
     // startGame()이 WAITING → DRAFT로 원자 전환 후 호출되므로 DRAFT도 수용
-    if (room.status !== RoomStatus.WAITING && room.status !== RoomStatus.DRAFT) {
+    if (
+      room.status !== RoomStatus.WAITING &&
+      room.status !== RoomStatus.DRAFT
+    ) {
       throw new BadRequestException("Room already started");
     }
 

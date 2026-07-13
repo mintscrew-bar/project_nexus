@@ -173,7 +173,12 @@ export class BroadcastService {
     if (!roomId) return null;
     const room = await this.prisma.room.findUnique({
       where: { id: roomId },
-      select: { id: true, name: true, status: true, broadcastFocusMatchId: true },
+      select: {
+        id: true,
+        name: true,
+        status: true,
+        broadcastFocusMatchId: true,
+      },
     });
     return room
       ? {

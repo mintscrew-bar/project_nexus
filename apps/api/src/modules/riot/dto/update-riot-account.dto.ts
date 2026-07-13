@@ -1,5 +1,13 @@
 import { Transform } from "class-transformer";
-import { IsEnum, IsIn, IsInt, IsObject, IsOptional, Max, Min } from "class-validator";
+import {
+  IsEnum,
+  IsIn,
+  IsInt,
+  IsObject,
+  IsOptional,
+  Max,
+  Min,
+} from "class-validator";
 import { Role } from "@nexus/database";
 import { RANKED_DIVISIONS, RANKED_TIERS } from "../riot-rank.util";
 

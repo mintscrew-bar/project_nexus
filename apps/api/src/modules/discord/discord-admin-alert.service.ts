@@ -62,7 +62,9 @@ export class DiscordAdminAlertService {
     }
 
     const fields = Object.entries(payload.fields ?? {})
-      .filter(([, value]) => value !== null && value !== undefined && value !== "")
+      .filter(
+        ([, value]) => value !== null && value !== undefined && value !== "",
+      )
       .map(([key, value]) => `- ${key}: ${value}`);
     const link = this.resolveLink(payload.link);
     const message = [
@@ -78,7 +80,11 @@ export class DiscordAdminAlertService {
       .slice(0, 1900);
 
     try {
-      return this.discordBotService.sendNotification(guildId, channelId, message);
+      return this.discordBotService.sendNotification(
+        guildId,
+        channelId,
+        message,
+      );
     } catch (error: any) {
       this.logger.warn(
         `Admin alert failed (${channel}): ${error?.message ?? error}`,
@@ -102,11 +108,11 @@ export class DiscordAdminAlertService {
       fields: {
         "링크 ID": params.linkId,
         "길드 ID": params.guildId,
-        "길드명": params.guildName,
-        "요청자": params.ownerName
+        길드명: params.guildName,
+        요청자: params.ownerName
           ? `${params.ownerName} (${params.ownerId})`
           : params.ownerId,
-        "상태": params.status,
+        상태: params.status,
       },
       link: "/admin",
     });
@@ -129,14 +135,14 @@ export class DiscordAdminAlertService {
           : "새 커뮤니티 신고가 접수되었습니다.",
       fields: {
         "신고 ID": params.reportId,
-        "유형": params.reportType,
-        "신고자": params.reporterName
+        유형: params.reportType,
+        신고자: params.reporterName
           ? `${params.reporterName} (${params.reporterId})`
           : params.reporterId,
-        "대상": params.targetName
+        대상: params.targetName
           ? `${params.targetName} (${params.targetId})`
           : params.targetId,
-        "사유": params.reason,
+        사유: params.reason,
       },
       link: "/admin",
     });
@@ -152,7 +158,7 @@ export class DiscordAdminAlertService {
       message: "새 이의신청이 접수되었습니다.",
       fields: {
         "이의신청 ID": params.appealId,
-        "유저": params.username
+        유저: params.username
           ? `${params.username} (${params.userId})`
           : params.userId,
       },
@@ -172,8 +178,8 @@ export class DiscordAdminAlertService {
       title: "관리자 민감 작업",
       message: params.summary || "관리자 작업이 수행되었습니다.",
       fields: {
-        "작업": params.operation,
-        "관리자": params.adminName
+        작업: params.operation,
+        관리자: params.adminName
           ? `${params.adminName} (${params.adminId})`
           : params.adminId,
         "대상 유형": params.targetType,
@@ -191,7 +197,7 @@ export class DiscordAdminAlertService {
       title: "Discord 권한 인증 알림 테스트",
       message: "Discord 권한 인증 채널 테스트 메시지입니다.",
       fields: {
-        "실행자": params.adminName
+        실행자: params.adminName
           ? `${params.adminName} (${params.adminId})`
           : params.adminId,
         "전송 시각": new Date().toISOString(),
@@ -215,8 +221,8 @@ export class DiscordAdminAlertService {
       fields: {
         "링크 ID": params.linkId,
         "길드 ID": params.guildId,
-        "길드명": params.guildName,
-        "요청자": params.requesterName
+        길드명: params.guildName,
+        요청자: params.requesterName
           ? `${params.requesterName} (${params.requesterId})`
           : params.requesterId,
         "부족 권한": params.missingPermissions,

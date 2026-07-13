@@ -208,7 +208,9 @@ export class PresenceGateway
       for (const friendId of friendIds) {
         // 친구가 현재 온라인 상태(게이트웨이에 연결됨)인 경우에만 발송
         if (this.userSockets.has(friendId)) {
-          this.server.to(`user:${friendId}`).emit("friend-status-changed", payload);
+          this.server
+            .to(`user:${friendId}`)
+            .emit("friend-status-changed", payload);
         }
       }
     } catch (error) {

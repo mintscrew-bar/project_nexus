@@ -80,8 +80,12 @@ describe("CommunityService", () => {
             notifyReportSubmitted: jest.fn().mockResolvedValue(undefined),
             notifyAppealSubmitted: jest.fn().mockResolvedValue(undefined),
             notifyAdminOperation: jest.fn().mockResolvedValue(undefined),
-            notifyDiscordGuildApprovalPending: jest.fn().mockResolvedValue(undefined),
-            notifyDiscordGuildPermissionFailure: jest.fn().mockResolvedValue(undefined),
+            notifyDiscordGuildApprovalPending: jest
+              .fn()
+              .mockResolvedValue(undefined),
+            notifyDiscordGuildPermissionFailure: jest
+              .fn()
+              .mockResolvedValue(undefined),
           },
         },
       ],

@@ -214,9 +214,8 @@ export class AuthController {
     try {
       const user = req.user as any;
       const refreshCookieValue = req.cookies?.refresh_token;
-      const refreshToken = this.authService.readRefreshTokenCookie(
-        refreshCookieValue,
-      );
+      const refreshToken =
+        this.authService.readRefreshTokenCookie(refreshCookieValue);
 
       const { accessToken } = await this.authService.refreshTokens(
         user.sub,

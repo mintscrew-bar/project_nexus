@@ -67,9 +67,7 @@ export class DiscordService {
       update: {
         ownerId,
         ...(guildName ? { guildName } : {}),
-        ...(keepDisabled
-          ? {}
-          : { status: "ACTIVE", activatedAt: new Date() }),
+        ...(keepDisabled ? {} : { status: "ACTIVE", activatedAt: new Date() }),
       },
       create: {
         guildId,

@@ -59,10 +59,7 @@ export class LabTasksService {
       "RIOT_TIER_REFRESH_DAILY_LIMIT",
       500,
     );
-    const chunkSize = this.getPositiveIntEnv(
-      "RIOT_TIER_REFRESH_CHUNK_SIZE",
-      5,
-    );
+    const chunkSize = this.getPositiveIntEnv("RIOT_TIER_REFRESH_CHUNK_SIZE", 5);
     const chunkDelayMs = this.getPositiveIntEnv(
       "RIOT_TIER_REFRESH_CHUNK_DELAY_MS",
       6_000,

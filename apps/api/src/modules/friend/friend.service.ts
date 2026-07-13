@@ -557,6 +557,8 @@ export class FriendService {
       },
     });
 
-    return friendships.map((f) => (f.userId === userId ? f.friendId : f.userId));
+    return friendships.map((f) =>
+      f.userId === userId ? f.friendId : f.userId,
+    );
   }
 }

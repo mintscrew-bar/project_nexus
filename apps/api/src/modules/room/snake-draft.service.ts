@@ -68,7 +68,10 @@ export class SnakeDraftService {
     }
 
     // startGame()이 WAITING → DRAFT로 원자 전환 후 호출되므로 DRAFT도 수용
-    if (room.status !== RoomStatus.WAITING && room.status !== RoomStatus.DRAFT) {
+    if (
+      room.status !== RoomStatus.WAITING &&
+      room.status !== RoomStatus.DRAFT
+    ) {
       throw new BadRequestException("Room already started");
     }
 
