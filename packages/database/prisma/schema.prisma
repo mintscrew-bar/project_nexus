@@ -528,6 +528,12 @@ model Match {
   queueId        Int?
   gameDuration   Int?
   dataCollected  Boolean            @default(false)
+  // 전적 수집 재시도 추적.
+  // 계속 실패하는 매치가 복구 큐(최신 20개)를 점유해 이전 미수집 경기가 영영
+  // 처리되지 못하는 것을 막는다. 실패할수록 지수 백오프로 뒤로 미루고,
+  // 상한을 넘기면 대상에서 제외한다.
+  collectAttempts      Int       @default(0)
+  lastCollectAttemptAt DateTime?
   scheduledAt    DateTime?
   startedAt      DateTime?
   completedAt    DateTime?
@@ -551,6 +557,7 @@ model Match {
   @@index([status])
   @@index([queueId])
   @@index([completedAt])
+  @@index([dataCollected, collectAttempts])
   @@map("matches")
 }
 

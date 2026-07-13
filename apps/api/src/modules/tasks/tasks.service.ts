@@ -145,7 +145,13 @@ export class TasksService {
   @Cron("*/15 * * * *")
   async handlePendingCustomMatchCollection(): Promise<void> {
     const lockKey = "tasks:pending-custom-match-collection";
-    const lockToken = await this.redis.acquireLock(lockKey, 14 * 60 * 1000);
+    // 락 TTL은 크론 주기(15분)보다 길어야 한다.
+    // 최대 20경기 × (경기당 3초 지연 + Riot API 호출/레이트리밋 대기)이므로
+    // 한 사이클이 15분을 넘길 수 있는데, TTL이 더 짧으면 작업이 아직 도는 중에
+    // 락이 먼저 풀려 다음 크론이 겹쳐 들어온다.
+    // 정상 종료 시에는 finally에서 즉시 해제하므로, TTL은 프로세스가 죽었을 때를
+    // 대비한 안전망 역할만 한다.
+    const lockToken = await this.redis.acquireLock(lockKey, 30 * 60 * 1000);
 
     if (!lockToken) {
       this.logger.warn(

@@ -38,25 +38,44 @@ describe("MatchDataCollectionService", () => {
   });
 
   describe("collectPendingMatches", () => {
-    it("retries every completed internal match whose data was not collected", async () => {
-      const findMany = jest.fn().mockResolvedValue([
-        { id: "tournament", tournamentCode: "code", riotMatchId: null },
-        { id: "known", tournamentCode: "code", riotMatchId: "KR_1" },
-        { id: "crossref", tournamentCode: null, riotMatchId: null },
-      ]);
-      const service = createService({ findMany });
-      const tournamentSpy = jest
-        .spyOn(service, "collectMatchData")
-        .mockResolvedValue();
-      const crossrefSpy = jest
-        .spyOn(service, "collectMatchDataByPuuidCrossref")
-        .mockResolvedValue();
+    /** 시도 이력이 없는(=백오프 대상 아님) 매치 */
+    const fresh = (
+      id: string,
+      tournamentCode: string | null,
+      riotMatchId: string | null,
+    ) => ({
+      id,
+      tournamentCode,
+      riotMatchId,
+      collectAttempts: 0,
+      lastCollectAttemptAt: null,
+    });
+
+    const immediateTimers = () =>
       jest.spyOn(global, "setTimeout").mockImplementation(((
         callback: () => void,
       ) => {
         callback();
         return 0;
       }) as typeof setTimeout);
+
+    it("retries every completed internal match whose data was not collected", async () => {
+      const findMany = jest
+        .fn()
+        .mockResolvedValue([
+          fresh("tournament", "code", null),
+          fresh("known", "code", "KR_1"),
+          fresh("crossref", null, null),
+        ]);
+      const update = jest.fn().mockResolvedValue(undefined);
+      const service = createService({ findMany, update });
+      const tournamentSpy = jest
+        .spyOn(service, "collectMatchData")
+        .mockResolvedValue();
+      const crossrefSpy = jest
+        .spyOn(service, "collectMatchDataByPuuidCrossref")
+        .mockResolvedValue();
+      immediateTimers();
 
       await service.collectPendingMatches();
 
@@ -66,12 +85,70 @@ describe("MatchDataCollectionService", () => {
             status: "COMPLETED",
             dataCollected: false,
             roomId: { not: null },
+            collectAttempts: { lt: 10 },
           },
         }),
       );
       expect(tournamentSpy).toHaveBeenCalledWith("tournament");
       expect(crossrefSpy).toHaveBeenCalledWith("known");
       expect(crossrefSpy).toHaveBeenCalledWith("crossref");
+    });
+
+    it("시도 횟수를 기록해 다음 백오프 간격을 늘린다", async () => {
+      const findMany = jest
+        .fn()
+        .mockResolvedValue([fresh("crossref", null, null)]);
+      const update = jest.fn().mockResolvedValue(undefined);
+      const service = createService({ findMany, update });
+      jest
+        .spyOn(service, "collectMatchDataByPuuidCrossref")
+        .mockResolvedValue();
+      immediateTimers();
+
+      await service.collectPendingMatches();
+
+      expect(update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: "crossref" },
+          data: expect.objectContaining({
+            collectAttempts: { increment: 1 },
+          }),
+        }),
+      );
+    });
+
+    it("백오프가 남은 매치는 건너뛰고 다른 매치를 처리한다", async () => {
+      const now = Date.now();
+      const findMany = jest.fn().mockResolvedValue([
+        // 5분 전에 1회 실패 → 백오프 15분이 아직 안 지났다
+        {
+          id: "backing-off",
+          tournamentCode: null,
+          riotMatchId: null,
+          collectAttempts: 1,
+          lastCollectAttemptAt: new Date(now - 5 * 60 * 1000),
+        },
+        // 1시간 전에 1회 실패 → 백오프 경과
+        {
+          id: "ready",
+          tournamentCode: null,
+          riotMatchId: null,
+          collectAttempts: 1,
+          lastCollectAttemptAt: new Date(now - 60 * 60 * 1000),
+        },
+      ]);
+      const update = jest.fn().mockResolvedValue(undefined);
+      const service = createService({ findMany, update });
+      const crossrefSpy = jest
+        .spyOn(service, "collectMatchDataByPuuidCrossref")
+        .mockResolvedValue();
+      immediateTimers();
+
+      await service.collectPendingMatches();
+
+      // 계속 실패하던 매치가 슬롯을 독점하지 않는다.
+      expect(crossrefSpy).not.toHaveBeenCalledWith("backing-off");
+      expect(crossrefSpy).toHaveBeenCalledWith("ready");
     });
   });
 

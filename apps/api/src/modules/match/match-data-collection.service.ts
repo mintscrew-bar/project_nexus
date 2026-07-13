@@ -22,6 +22,13 @@ type CrossrefCandidateScore = {
   reasons: string[];
 };
 
+/** 복구 큐에서 이 횟수만큼 실패하면 대상에서 제외한다. */
+const MAX_COLLECT_ATTEMPTS = 10;
+/** 첫 재시도 대기 시간. 실패할수록 2배씩 늘어난다. */
+const COLLECT_BASE_BACKOFF_MS = 15 * 60 * 1000; // 15분
+/** 백오프 상한 */
+const COLLECT_MAX_BACKOFF_MS = 24 * 60 * 60 * 1000; // 24시간
+
 export function isRiotCustomGame(matchData: MatchDto): boolean {
   return (
     matchData.info.queueId === 0 ||
@@ -880,27 +887,52 @@ export class MatchDataCollectionService {
    */
   async collectPendingMatches(): Promise<void> {
     try {
-      const matches = await this.prisma.match.findMany({
+      const now = Date.now();
+
+      // 백오프가 끝난 매치만 대상으로 삼는다.
+      // 계속 실패하는 최신 매치가 매 사이클 20개 슬롯을 독점하면 이전 미수집
+      // 경기가 영영 처리되지 못하므로, 실패할수록 뒤로 미루고 상한을 넘기면 제외한다.
+      const candidates = await this.prisma.match.findMany({
         where: {
           status: "COMPLETED",
           dataCollected: false,
           // roomId가 있는 내전 매치만 대상 (외부 인제스트 랭크 매치 제외)
           roomId: { not: null },
+          collectAttempts: { lt: MAX_COLLECT_ATTEMPTS },
         },
         select: {
           id: true,
           tournamentCode: true,
           riotMatchId: true,
+          collectAttempts: true,
+          lastCollectAttemptAt: true,
         },
-        orderBy: { completedAt: "desc" },
-        take: 20,
+        // 시도 횟수가 적은 것 → 오래된 것 순.
+        // 한 번도 시도하지 않은 매치가 항상 먼저 처리된다.
+        orderBy: [{ collectAttempts: "asc" }, { completedAt: "desc" }],
+        take: 60,
       });
 
+      const matches = candidates
+        .filter((match) => this.isCollectBackoffElapsed(match, now))
+        .slice(0, 20);
+
       this.logger.log(
-        `Found ${matches.length} matches pending data collection`,
+        `Found ${matches.length} matches pending data collection ` +
+          `(백오프 대기 중 ${candidates.length - matches.length}건)`,
       );
 
       for (const match of matches) {
+        // 시도 횟수를 먼저 기록한다. 수집이 성공하면 dataCollected=true가 되어
+        // 어차피 대상에서 빠지고, 실패하면 이 값이 다음 백오프 간격을 늘린다.
+        await this.prisma.match.update({
+          where: { id: match.id },
+          data: {
+            collectAttempts: { increment: 1 },
+            lastCollectAttemptAt: new Date(),
+          },
+        });
+
         if (match.tournamentCode && !match.riotMatchId) {
           await this.collectMatchData(match.id);
         } else {
@@ -912,6 +944,22 @@ export class MatchDataCollectionService {
     } catch (error) {
       this.logger.error("Error collecting pending matches:", error);
     }
+  }
+
+  /** 실패 횟수에 따른 지수 백오프가 지났는지 판단한다. */
+  private isCollectBackoffElapsed(
+    match: { collectAttempts: number; lastCollectAttemptAt: Date | null },
+    now: number,
+  ): boolean {
+    if (match.collectAttempts === 0 || !match.lastCollectAttemptAt) return true;
+
+    // 15분 → 30분 → 1시간 → 2시간 … (상한 24시간)
+    const backoffMs = Math.min(
+      COLLECT_BASE_BACKOFF_MS * 2 ** (match.collectAttempts - 1),
+      COLLECT_MAX_BACKOFF_MS,
+    );
+
+    return now - match.lastCollectAttemptAt.getTime() >= backoffMs;
   }
 
   private clearRetryTimer(matchId: string): void {
