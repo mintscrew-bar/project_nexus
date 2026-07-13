@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback } from "react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { ItemTooltip } from "./ItemTooltip";
-import { getDdragonVersion, itemIconUrl, fallbackTo } from "@/lib/ddragon";
+import { itemIconUrl } from "@/lib/ddragon";
+import { useCdnFallback } from "@/hooks/use-cdn-fallback";
 
 interface ItemImageProps {
   itemId: string;
@@ -30,28 +31,29 @@ export function ItemImage({
   alt,
   showTooltip = false,
 }: ItemImageProps) {
-  const imageUrl = `/icons/items/${itemId}.png`;
-  const [version, setVersion] = useState<string>("");
-
-  useEffect(() => {
-    getDdragonVersion().then(setVersion).catch(() => {});
-  }, []);
-
   const numericId = Number(itemId);
-  const cdnUrl = version && Number.isFinite(numericId)
-    ? itemIconUrl(numericId, version)
-    : null;
+
+  const buildCdnUrl = useCallback(
+    (version: string) =>
+      Number.isFinite(numericId) ? itemIconUrl(numericId, version) : null,
+    [numericId],
+  );
+
+  const { src, onError } = useCdnFallback(
+    `/icons/items/${itemId}.png`,
+    buildCdnUrl,
+  );
 
   const imageElement = (
     <div className={cn("relative overflow-hidden rounded", className)}>
       <Image
-        src={imageUrl}
+        src={src}
         alt={alt || `Item ${itemId}`}
         width={size}
         height={size}
         className="object-cover rounded"
         unoptimized
-        onError={cdnUrl ? fallbackTo(cdnUrl) : undefined}
+        onError={onError}
       />
     </div>
   );

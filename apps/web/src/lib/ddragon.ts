@@ -6,7 +6,7 @@
  *
  * - 모듈 레벨 캐시: 같은 페이지 세션에서는 한 번만 요청
  * - sessionStorage 캐시: 새 탭에서도 즉시 사용 가능 (1시간 TTL)
- * - 실패 시 fallback 으로 16.9.1 반환 (사용자 시점의 최신)
+ * - 실패 시 FALLBACK_VERSION 반환
  *
  * 주의: api-client.ts와의 순환 의존을 피하기 위해 fetch 를 직접 사용한다.
  */
@@ -16,7 +16,10 @@ const API_BASE_URL =
 
 const STORAGE_KEY = "nexus:ddragon-version";
 const STORAGE_TTL_MS = 60 * 60 * 1000; // 1시간
-const FALLBACK_VERSION = "16.9.1";
+// 백엔드 조회 실패 시에만 쓰이는 최후의 폴백.
+// 너무 오래된 버전이면 신규 챔피언 아이콘이 CDN에 없어 404가 나므로,
+// 신규 챔피언 추가 시 함께 갱신한다.
+const FALLBACK_VERSION = "16.13.1";
 
 let inMemory: string | null = null;
 let inflight: Promise<string> | null = null;

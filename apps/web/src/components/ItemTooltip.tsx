@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect, ReactNode, useRef } from "react";
+import { useState, useEffect, useCallback, ReactNode, useRef } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { getItemKoreanName } from "@nexus/types";
-import { getDdragonVersion, itemIconUrl, fallbackTo } from "@/lib/ddragon";
+import { getDdragonVersion, itemIconUrl } from "@/lib/ddragon";
+import { useCdnFallback } from "@/hooks/use-cdn-fallback";
 
 const DDRAGON_BASE = "https://ddragon.leagueoflegends.com";
 
@@ -130,15 +131,27 @@ export function ItemTooltip({ itemId, children, className }: ItemTooltipProps) {
   const [placement, setPlacement] = useState<"top" | "bottom">("top");
   const [alignment, setAlignment] = useState<"center" | "left" | "right">("center");
   const [isMounted, setIsMounted] = useState(false);
-  // CDN 폴백용 최신 패치 버전 (메모리 캐시되므로 한 번만 fetch)
-  const [version, setVersion] = useState<string>("");
   const containerRef = useRef<HTMLDivElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
+
+  // 로컬에 없는 신규 아이템은 CDN으로 자동 폴백
+  const buildCdnUrl = useCallback(
+    (version: string) => {
+      const numericId = Number(itemId);
+      return Number.isFinite(numericId)
+        ? itemIconUrl(numericId, version)
+        : null;
+    },
+    [itemId],
+  );
+  const { src: iconSrc, onError: onIconError } = useCdnFallback(
+    `/icons/items/${itemId}.png`,
+    buildCdnUrl,
+  );
 
   // 클라이언트 마운트 확인 (SSR 대비)
   useEffect(() => {
     setIsMounted(true);
-    getDdragonVersion().then(setVersion).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -239,14 +252,13 @@ export function ItemTooltip({ itemId, children, className }: ItemTooltipProps) {
               {/* 아이템 이름 & 가격 */}
               <div className="flex items-center gap-2 mb-2">
                 <Image
-                  src={`/icons/items/${itemId}.png`}
+                  src={iconSrc}
                   alt={item.name}
                   width={32}
                   height={32}
                   className="rounded"
                   unoptimized
-                  // 로컬에 없는 신규 아이템(예: 220012, 226660, 3168 등)은 CDN으로 자동 폴백
-                  onError={version ? fallbackTo(itemIconUrl(Number(itemId), version)) : undefined}
+                  onError={onIconError}
                 />
                 <div>
                   <p className="font-semibold text-text-primary">{getItemKoreanName(item.name) || item.name}</p>

@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useCallback } from "react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
-import { getDdragonVersion, championIconUrl, fallbackTo } from "@/lib/ddragon";
+import { championIconUrl } from "@/lib/ddragon";
+import { useCdnFallback } from "@/hooks/use-cdn-fallback";
+import { useDdragonStore } from "@/stores/ddragon-store";
 
 interface ChampionImageProps {
   championKey: string;
@@ -19,6 +21,9 @@ interface ChampionImageProps {
  * square: 1순위 로컬 → 폴백 DDragon CDN (신규 챔피언 자동 대응)
  * splash/loading: DDragon CDN 직접 사용
  *
+ * alt/title에는 DDragon의 한글 챔피언명(예: "아트록스")을 사용한다.
+ * 아직 목록이 로드되지 않았으면 영문 키로 폴백한다.
+ *
  * @param championKey 챔피언 키 (예: "Aatrox", "Ahri")
  * @param size 이미지 크기 (픽셀)
  * @param type 이미지 타입: "square" (아이콘), "splash" (스플래시), "loading" (로딩)
@@ -30,38 +35,43 @@ export function ChampionImage({
   className,
   alt,
 }: ChampionImageProps) {
-  const [version, setVersion] = useState<string>("");
+  const champions = useDdragonStore((s) => s.champions);
+  const fetchChampions = useDdragonStore((s) => s.fetchChampions);
 
+  // 챔피언 목록은 스토어가 한 번만 받아온다(이미 로드됐으면 no-op).
   useEffect(() => {
-    if (type === "square") {
-      getDdragonVersion().then(setVersion).catch(() => {});
-    }
-  }, [type]);
+    void fetchChampions();
+  }, [fetchChampions]);
 
-  const getImageUrl = () => {
-    switch (type) {
-      case "square":
-        return `/icons/champions/${championKey}.png`;
-      case "splash":
-        return `https://ddragon.leagueoflegends.com/cdn/img/champion/splash/${championKey}_0.jpg`;
-      case "loading":
-        return `https://ddragon.leagueoflegends.com/cdn/img/champion/loading/${championKey}_0.jpg`;
-      default:
-        return `/icons/champions/${championKey}.png`;
-    }
-  };
+  // championKey는 DDragon의 id(영문 키). 한글명은 name 필드에 들어있다.
+  const koreanName = useMemo(
+    () => champions.find((c) => c.id === championKey)?.name,
+    [champions, championKey],
+  );
+  const displayName = koreanName ?? championKey;
 
-  // square 타입만 폴백 적용 (splash/loading은 이미 CDN)
-  const onErrorHandler =
-    type === "square" && version
-      ? fallbackTo(championIconUrl(championKey, version))
-      : undefined;
+  const localUrl =
+    type === "square"
+      ? `/icons/champions/${championKey}.png`
+      : `https://ddragon.leagueoflegends.com/cdn/img/champion/${
+          type === "splash" ? "splash" : "loading"
+        }/${championKey}_0.jpg`;
+
+  // splash/loading은 이미 CDN이라 폴백 대상이 아니다.
+  const buildCdnUrl = useCallback(
+    (version: string) =>
+      type === "square" ? championIconUrl(championKey, version) : null,
+    [championKey, type],
+  );
+
+  const { src, onError } = useCdnFallback(localUrl, buildCdnUrl);
 
   return (
     <div className={cn("relative overflow-hidden rounded", className)}>
       <Image
-        src={getImageUrl()}
-        alt={alt || `${championKey} ${type} image`}
+        src={src}
+        alt={alt || displayName}
+        title={displayName}
         width={size}
         height={size}
         className={cn(
@@ -70,7 +80,7 @@ export function ChampionImage({
           type === "splash" && "rounded-lg"
         )}
         unoptimized // Data Dragon은 외부 CDN이므로 Next.js 최적화 비활성화
-        onError={onErrorHandler}
+        onError={onError}
       />
     </div>
   );
