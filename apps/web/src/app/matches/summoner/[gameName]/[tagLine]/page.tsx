@@ -764,6 +764,7 @@ export default function SummonerStatsPage() {
               tagLine={tagLine}
               puuid={summoner.puuid}
               navigateToSummoner={navigateToSummoner}
+              nexusMatches={nexusMatches}
             />
           </div>
 

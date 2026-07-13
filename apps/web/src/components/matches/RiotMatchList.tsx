@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { statsApi } from "@/lib/api-client";
 import {
@@ -9,6 +9,7 @@ import {
   getQueueTypeName,
   getSummonerSpellName,
   calculateTimeAgo,
+  type NexusMatchHistory,
 } from "./match-utils";
 import { getDdragonVersion, itemIconUrl, runeIconUrl, fallbackTo } from "@/lib/ddragon";
 import { ItemTooltip } from "@/components/ItemTooltip";
@@ -39,6 +40,8 @@ interface RiotMatchListProps {
   tagLine: string;
   puuid: string;
   navigateToSummoner: (gameName: string, tagLine: string) => void;
+  /** Nexus 내전 기록. riotMatchId로 대조해 "내전" 배지를 붙인다. */
+  nexusMatches?: NexusMatchHistory[];
 }
 
 const RIOT_MATCH_COUNT = 10;
@@ -48,7 +51,19 @@ export default function RiotMatchList({
   tagLine,
   puuid,
   navigateToSummoner,
+  nexusMatches,
 }: RiotMatchListProps) {
+  // Nexus 내전으로 확인된 Riot 매치 ID 집합.
+  // 사용자 지정 게임이라도 이 집합에 없으면 Nexus 내전이 아니다.
+  const nexusRiotMatchIds = useMemo(
+    () =>
+      new Set(
+        (nexusMatches ?? [])
+          .map((m) => m.match?.riotMatchId)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    [nexusMatches],
+  );
   const [selectedQueueId, setSelectedQueueId] = useState<number | undefined>(undefined);
   const [expandedMatches, setExpandedMatches] = useState<Set<string>>(new Set());
   const mountedMatchesRef = useRef(new Set<string>());
@@ -261,7 +276,7 @@ export default function RiotMatchList({
                         <span className={`font-bold text-xs sm:text-sm ${isRemake ? "text-text-tertiary" : participant.win ? "text-accent-success" : "text-accent-danger"}`}>
                           {isRemake ? "리메이크" : participant.win ? "승리" : "패배"}
                         </span>
-                        <span className="text-[10px] sm:text-xs text-text-secondary truncate hidden sm:inline">{getQueueTypeName(match.info.queueId, match.info.gameType)}</span>
+                        <span className="text-[10px] sm:text-xs text-text-secondary truncate hidden sm:inline">{getQueueTypeName(match.info.queueId, match.info.gameType, nexusRiotMatchIds.has(matchId))}</span>
                       </div>
                       <div className="text-[10px] sm:text-xs text-text-tertiary">{gameDurationMin}:{gameDurationSec.toString().padStart(2, '0')} · {timeAgo}</div>
                       <div className="text-[10px] sm:text-xs text-text-tertiary truncate">{getChampionKoreanName(participant.championName)}</div>

@@ -349,6 +349,7 @@ export default function UserStatsPage() {
                 tagLine={primaryAccount.tagLine}
                 puuid={primaryAccount.puuid}
                 navigateToSummoner={navigateToSummoner}
+                nexusMatches={matchHistory}
               />
             ) : (
               <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-6">

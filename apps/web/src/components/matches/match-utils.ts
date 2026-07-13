@@ -82,6 +82,8 @@ export interface NexusMatchHistory {
   matchId: string;
   match: {
     id: string;
+    /** 연결된 Riot 매치 ID. 전적 수집 전이면 null */
+    riotMatchId: string | null;
     teamA: { id: string; name: string } | null;
     teamB: { id: string; name: string } | null;
     winner: { id: string; name: string } | null;
@@ -189,9 +191,27 @@ export function getItemIcon(itemId: number): string {
   return `/icons/items/${itemId}.png`;
 }
 
-export function getQueueTypeName(queueId: number, gameType?: string): string {
-  if (queueId === 0 || gameType?.toUpperCase() === "CUSTOM_GAME") {
-    return "내전";
+/** 라이엇 사용자 지정 게임(사설방) 여부 */
+export function isCustomGame(queueId: number, gameType?: string): boolean {
+  return queueId === 0 || gameType?.toUpperCase() === "CUSTOM_GAME";
+}
+
+/**
+ * 큐 이름을 반환한다.
+ *
+ * 사용자 지정 게임이라고 해서 모두 Nexus 내전은 아니다. 친구들끼리 만든 사설방도
+ * CUSTOM_GAME이므로, Nexus 매치와 riotMatchId로 연결이 확인된 경기만 "내전"으로
+ * 표시하고 나머지는 라이엇 공식 용어인 "사용자 지정"으로 둔다.
+ *
+ * @param isNexusMatch riotMatchId가 Nexus 내전 기록과 매칭되었는지 여부
+ */
+export function getQueueTypeName(
+  queueId: number,
+  gameType?: string,
+  isNexusMatch = false,
+): string {
+  if (isCustomGame(queueId, gameType)) {
+    return isNexusMatch ? "내전" : "사용자 지정";
   }
 
   const queueTypes: Record<number, string> = {
