@@ -1,15 +1,14 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo } from "react";
-import { useInfiniteQuery } from "@tanstack/react-query";
-import { statsApi } from "@/lib/api-client";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { statsApi, matchApi } from "@/lib/api-client";
 import {
   QUEUE_TABS,
   getChampionIcon,
   getQueueTypeName,
   getSummonerSpellName,
   calculateTimeAgo,
-  type NexusMatchHistory,
 } from "./match-utils";
 import { getDdragonVersion, itemIconUrl, runeIconUrl, fallbackTo } from "@/lib/ddragon";
 import { ItemTooltip } from "@/components/ItemTooltip";
@@ -40,8 +39,8 @@ interface RiotMatchListProps {
   tagLine: string;
   puuid: string;
   navigateToSummoner: (gameName: string, tagLine: string) => void;
-  /** Nexus 내전 기록. riotMatchId로 대조해 "내전" 배지를 붙인다. */
-  nexusMatches?: NexusMatchHistory[];
+  /** Nexus 유저 ID. 있으면 내전 여부를 대조해 "내전" 배지를 붙인다. */
+  nexusUserId?: string | null;
 }
 
 const RIOT_MATCH_COUNT = 10;
@@ -51,18 +50,22 @@ export default function RiotMatchList({
   tagLine,
   puuid,
   navigateToSummoner,
-  nexusMatches,
+  nexusUserId,
 }: RiotMatchListProps) {
-  // Nexus 내전으로 확인된 Riot 매치 ID 집합.
-  // 사용자 지정 게임이라도 이 집합에 없으면 Nexus 내전이 아니다.
+  // Nexus 내전으로 확인된 Riot 매치 ID 전체.
+  // 화면용 매치 히스토리는 페이지네이션되지만 Riot 전적은 무한 스크롤되므로,
+  // 그 목록을 재사용하면 오래된 내전이 "사용자 지정"으로 잘못 표시된다.
+  // ID만 담은 전용 엔드포인트로 전체를 받아 대조한다.
+  const { data: nexusRiotMatchIdList } = useQuery<string[]>({
+    queryKey: ["nexusRiotMatchIds", nexusUserId],
+    queryFn: () => matchApi.getUserRiotMatchIds(nexusUserId!),
+    staleTime: 5 * 60 * 1000,
+    enabled: !!nexusUserId,
+  });
+
   const nexusRiotMatchIds = useMemo(
-    () =>
-      new Set(
-        (nexusMatches ?? [])
-          .map((m) => m.match?.riotMatchId)
-          .filter((id): id is string => Boolean(id)),
-      ),
-    [nexusMatches],
+    () => new Set(nexusRiotMatchIdList ?? []),
+    [nexusRiotMatchIdList],
   );
   const [selectedQueueId, setSelectedQueueId] = useState<number | undefined>(undefined);
   const [expandedMatches, setExpandedMatches] = useState<Set<string>>(new Set());

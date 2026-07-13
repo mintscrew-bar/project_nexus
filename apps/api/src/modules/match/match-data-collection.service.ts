@@ -24,6 +24,18 @@ type CrossrefCandidateScore = {
 
 /** 복구 큐에서 이 횟수만큼 실패하면 대상에서 제외한다. */
 const MAX_COLLECT_ATTEMPTS = 10;
+/**
+ * 한 사이클에서 실제로 처리할 매치 수.
+ *
+ * 백그라운드 Riot 요청은 8초 간격(RIOT_MATCH_BACKGROUND_REQUEST_DELAY_MS)이라,
+ * 실패하는 매치 하나가 최대 6명 × (목록 1회 + 상세 5회) = 36회 ≈ 5분까지 걸린다.
+ * 배치가 크면 한 사이클이 크론 주기와 락 TTL을 모두 넘겨 다음 실행과 겹친다.
+ * 최악(5 × 5분 = 25분)이 락 TTL(30분) 안에 들어오도록 잡는다.
+ * 15분마다 5건이면 시간당 20건으로 처리량도 충분하다.
+ */
+const COLLECT_BATCH_SIZE = 5;
+/** 백오프로 걸러질 것을 감안해 넉넉히 조회한 뒤 배치 크기만큼 자른다. */
+const COLLECT_CANDIDATE_POOL = 60;
 /** 첫 재시도 대기 시간. 실패할수록 2배씩 늘어난다. */
 const COLLECT_BASE_BACKOFF_MS = 15 * 60 * 1000; // 15분
 /** 백오프 상한 */
@@ -417,6 +429,15 @@ export class MatchDataCollectionService {
           .filter((puuid) => expectedPuuids.has(puuid)),
       );
 
+      // 라이엇 계정이 연동된 멤버가 한 명도 없으면 저장할 전적이 존재하지 않는다.
+      // 이때 아래 불완전 검사는 0 < 0 이라 통과해버려서, 참가자 0명짜리 매치가
+      // dataCollected=true로 확정된다. 그 전에 막는다.
+      if (expectedPuuids.size === 0) {
+        throw new Error(
+          `기대 참가자가 없다 (라이엇 계정 연동 멤버 0명) — 전적을 저장하지 않는다`,
+        );
+      }
+
       if (matchedPuuids.size < expectedPuuids.size) {
         const missing = [...expectedPuuids].filter(
           (puuid) => !matchedPuuids.has(puuid),
@@ -687,12 +708,13 @@ export class MatchDataCollectionService {
       const sampleMembers = this.selectCrossrefSampleMembers(expectedMembers);
       const evaluatedCandidates: CrossrefCandidateScore[] = [];
       const inspectedMatchIds = new Set<string>();
-      let bestCandidate: CrossrefCandidateScore | null = null;
-
       // 한 멤버의 목록에서 상세 조회할 후보 수 상한 (API 호출 폭주 방지)
       const MAX_DETAIL_LOOKUPS_PER_MEMBER = 5;
 
-      for (let i = 0; i < sampleMembers.length && !bestCandidate; i++) {
+      const hasValidCandidate = () =>
+        evaluatedCandidates.some((candidate) => candidate.valid);
+
+      for (let i = 0; i < sampleMembers.length && !hasValidCandidate(); i++) {
         const ids = await this.riotMatchService.getMatchIdsByPuuid(
           sampleMembers[i].puuid,
           0,
@@ -744,14 +766,27 @@ export class MatchDataCollectionService {
             completedAt,
           );
           evaluatedCandidates.push(scored);
-
-          // 검증을 통과하면 같은 매치이므로 더 찾을 필요가 없다.
-          if (scored.valid) {
-            bestCandidate = scored;
-            break;
-          }
         }
+
+        // 이 멤버의 목록에서 유효 후보가 나왔으면 다른 멤버는 볼 필요가 없다.
+        // (같은 매치이므로 다른 멤버의 목록에서도 같은 후보만 나온다)
+        // 단, 이 멤버의 후보들은 끝까지 평가한다 — 연속 내전처럼 유효 후보가
+        // 여러 개일 수 있어 그중 최적값을 골라야 하기 때문이다.
       }
+
+      // 같은 팀이 연달아 여러 판을 하면 모든 판이 "유효"하다(같은 10명 / 커스텀 /
+      // 시간 허용치 ±2시간). 그래서 먼저 찾은 후보를 그냥 쓰면 뒤 경기를 앞 대진에
+      // 연결할 수 있다. 점수 → 종료 시각 근접 순으로 정렬해 최적 후보를 고른다.
+      const bestCandidate =
+        evaluatedCandidates
+          .filter((candidate) => candidate.valid)
+          .sort((a, b) => {
+            if (b.score !== a.score) return b.score - a.score;
+            return (
+              (a.timeDeltaMs ?? Number.MAX_SAFE_INTEGER) -
+              (b.timeDeltaMs ?? Number.MAX_SAFE_INTEGER)
+            );
+          })[0] ?? null;
 
       if (!bestCandidate) {
         const summary =
@@ -907,15 +942,15 @@ export class MatchDataCollectionService {
           collectAttempts: true,
           lastCollectAttemptAt: true,
         },
-        // 시도 횟수가 적은 것 → 오래된 것 순.
-        // 한 번도 시도하지 않은 매치가 항상 먼저 처리된다.
+        // 1순위: 시도 횟수가 적은 것 — 한 번도 시도하지 않은 매치가 항상 먼저 처리된다.
+        // 2순위: 같은 시도 횟수라면 최근 경기부터 (사용자가 기다리는 건 방금 끝난 판이다).
         orderBy: [{ collectAttempts: "asc" }, { completedAt: "desc" }],
-        take: 60,
+        take: COLLECT_CANDIDATE_POOL,
       });
 
       const matches = candidates
         .filter((match) => this.isCollectBackoffElapsed(match, now))
-        .slice(0, 20);
+        .slice(0, COLLECT_BATCH_SIZE);
 
       this.logger.log(
         `Found ${matches.length} matches pending data collection ` +

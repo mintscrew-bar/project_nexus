@@ -224,4 +224,10 @@ export class MatchController {
       query.offset ?? 0,
     );
   }
+
+  /** Riot 전적 목록에서 Nexus 내전을 식별하기 위한 riotMatchId 전체 목록 */
+  @Get("user/:userId/riot-match-ids")
+  async getUserRiotMatchIds(@Param("userId") userId: string) {
+    return this.matchService.getUserRiotMatchIds(userId);
+  }
 }

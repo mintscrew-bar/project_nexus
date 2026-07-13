@@ -949,6 +949,12 @@ export const matchApi = {
     return response.data;
   },
 
+  // Riot 전적 목록에서 Nexus 내전을 식별하기 위한 riotMatchId 전체 목록
+  getUserRiotMatchIds: async (userId: string): Promise<string[]> => {
+    const response = await apiClient.get(`/matches/user/${userId}/riot-match-ids`);
+    return response.data;
+  },
+
   submitVote: async (matchId: string, data: { votedForId: string; voteType: 'MVP' | 'ACE' }) => {
     const response = await apiClient.post(`/matches/${matchId}/vote`, data);
     return response.data;

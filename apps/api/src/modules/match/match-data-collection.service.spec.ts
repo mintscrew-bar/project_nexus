@@ -229,6 +229,65 @@ describe("MatchDataCollectionService", () => {
       );
     });
 
+    it("연속 내전에서는 종료 시각이 가장 가까운 경기를 고른다", async () => {
+      // 같은 팀이 연달아 2판을 했다. 두 판 모두 같은 10명 / 커스텀 / 시간 허용치(±2h)
+      // 안이라 둘 다 "유효"하다. 먼저 나온 후보를 그냥 쓰면 뒤 경기를 앞 대진에
+      // 연결하게 되므로, 종료 시각이 가까운 쪽을 골라야 한다.
+      const completedAt = new Date("2026-07-13T10:00:00.000Z");
+      const member = (userId: string, puuid: string) => ({
+        userId,
+        user: { riotAccounts: [{ puuid }] },
+      });
+      const storedMatch = {
+        id: "match-first-game",
+        riotMatchId: null,
+        teamAId: "a",
+        teamBId: "b",
+        startedAt: new Date("2026-07-13T09:30:00.000Z"),
+        completedAt,
+        teamA: { id: "a", members: [member("user-a", "puuid-a")] },
+        teamB: { id: "b", members: [member("user-b", "puuid-b")] },
+      };
+      const game = (endMs: number) => ({
+        info: {
+          queueId: 0,
+          gameType: "CUSTOM_GAME",
+          gameEndTimestamp: endMs,
+          participants: [
+            { puuid: "puuid-a", teamId: 100 },
+            { puuid: "puuid-b", teamId: 200 },
+          ],
+        },
+      });
+      // Riot 최신 목록은 뒷 경기(KR_SECOND)가 먼저 나온다.
+      const secondGame = game(completedAt.getTime() + 40 * 60 * 1000); // 40분 뒤
+      const firstGame = game(completedAt.getTime()); // 대진과 동일 시각
+
+      const findUnique = jest.fn().mockResolvedValue(storedMatch);
+      const update = jest.fn().mockResolvedValue(undefined);
+      const getMatchIdsByPuuid = jest
+        .fn()
+        .mockResolvedValue(["KR_SECOND", "KR_FIRST"]);
+      const getMatchById = jest.fn(async (id: string) =>
+        id === "KR_SECOND" ? secondGame : firstGame,
+      );
+      const service = createService(
+        { findUnique, update },
+        { getMatchIdsByPuuid, getMatchById },
+      );
+      jest
+        .spyOn(service as never, "saveMatchData" as never)
+        .mockResolvedValue(undefined as never);
+
+      await service.collectMatchDataByPuuidCrossref("match-first-game");
+
+      expect(update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ riotMatchId: "KR_FIRST" }),
+        }),
+      );
+    });
+
     it("첫 멤버의 목록에서 매치를 찾으면 나머지 멤버는 조회하지 않는다", async () => {
       const completedAt = new Date("2026-07-13T10:00:00.000Z");
       const member = (userId: string, puuid: string) => ({
@@ -383,8 +442,16 @@ describe("MatchDataCollectionService", () => {
   });
 
   describe("saveMatchData", () => {
-    /** 내전 매치 1개(팀당 1명) + Riot 참가자 목록으로 saveMatchData를 실제 호출한다. */
-    const runSave = async (participantPuuids: string[]) => {
+    /**
+     * 내전 매치 1개(팀당 1명) + Riot 참가자 목록으로 saveMatchData를 실제 호출한다.
+     * @param linkRiotAccounts false면 멤버들이 라이엇 계정을 연동하지 않은 상태
+     */
+    const runSave = async (
+      participantPuuids: string[],
+      linkRiotAccounts = true,
+    ) => {
+      const riotAccounts = (puuid: string) =>
+        linkRiotAccounts ? [{ puuid }] : [];
       const storedMatch = {
         id: "match-1",
         teamAId: "a",
@@ -394,7 +461,7 @@ describe("MatchDataCollectionService", () => {
           members: [
             {
               userId: "user-a",
-              user: { riotAccounts: [{ puuid: "puuid-a" }] },
+              user: { riotAccounts: riotAccounts("puuid-a") },
             },
           ],
         },
@@ -403,7 +470,7 @@ describe("MatchDataCollectionService", () => {
           members: [
             {
               userId: "user-b",
-              user: { riotAccounts: [{ puuid: "puuid-b" }] },
+              user: { riotAccounts: riotAccounts("puuid-b") },
             },
           ],
         },
@@ -467,6 +534,18 @@ describe("MatchDataCollectionService", () => {
       const { call, tx, matchUpdate } = await runSave(["puuid-a"]);
 
       await expect(call).rejects.toThrow(/참가자 매핑 불완전/);
+      expect(tx.matchParticipant.create).not.toHaveBeenCalled();
+      expect(matchUpdate).not.toHaveBeenCalled();
+    });
+
+    it("라이엇 계정 연동 멤버가 없으면 빈 전적을 완료 처리하지 않는다", async () => {
+      // 기대 참가자가 0명이면 불완전 검사(0 < 0)를 통과해버린다 → 별도로 막아야 한다
+      const { call, tx, matchUpdate } = await runSave(
+        ["puuid-a", "puuid-b"],
+        false,
+      );
+
+      await expect(call).rejects.toThrow(/기대 참가자가 없다/);
       expect(tx.matchParticipant.create).not.toHaveBeenCalled();
       expect(matchUpdate).not.toHaveBeenCalled();
     });

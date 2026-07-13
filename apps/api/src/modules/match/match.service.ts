@@ -358,7 +358,9 @@ export class MatchService {
       (captainAId && captainAId === hostId) ||
       (captainBId && captainBId === hostId);
     if (!isAuthorized) {
-      throw new ForbiddenException("호스트 또는 팀장만 결과를 보고할 수 있습니다.");
+      throw new ForbiddenException(
+        "호스트 또는 팀장만 결과를 보고할 수 있습니다.",
+      );
     }
 
     if (match.status !== MatchStatus.IN_PROGRESS) {
@@ -1193,6 +1195,35 @@ export class MatchService {
       },
       team: participant.team,
     }));
+  }
+
+  /**
+   * 해당 유저가 참가한 Nexus 내전의 Riot 매치 ID 전체를 반환한다.
+   *
+   * Riot 전적 목록에서 "내전" 배지를 붙일지 판단하는 대조용이다.
+   * 화면 표시용 매치 히스토리는 페이지네이션되지만 Riot 전적은 무한 스크롤되므로,
+   * 그 목록을 재사용하면 오래된 내전이 "사용자 지정"으로 잘못 표시된다.
+   * ID만 담은 경량 응답이라 전체를 내려도 부담이 없다.
+   */
+  async getUserRiotMatchIds(userId: string): Promise<string[]> {
+    const participants = await this.prisma.matchParticipant.findMany({
+      where: {
+        userId,
+        match: {
+          roomId: { not: null },
+          riotMatchId: { not: null },
+        },
+      },
+      select: {
+        match: {
+          select: { riotMatchId: true },
+        },
+      },
+    });
+
+    return participants
+      .map((participant) => participant.match?.riotMatchId)
+      .filter((riotMatchId): riotMatchId is string => Boolean(riotMatchId));
   }
 
   // ========================================
