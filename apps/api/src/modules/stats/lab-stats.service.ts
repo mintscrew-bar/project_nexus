@@ -16,6 +16,7 @@ import {
   type MatchStatsSource,
 } from "./utils/custom-match-aggregator";
 import { normalizeRiotPosition } from "../match/position-normalizer";
+import { calculateChampionPickRate } from "./utils/champion-pick-rate";
 
 // ─── Lab Redis 캐시 키 네임스페이스 ───
 
@@ -694,10 +695,11 @@ export class LabStatsService {
           for (const row of rows) {
             const games = row.games;
             const wins = row.wins;
-            const pickRate =
-              position === null
-                ? games / (totalMatches * 10) // 전체: 매치당 10명
-                : games / totalMatches; // 포지션별: 매치당 해당 포지션 1명
+            const pickRate = calculateChampionPickRate(
+              games,
+              totalMatches,
+              position,
+            );
             const banCount = banCounts.get(row.championId) ?? 0;
             const banRate = banCount / totalMatches;
             const wl = wilsonLower(wins, games);
@@ -2089,12 +2091,11 @@ export class LabStatsService {
       .map((row) => {
         const championName = row.championName ?? String(row.championId);
         const winRate = row.games > 0 ? row.wins / row.games : 0;
-        const pickRate =
-          totalMatches > 0
-            ? normalizedPosition === null
-              ? row.games / (totalMatches * 10)
-              : row.games / totalMatches
-            : 0;
+        const pickRate = calculateChampionPickRate(
+          row.games,
+          totalMatches,
+          normalizedPosition,
+        );
         const banRate =
           totalMatches > 0
             ? (banCounts.get(row.championId) ?? 0) / totalMatches

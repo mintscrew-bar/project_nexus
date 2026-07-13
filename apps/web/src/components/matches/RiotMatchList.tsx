@@ -261,7 +261,7 @@ export default function RiotMatchList({
                         <span className={`font-bold text-xs sm:text-sm ${isRemake ? "text-text-tertiary" : participant.win ? "text-accent-success" : "text-accent-danger"}`}>
                           {isRemake ? "리메이크" : participant.win ? "승리" : "패배"}
                         </span>
-                        <span className="text-[10px] sm:text-xs text-text-secondary truncate hidden sm:inline">{getQueueTypeName(match.info.queueId)}</span>
+                        <span className="text-[10px] sm:text-xs text-text-secondary truncate hidden sm:inline">{getQueueTypeName(match.info.queueId, match.info.gameType)}</span>
                       </div>
                       <div className="text-[10px] sm:text-xs text-text-tertiary">{gameDurationMin}:{gameDurationSec.toString().padStart(2, '0')} · {timeAgo}</div>
                       <div className="text-[10px] sm:text-xs text-text-tertiary truncate">{getChampionKoreanName(participant.championName)}</div>

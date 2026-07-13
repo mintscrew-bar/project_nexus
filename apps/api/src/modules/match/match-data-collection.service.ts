@@ -22,6 +22,13 @@ type CrossrefCandidateScore = {
   reasons: string[];
 };
 
+export function isRiotCustomGame(matchData: MatchDto): boolean {
+  return (
+    matchData.info.queueId === 0 ||
+    matchData.info.gameType?.toUpperCase() === "CUSTOM_GAME"
+  );
+}
+
 @Injectable()
 export class MatchDataCollectionService {
   private readonly logger = new Logger(MatchDataCollectionService.name);
@@ -150,14 +157,18 @@ export class MatchDataCollectionService {
     const matchedRatio =
       expectedPuuidCount > 0 ? matchedPuuidCount / expectedPuuidCount : 0;
     const queueId = matchData.info.queueId;
-    const queueOk = queueId === 0;
+    const customGameOk = isRiotCustomGame(matchData);
     const endMs = this.getRiotMatchEndMs(matchData);
     const timeDeltaMs = endMs ? Math.abs(endMs - completedAt.getTime()) : null;
     const timeOk = timeDeltaMs === null || timeDeltaMs <= 2 * 60 * 60 * 1000;
     const teamOk = matchedPuuidCount < 4 || teamAlignmentRatio >= 0.75;
 
     const reasons: string[] = [];
-    if (!queueOk) reasons.push(`queueId=${queueId}`);
+    if (!customGameOk) {
+      reasons.push(
+        `notCustomGame(queueId=${queueId},gameType=${matchData.info.gameType})`,
+      );
+    }
     if (matchedPuuidCount < requiredMatchedCount) {
       reasons.push(`matched=${matchedPuuidCount}/${expectedPuuidCount}`);
     }
@@ -178,7 +189,7 @@ export class MatchDataCollectionService {
       matchedRatio * 100 +
       teamAlignmentRatio * 45 +
       (sampleHits / Math.max(sampleSize, 1)) * 25 +
-      (queueOk ? 25 : 0) +
+      (customGameOk ? 25 : 0) +
       timeScore;
 
     return {
@@ -186,7 +197,7 @@ export class MatchDataCollectionService {
       matchData,
       score,
       valid:
-        queueOk &&
+        customGameOk &&
         matchedPuuidCount >= requiredMatchedCount &&
         teamOk &&
         timeOk,
@@ -585,6 +596,35 @@ export class MatchDataCollectionService {
         return;
       }
 
+      // A previous attempt can persist the Riot ID before participant storage
+      // fails. Reuse that ID instead of trying to discover the same match again.
+      if (match.riotMatchId) {
+        const knownMatchData = await this.riotMatchService.getMatchById(
+          match.riotMatchId,
+          3,
+          "background",
+          {
+            emitCacheEvent: false,
+            propagateKnownPuuids: false,
+          },
+        );
+
+        if (!knownMatchData) {
+          this.logger.warn(
+            `[PuuidCrossref] 저장된 Riot 매치 재조회 실패: ${match.riotMatchId}`,
+          );
+          await this.schedulePuuidCrossrefRetry(matchId, attemptNumber);
+          return;
+        }
+
+        await this.saveMatchData(matchId, match, knownMatchData);
+        this.clearRetryTimer(`crossref:${matchId}`);
+        this.logger.log(
+          `[PuuidCrossref] 저장된 Riot 매치로 전적 복구 완료 matchId=${matchId} riotMatchId=${match.riotMatchId}`,
+        );
+        return;
+      }
+
       // 참가자 PUUID 수집 (teamA + teamB)
       const expectedMembers = this.buildExpectedMembers(match);
 
@@ -618,7 +658,7 @@ export class MatchDataCollectionService {
           sampleMembers[i].puuid,
           0,
           20, // 최근 20개로 늘려 누락 방지 (기존 10개에서 증가)
-          0, // queue=0: Custom Game
+          undefined, // 수동 사설방은 queueId가 0이 아닐 수 있어 상세 데이터로 검증
           undefined,
           3,
           startTime,
@@ -833,14 +873,17 @@ export class MatchDataCollectionService {
       const matches = await this.prisma.match.findMany({
         where: {
           status: "COMPLETED",
-          riotMatchId: null,
+          dataCollected: false,
           // roomId가 있는 내전 매치만 대상 (외부 인제스트 랭크 매치 제외)
           roomId: { not: null },
         },
         select: {
           id: true,
           tournamentCode: true,
+          riotMatchId: true,
         },
+        orderBy: { completedAt: "desc" },
+        take: 20,
       });
 
       this.logger.log(
@@ -848,7 +891,7 @@ export class MatchDataCollectionService {
       );
 
       for (const match of matches) {
-        if (match.tournamentCode) {
+        if (match.tournamentCode && !match.riotMatchId) {
           await this.collectMatchData(match.id);
         } else {
           await this.collectMatchDataByPuuidCrossref(match.id);

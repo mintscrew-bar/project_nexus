@@ -189,9 +189,12 @@ export function getItemIcon(itemId: number): string {
   return `/icons/items/${itemId}.png`;
 }
 
-export function getQueueTypeName(queueId: number): string {
+export function getQueueTypeName(queueId: number, gameType?: string): string {
+  if (queueId === 0 || gameType?.toUpperCase() === "CUSTOM_GAME") {
+    return "내전";
+  }
+
   const queueTypes: Record<number, string> = {
-    0: "내전",
     420: "솔로 랭크",
     440: "자유 랭크",
     450: "칼바람 나락",

@@ -8,6 +8,7 @@ import { RiotService } from "../riot/riot.service";
 import { getPeakTierUpdate } from "../riot/riot-rank.util";
 import { RedisService } from "../redis/redis.service";
 import { StatsService } from "../stats/stats.service";
+import { MatchDataCollectionService } from "../match/match-data-collection.service";
 
 type QueueGroupConfig = {
   name: "ranked" | "normal" | "aram" | "custom";
@@ -62,6 +63,7 @@ export class TasksService {
     private readonly riotMatchService: RiotMatchService,
     private readonly redis: RedisService,
     private readonly statsService: StatsService,
+    private readonly matchDataCollectionService: MatchDataCollectionService,
   ) {
     this.rankedSeededSlotCap = this.getPositiveIntConfig(
       "MATCH_FETCH_RANKED_SEEDED_SLOT_CAP",
@@ -137,6 +139,28 @@ export class TasksService {
         lastMatchIdField: "customLastMatchId",
       },
     ];
+  }
+
+  /** Re-process completed internal matches whose Riot data was not persisted. */
+  @Cron("*/15 * * * *")
+  async handlePendingCustomMatchCollection(): Promise<void> {
+    const lockKey = "tasks:pending-custom-match-collection";
+    const lockToken = await this.redis.acquireLock(lockKey, 14 * 60 * 1000);
+
+    if (!lockToken) {
+      this.logger.warn(
+        "Pending custom match collection skipped: another worker holds the lock",
+      );
+      return;
+    }
+
+    try {
+      await this.matchDataCollectionService.collectPendingMatches();
+    } catch (error) {
+      this.logger.error("Pending custom match collection failed", error);
+    } finally {
+      await this.redis.releaseLock(lockKey, lockToken);
+    }
   }
 
   private getPositiveIntConfig(key: string, fallback: number): number {
