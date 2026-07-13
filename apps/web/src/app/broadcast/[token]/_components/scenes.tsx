@@ -1030,12 +1030,14 @@ function BoardColumn({
   accent,
   focusMatchId,
   className = "",
+  dense = false,
 }: {
   title: string;
   matches: any[];
   accent: string;
   focusMatchId?: string | null;
   className?: string;
+  dense?: boolean;
 }) {
   return (
     <section className={`min-w-0 ${className}`}>
@@ -1047,7 +1049,7 @@ function BoardColumn({
           {matches.length || "-"}
         </span>
       </div>
-      <div className="grid gap-3">
+      <div className={`grid ${dense ? "gap-2" : "gap-3"}`}>
         {matches.length > 0 ? (
           matches.map((match) => (
             <BracketMatchCard
@@ -1056,10 +1058,15 @@ function BoardColumn({
               accent={accent}
               focused={match.id === focusMatchId}
               compact
+              dense={dense}
             />
           ))
         ) : (
-          <div className="flex h-[108px] items-center border-y border-white/14 px-3 text-sm font-black text-white/26">
+          <div
+            className={`flex items-center border-y border-white/14 px-3 text-sm font-black text-white/26 ${
+              dense ? "h-[84px]" : "h-[108px]"
+            }`}
+          >
             대기
           </div>
         )}
@@ -1077,27 +1084,40 @@ function DoubleElimBoard({
   accent: string;
   focusMatchId?: string | null;
 }) {
-  const upper = ["WB_R1", "WB_R2", "WB_F"];
-  const lower = ["LB_R1", "LB_R2", "LB_SEMI", "LB_F"];
+  // 섹션 순서는 고정하되, 실제 매치가 있는 섹션만 컬럼으로 그린다.
+  // (기존에는 3/4컬럼 고정이라 4팀 브래킷에서 빈 "대기" 컬럼이 남았다)
+  const upperOrder = ["WB_R1", "WB_R2", "WB_F"];
+  const lowerOrder = ["LB_R1", "LB_R2", "LB_SEMI", "LB_F"];
+  const upper = upperOrder.filter(
+    (section) => sectionMatches(matches, section).length > 0,
+  );
+  const lower = lowerOrder.filter(
+    (section) => sectionMatches(matches, section).length > 0,
+  );
+  const upperMaxMatches = Math.max(
+    1,
+    ...upper.map((section) => sectionMatches(matches, section).length),
+  );
+  const lowerMaxMatches = Math.max(
+    1,
+    ...lower.map((section) => sectionMatches(matches, section).length),
+  );
+  const denseColumns = Math.max(upperMaxMatches, lowerMaxMatches) >= 4;
   const wbRoundOne = sectionMatches(matches, "WB_R1");
   const wbRoundTwo = sectionMatches(matches, "WB_R2");
-  const upperFinal =
-    sectionMatches(matches, "WB_F")[0] ??
-    wbRoundTwo[0] ??
-    null;
-  const lowerRoundOne =
-    sectionMatches(matches, "LB_R1")[0] ??
-    sectionMatches(matches, "LB_R2")[0] ??
-    null;
-  const lowerFinal =
-    sectionMatches(matches, "LB_F")[0] ??
-    sectionMatches(matches, "LB_SEMI")[0] ??
-    null;
+  const upperFinal = sectionMatches(matches, "WB_F")[0] ?? null;
+  const lowerRoundOne = sectionMatches(matches, "LB_R1")[0] ?? null;
+  const lowerFinal = sectionMatches(matches, "LB_F")[0] ?? null;
   const grandFinal = sectionMatches(matches, "GF")[0] ?? null;
+  // 고정 트리는 4팀 표준형(WB_R1 2 + WB_F + LB_R1 + LB_F + GF)에만 맞는 레이아웃이다.
+  // 그 외 팀 수는 섹션 컬럼 모드가 매치 수에 맞춰 그린다.
   const canUseTree =
-    wbRoundOne.length <= 2 &&
-    matches.length <= 8 &&
-    (upperFinal || lowerFinal || grandFinal);
+    wbRoundOne.length === 2 &&
+    wbRoundTwo.length === 0 &&
+    sectionMatches(matches, "LB_R2").length === 0 &&
+    sectionMatches(matches, "LB_SEMI").length === 0 &&
+    matches.length <= 6 &&
+    Boolean(upperFinal || lowerFinal || grandFinal);
   const upperFirst = wbRoundOne[0] ?? wbRoundTwo[0] ?? null;
   const upperSecond = wbRoundOne[1] ?? wbRoundTwo[1] ?? null;
   const champion =
@@ -1217,7 +1237,14 @@ function DoubleElimBoard({
           <div className="pointer-events-none absolute right-[320px] top-[46%] h-px w-12 bg-white/14" />
 
           <div className="relative grid h-full grid-cols-[minmax(0,1fr)_330px] gap-10">
-            <div className="grid min-h-0 grid-rows-[1fr_1fr] gap-7">
+            <div
+              className={`grid min-h-0 ${denseColumns ? "gap-5" : "gap-7"}`}
+              style={{
+                gridTemplateRows: denseColumns
+                  ? "auto auto"
+                  : `${upperMaxMatches}fr ${lowerMaxMatches}fr`,
+              }}
+            >
               <div className="min-h-0">
                 <div className="mb-4 flex items-end justify-between">
                   <p className="text-2xl font-black uppercase tracking-[0.06em] text-white/82">
@@ -1227,7 +1254,12 @@ function DoubleElimBoard({
                     Winner Bracket
                   </p>
                 </div>
-                <div className="grid grid-cols-3 gap-5">
+                <div
+                  className="grid gap-5"
+                  style={{
+                    gridTemplateColumns: `repeat(${Math.max(upper.length, 1)}, minmax(0, 1fr))`,
+                  }}
+                >
                   {upper.map((section) => (
                     <BoardColumn
                       key={section}
@@ -1235,6 +1267,7 @@ function DoubleElimBoard({
                       matches={sectionMatches(matches, section)}
                       accent={accent}
                       focusMatchId={focusMatchId}
+                      dense={denseColumns}
                     />
                   ))}
                 </div>
@@ -1249,7 +1282,12 @@ function DoubleElimBoard({
                     Elimination Bracket
                   </p>
                 </div>
-                <div className="grid grid-cols-4 gap-5">
+                <div
+                  className="grid gap-5"
+                  style={{
+                    gridTemplateColumns: `repeat(${Math.max(lower.length, 1)}, minmax(0, 1fr))`,
+                  }}
+                >
                   {lower.map((section) => (
                     <BoardColumn
                       key={section}
@@ -1257,6 +1295,7 @@ function DoubleElimBoard({
                       matches={sectionMatches(matches, section)}
                       accent={accent}
                       focusMatchId={focusMatchId}
+                      dense={denseColumns}
                     />
                   ))}
                 </div>
@@ -1308,16 +1347,56 @@ function SingleElimBoard({
   const rounds = [...new Set(matches.map((match) => match.round ?? 1))].sort(
     (a, b) => Number(a) - Number(b),
   );
-  const roundOne = roundMatches(matches, Number(rounds[0] ?? 1));
-  const roundTwo = roundMatches(matches, Number(rounds[1] ?? 2));
-  const finalRound = roundMatches(matches, Number(rounds[2] ?? 3));
+  // 라운드별 실제 매치 — 트리는 이 데이터에서 위치를 계산한다.
+  // (기존에는 4강 고정 슬롯이라 팀 수가 다르면 빈 "대기" 칸이 생기거나 잘렸다)
+  const layoutRounds = rounds.map((round) => roundMatches(matches, Number(round)));
   const canUseTree =
+    rounds.length >= 1 &&
     rounds.length <= 3 &&
-    roundOne.length <= 4 &&
-    roundTwo.length <= 2 &&
+    (layoutRounds[0]?.length ?? 0) <= 4 &&
     matches.length <= 7;
 
   if (canUseTree) {
+    // 라운드 수에 따른 컬럼 배치(%): 결승 컬럼은 넓게
+    const COLUMN_PRESETS: Record<number, { x: number; width: number }[]> = {
+      1: [{ x: 36, width: 28 }],
+      2: [
+        { x: 6, width: 27 },
+        { x: 60, width: 30 },
+      ],
+      3: [
+        { x: 2, width: 25 },
+        { x: 31, width: 25 },
+        { x: 67, width: 28 },
+      ],
+    };
+    const columns = COLUMN_PRESETS[rounds.length];
+    // 제목이 상단을 차지하므로 트리는 그 아래 세로 대역에 고르게 분포
+    const Y_TOP = 20;
+    const Y_BOTTOM = 92;
+    const yOf = (count: number, index: number) =>
+      Y_TOP + ((index + 0.5) / Math.max(count, 1)) * (Y_BOTTOM - Y_TOP);
+
+    // 인접 라운드 연결선: i번 매치 → 다음 라운드 floor(i/2)번 매치
+    const lines: BracketLine[] = [];
+    for (let r = 0; r + 1 < layoutRounds.length; r++) {
+      const from = columns[r];
+      const to = columns[r + 1];
+      const fromCount = layoutRounds[r].length;
+      const toCount = layoutRounds[r + 1].length;
+      if (toCount === 0) continue;
+      layoutRounds[r].forEach((_, i) => {
+        const target = Math.min(Math.floor(i / 2), toCount - 1);
+        lines.push({
+          x1: from.x + from.width,
+          y1: yOf(fromCount, i),
+          x2: to.x,
+          y2: yOf(toCount, target),
+          viaX: (from.x + from.width + to.x) / 2,
+        });
+      });
+    }
+
     return (
       <div
         className="relative min-h-0 flex-1 overflow-hidden border border-white/10 px-8 py-7"
@@ -1343,67 +1422,21 @@ function SingleElimBoard({
           </p>
         </div>
 
-        <BracketLines
-          lines={[
-            { x1: 26, y1: 22, x2: 31, y2: 34 },
-            { x1: 26, y1: 46, x2: 31, y2: 34 },
-            { x1: 56, y1: 34, x2: 67, y2: 50 },
-            { x1: 26, y1: 64, x2: 31, y2: 74 },
-            { x1: 26, y1: 86, x2: 31, y2: 74 },
-            { x1: 56, y1: 74, x2: 67, y2: 50 },
-          ]}
-        />
+        <BracketLines lines={lines} />
 
-        <BracketSlot
-          match={roundOne[0]}
-          accent={accent}
-          focusMatchId={focusMatchId}
-          x={2}
-          y={22}
-        />
-        <BracketSlot
-          match={roundOne[1]}
-          accent={accent}
-          focusMatchId={focusMatchId}
-          x={2}
-          y={46}
-        />
-        <BracketSlot
-          match={roundOne[2]}
-          accent={accent}
-          focusMatchId={focusMatchId}
-          x={2}
-          y={64}
-        />
-        <BracketSlot
-          match={roundOne[3]}
-          accent={accent}
-          focusMatchId={focusMatchId}
-          x={2}
-          y={86}
-        />
-        <BracketSlot
-          match={roundTwo[0]}
-          accent={accent}
-          focusMatchId={focusMatchId}
-          x={31}
-          y={34}
-        />
-        <BracketSlot
-          match={roundTwo[1]}
-          accent={accent}
-          focusMatchId={focusMatchId}
-          x={31}
-          y={74}
-        />
-        <BracketSlot
-          match={finalRound[0] ?? roundTwo[0]}
-          accent={accent}
-          focusMatchId={focusMatchId}
-          x={67}
-          y={50}
-          width={28}
-        />
+        {layoutRounds.map((roundList, r) =>
+          roundList.map((match, i) => (
+            <BracketSlot
+              key={match.id}
+              match={match}
+              accent={accent}
+              focusMatchId={focusMatchId}
+              x={columns[r].x}
+              y={yOf(roundList.length, i)}
+              width={columns[r].width}
+            />
+          )),
+        )}
       </div>
     );
   }
