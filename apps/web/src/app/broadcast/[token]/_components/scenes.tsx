@@ -42,7 +42,7 @@ export function accentOf(snapshot: any): string {
   return snapshot?.theme?.accentColor || DEFAULT_ACCENT;
 }
 
-function HudLabel({
+export function HudLabel({
   children,
   color,
 }: {
@@ -67,7 +67,7 @@ function HudRule({ color }: { color: string }) {
   );
 }
 
-function StageFrame({
+export function StageFrame({
   children,
   accent,
   showTopRule = true,
@@ -1489,7 +1489,8 @@ export function BracketScene({ snapshot }: { snapshot: any }) {
 export function RoomScene({ snapshot }: { snapshot: any }) {
   const status = snapshot?.room?.status;
   const teamMode = snapshot?.room?.teamMode;
-  if (status === "AUCTION" || (status === "DRAFT" && teamMode === "AUCTION")) {
+  // "AUCTION"은 RoomStatus enum에 없는 값 — 경매 단계는 DRAFT + teamMode로 판별한다.
+  if (status === "DRAFT" && teamMode === "AUCTION") {
     return <AuctionScene snapshot={snapshot} />;
   }
   return <WaitingScene snapshot={snapshot} />;

@@ -4,7 +4,10 @@ import { useEffect, useMemo } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { broadcastApi } from "@/lib/api-client";
-import { connectBroadcastSocket } from "@/lib/socket-client";
+import {
+  connectBroadcastSocket,
+  connectBroadcastRoleSocket,
+} from "@/lib/socket-client";
 import { BroadcastShell } from "./_components/BroadcastShell";
 import { LowerThird } from "./_components/LowerThird";
 import {
@@ -16,6 +19,7 @@ import {
   RoleSelectionScene,
 } from "./_components/scenes";
 import { BroadcastAuctionLive } from "./_components/BroadcastAuctionLive";
+import { BroadcastSnakeDraftLive } from "./_components/BroadcastSnakeDraftLive";
 
 const SCENE_TRANSITIONS: Record<
   string,
@@ -103,15 +107,14 @@ function sceneKeyOf({
   if (scene === "bracket") return "bracket";
   if (scene === "auction") return "auction";
   if (scene === "role-selection") return "role-selection";
+  if (scene === "draft") return "draft";
   if (scene === "result") return "result";
   if (scene === "room") return "waiting";
   if (scene === "match") {
     return matchStatus === "COMPLETED" ? "result" : "match";
   }
   if (isAuctionRoom) return "auction";
-  if (status === "ROLE_SELECTION" || status === "ROLE_SELECT") {
-    return "role-selection";
-  }
+  if (status === "ROLE_SELECTION") return "role-selection";
   if (status === "DRAFT" && teamMode !== "AUCTION") return "draft";
   return "waiting";
 }
@@ -152,16 +155,22 @@ export default function BroadcastPage() {
   const controlScene =
     scene === "control" ? snapshot?.broadcast?.scene ?? "auto" : scene;
   const snapshotScene = (snapshot?.scene ?? controlScene) as string;
+  // "AUCTION"/"ROLE_SELECT"는 RoomStatus enum에 없는 값 — DRAFT + teamMode 및
+  // ROLE_SELECTION 상태로만 판별한다.
   const isAuctionRoom =
     controlScene === "auction" ||
     (controlScene === "auto" &&
-      (status === "AUCTION" || (status === "DRAFT" && teamMode === "AUCTION")));
+      status === "DRAFT" &&
+      teamMode === "AUCTION");
+  const isSnakeDraftRoom =
+    controlScene === "auto" && status === "DRAFT" && teamMode === "SNAKE_DRAFT";
   const isRoleSelectionRoom =
     controlScene === "role-selection" ||
-    (controlScene === "auto" &&
-      (status === "ROLE_SELECTION" || status === "ROLE_SELECT"));
+    (controlScene === "auto" && status === "ROLE_SELECTION");
   const displayScene = isAuctionRoom
     ? "auction"
+    : isSnakeDraftRoom
+    ? "draft"
     : isRoleSelectionRoom
     ? "role-selection"
     : snapshotScene;
@@ -201,6 +210,31 @@ export default function BroadcastPage() {
       socket.disconnect();
     };
   }, [token, roomId, queryClient, queryKey]);
+
+  // 롤 선택 장면은 스냅샷 기반이라 5초 폴링만으로는 픽 반영이 늦다.
+  // /role-selection을 read-only 구독해 선택/취소/완료 즉시 스냅샷을 갱신한다.
+  // (timer-tick은 1초마다 와서 구독하지 않는다 — 진행률 표시에 불필요)
+  useEffect(() => {
+    if (!token || !roomId || !isRoleSelectionRoom) return;
+    const socket = connectBroadcastRoleSocket(token);
+    const refetch = () => queryClient.invalidateQueries({ queryKey });
+
+    const subscribe = () => socket.emit("join-room", { roomId });
+    socket.on("connect", subscribe);
+    if (socket.connected) subscribe();
+
+    socket.on("role-selected", refetch);
+    socket.on("role-cancelled", refetch);
+    socket.on("role-selection-started", refetch);
+    socket.on("role-selection-completed", refetch);
+    socket.on("role-selection-timeout", refetch);
+
+    return () => {
+      socket.off("connect", subscribe);
+      socket.removeAllListeners();
+      socket.disconnect();
+    };
+  }, [token, roomId, isRoleSelectionRoom, queryClient, queryKey]);
 
   // auto 모드의 시간 기반 장면 전환(결과 12초, 시작 직후 대진표 8초 등)은
   // 5초 폴링만으로는 최대 5초까지 늦어진다. 서버가 알려준 전환 시각에 맞춰 즉시 갱신한다.
@@ -245,6 +279,9 @@ export default function BroadcastPage() {
   ) : isAuctionRoom && token && roomId ? (
     // 경매 단계는 정적 스냅샷 대신 기존 경매 화면(AuctionBoard)을 라이브로 중계
     <BroadcastAuctionLive token={token} roomId={roomId} />
+  ) : isSnakeDraftRoom && token && roomId ? (
+    // 스네이크 드래프트도 /snake-draft 게이트웨이를 read-only 구독해 라이브 중계
+    <BroadcastSnakeDraftLive token={token} roomId={roomId} snapshot={snapshot} />
   ) : isRoleSelectionRoom || broadcastSceneKey === "role-selection" ? (
     <RoleSelectionScene snapshot={snapshot} />
   ) : (
