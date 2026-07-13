@@ -798,7 +798,7 @@ export const roomApi = {
     const response = await apiClient.post("/rooms", data);
     return response.data;
   },
-  
+
   update: async (roomId: string, data: any) => {
     const response = await apiClient.put(`/rooms/${roomId}`, data);
     return response.data;
@@ -2306,4 +2306,3 @@ export const appealApi = {
     return response.data;
   },
 };
-

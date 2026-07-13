@@ -479,4 +479,29 @@ describe("MatchService", () => {
       expect(result[0].participant.championNameKorean).toBe("아리");
     });
   });
+
+  describe("getUserRiotMatchIds", () => {
+    it("참가자 전적 저장 전에도 대진 팀 멤버십으로 연결된 내전을 반환한다", async () => {
+      prisma.match.findMany.mockResolvedValue([
+        { riotMatchId: "KR_100" },
+        { riotMatchId: "KR_200" },
+      ]);
+
+      const result = await service.getUserRiotMatchIds("user-1");
+
+      expect(prisma.match.findMany).toHaveBeenCalledWith({
+        where: {
+          roomId: { not: null },
+          riotMatchId: { not: null },
+          OR: [
+            { teamA: { members: { some: { userId: "user-1" } } } },
+            { teamB: { members: { some: { userId: "user-1" } } } },
+          ],
+        },
+        select: { riotMatchId: true },
+      });
+      expect(prisma.matchParticipant.findMany).not.toHaveBeenCalled();
+      expect(result).toEqual(["KR_100", "KR_200"]);
+    });
+  });
 });

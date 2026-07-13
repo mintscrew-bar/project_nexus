@@ -288,7 +288,65 @@ describe("MatchDataCollectionService", () => {
       );
     });
 
-    it("첫 멤버의 목록에서 매치를 찾으면 나머지 멤버는 조회하지 않는다", async () => {
+    it("멤버별 Riot 인덱싱이 다르면 모든 목록에서 현재 경기를 찾는다", async () => {
+      const completedAt = new Date("2026-07-13T10:00:00.000Z");
+      const member = (userId: string, puuid: string) => ({
+        userId,
+        user: { riotAccounts: [{ puuid }] },
+      });
+      const storedMatch = {
+        id: "match-index-lag",
+        riotMatchId: null,
+        teamAId: "a",
+        teamBId: "b",
+        startedAt: new Date("2026-07-13T09:30:00.000Z"),
+        completedAt,
+        teamA: { id: "a", members: [member("user-a", "puuid-a")] },
+        teamB: { id: "b", members: [member("user-b", "puuid-b")] },
+      };
+      const game = (endMs: number) => ({
+        info: {
+          queueId: 0,
+          gameType: "CUSTOM_GAME",
+          gameEndTimestamp: endMs,
+          participants: [
+            { puuid: "puuid-a", teamId: 100 },
+            { puuid: "puuid-b", teamId: 200 },
+          ],
+        },
+      });
+      const previousGame = game(completedAt.getTime() - 40 * 60 * 1000);
+      const currentGame = game(completedAt.getTime());
+      const findUnique = jest.fn().mockResolvedValue(storedMatch);
+      const update = jest.fn().mockResolvedValue(undefined);
+      // 첫 멤버에게는 이전 경기만 인덱싱됐지만 두 번째 멤버에게는 현재 경기도 보인다.
+      const getMatchIdsByPuuid = jest
+        .fn()
+        .mockResolvedValueOnce(["KR_PREVIOUS"])
+        .mockResolvedValueOnce(["KR_CURRENT", "KR_PREVIOUS"]);
+      const getMatchById = jest.fn(async (id: string) =>
+        id === "KR_CURRENT" ? currentGame : previousGame,
+      );
+      const service = createService(
+        { findUnique, update },
+        { getMatchIdsByPuuid, getMatchById },
+      );
+      jest
+        .spyOn(service as never, "saveMatchData" as never)
+        .mockResolvedValue(undefined as never);
+
+      await service.collectMatchDataByPuuidCrossref("match-index-lag");
+
+      expect(getMatchIdsByPuuid).toHaveBeenCalledTimes(2);
+      expect(getMatchById).toHaveBeenCalledTimes(2);
+      expect(update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ riotMatchId: "KR_CURRENT" }),
+        }),
+      );
+    });
+
+    it("여러 멤버 목록의 동일 후보는 상세를 한 번만 조회한다", async () => {
       const completedAt = new Date("2026-07-13T10:00:00.000Z");
       const member = (userId: string, puuid: string) => ({
         userId,
@@ -344,9 +402,9 @@ describe("MatchDataCollectionService", () => {
 
       await service.collectMatchDataByPuuidCrossref("match-early-exit");
 
-      // 교집합을 위해 여러 명을 훑지 않고, 첫 멤버 한 명만 조회한다.
-      expect(getMatchIdsByPuuid).toHaveBeenCalledTimes(1);
-      // 매치 상세도 후보 1건만 조회한다.
+      // 인덱싱 지연을 보완하기 위해 모든 샘플 멤버의 목록을 확인한다.
+      expect(getMatchIdsByPuuid).toHaveBeenCalledTimes(4);
+      // 동일한 매치 ID의 상세는 중복 조회하지 않는다.
       expect(getMatchById).toHaveBeenCalledTimes(1);
       expect(update).toHaveBeenCalledWith(
         expect.objectContaining({

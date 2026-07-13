@@ -145,13 +145,9 @@ export class TasksService {
   @Cron("*/15 * * * *")
   async handlePendingCustomMatchCollection(): Promise<void> {
     const lockKey = "tasks:pending-custom-match-collection";
-    // 락 TTL은 한 사이클의 최악 소요 시간보다 길어야 한다.
-    // 백그라운드 Riot 요청이 8초 간격이라 실패 매치 하나가 최대 5분까지 걸리고,
-    // 한 사이클은 5건(COLLECT_BATCH_SIZE)이므로 최악 25분이다.
-    // TTL이 더 짧으면 작업이 도는 중에 락이 풀려 다음 크론이 겹쳐 들어온다.
-    // 정상 종료 시에는 finally에서 즉시 해제하므로, TTL은 프로세스가 죽었을 때를
-    // 대비한 안전망 역할만 한다.
-    const lockToken = await this.redis.acquireLock(lockKey, 30 * 60 * 1000);
+    const lockTtlMs = 30 * 60 * 1000;
+    const lockRenewIntervalMs = 5 * 60 * 1000;
+    const lockToken = await this.redis.acquireLock(lockKey, lockTtlMs);
 
     if (!lockToken) {
       this.logger.warn(
@@ -160,11 +156,34 @@ export class TasksService {
       return;
     }
 
+    // Riot 429 Retry-After, 네트워크 재시도, 전역 rate-limit 대기로 한 사이클이
+    // 예상보다 길어져도 작업 중에는 락 소유권을 유지한다. 토큰이 일치할 때만
+    // 갱신되므로 만료 후 다른 워커가 획득한 락을 연장하지 않는다.
+    const lockHeartbeat = setInterval(() => {
+      void this.redis
+        .extendLock(lockKey, lockToken, lockTtlMs)
+        .then((extended) => {
+          if (!extended) {
+            this.logger.error(
+              "Pending custom match collection lock was lost during execution",
+            );
+          }
+        })
+        .catch((error) => {
+          this.logger.error(
+            "Pending custom match collection lock renewal failed",
+            error,
+          );
+        });
+    }, lockRenewIntervalMs);
+    lockHeartbeat.unref();
+
     try {
       await this.matchDataCollectionService.collectPendingMatches();
     } catch (error) {
       this.logger.error("Pending custom match collection failed", error);
     } finally {
+      clearInterval(lockHeartbeat);
       await this.redis.releaseLock(lockKey, lockToken);
     }
   }

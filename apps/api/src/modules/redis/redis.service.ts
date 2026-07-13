@@ -102,6 +102,26 @@ export class RedisService implements OnModuleDestroy {
   }
 
   /**
+   * 락 TTL 갱신 — 현재 토큰 소유자일 때만 만료 시간을 연장한다.
+   * 오래 실행되는 작업의 락이 중간에 만료되어 다른 워커와 겹치는 것을 방지한다.
+   */
+  async extendLock(
+    key: string,
+    token: string,
+    ttlMs: number,
+  ): Promise<boolean> {
+    const lua = `
+      if redis.call("get", KEYS[1]) == ARGV[1] then
+        return redis.call("pexpire", KEYS[1], ARGV[2])
+      else
+        return 0
+      end
+    `;
+    const result = await this.client.eval(lua, 1, key, token, ttlMs);
+    return result === 1;
+  }
+
+  /**
    * 락 해제 — 본인이 설정한 토큰인지 확인 후 삭제 (Lua 스크립트로 원자적 처리).
    * 타인이 설정한 락을 실수로 해제하는 것을 방지한다.
    */

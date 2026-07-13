@@ -1206,23 +1206,20 @@ export class MatchService {
    * ID만 담은 경량 응답이라 전체를 내려도 부담이 없다.
    */
   async getUserRiotMatchIds(userId: string): Promise<string[]> {
-    const participants = await this.prisma.matchParticipant.findMany({
+    const matches = await this.prisma.match.findMany({
       where: {
-        userId,
-        match: {
-          roomId: { not: null },
-          riotMatchId: { not: null },
-        },
+        roomId: { not: null },
+        riotMatchId: { not: null },
+        OR: [
+          { teamA: { members: { some: { userId } } } },
+          { teamB: { members: { some: { userId } } } },
+        ],
       },
-      select: {
-        match: {
-          select: { riotMatchId: true },
-        },
-      },
+      select: { riotMatchId: true },
     });
 
-    return participants
-      .map((participant) => participant.match?.riotMatchId)
+    return matches
+      .map((match) => match.riotMatchId)
       .filter((riotMatchId): riotMatchId is string => Boolean(riotMatchId));
   }
 

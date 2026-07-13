@@ -711,10 +711,7 @@ export class MatchDataCollectionService {
       // 한 멤버의 목록에서 상세 조회할 후보 수 상한 (API 호출 폭주 방지)
       const MAX_DETAIL_LOOKUPS_PER_MEMBER = 5;
 
-      const hasValidCandidate = () =>
-        evaluatedCandidates.some((candidate) => candidate.valid);
-
-      for (let i = 0; i < sampleMembers.length && !hasValidCandidate(); i++) {
+      for (let i = 0; i < sampleMembers.length; i++) {
         const ids = await this.riotMatchService.getMatchIdsByPuuid(
           sampleMembers[i].puuid,
           0,
@@ -768,10 +765,10 @@ export class MatchDataCollectionService {
           evaluatedCandidates.push(scored);
         }
 
-        // 이 멤버의 목록에서 유효 후보가 나왔으면 다른 멤버는 볼 필요가 없다.
-        // (같은 매치이므로 다른 멤버의 목록에서도 같은 후보만 나온다)
-        // 단, 이 멤버의 후보들은 끝까지 평가한다 — 연속 내전처럼 유효 후보가
-        // 여러 개일 수 있어 그중 최적값을 골라야 하기 때문이다.
+        // Riot 인덱싱은 멤버별 반영 시점이 다를 수 있다. 첫 멤버에게 이전 경기만
+        // 보이는 순간에도 다른 멤버에게는 현재 경기가 보일 수 있으므로, 유효 후보를
+        // 찾았더라도 샘플 멤버의 목록은 끝까지 확인한다. 상세 조회는 위 Set으로
+        // 매치 ID별 한 번만 수행한다.
       }
 
       // 같은 팀이 연달아 여러 판을 하면 모든 판이 "유효"하다(같은 10명 / 커스텀 /
