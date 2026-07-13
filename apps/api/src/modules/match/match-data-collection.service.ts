@@ -399,6 +399,27 @@ export class MatchDataCollectionService {
         }
       }
 
+      // Riot 응답에 우리가 기대한 참가자가 전원 들어있는지 먼저 확인한다.
+      // 일부만 매핑된 채로 저장하면 7명짜리 불완전 전적이 dataCollected=true로
+      // 확정되어 재수집 대상에서 영구히 빠진다. 그럴 바엔 저장하지 않고 재시도한다.
+      // (Riot 참가자 중 Nexus 계정이 없는 사람은 애초에 기대 대상이 아니므로 무시)
+      const expectedPuuids = new Set(puuidToUser.keys());
+      const matchedPuuids = new Set(
+        matchData.info.participants
+          .map((p) => p.puuid)
+          .filter((puuid) => expectedPuuids.has(puuid)),
+      );
+
+      if (matchedPuuids.size < expectedPuuids.size) {
+        const missing = [...expectedPuuids].filter(
+          (puuid) => !matchedPuuids.has(puuid),
+        );
+        throw new Error(
+          `참가자 매핑 불완전: ${matchedPuuids.size}/${expectedPuuids.size} ` +
+            `(누락 PUUID: ${missing.join(", ")}) — 부분 저장을 막기 위해 중단`,
+        );
+      }
+
       // 멱등성 보장:
       // 기존 전적을 트랜잭션 내에서 교체(replace)해 중복/부분 저장을 방지한다.
       await this.prisma.$transaction(async (tx) => {
@@ -408,10 +429,8 @@ export class MatchDataCollectionService {
         for (const participant of matchData.info.participants) {
           const userMapping = puuidToUser.get(participant.puuid);
 
+          // Nexus 계정이 연결되지 않은 외부 참가자 — 저장 대상이 아니다.
           if (!userMapping) {
-            this.logger.warn(
-              `PUUID ${participant.puuid} not found in user mapping, skipping`,
-            );
             continue;
           }
 
