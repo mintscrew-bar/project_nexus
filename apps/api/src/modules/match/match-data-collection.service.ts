@@ -667,12 +667,25 @@ export class MatchDataCollectionService {
         (completedAt.getTime() + 20 * 60 * 1000) / 1000,
       );
 
-      // 크로스레퍼런스: 양 팀에서 샘플을 고르게 뽑아 후보 matchId를 수집한다.
-      // 후보는 저장 전 전체 참가자/팀/시간 검증을 다시 통과해야 한다.
+      // 크로스레퍼런스: 멤버를 한 명씩 순회하며 후보를 찾는다.
+      //
+      // 같은 매치를 치른 사람들이므로 한 명의 매치 목록만 있어도 후보는 나온다.
+      // 실제 검증(참가자 70% 일치 / 팀 배치 정합 / 커스텀 여부 / 종료 시각)은
+      // 어차피 매치 상세로 하기 때문에, 여러 명의 목록을 교집합낼 필요가 없다.
+      //
+      // 이전에는 샘플 3명 목록에 모두 나타나야(minCandidateHits=3) 후보로 인정했는데,
+      // Riot 인덱싱 지연으로 한 명에게만 아직 안 보여도 후보가 0이 되어 통째로
+      // 재시도로 빠졌다. 순차 탐색은 API 호출도 줄고(대개 목록 1회) 한 명이 실패해도
+      // 다음 멤버로 넘어가므로 더 견고하다.
       const sampleMembers = this.selectCrossrefSampleMembers(expectedMembers);
-      const candidateHitCounts = new Map<string, number>();
+      const evaluatedCandidates: CrossrefCandidateScore[] = [];
+      const inspectedMatchIds = new Set<string>();
+      let bestCandidate: CrossrefCandidateScore | null = null;
 
-      for (let i = 0; i < sampleMembers.length; i++) {
+      // 한 멤버의 목록에서 상세 조회할 후보 수 상한 (API 호출 폭주 방지)
+      const MAX_DETAIL_LOOKUPS_PER_MEMBER = 5;
+
+      for (let i = 0; i < sampleMembers.length && !bestCandidate; i++) {
         const ids = await this.riotMatchService.getMatchIdsByPuuid(
           sampleMembers[i].puuid,
           0,
@@ -684,76 +697,56 @@ export class MatchDataCollectionService {
           endTime,
           "background",
         );
-        for (const id of new Set(ids)) {
-          candidateHitCounts.set(id, (candidateHitCounts.get(id) ?? 0) + 1);
-        }
+
         this.logger.debug(
-          `[PuuidCrossref] puuid[${i}] 커스텀 게임 ${ids.length}개`,
-        );
-      }
-
-      const minCandidateHits =
-        sampleMembers.length <= 2 ? sampleMembers.length : 3;
-      const candidates = Array.from(candidateHitCounts.entries())
-        .filter(([, hits]) => hits >= minCandidateHits)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 10)
-        .map(([candidateMatchId, sampleHits]) => ({
-          matchId: candidateMatchId,
-          sampleHits,
-        }));
-
-      if (candidates.length === 0) {
-        this.logger.warn(
-          `[PuuidCrossref] 유효 후보 없음 (Riot 처리 중일 수 있음), 재시도 예약 matchId=${matchId}`,
-        );
-        await this.schedulePuuidCrossrefRetry(matchId, attemptNumber);
-        return;
-      }
-
-      const evaluatedCandidates: CrossrefCandidateScore[] = [];
-      for (const candidate of candidates) {
-        const candidateData = await this.riotMatchService.getMatchById(
-          candidate.matchId,
-          3,
-          "background",
-          {
-            emitCacheEvent: false,
-            propagateKnownPuuids: false,
-          },
+          `[PuuidCrossref] puuid[${i}] 시간창 내 매치 ${ids.length}개`,
         );
 
-        if (!candidateData) {
-          this.logger.warn(
-            `[PuuidCrossref] 후보 매치 상세 조회 실패: ${candidate.matchId}`,
+        let lookups = 0;
+        for (const candidateMatchId of new Set(ids)) {
+          // 앞선 멤버에서 이미 검증에 실패한 매치는 다시 볼 필요가 없다.
+          if (inspectedMatchIds.has(candidateMatchId)) continue;
+          if (lookups >= MAX_DETAIL_LOOKUPS_PER_MEMBER) break;
+          inspectedMatchIds.add(candidateMatchId);
+          lookups++;
+
+          const candidateData = await this.riotMatchService.getMatchById(
+            candidateMatchId,
+            3,
+            "background",
+            {
+              emitCacheEvent: false,
+              propagateKnownPuuids: false,
+            },
           );
-          continue;
-        }
 
-        evaluatedCandidates.push(
-          this.scoreCrossrefCandidate(
-            candidate.matchId,
-            candidate.sampleHits,
-            sampleMembers.length,
+          if (!candidateData) {
+            this.logger.warn(
+              `[PuuidCrossref] 후보 매치 상세 조회 실패: ${candidateMatchId}`,
+            );
+            continue;
+          }
+
+          const scored = this.scoreCrossrefCandidate(
+            candidateMatchId,
+            1, // 순차 탐색에서는 목록 교집합 히트 수를 쓰지 않는다
+            1,
             match,
             expectedMembers,
             candidateData,
             completedAt,
-          ),
-        );
+          );
+          evaluatedCandidates.push(scored);
+
+          // 검증을 통과하면 같은 매치이므로 더 찾을 필요가 없다.
+          if (scored.valid) {
+            bestCandidate = scored;
+            break;
+          }
+        }
       }
 
-      const validCandidates = evaluatedCandidates
-        .filter((candidate) => candidate.valid)
-        .sort((a, b) => {
-          if (b.score !== a.score) return b.score - a.score;
-          return (
-            (a.timeDeltaMs ?? Number.MAX_SAFE_INTEGER) -
-            (b.timeDeltaMs ?? Number.MAX_SAFE_INTEGER)
-          );
-        });
-
-      if (validCandidates.length === 0) {
+      if (!bestCandidate) {
         const summary =
           evaluatedCandidates.length > 0
             ? evaluatedCandidates
@@ -766,8 +759,6 @@ export class MatchDataCollectionService {
         await this.schedulePuuidCrossrefRetry(matchId, attemptNumber);
         return;
       }
-
-      const bestCandidate = validCandidates[0];
       const riotMatchId = bestCandidate.matchId;
       const matchData = bestCandidate.matchData;
 

@@ -152,6 +152,127 @@ describe("MatchDataCollectionService", () => {
       );
     });
 
+    it("첫 멤버의 목록에서 매치를 찾으면 나머지 멤버는 조회하지 않는다", async () => {
+      const completedAt = new Date("2026-07-13T10:00:00.000Z");
+      const member = (userId: string, puuid: string) => ({
+        userId,
+        user: { riotAccounts: [{ puuid }] },
+      });
+      const storedMatch = {
+        id: "match-early-exit",
+        riotMatchId: null,
+        teamAId: "a",
+        teamBId: "b",
+        startedAt: new Date("2026-07-13T09:30:00.000Z"),
+        completedAt,
+        teamA: {
+          id: "a",
+          members: [
+            member("user-a1", "puuid-a1"),
+            member("user-a2", "puuid-a2"),
+          ],
+        },
+        teamB: {
+          id: "b",
+          members: [
+            member("user-b1", "puuid-b1"),
+            member("user-b2", "puuid-b2"),
+          ],
+        },
+      };
+      // 4명 전원이 참가한 정상 커스텀 게임 → 첫 후보에서 검증 통과해야 한다.
+      const candidateData = {
+        info: {
+          queueId: 0,
+          gameType: "CUSTOM_GAME",
+          gameEndTimestamp: completedAt.getTime(),
+          participants: [
+            { puuid: "puuid-a1", teamId: 100 },
+            { puuid: "puuid-a2", teamId: 100 },
+            { puuid: "puuid-b1", teamId: 200 },
+            { puuid: "puuid-b2", teamId: 200 },
+          ],
+        },
+      };
+      const findUnique = jest.fn().mockResolvedValue(storedMatch);
+      const update = jest.fn().mockResolvedValue(undefined);
+      const getMatchIdsByPuuid = jest.fn().mockResolvedValue(["KR_777"]);
+      const getMatchById = jest.fn().mockResolvedValue(candidateData);
+      const service = createService(
+        { findUnique, update },
+        { getMatchIdsByPuuid, getMatchById },
+      );
+      jest
+        .spyOn(service as never, "saveMatchData" as never)
+        .mockResolvedValue(undefined as never);
+
+      await service.collectMatchDataByPuuidCrossref("match-early-exit");
+
+      // 교집합을 위해 여러 명을 훑지 않고, 첫 멤버 한 명만 조회한다.
+      expect(getMatchIdsByPuuid).toHaveBeenCalledTimes(1);
+      // 매치 상세도 후보 1건만 조회한다.
+      expect(getMatchById).toHaveBeenCalledTimes(1);
+      expect(update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ riotMatchId: "KR_777" }),
+        }),
+      );
+    });
+
+    it("첫 멤버에게서 못 찾으면 다음 멤버로 넘어간다", async () => {
+      const completedAt = new Date("2026-07-13T10:00:00.000Z");
+      const member = (userId: string, puuid: string) => ({
+        userId,
+        user: { riotAccounts: [{ puuid }] },
+      });
+      const storedMatch = {
+        id: "match-fallback",
+        riotMatchId: null,
+        teamAId: "a",
+        teamBId: "b",
+        startedAt: new Date("2026-07-13T09:30:00.000Z"),
+        completedAt,
+        teamA: { id: "a", members: [member("user-a", "puuid-a")] },
+        teamB: { id: "b", members: [member("user-b", "puuid-b")] },
+      };
+      const validData = {
+        info: {
+          queueId: 0,
+          gameType: "CUSTOM_GAME",
+          gameEndTimestamp: completedAt.getTime(),
+          participants: [
+            { puuid: "puuid-a", teamId: 100 },
+            { puuid: "puuid-b", teamId: 200 },
+          ],
+        },
+      };
+      const findUnique = jest.fn().mockResolvedValue(storedMatch);
+      const update = jest.fn().mockResolvedValue(undefined);
+      // 첫 멤버(puuid-a)의 목록은 Riot 인덱싱 지연으로 비어 있다.
+      const getMatchIdsByPuuid = jest
+        .fn()
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce(["KR_888"]);
+      const getMatchById = jest.fn().mockResolvedValue(validData);
+      const service = createService(
+        { findUnique, update },
+        { getMatchIdsByPuuid, getMatchById },
+      );
+      jest
+        .spyOn(service as never, "saveMatchData" as never)
+        .mockResolvedValue(undefined as never);
+
+      await service.collectMatchDataByPuuidCrossref("match-fallback");
+
+      // 첫 멤버가 빈손이어도 두 번째 멤버로 폴백해 복구한다.
+      expect(getMatchIdsByPuuid).toHaveBeenCalledTimes(2);
+      expect(update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ riotMatchId: "KR_888" }),
+        }),
+      );
+    });
+
     it("reuses a persisted Riot match ID after participant storage failed", async () => {
       const storedMatch = {
         id: "match-1",
