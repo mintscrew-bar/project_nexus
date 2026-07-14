@@ -887,6 +887,13 @@ function UsersTab({ addToast, currentUserId, isAdmin }: { addToast: (msg: string
   const [restrictModal, setRestrictModal] = useState<AdminUser | null>(null);
   const [detailUser, setDetailUser] = useState<AdminUser | null>(null);
   const [restrictUntil, setRestrictUntil] = useState("");
+  // 개인 메시지/공지 발송 모달
+  const [messageOpen, setMessageOpen] = useState(false);
+  const [msgMode, setMsgMode] = useState<"dm" | "notification">("dm");
+  const [msgTitle, setMsgTitle] = useState("");
+  const [msgContent, setMsgContent] = useState("");
+  const [msgLink, setMsgLink] = useState("");
+  const [msgBusy, setMsgBusy] = useState(false);
 
   const limit = 20;
   const totalPages = Math.ceil(total / limit);
@@ -1126,6 +1133,42 @@ function UsersTab({ addToast, currentUserId, isAdmin }: { addToast: (msg: string
     }
   };
 
+  const openMessageModal = () => {
+    setMsgMode("dm");
+    setMsgTitle("");
+    setMsgContent("");
+    setMsgLink("");
+    setMessageOpen(true);
+  };
+
+  const runSendMessage = async () => {
+    const targets = selectedUsers;
+    if (targets.length === 0 || !msgContent.trim()) return;
+    if (msgMode === "notification" && !msgTitle.trim()) return;
+
+    setMsgBusy(true);
+    try {
+      const { sent } = await adminApi.sendUserMessage({
+        userIds: targets.map((u) => u.id),
+        mode: msgMode,
+        title: msgMode === "notification" ? msgTitle.trim() : undefined,
+        content: msgContent.trim(),
+        link: msgMode === "notification" ? msgLink.trim() || undefined : undefined,
+      });
+      addToast(
+        msgMode === "dm"
+          ? `${sent}명에게 쪽지를 보냈습니다.`
+          : `${sent}명에게 개인 공지를 보냈습니다.`,
+        "success",
+      );
+      setMessageOpen(false);
+    } catch {
+      addToast("메시지 발송에 실패했습니다.", "error");
+    } finally {
+      setMsgBusy(false);
+    }
+  };
+
   const runBulkUnrestrict = async () => {
     const targets = selectedUsers.filter((u) => u.isRestricted);
     if (targets.length === 0) return;
@@ -1318,6 +1361,17 @@ function UsersTab({ addToast, currentUserId, isAdmin }: { addToast: (msg: string
               >
                 제재 해제
               </Button>
+              {isAdmin && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={openMessageModal}
+                  disabled={bulkBusy}
+                >
+                  <MessageSquare className="mr-1 h-3.5 w-3.5" />
+                  메시지 보내기
+                </Button>
+              )}
               <Button size="sm" variant="ghost" onClick={clearSelection} disabled={bulkBusy}>
                 선택 해제
               </Button>
@@ -1551,6 +1605,105 @@ function UsersTab({ addToast, currentUserId, isAdmin }: { addToast: (msg: string
               className="w-full"
             >
               {bulkBusy ? <LoadingSpinner /> : "선택 유저 제재"}
+            </Button>
+          </div>
+        </Modal>
+      )}
+
+      {messageOpen && (
+        <Modal
+          title={`선택 유저 ${selectedUsers.length}명에게 발송`}
+          onClose={() => !msgBusy && setMessageOpen(false)}
+        >
+          <div className="space-y-3">
+            {/* 발송 모드: 쪽지(DM) vs 개인 공지(알림) */}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setMsgMode("dm")}
+                className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                  msgMode === "dm"
+                    ? "border-accent-primary bg-accent-primary/15 text-text-primary"
+                    : "border-bg-elevated bg-bg-tertiary text-text-muted hover:text-text-primary"
+                }`}
+              >
+                쪽지(DM)
+              </button>
+              <button
+                type="button"
+                onClick={() => setMsgMode("notification")}
+                className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                  msgMode === "notification"
+                    ? "border-accent-primary bg-accent-primary/15 text-text-primary"
+                    : "border-bg-elevated bg-bg-tertiary text-text-muted hover:text-text-primary"
+                }`}
+              >
+                개인 공지(알림)
+              </button>
+            </div>
+
+            {msgMode === "notification" && (
+              <div>
+                <label className="block text-xs text-text-muted mb-1">제목 *</label>
+                <input
+                  value={msgTitle}
+                  onChange={(e) => setMsgTitle(e.target.value)}
+                  maxLength={100}
+                  placeholder="공지 제목"
+                  className="w-full px-3 py-2 rounded-lg bg-bg-tertiary text-text-primary text-sm focus:outline-none focus:ring-1 focus:ring-accent-primary"
+                />
+              </div>
+            )}
+
+            <div>
+              <label className="block text-xs text-text-muted mb-1">내용 *</label>
+              <textarea
+                value={msgContent}
+                onChange={(e) => setMsgContent(e.target.value)}
+                maxLength={2000}
+                rows={5}
+                placeholder={msgMode === "dm" ? "쪽지 내용" : "공지 내용"}
+                className="w-full px-3 py-2 rounded-lg bg-bg-tertiary text-text-primary text-sm resize-none focus:outline-none focus:ring-1 focus:ring-accent-primary"
+              />
+            </div>
+
+            {msgMode === "notification" && (
+              <div>
+                <label className="block text-xs text-text-muted mb-1">링크 (선택)</label>
+                <input
+                  value={msgLink}
+                  onChange={(e) => setMsgLink(e.target.value)}
+                  maxLength={300}
+                  placeholder="/community/123 또는 https://..."
+                  className="w-full px-3 py-2 rounded-lg bg-bg-tertiary text-text-primary text-sm focus:outline-none focus:ring-1 focus:ring-accent-primary"
+                />
+              </div>
+            )}
+
+            <div className="rounded-lg border border-bg-elevated bg-bg-tertiary p-3 text-xs text-text-muted">
+              {msgMode === "dm"
+                ? "운영자 계정에서 선택 유저에게 1:1 쪽지로 전송됩니다. DM 받은편지함에 실시간으로 도착합니다."
+                : "선택 유저에게 SYSTEM 알림(🔔)으로 전송됩니다. 알림 벨에 실시간으로 표시됩니다."}
+            </div>
+
+            <Button
+              variant="primary"
+              onClick={runSendMessage}
+              disabled={
+                msgBusy ||
+                !msgContent.trim() ||
+                (msgMode === "notification" && !msgTitle.trim())
+              }
+              className="w-full"
+            >
+              {msgBusy ? (
+                <LoadingSpinner />
+              ) : (
+                <>
+                  <MessageSquare className="mr-2 h-4 w-4" />
+                  {selectedUsers.length}명에게 발송
+                </>
+              )}
             </Button>
           </div>
         </Modal>

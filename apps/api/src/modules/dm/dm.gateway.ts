@@ -162,15 +162,9 @@ export class DmGateway
         client.username ?? "Unknown",
       );
 
-      // 즉시 양쪽에 전달
+      // 발신자 화면에 즉시 반영 + 수신자에게 실시간 전달(+미읽음 카운트)
       client.emit("new-dm", message);
-      this.server.to(`user:${receiverId}`).emit("new-dm", message);
-
-      // 미읽음 카운트 업데이트 (Redis에서 즉시 조회 — DB COUNT 안 함)
-      const unread = await this.dmService.getUnreadCount(receiverId);
-      this.server
-        .to(`user:${receiverId}`)
-        .emit("dm-unread-count", { total: unread });
+      await this.pushDmToUser(receiverId, message);
 
       // ACK 반환
       return {
@@ -185,6 +179,18 @@ export class DmGateway
       );
       return { success: false, error: "Failed to send message" };
     }
+  }
+
+  /**
+   * 게이트웨이 외부(관리자 REST 발송 등)에서 만들어진 DM을 수신자에게 실시간 전달한다.
+   * new-dm 이벤트 + 미읽음 카운트 갱신을 소켓 핸들러와 동일하게 처리한다.
+   */
+  async pushDmToUser(receiverId: string, message: unknown) {
+    this.server.to(`user:${receiverId}`).emit("new-dm", message);
+    const unread = await this.dmService.getUnreadCount(receiverId);
+    this.server
+      .to(`user:${receiverId}`)
+      .emit("dm-unread-count", { total: unread });
   }
 
   @SubscribeMessage("is-typing")
