@@ -190,7 +190,7 @@ export default function BookmarksPage() {
                 return (
                   <Card
                     key={post.id}
-                    className="cursor-pointer hover:border-accent-primary/50 transition-colors group"
+                    className="cursor-pointer hover:border-accent-primary/50 transition-colors group p-0"
                   >
                     <CardContent className="p-4">
                       <div className="flex items-start gap-3">

@@ -471,7 +471,7 @@ export default function SettingsPage() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           {/* Sidebar */}
           <div className="md:col-span-1">
-            <Card>
+            <Card className="p-0">
               <CardContent className="p-2">
                 <nav className="space-y-1">
                   {tabs.map((tab) => (

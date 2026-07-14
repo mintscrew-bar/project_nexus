@@ -740,7 +740,7 @@ export default function UserProfilePage() {
 
         {/* Champions Tabbed Section */}
         {showChampStats && (preferredChampions.length > 0 || championStats.length > 0 || rankedChampStats.length > 0) && (
-          <Card className="mb-6">
+          <Card className="mb-6 p-0">
             <CardContent className="p-6 md:p-8">
               <Tabs defaultValue={championStats.length > 0 ? "auto-stats" : preferredChampions.length > 0 ? "preferred" : "ranked"}>
                 <TabsList className="mb-6 flex-wrap">

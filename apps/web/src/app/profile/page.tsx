@@ -909,7 +909,7 @@ export default function ProfilePage() {
       <div className="flex-grow p-4 md:p-8 animate-fade-in">
         <div className="container mx-auto max-w-6xl">
           {/* 프로필 히어로 스켈레톤 */}
-          <Card className="mb-6">
+          <Card className="mb-6 p-0">
             <CardContent className="p-6 md:p-8">
               <div className="flex flex-col md:flex-row items-start gap-6">
                 <Skeleton className="w-24 h-24 md:w-28 md:h-28 rounded-full flex-shrink-0" />
@@ -1281,7 +1281,7 @@ export default function ProfilePage() {
 
         {/* Champions Tabbed Section */}
         {(preferredChampions.length > 0 || championStats.length > 0 || rankedChampStats.length > 0) && (
-          <Card className="mb-6">
+          <Card className="mb-6 p-0">
             <CardContent className="p-6 md:p-8">
               <Tabs defaultValue={championStats.length > 0 ? 'auto-stats' : preferredChampions.length > 0 ? 'preferred' : 'ranked'}>
                 <TabsList className="mb-6 flex-wrap">
