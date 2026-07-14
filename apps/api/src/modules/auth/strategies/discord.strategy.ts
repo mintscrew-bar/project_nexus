@@ -27,14 +27,11 @@ export class DiscordStrategy extends PassportStrategy(Strategy, "discord") {
   }
 
   async validate(
-    accessToken: string,
-    refreshToken: string,
+    _accessToken: string,
+    _refreshToken: string,
     profile: Profile,
   ): Promise<any> {
     try {
-      // [임시] Discord profile 객체 확인용 로그
-      this.logger.log(`Discord profile: ${JSON.stringify(profile, null, 2)}`);
-
       const result = await this.authService.validateOAuthUser({
         provider: "discord",
         providerId: profile.id,
@@ -49,9 +46,9 @@ export class DiscordStrategy extends PassportStrategy(Strategy, "discord") {
         avatar: profile.avatar
           ? `https://cdn.discordapp.com/avatars/${profile.id}/${profile.avatar}.${profile.avatar.startsWith("a_") ? "gif" : "png"}`
           : undefined,
+        // 주의: accessToken/refreshToken은 DB에 저장하지 않는다.
+        // 저장된 토큰을 사용하는 코드가 없고, 평문 저장 시 DB 유출 = Discord 계정 토큰 유출.
         metadata: {
-          accessToken,
-          refreshToken,
           discriminator: profile.discriminator,
         },
       });
