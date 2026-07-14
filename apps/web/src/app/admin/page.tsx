@@ -3152,7 +3152,7 @@ function DiscordGuildLinksTab({ addToast }: { addToast: (msg: string, type: "suc
         </div>
       </div>
       <p className="text-sm text-text-muted">
-        유저가 봇을 자신의 디스코드 서버에 추가하면 &quot;승인 대기&quot;로 등록됩니다. 승인하면 해당 서버에서 내전 채널이 생성됩니다.
+        유저가 봇을 자신의 Discord 서버에 추가하면 필수 권한을 확인한 뒤 자동으로 활성 연동됩니다.
       </p>
 
       <Card>

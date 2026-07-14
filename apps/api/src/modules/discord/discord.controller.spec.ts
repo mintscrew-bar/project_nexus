@@ -25,6 +25,7 @@ describe("DiscordController", () => {
   };
   const discordBotService = {
     verifyGuildPermissions: jest.fn(),
+    hasGuild: jest.fn().mockReturnValue(false),
   };
   const adminAlerts = {
     notifyDiscordGuildApprovalPending: jest.fn(),
@@ -34,6 +35,7 @@ describe("DiscordController", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    discordBotService.hasGuild.mockReturnValue(false);
     controller = new DiscordController(
       configService as any,
       authService as any,
@@ -52,7 +54,12 @@ describe("DiscordController", () => {
     expect(url.searchParams.get("response_type")).toBe("code");
     expect(url.searchParams.get("integration_type")).toBe("0");
     expect(url.searchParams.get("scope")?.split(" ")).toEqual(
-      expect.arrayContaining(["bot", "applications.commands", "identify"]),
+      expect.arrayContaining([
+        "bot",
+        "applications.commands",
+        "identify",
+        "guilds",
+      ]),
     );
     expect(url.searchParams.get("state")).toBe("state-token");
   });
@@ -61,6 +68,7 @@ describe("DiscordController", () => {
     authService.verifyLinkToken.mockResolvedValue("user-1");
     discordService.exchangeGuildInstallCode.mockResolvedValue({
       guild: { id: "guild-1", name: "내전 서버" },
+      manageableGuilds: [],
     });
     discordBotService.verifyGuildPermissions.mockResolvedValue({
       inGuild: true,
@@ -102,6 +110,7 @@ describe("DiscordController", () => {
     authService.verifyLinkToken.mockResolvedValue("user-1");
     discordService.exchangeGuildInstallCode.mockResolvedValue({
       guild: { id: "guild-1", name: "권한 없는 서버" },
+      manageableGuilds: [],
     });
     discordBotService.verifyGuildPermissions.mockResolvedValue({
       inGuild: true,
@@ -146,5 +155,55 @@ describe("DiscordController", () => {
       "복구된 서버 이름",
     );
     expect(result.guilds[0].guildName).toBe("복구된 서버 이름");
+  });
+
+  it("links manageable servers where the bot is already installed", async () => {
+    authService.verifyLinkToken.mockResolvedValue("user-1");
+    discordService.exchangeGuildInstallCode.mockResolvedValue({
+      guild: { id: "guild-1", name: "새로 선택한 서버" },
+      manageableGuilds: [
+        { id: "guild-1", name: "새로 선택한 서버" },
+        { id: "guild-2", name: "기존 봇 서버" },
+      ],
+    });
+    discordBotService.hasGuild.mockImplementation(
+      (guildId: string) => guildId === "guild-2",
+    );
+    discordBotService.verifyGuildPermissions.mockImplementation(
+      async (guildId: string) => ({
+        inGuild: true,
+        hasManageChannels: true,
+        hasMoveMembers: true,
+        guildName: guildId === "guild-1" ? "새로 선택한 서버" : "기존 봇 서버",
+      }),
+    );
+    discordService.linkGuild.mockImplementation(
+      async (ownerId: string, guildId: string, guildName: string) => ({
+        id: `link-${guildId}`,
+        guildId,
+        guildName,
+        ownerId,
+        owner: { username: "nexus-user" },
+        status: "ACTIVE",
+      }),
+    );
+    const response = { redirect: jest.fn() };
+
+    await controller.guildLinkCallback(
+      "oauth-code",
+      "state-token",
+      response as any,
+    );
+
+    expect(discordService.linkGuild).toHaveBeenCalledWith(
+      "user-1",
+      "guild-1",
+      "새로 선택한 서버",
+    );
+    expect(discordService.linkGuild).toHaveBeenCalledWith(
+      "user-1",
+      "guild-2",
+      "기존 봇 서버",
+    );
   });
 });

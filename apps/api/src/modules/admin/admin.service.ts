@@ -1606,13 +1606,37 @@ export class AdminService {
   // ── Discord 길드 연동 (멀티 길드) ──────────────────────────────────────────
 
   async getDiscordGuildLinks() {
-    return this.prisma.discordGuildLink.findMany({
+    const links = await this.prisma.discordGuildLink.findMany({
       orderBy: [{ status: "asc" }, { createdAt: "desc" }],
       include: {
         owner: { select: { id: true, username: true, avatar: true } },
         clan: { select: { id: true, name: true, tag: true } },
       },
     });
+
+    return Promise.all(
+      links.map(async (link) => {
+        if (link.guildName) return link;
+
+        const metadata = await this.discordBotService
+          .verifyGuildPermissions(link.guildId)
+          .catch(() => null);
+        if (!metadata?.inGuild || !metadata.guildName) return link;
+
+        await this.prisma.discordGuildLink
+          .update({
+            where: { id: link.id },
+            data: { guildName: metadata.guildName },
+          })
+          .catch((error) => {
+            this.logger.warn(
+              `Discord 길드명 복구 실패 (${link.guildId}): ${error?.message ?? error}`,
+            );
+          });
+
+        return { ...link, guildName: metadata.guildName };
+      }),
+    );
   }
 
   async sendDiscordTestAlert(adminId: string) {

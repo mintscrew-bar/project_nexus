@@ -303,6 +303,10 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  hasGuild(guildId: string): boolean {
+    return this.client.guilds.cache.has(guildId);
+  }
+
   /**
    * 봇이 외부 길드에서 추방/제거됨. 봇이 없는 연동은 삭제한다(재설치하면 새로 자동 승인).
    * 단, 관리자가 취소(DISABLED)한 기록은 남겨 재설치해도 자동 재활성화되지 않게 한다.

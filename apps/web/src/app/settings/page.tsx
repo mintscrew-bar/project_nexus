@@ -605,7 +605,8 @@ export default function SettingsPage() {
                     <CardTitle>내 디스코드 서버에 봇 추가</CardTitle>
                     <p className="text-sm text-text-secondary mt-1">
                       봇을 내 서버에 추가하면, 그 서버에서 내전 음성 채널이 자동
-                      생성됩니다.
+                      생성됩니다. 이미 봇이 참여 중이고 내가 관리하는 서버도 함께
+                      자동 연동됩니다.
                     </p>
                   </CardHeader>
                   <CardContent>

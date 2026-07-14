@@ -71,10 +71,57 @@ export class DiscordController {
     return result;
   }
 
+  private async linkExistingBotGuilds(
+    userId: string,
+    guilds: Array<{ id: string; name: string }>,
+    selectedGuildId: string,
+  ) {
+    const candidates = Array.from(
+      new Map(
+        guilds
+          .filter(
+            (guild) =>
+              guild.id !== selectedGuildId &&
+              this.discordBotService.hasGuild(guild.id),
+          )
+          .map((guild) => [guild.id, guild]),
+      ).values(),
+    );
+
+    await Promise.allSettled(
+      candidates.map(async (candidate) => {
+        const guild = await this.discordBotService.verifyGuildPermissions(
+          candidate.id,
+        );
+        if (
+          !guild.inGuild ||
+          !guild.hasManageChannels ||
+          !guild.hasMoveMembers
+        ) {
+          return;
+        }
+
+        const link = await this.discordService.linkGuild(
+          userId,
+          candidate.id,
+          guild.guildName || candidate.name,
+        );
+        await this.adminAlerts.notifyDiscordGuildApprovalPending({
+          linkId: link.id,
+          guildId: link.guildId,
+          guildName: link.guildName,
+          ownerId: link.ownerId,
+          ownerName: link.owner?.username,
+          status: link.status,
+        });
+      }),
+    );
+  }
+
   /**
    * 로그인한 유저에게 "내 디스코드 서버에 봇 추가" OAuth2 설치 URL을 반환한다.
-   * 프론트는 이 url로 이동시키면 됨. 설치 완료 시 Discord가 callback으로
-   * guild_id를 붙여 리다이렉트한다.
+   * 프론트는 이 URL로 이동시키면 된다. 설치 완료 후 authorization code를
+   * 콜백에서 교환해 선택한 서버와 사용자가 관리하는 서버 목록을 확인한다.
    */
   @Get("guild-link/install-url")
   @UseGuards(JwtAuthGuard)
@@ -98,7 +145,7 @@ export class DiscordController {
     const url =
       `https://discord.com/api/oauth2/authorize` +
       `?client_id=${clientId}` +
-      `&scope=${encodeURIComponent("bot applications.commands identify")}` +
+      `&scope=${encodeURIComponent("bot applications.commands identify guilds")}` +
       `&permissions=${BOT_PERMISSIONS}` +
       `&redirect_uri=${encodeURIComponent(redirectUri)}` +
       `&response_type=code` +
@@ -209,6 +256,11 @@ export class DiscordController {
         ownerName: link.owner?.username,
         status: link.status,
       });
+      await this.linkExistingBotGuilds(
+        userId,
+        installation.manageableGuilds,
+        guildId,
+      );
 
       const result = link.status === "ACTIVE" ? "active" : "error";
       return res.redirect(`${appUrl}/settings?discord_guild=${result}`);

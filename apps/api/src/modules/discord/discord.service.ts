@@ -122,7 +122,10 @@ export class DiscordService {
   async exchangeGuildInstallCode(
     code: string,
     redirectUri: string,
-  ): Promise<{ guild?: { id: string; name: string } }> {
+  ): Promise<{
+    guild?: { id: string; name: string };
+    manageableGuilds: Array<{ id: string; name: string }>;
+  }> {
     const clientId = this.configService.get<string>("DISCORD_CLIENT_ID");
     const clientSecret = this.configService.get<string>(
       "DISCORD_CLIENT_SECRET",
@@ -147,6 +150,47 @@ export class DiscordService {
       throw new BadRequestException("Discord 서버 설치 인증에 실패했습니다.");
     }
 
-    return response.json() as Promise<{ guild?: { id: string; name: string } }>;
+    const installation = (await response.json()) as {
+      access_token?: string;
+      guild?: { id: string; name: string };
+    };
+    if (!installation.access_token) {
+      throw new BadRequestException(
+        "Discord 서버 목록 접근 권한을 확인할 수 없습니다.",
+      );
+    }
+
+    const guildsResponse = await fetch(
+      "https://discord.com/api/v10/users/@me/guilds?limit=200",
+      {
+        headers: { Authorization: `Bearer ${installation.access_token}` },
+      },
+    );
+    if (!guildsResponse.ok) {
+      throw new BadRequestException(
+        "Discord에서 관리 서버 목록을 불러오지 못했습니다.",
+      );
+    }
+
+    const guilds = (await guildsResponse.json()) as Array<{
+      id: string;
+      name: string;
+      owner?: boolean;
+      permissions?: string;
+    }>;
+    const manageableGuilds = guilds.filter((guild) => {
+      if (guild.owner) return true;
+      try {
+        const permissions = BigInt(guild.permissions || "0");
+        return (permissions & 0x8n) !== 0n || (permissions & 0x20n) !== 0n;
+      } catch {
+        return false;
+      }
+    });
+
+    return {
+      guild: installation.guild,
+      manageableGuilds: manageableGuilds.map(({ id, name }) => ({ id, name })),
+    };
   }
 }

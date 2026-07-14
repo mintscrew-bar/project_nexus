@@ -21,10 +21,38 @@ describe("DiscordService", () => {
   });
 
   it("exchanges an install code and returns the selected guild", async () => {
-    const fetchMock = jest.spyOn(global, "fetch").mockResolvedValue({
-      ok: true,
-      json: async () => ({ guild: { id: "guild-1", name: "내전 서버" } }),
-    } as Response);
+    const fetchMock = jest
+      .spyOn(global, "fetch")
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          access_token: "discord-access-token",
+          guild: { id: "guild-1", name: "내전 서버" },
+        }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => [
+          {
+            id: "guild-1",
+            name: "내전 서버",
+            owner: true,
+            permissions: "0",
+          },
+          {
+            id: "guild-2",
+            name: "관리 서버",
+            owner: false,
+            permissions: "32",
+          },
+          {
+            id: "guild-3",
+            name: "일반 서버",
+            owner: false,
+            permissions: "0",
+          },
+        ],
+      } as Response);
 
     const result = await service.exchangeGuildInstallCode(
       "oauth-code",
@@ -32,6 +60,10 @@ describe("DiscordService", () => {
     );
 
     expect(result.guild).toEqual({ id: "guild-1", name: "내전 서버" });
+    expect(result.manageableGuilds).toEqual([
+      { id: "guild-1", name: "내전 서버" },
+      { id: "guild-2", name: "관리 서버" },
+    ]);
     const [, request] = fetchMock.mock.calls[0];
     const body = request?.body as URLSearchParams;
     expect(body.get("grant_type")).toBe("authorization_code");
