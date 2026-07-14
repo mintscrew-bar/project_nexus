@@ -1,14 +1,15 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useMemo, useRef } from "react";
-import { useRoomStore } from "@/stores/room-store";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuthStore } from "@/stores/auth-store";
+import { roomApi } from "@/lib/api-client";
+import { connectRoomSocket, roomSocketHelpers } from "@/lib/socket-client";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useKeyboardShortcutsContext } from "@/components/KeyboardShortcuts";
 import { RoomCard } from "@/components/domain";
-import { EmptyState, Badge, Input, RoomCardSkeleton } from "@/components/ui";
-import { RefreshCcw, Home, Search, Users, Clock, CheckCircle, Gavel, ListOrdered, X, ArrowUpDown, Calendar, TrendingUp, Scale, ArrowLeftRight } from "lucide-react";
+import { EmptyState, Input, RoomCardSkeleton } from "@/components/ui";
+import { RefreshCcw, Home, Search, Users, Clock, CheckCircle, Gavel, ListOrdered, X, ArrowUpDown, Scale, ArrowLeftRight } from "lucide-react";
 
 type StatusFilter = "ALL" | "WAITING" | "IN_PROGRESS" | "COMPLETED";
 type ModeFilter = "ALL" | "AUCTION" | "SNAKE_DRAFT" | "AUTO_BALANCE" | "MANUAL_TEAM";
@@ -31,12 +32,18 @@ const sortOptions: { value: SortOption; label: string }[] = [
 
 export function RoomList() {
   const router = useRouter();
-  const { rooms, isLoading, error, fetchRooms, subscribeToRoomList, unsubscribeFromRoomList } = useRoomStore();
   const currentUserId = useAuthStore((state) => state.user?.id);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const authLoading = useAuthStore((state) => state.isLoading);
   const { setSearchRef } = useKeyboardShortcutsContext();
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const [rooms, setRooms] = useState<any[]>([]);
+  const [totalRooms, setTotalRooms] = useState(0);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const nextCursorRef = useRef<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
   const [modeFilter, setModeFilter] = useState<ModeFilter>("ALL");
@@ -55,92 +62,74 @@ export function RoomList() {
     return () => setSearchRef(null);
   }, [setSearchRef]);
 
-  const filteredAndSortedRooms = useMemo(() => {
-    // First filter
-    const filtered = rooms.filter((room) => {
-      // Status filter
-      if (statusFilter !== "ALL") {
-        if (statusFilter === "IN_PROGRESS") {
-          if (!IN_PROGRESS_STATUSES.has(room.status)) return false;
-        } else if (room.status !== statusFilter) {
-          return false;
-        }
-      }
+  const roomQuery = useMemo(() => ({
+    status: statusFilter === "ALL" ? undefined : statusFilter,
+    teamMode: modeFilter === "ALL" ? undefined : modeFilter,
+    search: debouncedSearchQuery || undefined,
+    sort: sortBy,
+    limit: 24,
+  }), [statusFilter, modeFilter, debouncedSearchQuery, sortBy]);
 
-      // Mode filter
-      if (modeFilter !== "ALL" && room.teamMode !== modeFilter) {
-        return false;
-      }
+  const loadRooms = useCallback(async (append = false) => {
+    const cursor = nextCursorRef.current;
+    if (append && !cursor) return;
+    append ? setIsLoadingMore(true) : setIsLoading(true);
+    setError(null);
+    try {
+      const page = await roomApi.getRooms({
+        ...roomQuery,
+        ...(append ? { cursor: cursor ?? undefined } : {}),
+      });
+      setRooms((current) => {
+        if (!append) return page.items;
+        const ids = new Set(current.map((room: any) => room.id));
+        return [...current, ...page.items.filter((room: any) => !ids.has(room.id))];
+      });
+      setTotalRooms(page.total);
+      setNextCursor(page.nextCursor);
+      nextCursorRef.current = page.nextCursor;
+    } catch (err: any) {
+      setError(err?.response?.data?.message ?? err?.message ?? "방 목록을 불러오지 못했습니다.");
+    } finally {
+      append ? setIsLoadingMore(false) : setIsLoading(false);
+    }
+  }, [roomQuery]);
 
-      // Search filter (using debounced value)
-      if (debouncedSearchQuery) {
-        const query = debouncedSearchQuery.toLowerCase();
-        const roomName = room.name.toLowerCase();
-        const hostName = (room as any).hostName?.toLowerCase() || "";
-        if (!roomName.includes(query) && !hostName.includes(query)) {
-          return false;
-        }
-      }
-
-      // Joinable filter
-      if (showOnlyJoinable) {
+  const visibleRooms = useMemo(() => {
+    if (!showOnlyJoinable) return rooms;
+    return rooms.filter((room) => {
         const currentPlayers = room.participants?.length || 0;
         const isFull = currentPlayers >= room.maxParticipants;
         const isParticipant = !!currentUserId && (room.participants ?? []).some((p: any) => p.userId === currentUserId);
         const isJoinable = room.status === "WAITING" && !isFull;
-        if (!isJoinable && !isParticipant) {
-          return false;
-        }
-      }
-
-      return true;
+        return isJoinable || isParticipant;
     });
+  }, [rooms, showOnlyJoinable, currentUserId]);
 
-    // Then sort
-    return [...filtered].sort((a, b) => {
-      switch (sortBy) {
-        case "newest":
-          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-        case "oldest":
-          return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-        case "mostPlayers":
-          return (b.participants?.length || 0) - (a.participants?.length || 0);
-        case "leastPlayers":
-          return (a.participants?.length || 0) - (b.participants?.length || 0);
-        default:
-          return 0;
-      }
+  // 필터·정렬·검색은 서버가 처리하고, 변경될 때 첫 페이지부터 다시 불러온다.
+  useEffect(() => {
+    void loadRooms();
+  }, [loadRooms]);
+
+  // 첫 페이지는 실시간 델타가 오면 서버 기준으로 다시 조회한다. 구독 응답의
+  // 전체 배열은 무시해, 페이지네이션 상태를 덮어쓰지 않는다.
+  useEffect(() => {
+    if (authLoading || !isAuthenticated) return;
+    if (!connectRoomSocket()) return;
+
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+    roomSocketHelpers.subscribeRoomList(() => undefined);
+    roomSocketHelpers.onRoomListUpdated(() => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(() => void loadRooms(), 250);
     });
-  }, [rooms, statusFilter, modeFilter, debouncedSearchQuery, showOnlyJoinable, sortBy, currentUserId]);
-
-  // Count rooms by status
-  const statusCounts = useMemo(() => {
-    return {
-      ALL: rooms.length,
-      WAITING: rooms.filter(r => r.status === "WAITING").length,
-      IN_PROGRESS: rooms.filter(r => IN_PROGRESS_STATUSES.has(r.status)).length,
-      COMPLETED: rooms.filter(r => r.status === "COMPLETED").length,
-    };
-  }, [rooms]);
-
-  // fetchRooms는 공개 REST 목록이므로 로그인 여부와 무관하게 한 번 가져온다.
-  useEffect(() => {
-    fetchRooms();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // room socket은 인증 필수이므로 로그인 확정 후에만 실시간 업데이트를 구독한다.
-  useEffect(() => {
-    if (authLoading || !isAuthenticated) {
-      unsubscribeFromRoomList();
-      return;
-    }
-
-    subscribeToRoomList();
 
     return () => {
-      unsubscribeFromRoomList();
+      if (refreshTimer) clearTimeout(refreshTimer);
+      roomSocketHelpers.unsubscribeRoomList();
+      roomSocketHelpers.offRoomListUpdated();
     };
-  }, [authLoading, isAuthenticated, subscribeToRoomList, unsubscribeFromRoomList]);
+  }, [authLoading, isAuthenticated, loadRooms]);
 
   const handleRoomClick = (roomId: string) => {
     if (!isAuthenticated) {
@@ -181,7 +170,7 @@ export function RoomList() {
         description={error}
         action={{
           label: "다시 시도",
-          onClick: () => fetchRooms(),
+          onClick: () => void loadRooms(),
         }}
       />
     );
@@ -224,7 +213,6 @@ export function RoomList() {
             }`}
           >
             전체
-            <Badge variant="default" size="sm">{statusCounts.ALL}</Badge>
           </button>
           <button
             onClick={() => setStatusFilter("WAITING")}
@@ -236,7 +224,6 @@ export function RoomList() {
           >
             <Clock className="h-3.5 w-3.5" />
             대기 중
-            <Badge variant={statusFilter === "WAITING" ? "default" : "success"} size="sm">{statusCounts.WAITING}</Badge>
           </button>
           <button
             onClick={() => setStatusFilter("IN_PROGRESS")}
@@ -248,7 +235,6 @@ export function RoomList() {
           >
             <Users className="h-3.5 w-3.5" />
             진행 중
-            <Badge variant={statusFilter === "IN_PROGRESS" ? "default" : "primary"} size="sm">{statusCounts.IN_PROGRESS}</Badge>
           </button>
           <button
             onClick={() => setStatusFilter("COMPLETED")}
@@ -260,7 +246,6 @@ export function RoomList() {
           >
             <CheckCircle className="h-3.5 w-3.5" />
             완료
-            <Badge variant="default" size="sm">{statusCounts.COMPLETED}</Badge>
           </button>
         </div>
       </div>
@@ -359,7 +344,7 @@ export function RoomList() {
       </div>
 
       {/* Results */}
-      {filteredAndSortedRooms.length === 0 ? (
+      {visibleRooms.length === 0 ? (
         rooms.length === 0 ? (
           <EmptyState
             icon={Home}
@@ -385,7 +370,7 @@ export function RoomList() {
         )
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-fade-in">
-          {filteredAndSortedRooms.map((room) => (
+          {visibleRooms.map((room) => (
             <RoomCard
               key={room.id}
               room={room}
@@ -397,11 +382,23 @@ export function RoomList() {
       )}
 
       {/* Results count */}
-      {filteredAndSortedRooms.length > 0 && (
-        <p className="text-sm text-text-tertiary text-center pt-2">
-          총 {filteredAndSortedRooms.length}개의 방
-          {filteredAndSortedRooms.length !== rooms.length && ` (전체 ${rooms.length}개)`}
-        </p>
+      {rooms.length > 0 && (
+        <div className="flex flex-col items-center gap-3 pt-2">
+          <p className="text-center text-sm text-text-tertiary">
+            {showOnlyJoinable ? `현재 불러온 방 중 ${visibleRooms.length}개 표시 · ` : ""}
+            {rooms.length}/{totalRooms}개 불러옴
+          </p>
+          {nextCursor && (
+            <button
+              type="button"
+              onClick={() => void loadRooms(true)}
+              disabled={isLoadingMore}
+              className="rounded-lg border border-bg-tertiary bg-bg-secondary px-4 py-2 text-sm font-semibold text-text-secondary transition-colors hover:bg-bg-tertiary hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isLoadingMore ? "불러오는 중..." : "방 더 보기"}
+            </button>
+          )}
+        </div>
       )}
     </div>
   );

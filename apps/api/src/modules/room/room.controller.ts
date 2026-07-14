@@ -72,10 +72,14 @@ export class RoomController {
   @Throttle({ default: { limit: 600, ttl: 60000 } })
   async listRooms(@Query() query: ListRoomsQueryDto) {
     try {
-      return await this.roomService.listRooms({
+      return await this.roomService.listRoomsPage({
         status: query.status,
         teamMode: query.teamMode,
         includePrivate: query.includePrivate,
+        search: query.search,
+        sort: query.sort,
+        cursor: query.cursor,
+        limit: query.limit,
       });
     } catch (error) {
       const err = error as Error;

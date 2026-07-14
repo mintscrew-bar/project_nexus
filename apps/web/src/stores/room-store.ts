@@ -68,7 +68,7 @@ interface RoomStoreState {
   isSubscribedToRoomList: boolean;
 
   // REST API methods
-  fetchRooms: (params?: { mode?: string; status?: string }) => Promise<void>;
+  fetchRooms: (params?: { status?: string; teamMode?: string; search?: string }) => Promise<void>;
   createRoom: (data: RoomCreationData) => Promise<Room | null>;
   joinRoom: (roomId: string, password?: string) => Promise<void>;
   leaveRoom: (roomId: string) => Promise<void>;
@@ -100,8 +100,8 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
   fetchRooms: async (params) => {
     set({ isLoading: true, error: null });
     try {
-      const rooms = await roomApi.getRooms(params);
-      set({ rooms, isLoading: false });
+      const page = await roomApi.getRooms(params);
+      set({ rooms: page.items, isLoading: false });
     } catch (err: any) {
       set({ error: err.message || "Failed to fetch rooms.", isLoading: false });
     }

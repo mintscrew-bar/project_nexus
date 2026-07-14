@@ -16,7 +16,7 @@ export default function PrivacyPage() {
     <div className="max-w-3xl mx-auto px-6 py-12 text-text-primary">
       <h1 className="text-2xl font-bold mb-2">개인정보처리방침</h1>
       <p className="text-sm text-text-tertiary mb-10">
-        시행일: 2026년 1월 1일 &nbsp;|&nbsp; 최종 수정일: 2026년 3월 1일
+        시행일: 2026년 1월 1일 &nbsp;|&nbsp; 최종 수정일: 2026년 7월 14일
       </p>
 
       <Section title="1. 수집하는 개인정보 항목">
@@ -115,11 +115,31 @@ export default function PrivacyPage() {
         </ul>
       </Section>
 
-      <Section title="9. 쿠키(Cookie) 운영">
+      <Section title="9. 쿠키 및 광고 쿠키 운영">
         <ul className="list-disc pl-5 space-y-1.5 text-sm">
           <li>서비스는 로그인 상태 유지·세션 관리 목적으로 쿠키를 사용합니다.</li>
+          <li>
+            서비스는 광고를 제공하기 위해 Google을 포함한 제3자 광고 공급업체의 쿠키를 사용할 수
+            있습니다. 이 쿠키는 이용자의 서비스 및 다른 웹사이트 방문 기록을 바탕으로 개인 맞춤형
+            광고를 제공하는 데 사용될 수 있습니다.
+          </li>
+          <li>
+            Google의 광고 쿠키 사용으로 Google과 그 파트너가 이용자의 서비스 방문 및/또는 다른
+            웹사이트 방문 기록을 바탕으로 광고를 게재할 수 있습니다.
+          </li>
           <li>이용자는 브라우저 설정에서 쿠키 저장을 거부할 수 있습니다. 단, 거부 시 로그인이 유지되지 않아 일부 서비스 이용이 제한될 수 있습니다.</li>
           <li>쿠키 거부 방법: 브라우저 설정 → 개인정보/쿠키 → 쿠키 차단 또는 삭제</li>
+          <li>
+            개인 맞춤형 Google 광고는{" "}
+            <a href="https://www.google.com/settings/ads" target="_blank" rel="noopener noreferrer" className="text-accent-primary hover:underline">
+              Google 광고 설정
+            </a>
+            에서 거부할 수 있으며, 다른 제3자 공급업체의 개인 맞춤 광고 쿠키는{" "}
+            <a href="https://www.aboutads.info/choices/" target="_blank" rel="noopener noreferrer" className="text-accent-primary hover:underline">
+              aboutads.info
+            </a>
+            에서 관리할 수 있습니다.
+          </li>
         </ul>
       </Section>
 

@@ -839,7 +839,7 @@ export function DashboardContent() {
     queryKey: ["dashboard", "rooms"],
     queryFn: async () => {
       const data = await roomApi.getRooms({ status: "WAITING" });
-      const list = Array.isArray(data) ? data : (data?.rooms ?? data?.data ?? []);
+      const list = Array.isArray(data) ? data : (data?.items ?? []);
       return list.slice(0, 6);
     },
     staleTime: 2 * 60 * 1000,

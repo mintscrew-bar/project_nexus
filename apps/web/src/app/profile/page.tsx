@@ -992,7 +992,7 @@ export default function ProfilePage() {
   return (
     <div className="flex-grow p-4 md:p-8">
       <div className="container mx-auto max-w-6xl">
-        <section className="mb-6 grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
+        <section className="mb-6 grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
           <Card className="overflow-hidden rounded-lg border-bg-tertiary bg-bg-secondary p-0 shadow-sm">
             <div
               className="relative h-28 w-full bg-bg-tertiary md:h-36"
@@ -1047,7 +1047,7 @@ export default function ProfilePage() {
                 <div className="flex flex-col gap-6">
                   <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                     <div className="flex min-w-0 flex-1 flex-col gap-4 sm:flex-row sm:items-start">
-                      <div className="group relative flex-shrink-0 cursor-pointer" onClick={() => avatarInputRef.current?.click()}>
+                      <div className="group relative z-10 -mt-12 flex-shrink-0 cursor-pointer rounded-full ring-4 ring-bg-secondary sm:-mt-14" onClick={() => avatarInputRef.current?.click()}>
                         <div
                           className="relative flex h-24 w-24 items-center justify-center overflow-hidden rounded-full bg-bg-tertiary"
                           style={{ border: `2px solid ${PROFILE_ACCENT}88` }}

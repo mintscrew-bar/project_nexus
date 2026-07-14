@@ -72,7 +72,7 @@ export function Modal({
       {/* Modal */}
       <div
         className={cn(
-          'relative w-full max-h-[90vh] flex flex-col bg-bg-secondary border border-bg-tertiary rounded-xl shadow-2xl animate-scale-in',
+          'relative flex max-h-[calc(100dvh-1rem)] w-full flex-col bg-bg-secondary border border-bg-tertiary rounded-xl shadow-2xl animate-scale-in sm:max-h-[90vh]',
           sizeStyles[size],
           className
         )}
@@ -98,7 +98,7 @@ export function Modal({
         )}
 
         {/* Content */}
-        <div className="p-4 overflow-y-auto">
+        <div className="min-h-0 flex-1 overflow-y-auto p-4 overscroll-contain">
           {children}
         </div>
       </div>

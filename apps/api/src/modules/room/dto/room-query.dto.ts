@@ -2,17 +2,21 @@ import {
   IsBoolean,
   IsEnum,
   IsInt,
+  IsIn,
   IsOptional,
+  IsString,
   Max,
+  MaxLength,
   Min,
 } from "class-validator";
-import { RoomStatus, TeamMode } from "@nexus/database";
+import { Transform } from "class-transformer";
+import { TeamMode } from "@nexus/database";
 
 /** 방 목록 조회 쿼리 DTO */
 export class ListRoomsQueryDto {
   @IsOptional()
-  @IsEnum(RoomStatus)
-  status?: RoomStatus;
+  @IsIn(["WAITING", "IN_PROGRESS", "COMPLETED"])
+  status?: "WAITING" | "IN_PROGRESS" | "COMPLETED";
 
   @IsOptional()
   @IsEnum(TeamMode)
@@ -21,6 +25,27 @@ export class ListRoomsQueryDto {
   @IsOptional()
   @IsBoolean({ message: "includePrivate는 boolean이어야 합니다." })
   includePrivate?: boolean = false;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  search?: string;
+
+  @IsOptional()
+  @IsIn(["newest", "oldest", "mostPlayers", "leastPlayers"])
+  sort?: "newest" | "oldest" | "mostPlayers" | "leastPlayers" = "newest";
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  cursor?: string;
+
+  @IsOptional()
+  @Transform(({ value }) => Number(value))
+  @IsInt({ message: "limit는 정수여야 합니다." })
+  @Min(10)
+  @Max(50)
+  limit?: number = 24;
 }
 
 /** 채팅 메시지 조회 쿼리 DTO */
