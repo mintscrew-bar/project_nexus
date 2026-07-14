@@ -335,6 +335,8 @@ model Room {
   completedAt       DateTime?
   // 방송 오버레이: 호스트가 중계 중인 경기(방송 토큰은 User로 이동 — per-streamer 단일 토큰)
   broadcastFocusMatchId   String?
+  // 중계 경기를 바꾼 시각. 자동 송출에서 대진표 프리뷰 뒤 경기로 자연스럽게 넘기는 기준이다.
+  broadcastFocusChangedAt DateTime?
   createdAt         DateTime              @default(now())
   updatedAt         DateTime              @updatedAt
   chatMessages      ChatMessage[]

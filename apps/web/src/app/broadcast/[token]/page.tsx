@@ -13,9 +13,12 @@ import { LowerThird } from "./_components/LowerThird";
 import {
   RoomScene,
   MatchScene,
+  MatchIntroScene,
+  MatchResultScene,
   IdleScene,
   BreakScene,
   BracketScene,
+  TournamentSummaryScene,
   RoleSelectionScene,
   TeamRevealScene,
 } from "./_components/scenes";
@@ -85,10 +88,22 @@ const SCENE_TRANSITIONS: Record<
     eyebrow: "MATCH STATUS",
     tone: "match",
   },
+  "match-intro": {
+    label: "MATCH INTRO",
+    subLabel: "선수 소개",
+    eyebrow: "STARTING LINEUP",
+    tone: "match",
+  },
   result: {
     label: "RESULT",
     subLabel: "경기 결과",
     eyebrow: "RESULT CONFIRMED",
+    tone: "result",
+  },
+  summary: {
+    label: "TOURNAMENT COMPLETE",
+    subLabel: "전체 결과",
+    eyebrow: "FINAL STANDINGS",
     tone: "result",
   },
 };
@@ -112,11 +127,13 @@ function sceneKeyOf({
   if (scene === "idle") return "idle";
   if (scene === "break") return "break";
   if (scene === "bracket") return "bracket";
+  if (scene === "match-intro") return "match-intro";
   if (scene === "auction") return "auction";
   if (scene === "role-selection") return "role-selection";
   if (scene === "draft") return "draft";
   if (scene === "teams") return "teams";
   if (scene === "result") return "result";
+  if (scene === "summary") return "summary";
   if (scene === "room") return "waiting";
   if (scene === "match") {
     return matchStatus === "COMPLETED" ? "result" : "match";
@@ -162,15 +179,13 @@ export default function BroadcastPage() {
   const status = snapshot?.room?.status;
   const teamMode = snapshot?.room?.teamMode;
   const controlScene =
-    scene === "control" ? snapshot?.broadcast?.scene ?? "auto" : scene;
+    scene === "control" ? (snapshot?.broadcast?.scene ?? "auto") : scene;
   const snapshotScene = (snapshot?.scene ?? controlScene) as string;
   // "AUCTION"/"ROLE_SELECT"는 RoomStatus enum에 없는 값 — DRAFT + teamMode 및
   // ROLE_SELECTION 상태로만 판별한다.
   const isAuctionRoom =
     controlScene === "auction" ||
-    (controlScene === "auto" &&
-      status === "DRAFT" &&
-      teamMode === "AUCTION");
+    (controlScene === "auto" && status === "DRAFT" && teamMode === "AUCTION");
   const isSnakeDraftRoom =
     controlScene === "auto" && status === "DRAFT" && teamMode === "SNAKE_DRAFT";
   const isRoleSelectionRoom =
@@ -182,12 +197,12 @@ export default function BroadcastPage() {
   const displayScene = isAuctionRoom
     ? "auction"
     : isSnakeDraftRoom
-    ? "draft"
-    : isRoleSelectionRoom
-    ? "role-selection"
-    : isTeamRevealRoom
-    ? "teams"
-    : snapshotScene;
+      ? "draft"
+      : isRoleSelectionRoom
+        ? "role-selection"
+        : isTeamRevealRoom
+          ? "teams"
+          : snapshotScene;
   const broadcastSceneKey = sceneKeyOf({
     idle: snapshot?.idle,
     scene: displayScene,
@@ -282,37 +297,50 @@ export default function BroadcastPage() {
     return <div className="fixed inset-0 bg-transparent" />;
   }
 
-  const sceneNode = snapshot.idle || displayScene === "idle" ? (
-    <IdleScene snapshot={snapshot} />
-  ) : displayScene === "break" ? (
-    <BreakScene snapshot={snapshot} />
-  ) : displayScene === "bracket" ? (
-    <BracketScene snapshot={snapshot} />
-  ) : displayScene === "match" || displayScene === "result" ? (
-    <MatchScene snapshot={snapshot} />
-  ) : isAuctionRoom && token && roomId ? (
-    // 경매 단계는 정적 스냅샷 대신 기존 경매 화면(AuctionBoard)을 라이브로 중계
-    <BroadcastAuctionLive token={token} roomId={roomId} />
-  ) : isSnakeDraftRoom && token && roomId ? (
-    // 스네이크 드래프트도 /snake-draft 게이트웨이를 read-only 구독해 라이브 중계
-    <BroadcastSnakeDraftLive token={token} roomId={roomId} snapshot={snapshot} />
-  ) : displayScene === "teams" ? (
-    <TeamRevealScene snapshot={snapshot} />
-  ) : isRoleSelectionRoom || broadcastSceneKey === "role-selection" ? (
-    <RoleSelectionScene snapshot={snapshot} />
-  ) : (
-    <RoomScene snapshot={snapshot} />
-  );
+  const sceneNode =
+    snapshot.idle || displayScene === "idle" ? (
+      <IdleScene snapshot={snapshot} />
+    ) : displayScene === "break" ? (
+      <BreakScene snapshot={snapshot} />
+    ) : displayScene === "bracket" ? (
+      <BracketScene snapshot={snapshot} />
+    ) : displayScene === "summary" ? (
+      <TournamentSummaryScene snapshot={snapshot} />
+    ) : displayScene === "match-intro" ? (
+      <MatchIntroScene snapshot={snapshot} />
+    ) : displayScene === "result" ? (
+      <MatchResultScene snapshot={snapshot} />
+    ) : displayScene === "match" ? (
+      <MatchScene snapshot={snapshot} />
+    ) : isAuctionRoom && token && roomId ? (
+      // 경매 단계는 정적 스냅샷 대신 기존 경매 화면(AuctionBoard)을 라이브로 중계
+      <BroadcastAuctionLive token={token} roomId={roomId} />
+    ) : isSnakeDraftRoom && token && roomId ? (
+      // 스네이크 드래프트도 /snake-draft 게이트웨이를 read-only 구독해 라이브 중계
+      <BroadcastSnakeDraftLive
+        token={token}
+        roomId={roomId}
+        snapshot={snapshot}
+      />
+    ) : displayScene === "teams" ? (
+      <TeamRevealScene snapshot={snapshot} />
+    ) : isRoleSelectionRoom || broadcastSceneKey === "role-selection" ? (
+      <RoleSelectionScene snapshot={snapshot} />
+    ) : (
+      <RoomScene snapshot={snapshot} />
+    );
 
   const persistent =
-    snapshot?.broadcast?.lowerThirdVisible === false || displayScene === "match"
-      ? null
-      : (
-          <>
-            <LowerThird snapshot={snapshot} />
-            <BroadcastAnnouncement text={snapshot?.broadcast?.announcement} />
-          </>
-        );
+    snapshot?.broadcast?.lowerThirdVisible === false ||
+    displayScene === "match" ||
+    displayScene === "match-intro" ||
+    displayScene === "result" ||
+    displayScene === "summary" ? null : (
+      <>
+        <LowerThird snapshot={snapshot} />
+        <BroadcastAnnouncement text={snapshot?.broadcast?.announcement} />
+      </>
+    );
 
   return (
     <BroadcastShell

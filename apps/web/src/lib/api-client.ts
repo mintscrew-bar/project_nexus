@@ -748,8 +748,10 @@ export type BroadcastControlScene =
   | "auction"
   | "role-selection"
   | "bracket"
+  | "match-intro"
   | "match"
   | "result"
+  | "summary"
   | "break";
 
 export type BroadcastControlState = {

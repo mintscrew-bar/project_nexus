@@ -1283,7 +1283,10 @@ export class RoomService {
     }
     await this.prisma.room.update({
       where: { id: roomId },
-      data: { broadcastFocusMatchId: matchId },
+      data: {
+        broadcastFocusMatchId: matchId,
+        broadcastFocusChangedAt: matchId ? new Date() : null,
+      },
     });
     return { focusMatchId: matchId };
   }
