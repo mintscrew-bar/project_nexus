@@ -411,9 +411,13 @@ export default function TournamentLobbyPage() {
             : undefined;
   const readyBarStatus = canStart
     ? "시작 가능"
-    : allPlayersReady
-      ? "준비 완료"
-      : `${pendingReadyCount}명 대기`;
+    : !hasFullRoster
+      ? "정원 대기"
+      : !allPlayersAssigned || !manualTeamsFilled
+        ? "팀 편성 필요"
+        : allPlayersReady
+          ? "시작 조건 확인"
+          : `${pendingReadyCount}명 대기`;
   const readyBarHint = canStart
     ? "준비와 음성채널 확인이 완료되었습니다."
     : pendingReadyPlayers.length > 0
@@ -726,7 +730,7 @@ export default function TournamentLobbyPage() {
                   </TabsTrigger>
                 </TabsList>
               </div>
-              <TabsContent value="participants" className="min-h-0 flex-1 basis-0 overflow-y-auto p-4">
+              <TabsContent value="participants" className="min-h-0 flex-1 basis-0 overflow-y-auto overscroll-contain p-4">
                 {participantsList}
               </TabsContent>
               <TabsContent value="chat" className="flex min-h-0 flex-1 basis-0 overflow-hidden p-4">

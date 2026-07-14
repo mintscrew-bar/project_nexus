@@ -4,16 +4,13 @@ import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import {
   ArrowRight,
-  BarChart3,
   BookOpen,
   ClipboardList,
   Gavel,
   MessageSquare,
+  Radio,
   Scale,
-  ShieldCheck,
   Swords,
-  Trophy,
-  Users,
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { LandingBannerCarousel } from "@/components/home/LandingBannerCarousel";
@@ -27,52 +24,21 @@ const featureCards: Array<{
 }> = [
   {
     icon: Gavel,
-    title: "경매 드래프트",
+    title: "방을 열고 참가자를 모읍니다",
     description:
-      "방장이 시작 포인트와 입찰 시간을 정하면 팀장이 참가자를 직접 낙찰합니다. 포인트 흐름과 남은 매물이 한 화면에 남아, 디스코드 채팅으로 가격을 다시 확인할 필요가 없습니다.",
+      "정원, 관전, 팀 구성 방식을 먼저 정한 뒤 준비 상태로 실제 참가자를 확인합니다. 방장은 시작을 막는 조건을 로비에서 바로 볼 수 있습니다.",
   },
   {
     icon: Scale,
-    title: "자동 밸런싱",
+    title: "상황에 맞게 팀을 구성합니다",
     description:
-      "참가자의 티어, LP, 선호 포지션을 참고해 한쪽으로 치우친 팀 구성을 줄입니다. 인원이 모두 준비되면 방장이 바로 팀 편성을 확정할 수 있습니다.",
+      "경매·스네이크·자동 밸런스·자유 팀 선택 중 내전 목적에 맞는 방식을 고릅니다. 티어, LP, 선호 포지션과 역할 배치를 한 흐름으로 확인합니다.",
   },
   {
     icon: MessageSquare,
-    title: "Discord 연동",
+    title: "경기 뒤에도 기록을 남깁니다",
     description:
-      "계정 연동, 참가 확인, 음성 채널 이동, 봇 명령어를 내전 흐름에 맞춰 연결합니다. 운영자는 호출을 줄이고 참가자는 어디로 들어가야 하는지 빠르게 확인합니다.",
-  },
-];
-
-const workflowCards: Array<{
-  icon: LucideIcon;
-  title: string;
-  body: string;
-}> = [
-  {
-    icon: ClipboardList,
-    title: "모집과 준비 상태를 분리",
-    body:
-      "참가자, 관전자, 준비 완료 상태를 따로 관리합니다. 방장은 실제 경기 인원만 확인하고, 참가자는 로비에서 자신의 상태와 팀 이동 조건을 바로 볼 수 있습니다.",
-  },
-  {
-    icon: Swords,
-    title: "팀 구성 방식별 진행 화면",
-    body:
-      "경매, 스네이크, 자동 밸런스, 자유 팀 선택은 서로 다른 규칙을 사용합니다. Nexus는 각 모드의 시작 조건과 다음 단계 이동을 분리해 같은 방 안에서도 흐름이 섞이지 않게 설계합니다.",
-  },
-  {
-    icon: Trophy,
-    title: "경기 후 기록까지 연결",
-    body:
-      "대진표와 결과 입력, 내전 전적, 평점 기록을 이어서 남깁니다. 단순 모집 도구가 아니라 다음 내전의 밸런스와 회고에 사용할 수 있는 기록을 만드는 것이 목적입니다.",
-  },
-  {
-    icon: ShieldCheck,
-    title: "정책과 신뢰 정보 공개",
-    body:
-      "개인정보처리방침, 이용약관, Riot Games 고지, 커뮤니티 운영 기준을 공개 페이지에서 확인할 수 있게 정리합니다. 신규 방문자가 가입 전에 서비스 범위를 판단할 수 있습니다.",
+      "대진표, 결과, 전적과 회고를 다음 내전 준비에 활용합니다. Discord 음성 채널과 방송 오버레이도 운영 흐름 안에서 연결할 수 있습니다.",
   },
 ];
 
@@ -97,15 +63,15 @@ const resourceLinks: Array<{
       "내전 운영 체크리스트, 모드 선택 기준, 결과 기록 기준을 공개 문서로 정리했습니다.",
   },
   {
-    href: "/matches",
-    icon: BarChart3,
-    title: "내전 전적",
+    href: "/resources/obs-broadcast-overlay-guide",
+    icon: Radio,
+    title: "방송 오버레이 가이드",
     description:
-      "소환사와 Nexus 유저 기준으로 내전 기록, KDA, 챔피언 사용 흐름을 확인합니다.",
+      "OBS 브라우저 소스 등록, 방 자동 추종, 장면 조작과 토큰 보안 절차를 안내합니다.",
   },
   {
     href: "/about",
-    icon: Users,
+    icon: Swords,
     title: "서비스 소개",
     description:
       "Nexus가 어떤 문제를 해결하는지, 어떤 데이터를 다루는지, Riot Games와의 관계를 안내합니다.",
@@ -177,8 +143,10 @@ export function LandingContentSections({ showBanner = true }: { showBanner?: boo
         </section>
       )}
 
-      <section id="features" className="py-16 md:py-32 px-6">
-        <h2 className="text-2xl sm:text-3xl md:text-5xl font-bold text-center text-text-primary mb-10 md:mb-16">
+      <section id="features" className="px-6 py-16 md:py-24">
+        <div className="mx-auto max-w-6xl">
+          <p className="text-center text-sm font-semibold text-accent-primary">NEXUS로 하는 내전 운영</p>
+          <h2 className="mt-2 text-center text-2xl font-bold text-text-primary sm:text-3xl md:text-5xl">
           엑셀로 하던 내전,{" "}
           <span
             className="bg-clip-text text-transparent"
@@ -187,64 +155,28 @@ export function LandingContentSections({ showBanner = true }: { showBanner?: boo
             이제 그만할 때
           </span>
           {" "}됐잖아요.
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-10 max-w-6xl mx-auto">
+          </h2>
+          <p className="mx-auto mt-5 max-w-2xl text-center text-sm leading-relaxed text-text-secondary md:text-base">
+            모집부터 팀 확정, 경기 기록까지 단계마다 필요한 정보만 남겨 다음 진행을 쉽게 만듭니다.
+          </p>
+        <div className="mt-10 grid grid-cols-1 gap-4 md:grid-cols-3 md:gap-6">
           {featureCards.map((feature) => (
             <article
               key={feature.title}
-              className="group flex flex-col items-center text-center p-6 md:p-10 rounded-lg bg-bg-secondary/50 border border-bg-tertiary hover:border-violet-500/30 transition-all duration-300 hover:scale-[1.02]"
+              className="group rounded-xl border border-bg-tertiary bg-bg-secondary/50 p-6 transition-colors hover:border-accent-primary/40"
             >
-              <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-lg bg-accent-primary/10 text-accent-primary md:h-16 md:w-16">
-                <feature.icon className="h-8 w-8 md:h-9 md:w-9" />
+              <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-lg bg-accent-primary/10 text-accent-primary">
+                <feature.icon className="h-5 w-5" />
               </div>
-              <h3 className="text-xl sm:text-2xl md:text-3xl font-bold text-text-primary mb-3">
+              <h3 className="text-lg font-bold text-text-primary">
                 {feature.title}
               </h3>
-              <p className="text-sm md:text-base text-text-secondary leading-relaxed">
+              <p className="mt-3 text-sm leading-relaxed text-text-secondary">
                 {feature.description}
               </p>
             </article>
           ))}
         </div>
-      </section>
-
-      <section className="px-6 pb-16 md:pb-28">
-        <div className="mx-auto max-w-6xl">
-          <div className="mb-8 max-w-3xl">
-            <p className="text-sm font-semibold text-accent-primary">내전 운영 흐름</p>
-            <h2 className="mt-2 text-2xl sm:text-3xl md:text-4xl font-bold text-text-primary">
-              모집, 팀 구성, 경기 결과가 끊기지 않게
-            </h2>
-            <p className="mt-4 text-sm md:text-lg leading-relaxed text-text-secondary">
-              Nexus는 단순히 방 목록만 보여주는 사이트가 아닙니다. 내전 운영자가
-              매번 반복하던 참가 확인, 팀장 선정, 포지션 정리, 결과 기록을 하나의
-              공개된 흐름으로 묶어 신규 방문자도 어떤 서비스인지 이해할 수 있게
-              설명하고 기록합니다.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            {workflowCards.map((card) => (
-              <article
-                key={card.title}
-                className="rounded-lg border border-bg-tertiary bg-bg-secondary/50 p-5 md:p-6"
-              >
-                <div className="flex items-start gap-4">
-                  <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-bg-tertiary text-accent-primary">
-                    <card.icon className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-text-primary">
-                      {card.title}
-                    </h3>
-                    <p className="mt-2 text-sm leading-relaxed text-text-secondary">
-                      {card.body}
-                    </p>
-                  </div>
-                </div>
-              </article>
-            ))}
-          </div>
         </div>
       </section>
 
@@ -256,9 +188,9 @@ export function LandingContentSections({ showBanner = true }: { showBanner?: boo
               가입 전에 읽을 수 있는 Nexus 자료
             </h2>
             <p className="mt-4 text-sm md:text-lg leading-relaxed text-text-secondary">
-              처음 방문한 사용자와 검색 로봇이 서비스의 목적, 사용 방법, 운영
-              기준을 확인할 수 있도록 정적 콘텐츠를 별도로 제공합니다. 내전
-              참여 전에도 충분한 정보를 얻을 수 있게 내부 링크를 연결했습니다.
+              처음 방문한 사용자도 서비스의 목적, 사용 방법, 운영 기준을 확인할
+              수 있도록 운영 자료를 공개합니다. 내전 참여 전에도 필요한 정보를
+              충분히 비교하고 판단할 수 있게 관련 문서를 연결했습니다.
             </p>
           </div>
 
@@ -289,48 +221,19 @@ export function LandingContentSections({ showBanner = true }: { showBanner?: boo
         </div>
       </section>
 
-      <section className="px-6 pb-16 md:pb-32">
-        <div className="mx-auto max-w-6xl pt-16 md:pt-28">
-          <div className="mb-8 md:mb-10 max-w-3xl">
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-text-primary">
-              롤 내전, 전적, 스크림을 한 흐름으로 관리
-            </h2>
-            <p className="mt-4 text-sm md:text-lg leading-relaxed text-text-secondary">
-              Nexus는 리그 오브 레전드 내전과 스크림을 운영하는 팀을 위해
-              참가자 모집, 팀 밸런싱, 경기 기록, 롤 전적 확인, 챔피언 통계
-              분석을 연결합니다.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            <article className="rounded-lg border border-bg-tertiary bg-bg-secondary/50 p-6">
-              <h3 className="text-xl font-semibold text-text-primary">롤 내전 운영</h3>
-              <p className="mt-3 text-sm leading-relaxed text-text-secondary">
-                디스코드 기반 참가, 팀 구성, 경매 드래프트, 자유 팀 선택,
-                결과 기록까지 내전 진행에 필요한 과정을 한곳에서 처리합니다.
-                방장은 시작 조건을 확인하고 참가자는 다음 단계로 넘어가는
-                이유를 화면에서 확인할 수 있습니다.
-              </p>
-            </article>
-
-            <article className="rounded-lg border border-bg-tertiary bg-bg-secondary/50 p-6">
-              <h3 className="text-xl font-semibold text-text-primary">롤 전적 분석</h3>
-              <p className="mt-3 text-sm leading-relaxed text-text-secondary">
-                내전 기록과 랭크 기록을 구분해 챔피언 승률, 포지션, KDA,
-                장인 빌드 흐름을 비교할 수 있습니다. 경기 후 평점과 결과를
-                남기면 단발성 게임이 아니라 커뮤니티가 참고할 수 있는 기록으로
-                쌓입니다.
-              </p>
-            </article>
-
-            <article className="rounded-lg border border-bg-tertiary bg-bg-secondary/50 p-6">
-              <h3 className="text-xl font-semibold text-text-primary">롤 스크림 관리</h3>
-              <p className="mt-3 text-sm leading-relaxed text-text-secondary">
-                고정 팀, 클랜, 커뮤니티 스크림에서 반복되는 매칭과 기록
-                관리를 줄이고 다음 경기 준비에 집중할 수 있게 돕습니다. 클랜과
-                커뮤니티 페이지를 통해 함께 경기할 사람을 찾는 흐름도 연결합니다.
-              </p>
-            </article>
+      <section className="px-6 py-16 md:py-24">
+        <div className="mx-auto max-w-6xl rounded-2xl border border-accent-primary/20 bg-accent-primary/5 p-6 md:p-10">
+          <p className="text-sm font-semibold text-accent-primary">처음이라면 이렇게 시작하세요</p>
+          <div className="mt-4 grid gap-6 md:grid-cols-[1fr_1fr_auto] md:items-end">
+            <div>
+              <h2 className="text-2xl font-bold text-text-primary">먼저 운영 기준을 정하고, 방을 열어 보세요.</h2>
+              <p className="mt-3 text-sm leading-relaxed text-text-secondary">팀 구성 방식과 시작 조건이 익숙하지 않다면 운영 자료실에서 상황별 체크리스트를 확인할 수 있습니다.</p>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <Link href="/resources" className="rounded-lg border border-bg-tertiary bg-bg-secondary px-4 py-2.5 text-sm font-semibold text-text-primary transition-colors hover:bg-bg-elevated">운영 자료실</Link>
+              <Link href="/guide" className="rounded-lg border border-bg-tertiary bg-bg-secondary px-4 py-2.5 text-sm font-semibold text-text-primary transition-colors hover:bg-bg-elevated">기능 가이드</Link>
+            </div>
+            <Link href="/auth/login" className="inline-flex items-center justify-center gap-2 rounded-lg bg-accent-primary px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-accent-hover">내전 시작하기 <ArrowRight className="h-4 w-4" /></Link>
           </div>
         </div>
       </section>

@@ -4,11 +4,15 @@ import { ArrowRight, Bot, BookOpen, Radio, Shield, Users } from "lucide-react";
 import { absoluteUrl } from "@/lib/seo";
 
 export const metadata: Metadata = {
-  title: "NEXUS 파트너 모집",
+  title: "NEXUS 파트너 안내",
   description:
     "NEXUS와 함께 성장할 스트리머와 클랜을 위한 안내 페이지입니다. 스트리머 정보 등록, 클랜 만들기, Discord 봇 추가, 사용 가이드를 확인하세요.",
   alternates: {
     canonical: absoluteUrl("/partners"),
+  },
+  robots: {
+    index: false,
+    follow: false,
   },
   openGraph: {
     title: "NEXUS 파트너 모집",

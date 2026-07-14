@@ -157,7 +157,7 @@ export default function AdminPage() {
 
 function StatCard({ icon, label, value, sub }: { icon: React.ReactNode; label: string; value: number; sub?: string }) {
   return (
-    <Card>
+    <Card className="p-0">
       <CardContent className="p-4 flex items-center gap-3">
         <div className="text-accent-primary flex-shrink-0">{icon}</div>
         <div className="min-w-0">
@@ -1269,7 +1269,7 @@ function UsersTab({ addToast, currentUserId, isAdmin }: { addToast: (msg: string
       </div>
 
       {selectedUsers.length > 0 && (
-        <Card>
+        <Card className="p-0">
           <CardContent className="flex flex-col gap-3 p-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <p className="text-sm font-semibold text-text-primary">
@@ -2678,7 +2678,7 @@ function AnnouncementsTab({ addToast }: { addToast: (msg: string, type: "success
   return (
     <div className="space-y-4 max-w-lg">
       <h2 className="text-lg font-semibold text-text-primary">전체 공지 발송</h2>
-      <Card>
+      <Card className="p-0">
         <CardContent className="p-5">
           <form onSubmit={handleSend} className="space-y-4">
             <div>

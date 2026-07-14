@@ -20,6 +20,18 @@ const broadcastBgCss = `
   50% { opacity: 0.34; }
   100% { transform: translateX(22%); opacity: 0.18; }
 }
+@keyframes nexus-roster-in-left {
+  from { opacity: 0; transform: translate3d(-44px, 0, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+@keyframes nexus-roster-in-right {
+  from { opacity: 0; transform: translate3d(44px, 0, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+@keyframes nexus-result-rise {
+  from { opacity: 0; transform: translate3d(0, 24px, 0) scale(0.98); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
 `;
 
 const STATUS_LABELS: Record<string, string> = {
@@ -483,7 +495,8 @@ export function MatchScene({ snapshot }: { snapshot: any }) {
   const blueScore = match.blueScore ?? (blueWin ? 1 : 0);
   const redScore = match.redScore ?? (redWin ? 1 : 0);
   const roundLabel =
-    match.bracketRound || (match.round != null ? `${match.round}라운드` : "경기");
+    match.bracketRound ||
+    (match.round != null ? `${match.round}라운드` : "경기");
 
   return (
     // 롤 관전 위에 합성되는 오버레이라 배경 없이 투명하게 띄운다.
@@ -537,6 +550,73 @@ export function MatchScene({ snapshot }: { snapshot: any }) {
   );
 }
 
+export function MatchResultScene({ snapshot }: { snapshot: any }) {
+  const match = snapshot?.match;
+  const accent = accentOf(snapshot);
+  if (!match) return <MatchScene snapshot={snapshot} />;
+
+  const winner =
+    match.winnerId === match.blue?.id
+      ? match.blue
+      : match.winnerId === match.red?.id
+        ? match.red
+        : null;
+  const loser = winner?.id === match.blue?.id ? match.red : match.blue;
+  const roundLabel =
+    match.bracketRound ||
+    (match.round != null ? `${match.round}라운드` : "경기");
+
+  return (
+    <StageFrame accent={winner?.color ?? accent}>
+      <div className="flex h-full w-full flex-col items-center justify-center px-24 text-center">
+        <div style={{ animation: "nexus-result-rise 700ms ease-out both" }}>
+          <HudLabel color={winner?.color ?? accent}>MATCH RESULT</HudLabel>
+          <p className="mt-4 text-xl font-black uppercase tracking-[0.26em] text-white/40">
+            {roundLabel}
+            {match.matchNumber != null ? ` · MATCH ${match.matchNumber}` : ""}
+          </p>
+          <div className="mt-12 flex items-center justify-center gap-14">
+            <div className="min-w-[520px] border-y border-white/18 py-10">
+              <p className="text-sm font-black uppercase tracking-[0.34em] text-amber-300">
+                Winner
+              </p>
+              <h1
+                className="mt-5 truncate text-[82px] font-black leading-none"
+                style={{ color: winner?.color ?? accent }}
+              >
+                {winner?.name ?? "결과 확인 중"}
+              </h1>
+              <div className="mt-8 flex justify-center -space-x-2">
+                {(winner?.members ?? []).slice(0, 5).map((member: any) => (
+                  // 방송 토큰 스냅샷의 외부 아바타 URL을 그대로 표시한다.
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    key={member.userId}
+                    src={
+                      member.avatar || "/images/placeholders/non-avatar-64.png"
+                    }
+                    alt=""
+                    className="h-16 w-16 rounded-full border-2 border-[#05070d] object-cover"
+                  />
+                ))}
+              </div>
+            </div>
+            <div className="text-5xl font-black text-white/18">VS</div>
+            <div className="min-w-[420px] py-10 opacity-45">
+              <p className="text-sm font-black uppercase tracking-[0.34em] text-white/40">
+                Match Complete
+              </p>
+              <p className="mt-5 truncate text-[54px] font-black leading-none text-white">
+                {loser?.name ?? "상대 팀"}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </StageFrame>
+  );
+}
+
 const ROLE_ORDER = ["TOP", "JUNGLE", "MID", "ADC", "SUPPORT"];
 const ROLE_NAMES: Record<string, string> = {
   TOP: "TOP",
@@ -563,6 +643,154 @@ function roleKeyOf(member: any) {
   if (role === "BOTTOM") return "ADC";
   if (role === "UTILITY") return "SUPPORT";
   return role || null;
+}
+
+function introRosterOf(team: any) {
+  const members: any[] = team?.members ?? [];
+  const byRole = new Map<string, any>();
+  const unassigned: any[] = [];
+  for (const member of members) {
+    const role = roleKeyOf(member);
+    if (role && ROLE_ORDER.includes(role) && !byRole.has(role)) {
+      byRole.set(role, member);
+    } else {
+      unassigned.push(member);
+    }
+  }
+  return ROLE_ORDER.map((role) => ({
+    role,
+    member: byRole.get(role) ?? unassigned.shift(),
+  }));
+}
+
+function MatchIntroTeam({ team, side }: { team: any; side: "left" | "right" }) {
+  const roster = introRosterOf(team);
+  const color = team?.color ?? (side === "left" ? "#3B82F6" : "#EF4444");
+
+  return (
+    <section className="min-w-0">
+      <div className={side === "right" ? "text-right" : "text-left"}>
+        <p className="text-xs font-black uppercase tracking-[0.3em] text-white/36">
+          {side === "left" ? "Blue Side" : "Red Side"}
+        </p>
+        <h2
+          className="mt-2 truncate text-[46px] font-black leading-none"
+          style={{ color }}
+        >
+          {team?.name ?? "팀 미정"}
+        </h2>
+      </div>
+      <div className="mt-7 grid gap-2.5">
+        {roster.map(({ role, member }, index) => (
+          <div
+            key={role}
+            className={`grid h-[82px] items-center gap-4 border-y border-white/12 bg-black/28 px-5 ${
+              side === "left"
+                ? "grid-cols-[54px_64px_minmax(0,1fr)]"
+                : "grid-cols-[minmax(0,1fr)_64px_54px] text-right"
+            }`}
+            style={{
+              animation: `nexus-roster-in-${side} 520ms ease-out ${220 + index * 360}ms both`,
+              borderColor: `${color}66`,
+            }}
+          >
+            {side === "left" ? (
+              <>
+                <IntroRole role={role} />
+                <IntroAvatar member={member} />
+                <IntroMember member={member} />
+              </>
+            ) : (
+              <>
+                <IntroMember member={member} />
+                <IntroAvatar member={member} />
+                <IntroRole role={role} />
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function IntroRole({ role }: { role: string }) {
+  return (
+    <div className="flex flex-col items-center gap-1">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={ROLE_ICON[role]}
+        alt=""
+        className="h-5 w-5 brightness-0 invert opacity-70"
+      />
+      <span className="text-[10px] font-black tracking-[0.12em] text-white/48">
+        {ROLE_NAMES[role]}
+      </span>
+    </div>
+  );
+}
+
+function IntroAvatar({ member }: { member?: any }) {
+  return (
+    // 방송 토큰 스냅샷의 외부 아바타 URL을 그대로 표시한다.
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={member?.avatar || "/images/placeholders/non-avatar-64.png"}
+      alt=""
+      className="h-14 w-14 rounded-full border-2 border-white/16 object-cover"
+    />
+  );
+}
+
+function IntroMember({ member }: { member?: any }) {
+  return (
+    <div className="min-w-0">
+      <p className="truncate text-2xl font-black text-white">
+        {member?.username ?? "미정"}
+      </p>
+      <p className="mt-1 text-xs font-bold uppercase tracking-[0.14em] text-white/34">
+        {member?.tier ?? "NEXUS PLAYER"}
+      </p>
+    </div>
+  );
+}
+
+export function MatchIntroScene({ snapshot }: { snapshot: any }) {
+  const match = snapshot?.match;
+  const accent = accentOf(snapshot);
+  if (!match) return <MatchScene snapshot={snapshot} />;
+
+  const roundLabel =
+    match.bracketRound ||
+    (match.round != null ? `${match.round}라운드` : "경기");
+
+  return (
+    <StageFrame accent={accent}>
+      <div className="flex h-full w-full flex-col px-20 py-14">
+        <div className="mb-7 flex items-end justify-between">
+          <div>
+            <HudLabel color={accent}>STARTING LINEUP</HudLabel>
+            <h1 className="mt-2 text-[58px] font-black uppercase leading-none text-white">
+              Match Intro
+            </h1>
+          </div>
+          <p className="text-right text-lg font-black uppercase tracking-[0.22em] text-white/42">
+            {roundLabel}
+            {match.matchNumber != null ? ` · MATCH ${match.matchNumber}` : ""}
+          </p>
+        </div>
+        <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_120px_minmax(0,1fr)] items-center gap-7">
+          <MatchIntroTeam team={match.blue} side="left" />
+          <div className="flex h-full items-center justify-center">
+            <span className="text-[58px] font-black italic text-white/22">
+              VS
+            </span>
+          </div>
+          <MatchIntroTeam team={match.red} side="right" />
+        </div>
+      </div>
+    </StageFrame>
+  );
 }
 
 function filledRoleCount(members: any[]) {
@@ -598,14 +826,18 @@ function RoleSlot({
           height={compact ? 16 : 20}
           className={`brightness-0 invert ${member ? "opacity-90" : "opacity-28"}`}
         />
-        <span className={`font-black uppercase text-white/62 ${compact ? "text-[10px]" : "text-xs"}`}>
+        <span
+          className={`font-black uppercase text-white/62 ${compact ? "text-[10px]" : "text-xs"}`}
+        >
           {ROLE_NAMES[role]}
         </span>
       </div>
 
       {member ? (
         <div className="flex min-w-0 items-center gap-2.5">
-          <div className={`${compact ? "h-7 w-7" : "h-9 w-9"} shrink-0 overflow-hidden rounded-full bg-white/10`}>
+          <div
+            className={`${compact ? "h-7 w-7" : "h-9 w-9"} shrink-0 overflow-hidden rounded-full bg-white/10`}
+          >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={member.avatar || "/images/placeholders/non-avatar-64.png"}
@@ -613,12 +845,16 @@ function RoleSlot({
               className={`${compact ? "h-7 w-7" : "h-9 w-9"} rounded-full object-cover`}
             />
           </div>
-          <p className={`min-w-0 flex-1 truncate font-black text-white ${compact ? "text-sm" : "text-base"}`}>
+          <p
+            className={`min-w-0 flex-1 truncate font-black text-white ${compact ? "text-sm" : "text-base"}`}
+          >
             {member.username}
           </p>
         </div>
       ) : (
-        <p className={`truncate font-black uppercase tracking-[0.12em] text-white/24 ${compact ? "text-[10px]" : "text-xs"}`}>
+        <p
+          className={`truncate font-black uppercase tracking-[0.12em] text-white/24 ${compact ? "text-[10px]" : "text-xs"}`}
+        >
           Waiting
         </p>
       )}
@@ -706,15 +942,22 @@ export function RoleSelectionScene({ snapshot }: { snapshot: any }) {
     0,
   );
   const total = teams.length * ROLE_ORDER.length;
-  const progress = Math.max(0, Math.min(100, (assigned / Math.max(total, 1)) * 100));
+  const progress = Math.max(
+    0,
+    Math.min(100, (assigned / Math.max(total, 1)) * 100),
+  );
   const teamColumns = Math.min(Math.max(teams.length, 1), 4);
   const compactTeams =
     teams.length > 2 || teams.some((team) => (team.members ?? []).length >= 5);
 
   return (
     <StageFrame accent={accent}>
-      <div className={`flex h-full w-full flex-col px-24 ${compactTeams ? "py-14" : "py-24"}`}>
-        <div className={`${compactTeams ? "mb-5" : "mb-8"} flex items-end justify-between`}>
+      <div
+        className={`flex h-full w-full flex-col px-24 ${compactTeams ? "py-14" : "py-24"}`}
+      >
+        <div
+          className={`${compactTeams ? "mb-5" : "mb-8"} flex items-end justify-between`}
+        >
           <div>
             <HudLabel color={accent}>ROLE SELECTION</HudLabel>
             <h1 className="mt-2 text-[68px] font-black uppercase leading-none text-white">
@@ -810,8 +1053,8 @@ function BracketMatchCard({
           dense
             ? "h-[84px] overflow-hidden border-y px-3 py-2"
             : compact
-            ? "h-[108px] overflow-hidden border-y px-3.5 py-2.5"
-            : "h-[128px] overflow-hidden border-y px-4 py-3.5"
+              ? "h-[108px] overflow-hidden border-y px-3.5 py-2.5"
+              : "h-[128px] overflow-hidden border-y px-4 py-3.5"
         }
         style={{
           borderColor: focused ? accent : "rgba(255,255,255,0.22)",
@@ -825,8 +1068,8 @@ function BracketMatchCard({
             dense
               ? "mb-1.5 flex h-[14px] items-center justify-between gap-2"
               : compact
-              ? "mb-2.5 flex items-center justify-between gap-2"
-              : "mb-3 flex items-center justify-between gap-3"
+                ? "mb-2.5 flex items-center justify-between gap-2"
+                : "mb-3 flex items-center justify-between gap-3"
           }
         >
           <span className="text-[11px] font-black uppercase tracking-[0.18em] text-white/44">
@@ -842,7 +1085,11 @@ function BracketMatchCard({
           </span>
         </div>
 
-        <div className={dense ? "grid gap-1" : compact ? "grid gap-2" : "grid gap-2.5"}>
+        <div
+          className={
+            dense ? "grid gap-1" : compact ? "grid gap-2" : "grid gap-2.5"
+          }
+        >
           <BracketTeamRow
             team={blue}
             side={hasSides ? "BLUE" : "A"}
@@ -1124,8 +1371,8 @@ function DoubleElimBoard({
     grandFinal && grandFinal.winnerId === grandFinal.blue?.id
       ? grandFinal.blue
       : grandFinal && grandFinal.winnerId === grandFinal.red?.id
-      ? grandFinal.red
-      : null;
+        ? grandFinal.red
+        : null;
 
   return (
     <div
@@ -1349,7 +1596,9 @@ function SingleElimBoard({
   );
   // 라운드별 실제 매치 — 트리는 이 데이터에서 위치를 계산한다.
   // (기존에는 4강 고정 슬롯이라 팀 수가 다르면 빈 "대기" 칸이 생기거나 잘렸다)
-  const layoutRounds = rounds.map((round) => roundMatches(matches, Number(round)));
+  const layoutRounds = rounds.map((round) =>
+    roundMatches(matches, Number(round)),
+  );
   const canUseTree =
     rounds.length >= 1 &&
     rounds.length <= 3 &&
@@ -1444,10 +1693,14 @@ function SingleElimBoard({
   return (
     <div
       className="grid min-h-0 flex-1 gap-8 border border-white/10 bg-black/28 px-7 py-6"
-      style={{ gridTemplateColumns: `repeat(${rounds.length}, minmax(0, 1fr))` }}
+      style={{
+        gridTemplateColumns: `repeat(${rounds.length}, minmax(0, 1fr))`,
+      }}
     >
       {rounds.map((round) => {
-        const roundMatches = matches.filter((match) => (match.round ?? 1) === round);
+        const roundMatches = matches.filter(
+          (match) => (match.round ?? 1) === round,
+        );
         const label =
           roundMatches[0]?.bracketRound ??
           (roundMatches.length === 1 ? "GRAND FINALS" : `ROUND ${round}`);
@@ -1499,21 +1752,90 @@ export function BracketScene({ snapshot }: { snapshot: any }) {
               대진표가 아직 생성되지 않았습니다
             </p>
           </div>
+        ) : isDoubleElim ? (
+          <DoubleElimBoard
+            matches={matches}
+            accent={accent}
+            focusMatchId={focusMatchId}
+          />
         ) : (
-          isDoubleElim ? (
+          <SingleElimBoard
+            matches={matches}
+            accent={accent}
+            focusMatchId={focusMatchId}
+          />
+        )}
+      </div>
+    </StageFrame>
+  );
+}
+
+/** 토너먼트 종료 후: 마지막 한 경기 대신 우승 팀과 완료된 전체 대진을 유지한다. */
+export function TournamentSummaryScene({ snapshot }: { snapshot: any }) {
+  const accent = accentOf(snapshot);
+  const matches: any[] = snapshot?.matches ?? [];
+  const isDoubleElim = matches.some(
+    (match) => match.bracketType === "DOUBLE_ELIMINATION",
+  );
+  const completed = matches.filter((match) => match.winnerId);
+  const finalMatch =
+    completed.find((match) => match.bracketRound === "GF") ??
+    [...completed].sort(
+      (a, b) =>
+        Number(b.round ?? 0) - Number(a.round ?? 0) ||
+        Number(b.matchNumber ?? 0) - Number(a.matchNumber ?? 0),
+    )[0];
+  const winner =
+    finalMatch?.winnerId === finalMatch?.blue?.id
+      ? finalMatch.blue
+      : finalMatch?.winnerId === finalMatch?.red?.id
+        ? finalMatch.red
+        : null;
+
+  return (
+    <StageFrame accent={accent}>
+      <div className="flex h-full w-full flex-col px-16 py-14">
+        <div className="mb-6 flex items-end justify-between gap-8">
+          <div>
+            <HudLabel color={accent}>TOURNAMENT COMPLETE</HudLabel>
+            <h1 className="mt-2 text-[64px] font-black uppercase leading-none text-white">
+              Final Standings
+            </h1>
+          </div>
+          <div className="min-w-[360px] border-y border-white/18 py-4 text-right">
+            <p className="text-sm font-black uppercase tracking-[0.28em] text-white/40">
+              Champion
+            </p>
+            <p
+              className="mt-2 truncate text-4xl font-black"
+              style={{ color: winner?.color ?? accent }}
+            >
+              {winner?.name ?? "결과 집계 중"}
+            </p>
+          </div>
+        </div>
+
+        <div className="min-h-0 flex-1">
+          {matches.length === 0 ? (
+            <div className="flex h-full items-center justify-center border-y border-white/10">
+              <p className="text-3xl font-black text-white/32">
+                완료된 대진이 없습니다
+              </p>
+            </div>
+          ) : isDoubleElim ? (
             <DoubleElimBoard
               matches={matches}
               accent={accent}
-              focusMatchId={focusMatchId}
+              focusMatchId={finalMatch?.id ?? null}
             />
           ) : (
             <SingleElimBoard
               matches={matches}
               accent={accent}
-              focusMatchId={focusMatchId}
+              focusMatchId={finalMatch?.id ?? null}
             />
-          )
-        )}
+          )}
+        </div>
       </div>
     </StageFrame>
   );
@@ -1542,7 +1864,10 @@ function RevealMemberRow({
         <p className="truncate text-xl font-bold text-white">
           {member.username}
           {isCaptain && (
-            <span className="ml-2 text-sm font-black" style={{ color: teamColor }}>
+            <span
+              className="ml-2 text-sm font-black"
+              style={{ color: teamColor }}
+            >
               C
             </span>
           )}
@@ -1592,7 +1917,11 @@ export function TeamRevealScene({ snapshot }: { snapshot: any }) {
             const teamColor = team.color || accent;
             // 팀장을 맨 위로 정렬해 소개 순서를 고정한다
             const members = [...(team.members ?? [])].sort((a, b) =>
-              a.userId === team.captainId ? -1 : b.userId === team.captainId ? 1 : 0,
+              a.userId === team.captainId
+                ? -1
+                : b.userId === team.captainId
+                  ? 1
+                  : 0,
             );
             return (
               <div
@@ -1600,7 +1929,10 @@ export function TeamRevealScene({ snapshot }: { snapshot: any }) {
                 className="flex min-w-0 flex-1 flex-col border border-white/12 bg-black/45 px-7 py-6"
               >
                 <div className="flex items-center gap-3">
-                  <span className="h-8 w-1.5 flex-shrink-0" style={{ background: teamColor }} />
+                  <span
+                    className="h-8 w-1.5 flex-shrink-0"
+                    style={{ background: teamColor }}
+                  />
                   <p className="truncate text-3xl font-black">{team.name}</p>
                 </div>
                 <div className="mt-5 flex flex-1 flex-col gap-2.5">

@@ -13,8 +13,10 @@ export const BROADCAST_CONTROL_SCENES = [
   "auction",
   "role-selection",
   "bracket",
+  "match-intro",
   "match",
   "result",
+  "summary",
   "break",
 ] as const;
 

@@ -35,7 +35,8 @@ export function Sidebar() {
     staleTime: 3 * 60 * 1000,
     refetchOnWindowFocus: false,
     enabled: isAuthenticated,
-    select: (data: any) => (Array.isArray(data) ? data : (data?.rooms ?? [])).slice(0, 5),
+    select: (data: any) =>
+      (Array.isArray(data) ? data : (data?.items ?? [])).slice(0, 5),
   });
   const recentRooms: Room[] = roomsData ?? [];
 

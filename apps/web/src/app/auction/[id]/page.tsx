@@ -691,7 +691,7 @@ export default function AuctionRoomPage() {
             <>
               {/* 1) 본인 액션 카드 — 가장 큰 시각 비중, 명시적 지원/취소 버튼 */}
               {meParticipant && (
-                <Card className="mb-4">
+                <Card className="mb-4 p-0">
                   <CardContent className="p-5">
                     <div className="flex items-center gap-4 mb-4">
                       <div className={cn(
@@ -735,7 +735,7 @@ export default function AuctionRoomPage() {
               )}
 
               {/* 2) 자원자 현황 — 진행 바 + 자원자 카드 (초과 시 방장 선택 영역) */}
-              <Card className="mb-4">
+              <Card className="mb-4 p-0">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm font-semibold text-text-primary">자원자 현황</span>
@@ -813,7 +813,7 @@ export default function AuctionRoomPage() {
 
               {/* 3) 아직 미지원 참가자 (작은 칩) */}
               {otherWaitingParticipants.length > 0 && (
-                <Card className="mb-4">
+                <Card className="mb-4 p-0">
                   <CardContent className="p-4">
                     <div className="text-xs font-semibold text-text-tertiary uppercase tracking-wider mb-2">
                       대기 중 ({otherWaitingParticipants.length})
@@ -876,7 +876,7 @@ export default function AuctionRoomPage() {
                 </div>
               ) : (
                 /* 비방장: 참가자 목록 표시 (방장 선택 중 상태 안내) */
-                <Card className="mb-6">
+                <Card className="mb-6 p-0">
                   <CardContent className="p-5">
                     <div className="flex items-center gap-2 mb-4">
                       <Users className="w-4 h-4 text-accent-primary animate-pulse" />
@@ -982,7 +982,7 @@ export default function AuctionRoomPage() {
                 const members = (team as any).members ?? [];
                 const budget = (team as any).remainingGold ?? (team as any).remainingBudget ?? 0;
                 return (
-                  <Card key={team.id}>
+                  <Card key={team.id} className="p-0">
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
@@ -1186,14 +1186,14 @@ export default function AuctionRoomPage() {
             />
           )}
           {mobileTab === "players" && (
-            <Card>
+            <Card className="p-0">
               <CardContent className="p-3">
                 <PlayersList players={players} currentPlayerId={auctionState.currentPlayer?.id} />
               </CardContent>
             </Card>
           )}
           {mobileTab === "log" && (
-            <Card>
+            <Card className="p-0">
               <CardContent className="p-3 h-[60vh]">
                 <BidLog bidHistory={bidHistory} logEndRef={logEndRef} />
               </CardContent>

@@ -15,6 +15,7 @@ import {
   Radio,
   RefreshCw,
   Swords,
+  Trophy,
   Users,
 } from "lucide-react";
 import {
@@ -72,9 +73,15 @@ const SCENES: Array<{
     icon: ListTree,
   },
   {
+    scene: "match-intro",
+    label: "경기 소개",
+    description: "VS·라인별 선수",
+    icon: Swords,
+  },
+  {
     scene: "match",
-    label: "경기",
-    description: "포커스 매치",
+    label: "경기 HUD",
+    description: "게임 위 투명 정보",
     icon: Swords,
   },
   {
@@ -82,6 +89,12 @@ const SCENES: Array<{
     label: "결과",
     description: "경기 결과",
     icon: BadgeInfo,
+  },
+  {
+    scene: "summary",
+    label: "전체 결과",
+    description: "우승 팀·완료 대진",
+    icon: Trophy,
   },
   {
     scene: "break",
@@ -115,15 +128,17 @@ function BroadcastControlContent() {
   const { isAuthenticated, isLoading: authLoading } = useAuthStore();
   const searchParams = useSearchParams();
   const previewMode =
-    process.env.NODE_ENV !== "production" && searchParams?.get("preview") === "1";
+    process.env.NODE_ENV !== "production" &&
+    searchParams?.get("preview") === "1";
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [state, setState] = useState<
-    (BroadcastControlState & {
-      roomId: string | null;
-      room: BroadcastControlRoom | null;
-      focusMatchId: string | null;
-    }) | null
+    | (BroadcastControlState & {
+        roomId: string | null;
+        room: BroadcastControlRoom | null;
+        focusMatchId: string | null;
+      })
+    | null
   >(null);
   const [matches, setMatches] = useState<ControlMatch[]>([]);
   const [tokenState, setTokenState] = useState<{
@@ -156,7 +171,7 @@ function BroadcastControlContent() {
     }),
     [],
   );
-  const displayState = previewMode ? state ?? previewState : state;
+  const displayState = previewMode ? (state ?? previewState) : state;
 
   const activeScene = displayState?.scene ?? "auto";
   const activeLabel = useMemo(
@@ -164,7 +179,10 @@ function BroadcastControlContent() {
     [activeScene],
   );
 
-  const load = async (options?: { silent?: boolean; includeToken?: boolean }) => {
+  const load = async (options?: {
+    silent?: boolean;
+    includeToken?: boolean;
+  }) => {
     if (!options?.silent) setLoading(true);
     try {
       const includeToken = options?.includeToken ?? !options?.silent;
@@ -262,7 +280,7 @@ function BroadcastControlContent() {
   const focusMatch = async (match: ControlMatch) => {
     if (!displayState?.roomId) return;
     const nextScene: BroadcastControlScene =
-      match.status === "COMPLETED" ? "result" : "match";
+      match.status === "COMPLETED" ? "result" : "auto";
     setSaving(true);
     try {
       if (previewMode) {
@@ -317,18 +335,17 @@ function BroadcastControlContent() {
     match.matchNumber != null
       ? `경기 ${match.matchNumber}`
       : match.round != null
-      ? `${match.round}라운드`
-      : "토너먼트";
+        ? `${match.round}라운드`
+        : "토너먼트";
 
   const focusedMatch = useMemo(
-    () => matches.find((match) => match.id === displayState?.focusMatchId) ?? null,
+    () =>
+      matches.find((match) => match.id === displayState?.focusMatchId) ?? null,
     [matches, displayState?.focusMatchId],
   );
 
   if (!previewMode && (authLoading || (isAuthenticated && loading))) {
-    return (
-      <BroadcastControlLoading />
-    );
+    return <BroadcastControlLoading />;
   }
 
   if (!previewMode && !isAuthenticated) {
@@ -339,8 +356,8 @@ function BroadcastControlContent() {
           로그인이 필요합니다
         </h1>
         <p className="mt-2 text-sm text-text-secondary">
-          방송 조작 패널은 본인 방송 오버레이 상태를 바꾸는 화면입니다.
-          로그인 후 설정의 방송 탭에서 다시 열어주세요.
+          방송 조작 패널은 본인 방송 오버레이 상태를 바꾸는 화면입니다. 로그인
+          후 설정의 방송 탭에서 다시 열어주세요.
         </p>
         <a
           href="/auth/login"
@@ -370,12 +387,19 @@ function BroadcastControlContent() {
           <Button
             size="sm"
             variant="secondary"
-            onClick={() => openBroadcastControlWindow("/broadcast-control?preview=1")}
+            onClick={() =>
+              openBroadcastControlWindow("/broadcast-control?preview=1")
+            }
           >
             팝업으로 보기
           </Button>
         ) : (
-          <Button size="sm" variant="secondary" onClick={() => void load()} disabled={saving}>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => void load()}
+            disabled={saving}
+          >
             <RefreshCw className="mr-2 h-4 w-4" />
             새로고침
           </Button>
@@ -388,14 +412,16 @@ function BroadcastControlContent() {
             OBS Source
           </p>
           <p className="mt-1 text-xs font-bold text-text-primary">
-            {previewMode || tokenState?.exists ? "방송 토큰 활성" : "방송 토큰 없음"}
+            {previewMode || tokenState?.exists
+              ? "방송 토큰 활성"
+              : "방송 토큰 없음"}
           </p>
           <p className="mt-0.5 truncate text-[11px] text-text-tertiary">
             {previewMode
               ? "프리뷰 모드"
               : tokenState?.createdAt
-              ? `${new Date(tokenState.createdAt).toLocaleDateString("ko-KR")} 발급`
-              : "설정에서 OBS 링크 발급 필요"}
+                ? `${new Date(tokenState.createdAt).toLocaleDateString("ko-KR")} 발급`
+                : "설정에서 OBS 링크 발급 필요"}
           </p>
         </div>
         <div className="rounded-lg border border-bg-elevated bg-bg-secondary px-3 py-2.5">
@@ -403,7 +429,9 @@ function BroadcastControlContent() {
             External Control
           </p>
           <p className="mt-1 text-xs font-bold text-text-primary">
-            {previewMode || tokenState?.controlExists ? "외부 조작 토큰 활성" : "외부 조작 토큰 없음"}
+            {previewMode || tokenState?.controlExists
+              ? "외부 조작 토큰 활성"
+              : "외부 조작 토큰 없음"}
           </p>
           <p className="mt-0.5 truncate text-[11px] text-text-tertiary">
             Stream Deck·Ulanzi 연동
@@ -417,7 +445,9 @@ function BroadcastControlContent() {
             {displayState?.room?.name ?? "연동된 방 없음"}
           </p>
           <p className="mt-0.5 truncate text-[11px] text-text-tertiary">
-            {displayState?.room ? displayState.room.status : "활성 방 자동 추적"}
+            {displayState?.room
+              ? displayState.room.status
+              : "활성 방 자동 추적"}
           </p>
         </div>
       </section>
@@ -488,7 +518,8 @@ function BroadcastControlContent() {
               </p>
               {focusedMatch && (
                 <p className="mt-1 text-[11px] font-bold text-accent-primary">
-                  {stageLabel(focusedMatch)} · {matchRoundLabel(focusedMatch)} · {focusedMatch.status}
+                  {stageLabel(focusedMatch)} · {matchRoundLabel(focusedMatch)} ·{" "}
+                  {focusedMatch.status}
                 </p>
               )}
               <p className="mt-0.5 truncate text-xs font-black text-text-primary">
@@ -510,7 +541,8 @@ function BroadcastControlContent() {
                     >
                       <div className="min-w-0">
                         <p className="text-[11px] font-bold uppercase text-text-tertiary">
-                          {stageLabel(match)} · {matchRoundLabel(match)} · {match.status}
+                          {stageLabel(match)} · {matchRoundLabel(match)} ·{" "}
+                          {match.status}
                         </p>
                         <p className="mt-0.5 truncate text-xs font-black text-text-primary">
                           {matchLabel(match)}
@@ -522,7 +554,11 @@ function BroadcastControlContent() {
                         onClick={() => focusMatch(match)}
                         disabled={saving || focused}
                       >
-                        {focused ? "현재 중계 중" : "경기 전환"}
+                        {focused
+                          ? "현재 중계 중"
+                          : match.status === "COMPLETED"
+                            ? "결과 보기"
+                            : "대진표 후 중계"}
                       </Button>
                     </div>
                   );

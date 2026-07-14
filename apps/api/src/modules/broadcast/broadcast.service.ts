@@ -14,15 +14,18 @@ import {
 export type BroadcastScene =
   | "control"
   | "room"
+  | "match-intro"
   | "match"
   | "bracket"
   | "result"
+  | "summary"
   | "idle"
   | "break";
 
 const RESULT_SCENE_MS = 12_000;
-const BRACKET_SCENE_AFTER_RESULT_MS = 45_000;
-const BRACKET_SCENE_AFTER_MATCH_START_MS = 8_000;
+const BRACKET_SCENE_AFTER_RESULT_MS = 15_000;
+const BRACKET_SCENE_BEFORE_MATCH_MS = 15_000;
+const MATCH_INTRO_SCENE_MS = 12_000;
 
 /**
  * 방송 오버레이 서비스.
@@ -178,6 +181,7 @@ export class BroadcastService {
         name: true,
         status: true,
         broadcastFocusMatchId: true,
+        broadcastFocusChangedAt: true,
       },
     });
     return room
@@ -186,6 +190,7 @@ export class BroadcastService {
           name: room.name,
           status: room.status,
           focusMatchId: room.broadcastFocusMatchId ?? null,
+          focusChangedAt: room.broadcastFocusChangedAt ?? null,
         }
       : null;
   }
@@ -386,6 +391,7 @@ export class BroadcastService {
         teamMode: true,
         maxParticipants: true,
         broadcastFocusMatchId: true,
+        broadcastFocusChangedAt: true,
         host: {
           select: {
             username: true,
@@ -458,6 +464,7 @@ export class BroadcastService {
         ? await this.resolveControlledScene(control.scene, room.id, {
             status: room.status,
             teamMode: room.teamMode,
+            broadcastFocusChangedAt: room.broadcastFocusChangedAt,
           })
         : { scene, nextChangeAt: null as number | null };
     const effectiveScene = resolved.scene;
@@ -488,7 +495,11 @@ export class BroadcastService {
       sceneNextChangeAt: resolved.nextChangeAt,
     };
 
-    if (effectiveScene === "match" || effectiveScene === "result") {
+    if (
+      effectiveScene === "match" ||
+      effectiveScene === "match-intro" ||
+      effectiveScene === "result"
+    ) {
       // 우선순위: URL matchId → 방 focus → 진행 중 경기 → null
       const resolvedId =
         matchId ||
@@ -516,7 +527,7 @@ export class BroadcastService {
       return { ...common, match: this.matchDetail(match, teamById) };
     }
 
-    if (effectiveScene === "bracket") {
+    if (effectiveScene === "bracket" || effectiveScene === "summary") {
       const matches = await this.prisma.match.findMany({
         where: { roomId },
         orderBy: [{ round: "asc" }, { matchNumber: "asc" }],
@@ -552,14 +563,24 @@ export class BroadcastService {
   private async resolveControlledScene(
     scene: BroadcastControlScene,
     roomId: string,
-    room: { status?: string | null; teamMode?: string | null },
+    room: {
+      status?: string | null;
+      teamMode?: string | null;
+      broadcastFocusChangedAt?: Date | null;
+    },
   ): Promise<{ scene: BroadcastScene; nextChangeAt: number | null }> {
     const fixed = (value: BroadcastScene) => ({
       scene: value,
       nextChangeAt: null,
     });
 
-    if (scene === "bracket" || scene === "match" || scene === "result") {
+    if (
+      scene === "bracket" ||
+      scene === "match-intro" ||
+      scene === "match" ||
+      scene === "result" ||
+      scene === "summary"
+    ) {
       return fixed(scene);
     }
     // 대기(idle)와 휴식(break)은 서로 다른 화면이다.
@@ -567,13 +588,25 @@ export class BroadcastService {
     if (scene === "idle") return fixed("idle");
     if (scene !== "auto") return fixed("room");
 
-    if (room.status === "COMPLETED") return fixed("result");
-
     const [latestCompleted, liveMatch] = await Promise.all([
       this.latestCompletedMatch(roomId),
       this.firstLiveMatch(roomId),
     ]);
     const now = Date.now();
+
+    // 조작 패널에서 중계 경기를 바꾸면 바로 경기 화면으로 점프하지 않는다.
+    // 선택된 경기를 강조한 대진표를 잠깐 보여 준 뒤 자연스럽게 송출한다.
+    if (room.broadcastFocusChangedAt && liveMatch) {
+      const focusAt = room.broadcastFocusChangedAt.getTime();
+      const bracketUntil = focusAt + BRACKET_SCENE_BEFORE_MATCH_MS;
+      if (now <= bracketUntil) {
+        return { scene: "bracket", nextChangeAt: bracketUntil };
+      }
+      const introUntil = bracketUntil + MATCH_INTRO_SCENE_MS;
+      if (now <= introUntil) {
+        return { scene: "match-intro", nextChangeAt: introUntil };
+      }
+    }
 
     if (latestCompleted?.completedAt) {
       const resultUntil =
@@ -583,12 +616,19 @@ export class BroadcastService {
       }
     }
 
+    // 결승 결과도 먼저 보여 준 뒤, 우승 팀과 전체 완료 대진을 유지한다.
+    if (room.status === "COMPLETED") return fixed("summary");
+
     if (liveMatch) {
       if (liveMatch.startedAt) {
         const bracketUntil =
-          liveMatch.startedAt.getTime() + BRACKET_SCENE_AFTER_MATCH_START_MS;
+          liveMatch.startedAt.getTime() + BRACKET_SCENE_BEFORE_MATCH_MS;
         if (now <= bracketUntil) {
           return { scene: "bracket", nextChangeAt: bracketUntil };
+        }
+        const introUntil = bracketUntil + MATCH_INTRO_SCENE_MS;
+        if (now <= introUntil) {
+          return { scene: "match-intro", nextChangeAt: introUntil };
         }
       }
       return fixed("match");
@@ -596,7 +636,9 @@ export class BroadcastService {
 
     if (latestCompleted?.completedAt) {
       const bracketUntil =
-        latestCompleted.completedAt.getTime() + BRACKET_SCENE_AFTER_RESULT_MS;
+        latestCompleted.completedAt.getTime() +
+        RESULT_SCENE_MS +
+        BRACKET_SCENE_AFTER_RESULT_MS;
       if (now <= bracketUntil) {
         return { scene: "bracket", nextChangeAt: bracketUntil };
       }

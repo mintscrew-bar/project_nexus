@@ -794,15 +794,32 @@ export class RoomService {
     "MANUAL_TEAM",
   ]);
 
-  async listRooms(filters?: {
-    status?: RoomStatus;
+  async listRoomsPage(filters?: {
+    status?: "WAITING" | "IN_PROGRESS" | "COMPLETED";
     teamMode?: TeamMode;
     includePrivate?: boolean;
+    search?: string;
+    sort?: "newest" | "oldest" | "mostPlayers" | "leastPlayers";
+    cursor?: string;
+    limit?: number;
   }) {
     try {
-      const where: Record<string, unknown> = {};
+      const where: Prisma.RoomWhereInput = {};
 
-      if (filters?.status && this.validRoomStatuses.has(filters.status)) {
+      if (filters?.status === "IN_PROGRESS") {
+        where.status = {
+          in: [
+            "IN_PROGRESS",
+            "TEAM_SELECTION",
+            "DRAFT",
+            "DRAFT_COMPLETED",
+            "ROLE_SELECTION",
+          ],
+        };
+      } else if (
+        filters?.status &&
+        this.validRoomStatuses.has(filters.status)
+      ) {
         where.status = filters.status;
       }
       if (filters?.teamMode && this.validTeamModes.has(filters.teamMode)) {
@@ -812,27 +829,67 @@ export class RoomService {
         where.isPrivate = false;
       }
 
-      return await this.prisma.room.findMany({
-        where,
-        include: {
-          host: {
-            select: {
-              id: true,
-              username: true,
-              avatar: true,
+      const search = filters?.search?.trim();
+      if (search) {
+        where.OR = [
+          { name: { contains: search, mode: "insensitive" } },
+          { host: { username: { contains: search, mode: "insensitive" } } },
+        ];
+      }
+
+      const orderBy: Prisma.RoomOrderByWithRelationInput[] =
+        filters?.sort === "oldest"
+          ? [{ createdAt: "asc" }, { id: "asc" }]
+          : filters?.sort === "mostPlayers"
+            ? [
+                { participants: { _count: "desc" } },
+                { createdAt: "desc" },
+                { id: "desc" },
+              ]
+            : filters?.sort === "leastPlayers"
+              ? [
+                  { participants: { _count: "asc" } },
+                  { createdAt: "desc" },
+                  { id: "desc" },
+                ]
+              : [{ createdAt: "desc" }, { id: "desc" }];
+      const limit = Math.min(Math.max(filters?.limit ?? 24, 10), 50);
+
+      const [rooms, total] = await Promise.all([
+        this.prisma.room.findMany({
+          where,
+          include: {
+            host: {
+              select: {
+                id: true,
+                username: true,
+                avatar: true,
+              },
+            },
+            participants: {
+              select: {
+                id: true,
+                userId: true,
+                role: true,
+              },
             },
           },
-          participants: {
-            select: {
-              id: true,
-              userId: true,
-              role: true,
-            },
-          },
-        },
-        orderBy: { createdAt: "desc" },
-        take: 50,
-      });
+          orderBy,
+          ...(filters?.cursor
+            ? { cursor: { id: filters.cursor }, skip: 1 }
+            : {}),
+          take: limit + 1,
+        }),
+        this.prisma.room.count({ where }),
+      ]);
+
+      const hasMore = rooms.length > limit;
+      const items = hasMore ? rooms.slice(0, limit) : rooms;
+      return {
+        items,
+        total,
+        nextCursor: hasMore ? (items[items.length - 1]?.id ?? null) : null,
+      };
     } catch (error) {
       const err = error as Error;
       this.logger.error(
@@ -841,6 +898,13 @@ export class RoomService {
       );
       throw error;
     }
+  }
+
+  // 소켓 초기 동기화 등 기존 호출부는 최신 공개 방 목록 배열을 계속 사용한다.
+  // 페이지 UI는 listRoomsPage()로 커서·필터 메타데이터까지 받는다.
+  async listRooms() {
+    const page = await this.listRoomsPage({ limit: 50 });
+    return page.items;
   }
 
   // ========================================
@@ -1283,7 +1347,10 @@ export class RoomService {
     }
     await this.prisma.room.update({
       where: { id: roomId },
-      data: { broadcastFocusMatchId: matchId },
+      data: {
+        broadcastFocusMatchId: matchId,
+        broadcastFocusChangedAt: matchId ? new Date() : null,
+      },
     });
     return { focusMatchId: matchId };
   }

@@ -68,8 +68,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             "flex-1 flex flex-col min-h-0",
             isDashboardRoute ? "overflow-hidden" : "overflow-auto"
           )}>
-            {isDashboardRoute ? children : <div className="flex-shrink-0">{children}</div>}
-            {!isDashboardRoute && <Footer />}
+            {isDashboardRoute ? children : (
+              <div className="flex min-h-full flex-1 flex-col">
+                {children}
+                <Footer />
+              </div>
+            )}
           </div>
         </div>
       </main>

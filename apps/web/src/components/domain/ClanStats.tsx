@@ -171,7 +171,7 @@ export function ClanStats({ clanId }: ClanStatsProps) {
 
   if (error || !stats) {
     return (
-      <Card>
+      <Card className="p-0">
         <CardContent className="p-8 text-center">
           <p className="text-accent-danger">{error || "통계 데이터가 없습니다."}</p>
         </CardContent>

@@ -15,6 +15,7 @@ import {
   Users,
 } from "lucide-react";
 import { absoluteUrl } from "@/lib/seo";
+import { RESOURCE_ARTICLES } from "./articles";
 
 export const metadata: Metadata = {
   title: "롤 내전 운영 자료실 — 팀 구성, 경매, 결과 기록 체크리스트",
@@ -183,6 +184,27 @@ export default function ResourcesPage() {
                   </div>
                 </div>
               </article>
+            ))}
+          </div>
+        </ResourceSection>
+
+        <ResourceSection
+          icon={BookOpen}
+          eyebrow="실전 운영 문서"
+          title="상황별로 바로 꺼내 보는 운영 기준"
+          description="기능을 소개하는 데서 끝나지 않고, 실제 내전에서 자주 생기는 지연·팀 밸런스·기록 문제를 해결하는 기준을 문서로 정리했습니다."
+        >
+          <div className="grid gap-4 md:grid-cols-2">
+            {RESOURCE_ARTICLES.map((article) => (
+              <Link
+                key={article.slug}
+                href={`/resources/${article.slug}`}
+                className="group rounded-xl border border-bg-tertiary bg-bg-secondary/50 p-5 transition-colors hover:border-accent-primary/40 hover:bg-bg-secondary"
+              >
+                <p className="text-xs font-semibold text-accent-primary">{article.readingTime} 읽기 · 업데이트 {article.updatedAt}</p>
+                <h3 className="mt-2 text-lg font-bold text-text-primary group-hover:text-accent-primary">{article.title}</h3>
+                <p className="mt-3 text-sm leading-relaxed text-text-secondary">{article.description}</p>
+              </Link>
             ))}
           </div>
         </ResourceSection>
