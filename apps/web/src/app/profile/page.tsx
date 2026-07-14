@@ -995,12 +995,12 @@ export default function ProfilePage() {
         <section className="mb-6 grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
           <Card className="overflow-hidden rounded-lg border-bg-tertiary bg-bg-secondary p-0 shadow-sm">
             <div
-              className="relative h-28 w-full bg-bg-tertiary md:h-36"
+              className="relative h-40 w-full bg-bg-tertiary md:h-60"
               style={
                 profileBanner
                   ? undefined
                   : {
-                      background: `linear-gradient(135deg, ${PROFILE_ACCENT}44, ${PROFILE_ACCENT}0d)`,
+                      backgroundColor: `${PROFILE_ACCENT}22`,
                     }
               }
             >
@@ -1013,7 +1013,6 @@ export default function ProfilePage() {
                   unoptimized
                 />
               )}
-              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-bg-secondary to-transparent" />
               <Button
                 type="button"
                 variant="secondary"

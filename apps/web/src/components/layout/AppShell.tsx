@@ -40,8 +40,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const isLandingFullscreen = pathname === '/' && (!mounted || !isAuthenticated);
 
   // 푸터 숨김 라우트 (대시보드성 페이지들: 자체적인 액션바나 스크롤 관리가 필요한 경우)
+  const isTournamentLobbyRoute = /^\/tournaments\/[^/]+\/lobby(?:\/|$)/.test(pathname);
   const isDashboardRoute =
-    pathname.includes('/lobby') ||
+    isTournamentLobbyRoute ||
     pathname.startsWith('/auction/') ||
     pathname.startsWith('/draft/') ||
     pathname.startsWith('/role-selection/') ||
