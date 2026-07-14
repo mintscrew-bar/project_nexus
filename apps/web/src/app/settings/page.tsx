@@ -90,9 +90,9 @@ const DISCORD_GUILD_STATUS_META: Record<
   }
 > = {
   PENDING: {
-    label: "승인 대기",
+    label: "연동 확인 중",
     variant: "secondary",
-    description: "관리자 승인 후 방 생성 서버로 선택할 수 있습니다.",
+    description: "잠시 후 새로고침하면 연동 상태를 확인할 수 있습니다.",
   },
   ACTIVE: {
     label: "활성",
@@ -173,7 +173,8 @@ export default function SettingsPage() {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    const tab = new URLSearchParams(window.location.search).get("tab");
+    const searchParams = new URLSearchParams(window.location.search);
+    const tab = searchParams.get("tab");
     if (
       tab === "accounts" ||
       tab === "notifications" ||
@@ -184,7 +185,27 @@ export default function SettingsPage() {
     ) {
       setActiveTab(tab);
     }
-  }, []);
+
+    const discordGuildResult = searchParams.get("discord_guild");
+    if (discordGuildResult === "active") {
+      addToast("Discord 서버 연동이 완료되었습니다.", "success");
+    } else if (discordGuildResult === "error") {
+      addToast(
+        "Discord 서버 연동에 실패했습니다. 봇 설치와 채널 관리·멤버 이동 권한을 확인해주세요.",
+        "error",
+      );
+    }
+
+    if (discordGuildResult) {
+      searchParams.delete("discord_guild");
+      const query = searchParams.toString();
+      window.history.replaceState(
+        null,
+        "",
+        `/settings${query ? `?${query}` : ""}`,
+      );
+    }
+  }, [addToast]);
 
   useEffect(() => {
     if (isLoading || !isAuthenticated || !user) return;
@@ -584,7 +605,7 @@ export default function SettingsPage() {
                     <CardTitle>내 디스코드 서버에 봇 추가</CardTitle>
                     <p className="text-sm text-text-secondary mt-1">
                       봇을 내 서버에 추가하면, 그 서버에서 내전 음성 채널이 자동
-                      생성됩니다. (관리자 승인 후 활성화)
+                      생성됩니다.
                     </p>
                   </CardHeader>
                   <CardContent>
@@ -638,8 +659,8 @@ export default function SettingsPage() {
                           아직 연동한 서버가 없습니다.
                         </p>
                         <p className="text-xs text-text-secondary mt-1">
-                          봇 추가 후 관리자 승인이 완료되면 방 생성 화면에서
-                          해당 서버를 선택할 수 있습니다.
+                          봇을 추가하면 방 생성 화면에서 해당 서버를 선택할 수
+                          있습니다.
                         </p>
                       </div>
                     ) : (

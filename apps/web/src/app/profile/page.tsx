@@ -992,7 +992,7 @@ export default function ProfilePage() {
   return (
     <div className="flex-grow p-4 md:p-8">
       <div className="container mx-auto max-w-6xl">
-        <section className="mb-6 grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
+        <section className="mb-6 grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px] xl:items-stretch">
           <Card className="overflow-hidden rounded-lg border-bg-tertiary bg-bg-secondary p-0 shadow-sm">
             <div
               className="relative h-40 w-full bg-bg-tertiary md:h-60"

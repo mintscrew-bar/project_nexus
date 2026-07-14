@@ -1,4 +1,9 @@
-import { Injectable } from "@nestjs/common";
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+} from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../prisma/prisma.service";
 import { RedisService } from "../redis/redis.service";
 
@@ -7,6 +12,7 @@ export class DiscordService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
+    private readonly configService: ConfigService,
   ) {}
 
   // Channel pool management
@@ -53,12 +59,22 @@ export class DiscordService {
    * OAuth 봇 설치 후 캡처한 길드를 유저에게 바인딩한다.
    * 승인은 자동(즉시 ACTIVE) — 관리자는 취소(DISABLED)만 관리한다.
    * 단, 관리자가 이미 DISABLED로 내린 길드는 재설치해도 자동 재활성화하지 않는다.
+   * 활성 연동의 소유자는 다른 Nexus 계정의 재설치로 변경할 수 없다.
    */
   async linkGuild(ownerId: string, guildId: string, guildName?: string) {
     const existing = await this.prisma.discordGuildLink.findUnique({
       where: { guildId },
-      select: { status: true },
+      select: { ownerId: true, status: true },
     });
+    if (
+      existing &&
+      existing.ownerId !== ownerId &&
+      existing.status !== "DISABLED"
+    ) {
+      throw new ConflictException(
+        "이미 다른 Nexus 계정에 연동된 Discord 서버입니다.",
+      );
+    }
     // 관리자가 취소한 링크는 수동 재승인 전까지 비활성 유지
     const keepDisabled = existing?.status === "DISABLED";
 
@@ -94,5 +110,43 @@ export class DiscordService {
         createdAt: true,
       },
     });
+  }
+
+  async updateGuildName(guildId: string, guildName: string) {
+    return this.prisma.discordGuildLink.update({
+      where: { guildId },
+      data: { guildName },
+    });
+  }
+
+  async exchangeGuildInstallCode(
+    code: string,
+    redirectUri: string,
+  ): Promise<{ guild?: { id: string; name: string } }> {
+    const clientId = this.configService.get<string>("DISCORD_CLIENT_ID");
+    const clientSecret = this.configService.get<string>(
+      "DISCORD_CLIENT_SECRET",
+    );
+    if (!clientId || !clientSecret) {
+      throw new BadRequestException("Discord 연동 설정 오류입니다.");
+    }
+
+    const response = await fetch("https://discord.com/api/oauth2/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        grant_type: "authorization_code",
+        code,
+        redirect_uri: redirectUri,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new BadRequestException("Discord 서버 설치 인증에 실패했습니다.");
+    }
+
+    return response.json() as Promise<{ guild?: { id: string; name: string } }>;
   }
 }

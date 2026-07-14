@@ -236,11 +236,13 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * 봇이 외부 길드에 추가됨. OAuth 흐름으로 미리 만들어둔 PENDING 링크가 있으면
-   * 길드 이름을 갱신한다. 링크가 없으면(우리 흐름 외 무단 초대) 휴면 — 아무 동작 안 함.
+   * 봇이 외부 길드에 추가됨. Discord의 guildCreate 이벤트가 OAuth 콜백보다
+   * 먼저 도착할 수 있으므로 잠시 기다린 뒤 링크를 확인하고 길드 이름을 갱신한다.
+   * 링크가 없으면(우리 흐름 외 무단 초대) 휴면 — 아무 동작 안 함.
    */
   private async handleGuildCreate(guild: { id: string; name: string }) {
     try {
+      await new Promise((resolve) => setTimeout(resolve, 5_000));
       const link = await this.prisma.discordGuildLink.findUnique({
         where: { guildId: guild.id },
       });

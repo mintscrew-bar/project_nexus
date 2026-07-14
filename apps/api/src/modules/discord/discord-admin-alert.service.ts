@@ -80,7 +80,7 @@ export class DiscordAdminAlertService {
       .slice(0, 1900);
 
     try {
-      return this.discordBotService.sendNotification(
+      return await this.discordBotService.sendNotification(
         guildId,
         channelId,
         message,
