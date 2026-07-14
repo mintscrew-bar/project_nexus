@@ -444,8 +444,8 @@ export default function PostDetailClient() {
         </Button>
 
         {/* Post */}
-        <Card className="mb-6">
-          <CardContent className="p-6">
+        <Card className="mb-6 p-0">
+          <CardContent className="p-4 md:p-6">
             {/* Category & Title */}
             <div className="flex items-center gap-2 mb-3">
               <Badge
@@ -533,9 +533,9 @@ export default function PostDetailClient() {
               </div>
             )}
 
-            {/* Actions */}
-            <div className="flex items-center justify-between pt-6 border-t border-bg-tertiary">
-              <div className="flex items-center gap-2">
+            {/* Actions — 좁은 화면에서는 자연스럽게 다음 줄로 넘어가도록 wrap */}
+            <div className="flex flex-wrap items-center justify-between gap-y-2 pt-6 border-t border-bg-tertiary">
+              <div className="flex flex-wrap items-center gap-2">
                 <Button
                   variant={hasLiked ? "primary" : "secondary"}
                   size="sm"
@@ -579,7 +579,7 @@ export default function PostDetailClient() {
                 )}
               </div>
               {isAuthor && (
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <Button
                     variant="ghost"
                     size="sm"
@@ -599,8 +599,8 @@ export default function PostDetailClient() {
         </Card>
 
         {/* Comments */}
-        <Card>
-          <CardContent className="p-6">
+        <Card className="p-0">
+          <CardContent className="p-4 md:p-6">
             <h3 className="font-semibold text-text-primary mb-4 flex items-center gap-2">
               <MessageCircle className="h-5 w-5" />
               댓글 ({post.comments.length})
