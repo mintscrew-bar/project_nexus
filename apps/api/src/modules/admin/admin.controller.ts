@@ -30,6 +30,7 @@ import {
   AdminAppealsQueryDto,
   AdminMatchQueueQueryDto,
   AdminRecomputeStatsQueryDto,
+  SendUserMessageDto,
 } from "./dto/admin-query.dto";
 
 @Controller("admin")
@@ -215,6 +216,13 @@ export class AdminController {
       req.user.sub,
       body.link,
     );
+  }
+
+  // 특정 유저(단일/다중)에게 개인 쪽지(DM) 또는 개인 공지(알림) 발송
+  @Post("messages")
+  @Roles(UserRole.ADMIN)
+  sendUserMessage(@Body() body: SendUserMessageDto, @Request() req: any) {
+    return this.adminService.sendUserMessage(req.user.sub, body);
   }
 
   // ── Chat Logs (ADMIN + MODERATOR) ──────────────────────────────────────────

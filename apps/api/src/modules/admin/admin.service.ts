@@ -12,6 +12,9 @@ import { DiscordBotService } from "../discord/discord-bot.service";
 import { DiscordAdminAlertService } from "../discord/discord-admin-alert.service";
 import { DiscordVoiceService } from "../discord/discord-voice.service";
 import { RoomService } from "../room/room.service";
+import { DmService } from "../dm/dm.service";
+import { DmGateway } from "../dm/dm.gateway";
+import { NotificationService } from "../notification/notification.service";
 
 const MAX_LIMIT = 100;
 const PRESENCE_STATUS_MAP = {
@@ -50,6 +53,9 @@ export class AdminService {
     private readonly adminAlerts: DiscordAdminAlertService,
     private readonly discordVoiceService: DiscordVoiceService,
     private readonly roomService: RoomService,
+    private readonly dmService: DmService,
+    private readonly dmGateway: DmGateway,
+    private readonly notificationService: NotificationService,
   ) {}
 
   private readonly seededHighTierPriority = 7;
@@ -887,6 +893,72 @@ export class AdminService {
       {
         title,
         sentCount: sent,
+      },
+    );
+
+    return { sent };
+  }
+
+  /**
+   * 특정 유저(단일/다중)에게 개인 메시지를 보낸다.
+   * - mode "dm": 기존 DM 시스템으로 쪽지 발송(운영자 계정 발신) + 실시간 푸시
+   * - mode "notification": SYSTEM 알림(🔔)으로 개인 공지 발송(제목/링크 지원) + 실시간 푸시
+   * 두 경로 모두 실시간 전달이 되며, 존재하지 않는 대상과 발신자 본인은 건너뛴다.
+   */
+  async sendUserMessage(
+    adminId: string,
+    dto: {
+      userIds: string[];
+      mode: "dm" | "notification";
+      title?: string;
+      content: string;
+      link?: string;
+    },
+  ) {
+    const admin = await this.prisma.user.findUnique({
+      where: { id: adminId },
+      select: { username: true },
+    });
+    const adminName = admin?.username ?? "운영자";
+
+    // 실제로 존재하는 대상만, 발신자 본인은 제외
+    const targets = await this.prisma.user.findMany({
+      where: { id: { in: dto.userIds }, NOT: { id: adminId } },
+      select: { id: true },
+    });
+
+    let sent = 0;
+    for (const target of targets) {
+      if (dto.mode === "dm") {
+        const message = await this.dmService.sendMessage(
+          adminId,
+          target.id,
+          dto.content,
+          adminName,
+        );
+        await this.dmGateway.pushDmToUser(target.id, message);
+      } else {
+        await this.notificationService.create({
+          userId: target.id,
+          type: "SYSTEM",
+          title: dto.title?.trim() || "운영자 공지",
+          message: dto.content,
+          link: dto.link?.trim() || undefined,
+        });
+      }
+      sent++;
+    }
+
+    await this.logAction(
+      adminId,
+      AdminAction.ANNOUNCEMENT_SEND,
+      undefined,
+      undefined,
+      {
+        channel: dto.mode,
+        targetCount: sent,
+        title: dto.mode === "notification" ? dto.title : undefined,
+        preview: dto.content.slice(0, 100),
       },
     );
 

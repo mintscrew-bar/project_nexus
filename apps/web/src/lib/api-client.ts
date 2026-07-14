@@ -2401,6 +2401,17 @@ export const adminApi = {
     });
     return response.data;
   },
+  // 특정 유저(단일/다중)에게 개인 쪽지(DM) 또는 개인 공지(알림) 발송
+  sendUserMessage: async (payload: {
+    userIds: string[];
+    mode: "dm" | "notification";
+    title?: string;
+    content: string;
+    link?: string;
+  }): Promise<{ sent: number }> => {
+    const response = await apiClient.post("/admin/messages", payload);
+    return response.data;
+  },
   // Chat Logs
   getChatLogs: async (params?: {
     page?: number;
