@@ -15,6 +15,10 @@ import { RoomService } from "../room/room.service";
 import { DmService } from "../dm/dm.service";
 import { DmGateway } from "../dm/dm.gateway";
 import { NotificationService } from "../notification/notification.service";
+import {
+  decryptSensitive,
+  sensitiveLookup,
+} from "../../common/security/data-protection";
 
 const MAX_LIMIT = 100;
 const PRESENCE_STATUS_MAP = {
@@ -321,7 +325,6 @@ export class AdminService {
     return {
       OR: [
         { username: { startsWith: "testbot_" } },
-        { email: { endsWith: "@nexus.test" } },
         {
           riotAccounts: {
             some: {
@@ -335,12 +338,10 @@ export class AdminService {
 
   private isTestBotUser(user: {
     username?: string | null;
-    email?: string | null;
     riotAccounts?: Array<{ puuid?: string | null }>;
   }): boolean {
     return (
       user.username?.startsWith("testbot_") ||
-      user.email?.endsWith("@nexus.test") ||
       user.riotAccounts?.some((account) =>
         account.puuid?.startsWith("bot_puuid_"),
       ) ||
@@ -407,10 +408,11 @@ export class AdminService {
     }
 
     if (search) {
+      const emailLookupHash = sensitiveLookup(search);
       filters.push({
         OR: [
           { username: { contains: search, mode: "insensitive" as const } },
-          { email: { contains: search, mode: "insensitive" as const } },
+          { emailLookupHash },
         ],
       });
     }
@@ -424,7 +426,7 @@ export class AdminService {
         select: {
           id: true,
           username: true,
-          email: true,
+          emailEncrypted: true,
           avatar: true,
           role: true,
           status: true,
@@ -469,6 +471,10 @@ export class AdminService {
     return {
       users: users.map((user) => ({
         ...user,
+        email: user.emailEncrypted
+          ? decryptSensitive(user.emailEncrypted)
+          : null,
+        emailEncrypted: undefined,
         isBot: this.isTestBotUser(user),
       })),
       total,

@@ -1,4 +1,9 @@
-import { createCipheriv, createHmac, randomBytes } from "crypto";
+import {
+  createCipheriv,
+  createDecipheriv,
+  createHmac,
+  randomBytes,
+} from "crypto";
 
 function decodeKey(value: string | undefined, name: string): Buffer {
   if (!value) throw new Error(`${name} is required`);
@@ -21,6 +26,23 @@ export function encryptSensitive(value: string): string {
     cipher.getAuthTag().toString("base64url"),
     ciphertext.toString("base64url"),
   ].join(".");
+}
+
+export function decryptSensitive(value: string): string {
+  const [prefix, iv, tag, ciphertext] = value.split(".");
+  if (prefix !== "enc:v1" || !iv || !tag || !ciphertext) {
+    throw new Error("Invalid encrypted value");
+  }
+  const decipher = createDecipheriv(
+    "aes-256-gcm",
+    decodeKey(process.env.DATA_ENCRYPTION_KEY, "DATA_ENCRYPTION_KEY"),
+    Buffer.from(iv, "base64url"),
+  );
+  decipher.setAuthTag(Buffer.from(tag, "base64url"));
+  return Buffer.concat([
+    decipher.update(Buffer.from(ciphertext, "base64url")),
+    decipher.final(),
+  ]).toString("utf8");
 }
 
 export function sensitiveLookup(value: string): string {
