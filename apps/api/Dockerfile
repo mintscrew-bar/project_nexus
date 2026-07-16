@@ -67,4 +67,4 @@ COPY --from=builder /app/packages/database/prisma ./prisma
 EXPOSE 4000
 
 # 운영에서는 스키마 강제 동기화(db push)를 쓰지 않고 검증된 마이그레이션만 적용한다.
-CMD ["sh", "-c", "node_modules/.bin/prisma migrate deploy --schema=/app/prisma/schema.prisma && pm2-runtime ecosystem.config.js"]
+CMD ["sh", "-c", "node_modules/.bin/prisma migrate deploy --schema=/app/prisma/schema.prisma && node dist/scripts/backfill-encrypted-emails.js && pm2-runtime ecosystem.config.js"]
