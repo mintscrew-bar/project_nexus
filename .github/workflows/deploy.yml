@@ -63,6 +63,8 @@ jobs:
           REDIS_URL=${{ secrets.REDIS_URL }}
           JWT_ACCESS_SECRET=${{ secrets.JWT_ACCESS_SECRET }}
           JWT_REFRESH_SECRET=${{ secrets.JWT_REFRESH_SECRET }}
+          DATA_ENCRYPTION_KEY=${{ secrets.DATA_ENCRYPTION_KEY }}
+          DATA_LOOKUP_HMAC_KEY=${{ secrets.DATA_LOOKUP_HMAC_KEY }}
           JWT_ACCESS_EXPIRES_IN=${{ secrets.JWT_ACCESS_EXPIRES_IN }}
           JWT_REFRESH_EXPIRES_IN=${{ secrets.JWT_REFRESH_EXPIRES_IN }}
           NEXTAUTH_SECRET=${{ secrets.NEXTAUTH_SECRET }}

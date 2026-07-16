@@ -19,6 +19,10 @@ import {
 } from "crypto";
 import { PrismaService } from "../prisma/prisma.service";
 import { RedisService } from "../redis/redis.service";
+import {
+  encryptSensitive,
+  sensitiveLookup,
+} from "../../common/security/data-protection";
 
 const REFRESH_COOKIE_PREFIX = "v2";
 const REFRESH_TOKEN_HASH_PREFIX = "sha256:";
@@ -139,8 +143,11 @@ export class AuthService {
 
     // 동일 이메일로 기존 계정이 있으면 OAuth 제공자 연결 (신규 아님)
     if (profile.email) {
-      const existingUser = await this.prisma.user.findUnique({
-        where: { email: profile.email },
+      const emailLookupHash = sensitiveLookup(profile.email);
+      const existingUser = await this.prisma.user.findFirst({
+        // Legacy fallback is removed by the post-deploy backfill. It prevents
+        // existing accounts from being locked out between migration and backfill.
+        where: { OR: [{ emailLookupHash }, { email: profile.email }] },
       });
 
       if (existingUser) {
@@ -163,7 +170,13 @@ export class AuthService {
     // 약관 동의는 /auth/agree 페이지에서 명시적으로 처리 (개인정보보호법 제21조)
     const user = await this.prisma.user.create({
       data: {
-        email: profile.email,
+        email: null,
+        ...(profile.email
+          ? {
+              emailEncrypted: encryptSensitive(profile.email),
+              emailLookupHash: sensitiveLookup(profile.email),
+            }
+          : {}),
         emailVerified: !!profile.email,
         username: profile.username,
         avatar: profile.avatar,
@@ -296,8 +309,9 @@ export class AuthService {
     }
 
     // Check if email exists
-    const existingUser = await this.prisma.user.findUnique({
-      where: { email: dto.email },
+    const emailLookupHash = sensitiveLookup(dto.email);
+    const existingUser = await this.prisma.user.findFirst({
+      where: { OR: [{ emailLookupHash }, { email: dto.email }] },
     });
 
     if (existingUser) {
@@ -310,13 +324,17 @@ export class AuthService {
     // Create user
     const user = await this.prisma.user.create({
       data: {
-        email: dto.email,
+        email: null,
+        emailEncrypted: encryptSensitive(dto.email),
+        emailLookupHash,
         password: hashedPassword,
         username: dto.username,
         authProviders: {
           create: {
             provider: AuthProviderType.EMAIL,
-            providerId: dto.email,
+            // Do not duplicate an email address in auth_providers. The HMAC is
+            // stable for uniqueness but cannot be reversed without the secret.
+            providerId: emailLookupHash,
           },
         },
         termsAgreements: {
@@ -334,8 +352,9 @@ export class AuthService {
   }
 
   async login(dto: LoginDto, ip: string = "unknown") {
-    const failKey = `login_fail:${dto.email}:${ip}`;
-    const lockKey = `login_lock:${dto.email}`;
+    const loginSubject = sensitiveLookup(dto.email);
+    const failKey = `login_fail:${loginSubject}:${sensitiveLookup(ip)}`;
+    const lockKey = `login_lock:${loginSubject}`;
 
     // 계정 잠금 확인 (10회 이상 실패 → 30분 잠금)
     const accountLocked = await this.redis.exists(lockKey);
@@ -357,8 +376,8 @@ export class AuthService {
     }
 
     // Find user
-    const user = await this.prisma.user.findUnique({
-      where: { email: dto.email },
+    const user = await this.prisma.user.findFirst({
+      where: { OR: [{ emailLookupHash: loginSubject }, { email: dto.email }] },
     });
 
     if (!user || !user.password) {
