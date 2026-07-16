@@ -2071,7 +2071,6 @@ export class StatsService {
             id: true,
             gameName: true,
             tagLine: true,
-            puuid: true,
             tier: true,
             rank: true,
             lp: true,

@@ -790,23 +790,15 @@ export class AuthService {
     try {
       const user = await this.prisma.user.findUnique({
         where: { id },
-        include: {
-          authProviders: true,
-          riotAccounts: {
-            // 과거 데이터 호환: primary 플래그가 false인 채로 남은 계정도 노출되도록
-            // 필터를 제거하고 isPrimary desc 정렬만 유지한다.
-            include: {
-              championPreferences: {
-                orderBy: { order: "asc" },
-              },
-            },
-            orderBy: [{ isPrimary: "desc" }, { verifiedAt: "desc" }],
-          },
-          clanMemberships: {
-            include: {
-              clan: true,
-            },
-          },
+        // /auth/me is consumed by the browser. Keep it deliberately small:
+        // identity-provider metadata, emails, Riot identifiers, and token hashes
+        // must never be serialized into a normal user session response.
+        select: {
+          id: true,
+          username: true,
+          avatar: true,
+          profileBanner: true,
+          role: true,
         },
       });
 
@@ -814,9 +806,7 @@ export class AuthService {
         throw new UnauthorizedException("User not found");
       }
 
-      // Remove sensitive fields
-      const { password: _password, ...safeUser } = user;
-      return safeUser;
+      return user;
     } catch (e) {
       console.error("Error in getUserById:", e);
       throw e; // Re-throw the original error to trigger a 500 response
