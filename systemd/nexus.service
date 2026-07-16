@@ -1,0 +1,21 @@
+[Unit]
+Description=Nexus Docker Compose
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=haru
+WorkingDirectory=/home/haru/projects/nexus
+# 부팅 복구는 마지막 CI/CD 배포가 기록한 IMAGE_TAG의 로컬 이미지만 사용한다.
+# 이미지 pull/build는 CI/CD만 담당한다.
+ExecStart=/usr/bin/docker compose -f docker-compose.prod.yml --env-file .env.production up -d --no-build
+TimeoutStartSec=60
+
+# ExecStop을 두지 않는다. `docker compose down`은 컨테이너를 삭제하여
+# Docker의 restart: unless-stopped 기반 재부팅 복구를 무력화한다.
+
+[Install]
+WantedBy=multi-user.target
