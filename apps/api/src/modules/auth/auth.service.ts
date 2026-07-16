@@ -34,7 +34,6 @@ export interface OAuthProfile {
 
 export interface TokenPayload {
   sub: string; // User ID
-  email?: string;
   username: string;
   role: string; // UserRole: USER | MODERATOR | ADMIN
 }
@@ -593,7 +592,6 @@ export class AuthService {
   }) {
     const payload: TokenPayload = {
       sub: user.id,
-      email: user.email || undefined,
       username: user.username,
       role: user.role || "USER",
     };
@@ -683,7 +681,6 @@ export class AuthService {
     // no unnecessary DB writes on every page refresh.
     const payload: TokenPayload = {
       sub: session.user.id,
-      email: session.user.email || undefined,
       username: session.user.username,
       role: session.user.role || "USER",
     };
