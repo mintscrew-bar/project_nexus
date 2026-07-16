@@ -45,6 +45,9 @@ jobs:
           umask 077
           cat > /home/haru/projects/nexus/.env.production << 'EOF'
           NODE_ENV=${{ secrets.NODE_ENV }}
+          # 부팅 복구(systemd)도 마지막으로 배포된 동일 SHA 이미지를 사용한다.
+          # 값이 없으면 Compose가 latest를 pull하거나 로컬 build로 폴백할 수 있다.
+          IMAGE_TAG=${{ github.event.workflow_run.head_sha }}
           APP_URL=${{ secrets.APP_URL }}
           CORS_ORIGINS=${{ secrets.CORS_ORIGINS }}
           NEXTAUTH_URL=${{ secrets.NEXTAUTH_URL }}
@@ -63,6 +66,8 @@ jobs:
           REDIS_URL=${{ secrets.REDIS_URL }}
           JWT_ACCESS_SECRET=${{ secrets.JWT_ACCESS_SECRET }}
           JWT_REFRESH_SECRET=${{ secrets.JWT_REFRESH_SECRET }}
+          DATA_ENCRYPTION_KEY=${{ secrets.DATA_ENCRYPTION_KEY }}
+          DATA_LOOKUP_HMAC_KEY=${{ secrets.DATA_LOOKUP_HMAC_KEY }}
           JWT_ACCESS_EXPIRES_IN=${{ secrets.JWT_ACCESS_EXPIRES_IN }}
           JWT_REFRESH_EXPIRES_IN=${{ secrets.JWT_REFRESH_EXPIRES_IN }}
           NEXTAUTH_SECRET=${{ secrets.NEXTAUTH_SECRET }}

@@ -16,6 +16,7 @@
     "db:seed-known-puuids": "ts-node prisma/seed-known-puuids.ts",
     "db:backfill-known-puuids": "ts-node prisma/backfill-known-puuids.ts",
     "db:backfill-patch-version": "ts-node prisma/backfill-riot-cache-patch-version.ts",
+    "db:backfill-encrypted-emails": "ts-node prisma/backfill-encrypted-emails.ts",
     "db:scrub-oauth-tokens": "ts-node prisma/scrub-oauth-tokens.ts"
   },
   "dependencies": {

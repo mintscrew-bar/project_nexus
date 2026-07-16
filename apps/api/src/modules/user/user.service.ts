@@ -100,6 +100,7 @@ export class UserService {
     // Strip sensitive fields before returning
     const {
       password: _pw,
+      email: _email,
       isBanned: _ib,
       banReason: _br,
       bannedAt: _ba,
@@ -107,12 +108,25 @@ export class UserService {
       isRestricted: _ir,
       restrictedUntil: _ru,
       emailVerified: _ev,
+      settings: _settings,
       ...safeUser
     } = user;
 
     const isOwner = requesterId === userId;
 
-    // Apply privacy settings for non-owner viewers
+    // PUUID/summonerId are stable account identifiers used only by server-side
+    // Riot API integrations. They must not reach browsers, including the owner.
+    safeUser.riotAccounts = safeUser.riotAccounts.map((account: any) => {
+      const {
+        puuid: _puuid,
+        summonerId: _summonerId,
+        userId: _userId,
+        ...publicAccount
+      } = account;
+      return publicAccount;
+    });
+
+    // Apply privacy settings for non-owner viewers.
     if (!isOwner && user.settings) {
       if (!user.settings.showRiotAccounts) {
         safeUser.riotAccounts = [];
