@@ -10,7 +10,7 @@ import { RoomSettingsModal } from "@/components/domain/RoomSettingsModal";
 import { UserSettingsModal } from "@/components/domain/UserSettingsModal";
 import { ConfirmModal, Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
-import { shallow } from "zustand/shallow";
+import { useShallow } from "zustand/react/shallow";
 import {
   Users, MessageSquare, Settings,
   UserCog,
@@ -73,7 +73,7 @@ export default function TournamentLobbyPage() {
   const {
     connect, disconnect, room, isConnected, error, gameStarting,
     setReady, startGame, kickParticipant, toggleSpectator, selectTeam
-  } = useLobbyStore(state => ({
+  } = useLobbyStore(useShallow(state => ({
     connect: state.connect,
     disconnect: state.disconnect,
     room: state.room,
@@ -85,7 +85,7 @@ export default function TournamentLobbyPage() {
     kickParticipant: state.kickParticipant,
     toggleSpectator: state.toggleSpectator,
     selectTeam: state.selectTeam,
-  }), shallow);
+  })));
 
   // 채팅 메시지와 발송 함수는 따로 분리 (채팅이 올라올 때 전체 로비 UI 리렌더링 방지)
   const messages = useLobbyStore(state => state.messages);
@@ -93,10 +93,10 @@ export default function TournamentLobbyPage() {
 
   const currentUser = useAuthStore(state => state.user);
   const { addToast } = useToast(); // useToast internally might already be optimized or use context
-  const { friends, fetchFriends } = useFriendStore(state => ({
+  const { friends, fetchFriends } = useFriendStore(useShallow(state => ({
     friends: state.friends,
     fetchFriends: state.fetchFriends,
-  }), shallow);
+  })));
 
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isUserSettingsModalOpen, setIsUserSettingsModalOpen] = useState(false);
