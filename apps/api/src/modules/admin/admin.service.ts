@@ -1393,15 +1393,39 @@ export class AdminService {
   ): Promise<{ id: string; username: string }[]> {
     const bots: { id: string; username: string }[] = [];
 
+    // 이메일 암호화 백필이 모든 유저의 plaintext email을 null로 바꾸므로
+    // email 기준으로는 기존 봇을 찾지 못한다(→ 재생성 시도 → puuid 유니크 충돌).
+    // puuid는 백필 대상이 아니므로 봇의 안정적 식별자로 사용한다.
+    const puuids = Array.from(
+      { length: count },
+      (_, i) => `bot_puuid_${i + 1}`,
+    );
+    const existingAccounts = await client.riotAccount.findMany({
+      where: { puuid: { in: puuids } },
+      select: { puuid: true, user: { select: { id: true, username: true } } },
+    });
+    const botByPuuid = new Map(
+      existingAccounts.map((account) => [account.puuid, account.user]),
+    );
+
     for (let i = 1; i <= count; i++) {
       const username = `testbot_${String(i).padStart(2, "0")}`;
       const email = `${username}@nexus.test`;
+
+      // 이미 존재하는 봇은 그대로 재사용 (쿼리 왕복도 줄어든다)
+      const existingBot = botByPuuid.get(`bot_puuid_${i}`);
+      if (existingBot) {
+        bots.push(existingBot);
+        continue;
+      }
 
       // 봇의 기본 Tier: SILVER (중간 등급)
       const botTiers = ["BRONZE", "SILVER", "GOLD", "PLATINUM", "DIAMOND"];
       const botTier = botTiers[i % botTiers.length]; // 봇마다 다른 티어 할당
       const botRank = "IV";
 
+      // puuid가 없으면 riotAccount도 없으므로 nested create가 충돌하지 않는다.
+      // 백필 이후 생성된 봇은 plaintext email이 남아 있을 수 있어 upsert를 유지한다.
       const user = await client.user.upsert({
         where: { email },
         update: {}, // 이미 있으면 업데이트 안 함 (기존 봇 유지)
@@ -1448,71 +1472,82 @@ export class AdminService {
       throw new BadRequestException("count must be a positive integer.");
     }
 
-    const result = await this.prisma.$transaction(async (tx) => {
-      const room = await tx.room.findUnique({
-        where: { id: roomId },
-        include: {
-          participants: { select: { userId: true } },
-        },
-      });
-
-      if (!room) throw new NotFoundException("방을 찾을 수 없습니다.");
-      if (room.status !== ("WAITING" as any)) {
-        throw new BadRequestException(
-          "대기 중인 방에만 봇을 추가할 수 있습니다.",
-        );
-      }
-
-      const currentCount = room.participants.length;
-      const available = (room.maxParticipants || 10) - currentCount;
-      if (available <= 0) throw new BadRequestException("방이 가득 찼습니다.");
-
-      const toAdd = Math.min(requestedCount, available);
-      const existingBotIds = new Set(room.participants.map((p) => p.userId));
-
-      // 필요한 봇보다 여유 있게 확보 (방 최대 인원 40명 → 호스트 제외 최대 39봇)
-      const bots = await this.ensureBotUsers(
-        Math.min(39, currentCount + toAdd),
-        tx,
-      );
-
-      const newBots = bots
-        .filter((b) => !existingBotIds.has(b.id))
-        .slice(0, toAdd);
-      if (newBots.length === 0)
-        throw new BadRequestException("추가할 수 있는 봇이 없습니다.");
-
-      await tx.roomParticipant.createMany({
-        data: newBots.map((bot) => ({
-          roomId,
-          userId: bot.id,
-          role: "PLAYER" as any,
-          isReady: true,
-        })),
-        skipDuplicates: true,
-      });
-
-      const updatedParticipants = await tx.roomParticipant.findMany({
-        where: { roomId },
-        include: {
-          user: {
-            select: { id: true, username: true, avatar: true, role: true },
+    const result = await this.prisma.$transaction(
+      async (tx) => {
+        const room = await tx.room.findUnique({
+          where: { id: roomId },
+          include: {
+            participants: { select: { userId: true } },
           },
-        },
-      });
+        });
 
-      await tx.adminAuditLog.create({
-        data: {
-          adminId,
-          action: AdminAction.ROOM_ADD_BOT,
-          targetType: "room",
-          targetId: roomId,
-          details: { addedCount: newBots.length },
-        },
-      });
+        if (!room) throw new NotFoundException("방을 찾을 수 없습니다.");
+        if (room.status !== ("WAITING" as any)) {
+          throw new BadRequestException(
+            "대기 중인 방에만 봇을 추가할 수 있습니다.",
+          );
+        }
 
-      return { addedCount: newBots.length, participants: updatedParticipants };
-    });
+        const currentCount = room.participants.length;
+        const available = (room.maxParticipants || 10) - currentCount;
+        if (available <= 0)
+          throw new BadRequestException("방이 가득 찼습니다.");
+
+        const toAdd = Math.min(requestedCount, available);
+        const existingBotIds = new Set(room.participants.map((p) => p.userId));
+
+        // 필요한 봇보다 여유 있게 확보 (방 최대 인원 40명 → 호스트 제외 최대 39봇)
+        const bots = await this.ensureBotUsers(
+          Math.min(39, currentCount + toAdd),
+          tx,
+        );
+
+        const newBots = bots
+          .filter((b) => !existingBotIds.has(b.id))
+          .slice(0, toAdd);
+        if (newBots.length === 0)
+          throw new BadRequestException("추가할 수 있는 봇이 없습니다.");
+
+        await tx.roomParticipant.createMany({
+          data: newBots.map((bot) => ({
+            roomId,
+            userId: bot.id,
+            role: "PLAYER" as any,
+            isReady: true,
+          })),
+          skipDuplicates: true,
+        });
+
+        const updatedParticipants = await tx.roomParticipant.findMany({
+          where: { roomId },
+          include: {
+            user: {
+              select: { id: true, username: true, avatar: true, role: true },
+            },
+          },
+        });
+
+        await tx.adminAuditLog.create({
+          data: {
+            adminId,
+            action: AdminAction.ROOM_ADD_BOT,
+            targetType: "room",
+            targetId: roomId,
+            details: { addedCount: newBots.length },
+          },
+        });
+
+        return {
+          addedCount: newBots.length,
+          participants: updatedParticipants,
+        };
+      },
+      {
+        // 최초 실행 시 봇 최대 39개를 순차 생성하므로 기본 5초로는 부족하다.
+        maxWait: 10_000,
+        timeout: 30_000,
+      },
+    );
 
     const [admin, room] = await Promise.all([
       this.prisma.user.findUnique({
