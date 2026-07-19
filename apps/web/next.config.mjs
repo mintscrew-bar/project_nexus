@@ -15,7 +15,7 @@ const cspReportOnly = [
   // API REST + Socket.IO(ws/wss) + GA/AdSense 비콘
   "connect-src 'self' ws: wss: https://www.google-analytics.com https://*.google-analytics.com https://region1.google-analytics.com https://pagead2.googlesyndication.com https://*.googlesyndication.com https://*.google.com",
   // AdSense iframe
-  "frame-src https://googleads.g.doubleclick.net https://tpc.googlesyndication.com https://*.googlesyndication.com https://*.google.com",
+  "frame-src https://googleads.g.doubleclick.net https://tpc.googlesyndication.com https://*.googlesyndication.com https://*.google.com https://ep2.adtrafficquality.google",
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",
