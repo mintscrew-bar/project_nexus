@@ -324,11 +324,25 @@ export class AdminService {
   private getTestBotWhere(): Prisma.UserWhereInput {
     return {
       OR: [
-        { username: { startsWith: "testbot_" } },
+        {
+          username: {
+            startsWith: "testbot_",
+            mode: "insensitive",
+          },
+        },
+        {
+          email: {
+            endsWith: "@nexus.test",
+            mode: "insensitive",
+          },
+        },
         {
           riotAccounts: {
             some: {
-              puuid: { startsWith: "bot_puuid_" },
+              OR: [
+                { puuid: { startsWith: "bot_puuid_" } },
+                { tagLine: { equals: "BOT", mode: "insensitive" } },
+              ],
             },
           },
         },
@@ -338,12 +352,19 @@ export class AdminService {
 
   private isTestBotUser(user: {
     username?: string | null;
-    riotAccounts?: Array<{ puuid?: string | null }>;
+    email?: string | null;
+    riotAccounts?: Array<{
+      puuid?: string | null;
+      tagLine?: string | null;
+    }>;
   }): boolean {
     return (
-      user.username?.startsWith("testbot_") ||
-      user.riotAccounts?.some((account) =>
-        account.puuid?.startsWith("bot_puuid_"),
+      user.username?.toLowerCase().startsWith("testbot_") ||
+      user.email?.toLowerCase().endsWith("@nexus.test") ||
+      user.riotAccounts?.some(
+        (account) =>
+          account.puuid?.startsWith("bot_puuid_") ||
+          account.tagLine?.toUpperCase() === "BOT",
       ) ||
       false
     );
@@ -426,6 +447,9 @@ export class AdminService {
         select: {
           id: true,
           username: true,
+          // Legacy test bots may only retain the reserved internal email marker.
+          // The response mapper below replaces this with the decrypted public field.
+          email: true,
           emailEncrypted: true,
           avatar: true,
           role: true,
@@ -1365,6 +1389,7 @@ export class AdminService {
   /** testbot_01 ~ testbot_{count} 유저를 없으면 생성, 있으면 반환 */
   async ensureBotUsers(
     count: number,
+    client: Prisma.TransactionClient | PrismaService = this.prisma,
   ): Promise<{ id: string; username: string }[]> {
     const bots: { id: string; username: string }[] = [];
 
@@ -1377,7 +1402,7 @@ export class AdminService {
       const botTier = botTiers[i % botTiers.length]; // 봇마다 다른 티어 할당
       const botRank = "IV";
 
-      const user = await this.prisma.user.upsert({
+      const user = await client.user.upsert({
         where: { email },
         update: {}, // 이미 있으면 업데이트 안 함 (기존 봇 유지)
         create: {
@@ -1418,6 +1443,11 @@ export class AdminService {
 
   /** 방에 봇을 count명 추가. 이미 있는 봇은 스킵, maxParticipants 초과하지 않음 */
   async addBotToRoom(roomId: string, adminId: string, count: number = 1) {
+    const requestedCount = Number(count);
+    if (!Number.isInteger(requestedCount) || requestedCount < 1) {
+      throw new BadRequestException("count must be a positive integer.");
+    }
+
     const result = await this.prisma.$transaction(async (tx) => {
       const room = await tx.room.findUnique({
         where: { id: roomId },
@@ -1437,12 +1467,13 @@ export class AdminService {
       const available = (room.maxParticipants || 10) - currentCount;
       if (available <= 0) throw new BadRequestException("방이 가득 찼습니다.");
 
-      const toAdd = Math.min(count, available);
+      const toAdd = Math.min(requestedCount, available);
       const existingBotIds = new Set(room.participants.map((p) => p.userId));
 
       // 필요한 봇보다 여유 있게 확보 (방 최대 인원 40명 → 호스트 제외 최대 39봇)
       const bots = await this.ensureBotUsers(
         Math.min(39, currentCount + toAdd),
+        tx,
       );
 
       const newBots = bots
@@ -1470,8 +1501,14 @@ export class AdminService {
         },
       });
 
-      await this.logAction(adminId, AdminAction.ROOM_ADD_BOT, "room", roomId, {
-        addedCount: newBots.length,
+      await tx.adminAuditLog.create({
+        data: {
+          adminId,
+          action: AdminAction.ROOM_ADD_BOT,
+          targetType: "room",
+          targetId: roomId,
+          details: { addedCount: newBots.length },
+        },
       });
 
       return { addedCount: newBots.length, participants: updatedParticipants };
