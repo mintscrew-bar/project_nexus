@@ -6,16 +6,18 @@
 const cspReportOnly = [
   "default-src 'self'",
   // Next.js 인라인 스크립트 + AdSense/GA 로더 (초기엔 unsafe-inline/eval 허용, 이후 nonce화 검토)
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://pagead2.googlesyndication.com https://*.googlesyndication.com https://googleads.g.doubleclick.net https://adservice.google.com https://www.googletagmanager.com https://www.google-analytics.com https://*.google.com",
+  // adtrafficquality.google: AdSense 광고 품질(sodar) 스크립트
+  // static.cloudflareinsights.com: Cloudflare 프록시가 자동 주입하는 웹 분석 비콘
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://pagead2.googlesyndication.com https://*.googlesyndication.com https://googleads.g.doubleclick.net https://adservice.google.com https://www.googletagmanager.com https://www.google-analytics.com https://*.google.com https://*.adtrafficquality.google https://static.cloudflareinsights.com",
   // 폰트 CDN(jsdelivr)·구글 폰트 + Tailwind/런타임 인라인 스타일
   "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com",
   "font-src 'self' data: https://cdn.jsdelivr.net https://fonts.gstatic.com",
   // 이미지: 업로드/디스코드/ddragon/광고 픽셀 등 다양 → https 전반 허용
   "img-src 'self' data: blob: https:",
   // API REST + Socket.IO(ws/wss) + GA/AdSense 비콘
-  "connect-src 'self' ws: wss: https://www.google-analytics.com https://*.google-analytics.com https://region1.google-analytics.com https://pagead2.googlesyndication.com https://*.googlesyndication.com https://*.google.com",
+  "connect-src 'self' ws: wss: https://www.google-analytics.com https://*.google-analytics.com https://region1.google-analytics.com https://pagead2.googlesyndication.com https://*.googlesyndication.com https://*.google.com https://*.adtrafficquality.google https://static.cloudflareinsights.com",
   // AdSense iframe
-  "frame-src https://googleads.g.doubleclick.net https://tpc.googlesyndication.com https://*.googlesyndication.com https://*.google.com https://ep2.adtrafficquality.google",
+  "frame-src https://googleads.g.doubleclick.net https://tpc.googlesyndication.com https://*.googlesyndication.com https://*.google.com https://*.adtrafficquality.google",
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",
