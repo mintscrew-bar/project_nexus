@@ -10,11 +10,6 @@ on:
 permissions:
   contents: read
 
-# Node20 액션 deprecation 대응: 아직 Node24 네이티브 버전이 없는 JS 액션
-# (예: pnpm/action-setup@v4)을 Node24로 강제 실행. 2026-06-02부터 기본 동작.
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-
 jobs:
   ci:
     name: Lint / Build / Test
@@ -24,10 +19,10 @@ jobs:
       - name: 코드 체크아웃
         uses: actions/checkout@v6
 
+      # 버전은 루트 package.json의 packageManager 필드(pnpm@8.15.0)에서 읽는다.
+      # version 입력을 함께 주면 버전이 어긋날 때 에러가 나므로 단일 출처로 유지한다.
       - name: pnpm 설치
-        uses: pnpm/action-setup@v4
-        with:
-          version: 8.15.0
+        uses: pnpm/action-setup@v6
 
       - name: Node.js 22 설정
         uses: actions/setup-node@v5
@@ -77,17 +72,17 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Docker Buildx 설정
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: GHCR 로그인
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: API 이미지 빌드 & 푸시
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: apps/api/Dockerfile
@@ -101,7 +96,7 @@ jobs:
           cache-to: type=gha,mode=max,scope=api
 
       - name: Web 이미지 빌드 & 푸시
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: apps/web/Dockerfile
