@@ -44,7 +44,7 @@
       "ws": "^8.21.0",
       "diff": "^4.0.4",
       "basic-ftp": "^5.3.1",
-      "systeminformation": "^5.31.6",
+      "systeminformation": "^5.31.7",
       "ip-address": "^10.2.0",
       "fast-uri": "^3.1.2",
       "flatted": "^3.4.2",
