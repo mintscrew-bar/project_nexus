@@ -1394,26 +1394,52 @@ export class AdminService {
     const bots: { id: string; username: string }[] = [];
 
     // 이메일 암호화 백필이 모든 유저의 plaintext email을 null로 바꾸므로
-    // email 기준으로는 기존 봇을 찾지 못한다(→ 재생성 시도 → puuid 유니크 충돌).
-    // puuid는 백필 대상이 아니므로 봇의 안정적 식별자로 사용한다.
+    // email 기준으로는 기존 봇을 찾지 못한다(→ 재생성 시도 → 유니크 충돌).
+    //
+    // RiotAccount에는 봇 재생성을 막아야 할 유니크 제약이 둘 있다:
+    //   - puuid            (@unique)
+    //   - (gameName, tagLine) (@@unique)
+    // puuid 하나만 조회하면, gameName/tagLine은 같은데 puuid 규칙이 다른
+    // 레거시 봇(또는 중간에 실패한 이전 실행이 남긴 행)을 놓쳐 재생성으로 빠지고
+    // nested create가 (gameName, tagLine)에서 터진다. 두 키를 모두 조회한다.
+    const usernames = Array.from(
+      { length: count },
+      (_, i) => `testbot_${String(i + 1).padStart(2, "0")}`,
+    );
     const puuids = Array.from(
       { length: count },
       (_, i) => `bot_puuid_${i + 1}`,
     );
+
     const existingAccounts = await client.riotAccount.findMany({
-      where: { puuid: { in: puuids } },
-      select: { puuid: true, user: { select: { id: true, username: true } } },
+      where: {
+        OR: [
+          { puuid: { in: puuids } },
+          { gameName: { in: usernames }, tagLine: "BOT" },
+        ],
+      },
+      select: {
+        puuid: true,
+        gameName: true,
+        user: { select: { id: true, username: true } },
+      },
     });
+
     const botByPuuid = new Map(
       existingAccounts.map((account) => [account.puuid, account.user]),
+    );
+    const botByGameName = new Map(
+      existingAccounts.map((account) => [account.gameName, account.user]),
     );
 
     for (let i = 1; i <= count; i++) {
       const username = `testbot_${String(i).padStart(2, "0")}`;
       const email = `${username}@nexus.test`;
 
-      // 이미 존재하는 봇은 그대로 재사용 (쿼리 왕복도 줄어든다)
-      const existingBot = botByPuuid.get(`bot_puuid_${i}`);
+      // 이미 존재하는 봇은 그대로 재사용 (쿼리 왕복도 줄어든다).
+      // 두 유니크 키 중 어느 쪽으로든 걸리면 기존 봇으로 간주한다.
+      const existingBot =
+        botByPuuid.get(`bot_puuid_${i}`) ?? botByGameName.get(username);
       if (existingBot) {
         bots.push(existingBot);
         continue;
@@ -1424,8 +1450,9 @@ export class AdminService {
       const botTier = botTiers[i % botTiers.length]; // 봇마다 다른 티어 할당
       const botRank = "IV";
 
-      // puuid가 없으면 riotAccount도 없으므로 nested create가 충돌하지 않는다.
-      // 백필 이후 생성된 봇은 plaintext email이 남아 있을 수 있어 upsert를 유지한다.
+      // 위 조회에서 puuid·(gameName, tagLine) 두 유니크 키가 모두 비어있음을
+      // 확인했으므로 nested create가 충돌하지 않는다.
+      // 백필 이후에도 plaintext email이 남아 있는 유저가 있을 수 있어 upsert를 유지한다.
       const user = await client.user.upsert({
         where: { email },
         update: {}, // 이미 있으면 업데이트 안 함 (기존 봇 유지)
@@ -1458,6 +1485,30 @@ export class AdminService {
         },
         select: { id: true, username: true },
       });
+
+      // upsert가 update 분기를 타면(= email로 기존 유저를 찾은 경우) create 안의
+      // nested riotAccounts.create가 실행되지 않아 RiotAccount 없는 봇이 된다.
+      // 그 상태로 두면 드래프트/경매에서 조용히 깨지므로 여기서 보강한다.
+      const hasAccount = await client.riotAccount.findFirst({
+        where: { userId: user.id },
+        select: { id: true },
+      });
+      if (!hasAccount) {
+        await client.riotAccount.create({
+          data: {
+            userId: user.id,
+            gameName: username,
+            tagLine: "BOT",
+            puuid: `bot_puuid_${i}`,
+            tier: botTier,
+            rank: botRank,
+            lp: 0,
+            isPrimary: true,
+            mainRole: null,
+            subRole: null,
+          },
+        });
+      }
 
       bots.push(user);
     }
