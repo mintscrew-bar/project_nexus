@@ -387,12 +387,7 @@ export class AdminService {
     kind?: "users" | "bots" | "all";
     role?: UserRole;
     statusFilter?:
-      | "normal"
-      | "banned"
-      | "restricted"
-      | "reported"
-      | "streamer"
-      | "no-riot";
+      "normal" | "banned" | "restricted" | "reported" | "streamer" | "no-riot";
     presence?: "online" | "offline" | "away";
   }) {
     const { page, search } = params;

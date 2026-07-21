@@ -2,9 +2,7 @@ import { Prisma, PrismaClient } from "@prisma/client";
 
 export type CustomMatchPeriod = "30d" | "90d" | "all";
 export type CustomMatchGroupBy =
-  | "champion"
-  | "champion+position"
-  | "user+champion";
+  "champion" | "champion+position" | "user+champion";
 
 /**
  * 데이터 소스 구분 — 같은 match_participants 테이블에 내전/외부 ranked가 섞여 있어

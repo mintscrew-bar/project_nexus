@@ -3,11 +3,7 @@ import { ConfigService } from "@nestjs/config";
 import { DiscordBotService } from "./discord-bot.service";
 
 type AdminAlertChannel =
-  | "APPROVAL"
-  | "REPORT"
-  | "APPEAL"
-  | "OPERATION"
-  | "SECURITY";
+  "APPROVAL" | "REPORT" | "APPEAL" | "OPERATION" | "SECURITY";
 
 interface AlertPayload {
   title: string;

@@ -47,12 +47,7 @@ export class AdminPageQueryDto {
     message: "statusFilter가 유효하지 않습니다.",
   })
   statusFilter?:
-    | "normal"
-    | "banned"
-    | "restricted"
-    | "reported"
-    | "streamer"
-    | "no-riot";
+    "normal" | "banned" | "restricted" | "reported" | "streamer" | "no-riot";
 
   @IsOptional()
   @IsIn(["online", "offline", "away"], {
