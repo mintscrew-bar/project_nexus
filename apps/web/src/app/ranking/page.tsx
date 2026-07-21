@@ -4,12 +4,14 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { rankingApi } from "@/lib/api-client";
-import { Skeleton, Button } from "@/components/ui";
+import { Skeleton, Button, EmptyState } from "@/components/ui";
 import { Trophy, Crown, ChevronLeft, ChevronRight, Users } from "lucide-react";
 import { getTierImage } from "@/components/matches/match-utils";
 
 export default function RankingPage() {
+  const router = useRouter();
   const [page, setPage] = useState(1);
   const [tab, setTab] = useState<"global" | "clan">("global");
   const limit = 50;
@@ -115,15 +117,15 @@ export default function RankingPage() {
                 ))}
               </div>
             ) : !data || data.rankings.length === 0 ? (
-              <div className="text-center py-16">
-                <Trophy className="h-16 w-16 text-text-tertiary mx-auto mb-4 opacity-50" />
-                <h3 className="text-lg font-semibold text-text-primary mb-2">
-                  랭킹 데이터가 없습니다
-                </h3>
-                <p className="text-text-secondary">
-                  최소 10판 이상 플레이한 유저가 없습니다.
-                </p>
-              </div>
+              <EmptyState
+                icon={Trophy}
+                title="아직 랭킹에 오른 플레이어가 없습니다"
+                description="내전 기록이 10경기 쌓이면 승률과 전적을 기준으로 랭킹에 등록됩니다. 첫 기록을 만들어보세요."
+                action={{
+                  label: "내전 방 둘러보기",
+                  onClick: () => router.push("/tournaments"),
+                }}
+              />
             ) : (
               <>
                 <div className="space-y-2">
@@ -237,15 +239,15 @@ export default function RankingPage() {
         )}
 
         {tab === "clan" && (
-          <div className="text-center py-16">
-            <Users className="h-16 w-16 text-text-tertiary mx-auto mb-4 opacity-50" />
-            <h3 className="text-lg font-semibold text-text-primary mb-2">
-              클랜 랭킹
-            </h3>
-            <p className="text-text-secondary">
-              소속 클랜 페이지에서 클랜 내 랭킹을 확인할 수 있습니다.
-            </p>
-          </div>
+          <EmptyState
+            icon={Users}
+            title="클랜별 랭킹은 클랜 페이지에서 확인할 수 있습니다"
+            description="활동 중인 클랜을 찾아 가입하고 클랜원들과 내전 기록을 쌓아보세요."
+            action={{
+              label: "클랜 둘러보기",
+              onClick: () => router.push("/clans"),
+            }}
+          />
         )}
       </div>
     </div>
