@@ -55,6 +55,8 @@ export function LandingMobileNav({ links }: { links: NavLink[] }) {
         className={`fixed bottom-0 right-0 top-0 z-50 flex w-72 max-w-[80vw] flex-col border-l border-bg-tertiary bg-bg-secondary transition-transform duration-300 ease-out ${
           isOpen ? "translate-x-0" : "translate-x-full"
         }`}
+        aria-hidden={!isOpen}
+        inert={!isOpen}
       >
         <div className="flex flex-shrink-0 items-center justify-between border-b border-bg-tertiary p-4">
           <Link
