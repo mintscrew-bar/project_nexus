@@ -89,6 +89,11 @@ const nextConfig = {
           "/:path(admin|api|auth|dashboard|profile|settings|role-selection|draft|auction|lab|broadcast|broadcast-control)(.*)",
         headers: [
           {
+            // 인증·개인·관리 화면은 CDN/shared cache에 절대 보관하지 않는다.
+            key: "Cache-Control",
+            value: "private, no-store, max-age=0, must-revalidate",
+          },
+          {
             key: "X-Robots-Tag",
             value: "noindex, nofollow, noarchive",
           },
