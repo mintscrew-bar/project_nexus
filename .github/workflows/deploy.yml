@@ -116,8 +116,16 @@ jobs:
       - name: 컨테이너 재시작
         run: |
           docker compose -f docker-compose.prod.yml --env-file /home/haru/projects/nexus/.env.production up -d
-          # bind mount된 nginx.conf 변경은 컨테이너 재생성 없이도 파일에 반영되므로,
-          # 문법 검사 후 명시적으로 reload해야 실행 중 worker가 새 라우트를 사용한다.
+
+          # actions/checkout은 파일을 새 inode로 교체할 수 있다. 이 경우 기존 bind mount는
+          # 이전 inode를 계속 가리키므로, 설정 해시가 다를 때만 nginx를 재생성한다.
+          CHECKOUT_NGINX_HASH=$(sha256sum nginx/nginx.conf | awk '{print $1}')
+          RUNNING_NGINX_HASH=$(docker compose -f docker-compose.prod.yml --env-file /home/haru/projects/nexus/.env.production exec -T nginx sha256sum /etc/nginx/nginx.conf | awk '{print $1}')
+          if [ "$CHECKOUT_NGINX_HASH" != "$RUNNING_NGINX_HASH" ]; then
+            echo "nginx.conf 변경 감지 — nginx 컨테이너 재생성"
+            docker compose -f docker-compose.prod.yml --env-file /home/haru/projects/nexus/.env.production up -d --force-recreate nginx
+          fi
+
           docker compose -f docker-compose.prod.yml --env-file /home/haru/projects/nexus/.env.production exec -T nginx nginx -t
           docker compose -f docker-compose.prod.yml --env-file /home/haru/projects/nexus/.env.production exec -T nginx nginx -s reload
 
