@@ -75,6 +75,7 @@ export function MobileMenu({ className }: MobileMenuProps) {
         onClick={() => setIsOpen(true)}
         className="p-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-bg-tertiary transition-colors"
         aria-label="Open menu"
+        aria-expanded={isOpen}
       >
         <Menu className="h-6 w-6" />
       </button>
@@ -94,6 +95,8 @@ export function MobileMenu({ className }: MobileMenuProps) {
           'fixed top-0 left-0 bottom-0 w-72 bg-bg-secondary border-r border-bg-tertiary z-50 flex flex-col transform transition-transform duration-300 ease-out',
           isOpen ? 'translate-x-0' : '-translate-x-full'
         )}
+        aria-hidden={!isOpen}
+        inert={!isOpen}
       >
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-bg-tertiary flex-shrink-0">
