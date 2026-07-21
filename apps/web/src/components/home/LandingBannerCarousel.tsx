@@ -50,7 +50,13 @@ export function LandingBannerCarousel() {
   };
 
   const slides = [
-    <CreatorBanner key="creator" className="h-full aspect-auto" isActive={current === 0} priority />,
+    <CreatorBanner
+      key="creator"
+      className="h-full aspect-auto"
+      isActive={current === 0}
+      priority
+      sizes="(max-width: 768px) 100vw, 1152px"
+    />,
     <AuctionBanner key="auction" isActive={current === 1} />,
     <StatsBanner key="stats" isActive={current === 2} />,
     <DiscordBanner key="discord" />,

@@ -12,12 +12,14 @@ interface CreatorBannerProps {
   isActive?: boolean;
   className?: string;
   priority?: boolean;
+  sizes?: string;
 }
 
 export function CreatorBanner({
   isActive = true,
   className,
   priority = false,
+  sizes = "(max-width: 768px) 100vw, 50vw",
 }: CreatorBannerProps) {
   return (
     <Link
@@ -35,7 +37,8 @@ export function CreatorBanner({
         alt=""
         fill
         priority={priority}
-        sizes="(max-width: 768px) 100vw, 1180px"
+        quality={65}
+        sizes={sizes}
         className="object-cover object-center transition-transform duration-700 group-hover:scale-[1.012]"
       />
 
