@@ -22,6 +22,8 @@ const cspReportOnly = [
   "base-uri 'self'",
   "form-action 'self'",
   "frame-ancestors 'none'",
+  // 동일 출처 Route Handler로 위반을 수집한다. 차단 모드 전환 전 allowlist 근거로 사용한다.
+  "report-uri /api/csp-report",
 ].join("; ");
 
 const uploadRemotePattern = (() => {
@@ -144,9 +146,10 @@ const nextConfig = {
   async rewrites() {
     return [
       {
-        // Next.js Route Handler가 있는 경로 제외: auth/refresh, auth/login, auth/logout,
-        // auth/register, auth/me, auth/callback — 나머지는 NestJS 백엔드로 프록시
-        source: "/api/:path((?!auth/refresh|auth/login|auth/logout|auth/register|auth/me|auth/callback).*)",
+        // Next.js Route Handler가 있는 경로 제외: auth/*, csp-report
+        // 나머지는 NestJS 백엔드로 프록시
+        source:
+          "/api/:path((?!auth/refresh|auth/login|auth/logout|auth/register|auth/me|auth/callback|csp-report).*)",
         destination: `${process.env.API_URL || "http://localhost:4000"}/api/:path*`,
       },
       {
