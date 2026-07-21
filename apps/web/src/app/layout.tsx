@@ -3,11 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 import { AppShell } from "@/components/layout/AppShell";
-import { GoogleAnalytics } from "@/components/analytics/GoogleAnalytics";
-import { PageViewTracker } from "@/components/analytics/PageViewTracker";
-import { ConsentBanner } from "@/components/analytics/ConsentBanner";
-import { AdSenseScript } from "@/components/ads/AdSenseScript";
-import { Suspense } from "react";
+import { ThirdPartyScripts } from "@/components/analytics/ThirdPartyScripts";
 import { ADSENSE_CLIENT } from "@/lib/adsense";
 import {
   SITE_DESCRIPTION,
@@ -125,18 +121,12 @@ export default function RootLayout({
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }}
         />
-        <GoogleAnalytics />
-        <AdSenseScript />
       </head>
       <body className={`${inter.className} font-sans h-screen flex flex-col overflow-hidden`}>
         <Providers>
           <AppShell>{children}</AppShell>
         </Providers>
-        {/* useSearchParams는 Suspense 경계 필요 */}
-        <Suspense fallback={null}>
-          <PageViewTracker />
-        </Suspense>
-        <ConsentBanner />
+        <ThirdPartyScripts />
       </body>
     </html>
   );
