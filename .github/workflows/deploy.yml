@@ -116,6 +116,10 @@ jobs:
       - name: 컨테이너 재시작
         run: |
           docker compose -f docker-compose.prod.yml --env-file /home/haru/projects/nexus/.env.production up -d
+          # bind mount된 nginx.conf 변경은 컨테이너 재생성 없이도 파일에 반영되므로,
+          # 문법 검사 후 명시적으로 reload해야 실행 중 worker가 새 라우트를 사용한다.
+          docker compose -f docker-compose.prod.yml --env-file /home/haru/projects/nexus/.env.production exec -T nginx nginx -t
+          docker compose -f docker-compose.prod.yml --env-file /home/haru/projects/nexus/.env.production exec -T nginx nginx -s reload
 
       # 강화된 정리. 배포 성공/실패와 무관하게 항상 실행.
       # - image -a: 컨테이너가 안 쓰는 모든 image (옛 SHA 포함). 실행 중 컨테이너 image 는 자동 보호.
