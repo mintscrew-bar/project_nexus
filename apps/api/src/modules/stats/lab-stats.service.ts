@@ -172,8 +172,7 @@ export interface LabChampionMasteryCriteria {
 
 export type LabChampionMasteryBadge = "커뮤니티 인증" | "고평가" | "기준 완화";
 export type LabChampionMasteryBadgeWithDerived =
-  | LabChampionMasteryBadge
-  | "양쪽 장인";
+  LabChampionMasteryBadge | "양쪽 장인";
 
 export interface LabChampionMasteryEntry {
   rank: number;
@@ -5354,11 +5353,9 @@ export class LabStatsService {
     if (!Array.isArray(styles) || styles.length < 2) return null;
 
     const primary = styles[0] as
-      | { style?: number; selections?: { perk?: number }[] }
-      | undefined;
+      { style?: number; selections?: { perk?: number }[] } | undefined;
     const sub = styles[1] as
-      | { style?: number; selections?: { perk?: number }[] }
-      | undefined;
+      { style?: number; selections?: { perk?: number }[] } | undefined;
 
     const primaryStyle = primary?.style;
     const subStyle = sub?.style;

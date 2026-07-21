@@ -17,10 +17,7 @@ type QueueGroupConfig = {
   staleHours: number;
   includeNexusUsers: boolean;
   fetchedAtField:
-    | "rankedFetchedAt"
-    | "normalFetchedAt"
-    | "aramFetchedAt"
-    | "customFetchedAt";
+    "rankedFetchedAt" | "normalFetchedAt" | "aramFetchedAt" | "customFetchedAt";
   lastMatchIdField:
     | "rankedLastMatchId"
     | "normalLastMatchId"

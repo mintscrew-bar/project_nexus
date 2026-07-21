@@ -72,8 +72,7 @@ export function getPeakTierUpdate(
   peakTier: string | null,
   peakRank: string | null,
 ):
-  | { peakTier: string | null; peakRank: string | null }
-  | Record<string, never> {
+  { peakTier: string | null; peakRank: string | null } | Record<string, never> {
   const normalizedTier = (tier || "UNRANKED").toUpperCase();
   if (
     normalizedTier !== "UNRANKED" &&
