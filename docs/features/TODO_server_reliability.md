@@ -72,11 +72,12 @@
   - watchdog 스크립트: 1분마다 `tailscale status` 검사, 실패 시 데몬 재시작
   - **효과**: SSH 채널 자가 복구
 
-- [ ] Task 7: 컨테이너 자가 복구 강화
+- [x] Task 7: 컨테이너 자가 복구 강화
   - `restart: unless-stopped` 만으로는 healthcheck 실패 시 자동 재시작 안 됨
   - autoheal 컨테이너 추가 또는 healthcheck failure 핸들러 작성
   - **위치**: `docker-compose.prod.yml`
   - **효과**: nexus-web/nginx unhealthy 시 자동 재시작
+  - **완료(2026-07-24)**: `willfarrell/autoheal` 서비스 추가(docker.sock 마운트, 10초 간격). web·nginx에 healthcheck 신규 추가(web=`/` node fetch, nginx=`/healthz` 경량 엔드포인트를 nginx.conf에 추가). api·web·nginx에 `autoheal=true` 라벨. → 떠 있지만 응답 불능(unhealthy) 상태를 자동 재시작으로 복구.
 
 - [ ] Task 8: 빌드 스토리지 압축 정책
   - BuildKit 캐시가 무제한 누적 → 빌드 한 번에 수 GB 추가

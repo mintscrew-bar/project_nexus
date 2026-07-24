@@ -50,6 +50,9 @@ services:
     container_name: nexus-api
     restart: unless-stopped
     logging: *default-logging
+    # unhealthy 시 autoheal이 자동 재시작하도록 라벨 부여 (Task 7)
+    labels:
+      - autoheal=true
     env_file:
       - ${NEXUS_ENV_FILE:-.env.production}
     environment:
@@ -103,6 +106,20 @@ services:
     depends_on:
       api:
         condition: service_healthy
+    # unhealthy 시 autoheal이 자동 재시작하도록 라벨 부여 (Task 7)
+    labels:
+      - autoheal=true
+    # Next.js 서버 생존 확인. status<500 이면 응답한 것으로 간주(리다이렉트 포함).
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.status<500?0:1)).catch(()=>process.exit(1))\"",
+        ]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
 
   nginx:
     image: nginx:alpine
@@ -114,6 +131,15 @@ services:
     depends_on:
       - web
       - api
+    labels:
+      - autoheal=true
+    # nginx 자체 생존만 확인하는 /healthz (upstream 무관)
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/healthz || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   cloudflared:
     image: cloudflare/cloudflared:latest
@@ -135,6 +161,24 @@ services:
       - uptime_kuma_data:/app/data
     ports:
       - "127.0.0.1:${UPTIME_KUMA_HOST_PORT:-3001}:3001"
+
+  # 컨테이너 자가 복구 (Task 7). autoheal=true 라벨이 붙은 컨테이너가
+  # healthcheck 상 unhealthy 가 되면 자동으로 재시작한다.
+  # restart: unless-stopped 는 프로세스가 죽어 exit 했을 때만 동작하고,
+  # "떠 있지만 응답 불능(healthy→unhealthy)" 상태는 못 잡으므로 이를 보완한다.
+  # ⚠️ 컨테이너 재시작 권한을 위해 docker.sock 을 마운트한다(autoheal 필수).
+  autoheal:
+    image: willfarrell/autoheal:latest
+    container_name: nexus-autoheal
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      AUTOHEAL_CONTAINER_LABEL: autoheal
+      AUTOHEAL_INTERVAL: 10 # 10초마다 unhealthy 컨테이너 검사
+      AUTOHEAL_START_PERIOD: 60 # 기동 후 60초는 유예
+      DOCKER_SOCK: /var/run/docker.sock
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
 
 volumes:
   postgres_data:
