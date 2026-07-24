@@ -144,3 +144,30 @@ jobs:
           echo "=== 정리 후 ==="
           docker system df
           df -h /
+
+  # 배포(deploy) 실패 시 Discord 알림.
+  # ⚠️ 반드시 ubuntu-latest 에서 실행 — deploy 는 self-hosted(운영 서버)에서 도는데,
+  #    운영 서버가 죽어 배포가 실패한 경우 self-hosted 러너로는 알림조차 못 보낸다.
+  #    GitHub-hosted 러너에 두어야 운영 상태와 무관하게 알림이 발송된다.
+  # deploy 가 스킵된 경우(= CI 실패로 애초에 배포 안 함)에는 failure() 가 아니므로 발송 안 됨
+  # (그 경우는 CI 워크플로우의 notify-failure 가 담당).
+  notify-failure:
+    name: Notify deploy failure
+    needs: deploy
+    if: ${{ failure() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Discord 실패 알림
+        env:
+          WEBHOOK: ${{ secrets.DEPLOY_ALERT_DISCORD_WEBHOOK }}
+        run: |
+          # 시크릿 미설정 시 조용히 스킵 (알림 없음 ≠ 워크플로우 실패)
+          if [ -z "$WEBHOOK" ]; then
+            echo "DEPLOY_ALERT_DISCORD_WEBHOOK 미설정 — 알림 생략"
+            exit 0
+          fi
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          CONTENT=$(printf '🚨 **배포(CD) 실패** — `%s`\n커밋: `%s`\n%s\n→ 운영 배포가 실패했습니다. 사이트 상태를 즉시 확인하세요.' \
+            "${{ github.repository }}" "${{ github.event.workflow_run.head_sha }}" "$RUN_URL")
+          PAYLOAD=$(jq -n --arg c "$CONTENT" '{content:$c}')
+          curl -fsS -X POST -H "Content-Type: application/json" -d "$PAYLOAD" "$WEBHOOK"

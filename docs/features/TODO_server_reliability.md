@@ -114,10 +114,12 @@
   - 사이트 다운 시 즉시 푸시 알림 받도록
   - **효과**: 오늘처럼 사용자 보고 후에야 알게 되는 상황 방지
 
-- [ ] Task 13: deploy 워크플로우 실패 알림
+- [x] Task 13: deploy 워크플로우 실패 알림
   - 현재 GitHub Actions 빌드 실패가 Discord/이메일로 안 와서 사용자가 사이트 502 보고 알아챔
   - workflow 끝에 conclusion=failure 시 webhook 호출 step 추가
   - **효과**: 배포 실패 즉시 인지
+  - **완료(2026-07-24)**: `ci.yml`·`deploy.yml` 양쪽에 `notify-failure` job 추가(둘 다 `ubuntu-latest`에서 실행 — self-hosted가 죽어도 알림은 발송됨). CI 실패(lint/test/build/이미지푸시)와 CD 실패를 각각 커버.
+  - **⚠️ 활성화 조건**: GitHub 저장소 시크릿 `DEPLOY_ALERT_DISCORD_WEBHOOK`(Discord 채널 웹훅 URL) 등록 필요. 미등록 시 알림 step은 조용히 스킵됨(워크플로우는 정상).
 
 - [ ] Task 14: 핵심 메트릭 노출
   - 디스크 사용률, 메모리, 컨테이너 healthcheck 상태를 한눈에 볼 대시보드

@@ -112,3 +112,27 @@ jobs:
             ${{ env.IMAGE_PREFIX }}/web:${{ github.sha }}
           cache-from: type=gha,scope=web
           cache-to: type=gha,mode=max,scope=web
+
+  # CI(lint/test/build 또는 이미지 빌드·푸시) 실패 시 Discord 알림.
+  # main push 에서만 동작 — PR 실패는 작성자가 직접 인지하므로 제외.
+  # GitHub-hosted 러너에서 실행되므로 운영 서버 상태와 무관하게 항상 발송된다.
+  notify-failure:
+    name: Notify CI failure
+    needs: [ci, docker]
+    if: ${{ failure() && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Discord 실패 알림
+        env:
+          WEBHOOK: ${{ secrets.DEPLOY_ALERT_DISCORD_WEBHOOK }}
+        run: |
+          # 시크릿 미설정 시 조용히 스킵 (알림 없음 ≠ 워크플로우 실패)
+          if [ -z "$WEBHOOK" ]; then
+            echo "DEPLOY_ALERT_DISCORD_WEBHOOK 미설정 — 알림 생략"
+            exit 0
+          fi
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          CONTENT=$(printf '🚨 **CI 실패** — `%s`\n브랜치: `main` / 커밋: `%s`\n작성자: %s\n%s\n→ 이미지 빌드/푸시 실패로 이번 커밋은 배포되지 않습니다.' \
+            "${{ github.repository }}" "${{ github.sha }}" "${{ github.actor }}" "$RUN_URL")
+          PAYLOAD=$(jq -n --arg c "$CONTENT" '{content:$c}')
+          curl -fsS -X POST -H "Content-Type: application/json" -d "$PAYLOAD" "$WEBHOOK"
