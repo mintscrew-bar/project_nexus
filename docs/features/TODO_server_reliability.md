@@ -8,27 +8,29 @@
 
 ## 즉시 (사고 직후 우선순위, 작업량 작음)
 
-- [ ] Task 1: 디스크 자동 정리 cron
+- [x] Task 1: 디스크 자동 정리 cron
   - 매일 새벽 안 쓰는 도커 이미지/컨테이너/네트워크/빌드캐시 prune
   - `docker system prune -af --filter "until=24h"` + `journalctl --vacuum-time=7d`
   - **위치**: 서버 systemd timer 또는 cron (`/etc/cron.daily/nexus-cleanup`)
   - **효과**: 빌드마다 누적되는 dangling 이미지로 디스크가 차서 발생한 오늘 사고 재발 방지
+  - **완료**: `scripts/disk-cleanup.sh` + crontab `0 4 * * *` 매일 실행 등록됨(Discord 웹훅 알림 포함)
 
-- [ ] Task 2: Docker 로그 size 제한
+- [x] Task 2: Docker 로그 size 제한
   - 컨테이너 로그가 무한 누적되어 디스크를 잠식하는 문제 차단
   - `docker-compose.prod.yml` 각 서비스에 `logging.options.max-size: "10m"`, `max-file: "3"` 추가
   - **효과**: 컨테이너당 로그를 30MB로 제한, 디스크 보호
+  - **완료**: `x-logging` 앵커로 7개 서비스 전체에 공통 적용. ※ 기존 컨테이너에는 재생성(`up -d`) 시점부터 반영됨
 
 - [ ] Task 3: 디스크 사용량 알림
   - Uptime Kuma에 디스크 사용률 모니터링 추가 또는 별도 cron으로 80% 초과 시 Discord 웹훅 알림
   - **위치**: `~/scripts/disk-alert.sh` + cron, 또는 Uptime Kuma push monitor
   - **효과**: 사후 복구가 아니라 사전 경고로 전환
 
-- [ ] Task 4: swap 파일 추가
+- [ ] Task 4: swap 튜닝 (원안: swap 파일 추가 → 현황상 튜닝만 필요)
   - 메모리 부족 시 OOM-killer가 nginx/sshd/Tailscale 같은 핵심 서비스를 죽이는 위험 완화
-  - 4~8GB swap 파일 + `swappiness=10`
-  - **위치**: 서버 `/swapfile` + `/etc/fstab`
-  - **효과**: 빌드 시점 메모리 스파이크에도 OOM 회피, sshd 살아있게 유지
+  - **정정(2026-07-24 확인)**: "swap 부재" 전제는 틀림. WSL2가 이미 **4GB swap 자체 제공**(`/dev/sdc`, PRIO -2) + RAM 15GB. `/swapfile`+fstab 생성은 불필요·중복(WSL2는 fstab swap 미지속).
+  - **남은 작업**: `swappiness` 60 → 10 영구화만 하면 됨. `/etc/sysctl.d/99-nexus-swap.conf` 에 `vm.swappiness = 10` (sudo 필요, 아직 미적용).
+  - **효과**: hot page는 RAM 유지, swap은 비상 예비로만 사용
 
 ---
 

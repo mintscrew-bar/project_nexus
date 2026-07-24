@@ -1,10 +1,19 @@
 name: nexus
 
+# 모든 서비스 공통 로그 설정 — 컨테이너 로그 무한 누적으로 인한 디스크 잠식 방지
+# (TODO_server_reliability Task 2). 서비스당 최대 30MB(10MB × 3파일)로 제한.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   postgres:
     image: postgres:16-alpine
     container_name: nexus-postgres
     restart: unless-stopped
+    logging: *default-logging
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-nexus}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
@@ -21,6 +30,7 @@ services:
     image: redis:7-alpine
     container_name: nexus-redis
     restart: unless-stopped
+    logging: *default-logging
     command: redis-server --appendonly yes
     volumes:
       - redis_data:/data
@@ -39,6 +49,7 @@ services:
       dockerfile: apps/api/Dockerfile
     container_name: nexus-api
     restart: unless-stopped
+    logging: *default-logging
     env_file:
       - ${NEXUS_ENV_FILE:-.env.production}
     environment:
@@ -79,6 +90,7 @@ services:
         API_URL: http://api:4000
     container_name: nexus-web
     restart: unless-stopped
+    logging: *default-logging
     environment:
       NODE_ENV: production
       API_URL: http://api:4000
@@ -96,6 +108,7 @@ services:
     image: nginx:alpine
     container_name: nexus-nginx
     restart: unless-stopped
+    logging: *default-logging
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
@@ -106,6 +119,7 @@ services:
     image: cloudflare/cloudflared:latest
     container_name: nexus-cloudflared
     restart: unless-stopped
+    logging: *default-logging
     command: tunnel --no-autoupdate run
     environment:
       TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?CLOUDFLARE_TUNNEL_TOKEN is required}
@@ -116,6 +130,7 @@ services:
     image: louislam/uptime-kuma:2
     container_name: nexus-uptime-kuma
     restart: unless-stopped
+    logging: *default-logging
     volumes:
       - uptime_kuma_data:/app/data
     ports:
