@@ -36,7 +36,8 @@
 
 ## 핵심 인프라 (중간 작업량)
 
-- [ ] Task 5: 빌드를 GitHub-hosted runner로 이전 ★ **구조적 원인** — 최우선
+- [x] Task 5: 빌드를 GitHub-hosted runner로 이전 ★ **구조적 원인** — 최우선
+  - **완료(2026-07-24 확인)**: 이미 구현됨. `ci.yml` 의 `docker` job이 ubuntu-latest에서 buildx로 빌드→GHCR push(`packages: write`, gha 캐시, latest+sha 태그), `deploy.yml` 은 self-hosted에서 `pull`+`up -d`만, `docker-compose.prod.yml` 은 `image: ghcr.io/...`(build는 dev 폴백). 빌드가 운영을 죽이는 구조는 이미 제거됨.
   - **현재 구조의 문제**:
     - `deploy.yml` 이 self-hosted (= 운영 서버) 위에서 `docker compose build` 실행
     - 매 빌드마다 nexus-api(~1.5GB) + nexus-web(~1GB) 이미지 layer 가 `/var/lib/containerd/...` 누적
@@ -127,9 +128,10 @@
 
 ## 정책 / 프로세스
 
-- [ ] Task 15: 배포 전 리소스 체크 게이트
+- [x] Task 15: 배포 전 리소스 체크 게이트
   - deploy.yml 에 빌드 직전 `df -h`, `free -h` 검사 → 임계치 미만이면 abort
   - **효과**: 디스크/메모리 부족 상태에서 배포 진입 자체 차단
+  - **완료**: `deploy.yml` "디스크 여유 체크(배포 전 게이트)" step — `/` 사용률 ≥ `DISK_USAGE_LIMIT`(90%)면 복구 명령 노출하고 abort
 
 - [ ] Task 16: 운영 런북 (recovery playbook) 정리
   - "사이트 502 시 1분 안에 할 일", "SSH 안 될 때 복구 순서", "디스크 풀 시 정리 명령"
