@@ -26,10 +26,10 @@
   - **위치**: `~/scripts/disk-alert.sh` + cron, 또는 Uptime Kuma push monitor
   - **효과**: 사후 복구가 아니라 사전 경고로 전환
 
-- [ ] Task 4: swap 튜닝 (원안: swap 파일 추가 → 현황상 튜닝만 필요)
+- [x] Task 4: swap 튜닝 (원안: swap 파일 추가 → 현황상 튜닝만 필요)
   - 메모리 부족 시 OOM-killer가 nginx/sshd/Tailscale 같은 핵심 서비스를 죽이는 위험 완화
   - **정정(2026-07-24 확인)**: "swap 부재" 전제는 틀림. WSL2가 이미 **4GB swap 자체 제공**(`/dev/sdc`, PRIO -2) + RAM 15GB. `/swapfile`+fstab 생성은 불필요·중복(WSL2는 fstab swap 미지속).
-  - **남은 작업**: `swappiness` 60 → 10 영구화만 하면 됨. `/etc/sysctl.d/99-nexus-swap.conf` 에 `vm.swappiness = 10` (sudo 필요, 아직 미적용).
+  - **완료(2026-07-24)**: `swappiness` 60 → 10 적용. `/etc/sysctl.d/99-nexus-swap.conf` 에 `vm.swappiness = 10` 기록(systemd-sysctl가 부팅 시 로드 → 재시작 후에도 유지). 런타임도 즉시 반영됨.
   - **효과**: hot page는 RAM 유지, swap은 비상 예비로만 사용
 
 ---
