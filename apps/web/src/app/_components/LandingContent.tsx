@@ -97,53 +97,59 @@ const landingNavLinks = [
   { href: "/community", label: "커뮤니티" },
 ];
 
-// 로그인 후에도 재사용 가능한 랜딩 콘텐츠 섹션들 (서버 컴포넌트)
-export function LandingContentSections({ showBanner = true }: { showBanner?: boolean }) {
+// 비로그인 사용자에게만 필요한 히어로와 배너.
+export function LandingIntro() {
   return (
     <>
       {/* 모바일 전용 히어로 — 배너보다 먼저 핵심 가치와 CTA를 노출 */}
-      {showBanner && (
-        <section className="md:hidden px-6 pt-8 pb-4">
-          <h1 className="text-3xl font-extrabold text-text-primary leading-tight">
-            롤 내전 운영의{" "}
-            <span
-              className="bg-clip-text text-transparent"
-              style={{ backgroundImage: "linear-gradient(135deg, #8b5cf6, #6366f1, #d946ef)" }}
-            >
-              모든 것
-            </span>
-            , Nexus
-          </h1>
-          <p className="mt-3 text-sm leading-relaxed text-text-secondary">
-            팀 구성, 경매 드래프트, 전적 기록까지 — 디스코드 채팅 없이 한 화면에서.
-          </p>
-          <div className="mt-5 flex gap-3">
-            <Link
-              href="/auth/login"
-              className="rounded-lg bg-accent-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent-hover"
-            >
-              무료로 시작하기
-            </Link>
-            <Link
-              href="/tournaments"
-              className="rounded-lg border border-bg-tertiary bg-bg-secondary px-4 py-2.5 text-sm font-semibold text-text-secondary transition-colors hover:text-text-primary"
-            >
-              내전방 보기
-            </Link>
-          </div>
-        </section>
-      )}
+      <section className="md:hidden px-6 pt-8 pb-4">
+        <h1 className="text-3xl font-extrabold text-text-primary leading-tight">
+          롤 내전 운영의{" "}
+          <span
+            className="bg-clip-text text-transparent"
+            style={{ backgroundImage: "linear-gradient(135deg, #8b5cf6, #6366f1, #d946ef)" }}
+          >
+            모든 것
+          </span>
+          , Nexus
+        </h1>
+        <p className="mt-3 text-sm leading-relaxed text-text-secondary">
+          팀 구성, 경매 드래프트, 전적 기록까지 — 디스코드 채팅 없이 한 화면에서.
+        </p>
+        <div className="mt-5 flex gap-3">
+          <Link
+            href="/auth/login"
+            className="rounded-lg bg-accent-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent-hover"
+          >
+            무료로 시작하기
+          </Link>
+          <Link
+            href="/tournaments"
+            className="rounded-lg border border-bg-tertiary bg-bg-secondary px-4 py-2.5 text-sm font-semibold text-text-secondary transition-colors hover:text-text-primary"
+          >
+            내전방 보기
+          </Link>
+        </div>
+      </section>
 
       {/* 배너 캐러셀 */}
-      {showBanner && (
-        <section className="px-6 py-6">
-          <div className="mx-auto max-w-6xl">
-            <LandingBannerCarousel />
-          </div>
-        </section>
-      )}
+      <section className="px-6 py-6">
+        <div className="mx-auto max-w-6xl">
+          <LandingBannerCarousel />
+        </div>
+      </section>
+    </>
+  );
+}
 
-      <section id="features" className="px-6 py-16 md:py-24">
+// 로그인 여부와 관계없이 재사용하는 랜딩 콘텐츠 섹션들 (서버 컴포넌트)
+export function LandingContentSections() {
+  return (
+    <>
+      <section
+        id="features"
+        className="px-6 py-16 [content-visibility:auto] [contain-intrinsic-size:auto_700px] md:py-24"
+      >
         <div className="mx-auto max-w-6xl">
           <p className="text-center text-sm font-semibold text-accent-primary">NEXUS로 하는 내전 운영</p>
           <h2 className="mt-2 text-center text-2xl font-bold text-text-primary sm:text-3xl md:text-5xl">
@@ -180,7 +186,7 @@ export function LandingContentSections({ showBanner = true }: { showBanner?: boo
         </div>
       </section>
 
-      <section className="border-y border-bg-tertiary bg-bg-secondary/30 px-6 py-14 md:py-20">
+      <section className="border-y border-bg-tertiary bg-bg-secondary/30 px-6 py-14 [content-visibility:auto] [contain-intrinsic-size:auto_720px] md:py-20">
         <div className="mx-auto max-w-6xl">
           <div className="mb-8 max-w-3xl">
             <p className="text-sm font-semibold text-accent-primary">공개 자료</p>
@@ -221,7 +227,7 @@ export function LandingContentSections({ showBanner = true }: { showBanner?: boo
         </div>
       </section>
 
-      <section className="px-6 py-16 md:py-24">
+      <section className="px-6 py-16 [content-visibility:auto] [contain-intrinsic-size:auto_360px] md:py-24">
         <div className="mx-auto max-w-6xl rounded-2xl border border-accent-primary/20 bg-accent-primary/5 p-6 md:p-10">
           <p className="text-sm font-semibold text-accent-primary">처음이라면 이렇게 시작하세요</p>
           <div className="mt-4 grid gap-6 md:grid-cols-[1fr_1fr_auto] md:items-end">
@@ -238,7 +244,7 @@ export function LandingContentSections({ showBanner = true }: { showBanner?: boo
         </div>
       </section>
 
-      <section className="px-6 pb-12">
+      <section className="px-6 pb-12 [content-visibility:auto] [contain-intrinsic-size:auto_180px]">
         <div className="mx-auto max-w-4xl">
           <AdSlotCard slotKey="landingMid" minHeight={120} />
         </div>
@@ -283,13 +289,14 @@ export default function LandingContent() {
   return (
     <main className="flex min-h-screen flex-col bg-bg-primary">
       <LandingHeader />
+      <LandingIntro />
       <LandingContentSections />
       <LandingFooter />
     </main>
   );
 }
 
-function LandingHeader() {
+export function LandingHeader() {
   return (
     <header className="sticky top-0 z-40 border-b border-bg-tertiary bg-bg-primary/95 backdrop-blur supports-[backdrop-filter]:bg-bg-primary/85">
       <div className="mx-auto flex h-20 max-w-6xl items-center gap-2 px-4 md:gap-4 md:px-6">

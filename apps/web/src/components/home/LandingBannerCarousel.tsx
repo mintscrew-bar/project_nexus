@@ -12,10 +12,13 @@ const TOTAL_SLIDES = 4;
 
 export function LandingBannerCarousel() {
   const [current, setCurrent] = useState(0);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [isInView, setIsInView] = useState(false);
+  const [isPageVisible, setIsPageVisible] = useState(true);
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const carouselRef = useRef<HTMLDivElement>(null);
 
   const touchStartX = useRef(0);
-  const touchEndX = useRef(0);
   const SWIPE_THRESHOLD = 50;
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -23,30 +26,57 @@ export function LandingBannerCarousel() {
   }, []);
 
   const handleTouchEnd = useCallback((e: React.TouchEvent) => {
-    touchEndX.current = e.changedTouches[0].clientX;
-    const diff = touchStartX.current - touchEndX.current;
+    const diff = touchStartX.current - e.changedTouches[0].clientX;
     if (Math.abs(diff) < SWIPE_THRESHOLD) return;
-    if (timerRef.current) clearInterval(timerRef.current);
     setCurrent((c) => diff > 0 ? (c + 1) % TOTAL_SLIDES : (c - 1 + TOTAL_SLIDES) % TOTAL_SLIDES);
-    startTimer();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const startTimer = useCallback(() => {
-    timerRef.current = setInterval(() => {
-      setCurrent((c) => (c + 1) % TOTAL_SLIDES);
-    }, 5000);
+  // 화면 근처에 있을 때만 자동 재생해 아래쪽 캐러셀의 백그라운드 작업을 줄인다.
+  useEffect(() => {
+    const element = carouselRef.current;
+    if (!element || typeof IntersectionObserver === "undefined") {
+      setIsInView(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => setIsInView(entry.isIntersecting),
+      { rootMargin: "200px 0px" },
+    );
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  // 숨겨진 브라우저 탭과 모션 축소 설정에서는 자동 전환하지 않는다.
+  useEffect(() => {
+    const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const syncMotionPreference = () =>
+      setPrefersReducedMotion(motionQuery.matches);
+    const syncVisibility = () =>
+      setIsPageVisible(document.visibilityState === "visible");
+
+    syncMotionPreference();
+    syncVisibility();
+    motionQuery.addEventListener("change", syncMotionPreference);
+    document.addEventListener("visibilitychange", syncVisibility);
+
+    return () => {
+      motionQuery.removeEventListener("change", syncMotionPreference);
+      document.removeEventListener("visibilitychange", syncVisibility);
+    };
   }, []);
 
   useEffect(() => {
-    startTimer();
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [startTimer]);
+    if (!isInView || !isPageVisible || prefersReducedMotion || isPaused) return;
+
+    const timer = window.setTimeout(() => {
+      setCurrent((value) => (value + 1) % TOTAL_SLIDES);
+    }, 5000);
+    return () => window.clearTimeout(timer);
+  }, [current, isInView, isPageVisible, prefersReducedMotion, isPaused]);
 
   const goTo = (idx: number) => {
-    if (timerRef.current) clearInterval(timerRef.current);
     setCurrent(idx);
-    startTimer();
   };
 
   const slides = [
@@ -58,13 +88,26 @@ export function LandingBannerCarousel() {
 
   return (
     <div
+      ref={carouselRef}
       className="relative aspect-[3/2] w-full overflow-hidden rounded-2xl"
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
+      onMouseEnter={() => setIsPaused(true)}
+      onMouseLeave={() => setIsPaused(false)}
+      onFocusCapture={() => setIsPaused(true)}
+      onBlurCapture={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) {
+          setIsPaused(false);
+        }
+      }}
+      aria-roledescription="carousel"
+      aria-label="Nexus 주요 기능"
     >
       {slides.map((slide, i) => (
         <div
           key={i}
+          aria-hidden={i !== current}
+          inert={i !== current}
           className="absolute inset-0 transition-all duration-500 ease-out"
           style={{
             opacity: i === current ? 1 : 0,

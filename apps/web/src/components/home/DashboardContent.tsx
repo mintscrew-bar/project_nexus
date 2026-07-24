@@ -1,15 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { useAuthStore } from "@/stores/auth-store";
 import { useRiotStore, type RiotAccount } from "@/stores/riot-store";
-import { DiscordBanner } from "@/components/home/DiscordBanner";
-import { AuctionBanner } from "@/components/home/AuctionBanner";
-import { StatsBanner } from "@/components/home/StatsBanner";
-import { CreatorBanner } from "@/components/home/CreatorBanner";
+import { LandingBannerCarousel } from "@/components/home/LandingBannerCarousel";
 import { userApi, roomApi, communityApi, statsApi } from "@/lib/api-client";
 import { Card, CardContent, Button, Skeleton, ErrorBoundary } from "@/components/ui";
 import { TierBadge } from "@/components/domain/TierBadge";
@@ -25,7 +22,6 @@ import {
   Plus,
   Shield,
   Lock,
-  ChevronLeft,
   Flame,
   Megaphone,
 } from "lucide-react";
@@ -161,139 +157,6 @@ function GlassCard({
       )}
     >
       {children}
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Banner Carousel — 보라 테마 통일
-// ─────────────────────────────────────────────────────────────────────────────
-
-// 배너 슬라이드 총 개수 — 각각 전용 컴포넌트로 렌더링
-const TOTAL_SLIDES = 4;
-
-function BannerCarousel() {
-  const [current, setCurrent] = useState(0);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  // ── 터치 스와이프 지원 ──
-  const touchStartX = useRef(0);
-  const touchEndX = useRef(0);
-  const SWIPE_THRESHOLD = 50; // 최소 스와이프 거리(px)
-
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    touchStartX.current = e.touches[0].clientX;
-  }, []);
-
-  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
-    touchEndX.current = e.changedTouches[0].clientX;
-    const diff = touchStartX.current - touchEndX.current;
-
-    if (Math.abs(diff) < SWIPE_THRESHOLD) return;
-
-    if (timerRef.current) clearInterval(timerRef.current);
-    if (diff > 0) {
-      // 왼쪽 스와이프 → 다음 슬라이드
-      setCurrent((c) => (c + 1) % TOTAL_SLIDES);
-    } else {
-      // 오른쪽 스와이프 → 이전 슬라이드
-      setCurrent((c) => (c - 1 + TOTAL_SLIDES) % TOTAL_SLIDES);
-    }
-    startTimer();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const startTimer = useCallback(() => {
-    timerRef.current = setInterval(() => {
-      setCurrent((c) => (c + 1) % TOTAL_SLIDES);
-    }, 5000);
-  }, []);
-
-  useEffect(() => {
-    startTimer();
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [startTimer]);
-
-  const goTo = (idx: number) => {
-    if (timerRef.current) clearInterval(timerRef.current);
-    setCurrent(idx);
-    startTimer();
-  };
-
-  // 슬라이드 목록 — 모든 슬라이드를 렌더링하되 현재만 보이게 (페이드 전환)
-  // isActive prop으로 활성 슬라이드에서만 애니메이션 시작
-  const slides = [
-    <CreatorBanner
-      key="creator"
-      className="h-full aspect-auto"
-      isActive={current === 0}
-      priority
-    />,
-    <AuctionBanner key="auction" isActive={current === 1} />,
-    <StatsBanner key="stats" isActive={current === 2} />,
-    <DiscordBanner key="discord" />,
-  ];
-
-  return (
-    // 모든 배너는 3:2 고정 비율로 통일 — 새 배너 추가 시 1536x1024 기준
-    <div
-      className="relative aspect-[3/2] w-full overflow-hidden rounded-2xl"
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
-    >
-      {/* 페이드 크로스페이드 전환 — 모든 슬라이드를 절대 배치, 현재만 visible */}
-      {slides.map((slide, i) => (
-        <div
-          key={i}
-          className="absolute inset-0 transition-all duration-500 ease-out"
-          style={{
-            opacity: i === current ? 1 : 0,
-            // 비활성 슬라이드는 마우스/터치 이벤트 무시 + 스케일 살짝 줄여 깊이감
-            pointerEvents: i === current ? "auto" : "none",
-            transform: i === current ? "scale(1)" : "scale(0.98)",
-          }}
-        >
-          {slide}
-        </div>
-      ))}
-
-      {/* 좌우 화살표 — 좁은 폭에서는 콘텐츠와 겹치므로 데스크톱에서만 노출 */}
-      <button
-        onClick={() => goTo((current - 1 + TOTAL_SLIDES) % TOTAL_SLIDES)}
-        aria-label="이전 슬라이드"
-        className="hidden lg:block absolute left-3 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-white/5 text-white/45 hover:bg-white/10 hover:text-white transition-all z-20 backdrop-blur-sm"
-      >
-        <ChevronLeft className="h-3.5 w-3.5" />
-      </button>
-      <button
-        onClick={() => goTo((current + 1) % TOTAL_SLIDES)}
-        aria-label="다음 슬라이드"
-        className="hidden lg:block absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-white/5 text-white/45 hover:bg-white/10 hover:text-white transition-all z-20 backdrop-blur-sm"
-      >
-        <ChevronRight className="h-3.5 w-3.5" />
-      </button>
-
-      {/* 닷 네비게이션 — 터치 영역 확대 (시각 6px, 터치 44px) */}
-      <div className="absolute bottom-1 left-1/2 -translate-x-1/2 flex gap-1 z-20">
-        {Array.from({ length: TOTAL_SLIDES }).map((_, i) => (
-          <button
-            key={i}
-            onClick={() => goTo(i)}
-            aria-label={`슬라이드 ${i + 1}/${TOTAL_SLIDES}`}
-            aria-current={i === current ? "true" : undefined}
-            className="flex items-center justify-center h-7 px-1"
-          >
-            <span
-              className={cn(
-                "block rounded-full transition-all duration-500",
-                i === current ? "h-1.5 w-6 bg-violet-500" : "h-1.5 w-1.5 bg-white/50"
-              )}
-            />
-          </button>
-        ))}
-      </div>
     </div>
   );
 }
@@ -819,6 +682,9 @@ function DashboardSkeleton() {
 export function DashboardContent() {
   const { user, isAuthenticated } = useAuthStore();
   const { primaryAccount, fetchAccounts } = useRiotStore();
+  const [communitySectionElement, setCommunitySectionElement] =
+    useState<HTMLDivElement | null>(null);
+  const [shouldLoadCommunity, setShouldLoadCommunity] = useState(false);
 
   // 로그인 직후 riot 계정 목록 1회 동기화
   useEffect(() => {
@@ -826,6 +692,28 @@ export function DashboardContent() {
   }, [isAuthenticated, fetchAccounts]);
 
   const enabled = isAuthenticated && !!user?.id;
+
+  // 인기글·공지 영역이 가까워질 때만 요청한다. 대형 배너와 전적 카드 아래에 있어
+  // 초기 화면에서는 필요하지 않은 두 API 호출을 피할 수 있다.
+  useEffect(() => {
+    const element = communitySectionElement;
+    if (!enabled || !element || shouldLoadCommunity) return;
+    if (typeof IntersectionObserver === "undefined") {
+      setShouldLoadCommunity(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting) return;
+        setShouldLoadCommunity(true);
+        observer.disconnect();
+      },
+      { rootMargin: "600px 0px" },
+    );
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [communitySectionElement, enabled, shouldLoadCommunity]);
 
   const { data: userStats = null } = useQuery<UserStats | null>({
     queryKey: ["dashboard", "userStats"],
@@ -856,7 +744,7 @@ export function DashboardContent() {
     },
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
-    enabled,
+    enabled: enabled && shouldLoadCommunity,
   });
 
   const { data: noticePosts = [] } = useQuery<Post[]>({
@@ -868,7 +756,7 @@ export function DashboardContent() {
     },
     staleTime: 10 * 60 * 1000,
     refetchOnWindowFocus: false,
-    enabled,
+    enabled: enabled && shouldLoadCommunity,
   });
 
   const { data: championStats = [] } = useQuery<ChampionStat[]>({
@@ -908,7 +796,7 @@ export function DashboardContent() {
     <div className="space-y-6">
       {/* 배너 — 개별 배너 crash 시 전체 대시보드 보호 */}
       <ErrorBoundary>
-        <BannerCarousel />
+        <LandingBannerCarousel />
       </ErrorBoundary>
 
       {/* 내 전적 */}
@@ -923,7 +811,10 @@ export function DashboardContent() {
       <ActiveRoomsCard rooms={rooms} />
 
       {/* 인기글 + 공지사항 */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div
+        ref={setCommunitySectionElement}
+        className="grid grid-cols-1 gap-6 lg:grid-cols-2"
+      >
         <PopularPostsCard posts={popularPosts} />
         <NoticePostsCard posts={noticePosts} />
       </div>

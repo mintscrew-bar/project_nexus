@@ -3,7 +3,6 @@
 import dynamic from "next/dynamic";
 import { useAuthStore } from "@/stores/auth-store";
 import { ErrorBoundary, Skeleton } from "@/components/ui";
-import { OnboardingGuideModal } from "@/components/OnboardingGuideModal";
 
 // 대시보드 스켈레톤 — dynamic 청크 로드 중 빈 화면 방지
 function DashboardFallback() {
@@ -22,15 +21,27 @@ const DashboardContent = dynamic(
   { ssr: false, loading: () => <DashboardFallback /> }
 );
 
-// 비로그인 랜딩(landing)은 page.tsx에서 서버 컴포넌트로 렌더해 prop으로 주입한다.
-// → 미인증/로딩/SSR 시 그대로 출력되므로 검색봇이 랜딩 본문을 HTML로 읽을 수 있다.
-// contentSections는 로그인 후에도 랜딩 섹션(Features, Workflow, Resources)을 보여주기 위한 prop이다.
+// 첫 방문 로그인 사용자에게만 필요한 모달이므로 공개 랜딩 번들에서는 제외한다.
+const OnboardingGuideModal = dynamic(
+  () =>
+    import("@/components/OnboardingGuideModal").then(
+      (mod) => mod.OnboardingGuideModal,
+    ),
+  { ssr: false },
+);
+
+// 공통 콘텐츠는 children으로 한 번만 서버 렌더링한다. 비로그인 전용 영역만
+// 작은 슬롯으로 나누어, 긴 소개 섹션이 RSC payload에 중복되는 것을 방지한다.
 export default function HomeClient({
-  landing,
-  contentSections,
+  header,
+  intro,
+  footer,
+  children,
 }: {
-  landing: React.ReactNode;
-  contentSections: React.ReactNode;
+  header: React.ReactNode;
+  intro: React.ReactNode;
+  footer: React.ReactNode;
+  children: React.ReactNode;
 }) {
   const { isAuthenticated } = useAuthStore();
 
@@ -47,11 +58,18 @@ export default function HomeClient({
           </ErrorBoundary>
         </div>
         {/* 랜딩과 동일한 콘텐츠 섹션 — 로그인 후에도 서비스 소개 콘텐츠를 유지 */}
-        {contentSections}
+        {children}
       </div>
     );
   }
 
   // 미인증·로딩·SSR → 서버 렌더된 랜딩 그대로 출력 (SEO 본문 노출)
-  return <>{landing}</>;
+  return (
+    <main className="flex min-h-screen flex-col bg-bg-primary">
+      {header}
+      {intro}
+      {children}
+      {footer}
+    </main>
+  );
 }

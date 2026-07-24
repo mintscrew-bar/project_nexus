@@ -1,7 +1,12 @@
 import type { Metadata } from "next";
-import { absoluteUrl, SITE_DESCRIPTION, SITE_NAME, SITE_TITLE } from "@/lib/seo";
+import { absoluteUrl, SITE_DESCRIPTION, SITE_TITLE } from "@/lib/seo";
 import HomeClient from "./_components/HomeClient";
-import LandingContent, { LandingContentSections } from "./_components/LandingContent";
+import {
+  LandingContentSections,
+  LandingFooter,
+  LandingHeader,
+  LandingIntro,
+} from "./_components/LandingContent";
 
 export const metadata: Metadata = {
   title: {
@@ -19,12 +24,15 @@ export const metadata: Metadata = {
 };
 
 export default function HomePage() {
-  // 랜딩을 서버 컴포넌트로 렌더해 주입 → 비로그인/봇은 SSR HTML로 랜딩 본문을 받는다.
-  // contentSections는 로그인 후에도 콘텐츠 섹션을 보여주기 위해 별도로 주입한다.
+  // 긴 공통 섹션은 한 번만 렌더링하고, 비로그인 전용 UI만 작은 슬롯으로 전달한다.
+  // 비로그인/봇은 기존과 동일하게 전체 랜딩 본문을 SSR HTML로 받는다.
   return (
     <HomeClient
-      landing={<LandingContent />}
-      contentSections={<LandingContentSections showBanner={false} />}
-    />
+      header={<LandingHeader />}
+      intro={<LandingIntro />}
+      footer={<LandingFooter />}
+    >
+      <LandingContentSections />
+    </HomeClient>
   );
 }
