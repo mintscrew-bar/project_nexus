@@ -1,5 +1,13 @@
 /** @ts-check */
 
+import { createRequire } from "module";
+
+// 앱 버전 단일 출처: apps/web/package.json 의 version 을 빌드 타임에 읽어
+// NEXT_PUBLIC_APP_VERSION 으로 노출한다. → 설정 페이지 등 UI가 이 값을 사용해
+// package.json 범프만으로 화면 버전이 자동 동기화된다(수동 수정 불필요).
+const require = createRequire(import.meta.url);
+const { version: appVersion } = require("./package.json");
+
 // XSS/서드파티 스크립트 리스크 완화용 CSP.
 // 우선 Report-Only로 시작 — 실제 차단은 하지 않고 위반만 콘솔/리포트로 수집해
 // 광고(AdSense)·분석(GA)·폰트·소켓 등 누락 도메인을 파악한 뒤 강제(enforce) 전환한다.
@@ -49,6 +57,10 @@ const uploadRemotePattern = (() => {
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  // 클라이언트 번들에 앱 버전 인라인 (위 appVersion = package.json version)
+  env: {
+    NEXT_PUBLIC_APP_VERSION: appVersion,
+  },
   transpilePackages: ["@nexus/types", "@uiw/react-md-editor", "@uiw/react-markdown-preview"],
   images: {
     remotePatterns: [
