@@ -60,7 +60,7 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write # 버전 자동 범프 커밋을 main 에 push-back 하기 위해 write
       packages: write
     env:
       REGISTRY: ghcr.io
@@ -70,6 +70,30 @@ jobs:
     steps:
       - name: 코드 체크아웃
         uses: actions/checkout@v6
+        with:
+          # 버전 범프가 이번 push 의 커밋 범위(before..sha)를 분석하므로 전체 히스토리 필요
+          fetch-depth: 0
+
+      # 이번 push 커밋들을 분석해 버전 자동 범프 후 main 에 커밋 반영.
+      # - 세 package.json 갱신 → 이어지는 이미지 빌드에 새 버전이 그대로 baked in
+      #   (화면 버전은 next.config 가 apps/web/package.json 을 읽어 자동 동기화)
+      # - push-back 은 [skip ci] 라 재빌드/재배포 루프를 만들지 않음
+      # - 전 과정 non-fatal: 실패해도 배포는 계속 진행 (버전만 다음 기회에 반영)
+      - name: 버전 자동 범프
+        continue-on-error: true
+        if: github.event.before != '0000000000000000000000000000000000000000'
+        env:
+          BASE_REF: ${{ github.event.before }}
+        run: |
+          node scripts/bump-version.mjs || { echo "범프 대상 없음/스킵"; exit 0; }
+          git diff --quiet && { echo "버전 변경 없음"; exit 0; }
+          NEW=$(node -e "console.log(require('./package.json').version)")
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json apps/api/package.json apps/web/package.json
+          git commit -m "chore(release): 버전 ${NEW} [skip ci]"
+          git push origin HEAD:main \
+            || echo "push-back 실패(비치명) — 이번 이미지엔 ${NEW} 반영됨, 저장소 동기화는 다음 기회에"
 
       - name: Docker Buildx 설정
         uses: docker/setup-buildx-action@v4
