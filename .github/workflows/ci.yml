@@ -85,6 +85,13 @@ jobs:
         env:
           BASE_REF: ${{ github.event.before }}
         run: |
+          # 더블 범프 방지: 이번 범위에서 package.json 의 "version" 라인을 이미 바꾼
+          # 커밋이 있으면(수동 범프 또는 과거 auto release) 재범프하지 않는다.
+          # 메시지 문구가 아니라 실제 version 필드 변경을 기준으로 판정한다.
+          if [ -n "$(git log --format=%H -G'\"version\":' "${BASE_REF}..HEAD" -- package.json)" ]; then
+            echo "범위에 version 변경 커밋 존재 → 이미 릴리스됨, 스킵"
+            exit 0
+          fi
           node scripts/bump-version.mjs || { echo "범프 대상 없음/스킵"; exit 0; }
           git diff --quiet && { echo "버전 변경 없음"; exit 0; }
           NEW=$(node -e "console.log(require('./package.json').version)")
