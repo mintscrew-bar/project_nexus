@@ -8,6 +8,11 @@ const staticRoutes = [
   { path: "/about", priority: 0.75, changeFrequency: "monthly" },
   { path: "/resources", priority: 0.8, changeFrequency: "monthly" },
   { path: "/guide", priority: 0.85, changeFrequency: "monthly" },
+  { path: "/community", priority: 0.9, changeFrequency: "daily" },
+  { path: "/matches", priority: 0.9, changeFrequency: "daily" },
+  { path: "/tournaments", priority: 0.9, changeFrequency: "hourly" },
+  { path: "/ranking", priority: 0.8, changeFrequency: "daily" },
+  { path: "/clans", priority: 0.75, changeFrequency: "daily" },
   { path: "/contact", priority: 0.45, changeFrequency: "yearly" },
   { path: "/terms", priority: 0.2, changeFrequency: "yearly" },
   { path: "/privacy", priority: 0.2, changeFrequency: "yearly" },
@@ -27,7 +32,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.8,
   }));
 
-  // 공개 경기·커뮤니티 데이터가 충분히 축적되기 전까지는 제품 문서만 색인에
-  // 제출한다. 빈 목록·테스트성 UGC가 사이트 전체 품질 평가를 낮추지 않게 한다.
+  // 실제 내전 룸처럼 휘발성·진행 중심인 화면은 제외하고, 공개 서비스 목록과
+  // 검색·커뮤니티 진입점은 검색엔진에 제출한다.
   return [...staticEntries, ...articleEntries];
 }

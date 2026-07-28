@@ -21,7 +21,9 @@ export default function robots(): MetadataRoute.Robots {
     "/dm",
     "/community/write",
     "/community/bookmarks",
+    "/community/*/edit",
     "/clans/create",
+    "/clans/*/settings",
   ];
 
   return {

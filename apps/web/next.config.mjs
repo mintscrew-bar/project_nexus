@@ -123,6 +123,15 @@ const nextConfig = {
         ],
       },
       {
+        source: "/community/:id/edit",
+        headers: [
+          {
+            key: "X-Robots-Tag",
+            value: "noindex, nofollow, noarchive",
+          },
+        ],
+      },
+      {
         // 실제 파트너 프로그램·사례가 축적되기 전까지 단순 기능 안내 페이지는
         // 검색 결과에서 제외한다.
         source: "/partners",
@@ -134,9 +143,7 @@ const nextConfig = {
         ],
       },
       {
-        // 데이터가 쌓이기 전의 빈 목록·테스트성 UGC는 공개 접근은 유지하되
-        // 검색 색인에서는 제외한다. 큐레이션된 공개 콘텐츠가 축적되면 해제한다.
-        source: "/:path(tournaments|matches|ranking|clans|community)(.*)",
+        source: "/clans/create",
         headers: [
           {
             key: "X-Robots-Tag",
@@ -145,7 +152,7 @@ const nextConfig = {
         ],
       },
       {
-        source: "/clans/create",
+        source: "/clans/:id/settings",
         headers: [
           {
             key: "X-Robots-Tag",
