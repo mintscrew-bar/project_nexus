@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/stores/auth-store";
 import { Logo } from "@/components/Logo";
-import { AlertCircle, X } from "lucide-react";
+import { AlertCircle, X, CornerDownLeft } from "lucide-react";
 
 const POST_LOGIN_REDIRECT_KEY = "nexus_post_login_redirect";
 
@@ -15,10 +15,29 @@ function sanitizeRedirect(value: string | null) {
   return value;
 }
 
+/**
+ * 어디서 로그인 화면으로 넘어왔는지 알려주는 복귀 안내 문구.
+ * 방 생성/방 입장처럼 행동 도중 로그인으로 튕긴 경우의 이탈을 줄이는 목적이다.
+ */
+function getRedirectNotice(redirect: string | null) {
+  if (!redirect) return null;
+  if (/^\/tournaments\/[^/]+\/lobby/.test(redirect)) {
+    return "로그인하면 참여하려던 내전 방으로 다시 돌아갑니다.";
+  }
+  if (redirect.startsWith("/tournaments")) {
+    return "로그인 후 내전 방 목록으로 돌아가 바로 방을 만들 수 있습니다.";
+  }
+  if (redirect.startsWith("/community")) return "로그인하면 보던 커뮤니티 화면으로 돌아갑니다.";
+  if (redirect.startsWith("/clans")) return "로그인하면 보던 클랜 화면으로 돌아갑니다.";
+  return "로그인하면 이전 화면으로 돌아갑니다.";
+}
+
 function LoginPageContent() {
   const searchParams = useSearchParams();
   const { loginWithDiscord, isLoading } = useAuthStore();
   const [error, setError] = useState<string | null>(null);
+  // 에러 파라미터 처리 시 URL을 replaceState로 정리하므로 redirect 값은 state에 보관한다.
+  const [redirectTo, setRedirectTo] = useState<string | null>(null);
 
   // URL에서 에러 파라미터 확인
   useEffect(() => {
@@ -32,8 +51,11 @@ function LoginPageContent() {
     const redirect = sanitizeRedirect(searchParams.get("redirect"));
     if (redirect) {
       sessionStorage.setItem(POST_LOGIN_REDIRECT_KEY, redirect);
+      setRedirectTo(redirect);
     }
   }, [searchParams]);
+
+  const redirectNotice = getRedirectNotice(redirectTo);
 
   return (
     <div className="flex min-h-screen items-center justify-center px-4">
@@ -72,9 +94,17 @@ function LoginPageContent() {
             <div>
               <h2 className="text-2xl font-semibold text-text-primary mb-2">로그인</h2>
               <p className="text-text-secondary text-sm">
-                소셜 계정으로 간편하게 로그인하세요
+                Nexus는 Discord 계정으로만 로그인합니다. 별도 회원가입은 없습니다.
               </p>
             </div>
+
+            {/* 방 생성/방 입장 도중 넘어온 경우 복귀 지점을 알려준다 */}
+            {redirectNotice && (
+              <div className="flex items-start gap-2 rounded-lg border border-accent-primary/30 bg-accent-primary/10 p-3">
+                <CornerDownLeft className="h-4 w-4 flex-shrink-0 mt-0.5 text-accent-primary" />
+                <p className="text-sm text-text-secondary">{redirectNotice}</p>
+              </div>
+            )}
 
             <button
               onClick={loginWithDiscord}
@@ -99,6 +129,18 @@ function LoginPageContent() {
                 </>
               )}
             </button>
+
+            {/* Discord 권한 범위와 Riot 연동 시점 안내 — 권한 요청 화면에서 당황하지 않도록 미리 설명한다 */}
+            <ul className="space-y-1.5 text-xs leading-relaxed text-text-tertiary">
+              <li>
+                Discord에서 <span className="text-text-secondary">기본 프로필과 이메일(identify, email)</span>만
+                받아 계정 식별과 내전 알림에 사용합니다.
+              </li>
+              <li>
+                Riot 계정은 로그인 후 별도 단계에서 직접 입력합니다.{" "}
+                <span className="text-text-secondary">비밀번호는 어떤 경우에도 요청하지 않습니다.</span>
+              </li>
+            </ul>
 
             <div className="text-center text-xs text-text-tertiary">
               <p>
