@@ -46,6 +46,8 @@ export function CreatorBanner({
         className="relative z-10 flex h-full max-w-[86%] flex-col justify-center px-6 py-7 sm:max-w-[58%] sm:px-10 md:max-w-[52%] md:px-14"
         style={{ fontFamily: KKUKKKUK_FONT }}
       >
+        {/* ⚠ 이 문구를 바꾸면 scripts/subset-banner-font.sh로 폰트 서브셋을 재생성해야 한다.
+            서브셋에 없는 글자는 조용히 폴백 폰트로 렌더되어 글씨체가 섞여 보인다. */}
         <p className="max-w-[560px] text-2xl font-black leading-[1.18] text-zinc-950 sm:text-4xl lg:text-5xl">
           NEXUS와 함께 성장할
           <br className="hidden sm:block" />
