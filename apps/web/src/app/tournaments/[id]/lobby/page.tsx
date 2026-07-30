@@ -28,6 +28,8 @@ const STAGE_TRANSITION_MAX_ATTEMPTS = 12;
 const STAGE_TRANSITION_RETRY_DELAY_MS = 750;
 const STAGE_TRANSITION_MIN_TOKEN_TTL_MS = 2 * 60 * 1000;
 const STAGE_HANDOFF_LOBBY_CLEANUP_DELAY_MS = 15 * 1000;
+// 소켓 연결이 이 시간 내에 성립하지 않으면 무한 스피너 대신 복구 화면으로 전환한다.
+const LOBBY_CONNECT_TIMEOUT_MS = 10 * 1000;
 
 const getTeamModeStagePath = (room: {
   id: string;
@@ -92,6 +94,11 @@ export default function TournamentLobbyPage() {
   const sendMessage = useLobbyStore(state => state.sendMessage);
 
   const currentUser = useAuthStore(state => state.user);
+  // 소켓은 JWT가 있을 때만 연결을 시도한다(socket-client의 auth 게이트).
+  // 따라서 비로그인 상태에서는 connect/connect_error 어느 쪽도 발생하지 않아
+  // 로그인 여부를 페이지에서 직접 확인해야 무한 스피너를 막을 수 있다.
+  const isAuthenticated = useAuthStore(state => state.isAuthenticated);
+  const isAuthLoading = useAuthStore(state => state.isLoading);
   const { addToast } = useToast(); // useToast internally might already be optimized or use context
   const { friends, fetchFriends } = useFriendStore(useShallow(state => ({
     friends: state.friends,
@@ -109,7 +116,12 @@ export default function TournamentLobbyPage() {
   const [addingFriend, setAddingFriend] = useState<string | null>(null);
   const [sentFriendIds, setSentFriendIds] = useState<Set<string>>(new Set());
   const [mobileTab, setMobileTab] = useState<string>("participants");
+  const [connectTimedOut, setConnectTimedOut] = useState(false);
+  // "다시 시도"를 누를 때마다 증가시켜 connect 이펙트를 재실행한다.
+  const [retryNonce, setRetryNonce] = useState(0);
   const hasRedirected = useRef(false);
+  // 최초 입장 성공 여부 — 이후의 재연결 대기에는 타임아웃을 걸지 않는다.
+  const hasJoinedOnce = useRef(false);
   const hoverCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const transitionRetryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const transitionState = useRef({
@@ -258,13 +270,40 @@ export default function TournamentLobbyPage() {
 
   // connect/disconnect는 zustand 스토어 함수로 참조가 안정적이므로 dependency에서 제외
   useEffect(() => {
-    if (roomId) connect(roomId);
+    // 인증 복원이 끝나고 로그인 상태일 때만 연결한다.
+    // (비로그인 상태에서 connect를 불러도 소켓이 열리지 않아 스피너만 남는다)
+    if (roomId && isAuthenticated) connect(roomId);
     return () => {
       clearTransitionRetry();
       if (hasRedirected.current) return;
       disconnect();
     };
-  }, [roomId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [roomId, isAuthenticated, retryNonce]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 연결이 성립하지도, 에러가 나지도 않는 상태(방화벽/네트워크 지연 등)를 타임아웃으로 끊는다.
+  // 단, 한 번 입장에 성공한 뒤의 일시적 끊김은 소켓 자동 재연결에 맡기고 타임아웃하지 않는다.
+  useEffect(() => {
+    if (!isAuthenticated || hasJoinedOnce.current) return;
+    // 연결 + 방 데이터까지 도착해야 정상 상태다. join-room 응답이 오지 않는 경우도 함께 끊는다.
+    if (isConnected && room) {
+      hasJoinedOnce.current = true;
+      setConnectTimedOut(false);
+      return;
+    }
+    if (error) {
+      setConnectTimedOut(false);
+      return;
+    }
+    const timer = setTimeout(() => setConnectTimedOut(true), LOBBY_CONNECT_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [isAuthenticated, isConnected, !!room, error, roomId, retryNonce]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleRetryConnect = useCallback(() => {
+    setConnectTimedOut(false);
+    // 아직 방에 입장한 적이 없으므로 leave 없이 소켓만 정리하고 재연결한다.
+    disconnect({ skipLeave: true });
+    setRetryNonce((prev) => prev + 1);
+  }, [disconnect]);
 
   useEffect(() => {
     if (hasRedirected.current || !room) return;
@@ -281,14 +320,27 @@ export default function TournamentLobbyPage() {
   }, [gameStarting, room, navigateToGameStage]);
 
   /* ─── Loading / Error States ─── */
-  if (!isConnected && !error) {
-    return (
-      <div className="flex-grow flex items-center justify-center p-8">
-        <div className="flex flex-col items-center gap-3 animate-fade-in">
-          <div className="w-8 h-8 border-2 border-accent-primary border-t-transparent rounded-full animate-spin" />
-          <p className="text-text-secondary text-sm">로비에 연결하는 중...</p>
-        </div>
+  const connectingSpinner = (
+    <div className="flex-grow flex items-center justify-center p-8">
+      <div className="flex flex-col items-center gap-3 animate-fade-in">
+        <div className="w-8 h-8 border-2 border-accent-primary border-t-transparent rounded-full animate-spin" />
+        <p className="text-text-secondary text-sm">로비에 연결하는 중...</p>
       </div>
+    </div>
+  );
+
+  // 인증 복원 중에는 아직 로그인 여부를 알 수 없으므로 스피너를 유지한다.
+  if (isAuthLoading) return connectingSpinner;
+
+  // 공유받은 방 링크를 비로그인 상태로 열었을 때 — 로그인 후 이 로비로 복귀시킨다.
+  if (!isAuthenticated) {
+    return (
+      <LobbyErrorState
+        error="NOT_AUTHENTICATED::내전 방에 입장하려면 로그인이 필요합니다. 로그인하면 이 방으로 다시 돌아옵니다."
+        onGoSettings={() => router.push("/settings")}
+        onGoProfile={() => router.push("/profile")}
+        loginHref={`/auth/login?redirect=${encodeURIComponent(`/tournaments/${roomId}/lobby`)}`}
+      />
     );
   }
 
@@ -301,6 +353,19 @@ export default function TournamentLobbyPage() {
       />
     );
   }
+
+  if (connectTimedOut) {
+    return (
+      <LobbyErrorState
+        error="CONNECT_TIMEOUT::방이 삭제되었거나 네트워크 연결이 불안정할 수 있습니다. 다시 시도하거나 내전 목록에서 방을 확인해 주세요."
+        onGoSettings={() => router.push("/settings")}
+        onGoProfile={() => router.push("/profile")}
+        onRetry={handleRetryConnect}
+      />
+    );
+  }
+
+  if (!isConnected) return connectingSpinner;
 
   if (!room) {
     return (
