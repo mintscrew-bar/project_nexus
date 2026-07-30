@@ -346,6 +346,7 @@ export default function ClansPage() {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-tertiary" />
                 <Input
                   type="text"
+                  aria-label="클랜 검색"
                   placeholder="클랜 이름 또는 태그로 검색..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}

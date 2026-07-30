@@ -216,6 +216,9 @@ export default function StatsPage() {
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-text-tertiary z-10" />
                 <Input
                   type="text"
+                  aria-label={
+                    searchType === "summoner" ? "소환사 검색" : "Nexus 유저 검색"
+                  }
                   placeholder={
                     searchType === "summoner"
                       ? "소환사 이름 + #태그 (예: Hide on bush#KR1)"

@@ -7,6 +7,7 @@ import { roomApi } from "@/lib/api-client";
 import { connectRoomSocket, roomSocketHelpers } from "@/lib/socket-client";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useKeyboardShortcutsContext } from "@/components/KeyboardShortcuts";
+import { NEXUS_DISCORD_INVITE_URL } from "@/lib/constants";
 import { RoomCard } from "@/components/domain";
 import { EmptyState, Input, RoomCardSkeleton } from "@/components/ui";
 import { RefreshCcw, Home, Search, Users, Clock, CheckCircle, Gavel, ListOrdered, X, ArrowUpDown, Scale, ArrowLeftRight } from "lucide-react";
@@ -30,7 +31,12 @@ const sortOptions: { value: SortOption; label: string }[] = [
   { value: "leastPlayers", label: "인원 적은순" },
 ];
 
-export function RoomList() {
+interface RoomListProps {
+  /** 빈 목록 상태에서 방 생성 모달을 여는 콜백 (페이지가 모달과 로그인 리다이렉트를 소유) */
+  onCreateRoom?: () => void;
+}
+
+export function RoomList({ onCreateRoom }: RoomListProps = {}) {
   const router = useRouter();
   const currentUserId = useAuthStore((state) => state.user?.id);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
@@ -186,6 +192,7 @@ export function RoomList() {
           <Input
             ref={searchInputRef}
             type="text"
+            aria-label="내전 방 검색"
             placeholder="방 이름 또는 방장으로 검색... (/ 또는 Ctrl+K)"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -348,8 +355,23 @@ export function RoomList() {
         rooms.length === 0 ? (
           <EmptyState
             icon={Home}
-            title="생성된 내전 방이 없습니다"
-            description="새로운 방을 생성해서 친구들과 내전을 시작해보세요!"
+            title="아직 열린 내전 방이 없습니다"
+            description={
+              <>
+                첫 방을 만들면 이 목록 맨 위에 바로 노출됩니다. 처음이라면 가이드에서 팀 구성
+                방식을 먼저 확인해 보세요.{" "}
+                <a
+                  href={NEXUS_DISCORD_INVITE_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-accent-primary hover:underline"
+                >
+                  Discord에서 같이 할 사람 찾기
+                </a>
+              </>
+            }
+            action={onCreateRoom ? { label: "방 만들기", onClick: onCreateRoom } : undefined}
+            secondaryAction={{ label: "가이드 보기", href: "/guide" }}
           />
         ) : (
           <EmptyState
