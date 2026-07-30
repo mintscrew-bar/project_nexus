@@ -6,6 +6,7 @@ import Image from "next/image";
 import { useAuthStore } from "@/stores/auth-store";
 import { communityApi } from "@/lib/api-client";
 import { resolveBoardIcon } from "@/lib/board-icons";
+import { getApiErrorMessage } from "@/lib/utils";
 import {
   Card,
   CardContent,
@@ -206,7 +207,13 @@ export default function PostDetailClient() {
         }
       }
     } catch (err: any) {
-      setError(err.message || "게시글을 불러오는데 실패했습니다.");
+      // 삭제/비공개 글이나 잘못된 링크로 들어온 경우가 대부분이라 상태별 문구로 안내한다.
+      setError(
+        getApiErrorMessage(err, "게시글을 불러오는데 실패했습니다.", {
+          404: "게시글을 찾을 수 없습니다. 삭제되었거나 주소가 잘못되었을 수 있습니다.",
+          403: "이 게시글을 볼 권한이 없습니다.",
+        }),
+      );
     } finally {
       setIsLoading(false);
     }
@@ -255,7 +262,7 @@ export default function PostDetailClient() {
         setLikeCount((c) => c + 1);
       }
     } catch (err: any) {
-      addToast(err.message || "좋아요 처리에 실패했습니다.", "error");
+      addToast(getApiErrorMessage(err, "좋아요 처리에 실패했습니다."), "error");
     }
   };
 
@@ -275,7 +282,7 @@ export default function PostDetailClient() {
         addToast("북마크에 저장되었습니다.", "success");
       }
     } catch (err: any) {
-      addToast(err.message || "북마크 처리에 실패했습니다.", "error");
+      addToast(getApiErrorMessage(err, "북마크 처리에 실패했습니다."), "error");
     }
   };
 
@@ -290,7 +297,7 @@ export default function PostDetailClient() {
       addToast("댓글이 작성되었습니다.", "success");
       fetchPost();
     } catch (err: any) {
-      addToast(err.message || "댓글 작성에 실패했습니다.", "error");
+      addToast(getApiErrorMessage(err, "댓글 작성에 실패했습니다."), "error");
     } finally {
       setIsSubmitting(false);
     }
@@ -302,7 +309,7 @@ export default function PostDetailClient() {
       addToast("게시글이 삭제되었습니다.", "info");
       router.push("/community");
     } catch (err: any) {
-      addToast(err.message || "게시글 삭제에 실패했습니다.", "error");
+      addToast(getApiErrorMessage(err, "게시글 삭제에 실패했습니다."), "error");
     }
   };
 
@@ -312,7 +319,7 @@ export default function PostDetailClient() {
       addToast("댓글이 삭제되었습니다.", "info");
       fetchPost();
     } catch (err: any) {
-      addToast(err.message || "댓글 삭제에 실패했습니다.", "error");
+      addToast(getApiErrorMessage(err, "댓글 삭제에 실패했습니다."), "error");
     }
   };
 
@@ -331,7 +338,7 @@ export default function PostDetailClient() {
       addToast("답글이 작성되었습니다.", "success");
       fetchPost();
     } catch (err: any) {
-      addToast(err.message || "답글 작성에 실패했습니다.", "error");
+      addToast(getApiErrorMessage(err, "답글 작성에 실패했습니다."), "error");
     } finally {
       setIsSubmittingReply(false);
     }
@@ -363,7 +370,7 @@ export default function PostDetailClient() {
         }));
       }
     } catch (err: any) {
-      addToast(err.message || "좋아요 처리에 실패했습니다.", "error");
+      addToast(getApiErrorMessage(err, "좋아요 처리에 실패했습니다."), "error");
     }
   };
 
@@ -377,7 +384,7 @@ export default function PostDetailClient() {
       addToast("댓글이 수정되었습니다.", "success");
       fetchPost();
     } catch (err: any) {
-      addToast(err.message || "댓글 수정에 실패했습니다.", "error");
+      addToast(getApiErrorMessage(err, "댓글 수정에 실패했습니다."), "error");
     }
   };
 

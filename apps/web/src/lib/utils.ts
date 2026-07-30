@@ -9,6 +9,40 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/**
+ * API 에러를 사용자에게 보여줄 문구로 변환한다.
+ * axios 에러의 `message`는 "Request failed with status code 404" 같은 내부 문자열이라
+ * 그대로 노출하면 안 된다. 서버가 준 메시지 → 상태 코드별 문구 → fallback 순으로 고른다.
+ */
+export function getApiErrorMessage(
+  error: unknown,
+  fallback = "요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+  statusMessages: Record<number, string> = {},
+): string {
+  const err = error as {
+    response?: { status?: number; data?: { message?: string | string[] } };
+    code?: string;
+  };
+
+  const status = err?.response?.status;
+  if (status && statusMessages[status]) return statusMessages[status];
+
+  const serverMessage = err?.response?.data?.message;
+  if (Array.isArray(serverMessage) && serverMessage.length > 0) return serverMessage[0];
+  if (typeof serverMessage === "string" && serverMessage) return serverMessage;
+
+  // 서버 메시지가 없을 때의 기본 문구 — 상태 코드별로 최소한의 맥락은 준다.
+  if (status === 401) return "로그인이 필요합니다. 다시 로그인해 주세요.";
+  if (status === 403) return "권한이 없습니다.";
+  if (status === 404) return "요청한 정보를 찾을 수 없습니다.";
+  if (status === 429) return "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.";
+  if (status && status >= 500) return "서버에 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.";
+  // 응답 자체가 없으면 네트워크 문제로 간주한다.
+  if (!status) return "네트워크 연결을 확인해 주세요.";
+
+  return fallback;
+}
+
 export type TierKey =
   | 'iron' | 'bronze' | 'silver' | 'gold' | 'platinum'
   | 'emerald' | 'diamond' | 'master' | 'grandmaster' | 'challenger';
