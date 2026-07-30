@@ -50,7 +50,7 @@ export default function TournamentsPage() {
 
         <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-4 md:p-6 animate-slide-up">
           <h2 className="text-lg md:text-xl font-bold text-text-primary mb-4">참여 가능한 방</h2>
-          <RoomList />
+          <RoomList onCreateRoom={openRoomCreation} />
         </div>
 
         <Modal
