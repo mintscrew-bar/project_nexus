@@ -3,14 +3,19 @@
 @tailwind utilities;
 
 @layer base {
+  /* 메모먼트 꾹꾹체 — CreatorBanner 문구 전용.
+     원본 전체 폰트는 2.46MB(한글 11,172자)라 첫 방문마다 그만큼 내려받았다.
+     배너 고정 문구에 필요한 글자만 남긴 36KB 서브셋을 자체 호스팅한다.
+     ※ 배너 문구를 바꾸면 scripts/subset-banner-font.sh로 서브셋을 재생성해야 한다.
+        (없는 글자는 조용히 폴백 폰트로 렌더되어 글씨체가 섞여 보인다) */
   @font-face {
     font-family: "MemomentKkukkkuk";
     src:
-      url("https://cdn.jsdelivr.net/gh/woffz/b3@main/memomentKkukKkuk/memomentKkukKkuk.woff2") format("woff2"),
       local("Memoment Kkukkkuk"),
       local("MemomentKkukkkuk"),
       local("메모먼트 꾹꾹체"),
-      local("메모먼트꾹꾹체");
+      local("메모먼트꾹꾹체"),
+      url("/fonts/memoment-kkukkkuk-subset.woff2") format("woff2");
     font-weight: 400;
     font-style: normal;
     font-display: swap;

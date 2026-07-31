@@ -1,80 +1,57 @@
-// 비로그인·검색봇용 랜딩 콘텐츠 — 서버 컴포넌트로 항상 SSR HTML에 포함된다.
-// (HomeAuthOverlay의 로딩 게이트 밖에 두어 봇이 본문 텍스트를 읽을 수 있게 함)
+// 비로그인·검색봇용 랜딩 콘텐츠. 핵심 본문은 서버에서 렌더링한다.
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import {
   ArrowRight,
-  BookOpen,
-  ClipboardList,
-  Gavel,
-  MessageSquare,
-  Radio,
+  Bot,
+  Check,
+  ChevronRight,
+  CircleDot,
   Scale,
+  ShieldCheck,
+  Sparkles,
   Swords,
+  Trophy,
+  Users,
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
-import { LandingBannerCarousel } from "@/components/home/LandingBannerCarousel";
 import { AdSlotCard } from "@/components/ads/AdSlot";
 import { LandingMobileNav } from "./LandingMobileNav";
 
-const featureCards: Array<{
+const operations: Array<{
+  index: string;
   icon: LucideIcon;
   title: string;
   description: string;
+  accent: string;
+  glow: string;
 }> = [
   {
-    icon: Gavel,
-    title: "방을 열고 참가자를 모읍니다",
+    index: "01",
+    icon: Users,
+    title: "모집이 아니라 준비까지",
     description:
-      "정원, 관전, 팀 구성 방식을 먼저 정한 뒤 준비 상태로 실제 참가자를 확인합니다. 방장은 시작을 막는 조건을 로비에서 바로 볼 수 있습니다.",
+      "참가 인원, Riot 계정, 선호 포지션과 준비 상태를 한 화면에서 확인합니다. 시작을 막는 조건이 먼저 보입니다.",
+    accent: "text-amber-300",
+    glow: "from-amber-400/20",
   },
   {
+    index: "02",
     icon: Scale,
-    title: "상황에 맞게 팀을 구성합니다",
+    title: "감이 아니라 데이터로 편성",
     description:
-      "경매·스네이크·자동 밸런스·자유 팀 선택 중 내전 목적에 맞는 방식을 고릅니다. 티어, LP, 선호 포지션과 역할 배치를 한 흐름으로 확인합니다.",
+      "경매·스네이크·자동 밸런스·자유 선택. 티어와 포지션 데이터를 바탕으로 내전에 맞는 팀을 만듭니다.",
+    accent: "text-violet-300",
+    glow: "from-violet-500/25",
   },
   {
-    icon: MessageSquare,
-    title: "경기 뒤에도 기록을 남깁니다",
+    index: "03",
+    icon: Trophy,
+    title: "끝난 경기도 운영 자산으로",
     description:
-      "대진표, 결과, 전적과 회고를 다음 내전 준비에 활용합니다. Discord 음성 채널과 방송 오버레이도 운영 흐름 안에서 연결할 수 있습니다.",
-  },
-];
-
-const resourceLinks: Array<{
-  href: string;
-  icon: LucideIcon;
-  title: string;
-  description: string;
-}> = [
-  {
-    href: "/guide",
-    icon: BookOpen,
-    title: "기능 가이드",
-    description:
-      "방 만들기, 팀 구성 방식, 역할 선택, 대진표, 디스코드 봇 명령어를 순서대로 설명합니다.",
-  },
-  {
-    href: "/resources",
-    icon: ClipboardList,
-    title: "운영 자료실",
-    description:
-      "내전 운영 체크리스트, 모드 선택 기준, 결과 기록 기준을 공개 문서로 정리했습니다.",
-  },
-  {
-    href: "/resources/obs-broadcast-overlay-guide",
-    icon: Radio,
-    title: "방송 오버레이 가이드",
-    description:
-      "OBS 브라우저 소스 등록, 방 자동 추종, 장면 조작과 토큰 보안 절차를 안내합니다.",
-  },
-  {
-    href: "/about",
-    icon: Swords,
-    title: "서비스 소개",
-    description:
-      "Nexus가 어떤 문제를 해결하는지, 어떤 데이터를 다루는지, Riot Games와의 관계를 안내합니다.",
+      "대진표, 결과, 전적과 방송 오버레이를 연결해 한 번의 내전을 다음 운영을 위한 기록으로 남깁니다.",
+    accent: "text-cyan-300",
+    glow: "from-cyan-400/20",
   },
 ];
 
@@ -89,228 +66,392 @@ const footerLinks = [
 ];
 
 const landingNavLinks = [
-  { href: "/about", label: "소개" },
-  { href: "/resources", label: "자료실" },
-  { href: "/guide", label: "가이드" },
-  { href: "/contact", label: "문의" },
+  { href: "#operations", label: "서비스" },
   { href: "/tournaments", label: "내전방" },
   { href: "/community", label: "커뮤니티" },
 ];
 
-// 로그인 후에도 재사용 가능한 랜딩 콘텐츠 섹션들 (서버 컴포넌트)
-export function LandingContentSections({ showBanner = true }: { showBanner?: boolean }) {
+const positions = ["TOP", "JGL", "MID", "BOT", "SUP"];
+
+function OperationBoard() {
   return (
-    <>
-      {/* 모바일 전용 히어로 — 배너보다 먼저 핵심 가치와 CTA를 노출 */}
-      {showBanner && (
-        <section className="md:hidden px-6 pt-8 pb-4">
-          <h1 className="text-3xl font-extrabold text-text-primary leading-tight">
-            롤 내전 운영의{" "}
-            <span
-              className="bg-clip-text text-transparent"
-              style={{ backgroundImage: "linear-gradient(135deg, #8b5cf6, #6366f1, #d946ef)" }}
-            >
-              모든 것
-            </span>
-            , Nexus
-          </h1>
-          <p className="mt-3 text-sm leading-relaxed text-text-secondary">
-            팀 구성, 경매 드래프트, 전적 기록까지 — 디스코드 채팅 없이 한 화면에서.
-          </p>
-          <div className="mt-5 flex gap-3">
-            <Link
-              href="/auth/login"
-              className="rounded-lg bg-accent-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent-hover"
-            >
-              무료로 시작하기
-            </Link>
-            <Link
-              href="/tournaments"
-              className="rounded-lg border border-bg-tertiary bg-bg-secondary px-4 py-2.5 text-sm font-semibold text-text-secondary transition-colors hover:text-text-primary"
-            >
-              내전방 보기
-            </Link>
-          </div>
-        </section>
-      )}
+    <div className="relative mx-auto w-full max-w-[680px] lg:ml-auto">
+      <div
+        aria-hidden="true"
+        className="absolute -inset-12 -z-10 rounded-full bg-violet-500/15 blur-[90px]"
+      />
 
-      {/* 배너 캐러셀 */}
-      {showBanner && (
-        <section className="px-6 py-6">
-          <div className="mx-auto max-w-6xl">
-            <LandingBannerCarousel />
-          </div>
-        </section>
-      )}
-
-      <section id="features" className="px-6 py-16 md:py-24">
-        <div className="mx-auto max-w-6xl">
-          <p className="text-center text-sm font-semibold text-accent-primary">NEXUS로 하는 내전 운영</p>
-          <h2 className="mt-2 text-center text-2xl font-bold text-text-primary sm:text-3xl md:text-5xl">
-          엑셀로 하던 내전,{" "}
-          <span
-            className="bg-clip-text text-transparent"
-            style={{ backgroundImage: "linear-gradient(135deg, #8b5cf6, #6366f1, #d946ef)" }}
-          >
-            이제 그만할 때
-          </span>
-          {" "}됐잖아요.
-          </h2>
-          <p className="mx-auto mt-5 max-w-2xl text-center text-sm leading-relaxed text-text-secondary md:text-base">
-            모집부터 팀 확정, 경기 기록까지 단계마다 필요한 정보만 남겨 다음 진행을 쉽게 만듭니다.
-          </p>
-        <div className="mt-10 grid grid-cols-1 gap-4 md:grid-cols-3 md:gap-6">
-          {featureCards.map((feature) => (
-            <article
-              key={feature.title}
-              className="group rounded-xl border border-bg-tertiary bg-bg-secondary/50 p-6 transition-colors hover:border-accent-primary/40"
-            >
-              <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-lg bg-accent-primary/10 text-accent-primary">
-                <feature.icon className="h-5 w-5" />
-              </div>
-              <h3 className="text-lg font-bold text-text-primary">
-                {feature.title}
-              </h3>
-              <p className="mt-3 text-sm leading-relaxed text-text-secondary">
-                {feature.description}
+      <div className="overflow-hidden rounded-[28px] border border-white/10 bg-[#111217]/95 shadow-[0_40px_120px_rgba(0,0,0,0.55)]">
+        <div className="flex items-center justify-between border-b border-white/[0.07] px-5 py-4 sm:px-6">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-violet-400/25 bg-violet-500/10">
+              <Swords className="h-4 w-4 text-violet-300" />
+            </div>
+            <div>
+              <p className="text-[10px] font-semibold tracking-[0.2em] text-white/35">
+                MATCH CONTROL
               </p>
-            </article>
+              <p className="mt-0.5 text-sm font-semibold text-white">금요일 밤 5:5 내전</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/[0.08] px-3 py-1.5 text-[11px] font-semibold text-emerald-300">
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-300" />
+            모집 중
+          </div>
+        </div>
+
+        <div className="grid gap-4 p-4 sm:p-6 md:grid-cols-[1.1fr_0.9fr]">
+          <div className="rounded-2xl border border-white/[0.07] bg-white/[0.025] p-4 sm:p-5">
+            <div className="flex items-end justify-between">
+              <div>
+                <p className="text-xs text-white/40">참가 준비</p>
+                <p className="mt-1 text-3xl font-bold tracking-tight text-white">
+                  8<span className="text-white/25"> / 10</span>
+                </p>
+              </div>
+              <span className="text-xs font-semibold text-amber-300">2명 남음</span>
+            </div>
+            <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
+              <div className="h-full w-4/5 rounded-full bg-gradient-to-r from-violet-500 via-indigo-400 to-cyan-300" />
+            </div>
+
+            <div className="mt-5 space-y-2.5">
+              {[
+                ["Riot 계정 연동", "8 / 8", true],
+                ["포지션 선택", "8 / 8", true],
+                ["Discord 음성", "6 / 8", false],
+              ].map(([label, value, ready]) => (
+                <div
+                  key={String(label)}
+                  className="flex items-center justify-between rounded-xl bg-black/20 px-3 py-2.5"
+                >
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`flex h-5 w-5 items-center justify-center rounded-full ${
+                        ready ? "bg-emerald-400/15 text-emerald-300" : "bg-amber-400/15 text-amber-300"
+                      }`}
+                    >
+                      {ready ? <Check className="h-3 w-3" /> : <CircleDot className="h-3 w-3" />}
+                    </span>
+                    <span className="text-xs text-white/65">{label}</span>
+                  </div>
+                  <span className="text-xs font-medium tabular-nums text-white/40">{value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-4">
+            <div className="flex-1 rounded-2xl border border-white/[0.07] bg-gradient-to-br from-violet-500/[0.09] to-transparent p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] font-semibold tracking-[0.18em] text-violet-300/70">
+                    TEAM BUILDER
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-white">자동 밸런스</p>
+                </div>
+                <Scale className="h-5 w-5 text-violet-300" />
+              </div>
+
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <div className="space-y-1.5">
+                  <p className="mb-2 text-[10px] font-bold text-cyan-300">BLUE</p>
+                  {positions.map((position) => (
+                    <div
+                      key={`blue-${position}`}
+                      className="rounded-lg border border-cyan-300/10 bg-cyan-300/[0.05] px-2 py-1.5 text-[10px] text-white/55"
+                    >
+                      {position}
+                    </div>
+                  ))}
+                </div>
+                <div className="space-y-1.5">
+                  <p className="mb-2 text-[10px] font-bold text-rose-300">RED</p>
+                  {positions.map((position) => (
+                    <div
+                      key={`red-${position}`}
+                      className="rounded-lg border border-rose-300/10 bg-rose-300/[0.05] px-2 py-1.5 text-[10px] text-white/55"
+                    >
+                      {position}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 rounded-2xl border border-white/[0.07] bg-white/[0.025] p-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#5865F2]/15 text-[#8d96ff]">
+                <Bot className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-white">Discord 연결 준비</p>
+                <p className="mt-0.5 truncate text-[10px] text-white/35">팀 확정 후 음성 채널 자동 생성</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-3 border-t border-white/[0.07] bg-black/20">
+          {[
+            ["MODE", "자동 밸런스"],
+            ["FORMAT", "5 VS 5"],
+            ["STATUS", "참가 가능"],
+          ].map(([label, value]) => (
+            <div key={label} className="border-r border-white/[0.06] px-4 py-3 last:border-r-0 sm:px-5">
+              <p className="text-[9px] font-semibold tracking-[0.16em] text-white/25">{label}</p>
+              <p className="mt-1 truncate text-[11px] font-medium text-white/65">{value}</p>
+            </div>
           ))}
         </div>
+      </div>
+
+      <div className="absolute -bottom-5 -left-3 hidden items-center gap-3 rounded-2xl border border-white/10 bg-[#18191f]/95 px-4 py-3 shadow-2xl backdrop-blur md:flex">
+        <ShieldCheck className="h-5 w-5 text-emerald-300" />
+        <div>
+          <p className="text-[10px] text-white/35">START CHECK</p>
+          <p className="text-xs font-semibold text-white">시작 조건을 자동으로 확인 중</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function LandingContentSections() {
+  return (
+    <>
+      <section className="relative isolate overflow-hidden px-5 pb-20 pt-12 sm:px-6 md:pb-28 md:pt-20 lg:min-h-[calc(100vh-80px)] lg:py-20">
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 -z-20 bg-[radial-gradient(circle_at_15%_25%,rgba(102,126,234,0.18),transparent_32%),radial-gradient(circle_at_85%_65%,rgba(34,211,238,0.09),transparent_30%),linear-gradient(180deg,#0f0f0f_0%,#111117_100%)]"
+        />
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 -z-10 opacity-[0.06] [background-image:linear-gradient(rgba(255,255,255,0.3)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.3)_1px,transparent_1px)] [background-size:72px_72px] [mask-image:linear-gradient(to_bottom,black,transparent_90%)]"
+        />
+
+        <div className="mx-auto grid w-full max-w-[1480px] items-center gap-14 lg:grid-cols-[0.88fr_1.12fr] lg:gap-12">
+          <div className="animate-fade-in">
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5">
+              <Sparkles className="h-3.5 w-3.5 text-amber-300" />
+              <span className="text-[10px] font-semibold tracking-[0.16em] text-white/55 sm:text-xs">
+                CUSTOM MATCH OPERATIONS
+              </span>
+            </div>
+
+            <h1 className="mt-7 max-w-[760px] text-[clamp(3rem,6.4vw,6.8rem)] font-black leading-[0.98] tracking-[-0.065em] text-white">
+              내전 운영,
+              <br />
+              <span className="bg-gradient-to-r from-[#8da2ff] via-[#b89cff] to-[#70d9ec] bg-clip-text text-transparent">
+                한곳에서
+              </span>
+              <br />
+              끝까지.
+            </h1>
+
+            <p className="mt-7 max-w-xl text-base leading-7 text-white/55 sm:text-lg sm:leading-8">
+              모집부터 팀 편성, 경기 기록까지. 흩어진 내전 운영을 하나의 흐름으로 연결합니다.
+            </p>
+
+            <div className="mt-9 flex flex-col gap-3 sm:flex-row">
+              <Link
+                href="/auth/login"
+                className="group inline-flex items-center justify-center gap-2 rounded-xl bg-white px-6 py-3.5 text-sm font-bold text-[#111217] transition-transform duration-200 hover:-translate-y-0.5"
+              >
+                내전 시작하기
+                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+              </Link>
+              <Link
+                href="/tournaments"
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/12 bg-white/[0.04] px-6 py-3.5 text-sm font-semibold text-white/80 transition-colors hover:bg-white/[0.08] hover:text-white"
+              >
+                열린 내전 보기
+                <ChevronRight className="h-4 w-4" />
+              </Link>
+            </div>
+          </div>
+
+          <div className="animate-slide-up [animation-delay:120ms] [animation-fill-mode:both]">
+            <OperationBoard />
+          </div>
         </div>
       </section>
 
-      <section className="border-y border-bg-tertiary bg-bg-secondary/30 px-6 py-14 md:py-20">
-        <div className="mx-auto max-w-6xl">
-          <div className="mb-8 max-w-3xl">
-            <p className="text-sm font-semibold text-accent-primary">공개 자료</p>
-            <h2 className="mt-2 text-2xl sm:text-3xl md:text-4xl font-bold text-text-primary">
-              가입 전에 읽을 수 있는 Nexus 자료
-            </h2>
-            <p className="mt-4 text-sm md:text-lg leading-relaxed text-text-secondary">
-              처음 방문한 사용자도 서비스의 목적, 사용 방법, 운영 기준을 확인할
-              수 있도록 운영 자료를 공개합니다. 내전 참여 전에도 필요한 정보를
-              충분히 비교하고 판단할 수 있게 관련 문서를 연결했습니다.
+      <section className="border-y border-white/[0.07] bg-[#0b0c10] px-5 sm:px-6">
+        <div className="mx-auto grid max-w-[1480px] grid-cols-2 divide-x divide-white/[0.07] md:grid-cols-4">
+          {[
+            ["01", "모집과 준비"],
+            ["02", "팀 구성"],
+            ["03", "로비와 경기"],
+            ["04", "결과와 기록"],
+          ].map(([number, label]) => (
+            <div key={number} className="flex items-center gap-3 px-4 py-5 sm:px-7">
+              <span className="text-[10px] font-bold text-violet-300/70">{number}</span>
+              <span className="text-xs font-semibold text-white/55 sm:text-sm">{label}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="bg-[#efede7] px-5 py-24 text-[#151515] sm:px-6 md:py-36">
+        <div className="mx-auto max-w-[1480px]">
+          <p className="text-xs font-bold tracking-[0.18em] text-[#151515]/45">WHY NEXUS</p>
+          <p className="mt-8 max-w-[1240px] text-[clamp(2.5rem,6vw,6.6rem)] font-black leading-[1.02] tracking-[-0.065em]">
+            내전은 방을 만드는 순간이 아니라,
+            <span className="text-[#5d63d8]"> 10명이 경기를 끝내는 순간</span> 완성됩니다.
+          </p>
+          <div className="mt-12 flex flex-col justify-between gap-8 border-t border-black/15 pt-6 md:flex-row md:items-start">
+            <p className="max-w-xl text-base leading-7 text-black/55 md:text-lg">
+              NEXUS는 참가자를 모으는 게시판을 넘어, 방장이 경기 전체를 끝까지 운영할 수 있는
+              도구를 만듭니다.
+            </p>
+            <Link
+              href="/about"
+              className="group inline-flex w-fit items-center gap-3 text-sm font-bold"
+            >
+              NEXUS가 해결하는 문제
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#151515] text-white transition-transform group-hover:translate-x-1">
+                <ArrowRight className="h-4 w-4" />
+              </span>
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      <section id="operations" className="relative overflow-hidden bg-[#0f0f0f] px-5 py-24 sm:px-6 md:py-32">
+        <div
+          aria-hidden="true"
+          className="absolute left-1/2 top-0 h-[420px] w-[900px] -translate-x-1/2 rounded-full bg-violet-500/[0.08] blur-[140px]"
+        />
+        <div className="relative mx-auto max-w-[1480px]">
+          <div className="grid gap-8 lg:grid-cols-[0.72fr_1.28fr] lg:items-end">
+            <div>
+              <p className="text-xs font-bold tracking-[0.18em] text-violet-300">OPERATIONS</p>
+              <h2 className="mt-5 text-4xl font-black leading-[1.05] tracking-[-0.045em] text-white sm:text-5xl md:text-6xl">
+                진행할수록
+                <br />
+                더 명확하게.
+              </h2>
+            </div>
+            <p className="max-w-2xl text-base leading-7 text-white/45 lg:ml-auto lg:text-lg">
+              단계마다 필요한 정보와 행동만 남깁니다. 참가자는 다음에 무엇을 해야 하는지 알고,
+              방장은 무엇이 막혀 있는지 바로 확인합니다.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            {resourceLinks.map((resource) => (
-              <Link
-                key={resource.href}
-                href={resource.href}
-                className="group rounded-lg border border-bg-tertiary bg-bg-primary/80 p-5 transition-colors hover:border-accent-primary/40 hover:bg-bg-secondary"
+          <div className="mt-14 grid gap-4 lg:grid-cols-3">
+            {operations.map((operation) => (
+              <article
+                key={operation.index}
+                className="group relative min-h-[390px] overflow-hidden rounded-[28px] border border-white/[0.08] bg-[#17181d] p-7 transition-transform duration-300 hover:-translate-y-1 md:p-9"
               >
-                <div className="flex items-start gap-4">
-                  <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-accent-primary/10 text-accent-primary">
-                    <resource.icon className="h-5 w-5" />
+                <div
+                  aria-hidden="true"
+                  className={`absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t ${operation.glow} to-transparent opacity-40 transition-opacity group-hover:opacity-70`}
+                />
+                <div className="relative flex h-full flex-col">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold tracking-[0.18em] text-white/25">
+                      {operation.index}
+                    </span>
+                    <operation.icon className={`h-6 w-6 ${operation.accent}`} />
                   </div>
-                  <div className="min-w-0">
-                    <h3 className="flex items-center gap-2 text-lg font-semibold text-text-primary">
-                      {resource.title}
-                      <ArrowRight className="h-4 w-4 flex-shrink-0 transition-transform group-hover:translate-x-0.5" />
+                  <div className="mt-auto pt-24">
+                    <h3 className="text-2xl font-bold tracking-[-0.03em] text-white sm:text-3xl">
+                      {operation.title}
                     </h3>
-                    <p className="mt-2 text-sm leading-relaxed text-text-secondary">
-                      {resource.description}
+                    <p className="mt-5 text-sm leading-7 text-white/45">
+                      {operation.description}
                     </p>
                   </div>
                 </div>
-              </Link>
+              </article>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="px-6 py-16 md:py-24">
-        <div className="mx-auto max-w-6xl rounded-2xl border border-accent-primary/20 bg-accent-primary/5 p-6 md:p-10">
-          <p className="text-sm font-semibold text-accent-primary">처음이라면 이렇게 시작하세요</p>
-          <div className="mt-4 grid gap-6 md:grid-cols-[1fr_1fr_auto] md:items-end">
+      <section className="border-t border-white/[0.07] bg-[#0f0f0f] px-5 py-24 sm:px-6 md:py-32">
+        <div className="relative mx-auto max-w-[1480px] overflow-hidden rounded-[32px] border border-violet-300/15 bg-[#191a22] px-6 py-14 sm:px-10 md:px-16 md:py-20">
+          <div
+            aria-hidden="true"
+            className="absolute -right-24 -top-32 h-[420px] w-[420px] rounded-full bg-violet-500/25 blur-[100px]"
+          />
+          <div
+            aria-hidden="true"
+            className="absolute -bottom-40 left-1/3 h-[360px] w-[360px] rounded-full bg-cyan-400/10 blur-[100px]"
+          />
+          <div className="relative flex flex-col justify-between gap-10 lg:flex-row lg:items-end">
             <div>
-              <h2 className="text-2xl font-bold text-text-primary">먼저 운영 기준을 정하고, 방을 열어 보세요.</h2>
-              <p className="mt-3 text-sm leading-relaxed text-text-secondary">팀 구성 방식과 시작 조건이 익숙하지 않다면 운영 자료실에서 상황별 체크리스트를 확인할 수 있습니다.</p>
+              <p className="text-xs font-bold tracking-[0.18em] text-violet-300">READY TO HOST</p>
+              <h2 className="mt-5 max-w-4xl text-4xl font-black leading-[1.04] tracking-[-0.05em] text-white sm:text-5xl md:text-6xl">
+                다음 내전은 채팅방이 아니라
+                <br className="hidden sm:block" /> NEXUS에서 시작하세요.
+              </h2>
             </div>
-            <div className="flex flex-wrap gap-3">
-              <Link href="/resources" className="rounded-lg border border-bg-tertiary bg-bg-secondary px-4 py-2.5 text-sm font-semibold text-text-primary transition-colors hover:bg-bg-elevated">운영 자료실</Link>
-              <Link href="/guide" className="rounded-lg border border-bg-tertiary bg-bg-secondary px-4 py-2.5 text-sm font-semibold text-text-primary transition-colors hover:bg-bg-elevated">기능 가이드</Link>
-            </div>
-            <Link href="/auth/login" className="inline-flex items-center justify-center gap-2 rounded-lg bg-accent-primary px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-accent-hover">내전 시작하기 <ArrowRight className="h-4 w-4" /></Link>
+            <Link
+              href="/auth/login"
+              className="group inline-flex flex-shrink-0 items-center justify-center gap-3 rounded-xl bg-white px-6 py-4 text-sm font-bold text-[#111217] transition-transform hover:-translate-y-0.5"
+            >
+              무료로 시작하기
+              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+            </Link>
           </div>
         </div>
       </section>
 
-      <section className="px-6 pb-12">
+      <section className="bg-[#0f0f0f] px-5 pb-12 sm:px-6">
         <div className="mx-auto max-w-4xl">
           <AdSlotCard slotKey="landingMid" minHeight={120} />
         </div>
       </section>
-
     </>
   );
 }
 
 export function LandingFooter() {
   return (
-    <footer className="border-t border-bg-tertiary bg-bg-secondary px-6 py-8">
-      <div className="mx-auto flex max-w-6xl flex-col gap-5 text-sm text-text-tertiary">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+    <footer className="border-t border-white/[0.07] bg-[#0b0c10] px-5 py-10 sm:px-6">
+      <div className="mx-auto flex max-w-[1480px] flex-col gap-7 text-sm text-white/35">
+        <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
           <div>
-            <p className="font-semibold text-text-secondary">Project Nexus</p>
-            <p className="mt-1 text-xs leading-relaxed">
-              롤 내전 운영, 전적 기록, 스크림 준비를 돕는 커뮤니티 플랫폼입니다.
+            <Logo size="sm" />
+            <p className="mt-3 max-w-md text-xs leading-5 text-white/30">
+              롤 내전을 만들고, 진행하고, 기록하는 운영 플랫폼입니다.
             </p>
           </div>
-          <nav className="flex flex-wrap gap-x-4 gap-y-2">
+          <nav className="flex flex-wrap gap-x-5 gap-y-2">
             {footerLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className="hover:text-text-secondary transition-colors"
-              >
+              <Link key={link.href} href={link.href} className="transition-colors hover:text-white/70">
                 {link.label}
               </Link>
             ))}
           </nav>
         </div>
-        <p className="text-xs leading-relaxed text-text-tertiary/70">
-          Project Nexus isn&apos;t endorsed by Riot Games and doesn&apos;t reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. League of Legends and Riot Games are trademarks or registered trademarks of Riot Games, Inc.
+        <p className="border-t border-white/[0.06] pt-6 text-[11px] leading-5 text-white/20">
+          Project Nexus isn&apos;t endorsed by Riot Games and doesn&apos;t reflect the views or opinions
+          of Riot Games or anyone officially involved in producing or managing Riot Games properties.
+          League of Legends and Riot Games are trademarks or registered trademarks of Riot Games, Inc.
         </p>
       </div>
     </footer>
   );
 }
 
-export default function LandingContent() {
-  return (
-    <main className="flex min-h-screen flex-col bg-bg-primary">
-      <LandingHeader />
-      <LandingContentSections />
-      <LandingFooter />
-    </main>
-  );
-}
-
 function LandingHeader() {
   return (
-    <header className="sticky top-0 z-40 border-b border-bg-tertiary bg-bg-primary/95 backdrop-blur supports-[backdrop-filter]:bg-bg-primary/85">
-      <div className="mx-auto flex h-20 max-w-6xl items-center gap-2 px-4 md:gap-4 md:px-6">
-        <Link
-          href="/"
-          className="flex flex-shrink-0 items-center"
-          aria-label="Nexus 홈"
-        >
+    <header className="sticky top-0 z-40 border-b border-white/[0.07] bg-[#0f0f0f]/90 backdrop-blur-xl">
+      <div className="mx-auto flex h-20 max-w-[1480px] items-center gap-3 px-5 sm:px-6 md:gap-5">
+        <Link href="/" className="flex flex-shrink-0 items-center" aria-label="Nexus 홈">
           <Logo size="sm" />
         </Link>
 
-        <nav
-          aria-label="랜딩 페이지 주요 메뉴"
-          className="hidden min-w-0 flex-1 md:block"
-        >
-          <div className="flex items-center justify-center gap-1 px-1">
+        <nav aria-label="랜딩 페이지 주요 메뉴" className="hidden min-w-0 flex-1 md:block">
+          <div className="flex items-center justify-center gap-1">
             {landingNavLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
-                className="rounded-lg px-3 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-bg-tertiary hover:text-text-primary"
+                className="rounded-lg px-3 py-2 text-sm font-medium text-white/45 transition-colors hover:bg-white/[0.05] hover:text-white"
               >
                 {link.label}
               </Link>
@@ -318,17 +459,26 @@ function LandingHeader() {
           </div>
         </nav>
 
-        <div className="flex flex-1 items-center justify-end gap-2 md:flex-none">
+        <div className="ml-auto flex items-center gap-2">
           <Link
             href="/auth/login"
-            className="flex-shrink-0 rounded-lg bg-accent-primary px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-accent-hover md:px-4"
+            className="flex-shrink-0 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-[#111217] transition-colors hover:bg-white/90"
           >
             시작하기
           </Link>
-          {/* 모바일 전용 햄버거 — 데스크톱 nav가 숨겨지는 <md에서 전체 링크 노출 */}
           <LandingMobileNav links={landingNavLinks} />
         </div>
       </div>
     </header>
+  );
+}
+
+export default function LandingContent() {
+  return (
+    <main className="min-h-screen overflow-x-clip bg-[#0f0f0f]">
+      <LandingHeader />
+      <LandingContentSections />
+      <LandingFooter />
+    </main>
   );
 }

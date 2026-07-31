@@ -45,6 +45,7 @@ export function PostListFilters({ popularTags }: PostListFiltersProps) {
           <Input
             ref={searchInputRef}
             type="text"
+            aria-label="게시글 검색"
             placeholder="제목, 내용, 작성자 검색... (/ 또는 Ctrl+K)"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}

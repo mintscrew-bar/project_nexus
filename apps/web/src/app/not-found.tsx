@@ -4,10 +4,13 @@ export default function NotFound() {
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] px-4">
       <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-8 max-w-md w-full text-center">
-        <div className="text-6xl font-bold text-accent-primary mb-2">404</div>
-        <h2 className="text-xl font-bold text-text-primary mb-2">
+        {/* 404 숫자는 장식이므로 aria-hidden, 실제 제목은 h1로 노출한다 */}
+        <div className="text-6xl font-bold text-accent-primary mb-2" aria-hidden="true">
+          404
+        </div>
+        <h1 className="text-xl font-bold text-text-primary mb-2">
           페이지를 찾을 수 없습니다
-        </h2>
+        </h1>
         <p className="text-text-secondary text-sm mb-6">
           요청하신 페이지가 존재하지 않거나 이동되었습니다.
         </p>
