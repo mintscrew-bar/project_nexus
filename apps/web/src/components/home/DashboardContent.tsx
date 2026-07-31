@@ -906,11 +906,6 @@ export function DashboardContent() {
 
   return (
     <div className="space-y-6">
-      {/* 배너 — 개별 배너 crash 시 전체 대시보드 보호 */}
-      <ErrorBoundary>
-        <BannerCarousel />
-      </ErrorBoundary>
-
       {/* 내 전적 */}
       <MyStatsCard
         stats={userStats}
@@ -927,6 +922,11 @@ export function DashboardContent() {
         <PopularPostsCard posts={popularPosts} />
         <NoticePostsCard posts={noticePosts} />
       </div>
+
+      {/* 프로모션은 핵심 작업을 방해하지 않도록 대시보드 하단에 배치한다. */}
+      <ErrorBoundary>
+        <BannerCarousel />
+      </ErrorBoundary>
     </div>
   );
 }
