@@ -7,7 +7,7 @@ import {
   QUEUE_TABS,
   getChampionIcon,
   getQueueTypeName,
-  getSummonerSpellName,
+  getSummonerSpellIcon,
   calculateTimeAgo,
 } from "./match-utils";
 import { getDdragonVersion, itemIconUrl, runeIconUrl, fallbackTo } from "@/lib/ddragon";
@@ -287,7 +287,7 @@ export default function RiotMatchList({
                       {/* 데스크탑: 소환사 주문 + 룬 (sm 이상) */}
                       <div className="hidden sm:flex gap-0.5 items-center mt-1">
                         <Image
-                          src={`/icons/spells/Summoner${getSummonerSpellName(participant.summoner1Id)}.png`}
+                          src={getSummonerSpellIcon(participant.summoner1Id)}
                           alt="spell1"
                           width={14}
                           height={14}
@@ -296,7 +296,7 @@ export default function RiotMatchList({
                           onError={(e) => { e.currentTarget.style.opacity = '0.3'; }}
                         />
                         <Image
-                          src={`/icons/spells/Summoner${getSummonerSpellName(participant.summoner2Id)}.png`}
+                          src={getSummonerSpellIcon(participant.summoner2Id)}
                           alt="spell2"
                           width={14}
                           height={14}
@@ -606,7 +606,7 @@ export default function RiotMatchList({
                                 <div className="hidden lg:flex gap-0.5">
                                   <div className="flex flex-col gap-0.5">
                                     <Image
-                                      src={`/icons/spells/Summoner${getSummonerSpellName(p.summoner1Id)}.png`}
+                                      src={getSummonerSpellIcon(p.summoner1Id)}
                                       alt="spell1"
                                       width={20}
                                       height={20}
@@ -614,7 +614,7 @@ export default function RiotMatchList({
                                       onError={(e) => { e.currentTarget.style.opacity = '0.3'; }}
                                     />
                                     <Image
-                                      src={`/icons/spells/Summoner${getSummonerSpellName(p.summoner2Id)}.png`}
+                                      src={getSummonerSpellIcon(p.summoner2Id)}
                                       alt="spell2"
                                       width={20}
                                       height={20}
@@ -747,7 +747,7 @@ export default function RiotMatchList({
                               {/* 소환사 주문 */}
                               <div className="flex gap-0.5 items-center flex-shrink-0">
                                 <Image
-                                  src={`/icons/spells/Summoner${getSummonerSpellName(p.summoner1Id)}.png`}
+                                  src={getSummonerSpellIcon(p.summoner1Id)}
                                   alt="spell1"
                                   width={16}
                                   height={16}
@@ -755,7 +755,7 @@ export default function RiotMatchList({
                                   onError={(e) => { e.currentTarget.style.opacity = '0.3'; }}
                                 />
                                 <Image
-                                  src={`/icons/spells/Summoner${getSummonerSpellName(p.summoner2Id)}.png`}
+                                  src={getSummonerSpellIcon(p.summoner2Id)}
                                   alt="spell2"
                                   width={16}
                                   height={16}

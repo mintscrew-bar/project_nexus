@@ -268,47 +268,33 @@ export function getPerkName(perkId: number): string {
   return PERK_NAMES[perkId] ?? String(perkId);
 }
 
-export function getSummonerSpellIcon(spellId: number): string {
-  const spellMap: Record<number, string> = {
-    1: "SummonerBoost",
-    3: "SummonerExhaust",
-    4: "SummonerFlash",
-    6: "SummonerHaste",
-    7: "SummonerHeal",
-    11: "SummonerSmite",
-    12: "SummonerTeleport",
-    13: "SummonerMana",
-    14: "SummonerDot",
-    21: "SummonerBarrier",
-    30: "SummonerPoroRecall",
-    31: "SummonerPoroThrow",
-    32: "SummonerSnowball",
-    39: "SummonerUltBookSmitePlaceholder",
-  };
-  const spellName = spellMap[spellId] || "SummonerFlash";
-  return `/icons/spells/${spellName}.png`;
-}
+// 소환사 주문 ID → Data Dragon 아이콘 파일명.
+// 파일명은 Data Dragon 16.15.1 기준이며 public/icons/spells 에 있는 파일과 1:1로 대응한다.
+// (packages/types의 SUMMONER_SPELL_MAPPINGS와 동일한 ID 체계를 쓴다)
+const SUMMONER_SPELL_ICONS: Record<number, string> = {
+  1: "SummonerBoost",
+  3: "SummonerExhaust",
+  4: "SummonerFlash",
+  6: "SummonerHaste",
+  7: "SummonerHeal",
+  11: "SummonerSmite",
+  12: "SummonerTeleport",
+  13: "SummonerMana",
+  14: "SummonerDot",
+  21: "SummonerBarrier",
+  30: "SummonerPoroRecall",
+  31: "SummonerPoroThrow",
+  32: "SummonerSnowball",
+  39: "SummonerSnowURFSnowball_Mark", // 눈보라 URF 표식
+  54: "Summoner_UltBookPlaceholder", // 궁 주문서 자리 채움
+  55: "Summoner_UltBookSmitePlaceholder", // 궁 주문서 자리 채움(강타)
+  2201: "SummonerCherryHold", // 아레나 전용 이동기
+  2202: "SummonerCherryFlash", // 아레나 전용 점멸
+};
 
-export function getSummonerSpellName(spellId: number): string {
-  const spellMap: Record<number, string> = {
-    1: "Boost",
-    3: "Exhaust",
-    4: "Flash",
-    6: "Haste",
-    7: "Heal",
-    11: "Smite",
-    12: "Teleport",
-    13: "Mana",
-    14: "Dot",
-    21: "Barrier",
-    30: "PoroRecall",
-    31: "PoroThrow",
-    32: "Snowball",
-    39: "UltBook",
-    54: "Summoner_UltBookSmitePlaceholder",
-    55: "Summoner_UltBookFlashPlaceholder",
-  };
-  return spellMap[spellId] || "Flash";
+export function getSummonerSpellIcon(spellId: number): string {
+  const spellName = SUMMONER_SPELL_ICONS[spellId] || "SummonerFlash";
+  return `/icons/spells/${spellName}.png`;
 }
 
 export function calculateTimeAgo(timestamp: number): string {
