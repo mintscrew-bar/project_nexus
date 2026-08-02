@@ -119,14 +119,8 @@ export default function AboutPage() {
               href="/guide"
               className="inline-flex items-center gap-2 rounded-lg bg-accent-primary px-5 py-2.5 font-semibold text-white transition-colors hover:bg-accent-hover"
             >
-              사용법 보기
+              가이드 · 운영 자료
               <ArrowRight className="h-4 w-4" />
-            </Link>
-            <Link
-              href="/resources"
-              className="inline-flex items-center gap-2 rounded-lg bg-bg-tertiary px-5 py-2.5 font-semibold text-text-primary transition-colors hover:bg-bg-elevated"
-            >
-              운영 자료실
             </Link>
           </div>
         </header>

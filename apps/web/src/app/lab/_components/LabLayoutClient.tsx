@@ -190,7 +190,7 @@ export default function LabLayoutClient({ children }: { children: React.ReactNod
             </div>
 
             {/* 탭 네비게이션 */}
-            <nav className="-mx-1 flex items-center gap-2 overflow-x-auto px-1 pb-1 scrollbar-none">
+            <nav className="scrollbar-none -mx-1 flex max-w-full items-center gap-1 overflow-x-auto rounded-2xl border border-bg-elevated bg-bg-tertiary p-1.5" aria-label="실험실 분석 메뉴">
               {LAB_TABS.map((tab) => {
                 const unlocked = isTabUnlocked(tab.href);
                 // /lab/champions/[id] 등 하위 라우트에서도 탭이 활성화되도록
@@ -202,10 +202,11 @@ export default function LabLayoutClient({ children }: { children: React.ReactNod
                   <Link
                     key={tab.href}
                     href={`${tab.href}?period=${activePeriod}`}
-                    className={`shrink-0 rounded-xl px-3 py-2 text-sm font-semibold transition-colors ${
+                    aria-current={isActive ? "page" : undefined}
+                    className={`shrink-0 rounded-xl border px-3.5 py-2 text-sm font-semibold transition-all duration-200 ${
                       isActive
-                        ? "bg-accent-primary/20 text-accent-primary"
-                        : "bg-bg-primary/60 text-text-secondary hover:bg-bg-elevated"
+                        ? "border-accent-primary/30 bg-bg-secondary text-accent-primary shadow-sm"
+                        : "border-transparent text-text-secondary hover:-translate-y-px hover:border-bg-elevated hover:bg-bg-elevated/60 hover:text-text-primary"
                     }`}
                   >
                     {tab.label}
@@ -213,7 +214,7 @@ export default function LabLayoutClient({ children }: { children: React.ReactNod
                 ) : (
                   <span
                     key={tab.href}
-                    className="flex shrink-0 cursor-not-allowed items-center gap-1 rounded-xl bg-bg-primary/60 px-3 py-2 text-sm font-semibold text-text-tertiary opacity-50"
+                    className="flex shrink-0 cursor-not-allowed items-center gap-1 rounded-xl border border-transparent px-3.5 py-2 text-sm font-semibold text-text-tertiary opacity-45"
                   >
                     {tab.label}
                     <Badge variant="secondary" size="sm">

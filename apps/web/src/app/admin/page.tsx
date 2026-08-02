@@ -113,20 +113,21 @@ export default function AdminPage() {
   return (
     <div className="flex flex-col md:flex-row h-[calc(100vh-64px)]">
       {/* 사이드바 — 모바일에서는 상단 가로 스크롤 탭바, 데스크톱에서는 세로 사이드바 */}
-      <aside className="md:w-48 flex-shrink-0 border-b md:border-b-0 md:border-r border-bg-tertiary bg-bg-secondary flex flex-col">
-        <div className="hidden md:flex items-center gap-2 px-4 py-4 border-b border-bg-tertiary">
+      <aside className="flex flex-shrink-0 flex-col border-b border-bg-tertiary bg-bg-secondary md:w-52 md:border-b-0 md:border-r">
+        <div className="hidden items-center gap-2 border-b border-bg-tertiary/80 px-4 py-4 md:flex">
           <Shield className="h-5 w-5 text-accent-primary" />
           <span className="font-bold text-text-primary text-sm">관리자 패널</span>
         </div>
-        <nav className="flex md:flex-col md:flex-1 overflow-x-auto md:overflow-x-visible scrollbar-none py-1 md:py-2">
+        <nav className="scrollbar-none flex gap-1 overflow-x-auto p-1.5 md:flex-1 md:flex-col md:overflow-x-visible md:p-2" aria-label="관리자 메뉴">
           {visibleTabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => handleTabChange(tab.id)}
-              className={`flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors whitespace-nowrap flex-shrink-0 md:w-full ${
+              aria-current={activeTab === tab.id ? "page" : undefined}
+              className={`flex flex-shrink-0 items-center gap-2.5 whitespace-nowrap rounded-xl border px-4 py-2.5 text-sm transition-all duration-200 md:w-full ${
                 activeTab === tab.id
-                  ? "bg-accent-primary/10 text-accent-primary font-medium border-b-2 md:border-b-0 border-accent-primary"
-                  : "text-text-secondary hover:bg-bg-tertiary hover:text-text-primary"
+                  ? "border-accent-primary/30 bg-bg-tertiary font-semibold text-accent-primary"
+                  : "border-transparent text-text-secondary hover:-translate-y-px hover:border-bg-elevated hover:bg-bg-tertiary/70 hover:text-text-primary md:hover:translate-y-0 md:hover:translate-x-0.5"
               }`}
             >
               {tab.icon}
