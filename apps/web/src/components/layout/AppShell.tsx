@@ -41,6 +41,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   // 푸터 숨김 라우트 (대시보드성 페이지들: 자체적인 액션바나 스크롤 관리가 필요한 경우)
   const isTournamentLobbyRoute = /^\/tournaments\/[^/]+\/lobby(?:\/|$)/.test(pathname);
+  const isTournamentListRoute = pathname === '/tournaments';
+  const isGuideRoute = pathname.startsWith('/guide');
   const isDashboardRoute =
     isTournamentLobbyRoute ||
     pathname.startsWith('/auction/') ||
@@ -58,7 +60,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <>
       <Header />
       <main className="flex flex-grow min-h-0">
-        {!isDashboardRoute && <Sidebar />}
+        {!isDashboardRoute && !isTournamentListRoute && !isGuideRoute && <Sidebar />}
         <div className="flex flex-col flex-grow min-h-0 bg-bg-primary overflow-hidden">
           {showCreatorPromo && <CreatorPromoStrip />}
           {/*

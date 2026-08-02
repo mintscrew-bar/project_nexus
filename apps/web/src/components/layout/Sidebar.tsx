@@ -11,7 +11,6 @@ import { useQuery } from '@tanstack/react-query';
 import { MatchesSidebarContent } from './sidebar/MatchesSidebarContent';
 import { CommunitySidebarContent } from './sidebar/CommunitySidebarContent';
 import { ClansSidebarContent } from './sidebar/ClansSidebarContent';
-import { GuideSidebarContent } from './sidebar/GuideSidebarContent';
 
 interface Room {
   id: string;
@@ -51,12 +50,11 @@ export function Sidebar() {
   const isMatchesRoute = pathname.startsWith('/matches');
   const isCommunityRoute = pathname.startsWith('/community');
   const isClansRoute = pathname.startsWith('/clans');
-  const isGuideRoute = pathname === '/guide';
   const getParticipantCount = (room: Room) =>
     room.participantCount ?? room.participants?.length ?? room.currentParticipants ?? 0;
 
   return (
-    <aside className="w-64 bg-bg-secondary border-r border-bg-tertiary p-4 hidden md:block flex-shrink-0 sticky top-16 self-start h-[calc(100vh-4rem)] overflow-y-auto">
+    <aside className="sticky top-16 hidden h-[calc(100vh-4rem)] w-64 flex-shrink-0 self-start overflow-y-auto border-r border-bg-tertiary bg-bg-secondary p-4 md:block">
       {/* 페이지별 맞춤 사이드바 */}
       {isMatchesRoute ? (
         <MatchesSidebarContent />
@@ -64,8 +62,6 @@ export function Sidebar() {
         <CommunitySidebarContent />
       ) : isClansRoute ? (
         <ClansSidebarContent />
-      ) : isGuideRoute ? (
-        <GuideSidebarContent />
       ) : (
         <>
           {/* Quick Actions */}
@@ -77,10 +73,10 @@ export function Sidebar() {
               <Link
                 href="/tournaments"
                 className={cn(
-                  'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors duration-150',
+                  'flex items-center gap-3 rounded-xl border px-3 py-2.5 transition-all duration-200',
                   isActive('/tournaments')
-                    ? 'bg-accent-primary/10 text-accent-primary'
-                    : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary'
+                    ? 'border-accent-primary/25 bg-bg-tertiary text-accent-primary'
+                    : 'border-transparent text-text-secondary hover:border-bg-elevated hover:bg-bg-tertiary/70 hover:text-text-primary'
                 )}
               >
                 <Swords className="h-4 w-4" />
@@ -89,7 +85,7 @@ export function Sidebar() {
               {isAuthenticated && (
                 <Link
                   href="/tournaments?create=true"
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-text-secondary hover:text-text-primary hover:bg-bg-tertiary transition-colors duration-150"
+                  className="flex items-center gap-3 rounded-xl border border-transparent px-3 py-2.5 text-text-secondary transition-all duration-200 hover:border-bg-elevated hover:bg-bg-tertiary/70 hover:text-text-primary"
                 >
                   <Plus className="h-4 w-4" />
                   <span className="font-medium">방 만들기</span>
@@ -98,10 +94,10 @@ export function Sidebar() {
               <Link
                 href="/matches"
                 className={cn(
-                  'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors duration-150',
+                  'flex items-center gap-3 rounded-xl border px-3 py-2.5 transition-all duration-200',
                   isActive('/matches')
-                    ? 'bg-accent-primary/10 text-accent-primary'
-                    : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary'
+                    ? 'border-accent-primary/25 bg-bg-tertiary text-accent-primary'
+                    : 'border-transparent text-text-secondary hover:border-bg-elevated hover:bg-bg-tertiary/70 hover:text-text-primary'
                 )}
               >
                 <Trophy className="h-4 w-4" />
