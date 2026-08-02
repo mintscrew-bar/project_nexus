@@ -11,11 +11,8 @@ export function Footer() {
             <Link href="/about" className="hover:text-text-secondary transition-colors duration-150">
               서비스 소개
             </Link>
-            <Link href="/resources" className="hover:text-text-secondary transition-colors duration-150">
-              자료실
-            </Link>
             <Link href="/guide" className="hover:text-text-secondary transition-colors duration-150">
-              이용 가이드
+              가이드 · 자료
             </Link>
             <Link href="/community" className="hover:text-text-secondary transition-colors duration-150">
               커뮤니티
