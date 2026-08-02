@@ -59,6 +59,10 @@ docker-compose.override.yml
 # Windows artifacts
 nul
 
+# 로컬 확인용 스크린샷 산출물
+main-page-full.png
+room-card-preview.png
+
 # Actions Runner & Backups
 actions-runner/
 actions-runner.bak.*
