@@ -2,8 +2,8 @@
 
 import React from 'react';
 import { Card, CardContent, CardFooter, Badge } from '@/components/ui';
-import { TierBadge } from './TierBadge';
 import { cn, getRelativeTime } from '@/lib/utils';
+import { ArrowRight, ArrowLeftRight, Eye, EyeOff, Gavel, ListOrdered, LockKeyhole, Scale, Server, Users } from 'lucide-react';
 
 interface Room {
   id: string;
@@ -16,8 +16,8 @@ interface Room {
   status: 'WAITING' | 'IN_PROGRESS' | 'COMPLETED' | 'DRAFT' | 'DRAFT_COMPLETED' | 'TEAM_SELECTION' | 'ROLE_SELECTION';
   teamMode: 'AUCTION' | 'SNAKE_DRAFT' | 'AUTO_BALANCE' | 'MANUAL_TEAM';
   createdAt: string;
-  minTier?: string;
-  maxTier?: string;
+  discordGuildId?: string | null;
+  allowSpectators?: boolean;
   participants?: any[];
 }
 
@@ -56,87 +56,135 @@ const getStatusBadge = (status: string) => {
   }
 };
 
+const getModeIcon = (mode: Room['teamMode']) => {
+  switch (mode) {
+    case 'AUCTION':
+      return Gavel;
+    case 'SNAKE_DRAFT':
+      return ListOrdered;
+    case 'AUTO_BALANCE':
+      return Scale;
+    default:
+      return ArrowLeftRight;
+  }
+};
+
 export const RoomCard: React.FC<RoomCardProps> = ({ room, currentUserId, onClick, className }) => {
-  const currentPlayers = room.participants?.length || 0;
+  const currentPlayers = (room.participants ?? []).filter(
+    (participant: any) => participant.role !== 'SPECTATOR'
+  ).length;
   const isFull = currentPlayers >= room.maxParticipants;
   const isParticipant =
     !!currentUserId && (room.participants ?? []).some((p: any) => p.userId === currentUserId);
   const canJoin = room.status === 'WAITING' && !isFull;
   const canEnter = canJoin || isParticipant;
+  const ModeIcon = getModeIcon(room.teamMode);
+  const occupancy = Math.max(
+    0,
+    Math.min(100, (currentPlayers / Math.max(room.maxParticipants, 1)) * 100)
+  );
 
   return (
     <Card
       hoverable={canEnter}
       onClick={canEnter ? onClick : undefined}
       className={cn(
-        'transition-all duration-150',
-        !canEnter && 'opacity-60 cursor-not-allowed',
+        'group relative flex h-full flex-col overflow-hidden rounded-2xl border-bg-tertiary/45 bg-bg-secondary p-0 shadow-[0_8px_24px_rgb(0_0_0/0.10)] transition-all duration-200',
+        canEnter && 'hover:-translate-y-1 hover:border-accent-primary/30 hover:shadow-[0_18px_42px_rgb(0_0_0/0.20)]',
+        !canEnter && 'opacity-70 cursor-not-allowed',
         className
       )}
     >
-      <CardContent>
+      <div
+        aria-hidden="true"
+        className="absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-accent-primary/50 to-transparent opacity-0 transition-opacity group-hover:opacity-100"
+      />
+
+      <CardContent className="flex-1 p-5 sm:p-6">
         {/* Header */}
-        <div className="flex items-start justify-between mb-3">
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-1">
-              <h3 className="text-lg font-semibold text-text-primary">{room.name}</h3>
-              {room.isPrivate && <span className="text-accent-warning">🔒</span>}
+        <div className="mb-6 flex items-start justify-between gap-5">
+          <div className="flex min-w-0 items-start gap-3.5">
+            <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-accent-primary/[0.09] text-accent-primary shadow-[inset_0_1px_0_rgb(255_255_255/0.04)]">
+              <ModeIcon className="h-4 w-4" />
+            </span>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h3 className="truncate text-base font-bold tracking-[-0.02em] text-text-primary md:text-lg">
+                  {room.name}
+                </h3>
+                {room.isPrivate && <LockKeyhole className="h-3.5 w-3.5 flex-shrink-0 text-accent-warning" />}
+              </div>
+              <p className="mt-1.5 truncate text-xs text-text-tertiary">
+                {room.host?.username || room.hostName || `User ${room.hostId.slice(0, 8)}`} 방장 · {getRelativeTime(room.createdAt)}
+              </p>
             </div>
-            <p className="text-sm text-text-secondary">
-              방장: {room.host?.username || room.hostName || `User ${room.hostId.slice(0, 8)}`}
-            </p>
           </div>
-          {getStatusBadge(room.status)}
+          <div className="flex-shrink-0">{getStatusBadge(room.status)}</div>
         </div>
 
         {/* Room Info */}
-        <div className="grid grid-cols-2 gap-3 mb-3">
-          <div>
-            <p className="text-xs text-text-tertiary mb-1">게임 모드</p>
-            <Badge variant="primary" size="sm">
-              {getModeLabel(room.teamMode)}
-            </Badge>
+        <div className="grid grid-cols-3 gap-3">
+          <div className="rounded-xl border border-bg-elevated/30 bg-bg-elevated/20 px-3.5 py-4">
+            <p className="mb-2.5 text-[10px] font-semibold tracking-[0.1em] text-text-tertiary">MODE</p>
+            <p className="truncate text-xs font-semibold text-text-secondary">{getModeLabel(room.teamMode)}</p>
           </div>
-          <div>
-            <p className="text-xs text-text-tertiary mb-1">인원</p>
-            <Badge
-              variant={isFull ? 'danger' : 'success'}
-              size="sm"
-            >
-              {currentPlayers}/{room.maxParticipants}명
-            </Badge>
+          <div className="rounded-xl border border-bg-elevated/30 bg-bg-elevated/20 px-3.5 py-4">
+            <div className="mb-2.5 flex items-center gap-1.5 text-text-tertiary">
+              <Server className="h-3 w-3" />
+              <p className="text-[10px] font-semibold tracking-[0.1em]">생성 서버</p>
+            </div>
+            <p className="truncate text-xs font-semibold text-text-secondary">
+              {room.discordGuildId ? 'Discord 서버' : '넥서스 서버'}
+            </p>
+          </div>
+          <div className="rounded-xl border border-bg-elevated/30 bg-bg-elevated/20 px-3.5 py-4">
+            <div className="mb-2.5 flex items-center gap-1.5 text-text-tertiary">
+              {room.allowSpectators === false ? (
+                <EyeOff className="h-3 w-3" />
+              ) : (
+                <Eye className="h-3 w-3" />
+              )}
+              <p className="text-[10px] font-semibold tracking-[0.1em]">관전 허용</p>
+            </div>
+            <p className={cn(
+              'truncate text-xs font-semibold',
+              room.allowSpectators === false ? 'text-text-tertiary' : 'text-accent-success'
+            )}>
+              {room.allowSpectators === false ? '비허용' : '허용'}
+            </p>
           </div>
         </div>
-
-        {/* Tier Range */}
-        {(room.minTier || room.maxTier) && (
-          <div className="mb-3">
-            <p className="text-xs text-text-tertiary mb-1">티어 제한</p>
-            <div className="flex items-center gap-2">
-              {room.minTier && <TierBadge tier={room.minTier} size="sm" />}
-              {room.minTier && room.maxTier && (
-                <span className="text-text-tertiary">~</span>
-              )}
-              {room.maxTier && <TierBadge tier={room.maxTier} size="sm" />}
-            </div>
-          </div>
-        )}
       </CardContent>
 
-      <CardFooter className="border-t border-bg-tertiary pt-3">
-        <p className="text-xs text-text-tertiary">
-          {getRelativeTime(room.createdAt)}
-        </p>
-        {canJoin && (
-          <div className="ml-auto">
-            <span className="text-sm text-accent-primary font-medium">
-              참가 가능 →
+      <CardFooter className="m-0 border-t border-bg-tertiary/35 bg-bg-primary/10 px-5 py-4 sm:px-6 sm:py-5">
+        <div className="min-w-0">
+          <div className="flex w-28 max-w-full items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 text-text-tertiary">
+              <Users className="h-3 w-3" />
+              <p className="text-[10px] font-semibold tracking-[0.1em]">참가 인원</p>
+            </div>
+            <span className={cn('flex-none text-xs font-bold tabular-nums', isFull ? 'text-accent-danger' : 'text-accent-success')}>
+              {currentPlayers}/{room.maxParticipants}
             </span>
+          </div>
+          <div className="mt-2.5 h-1 w-28 max-w-full overflow-hidden rounded-full bg-bg-elevated">
+            <div
+              className={cn('h-full rounded-full', isFull ? 'bg-accent-danger' : 'bg-accent-success')}
+              style={{ width: `${occupancy}%` }}
+            />
+          </div>
+        </div>
+        {canJoin && (
+          <div className="ml-auto flex items-center gap-1.5">
+            <Users className="h-3.5 w-3.5 text-accent-primary" />
+            <span className="text-xs font-semibold text-accent-primary">참가 가능</span>
+            <ArrowRight className="h-3.5 w-3.5 text-accent-primary transition-transform group-hover:translate-x-1" />
           </div>
         )}
         {!canJoin && isParticipant && (
-          <div className="ml-auto">
-            <span className="text-sm text-accent-primary font-medium">재입장</span>
+          <div className="ml-auto flex items-center gap-1.5">
+            <span className="text-xs font-semibold text-accent-primary">재입장</span>
+            <ArrowRight className="h-3.5 w-3.5 text-accent-primary transition-transform group-hover:translate-x-1" />
           </div>
         )}
       </CardFooter>

@@ -59,34 +59,38 @@ export function SkeletonCard({ className }: { className?: string }) {
 
 export function RoomCardSkeleton({ className }: { className?: string }) {
   return (
-    <div className={cn('bg-bg-secondary border border-bg-tertiary rounded-xl', className)}>
-      <div className="p-4 space-y-3">
-        {/* Header */}
-        <div className="flex items-start justify-between">
-          <div className="flex-1 space-y-2">
-            <Skeleton className="h-6 w-3/4" />
-            <Skeleton className="h-4 w-1/2" />
+    <div className={cn('flex h-full flex-col overflow-hidden rounded-2xl border border-bg-tertiary/45 bg-bg-secondary shadow-[0_8px_24px_rgb(0_0_0/0.10)]', className)}>
+      <div className="flex-1 p-5 sm:p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex min-w-0 flex-1 items-start gap-3">
+            <Skeleton className="h-10 w-10 flex-none rounded-xl" />
+            <div className="min-w-0 flex-1 space-y-2">
+              <Skeleton className="h-5 w-3/4" />
+              <Skeleton className="h-3 w-1/2" />
+            </div>
           </div>
           <Skeleton className="h-6 w-16 rounded-full" />
         </div>
 
-        {/* Info Grid */}
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1">
-            <Skeleton className="h-3 w-12" />
-            <Skeleton className="h-5 w-16 rounded-full" />
-          </div>
-          <div className="space-y-1">
-            <Skeleton className="h-3 w-8" />
-            <Skeleton className="h-5 w-14 rounded-full" />
-          </div>
+        <div className="mt-6 grid grid-cols-3 gap-3">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <div key={index} className="min-w-0 space-y-2.5 rounded-xl border border-bg-elevated/30 bg-bg-elevated/20 px-3.5 py-4">
+              <Skeleton className="h-3 w-12" />
+              <Skeleton className="h-4 w-16 max-w-full" />
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* Footer */}
-      <div className="px-4 py-3 border-t border-bg-tertiary flex justify-between items-center">
-        <Skeleton className="h-3 w-20" />
-        <Skeleton className="h-4 w-16" />
+      <div className="flex items-center border-t border-bg-tertiary/35 bg-bg-primary/10 px-5 py-4 sm:px-6 sm:py-5">
+        <div className="w-28 max-w-full space-y-2">
+          <div className="flex items-center justify-between">
+            <Skeleton className="h-3 w-14" />
+            <Skeleton className="h-3 w-8" />
+          </div>
+          <Skeleton className="h-1 w-28 max-w-full rounded-full" />
+        </div>
+        <Skeleton className="ml-auto h-4 w-16" />
       </div>
     </div>
   );

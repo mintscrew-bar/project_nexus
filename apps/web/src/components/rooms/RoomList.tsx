@@ -6,15 +6,15 @@ import { useAuthStore } from "@/stores/auth-store";
 import { roomApi } from "@/lib/api-client";
 import { connectRoomSocket, roomSocketHelpers } from "@/lib/socket-client";
 import { useDebounce } from "@/hooks/useDebounce";
-import { useKeyboardShortcutsContext } from "@/components/KeyboardShortcuts";
+import { cn } from "@/lib/utils";
 import { NEXUS_DISCORD_INVITE_URL } from "@/lib/constants";
 import { RoomCard } from "@/components/domain";
-import { EmptyState, Input, RoomCardSkeleton } from "@/components/ui";
-import { RefreshCcw, Home, Search, Users, Clock, CheckCircle, Gavel, ListOrdered, X, ArrowUpDown, Scale, ArrowLeftRight } from "lucide-react";
+import { EmptyState, RoomCardSkeleton } from "@/components/ui";
+import { RefreshCcw, Home, Search, Gavel, ListOrdered, Scale, ArrowLeftRight, LayoutGrid } from "lucide-react";
 
-type StatusFilter = "ALL" | "WAITING" | "IN_PROGRESS" | "COMPLETED";
+export type StatusFilter = "ALL" | "WAITING" | "IN_PROGRESS" | "COMPLETED";
 type ModeFilter = "ALL" | "AUCTION" | "SNAKE_DRAFT" | "AUTO_BALANCE" | "MANUAL_TEAM";
-type SortOption = "newest" | "oldest" | "mostPlayers" | "leastPlayers";
+export type SortOption = "newest" | "oldest" | "mostPlayers" | "leastPlayers";
 
 const IN_PROGRESS_STATUSES = new Set([
   "IN_PROGRESS",
@@ -24,25 +24,74 @@ const IN_PROGRESS_STATUSES = new Set([
   "DRAFT_COMPLETED",
 ]);
 
-const sortOptions: { value: SortOption; label: string }[] = [
+export const roomSortOptions: { value: SortOption; label: string }[] = [
   { value: "newest", label: "최신순" },
   { value: "oldest", label: "오래된순" },
   { value: "mostPlayers", label: "인원 많은순" },
   { value: "leastPlayers", label: "인원 적은순" },
 ];
 
+const modeOptions = [
+  {
+    value: "ALL" as const,
+    label: "전체",
+    description: "모든 방식의 방 보기",
+    icon: LayoutGrid,
+  },
+  {
+    value: "AUCTION" as const,
+    label: "경매",
+    description: "포인트로 팀원을 영입",
+    icon: Gavel,
+  },
+  {
+    value: "SNAKE_DRAFT" as const,
+    label: "스네이크",
+    description: "순서대로 번갈아 선택",
+    icon: ListOrdered,
+  },
+  {
+    value: "AUTO_BALANCE" as const,
+    label: "자동 밸런스",
+    description: "티어 기준으로 자동 구성",
+    icon: Scale,
+  },
+  {
+    value: "MANUAL_TEAM" as const,
+    label: "자유 팀 선택",
+    description: "원하는 팀을 직접 선택",
+    icon: ArrowLeftRight,
+  },
+];
+
 interface RoomListProps {
   /** 빈 목록 상태에서 방 생성 모달을 여는 콜백 (페이지가 모달과 로그인 리다이렉트를 소유) */
   onCreateRoom?: () => void;
+  searchQuery: string;
+  onSearchQueryChange: (value: string) => void;
+  statusFilter: StatusFilter;
+  onStatusFilterChange: (value: StatusFilter) => void;
+  showOnlyJoinable: boolean;
+  onShowOnlyJoinableChange: (value: boolean) => void;
+  sortBy: SortOption;
+  onSortByChange: (value: SortOption) => void;
 }
 
-export function RoomList({ onCreateRoom }: RoomListProps = {}) {
+export function RoomList({
+  onCreateRoom,
+  searchQuery,
+  onSearchQueryChange,
+  statusFilter,
+  onStatusFilterChange,
+  showOnlyJoinable,
+  onShowOnlyJoinableChange,
+  sortBy,
+  onSortByChange,
+}: RoomListProps) {
   const router = useRouter();
   const currentUserId = useAuthStore((state) => state.user?.id);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const authLoading = useAuthStore((state) => state.isLoading);
-  const { setSearchRef } = useKeyboardShortcutsContext();
-  const searchInputRef = useRef<HTMLInputElement>(null);
   const [rooms, setRooms] = useState<any[]>([]);
   const [totalRooms, setTotalRooms] = useState(0);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
@@ -51,22 +100,10 @@ export function RoomList({ onCreateRoom }: RoomListProps = {}) {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
   const [modeFilter, setModeFilter] = useState<ModeFilter>("ALL");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [showOnlyJoinable, setShowOnlyJoinable] = useState(false);
-  const [sortBy, setSortBy] = useState<SortOption>("newest");
 
   // Debounce search query to improve performance
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
-
-  // Register search input for keyboard shortcut
-  useEffect(() => {
-    if (searchInputRef.current) {
-      setSearchRef(searchInputRef.current);
-    }
-    return () => setSearchRef(null);
-  }, [setSearchRef]);
 
   const roomQuery = useMemo(() => ({
     status: statusFilter === "ALL" ? undefined : statusFilter,
@@ -146,212 +183,77 @@ export function RoomList({ onCreateRoom }: RoomListProps = {}) {
     router.push(`/tournaments/${roomId}/lobby`);
   };
 
-  if (isLoading && rooms.length === 0) {
-    return (
-      <div className="space-y-4">
-        {/* Skeleton Filters */}
-        <div className="flex flex-col lg:flex-row gap-4">
-          <div className="h-10 w-full max-w-md bg-bg-tertiary rounded-lg skeleton" />
-          <div className="flex items-center gap-2">
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-8 w-20 bg-bg-tertiary rounded-lg skeleton" />
-            ))}
-          </div>
+  return (
+    <div className="space-y-8">
+      <section aria-labelledby="room-mode-heading">
+        <div className="mb-4">
+          <h2 id="room-mode-heading" className="text-sm font-bold text-text-primary">
+            모드 선택
+          </h2>
         </div>
-        {/* Skeleton Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+          {modeOptions.map((option) => {
+            const Icon = option.icon;
+            const isSelected = modeFilter === option.value;
+
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setModeFilter(isSelected ? "ALL" : option.value)}
+                aria-pressed={isSelected}
+                className={cn(
+                  "group flex min-w-0 items-center gap-3 rounded-xl border p-4 text-left transition-all duration-150",
+                  isSelected
+                    ? "border-accent-primary/40 bg-accent-primary/10 shadow-[0_8px_24px_rgb(var(--color-accent-primary)/0.08)]"
+                    : "border-bg-tertiary/60 bg-bg-secondary/55 hover:border-bg-elevated hover:bg-bg-secondary"
+                )}
+              >
+                <span className={cn(
+                  "flex h-10 w-10 flex-none items-center justify-center rounded-lg transition-colors",
+                  isSelected
+                    ? "bg-accent-primary text-white"
+                    : "bg-bg-elevated/50 text-text-secondary group-hover:text-text-primary"
+                )}>
+                  <Icon className="h-4 w-4" />
+                </span>
+                <span className="min-w-0">
+                  <span className={cn(
+                    "block truncate text-sm font-bold",
+                    isSelected ? "text-accent-primary" : "text-text-primary"
+                  )}>
+                    {option.label}
+                  </span>
+                  <span className="mt-1 block truncate text-xs text-text-tertiary">
+                    {option.description}
+                  </span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* Results */}
+      {isLoading && rooms.length === 0 ? (
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,22rem),1fr))] gap-6">
           {[1, 2, 3, 4, 5, 6].map((i) => (
             <RoomCardSkeleton key={i} />
           ))}
         </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <EmptyState
-        icon={RefreshCcw}
-        title="방 목록을 불러올 수 없습니다"
-        description={error}
-        action={{
-          label: "다시 시도",
-          onClick: () => void loadRooms(),
-        }}
-      />
-    );
-  }
-
-  return (
-    <div className="space-y-4">
-      {/* Filters */}
-      <div className="flex flex-col lg:flex-row gap-4">
-        {/* Search */}
-        <div className="relative w-full lg:max-w-md lg:flex-grow">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-tertiary" />
-          <Input
-            ref={searchInputRef}
-            type="text"
-            aria-label="내전 방 검색"
-            placeholder="방 이름 또는 방장으로 검색... (/ 또는 Ctrl+K)"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 pr-10"
-          />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full text-text-tertiary hover:text-text-primary hover:bg-bg-elevated transition-colors"
-              aria-label="검색어 지우기"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          )}
-        </div>
-
-        {/* Status Filter Tabs */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 lg:flex-wrap lg:overflow-visible lg:pb-0">
-          <button
-            onClick={() => setStatusFilter("ALL")}
-            className={`shrink-0 whitespace-nowrap px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
-              statusFilter === "ALL"
-                ? "bg-accent-primary text-white"
-                : "bg-bg-tertiary text-text-secondary hover:bg-bg-elevated"
-            }`}
-          >
-            전체
-          </button>
-          <button
-            onClick={() => setStatusFilter("WAITING")}
-            className={`shrink-0 whitespace-nowrap px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
-              statusFilter === "WAITING"
-                ? "bg-accent-primary text-white"
-                : "bg-bg-tertiary text-text-secondary hover:bg-bg-elevated"
-            }`}
-          >
-            <Clock className="h-3.5 w-3.5" />
-            대기 중
-          </button>
-          <button
-            onClick={() => setStatusFilter("IN_PROGRESS")}
-            className={`shrink-0 whitespace-nowrap px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
-              statusFilter === "IN_PROGRESS"
-                ? "bg-accent-primary text-white"
-                : "bg-bg-tertiary text-text-secondary hover:bg-bg-elevated"
-            }`}
-          >
-            <Users className="h-3.5 w-3.5" />
-            진행 중
-          </button>
-          <button
-            onClick={() => setStatusFilter("COMPLETED")}
-            className={`shrink-0 whitespace-nowrap px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
-              statusFilter === "COMPLETED"
-                ? "bg-accent-primary text-white"
-                : "bg-bg-tertiary text-text-secondary hover:bg-bg-elevated"
-            }`}
-          >
-            <CheckCircle className="h-3.5 w-3.5" />
-            완료
-          </button>
-        </div>
-      </div>
-
-      {/* Second row filters — 모바일: 세로로 쌓아 좌측 정렬 / 데스크톱: 한 줄 배치 */}
-      <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3">
-        {/* Mode Filter */}
-        <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <span className="text-sm text-text-secondary">모드:</span>
-          <button
-            onClick={() => setModeFilter("ALL")}
-            className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
-              modeFilter === "ALL"
-                ? "bg-accent-primary/20 text-accent-primary"
-                : "bg-bg-tertiary text-text-secondary hover:bg-bg-elevated"
-            }`}
-          >
-            전체
-          </button>
-          <button
-            onClick={() => setModeFilter("AUCTION")}
-            className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors flex items-center gap-1 ${
-              modeFilter === "AUCTION"
-                ? "bg-accent-primary/20 text-accent-primary"
-                : "bg-bg-tertiary text-text-secondary hover:bg-bg-elevated"
-            }`}
-          >
-            <Gavel className="h-3 w-3" />
-            경매
-          </button>
-          <button
-            onClick={() => setModeFilter("SNAKE_DRAFT")}
-            className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors flex items-center gap-1 ${
-              modeFilter === "SNAKE_DRAFT"
-                ? "bg-accent-primary/20 text-accent-primary"
-                : "bg-bg-tertiary text-text-secondary hover:bg-bg-elevated"
-            }`}
-          >
-            <ListOrdered className="h-3 w-3" />
-            스네이크
-          </button>
-          <button
-            onClick={() => setModeFilter("AUTO_BALANCE")}
-            className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors flex items-center gap-1 ${
-              modeFilter === "AUTO_BALANCE"
-                ? "bg-accent-primary/20 text-accent-primary"
-                : "bg-bg-tertiary text-text-secondary hover:bg-bg-elevated"
-            }`}
-          >
-            <Scale className="h-3 w-3" />
-            자동 밸런스
-          </button>
-          <button
-            onClick={() => setModeFilter("MANUAL_TEAM")}
-            className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors flex items-center gap-1 ${
-              modeFilter === "MANUAL_TEAM"
-                ? "bg-accent-primary/20 text-accent-primary"
-                : "bg-bg-tertiary text-text-secondary hover:bg-bg-elevated"
-            }`}
-          >
-            <ArrowLeftRight className="h-3 w-3" />
-            자유 팀 선택
-          </button>
-        </div>
-
-        {/* Joinable only toggle */}
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={showOnlyJoinable}
-            onChange={(e) => setShowOnlyJoinable(e.target.checked)}
-            className="w-4 h-4 accent-accent-primary cursor-pointer rounded"
-          />
-          <span className="text-sm text-text-secondary">참가 가능한 방만</span>
-        </label>
-
-        {/* Sort Options */}
-        <div className="flex min-w-0 flex-wrap items-center gap-2 sm:ml-auto">
-          <ArrowUpDown className="h-4 w-4 text-text-tertiary flex-shrink-0" />
-          <div className="flex items-center gap-1 flex-wrap">
-            {sortOptions.map((option) => (
-              <button
-                key={option.value}
-                onClick={() => setSortBy(option.value)}
-                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
-                  sortBy === option.value
-                    ? "bg-accent-primary/20 text-accent-primary"
-                    : "bg-bg-tertiary text-text-secondary hover:bg-bg-elevated"
-                }`}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Results */}
-      {visibleRooms.length === 0 ? (
+      ) : error ? (
+        <EmptyState
+          icon={RefreshCcw}
+          title="방 목록을 불러올 수 없습니다"
+          description={error}
+          action={{
+            label: "다시 시도",
+            onClick: () => void loadRooms(),
+          }}
+          className="py-16 md:py-24"
+        />
+      ) : visibleRooms.length === 0 ? (
         rooms.length === 0 ? (
           <EmptyState
             icon={Home}
@@ -372,6 +274,7 @@ export function RoomList({ onCreateRoom }: RoomListProps = {}) {
             }
             action={onCreateRoom ? { label: "방 만들기", onClick: onCreateRoom } : undefined}
             secondaryAction={{ label: "가이드 보기", href: "/guide" }}
+            className="py-16 md:py-24"
           />
         ) : (
           <EmptyState
@@ -381,17 +284,18 @@ export function RoomList({ onCreateRoom }: RoomListProps = {}) {
             action={{
               label: "필터 초기화",
               onClick: () => {
-                setStatusFilter("ALL");
+                onStatusFilterChange("ALL");
                 setModeFilter("ALL");
-                setSearchQuery("");
-                setShowOnlyJoinable(false);
-                setSortBy("newest");
+                onSearchQueryChange("");
+                onShowOnlyJoinableChange(false);
+                onSortByChange("newest");
               },
             }}
+            className="py-16 md:py-24"
           />
         )
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-fade-in">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,22rem),1fr))] gap-6 animate-fade-in">
           {visibleRooms.map((room) => (
             <RoomCard
               key={room.id}
