@@ -487,7 +487,8 @@ function ActiveRoomsCard({ rooms }: { rooms: Room[] }) {
   const router = useRouter();
 
   return (
-    <GlassCard>
+    <div data-tour="home-active-rooms">
+      <GlassCard>
       <CardHeader
         icon={Swords}
         iconColor="bg-amber-500/80"
@@ -505,6 +506,7 @@ function ActiveRoomsCard({ rooms }: { rooms: Room[] }) {
             <p className="text-sm text-text-secondary">모집 중인 내전이 없습니다</p>
             <button
               onClick={() => router.push("/tournaments")}
+              data-tour="home-create-room"
               className="px-5 py-2 rounded-xl text-sm font-medium text-amber-400 border border-amber-500/30 hover:bg-amber-500/10 transition-colors flex items-center gap-1.5"
             >
               <Plus className="h-3.5 w-3.5" />
@@ -565,6 +567,7 @@ function ActiveRoomsCard({ rooms }: { rooms: Room[] }) {
             })}
             <button
               onClick={() => router.push("/tournaments")}
+              data-tour="home-create-room"
               className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl border border-dashed border-white/[0.08] text-text-tertiary hover:text-violet-400 hover:border-violet-500/30 transition-all duration-200 min-h-[80px]"
             >
               <Plus className="h-5 w-5" />
@@ -573,7 +576,8 @@ function ActiveRoomsCard({ rooms }: { rooms: Room[] }) {
           </div>
         )}
       </div>
-    </GlassCard>
+      </GlassCard>
+    </div>
   );
 }
 
@@ -907,12 +911,14 @@ export function DashboardContent() {
   return (
     <div className="space-y-6">
       {/* 내 전적 */}
-      <MyStatsCard
-        stats={userStats}
-        primaryAccount={primaryAccount}
-        championStats={championStats}
-        positionStats={positionStats}
-      />
+      <div data-tour="home-my-stats">
+        <MyStatsCard
+          stats={userStats}
+          primaryAccount={primaryAccount}
+          championStats={championStats}
+          positionStats={positionStats}
+        />
+      </div>
 
       {/* 모집중인 내전 */}
       <ActiveRoomsCard rooms={rooms} />

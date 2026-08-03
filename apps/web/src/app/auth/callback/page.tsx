@@ -38,18 +38,10 @@ function AuthCallbackContent() {
 
       // 사용자 정보 가져오기
       fetchUser().then(() => {
-        const currentUser = useAuthStore.getState().user;
         const redirect = takeStoredRedirect();
-        const hasRiotAccount =
-          Array.isArray(currentUser?.riotAccounts) &&
-          currentUser.riotAccounts.length > 0;
-
-        if (!hasRiotAccount) {
-          router.push("/settings?onboarding=riot");
-          return;
-        }
-
-        router.push(redirect ?? "/dashboard");
+        // 신규 사용자도 설정 페이지로 강제 이동시키지 않는다.
+        // 메인 페이지에서 온보딩 모달을 띄우고 필요한 설정을 이어서 진행한다.
+        router.push(redirect ?? "/");
       });
     } else {
       router.push("/auth/login");

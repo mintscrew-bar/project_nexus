@@ -68,17 +68,8 @@ function AgreePageContent() {
       setAccessToken(accessToken);
       // 유저 정보 갱신
       await fetchUser();
-      const currentUser = useAuthStore.getState().user;
-      const hasRiotAccount =
-        Array.isArray(currentUser?.riotAccounts) &&
-        currentUser.riotAccounts.length > 0;
-
-      if (!hasRiotAccount) {
-        router.replace("/settings?onboarding=riot");
-        return;
-      }
-
-      router.replace("/dashboard");
+      // 첫 로그인 온보딩은 설정 페이지가 아니라 메인 페이지의 가이드에서 진행한다.
+      router.replace("/");
     } catch (err: any) {
       const status = err?.response?.status;
       const msg = err?.response?.data?.message || "약관 동의 처리 중 오류가 발생했습니다.";

@@ -13,6 +13,7 @@ import { Button, Input, Modal } from "@/components/ui";
 import { useKeyboardShortcutsContext } from "@/components/KeyboardShortcuts";
 import { ArrowUpDown, CheckCircle, Clock, Plus, Search, Users, X } from "lucide-react";
 import { useAuthStore } from "@/stores/auth-store";
+import { TournamentsTour } from "@/components/onboarding/TournamentsTour";
 
 export default function TournamentsPage() {
   const router = useRouter();
@@ -51,6 +52,7 @@ export default function TournamentsPage() {
 
   return (
     <div className="flex-grow bg-bg-primary">
+      {isAuthenticated && <TournamentsTour />}
       <div className="w-full px-5 py-8 sm:px-6 md:py-10 lg:px-8">
         <header className="grid gap-6 border-b border-bg-tertiary/70 pb-8 md:pb-10 lg:grid-cols-[minmax(18rem,1fr)_minmax(34rem,52rem)] lg:items-start">
           <div>
@@ -87,16 +89,18 @@ export default function TournamentsPage() {
                 )}
               </div>
 
-              <Button
-                onClick={openRoomCreation}
-                className="h-11 w-full flex-none rounded-lg px-5 text-sm font-semibold sm:w-auto"
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                방 생성
-              </Button>
+              <div data-tour="tournaments-create" className="flex-none">
+                <Button
+                  onClick={openRoomCreation}
+                  className="h-11 w-full rounded-lg px-5 text-sm font-semibold sm:w-auto"
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  방 생성
+                </Button>
+              </div>
             </div>
 
-            <div className="mt-3 flex flex-wrap items-center gap-2">
+            <div data-tour="tournaments-filters" className="mt-3 flex flex-wrap items-center gap-2">
               <div className="scrollbar-none flex max-w-full items-center gap-1 overflow-x-auto rounded-xl bg-bg-secondary/55 p-1">
                 {([
                   { value: "ALL" as const, label: "전체", icon: null },
@@ -153,7 +157,7 @@ export default function TournamentsPage() {
           </div>
         </header>
 
-        <section className="py-8">
+        <section data-tour="tournaments-results" className="py-8">
           <RoomList
             onCreateRoom={openRoomCreation}
             searchQuery={searchQuery}

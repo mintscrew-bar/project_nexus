@@ -25,6 +25,9 @@ export interface UpdateSettingsDto {
 
   // Appearance settings
   theme?: string;
+
+  // Onboarding — 클라이언트는 true만 보내고 시각은 서버가 찍는다
+  onboardingSeen?: boolean;
 }
 
 @Injectable()
@@ -47,13 +50,23 @@ export class UserSettingsService {
   }
 
   async updateSettings(userId: string, data: UpdateSettingsDto) {
+    // onboardingSeen(boolean)은 저장 컬럼이 아니라 시각(onboardingSeenAt)으로 변환한다.
+    // 되돌리기(false)는 온보딩 안내 다시 보기용으로 null 처리한다.
+    const { onboardingSeen, ...rest } = data;
+    const payload = {
+      ...rest,
+      ...(onboardingSeen === undefined
+        ? {}
+        : { onboardingSeenAt: onboardingSeen ? new Date() : null }),
+    };
+
     // Upsert settings
     return this.prisma.userSettings.upsert({
       where: { userId },
-      update: data,
+      update: payload,
       create: {
         userId,
-        ...data,
+        ...payload,
       },
     });
   }

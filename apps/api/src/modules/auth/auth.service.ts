@@ -815,6 +815,15 @@ export class AuthService {
           avatar: true,
           profileBanner: true,
           role: true,
+          // 온보딩 안내 모달 노출 판단용 — 계정 기준이어야 기기가 바뀌어도 다시 뜨지 않는다.
+          settings: { select: { onboardingSeenAt: true } },
+          // 이미 Riot 계정과 주 라인을 등록한 기존 유저는 온보딩을 마친 것으로 본다.
+          // (설정 행이 없어 백필되지 않은 유저를 위한 런타임 판정)
+          riotAccounts: {
+            where: { mainRole: { not: null } },
+            take: 1,
+            select: { id: true },
+          },
         },
       });
 
@@ -822,7 +831,13 @@ export class AuthService {
         throw new UnauthorizedException("User not found");
       }
 
-      return user;
+      const { settings, riotAccounts, ...profile } = user;
+
+      return {
+        ...profile,
+        onboardingSeen:
+          !!settings?.onboardingSeenAt || riotAccounts.length > 0,
+      };
     } catch (e) {
       console.error("Error in getUserById:", e);
       throw e; // Re-throw the original error to trigger a 500 response

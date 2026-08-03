@@ -72,4 +72,10 @@ export class UpdateSettingsDto {
   @IsString()
   @MaxLength(20)
   theme?: string;
+
+  // ── 온보딩 ──
+  // 클라이언트는 "봤다"는 사실만 보내고, 시각은 서버가 기록한다.
+  @IsOptional()
+  @IsBoolean()
+  onboardingSeen?: boolean;
 }

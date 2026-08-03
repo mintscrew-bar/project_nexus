@@ -647,6 +647,8 @@ export const userApi = {
     highlightChampionId?: string | null;
     highlightStatType?: string | null;
     theme?: string;
+    /** 온보딩 안내 확인 여부 — 서버가 확인 시각을 기록한다 */
+    onboardingSeen?: boolean;
   }) => {
     const response = await apiClient.patch("/users/settings", data);
     return response.data;

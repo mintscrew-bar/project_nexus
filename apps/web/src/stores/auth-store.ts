@@ -8,6 +8,8 @@ interface User {
   profileBanner?: string | null;
   email?: string;
   role: 'USER' | 'MODERATOR' | 'ADMIN';
+  /** 온보딩 안내를 이미 확인했는지 — 계정 기준(기기 무관) */
+  onboardingSeen?: boolean;
   [key: string]: any;
 }
 

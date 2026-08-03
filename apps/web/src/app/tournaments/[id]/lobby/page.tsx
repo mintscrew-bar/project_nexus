@@ -20,6 +20,7 @@ import Link from "next/link";
 import { friendApi, adminApi, roomApi, ensureValidToken } from "@/lib/api-client";
 import { PlayerHoverCard } from "@/components/domain/PlayerHoverCard";
 import { PlayerProfileModal } from "@/components/domain/PlayerProfileModal";
+import { LobbyTour } from "@/components/onboarding/LobbyTour";
 import { LobbyParticipantsList } from "./_components/LobbyParticipantsList";
 import { LobbyErrorState } from "./_components/LobbyErrorState";
 import { BroadcastLinkModal } from "./_components/BroadcastLinkModal";
@@ -549,6 +550,7 @@ export default function TournamentLobbyPage() {
 
   return (
     <>
+      <LobbyTour />
       {/* 참가자 호버 툴팁 — overflow-hidden 탈출을 위해 페이지 최상위에서 렌더링 */}
       {hoveredPlayer && (
         <PlayerHoverCard
@@ -637,7 +639,7 @@ export default function TournamentLobbyPage() {
         </header>
 
         {/* ═══ Ready Progress Bar ═══ */}
-        <div className={`border-b px-4 py-3 lg:px-6 ${
+        <div data-tour="lobby-ready-status" className={`border-b px-4 py-3 lg:px-6 ${
           canStart
             ? "border-accent-success/30 bg-accent-success/10"
             : "border-bg-tertiary bg-bg-secondary/90"
@@ -754,7 +756,7 @@ export default function TournamentLobbyPage() {
           {/* Desktop layout (lg+) */}
           <div className="container mx-auto hidden h-full min-h-0 gap-4 px-6 py-4 lg:flex">
             {/* Participants: 2/3 */}
-            <section className="flex min-h-0 min-w-0 flex-[2] flex-col overflow-hidden rounded-xl border border-bg-tertiary bg-bg-secondary">
+            <section data-tour="lobby-participants" className="flex min-h-0 min-w-0 flex-[2] flex-col overflow-hidden rounded-xl border border-bg-tertiary bg-bg-secondary">
               <div className="px-5 py-3 border-b border-bg-tertiary flex items-center justify-between">
                 <h2 className="font-bold text-text-primary flex items-center gap-2">
                   <Users className="h-5 w-5 text-text-secondary" />
@@ -768,7 +770,7 @@ export default function TournamentLobbyPage() {
             </section>
 
             {/* Chat: 1/3 */}
-            <section className="flex min-h-0 min-w-0 flex-[1] flex-col overflow-hidden rounded-xl border border-bg-tertiary bg-bg-secondary">
+            <section data-tour="lobby-chat" className="flex min-h-0 min-w-0 flex-[1] flex-col overflow-hidden rounded-xl border border-bg-tertiary bg-bg-secondary">
               <div className="px-5 py-3 border-b border-bg-tertiary">
                 <h2 className="font-bold text-text-primary flex items-center gap-2">
                   <MessageSquare className="h-5 w-5 text-text-secondary" />
@@ -786,11 +788,11 @@ export default function TournamentLobbyPage() {
             <Tabs defaultValue="participants" value={mobileTab} onValueChange={setMobileTab} className="flex h-full min-h-0 flex-col overflow-hidden">
               <div className="px-4 pt-3 flex-shrink-0">
                 <TabsList className="w-full">
-                  <TabsTrigger value="participants" className="flex-1 justify-center">
+                  <TabsTrigger data-tour="lobby-participants" value="participants" className="flex-1 justify-center">
                     <Users className="h-4 w-4 mr-1.5" />
                     {room.teamMode === "MANUAL_TEAM" ? "팀 편성" : "참가자"} ({totalPlayers})
                   </TabsTrigger>
-                  <TabsTrigger value="chat" className="flex-1 justify-center relative">
+                  <TabsTrigger data-tour="lobby-chat" value="chat" className="flex-1 justify-center relative">
                     <MessageSquare className="h-4 w-4 mr-1.5" />채팅
                   </TabsTrigger>
                 </TabsList>
@@ -806,7 +808,7 @@ export default function TournamentLobbyPage() {
         </div>
 
         {/* ═══ Sticky Bottom Action Bar ═══ */}
-        <footer className="bg-bg-secondary border-t border-bg-tertiary px-4 py-3 lg:px-6 flex-shrink-0">
+        <footer data-tour="lobby-ready-action" className="bg-bg-secondary border-t border-bg-tertiary px-4 py-3 lg:px-6 flex-shrink-0">
           <div className="container mx-auto flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               {room.status !== 'DRAFT_COMPLETED' && !currentUserIsSpectator && (

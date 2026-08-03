@@ -3,9 +3,11 @@
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth-store';
 import { Avatar } from './ui/Avatar';
-import { LogOut, User, Settings, ChevronDown } from 'lucide-react';
+import { BookOpen, LogOut, User, Settings, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
 import { useState, useRef, useEffect } from 'react';
+import { resetOnboardingGuides } from '@/lib/onboarding';
+import { userApi } from '@/lib/api-client';
 
 export function UserMenu() {
   const { user, isAuthenticated, isLoading, logout } = useAuthStore();
@@ -46,6 +48,7 @@ export function UserMenu() {
     <div className="relative" ref={menuRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
+        data-tour="user-menu"
         className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-bg-tertiary transition-colors"
       >
         <Avatar
@@ -89,6 +92,20 @@ export function UserMenu() {
               <Settings className="h-4 w-4" />
               <span>설정</span>
             </Link>
+            <button
+              type="button"
+              onClick={async () => {
+                setIsOpen(false);
+                resetOnboardingGuides(user.id);
+                // 계정에 남은 확인 이력도 지워야 안내가 다시 뜬다.
+                await userApi.updateSettings({ onboardingSeen: false }).catch(() => {});
+                window.location.assign('/');
+              }}
+              className="flex w-full items-center gap-3 px-3 py-2 text-text-secondary hover:text-text-primary hover:bg-bg-tertiary rounded-lg transition-colors"
+            >
+              <BookOpen className="h-4 w-4" />
+              <span>사용 가이드 다시 보기</span>
+            </button>
           </div>
 
           <div className="p-1 border-t border-bg-tertiary">
