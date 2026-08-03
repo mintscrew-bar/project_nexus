@@ -25,6 +25,8 @@ jobs:
     steps:
       - name: 코드 체크아웃
         uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       # 배포 전 디스크 게이트 — 디스크 풀로 CD 자체가 죽는 사고 방지.
       # 한도 초과 시 배포를 abort 하고, 정리 명령을 에러 메시지에 노출.
@@ -111,23 +113,92 @@ jobs:
       # 운영 서버에서는 더 이상 빌드하지 않음 — compose 전체 서비스를 pull 해 sidecar drift 방지.
       - name: 최신 이미지 pull
         run: |
-          docker compose -f docker-compose.prod.yml --env-file /home/haru/projects/nexus/.env.production pull
+          docker compose -f docker-compose.prod.yml --env-file /home/haru/projects/nexus/.env.production pull api web nginx cloudflared
 
-      - name: 컨테이너 재시작
+      - name: 단계별 롤아웃
         run: |
-          docker compose -f docker-compose.prod.yml --env-file /home/haru/projects/nexus/.env.production up -d
+          set -euo pipefail
+          COMPOSE="docker compose -f docker-compose.prod.yml --env-file /home/haru/projects/nexus/.env.production"
+
+          wait_for_health() {
+            local container="$1"
+            local timeout="${2:-180}"
+            local elapsed=0
+
+            while [ "$elapsed" -lt "$timeout" ]; do
+              status=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container" 2>/dev/null || true)
+              if [ "$status" = "healthy" ] || [ "$status" = "running" ]; then
+                echo "$container is $status"
+                return 0
+              fi
+
+              sleep 2
+              elapsed=$((elapsed + 2))
+            done
+
+            echo "::error::$container did not become healthy within ${timeout}s"
+            docker inspect "$container" || true
+            return 1
+          }
+
+          wait_for_http() {
+            local url="$1"
+            local timeout="${2:-180}"
+            local elapsed=0
+
+            while [ "$elapsed" -lt "$timeout" ]; do
+              if curl -fsS "$url" > /dev/null; then
+                echo "$url is reachable"
+                return 0
+              fi
+
+              sleep 2
+              elapsed=$((elapsed + 2))
+            done
+
+            echo "::error::$url did not become reachable within ${timeout}s"
+            return 1
+          }
+
+          # 상태 저장소는 보장하되, 불필요한 재생성은 피한다.
+          $COMPOSE up -d postgres redis uptime-kuma
+          wait_for_health nexus-postgres 120
+          wait_for_health nexus-redis 120
+
+          $COMPOSE up -d --no-deps api
+          wait_for_health nexus-api 180
+
+          $COMPOSE up -d --no-deps web
+          wait_for_health nexus-web 180
 
           # actions/checkout은 파일을 새 inode로 교체할 수 있다. 이 경우 기존 bind mount는
-          # 이전 inode를 계속 가리키므로, 설정 해시가 다를 때만 nginx를 재생성한다.
+          # 이전 inode를 계속 가리키므로, 설정 해시가 다를 때만 nginx를 강제 재생성한다.
           CHECKOUT_NGINX_HASH=$(sha256sum nginx/nginx.conf | awk '{print $1}')
-          RUNNING_NGINX_HASH=$(docker compose -f docker-compose.prod.yml --env-file /home/haru/projects/nexus/.env.production exec -T nginx sha256sum /etc/nginx/nginx.conf | awk '{print $1}')
-          if [ "$CHECKOUT_NGINX_HASH" != "$RUNNING_NGINX_HASH" ]; then
-            echo "nginx.conf 변경 감지 — nginx 컨테이너 재생성"
-            docker compose -f docker-compose.prod.yml --env-file /home/haru/projects/nexus/.env.production up -d --force-recreate nginx
+          RUNNING_NGINX_HASH=""
+          if docker container inspect nexus-nginx > /dev/null 2>&1; then
+            RUNNING_NGINX_HASH=$($COMPOSE exec -T nginx sha256sum /etc/nginx/nginx.conf | awk '{print $1}')
           fi
 
-          docker compose -f docker-compose.prod.yml --env-file /home/haru/projects/nexus/.env.production exec -T nginx nginx -t
-          docker compose -f docker-compose.prod.yml --env-file /home/haru/projects/nexus/.env.production exec -T nginx nginx -s reload
+          if [ "$CHECKOUT_NGINX_HASH" != "$RUNNING_NGINX_HASH" ]; then
+            echo "nginx.conf 변경 감지 — nginx 컨테이너 재생성"
+            $COMPOSE up -d --no-deps --force-recreate nginx
+          else
+            $COMPOSE up -d --no-deps nginx
+          fi
+
+          $COMPOSE exec -T nginx nginx -t
+          $COMPOSE exec -T nginx nginx -s reload
+          wait_for_health nexus-nginx 60
+
+          # cloudflared는 이미지나 설정이 바뀐 경우에만 compose가 재생성한다.
+          $COMPOSE up -d --no-deps cloudflared
+
+          wait_for_http http://127.0.0.1:4000/api/health 60
+
+          set -a
+          . /home/haru/projects/nexus/.env.production
+          set +a
+          wait_for_http "${APP_URL%/}/api/health" 120
 
       # 강화된 정리. 배포 성공/실패와 무관하게 항상 실행.
       # - image -a: 컨테이너가 안 쓰는 모든 image (옛 SHA 포함). 실행 중 컨테이너 image 는 자동 보호.
