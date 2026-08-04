@@ -1,22 +1,12 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Radio } from "lucide-react";
-
-const BANNER_IMAGE = "/images/banners/streamer-clan-recruit-characters-v3.png";
 
 export function CreatorPromoStrip() {
   return (
     <aside className="relative flex-shrink-0 overflow-hidden border-b border-violet-100 bg-[#fff8ef]">
-      <Image
-        src={BANNER_IMAGE}
-        alt=""
-        fill
-        sizes="100vw"
-        className="object-cover object-center opacity-45"
-      />
-      <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,250,242,0.98),rgba(255,250,242,0.9)_56%,rgba(255,250,242,0.96))]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_78%_20%,rgba(167,139,250,0.2),transparent_30%),linear-gradient(90deg,#fffaf2,rgba(245,243,255,0.92)_56%,#fffaf2)]" />
 
       <div className="relative z-10 mx-auto flex max-w-7xl flex-col gap-2 px-4 py-2.5 sm:flex-row sm:items-center sm:justify-between md:px-6">
         <div className="flex min-w-0 items-center gap-3">
