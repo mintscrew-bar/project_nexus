@@ -1078,10 +1078,13 @@ export default function ProfilePage() {
                 <div className="flex flex-col gap-6">
                   <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                     <div className="flex min-w-0 flex-1 flex-col gap-4 sm:flex-row sm:items-start">
-                      <div className="group relative z-10 -mt-12 flex-shrink-0 cursor-pointer rounded-full ring-4 ring-bg-secondary sm:-mt-14" onClick={() => avatarInputRef.current?.click()}>
+                      <div
+                        className="group relative z-10 -mt-12 flex-shrink-0 cursor-pointer rounded-full bg-bg-secondary p-1 sm:-mt-14"
+                        onClick={() => avatarInputRef.current?.click()}
+                      >
                         <div
-                          className="relative flex h-24 w-24 items-center justify-center overflow-hidden rounded-full bg-bg-tertiary"
-                          style={{ border: `2px solid ${PROFILE_ACCENT}88` }}
+                          className="relative flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border-2 bg-bg-tertiary"
+                          style={{ borderColor: `${PROFILE_ACCENT}88` }}
                         >
                           {(avatarPreview || user.avatar) ? (
                             <Image
