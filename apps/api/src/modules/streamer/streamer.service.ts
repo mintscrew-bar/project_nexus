@@ -2,8 +2,17 @@ import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { Prisma, StreamerPlatform } from "@nexus/database";
 import { PrismaService } from "../prisma/prisma.service";
 import { RedisService } from "../redis/redis.service";
+import { DiscordAdminAlertService } from "../discord/discord-admin-alert.service";
 import { LiveProviderRegistry } from "./providers/live-provider.registry";
 import { LiveSnapshot } from "./providers/live-provider.interface";
+
+/**
+ * 이 횟수만큼 폴링 사이클이 연속으로 "검증된 스트리머 전원 조회 실패"면
+ * 비공식 엔드포인트가 막혔다고 보고 운영 채널에 알린다.
+ * (한두 명 순간 실패는 흔하므로 "전원 실패"만 신호로 본다)
+ */
+const CONSECUTIVE_FAILURE_ALERT_THRESHOLD = 3;
+const FAILURE_STREAK_CACHE_KEY = "streamer:live:failure-streak";
 
 /** 라이브 상태 캐시 TTL(초). 폴링 주기(60초)보다 살짝 길게 잡아 빈틈을 막는다. */
 const LIVE_CACHE_TTL = 90;
@@ -39,6 +48,7 @@ export class StreamerService {
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
     private readonly providers: LiveProviderRegistry,
+    private readonly adminAlert: DiscordAdminAlertService,
   ) {}
 
   // ── 캐시 ──────────────────────────────────────────────────────────────
@@ -368,7 +378,123 @@ export class StreamerService {
       `스트리머 라이브 갱신: 대상 ${profiles.length}명 · 방송 중 ${live}명 · 실패 ${failed}명`,
     );
 
+    await this.trackFailureStreak(profiles.length, failed);
+
     return { checked: profiles.length, live, failed };
+  }
+
+  /**
+   * 검증된 스트리머 "전원" 조회 실패가 연속되면 비공식 엔드포인트가 막혔다고
+   * 보고 운영 채널에 알린다. 한두 명 순간 실패는 흔해서 신호로 보지 않는다.
+   */
+  private async trackFailureStreak(
+    checked: number,
+    failed: number,
+  ): Promise<void> {
+    const allFailed = checked > 0 && failed === checked;
+
+    if (!allFailed) {
+      const previous = await this.redis.get(FAILURE_STREAK_CACHE_KEY);
+      if (previous && Number(previous) >= CONSECUTIVE_FAILURE_ALERT_THRESHOLD) {
+        await this.adminAlert.notifyAdminOperation({
+          operation: "스트리머 라이브 조회 복구",
+          adminId: "system",
+          adminName: "스트리머 폴링",
+          summary: "치지직/숲 라이브 조회가 다시 정상적으로 동작합니다.",
+        });
+      }
+      await this.redis.del(FAILURE_STREAK_CACHE_KEY);
+      return;
+    }
+
+    const streak = await this.redis.incr(FAILURE_STREAK_CACHE_KEY);
+    // 재시작 등으로 키가 영구화되지 않도록 여유 있게 TTL을 걸어둔다.
+    await this.redis.expire(FAILURE_STREAK_CACHE_KEY, 60 * 60);
+
+    if (streak === CONSECUTIVE_FAILURE_ALERT_THRESHOLD) {
+      await this.adminAlert.notifyAdminOperation({
+        operation: "스트리머 라이브 조회 연속 실패",
+        adminId: "system",
+        adminName: "스트리머 폴링",
+        summary: `검증된 스트리머 ${checked}명 전원의 라이브 조회가 ${streak}회 연속 실패했습니다. 치지직/숲 비공식 엔드포인트가 바뀌었을 수 있습니다.`,
+        targetType: "streamer-provider",
+      });
+    }
+  }
+
+  /**
+   * 검증된 채널의 이름·프로필 이미지·팔로워 수를 갱신한다. (하루 1회 폴링)
+   *
+   * 인증 시점에만 저장해두면 스트리머가 나중에 채널명을 바꿔도 NEXUS에는
+   * 옛날 정보가 남는다. 라이브 상태처럼 자주 바뀌는 값이 아니라서
+   * 1분 폴링과 분리해 하루 1회만 갱신한다.
+   */
+  async refreshChannelIdentities(): Promise<{
+    checked: number;
+    updated: number;
+    failed: number;
+  }> {
+    const profiles = await this.prisma.streamerProfile.findMany({
+      where: {
+        isActive: true,
+        verifiedAt: { not: null },
+        channelId: { not: null },
+      },
+      select: {
+        id: true,
+        platform: true,
+        channelId: true,
+        channelName: true,
+        channelImageUrl: true,
+        followerCount: true,
+      },
+    });
+
+    let updated = 0;
+    let failed = 0;
+
+    const concurrency = 5;
+    for (let i = 0; i < profiles.length; i += concurrency) {
+      const chunk = profiles.slice(i, i + concurrency);
+
+      await Promise.all(
+        chunk.map(async (profile) => {
+          if (!profile.channelId) return;
+
+          const provider = this.providers.get(profile.platform);
+          if (!provider) return;
+
+          const identity = await provider.fetchIdentity(profile.channelId);
+          if (!identity) {
+            failed += 1;
+            return;
+          }
+
+          const changed =
+            identity.channelName !== profile.channelName ||
+            identity.channelImageUrl !== profile.channelImageUrl ||
+            identity.followerCount !== profile.followerCount;
+
+          if (!changed) return;
+
+          updated += 1;
+          await this.prisma.streamerProfile.update({
+            where: { id: profile.id },
+            data: {
+              channelName: identity.channelName ?? profile.channelName,
+              channelImageUrl: identity.channelImageUrl,
+              followerCount: identity.followerCount,
+            },
+          });
+        }),
+      );
+    }
+
+    this.logger.log(
+      `스트리머 채널 정보 갱신: 대상 ${profiles.length}명 · 변경 ${updated}명 · 실패 ${failed}명`,
+    );
+
+    return { checked: profiles.length, updated, failed };
   }
 
   // ── 관리자 ────────────────────────────────────────────────────────────
