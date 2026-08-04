@@ -358,6 +358,27 @@ export class UserService {
       );
     }
 
+    // 채널을 바꾸면 인증을 무효화한다.
+    // 그러지 않으면 내 채널로 인증받은 뒤 URL만 남의 채널로 갈아끼워
+    // "인증됨" 상태로 다른 사람 채널을 가리킬 수 있다.
+    const channelChanged =
+      !!hasSamePlatform &&
+      (hasSamePlatform.channelUrl !== channelUrl ||
+        hasSamePlatform.channelName !== channelName);
+
+    const resetVerification = channelChanged
+      ? {
+          channelId: null,
+          channelImageUrl: null,
+          followerCount: null,
+          verifiedAt: null,
+          verificationCode: null,
+          verificationExpiresAt: null,
+          lastLiveAt: null,
+          lastCheckedAt: null,
+        }
+      : {};
+
     return this.prisma.streamerProfile.upsert({
       where: { userId_platform: { userId, platform: data.platform } },
       create: {
@@ -371,6 +392,7 @@ export class UserService {
         channelUrl,
         channelName,
         isActive: true,
+        ...resetVerification,
       },
     });
   }
