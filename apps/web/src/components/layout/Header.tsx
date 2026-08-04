@@ -19,6 +19,7 @@ const navItems = [
   { href: '/matches', label: '내전 전적' },
   { href: '/ranking', label: '랭킹' },
   { href: '/clans', label: '클랜' },
+  { href: '/streamers', label: '스트리머' },
   { href: '/community', label: '커뮤니티' },
   { href: '/guide', label: '가이드' },
 ];

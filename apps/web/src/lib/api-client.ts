@@ -2639,3 +2639,111 @@ export const appealApi = {
     return response.data;
   },
 };
+
+// ── 스트리머 (치지직/숲 라이브) ───────────────────────────────────────────────
+
+export type StreamerPlatformKind = "CHZZK" | "SOOP" | "YOUTUBE";
+
+/** 라이브 상태. 조회에 실패하면 null이며 이때는 뱃지를 감춘다. */
+export interface StreamerLiveState {
+  isLive: boolean;
+  title?: string | null;
+  viewerCount?: number | null;
+  thumbnailUrl?: string | null;
+  categoryName?: string | null;
+  startedAt?: string | null;
+  checkedAt: string;
+}
+
+export interface StreamerListItem {
+  userId: string;
+  username: string;
+  avatar: string | null;
+  platform: StreamerPlatformKind;
+  channelUrl: string;
+  channelName: string | null;
+  channelImageUrl: string | null;
+  followerCount: number | null;
+  verified: boolean;
+  lastLiveAt: string | null;
+  live: StreamerLiveState | null;
+  activeRoom: { id: string; name: string; status: string } | null;
+}
+
+export interface AdminStreamerItem {
+  id: string;
+  userId: string;
+  username: string;
+  avatar: string | null;
+  platform: StreamerPlatformKind;
+  channelUrl: string;
+  channelId: string | null;
+  channelName: string | null;
+  followerCount: number | null;
+  isActive: boolean;
+  verifiedAt: string | null;
+  lastLiveAt: string | null;
+  lastCheckedAt: string | null;
+  isLive: boolean | null;
+  createdAt: string;
+}
+
+export const streamerApi = {
+  /** 스트리머 탭 목록 — 방송 중인 스트리머가 위로 정렬되어 온다 */
+  list: async (): Promise<StreamerListItem[]> => {
+    const response = await apiClient.get("/streamers");
+    return response.data;
+  },
+
+  /** 채널 인증 코드 발급 */
+  issueVerificationCode: async (
+    platform: StreamerPlatformKind,
+  ): Promise<{ code: string; expiresAt: string; instruction: string }> => {
+    const response = await apiClient.post("/streamers/verify/code", {
+      platform,
+    });
+    return response.data;
+  },
+
+  /** 채널 소개글의 코드를 대조해 인증 완료 처리 */
+  confirmVerification: async (platform: StreamerPlatformKind) => {
+    const response = await apiClient.post("/streamers/verify/confirm", {
+      platform,
+    });
+    return response.data;
+  },
+
+  // ── 관리자용 ──
+
+  listForAdmin: async (params?: {
+    verified?: "all" | "verified" | "pending";
+    search?: string;
+  }): Promise<AdminStreamerItem[]> => {
+    const response = await apiClient.get("/streamers/admin", { params });
+    return response.data;
+  },
+
+  setVerified: async (id: string, verified: boolean) => {
+    const response = await apiClient.patch(`/streamers/admin/${id}/verified`, {
+      verified,
+    });
+    return response.data;
+  },
+
+  setActive: async (id: string, isActive: boolean) => {
+    const response = await apiClient.patch(`/streamers/admin/${id}/active`, {
+      isActive,
+    });
+    return response.data;
+  },
+
+  /** 폴링을 기다리지 않고 라이브 상태를 즉시 갱신 */
+  refresh: async (): Promise<{
+    checked: number;
+    live: number;
+    failed: number;
+  }> => {
+    const response = await apiClient.post("/streamers/admin/refresh");
+    return response.data;
+  },
+};

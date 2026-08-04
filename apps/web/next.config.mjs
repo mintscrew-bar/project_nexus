@@ -65,6 +65,20 @@ const nextConfig = {
         hostname: "localhost",
         port: "4000",
       },
+      // 스트리머 탭 미리보기 — 치지직 라이브 썸네일·채널 이미지
+      {
+        protocol: "https",
+        hostname: "livecloud-thumb.akamaized.net",
+      },
+      {
+        protocol: "https",
+        hostname: "nng-phinf.pstatic.net",
+      },
+      // 숲(SOOP) 라이브 썸네일
+      {
+        protocol: "https",
+        hostname: "liveimg.sooplive.com",
+      },
       ...(uploadRemotePattern ? [uploadRemotePattern] : []),
     ],
   },

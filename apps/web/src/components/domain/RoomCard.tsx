@@ -19,6 +19,8 @@ interface Room {
   discordGuildId?: string | null;
   allowSpectators?: boolean;
   participants?: any[];
+  /** 호스트가 방송 중이면 채워진다. 라이브 조회 실패 시에는 null이라 뱃지가 숨는다. */
+  hostLive?: { platform: string; channelUrl: string } | null;
 }
 
 interface RoomCardProps {
@@ -26,6 +28,26 @@ interface RoomCardProps {
   currentUserId?: string;
   onClick?: () => void;
   className?: string;
+}
+
+/**
+ * 호스트 방송 중 뱃지. 카드 클릭(방 입장)과 겹치지 않게 클릭을 가로채
+ * 방송으로 보낸다.
+ */
+function HostLiveBadge({ channelUrl }: { channelUrl: string }) {
+  return (
+    <a
+      href={channelUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={(e) => e.stopPropagation()}
+      title="호스트가 방송 중입니다"
+      className="flex flex-shrink-0 items-center gap-1 rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-bold text-white transition-opacity hover:opacity-80"
+    >
+      <span className="h-1 w-1 animate-pulse rounded-full bg-white" />
+      LIVE
+    </a>
+  );
 }
 
 const getModeLabel = (mode: string): string => {
@@ -113,6 +135,7 @@ export const RoomCard: React.FC<RoomCardProps> = ({ room, currentUserId, onClick
                   {room.name}
                 </h3>
                 {room.isPrivate && <LockKeyhole className="h-3.5 w-3.5 flex-shrink-0 text-accent-warning" />}
+                {room.hostLive && <HostLiveBadge channelUrl={room.hostLive.channelUrl} />}
               </div>
               <p className="mt-1.5 truncate text-xs text-text-tertiary">
                 {room.host?.username || room.hostName || `User ${room.hostId.slice(0, 8)}`} 방장 · {getRelativeTime(room.createdAt)}

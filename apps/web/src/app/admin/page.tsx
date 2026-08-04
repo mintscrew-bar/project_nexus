@@ -11,6 +11,7 @@ import { AppealsTab } from "@/components/admin/users/AppealsTab";
 import { ChatLogsTab } from "@/components/admin/users/ChatLogsTab";
 import { CommunityTab } from "@/components/admin/content/CommunityTab";
 import { AnnouncementsTab } from "@/components/admin/content/AnnouncementsTab";
+import { StreamersTab } from "@/components/admin/content/StreamersTab";
 import { ClansTab } from "@/components/admin/game/ClansTab";
 import { RoomsTab } from "@/components/admin/game/RoomsTab";
 import { MatchesTab } from "@/components/admin/game/MatchesTab";
@@ -26,6 +27,7 @@ import {
   Swords,
   BookOpen,
   Megaphone,
+  Radio,
   Bot,
 } from "lucide-react";
 
@@ -39,6 +41,7 @@ type Tab =
   | "matches"
   | "chatlogs"
   | "announcements"
+  | "streamers"
   | "appeals"
   | "discord";
 
@@ -103,6 +106,11 @@ const TAB_GROUPS: TabGroup[] = [
         id: "announcements",
         label: "공지 발송",
         icon: <Megaphone className="h-4 w-4" />,
+      },
+      {
+        id: "streamers",
+        label: "스트리머",
+        icon: <Radio className="h-4 w-4" />,
       },
     ],
   },
@@ -246,6 +254,7 @@ export default function AdminPage() {
         {activeTab === "announcements" && (
           <AnnouncementsTab addToast={addToast} />
         )}
+        {activeTab === "streamers" && <StreamersTab addToast={addToast} />}
         {activeTab === "clans" && <ClansTab addToast={addToast} />}
         {activeTab === "rooms" && <RoomsTab addToast={addToast} />}
         {activeTab === "matches" && <MatchesTab addToast={addToast} />}
