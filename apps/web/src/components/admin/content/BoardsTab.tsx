@@ -25,7 +25,7 @@ import {
   Lock,
 } from "lucide-react";
 
-type AddToast = (msg: string, type: "success" | "error") => void;
+import type { AddToast } from "../shared";
 
 /** 빈 폼 기본값 */
 const emptyForm: BoardInput = {

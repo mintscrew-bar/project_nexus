@@ -26,7 +26,7 @@ import {
   Trophy,
 } from "lucide-react";
 
-type AddToast = (msg: string, type: "success" | "error") => void;
+import type { AddToast } from "../shared";
 
 const PAGE_SIZE = 20;
 
