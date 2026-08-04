@@ -89,8 +89,8 @@ export class StreamerVerificationService {
       // 플랫폼마다 코드를 넣을 위치가 달라 안내 문구를 함께 내려준다.
       instruction:
         platform === StreamerPlatform.CHZZK
-          ? "치지직 채널 설정 > 채널 소개에 아래 코드를 붙여넣고 저장한 뒤 인증하기를 눌러주세요."
-          : "숲 방송국 설정의 방송국 소개에 아래 코드를 붙여넣고 저장한 뒤 인증하기를 눌러주세요.",
+          ? "치지직 스튜디오 > 채널 관리 > 채널 소개에 아래 코드를 붙여넣고 저장한 뒤 인증하기를 눌러주세요."
+          : "숲 방송국 > 방송국 설정 > 방송국 제목 뒤에 아래 코드를 붙여넣고 저장한 뒤 인증하기를 눌러주세요.",
     };
   }
 
@@ -128,7 +128,7 @@ export class StreamerVerificationService {
       );
     }
 
-    // SOOP은 소개글을 주지 않아 코드 대조가 불가능하다. 관리자 수동 승인으로 넘긴다.
+    // 코드를 넣을 수 있는 필드를 주지 않는 플랫폼은 관리자 수동 승인으로 넘긴다.
     if (identity.description == null) {
       throw new BadRequestException(
         "이 플랫폼은 자동 인증을 지원하지 않습니다. 관리자 확인 후 처리됩니다.",
@@ -137,7 +137,9 @@ export class StreamerVerificationService {
 
     if (!identity.description.includes(profile.verificationCode)) {
       throw new BadRequestException(
-        "채널 소개글에서 인증 코드를 찾지 못했습니다. 저장 후 다시 시도해주세요.",
+        platform === StreamerPlatform.CHZZK
+          ? "채널 소개에서 인증 코드를 찾지 못했습니다. 저장 후 다시 시도해주세요."
+          : "방송국 제목에서 인증 코드를 찾지 못했습니다. 저장 후 다시 시도해주세요.",
       );
     }
 

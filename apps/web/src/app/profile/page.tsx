@@ -14,8 +14,9 @@ import { ChampionImage } from '@/components/ChampionImage';
 import { PositionIcon, POSITION_LABELS } from '@/app/tournaments/[id]/lobby/_components/icons';
 import { getChampionIcon } from '@/components/matches/match-utils';
 import { LoadingSpinner, Card, CardHeader, CardTitle, CardContent, Badge, Button, Skeleton, EmptyState, ConfirmModal, StatusSelector, Tabs, TabsList, TabsTrigger, TabsContent, Dropdown } from '@/components/ui';
-import { Star, Plus, RefreshCw, Shield, TrendingUp, Loader2, History, Clock, Settings, User, BarChart3, Pencil, Trash2, Swords, Gavel, Camera, Check, X, MoreVertical, Activity, Calendar, Trophy, Target, Radio, ExternalLink } from 'lucide-react';
+import { Star, Plus, RefreshCw, Shield, TrendingUp, Loader2, History, Clock, Settings, User, BarChart3, Pencil, Trash2, Swords, Gavel, Camera, Check, X, MoreVertical, Activity, Calendar, Trophy, Target, Radio, ShieldCheck, ExternalLink } from 'lucide-react';
 import { TierBadge } from '@/components/domain/TierBadge';
+import { ChannelVerifyModal } from '@/components/domain/ChannelVerifyModal';
 import { RatingStars, WinRateSparkline, getCombinedProfileMetrics } from '@/components/domain/ProfileStats';
 import { PreferredChampionPanel, RankedChampionPanel } from '@/components/domain/ProfileChampionPanels';
 import { useToast } from '@/components/ui/Toast';
@@ -67,6 +68,7 @@ function StreamerRow({
   usedPlatforms,
   onSave,
   onDelete,
+  onVerify,
   onCancel,
 }: {
   entry: StreamerProfile | null;
@@ -74,6 +76,7 @@ function StreamerRow({
   usedPlatforms: StreamerPlatform[];
   onSave: (data: { platform: StreamerPlatform; channelUrl: string; channelName?: string }) => Promise<void>;
   onDelete: (platform: StreamerPlatform) => Promise<void>;
+  onVerify: (platform: StreamerPlatform) => void;
   onCancel?: () => void;
 }) {
   const availablePlatforms = STREAMER_PLATFORM_OPTIONS.filter(
@@ -111,8 +114,9 @@ function StreamerRow({
   };
 
   if (!editing) {
+    const verified = !!entry!.verifiedAt;
     return (
-      <div className="flex items-center gap-3 rounded-lg bg-bg-tertiary/50 px-3 py-2.5">
+      <div className="flex flex-wrap items-center gap-3 rounded-lg bg-bg-tertiary/50 px-3 py-2.5">
         <span className="w-16 flex-shrink-0 text-xs font-bold text-text-secondary">
           {STREAMER_PLATFORM_LABELS[entry!.platform]}
         </span>
@@ -124,6 +128,22 @@ function StreamerRow({
         >
           {entry!.channelName || entry!.channelUrl}
         </a>
+        {/* 인증을 마쳐야 스트리머 목록·방 목록에 LIVE가 붙는다 */}
+        {verified ? (
+          <span className="flex flex-shrink-0 items-center gap-1 rounded-md bg-accent-primary/15 px-2 py-1 text-[10px] font-bold text-accent-primary">
+            <ShieldCheck className="h-3 w-3" />
+            인증됨
+          </span>
+        ) : (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 flex-shrink-0 px-2 text-xs"
+            onClick={() => onVerify(entry!.platform)}
+          >
+            채널 인증
+          </Button>
+        )}
         <div className="flex flex-shrink-0 gap-1">
           <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setEditing(true)}>
             수정
@@ -190,6 +210,7 @@ function StreamerRegistrationCard({
   addToast: (message: string, type: 'success' | 'error') => void;
 }) {
   const [addingNew, setAddingNew] = useState(false);
+  const [verifyingPlatform, setVerifyingPlatform] = useState<StreamerPlatform | null>(null);
 
   const usedPlatforms = profiles.map((p) => p.platform);
   // 3개 플랫폼이 모두 등록됐으면 추가 버튼 숨김
@@ -255,6 +276,7 @@ function StreamerRegistrationCard({
               usedPlatforms={usedPlatforms}
               onSave={handleSave}
               onDelete={handleDelete}
+              onVerify={setVerifyingPlatform}
             />
           ))}
           {addingNew && (
@@ -264,11 +286,21 @@ function StreamerRegistrationCard({
               usedPlatforms={usedPlatforms}
               onSave={handleSave}
               onDelete={handleDelete}
+              onVerify={setVerifyingPlatform}
               onCancel={() => setAddingNew(false)}
             />
           )}
         </div>
       </CardContent>
+
+      {verifyingPlatform && (
+        <ChannelVerifyModal
+          platform={verifyingPlatform}
+          onClose={() => setVerifyingPlatform(null)}
+          onVerified={onSaved}
+          addToast={addToast}
+        />
+      )}
     </Card>
   );
 }

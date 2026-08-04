@@ -25,6 +25,7 @@ export class SoopLiveProvider implements LiveProvider {
   private readonly logger = new Logger(SoopLiveProvider.name);
   private readonly liveApiUrl =
     "https://live.sooplive.co.kr/afreeca/player_live_api.php";
+  private readonly stationApiUrl = "https://chapi.sooplive.co.kr/api";
   private readonly timeout = 4000;
 
   // SOOP 스트리머 ID는 영문 소문자·숫자·언더스코어 조합이다.
@@ -53,20 +54,54 @@ export class SoopLiveProvider implements LiveProvider {
   }
 
   /**
-   * SOOP은 방송 중이 아니면 닉네임조차 돌려주지 않는다.
-   * 그래서 오프라인 채널은 식별자만 확인된 상태로 둔다.
+   * 방송국 정보 조회. 라이브 API와 달리 오프라인이어도 응답한다.
+   *
+   * SOOP은 치지직의 채널 소개글에 해당하는 필드를 주지 않는다.
+   * 대신 스트리머가 직접 수정할 수 있는 방송국 제목/이름을 description으로 합쳐서
+   * 인증 코드 대조에 쓴다. (둘 중 어디에 넣어도 통과하도록)
    */
   async fetchIdentity(channelId: string): Promise<ChannelIdentity | null> {
-    const channel = await this.fetchChannel(channelId);
-    if (!channel) return null;
+    const station = await this.fetchStation(channelId);
+    if (!station) return null;
+
+    const description = [station.station_title, station.station_name]
+      .filter(Boolean)
+      .join(" ");
 
     return {
       channelId,
-      channelName: channel.BJNICK ?? null,
+      channelName: station.user_nick ?? station.station_name ?? null,
       channelImageUrl: null,
       followerCount: null,
-      description: null,
+      description,
     };
+  }
+
+  private async fetchStation(channelId: string): Promise<{
+    user_id?: string;
+    user_nick?: string;
+    station_title?: string;
+    station_name?: string;
+  } | null> {
+    try {
+      const response = await axios.get<{
+        station?: {
+          user_id?: string;
+          user_nick?: string;
+          station_title?: string;
+          station_name?: string;
+        };
+      }>(`${this.stationApiUrl}/${channelId}/station`, {
+        timeout: this.timeout,
+        headers: { "User-Agent": "Mozilla/5.0 (compatible; NexusBot/1.0)" },
+      });
+
+      return response.data?.station ?? null;
+    } catch (error) {
+      const err = error as Error;
+      this.logger.warn(`숲 방송국 조회 실패 ${channelId}: ${err?.message}`);
+      return null;
+    }
   }
 
   async fetchLiveSnapshot(channelId: string): Promise<LiveSnapshot | null> {

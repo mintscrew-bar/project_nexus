@@ -453,6 +453,8 @@ export interface StreamerProfile {
   channelUrl: string;
   channelName: string | null;
   isActive?: boolean;
+  /** 채널 소유권 인증 시각. null이면 미인증이라 LIVE 뱃지가 붙지 않는다. */
+  verifiedAt?: string | null;
   createdAt?: string;
   updatedAt?: string;
 }
