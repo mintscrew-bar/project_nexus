@@ -7,6 +7,7 @@ import { Search, TrendingUp, Clock, User, Target, Users } from "lucide-react";
 import { Button, Input, Badge } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
 import { statsApi } from "@/lib/api-client";
+import { MatchesTour } from "@/components/onboarding/PrimaryPageTours";
 
 interface RecentSearch {
   type: "summoner" | "user";
@@ -162,6 +163,7 @@ export default function StatsPage() {
 
   return (
     <div className="min-h-screen bg-bg-primary">
+      <MatchesTour />
       {/* Hero Section */}
       <div className="bg-gradient-to-b from-accent-primary/10 to-bg-primary border-b border-bg-tertiary">
         <div className="container mx-auto px-4 py-8 md:py-16 text-center">
@@ -176,7 +178,7 @@ export default function StatsPage() {
           </p>
 
           {/* Search Bar */}
-          <div className="max-w-2xl mx-auto">
+          <div data-tour="matches-search" className="max-w-2xl mx-auto">
             {/* Search Type Tabs */}
             <div className="flex flex-wrap gap-2 mb-4 justify-center">
               <button
@@ -311,7 +313,7 @@ export default function StatsPage() {
       <div className="container mx-auto px-4 py-8 md:py-12">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-6xl mx-auto">
           {/* Recent Searches */}
-          <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-6">
+          <div data-tour="matches-recent" className="bg-bg-secondary border border-bg-tertiary rounded-xl p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold text-text-primary flex items-center gap-2">
                 <Clock className="h-5 w-5 text-accent-primary" />
@@ -367,7 +369,7 @@ export default function StatsPage() {
           </div>
 
           {/* Popular Features */}
-          <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-6">
+          <div data-tour="matches-features" className="bg-bg-secondary border border-bg-tertiary rounded-xl p-6">
             <h2 className="text-xl font-bold text-text-primary flex items-center gap-2 mb-4">
               <TrendingUp className="h-5 w-5 text-accent-primary" />
               주요 기능

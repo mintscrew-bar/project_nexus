@@ -13,6 +13,7 @@ import type { StreamerListItem } from "@/lib/api-client";
 import { useAuthStore } from "@/stores/auth-store";
 import { useToast } from "@/components/ui/Toast";
 import { useRouter } from "next/navigation";
+import { StreamersTour } from "@/components/onboarding/PrimaryPageTours";
 
 export function StreamersClient() {
   const router = useRouter();
@@ -70,7 +71,8 @@ export function StreamersClient() {
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-8 md:px-6">
-      <header className="mb-8">
+      <StreamersTour />
+      <header data-tour="streamers-intro" className="mb-8">
         <h1 className="text-2xl font-bold text-text-primary md:text-3xl">
           스트리머
         </h1>
@@ -79,6 +81,7 @@ export function StreamersClient() {
         </p>
       </header>
 
+      <div data-tour="streamers-list">
       {isLoading && (
         <div className="flex justify-center py-20">
           <LoadingSpinner />
@@ -141,6 +144,7 @@ export function StreamersClient() {
           </div>
         </section>
       )}
+      </div>
     </div>
   );
 }

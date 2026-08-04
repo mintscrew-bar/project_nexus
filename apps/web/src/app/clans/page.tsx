@@ -32,6 +32,7 @@ import {
   POSITION_LABELS,
 } from "@/app/tournaments/[id]/lobby/_components/icons";
 import { ClanEmblem, ClanTag } from "@/components/domain/ClanEmblem";
+import { ClansTour } from "@/components/onboarding/PrimaryPageTours";
 
 interface Clan {
   id: string;
@@ -336,11 +337,12 @@ export default function ClansPage() {
 
   return (
     <>
+      <ClansTour />
       <div className="flex-grow p-4 md:p-6 animate-fade-in">
         <div className="container mx-auto max-w-5xl">
           <h1 className="sr-only">클랜 브라우저</h1>
           {/* 검색 & 필터 */}
-          <div className="flex flex-col gap-3 mb-6">
+          <div data-tour="clans-filters" className="flex flex-col gap-3 mb-6">
             <form onSubmit={handleSearch} className="flex-grow flex gap-2">
               <div className="relative flex-grow">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-tertiary" />
@@ -425,7 +427,7 @@ export default function ClansPage() {
           </div>
 
           {/* 모집 포지션 필터 토글 */}
-          <div className="mb-6 flex flex-wrap items-center gap-2">
+          <div data-tour="clans-roles" className="mb-6 flex flex-wrap items-center gap-2">
             <span className="text-xs font-semibold text-text-tertiary">
               모집 포지션
             </span>
@@ -467,6 +469,7 @@ export default function ClansPage() {
           )}
 
           {/* 스켈레톤 로딩 */}
+          <div data-tour="clans-results">
           {isLoading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {Array.from({ length: 6 }).map((_, i) => (
@@ -671,6 +674,7 @@ export default function ClansPage() {
               })}
             </div>
           )}
+          </div>
         </div>
       </div>
 
