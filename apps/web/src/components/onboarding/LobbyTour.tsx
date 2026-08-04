@@ -5,7 +5,6 @@ import { useAuthStore } from "@/stores/auth-store";
 import {
   getUserOnboardingStorageKey,
   LOBBY_TOUR_STORAGE_KEY,
-  TOURNAMENTS_TOUR_STORAGE_KEY,
 } from "@/lib/onboarding";
 
 const STEPS: GuidedTourStep[] = [
@@ -49,10 +48,6 @@ export function LobbyTour() {
       steps={STEPS}
       storageKey={getUserOnboardingStorageKey(
         LOBBY_TOUR_STORAGE_KEY,
-        userId,
-      )}
-      prerequisiteStorageKey={getUserOnboardingStorageKey(
-        TOURNAMENTS_TOUR_STORAGE_KEY,
         userId,
       )}
       startDelay={900}

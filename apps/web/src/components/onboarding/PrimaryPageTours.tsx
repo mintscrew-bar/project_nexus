@@ -5,7 +5,6 @@ import {
   CLANS_TOUR_STORAGE_KEY,
   COMMUNITY_TOUR_STORAGE_KEY,
   getUserOnboardingStorageKey,
-  HOME_TOUR_STORAGE_KEY,
   MATCHES_TOUR_STORAGE_KEY,
   RANKING_TOUR_STORAGE_KEY,
   STREAMERS_TOUR_STORAGE_KEY,
@@ -27,10 +26,6 @@ function PageTour({ ariaLabel, steps, storageKey }: PageTourProps) {
       ariaLabel={ariaLabel}
       steps={steps}
       storageKey={getUserOnboardingStorageKey(storageKey, userId)}
-      prerequisiteStorageKey={getUserOnboardingStorageKey(
-        HOME_TOUR_STORAGE_KEY,
-        userId,
-      )}
       startDelay={700}
     />
   );
