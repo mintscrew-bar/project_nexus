@@ -13,6 +13,16 @@ const PLATFORM_LABELS: Record<string, string> = {
   YOUTUBE: "유튜브",
 };
 
+/**
+ * 썸네일 URL은 방송 내내 고정이라 그냥 쓰면 브라우저가 첫 프레임을 캐시해
+ * 화면이 멈춘 것처럼 보인다. 폴링 시각을 붙여 갱신될 때마다 새로 받게 한다.
+ */
+function withCacheBuster(url: string, checkedAt: string): string {
+  const stamp = new Date(checkedAt).getTime();
+  if (Number.isNaN(stamp)) return url;
+  return `${url}${url.includes("?") ? "&" : "?"}t=${stamp}`;
+}
+
 /** 마지막 방송 시각을 "3일 전 방송" 형태로 표현한다. */
 function formatLastLive(lastLiveAt: string | null): string {
   if (!lastLiveAt) return "방송 기록 없음";
@@ -34,9 +44,14 @@ function formatLastLive(lastLiveAt: string | null): string {
  * (임베드로 여기서 시청하게 하면 플랫폼 시청자 수에 안 잡혀 홍보에 손해)
  */
 export function LiveStreamerCard({ streamer }: { streamer: StreamerListItem }) {
-  const [thumbnailFailed, setThumbnailFailed] = useState(false);
+  // 실패한 URL 자체를 기억한다. 폴링으로 URL이 바뀌면 자연히 다시 시도하게 된다.
+  const [failedThumbnail, setFailedThumbnail] = useState<string | null>(null);
   const live = streamer.live;
-  const thumbnail = live?.thumbnailUrl;
+  const thumbnail =
+    live?.thumbnailUrl && live.checkedAt
+      ? withCacheBuster(live.thumbnailUrl, live.checkedAt)
+      : live?.thumbnailUrl;
+  const thumbnailFailed = !!thumbnail && failedThumbnail === thumbnail;
 
   return (
     <div className="group overflow-hidden rounded-2xl border border-bg-tertiary bg-bg-secondary transition-colors hover:border-accent-primary/40">
@@ -56,7 +71,7 @@ export function LiveStreamerCard({ streamer }: { streamer: StreamerListItem }) {
               unoptimized
               sizes="(max-width: 768px) 100vw, 420px"
               className="object-cover transition-transform duration-500 group-hover:scale-[1.04]"
-              onError={() => setThumbnailFailed(true)}
+              onError={() => thumbnail && setFailedThumbnail(thumbnail)}
             />
           ) : (
             <div className="flex h-full items-center justify-center text-text-muted">
