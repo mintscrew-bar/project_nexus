@@ -835,8 +835,7 @@ export class AuthService {
 
       return {
         ...profile,
-        onboardingSeen:
-          !!settings?.onboardingSeenAt || riotAccounts.length > 0,
+        onboardingSeen: !!settings?.onboardingSeenAt || riotAccounts.length > 0,
       };
     } catch (e) {
       console.error("Error in getUserById:", e);
