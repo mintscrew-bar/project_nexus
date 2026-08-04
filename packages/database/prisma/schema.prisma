@@ -87,6 +87,8 @@ model User {
   settings            UserSettings?
   streamerProfiles    StreamerProfile[]
   streamerLinks       StreamerLink[]
+  streamerFollowing   StreamerFollow[]   @relation("StreamerFollower")
+  streamerFollowers   StreamerFollow[]   @relation("StreamerFollowed")
   statsRecomputeQueue StatsRecomputeQueue?
   votesGiven          MatchVote[]        @relation("VoterUser")
   votesReceived       MatchVote[]        @relation("VotedForUser")
@@ -227,6 +229,21 @@ model StreamerLink {
   @@index([userId, order])
   @@index([isActive])
   @@map("streamer_links")
+}
+
+/** 스트리머 방송 시작 알림 구독. 팔로우한 스트리머가 라이브로 전환되면 알림을 보낸다. */
+model StreamerFollow {
+  id         String   @id @default(cuid())
+  followerId String
+  streamerId String
+  createdAt  DateTime @default(now())
+
+  follower User @relation("StreamerFollower", fields: [followerId], references: [id], onDelete: Cascade)
+  streamer User @relation("StreamerFollowed", fields: [streamerId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, streamerId])
+  @@index([streamerId])
+  @@map("streamer_follows")
 }
 
 model RiotAccount {
@@ -1414,6 +1431,7 @@ enum NotificationType {
   CLAN_JOIN_REQUEST
   CLAN_JOIN_APPROVED
   CLAN_ANNOUNCEMENT
+  STREAMER_LIVE
 }
 
 enum AdminAction {

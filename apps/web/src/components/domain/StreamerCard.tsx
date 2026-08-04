@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
-import { Eye, Radio, Swords } from "lucide-react";
+import { Bell, BellOff, Eye, Radio, Swords } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { StreamerListItem } from "@/lib/api-client";
 
@@ -43,7 +43,17 @@ function formatLastLive(lastLiveAt: string | null): string {
  * 카드를 누르면 NEXUS에 붙잡아두지 않고 스트리머의 방송으로 보낸다.
  * (임베드로 여기서 시청하게 하면 플랫폼 시청자 수에 안 잡혀 홍보에 손해)
  */
-export function LiveStreamerCard({ streamer }: { streamer: StreamerListItem }) {
+interface StreamerCardProps {
+  streamer: StreamerListItem;
+  onToggleFollow?: (streamer: StreamerListItem) => void;
+  followPending?: boolean;
+}
+
+export function LiveStreamerCard({
+  streamer,
+  onToggleFollow,
+  followPending,
+}: StreamerCardProps) {
   // 실패한 URL 자체를 기억한다. 폴링으로 URL이 바뀌면 자연히 다시 시도하게 된다.
   const [failedThumbnail, setFailedThumbnail] = useState<string | null>(null);
   const live = streamer.live;
@@ -110,17 +120,28 @@ export function LiveStreamerCard({ streamer }: { streamer: StreamerListItem }) {
         </div>
       </a>
 
-      {/* 내전 방을 열어둔 경우 — 치지직에서는 볼 수 없는 정보라 이 탭의 핵심이다 */}
-      {streamer.activeRoom && (
-        <Link
-          href={`/tournaments/${streamer.activeRoom.id}`}
-          className="flex items-center gap-2 border-t border-bg-tertiary bg-accent-primary/10 px-4 py-3 text-sm font-medium text-accent-primary transition-colors hover:bg-accent-primary/20"
-        >
-          <Swords className="h-4 w-4 flex-shrink-0" />
-          <span className="truncate">{streamer.activeRoom.name}</span>
-          <span className="ml-auto flex-shrink-0 text-xs">참가하기 →</span>
-        </Link>
-      )}
+      <div className="flex items-center gap-2 border-t border-bg-tertiary px-4 py-3">
+        {streamer.activeRoom && (
+          <Link
+            href={`/tournaments/${streamer.activeRoom.id}`}
+            className="flex min-w-0 flex-1 items-center gap-2 text-sm font-medium text-accent-primary"
+          >
+            <Swords className="h-4 w-4 flex-shrink-0" />
+            <span className="truncate">{streamer.activeRoom.name}</span>
+            <span className="ml-auto flex-shrink-0 text-xs">참가하기 →</span>
+          </Link>
+        )}
+        {!streamer.activeRoom && (
+          <span className="flex-1 text-xs text-text-muted">방송 시작 알림</span>
+        )}
+        {onToggleFollow && (
+          <FollowButton
+            streamer={streamer}
+            pending={followPending}
+            onClick={() => onToggleFollow(streamer)}
+          />
+        )}
+      </div>
     </div>
   );
 }
@@ -128,28 +149,66 @@ export function LiveStreamerCard({ streamer }: { streamer: StreamerListItem }) {
 /** 오프라인 스트리머 카드 — 목록이 비어 보이지 않게 하는 역할 */
 export function OfflineStreamerCard({
   streamer,
+  onToggleFollow,
+  followPending,
+}: StreamerCardProps) {
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-bg-tertiary bg-bg-secondary p-3 transition-colors hover:border-bg-elevated hover:bg-bg-tertiary/60">
+      <a
+        href={streamer.channelUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex min-w-0 flex-1 items-center gap-3"
+      >
+        <StreamerAvatar streamer={streamer} size={44} />
+
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-medium text-text-primary">
+            {streamer.channelName ?? streamer.username}
+          </p>
+          <p className="truncate text-xs text-text-muted">
+            {PLATFORM_LABELS[streamer.platform] ?? streamer.platform} ·{" "}
+            {formatLastLive(streamer.lastLiveAt)}
+          </p>
+        </div>
+      </a>
+      {onToggleFollow && (
+        <FollowButton
+          streamer={streamer}
+          pending={followPending}
+          onClick={() => onToggleFollow(streamer)}
+        />
+      )}
+    </div>
+  );
+}
+
+function FollowButton({
+  streamer,
+  pending,
+  onClick,
 }: {
   streamer: StreamerListItem;
+  pending?: boolean;
+  onClick: () => void;
 }) {
+  const Icon = streamer.isFollowing ? BellOff : Bell;
   return (
-    <a
-      href={streamer.channelUrl}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="flex items-center gap-3 rounded-xl border border-bg-tertiary bg-bg-secondary p-3 transition-colors hover:border-bg-elevated hover:bg-bg-tertiary/60"
+    <button
+      type="button"
+      disabled={pending}
+      onClick={onClick}
+      aria-label={streamer.isFollowing ? "방송 알림 끄기" : "방송 알림 받기"}
+      title={streamer.isFollowing ? "방송 알림 끄기" : "방송 알림 받기"}
+      className={cn(
+        "flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border transition-colors disabled:opacity-50",
+        streamer.isFollowing
+          ? "border-accent-primary/40 bg-accent-primary/15 text-accent-primary"
+          : "border-bg-elevated text-text-muted hover:border-accent-primary/40 hover:text-accent-primary",
+      )}
     >
-      <StreamerAvatar streamer={streamer} size={44} />
-
-      <div className="min-w-0 flex-1">
-        <p className="truncate font-medium text-text-primary">
-          {streamer.channelName ?? streamer.username}
-        </p>
-        <p className="truncate text-xs text-text-muted">
-          {PLATFORM_LABELS[streamer.platform] ?? streamer.platform} ·{" "}
-          {formatLastLive(streamer.lastLiveAt)}
-        </p>
-      </div>
-    </a>
+      <Icon className="h-4 w-4" />
+    </button>
   );
 }
 

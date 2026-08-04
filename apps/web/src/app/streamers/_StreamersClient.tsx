@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Radio, Sparkles } from "lucide-react";
 import { streamerApi } from "@/lib/api-client";
 import { LoadingSpinner } from "@/components/ui";
@@ -9,8 +9,16 @@ import {
   LiveStreamerCard,
   OfflineStreamerCard,
 } from "@/components/domain/StreamerCard";
+import type { StreamerListItem } from "@/lib/api-client";
+import { useAuthStore } from "@/stores/auth-store";
+import { useToast } from "@/components/ui/Toast";
+import { useRouter } from "next/navigation";
 
 export function StreamersClient() {
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const { isAuthenticated } = useAuthStore();
+  const { addToast } = useToast();
   const { data, isLoading, isError } = useQuery({
     queryKey: ["streamers"],
     queryFn: streamerApi.list,
@@ -18,6 +26,41 @@ export function StreamersClient() {
     refetchInterval: 60_000,
     staleTime: 30_000,
   });
+
+  const followMutation = useMutation({
+    mutationFn: async (streamer: StreamerListItem) => {
+      if (streamer.isFollowing) {
+        await streamerApi.unfollow(streamer.userId);
+      } else {
+        await streamerApi.follow(streamer.userId);
+      }
+      return streamer;
+    },
+    onSuccess: (streamer) => {
+      queryClient.setQueryData<StreamerListItem[]>(["streamers"], (current) =>
+        current?.map((item) =>
+          item.userId === streamer.userId
+            ? { ...item, isFollowing: !streamer.isFollowing }
+            : item,
+        ),
+      );
+      addToast(
+        streamer.isFollowing
+          ? "방송 시작 알림을 해제했습니다."
+          : "방송을 시작하면 알림으로 알려드릴게요.",
+        "success",
+      );
+    },
+    onError: () => addToast("알림 설정을 변경하지 못했습니다.", "error"),
+  });
+
+  const toggleFollow = (streamer: StreamerListItem) => {
+    if (!isAuthenticated) {
+      router.push("/auth/login?callbackUrl=/streamers");
+      return;
+    }
+    followMutation.mutate(streamer);
+  };
 
   const streamers = data ?? [];
   const liveStreamers = streamers.filter((streamer) => streamer.live?.isLive);
@@ -63,6 +106,11 @@ export function StreamersClient() {
               <LiveStreamerCard
                 key={`${streamer.userId}-${streamer.platform}`}
                 streamer={streamer}
+                onToggleFollow={toggleFollow}
+                followPending={
+                  followMutation.isPending &&
+                  followMutation.variables?.userId === streamer.userId
+                }
               />
             ))}
           </div>
@@ -83,6 +131,11 @@ export function StreamersClient() {
               <OfflineStreamerCard
                 key={`${streamer.userId}-${streamer.platform}`}
                 streamer={streamer}
+                onToggleFollow={toggleFollow}
+                followPending={
+                  followMutation.isPending &&
+                  followMutation.variables?.userId === streamer.userId
+                }
               />
             ))}
           </div>
@@ -101,8 +154,8 @@ function EmptyState() {
         아직 등록된 스트리머가 없어요
       </p>
       <p className="mx-auto mt-2 max-w-md text-sm text-text-secondary">
-        방송하면서 내전을 진행하신다면 NEXUS와 함께해요. 방송 중일 때 이 페이지와
-        내전 방 목록에 노출됩니다.
+        방송하면서 내전을 진행하신다면 NEXUS와 함께해요. 방송 중일 때 이
+        페이지와 내전 방 목록에 노출됩니다.
       </p>
       <Link
         href="/partners"

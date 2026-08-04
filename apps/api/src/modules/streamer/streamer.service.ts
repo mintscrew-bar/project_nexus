@@ -1,10 +1,22 @@
-import { Injectable, Logger, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from "@nestjs/common";
 import { Prisma, StreamerPlatform } from "@nexus/database";
 import { PrismaService } from "../prisma/prisma.service";
 import { RedisService } from "../redis/redis.service";
 import { DiscordAdminAlertService } from "../discord/discord-admin-alert.service";
+import { NotificationService } from "../notification/notification.service";
 import { LiveProviderRegistry } from "./providers/live-provider.registry";
 import { LiveSnapshot } from "./providers/live-provider.interface";
+
+/**
+ * "방송 시작" 전환 감지용 캐시 TTL. 라이브 캐시(90초)보다 넉넉히 길게 잡아
+ * 폴링이 잠깐 밀려도 이전 상태를 잃지 않게 한다.
+ */
+const WAS_LIVE_CACHE_TTL = 60 * 60 * 6;
 
 /**
  * 이 횟수만큼 폴링 사이클이 연속으로 "검증된 스트리머 전원 조회 실패"면
@@ -38,6 +50,8 @@ export interface StreamerListItem {
   live: StreamerLiveState | null;
   /** 이 스트리머가 지금 호스트로 열어둔 내전 방 */
   activeRoom: { id: string; name: string; status: string } | null;
+  /** 요청한 유저가 팔로우 중인지. 비로그인 요청이면 항상 false. */
+  isFollowing: boolean;
 }
 
 @Injectable()
@@ -49,6 +63,7 @@ export class StreamerService {
     private readonly redis: RedisService,
     private readonly providers: LiveProviderRegistry,
     private readonly adminAlert: DiscordAdminAlertService,
+    private readonly notificationService: NotificationService,
   ) {}
 
   // ── 캐시 ──────────────────────────────────────────────────────────────
@@ -166,7 +181,7 @@ export class StreamerService {
    * 라이브 전용 목록이 아니라 "등록된 스트리머 목록"이고, 방송 중인 사람이
    * 위로 올라오는 형태다. 등록자가 적은 초기에도 페이지가 비지 않게 하려는 의도다.
    */
-  async listStreamers(): Promise<StreamerListItem[]> {
+  async listStreamers(viewerId?: string): Promise<StreamerListItem[]> {
     const profiles = await this.prisma.streamerProfile.findMany({
       where: { isActive: true, verifiedAt: { not: null } },
       include: {
@@ -191,6 +206,10 @@ export class StreamerService {
       profiles.map((profile) => profile.userId),
     );
 
+    const followedIds = viewerId
+      ? new Set(await this.getFollowedStreamerIds(viewerId))
+      : new Set<string>();
+
     const items: StreamerListItem[] = profiles.map((profile) => {
       const live = profile.channelId
         ? (liveStates.get(`${profile.platform}:${profile.channelId}`) ?? null)
@@ -209,6 +228,7 @@ export class StreamerService {
         lastLiveAt: profile.lastLiveAt,
         live,
         activeRoom: activeRooms.get(profile.userId) ?? null,
+        isFollowing: followedIds.has(profile.userId),
       };
     });
 
@@ -331,7 +351,14 @@ export class StreamerService {
         verifiedAt: { not: null },
         channelId: { not: null },
       },
-      select: { id: true, platform: true, channelId: true, lastLiveAt: true },
+      select: {
+        id: true,
+        userId: true,
+        platform: true,
+        channelId: true,
+        channelName: true,
+        lastLiveAt: true,
+      },
     });
 
     let live = 0;
@@ -357,6 +384,8 @@ export class StreamerService {
           }
           if (state.isLive) live += 1;
 
+          await this.notifyFollowersIfWentLive(profile, state.isLive);
+
           // lastLiveAt은 "3일 전 방송" 표시용이라 방송 중일 때만,
           // 그것도 10분 이상 지났을 때만 쓴다. (폴링마다 DB를 때리지 않도록)
           const shouldTouch =
@@ -381,6 +410,89 @@ export class StreamerService {
     await this.trackFailureStreak(profiles.length, failed);
 
     return { checked: profiles.length, live, failed };
+  }
+
+  /**
+   * 오프라인 → 라이브로 전환된 순간에만 팔로워에게 알림을 보낸다.
+   * 매 폴링(1분)마다 계속 알리면 스팸이 되므로, 직전 상태를 Redis에 저장해 비교한다.
+   */
+  private async notifyFollowersIfWentLive(
+    profile: {
+      id: string;
+      userId: string;
+      platform: StreamerPlatform;
+      channelId: string | null;
+      channelName: string | null;
+    },
+    isLive: boolean,
+  ): Promise<void> {
+    if (!profile.channelId) return;
+
+    const key = `streamer:was-live:${profile.platform}:${profile.channelId}`;
+    const previousState = await this.redis.get(key);
+
+    await this.redis.set(key, isLive ? "1" : "0", WAS_LIVE_CACHE_TTL);
+
+    // 배포·캐시 유실 직후에는 직전 상태를 모르므로 현재 상태만 기준점으로 기록한다.
+    if (previousState == null) return;
+
+    const wasLive = previousState === "1";
+    if (!isLive || wasLive) return;
+
+    const followers = await this.prisma.streamerFollow.findMany({
+      where: { streamerId: profile.userId },
+      select: { followerId: true },
+    });
+    if (followers.length === 0) return;
+
+    const streamerName = profile.channelName ?? "스트리머";
+    await Promise.all(
+      followers.map((f) =>
+        this.notificationService
+          .notifyStreamerLive(f.followerId, streamerName, profile.userId)
+          .catch((error) => {
+            const err = error as Error;
+            this.logger.warn(`방송 시작 알림 실패: ${err?.message}`);
+          }),
+      ),
+    );
+  }
+
+  // ── 팔로우 ────────────────────────────────────────────────────────────
+
+  async follow(followerId: string, streamerId: string): Promise<void> {
+    if (followerId === streamerId) {
+      throw new BadRequestException("본인을 팔로우할 수 없습니다.");
+    }
+
+    const hasProfile = await this.prisma.streamerProfile.findFirst({
+      where: { userId: streamerId, verifiedAt: { not: null } },
+      select: { id: true },
+    });
+    if (!hasProfile) {
+      throw new NotFoundException("인증된 스트리머가 아닙니다.");
+    }
+
+    await this.prisma.streamerFollow.upsert({
+      where: { followerId_streamerId: { followerId, streamerId } },
+      create: { followerId, streamerId },
+      update: {},
+    });
+  }
+
+  async unfollow(followerId: string, streamerId: string): Promise<void> {
+    await this.prisma.streamerFollow.deleteMany({
+      where: { followerId, streamerId },
+    });
+  }
+
+  /** 현재 유저가 팔로우 중인 스트리머 userId 목록 */
+  async getFollowedStreamerIds(followerId: string): Promise<string[]> {
+    const rows = await this.prisma.streamerFollow.findMany({
+      where: { followerId },
+      select: { streamerId: true },
+    });
+    return rows.map((row) => row.streamerId);
   }
 
   /**

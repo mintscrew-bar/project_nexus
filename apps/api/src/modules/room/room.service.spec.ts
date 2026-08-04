@@ -8,6 +8,7 @@ import { RoomService } from "./room.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { ShutdownService } from "../common/shutdown.service";
 import { RoomStatus, TeamMode } from "@nexus/database";
+import { StreamerService } from "../streamer/streamer.service";
 
 describe("RoomService", () => {
   let service: RoomService;
@@ -60,6 +61,10 @@ describe("RoomService", () => {
         { provide: PrismaService, useValue: prisma },
         { provide: ConfigService, useValue: { get: jest.fn() } },
         { provide: ShutdownService, useValue: shutdownService },
+        {
+          provide: StreamerService,
+          useValue: { getHostLiveMap: jest.fn().mockResolvedValue(new Map()) },
+        },
       ],
     }).compile();
 

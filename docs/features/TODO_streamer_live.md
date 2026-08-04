@@ -3,9 +3,9 @@
 > 작성일: 2026-08-04
 > 브랜치: `feat/streamer-live`
 >
-> **진행(2026-08-04):** 백엔드·프론트·관리자 탭·채널 인증까지 1차 완료. api/web 타입체크·린트 그린.
-> **남음:** 실사용 검증(실제 스트리머 계정으로 인증→LIVE 표시 확인), 치지직 OAuth 경로 추가.
-
+> **진행(2026-08-04):** 출시 범위 구현 완료. CHZZK OAuth, 팔로우 알림, 방송 설정 통합까지 반영했고 API 테스트 196개·전체 린트·프로덕션 빌드 통과.
+> **남음:** 실제 스트리머가 방송을 켜야 가능한 E2E 실사용 확인. 대규모 폴링 최적화와 YouTube는 후속 확장 범위.
+>
 ---
 
 ## 한 줄 정의
@@ -51,14 +51,16 @@ NEXUS에 채널을 등록·인증한 스트리머가 방송을 켜면, **스트�
 - [x] Task 11: 프로필 채널 인증 UI (`ChannelVerifyModal`)
 - [x] Task 12: 메인 홈 "지금 방송 중" 섹션 (방송 중인 스트리머 없으면 렌더 안 함)
 - [ ] Task 13: 실사용 검증 — 실제 스트리머 계정으로 인증 → 방송 켜기 → LIVE 표시 확인
-- [ ] Task 14: 치지직 OAuth 인증 경로 추가 (앱 등록 완료 후, 코드 대조보다 깔끔한 경로)
+- [x] Task 14: 치지직 OAuth 인증 경로 추가 (10분 만료 1회성 state, 토큰 비저장, `/users/me` 소유권 확인)
 - [ ] Task 15: 스트리머 수가 늘면 폴링 대상을 온라인·방 참가자 기준으로 좁히기
 - [ ] Task 16: 유튜브 지원 (쿼터 설계 선행 필요)
+- [x] Task 17: 방송 시작 알림 (팔로우) — 팔로우 API·UI, 오프라인→LIVE 전환 알림, DB 마이그레이션 완료
+- [x] Task 18: 방송 설정 모으기 — 채널 등록·인증·링크·OBS 도구를 설정 방송 탭으로 통합, 프로필은 바로가기만 유지
 
 ## 운영 메모
 
 - 비공식 엔드포인트가 막히면 `apps/api/src/modules/streamer/providers/` 의 해당 파일만 교체하면 된다. 조회 실패는 전부 `null`로 흡수되어 **LIVE 뱃지만 사라지고 스트리머 탭·목록은 그대로 동작한다.**
-- 치지직 OAuth용 환경변수는 `CHZZK_CLIENT_ID` / `CHZZK_CLIENT_SECRET` / `CHZZK_CALLBACK_URL`. GitHub Secrets에 등록되어 있고 배포 워크플로가 `.env.production`으로 내려준다. **스코프는 "채널 조회"만 요청한다** (스트림키 조회는 유출 시 제3자 송출이 가능해 절대 요청하지 않음).
-- 스키마 변경분은 아직 운영 DB에 반영되지 않았다. `migrate deploy` 필요.
+- 치지직 OAuth용 환경변수는 `CHZZK_CLIENT_ID` / `CHZZK_CLIENT_SECRET` / `CHZZK_CALLBACK_URL`. GitHub Secrets와 배포 워크플로를 통해 `.env.production`으로 내려준다. 앱 권한은 공식 `/users/me` 호출에 필요한 **"유저 정보 조회"만 요청한다** (스트림키·방송 설정 권한은 요청하지 않음).
+- 스키마 변경분(`StreamerFollow` 포함)은 아직 운영 DB에 반영되지 않았다. `migrate deploy` 필요.
 
 관련: [`TODO_broadcast_overlay.md`](./TODO_broadcast_overlay.md)

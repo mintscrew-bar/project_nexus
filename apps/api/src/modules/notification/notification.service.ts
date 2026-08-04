@@ -211,6 +211,22 @@ export class NotificationService {
     });
   }
 
+  /** 팔로우한 스트리머가 방송을 시작하면 발송 */
+  async notifyStreamerLive(
+    userId: string,
+    streamerName: string,
+    streamerUserId: string,
+  ) {
+    return this.create({
+      userId,
+      type: "STREAMER_LIVE",
+      title: "방송 시작",
+      message: `${streamerName}님이 방송을 시작했어요.`,
+      link: `/streamers`,
+      data: { streamerUserId },
+    });
+  }
+
   async notifyMention(userId: string, mentionerName: string, postId: string) {
     return this.create({
       userId,
