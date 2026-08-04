@@ -36,9 +36,9 @@
 | reputation | ✅ | 평가(실력·태도·의사소통), 신고, 자동 밴 |
 | ranking | ✅ | 전체·클랜 랭킹 집계 |
 | discord | ✅ | 음성채널 자동화 (팀별 이동·생성·정리) |
-| stats | ✅ | 사용자 통계, 전적 크롤링, Lab 분석 대시보드 |
-| admin | ✅ | 유저 관리, 신고 검토, Lab 스냅샷 운영 |
-| tasks | ✅ | Cron (티어 동기화, 세션 정리, Lab 스냅샷) |
+| stats | ✅ | 사용자 통계, 내전 전적 집계 |
+| admin | ✅ | 유저 관리, 신고 검토, 운영 상태 확인 |
+| tasks | ✅ | Cron (종료 내전 수집, 티어 동기화, 세션 정리) |
 | upload | ✅ | 파일 업로드 (아바타, 커뮤니티 이미지) |
 
 ---
@@ -56,7 +56,7 @@
 | 구분 | 라우트 수 | 주요 라우트 |
 |------|----------|-----------|
 | Static | 21 | `/`, `/auth/*`, `/clans`, `/community`, `/matches`, `/settings`, `/terms`, `/privacy` 등 |
-| Dynamic | 29 | `/auction/[id]`, `/draft/[id]`, `/lab/*`, `/tournaments/[id]/*`, `/users/[id]` 등 |
+| Dynamic | 29 | `/auction/[id]`, `/draft/[id]`, `/tournaments/[id]/*`, `/users/[id]` 등 |
 
 ---
 

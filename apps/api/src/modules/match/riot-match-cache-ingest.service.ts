@@ -12,7 +12,7 @@ import { normalizeRiotPosition } from "./position-normalizer";
  * - Cron 트리거: 5분마다 누락된 캐시 행 일괄 처리 (이벤트 누락/재시작 대비)
  * - 멱등성: matches.riotMatchId 기준으로 중복 처리 방지
  *
- * Lab 대시보드와 head-to-head/play-patterns가 match_participants를 직접 쿼리하므로
+ * 내전 전적과 사용자 통계가 match_participants를 직접 쿼리하므로
  * 외부(랭크) 데이터를 정규화 테이블에 채워야 통계가 잡힌다.
  */
 @Injectable()

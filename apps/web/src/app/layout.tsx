@@ -18,7 +18,7 @@ const websiteJsonLd = {
   "@context": "https://schema.org",
   "@type": "WebSite",
   name: SITE_NAME,
-  alternateName: ["Nexus Lab", "넥서스", "롤 내전 Nexus"],
+  alternateName: ["넥서스", "롤 내전 Nexus"],
   url: absoluteUrl("/"),
   description: SITE_DESCRIPTION,
   inLanguage: "ko-KR",

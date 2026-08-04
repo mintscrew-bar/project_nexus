@@ -102,7 +102,7 @@ const nextConfig = {
       },
       {
         source:
-          "/:path(admin|api|auth|dashboard|profile|settings|role-selection|draft|auction|lab|broadcast|broadcast-control)(.*)",
+          "/:path(admin|api|auth|dashboard|profile|settings|role-selection|draft|auction|broadcast|broadcast-control)(.*)",
         headers: [
           {
             // 인증·개인·관리 화면은 CDN/shared cache에 절대 보관하지 않는다.
@@ -154,6 +154,20 @@ const nextConfig = {
             value: "noindex, nofollow, noarchive",
           },
         ],
+      },
+    ];
+  },
+  async redirects() {
+    return [
+      {
+        source: "/lab",
+        destination: "/matches",
+        permanent: false,
+      },
+      {
+        source: "/lab/:path*",
+        destination: "/matches",
+        permanent: false,
       },
     ];
   },

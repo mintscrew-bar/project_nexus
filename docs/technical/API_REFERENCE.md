@@ -421,58 +421,14 @@
 
 ---
 
-## 17. Lab — 분석 대시보드 (`/stats/lab`)
-
-> 모든 Lab 엔드포인트는 `JwtAuthGuard + RolesGuard(ADMIN)` — 운영자 전용.
-
-### 메타
-
-- `GET /stats/lab/overview` — 랩 개요 (admin)
-- `GET /stats/lab/meta/radar` — 메타 레이더 (admin)
-- `GET /stats/lab/meta/patch-impact` — 패치 임팩트 (admin)
-- `GET /stats/lab/meta/ban-rates` — 밴률 통계 (admin)
-- `GET /stats/lab/meta/ranked-snapshots` — 랭크 챔피언 스냅샷 (admin)
-- `GET /stats/lab/meta/play-patterns` — 플레이 패턴 분석 (admin)
-
-### 챔피언
-
-- `GET /stats/lab/champions` — 챔피언 목록 (admin)
-- `GET /stats/lab/champions/:championId` — 챔피언 상세 (admin)
-- `GET /stats/lab/champions/:championId/mastery` — 챔피언 장인 통계 (admin)
-
-### 시너지/카운터/조합
-
-- `GET /stats/lab/synergy` — 시너지 조합 통계 (admin)
-- `GET /stats/lab/counter` — 카운터 상성 (admin)
-- `GET /stats/lab/compositions` — 팀 구성 분석 (admin)
-
-### Oracle (예측/추천)
-
-- `GET /stats/lab/oracle/auction-efficiency` — 경매 효율 (admin)
-- `POST /stats/lab/oracle/balance-score` — 팀 밸런스 예측 (admin)
-- `GET /stats/lab/oracle/ban-recommend` — 밴픽 추천 (admin)
-- `GET /stats/lab/oracle/head-to-head` — 사용자 간 상성 (admin)
-
-### 사용자 프로필
-
-- `GET /stats/lab/user-profile/:userId/fallback` — 사용자 프로필 폴백 (admin)
-- `GET /stats/lab/user-profile/:userId/compare` — 랭크 vs 내전 비교 (admin)
-
-> 데이터 단계 / 스냅샷 갱신은 `/admin/lab/*` 엔드포인트로 트리거한다.
-
----
-
-## 18. 관리자 (`/admin`)
+## 17. 관리자 (`/admin`)
 
 > 전체 라우트 `JwtAuthGuard + RolesGuard`. 권한은 라우트별로 ADMIN 또는 ADMIN/MODERATOR.
 
 ### 통계 / 매치 운영
 
 - `GET /admin/stats` — 관리 대시보드 통계 (admin/moderator)
-- `GET /admin/matches/queue-stats` — 매칭 큐 통계 (admin)
-- `POST /admin/matches/trigger-fetch` — 매칭 페치 수동 실행 (admin)
 - `POST /admin/matches/recompute-stats` — 매치 통계 재계산 (admin)
-- `POST /admin/matches/seed-high-tiers` — 고티어 시딩 (admin)
 
 ### 사용자 관리
 
@@ -507,15 +463,7 @@
 - `POST /admin/rooms/:id/close` — 방 강제 종료 (admin)
 - `POST /admin/rooms/:id/add-bot` — 방에 봇 추가 (admin)
 
-### Lab 운영
-
-- `GET /admin/lab/data-phase` — 랩 데이터 단계/스냅샷 신선도 (admin)
-- `POST /admin/lab/recompute-snapshots` — 챔피언/시너지/카운터 스냅샷 재계산 (admin)
-- `POST /admin/lab/recompute-ranked-snapshots` — 랭크 챔피언 스냅샷 재계산 (admin)
-
----
-
-## 19. WebSocket
+## 18. WebSocket
 
 REST와 별도로 8개 namespace가 있다. 자세한 이벤트 명세는 [WEBSOCKET_EVENTS.md](./WEBSOCKET_EVENTS.md) 참조.
 

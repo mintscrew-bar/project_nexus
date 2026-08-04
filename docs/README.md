@@ -14,7 +14,6 @@
 - **[RIOT_SETUP.md](./setup/RIOT_SETUP.md)**: Riot API 발급 및 설정
 - **[DEPLOYMENT.md](./setup/DEPLOYMENT.md)**: 배포 가이드
 - **[REMOTE_ACCESS.md](./setup/REMOTE_ACCESS.md)**: 서버 PC 원격 접속 및 집에서 작업하는 방법
-- **[lab_workflow.md](./setup/lab_workflow.md)**: Lab 기능 개발 워크플로우
 
 ### 🏗️ [Technical Specs](./technical/)
 시스템 설계, 데이터베이스 구조 및 API 명세입니다.
@@ -41,7 +40,6 @@
 개별 기능별 상세 개선안 및 TODO 목록입니다.
 - **Auction**: [Spectator Improvement](./features/TODO_auction_spectator_improvement.md)
 - **Clan**: [Clan Improvement](./features/TODO_clan_improvement.md)
-- **Lab**: [Dashboard](./features/TODO_lab_dashboard.md), [Dashboard Refactor](./features/TODO_lab_dashboard_refactor.md), [Ranked/Custom Split](./features/TODO_lab_ranked_custom_split.md)
 - **Match**: [Matches Crawling](./features/TODO_matches_crawling.md)
 - **Discord**: [Voice Validation](./features/DISCORD_VOICE_VALIDATION_TODO.md)
 

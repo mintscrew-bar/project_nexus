@@ -27,7 +27,6 @@ describe("AdminService Discord guild links", () => {
     };
     const service = new AdminService(
       prisma as any,
-      {} as any,
       discordBotService as any,
       {} as any,
       {} as any,

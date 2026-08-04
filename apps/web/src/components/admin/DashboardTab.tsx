@@ -19,7 +19,6 @@ import {
   Sword,
   CheckCircle,
   XCircle,
-  Database,
   RefreshCw,
 } from "lucide-react";
 import { StatCard, type AddToast } from "./shared";
@@ -34,69 +33,18 @@ export function DashboardTab({ addToast }: { addToast: AddToast }) {
     };
   };
 
-  type MatchQueueStats = {
-    knownPuuids: { total: number; nexusUsers: number; seeded: number };
-    fetchPending: {
-      ranked: { total: number; nexus: number; seeded: number };
-      normal: number;
-      aram: number;
-      custom: number;
-    };
-    seededPolicy: {
-      priority: number;
-      slotCap: number;
-      staleHours: number;
-      initialBackfillLimit: number;
-    };
-    riotMatchCacheSize: number;
-    matchStatsCacheSize: {
-      ranked: number;
-      normal: number;
-      aram: number;
-      custom: number;
-      all: number;
-    };
-    statsRecomputeQueueSize: number;
-  };
-
-  type SeedHighTiersResponse = {
-    ok: boolean;
-    skipped: boolean;
-    reason?: string;
-    summary?: {
-      challengerCount: number;
-      grandmasterCount: number;
-      targetCount: number;
-      insertedCount: number;
-      updatedCount: number;
-      failedCount: number;
-      missingPuuidCount: number;
-    };
-  };
-
   const [stats, setStats] = useState<any>(null);
   const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null);
   const [systemStatusFailedAt, setSystemStatusFailedAt] = useState<
     string | null
   >(null);
-  const [queueStats, setQueueStats] = useState<MatchQueueStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [queueLoading, setQueueLoading] = useState(true);
-  const [seeding, setSeeding] = useState(false);
-  const [fetchTriggeringGroup, setFetchTriggeringGroup] = useState<
-    "ranked" | "normal" | "aram" | "custom" | "all" | null
-  >(null);
-  const [lastSeedingResult, setLastSeedingResult] =
-    useState<SeedHighTiersResponse | null>(null);
 
   const fetchDashboardStats = useCallback(async () => {
     setLoading(true);
-    setQueueLoading(true);
-
-    const [statsResult, queueStatsResult] = await Promise.allSettled([
-      adminApi.getStats(),
-      adminApi.getMatchQueueStats(),
-    ]);
+    const statsResult = await Promise.resolve(adminApi.getStats())
+      .then((value) => ({ status: "fulfilled" as const, value }))
+      .catch((reason) => ({ status: "rejected" as const, reason }));
 
     const systemStatusResult = await adminApi
       .getSystemStatus()
@@ -108,12 +56,6 @@ export function DashboardTab({ addToast }: { addToast: AddToast }) {
       addToast("대시보드 통계 로드 실패", "error");
     }
 
-    if (queueStatsResult.status === "fulfilled") {
-      setQueueStats(queueStatsResult.value as MatchQueueStats);
-    } else {
-      addToast("매치 큐 통계 로드 실패", "error");
-    }
-
     if (systemStatusResult) {
       setSystemStatus(systemStatusResult as SystemStatus);
       setSystemStatusFailedAt(null);
@@ -123,46 +65,11 @@ export function DashboardTab({ addToast }: { addToast: AddToast }) {
     }
 
     setLoading(false);
-    setQueueLoading(false);
   }, [addToast]);
 
   useEffect(() => {
     fetchDashboardStats();
   }, [fetchDashboardStats]);
-
-  const handleSeedHighTiers = async () => {
-    setSeeding(true);
-    try {
-      const result = (await adminApi.seedHighTiers()) as SeedHighTiersResponse;
-      setLastSeedingResult(result);
-      if (result.skipped) {
-        addToast(`시딩 건너뜀: ${result.reason ?? "락 점유 중"}`, "error");
-      } else {
-        addToast("고티어 시딩 실행 완료", "success");
-      }
-      await fetchDashboardStats();
-    } catch {
-      addToast("고티어 시딩 실행 실패", "error");
-    } finally {
-      setSeeding(false);
-    }
-  };
-
-  const handleTriggerFetch = async (
-    queueGroup?: "ranked" | "normal" | "aram" | "custom",
-  ) => {
-    const label = queueGroup ?? "all";
-    setFetchTriggeringGroup(label);
-    try {
-      await adminApi.triggerMatchFetch(queueGroup);
-      addToast(`매치 수집 수동 실행 완료 (${queueGroup ?? "all"})`, "success");
-      await fetchDashboardStats();
-    } catch {
-      addToast(`매치 수집 수동 실행 실패 (${queueGroup ?? "all"})`, "error");
-    } finally {
-      setFetchTriggeringGroup(null);
-    }
-  };
 
   if (loading)
     return (
@@ -254,9 +161,7 @@ export function DashboardTab({ addToast }: { addToast: AddToast }) {
               size="sm"
               variant="outline"
               onClick={fetchDashboardStats}
-              disabled={
-                queueLoading || seeding || fetchTriggeringGroup !== null
-              }
+              disabled={loading}
             >
               <RefreshCw className="h-3.5 w-3.5 mr-1" />
               새로고침
@@ -307,169 +212,6 @@ export function DashboardTab({ addToast }: { addToast: AddToast }) {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between gap-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Database className="h-4 w-4 text-accent-primary" />
-              매치 수집 운영
-            </CardTitle>
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={fetchDashboardStats}
-                disabled={
-                  queueLoading || seeding || fetchTriggeringGroup !== null
-                }
-              >
-                <RefreshCw className="h-3.5 w-3.5 mr-1" />
-                새로고침
-              </Button>
-              <Button
-                size="sm"
-                onClick={handleSeedHighTiers}
-                disabled={seeding || fetchTriggeringGroup !== null}
-              >
-                {seeding ? "실행 중..." : "고티어 시딩 실행"}
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex flex-wrap gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => handleTriggerFetch(undefined)}
-              disabled={seeding || fetchTriggeringGroup !== null}
-            >
-              {fetchTriggeringGroup === "all" ? "실행 중..." : "전체 수집 실행"}
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => handleTriggerFetch("ranked")}
-              disabled={seeding || fetchTriggeringGroup !== null}
-            >
-              {fetchTriggeringGroup === "ranked"
-                ? "실행 중..."
-                : "랭크 수집 실행"}
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => handleTriggerFetch("normal")}
-              disabled={seeding || fetchTriggeringGroup !== null}
-            >
-              {fetchTriggeringGroup === "normal"
-                ? "실행 중..."
-                : "일반 수집 실행"}
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => handleTriggerFetch("aram")}
-              disabled={seeding || fetchTriggeringGroup !== null}
-            >
-              {fetchTriggeringGroup === "aram"
-                ? "실행 중..."
-                : "칼바람 수집 실행"}
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => handleTriggerFetch("custom")}
-              disabled={seeding || fetchTriggeringGroup !== null}
-            >
-              {fetchTriggeringGroup === "custom"
-                ? "실행 중..."
-                : "내전 수집 실행"}
-            </Button>
-          </div>
-
-          {queueLoading || !queueStats ? (
-            <div className="flex justify-center py-8">
-              <LoadingSpinner />
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 text-sm">
-              <div className="rounded-lg bg-bg-tertiary/60 p-3">
-                <p className="text-xs text-text-muted">KnownPuuid 전체</p>
-                <p className="text-lg font-semibold text-text-primary">
-                  {queueStats.knownPuuids.total.toLocaleString()}
-                </p>
-                <p className="text-[11px] text-text-muted">
-                  Nexus {queueStats.knownPuuids.nexusUsers} / Seeded{" "}
-                  {queueStats.knownPuuids.seeded}
-                </p>
-              </div>
-              <div className="rounded-lg bg-bg-tertiary/60 p-3">
-                <p className="text-xs text-text-muted">Ranked 대기</p>
-                <p className="text-lg font-semibold text-text-primary">
-                  {queueStats.fetchPending.ranked.total.toLocaleString()}
-                </p>
-                <p className="text-[11px] text-text-muted">
-                  Nexus {queueStats.fetchPending.ranked.nexus} / Seeded{" "}
-                  {queueStats.fetchPending.ranked.seeded}
-                </p>
-              </div>
-              <div className="rounded-lg bg-bg-tertiary/60 p-3">
-                <p className="text-xs text-text-muted">RiotMatchCache</p>
-                <p className="text-lg font-semibold text-text-primary">
-                  {queueStats.riotMatchCacheSize.toLocaleString()}
-                </p>
-                <p className="text-[11px] text-text-muted">
-                  StatsQueue {queueStats.statsRecomputeQueueSize}
-                </p>
-              </div>
-              <div className="rounded-lg bg-bg-tertiary/60 p-3">
-                <p className="text-xs text-text-muted">비랭크 대기</p>
-                <p className="text-lg font-semibold text-text-primary">
-                  {(
-                    queueStats.fetchPending.normal +
-                    queueStats.fetchPending.aram +
-                    queueStats.fetchPending.custom
-                  ).toLocaleString()}
-                </p>
-                <p className="text-[11px] text-text-muted">
-                  N {queueStats.fetchPending.normal} / A{" "}
-                  {queueStats.fetchPending.aram} / C{" "}
-                  {queueStats.fetchPending.custom}
-                </p>
-              </div>
-              <div className="rounded-lg bg-bg-tertiary/60 p-3">
-                <p className="text-xs text-text-muted">Seeded 정책</p>
-                <p className="text-lg font-semibold text-text-primary">
-                  P{queueStats.seededPolicy.priority} ·{" "}
-                  {queueStats.seededPolicy.slotCap} 슬롯
-                </p>
-                <p className="text-[11px] text-text-muted">
-                  stale {queueStats.seededPolicy.staleHours}h / backfill{" "}
-                  {queueStats.seededPolicy.initialBackfillLimit}
-                </p>
-              </div>
-            </div>
-          )}
-
-          {lastSeedingResult?.summary && (
-            <div className="rounded-lg border border-bg-tertiary p-3 text-xs text-text-secondary">
-              <p className="text-text-primary font-medium mb-2">
-                최근 시딩 결과
-              </p>
-              <p>
-                대상 {lastSeedingResult.summary.targetCount}명 (챌{" "}
-                {lastSeedingResult.summary.challengerCount}, 그마{" "}
-                {lastSeedingResult.summary.grandmasterCount}) · 추가{" "}
-                {lastSeedingResult.summary.insertedCount} · 갱신{" "}
-                {lastSeedingResult.summary.updatedCount} · 실패{" "}
-                {lastSeedingResult.summary.failedCount} · puuid 누락{" "}
-                {lastSeedingResult.summary.missingPuuidCount}
-              </p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
     </div>
   );
 }

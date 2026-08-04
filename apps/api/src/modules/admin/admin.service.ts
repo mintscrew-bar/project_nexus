@@ -5,7 +5,6 @@ import {
   BadRequestException,
   ForbiddenException,
 } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../prisma/prisma.service";
 import {
   UserRole,
@@ -58,7 +57,6 @@ export class AdminService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly configService: ConfigService,
     private readonly discordBotService: DiscordBotService,
     private readonly adminAlerts: DiscordAdminAlertService,
     private readonly discordVoiceService: DiscordVoiceService,
@@ -67,24 +65,6 @@ export class AdminService {
     private readonly dmGateway: DmGateway,
     private readonly notificationService: NotificationService,
   ) {}
-
-  private readonly seededHighTierPriority = 7;
-  private readonly matchFetchStaleHours = {
-    ranked: 6,
-    normal: 12,
-    aram: 24,
-    custom: 24,
-  } as const;
-
-  private getPositiveIntConfig(key: string, fallback: number): number {
-    const raw = this.configService.get<string>(key);
-    if (!raw) return fallback;
-    const parsed = Number(raw);
-    if (!Number.isFinite(parsed) || parsed <= 0) {
-      return fallback;
-    }
-    return Math.floor(parsed);
-  }
 
   // ── Audit Log ───────────────────────────────────────────────────────────────
 
@@ -144,158 +124,6 @@ export class AdminService {
       pendingUserReports,
       pendingPostReports,
       totalClans,
-    };
-  }
-
-  async getMatchQueueStats() {
-    const now = Date.now();
-    const rankedStaleBefore = new Date(
-      now - this.matchFetchStaleHours.ranked * 60 * 60 * 1000,
-    );
-    const normalStaleBefore = new Date(
-      now - this.matchFetchStaleHours.normal * 60 * 60 * 1000,
-    );
-    const aramStaleBefore = new Date(
-      now - this.matchFetchStaleHours.aram * 60 * 60 * 1000,
-    );
-    const customStaleBefore = new Date(
-      now - this.matchFetchStaleHours.custom * 60 * 60 * 1000,
-    );
-
-    const [
-      knownPuuidsTotal,
-      nexusUsers,
-      seededUsers,
-      rankedPending,
-      rankedPendingNexus,
-      rankedPendingSeeded,
-      normalPending,
-      aramPending,
-      customPending,
-      riotMatchCacheSize,
-      matchStatsCacheGrouped,
-      recomputeQueueSize,
-    ] = await Promise.all([
-      this.prisma.knownPuuid.count(),
-      this.prisma.knownPuuid.count({
-        where: { isNexusUser: true },
-      }),
-      this.prisma.knownPuuid.count({
-        where: {
-          isNexusUser: false,
-          priority: this.seededHighTierPriority,
-        },
-      }),
-      this.prisma.knownPuuid.count({
-        where: {
-          OR: [
-            { rankedFetchedAt: null },
-            { rankedFetchedAt: { lt: rankedStaleBefore } },
-          ],
-        },
-      }),
-      this.prisma.knownPuuid.count({
-        where: {
-          isNexusUser: true,
-          OR: [
-            { rankedFetchedAt: null },
-            { rankedFetchedAt: { lt: rankedStaleBefore } },
-          ],
-        },
-      }),
-      this.prisma.knownPuuid.count({
-        where: {
-          isNexusUser: false,
-          priority: this.seededHighTierPriority,
-          OR: [
-            { rankedFetchedAt: null },
-            { rankedFetchedAt: { lt: rankedStaleBefore } },
-          ],
-        },
-      }),
-      this.prisma.knownPuuid.count({
-        where: {
-          OR: [
-            { normalFetchedAt: null },
-            { normalFetchedAt: { lt: normalStaleBefore } },
-          ],
-        },
-      }),
-      this.prisma.knownPuuid.count({
-        where: {
-          OR: [
-            { aramFetchedAt: null },
-            { aramFetchedAt: { lt: aramStaleBefore } },
-          ],
-        },
-      }),
-      this.prisma.knownPuuid.count({
-        where: {
-          isNexusUser: false,
-          OR: [
-            { customFetchedAt: null },
-            { customFetchedAt: { lt: customStaleBefore } },
-          ],
-        },
-      }),
-      this.prisma.riotMatchCache.count(),
-      this.prisma.matchStatsCache.groupBy({
-        by: ["queueGroup"],
-        _count: { _all: true },
-      }),
-      this.prisma.statsRecomputeQueue.count(),
-    ]);
-
-    const matchStatsCacheSize = {
-      ranked: 0,
-      normal: 0,
-      aram: 0,
-      custom: 0,
-      all: 0,
-    };
-
-    for (const row of matchStatsCacheGrouped) {
-      if (row.queueGroup in matchStatsCacheSize) {
-        matchStatsCacheSize[
-          row.queueGroup as keyof typeof matchStatsCacheSize
-        ] = row._count._all;
-      }
-    }
-
-    return {
-      knownPuuids: {
-        total: knownPuuidsTotal,
-        nexusUsers,
-        seeded: seededUsers,
-      },
-      fetchPending: {
-        ranked: {
-          total: rankedPending,
-          nexus: rankedPendingNexus,
-          seeded: rankedPendingSeeded,
-        },
-        normal: normalPending,
-        aram: aramPending,
-        custom: customPending,
-      },
-      seededPolicy: {
-        priority: this.seededHighTierPriority,
-        slotCap: this.getPositiveIntConfig(
-          "MATCH_FETCH_RANKED_SEEDED_SLOT_CAP",
-          15,
-        ),
-        staleHours: this.getPositiveIntConfig(
-          "MATCH_FETCH_RANKED_SEEDED_STALE_HOURS",
-          72,
-        ),
-        initialBackfillLimit: this.getPositiveIntConfig(
-          "MATCH_FETCH_RANKED_SEEDED_INITIAL_BACKFILL_LIMIT",
-          100,
-        ),
-      },
-      riotMatchCacheSize,
-      matchStatsCacheSize,
-      statsRecomputeQueueSize: recomputeQueueSize,
     };
   }
 

@@ -16,7 +16,6 @@ const PRIVATE_ROUTE_PREFIXES = [
   "/role-selection",
   "/draft",
   "/auction",
-  "/lab",
   "/broadcast",
   "/broadcast-control",
 ];

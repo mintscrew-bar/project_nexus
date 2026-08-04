@@ -304,7 +304,7 @@ export class RiotMatchService {
 
   /**
    * Riot `info.gameVersion` (ex: "14.8.616.1234")에서 패치 버전("14.8")만 추출.
-   * 챔피언/아이템 메타가 패치 단위로 바뀌므로 Lab 분석 시 기준 키로 사용.
+   * 챔피언/아이템 데이터와 매치 표시 기준 키로 사용.
    */
   private parsePatchVersion(gameVersion?: string): string | null {
     if (!gameVersion) return null;

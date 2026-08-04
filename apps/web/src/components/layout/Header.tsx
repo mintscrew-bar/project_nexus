@@ -48,10 +48,6 @@ export function Header() {
   const clientIsOpen = mounted && isOpen;
   const clientIncomingCount = mounted ? incomingCount : 0;
   const clientUser = mounted ? user : null;
-  const visibleNavItems =
-    clientUser?.role === 'ADMIN'
-      ? [...navItems.slice(0, 2), { href: '/lab', label: '실험실' }, ...navItems.slice(2)]
-      : navItems;
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
 
@@ -68,7 +64,7 @@ export function Header() {
       {/* Center: Navigation (kept compact until wide desktop to avoid crowding) */}
       <nav className="hidden min-w-0 flex-1 justify-center nav:flex">
         <ul className="flex space-x-1">
-          {visibleNavItems.map((item) => (
+          {navItems.map((item) => (
             <li key={item.href}>
               <Link
                 href={item.href}

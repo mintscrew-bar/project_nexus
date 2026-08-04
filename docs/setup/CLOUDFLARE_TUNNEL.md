@@ -137,7 +137,7 @@ Cloudflare 대시보드 → 만든 Tunnel → **Public Hostnames** → **Add a p
 - [ ] Riot 연동
 - [ ] 방 만들기 / 입장
 - [ ] WebSocket 연결 (방 채팅)
-- [ ] Lab 대시보드 진입
+- [ ] 종료된 내전 전적 조회
 
 ---
 
@@ -157,7 +157,6 @@ Cloudflare 대시보드 → 만든 Tunnel → **Public Hostnames** → **Add a p
 |---|---|---|
 | `web` 컨테이너에서 `NEXT_PUBLIC_API_URL`이 빈 값 | 빌드 시 ARG 미지정 | 환경변수 확인 후 web 이미지 재빌드 |
 | Discord 로그인 시 redirect_uri 오류 | Developer Portal에 운영 콜백 URL 미등록 | 4단계 다시 확인 |
-| Lab 진입 시 빈 화면 | 로그인 안 함 (랩은 등록 유저 전용) | Discord로 로그인 후 재진입 |
 | 502 Bad Gateway | `nginx` upstream(`api` 또는 `web`)이 아직 준비되지 않음 | `docker compose ps`, `docker logs nexus-api`, `docker logs nexus-web` 확인 |
 | Tunnel 연결 끊김 | `cloudflared` 재기동 또는 이미지 변경 | `docker logs nexus-cloudflared` 와 Public Hostname origin(`nginx:80`) 확인 |
 | WebSocket 끊김 | Cloudflare WebSocket 비활성 | Network → WebSockets ON 확인 |

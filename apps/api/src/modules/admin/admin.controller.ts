@@ -18,8 +18,7 @@ import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { UserRole } from "@nexus/database";
-import { TasksService, MatchFetchQueueGroup } from "../tasks/tasks.service";
-import { LabTasksService } from "../tasks/lab-tasks.service";
+import { TasksService } from "../tasks/tasks.service";
 import { RoomGateway } from "../room/room.gateway";
 import { RoomService } from "../room/room.service";
 import {
@@ -28,7 +27,6 @@ import {
   AdminChatLogsQueryDto,
   AdminRoomsQueryDto,
   AdminAppealsQueryDto,
-  AdminMatchQueueQueryDto,
   AdminInternalMatchesQueryDto,
   AdminRecomputeStatsQueryDto,
   SendUserMessageDto,
@@ -40,7 +38,6 @@ export class AdminController {
   constructor(
     private readonly adminService: AdminService,
     private readonly tasksService: TasksService,
-    private readonly labTasksService: LabTasksService,
     @Inject(forwardRef(() => RoomGateway))
     private readonly roomGateway: RoomGateway,
     @Inject(forwardRef(() => RoomService))
@@ -54,23 +51,6 @@ export class AdminController {
     return this.adminService.getStats();
   }
 
-  @Get("matches/queue-stats")
-  @Roles(UserRole.ADMIN)
-  getMatchQueueStats() {
-    return this.adminService.getMatchQueueStats();
-  }
-
-  @Post("matches/trigger-fetch")
-  @Roles(UserRole.ADMIN)
-  async triggerMatchFetch(@Query() query: AdminMatchQueueQueryDto) {
-    const queueGroup = query.queueGroup as MatchFetchQueueGroup | undefined;
-    await this.tasksService.runMatchFetch(queueGroup);
-    return {
-      ok: true,
-      queueGroup: queueGroup ?? "all",
-    };
-  }
-
   @Post("matches/recompute-stats")
   @Roles(UserRole.ADMIN)
   async recomputeMatchStats(@Query() query: AdminRecomputeStatsQueryDto) {
@@ -82,29 +62,7 @@ export class AdminController {
     };
   }
 
-  @Post("matches/seed-high-tiers")
-  @Roles(UserRole.ADMIN)
-  @Throttle({ default: { limit: 5, ttl: 600000 } }) // 10분당 5회
-  async seedHighTiers() {
-    const result = await this.tasksService.runHighTierSeeding();
-    return {
-      ok: result.ok,
-      skipped: result.skipped,
-      reason: result.reason,
-      summary: {
-        challengerCount: result.challengerCount,
-        grandmasterCount: result.grandmasterCount,
-        targetCount: result.targetCount,
-        insertedCount: result.insertedCount,
-        updatedCount: result.updatedCount,
-        failedCount: result.failedCount,
-        missingPuuidCount: result.missingPuuidCount,
-      },
-    };
-  }
-
   // ── 내전 기록 (실제 진행된 내부 토너먼트 매치) ─────────────────────────────
-  // 주의: "matches/queue-stats"가 위에 먼저 선언돼 있어야 "matches/:id"에 잡히지 않는다.
   // 운영 현황 파악용 조회이므로 매니저(MODERATOR)에게도 열어둔다.
   @Get("matches")
   @Roles(UserRole.ADMIN, UserRole.MODERATOR)
@@ -393,35 +351,6 @@ export class AdminController {
       req.user.sub,
       body.adminNote,
     );
-  }
-
-  // ── Lab 스냅샷 Admin (ADMIN only) ──────────────────────────────────────────
-
-  /**
-   * Task 35: Lab 스냅샷 전체 재계산 수동 트리거
-   * cron 대기 없이 즉시 실행. 배포 후 첫 시딩 및 긴급 재집계 시 사용.
-   */
-  @Post("lab/recompute-snapshots")
-  @Roles(UserRole.ADMIN)
-  @Throttle({ default: { limit: 5, ttl: 600000 } }) // 10분당 5회
-  async recomputeLabSnapshots() {
-    const result = await this.labTasksService.runLabSnapshot();
-    return {
-      ok: true,
-      ...result,
-    };
-  }
-
-  /**
-   * Task 39: 외부 랭크 챔피언 스냅샷 수동 재계산 트리거
-   * 고티어 시딩 유저 랭크 매치 → LabRankedChampionSnapshot 즉시 재계산
-   */
-  @Post("lab/recompute-ranked-snapshots")
-  @Roles(UserRole.ADMIN)
-  @Throttle({ default: { limit: 3, ttl: 600000 } }) // 10분당 3회
-  async recomputeRankedChampionSnapshots() {
-    const result = await this.labTasksService.runRankedChampionSnapshot();
-    return { ok: true, ...result };
   }
 
   // ── Discord 길드 연동 (멀티 길드) ──────────────────────────────────────────

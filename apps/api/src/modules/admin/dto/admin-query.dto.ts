@@ -118,14 +118,6 @@ export class AdminRoomsQueryDto {
 // 이의 제기 목록 조회
 export class AdminAppealsQueryDto extends AdminRoomsQueryDto {}
 
-export class AdminMatchQueueQueryDto {
-  @IsOptional()
-  @IsIn(["ranked", "normal", "aram", "custom"], {
-    message: "queueGroup은 ranked, normal, aram, custom 중 하나여야 합니다.",
-  })
-  queueGroup?: "ranked" | "normal" | "aram" | "custom";
-}
-
 // 실제 진행된 내전(내부 토너먼트) 매치 목록 조회.
 // 외부 랭크 인제스트 매치는 제외하고 isInternal=true인 내전만 다룬다.
 export class AdminInternalMatchesQueryDto {
