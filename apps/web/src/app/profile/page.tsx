@@ -1079,7 +1079,7 @@ export default function ProfilePage() {
                   <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                     <div className="flex min-w-0 flex-1 flex-col gap-4 sm:flex-row sm:items-start">
                       <div
-                        className="group relative z-10 -mt-12 flex-shrink-0 cursor-pointer rounded-full bg-bg-secondary p-1 sm:-mt-14"
+                        className="group relative z-10 -mt-12 h-[104px] w-[104px] flex-shrink-0 self-start cursor-pointer rounded-full border-4 border-bg-secondary sm:-mt-14"
                         onClick={() => avatarInputRef.current?.click()}
                       >
                         <div
