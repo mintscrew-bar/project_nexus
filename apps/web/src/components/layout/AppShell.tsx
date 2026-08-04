@@ -5,7 +5,6 @@ import { useEffect, useState } from 'react';
 import { useAuthStore } from '@/stores/auth-store';
 import { cn } from '@/lib/utils';
 import { Header } from './Header';
-import { Sidebar } from './Sidebar';
 import { Footer } from './Footer';
 import { FriendsPanel } from '@/components/domain/FriendsPanel';
 import { FloatingDmPanel } from '@/components/domain/FloatingDmPanel';
@@ -41,8 +40,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   // 푸터 숨김 라우트 (대시보드성 페이지들: 자체적인 액션바나 스크롤 관리가 필요한 경우)
   const isTournamentLobbyRoute = /^\/tournaments\/[^/]+\/lobby(?:\/|$)/.test(pathname);
-  const isTournamentListRoute = pathname === '/tournaments';
-  const isGuideRoute = pathname.startsWith('/guide');
   const isDashboardRoute =
     isTournamentLobbyRoute ||
     pathname.startsWith('/auction/') ||
@@ -59,9 +56,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <>
       <Header />
-      <main className="flex flex-grow min-h-0">
-        {!isDashboardRoute && !isTournamentListRoute && !isGuideRoute && <Sidebar />}
-        <div className="flex flex-col flex-grow min-h-0 bg-bg-primary overflow-hidden">
+      <main className="flex min-h-0 min-w-0 flex-grow">
+        <div className="flex min-h-0 min-w-0 flex-grow flex-col overflow-hidden bg-bg-primary">
           {showCreatorPromo && <CreatorPromoStrip />}
           {/*
             - isDashboardRoute: 페이지 전체가 viewport에 맞게 고정되어야 함 (h-full)
@@ -72,8 +68,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             isDashboardRoute ? "overflow-hidden" : "overflow-auto"
           )}>
             {isDashboardRoute ? children : (
-              <div className="flex min-h-full flex-1 flex-col">
-                {children}
+              <div className="grid min-h-full grid-rows-[1fr_auto]">
+                <div className="min-w-0">{children}</div>
                 <Footer />
               </div>
             )}

@@ -25,11 +25,18 @@ export function OnboardingGuideModal() {
     if (typeof window === "undefined") return;
     // 계정에 기록된 확인 이력이 최우선 — 기기·브라우저가 바뀌어도 다시 뜨지 않는다.
     // (Riot 계정과 주 라인을 이미 등록한 기존 유저도 서버에서 확인 완료로 판정한다)
-    if (user.onboardingSeen) return;
     const userStorageKey = getUserOnboardingStorageKey(
       ONBOARDING_MODAL_STORAGE_KEY,
       user.id,
     );
+    if (user.onboardingSeen) {
+      // 서버에 완료 이력만 있는 사용자는 로컬 선행 조건이 없어 후속 투어가 시작되지 않았다.
+      if (!window.localStorage.getItem(userStorageKey)) {
+        window.localStorage.setItem(userStorageKey, "1");
+        window.dispatchEvent(new Event(ONBOARDING_MODAL_CLOSED_EVENT));
+      }
+      return;
+    }
     const accountCreatedAt = user.createdAt
       ? new Date(user.createdAt).getTime()
       : Number.NaN;
