@@ -44,6 +44,7 @@ import {
 } from "lucide-react";
 import { AddAccountModal } from "@/components/domain/AddAccountModal";
 import { BroadcastTokenSection } from "./_components/BroadcastTokenSection";
+import { StreamerSettingsSection } from "./_components/StreamerSettingsSection";
 import { useRiotStore } from "@/stores/riot-store";
 
 type SettingsTab =
@@ -196,8 +197,16 @@ export default function SettingsPage() {
       );
     }
 
-    if (discordGuildResult) {
+    const chzzkOAuthResult = searchParams.get("chzzk_oauth");
+    if (chzzkOAuthResult === "success") {
+      addToast("치지직 채널 연결과 소유권 인증이 완료되었습니다.", "success");
+    } else if (chzzkOAuthResult === "error") {
+      addToast("치지직 채널 연결에 실패했습니다. 다시 시도해주세요.", "error");
+    }
+
+    if (discordGuildResult || chzzkOAuthResult) {
       searchParams.delete("discord_guild");
+      searchParams.delete("chzzk_oauth");
       const query = searchParams.toString();
       window.history.replaceState(
         null,
@@ -1303,6 +1312,7 @@ export default function SettingsPage() {
 
             {activeTab === "broadcast" && (
               <div className="space-y-4">
+                <StreamerSettingsSection />
                 <BroadcastTokenSection />
               </div>
             )}

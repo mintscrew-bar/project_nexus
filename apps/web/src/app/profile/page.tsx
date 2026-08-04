@@ -1291,24 +1291,20 @@ export default function ProfilePage() {
           </Card>
         </section>
 
-        <div className="mb-3">
-          <h2 className="text-sm font-black text-text-primary">프로필 관리</h2>
-          <p className="mt-1 text-xs text-text-tertiary">방송 채널과 외부 링크는 공개 프로필에 표시됩니다.</p>
-        </div>
-
-        <section className="mb-6 grid gap-4 xl:grid-cols-[380px_minmax(0,1fr)]">
-          <StreamerRegistrationCard
-            profiles={streamerProfiles}
-            onSaved={fetchProfile}
-            addToast={addToast}
-          />
-
-          <StreamerLinksCard
-            links={streamerLinks}
-            onSaved={fetchProfile}
-            addToast={addToast}
-          />
-        </section>
+        <Card className="mb-6 border-accent-primary/20 bg-accent-primary/5 p-0">
+          <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-bold text-text-primary">방송 프로필 설정</p>
+              <p className="mt-1 text-xs text-text-muted">
+                채널 {streamerProfiles.length}개 · 추가 링크 {streamerLinks.length}개
+              </p>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => router.push('/settings?tab=broadcast')}>
+              방송 설정 열기
+              <ExternalLink className="ml-1.5 h-3.5 w-3.5" />
+            </Button>
+          </CardContent>
+        </Card>
 
         {/* Champions Tabbed Section */}
         {(preferredChampions.length > 0 || championStats.length > 0 || rankedChampStats.length > 0) && (

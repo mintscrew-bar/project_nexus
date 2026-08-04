@@ -2670,6 +2670,7 @@ export interface StreamerListItem {
   lastLiveAt: string | null;
   live: StreamerLiveState | null;
   activeRoom: { id: string; name: string; status: string } | null;
+  isFollowing: boolean;
 }
 
 export interface AdminStreamerItem {
@@ -2694,6 +2695,19 @@ export const streamerApi = {
   /** 스트리머 탭 목록 — 방송 중인 스트리머가 위로 정렬되어 온다 */
   list: async (): Promise<StreamerListItem[]> => {
     const response = await apiClient.get("/streamers");
+    return response.data;
+  },
+
+  follow: async (streamerId: string): Promise<void> => {
+    await apiClient.post(`/streamers/${streamerId}/follow`);
+  },
+
+  unfollow: async (streamerId: string): Promise<void> => {
+    await apiClient.delete(`/streamers/${streamerId}/follow`);
+  },
+
+  startChzzkOAuth: async (): Promise<{ url: string }> => {
+    const response = await apiClient.post("/streamers/verify/chzzk/oauth");
     return response.data;
   },
 
