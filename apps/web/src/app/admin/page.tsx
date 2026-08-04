@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/stores/auth-store";
 import { adminApi, appealApi } from "@/lib/api-client";
 import { BoardsTab } from "@/components/admin/BoardsTab";
+import { MatchesTab } from "@/components/admin/MatchesTab";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/Toast";
 import {
@@ -28,6 +29,7 @@ import {
   Flag,
   MessageSquare,
   Sword,
+  Swords,
   BookOpen,
   Megaphone,
   Ban,
@@ -50,13 +52,15 @@ type Tab =
   | "community"
   | "clans"
   | "rooms"
+  | "matches"
   | "chatlogs"
   | "announcements"
   | "appeals"
   | "discord";
 
 // MODERATOR(매니저)가 접근 가능한 탭 — 유저 관리는 제재 권한용으로 포함(밴/역할변경 UI는 ADMIN만 노출)
-const MODERATOR_TABS: Tab[] = ["dashboard", "users", "reports", "community", "chatlogs", "appeals"];
+// 내전 기록은 조회 전용이라 매니저에게도 연다.
+const MODERATOR_TABS: Tab[] = ["dashboard", "users", "reports", "community", "matches", "chatlogs", "appeals"];
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: "dashboard", label: "대시보드", icon: <Activity className="h-4 w-4" /> },
@@ -65,6 +69,7 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: "community", label: "커뮤니티", icon: <BookOpen className="h-4 w-4" /> },
   { id: "clans", label: "클랜 관리", icon: <Shield className="h-4 w-4" /> },
   { id: "rooms", label: "방 관리", icon: <Home className="h-4 w-4" /> },
+  { id: "matches", label: "내전 기록", icon: <Swords className="h-4 w-4" /> },
   { id: "chatlogs", label: "채팅 로그", icon: <MessageSquare className="h-4 w-4" /> },
   { id: "announcements", label: "공지 발송", icon: <Megaphone className="h-4 w-4" /> },
   { id: "appeals", label: "이의신청", icon: <Sword className="h-4 w-4" /> },
@@ -145,6 +150,7 @@ export default function AdminPage() {
         {activeTab === "community" && <CommunityTab addToast={addToast} isAdmin={isAdmin} />}
         {activeTab === "clans" && <ClansTab addToast={addToast} />}
         {activeTab === "rooms" && <RoomsTab addToast={addToast} />}
+        {activeTab === "matches" && <MatchesTab addToast={addToast} />}
         {activeTab === "chatlogs" && <ChatLogsTab />}
         {activeTab === "announcements" && <AnnouncementsTab addToast={addToast} />}
         {activeTab === "appeals" && <AppealsTab addToast={addToast} />}

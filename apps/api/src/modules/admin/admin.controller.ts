@@ -29,6 +29,7 @@ import {
   AdminRoomsQueryDto,
   AdminAppealsQueryDto,
   AdminMatchQueueQueryDto,
+  AdminInternalMatchesQueryDto,
   AdminRecomputeStatsQueryDto,
   SendUserMessageDto,
 } from "./dto/admin-query.dto";
@@ -100,6 +101,27 @@ export class AdminController {
         missingPuuidCount: result.missingPuuidCount,
       },
     };
+  }
+
+  // ── 내전 기록 (실제 진행된 내부 토너먼트 매치) ─────────────────────────────
+  // 주의: "matches/queue-stats"가 위에 먼저 선언돼 있어야 "matches/:id"에 잡히지 않는다.
+  // 운영 현황 파악용 조회이므로 매니저(MODERATOR)에게도 열어둔다.
+  @Get("matches")
+  @Roles(UserRole.ADMIN, UserRole.MODERATOR)
+  getInternalMatches(@Query() query: AdminInternalMatchesQueryDto) {
+    return this.adminService.getInternalMatches({
+      page: query.page,
+      limit: query.limit,
+      status: query.status,
+      collected: query.collected,
+      search: query.search,
+    });
+  }
+
+  @Get("matches/:id")
+  @Roles(UserRole.ADMIN, UserRole.MODERATOR)
+  getInternalMatchDetail(@Param("id") matchId: string) {
+    return this.adminService.getInternalMatchDetail(matchId);
   }
 
   // ── Users ────────────────────────────────────────────────────────────────

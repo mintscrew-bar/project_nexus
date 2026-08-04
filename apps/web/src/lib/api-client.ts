@@ -2251,6 +2251,75 @@ export const rankingApi = {
 // Admin API
 // ========================================
 
+/** 관리자 내전 기록 목록 행 */
+export interface AdminInternalMatch {
+  id: string;
+  status: "PENDING" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
+  matchNumber: number | null;
+  bracketRound: string | null;
+  riotMatchId: string | null;
+  gameDuration: number | null;
+  dataCollected: boolean;
+  collectAttempts: number;
+  startedAt: string | null;
+  completedAt: string | null;
+  createdAt: string;
+  winnerId: string | null;
+  room: {
+    id: string;
+    name: string;
+    status: string;
+    teamMode: string;
+    host: { id: string; username: string } | null;
+  } | null;
+  teamA: { id: string; name: string } | null;
+  teamB: { id: string; name: string } | null;
+  winner: { id: string; name: string } | null;
+  mvpUser: { id: string; username: string } | null;
+  aceUser: { id: string; username: string } | null;
+  _count: { participants: number };
+}
+
+/** 관리자 내전 기록 상세 — 목록 필드에 팀/참가자 지표가 더해진다 */
+export interface AdminInternalMatchDetail
+  extends Omit<AdminInternalMatch, "_count"> {
+  bracketType: string | null;
+  round: number | null;
+  tournamentCode: string | null;
+  patchVersion: string | null;
+  lastCollectAttemptAt: string | null;
+  blueSideTeamId: string | null;
+  scheduledAt: string | null;
+  teamStats: {
+    teamId: string;
+    win: boolean;
+    towerKills: number;
+    inhibitorKills: number;
+    baronKills: number;
+    dragonKills: number;
+    riftHeraldKills: number;
+    firstBlood: boolean;
+    firstTower: boolean;
+  }[];
+  participants: {
+    id: string;
+    teamId: string | null;
+    riotTeamId: number | null;
+    championId: number;
+    championName: string;
+    position: string;
+    kills: number;
+    deaths: number;
+    assists: number;
+    totalMinionsKilled: number;
+    neutralMinionsKilled: number;
+    goldEarned: number;
+    totalDamageDealtToChampions: number;
+    visionScore: number;
+    user: { id: string; username: string; avatar: string | null } | null;
+  }[];
+}
+
 export const adminApi = {
   // Stats
   getStats: async () => {
@@ -2470,6 +2539,26 @@ export const adminApi = {
   }) => {
     const response = await apiClient.get("/admin/rooms", { params });
     return response.data;
+  },
+  // 실제 진행된 내전 기록 (외부 랭크 인제스트 매치는 제외)
+  getInternalMatches: async (params?: {
+    page?: number;
+    limit?: number;
+    status?: "PENDING" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
+    collected?: "collected" | "pending";
+    search?: string;
+  }) => {
+    const response = await apiClient.get("/admin/matches", { params });
+    return response.data as {
+      matches: AdminInternalMatch[];
+      total: number;
+      page: number;
+      limit: number;
+    };
+  },
+  getInternalMatchDetail: async (matchId: string) => {
+    const response = await apiClient.get(`/admin/matches/${matchId}`);
+    return response.data as AdminInternalMatchDetail;
   },
   closeRoom: async (roomId: string) => {
     const response = await apiClient.post(`/admin/rooms/${roomId}/close`);

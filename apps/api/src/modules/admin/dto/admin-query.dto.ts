@@ -1,4 +1,4 @@
-import { UserRole } from "@nexus/database";
+import { MatchStatus, UserRole } from "@nexus/database";
 import {
   ArrayMaxSize,
   ArrayNotEmpty,
@@ -124,6 +124,38 @@ export class AdminMatchQueueQueryDto {
     message: "queueGroup은 ranked, normal, aram, custom 중 하나여야 합니다.",
   })
   queueGroup?: "ranked" | "normal" | "aram" | "custom";
+}
+
+// 실제 진행된 내전(내부 토너먼트) 매치 목록 조회.
+// 외부 랭크 인제스트 매치(roomId=NULL)는 제외하고 roomId가 있는 매치만 다룬다.
+export class AdminInternalMatchesQueryDto {
+  @IsOptional()
+  @IsInt({ message: "page는 정수여야 합니다." })
+  @Min(1, { message: "page는 1 이상이어야 합니다." })
+  page: number = 1;
+
+  @IsOptional()
+  @IsInt({ message: "limit는 정수여야 합니다." })
+  @Min(1, { message: "limit는 1 이상이어야 합니다." })
+  @Max(100, { message: "limit는 100 이하여야 합니다." })
+  limit: number = 20;
+
+  @IsOptional()
+  @IsEnum(MatchStatus, { message: "유효한 매치 상태를 선택해주세요." })
+  status?: MatchStatus;
+
+  // "collected" = Riot 전적 수집 완료, "pending" = 미수집
+  @IsOptional()
+  @IsIn(["collected", "pending"], {
+    message: "collected는 collected, pending 중 하나여야 합니다.",
+  })
+  collected?: "collected" | "pending";
+
+  // 방 이름 / 호스트 닉네임 부분 검색
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  search?: string;
 }
 
 // 특정 유저(단일/다중) 개인 메시지·공지 발송

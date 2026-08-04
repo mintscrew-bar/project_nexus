@@ -7,7 +7,13 @@ import {
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../prisma/prisma.service";
-import { UserRole, UserStatus, AdminAction, Prisma } from "@nexus/database";
+import {
+  UserRole,
+  UserStatus,
+  AdminAction,
+  MatchStatus,
+  Prisma,
+} from "@nexus/database";
 import { DiscordBotService } from "../discord/discord-bot.service";
 import { DiscordAdminAlertService } from "../discord/discord-admin-alert.service";
 import { DiscordVoiceService } from "../discord/discord-voice.service";
@@ -1336,6 +1342,171 @@ export class AdminService {
     ]);
 
     return { rooms, total, page, limit };
+  }
+
+  // ── 내전 기록 (실제 진행된 내부 토너먼트 매치) ─────────────────────────────
+  //
+  // Match 테이블은 두 종류가 섞여 있다.
+  //   · 내부 내전 매치 — roomId가 있고 Nexus Team으로 편성된 경기
+  //   · 외부 랭크 인제스트 매치 — roomId가 NULL이고 queueId로 식별되는 캐시 데이터
+  // 관리자 화면에서 필요한 것은 전자뿐이므로 roomId 존재 여부로 걸러낸다.
+
+  async getInternalMatches(params: {
+    page: number;
+    limit: number;
+    status?: MatchStatus;
+    collected?: "collected" | "pending";
+    search?: string;
+  }) {
+    const { page, status, collected, search } = params;
+    const limit = clampLimit(params.limit);
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.MatchWhereInput = {
+      roomId: { not: null },
+      ...(status ? { status } : {}),
+      ...(collected ? { dataCollected: collected === "collected" } : {}),
+      ...(search
+        ? {
+            room: {
+              is: {
+                OR: [
+                  { name: { contains: search, mode: "insensitive" } },
+                  {
+                    host: {
+                      is: {
+                        username: { contains: search, mode: "insensitive" },
+                      },
+                    },
+                  },
+                ],
+              },
+            },
+          }
+        : {}),
+    };
+
+    const [matches, total] = await Promise.all([
+      this.prisma.match.findMany({
+        where,
+        select: {
+          id: true,
+          status: true,
+          matchNumber: true,
+          bracketRound: true,
+          riotMatchId: true,
+          gameDuration: true,
+          dataCollected: true,
+          collectAttempts: true,
+          startedAt: true,
+          completedAt: true,
+          createdAt: true,
+          winnerId: true,
+          room: {
+            select: {
+              id: true,
+              name: true,
+              status: true,
+              teamMode: true,
+              host: { select: { id: true, username: true } },
+            },
+          },
+          teamA: { select: { id: true, name: true } },
+          teamB: { select: { id: true, name: true } },
+          winner: { select: { id: true, name: true } },
+          mvpUser: { select: { id: true, username: true } },
+          aceUser: { select: { id: true, username: true } },
+          _count: { select: { participants: true } },
+        },
+        // 실제로 진행된 순서를 보려면 완료 시각이 가장 자연스럽다.
+        // 미완료 매치는 completedAt이 NULL이므로 생성 시각으로 이어서 정렬한다.
+        orderBy: [{ completedAt: "desc" }, { createdAt: "desc" }],
+        skip,
+        take: limit,
+      }),
+      this.prisma.match.count({ where }),
+    ]);
+
+    return { matches, total, page, limit };
+  }
+
+  async getInternalMatchDetail(matchId: string) {
+    const match = await this.prisma.match.findFirst({
+      // roomId 조건을 함께 걸어 외부 인제스트 매치가 이 경로로 노출되지 않게 한다.
+      where: { id: matchId, roomId: { not: null } },
+      select: {
+        id: true,
+        status: true,
+        matchNumber: true,
+        bracketRound: true,
+        bracketType: true,
+        round: true,
+        riotMatchId: true,
+        tournamentCode: true,
+        patchVersion: true,
+        gameDuration: true,
+        dataCollected: true,
+        collectAttempts: true,
+        lastCollectAttemptAt: true,
+        blueSideTeamId: true,
+        scheduledAt: true,
+        startedAt: true,
+        completedAt: true,
+        createdAt: true,
+        winnerId: true,
+        room: {
+          select: {
+            id: true,
+            name: true,
+            status: true,
+            teamMode: true,
+            createdAt: true,
+            host: { select: { id: true, username: true } },
+          },
+        },
+        teamA: { select: { id: true, name: true } },
+        teamB: { select: { id: true, name: true } },
+        winner: { select: { id: true, name: true } },
+        mvpUser: { select: { id: true, username: true } },
+        aceUser: { select: { id: true, username: true } },
+        teamStats: {
+          select: {
+            teamId: true,
+            win: true,
+            towerKills: true,
+            inhibitorKills: true,
+            baronKills: true,
+            dragonKills: true,
+            riftHeraldKills: true,
+            firstBlood: true,
+            firstTower: true,
+          },
+        },
+        participants: {
+          select: {
+            id: true,
+            teamId: true,
+            riotTeamId: true,
+            championId: true,
+            championName: true,
+            position: true,
+            kills: true,
+            deaths: true,
+            assists: true,
+            totalMinionsKilled: true,
+            neutralMinionsKilled: true,
+            goldEarned: true,
+            totalDamageDealtToChampions: true,
+            visionScore: true,
+            user: { select: { id: true, username: true, avatar: true } },
+          },
+        },
+      },
+    });
+
+    if (!match) throw new NotFoundException("내전 기록을 찾을 수 없습니다.");
+
+    return match;
   }
 
   async closeRoom(roomId: string, adminId: string) {
