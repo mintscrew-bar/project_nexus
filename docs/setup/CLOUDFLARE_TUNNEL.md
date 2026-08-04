@@ -43,7 +43,7 @@ CD 워크플로는 배포 시 `.env.production`을 매번 다시 생성한다. �
 - Riot / Discord: `RIOT_API_KEY`, `RIOT_REGION`, `RIOT_TOURNAMENT_PROVIDER_ID`, `RIOT_TOURNAMENT_ID`, `TOURNAMENT_API_ENABLED`, `DISCORD_*`
 - 업로드 / 터널: `UPLOAD_DRIVER`, `UPLOAD_PUBLIC_BASE_URL`, `R2_*`, `CLOUDFLARE_TUNNEL_TOKEN`
 
-예시 키 목록은 [`.env.production.example`](../../.env.production.example) 를 기준으로 유지한다.
+예시 키 목록은 [`.env.example`](../../.env.example) 를 기준으로 유지한다.
 
 ---
 

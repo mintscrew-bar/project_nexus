@@ -33,6 +33,7 @@ import { AdminModule } from "./modules/admin/admin.module";
 import { DmModule } from "./modules/dm/dm.module";
 import { TasksModule } from "./modules/tasks/tasks.module";
 import { RankingModule } from "./modules/ranking/ranking.module";
+import { StreamerModule } from "./modules/streamer/streamer.module";
 import { PrismaModule } from "./modules/prisma/prisma.module";
 import { RedisModule } from "./modules/redis/redis.module";
 import { ShutdownModule } from "./modules/common/shutdown.module";
@@ -106,6 +107,7 @@ const projectRoot = resolve(apiRoot, "../..");
     DmModule,
     TasksModule,
     RankingModule,
+    StreamerModule,
   ],
   controllers: [HealthController],
   providers: [

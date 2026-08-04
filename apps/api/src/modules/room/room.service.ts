@@ -21,6 +21,7 @@ import { Prisma } from "@prisma/client";
 import * as bcrypt from "bcrypt";
 import { randomInt } from "crypto";
 import { calculateTierScore } from "../common/tier-score.util";
+import { StreamerService } from "../streamer/streamer.service";
 
 export interface CreateRoomDto {
   name: string;
@@ -74,6 +75,7 @@ export class RoomService {
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
     private readonly shutdownService: ShutdownService,
+    private readonly streamerService: StreamerService,
     @Optional() @Inject("DISCORD_BOT_SERVICE") discordBot?: any,
     @Optional() @Inject("DISCORD_VOICE_SERVICE") discordVoice?: any,
   ) {
@@ -885,8 +887,18 @@ export class RoomService {
 
       const hasMore = rooms.length > limit;
       const items = hasMore ? rooms.slice(0, limit) : rooms;
+
+      // 호스트가 방송 중이면 방 목록 카드에 🔴 뱃지를 붙인다.
+      // 캐시된 값만 읽으므로(폴링이 갱신 담당) 목록 응답이 느려지지 않는다.
+      const hostLive = await this.streamerService.getHostLiveMap(
+        items.map((room) => room.hostId),
+      );
+
       return {
-        items,
+        items: items.map((room) => ({
+          ...room,
+          hostLive: hostLive.get(room.hostId) ?? null,
+        })),
         total,
         nextCursor: hasMore ? (items[items.length - 1]?.id ?? null) : null,
       };

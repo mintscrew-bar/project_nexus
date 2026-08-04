@@ -64,7 +64,7 @@ Prisma datasource는 `packages/database/prisma/schema.prisma`의 `datasource db`
 | --- | --- | --- | --- |
 | `DATABASE_URL` | Prisma datasource, API 서버, DB 스크립트 | PostgreSQL 접속 문자열 | `postgresql://nexus:nexus_password@localhost:5432/nexus?schema=public` |
 | `POSTGRES_USER` | `docker-compose.prod.yml` `postgres`, prod `api` | 운영 Postgres 계정명 및 API `DATABASE_URL` 조립 | 기본값 `nexus` |
-| `POSTGRES_PASSWORD` | `docker-compose.prod.yml` `postgres`, prod `api` | 운영 Postgres 비밀번호 | 운영 compose에서는 필수. `.env.production.example` 기준 긴 랜덤값 필요 |
+| `POSTGRES_PASSWORD` | `docker-compose.prod.yml` `postgres`, prod `api` | 운영 Postgres 비밀번호 | 운영 compose에서는 필수. `.env.example` 기준 긴 랜덤값 필요 |
 | `POSTGRES_DB` | `docker-compose.prod.yml` `postgres`, prod `api` | 운영 DB 이름 | 기본값 `nexus` |
 | `POSTGRES_HOST_PORT` | `docker-compose.dev.yml` | 개발 DB 호스트 포트 노출 | 기본 `5432`; 로컬 DB와 충돌하면 변경 |
 | `REDIS_URL` | API 서버, Riot 인증 상태, 큐/캐시 | DB는 아니지만 DB 파이프라인과 함께 필요한 Redis 접속 문자열 | dev `redis://localhost:6379`, compose 내부 `redis://redis:6379` |

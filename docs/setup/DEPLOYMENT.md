@@ -3,7 +3,7 @@
 ## 1. Prepare Environment
 
 ```bash
-cp .env.production.example .env.production
+cp .env.example .env.production
 ```
 
 Set real values before starting:
@@ -29,7 +29,7 @@ pnpm compose:prod:config
 To validate with the example file before creating real secrets:
 
 ```bash
-NEXUS_ENV_FILE=.env.production.example docker compose --env-file .env.production.example -f docker-compose.prod.yml config
+NEXUS_ENV_FILE=.env.example docker compose --env-file .env.example -f docker-compose.prod.yml config
 ```
 
 ## 3. Start
