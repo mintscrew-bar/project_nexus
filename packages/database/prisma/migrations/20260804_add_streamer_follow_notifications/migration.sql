@@ -15,7 +15,7 @@ CREATE INDEX "StreamerFollow_streamerId_idx" ON "StreamerFollow"("streamerId");
 
 ALTER TABLE "StreamerFollow"
     ADD CONSTRAINT "StreamerFollow_followerId_fkey"
-    FOREIGN KEY ("followerId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    FOREIGN KEY ("followerId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "StreamerFollow"
     ADD CONSTRAINT "StreamerFollow_streamerId_fkey"
-    FOREIGN KEY ("streamerId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    FOREIGN KEY ("streamerId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
