@@ -9,13 +9,13 @@ overrides:
   follow-redirects: ^1.16.0
   postcss: ^8.5.18
   qs: ^6.15.2
-  socket.io-parser: ^4.2.6
+  socket.io-parser: ^4.2.7
   engine.io: ^6.6.7
   ws: ^8.21.0
   diff: ^4.0.4
   basic-ftp: ^5.3.1
   systeminformation: ^5.31.7
-  ip-address: ^10.2.0
+  ip-address: ^10.3.1
   fast-uri: ^3.1.4
   flatted: ^3.4.2
   brace-expansion@1: 1.1.17
@@ -34,7 +34,7 @@ overrides:
   path-to-regexp@>=8.0.0 <8.4.0: ^8.4.2
   uuid@<11.1.1: ^11.1.1
   multer: ^2.2.0
-  undici: ^6.27.0
+  undici: ^6.28.0
 
 importers:
 
@@ -1127,7 +1127,7 @@ packages:
       discord-api-types: 0.38.45
       magic-bytes.js: 1.13.0
       tslib: 2.8.1
-      undici: 6.27.0
+      undici: 6.28.0
     dev: false
 
   /@discordjs/util@1.2.0:
@@ -5382,7 +5382,7 @@ packages:
       lodash.snakecase: 4.1.1
       magic-bytes.js: 1.13.0
       tslib: 2.8.1
-      undici: 6.27.0
+      undici: 6.28.0
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
@@ -6981,8 +6981,8 @@ packages:
       - supports-color
     dev: false
 
-  /ip-address@10.2.0:
-    resolution: {integrity: sha512-/+S6j4E9AHvW9SWMSEY9Xfy66O5PWvVEJ08O0y5JGyEKQpojb0K0GKpz/v5HJ/G0vi3D2sjGK78119oXZeE0qA==}
+  /ip-address@10.4.0:
+    resolution: {integrity: sha512-oSK96Grm3aP6OrS263xVxbNDGVL7rzBtYdpGqlDG8iQdoenDoTs/nkki+DflYbAEE8Xl6o5YxhxlrKvI3nqKXQ==}
     engines: {node: '>= 12'}
     dev: false
 
@@ -10371,15 +10371,15 @@ packages:
       '@socket.io/component-emitter': 3.1.2
       debug: 4.4.3
       engine.io-client: 6.6.4
-      socket.io-parser: 4.2.6
+      socket.io-parser: 4.2.7
     transitivePeerDependencies:
       - bufferutil
       - supports-color
       - utf-8-validate
     dev: false
 
-  /socket.io-parser@4.2.6:
-    resolution: {integrity: sha512-asJqbVBDsBCJx0pTqw3WfesSY0iRX+2xzWEWzrpcH7L6fLzrhyF8WPI8UaeM4YCuDfpwA/cgsdugMsmtz8EJeg==}
+  /socket.io-parser@4.2.7:
+    resolution: {integrity: sha512-IH/iSeO9T6gz1KkFleGDWkG9N3dl4jXVYUtMhIqH10Md0ttMer8nUNWiP1DKuNrybD2xBrixLJdCC9J6ECoYkg==}
     engines: {node: '>=10.0.0'}
     dependencies:
       '@socket.io/component-emitter': 3.1.2
@@ -10397,7 +10397,7 @@ packages:
       debug: 4.4.3
       engine.io: 6.6.9
       socket.io-adapter: 2.5.6
-      socket.io-parser: 4.2.6
+      socket.io-parser: 4.2.7
     transitivePeerDependencies:
       - bufferutil
       - supports-color
@@ -10418,7 +10418,7 @@ packages:
     resolution: {integrity: sha512-HLpt+uLy/pxB+bum/9DzAgiKS8CX1EvbWxI4zlmgGCExImLdiad2iCwXT5Z4c9c3Eq8rP2318mPW2c+QbtjK8A==}
     engines: {node: '>= 10.0.0', npm: '>= 3.0.0'}
     dependencies:
-      ip-address: 10.2.0
+      ip-address: 10.4.0
       smart-buffer: 4.2.0
     dev: false
 
@@ -11176,8 +11176,8 @@ packages:
   /undici-types@6.21.0:
     resolution: {integrity: sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ==}
 
-  /undici@6.27.0:
-    resolution: {integrity: sha512-YmfV3YnEDzXRC5lZ2jWtWWHKGUm1zIt8AhesR1tens+HTNv+YZlN/dp6G727LOvMJ8xjP9Be7Y2Sdr96LDm+pg==}
+  /undici@6.28.0:
+    resolution: {integrity: sha512-LIY910g9TI13YS95lrMFrs8Rm/u/irgHeTWoKCoteeJ04CUJ92eEfj0rVn+7VKMPBpUPiUoBKfhNyLI23EE/KA==}
     engines: {node: '>=18.17'}
     dev: false
 

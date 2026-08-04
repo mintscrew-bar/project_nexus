@@ -198,9 +198,11 @@ jobs:
 
           wait_for_http http://127.0.0.1:4000/api/health 60
 
-          set -a
-          . /home/haru/projects/nexus/.env.production
-          set +a
+          APP_URL=$(grep -m1 '^APP_URL=' /home/haru/projects/nexus/.env.production | cut -d= -f2-)
+          if [ -z "$APP_URL" ]; then
+            echo "::error::APP_URL is missing from .env.production"
+            exit 1
+          fi
           wait_for_http "${APP_URL%/}/api/health" 120
 
       # 강화된 정리. 배포 성공/실패와 무관하게 항상 실행.
