@@ -1,6 +1,18 @@
 import { StreamerPlatform } from "@nexus/database";
 
 /**
+ * hostname이 domain 자신이거나 그 하위 도메인인지 검사한다.
+ *
+ * `hostname.endsWith(domain)`은 라벨 경계를 보지 않아
+ * "evilsooplive.co.kr" 같은, domain과 무관하게 독립 등록 가능한 도메인도
+ * 통과시킨다("sooplive.co.kr"으로 끝나는 문자열이라는 이유만으로).
+ * 반드시 "." 경계를 확인해야 한다.
+ */
+export function isDomainOrSubdomain(hostname: string, domain: string): boolean {
+  return hostname === domain || hostname.endsWith(`.${domain}`);
+}
+
+/**
  * 플랫폼별 라이브 조회 결과를 플랫폼과 무관한 형태로 정규화한 값.
  * 필드 대부분이 optional인 이유는 플랫폼마다 주는 정보가 다르기 때문이다.
  * (예: SOOP은 시청자 수를 이 경로로 주지 않는다)

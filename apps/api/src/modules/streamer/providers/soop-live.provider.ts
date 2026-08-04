@@ -3,6 +3,7 @@ import { StreamerPlatform } from "@nexus/database";
 import axios from "axios";
 import {
   ChannelIdentity,
+  isDomainOrSubdomain,
   LiveProvider,
   LiveSnapshot,
 } from "./live-provider.interface";
@@ -40,8 +41,8 @@ export class SoopLiveProvider implements LiveProvider {
       const url = new URL(raw);
       // ch.sooplive.co.kr/{id}, play.sooplive.co.kr/{id}/... 및 구 afreecatv 도메인
       if (
-        !url.hostname.endsWith("sooplive.co.kr") &&
-        !url.hostname.endsWith("afreecatv.com")
+        !isDomainOrSubdomain(url.hostname, "sooplive.co.kr") &&
+        !isDomainOrSubdomain(url.hostname, "afreecatv.com")
       ) {
         return null;
       }

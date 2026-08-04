@@ -3,6 +3,7 @@ import { StreamerPlatform } from "@nexus/database";
 import axios from "axios";
 import {
   ChannelIdentity,
+  isDomainOrSubdomain,
   LiveProvider,
   LiveSnapshot,
 } from "./live-provider.interface";
@@ -40,7 +41,7 @@ export class ChzzkLiveProvider implements LiveProvider {
 
     try {
       const url = new URL(raw);
-      if (!url.hostname.endsWith("chzzk.naver.com")) return null;
+      if (!isDomainOrSubdomain(url.hostname, "chzzk.naver.com")) return null;
 
       // /{channelId} 또는 /live/{channelId} 두 형태를 모두 받는다.
       const segments = url.pathname.split("/").filter(Boolean);
