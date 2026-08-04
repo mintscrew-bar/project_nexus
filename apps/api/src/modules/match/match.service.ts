@@ -408,6 +408,10 @@ export class MatchService {
       throw new NotFoundException("Match not found after update");
     }
 
+    // 방과 팀은 이후 삭제되거나 재구성될 수 있으므로 결과 확정 시점의 표시 정보와
+    // 참가 명단을 매치에 독립적으로 고정한다.
+    await this.persistInternalMatchSnapshot(matchId);
+
     // 위에서 roomId는 이미 검증됨 — 동일 매치이므로 updatedMatch.roomId도 NULL이 아님
     const roomId = updatedMatch.roomId;
     if (!roomId) {
@@ -967,6 +971,7 @@ export class MatchService {
   }) {
     return this.prisma.match.create({
       data: {
+        isInternal: true,
         roomId: data.roomId,
         teamAId: data.teamAId,
         teamBId: data.teamBId,
@@ -983,7 +988,7 @@ export class MatchService {
       riotMatchId?: string;
     },
   ) {
-    return this.prisma.match.update({
+    const match = await this.prisma.match.update({
       where: { id: matchId },
       data: {
         winnerId: data.winnerId,
@@ -991,6 +996,112 @@ export class MatchService {
         status: "COMPLETED",
         completedAt: new Date(),
       },
+    });
+    await this.persistInternalMatchSnapshot(matchId);
+    return match;
+  }
+
+  private async persistInternalMatchSnapshot(matchId: string): Promise<void> {
+    const match = await this.prisma.match.findUnique({
+      where: { id: matchId },
+      include: {
+        room: {
+          include: {
+            host: { select: { id: true, username: true } },
+          },
+        },
+        teamA: {
+          include: {
+            members: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    username: true,
+                    riotAccounts: {
+                      where: { isPrimary: true },
+                      take: 1,
+                      select: { puuid: true },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        teamB: {
+          include: {
+            members: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    username: true,
+                    riotAccounts: {
+                      where: { isPrimary: true },
+                      take: 1,
+                      select: { puuid: true },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!match?.room || !match.teamA || !match.teamB) return;
+
+    const roster = [
+      ...match.teamA.members.map((member) => ({
+        matchId,
+        userId: member.userId,
+        username: member.user.username,
+        puuid: member.user.riotAccounts[0]?.puuid ?? null,
+        teamSlot: "A",
+        teamIdSnapshot: match.teamA!.id,
+        teamName: match.teamA!.name,
+      })),
+      ...match.teamB.members.map((member) => ({
+        matchId,
+        userId: member.userId,
+        username: member.user.username,
+        puuid: member.user.riotAccounts[0]?.puuid ?? null,
+        teamSlot: "B",
+        teamIdSnapshot: match.teamB!.id,
+        teamName: match.teamB!.name,
+      })),
+    ];
+    const winner =
+      match.winnerId === match.teamA.id
+        ? match.teamA
+        : match.winnerId === match.teamB.id
+          ? match.teamB
+          : null;
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.match.update({
+        where: { id: matchId },
+        data: {
+          isInternal: true,
+          roomIdSnapshot: match.room!.id,
+          roomName: match.room!.name,
+          roomTeamMode: match.room!.teamMode,
+          roomHostId: match.room!.host.id,
+          roomHostName: match.room!.host.username,
+          teamAIdSnapshot: match.teamA!.id,
+          teamAName: match.teamA!.name,
+          teamBIdSnapshot: match.teamB!.id,
+          teamBName: match.teamB!.name,
+          winnerIdSnapshot: winner?.id ?? null,
+          winnerName: winner?.name ?? null,
+        },
+      });
+      await tx.matchRosterSnapshot.deleteMany({ where: { matchId } });
+      if (roster.length > 0) {
+        await tx.matchRosterSnapshot.createMany({ data: roster });
+      }
     });
   }
 
@@ -1077,6 +1188,13 @@ export class MatchService {
             },
           },
         },
+        rosterSnapshots: {
+          include: {
+            user: {
+              select: { id: true, username: true, avatar: true },
+            },
+          },
+        },
       },
     });
 
@@ -1084,14 +1202,65 @@ export class MatchService {
       throw new NotFoundException("Match not found");
     }
 
-    return match;
+    const buildSnapshotTeam = (
+      teamSlot: string,
+      id: string | null,
+      name: string | null,
+    ) =>
+      id && name
+        ? {
+            id,
+            name,
+            color: null,
+            captain: null,
+            members: match.rosterSnapshots
+              .filter((member) => member.teamSlot === teamSlot)
+              .map((member) => ({
+                userId: member.userId,
+                assignedRole: null,
+                user: member.user ?? {
+                  id: member.userId,
+                  username: member.username,
+                  avatar: null,
+                  riotAccounts: [],
+                },
+              })),
+          }
+        : null;
+
+    return {
+      ...match,
+      teamA:
+        match.teamA ??
+        buildSnapshotTeam("A", match.teamAIdSnapshot, match.teamAName),
+      teamB:
+        match.teamB ??
+        buildSnapshotTeam("B", match.teamBIdSnapshot, match.teamBName),
+      participants: match.participants.map((participant) => ({
+        ...participant,
+        teamId: participant.teamId ?? participant.teamIdSnapshot,
+      })),
+      teamStats: match.teamStats.map((stats) => ({
+        ...stats,
+        teamId: stats.teamId ?? stats.teamIdSnapshot,
+        team:
+          stats.team ??
+          (stats.teamIdSnapshot && stats.teamName
+            ? {
+                id: stats.teamIdSnapshot,
+                name: stats.teamName,
+                color: null,
+              }
+            : null),
+      })),
+    };
   }
 
   /**
    * Get match participants
    */
   async getMatchParticipants(matchId: string) {
-    return this.prisma.matchParticipant.findMany({
+    const participants = await this.prisma.matchParticipant.findMany({
       where: { matchId },
       include: {
         user: {
@@ -1113,6 +1282,19 @@ export class MatchService {
         teamId: "asc",
       },
     });
+
+    return participants.map((participant) => ({
+      ...participant,
+      team:
+        participant.team ??
+        (participant.teamIdSnapshot && participant.teamName
+          ? {
+              id: participant.teamIdSnapshot,
+              name: participant.teamName,
+              color: null,
+            }
+          : null),
+    }));
   }
 
   /**
@@ -1127,7 +1309,7 @@ export class MatchService {
       where: {
         userId,
         match: {
-          roomId: { not: null },
+          isInternal: true,
         },
       },
       include: {
@@ -1172,7 +1354,35 @@ export class MatchService {
 
     return matches.map((participant: (typeof matches)[number]) => ({
       matchId: participant.matchId,
-      match: participant.match,
+      match: {
+        ...participant.match,
+        teamA:
+          participant.match.teamA ??
+          (participant.match.teamAIdSnapshot && participant.match.teamAName
+            ? {
+                id: participant.match.teamAIdSnapshot,
+                name: participant.match.teamAName,
+                color: null,
+              }
+            : null),
+        teamB:
+          participant.match.teamB ??
+          (participant.match.teamBIdSnapshot && participant.match.teamBName
+            ? {
+                id: participant.match.teamBIdSnapshot,
+                name: participant.match.teamBName,
+                color: null,
+              }
+            : null),
+        winner:
+          participant.match.winner ??
+          (participant.match.winnerIdSnapshot && participant.match.winnerName
+            ? {
+                id: participant.match.winnerIdSnapshot,
+                name: participant.match.winnerName,
+              }
+            : null),
+      },
       participant: {
         championId: participant.championId,
         championName: participant.championName,
@@ -1193,7 +1403,15 @@ export class MatchService {
             ? participant.kills + participant.assists
             : (participant.kills + participant.assists) / participant.deaths,
       },
-      team: participant.team,
+      team:
+        participant.team ??
+        (participant.teamIdSnapshot && participant.teamName
+          ? {
+              id: participant.teamIdSnapshot,
+              name: participant.teamName,
+              color: null,
+            }
+          : null),
     }));
   }
 
@@ -1208,11 +1426,12 @@ export class MatchService {
   async getUserRiotMatchIds(userId: string): Promise<string[]> {
     const matches = await this.prisma.match.findMany({
       where: {
-        roomId: { not: null },
+        isInternal: true,
         riotMatchId: { not: null },
         OR: [
           { teamA: { members: { some: { userId } } } },
           { teamB: { members: { some: { userId } } } },
+          { rosterSnapshots: { some: { userId } } },
         ],
       },
       select: { riotMatchId: true },

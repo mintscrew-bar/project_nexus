@@ -32,6 +32,10 @@ describe("MatchService", () => {
       matchParticipant: {
         findMany: jest.fn(),
       },
+      matchRosterSnapshot: {
+        deleteMany: jest.fn(),
+        createMany: jest.fn(),
+      },
       team: {
         findUnique: jest.fn(),
       },
@@ -42,6 +46,9 @@ describe("MatchService", () => {
         findUnique: jest.fn(),
         update: jest.fn(),
       },
+      $transaction: jest.fn(async (callback: (tx: any) => unknown) =>
+        callback(prisma),
+      ),
     };
 
     // 각 외부 의존 서비스 mock — 실제 동작 불필요
@@ -99,6 +106,76 @@ describe("MatchService", () => {
     }).compile();
 
     service = module.get<MatchService>(MatchService);
+  });
+
+  describe("매치 종료 스냅샷", () => {
+    it("종료 시점의 방, 팀, 승자, 로스터를 매치와 독립적으로 기록한다", async () => {
+      prisma.match.findUnique.mockResolvedValue({
+        id: "match-1",
+        winnerId: "team-a",
+        room: {
+          id: "room-1",
+          name: "여름 내전",
+          teamMode: "MANUAL_TEAM",
+          host: { id: "host-1", username: "방장" },
+        },
+        teamA: {
+          id: "team-a",
+          name: "A팀",
+          members: [
+            {
+              userId: "user-a",
+              user: {
+                username: "선수A",
+                riotAccounts: [{ puuid: "puuid-a" }],
+              },
+            },
+          ],
+        },
+        teamB: {
+          id: "team-b",
+          name: "B팀",
+          members: [
+            {
+              userId: "user-b",
+              user: {
+                username: "선수B",
+                riotAccounts: [{ puuid: "puuid-b" }],
+              },
+            },
+          ],
+        },
+      });
+
+      await (service as any).persistInternalMatchSnapshot("match-1");
+
+      expect(prisma.match.update).toHaveBeenCalledWith({
+        where: { id: "match-1" },
+        data: expect.objectContaining({
+          isInternal: true,
+          roomIdSnapshot: "room-1",
+          roomName: "여름 내전",
+          teamAIdSnapshot: "team-a",
+          teamBIdSnapshot: "team-b",
+          winnerIdSnapshot: "team-a",
+          winnerName: "A팀",
+        }),
+      });
+      expect(prisma.matchRosterSnapshot.createMany).toHaveBeenCalledWith({
+        data: expect.arrayContaining([
+          expect.objectContaining({
+            userId: "user-a",
+            puuid: "puuid-a",
+            teamIdSnapshot: "team-a",
+          }),
+          expect.objectContaining({
+            userId: "user-b",
+            puuid: "puuid-b",
+            teamIdSnapshot: "team-b",
+          }),
+        ]),
+      });
+    });
   });
 
   describe("getRpsContext", () => {
@@ -491,11 +568,12 @@ describe("MatchService", () => {
 
       expect(prisma.match.findMany).toHaveBeenCalledWith({
         where: {
-          roomId: { not: null },
+          isInternal: true,
           riotMatchId: { not: null },
           OR: [
             { teamA: { members: { some: { userId: "user-1" } } } },
             { teamB: { members: { some: { userId: "user-1" } } } },
+            { rosterSnapshots: { some: { userId: "user-1" } } },
           ],
         },
         select: { riotMatchId: true },

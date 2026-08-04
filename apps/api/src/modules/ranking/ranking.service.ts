@@ -20,7 +20,7 @@ export class RankingService {
         where: {
           userId,
           match: {
-            roomId: { not: null },
+            isInternal: true,
           },
         },
         select: { win: true, createdAt: true },
@@ -97,7 +97,7 @@ export class RankingService {
       where: {
         userId,
         match: {
-          roomId: { not: null },
+          isInternal: true,
         },
       },
       select: { win: true },
@@ -290,7 +290,7 @@ export class RankingService {
         where: {
           userId: { not: null },
           match: {
-            roomId: { not: null },
+            isInternal: true,
           },
         },
         select: { userId: true },

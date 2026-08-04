@@ -31,21 +31,43 @@ describe("RoomService", () => {
         create: jest.fn(),
         findUnique: jest.fn(),
         update: jest.fn(),
+        delete: jest.fn(),
       },
+      match: {
+        findMany: jest.fn(),
+        update: jest.fn(),
+        deleteMany: jest.fn(),
+      },
+      matchRosterSnapshot: { createMany: jest.fn() },
+      matchParticipant: {
+        updateMany: jest.fn(),
+        deleteMany: jest.fn(),
+      },
+      matchTeamStats: {
+        updateMany: jest.fn(),
+        deleteMany: jest.fn(),
+      },
+      matchVote: { deleteMany: jest.fn() },
+      userRating: { deleteMany: jest.fn() },
+      userReport: { updateMany: jest.fn() },
       roomParticipant: {
         findFirst: jest.fn(),
         count: jest.fn(),
         update: jest.fn(),
         updateMany: jest.fn(),
+        deleteMany: jest.fn(),
       },
       snakeDraftPick: { deleteMany: jest.fn() },
       auctionBid: { deleteMany: jest.fn() },
       team: {
         create: jest.fn(),
+        findMany: jest.fn(),
         update: jest.fn(),
         deleteMany: jest.fn(),
       },
-      teamMember: { createMany: jest.fn() },
+      teamMember: { createMany: jest.fn(), deleteMany: jest.fn() },
+      roomDiscordChannel: { deleteMany: jest.fn() },
+      chatMessage: { updateMany: jest.fn() },
       $transaction: jest.fn(async (callback: (tx: any) => unknown) =>
         callback(prisma),
       ),
@@ -69,6 +91,95 @@ describe("RoomService", () => {
     }).compile();
 
     service = module.get<RoomService>(RoomService);
+  });
+
+  describe("deleteRoomData — 완료 기록 보존", () => {
+    it("완료 매치는 스냅샷을 남기고 방/팀 FK만 분리한다", async () => {
+      prisma.room.findUnique.mockResolvedValue({
+        id: "room-1",
+        name: "여름 내전",
+        teamMode: TeamMode.MANUAL_TEAM,
+        host: { id: "host-1", username: "방장" },
+      });
+      prisma.match.findMany.mockResolvedValue([
+        {
+          id: "match-completed",
+          status: "COMPLETED",
+          roomName: null,
+          teamAId: "team-a",
+          teamAIdSnapshot: null,
+          teamBId: "team-b",
+          teamBIdSnapshot: null,
+          winnerId: "team-a",
+          winnerIdSnapshot: null,
+          _count: { rosterSnapshots: 0 },
+        },
+      ]);
+      prisma.team.findMany.mockResolvedValue([
+        {
+          id: "team-a",
+          name: "A팀",
+          members: [
+            {
+              userId: "user-a",
+              user: {
+                username: "선수A",
+                riotAccounts: [{ puuid: "puuid-a" }],
+              },
+            },
+          ],
+        },
+        {
+          id: "team-b",
+          name: "B팀",
+          members: [
+            {
+              userId: "user-b",
+              user: {
+                username: "선수B",
+                riotAccounts: [{ puuid: "puuid-b" }],
+              },
+            },
+          ],
+        },
+      ]);
+
+      await service.deleteRoomData("room-1");
+
+      expect(prisma.match.update).toHaveBeenCalledWith({
+        where: { id: "match-completed" },
+        data: expect.objectContaining({
+          isInternal: true,
+          roomIdSnapshot: "room-1",
+          roomName: "여름 내전",
+          teamAIdSnapshot: "team-a",
+          teamBIdSnapshot: "team-b",
+          winnerIdSnapshot: "team-a",
+          roomId: null,
+          teamAId: null,
+          teamBId: null,
+          winnerId: null,
+        }),
+      });
+      expect(prisma.matchRosterSnapshot.createMany).toHaveBeenCalledWith({
+        data: expect.arrayContaining([
+          expect.objectContaining({
+            matchId: "match-completed",
+            userId: "user-a",
+            teamIdSnapshot: "team-a",
+          }),
+          expect.objectContaining({
+            matchId: "match-completed",
+            userId: "user-b",
+            teamIdSnapshot: "team-b",
+          }),
+        ]),
+      });
+      expect(prisma.match.deleteMany).not.toHaveBeenCalled();
+      expect(prisma.room.delete).toHaveBeenCalledWith({
+        where: { id: "room-1" },
+      });
+    });
   });
 
   // ============================================================

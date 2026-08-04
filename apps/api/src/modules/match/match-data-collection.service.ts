@@ -81,6 +81,24 @@ export class MatchDataCollectionService {
     collect(match.teamA?.members, match.teamAId ?? match.teamA?.id);
     collect(match.teamB?.members, match.teamBId ?? match.teamB?.id);
 
+    for (const snapshot of match.rosterSnapshots ?? []) {
+      if (
+        !snapshot.puuid ||
+        !snapshot.userId ||
+        !snapshot.teamIdSnapshot ||
+        seenPuuids.has(snapshot.puuid)
+      ) {
+        continue;
+      }
+
+      seenPuuids.add(snapshot.puuid);
+      expectedMembers.push({
+        puuid: snapshot.puuid,
+        userId: snapshot.userId,
+        teamId: snapshot.teamIdSnapshot,
+      });
+    }
+
     return expectedMembers;
   }
 
@@ -141,8 +159,8 @@ export class MatchDataCollectionService {
     const expectedByPuuid = new Map(
       expectedMembers.map((member) => [member.puuid, member]),
     );
-    const teamAId = match.teamAId ?? match.teamA?.id;
-    const teamBId = match.teamBId ?? match.teamB?.id;
+    const teamAId = match.teamAId ?? match.teamA?.id ?? match.teamAIdSnapshot;
+    const teamBId = match.teamBId ?? match.teamB?.id ?? match.teamBIdSnapshot;
 
     let matchedPuuidCount = 0;
     let blueToA = 0;
@@ -305,6 +323,7 @@ export class MatchDataCollectionService {
               },
             },
           },
+          rosterSnapshots: true,
         },
       });
 
@@ -386,7 +405,9 @@ export class MatchDataCollectionService {
     matchData: MatchDto,
   ): Promise<void> {
     try {
-      if (!match.teamAId || !match.teamBId || !match.teamA || !match.teamB) {
+      const teamAId = match.teamAId ?? match.teamA?.id ?? match.teamAIdSnapshot;
+      const teamBId = match.teamBId ?? match.teamB?.id ?? match.teamBIdSnapshot;
+      if (!teamAId || !teamBId) {
         this.logger.warn(
           `Match ${matchId} has incomplete team assignment, skipping data save`,
         );
@@ -396,27 +417,19 @@ export class MatchDataCollectionService {
       // Build PUUID to User mapping
       const puuidToUser = new Map<string, { userId: string; teamId: string }>();
 
-      // Map TeamA members
-      for (const member of match.teamA.members) {
-        const riotAccount = member.user.riotAccounts[0];
-        if (riotAccount?.puuid) {
-          puuidToUser.set(riotAccount.puuid, {
-            userId: member.userId,
-            teamId: match.teamAId,
-          });
-        }
+      for (const member of this.buildExpectedMembers(match)) {
+        puuidToUser.set(member.puuid, {
+          userId: member.userId,
+          teamId: member.teamId,
+        });
       }
 
-      // Map TeamB members
-      for (const member of match.teamB.members) {
-        const riotAccount = member.user.riotAccounts[0];
-        if (riotAccount?.puuid) {
-          puuidToUser.set(riotAccount.puuid, {
-            userId: member.userId,
-            teamId: match.teamBId,
-          });
-        }
-      }
+      const getTeamName = (teamId: string) =>
+        teamId === teamAId
+          ? (match.teamA?.name ?? match.teamAName ?? "Team A")
+          : (match.teamB?.name ?? match.teamBName ?? "Team B");
+      const getLiveTeamId = (teamId: string) =>
+        teamId === match.teamAId || teamId === match.teamBId ? teamId : null;
 
       // Riot 응답에 우리가 기대한 참가자가 전원 들어있는지 먼저 확인한다.
       // 일부만 매핑된 채로 저장하면 7명짜리 불완전 전적이 dataCollected=true로
@@ -466,7 +479,9 @@ export class MatchDataCollectionService {
             data: {
               matchId,
               userId: userMapping.userId,
-              teamId: userMapping.teamId,
+              teamId: getLiveTeamId(userMapping.teamId),
+              teamIdSnapshot: userMapping.teamId,
+              teamName: getTeamName(userMapping.teamId),
               puuid: participant.puuid,
               riotTeamId: participant.teamId,
               championId: participant.championId,
@@ -536,11 +551,13 @@ export class MatchDataCollectionService {
         for (const team of matchData.info.teams) {
           const teamId =
             riotTeamToNexusTeam.get(team.teamId) ??
-            (team.teamId === 100 ? match.teamAId : match.teamBId); // 폴백
+            (team.teamId === 100 ? teamAId : teamBId); // 폴백
           await tx.matchTeamStats.create({
             data: {
               matchId,
-              teamId,
+              teamId: getLiveTeamId(teamId),
+              teamIdSnapshot: teamId,
+              teamName: getTeamName(teamId),
               win: team.win,
               towerKills: team.objectives.tower.kills,
               inhibitorKills: team.objectives.inhibitor.kills,
@@ -630,6 +647,7 @@ export class MatchDataCollectionService {
               },
             },
           },
+          rosterSnapshots: true,
         },
       });
 
@@ -638,7 +656,10 @@ export class MatchDataCollectionService {
         return;
       }
 
-      if (!match.teamA || !match.teamB) {
+      if (
+        !(match.teamAId ?? match.teamA?.id ?? match.teamAIdSnapshot) ||
+        !(match.teamBId ?? match.teamB?.id ?? match.teamBIdSnapshot)
+      ) {
         this.logger.warn(`[PuuidCrossref] 팀 미배정: ${matchId}`);
         return;
       }
@@ -928,8 +949,8 @@ export class MatchDataCollectionService {
         where: {
           status: "COMPLETED",
           dataCollected: false,
-          // roomId가 있는 내전 매치만 대상 (외부 인제스트 랭크 매치 제외)
-          roomId: { not: null },
+          // 방이 삭제된 뒤에도 보존되는 내부 내전 매치만 대상
+          isInternal: true,
           collectAttempts: { lt: MAX_COLLECT_ATTEMPTS },
         },
         select: {

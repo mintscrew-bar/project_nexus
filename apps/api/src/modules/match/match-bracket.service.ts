@@ -143,6 +143,7 @@ export class MatchBracketService {
         bracket.matches.map((match) =>
           tx.match.create({
             data: {
+              isInternal: true,
               roomId,
               round: match.round,
               matchNumber: match.matchNumber,

@@ -9,92 +9,93 @@ datasource db {
 }
 
 model User {
-  id                  String             @id @default(cuid())
-  email               String?            @unique
-  emailEncrypted      String?
-  emailLookupHash     String?            @unique
-  emailVerified       Boolean            @default(false)
-  password            String?
-  username            String
-  bio                 String?
-  avatar              String?
-  profileBanner       String?
-  role                UserRole           @default(USER)
-  reputation          Int                @default(100)
-  isRestricted        Boolean            @default(false)
-  restrictedUntil     DateTime?
-  createdAt           DateTime           @default(now())
-  updatedAt           DateTime           @updatedAt
-  status              UserStatus         @default(OFFLINE)
-  lastSeenAt          DateTime?
-  reputationScore     Float?
-  isBanned            Boolean            @default(false)
-  banReason           String?
-  bannedAt            DateTime?
-  banUntil            DateTime?
+  id                             String                @id @default(cuid())
+  email                          String?               @unique
+  emailEncrypted                 String?
+  emailLookupHash                String?               @unique
+  emailVerified                  Boolean               @default(false)
+  password                       String?
+  username                       String
+  bio                            String?
+  avatar                         String?
+  profileBanner                  String?
+  role                           UserRole              @default(USER)
+  reputation                     Int                   @default(100)
+  isRestricted                   Boolean               @default(false)
+  restrictedUntil                DateTime?
+  createdAt                      DateTime              @default(now())
+  updatedAt                      DateTime              @updatedAt
+  status                         UserStatus            @default(OFFLINE)
+  lastSeenAt                     DateTime?
+  reputationScore                Float?
+  isBanned                       Boolean               @default(false)
+  banReason                      String?
+  bannedAt                       DateTime?
+  banUntil                       DateTime?
   // 방송 오버레이(OBS): 스트리머당 1개 read-only 토큰(hash 저장, 원문은 발급 응답에서만 노출).
   // OBS에 한 번 등록해두면 오버레이가 이 유저의 활성 방을 자동 추종한다.
-  broadcastTokenHash      String?        @unique
-  broadcastTokenCreatedAt DateTime?
+  broadcastTokenHash             String?               @unique
+  broadcastTokenCreatedAt        DateTime?
   // 방송 조작 패널/외부 장비용 토큰. OBS 출력 토큰과 분리한다.
-  broadcastControlTokenHash      String? @unique
+  broadcastControlTokenHash      String?               @unique
   broadcastControlTokenCreatedAt DateTime?
   // 수동 오버라이드: 호스트가 "이 방 송출 중"으로 지정한 방. 없으면 최근 활성 방 자동 선택.
-  broadcastLiveRoomId     String?
+  broadcastLiveRoomId            String?
   // 조작 패널에서 선택한 출력 상태. auto는 방 상태 기반 자동 추종.
-  broadcastScene          String         @default("auto")
-  broadcastLowerThirdVisible Boolean     @default(true)
-  broadcastAnnouncement   String?
-  adminAuditLogs      AdminAuditLog[]    @relation("AdminAuditLogs")
-  reviewedAppeals     Appeal[]           @relation("AppealReviewer")
-  appeals             Appeal[]           @relation("UserAppeals")
-  authProviders       AuthProvider[]
-  chatMessages        ChatMessage[]
-  clanActivityLogs    ClanActivityLog[]  @relation("ClanActivityActor")
-  clanAnnouncements   ClanAnnouncement[] @relation("ClanAnnouncementAuthor")
-  clanChatMessages    ClanChatMessage[]
-  clanInvitesReceived ClanInvitation[]   @relation("ClanInvitee")
-  clanInvitesSent     ClanInvitation[]   @relation("ClanInviter")
-  clanMemberships     ClanMember[]
-  clanRankings        ClanRanking[]
-  ownedClans          Clan[]             @relation("ClanOwner")
-  commentLikes        CommentLike[]
-  comments            Comment[]
-  receivedDMs         DirectMessage[]    @relation("ReceivedDMs")
-  sentDMs             DirectMessage[]    @relation("SentDMs")
-  friendOf            Friendship[]       @relation("FriendOfUser")
-  friendships         Friendship[]       @relation("UserFriendships")
-  matchParticipations MatchParticipant[]
-  matchStatsCaches    MatchStatsCache[]
-  nexusRanking        NexusRanking?
-  notifications       Notification[]
-  bookmarks           PostBookmark[]
-  postLikes           PostLike[]
-  postReports         PostReport[]       @relation("PostReportReporter")
-  posts               Post[]
-  riotAccounts        RiotAccount[]
-  roomParticipations  RoomParticipant[]
-  hostedRooms         Room[]             @relation("RoomHost")
-  sessions            Session[]
-  snakeDraftPicks     SnakeDraftPick[]
-  teamMembers         TeamMember[]
-  captainedTeams      Team[]             @relation("TeamCaptain")
-  termsAgreements     TermsAgreement[]
-  ratingsGiven        UserRating[]       @relation("RaterUser")
-  ratingsReceived     UserRating[]       @relation("RatedUser")
-  reportsSubmitted    UserReport[]       @relation("ReporterUser")
-  reportsReceived     UserReport[]       @relation("ReportedUser")
-  settings            UserSettings?
-  streamerProfiles    StreamerProfile[]
-  streamerLinks       StreamerLink[]
-  streamerFollowing   StreamerFollow[]   @relation("StreamerFollower")
-  streamerFollowers   StreamerFollow[]   @relation("StreamerFollowed")
-  statsRecomputeQueue StatsRecomputeQueue?
-  votesGiven          MatchVote[]        @relation("VoterUser")
-  votesReceived       MatchVote[]        @relation("VotedForUser")
-  mvpMatches          Match[]            @relation("MatchMVP")
-  aceMatches          Match[]            @relation("MatchACE")
-  discordGuildLinks   DiscordGuildLink[] @relation("DiscordGuildLinkOwner")
+  broadcastScene                 String                @default("auto")
+  broadcastLowerThirdVisible     Boolean               @default(true)
+  broadcastAnnouncement          String?
+  adminAuditLogs                 AdminAuditLog[]       @relation("AdminAuditLogs")
+  reviewedAppeals                Appeal[]              @relation("AppealReviewer")
+  appeals                        Appeal[]              @relation("UserAppeals")
+  authProviders                  AuthProvider[]
+  chatMessages                   ChatMessage[]
+  clanActivityLogs               ClanActivityLog[]     @relation("ClanActivityActor")
+  clanAnnouncements              ClanAnnouncement[]    @relation("ClanAnnouncementAuthor")
+  clanChatMessages               ClanChatMessage[]
+  clanInvitesReceived            ClanInvitation[]      @relation("ClanInvitee")
+  clanInvitesSent                ClanInvitation[]      @relation("ClanInviter")
+  clanMemberships                ClanMember[]
+  clanRankings                   ClanRanking[]
+  ownedClans                     Clan[]                @relation("ClanOwner")
+  commentLikes                   CommentLike[]
+  comments                       Comment[]
+  receivedDMs                    DirectMessage[]       @relation("ReceivedDMs")
+  sentDMs                        DirectMessage[]       @relation("SentDMs")
+  friendOf                       Friendship[]          @relation("FriendOfUser")
+  friendships                    Friendship[]          @relation("UserFriendships")
+  matchParticipations            MatchParticipant[]
+  matchRosterSnapshots           MatchRosterSnapshot[]
+  matchStatsCaches               MatchStatsCache[]
+  nexusRanking                   NexusRanking?
+  notifications                  Notification[]
+  bookmarks                      PostBookmark[]
+  postLikes                      PostLike[]
+  postReports                    PostReport[]          @relation("PostReportReporter")
+  posts                          Post[]
+  riotAccounts                   RiotAccount[]
+  roomParticipations             RoomParticipant[]
+  hostedRooms                    Room[]                @relation("RoomHost")
+  sessions                       Session[]
+  snakeDraftPicks                SnakeDraftPick[]
+  teamMembers                    TeamMember[]
+  captainedTeams                 Team[]                @relation("TeamCaptain")
+  termsAgreements                TermsAgreement[]
+  ratingsGiven                   UserRating[]          @relation("RaterUser")
+  ratingsReceived                UserRating[]          @relation("RatedUser")
+  reportsSubmitted               UserReport[]          @relation("ReporterUser")
+  reportsReceived                UserReport[]          @relation("ReportedUser")
+  settings                       UserSettings?
+  streamerProfiles               StreamerProfile[]
+  streamerLinks                  StreamerLink[]
+  streamerFollowing              StreamerFollow[]      @relation("StreamerFollower")
+  streamerFollowers              StreamerFollow[]      @relation("StreamerFollowed")
+  statsRecomputeQueue            StatsRecomputeQueue?
+  votesGiven                     MatchVote[]           @relation("VoterUser")
+  votesReceived                  MatchVote[]           @relation("VotedForUser")
+  mvpMatches                     Match[]               @relation("MatchMVP")
+  aceMatches                     Match[]               @relation("MatchACE")
+  discordGuildLinks              DiscordGuildLink[]    @relation("DiscordGuildLinkOwner")
 
   @@index([email])
   @@index([reputation])
@@ -148,30 +149,30 @@ model Session {
 }
 
 model UserSettings {
-  id                   String   @id @default(cuid())
-  userId               String   @unique
-  notifyFriendRequest  Boolean  @default(true)
-  notifyFriendAccepted Boolean  @default(true)
-  notifyMatchStart     Boolean  @default(true)
-  notifyMatchResult    Boolean  @default(true)
-  notifyTeamInvite     Boolean  @default(true)
-  notifyMention        Boolean  @default(true)
-  notifyComment        Boolean  @default(true)
-  notifyClanActivity   Boolean  @default(true)
-  notifySystem         Boolean  @default(true)
-  showOnlineStatus     Boolean  @default(true)
-  showMatchHistory     Boolean  @default(true)
-  showRiotAccounts     Boolean  @default(true)
-  showChampionStats    Boolean  @default(true)
-  allowFriendRequests  Boolean  @default(true)
+  id                   String    @id @default(cuid())
+  userId               String    @unique
+  notifyFriendRequest  Boolean   @default(true)
+  notifyFriendAccepted Boolean   @default(true)
+  notifyMatchStart     Boolean   @default(true)
+  notifyMatchResult    Boolean   @default(true)
+  notifyTeamInvite     Boolean   @default(true)
+  notifyMention        Boolean   @default(true)
+  notifyComment        Boolean   @default(true)
+  notifyClanActivity   Boolean   @default(true)
+  notifySystem         Boolean   @default(true)
+  showOnlineStatus     Boolean   @default(true)
+  showMatchHistory     Boolean   @default(true)
+  showRiotAccounts     Boolean   @default(true)
+  showChampionStats    Boolean   @default(true)
+  allowFriendRequests  Boolean   @default(true)
   highlightChampionId  String?
   highlightStatType    String?
-  theme                String   @default("dark")
+  theme                String    @default("dark")
   // 온보딩 안내 모달 확인 시각 — 기기/브라우저가 바뀌어도 다시 뜨지 않도록 계정 기준으로 보관
   onboardingSeenAt     DateTime?
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
-  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("user_settings")
 }
@@ -192,7 +193,7 @@ model StreamerProfile {
 
   // 소유권 검증 — verifiedAt이 null이면 미검증이며 라이브 뱃지를 붙이지 않는다.
   // 사칭 방지를 위해 라이브 노출은 검증된 채널로만 제한한다.
-  verifiedAt DateTime?
+  verifiedAt            DateTime?
   // SOOP처럼 OAuth를 못 쓰는 플랫폼용 폴백 — 채널 소개글에 넣게 하고 대조한다.
   verificationCode      String?
   verificationExpiresAt DateTime?
@@ -231,7 +232,9 @@ model StreamerLink {
   @@map("streamer_links")
 }
 
-/** 스트리머 방송 시작 알림 구독. 팔로우한 스트리머가 라이브로 전환되면 알림을 보낸다. */
+/**
+ * 스트리머 방송 시작 알림 구독. 팔로우한 스트리머가 라이브로 전환되면 알림을 보낸다.
+ */
 model StreamerFollow {
   id         String   @id @default(cuid())
   followerId String
@@ -288,18 +291,18 @@ model RiotAccount {
 // 챔피언별 시즌 누적 통계 (match-v5 스캔 집계). puuid 기준이라 미등록 소환사도 누적.
 // 스캔마다 전체 교체(멱등). 매치는 DB 영구 캐시라 재스캔 시 신규분만 API 소모.
 model ChampionSeasonStat {
-  id         String   @id @default(cuid())
-  puuid      String
-  season     String
-  queueGroup String // "ranked" | "normal" | "aram"
-  championId Int
-  championName String @default("")
-  games      Int      @default(0)
-  wins       Int      @default(0)
-  kills      Int      @default(0)
-  deaths     Int      @default(0)
-  assists    Int      @default(0)
-  updatedAt  DateTime @updatedAt
+  id           String   @id @default(cuid())
+  puuid        String
+  season       String
+  queueGroup   String // "ranked" | "normal" | "aram"
+  championId   Int
+  championName String   @default("")
+  games        Int      @default(0)
+  wins         Int      @default(0)
+  kills        Int      @default(0)
+  deaths       Int      @default(0)
+  assists      Int      @default(0)
+  updatedAt    DateTime @updatedAt
 
   @@unique([puuid, season, queueGroup, championId])
   @@index([puuid, season, queueGroup])
@@ -355,38 +358,38 @@ model ChampionPreference {
 }
 
 model Room {
-  id                String                @id @default(cuid())
-  name              String
-  hostId            String
-  password          String?
-  maxParticipants   Int                   @default(10)
-  isPrivate         Boolean               @default(false)
-  status            RoomStatus            @default(WAITING)
-  teamMode          TeamMode              @default(SNAKE_DRAFT)
-  allowSpectators   Boolean               @default(true)
-  startingPoints    Int?
-  minBidIncrement   Int?
-  bidTimeLimit      Int?                  @default(30)
-  pickTimeLimit     Int?                  @default(60)
-  captainSelection  TeamCaptainSelection? @default(RANDOM)
-  bracketFormat     BracketType?          @default(SINGLE_ELIMINATION)
-  discordGuildId    String?
-  discordCategoryId String?
-  startedAt         DateTime?
-  completedAt       DateTime?
+  id                      String                @id @default(cuid())
+  name                    String
+  hostId                  String
+  password                String?
+  maxParticipants         Int                   @default(10)
+  isPrivate               Boolean               @default(false)
+  status                  RoomStatus            @default(WAITING)
+  teamMode                TeamMode              @default(SNAKE_DRAFT)
+  allowSpectators         Boolean               @default(true)
+  startingPoints          Int?
+  minBidIncrement         Int?
+  bidTimeLimit            Int?                  @default(30)
+  pickTimeLimit           Int?                  @default(60)
+  captainSelection        TeamCaptainSelection? @default(RANDOM)
+  bracketFormat           BracketType?          @default(SINGLE_ELIMINATION)
+  discordGuildId          String?
+  discordCategoryId       String?
+  startedAt               DateTime?
+  completedAt             DateTime?
   // 방송 오버레이: 호스트가 중계 중인 경기(방송 토큰은 User로 이동 — per-streamer 단일 토큰)
   broadcastFocusMatchId   String?
   // 중계 경기를 바꾼 시각. 자동 송출에서 대진표 프리뷰 뒤 경기로 자연스럽게 넘기는 기준이다.
   broadcastFocusChangedAt DateTime?
-  createdAt         DateTime              @default(now())
-  updatedAt         DateTime              @updatedAt
-  chatMessages      ChatMessage[]
-  matches           Match[]
-  discordChannels   RoomDiscordChannel[]
-  participants      RoomParticipant[]
-  host              User                  @relation("RoomHost", fields: [hostId], references: [id])
-  snakeDraftPicks   SnakeDraftPick[]
-  teams             Team[]
+  createdAt               DateTime              @default(now())
+  updatedAt               DateTime              @updatedAt
+  chatMessages            ChatMessage[]
+  matches                 Match[]
+  discordChannels         RoomDiscordChannel[]
+  participants            RoomParticipant[]
+  host                    User                  @relation("RoomHost", fields: [hostId], references: [id])
+  snakeDraftPicks         SnakeDraftPick[]
+  teams                   Team[]
 
   @@index([hostId])
   @@index([status])
@@ -546,55 +549,69 @@ model AuctionBid {
 }
 
 model Match {
-  id             String             @id @default(cuid())
-  // 외부(랭크 캐시 인제스트) 매치의 경우 roomId는 NULL — Nexus 내부 토너먼트 매치만 roomId를 가진다.
-  roomId         String?
-  teamAId        String?
-  teamBId        String?
-  winnerId       String?
+  id                   String                @id @default(cuid())
+  isInternal           Boolean               @default(false)
+  // 내부 매치도 방 삭제 후에는 roomId가 NULL이므로 isInternal과 스냅샷으로 구분한다.
+  roomId               String?
+  roomIdSnapshot       String?
+  roomName             String?
+  roomTeamMode         TeamMode?
+  roomHostId           String?
+  roomHostName         String?
+  teamAId              String?
+  teamAIdSnapshot      String?
+  teamAName            String?
+  teamBId              String?
+  teamBIdSnapshot      String?
+  teamBName            String?
+  winnerId             String?
+  winnerIdSnapshot     String?
+  winnerName           String?
   // MVP: 이긴 팀 중 투표로 선정된 유저, ACE: 진 팀 중 투표로 선정된 유저
-  mvpUserId      String?
-  aceUserId      String?
-  status         MatchStatus        @default(PENDING)
-  matchNumber    Int?
-  bracketRound   String?
-  round          Int?
-  bracketType    BracketType?
-  tournamentCode String?
+  mvpUserId            String?
+  aceUserId            String?
+  status               MatchStatus           @default(PENDING)
+  matchNumber          Int?
+  bracketRound         String?
+  round                Int?
+  bracketType          BracketType?
+  tournamentCode       String?
   // 진영(블루/레드) — 매치 시작 시 양 팀장 가위바위보로 결정. 이 팀이 블루 사이드,
   // 나머지(teamA/teamB 중)가 레드. 관계 없이 팀 id만 보관(표시·안내용). 미설정이면 진영 미정.
-  blueSideTeamId String?
-  riotMatchId    String?
-  patchVersion   String?            // ex: "14.8" — 패치 임팩트 분석용
+  blueSideTeamId       String?
+  riotMatchId          String?
+  patchVersion         String? // ex: "14.8" — 패치 임팩트 분석용
   // Riot 큐 식별자 (외부 인제스트 매치). 420=솔랭, 440=자랭, 400=일반 드래프트, 430=일반 블라인드, 450=ARAM.
-  // 내부 토너먼트 매치는 NULL — roomId 기준으로 식별한다.
-  queueId        Int?
-  gameDuration   Int?
-  dataCollected  Boolean            @default(false)
+  // 내부 토너먼트 매치는 NULL — isInternal 기준으로 식별한다.
+  queueId              Int?
+  gameDuration         Int?
+  dataCollected        Boolean               @default(false)
   // 전적 수집 재시도 추적.
   // 계속 실패하는 매치가 복구 큐(최신 20개)를 점유해 이전 미수집 경기가 영영
   // 처리되지 못하는 것을 막는다. 실패할수록 지수 백오프로 뒤로 미루고,
   // 상한을 넘기면 대상에서 제외한다.
-  collectAttempts      Int       @default(0)
+  collectAttempts      Int                   @default(0)
   lastCollectAttemptAt DateTime?
-  scheduledAt    DateTime?
-  startedAt      DateTime?
-  completedAt    DateTime?
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
-  participants   MatchParticipant[]
-  teamStats      MatchTeamStats[]
-  votes          MatchVote[]
-  room           Room?              @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  teamA          Team?              @relation("TeamA", fields: [teamAId], references: [id])
-  teamB          Team?              @relation("TeamB", fields: [teamBId], references: [id])
-  winner         Team?              @relation("MatchWinner", fields: [winnerId], references: [id])
-  mvpUser        User?              @relation("MatchMVP", fields: [mvpUserId], references: [id])
-  aceUser        User?              @relation("MatchACE", fields: [aceUserId], references: [id])
-  ratings        UserRating[]
-  reports        UserReport[]
+  scheduledAt          DateTime?
+  startedAt            DateTime?
+  completedAt          DateTime?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  participants         MatchParticipant[]
+  rosterSnapshots      MatchRosterSnapshot[]
+  teamStats            MatchTeamStats[]
+  votes                MatchVote[]
+  room                 Room?                 @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  teamA                Team?                 @relation("TeamA", fields: [teamAId], references: [id], onDelete: SetNull)
+  teamB                Team?                 @relation("TeamB", fields: [teamBId], references: [id], onDelete: SetNull)
+  winner               Team?                 @relation("MatchWinner", fields: [winnerId], references: [id], onDelete: SetNull)
+  mvpUser              User?                 @relation("MatchMVP", fields: [mvpUserId], references: [id], onDelete: SetNull)
+  aceUser              User?                 @relation("MatchACE", fields: [aceUserId], references: [id], onDelete: SetNull)
+  ratings              UserRating[]
+  reports              UserReport[]
 
   @@index([roomId])
+  @@index([isInternal, completedAt])
   @@index([teamAId])
   @@index([teamBId])
   @@index([status])
@@ -605,16 +622,16 @@ model Match {
 }
 
 model MatchVote {
-  id          String    @id @default(cuid())
-  matchId     String
-  voterId     String    // 투표한 유저
-  votedForId  String    // 투표 대상 유저
-  voteType    VoteType  // MVP | ACE
-  createdAt   DateTime  @default(now())
+  id         String   @id @default(cuid())
+  matchId    String
+  voterId    String // 투표한 유저
+  votedForId String // 투표 대상 유저
+  voteType   VoteType // MVP | ACE
+  createdAt  DateTime @default(now())
 
-  match       Match     @relation(fields: [matchId], references: [id], onDelete: Cascade)
-  voter       User      @relation("VoterUser", fields: [voterId], references: [id], onDelete: Cascade)
-  votedFor    User      @relation("VotedForUser", fields: [votedForId], references: [id], onDelete: Cascade)
+  match    Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  voter    User  @relation("VoterUser", fields: [voterId], references: [id], onDelete: Cascade)
+  votedFor User  @relation("VotedForUser", fields: [votedForId], references: [id], onDelete: Cascade)
 
   // 같은 매치에서 같은 타입 중복 투표 방지
   @@unique([matchId, voterId, voteType])
@@ -623,12 +640,14 @@ model MatchVote {
 }
 
 model MatchParticipant {
-  id                          String   @id @default(cuid())
+  id                          String    @id @default(cuid())
   matchId                     String
   // 외부 랭크 캐시 인제스트 시 Nexus 유저로 매핑되지 않는 puuid는 userId가 NULL.
   userId                      String?
   // 외부 매치는 Nexus Team이 없으므로 teamId NULL — Riot 100/200 팀은 riotTeamId로 구분한다.
   teamId                      String?
+  teamIdSnapshot              String?
+  teamName                    String?
   // Riot puuid (외부/내부 매치 공통 식별자) — 인제스트 멱등성과 외부 puuid 조회용.
   puuid                       String?
   // Riot 팀 번호 (100=블루, 200=레드). 외부 매치 head-to-head 비교 시 같은 팀/적팀 판단에 사용.
@@ -682,10 +701,10 @@ model MatchParticipant {
   firstBloodKill              Boolean
   firstTowerKill              Boolean
   win                         Boolean
-  createdAt                   DateTime @default(now())
-  match                       Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
-  team                        Team?    @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  user                        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt                   DateTime  @default(now())
+  match                       Match     @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  team                        Team?     @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  user                        User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   // 인제스트 멱등성: 동일 매치 내 같은 puuid 중복 방지. (외부/내부 매치 공통)
   @@unique([matchId, puuid])
@@ -697,10 +716,32 @@ model MatchParticipant {
   @@map("match_participants")
 }
 
+model MatchRosterSnapshot {
+  id             String   @id @default(cuid())
+  matchId        String
+  userId         String?
+  username       String
+  puuid          String?
+  teamSlot       String
+  teamIdSnapshot String?
+  teamName       String
+  createdAt      DateTime @default(now())
+  match          Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  user           User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@unique([matchId, userId])
+  @@index([matchId])
+  @@index([userId])
+  @@index([puuid])
+  @@map("match_roster_snapshots")
+}
+
 model MatchTeamStats {
   id              String   @id @default(cuid())
   matchId         String
-  teamId          String
+  teamId          String?
+  teamIdSnapshot  String?
+  teamName        String?
   win             Boolean
   towerKills      Int
   inhibitorKills  Int
@@ -714,7 +755,7 @@ model MatchTeamStats {
   bans            Json
   createdAt       DateTime @default(now())
   match           Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
-  team            Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  team            Team?    @relation(fields: [teamId], references: [id], onDelete: SetNull)
 
   @@unique([matchId, teamId])
   @@index([matchId])
@@ -723,34 +764,34 @@ model MatchTeamStats {
 }
 
 model Clan {
-  id            String             @id @default(cuid())
-  name          String             @unique
-  tag           String             @unique
-  description   String?
-  logo          String?
-  banner        String?
-  accentColor   String?
-  recruitRoles  String[]
-  lastActiveAt  DateTime?
-  ownerId       String
-  isRecruiting  Boolean            @default(true)
-  maxMembers    Int                @default(50)
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
-  minTier       String?
-  discord       String?
-  officerCanManageSettings      Boolean @default(true)
-  officerCanManageMembers       Boolean @default(true)
-  officerCanManageAnnouncements Boolean @default(true)
-  officerCanManageInvitations   Boolean @default(true)
-  activityLogs  ClanActivityLog[]
-  announcements ClanAnnouncement[]
-  chatMessages  ClanChatMessage[]
-  invitations   ClanInvitation[]
-  members       ClanMember[]
-  clanRankings  ClanRanking[]
-  discordGuildLinks DiscordGuildLink[]
-  owner         User               @relation("ClanOwner", fields: [ownerId], references: [id])
+  id                            String             @id @default(cuid())
+  name                          String             @unique
+  tag                           String             @unique
+  description                   String?
+  logo                          String?
+  banner                        String?
+  accentColor                   String?
+  recruitRoles                  String[]
+  lastActiveAt                  DateTime?
+  ownerId                       String
+  isRecruiting                  Boolean            @default(true)
+  maxMembers                    Int                @default(50)
+  createdAt                     DateTime           @default(now())
+  updatedAt                     DateTime           @updatedAt
+  minTier                       String?
+  discord                       String?
+  officerCanManageSettings      Boolean            @default(true)
+  officerCanManageMembers       Boolean            @default(true)
+  officerCanManageAnnouncements Boolean            @default(true)
+  officerCanManageInvitations   Boolean            @default(true)
+  activityLogs                  ClanActivityLog[]
+  announcements                 ClanAnnouncement[]
+  chatMessages                  ClanChatMessage[]
+  invitations                   ClanInvitation[]
+  members                       ClanMember[]
+  clanRankings                  ClanRanking[]
+  discordGuildLinks             DiscordGuildLink[]
+  owner                         User               @relation("ClanOwner", fields: [ownerId], references: [id])
 
   @@index([ownerId])
   @@index([isRecruiting])
@@ -886,26 +927,26 @@ model Post {
   /// RICHTEXT 게시글의 Tiptap JSON 문서. MARKDOWN 게시글은 null.
   contentJson   Json?
   /// 레거시 카테고리 enum — boardId 도입 후 스냅샷/하위호환용으로 보존(nullable)
-  category  PostCategory?
+  category      PostCategory?
   /// 소속 게시판 FK. 게시판 삭제 시 글은 보존하기 위해 SetNull
-  boardId   String?
-  board     Board?         @relation(fields: [boardId], references: [id], onDelete: SetNull)
-  authorId  String
-  views     Int            @default(0)
-  isPinned  Boolean        @default(false)
-  isEdited  Boolean        @default(false)
-  isDeleted Boolean        @default(false)
-  isBlinded Boolean        @default(false)
-  deletedAt DateTime?
-  deletedBy String?
-  createdAt DateTime       @default(now())
-  updatedAt DateTime       @updatedAt
-  comments  Comment[]
-  bookmarks PostBookmark[]
-  likes     PostLike[]
-  reports   PostReport[]
-  tags      PostTag[]
-  author    User           @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  boardId       String?
+  board         Board?            @relation(fields: [boardId], references: [id], onDelete: SetNull)
+  authorId      String
+  views         Int               @default(0)
+  isPinned      Boolean           @default(false)
+  isEdited      Boolean           @default(false)
+  isDeleted     Boolean           @default(false)
+  isBlinded     Boolean           @default(false)
+  deletedAt     DateTime?
+  deletedBy     String?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  comments      Comment[]
+  bookmarks     PostBookmark[]
+  likes         PostLike[]
+  reports       PostReport[]
+  tags          PostTag[]
+  author        User              @relation(fields: [authorId], references: [id], onDelete: Cascade)
 
   @@index([category, isPinned, createdAt])
   @@index([boardId, isPinned, createdAt])
@@ -1109,21 +1150,21 @@ model SummonerSeasonTier {
 }
 
 model KnownPuuid {
-  puuid              String   @id
-  gameName           String?
-  tagLine            String?
-  priority           Int      @default(0)
-  isNexusUser        Boolean  @default(false)
-  rankedFetchedAt    DateTime?
-  normalFetchedAt    DateTime?
-  aramFetchedAt      DateTime?
-  customFetchedAt    DateTime?
-  rankedLastMatchId  String?
-  normalLastMatchId  String?
-  aramLastMatchId    String?
-  customLastMatchId  String?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  puuid             String    @id
+  gameName          String?
+  tagLine           String?
+  priority          Int       @default(0)
+  isNexusUser       Boolean   @default(false)
+  rankedFetchedAt   DateTime?
+  normalFetchedAt   DateTime?
+  aramFetchedAt     DateTime?
+  customFetchedAt   DateTime?
+  rankedLastMatchId String?
+  normalLastMatchId String?
+  aramLastMatchId   String?
+  customLastMatchId String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   @@index([priority, rankedFetchedAt])
   @@index([priority, normalFetchedAt])
@@ -1134,16 +1175,16 @@ model KnownPuuid {
 }
 
 model MatchStatsCache {
-  id         String   @id @default(cuid())
-  userId     String
-  queueGroup String
-  season     String
-  stats      Json
+  id          String   @id @default(cuid())
+  userId      String
+  queueGroup  String
+  season      String
+  stats       Json
   recentGames Json?
-  matchCount Int
-  isPartial  Boolean  @default(false)
-  computedAt DateTime @default(now())
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  matchCount  Int
+  isPartial   Boolean  @default(false)
+  computedAt  DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, queueGroup, season])
   @@index([userId])
@@ -1166,7 +1207,7 @@ model RiotMatchCache {
   data         Json
   queueId      Int
   gameEnd      DateTime
-  patchVersion String?  // ex: "14.8" — info.gameVersion 앞 두 자리
+  patchVersion String? // ex: "14.8" — info.gameVersion 앞 두 자리
   createdAt    DateTime @default(now())
 
   @@index([queueId])
@@ -1473,18 +1514,18 @@ model LabChampionSnapshot {
   // 'custom'           = 내전 (matches.roomId IS NOT NULL)
   // 'ranked-community' = 외부 ranked 매치 (roomId NULL & riotMatchId IS NOT NULL)
   source       String   @default("custom")
-  period       String   // '30d' | '90d' | 'all'
+  period       String // '30d' | '90d' | 'all'
   patchVersion String?
   championId   Int
-  position     String?  // null = 전체 포지션
+  position     String? // null = 전체 포지션
   games        Int
   wins         Int
   avgKda       Float
   avgDamage    Float
   avgGold      Float
-  pickRate     Float    // 해당 기간 전체 게임 대비 픽률
-  banRate      Float    // 해당 기간 전체 게임 대비 밴률
-  wilsonLower  Float    // Wilson score 하한 — 정렬/티어 기준
+  pickRate     Float // 해당 기간 전체 게임 대비 픽률
+  banRate      Float // 해당 기간 전체 게임 대비 밴률
+  wilsonLower  Float // Wilson score 하한 — 정렬/티어 기준
   computedAt   DateTime @default(now())
 
   @@unique([source, period, patchVersion, championId, position])
@@ -1496,13 +1537,13 @@ model LabChampionSnapshot {
 // 챔피언 2인 시너지 캐시
 model LabSynergySnapshot {
   id          String   @id @default(cuid())
-  period      String   // '30d' | '90d' | 'all'
-  champ1Id    Int      // 항상 champ1Id < champ2Id (정규화)
+  period      String // '30d' | '90d' | 'all'
+  champ1Id    Int // 항상 champ1Id < champ2Id (정규화)
   champ2Id    Int
   games       Int
   wins        Int
-  winRate     Float    // 표시용
-  wilsonLower Float    // 정렬 기준
+  winRate     Float // 표시용
+  wilsonLower Float // 정렬 기준
   computedAt  DateTime @default(now())
 
   @@unique([period, champ1Id, champ2Id])
@@ -1513,21 +1554,21 @@ model LabSynergySnapshot {
 
 // 외부 고티어(챌린저+그마) 시딩 유저 랭크 매치 기반 챔피언 메타 스냅샷
 model LabRankedChampionSnapshot {
-  id                   String    @id @default(cuid())
-  period               String    // '7d' | '30d' | 'current_patch'
-  patchVersion         String?   // period='current_patch'일 때만 값 있음
-  championId           Int
-  position             String?   // null = 전체 포지션
-  games                Int
-  wins                 Int
-  avgKda               Float
-  avgDamage            Float
-  pickRate             Float
-  banRate              Float
-  wilsonLower          Float
-  confidence           String    // 'low' | 'moderate' | 'high'
-  lastMatchCreatedAt   DateTime? // 증분 재계산 cursor (current_patch 전용)
-  computedAt           DateTime  @default(now())
+  id                 String    @id @default(cuid())
+  period             String // '7d' | '30d' | 'current_patch'
+  patchVersion       String? // period='current_patch'일 때만 값 있음
+  championId         Int
+  position           String? // null = 전체 포지션
+  games              Int
+  wins               Int
+  avgKda             Float
+  avgDamage          Float
+  pickRate           Float
+  banRate            Float
+  wilsonLower        Float
+  confidence         String // 'low' | 'moderate' | 'high'
+  lastMatchCreatedAt DateTime? // 증분 재계산 cursor (current_patch 전용)
+  computedAt         DateTime  @default(now())
 
   @@unique([period, patchVersion, championId, position])
   @@index([period, championId])
@@ -1538,14 +1579,14 @@ model LabRankedChampionSnapshot {
 // 챔피언 상성 캐시
 model LabCounterSnapshot {
   id          String   @id @default(cuid())
-  period      String   // '30d' | '90d' | 'all'
+  period      String // '30d' | '90d' | 'all'
   champId     Int
   vsChampId   Int
-  position    String?  // null = 전체 포지션, 값 있으면 맞라인 상성
+  position    String? // null = 전체 포지션, 값 있으면 맞라인 상성
   games       Int
-  wins        Int      // champId 기준 승리 수
-  winRate     Float    // 표시용
-  wilsonLower Float    // 정렬 기준
+  wins        Int // champId 기준 승리 수
+  winRate     Float // 표시용
+  wilsonLower Float // 정렬 기준
   computedAt  DateTime @default(now())
 
   @@unique([period, champId, vsChampId, position])

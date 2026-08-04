@@ -572,21 +572,26 @@ export class StatsService {
       deaths: number;
       assists: number;
       win: boolean;
-      // 외부 인제스트 매치는 teamId NULL — 팀 데미지 집계 시 같은 팀(NULL=NULL) 매칭은 제외된다.
       teamId: string | null;
+      teamIdSnapshot: string | null;
       totalDamageDealtToChampions: number;
       match: {
         createdAt: Date;
         participants: Array<{
           teamId: string | null;
+          teamIdSnapshot: string | null;
           totalDamageDealtToChampions: number;
         }>;
       };
     }>,
   ): CacheParticipantRow[] {
     return rows.map((row) => {
+      const teamId = row.teamId ?? row.teamIdSnapshot;
       const teamDamage = row.match.participants
-        .filter((participant) => participant.teamId === row.teamId)
+        .filter(
+          (participant) =>
+            (participant.teamId ?? participant.teamIdSnapshot) === teamId,
+        )
         .reduce(
           (sum, participant) => sum + participant.totalDamageDealtToChampions,
           0,
@@ -647,7 +652,7 @@ export class StatsService {
         where: {
           userId,
           match: {
-            roomId: { not: null },
+            isInternal: true,
             createdAt: {
               gte: seasonStart,
             },
@@ -660,6 +665,7 @@ export class StatsService {
           deaths: true,
           assists: true,
           teamId: true,
+          teamIdSnapshot: true,
           totalDamageDealtToChampions: true,
           win: true,
           match: {
@@ -668,6 +674,7 @@ export class StatsService {
               participants: {
                 select: {
                   teamId: true,
+                  teamIdSnapshot: true,
                   totalDamageDealtToChampions: true,
                 },
               },
@@ -698,7 +705,7 @@ export class StatsService {
         where: {
           userId,
           match: {
-            roomId: { not: null },
+            isInternal: true,
             createdAt: {
               gte: seasonStart,
             },
@@ -711,6 +718,7 @@ export class StatsService {
           deaths: true,
           assists: true,
           teamId: true,
+          teamIdSnapshot: true,
           totalDamageDealtToChampions: true,
           win: true,
           match: {
@@ -719,6 +727,7 @@ export class StatsService {
               participants: {
                 select: {
                   teamId: true,
+                  teamIdSnapshot: true,
                   totalDamageDealtToChampions: true,
                 },
               },
@@ -738,7 +747,7 @@ export class StatsService {
             where: {
               userId,
               match: {
-                roomId: null,
+                isInternal: false,
                 queueId: { in: [420, 440, 400, 430, 450] },
                 completedAt: { gte: seasonStart },
               },
@@ -823,7 +832,7 @@ export class StatsService {
           where: {
             userId,
             match: {
-              roomId: null,
+              isInternal: false,
               queueId: { in: queueIds },
               completedAt: { gte: seasonStart },
             },
@@ -1429,14 +1438,14 @@ export class StatsService {
         by: ["matchId"],
         where: {
           match: {
-            roomId: { not: null },
+            isInternal: true,
           },
         },
       }),
       this.prisma.matchParticipant.count({
         where: {
           match: {
-            roomId: { not: null },
+            isInternal: true,
           },
         },
       }),
@@ -1444,13 +1453,13 @@ export class StatsService {
         SELECT COUNT(DISTINCT mp."userId")::bigint AS count
         FROM "match_participants" mp
         INNER JOIN "matches" m ON m."id" = mp."matchId"
-        WHERE m."roomId" IS NOT NULL
+        WHERE m."isInternal" = true
       `),
       this.prisma.$queryRaw<{ count: bigint }[]>(Prisma.sql`
         SELECT COUNT(DISTINCT mp."championId")::bigint AS count
         FROM "match_participants" mp
         INNER JOIN "matches" m ON m."id" = mp."matchId"
-        WHERE m."roomId" IS NOT NULL
+        WHERE m."isInternal" = true
       `),
       this.prisma.$queryRaw<{ count: bigint }[]>(Prisma.sql`
         SELECT COUNT(*)::bigint AS count
@@ -1458,7 +1467,7 @@ export class StatsService {
           SELECT unnest(ARRAY[mp."item0", mp."item1", mp."item2", mp."item3", mp."item4", mp."item5", mp."item6"]) AS item_id
           FROM "match_participants" mp
           INNER JOIN "matches" m ON m."id" = mp."matchId"
-          WHERE m."roomId" IS NOT NULL
+          WHERE m."isInternal" = true
         ) items
         WHERE item_id > 0
       `),
@@ -1467,7 +1476,7 @@ export class StatsService {
         FROM "match_participants" mp
         INNER JOIN "matches" m ON m."id" = mp."matchId"
         WHERE COALESCE(m."completedAt", m."createdAt") >= NOW() - INTERVAL '30 days'
-          AND m."roomId" IS NOT NULL
+          AND m."isInternal" = true
       `),
       this.prisma.$queryRaw<
         {
@@ -1492,7 +1501,7 @@ export class StatsService {
           ROUND(AVG(mp."goldEarned")::numeric, 0)::float AS "avgGold"
         FROM "match_participants" mp
         INNER JOIN "matches" m ON m."id" = mp."matchId"
-        WHERE m."roomId" IS NOT NULL
+        WHERE m."isInternal" = true
           AND mp."position" IS NOT NULL
           AND mp."position" <> ''
           AND mp."position" <> 'UNKNOWN'
@@ -1520,7 +1529,7 @@ export class StatsService {
           ROUND(AVG(mp."assists")::numeric, 1)::float AS "avgAssists"
         FROM "match_participants" mp
         INNER JOIN "matches" m ON m."id" = mp."matchId"
-        WHERE m."roomId" IS NOT NULL
+        WHERE m."isInternal" = true
         GROUP BY mp."championId", mp."championName"
         HAVING COUNT(*) >= 3
         ORDER BY COUNT(*) DESC, "winRate" DESC
@@ -1543,7 +1552,7 @@ export class StatsService {
             unnest(ARRAY[mp."item0", mp."item1", mp."item2", mp."item3", mp."item4", mp."item5", mp."item6"]) AS item_id
           FROM "match_participants" mp
           INNER JOIN "matches" m ON m."id" = mp."matchId"
-          WHERE m."roomId" IS NOT NULL
+          WHERE m."isInternal" = true
         ) items
         WHERE item_id > 0
         GROUP BY item_id
@@ -1576,7 +1585,7 @@ export class StatsService {
           FROM "match_participants" mp
           INNER JOIN "matches" m ON m."id" = mp."matchId"
           INNER JOIN "users" u ON u."id" = mp."userId"
-          WHERE m."roomId" IS NOT NULL
+          WHERE m."isInternal" = true
           GROUP BY mp."userId", u."username", u."avatar", mp."championId", mp."championName"
           HAVING COUNT(*) >= 4
         ),
@@ -1893,7 +1902,7 @@ export class StatsService {
       where: {
         userId,
         match: {
-          roomId: { not: null },
+          isInternal: true,
         },
       },
       select: {
@@ -1966,7 +1975,7 @@ export class StatsService {
       where: {
         userId,
         match: {
-          roomId: { not: null },
+          isInternal: true,
         },
       },
       select: {

@@ -134,7 +134,7 @@ describe("StatsService", () => {
           where: {
             userId,
             match: {
-              roomId: { not: null },
+              isInternal: true,
             },
           },
         }),
@@ -335,7 +335,7 @@ describe("StatsService", () => {
           where: {
             userId,
             match: {
-              roomId: { not: null },
+              isInternal: true,
             },
           },
         }),

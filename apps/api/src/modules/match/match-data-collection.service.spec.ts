@@ -84,7 +84,7 @@ describe("MatchDataCollectionService", () => {
           where: {
             status: "COMPLETED",
             dataCollected: false,
-            roomId: { not: null },
+            isInternal: true,
             collectAttempts: { lt: 10 },
           },
         }),
@@ -507,10 +507,11 @@ describe("MatchDataCollectionService", () => {
     const runSave = async (
       participantPuuids: string[],
       linkRiotAccounts = true,
+      useSnapshots = false,
     ) => {
       const riotAccounts = (puuid: string) =>
         linkRiotAccounts ? [{ puuid }] : [];
-      const storedMatch = {
+      const liveMatch = {
         id: "match-1",
         teamAId: "a",
         teamBId: "b",
@@ -533,6 +534,31 @@ describe("MatchDataCollectionService", () => {
           ],
         },
       };
+      const storedMatch = useSnapshots
+        ? {
+            id: "match-1",
+            teamAId: null,
+            teamBId: null,
+            teamAIdSnapshot: "a",
+            teamAName: "A팀",
+            teamBIdSnapshot: "b",
+            teamBName: "B팀",
+            teamA: null,
+            teamB: null,
+            rosterSnapshots: [
+              {
+                userId: "user-a",
+                puuid: "puuid-a",
+                teamIdSnapshot: "a",
+              },
+              {
+                userId: "user-b",
+                puuid: "puuid-b",
+                teamIdSnapshot: "b",
+              },
+            ],
+          }
+        : liveMatch;
 
       const matchUpdate = jest.fn().mockResolvedValue(undefined);
       const tx = {
@@ -584,6 +610,22 @@ describe("MatchDataCollectionService", () => {
       expect(tx.matchParticipant.create).toHaveBeenCalledTimes(2);
       expect(matchUpdate).toHaveBeenCalledWith(
         expect.objectContaining({ data: { dataCollected: true } }),
+      );
+    });
+
+    it("방과 팀이 삭제된 뒤에도 종료 로스터 스냅샷으로 전적을 저장한다", async () => {
+      const { call, tx } = await runSave(["puuid-a", "puuid-b"], true, true);
+
+      await expect(call).resolves.toBeUndefined();
+      expect(tx.matchParticipant.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            userId: "user-a",
+            teamId: null,
+            teamIdSnapshot: "a",
+            teamName: "A팀",
+          }),
+        }),
       );
     });
 
