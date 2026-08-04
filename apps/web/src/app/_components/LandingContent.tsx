@@ -20,6 +20,7 @@ import {
 import { Logo } from "@/components/Logo";
 import { AdSlotCard } from "@/components/ads/AdSlot";
 import { LandingMobileNav } from "./LandingMobileNav";
+import { LiveStreamersSection } from "@/components/home/LiveStreamersSection";
 
 const operations: Array<{
   index: string;
@@ -722,6 +723,9 @@ export function LandingContentSections() {
           </div>
         </div>
       </section>
+
+      {/* 방송 중인 스트리머가 있을 때만 나타난다 (없으면 섹션째 렌더 안 함) */}
+      <LiveStreamersSection className="mx-auto max-w-[1480px] px-5 py-10 sm:px-6" />
 
       <section className="border-y border-white/[0.07] bg-[#0b0c10] px-5 sm:px-6">
         <div className="mx-auto grid max-w-[1480px] grid-cols-2 divide-x divide-white/[0.07] [&>*:nth-child(-n+2)]:border-b [&>*:nth-child(-n+2)]:border-white/[0.07] md:grid-cols-4 md:[&>*:nth-child(-n+2)]:border-b-0">
