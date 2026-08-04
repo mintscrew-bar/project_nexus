@@ -204,9 +204,13 @@ export default function SettingsPage() {
       addToast("치지직 채널 연결에 실패했습니다. 다시 시도해주세요.", "error");
     }
 
-    if (discordGuildResult || chzzkOAuthResult) {
+    // 계정 등록 온보딩은 홈에서만 진행한다. 이전 버전의 설정 URL은 쿼리만 정리한다.
+    const legacyRiotOnboarding = searchParams.get("onboarding") === "riot";
+
+    if (discordGuildResult || chzzkOAuthResult || legacyRiotOnboarding) {
       searchParams.delete("discord_guild");
       searchParams.delete("chzzk_oauth");
+      searchParams.delete("onboarding");
       const query = searchParams.toString();
       window.history.replaceState(
         null,
@@ -215,22 +219,6 @@ export default function SettingsPage() {
       );
     }
   }, [addToast]);
-
-  useEffect(() => {
-    if (isLoading || !isAuthenticated || !user) return;
-
-    const shouldOpenOnboarding =
-      typeof window !== "undefined" &&
-      new URLSearchParams(window.location.search).get("onboarding") === "riot";
-    const hasRiot =
-      Array.isArray(user.riotAccounts) && user.riotAccounts.length > 0;
-
-    if (shouldOpenOnboarding && !hasRiot) {
-      setActiveTab("accounts");
-      setShowRiotModal(true);
-      router.replace("/settings");
-    }
-  }, [isLoading, isAuthenticated, user, router]);
 
   // Fetch champions for highlight picker
   useEffect(() => {
