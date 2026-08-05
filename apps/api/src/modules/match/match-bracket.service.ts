@@ -8,6 +8,7 @@ import {
 import { PrismaService } from "../prisma/prisma.service";
 import { Prisma } from "@prisma/client";
 import { RoomStatus, MatchStatus, BracketType } from "@nexus/database";
+import { normalizeSeriesPreset, resolveSeriesBestOf } from "@nexus/types";
 import { randomInt } from "crypto";
 
 export interface BracketMatch {
@@ -20,11 +21,24 @@ export interface BracketMatch {
   status: MatchStatus;
   tournamentCode?: string;
   winnerId?: string;
+  /** 이 슬롯의 시리즈 길이. 1=단판, 3=3판 2선, 5=5판 3선 */
+  bestOf: number;
 }
 
 export interface Bracket {
   type: BracketType;
   matches: BracketMatch[];
+}
+
+/**
+ * 생성기가 만드는 중간 형태 — 대진 모양만 정하고 시리즈 길이는 아직 모른다.
+ * bestOf는 방의 프리셋을 라운드별로 해석해 applySeriesFormat에서 채운다.
+ */
+type BracketSlotDraft = Omit<BracketMatch, "bestOf">;
+
+interface BracketDraft {
+  type: BracketType;
+  matches: BracketSlotDraft[];
 }
 
 @Injectable()
@@ -44,6 +58,7 @@ export class MatchBracketService {
         hostId: true,
         status: true,
         bracketFormat: true,
+        seriesPreset: true,
         teams: {
           include: {
             members: true,
@@ -106,27 +121,27 @@ export class MatchBracketService {
       }
     }
 
-    let bracket: Bracket;
+    let draft: BracketDraft;
     const isDoubleElim = room.bracketFormat === BracketType.DOUBLE_ELIMINATION;
     const shuffledTeams = this.shuffleTeams(room.teams);
 
     switch (teamCount) {
       case 2:
-        bracket = this.generateSingleMatch(shuffledTeams);
+        draft = this.generateSingleMatch(shuffledTeams);
         break;
       case 3:
       case 5:
       case 6:
       case 7:
-        bracket = this.generateRoundRobin(shuffledTeams);
+        draft = this.generateRoundRobin(shuffledTeams);
         break;
       case 4:
-        bracket = isDoubleElim
+        draft = isDoubleElim
           ? this.generateDoubleElimination4(shuffledTeams)
           : this.generateSingleElimination(shuffledTeams);
         break;
       case 8:
-        bracket = isDoubleElim
+        draft = isDoubleElim
           ? this.generateDoubleElimination8(shuffledTeams)
           : this.generatePowerOf2Elimination(shuffledTeams);
         break;
@@ -136,25 +151,48 @@ export class MatchBracketService {
         );
     }
 
-    // Create matches in database with transaction for atomicity
+    const bracket = this.applySeriesFormat(
+      draft,
+      room.seriesPreset,
+      teamCount,
+    );
+
+    // 시리즈(대진 슬롯)와 각 시리즈의 1세트를 함께 만든다.
+    // 2세트 이후는 미리 만들지 않는다 — 2-0으로 끝나면 3세트는 치르지 않으므로
+    // 미리 만들어두면 완주 판정에서 빼는 예외 처리가 계속 따라붙는다.
     await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      // Create all matches
-      await Promise.all(
-        bracket.matches.map((match) =>
-          tx.match.create({
-            data: {
-              roomId,
-              round: match.round,
-              matchNumber: match.matchNumber,
-              teamAId: match.teamAId ?? undefined,
-              teamBId: match.teamBId ?? undefined,
-              status: MatchStatus.PENDING,
-              bracketType: bracket.type,
-              bracketRound: match.bracketSection ?? undefined,
-            },
-          }),
-        ),
-      );
+      for (const slot of bracket.matches) {
+        const series = await tx.matchSeries.create({
+          data: {
+            roomId,
+            round: slot.round,
+            matchNumber: slot.matchNumber,
+            bracketRound: slot.bracketSection ?? undefined,
+            bracketType: bracket.type,
+            teamAId: slot.teamAId ?? undefined,
+            teamBId: slot.teamBId ?? undefined,
+            bestOf: slot.bestOf,
+            status: MatchStatus.PENDING,
+          },
+        });
+
+        await tx.match.create({
+          data: {
+            roomId,
+            seriesId: series.id,
+            gameNumber: 1,
+            // round/matchNumber/bracketRound는 시리즈에서 미러링한다.
+            // 방송 오버레이·관리자·전적 수집이 Match만 보고 동작하기 때문이다.
+            round: slot.round,
+            matchNumber: slot.matchNumber,
+            teamAId: slot.teamAId ?? undefined,
+            teamBId: slot.teamBId ?? undefined,
+            status: MatchStatus.PENDING,
+            bracketType: bracket.type,
+            bracketRound: slot.bracketSection ?? undefined,
+          },
+        });
+      }
 
       // Update room status atomically
       await tx.room.update({
@@ -164,16 +202,86 @@ export class MatchBracketService {
     });
 
     this.logger.log(
-      `Generated ${bracket.type} bracket for room ${roomId} with ${bracket.matches.length} matches`,
+      `Generated ${bracket.type} bracket for room ${roomId} with ${bracket.matches.length} series ` +
+        `(bestOf: ${bracket.matches.map((m) => m.bestOf).join(",")})`,
     );
 
     return bracket;
   }
 
   /**
+   * 대진 모양(draft)에 방의 다전제 프리셋을 얹어 슬롯별 bestOf를 확정한다.
+   *
+   * 다전제는 1차 범위상 싱글 엘리미네이션과 2팀 단판방에만 적용한다.
+   * 더블 엘리미네이션·리그전은 프리셋과 무관하게 단판을 유지한다.
+   */
+  private applySeriesFormat(
+    draft: BracketDraft,
+    rawPreset: string | null,
+    teamCount: number,
+  ): Bracket {
+    const supportsSeries =
+      draft.type === BracketType.SINGLE ||
+      draft.type === BracketType.SINGLE_ELIMINATION;
+
+    if (!supportsSeries) {
+      return {
+        type: draft.type,
+        matches: draft.matches.map((slot) => ({ ...slot, bestOf: 1 })),
+      };
+    }
+
+    const preset = normalizeSeriesPreset(rawPreset, teamCount);
+    const totalRounds = Math.max(...draft.matches.map((slot) => slot.round));
+
+    return {
+      type: draft.type,
+      matches: draft.matches.map((slot) => ({
+        ...slot,
+        bestOf: resolveSeriesBestOf(preset, slot.round, totalRounds),
+      })),
+    };
+  }
+
+  /**
    * Get existing bracket structure from database
    */
   private async getExistingBracket(roomId: string): Promise<Bracket> {
+    const series = await this.prisma.matchSeries.findMany({
+      where: { roomId },
+      select: {
+        id: true,
+        round: true,
+        matchNumber: true,
+        teamAId: true,
+        teamBId: true,
+        bracketRound: true,
+        status: true,
+        bracketType: true,
+        bestOf: true,
+        winnerId: true,
+      },
+      orderBy: [{ round: "asc" }, { matchNumber: "asc" }],
+    });
+
+    if (series.length > 0) {
+      return {
+        type: series[0].bracketType || BracketType.SINGLE,
+        matches: series.map((s: (typeof series)[number]) => ({
+          id: s.id,
+          round: s.round,
+          matchNumber: s.matchNumber,
+          teamAId: s.teamAId || undefined,
+          teamBId: s.teamBId || undefined,
+          bracketSection: s.bracketRound || undefined,
+          status: s.status,
+          bestOf: s.bestOf,
+          winnerId: s.winnerId || undefined,
+        })),
+      };
+    }
+
+    // 시리즈 도입 이전에 만들어진 방 — Match를 슬롯으로 그대로 읽는다.
     const matches = await this.prisma.match.findMany({
       where: { roomId },
       select: {
@@ -205,6 +313,7 @@ export class MatchBracketService {
         teamBId: m.teamBId || undefined,
         bracketSection: m.bracketRound || undefined,
         status: m.status,
+        bestOf: 1,
       })),
     };
   }
@@ -216,7 +325,7 @@ export class MatchBracketService {
   /**
    * 10-player (2 teams): Single match
    */
-  private generateSingleMatch(teams: any[]): Bracket {
+  private generateSingleMatch(teams: any[]): BracketDraft {
     return {
       type: BracketType.SINGLE,
       matches: [
@@ -235,8 +344,8 @@ export class MatchBracketService {
    * 15-player (3 teams): Round Robin (리그전)
    * Each team plays every other team once
    */
-  private generateRoundRobin(teams: any[]): Bracket {
-    const matches: BracketMatch[] = [];
+  private generateRoundRobin(teams: any[]): BracketDraft {
+    const matches: BracketSlotDraft[] = [];
     let matchNumber = 1;
 
     for (let i = 0; i < teams.length; i++) {
@@ -260,8 +369,8 @@ export class MatchBracketService {
   /**
    * 20-player (4 teams): Single Elimination Tournament
    */
-  private generateSingleElimination(teams: any[]): Bracket {
-    const matches: BracketMatch[] = [];
+  private generateSingleElimination(teams: any[]): BracketDraft {
+    const matches: BracketSlotDraft[] = [];
 
     // Semi-finals
     matches.push({
@@ -299,10 +408,10 @@ export class MatchBracketService {
   /**
    * N-team (N = power of 2, e.g. 8) Single Elimination
    */
-  private generatePowerOf2Elimination(teams: any[]): Bracket {
+  private generatePowerOf2Elimination(teams: any[]): BracketDraft {
     const n = teams.length;
     const totalRounds = Math.log2(n);
-    const matches: BracketMatch[] = [];
+    const matches: BracketSlotDraft[] = [];
     let matchNumber = 1;
 
     // Round 1: n/2 actual matches (랜덤 사이드 배정)
@@ -340,9 +449,9 @@ export class MatchBracketService {
   /**
    * 4-team Double Elimination
    */
-  private generateDoubleElimination4(teams: any[]): Bracket {
+  private generateDoubleElimination4(teams: any[]): BracketDraft {
     let matchNumber = 1;
-    const matches: BracketMatch[] = [
+    const matches: BracketSlotDraft[] = [
       // WB Round 1 (랜덤 사이드 배정)
       {
         id: this.generateMatchId(),
@@ -399,9 +508,9 @@ export class MatchBracketService {
   /**
    * 8-team Double Elimination
    */
-  private generateDoubleElimination8(teams: any[]): Bracket {
+  private generateDoubleElimination8(teams: any[]): BracketDraft {
     let matchNumber = 1;
-    const matches: BracketMatch[] = [
+    const matches: BracketSlotDraft[] = [
       // WB Round 1 (4 matches, 랜덤 사이드 배정)
       {
         id: this.generateMatchId(),

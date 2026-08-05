@@ -8,6 +8,7 @@ import { MatchDataCollectionService } from "./match-data-collection.service";
 import { NotificationService } from "../notification/notification.service";
 import { MatchBracketService } from "./match-bracket.service";
 import { MatchAdvancementService } from "./match-advancement.service";
+import { MatchSeriesService } from "./match-series.service";
 import { RankingService } from "../ranking/ranking.service";
 import {
   getChampionKoreanName,
@@ -67,6 +68,12 @@ describe("MatchService", () => {
       advanceDoubleElimination: jest.fn().mockResolvedValue(undefined),
       checkBracketCompletion: jest.fn().mockResolvedValue(false),
     };
+    const mockMatchSeriesService = {
+      applyGameResult: jest.fn().mockResolvedValue(null),
+      getRoomSeriesScores: jest.fn().mockResolvedValue([]),
+      assignTeam: jest.fn().mockResolvedValue(undefined),
+      hasSeries: jest.fn().mockResolvedValue(false),
+    };
     const mockRankingService = {
       updateRanking: jest.fn().mockResolvedValue(undefined),
     };
@@ -91,6 +98,7 @@ describe("MatchService", () => {
           provide: MatchAdvancementService,
           useValue: mockMatchAdvancementService,
         },
+        { provide: MatchSeriesService, useValue: mockMatchSeriesService },
         { provide: RankingService, useValue: mockRankingService },
         // Optional 의존성 — Discord 서비스는 테스트에서 불필요
         { provide: "DISCORD_BOT_SERVICE", useValue: null },
