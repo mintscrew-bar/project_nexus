@@ -44,7 +44,7 @@ const ACCENT = "#667EEA";
 // 스트리머 플랫폼 표시 라벨
 const STREAMER_PLATFORM_LABELS: Record<string, string> = {
   CHZZK: "치지직",
-  SOOP: "숲",
+  SOOP: "SOOP",
   YOUTUBE: "유튜브",
 };
 

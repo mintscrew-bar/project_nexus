@@ -7,16 +7,18 @@ import { streamerApi, type StreamerPlatformKind } from "@/lib/api-client";
 
 const PLATFORM_LABELS: Record<string, string> = {
   CHZZK: "치지직",
-  SOOP: "숲",
+  SOOP: "SOOP",
   YOUTUBE: "유튜브",
 };
 
 /**
  * 채널 소유권 인증 모달.
  *
- * 발급받은 코드를 채널 소개글에 넣게 하고, 우리가 채널 정보를 읽어서 대조한다.
- * 소개글을 API로 주지 않는 플랫폼(숲)은 자동 대조가 불가능해서
- * 관리자 수동 확인으로 안내한다.
+ * 발급받은 코드를 스트리머가 직접 수정할 수 있는 채널 필드에 넣게 하고,
+ * 우리가 그 필드를 읽어서 대조한다.
+ * 코드를 넣을 위치는 플랫폼마다 다르므로(치지직=채널 소개,
+ * SOOP=방송국 제목·이름) 안내 문구는 서버가 내려주는 instruction을 그대로 쓴다.
+ * 코드를 넣을 필드 자체가 없는 플랫폼만 관리자 수동 확인으로 넘어간다.
  */
 export function ChannelVerifyModal({
   platform,

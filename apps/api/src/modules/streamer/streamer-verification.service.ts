@@ -87,10 +87,11 @@ export class StreamerVerificationService {
       code,
       expiresAt,
       // 플랫폼마다 코드를 넣을 위치가 달라 안내 문구를 함께 내려준다.
+      // SOOP은 방송국 제목/이름을 합쳐서 대조하므로 둘 중 아무 곳이나 통과한다.
       instruction:
         platform === StreamerPlatform.CHZZK
           ? "치지직 스튜디오 > 채널 관리 > 채널 소개에 아래 코드를 붙여넣고 저장한 뒤 인증하기를 눌러주세요."
-          : "숲 방송국 > 방송국 설정 > 방송국 제목 뒤에 아래 코드를 붙여넣고 저장한 뒤 인증하기를 눌러주세요.",
+          : "SOOP 내 방송국 > 방송국 설정에서 방송국 제목 또는 방송국 이름 뒤에 아래 코드를 붙여넣고 저장해주세요. 방송을 켜지 않아도 인증됩니다.",
     };
   }
 
@@ -139,7 +140,7 @@ export class StreamerVerificationService {
       throw new BadRequestException(
         platform === StreamerPlatform.CHZZK
           ? "채널 소개에서 인증 코드를 찾지 못했습니다. 저장 후 다시 시도해주세요."
-          : "방송국 제목에서 인증 코드를 찾지 못했습니다. 저장 후 다시 시도해주세요.",
+          : "방송국 제목·이름에서 인증 코드를 찾지 못했습니다. 저장 후 다시 시도해주세요.",
       );
     }
 

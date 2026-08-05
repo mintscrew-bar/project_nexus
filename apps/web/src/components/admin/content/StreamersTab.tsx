@@ -14,7 +14,7 @@ import type { AddToast } from "../shared";
 
 const PLATFORM_LABELS: Record<string, string> = {
   CHZZK: "치지직",
-  SOOP: "숲",
+  SOOP: "SOOP",
   YOUTUBE: "유튜브",
 };
 

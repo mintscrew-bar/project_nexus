@@ -512,7 +512,7 @@ export class StreamerService {
           operation: "스트리머 라이브 조회 복구",
           adminId: "system",
           adminName: "스트리머 폴링",
-          summary: "치지직/숲 라이브 조회가 다시 정상적으로 동작합니다.",
+          summary: "치지직/SOOP 라이브 조회가 다시 정상적으로 동작합니다.",
         });
       }
       await this.redis.del(FAILURE_STREAK_CACHE_KEY);
@@ -528,7 +528,7 @@ export class StreamerService {
         operation: "스트리머 라이브 조회 연속 실패",
         adminId: "system",
         adminName: "스트리머 폴링",
-        summary: `검증된 스트리머 ${checked}명 전원의 라이브 조회가 ${streak}회 연속 실패했습니다. 치지직/숲 비공식 엔드포인트가 바뀌었을 수 있습니다.`,
+        summary: `검증된 스트리머 ${checked}명 전원의 라이브 조회가 ${streak}회 연속 실패했습니다. 치지직/SOOP 비공식 엔드포인트가 바뀌었을 수 있습니다.`,
         targetType: "streamer-provider",
       });
     }
