@@ -151,11 +151,7 @@ export class MatchBracketService {
         );
     }
 
-    const bracket = this.applySeriesFormat(
-      draft,
-      room.seriesPreset,
-      teamCount,
-    );
+    const bracket = this.applySeriesFormat(draft, room.seriesPreset, teamCount);
 
     // 시리즈(대진 슬롯)와 각 시리즈의 1세트를 함께 만든다.
     // 2세트 이후는 미리 만들지 않는다 — 2-0으로 끝나면 3세트는 치르지 않으므로

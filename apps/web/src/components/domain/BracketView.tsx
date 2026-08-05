@@ -32,6 +32,12 @@ export interface Match { // Exporting for use in other components
   bracketSection?: string; // "WB_R1", "WB_F", "LB_R1", "LB_F", "GF", etc.
   mvpUserId?: string;
   aceUserId?: string;
+  /** 다전제 시리즈 길이. 1=단판 */
+  bestOf?: number;
+  /** 현재 진행 중이거나 다음에 치를 세트 번호 */
+  currentGameNumber?: number;
+  /** 이 슬롯에 속한 세트(Match) id 목록 */
+  gameIds?: string[];
 }
 
 interface BracketViewProps {
@@ -100,11 +106,13 @@ function TeamSlot({
           {getTeamDisplayName(team)}
         </span>
       </div>
-      {isWinner ? (
-        <Trophy className="h-4 w-4 shrink-0 text-accent-gold" />
-      ) : team?.score !== undefined ? (
-        <span className="shrink-0 text-base font-bold text-text-primary">{team.score}</span>
-      ) : null}
+      {/* 다전제에서는 이긴 팀도 스코어를 함께 보여준다 (2-1처럼 읽히도록) */}
+      <div className="flex shrink-0 items-center gap-1.5">
+        {team?.score !== undefined && (
+          <span className="text-base font-bold text-text-primary">{team.score}</span>
+        )}
+        {isWinner && <Trophy className="h-4 w-4 text-accent-gold" />}
+      </div>
     </div>
   );
 }
@@ -136,9 +144,18 @@ function MatchCard({
         <div className="min-w-0">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-text-tertiary">
             Match {match.matchNumber}
+            {/* 다전제면 시리즈 길이를 함께 보여준다 */}
+            {(match.bestOf ?? 1) > 1 && (
+              <span className="ml-1.5 text-accent-primary">BO{match.bestOf}</span>
+            )}
           </p>
           {match.bracketSection && (
             <p className="mt-0.5 truncate text-xs text-text-secondary">{SECTION_LABELS[match.bracketSection] || match.bracketSection}</p>
+          )}
+          {(match.bestOf ?? 1) > 1 && match.status !== 'COMPLETED' && (
+            <p className="mt-0.5 text-xs text-text-secondary">
+              {match.currentGameNumber ?? 1}세트 진행
+            </p>
           )}
         </div>
         <span className={cn("inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-bold", status.className)}>

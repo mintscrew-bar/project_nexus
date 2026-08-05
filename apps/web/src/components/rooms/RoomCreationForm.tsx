@@ -7,6 +7,12 @@ import { Users, Lock, Unlock, Gavel, ListOrdered, Trophy, Info, GitBranch, Alert
 import Link from "next/link";
 import { discordApi } from "@/lib/api-client";
 import { useAuthStore } from "@/stores/auth-store";
+import { SeriesPresetSelector } from "./SeriesPresetSelector";
+import {
+  DEFAULT_SERIES_PRESET,
+  normalizeSeriesPreset,
+  type SeriesPreset,
+} from "@nexus/types";
 
 interface RoomCreationFormProps {
   onCancel: () => void;
@@ -84,6 +90,9 @@ export function RoomCreationForm({ onCancel, onRoomCreated }: RoomCreationFormPr
 
   // 브래킷 포맷 (4/8팀 전용)
   const [useDoubleElim, setUseDoubleElim] = useState(false);
+  // 다전제 프리셋. 방 크기를 바꾸면 팀 수가 달라져 이전 선택이 무효일 수 있다.
+  const [seriesPreset, setSeriesPreset] =
+    useState<SeriesPreset>(DEFAULT_SERIES_PRESET);
 
   useEffect(() => {
     if (authLoading || !isAuthenticated || !user) {
@@ -119,6 +128,14 @@ export function RoomCreationForm({ onCancel, onRoomCreated }: RoomCreationFormPr
     };
   }, [authLoading, isAuthenticated, user]);
 
+  // 인원(=팀 수)이 바뀌면 고를 수 있는 프리셋 목록도 갈아끼워진다.
+  // 이전 선택이 새 팀 수에서 유효하지 않으면 단판으로 되돌린다.
+  const handleParticipantChange = (value: number) => {
+    setMaxParticipants(value);
+    const nextTeams = PLAYER_OPTIONS.find((o) => o.value === value)?.teams ?? 0;
+    setSeriesPreset(normalizeSeriesPreset(seriesPreset, nextTeams));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
@@ -147,6 +164,11 @@ export function RoomCreationForm({ onCancel, onRoomCreated }: RoomCreationFormPr
       bracketFormat: selectedOption?.supportsDE && useDoubleElim
         ? 'DOUBLE_ELIMINATION'
         : 'SINGLE_ELIMINATION',
+      // 더블 일리미네이션은 아직 다전제를 지원하지 않는다 (서버도 단판으로 강제).
+      seriesPreset:
+        selectedOption?.supportsDE && useDoubleElim
+          ? DEFAULT_SERIES_PRESET
+          : seriesPreset,
     };
 
     const newRoom = await createRoom(roomData);
@@ -230,7 +252,7 @@ export function RoomCreationForm({ onCancel, onRoomCreated }: RoomCreationFormPr
             <button
               key={option.value}
               type="button"
-              onClick={() => setMaxParticipants(option.value)}
+              onClick={() => handleParticipantChange(option.value)}
               className={`p-3 rounded-lg border-2 transition-all text-left ${
                 maxParticipants === option.value
                   ? "border-accent-primary bg-accent-primary/10"
@@ -270,6 +292,15 @@ export function RoomCreationForm({ onCancel, onRoomCreated }: RoomCreationFormPr
             </p>
           )}
         </div>
+      )}
+
+      {/* 다전제 프리셋 — 더블 일리미네이션은 아직 단판만 지원한다 */}
+      {!(selectedPlayerOption?.supportsDE && useDoubleElim) && (
+        <SeriesPresetSelector
+          teamCount={selectedPlayerOption?.teams ?? 0}
+          value={seriesPreset}
+          onChange={setSeriesPreset}
+        />
       )}
 
       {/* 팀 구성 방식 */}

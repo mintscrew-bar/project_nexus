@@ -830,6 +830,8 @@ export const roomApi = {
     pickTimeLimit?: number;
     captainSelection?: "RANDOM" | "TIER" | "MANUAL" | "VOLUNTEER";
     bracketFormat?: string;
+    // 다전제 프리셋 (@nexus/types의 SeriesPreset 키)
+    seriesPreset?: string;
   }) => {
     const response = await apiClient.post("/rooms", data);
     return response.data;

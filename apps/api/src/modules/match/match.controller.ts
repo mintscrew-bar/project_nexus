@@ -138,8 +138,16 @@ export class MatchController {
       });
     }
 
-    // If bracket advanced (e.g. semi-final → finals), emit updated bracket
-    if (result.bracketAdvanced && result.roomId) {
+    // 다전제 진행 상황을 대진표에 알린다 (스코어 갱신 / 다음 세트 안내).
+    if (result.series && result.roomId) {
+      this.matchGateway.emitSeriesUpdate(result.roomId, result.series);
+    }
+
+    // 진출했거나(준결승 → 결승) 다음 세트가 새로 생겼으면 대진표를 갱신한다.
+    if (
+      (result.bracketAdvanced || result.series?.nextMatchId) &&
+      result.roomId
+    ) {
       const updatedMatches = await this.matchService.getRoomMatches(
         result.roomId,
       );

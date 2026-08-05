@@ -21,6 +21,7 @@ import { Prisma } from "@prisma/client";
 import * as bcrypt from "bcrypt";
 import { randomInt } from "crypto";
 import { calculateTierScore } from "../common/tier-score.util";
+import { normalizeSeriesPreset, teamCountForRoomSize } from "@nexus/types";
 import { StreamerService } from "../streamer/streamer.service";
 
 export interface CreateRoomDto {
@@ -42,6 +43,9 @@ export interface CreateRoomDto {
 
   // Tournament bracket format
   bracketFormat?: BracketType;
+
+  // 다전제 프리셋 (@nexus/types의 SeriesPreset 키)
+  seriesPreset?: string;
 }
 
 export interface JoinRoomDto {
@@ -482,6 +486,11 @@ export class RoomService {
             pickTimeLimit: dto.pickTimeLimit,
             captainSelection: dto.captainSelection,
             ...(dto.bracketFormat && { bracketFormat: dto.bracketFormat }),
+            // 팀 수에 맞지 않는 프리셋은 단판으로 떨어뜨린다.
+            seriesPreset: normalizeSeriesPreset(
+              dto.seriesPreset,
+              teamCountForRoomSize(dto.maxParticipants),
+            ),
 
             participants: {
               create: {
@@ -1441,6 +1450,20 @@ export class RoomService {
     // Bracket format
     if (updates.bracketFormat !== undefined)
       data.bracketFormat = updates.bracketFormat;
+
+    // 다전제 프리셋.
+    // 방 크기가 바뀌면 이전 프리셋이 새 팀 수에서 유효하지 않을 수 있으므로,
+    // 프리셋을 안 건드렸더라도 크기 변경 시 함께 재검증한다.
+    const nextMaxParticipants = updates.maxParticipants ?? room.maxParticipants;
+    if (
+      updates.seriesPreset !== undefined ||
+      updates.maxParticipants !== undefined
+    ) {
+      data.seriesPreset = normalizeSeriesPreset(
+        updates.seriesPreset ?? room.seriesPreset,
+        teamCountForRoomSize(nextMaxParticipants),
+      );
+    }
 
     await this.prisma.room.update({
       where: { id: roomId },

@@ -2,7 +2,8 @@
 
 // 가위바위보 진영 결정 흐름 (프레젠테이셔널). 소켓은 부모(MatchDetailModal)가 소유하고,
 // 이 컴포넌트는 서버 상태(rps) + 공개 이벤트(reveal)를 props로 받아 렌더한다.
-// 규칙: 팀장 1:1 단판, 이긴 팀이 진영 선택권.
+// 규칙: 1세트는 팀장 1:1 가위바위보 단판이고 이긴 팀이 진영 선택권.
+// 다전제 2세트부터는 가위바위보 없이 직전 세트에서 진 팀이 진영을 고른다.
 
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -20,8 +21,14 @@ export interface RpsStateData {
   captainAIsBot?: boolean;
   captainBIsBot?: boolean;
   submitted: string[];
+  // side 페이즈에서 진영 선택권을 가진 팀.
+  // 1세트는 가위바위보 승자, 다전제 2세트부터는 직전 세트 패자다.
   winnerTeamId: string | null;
   blueSideTeamId: string | null;
+  /// 다전제 세트 번호 (단판이면 1)
+  gameNumber?: number;
+  /// true면 가위바위보 없이 진영 선택만 하는 세트
+  sidePickOnly?: boolean;
 }
 
 export interface RpsRevealData {
@@ -110,8 +117,12 @@ export function MatchRpsFlow({
   const submittedB = rps.submitted.includes(rps.captainBId);
   const iSubmitted = (amCaptainA && submittedA) || (amCaptainB && submittedB);
 
-  const winnerTeam =
+  // 다전제 2세트 이후에는 가위바위보를 건너뛰고 진영 선택만 한다.
+  // 이때 winnerTeamId는 "이긴 팀"이 아니라 직전 세트 패자(선택권자)다.
+  const sidePickOnly = !!rps.sidePickOnly;
+  const pickerTeam =
     rps.winnerTeamId === rps.teamAId ? teamA : rps.winnerTeamId === rps.teamBId ? teamB : null;
+  const winnerTeam = pickerTeam;
   const amWinnerCaptain =
     !!rps.winnerTeamId &&
     currentUserId === (rps.winnerTeamId === rps.teamAId ? rps.captainAId : rps.captainBId);
@@ -123,10 +134,15 @@ export function MatchRpsFlow({
   const Panel = ({ team, isA }: { team: RpsTeam; isA: boolean }) => {
     const submitted = isA ? submittedA : submittedB;
     const isMe = isA ? amCaptainA : amCaptainB;
+    // 진영 선택만 하는 세트에서는 승패 연출을 하지 않는다.
+    // 선택권자가 직전 세트 패자라 "승리" 강조가 거꾸로 읽힌다.
     const won =
-      (showSide || showDone) && rps.winnerTeamId === team.id;
+      !sidePickOnly && (showSide || showDone) && rps.winnerTeamId === team.id;
     const lost =
-      (showSide || showDone) && !!rps.winnerTeamId && rps.winnerTeamId !== team.id;
+      !sidePickOnly &&
+      (showSide || showDone) &&
+      !!rps.winnerTeamId &&
+      rps.winnerTeamId !== team.id;
     const hand = anim === "revealed" || anim === "tie" || showSide || showDone
       ? (isA ? reveal?.handA : reveal?.handB)
       : null;
@@ -202,12 +218,23 @@ export function MatchRpsFlow({
   return (
     <div className="space-y-3">
       <div className="text-center">
-        <h2 className="text-lg font-bold text-text-primary">진영 결정 — 가위바위보</h2>
+        <h2 className="text-lg font-bold text-text-primary">
+          {sidePickOnly
+            ? `${rps.gameNumber ?? 2}세트 — 진영 선택`
+            : "진영 결정 — 가위바위보"}
+        </h2>
         <p className="text-sm text-text-secondary mt-0.5">
           {anim === "countdown" && "준비!"}
           {anim === "tie" && "비겼습니다 — 다시!"}
           {anim !== "countdown" && anim !== "tie" && rps.phase === "throw" && (amCaptain ? "가위·바위·보를 내세요 (단판)" : "양 팀장이 진영을 가립니다")}
-          {showSide && (amWinnerCaptain ? "승리! 진영을 선택하세요" : `${winnerTeam?.name ?? "승자"}가 진영을 고르는 중...`)}
+          {showSide &&
+            (sidePickOnly
+              ? amWinnerCaptain
+                ? "직전 세트에서 졌습니다 — 진영을 선택하세요"
+                : `${pickerTeam?.name ?? "직전 세트 패배 팀"}이 진영을 고르는 중...`
+              : amWinnerCaptain
+                ? "승리! 진영을 선택하세요"
+                : `${winnerTeam?.name ?? "승자"}가 진영을 고르는 중...`)}
         </p>
       </div>
 

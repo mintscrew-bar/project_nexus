@@ -46,9 +46,7 @@ describe("MatchBracketService", () => {
       },
       matchSeries: {
         findMany: jest.fn().mockResolvedValue([]),
-        create: jest.fn(() =>
-          Promise.resolve({ id: `series-${seriesSeq++}` }),
-        ),
+        create: jest.fn(() => Promise.resolve({ id: `series-${seriesSeq++}` })),
       },
       $transaction: jest.fn((fn) => fn(prisma)),
     };

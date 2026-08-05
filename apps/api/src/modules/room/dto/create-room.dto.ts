@@ -80,4 +80,13 @@ export class CreateRoomDto {
   @IsOptional()
   @IsEnum(BracketType)
   bracketFormat?: BracketType;
+
+  /**
+   * 다전제 프리셋 키. 팀 수마다 고를 수 있는 값이 다르므로
+   * 실제 유효성은 maxParticipants와 함께 room.service에서 검증한다.
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  seriesPreset?: string;
 }

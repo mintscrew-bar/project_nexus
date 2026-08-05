@@ -143,25 +143,92 @@ export default function BracketPage() {
     ? Math.max(...roomMatches.map(m => m.round || 1))
     : 1;
 
-  // Transform matches to BracketView format (API returns teamA/teamB)
-  const bracketMatches: Match[] = roomMatches.map((m, index) => ({
-    id: m.id,
-    round: m.round || 1,
-    matchNumber: m.matchNumber || index + 1,
-    team1: m.teamA ? { id: m.teamA.id, name: m.teamA.name, score: m.teamA.score, captain: m.teamA.captain } : undefined,
-    team2: m.teamB ? { id: m.teamB.id, name: m.teamB.name, score: m.teamB.score, captain: m.teamB.captain } : undefined,
-    winner: m.winnerId
-      ? (m.teamA?.id === m.winnerId && m.teamA
-        ? { id: m.teamA.id, name: m.teamA.name, captain: m.teamA.captain }
-        : m.teamB?.id === m.winnerId && m.teamB
-          ? { id: m.teamB.id, name: m.teamB.name, captain: m.teamB.captain }
-          : undefined)
-      : undefined,
-    status: m.status as 'PENDING' | 'IN_PROGRESS' | 'COMPLETED',
-    scheduledTime: m.scheduledTime,
-    tournamentCode: m.tournamentCode,
-    bracketSection: m.bracketRound || undefined,
-  }));
+  // 대진표는 슬롯 단위로 그린다.
+  //
+  // 다전제에서는 슬롯 하나에 세트(Match)가 여러 개 붙으므로 그대로 매핑하면
+  // 같은 대진이 카드 여러 장으로 중복 렌더된다. 시리즈별로 묶어 카드 한 장을
+  // 만들고, 스코어와 "현재 진행 중인 세트"를 그 카드에 싣는다.
+  const bracketMatches: Match[] = (() => {
+    const slots = new Map<string, typeof roomMatches>();
+    roomMatches.forEach((m, index) => {
+      // 시리즈가 없으면(레거시/단판) 매치 자체가 슬롯이다.
+      const key = m.seriesId ?? `${m.round ?? 1}-${m.matchNumber ?? index + 1}`;
+      const bucket = slots.get(key);
+      if (bucket) bucket.push(m);
+      else slots.set(key, [m]);
+    });
+
+    return Array.from(slots.values()).map((games, index) => {
+      const games_ = [...games].sort(
+        (a, b) => (a.gameNumber ?? 1) - (b.gameNumber ?? 1),
+      );
+      const first = games_[0];
+      const series = first.series ?? null;
+      const bestOf = series?.bestOf ?? 1;
+
+      // 시리즈의 팀 기준으로 승수를 센다. 세트마다 진영이 바뀌어도
+      // teamA/teamB 자체는 시리즈에서 미러링되므로 안전하다.
+      const teamAId = series?.teamAId ?? first.teamAId ?? first.teamA?.id;
+      const teamBId = series?.teamBId ?? first.teamBId ?? first.teamB?.id;
+      const teamAWins = games_.filter((g) => g.winnerId && g.winnerId === teamAId).length;
+      const teamBWins = games_.filter((g) => g.winnerId && g.winnerId === teamBId).length;
+
+      // 카드가 가리키는 매치 = 진행 중이거나 아직 안 끝난 마지막 세트.
+      const activeGame =
+        games_.find((g) => g.status === 'IN_PROGRESS') ??
+        games_.find((g) => g.status === 'PENDING') ??
+        games_[games_.length - 1];
+
+      // 슬롯 상태: 시리즈가 있으면 시리즈 상태를 그대로 쓴다.
+      // 없으면 기존처럼 매치 상태.
+      const slotStatus = (series?.status ?? activeGame.status) as
+        | 'PENDING'
+        | 'IN_PROGRESS'
+        | 'COMPLETED';
+
+      const slotWinnerId = series ? series.winnerId : activeGame.winnerId;
+      const teamOf = (id?: string | null) => {
+        if (!id) return undefined;
+        if (first.teamA?.id === id) return first.teamA;
+        if (first.teamB?.id === id) return first.teamB;
+        return undefined;
+      };
+      const winnerTeam = teamOf(slotWinnerId);
+
+      return {
+        id: activeGame.id,
+        round: first.round || 1,
+        matchNumber: first.matchNumber || index + 1,
+        team1: first.teamA
+          ? {
+              id: first.teamA.id,
+              name: first.teamA.name,
+              // 다전제일 때만 스코어를 노출한다 (단판은 0-0이 의미 없다).
+              score: bestOf > 1 ? teamAWins : first.teamA.score,
+              captain: first.teamA.captain,
+            }
+          : undefined,
+        team2: first.teamB
+          ? {
+              id: first.teamB.id,
+              name: first.teamB.name,
+              score: bestOf > 1 ? teamBWins : first.teamB.score,
+              captain: first.teamB.captain,
+            }
+          : undefined,
+        winner: winnerTeam
+          ? { id: winnerTeam.id, name: winnerTeam.name, captain: winnerTeam.captain }
+          : undefined,
+        status: slotStatus,
+        scheduledTime: activeGame.scheduledTime,
+        tournamentCode: activeGame.tournamentCode,
+        bracketSection: first.bracketRound || undefined,
+        bestOf,
+        currentGameNumber: activeGame.gameNumber ?? 1,
+        gameIds: games_.map((g) => g.id),
+      };
+    });
+  })();
 
   // bracketMatches에서 selectedMatch 파생 — roomMatches WebSocket 업데이트 시 자동 반영
   const selectedMatch = bracketMatches.find(m => m.id === selectedMatchId) ?? null;

@@ -841,6 +841,8 @@ export class MatchService {
         teamBId: true,
         status: true,
         blueSideTeamId: true,
+        seriesId: true,
+        gameNumber: true,
         teamA: {
           select: {
             captainId: true,
@@ -861,6 +863,26 @@ export class MatchService {
     if (!match) {
       throw new NotFoundException("Match not found");
     }
+
+    // 다전제 2세트부터는 가위바위보를 다시 하지 않는다.
+    // 직전 세트 패자가 진영을 고른다 (LCK 방식).
+    let sidePickerTeamId: string | null = null;
+    if (match.seriesId && match.gameNumber > 1) {
+      const previous = await this.prisma.match.findFirst({
+        where: {
+          seriesId: match.seriesId,
+          gameNumber: { lt: match.gameNumber },
+          winnerId: { not: null },
+        },
+        orderBy: { gameNumber: "desc" },
+        select: { winnerId: true },
+      });
+      if (previous?.winnerId) {
+        sidePickerTeamId =
+          previous.winnerId === match.teamAId ? match.teamBId : match.teamAId;
+      }
+    }
+
     return {
       teamAId: match.teamAId,
       teamBId: match.teamBId,
@@ -875,6 +897,9 @@ export class MatchService {
       hostId: match.room?.hostId ?? null,
       status: match.status,
       blueSideTeamId: match.blueSideTeamId,
+      gameNumber: match.gameNumber,
+      // null이면 1세트(또는 단판) — 가위바위보부터 시작한다.
+      sidePickerTeamId,
     };
   }
 
@@ -908,6 +933,19 @@ export class MatchService {
         completedAt: true,
         createdAt: true,
         updatedAt: true,
+        // 다전제: 대진표는 시리즈 단위로 카드를 그리고 세트는 그 안에 접어 넣는다.
+        seriesId: true,
+        gameNumber: true,
+        series: {
+          select: {
+            id: true,
+            bestOf: true,
+            status: true,
+            winnerId: true,
+            teamAId: true,
+            teamBId: true,
+          },
+        },
         teamA: {
           select: {
             id: true,
@@ -933,7 +971,11 @@ export class MatchService {
           },
         },
       },
-      orderBy: [{ round: "asc" }, { matchNumber: "asc" }],
+      orderBy: [
+        { round: "asc" },
+        { matchNumber: "asc" },
+        { gameNumber: "asc" },
+      ],
     });
   }
 

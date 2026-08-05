@@ -7,7 +7,14 @@ import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
 import { Switch } from '@/components/ui/Switch';
 import { Loader2, Users, Lock, Unlock, Gavel, ListOrdered, Trophy, Info, Eye, EyeOff, GitBranch, Scale, ArrowLeftRight } from 'lucide-react';
-import { RoomSettingsDto, useLobbyStore } from '@/stores/lobby-store';
+import { RoomSettingsDto, useLobbyStore } from "@/stores/lobby-store";
+import { SeriesPresetSelector } from "@/components/rooms/SeriesPresetSelector";
+import {
+  DEFAULT_SERIES_PRESET,
+  normalizeSeriesPreset,
+  teamCountForRoomSize,
+  type SeriesPreset,
+} from "@nexus/types";
 
 type TeamMode = "AUCTION" | "SNAKE_DRAFT" | "AUTO_BALANCE" | "MANUAL_TEAM";
 type TeamCaptainSelection = "RANDOM" | "TIER" | "MANUAL" | "VOLUNTEER";
@@ -30,6 +37,7 @@ interface RoomSettingsModalProps {
     pickTimeLimit?: number;
     captainSelection?: TeamCaptainSelection;
     bracketFormat?: string;
+    seriesPreset?: string | null;
   };
 }
 
@@ -108,7 +116,11 @@ export function RoomSettingsModal({ isOpen, onClose, room }: RoomSettingsModalPr
   );
 
   // Bracket format
-  const [useDoubleElim, setUseDoubleElim] = useState(room.bracketFormat === 'DOUBLE_ELIMINATION');
+  const [useDoubleElim, setUseDoubleElim] = useState(room.bracketFormat === "DOUBLE_ELIMINATION");
+  // 다전제 프리셋 — 방 크기가 바뀌면 팀 수가 달라져 이전 선택이 무효일 수 있다.
+  const [seriesPreset, setSeriesPreset] = useState<SeriesPreset>(
+    normalizeSeriesPreset(room.seriesPreset, teamCountForRoomSize(room.maxParticipants)),
+  );
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -131,10 +143,24 @@ export function RoomSettingsModal({ isOpen, onClose, room }: RoomSettingsModalPr
       setPickTimeLimit(room.pickTimeLimit ?? 60);
       setSnakeCaptainSelection(toSnakeCaptainSelection(room.captainSelection));
       setAuctionCaptainSelection(toAuctionCaptainSelection(room.captainSelection));
-      setUseDoubleElim(room.bracketFormat === 'DOUBLE_ELIMINATION');
+      setUseDoubleElim(room.bracketFormat === "DOUBLE_ELIMINATION");
+      setSeriesPreset(
+        normalizeSeriesPreset(
+          room.seriesPreset,
+          teamCountForRoomSize(room.maxParticipants),
+        ),
+      );
       setError(null);
     }
   }, [isOpen, room]);
+
+  // 인원(=팀 수)이 바뀌면 고를 수 있는 프리셋 목록도 갈아끼워진다.
+  const handleParticipantChange = (value: number) => {
+    setMaxParticipants(value);
+    setSeriesPreset(
+      normalizeSeriesPreset(seriesPreset, teamCountForRoomSize(value)),
+    );
+  };
 
   const handleSave = async () => {
     setIsSubmitting(true);
@@ -155,8 +181,13 @@ export function RoomSettingsModal({ isOpen, onClose, room }: RoomSettingsModalPr
             ? snakeCaptainSelection
             : undefined,
         bracketFormat: selectedPlayerOption?.supportsDE
-          ? (useDoubleElim ? 'DOUBLE_ELIMINATION' : 'SINGLE_ELIMINATION')
+          ? (useDoubleElim ? "DOUBLE_ELIMINATION" : "SINGLE_ELIMINATION")
           : undefined,
+        // 더블 일리미네이션은 아직 다전제를 지원하지 않는다.
+        seriesPreset:
+          selectedPlayerOption?.supportsDE && useDoubleElim
+            ? DEFAULT_SERIES_PRESET
+            : seriesPreset,
       };
 
       if (isPrivate) {
@@ -209,7 +240,7 @@ export function RoomSettingsModal({ isOpen, onClose, room }: RoomSettingsModalPr
               <button
                 key={option.value}
                 type="button"
-                onClick={() => setMaxParticipants(option.value)}
+                onClick={() => handleParticipantChange(option.value)}
                 className={`p-2 rounded-lg border-2 transition-all text-center ${
                   maxParticipants === option.value
                     ? "border-accent-primary bg-accent-primary/10"
@@ -247,6 +278,15 @@ export function RoomSettingsModal({ isOpen, onClose, room }: RoomSettingsModalPr
               </p>
             )}
           </div>
+        )}
+
+        {/* 다전제 프리셋 — 더블 일리미네이션은 아직 단판만 지원한다 */}
+        {!(selectedPlayerOption?.supportsDE && useDoubleElim) && (
+          <SeriesPresetSelector
+            teamCount={selectedPlayerOption?.teams ?? 0}
+            value={seriesPreset}
+            onChange={setSeriesPreset}
+          />
         )}
 
         {/* 팀 구성 방식 */}
