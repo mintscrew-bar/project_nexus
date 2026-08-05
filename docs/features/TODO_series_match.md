@@ -1,7 +1,9 @@
 # 내전 다전제 (3판 2선 / 5판 3선)
 
 > 작성일: 2026-08-05
-> 상태: 설계 확정, 구현 전
+> 상태: 1단계 구현 완료 (API 테스트 238개·전체 린트·프로덕션 빌드 통과)
+>
+> **남음:** 실제 방으로 Bo3를 끝까지 돌려보는 E2E 확인. 스키마 변경분은 운영 DB에 `migrate deploy` 필요.
 
 ---
 
@@ -82,21 +84,21 @@
 
 ### 1단계 — 다전제 동작
 
-- [ ] Task 1: `MatchSeries` 스키마 추가 + `Match.seriesId` / `Match.gameNumber` / `Room` 프리셋 컬럼
-- [ ] Task 2: 룸 사이즈별 프리셋 테이블 정의 (`packages/types`에 두고 웹·API가 공유) — 팀 수 → 프리셋 목록 → 라운드별 `bestOf`, 예상 게임 수
-- [ ] Task 3: 대진 생성기를 시리즈 기준으로 전환 (`generateSingleMatch`, `generateSingleElimination`, `generatePowerOf2Elimination`) — 시리즈 + 각 시리즈의 1세트 Match 생성, 프리셋 → `bestOf` 해석
-- [ ] Task 4: `match-series.service.ts` 신설 — 시리즈 집계, 클린치 판정, 다음 세트 생성 (`match.service.ts`가 이미 1481줄이라 분리)
-- [ ] Task 5: `reportMatchResult` 분기 — 게임 기록 → 시리즈 집계 → 클린치면 진출 / 아니면 다음 세트 준비. 알림 문구도 "N세트 승리"와 "시리즈 승리" 구분
-- [ ] Task 6: 진출·완주 판정을 시리즈 기준으로 (`advanceWinnerToNextRound`, `checkBracketCompletion`)
-- [ ] Task 7: 최종 순위 집계를 시리즈 승 기준으로 (`emitTournamentCompleted`)
-- [ ] Task 8: 2세트부터 직전 세트 패자에게 진영 선택권 — RPS `side` 페이즈 재사용, 타임아웃 시 자동 스왑
-- [ ] Task 9: 전적 수집 riotMatchId 중복 할당 방지 (아래 "먼저 막아야 할 것" 참고)
-- [ ] Task 10: 방 생성·설정 UI에 프리셋 선택 — 룸 사이즈에 맞는 목록만 노출, 예상 게임 수·시간 표시, 크기 변경 시 재검증/리셋 (`RoomCreationForm`, `RoomSettingsModal`)
-- [ ] Task 11: 서버 측 프리셋 검증 — 팀 수와 프리셋 조합이 유효한지 (`create-room.dto.ts`, `room.service.ts`의 방 설정 수정 경로)
-- [ ] Task 12: 대진표 UI에 시리즈 스코어 — `BracketView`의 `TeamSlot`에 이미 `team.score` 렌더 자리가 있는데 Team 모델엔 `score`가 없어 늘 비어 있다. 그 자리를 그대로 쓴다
-- [ ] Task 13: `MatchDetailModal`에 세트 목록/탭 + 세트별 결과 보고
-- [ ] Task 14: `bracket/page.tsx` 통계 카드를 "총 시리즈 / 총 경기"로 분리, `match-store` 시리즈 상태
-- [ ] Task 15: `bestOf=1` 회귀 검증 — 기존 단판 흐름이 완전히 동일하게 동작하는지
+- [x] Task 1: `MatchSeries` 스키마 추가 + `Match.seriesId` / `Match.gameNumber` / `Room` 프리셋 컬럼
+- [x] Task 2: 룸 사이즈별 프리셋 테이블 정의 (`packages/types`에 두고 웹·API가 공유) — 팀 수 → 프리셋 목록 → 라운드별 `bestOf`, 예상 게임 수
+- [x] Task 3: 대진 생성기를 시리즈 기준으로 전환 (`generateSingleMatch`, `generateSingleElimination`, `generatePowerOf2Elimination`) — 시리즈 + 각 시리즈의 1세트 Match 생성, 프리셋 → `bestOf` 해석
+- [x] Task 4: `match-series.service.ts` 신설 — 시리즈 집계, 클린치 판정, 다음 세트 생성 (`match.service.ts`가 이미 1481줄이라 분리)
+- [x] Task 5: `reportMatchResult` 분기 — 게임 기록 → 시리즈 집계 → 클린치면 진출 / 아니면 다음 세트 준비. 알림 문구도 "N세트 승리"와 "시리즈 승리" 구분
+- [x] Task 6: 진출·완주 판정을 시리즈 기준으로 (`advanceWinnerToNextRound`, `checkBracketCompletion`)
+- [x] Task 7: 최종 순위 집계를 시리즈 승 기준으로 (`emitTournamentCompleted`)
+- [x] Task 8: 2세트부터 직전 세트 패자에게 진영 선택권 — RPS `side` 페이즈 재사용, 타임아웃 시 자동 스왑
+- [x] Task 9: 전적 수집 riotMatchId 중복 할당 방지 (아래 "먼저 막아야 할 것" 참고)
+- [x] Task 10: 방 생성·설정 UI에 프리셋 선택 — 룸 사이즈에 맞는 목록만 노출, 예상 게임 수·시간 표시, 크기 변경 시 재검증/리셋 (`RoomCreationForm`, `RoomSettingsModal`)
+- [x] Task 11: 서버 측 프리셋 검증 — 팀 수와 프리셋 조합이 유효한지 (`create-room.dto.ts`, `room.service.ts`의 방 설정 수정 경로)
+- [x] Task 12: 대진표 UI에 시리즈 스코어 — `BracketView`의 `TeamSlot`에 이미 `team.score` 렌더 자리가 있는데 Team 모델엔 `score`가 없어 늘 비어 있다. 그 자리를 그대로 쓴다
+- [x] Task 13: `MatchDetailModal`에 세트 목록/탭 + 세트별 결과 보고
+- [x] Task 14: `bracket/page.tsx` 통계 카드를 "총 시리즈 / 총 경기"로 분리, `match-store` 시리즈 상태
+- [x] Task 15: `bestOf=1` 회귀 검증 — 기존 단판 흐름이 완전히 동일하게 동작하는지
 
 ### 2단계 — 운영 편의
 
@@ -115,7 +117,9 @@
 
 Riot 퍼스널 키 상황이라 Tournament API가 아니라 PUUID 크로스레퍼런스로 게임을 찾는다. 탐색 창이 `startedAt - 5분 ~ completedAt + 20분`인데([`match-data-collection.service.ts`](../../apps/api/src/modules/match/match-data-collection.service.ts)), 같은 10명이 연달아 3판을 하면 1세트 게임이 2세트 탐색 창에 그대로 들어온다. 게다가 **이미 다른 Match에 할당된 `riotMatchId`를 제외하는 가드가 없다.**
 
-다전제를 켜기 전에 반드시 넣어야 한다 (Task 8). 안 넣으면 세트 2·3의 전적이 세트 1 게임으로 덮어써질 수 있다.
+다전제를 켜기 전에 반드시 넣어야 한다 (Task 9). 안 넣으면 세트 2·3의 전적이 세트 1 게임으로 덮어써질 수 있다.
+
+**처리 완료.** 같은 방의 다른 매치가 이미 가져간 `riotMatchId`는 후보 탐색 단계에서 제외하고(상세 조회도 건너뛰어 API 호출을 아낀다), 저장 직전에 한 번 더 확인한다. 여러 세트의 수집이 동시에 돌 때의 경합까지 막기 위해서다.
 
 ## 엣지 케이스 체크리스트
 
