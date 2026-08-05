@@ -1,6 +1,7 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, Optional } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { RiotMatchService, MatchDto } from "../riot/riot-match.service";
+import { RankingService } from "../ranking/ranking.service";
 import { normalizeRiotPosition } from "./position-normalizer";
 
 type CrossrefExpectedMember = {
@@ -56,6 +57,7 @@ export class MatchDataCollectionService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly riotMatchService: RiotMatchService,
+    @Optional() private readonly rankingService?: RankingService,
   ) {}
 
   private buildExpectedMembers(match: any): CrossrefExpectedMember[] {
@@ -184,10 +186,7 @@ export class MatchDataCollectionService {
     }
 
     const expectedPuuidCount = expectedMembers.length;
-    const requiredMatchedCount =
-      expectedPuuidCount <= 2
-        ? expectedPuuidCount
-        : Math.max(3, Math.ceil(expectedPuuidCount * 0.7));
+    const requiredMatchedCount = expectedPuuidCount;
     const teamAlignedCount = Math.max(blueToA + redToB, blueToB + redToA);
     const teamAlignmentRatio =
       matchedPuuidCount > 0 ? teamAlignedCount / matchedPuuidCount : 0;
@@ -198,7 +197,8 @@ export class MatchDataCollectionService {
     const endMs = this.getRiotMatchEndMs(matchData);
     const timeDeltaMs = endMs ? Math.abs(endMs - completedAt.getTime()) : null;
     const timeOk = timeDeltaMs === null || timeDeltaMs <= 2 * 60 * 60 * 1000;
-    const teamOk = matchedPuuidCount < 4 || teamAlignmentRatio >= 0.75;
+    const teamOk =
+      matchedPuuidCount > 0 && teamAlignedCount === matchedPuuidCount;
 
     const reasons: string[] = [];
     if (!customGameOk) {
@@ -354,42 +354,36 @@ export class MatchDataCollectionService {
         return;
       }
 
-      // Usually there should be only one match per tournament code
-      const riotMatchId = riotMatchIds[0];
+      let lastError: unknown = null;
+      for (const riotMatchId of riotMatchIds) {
+        this.logger.log(`Found Riot match ID: ${riotMatchId}`);
+        const matchData = await this.riotMatchService.getMatchById(
+          riotMatchId,
+          3,
+          "foreground",
+          {
+            emitCacheEvent: false,
+            propagateKnownPuuids: false,
+          },
+        );
+        if (!matchData) continue;
 
-      this.logger.log(`Found Riot match ID: ${riotMatchId}`);
-
-      // Fetch match data
-      const matchData = await this.riotMatchService.getMatchById(
-        riotMatchId,
-        3,
-        "foreground",
-        {
-          emitCacheEvent: false,
-          propagateKnownPuuids: false,
-        },
-      );
-
-      if (!matchData) {
-        this.logger.error(`Failed to fetch match data for ${riotMatchId}`);
-        await this.scheduleRetry(matchId, attemptNumber);
-        return;
+        try {
+          await this.saveMatchData(matchId, match, matchData, riotMatchId);
+          this.clearRetryTimer(matchId);
+          this.logger.log(`Successfully collected data for match ${matchId}`);
+          return;
+        } catch (error) {
+          lastError = error;
+          this.logger.warn(
+            `Riot match ${riotMatchId} did not match Nexus roster; trying the next tournament-code result`,
+          );
+        }
       }
 
-      // Update match with Riot match ID and game duration
-      await this.prisma.match.update({
-        where: { id: matchId },
-        data: {
-          riotMatchId,
-          gameDuration: matchData.info.gameDuration ?? null,
-        },
-      });
-
-      // Save match data
-      await this.saveMatchData(matchId, match, matchData);
-
-      this.clearRetryTimer(matchId);
-      this.logger.log(`Successfully collected data for match ${matchId}`);
+      throw (
+        lastError ?? new Error("No tournament-code match data was readable")
+      );
     } catch (error) {
       this.logger.error(`Error collecting data for match ${matchId}:`, error);
       await this.scheduleRetry(matchId, attemptNumber);
@@ -403,15 +397,15 @@ export class MatchDataCollectionService {
     matchId: string,
     match: any,
     matchData: MatchDto,
+    riotMatchId?: string,
   ): Promise<void> {
     try {
       const teamAId = match.teamAId ?? match.teamA?.id ?? match.teamAIdSnapshot;
       const teamBId = match.teamBId ?? match.teamB?.id ?? match.teamBIdSnapshot;
       if (!teamAId || !teamBId) {
-        this.logger.warn(
-          `Match ${matchId} has incomplete team assignment, skipping data save`,
+        throw new Error(
+          `Match ${matchId} has incomplete team assignment, cannot save data`,
         );
-        return;
       }
 
       // Build PUUID to User mapping
@@ -458,6 +452,31 @@ export class MatchDataCollectionService {
         throw new Error(
           `참가자 매핑 불완전: ${matchedPuuids.size}/${expectedPuuids.size} ` +
             `(누락 PUUID: ${missing.join(", ")}) — 부분 저장을 막기 위해 중단`,
+        );
+      }
+
+      // 같은 참가자라도 다른 사설방 경기일 수 있다. 두 Nexus 팀이 Riot의
+      // 100/200 진영 중 한 방향으로 전원 일치하지 않으면 해당 후보를 저장하지 않는다.
+      let blueToA = 0;
+      let blueToB = 0;
+      let redToA = 0;
+      let redToB = 0;
+      for (const participant of matchData.info.participants) {
+        const expected = puuidToUser.get(participant.puuid);
+        if (!expected) continue;
+        if (participant.teamId === 100) {
+          if (expected.teamId === teamAId) blueToA++;
+          if (expected.teamId === teamBId) blueToB++;
+        } else if (participant.teamId === 200) {
+          if (expected.teamId === teamAId) redToA++;
+          if (expected.teamId === teamBId) redToB++;
+        }
+      }
+      const alignedCount = Math.max(blueToA + redToB, blueToB + redToA);
+      if (alignedCount !== expectedPuuids.size) {
+        throw new Error(
+          `팀 배치 불일치: ${alignedCount}/${expectedPuuids.size} ` +
+            `- 다른 사설방 경기일 수 있어 저장하지 않는다`,
         );
       }
 
@@ -575,14 +594,23 @@ export class MatchDataCollectionService {
 
         await tx.match.update({
           where: { id: matchId },
-          data: { dataCollected: true },
+          data: {
+            dataCollected: true,
+            ...(riotMatchId
+              ? {
+                  riotMatchId,
+                  gameDuration: matchData.info.gameDuration ?? null,
+                }
+              : {}),
+          },
         });
       });
 
+      const affectedUserIds = Array.from(
+        new Set(Array.from(puuidToUser.values()).map(({ userId }) => userId)),
+      );
       await Promise.all(
-        Array.from(
-          new Set(Array.from(puuidToUser.values()).map(({ userId }) => userId)),
-        ).map((userId) =>
+        affectedUserIds.map((userId) =>
           this.prisma.statsRecomputeQueue.upsert({
             where: { userId },
             create: {
@@ -597,6 +625,13 @@ export class MatchDataCollectionService {
           }),
         ),
       );
+      if (this.rankingService) {
+        await Promise.all(
+          affectedUserIds.map((userId) =>
+            this.rankingService!.updateRanking(userId),
+          ),
+        );
+      }
 
       this.logger.log(`Saved match data for match ${matchId}`);
     } catch (error) {
@@ -685,7 +720,12 @@ export class MatchDataCollectionService {
           return;
         }
 
-        await this.saveMatchData(matchId, match, knownMatchData);
+        await this.saveMatchData(
+          matchId,
+          match,
+          knownMatchData,
+          match.riotMatchId,
+        );
         this.clearRetryTimer(`crossref:${matchId}`);
         this.logger.log(
           `[PuuidCrossref] 저장된 Riot 매치로 전적 복구 완료 matchId=${matchId} riotMatchId=${match.riotMatchId}`,
@@ -703,6 +743,20 @@ export class MatchDataCollectionService {
         return;
       }
 
+      const assignedRiotMatches = await this.prisma.match.findMany({
+        where: {
+          id: { not: matchId },
+          isInternal: true,
+          riotMatchId: { not: null },
+        },
+        select: { riotMatchId: true },
+      });
+      const assignedRiotMatchIds = new Set(
+        assignedRiotMatches
+          .map((assigned) => assigned.riotMatchId)
+          .filter((id): id is string => Boolean(id)),
+      );
+
       // 탐색 시간 범위: 게임 시작 5분 전 ~ 종료 20분 후 (Riot API 처리 지연 고려)
       // startedAt이 없으면 completedAt 기준 90분 전으로 fallback
       const completedAt = match.completedAt ?? new Date();
@@ -719,7 +773,7 @@ export class MatchDataCollectionService {
       // 크로스레퍼런스: 멤버를 한 명씩 순회하며 후보를 찾는다.
       //
       // 같은 매치를 치른 사람들이므로 한 명의 매치 목록만 있어도 후보는 나온다.
-      // 실제 검증(참가자 70% 일치 / 팀 배치 정합 / 커스텀 여부 / 종료 시각)은
+      // 실제 검증(연동 참가자 전원 일치 / 팀 배치 정합 / 커스텀 여부 / 종료 시각)은
       // 어차피 매치 상세로 하기 때문에, 여러 명의 목록을 교집합낼 필요가 없다.
       //
       // 이전에는 샘플 3명 목록에 모두 나타나야(minCandidateHits=3) 후보로 인정했는데,
@@ -751,6 +805,7 @@ export class MatchDataCollectionService {
 
         let lookups = 0;
         for (const candidateMatchId of new Set(ids)) {
+          if (assignedRiotMatchIds.has(candidateMatchId)) continue;
           // 앞선 멤버에서 이미 검증에 실패한 매치는 다시 볼 필요가 없다.
           if (inspectedMatchIds.has(candidateMatchId)) continue;
           if (lookups >= MAX_DETAIL_LOOKUPS_PER_MEMBER) break;
@@ -828,16 +883,7 @@ export class MatchDataCollectionService {
         )}`,
       );
 
-      // riotMatchId 저장 후 기존 saveMatchData 재사용
-      await this.prisma.match.update({
-        where: { id: matchId },
-        data: {
-          riotMatchId,
-          gameDuration: matchData.info.gameDuration ?? null,
-        },
-      });
-
-      await this.saveMatchData(matchId, match, matchData);
+      await this.saveMatchData(matchId, match, matchData, riotMatchId);
 
       this.clearRetryTimer(`crossref:${matchId}`);
       this.logger.log(

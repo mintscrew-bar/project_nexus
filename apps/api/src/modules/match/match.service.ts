@@ -19,7 +19,6 @@ import { MatchDataCollectionService } from "./match-data-collection.service";
 import { NotificationService } from "../notification/notification.service";
 import { MatchBracketService, Bracket } from "./match-bracket.service";
 import { MatchAdvancementService } from "./match-advancement.service";
-import { RankingService } from "../ranking/ranking.service";
 import {
   Prisma,
   RoomStatus,
@@ -54,7 +53,6 @@ export class MatchService {
     private readonly notificationService: NotificationService,
     private readonly matchBracketService: MatchBracketService,
     private readonly matchAdvancementService: MatchAdvancementService,
-    private readonly rankingService: RankingService,
     @Optional() @Inject("DISCORD_BOT_SERVICE") discordBot?: any,
     @Optional() @Inject("DISCORD_VOICE_SERVICE") discordVoice?: any,
   ) {
@@ -382,15 +380,10 @@ export class MatchService {
       );
     }
 
-    // Atomic update: only update if still IN_PROGRESS (prevents race condition)
-    const updateResult = await this.prisma.match.updateMany({
-      where: { id: matchId, status: MatchStatus.IN_PROGRESS },
-      data: {
-        status: MatchStatus.COMPLETED,
-        winnerId,
-        completedAt: new Date(),
-      },
-    });
+    const updateResult = await this.completeInternalMatchWithSnapshot(
+      matchId,
+      winnerId,
+    );
 
     if (updateResult.count === 0) {
       throw new BadRequestException(
@@ -407,10 +400,6 @@ export class MatchService {
     if (!updatedMatch) {
       throw new NotFoundException("Match not found after update");
     }
-
-    // 방과 팀은 이후 삭제되거나 재구성될 수 있으므로 결과 확정 시점의 표시 정보와
-    // 참가 명단을 매치에 독립적으로 고정한다.
-    await this.persistInternalMatchSnapshot(matchId);
 
     // 위에서 roomId는 이미 검증됨 — 동일 매치이므로 updatedMatch.roomId도 NULL이 아님
     const roomId = updatedMatch.roomId;
@@ -683,31 +672,6 @@ export class MatchService {
       });
     }
 
-    // Update rankings for all participants (non-blocking)
-    setImmediate(async () => {
-      try {
-        const participantUsers = await this.prisma.teamMember.findMany({
-          where: {
-            teamId: { in: [match.teamAId!, match.teamBId!].filter(Boolean) },
-          },
-          select: { userId: true },
-          distinct: ["userId"],
-        });
-
-        for (const { userId: uid } of participantUsers) {
-          await this.rankingService.updateRanking(uid);
-        }
-        this.logger.log(
-          `Updated rankings for ${participantUsers.length} participants of match ${matchId}`,
-        );
-      } catch (error) {
-        this.logger.error(
-          `Failed to update rankings for match ${matchId}:`,
-          error,
-        );
-      }
-    });
-
     return {
       message: "Match result recorded",
       winnerId,
@@ -903,6 +867,7 @@ export class MatchService {
       OR: [
         { teamA: { members: { some: { userId } } } },
         { teamB: { members: { some: { userId } } } },
+        { rosterSnapshots: { some: { userId } } },
       ],
     };
 
@@ -950,13 +915,63 @@ export class MatchService {
             name: true,
           },
         },
+        rosterSnapshots: {
+          include: {
+            user: {
+              select: { id: true, username: true, avatar: true },
+            },
+          },
+        },
       },
       orderBy: { createdAt: "desc" },
       take: limit,
       skip: offset,
     });
 
-    return matches;
+    const buildSnapshotTeam = (
+      match: (typeof matches)[number],
+      teamSlot: string,
+      id: string | null,
+      name: string | null,
+    ) =>
+      id && name
+        ? {
+            id,
+            name,
+            color: null,
+            captainId: null,
+            members: match.rosterSnapshots
+              .filter((member) => member.teamSlot === teamSlot)
+              .map((member) => ({
+                userId: member.userId,
+                user: member.user ?? {
+                  id: member.userId,
+                  username: member.username,
+                  avatar: null,
+                },
+              })),
+          }
+        : null;
+
+    return matches.map((match) => ({
+      ...match,
+      room:
+        match.room ??
+        (match.roomIdSnapshot && match.roomName
+          ? { id: match.roomIdSnapshot, name: match.roomName }
+          : null),
+      teamA:
+        match.teamA ??
+        buildSnapshotTeam(match, "A", match.teamAIdSnapshot, match.teamAName),
+      teamB:
+        match.teamB ??
+        buildSnapshotTeam(match, "B", match.teamBIdSnapshot, match.teamBName),
+      winner:
+        match.winner ??
+        (match.winnerIdSnapshot && match.winnerName
+          ? { id: match.winnerIdSnapshot, name: match.winnerName }
+          : null),
+    }));
   }
 
   // ========================================
@@ -981,34 +996,15 @@ export class MatchService {
     });
   }
 
-  async updateResult(
+  private async completeInternalMatchWithSnapshot(
     matchId: string,
-    data: {
-      winnerId: string;
-      riotMatchId?: string;
-    },
-  ) {
-    const match = await this.prisma.match.update({
-      where: { id: matchId },
-      data: {
-        winnerId: data.winnerId,
-        riotMatchId: data.riotMatchId,
-        status: "COMPLETED",
-        completedAt: new Date(),
-      },
-    });
-    await this.persistInternalMatchSnapshot(matchId);
-    return match;
-  }
-
-  private async persistInternalMatchSnapshot(matchId: string): Promise<void> {
+    winnerId: string,
+  ): Promise<{ count: number }> {
     const match = await this.prisma.match.findUnique({
       where: { id: matchId },
       include: {
         room: {
-          include: {
-            host: { select: { id: true, username: true } },
-          },
+          include: { host: { select: { id: true, username: true } } },
         },
         teamA: {
           include: {
@@ -1051,7 +1047,11 @@ export class MatchService {
       },
     });
 
-    if (!match?.room || !match.teamA || !match.teamB) return;
+    if (!match?.room || !match.teamA || !match.teamB) {
+      throw new BadRequestException(
+        "Cannot complete an internal match without room and team data",
+      );
+    }
 
     const roster = [
       ...match.teamA.members.map((member) => ({
@@ -1073,14 +1073,16 @@ export class MatchService {
         teamName: match.teamB!.name,
       })),
     ];
-    const winner =
-      match.winnerId === match.teamA.id
-        ? match.teamA
-        : match.winnerId === match.teamB.id
-          ? match.teamB
-          : null;
+    const winner = winnerId === match.teamA.id ? match.teamA : match.teamB;
+    const completedAt = new Date();
 
-    await this.prisma.$transaction(async (tx) => {
+    return this.prisma.$transaction(async (tx) => {
+      const result = await tx.match.updateMany({
+        where: { id: matchId, status: MatchStatus.IN_PROGRESS },
+        data: { status: MatchStatus.COMPLETED, winnerId, completedAt },
+      });
+      if (result.count === 0) return result;
+
       await tx.match.update({
         where: { id: matchId },
         data: {
@@ -1094,14 +1096,15 @@ export class MatchService {
           teamAName: match.teamA!.name,
           teamBIdSnapshot: match.teamB!.id,
           teamBName: match.teamB!.name,
-          winnerIdSnapshot: winner?.id ?? null,
-          winnerName: winner?.name ?? null,
+          winnerIdSnapshot: winner.id,
+          winnerName: winner.name,
         },
       });
       await tx.matchRosterSnapshot.deleteMany({ where: { matchId } });
       if (roster.length > 0) {
         await tx.matchRosterSnapshot.createMany({ data: roster });
       }
+      return result;
     });
   }
 

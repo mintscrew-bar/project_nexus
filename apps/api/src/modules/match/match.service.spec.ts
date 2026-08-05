@@ -8,7 +8,6 @@ import { MatchDataCollectionService } from "./match-data-collection.service";
 import { NotificationService } from "../notification/notification.service";
 import { MatchBracketService } from "./match-bracket.service";
 import { MatchAdvancementService } from "./match-advancement.service";
-import { RankingService } from "../ranking/ranking.service";
 import {
   getChampionKoreanName,
   getSummonerSpellKoreanName,
@@ -74,9 +73,6 @@ describe("MatchService", () => {
       advanceDoubleElimination: jest.fn().mockResolvedValue(undefined),
       checkBracketCompletion: jest.fn().mockResolvedValue(false),
     };
-    const mockRankingService = {
-      updateRanking: jest.fn().mockResolvedValue(undefined),
-    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -98,7 +94,6 @@ describe("MatchService", () => {
           provide: MatchAdvancementService,
           useValue: mockMatchAdvancementService,
         },
-        { provide: RankingService, useValue: mockRankingService },
         // Optional 의존성 — Discord 서비스는 테스트에서 불필요
         { provide: "DISCORD_BOT_SERVICE", useValue: null },
         { provide: "DISCORD_VOICE_SERVICE", useValue: null },
@@ -109,7 +104,7 @@ describe("MatchService", () => {
   });
 
   describe("매치 종료 스냅샷", () => {
-    it("종료 시점의 방, 팀, 승자, 로스터를 매치와 독립적으로 기록한다", async () => {
+    it("상태 전환과 방, 팀, 승자, 로스터를 한 트랜잭션에서 기록한다", async () => {
       prisma.match.findUnique.mockResolvedValue({
         id: "match-1",
         winnerId: "team-a",
@@ -146,9 +141,21 @@ describe("MatchService", () => {
           ],
         },
       });
+      prisma.match.updateMany.mockResolvedValue({ count: 1 });
 
-      await (service as any).persistInternalMatchSnapshot("match-1");
+      await (service as any).completeInternalMatchWithSnapshot(
+        "match-1",
+        "team-a",
+      );
 
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(prisma.match.updateMany).toHaveBeenCalledWith({
+        where: { id: "match-1", status: "IN_PROGRESS" },
+        data: expect.objectContaining({
+          status: "COMPLETED",
+          winnerId: "team-a",
+        }),
+      });
       expect(prisma.match.update).toHaveBeenCalledWith({
         where: { id: "match-1" },
         data: expect.objectContaining({
@@ -175,6 +182,55 @@ describe("MatchService", () => {
           }),
         ]),
       });
+    });
+  });
+
+  describe("getUserMatches", () => {
+    it("방 재사용 뒤에도 로스터 스냅샷으로 내 경기를 복원한다", async () => {
+      prisma.match.findMany.mockResolvedValue([
+        {
+          id: "match-1",
+          room: null,
+          roomIdSnapshot: "room-old",
+          roomName: "지난 내전",
+          teamA: null,
+          teamAIdSnapshot: "team-a",
+          teamAName: "A팀",
+          teamB: null,
+          teamBIdSnapshot: "team-b",
+          teamBName: "B팀",
+          winner: null,
+          winnerIdSnapshot: "team-a",
+          winnerName: "A팀",
+          rosterSnapshots: [
+            {
+              userId: "user-1",
+              username: "선수1",
+              teamSlot: "A",
+              user: { id: "user-1", username: "선수1", avatar: null },
+            },
+          ],
+        },
+      ]);
+
+      const result = await service.getUserMatches("user-1");
+
+      expect(prisma.match.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            OR: expect.arrayContaining([
+              { rosterSnapshots: { some: { userId: "user-1" } } },
+            ]),
+          }),
+        }),
+      );
+      expect(result[0]).toEqual(
+        expect.objectContaining({
+          room: { id: "room-old", name: "지난 내전" },
+          teamA: expect.objectContaining({ id: "team-a", name: "A팀" }),
+          winner: { id: "team-a", name: "A팀" },
+        }),
+      );
     });
   });
 

@@ -155,6 +155,132 @@ export class RoomService {
     await tx.team.deleteMany({ where: { roomId } });
   }
 
+  private async preserveCompletedMatchesForReuse(
+    tx: Prisma.TransactionClient,
+    roomId: string,
+  ) {
+    const room = await tx.room.findUnique({
+      where: { id: roomId },
+      include: { host: { select: { id: true, username: true } } },
+    });
+    if (!room) return;
+
+    const [matches, teams] = await Promise.all([
+      tx.match.findMany({
+        where: { roomId, status: MatchStatus.COMPLETED },
+        select: {
+          id: true,
+          roomName: true,
+          teamAId: true,
+          teamAIdSnapshot: true,
+          teamBId: true,
+          teamBIdSnapshot: true,
+          winnerId: true,
+          winnerIdSnapshot: true,
+          _count: { select: { rosterSnapshots: true } },
+        },
+      }),
+      tx.team.findMany({
+        where: { roomId },
+        include: {
+          members: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  username: true,
+                  riotAccounts: {
+                    where: { isPrimary: true },
+                    take: 1,
+                    select: { puuid: true },
+                  },
+                },
+              },
+            },
+          },
+        },
+      }),
+    ]);
+    const teamsById = new Map(teams.map((team) => [team.id, team]));
+
+    for (const match of matches) {
+      const teamAId = match.teamAId ?? match.teamAIdSnapshot;
+      const teamBId = match.teamBId ?? match.teamBIdSnapshot;
+      const winnerId = match.winnerId ?? match.winnerIdSnapshot;
+      const teamA = teamAId ? teamsById.get(teamAId) : null;
+      const teamB = teamBId ? teamsById.get(teamBId) : null;
+      const winner = winnerId ? teamsById.get(winnerId) : null;
+
+      await tx.match.update({
+        where: { id: match.id },
+        data: {
+          isInternal: true,
+          roomIdSnapshot: room.id,
+          roomName: match.roomName ?? room.name,
+          roomTeamMode: room.teamMode,
+          roomHostId: room.host.id,
+          roomHostName: room.host.username,
+          teamAIdSnapshot: teamAId,
+          teamAName: teamA?.name,
+          teamBIdSnapshot: teamBId,
+          teamBName: teamB?.name,
+          winnerIdSnapshot: winnerId,
+          winnerName: winner?.name,
+          roomId: null,
+          teamAId: null,
+          teamBId: null,
+          winnerId: null,
+        },
+      });
+
+      if (match._count.rosterSnapshots === 0) {
+        const roster = [
+          ...(teamA?.members ?? []).map((member) => ({
+            matchId: match.id,
+            userId: member.userId,
+            username: member.user.username,
+            puuid: member.user.riotAccounts[0]?.puuid ?? null,
+            teamSlot: "A",
+            teamIdSnapshot: teamAId,
+            teamName: teamA?.name ?? "Team A",
+          })),
+          ...(teamB?.members ?? []).map((member) => ({
+            matchId: match.id,
+            userId: member.userId,
+            username: member.user.username,
+            puuid: member.user.riotAccounts[0]?.puuid ?? null,
+            teamSlot: "B",
+            teamIdSnapshot: teamBId,
+            teamName: teamB?.name ?? "Team B",
+          })),
+        ];
+        if (roster.length > 0) {
+          await tx.matchRosterSnapshot.createMany({ data: roster });
+        }
+      }
+
+      for (const [teamId, team] of [
+        [teamAId, teamA],
+        [teamBId, teamB],
+      ] as const) {
+        if (!teamId) continue;
+        const data = {
+          teamIdSnapshot: teamId,
+          teamName: team?.name,
+          teamId: null,
+        };
+        await tx.matchParticipant.updateMany({
+          where: { matchId: match.id, teamId },
+          data,
+        });
+        await tx.matchTeamStats.updateMany({
+          where: { matchId: match.id, teamId },
+          data,
+        });
+      }
+    }
+  }
+
   async deleteRoomData(roomId: string) {
     await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const room = await tx.room.findUnique({
@@ -2298,9 +2424,11 @@ export class RoomService {
         },
       });
 
-      // 매치 데이터 삭제 (전적은 MatchParticipant에 이미 기록됨)
+      await this.preserveCompletedMatchesForReuse(tx, roomId);
+
+      // 완료되지 않은 대진만 폐기한다. 완료 매치는 방과 분리되어 전적으로 남는다.
       await tx.match.deleteMany({
-        where: { roomId },
+        where: { roomId, status: { not: MatchStatus.COMPLETED } },
       });
 
       // 드래프트/경매 데이터 삭제
@@ -2428,8 +2556,9 @@ export class RoomService {
         },
       });
 
+      await this.preserveCompletedMatchesForReuse(tx, roomId);
       await tx.match.deleteMany({
-        where: { roomId },
+        where: { roomId, status: { not: MatchStatus.COMPLETED } },
       });
 
       await tx.snakeDraftPick.deleteMany({

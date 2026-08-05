@@ -182,6 +182,93 @@ describe("RoomService", () => {
     });
   });
 
+  describe("returnToLobby — 완료 기록 보존", () => {
+    it("완료 매치를 분리하고 미완료 대진만 삭제한다", async () => {
+      prisma.room.findUnique
+        .mockResolvedValueOnce({
+          id: "room-1",
+          name: "재사용 방",
+          status: RoomStatus.COMPLETED,
+          teamMode: TeamMode.AUCTION,
+          hostId: "host-1",
+          maxParticipants: 10,
+          participants: [{ userId: "user-a" }],
+          teams: [
+            { captain: { authProviders: [] } },
+            { captain: { authProviders: [] } },
+          ],
+        })
+        .mockResolvedValueOnce({
+          id: "room-1",
+          name: "재사용 방",
+          teamMode: TeamMode.AUCTION,
+          host: { id: "host-1", username: "방장" },
+        })
+        .mockResolvedValueOnce({
+          id: "room-1",
+          hostId: "host-1",
+          participants: [],
+          teams: [],
+        });
+      prisma.match.findMany.mockResolvedValue([
+        {
+          id: "match-completed",
+          roomName: null,
+          teamAId: "team-a",
+          teamAIdSnapshot: null,
+          teamBId: "team-b",
+          teamBIdSnapshot: null,
+          winnerId: "team-a",
+          winnerIdSnapshot: null,
+          _count: { rosterSnapshots: 0 },
+        },
+      ]);
+      prisma.team.findMany.mockResolvedValue([
+        {
+          id: "team-a",
+          name: "A팀",
+          members: [
+            {
+              userId: "user-a",
+              user: { username: "선수A", riotAccounts: [{ puuid: "pa" }] },
+            },
+          ],
+        },
+        {
+          id: "team-b",
+          name: "B팀",
+          members: [
+            {
+              userId: "user-b",
+              user: { username: "선수B", riotAccounts: [{ puuid: "pb" }] },
+            },
+          ],
+        },
+      ]);
+
+      await service.returnToLobby("user-a", "room-1");
+
+      expect(prisma.match.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: "match-completed" },
+          data: expect.objectContaining({
+            roomId: null,
+            teamAId: null,
+            teamBId: null,
+            winnerId: null,
+            winnerIdSnapshot: "team-a",
+          }),
+        }),
+      );
+      expect(prisma.match.deleteMany).toHaveBeenCalledWith({
+        where: {
+          roomId: "room-1",
+          status: { not: "COMPLETED" },
+        },
+      });
+    });
+  });
+
   // ============================================================
   // createRoom — Graceful Shutdown 가드
   // ============================================================
