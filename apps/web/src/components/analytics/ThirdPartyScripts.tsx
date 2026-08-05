@@ -18,20 +18,42 @@ const PRIVATE_ROUTE_PREFIXES = [
   "/auction",
   "/broadcast",
   "/broadcast-control",
+  "/dev",
 ];
+
+const PRIVATE_ROUTE_PATTERNS = [
+  /^\/community\/(?:write|bookmarks)(?:\/|$)/,
+  /^\/community\/[^/]+\/edit(?:\/|$)/,
+  /^\/clans\/create(?:\/|$)/,
+  /^\/clans\/[^/]+\/settings(?:\/|$)/,
+  /^\/tournaments\/[^/]+\/lobby(?:\/|$)/,
+];
+
+const AD_EXCLUDED_ROUTE_PREFIXES = ["/contact", "/privacy", "/terms"];
+
+function matchesRoutePrefix(pathname: string, prefixes: string[]) {
+  return prefixes.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+  );
+}
 
 export function ThirdPartyScripts() {
   const pathname = usePathname();
-  const isPrivateRoute = PRIVATE_ROUTE_PREFIXES.some(
-    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
-  );
+  const isPrivateRoute =
+    matchesRoutePrefix(pathname, PRIVATE_ROUTE_PREFIXES) ||
+    PRIVATE_ROUTE_PATTERNS.some((pattern) => pattern.test(pathname));
 
   if (isPrivateRoute) return null;
+
+  const shouldLoadAds = !matchesRoutePrefix(
+    pathname,
+    AD_EXCLUDED_ROUTE_PREFIXES,
+  );
 
   return (
     <>
       <GoogleAnalytics />
-      <AdSenseScript />
+      {shouldLoadAds && <AdSenseScript />}
       <Suspense fallback={null}>
         <PageViewTracker />
       </Suspense>

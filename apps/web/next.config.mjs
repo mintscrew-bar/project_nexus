@@ -3,6 +3,13 @@
 // XSS/서드파티 스크립트 리스크 완화용 CSP.
 // 우선 Report-Only로 시작 — 실제 차단은 하지 않고 위반만 콘솔/리포트로 수집해
 // 광고(AdSense)·분석(GA)·폰트·소켓 등 누락 도메인을 파악한 뒤 강제(enforce) 전환한다.
+const adsensePreviewFrameAncestors =
+  "frame-ancestors 'self' https://adsense.google.com https://www.google.com";
+const denyFramingHeaders = [
+  { key: "X-Frame-Options", value: "DENY" },
+  { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
+];
+
 const cspReportOnly = [
   "default-src 'self'",
   // Next.js 인라인 스크립트 + AdSense/GA 로더 (초기엔 unsafe-inline/eval 허용, 이후 nonce화 검토)
@@ -21,7 +28,7 @@ const cspReportOnly = [
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",
-  "frame-ancestors 'none'",
+  adsensePreviewFrameAncestors,
   // 동일 출처 Route Handler로 위반을 수집한다. 차단 모드 전환 전 allowlist 근거로 사용한다.
   "report-uri /api/csp-report",
 ].join("; ");
@@ -49,7 +56,11 @@ const uploadRemotePattern = (() => {
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
-  transpilePackages: ["@nexus/types", "@uiw/react-md-editor", "@uiw/react-markdown-preview"],
+  transpilePackages: [
+    "@nexus/types",
+    "@uiw/react-md-editor",
+    "@uiw/react-markdown-preview",
+  ],
   images: {
     remotePatterns: [
       {
@@ -88,11 +99,16 @@ const nextConfig = {
         source: "/(.*)",
         headers: [
           { key: "X-Content-Type-Options", value: "nosniff" },
-          { key: "X-Frame-Options", value: "DENY" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           {
             key: "Permissions-Policy",
             value: "camera=(), microphone=(), geolocation=()",
+          },
+          {
+            // AdSense 자동 광고 미리보기는 사이트를 Google iframe에서 연다.
+            // 공개 페이지는 해당 출처만 허용하고 보호 경로는 아래에서 다시 차단한다.
+            key: "Content-Security-Policy",
+            value: adsensePreviewFrameAncestors,
           },
           {
             key: "Content-Security-Policy-Report-Only",
@@ -102,8 +118,9 @@ const nextConfig = {
       },
       {
         source:
-          "/:path(admin|api|auth|dashboard|profile|settings|role-selection|draft|auction|broadcast|broadcast-control)(.*)",
+          "/:path(admin|api|auth|dashboard|profile|settings|role-selection|draft|auction|broadcast|broadcast-control|dev|dm)(.*)",
         headers: [
+          ...denyFramingHeaders,
           {
             // 인증·개인·관리 화면은 CDN/shared cache에 절대 보관하지 않는다.
             key: "Cache-Control",
@@ -118,6 +135,17 @@ const nextConfig = {
       {
         source: "/community/:path(write|bookmarks)(.*)",
         headers: [
+          ...denyFramingHeaders,
+          {
+            key: "X-Robots-Tag",
+            value: "noindex, nofollow, noarchive",
+          },
+        ],
+      },
+      {
+        source: "/community/:id/edit(.*)",
+        headers: [
+          ...denyFramingHeaders,
           {
             key: "X-Robots-Tag",
             value: "noindex, nofollow, noarchive",
@@ -149,11 +177,26 @@ const nextConfig = {
       {
         source: "/clans/create",
         headers: [
+          ...denyFramingHeaders,
           {
             key: "X-Robots-Tag",
             value: "noindex, nofollow, noarchive",
           },
         ],
+      },
+      {
+        source: "/clans/:id/settings(.*)",
+        headers: [
+          ...denyFramingHeaders,
+          {
+            key: "X-Robots-Tag",
+            value: "noindex, nofollow, noarchive",
+          },
+        ],
+      },
+      {
+        source: "/tournaments/:id/lobby(.*)",
+        headers: denyFramingHeaders,
       },
     ];
   },
