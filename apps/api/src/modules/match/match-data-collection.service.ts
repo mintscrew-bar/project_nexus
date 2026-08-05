@@ -695,6 +695,29 @@ export class MatchDataCollectionService {
         (completedAt.getTime() + 20 * 60 * 1000) / 1000,
       );
 
+      // 같은 방의 다른 매치가 이미 가져간 Riot 게임은 후보에서 제외한다.
+      //
+      // 다전제(3판 2선 등)에서는 같은 10명이 연달아 경기하므로 1세트 게임이
+      // 2세트의 탐색 시간창(시작 5분 전 ~ 종료 20분 후)에도 그대로 잡힌다.
+      // 참가자·커스텀 여부 검증은 모두 통과하기 때문에 시간 근접도만으로는
+      // 같은 riotMatchId가 두 세트에 중복 할당될 수 있다.
+      const claimedRiotMatchIds = match.roomId
+        ? new Set(
+            (
+              await this.prisma.match.findMany({
+                where: {
+                  roomId: match.roomId,
+                  riotMatchId: { not: null },
+                  NOT: { id: matchId },
+                },
+                select: { riotMatchId: true },
+              })
+            )
+              .map((m: { riotMatchId: string | null }) => m.riotMatchId)
+              .filter((id: string | null): id is string => id !== null),
+          )
+        : new Set<string>();
+
       // 크로스레퍼런스: 멤버를 한 명씩 순회하며 후보를 찾는다.
       //
       // 같은 매치를 치른 사람들이므로 한 명의 매치 목록만 있어도 후보는 나온다.
@@ -732,6 +755,8 @@ export class MatchDataCollectionService {
         for (const candidateMatchId of new Set(ids)) {
           // 앞선 멤버에서 이미 검증에 실패한 매치는 다시 볼 필요가 없다.
           if (inspectedMatchIds.has(candidateMatchId)) continue;
+          // 다른 세트가 이미 가져간 게임은 상세 조회조차 하지 않는다 (API 호출 절약).
+          if (claimedRiotMatchIds.has(candidateMatchId)) continue;
           if (lookups >= MAX_DETAIL_LOOKUPS_PER_MEMBER) break;
           inspectedMatchIds.add(candidateMatchId);
           lookups++;
@@ -806,6 +831,26 @@ export class MatchDataCollectionService {
           bestCandidate,
         )}`,
       );
+
+      // 저장 직전 재확인 — 같은 방의 여러 세트가 동시에 수집을 돌면 위 필터를
+      // 통과한 뒤에 다른 세트가 먼저 같은 게임을 확정했을 수 있다.
+      if (match.roomId) {
+        const alreadyClaimed = await this.prisma.match.findFirst({
+          where: {
+            roomId: match.roomId,
+            riotMatchId,
+            NOT: { id: matchId },
+          },
+          select: { id: true },
+        });
+        if (alreadyClaimed) {
+          this.logger.warn(
+            `[PuuidCrossref] Riot 매치 ${riotMatchId}는 이미 매치 ${alreadyClaimed.id}에 할당됨 — matchId=${matchId} 재시도`,
+          );
+          await this.schedulePuuidCrossrefRetry(matchId, attemptNumber);
+          return;
+        }
+      }
 
       // riotMatchId 저장 후 기존 saveMatchData 재사용
       await this.prisma.match.update({

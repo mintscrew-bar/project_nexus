@@ -370,6 +370,9 @@ model Room {
   pickTimeLimit     Int?                  @default(60)
   captainSelection  TeamCaptainSelection? @default(RANDOM)
   bracketFormat     BracketType?          @default(SINGLE_ELIMINATION)
+  // 다전제 프리셋 키 (@nexus/types의 SeriesPreset). NULL/ALL_BO1 = 전 경기 단판.
+  // 룸 사이즈(팀 수)마다 고를 수 있는 프리셋이 달라 대진 생성 시 라운드별 bestOf로 해석된다.
+  seriesPreset      String?
   discordGuildId    String?
   discordCategoryId String?
   startedAt         DateTime?
@@ -382,6 +385,7 @@ model Room {
   updatedAt         DateTime              @updatedAt
   chatMessages      ChatMessage[]
   matches           Match[]
+  matchSeries       MatchSeries[]
   discordChannels   RoomDiscordChannel[]
   participants      RoomParticipant[]
   host              User                  @relation("RoomHost", fields: [hostId], references: [id])
@@ -484,6 +488,9 @@ model Team {
   matchesAsTeamA    Match[]            @relation("TeamA")
   matchesAsTeamB    Match[]            @relation("TeamB")
   wonMatches        Match[]            @relation("MatchWinner")
+  seriesAsTeamA     MatchSeries[]      @relation("SeriesTeamA")
+  seriesAsTeamB     MatchSeries[]      @relation("SeriesTeamB")
+  wonSeries         MatchSeries[]      @relation("SeriesWinner")
   roomParticipants  RoomParticipant[]
   snakeDraftPicks   SnakeDraftPick[]
   members           TeamMember[]
@@ -545,10 +552,46 @@ model AuctionBid {
   @@map("auction_bids")
 }
 
+/// 대진표의 슬롯 하나(= 다전제 시리즈). Match는 그 안의 개별 게임(세트)이다.
+///
+/// bestOf=1이면 시리즈 하나에 Match 하나로 기존 단판과 동일하게 동작한다.
+/// 진출·완주 판정은 시리즈 기준으로 하고, Match에는 round/matchNumber/bracketRound를
+/// 미러링해 두어 방송 오버레이·관리자·전적 수집 같은 읽기 경로를 그대로 둔다.
+model MatchSeries {
+  id           String       @id @default(cuid())
+  roomId       String
+  round        Int
+  matchNumber  Int
+  bracketRound String?
+  bracketType  BracketType?
+  teamAId      String?
+  teamBId      String?
+  /// 선취해야 하는 승수의 기준. 1=단판, 3=3판 2선, 5=5판 3선
+  bestOf       Int          @default(1)
+  winnerId     String?
+  status       MatchStatus  @default(PENDING)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  matches      Match[]
+  room         Room         @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  teamA        Team?        @relation("SeriesTeamA", fields: [teamAId], references: [id])
+  teamB        Team?        @relation("SeriesTeamB", fields: [teamBId], references: [id])
+  winner       Team?        @relation("SeriesWinner", fields: [winnerId], references: [id])
+
+  @@unique([roomId, round, matchNumber])
+  @@index([roomId])
+  @@index([roomId, bracketRound])
+  @@map("match_series")
+}
+
 model Match {
   id             String             @id @default(cuid())
   // 외부(랭크 캐시 인제스트) 매치의 경우 roomId는 NULL — Nexus 내부 토너먼트 매치만 roomId를 가진다.
   roomId         String?
+  // 소속 시리즈. 외부 인제스트 매치와 기존(마이그레이션 이전) 매치는 NULL.
+  seriesId       String?
+  // 시리즈 내 세트 번호 (1부터). 단판이면 항상 1.
+  gameNumber     Int                @default(1)
   teamAId        String?
   teamBId        String?
   winnerId       String?
@@ -585,6 +628,7 @@ model Match {
   participants   MatchParticipant[]
   teamStats      MatchTeamStats[]
   votes          MatchVote[]
+  series         MatchSeries?       @relation(fields: [seriesId], references: [id], onDelete: Cascade)
   room           Room?              @relation(fields: [roomId], references: [id], onDelete: Cascade)
   teamA          Team?              @relation("TeamA", fields: [teamAId], references: [id])
   teamB          Team?              @relation("TeamB", fields: [teamBId], references: [id])
@@ -595,6 +639,7 @@ model Match {
   reports        UserReport[]
 
   @@index([roomId])
+  @@index([seriesId])
   @@index([teamAId])
   @@index([teamBId])
   @@index([status])

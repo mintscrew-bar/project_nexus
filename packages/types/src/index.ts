@@ -241,3 +241,17 @@ export {
 } from './bracket-topology';
 
 export type { BracketSlot, FeederTarget, MatchFeeders } from './bracket-topology';
+
+export {
+  DEFAULT_SERIES_PRESET,
+  getEliminationRoundSizes,
+  resolveSeriesBestOf,
+  winsNeededFor,
+  estimateSeriesGames,
+  getSeriesPresetsForTeamCount,
+  isSeriesPresetAllowed,
+  normalizeSeriesPreset,
+  teamCountForRoomSize,
+} from './series-preset';
+
+export type { SeriesPreset, SeriesPresetInfo } from './series-preset';
