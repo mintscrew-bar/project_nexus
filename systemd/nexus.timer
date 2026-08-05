@@ -1,0 +1,10 @@
+[Unit]
+Description=Restore Nexus containers after WSL startup
+
+[Timer]
+OnStartupSec=20s
+AccuracySec=1s
+Unit=nexus.service
+
+[Install]
+WantedBy=timers.target

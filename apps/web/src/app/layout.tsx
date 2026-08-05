@@ -29,8 +29,10 @@ const websiteJsonLd = {
     "리그 오브 레전드 내전",
     "내전 전적",
     "스크림 관리",
-    "챔피언 통계",
-    "장인 빌드",
+    "롤 내전 경매",
+    "롤 내전 팀 밸런스",
+    "롤 내전 대진표",
+    "디스코드 내전",
   ],
 };
 
@@ -55,10 +57,10 @@ export const metadata: Metadata = {
     "내전 모집",
     "스크림 모집",
     "내전 전적",
-    "챔피언 통계",
-    "장인 빌드",
-    "롤 챔피언 통계",
-    "롤 장인 빌드",
+    "롤 내전 경매",
+    "롤 내전 팀 밸런스",
+    "롤 내전 대진표",
+    "디스코드 내전",
     "클랜",
     "랭킹",
   ],
@@ -122,7 +124,9 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }}
         />
       </head>
-      <body className={`${inter.className} font-sans h-screen flex flex-col overflow-hidden`}>
+      <body
+        className={`${inter.className} font-sans h-screen flex flex-col overflow-hidden`}
+      >
         <Providers>
           <AppShell>{children}</AppShell>
         </Providers>

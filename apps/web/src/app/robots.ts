@@ -16,7 +16,6 @@ export default function robots(): MetadataRoute.Robots {
     "/auction",
     "/draft",
     "/role-selection",
-    "/users",
     "/dm",
     "/community/write",
     "/community/bookmarks",
@@ -31,7 +30,7 @@ export default function robots(): MetadataRoute.Robots {
         allow: [
           "/",
           "/feed.xml",
-          "/*.js",   // JS·CSS 파비콘 수집 허용 (Naver 권고)
+          "/*.js", // JS·CSS 파비콘 수집 허용 (Naver 권고)
           "/*.css",
           "/icons/",
           "/images/",
@@ -41,14 +40,7 @@ export default function robots(): MetadataRoute.Robots {
       // 네이버 검색 로봇(Yeti) — 동일 규칙 명시적 적용
       {
         userAgent: "Yeti",
-        allow: [
-          "/",
-          "/feed.xml",
-          "/*.js",
-          "/*.css",
-          "/icons/",
-          "/images/",
-        ],
+        allow: ["/", "/feed.xml", "/*.js", "/*.css", "/icons/", "/images/"],
         disallow: privateDisallow,
       },
     ],

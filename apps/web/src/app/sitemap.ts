@@ -14,6 +14,12 @@ const staticRoutes = [
   { path: "/guide/records", priority: 0.68, changeFrequency: "monthly" },
   { path: "/guide/resources", priority: 0.8, changeFrequency: "monthly" },
   { path: "/guide/faq", priority: 0.68, changeFrequency: "monthly" },
+  { path: "/matches", priority: 0.9, changeFrequency: "daily" },
+  { path: "/ranking", priority: 0.82, changeFrequency: "daily" },
+  { path: "/community", priority: 0.78, changeFrequency: "daily" },
+  { path: "/clans", priority: 0.72, changeFrequency: "daily" },
+  { path: "/tournaments", priority: 0.72, changeFrequency: "daily" },
+  { path: "/streamers", priority: 0.68, changeFrequency: "hourly" },
   { path: "/contact", priority: 0.45, changeFrequency: "yearly" },
   { path: "/terms", priority: 0.2, changeFrequency: "yearly" },
   { path: "/privacy", priority: 0.2, changeFrequency: "yearly" },
@@ -26,14 +32,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: route.priority,
   }));
 
-  const articleEntries: MetadataRoute.Sitemap = RESOURCE_ARTICLES.map((article) => ({
-    url: absoluteUrl(`/guide/${article.slug}`),
-    lastModified: new Date(article.updatedAt),
-    changeFrequency: "monthly",
-    priority: 0.8,
-  }));
+  const articleEntries: MetadataRoute.Sitemap = RESOURCE_ARTICLES.map(
+    (article) => ({
+      url: absoluteUrl(`/guide/${article.slug}`),
+      lastModified: new Date(article.updatedAt),
+      changeFrequency: "monthly",
+      priority: 0.8,
+    }),
+  );
 
-  // 공개 경기·커뮤니티 데이터가 충분히 축적되기 전까지는 제품 문서만 색인에
-  // 제출한다. 빈 목록·테스트성 UGC가 사이트 전체 품질 평가를 낮추지 않게 한다.
   return [...staticEntries, ...articleEntries];
 }

@@ -164,17 +164,6 @@ const nextConfig = {
         ],
       },
       {
-        // 데이터가 쌓이기 전의 빈 목록·테스트성 UGC는 공개 접근은 유지하되
-        // 검색 색인에서는 제외한다. 큐레이션된 공개 콘텐츠가 축적되면 해제한다.
-        source: "/:path(tournaments|matches|ranking|clans|community)(.*)",
-        headers: [
-          {
-            key: "X-Robots-Tag",
-            value: "noindex, nofollow, noarchive",
-          },
-        ],
-      },
-      {
         source: "/clans/create",
         headers: [
           ...denyFramingHeaders,
