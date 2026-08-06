@@ -10,13 +10,19 @@ import { DiscordBanner } from "@/components/home/DiscordBanner";
 import { AuctionBanner } from "@/components/home/AuctionBanner";
 import { StatsBanner } from "@/components/home/StatsBanner";
 import { CreatorBanner } from "@/components/home/CreatorBanner";
-import { userApi, roomApi, communityApi, statsApi } from "@/lib/api-client";
-import { Card, CardContent, Button, Skeleton, ErrorBoundary } from "@/components/ui";
+import { LiveStreamersSection } from "@/components/home/LiveStreamersSection";
+import {
+  userApi,
+  roomApi,
+  communityApi,
+  statsApi,
+  clanApi,
+} from "@/lib/api-client";
+import { Skeleton, ErrorBoundary } from "@/components/ui";
 import { TierBadge } from "@/components/domain/TierBadge";
 import {
   Trophy,
   Users,
-  TrendingUp,
   MessageSquare,
   Swords,
   ChevronRight,
@@ -28,6 +34,11 @@ import {
   ChevronLeft,
   Flame,
   Megaphone,
+  ArrowRight,
+  Activity,
+  UserRound,
+  PenLine,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -74,6 +85,15 @@ interface PositionStat {
   position: string;
   games: number;
   wins: number;
+}
+
+interface ClanSummary {
+  id: string;
+  name: string;
+  tag: string;
+  accentColor?: string | null;
+  members?: Array<{ id: string }>;
+  _count?: { members: number };
 }
 
 const POSITION_LABEL: Record<string, string> = {
@@ -161,6 +181,253 @@ function GlassCard({
       )}
     >
       {children}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 로그인 홈 히어로 — 랜딩의 시각 언어를 작업 중심 대시보드로 변환
+// ─────────────────────────────────────────────────────────────────────────────
+
+function getTimeGreeting() {
+  const hour = new Date().getHours();
+  if (hour < 6) return "늦은 시간에도 반가워요";
+  if (hour < 12) return "좋은 아침이에요";
+  if (hour < 18) return "오늘도 반가워요";
+  return "좋은 저녁이에요";
+}
+
+function DashboardHero({
+  username,
+  rooms,
+  stats,
+  primaryAccount,
+  clan,
+}: {
+  username: string;
+  rooms: Room[];
+  stats: UserStats | null;
+  primaryAccount: RiotAccount | null;
+  clan: ClanSummary | null;
+}) {
+  const router = useRouter();
+  const clanMemberCount = clan?._count?.members ?? clan?.members?.length ?? 0;
+  const metrics = [
+    {
+      label: "참가 가능한 내전",
+      value: `${rooms.length}개`,
+      detail: rooms.length > 0 ? "지금 참가자를 기다리는 중" : "새 내전을 열어보세요",
+      icon: Swords,
+      color: "text-amber-200",
+      href: "/tournaments",
+    },
+    {
+      label: "내전 기록",
+      value: stats ? `${stats.gamesPlayed}전` : "기록 전",
+      detail:
+        stats && stats.gamesPlayed > 0
+          ? `승률 ${stats.winRate.toFixed(0)}%`
+          : "첫 경기를 시작해보세요",
+      icon: Trophy,
+      color: "text-cyan-200",
+      href: "/profile",
+    },
+    {
+      label: "내 클랜",
+      value: clan ? `[${clan.tag}]` : "미가입",
+      detail: clan ? `${clan.name} · ${clanMemberCount}명` : "함께할 클랜을 찾아보세요",
+      icon: Shield,
+      color: "text-violet-200",
+      href: "/clans",
+    },
+  ];
+
+  return (
+    <section className="relative isolate overflow-hidden rounded-[28px] border border-white/[0.09] bg-[#0b0c11] px-5 py-7 shadow-[0_35px_100px_rgba(0,0,0,0.28)] sm:px-8 sm:py-9 lg:px-10 lg:py-10">
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 -z-20 opacity-60 [background-image:linear-gradient(rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.025)_1px,transparent_1px)] [background-size:44px_44px]"
+      />
+      <div
+        aria-hidden="true"
+        className="absolute -left-24 -top-32 -z-10 h-96 w-96 rounded-full bg-violet-500/20 blur-[120px]"
+      />
+      <div
+        aria-hidden="true"
+        className="absolute -bottom-40 right-0 -z-10 h-96 w-96 rounded-full bg-cyan-400/10 blur-[120px]"
+      />
+
+      <div className="grid gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-end lg:gap-12">
+        <div>
+          <div className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.22em] text-violet-200/75">
+            <Sparkles className="h-3.5 w-3.5" />
+            Nexus command center
+          </div>
+          <h1 className="mt-5 max-w-3xl text-3xl font-black leading-[1.08] tracking-[-0.045em] text-white sm:text-4xl lg:text-5xl">
+            {getTimeGreeting()},
+            <br />
+            <span className="bg-gradient-to-r from-violet-200 via-white to-cyan-200 bg-clip-text text-transparent">
+              {username}님.
+            </span>
+          </h1>
+          <p className="mt-5 max-w-xl text-sm leading-6 text-white/45 sm:text-base sm:leading-7">
+            {rooms.length > 0
+              ? `${rooms.length}개의 내전이 참가자를 기다리고 있습니다. 로비에 합류하거나 직접 새로운 경기를 시작해보세요.`
+              : "현재 모집 중인 내전이 없습니다. 새 로비를 열고 오늘의 경기를 시작해보세요."}
+          </p>
+
+          <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+            <button
+              type="button"
+              onClick={() => router.push("/tournaments")}
+              className="group inline-flex items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-bold text-[#111218] transition-all hover:bg-violet-100"
+            >
+              참가할 내전 찾기
+              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push("/tournaments?create=true")}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-5 py-3 text-sm font-bold text-white/75 transition-colors hover:border-violet-300/25 hover:bg-violet-300/[0.08] hover:text-white"
+            >
+              <Plus className="h-4 w-4" />
+              새 내전 만들기
+            </button>
+          </div>
+
+          <div className="mt-7 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => router.push("/profile")}
+              className="inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.035] px-3 py-1.5 text-xs text-white/50 transition-colors hover:text-white/80"
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />
+              {primaryAccount
+                ? `${primaryAccount.gameName} #${primaryAccount.tagLine}`
+                : "Riot 계정 연결하기"}
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push("/clans")}
+              className="inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.035] px-3 py-1.5 text-xs text-white/50 transition-colors hover:text-white/80"
+            >
+              <span
+                className="h-1.5 w-1.5 rounded-full"
+                style={{ backgroundColor: clan?.accentColor || "#a78bfa" }}
+              />
+              {clan ? `[${clan.tag}] ${clan.name}` : "클랜 찾기"}
+            </button>
+          </div>
+        </div>
+
+        <div className="overflow-hidden rounded-2xl border border-white/[0.08] bg-black/20 backdrop-blur-sm">
+          <div className="flex items-center justify-between border-b border-white/[0.07] px-4 py-3">
+            <div>
+              <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-white/25">
+                Today at nexus
+              </p>
+              <p className="mt-0.5 text-xs font-semibold text-white/70">
+                지금 확인할 항목
+              </p>
+            </div>
+            <Activity className="h-4 w-4 text-emerald-300/70" />
+          </div>
+          <div className="divide-y divide-white/[0.06]">
+            {metrics.map((metric, index) => (
+              <button
+                key={metric.label}
+                type="button"
+                onClick={() => router.push(metric.href)}
+                className="group grid w-full grid-cols-[auto_1fr_auto] items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-white/[0.035]"
+              >
+                <span className="text-[10px] font-bold tabular-nums text-white/20">
+                  0{index + 1}
+                </span>
+                <span className="min-w-0">
+                  <span className="flex items-center gap-2 text-xs font-semibold text-white/65">
+                    <metric.icon className={cn("h-3.5 w-3.5", metric.color)} />
+                    {metric.label}
+                  </span>
+                  <span className="mt-1 block truncate text-[11px] text-white/30">
+                    {metric.detail}
+                  </span>
+                </span>
+                <span className="flex items-center gap-2">
+                  <span className="text-sm font-black tabular-nums text-white/85">
+                    {metric.value}
+                  </span>
+                  <ChevronRight className="h-3.5 w-3.5 text-white/20 transition-transform group-hover:translate-x-0.5 group-hover:text-white/50" />
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function QuickActions({ clan }: { clan: ClanSummary | null }) {
+  const router = useRouter();
+  const actions = [
+    {
+      label: "내전 만들기",
+      description: "새 로비를 열고 참가자를 모집하세요",
+      icon: Plus,
+      href: "/tournaments?create=true",
+      tone: "text-amber-300 bg-amber-300/[0.08] border-amber-300/10",
+    },
+    {
+      label: clan ? "내 클랜" : "클랜 찾기",
+      description: clan ? `[${clan.tag}] ${clan.name}으로 이동` : "함께할 팀을 찾아보세요",
+      icon: Users,
+      href: "/clans",
+      tone: "text-violet-300 bg-violet-300/[0.08] border-violet-300/10",
+    },
+    {
+      label: "내 전적",
+      description: "경기 기록과 플레이 성향을 확인하세요",
+      icon: UserRound,
+      href: "/profile",
+      tone: "text-cyan-300 bg-cyan-300/[0.08] border-cyan-300/10",
+    },
+    {
+      label: "글쓰기",
+      description: "커뮤니티에 새로운 이야기를 남겨보세요",
+      icon: PenLine,
+      href: "/community/write",
+      tone: "text-emerald-300 bg-emerald-300/[0.08] border-emerald-300/10",
+    },
+  ];
+
+  return (
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      {actions.map((action) => (
+        <button
+          key={action.label}
+          type="button"
+          onClick={() => router.push(action.href)}
+          className="group flex items-center gap-3 rounded-2xl border border-white/[0.06] bg-bg-secondary/55 p-4 text-left transition-all hover:-translate-y-0.5 hover:border-violet-400/20 hover:bg-bg-secondary"
+        >
+          <span
+            className={cn(
+              "flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl border",
+              action.tone,
+            )}
+          >
+            <action.icon className="h-5 w-5" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-bold text-text-primary">
+              {action.label}
+            </span>
+            <span className="mt-0.5 block truncate text-[11px] text-text-tertiary">
+              {action.description}
+            </span>
+          </span>
+          <ChevronRight className="h-4 w-4 flex-shrink-0 text-text-tertiary transition-transform group-hover:translate-x-0.5 group-hover:text-violet-400" />
+        </button>
+      ))}
     </div>
   );
 }
@@ -319,7 +586,11 @@ function MyStatsCard({
   const topChampions = championStats.slice(0, 3);
 
   return (
-    <GlassCard>
+    <GlassCard className="relative">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-violet-500/[0.08] blur-[90px]"
+      />
       <CardHeader
         icon={Shield}
         iconColor="bg-violet-500/80"
@@ -328,7 +599,7 @@ function MyStatsCard({
         onAction={() => router.push("/profile")}
       />
 
-      <div className="px-5 pb-5">
+      <div className="relative px-5 pb-5">
         {!primaryAccount ? (
           <div className="flex flex-col items-center justify-center py-8 text-center gap-4">
             <div className="w-14 h-14 rounded-2xl bg-violet-500/10 flex items-center justify-center">
@@ -350,18 +621,18 @@ function MyStatsCard({
             </button>
           </div>
         ) : (
-          <div className="flex flex-col md:flex-row gap-5">
+          <div className="grid gap-4 lg:grid-cols-[minmax(250px,0.8fr)_minmax(300px,1.1fr)_auto]">
             {/* 왼쪽: 계정 정보 */}
-            <div className="flex items-center gap-4 md:w-60 flex-shrink-0">
+            <div className="flex items-center gap-4 rounded-2xl border border-violet-400/10 bg-gradient-to-br from-violet-500/[0.09] to-transparent p-4">
               <TierBadge tier={primaryAccount.tier} size="lg" />
               <div className="min-w-0">
-                <p className="font-semibold text-text-primary truncate text-base">
+                <p className="truncate text-base font-bold text-text-primary">
                   {primaryAccount.gameName}
-                  <span className="text-text-tertiary font-normal text-sm ml-0.5">
+                  <span className="ml-0.5 text-sm font-normal text-text-tertiary">
                     #{primaryAccount.tagLine}
                   </span>
                 </p>
-                <p className="text-xs text-text-secondary mt-0.5">
+                <p className="mt-1 text-xs text-text-secondary">
                   {primaryAccount.tier} {primaryAccount.rank} · {primaryAccount.lp} LP
                 </p>
                 <button
@@ -370,70 +641,74 @@ function MyStatsCard({
                       `/matches/summoner/${encodeURIComponent(primaryAccount.gameName)}/${encodeURIComponent(primaryAccount.tagLine)}`
                     )
                   }
-                  className="text-[11px] text-violet-400/70 hover:text-violet-400 transition-colors flex items-center gap-0.5 mt-1.5"
+                  className="mt-3 flex items-center gap-1 text-[11px] font-semibold text-violet-400/80 transition-colors hover:text-violet-300"
                 >
-                  전적 상세 <ChevronRight className="h-2.5 w-2.5" />
+                  소환사 전적 보기 <ChevronRight className="h-3 w-3" />
                 </button>
               </div>
             </div>
 
-            <div className="w-px bg-white/[0.06] hidden md:block flex-shrink-0" />
-
             {/* 가운데: 내전 통계 */}
-            {stats && (
-              <div className="flex-grow">
-                <div className="grid grid-cols-3 gap-3 mb-3">
-                  <div className="rounded-xl bg-white/[0.03] border border-white/[0.04] p-3 text-center">
-                    <p className="text-[10px] text-text-tertiary mb-1 uppercase tracking-wider">내전</p>
-                    <p className="text-2xl font-bold text-text-primary">{stats.gamesPlayed}</p>
-                  </div>
-                  <div className="rounded-xl bg-white/[0.03] border border-white/[0.04] p-3 text-center">
-                    <p className="text-[10px] text-text-tertiary mb-1 uppercase tracking-wider">승률</p>
-                    <p
-                      className={cn(
-                        "text-2xl font-bold",
-                        winRate >= 50 ? "text-emerald-400" : "text-red-400"
-                      )}
-                    >
-                      {winRate.toFixed(0)}%
-                    </p>
-                  </div>
-                  <div className="rounded-xl bg-white/[0.03] border border-white/[0.04] p-3 text-center">
-                    <p className="text-[10px] text-text-tertiary mb-1 uppercase tracking-wider">승 / 패</p>
-                    <p className="text-lg font-bold">
-                      <span className="text-emerald-400">{stats.wins}</span>
-                      <span className="text-text-tertiary mx-1">/</span>
-                      <span className="text-red-400">{stats.losses}</span>
-                    </p>
-                  </div>
+            <div className="rounded-2xl border border-white/[0.05] bg-white/[0.02] p-4">
+              <div className="grid grid-cols-3 gap-2">
+                <div className="text-center">
+                  <p className="text-[10px] uppercase tracking-wider text-text-tertiary">
+                    내전
+                  </p>
+                  <p className="mt-1 text-2xl font-black tabular-nums text-text-primary">
+                    {stats?.gamesPlayed ?? 0}
+                  </p>
                 </div>
-                {stats.gamesPlayed > 0 && (
-                  <div className="h-1.5 bg-white/[0.04] rounded-full overflow-hidden">
-                    <div
-                      className="h-full rounded-full transition-all duration-500"
-                      style={{
-                        width: `${winRate}%`,
-                        background: "linear-gradient(90deg, #8b5cf6, #6366f1)",
-                      }}
-                    />
-                  </div>
-                )}
+                <div className="border-x border-white/[0.06] text-center">
+                  <p className="text-[10px] uppercase tracking-wider text-text-tertiary">
+                    승률
+                  </p>
+                  <p
+                    className={cn(
+                      "mt-1 text-2xl font-black tabular-nums",
+                      winRate >= 50 ? "text-emerald-400" : "text-red-400",
+                    )}
+                  >
+                    {winRate.toFixed(0)}%
+                  </p>
+                </div>
+                <div className="text-center">
+                  <p className="text-[10px] uppercase tracking-wider text-text-tertiary">
+                    승 / 패
+                  </p>
+                  <p className="mt-2 text-base font-black tabular-nums">
+                    <span className="text-emerald-400">{stats?.wins ?? 0}</span>
+                    <span className="mx-1 text-text-tertiary">/</span>
+                    <span className="text-red-400">{stats?.losses ?? 0}</span>
+                  </p>
+                </div>
               </div>
-            )}
-
-            <div className="w-px bg-white/[0.06] hidden md:block flex-shrink-0" />
+              <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/[0.04]">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-violet-500 to-cyan-400 transition-all duration-500"
+                  style={{ width: `${stats?.gamesPlayed ? winRate : 0}%` }}
+                />
+              </div>
+              <p className="mt-2 text-[10px] text-text-tertiary">
+                {stats?.gamesPlayed
+                  ? `${stats.participations}회 참가 · 총 ${stats.gamesPlayed}경기 기록`
+                  : "내전에 참가하면 승률과 경기 기록이 여기에 쌓입니다."}
+              </p>
+            </div>
 
             {/* 오른쪽: 포지션 + 챔피언 */}
-            <div className="flex gap-6 md:flex-shrink-0">
+            <div className="flex min-w-[220px] gap-6 rounded-2xl border border-white/[0.05] bg-white/[0.02] p-4">
               {topPositions.length > 0 && (
                 <div>
-                  <p className="text-[10px] text-text-tertiary mb-2 uppercase tracking-wider">포지션</p>
+                  <p className="mb-2 text-[10px] uppercase tracking-wider text-text-tertiary">
+                    포지션
+                  </p>
                   <div className="flex flex-col gap-1.5">
                     {topPositions.map((pos, i) => (
                       <span
                         key={pos.position}
                         className={cn(
-                          "px-3 py-1 rounded-lg text-xs font-medium",
+                          "rounded-lg px-3 py-1 text-xs font-medium",
                           i === 0
                             ? "bg-violet-500/15 text-violet-400"
                             : "bg-white/[0.04] text-text-secondary"
@@ -447,13 +722,18 @@ function MyStatsCard({
               )}
               {topChampions.length > 0 && (
                 <div>
-                  <p className="text-[10px] text-text-tertiary mb-2 uppercase tracking-wider">챔피언</p>
+                  <p className="mb-2 text-[10px] uppercase tracking-wider text-text-tertiary">
+                    챔피언
+                  </p>
                   <div className="flex gap-3">
                     {topChampions.map((champ) => {
                       const wr =
                         champ.games > 0 ? Math.round((champ.wins / champ.games) * 100) : 0;
                       return (
-                        <div key={champ.championId} className="flex flex-col items-center gap-1.5">
+                        <div
+                          key={champ.championId}
+                          className="flex flex-col items-center gap-1.5"
+                        >
                           <Image
                             src={`/icons/champions/${champ.championName}.png`}
                             alt={champ.championName}
@@ -464,11 +744,18 @@ function MyStatsCard({
                               e.currentTarget.style.display = "none";
                             }}
                           />
-                          <span className="text-[10px] text-text-tertiary">{wr}%</span>
+                          <span className="text-[10px] font-semibold text-text-tertiary">
+                            {wr}%
+                          </span>
                         </div>
                       );
                     })}
                   </div>
+                </div>
+              )}
+              {topPositions.length === 0 && topChampions.length === 0 && (
+                <div className="flex flex-1 items-center justify-center text-center text-xs leading-5 text-text-tertiary">
+                  경기를 기록하면 선호 포지션과 챔피언이 표시됩니다.
                 </div>
               )}
             </div>
@@ -745,14 +1032,24 @@ function NoticePostsCard({ posts }: { posts: Post[] }) {
 function DashboardSkeleton() {
   return (
     <div className="space-y-6">
-      {/* 배너 */}
-      <div className="relative overflow-hidden rounded-2xl bg-white/[0.03] border border-white/[0.06] min-h-[180px] md:min-h-[220px] p-7 md:p-10">
-        <div className="max-w-lg space-y-3">
+      {/* 작업 중심 히어로 */}
+      <div className="relative min-h-[360px] overflow-hidden rounded-[28px] border border-white/[0.06] bg-white/[0.03] p-7 md:p-10">
+        <div className="max-w-xl space-y-4">
           <Skeleton className="h-6 w-16 rounded-full" />
-          <Skeleton className="h-8 w-64" />
-          <Skeleton className="h-4 w-80" />
-          <Skeleton className="h-10 w-32 rounded-xl mt-2" />
+          <Skeleton className="h-10 w-72" />
+          <Skeleton className="h-10 w-56" />
+          <Skeleton className="h-4 w-full max-w-md" />
+          <div className="flex gap-3 pt-2">
+            <Skeleton className="h-11 w-36 rounded-xl" />
+            <Skeleton className="h-11 w-36 rounded-xl" />
+          </div>
         </div>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {[1, 2, 3, 4].map((i) => (
+          <Skeleton key={i} className="h-[78px] rounded-2xl" />
+        ))}
       </div>
 
       {/* 내 전적 */}
@@ -831,15 +1128,15 @@ export function DashboardContent() {
 
   const enabled = isAuthenticated && !!user?.id;
 
-  const { data: userStats = null } = useQuery<UserStats | null>({
-    queryKey: ["dashboard", "userStats"],
+  const { data: userStats = null, isLoading: isStatsLoading } = useQuery<UserStats | null>({
+    queryKey: ["dashboard", "userStats", user?.id],
     queryFn: () => userApi.getStats(),
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
     enabled,
   });
 
-  const { data: rooms = [] } = useQuery<Room[]>({
+  const { data: rooms = [], isLoading: isRoomsLoading } = useQuery<Room[]>({
     queryKey: ["dashboard", "rooms"],
     queryFn: async () => {
       const data = await roomApi.getRooms({ status: "WAITING" });
@@ -851,7 +1148,7 @@ export function DashboardContent() {
     enabled,
   });
 
-  const { data: popularPosts = [] } = useQuery<Post[]>({
+  const { data: popularPosts = [], isLoading: isPopularPostsLoading } = useQuery<Post[]>({
     queryKey: ["dashboard", "popularPosts"],
     queryFn: async () => {
       const data = await communityApi.getPosts({ limit: 20 });
@@ -863,7 +1160,7 @@ export function DashboardContent() {
     enabled,
   });
 
-  const { data: noticePosts = [] } = useQuery<Post[]>({
+  const { data: noticePosts = [], isLoading: isNoticePostsLoading } = useQuery<Post[]>({
     queryKey: ["dashboard", "noticePosts"],
     queryFn: async () => {
       const data = await communityApi.getPosts({ category: "NOTICE", limit: 5 });
@@ -899,10 +1196,21 @@ export function DashboardContent() {
     enabled,
   });
 
-  // 6개 쿼리 중 하나라도 로딩 중이면 스켈레톤 표시
-  const isDataLoading = enabled && (
-    userStats === null && rooms.length === 0 && popularPosts.length === 0
-  );
+  const { data: myClan = null, isLoading: isClanLoading } = useQuery<ClanSummary | null>({
+    queryKey: ["clans", "my", user?.id],
+    queryFn: () => clanApi.getMyClan().catch(() => null),
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    enabled,
+  });
+
+  const isDataLoading =
+    enabled &&
+    (isStatsLoading ||
+      isRoomsLoading ||
+      isPopularPostsLoading ||
+      isNoticePostsLoading ||
+      isClanLoading);
 
   if (isDataLoading) {
     return <DashboardSkeleton />;
@@ -910,6 +1218,24 @@ export function DashboardContent() {
 
   return (
     <div className="space-y-6">
+      <DashboardHero
+        username={user?.username || "플레이어"}
+        rooms={rooms}
+        stats={userStats}
+        primaryAccount={primaryAccount}
+        clan={myClan}
+      />
+
+      <QuickActions clan={myClan} />
+
+      {/* 방송 중인 스트리머가 있을 때만 나타나는 섹션 */}
+      <ErrorBoundary>
+        <LiveStreamersSection />
+      </ErrorBoundary>
+
+      {/* 모집중인 내전 */}
+      <ActiveRoomsCard rooms={rooms} />
+
       {/* 내 전적 */}
       <div data-tour="home-my-stats">
         <MyStatsCard
@@ -919,9 +1245,6 @@ export function DashboardContent() {
           positionStats={positionStats}
         />
       </div>
-
-      {/* 모집중인 내전 */}
-      <ActiveRoomsCard rooms={rooms} />
 
       {/* 인기글 + 공지사항 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

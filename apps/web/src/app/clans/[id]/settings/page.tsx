@@ -5,6 +5,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import Image from "next/image";
 import {
   ClanEmblem,
@@ -274,6 +275,7 @@ export default function ClanSettingsPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const { addToast } = useToast();
+  const queryClient = useQueryClient();
   const debouncedInviteSearchQuery = useDebounce(inviteSearchQuery, 250);
 
   // ─────────────────────────────────────────────────────────────
@@ -416,7 +418,7 @@ export default function ClanSettingsPage() {
       const payload: {
         name?: string;
         description?: string;
-        discord?: string;
+        discord?: string | null;
         isRecruiting?: boolean;
         minTier?: string;
         maxMembers?: number;
@@ -427,7 +429,7 @@ export default function ClanSettingsPage() {
         officerCanManageInvitations?: boolean;
       } = {
         description: description.trim() || undefined,
-        discord: discord.trim() || undefined,
+        discord: discord.trim() || null,
         isRecruiting,
         accentColor,
       };
@@ -574,6 +576,7 @@ export default function ClanSettingsPage() {
   const handleDeleteClan = async () => {
     try {
       await clanApi.deleteClan(clanId);
+      await queryClient.invalidateQueries({ queryKey: ["clans", "my"] });
       addToast("클랜이 해체되었습니다.", "info");
       router.push("/clans");
     } catch (err: any) {
@@ -1036,6 +1039,9 @@ export default function ClanSettingsPage() {
                     placeholder="https://discord.gg/..."
                     className="mt-1"
                   />
+                  <p className="mt-1 text-xs text-text-tertiary">
+                    봇 설치 없이 서버 전체 인원과 온라인 인원의 근사치를 표시합니다.
+                  </p>
                 </div>
 
                 {/* 모집 여부 */}

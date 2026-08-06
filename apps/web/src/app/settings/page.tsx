@@ -229,7 +229,12 @@ export default function SettingsPage() {
 
   // 밴/제재 상태일 때 최근 이의신청 조회
   useEffect(() => {
-    if (!isLoading && isAuthenticated && user && (user.isBanned || user.isRestricted)) {
+    if (
+      !isLoading &&
+      isAuthenticated &&
+      user &&
+      (user.isBanned || user.isRestricted)
+    ) {
       appealApi
         .getLatest()
         .then((data) => {
@@ -250,51 +255,47 @@ export default function SettingsPage() {
 
     setSettingsLoading(true);
 
-      userApi
-        .getSettings()
-        .then((data) => {
-          if (!isMounted) return;
-          const serverTheme = isPersistedTheme(data.theme)
-            ? data.theme
-            : "dark";
-          const storedTheme = getStoredThemePreference();
-          const savedTheme = storedTheme ?? serverTheme;
-          setSettings({
-            notifyFriendRequest: data.notifyFriendRequest ?? true,
-            notifyFriendAccepted: data.notifyFriendAccepted ?? true,
-            notifyMatchStart: data.notifyMatchStart ?? true,
-            notifyMatchResult: data.notifyMatchResult ?? true,
-            notifyTeamInvite: data.notifyTeamInvite ?? true,
-            notifyMention: data.notifyMention ?? true,
-            notifyComment: data.notifyComment ?? true,
-            notifyClanActivity: data.notifyClanActivity ?? true,
-            notifySystem: data.notifySystem ?? true,
-            showOnlineStatus: data.showOnlineStatus ?? true,
-            showRiotAccounts: data.showRiotAccounts ?? true,
-            showChampionStats: data.showChampionStats ?? true,
-            allowFriendRequests: data.allowFriendRequests ?? true,
-            highlightChampionId: data.highlightChampionId ?? null,
-            highlightStatType: data.highlightStatType ?? null,
-            theme: savedTheme,
-          });
-          // 브라우저에 명시적으로 저장된 테마가 있으면 서버의 오래된 기본값보다 우선한다.
-          setNextTheme(savedTheme);
-          if (storedTheme && storedTheme !== serverTheme) {
-            void userApi
-              .updateSettings({ theme: storedTheme })
-              .catch((error) => {
-                console.error("Theme settings sync error:", error);
-              });
-          }
-        })
-        .catch((err) => {
-          console.error("Failed to fetch settings:", err);
-        })
-        .finally(() => {
-          if (isMounted) {
-            setSettingsLoading(false);
-          }
+    userApi
+      .getSettings()
+      .then((data) => {
+        if (!isMounted) return;
+        const serverTheme = isPersistedTheme(data.theme) ? data.theme : "dark";
+        const storedTheme = getStoredThemePreference();
+        const savedTheme = storedTheme ?? serverTheme;
+        setSettings({
+          notifyFriendRequest: data.notifyFriendRequest ?? true,
+          notifyFriendAccepted: data.notifyFriendAccepted ?? true,
+          notifyMatchStart: data.notifyMatchStart ?? true,
+          notifyMatchResult: data.notifyMatchResult ?? true,
+          notifyTeamInvite: data.notifyTeamInvite ?? true,
+          notifyMention: data.notifyMention ?? true,
+          notifyComment: data.notifyComment ?? true,
+          notifyClanActivity: data.notifyClanActivity ?? true,
+          notifySystem: data.notifySystem ?? true,
+          showOnlineStatus: data.showOnlineStatus ?? true,
+          showRiotAccounts: data.showRiotAccounts ?? true,
+          showChampionStats: data.showChampionStats ?? true,
+          allowFriendRequests: data.allowFriendRequests ?? true,
+          highlightChampionId: data.highlightChampionId ?? null,
+          highlightStatType: data.highlightStatType ?? null,
+          theme: savedTheme,
         });
+        // 브라우저에 명시적으로 저장된 테마가 있으면 서버의 오래된 기본값보다 우선한다.
+        setNextTheme(savedTheme);
+        if (storedTheme && storedTheme !== serverTheme) {
+          void userApi.updateSettings({ theme: storedTheme }).catch((error) => {
+            console.error("Theme settings sync error:", error);
+          });
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to fetch settings:", err);
+      })
+      .finally(() => {
+        if (isMounted) {
+          setSettingsLoading(false);
+        }
+      });
 
     return () => {
       isMounted = false;
@@ -585,8 +586,8 @@ export default function SettingsPage() {
                     <CardTitle>내 디스코드 서버에 봇 추가</CardTitle>
                     <p className="text-sm text-text-secondary mt-1">
                       봇을 내 서버에 추가하면, 그 서버에서 내전 음성 채널이 자동
-                      생성됩니다. 이미 봇이 참여 중이고 내가 관리하는 서버도 함께
-                      자동 연동됩니다.
+                      생성됩니다. 이미 봇이 참여 중이고 내가 관리하는 서버도
+                      함께 자동 연동됩니다.
                     </p>
                   </CardHeader>
                   <CardContent>

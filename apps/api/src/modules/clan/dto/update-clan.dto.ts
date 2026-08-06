@@ -59,7 +59,7 @@ export class UpdateClanDto {
   @IsOptional()
   @IsString()
   @MaxLength(200)
-  discord?: string;
+  discord?: string | null;
 
   /** 클랜 로고 이미지 URL */
   @IsOptional()

@@ -18,6 +18,10 @@ import {
   NotificationType,
 } from "@nexus/database";
 import { NotificationService } from "../notification/notification.service";
+import {
+  DiscordInviteStatsService,
+  extractDiscordInviteCode,
+} from "./discord-invite-stats.service";
 
 export interface CreateClanDto {
   name: string;
@@ -66,6 +70,7 @@ export class ClanService {
     private readonly prisma: PrismaService,
     @Inject(forwardRef(() => NotificationService))
     private readonly notificationService: NotificationService,
+    private readonly discordInviteStatsService: DiscordInviteStatsService,
   ) {}
 
   private canManageSettings(role: ClanRole, permissions: OfficerPermissions) {
@@ -131,6 +136,10 @@ export class ClanService {
   // ========================================
 
   async createClan(ownerId: string, dto: CreateClanDto) {
+    if (dto.discord && !extractDiscordInviteCode(dto.discord)) {
+      throw new BadRequestException("올바른 Discord 초대 링크를 입력해주세요.");
+    }
+
     // Check if user is already in a clan
     const existingMembership = await this.prisma.clanMember.findFirst({
       where: { userId: ownerId },
@@ -350,6 +359,10 @@ export class ClanService {
       );
     }
 
+    if (dto.discord && !extractDiscordInviteCode(dto.discord)) {
+      throw new BadRequestException("올바른 Discord 초대 링크를 입력해주세요.");
+    }
+
     const ownerOnlyFieldsChanged =
       dto.name !== undefined ||
       dto.minTier !== undefined ||
@@ -433,6 +446,20 @@ export class ClanService {
         dto.officerCanManageInvitations ??
         permissions.officerCanManageInvitations,
     };
+  }
+
+  async getDiscordInviteStats(clanId: string) {
+    const clan = await this.prisma.clan.findUnique({
+      where: { id: clanId },
+      select: { discord: true },
+    });
+
+    if (!clan) throw new NotFoundException("Clan not found");
+    if (!clan.discord) {
+      return { available: false, checkedAt: new Date().toISOString() };
+    }
+
+    return this.discordInviteStatsService.getStats(clan.discord);
   }
 
   async deleteClan(userId: string, clanId: string) {

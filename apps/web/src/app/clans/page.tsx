@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState, useCallback } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Image from "next/image";
 import { useAuthStore } from "@/stores/auth-store";
 import { clanApi } from "@/lib/api-client";
@@ -33,6 +34,7 @@ import {
 } from "@/app/tournaments/[id]/lobby/_components/icons";
 import { ClanEmblem, ClanTag } from "@/components/domain/ClanEmblem";
 import { ClansTour } from "@/components/onboarding/PrimaryPageTours";
+import ClanDetailClient from "./[id]/_ClanDetailClient";
 
 interface Clan {
   id: string;
@@ -190,8 +192,13 @@ function JoinByCodeModal({ isOpen, onClose, onSuccess }: JoinByCodeModalProps) {
 // ─────────────────────────────────────────────────────────────
 // 메인 페이지 컴포넌트
 // ─────────────────────────────────────────────────────────────
-export default function ClansPage() {
+interface ClanExplorerProps {
+  knownHasMyClan?: boolean;
+}
+
+function ClanExplorer({ knownHasMyClan }: ClanExplorerProps = {}) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { isAuthenticated } = useAuthStore();
 
   const [clans, setClans] = useState<Clan[]>([]);
@@ -207,7 +214,9 @@ export default function ClansPage() {
   // 초대 코드로 가입 모달 표시 여부
   const [showJoinByCodeModal, setShowJoinByCodeModal] = useState(false);
   // 내 클랜 가입 여부 — 가입돼 있으면 만들기 버튼 숨김
-  const [hasMyClan, setHasMyClan] = useState<boolean | null>(null);
+  const [hasMyClan, setHasMyClan] = useState<boolean | null>(
+    knownHasMyClan ?? null,
+  );
   const { addToast } = useToast();
 
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
@@ -252,6 +261,10 @@ export default function ClansPage() {
 
   // 내 클랜 가입 여부 조회 (만들기 버튼 노출 조건)
   useEffect(() => {
+    if (knownHasMyClan !== undefined) {
+      setHasMyClan(knownHasMyClan);
+      return;
+    }
     if (!isAuthenticated) {
       setHasMyClan(false);
       return;
@@ -260,7 +273,7 @@ export default function ClansPage() {
       .getMyClan()
       .then((c) => setHasMyClan(!!c))
       .catch(() => setHasMyClan(false));
-  }, [isAuthenticated]);
+  }, [isAuthenticated, knownHasMyClan]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -276,6 +289,7 @@ export default function ClansPage() {
     setJoiningClanId(clanId);
     try {
       await clanApi.joinClan(clanId);
+      await queryClient.invalidateQueries({ queryKey: ["clans", "my"] });
       addToast("클랜에 가입되었습니다.", "success");
       fetchClans();
     } catch (err: any) {
@@ -339,8 +353,18 @@ export default function ClansPage() {
     <>
       <ClansTour />
       <div className="flex-grow p-4 md:p-6 animate-fade-in">
-        <div className="container mx-auto max-w-5xl">
-          <h1 className="sr-only">클랜 브라우저</h1>
+        <div className="container mx-auto max-w-[1600px]">
+          <div className="mb-6">
+            <p className="text-xs font-semibold uppercase tracking-wider text-text-tertiary">
+              Clan discovery
+            </p>
+            <h1 className="text-2xl font-bold text-text-primary">
+              클랜 둘러보기
+            </h1>
+            <p className="mt-1 text-sm text-text-secondary">
+              활동 중인 클랜을 살펴보고 나에게 맞는 클랜을 찾아보세요.
+            </p>
+          </div>
           {/* 검색 & 필터 */}
           <div data-tour="clans-filters" className="flex flex-col gap-3 mb-6">
             <form onSubmit={handleSearch} className="flex-grow flex gap-2">
@@ -412,6 +436,17 @@ export default function ClansPage() {
                 </Button>
               )}
 
+              {isAuthenticated && hasMyClan && (
+                <Button
+                  variant="primary"
+                  onClick={() => router.push("/clans")}
+                  className="w-full sm:w-auto"
+                >
+                  <Shield className="h-4 w-4 mr-2" />
+                  내 클랜
+                </Button>
+              )}
+
               {/* 클랜 만들기 — 가입한 클랜 없을 때만 노출 */}
               {isAuthenticated && hasMyClan === false && (
                 <Button
@@ -471,8 +506,8 @@ export default function ClansPage() {
           {/* 스켈레톤 로딩 */}
           <div data-tour="clans-results">
           {isLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {Array.from({ length: 6 }).map((_, i) => (
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-[repeat(auto-fill,minmax(340px,1fr))]">
+              {Array.from({ length: 8 }).map((_, i) => (
                 <ClanCardSkeleton key={i} />
               ))}
             </div>
@@ -496,7 +531,7 @@ export default function ClansPage() {
               }
             />
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 stagger-children">
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-[repeat(auto-fill,minmax(340px,1fr))] stagger-children">
               {clans.map((clan) => {
                 const memberCount = clan._count.members;
                 const isFull = memberCount >= clan.maxMembers;
@@ -626,7 +661,7 @@ export default function ClansPage() {
                       </div>
 
                       {/* 가입 버튼 */}
-                      {isAuthenticated && (
+                      {isAuthenticated && hasMyClan === false && (
                         <div className="mt-3">
                           {clan.isRecruiting && !isFull ? (
                             <Button
@@ -682,8 +717,58 @@ export default function ClansPage() {
       <JoinByCodeModal
         isOpen={showJoinByCodeModal}
         onClose={() => setShowJoinByCodeModal(false)}
-        onSuccess={fetchClans}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ["clans", "my"] });
+          fetchClans();
+        }}
       />
     </>
+  );
+}
+
+function ClanHomeSkeleton() {
+  return (
+    <div className="flex flex-grow items-center justify-center p-8">
+      <div className="w-full max-w-7xl space-y-6">
+        <Skeleton className="h-48 w-full rounded-2xl" />
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Skeleton className="h-72 w-full rounded-xl" />
+          <Skeleton className="h-72 w-full rounded-xl" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ClansPageContent() {
+  const { isAuthenticated, user } = useAuthStore();
+  const searchParams = useSearchParams();
+  const forceExplore = searchParams.get("view") === "explore";
+  const { data: myClan, isLoading } = useQuery<{ id: string } | null>({
+    queryKey: ["clans", "my", user?.id],
+    queryFn: () => clanApi.getMyClan().catch(() => null),
+    enabled: isAuthenticated,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+
+  if (isAuthenticated && isLoading) {
+    return <ClanHomeSkeleton />;
+  }
+
+  if (isAuthenticated && myClan && !forceExplore) {
+    return <ClanDetailClient clanIdOverride={myClan.id} isClanHome />;
+  }
+
+  return (
+    <ClanExplorer knownHasMyClan={Boolean(isAuthenticated && myClan)} />
+  );
+}
+
+export default function ClansPage() {
+  return (
+    <Suspense fallback={<ClanHomeSkeleton />}>
+      <ClansPageContent />
+    </Suspense>
   );
 }
