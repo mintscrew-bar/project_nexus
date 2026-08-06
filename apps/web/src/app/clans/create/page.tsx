@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import Image from "next/image";
 import { useAuthStore } from "@/stores/auth-store";
 import { clanApi } from "@/lib/api-client";
@@ -40,6 +41,7 @@ function getCounterColor(current: number, max: number): string {
 
 export default function CreateClanPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { isAuthenticated, isLoading: authLoading } = useAuthStore();
 
   const [name, setName] = useState("");
@@ -124,6 +126,9 @@ export default function CreateClanPage() {
       if (bannerFile) {
         await clanApi.uploadClanBanner(clan.id, bannerFile).catch(() => null);
       }
+      // 내 클랜 캐시를 비운다. staleTime이 5분이라 이걸 안 하면
+      // 생성 직후 /clans로 가도 내 클랜 홈이 아니라 둘러보기가 뜬다.
+      await queryClient.invalidateQueries({ queryKey: ["clans", "my"] });
       router.push(`/clans/${clan.id}`);
     } catch (err: any) {
       setError(

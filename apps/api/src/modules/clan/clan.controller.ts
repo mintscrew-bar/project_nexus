@@ -93,6 +93,12 @@ export class ClanController {
     return this.clanService.getClanStats(clanId);
   }
 
+  @Get(":id/discord-stats")
+  @Public()
+  async getDiscordStats(@Param("id") clanId: string) {
+    return this.clanService.getDiscordInviteStats(clanId);
+  }
+
   // 부분 업데이트이므로 Patch 사용
   @Patch(":id")
   async updateClan(

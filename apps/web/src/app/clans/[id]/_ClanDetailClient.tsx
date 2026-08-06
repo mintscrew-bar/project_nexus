@@ -65,6 +65,7 @@ import {
   Plus,
   Trash2,
   KeyRound,
+  Compass,
 } from "lucide-react";
 
 const ClanChat = dynamic(
@@ -525,10 +526,18 @@ function JoinByCodeModal({ isOpen, onClose, onSuccess }: JoinByCodeModalProps) {
 // ─────────────────────────────────────────────────────────────
 // 메인 페이지 컴포넌트
 // ─────────────────────────────────────────────────────────────
-export default function ClanDetailClient() {
+interface ClanDetailClientProps {
+  clanIdOverride?: string;
+  isClanHome?: boolean;
+}
+
+export default function ClanDetailClient({
+  clanIdOverride,
+  isClanHome = false,
+}: ClanDetailClientProps = {}) {
   const params = useParams();
   const router = useRouter();
-  const clanId = params.id as string;
+  const clanId = clanIdOverride ?? (params.id as string);
   const user = useAuthStore(state => state.user);
   const isAuthenticated = useAuthStore(state => state.isAuthenticated);
   // presence-store에서 온라인 상태 조회
@@ -542,6 +551,16 @@ export default function ClanDetailClient() {
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [showJoinByCodeModal, setShowJoinByCodeModal] = useState(false);
   const { addToast } = useToast();
+  const queryClient = useQueryClient();
+
+  const { data: discordStats } = useQuery({
+    queryKey: ["clanDiscordStats", clanId, clan?.discord],
+    queryFn: () => clanApi.getDiscordStats(clanId),
+    enabled: Boolean(clan?.discord),
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    retry: 1,
+  });
 
   const fetchClan = useCallback(async () => {
     setIsLoading(true);
@@ -576,6 +595,7 @@ export default function ClanDetailClient() {
     }
     try {
       await clanApi.joinClan(clanId);
+      await queryClient.invalidateQueries({ queryKey: ["clans", "my"] });
       addToast("클랜에 가입되었습니다.", "success");
       fetchClan();
     } catch (err: any) {
@@ -601,6 +621,7 @@ export default function ClanDetailClient() {
   const handleLeaveClan = async () => {
     try {
       await clanApi.leaveClan(clanId);
+      await queryClient.invalidateQueries({ queryKey: ["clans", "my"] });
       addToast("클랜을 탈퇴했습니다.", "info");
       router.push("/clans");
     } catch (err: any) {
@@ -658,7 +679,26 @@ export default function ClanDetailClient() {
   return (
     <>
       <div className="flex-grow p-4 md:p-8 animate-fade-in">
-        <div className="container mx-auto max-w-4xl">
+        <div className="container mx-auto max-w-7xl">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-text-tertiary">
+                {isClanHome ? "My clan" : "Clan profile"}
+              </p>
+              <h1 className="text-xl font-bold text-text-primary">
+                {isClanHome ? "내 클랜 홈" : `${clan.name} 클랜`}
+              </h1>
+            </div>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => router.push("/clans/explore")}
+            >
+              <Compass className="mr-2 h-4 w-4" />
+              클랜 둘러보기
+            </Button>
+          </div>
+
           {/* ── 클랜 헤더 카드 (배너 + 엠블럼 + 대표색) ── */}
           <Card className="mb-6 overflow-hidden">
             {/* 배너: 이미지 또는 대표색 그라디언트 */}
@@ -717,7 +757,7 @@ export default function ClanDetailClient() {
                   <p className="mt-2 text-text-secondary">
                     {clan.description || "클랜 소개가 없습니다."}
                   </p>
-                  <div className="mt-3 flex items-center gap-4 text-sm text-text-tertiary">
+                  <div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-text-tertiary">
                     <span className="flex items-center gap-1">
                       <Users className="h-4 w-4" />
                       {clan.members.length}/{clan.maxMembers} 멤버
@@ -733,9 +773,21 @@ export default function ClanDetailClient() {
                         target="_blank"
                         rel="noopener noreferrer"
                         className="flex items-center gap-1 text-accent-primary hover:underline"
+                        title={discordStats?.guildName || "Discord 서버 참여"}
                       >
                         <ExternalLink className="h-4 w-4" />
                         Discord
+                        {discordStats?.available && (
+                          <span className="flex items-center gap-2 text-text-tertiary no-underline">
+                            <span>
+                              {discordStats.memberCount?.toLocaleString()}명
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <span className="h-2 w-2 rounded-full bg-accent-success" />
+                              {discordStats.onlineCount?.toLocaleString()} 온라인
+                            </span>
+                          </span>
+                        )}
                       </a>
                     )}
                   </div>
@@ -816,7 +868,7 @@ export default function ClanDetailClient() {
             <TabsList className="mb-6 w-full">
               <TabsTrigger value="info" className="flex items-center gap-1.5">
                 <Info className="h-4 w-4" />
-                정보
+                홈
               </TabsTrigger>
               <TabsTrigger value="members" className="flex items-center gap-1.5">
                 <Users className="h-4 w-4" />
@@ -841,64 +893,68 @@ export default function ClanDetailClient() {
               </TabsTrigger>
             </TabsList>
 
-            {/* ── 정보 탭 ── */}
+            {/* ── 홈 탭 ── */}
             <TabsContent value="info" className="space-y-4">
-              {/* 기본 클랜 정보 카드 */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>클랜 정보</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3 text-sm">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <p className="text-text-tertiary mb-0.5">클랜 태그</p>
-                      <p className="text-text-primary font-medium">[{clan.tag}]</p>
-                    </div>
-                    <div>
-                      <p className="text-text-tertiary mb-0.5">설립일</p>
-                      <p className="text-text-primary font-medium">
-                        {new Date(clan.createdAt).toLocaleDateString("ko-KR")}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-text-tertiary mb-0.5">클랜장</p>
-                      <p className="text-text-primary font-medium">
-                        {clan.owner.username}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-text-tertiary mb-0.5">모집 상태</p>
-                      <p
-                        className={
-                          clan.isRecruiting
-                            ? "text-accent-success font-medium"
-                            : "text-text-tertiary font-medium"
-                        }
-                      >
-                        {clan.isRecruiting ? "모집 중" : "모집 안 함"}
-                      </p>
-                    </div>
-                    {clan.minTier && (
+              <div className="grid items-stretch gap-4 lg:grid-cols-2">
+                {/* 기본 클랜 정보 카드 */}
+                <Card className="h-full">
+                  <CardHeader>
+                    <CardTitle>클랜 정보</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3 text-sm">
+                    <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <p className="text-text-tertiary mb-0.5">최소 티어</p>
+                        <p className="text-text-tertiary mb-0.5">클랜 태그</p>
                         <p className="text-text-primary font-medium">
-                          {clan.minTier}
+                          [{clan.tag}]
                         </p>
                       </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
+                      <div>
+                        <p className="text-text-tertiary mb-0.5">설립일</p>
+                        <p className="text-text-primary font-medium">
+                          {new Date(clan.createdAt).toLocaleDateString("ko-KR")}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-text-tertiary mb-0.5">클랜장</p>
+                        <p className="text-text-primary font-medium">
+                          {clan.owner.username}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-text-tertiary mb-0.5">모집 상태</p>
+                        <p
+                          className={
+                            clan.isRecruiting
+                              ? "text-accent-success font-medium"
+                              : "text-text-tertiary font-medium"
+                          }
+                        >
+                          {clan.isRecruiting ? "모집 중" : "모집 안 함"}
+                        </p>
+                      </div>
+                      {clan.minTier && (
+                        <div>
+                          <p className="text-text-tertiary mb-0.5">최소 티어</p>
+                          <p className="text-text-primary font-medium">
+                            {clan.minTier}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
 
-              {/* 모집 공고 — 모집 포지션·최소 티어, OWNER/OFFICER 인라인 편집 */}
-              <RecruitmentSection
-                clanId={clanId}
-                isRecruiting={clan.isRecruiting}
-                minTier={clan.minTier}
-                recruitRoles={clan.recruitRoles ?? []}
-                canManageSettings={canManageSettings}
-                onUpdated={fetchClan}
-              />
+                {/* 모집 공고 — 모집 포지션·최소 티어, OWNER/OFFICER 인라인 편집 */}
+                <RecruitmentSection
+                  clanId={clanId}
+                  isRecruiting={clan.isRecruiting}
+                  minTier={clan.minTier}
+                  recruitRoles={clan.recruitRoles ?? []}
+                  canManageSettings={canManageSettings}
+                  onUpdated={fetchClan}
+                />
+              </div>
 
               {/* 공지사항 — 멤버에게만 표시 */}
               {isMember && (
@@ -1087,7 +1143,11 @@ export default function ClanDetailClient() {
       <JoinByCodeModal
         isOpen={showJoinByCodeModal}
         onClose={() => setShowJoinByCodeModal(false)}
-        onSuccess={fetchClan}
+        onSuccess={async () => {
+          // 가입 직후 /clans가 내 클랜 홈으로 뜨도록 캐시를 비운다.
+          await queryClient.invalidateQueries({ queryKey: ["clans", "my"] });
+          await fetchClan();
+        }}
       />
     </>
   );

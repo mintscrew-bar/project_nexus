@@ -1185,6 +1185,18 @@ export const clanApi = {
     return response.data;
   },
 
+  getDiscordStats: async (clanId: string) => {
+    const response = await apiClient.get(`/clans/${clanId}/discord-stats`);
+    return response.data as {
+      available: boolean;
+      guildId?: string;
+      guildName?: string;
+      memberCount?: number;
+      onlineCount?: number;
+      checkedAt: string;
+    };
+  },
+
   getMyClan: async () => {
     const response = await apiClient.get("/clans/my");
     return response.data;
@@ -1211,7 +1223,7 @@ export const clanApi = {
       isRecruiting?: boolean;
       maxMembers?: number;
       minTier?: string;
-      discord?: string;
+      discord?: string | null;
       accentColor?: string;
       recruitRoles?: string[];
       officerCanManageSettings?: boolean;
@@ -2121,8 +2133,10 @@ export interface AdminInternalMatch {
 }
 
 /** 관리자 내전 기록 상세 — 목록 필드에 팀/참가자 지표가 더해진다 */
-export interface AdminInternalMatchDetail
-  extends Omit<AdminInternalMatch, "_count"> {
+export interface AdminInternalMatchDetail extends Omit<
+  AdminInternalMatch,
+  "_count"
+> {
   bracketType: string | null;
   round: number | null;
   tournamentCode: string | null;
@@ -2452,7 +2466,7 @@ export const appealApi = {
   },
 };
 
-// ── 스트리머 (치지직/숲 라이브) ───────────────────────────────────────────────
+// ── 스트리머 (치지직/SOOP 라이브) ───────────────────────────────────────────────
 
 export type StreamerPlatformKind = "CHZZK" | "SOOP" | "YOUTUBE";
 
