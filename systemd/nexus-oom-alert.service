@@ -1,0 +1,17 @@
+[Unit]
+Description=Nexus OOM watcher (Discord alert on container OOM-kill)
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=simple
+User=haru
+WorkingDirectory=/home/haru/projects/nexus
+ExecStart=/home/haru/projects/nexus/scripts/oom-alert.sh
+# docker events 스트림이 끊기면(데몬 재시작 등) 스크립트가 종료된다. 항상 재기동한다.
+Restart=always
+# 크래시 루프 시 알림 폭주를 막기 위한 최소 간격.
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target

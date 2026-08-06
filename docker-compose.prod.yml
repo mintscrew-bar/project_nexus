@@ -5,6 +5,10 @@ services:
     image: postgres:16-alpine
     container_name: nexus-postgres
     restart: unless-stopped
+    mem_limit: 1024m
+    memswap_limit: 1024m
+    cpus: "1.5"
+    pids_limit: 256
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-nexus}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
@@ -21,6 +25,10 @@ services:
     image: redis:7-alpine
     container_name: nexus-redis
     restart: unless-stopped
+    mem_limit: 256m
+    memswap_limit: 256m
+    cpus: "0.5"
+    pids_limit: 128
     command: redis-server --appendonly yes
     volumes:
       - redis_data:/data
@@ -34,11 +42,18 @@ services:
     # 운영: GHCR에서 pull. 로컬 dev 폴백용으로 build 섹션은 유지.
     # 롤백 시: IMAGE_TAG=<commit-sha> docker compose -f docker-compose.prod.yml up -d
     image: ghcr.io/mintscrew-bar/project_nexus/api:${IMAGE_TAG:-latest}
+    # ⚠️ 이 build 섹션은 로컬 dev 폴백 전용. 운영 호스트에서 --build 금지.
+    # 빌드는 mem_limit 밖이라 3GB 힙을 무제한으로 써 WSL OOM을 재유발할 수 있다.
+    # 운영/복구는 GHCR 이미지를 pull 한다. (docs/setup/OPERATIONS_RECOVERY.md 참고)
     build:
       context: .
       dockerfile: apps/api/Dockerfile
     container_name: nexus-api
     restart: unless-stopped
+    mem_limit: 1536m
+    memswap_limit: 1536m
+    cpus: "2.0"
+    pids_limit: 256
     env_file:
       - ${NEXUS_ENV_FILE:-.env.production}
     environment:
@@ -56,11 +71,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "node -e \"fetch('http://127.0.0.1:4000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"",
-        ]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:4000/api/health > /dev/null 2>&1 || exit 1"]
       interval: 20s
       timeout: 5s
       retries: 10
@@ -69,6 +80,9 @@ services:
   web:
     # 운영: GHCR에서 pull. 로컬 dev 폴백용으로 build 섹션은 유지.
     image: ghcr.io/mintscrew-bar/project_nexus/web:${IMAGE_TAG:-latest}
+    # ⚠️ 이 build 섹션은 로컬 dev 폴백 전용. 운영 호스트에서 --build 금지.
+    # 빌드는 mem_limit 밖이라 3GB 힙을 무제한으로 써 WSL OOM을 재유발할 수 있다.
+    # 운영/복구는 GHCR 이미지를 pull 한다. (docs/setup/OPERATIONS_RECOVERY.md 참고)
     build:
       context: .
       dockerfile: apps/web/Dockerfile
@@ -79,6 +93,10 @@ services:
         API_URL: http://api:4000
     container_name: nexus-web
     restart: unless-stopped
+    mem_limit: 2048m
+    memswap_limit: 2048m
+    cpus: "2.0"
+    pids_limit: 256
     environment:
       NODE_ENV: production
       API_URL: http://api:4000
@@ -92,11 +110,7 @@ services:
       api:
         condition: service_healthy
     healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "node -e \"fetch('http://127.0.0.1:3000').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"",
-        ]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000 > /dev/null 2>&1 || exit 1"]
       interval: 20s
       timeout: 5s
       retries: 10
@@ -106,6 +120,10 @@ services:
     image: nginx:alpine
     container_name: nexus-nginx
     restart: unless-stopped
+    mem_limit: 128m
+    memswap_limit: 128m
+    cpus: "0.5"
+    pids_limit: 128
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
@@ -124,6 +142,10 @@ services:
     image: cloudflare/cloudflared:2026.7.2
     container_name: nexus-cloudflared
     restart: unless-stopped
+    mem_limit: 256m
+    memswap_limit: 256m
+    cpus: "0.5"
+    pids_limit: 128
     command: tunnel --no-autoupdate run
     environment:
       TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?CLOUDFLARE_TUNNEL_TOKEN is required}
@@ -135,6 +157,10 @@ services:
     image: louislam/uptime-kuma:2
     container_name: nexus-uptime-kuma
     restart: unless-stopped
+    mem_limit: 512m
+    memswap_limit: 512m
+    cpus: "1.0"
+    pids_limit: 128
     volumes:
       - uptime_kuma_data:/app/data
     ports:
