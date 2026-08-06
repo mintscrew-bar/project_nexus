@@ -225,6 +225,9 @@ export default function BracketPage() {
         bracketSection: first.bracketRound || undefined,
         bestOf,
         currentGameNumber: activeGame.gameNumber ?? 1,
+        // 슬롯 상태(status)와 별개로 지금 가리키는 세트의 상태를 그대로 넘긴다.
+        // 시작/보고 UI는 시리즈가 아니라 이 세트를 대상으로 동작하기 때문이다.
+        currentGameStatus: activeGame.status as 'PENDING' | 'IN_PROGRESS' | 'COMPLETED',
         gameIds: games_.map((g) => g.id),
       };
     });

@@ -1,5 +1,11 @@
 /** @ts-check */
 
+import { createRequire } from "node:module";
+
+// package.json을 앱 버전의 단일 출처로 사용하고 클라이언트 번들에 주입한다.
+const require = createRequire(import.meta.url);
+const { version: appVersion } = require("./package.json");
+
 // XSS/서드파티 스크립트 리스크 완화용 CSP.
 // 우선 Report-Only로 시작 — 실제 차단은 하지 않고 위반만 콘솔/리포트로 수집해
 // 광고(AdSense)·분석(GA)·폰트·소켓 등 누락 도메인을 파악한 뒤 강제(enforce) 전환한다.
@@ -56,6 +62,9 @@ const uploadRemotePattern = (() => {
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  env: {
+    NEXT_PUBLIC_APP_VERSION: appVersion,
+  },
   transpilePackages: [
     "@nexus/types",
     "@uiw/react-md-editor",

@@ -128,7 +128,9 @@ export default function SnakeDraftPage() {
   }
 
   return (
-    <div className="h-full p-4 md:p-6">
+    // 역할 선택과 같은 이유로 자체 스크롤이 필요하다.
+    // AppShell이 대시보드 라우트를 overflow-hidden으로 가둔다.
+    <div className="h-full overflow-y-auto p-4 md:p-6">
       <ConfirmModal
         isOpen={isAbortConfirmOpen}
         onClose={() => setIsAbortConfirmOpen(false)}

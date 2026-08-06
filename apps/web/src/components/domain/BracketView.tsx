@@ -36,6 +36,16 @@ export interface Match { // Exporting for use in other components
   bestOf?: number;
   /** 현재 진행 중이거나 다음에 치를 세트 번호 */
   currentGameNumber?: number;
+  /**
+   * 지금 가리키고 있는 세트(= `id`가 가리키는 Match) 자체의 상태.
+   *
+   * 위의 `status`는 시리즈(대진 슬롯) 상태라 세트 상태와 다르다.
+   * 예를 들어 2세트가 막 만들어졌을 때 시리즈는 IN_PROGRESS지만 세트는 PENDING이다.
+   * 시작·가위바위보·결과 보고처럼 "세트 하나"에 대한 동작은 반드시 이 값으로 판단해야 한다.
+   * `status`로 판단하면 시작 버튼이 사라지거나, 아직 시작도 안 한 세트에
+   * 결과 보고를 걸어 서버가 400으로 막는다.
+   */
+  currentGameStatus?: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED';
   /** 이 슬롯에 속한 세트(Match) id 목록 */
   gameIds?: string[];
 }

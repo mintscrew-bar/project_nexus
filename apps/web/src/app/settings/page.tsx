@@ -1297,7 +1297,11 @@ export default function SettingsPage() {
                   </CardHeader>
                   <CardContent className="space-y-0">
                     <InfoRow label="서비스 이름" value="NEXUS" />
-                    <InfoRow label="버전" value="1.0.0" mono />
+                    <InfoRow
+                      label="버전"
+                      value={process.env.NEXT_PUBLIC_APP_VERSION ?? "—"}
+                      mono
+                    />
                     <InfoRow label="제작" value="Harumaroon" />
                     <InfoRow
                       label="문의"
