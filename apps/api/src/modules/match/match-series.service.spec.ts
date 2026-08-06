@@ -15,6 +15,7 @@ describe("MatchSeriesService", () => {
       findUnique: jest.Mock;
       findMany: jest.Mock;
       update: jest.Mock;
+      updateMany: jest.Mock;
       count: jest.Mock;
     };
   };
@@ -31,6 +32,7 @@ describe("MatchSeriesService", () => {
         findUnique: jest.fn(),
         findMany: jest.fn().mockResolvedValue([]),
         update: jest.fn().mockResolvedValue({}),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         count: jest.fn().mockResolvedValue(0),
       },
     };
@@ -238,6 +240,27 @@ describe("MatchSeriesService", () => {
 
       expect(await service.applyGameResult("match-x")).toBeNull();
       expect(prisma.match.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("markInProgress", () => {
+    it("PENDING 시리즈만 진행 중으로 올린다", async () => {
+      prisma.match.findUnique.mockResolvedValue({ seriesId: "series-1" });
+
+      expect(await service.markInProgress("match-1")).toBe("series-1");
+      // where에 status: PENDING을 걸어 이미 IN_PROGRESS거나 COMPLETED인
+      // 시리즈는 건드리지 않는다.
+      expect(prisma.matchSeries.updateMany).toHaveBeenCalledWith({
+        where: { id: "series-1", status: "PENDING" },
+        data: { status: "IN_PROGRESS" },
+      });
+    });
+
+    it("시리즈 없는 매치는 null이고 아무것도 쓰지 않는다", async () => {
+      prisma.match.findUnique.mockResolvedValue({ seriesId: null });
+
+      expect(await service.markInProgress("match-x")).toBeNull();
+      expect(prisma.matchSeries.updateMany).not.toHaveBeenCalled();
     });
   });
 

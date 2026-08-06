@@ -187,6 +187,34 @@ export class MatchSeriesService {
     };
   }
 
+  /**
+   * 세트가 시작되면 시리즈도 진행 중으로 올린다.
+   *
+   * 이걸 안 하면 시리즈 상태가 결과 보고 때만 갱신돼서 실제 진행보다 한 박자 늦는다.
+   * 1세트를 치르는 내내 시리즈가 PENDING으로 남고, 단판(bestOf=1) 시리즈는
+   * IN_PROGRESS를 아예 거치지 않고 PENDING에서 COMPLETED로 건너뛴다.
+   * 대진표는 시리즈 상태를 슬롯 상태로 쓰기 때문에 그대로 표시 오류가 된다.
+   *
+   * @returns 시리즈에 속하지 않는 매치면 null, 아니면 시리즈 id
+   */
+  async markInProgress(matchId: string): Promise<string | null> {
+    const match = await this.prisma.match.findUnique({
+      where: { id: matchId },
+      select: { seriesId: true },
+    });
+
+    if (!match?.seriesId) return null;
+
+    // 이미 IN_PROGRESS면 건드리지 않는다. COMPLETED된 시리즈를 되돌리지도 않는다
+    // (클린치 이후 남은 세트를 실수로 시작해도 시리즈 결과는 유지).
+    await this.prisma.matchSeries.updateMany({
+      where: { id: match.seriesId, status: MatchStatus.PENDING },
+      data: { status: MatchStatus.IN_PROGRESS },
+    });
+
+    return match.seriesId;
+  }
+
   /** 방의 모든 시리즈 스코어 (대진표 표시용) */
   async getRoomSeriesScores(roomId: string): Promise<SeriesScore[]> {
     const series = await this.prisma.matchSeries.findMany({

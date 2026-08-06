@@ -204,13 +204,18 @@ export function MatchDetailModal({
     };
   }, [isOpen, match?.id]);
 
-  // 매치가 시작(IN_PROGRESS)되면 가위바위보 상태 정리
+  // 세트 하나에 대한 동작(시작·가위바위보·결과 보고·라이브 조회)은 시리즈가 아니라
+  // 그 세트의 상태로 판단해야 한다. match.status는 시리즈(대진 슬롯) 상태다.
+  // 시리즈가 없는 레거시/외부 매치는 currentGameStatus가 없어 기존대로 status를 쓴다.
+  const currentGameStatus = match ? (match.currentGameStatus ?? match.status) : null;
+
+  // 세트가 시작(IN_PROGRESS)되면 가위바위보 상태 정리
   useEffect(() => {
-    if (match?.status && match.status !== 'PENDING') {
+    if (currentGameStatus && currentGameStatus !== 'PENDING') {
       setRps(null);
       setRpsReveal(null);
     }
-  }, [match?.status]);
+  }, [currentGameStatus]);
 
   const fetchVoteData = useCallback(async (matchId: string) => {
     try {
@@ -285,7 +290,7 @@ export function MatchDetailModal({
 
   // Auto-refresh live status every 30 seconds for IN_PROGRESS matches
   useEffect(() => {
-    if (!isOpen || !match || match.status !== 'IN_PROGRESS' || !onRefreshLiveStatus) {
+    if (!isOpen || !match || currentGameStatus !== 'IN_PROGRESS' || !onRefreshLiveStatus) {
       return;
     }
 
@@ -361,7 +366,7 @@ export function MatchDetailModal({
   const canManageMatch = isHost || isCaptainOfMatch;
 
   // 가위바위보 진행 중 여부 + 팀(A/B) 매핑
-  const rpsActive = !!rps && match.status === 'PENDING';
+  const rpsActive = !!rps && currentGameStatus === 'PENDING';
   const teamNameById = (id: string) =>
     match.team1?.id === id ? getTeamDisplayName(match.team1)
       : match.team2?.id === id ? getTeamDisplayName(match.team2) : '팀';
@@ -548,7 +553,7 @@ export function MatchDetailModal({
           </div>
         )}
 
-        {match.status === 'PENDING' && !rpsActive && match.team1 && match.team2 && (() => {
+        {currentGameStatus === 'PENDING' && !rpsActive && match.team1 && match.team2 && (() => {
           const captainAId = rpsReadyState?.captainAId ?? match.team1.captain?.id;
           const captainBId = rpsReadyState?.captainBId ?? match.team2.captain?.id;
           const isCaptain = !!(user?.id && (user.id === captainAId || user.id === captainBId));
@@ -610,7 +615,7 @@ export function MatchDetailModal({
           );
         })()}
 
-        {canManageMatch && match.status === 'IN_PROGRESS' && (
+        {canManageMatch && currentGameStatus === 'IN_PROGRESS' && (
           <div className="pt-4 border-t border-bg-tertiary">
             <h3 className="text-md font-semibold mb-2 text-text-primary flex items-center gap-2">
               <ShieldCheck className="h-5 w-5 text-accent-primary" />

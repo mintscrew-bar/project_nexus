@@ -315,6 +315,11 @@ export class MatchService {
       },
     });
 
+    // 다전제: 세트가 시작되면 시리즈도 진행 중으로 올린다.
+    // 대진표가 시리즈 상태를 슬롯 상태로 쓰므로, 여기서 안 올리면
+    // 경기 중인데 슬롯이 "대기 중"으로 남는다.
+    await this.matchSeriesService.markInProgress(matchId);
+
     await this.prisma.room.update({
       where: { id: match.room.id },
       data: { broadcastFocusMatchId: matchId },

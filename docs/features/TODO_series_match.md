@@ -113,6 +113,18 @@
 - [ ] Task 21: 그랜드파이널 브래킷 리셋 (승자조 어드밴티지) — 별건, 필요성부터 확인
 - [ ] Task 22: 시리즈 MVP (현재 MVP/ACE 투표는 게임 단위)
 
+### 운영 장애 대응
+
+- [x] Task 23: 시리즈 상태와 세트 상태 분리 — 대진표·모달이 시리즈 상태 하나로 세트 단위 액션(시작·가위바위보·결과 보고)까지 판단해서 진행이 막혔다
+
+  `bracket/page.tsx`가 슬롯 상태를 `series.status`로 내려보내는데, 시리즈 상태는 결과 보고 때만 갱신돼서 실제 세트보다 한 박자 늦었다. 그 결과 1세트 진행 중에는 슬롯이 `PENDING`이라 보고 UI(`IN_PROGRESS` 조건)가 안 뜨고, 2세트가 만들어진 뒤에는 슬롯이 `IN_PROGRESS`라 시작 UI(`PENDING` 조건)가 사라졌다. 보고 버튼은 보이지만 대상 세트가 `PENDING`이라 서버가 400으로 막았다.
+
+  대진 생성은 `bestOf`와 무관하게 모든 슬롯에 시리즈를 만들므로 **기본 프리셋 `ALL_BO1` 단판 방도 동일하게 막혔다.** 토너먼트 코드 발급이 불가한 현재는 수동 보고가 유일한 진행 경로라 우회 수단이 없었다.
+
+  수정: `Match` 타입에 `currentGameStatus`(세트 자체 상태)를 추가해 세트 단위 액션은 전부 이걸로 판단하고, `status`는 대진 카드 배지 등 시리즈 단위 표시에만 쓴다. 서버는 `startMatch`에서 `markInProgress`로 시리즈도 진행 중으로 올려 상태가 실제 진행과 어긋나지 않게 한다.
+
+  Task 15(`bestOf=1` 회귀 검증)가 이걸 잡지 못했다. 서버 로직만 봤고 UI 게이트 조건은 확인하지 않았다.
+
 ## 먼저 막아야 할 것 — 전적 수집 오염
 
 Riot 퍼스널 키 상황이라 Tournament API가 아니라 PUUID 크로스레퍼런스로 게임을 찾는다. 탐색 창이 `startedAt - 5분 ~ completedAt + 20분`인데([`match-data-collection.service.ts`](../../apps/api/src/modules/match/match-data-collection.service.ts)), 같은 10명이 연달아 3판을 하면 1세트 게임이 2세트 탐색 창에 그대로 들어온다. 게다가 **이미 다른 Match에 할당된 `riotMatchId`를 제외하는 가드가 없다.**
