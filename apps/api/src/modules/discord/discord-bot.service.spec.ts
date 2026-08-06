@@ -67,7 +67,7 @@ describe("DiscordBotService room notification", () => {
     );
   });
 
-  it("큰 방의 참가자 명단을 Discord 필드 제한에 맞춰 분할한다", () => {
+  it("40명 방의 참가자 명단을 세 개의 균형 잡힌 열로 표시한다", () => {
     const participants = Array.from(
       { length: 40 },
       (_, index) => `긴닉네임_${index}_${"가".repeat(24)}`,
@@ -85,12 +85,21 @@ describe("DiscordBotService room notification", () => {
     const participantFields = (embed.toJSON().fields ?? []).filter((field) =>
       field.name.startsWith("참가자"),
     );
-    expect(participantFields.length).toBeGreaterThan(1);
+    expect(participantFields).toHaveLength(3);
+    expect(participantFields.map((field) => field.name)).toEqual([
+      "참가자 1–14",
+      "참가자 15–27",
+      "참가자 28–40",
+    ]);
+    expect(participantFields.every((field) => field.inline)).toBe(true);
     expect(participantFields.every((field) => field.value.length <= 1024)).toBe(
       true,
     );
     expect(participantFields.map((field) => field.value).join("\n")).toContain(
       participants[39],
+    );
+    expect(embed.toJSON().footer?.text).toBe(
+      "참가자 변경 시 자동으로 업데이트됩니다.",
     );
   });
 
