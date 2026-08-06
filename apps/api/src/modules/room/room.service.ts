@@ -801,6 +801,7 @@ export class RoomService {
     );
 
     // Discord 봇 연동: 팀별 음성채널 생성
+    let lobbyVoiceChannelId: string | undefined;
     try {
       if (this.discordVoiceService) {
         const numTeams = Math.floor(dto.maxParticipants / 5);
@@ -811,6 +812,7 @@ export class RoomService {
           room.name,
           numTeams,
         );
+        lobbyVoiceChannelId = channelData.lobbyChannelId;
 
         // 룸에 Discord 카테고리 ID 저장
         await this.prisma.room.update({
@@ -841,6 +843,12 @@ export class RoomService {
               room.teamMode,
               room.isPrivate,
               [room.host.username], // 방 생성 시 방장 1명
+              lobbyVoiceChannelId
+                ? {
+                    guildId: notificationTarget.guildId,
+                    channelId: lobbyVoiceChannelId,
+                  }
+                : undefined,
             );
 
           const messageId = await this.discordBotService.sendEmbedNotification(
@@ -860,6 +868,7 @@ export class RoomService {
               maxPlayers: room.maxParticipants,
               teamMode: room.teamMode,
               isPrivate: room.isPrivate,
+              voiceChannelId: lobbyVoiceChannelId,
             });
           } else {
             // 대상은 찾았으나 전송 실패 — 채널이 없거나 텍스트 채널이 아님(봇 권한 포함)
@@ -1195,6 +1204,19 @@ export class RoomService {
   // Room Joining & Leaving
   // ========================================
 
+  /** Discord 모집 메시지의 플레이어 수와 명단을 최신 DB 상태로 갱신한다. */
+  private refreshDiscordRoomNotification(roomId: string): void {
+    if (!this.discordBotService) return;
+
+    void this.discordBotService
+      .updateRoomNotification(roomId)
+      .catch((error: unknown) =>
+        this.logger.warn(
+          `Discord room notification refresh failed: ${error instanceof Error ? error.message : String(error)}`,
+        ),
+      );
+  }
+
   async joinRoom(userId: string, dto: JoinRoomDto) {
     const joinAsSpectator = dto.asSpectator === true;
 
@@ -1278,15 +1300,7 @@ export class RoomService {
 
     const roomData = await this.getRoomById(joinedRoomId);
 
-    // WAITING 중 참가자 변동 → Discord 알림 embed 업데이트
-    if (this.discordBotService) {
-      const playerNames: string[] = ((roomData as any).participants ?? [])
-        .filter((p: any) => p.role === "PLAYER")
-        .map((p: any) => p.user?.username ?? p.username ?? "");
-      this.discordBotService
-        .updateRoomNotification(joinedRoomId, playerNames)
-        .catch(() => {});
-    }
+    this.refreshDiscordRoomNotification(joinedRoomId);
 
     return roomData;
   }
@@ -1346,10 +1360,13 @@ export class RoomService {
       return nextRole;
     });
 
+    const room = await this.getRoomById(roomId);
+    this.refreshDiscordRoomNotification(roomId);
+
     return {
       userId,
       newRole,
-      room: await this.getRoomById(roomId),
+      room,
     };
   }
 
@@ -1500,15 +1517,7 @@ export class RoomService {
       }
     }
 
-    // 퇴장 후 남은 PLAYER 명단으로 Discord 알림 업데이트
-    if (this.discordBotService) {
-      const remainingPlayerNames: string[] = remainingParticipants
-        .filter((p: any) => p.role === "PLAYER")
-        .map((p: any) => p.user?.username ?? "");
-      this.discordBotService
-        .updateRoomNotification(roomId, remainingPlayerNames)
-        .catch(() => {});
-    }
+    this.refreshDiscordRoomNotification(roomId);
 
     return { message: "Left room successfully", username, newHostId };
   }
@@ -1817,6 +1826,8 @@ export class RoomService {
     await this.prisma.roomParticipant.delete({
       where: { id: participantId },
     });
+
+    this.refreshDiscordRoomNotification(roomId);
 
     return { message: "Participant kicked" };
   }

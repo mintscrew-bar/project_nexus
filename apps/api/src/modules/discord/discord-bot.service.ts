@@ -27,6 +27,7 @@ import {
   VoiceState,
 } from "discord.js";
 import { PrismaService } from "../prisma/prisma.service";
+import { RedisService } from "../redis/redis.service";
 import type { DiscordVoiceService } from "./discord-voice.service";
 
 // 티어 이모지 맵핑
@@ -85,6 +86,8 @@ const RULES_CONTENT_INPUT_ID = "nexus_rules_content";
 const VERIFY_MODAL_ID = "nexus_verify_modal";
 const VERIFY_BUTTON_ID = "nexus_verify_start_button";
 const VERIFY_RIOT_ID_INPUT_ID = "nexus_verify_riot_id";
+const ROOM_NOTIFICATION_CACHE_PREFIX = "discord:room-notification:";
+const ROOM_NOTIFICATION_TTL_SECONDS = 24 * 60 * 60;
 const DISCORD_EMBED_DESCRIPTION_LIMIT = 4000;
 const RULES_EMBED_DESCRIPTION_LIMIT = 3800;
 const DISCORD_LINE_ROLE_KEYS = ["TOP", "JUNGLE", "MID", "ADC", "SUPPORT"];
@@ -111,6 +114,7 @@ interface RoomNotifEntry {
   maxPlayers: number;
   teamMode: string;
   isPrivate: boolean;
+  voiceChannelId?: string;
 }
 
 @Injectable()
@@ -120,11 +124,14 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
   private voiceService: DiscordVoiceService | null = null;
   // 방 생성 알림 메시지 참조 (roomId → 메시지 정보), 재시작 시 초기화됨
   private readonly roomNotifMap = new Map<string, RoomNotifEntry>();
+  // 같은 방의 참가/퇴장 편집이 역순으로 완료되지 않도록 직렬화한다.
+  private readonly roomNotifUpdateQueue = new Map<string, Promise<void>>();
 
   constructor(
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly redis: RedisService,
   ) {
     this.client = new Client({
       intents: [
@@ -2037,27 +2044,122 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
 
   storeRoomNotification(roomId: string, entry: RoomNotifEntry) {
     this.roomNotifMap.set(roomId, entry);
+    void this.redis
+      .set(
+        `${ROOM_NOTIFICATION_CACHE_PREFIX}${roomId}`,
+        JSON.stringify(entry),
+        ROOM_NOTIFICATION_TTL_SECONDS,
+      )
+      .catch((error: unknown) => {
+        console.warn(
+          `[DiscordBot] 방 알림 캐시 저장 실패 (${roomId}): ${error instanceof Error ? error.message : String(error)}`,
+        );
+      });
+  }
+
+  private async getRoomNotification(
+    roomId: string,
+  ): Promise<RoomNotifEntry | null> {
+    const inMemory = this.roomNotifMap.get(roomId);
+    if (inMemory) return inMemory;
+
+    try {
+      const cached = await this.redis.get(
+        `${ROOM_NOTIFICATION_CACHE_PREFIX}${roomId}`,
+      );
+      if (!cached) return null;
+      const entry = JSON.parse(cached) as RoomNotifEntry;
+      this.roomNotifMap.set(roomId, entry);
+      return entry;
+    } catch (error: unknown) {
+      console.warn(
+        `[DiscordBot] 방 알림 캐시 조회 실패 (${roomId}): ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return null;
+    }
   }
 
   async updateRoomNotification(
     roomId: string,
-    participants: string[],
+    participants?: string[],
   ): Promise<void> {
-    const notif = this.roomNotifMap.get(roomId);
+    const previous = this.roomNotifUpdateQueue.get(roomId) ?? Promise.resolve();
+    const current = previous
+      .catch(() => {})
+      .then(() => this.performRoomNotificationUpdate(roomId, participants));
+    this.roomNotifUpdateQueue.set(roomId, current);
+
+    try {
+      await current;
+    } finally {
+      if (this.roomNotifUpdateQueue.get(roomId) === current) {
+        this.roomNotifUpdateQueue.delete(roomId);
+      }
+    }
+  }
+
+  private async performRoomNotificationUpdate(
+    roomId: string,
+    fallbackParticipants?: string[],
+  ): Promise<void> {
+    const notif = await this.getRoomNotification(roomId);
     if (!notif) return;
     try {
+      const room = await this.prisma.room.findUnique({
+        where: { id: roomId },
+        select: {
+          name: true,
+          maxParticipants: true,
+          teamMode: true,
+          isPrivate: true,
+          host: { select: { username: true } },
+          participants: {
+            where: { role: "PLAYER" },
+            select: { user: { select: { username: true } } },
+            orderBy: { joinedAt: "asc" },
+          },
+          discordChannels: {
+            where: { teamName: "Lobby" },
+            select: { channelId: true },
+            take: 1,
+          },
+        },
+      });
+      const latestNotif: RoomNotifEntry = room
+        ? {
+            ...notif,
+            roomName: room.name,
+            hostName: room.host.username,
+            maxPlayers: room.maxParticipants,
+            teamMode: room.teamMode,
+            isPrivate: room.isPrivate,
+            voiceChannelId:
+              room.discordChannels[0]?.channelId ?? notif.voiceChannelId,
+          }
+        : notif;
+      const latestParticipants = room
+        ? room.participants.map((participant) => participant.user.username)
+        : (fallbackParticipants ?? []);
+
+      this.storeRoomNotification(roomId, latestNotif);
       const guild = await this.client.guilds.fetch(notif.guildId);
       const channel = await guild.channels.fetch(notif.channelId);
       if (!channel?.isTextBased()) return;
       const message = await channel.messages.fetch(notif.messageId);
       const { embed, components } = this.buildRoomCreatedEmbed(
         roomId,
-        notif.roomName,
-        notif.hostName,
-        notif.maxPlayers,
-        notif.teamMode,
-        notif.isPrivate,
-        participants,
+        latestNotif.roomName,
+        latestNotif.hostName,
+        latestNotif.maxPlayers,
+        latestNotif.teamMode,
+        latestNotif.isPrivate,
+        latestParticipants,
+        latestNotif.voiceChannelId
+          ? {
+              guildId: latestNotif.guildId,
+              channelId: latestNotif.voiceChannelId,
+            }
+          : undefined,
       );
       await message.edit({ embeds: [embed], components });
     } catch (err: any) {
@@ -2069,6 +2171,9 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
 
   clearRoomNotification(roomId: string) {
     this.roomNotifMap.delete(roomId);
+    void this.redis
+      .del(`${ROOM_NOTIFICATION_CACHE_PREFIX}${roomId}`)
+      .catch(() => {});
   }
 
   async syncUserTierAndLineRoles(userId: string): Promise<void> {
@@ -2166,6 +2271,7 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
     teamMode: string,
     isPrivate: boolean,
     participants: string[] = [],
+    voiceChannel?: { guildId: string; channelId: string },
   ): { embed: EmbedBuilder; components: ActionRowBuilder<ButtonBuilder>[] } {
     const appUrl =
       this.configService.get("APP_URL") || "https://labs-nexus.com";
@@ -2181,10 +2287,20 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
     const lockSuffix = isPrivate ? "  ·  비공개" : "";
     const currentPlayers = participants.length;
 
-    const memberList =
-      participants.length > 0
-        ? participants.map((name) => `╸ ${name}`).join("\n")
-        : "—";
+    const participantLines = participants.map((name) => `╸ ${name}`);
+    const participantChunks: string[] = [];
+    let participantChunk = "";
+    for (const line of participantLines) {
+      const next = participantChunk ? `${participantChunk}\n${line}` : line;
+      if (next.length > 1024 && participantChunk) {
+        participantChunks.push(participantChunk);
+        participantChunk = line;
+      } else {
+        participantChunk = next;
+      }
+    }
+    if (participantChunk) participantChunks.push(participantChunk);
+    if (participantChunks.length === 0) participantChunks.push("—");
 
     const embed = new EmbedBuilder()
       .setColor(0x667eea)
@@ -2198,16 +2314,33 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
           value: `${currentPlayers} / ${maxPlayers}`,
           inline: true,
         },
-        { name: "참가자", value: memberList, inline: false },
+      )
+      .addFields(
+        ...participantChunks.map((value, index) => ({
+          name: index === 0 ? "참가자" : "참가자 (계속)",
+          value,
+          inline: false,
+        })),
       )
       .setTimestamp();
 
-    const button = new ButtonBuilder()
-      .setLabel("참가하기")
+    const roomButton = new ButtonBuilder()
+      .setLabel("룸 참가")
       .setStyle(ButtonStyle.Link)
       .setURL(`${appUrl}/tournaments/${roomId}/lobby`);
 
-    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(button);
+    const row = new ActionRowBuilder<ButtonBuilder>();
+    if (voiceChannel) {
+      row.addComponents(
+        new ButtonBuilder()
+          .setLabel("음성채널 참가")
+          .setStyle(ButtonStyle.Link)
+          .setURL(
+            `https://discord.com/channels/${voiceChannel.guildId}/${voiceChannel.channelId}`,
+          ),
+      );
+    }
+    row.addComponents(roomButton);
 
     return { embed, components: [row] };
   }
