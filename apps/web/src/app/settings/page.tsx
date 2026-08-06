@@ -46,6 +46,7 @@ import { AddAccountModal } from "@/components/domain/AddAccountModal";
 import { BroadcastTokenSection } from "./_components/BroadcastTokenSection";
 import { StreamerSettingsSection } from "./_components/StreamerSettingsSection";
 import { useRiotStore } from "@/stores/riot-store";
+import webPackage from "../../../package.json";
 
 type SettingsTab =
   | "accounts"
@@ -1297,7 +1298,7 @@ export default function SettingsPage() {
                   </CardHeader>
                   <CardContent className="space-y-0">
                     <InfoRow label="서비스 이름" value="NEXUS" />
-                    <InfoRow label="버전" value="1.0.0" mono />
+                    <InfoRow label="버전" value={webPackage.version} mono />
                     <InfoRow label="제작" value="Harumaroon" />
                     <InfoRow
                       label="문의"
