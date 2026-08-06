@@ -8,8 +8,8 @@ export type CustomMatchGroupBy =
  * 데이터 소스 구분 — 같은 match_participants 테이블에 내전/외부 ranked가 섞여 있어
  * 통계 집계 시 source 분리가 필수.
  *
- * - 'custom'           = 내전 (matches.roomId IS NOT NULL)
- * - 'ranked-community' = 외부 ranked 매치 (roomId NULL & riotMatchId IS NOT NULL)
+ * - 'custom'           = 내전 (matches.isInternal = true)
+ * - 'ranked-community' = 외부 ranked 매치 (isInternal = false & riotMatchId IS NOT NULL)
  * - 'all'              = 분리 없이 전체 (기존 동작 유지용 — 새 호출은 자제)
  */
 export type MatchStatsSource = "custom" | "ranked-community" | "all";
@@ -59,11 +59,11 @@ function buildSourceFilter(source?: MatchStatsSource): Prisma.Sql {
   // 소스 미지정 시 분리 없이 전체 (호환). 새 호출은 명시적으로 지정해야 함.
   if (!source || source === "all") return Prisma.empty;
   if (source === "custom") {
-    // 내전: roomId가 있는 매치 (Nexus 내부 토너먼트)
-    return Prisma.sql`AND m."roomId" IS NOT NULL`;
+    // 내전: 방 삭제 여부와 무관한 Nexus 내부 토너먼트
+    return Prisma.sql`AND m."isInternal" = true`;
   }
-  // ranked-community: 외부 ranked 매치 — roomId 없고 riotMatchId 있는 매치
-  return Prisma.sql`AND m."roomId" IS NULL AND m."riotMatchId" IS NOT NULL`;
+  // ranked-community: 외부 ranked 매치
+  return Prisma.sql`AND m."isInternal" = false AND m."riotMatchId" IS NOT NULL`;
 }
 
 function buildWhereSql(options: AggregateCustomMatchStatsOptions): Prisma.Sql {

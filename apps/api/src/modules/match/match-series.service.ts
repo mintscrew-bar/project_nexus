@@ -145,6 +145,9 @@ export class MatchSeriesService {
 
     const nextMatch = await this.prisma.match.create({
       data: {
+        // 내부 내전 매치 표식. 빠지면 2세트부터 외부 인제스트 매치로 잡혀
+        // 전적 조회·수집 대상에서 빠진다.
+        isInternal: true,
         roomId: series.roomId,
         seriesId: series.id,
         gameNumber: nextGameNumber,

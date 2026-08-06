@@ -204,9 +204,13 @@ export default function SettingsPage() {
       addToast("치지직 채널 연결에 실패했습니다. 다시 시도해주세요.", "error");
     }
 
-    if (discordGuildResult || chzzkOAuthResult) {
+    // 계정 등록 온보딩은 홈에서만 진행한다. 이전 버전의 설정 URL은 쿼리만 정리한다.
+    const legacyRiotOnboarding = searchParams.get("onboarding") === "riot";
+
+    if (discordGuildResult || chzzkOAuthResult || legacyRiotOnboarding) {
       searchParams.delete("discord_guild");
       searchParams.delete("chzzk_oauth");
+      searchParams.delete("onboarding");
       const query = searchParams.toString();
       window.history.replaceState(
         null,
@@ -215,22 +219,6 @@ export default function SettingsPage() {
       );
     }
   }, [addToast]);
-
-  useEffect(() => {
-    if (isLoading || !isAuthenticated || !user) return;
-
-    const shouldOpenOnboarding =
-      typeof window !== "undefined" &&
-      new URLSearchParams(window.location.search).get("onboarding") === "riot";
-    const hasRiot =
-      Array.isArray(user.riotAccounts) && user.riotAccounts.length > 0;
-
-    if (shouldOpenOnboarding && !hasRiot) {
-      setActiveTab("accounts");
-      setShowRiotModal(true);
-      router.replace("/settings");
-    }
-  }, [isLoading, isAuthenticated, user, router]);
 
   // Fetch champions for highlight picker
   useEffect(() => {
@@ -492,54 +480,37 @@ export default function SettingsPage() {
   ];
 
   return (
-    <div className="flex-grow p-4 md:p-8 animate-fade-in">
-      <div className="container mx-auto max-w-4xl">
+    <div className="min-w-0 flex-grow p-3 sm:p-4 md:p-8 animate-fade-in">
+      <div className="container mx-auto max-w-5xl">
         <h1 className="text-2xl md:text-3xl font-bold mb-6 md:mb-8 text-text-primary">
           설정
         </h1>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          {/* Sidebar */}
-          <div className="md:col-span-1">
-            <Card className="p-0">
-              <CardContent className="p-2">
-                <nav className="space-y-1">
+        <div className="space-y-5 md:space-y-6">
+          <Card className="p-0">
+            <CardContent className="p-2">
+              <nav aria-label="설정 메뉴">
+                <div className="grid grid-cols-3 gap-1 sm:grid-cols-6">
                   {tabs.map((tab) => (
                     <button
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id)}
-                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+                      className={`flex min-w-0 flex-col items-center justify-center gap-1.5 rounded-lg px-2 py-2.5 text-center transition-colors sm:flex-row sm:gap-2 ${
                         activeTab === tab.id
                           ? "bg-accent-primary/10 text-accent-primary"
                           : "text-text-secondary hover:bg-bg-tertiary"
                       }`}
                     >
-                      <tab.icon className="h-5 w-5" />
-                      <span className="font-medium">{tab.label}</span>
+                      <tab.icon className="h-4 w-4 shrink-0" />
+                      <span className="truncate text-xs font-medium sm:text-sm">{tab.label}</span>
                     </button>
                   ))}
-                  <hr className="my-2 border-bg-tertiary" />
-                  <button
-                    onClick={() => setIsLogoutModalOpen(true)}
-                    className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-accent-danger hover:bg-accent-danger/10 transition-colors"
-                  >
-                    <LogOut className="h-5 w-5" />
-                    <span className="font-medium">로그아웃</span>
-                  </button>
-                  {/* 회원 탈퇴 버튼 — 작고 위험 색상으로 표시 */}
-                  <button
-                    onClick={() => setIsDeleteAccountModalOpen(true)}
-                    className="w-full flex items-center justify-center px-4 py-2 rounded-lg text-xs text-text-tertiary hover:text-accent-danger hover:bg-accent-danger/10 transition-colors"
-                  >
-                    회원 탈퇴
-                  </button>
-                </nav>
-              </CardContent>
-            </Card>
-          </div>
+                </div>
+              </nav>
+            </CardContent>
+          </Card>
 
-          {/* Content */}
-          <div className="md:col-span-3">
+          <div className="min-w-0">
             {activeTab === "accounts" && (
               <div className="space-y-4">
                 {/* 밴/제재 상태 배너 + 이의신청 UI */}
@@ -1359,6 +1330,22 @@ export default function SettingsPage() {
                 />
               </div>
             )}
+          </div>
+
+          <div className="flex flex-wrap items-center justify-end gap-2 border-t border-bg-tertiary pt-4">
+            <button
+              onClick={() => setIsDeleteAccountModalOpen(true)}
+              className="rounded-lg px-3 py-2 text-xs text-text-tertiary transition-colors hover:bg-accent-danger/10 hover:text-accent-danger"
+            >
+              회원 탈퇴
+            </button>
+            <button
+              onClick={() => setIsLogoutModalOpen(true)}
+              className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-accent-danger transition-colors hover:bg-accent-danger/10"
+            >
+              <LogOut className="h-4 w-4" />
+              로그아웃
+            </button>
           </div>
         </div>
       </div>

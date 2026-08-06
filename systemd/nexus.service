@@ -16,6 +16,3 @@ TimeoutStartSec=60
 
 # ExecStop을 두지 않는다. `docker compose down`은 컨테이너를 삭제하여
 # Docker의 restart: unless-stopped 기반 재부팅 복구를 무력화한다.
-
-[Install]
-WantedBy=multi-user.target

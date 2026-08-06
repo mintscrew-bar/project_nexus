@@ -9,6 +9,7 @@ import { rankingApi } from "@/lib/api-client";
 import { Skeleton, Button, EmptyState } from "@/components/ui";
 import { Trophy, Crown, ChevronLeft, ChevronRight, Users } from "lucide-react";
 import { getTierImage } from "@/components/matches/match-utils";
+import { RankingTour } from "@/components/onboarding/PrimaryPageTours";
 
 export default function RankingPage() {
   const router = useRouter();
@@ -51,6 +52,7 @@ export default function RankingPage() {
 
   return (
     <div className="min-h-screen bg-bg-primary">
+      <RankingTour />
       {/* Header */}
       <div className="border-b border-bg-tertiary bg-bg-secondary">
         <div className="container mx-auto px-4 py-6">
@@ -63,7 +65,7 @@ export default function RankingPage() {
           </p>
 
           {/* Tabs */}
-          <div className="flex gap-2 mt-4">
+          <div data-tour="ranking-tabs" className="flex gap-2 mt-4">
             <button
               onClick={() => {
                 setTab("global");
@@ -96,7 +98,7 @@ export default function RankingPage() {
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-8 max-w-4xl">
+      <div data-tour="ranking-results" className="container mx-auto px-4 py-8 max-w-4xl">
         {tab === "global" && (
           <>
             {isLoading ? (

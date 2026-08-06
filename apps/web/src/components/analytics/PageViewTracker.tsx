@@ -12,17 +12,32 @@ export function PageViewTracker() {
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    if (!gaId || typeof window === "undefined" || !window.gtag) return;
+    if (!gaId || typeof window === "undefined") return;
 
     const search = searchParams?.toString();
     const url = search ? `${pathname}?${search}` : pathname;
 
-    window.gtag("event", "page_view", {
-      page_path: url,
-      page_location: window.location.href,
-      page_title: document.title,
-      send_to: gaId,
+    const sendPageView = () => {
+      if (!window.gtag) return;
+      window.gtag("event", "page_view", {
+        page_path: url,
+        page_location: window.location.href,
+        page_title: document.title,
+        send_to: gaId,
+      });
+    };
+
+    if (window.gtag) {
+      sendPageView();
+      return;
+    }
+
+    // lazyOnload로 늦게 준비되는 첫 방문의 page_view도 놓치지 않는다.
+    window.addEventListener("nexus:analytics-ready", sendPageView, {
+      once: true,
     });
+    return () =>
+      window.removeEventListener("nexus:analytics-ready", sendPageView);
   }, [gaId, pathname, searchParams]);
 
   return null;

@@ -15,21 +15,30 @@ import {
 } from "@/lib/onboarding";
 
 export function OnboardingGuideModal() {
-  const { user, isAuthenticated, fetchUser } = useAuthStore();
+  const { user, isAuthenticated, isLoading, fetchUser } = useAuthStore();
   const [isOpen, setIsOpen] = useState(false);
   const [addAccountOpen, setAddAccountOpen] = useState(false);
 
   // 첫 방문(미열람) + 로그인 상태일 때만 자동 노출
   useEffect(() => {
-    if (!isAuthenticated || !user?.id) return;
+    // 세션 캐시에는 onboardingSeen이 없으므로 서버 인증 조회가 끝날 때까지 판정하지 않는다.
+    if (isLoading || !isAuthenticated || !user?.id) return;
     if (typeof window === "undefined") return;
     // 계정에 기록된 확인 이력이 최우선 — 기기·브라우저가 바뀌어도 다시 뜨지 않는다.
     // (Riot 계정과 주 라인을 이미 등록한 기존 유저도 서버에서 확인 완료로 판정한다)
-    if (user.onboardingSeen) return;
     const userStorageKey = getUserOnboardingStorageKey(
       ONBOARDING_MODAL_STORAGE_KEY,
       user.id,
     );
+    if (user.onboardingSeen) {
+      setIsOpen(false);
+      // 서버에 완료 이력만 있는 사용자는 로컬 선행 조건이 없어 후속 투어가 시작되지 않았다.
+      if (!window.localStorage.getItem(userStorageKey)) {
+        window.localStorage.setItem(userStorageKey, "1");
+        window.dispatchEvent(new Event(ONBOARDING_MODAL_CLOSED_EVENT));
+      }
+      return;
+    }
     const accountCreatedAt = user.createdAt
       ? new Date(user.createdAt).getTime()
       : Number.NaN;
@@ -41,7 +50,7 @@ export function OnboardingGuideModal() {
       (!isNewAccount &&
         window.localStorage.getItem(ONBOARDING_MODAL_STORAGE_KEY));
     if (!seen) setIsOpen(true);
-  }, [isAuthenticated, user?.createdAt, user?.id, user?.onboardingSeen]);
+  }, [isAuthenticated, isLoading, user?.createdAt, user?.id, user?.onboardingSeen]);
 
   // 모달이 실제로 열릴 때만 Riot 연동 상태를 조회한다.
   // /auth/me는 최소 필드만 반환해 user.riotAccounts가 없으므로, 단계 완료 표시에 쓸 수 없다.

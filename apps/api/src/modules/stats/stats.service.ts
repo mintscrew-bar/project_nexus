@@ -1,5 +1,4 @@
 import {
-  ForbiddenException,
   HttpException,
   HttpStatus,
   Injectable,
@@ -58,73 +57,6 @@ export interface ChampionStatsCacheResponse {
   stats: RankedChampStat[];
 }
 
-export interface LabUserProfileFallbackChampion {
-  championId: number;
-  championName: string;
-  championNameKorean: string;
-  games: number;
-  wins: number;
-  losses: number;
-  winRate: number;
-  avgKda: number;
-}
-
-export interface LabUserProfileFallbackResponse {
-  userId: string;
-  customGames: number;
-  threshold: number;
-  message: string;
-  summary: {
-    rankedGames: number;
-    wins: number;
-    losses: number;
-    winRate: number;
-    avgKda: number;
-  };
-  champions: LabUserProfileFallbackChampion[];
-}
-
-export interface LabUserProfileCompareEntry {
-  championId: number;
-  championName: string;
-  championNameKorean: string;
-  ranked: {
-    games: number;
-    wins: number;
-    losses: number;
-    winRate: number;
-    avgKda: number;
-  };
-  custom: {
-    games: number;
-    wins: number;
-    losses: number;
-    winRate: number;
-    avgKda: number;
-  };
-  delta: {
-    games: number;
-    winRate: number;
-    avgKda: number;
-  };
-  signal: "ranked-favored" | "scrim-favored" | "aligned" | "insufficient-data";
-}
-
-export interface LabUserProfileCompareResponse {
-  userId: string;
-  summary: {
-    rankedGames: number;
-    customGames: number;
-    rankedWinRate: number;
-    customWinRate: number;
-    rankedAvgKda: number;
-    customAvgKda: number;
-    winRateDelta: number;
-    avgKdaDelta: number;
-  };
-  champions: LabUserProfileCompareEntry[];
-}
-
 export interface RecentGamesSnapshot {
   last20: {
     wins: number;
@@ -173,78 +105,6 @@ export interface AuctionStats {
   avgSoldPrice: number;
   maxSoldPrice: number;
   titles: AuctionTitle[];
-}
-
-export interface LabSampleOverview {
-  matchesWithStats: number;
-  participantRows: number;
-  playersInDataset: number;
-  championsInDataset: number;
-  itemSelections: number;
-  recentMatches30d: number;
-}
-
-export interface LabLaneProfile {
-  position: string;
-  games: number;
-  winRate: number;
-  avgKills: number;
-  avgDeaths: number;
-  avgAssists: number;
-  avgDamage: number;
-  avgGold: number;
-}
-
-export interface LabChampionSignal {
-  championId: number;
-  championName: string;
-  championNameKorean: string;
-  games: number;
-  winRate: number;
-  avgKills: number;
-  avgDeaths: number;
-  avgAssists: number;
-}
-
-export interface LabItemTrend {
-  itemId: number;
-  picks: number;
-  uniqueUsers: number;
-}
-
-export interface LabMasteryLeader {
-  userId: string;
-  username: string;
-  avatar: string | null;
-  championId: number;
-  championName: string;
-  championNameKorean: string;
-  games: number;
-  winRate: number;
-  avgKda: number;
-  masteryScore: number;
-}
-
-export interface LabSeededChampionLeader {
-  puuid: string;
-  gameName: string | null;
-  tagLine: string | null;
-  championId: number;
-  championName: string;
-  championNameKorean: string;
-  games: number;
-  winRate: number;
-  avgKda: number;
-  lastGameAt: string;
-}
-
-export interface LabOverview {
-  sample: LabSampleOverview;
-  laneProfiles: LabLaneProfile[];
-  championSignals: LabChampionSignal[];
-  itemTrends: LabItemTrend[];
-  masteryLeaders: LabMasteryLeader[];
-  seededChampionLeaders: LabSeededChampionLeader[];
 }
 
 @Injectable()
@@ -392,16 +252,6 @@ export class StatsService {
 
   private roundMetric(value: number, digits = 4): number {
     return Number(value.toFixed(digits));
-  }
-
-  private computeStatWinRate(stat: RankedChampStat): number {
-    return stat.games > 0 ? stat.wins / stat.games : 0;
-  }
-
-  private computeStatAvgKda(stat: RankedChampStat): number {
-    return stat.games > 0
-      ? (stat.kills + stat.assists) / Math.max(stat.deaths, 1)
-      : 0;
   }
 
   private toRankedStatsFromCustomAggregate(
@@ -572,21 +422,26 @@ export class StatsService {
       deaths: number;
       assists: number;
       win: boolean;
-      // 외부 인제스트 매치는 teamId NULL — 팀 데미지 집계 시 같은 팀(NULL=NULL) 매칭은 제외된다.
       teamId: string | null;
+      teamIdSnapshot: string | null;
       totalDamageDealtToChampions: number;
       match: {
         createdAt: Date;
         participants: Array<{
           teamId: string | null;
+          teamIdSnapshot: string | null;
           totalDamageDealtToChampions: number;
         }>;
       };
     }>,
   ): CacheParticipantRow[] {
     return rows.map((row) => {
+      const teamId = row.teamId ?? row.teamIdSnapshot;
       const teamDamage = row.match.participants
-        .filter((participant) => participant.teamId === row.teamId)
+        .filter(
+          (participant) =>
+            (participant.teamId ?? participant.teamIdSnapshot) === teamId,
+        )
         .reduce(
           (sum, participant) => sum + participant.totalDamageDealtToChampions,
           0,
@@ -647,7 +502,7 @@ export class StatsService {
         where: {
           userId,
           match: {
-            roomId: { not: null },
+            isInternal: true,
             createdAt: {
               gte: seasonStart,
             },
@@ -660,6 +515,7 @@ export class StatsService {
           deaths: true,
           assists: true,
           teamId: true,
+          teamIdSnapshot: true,
           totalDamageDealtToChampions: true,
           win: true,
           match: {
@@ -668,6 +524,7 @@ export class StatsService {
               participants: {
                 select: {
                   teamId: true,
+                  teamIdSnapshot: true,
                   totalDamageDealtToChampions: true,
                 },
               },
@@ -698,7 +555,7 @@ export class StatsService {
         where: {
           userId,
           match: {
-            roomId: { not: null },
+            isInternal: true,
             createdAt: {
               gte: seasonStart,
             },
@@ -711,6 +568,7 @@ export class StatsService {
           deaths: true,
           assists: true,
           teamId: true,
+          teamIdSnapshot: true,
           totalDamageDealtToChampions: true,
           win: true,
           match: {
@@ -719,6 +577,7 @@ export class StatsService {
               participants: {
                 select: {
                   teamId: true,
+                  teamIdSnapshot: true,
                   totalDamageDealtToChampions: true,
                 },
               },
@@ -738,7 +597,7 @@ export class StatsService {
             where: {
               userId,
               match: {
-                roomId: null,
+                isInternal: false,
                 queueId: { in: [420, 440, 400, 430, 450] },
                 completedAt: { gte: seasonStart },
               },
@@ -823,7 +682,7 @@ export class StatsService {
           where: {
             userId,
             match: {
-              roomId: null,
+              isInternal: false,
               queueId: { in: queueIds },
               completedAt: { gte: seasonStart },
             },
@@ -963,287 +822,6 @@ export class StatsService {
     }
 
     return this.getChampionStatsCacheByUserId(found.userId, queueGroup);
-  }
-
-  async getLabUserProfileFallback(
-    userId: string,
-    requesterId?: string,
-  ): Promise<LabUserProfileFallbackResponse> {
-    const user = await this.getUserWithSettings(userId);
-    if (!user) {
-      throw new NotFoundException("User not found");
-    }
-
-    if (
-      requesterId &&
-      !this.isPrivacyAllowed(
-        user.settings,
-        requesterId,
-        userId,
-        "showChampionStats",
-      )
-    ) {
-      throw new ForbiddenException("Champion stats are private");
-    }
-
-    const [customCache, rankedCache] = await Promise.all([
-      this.getChampionStatsCacheByUserId(userId, "custom"),
-      this.getChampionStatsCacheByUserId(userId, "ranked"),
-    ]);
-
-    if (customCache.matchCount >= 10) {
-      throw new NotFoundException(
-        "Lab fallback is only available for users with fewer than 10 custom games",
-      );
-    }
-
-    const champions = rankedCache.stats.map((stat) => {
-      const avgKda =
-        stat.games > 0
-          ? (stat.kills + stat.assists) / Math.max(stat.deaths, 1)
-          : 0;
-      const winRate = stat.games > 0 ? stat.wins / stat.games : 0;
-
-      return {
-        championId: stat.championId,
-        championName: stat.championName,
-        championNameKorean: stat.championNameKorean,
-        games: stat.games,
-        wins: stat.wins,
-        losses: stat.losses,
-        winRate: this.roundMetric(winRate, 4),
-        avgKda: this.roundMetric(avgKda, 2),
-      };
-    });
-
-    const rankedGames = champions.reduce(
-      (sum, champion) => sum + champion.games,
-      0,
-    );
-    const wins = champions.reduce((sum, champion) => sum + champion.wins, 0);
-    const losses = champions.reduce(
-      (sum, champion) => sum + champion.losses,
-      0,
-    );
-    const totalKills = rankedCache.stats.reduce(
-      (sum, champion) => sum + champion.kills,
-      0,
-    );
-    const totalDeaths = rankedCache.stats.reduce(
-      (sum, champion) => sum + champion.deaths,
-      0,
-    );
-    const totalAssists = rankedCache.stats.reduce(
-      (sum, champion) => sum + champion.assists,
-      0,
-    );
-
-    return {
-      userId,
-      customGames: customCache.matchCount,
-      threshold: 10,
-      message:
-        "랭크 전적 기반 성향 참고 데이터입니다. 내전 데이터와는 별도로 해석해야 합니다.",
-      summary: {
-        rankedGames,
-        wins,
-        losses,
-        winRate: rankedGames > 0 ? this.roundMetric(wins / rankedGames, 4) : 0,
-        avgKda:
-          rankedGames > 0
-            ? this.roundMetric(
-                (totalKills + totalAssists) / Math.max(totalDeaths, 1),
-                2,
-              )
-            : 0,
-      },
-      champions,
-    };
-  }
-
-  async getLabUserProfileComparison(
-    userId: string,
-    requesterId?: string,
-  ): Promise<LabUserProfileCompareResponse> {
-    const user = await this.getUserWithSettings(userId);
-    if (!user) {
-      throw new NotFoundException("User not found");
-    }
-
-    if (
-      requesterId &&
-      !this.isPrivacyAllowed(
-        user.settings,
-        requesterId,
-        userId,
-        "showChampionStats",
-      )
-    ) {
-      throw new ForbiddenException("Champion stats are private");
-    }
-
-    const [rankedCache, customCache] = await Promise.all([
-      this.getChampionStatsCacheByUserId(userId, "ranked"),
-      this.getChampionStatsCacheByUserId(userId, "custom"),
-    ]);
-
-    const rankedMap = new Map(
-      rankedCache.stats.map((stat) => [stat.championId, stat] as const),
-    );
-    const customMap = new Map(
-      customCache.stats.map((stat) => [stat.championId, stat] as const),
-    );
-    const championIds = Array.from(
-      new Set([...rankedMap.keys(), ...customMap.keys()]),
-    );
-
-    const champions = championIds
-      .map((championId): LabUserProfileCompareEntry => {
-        const rankedStat =
-          rankedMap.get(championId) ??
-          ({
-            championId,
-            championName:
-              customMap.get(championId)?.championName ?? String(championId),
-            championNameKorean:
-              customMap.get(championId)?.championNameKorean ??
-              String(championId),
-            games: 0,
-            wins: 0,
-            losses: 0,
-            kills: 0,
-            deaths: 0,
-            assists: 0,
-          } satisfies RankedChampStat);
-        const customStat =
-          customMap.get(championId) ??
-          ({
-            championId,
-            championName:
-              rankedMap.get(championId)?.championName ?? String(championId),
-            championNameKorean:
-              rankedMap.get(championId)?.championNameKorean ??
-              String(championId),
-            games: 0,
-            wins: 0,
-            losses: 0,
-            kills: 0,
-            deaths: 0,
-            assists: 0,
-          } satisfies RankedChampStat);
-
-        const rankedWinRate = this.computeStatWinRate(rankedStat);
-        const customWinRate = this.computeStatWinRate(customStat);
-        const rankedAvgKda = this.computeStatAvgKda(rankedStat);
-        const customAvgKda = this.computeStatAvgKda(customStat);
-        const winRateDelta = customWinRate - rankedWinRate;
-        const avgKdaDelta = customAvgKda - rankedAvgKda;
-
-        let signal: LabUserProfileCompareEntry["signal"] = "aligned";
-        if (rankedStat.games < 3 || customStat.games < 3) {
-          signal = "insufficient-data";
-        } else if (winRateDelta >= 0.15 || avgKdaDelta >= 1) {
-          signal = "scrim-favored";
-        } else if (winRateDelta <= -0.15 || avgKdaDelta <= -1) {
-          signal = "ranked-favored";
-        }
-
-        return {
-          championId,
-          championName: rankedStat.championName || customStat.championName,
-          championNameKorean:
-            rankedStat.championNameKorean || customStat.championNameKorean,
-          ranked: {
-            games: rankedStat.games,
-            wins: rankedStat.wins,
-            losses: rankedStat.losses,
-            winRate: this.roundMetric(rankedWinRate, 4),
-            avgKda: this.roundMetric(rankedAvgKda, 2),
-          },
-          custom: {
-            games: customStat.games,
-            wins: customStat.wins,
-            losses: customStat.losses,
-            winRate: this.roundMetric(customWinRate, 4),
-            avgKda: this.roundMetric(customAvgKda, 2),
-          },
-          delta: {
-            games: customStat.games - rankedStat.games,
-            winRate: this.roundMetric(winRateDelta, 4),
-            avgKda: this.roundMetric(avgKdaDelta, 2),
-          },
-          signal,
-        };
-      })
-      .sort((a, b) => {
-        const gameDelta =
-          b.ranked.games + b.custom.games - (a.ranked.games + a.custom.games);
-        if (gameDelta !== 0) return gameDelta;
-        return Math.abs(b.delta.winRate) - Math.abs(a.delta.winRate);
-      });
-
-    const totalRankedKills = rankedCache.stats.reduce(
-      (sum, stat) => sum + stat.kills,
-      0,
-    );
-    const totalRankedDeaths = rankedCache.stats.reduce(
-      (sum, stat) => sum + stat.deaths,
-      0,
-    );
-    const totalRankedAssists = rankedCache.stats.reduce(
-      (sum, stat) => sum + stat.assists,
-      0,
-    );
-    const totalCustomKills = customCache.stats.reduce(
-      (sum, stat) => sum + stat.kills,
-      0,
-    );
-    const totalCustomDeaths = customCache.stats.reduce(
-      (sum, stat) => sum + stat.deaths,
-      0,
-    );
-    const totalCustomAssists = customCache.stats.reduce(
-      (sum, stat) => sum + stat.assists,
-      0,
-    );
-    const rankedWins = rankedCache.stats.reduce(
-      (sum, stat) => sum + stat.wins,
-      0,
-    );
-    const customWins = customCache.stats.reduce(
-      (sum, stat) => sum + stat.wins,
-      0,
-    );
-
-    const rankedWinRate =
-      rankedCache.matchCount > 0 ? rankedWins / rankedCache.matchCount : 0;
-    const customWinRate =
-      customCache.matchCount > 0 ? customWins / customCache.matchCount : 0;
-    const rankedAvgKda =
-      rankedCache.matchCount > 0
-        ? (totalRankedKills + totalRankedAssists) /
-          Math.max(totalRankedDeaths, 1)
-        : 0;
-    const customAvgKda =
-      customCache.matchCount > 0
-        ? (totalCustomKills + totalCustomAssists) /
-          Math.max(totalCustomDeaths, 1)
-        : 0;
-
-    return {
-      userId,
-      summary: {
-        rankedGames: rankedCache.matchCount,
-        customGames: customCache.matchCount,
-        rankedWinRate: this.roundMetric(rankedWinRate, 4),
-        customWinRate: this.roundMetric(customWinRate, 4),
-        rankedAvgKda: this.roundMetric(rankedAvgKda, 2),
-        customAvgKda: this.roundMetric(customAvgKda, 2),
-        winRateDelta: this.roundMetric(customWinRate - rankedWinRate, 4),
-        avgKdaDelta: this.roundMetric(customAvgKda - rankedAvgKda, 2),
-      },
-      champions,
-    };
   }
 
   async enqueueStatsRefresh(
@@ -1411,340 +989,6 @@ export class StatsService {
     });
   }
 
-  async getLabOverview(): Promise<LabOverview> {
-    const [
-      matchesWithStats,
-      participantRows,
-      playersInDatasetRows,
-      championsInDatasetRows,
-      itemSelectionsRows,
-      recentMatchesRows,
-      laneProfileRows,
-      championSignalRows,
-      itemTrendRows,
-      masteryLeaderRows,
-      seededChampionLeaderRows,
-    ] = await Promise.all([
-      this.prisma.matchParticipant.groupBy({
-        by: ["matchId"],
-        where: {
-          match: {
-            roomId: { not: null },
-          },
-        },
-      }),
-      this.prisma.matchParticipant.count({
-        where: {
-          match: {
-            roomId: { not: null },
-          },
-        },
-      }),
-      this.prisma.$queryRaw<{ count: bigint }[]>(Prisma.sql`
-        SELECT COUNT(DISTINCT mp."userId")::bigint AS count
-        FROM "match_participants" mp
-        INNER JOIN "matches" m ON m."id" = mp."matchId"
-        WHERE m."roomId" IS NOT NULL
-      `),
-      this.prisma.$queryRaw<{ count: bigint }[]>(Prisma.sql`
-        SELECT COUNT(DISTINCT mp."championId")::bigint AS count
-        FROM "match_participants" mp
-        INNER JOIN "matches" m ON m."id" = mp."matchId"
-        WHERE m."roomId" IS NOT NULL
-      `),
-      this.prisma.$queryRaw<{ count: bigint }[]>(Prisma.sql`
-        SELECT COUNT(*)::bigint AS count
-        FROM (
-          SELECT unnest(ARRAY[mp."item0", mp."item1", mp."item2", mp."item3", mp."item4", mp."item5", mp."item6"]) AS item_id
-          FROM "match_participants" mp
-          INNER JOIN "matches" m ON m."id" = mp."matchId"
-          WHERE m."roomId" IS NOT NULL
-        ) items
-        WHERE item_id > 0
-      `),
-      this.prisma.$queryRaw<{ count: bigint }[]>(Prisma.sql`
-        SELECT COUNT(DISTINCT mp."matchId")::bigint AS count
-        FROM "match_participants" mp
-        INNER JOIN "matches" m ON m."id" = mp."matchId"
-        WHERE COALESCE(m."completedAt", m."createdAt") >= NOW() - INTERVAL '30 days'
-          AND m."roomId" IS NOT NULL
-      `),
-      this.prisma.$queryRaw<
-        {
-          position: string;
-          games: bigint;
-          winRate: number;
-          avgKills: number;
-          avgDeaths: number;
-          avgAssists: number;
-          avgDamage: number;
-          avgGold: number;
-        }[]
-      >(Prisma.sql`
-        SELECT
-          mp."position",
-          COUNT(*)::bigint AS games,
-          ROUND((AVG(CASE WHEN mp."win" THEN 1.0 ELSE 0.0 END) * 100)::numeric, 1)::float AS "winRate",
-          ROUND(AVG(mp."kills")::numeric, 1)::float AS "avgKills",
-          ROUND(AVG(mp."deaths")::numeric, 1)::float AS "avgDeaths",
-          ROUND(AVG(mp."assists")::numeric, 1)::float AS "avgAssists",
-          ROUND(AVG(mp."totalDamageDealtToChampions")::numeric, 0)::float AS "avgDamage",
-          ROUND(AVG(mp."goldEarned")::numeric, 0)::float AS "avgGold"
-        FROM "match_participants" mp
-        INNER JOIN "matches" m ON m."id" = mp."matchId"
-        WHERE m."roomId" IS NOT NULL
-          AND mp."position" IS NOT NULL
-          AND mp."position" <> ''
-          AND mp."position" <> 'UNKNOWN'
-        GROUP BY mp."position"
-        ORDER BY COUNT(*) DESC
-      `),
-      this.prisma.$queryRaw<
-        {
-          championId: number;
-          championName: string;
-          games: bigint;
-          winRate: number;
-          avgKills: number;
-          avgDeaths: number;
-          avgAssists: number;
-        }[]
-      >(Prisma.sql`
-        SELECT
-          mp."championId",
-          mp."championName",
-          COUNT(*)::bigint AS games,
-          ROUND((AVG(CASE WHEN mp."win" THEN 1.0 ELSE 0.0 END) * 100)::numeric, 1)::float AS "winRate",
-          ROUND(AVG(mp."kills")::numeric, 1)::float AS "avgKills",
-          ROUND(AVG(mp."deaths")::numeric, 1)::float AS "avgDeaths",
-          ROUND(AVG(mp."assists")::numeric, 1)::float AS "avgAssists"
-        FROM "match_participants" mp
-        INNER JOIN "matches" m ON m."id" = mp."matchId"
-        WHERE m."roomId" IS NOT NULL
-        GROUP BY mp."championId", mp."championName"
-        HAVING COUNT(*) >= 3
-        ORDER BY COUNT(*) DESC, "winRate" DESC
-        LIMIT 12
-      `),
-      this.prisma.$queryRaw<
-        {
-          itemId: number;
-          picks: bigint;
-          uniqueUsers: bigint;
-        }[]
-      >(Prisma.sql`
-        SELECT
-          item_id AS "itemId",
-          COUNT(*)::bigint AS picks,
-          COUNT(DISTINCT "userId")::bigint AS "uniqueUsers"
-        FROM (
-          SELECT
-            mp."userId",
-            unnest(ARRAY[mp."item0", mp."item1", mp."item2", mp."item3", mp."item4", mp."item5", mp."item6"]) AS item_id
-          FROM "match_participants" mp
-          INNER JOIN "matches" m ON m."id" = mp."matchId"
-          WHERE m."roomId" IS NOT NULL
-        ) items
-        WHERE item_id > 0
-        GROUP BY item_id
-        ORDER BY COUNT(*) DESC
-        LIMIT 12
-      `),
-      this.prisma.$queryRaw<
-        {
-          userId: string;
-          username: string;
-          avatar: string | null;
-          championId: number;
-          championName: string;
-          games: bigint;
-          winRate: number;
-          avgKda: number;
-          masteryScore: number;
-        }[]
-      >(Prisma.sql`
-        WITH champion_user AS (
-          SELECT
-            mp."userId",
-            u."username",
-            u."avatar",
-            mp."championId",
-            mp."championName",
-            COUNT(*)::bigint AS games,
-            AVG(CASE WHEN mp."win" THEN 1.0 ELSE 0.0 END) * 100 AS "winRate",
-            AVG((mp."kills" + mp."assists")::float / GREATEST(mp."deaths", 1)) AS "avgKda"
-          FROM "match_participants" mp
-          INNER JOIN "matches" m ON m."id" = mp."matchId"
-          INNER JOIN "users" u ON u."id" = mp."userId"
-          WHERE m."roomId" IS NOT NULL
-          GROUP BY mp."userId", u."username", u."avatar", mp."championId", mp."championName"
-          HAVING COUNT(*) >= 4
-        ),
-        ranked AS (
-          SELECT
-            *,
-            ROUND(((games * 4) + ("winRate" * 0.45) + ("avgKda" * 8))::numeric, 1) AS "masteryScore",
-            ROW_NUMBER() OVER (
-              PARTITION BY "userId"
-              ORDER BY ((games * 4) + ("winRate" * 0.45) + ("avgKda" * 8)) DESC, games DESC
-            ) AS rn
-          FROM champion_user
-        )
-        SELECT
-          "userId",
-          "username",
-          "avatar",
-          "championId",
-          "championName",
-          games,
-          ROUND("winRate"::numeric, 1)::float AS "winRate",
-          ROUND("avgKda"::numeric, 2)::float AS "avgKda",
-          "masteryScore"
-        FROM ranked
-        WHERE rn = 1
-        ORDER BY "masteryScore" DESC
-        LIMIT 10
-      `),
-      this.prisma.$queryRaw<
-        {
-          puuid: string;
-          gameName: string | null;
-          tagLine: string | null;
-          championId: number;
-          championName: string;
-          games: bigint;
-          winRate: number;
-          avgKda: number;
-          lastGameAt: Date;
-        }[]
-      >(Prisma.sql`
-        WITH seeded AS (
-          SELECT
-            kp."puuid",
-            kp."gameName",
-            kp."tagLine"
-          FROM "known_puuids" kp
-          WHERE kp."priority" = 7
-        ),
-        seeded_participants AS (
-          SELECT
-            s."puuid",
-            s."gameName",
-            s."tagLine",
-            (participant->>'championId')::int AS "championId",
-            participant->>'championName' AS "championName",
-            CASE WHEN (participant->>'win')::boolean THEN 1 ELSE 0 END AS win,
-            ((participant->>'kills')::float + (participant->>'assists')::float)
-              / GREATEST((participant->>'deaths')::float, 1) AS kda,
-            rmc."gameEnd" AS "gameEnd"
-          FROM "riot_match_cache" rmc
-          INNER JOIN LATERAL jsonb_array_elements((rmc."data"::jsonb->'info'->'participants')) participant ON TRUE
-          INNER JOIN seeded s ON s."puuid" = participant->>'puuid'
-          WHERE rmc."queueId" IN (420, 440)
-            AND rmc."gameEnd" >= NOW() - INTERVAL '90 days'
-        ),
-        per_champion AS (
-          SELECT
-            "puuid",
-            "gameName",
-            "tagLine",
-            "championId",
-            "championName",
-            COUNT(*)::bigint AS games,
-            ROUND((AVG(win) * 100)::numeric, 1)::float AS "winRate",
-            ROUND(AVG(kda)::numeric, 2)::float AS "avgKda",
-            MAX("gameEnd") AS "lastGameAt"
-          FROM seeded_participants
-          GROUP BY "puuid", "gameName", "tagLine", "championId", "championName"
-          HAVING COUNT(*) >= 8
-        ),
-        ranked AS (
-          SELECT
-            *,
-            ROW_NUMBER() OVER (
-              PARTITION BY "puuid"
-              ORDER BY games DESC, "avgKda" DESC, "winRate" DESC
-            ) AS rn
-          FROM per_champion
-        )
-        SELECT
-          "puuid",
-          "gameName",
-          "tagLine",
-          "championId",
-          "championName",
-          games,
-          "winRate",
-          "avgKda",
-          "lastGameAt"
-        FROM ranked
-        WHERE rn = 1
-        ORDER BY games DESC, "avgKda" DESC
-        LIMIT 12
-      `),
-    ]);
-
-    return {
-      sample: {
-        matchesWithStats: matchesWithStats.length,
-        participantRows,
-        playersInDataset: Number(playersInDatasetRows[0]?.count ?? 0),
-        championsInDataset: Number(championsInDatasetRows[0]?.count ?? 0),
-        itemSelections: Number(itemSelectionsRows[0]?.count ?? 0),
-        recentMatches30d: Number(recentMatchesRows[0]?.count ?? 0),
-      },
-      laneProfiles: laneProfileRows.map((row) => ({
-        position: row.position,
-        games: Number(row.games),
-        winRate: Number(row.winRate),
-        avgKills: Number(row.avgKills),
-        avgDeaths: Number(row.avgDeaths),
-        avgAssists: Number(row.avgAssists),
-        avgDamage: Number(row.avgDamage),
-        avgGold: Number(row.avgGold),
-      })),
-      championSignals: championSignalRows.map((row) => ({
-        championId: row.championId,
-        championName: row.championName,
-        championNameKorean: getChampionKoreanName(row.championName),
-        games: Number(row.games),
-        winRate: Number(row.winRate),
-        avgKills: Number(row.avgKills),
-        avgDeaths: Number(row.avgDeaths),
-        avgAssists: Number(row.avgAssists),
-      })),
-      itemTrends: itemTrendRows.map((row) => ({
-        itemId: row.itemId,
-        picks: Number(row.picks),
-        uniqueUsers: Number(row.uniqueUsers),
-      })),
-      masteryLeaders: masteryLeaderRows.map((row) => ({
-        userId: row.userId,
-        username: row.username,
-        avatar: row.avatar,
-        championId: row.championId,
-        championName: row.championName,
-        championNameKorean: getChampionKoreanName(row.championName),
-        games: Number(row.games),
-        winRate: Number(row.winRate),
-        avgKda: Number(row.avgKda),
-        masteryScore: Number(row.masteryScore),
-      })),
-      seededChampionLeaders: seededChampionLeaderRows.map((row) => ({
-        puuid: row.puuid,
-        gameName: row.gameName,
-        tagLine: row.tagLine,
-        championId: row.championId,
-        championName: row.championName,
-        championNameKorean: getChampionKoreanName(row.championName),
-        games: Number(row.games),
-        winRate: Number(row.winRate),
-        avgKda: Number(row.avgKda),
-        lastGameAt: row.lastGameAt.toISOString(),
-      })),
-    };
-  }
-
   private isPrivacyAllowed(
     settings: {
       showChampionStats?: boolean;
@@ -1893,7 +1137,7 @@ export class StatsService {
       where: {
         userId,
         match: {
-          roomId: { not: null },
+          isInternal: true,
         },
       },
       select: {
@@ -1966,7 +1210,7 @@ export class StatsService {
       where: {
         userId,
         match: {
-          roomId: { not: null },
+          isInternal: true,
         },
       },
       select: {

@@ -31,7 +31,18 @@ describe("isRiotCustomGame", () => {
 
 describe("MatchDataCollectionService", () => {
   const createService = (match: Record<string, jest.Mock>, riot = {}) =>
-    new MatchDataCollectionService({ match } as never, riot as never);
+    new MatchDataCollectionService(
+      {
+        match: {
+          findMany: jest.fn().mockResolvedValue([]),
+          // 크로스레퍼런스가 저장 직전 "이미 다른 매치가 가져간 Riot 게임인지"를
+          // 확인한다. 기본은 미할당(null).
+          findFirst: jest.fn().mockResolvedValue(null),
+          ...match,
+        },
+      } as never,
+      riot as never,
+    );
 
   afterEach(() => {
     jest.restoreAllMocks();
@@ -84,7 +95,7 @@ describe("MatchDataCollectionService", () => {
           where: {
             status: "COMPLETED",
             dataCollected: false,
-            roomId: { not: null },
+            isInternal: true,
             collectAttempts: { lt: 10 },
           },
         }),
@@ -217,15 +228,12 @@ describe("MatchDataCollectionService", () => {
         expect.any(Number),
         "background",
       );
-      expect(update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({ riotMatchId: "KR_999" }),
-        }),
-      );
+      expect(update).not.toHaveBeenCalled();
       expect(saveSpy).toHaveBeenCalledWith(
         "match-manual",
         storedMatch,
         candidateData,
+        "KR_999",
       );
     });
 
@@ -275,16 +283,18 @@ describe("MatchDataCollectionService", () => {
         { findUnique, update },
         { getMatchIdsByPuuid, getMatchById },
       );
-      jest
+      const saveSpy = jest
         .spyOn(service as never, "saveMatchData" as never)
         .mockResolvedValue(undefined as never);
 
       await service.collectMatchDataByPuuidCrossref("match-first-game");
 
-      expect(update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({ riotMatchId: "KR_FIRST" }),
-        }),
+      expect(update).not.toHaveBeenCalled();
+      expect(saveSpy).toHaveBeenCalledWith(
+        "match-first-game",
+        storedMatch,
+        firstGame,
+        "KR_FIRST",
       );
     });
 
@@ -331,7 +341,7 @@ describe("MatchDataCollectionService", () => {
         { findUnique, update },
         { getMatchIdsByPuuid, getMatchById },
       );
-      jest
+      const saveSpy = jest
         .spyOn(service as never, "saveMatchData" as never)
         .mockResolvedValue(undefined as never);
 
@@ -339,10 +349,12 @@ describe("MatchDataCollectionService", () => {
 
       expect(getMatchIdsByPuuid).toHaveBeenCalledTimes(2);
       expect(getMatchById).toHaveBeenCalledTimes(2);
-      expect(update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({ riotMatchId: "KR_CURRENT" }),
-        }),
+      expect(update).not.toHaveBeenCalled();
+      expect(saveSpy).toHaveBeenCalledWith(
+        "match-index-lag",
+        storedMatch,
+        currentGame,
+        "KR_CURRENT",
       );
     });
 
@@ -396,7 +408,7 @@ describe("MatchDataCollectionService", () => {
         { findUnique, update },
         { getMatchIdsByPuuid, getMatchById },
       );
-      jest
+      const saveSpy = jest
         .spyOn(service as never, "saveMatchData" as never)
         .mockResolvedValue(undefined as never);
 
@@ -406,10 +418,12 @@ describe("MatchDataCollectionService", () => {
       expect(getMatchIdsByPuuid).toHaveBeenCalledTimes(4);
       // 동일한 매치 ID의 상세는 중복 조회하지 않는다.
       expect(getMatchById).toHaveBeenCalledTimes(1);
-      expect(update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({ riotMatchId: "KR_777" }),
-        }),
+      expect(update).not.toHaveBeenCalled();
+      expect(saveSpy).toHaveBeenCalledWith(
+        "match-early-exit",
+        storedMatch,
+        candidateData,
+        "KR_777",
       );
     });
 
@@ -452,7 +466,7 @@ describe("MatchDataCollectionService", () => {
         { findUnique, update },
         { getMatchIdsByPuuid, getMatchById },
       );
-      jest
+      const saveSpy = jest
         .spyOn(service as never, "saveMatchData" as never)
         .mockResolvedValue(undefined as never);
 
@@ -460,10 +474,12 @@ describe("MatchDataCollectionService", () => {
 
       // 첫 멤버가 빈손이어도 두 번째 멤버로 폴백해 복구한다.
       expect(getMatchIdsByPuuid).toHaveBeenCalledTimes(2);
-      expect(update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({ riotMatchId: "KR_888" }),
-        }),
+      expect(update).not.toHaveBeenCalled();
+      expect(saveSpy).toHaveBeenCalledWith(
+        "match-fallback",
+        storedMatch,
+        validData,
+        "KR_888",
       );
     });
 
@@ -494,8 +510,73 @@ describe("MatchDataCollectionService", () => {
         "background",
         expect.any(Object),
       );
-      expect(saveSpy).toHaveBeenCalledWith("match-1", storedMatch, matchData);
+      expect(saveSpy).toHaveBeenCalledWith(
+        "match-1",
+        storedMatch,
+        matchData,
+        "KR_123",
+      );
       expect(getMatchIdsByPuuid).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("Riot 후보 검증", () => {
+    const score = (
+      expectedMembers: { puuid: string; userId: string; teamId: string }[],
+      participants: { puuid: string; teamId: number }[],
+    ) => {
+      const service = createService({});
+      return (
+        service as never as {
+          scoreCrossrefCandidate: (...args: unknown[]) => { valid: boolean };
+        }
+      ).scoreCrossrefCandidate(
+        "KR_TEST",
+        1,
+        1,
+        { teamAId: "a", teamBId: "b" },
+        expectedMembers,
+        {
+          info: {
+            queueId: 0,
+            gameType: "CUSTOM_GAME",
+            gameEndTimestamp: Date.now(),
+            participants,
+          },
+        },
+        new Date(),
+      );
+    };
+
+    it("기대 참가자가 일부만 있는 후보를 거부한다", () => {
+      const expected = [
+        { puuid: "a1", userId: "ua1", teamId: "a" },
+        { puuid: "a2", userId: "ua2", teamId: "a" },
+        { puuid: "b1", userId: "ub1", teamId: "b" },
+        { puuid: "b2", userId: "ub2", teamId: "b" },
+      ];
+
+      expect(
+        score(expected, [
+          { puuid: "a1", teamId: 100 },
+          { puuid: "a2", teamId: 100 },
+          { puuid: "b1", teamId: 200 },
+        ]).valid,
+      ).toBe(false);
+    });
+
+    it("참가자는 같아도 Nexus 팀 배치가 다른 후보를 거부한다", () => {
+      const expected = [
+        { puuid: "a1", userId: "ua1", teamId: "a" },
+        { puuid: "b1", userId: "ub1", teamId: "b" },
+      ];
+
+      expect(
+        score(expected, [
+          { puuid: "a1", teamId: 100 },
+          { puuid: "b1", teamId: 100 },
+        ]).valid,
+      ).toBe(false);
     });
   });
 
@@ -507,10 +588,13 @@ describe("MatchDataCollectionService", () => {
     const runSave = async (
       participantPuuids: string[],
       linkRiotAccounts = true,
+      useSnapshots = false,
+      riotMatchId?: string,
+      misalignTeams = false,
     ) => {
       const riotAccounts = (puuid: string) =>
         linkRiotAccounts ? [{ puuid }] : [];
-      const storedMatch = {
+      const liveMatch = {
         id: "match-1",
         teamAId: "a",
         teamBId: "b",
@@ -533,6 +617,31 @@ describe("MatchDataCollectionService", () => {
           ],
         },
       };
+      const storedMatch = useSnapshots
+        ? {
+            id: "match-1",
+            teamAId: null,
+            teamBId: null,
+            teamAIdSnapshot: "a",
+            teamAName: "A팀",
+            teamBIdSnapshot: "b",
+            teamBName: "B팀",
+            teamA: null,
+            teamB: null,
+            rosterSnapshots: [
+              {
+                userId: "user-a",
+                puuid: "puuid-a",
+                teamIdSnapshot: "a",
+              },
+              {
+                userId: "user-b",
+                puuid: "puuid-b",
+                teamIdSnapshot: "b",
+              },
+            ],
+          }
+        : liveMatch;
 
       const matchUpdate = jest.fn().mockResolvedValue(undefined);
       const tx = {
@@ -552,17 +661,19 @@ describe("MatchDataCollectionService", () => {
         $transaction: jest.fn(async (cb: (t: unknown) => unknown) => cb(tx)),
         statsRecomputeQueue: { upsert: jest.fn().mockResolvedValue(undefined) },
       };
+      const rankingUpdate = jest.fn().mockResolvedValue(undefined);
 
       const service = new MatchDataCollectionService(
         prisma as never,
         {} as never,
+        { updateRanking: rankingUpdate } as never,
       );
 
       const matchData = {
         info: {
           participants: participantPuuids.map((puuid, i) => ({
             puuid,
-            teamId: i === 0 ? 100 : 200,
+            teamId: i === 0 || misalignTeams ? 100 : 200,
           })),
           teams: [],
         },
@@ -570,20 +681,67 @@ describe("MatchDataCollectionService", () => {
 
       const call = (
         service as never as {
-          saveMatchData: (id: string, m: unknown, d: unknown) => Promise<void>;
+          saveMatchData: (
+            id: string,
+            m: unknown,
+            d: unknown,
+            riotId?: string,
+          ) => Promise<void>;
         }
-      ).saveMatchData("match-1", storedMatch, matchData);
+      ).saveMatchData("match-1", storedMatch, matchData, riotMatchId);
 
-      return { call, tx, matchUpdate };
+      return { call, tx, matchUpdate, rankingUpdate };
     };
 
     it("기대 참가자가 모두 매핑되면 전적을 저장하고 dataCollected를 확정한다", async () => {
-      const { call, tx, matchUpdate } = await runSave(["puuid-a", "puuid-b"]);
+      const { call, tx, matchUpdate, rankingUpdate } = await runSave(
+        ["puuid-a", "puuid-b"],
+        true,
+        false,
+        "KR_100",
+      );
 
       await expect(call).resolves.toBeUndefined();
       expect(tx.matchParticipant.create).toHaveBeenCalledTimes(2);
       expect(matchUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({ data: { dataCollected: true } }),
+        expect.objectContaining({
+          data: expect.objectContaining({
+            dataCollected: true,
+            riotMatchId: "KR_100",
+          }),
+        }),
+      );
+      expect(rankingUpdate).toHaveBeenCalledWith("user-a");
+      expect(rankingUpdate).toHaveBeenCalledWith("user-b");
+    });
+
+    it("팀 배치가 다르면 Riot ID와 전적을 확정하지 않는다", async () => {
+      const { call, tx, matchUpdate } = await runSave(
+        ["puuid-a", "puuid-b"],
+        true,
+        false,
+        "KR_WRONG",
+        true,
+      );
+
+      await expect(call).rejects.toThrow(/팀 배치 불일치/);
+      expect(tx.matchParticipant.create).not.toHaveBeenCalled();
+      expect(matchUpdate).not.toHaveBeenCalled();
+    });
+
+    it("방과 팀이 삭제된 뒤에도 종료 로스터 스냅샷으로 전적을 저장한다", async () => {
+      const { call, tx } = await runSave(["puuid-a", "puuid-b"], true, true);
+
+      await expect(call).resolves.toBeUndefined();
+      expect(tx.matchParticipant.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            userId: "user-a",
+            teamId: null,
+            teamIdSnapshot: "a",
+            teamName: "A팀",
+          }),
+        }),
       );
     });
 

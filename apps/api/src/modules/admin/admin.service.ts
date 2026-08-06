@@ -5,7 +5,6 @@ import {
   BadRequestException,
   ForbiddenException,
 } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../prisma/prisma.service";
 import {
   UserRole,
@@ -58,7 +57,6 @@ export class AdminService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly configService: ConfigService,
     private readonly discordBotService: DiscordBotService,
     private readonly adminAlerts: DiscordAdminAlertService,
     private readonly discordVoiceService: DiscordVoiceService,
@@ -67,24 +65,6 @@ export class AdminService {
     private readonly dmGateway: DmGateway,
     private readonly notificationService: NotificationService,
   ) {}
-
-  private readonly seededHighTierPriority = 7;
-  private readonly matchFetchStaleHours = {
-    ranked: 6,
-    normal: 12,
-    aram: 24,
-    custom: 24,
-  } as const;
-
-  private getPositiveIntConfig(key: string, fallback: number): number {
-    const raw = this.configService.get<string>(key);
-    if (!raw) return fallback;
-    const parsed = Number(raw);
-    if (!Number.isFinite(parsed) || parsed <= 0) {
-      return fallback;
-    }
-    return Math.floor(parsed);
-  }
 
   // ── Audit Log ───────────────────────────────────────────────────────────────
 
@@ -144,158 +124,6 @@ export class AdminService {
       pendingUserReports,
       pendingPostReports,
       totalClans,
-    };
-  }
-
-  async getMatchQueueStats() {
-    const now = Date.now();
-    const rankedStaleBefore = new Date(
-      now - this.matchFetchStaleHours.ranked * 60 * 60 * 1000,
-    );
-    const normalStaleBefore = new Date(
-      now - this.matchFetchStaleHours.normal * 60 * 60 * 1000,
-    );
-    const aramStaleBefore = new Date(
-      now - this.matchFetchStaleHours.aram * 60 * 60 * 1000,
-    );
-    const customStaleBefore = new Date(
-      now - this.matchFetchStaleHours.custom * 60 * 60 * 1000,
-    );
-
-    const [
-      knownPuuidsTotal,
-      nexusUsers,
-      seededUsers,
-      rankedPending,
-      rankedPendingNexus,
-      rankedPendingSeeded,
-      normalPending,
-      aramPending,
-      customPending,
-      riotMatchCacheSize,
-      matchStatsCacheGrouped,
-      recomputeQueueSize,
-    ] = await Promise.all([
-      this.prisma.knownPuuid.count(),
-      this.prisma.knownPuuid.count({
-        where: { isNexusUser: true },
-      }),
-      this.prisma.knownPuuid.count({
-        where: {
-          isNexusUser: false,
-          priority: this.seededHighTierPriority,
-        },
-      }),
-      this.prisma.knownPuuid.count({
-        where: {
-          OR: [
-            { rankedFetchedAt: null },
-            { rankedFetchedAt: { lt: rankedStaleBefore } },
-          ],
-        },
-      }),
-      this.prisma.knownPuuid.count({
-        where: {
-          isNexusUser: true,
-          OR: [
-            { rankedFetchedAt: null },
-            { rankedFetchedAt: { lt: rankedStaleBefore } },
-          ],
-        },
-      }),
-      this.prisma.knownPuuid.count({
-        where: {
-          isNexusUser: false,
-          priority: this.seededHighTierPriority,
-          OR: [
-            { rankedFetchedAt: null },
-            { rankedFetchedAt: { lt: rankedStaleBefore } },
-          ],
-        },
-      }),
-      this.prisma.knownPuuid.count({
-        where: {
-          OR: [
-            { normalFetchedAt: null },
-            { normalFetchedAt: { lt: normalStaleBefore } },
-          ],
-        },
-      }),
-      this.prisma.knownPuuid.count({
-        where: {
-          OR: [
-            { aramFetchedAt: null },
-            { aramFetchedAt: { lt: aramStaleBefore } },
-          ],
-        },
-      }),
-      this.prisma.knownPuuid.count({
-        where: {
-          isNexusUser: false,
-          OR: [
-            { customFetchedAt: null },
-            { customFetchedAt: { lt: customStaleBefore } },
-          ],
-        },
-      }),
-      this.prisma.riotMatchCache.count(),
-      this.prisma.matchStatsCache.groupBy({
-        by: ["queueGroup"],
-        _count: { _all: true },
-      }),
-      this.prisma.statsRecomputeQueue.count(),
-    ]);
-
-    const matchStatsCacheSize = {
-      ranked: 0,
-      normal: 0,
-      aram: 0,
-      custom: 0,
-      all: 0,
-    };
-
-    for (const row of matchStatsCacheGrouped) {
-      if (row.queueGroup in matchStatsCacheSize) {
-        matchStatsCacheSize[
-          row.queueGroup as keyof typeof matchStatsCacheSize
-        ] = row._count._all;
-      }
-    }
-
-    return {
-      knownPuuids: {
-        total: knownPuuidsTotal,
-        nexusUsers,
-        seeded: seededUsers,
-      },
-      fetchPending: {
-        ranked: {
-          total: rankedPending,
-          nexus: rankedPendingNexus,
-          seeded: rankedPendingSeeded,
-        },
-        normal: normalPending,
-        aram: aramPending,
-        custom: customPending,
-      },
-      seededPolicy: {
-        priority: this.seededHighTierPriority,
-        slotCap: this.getPositiveIntConfig(
-          "MATCH_FETCH_RANKED_SEEDED_SLOT_CAP",
-          15,
-        ),
-        staleHours: this.getPositiveIntConfig(
-          "MATCH_FETCH_RANKED_SEEDED_STALE_HOURS",
-          72,
-        ),
-        initialBackfillLimit: this.getPositiveIntConfig(
-          "MATCH_FETCH_RANKED_SEEDED_INITIAL_BACKFILL_LIMIT",
-          100,
-        ),
-      },
-      riotMatchCacheSize,
-      matchStatsCacheSize,
-      statsRecomputeQueueSize: recomputeQueueSize,
     };
   }
 
@@ -1347,9 +1175,8 @@ export class AdminService {
   // ── 내전 기록 (실제 진행된 내부 토너먼트 매치) ─────────────────────────────
   //
   // Match 테이블은 두 종류가 섞여 있다.
-  //   · 내부 내전 매치 — roomId가 있고 Nexus Team으로 편성된 경기
-  //   · 외부 랭크 인제스트 매치 — roomId가 NULL이고 queueId로 식별되는 캐시 데이터
-  // 관리자 화면에서 필요한 것은 전자뿐이므로 roomId 존재 여부로 걸러낸다.
+  //   · 내부 내전 매치 — isInternal=true이며 방 삭제 후에도 스냅샷으로 보존되는 경기
+  //   · 외부 랭크 인제스트 매치 — queueId로 식별되는 캐시 데이터
 
   async getInternalMatches(params: {
     page: number;
@@ -1363,25 +1190,34 @@ export class AdminService {
     const skip = (page - 1) * limit;
 
     const where: Prisma.MatchWhereInput = {
-      roomId: { not: null },
+      isInternal: true,
       ...(status ? { status } : {}),
       ...(collected ? { dataCollected: collected === "collected" } : {}),
       ...(search
         ? {
-            room: {
-              is: {
-                OR: [
-                  { name: { contains: search, mode: "insensitive" } },
-                  {
-                    host: {
-                      is: {
-                        username: { contains: search, mode: "insensitive" },
+            OR: [
+              { roomName: { contains: search, mode: "insensitive" } },
+              { roomHostName: { contains: search, mode: "insensitive" } },
+              {
+                room: {
+                  is: {
+                    OR: [
+                      { name: { contains: search, mode: "insensitive" } },
+                      {
+                        host: {
+                          is: {
+                            username: {
+                              contains: search,
+                              mode: "insensitive",
+                            },
+                          },
+                        },
                       },
-                    },
+                    ],
                   },
-                ],
+                },
               },
-            },
+            ],
           }
         : {}),
     };
@@ -1402,6 +1238,17 @@ export class AdminService {
           completedAt: true,
           createdAt: true,
           winnerId: true,
+          roomIdSnapshot: true,
+          roomName: true,
+          roomTeamMode: true,
+          roomHostId: true,
+          roomHostName: true,
+          teamAIdSnapshot: true,
+          teamAName: true,
+          teamBIdSnapshot: true,
+          teamBName: true,
+          winnerIdSnapshot: true,
+          winnerName: true,
           room: {
             select: {
               id: true,
@@ -1427,13 +1274,50 @@ export class AdminService {
       this.prisma.match.count({ where }),
     ]);
 
-    return { matches, total, page, limit };
+    return {
+      matches: matches.map((match) => ({
+        ...match,
+        room:
+          match.room ??
+          (match.roomIdSnapshot && match.roomName
+            ? {
+                id: match.roomIdSnapshot,
+                name: match.roomName,
+                status: "COMPLETED",
+                teamMode: match.roomTeamMode,
+                host:
+                  match.roomHostId && match.roomHostName
+                    ? { id: match.roomHostId, username: match.roomHostName }
+                    : null,
+              }
+            : null),
+        teamA:
+          match.teamA ??
+          (match.teamAIdSnapshot && match.teamAName
+            ? { id: match.teamAIdSnapshot, name: match.teamAName }
+            : null),
+        teamB:
+          match.teamB ??
+          (match.teamBIdSnapshot && match.teamBName
+            ? { id: match.teamBIdSnapshot, name: match.teamBName }
+            : null),
+        winner:
+          match.winner ??
+          (match.winnerIdSnapshot && match.winnerName
+            ? { id: match.winnerIdSnapshot, name: match.winnerName }
+            : null),
+        winnerId: match.winnerId ?? match.winnerIdSnapshot,
+      })),
+      total,
+      page,
+      limit,
+    };
   }
 
   async getInternalMatchDetail(matchId: string) {
     const match = await this.prisma.match.findFirst({
-      // roomId 조건을 함께 걸어 외부 인제스트 매치가 이 경로로 노출되지 않게 한다.
-      where: { id: matchId, roomId: { not: null } },
+      // isInternal 조건으로 외부 인제스트 매치가 이 경로로 노출되지 않게 한다.
+      where: { id: matchId, isInternal: true },
       select: {
         id: true,
         status: true,
@@ -1454,6 +1338,17 @@ export class AdminService {
         completedAt: true,
         createdAt: true,
         winnerId: true,
+        roomIdSnapshot: true,
+        roomName: true,
+        roomTeamMode: true,
+        roomHostId: true,
+        roomHostName: true,
+        teamAIdSnapshot: true,
+        teamAName: true,
+        teamBIdSnapshot: true,
+        teamBName: true,
+        winnerIdSnapshot: true,
+        winnerName: true,
         room: {
           select: {
             id: true,
@@ -1472,6 +1367,8 @@ export class AdminService {
         teamStats: {
           select: {
             teamId: true,
+            teamIdSnapshot: true,
+            teamName: true,
             win: true,
             towerKills: true,
             inhibitorKills: true,
@@ -1486,6 +1383,8 @@ export class AdminService {
           select: {
             id: true,
             teamId: true,
+            teamIdSnapshot: true,
+            teamName: true,
             riotTeamId: true,
             championId: true,
             championName: true,
@@ -1506,7 +1405,48 @@ export class AdminService {
 
     if (!match) throw new NotFoundException("내전 기록을 찾을 수 없습니다.");
 
-    return match;
+    return {
+      ...match,
+      room:
+        match.room ??
+        (match.roomIdSnapshot && match.roomName
+          ? {
+              id: match.roomIdSnapshot,
+              name: match.roomName,
+              status: "COMPLETED",
+              teamMode: match.roomTeamMode,
+              createdAt: match.createdAt,
+              host:
+                match.roomHostId && match.roomHostName
+                  ? { id: match.roomHostId, username: match.roomHostName }
+                  : null,
+            }
+          : null),
+      teamA:
+        match.teamA ??
+        (match.teamAIdSnapshot && match.teamAName
+          ? { id: match.teamAIdSnapshot, name: match.teamAName }
+          : null),
+      teamB:
+        match.teamB ??
+        (match.teamBIdSnapshot && match.teamBName
+          ? { id: match.teamBIdSnapshot, name: match.teamBName }
+          : null),
+      winner:
+        match.winner ??
+        (match.winnerIdSnapshot && match.winnerName
+          ? { id: match.winnerIdSnapshot, name: match.winnerName }
+          : null),
+      winnerId: match.winnerId ?? match.winnerIdSnapshot,
+      participants: match.participants.map((participant) => ({
+        ...participant,
+        teamId: participant.teamId ?? participant.teamIdSnapshot,
+      })),
+      teamStats: match.teamStats.map((stats) => ({
+        ...stats,
+        teamId: stats.teamId ?? stats.teamIdSnapshot,
+      })),
+    };
   }
 
   async closeRoom(roomId: string, adminId: string) {

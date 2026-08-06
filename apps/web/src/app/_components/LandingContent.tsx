@@ -124,7 +124,7 @@ function OperationCardVisual({
       <div className={visualClassName}>
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-[9px] font-bold tracking-[0.16em] text-white/30">
+            <p className="text-[9px] font-bold tracking-[0.16em] text-white/60">
               PLAYER CHECK
             </p>
             <p className="mt-1 text-xs font-semibold text-white/80">
@@ -132,7 +132,7 @@ function OperationCardVisual({
             </p>
           </div>
           <p className="text-lg font-bold tabular-nums text-white">
-            8 <span className="text-white/25">/ 10</span>
+            8 <span className="text-white/60">/ 10</span>
           </p>
         </div>
         <div className="mt-3 h-1 overflow-hidden rounded-full bg-white/[0.06]">
@@ -143,10 +143,10 @@ function OperationCardVisual({
             <div key={position} className="text-center">
               <div className="mx-auto flex h-7 w-7 items-center justify-center rounded-full border border-amber-300/15 bg-amber-300/[0.07]">
                 <Check
-                  className={`h-3 w-3 ${index < 4 ? "text-amber-200" : "text-white/20"}`}
+                  className={`h-3 w-3 ${index < 4 ? "text-amber-200" : "text-white/60"}`}
                 />
               </div>
-              <p className="mt-1.5 text-[8px] font-semibold text-white/30">
+              <p className="mt-1.5 text-[8px] font-semibold text-white/60">
                 {position}
               </p>
             </div>
@@ -161,7 +161,7 @@ function OperationCardVisual({
       <div className={visualClassName}>
         <div className="flex items-end justify-between">
           <div>
-            <p className="text-[9px] font-bold tracking-[0.16em] text-white/30">
+            <p className="text-[9px] font-bold tracking-[0.16em] text-white/60">
               TEAM BALANCE
             </p>
             <p className="mt-1 text-xs font-semibold text-white/80">
@@ -205,7 +205,7 @@ function OperationCardVisual({
     <div className={visualClassName}>
       <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
         <div>
-          <p className="text-[9px] font-bold tracking-[0.16em] text-white/30">
+          <p className="text-[9px] font-bold tracking-[0.16em] text-white/60">
             MATCH RESULT
           </p>
           <p className="mt-1 text-xs font-semibold text-white/80">
@@ -214,7 +214,7 @@ function OperationCardVisual({
         </div>
         <div className="flex items-center gap-2 text-sm font-black tabular-nums">
           <span className="text-cyan-200">BLUE 2</span>
-          <span className="text-white/20">:</span>
+          <span className="text-white/60">:</span>
           <span className="text-rose-200">1 RED</span>
         </div>
       </div>
@@ -222,7 +222,7 @@ function OperationCardVisual({
         <div className="space-y-2">
           {[72, 58, 84].map((width, index) => (
             <div key={width} className="flex items-center gap-2">
-              <span className="w-7 text-[8px] font-medium text-white/25">
+              <span className="w-7 text-[8px] font-medium text-white/60">
                 {["KDA", "DMG", "GOLD"][index]}
               </span>
               <div className="h-1 flex-1 overflow-hidden rounded-full bg-white/[0.06]">
@@ -235,7 +235,7 @@ function OperationCardVisual({
           ))}
         </div>
         <div className="rounded-lg border border-cyan-300/10 bg-cyan-300/[0.05] px-3 py-2 text-center">
-          <p className="text-[8px] text-white/30">MVP</p>
+          <p className="text-[8px] text-white/60">MVP</p>
           <p className="mt-1 text-[10px] font-bold text-cyan-100/75">
             MID · 4표
           </p>
@@ -290,7 +290,7 @@ function AuctionShowcase() {
             <br />
             진행하는 실시간 팀 경매
           </h2>
-          <p className="mt-7 max-w-xl text-base leading-7 text-white/45 md:text-lg md:leading-8">
+          <p className="mt-7 max-w-xl text-base leading-7 text-white/60 md:text-lg md:leading-8">
             팀장은 남은 자리를 고려해 입찰하고 참가자는 현재 매물과 최고가,
             팀별 예산과 로스터 변화를 같은 화면에서 확인합니다
           </p>
@@ -305,7 +305,7 @@ function AuctionShowcase() {
                   <h3 className="text-sm font-bold text-white/85">
                     {benefit.title}
                   </h3>
-                  <p className="mt-1 text-sm leading-6 text-white/35">
+                  <p className="mt-1 text-sm leading-6 text-white/60">
                     {benefit.description}
                   </p>
                 </div>
@@ -334,7 +334,7 @@ function AuctionShowcase() {
                   <Gavel className="auction-hammer h-4 w-4" />
                 </span>
                 <div>
-                  <p className="text-[9px] font-bold tracking-[0.18em] text-white/25">
+                  <p className="text-[9px] font-bold tracking-[0.18em] text-white/60">
                     AUCTION ROOM
                   </p>
                   <p className="mt-0.5 text-xs font-semibold text-white/75">
@@ -352,7 +352,7 @@ function AuctionShowcase() {
               <div className="rounded-2xl border border-white/[0.07] bg-white/[0.025] p-4 sm:p-5">
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="text-[9px] font-bold tracking-[0.16em] text-white/25">
+                    <p className="text-[9px] font-bold tracking-[0.16em] text-white/60">
                       현재 매물 06 / 08
                     </p>
                     <div className="mt-4 flex items-center gap-3">
@@ -373,7 +373,7 @@ function AuctionShowcase() {
                     <p className="auction-countdown text-3xl font-black tabular-nums text-white">
                       12
                     </p>
-                    <p className="mt-0.5 text-[9px] text-white/25">
+                    <p className="mt-0.5 text-[9px] text-white/60">
                       남은 시간(초)
                     </p>
                   </div>
@@ -385,7 +385,7 @@ function AuctionShowcase() {
                   </span>
                   <div className="flex items-end justify-between gap-3">
                     <div>
-                      <p className="text-[9px] font-medium text-white/30">
+                      <p className="text-[9px] font-medium text-white/60">
                         최고 입찰가
                       </p>
                       <p className="auction-bid-value mt-1 text-2xl font-black tabular-nums text-amber-200">
@@ -393,7 +393,7 @@ function AuctionShowcase() {
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="text-[9px] text-white/25">최고 입찰 팀</p>
+                      <p className="text-[9px] text-white/60">최고 입찰 팀</p>
                       <p className="mt-1 text-xs font-bold text-white/65">
                         TEAM VIOLET
                       </p>
@@ -405,7 +405,7 @@ function AuctionShowcase() {
                   {["+50G", "+100G", "+250G"].map((amount) => (
                     <div
                       key={amount}
-                      className="rounded-lg border border-white/[0.07] bg-white/[0.03] px-2 py-2 text-center text-[10px] font-bold text-white/50"
+                      className="rounded-lg border border-white/[0.07] bg-white/[0.03] px-2 py-2 text-center text-[10px] font-bold text-white/60"
                     >
                       {amount}
                     </div>
@@ -419,7 +419,7 @@ function AuctionShowcase() {
               <div className="flex flex-col gap-3">
                 <div className="rounded-2xl border border-white/[0.07] bg-white/[0.025] p-4">
                   <div className="flex items-center justify-between">
-                    <p className="text-[9px] font-bold tracking-[0.16em] text-white/25">
+                    <p className="text-[9px] font-bold tracking-[0.16em] text-white/60">
                       TEAM BUDGET
                     </p>
                     <Coins className="h-3.5 w-3.5 text-amber-200/60" />
@@ -445,7 +445,7 @@ function AuctionShowcase() {
                             {budget}
                           </span>
                         </div>
-                        <p className="mt-1 pl-3.5 text-[8px] text-white/20">
+                        <p className="mt-1 pl-3.5 text-[8px] text-white/60">
                           로스터 {members}
                         </p>
                       </div>
@@ -461,7 +461,7 @@ function AuctionShowcase() {
                     <p className="text-[10px] font-bold text-white/65">
                       입찰 이벤트 동기화
                     </p>
-                    <p className="mt-1 text-[9px] text-white/25">
+                    <p className="mt-1 text-[9px] text-white/60">
                       모든 참가자에게 즉시 반영
                     </p>
                   </div>
@@ -490,7 +490,7 @@ function OperationBoard() {
               <Swords className="h-4 w-4 text-violet-300" />
             </div>
             <div className="min-w-0">
-              <p className="text-[10px] font-semibold tracking-[0.2em] text-white/35">
+              <p className="text-[10px] font-semibold tracking-[0.2em] text-white/60">
                 MATCH CONTROL
               </p>
               <p className="mt-0.5 truncate text-sm font-semibold text-white">
@@ -508,9 +508,9 @@ function OperationBoard() {
           <div className="rounded-2xl border border-white/[0.07] bg-white/[0.025] p-4 sm:p-5">
             <div className="flex items-end justify-between">
               <div>
-                <p className="text-xs text-white/40">참가 준비</p>
+                <p className="text-xs text-white/60">참가 준비</p>
                 <p className="mt-1 text-3xl font-bold tracking-tight text-white">
-                  8<span className="text-white/25"> / 10</span>
+                  8<span className="text-white/60"> / 10</span>
                 </p>
               </div>
               <span className="text-xs font-semibold text-amber-300">
@@ -547,7 +547,7 @@ function OperationBoard() {
                     </span>
                     <span className="text-xs text-white/65">{label}</span>
                   </div>
-                  <span className="text-xs font-medium tabular-nums text-white/40">
+                  <span className="text-xs font-medium tabular-nums text-white/60">
                     {value}
                   </span>
                 </div>
@@ -607,7 +607,7 @@ function OperationBoard() {
                 <p className="text-xs font-semibold text-white">
                   Discord 연결 준비
                 </p>
-                <p className="mt-0.5 truncate text-[10px] text-white/35">
+                <p className="mt-0.5 truncate text-[10px] text-white/60">
                   팀 확정 후 각 팀 음성 채널로 이동
                 </p>
               </div>
@@ -625,7 +625,7 @@ function OperationBoard() {
               key={label}
               className="border-r border-white/[0.06] px-4 py-3 last:border-r-0 sm:px-5"
             >
-              <p className="text-[9px] font-semibold tracking-[0.16em] text-white/25">
+              <p className="text-[9px] font-semibold tracking-[0.16em] text-white/60">
                 {label}
               </p>
               <p className="mt-1 truncate text-[11px] font-medium text-white/65">
@@ -639,7 +639,7 @@ function OperationBoard() {
       <div className="absolute -bottom-5 -left-3 hidden items-center gap-3 rounded-2xl border border-white/10 bg-[#18191f]/95 px-4 py-3 shadow-2xl backdrop-blur lg:flex">
         <ShieldCheck className="h-5 w-5 text-emerald-300" />
         <div>
-          <p className="text-[10px] text-white/35">START CHECK</p>
+          <p className="text-[10px] text-white/60">START CHECK</p>
           <p className="text-xs font-semibold text-white">
             참가 준비와 시작 조건 확인 중
           </p>
@@ -663,7 +663,7 @@ export function LandingContentSections() {
         />
 
         <div className="mx-auto grid w-full max-w-[1480px] items-center gap-14 lg:grid-cols-[0.88fr_1.12fr] lg:gap-12">
-          <div className="animate-fade-in">
+          <div>
             <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5">
               <Sparkles className="h-3.5 w-3.5 text-amber-300" />
               <span className="text-[10px] font-semibold tracking-[0.16em] text-white/55 sm:text-xs">
@@ -704,7 +704,7 @@ export function LandingContentSections() {
             </div>
 
             <ul
-              className="mt-6 flex flex-wrap gap-x-5 gap-y-2 text-xs font-medium text-white/40"
+              className="mt-6 flex flex-wrap gap-x-5 gap-y-2 text-xs font-medium text-white/60"
               aria-label="서비스 특징"
             >
               {heroSignals.map((signal) => (
@@ -752,17 +752,17 @@ export function LandingContentSections() {
 
       <section className="bg-[#efede7] px-5 py-24 text-[#151515] sm:px-6 md:py-36">
         <div className="mx-auto max-w-[1480px]">
-          <p className="text-xs font-bold tracking-[0.18em] text-[#151515]/45">
+          <p className="text-xs font-bold tracking-[0.18em] text-[#151515]/65">
             WHY NEXUS
           </p>
-          <p className="mt-8 max-w-[1240px] text-[clamp(2.5rem,6vw,6.6rem)] font-black leading-[1.02] tracking-[-0.065em]">
+          <h2 className="mt-8 max-w-[1240px] text-[clamp(2.5rem,6vw,6.6rem)] font-black leading-[1.02] tracking-[-0.065em]">
             내전은 방을 만드는 순간이 아니라,
             <span className="text-[#5d63d8]">
               {" "}
               마지막 경기가 끝나는 순간
             </span>{" "}
             완성됩니다
-          </p>
+          </h2>
           <div className="mt-12 flex flex-col justify-between gap-8 border-t border-black/15 pt-6 md:flex-row md:items-start">
             <p className="max-w-xl text-base leading-7 text-black/55 md:text-lg">
               NEXUS는 방 생성과 참가 준비, 팀 구성, 경기 결과 기록을 하나의 운영
@@ -791,7 +791,7 @@ export function LandingContentSections() {
                 <h3 className="mt-4 text-lg font-bold tracking-[-0.02em]">
                   {outcome.label}
                 </h3>
-                <p className="mt-2 text-sm leading-6 text-black/50">
+                <p className="mt-2 text-sm leading-6 text-black/65">
                   {outcome.description}
                 </p>
               </article>
@@ -821,7 +821,7 @@ export function LandingContentSections() {
                 <br />더 명확하게
               </h2>
             </div>
-            <p className="max-w-2xl text-base leading-7 text-white/45 lg:ml-auto lg:text-lg">
+            <p className="max-w-2xl text-base leading-7 text-white/60 lg:ml-auto lg:text-lg">
               로비에서는 참가 준비와 시작 조건을, 팀 구성 단계에서는 선택한 편성
               방식의 진행 상태를, 경기 후에는 결과와 전적을 확인합니다
             </p>
@@ -860,7 +860,7 @@ export function LandingContentSections() {
                 </div>
                 <div className="relative flex h-full flex-col">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold tracking-[0.18em] text-white/25">
+                    <span className="text-xs font-bold tracking-[0.18em] text-white/60">
                       FEATURE · {operation.index}
                     </span>
                     <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/[0.07] bg-white/[0.035]">
@@ -873,7 +873,7 @@ export function LandingContentSections() {
                     <h3 className="text-2xl font-bold tracking-[-0.03em] text-white sm:text-3xl">
                       {operation.title}
                     </h3>
-                    <p className="mt-4 max-w-xl text-sm leading-7 text-white/45">
+                    <p className="mt-4 max-w-xl text-sm leading-7 text-white/60">
                       {operation.description}
                     </p>
                     <ul
@@ -909,7 +909,7 @@ export function LandingContentSections() {
                 내전 준비,
                 <br />방 하나로 끝
               </h2>
-              <p className="mt-5 max-w-2xl text-sm leading-6 text-white/40 sm:text-base">
+              <p className="mt-5 max-w-2xl text-sm leading-6 text-white/60 sm:text-base">
                 브라우저에서 참가자를 확인하고 선택한 팀 구성 방식으로 경기를
                 준비하세요
               </p>
@@ -922,7 +922,7 @@ export function LandingContentSections() {
                 내전 방 만들기
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
               </Link>
-              <p className="text-[10px] text-white/25">
+              <p className="text-[10px] text-white/60">
                 Discord 로그인 후 바로 시작
               </p>
             </div>
@@ -942,11 +942,11 @@ export function LandingContentSections() {
 export function LandingFooter() {
   return (
     <footer className="border-t border-white/[0.07] bg-[#0b0c10] px-5 py-10 sm:px-6">
-      <div className="mx-auto flex max-w-[1480px] flex-col gap-7 text-sm text-white/35">
+      <div className="mx-auto flex max-w-[1480px] flex-col gap-7 text-sm text-white/60">
         <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
           <div>
             <Logo size="sm" />
-            <p className="mt-3 max-w-md text-xs leading-5 text-white/30">
+            <p className="mt-3 max-w-md text-xs leading-5 text-white/60">
               롤 내전의 로비, 팀 구성, 경기 결과를 연결하는 운영 플랫폼입니다
             </p>
           </div>
@@ -962,7 +962,7 @@ export function LandingFooter() {
             ))}
           </nav>
         </div>
-        <p className="border-t border-white/[0.06] pt-6 text-[11px] leading-5 text-white/20">
+        <p className="border-t border-white/[0.06] pt-6 text-[11px] leading-5 text-white/60">
           Project Nexus isn&apos;t endorsed by Riot Games and doesn&apos;t
           reflect the views or opinions of Riot Games or anyone officially
           involved in producing or managing Riot Games properties; League of

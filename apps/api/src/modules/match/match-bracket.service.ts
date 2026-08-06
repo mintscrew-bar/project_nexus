@@ -174,6 +174,7 @@ export class MatchBracketService {
 
         await tx.match.create({
           data: {
+            isInternal: true,
             roomId,
             seriesId: series.id,
             gameNumber: 1,

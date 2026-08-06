@@ -51,7 +51,7 @@ export function HomeTour() {
         userId,
       )}
       startEvent={ONBOARDING_MODAL_CLOSED_EVENT}
-      startOnMount={false}
+      startOnMount
     />
   );
 }

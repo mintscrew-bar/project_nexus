@@ -25,8 +25,6 @@ Project Nexus는 Riot Games API를 사용하여 다음 기능을 제공합니다
    RIOT_MATCH_RATE_LIMIT_MAX=70
    RIOT_MATCH_RATE_LIMIT_WINDOW_SECONDS=120
    RIOT_MATCH_REQUEST_DELAY_MS=1350
-   RIOT_MATCH_BACKGROUND_RATE_LIMIT_MAX=15
-   RIOT_MATCH_BACKGROUND_REQUEST_DELAY_MS=8000
    ```
 
 **제한사항:**
@@ -35,7 +33,7 @@ Project Nexus는 Riot Games API를 사용하여 다음 기능을 제공합니다
 - Rate Limit: 20 requests/second, 100 requests/2 minutes
 - 개발 목적으로만 사용 가능
 
-Project Nexus는 전적 검색용 foreground 예산과 자동 매치 캐시 로더용 background 예산을 분리합니다. 개발 키 기준 기본값은 전적 검색 2분당 최대 70회, 자동 로더 2분당 최대 15회이며 자동 로더는 요청 간 최소 8초를 기다립니다. 운영 키를 발급받으면 `RIOT_MATCH_RATE_LIMIT_*`, `RIOT_MATCH_BACKGROUND_*`, `MATCH_FETCH_*_LIMIT` 값을 올려 처리량을 확장할 수 있습니다.
+Project Nexus는 Riot API를 계정 인증, 티어 동기화, 종료된 내전 기록 보강에 사용합니다. 외부 랭크·일반 경기를 대량 수집하는 자동 로더는 운영하지 않습니다.
 
 ### Production Key (프로덕션용)
 

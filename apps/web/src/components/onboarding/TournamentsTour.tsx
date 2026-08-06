@@ -4,7 +4,6 @@ import { GuidedTour, type GuidedTourStep } from "./GuidedTour";
 import { useAuthStore } from "@/stores/auth-store";
 import {
   getUserOnboardingStorageKey,
-  HOME_TOUR_STORAGE_KEY,
   TOURNAMENTS_TOUR_STORAGE_KEY,
 } from "@/lib/onboarding";
 
@@ -42,10 +41,6 @@ export function TournamentsTour() {
       steps={STEPS}
       storageKey={getUserOnboardingStorageKey(
         TOURNAMENTS_TOUR_STORAGE_KEY,
-        userId,
-      )}
-      prerequisiteStorageKey={getUserOnboardingStorageKey(
-        HOME_TOUR_STORAGE_KEY,
         userId,
       )}
       startDelay={700}

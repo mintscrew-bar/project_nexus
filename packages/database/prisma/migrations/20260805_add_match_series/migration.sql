@@ -69,13 +69,15 @@ ALTER TABLE "matches"
 
 CREATE INDEX IF NOT EXISTS "matches_seriesId_idx" ON "matches"("seriesId");
 
+-- 시리즈는 대진 진행용 스캐폴딩이라 방과 함께 지워지지만, 매치(전적)는 남아야 한다.
+-- CASCADE로 두면 방 삭제 시 시리즈를 타고 완료된 경기까지 지워진다.
 DO $$
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM pg_constraint WHERE conname = 'matches_seriesId_fkey'
   ) THEN
     ALTER TABLE "matches" ADD CONSTRAINT "matches_seriesId_fkey"
-      FOREIGN KEY ("seriesId") REFERENCES "match_series"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+      FOREIGN KEY ("seriesId") REFERENCES "match_series"("id") ON DELETE SET NULL ON UPDATE CASCADE;
   END IF;
 END
 $$;

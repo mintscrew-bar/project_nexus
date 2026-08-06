@@ -1,7 +1,7 @@
 'use client';
 
 import { cn } from '@/lib/utils';
-import { X, Menu, Home, Swords, Trophy, Users, MessageSquare, Settings, User, FlaskConical, ExternalLink, Shield, Moon, Sun, BookOpen } from 'lucide-react';
+import { X, Menu, Home, Swords, Trophy, Users, Radio, MessageSquare, Settings, User, ExternalLink, Shield, Moon, Sun, BookOpen } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
@@ -51,13 +51,10 @@ export function MobileMenu({ className }: MobileMenuProps) {
     { href: '/tournaments', label: '내전', icon: Swords },
     { href: '/matches', label: '내전 전적', icon: Trophy },
     { href: '/clans', label: '클랜', icon: Users },
+    { href: '/streamers', label: '스트리머', icon: Radio },
     { href: '/community', label: '커뮤니티', icon: MessageSquare },
     { href: '/guide', label: '가이드', icon: BookOpen },
   ];
-  const visibleNavItems =
-    mounted && user?.role === 'ADMIN'
-      ? [...navItems.slice(0, 3), { href: '/lab', label: '실험실', icon: FlaskConical }, ...navItems.slice(3)]
-      : navItems;
 
   const sidebarItems = [
     { href: '/profile', label: '마이페이지', icon: User },
@@ -119,7 +116,7 @@ export function MobileMenu({ className }: MobileMenuProps) {
               메뉴
             </h3>
             <ul className="space-y-1">
-              {visibleNavItems.map((item) => (
+              {navItems.map((item) => (
                 <li key={item.href}>
                   <Link
                     href={item.href}

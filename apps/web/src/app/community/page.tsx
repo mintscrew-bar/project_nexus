@@ -18,13 +18,14 @@ import {
 import { PostRow } from "@/components/community/PostRow";
 import { CategoryCard } from "@/components/community/CategoryCard";
 import { PostListFilters } from "@/components/community/PostListFilters";
+import { CommunityTour } from "@/components/onboarding/PrimaryPageTours";
 
 /**
- * 모바일 전용 게시판 칩 내비.
+ * 전 해상도 공용 게시판 칩 내비.
  * 스크롤바를 숨긴 대신, 더 스크롤할 수 있는 방향에만 가장자리 페이드를 띄워
  * "옆에 더 있다"는 신호를 준다.
  */
-function MobileBoardChips({
+function BoardChips({
   boards,
   selectedCategory,
   isAllMode,
@@ -62,7 +63,7 @@ function MobileBoardChips({
   const chips = [{ slug: "ALL", name: "전체" }, ...boards];
 
   return (
-    <div className="md:hidden relative -mx-4 mb-4">
+    <div data-tour="community-boards" className="relative -mx-4 mb-4 md:mx-0">
       <div
         ref={scrollRef}
         className="flex gap-2 overflow-x-auto px-4 scrollbar-none"
@@ -259,10 +260,11 @@ function CommunityPageContent() {
 
   return (
     <div className="flex-grow p-4 md:p-6 animate-fade-in">
+      <CommunityTour />
       <div className="container mx-auto max-w-5xl">
 
-        {/* ── 모바일 전용 게시판 칩 내비 (사이드바가 md 미만에서 숨겨지므로 전체/게시판 전환 제공) ── */}
-        <MobileBoardChips
+        {/* 사이드바 없이 모든 해상도에서 게시판 전환을 제공한다. */}
+        <BoardChips
           boards={boards}
           selectedCategory={selectedCategory}
           isAllMode={isAllMode}
@@ -280,7 +282,9 @@ function CommunityPageContent() {
         )}
 
         {/* ── 검색/정렬/태그 필터바 ── */}
-        <PostListFilters popularTags={popularTags} />
+        <div data-tour="community-filters">
+          <PostListFilters popularTags={popularTags} />
+        </div>
 
         {/* 에러 표시 */}
         {error && (
@@ -299,6 +303,7 @@ function CommunityPageContent() {
         )}
 
         {/* ── ALL 모드: 대문 카드 + 통합 피드 ── */}
+        <div data-tour="community-feed">
         {isAllMode && (
           <div className="space-y-6">
             {/* 2x2 카테고리 카드 그리드 (검색 중이 아닐 때만) */}
@@ -403,6 +408,7 @@ function CommunityPageContent() {
             )}
           </>
         )}
+        </div>
       </div>
     </div>
   );

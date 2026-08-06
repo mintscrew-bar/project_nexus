@@ -5,7 +5,9 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 sudo install -m 0644 "$ROOT_DIR/systemd/nexus.service" /etc/systemd/system/nexus.service
+sudo install -m 0644 "$ROOT_DIR/systemd/nexus.timer" /etc/systemd/system/nexus.timer
 sudo systemctl daemon-reload
-sudo systemctl enable nexus.service
+sudo systemctl disable --now nexus.service
+sudo systemctl enable --now nexus.timer
 
-echo "Installed nexus.service. It will restore existing containers without pulling or building on reboot."
+echo "Installed nexus.timer. It restores existing containers 20 seconds after WSL starts."

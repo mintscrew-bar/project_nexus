@@ -41,7 +41,7 @@ describe("RankingService", () => {
         where: {
           userId: "user-1",
           match: {
-            roomId: { not: null },
+            isInternal: true,
           },
         },
         select: { win: true, createdAt: true },

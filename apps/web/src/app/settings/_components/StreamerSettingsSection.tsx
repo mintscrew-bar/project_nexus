@@ -311,13 +311,13 @@ export function StreamerSettingsSection() {
           </div>
 
           {profiles.length < 3 && (
-            <div className="grid gap-2 md:grid-cols-[120px_1fr_160px_auto]">
+            <div className="grid min-w-0 gap-2 md:grid-cols-[120px_minmax(0,1fr)_160px_auto]">
               <select
                 value={selectedPlatform}
                 onChange={(event) =>
                   setPlatform(event.target.value as StreamerPlatform)
                 }
-                className="rounded-lg border border-bg-tertiary bg-bg-primary px-3 py-2 text-sm text-text-primary"
+                className="min-w-0 rounded-lg border border-bg-tertiary bg-bg-primary px-3 py-2 text-sm text-text-primary"
               >
                 {availablePlatforms.map((item) => (
                   <option key={item.value} value={item.value}>
@@ -333,13 +333,13 @@ export function StreamerSettingsSection() {
                   PLATFORMS.find((item) => item.value === selectedPlatform)
                     ?.placeholder
                 }
-                className="rounded-lg border border-bg-tertiary bg-bg-primary px-3 py-2 text-sm text-text-primary"
+                className="min-w-0 rounded-lg border border-bg-tertiary bg-bg-primary px-3 py-2 text-sm text-text-primary"
               />
               <input
                 value={channelName}
                 onChange={(event) => setChannelName(event.target.value)}
                 placeholder="채널명 (선택)"
-                className="rounded-lg border border-bg-tertiary bg-bg-primary px-3 py-2 text-sm text-text-primary"
+                className="min-w-0 rounded-lg border border-bg-tertiary bg-bg-primary px-3 py-2 text-sm text-text-primary"
               />
               <Button
                 onClick={saveChannel}
@@ -361,7 +361,7 @@ export function StreamerSettingsSection() {
           {links.map((link) => (
             <div
               key={link.id}
-              className="flex items-center gap-3 rounded-xl bg-bg-tertiary/60 p-3"
+              className="flex min-w-0 flex-wrap items-center gap-2 rounded-xl bg-bg-tertiary/60 p-3 sm:flex-nowrap sm:gap-3"
             >
               <div className="relative h-10 w-14 flex-shrink-0 overflow-hidden rounded-lg bg-bg-primary">
                 {link.imageUrl ? (
@@ -407,20 +407,20 @@ export function StreamerSettingsSection() {
               </Button>
             </div>
           ))}
-          <div className="grid gap-2 md:grid-cols-[180px_1fr_auto]">
+          <div className="grid min-w-0 gap-2 md:grid-cols-[180px_minmax(0,1fr)_auto]">
             <input
               value={linkLabel}
               onChange={(event) => setLinkLabel(event.target.value)}
               placeholder="링크 이름"
-              className="rounded-lg border border-bg-tertiary bg-bg-primary px-3 py-2 text-sm text-text-primary"
+              className="min-w-0 rounded-lg border border-bg-tertiary bg-bg-primary px-3 py-2 text-sm text-text-primary"
             />
             <input
               value={linkUrl}
               onChange={(event) => setLinkUrl(event.target.value)}
               placeholder="https://..."
-              className="rounded-lg border border-bg-tertiary bg-bg-primary px-3 py-2 text-sm text-text-primary"
+              className="min-w-0 rounded-lg border border-bg-tertiary bg-bg-primary px-3 py-2 text-sm text-text-primary"
             />
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <label className="inline-flex cursor-pointer items-center rounded-lg border border-bg-tertiary px-3 py-2 text-xs text-text-secondary hover:border-accent-primary/40">
                 이미지
                 <input

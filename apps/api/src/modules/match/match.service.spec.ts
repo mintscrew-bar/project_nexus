@@ -9,7 +9,6 @@ import { NotificationService } from "../notification/notification.service";
 import { MatchBracketService } from "./match-bracket.service";
 import { MatchAdvancementService } from "./match-advancement.service";
 import { MatchSeriesService } from "./match-series.service";
-import { RankingService } from "../ranking/ranking.service";
 import {
   getChampionKoreanName,
   getSummonerSpellKoreanName,
@@ -33,6 +32,10 @@ describe("MatchService", () => {
       matchParticipant: {
         findMany: jest.fn(),
       },
+      matchRosterSnapshot: {
+        deleteMany: jest.fn(),
+        createMany: jest.fn(),
+      },
       team: {
         findUnique: jest.fn(),
       },
@@ -43,6 +46,9 @@ describe("MatchService", () => {
         findUnique: jest.fn(),
         update: jest.fn(),
       },
+      $transaction: jest.fn(async (callback: (tx: any) => unknown) =>
+        callback(prisma),
+      ),
     };
 
     // 각 외부 의존 서비스 mock — 실제 동작 불필요
@@ -74,9 +80,6 @@ describe("MatchService", () => {
       assignTeam: jest.fn().mockResolvedValue(undefined),
       hasSeries: jest.fn().mockResolvedValue(false),
     };
-    const mockRankingService = {
-      updateRanking: jest.fn().mockResolvedValue(undefined),
-    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -99,7 +102,6 @@ describe("MatchService", () => {
           useValue: mockMatchAdvancementService,
         },
         { provide: MatchSeriesService, useValue: mockMatchSeriesService },
-        { provide: RankingService, useValue: mockRankingService },
         // Optional 의존성 — Discord 서비스는 테스트에서 불필요
         { provide: "DISCORD_BOT_SERVICE", useValue: null },
         { provide: "DISCORD_VOICE_SERVICE", useValue: null },
@@ -107,6 +109,137 @@ describe("MatchService", () => {
     }).compile();
 
     service = module.get<MatchService>(MatchService);
+  });
+
+  describe("매치 종료 스냅샷", () => {
+    it("상태 전환과 방, 팀, 승자, 로스터를 한 트랜잭션에서 기록한다", async () => {
+      prisma.match.findUnique.mockResolvedValue({
+        id: "match-1",
+        winnerId: "team-a",
+        room: {
+          id: "room-1",
+          name: "여름 내전",
+          teamMode: "MANUAL_TEAM",
+          host: { id: "host-1", username: "방장" },
+        },
+        teamA: {
+          id: "team-a",
+          name: "A팀",
+          members: [
+            {
+              userId: "user-a",
+              user: {
+                username: "선수A",
+                riotAccounts: [{ puuid: "puuid-a" }],
+              },
+            },
+          ],
+        },
+        teamB: {
+          id: "team-b",
+          name: "B팀",
+          members: [
+            {
+              userId: "user-b",
+              user: {
+                username: "선수B",
+                riotAccounts: [{ puuid: "puuid-b" }],
+              },
+            },
+          ],
+        },
+      });
+      prisma.match.updateMany.mockResolvedValue({ count: 1 });
+
+      await (service as any).completeInternalMatchWithSnapshot(
+        "match-1",
+        "team-a",
+      );
+
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(prisma.match.updateMany).toHaveBeenCalledWith({
+        where: { id: "match-1", status: "IN_PROGRESS" },
+        data: expect.objectContaining({
+          status: "COMPLETED",
+          winnerId: "team-a",
+        }),
+      });
+      expect(prisma.match.update).toHaveBeenCalledWith({
+        where: { id: "match-1" },
+        data: expect.objectContaining({
+          isInternal: true,
+          roomIdSnapshot: "room-1",
+          roomName: "여름 내전",
+          teamAIdSnapshot: "team-a",
+          teamBIdSnapshot: "team-b",
+          winnerIdSnapshot: "team-a",
+          winnerName: "A팀",
+        }),
+      });
+      expect(prisma.matchRosterSnapshot.createMany).toHaveBeenCalledWith({
+        data: expect.arrayContaining([
+          expect.objectContaining({
+            userId: "user-a",
+            puuid: "puuid-a",
+            teamIdSnapshot: "team-a",
+          }),
+          expect.objectContaining({
+            userId: "user-b",
+            puuid: "puuid-b",
+            teamIdSnapshot: "team-b",
+          }),
+        ]),
+      });
+    });
+  });
+
+  describe("getUserMatches", () => {
+    it("방 재사용 뒤에도 로스터 스냅샷으로 내 경기를 복원한다", async () => {
+      prisma.match.findMany.mockResolvedValue([
+        {
+          id: "match-1",
+          room: null,
+          roomIdSnapshot: "room-old",
+          roomName: "지난 내전",
+          teamA: null,
+          teamAIdSnapshot: "team-a",
+          teamAName: "A팀",
+          teamB: null,
+          teamBIdSnapshot: "team-b",
+          teamBName: "B팀",
+          winner: null,
+          winnerIdSnapshot: "team-a",
+          winnerName: "A팀",
+          rosterSnapshots: [
+            {
+              userId: "user-1",
+              username: "선수1",
+              teamSlot: "A",
+              user: { id: "user-1", username: "선수1", avatar: null },
+            },
+          ],
+        },
+      ]);
+
+      const result = await service.getUserMatches("user-1");
+
+      expect(prisma.match.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            OR: expect.arrayContaining([
+              { rosterSnapshots: { some: { userId: "user-1" } } },
+            ]),
+          }),
+        }),
+      );
+      expect(result[0]).toEqual(
+        expect.objectContaining({
+          room: { id: "room-old", name: "지난 내전" },
+          teamA: expect.objectContaining({ id: "team-a", name: "A팀" }),
+          winner: { id: "team-a", name: "A팀" },
+        }),
+      );
+    });
   });
 
   describe("getRpsContext", () => {
@@ -499,11 +632,12 @@ describe("MatchService", () => {
 
       expect(prisma.match.findMany).toHaveBeenCalledWith({
         where: {
-          roomId: { not: null },
+          isInternal: true,
           riotMatchId: { not: null },
           OR: [
             { teamA: { members: { some: { userId: "user-1" } } } },
             { teamB: { members: { some: { userId: "user-1" } } } },
+            { rosterSnapshots: { some: { userId: "user-1" } } },
           ],
         },
         select: { riotMatchId: true },

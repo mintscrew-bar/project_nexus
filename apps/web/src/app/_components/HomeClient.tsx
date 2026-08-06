@@ -3,8 +3,6 @@
 import dynamic from "next/dynamic";
 import { useAuthStore } from "@/stores/auth-store";
 import { ErrorBoundary, Skeleton } from "@/components/ui";
-import { OnboardingGuideModal } from "@/components/OnboardingGuideModal";
-import { HomeTour } from "@/components/onboarding/HomeTour";
 
 // 대시보드 스켈레톤 — dynamic 청크 로드 중 빈 화면 방지
 function DashboardFallback() {
@@ -21,6 +19,19 @@ function DashboardFallback() {
 const DashboardContent = dynamic(
   () => import("@/components/home/DashboardContent").then((mod) => mod.DashboardContent),
   { ssr: false, loading: () => <DashboardFallback /> }
+);
+
+// 온보딩 코드는 로그인 사용자에게만 필요하다. 공개 랜딩의 초기 번들에서 분리한다.
+const OnboardingGuideModal = dynamic(
+  () =>
+    import("@/components/OnboardingGuideModal").then(
+      (mod) => mod.OnboardingGuideModal,
+    ),
+  { ssr: false },
+);
+const HomeTour = dynamic(
+  () => import("@/components/onboarding/HomeTour").then((mod) => mod.HomeTour),
+  { ssr: false },
 );
 
 // 비로그인 랜딩(landing)은 page.tsx에서 서버 컴포넌트로 렌더해 prop으로 주입한다.
