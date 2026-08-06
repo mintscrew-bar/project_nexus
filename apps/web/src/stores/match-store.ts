@@ -268,13 +268,36 @@ export const useMatchStore = create<MatchStoreState>((set, get) => ({
     // 매치 시작 이벤트 — 서버가 bracket 룸에도 브로드캐스트하므로 여기서 수신 가능
     matchSocketHelpers.onMatchStarted((data: { matchId: string; tournamentCode?: string }) => {
       if (!data.matchId) return; // connectToMatch 쪽 payload는 matchId 없음
-      set(state => ({
-        roomMatches: state.roomMatches.map(m =>
-          m.id === data.matchId
-            ? { ...m, status: 'IN_PROGRESS' as const, tournamentCode: data.tournamentCode ?? m.tournamentCode }
-            : m
-        ),
-      }));
+      set(state => {
+        // 서버는 세트를 시작할 때 시리즈도 진행 중으로 올린다(markInProgress).
+        // 시리즈 사본은 세트(Match)마다 따로 들고 있고 대진표는 1세트 쪽 사본을
+        // 슬롯 상태로 읽으므로, 같은 시리즈에 속한 모든 세트의 사본을 함께 갱신해야
+        // 2세트를 시작했을 때도 슬롯 배지가 "대기 중"에 머물지 않는다.
+        const startedSeriesId = state.roomMatches.find(
+          m => m.id === data.matchId
+        )?.seriesId;
+
+        return {
+          roomMatches: state.roomMatches.map(m => {
+            // 이미 끝난 시리즈는 되돌리지 않는다.
+            const series =
+              startedSeriesId &&
+              m.seriesId === startedSeriesId &&
+              m.series?.status === 'PENDING'
+                ? { ...m.series, status: 'IN_PROGRESS' as const }
+                : m.series;
+
+            if (m.id !== data.matchId) return series === m.series ? m : { ...m, series };
+
+            return {
+              ...m,
+              status: 'IN_PROGRESS' as const,
+              tournamentCode: data.tournamentCode ?? m.tournamentCode,
+              series,
+            };
+          }),
+        };
+      });
     });
 
     matchSocketHelpers.onMatchResult((data: { matchId: string; winnerId: string }) => {
