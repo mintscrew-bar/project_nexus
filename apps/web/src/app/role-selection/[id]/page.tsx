@@ -186,7 +186,10 @@ export default function RoleSelectionPage() {
   const myTeamOpenRoles = ROLES.filter((role) => !myTeamTakenRoles.includes(role));
 
   return (
-    <div className="flex-grow p-4 md:p-6">
+    // AppShell이 이 라우트를 대시보드로 보고 overflow-hidden으로 가두므로
+    // 페이지가 자체 스크롤을 가져야 한다. flex-grow만 두면 팀이 많을 때
+    // (20명 4팀 이상) 아래 카드가 뷰포트 밖으로 잘린다. 대진표와 같은 방식.
+    <div className="h-full overflow-y-auto p-4 md:p-6">
       <ConfirmModal
         isOpen={isAbortConfirmOpen}
         onClose={() => setIsAbortConfirmOpen(false)}
