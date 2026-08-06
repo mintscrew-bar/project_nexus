@@ -2287,20 +2287,42 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
     const lockSuffix = isPrivate ? "  ·  비공개" : "";
     const currentPlayers = participants.length;
 
-    const participantLines = participants.map((name) => `╸ ${name}`);
-    const participantChunks: string[] = [];
-    let participantChunk = "";
-    for (const line of participantLines) {
-      const next = participantChunk ? `${participantChunk}\n${line}` : line;
-      if (next.length > 1024 && participantChunk) {
-        participantChunks.push(participantChunk);
-        participantChunk = line;
-      } else {
-        participantChunk = next;
-      }
-    }
-    if (participantChunk) participantChunks.push(participantChunk);
-    if (participantChunks.length === 0) participantChunks.push("—");
+    const participantColumnCount =
+      participants.length <= 10 ? 1 : participants.length <= 20 ? 2 : 3;
+    const participantColumnBaseSize = Math.floor(
+      participants.length / participantColumnCount,
+    );
+    const participantColumnRemainder =
+      participants.length % participantColumnCount;
+    let participantOffset = 0;
+    const participantColumns = Array.from(
+      { length: participantColumnCount },
+      (_, columnIndex) => {
+        const size =
+          participantColumnBaseSize +
+          (columnIndex < participantColumnRemainder ? 1 : 0);
+        const start = participantOffset;
+        participantOffset += size;
+        const names = participants.slice(start, start + size);
+        const end = start + names.length;
+        return {
+          name:
+            participantColumnCount === 1
+              ? "참가자"
+              : `참가자 ${start + 1}–${end}`,
+          value:
+            names.length > 0
+              ? names
+                  .map(
+                    (name, index) =>
+                      `**${start + index + 1}.** ${name.slice(0, 48)}`,
+                  )
+                  .join("\n")
+              : "—",
+          inline: participantColumnCount > 1,
+        };
+      },
+    );
 
     const embed = new EmbedBuilder()
       .setColor(0x667eea)
@@ -2315,13 +2337,8 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
           inline: true,
         },
       )
-      .addFields(
-        ...participantChunks.map((value, index) => ({
-          name: index === 0 ? "참가자" : "참가자 (계속)",
-          value,
-          inline: false,
-        })),
-      )
+      .addFields(...participantColumns)
+      .setFooter({ text: "참가자 변경 시 자동으로 업데이트됩니다." })
       .setTimestamp();
 
     const roomButton = new ButtonBuilder()
