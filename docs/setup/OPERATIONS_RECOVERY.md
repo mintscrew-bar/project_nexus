@@ -106,6 +106,23 @@ Therefore, on this host:
 The `build:` sections in `docker-compose.prod.yml` are kept only as a local dev
 fallback and carry a warning comment. Do not use them on the production host.
 
+#### Root-owned build artifacts
+
+A container build that bind-mounts the repo writes as `root`, and the resulting
+directories stay root-owned after the build. On 2026-08-06 this was found on
+`.turbo/`, created 2026-04-02. Turbo could not write its cache, so every build
+since then silently failed with `WARNING IO error: Permission denied (os error
+13)` and reported `Cached: 0`. Fixing the ownership took a full build from 49s
+to 358ms (`FULL TURBO`).
+
+The warning is non-fatal and easy to miss — builds still succeed, just never
+cached. If builds feel slow, check ownership before anything else:
+
+```bash
+find . -maxdepth 2 \( -name .turbo -o -name .next -o -name dist -o -name node_modules \) ! -user "$USER"
+sudo chown -R "$USER:$USER" <path>
+```
+
 ### OOM alerting
 
 `nexus-oom-alert.service` streams `docker events --filter event=oom` and posts to
