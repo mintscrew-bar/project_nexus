@@ -100,7 +100,7 @@ export class SoopLiveProvider implements LiveProvider {
       return response.data?.station ?? null;
     } catch (error) {
       const err = error as Error;
-      this.logger.warn(`숲 방송국 조회 실패 ${channelId}: ${err?.message}`);
+      this.logger.warn(`SOOP 방송국 조회 실패 ${channelId}: ${err?.message}`);
       return null;
     }
   }
@@ -159,7 +159,7 @@ export class SoopLiveProvider implements LiveProvider {
       return response.data?.CHANNEL ?? null;
     } catch (error) {
       const err = error as Error;
-      this.logger.warn(`숲 조회 실패 ${channelId}: ${err?.message}`);
+      this.logger.warn(`SOOP 조회 실패 ${channelId}: ${err?.message}`);
       return null;
     }
   }

@@ -31,6 +31,18 @@ export interface Match {
   status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED';
   tournamentCode?: string;
   scheduledTime?: string;
+  // 다전제: 이 매치가 속한 시리즈(대진 슬롯)와 세트 번호.
+  // 시리즈 도입 이전 방과 외부 매치는 없다.
+  seriesId?: string | null;
+  gameNumber?: number;
+  series?: {
+    id: string;
+    bestOf: number;
+    status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+    winnerId?: string | null;
+    teamAId?: string | null;
+    teamBId?: string | null;
+  } | null;
 }
 
 interface TeamStanding {
@@ -207,6 +219,8 @@ export const useMatchStore = create<MatchStoreState>((set, get) => ({
     socket.off('connect');
     socket.off('disconnect');
     socket.off('connect_error');
+    // offAllListeners는 helper로 등록한 것만 정리하므로 직접 등록한 건 따로 뗀다.
+    socket.off('series-updated');
 
     const joinBracket = () => {
       matchSocketHelpers.joinBracket(roomId).then((response: any) => {
@@ -269,6 +283,12 @@ export const useMatchStore = create<MatchStoreState>((set, get) => ({
           m.id === data.matchId ? { ...m, status: 'COMPLETED' as const, winnerId: data.winnerId } : m
         ),
       }));
+    });
+
+    // 다전제 진행 알림 — 다음 세트가 생겼으면 bracket-updated가 뒤따르지만,
+    // 스코어만 바뀐 경우(클린치)에는 이 이벤트로 대진표를 다시 읽는다.
+    socket.on('series-updated', () => {
+      void get().fetchRoomMatches(roomId);
     });
 
     matchSocketHelpers.onBracketComplete(() => {

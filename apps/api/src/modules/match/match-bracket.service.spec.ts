@@ -28,11 +28,13 @@ describe("MatchBracketService", () => {
   let prisma: {
     room: { findUnique: jest.Mock; update: jest.Mock };
     match: { findMany: jest.Mock; create: jest.Mock };
+    matchSeries: { findMany: jest.Mock; create: jest.Mock };
     $transaction: jest.Mock;
   };
 
   beforeEach(async () => {
     mockedRandomInt.mockImplementation(() => 0);
+    let seriesSeq = 0;
     prisma = {
       room: {
         findUnique: jest.fn(),
@@ -41,6 +43,10 @@ describe("MatchBracketService", () => {
       match: {
         findMany: jest.fn().mockResolvedValue([]),
         create: jest.fn(),
+      },
+      matchSeries: {
+        findMany: jest.fn().mockResolvedValue([]),
+        create: jest.fn(() => Promise.resolve({ id: `series-${seriesSeq++}` })),
       },
       $transaction: jest.fn((fn) => fn(prisma)),
     };
@@ -67,6 +73,7 @@ describe("MatchBracketService", () => {
       hostId: "host-1",
       status: "ROLE_SELECTION",
       bracketFormat: null,
+      seriesPreset: null,
       teams,
       ...overrides,
     });
@@ -295,17 +302,113 @@ describe("MatchBracketService", () => {
   });
 
   describe("DB 저장", () => {
-    it("트랜잭션 내에서 매치를 생성하고 방 상태를 변경한다", async () => {
+    it("트랜잭션 내에서 시리즈와 1세트를 생성하고 방 상태를 변경한다", async () => {
       setupRoom(2);
       await service.generateBracket("host-1", "room-1");
 
       expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(prisma.matchSeries.create).toHaveBeenCalledTimes(1);
       expect(prisma.match.create).toHaveBeenCalledTimes(1);
       expect(prisma.room.update).toHaveBeenCalledWith(
         expect.objectContaining({
           data: { status: "IN_PROGRESS" },
         }),
       );
+    });
+
+    it("생성한 매치는 시리즈의 1세트이고 슬롯 정보를 미러링한다", async () => {
+      setupRoom(2);
+      await service.generateBracket("host-1", "room-1");
+
+      expect(prisma.match.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            seriesId: "series-0",
+            gameNumber: 1,
+            round: 1,
+            matchNumber: 1,
+            bracketType: "SINGLE",
+          }),
+        }),
+      );
+    });
+  });
+
+  describe("다전제 프리셋", () => {
+    const createdBestOf = () =>
+      prisma.matchSeries.create.mock.calls.map(
+        ([args]: [{ data: { round: number; bestOf: number } }]) => ({
+          round: args.data.round,
+          bestOf: args.data.bestOf,
+        }),
+      );
+
+    it("프리셋이 없으면 모든 시리즈가 단판이다", async () => {
+      setupRoom(4);
+      await service.generateBracket("host-1", "room-1");
+
+      expect(createdBestOf().every((s) => s.bestOf === 1)).toBe(true);
+    });
+
+    it("4팀 FINAL_BO3는 결승만 3판 2선이다", async () => {
+      setupRoom(4, { seriesPreset: "FINAL_BO3" });
+      await service.generateBracket("host-1", "room-1");
+
+      const byRound = createdBestOf();
+      expect(byRound.filter((s) => s.round === 1)).toEqual([
+        { round: 1, bestOf: 1 },
+        { round: 1, bestOf: 1 },
+      ]);
+      expect(byRound.filter((s) => s.round === 2)).toEqual([
+        { round: 2, bestOf: 3 },
+      ]);
+    });
+
+    it("4팀 SEMI_BO3_FINAL_BO5는 준결승 3판·결승 5판이다", async () => {
+      setupRoom(4, { seriesPreset: "SEMI_BO3_FINAL_BO5" });
+      await service.generateBracket("host-1", "room-1");
+
+      const byRound = createdBestOf();
+      expect(byRound.filter((s) => s.round === 1).map((s) => s.bestOf)).toEqual(
+        [3, 3],
+      );
+      expect(byRound.filter((s) => s.round === 2).map((s) => s.bestOf)).toEqual(
+        [5],
+      );
+    });
+
+    it("다전제여도 1세트만 만든다 (2세트는 필요해질 때 생성)", async () => {
+      setupRoom(4, { seriesPreset: "SEMI_BO3_FINAL_BO5" });
+      await service.generateBracket("host-1", "room-1");
+
+      // 시리즈 3개 → 매치도 3개(각 1세트)뿐이어야 한다.
+      expect(prisma.matchSeries.create).toHaveBeenCalledTimes(3);
+      expect(prisma.match.create).toHaveBeenCalledTimes(3);
+    });
+
+    it("팀 수에 맞지 않는 프리셋은 무시하고 단판으로 떨어뜨린다", async () => {
+      // SEMI_UP_BO3는 8팀 전용이다.
+      setupRoom(4, { seriesPreset: "SEMI_UP_BO3" });
+      await service.generateBracket("host-1", "room-1");
+
+      expect(createdBestOf().every((s) => s.bestOf === 1)).toBe(true);
+    });
+
+    it("더블 엘리미네이션은 프리셋과 무관하게 단판을 유지한다", async () => {
+      setupRoom(4, {
+        bracketFormat: "DOUBLE_ELIMINATION",
+        seriesPreset: "SEMI_BO3_FINAL_BO5",
+      });
+      await service.generateBracket("host-1", "room-1");
+
+      expect(createdBestOf().every((s) => s.bestOf === 1)).toBe(true);
+    });
+
+    it("리그전도 프리셋과 무관하게 단판을 유지한다", async () => {
+      setupRoom(3, { seriesPreset: "ALL_BO3" });
+      await service.generateBracket("host-1", "room-1");
+
+      expect(createdBestOf().every((s) => s.bestOf === 1)).toBe(true);
     });
   });
 });

@@ -12,9 +12,9 @@ export function GoogleAnalytics() {
     <>
       <Script
         src={`https://www.googletagmanager.com/gtag/js?id=${gaId}`}
-        strategy="afterInteractive"
+        strategy="lazyOnload"
       />
-      <Script id="ga-init" strategy="afterInteractive">
+      <Script id="ga-init" strategy="lazyOnload">
         {`
           window.dataLayer = window.dataLayer || [];
           function gtag(){dataLayer.push(arguments);}
@@ -45,6 +45,7 @@ export function GoogleAnalytics() {
           gtag('js', new Date());
           // send_page_view: false — App Router에서 PageViewTracker가 수동 전송
           gtag('config', '${gaId}', { send_page_view: false });
+          window.dispatchEvent(new Event('nexus:analytics-ready'));
         `}
       </Script>
     </>

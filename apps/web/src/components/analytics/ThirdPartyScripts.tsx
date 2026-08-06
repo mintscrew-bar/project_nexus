@@ -47,7 +47,7 @@ export function ThirdPartyScripts() {
 
   const shouldLoadAds = !matchesRoutePrefix(
     pathname,
-    AD_EXCLUDED_ROUTE_PREFIXES,
+    ["/", ...AD_EXCLUDED_ROUTE_PREFIXES],
   );
 
   return (

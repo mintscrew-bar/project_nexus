@@ -19,6 +19,7 @@ import { MatchDataCollectionService } from "./match-data-collection.service";
 import { NotificationService } from "../notification/notification.service";
 import { MatchBracketService, Bracket } from "./match-bracket.service";
 import { MatchAdvancementService } from "./match-advancement.service";
+import { MatchSeriesService } from "./match-series.service";
 import {
   Prisma,
   RoomStatus,
@@ -53,6 +54,7 @@ export class MatchService {
     private readonly notificationService: NotificationService,
     private readonly matchBracketService: MatchBracketService,
     private readonly matchAdvancementService: MatchAdvancementService,
+    private readonly matchSeriesService: MatchSeriesService,
     @Optional() @Inject("DISCORD_BOT_SERVICE") discordBot?: any,
     @Optional() @Inject("DISCORD_VOICE_SERVICE") discordVoice?: any,
   ) {
@@ -412,9 +414,25 @@ export class MatchService {
       data: { broadcastFocusMatchId: matchId },
     });
 
+    // 다전제: 게임 결과를 시리즈에 반영한다.
+    // 아직 선취 승수에 도달하지 않았으면 진출시키지 않고 다음 세트를 만든다
+    // (세트 생성은 applyGameResult 안에서 처리).
+    // 시리즈가 없는 매치(외부 인제스트 / 시리즈 도입 이전 방)는 null이 오고,
+    // 이 경우 기존처럼 한 판 = 진출로 동작한다.
+    const seriesProgress =
+      await this.matchSeriesService.applyGameResult(matchId);
+    const seriesClinched = seriesProgress ? seriesProgress.clinched : true;
+    // 진출하는 건 게임 승자가 아니라 시리즈 승자다 (단판이면 같다).
+    const advancingWinnerId = seriesProgress?.seriesWinnerId ?? winnerId;
+
     // Advance winner to next round (delegated to MatchAdvancementService)
     let bracketAdvanced = false;
-    if (updatedMatch.bracketType === BracketType.SINGLE_ELIMINATION) {
+    if (!seriesClinched) {
+      this.logger.log(
+        `[Match] 시리즈 진행 중 — seriesId=${seriesProgress?.seriesId} ` +
+          `${seriesProgress?.teamAWins}-${seriesProgress?.teamBWins} (Bo${seriesProgress?.bestOf}), 진출 보류`,
+      );
+    } else if (updatedMatch.bracketType === BracketType.SINGLE_ELIMINATION) {
       if (updatedMatch.round && updatedMatch.matchNumber) {
         try {
           bracketAdvanced =
@@ -422,7 +440,7 @@ export class MatchService {
               roomId,
               updatedMatch.round,
               updatedMatch.matchNumber,
-              winnerId,
+              advancingWinnerId,
             );
         } catch (advanceError) {
           // 브래킷 진급 실패: 매치 결과는 이미 기록됐으므로 롤백하지 않고 에러만 기록
@@ -438,15 +456,16 @@ export class MatchService {
       }
     } else if (updatedMatch.bracketType === BracketType.DOUBLE_ELIMINATION) {
       const loserId =
-        winnerId === updatedMatch.teamAId
+        advancingWinnerId === updatedMatch.teamAId
           ? updatedMatch.teamBId
           : updatedMatch.teamAId;
       if (loserId) {
         await this.matchAdvancementService.advanceDoubleElimination(
           roomId,
-          updatedMatch.id,
+          // 시리즈 방이면 대진 슬롯은 시리즈다.
+          updatedMatch.seriesId ?? updatedMatch.id,
           updatedMatch.bracketRound,
-          winnerId,
+          advancingWinnerId,
           loserId,
         );
         bracketAdvanced = true;
@@ -457,7 +476,12 @@ export class MatchService {
       }
     }
 
-    if (this.tournamentApiEnabled && bracketAdvanced) {
+    // 토너먼트 코드는 세트마다 새로 필요하다.
+    // 다음 세트가 생겼거나 다음 라운드에 팀이 채워졌으면 코드 없는 매치에 발급한다.
+    if (
+      this.tournamentApiEnabled &&
+      (bracketAdvanced || seriesProgress?.nextMatchId)
+    ) {
       await this.autoGenerateCodesForRoom(roomId);
     }
 
@@ -473,9 +497,31 @@ export class MatchService {
             ? updatedMatch.teamB
             : updatedMatch.teamA;
 
+        // 다전제면 시리즈 스코어를 승자 기준으로 정렬해 붙인다.
+        const isMultiGameSeries = (seriesProgress?.bestOf ?? 1) > 1;
+        let score: string | undefined;
+        let seriesLabel: string | undefined;
+        if (seriesProgress && isMultiGameSeries) {
+          const winnerWins =
+            winnerId === updatedMatch.teamAId
+              ? seriesProgress.teamAWins
+              : seriesProgress.teamBWins;
+          const loserWins =
+            winnerId === updatedMatch.teamAId
+              ? seriesProgress.teamBWins
+              : seriesProgress.teamAWins;
+          score = `${winnerWins} - ${loserWins}`;
+          // 시리즈가 아직 안 끝났으면 "N세트 종료"로 낮춰 표기한다.
+          if (!seriesProgress.clinched) {
+            seriesLabel = `${updatedMatch.gameNumber}세트`;
+          }
+        }
+
         const embed = this.discordBotService.buildMatchResultEmbed(
           winner?.name ?? "TBD",
           loser?.name ?? "TBD",
+          score,
+          seriesLabel,
         );
 
         await this.sendRoomEmbedNotification(roomId, embed);
@@ -678,6 +724,8 @@ export class MatchService {
       tournamentCompleted,
       bracketAdvanced,
       roomId: roomId,
+      // 다전제 진행 상황 — 게이트웨이가 다음 세트 안내·진영 선택을 띄우는 데 쓴다.
+      series: seriesProgress,
     };
   }
 
@@ -761,6 +809,8 @@ export class MatchService {
         teamBId: true,
         status: true,
         blueSideTeamId: true,
+        seriesId: true,
+        gameNumber: true,
         teamA: {
           select: {
             captainId: true,
@@ -781,6 +831,26 @@ export class MatchService {
     if (!match) {
       throw new NotFoundException("Match not found");
     }
+
+    // 다전제 2세트부터는 가위바위보를 다시 하지 않는다.
+    // 직전 세트 패자가 진영을 고른다 (LCK 방식).
+    let sidePickerTeamId: string | null = null;
+    if (match.seriesId && match.gameNumber > 1) {
+      const previous = await this.prisma.match.findFirst({
+        where: {
+          seriesId: match.seriesId,
+          gameNumber: { lt: match.gameNumber },
+          winnerId: { not: null },
+        },
+        orderBy: { gameNumber: "desc" },
+        select: { winnerId: true },
+      });
+      if (previous?.winnerId) {
+        sidePickerTeamId =
+          previous.winnerId === match.teamAId ? match.teamBId : match.teamAId;
+      }
+    }
+
     return {
       teamAId: match.teamAId,
       teamBId: match.teamBId,
@@ -795,6 +865,9 @@ export class MatchService {
       hostId: match.room?.hostId ?? null,
       status: match.status,
       blueSideTeamId: match.blueSideTeamId,
+      gameNumber: match.gameNumber,
+      // null이면 1세트(또는 단판) — 가위바위보부터 시작한다.
+      sidePickerTeamId,
     };
   }
 
@@ -828,6 +901,19 @@ export class MatchService {
         completedAt: true,
         createdAt: true,
         updatedAt: true,
+        // 다전제: 대진표는 시리즈 단위로 카드를 그리고 세트는 그 안에 접어 넣는다.
+        seriesId: true,
+        gameNumber: true,
+        series: {
+          select: {
+            id: true,
+            bestOf: true,
+            status: true,
+            winnerId: true,
+            teamAId: true,
+            teamBId: true,
+          },
+        },
         teamA: {
           select: {
             id: true,
@@ -853,7 +939,11 @@ export class MatchService {
           },
         },
       },
-      orderBy: [{ round: "asc" }, { matchNumber: "asc" }],
+      orderBy: [
+        { round: "asc" },
+        { matchNumber: "asc" },
+        { gameNumber: "asc" },
+      ],
     });
   }
 

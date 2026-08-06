@@ -369,7 +369,16 @@ export function MatchDetailModal({
   const rpsTeamB = rps ? { id: rps.teamBId, name: teamNameById(rps.teamBId), color: null } : null;
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={`매치 #${match.matchNumber} 상세 정보`} size="md">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={
+        (match.bestOf ?? 1) > 1
+          ? `매치 #${match.matchNumber} · ${match.currentGameNumber ?? 1}세트`
+          : `매치 #${match.matchNumber} 상세 정보`
+      }
+      size="md"
+    >
       <p className="text-text-secondary mb-4">
         {getTeamDisplayName(match.team1)} vs {getTeamDisplayName(match.team2)}
       </p>
@@ -379,6 +388,34 @@ export function MatchDetailModal({
           <span className="text-sm font-medium text-text-secondary">상태</span>
           {getStatusBadge(match.status)}
         </div>
+
+        {/* 다전제 시리즈 스코어 */}
+        {(match.bestOf ?? 1) > 1 && (
+          <div className="rounded-xl border border-accent-primary/25 bg-accent-primary/5 p-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-semibold text-text-primary">
+                {match.bestOf}판 {Math.floor((match.bestOf ?? 1) / 2) + 1}선
+              </span>
+              <span className="text-sm text-text-secondary">
+                {match.status === 'COMPLETED'
+                  ? '시리즈 종료'
+                  : `${match.currentGameNumber ?? 1}세트 진행 중`}
+              </span>
+            </div>
+            <div className="mt-2 flex items-center justify-center gap-3 text-lg font-bold text-text-primary">
+              <span className="truncate">{getTeamDisplayName(match.team1)}</span>
+              <span className="shrink-0 text-accent-primary">
+                {match.team1?.score ?? 0} : {match.team2?.score ?? 0}
+              </span>
+              <span className="truncate">{getTeamDisplayName(match.team2)}</span>
+            </div>
+            {match.status !== 'COMPLETED' && (match.currentGameNumber ?? 1) > 1 && (
+              <p className="mt-2 text-center text-xs text-text-tertiary">
+                직전 세트에서 진 팀이 진영을 선택합니다.
+              </p>
+            )}
+          </div>
+        )}
 
         {/* 가위바위보 진영 결정 */}
         {rpsActive && rps && rpsTeamA && rpsTeamB && (

@@ -10,6 +10,10 @@ import {
 import { Server, Socket } from "socket.io";
 import { AuthService } from "../auth/auth.service";
 import { MatchService } from "./match.service";
+import {
+  MatchSeriesService,
+  type SeriesProgress,
+} from "./match-series.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { resolveBroadcastRoomId } from "../broadcast/broadcast-resolve.util";
 
@@ -34,8 +38,12 @@ interface RpsState {
   hostId: string;
   phase: "throw" | "side" | "done";
   submissions: Map<string, RpsHand>; // userId(팀장) -> 낸 손 (현재 라운드)
+  // side 페이즈에서 진영 선택권을 가진 팀.
+  // 1세트는 가위바위보 승자, 다전제 2세트부터는 직전 세트 패자다.
   winnerTeamId?: string;
   blueSideTeamId?: string;
+  /** 다전제 세트 번호 (단판이면 1) */
+  gameNumber: number;
 }
 
 // 양 팀장 준비 완료 대기 상태
@@ -76,6 +84,7 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
   constructor(
     private readonly authService: AuthService,
     private readonly matchService: MatchService,
+    private readonly matchSeriesService: MatchSeriesService,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -234,6 +243,10 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
       submitted: Array.from(state.submissions.keys()), // 누가 냈는지만 (손 내용은 공개 전 비공개)
       winnerTeamId: state.winnerTeamId ?? null,
       blueSideTeamId: state.blueSideTeamId ?? null,
+      gameNumber: state.gameNumber,
+      // true면 가위바위보 없이 진영 선택만 하는 세트다 (다전제 2세트 이후).
+      // 클라이언트는 이 값으로 손 내는 UI를 건너뛴다.
+      sidePickOnly: state.gameNumber > 1,
     };
   }
 
@@ -425,21 +438,7 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
     });
     this.broadcastRpsState(state);
 
-    const winnerIsBot =
-      state.winnerTeamId === state.teamAId
-        ? state.captainAIsBot
-        : state.captainBIsBot;
-    if (winnerIsBot) {
-      void this.autoChooseBotSide(matchId);
-      return;
-    }
-
-    // 진영 미선택 시 자동 랜덤
-    this.armRpsTimer(matchId, this.RPS_SIDE_TIMEOUT, () => {
-      const s = this.rpsStates.get(matchId);
-      if (!s || s.phase !== "side") return;
-      void this.finalizeRpsSide(matchId, Math.random() < 0.5 ? "blue" : "red");
-    });
+    void this.beginSidePhase(matchId);
   }
 
   private async finalizeRpsSide(matchId: string, side: "blue" | "red") {
@@ -514,8 +513,15 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
       captainBId: string | null;
       captainAIsBot?: boolean;
       captainBIsBot?: boolean;
+      gameNumber?: number;
+      sidePickerTeamId?: string | null;
     },
   ) {
+    // 다전제 2세트 이후에는 가위바위보를 다시 하지 않고
+    // 직전 세트 패자에게 진영 선택권만 준다.
+    const sidePickerTeamId = ctx.sidePickerTeamId ?? null;
+    const skipThrow = Boolean(sidePickerTeamId);
+
     const state: RpsState = {
       matchId,
       teamAId: ctx.teamAId ?? "",
@@ -525,8 +531,12 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
       captainAIsBot: !!ctx.captainAIsBot,
       captainBIsBot: !!ctx.captainBIsBot,
       hostId: ctx.hostId ?? "",
-      phase: "throw",
+      phase: skipThrow ? "side" : "throw",
       submissions: new Map(),
+      // side 페이즈에서 선택권을 가진 팀. 1세트는 가위바위보 승자,
+      // 2세트부터는 직전 세트 패자다.
+      winnerTeamId: skipThrow ? (sidePickerTeamId ?? undefined) : undefined,
+      gameNumber: ctx.gameNumber ?? 1,
     };
     this.rpsStates.set(matchId, state);
     this.broadcastRpsState(state);
@@ -537,7 +547,37 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.server.to(`bracket:${match.roomId}`).emit("rps:invite", { matchId });
     }
 
+    if (skipThrow) {
+      await this.beginSidePhase(matchId);
+      return;
+    }
+
     await this.autoAdvanceBotRpsThrow(matchId);
+  }
+
+  /**
+   * 진영 선택 단계 진입 공통 처리.
+   * 선택권을 가진 팀장이 봇이면 즉시 랜덤, 아니면 타임아웃을 건다.
+   */
+  private async beginSidePhase(matchId: string) {
+    const state = this.rpsStates.get(matchId);
+    if (!state || state.phase !== "side" || !state.winnerTeamId) return;
+
+    const pickerIsBot =
+      state.winnerTeamId === state.teamAId
+        ? state.captainAIsBot
+        : state.captainBIsBot;
+    if (pickerIsBot) {
+      await this.autoChooseBotSide(matchId);
+      return;
+    }
+
+    // 진영 미선택 시 자동 랜덤
+    this.armRpsTimer(matchId, this.RPS_SIDE_TIMEOUT, () => {
+      const s = this.rpsStates.get(matchId);
+      if (!s || s.phase !== "side") return;
+      void this.finalizeRpsSide(matchId, Math.random() < 0.5 ? "blue" : "red");
+    });
   }
 
   // 양 팀장이 준비 완료하면 RPS 자동 시작 (기존 호스트 버튼 대체)
@@ -676,12 +716,19 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (!state || state.phase !== "side" || !state.winnerTeamId) {
       return { success: false, error: "진영 선택 단계가 아닙니다." };
     }
-    const winnerCaptain =
+    const pickerCaptain =
       state.winnerTeamId === state.teamAId
         ? state.captainAId
         : state.captainBId;
-    if (!client.userId || client.userId !== winnerCaptain) {
-      return { success: false, error: "이긴 팀 팀장만 선택할 수 있습니다." };
+    if (!client.userId || client.userId !== pickerCaptain) {
+      return {
+        success: false,
+        // 1세트는 가위바위보 승자, 2세트부터는 직전 세트 패자가 고른다.
+        error:
+          state.gameNumber > 1
+            ? "직전 세트에서 진 팀 팀장만 선택할 수 있습니다."
+            : "이긴 팀 팀장만 선택할 수 있습니다.",
+      };
     }
     if (data.side !== "blue" && data.side !== "red") {
       return { success: false, error: "잘못된 진영입니다." };
@@ -751,6 +798,14 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.server.to(`bracket:${roomId}`).emit("bracket-updated", data);
   }
 
+  /**
+   * 다전제 진행 상황. 시리즈 스코어 갱신과 다음 세트 안내에 쓴다.
+   * clinched=false면 아직 시리즈가 안 끝났다는 뜻이다.
+   */
+  emitSeriesUpdate(roomId: string, data: SeriesProgress) {
+    this.server.to(`bracket:${roomId}`).emit("series-updated", data);
+  }
+
   emitBracketComplete(roomId: string) {
     this.server.to(`bracket:${roomId}`).emit("bracket-complete");
   }
@@ -768,48 +823,79 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
       // Get final standings
       const matches = await this.matchService.getRoomMatches(roomId);
 
+      // 다전제에서는 대진 하나가 여러 게임이므로 게임 승수로 순위를 매기면
+      // 2-1로 이긴 팀이 "2승 1패"로 잡혀 순위가 뒤섞인다.
+      // 시리즈 방이면 시리즈(대진) 승패로 집계하고, 시리즈가 없는 레거시 방만
+      // 기존처럼 매치 단위로 센다.
+      const seriesScores =
+        await this.matchSeriesService.getRoomSeriesScores(roomId);
+      const useSeries = seriesScores.length > 0;
+
+      // 팀 이름은 매치 쪽 relation에서만 오므로 먼저 모아둔다.
+      const teamNames = new Map<string, string>();
+      for (const match of matches) {
+        const withTeams = match as typeof match & {
+          teamA: { id: string; name: string } | null;
+          teamB: { id: string; name: string } | null;
+        };
+        if (withTeams.teamA)
+          teamNames.set(withTeams.teamA.id, withTeams.teamA.name);
+        if (withTeams.teamB)
+          teamNames.set(withTeams.teamB.id, withTeams.teamB.name);
+      }
+
       // Calculate final standings (teams ranked by wins)
       const teamStats = new Map<
         string,
         { teamId: string; teamName: string; wins: number; losses: number }
       >();
 
-      for (const match of matches) {
-        // Type assertion: getRoomMatches includes teamA and teamB relations
-        const matchWithTeams = match as typeof match & {
-          teamA: { id: string; name: string } | null;
-          teamB: { id: string; name: string } | null;
-        };
-
-        if (!matchWithTeams.teamA || !matchWithTeams.teamB) continue; // Skip TBD matches
-        const teamAId = matchWithTeams.teamA.id;
-        const teamBId = matchWithTeams.teamB.id;
-        const teamAName = matchWithTeams.teamA.name;
-        const teamBName = matchWithTeams.teamB.name;
-
-        if (!teamStats.has(teamAId)) {
-          teamStats.set(teamAId, {
-            teamId: teamAId,
-            teamName: teamAName,
+      const ensure = (teamId: string) => {
+        if (!teamStats.has(teamId)) {
+          teamStats.set(teamId, {
+            teamId,
+            teamName: teamNames.get(teamId) ?? teamId,
             wins: 0,
             losses: 0,
           });
         }
-        if (!teamStats.has(teamBId)) {
-          teamStats.set(teamBId, {
-            teamId: teamBId,
-            teamName: teamBName,
-            wins: 0,
-            losses: 0,
-          });
-        }
+        return teamStats.get(teamId)!;
+      };
 
-        if (match.winnerId === teamAId) {
-          teamStats.get(teamAId)!.wins++;
-          teamStats.get(teamBId)!.losses++;
-        } else if (match.winnerId === teamBId) {
-          teamStats.get(teamBId)!.wins++;
-          teamStats.get(teamAId)!.losses++;
+      if (useSeries) {
+        for (const series of seriesScores) {
+          if (!series.teamAId || !series.teamBId) continue; // TBD 슬롯
+          ensure(series.teamAId);
+          ensure(series.teamBId);
+          if (series.winnerId === series.teamAId) {
+            ensure(series.teamAId).wins++;
+            ensure(series.teamBId).losses++;
+          } else if (series.winnerId === series.teamBId) {
+            ensure(series.teamBId).wins++;
+            ensure(series.teamAId).losses++;
+          }
+        }
+      } else {
+        for (const match of matches) {
+          // Type assertion: getRoomMatches includes teamA and teamB relations
+          const matchWithTeams = match as typeof match & {
+            teamA: { id: string; name: string } | null;
+            teamB: { id: string; name: string } | null;
+          };
+
+          if (!matchWithTeams.teamA || !matchWithTeams.teamB) continue; // Skip TBD matches
+          const teamAId = matchWithTeams.teamA.id;
+          const teamBId = matchWithTeams.teamB.id;
+          ensure(teamAId);
+          ensure(teamBId);
+
+          if (match.winnerId === teamAId) {
+            ensure(teamAId).wins++;
+            ensure(teamBId).losses++;
+          } else if (match.winnerId === teamBId) {
+            ensure(teamBId).wins++;
+            ensure(teamAId).losses++;
+          }
         }
       }
 

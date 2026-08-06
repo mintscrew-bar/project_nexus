@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import {
   ExternalLink,
@@ -64,10 +64,13 @@ export function StreamerSettingsSection() {
   const [linkUrl, setLinkUrl] = useState("");
   const [linkImage, setLinkImage] = useState<File | null>(null);
   const [editingLink, setEditingLink] = useState<StreamerLink | null>(null);
+  // SOOP 안내 카드에서 "채널 등록"을 누르면 아래 폼으로 시선을 옮기기 위한 참조
+  const channelUrlRef = useRef<HTMLInputElement>(null);
 
   const availablePlatforms = PLATFORMS.filter(
     (item) => !profiles.some((profile) => profile.platform === item.value),
   );
+  const soopProfile = profiles.find((profile) => profile.platform === "SOOP");
   const selectedPlatform = availablePlatforms.some(
     (item) => item.value === platform,
   )
@@ -117,6 +120,13 @@ export function StreamerSettingsSection() {
     await userApi.deleteStreamerProfile(value);
     await reload();
     addToast("방송 채널을 삭제했습니다.", "success");
+  };
+
+  /** SOOP 안내 카드 → 아래 채널 추가 폼을 SOOP으로 맞추고 URL 입력에 포커스 */
+  const beginSoopRegister = () => {
+    setPlatform("SOOP");
+    channelUrlRef.current?.scrollIntoView({ block: "center" });
+    channelUrlRef.current?.focus();
   };
 
   const connectChzzk = async () => {
@@ -208,23 +218,50 @@ export function StreamerSettingsSection() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="rounded-xl border border-[#00ffa3]/25 bg-[#00ffa3]/5 p-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="font-semibold text-text-primary">
-                  치지직 공식 계정 연결
-                </p>
-                <p className="mt-1 text-xs text-text-muted">
-                  채널 소개 수정 없이 로그인 한 번으로 소유권을 인증합니다.
-                </p>
-              </div>
+          {/*
+            플랫폼별 인증 경로 안내. 치지직은 OAuth 한 번으로 끝나지만
+            SOOP은 OAuth를 쓸 수 없어 코드 대조를 거친다.
+            경로가 서로 다르므로 두 카드를 같은 비중으로 나란히 둔다.
+          */}
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="flex flex-col rounded-xl border border-[#00ffa3]/25 bg-[#00ffa3]/5 p-4">
+              <p className="font-semibold text-text-primary">
+                치지직 공식 계정 연결
+              </p>
+              <p className="mt-1 text-xs text-text-muted">
+                채널 소개 수정 없이 로그인 한 번으로 소유권을 인증합니다.
+              </p>
               <Button
                 onClick={connectChzzk}
                 disabled={saving}
-                className="shrink-0"
+                className="mt-3 w-full sm:mt-auto sm:w-auto sm:self-start"
               >
                 치지직으로 연결
               </Button>
+            </div>
+
+            <div className="flex flex-col rounded-xl border border-[#2b6fff]/25 bg-[#2b6fff]/5 p-4">
+              <p className="font-semibold text-text-primary">SOOP 채널 인증</p>
+              <p className="mt-1 text-xs text-text-muted">
+                방송국 제목에 인증 코드를 붙여넣어 소유권을 확인합니다. 인증
+                후에는 코드를 지워도 됩니다.
+              </p>
+              {soopProfile?.verifiedAt ? (
+                <span className="mt-3 flex items-center gap-1 text-xs font-semibold text-[#00d68f] sm:mt-auto">
+                  <ShieldCheck className="h-4 w-4" /> 인증됨
+                </span>
+              ) : (
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    soopProfile ? setVerifying("SOOP") : beginSoopRegister()
+                  }
+                  disabled={saving}
+                  className="mt-3 w-full sm:mt-auto sm:w-auto sm:self-start"
+                >
+                  {soopProfile ? "SOOP 채널 인증하기" : "SOOP 채널 등록"}
+                </Button>
+              )}
             </div>
           </div>
 
@@ -289,6 +326,7 @@ export function StreamerSettingsSection() {
                 ))}
               </select>
               <input
+                ref={channelUrlRef}
                 value={channelUrl}
                 onChange={(event) => setChannelUrl(event.target.value)}
                 placeholder={

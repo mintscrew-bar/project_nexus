@@ -56,9 +56,12 @@ NEXUS에 채널을 등록·인증한 스트리머가 방송을 켜면, **스트�
 - [ ] Task 16: 유튜브 지원 (쿼터 설계 선행 필요)
 - [x] Task 17: 방송 시작 알림 (팔로우) — 팔로우 API·UI, 오프라인→LIVE 전환 알림, DB 마이그레이션 완료
 - [x] Task 18: 방송 설정 모으기 — 채널 등록·인증·링크·OBS 도구를 설정 방송 탭으로 통합, 프로필은 바로가기만 유지
+- [x] Task 19: SOOP 노출 개선 — 방송 탭에 SOOP 인증 안내 카드 추가, 플랫폼 라벨을 "SOOP"으로 통일, 인증 안내 문구 보강
 
 ## 운영 메모
 
+- 플랫폼 표기는 UI 전체에서 **"SOOP"** 으로 통일한다. 예전에 설정·프로필만 "SOOP", 나머지 컴포넌트는 "숲"으로 갈려 있어서 같은 플랫폼을 못 찾는 문제가 있었다.
+- SOOP 코드 대조 대상은 `station_title` + `station_name`을 합친 문자열이라 **둘 중 아무 데나** 코드를 넣어도 통과한다. 방송국 API는 오프라인이어도 응답하므로 방송을 켜지 않고 인증할 수 있다.
 - 비공식 엔드포인트가 막히면 `apps/api/src/modules/streamer/providers/` 의 해당 파일만 교체하면 된다. 조회 실패는 전부 `null`로 흡수되어 **LIVE 뱃지만 사라지고 스트리머 탭·목록은 그대로 동작한다.**
 - 치지직 OAuth용 환경변수는 `CHZZK_CLIENT_ID` / `CHZZK_CLIENT_SECRET` / `CHZZK_CALLBACK_URL`. GitHub Secrets와 배포 워크플로를 통해 `.env.production`으로 내려준다. 앱 권한은 공식 `/users/me` 호출에 필요한 **"유저 정보 조회"만 요청한다** (스트림키·방송 설정 권한은 요청하지 않음).
 - 스키마 변경분(`StreamerFollow` 포함)은 아직 운영 DB에 반영되지 않았다. `migrate deploy` 필요.

@@ -55,6 +55,8 @@ interface Room {
   pickTimeLimit?: number;
   captainSelection?: "RANDOM" | "TIER" | "MANUAL" | "VOLUNTEER";
   bracketFormat?: string;
+  // 다전제 프리셋 (@nexus/types의 SeriesPreset 키)
+  seriesPreset?: string | null;
 }
 
 interface ChatMessage {
@@ -81,6 +83,8 @@ export interface RoomSettingsDto {
   captainSelection?: "RANDOM" | "TIER" | "MANUAL" | "VOLUNTEER";
   // Bracket format
   bracketFormat?: string;
+  // 다전제 프리셋
+  seriesPreset?: string;
 }
 
 // 게임 시작 실패 시 서버에서 내려오는 에러 응답 타입

@@ -2250,11 +2250,24 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
     return embed;
   }
 
-  buildMatchResultEmbed(winnerName: string, loserName: string, score?: string) {
+  /**
+   * @param seriesLabel 다전제 진행 중인 세트면 "2세트" 같은 라벨.
+   *                    주면 시리즈가 아직 안 끝났다는 뜻이므로 문구를 낮춘다.
+   */
+  buildMatchResultEmbed(
+    winnerName: string,
+    loserName: string,
+    score?: string,
+    seriesLabel?: string,
+  ) {
     return new EmbedBuilder()
       .setColor(Colors.Green)
-      .setTitle("🏆 매치 종료!")
-      .setDescription(`**${winnerName}** 팀이 승리했습니다!`)
+      .setTitle(seriesLabel ? `⚔️ ${seriesLabel} 종료` : "🏆 매치 종료!")
+      .setDescription(
+        seriesLabel
+          ? `**${winnerName}** 팀이 ${seriesLabel}를 가져갔습니다.`
+          : `**${winnerName}** 팀이 승리했습니다!`,
+      )
       .addFields({
         name: "결과",
         value: `${winnerName} ${score ? score : ">"} ${loserName}`,

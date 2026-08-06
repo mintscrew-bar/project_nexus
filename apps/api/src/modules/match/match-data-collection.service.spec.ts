@@ -35,6 +35,9 @@ describe("MatchDataCollectionService", () => {
       {
         match: {
           findMany: jest.fn().mockResolvedValue([]),
+          // 크로스레퍼런스가 저장 직전 "이미 다른 매치가 가져간 Riot 게임인지"를
+          // 확인한다. 기본은 미할당(null).
+          findFirst: jest.fn().mockResolvedValue(null),
           ...match,
         },
       } as never,

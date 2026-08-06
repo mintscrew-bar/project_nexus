@@ -3,6 +3,40 @@
 import { useEffect, useRef } from "react";
 import { ADSENSE_CLIENT, ADSENSE_SLOTS, type AdSlotKey } from "@/lib/adsense";
 
+const ADSENSE_SCRIPT_ID = "adsense-loader";
+
+/** 광고가 실제로 필요해진 시점에 AdSense 로더를 한 번만 내려받는다. */
+function loadAdSense(): Promise<void> {
+  if ("adsbygoogle" in window) return Promise.resolve();
+
+  const existing = document.getElementById(
+    ADSENSE_SCRIPT_ID,
+  ) as HTMLScriptElement | null;
+
+  if (existing?.dataset.loaded === "true") return Promise.resolve();
+
+  return new Promise((resolve, reject) => {
+    const script = existing ?? document.createElement("script");
+    script.addEventListener("load", () => resolve(), { once: true });
+    script.addEventListener("error", () => reject(), { once: true });
+
+    if (!existing) {
+      script.id = ADSENSE_SCRIPT_ID;
+      script.async = true;
+      script.crossOrigin = "anonymous";
+      script.src = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADSENSE_CLIENT}`;
+      script.addEventListener(
+        "load",
+        () => {
+          script.dataset.loaded = "true";
+        },
+        { once: true },
+      );
+      document.head.appendChild(script);
+    }
+  });
+}
+
 interface AdSlotProps {
   slotKey: AdSlotKey;
   format?: "auto" | "fluid" | "rectangle" | "horizontal" | "vertical";
@@ -33,18 +67,48 @@ export function AdSlot({
   useEffect(() => {
     const el = insRef.current;
     if (!el || !slot) return;
-    // 이미 채워진 슬롯은 다시 push 하지 않음 (TagError 방지)
-    if (el.getAttribute("data-adsbygoogle-status") === "done") return;
-    try {
-      // 스크립트가 아직 로드되지 않았어도 push 큐에 쌓이므로 안전
-      (window as unknown as { adsbygoogle: unknown[] }).adsbygoogle =
-        (window as unknown as { adsbygoogle: unknown[] }).adsbygoogle || [];
-      (
-        window as unknown as { adsbygoogle: unknown[] }
-      ).adsbygoogle.push({});
-    } catch {
-      // 광고 실패는 페이지 동작에 영향 없음 — 조용히 무시
+
+    const requestAd = () => {
+      // Strict Mode 재실행과 중복 관찰 콜백에서 같은 슬롯을 요청하지 않는다.
+      if (
+        el.dataset.adsRequested === "true" ||
+        el.getAttribute("data-adsbygoogle-status") === "done"
+      ) {
+        return;
+      }
+      el.dataset.adsRequested = "true";
+
+      void loadAdSense()
+        .then(() => {
+          (window as unknown as { adsbygoogle: unknown[] }).adsbygoogle =
+            (window as unknown as { adsbygoogle: unknown[] }).adsbygoogle || [];
+          (
+            window as unknown as { adsbygoogle: unknown[] }
+          ).adsbygoogle.push({});
+        })
+        .catch(() => {
+          // 일시적인 로드 실패 뒤 다시 관찰될 때 재시도할 수 있게 한다.
+          delete el.dataset.adsRequested;
+        });
+    };
+
+    if (!("IntersectionObserver" in window)) {
+      requestAd();
+      return;
     }
+
+    // 뷰포트에 들어오기 직전 로드해 광고 공간의 빈 시간을 줄인다.
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) return;
+        observer.disconnect();
+        requestAd();
+      },
+      { rootMargin: "600px 0px" },
+    );
+    observer.observe(el);
+
+    return () => observer.disconnect();
   }, [slot]);
 
   // 슬롯 ID 미설정 — 안전 모드: 아무것도 렌더하지 않음
