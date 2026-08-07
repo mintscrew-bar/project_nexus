@@ -14,26 +14,26 @@ import {
 export class SubmitRatingDto {
   @IsString()
   @IsNotEmpty()
-  targetUserId: string;
+  targetUserId!: string;
 
   @IsString()
   @IsNotEmpty()
-  matchId: string;
+  matchId!: string;
 
   @IsInt()
   @Min(1, { message: "실력 평가는 1~5 사이여야 합니다." })
   @Max(5, { message: "실력 평가는 1~5 사이여야 합니다." })
-  skillRating: number;
+  skillRating!: number;
 
   @IsInt()
   @Min(1, { message: "태도 평가는 1~5 사이여야 합니다." })
   @Max(5, { message: "태도 평가는 1~5 사이여야 합니다." })
-  attitudeRating: number;
+  attitudeRating!: number;
 
   @IsInt()
   @Min(1, { message: "소통 평가는 1~5 사이여야 합니다." })
   @Max(5, { message: "소통 평가는 1~5 사이여야 합니다." })
-  communicationRating: number;
+  communicationRating!: number;
 
   @IsOptional()
   @IsString()

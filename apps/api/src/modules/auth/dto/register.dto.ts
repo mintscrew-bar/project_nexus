@@ -13,26 +13,26 @@ import {
  */
 export class RegisterDto {
   @IsEmail({}, { message: "유효한 이메일 주소를 입력해주세요." })
-  email: string;
+  email!: string;
 
   @IsString()
   @MinLength(8, { message: "비밀번호는 최소 8자 이상이어야 합니다." })
   @MaxLength(100, { message: "비밀번호는 100자를 초과할 수 없습니다." })
-  password: string;
+  password!: string;
 
   @IsString()
   @MinLength(2, { message: "닉네임은 최소 2자 이상이어야 합니다." })
   @MaxLength(20, { message: "닉네임은 20자를 초과할 수 없습니다." })
-  username: string;
+  username!: string;
 
   @IsBoolean()
-  termsOfService: boolean;
+  termsOfService!: boolean;
 
   @IsBoolean()
-  privacyPolicy: boolean;
+  privacyPolicy!: boolean;
 
   @IsBoolean()
-  ageVerification: boolean;
+  ageVerification!: boolean;
 
   @IsOptional()
   @IsBoolean()

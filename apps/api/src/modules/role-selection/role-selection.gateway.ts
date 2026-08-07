@@ -40,7 +40,7 @@ export class RoleSelectionGateway
   implements OnGatewayConnection, OnGatewayDisconnect, OnModuleDestroy
 {
   @WebSocketServer()
-  server: Server;
+  server!: Server;
 
   private roomTimers = new Map<string, NodeJS.Timeout>();
   // 정확한 타이머 만료 시점에 completeRoleSelection을 호출하는 setTimeout Map

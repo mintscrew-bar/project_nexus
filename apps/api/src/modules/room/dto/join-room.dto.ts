@@ -6,7 +6,7 @@ import { IsString, IsNotEmpty, IsOptional, MaxLength } from "class-validator";
 export class JoinRoomDto {
   @IsString()
   @IsNotEmpty()
-  roomId: string;
+  roomId!: string;
 
   @IsOptional()
   @IsString()

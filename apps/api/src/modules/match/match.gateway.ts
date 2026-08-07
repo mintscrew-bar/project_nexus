@@ -71,7 +71,7 @@ interface RpsReadyEntry {
 })
 export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
-  server: Server;
+  server!: Server;
 
   // 가위바위보 진행 상태 (인메모리 — 단일 인스턴스 가정). 최종 진영만 DB 저장.
   private readonly rpsStates = new Map<string, RpsState>();

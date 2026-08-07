@@ -19,10 +19,10 @@ function optionalUppercase({ value }: { value: unknown }): unknown {
 
 export class UpdateRiotAccountDto {
   @IsEnum(Role, { message: "유효한 주 포지션을 선택해주세요." })
-  mainRole: Role;
+  mainRole!: Role;
 
   @IsEnum(Role, { message: "유효한 부 포지션을 선택해주세요." })
-  subRole: Role;
+  subRole!: Role;
 
   @Transform(optionalUppercase)
   @IsOptional()

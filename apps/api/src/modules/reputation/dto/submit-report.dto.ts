@@ -13,7 +13,7 @@ import { ReportReason } from "@nexus/database";
 export class SubmitReportDto {
   @IsString()
   @IsNotEmpty()
-  targetUserId: string;
+  targetUserId!: string;
 
   @IsOptional()
   @IsString()
@@ -24,10 +24,10 @@ export class SubmitReportDto {
   clanChatMessageId?: string;
 
   @IsEnum(ReportReason, { message: "유효한 신고 사유를 선택해주세요." })
-  reason: ReportReason;
+  reason!: ReportReason;
 
   @IsString()
   @IsNotEmpty({ message: "신고 상세 내용을 입력해주세요." })
   @MaxLength(1000, { message: "신고 내용은 1,000자를 초과할 수 없습니다." })
-  description: string;
+  description!: string;
 }

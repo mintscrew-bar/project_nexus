@@ -21,7 +21,7 @@ export class CreateBoardDto {
   @IsString()
   @IsNotEmpty({ message: "게시판 이름을 입력해주세요." })
   @MaxLength(30, { message: "게시판 이름은 30자를 초과할 수 없습니다." })
-  name: string;
+  name!: string;
 
   /** URL 슬러그 (소문자/숫자/하이픈). 생략 시 서버에서 자동 생성 */
   @IsOptional()
