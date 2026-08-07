@@ -22,9 +22,15 @@ Project Nexus는 Riot Games API를 사용하여 다음 기능을 제공합니다
 5. `.env` 파일에 추가:
    ```env
    RIOT_API_KEY="RGAPI-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+   RIOT_GLOBAL_RATE_SHORT_MAX=20
+   RIOT_GLOBAL_RATE_SHORT_WINDOW_SEC=1
+   RIOT_GLOBAL_RATE_LONG_MAX=95
+   RIOT_GLOBAL_RATE_LONG_WINDOW_SEC=120
    RIOT_MATCH_RATE_LIMIT_MAX=70
    RIOT_MATCH_RATE_LIMIT_WINDOW_SECONDS=120
    RIOT_MATCH_REQUEST_DELAY_MS=1350
+   RIOT_MATCH_BACKGROUND_RATE_LIMIT_MAX=15
+   RIOT_MATCH_BACKGROUND_REQUEST_DELAY_MS=8000
    ```
 
 **제한사항:**
@@ -34,6 +40,8 @@ Project Nexus는 Riot Games API를 사용하여 다음 기능을 제공합니다
 - 개발 목적으로만 사용 가능
 
 Project Nexus는 Riot API를 계정 인증, 티어 동기화, 종료된 내전 기록 보강에 사용합니다. 외부 랭크·일반 경기를 대량 수집하는 자동 로더는 운영하지 않습니다.
+
+현재 구현의 최종 권위는 `RiotRateLimiterService`의 Redis dual-window 전역 제한입니다. 기본값은 `20/1초`, `95/120초`이며 Riot 개발 키의 `100/2분` 한도보다 약간 낮게 잡아 윈도우 경계와 동시 요청으로 인한 429를 줄입니다. `RIOT_MATCH_*` 값은 match fetch의 보조 속도 제한과 백그라운드 부하 완화용입니다.
 
 ### Production Key (프로덕션용)
 

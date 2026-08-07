@@ -18,8 +18,15 @@
 
 ### Rate Limiting
 
-- 기본: 100 req/min (전역 ThrottlerGuard)
-- 인증 계열은 별도 제한이 적용될 수 있다.
+- 기본: 100 req/min (전역 `ThrottlerGuard`)
+- 추적 기준: 유효한 Bearer JWT가 있으면 `userId`, 없거나 검증 실패 시 클라이언트 IP
+- `POST /auth/register`: 3 req/min
+- `POST /auth/login`: 5 req/min
+- `POST /auth/refresh`: 300 req/min
+- `GET /health`: `@SkipThrottle()`로 제외
+- 일부 실시간/검색성 API는 컨트롤러별 `@Throttle()` 값이 다르다. 예: Room/Match/Role Selection 600 req/min, Riot 조회 일부 20 req/min, Stats 일부 10-30 req/min.
+- WebSocket 도메인 제한: Auction bid 5회/3초, Snake Draft pick 3회/2초.
+- Riot 외부 API 호출은 Redis 기반 `RiotRateLimiterService`가 전역 예산 `20/1초`, `95/120초`를 공유한다.
 
 ### 응답 형식
 

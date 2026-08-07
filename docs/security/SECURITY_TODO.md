@@ -14,7 +14,8 @@
 
 - [x] Phase 1-2: Rate Limiting 실제 적용
   - `app.module.ts`에 `APP_GUARD`로 `ThrottlerGuard` 글로벌 등록
-  - `auth.controller.ts` 엔드포인트별 제한: login 5/min, register 3/min, refresh 10/min
+  - `auth.controller.ts` 엔드포인트별 제한: login 5/min, register 3/min, refresh 300/min
+  - `AuthAwareThrottlerGuard`로 인증 요청은 userId별, 익명 요청은 IP별 제한
   - `health.controller.ts`에 `@SkipThrottle()` 적용
 
 - [x] Phase 1-3: 글로벌 예외 필터
