@@ -40,7 +40,7 @@ export class DmGateway
   }
 
   @WebSocketServer()
-  server: Server;
+  server!: Server;
 
   // "senderId:receiverId" → Timeout
   private typingTimers = new Map<string, NodeJS.Timeout>();

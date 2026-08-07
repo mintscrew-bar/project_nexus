@@ -12,7 +12,7 @@ import { ClanRole } from "@nexus/database";
  */
 export class UpdateMemberRoleDto {
   @IsEnum(ClanRole, { message: "유효하지 않은 역할입니다." })
-  role: ClanRole;
+  role!: ClanRole;
 }
 
 /**
@@ -21,7 +21,7 @@ export class UpdateMemberRoleDto {
 export class TransferOwnershipDto {
   @IsString()
   @IsNotEmpty({ message: "새 소유자 ID를 입력해주세요." })
-  newOwnerId: string;
+  newOwnerId!: string;
 }
 
 /**
@@ -31,7 +31,7 @@ export class ContentDto {
   @IsString()
   @IsNotEmpty({ message: "내용을 입력해주세요." })
   @MaxLength(500, { message: "내용은 500자를 초과할 수 없습니다." })
-  content: string;
+  content!: string;
 }
 
 /**
@@ -40,7 +40,7 @@ export class ContentDto {
 export class JoinByCodeDto {
   @IsString()
   @IsNotEmpty({ message: "초대 코드를 입력해주세요." })
-  code: string;
+  code!: string;
 }
 
 /**
@@ -49,7 +49,7 @@ export class JoinByCodeDto {
 export class InviteUserDto {
   @IsString()
   @IsNotEmpty({ message: "초대할 유저 ID를 입력해주세요." })
-  inviteeId: string;
+  inviteeId!: string;
 }
 
 /**
@@ -57,5 +57,5 @@ export class InviteUserDto {
  */
 export class ResolveDto {
   @IsBoolean({ message: "수락 여부를 boolean 값으로 입력해주세요." })
-  accept: boolean;
+  accept!: boolean;
 }
