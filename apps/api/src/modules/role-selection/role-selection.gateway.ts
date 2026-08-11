@@ -444,8 +444,8 @@ export class RoleSelectionGateway
     }
   }
 
-  @SubscribeMessage("vote-skip")
-  async handleVoteSkip(
+  @SubscribeMessage("mark-captain-ready")
+  async handleMarkCaptainReady(
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() data: { roomId: string },
   ) {
@@ -454,22 +454,24 @@ export class RoleSelectionGateway
         return { error: "Unauthorized" };
       }
 
-      const skipVote = await this.roleSelectionService.voteToSkip(
+      const captainReady = await this.roleSelectionService.markCaptainReady(
         client.userId,
         data.roomId,
       );
-      this.server.to(`room:${data.roomId}`).emit("skip-vote-updated", skipVote);
+      this.server
+        .to(`room:${data.roomId}`)
+        .emit("captain-ready-updated", captainReady);
 
-      if (skipVote.passed) {
+      if (captainReady.allReady) {
         this.completeRoleSelection(data.roomId).catch((error) => {
           console.error(
-            "Failed to complete role selection after skip vote:",
+            "Failed to complete role selection after all captains were ready:",
             error,
           );
         });
       }
 
-      return { success: true, skipVote };
+      return { success: true, captainReady };
     } catch (error: any) {
       return { error: error.message };
     }

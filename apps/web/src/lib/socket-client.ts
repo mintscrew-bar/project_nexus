@@ -1314,29 +1314,33 @@ export const roleSelectionSocketHelpers = {
     });
   },
 
-  voteToSkip: (roomId: string): Promise<any> => {
+  markCaptainReady: (roomId: string): Promise<any> => {
     return new Promise<any>((resolve) => {
       if (!roleSelectionSocket?.connected) {
         resolve({ error: "소켓이 연결되어 있지 않습니다." });
         return;
       }
       const timeout = setTimeout(() => resolve({ error: "timeout" }), 10000);
-      roleSelectionSocket.emit("vote-skip", { roomId }, (response: any) => {
-        clearTimeout(timeout);
-        resolve(response ?? {});
-      });
+      roleSelectionSocket.emit(
+        "mark-captain-ready",
+        { roomId },
+        (response: any) => {
+          clearTimeout(timeout);
+          resolve(response ?? {});
+        },
+      );
     });
   },
 
-  onSkipVoteUpdated: (
+  onCaptainReadyUpdated: (
     callback: (data: {
-      voterIds: string[];
-      voteCount: number;
-      requiredVotes: number;
-      passed: boolean;
+      readyCaptainIds: string[];
+      readyCount: number;
+      requiredCount: number;
+      allReady: boolean;
     }) => void,
   ) => {
-    roleSelectionSocket?.on("skip-vote-updated", callback);
+    roleSelectionSocket?.on("captain-ready-updated", callback);
   },
 
   onTimerExtended: (
@@ -1414,7 +1418,7 @@ export const roleSelectionSocketHelpers = {
     roleSelectionSocket?.off("role-selection-started");
     roleSelectionSocket?.off("timer-tick");
     roleSelectionSocket?.off("timer-extended");
-    roleSelectionSocket?.off("skip-vote-updated");
+    roleSelectionSocket?.off("captain-ready-updated");
     roleSelectionSocket?.off("role-selection-error");
     roleSelectionSocket?.off("session-aborted");
   },

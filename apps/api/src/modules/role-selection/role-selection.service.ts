@@ -19,17 +19,17 @@ export interface RoleSelectionState {
   startedAt: number;
 }
 
-export interface RoleSelectionSkipVoteState {
-  voterIds: string[];
-  voteCount: number;
-  requiredVotes: number;
-  passed: boolean;
+export interface RoleSelectionCaptainReadyState {
+  readyCaptainIds: string[];
+  readyCount: number;
+  requiredCount: number;
+  allReady: boolean;
 }
 
 @Injectable()
 export class RoleSelectionService {
   private roleSelectionStates = new Map<string, RoleSelectionState>();
-  private skipVoters = new Map<string, Set<string>>();
+  private readyCaptains = new Map<string, Set<string>>();
   // roomId → 연장을 사용한 userId Set
   private extendedUsers = new Map<string, Set<string>>();
 
@@ -107,7 +107,7 @@ export class RoleSelectionService {
     };
 
     this.roleSelectionStates.set(roomId, state);
-    this.skipVoters.delete(roomId);
+    this.readyCaptains.delete(roomId);
 
     return {
       room,
@@ -478,7 +478,7 @@ export class RoleSelectionService {
     // Clean up state
     this.roleSelectionStates.delete(roomId);
     this.extendedUsers.delete(roomId);
-    this.skipVoters.delete(roomId);
+    this.readyCaptains.delete(roomId);
 
     return updatedRoom;
   }
@@ -494,58 +494,59 @@ export class RoleSelectionService {
   clearRoleSelectionState(roomId: string): void {
     this.roleSelectionStates.delete(roomId);
     this.extendedUsers.delete(roomId);
-    this.skipVoters.delete(roomId);
+    this.readyCaptains.delete(roomId);
   }
 
-  async getSkipVoteState(roomId: string): Promise<RoleSelectionSkipVoteState> {
-    const players = await this.prisma.roomParticipant.findMany({
-      where: { roomId, role: "PLAYER" },
-      select: { userId: true },
+  async getCaptainReadyState(
+    roomId: string,
+  ): Promise<RoleSelectionCaptainReadyState> {
+    const teams = await this.prisma.team.findMany({
+      where: { roomId },
+      select: { captainId: true },
     });
-    const playerIds = new Set(players.map((player) => player.userId));
-    const voters = this.skipVoters.get(roomId) ?? new Set<string>();
+    const captainIds = new Set(teams.map((team) => team.captainId));
+    const ready = this.readyCaptains.get(roomId) ?? new Set<string>();
 
-    for (const voterId of voters) {
-      if (!playerIds.has(voterId)) voters.delete(voterId);
+    for (const captainId of ready) {
+      if (!captainIds.has(captainId)) ready.delete(captainId);
     }
 
-    if (voters.size > 0) this.skipVoters.set(roomId, voters);
-    const requiredVotes = Math.floor(playerIds.size / 2) + 1;
+    if (ready.size > 0) this.readyCaptains.set(roomId, ready);
 
     return {
-      voterIds: [...voters],
-      voteCount: voters.size,
-      requiredVotes,
-      passed: playerIds.size > 0 && voters.size >= requiredVotes,
+      readyCaptainIds: [...ready],
+      readyCount: ready.size,
+      requiredCount: captainIds.size,
+      allReady: captainIds.size > 0 && ready.size === captainIds.size,
     };
   }
 
-  async voteToSkip(
+  async markCaptainReady(
     userId: string,
     roomId: string,
-  ): Promise<RoleSelectionSkipVoteState> {
+  ): Promise<RoleSelectionCaptainReadyState> {
     if (!this.roleSelectionStates.has(roomId)) {
       throw new BadRequestException("역할 선택이 진행 중이 아닙니다.");
     }
 
-    const participant = await this.prisma.roomParticipant.findFirst({
-      where: { roomId, userId, role: "PLAYER" },
+    const team = await this.prisma.team.findFirst({
+      where: { roomId, captainId: userId },
       select: { id: true },
     });
-    if (!participant) {
+    if (!team) {
       throw new ForbiddenException(
-        "플레이어만 스킵 투표에 참여할 수 있습니다.",
+        "팀장만 다음 단계 준비를 완료할 수 있습니다.",
       );
     }
 
-    let voters = this.skipVoters.get(roomId);
-    if (!voters) {
-      voters = new Set<string>();
-      this.skipVoters.set(roomId, voters);
+    let ready = this.readyCaptains.get(roomId);
+    if (!ready) {
+      ready = new Set<string>();
+      this.readyCaptains.set(roomId, ready);
     }
-    voters.add(userId);
+    ready.add(userId);
 
-    return this.getSkipVoteState(roomId);
+    return this.getCaptainReadyState(roomId);
   }
 
   // 인당 1회 15초 연장. 반환값: 새 timerEnd (ms)
@@ -634,7 +635,7 @@ export class RoleSelectionService {
       state,
       timerEndAt: state?.timerEnd ?? null,
       timeRemaining,
-      skipVote: await this.getSkipVoteState(roomId),
+      captainReady: await this.getCaptainReadyState(roomId),
     };
   }
 }

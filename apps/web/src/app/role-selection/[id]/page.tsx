@@ -11,7 +11,7 @@ import { PlayerProfileModal } from "@/components/domain/PlayerProfileModal";
 import { PositionIcon } from "@/app/tournaments/[id]/lobby/_components/icons";
 import { LoadingSpinner, Badge, Avatar, Button, ConfirmModal } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
-import { Clock, Check, SkipForward, TimerReset } from "lucide-react";
+import { Clock, Check, CheckCircle2, TimerReset } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const ROLES = ["TOP", "JUNGLE", "MID", "ADC", "SUPPORT"] as const;
@@ -33,7 +33,7 @@ export default function RoleSelectionPage() {
   const { user } = useAuthStore();
   const hasRedirected = useRef(false);
   const [isAborting, setIsAborting] = useState(false);
-  const [isVotingToSkip, setIsVotingToSkip] = useState(false);
+  const [isMarkingReady, setIsMarkingReady] = useState(false);
   const [isAbortConfirmOpen, setIsAbortConfirmOpen] = useState(false);
   const [hoveredMember, setHoveredMember] = useState<{ userId: string; rect: DOMRect } | null>(null);
   const [profileUserId, setProfileUserId] = useState<string | null>(null);
@@ -67,10 +67,10 @@ export default function RoleSelectionPage() {
     selectRole,
     cancelRole,
     extendTimer,
-    voteToSkip,
+    markCaptainReady,
     hasExtended,
-    skipVoterIds,
-    skipVotesRequired,
+    readyCaptainIds,
+    readyCaptainsRequired,
     sessionAbortedAt,
     sessionAbortMessage,
     clearSessionAbort,
@@ -144,14 +144,14 @@ export default function RoleSelectionPage() {
     }
   };
 
-  const handleVoteToSkip = async () => {
-    setIsVotingToSkip(true);
+  const handleMarkCaptainReady = async () => {
+    setIsMarkingReady(true);
     try {
-      await voteToSkip(roomId);
+      await markCaptainReady(roomId);
     } catch (err: any) {
-      addToast(err.message || "스킵 투표에 실패했습니다.", "error");
+      addToast(err.message || "다음 단계 준비 처리에 실패했습니다.", "error");
     } finally {
-      setIsVotingToSkip(false);
+      setIsMarkingReady(false);
     }
   };
 
@@ -194,7 +194,11 @@ export default function RoleSelectionPage() {
     team.members.some((member) => member.userId === user?.id),
   );
   const myMember = myTeam?.members.find((member) => member.userId === user?.id);
-  const hasVotedToSkip = !!user?.id && skipVoterIds.includes(user.id);
+  const isMyTeamCaptain = !!user?.id && myTeam?.captainId === user.id;
+  const hasMarkedReady = !!user?.id && readyCaptainIds.includes(user.id);
+  const allCaptainsReady =
+    readyCaptainsRequired > 0 &&
+    readyCaptainIds.length === readyCaptainsRequired;
   const selectedRole = myMember?.assignedRole as Role | null;
   const myTeamTakenRoles = myTeam?.members
     .filter((member) => member.assignedRole)
@@ -240,20 +244,20 @@ export default function RoleSelectionPage() {
             <Badge variant={isConnected ? "success" : "danger"}>
               {isConnected ? "● 연결됨" : "● 연결 끊김"}
             </Badge>
-            {myMember && (
+            <Badge variant={allCaptainsReady ? "success" : "primary"}>
+              팀장 준비 {readyCaptainIds.length}/{readyCaptainsRequired}
+            </Badge>
+            {isMyTeamCaptain && (
               <Button
-                variant={hasVotedToSkip ? "secondary" : "outline"}
+                variant={hasMarkedReady ? "secondary" : "outline"}
                 size="sm"
-                isLoading={isVotingToSkip}
-                disabled={!isConnected || hasVotedToSkip || isVotingToSkip}
-                onClick={handleVoteToSkip}
-                title="과반수가 동의하면 미선택 역할을 자동 배정하고 대진표로 이동합니다."
+                isLoading={isMarkingReady}
+                disabled={!isConnected || hasMarkedReady || isMarkingReady}
+                onClick={handleMarkCaptainReady}
+                title="모든 팀장이 준비되면 미선택 역할을 자동 배정하고 대진표로 이동합니다."
               >
-                <SkipForward className="h-4 w-4" />
-                <span>
-                  {hasVotedToSkip ? "투표 완료" : "스킵 투표"}{" "}
-                  {skipVoterIds.length}/{skipVotesRequired}
-                </span>
+                <CheckCircle2 className="h-4 w-4" />
+                <span>{hasMarkedReady ? "준비 완료" : "다음 단계 준비"}</span>
               </Button>
             )}
             <button

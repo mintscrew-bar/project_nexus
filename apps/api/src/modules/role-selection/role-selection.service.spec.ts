@@ -1,24 +1,24 @@
 import { RoleSelectionService } from "./role-selection.service";
 
-describe("RoleSelectionService skip voting", () => {
+describe("RoleSelectionService captain readiness", () => {
   let service: RoleSelectionService;
   let prisma: {
-    roomParticipant: {
+    team: {
       findMany: jest.Mock;
       findFirst: jest.Mock;
     };
   };
 
   const roomId = "room-1";
-  const players = Array.from({ length: 20 }, (_, index) => ({
-    userId: `user-${index + 1}`,
+  const teams = Array.from({ length: 4 }, (_, index) => ({
+    captainId: `captain-${index + 1}`,
   }));
 
   beforeEach(() => {
     prisma = {
-      roomParticipant: {
-        findMany: jest.fn().mockResolvedValue(players),
-        findFirst: jest.fn().mockResolvedValue({ id: "participant-1" }),
+      team: {
+        findMany: jest.fn().mockResolvedValue(teams),
+        findFirst: jest.fn().mockResolvedValue({ id: "team-1" }),
       },
     };
     service = new RoleSelectionService(prisma as any, {} as any);
@@ -29,33 +29,33 @@ describe("RoleSelectionService skip voting", () => {
     });
   });
 
-  it("counts one vote per player", async () => {
-    await service.voteToSkip("user-1", roomId);
-    const result = await service.voteToSkip("user-1", roomId);
+  it("counts one ready response per captain", async () => {
+    await service.markCaptainReady("captain-1", roomId);
+    const result = await service.markCaptainReady("captain-1", roomId);
 
-    expect(result.voteCount).toBe(1);
-    expect(result.requiredVotes).toBe(11);
-    expect(result.passed).toBe(false);
+    expect(result.readyCount).toBe(1);
+    expect(result.requiredCount).toBe(4);
+    expect(result.allReady).toBe(false);
   });
 
-  it("passes when a strict majority of players vote", async () => {
+  it("finishes only after every captain is ready", async () => {
     let result;
-    for (let index = 1; index <= 11; index += 1) {
-      result = await service.voteToSkip(`user-${index}`, roomId);
+    for (let index = 1; index <= 4; index += 1) {
+      result = await service.markCaptainReady(`captain-${index}`, roomId);
     }
 
     expect(result).toMatchObject({
-      voteCount: 11,
-      requiredVotes: 11,
-      passed: true,
+      readyCount: 4,
+      requiredCount: 4,
+      allReady: true,
     });
   });
 
-  it("rejects spectators and non-participants", async () => {
-    prisma.roomParticipant.findFirst.mockResolvedValue(null);
+  it("rejects non-captains", async () => {
+    prisma.team.findFirst.mockResolvedValue(null);
 
-    await expect(service.voteToSkip("spectator-1", roomId)).rejects.toThrow(
-      "플레이어만 스킵 투표에 참여할 수 있습니다.",
+    await expect(service.markCaptainReady("player-1", roomId)).rejects.toThrow(
+      "팀장만 다음 단계 준비를 완료할 수 있습니다.",
     );
   });
 });
