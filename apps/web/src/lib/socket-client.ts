@@ -400,6 +400,22 @@ export const auctionSocketHelpers = {
     });
   },
 
+  resolveBid: (roomId: string): Promise<any> => {
+    return new Promise((resolve) => {
+      if (!auctionSocket?.connected) {
+        resolve({ error: "소켓이 연결되어 있지 않습니다." });
+        return;
+      }
+      const timeout = setTimeout(() => {
+        resolve({ error: "resolve_timeout" });
+      }, 10000);
+      auctionSocket.emit("resolve-bid", { roomId }, (response: any) => {
+        clearTimeout(timeout);
+        resolve(response ?? {});
+      });
+    });
+  },
+
   onAuctionStarted: (callback: (data: any) => void) => {
     auctionSocket?.on("auction-started", callback);
   },

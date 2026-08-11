@@ -38,6 +38,7 @@ describe("RoomService", () => {
         update: jest.fn(),
         deleteMany: jest.fn(),
       },
+      matchSeries: { deleteMany: jest.fn() },
       matchRosterSnapshot: { createMany: jest.fn() },
       matchParticipant: {
         updateMany: jest.fn(),
@@ -265,6 +266,9 @@ describe("RoomService", () => {
           roomId: "room-1",
           status: { not: "COMPLETED" },
         },
+      });
+      expect(prisma.matchSeries.deleteMany).toHaveBeenCalledWith({
+        where: { roomId: "room-1" },
       });
     });
   });

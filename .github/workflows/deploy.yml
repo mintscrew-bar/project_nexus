@@ -28,6 +28,12 @@ jobs:
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
 
+      - name: Sync WSL recovery configuration
+        run: |
+          install -d /home/haru/projects/nexus/nginx
+          install -m 0644 docker-compose.prod.yml /home/haru/projects/nexus/docker-compose.prod.yml
+          install -m 0644 nginx/nginx.conf /home/haru/projects/nexus/nginx/nginx.conf
+
       # 배포 전 디스크 게이트 — 디스크 풀로 CD 자체가 죽는 사고 방지.
       # 한도 초과 시 배포를 abort 하고, 정리 명령을 에러 메시지에 노출.
       - name: 디스크 여유 체크 (배포 전 게이트)

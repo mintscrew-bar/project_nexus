@@ -30,6 +30,7 @@ interface Team {
 
 interface AuctionState {
   roomId: string;
+  hostId?: string | null;
   currentPlayerIndex: number;
   currentPlayer: Player | null;
   currentHighestBid: number;
@@ -97,6 +98,7 @@ interface AuctionStoreState {
   connectToAuction: (roomId: string) => Promise<void>;
   disconnectFromAuction: () => void;
   placeBid: (amount: number) => Promise<void>;
+  resolveBid: () => Promise<void>;
   setCurrentUserId: (userId: string) => void;
 
   // Captain selection
@@ -107,12 +109,13 @@ interface AuctionStoreState {
 }
 
 function resolveCurrentPlayer(rawState: any, players: Player[]): Player | null {
-  if (!players.length) return null;
   // Prefer server-provided currentPlayer over index-based lookup
   if (rawState?.currentPlayer?.id) {
     const found = players.find(p => p.id === rawState.currentPlayer.id);
     if (found) return found;
+    if (!players.length) return rawState.currentPlayer;
   }
+  if (!players.length) return null;
   const idx = typeof rawState?.currentPlayerIndex === 'number' ? rawState.currentPlayerIndex : 0;
   return players[idx] ?? players[0] ?? null;
 }
@@ -133,8 +136,9 @@ function normalizeAuctionState(rawState: any, players: Player[]): AuctionState |
 
   return {
     roomId: rawState.roomId ?? '',
+    hostId: rawState.hostId ?? null,
     currentPlayerIndex: typeof rawState.currentPlayerIndex === 'number' ? rawState.currentPlayerIndex : 0,
-    currentPlayer: rawState.currentPlayer ?? resolveCurrentPlayer(rawState, players),
+    currentPlayer: resolveCurrentPlayer(rawState, players),
     currentHighestBid: typeof rawState.currentHighestBid === 'number' ? rawState.currentHighestBid : 0,
     currentHighestBidder: rawState.currentHighestBidder ?? null,
     currentHighestBidderName: rawState.currentHighestBidderName ?? null,
@@ -437,6 +441,19 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
           }, 5000);
         }
 
+        updates.auctionState = state.auctionState
+          ? normalizeAuctionState(
+              {
+                ...state.auctionState,
+                currentHighestBid: data.sold ? 0 : state.auctionState.currentHighestBid,
+                currentHighestBidder: data.sold ? null : state.auctionState.currentHighestBidder,
+                currentHighestBidderName: data.sold ? null : state.auctionState.currentHighestBidderName,
+                yuchalCount: data.sold ? 0 : state.auctionState.yuchalCount,
+              },
+              nextPlayers,
+            )
+          : null;
+
         return { ...state, ...updates };
       });
     });
@@ -600,6 +617,23 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
       const token = ++bidErrorToken;
       set({ error: msg });
       // Auto-clear bid error after 3 seconds (다른 에러로 교체된 경우엔 클리어 안 함)
+      setTimeout(() => {
+        if (bidErrorToken === token && get().error === msg) set({ error: null });
+      }, 3000);
+    }
+  },
+
+  resolveBid: async () => {
+    const { auctionState } = get();
+    if (!auctionState?.roomId) return;
+
+    const response = await auctionSocketHelpers.resolveBid(auctionState.roomId);
+    if (response?.error) {
+      const msg = response.error === 'resolve_timeout'
+        ? '경매 진행 요청 시간이 초과되었습니다.'
+        : response.error;
+      const token = ++bidErrorToken;
+      set({ error: msg });
       setTimeout(() => {
         if (bidErrorToken === token && get().error === msg) set({ error: null });
       }, 3000);

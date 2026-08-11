@@ -86,6 +86,18 @@ export class AuctionGateway
     return { ...state, serverNow: Date.now() } as T;
   }
 
+  private withCurrentPlayer<T extends Record<string, any> | null | undefined>(
+    state: T,
+    players: any[],
+  ): T {
+    if (!state) return state;
+    const currentPlayer =
+      players.find((player) => player.id === state.currentPlayer?.id) ??
+      players[state.currentPlayerIndex ?? 0] ??
+      null;
+    return { ...state, currentPlayer } as T;
+  }
+
   private async waitForNextItemDelay(): Promise<void> {
     await new Promise((resolve) =>
       setTimeout(resolve, this.NEXT_ITEM_DELAY_MS),
@@ -254,7 +266,7 @@ export class AuctionGateway
         );
         return {
           success: true,
-          state: this.withServerNow(state),
+          state: this.withServerNow(this.withCurrentPlayer(state, players)),
           teams,
           players,
           captainSelectionPhase: null,
@@ -266,7 +278,7 @@ export class AuctionGateway
         );
         return {
           success: true,
-          state: this.withServerNow(state),
+          state: this.withServerNow(this.withCurrentPlayer(state, [])),
           teams: [],
           players: [],
           captainSelectionPhase: null,
@@ -379,7 +391,9 @@ export class AuctionGateway
     this.server.to(`room:${roomId}`).emit("auction-started", {
       teams: result.teams,
       players: result.players,
-      auctionState: this.withServerNow(result.auctionState),
+      auctionState: this.withServerNow(
+        this.withCurrentPlayer(result.auctionState, result.players ?? []),
+      ),
     });
     if (result.auctionState?.timerEnd) {
       this._scheduleBidResolve(roomId, result.auctionState.timerEnd);
@@ -538,7 +552,12 @@ export class AuctionGateway
   emitAuctionStarted(roomId: string, data: any) {
     this.server.to(`room:${roomId}`).emit("auction-started", {
       ...data,
-      auctionState: this.withServerNow(data?.auctionState ?? data?.state),
+      auctionState: this.withServerNow(
+        this.withCurrentPlayer(
+          data?.auctionState ?? data?.state,
+          data?.players ?? [],
+        ),
+      ),
     });
     if (data?.auctionState?.timerEnd) {
       this._scheduleBidResolve(roomId, data.auctionState.timerEnd);
@@ -558,7 +577,9 @@ export class AuctionGateway
   ) {
     this.server.to(`room:${roomId}`).emit("auction-item-started", {
       ...data,
-      state: this.withServerNow(data.state),
+      state: this.withServerNow(
+        this.withCurrentPlayer(data.state, data.players ?? []),
+      ),
     });
   }
 

@@ -323,6 +323,7 @@ export class SnakeDraftGateway
         // Emit next pick turn
         this.server.to(`draft:${data.roomId}`).emit("next-pick", {
           currentTeamId: nextTeamId,
+          currentPickIndex: state.currentTeamIndex,
           timerEnd: state.timerEnd,
         });
       }
@@ -482,6 +483,7 @@ export class SnakeDraftGateway
           }
           this.server.to(`draft:${roomId}`).emit("next-pick", {
             currentTeamId: nextTeamId,
+            currentPickIndex: state.currentTeamIndex,
             timerEnd: state.timerEnd,
           });
         }

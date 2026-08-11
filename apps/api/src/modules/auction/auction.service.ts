@@ -24,6 +24,7 @@ const DEFAULT_BID_INCREMENT = 50;
 
 export interface AuctionState {
   roomId: string;
+  hostId?: string;
   currentPlayerIndex: number;
   currentHighestBid: number;
   currentHighestBidder: string | null; // teamId of the current leading bidder
@@ -194,6 +195,29 @@ export class AuctionService implements OnModuleInit {
       ),
       position: participant?.assignedRole ?? acc?.mainRole ?? "FLEX",
     };
+  }
+
+  private _getParticipantScore(participant: any): number {
+    const acc = participant?.user?.riotAccounts?.[0];
+    return calculateTierScore(
+      acc?.tier || "UNRANKED",
+      acc?.rank || "",
+      acc?.lp || 0,
+    );
+  }
+
+  private _sortAuctionParticipants<
+    T extends { joinedAt?: Date | string | null },
+  >(participants: T[]): T[] {
+    return [...participants].sort((a: any, b: any) => {
+      const scoreDiff =
+        this._getParticipantScore(b) - this._getParticipantScore(a);
+      if (scoreDiff !== 0) return scoreDiff;
+
+      const aJoined = a.joinedAt ? new Date(a.joinedAt).getTime() : 0;
+      const bJoined = b.joinedAt ? new Date(b.joinedAt).getTime() : 0;
+      return aJoined - bJoined;
+    });
   }
 
   /** 팀장 선정 단계를 인메모리 + Redis에 저장 (timerHandle 제외) */
@@ -421,21 +445,7 @@ export class AuctionService implements OnModuleInit {
   ) {
     const numTeams = Math.max(2, Math.floor(room.participants.length / 5));
 
-    const sortedPlayers = [...room.participants].sort((a: any, b: any) => {
-      const aAcc = a.user.riotAccounts[0];
-      const bAcc = b.user.riotAccounts[0];
-      const aScore = calculateTierScore(
-        aAcc?.tier || "UNRANKED",
-        aAcc?.rank || "",
-        aAcc?.lp || 0,
-      );
-      const bScore = calculateTierScore(
-        bAcc?.tier || "UNRANKED",
-        bAcc?.rank || "",
-        bAcc?.lp || 0,
-      );
-      return bScore - aScore;
-    });
+    const sortedPlayers = this._sortAuctionParticipants(room.participants);
 
     const captains = sortedPlayers.slice(0, numTeams);
     const players = sortedPlayers.slice(numTeams);
@@ -454,6 +464,7 @@ export class AuctionService implements OnModuleInit {
 
     const auctionState: AuctionState = {
       roomId,
+      hostId: room.hostId,
       currentPlayerIndex: 0,
       currentHighestBid: 0,
       currentHighestBidder: null,
@@ -707,8 +718,8 @@ export class AuctionService implements OnModuleInit {
       captainUserIds,
     );
 
-    const nonCaptains = room.participants.filter(
-      (p) => !captainUserIds.includes(p.userId),
+    const nonCaptains = this._sortAuctionParticipants(
+      room.participants.filter((p) => !captainUserIds.includes(p.userId)),
     );
     const numTeamsFinal = teams.length;
     const botCaptainIds = await this._filterBotCaptains(
@@ -718,6 +729,7 @@ export class AuctionService implements OnModuleInit {
 
     const auctionState: AuctionState = {
       roomId,
+      hostId: room.hostId,
       currentPlayerIndex: 0,
       currentHighestBid: 0,
       currentHighestBidder: null,
@@ -788,8 +800,8 @@ export class AuctionService implements OnModuleInit {
     }
 
     const { teams } = await this._applySelectedCaptains(roomId, room, userIds);
-    const nonCaptains = room.participants.filter(
-      (p: any) => !userIds.includes(p.userId),
+    const nonCaptains = this._sortAuctionParticipants(
+      room.participants.filter((p: any) => !userIds.includes(p.userId)),
     );
     const botCaptainIds = await this._filterBotCaptains(
       userIds,
@@ -798,6 +810,7 @@ export class AuctionService implements OnModuleInit {
 
     const auctionState: AuctionState = {
       roomId,
+      hostId: room.hostId,
       currentPlayerIndex: 0,
       currentHighestBid: 0,
       currentHighestBidder: null,
@@ -998,8 +1011,10 @@ export class AuctionService implements OnModuleInit {
       },
     });
 
-    const currentPlayer =
-      roomWithParticipants?.participants[state.currentPlayerIndex];
+    const availableParticipants = this._sortAuctionParticipants(
+      roomWithParticipants?.participants ?? [],
+    );
+    const currentPlayer = availableParticipants[state.currentPlayerIndex];
     if (!currentPlayer) {
       throw new BadRequestException("No player to bid on");
     }
@@ -1119,7 +1134,10 @@ export class AuctionService implements OnModuleInit {
       throw new NotFoundException("Room not found");
     }
 
-    const currentPlayer = room.participants[state.currentPlayerIndex];
+    const availableParticipants = this._sortAuctionParticipants(
+      room.participants,
+    );
+    const currentPlayer = availableParticipants[state.currentPlayerIndex];
     if (!currentPlayer) {
       throw new BadRequestException("No player to resolve");
     }
@@ -1338,13 +1356,16 @@ export class AuctionService implements OnModuleInit {
     );
     // 미완성 팀이 정확히 하나일 때만 자동 배정 (둘 이상이면 경매 계속)
     if (incompleteTeams.length !== 1) return [];
-    if (room.participants.length === 0) return [];
+    const remainingParticipants = this._sortAuctionParticipants(
+      room.participants,
+    );
+    if (remainingParticipants.length === 0) return [];
 
     const targetTeam = incompleteTeams[0];
 
     // 남은 플레이어 전원을 한 트랜잭션으로 배정 (부분 배정 방지)
     await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      for (const participant of room.participants) {
+      for (const participant of remainingParticipants) {
         await tx.teamMember.create({
           data: {
             teamId: targetTeam.id,
@@ -1369,7 +1390,7 @@ export class AuctionService implements OnModuleInit {
       }
     });
 
-    return room.participants.map((participant: any) => ({
+    return remainingParticipants.map((participant: any) => ({
       player: this._mapAuctionParticipant(participant),
       team: targetTeam,
       price: 0,
@@ -1570,28 +1591,30 @@ export class AuctionService implements OnModuleInit {
     });
     if (!room) return { teams: [], players: [] };
 
-    const players = room.participants.map((p: any) => {
-      const acc = p.user.riotAccounts[0];
-      return {
-        id: p.userId,
-        username: p.user.username,
-        avatar: p.user.avatar,
-        tier: acc?.tier,
-        rank: acc?.rank,
-        mainRole: acc?.mainRole,
-        subRole: acc?.subRole,
-        gameName: acc?.gameName,
-        tagLine: acc?.tagLine,
-        peakTier: acc?.peakTier,
-        peakRank: acc?.peakRank,
-        championPreferences: acc?.championPreferences ?? [],
-        mmr: calculateTierScore(
-          acc?.tier || "UNRANKED",
-          acc?.rank || "",
-          acc?.lp || 0,
-        ),
-      };
-    });
+    const players = this._sortAuctionParticipants(room.participants).map(
+      (p: any) => {
+        const acc = p.user.riotAccounts[0];
+        return {
+          id: p.userId,
+          username: p.user.username,
+          avatar: p.user.avatar,
+          tier: acc?.tier,
+          rank: acc?.rank,
+          mainRole: acc?.mainRole,
+          subRole: acc?.subRole,
+          gameName: acc?.gameName,
+          tagLine: acc?.tagLine,
+          peakTier: acc?.peakTier,
+          peakRank: acc?.peakRank,
+          championPreferences: acc?.championPreferences ?? [],
+          mmr: calculateTierScore(
+            acc?.tier || "UNRANKED",
+            acc?.rank || "",
+            acc?.lp || 0,
+          ),
+        };
+      },
+    );
 
     const teams = room.teams.map((t: any) => ({
       id: t.id,

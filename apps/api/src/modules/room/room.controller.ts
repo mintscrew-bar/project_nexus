@@ -282,6 +282,18 @@ export class RoomController {
     @CurrentUser("sub") userId: string,
     @Param("id") roomId: string,
   ) {
+    await this.roomService.assertHost(userId, roomId);
+
+    // Stop all active timers before deleting teams and picks in the database.
+    // Otherwise an auction timeout can resolve against teams removed by abort.
+    this.snakeDraftService.clearDraftState(roomId);
+    this.auctionService.clearAuctionState(roomId);
+    this.roleSelectionService.clearRoleSelectionState(roomId);
+
+    this.snakeDraftGateway.cleanupRoom(roomId);
+    this.auctionGateway.cleanupRoom(roomId);
+    this.roleSelectionGateway.clearRoomTimer(roomId);
+
     const result = await this.roomService.abortActiveSession(userId, roomId);
 
     this.snakeDraftService.clearDraftState(roomId);

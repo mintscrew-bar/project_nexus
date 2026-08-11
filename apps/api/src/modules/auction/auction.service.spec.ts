@@ -58,6 +58,43 @@ describe("AuctionService", () => {
     service = module.get<AuctionService>(AuctionService);
   });
 
+  describe("auction participant ordering", () => {
+    it("uses MMR descending and joinedAt as the stable tie breaker", () => {
+      const participants = [
+        {
+          userId: "gold-late",
+          joinedAt: new Date("2026-01-02T00:00:00Z"),
+          user: {
+            riotAccounts: [{ tier: "GOLD", rank: "I", lp: 0 }],
+          },
+        },
+        {
+          userId: "diamond",
+          joinedAt: new Date("2026-01-03T00:00:00Z"),
+          user: {
+            riotAccounts: [{ tier: "DIAMOND", rank: "IV", lp: 0 }],
+          },
+        },
+        {
+          userId: "gold-early",
+          joinedAt: new Date("2026-01-01T00:00:00Z"),
+          user: {
+            riotAccounts: [{ tier: "GOLD", rank: "I", lp: 0 }],
+          },
+        },
+      ];
+
+      const sorted = (service as any)._sortAuctionParticipants(participants);
+
+      expect(sorted.map((participant: any) => participant.userId)).toEqual([
+        "diamond",
+        "gold-early",
+        "gold-late",
+      ]);
+      expect(participants[0].userId).toBe("gold-late");
+    });
+  });
+
   afterEach(() => {
     jest.restoreAllMocks();
   });

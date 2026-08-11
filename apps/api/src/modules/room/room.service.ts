@@ -2465,6 +2465,10 @@ export class RoomService {
         where: { roomId, status: { not: MatchStatus.COMPLETED } },
       });
 
+      await tx.matchSeries.deleteMany({
+        where: { roomId },
+      });
+
       // 드래프트/경매 데이터 삭제
       await tx.snakeDraftPick.deleteMany({
         where: { roomId },
@@ -2593,6 +2597,10 @@ export class RoomService {
       await this.preserveCompletedMatchesForReuse(tx, roomId);
       await tx.match.deleteMany({
         where: { roomId, status: { not: MatchStatus.COMPLETED } },
+      });
+
+      await tx.matchSeries.deleteMany({
+        where: { roomId },
       });
 
       await tx.snakeDraftPick.deleteMany({

@@ -10,7 +10,7 @@ import { LoadingSpinner, Badge, Button, Card, CardContent, ConfirmModal, Avatar 
 import { useToast } from "@/components/ui/Toast";
 import { GameChatPanel } from "@/components/domain/GameChatPanel";
 import { cn } from "@/lib/utils";
-import { Users, Hand, Check, Coins, ScrollText, Gavel, MessageSquare, Maximize2 } from "lucide-react";
+import { Users, Hand, Check, Coins, ScrollText, Gavel, MessageSquare, Maximize2, SkipForward } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 
 const ROLE_ICON: Record<string, string> = {
@@ -490,6 +490,7 @@ export default function AuctionRoomPage() {
     isLoading,
     error,
     placeBid,
+    resolveBid,
     captainSelectionPhase,
     volunteerAsCaptain,
     finalizeVolunteers,
@@ -500,7 +501,7 @@ export default function AuctionRoomPage() {
     lastSoldEvent,
   } = useAuction(auctionId);
 
-  const isHost = user?.id === captainSelectionPhase?.hostId;
+  const isHost = user?.id === (captainSelectionPhase?.hostId ?? auctionState?.hostId);
 
   // VOLUNTEER 타이머 카운트다운 (클라이언트 표시용)
   useEffect(() => {
@@ -1105,6 +1106,18 @@ export default function AuctionRoomPage() {
               <span className="hidden sm:inline">내전 종료</span>
               <span className="sm:hidden">종료</span>
             </Button>
+            {isHost && auctionState?.status === "IN_PROGRESS" && (
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={!isConnected}
+                onClick={resolveBid}
+                title="현재 매물을 즉시 처리하고 다음 매물로 진행"
+              >
+                <SkipForward className="h-4 w-4 sm:mr-1.5" />
+                <span className="hidden sm:inline">스킵</span>
+              </Button>
+            )}
           </div>
         </div>
 

@@ -173,7 +173,14 @@ export const useMatchStore = create<MatchStoreState>((set, get) => ({
   reportResult: async (matchId: string, winnerId: string) => {
     try {
       await matchApi.reportResult(matchId, { winnerId });
-      // Optimistically update the state, the websocket event will be the source of truth
+      const roomId = get().roomId;
+      if (roomId) {
+        const matches = await matchApi.getBracket(roomId);
+        const totalRounds = Math.max(...matches.map((m: Match) => m.round), 0);
+        set({ roomMatches: matches, totalRounds });
+        return;
+      }
+
       set(state => ({
         roomMatches: state.roomMatches.map(m =>
           m.id === matchId
@@ -254,7 +261,8 @@ export const useMatchStore = create<MatchStoreState>((set, get) => ({
     });
 
     matchSocketHelpers.onBracketUpdated((data: { matches: Match[] }) => {
-      set({ roomMatches: data.matches });
+      const totalRounds = Math.max(...data.matches.map((m: Match) => m.round), 0);
+      set({ roomMatches: data.matches, totalRounds });
     });
 
     matchSocketHelpers.onTournamentCodeGenerated((data: { matchId: string; code: string }) => {

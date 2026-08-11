@@ -205,13 +205,14 @@ export const useSnakeDraftStore = create<SnakeDraftStoreState>((set, get) => ({
       set({ draftState: data });
     });
 
-    snakeDraftSocketHelpers.onNextPick((data: { currentTeamId: string; timerEnd: number }) => {
+    snakeDraftSocketHelpers.onNextPick((data: { currentTeamId: string; currentPickIndex?: number; timerEnd: number }) => {
       set((state) => {
         if (!state.draftState) return state;
         return {
           draftState: {
             ...state.draftState,
             currentTeamId: data.currentTeamId,
+            currentPickIndex: data.currentPickIndex ?? state.draftState.currentPickIndex,
             timerEnd: data.timerEnd,
           },
         };
