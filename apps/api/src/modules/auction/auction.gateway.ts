@@ -900,7 +900,7 @@ export class AuctionGateway
             const latestState = this.auctionService.getAuctionState(roomId);
             this.emitPlayerUnsold(roomId, {
               player: result.player,
-              yuchalCount: latestState?.yuchalCount ?? 0,
+              yuchalCount: result.yuchalCount ?? latestState?.yuchalCount ?? 0,
             });
           }
 

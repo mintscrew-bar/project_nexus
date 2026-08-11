@@ -1080,6 +1080,7 @@ export class AuctionService implements OnModuleInit {
     player?: any;
     team?: any;
     price?: number;
+    yuchalCount?: number;
   }> {
     const state = this.auctionStates.get(roomId);
     if (!state) {
@@ -1195,9 +1196,18 @@ export class AuctionService implements OnModuleInit {
         (t: any) => t.remainingBudget >= bidIncrement,
       );
 
-      // If someone can still bid and the cycle is not exhausted, keep the same player.
-      if (nextYuchalCount < state.maxYuchalCycles && anyCanBid) {
-        state.yuchalCount = nextYuchalCount;
+      // If multiple teams can still compete, a yuchal must not put the player
+      // into one arbitrary team. Keep the player for another pass, then move
+      // to the next unassigned player after every team has had a chance.
+      if (incompleteTeams.length > 1 && anyCanBid) {
+        const shouldAdvancePlayer = nextYuchalCount >= state.maxYuchalCycles;
+        state.yuchalCount = shouldAdvancePlayer ? 0 : nextYuchalCount;
+        if (shouldAdvancePlayer) {
+          state.currentPlayerIndex =
+            room.participants.length > 0
+              ? (state.currentPlayerIndex + 1) % room.participants.length
+              : 0;
+        }
         state.currentHighestBid = 0;
         state.currentHighestBidder = null;
         state.currentHighestBidderName = null;
@@ -1207,10 +1217,13 @@ export class AuctionService implements OnModuleInit {
         return {
           sold: false,
           player: this._mapAuctionParticipant(currentPlayer),
+          yuchalCount: nextYuchalCount,
         };
       }
 
       // Otherwise force-assign to the incomplete team with the highest budget.
+      // This is only used when there is no remaining competition: one team is
+      // incomplete, or no incomplete team can afford the minimum bid.
       const targetTeamPool =
         incompleteTeams.length > 0 ? incompleteTeams : room.teams;
       const targetTeam = [...targetTeamPool].sort(

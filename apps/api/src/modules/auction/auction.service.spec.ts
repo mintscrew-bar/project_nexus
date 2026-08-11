@@ -327,7 +327,10 @@ describe("AuctionService", () => {
         id: roomId,
         minBidIncrement: 100,
         participants: [{ id: "p1", userId: "user-p1" }],
-        teams: [{ id: "t1", remainingBudget: 1000, _count: { members: 0 } }],
+        teams: [
+          { id: "t1", remainingBudget: 1000, _count: { members: 2 } },
+          { id: "t2", remainingBudget: 900, _count: { members: 2 } },
+        ],
       });
 
       const result = await service.resolveCurrentBid(roomId);
@@ -335,6 +338,46 @@ describe("AuctionService", () => {
       expect(result.sold).toBe(false);
       const state = (service as any).auctionStates.get(roomId);
       expect(state.yuchalCount).toBe(1);
+    });
+
+    it("여러 팀이 아직 입찰 가능하면 유찰 한도에 도달해도 0원 자동배정하지 않고 다음 선수로 넘긴다", async () => {
+      (service as any).auctionStates.set(roomId, {
+        roomId,
+        currentPlayerIndex: 0,
+        currentHighestBid: 0,
+        currentHighestBidder: null,
+        timerEnd: Date.now() + 10000,
+        yuchalCount: 1,
+        maxYuchalCycles: 2,
+        bidIncrement: 100,
+      });
+
+      prisma.room.findUnique.mockResolvedValue({
+        id: roomId,
+        minBidIncrement: 100,
+        participants: [
+          { id: "p1", userId: "user-p1" },
+          { id: "p2", userId: "user-p2" },
+        ],
+        teams: [
+          { id: "t1", remainingBudget: 1000, _count: { members: 2 } },
+          { id: "t2", remainingBudget: 900, _count: { members: 2 } },
+        ],
+      });
+
+      const result = await service.resolveCurrentBid(roomId);
+
+      expect(result.sold).toBe(false);
+      expect(result.player?.userId).toBe("user-p1");
+      expect(result.yuchalCount).toBe(2);
+      expect(prisma.teamMember.create).not.toHaveBeenCalled();
+      expect(prisma.roomParticipant.update).not.toHaveBeenCalled();
+      expect(prisma.auctionBid.create).not.toHaveBeenCalled();
+
+      const state = (service as any).auctionStates.get(roomId);
+      expect(state.currentPlayerIndex).toBe(1);
+      expect(state.yuchalCount).toBe(0);
+      expect(state.currentHighestBidder).toBeNull();
     });
   });
 });
