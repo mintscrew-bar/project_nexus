@@ -513,38 +513,6 @@ export class AuctionGateway
     }
   }
 
-  @SubscribeMessage("resolve-bid")
-  async handleResolveBid(
-    @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { roomId: string },
-  ) {
-    if (!client.userId) {
-      return { error: "Unauthorized" };
-    }
-
-    // 호스트만 수동 resolve 가능
-    const isHost = await this.auctionService.isRoomHost(
-      client.userId,
-      data.roomId,
-    );
-    if (!isHost) {
-      return { error: "호스트만 경매를 수동 진행할 수 있습니다." };
-    }
-
-    try {
-      const result = await this._resolveCurrentBidAndAdvance(data.roomId, {
-        force: true,
-      });
-      if (result === null) {
-        // 이미 다른 resolve가 진행 중 (타이머 만료와 수동 resolve 동시 호출)
-        return { success: true, alreadyResolved: true };
-      }
-      return { success: true, result };
-    } catch (error: any) {
-      return { error: error.message };
-    }
-  }
-
   // ========================================
   // Emit Methods (called from service or external)
   // ========================================
@@ -865,11 +833,8 @@ export class AuctionGateway
     await this._resolveCurrentBidAndAdvance(roomId);
   }
 
-  private async _resolveCurrentBidAndAdvance(
-    roomId: string,
-    options: { force?: boolean } = {},
-  ): Promise<any> {
-    // Prevent concurrent resolve calls (timer expiry + client resolve-bid race)
+  private async _resolveCurrentBidAndAdvance(roomId: string): Promise<any> {
+    // Prevent concurrent scheduled resolve calls.
     if (this.resolvingRooms.has(roomId)) {
       return null;
     }
@@ -879,7 +844,7 @@ export class AuctionGateway
         roomId,
         async () => {
           const latestState = this.auctionService.getAuctionState(roomId);
-          if (latestState && !options.force) {
+          if (latestState) {
             const remainingMs = latestState.timerEnd - Date.now();
             if (remainingMs > 50) {
               this._scheduleBidResolve(roomId, latestState.timerEnd);

@@ -104,12 +104,15 @@ interface RoleSelectionState {
   sessionAbortedAt: number | null;
   sessionAbortMessage: string | null;
   hasExtended: boolean;
+  skipVoterIds: string[];
+  skipVotesRequired: number;
 
   connect: (roomId: string) => void;
   disconnect: () => void;
   selectRole: (roomId: string, role: string) => Promise<void>;
   cancelRole: (roomId: string) => Promise<void>;
   extendTimer: (roomId: string) => Promise<void>;
+  voteToSkip: (roomId: string) => Promise<void>;
   clearSessionAbort: () => void;
 }
 
@@ -124,6 +127,8 @@ export const useRoleSelectionStore = create<RoleSelectionState>((set) => ({
   sessionAbortedAt: null,
   sessionAbortMessage: null,
   hasExtended: false,
+  skipVoterIds: [],
+  skipVotesRequired: 1,
 
   connect: (roomId: string) => {
     clearJoinRetryTimer();
@@ -134,6 +139,8 @@ export const useRoleSelectionStore = create<RoleSelectionState>((set) => ({
       navigationTarget: null,
       sessionAbortedAt: null,
       sessionAbortMessage: null,
+      skipVoterIds: [],
+      skipVotesRequired: 1,
     });
     const socket = connectRoleSelectionSocket();
     // Clear existing listeners (game events + raw socket events) to prevent duplication
@@ -155,6 +162,8 @@ export const useRoleSelectionStore = create<RoleSelectionState>((set) => ({
             isLoading: false,
             isConnected: true,
             error: null,
+            skipVoterIds: response.skipVote?.voterIds ?? [],
+            skipVotesRequired: response.skipVote?.requiredVotes ?? 1,
           });
           // 로컬 카운트다운 시작 (서버 5초 보정 tick 사이에 매초 감소)
           startLocalCountdown(initialSeconds, set);
@@ -265,6 +274,13 @@ export const useRoleSelectionStore = create<RoleSelectionState>((set) => ({
       set({ navigationTarget: data.target });
     });
 
+    roleSelectionSocketHelpers.onSkipVoteUpdated((data) => {
+      set({
+        skipVoterIds: data.voterIds,
+        skipVotesRequired: data.requiredVotes,
+      });
+    });
+
     roleSelectionSocketHelpers.onRoleSelectionCompleted(() => {
       set({ isCompleted: true });
     });
@@ -300,6 +316,8 @@ export const useRoleSelectionStore = create<RoleSelectionState>((set) => ({
       sessionAbortedAt: null,
       sessionAbortMessage: null,
       hasExtended: false,
+      skipVoterIds: [],
+      skipVotesRequired: 1,
     });
   },
 
@@ -324,6 +342,19 @@ export const useRoleSelectionStore = create<RoleSelectionState>((set) => ({
       throw new Error(response.error);
     }
     set({ hasExtended: true });
+  },
+
+  voteToSkip: async (roomId: string) => {
+    const response = await roleSelectionSocketHelpers.voteToSkip(roomId);
+    if (response?.error) {
+      throw new Error(response.error);
+    }
+    if (response?.skipVote) {
+      set({
+        skipVoterIds: response.skipVote.voterIds,
+        skipVotesRequired: response.skipVote.requiredVotes,
+      });
+    }
   },
 
   clearSessionAbort: () => {

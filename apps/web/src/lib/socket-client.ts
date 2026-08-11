@@ -400,22 +400,6 @@ export const auctionSocketHelpers = {
     });
   },
 
-  resolveBid: (roomId: string): Promise<any> => {
-    return new Promise((resolve) => {
-      if (!auctionSocket?.connected) {
-        resolve({ error: "소켓이 연결되어 있지 않습니다." });
-        return;
-      }
-      const timeout = setTimeout(() => {
-        resolve({ error: "resolve_timeout" });
-      }, 10000);
-      auctionSocket.emit("resolve-bid", { roomId }, (response: any) => {
-        clearTimeout(timeout);
-        resolve(response ?? {});
-      });
-    });
-  },
-
   onAuctionStarted: (callback: (data: any) => void) => {
     auctionSocket?.on("auction-started", callback);
   },
@@ -1330,6 +1314,31 @@ export const roleSelectionSocketHelpers = {
     });
   },
 
+  voteToSkip: (roomId: string): Promise<any> => {
+    return new Promise<any>((resolve) => {
+      if (!roleSelectionSocket?.connected) {
+        resolve({ error: "소켓이 연결되어 있지 않습니다." });
+        return;
+      }
+      const timeout = setTimeout(() => resolve({ error: "timeout" }), 10000);
+      roleSelectionSocket.emit("vote-skip", { roomId }, (response: any) => {
+        clearTimeout(timeout);
+        resolve(response ?? {});
+      });
+    });
+  },
+
+  onSkipVoteUpdated: (
+    callback: (data: {
+      voterIds: string[];
+      voteCount: number;
+      requiredVotes: number;
+      passed: boolean;
+    }) => void,
+  ) => {
+    roleSelectionSocket?.on("skip-vote-updated", callback);
+  },
+
   onTimerExtended: (
     callback: (data: {
       timerEndAt: number;
@@ -1405,6 +1414,7 @@ export const roleSelectionSocketHelpers = {
     roleSelectionSocket?.off("role-selection-started");
     roleSelectionSocket?.off("timer-tick");
     roleSelectionSocket?.off("timer-extended");
+    roleSelectionSocket?.off("skip-vote-updated");
     roleSelectionSocket?.off("role-selection-error");
     roleSelectionSocket?.off("session-aborted");
   },

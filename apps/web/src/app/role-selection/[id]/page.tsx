@@ -11,7 +11,7 @@ import { PlayerProfileModal } from "@/components/domain/PlayerProfileModal";
 import { PositionIcon } from "@/app/tournaments/[id]/lobby/_components/icons";
 import { LoadingSpinner, Badge, Avatar, Button, ConfirmModal } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
-import { Clock, Check, TimerReset } from "lucide-react";
+import { Clock, Check, SkipForward, TimerReset } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const ROLES = ["TOP", "JUNGLE", "MID", "ADC", "SUPPORT"] as const;
@@ -33,6 +33,7 @@ export default function RoleSelectionPage() {
   const { user } = useAuthStore();
   const hasRedirected = useRef(false);
   const [isAborting, setIsAborting] = useState(false);
+  const [isVotingToSkip, setIsVotingToSkip] = useState(false);
   const [isAbortConfirmOpen, setIsAbortConfirmOpen] = useState(false);
   const [hoveredMember, setHoveredMember] = useState<{ userId: string; rect: DOMRect } | null>(null);
   const [profileUserId, setProfileUserId] = useState<string | null>(null);
@@ -66,7 +67,10 @@ export default function RoleSelectionPage() {
     selectRole,
     cancelRole,
     extendTimer,
+    voteToSkip,
     hasExtended,
+    skipVoterIds,
+    skipVotesRequired,
     sessionAbortedAt,
     sessionAbortMessage,
     clearSessionAbort,
@@ -140,6 +144,17 @@ export default function RoleSelectionPage() {
     }
   };
 
+  const handleVoteToSkip = async () => {
+    setIsVotingToSkip(true);
+    try {
+      await voteToSkip(roomId);
+    } catch (err: any) {
+      addToast(err.message || "스킵 투표에 실패했습니다.", "error");
+    } finally {
+      setIsVotingToSkip(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex-grow flex items-center justify-center">
@@ -179,6 +194,7 @@ export default function RoleSelectionPage() {
     team.members.some((member) => member.userId === user?.id),
   );
   const myMember = myTeam?.members.find((member) => member.userId === user?.id);
+  const hasVotedToSkip = !!user?.id && skipVoterIds.includes(user.id);
   const selectedRole = myMember?.assignedRole as Role | null;
   const myTeamTakenRoles = myTeam?.members
     .filter((member) => member.assignedRole)
@@ -224,6 +240,22 @@ export default function RoleSelectionPage() {
             <Badge variant={isConnected ? "success" : "danger"}>
               {isConnected ? "● 연결됨" : "● 연결 끊김"}
             </Badge>
+            {myMember && (
+              <Button
+                variant={hasVotedToSkip ? "secondary" : "outline"}
+                size="sm"
+                isLoading={isVotingToSkip}
+                disabled={!isConnected || hasVotedToSkip || isVotingToSkip}
+                onClick={handleVoteToSkip}
+                title="과반수가 동의하면 미선택 역할을 자동 배정하고 대진표로 이동합니다."
+              >
+                <SkipForward className="h-4 w-4" />
+                <span>
+                  {hasVotedToSkip ? "투표 완료" : "스킵 투표"}{" "}
+                  {skipVoterIds.length}/{skipVotesRequired}
+                </span>
+              </Button>
+            )}
             <button
               onClick={handleExtendTimer}
               disabled={hasExtended || !isConnected}

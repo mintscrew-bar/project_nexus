@@ -98,7 +98,6 @@ interface AuctionStoreState {
   connectToAuction: (roomId: string) => Promise<void>;
   disconnectFromAuction: () => void;
   placeBid: (amount: number) => Promise<void>;
-  resolveBid: () => Promise<void>;
   setCurrentUserId: (userId: string) => void;
 
   // Captain selection
@@ -617,23 +616,6 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
       const token = ++bidErrorToken;
       set({ error: msg });
       // Auto-clear bid error after 3 seconds (다른 에러로 교체된 경우엔 클리어 안 함)
-      setTimeout(() => {
-        if (bidErrorToken === token && get().error === msg) set({ error: null });
-      }, 3000);
-    }
-  },
-
-  resolveBid: async () => {
-    const { auctionState } = get();
-    if (!auctionState?.roomId) return;
-
-    const response = await auctionSocketHelpers.resolveBid(auctionState.roomId);
-    if (response?.error) {
-      const msg = response.error === 'resolve_timeout'
-        ? '경매 진행 요청 시간이 초과되었습니다.'
-        : response.error;
-      const token = ++bidErrorToken;
-      set({ error: msg });
       setTimeout(() => {
         if (bidErrorToken === token && get().error === msg) set({ error: null });
       }, 3000);

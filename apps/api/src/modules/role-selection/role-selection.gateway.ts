@@ -444,6 +444,37 @@ export class RoleSelectionGateway
     }
   }
 
+  @SubscribeMessage("vote-skip")
+  async handleVoteSkip(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() data: { roomId: string },
+  ) {
+    try {
+      if (!client.userId) {
+        return { error: "Unauthorized" };
+      }
+
+      const skipVote = await this.roleSelectionService.voteToSkip(
+        client.userId,
+        data.roomId,
+      );
+      this.server.to(`room:${data.roomId}`).emit("skip-vote-updated", skipVote);
+
+      if (skipVote.passed) {
+        this.completeRoleSelection(data.roomId).catch((error) => {
+          console.error(
+            "Failed to complete role selection after skip vote:",
+            error,
+          );
+        });
+      }
+
+      return { success: true, skipVote };
+    } catch (error: any) {
+      return { error: error.message };
+    }
+  }
+
   emitRoleSelectionError(
     roomId: string,
     data: { message: string; error?: string; retryable?: boolean },
