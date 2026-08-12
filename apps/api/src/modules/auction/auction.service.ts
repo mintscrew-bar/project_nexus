@@ -245,9 +245,11 @@ export class AuctionService implements OnModuleInit {
         .map((participant) => participant.id);
     }
 
-    state.deferredPlayerIds = (state.deferredPlayerIds ?? []).filter((id) =>
-      availableIds.has(id),
-    );
+    state.deferredPlayerIds = [
+      ...new Set(
+        (state.deferredPlayerIds ?? []).filter((id) => availableIds.has(id)),
+      ),
+    ];
     state.yuchalCountsByPlayer = Object.fromEntries(
       Object.entries(counts).filter(([id]) => availableIds.has(id)),
     );
@@ -1368,12 +1370,9 @@ export class AuctionService implements OnModuleInit {
           ...(state.yuchalCountsByPlayer ?? {}),
           [currentPlayer.id]: nextYuchalCount,
         };
-        state.deferredPlayerIds = [
-          ...(state.deferredPlayerIds ?? []).filter(
-            (id) => id !== currentPlayer.id,
-          ),
-          currentPlayer.id,
-        ];
+        const deferredPlayerIds = new Set(state.deferredPlayerIds ?? []);
+        deferredPlayerIds.add(currentPlayer.id);
+        state.deferredPlayerIds = [...deferredPlayerIds];
         this._syncCurrentAuctionPlayer(state, availableParticipants);
         state.currentHighestBid = 0;
         state.currentHighestBidder = null;

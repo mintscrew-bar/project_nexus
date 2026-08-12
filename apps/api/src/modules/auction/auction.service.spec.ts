@@ -457,6 +457,45 @@ describe("AuctionService", () => {
       expect(state.currentPlayerIndex).toBe(1);
     });
 
+    it("does not repeat a player within the same unsold cycle even when restored state contains duplicates", async () => {
+      (service as any).auctionStates.set(roomId, {
+        roomId,
+        currentPlayerIndex: 0,
+        currentHighestBid: 0,
+        currentHighestBidder: null,
+        timerEnd: Date.now() + 10000,
+        yuchalCount: 1,
+        maxYuchalCycles: 2,
+        bidIncrement: 100,
+        deferredPlayerIds: ["p1", "p1"],
+        yuchalCountsByPlayer: { p1: 1 },
+      });
+
+      prisma.room.findUnique.mockResolvedValue({
+        id: roomId,
+        minBidIncrement: 100,
+        participants: [
+          { id: "p1", userId: "user-p1" },
+          { id: "p2", userId: "user-p2" },
+          { id: "p3", userId: "user-p3" },
+        ],
+        teams: [
+          { id: "t1", remainingBudget: 1000, _count: { members: 2 } },
+          { id: "t2", remainingBudget: 900, _count: { members: 2 } },
+        ],
+      });
+
+      const seenPlayers: string[] = [];
+      for (let index = 0; index < 3; index += 1) {
+        const result = await service.resolveCurrentBid(roomId);
+        seenPlayers.push(result.player?.userId);
+      }
+
+      expect(seenPlayers).toEqual(["user-p2", "user-p3", "user-p1"]);
+      const state = (service as any).auctionStates.get(roomId);
+      expect(state.deferredPlayerIds).toEqual(["p1"]);
+    });
+
     it("keeps earlier unsold players deferred when a later player is sold", async () => {
       (service as any).auctionStates.set(roomId, {
         roomId,
