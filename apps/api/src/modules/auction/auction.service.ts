@@ -34,6 +34,9 @@ export interface AuctionState {
   maxYuchalCycles: number;
   deferredPlayerIds?: string[];
   yuchalCountsByPlayer?: Record<string, number>;
+  skipVotePlayerId?: string | null;
+  skipCaptainIds?: string[];
+  skipVotesRequired?: number;
   bidIncrement: number;
   botCaptainIds: string[]; // captain userIds whose usernames match testbot_*
 }
@@ -262,6 +265,10 @@ export class AuctionService implements OnModuleInit {
 
     state.currentPlayerIndex = Math.max(0, nextIndex);
     const currentPlayer = participants[nextIndex];
+    if (state.skipVotePlayerId !== (currentPlayer?.id ?? null)) {
+      state.skipVotePlayerId = currentPlayer?.id ?? null;
+      state.skipCaptainIds = [];
+    }
     state.yuchalCount = currentPlayer
       ? (state.yuchalCountsByPlayer[currentPlayer.id] ?? 0)
       : 0;
@@ -522,6 +529,9 @@ export class AuctionService implements OnModuleInit {
       maxYuchalCycles: numTeams,
       deferredPlayerIds: [],
       yuchalCountsByPlayer: {},
+      skipVotePlayerId: (players[0] as any)?.id ?? null,
+      skipCaptainIds: [],
+      skipVotesRequired: teams.length,
       bidIncrement: room.minBidIncrement || DEFAULT_BID_INCREMENT,
       botCaptainIds,
     };
@@ -789,6 +799,9 @@ export class AuctionService implements OnModuleInit {
       maxYuchalCycles: numTeamsFinal,
       deferredPlayerIds: [],
       yuchalCountsByPlayer: {},
+      skipVotePlayerId: nonCaptains[0]?.id ?? null,
+      skipCaptainIds: [],
+      skipVotesRequired: teams.length,
       bidIncrement: room.minBidIncrement || DEFAULT_BID_INCREMENT,
       botCaptainIds,
     };
@@ -872,6 +885,9 @@ export class AuctionService implements OnModuleInit {
       maxYuchalCycles: numTeams,
       deferredPlayerIds: [],
       yuchalCountsByPlayer: {},
+      skipVotePlayerId: nonCaptains[0]?.id ?? null,
+      skipCaptainIds: [],
+      skipVotesRequired: teams.length,
       bidIncrement: room.minBidIncrement || DEFAULT_BID_INCREMENT,
       botCaptainIds,
     };
@@ -1141,6 +1157,66 @@ export class AuctionService implements OnModuleInit {
     this._setAuctionState(roomId, state);
 
     return state;
+  }
+
+  async voteToSkipCurrentPlayer(userId: string, roomId: string) {
+    const state = this.auctionStates.get(roomId);
+    if (!state) {
+      throw new BadRequestException("경매가 진행 중이 아닙니다.");
+    }
+
+    const room = await this.prisma.room.findUnique({
+      where: { id: roomId },
+      include: {
+        participants: {
+          where: { role: "PLAYER", isCaptain: false, teamId: null },
+          include: {
+            user: {
+              include: {
+                riotAccounts: { where: { isPrimary: true } },
+              },
+            },
+          },
+          orderBy: { joinedAt: "asc" },
+        },
+        teams: { select: { captainId: true } },
+      },
+    });
+    if (!room) throw new NotFoundException("Room not found");
+
+    const captainIds = new Set(room.teams.map((team: any) => team.captainId));
+    if (!captainIds.has(userId)) {
+      throw new ForbiddenException(
+        "팀장만 매물 스킵 투표에 참여할 수 있습니다.",
+      );
+    }
+
+    const participants = this._sortAuctionParticipants(room.participants);
+    const currentPlayer = this._syncCurrentAuctionPlayer(state, participants);
+    if (!currentPlayer) {
+      throw new BadRequestException("스킵할 경매 매물이 없습니다.");
+    }
+
+    const votes = new Set(state.skipCaptainIds ?? []);
+    votes.add(userId);
+    state.skipVotePlayerId = currentPlayer.id;
+    state.skipCaptainIds = [...votes].filter((id) => captainIds.has(id));
+    state.skipVotesRequired = captainIds.size;
+    const allCaptainsAgreed =
+      captainIds.size > 0 && state.skipCaptainIds.length === captainIds.size;
+
+    if (allCaptainsAgreed) {
+      state.timerEnd = Date.now();
+    }
+    this._setAuctionState(roomId, state);
+
+    return {
+      playerId: currentPlayer.id,
+      captainIds: state.skipCaptainIds,
+      voteCount: state.skipCaptainIds.length,
+      requiredVotes: captainIds.size,
+      allCaptainsAgreed,
+    };
   }
 
   // ========================================
@@ -1673,6 +1749,7 @@ export class AuctionService implements OnModuleInit {
     const state = this.auctionStates.get(roomId);
     if (state) {
       this._syncCurrentAuctionPlayer(state, sortedParticipants);
+      state.skipVotesRequired = room.teams.length;
       this._setAuctionState(roomId, state);
     }
 

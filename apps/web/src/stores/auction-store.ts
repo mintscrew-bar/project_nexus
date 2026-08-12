@@ -39,6 +39,8 @@ interface AuctionState {
   timerEnd: number;
   yuchalCount: number;
   maxYuchalCycles: number;
+  skipCaptainIds: string[];
+  skipVotesRequired: number;
   bidIncrement: number;
   status: 'WAITING' | 'IN_PROGRESS' | 'COMPLETED';
 }
@@ -98,6 +100,7 @@ interface AuctionStoreState {
   connectToAuction: (roomId: string) => Promise<void>;
   disconnectFromAuction: () => void;
   placeBid: (amount: number) => Promise<void>;
+  voteItemSkip: () => Promise<void>;
   setCurrentUserId: (userId: string) => void;
 
   // Captain selection
@@ -144,6 +147,8 @@ function normalizeAuctionState(rawState: any, players: Player[]): AuctionState |
     timerEnd: normalizeTimerEnd(rawState),
     yuchalCount: typeof rawState.yuchalCount === 'number' ? rawState.yuchalCount : 0,
     maxYuchalCycles: typeof rawState.maxYuchalCycles === 'number' ? rawState.maxYuchalCycles : 0,
+    skipCaptainIds: Array.isArray(rawState.skipCaptainIds) ? rawState.skipCaptainIds : [],
+    skipVotesRequired: typeof rawState.skipVotesRequired === 'number' ? rawState.skipVotesRequired : 0,
     bidIncrement: typeof rawState.bidIncrement === 'number' ? rawState.bidIncrement : 50,
     status: rawState.status ?? 'IN_PROGRESS',
   };
@@ -332,6 +337,18 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
             }
           : null,
         bidHistory: [...state.bidHistory, { username: data.username, amount: data.amount, timestamp: Date.now() }],
+      }));
+    });
+
+    auctionSocketHelpers.onItemSkipVoteUpdated((data: any) => {
+      set((state) => ({
+        auctionState: state.auctionState
+          ? {
+              ...state.auctionState,
+              skipCaptainIds: data.captainIds ?? [],
+              skipVotesRequired: data.requiredVotes ?? 0,
+            }
+          : null,
       }));
     });
 
@@ -619,6 +636,29 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
       setTimeout(() => {
         if (bidErrorToken === token && get().error === msg) set({ error: null });
       }, 3000);
+    }
+  },
+
+  voteItemSkip: async () => {
+    const { auctionState } = get();
+    if (!auctionState?.roomId) return;
+
+    const response = await auctionSocketHelpers.voteItemSkip(
+      auctionState.roomId,
+    );
+    if (response?.error) {
+      throw new Error(response.error);
+    }
+    if (response?.skipVote) {
+      set((state) => ({
+        auctionState: state.auctionState
+          ? {
+              ...state.auctionState,
+              skipCaptainIds: response.skipVote.captainIds ?? [],
+              skipVotesRequired: response.skipVote.requiredVotes ?? 0,
+            }
+          : null,
+      }));
     }
   },
 

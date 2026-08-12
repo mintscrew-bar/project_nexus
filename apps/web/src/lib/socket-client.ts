@@ -400,6 +400,24 @@ export const auctionSocketHelpers = {
     });
   },
 
+  voteItemSkip: (roomId: string): Promise<any> => {
+    return new Promise((resolve) => {
+      if (!auctionSocket?.connected) {
+        resolve({ error: "소켓이 연결되어 있지 않습니다." });
+        return;
+      }
+      const timeout = setTimeout(() => resolve({ error: "timeout" }), 10000);
+      auctionSocket.emit("vote-item-skip", { roomId }, (response: any) => {
+        clearTimeout(timeout);
+        resolve(response ?? {});
+      });
+    });
+  },
+
+  onItemSkipVoteUpdated: (callback: (data: any) => void) => {
+    auctionSocket?.on("item-skip-vote-updated", callback);
+  },
+
   onAuctionStarted: (callback: (data: any) => void) => {
     auctionSocket?.on("auction-started", callback);
   },
@@ -523,6 +541,7 @@ export const auctionSocketHelpers = {
     auctionSocket?.off("auction-started");
     auctionSocket?.off("auction-item-started");
     auctionSocket?.off("bid-placed");
+    auctionSocket?.off("item-skip-vote-updated");
     auctionSocket?.off("player-sold");
     auctionSocket?.off("player-unsold");
     auctionSocket?.off("auction-complete");

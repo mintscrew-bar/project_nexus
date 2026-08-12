@@ -513,6 +513,46 @@ export class AuctionGateway
     }
   }
 
+  @SubscribeMessage("vote-item-skip")
+  async handleVoteItemSkip(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() data: { roomId: string },
+  ) {
+    if (!client.userId) return { error: "Unauthorized" };
+
+    try {
+      const skipVote = await this._withRoomBidLock(
+        data.roomId,
+        () =>
+          this.auctionService.voteToSkipCurrentPlayer(
+            client.userId!,
+            data.roomId,
+          ),
+        { wait: true },
+      );
+
+      this.server.to(`room:${data.roomId}`).emit("item-skip-vote-updated", {
+        ...skipVote,
+        serverNow: Date.now(),
+      });
+
+      if (skipVote.allCaptainsAgreed) {
+        this._cancelBidResolve(data.roomId);
+        this.emitTimerExpired(data.roomId);
+        this._resolveCurrentBidAndAdvance(data.roomId).catch((error) => {
+          console.error(
+            `[Auction] Failed to resolve unanimously skipped item in room ${data.roomId}:`,
+            error,
+          );
+        });
+      }
+
+      return { success: true, skipVote };
+    } catch (error: any) {
+      return { error: error.message };
+    }
+  }
+
   // ========================================
   // Emit Methods (called from service or external)
   // ========================================

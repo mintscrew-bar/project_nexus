@@ -10,7 +10,7 @@ import { LoadingSpinner, Badge, Button, Card, CardContent, ConfirmModal, Avatar 
 import { useToast } from "@/components/ui/Toast";
 import { GameChatPanel } from "@/components/domain/GameChatPanel";
 import { cn } from "@/lib/utils";
-import { Users, Hand, Check, Coins, ScrollText, Gavel, MessageSquare, Maximize2 } from "lucide-react";
+import { Users, Hand, Check, Coins, ScrollText, Gavel, MessageSquare, Maximize2, SkipForward } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 
 const ROLE_ICON: Record<string, string> = {
@@ -473,6 +473,7 @@ export default function AuctionRoomPage() {
   const [selectedCaptains, setSelectedCaptains] = useState<string[]>([]);
   const [volunteerTimer, setVolunteerTimer] = useState(0);
   const [isAborting, setIsAborting] = useState(false);
+  const [isVotingItemSkip, setIsVotingItemSkip] = useState(false);
   const [isAbortConfirmOpen, setIsAbortConfirmOpen] = useState(false);
   // 모바일 탭: "auction" | "players" | "log" | "chat"
   const [mobileTab, setMobileTab] = useState<"auction" | "players" | "log" | "chat">("auction");
@@ -490,6 +491,7 @@ export default function AuctionRoomPage() {
     isLoading,
     error,
     placeBid,
+    voteItemSkip,
     captainSelectionPhase,
     volunteerAsCaptain,
     finalizeVolunteers,
@@ -589,6 +591,17 @@ export default function AuctionRoomPage() {
       );
     } finally {
       setIsAborting(false);
+    }
+  };
+
+  const handleVoteItemSkip = async () => {
+    setIsVotingItemSkip(true);
+    try {
+      await voteItemSkip();
+    } catch (err: any) {
+      addToast(err.message || "매물 스킵 투표에 실패했습니다.", "error");
+    } finally {
+      setIsVotingItemSkip(false);
     }
   };
 
@@ -1056,6 +1069,8 @@ export default function AuctionRoomPage() {
   // 현재 유저가 캡틴인지 (모바일 하단 입찰 패널 표시 여부 판단)
   const myTeam = teams.find((t) => t.captainId === user?.id);
   const isCaptainTurn = Boolean(myTeam) && auctionState.status === "IN_PROGRESS";
+  const hasVotedItemSkip =
+    !!user?.id && auctionState.skipCaptainIds.includes(user.id);
   // currentHighestBidder는 teamId 또는 userId일 수 있음 — 둘 다 체크
   const isAlreadyHighest = !!auctionState.currentHighestBidder && (
     auctionState.currentHighestBidder === user?.id ||
@@ -1096,6 +1111,26 @@ export default function AuctionRoomPage() {
             <Badge variant={isConnected ? 'success' : 'danger'} className="hidden sm:inline-flex">
               {isConnected ? '● 연결됨' : '● 연결 끊김'}
             </Badge>
+            {auctionState.status === "IN_PROGRESS" && (
+              <Badge variant="warning">
+                스킵 {auctionState.skipCaptainIds.length}/{auctionState.skipVotesRequired}
+              </Badge>
+            )}
+            {isCaptainTurn && (
+              <Button
+                variant={hasVotedItemSkip ? "secondary" : "outline"}
+                size="sm"
+                isLoading={isVotingItemSkip}
+                disabled={!isConnected || hasVotedItemSkip || isVotingItemSkip}
+                onClick={handleVoteItemSkip}
+                title="모든 팀장이 동의하면 현재 최고 입찰 결과로 매물을 즉시 마감합니다."
+              >
+                <SkipForward className="h-4 w-4" />
+                <span className="hidden sm:inline">
+                  {hasVotedItemSkip ? "스킵 투표 완료" : "매물 스킵 투표"}
+                </span>
+              </Button>
+            )}
             <Button
               variant="danger"
               size="sm"

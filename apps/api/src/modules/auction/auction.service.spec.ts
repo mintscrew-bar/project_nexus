@@ -503,4 +503,70 @@ describe("AuctionService", () => {
       expect(state.currentPlayerIndex).toBe(1);
     });
   });
+
+  describe("current item skip voting", () => {
+    const roomId = "room-skip";
+    const currentPlayer = {
+      id: "participant-1",
+      userId: "player-1",
+      user: { riotAccounts: [] },
+    };
+
+    beforeEach(() => {
+      (service as any).auctionStates.set(roomId, {
+        roomId,
+        currentPlayerIndex: 0,
+        currentHighestBid: 0,
+        currentHighestBidder: null,
+        timerEnd: Date.now() + 30_000,
+        yuchalCount: 0,
+        maxYuchalCycles: 3,
+        bidIncrement: 100,
+        botCaptainIds: [],
+        deferredPlayerIds: [],
+        yuchalCountsByPlayer: {},
+        skipVotePlayerId: "participant-1",
+        skipCaptainIds: [],
+        skipVotesRequired: 3,
+      });
+      prisma.room.findUnique.mockResolvedValue({
+        id: roomId,
+        participants: [currentPlayer],
+        teams: [
+          { captainId: "captain-1" },
+          { captainId: "captain-2" },
+          { captainId: "captain-3" },
+        ],
+      });
+    });
+
+    it("expires the item only after every captain agrees", async () => {
+      await service.voteToSkipCurrentPlayer("captain-1", roomId);
+      await service.voteToSkipCurrentPlayer("captain-2", roomId);
+      const duplicate = await service.voteToSkipCurrentPlayer(
+        "captain-2",
+        roomId,
+      );
+      const beforeFinalVote = (service as any).auctionStates.get(roomId);
+
+      expect(duplicate.voteCount).toBe(2);
+      expect(duplicate.allCaptainsAgreed).toBe(false);
+      expect(beforeFinalVote.timerEnd).toBeGreaterThan(Date.now());
+
+      const result = await service.voteToSkipCurrentPlayer("captain-3", roomId);
+
+      expect(result).toMatchObject({
+        voteCount: 3,
+        requiredVotes: 3,
+        allCaptainsAgreed: true,
+      });
+      expect(beforeFinalVote.timerEnd).toBeLessThanOrEqual(Date.now());
+    });
+
+    it("rejects non-captains", async () => {
+      await expect(
+        service.voteToSkipCurrentPlayer("player-1", roomId),
+      ).rejects.toThrow("팀장만 매물 스킵 투표에 참여할 수 있습니다.");
+    });
+  });
 });
