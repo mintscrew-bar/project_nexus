@@ -526,16 +526,16 @@ describe("AuctionService", () => {
         deferredPlayerIds: [],
         yuchalCountsByPlayer: {},
         skipVotePlayerId: "participant-1",
-        skipCaptainIds: [],
+        skipTeamIds: [],
         skipVotesRequired: 3,
       });
       prisma.room.findUnique.mockResolvedValue({
         id: roomId,
         participants: [currentPlayer],
         teams: [
-          { captainId: "captain-1" },
-          { captainId: "captain-2" },
-          { captainId: "captain-3" },
+          { id: "team-1", captainId: "captain-1" },
+          { id: "team-2", captainId: "captain-2" },
+          { id: "team-3", captainId: "captain-3" },
         ],
       });
     });
@@ -550,6 +550,7 @@ describe("AuctionService", () => {
       const beforeFinalVote = (service as any).auctionStates.get(roomId);
 
       expect(duplicate.voteCount).toBe(2);
+      expect(duplicate.teamIds).toEqual(["team-1", "team-2"]);
       expect(duplicate.allCaptainsAgreed).toBe(false);
       expect(beforeFinalVote.timerEnd).toBeGreaterThan(Date.now());
 

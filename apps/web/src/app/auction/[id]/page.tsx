@@ -1070,7 +1070,7 @@ export default function AuctionRoomPage() {
   const myTeam = teams.find((t) => t.captainId === user?.id);
   const isCaptainTurn = Boolean(myTeam) && auctionState.status === "IN_PROGRESS";
   const hasVotedItemSkip =
-    !!user?.id && auctionState.skipCaptainIds.includes(user.id);
+    !!myTeam?.id && auctionState.skipTeamIds.includes(myTeam.id);
   // currentHighestBidder는 teamId 또는 userId일 수 있음 — 둘 다 체크
   const isAlreadyHighest = !!auctionState.currentHighestBidder && (
     auctionState.currentHighestBidder === user?.id ||
@@ -1113,7 +1113,7 @@ export default function AuctionRoomPage() {
             </Badge>
             {auctionState.status === "IN_PROGRESS" && (
               <Badge variant="warning">
-                스킵 {auctionState.skipCaptainIds.length}/{auctionState.skipVotesRequired}
+                스킵 {auctionState.skipTeamIds.length}/{auctionState.skipVotesRequired}
               </Badge>
             )}
             {isCaptainTurn && (

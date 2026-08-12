@@ -39,7 +39,7 @@ interface AuctionState {
   timerEnd: number;
   yuchalCount: number;
   maxYuchalCycles: number;
-  skipCaptainIds: string[];
+  skipTeamIds: string[];
   skipVotesRequired: number;
   bidIncrement: number;
   status: 'WAITING' | 'IN_PROGRESS' | 'COMPLETED';
@@ -147,7 +147,7 @@ function normalizeAuctionState(rawState: any, players: Player[]): AuctionState |
     timerEnd: normalizeTimerEnd(rawState),
     yuchalCount: typeof rawState.yuchalCount === 'number' ? rawState.yuchalCount : 0,
     maxYuchalCycles: typeof rawState.maxYuchalCycles === 'number' ? rawState.maxYuchalCycles : 0,
-    skipCaptainIds: Array.isArray(rawState.skipCaptainIds) ? rawState.skipCaptainIds : [],
+    skipTeamIds: Array.isArray(rawState.skipTeamIds) ? rawState.skipTeamIds : [],
     skipVotesRequired: typeof rawState.skipVotesRequired === 'number' ? rawState.skipVotesRequired : 0,
     bidIncrement: typeof rawState.bidIncrement === 'number' ? rawState.bidIncrement : 50,
     status: rawState.status ?? 'IN_PROGRESS',
@@ -345,7 +345,7 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
         auctionState: state.auctionState
           ? {
               ...state.auctionState,
-              skipCaptainIds: data.captainIds ?? [],
+              skipTeamIds: data.teamIds ?? [],
               skipVotesRequired: data.requiredVotes ?? 0,
             }
           : null,
@@ -654,7 +654,7 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
         auctionState: state.auctionState
           ? {
               ...state.auctionState,
-              skipCaptainIds: response.skipVote.captainIds ?? [],
+              skipTeamIds: response.skipVote.teamIds ?? [],
               skipVotesRequired: response.skipVote.requiredVotes ?? 0,
             }
           : null,

@@ -35,7 +35,7 @@ export interface AuctionState {
   deferredPlayerIds?: string[];
   yuchalCountsByPlayer?: Record<string, number>;
   skipVotePlayerId?: string | null;
-  skipCaptainIds?: string[];
+  skipTeamIds?: string[];
   skipVotesRequired?: number;
   bidIncrement: number;
   botCaptainIds: string[]; // captain userIds whose usernames match testbot_*
@@ -267,7 +267,7 @@ export class AuctionService implements OnModuleInit {
     const currentPlayer = participants[nextIndex];
     if (state.skipVotePlayerId !== (currentPlayer?.id ?? null)) {
       state.skipVotePlayerId = currentPlayer?.id ?? null;
-      state.skipCaptainIds = [];
+      state.skipTeamIds = [];
     }
     state.yuchalCount = currentPlayer
       ? (state.yuchalCountsByPlayer[currentPlayer.id] ?? 0)
@@ -530,7 +530,7 @@ export class AuctionService implements OnModuleInit {
       deferredPlayerIds: [],
       yuchalCountsByPlayer: {},
       skipVotePlayerId: (players[0] as any)?.id ?? null,
-      skipCaptainIds: [],
+      skipTeamIds: [],
       skipVotesRequired: teams.length,
       bidIncrement: room.minBidIncrement || DEFAULT_BID_INCREMENT,
       botCaptainIds,
@@ -800,7 +800,7 @@ export class AuctionService implements OnModuleInit {
       deferredPlayerIds: [],
       yuchalCountsByPlayer: {},
       skipVotePlayerId: nonCaptains[0]?.id ?? null,
-      skipCaptainIds: [],
+      skipTeamIds: [],
       skipVotesRequired: teams.length,
       bidIncrement: room.minBidIncrement || DEFAULT_BID_INCREMENT,
       botCaptainIds,
@@ -886,7 +886,7 @@ export class AuctionService implements OnModuleInit {
       deferredPlayerIds: [],
       yuchalCountsByPlayer: {},
       skipVotePlayerId: nonCaptains[0]?.id ?? null,
-      skipCaptainIds: [],
+      skipTeamIds: [],
       skipVotesRequired: teams.length,
       bidIncrement: room.minBidIncrement || DEFAULT_BID_INCREMENT,
       botCaptainIds,
@@ -1179,13 +1179,15 @@ export class AuctionService implements OnModuleInit {
           },
           orderBy: { joinedAt: "asc" },
         },
-        teams: { select: { captainId: true } },
+        teams: { select: { id: true, captainId: true } },
       },
     });
     if (!room) throw new NotFoundException("Room not found");
 
-    const captainIds = new Set(room.teams.map((team: any) => team.captainId));
-    if (!captainIds.has(userId)) {
+    const captainTeam = room.teams.find(
+      (team: any) => team.captainId === userId,
+    );
+    if (!captainTeam) {
       throw new ForbiddenException(
         "팀장만 매물 스킵 투표에 참여할 수 있습니다.",
       );
@@ -1197,13 +1199,14 @@ export class AuctionService implements OnModuleInit {
       throw new BadRequestException("스킵할 경매 매물이 없습니다.");
     }
 
-    const votes = new Set(state.skipCaptainIds ?? []);
-    votes.add(userId);
+    const teamIds = new Set(room.teams.map((team: any) => team.id));
+    const votes = new Set(state.skipTeamIds ?? []);
+    votes.add(captainTeam.id);
     state.skipVotePlayerId = currentPlayer.id;
-    state.skipCaptainIds = [...votes].filter((id) => captainIds.has(id));
-    state.skipVotesRequired = captainIds.size;
+    state.skipTeamIds = [...votes].filter((id) => teamIds.has(id));
+    state.skipVotesRequired = teamIds.size;
     const allCaptainsAgreed =
-      captainIds.size > 0 && state.skipCaptainIds.length === captainIds.size;
+      teamIds.size > 0 && state.skipTeamIds.length === teamIds.size;
 
     if (allCaptainsAgreed) {
       state.timerEnd = Date.now();
@@ -1212,9 +1215,9 @@ export class AuctionService implements OnModuleInit {
 
     return {
       playerId: currentPlayer.id,
-      captainIds: state.skipCaptainIds,
-      voteCount: state.skipCaptainIds.length,
-      requiredVotes: captainIds.size,
+      teamIds: state.skipTeamIds,
+      voteCount: state.skipTeamIds.length,
+      requiredVotes: teamIds.size,
       allCaptainsAgreed,
     };
   }
