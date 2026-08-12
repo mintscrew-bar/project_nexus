@@ -52,11 +52,13 @@ describe("MatchSeriesService", () => {
     bestOf: number,
     games: { gameNumber: number; winnerId: string | null }[],
     justPlayedWinnerId: string,
+    blueSideTeamId = "team-a",
   ) => {
     prisma.match.findUnique.mockResolvedValue({
       id: "match-current",
       seriesId: "series-1",
       winnerId: justPlayedWinnerId,
+      blueSideTeamId,
     });
     prisma.matchSeries.findUnique.mockResolvedValue({
       id: "series-1",
@@ -122,18 +124,24 @@ describe("MatchSeriesService", () => {
             matchNumber: 3,
             teamAId: "team-a",
             teamBId: "team-b",
+            blueSideTeamId: "team-b",
             status: "PENDING",
           }),
         }),
       );
     });
 
-    it("다음 세트 진영 선택권은 직전 세트 패자에게 간다", async () => {
+    it("다음 세트는 직전 세트와 블루·레드 진영을 자동 교대한다", async () => {
       setup(3, [{ gameNumber: 1, winnerId: "team-a" }], "team-a");
 
       const progress = await service.applyGameResult("match-current");
 
-      expect(progress?.sidePickerTeamId).toBe("team-b");
+      expect(progress?.nextBlueSideTeamId).toBe("team-b");
+      expect(prisma.match.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ blueSideTeamId: "team-b" }),
+        }),
+      );
     });
 
     it("2-0이면 클린치하고 3세트를 만들지 않는다", async () => {
@@ -179,9 +187,16 @@ describe("MatchSeriesService", () => {
         teamAWins: 1,
         teamBWins: 1,
         nextGameNumber: 3,
-        // 2세트를 진 team-a가 3세트 진영을 고른다.
-        sidePickerTeamId: "team-a",
+        nextBlueSideTeamId: "team-b",
       });
+    });
+
+    it("직전 블루가 team-b이면 다음 세트 블루는 team-a다", async () => {
+      setup(3, [{ gameNumber: 1, winnerId: "team-a" }], "team-a", "team-b");
+
+      const progress = await service.applyGameResult("match-current");
+
+      expect(progress?.nextBlueSideTeamId).toBe("team-a");
     });
   });
 

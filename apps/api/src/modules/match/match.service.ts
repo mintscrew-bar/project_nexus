@@ -837,22 +837,35 @@ export class MatchService {
       throw new NotFoundException("Match not found");
     }
 
-    // 다전제 2세트부터는 가위바위보를 다시 하지 않는다.
-    // 직전 세트 패자가 진영을 고른다 (LCK 방식).
-    let sidePickerTeamId: string | null = null;
-    if (match.seriesId && match.gameNumber > 1) {
+    const autoSideSwap = Boolean(match.seriesId && match.gameNumber > 1);
+    let blueSideTeamId = match.blueSideTeamId;
+
+    // 기존에 생성된 다음 세트나 복구 상태에 진영이 비어 있어도 직전 세트와
+    // 반대로 확정한다. 한 번 저장한 뒤에는 재접속해도 같은 진영을 사용한다.
+    if (
+      autoSideSwap &&
+      blueSideTeamId !== match.teamAId &&
+      blueSideTeamId !== match.teamBId
+    ) {
       const previous = await this.prisma.match.findFirst({
         where: {
           seriesId: match.seriesId,
           gameNumber: { lt: match.gameNumber },
-          winnerId: { not: null },
+          blueSideTeamId: { not: null },
         },
         orderBy: { gameNumber: "desc" },
-        select: { winnerId: true },
+        select: { blueSideTeamId: true },
       });
-      if (previous?.winnerId) {
-        sidePickerTeamId =
-          previous.winnerId === match.teamAId ? match.teamBId : match.teamAId;
+      blueSideTeamId =
+        previous?.blueSideTeamId === match.teamAId
+          ? match.teamBId
+          : match.teamAId;
+
+      if (blueSideTeamId) {
+        await this.prisma.match.update({
+          where: { id: matchId },
+          data: { blueSideTeamId },
+        });
       }
     }
 
@@ -869,10 +882,10 @@ export class MatchService {
       captainBIsBot: /^testbot_\d+$/.test(match.teamB?.captain?.username ?? ""),
       hostId: match.room?.hostId ?? null,
       status: match.status,
-      blueSideTeamId: match.blueSideTeamId,
+      blueSideTeamId,
       gameNumber: match.gameNumber,
-      // null이면 1세트(또는 단판) — 가위바위보부터 시작한다.
-      sidePickerTeamId,
+      // 다전제 2세트부터는 생성 시 저장된 진영으로 바로 시작한다.
+      autoSideSwap,
     };
   }
 

@@ -2,8 +2,8 @@
 
 // 가위바위보 진영 결정 흐름 (프레젠테이셔널). 소켓은 부모(MatchDetailModal)가 소유하고,
 // 이 컴포넌트는 서버 상태(rps) + 공개 이벤트(reveal)를 props로 받아 렌더한다.
-// 규칙: 1세트는 팀장 1:1 가위바위보 단판이고 이긴 팀이 진영 선택권.
-// 다전제 2세트부터는 가위바위보 없이 직전 세트에서 진 팀이 진영을 고른다.
+// 규칙: 1세트만 팀장 1:1 가위바위보를 하고 이긴 팀이 진영을 고른다.
+// 다전제 2세트부터는 서버가 진영을 자동 교대하고 이 흐름을 열지 않는다.
 
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -21,13 +21,12 @@ export interface RpsStateData {
   captainAIsBot?: boolean;
   captainBIsBot?: boolean;
   submitted: string[];
-  // side 페이즈에서 진영 선택권을 가진 팀.
-  // 1세트는 가위바위보 승자, 다전제 2세트부터는 직전 세트 패자다.
+  // 가위바위보 승리 후 진영 선택권을 가진 팀.
   winnerTeamId: string | null;
   blueSideTeamId: string | null;
   /// 다전제 세트 번호 (단판이면 1)
   gameNumber?: number;
-  /// true면 가위바위보 없이 진영 선택만 하는 세트
+  /// 이전 서버 상태와의 호환용
   sidePickOnly?: boolean;
 }
 

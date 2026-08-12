@@ -8,6 +8,7 @@ import {
   MessageBody,
 } from "@nestjs/websockets";
 import { Server, Socket } from "socket.io";
+import { BadRequestException } from "@nestjs/common";
 import { AuthService } from "../auth/auth.service";
 import { MatchService } from "./match.service";
 import {
@@ -38,8 +39,7 @@ interface RpsState {
   hostId: string;
   phase: "throw" | "side" | "done";
   submissions: Map<string, RpsHand>; // userId(팀장) -> 낸 손 (현재 라운드)
-  // side 페이즈에서 진영 선택권을 가진 팀.
-  // 1세트는 가위바위보 승자, 다전제 2세트부터는 직전 세트 패자다.
+  // 1세트 가위바위보 승자에게 주어지는 진영 선택권.
   winnerTeamId?: string;
   blueSideTeamId?: string;
   /** 다전제 세트 번호 (단판이면 1) */
@@ -78,6 +78,7 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private readonly rpsTimers = new Map<string, NodeJS.Timeout>();
   private readonly RPS_THROW_TIMEOUT = 30000; // 팀장 미제출 시 자동 랜덤
   private readonly RPS_SIDE_TIMEOUT = 30000; // 진영 미선택 시 자동 랜덤
+  private readonly startingMatches = new Set<string>();
   // 양 팀장 준비 완료 대기 (RPS 시작 전)
   private readonly rpsReadyStates = new Map<string, RpsReadyEntry>();
 
@@ -244,8 +245,7 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
       winnerTeamId: state.winnerTeamId ?? null,
       blueSideTeamId: state.blueSideTeamId ?? null,
       gameNumber: state.gameNumber,
-      // true면 가위바위보 없이 진영 선택만 하는 세트다 (다전제 2세트 이후).
-      // 클라이언트는 이 값으로 손 내는 UI를 건너뛴다.
+      // 이전 클라이언트 호환 필드. 새 다전제는 2세트부터 RPS 상태를 만들지 않는다.
       sidePickOnly: state.gameNumber > 1,
     };
   }
@@ -514,13 +514,36 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
       captainAIsBot?: boolean;
       captainBIsBot?: boolean;
       gameNumber?: number;
-      sidePickerTeamId?: string | null;
+      blueSideTeamId?: string | null;
+      autoSideSwap?: boolean;
     },
   ) {
-    // 다전제 2세트 이후에는 가위바위보를 다시 하지 않고
-    // 직전 세트 패자에게 진영 선택권만 준다.
-    const sidePickerTeamId = ctx.sidePickerTeamId ?? null;
-    const skipThrow = Boolean(sidePickerTeamId);
+    // 다전제 2세트부터는 직전 세트와 진영을 자동 교대하고 곧바로 시작한다.
+    // RPS 상태를 만들지 않으므로 클라이언트에 가위바위보 UI가 다시 뜨지 않는다.
+    if (ctx.autoSideSwap) {
+      if (this.startingMatches.has(matchId)) return;
+      if (
+        !ctx.blueSideTeamId ||
+        (ctx.blueSideTeamId !== ctx.teamAId &&
+          ctx.blueSideTeamId !== ctx.teamBId)
+      ) {
+        throw new BadRequestException("다음 세트 진영을 확정할 수 없습니다.");
+      }
+
+      this.startingMatches.add(matchId);
+      try {
+        const result = await this.matchService.startMatch(
+          ctx.hostId ?? "",
+          matchId,
+        );
+        await this.emitMatchStarted(matchId, {
+          tournamentCode: result?.tournamentCode ?? undefined,
+        });
+      } finally {
+        this.startingMatches.delete(matchId);
+      }
+      return;
+    }
 
     const state: RpsState = {
       matchId,
@@ -531,11 +554,8 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
       captainAIsBot: !!ctx.captainAIsBot,
       captainBIsBot: !!ctx.captainBIsBot,
       hostId: ctx.hostId ?? "",
-      phase: skipThrow ? "side" : "throw",
+      phase: "throw",
       submissions: new Map(),
-      // side 페이즈에서 선택권을 가진 팀. 1세트는 가위바위보 승자,
-      // 2세트부터는 직전 세트 패자다.
-      winnerTeamId: skipThrow ? (sidePickerTeamId ?? undefined) : undefined,
       gameNumber: ctx.gameNumber ?? 1,
     };
     this.rpsStates.set(matchId, state);
@@ -545,11 +565,6 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const match = await this.matchService.findById(matchId).catch(() => null);
     if (match?.roomId) {
       this.server.to(`bracket:${match.roomId}`).emit("rps:invite", { matchId });
-    }
-
-    if (skipThrow) {
-      await this.beginSidePhase(matchId);
-      return;
     }
 
     await this.autoAdvanceBotRpsThrow(matchId);

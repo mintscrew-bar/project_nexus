@@ -16,11 +16,8 @@ export interface SeriesProgress {
   /** 다음 세트가 만들어졌으면 그 매치 id */
   nextMatchId: string | null;
   nextGameNumber: number | null;
-  /**
-   * 다음 세트의 진영 선택권을 가진 팀 = 직전 세트 패자.
-   * 시리즈가 끝났으면 null.
-   */
-  sidePickerTeamId: string | null;
+  /** 다음 세트 블루 팀. 직전 세트와 진영을 자동 교대한다. */
+  nextBlueSideTeamId: string | null;
 }
 
 /** 시리즈 스코어 (표시용) */
@@ -61,7 +58,12 @@ export class MatchSeriesService {
   async applyGameResult(matchId: string): Promise<SeriesProgress | null> {
     const match = await this.prisma.match.findUnique({
       where: { id: matchId },
-      select: { id: true, seriesId: true, winnerId: true },
+      select: {
+        id: true,
+        seriesId: true,
+        winnerId: true,
+        blueSideTeamId: true,
+      },
     });
 
     if (!match?.seriesId) return null;
@@ -131,7 +133,7 @@ export class MatchSeriesService {
         seriesWinnerId,
         nextMatchId: null,
         nextGameNumber: null,
-        sidePickerTeamId: null,
+        nextBlueSideTeamId: null,
       };
     }
 
@@ -139,9 +141,14 @@ export class MatchSeriesService {
     const nextGameNumber =
       Math.max(...games.map((g: { gameNumber: number }) => g.gameNumber)) + 1;
 
-    // 직전 세트 패자가 다음 세트 진영을 고른다 (LCK 방식).
-    const sidePickerTeamId =
-      match.winnerId === series.teamAId ? series.teamBId : series.teamAId;
+    // 2세트부터는 가위바위보나 추가 선택 없이 직전 세트와 진영을 교대한다.
+    // 레거시/복구 상태에서 직전 진영이 없으면 teamA를 블루로 정해 흐름을 멈추지 않는다.
+    const nextBlueSideTeamId =
+      match.blueSideTeamId === series.teamAId
+        ? series.teamBId
+        : match.blueSideTeamId === series.teamBId
+          ? series.teamAId
+          : series.teamAId;
 
     const nextMatch = await this.prisma.match.create({
       data: {
@@ -158,6 +165,7 @@ export class MatchSeriesService {
         bracketType: series.bracketType,
         teamAId: series.teamAId,
         teamBId: series.teamBId,
+        blueSideTeamId: nextBlueSideTeamId,
         status: MatchStatus.PENDING,
       },
       select: { id: true },
@@ -183,7 +191,7 @@ export class MatchSeriesService {
       seriesWinnerId: null,
       nextMatchId: nextMatch.id,
       nextGameNumber,
-      sidePickerTeamId,
+      nextBlueSideTeamId,
     };
   }
 

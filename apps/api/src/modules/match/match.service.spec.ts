@@ -249,6 +249,8 @@ describe("MatchService", () => {
         teamBId: "team-b",
         status: "PENDING",
         blueSideTeamId: null,
+        seriesId: null,
+        gameNumber: 1,
         teamA: {
           captainId: "captain-a",
           name: "팀A",
@@ -268,6 +270,70 @@ describe("MatchService", () => {
       expect(result.captainBUsername).toBe("real_user");
       expect(result.captainAIsBot).toBe(true);
       expect(result.captainBIsBot).toBe(false);
+    });
+
+    it("다전제 2세트는 저장된 자동 교대 진영으로 시작한다", async () => {
+      prisma.match.findUnique.mockResolvedValue({
+        id: "match-2",
+        teamAId: "team-a",
+        teamBId: "team-b",
+        status: "PENDING",
+        blueSideTeamId: "team-b",
+        seriesId: "series-1",
+        gameNumber: 2,
+        teamA: {
+          captainId: "captain-a",
+          name: "팀A",
+          captain: { id: "captain-a", username: "captain_a" },
+        },
+        teamB: {
+          captainId: "captain-b",
+          name: "팀B",
+          captain: { id: "captain-b", username: "captain_b" },
+        },
+        room: { hostId: "host-1" },
+      });
+
+      const result = await service.getRpsContext("match-2");
+
+      expect(result.autoSideSwap).toBe(true);
+      expect(result.blueSideTeamId).toBe("team-b");
+      expect(prisma.match.findFirst).not.toHaveBeenCalled();
+    });
+
+    it("진영이 비어 있는 2세트는 직전 세트 반대 진영으로 복구한다", async () => {
+      prisma.match.findUnique.mockResolvedValue({
+        id: "match-2",
+        teamAId: "team-a",
+        teamBId: "team-b",
+        status: "PENDING",
+        blueSideTeamId: null,
+        seriesId: "series-1",
+        gameNumber: 2,
+        teamA: {
+          captainId: "captain-a",
+          name: "팀A",
+          captain: { id: "captain-a", username: "captain_a" },
+        },
+        teamB: {
+          captainId: "captain-b",
+          name: "팀B",
+          captain: { id: "captain-b", username: "captain_b" },
+        },
+        room: { hostId: "host-1" },
+      });
+      prisma.match.findFirst.mockResolvedValue({
+        blueSideTeamId: "team-a",
+      });
+      prisma.match.update.mockResolvedValue({});
+
+      const result = await service.getRpsContext("match-2");
+
+      expect(result.blueSideTeamId).toBe("team-b");
+      expect(prisma.match.update).toHaveBeenCalledWith({
+        where: { id: "match-2" },
+        data: { blueSideTeamId: "team-b" },
+      });
     });
   });
 

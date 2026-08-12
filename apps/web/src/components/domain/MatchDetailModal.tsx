@@ -416,7 +416,7 @@ export function MatchDetailModal({
             </div>
             {match.status !== 'COMPLETED' && (match.currentGameNumber ?? 1) > 1 && (
               <p className="mt-2 text-center text-xs text-text-tertiary">
-                직전 세트에서 진 팀이 진영을 선택합니다.
+                직전 세트와 블루·레드 진영이 자동으로 교대됩니다.
               </p>
             )}
           </div>
@@ -564,7 +564,9 @@ export function MatchDetailModal({
             <div className="pt-4 border-t border-bg-tertiary space-y-3">
               <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
                 <Swords className="h-4 w-4 text-accent-primary" />
-                진영 결정 준비
+                {(match.currentGameNumber ?? 1) > 1
+                  ? "다음 세트 시작 준비"
+                  : "진영 결정 준비"}
               </h3>
               <div className="grid grid-cols-2 gap-2">
                 {([
@@ -607,7 +609,9 @@ export function MatchDetailModal({
               ) : (
                 <p className="text-xs text-text-tertiary text-center">
                   {rpsReadyState?.captainAIsBot || rpsReadyState?.captainBIsBot
-                    ? "봇은 자동으로 준비하고 가위바위보에 참여합니다"
+                    ? (match.currentGameNumber ?? 1) > 1
+                      ? "봇은 자동으로 준비합니다"
+                      : "봇은 자동으로 준비하고 가위바위보에 참여합니다"
                     : "팀장만 준비할 수 있습니다"}
                 </p>
               )}
