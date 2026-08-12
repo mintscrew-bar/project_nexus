@@ -1362,6 +1362,9 @@ function MobileBidPanel({
           className="shrink-0 ring-1 ring-accent-primary/40"
         />
         <div className="min-w-0 flex-1">
+          <p className="text-[10px] font-semibold text-accent-primary">
+            현재 매물 · 팀장 동시 입찰
+          </p>
           <div className="flex min-w-0 items-center gap-1.5">
             <span className="truncate text-sm font-bold text-text-primary">
               {currentPlayer.username}
@@ -1374,7 +1377,7 @@ function MobileBidPanel({
           </div>
           <p className="truncate text-[11px] text-text-secondary">
             최고가 {auctionState.currentHighestBid.toLocaleString()}G
-            {auctionState.currentHighestBidderName ? ` · ${auctionState.currentHighestBidderName}` : ""}
+            {auctionState.currentHighestBidderName ? ` · 선두 ${auctionState.currentHighestBidderName}` : ""}
           </p>
         </div>
         {onFocusAuction && (

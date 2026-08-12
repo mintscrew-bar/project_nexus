@@ -138,7 +138,7 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
   const [accumulatedBid, setAccumulatedBid] = useState<number>(0);
   const [isBidding, setIsBidding] = useState(false);
   const currentTeam = sortedTeams.find((t) => t.captainId === currentUserId);
-  const isCurrentUserTurn =
+  const canCurrentUserBid =
     Boolean(currentTeam) && auctionState.status === "IN_PROGRESS";
   const isAlreadyHighestBidder =
     !!auctionState.currentHighestBidder &&
@@ -326,9 +326,14 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
                 size="sm"
                 className="ring-2 ring-accent-primary/50 flex-shrink-0"
               />
-              <span className="font-bold text-text-primary truncate">
-                {auctionState.currentPlayer.username}
-              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-semibold text-accent-primary">
+                  현재 매물 · 팀장 동시 입찰
+                </p>
+                <p className="truncate font-bold text-text-primary">
+                  {auctionState.currentPlayer.username}
+                </p>
+              </div>
               <TierBadge tier={auctionState.currentPlayer.tier} size="sm" showIcon={false} />
               <Badge variant="primary" className="text-[10px] px-1.5 py-0.5">
                 {getPlayerPosition(auctionState.currentPlayer)}
@@ -395,7 +400,13 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
                 />
 
                 <div className="flex-1 min-w-0">
-                  <h2 className="text-3xl font-bold text-text-primary mb-2 truncate">
+                  <div className="mb-2 flex items-center gap-2">
+                    <Badge variant="primary">현재 매물</Badge>
+                    <span className="text-xs font-medium text-text-secondary">
+                      모든 팀장 동시 입찰
+                    </span>
+                  </div>
+                  <h2 className="mb-2 truncate text-3xl font-bold text-text-primary">
                     {auctionState.currentPlayer.username}
                   </h2>
                   <div className="flex items-center gap-3 flex-wrap">
@@ -475,6 +486,7 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
                       {bidderTeam && (
                         <span className="text-xs text-text-muted">· {bidderTeam.name}</span>
                       )}
+                      <Badge variant="warning" className="ml-1">현재 선두</Badge>
                     </div>
                   );
                 })() : (
@@ -550,20 +562,20 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
       )}
 
       {/* 비캡틴/관전자 관전 안내 */}
-      {!isCurrentUserTurn && auctionState.currentPlayer && !hideBidPanel && (
+      {!canCurrentUserBid && auctionState.currentPlayer && !hideBidPanel && (
         <div
           className={cn(
             "py-3 px-4 rounded-lg bg-bg-secondary border border-bg-tertiary text-center text-sm text-text-secondary",
             shouldDockBidPanel && "sticky bottom-0 z-20 mt-auto bg-bg-secondary/95 shadow-[0_-18px_44px_rgba(0,0,0,0.28)] backdrop-blur",
           )}
         >
-          {currentTeam
-            ? "다른 팀의 입찰 차례입니다. 경매를 관전 중입니다."
-            : "관전 모드 — 팀장만 입찰에 참여할 수 있습니다."}
+          {auctionState.status === "IN_PROGRESS"
+            ? "모든 팀장이 동시에 입찰 중입니다. 현재 관전 중입니다."
+            : "경매가 종료되었습니다."}
         </div>
       )}
 
-      {isCurrentUserTurn && auctionState.currentPlayer && !hideBidPanel && (
+      {canCurrentUserBid && auctionState.currentPlayer && !hideBidPanel && (
         <Card
           className={cn(
             "overflow-hidden p-0",
@@ -572,6 +584,7 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
         >
           <CardContent className="p-5">
             <div className="flex items-center justify-between mb-4">
+              <Badge variant="success">지금 입찰 가능</Badge>
               <p className="text-sm text-text-tertiary">
                 사용 가능:{" "}
                 <span className="text-accent-gold font-bold">
