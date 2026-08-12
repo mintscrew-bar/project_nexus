@@ -336,7 +336,7 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
               {auctionState.yuchalCount > 0 && (
                 <div className="flex items-center gap-0.5 text-accent-warning text-[10px] font-medium ml-auto flex-shrink-0">
                   <AlertTriangle className="w-3 h-3" />
-                  {auctionState.yuchalCount}/{auctionState.maxYuchalCycles}
+                  {auctionState.yuchalCount}회
                 </div>
               )}
             </div>
@@ -439,7 +439,7 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
                   {auctionState.yuchalCount > 0 && (
                     <div className="flex items-center gap-1 mt-1.5 text-accent-warning text-xs font-medium">
                       <AlertTriangle className="w-3 h-3" />
-                      유찰 {auctionState.yuchalCount}/{auctionState.maxYuchalCycles}
+                      유찰 {auctionState.yuchalCount}회
                     </div>
                   )}
                 </div>

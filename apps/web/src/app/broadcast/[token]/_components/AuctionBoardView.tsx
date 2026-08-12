@@ -722,7 +722,7 @@ function CurrentLot({
             </div>
             {auctionState.yuchalCount > 0 && (
               <p className="rounded bg-amber-300/10 px-2 py-1 text-xs font-black text-amber-200">
-                유찰 {auctionState.yuchalCount}/{auctionState.maxYuchalCycles}
+                유찰 {auctionState.yuchalCount}회
               </p>
             )}
           </div>
@@ -814,7 +814,7 @@ function CurrentLot({
             </div>
             {auctionState.yuchalCount > 0 && (
               <p className="mt-5 rounded bg-amber-300/14 px-3 py-1 text-sm font-black text-amber-200">
-                유찰 {auctionState.yuchalCount}/{auctionState.maxYuchalCycles}
+                유찰 {auctionState.yuchalCount}회
               </p>
             )}
           </div>

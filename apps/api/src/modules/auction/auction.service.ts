@@ -32,6 +32,8 @@ export interface AuctionState {
   timerEnd: number;
   yuchalCount: number;
   maxYuchalCycles: number;
+  deferredPlayerIds?: string[];
+  yuchalCountsByPlayer?: Record<string, number>;
   bidIncrement: number;
   botCaptainIds: string[]; // captain userIds whose usernames match testbot_*
 }
@@ -218,6 +220,52 @@ export class AuctionService implements OnModuleInit {
       const bJoined = b.joinedAt ? new Date(b.joinedAt).getTime() : 0;
       return aJoined - bJoined;
     });
+  }
+
+  private _syncCurrentAuctionPlayer<T extends { id: string }>(
+    state: AuctionState,
+    participants: T[],
+  ): T | undefined {
+    const isLegacyState = !Array.isArray(state.deferredPlayerIds);
+    const availableIds = new Set(
+      participants.map((participant) => participant.id),
+    );
+    const counts = state.yuchalCountsByPlayer ?? {};
+
+    if (isLegacyState) {
+      const legacyCurrent = participants[state.currentPlayerIndex];
+      if (legacyCurrent && state.yuchalCount > 0) {
+        counts[legacyCurrent.id] = state.yuchalCount;
+      }
+      state.deferredPlayerIds = participants
+        .slice(0, state.currentPlayerIndex)
+        .map((participant) => participant.id);
+    }
+
+    state.deferredPlayerIds = (state.deferredPlayerIds ?? []).filter((id) =>
+      availableIds.has(id),
+    );
+    state.yuchalCountsByPlayer = Object.fromEntries(
+      Object.entries(counts).filter(([id]) => availableIds.has(id)),
+    );
+
+    const deferred = new Set(state.deferredPlayerIds);
+    let nextIndex = participants.findIndex(
+      (participant) => !deferred.has(participant.id),
+    );
+
+    // Every remaining player has appeared once. Start the next unsold cycle.
+    if (nextIndex === -1 && participants.length > 0) {
+      state.deferredPlayerIds = [];
+      nextIndex = 0;
+    }
+
+    state.currentPlayerIndex = Math.max(0, nextIndex);
+    const currentPlayer = participants[nextIndex];
+    state.yuchalCount = currentPlayer
+      ? (state.yuchalCountsByPlayer[currentPlayer.id] ?? 0)
+      : 0;
+    return currentPlayer;
   }
 
   /** 팀장 선정 단계를 인메모리 + Redis에 저장 (timerHandle 제외) */
@@ -472,6 +520,8 @@ export class AuctionService implements OnModuleInit {
       timerEnd: Date.now() + this.getBaseBidTimerMs(room),
       yuchalCount: 0,
       maxYuchalCycles: numTeams,
+      deferredPlayerIds: [],
+      yuchalCountsByPlayer: {},
       bidIncrement: room.minBidIncrement || DEFAULT_BID_INCREMENT,
       botCaptainIds,
     };
@@ -737,6 +787,8 @@ export class AuctionService implements OnModuleInit {
       timerEnd: Date.now() + this.getBaseBidTimerMs(room),
       yuchalCount: 0,
       maxYuchalCycles: numTeamsFinal,
+      deferredPlayerIds: [],
+      yuchalCountsByPlayer: {},
       bidIncrement: room.minBidIncrement || DEFAULT_BID_INCREMENT,
       botCaptainIds,
     };
@@ -818,6 +870,8 @@ export class AuctionService implements OnModuleInit {
       timerEnd: Date.now() + this.getBaseBidTimerMs(room),
       yuchalCount: 0,
       maxYuchalCycles: numTeams,
+      deferredPlayerIds: [],
+      yuchalCountsByPlayer: {},
       bidIncrement: room.minBidIncrement || DEFAULT_BID_INCREMENT,
       botCaptainIds,
     };
@@ -1014,7 +1068,10 @@ export class AuctionService implements OnModuleInit {
     const availableParticipants = this._sortAuctionParticipants(
       roomWithParticipants?.participants ?? [],
     );
-    const currentPlayer = availableParticipants[state.currentPlayerIndex];
+    const currentPlayer = this._syncCurrentAuctionPlayer(
+      state,
+      availableParticipants,
+    );
     if (!currentPlayer) {
       throw new BadRequestException("No player to bid on");
     }
@@ -1137,7 +1194,10 @@ export class AuctionService implements OnModuleInit {
     const availableParticipants = this._sortAuctionParticipants(
       room.participants,
     );
-    const currentPlayer = availableParticipants[state.currentPlayerIndex];
+    const currentPlayer = this._syncCurrentAuctionPlayer(
+      state,
+      availableParticipants,
+    );
     if (!currentPlayer) {
       throw new BadRequestException("No player to resolve");
     }
@@ -1184,13 +1244,20 @@ export class AuctionService implements OnModuleInit {
         });
       });
 
-      // Move to the next available player.
-      state.currentPlayerIndex = 0;
+      const remainingParticipants = availableParticipants.filter(
+        (participant) => participant.id !== currentPlayer.id,
+      );
+      state.deferredPlayerIds = (state.deferredPlayerIds ?? []).filter(
+        (id) => id !== currentPlayer.id,
+      );
+      if (state.yuchalCountsByPlayer) {
+        delete state.yuchalCountsByPlayer[currentPlayer.id];
+      }
+      this._syncCurrentAuctionPlayer(state, remainingParticipants);
       state.currentHighestBid = 0;
       state.currentHighestBidder = null;
       state.currentHighestBidderName = null;
       state.timerEnd = 0;
-      state.yuchalCount = 0;
 
       // 낙찰 후 초기화된 상태를 Redis에 동기화
       this._setAuctionState(roomId, state);
@@ -1203,7 +1270,8 @@ export class AuctionService implements OnModuleInit {
       };
     } else {
       // Yuchal (no sale)
-      const prevYuchalCount = state.yuchalCount;
+      const prevYuchalCount =
+        state.yuchalCountsByPlayer?.[currentPlayer.id] ?? state.yuchalCount;
       const nextYuchalCount = prevYuchalCount + 1;
       const bidIncrement = room.minBidIncrement || DEFAULT_BID_INCREMENT;
       const maxTeamSize = 5;
@@ -1214,18 +1282,20 @@ export class AuctionService implements OnModuleInit {
         (t: any) => t.remainingBudget >= bidIncrement,
       );
 
-      // If multiple teams can still compete, a yuchal must not put the player
-      // into one arbitrary team. Keep the player for another pass, then move
-      // to the next unassigned player after every team has had a chance.
+      // If multiple teams can still compete, defer this player until every
+      // other remaining player has appeared once in the current cycle.
       if (incompleteTeams.length > 1 && anyCanBid) {
-        const shouldAdvancePlayer = nextYuchalCount >= state.maxYuchalCycles;
-        state.yuchalCount = shouldAdvancePlayer ? 0 : nextYuchalCount;
-        if (shouldAdvancePlayer) {
-          state.currentPlayerIndex =
-            room.participants.length > 0
-              ? (state.currentPlayerIndex + 1) % room.participants.length
-              : 0;
-        }
+        state.yuchalCountsByPlayer = {
+          ...(state.yuchalCountsByPlayer ?? {}),
+          [currentPlayer.id]: nextYuchalCount,
+        };
+        state.deferredPlayerIds = [
+          ...(state.deferredPlayerIds ?? []).filter(
+            (id) => id !== currentPlayer.id,
+          ),
+          currentPlayer.id,
+        ];
+        this._syncCurrentAuctionPlayer(state, availableParticipants);
         state.currentHighestBid = 0;
         state.currentHighestBidder = null;
         state.currentHighestBidderName = null;
@@ -1296,12 +1366,20 @@ export class AuctionService implements OnModuleInit {
         });
       });
 
-      state.currentPlayerIndex = 0;
+      const remainingParticipants = availableParticipants.filter(
+        (participant) => participant.id !== currentPlayer.id,
+      );
+      state.deferredPlayerIds = (state.deferredPlayerIds ?? []).filter(
+        (id) => id !== currentPlayer.id,
+      );
+      if (state.yuchalCountsByPlayer) {
+        delete state.yuchalCountsByPlayer[currentPlayer.id];
+      }
+      this._syncCurrentAuctionPlayer(state, remainingParticipants);
       state.currentHighestBid = 0;
       state.currentHighestBidder = null;
       state.currentHighestBidderName = null;
       state.timerEnd = 0;
-      state.yuchalCount = 0;
 
       // 강제배정 후 초기화된 상태를 Redis에 동기화
       this._setAuctionState(roomId, state);
@@ -1591,30 +1669,35 @@ export class AuctionService implements OnModuleInit {
     });
     if (!room) return { teams: [], players: [] };
 
-    const players = this._sortAuctionParticipants(room.participants).map(
-      (p: any) => {
-        const acc = p.user.riotAccounts[0];
-        return {
-          id: p.userId,
-          username: p.user.username,
-          avatar: p.user.avatar,
-          tier: acc?.tier,
-          rank: acc?.rank,
-          mainRole: acc?.mainRole,
-          subRole: acc?.subRole,
-          gameName: acc?.gameName,
-          tagLine: acc?.tagLine,
-          peakTier: acc?.peakTier,
-          peakRank: acc?.peakRank,
-          championPreferences: acc?.championPreferences ?? [],
-          mmr: calculateTierScore(
-            acc?.tier || "UNRANKED",
-            acc?.rank || "",
-            acc?.lp || 0,
-          ),
-        };
-      },
-    );
+    const sortedParticipants = this._sortAuctionParticipants(room.participants);
+    const state = this.auctionStates.get(roomId);
+    if (state) {
+      this._syncCurrentAuctionPlayer(state, sortedParticipants);
+      this._setAuctionState(roomId, state);
+    }
+
+    const players = sortedParticipants.map((p: any) => {
+      const acc = p.user.riotAccounts[0];
+      return {
+        id: p.userId,
+        username: p.user.username,
+        avatar: p.user.avatar,
+        tier: acc?.tier,
+        rank: acc?.rank,
+        mainRole: acc?.mainRole,
+        subRole: acc?.subRole,
+        gameName: acc?.gameName,
+        tagLine: acc?.tagLine,
+        peakTier: acc?.peakTier,
+        peakRank: acc?.peakRank,
+        championPreferences: acc?.championPreferences ?? [],
+        mmr: calculateTierScore(
+          acc?.tier || "UNRANKED",
+          acc?.rank || "",
+          acc?.lp || 0,
+        ),
+      };
+    });
 
     const teams = room.teams.map((t: any) => ({
       id: t.id,
