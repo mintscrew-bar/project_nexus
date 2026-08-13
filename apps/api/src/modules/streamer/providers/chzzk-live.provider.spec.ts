@@ -1,10 +1,32 @@
+import axios from "axios";
 import { ChzzkLiveProvider } from "./chzzk-live.provider";
 
 describe("ChzzkLiveProvider", () => {
   let provider: ChzzkLiveProvider;
 
   beforeEach(() => {
+    jest.restoreAllMocks();
     provider = new ChzzkLiveProvider();
+  });
+
+  describe("fetchLiveSnapshot", () => {
+    const channelId = "2086f44c7b09a17cef6786f21389db3b";
+
+    it("200 응답의 content null은 조회 실패가 아닌 오프라인으로 처리한다", async () => {
+      jest.spyOn(axios, "get").mockResolvedValue({
+        data: { code: 200, content: null },
+      });
+
+      await expect(provider.fetchLiveSnapshot(channelId)).resolves.toEqual({
+        isLive: false,
+      });
+    });
+
+    it("요청 자체가 실패하면 알 수 없는 상태를 반환한다", async () => {
+      jest.spyOn(axios, "get").mockRejectedValue(new Error("timeout"));
+
+      await expect(provider.fetchLiveSnapshot(channelId)).resolves.toBeNull();
+    });
   });
 
   describe("parseChannelId", () => {

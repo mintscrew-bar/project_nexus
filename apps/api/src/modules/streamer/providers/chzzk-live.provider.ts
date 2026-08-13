@@ -83,7 +83,10 @@ export class ChzzkLiveProvider implements LiveProvider {
       openDate?: string;
     }>(`/service/v3/channels/${channelId}/live-detail`);
 
-    if (!content) return null;
+    // 치지직은 정상적인 오프라인 채널도 200 응답의 content를 null로 준다.
+    // undefined만 실제 요청 실패로 보고, null은 오프라인 상태로 캐시한다.
+    if (content === undefined) return null;
+    if (content === null) return { isLive: false };
 
     const isLive = content.status === "OPEN";
     if (!isLive) return { isLive: false };
@@ -118,9 +121,9 @@ export class ChzzkLiveProvider implements LiveProvider {
     return Number.isNaN(parsed.getTime()) ? null : parsed;
   }
 
-  private async get<T>(path: string): Promise<T | null> {
+  private async get<T>(path: string): Promise<T | null | undefined> {
     try {
-      const response = await axios.get<{ code?: number; content?: T }>(
+      const response = await axios.get<{ code?: number; content?: T | null }>(
         `${this.baseUrl}${path}`,
         {
           timeout: this.timeout,
@@ -128,11 +131,11 @@ export class ChzzkLiveProvider implements LiveProvider {
           headers: { "User-Agent": "Mozilla/5.0 (compatible; NexusBot/1.0)" },
         },
       );
-      return response.data?.content ?? null;
+      return response.data?.content;
     } catch (error) {
       const err = error as Error;
       this.logger.warn(`치지직 조회 실패 ${path}: ${err?.message}`);
-      return null;
+      return undefined;
     }
   }
 }
