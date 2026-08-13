@@ -2052,14 +2052,27 @@ export function TeamRevealScene({ snapshot }: { snapshot: any }) {
         <div className="flex min-h-0 flex-1 gap-6">
           {teams.map((team) => {
             const teamColor = team.color || accent;
-            // 팀장을 맨 위로 정렬해 소개 순서를 고정한다
-            const members = [...(team.members ?? [])].sort((a, b) =>
-              a.userId === team.captainId
-                ? -1
-                : b.userId === team.captainId
-                  ? 1
-                  : 0,
-            );
+            // 소개 순서: 팀장 → 라인 순(탑·정글·미드·원딜·서포) → 역할 미정
+            // 기존에는 DB가 돌려주는 순서(경매 낙찰 순 등)를 그대로 써서
+            // orderBy 가 없는 만큼 조회마다 순서가 달라질 수 있었다.
+            const roleRank = (member: any) => {
+              const index = ROLE_ORDER.indexOf(member.assignedRole);
+              return index === -1 ? ROLE_ORDER.length : index;
+            };
+            const members = [...(team.members ?? [])].sort((a, b) => {
+              const aCaptain = a.userId === team.captainId ? 0 : 1;
+              const bCaptain = b.userId === team.captainId ? 0 : 1;
+              if (aCaptain !== bCaptain) return aCaptain - bCaptain;
+
+              const byRole = roleRank(a) - roleRank(b);
+              if (byRole !== 0) return byRole;
+
+              // 라인까지 같으면 닉네임으로 고정해 순서가 흔들리지 않게 한다
+              return String(a.username ?? "").localeCompare(
+                String(b.username ?? ""),
+                "ko",
+              );
+            });
             return (
               <div
                 key={team.id}
