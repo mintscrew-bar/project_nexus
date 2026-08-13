@@ -107,14 +107,30 @@ const withPartialAssignedRoles = (team: any, roles: Array<string | null>) => ({
   })),
 });
 
-const WAITING_PARTICIPANTS = Array.from({ length: 30 }).map((_, index) => ({
-  userId: `p${index + 1}`,
-  username: ["다이아왕", "미드갓", "정글러킹", "서포터장인", "원딜에이스"][
-    index % 5
-  ],
-  isReady: index % 3 !== 1,
-  isCaptain: index === 0 || index === 5,
-}));
+// 프리뷰용 티어 샘플 — 언랭/미연동(null) 케이스도 섞어 배지 숨김 동작을 확인한다
+const PREVIEW_TIERS: Array<[string | null, string | null, number | null]> = [
+  ["CHALLENGER", "I", 1204],
+  ["DIAMOND", "II", 45],
+  ["GOLD", "IV", 12],
+  ["UNRANKED", "", 0],
+  [null, null, null],
+  ["EMERALD", "III", 88],
+];
+
+const WAITING_PARTICIPANTS = Array.from({ length: 30 }).map((_, index) => {
+  const [tier, rank, lp] = PREVIEW_TIERS[index % PREVIEW_TIERS.length];
+  return {
+    userId: `p${index + 1}`,
+    username: ["다이아왕", "미드갓", "정글러킹", "서포터장인", "원딜에이스"][
+      index % 5
+    ],
+    isReady: index % 3 !== 1,
+    isCaptain: index === 0 || index === 5,
+    tier,
+    rank,
+    lp,
+  };
+});
 
 const common = (status: string) => ({
   room: {

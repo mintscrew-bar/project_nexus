@@ -34,6 +34,48 @@ const broadcastBgCss = `
 }
 `;
 
+/**
+ * 티어별 강조색. globals.css의 --color-tier-* 와 동일한 값을 hex로 둔다.
+ * (오버레이는 인라인 색상 위주로 그려지므로 tailwind 클래스 대신 hex를 쓴다)
+ */
+const TIER_COLORS: Record<string, string> = {
+  challenger: "#f4c430",
+  grandmaster: "#ff4500",
+  master: "#9b30ff",
+  diamond: "#b9f2ff",
+  emerald: "#50c878",
+  platinum: "#40e0d0",
+  gold: "#ffd700",
+  silver: "#c0c0c0",
+  bronze: "#cd7f32",
+  iron: "#8b8b8b",
+};
+
+/** 랭크(I~IV)가 의미 없는 상위 티어 — 표기에서 제외한다. */
+const APEX_TIERS = new Set(["master", "grandmaster", "challenger"]);
+
+/**
+ * 티어/랭크/LP를 오버레이 표기 문자열과 색상으로 변환.
+ * 미연동·언랭이면 null을 돌려주고 호출부에서 배지를 숨긴다.
+ */
+function tierBadge(
+  tier?: string | null,
+  rank?: string | null,
+  lp?: number | null,
+): { text: string; color: string } | null {
+  const key = (tier ?? "").toLowerCase();
+  if (!key || key === "unranked") return null;
+
+  const matched = Object.keys(TIER_COLORS).find((t) => key.includes(t));
+  if (!matched) return null;
+
+  const parts = [matched.slice(0, 3).toUpperCase()];
+  if (rank && !APEX_TIERS.has(matched)) parts.push(rank);
+  if (typeof lp === "number") parts.push(`${lp}LP`);
+
+  return { text: parts.join(" "), color: TIER_COLORS[matched] };
+}
+
 const STATUS_LABELS: Record<string, string> = {
   WAITING: "대기 중",
   AUCTION: "경매 중",
@@ -244,6 +286,13 @@ export function WaitingScene({ snapshot }: { snapshot: any }) {
       : participants.length > 25
         ? "text-[9px]"
         : "text-[10px]";
+  // 티어 줄은 이름보다 한 단계 작게 — 40인 그리드에서도 두 줄이 안정적으로 들어간다
+  const tierText =
+    participants.length > 36
+      ? "text-[9px]"
+      : participants.length > 25
+        ? "text-[10px]"
+        : "text-[11px]";
 
   return (
     <StageFrame accent={accent}>
@@ -289,34 +338,55 @@ export function WaitingScene({ snapshot }: { snapshot: any }) {
               </p>
             </div>
             <div className={`grid ${participantColumns} gap-2.5`}>
-              {participants.map((participant, index) => (
-                <div
-                  key={participant.userId ?? index}
-                  className={`flex min-w-0 items-center border-l border-white/12 bg-white/[0.035] ${participantCell}`}
-                >
-                  <span className="w-5 shrink-0 text-xs font-black text-white/28">
-                    {String(index + 1).padStart(2, "0")}
-                  </span>
-                  <span className="min-w-0 flex-1 truncate font-black text-white/84">
-                    {participant.username ?? "대기자"}
-                  </span>
-                  {participant.isCaptain && (
-                    <span
-                      className={`shrink-0 font-black uppercase ${badgeText}`}
-                      style={{ color: accent }}
-                    >
-                      CAP
+              {participants.map((participant, index) => {
+                const badge = tierBadge(
+                  participant.tier,
+                  participant.rank,
+                  participant.lp,
+                );
+                return (
+                  <div
+                    key={participant.userId ?? index}
+                    className={`flex min-w-0 items-center border-l border-white/12 bg-white/[0.035] ${participantCell}`}
+                    // 티어 색을 좌측 보더로도 흘려 한눈에 티어 분포가 보이게 한다
+                    style={
+                      badge ? { borderLeftColor: badge.color } : undefined
+                    }
+                  >
+                    <span className="w-5 shrink-0 text-xs font-black text-white/28">
+                      {String(index + 1).padStart(2, "0")}
                     </span>
-                  )}
-                  {participant.isReady && !participant.isCaptain && (
-                    <span
-                      className={`shrink-0 font-black uppercase text-emerald-300 ${badgeText}`}
-                    >
-                      READY
+                    <span className="flex min-w-0 flex-1 flex-col leading-tight">
+                      <span className="truncate font-black text-white/84">
+                        {participant.username ?? "대기자"}
+                      </span>
+                      {badge && (
+                        <span
+                          className={`truncate font-black tracking-wide ${tierText}`}
+                          style={{ color: badge.color }}
+                        >
+                          {badge.text}
+                        </span>
+                      )}
                     </span>
-                  )}
-                </div>
-              ))}
+                    {participant.isCaptain && (
+                      <span
+                        className={`shrink-0 font-black uppercase ${badgeText}`}
+                        style={{ color: accent }}
+                      >
+                        CAP
+                      </span>
+                    )}
+                    {participant.isReady && !participant.isCaptain && (
+                      <span
+                        className={`shrink-0 font-black uppercase text-emerald-300 ${badgeText}`}
+                      >
+                        READY
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
