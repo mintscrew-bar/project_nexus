@@ -1965,15 +1965,18 @@ function RevealMemberRow({
   teamColor: string;
   isCaptain: boolean;
 }) {
+  // 대기화면과 같은 배지 규칙을 써서 방송 전체의 티어 표기를 통일한다
+  const badge = tierBadge(member.tier, member.rank, member.lp);
+
   return (
-    <div className="flex h-14 items-center justify-between border border-white/12 bg-white/[0.05] px-4">
+    <div className="flex h-full min-h-0 items-center justify-between border border-white/12 bg-white/[0.05] px-4">
       <div className="flex min-w-0 items-center gap-3">
-        <div className="h-9 w-9 shrink-0 overflow-hidden rounded-full bg-white/10">
+        <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-white/10">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={member.avatar || "/images/placeholders/non-avatar-64.png"}
             alt=""
-            className="h-9 w-9 rounded-full object-cover"
+            className="h-10 w-10 rounded-full object-cover"
           />
         </div>
         <p className="truncate text-xl font-bold text-white">
@@ -1994,8 +1997,21 @@ function RevealMemberRow({
             {member.soldPrice}P
           </span>
         )}
-        <span className="text-base font-black text-white/50">
-          {member.tier ?? "–"}
+        <span
+          className="flex items-center gap-1.5 text-base font-black"
+          style={{ color: badge.color }}
+        >
+          {badge.icon && (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={badge.icon}
+              alt=""
+              width={22}
+              height={22}
+              className="shrink-0"
+            />
+          )}
+          {badge.text}
         </span>
       </div>
     </div>
@@ -2011,6 +2027,12 @@ export function TeamRevealScene({ snapshot }: { snapshot: any }) {
   const accent = accentOf(snapshot);
   const teams: any[] = snapshot?.teams ?? [];
   const roomName = snapshot?.room?.name ?? "";
+  // 팀마다 인원이 달라도 행 높이를 맞추기 위해 최대 인원 기준으로 트랙을 잡는다.
+  // (1fr 트랙이라 남는 세로 공간 없이 패널을 꽉 채운다)
+  const maxMembers = Math.max(
+    1,
+    ...teams.map((team) => (team.members ?? []).length),
+  );
 
   return (
     <StageFrame accent={accent}>
@@ -2050,7 +2072,12 @@ export function TeamRevealScene({ snapshot }: { snapshot: any }) {
                   />
                   <p className="truncate text-3xl font-black">{team.name}</p>
                 </div>
-                <div className="mt-5 flex flex-1 flex-col gap-2.5">
+                <div
+                  className="mt-5 grid min-h-0 flex-1 gap-2.5"
+                  style={{
+                    gridTemplateRows: `repeat(${maxMembers}, minmax(0, 1fr))`,
+                  }}
+                >
                   {members.map((member) => (
                     <RevealMemberRow
                       key={member.userId}
