@@ -67,16 +67,58 @@ const TEAM_RED = {
   captainId: "u5",
   initialBudget: 1000,
   remainingBudget: 90,
-  members: mkMembers([
-    ["탑솔러", 260],
-    ["갱킹장인", 200],
-    ["로밍메타", 150],
-    ["와드요정", 100],
-    ["막타학살", 200],
-  ], 5),
+  members: mkMembers(
+    [
+      ["탑솔러", 260],
+      ["갱킹장인", 200],
+      ["로밍메타", 150],
+      ["와드요정", 100],
+      ["막타학살", 200],
+    ],
+    5,
+  ),
 };
 
-const TEAM_COLORS = ["#3B82F6", "#EF4444", "#10B981", "#F59E0B", "#EC4899", "#06B6D4"];
+const TEAM_COLORS = [
+  "#3B82F6",
+  "#EF4444",
+  "#10B981",
+  "#F59E0B",
+  "#EC4899",
+  "#06B6D4",
+];
+
+// 실제 라이엇 닉네임 길이(최대 16자)를 감안해 짧은 것부터 긴 것까지 섞는다.
+// 잘림 여부를 프리뷰에서 바로 확인하기 위한 목업 값이다.
+const PREVIEW_NICKNAMES = [
+  "칼바람장인",
+  "미드차이",
+  "정글러킹",
+  "와드요정",
+  "막타학살자",
+  "탑솔러갓",
+  "로밍메타",
+  "갱킹장인",
+  "원딜에이스",
+  "서포터장인",
+  "한타의신",
+  "라인전귀신",
+  "닉네임긴사람임",
+];
+
+const PREVIEW_TEAM_TIERS = [
+  "CHALLENGER",
+  "GRANDMASTER",
+  "MASTER",
+  "DIAMOND",
+  "EMERALD",
+  "PLATINUM",
+  "GOLD",
+  "SILVER",
+  "BRONZE",
+  "IRON",
+  "UNRANKED",
+];
 
 const makePreviewTeam = (index: number) => ({
   id: `team${index + 1}`,
@@ -85,13 +127,18 @@ const makePreviewTeam = (index: number) => ({
   captainId: `m${index}-0`,
   initialBudget: 1000,
   remainingBudget: 1000 - index * 80,
-  members: Array.from({ length: index % 3 === 0 ? 4 : 3 }).map((_, slot) => ({
+  // 5v5 기준으로 5명을 꽉 채운다. 라인 정렬이 눈에 보이도록 assignedRole 을
+  // 일부러 뒤섞어 넣고(원딜→탑→서포→정글→미드), 티어도 팀마다 달라지게 한다.
+  members: Array.from({ length: 5 }).map((_, slot) => ({
     userId: `m${index}-${slot}`,
-    username: slot === 0 ? `${index + 1}팀장` : `선수${index + 1}-${slot}`,
+    username:
+      slot === 0
+        ? `${index + 1}팀장`
+        : PREVIEW_NICKNAMES[(index * 5 + slot) % PREVIEW_NICKNAMES.length],
     avatar: null,
-    assignedRole: null,
-    soldPrice: slot === 0 ? null : 100 + slot * 20,
-    tier: ["DIAMOND", "PLATINUM", "GOLD", "EMERALD"][slot % 4],
+    assignedRole: ["ADC", "TOP", "SUPPORT", "JUNGLE", "MID"][slot],
+    soldPrice: slot === 0 ? null : 220 - slot * 30,
+    tier: PREVIEW_TEAM_TIERS[(index * 5 + slot) % PREVIEW_TEAM_TIERS.length],
   })),
 });
 
@@ -107,14 +154,32 @@ const withPartialAssignedRoles = (team: any, roles: Array<string | null>) => ({
   })),
 });
 
-const WAITING_PARTICIPANTS = Array.from({ length: 30 }).map((_, index) => ({
-  userId: `p${index + 1}`,
-  username: ["다이아왕", "미드갓", "정글러킹", "서포터장인", "원딜에이스"][
-    index % 5
-  ],
-  isReady: index % 3 !== 1,
-  isCaptain: index === 0 || index === 5,
-}));
+// 프리뷰용 티어 샘플 — 언랭(UNRANKED)/미연동(null) 케이스도 섞어 표기를 확인한다.
+// 길이를 소수(7)로 둬 그리드 열 수(5·6·8)와 주기가 겹치지 않게 한다.
+const PREVIEW_TIERS: Array<[string | null, string | null, number | null]> = [
+  ["CHALLENGER", "I", 1204],
+  ["DIAMOND", "II", 45],
+  ["GOLD", "IV", 12],
+  ["UNRANKED", "", 0],
+  [null, null, null],
+  ["EMERALD", "III", 88],
+  ["SILVER", "III", 50],
+];
+
+const WAITING_PARTICIPANTS = Array.from({ length: 30 }).map((_, index) => {
+  const [tier, rank, lp] = PREVIEW_TIERS[index % PREVIEW_TIERS.length];
+  return {
+    userId: `p${index + 1}`,
+    username: ["다이아왕", "미드갓", "정글러킹", "서포터장인", "원딜에이스"][
+      index % 5
+    ],
+    isReady: index % 3 !== 1,
+    isCaptain: index === 0 || index === 5,
+    tier,
+    rank,
+    lp,
+  };
+});
 
 const common = (status: string) => ({
   room: {
@@ -156,7 +221,13 @@ const SNAP: Record<string, any> = {
   roleSelect: {
     ...common("ROLE_SELECTION"),
     teams: [
-      withPartialAssignedRoles(TEAM_BLUE, ["MID", "JUNGLE", null, "SUPPORT", null]),
+      withPartialAssignedRoles(TEAM_BLUE, [
+        "MID",
+        "JUNGLE",
+        null,
+        "SUPPORT",
+        null,
+      ]),
       withPartialAssignedRoles(TEAM_RED, ["TOP", null, "ADC", null, "SUPPORT"]),
     ],
   },
@@ -599,6 +670,21 @@ const SNAP: Record<string, any> = {
     ...common("DRAFT_COMPLETED"),
     room: { ...common("DRAFT_COMPLETED").room, teamMode: "AUTO_BALANCE" },
   },
+  teamReveal4: {
+    ...common("DRAFT_COMPLETED"),
+    room: { ...common("DRAFT_COMPLETED").room, teamMode: "AUTO_BALANCE" },
+    teams: MULTI_TEAMS.slice(0, 4),
+  },
+  teamReveal6: {
+    ...common("DRAFT_COMPLETED"),
+    room: { ...common("DRAFT_COMPLETED").room, teamMode: "AUTO_BALANCE" },
+    teams: MULTI_TEAMS,
+  },
+  teamReveal8: {
+    ...common("DRAFT_COMPLETED"),
+    room: { ...common("DRAFT_COMPLETED").room, teamMode: "AUTO_BALANCE" },
+    teams: [...MULTI_TEAMS, makePreviewTeam(6), makePreviewTeam(7)],
+  },
 };
 
 /** 스네이크 드래프트 프리뷰 — 3픽 진행된 중반 상태 */
@@ -694,7 +780,12 @@ const MOCK_AUCTION_MULTI: BroadcastAuctionData = {
   ],
   auctionState: {
     ...MOCK_AUCTION_LIVE.auctionState,
-    currentPlayer: { id: "mp1", username: "경매대상", tier: "EMERALD", position: "JUNGLE" },
+    currentPlayer: {
+      id: "mp1",
+      username: "경매대상",
+      tier: "EMERALD",
+      position: "JUNGLE",
+    },
     currentHighestBid: 460,
     currentHighestBidder: "team4",
     currentHighestBidderName: "4팀",
@@ -712,6 +803,9 @@ const SCENES: { key: string; label: string }[] = [
   { key: "auctionMulti", label: "경매(6팀)" },
   { key: "snakeDraft", label: "스네이크 드래프트" },
   { key: "teamReveal", label: "팀 확정" },
+  { key: "teamReveal4", label: "팀 확정(4팀)" },
+  { key: "teamReveal6", label: "팀 확정(6팀)" },
+  { key: "teamReveal8", label: "팀 확정(8팀)" },
   { key: "roleSelect", label: "역할선택" },
   { key: "bracketSingle4", label: "일반 대진표(4팀)" },
   { key: "bracketSingle", label: "일반 대진표(8팀)" },
@@ -759,6 +853,24 @@ const PREVIEW_TRANSITIONS: Record<
     label: "DRAFT PHASE",
     subLabel: "스네이크 드래프트",
     eyebrow: "NEXT PHASE",
+    tone: "phase",
+  },
+  teamReveal4: {
+    label: "TEAMS LOCKED",
+    subLabel: "팀 확정",
+    eyebrow: "ROSTER REVEAL",
+    tone: "phase",
+  },
+  teamReveal6: {
+    label: "TEAMS LOCKED",
+    subLabel: "팀 확정",
+    eyebrow: "ROSTER REVEAL",
+    tone: "phase",
+  },
+  teamReveal8: {
+    label: "TEAMS LOCKED",
+    subLabel: "팀 확정",
+    eyebrow: "ROSTER REVEAL",
     tone: "phase",
   },
   teamReveal: {
@@ -862,7 +974,7 @@ export default function BroadcastPreviewPage() {
       draft={{ ...MOCK_SNAKE_DRAFT, timerEnd: Date.now() + 23_000 }}
       snapshot={snapshot}
     />
-  ) : sceneKey === "teamReveal" ? (
+  ) : sceneKey.startsWith("teamReveal") ? (
     <TeamRevealScene snapshot={snapshot} />
   ) : sceneKey === "roleSelect" ? (
     <RoleSelectionScene snapshot={snapshot} />

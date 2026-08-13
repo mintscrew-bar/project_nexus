@@ -2,7 +2,11 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useRoleSelectionStore } from "@/stores/role-selection-store";
+import {
+  useRoleSelectionStore,
+  EXTENSION_SECONDS,
+  MAX_EXTENSIONS_PER_USER,
+} from "@/stores/role-selection-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { roomApi } from "@/lib/api-client";
 import { GameChatPanel } from "@/components/domain/GameChatPanel";
@@ -68,7 +72,7 @@ export default function RoleSelectionPage() {
     cancelRole,
     extendTimer,
     markCaptainReady,
-    hasExtended,
+    remainingExtensions,
     readyCaptainIds,
     readyCaptainsRequired,
     sessionAbortedAt,
@@ -138,7 +142,7 @@ export default function RoleSelectionPage() {
   const handleExtendTimer = async () => {
     try {
       await extendTimer(roomId);
-      addToast("시간이 15초 연장됐습니다.", "success");
+      addToast(`시간이 ${EXTENSION_SECONDS}초 연장됐습니다.`, "success");
     } catch (err: any) {
       addToast(err.message || "시간 연장에 실패했습니다.", "error");
     }
@@ -262,16 +266,25 @@ export default function RoleSelectionPage() {
             )}
             <button
               onClick={handleExtendTimer}
-              disabled={hasExtended || !isConnected}
+              disabled={remainingExtensions <= 0 || !isConnected}
+              title={`연장은 인당 ${MAX_EXTENSIONS_PER_USER}회까지 가능합니다.`}
               className={cn(
                 "flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border transition-colors",
-                hasExtended
+                remainingExtensions <= 0
                   ? "bg-bg-tertiary text-text-muted border-bg-tertiary cursor-not-allowed opacity-50"
                   : "bg-accent-primary/10 text-accent-primary border-accent-primary/30 hover:bg-accent-primary/20"
               )}
             >
               <TimerReset className="h-4 w-4" />
-              {hasExtended ? "연장 사용됨" : "+15초"}
+              {remainingExtensions <= 0
+                ? "연장 모두 사용"
+                : `+${EXTENSION_SECONDS}초`}
+              {/* 잔여 횟수는 남아있을 때만 노출해 버튼이 불필요하게 길어지지 않게 한다 */}
+              {remainingExtensions > 0 && (
+                <span className="text-[11px] font-semibold opacity-70">
+                  {remainingExtensions}/{MAX_EXTENSIONS_PER_USER}
+                </span>
+              )}
             </button>
             <div className="flex items-center gap-2 bg-bg-secondary border border-bg-tertiary rounded-lg px-4 py-2">
               <Clock className={cn("h-5 w-5", timerColor)} />

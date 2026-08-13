@@ -34,6 +34,73 @@ const broadcastBgCss = `
 }
 `;
 
+/**
+ * 티어별 강조색. globals.css의 --color-tier-* 와 동일한 값을 hex로 둔다.
+ * (오버레이는 인라인 색상 위주로 그려지므로 tailwind 클래스 대신 hex를 쓴다)
+ */
+const TIER_COLORS: Record<string, string> = {
+  challenger: "#f4c430",
+  grandmaster: "#ff4500",
+  master: "#9b30ff",
+  diamond: "#b9f2ff",
+  emerald: "#50c878",
+  platinum: "#40e0d0",
+  gold: "#ffd700",
+  silver: "#c0c0c0",
+  bronze: "#cd7f32",
+  iron: "#8b8b8b",
+};
+
+/** 랭크(I~IV)가 의미 없는 상위 티어 — 표기에서 제외한다. */
+const APEX_TIERS = new Set(["master", "grandmaster", "challenger"]);
+
+/** 미연동·언랭 표기용 무채색 — 실제 티어 색과 확실히 구분된다. */
+const NO_TIER_COLOR = "#7b7b83";
+
+interface TierBadge {
+  text: string;
+  color: string;
+  /** 언랭/미연동은 대응하는 엠블럼이 없어 null */
+  icon: string | null;
+  /** 실제 티어가 아님 — 카드 좌측 보더에는 색을 입히지 않는다 */
+  dim: boolean;
+}
+
+/**
+ * 티어/랭크/LP를 오버레이 표기 문자열과 색상으로 변환.
+ * 참가자마다 항상 한 줄을 반환해 카드 높이를 균일하게 유지한다.
+ * - tier === null  → 라이엇 계정 미연동
+ * - tier === "UNRANKED" → 연동했으나 배치 전/언랭
+ */
+function tierBadge(
+  tier?: string | null,
+  rank?: string | null,
+  lp?: number | null,
+): TierBadge {
+  const key = (tier ?? "").toLowerCase();
+  if (!key) {
+    return { text: "미연동", color: NO_TIER_COLOR, icon: null, dim: true };
+  }
+
+  const matched = Object.keys(TIER_COLORS).find((t) => key.includes(t));
+  if (!matched) {
+    // "UNRANKED" 및 예상 못 한 값 전부 여기로 떨어진다
+    return { text: "UNRANKED", color: NO_TIER_COLOR, icon: null, dim: true };
+  }
+
+  // 티어명은 축약 없이 전체로 표기한다 (GOLD, PLATINUM ...)
+  const parts = [matched.toUpperCase()];
+  if (rank && !APEX_TIERS.has(matched)) parts.push(rank);
+  if (typeof lp === "number") parts.push(`${lp}LP`);
+
+  return {
+    text: parts.join(" "),
+    color: TIER_COLORS[matched],
+    icon: `/icons/tiers/${matched}.png`,
+    dim: false,
+  };
+}
+
 const STATUS_LABELS: Record<string, string> = {
   WAITING: "대기 중",
   AUCTION: "경매 중",
@@ -244,6 +311,15 @@ export function WaitingScene({ snapshot }: { snapshot: any }) {
       : participants.length > 25
         ? "text-[9px]"
         : "text-[10px]";
+  // 티어 줄은 이름보다 한 단계 작게 — 40인 그리드에서도 두 줄이 안정적으로 들어간다
+  const tierText =
+    participants.length > 36
+      ? "text-[9px]"
+      : participants.length > 25
+        ? "text-[10px]"
+        : "text-[11px]";
+  const tierIconSize =
+    participants.length > 36 ? 11 : participants.length > 25 ? 13 : 15;
 
   return (
     <StageFrame accent={accent}>
@@ -289,34 +365,73 @@ export function WaitingScene({ snapshot }: { snapshot: any }) {
               </p>
             </div>
             <div className={`grid ${participantColumns} gap-2.5`}>
-              {participants.map((participant, index) => (
-                <div
-                  key={participant.userId ?? index}
-                  className={`flex min-w-0 items-center border-l border-white/12 bg-white/[0.035] ${participantCell}`}
-                >
-                  <span className="w-5 shrink-0 text-xs font-black text-white/28">
-                    {String(index + 1).padStart(2, "0")}
-                  </span>
-                  <span className="min-w-0 flex-1 truncate font-black text-white/84">
-                    {participant.username ?? "대기자"}
-                  </span>
-                  {participant.isCaptain && (
-                    <span
-                      className={`shrink-0 font-black uppercase ${badgeText}`}
-                      style={{ color: accent }}
-                    >
-                      CAP
+              {participants.map((participant, index) => {
+                const badge = tierBadge(
+                  participant.tier,
+                  participant.rank,
+                  participant.lp,
+                );
+                return (
+                  <div
+                    key={participant.userId ?? index}
+                    className={`flex min-w-0 items-center border-l border-white/12 bg-white/[0.035] ${participantCell}`}
+                    // 티어 색을 좌측 보더로도 흘려 한눈에 티어 분포가 보이게 한다
+                    // (언랭·미연동은 기본 보더 유지)
+                    style={
+                      badge.dim ? undefined : { borderLeftColor: badge.color }
+                    }
+                  >
+                    <span className="w-5 shrink-0 text-xs font-black text-white/28">
+                      {String(index + 1).padStart(2, "0")}
                     </span>
-                  )}
-                  {participant.isReady && !participant.isCaptain && (
-                    <span
-                      className={`shrink-0 font-black uppercase text-emerald-300 ${badgeText}`}
-                    >
-                      READY
+                    <span className="flex min-w-0 flex-1 flex-col leading-tight">
+                      <span className="truncate font-black text-white/84">
+                        {participant.username ?? "대기자"}
+                      </span>
+                      <span
+                        className={`flex min-w-0 items-center gap-1 font-black tracking-wide ${tierText}`}
+                        style={{ color: badge.color }}
+                      >
+                        {badge.icon ? (
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          <img
+                            src={badge.icon}
+                            alt=""
+                            width={tierIconSize}
+                            height={tierIconSize}
+                            className="shrink-0"
+                          />
+                        ) : (
+                          /* 엠블럼이 없는 경우에도 자리를 잡아 텍스트 시작점을 맞춘다 */
+                          <span
+                            className="shrink-0"
+                            style={{
+                              width: tierIconSize,
+                              height: tierIconSize,
+                            }}
+                          />
+                        )}
+                        <span className="truncate">{badge.text}</span>
+                      </span>
                     </span>
-                  )}
-                </div>
-              ))}
+                    {participant.isCaptain && (
+                      <span
+                        className={`shrink-0 font-black uppercase ${badgeText}`}
+                        style={{ color: accent }}
+                      >
+                        CAP
+                      </span>
+                    )}
+                    {participant.isReady && !participant.isCaptain && (
+                      <span
+                        className={`shrink-0 font-black uppercase text-emerald-300 ${badgeText}`}
+                      >
+                        READY
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
@@ -1850,38 +1965,58 @@ function RevealMemberRow({
   teamColor: string;
   isCaptain: boolean;
 }) {
+  // 대기화면과 같은 배지 규칙을 써서 방송 전체의 티어 표기를 통일한다
+  const badge = tierBadge(member.tier, member.rank, member.lp);
+
   return (
-    <div className="flex h-14 items-center justify-between border border-white/12 bg-white/[0.05] px-4">
-      <div className="flex min-w-0 items-center gap-3">
-        <div className="h-9 w-9 shrink-0 overflow-hidden rounded-full bg-white/10">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={member.avatar || "/images/placeholders/non-avatar-64.png"}
-            alt=""
-            className="h-9 w-9 rounded-full object-cover"
-          />
-        </div>
-        <p className="truncate text-xl font-bold text-white">
+    // 프레임리스: 테두리·배경 없이, 행 자체를 실하게 만들어 내용이 곧 블록이 되게 한다.
+    // 아바타를 키우고 이름/티어를 2행으로 쌓으면 행 하나가 덩어리로 읽혀서
+    // 세로를 꽉 채워도 흩어져 보이지 않는다.
+    <div className="flex h-full min-h-0 w-full items-center gap-4">
+      <div className="h-14 w-14 shrink-0 overflow-hidden rounded-full bg-white/10">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={member.avatar || "/images/placeholders/non-avatar-64.png"}
+          alt=""
+          className="h-14 w-14 rounded-full object-cover"
+        />
+      </div>
+      <div className="flex min-w-0 flex-1 flex-col justify-center leading-tight">
+        <p className="truncate text-2xl font-black text-white">
           {member.username}
           {isCaptain && (
             <span
-              className="ml-2 text-sm font-black"
+              className="ml-2 align-middle text-sm font-black"
               style={{ color: teamColor }}
             >
               C
             </span>
           )}
         </p>
+        <span
+          className="mt-0.5 flex items-center gap-1.5 text-sm font-black"
+          style={{ color: badge.color }}
+        >
+          {badge.icon && (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={badge.icon}
+              alt=""
+              width={18}
+              height={18}
+              className="shrink-0"
+            />
+          )}
+          <span className="truncate">{badge.text}</span>
+        </span>
       </div>
-      <div className="ml-3 flex flex-shrink-0 items-center gap-3">
+      <div className="flex flex-shrink-0 items-center">
         {member.soldPrice != null && (
-          <span className="text-base font-black" style={{ color: teamColor }}>
-            {member.soldPrice}P
+          <span className="text-2xl font-black" style={{ color: teamColor }}>
+            {member.soldPrice}
+            <span className="ml-0.5 text-sm opacity-60">P</span>
           </span>
         )}
-        <span className="text-base font-black text-white/50">
-          {member.tier ?? "–"}
-        </span>
       </div>
     </div>
   );
@@ -1896,6 +2031,23 @@ export function TeamRevealScene({ snapshot }: { snapshot: any }) {
   const accent = accentOf(snapshot);
   const teams: any[] = snapshot?.teams ?? [];
   const roomName = snapshot?.room?.name ?? "";
+  // 팀마다 인원이 달라도 행 높이를 맞추기 위해 최대 인원 기준으로 트랙을 잡는다.
+  // (1fr 트랙이라 남는 세로 공간 없이 패널을 꽉 채운다)
+  const maxMembers = Math.max(
+    1,
+    ...teams.map((team) => (team.members ?? []).length),
+  );
+
+  // 팀이 늘어나면 한 줄로는 패널 폭이 모자라 행 내용이 밖으로 넘친다.
+  // 4팀부터 2줄로 개행해 폭을 확보한다.
+  const columns =
+    teams.length <= 3 ? Math.max(teams.length, 1) : Math.ceil(teams.length / 2);
+  const rows = Math.ceil(teams.length / Math.max(columns, 1));
+
+  // 확보한 칸에 맞춰 패널을 통째로 축소한다. 개별 요소를 따로 줄이지 않고
+  // transform 으로 비율을 유지한 채 줄여야 여백·테두리까지 같이 작아진다.
+  // 기준(scale 1)은 3열 1행 — 이때 패널 폭이 원래 디자인 폭과 같다.
+  const panelScale = Math.min(1, (3 / columns) * (rows > 1 ? 0.62 : 1));
 
   return (
     <StageFrame accent={accent}>
@@ -1912,38 +2064,87 @@ export function TeamRevealScene({ snapshot }: { snapshot: any }) {
 
         <HudRule color={accent} />
 
-        <div className="flex min-h-0 flex-1 gap-6">
+        <div
+          className="grid min-h-0 flex-1 gap-x-14 gap-y-10"
+          style={{
+            gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
+            gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))`,
+          }}
+        >
           {teams.map((team) => {
             const teamColor = team.color || accent;
-            // 팀장을 맨 위로 정렬해 소개 순서를 고정한다
-            const members = [...(team.members ?? [])].sort((a, b) =>
-              a.userId === team.captainId
-                ? -1
-                : b.userId === team.captainId
-                  ? 1
-                  : 0,
-            );
+            // 소개 순서: 팀장 → 라인 순(탑·정글·미드·원딜·서포) → 역할 미정
+            // 기존에는 DB가 돌려주는 순서(경매 낙찰 순 등)를 그대로 써서
+            // orderBy 가 없는 만큼 조회마다 순서가 달라질 수 있었다.
+            const roleRank = (member: any) => {
+              const index = ROLE_ORDER.indexOf(member.assignedRole);
+              return index === -1 ? ROLE_ORDER.length : index;
+            };
+            const members = [...(team.members ?? [])].sort((a, b) => {
+              const aCaptain = a.userId === team.captainId ? 0 : 1;
+              const bCaptain = b.userId === team.captainId ? 0 : 1;
+              if (aCaptain !== bCaptain) return aCaptain - bCaptain;
+
+              const byRole = roleRank(a) - roleRank(b);
+              if (byRole !== 0) return byRole;
+
+              // 라인까지 같으면 닉네임으로 고정해 순서가 흔들리지 않게 한다
+              return String(a.username ?? "").localeCompare(
+                String(b.username ?? ""),
+                "ko",
+              );
+            });
             return (
-              <div
-                key={team.id}
-                className="flex min-w-0 flex-1 flex-col border border-white/12 bg-black/45 px-7 py-6"
-              >
-                <div className="flex items-center gap-3">
-                  <span
-                    className="h-8 w-1.5 flex-shrink-0"
-                    style={{ background: teamColor }}
-                  />
-                  <p className="truncate text-3xl font-black">{team.name}</p>
-                </div>
-                <div className="mt-5 flex flex-1 flex-col gap-2.5">
-                  {members.map((member) => (
-                    <RevealMemberRow
-                      key={member.userId}
-                      member={member}
-                      teamColor={teamColor}
-                      isCaptain={member.userId === team.captainId}
+              <div key={team.id} className="min-w-0 overflow-hidden">
+                {/* 축소 레이어: 실제 칸보다 1/scale 만큼 크게 그린 뒤 통째로 줄인다.
+                    폰트·아바타·여백·테두리가 같은 비율로 작아진다. */}
+                <div
+                  className="flex"
+                  style={{
+                    width: `${100 / panelScale}%`,
+                    height: `${100 / panelScale}%`,
+                    transform: `scale(${panelScale})`,
+                    transformOrigin: "top left",
+                  }}
+                >
+                  {/* 색 면·스파인이 로스터보다 넓으면 오른쪽이 비어 보인다.
+                      축소율과 무관하게 화면상 폭이 일정하도록 상한을 보정한다. */}
+                  <div
+                    className="relative flex w-full min-w-0 flex-col py-2 pl-6 pr-5"
+                    style={{ maxWidth: `${Math.round(520 / panelScale)}px` }}
+                  >
+                    {/* 팀 스파인: 블록의 세로 범위를 팀 컬러로 잡아준다.
+                        테두리 대신 이 한 줄이 "여기부터 여기까지 한 팀"을 말한다. */}
+                    <span
+                      className="absolute inset-y-0 left-0 w-[3px]"
+                      style={{
+                        background: `linear-gradient(180deg, ${teamColor}, ${teamColor}33)`,
+                      }}
                     />
-                  ))}
+                    {/* 팀명을 로스터와 같은 좌측 정렬선에 붙여 제목이 뜨지 않게 한다 */}
+                    <p
+                      className="truncate text-3xl font-black tracking-wide text-white"
+                      style={{ textShadow: `0 0 24px ${teamColor}55` }}
+                    >
+                      {team.name}
+                    </p>
+                    <div
+                      // 행이 덩어리로 읽히므로 1fr 로 세로를 꽉 채운다
+                      className="mt-4 grid min-h-0 flex-1 gap-3"
+                      style={{
+                        gridTemplateRows: `repeat(${maxMembers}, minmax(0, 1fr))`,
+                      }}
+                    >
+                      {members.map((member) => (
+                        <RevealMemberRow
+                          key={member.userId}
+                          member={member}
+                          teamColor={teamColor}
+                          isCaptain={member.userId === team.captainId}
+                        />
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
             );

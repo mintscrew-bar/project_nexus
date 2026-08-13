@@ -51,7 +51,11 @@ const config: Config = {
         },
       },
       fontFamily: {
+        // Pretendard 는 src/styles/pretendard.css 에서 자체 호스팅한다.
+        // 라틴 문자는 Inter(next/font, --font-inter)가 먼저 잡고,
+        // 한글은 Inter 에 글리프가 없어 자연스럽게 Pretendard 로 내려온다.
         sans: [
+          'var(--font-inter)',
           'Pretendard Variable',
           '-apple-system',
           'BlinkMacSystemFont',

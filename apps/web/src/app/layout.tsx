@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import "@/styles/pretendard.css";
 import "./globals.css";
 import { Providers } from "./providers";
 import { AppShell } from "@/components/layout/AppShell";
@@ -13,7 +14,9 @@ import {
   getSiteUrl,
 } from "@/lib/seo";
 
-const inter = Inter({ subsets: ["latin"] });
+// className 대신 variable 로 받는다. className 을 body 에 걸면 font-family 가
+// 통째로 Inter 로 고정돼 tailwind 의 fontFamily.sans(Pretendard 우선) 가 무시된다.
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const websiteJsonLd = {
   "@context": "https://schema.org",
   "@type": "WebSite",
@@ -125,7 +128,7 @@ export default function RootLayout({
         />
       </head>
       <body
-        className={`${inter.className} font-sans h-screen flex flex-col overflow-hidden`}
+        className={`${inter.variable} font-sans h-screen flex flex-col overflow-hidden`}
       >
         <Providers>
           <AppShell>{children}</AppShell>

@@ -422,6 +422,11 @@ export class BroadcastService {
               select: {
                 username: true,
                 avatar: true,
+                // 대기화면에서 티어/랭크/LP를 노출하기 위해 대표 라이엇 계정을 함께 조회한다.
+                riotAccounts: {
+                  where: { isPrimary: true },
+                  select: { tier: true, rank: true, lp: true },
+                },
               },
             },
           },
@@ -478,13 +483,20 @@ export class BroadcastService {
         participantCount: room.participants.length,
         maxParticipants: room.maxParticipants,
         hostName: room.host?.username ?? null,
-        participants: (room.participants ?? []).map((p: any) => ({
-          userId: p.userId,
-          username: p.user?.username ?? null,
-          avatar: p.user?.avatar ?? null,
-          isReady: p.isReady,
-          isCaptain: p.isCaptain,
-        })),
+        participants: (room.participants ?? []).map((p: any) => {
+          const riot = p.user?.riotAccounts?.[0] ?? null;
+          return {
+            userId: p.userId,
+            username: p.user?.username ?? null,
+            avatar: p.user?.avatar ?? null,
+            isReady: p.isReady,
+            isCaptain: p.isCaptain,
+            // 미연동/언랭이면 null — 오버레이에서 티어 배지를 숨긴다.
+            tier: riot?.tier ?? null,
+            rank: riot?.rank || null,
+            lp: typeof riot?.lp === "number" ? riot.lp : null,
+          };
+        }),
       },
       theme: this.clanTheme(clan),
       teams: (room.teams ?? []).map((t: any) => this.teamSummary(t)),

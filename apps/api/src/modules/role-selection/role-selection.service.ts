@@ -10,8 +10,9 @@ import { PrismaService } from "../prisma/prisma.service";
 import { Prisma, RoomStatus, Role } from "@nexus/database";
 import { MatchService } from "../match/match.service";
 
-const ROLE_SELECTION_TIME_MS = 60000; // 60초 기본 시간
-const EXTENSION_TIME_MS = 15000; // 인당 1회 15초 연장
+const ROLE_SELECTION_TIME_MS = 90000; // 90초 기본 시간
+const EXTENSION_TIME_MS = 15000; // 연장 1회당 15초
+const EXTENSION_MAX_PER_USER = 2; // 인당 최대 연장 횟수
 
 export interface RoleSelectionState {
   roomId: string;
@@ -30,8 +31,8 @@ export interface RoleSelectionCaptainReadyState {
 export class RoleSelectionService {
   private roleSelectionStates = new Map<string, RoleSelectionState>();
   private readyCaptains = new Map<string, Set<string>>();
-  // roomId → 연장을 사용한 userId Set
-  private extendedUsers = new Map<string, Set<string>>();
+  // roomId → (userId → 사용한 연장 횟수). 인당 EXTENSION_MAX_PER_USER 회까지 허용한다.
+  private extendedUsers = new Map<string, Map<string, number>>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -549,28 +550,48 @@ export class RoleSelectionService {
     return this.getCaptainReadyState(roomId);
   }
 
-  // 인당 1회 15초 연장. 반환값: 새 timerEnd (ms)
-  extendTimer(userId: string, roomId: string): number {
+  // 1회당 15초 연장, 인당 EXTENSION_MAX_PER_USER 회까지.
+  // 반환값: 새 timerEnd(ms)와 해당 유저의 사용/잔여 횟수
+  extendTimer(
+    userId: string,
+    roomId: string,
+  ): { timerEnd: number; usedExtensions: number; remainingExtensions: number } {
     const state = this.roleSelectionStates.get(roomId);
     if (!state) {
       throw new BadRequestException("역할 선택 세션이 없습니다.");
     }
 
     if (!this.extendedUsers.has(roomId)) {
-      this.extendedUsers.set(roomId, new Set());
+      this.extendedUsers.set(roomId, new Map());
     }
     const extended = this.extendedUsers.get(roomId)!;
-    if (extended.has(userId)) {
-      throw new BadRequestException("이미 연장 기회를 사용했습니다.");
+    const used = extended.get(userId) ?? 0;
+    if (used >= EXTENSION_MAX_PER_USER) {
+      throw new BadRequestException(
+        `연장은 인당 ${EXTENSION_MAX_PER_USER}회까지만 가능합니다.`,
+      );
     }
 
-    extended.add(userId);
+    const nextUsed = used + 1;
+    extended.set(userId, nextUsed);
     state.timerEnd += EXTENSION_TIME_MS;
-    return state.timerEnd;
+
+    return {
+      timerEnd: state.timerEnd,
+      usedExtensions: nextUsed,
+      remainingExtensions: EXTENSION_MAX_PER_USER - nextUsed,
+    };
   }
 
+  // 해당 유저가 이 방에서 남은 연장 횟수
+  getRemainingExtensions(userId: string, roomId: string): number {
+    const used = this.extendedUsers.get(roomId)?.get(userId) ?? 0;
+    return Math.max(0, EXTENSION_MAX_PER_USER - used);
+  }
+
+  // 연장 기회를 모두 소진했는지 여부
   hasExtended(userId: string, roomId: string): boolean {
-    return this.extendedUsers.get(roomId)?.has(userId) ?? false;
+    return this.getRemainingExtensions(userId, roomId) <= 0;
   }
 
   getTimeRemaining(roomId: string): number {
