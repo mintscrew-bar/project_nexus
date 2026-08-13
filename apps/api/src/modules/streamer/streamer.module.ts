@@ -8,10 +8,11 @@ import { LiveProviderRegistry } from "./providers/live-provider.registry";
 import { DiscordModule } from "../discord/discord.module";
 import { NotificationModule } from "../notification/notification.module";
 import { ChzzkOAuthService } from "./chzzk-oauth.service";
+import { ChzzkOAuthController } from "./chzzk-oauth.controller";
 
 @Module({
   imports: [DiscordModule, NotificationModule],
-  controllers: [StreamerController],
+  controllers: [StreamerController, ChzzkOAuthController],
   providers: [
     StreamerService,
     StreamerVerificationService,

@@ -13,8 +13,7 @@ describe("ChzzkOAuthService", () => {
         ({
           CHZZK_CLIENT_ID: "client-id",
           CHZZK_CLIENT_SECRET: "client-secret",
-          CHZZK_CALLBACK_URL:
-            "https://api.example.com/streamers/verify/chzzk/callback",
+          CHZZK_CALLBACK_URL: "https://api.example.com/api/auth/chzzk/callback",
           APP_URL: "https://example.com/",
         })[key],
     ),
@@ -45,7 +44,7 @@ describe("ChzzkOAuthService", () => {
     );
     expect(url.searchParams.get("clientId")).toBe("client-id");
     expect(url.searchParams.get("redirectUri")).toContain(
-      "/streamers/verify/chzzk/callback",
+      "/api/auth/chzzk/callback",
     );
     expect(redis.set).toHaveBeenCalledWith(
       expect.stringMatching(/^streamer:chzzk-oauth:/),
