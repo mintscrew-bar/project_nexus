@@ -58,6 +58,25 @@ const LUCIDE = {
 };
 const MANUAL_CIRCLE = { cx: 10, cy: 8, r: 5 };
 
+/**
+ * 버튼에 붙일 글리프. 모드 아이콘과 달리 배경 타일이 없다 —
+ * 회색 버튼 위에 얹히므로 타일이 있으면 버튼 안에 또 버튼이 있는 꼴이 된다.
+ */
+const BUTTON_GLYPHS: Record<string, string[]> = {
+  // log-in: 방(문)으로 들어가는 화살표
+  nx_btn_join: [
+    "M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4",
+    "M10 17l5-5-5-5",
+    "M15 12H3",
+  ],
+  // volume-2: 음성 채널
+  nx_btn_voice: [
+    "M11 5 6 9H2v6h4l5 4V5Z",
+    "M15.54 8.46a5 5 0 0 1 0 7.07",
+    "M19.07 4.93a10 10 0 0 1 0 14.14",
+  ],
+};
+
 /** 게이지 눈금 한 칸. 인라인 이모지는 서로 붙지 않아 '칸' 형태가 자연스럽다. */
 function pipSvg(on: boolean): string {
   // 이모지는 22px 남짓으로 축소되므로 여백을 넉넉히 주면 형체가 사라진다.
@@ -121,6 +140,22 @@ function modeSvg(kind: keyof typeof LUCIDE): string {
   </svg>`;
 }
 
+/** 버튼용 글리프 — 투명 배경 + 밝은 액센트 선. 회색 버튼 위에서 또렷하게 뜬다. */
+function glyphSvg(name: keyof typeof BUTTON_GLYPHS): string {
+  const paths = BUTTON_GLYPHS[name].map((d) => `<path d="${d}"/>`).join("");
+  const inner = 96;
+  const offset = (SIZE - inner) / 2;
+  const scale = inner / 24;
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${SIZE}" height="${SIZE}" viewBox="0 0 ${SIZE} ${SIZE}">
+    <g transform="translate(${offset} ${offset}) scale(${scale})"
+       fill="none" stroke="#A5B4FC" stroke-width="2.2"
+       stroke-linecap="round" stroke-linejoin="round">
+      ${paths}
+    </g>
+  </svg>`;
+}
+
 const ASSETS: Array<[string, string]> = [
   ["nx_pip_on", pipSvg(true)],
   ["nx_pip_off", pipSvg(false)],
@@ -128,6 +163,8 @@ const ASSETS: Array<[string, string]> = [
   ["nx_mode_snake", modeSvg("snake")],
   ["nx_mode_balance", modeSvg("balance")],
   ["nx_mode_manual", modeSvg("manual")],
+  ["nx_btn_join", glyphSvg("nx_btn_join")],
+  ["nx_btn_voice", glyphSvg("nx_btn_voice")],
 ];
 
 async function main() {

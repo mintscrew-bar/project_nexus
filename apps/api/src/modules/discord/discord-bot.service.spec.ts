@@ -125,6 +125,45 @@ describe("DiscordBotService room notification", () => {
     expect(text.match(/<:nx_pip_off:222>/g)).toHaveLength(8);
   });
 
+  it("이모지가 있으면 Link 버튼에 아이콘을 붙인다", () => {
+    const payload = service.buildRoomRecruitMessage(
+      "room-1",
+      "내전",
+      "host",
+      10,
+      "AUCTION",
+      false,
+      ["host"],
+      { guildId: "guild-1", channelId: "voice-1" },
+      {
+        nx_btn_join: "<:nx_btn_join:777>",
+        nx_btn_voice: "<:nx_btn_voice:888>",
+      },
+    );
+
+    const buttons = buttonsOf(payload.components[0].toJSON() as any) as any[];
+    const join = buttons.find((b) => b.label === "룸 참가");
+    const voice = buttons.find((b) => b.label === "음성채널 참가");
+    expect(join.emoji).toEqual({ id: "777", name: "nx_btn_join" });
+    expect(voice.emoji).toEqual({ id: "888", name: "nx_btn_voice" });
+  });
+
+  it("이모지가 없으면 버튼은 라벨만 남는다", () => {
+    const payload = service.buildRoomRecruitMessage(
+      "room-1",
+      "내전",
+      "host",
+      10,
+      "AUCTION",
+      false,
+      ["host"],
+      { guildId: "guild-1", channelId: "voice-1" },
+    );
+
+    const buttons = buttonsOf(payload.components[0].toJSON() as any) as any[];
+    expect(buttons.every((b) => b.emoji === undefined)).toBe(true);
+  });
+
   it("이모지가 없으면 유니코드 게이지로 폴백한다", () => {
     const payload = service.buildRoomRecruitMessage(
       "room-1",

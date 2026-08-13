@@ -35,7 +35,7 @@ import {
 import { PrismaService } from "../prisma/prisma.service";
 import { RedisService } from "../redis/redis.service";
 import type { DiscordVoiceService } from "./discord-voice.service";
-import { DiscordEmojiService } from "./discord-emoji.service";
+import { DiscordEmojiService, parseEmojiRef } from "./discord-emoji.service";
 import type { EmojiMap, RecruitEmojiName } from "./discord-emoji.service";
 
 // 티어 이모지 맵핑
@@ -2396,6 +2396,13 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
               .join("\n")
           : participants.map((name) => name.slice(0, 24)).join(" · ");
 
+    // Link 버튼은 Discord 사양상 색을 바꿀 수 없어(항상 회색) 아이콘으로 살린다.
+    // 이모지가 등록돼 있지 않으면 라벨만 있는 기본 버튼으로 둔다.
+    const withEmoji = (button: ButtonBuilder, mention?: string) => {
+      const ref = parseEmojiRef(mention);
+      return ref ? button.setEmoji(ref) : button;
+    };
+
     // ─── 컨테이너 ───
     const container = new ContainerBuilder().setAccentColor(
       isFull ? 0x22c55e : 0x667eea,
@@ -2412,12 +2419,13 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
         .addTextDisplayComponents(
           new TextDisplayBuilder().setContent(headerLines.join("\n")),
         )
-        .setButtonAccessory(
+        .setButtonAccessory(withEmoji(
           new ButtonBuilder()
             .setLabel("룸 참가")
             .setStyle(ButtonStyle.Link)
             .setURL(lobbyUrl),
-        ),
+          emojis.nx_btn_join,
+        )),
     );
 
     container.addSeparatorComponents(
@@ -2453,12 +2461,15 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
       );
       container.addActionRowComponents(
         new ActionRowBuilder<ButtonBuilder>().addComponents(
-          new ButtonBuilder()
-            .setLabel("음성채널 참가")
-            .setStyle(ButtonStyle.Link)
-            .setURL(
-              `https://discord.com/channels/${voiceChannel.guildId}/${voiceChannel.channelId}`,
-            ),
+          withEmoji(
+            new ButtonBuilder()
+              .setLabel("음성채널 참가")
+              .setStyle(ButtonStyle.Link)
+              .setURL(
+                `https://discord.com/channels/${voiceChannel.guildId}/${voiceChannel.channelId}`,
+              ),
+            emojis.nx_btn_voice,
+          ),
         ),
       );
     }

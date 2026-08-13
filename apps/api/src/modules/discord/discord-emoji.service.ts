@@ -22,12 +22,26 @@ export const RECRUIT_EMOJI_NAMES = [
   "nx_mode_snake",
   "nx_mode_balance",
   "nx_mode_manual",
+  "nx_btn_join",
+  "nx_btn_voice",
 ] as const;
 
 export type RecruitEmojiName = (typeof RECRUIT_EMOJI_NAMES)[number];
 
 /** 이모지 이름 → `<:name:id>` 멘션. 미등록 이름은 키 자체가 없다. */
 export type EmojiMap = Partial<Record<RecruitEmojiName, string>>;
+
+/**
+ * 멘션 문자열에서 버튼용 식별자를 뽑는다.
+ * 본문에는 `<:name:id>` 를 그대로 쓰지만 ButtonBuilder.setEmoji 는
+ * { id, name } 객체를 요구해서 한 번 풀어줘야 한다.
+ */
+export function parseEmojiRef(
+  mention?: string,
+): { id: string; name: string } | null {
+  const matched = mention?.match(/^<:(\w+):(\d+)>$/);
+  return matched ? { name: matched[1], id: matched[2] } : null;
+}
 
 const ASSET_DIR = path.join(__dirname, "assets", "emoji");
 
