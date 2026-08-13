@@ -62,18 +62,23 @@ function tierBadge(
   tier?: string | null,
   rank?: string | null,
   lp?: number | null,
-): { text: string; color: string } | null {
+): { text: string; color: string; icon: string } | null {
   const key = (tier ?? "").toLowerCase();
   if (!key || key === "unranked") return null;
 
   const matched = Object.keys(TIER_COLORS).find((t) => key.includes(t));
   if (!matched) return null;
 
-  const parts = [matched.slice(0, 3).toUpperCase()];
+  // 티어명은 축약 없이 전체로 표기한다 (GOLD, PLATINUM ...)
+  const parts = [matched.toUpperCase()];
   if (rank && !APEX_TIERS.has(matched)) parts.push(rank);
   if (typeof lp === "number") parts.push(`${lp}LP`);
 
-  return { text: parts.join(" "), color: TIER_COLORS[matched] };
+  return {
+    text: parts.join(" "),
+    color: TIER_COLORS[matched],
+    icon: `/icons/tiers/${matched}.png`,
+  };
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -293,6 +298,8 @@ export function WaitingScene({ snapshot }: { snapshot: any }) {
       : participants.length > 25
         ? "text-[10px]"
         : "text-[11px]";
+  const tierIconSize =
+    participants.length > 36 ? 11 : participants.length > 25 ? 13 : 15;
 
   return (
     <StageFrame accent={accent}>
@@ -362,10 +369,18 @@ export function WaitingScene({ snapshot }: { snapshot: any }) {
                       </span>
                       {badge && (
                         <span
-                          className={`truncate font-black tracking-wide ${tierText}`}
+                          className={`flex min-w-0 items-center gap-1 font-black tracking-wide ${tierText}`}
                           style={{ color: badge.color }}
                         >
-                          {badge.text}
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={badge.icon}
+                            alt=""
+                            width={tierIconSize}
+                            height={tierIconSize}
+                            className="shrink-0"
+                          />
+                          <span className="truncate">{badge.text}</span>
                         </span>
                       )}
                     </span>
