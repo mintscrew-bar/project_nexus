@@ -10,6 +10,7 @@ import { LoadingSpinner, Badge, Button, Card, CardContent, ConfirmModal, Avatar 
 import { useToast } from "@/components/ui/Toast";
 import { GameChatPanel } from "@/components/domain/GameChatPanel";
 import { cn } from "@/lib/utils";
+import { getTierIcon } from "@/lib/tier-icon";
 import { Users, Hand, Check, Coins, ScrollText, Gavel, MessageSquare, Maximize2, SkipForward } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 
@@ -89,7 +90,7 @@ function PlayersList({
             <div className="grid grid-cols-2 gap-1 p-0.5">
               {players.map((player, idx) => {
                 const isCurrentTarget = currentPlayerId === player.id;
-                const tierIcon = player.tier ? `/icons/tiers/${player.tier.toLowerCase()}.png` : null;
+                const tierIcon = getTierIcon(player.tier);
                 return (
                   <div
                     key={player.id}
@@ -367,7 +368,7 @@ function TeamSummaryPanel({
                 }
                 const isCaptain = member.id === team.captainId;
                 const tier = String(member.tier ?? "").toUpperCase();
-                const tierIcon = tier && tier !== "UNRANKED" ? `/icons/tiers/${tier.toLowerCase()}.png` : null;
+                const tierIcon = getTierIcon(tier);
                 return (
                   <div
                     key={member.id}

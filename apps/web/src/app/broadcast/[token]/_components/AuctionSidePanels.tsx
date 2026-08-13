@@ -4,6 +4,7 @@ import { Coins, ScrollText, Users } from "lucide-react";
 import { Card } from "@/components/ui";
 import { Avatar } from "@/components/ui";
 import { cn } from "@/lib/utils";
+import { getTierIcon } from "@/lib/tier-icon";
 
 /**
  * 방송용 경매 사이드 패널(read-only) — 기존 경매 페이지의 팀 요약/남은 매물
@@ -37,10 +38,7 @@ function RoleIcon({ role, dim }: { role?: string | null; dim?: boolean }) {
   );
 }
 
-const tierIconUrl = (tier?: string) => {
-  const t = String(tier ?? "").toUpperCase();
-  return t && t !== "UNRANKED" ? `/icons/tiers/${t.toLowerCase()}.png` : null;
-};
+const tierIconUrl = getTierIcon;
 
 const userIdOf = (value: any) => value?.id ?? value?.userId;
 

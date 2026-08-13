@@ -3,19 +3,7 @@
 import React from 'react';
 import { Badge } from '@/components/ui';
 import { cn, getTierBadgeVariant } from '@/lib/utils';
-
-const TIER_ICON: Record<string, string> = {
-  IRON:        '/icons/tiers/iron.png',
-  BRONZE:      '/icons/tiers/bronze.png',
-  SILVER:      '/icons/tiers/silver.png',
-  GOLD:        '/icons/tiers/gold.png',
-  PLATINUM:    '/icons/tiers/platinum.png',
-  EMERALD:     '/icons/tiers/emerald.png',
-  DIAMOND:     '/icons/tiers/diamond.png',
-  MASTER:      '/icons/tiers/master.png',
-  GRANDMASTER: '/icons/tiers/grandmaster.png',
-  CHALLENGER:  '/icons/tiers/challenger.png',
-};
+import { getTierIcon } from '@/lib/tier-icon';
 
 const ICON_SIZE: Record<string, number> = { sm: 16, md: 20, lg: 26 };
 
@@ -37,7 +25,7 @@ export const TierBadge: React.FC<TierBadgeProps> = ({
   const variant = getTierBadgeVariant(tier) as any;
   const displayTier = tier ?? 'UNRANKED';
   const displayText = rank ? `${displayTier} ${rank}` : displayTier;
-  const iconUrl = TIER_ICON[displayTier.toUpperCase()];
+  const iconUrl = getTierIcon(displayTier);
   const iconPx = ICON_SIZE[size] ?? 20;
 
   return (

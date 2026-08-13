@@ -1,5 +1,7 @@
 // Shared utilities and types for match pages
 
+import { getTierIcon } from "@/lib/tier-icon";
+
 // ─── Types ───────────────────────────────────────────
 
 export interface SummonerData {
@@ -183,8 +185,7 @@ export function getProfileIconUrl(iconId: number, version: string): string {
 }
 
 export function getTierImage(tier?: string): string | null {
-  if (!tier) return null;
-  return `/icons/tiers/${tier.toLowerCase()}.png`;
+  return getTierIcon(tier);
 }
 
 export function getItemIcon(itemId: number): string {

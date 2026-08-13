@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Avatar } from "@/components/ui";
 import { cn } from "@/lib/utils";
+import { getTierIcon } from "@/lib/tier-icon";
 import type { BroadcastAuctionData } from "../_live/useBroadcastAuction";
 
 /**
@@ -60,10 +61,7 @@ const DEFAULT_AVATAR_SRC = AVATAR_PLACEHOLDER.lg;
 
 const userIdOf = (value: any) => value?.id ?? value?.userId;
 
-const tierIconUrl = (tier?: string | null) => {
-  const t = String(tier ?? "").toUpperCase();
-  return t && t !== "UNRANKED" ? `/icons/tiers/${t.toLowerCase()}.png` : null;
-};
+const tierIconUrl = getTierIcon;
 
 const roleLabel = (role?: string | null) => {
   if (!role) return null;

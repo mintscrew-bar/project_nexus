@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { getTierIcon } from "@/lib/tier-icon";
 
 /**
  * Nexus Broadcast HUD scenes.
@@ -96,7 +97,7 @@ function tierBadge(
   return {
     text: parts.join(" "),
     color: TIER_COLORS[matched],
-    icon: `/icons/tiers/${matched}.png`,
+    icon: getTierIcon(matched),
     dim: false,
   };
 }
