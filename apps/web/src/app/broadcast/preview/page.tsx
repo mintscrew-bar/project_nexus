@@ -67,16 +67,26 @@ const TEAM_RED = {
   captainId: "u5",
   initialBudget: 1000,
   remainingBudget: 90,
-  members: mkMembers([
-    ["탑솔러", 260],
-    ["갱킹장인", 200],
-    ["로밍메타", 150],
-    ["와드요정", 100],
-    ["막타학살", 200],
-  ], 5),
+  members: mkMembers(
+    [
+      ["탑솔러", 260],
+      ["갱킹장인", 200],
+      ["로밍메타", 150],
+      ["와드요정", 100],
+      ["막타학살", 200],
+    ],
+    5,
+  ),
 };
 
-const TEAM_COLORS = ["#3B82F6", "#EF4444", "#10B981", "#F59E0B", "#EC4899", "#06B6D4"];
+const TEAM_COLORS = [
+  "#3B82F6",
+  "#EF4444",
+  "#10B981",
+  "#F59E0B",
+  "#EC4899",
+  "#06B6D4",
+];
 
 const makePreviewTeam = (index: number) => ({
   id: `team${index + 1}`,
@@ -174,7 +184,13 @@ const SNAP: Record<string, any> = {
   roleSelect: {
     ...common("ROLE_SELECTION"),
     teams: [
-      withPartialAssignedRoles(TEAM_BLUE, ["MID", "JUNGLE", null, "SUPPORT", null]),
+      withPartialAssignedRoles(TEAM_BLUE, [
+        "MID",
+        "JUNGLE",
+        null,
+        "SUPPORT",
+        null,
+      ]),
       withPartialAssignedRoles(TEAM_RED, ["TOP", null, "ADC", null, "SUPPORT"]),
     ],
   },
@@ -617,6 +633,21 @@ const SNAP: Record<string, any> = {
     ...common("DRAFT_COMPLETED"),
     room: { ...common("DRAFT_COMPLETED").room, teamMode: "AUTO_BALANCE" },
   },
+  teamReveal4: {
+    ...common("DRAFT_COMPLETED"),
+    room: { ...common("DRAFT_COMPLETED").room, teamMode: "AUTO_BALANCE" },
+    teams: MULTI_TEAMS.slice(0, 4),
+  },
+  teamReveal6: {
+    ...common("DRAFT_COMPLETED"),
+    room: { ...common("DRAFT_COMPLETED").room, teamMode: "AUTO_BALANCE" },
+    teams: MULTI_TEAMS,
+  },
+  teamReveal8: {
+    ...common("DRAFT_COMPLETED"),
+    room: { ...common("DRAFT_COMPLETED").room, teamMode: "AUTO_BALANCE" },
+    teams: [...MULTI_TEAMS, makePreviewTeam(6), makePreviewTeam(7)],
+  },
 };
 
 /** 스네이크 드래프트 프리뷰 — 3픽 진행된 중반 상태 */
@@ -712,7 +743,12 @@ const MOCK_AUCTION_MULTI: BroadcastAuctionData = {
   ],
   auctionState: {
     ...MOCK_AUCTION_LIVE.auctionState,
-    currentPlayer: { id: "mp1", username: "경매대상", tier: "EMERALD", position: "JUNGLE" },
+    currentPlayer: {
+      id: "mp1",
+      username: "경매대상",
+      tier: "EMERALD",
+      position: "JUNGLE",
+    },
     currentHighestBid: 460,
     currentHighestBidder: "team4",
     currentHighestBidderName: "4팀",
@@ -730,6 +766,9 @@ const SCENES: { key: string; label: string }[] = [
   { key: "auctionMulti", label: "경매(6팀)" },
   { key: "snakeDraft", label: "스네이크 드래프트" },
   { key: "teamReveal", label: "팀 확정" },
+  { key: "teamReveal4", label: "팀 확정(4팀)" },
+  { key: "teamReveal6", label: "팀 확정(6팀)" },
+  { key: "teamReveal8", label: "팀 확정(8팀)" },
   { key: "roleSelect", label: "역할선택" },
   { key: "bracketSingle4", label: "일반 대진표(4팀)" },
   { key: "bracketSingle", label: "일반 대진표(8팀)" },
@@ -777,6 +816,24 @@ const PREVIEW_TRANSITIONS: Record<
     label: "DRAFT PHASE",
     subLabel: "스네이크 드래프트",
     eyebrow: "NEXT PHASE",
+    tone: "phase",
+  },
+  teamReveal4: {
+    label: "TEAMS LOCKED",
+    subLabel: "팀 확정",
+    eyebrow: "ROSTER REVEAL",
+    tone: "phase",
+  },
+  teamReveal6: {
+    label: "TEAMS LOCKED",
+    subLabel: "팀 확정",
+    eyebrow: "ROSTER REVEAL",
+    tone: "phase",
+  },
+  teamReveal8: {
+    label: "TEAMS LOCKED",
+    subLabel: "팀 확정",
+    eyebrow: "ROSTER REVEAL",
     tone: "phase",
   },
   teamReveal: {
@@ -880,7 +937,7 @@ export default function BroadcastPreviewPage() {
       draft={{ ...MOCK_SNAKE_DRAFT, timerEnd: Date.now() + 23_000 }}
       snapshot={snapshot}
     />
-  ) : sceneKey === "teamReveal" ? (
+  ) : sceneKey.startsWith("teamReveal") ? (
     <TeamRevealScene snapshot={snapshot} />
   ) : sceneKey === "roleSelect" ? (
     <RoleSelectionScene snapshot={snapshot} />

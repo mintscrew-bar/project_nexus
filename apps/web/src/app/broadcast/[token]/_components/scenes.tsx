@@ -2034,6 +2034,17 @@ export function TeamRevealScene({ snapshot }: { snapshot: any }) {
     ...teams.map((team) => (team.members ?? []).length),
   );
 
+  // 팀이 늘어나면 한 줄로는 패널 폭이 모자라 행 내용이 밖으로 넘친다.
+  // 4팀부터 2줄로 개행해 폭을 확보한다.
+  const columns =
+    teams.length <= 3 ? Math.max(teams.length, 1) : Math.ceil(teams.length / 2);
+  const rows = Math.ceil(teams.length / Math.max(columns, 1));
+
+  // 확보한 칸에 맞춰 패널을 통째로 축소한다. 개별 요소를 따로 줄이지 않고
+  // transform 으로 비율을 유지한 채 줄여야 여백·테두리까지 같이 작아진다.
+  // 기준(scale 1)은 3열 1행 — 이때 패널 폭이 원래 디자인 폭과 같다.
+  const panelScale = Math.min(1, (3 / columns) * (rows > 1 ? 0.62 : 1));
+
   return (
     <StageFrame accent={accent}>
       <div className="flex h-full w-full flex-col px-24 pb-36 pt-16">
@@ -2049,7 +2060,13 @@ export function TeamRevealScene({ snapshot }: { snapshot: any }) {
 
         <HudRule color={accent} />
 
-        <div className="flex min-h-0 flex-1 gap-6">
+        <div
+          className="grid min-h-0 flex-1 gap-6"
+          style={{
+            gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
+            gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))`,
+          }}
+        >
           {teams.map((team) => {
             const teamColor = team.color || accent;
             // 소개 순서: 팀장 → 라인 순(탑·정글·미드·원딜·서포) → 역할 미정
@@ -2076,29 +2093,41 @@ export function TeamRevealScene({ snapshot }: { snapshot: any }) {
             return (
               <div
                 key={team.id}
-                className="flex min-w-0 flex-1 flex-col border border-white/12 bg-black/45 px-7 py-6"
+                className="min-w-0 overflow-hidden border border-white/12 bg-black/45"
               >
-                <div className="flex items-center gap-3">
-                  <span
-                    className="h-8 w-1.5 flex-shrink-0"
-                    style={{ background: teamColor }}
-                  />
-                  <p className="truncate text-3xl font-black">{team.name}</p>
-                </div>
+                {/* 축소 레이어: 실제 칸보다 1/scale 만큼 크게 그린 뒤 통째로 줄인다.
+                    폰트·아바타·여백·테두리가 같은 비율로 작아진다. */}
                 <div
-                  className="mt-5 grid min-h-0 flex-1 gap-2.5"
+                  className="flex flex-col px-7 py-6"
                   style={{
-                    gridTemplateRows: `repeat(${maxMembers}, minmax(0, 1fr))`,
+                    width: `${100 / panelScale}%`,
+                    height: `${100 / panelScale}%`,
+                    transform: `scale(${panelScale})`,
+                    transformOrigin: "top left",
                   }}
                 >
-                  {members.map((member) => (
-                    <RevealMemberRow
-                      key={member.userId}
-                      member={member}
-                      teamColor={teamColor}
-                      isCaptain={member.userId === team.captainId}
+                  <div className="flex items-center gap-3">
+                    <span
+                      className="h-8 w-1.5 flex-shrink-0"
+                      style={{ background: teamColor }}
                     />
-                  ))}
+                    <p className="truncate text-3xl font-black">{team.name}</p>
+                  </div>
+                  <div
+                    className="mt-5 grid min-h-0 flex-1 gap-2.5"
+                    style={{
+                      gridTemplateRows: `repeat(${maxMembers}, minmax(0, 1fr))`,
+                    }}
+                  >
+                    {members.map((member) => (
+                      <RevealMemberRow
+                        key={member.userId}
+                        member={member}
+                        teamColor={teamColor}
+                        isCaptain={member.userId === team.captainId}
+                      />
+                    ))}
+                  </div>
                 </div>
               </div>
             );
