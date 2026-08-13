@@ -423,8 +423,18 @@ export class BroadcastService {
                 username: true,
                 avatar: true,
                 // 대기화면에서 티어/랭크/LP를 노출하기 위해 대표 라이엇 계정을 함께 조회한다.
+                // isPrimary 에 유니크 제약이 없어 where 로만 거르면 결과가 비결정적이고,
+                // primary 를 지정하지 않은 유저는 계정이 있어도 '미연동'으로 보인다.
+                // → 전체를 정렬해 첫 건만 대표로 쓴다. (primary → 인증 완료 → 먼저 등록된 순)
                 riotAccounts: {
-                  where: { isPrimary: true },
+                  orderBy: [
+                    { isPrimary: "desc" },
+                    // Postgres 는 DESC 시 NULL 이 먼저 오므로 미인증 계정이
+                    // 앞으로 튀지 않게 nulls: last 를 명시한다.
+                    { verifiedAt: { sort: "desc", nulls: "last" } },
+                    { createdAt: "asc" },
+                  ],
+                  take: 1,
                   select: { tier: true, rank: true, lp: true },
                 },
               },
