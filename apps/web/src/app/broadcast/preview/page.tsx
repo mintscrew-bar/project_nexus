@@ -107,7 +107,8 @@ const withPartialAssignedRoles = (team: any, roles: Array<string | null>) => ({
   })),
 });
 
-// 프리뷰용 티어 샘플 — 언랭/미연동(null) 케이스도 섞어 배지 숨김 동작을 확인한다
+// 프리뷰용 티어 샘플 — 언랭(UNRANKED)/미연동(null) 케이스도 섞어 표기를 확인한다.
+// 길이를 소수(7)로 둬 그리드 열 수(5·6·8)와 주기가 겹치지 않게 한다.
 const PREVIEW_TIERS: Array<[string | null, string | null, number | null]> = [
   ["CHALLENGER", "I", 1204],
   ["DIAMOND", "II", 45],
@@ -115,6 +116,7 @@ const PREVIEW_TIERS: Array<[string | null, string | null, number | null]> = [
   ["UNRANKED", "", 0],
   [null, null, null],
   ["EMERALD", "III", 88],
+  ["SILVER", "III", 50],
 ];
 
 const WAITING_PARTICIPANTS = Array.from({ length: 30 }).map((_, index) => {

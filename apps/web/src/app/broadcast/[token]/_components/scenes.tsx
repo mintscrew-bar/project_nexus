@@ -54,20 +54,39 @@ const TIER_COLORS: Record<string, string> = {
 /** 랭크(I~IV)가 의미 없는 상위 티어 — 표기에서 제외한다. */
 const APEX_TIERS = new Set(["master", "grandmaster", "challenger"]);
 
+/** 미연동·언랭 표기용 무채색 — 실제 티어 색과 확실히 구분된다. */
+const NO_TIER_COLOR = "#7b7b83";
+
+interface TierBadge {
+  text: string;
+  color: string;
+  /** 언랭/미연동은 대응하는 엠블럼이 없어 null */
+  icon: string | null;
+  /** 실제 티어가 아님 — 카드 좌측 보더에는 색을 입히지 않는다 */
+  dim: boolean;
+}
+
 /**
  * 티어/랭크/LP를 오버레이 표기 문자열과 색상으로 변환.
- * 미연동·언랭이면 null을 돌려주고 호출부에서 배지를 숨긴다.
+ * 참가자마다 항상 한 줄을 반환해 카드 높이를 균일하게 유지한다.
+ * - tier === null  → 라이엇 계정 미연동
+ * - tier === "UNRANKED" → 연동했으나 배치 전/언랭
  */
 function tierBadge(
   tier?: string | null,
   rank?: string | null,
   lp?: number | null,
-): { text: string; color: string; icon: string } | null {
+): TierBadge {
   const key = (tier ?? "").toLowerCase();
-  if (!key || key === "unranked") return null;
+  if (!key) {
+    return { text: "미연동", color: NO_TIER_COLOR, icon: null, dim: true };
+  }
 
   const matched = Object.keys(TIER_COLORS).find((t) => key.includes(t));
-  if (!matched) return null;
+  if (!matched) {
+    // "UNRANKED" 및 예상 못 한 값 전부 여기로 떨어진다
+    return { text: "UNRANKED", color: NO_TIER_COLOR, icon: null, dim: true };
+  }
 
   // 티어명은 축약 없이 전체로 표기한다 (GOLD, PLATINUM ...)
   const parts = [matched.toUpperCase()];
@@ -78,6 +97,7 @@ function tierBadge(
     text: parts.join(" "),
     color: TIER_COLORS[matched],
     icon: `/icons/tiers/${matched}.png`,
+    dim: false,
   };
 }
 
@@ -356,8 +376,9 @@ export function WaitingScene({ snapshot }: { snapshot: any }) {
                     key={participant.userId ?? index}
                     className={`flex min-w-0 items-center border-l border-white/12 bg-white/[0.035] ${participantCell}`}
                     // 티어 색을 좌측 보더로도 흘려 한눈에 티어 분포가 보이게 한다
+                    // (언랭·미연동은 기본 보더 유지)
                     style={
-                      badge ? { borderLeftColor: badge.color } : undefined
+                      badge.dim ? undefined : { borderLeftColor: badge.color }
                     }
                   >
                     <span className="w-5 shrink-0 text-xs font-black text-white/28">
@@ -367,12 +388,12 @@ export function WaitingScene({ snapshot }: { snapshot: any }) {
                       <span className="truncate font-black text-white/84">
                         {participant.username ?? "대기자"}
                       </span>
-                      {badge && (
-                        <span
-                          className={`flex min-w-0 items-center gap-1 font-black tracking-wide ${tierText}`}
-                          style={{ color: badge.color }}
-                        >
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <span
+                        className={`flex min-w-0 items-center gap-1 font-black tracking-wide ${tierText}`}
+                        style={{ color: badge.color }}
+                      >
+                        {badge.icon ? (
+                          /* eslint-disable-next-line @next/next/no-img-element */
                           <img
                             src={badge.icon}
                             alt=""
@@ -380,9 +401,18 @@ export function WaitingScene({ snapshot }: { snapshot: any }) {
                             height={tierIconSize}
                             className="shrink-0"
                           />
-                          <span className="truncate">{badge.text}</span>
-                        </span>
-                      )}
+                        ) : (
+                          /* 엠블럼이 없는 경우에도 자리를 잡아 텍스트 시작점을 맞춘다 */
+                          <span
+                            className="shrink-0"
+                            style={{
+                              width: tierIconSize,
+                              height: tierIconSize,
+                            }}
+                          />
+                        )}
+                        <span className="truncate">{badge.text}</span>
+                      </span>
                     </span>
                     {participant.isCaptain && (
                       <span
