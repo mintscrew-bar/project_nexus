@@ -40,14 +40,23 @@ describe("DiscordBotService room notification", () => {
       { guildId: "guild-1", channelId: "voice-1" },
     );
 
-    const fields = embed.toJSON().fields ?? [];
-    expect(fields.find((field) => field.name === "인원")?.value).toBe("2 / 10");
-    expect(fields.find((field) => field.name === "참가자")?.value).toContain(
-      "host",
-    );
-    expect(fields.find((field) => field.name === "참가자")?.value).toContain(
-      "player",
-    );
+    const json = embed.toJSON();
+    const fields = json.fields ?? [];
+
+    // 방 이름이 제목으로 올라가고 모드/방장은 요약 줄로 내려간다.
+    expect(json.title).toBe("금요일 내전");
+    expect(json.url).toBe("https://labs-nexus.com/tournaments/room-1/lobby");
+    expect(json.description).toContain("스네이크 드래프트");
+    expect(json.description).toContain("host");
+
+    const status = fields.find((field) => field.name === "모집 현황")?.value;
+    expect(status).toContain("**2** / 10");
+    expect(status).toContain("8자리 남음");
+    expect(status).toMatch(/[▰▱]{10}/);
+
+    const roster = fields.find((field) => field.name === "참가자 2명")?.value;
+    expect(roster).toContain("host");
+    expect(roster).toContain("player");
 
     const buttons = components[0].toJSON().components as Array<{
       label?: string;
@@ -151,11 +160,11 @@ describe("DiscordBotService room notification", () => {
     expect(edit).toHaveBeenCalledTimes(1);
     const payload = edit.mock.calls[0][0];
     const fields = payload.embeds[0].toJSON().fields ?? [];
-    expect(fields.find((field: any) => field.name === "인원")?.value).toBe(
-      "2 / 10",
-    );
     expect(
-      fields.find((field: any) => field.name === "참가자")?.value,
+      fields.find((field: any) => field.name === "모집 현황")?.value,
+    ).toContain("**2** / 10");
+    expect(
+      fields.find((field: any) => field.name === "참가자 2명")?.value,
     ).toContain("player");
   });
 });

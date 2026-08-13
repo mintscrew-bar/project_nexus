@@ -2284,8 +2284,21 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
     };
 
     const modeLabel = MODE_LABEL[teamMode] ?? teamMode;
-    const lockSuffix = isPrivate ? "  ·  비공개" : "";
     const currentPlayers = participants.length;
+    const remainingSlots = Math.max(0, maxPlayers - currentPlayers);
+    const isFull = remainingSlots === 0;
+
+    // 모집 현황 게이지. 인원 숫자만 있으면 얼마나 찼는지 한눈에 안 들어와서
+    // 10칸짜리 막대를 같이 그린다. (maxPlayers 가 0 인 방은 없지만 방어)
+    const GAUGE_SLOTS = 10;
+    const filledSlots =
+      maxPlayers > 0
+        ? Math.min(
+            GAUGE_SLOTS,
+            Math.round((currentPlayers / maxPlayers) * GAUGE_SLOTS),
+          )
+        : 0;
+    const gauge = "▰".repeat(filledSlots) + "▱".repeat(GAUGE_SLOTS - filledSlots);
 
     const participantColumnCount =
       participants.length <= 10 ? 1 : participants.length <= 20 ? 2 : 3;
@@ -2307,36 +2320,41 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
         const end = start + names.length;
         return {
           name:
-            participantColumnCount === 1
-              ? "참가자"
-              : `참가자 ${start + 1}–${end}`,
+            participantColumnCount > 1
+              ? `참가자 ${start + 1}–${end}`
+              : currentPlayers > 0
+                ? `참가자 ${currentPlayers}명`
+                : "참가자",
           value:
             names.length > 0
               ? names
+                  // 번호를 코드 블록으로 감싸면 자릿수가 달라도 이름 시작 위치가 맞는다.
                   .map(
                     (name, index) =>
-                      `**${start + index + 1}.** ${name.slice(0, 48)}`,
+                      `\`${String(start + index + 1).padStart(2, " ")}\` ${name.slice(0, 48)}`,
                   )
                   .join("\n")
-              : "—",
+              : "_아직 참가자가 없습니다_",
           inline: participantColumnCount > 1,
         };
       },
     );
 
+    // 방 이름이 본문이고 "내전 모집"이 제목이라 위계가 뒤집혀 있었다.
+    // 제목을 방 이름으로 올리고, 모드/방장은 한 줄 요약으로 내린다.
+    // (모드를 inline 필드에 두면 모바일 3열에서 "경매 드래프 / 트" 로 잘렸다)
     const embed = new EmbedBuilder()
-      .setColor(0x667eea)
-      .setTitle("내전 모집")
-      .setDescription(`### ${roomName}${lockSuffix}`)
-      .addFields(
-        { name: "방장", value: hostName, inline: true },
-        { name: "모드", value: modeLabel, inline: true },
-        {
-          name: "인원",
-          value: `${currentPlayers} / ${maxPlayers}`,
-          inline: true,
-        },
-      )
+      .setColor(isFull ? 0x22c55e : 0x667eea)
+      .setAuthor({ name: isPrivate ? "내전 모집 · 비공개" : "내전 모집" })
+      .setTitle(`${isPrivate ? "🔒 " : ""}${roomName}`)
+      .setURL(`${appUrl}/tournaments/${roomId}/lobby`)
+      .setDescription(`\`${modeLabel}\` · 방장 **${hostName}**`)
+      .addFields({
+        name: "모집 현황",
+        value: `${gauge}  **${currentPlayers}** / ${maxPlayers}${
+          isFull ? "  ·  모집 완료" : `  ·  ${remainingSlots}자리 남음`
+        }`,
+      })
       .addFields(...participantColumns)
       .setFooter({ text: "참가자 변경 시 자동으로 업데이트됩니다." })
       .setTimestamp();
