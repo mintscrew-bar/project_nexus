@@ -54,6 +54,13 @@ const TIER_COLORS: Record<string, string> = {
 /** 랭크(I~IV)가 의미 없는 상위 티어 — 표기에서 제외한다. */
 const APEX_TIERS = new Set(["master", "grandmaster", "challenger"]);
 
+/**
+ * 팀 블록 뒤에 팀 컬러 그라데이션을 아주 옅게 깔지 여부.
+ * 프레임리스라 테두리는 없지만, 반복 블록이 많을 때(6~8팀) 묶음이 흐려져서
+ * 색 면으로 최소한의 구분감을 준다.
+ */
+const TEAM_BLOCK_WASH = true;
+
 /** 미연동·언랭 표기용 무채색 — 실제 티어 색과 확실히 구분된다. */
 const NO_TIER_COLOR = "#7b7b83";
 
@@ -1969,14 +1976,9 @@ function RevealMemberRow({
   const badge = tierBadge(member.tier, member.rank, member.lp);
 
   return (
-    // 프레임리스: 행 테두리·배경 없이 여백과 팀 컬러 눈금으로만 구분한다.
-    // 박스가 없으면 이름과 우측 정보가 멀수록 한 줄로 안 읽혀서 폭을 제한한다.
-    <div className="flex h-full min-h-0 w-full max-w-[600px] items-center justify-between gap-4">
+    // 프레임리스: 행 테두리·배경 없이 여백과 팀 컬러로만 구분한다.
+    <div className="flex h-full min-h-0 w-full items-center justify-between gap-4">
       <div className="flex min-w-0 items-center gap-3">
-        <span
-          className="h-7 w-[3px] shrink-0 rounded-full"
-          style={{ background: teamColor, opacity: isCaptain ? 1 : 0.32 }}
-        />
         <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-white/10">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -2101,7 +2103,7 @@ export function TeamRevealScene({ snapshot }: { snapshot: any }) {
                 {/* 축소 레이어: 실제 칸보다 1/scale 만큼 크게 그린 뒤 통째로 줄인다.
                     폰트·아바타·여백·테두리가 같은 비율로 작아진다. */}
                 <div
-                  className="flex flex-col pr-6"
+                  className="flex"
                   style={{
                     width: `${100 / panelScale}%`,
                     height: `${100 / panelScale}%`,
@@ -2109,33 +2111,50 @@ export function TeamRevealScene({ snapshot }: { snapshot: any }) {
                     transformOrigin: "top left",
                   }}
                 >
-                  {/* 팀 이름 자체를 팀 컬러로 세워 박스 없이도 소속이 읽히게 한다 */}
-                  <p
-                    className="truncate text-3xl font-black uppercase tracking-wide"
-                    style={{ color: teamColor }}
-                  >
-                    {team.name}
-                  </p>
+                  {/* 색 면·스파인이 로스터보다 넓으면 오른쪽이 비어 보인다.
+                      축소율과 무관하게 화면상 폭이 일정하도록 상한을 보정한다. */}
                   <div
-                    className="mt-2 h-[3px] w-16 flex-shrink-0"
-                    style={{ background: teamColor }}
-                  />
-                  <div
-                    // 프레임리스에서는 1fr 로 꽉 채우면 행 사이가 벌어져 한 팀으로
-                    // 안 묶인다. 행 높이를 제한하고 세로 가운데로 모은다.
-                    className="mt-6 grid min-h-0 flex-1 content-center gap-4"
-                    style={{
-                      gridTemplateRows: `repeat(${maxMembers}, minmax(0, 64px))`,
-                    }}
+                    className="relative flex w-full min-w-0 flex-col py-2 pl-6 pr-5"
+                    style={{ maxWidth: `${Math.round(520 / panelScale)}px` }}
                   >
-                    {members.map((member) => (
-                      <RevealMemberRow
-                        key={member.userId}
-                        member={member}
-                        teamColor={teamColor}
-                        isCaptain={member.userId === team.captainId}
+                    {/* 팀 스파인: 블록의 세로 범위를 팀 컬러로 잡아준다.
+                        테두리 대신 이 한 줄이 "여기부터 여기까지 한 팀"을 말한다. */}
+                    <span
+                      className="absolute inset-y-0 left-0 w-[3px]"
+                      style={{
+                        background: `linear-gradient(180deg, ${teamColor}, ${teamColor}33)`,
+                      }}
+                    />
+                    {TEAM_BLOCK_WASH && (
+                      <span
+                        className="pointer-events-none absolute inset-0 -z-10"
+                        style={{
+                          background: `linear-gradient(180deg, ${teamColor}22, transparent 68%)`,
+                        }}
                       />
-                    ))}
+                    )}
+                    {/* 팀명을 로스터와 같은 좌측 정렬선에 붙여 제목이 뜨지 않게 한다 */}
+                    <p
+                      className="truncate text-3xl font-black tracking-wide text-white"
+                      style={{ textShadow: `0 0 24px ${teamColor}55` }}
+                    >
+                      {team.name}
+                    </p>
+                    <div
+                      className="mt-3 grid min-h-0 flex-1 content-center gap-4"
+                      style={{
+                        gridTemplateRows: `repeat(${maxMembers}, minmax(0, 64px))`,
+                      }}
+                    >
+                      {members.map((member) => (
+                        <RevealMemberRow
+                          key={member.userId}
+                          member={member}
+                          teamColor={teamColor}
+                          isCaptain={member.userId === team.captainId}
+                        />
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
