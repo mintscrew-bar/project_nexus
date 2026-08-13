@@ -91,7 +91,7 @@ describe("RoleSelectionService timer extension", () => {
     expect(() => service.extendTimer("user-1", roomId)).toThrow(
       "연장은 인당 2회까지만 가능합니다.",
     );
-    expect(service.hasExtended("user-1", roomId)).toBe(true);
+    expect(service.getRemainingExtensions("user-1", roomId)).toBe(0);
   });
 
   it("연장 횟수는 유저별로 독립적으로 관리된다", () => {

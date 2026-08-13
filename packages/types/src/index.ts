@@ -255,3 +255,11 @@ export {
 } from './series-preset';
 
 export type { SeriesPreset, SeriesPresetInfo } from './series-preset';
+
+export {
+  ROLE_SELECTION_TIME_SECONDS,
+  ROLE_SELECTION_EXTENSION_SECONDS,
+  ROLE_SELECTION_MAX_EXTENSIONS_PER_USER,
+  ROLE_SELECTION_TIME_MS,
+  ROLE_SELECTION_EXTENSION_MS,
+} from './role-selection';

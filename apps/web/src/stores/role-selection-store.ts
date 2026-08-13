@@ -5,16 +5,21 @@ import {
   roleSelectionSocketHelpers,
 } from "@/lib/socket-client";
 import { useLobbyStore } from "@/stores/lobby-store";
+import {
+  ROLE_SELECTION_TIME_SECONDS,
+  ROLE_SELECTION_EXTENSION_SECONDS,
+  ROLE_SELECTION_MAX_EXTENSIONS_PER_USER,
+} from "@nexus/types";
 
 // 로컬 카운트다운 인터벌 (서버 5초 tick 사이에 매초 감소)
 let localCountdownInterval: ReturnType<typeof setInterval> | null = null;
 let roleSelectionJoinRetryTimer: ReturnType<typeof setTimeout> | null = null;
 const ROLE_SELECTION_JOIN_RETRY_DELAY_MS = 500;
 const ROLE_SELECTION_JOIN_MAX_ATTEMPTS = 8;
-// 서버(role-selection.service.ts)와 동일해야 하는 값
-export const DEFAULT_TIME_SECONDS = 90; // 기본 역할 선택 시간
-export const MAX_EXTENSIONS_PER_USER = 2; // 인당 최대 연장 횟수
-export const EXTENSION_SECONDS = 15; // 연장 1회당 추가 시간
+// 서버와 공유하는 값 (@nexus/types). 기존 이름으로 재노출해 호출부는 그대로 둔다.
+export const DEFAULT_TIME_SECONDS = ROLE_SELECTION_TIME_SECONDS;
+export const MAX_EXTENSIONS_PER_USER = ROLE_SELECTION_MAX_EXTENSIONS_PER_USER;
+export const EXTENSION_SECONDS = ROLE_SELECTION_EXTENSION_SECONDS;
 
 const startLocalCountdown = (initialSeconds: number, setFn: (fn: (s: any) => any) => void) => {
   if (localCountdownInterval) {
@@ -169,6 +174,11 @@ export const useRoleSelectionStore = create<RoleSelectionState>((set) => ({
             error: null,
             readyCaptainIds: response.captainReady?.readyCaptainIds ?? [],
             readyCaptainsRequired: response.captainReady?.requiredCount ?? 0,
+            // 새로고침·재연결 시 이미 쓴 연장 횟수를 서버 기준으로 복원한다.
+            // (없으면 로컬 값을 유지 — 구버전 서버 대응)
+            ...(typeof response.remainingExtensions === "number"
+              ? { remainingExtensions: response.remainingExtensions }
+              : {}),
           });
           // 로컬 카운트다운 시작 (서버 5초 보정 tick 사이에 매초 감소)
           startLocalCountdown(initialSeconds, set);

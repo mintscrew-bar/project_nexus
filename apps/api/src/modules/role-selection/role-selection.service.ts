@@ -9,10 +9,12 @@ import {
 import { PrismaService } from "../prisma/prisma.service";
 import { Prisma, RoomStatus, Role } from "@nexus/database";
 import { MatchService } from "../match/match.service";
-
-const ROLE_SELECTION_TIME_MS = 90000; // 90초 기본 시간
-const EXTENSION_TIME_MS = 15000; // 연장 1회당 15초
-const EXTENSION_MAX_PER_USER = 2; // 인당 최대 연장 횟수
+// 클라이언트와 값이 어긋나지 않도록 공용 패키지에서 가져온다.
+import {
+  ROLE_SELECTION_TIME_MS,
+  ROLE_SELECTION_EXTENSION_MS as EXTENSION_TIME_MS,
+  ROLE_SELECTION_MAX_EXTENSIONS_PER_USER as EXTENSION_MAX_PER_USER,
+} from "@nexus/types";
 
 export interface RoleSelectionState {
   roomId: string;
@@ -587,11 +589,6 @@ export class RoleSelectionService {
   getRemainingExtensions(userId: string, roomId: string): number {
     const used = this.extendedUsers.get(roomId)?.get(userId) ?? 0;
     return Math.max(0, EXTENSION_MAX_PER_USER - used);
-  }
-
-  // 연장 기회를 모두 소진했는지 여부
-  hasExtended(userId: string, roomId: string): boolean {
-    return this.getRemainingExtensions(userId, roomId) <= 0;
   }
 
   getTimeRemaining(roomId: string): number {

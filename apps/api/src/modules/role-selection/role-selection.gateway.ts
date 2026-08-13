@@ -151,6 +151,14 @@ export class RoleSelectionGateway
       return {
         success: true,
         ...roleSelectionData,
+        // 연장 잔여 횟수는 유저별 값이라 방 단위 데이터에 담을 수 없다.
+        // 새로고침·재연결로 다시 join 할 때 버튼 상태를 복원하려면 여기서 실어보내야 한다.
+        remainingExtensions: client.userId
+          ? this.roleSelectionService.getRemainingExtensions(
+              client.userId,
+              data.roomId,
+            )
+          : 0,
       };
     } catch (error: any) {
       return {
