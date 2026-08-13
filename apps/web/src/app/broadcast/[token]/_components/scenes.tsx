@@ -54,13 +54,6 @@ const TIER_COLORS: Record<string, string> = {
 /** 랭크(I~IV)가 의미 없는 상위 티어 — 표기에서 제외한다. */
 const APEX_TIERS = new Set(["master", "grandmaster", "challenger"]);
 
-/**
- * 팀 블록 뒤에 팀 컬러 그라데이션을 아주 옅게 깔지 여부.
- * 프레임리스라 테두리는 없지만, 반복 블록이 많을 때(6~8팀) 묶음이 흐려져서
- * 색 면으로 최소한의 구분감을 준다.
- */
-const TEAM_BLOCK_WASH = true;
-
 /** 미연동·언랭 표기용 무채색 — 실제 티어 색과 확실히 구분된다. */
 const NO_TIER_COLOR = "#7b7b83";
 
@@ -1976,37 +1969,32 @@ function RevealMemberRow({
   const badge = tierBadge(member.tier, member.rank, member.lp);
 
   return (
-    // 프레임리스: 행 테두리·배경 없이 여백과 팀 컬러로만 구분한다.
-    <div className="flex h-full min-h-0 w-full items-center justify-between gap-4">
-      <div className="flex min-w-0 items-center gap-3">
-        <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-white/10">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={member.avatar || "/images/placeholders/non-avatar-64.png"}
-            alt=""
-            className="h-10 w-10 rounded-full object-cover"
-          />
-        </div>
-        <p className="truncate text-xl font-bold text-white">
+    // 프레임리스: 테두리·배경 없이, 행 자체를 실하게 만들어 내용이 곧 블록이 되게 한다.
+    // 아바타를 키우고 이름/티어를 2행으로 쌓으면 행 하나가 덩어리로 읽혀서
+    // 세로를 꽉 채워도 흩어져 보이지 않는다.
+    <div className="flex h-full min-h-0 w-full items-center gap-4">
+      <div className="h-14 w-14 shrink-0 overflow-hidden rounded-full bg-white/10">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={member.avatar || "/images/placeholders/non-avatar-64.png"}
+          alt=""
+          className="h-14 w-14 rounded-full object-cover"
+        />
+      </div>
+      <div className="flex min-w-0 flex-1 flex-col justify-center leading-tight">
+        <p className="truncate text-2xl font-black text-white">
           {member.username}
           {isCaptain && (
             <span
-              className="ml-2 text-sm font-black"
+              className="ml-2 align-middle text-sm font-black"
               style={{ color: teamColor }}
             >
               C
             </span>
           )}
         </p>
-      </div>
-      <div className="ml-3 flex flex-shrink-0 items-center gap-3">
-        {member.soldPrice != null && (
-          <span className="text-base font-black" style={{ color: teamColor }}>
-            {member.soldPrice}P
-          </span>
-        )}
         <span
-          className="flex items-center gap-1.5 text-base font-black"
+          className="mt-0.5 flex items-center gap-1.5 text-sm font-black"
           style={{ color: badge.color }}
         >
           {badge.icon && (
@@ -2014,13 +2002,21 @@ function RevealMemberRow({
             <img
               src={badge.icon}
               alt=""
-              width={22}
-              height={22}
+              width={18}
+              height={18}
               className="shrink-0"
             />
           )}
-          {badge.text}
+          <span className="truncate">{badge.text}</span>
         </span>
+      </div>
+      <div className="flex flex-shrink-0 items-center">
+        {member.soldPrice != null && (
+          <span className="text-2xl font-black" style={{ color: teamColor }}>
+            {member.soldPrice}
+            <span className="ml-0.5 text-sm opacity-60">P</span>
+          </span>
+        )}
       </div>
     </div>
   );
@@ -2125,14 +2121,6 @@ export function TeamRevealScene({ snapshot }: { snapshot: any }) {
                         background: `linear-gradient(180deg, ${teamColor}, ${teamColor}33)`,
                       }}
                     />
-                    {TEAM_BLOCK_WASH && (
-                      <span
-                        className="pointer-events-none absolute inset-0 -z-10"
-                        style={{
-                          background: `linear-gradient(180deg, ${teamColor}22, transparent 68%)`,
-                        }}
-                      />
-                    )}
                     {/* 팀명을 로스터와 같은 좌측 정렬선에 붙여 제목이 뜨지 않게 한다 */}
                     <p
                       className="truncate text-3xl font-black tracking-wide text-white"
@@ -2141,9 +2129,10 @@ export function TeamRevealScene({ snapshot }: { snapshot: any }) {
                       {team.name}
                     </p>
                     <div
-                      className="mt-3 grid min-h-0 flex-1 content-center gap-4"
+                      // 행이 덩어리로 읽히므로 1fr 로 세로를 꽉 채운다
+                      className="mt-4 grid min-h-0 flex-1 gap-3"
                       style={{
-                        gridTemplateRows: `repeat(${maxMembers}, minmax(0, 64px))`,
+                        gridTemplateRows: `repeat(${maxMembers}, minmax(0, 1fr))`,
                       }}
                     >
                       {members.map((member) => (
