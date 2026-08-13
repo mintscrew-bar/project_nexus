@@ -1,10 +1,12 @@
-import { Controller, Get, Query, Res } from "@nestjs/common";
+import { Controller, Get, Logger, Query, Res } from "@nestjs/common";
 import { Throttle } from "@nestjs/throttler";
 import type { Response } from "express";
 import { ChzzkOAuthService } from "./chzzk-oauth.service";
 
 @Controller("auth/chzzk")
 export class ChzzkOAuthController {
+  private readonly logger = new Logger(ChzzkOAuthController.name);
+
   constructor(private readonly chzzkOAuth: ChzzkOAuthService) {}
 
   @Get("callback")
@@ -17,7 +19,10 @@ export class ChzzkOAuthController {
     try {
       await this.chzzkOAuth.completeAuthorization(code, state);
       return response.redirect(this.chzzkOAuth.getSettingsRedirect("success"));
-    } catch {
+    } catch (error) {
+      this.logger.warn(
+        `치지직 OAuth 콜백 실패: ${error instanceof Error ? error.message : String(error)}`,
+      );
       return response.redirect(this.chzzkOAuth.getSettingsRedirect("error"));
     }
   }

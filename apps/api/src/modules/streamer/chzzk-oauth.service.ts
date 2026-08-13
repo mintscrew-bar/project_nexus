@@ -139,13 +139,25 @@ export class ChzzkOAuthService {
       return profile;
     } catch (error) {
       if (error instanceof BadRequestException) throw error;
-      this.logger.warn(
-        `치지직 OAuth 처리 실패: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      const oauthError = this.describeOAuthError(error);
+      this.logger.warn(`치지직 OAuth 처리 실패: ${oauthError}`);
       throw new BadGatewayException(
         "치지직 채널 정보를 확인하지 못했습니다. 잠시 후 다시 시도해주세요.",
       );
     }
+  }
+
+  private describeOAuthError(error: unknown): string {
+    if (axios.isAxiosError(error)) {
+      const data = error.response?.data as
+        { code?: string | number; message?: string } | undefined;
+      return [
+        `status=${error.response?.status ?? "network"}`,
+        `code=${data?.code ?? "unknown"}`,
+        `message=${data?.message ?? error.message}`,
+      ].join(" ");
+    }
+    return error instanceof Error ? error.message : String(error);
   }
 
   getSettingsRedirect(result: "success" | "error"): string {

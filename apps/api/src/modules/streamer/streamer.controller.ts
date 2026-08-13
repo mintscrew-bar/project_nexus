@@ -87,7 +87,7 @@ export class StreamerController {
   @Post("verify/chzzk/oauth")
   @UseGuards(JwtAuthGuard)
   @Throttle({ default: { limit: 10, ttl: 60000 } })
-  startChzzkOAuth(@CurrentUser("id") userId: string) {
+  startChzzkOAuth(@CurrentUser("sub") userId: string) {
     return this.chzzkOAuth.createAuthorizationUrl(userId);
   }
 
