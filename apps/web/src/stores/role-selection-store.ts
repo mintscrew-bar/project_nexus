@@ -11,6 +11,10 @@ let localCountdownInterval: ReturnType<typeof setInterval> | null = null;
 let roleSelectionJoinRetryTimer: ReturnType<typeof setTimeout> | null = null;
 const ROLE_SELECTION_JOIN_RETRY_DELAY_MS = 500;
 const ROLE_SELECTION_JOIN_MAX_ATTEMPTS = 8;
+// 서버(role-selection.service.ts)와 동일해야 하는 값
+export const DEFAULT_TIME_SECONDS = 90; // 기본 역할 선택 시간
+export const MAX_EXTENSIONS_PER_USER = 2; // 인당 최대 연장 횟수
+export const EXTENSION_SECONDS = 15; // 연장 1회당 추가 시간
 
 const startLocalCountdown = (initialSeconds: number, setFn: (fn: (s: any) => any) => void) => {
   if (localCountdownInterval) {
@@ -103,7 +107,8 @@ interface RoleSelectionState {
   error: string | null;
   sessionAbortedAt: number | null;
   sessionAbortMessage: string | null;
-  hasExtended: boolean;
+  // 남은 연장 횟수(인당 최대 2회). 0이면 버튼 비활성.
+  remainingExtensions: number;
   readyCaptainIds: string[];
   readyCaptainsRequired: number;
 
@@ -118,7 +123,7 @@ interface RoleSelectionState {
 
 export const useRoleSelectionStore = create<RoleSelectionState>((set) => ({
   room: null,
-  timeRemaining: 60,
+  timeRemaining: DEFAULT_TIME_SECONDS,
   isConnected: false,
   isLoading: true,
   isCompleted: false,
@@ -126,7 +131,7 @@ export const useRoleSelectionStore = create<RoleSelectionState>((set) => ({
   error: null,
   sessionAbortedAt: null,
   sessionAbortMessage: null,
-  hasExtended: false,
+  remainingExtensions: MAX_EXTENSIONS_PER_USER,
   readyCaptainIds: [],
   readyCaptainsRequired: 0,
 
@@ -308,14 +313,14 @@ export const useRoleSelectionStore = create<RoleSelectionState>((set) => ({
     set({
       isConnected: false,
       room: null,
-      timeRemaining: 60,
+      timeRemaining: DEFAULT_TIME_SECONDS,
       isLoading: false,
       isCompleted: false,
       navigationTarget: null,
       error: null,
       sessionAbortedAt: null,
       sessionAbortMessage: null,
-      hasExtended: false,
+      remainingExtensions: MAX_EXTENSIONS_PER_USER,
       readyCaptainIds: [],
       readyCaptainsRequired: 0,
     });
@@ -341,7 +346,13 @@ export const useRoleSelectionStore = create<RoleSelectionState>((set) => ({
     if (response?.error) {
       throw new Error(response.error);
     }
-    set({ hasExtended: true });
+    // 서버가 잔여 횟수를 알려주면 그대로, 아니면 방어적으로 1 감소
+    set((state) => ({
+      remainingExtensions:
+        typeof response?.remainingExtensions === "number"
+          ? response.remainingExtensions
+          : Math.max(0, state.remainingExtensions - 1),
+    }));
   },
 
   markCaptainReady: async (roomId: string) => {
