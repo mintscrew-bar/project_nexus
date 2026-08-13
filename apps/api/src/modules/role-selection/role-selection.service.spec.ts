@@ -59,3 +59,55 @@ describe("RoleSelectionService captain readiness", () => {
     );
   });
 });
+
+describe("RoleSelectionService timer extension", () => {
+  let service: RoleSelectionService;
+  const roomId = "room-1";
+  const startTimerEnd = Date.now() + 90_000;
+
+  beforeEach(() => {
+    service = new RoleSelectionService({} as any, {} as any);
+    (service as any).roleSelectionStates.set(roomId, {
+      roomId,
+      timerEnd: startTimerEnd,
+      startedAt: Date.now(),
+    });
+  });
+
+  it("인당 2회까지 연장을 허용하고 회당 15초를 더한다", () => {
+    const first = service.extendTimer("user-1", roomId);
+    expect(first.timerEnd).toBe(startTimerEnd + 15_000);
+    expect(first.remainingExtensions).toBe(1);
+
+    const second = service.extendTimer("user-1", roomId);
+    expect(second.timerEnd).toBe(startTimerEnd + 30_000);
+    expect(second.remainingExtensions).toBe(0);
+  });
+
+  it("3회째 연장은 거부한다", () => {
+    service.extendTimer("user-1", roomId);
+    service.extendTimer("user-1", roomId);
+
+    expect(() => service.extendTimer("user-1", roomId)).toThrow(
+      "연장은 인당 2회까지만 가능합니다.",
+    );
+    expect(service.hasExtended("user-1", roomId)).toBe(true);
+  });
+
+  it("연장 횟수는 유저별로 독립적으로 관리된다", () => {
+    service.extendTimer("user-1", roomId);
+    service.extendTimer("user-1", roomId);
+
+    expect(service.getRemainingExtensions("user-1", roomId)).toBe(0);
+    expect(service.getRemainingExtensions("user-2", roomId)).toBe(2);
+
+    const other = service.extendTimer("user-2", roomId);
+    expect(other.timerEnd).toBe(startTimerEnd + 45_000);
+  });
+
+  it("세션이 없으면 연장할 수 없다", () => {
+    expect(() => service.extendTimer("user-1", "unknown-room")).toThrow(
+      "역할 선택 세션이 없습니다.",
+    );
+  });
+});

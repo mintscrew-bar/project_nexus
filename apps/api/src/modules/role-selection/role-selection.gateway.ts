@@ -387,10 +387,8 @@ export class RoleSelectionGateway
         return { error: "Unauthorized" };
       }
 
-      const newTimerEnd = this.roleSelectionService.extendTimer(
-        client.userId,
-        data.roomId,
-      );
+      const { timerEnd: newTimerEnd, remainingExtensions } =
+        this.roleSelectionService.extendTimer(client.userId, data.roomId);
 
       // 기존 resolve 타이머 재설정
       this.stopTimer(data.roomId);
@@ -438,7 +436,8 @@ export class RoleSelectionGateway
         extendedBy: client.username,
       });
 
-      return { success: true, timerEndAt: newTimerEnd };
+      // 잔여 횟수는 요청한 본인에게만 의미가 있으므로 ack로만 돌려준다.
+      return { success: true, timerEndAt: newTimerEnd, remainingExtensions };
     } catch (error: any) {
       return { error: error.message };
     }
