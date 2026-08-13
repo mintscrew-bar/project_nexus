@@ -1,3 +1,4 @@
+import { MessageFlags } from "discord.js";
 import { DiscordBotService } from "./discord-bot.service";
 
 describe("DiscordBotService room notification", () => {
@@ -15,6 +16,9 @@ describe("DiscordBotService room notification", () => {
     set: jest.fn().mockResolvedValue(undefined),
     del: jest.fn().mockResolvedValue(undefined),
   };
+  const emojiService = {
+    ensureRecruitEmojis: jest.fn().mockResolvedValue({}),
+  };
 
   let service: DiscordBotService;
 
@@ -25,11 +29,36 @@ describe("DiscordBotService room notification", () => {
       prisma as any,
       eventEmitter as any,
       redis as any,
+      emojiService as any,
     );
   });
 
-  it("룸과 음성채널 참가 버튼 및 현재 참가자 명단을 표시한다", () => {
-    const { embed, components } = service.buildRoomCreatedEmbed(
+  /** V2 컨테이너에서 텍스트 조각만 순서대로 뽑는다 */
+  const textOf = (container: any): string[] => {
+    const out: string[] = [];
+    const walk = (component: any) => {
+      if (component.type === 10) out.push(component.content); // TextDisplay
+      for (const child of component.components ?? []) walk(child);
+      if (component.accessory) walk(component.accessory);
+    };
+    walk(container);
+    return out;
+  };
+
+  /** V2 컨테이너 안의 모든 버튼 */
+  const buttonsOf = (container: any): Array<{ label: string; url: string }> => {
+    const out: Array<{ label: string; url: string }> = [];
+    const walk = (component: any) => {
+      if (component.type === 2) out.push(component); // Button
+      for (const child of component.components ?? []) walk(child);
+      if (component.accessory) walk(component.accessory);
+    };
+    walk(container);
+    return out;
+  };
+
+  it("컨테이너 안에 참가 버튼과 참가자 명단을 담는다", () => {
+    const payload = service.buildRoomRecruitMessage(
       "room-1",
       "금요일 내전",
       "host",
@@ -40,28 +69,22 @@ describe("DiscordBotService room notification", () => {
       { guildId: "guild-1", channelId: "voice-1" },
     );
 
-    const json = embed.toJSON();
-    const fields = json.fields ?? [];
+    // V2 메시지는 전용 플래그가 없으면 Discord 가 거부한다.
+    expect(payload.flags).toBe(MessageFlags.IsComponentsV2);
 
-    // 방 이름이 제목으로 올라가고 모드/방장은 요약 줄로 내려간다.
-    expect(json.title).toBe("금요일 내전");
-    expect(json.url).toBe("https://labs-nexus.com/tournaments/room-1/lobby");
-    expect(json.description).toContain("스네이크 드래프트");
-    expect(json.description).toContain("host");
+    const container = payload.components[0].toJSON() as any;
+    const text = textOf(container).join("\n");
 
-    const status = fields.find((field) => field.name === "모집 현황")?.value;
-    expect(status).toContain("**2** / 10");
-    expect(status).toContain("8자리 남음");
-    expect(status).toMatch(/[▰▱]{10}/);
+    expect(text).toContain("## 금요일 내전");
+    expect(text).toContain("스네이크 드래프트");
+    expect(text).toContain("방장 **host**");
+    expect(text).toContain("**2** / 10");
+    expect(text).toContain("8자리 남음");
+    expect(text).toContain("host");
+    expect(text).toContain("player");
 
-    const roster = fields.find((field) => field.name === "참가자 2명")?.value;
-    expect(roster).toContain("host");
-    expect(roster).toContain("player");
-
-    const buttons = components[0].toJSON().components as Array<{
-      label?: string;
-      url?: string;
-    }>;
+    // 버튼이 컨테이너 바깥이 아니라 안에 있어야 한다 (클래식 임베드와의 차이)
+    const buttons = buttonsOf(container);
     expect(buttons).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -74,14 +97,84 @@ describe("DiscordBotService room notification", () => {
         }),
       ]),
     );
+    // "룸 참가"는 헤더 액세서리 하나뿐이어야 한다 (하단 중복 금지)
+    expect(buttons.filter((b) => b.label === "룸 참가")).toHaveLength(1);
   });
 
-  it("40명 방의 참가자 명단을 세 개의 균형 잡힌 열로 표시한다", () => {
-    const participants = Array.from(
-      { length: 40 },
-      (_, index) => `긴닉네임_${index}_${"가".repeat(24)}`,
+  it("커스텀 이모지가 있으면 게이지와 모드 아이콘에 사용한다", () => {
+    const payload = service.buildRoomRecruitMessage(
+      "room-1",
+      "내전",
+      "host",
+      10,
+      "AUCTION",
+      false,
+      ["host", "player"],
+      undefined,
+      {
+        nx_pip_on: "<:nx_pip_on:111>",
+        nx_pip_off: "<:nx_pip_off:222>",
+        nx_mode_auction: "<:nx_mode_auction:333>",
+      },
     );
-    const { embed } = service.buildRoomCreatedEmbed(
+
+    const text = textOf(payload.components[0].toJSON() as any).join("\n");
+    expect(text).toContain("<:nx_mode_auction:333>");
+    // 2/10 → 눈금 2칸이 켜지고 8칸이 꺼진다
+    expect(text.match(/<:nx_pip_on:111>/g)).toHaveLength(2);
+    expect(text.match(/<:nx_pip_off:222>/g)).toHaveLength(8);
+  });
+
+  it("이모지가 없으면 유니코드 게이지로 폴백한다", () => {
+    const payload = service.buildRoomRecruitMessage(
+      "room-1",
+      "내전",
+      "host",
+      10,
+      "AUCTION",
+      false,
+      ["host"],
+    );
+
+    const text = textOf(payload.components[0].toJSON() as any).join("\n");
+    expect(text).toMatch(/[▰▱]{10}/);
+  });
+
+  it("정원이 차면 액센트 색을 바꾸고 모집 완료로 표시한다", () => {
+    const payload = service.buildRoomRecruitMessage(
+      "room-1",
+      "내전",
+      "host",
+      2,
+      "AUCTION",
+      false,
+      ["a", "b"],
+    );
+
+    const container = payload.components[0].toJSON() as any;
+    expect(container.accent_color).toBe(0x22c55e);
+    expect(textOf(container).join("\n")).toContain("모집 완료");
+  });
+
+  it("비공개 방은 제목에 자물쇠를 붙인다", () => {
+    const payload = service.buildRoomRecruitMessage(
+      "room-1",
+      "비밀 내전",
+      "host",
+      10,
+      "AUCTION",
+      true,
+      [],
+    );
+
+    const text = textOf(payload.components[0].toJSON() as any).join("\n");
+    expect(text).toContain("## 🔒 비밀 내전");
+    expect(text).toContain("아직 참가자가 없습니다");
+  });
+
+  it("대규모 방은 세로 목록 대신 흐름 텍스트로 접는다", () => {
+    const participants = Array.from({ length: 40 }, (_, i) => `참가자${i + 1}`);
+    const payload = service.buildRoomRecruitMessage(
       "room-40",
       "40명 내전",
       "host",
@@ -91,25 +184,12 @@ describe("DiscordBotService room notification", () => {
       participants,
     );
 
-    const participantFields = (embed.toJSON().fields ?? []).filter((field) =>
-      field.name.startsWith("참가자"),
-    );
-    expect(participantFields).toHaveLength(3);
-    expect(participantFields.map((field) => field.name)).toEqual([
-      "참가자 1–14",
-      "참가자 15–27",
-      "참가자 28–40",
-    ]);
-    expect(participantFields.every((field) => field.inline)).toBe(true);
-    expect(participantFields.every((field) => field.value.length <= 1024)).toBe(
-      true,
-    );
-    expect(participantFields.map((field) => field.value).join("\n")).toContain(
-      participants[39],
-    );
-    expect(embed.toJSON().footer?.text).toBe(
-      "참가자 변경 시 자동으로 업데이트됩니다.",
-    );
+    const text = textOf(payload.components[0].toJSON() as any).join("\n");
+    expect(text).toContain("**참가자** 40명");
+    expect(text).toContain("참가자1 · 참가자2");
+    expect(text).toContain("참가자40");
+    // 40줄짜리 세로 목록이 되면 안 된다
+    expect(text.split("\n").length).toBeLessThan(15);
   });
 
   it("재시작 뒤 Redis에서 메시지 참조를 복구해 참가자를 갱신한다", async () => {
@@ -158,13 +238,11 @@ describe("DiscordBotService room notification", () => {
     expect(redis.get).toHaveBeenCalledWith("discord:room-notification:room-1");
     expect(fetchMessage).toHaveBeenCalledWith("message-1");
     expect(edit).toHaveBeenCalledTimes(1);
+
     const payload = edit.mock.calls[0][0];
-    const fields = payload.embeds[0].toJSON().fields ?? [];
-    expect(
-      fields.find((field: any) => field.name === "모집 현황")?.value,
-    ).toContain("**2** / 10");
-    expect(
-      fields.find((field: any) => field.name === "참가자 2명")?.value,
-    ).toContain("player");
+    expect(payload.flags).toBe(MessageFlags.IsComponentsV2);
+    const text = textOf(payload.components[0].toJSON() as any).join("\n");
+    expect(text).toContain("**2** / 10");
+    expect(text).toContain("player");
   });
 });

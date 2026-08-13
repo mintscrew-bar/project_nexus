@@ -3,6 +3,13 @@
   "collection": "@nestjs/schematics",
   "sourceRoot": "src",
   "compilerOptions": {
-    "deleteOutDir": false
+    "deleteOutDir": false,
+    "assets": [
+      {
+        "include": "modules/discord/assets/**/*",
+        "outDir": "dist",
+        "watchAssets": true
+      }
+    ]
   }
 }

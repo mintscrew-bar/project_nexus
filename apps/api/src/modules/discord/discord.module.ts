@@ -4,6 +4,7 @@ import { DiscordBotService } from "./discord-bot.service";
 import { DiscordVoiceService } from "./discord-voice.service";
 import { DiscordController } from "./discord.controller";
 import { DiscordAdminAlertService } from "./discord-admin-alert.service";
+import { DiscordEmojiService } from "./discord-emoji.service";
 import { AuthModule } from "../auth/auth.module";
 
 @Module({
@@ -14,12 +15,14 @@ import { AuthModule } from "../auth/auth.module";
     DiscordBotService,
     DiscordVoiceService,
     DiscordAdminAlertService,
+    DiscordEmojiService,
   ],
   exports: [
     DiscordService,
     DiscordBotService,
     DiscordVoiceService,
     DiscordAdminAlertService,
+    DiscordEmojiService,
   ],
 })
 export class DiscordModule implements OnModuleInit {

@@ -834,29 +834,21 @@ export class RoomService {
           await this.discordVoiceService?.getRoomNotificationTarget?.(room.id);
 
         if (notificationTarget) {
-          const { embed, components } =
-            this.discordBotService.buildRoomCreatedEmbed(
-              room.id,
-              room.name,
-              room.host.username,
-              room.maxParticipants,
-              room.teamMode,
-              room.isPrivate,
-              [room.host.username], // 방 생성 시 방장 1명
-              lobbyVoiceChannelId
-                ? {
-                    guildId: notificationTarget.guildId,
-                    channelId: lobbyVoiceChannelId,
-                  }
-                : undefined,
+          const messageId =
+            await this.discordBotService.sendRoomRecruitMessage(
+              notificationTarget.guildId,
+              notificationTarget.channelId,
+              {
+                roomId: room.id,
+                roomName: room.name,
+                hostName: room.host.username,
+                maxPlayers: room.maxParticipants,
+                teamMode: room.teamMode,
+                isPrivate: room.isPrivate,
+                participants: [room.host.username], // 방 생성 시 방장 1명
+                voiceChannelId: lobbyVoiceChannelId,
+              },
             );
-
-          const messageId = await this.discordBotService.sendEmbedNotification(
-            notificationTarget.guildId,
-            notificationTarget.channelId,
-            embed,
-            components,
-          );
 
           if (messageId) {
             this.discordBotService.storeRoomNotification(room.id, {

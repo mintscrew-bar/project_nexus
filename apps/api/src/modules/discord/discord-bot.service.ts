@@ -25,10 +25,18 @@ import {
   TextInputStyle,
   ActionRowBuilder,
   VoiceState,
+  ContainerBuilder,
+  SectionBuilder,
+  SeparatorBuilder,
+  SeparatorSpacingSize,
+  TextDisplayBuilder,
+  MessageFlags,
 } from "discord.js";
 import { PrismaService } from "../prisma/prisma.service";
 import { RedisService } from "../redis/redis.service";
 import type { DiscordVoiceService } from "./discord-voice.service";
+import { DiscordEmojiService } from "./discord-emoji.service";
+import type { EmojiMap, RecruitEmojiName } from "./discord-emoji.service";
 
 // 티어 이모지 맵핑
 const TIER_EMOJI: Record<string, string> = {
@@ -132,6 +140,7 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
     private readonly redis: RedisService,
+    private readonly emojiService: DiscordEmojiService,
   ) {
     this.client = new Client({
       intents: [
@@ -2023,6 +2032,47 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
     return false;
   }
 
+  /**
+   * 내전 모집 메시지를 보낸다. 커스텀 이모지 확보 → V2 컨테이너 조립 → 전송까지
+   * 여기서 처리해, 호출부(room.service)가 Discord 세부사항을 몰라도 되게 한다.
+   */
+  async sendRoomRecruitMessage(
+    guildId: string,
+    channelId: string,
+    args: {
+      roomId: string;
+      roomName: string;
+      hostName: string;
+      maxPlayers: number;
+      teamMode: string;
+      isPrivate: boolean;
+      participants: string[];
+      voiceChannelId?: string | null;
+    },
+  ): Promise<string | null> {
+    const guild = await this.client.guilds.fetch(guildId);
+    const channel = await guild.channels.fetch(channelId);
+    if (!channel?.isTextBased()) return null;
+
+    const emojis = await this.emojiService.ensureRecruitEmojis(guild);
+    const payload = this.buildRoomRecruitMessage(
+      args.roomId,
+      args.roomName,
+      args.hostName,
+      args.maxPlayers,
+      args.teamMode,
+      args.isPrivate,
+      args.participants,
+      args.voiceChannelId
+        ? { guildId, channelId: args.voiceChannelId }
+        : undefined,
+      emojis,
+    );
+
+    const message = await channel.send(payload);
+    return message.id;
+  }
+
   async sendEmbedNotification(
     guildId: string,
     channelId: string,
@@ -2146,7 +2196,8 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
       const channel = await guild.channels.fetch(notif.channelId);
       if (!channel?.isTextBased()) return;
       const message = await channel.messages.fetch(notif.messageId);
-      const { embed, components } = this.buildRoomCreatedEmbed(
+      const emojis = await this.emojiService.ensureRecruitEmojis(guild);
+      const payload = this.buildRoomRecruitMessage(
         roomId,
         latestNotif.roomName,
         latestNotif.hostName,
@@ -2160,8 +2211,11 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
               channelId: latestNotif.voiceChannelId,
             }
           : undefined,
+        emojis,
       );
-      await message.edit({ embeds: [embed], components });
+      // V2 로 전환하기 전에 보낸 메시지는 플래그를 나중에 붙일 수 없어 edit 이
+      // 실패한다. 그 방들은 아래 catch 로 떨어지고, 다음 모집부터 새 형식이 된다.
+      await message.edit(payload);
     } catch (err: any) {
       console.warn(
         `[DiscordBot] 방 알림 업데이트 실패 (${roomId}): ${err?.message}`,
@@ -2263,7 +2317,19 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
   // Notification Builders (for use by other services)
   // ========================================
 
-  buildRoomCreatedEmbed(
+  /**
+   * 내전 모집 메시지를 Components V2 컨테이너로 만든다.
+   *
+   * 클래식 임베드는 버튼이 항상 메시지 하단(임베드 바깥)에 붙어 카드가 두 동강
+   * 나 보였다. V2 컨테이너는 액센트 바를 유지하면서 버튼까지 안에 품는다.
+   *
+   * 주의: V2 메시지는 content/embeds 를 같이 보낼 수 없고
+   * MessageFlags.IsComponentsV2 가 반드시 필요하다. 반환값을 그대로
+   * send()/edit() 에 넘기면 된다.
+   *
+   * @param emojis 길드에 등록된 커스텀 이모지 맵. 비어 있으면 텍스트로 폴백한다.
+   */
+  buildRoomRecruitMessage(
     roomId: string,
     roomName: string,
     hostName: string,
@@ -2272,9 +2338,11 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
     isPrivate: boolean,
     participants: string[] = [],
     voiceChannel?: { guildId: string; channelId: string },
-  ): { embed: EmbedBuilder; components: ActionRowBuilder<ButtonBuilder>[] } {
+    emojis: EmojiMap = {},
+  ): { components: ContainerBuilder[]; flags: number } {
     const appUrl =
       this.configService.get("APP_URL") || "https://labs-nexus.com";
+    const lobbyUrl = `${appUrl}/tournaments/${roomId}/lobby`;
 
     const MODE_LABEL: Record<string, string> = {
       AUCTION: "경매 드래프트",
@@ -2282,14 +2350,22 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
       AUTO_BALANCE: "자동 밸런스",
       MANUAL_TEAM: "자유 팀 선택",
     };
+    const MODE_EMOJI: Record<string, RecruitEmojiName> = {
+      AUCTION: "nx_mode_auction",
+      SNAKE_DRAFT: "nx_mode_snake",
+      AUTO_BALANCE: "nx_mode_balance",
+      MANUAL_TEAM: "nx_mode_manual",
+    };
 
     const modeLabel = MODE_LABEL[teamMode] ?? teamMode;
+    const modeIcon = emojis[MODE_EMOJI[teamMode]];
     const currentPlayers = participants.length;
     const remainingSlots = Math.max(0, maxPlayers - currentPlayers);
     const isFull = remainingSlots === 0;
 
-    // 모집 현황 게이지. 인원 숫자만 있으면 얼마나 찼는지 한눈에 안 들어와서
-    // 10칸짜리 막대를 같이 그린다. (maxPlayers 가 0 인 방은 없지만 방어)
+    // ─── 모집 게이지 ───
+    // 커스텀 이모지가 있으면 이미지 눈금으로, 없으면 유니코드로 폴백한다.
+    // (▰▱ 는 클라이언트 폰트에 따라 두부로 깨질 수 있어 이모지가 우선)
     const GAUGE_SLOTS = 10;
     const filledSlots =
       maxPlayers > 0
@@ -2298,86 +2374,103 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
             Math.round((currentPlayers / maxPlayers) * GAUGE_SLOTS),
           )
         : 0;
-    const gauge = "▰".repeat(filledSlots) + "▱".repeat(GAUGE_SLOTS - filledSlots);
+    const pipOn = emojis.nx_pip_on ?? "▰";
+    const pipOff = emojis.nx_pip_off ?? "▱";
+    const gauge =
+      pipOn.repeat(filledSlots) + pipOff.repeat(GAUGE_SLOTS - filledSlots);
 
-    const participantColumnCount =
-      participants.length <= 10 ? 1 : participants.length <= 20 ? 2 : 3;
-    const participantColumnBaseSize = Math.floor(
-      participants.length / participantColumnCount,
-    );
-    const participantColumnRemainder =
-      participants.length % participantColumnCount;
-    let participantOffset = 0;
-    const participantColumns = Array.from(
-      { length: participantColumnCount },
-      (_, columnIndex) => {
-        const size =
-          participantColumnBaseSize +
-          (columnIndex < participantColumnRemainder ? 1 : 0);
-        const start = participantOffset;
-        participantOffset += size;
-        const names = participants.slice(start, start + size);
-        const end = start + names.length;
-        return {
-          name:
-            participantColumnCount > 1
-              ? `참가자 ${start + 1}–${end}`
-              : currentPlayers > 0
-                ? `참가자 ${currentPlayers}명`
-                : "참가자",
-          value:
-            names.length > 0
-              ? names
-                  // 번호를 코드 블록으로 감싸면 자릿수가 달라도 이름 시작 위치가 맞는다.
-                  .map(
-                    (name, index) =>
-                      `\`${String(start + index + 1).padStart(2, " ")}\` ${name.slice(0, 48)}`,
-                  )
-                  .join("\n")
-              : "_아직 참가자가 없습니다_",
-          inline: participantColumnCount > 1,
-        };
-      },
+    // ─── 참가자 명단 ───
+    // V2 에는 임베드의 inline 필드 같은 다단 레이아웃이 없다. 소규모는 번호를
+    // 붙인 세로 목록이 읽기 좋고, 대규모는 세로로 늘어지므로 흐름 텍스트로 접는다.
+    const LIST_LIMIT = 12;
+    const rosterBody =
+      currentPlayers === 0
+        ? "-# 아직 참가자가 없습니다"
+        : currentPlayers <= LIST_LIMIT
+          ? participants
+              // 번호를 코드 스팬으로 감싸면 자릿수가 달라도 이름 시작 위치가 맞는다.
+              .map(
+                (name, index) =>
+                  `\`${String(index + 1).padStart(2, " ")}\` ${name.slice(0, 48)}`,
+              )
+              .join("\n")
+          : participants.map((name) => name.slice(0, 24)).join(" · ");
+
+    // ─── 컨테이너 ───
+    const container = new ContainerBuilder().setAccentColor(
+      isFull ? 0x22c55e : 0x667eea,
     );
 
-    // 방 이름이 본문이고 "내전 모집"이 제목이라 위계가 뒤집혀 있었다.
-    // 제목을 방 이름으로 올리고, 모드/방장은 한 줄 요약으로 내린다.
-    // (모드를 inline 필드에 두면 모바일 3열에서 "경매 드래프 / 트" 로 잘렸다)
-    const embed = new EmbedBuilder()
-      .setColor(isFull ? 0x22c55e : 0x667eea)
-      .setAuthor({ name: isPrivate ? "내전 모집 · 비공개" : "내전 모집" })
-      .setTitle(`${isPrivate ? "🔒 " : ""}${roomName}`)
-      .setURL(`${appUrl}/tournaments/${roomId}/lobby`)
-      .setDescription(`\`${modeLabel}\` · 방장 **${hostName}**`)
-      .addFields({
-        name: "모집 현황",
-        value: `${gauge}  **${currentPlayers}** / ${maxPlayers}${
-          isFull ? "  ·  모집 완료" : `  ·  ${remainingSlots}자리 남음`
-        }`,
-      })
-      .addFields(...participantColumns)
-      .setFooter({ text: "참가자 변경 시 자동으로 업데이트됩니다." })
-      .setTimestamp();
+    // 헤더: 방 이름을 제목으로 올리고 모드/방장은 요약 줄로. 참가 버튼을 우측에 붙여
+    // 스크롤 없이 바로 누를 수 있게 한다.
+    const headerLines = [
+      `## ${isPrivate ? "🔒 " : ""}${roomName}`,
+      `${modeIcon ? `${modeIcon} ` : ""}${modeLabel}  ·  방장 **${hostName}**`,
+    ];
+    container.addSectionComponents(
+      new SectionBuilder()
+        .addTextDisplayComponents(
+          new TextDisplayBuilder().setContent(headerLines.join("\n")),
+        )
+        .setButtonAccessory(
+          new ButtonBuilder()
+            .setLabel("룸 참가")
+            .setStyle(ButtonStyle.Link)
+            .setURL(lobbyUrl),
+        ),
+    );
 
-    const roomButton = new ButtonBuilder()
-      .setLabel("룸 참가")
-      .setStyle(ButtonStyle.Link)
-      .setURL(`${appUrl}/tournaments/${roomId}/lobby`);
+    container.addSeparatorComponents(
+      new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small),
+    );
 
-    const row = new ActionRowBuilder<ButtonBuilder>();
+    container.addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        [
+          `**모집 현황**  ${isFull ? "· 모집 완료" : `· ${remainingSlots}자리 남음`}`,
+          `${gauge}  **${currentPlayers}** / ${maxPlayers}`,
+        ].join("\n"),
+      ),
+    );
+
+    container.addSeparatorComponents(
+      new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small),
+    );
+
+    container.addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        `**참가자**${currentPlayers > 0 ? ` ${currentPlayers}명` : ""}\n${rosterBody}`,
+      ),
+    );
+
+    // 음성채널 버튼만 하단에 둔다 — "룸 참가"는 이미 헤더 우측 액세서리로 있어
+    // 여기 또 넣으면 같은 버튼이 두 번 보인다.
     if (voiceChannel) {
-      row.addComponents(
-        new ButtonBuilder()
-          .setLabel("음성채널 참가")
-          .setStyle(ButtonStyle.Link)
-          .setURL(
-            `https://discord.com/channels/${voiceChannel.guildId}/${voiceChannel.channelId}`,
-          ),
+      container.addSeparatorComponents(
+        new SeparatorBuilder()
+          .setDivider(false)
+          .setSpacing(SeparatorSpacingSize.Small),
+      );
+      container.addActionRowComponents(
+        new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder()
+            .setLabel("음성채널 참가")
+            .setStyle(ButtonStyle.Link)
+            .setURL(
+              `https://discord.com/channels/${voiceChannel.guildId}/${voiceChannel.channelId}`,
+            ),
+        ),
       );
     }
-    row.addComponents(roomButton);
 
-    return { embed, components: [row] };
+    // 임베드 footer 대응 — `-# ` 는 작은 회색 텍스트로 렌더된다.
+    container.addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        "-# 참가자 변경 시 자동으로 업데이트됩니다.",
+      ),
+    );
+
+    return { components: [container], flags: MessageFlags.IsComponentsV2 };
   }
 
   buildAuctionStartEmbed(roomName: string, teams: string[]) {
