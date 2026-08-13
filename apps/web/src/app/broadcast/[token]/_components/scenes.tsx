@@ -1969,8 +1969,14 @@ function RevealMemberRow({
   const badge = tierBadge(member.tier, member.rank, member.lp);
 
   return (
-    <div className="flex h-full min-h-0 items-center justify-between border border-white/12 bg-white/[0.05] px-4">
+    // 프레임리스: 행 테두리·배경 없이 여백과 팀 컬러 눈금으로만 구분한다.
+    // 박스가 없으면 이름과 우측 정보가 멀수록 한 줄로 안 읽혀서 폭을 제한한다.
+    <div className="flex h-full min-h-0 w-full max-w-[600px] items-center justify-between gap-4">
       <div className="flex min-w-0 items-center gap-3">
+        <span
+          className="h-7 w-[3px] shrink-0 rounded-full"
+          style={{ background: teamColor, opacity: isCaptain ? 1 : 0.32 }}
+        />
         <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-white/10">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -2061,7 +2067,7 @@ export function TeamRevealScene({ snapshot }: { snapshot: any }) {
         <HudRule color={accent} />
 
         <div
-          className="grid min-h-0 flex-1 gap-6"
+          className="grid min-h-0 flex-1 gap-x-14 gap-y-10"
           style={{
             gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
             gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))`,
@@ -2091,14 +2097,11 @@ export function TeamRevealScene({ snapshot }: { snapshot: any }) {
               );
             });
             return (
-              <div
-                key={team.id}
-                className="min-w-0 overflow-hidden border border-white/12 bg-black/45"
-              >
+              <div key={team.id} className="min-w-0 overflow-hidden">
                 {/* 축소 레이어: 실제 칸보다 1/scale 만큼 크게 그린 뒤 통째로 줄인다.
                     폰트·아바타·여백·테두리가 같은 비율로 작아진다. */}
                 <div
-                  className="flex flex-col px-7 py-6"
+                  className="flex flex-col pr-6"
                   style={{
                     width: `${100 / panelScale}%`,
                     height: `${100 / panelScale}%`,
@@ -2106,17 +2109,23 @@ export function TeamRevealScene({ snapshot }: { snapshot: any }) {
                     transformOrigin: "top left",
                   }}
                 >
-                  <div className="flex items-center gap-3">
-                    <span
-                      className="h-8 w-1.5 flex-shrink-0"
-                      style={{ background: teamColor }}
-                    />
-                    <p className="truncate text-3xl font-black">{team.name}</p>
-                  </div>
+                  {/* 팀 이름 자체를 팀 컬러로 세워 박스 없이도 소속이 읽히게 한다 */}
+                  <p
+                    className="truncate text-3xl font-black uppercase tracking-wide"
+                    style={{ color: teamColor }}
+                  >
+                    {team.name}
+                  </p>
                   <div
-                    className="mt-5 grid min-h-0 flex-1 gap-2.5"
+                    className="mt-2 h-[3px] w-16 flex-shrink-0"
+                    style={{ background: teamColor }}
+                  />
+                  <div
+                    // 프레임리스에서는 1fr 로 꽉 채우면 행 사이가 벌어져 한 팀으로
+                    // 안 묶인다. 행 높이를 제한하고 세로 가운데로 모은다.
+                    className="mt-6 grid min-h-0 flex-1 content-center gap-4"
                     style={{
-                      gridTemplateRows: `repeat(${maxMembers}, minmax(0, 1fr))`,
+                      gridTemplateRows: `repeat(${maxMembers}, minmax(0, 64px))`,
                     }}
                   >
                     {members.map((member) => (
