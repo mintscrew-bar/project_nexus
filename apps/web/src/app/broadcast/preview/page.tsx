@@ -88,6 +88,38 @@ const TEAM_COLORS = [
   "#06B6D4",
 ];
 
+// 실제 라이엇 닉네임 길이(최대 16자)를 감안해 짧은 것부터 긴 것까지 섞는다.
+// 잘림 여부를 프리뷰에서 바로 확인하기 위한 목업 값이다.
+const PREVIEW_NICKNAMES = [
+  "칼바람장인",
+  "미드차이",
+  "정글러킹",
+  "와드요정",
+  "막타학살자",
+  "탑솔러갓",
+  "로밍메타",
+  "갱킹장인",
+  "원딜에이스",
+  "서포터장인",
+  "한타의신",
+  "라인전귀신",
+  "닉네임긴사람임",
+];
+
+const PREVIEW_TEAM_TIERS = [
+  "CHALLENGER",
+  "GRANDMASTER",
+  "MASTER",
+  "DIAMOND",
+  "EMERALD",
+  "PLATINUM",
+  "GOLD",
+  "SILVER",
+  "BRONZE",
+  "IRON",
+  "UNRANKED",
+];
+
 const makePreviewTeam = (index: number) => ({
   id: `team${index + 1}`,
   name: `${index + 1}팀`,
@@ -95,13 +127,18 @@ const makePreviewTeam = (index: number) => ({
   captainId: `m${index}-0`,
   initialBudget: 1000,
   remainingBudget: 1000 - index * 80,
-  members: Array.from({ length: index % 3 === 0 ? 4 : 3 }).map((_, slot) => ({
+  // 5v5 기준으로 5명을 꽉 채운다. 라인 정렬이 눈에 보이도록 assignedRole 을
+  // 일부러 뒤섞어 넣고(원딜→탑→서포→정글→미드), 티어도 팀마다 달라지게 한다.
+  members: Array.from({ length: 5 }).map((_, slot) => ({
     userId: `m${index}-${slot}`,
-    username: slot === 0 ? `${index + 1}팀장` : `선수${index + 1}-${slot}`,
+    username:
+      slot === 0
+        ? `${index + 1}팀장`
+        : PREVIEW_NICKNAMES[(index * 5 + slot) % PREVIEW_NICKNAMES.length],
     avatar: null,
-    assignedRole: null,
-    soldPrice: slot === 0 ? null : 100 + slot * 20,
-    tier: ["DIAMOND", "PLATINUM", "GOLD", "EMERALD"][slot % 4],
+    assignedRole: ["ADC", "TOP", "SUPPORT", "JUNGLE", "MID"][slot],
+    soldPrice: slot === 0 ? null : 220 - slot * 30,
+    tier: PREVIEW_TEAM_TIERS[(index * 5 + slot) % PREVIEW_TEAM_TIERS.length],
   })),
 });
 
