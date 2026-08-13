@@ -834,21 +834,20 @@ export class RoomService {
           await this.discordVoiceService?.getRoomNotificationTarget?.(room.id);
 
         if (notificationTarget) {
-          const messageId =
-            await this.discordBotService.sendRoomRecruitMessage(
-              notificationTarget.guildId,
-              notificationTarget.channelId,
-              {
-                roomId: room.id,
-                roomName: room.name,
-                hostName: room.host.username,
-                maxPlayers: room.maxParticipants,
-                teamMode: room.teamMode,
-                isPrivate: room.isPrivate,
-                participants: [room.host.username], // 방 생성 시 방장 1명
-                voiceChannelId: lobbyVoiceChannelId,
-              },
-            );
+          const messageId = await this.discordBotService.sendRoomRecruitMessage(
+            notificationTarget.guildId,
+            notificationTarget.channelId,
+            {
+              roomId: room.id,
+              roomName: room.name,
+              hostName: room.host.username,
+              maxPlayers: room.maxParticipants,
+              teamMode: room.teamMode,
+              isPrivate: room.isPrivate,
+              participants: [room.host.username], // 방 생성 시 방장 1명
+              voiceChannelId: lobbyVoiceChannelId,
+            },
+          );
 
           if (messageId) {
             this.discordBotService.storeRoomNotification(room.id, {

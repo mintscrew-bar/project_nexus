@@ -2419,13 +2419,15 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
         .addTextDisplayComponents(
           new TextDisplayBuilder().setContent(headerLines.join("\n")),
         )
-        .setButtonAccessory(withEmoji(
-          new ButtonBuilder()
-            .setLabel("룸 참가")
-            .setStyle(ButtonStyle.Link)
-            .setURL(lobbyUrl),
-          emojis.nx_btn_join,
-        )),
+        .setButtonAccessory(
+          withEmoji(
+            new ButtonBuilder()
+              .setLabel("룸 참가")
+              .setStyle(ButtonStyle.Link)
+              .setURL(lobbyUrl),
+            emojis.nx_btn_join,
+          ),
+        ),
     );
 
     container.addSeparatorComponents(
