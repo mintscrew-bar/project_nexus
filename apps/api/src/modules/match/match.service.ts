@@ -20,6 +20,7 @@ import { NotificationService } from "../notification/notification.service";
 import { MatchBracketService, Bracket } from "./match-bracket.service";
 import { MatchAdvancementService } from "./match-advancement.service";
 import { MatchSeriesService } from "./match-series.service";
+import { RankingService } from "../ranking/ranking.service";
 import {
   Prisma,
   RoomStatus,
@@ -76,6 +77,7 @@ export class MatchService {
     private readonly matchBracketService: MatchBracketService,
     private readonly matchAdvancementService: MatchAdvancementService,
     private readonly matchSeriesService: MatchSeriesService,
+    @Optional() private readonly rankingService?: RankingService,
     @Optional() @Inject("DISCORD_BOT_SERVICE") discordBot?: any,
     @Optional() @Inject("DISCORD_VOICE_SERVICE") discordVoice?: any,
   ) {
@@ -439,6 +441,11 @@ export class MatchService {
       where: { id: roomId },
       data: { broadcastFocusMatchId: matchId },
     });
+
+    // 승패는 Riot 데이터와 무관하게 여기서 확정된다. 예전에는 랭킹 갱신이
+    // Riot 전적 수집 성공 후에만 돌아서, 수집이 불가능한 수동 사설방의 결과는
+    // 랭킹에 영원히 반영되지 않았다.
+    void this.updateRankingsForMatch(matchId);
 
     // 다전제: 게임 결과를 시리즈에 반영한다.
     // 아직 선취 승수에 도달하지 않았으면 진출시키지 않고 다음 세트를 만든다
@@ -1123,6 +1130,32 @@ export class MatchService {
         status: "PENDING",
       },
     });
+  }
+
+  /**
+   * 매치 참가자 전원의 Nexus 랭킹을 갱신한다.
+   * 랭킹은 결과 입력만으로 성립하므로 Riot 수집을 기다리지 않는다.
+   * 실패해도 결과 보고 자체는 성공시켜야 하므로 예외를 삼킨다.
+   */
+  private async updateRankingsForMatch(matchId: string): Promise<void> {
+    if (!this.rankingService) return;
+
+    try {
+      const rosters = await this.prisma.matchRosterSnapshot.findMany({
+        where: { matchId, userId: { not: null } },
+        select: { userId: true },
+      });
+
+      await Promise.all(
+        rosters
+          .map((roster) => roster.userId)
+          .filter((userId): userId is string => Boolean(userId))
+          .map((userId) => this.rankingService!.updateRanking(userId)),
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`랭킹 갱신 실패 matchId=${matchId}: ${message}`);
+    }
   }
 
   private async completeInternalMatchWithSnapshot(

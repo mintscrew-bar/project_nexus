@@ -9,6 +9,9 @@ describe("RankingService", () => {
       matchParticipant: {
         findMany: jest.fn(),
       },
+      matchRosterSnapshot: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
       nexusRanking: {
         upsert: jest.fn(),
         findMany: jest.fn(),
@@ -27,26 +30,50 @@ describe("RankingService", () => {
   });
 
   describe("updateRanking", () => {
-    it("외부 Riot 인제스트 매치를 제외하고 Nexus 내전만 랭킹에 반영한다", async () => {
-      prisma.matchParticipant.findMany.mockResolvedValue([
-        { win: true, createdAt: new Date("2026-05-01T00:00:00.000Z") },
-        { win: false, createdAt: new Date("2026-04-30T00:00:00.000Z") },
+    it("Riot 수집 없이 로스터 스냅샷과 경기 결과만으로 승패를 센다", async () => {
+      // 수동 사설방은 match_participants 가 0건이다. 그래도 방장이 입력한
+      // 승패는 랭킹에 반영돼야 한다.
+      prisma.matchRosterSnapshot.findMany.mockResolvedValue([
+        {
+          teamSlot: "A",
+          match: {
+            completedAt: new Date("2026-05-01T00:00:00.000Z"),
+            winnerId: null,
+            winnerIdSnapshot: "team-a",
+            teamAId: null,
+            teamBId: null,
+            teamAIdSnapshot: "team-a",
+            teamBIdSnapshot: "team-b",
+          },
+        },
+        {
+          teamSlot: "B",
+          match: {
+            completedAt: new Date("2026-04-30T00:00:00.000Z"),
+            winnerId: null,
+            winnerIdSnapshot: "team-a",
+            teamAId: null,
+            teamBId: null,
+            teamAIdSnapshot: "team-a",
+            teamBIdSnapshot: "team-b",
+          },
+        },
       ]);
       prisma.nexusRanking.upsert.mockResolvedValue({});
       prisma.clanMember.findMany.mockResolvedValue([]);
 
       await service.updateRanking("user-1");
 
-      expect(prisma.matchParticipant.findMany).toHaveBeenCalledWith({
-        where: {
-          userId: "user-1",
-          match: {
-            isInternal: true,
+      // Riot 수집 결과는 더 이상 승패 근거가 아니다.
+      expect(prisma.matchParticipant.findMany).not.toHaveBeenCalled();
+      expect(prisma.matchRosterSnapshot.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            userId: "user-1",
+            match: { isInternal: true, status: "COMPLETED" },
           },
-        },
-        select: { win: true, createdAt: true },
-        orderBy: { createdAt: "desc" },
-      });
+        }),
+      );
       expect(prisma.nexusRanking.upsert).toHaveBeenCalledWith(
         expect.objectContaining({
           create: expect.objectContaining({
@@ -60,6 +87,64 @@ describe("RankingService", () => {
             wins: 1,
             losses: 1,
             winRate: 50,
+          }),
+        }),
+      );
+    });
+  });
+
+  describe("승패 판정", () => {
+    const snapshot = (teamSlot: string, winnerIdSnapshot: string | null) => ({
+      teamSlot,
+      match: {
+        completedAt: new Date("2026-05-01T00:00:00.000Z"),
+        winnerId: null,
+        winnerIdSnapshot,
+        teamAId: null,
+        teamBId: null,
+        teamAIdSnapshot: "team-a",
+        teamBIdSnapshot: "team-b",
+      },
+    });
+
+    beforeEach(() => {
+      prisma.nexusRanking.upsert.mockResolvedValue({});
+      prisma.clanMember.findMany.mockResolvedValue([]);
+    });
+
+    it("결과가 입력되지 않은 경기는 집계에서 제외한다", async () => {
+      prisma.matchRosterSnapshot.findMany.mockResolvedValue([
+        snapshot("A", "team-a"),
+        snapshot("A", null),
+      ]);
+
+      await service.updateRanking("user-1");
+
+      expect(prisma.nexusRanking.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          create: expect.objectContaining({
+            totalGames: 1,
+            wins: 1,
+            losses: 0,
+          }),
+        }),
+      );
+    });
+
+    it("진 팀 슬롯이면 패배로 센다", async () => {
+      prisma.matchRosterSnapshot.findMany.mockResolvedValue([
+        snapshot("B", "team-a"),
+      ]);
+
+      await service.updateRanking("user-1");
+
+      expect(prisma.nexusRanking.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          create: expect.objectContaining({
+            totalGames: 1,
+            wins: 0,
+            losses: 1,
+            winRate: 0,
           }),
         }),
       );
