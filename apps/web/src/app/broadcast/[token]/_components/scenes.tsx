@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { getTierIcon } from "@/lib/tier-icon";
+import { getRoleIcon, normalizeRole } from "@/lib/role-icon";
 
 /**
  * Nexus Broadcast HUD scenes.
@@ -745,20 +746,8 @@ const ROLE_NAMES: Record<string, string> = {
   UTILITY: "SUP",
 };
 
-const ROLE_ICON: Record<string, string> = {
-  TOP: "/icons/positions/position-top.svg",
-  JUNGLE: "/icons/positions/position-jungle.svg",
-  MID: "/icons/positions/position-middle.svg",
-  ADC: "/icons/positions/position-bottom.svg",
-  SUPPORT: "/icons/positions/position-utility.svg",
-};
-
 function roleKeyOf(member: any) {
-  const role = String(member?.assignedRole ?? "").toUpperCase();
-  if (role === "MIDDLE") return "MID";
-  if (role === "BOTTOM") return "ADC";
-  if (role === "UTILITY") return "SUPPORT";
-  return role || null;
+  return normalizeRole(member?.assignedRole);
 }
 
 function introRosterOf(team: any) {
@@ -835,7 +824,7 @@ function IntroRole({ role }: { role: string }) {
     <div className="flex flex-col items-center gap-1">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src={ROLE_ICON[role]}
+        src={getRoleIcon(role) ?? undefined}
         alt=""
         className="h-5 w-5 brightness-0 invert opacity-70"
       />
@@ -936,7 +925,7 @@ function RoleSlot({
       <div className="flex items-center gap-2">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={ROLE_ICON[role]}
+          src={getRoleIcon(role) ?? undefined}
           alt=""
           width={compact ? 16 : 20}
           height={compact ? 16 : 20}

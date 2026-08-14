@@ -31,6 +31,7 @@ import type { SummonerData, ChampionStats, NexusMatchHistory } from "@/component
 import { getQueueTypeName } from "@/components/matches/match-utils";
 import { getChampionKoreanName } from "@nexus/types";
 import RecentStatsSummary from "@/components/matches/RecentStatsSummary";
+import { RoleRecordList } from "@/components/domain/RoleRecordList";
 import RiotMatchList from "@/components/matches/RiotMatchList";
 
 type QueueGroup = "ranked" | "normal" | "aram" | "custom" | "all";
@@ -729,6 +730,11 @@ export default function SummonerStatsPage() {
                     <p className="text-[10px] sm:text-xs text-text-tertiary">
                       {nexusRanking.totalGames}전 {nexusRanking.wins}승 {nexusRanking.losses}패
                     </p>
+                    {nexusRanking.byRole?.length > 0 && (
+                      <div className="mt-2 border-t border-bg-elevated pt-2">
+                        <RoleRecordList records={nexusRanking.byRole} />
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="bg-bg-tertiary rounded-lg p-2 sm:p-3">

@@ -13,21 +13,11 @@ import { cn } from "@/lib/utils";
 import { getTierIcon } from "@/lib/tier-icon";
 import { Users, Hand, Check, Coins, ScrollText, Gavel, MessageSquare, Maximize2, SkipForward } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
-
-const ROLE_ICON: Record<string, string> = {
-  TOP: '/icons/positions/position-top.svg',
-  JUNGLE: '/icons/positions/position-jungle.svg',
-  MID: '/icons/positions/position-middle.svg',
-  MIDDLE: '/icons/positions/position-middle.svg',
-  ADC: '/icons/positions/position-bottom.svg',
-  BOTTOM: '/icons/positions/position-bottom.svg',
-  SUPPORT: '/icons/positions/position-utility.svg',
-  UTILITY: '/icons/positions/position-utility.svg',
-};
+import { getRoleIcon } from "@/lib/role-icon";
 
 function RoleIcon({ role, dim }: { role?: string; dim?: boolean }) {
   if (!role) return null;
-  const url = ROLE_ICON[role.toUpperCase()];
+  const url = getRoleIcon(role.toUpperCase());
   if (!url) return null;
   // eslint-disable-next-line @next/next/no-img-element
   return <img src={url} alt={role} className="h-3.5 w-3.5 shrink-0 brightness-0 invert" style={{ opacity: dim ? 0.35 : 0.8 }} />;

@@ -7,7 +7,8 @@ import Image from "next/image";
 import { userApi, matchApi, statsApi, rankingApi } from "@/lib/api-client";
 import { LoadingSpinner, Button, Badge, Skeleton } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
-import { ArrowLeft, User, Trophy, Target, TrendingUp, Calendar, ExternalLink } from "lucide-react";
+import { ArrowLeft, User, Trophy, Target, TrendingUp, Calendar, ExternalLink, Swords } from "lucide-react";
+import { RoleRecordList } from "@/components/domain/RoleRecordList";
 import Link from "next/link";
 
 import { getChampionIcon } from "@/components/matches/match-utils";
@@ -294,6 +295,24 @@ export default function UserStatsPage() {
             </div>
           </div>
         </div>
+
+        {/* 내전 라인별 전적 — 승패는 Nexus가 확정하므로 Riot 수집과 무관하게 쌓인다 */}
+        {nexusRanking && (
+          <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-6 mb-6">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h2 className="flex items-center gap-2 text-xl font-bold text-text-primary">
+                <Swords className="h-5 w-5 text-accent-primary" />
+                내전 라인별 전적
+              </h2>
+              <p className="text-sm text-text-tertiary">
+                {nexusRanking.totalGames}전 {nexusRanking.wins}승{" "}
+                {nexusRanking.losses}패
+                {nexusRanking.globalRank ? ` · #${nexusRanking.globalRank}` : ""}
+              </p>
+            </div>
+            <RoleRecordList records={nexusRanking.byRole} />
+          </div>
+        )}
 
         {/* Riot Accounts */}
         {riotAccounts.length > 0 && (

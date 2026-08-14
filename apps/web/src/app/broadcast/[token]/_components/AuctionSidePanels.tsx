@@ -5,26 +5,16 @@ import { Card } from "@/components/ui";
 import { Avatar } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { getTierIcon } from "@/lib/tier-icon";
+import { getRoleIcon } from "@/lib/role-icon";
 
 /**
  * 방송용 경매 사이드 패널(read-only) — 기존 경매 페이지의 팀 요약/남은 매물
  * 패널을 넥서스 디자인 그대로 재현하되, 호버·프로필 모달 등 상호작용은 제거.
  */
 
-const ROLE_ICON: Record<string, string> = {
-  TOP: "/icons/positions/position-top.svg",
-  JUNGLE: "/icons/positions/position-jungle.svg",
-  MID: "/icons/positions/position-middle.svg",
-  MIDDLE: "/icons/positions/position-middle.svg",
-  ADC: "/icons/positions/position-bottom.svg",
-  BOTTOM: "/icons/positions/position-bottom.svg",
-  SUPPORT: "/icons/positions/position-utility.svg",
-  UTILITY: "/icons/positions/position-utility.svg",
-};
-
 function RoleIcon({ role, dim }: { role?: string | null; dim?: boolean }) {
   if (!role) return null;
-  const url = ROLE_ICON[role.toUpperCase()];
+  const url = getRoleIcon(role.toUpperCase());
   if (!url) return null;
   return (
     // eslint-disable-next-line @next/next/no-img-element

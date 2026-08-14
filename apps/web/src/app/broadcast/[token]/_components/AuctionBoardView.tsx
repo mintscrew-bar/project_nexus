@@ -5,22 +5,12 @@ import { Avatar } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { getTierIcon } from "@/lib/tier-icon";
 import type { BroadcastAuctionData } from "../_live/useBroadcastAuction";
+import { getRoleIcon } from "@/lib/role-icon";
 
 /**
  * 방송용 경매 화면.
  * 앱 화면을 그대로 복제하기보다 OBS에서 바로 읽히는 중계 그래픽으로 재구성한다.
  */
-
-const ROLE_ICON: Record<string, string> = {
-  TOP: "/icons/positions/position-top.svg",
-  JUNGLE: "/icons/positions/position-jungle.svg",
-  MID: "/icons/positions/position-middle.svg",
-  MIDDLE: "/icons/positions/position-middle.svg",
-  ADC: "/icons/positions/position-bottom.svg",
-  BOTTOM: "/icons/positions/position-bottom.svg",
-  SUPPORT: "/icons/positions/position-utility.svg",
-  UTILITY: "/icons/positions/position-utility.svg",
-};
 
 const ROLE_LABELS: Record<string, string> = {
   TOP: "TOP",
@@ -100,7 +90,7 @@ const sortTeams = (teams: any[]) =>
 
 function RoleIcon({ role, dim }: { role?: string | null; dim?: boolean }) {
   if (!role) return null;
-  const url = ROLE_ICON[role.toUpperCase()];
+  const url = getRoleIcon(role.toUpperCase());
   if (!url) return null;
   return (
     // eslint-disable-next-line @next/next/no-img-element
