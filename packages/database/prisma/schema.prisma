@@ -67,6 +67,7 @@ model User {
   matchParticipations            MatchParticipant[]
   matchRosterSnapshots           MatchRosterSnapshot[]
   matchDraftSnapshots            MatchDraftSnapshot[]
+  nexusRoleRecords               NexusRoleRecord[]
   matchStatsCaches               MatchStatsCache[]
   nexusRanking                   NexusRanking?
   notifications                  Notification[]
@@ -786,6 +787,9 @@ model MatchRosterSnapshot {
   teamSlot       String
   teamIdSnapshot String?
   teamName       String
+  /// 역할 선택에서 배정된 라인. TeamMember.assignedRole은 방과 함께 삭제되므로
+  /// 라인별 전적을 남기려면 스냅샷 시점에 함께 복사해 두어야 한다.
+  assignedRole   Role?
   createdAt      DateTime @default(now())
   match          Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
   user           User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
@@ -1335,6 +1339,27 @@ model AdminAuditLog {
   @@index([action])
   @@index([createdAt])
   @@map("admin_audit_logs")
+}
+
+/// 내전 라인별 전적.
+///
+/// 승패는 Nexus가 자체 확정하는 값이라 Riot 수집과 무관하게 집계된다.
+/// (개인 스탯은 2차 보강 영역이고, 여기 값은 1차로 항상 존재한다)
+model NexusRoleRecord {
+  id         String   @id @default(cuid())
+  userId     String
+  role       Role
+  totalGames Int      @default(0)
+  wins       Int      @default(0)
+  losses     Int      @default(0)
+  winRate    Float    @default(0)
+  updatedAt  DateTime @updatedAt
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, role])
+  @@index([userId])
+  @@index([role, winRate])
+  @@map("nexus_role_records")
 }
 
 model NexusRanking {

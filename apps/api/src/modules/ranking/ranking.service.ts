@@ -1,5 +1,7 @@
 import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
+import { Role } from "@nexus/database";
+import { resolveWinnerSlot } from "../match/match-roster.util";
 
 @Injectable()
 export class RankingService {
@@ -14,35 +16,17 @@ export class RankingService {
    */
   async updateRanking(userId: string): Promise<void> {
     try {
-      // Nexus 랭킹은 내전만 반영한다. 외부 Riot 인제스트 매치도
-      // match_participants.userId에 매핑될 수 있으므로 roomId로 분리한다.
-      const participants = await this.prisma.matchParticipant.findMany({
-        where: {
-          userId,
-          match: {
-            isInternal: true,
-          },
-        },
-        select: { win: true, createdAt: true },
-        orderBy: { createdAt: "desc" },
-      });
+      const {
+        totalGames,
+        wins,
+        losses,
+        winRate,
+        recentWins,
+        recentLosses,
+        byRole,
+      } = await this.computeInternalRecord(userId);
 
-      const totalGames = participants.length;
-      const wins = participants.filter(
-        (p: { win: boolean; createdAt: Date }) => p.win,
-      ).length;
-      const losses = totalGames - wins;
-      const winRate = totalGames > 0 ? (wins / totalGames) * 100 : 0;
-
-      // Recent form (last 20 games)
-      const recentGames = participants.slice(
-        0,
-        RankingService.RECENT_GAMES_COUNT,
-      );
-      const recentWins = recentGames.filter(
-        (p: { win: boolean; createdAt: Date }) => p.win,
-      ).length;
-      const recentLosses = recentGames.length - recentWins;
+      await this.syncRoleRecords(userId, byRole);
 
       // Upsert NexusRanking
       await this.prisma.nexusRanking.upsert({
@@ -85,6 +69,123 @@ export class RankingService {
   }
 
   /**
+   * 내전 전적(승/패)을 계산한다.
+   *
+   * 예전에는 match_participants(=Riot 수집 결과)로 셌다. 그런데 수동 사설방은
+   * Riot이 데이터를 주지 않아 참가자 행이 0건이고, 방장이 버튼으로 입력한 승패가
+   * 랭킹에 전혀 반영되지 않았다.
+   *
+   * 승패는 Nexus가 자체적으로 확정하는 값이므로 Riot 수집 여부와 무관해야 한다.
+   * 로스터 스냅샷(방이 삭제돼도 남는다)과 매치 결과만으로 계산한다.
+   */
+  private async computeInternalRecord(userId: string): Promise<{
+    totalGames: number;
+    wins: number;
+    losses: number;
+    winRate: number;
+    recentWins: number;
+    recentLosses: number;
+    byRole: Map<Role, { totalGames: number; wins: number }>;
+  }> {
+    const rosters = await this.prisma.matchRosterSnapshot.findMany({
+      where: {
+        userId,
+        match: { isInternal: true, status: "COMPLETED" },
+      },
+      select: {
+        teamSlot: true,
+        assignedRole: true,
+        match: {
+          select: {
+            completedAt: true,
+            winnerId: true,
+            winnerIdSnapshot: true,
+            teamAId: true,
+            teamBId: true,
+            teamAIdSnapshot: true,
+            teamBIdSnapshot: true,
+          },
+        },
+      },
+      orderBy: { match: { completedAt: "desc" } },
+    });
+
+    // 승패가 확정된 경기만 집계한다 (결과 미입력 경기는 제외).
+    const results = rosters
+      .map((roster) => {
+        const winnerSlot = resolveWinnerSlot(roster.match);
+        return winnerSlot
+          ? { win: winnerSlot === roster.teamSlot, role: roster.assignedRole }
+          : null;
+      })
+      .filter(
+        (result): result is { win: boolean; role: Role | null } =>
+          result !== null,
+      );
+
+    const totalGames = results.length;
+    const wins = results.filter((result) => result.win).length;
+    const recentGames = results.slice(0, RankingService.RECENT_GAMES_COUNT);
+    const recentWins = recentGames.filter((result) => result.win).length;
+
+    // 라인별 집계. 역할 선택을 거치지 않은 경기(assignedRole 없음)는 제외한다.
+    const byRole = new Map<Role, { totalGames: number; wins: number }>();
+    for (const result of results) {
+      if (!result.role) continue;
+      const entry = byRole.get(result.role) ?? { totalGames: 0, wins: 0 };
+      entry.totalGames += 1;
+      if (result.win) entry.wins += 1;
+      byRole.set(result.role, entry);
+    }
+
+    return {
+      totalGames,
+      wins,
+      losses: totalGames - wins,
+      winRate: totalGames > 0 ? (wins / totalGames) * 100 : 0,
+      recentWins,
+      recentLosses: recentGames.length - recentWins,
+      byRole,
+    };
+  }
+
+  /**
+   * 라인별 전적을 저장한다.
+   * 집계에서 사라진 라인은 남겨두면 오래된 값이 유령처럼 보이므로 지운다.
+   */
+  private async syncRoleRecords(
+    userId: string,
+    byRole: Map<Role, { totalGames: number; wins: number }>,
+  ): Promise<void> {
+    const activeRoles = [...byRole.keys()];
+
+    await this.prisma.nexusRoleRecord.deleteMany({
+      where: {
+        userId,
+        ...(activeRoles.length > 0 ? { role: { notIn: activeRoles } } : {}),
+      },
+    });
+
+    for (const [role, entry] of byRole) {
+      const losses = entry.totalGames - entry.wins;
+      const winRate =
+        entry.totalGames > 0 ? (entry.wins / entry.totalGames) * 100 : 0;
+      const payload = {
+        totalGames: entry.totalGames,
+        wins: entry.wins,
+        losses,
+        winRate,
+      };
+
+      await this.prisma.nexusRoleRecord.upsert({
+        where: { userId_role: { userId, role } },
+        create: { userId, role, ...payload },
+        update: payload,
+      });
+    }
+  }
+
+  /**
    * Update clan-specific ranking for a user.
    * Since rooms don't have a clanId field, clan ranking uses the same
    * Nexus custom-match stats to rank members within each clan.
@@ -93,20 +194,8 @@ export class RankingService {
     userId: string,
     clanId: string,
   ): Promise<void> {
-    const participants = await this.prisma.matchParticipant.findMany({
-      where: {
-        userId,
-        match: {
-          isInternal: true,
-        },
-      },
-      select: { win: true },
-    });
-
-    const totalGames = participants.length;
-    const wins = participants.filter((p: { win: boolean }) => p.win).length;
-    const losses = totalGames - wins;
-    const winRate = totalGames > 0 ? (wins / totalGames) * 100 : 0;
+    const { totalGames, wins, losses, winRate } =
+      await this.computeInternalRecord(userId);
 
     await this.prisma.clanRanking.upsert({
       where: { userId_clanId: { userId, clanId } },
@@ -239,9 +328,18 @@ export class RankingService {
    * Get a specific user's ranking info
    */
   async getUserRanking(userId: string) {
-    const ranking = await this.prisma.nexusRanking.findUnique({
-      where: { userId },
-    });
+    const [ranking, roleRecords] = await Promise.all([
+      this.prisma.nexusRanking.findUnique({ where: { userId } }),
+      // 라인별 전적 — 표시 순서는 라인 순(TOP→SUPPORT)으로 고정한다.
+      this.prisma.nexusRoleRecord.findMany({ where: { userId } }),
+    ]);
+
+    const ROLE_ORDER: Role[] = ["TOP", "JUNGLE", "MID", "ADC", "SUPPORT"];
+    const byRole = ROLE_ORDER.map(
+      (role) => roleRecords.find((record) => record.role === role) ?? null,
+    ).filter((record): record is (typeof roleRecords)[number] =>
+      Boolean(record),
+    );
 
     if (!ranking) {
       return {
@@ -252,6 +350,7 @@ export class RankingService {
         globalRank: null,
         recentWins: 0,
         recentLosses: 0,
+        byRole,
       };
     }
 
@@ -276,6 +375,7 @@ export class RankingService {
     return {
       ...ranking,
       globalRank,
+      byRole,
     };
   }
 

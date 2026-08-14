@@ -20,6 +20,7 @@ import { NotificationService } from "../notification/notification.service";
 import { MatchBracketService, Bracket } from "./match-bracket.service";
 import { MatchAdvancementService } from "./match-advancement.service";
 import { MatchSeriesService } from "./match-series.service";
+import { RankingService } from "../ranking/ranking.service";
 import {
   Prisma,
   RoomStatus,
@@ -34,6 +35,11 @@ import {
 
 // Re-export types for backward compatibility
 export type { BracketMatch, Bracket } from "./match-bracket.service";
+import {
+  resolveMatchMembers,
+  resolveWinnerSlot,
+  type TeamSlot,
+} from "./match-roster.util";
 
 /** 라이브 캡처에서 puuid를 Nexus 유저·팀으로 되돌리기 위한 항목 */
 interface LiveRosterEntry {
@@ -71,6 +77,7 @@ export class MatchService {
     private readonly matchBracketService: MatchBracketService,
     private readonly matchAdvancementService: MatchAdvancementService,
     private readonly matchSeriesService: MatchSeriesService,
+    @Optional() private readonly rankingService?: RankingService,
     @Optional() @Inject("DISCORD_BOT_SERVICE") discordBot?: any,
     @Optional() @Inject("DISCORD_VOICE_SERVICE") discordVoice?: any,
   ) {
@@ -434,6 +441,11 @@ export class MatchService {
       where: { id: roomId },
       data: { broadcastFocusMatchId: matchId },
     });
+
+    // 승패는 Riot 데이터와 무관하게 여기서 확정된다. 예전에는 랭킹 갱신이
+    // Riot 전적 수집 성공 후에만 돌아서, 수집이 불가능한 수동 사설방의 결과는
+    // 랭킹에 영원히 반영되지 않았다.
+    void this.updateRankingsForMatch(matchId);
 
     // 다전제: 게임 결과를 시리즈에 반영한다.
     // 아직 선취 승수에 도달하지 않았으면 진출시키지 않고 다음 세트를 만든다
@@ -1120,6 +1132,32 @@ export class MatchService {
     });
   }
 
+  /**
+   * 매치 참가자 전원의 Nexus 랭킹을 갱신한다.
+   * 랭킹은 결과 입력만으로 성립하므로 Riot 수집을 기다리지 않는다.
+   * 실패해도 결과 보고 자체는 성공시켜야 하므로 예외를 삼킨다.
+   */
+  private async updateRankingsForMatch(matchId: string): Promise<void> {
+    if (!this.rankingService) return;
+
+    try {
+      const rosters = await this.prisma.matchRosterSnapshot.findMany({
+        where: { matchId, userId: { not: null } },
+        select: { userId: true },
+      });
+
+      await Promise.all(
+        rosters
+          .map((roster) => roster.userId)
+          .filter((userId): userId is string => Boolean(userId))
+          .map((userId) => this.rankingService!.updateRanking(userId)),
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`랭킹 갱신 실패 matchId=${matchId}: ${message}`);
+    }
+  }
+
   private async completeInternalMatchWithSnapshot(
     matchId: string,
     winnerId: string,
@@ -1183,6 +1221,8 @@ export class MatchService {
         userId: member.userId,
         username: member.user.username,
         puuid: member.user.riotAccounts[0]?.puuid ?? null,
+        // 라인별 전적용 — assignedRole 은 방과 함께 사라지므로 여기서 복사한다
+        assignedRole: member.assignedRole ?? null,
         teamSlot: "A",
         teamIdSnapshot: match.teamA!.id,
         teamName: match.teamA!.name,
@@ -1192,6 +1232,7 @@ export class MatchService {
         userId: member.userId,
         username: member.user.username,
         puuid: member.user.riotAccounts[0]?.puuid ?? null,
+        assignedRole: member.assignedRole ?? null,
         teamSlot: "B",
         teamIdSnapshot: match.teamB!.id,
         teamName: match.teamB!.name,
@@ -1619,6 +1660,8 @@ export class MatchService {
       include: {
         teamA: { include: { members: true } },
         teamB: { include: { members: true } },
+        // 방이 정리되면 팀·팀멤버가 사라지므로 스냅샷이 유일한 참가자 근거가 된다.
+        rosterSnapshots: true,
       },
     });
 
@@ -1626,39 +1669,35 @@ export class MatchService {
     if (match.status !== MatchStatus.COMPLETED) {
       throw new BadRequestException("투표는 경기 종료 후에만 가능합니다.");
     }
-    if (!match.winnerId) {
+
+    // winnerId 도 방 삭제 시 NULL 이 되므로 스냅샷까지 본다.
+    const winnerSlot = resolveWinnerSlot(match);
+    if (!winnerSlot) {
       throw new BadRequestException("경기 결과가 아직 입력되지 않았습니다.");
     }
 
-    // 투표자가 해당 매치 참가자인지 확인
-    const allMemberIds = [
-      ...(match.teamA?.members ?? []),
-      ...(match.teamB?.members ?? []),
-    ].map((m) => m.userId);
+    const members = resolveMatchMembers(match);
 
-    if (!allMemberIds.includes(voterId)) {
+    // 투표자가 해당 매치 참가자인지 확인
+    if (!members.some((member) => member.userId === voterId)) {
       throw new ForbiddenException("해당 경기 참가자만 투표할 수 있습니다.");
     }
 
     // 투표 대상이 올바른 팀인지 확인
-    const loserId =
-      match.winnerId === match.teamAId ? match.teamBId : match.teamAId;
-    const winnerMembers =
-      (match.winnerId === match.teamAId ? match.teamA : match.teamB)?.members ??
-      [];
-    const loserMembers =
-      (loserId === match.teamAId ? match.teamA : match.teamB)?.members ?? [];
+    const loserSlot: TeamSlot = winnerSlot === "A" ? "B" : "A";
+    const isInSlot = (userId: string, slot: TeamSlot) =>
+      members.some(
+        (member) => member.userId === userId && member.slot === slot,
+      );
 
     if (voteType === VoteType.MVP) {
-      const isWinnerMember = winnerMembers.some((m) => m.userId === votedForId);
-      if (!isWinnerMember) {
+      if (!isInSlot(votedForId, winnerSlot)) {
         throw new BadRequestException(
           "MVP는 이긴 팀 멤버만 선택할 수 있습니다.",
         );
       }
     } else {
-      const isLoserMember = loserMembers.some((m) => m.userId === votedForId);
-      if (!isLoserMember) {
+      if (!isInSlot(votedForId, loserSlot)) {
         throw new BadRequestException("ACE는 진 팀 멤버만 선택할 수 있습니다.");
       }
     }

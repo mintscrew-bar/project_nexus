@@ -1,4 +1,5 @@
 import { getChampionIcon, getChampionIconById } from "@/components/matches/match-utils";
+import { getRoleIcon } from "@/lib/role-icon";
 
 export function getChampionIconUrl(championId: string) {
   const raw = String(championId ?? "").trim();
@@ -14,24 +15,13 @@ export function getChampionIconUrl(championId: string) {
   return getChampionIcon(raw);
 }
 
-export const POSITION_ICON_URLS = {
-  TOP: "/icons/positions/position-top.svg",
-  JUNGLE: "/icons/positions/position-jungle.svg",
-  MID: "/icons/positions/position-middle.svg",
-  MIDDLE: "/icons/positions/position-middle.svg",
-  ADC: "/icons/positions/position-bottom.svg",
-  BOTTOM: "/icons/positions/position-bottom.svg",
-  SUPPORT: "/icons/positions/position-utility.svg",
-  UTILITY: "/icons/positions/position-utility.svg",
-} as const;
-
 export const POSITION_LABELS: Record<string, string> = {
   TOP: "탑", JUNGLE: "정글", MID: "미드", MIDDLE: "미드",
   ADC: "원딜", BOTTOM: "원딜", SUPPORT: "서포터", UTILITY: "서포터",
 };
 
 export function PositionIcon({ position, className = "", opacity = 1, showLabel = false }: { position: string; className?: string; opacity?: number; showLabel?: boolean }) {
-  const iconUrl = POSITION_ICON_URLS[position as keyof typeof POSITION_ICON_URLS];
+  const iconUrl = getRoleIcon(position);
   if (!iconUrl) return null;
   return (
     <span className="inline-flex items-center gap-1">

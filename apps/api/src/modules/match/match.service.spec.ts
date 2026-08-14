@@ -306,6 +306,62 @@ describe("MatchService", () => {
     });
   });
 
+  describe("방이 정리된 매치의 투표", () => {
+    // 운영 실측: 완료된 내전 8건 전부 teamAId/winnerId 가 NULL 이고
+    // 팀·팀멤버 행이 0개다. 그래서 투표·평가가 전원 차단돼 있었다.
+    const archived = {
+      id: "match-1",
+      status: "COMPLETED",
+      teamAId: null,
+      teamBId: null,
+      winnerId: null,
+      teamAIdSnapshot: "team-a",
+      teamBIdSnapshot: "team-b",
+      winnerIdSnapshot: "team-a",
+      teamA: null,
+      teamB: null,
+      rosterSnapshots: [
+        { userId: "winner-1", teamSlot: "A" },
+        { userId: "winner-2", teamSlot: "A" },
+        { userId: "loser-1", teamSlot: "B" },
+      ],
+    };
+
+    beforeEach(() => {
+      prisma.match.findUnique.mockResolvedValue(archived);
+      prisma.matchVote = { create: jest.fn(), findMany: jest.fn() };
+      prisma.match.update = jest.fn();
+    });
+
+    it("스냅샷 참가자의 MVP 투표를 허용한다", async () => {
+      jest
+        .spyOn(service as any, "recalculateVoteWinnerTx")
+        .mockResolvedValue(undefined);
+
+      await expect(
+        service.submitVote("winner-2", "match-1", "winner-1", "MVP" as never),
+      ).resolves.toEqual({ message: "투표가 완료되었습니다." });
+    });
+
+    it("참가하지 않은 유저는 여전히 막는다", async () => {
+      await expect(
+        service.submitVote("outsider", "match-1", "winner-1", "MVP" as never),
+      ).rejects.toThrow("해당 경기 참가자만 투표할 수 있습니다.");
+    });
+
+    it("MVP 대상이 진 팀이면 막는다", async () => {
+      await expect(
+        service.submitVote("winner-2", "match-1", "loser-1", "MVP" as never),
+      ).rejects.toThrow("MVP는 이긴 팀 멤버만 선택할 수 있습니다.");
+    });
+
+    it("ACE 대상이 이긴 팀이면 막는다", async () => {
+      await expect(
+        service.submitVote("winner-2", "match-1", "winner-1", "ACE" as never),
+      ).rejects.toThrow("ACE는 진 팀 멤버만 선택할 수 있습니다.");
+    });
+  });
+
   describe("매치 종료 스냅샷", () => {
     it("상태 전환과 방, 팀, 승자, 로스터를 한 트랜잭션에서 기록한다", async () => {
       prisma.match.findUnique.mockResolvedValue({
