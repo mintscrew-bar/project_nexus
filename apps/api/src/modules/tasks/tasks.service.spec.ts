@@ -47,4 +47,45 @@ describe("TasksService pending custom match collection lock", () => {
     await jest.advanceTimersByTimeAsync(5 * 60 * 1000);
     expect(redis.extendLock).not.toHaveBeenCalled();
   });
+
+  it("진행 중이며 Riot ID가 없는 내부 매치를 자동 탐색한다", async () => {
+    const redis = {
+      acquireLock: jest.fn().mockResolvedValue("discovery-token"),
+      releaseLock: jest.fn().mockResolvedValue(undefined),
+    };
+    const prisma = {
+      match: {
+        findMany: jest
+          .fn()
+          .mockResolvedValue([{ id: "match-1" }, { id: "match-2" }]),
+      },
+    };
+    const matchService = {
+      getLiveMatchStatus: jest.fn().mockResolvedValue({ isLive: false }),
+    };
+    const service = Object.create(TasksService.prototype) as TasksService;
+    Object.assign(service as object, {
+      redis,
+      prisma,
+      matchService,
+      logger: { log: jest.fn(), error: jest.fn() },
+    });
+
+    await service.handleActiveCustomMatchDiscovery();
+
+    expect(prisma.match.findMany).toHaveBeenCalledWith({
+      where: {
+        status: "IN_PROGRESS",
+        isInternal: true,
+        riotMatchId: null,
+      },
+      select: { id: true },
+      take: 10,
+    });
+    expect(matchService.getLiveMatchStatus).toHaveBeenCalledTimes(2);
+    expect(redis.releaseLock).toHaveBeenCalledWith(
+      "tasks:active-custom-match-discovery",
+      "discovery-token",
+    );
+  });
 });

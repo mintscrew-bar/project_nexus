@@ -71,19 +71,10 @@ export default function BracketPage() {
     fetchRoomMatches(roomId);
   };
 
-  const handleMatchClick = async (match: Match) => {
+  const handleMatchClick = (match: Match) => {
     setSelectedMatchId(match.id);
     setIsModalOpen(true);
     setLiveStatus(null);
-
-    if (match.status === 'IN_PROGRESS') {
-      try {
-        const status = await matchApi.getLiveStatus(match.id);
-        setLiveStatus(status);
-      } catch {
-        setLiveStatus(null);
-      }
-    }
   };
 
   const handleCloseModal = () => {

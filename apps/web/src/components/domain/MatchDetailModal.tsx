@@ -288,25 +288,27 @@ export function MatchDetailModal({
     }
   };
 
+  const liveMatchId = match?.id;
+
   // Auto-refresh live status every 30 seconds for IN_PROGRESS matches
   useEffect(() => {
-    if (!isOpen || !match || currentGameStatus !== 'IN_PROGRESS' || !onRefreshLiveStatus) {
+    if (!isOpen || !liveMatchId || currentGameStatus !== 'IN_PROGRESS' || !onRefreshLiveStatus) {
       return;
     }
 
     // Initial fetch
-    onRefreshLiveStatus(match.id);
+    void onRefreshLiveStatus(liveMatchId);
 
     // Set up polling interval (30 seconds)
     const intervalId = setInterval(() => {
-      onRefreshLiveStatus(match.id);
+      void onRefreshLiveStatus(liveMatchId);
     }, 30000);
 
     // Cleanup on unmount or when dependencies change
     return () => {
       clearInterval(intervalId);
     };
-  }, [isOpen, match, onRefreshLiveStatus]);
+  }, [isOpen, liveMatchId, currentGameStatus, onRefreshLiveStatus]);
 
   if (!match) return null;
 

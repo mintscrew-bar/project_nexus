@@ -40,6 +40,14 @@ export class MatchService {
   private readonly logger = new Logger(MatchService.name);
   private discordBotService: any;
   private discordVoiceService: any;
+  private readonly liveStatusCache = new Map<
+    string,
+    { expiresAt: number; value: LiveGameStatus }
+  >();
+  private readonly liveStatusInFlight = new Map<
+    string,
+    Promise<LiveGameStatus>
+  >();
 
   // Tournament API 활성화 여부 — 환경변수 TOURNAMENT_API_ENABLED=true 로 제어
   private readonly tournamentApiEnabled: boolean;
@@ -1722,6 +1730,29 @@ export class MatchService {
    * Checks if any participants are currently in a live game
    */
   async getLiveMatchStatus(matchId: string): Promise<LiveGameStatus> {
+    const cached = this.liveStatusCache.get(matchId);
+    if (cached && cached.expiresAt > Date.now()) return cached.value;
+
+    const existingRequest = this.liveStatusInFlight.get(matchId);
+    if (existingRequest) return existingRequest;
+
+    const request = this.fetchLiveMatchStatus(matchId)
+      .then((value) => {
+        this.liveStatusCache.set(matchId, {
+          expiresAt: Date.now() + 20_000,
+          value,
+        });
+        return value;
+      })
+      .finally(() => {
+        this.liveStatusInFlight.delete(matchId);
+      });
+
+    this.liveStatusInFlight.set(matchId, request);
+    return request;
+  }
+
+  private async fetchLiveMatchStatus(matchId: string): Promise<LiveGameStatus> {
     const match = await this.prisma.match.findUnique({
       where: { id: matchId },
       include: {
@@ -1774,21 +1805,24 @@ export class MatchService {
     }
 
     // Collect all participant PUUIDs
-    const puuids: string[] = [];
+    const teamAPuuids: string[] = [];
+    const teamBPuuids: string[] = [];
 
     for (const member of match.teamA?.members ?? []) {
       const puuid = member.user.riotAccounts[0]?.puuid;
       if (puuid) {
-        puuids.push(puuid);
+        teamAPuuids.push(puuid);
       }
     }
 
     for (const member of match.teamB?.members ?? []) {
       const puuid = member.user.riotAccounts[0]?.puuid;
       if (puuid) {
-        puuids.push(puuid);
+        teamBPuuids.push(puuid);
       }
     }
+
+    const puuids = [...teamAPuuids, ...teamBPuuids];
 
     if (puuids.length === 0) {
       this.logger.warn(`No PUUIDs found for match ${matchId} participants`);
@@ -1799,6 +1833,13 @@ export class MatchService {
     try {
       const liveStatus =
         await this.riotSpectatorService.findActiveGameByPUUIDs(puuids);
+      await this.captureSpectatorMatchId(
+        matchId,
+        match.riotMatchId,
+        teamAPuuids,
+        teamBPuuids,
+        liveStatus,
+      );
       return liveStatus;
     } catch (error) {
       this.logger.error(
@@ -1806,6 +1847,76 @@ export class MatchService {
         error,
       );
       return { isLive: false };
+    }
+  }
+
+  /**
+   * 일반 사설게임은 종료 후 PUUID 매치 목록에 나타나지 않을 수 있다.
+   * 경기 중 Spectator 응답의 gameId를 보존하면 종료 후 Match-v5 상세를
+   * ID로 직접 조회할 수 있다. 다른 게임 오연결을 막기 위해 CUSTOM_GAME이며
+   * NEXUS 양 팀 각각 80% 이상이 참가 중일 때만 저장한다.
+   */
+  private async captureSpectatorMatchId(
+    matchId: string,
+    existingRiotMatchId: string | null,
+    teamAPuuids: string[],
+    teamBPuuids: string[],
+    liveStatus: LiveGameStatus,
+  ): Promise<void> {
+    const game = liveStatus.gameInfo;
+    if (!liveStatus.isLive || !game || existingRiotMatchId) return;
+
+    const isCustomGame =
+      game.gameType === "CUSTOM_GAME" || game.gameQueueConfigId === 0;
+    if (!isCustomGame) return;
+
+    const activePuuids = new Set(game.participants.map((item) => item.puuid));
+    const matchedA = teamAPuuids.filter((puuid) =>
+      activePuuids.has(puuid),
+    ).length;
+    const matchedB = teamBPuuids.filter((puuid) =>
+      activePuuids.has(puuid),
+    ).length;
+    const requiredA = Math.max(1, Math.ceil(teamAPuuids.length * 0.8));
+    const requiredB = Math.max(1, Math.ceil(teamBPuuids.length * 0.8));
+
+    if (matchedA < requiredA || matchedB < requiredB) {
+      this.logger.warn(
+        `[SpectatorMatchId] 참가자 불일치로 저장 생략 matchId=${matchId} ` +
+          `teamA=${matchedA}/${teamAPuuids.length} teamB=${matchedB}/${teamBPuuids.length}`,
+      );
+      return;
+    }
+
+    const rawPlatformId = game.platformId
+      ?.toUpperCase()
+      .replace(/[^A-Z0-9]/g, "");
+    if (!rawPlatformId || !Number.isFinite(game.gameId)) return;
+
+    // Spectator가 KR1을 주는 경우에도 Match-v5 ID 접두사는 KR이다.
+    const platformId = rawPlatformId === "KR1" ? "KR" : rawPlatformId;
+
+    const riotMatchId = `${platformId}_${Math.trunc(game.gameId)}`;
+    try {
+      const updated = await this.prisma.match.updateMany({
+        where: {
+          id: matchId,
+          status: MatchStatus.IN_PROGRESS,
+          riotMatchId: null,
+        },
+        data: { riotMatchId },
+      });
+
+      if (updated.count > 0) {
+        this.logger.log(
+          `[SpectatorMatchId] Riot 매치 ID 저장 matchId=${matchId} riotMatchId=${riotMatchId}`,
+        );
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(
+        `[SpectatorMatchId] Riot 매치 ID 저장 실패 matchId=${matchId}: ${message}`,
+      );
     }
   }
 }

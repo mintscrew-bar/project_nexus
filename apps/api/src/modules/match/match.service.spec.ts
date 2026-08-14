@@ -17,6 +17,7 @@ import {
 describe("MatchService", () => {
   let service: MatchService;
   let prisma: any;
+  let spectator: any;
 
   beforeEach(async () => {
     // Prisma mock — 실제 DB 연결 없이 단위 테스트
@@ -56,7 +57,7 @@ describe("MatchService", () => {
     const mockRiotTournamentService = {
       createTournamentCode: jest.fn().mockResolvedValue("NEXUS-TEST"),
     };
-    const mockRiotSpectatorService = {
+    spectator = {
       findActiveGameByPUUIDs: jest.fn().mockResolvedValue({ isLive: false }),
     };
     const mockMatchDataCollectionService = {
@@ -89,7 +90,7 @@ describe("MatchService", () => {
         { provide: RiotTournamentService, useValue: mockRiotTournamentService },
         {
           provide: RiotSpectatorService,
-          useValue: mockRiotSpectatorService,
+          useValue: spectator,
         },
         {
           provide: MatchDataCollectionService,
@@ -109,6 +110,63 @@ describe("MatchService", () => {
     }).compile();
 
     service = module.get<MatchService>(MatchService);
+  });
+
+  describe("라이브 경기 Riot ID 보존", () => {
+    const makeMember = (puuid: string) => ({
+      user: { riotAccounts: [{ puuid }] },
+    });
+
+    it("양 팀이 일치하는 사설게임의 Spectator gameId를 저장한다", async () => {
+      const teamAPuuids = ["a1", "a2", "a3", "a4", "a5"];
+      const teamBPuuids = ["b1", "b2", "b3", "b4", "b5"];
+      prisma.match.findUnique.mockResolvedValue({
+        id: "match-1",
+        status: "IN_PROGRESS",
+        riotMatchId: null,
+        teamA: { members: teamAPuuids.map(makeMember) },
+        teamB: { members: teamBPuuids.map(makeMember) },
+      });
+      prisma.match.updateMany.mockResolvedValue({ count: 1 });
+      spectator.findActiveGameByPUUIDs.mockResolvedValue({
+        isLive: true,
+        gameInfo: {
+          gameId: 8339000000,
+          gameType: "CUSTOM_GAME",
+          gameQueueConfigId: 0,
+          platformId: "KR1",
+          participants: [...teamAPuuids, ...teamBPuuids].map((puuid) => ({
+            puuid,
+          })),
+        },
+      });
+
+      await service.getLiveMatchStatus("match-1");
+
+      expect(prisma.match.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: "match-1",
+          status: "IN_PROGRESS",
+          riotMatchId: null,
+        },
+        data: { riotMatchId: "KR_8339000000" },
+      });
+    });
+
+    it("같은 매치의 반복 요청은 20초 캐시로 Spectator를 다시 호출하지 않는다", async () => {
+      prisma.match.findUnique.mockResolvedValue({
+        id: "match-2",
+        status: "IN_PROGRESS",
+        riotMatchId: null,
+        teamA: { members: [makeMember("a1")] },
+        teamB: { members: [makeMember("b1")] },
+      });
+
+      await service.getLiveMatchStatus("match-2");
+      await service.getLiveMatchStatus("match-2");
+
+      expect(spectator.findActiveGameByPUUIDs).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe("매치 종료 스냅샷", () => {

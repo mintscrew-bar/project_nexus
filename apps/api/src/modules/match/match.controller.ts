@@ -213,6 +213,7 @@ export class MatchController {
   // ========================================
 
   @Get(":id/live-status")
+  @Throttle({ default: { limit: 2, ttl: 60000 } })
   async getLiveMatchStatus(@Param("id") matchId: string) {
     return this.matchService.getLiveMatchStatus(matchId);
   }

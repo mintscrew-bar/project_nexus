@@ -8,6 +8,7 @@ import { getPeakTierUpdate } from "../riot/riot-rank.util";
 import { RedisService } from "../redis/redis.service";
 import { StatsService } from "../stats/stats.service";
 import { MatchDataCollectionService } from "../match/match-data-collection.service";
+import { MatchService } from "../match/match.service";
 
 @Injectable()
 export class TasksService {
@@ -23,6 +24,7 @@ export class TasksService {
     private readonly redis: RedisService,
     private readonly statsService: StatsService,
     private readonly matchDataCollectionService: MatchDataCollectionService,
+    private readonly matchService: MatchService,
   ) {
     this.riotMatchCacheCleanupEnabled =
       this.configService.get<string>("RIOT_MATCH_CACHE_CLEANUP_ENABLED") ===
@@ -31,6 +33,40 @@ export class TasksService {
       "RIOT_MATCH_CACHE_TTL_DAYS",
       14,
     );
+  }
+
+  /** 진행 중인 일반 사설게임의 Spectator gameId를 종료 전에 확보한다. */
+  @Cron("*/2 * * * *")
+  async handleActiveCustomMatchDiscovery(): Promise<void> {
+    const lockKey = "tasks:active-custom-match-discovery";
+    const lockToken = await this.redis.acquireLock(lockKey, 110_000);
+    if (!lockToken) return;
+
+    try {
+      const matches = await this.prisma.match.findMany({
+        where: {
+          status: "IN_PROGRESS",
+          isInternal: true,
+          riotMatchId: null,
+        },
+        select: { id: true },
+        take: 10,
+      });
+
+      for (const match of matches) {
+        await this.matchService.getLiveMatchStatus(match.id);
+      }
+
+      if (matches.length > 0) {
+        this.logger.log(
+          `진행 중 사설게임 Riot ID 탐색: 대상 ${matches.length}건`,
+        );
+      }
+    } catch (error) {
+      this.logger.error("진행 중 사설게임 Riot ID 탐색 실패", error);
+    } finally {
+      await this.redis.releaseLock(lockKey, lockToken);
+    }
   }
 
   /** Re-process completed internal matches whose Riot data was not persisted. */
