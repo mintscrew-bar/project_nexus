@@ -9,6 +9,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { ReportReason, ReportStatus } from "../community/community.types";
 import { DiscordAdminAlertService } from "../discord/discord-admin-alert.service";
 import { MatchStatus } from "@nexus/database";
+import { resolveMatchMembers } from "../match/match-roster.util";
 
 export interface SubmitRatingDto {
   targetUserId: string;
@@ -63,6 +64,8 @@ export class ReputationService {
       include: {
         teamA: { include: { members: true } },
         teamB: { include: { members: true } },
+        // 방이 정리되면 팀·팀멤버가 사라진다. 스냅샷이 유일한 참가자 근거다.
+        rosterSnapshots: true,
       },
     });
 
@@ -75,17 +78,16 @@ export class ReputationService {
     }
 
     // Verify both users were in the match
-    const allMembers = [
-      ...(match.teamA?.members.map((m: { userId: string }) => m.userId) ?? []),
-      ...(match.teamB?.members.map((m: { userId: string }) => m.userId) ?? []),
-    ];
+    const allMembers = resolveMatchMembers(match).map(
+      (member) => member.userId,
+    );
 
     if (
       !allMembers.includes(reporterId) ||
       !allMembers.includes(dto.targetUserId)
     ) {
       throw new ForbiddenException(
-        "Both users must have participated in the match",
+        "해당 경기에 참여한 유저만 서로 평가할 수 있습니다.",
       );
     }
 

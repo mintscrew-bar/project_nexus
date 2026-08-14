@@ -34,6 +34,11 @@ import {
 
 // Re-export types for backward compatibility
 export type { BracketMatch, Bracket } from "./match-bracket.service";
+import {
+  resolveMatchMembers,
+  resolveWinnerSlot,
+  type TeamSlot,
+} from "./match-roster.util";
 
 /** 라이브 캡처에서 puuid를 Nexus 유저·팀으로 되돌리기 위한 항목 */
 interface LiveRosterEntry {
@@ -1619,6 +1624,8 @@ export class MatchService {
       include: {
         teamA: { include: { members: true } },
         teamB: { include: { members: true } },
+        // 방이 정리되면 팀·팀멤버가 사라지므로 스냅샷이 유일한 참가자 근거가 된다.
+        rosterSnapshots: true,
       },
     });
 
@@ -1626,39 +1633,35 @@ export class MatchService {
     if (match.status !== MatchStatus.COMPLETED) {
       throw new BadRequestException("투표는 경기 종료 후에만 가능합니다.");
     }
-    if (!match.winnerId) {
+
+    // winnerId 도 방 삭제 시 NULL 이 되므로 스냅샷까지 본다.
+    const winnerSlot = resolveWinnerSlot(match);
+    if (!winnerSlot) {
       throw new BadRequestException("경기 결과가 아직 입력되지 않았습니다.");
     }
 
-    // 투표자가 해당 매치 참가자인지 확인
-    const allMemberIds = [
-      ...(match.teamA?.members ?? []),
-      ...(match.teamB?.members ?? []),
-    ].map((m) => m.userId);
+    const members = resolveMatchMembers(match);
 
-    if (!allMemberIds.includes(voterId)) {
+    // 투표자가 해당 매치 참가자인지 확인
+    if (!members.some((member) => member.userId === voterId)) {
       throw new ForbiddenException("해당 경기 참가자만 투표할 수 있습니다.");
     }
 
     // 투표 대상이 올바른 팀인지 확인
-    const loserId =
-      match.winnerId === match.teamAId ? match.teamBId : match.teamAId;
-    const winnerMembers =
-      (match.winnerId === match.teamAId ? match.teamA : match.teamB)?.members ??
-      [];
-    const loserMembers =
-      (loserId === match.teamAId ? match.teamA : match.teamB)?.members ?? [];
+    const loserSlot: TeamSlot = winnerSlot === "A" ? "B" : "A";
+    const isInSlot = (userId: string, slot: TeamSlot) =>
+      members.some(
+        (member) => member.userId === userId && member.slot === slot,
+      );
 
     if (voteType === VoteType.MVP) {
-      const isWinnerMember = winnerMembers.some((m) => m.userId === votedForId);
-      if (!isWinnerMember) {
+      if (!isInSlot(votedForId, winnerSlot)) {
         throw new BadRequestException(
           "MVP는 이긴 팀 멤버만 선택할 수 있습니다.",
         );
       }
     } else {
-      const isLoserMember = loserMembers.some((m) => m.userId === votedForId);
-      if (!isLoserMember) {
+      if (!isInSlot(votedForId, loserSlot)) {
         throw new BadRequestException("ACE는 진 팀 멤버만 선택할 수 있습니다.");
       }
     }
