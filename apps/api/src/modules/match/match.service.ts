@@ -1337,6 +1337,14 @@ export class MatchService {
             },
           },
         },
+        // 수동 사설방은 개인 스탯을 못 가져오는 대신 픽/밴이 남는다.
+        draftSnapshots: {
+          include: {
+            user: {
+              select: { id: true, username: true, avatar: true },
+            },
+          },
+        },
       },
     });
 
@@ -1382,6 +1390,13 @@ export class MatchService {
         ...participant,
         teamId: participant.teamId ?? participant.teamIdSnapshot,
       })),
+      // 상세 전적을 못 가져온 수동 사설방인지 프런트가 판별할 수 있게 표식을 준다.
+      // (Riot이 토너먼트 코드 없는 커스텀을 제공하지 않아 KDA/골드 등은 영구 부재)
+      draftOnly:
+        match.participants.length === 0 && match.draftSnapshots.length > 0,
+      // championId/spellId 는 원본 그대로 넘긴다 — 웹에 이미 ID→아이콘/이름
+      // 매핑(match-utils)이 있어서 API 쪽에 같은 표를 또 두지 않는다.
+      draftSnapshots: match.draftSnapshots,
       teamStats: match.teamStats.map((stats) => ({
         ...stats,
         teamId: stats.teamId ?? stats.teamIdSnapshot,

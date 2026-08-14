@@ -17,6 +17,8 @@ import {
   Crosshair,
   ChevronDown,
   ChevronUp,
+  Info,
+  Ban,
 } from "lucide-react";
 import {
   getChampionIcon,
@@ -137,6 +139,25 @@ interface MatchDetails {
   };
   participants: MatchParticipant[];
   teamStats: TeamStats[];
+  tournamentCode: string | null;
+  // 수동 사설방 픽/밴 스냅샷 (Spectator 기반). 개인 스탯은 Riot이 제공하지 않는다.
+  draftOnly?: boolean;
+  draftSnapshots?: DraftSnapshot[];
+  draftBans?: { championId: number; teamId: number; pickTurn: number }[] | null;
+  liveStartedAt?: string | null;
+}
+
+interface DraftSnapshot {
+  id: string;
+  puuid: string;
+  userId: string | null;
+  username: string | null;
+  riotTeamId: number;
+  teamIdSnapshot: string | null;
+  championId: number;
+  spell1Id: number;
+  spell2Id: number;
+  user?: { id: string; username: string; avatar: string | null } | null;
 }
 
 // ─── Helpers ─────────────────────────────────────────
@@ -151,7 +172,7 @@ function getTeamAggregates(participants: MatchParticipant[]) {
       damage: acc.damage + p.totalDamageDealtToChampions,
       vision: acc.vision + p.visionScore,
     }),
-    { kills: 0, deaths: 0, assists: 0, gold: 0, damage: 0, vision: 0 }
+    { kills: 0, deaths: 0, assists: 0, gold: 0, damage: 0, vision: 0 },
   );
 }
 
@@ -161,10 +182,14 @@ function getCarryScore(p: MatchParticipant) {
 
 function getMvpAndAce(
   winTeam: MatchParticipant[],
-  loseTeam: MatchParticipant[]
+  loseTeam: MatchParticipant[],
 ): { mvpId: string | null; aceId: string | null } {
-  const mvp = [...winTeam].sort((a, b) => getCarryScore(b) - getCarryScore(a))[0];
-  const ace = [...loseTeam].sort((a, b) => getCarryScore(b) - getCarryScore(a))[0];
+  const mvp = [...winTeam].sort(
+    (a, b) => getCarryScore(b) - getCarryScore(a),
+  )[0];
+  const ace = [...loseTeam].sort(
+    (a, b) => getCarryScore(b) - getCarryScore(a),
+  )[0];
   return {
     mvpId: mvp?.userId ?? null,
     aceId: ace?.userId ?? null,
@@ -185,10 +210,24 @@ function getPositionLabel(pos: string): string {
   return map[pos?.toUpperCase()] || pos || "";
 }
 
-function getMultiKillBadge(p: MatchParticipant): { label: string; color: string } | null {
-  if (p.pentaKills > 0) return { label: "펜타킬", color: "bg-gradient-to-r from-red-500 to-orange-500 text-white" };
-  if (p.quadraKills > 0) return { label: "쿼드라킬", color: "bg-gradient-to-r from-purple-500 to-pink-500 text-white" };
-  if (p.tripleKills > 0) return { label: "트리플킬", color: "bg-gradient-to-r from-blue-500 to-cyan-500 text-white" };
+function getMultiKillBadge(
+  p: MatchParticipant,
+): { label: string; color: string } | null {
+  if (p.pentaKills > 0)
+    return {
+      label: "펜타킬",
+      color: "bg-gradient-to-r from-red-500 to-orange-500 text-white",
+    };
+  if (p.quadraKills > 0)
+    return {
+      label: "쿼드라킬",
+      color: "bg-gradient-to-r from-purple-500 to-pink-500 text-white",
+    };
+  if (p.tripleKills > 0)
+    return {
+      label: "트리플킬",
+      color: "bg-gradient-to-r from-blue-500 to-cyan-500 text-white",
+    };
   return null;
 }
 
@@ -270,7 +309,19 @@ function ObjectiveIcon({ type, count }: { type: string; count: number }) {
     <div className="flex flex-col items-center gap-0.5">
       <span className="text-lg">{icons[type] || "❓"}</span>
       <span className="text-sm font-bold text-text-primary">{count}</span>
-      <span className="text-[10px] text-text-tertiary capitalize">{type === "herald" ? "전령" : type === "baron" ? "바론" : type === "dragon" ? "드래곤" : type === "tower" ? "타워" : type === "inhibitor" ? "억제기" : type}</span>
+      <span className="text-[10px] text-text-tertiary capitalize">
+        {type === "herald"
+          ? "전령"
+          : type === "baron"
+            ? "바론"
+            : type === "dragon"
+              ? "드래곤"
+              : type === "tower"
+                ? "타워"
+                : type === "inhibitor"
+                  ? "억제기"
+                  : type}
+      </span>
     </div>
   );
 }
@@ -333,12 +384,27 @@ function PlayerRow({
   gameDuration: number;
   teamColor: string;
 }) {
-  const kda = calculateKDA(participant.kills, participant.deaths, participant.assists);
+  const kda = calculateKDA(
+    participant.kills,
+    participant.deaths,
+    participant.assists,
+  );
   const cs = participant.totalMinionsKilled + participant.neutralMinionsKilled;
-  const csPerMin = gameDuration > 0 ? (cs / (gameDuration / 60)).toFixed(1) : "0.0";
-  const dmgPct = maxDamage > 0 ? (participant.totalDamageDealtToChampions / maxDamage) * 100 : 0;
+  const csPerMin =
+    gameDuration > 0 ? (cs / (gameDuration / 60)).toFixed(1) : "0.0";
+  const dmgPct =
+    maxDamage > 0
+      ? (participant.totalDamageDealtToChampions / maxDamage) * 100
+      : 0;
   const multiKill = getMultiKillBadge(participant);
-  const items = [participant.item0, participant.item1, participant.item2, participant.item3, participant.item4, participant.item5];
+  const items = [
+    participant.item0,
+    participant.item1,
+    participant.item2,
+    participant.item3,
+    participant.item4,
+    participant.item5,
+  ];
   const trinket = participant.item6;
   const questItem = participant.item7;
 
@@ -359,7 +425,9 @@ function PlayerRow({
           width={48}
           height={48}
           className="w-12 h-12 rounded-lg"
-          onError={(e) => { e.currentTarget.style.display = "none"; }}
+          onError={(e) => {
+            e.currentTarget.style.display = "none";
+          }}
         />
         <span className="absolute -bottom-1 -right-1 bg-bg-primary text-text-primary text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center border border-bg-tertiary">
           {participant.champLevel || ""}
@@ -406,7 +474,9 @@ function PlayerRow({
             {getPositionLabel(participant.position)}
           </span>
           {multiKill && (
-            <span className={`px-1 py-0 text-[9px] font-bold rounded ${multiKill.color}`}>
+            <span
+              className={`px-1 py-0 text-[9px] font-bold rounded ${multiKill.color}`}
+            >
               {multiKill.label}
             </span>
           )}
@@ -416,7 +486,9 @@ function PlayerRow({
       {/* KDA */}
       <div className="w-[90px] text-center flex-shrink-0">
         <p className="text-sm text-text-primary font-medium">
-          {participant.kills} / <span className="text-red-400">{participant.deaths}</span> / {participant.assists}
+          {participant.kills} /{" "}
+          <span className="text-red-400">{participant.deaths}</span> /{" "}
+          {participant.assists}
         </p>
         <p className={`text-xs font-bold ${getKDAColor(kda)}`}>
           {kda === Infinity ? "Perfect" : kda.toFixed(2)} KDA
@@ -451,7 +523,9 @@ function PlayerRow({
 
       {/* Vision */}
       <div className="w-[40px] text-center flex-shrink-0 hidden lg:block">
-        <p className="text-sm font-medium text-text-primary">{participant.visionScore}</p>
+        <p className="text-sm font-medium text-text-primary">
+          {participant.visionScore}
+        </p>
         <p className="text-[10px] text-text-tertiary">시야</p>
       </div>
 
@@ -520,7 +594,11 @@ function CompactPlayerRow({
   isAce: boolean;
   teamColor: string;
 }) {
-  const kda = calculateKDA(participant.kills, participant.deaths, participant.assists);
+  const kda = calculateKDA(
+    participant.kills,
+    participant.deaths,
+    participant.assists,
+  );
   const cs = participant.totalMinionsKilled + participant.neutralMinionsKilled;
   const multiKill = getMultiKillBadge(participant);
 
@@ -540,7 +618,9 @@ function CompactPlayerRow({
         width={32}
         height={32}
         className="w-8 h-8 rounded flex-shrink-0"
-        onError={(e) => { e.currentTarget.style.display = "none"; }}
+        onError={(e) => {
+          e.currentTarget.style.display = "none";
+        }}
       />
 
       {/* Username + badges */}
@@ -549,10 +629,20 @@ function CompactPlayerRow({
           <span className="font-medium text-xs text-text-primary truncate">
             {participant.user.username}
           </span>
-          {isMvp && <span className="px-0.5 bg-amber-500/90 text-amber-950 text-[8px] font-bold rounded">MVP</span>}
-          {isAce && <span className="px-0.5 bg-purple-500/80 text-white text-[8px] font-bold rounded">ACE</span>}
+          {isMvp && (
+            <span className="px-0.5 bg-amber-500/90 text-amber-950 text-[8px] font-bold rounded">
+              MVP
+            </span>
+          )}
+          {isAce && (
+            <span className="px-0.5 bg-purple-500/80 text-white text-[8px] font-bold rounded">
+              ACE
+            </span>
+          )}
         </div>
-        <span className="text-[10px] text-text-tertiary">{getPositionLabel(participant.position)}</span>
+        <span className="text-[10px] text-text-tertiary">
+          {getPositionLabel(participant.position)}
+        </span>
       </div>
 
       {/* KDA */}
@@ -568,7 +658,9 @@ function CompactPlayerRow({
       {/* CS + Gold */}
       <div className="w-[50px] text-center flex-shrink-0 hidden sm:block">
         <p className="text-xs text-text-primary">{cs}</p>
-        <p className="text-[10px] text-text-tertiary">{(participant.goldEarned / 1000).toFixed(1)}k</p>
+        <p className="text-[10px] text-text-tertiary">
+          {(participant.goldEarned / 1000).toFixed(1)}k
+        </p>
       </div>
 
       {/* Damage mini bar */}
@@ -580,26 +672,50 @@ function CompactPlayerRow({
 
       {/* Multi kill badge */}
       {multiKill && (
-        <span className={`px-1 py-0 text-[8px] font-bold rounded flex-shrink-0 ${multiKill.color}`}>
+        <span
+          className={`px-1 py-0 text-[8px] font-bold rounded flex-shrink-0 ${multiKill.color}`}
+        >
           {multiKill.label}
         </span>
       )}
 
       {/* Items (compact) */}
       <div className="flex gap-px flex-shrink-0 ml-auto items-center">
-        {[participant.item0, participant.item1, participant.item2, participant.item3, participant.item4, participant.item5].map((itemId, idx) => {
+        {[
+          participant.item0,
+          participant.item1,
+          participant.item2,
+          participant.item3,
+          participant.item4,
+          participant.item5,
+        ].map((itemId, idx) => {
           const icon = getItemIconUrl(itemId);
           return (
-            <div key={idx} className="w-5 h-5 bg-bg-elevated rounded border border-bg-tertiary/30">
+            <div
+              key={idx}
+              className="w-5 h-5 bg-bg-elevated rounded border border-bg-tertiary/30"
+            >
               {icon && (
-                <Image src={icon} alt="" width={20} height={20} className="w-full h-full rounded" />
+                <Image
+                  src={icon}
+                  alt=""
+                  width={20}
+                  height={20}
+                  className="w-full h-full rounded"
+                />
               )}
             </div>
           );
         })}
         {participant.item7 != null && participant.item7 !== 0 && (
           <div className="w-5 h-5 bg-bg-elevated rounded border border-amber-500/40 ml-px">
-            <Image src={getItemIcon(participant.item7)} alt="quest" width={20} height={20} className="w-full h-full rounded" />
+            <Image
+              src={getItemIcon(participant.item7)}
+              alt="quest"
+              width={20}
+              height={20}
+              className="w-full h-full rounded"
+            />
           </div>
         )}
       </div>
@@ -644,10 +760,18 @@ function TeamSection({
           isLargeMatch ? "cursor-pointer hover:bg-bg-elevated/30" : ""
         } transition-colors`}
       >
-        <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: teamColor }} />
+        <div
+          className="w-3 h-3 rounded-full flex-shrink-0"
+          style={{ backgroundColor: teamColor }}
+        />
         <h3 className="text-base font-bold text-text-primary">{teamName}</h3>
-        {isWinner && <Trophy className="h-4 w-4 text-amber-400 flex-shrink-0" />}
-        <Badge variant={isWinner ? "success" : "danger"} className="text-[10px] flex-shrink-0">
+        {isWinner && (
+          <Trophy className="h-4 w-4 text-amber-400 flex-shrink-0" />
+        )}
+        <Badge
+          variant={isWinner ? "success" : "danger"}
+          className="text-[10px] flex-shrink-0"
+        >
           {isWinner ? "승리" : "패배"}
         </Badge>
         <span className="text-xs text-text-tertiary ml-2">
@@ -671,10 +795,18 @@ function TeamSection({
               <div className="w-5 flex-shrink-0" />
               <div className="w-[110px] flex-shrink-0">플레이어</div>
               <div className="w-[90px] text-center flex-shrink-0">KDA</div>
-              <div className="w-[60px] text-center flex-shrink-0 hidden md:block">CS</div>
-              <div className="w-[55px] text-center flex-shrink-0 hidden md:block">골드</div>
-              <div className="w-[130px] text-center flex-shrink-0 hidden lg:block">딜량</div>
-              <div className="w-[40px] text-center flex-shrink-0 hidden lg:block">시야</div>
+              <div className="w-[60px] text-center flex-shrink-0 hidden md:block">
+                CS
+              </div>
+              <div className="w-[55px] text-center flex-shrink-0 hidden md:block">
+                골드
+              </div>
+              <div className="w-[130px] text-center flex-shrink-0 hidden lg:block">
+                딜량
+              </div>
+              <div className="w-[40px] text-center flex-shrink-0 hidden lg:block">
+                시야
+              </div>
               <div className="ml-auto flex-shrink-0">아이템</div>
             </div>
           )}
@@ -700,7 +832,7 @@ function TeamSection({
                   gameDuration={gameDuration}
                   teamColor={teamColor}
                 />
-              )
+              ),
             )}
           </div>
         </div>
@@ -721,7 +853,10 @@ function DetailStatsTabs({
   const sorted = [...allParticipants];
 
   return (
-    <Tabs defaultValue="damage" className="bg-bg-secondary border border-bg-tertiary rounded-xl p-4">
+    <Tabs
+      defaultValue="damage"
+      className="bg-bg-secondary border border-bg-tertiary rounded-xl p-4"
+    >
       <TabsList className="mb-4">
         <TabsTrigger value="damage">딜량 상세</TabsTrigger>
         <TabsTrigger value="vision">시야 상세</TabsTrigger>
@@ -733,21 +868,28 @@ function DetailStatsTabs({
         <div className="space-y-2">
           <StatBarSection
             title="챔피언 딜량"
-            participants={sorted.sort((a, b) => b.totalDamageDealtToChampions - a.totalDamageDealtToChampions)}
+            participants={sorted.sort(
+              (a, b) =>
+                b.totalDamageDealtToChampions - a.totalDamageDealtToChampions,
+            )}
             getValue={(p) => p.totalDamageDealtToChampions}
             gradient="bg-gradient-to-r from-red-600 to-orange-500"
           />
           <div className="border-t border-bg-tertiary my-4" />
           <StatBarSection
             title="받은 피해량"
-            participants={[...allParticipants].sort((a, b) => b.totalDamageTaken - a.totalDamageTaken)}
+            participants={[...allParticipants].sort(
+              (a, b) => b.totalDamageTaken - a.totalDamageTaken,
+            )}
             getValue={(p) => p.totalDamageTaken}
             gradient="bg-gradient-to-r from-blue-600 to-cyan-500"
           />
           <div className="border-t border-bg-tertiary my-4" />
           <StatBarSection
             title="회복량"
-            participants={[...allParticipants].sort((a, b) => b.totalHeal - a.totalHeal)}
+            participants={[...allParticipants].sort(
+              (a, b) => b.totalHeal - a.totalHeal,
+            )}
             getValue={(p) => p.totalHeal}
             gradient="bg-gradient-to-r from-green-600 to-emerald-500"
           />
@@ -759,7 +901,9 @@ function DetailStatsTabs({
         <div className="space-y-2">
           <StatBarSection
             title="시야 점수"
-            participants={[...allParticipants].sort((a, b) => b.visionScore - a.visionScore)}
+            participants={[...allParticipants].sort(
+              (a, b) => b.visionScore - a.visionScore,
+            )}
             getValue={(p) => p.visionScore}
             gradient="bg-gradient-to-r from-yellow-600 to-amber-500"
             raw
@@ -767,7 +911,9 @@ function DetailStatsTabs({
           <div className="border-t border-bg-tertiary my-4" />
           <StatBarSection
             title="와드 설치"
-            participants={[...allParticipants].sort((a, b) => b.wardsPlaced - a.wardsPlaced)}
+            participants={[...allParticipants].sort(
+              (a, b) => b.wardsPlaced - a.wardsPlaced,
+            )}
             getValue={(p) => p.wardsPlaced}
             gradient="bg-gradient-to-r from-emerald-600 to-green-500"
             raw
@@ -775,7 +921,9 @@ function DetailStatsTabs({
           <div className="border-t border-bg-tertiary my-4" />
           <StatBarSection
             title="와드 제거"
-            participants={[...allParticipants].sort((a, b) => b.wardsKilled - a.wardsKilled)}
+            participants={[...allParticipants].sort(
+              (a, b) => b.wardsKilled - a.wardsKilled,
+            )}
             getValue={(p) => p.wardsKilled}
             gradient="bg-gradient-to-r from-rose-600 to-pink-500"
             raw
@@ -783,7 +931,9 @@ function DetailStatsTabs({
           <div className="border-t border-bg-tertiary my-4" />
           <StatBarSection
             title="제어 와드"
-            participants={[...allParticipants].sort((a, b) => b.detectorWardsPlaced - a.detectorWardsPlaced)}
+            participants={[...allParticipants].sort(
+              (a, b) => b.detectorWardsPlaced - a.detectorWardsPlaced,
+            )}
             getValue={(p) => p.detectorWardsPlaced}
             gradient="bg-gradient-to-r from-purple-600 to-violet-500"
             raw
@@ -796,21 +946,30 @@ function DetailStatsTabs({
         <div className="space-y-2">
           <StatBarSection
             title="골드 획득"
-            participants={[...allParticipants].sort((a, b) => b.goldEarned - a.goldEarned)}
+            participants={[...allParticipants].sort(
+              (a, b) => b.goldEarned - a.goldEarned,
+            )}
             getValue={(p) => p.goldEarned}
             gradient="bg-gradient-to-r from-yellow-600 to-amber-500"
           />
           <div className="border-t border-bg-tertiary my-4" />
           <StatBarSection
             title="골드 사용"
-            participants={[...allParticipants].sort((a, b) => b.goldSpent - a.goldSpent)}
+            participants={[...allParticipants].sort(
+              (a, b) => b.goldSpent - a.goldSpent,
+            )}
             getValue={(p) => p.goldSpent}
             gradient="bg-gradient-to-r from-orange-600 to-yellow-500"
           />
           <div className="border-t border-bg-tertiary my-4" />
           <StatBarSection
             title="CS (총)"
-            participants={[...allParticipants].sort((a, b) => (b.totalMinionsKilled + b.neutralMinionsKilled) - (a.totalMinionsKilled + a.neutralMinionsKilled))}
+            participants={[...allParticipants].sort(
+              (a, b) =>
+                b.totalMinionsKilled +
+                b.neutralMinionsKilled -
+                (a.totalMinionsKilled + a.neutralMinionsKilled),
+            )}
             getValue={(p) => p.totalMinionsKilled + p.neutralMinionsKilled}
             gradient="bg-gradient-to-r from-teal-600 to-cyan-500"
             raw
@@ -819,8 +978,12 @@ function DetailStatsTabs({
           <StatBarSection
             title="CS/분"
             participants={[...allParticipants].sort((a, b) => {
-              const csA = (a.totalMinionsKilled + a.neutralMinionsKilled) / Math.max(gameDuration / 60, 1);
-              const csB = (b.totalMinionsKilled + b.neutralMinionsKilled) / Math.max(gameDuration / 60, 1);
+              const csA =
+                (a.totalMinionsKilled + a.neutralMinionsKilled) /
+                Math.max(gameDuration / 60, 1);
+              const csB =
+                (b.totalMinionsKilled + b.neutralMinionsKilled) /
+                Math.max(gameDuration / 60, 1);
               return csB - csA;
             })}
             getValue={(p) => {
@@ -856,7 +1019,10 @@ function StatBarSection({
   const [expanded, setExpanded] = useState(false);
   const maxVal = Math.max(...participants.map(getValue), 1);
   const needsExpand = participants.length > defaultShowCount;
-  const visible = expanded || !needsExpand ? participants : participants.slice(0, defaultShowCount);
+  const visible =
+    expanded || !needsExpand
+      ? participants
+      : participants.slice(0, defaultShowCount);
 
   const fmt = (v: number) => {
     if (formatValue) return formatValue(v);
@@ -866,7 +1032,9 @@ function StatBarSection({
 
   return (
     <div>
-      <h4 className="text-sm font-semibold text-text-secondary mb-2">{title}</h4>
+      <h4 className="text-sm font-semibold text-text-secondary mb-2">
+        {title}
+      </h4>
       <div className="space-y-1">
         {visible.map((p) => {
           const val = getValue(p);
@@ -902,9 +1070,14 @@ function StatBarSection({
           className="mt-2 text-xs text-accent-primary hover:text-accent-hover flex items-center gap-1 mx-auto"
         >
           {expanded ? (
-            <>접기 <ChevronUp className="h-3 w-3" /></>
+            <>
+              접기 <ChevronUp className="h-3 w-3" />
+            </>
           ) : (
-            <>나머지 {participants.length - defaultShowCount}명 더 보기 <ChevronDown className="h-3 w-3" /></>
+            <>
+              나머지 {participants.length - defaultShowCount}명 더 보기{" "}
+              <ChevronDown className="h-3 w-3" />
+            </>
           )}
         </button>
       )}
@@ -947,7 +1120,10 @@ function MatchSkeleton() {
         </div>
         {/* Player cards skeleton */}
         {[1, 2].map((t) => (
-          <div key={t} className="bg-bg-secondary border border-bg-tertiary rounded-xl p-4 space-y-2">
+          <div
+            key={t}
+            className="bg-bg-secondary border border-bg-tertiary rounded-xl p-4 space-y-2"
+          >
             <Skeleton className="h-6 w-32 mb-2" />
             {[1, 2, 3, 4, 5].map((j) => (
               <div key={j} className="flex items-center gap-3 p-2">
@@ -974,6 +1150,160 @@ function MatchSkeleton() {
   );
 }
 
+// ─── Draft-Only View ─────────────────────────────────
+//
+// 수동 사설방은 Riot이 종료 후 데이터를 주지 않는다. 경기 중 Spectator로 확보한
+// 픽/밴만 있으므로, 없는 개인 스탯을 "로딩 중"처럼 보이게 하지 않고 있는 것만 보여준다.
+
+function DraftTeamColumn({
+  title,
+  color,
+  isWinner,
+  drafts,
+  bans,
+}: {
+  title: string;
+  color: string;
+  isWinner: boolean;
+  drafts: DraftSnapshot[];
+  bans: number[];
+}) {
+  return (
+    <div className="bg-bg-secondary border border-bg-tertiary rounded-xl overflow-hidden">
+      <div
+        className="flex items-center justify-between px-4 py-3 border-b border-bg-tertiary"
+        style={{ backgroundColor: `${color}14` }}
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          <span
+            className="h-2.5 w-2.5 rounded-full shrink-0"
+            style={{ backgroundColor: color }}
+          />
+          <span className="font-bold text-text-primary truncate">{title}</span>
+        </div>
+        {isWinner && (
+          <Badge variant="success" size="sm">
+            <Trophy className="h-3 w-3 mr-1" />
+            승리
+          </Badge>
+        )}
+      </div>
+
+      <div className="divide-y divide-bg-tertiary/60">
+        {drafts.map((draft) => (
+          <div key={draft.id} className="flex items-center gap-3 px-4 py-2.5">
+            <Image
+              src={getChampionIconById(draft.championId)}
+              alt={String(draft.championId)}
+              width={36}
+              height={36}
+              className="rounded-md shrink-0"
+              unoptimized
+            />
+            <div className="flex flex-col gap-0.5 shrink-0">
+              <Image
+                src={getSummonerSpellIcon(draft.spell1Id)}
+                alt={String(draft.spell1Id)}
+                width={16}
+                height={16}
+                className="rounded"
+                unoptimized
+              />
+              <Image
+                src={getSummonerSpellIcon(draft.spell2Id)}
+                alt={String(draft.spell2Id)}
+                width={16}
+                height={16}
+                className="rounded"
+                unoptimized
+              />
+            </div>
+            <span className="text-sm text-text-primary truncate">
+              {draft.user?.username ?? draft.username ?? "알 수 없음"}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {bans.length > 0 && (
+        <div className="flex items-center gap-2 px-4 py-2.5 border-t border-bg-tertiary bg-bg-tertiary/20">
+          <Ban className="h-3.5 w-3.5 text-text-tertiary shrink-0" />
+          <div className="flex flex-wrap gap-1">
+            {bans.map((championId, index) => (
+              <Image
+                key={`${championId}-${index}`}
+                src={getChampionIconById(championId)}
+                alt={String(championId)}
+                width={22}
+                height={22}
+                className="rounded opacity-60 grayscale"
+                unoptimized
+              />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DraftOnlyView({ match }: { match: MatchDetails }) {
+  const drafts = match.draftSnapshots ?? [];
+  const bans = match.draftBans ?? [];
+
+  // Spectator의 riotTeamId(100/200)를 Nexus 팀으로 되돌린다.
+  // 매핑에 실패한 경우(teamIdSnapshot이 없을 때)는 100=A로 둔다.
+  const teamAKey =
+    drafts.find((d) => d.teamIdSnapshot === match.teamAId)?.riotTeamId ?? 100;
+  const teamADrafts = drafts.filter((d) => d.riotTeamId === teamAKey);
+  const teamBDrafts = drafts.filter((d) => d.riotTeamId !== teamAKey);
+  const banFor = (riotTeamId: number) =>
+    bans.filter((b) => b.teamId === riotTeamId).map((b) => b.championId);
+
+  return (
+    <>
+      <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-5">
+        <div className="flex items-start gap-3">
+          <Info className="h-5 w-5 text-accent-primary shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <h3 className="font-semibold text-text-primary">
+              픽/밴만 기록된 경기입니다
+            </h3>
+            <p className="text-sm text-text-secondary leading-relaxed">
+              Riot은 토너먼트 코드로 만든 사용자 지정 게임의 기록만 제공합니다.
+              이 경기는 직접 만든 사설방이라 KDA·골드 같은 개인 기록을 가져올 수
+              없어, 경기 중에 확보한 밴픽과 팀 구성만 남아 있습니다.
+            </p>
+            {match.gameDuration ? (
+              <p className="text-xs text-text-tertiary pt-1">
+                <Clock className="h-3 w-3 inline mr-1" />
+                경기 시간 약 {Math.floor(match.gameDuration / 60)}분
+              </p>
+            ) : null}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <DraftTeamColumn
+          title={match.teamA?.name ?? "팀 A"}
+          color={TEAM_A_COLOR}
+          isWinner={match.winnerId === match.teamAId}
+          drafts={teamADrafts}
+          bans={banFor(teamAKey)}
+        />
+        <DraftTeamColumn
+          title={match.teamB?.name ?? "팀 B"}
+          color={TEAM_B_COLOR}
+          isWinner={match.winnerId === match.teamBId}
+          drafts={teamBDrafts}
+          bans={banFor(teamAKey === 100 ? 200 : 100)}
+        />
+      </div>
+    </>
+  );
+}
+
 // ─── Main Component ──────────────────────────────────
 
 export default function MatchDetailsPage() {
@@ -994,7 +1324,9 @@ export default function MatchDetailsPage() {
         setMatch(data);
       } catch (err: any) {
         console.error("Failed to fetch match details:", err);
-        setError(err.response?.data?.message || "매치 정보를 불러오는데 실패했습니다.");
+        setError(
+          err.response?.data?.message || "매치 정보를 불러오는데 실패했습니다.",
+        );
       } finally {
         setIsLoading(false);
       }
@@ -1008,15 +1340,26 @@ export default function MatchDetailsPage() {
     return (
       <div className="flex-grow flex items-center justify-center min-h-screen">
         <div className="text-center max-w-md">
-          <p className="text-accent-danger mb-4">{error || "매치를 찾을 수 없습니다."}</p>
+          <p className="text-accent-danger mb-4">
+            {error || "매치를 찾을 수 없습니다."}
+          </p>
           <Button onClick={() => router.back()}>돌아가기</Button>
         </div>
       </div>
     );
   }
 
-  // ── Data Not Collected ──
+  // ── 상세 스탯이 없는 경우 ──
+  //
+  // 세 갈래로 나뉜다. 예전에는 전부 "수집 중" 스피너였는데, 수동 사설방은
+  // 기다려도 영원히 오지 않아서 사용자를 속이는 화면이었다.
+  //   1) 픽/밴 스냅샷이 있음      → 그거라도 보여준다
+  //   2) 수집 경로 자체가 없음    → 불가하다고 분명히 알린다
+  //   3) 수집 가능한데 아직 안 됨 → 기존대로 대기 안내
   if (!match.dataCollected && match.participants.length === 0) {
+    const hasDraft = (match.draftSnapshots?.length ?? 0) > 0;
+    const collectable = Boolean(match.tournamentCode || match.riotMatchId);
+
     return (
       <div className="min-h-screen bg-bg-primary">
         <div className="border-b border-bg-tertiary">
@@ -1030,24 +1373,45 @@ export default function MatchDetailsPage() {
             </button>
           </div>
         </div>
-        <div className="container mx-auto px-4 py-16 max-w-7xl">
-          <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-12 text-center">
-            <Loader2 className="h-10 w-10 text-accent-primary animate-spin mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-text-primary mb-2">
-              Riot 게임 데이터가 아직 수집되지 않았습니다
-            </h3>
-            <p className="text-text-secondary text-sm">
-              데이터 수집이 완료되면 상세 정보를 확인할 수 있습니다. 잠시 후 새로고침해 주세요.
-            </p>
-          </div>
+        <div className="container mx-auto px-4 py-10 max-w-7xl space-y-6">
+          {hasDraft ? (
+            <DraftOnlyView match={match} />
+          ) : collectable ? (
+            <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-12 text-center">
+              <Loader2 className="h-10 w-10 text-accent-primary animate-spin mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-text-primary mb-2">
+                Riot 게임 데이터를 수집하는 중입니다
+              </h3>
+              <p className="text-text-secondary text-sm">
+                수집이 완료되면 상세 정보를 확인할 수 있습니다. 잠시 후
+                새로고침해 주세요.
+              </p>
+            </div>
+          ) : (
+            <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-12 text-center">
+              <Info className="h-10 w-10 text-text-tertiary mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-text-primary mb-2">
+                이 경기는 상세 전적을 제공할 수 없습니다
+              </h3>
+              <p className="text-text-secondary text-sm max-w-lg mx-auto leading-relaxed">
+                Riot은 토너먼트 코드로 생성된 사용자 지정 게임의 기록만
+                제공합니다. 직접 만든 사설방은 경기가 끝나면 조회할 수 없어
+                KDA·골드 같은 개인 기록이 남지 않습니다.
+              </p>
+            </div>
+          )}
         </div>
       </div>
     );
   }
 
   // ── Derived Data ──
-  const teamAParticipants = match.participants.filter((p) => p.teamId === match.teamAId);
-  const teamBParticipants = match.participants.filter((p) => p.teamId === match.teamBId);
+  const teamAParticipants = match.participants.filter(
+    (p) => p.teamId === match.teamAId,
+  );
+  const teamBParticipants = match.participants.filter(
+    (p) => p.teamId === match.teamBId,
+  );
   const teamAStats = match.teamStats.find((ts) => ts.teamId === match.teamAId);
   const teamBStats = match.teamStats.find((ts) => ts.teamId === match.teamBId);
   const isTeamAWinner = match.winnerId === match.teamAId;
@@ -1060,7 +1424,10 @@ export default function MatchDetailsPage() {
   const { mvpId, aceId } = getMvpAndAce(winTeam, loseTeam);
 
   const allParticipants = match.participants;
-  const maxDamage = Math.max(...allParticipants.map((p) => p.totalDamageDealtToChampions), 1);
+  const maxDamage = Math.max(
+    ...allParticipants.map((p) => p.totalDamageDealtToChampions),
+    1,
+  );
   const gameDuration = match.gameDuration || 0;
 
   const isLargeMatch = allParticipants.length > 10;
@@ -1075,7 +1442,10 @@ export default function MatchDetailsPage() {
   // Bans parsing
   const parseBans = (bans: any): number[] => {
     if (!bans) return [];
-    if (Array.isArray(bans)) return bans.map((b: any) => (typeof b === "object" ? b.championId : b)).filter(Boolean);
+    if (Array.isArray(bans))
+      return bans
+        .map((b: any) => (typeof b === "object" ? b.championId : b))
+        .filter(Boolean);
     return [];
   };
   const teamABans = parseBans(teamAStats?.bans);
@@ -1101,8 +1471,18 @@ export default function MatchDetailsPage() {
         <div className="bg-bg-secondary border border-bg-tertiary rounded-xl overflow-hidden">
           {/* Team color gradient bar */}
           <div className="h-1 flex">
-            <div className="flex-1" style={{ background: `linear-gradient(to right, ${TEAM_A_COLOR}, ${TEAM_A_COLOR}88)` }} />
-            <div className="flex-1" style={{ background: `linear-gradient(to left, ${TEAM_B_COLOR}, ${TEAM_B_COLOR}88)` }} />
+            <div
+              className="flex-1"
+              style={{
+                background: `linear-gradient(to right, ${TEAM_A_COLOR}, ${TEAM_A_COLOR}88)`,
+              }}
+            />
+            <div
+              className="flex-1"
+              style={{
+                background: `linear-gradient(to left, ${TEAM_B_COLOR}, ${TEAM_B_COLOR}88)`,
+              }}
+            />
           </div>
 
           <div className="p-6">
@@ -1110,12 +1490,19 @@ export default function MatchDetailsPage() {
               {/* Team A */}
               <div className="flex-1 text-center">
                 <div className="flex items-center justify-center gap-2 mb-1">
-                  {isTeamAWinner && <Trophy className="h-5 w-5 text-amber-400" />}
-                  <h2 className={`text-xl font-bold ${isTeamAWinner ? "text-text-primary" : "text-text-secondary"}`}>
+                  {isTeamAWinner && (
+                    <Trophy className="h-5 w-5 text-amber-400" />
+                  )}
+                  <h2
+                    className={`text-xl font-bold ${isTeamAWinner ? "text-text-primary" : "text-text-secondary"}`}
+                  >
                     {match.teamA.name}
                   </h2>
                 </div>
-                <Badge variant={isTeamAWinner ? "success" : "danger"} className="text-xs">
+                <Badge
+                  variant={isTeamAWinner ? "success" : "danger"}
+                  className="text-xs"
+                >
                   {isTeamAWinner ? "승리" : "패배"}
                 </Badge>
               </div>
@@ -1123,11 +1510,19 @@ export default function MatchDetailsPage() {
               {/* Score */}
               <div className="flex-shrink-0 px-4 md:px-8 text-center">
                 <div className="flex items-center gap-3">
-                  <span className="text-3xl md:text-4xl font-black" style={{ color: TEAM_A_COLOR }}>
+                  <span
+                    className="text-3xl md:text-4xl font-black"
+                    style={{ color: TEAM_A_COLOR }}
+                  >
                     {aggA.kills}
                   </span>
-                  <span className="text-xl md:text-2xl text-text-tertiary font-light">-</span>
-                  <span className="text-3xl md:text-4xl font-black" style={{ color: TEAM_B_COLOR }}>
+                  <span className="text-xl md:text-2xl text-text-tertiary font-light">
+                    -
+                  </span>
+                  <span
+                    className="text-3xl md:text-4xl font-black"
+                    style={{ color: TEAM_B_COLOR }}
+                  >
                     {aggB.kills}
                   </span>
                 </div>
@@ -1136,12 +1531,19 @@ export default function MatchDetailsPage() {
               {/* Team B */}
               <div className="flex-1 text-center">
                 <div className="flex items-center justify-center gap-2 mb-1">
-                  <h2 className={`text-xl font-bold ${!isTeamAWinner ? "text-text-primary" : "text-text-secondary"}`}>
+                  <h2
+                    className={`text-xl font-bold ${!isTeamAWinner ? "text-text-primary" : "text-text-secondary"}`}
+                  >
                     {match.teamB.name}
                   </h2>
-                  {!isTeamAWinner && <Trophy className="h-5 w-5 text-amber-400" />}
+                  {!isTeamAWinner && (
+                    <Trophy className="h-5 w-5 text-amber-400" />
+                  )}
                 </div>
-                <Badge variant={!isTeamAWinner ? "success" : "danger"} className="text-xs">
+                <Badge
+                  variant={!isTeamAWinner ? "success" : "danger"}
+                  className="text-xs"
+                >
                   {!isTeamAWinner ? "승리" : "패배"}
                 </Badge>
               </div>
@@ -1154,7 +1556,13 @@ export default function MatchDetailsPage() {
                 {formatDuration(gameDuration)}
               </span>
               <span>•</span>
-              <span>{new Date(match.completedAt).toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric" })}</span>
+              <span>
+                {new Date(match.completedAt).toLocaleDateString("ko-KR", {
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                })}
+              </span>
               <span>•</span>
               <span>내전 매치</span>
               {match.bracketRound && (
@@ -1206,42 +1614,102 @@ export default function MatchDetailsPage() {
               {/* Team A Objectives */}
               <div>
                 <h3 className="text-sm font-semibold text-text-secondary mb-3 flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: TEAM_A_COLOR }} />
+                  <div
+                    className="w-3 h-3 rounded-full"
+                    style={{ backgroundColor: TEAM_A_COLOR }}
+                  />
                   {match.teamA.name}
                 </h3>
                 <div className="flex items-center gap-4 mb-3">
-                  <ObjectiveIcon type="baron" count={teamAStats?.baronKills ?? 0} />
-                  <ObjectiveIcon type="dragon" count={teamAStats?.dragonKills ?? 0} />
-                  <ObjectiveIcon type="tower" count={teamAStats?.towerKills ?? 0} />
-                  <ObjectiveIcon type="herald" count={teamAStats?.riftHeraldKills ?? 0} />
-                  <ObjectiveIcon type="inhibitor" count={teamAStats?.inhibitorKills ?? 0} />
+                  <ObjectiveIcon
+                    type="baron"
+                    count={teamAStats?.baronKills ?? 0}
+                  />
+                  <ObjectiveIcon
+                    type="dragon"
+                    count={teamAStats?.dragonKills ?? 0}
+                  />
+                  <ObjectiveIcon
+                    type="tower"
+                    count={teamAStats?.towerKills ?? 0}
+                  />
+                  <ObjectiveIcon
+                    type="herald"
+                    count={teamAStats?.riftHeraldKills ?? 0}
+                  />
+                  <ObjectiveIcon
+                    type="inhibitor"
+                    count={teamAStats?.inhibitorKills ?? 0}
+                  />
                 </div>
                 <div className="flex flex-wrap gap-1">
-                  <FirstBadge label="First Blood" active={teamAStats?.firstBlood ?? false} />
-                  <FirstBadge label="First Tower" active={teamAStats?.firstTower ?? false} />
-                  <FirstBadge label="First Dragon" active={teamAStats?.firstDragon ?? false} />
-                  <FirstBadge label="First Baron" active={teamAStats?.firstBaron ?? false} />
+                  <FirstBadge
+                    label="First Blood"
+                    active={teamAStats?.firstBlood ?? false}
+                  />
+                  <FirstBadge
+                    label="First Tower"
+                    active={teamAStats?.firstTower ?? false}
+                  />
+                  <FirstBadge
+                    label="First Dragon"
+                    active={teamAStats?.firstDragon ?? false}
+                  />
+                  <FirstBadge
+                    label="First Baron"
+                    active={teamAStats?.firstBaron ?? false}
+                  />
                 </div>
               </div>
 
               {/* Team B Objectives */}
               <div>
                 <h3 className="text-sm font-semibold text-text-secondary mb-3 flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: TEAM_B_COLOR }} />
+                  <div
+                    className="w-3 h-3 rounded-full"
+                    style={{ backgroundColor: TEAM_B_COLOR }}
+                  />
                   {match.teamB.name}
                 </h3>
                 <div className="flex items-center gap-4 mb-3">
-                  <ObjectiveIcon type="baron" count={teamBStats?.baronKills ?? 0} />
-                  <ObjectiveIcon type="dragon" count={teamBStats?.dragonKills ?? 0} />
-                  <ObjectiveIcon type="tower" count={teamBStats?.towerKills ?? 0} />
-                  <ObjectiveIcon type="herald" count={teamBStats?.riftHeraldKills ?? 0} />
-                  <ObjectiveIcon type="inhibitor" count={teamBStats?.inhibitorKills ?? 0} />
+                  <ObjectiveIcon
+                    type="baron"
+                    count={teamBStats?.baronKills ?? 0}
+                  />
+                  <ObjectiveIcon
+                    type="dragon"
+                    count={teamBStats?.dragonKills ?? 0}
+                  />
+                  <ObjectiveIcon
+                    type="tower"
+                    count={teamBStats?.towerKills ?? 0}
+                  />
+                  <ObjectiveIcon
+                    type="herald"
+                    count={teamBStats?.riftHeraldKills ?? 0}
+                  />
+                  <ObjectiveIcon
+                    type="inhibitor"
+                    count={teamBStats?.inhibitorKills ?? 0}
+                  />
                 </div>
                 <div className="flex flex-wrap gap-1">
-                  <FirstBadge label="First Blood" active={teamBStats?.firstBlood ?? false} />
-                  <FirstBadge label="First Tower" active={teamBStats?.firstTower ?? false} />
-                  <FirstBadge label="First Dragon" active={teamBStats?.firstDragon ?? false} />
-                  <FirstBadge label="First Baron" active={teamBStats?.firstBaron ?? false} />
+                  <FirstBadge
+                    label="First Blood"
+                    active={teamBStats?.firstBlood ?? false}
+                  />
+                  <FirstBadge
+                    label="First Tower"
+                    active={teamBStats?.firstTower ?? false}
+                  />
+                  <FirstBadge
+                    label="First Dragon"
+                    active={teamBStats?.firstDragon ?? false}
+                  />
+                  <FirstBadge
+                    label="First Baron"
+                    active={teamBStats?.firstBaron ?? false}
+                  />
                 </div>
               </div>
             </div>
@@ -1251,12 +1719,19 @@ export default function MatchDetailsPage() {
         {/* ──────────── Section 4: Bans ──────────── */}
         {(teamABans.length > 0 || teamBBans.length > 0) && (
           <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-5">
-            <h3 className="text-sm font-semibold text-text-secondary mb-3">밴</h3>
+            <h3 className="text-sm font-semibold text-text-secondary mb-3">
+              밴
+            </h3>
             <div className="grid grid-cols-2 gap-6">
               <div>
                 <div className="flex items-center gap-2 mb-2">
-                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: TEAM_A_COLOR }} />
-                  <span className="text-xs text-text-tertiary">{match.teamA.name}</span>
+                  <div
+                    className="w-3 h-3 rounded-full"
+                    style={{ backgroundColor: TEAM_A_COLOR }}
+                  />
+                  <span className="text-xs text-text-tertiary">
+                    {match.teamA.name}
+                  </span>
                 </div>
                 <div className="flex gap-1.5">
                   {teamABans.map((champId, idx) => (
@@ -1267,18 +1742,27 @@ export default function MatchDetailsPage() {
                       width={36}
                       height={36}
                       className="w-9 h-9 rounded-lg grayscale opacity-60 border border-bg-tertiary"
-                      onError={(e) => { e.currentTarget.style.display = "none"; }}
+                      onError={(e) => {
+                        e.currentTarget.style.display = "none";
+                      }}
                     />
                   ))}
                   {teamABans.length === 0 && (
-                    <span className="text-xs text-text-tertiary">밴 정보 없음</span>
+                    <span className="text-xs text-text-tertiary">
+                      밴 정보 없음
+                    </span>
                   )}
                 </div>
               </div>
               <div>
                 <div className="flex items-center gap-2 mb-2">
-                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: TEAM_B_COLOR }} />
-                  <span className="text-xs text-text-tertiary">{match.teamB.name}</span>
+                  <div
+                    className="w-3 h-3 rounded-full"
+                    style={{ backgroundColor: TEAM_B_COLOR }}
+                  />
+                  <span className="text-xs text-text-tertiary">
+                    {match.teamB.name}
+                  </span>
                 </div>
                 <div className="flex gap-1.5">
                   {teamBBans.map((champId, idx) => (
@@ -1289,11 +1773,15 @@ export default function MatchDetailsPage() {
                       width={36}
                       height={36}
                       className="w-9 h-9 rounded-lg grayscale opacity-60 border border-bg-tertiary"
-                      onError={(e) => { e.currentTarget.style.display = "none"; }}
+                      onError={(e) => {
+                        e.currentTarget.style.display = "none";
+                      }}
                     />
                   ))}
                   {teamBBans.length === 0 && (
-                    <span className="text-xs text-text-tertiary">밴 정보 없음</span>
+                    <span className="text-xs text-text-tertiary">
+                      밴 정보 없음
+                    </span>
                   )}
                 </div>
               </div>
@@ -1332,7 +1820,10 @@ export default function MatchDetailsPage() {
         </div>
 
         {/* ──────────── Section 6: Detailed Stats Tabs ──────────── */}
-        <DetailStatsTabs allParticipants={allParticipants} gameDuration={gameDuration} />
+        <DetailStatsTabs
+          allParticipants={allParticipants}
+          gameDuration={gameDuration}
+        />
       </div>
     </div>
   );
