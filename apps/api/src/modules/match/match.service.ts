@@ -35,6 +35,14 @@ import {
 // Re-export types for backward compatibility
 export type { BracketMatch, Bracket } from "./match-bracket.service";
 
+/** 라이브 캡처에서 puuid를 Nexus 유저·팀으로 되돌리기 위한 항목 */
+interface LiveRosterEntry {
+  puuid: string;
+  userId: string | null;
+  username: string | null;
+  teamIdSnapshot: string | null;
+}
+
 @Injectable()
 export class MatchService {
   private readonly logger = new Logger(MatchService.name);
@@ -1192,6 +1200,21 @@ export class MatchService {
     const winner = winnerId === match.teamA.id ? match.teamA : match.teamB;
     const completedAt = new Date();
 
+    // COMPLETED로 넘어가기 직전에 마지막으로 한 번 훑는다.
+    // 방장이 게임이 아직 켜져 있는 상태에서 결과를 먼저 입력하는 경우가 있고,
+    // 상태가 COMPLETED가 되면 fetchLiveMatchStatus가 곧바로 반환하므로
+    // 이 순간을 놓치면 그 경기의 픽/밴은 영영 복구할 수 없다.
+    if (!match.draftCapturedAt) {
+      try {
+        await this.getLiveMatchStatus(matchId, true);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        this.logger.warn(
+          `[DraftCapture] 종료 직전 캡처 실패 matchId=${matchId}: ${message}`,
+        );
+      }
+    }
+
     return this.prisma.$transaction(async (tx) => {
       const result = await tx.match.updateMany({
         where: { id: matchId, status: MatchStatus.IN_PROGRESS },
@@ -1729,9 +1752,18 @@ export class MatchService {
    * Get live match status using Riot Spectator-V5 API
    * Checks if any participants are currently in a live game
    */
-  async getLiveMatchStatus(matchId: string): Promise<LiveGameStatus> {
+  /**
+   * @param forceRefresh 캐시를 무시하고 새로 조회한다. 매치 종료 직전처럼
+   *   "이번 한 번이 마지막 기회"인 경로에서만 쓴다.
+   */
+  async getLiveMatchStatus(
+    matchId: string,
+    forceRefresh = false,
+  ): Promise<LiveGameStatus> {
     const cached = this.liveStatusCache.get(matchId);
-    if (cached && cached.expiresAt > Date.now()) return cached.value;
+    if (!forceRefresh && cached && cached.expiresAt > Date.now()) {
+      return cached.value;
+    }
 
     const existingRequest = this.liveStatusInFlight.get(matchId);
     if (existingRequest) return existingRequest;
@@ -1756,6 +1788,8 @@ export class MatchService {
     const match = await this.prisma.match.findUnique({
       where: { id: matchId },
       include: {
+        // 방·팀이 지워진 뒤에도 puuid를 복원할 수 있는 유일한 경로
+        rosterSnapshots: true,
         teamA: {
           include: {
             members: {
@@ -1822,6 +1856,19 @@ export class MatchService {
       }
     }
 
+    // 팀이 이미 정리된 매치(방 삭제 등)는 라이브 관계가 비어 있다.
+    // 로스터 스냅샷에는 puuid가 남아 있으므로 그것으로 보강한다.
+    const roster = this.buildLiveRoster(match);
+    if (teamAPuuids.length === 0 && teamBPuuids.length === 0) {
+      for (const entry of roster.values()) {
+        if (entry.teamIdSnapshot === match.teamAIdSnapshot) {
+          teamAPuuids.push(entry.puuid);
+        } else if (entry.teamIdSnapshot === match.teamBIdSnapshot) {
+          teamBPuuids.push(entry.puuid);
+        }
+      }
+    }
+
     const puuids = [...teamAPuuids, ...teamBPuuids];
 
     if (puuids.length === 0) {
@@ -1833,9 +1880,10 @@ export class MatchService {
     try {
       const liveStatus =
         await this.riotSpectatorService.findActiveGameByPUUIDs(puuids);
-      await this.captureSpectatorMatchId(
+      await this.captureLiveCustomGame(
         matchId,
-        match.riotMatchId,
+        match,
+        roster,
         teamAPuuids,
         teamBPuuids,
         liveStatus,
@@ -1851,24 +1899,84 @@ export class MatchService {
   }
 
   /**
+   * puuid → 신원/소속 매핑.
+   * 라이브 팀 관계를 우선 쓰고, 비어 있으면 로스터 스냅샷으로 채운다.
+   */
+  private buildLiveRoster(match: any): Map<string, LiveRosterEntry> {
+    const roster = new Map<string, LiveRosterEntry>();
+
+    const addMembers = (
+      members: any[] = [],
+      teamIdSnapshot?: string | null,
+    ) => {
+      for (const member of members) {
+        const puuid = member.user?.riotAccounts?.[0]?.puuid;
+        if (!puuid || roster.has(puuid)) continue;
+        roster.set(puuid, {
+          puuid,
+          userId: member.userId ?? member.user?.id ?? null,
+          username: member.user?.username ?? null,
+          teamIdSnapshot: teamIdSnapshot ?? null,
+        });
+      }
+    };
+
+    addMembers(match.teamA?.members, match.teamAId ?? match.teamAIdSnapshot);
+    addMembers(match.teamB?.members, match.teamBId ?? match.teamBIdSnapshot);
+
+    for (const snapshot of match.rosterSnapshots ?? []) {
+      if (!snapshot.puuid || roster.has(snapshot.puuid)) continue;
+      roster.set(snapshot.puuid, {
+        puuid: snapshot.puuid,
+        userId: snapshot.userId ?? null,
+        username: snapshot.username ?? null,
+        teamIdSnapshot: snapshot.teamIdSnapshot ?? null,
+      });
+    }
+
+    return roster;
+  }
+
+  /**
    * 일반 사설게임은 종료 후 PUUID 매치 목록에 나타나지 않을 수 있다.
    * 경기 중 Spectator 응답의 gameId를 보존하면 종료 후 Match-v5 상세를
    * ID로 직접 조회할 수 있다. 다른 게임 오연결을 막기 위해 CUSTOM_GAME이며
    * NEXUS 양 팀 각각 80% 이상이 참가 중일 때만 저장한다.
    */
-  private async captureSpectatorMatchId(
+  /**
+   * 경기 중 Spectator 응답으로 수동 사설방의 픽/밴을 스냅샷으로 남긴다.
+   *
+   * Riot match-v5는 토너먼트 코드로 만든 커스텀만 제공한다. 수동 사설방은 종료
+   * 후 매치 히스토리에 나타나지 않아 어떤 방법으로도 조회할 수 없으므로,
+   * "경기가 켜져 있는 동안"이 유일한 수집 기회다.
+   *
+   * 다른 게임 오연결을 막기 위해 CUSTOM_GAME이며 NEXUS 양 팀 각각 80% 이상이
+   * 참가 중일 때만 저장한다.
+   */
+  private async captureLiveCustomGame(
     matchId: string,
-    existingRiotMatchId: string | null,
+    match: {
+      riotMatchId: string | null;
+      spectatorGameId: string | null;
+      draftCapturedAt: Date | null;
+      tournamentCode: string | null;
+    },
+    roster: Map<string, LiveRosterEntry>,
     teamAPuuids: string[],
     teamBPuuids: string[],
     liveStatus: LiveGameStatus,
   ): Promise<void> {
     const game = liveStatus.gameInfo;
-    if (!liveStatus.isLive || !game || existingRiotMatchId) return;
+    if (!liveStatus.isLive || !game) return;
 
     const isCustomGame =
       game.gameType === "CUSTOM_GAME" || game.gameQueueConfigId === 0;
-    if (!isCustomGame) return;
+    if (!isCustomGame) {
+      this.logger.debug(
+        `[DraftCapture] 커스텀이 아니라 생략 matchId=${matchId} gameType=${game.gameType}`,
+      );
+      return;
+    }
 
     const activePuuids = new Set(game.participants.map((item) => item.puuid));
     const matchedA = teamAPuuids.filter((puuid) =>
@@ -1882,7 +1990,7 @@ export class MatchService {
 
     if (matchedA < requiredA || matchedB < requiredB) {
       this.logger.warn(
-        `[SpectatorMatchId] 참가자 불일치로 저장 생략 matchId=${matchId} ` +
+        `[DraftCapture] 참가자 불일치로 저장 생략 matchId=${matchId} ` +
           `teamA=${matchedA}/${teamAPuuids.length} teamB=${matchedB}/${teamBPuuids.length}`,
       );
       return;
@@ -1891,31 +1999,88 @@ export class MatchService {
     const rawPlatformId = game.platformId
       ?.toUpperCase()
       .replace(/[^A-Z0-9]/g, "");
-    if (!rawPlatformId || !Number.isFinite(game.gameId)) return;
+    if (!rawPlatformId || !Number.isFinite(game.gameId)) {
+      this.logger.warn(
+        `[DraftCapture] gameId/platformId 이상 matchId=${matchId} ` +
+          `platformId=${game.platformId} gameId=${game.gameId}`,
+      );
+      return;
+    }
 
     // Spectator가 KR1을 주는 경우에도 Match-v5 ID 접두사는 KR이다.
     const platformId = rawPlatformId === "KR1" ? "KR" : rawPlatformId;
+    const gameKey = `${platformId}_${Math.trunc(game.gameId)}`;
+    const durationSec = Math.max(0, Math.trunc(game.gameLength ?? 0));
 
-    const riotMatchId = `${platformId}_${Math.trunc(game.gameId)}`;
-    try {
-      const updated = await this.prisma.match.updateMany({
-        where: {
-          id: matchId,
-          status: MatchStatus.IN_PROGRESS,
-          riotMatchId: null,
-        },
-        data: { riotMatchId },
+    // 이미 같은 게임을 캡처했으면 경기 시간만 갱신한다.
+    // Spectator가 사라지는 순간이 종료 시점이라, 마지막으로 본 gameLength가
+    // 우리가 알 수 있는 가장 정확한 경기 시간이 된다.
+    if (match.draftCapturedAt && match.spectatorGameId === gameKey) {
+      if (durationSec > 0) {
+        await this.prisma.match
+          .updateMany({
+            where: { id: matchId },
+            data: { gameDuration: durationSec },
+          })
+          .catch(() => undefined);
+      }
+      return;
+    }
+
+    const drafts = game.participants
+      .filter((participant) => !participant.bot)
+      .map((participant) => {
+        const entry = roster.get(participant.puuid);
+        return {
+          matchId,
+          puuid: participant.puuid,
+          userId: entry?.userId ?? null,
+          username: entry?.username ?? participant.riotId ?? null,
+          riotTeamId: participant.teamId,
+          teamIdSnapshot: entry?.teamIdSnapshot ?? null,
+          championId: participant.championId,
+          spell1Id: participant.spell1Id,
+          spell2Id: participant.spell2Id,
+        };
       });
 
-      if (updated.count > 0) {
-        this.logger.log(
-          `[SpectatorMatchId] Riot 매치 ID 저장 matchId=${matchId} riotMatchId=${riotMatchId}`,
-        );
-      }
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        await tx.match.updateMany({
+          where: { id: matchId, draftCapturedAt: null },
+          data: {
+            spectatorGameId: gameKey,
+            draftCapturedAt: new Date(),
+            draftBans: (game.bannedChampions ??
+              []) as unknown as Prisma.JsonArray,
+            liveStartedAt: game.gameStartTime
+              ? new Date(game.gameStartTime)
+              : null,
+            ...(durationSec > 0 ? { gameDuration: durationSec } : {}),
+            // 토너먼트 코드로 만든 경기만 match-v5로 상세 조회가 된다.
+            // 수동 사설방에 riotMatchId를 채우면 수집 큐에서 404만 반복한다.
+            ...(match.tournamentCode && !match.riotMatchId
+              ? { riotMatchId: gameKey }
+              : {}),
+          },
+        });
+
+        if (drafts.length > 0) {
+          await tx.matchDraftSnapshot.createMany({
+            data: drafts,
+            skipDuplicates: true,
+          });
+        }
+      });
+
+      this.logger.log(
+        `[DraftCapture] 픽/밴 캡처 완료 matchId=${matchId} game=${gameKey} ` +
+          `참가자=${drafts.length}명 밴=${game.bannedChampions?.length ?? 0}개`,
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.warn(
-        `[SpectatorMatchId] Riot 매치 ID 저장 실패 matchId=${matchId}: ${message}`,
+        `[DraftCapture] 캡처 실패 matchId=${matchId} game=${gameKey}: ${message}`,
       );
     }
   }

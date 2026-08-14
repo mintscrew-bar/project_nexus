@@ -35,11 +35,22 @@ export class TasksService {
     );
   }
 
-  /** 진행 중인 일반 사설게임의 Spectator gameId를 종료 전에 확보한다. */
-  @Cron("*/2 * * * *")
+  /**
+   * 진행 중인 수동 사설방의 픽/밴을 경기 중에 캡처한다.
+   *
+   * 수동 사설방은 종료되면 Riot 어디에도 남지 않으므로 "경기가 켜져 있는 동안"이
+   * 유일한 기회다. 이 크론은 그중 정상적으로 진행되는 경기를 담당한다.
+   *
+   * 방장이 결과를 즉시 입력해 IN_PROGRESS 구간이 수십 초로 끝나는 경우(실측: 2초,
+   * 66초짜리 매치 존재)는 주기를 아무리 줄여도 폴링으로는 못 잡는다. 그쪽은
+   * completeInternalMatchWithSnapshot()이 COMPLETED 전환 직전에 강제 조회로 막는다.
+   *
+   * 대상이 없으면 Riot 호출 0이라 유휴 비용이 없다.
+   */
+  @Cron(CronExpression.EVERY_MINUTE)
   async handleActiveCustomMatchDiscovery(): Promise<void> {
     const lockKey = "tasks:active-custom-match-discovery";
-    const lockToken = await this.redis.acquireLock(lockKey, 110_000);
+    const lockToken = await this.redis.acquireLock(lockKey, 55_000);
     if (!lockToken) return;
 
     try {
@@ -47,23 +58,23 @@ export class TasksService {
         where: {
           status: "IN_PROGRESS",
           isInternal: true,
-          riotMatchId: null,
+          // 이미 캡처한 매치는 다시 훑지 않는다 — 경기 시간 갱신은
+          // getLiveMatchStatus 내부에서 저렴하게 처리된다.
+          draftCapturedAt: null,
         },
         select: { id: true },
         take: 10,
       });
 
+      if (matches.length === 0) return;
+
       for (const match of matches) {
         await this.matchService.getLiveMatchStatus(match.id);
       }
 
-      if (matches.length > 0) {
-        this.logger.log(
-          `진행 중 사설게임 Riot ID 탐색: 대상 ${matches.length}건`,
-        );
-      }
+      this.logger.log(`진행 중 사설게임 픽/밴 탐색: 대상 ${matches.length}건`);
     } catch (error) {
-      this.logger.error("진행 중 사설게임 Riot ID 탐색 실패", error);
+      this.logger.error("진행 중 사설게임 픽/밴 탐색 실패", error);
     } finally {
       await this.redis.releaseLock(lockKey, lockToken);
     }

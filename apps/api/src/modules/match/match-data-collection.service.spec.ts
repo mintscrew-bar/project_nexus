@@ -38,6 +38,8 @@ describe("MatchDataCollectionService", () => {
           // 크로스레퍼런스가 저장 직전 "이미 다른 매치가 가져간 Riot 게임인지"를
           // 확인한다. 기본은 미할당(null).
           findFirst: jest.fn().mockResolvedValue(null),
+          // 수집 불가로 제외된 건수 로깅용
+          count: jest.fn().mockResolvedValue(0),
           ...match,
         },
       } as never,
@@ -49,6 +51,29 @@ describe("MatchDataCollectionService", () => {
   });
 
   describe("collectPendingMatches", () => {
+    it("토너먼트 코드도 riotMatchId도 없는 수동 사설방은 재시도하지 않는다", async () => {
+      // Riot match-v5는 토너먼트 코드로 만든 커스텀만 제공한다. 수동 사설방을
+      // 큐에 남겨두면 15분마다 멤버별 목록·상세 조회를 헛되이 태운다.
+      const findMany = jest.fn().mockResolvedValue([]);
+      const service = createService({ findMany });
+      const tournamentSpy = jest
+        .spyOn(service, "collectMatchData")
+        .mockResolvedValue();
+      const crossrefSpy = jest
+        .spyOn(service, "collectMatchDataByPuuidCrossref")
+        .mockResolvedValue();
+
+      await service.collectPendingMatches();
+
+      const where = findMany.mock.calls[0][0].where;
+      expect(where.OR).toEqual([
+        { tournamentCode: { not: null } },
+        { riotMatchId: { not: null } },
+      ]);
+      expect(tournamentSpy).not.toHaveBeenCalled();
+      expect(crossrefSpy).not.toHaveBeenCalled();
+    });
+
     /** 시도 이력이 없는(=백오프 대상 아님) 매치 */
     const fresh = (
       id: string,
@@ -97,6 +122,12 @@ describe("MatchDataCollectionService", () => {
             dataCollected: false,
             isInternal: true,
             collectAttempts: { lt: 10 },
+            // 토너먼트 코드도 riotMatchId도 없는 수동 사설방은 match-v5로
+            // 조회 자체가 불가능하므로 재시도 대상에서 제외한다.
+            OR: [
+              { tournamentCode: { not: null } },
+              { riotMatchId: { not: null } },
+            ],
           },
         }),
       );

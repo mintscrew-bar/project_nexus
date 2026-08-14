@@ -48,7 +48,7 @@ describe("TasksService pending custom match collection lock", () => {
     expect(redis.extendLock).not.toHaveBeenCalled();
   });
 
-  it("진행 중이며 Riot ID가 없는 내부 매치를 자동 탐색한다", async () => {
+  it("픽/밴 미캡처 상태인 진행 중 내부 매치를 자동 탐색한다", async () => {
     const redis = {
       acquireLock: jest.fn().mockResolvedValue("discovery-token"),
       releaseLock: jest.fn().mockResolvedValue(undefined),
@@ -77,7 +77,7 @@ describe("TasksService pending custom match collection lock", () => {
       where: {
         status: "IN_PROGRESS",
         isInternal: true,
-        riotMatchId: null,
+        draftCapturedAt: null,
       },
       select: { id: true },
       take: 10,

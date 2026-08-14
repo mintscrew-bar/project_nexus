@@ -22,11 +22,26 @@ export class RiotTournamentService {
   private providerId: string | null = null;
   private tournamentId: string | null = null;
 
+  /**
+   * 토너먼트 API 경로. stub은 개발 키로도 호출되지만 **클라이언트에서 실제로
+   * 동작하지 않는 가짜 코드**를 돌려준다. 프로덕션 키 승인 후
+   * RIOT_TOURNAMENT_MODE=production 으로 바꾸면 진짜 코드가 발급된다.
+   *
+   * 이게 중요한 이유: Riot match-v5는 토너먼트 코드로 만든 커스텀만 제공한다.
+   * 진짜 코드가 나오기 시작하면 내전 전적이 개인 스탯까지 전부 정상 수집된다.
+   * (그 전까지는 Spectator 기반 픽/밴 스냅샷이 최선이다)
+   */
+  private readonly tournamentPath: string;
+
   constructor(
     private readonly configService: ConfigService,
     private readonly redis: RedisService,
   ) {
     this.apiKey = this.configService.get("RIOT_API_KEY") || "";
+    const mode =
+      this.configService.get<string>("RIOT_TOURNAMENT_MODE") || "stub";
+    this.tournamentPath =
+      mode === "production" ? "tournament" : "tournament-stub";
   }
 
   /**
@@ -51,8 +66,15 @@ export class RiotTournamentService {
     this.tournamentId = savedTournamentId;
 
     this.logger.log(
-      `Tournament initialized with Provider: ${this.providerId}, Tournament: ${this.tournamentId}`,
+      `Tournament initialized with Provider: ${this.providerId}, ` +
+        `Tournament: ${this.tournamentId}, mode: ${this.tournamentPath}`,
     );
+    if (this.tournamentPath === "tournament-stub") {
+      this.logger.warn(
+        "토너먼트 코드가 stub 모드입니다 — 발급된 코드는 클라이언트에서 동작하지 않습니다. " +
+          "프로덕션 키 승인 후 RIOT_TOURNAMENT_MODE=production 으로 전환하세요.",
+      );
+    }
   }
 
   /**
@@ -87,7 +109,7 @@ export class RiotTournamentService {
     const webhookUrl = `${this.configService.get("API_URL") || "http://localhost:4000"}/api/webhooks/riot/tournament`;
 
     const response = await axios.post(
-      `${this.baseUrl}/lol/tournament-stub/v5/providers`,
+      `${this.baseUrl}/lol/${this.tournamentPath}/v5/providers`,
       {
         region: "KR",
         url: webhookUrl,
@@ -121,7 +143,7 @@ export class RiotTournamentService {
     }
 
     const response = await axios.post(
-      `${this.baseUrl}/lol/tournament-stub/v5/tournaments`,
+      `${this.baseUrl}/lol/${this.tournamentPath}/v5/tournaments`,
       {
         name: "Nexus In-House Tournament",
         providerId: providerIdNum,
@@ -174,7 +196,7 @@ export class RiotTournamentService {
       }
 
       const response = await axios.post(
-        `${this.baseUrl}/lol/tournament-stub/v5/codes`,
+        `${this.baseUrl}/lol/${this.tournamentPath}/v5/codes`,
         {
           count: 1,
           tournamentId: tournamentIdNum,

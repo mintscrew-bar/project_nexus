@@ -1045,6 +1045,17 @@ export class MatchDataCollectionService {
           // 방이 삭제된 뒤에도 보존되는 내부 내전 매치만 대상
           isInternal: true,
           collectAttempts: { lt: MAX_COLLECT_ATTEMPTS },
+          // 수집이 원천적으로 불가능한 매치는 제외한다.
+          //
+          // Riot match-v5는 토너먼트 코드로 생성된 커스텀만 제공한다. 수동
+          // 사설방은 매치 목록(by-puuid/ids)에도, ID 직접 조회에도 나타나지 않아
+          // 크로스레퍼런스가 영원히 실패한다. 그런데도 재시도 큐에 남으면
+          // 15분마다 멤버당 목록+상세 조회를 태워 Riot 예산(앱 전체 100req/2분)만
+          // 갉아먹는다. 실제로 8건이 6~9회씩 헛돌고 있었다.
+          OR: [
+            { tournamentCode: { not: null } },
+            { riotMatchId: { not: null } },
+          ],
         },
         select: {
           id: true,
@@ -1063,9 +1074,21 @@ export class MatchDataCollectionService {
         .filter((match) => this.isCollectBackoffElapsed(match, now))
         .slice(0, COLLECT_BATCH_SIZE);
 
+      // 제외된 건수를 로그에 남긴다 — "왜 안 걷히지?"를 로그만 보고 판단할 수 있어야 한다.
+      const uncollectableCount = await this.prisma.match.count({
+        where: {
+          status: "COMPLETED",
+          dataCollected: false,
+          isInternal: true,
+          tournamentCode: null,
+          riotMatchId: null,
+        },
+      });
+
       this.logger.log(
         `Found ${matches.length} matches pending data collection ` +
-          `(백오프 대기 중 ${candidates.length - matches.length}건)`,
+          `(백오프 대기 중 ${candidates.length - matches.length}건, ` +
+          `수집 불가로 제외 ${uncollectableCount}건)`,
       );
 
       for (const match of matches) {
