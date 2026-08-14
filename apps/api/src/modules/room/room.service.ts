@@ -244,6 +244,8 @@ export class RoomService {
             userId: member.userId,
             username: member.user.username,
             puuid: member.user.riotAccounts[0]?.puuid ?? null,
+            // 라인별 전적용 — assignedRole 은 방과 함께 사라지므로 여기서 복사한다
+            assignedRole: member.assignedRole ?? null,
             teamSlot: "A",
             teamIdSnapshot: teamAId,
             teamName: teamA?.name ?? "Team A",
@@ -253,6 +255,7 @@ export class RoomService {
             userId: member.userId,
             username: member.user.username,
             puuid: member.user.riotAccounts[0]?.puuid ?? null,
+            assignedRole: member.assignedRole ?? null,
             teamSlot: "B",
             teamIdSnapshot: teamBId,
             teamName: teamB?.name ?? "Team B",
@@ -376,6 +379,8 @@ export class RoomService {
               userId: member.userId,
               username: member.user.username,
               puuid: member.user.riotAccounts[0]?.puuid ?? null,
+              // 라인별 전적용 — assignedRole 은 방과 함께 사라지므로 여기서 복사한다
+              assignedRole: member.assignedRole ?? null,
               teamSlot: "A",
               teamIdSnapshot: teamAId,
               teamName: teamA?.name ?? "Team A",
@@ -385,6 +390,7 @@ export class RoomService {
               userId: member.userId,
               username: member.user.username,
               puuid: member.user.riotAccounts[0]?.puuid ?? null,
+              assignedRole: member.assignedRole ?? null,
               teamSlot: "B",
               teamIdSnapshot: teamBId,
               teamName: teamB?.name ?? "Team B",

@@ -24,6 +24,11 @@ describe("RankingService", () => {
       clanRanking: {
         upsert: jest.fn(),
       },
+      nexusRoleRecord: {
+        upsert: jest.fn(),
+        deleteMany: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
     };
 
     service = new RankingService(prisma);
@@ -148,6 +153,96 @@ describe("RankingService", () => {
           }),
         }),
       );
+    });
+  });
+
+  describe("라인별 전적", () => {
+    const roster = (
+      teamSlot: string,
+      assignedRole: string | null,
+      winnerIdSnapshot: string | null = "team-a",
+    ) => ({
+      teamSlot,
+      assignedRole,
+      match: {
+        completedAt: new Date("2026-05-01T00:00:00.000Z"),
+        winnerId: null,
+        winnerIdSnapshot,
+        teamAId: null,
+        teamBId: null,
+        teamAIdSnapshot: "team-a",
+        teamBIdSnapshot: "team-b",
+      },
+    });
+
+    beforeEach(() => {
+      prisma.nexusRanking.upsert.mockResolvedValue({});
+      prisma.clanMember.findMany.mockResolvedValue([]);
+    });
+
+    it("배정 라인별로 승패를 나눠 저장한다", async () => {
+      prisma.matchRosterSnapshot.findMany.mockResolvedValue([
+        roster("A", "MID"), // 승
+        roster("B", "MID"), // 패
+        roster("A", "JUNGLE"), // 승
+      ]);
+
+      await service.updateRanking("user-1");
+
+      const upserts = prisma.nexusRoleRecord.upsert.mock.calls.map(
+        (call: any[]) => call[0],
+      );
+      const mid = upserts.find((u: any) => u.create.role === "MID");
+      const jungle = upserts.find((u: any) => u.create.role === "JUNGLE");
+
+      expect(mid.create).toMatchObject({
+        totalGames: 2,
+        wins: 1,
+        losses: 1,
+        winRate: 50,
+      });
+      expect(jungle.create).toMatchObject({
+        totalGames: 1,
+        wins: 1,
+        losses: 0,
+        winRate: 100,
+      });
+    });
+
+    it("라인 정보가 없는 경기는 라인별 집계에서 뺀다", async () => {
+      // 역할 선택을 거치지 않은 방(자유 팀 선택 등)
+      prisma.matchRosterSnapshot.findMany.mockResolvedValue([
+        roster("A", null),
+        roster("A", "TOP"),
+      ]);
+
+      await service.updateRanking("user-1");
+
+      const upserts = prisma.nexusRoleRecord.upsert.mock.calls;
+      expect(upserts).toHaveLength(1);
+      expect(upserts[0][0].create).toMatchObject({
+        role: "TOP",
+        totalGames: 1,
+      });
+
+      // 전체 전적에는 두 경기가 모두 반영된다
+      expect(prisma.nexusRanking.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          create: expect.objectContaining({ totalGames: 2 }),
+        }),
+      );
+    });
+
+    it("더 이상 집계되지 않는 라인 기록은 지운다", async () => {
+      prisma.matchRosterSnapshot.findMany.mockResolvedValue([
+        roster("A", "ADC"),
+      ]);
+
+      await service.updateRanking("user-1");
+
+      expect(prisma.nexusRoleRecord.deleteMany).toHaveBeenCalledWith({
+        where: { userId: "user-1", role: { notIn: ["ADC"] } },
+      });
     });
   });
 
