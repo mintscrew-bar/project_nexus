@@ -140,9 +140,9 @@ export function AdSlot({
 }
 
 /**
- * 사이트 디자인과 조화롭게 보이도록 카드 스타일로 감싼 AdSlot.
- * - 상단에 작은 "광고" 라벨 (AdSense 정책 + UX)
- * - bg-secondary + border-bg-tertiary 로 다른 카드들과 톤 통일
+ * 콘텐츠와 광고의 경계를 분명히 하되 별도 카드처럼 강조하지 않는 AdSlot.
+ * - 상단에 작은 "광고" 라벨
+ * - 고정/오버레이 없이 문서 흐름 안에서만 노출
  * - 슬롯 ID 미설정 시엔 null (공간을 차지하지 않음)
  */
 export function AdSlotCard({
@@ -161,10 +161,10 @@ export function AdSlotCard({
 
   return (
     <div
-      className={`rounded-xl border border-bg-tertiary bg-bg-secondary/40 p-3 ${className ?? ""}`}
+      className={`border-y border-bg-tertiary/70 py-3 ${className ?? ""}`}
     >
-      <div className="mb-2 flex items-center justify-between">
-        <span className="text-[10px] uppercase tracking-[0.18em] text-text-tertiary">
+      <div className="mb-2 flex items-center justify-center">
+        <span className="text-[10px] text-text-tertiary">
           광고
         </span>
       </div>

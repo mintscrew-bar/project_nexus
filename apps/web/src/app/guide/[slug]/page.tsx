@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ArrowLeft, CalendarDays, Clock3 } from "lucide-react";
 import { absoluteUrl } from "@/lib/seo";
 import { getResourceArticle, RESOURCE_ARTICLES } from "../../resources/articles";
+import { AdSlotCard } from "@/components/ads/AdSlot";
 
 export function generateStaticParams() {
   return RESOURCE_ARTICLES.map(({ slug }) => ({ slug }));
@@ -105,6 +106,12 @@ export default async function GuideArticlePage({
             ))}
           </div>
         </aside>
+
+        <AdSlotCard
+          slotKey="article"
+          minHeight={100}
+          className="mt-12"
+        />
       </article>
     </main>
   );

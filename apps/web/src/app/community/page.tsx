@@ -19,6 +19,7 @@ import { PostRow } from "@/components/community/PostRow";
 import { CategoryCard } from "@/components/community/CategoryCard";
 import { PostListFilters } from "@/components/community/PostListFilters";
 import { CommunityTour } from "@/components/onboarding/PrimaryPageTours";
+import { AdSlotCard } from "@/components/ads/AdSlot";
 
 /**
  * 전 해상도 공용 게시판 칩 내비.
@@ -409,6 +410,12 @@ function CommunityPageContent() {
           </>
         )}
         </div>
+
+        <AdSlotCard
+          slotKey="feed"
+          minHeight={100}
+          className="mt-8"
+        />
       </div>
     </div>
   );

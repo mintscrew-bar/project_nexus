@@ -1115,7 +1115,7 @@ export default function UserProfilePage() {
 
           {/* 페이지 하단 광고 — 콘텐츠를 다 보고 난 뒤 노출 (UX 침해 최소) */}
           <div className="mt-6">
-            <AdSlotCard slotKey="profileBottom" minHeight={120} />
+            <AdSlotCard slotKey="profile" minHeight={100} />
           </div>
         </div>
       </div>

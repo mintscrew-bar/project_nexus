@@ -932,7 +932,7 @@ export function LandingContentSections() {
 
       <section className="bg-[#0f0f0f] px-5 pb-12 sm:px-6">
         <div className="mx-auto max-w-4xl">
-          <AdSlotCard slotKey="landingMid" minHeight={120} />
+          <AdSlotCard slotKey="landing" minHeight={100} />
         </div>
       </section>
     </>

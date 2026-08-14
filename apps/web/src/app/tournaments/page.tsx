@@ -14,6 +14,7 @@ import { useKeyboardShortcutsContext } from "@/components/KeyboardShortcuts";
 import { ArrowUpDown, CheckCircle, Clock, Plus, Search, Users, X } from "lucide-react";
 import { useAuthStore } from "@/stores/auth-store";
 import { TournamentsTour } from "@/components/onboarding/TournamentsTour";
+import { AdSlotCard } from "@/components/ads/AdSlot";
 
 export default function TournamentsPage() {
   const router = useRouter();
@@ -170,6 +171,12 @@ export default function TournamentsPage() {
             onSortByChange={setSortBy}
           />
         </section>
+
+        <AdSlotCard
+          slotKey="feed"
+          minHeight={100}
+          className="mb-8"
+        />
 
         <Modal
           isOpen={isCreatingRoom}

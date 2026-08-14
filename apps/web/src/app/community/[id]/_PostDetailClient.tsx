@@ -19,6 +19,7 @@ import { useToast } from "@/components/ui/Toast";
 import { ConfirmModal } from "@/components/ui/Modal";
 import { MarkdownViewer } from "@/components/community/MarkdownViewer";
 import { RichTextViewer } from "@/components/community/RichTextViewer";
+import { AdSlotCard } from "@/components/ads/AdSlot";
 import type { PostContentFormat, RichTextDocument } from "@/lib/rich-text";
 import {
   ArrowLeft,
@@ -912,6 +913,12 @@ export default function PostDetailClient() {
             )}
           </CardContent>
         </Card>
+
+        <AdSlotCard
+          slotKey="article"
+          minHeight={100}
+          className="mt-8"
+        />
       </div>
     </div>
 

@@ -21,6 +21,7 @@ import { Button, Input } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
 import { statsApi } from "@/lib/api-client";
 import { MatchesTour } from "@/components/onboarding/PrimaryPageTours";
+import { AdSlotCard } from "@/components/ads/AdSlot";
 
 interface RecentSearch {
   type: "summoner" | "user";
@@ -491,6 +492,12 @@ export default function StatsPage() {
             </div>
           </section>
         </div>
+
+        <AdSlotCard
+          slotKey="matchHub"
+          minHeight={100}
+          className="mt-10"
+        />
       </div>
     </div>
   );
