@@ -66,6 +66,7 @@ model User {
   friendships                    Friendship[]          @relation("UserFriendships")
   matchParticipations            MatchParticipant[]
   matchRosterSnapshots           MatchRosterSnapshot[]
+  matchDraftSnapshots            MatchDraftSnapshot[]
   matchStatsCaches               MatchStatsCache[]
   nexusRanking                   NexusRanking?
   notifications                  Notification[]
@@ -623,6 +624,18 @@ model Match {
   // 나머지(teamA/teamB 중)가 레드. 관계 없이 팀 id만 보관(표시·안내용). 미설정이면 진영 미정.
   blueSideTeamId       String?
   riotMatchId          String?
+  // ── 수동 사설방(토너먼트 코드 없는 커스텀) 라이브 캡처 ──
+  // Riot match-v5는 토너먼트 코드로 생성된 커스텀만 제공한다. 수동 사설방은
+  // 매치 히스토리에 남지 않아 종료 후에는 어떤 방법으로도 조회할 수 없다.
+  // 그래서 경기 "중"에 Spectator-V5로 픽/밴·구성을 스냅샷으로 남긴다.
+  // riotMatchId와 분리한 이유: riotMatchId가 있으면 match-v5 수집 대상이 되는데
+  // 이 gameId는 조회해도 404라 수집 큐만 낭비한다.
+  spectatorGameId      String?
+  draftCapturedAt      DateTime?
+  // Spectator bannedChampions 원본 ([{championId, teamId, pickTurn}])
+  draftBans            Json?
+  // Spectator가 알려준 실제 게임 시작 시각 (Nexus의 startedAt과 다를 수 있다)
+  liveStartedAt        DateTime?
   patchVersion         String? // ex: "14.8" — 패치 임팩트 분석용
   // Riot 큐 식별자 (외부 인제스트 매치). 420=솔랭, 440=자랭, 400=일반 드래프트, 430=일반 블라인드, 450=ARAM.
   // 내부 토너먼트 매치는 NULL — isInternal 기준으로 식별한다.
@@ -642,6 +655,7 @@ model Match {
   updatedAt            DateTime              @updatedAt
   participants         MatchParticipant[]
   rosterSnapshots      MatchRosterSnapshot[]
+  draftSnapshots       MatchDraftSnapshot[]
   teamStats            MatchTeamStats[]
   votes                MatchVote[]
   // 시리즈는 대진 진행용 스캐폴딩이라 방과 함께 지워지지만, 매치(전적)는 남아야 한다.
@@ -781,6 +795,34 @@ model MatchRosterSnapshot {
   @@index([userId])
   @@index([puuid])
   @@map("match_roster_snapshots")
+}
+
+/// 수동 사설방의 픽/밴 스냅샷 (Spectator-V5, 경기 중 캡처).
+///
+/// MatchRosterSnapshot과 따로 두는 이유: 로스터 스냅샷은 매치 완료 시점에
+/// deleteMany + createMany로 통째로 다시 쓰여서, 경기 중에 채워 넣으면 날아간다.
+/// 이 표는 캡처 시점에 한 번만 쓰고 이후 건드리지 않는다.
+model MatchDraftSnapshot {
+  id             String   @id @default(cuid())
+  matchId        String
+  puuid          String
+  userId         String?
+  username       String?
+  /// Spectator 기준 팀 (100=블루, 200=레드)
+  riotTeamId     Int
+  /// 매핑에 성공한 경우의 Nexus 팀 id. 실패하면 NULL이라도 픽 자체는 남긴다.
+  teamIdSnapshot String?
+  championId     Int
+  spell1Id       Int
+  spell2Id       Int
+  createdAt      DateTime @default(now())
+  match          Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  user           User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@unique([matchId, puuid])
+  @@index([matchId])
+  @@index([puuid])
+  @@map("match_draft_snapshots")
 }
 
 model MatchTeamStats {
