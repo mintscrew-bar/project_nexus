@@ -526,12 +526,6 @@ function MatchFlank({
   const teamColor = team?.color || sideColor;
   const right = align === "right";
 
-  const bar = (
-    <span
-      className="h-16 w-1.5 shrink-0 rounded-full"
-      style={{ background: sideColor, boxShadow: `0 0 18px ${sideColor}` }}
-    />
-  );
   const scoreEl = (
     <span
       className="text-[64px] font-black tabular-nums leading-none"
@@ -576,11 +570,9 @@ function MatchFlank({
         <>
           {info}
           {scoreEl}
-          {bar}
         </>
       ) : (
         <>
-          {bar}
           {scoreEl}
           {info}
         </>
@@ -611,9 +603,6 @@ export function MatchScene({ snapshot }: { snapshot: any }) {
   // 시리즈 스코어 필드가 있으면 사용, 없으면 승패 기반 폴백
   const blueScore = match.blueScore ?? (blueWin ? 1 : 0);
   const redScore = match.redScore ?? (redWin ? 1 : 0);
-  const roundLabel =
-    match.bracketRound ||
-    (match.round != null ? `${match.round}라운드` : "경기");
 
   return (
     // 롤 관전 위에 합성되는 오버레이라 배경 없이 투명하게 띄운다.
@@ -640,29 +629,12 @@ export function MatchScene({ snapshot }: { snapshot: any }) {
         </div>
       </div>
 
-      {/* 라운드/경기 캡션 — 상단 중앙, 게임 점수창 아래 (위치는 조정 가능) */}
-      <div className="absolute inset-x-0 top-[150px] flex justify-center">
-        <div className="flex items-center gap-3 border-y border-white/12 bg-black/60 px-6 py-2 backdrop-blur">
-          <span className="text-sm font-black uppercase tracking-[0.3em] text-white/72">
-            {roundLabel}
-          </span>
-          {match.matchNumber != null && (
-            <>
-              <span className="text-white/20">·</span>
-              <span className="text-sm font-black uppercase tracking-[0.2em] text-white/40">
-                Match {match.matchNumber}
-              </span>
-            </>
-          )}
-          <span className="text-white/20">·</span>
-          <span
-            className="text-sm font-black uppercase tracking-[0.28em]"
-            style={{ color: done ? "#9CA3AF" : "#F87171" }}
-          >
-            {done ? "Final" : "Live"}
-          </span>
-        </div>
-      </div>
+      {/*
+        경기 중 오버레이는 양옆 플랭킹(팀명 + 세트 스코어)만 남긴다.
+        상단 중앙에 라운드/Match/Live 캡션이 있었는데, 롤 자체 점수창 바로 아래에
+        붙어 관전 화면을 가렸다. 이 씬에서는 하단 바(LowerThird)도 띄우지 않으므로
+        (page.tsx 의 persistent 참고) 화면을 최대한 비워 두는 쪽이 맞다.
+      */}
     </div>
   );
 }
