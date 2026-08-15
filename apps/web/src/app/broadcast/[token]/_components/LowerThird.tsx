@@ -6,7 +6,14 @@ import { accentOf, statusLabel } from "./scenes";
  * 공통 하단 상태 바.
  * 사선 카드 대신 얇은 방송 ticker 형태로 유지해 모든 씬에서 같은 패키지처럼 보이게 한다.
  */
-export function LowerThird({ snapshot }: { snapshot: any }) {
+export function LowerThird({
+  snapshot,
+  bg = "transparent",
+}: {
+  snapshot: any;
+  /** 투명 오버레이인지 풀씬인지. 투명이면 backdrop-blur 를 끈다. */
+  bg?: "transparent" | "opaque";
+}) {
   if (!snapshot?.room) return null;
   const accent = accentOf(snapshot);
   const room = snapshot.room;
@@ -14,7 +21,18 @@ export function LowerThird({ snapshot }: { snapshot: any }) {
 
   return (
     <div className="absolute bottom-12 left-12 right-12 select-none">
-      <div className="flex h-[64px] items-center border-y border-white/10 bg-black/62 px-5 text-white backdrop-blur">
+      {/*
+        backdrop-blur 는 투명 오버레이에서 비용만 크고 효과가 없다.
+        페이지 배경이 투명하면 블러할 대상이 아예 없는데도, OBS 계열 브라우저
+        소스(CEF)는 매 프레임 backdrop 을 읽어와 블러 패스를 돈다. 알파 합성과
+        겹치면 패널 가장자리에 회색 테두리가 생기기도 한다.
+        풀씬(opaque)일 때는 뒤에 배경이 실제로 있으므로 그대로 둔다.
+      */}
+      <div
+        className={`flex h-[64px] items-center border-y border-white/10 bg-black/62 px-5 text-white ${
+          bg === "opaque" ? "backdrop-blur" : ""
+        }`}
+      >
         <div className="flex h-full items-center gap-4 pr-5">
           <div
             className="flex h-10 min-w-10 items-center justify-center border-y px-2 text-xl font-black"

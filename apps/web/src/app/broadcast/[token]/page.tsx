@@ -157,9 +157,11 @@ export default function BroadcastPage() {
   const token = params.token as string;
   const scene = (search?.get("scene") ?? "control") as string;
   const bg = (search?.get("bg") === "opaque" ? "opaque" : "transparent") as
-    | "opaque"
-    | "transparent";
+    "opaque" | "transparent";
   const matchId = search?.get("matchId") ?? undefined;
+  // 방송 PC 한 대로 인코딩까지 돌리는 환경(프릭샷 등)을 위한 저사양 모드.
+  // ?fx=low 를 붙이면 장식용 무한 애니메이션을 멈춘다. 정보 표시에는 영향이 없다.
+  const lowFx = search?.get("fx") === "low";
 
   const queryKey = useMemo(
     () => ["broadcastSnapshot", token, scene, matchId],
@@ -268,9 +270,7 @@ export default function BroadcastPage() {
   // auto 모드의 시간 기반 장면 전환(결과 12초, 시작 직후 대진표 8초 등)은
   // 5초 폴링만으로는 최대 5초까지 늦어진다. 서버가 알려준 전환 시각에 맞춰 즉시 갱신한다.
   const sceneNextChangeAt = snapshot?.sceneNextChangeAt as
-    | number
-    | null
-    | undefined;
+    number | null | undefined;
   useEffect(() => {
     if (!sceneNextChangeAt) return;
     const delay = sceneNextChangeAt - Date.now();
@@ -337,20 +337,35 @@ export default function BroadcastPage() {
     displayScene === "result" ||
     displayScene === "summary" ? null : (
       <>
-        <LowerThird snapshot={snapshot} />
+        <LowerThird snapshot={snapshot} bg={bg} />
         <BroadcastAnnouncement text={snapshot?.broadcast?.announcement} />
       </>
     );
 
   return (
-    <BroadcastShell
-      bg={bg}
-      theme={snapshot.theme}
-      scene={sceneNode}
-      persistent={persistent}
-      transitionKey={broadcastSceneKey}
-      transition={transition}
-    />
+    <>
+      {/*
+        저사양 모드: 장식용 무한 애니메이션만 정지시킨다.
+        OBS 계열 브라우저 소스는 화면이 정지해 있어도 설정 FPS 로 계속 렌더하므로,
+        16초/9초짜리 배경 팬·스캔 같은 무한 루프는 방송 내내 GPU 를 점유한다.
+        전환 효과처럼 한 번 재생하고 끝나는 애니메이션은 건드리지 않는다.
+      */}
+      {lowFx && (
+        <style
+          dangerouslySetInnerHTML={{
+            __html: `[style*="infinite"],.animate-pulse,.animate-ping{animation:none !important;}`,
+          }}
+        />
+      )}
+      <BroadcastShell
+        bg={bg}
+        theme={snapshot.theme}
+        scene={sceneNode}
+        persistent={persistent}
+        transitionKey={broadcastSceneKey}
+        transition={transition}
+      />
+    </>
   );
 }
 

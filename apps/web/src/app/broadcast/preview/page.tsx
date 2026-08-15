@@ -1027,7 +1027,7 @@ export default function BroadcastPreviewPage() {
         bg={bg}
         theme={snapshot.theme}
         scene={sceneNode}
-        persistent={isMatch ? null : <LowerThird snapshot={snapshot} />}
+        persistent={isMatch ? null : <LowerThird snapshot={snapshot} bg={bg} />}
         transitionKey={sceneKey}
         transition={PREVIEW_TRANSITIONS[sceneKey]}
       />
