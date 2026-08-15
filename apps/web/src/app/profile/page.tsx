@@ -108,7 +108,7 @@ const STREAMER_PLATFORM_OPTIONS: Array<{
   {
     value: "SOOP",
     label: "SOOP",
-    placeholder: "https://ch.sooplive.co.kr/...",
+    placeholder: "https://www.sooplive.com/station/...",
   },
   {
     value: "YOUTUBE",

@@ -41,7 +41,7 @@ const PLATFORMS: Array<{
   {
     value: "SOOP",
     label: "SOOP",
-    placeholder: "https://ch.sooplive.co.kr/...",
+    placeholder: "https://www.sooplive.com/station/...",
   },
   {
     value: "YOUTUBE",

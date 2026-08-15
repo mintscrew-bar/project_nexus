@@ -25,8 +25,8 @@ export class SoopLiveProvider implements LiveProvider {
 
   private readonly logger = new Logger(SoopLiveProvider.name);
   private readonly liveApiUrl =
-    "https://live.sooplive.co.kr/afreeca/player_live_api.php";
-  private readonly stationApiUrl = "https://chapi.sooplive.co.kr/api";
+    "https://live.sooplive.com/afreeca/player_live_api.php";
+  private readonly stationApiUrl = "https://chapi.sooplive.com/api";
   private readonly timeout = 4000;
 
   // SOOP 스트리머 ID는 영문 소문자·숫자·언더스코어 조합이다.
@@ -39,15 +39,21 @@ export class SoopLiveProvider implements LiveProvider {
 
     try {
       const url = new URL(raw);
-      // ch.sooplive.co.kr/{id}, play.sooplive.co.kr/{id}/... 및 구 afreecatv 도메인
+      // 2026년 통합 주소는 www.sooplive.com/station/{id}이며,
+      // 기존 ch/play 주소와 구 afreecatv 주소도 계속 허용한다.
       if (
+        !isDomainOrSubdomain(url.hostname, "sooplive.com") &&
         !isDomainOrSubdomain(url.hostname, "sooplive.co.kr") &&
         !isDomainOrSubdomain(url.hostname, "afreecatv.com")
       ) {
         return null;
       }
 
-      const candidate = url.pathname.split("/").filter(Boolean)[0] ?? "";
+      const segments = url.pathname.split("/").filter(Boolean);
+      const candidate =
+        segments[0]?.toLowerCase() === "station"
+          ? (segments[1] ?? "")
+          : (segments[0] ?? "");
       return this.channelIdPattern.test(candidate) ? candidate : null;
     } catch {
       return null;
@@ -72,32 +78,43 @@ export class SoopLiveProvider implements LiveProvider {
     return {
       channelId,
       channelName: station.user_nick ?? station.station_name ?? null,
-      channelImageUrl: null,
-      followerCount: null,
+      channelImageUrl: station.profile_image
+        ? this.normalizeAssetUrl(station.profile_image)
+        : null,
+      followerCount: station.upd?.fan_cnt ?? null,
       description,
     };
   }
 
+  private normalizeAssetUrl(url: string): string {
+    return url.startsWith("//") ? `https:${url}` : url;
+  }
+
   private async fetchStation(channelId: string): Promise<{
+    profile_image?: string;
     user_id?: string;
     user_nick?: string;
     station_title?: string;
     station_name?: string;
+    upd?: { fan_cnt?: number };
   } | null> {
     try {
       const response = await axios.get<{
+        profile_image?: string;
         station?: {
           user_id?: string;
           user_nick?: string;
           station_title?: string;
           station_name?: string;
+          upd?: { fan_cnt?: number };
         };
       }>(`${this.stationApiUrl}/${channelId}/station`, {
         timeout: this.timeout,
         headers: { "User-Agent": "Mozilla/5.0 (compatible; NexusBot/1.0)" },
       });
-
-      return response.data?.station ?? null;
+      const station = response.data?.station;
+      if (!station) return null;
+      return { ...station, profile_image: response.data.profile_image };
     } catch (error) {
       const err = error as Error;
       this.logger.warn(`SOOP 방송국 조회 실패 ${channelId}: ${err?.message}`);

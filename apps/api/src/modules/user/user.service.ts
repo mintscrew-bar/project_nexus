@@ -13,7 +13,7 @@ import { UploadService } from "../upload/upload.service";
 
 const STREAMER_PLATFORM_HOSTS: Record<StreamerPlatform, string[]> = {
   CHZZK: ["chzzk.naver.com"],
-  SOOP: ["sooplive.co.kr", "afreecatv.com"],
+  SOOP: ["sooplive.com", "sooplive.co.kr", "afreecatv.com"],
   YOUTUBE: ["youtube.com", "youtu.be"],
 };
 const MAX_STREAMER_LINKS = 12;
