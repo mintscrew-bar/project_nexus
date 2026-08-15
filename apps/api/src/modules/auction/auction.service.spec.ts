@@ -224,10 +224,10 @@ describe("AuctionService", () => {
       expect(prisma.auctionBid.create).toHaveBeenCalled();
       expect(result.currentHighestBid).toBe(bidAmount);
       expect(result.currentHighestBidder).toBe(teamId);
-      expect(result.timerEnd).toBe(now + 10000);
+      expect(result.timerEnd).toBe(now + 20000);
     });
 
-    it("마감 임박 입찰이면 타이머를 연장한다", async () => {
+    it("입찰하면 기존 종료 시각에 10초를 더한다", async () => {
       const now = 1_700_000_000_000;
       jest.spyOn(Date, "now").mockReturnValue(now);
 
@@ -271,7 +271,7 @@ describe("AuctionService", () => {
 
       const result = await service.placeBid(userId, roomId, 600);
 
-      expect(result.timerEnd).toBe(now + 5000);
+      expect(result.timerEnd).toBe(now + 13000);
     });
   });
 

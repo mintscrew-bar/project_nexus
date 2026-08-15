@@ -7,6 +7,7 @@ import {
 import { ConfigService } from "@nestjs/config";
 import { StreamerPlatform } from "@nexus/database";
 import { PrismaService } from "../prisma/prisma.service";
+import { BalanceScoreService } from "../common/balance-score.service";
 import { DiscordAdminAlertService } from "../discord/discord-admin-alert.service";
 import { ReputationService } from "../reputation/reputation.service";
 import { UploadService } from "../upload/upload.service";
@@ -26,6 +27,7 @@ export class UserService {
     private readonly adminAlerts: DiscordAdminAlertService,
     private readonly reputationService: ReputationService,
     private readonly uploadService: UploadService,
+    private readonly balanceScores: BalanceScoreService,
   ) {}
 
   async findById(id: string) {
@@ -66,7 +68,7 @@ export class UserService {
       where: { id: userId },
       include: {
         riotAccounts: {
-          include: { championPreferences: true },
+          include: { championPreferences: true, roleTiers: true },
           orderBy: [{ isPrimary: "desc" }, { createdAt: "desc" }],
         },
         clanMemberships: {
@@ -121,9 +123,17 @@ export class UserService {
         puuid: _puuid,
         summonerId: _summonerId,
         userId: _userId,
+        // 캐시 메타는 내부용이라 내보내지 않는다. 점수는 아래에서 검증해 붙인다.
+        balanceScores: _balanceScores,
+        balanceScoreVersion: _balanceScoreVersion,
+        balanceScoresAt: _balanceScoresAt,
         ...publicAccount
       } = account;
-      return publicAccount;
+      return {
+        ...publicAccount,
+        // 산식 버전이 맞는 캐시만 내보낸다. 오래된 값이면 null 이라 화면에서 숨는다.
+        balanceScores: this.balanceScores.readCached(account),
+      };
     });
 
     // Apply privacy settings for non-owner viewers.
@@ -212,6 +222,9 @@ export class UserService {
             peakLp: true,
             mainRole: true,
             subRole: true,
+            roleTiers: {
+              select: { role: true, tier: true, rank: true, lp: true },
+            },
             championPreferences: {
               orderBy: { order: "asc" },
               select: { role: true, championId: true, order: true },

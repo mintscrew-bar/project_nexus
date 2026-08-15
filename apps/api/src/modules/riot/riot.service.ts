@@ -9,6 +9,7 @@ import {
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../prisma/prisma.service";
+import { BalanceScoreService } from "../common/balance-score.service";
 import { RedisService } from "../redis/redis.service";
 import { DiscordBotService } from "../discord/discord-bot.service";
 import { Role } from "@nexus/database";
@@ -62,6 +63,7 @@ export interface RegisterRiotAccountDto {
   championsByRole: {
     [key in Role]?: string[]; // Champion IDs
   };
+  roleTiers?: Record<string, { tier?: string; rank?: string; lp?: number }>;
 }
 
 type RiotLeagueEntryDto = {
@@ -93,6 +95,7 @@ export class RiotService {
     private readonly redis: RedisService,
     private readonly discordBotService: DiscordBotService,
     private readonly rateLimiter: RiotRateLimiterService,
+    private readonly balanceScores: BalanceScoreService,
   ) {
     // Try both ConfigService and process.env
     this.apiKey =
@@ -186,6 +189,72 @@ export class RiotService {
     }
 
     return toStoredPeakTier(tier, rank);
+  }
+
+  private normalizeRoleTiers(
+    roleTiers?: Record<string, { tier?: string; rank?: string; lp?: number }>,
+  ): Array<{ role: Role; tier: string; rank: string; lp: number }> | null {
+    if (roleTiers === undefined) return null;
+
+    const validRoles = new Set(Object.values(Role));
+    const normalized: Array<{
+      role: Role;
+      tier: string;
+      rank: string;
+      lp: number;
+    }> = [];
+
+    for (const [roleKey, value] of Object.entries(roleTiers)) {
+      if (!validRoles.has(roleKey as Role)) {
+        throw new BadRequestException("유효한 라인을 선택해주세요.");
+      }
+      if (!value || typeof value !== "object") {
+        throw new BadRequestException("라인별 티어 형식이 올바르지 않습니다.");
+      }
+
+      const tier = (value.tier || "").trim().toUpperCase();
+      if (!tier) continue;
+      if (!RANKED_TIERS.includes(tier as (typeof RANKED_TIERS)[number])) {
+        throw new BadRequestException(
+          `${roleKey} 라인의 티어가 올바르지 않습니다.`,
+        );
+      }
+
+      const apex = isApexTier(tier);
+      const rank = apex ? "" : (value.rank || "").trim().toUpperCase();
+      if (
+        !apex &&
+        !RANKED_DIVISIONS.includes(rank as (typeof RANKED_DIVISIONS)[number])
+      ) {
+        throw new BadRequestException(
+          `${roleKey} 라인의 디비전을 선택해주세요.`,
+        );
+      }
+
+      const lp = apex ? (value.lp ?? 0) : 0;
+      if (!Number.isInteger(lp) || lp < 0 || lp > 9999) {
+        throw new BadRequestException(
+          `${roleKey} 라인의 LP가 올바르지 않습니다.`,
+        );
+      }
+      normalized.push({ role: roleKey as Role, tier, rank, lp });
+    }
+
+    return normalized;
+  }
+
+  private async replaceRoleTiers(
+    riotAccountId: string,
+    roleTiers: Array<{ role: Role; tier: string; rank: string; lp: number }>,
+  ) {
+    await this.prisma.$transaction([
+      this.prisma.riotAccountRoleTier.deleteMany({ where: { riotAccountId } }),
+      ...roleTiers.map((roleTier) =>
+        this.prisma.riotAccountRoleTier.create({
+          data: { riotAccountId, ...roleTier },
+        }),
+      ),
+    ]);
   }
 
   private async request<T>(url: string): Promise<T> {
@@ -565,6 +634,7 @@ export class RiotService {
 
   async registerRiotAccount(userId: string, dto: RegisterRiotAccountDto) {
     const manualPeak = this.normalizeManualPeakTier(dto.peakTier, dto.peakRank);
+    const roleTiers = this.normalizeRoleTiers(dto.roleTiers);
 
     // 아이콘 변경 인증 단계를 제거하고 닉네임/태그로 직접 puuid 조회 후 등록.
     // 라이엇은 외부 OAuth 가 없어 100% 본인 확인이 불가하지만, puuid 유니크 제약으로
@@ -722,6 +792,13 @@ export class RiotService {
       });
     }
 
+    if (roleTiers) {
+      await this.replaceRoleTiers(riotAccount.id, roleTiers);
+    }
+
+    // 티어·라인 티어가 정해졌으니 밸런스 점수를 만들어 둔다.
+    await this.balanceScores.refreshAccount(riotAccount.id);
+
     // 숙련도 최초 수집 (실패해도 등록 자체는 성공 처리)
     await this.syncChampionMastery(riotAccount.id, summoner.puuid);
 
@@ -744,6 +821,7 @@ export class RiotService {
     return this.prisma.riotAccount.findUnique({
       where: { id: riotAccount.id },
       include: {
+        roleTiers: { orderBy: { role: "asc" } },
         championPreferences: {
           orderBy: [{ role: "asc" }, { order: "asc" }],
         },
@@ -795,6 +873,9 @@ export class RiotService {
         lastSyncedAt: new Date(),
       },
     });
+
+    // 티어·솔랭 전적이 바뀌면 밸런스 점수도 다시 계산한다.
+    await this.balanceScores.refreshAccount(riotAccountId);
 
     // 숙련도 최신화 (실패해도 동기화 자체는 성공 처리)
     await this.syncChampionMastery(riotAccountId, account.puuid);
@@ -868,6 +949,7 @@ export class RiotService {
     const accounts = await this.prisma.riotAccount.findMany({
       where: { userId },
       include: {
+        roleTiers: { orderBy: { role: "asc" } },
         championPreferences: {
           orderBy: [{ role: "asc" }, { order: "asc" }],
         },
@@ -906,6 +988,11 @@ export class RiotService {
       where: { id: riotAccountId },
       data: { isPrimary: true },
     });
+
+    // 밸런스 점수는 대표 계정 기준으로 읽는다. 새로 대표가 된 계정에 캐시가
+    // 없으면(기능 도입 전 등록된 계정 등) 점수가 화면에서 사라지므로 채워 둔다.
+    await this.balanceScores.refreshAccount(riotAccountId);
+
     await this.discordBotService.syncUserTierAndLineRoles(userId).catch(() => {
       this.logger.warn(
         `Discord tier/line role sync failed (primary): ${userId}`,
@@ -961,6 +1048,7 @@ export class RiotService {
       peakRank?: string;
       peakLp?: number;
       championsByRole?: { [key in Role]?: string[] };
+      roleTiers?: Record<string, { tier?: string; rank?: string; lp?: number }>;
     },
   ) {
     const account = await this.prisma.riotAccount.findUnique({
@@ -977,6 +1065,8 @@ export class RiotService {
     if (dto.mainRole === dto.subRole) {
       throw new BadRequestException("주 역할과 부 역할은 동일할 수 없습니다");
     }
+
+    const roleTiers = this.normalizeRoleTiers(dto.roleTiers);
 
     const APEX_TIERS_UPDATE = new Set(["MASTER", "GRANDMASTER", "CHALLENGER"]);
     let peakUpdate: Record<string, unknown> = {};
@@ -1024,6 +1114,14 @@ export class RiotService {
         }
       }
     }
+    if (roleTiers) {
+      await this.replaceRoleTiers(riotAccountId, roleTiers);
+    }
+
+    // 최고 티어와 라인 티어가 모두 점수에 반영된다. 라인 티어를 저장하기 전에
+    // 계산하면 이전 값으로 캐시가 굳으므로 반드시 이 순서를 지킨다.
+    await this.balanceScores.refreshAccount(riotAccountId);
+
     await this.discordBotService.syncUserTierAndLineRoles(userId).catch(() => {
       this.logger.warn(
         `Discord tier/line role sync failed (update): ${userId}`,
@@ -1033,6 +1131,7 @@ export class RiotService {
     return this.prisma.riotAccount.findUnique({
       where: { id: riotAccountId },
       include: {
+        roleTiers: { orderBy: { role: "asc" } },
         championPreferences: { orderBy: [{ role: "asc" }, { order: "asc" }] },
       },
     });

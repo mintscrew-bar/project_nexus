@@ -45,4 +45,8 @@ export class UpdateRiotAccountDto {
   @IsOptional()
   @IsObject()
   championsByRole?: Record<string, string[]>;
+
+  @IsOptional()
+  @IsObject()
+  roleTiers?: Record<string, { tier?: string; rank?: string; lp?: number }>;
 }

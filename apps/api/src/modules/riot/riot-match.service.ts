@@ -145,6 +145,10 @@ interface GetMatchByIdOptions {
   propagateKnownPuuids?: boolean;
 }
 
+interface GetMatchIdsOptions {
+  throwOnFailure?: boolean;
+}
+
 @Injectable()
 export class RiotMatchService {
   private readonly logger = new Logger(RiotMatchService.name);
@@ -713,9 +717,13 @@ export class RiotMatchService {
     startTime?: number, // Unix seconds
     endTime?: number, // Unix seconds
     priority: RiotMatchRequestPriority = "foreground",
+    options: GetMatchIdsOptions = {},
   ): Promise<string[]> {
     if (!this.apiKey) {
       this.logger.error("RIOT_API_KEY not configured");
+      if (options.throwOnFailure) {
+        throw new Error("RIOT_API_KEY not configured");
+      }
       return [];
     }
 
@@ -784,11 +792,17 @@ export class RiotMatchService {
             startTime,
             endTime,
             priority,
+            options,
           );
         }
         this.logger.error(
           `Rate limit exhausted fetching match IDs for PUUID ${puuid}`,
         );
+        if (options.throwOnFailure) {
+          throw new Error(
+            `Rate limit exhausted fetching match IDs for ${puuid}`,
+          );
+        }
         return [];
       }
 
@@ -807,6 +821,7 @@ export class RiotMatchService {
           startTime,
           endTime,
           priority,
+          options,
         );
       }
 
@@ -814,6 +829,9 @@ export class RiotMatchService {
         `Error fetching match IDs for PUUID ${puuid}:`,
         error.message,
       );
+      if (options.throwOnFailure) {
+        throw error;
+      }
       return [];
     }
   }

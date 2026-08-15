@@ -98,7 +98,7 @@ export function LobbyParticipantsList({
               팀을 이동하면 준비가 해제됩니다. 선택한 팀 카드에서 「팀 나가기」로 대기석으로 돌아올 수 있어요.
             </p>
           </div>
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-2 sm:grid-cols-2">
             {manualTeams.map((team: any) => {
               const members = players.filter((player: any) => player.teamId === team.id);
               const selected = currentUserParticipant?.teamId === team.id;
@@ -106,7 +106,7 @@ export function LobbyParticipantsList({
               return (
                 <div
                   key={team.id}
-                  className={`rounded-lg border p-2.5 ${
+                  className={`min-w-0 rounded-lg border p-2.5 ${
                     selected
                       ? "border-accent-primary bg-accent-primary/10"
                       : "border-bg-elevated bg-bg-secondary"

@@ -3,6 +3,7 @@ import { RankingService } from "./ranking.service";
 describe("RankingService", () => {
   let service: RankingService;
   let prisma: any;
+  let balanceScores: any;
 
   beforeEach(() => {
     prisma = {
@@ -31,7 +32,9 @@ describe("RankingService", () => {
       },
     };
 
-    service = new RankingService(prisma);
+    // 전적이 바뀌면 밸런스 점수 캐시도 갱신한다. 여기서는 호출 여부만 보면 된다.
+    balanceScores = { refreshUser: jest.fn().mockResolvedValue(undefined) };
+    service = new RankingService(prisma, balanceScores as any);
   });
 
   describe("updateRanking", () => {
@@ -244,6 +247,20 @@ describe("RankingService", () => {
         where: { userId: "user-1", role: { notIn: ["ADC"] } },
       });
     });
+  });
+
+  it("전적 갱신 후 밸런스 점수 캐시도 다시 계산한다", async () => {
+    // 점수는 미리 계산해 저장하므로, 내전 전적이 바뀌면 무효화해야 한다.
+    prisma.matchRosterSnapshot.findMany.mockResolvedValue([]);
+    prisma.nexusRanking.upsert.mockResolvedValue({});
+    prisma.clanMember.findMany.mockResolvedValue([]);
+
+    await service.updateRanking("user-1");
+
+    expect(balanceScores.refreshUser).toHaveBeenCalledWith("user-1");
+    expect(prisma.nexusRanking.upsert.mock.invocationCallOrder[0]).toBeLessThan(
+      balanceScores.refreshUser.mock.invocationCallOrder[0],
+    );
   });
 
   describe("recalculateAllRankings", () => {

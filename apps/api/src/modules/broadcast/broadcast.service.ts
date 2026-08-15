@@ -277,14 +277,20 @@ export class BroadcastService {
       captainId: team.captainId,
       initialBudget: team.initialBudget,
       remainingBudget: team.remainingBudget,
-      members: (team.members ?? []).map((m: any) => ({
-        userId: m.userId,
-        username: m.user?.username ?? null,
-        avatar: m.user?.avatar ?? null,
-        assignedRole: m.assignedRole ?? null,
-        soldPrice: m.soldPrice ?? null,
-        tier: m.user?.riotAccounts?.[0]?.tier ?? null,
-      })),
+      members: (team.members ?? []).map((m: any) => {
+        const account = m.user?.riotAccounts?.[0];
+        return {
+          userId: m.userId,
+          username: m.user?.username ?? null,
+          avatar: m.user?.avatar ?? null,
+          assignedRole: m.assignedRole ?? null,
+          soldPrice: m.soldPrice ?? null,
+          tier: account?.tier ?? null,
+          rank: account?.rank ?? null,
+          lp: account?.lp ?? null,
+          roleTiers: account?.roleTiers ?? [],
+        };
+      }),
     };
   }
 
@@ -459,8 +465,25 @@ export class BroadcastService {
                     username: true,
                     avatar: true,
                     riotAccounts: {
-                      where: { isPrimary: true },
-                      select: { tier: true },
+                      orderBy: [
+                        { isPrimary: "desc" },
+                        { verifiedAt: { sort: "desc", nulls: "last" } },
+                        { createdAt: "asc" },
+                      ],
+                      take: 1,
+                      select: {
+                        tier: true,
+                        rank: true,
+                        lp: true,
+                        roleTiers: {
+                          select: {
+                            role: true,
+                            tier: true,
+                            rank: true,
+                            lp: true,
+                          },
+                        },
+                      },
                     },
                   },
                 },

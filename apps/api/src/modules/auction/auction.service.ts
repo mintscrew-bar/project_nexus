@@ -16,8 +16,7 @@ import { calculateTierScore } from "../common/tier-score.util";
 
 const BONUS_GOLD = 500;
 const DEFAULT_BID_TIME_SECONDS = 30;
-const BID_EXTENSION_SECONDS = 5;
-const BID_EXTENSION_THRESHOLD_SECONDS = 5;
+const BID_EXTENSION_SECONDS = 10;
 const MIN_BID_TIME_SECONDS = 5;
 const MAX_BID_TIME_SECONDS = 120;
 const DEFAULT_BID_INCREMENT = 50;
@@ -333,20 +332,8 @@ export class AuctionService implements OnModuleInit {
     return this.getBidTimeLimitSeconds(room) * 1000;
   }
 
-  private getExtendedBidTimerEnd(
-    currentTimerEnd: number,
-    room?: { bidTimeLimit?: number | null },
-  ): number {
-    const now = Date.now();
-    const remainingMs = Math.max(0, currentTimerEnd - now);
-    const extensionThresholdMs = BID_EXTENSION_THRESHOLD_SECONDS * 1000;
-    if (remainingMs > extensionThresholdMs) {
-      return currentTimerEnd;
-    }
-
-    const maxBidTimerMs = this.getBaseBidTimerMs(room);
-    const extendedMs = Math.min(maxBidTimerMs, BID_EXTENSION_SECONDS * 1000);
-    return now + extendedMs;
+  private getExtendedBidTimerEnd(currentTimerEnd: number): number {
+    return currentTimerEnd + BID_EXTENSION_SECONDS * 1000;
   }
 
   // ========================================
@@ -1152,7 +1139,7 @@ export class AuctionService implements OnModuleInit {
     state.currentHighestBid = amount;
     state.currentHighestBidder = team.id;
     state.currentHighestBidderName = team.captain.username;
-    state.timerEnd = this.getExtendedBidTimerEnd(state.timerEnd, room);
+    state.timerEnd = this.getExtendedBidTimerEnd(state.timerEnd);
     state.yuchalCount = 0;
 
     // 입찰 상태 변경을 Redis에 동기화

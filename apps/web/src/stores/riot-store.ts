@@ -1,13 +1,20 @@
-import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
-import { riotApi } from '@/lib/api-client';
-import { useAuthStore } from '@/stores/auth-store';
+import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
+import { riotApi } from "@/lib/api-client";
+import { useAuthStore } from "@/stores/auth-store";
 
 interface ChampionPreference {
   id: string;
   championId: string;
   role: string;
   order: number;
+}
+
+export interface RiotAccountRoleTier {
+  role: string;
+  tier: string;
+  rank: string;
+  lp: number;
 }
 
 export interface RiotAccount {
@@ -28,6 +35,7 @@ export interface RiotAccount {
   verifiedAt: string;
   lastSyncedAt: string;
   championPreferences?: ChampionPreference[];
+  roleTiers?: RiotAccountRoleTier[];
 }
 
 interface VerificationData {
@@ -56,20 +64,35 @@ interface RiotStoreState {
   setPrimaryAccount: (accountId: string) => Promise<void>;
   syncAccount: (accountId: string) => Promise<void>;
   selectAccount: (account: RiotAccount | null) => void;
-  updateChampions: (accountId: string, role: string, championIds: string[]) => Promise<void>;
-  updateAccount: (accountId: string, data: {
-    mainRole: string;
-    subRole: string;
-    championsByRole?: Record<string, string[]>;
-    peakTier?: string;
-    peakRank?: string;
-    peakLp?: number;
-  }) => Promise<void>;
+  updateChampions: (
+    accountId: string,
+    role: string,
+    championIds: string[],
+  ) => Promise<void>;
+  updateAccount: (
+    accountId: string,
+    data: {
+      mainRole: string;
+      subRole: string;
+      championsByRole?: Record<string, string[]>;
+      peakTier?: string;
+      peakRank?: string;
+      peakLp?: number;
+      roleTiers?: Record<string, { tier?: string; rank?: string; lp?: number }>;
+    },
+  ) => Promise<void>;
   deleteAccount: (accountId: string) => Promise<void>;
 
   // Actions - Verification Flow
-  startVerification: (gameName: string, tagLine: string) => Promise<VerificationData>;
-  checkVerification: () => Promise<{ verified: boolean; expected: number; current: number }>;
+  startVerification: (
+    gameName: string,
+    tagLine: string,
+  ) => Promise<VerificationData>;
+  checkVerification: () => Promise<{
+    verified: boolean;
+    expected: number;
+    current: number;
+  }>;
   registerAccount: (data: {
     gameName: string;
     tagLine: string;
@@ -79,6 +102,7 @@ interface RiotStoreState {
     peakTier?: string;
     peakRank?: string;
     peakLp?: number;
+    roleTiers?: Record<string, { tier?: string; rank?: string; lp?: number }>;
   }) => Promise<void>;
 
   // Actions - Utility
@@ -89,222 +113,6 @@ interface RiotStoreState {
 export const useRiotStore = create<RiotStoreState>()(
   persist(
     (set, get) => ({
-  accounts: [],
-  primaryAccount: null,
-  selectedAccount: null,
-  isLoading: false,
-  error: null,
-  verificationData: null,
-  isVerifying: false,
-  isIconVerified: false,
-
-  // ========================================
-  // Account Management
-  // ========================================
-
-  fetchAccounts: async () => {
-    set({ isLoading: true, error: null });
-    try {
-      const accounts = await riotApi.getAccounts();
-      const primary = accounts.find((acc: RiotAccount) => acc.isPrimary) || accounts[0] || null;
-      set({
-        accounts,
-        primaryAccount: primary,
-        selectedAccount: get().selectedAccount || primary,
-        isLoading: false,
-      });
-    } catch (error: any) {
-      set({
-        error: error.response?.data?.message || '계정 목록을 불러올 수 없습니다',
-        isLoading: false,
-      });
-    }
-  },
-
-  setPrimaryAccount: async (accountId: string) => {
-    set({ isLoading: true, error: null });
-    try {
-      await riotApi.setPrimaryAccount(accountId);
-
-      // Update local state
-      const accounts = get().accounts.map(acc => ({
-        ...acc,
-        isPrimary: acc.id === accountId,
-      }));
-
-      const primary = accounts.find(acc => acc.isPrimary) || null;
-
-      set({
-        accounts,
-        primaryAccount: primary,
-        selectedAccount: primary,
-        isLoading: false,
-      });
-    } catch (error: any) {
-      set({
-        error: error.response?.data?.message || '대표 계정 설정에 실패했습니다',
-        isLoading: false,
-      });
-      throw error;
-    }
-  },
-
-  syncAccount: async (accountId: string) => {
-    // Don't set global isLoading to prevent hiding the entire page
-    set({ error: null });
-    try {
-      const updated = await riotApi.syncAccount(accountId);
-
-      // Update local state
-      const accounts = get().accounts.map(acc =>
-        acc.id === accountId ? { ...acc, ...updated } : acc
-      );
-
-      set({
-        accounts,
-        primaryAccount: accounts.find(a => a.isPrimary) || null,
-        selectedAccount: accounts.find(a => a.id === get().selectedAccount?.id) || null,
-      });
-    } catch (error: any) {
-      set({
-        error: error.response?.data?.message || '계정 동기화에 실패했습니다',
-      });
-      throw error; // Re-throw so the UI can handle it
-    }
-  },
-
-  selectAccount: (account: RiotAccount | null) => {
-    set({ selectedAccount: account });
-  },
-
-  // ========================================
-  // Verification Flow
-  // ========================================
-
-  startVerification: async (gameName: string, tagLine: string) => {
-    set({ isVerifying: true, error: null });
-    try {
-      const data = await riotApi.startVerification(gameName, tagLine);
-      set({
-        verificationData: data,
-        isVerifying: false,
-      });
-      return data;
-    } catch (error: any) {
-      set({
-        error: error.response?.data?.message || '소환사를 찾을 수 없습니다',
-        isVerifying: false,
-      });
-      throw error;
-    }
-  },
-
-  checkVerification: async () => {
-    set({ isVerifying: true, error: null });
-    try {
-      const result = await riotApi.checkVerification();
-      if (result.verified) {
-        set({ isVerifying: false, isIconVerified: true });
-      } else {
-        set({ isVerifying: false });
-      }
-      return result;
-    } catch (error: any) {
-      set({
-        error: error.response?.data?.message || '인증 확인에 실패했습니다',
-        isVerifying: false,
-      });
-      throw error;
-    }
-  },
-
-  registerAccount: async (data) => {
-    set({ isLoading: true, error: null });
-    try {
-      await riotApi.registerAccount(data);
-
-      set({ verificationData: null, isIconVerified: false });
-
-      // 계정 목록 + 유저 프로필 동시 갱신 (설정 패널 즉시 반영)
-      await Promise.all([
-        get().fetchAccounts(),
-        useAuthStore.getState().fetchUser(),
-      ]);
-    } catch (error: any) {
-      set({
-        error: error.response?.data?.message || '계정 등록에 실패했습니다',
-        isLoading: false,
-      });
-      throw error;
-    }
-  },
-
-  updateChampions: async (accountId: string, role: string, championIds: string[]) => {
-    set({ isLoading: true, error: null });
-    try {
-        const updatedPreferences = await riotApi.updateChampions(accountId, role, championIds);
-        
-        // Update local state
-        const accounts = get().accounts.map(acc => {
-            if (acc.id === accountId) {
-                const otherPreferences = acc.championPreferences?.filter(p => p.role !== role) || [];
-                return { ...acc, championPreferences: [...otherPreferences, ...updatedPreferences] };
-            }
-            return acc;
-        });
-
-        set({ accounts, isLoading: false });
-
-    } catch (error: any) {
-        set({
-            error: error.response?.data?.message || '챔피언 선호도 업데이트에 실패했습니다.',
-            isLoading: false,
-        });
-        throw error;
-    }
-  },
-
-  updateAccount: async (accountId: string, data: {
-    mainRole: string;
-    subRole: string;
-    championsByRole?: Record<string, string[]>;
-    peakTier?: string;
-    peakRank?: string;
-    peakLp?: number;
-  }) => {
-    set({ isLoading: true, error: null });
-    try {
-      const updated = await riotApi.updateAccount(accountId, data);
-      const accounts = get().accounts.map(acc => acc.id === accountId ? { ...acc, ...updated } : acc);
-      set({
-        accounts,
-        primaryAccount: accounts.find(a => a.isPrimary) || null,
-        selectedAccount: accounts.find(a => a.id === get().selectedAccount?.id) || null,
-        isLoading: false,
-      });
-    } catch (error: any) {
-      set({ error: error.response?.data?.message || '계정 수정에 실패했습니다.', isLoading: false });
-      throw error;
-    }
-  },
-
-  deleteAccount: async (accountId: string) => {
-    set({ isLoading: true, error: null });
-    try {
-      await riotApi.deleteAccount(accountId);
-      await get().fetchAccounts();
-    } catch (error: any) {
-      set({ error: error.response?.data?.message || '계정 삭제에 실패했습니다.', isLoading: false });
-      throw error;
-    }
-  },
-
-  // ========================================
-  // Utility
-  // ========================================
-
-  reset: () => {
-    set({
       accounts: [],
       primaryAccount: null,
       selectedAccount: null,
@@ -313,21 +121,276 @@ export const useRiotStore = create<RiotStoreState>()(
       verificationData: null,
       isVerifying: false,
       isIconVerified: false,
-    });
-  },
 
-  clearError: () => {
-    set({ error: null });
-  },
+      // ========================================
+      // Account Management
+      // ========================================
+
+      fetchAccounts: async () => {
+        set({ isLoading: true, error: null });
+        try {
+          const accounts = await riotApi.getAccounts();
+          const primary =
+            accounts.find((acc: RiotAccount) => acc.isPrimary) ||
+            accounts[0] ||
+            null;
+          set({
+            accounts,
+            primaryAccount: primary,
+            selectedAccount: get().selectedAccount || primary,
+            isLoading: false,
+          });
+        } catch (error: any) {
+          set({
+            error:
+              error.response?.data?.message || "계정 목록을 불러올 수 없습니다",
+            isLoading: false,
+          });
+        }
+      },
+
+      setPrimaryAccount: async (accountId: string) => {
+        set({ isLoading: true, error: null });
+        try {
+          await riotApi.setPrimaryAccount(accountId);
+
+          // Update local state
+          const accounts = get().accounts.map((acc) => ({
+            ...acc,
+            isPrimary: acc.id === accountId,
+          }));
+
+          const primary = accounts.find((acc) => acc.isPrimary) || null;
+
+          set({
+            accounts,
+            primaryAccount: primary,
+            selectedAccount: primary,
+            isLoading: false,
+          });
+        } catch (error: any) {
+          set({
+            error:
+              error.response?.data?.message || "대표 계정 설정에 실패했습니다",
+            isLoading: false,
+          });
+          throw error;
+        }
+      },
+
+      syncAccount: async (accountId: string) => {
+        // Don't set global isLoading to prevent hiding the entire page
+        set({ error: null });
+        try {
+          const updated = await riotApi.syncAccount(accountId);
+
+          // Update local state
+          const accounts = get().accounts.map((acc) =>
+            acc.id === accountId ? { ...acc, ...updated } : acc,
+          );
+
+          set({
+            accounts,
+            primaryAccount: accounts.find((a) => a.isPrimary) || null,
+            selectedAccount:
+              accounts.find((a) => a.id === get().selectedAccount?.id) || null,
+          });
+        } catch (error: any) {
+          set({
+            error:
+              error.response?.data?.message || "계정 동기화에 실패했습니다",
+          });
+          throw error; // Re-throw so the UI can handle it
+        }
+      },
+
+      selectAccount: (account: RiotAccount | null) => {
+        set({ selectedAccount: account });
+      },
+
+      // ========================================
+      // Verification Flow
+      // ========================================
+
+      startVerification: async (gameName: string, tagLine: string) => {
+        set({ isVerifying: true, error: null });
+        try {
+          const data = await riotApi.startVerification(gameName, tagLine);
+          set({
+            verificationData: data,
+            isVerifying: false,
+          });
+          return data;
+        } catch (error: any) {
+          set({
+            error: error.response?.data?.message || "소환사를 찾을 수 없습니다",
+            isVerifying: false,
+          });
+          throw error;
+        }
+      },
+
+      checkVerification: async () => {
+        set({ isVerifying: true, error: null });
+        try {
+          const result = await riotApi.checkVerification();
+          if (result.verified) {
+            set({ isVerifying: false, isIconVerified: true });
+          } else {
+            set({ isVerifying: false });
+          }
+          return result;
+        } catch (error: any) {
+          set({
+            error: error.response?.data?.message || "인증 확인에 실패했습니다",
+            isVerifying: false,
+          });
+          throw error;
+        }
+      },
+
+      registerAccount: async (data) => {
+        set({ isLoading: true, error: null });
+        try {
+          await riotApi.registerAccount(data);
+
+          set({ verificationData: null, isIconVerified: false });
+
+          // 계정 목록 + 유저 프로필 동시 갱신 (설정 패널 즉시 반영)
+          await Promise.all([
+            get().fetchAccounts(),
+            useAuthStore.getState().fetchUser(),
+          ]);
+        } catch (error: any) {
+          set({
+            error: error.response?.data?.message || "계정 등록에 실패했습니다",
+            isLoading: false,
+          });
+          throw error;
+        }
+      },
+
+      updateChampions: async (
+        accountId: string,
+        role: string,
+        championIds: string[],
+      ) => {
+        set({ isLoading: true, error: null });
+        try {
+          const updatedPreferences = await riotApi.updateChampions(
+            accountId,
+            role,
+            championIds,
+          );
+
+          // Update local state
+          const accounts = get().accounts.map((acc) => {
+            if (acc.id === accountId) {
+              const otherPreferences =
+                acc.championPreferences?.filter((p) => p.role !== role) || [];
+              return {
+                ...acc,
+                championPreferences: [
+                  ...otherPreferences,
+                  ...updatedPreferences,
+                ],
+              };
+            }
+            return acc;
+          });
+
+          set({ accounts, isLoading: false });
+        } catch (error: any) {
+          set({
+            error:
+              error.response?.data?.message ||
+              "챔피언 선호도 업데이트에 실패했습니다.",
+            isLoading: false,
+          });
+          throw error;
+        }
+      },
+
+      updateAccount: async (
+        accountId: string,
+        data: {
+          mainRole: string;
+          subRole: string;
+          championsByRole?: Record<string, string[]>;
+          peakTier?: string;
+          peakRank?: string;
+          peakLp?: number;
+          roleTiers?: Record<
+            string,
+            { tier?: string; rank?: string; lp?: number }
+          >;
+        },
+      ) => {
+        set({ isLoading: true, error: null });
+        try {
+          const updated = await riotApi.updateAccount(accountId, data);
+          const accounts = get().accounts.map((acc) =>
+            acc.id === accountId ? { ...acc, ...updated } : acc,
+          );
+          set({
+            accounts,
+            primaryAccount: accounts.find((a) => a.isPrimary) || null,
+            selectedAccount:
+              accounts.find((a) => a.id === get().selectedAccount?.id) || null,
+            isLoading: false,
+          });
+        } catch (error: any) {
+          set({
+            error: error.response?.data?.message || "계정 수정에 실패했습니다.",
+            isLoading: false,
+          });
+          throw error;
+        }
+      },
+
+      deleteAccount: async (accountId: string) => {
+        set({ isLoading: true, error: null });
+        try {
+          await riotApi.deleteAccount(accountId);
+          await get().fetchAccounts();
+        } catch (error: any) {
+          set({
+            error: error.response?.data?.message || "계정 삭제에 실패했습니다.",
+            isLoading: false,
+          });
+          throw error;
+        }
+      },
+
+      // ========================================
+      // Utility
+      // ========================================
+
+      reset: () => {
+        set({
+          accounts: [],
+          primaryAccount: null,
+          selectedAccount: null,
+          isLoading: false,
+          error: null,
+          verificationData: null,
+          isVerifying: false,
+          isIconVerified: false,
+        });
+      },
+
+      clearError: () => {
+        set({ error: null });
+      },
     }),
     {
-      name: 'riot-verification',           // sessionStorage 키
+      name: "riot-verification", // sessionStorage 키
       storage: createJSONStorage(() => sessionStorage),
       // 인증 진행 상태만 저장 — 계정 목록 등 서버 데이터는 제외
       partialize: (state) => ({
         isIconVerified: state.isIconVerified,
         verificationData: state.verificationData,
       }),
-    }
-  )
+    },
+  ),
 );

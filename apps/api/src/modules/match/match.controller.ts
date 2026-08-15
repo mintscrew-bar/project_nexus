@@ -213,7 +213,9 @@ export class MatchController {
   // ========================================
 
   @Get(":id/live-status")
-  @Throttle({ default: { limit: 2, ttl: 60000 } })
+  // 모달은 30초마다 폴링하며 열기/재연결 시 즉시 조회도 발생한다.
+  // 실제 Riot 조회는 서비스의 매치별 캐시와 in-flight 병합으로 보호한다.
+  @Throttle({ default: { limit: 6, ttl: 60000 } })
   async getLiveMatchStatus(@Param("id") matchId: string) {
     return this.matchService.getLiveMatchStatus(matchId);
   }

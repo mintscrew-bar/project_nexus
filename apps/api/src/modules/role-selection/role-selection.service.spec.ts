@@ -1,4 +1,47 @@
 import { RoleSelectionService } from "./role-selection.service";
+import { RoomStatus, TeamMode } from "@nexus/database";
+
+describe("RoleSelectionService 자동 밸런스 역할 잠금", () => {
+  it("자동 밸런스가 확정한 역할 선택을 취소할 수 없다", async () => {
+    const prisma = {
+      teamMember: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: "member-1",
+          assignedRole: "TOP",
+          team: { room: { teamMode: TeamMode.AUTO_BALANCE } },
+        }),
+        update: jest.fn(),
+      },
+    };
+    const service = new RoleSelectionService(prisma as any, {} as any);
+
+    await expect(service.cancelRole("user-1", "room-1")).rejects.toThrow(
+      "자동 밸런스로 확정된 역할은 변경할 수 없습니다.",
+    );
+    expect(prisma.teamMember.update).not.toHaveBeenCalled();
+  });
+
+  it("자동 밸런스 방에서는 다른 역할을 다시 선택할 수 없다", async () => {
+    const prisma: any = {
+      room: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "room-1",
+          teamMode: TeamMode.AUTO_BALANCE,
+          status: RoomStatus.ROLE_SELECTION,
+          teams: [],
+        }),
+      },
+    };
+    prisma.$transaction = jest.fn(async (callback: (tx: any) => unknown) =>
+      callback(prisma),
+    );
+    const service = new RoleSelectionService(prisma as any, {} as any);
+
+    await expect(
+      service.selectRole("user-1", "room-1", "MID" as any),
+    ).rejects.toThrow("자동 밸런스로 확정된 역할은 변경할 수 없습니다.");
+  });
+});
 
 describe("RoleSelectionService captain readiness", () => {
   let service: RoleSelectionService;

@@ -7,6 +7,13 @@ import { useDdragonStore, Champion } from "@/stores/ddragon-store";
 import { X, Loader2, AlertCircle, ChevronDown } from "lucide-react";
 import { ChampionSelector } from "./ChampionSelector";
 import { PeakTierSelector } from "./PeakTierSelector";
+import {
+  createEmptyLineTiers,
+  LineTierMap,
+  LineTierSelector,
+  toLineTierMap,
+  toLineTierPayload,
+} from "./LineTierSelector";
 import Image from "next/image";
 import { getRoleIcon } from "@/lib/role-icon";
 
@@ -68,6 +75,7 @@ export function EditAccountModal({
   const [peakTier, setPeakTier] = useState("");
   const [peakRank, setPeakRank] = useState("");
   const [peakLp, setPeakLp] = useState<number | null>(null);
+  const [roleTiers, setRoleTiers] = useState<LineTierMap>(createEmptyLineTiers);
 
   // account가 바뀌거나 모달이 열릴 때 초기값 세팅
   useEffect(() => {
@@ -89,6 +97,7 @@ export function EditAccountModal({
           : "",
       );
       setPeakLp((account as any).peakLp ?? null);
+      setRoleTiers(toLineTierMap(account.roleTiers));
       clearError();
       setLocalError(null);
 
@@ -163,6 +172,7 @@ export function EditAccountModal({
           peakTier && APEX_TIERS.has(peakTier)
             ? (peakLp ?? undefined)
             : undefined,
+        roleTiers: toLineTierPayload(roleTiers),
       });
       onAccountUpdated();
       onClose();
@@ -220,16 +230,23 @@ export function EditAccountModal({
       </p>
 
       {step === 1 && (
-        <PeakTierSelector
-          peakTier={peakTier}
-          peakRank={peakRank}
-          peakLp={peakLp}
-          onTierChange={setPeakTier}
-          onRankChange={setPeakRank}
-          onLpChange={setPeakLp}
-          disabled={isLoading}
-          allowEmpty={!account.peakTier || account.peakTier === "UNRANKED"}
-        />
+        <div className="max-h-[58vh] space-y-4 overflow-y-auto pr-1">
+          <PeakTierSelector
+            peakTier={peakTier}
+            peakRank={peakRank}
+            peakLp={peakLp}
+            onTierChange={setPeakTier}
+            onRankChange={setPeakRank}
+            onLpChange={setPeakLp}
+            disabled={isLoading}
+            allowEmpty={!account.peakTier || account.peakTier === "UNRANKED"}
+          />
+          <LineTierSelector
+            value={roleTiers}
+            onChange={setRoleTiers}
+            disabled={isLoading}
+          />
+        </div>
       )}
 
       {step === 2 && (

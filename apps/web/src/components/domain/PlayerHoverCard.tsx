@@ -6,6 +6,7 @@ import { Activity, ArrowRight, ShieldCheck, TrendingUp, Users } from "lucide-rea
 import { useQuery } from "@tanstack/react-query";
 import { userApi } from "@/lib/api-client";
 import { ChampionIcon, PositionIcon, POSITION_LABELS } from "@/app/tournaments/[id]/lobby/_components/icons";
+import { RoleTierBadges } from "@/components/domain/RoleTierBadges";
 
 interface PlayerHoverCardProps {
   userId: string;
@@ -320,6 +321,8 @@ export function PlayerHoverCard({ userId, anchorRect, onOpenProfile, onMouseEnte
                 )}
               </div>
             )}
+
+            <RoleTierBadges roleTiers={riot?.roleTiers} compact />
 
             {/* ── 승률 / KDA ── */}
             {!isActualBot && (

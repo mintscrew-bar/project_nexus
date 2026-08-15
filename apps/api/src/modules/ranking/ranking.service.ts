@@ -1,5 +1,6 @@
 import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
+import { BalanceScoreService } from "../common/balance-score.service";
 import { Role } from "@nexus/database";
 import { resolveWinnerSlot } from "../match/match-roster.util";
 
@@ -9,7 +10,10 @@ export class RankingService {
   private static readonly MIN_GAMES_FOR_RANK = 10;
   private static readonly RECENT_GAMES_COUNT = 20;
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly balanceScores: BalanceScoreService,
+  ) {}
 
   /**
    * Update ranking for a user after match completion
@@ -49,6 +53,9 @@ export class RankingService {
           recentLosses,
         },
       });
+
+      // 전체·라인 전적을 모두 저장한 뒤 계산해야 방금 끝난 경기까지 반영된다.
+      await this.balanceScores.refreshUser(userId);
 
       // Update clan rankings if user is in any clan
       const clanMemberships = await this.prisma.clanMember.findMany({

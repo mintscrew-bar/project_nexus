@@ -7,7 +7,14 @@ import { useMatchStore } from "@/stores/match-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { roomApi, matchApi } from "@/lib/api-client";
 import { connectMatchSocket } from "@/lib/socket-client";
-import { BracketView, Match, MatchDetailModal, VictoryScreen, GameChatPanel, getTeamDisplayName } from "@/components/domain";
+import {
+  BracketView,
+  Match,
+  MatchDetailModal,
+  VictoryScreen,
+  GameChatPanel,
+  getTeamDisplayName,
+} from "@/components/domain";
 import { LoadingSpinner, Badge, Button, ConfirmModal } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
 import { ArrowLeft, RefreshCw, Trophy } from "lucide-react";
@@ -21,11 +28,20 @@ export default function BracketPage() {
 
   const { user } = useAuthStore();
   const {
-    roomMatches, isLoading, error,
-    fetchRoomMatches, connectToBracket, disconnect, reset,
-    startMatch, reportResult,
-    tournamentCompleted, finalStandings,
-    sessionAbortedAt, sessionAbortMessage, clearSessionAbort,
+    roomMatches,
+    isLoading,
+    error,
+    fetchRoomMatches,
+    connectToBracket,
+    disconnect,
+    reset,
+    startMatch,
+    reportResult,
+    tournamentCompleted,
+    finalStandings,
+    sessionAbortedAt,
+    sessionAbortMessage,
+    clearSessionAbort,
   } = useMatchStore();
 
   // ID만 저장 — 실제 매치 객체는 bracketMatches에서 파생 (WebSocket 업데이트 자동 반영)
@@ -58,14 +74,26 @@ export default function BracketPage() {
     };
   }, [roomId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-
   useEffect(() => {
     if (!sessionAbortedAt) return;
-    addToast(sessionAbortMessage ?? "내전이 종료되어 로비로 이동합니다.", "warning");
+    addToast(
+      sessionAbortMessage ?? "내전이 종료되어 로비로 이동합니다.",
+      "warning",
+    );
     clearSessionAbort();
-    const timer = setTimeout(() => router.push(`/tournaments/${roomId}/lobby`), 1500);
+    const timer = setTimeout(
+      () => router.push(`/tournaments/${roomId}/lobby`),
+      1500,
+    );
     return () => clearTimeout(timer);
-  }, [sessionAbortedAt, sessionAbortMessage, clearSessionAbort, addToast, router, roomId]);
+  }, [
+    sessionAbortedAt,
+    sessionAbortMessage,
+    clearSessionAbort,
+    addToast,
+    router,
+    roomId,
+  ]);
 
   const handleRefresh = () => {
     fetchRoomMatches(roomId);
@@ -83,21 +111,29 @@ export default function BracketPage() {
     setLiveStatus(null);
   };
 
-  const handleRefreshLiveStatus = useCallback(async (matchId: string) => {
-    try {
-      const status = await matchApi.getLiveStatus(matchId);
-      setLiveStatus(status);
-    } catch {
-      addToast("라이브 상태 새로고침에 실패했습니다.", "error");
-    }
-  }, [addToast]);
+  const handleRefreshLiveStatus = useCallback(
+    async (matchId: string) => {
+      try {
+        const status = await matchApi.getLiveStatus(matchId);
+        setLiveStatus(status);
+      } catch (error: any) {
+        // 기존 라이브 상태를 유지하고 다음 폴링에서 재시도한다.
+        if (error?.response?.status === 429) return;
+        addToast("라이브 상태 새로고침에 실패했습니다.", "error");
+      }
+    },
+    [addToast],
+  );
 
   const handleStartMatch = async (matchId: string) => {
     try {
       await startMatch(matchId);
       // roomMatches가 WebSocket으로 자동 업데이트되므로 selectedMatch 수동 갱신 불필요
     } catch (error: any) {
-      addToast(error?.response?.data?.message || "매치 시작에 실패했습니다.", "error");
+      addToast(
+        error?.response?.data?.message || "매치 시작에 실패했습니다.",
+        "error",
+      );
     }
   };
 
@@ -106,7 +142,10 @@ export default function BracketPage() {
       await reportResult(matchId, winnerId);
       handleCloseModal();
     } catch (error: any) {
-      addToast(error?.response?.data?.message || "경기 결과 보고에 실패했습니다.", "error");
+      addToast(
+        error?.response?.data?.message || "경기 결과 보고에 실패했습니다.",
+        "error",
+      );
     }
   };
 
@@ -130,9 +169,10 @@ export default function BracketPage() {
   };
 
   // Calculate number of rounds based on matches
-  const rounds = roomMatches.length > 0
-    ? Math.max(...roomMatches.map(m => m.round || 1))
-    : 1;
+  const rounds =
+    roomMatches.length > 0
+      ? Math.max(...roomMatches.map((m) => m.round || 1))
+      : 1;
 
   // 대진표는 슬롯 단위로 그린다.
   //
@@ -161,21 +201,23 @@ export default function BracketPage() {
       // teamA/teamB 자체는 시리즈에서 미러링되므로 안전하다.
       const teamAId = series?.teamAId ?? first.teamAId ?? first.teamA?.id;
       const teamBId = series?.teamBId ?? first.teamBId ?? first.teamB?.id;
-      const teamAWins = games_.filter((g) => g.winnerId && g.winnerId === teamAId).length;
-      const teamBWins = games_.filter((g) => g.winnerId && g.winnerId === teamBId).length;
+      const teamAWins = games_.filter(
+        (g) => g.winnerId && g.winnerId === teamAId,
+      ).length;
+      const teamBWins = games_.filter(
+        (g) => g.winnerId && g.winnerId === teamBId,
+      ).length;
 
       // 카드가 가리키는 매치 = 진행 중이거나 아직 안 끝난 마지막 세트.
       const activeGame =
-        games_.find((g) => g.status === 'IN_PROGRESS') ??
-        games_.find((g) => g.status === 'PENDING') ??
+        games_.find((g) => g.status === "IN_PROGRESS") ??
+        games_.find((g) => g.status === "PENDING") ??
         games_[games_.length - 1];
 
       // 슬롯 상태: 시리즈가 있으면 시리즈 상태를 그대로 쓴다.
       // 없으면 기존처럼 매치 상태.
       const slotStatus = (series?.status ?? activeGame.status) as
-        | 'PENDING'
-        | 'IN_PROGRESS'
-        | 'COMPLETED';
+        "PENDING" | "IN_PROGRESS" | "COMPLETED";
 
       const slotWinnerId = series ? series.winnerId : activeGame.winnerId;
       const teamOf = (id?: string | null) => {
@@ -185,6 +227,14 @@ export default function BracketPage() {
         return undefined;
       };
       const winnerTeam = teamOf(slotWinnerId);
+      const membersOf = (team: typeof first.teamA) =>
+        team?.members?.map((member) => ({
+          id: member.id,
+          username: member.user.username,
+          assignedRole: member.assignedRole,
+          championPreferences:
+            member.user.riotAccounts?.[0]?.championPreferences || [],
+        }));
 
       return {
         id: activeGame.id,
@@ -197,6 +247,7 @@ export default function BracketPage() {
               // 다전제일 때만 스코어를 노출한다 (단판은 0-0이 의미 없다).
               score: bestOf > 1 ? teamAWins : first.teamA.score,
               captain: first.teamA.captain,
+              members: membersOf(first.teamA),
             }
           : undefined,
         team2: first.teamB
@@ -205,10 +256,15 @@ export default function BracketPage() {
               name: first.teamB.name,
               score: bestOf > 1 ? teamBWins : first.teamB.score,
               captain: first.teamB.captain,
+              members: membersOf(first.teamB),
             }
           : undefined,
         winner: winnerTeam
-          ? { id: winnerTeam.id, name: winnerTeam.name, captain: winnerTeam.captain }
+          ? {
+              id: winnerTeam.id,
+              name: winnerTeam.name,
+              captain: winnerTeam.captain,
+            }
           : undefined,
         status: slotStatus,
         scheduledTime: activeGame.scheduledTime,
@@ -218,14 +274,16 @@ export default function BracketPage() {
         currentGameNumber: activeGame.gameNumber ?? 1,
         // 슬롯 상태(status)와 별개로 지금 가리키는 세트의 상태를 그대로 넘긴다.
         // 시작/보고 UI는 시리즈가 아니라 이 세트를 대상으로 동작하기 때문이다.
-        currentGameStatus: activeGame.status as 'PENDING' | 'IN_PROGRESS' | 'COMPLETED',
+        currentGameStatus: activeGame.status as
+          "PENDING" | "IN_PROGRESS" | "COMPLETED",
         gameIds: games_.map((g) => g.id),
       };
     });
   })();
 
   // bracketMatches에서 selectedMatch 파생 — roomMatches WebSocket 업데이트 시 자동 반영
-  const selectedMatch = bracketMatches.find(m => m.id === selectedMatchId) ?? null;
+  const selectedMatch =
+    bracketMatches.find((m) => m.id === selectedMatchId) ?? null;
 
   // 가위바위보 소집(rps:invite) — 호스트가 매치 시작 시 상대 팀장 모달 자동 오픈
   const bracketMatchesRef = useRef(bracketMatches);
@@ -241,22 +299,29 @@ export default function BracketPage() {
         setIsModalOpen(true);
       }
     };
-    socket.on('rps:invite', onInvite);
-    return () => { socket.off('rps:invite', onInvite); };
+    socket.on("rps:invite", onInvite);
+    return () => {
+      socket.off("rps:invite", onInvite);
+    };
   }, []);
 
   // Get tournament status
-  const completedMatches = bracketMatches.filter(m => m.status === 'COMPLETED').length;
+  const completedMatches = bracketMatches.filter(
+    (m) => m.status === "COMPLETED",
+  ).length;
   const totalMatches = bracketMatches.length;
-  const inProgressMatches = bracketMatches.filter(m => m.status === 'IN_PROGRESS').length;
+  const inProgressMatches = bracketMatches.filter(
+    (m) => m.status === "IN_PROGRESS",
+  ).length;
 
   // Find winner if tournament is complete
   // For DE, the grand final is the GF-section match; for SE, it's the highest round
-  const isDE = bracketMatches.some(m => m.bracketSection === 'GF');
+  const isDE = bracketMatches.some((m) => m.bracketSection === "GF");
   const finalMatch = isDE
-    ? bracketMatches.find(m => m.bracketSection === 'GF')
-    : bracketMatches.find(m => m.round === rounds);
-  const tournamentWinner = finalMatch?.status === 'COMPLETED' ? finalMatch.winner : null;
+    ? bracketMatches.find((m) => m.bracketSection === "GF")
+    : bracketMatches.find((m) => m.round === rounds);
+  const tournamentWinner =
+    finalMatch?.status === "COMPLETED" ? finalMatch.winner : null;
 
   if (isLoading && roomMatches.length === 0) {
     return (
@@ -293,7 +358,7 @@ export default function BracketPage() {
         variant="danger"
         isLoading={isAborting}
       />
-      <div className="container mx-auto">
+      <div className="mx-auto w-full max-w-none">
         {/* Header */}
         <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex min-w-0 items-center gap-3 sm:gap-4">
@@ -310,7 +375,10 @@ export default function BracketPage() {
                 대진표
               </h1>
               <p className="mt-1 truncate text-text-secondary">
-                방 ID: <span className="font-mono text-accent-primary">{roomId.slice(0, 8)}</span>
+                방 ID:{" "}
+                <span className="font-mono text-accent-primary">
+                  {roomId.slice(0, 8)}
+                </span>
               </p>
             </div>
           </div>
@@ -324,9 +392,15 @@ export default function BracketPage() {
             >
               내전 종료
             </Button>
-            <Button variant="secondary" onClick={handleRefresh} disabled={isLoading}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-            새로고침
+            <Button
+              variant="secondary"
+              onClick={handleRefresh}
+              disabled={isLoading}
+            >
+              <RefreshCw
+                className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`}
+              />
+              새로고침
             </Button>
           </div>
         </div>
@@ -335,20 +409,29 @@ export default function BracketPage() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-4">
             <p className="text-sm text-text-secondary mb-1">총 경기</p>
-            <p className="text-xl md:text-2xl font-bold text-text-primary">{totalMatches}</p>
+            <p className="text-xl md:text-2xl font-bold text-text-primary">
+              {totalMatches}
+            </p>
           </div>
           <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-4">
             <p className="text-sm text-text-secondary mb-1">완료된 경기</p>
-            <p className="text-xl md:text-2xl font-bold text-accent-success">{completedMatches}</p>
+            <p className="text-xl md:text-2xl font-bold text-accent-success">
+              {completedMatches}
+            </p>
           </div>
           <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-4">
             <p className="text-sm text-text-secondary mb-1">진행 중</p>
-            <p className="text-xl md:text-2xl font-bold text-accent-primary">{inProgressMatches}</p>
+            <p className="text-xl md:text-2xl font-bold text-accent-primary">
+              {inProgressMatches}
+            </p>
           </div>
           <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-4">
             <p className="text-sm text-text-secondary mb-1">진행률</p>
             <p className="text-xl md:text-2xl font-bold text-accent-gold">
-              {totalMatches > 0 ? Math.round((completedMatches / totalMatches) * 100) : 0}%
+              {totalMatches > 0
+                ? Math.round((completedMatches / totalMatches) * 100)
+                : 0}
+              %
             </p>
           </div>
         </div>
@@ -357,8 +440,12 @@ export default function BracketPage() {
         {tournamentWinner && (
           <div className="bg-gradient-to-r from-accent-gold/20 to-accent-gold/5 border border-accent-gold/30 rounded-xl p-6 mb-6 text-center">
             <Trophy className="h-12 w-12 text-accent-gold mx-auto mb-3" />
-            <h2 className="text-xl md:text-2xl font-bold text-accent-gold mb-1">우승</h2>
-            <p className="text-2xl md:text-3xl font-bold text-text-primary">{getTeamDisplayName(tournamentWinner)}</p>
+            <h2 className="text-xl md:text-2xl font-bold text-accent-gold mb-1">
+              우승
+            </h2>
+            <p className="text-2xl md:text-3xl font-bold text-text-primary">
+              {getTeamDisplayName(tournamentWinner)}
+            </p>
           </div>
         )}
 
@@ -372,18 +459,22 @@ export default function BracketPage() {
               </div>
             </div>
             <div className="bg-[linear-gradient(to_right,rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[size:28px_28px] p-3 md:p-4">
-            <BracketView
-              matches={bracketMatches}
-              rounds={rounds}
-              onMatchClick={handleMatchClick}
-            />
+              <BracketView
+                matches={bracketMatches}
+                rounds={rounds}
+                onMatchClick={handleMatchClick}
+              />
             </div>
           </div>
         ) : (
           <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-12 text-center">
             <Trophy className="h-16 w-16 text-text-tertiary mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-text-primary mb-2">대진표가 아직 생성되지 않았습니다</h3>
-            <p className="text-text-secondary">팀 구성이 완료되면 대진표가 자동으로 생성됩니다.</p>
+            <h3 className="text-xl font-semibold text-text-primary mb-2">
+              대진표가 아직 생성되지 않았습니다
+            </h3>
+            <p className="text-text-secondary">
+              팀 구성이 완료되면 대진표가 자동으로 생성됩니다.
+            </p>
           </div>
         )}
 

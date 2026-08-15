@@ -27,7 +27,11 @@ import {
   getTierImage,
 } from "@/components/matches/match-utils";
 import { useDdragonVersion } from "@/hooks/useDdragonVersion";
-import type { SummonerData, ChampionStats, NexusMatchHistory } from "@/components/matches/match-utils";
+import type {
+  SummonerData,
+  ChampionStats,
+  NexusMatchHistory,
+} from "@/components/matches/match-utils";
 import { getQueueTypeName } from "@/components/matches/match-utils";
 import { getChampionKoreanName } from "@nexus/types";
 import RecentStatsSummary from "@/components/matches/RecentStatsSummary";
@@ -77,15 +81,23 @@ export default function SummonerStatsPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { addToast } = useToast();
-  const gameName = decodeURIComponent(params.gameName as string).replace(/[\u200B-\u200F\u2028-\u202E\u2060-\u2069\uFEFF]/g, "");
-  const tagLine = decodeURIComponent(params.tagLine as string).replace(/[\u200B-\u200F\u2028-\u202E\u2060-\u2069\uFEFF]/g, "");
+  const gameName = decodeURIComponent(params.gameName as string).replace(
+    /[\u200B-\u200F\u2028-\u202E\u2060-\u2069\uFEFF]/g,
+    "",
+  );
+  const tagLine = decodeURIComponent(params.tagLine as string).replace(
+    /[\u200B-\u200F\u2028-\u202E\u2060-\u2069\uFEFF]/g,
+    "",
+  );
 
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshCooldown, setRefreshCooldown] = useState(0); // 갱신 쿨다운 (초)
   const [searchInput, setSearchInput] = useState("");
   const [showHistory, setShowHistory] = useState(false);
   const [historyVersion, setHistoryVersion] = useState(0); // 히스토리 변경 시 리렌더 트리거
-  const [champStatTab, setChampStatTab] = useState<QueueGroup | "nexus">("ranked");
+  const [champStatTab, setChampStatTab] = useState<QueueGroup | "nexus">(
+    "ranked",
+  );
 
   // 최근 검색 히스토리 (localStorage, 최대 10개)
   const HISTORY_KEY = "summoner_search_history";
@@ -101,19 +113,29 @@ export default function SummonerStatsPage() {
 
   const saveToHistory = (gameName: string, tagLine: string) => {
     const entry = `${gameName}#${tagLine}`;
-    const history = getHistory().filter(h => h.toLowerCase() !== entry.toLowerCase());
+    const history = getHistory().filter(
+      (h) => h.toLowerCase() !== entry.toLowerCase(),
+    );
     history.unshift(entry);
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(history.slice(0, MAX_HISTORY)));
+    localStorage.setItem(
+      HISTORY_KEY,
+      JSON.stringify(history.slice(0, MAX_HISTORY)),
+    );
   };
 
   const removeFromHistory = (entry: string) => {
-    const history = getHistory().filter(h => h !== entry);
+    const history = getHistory().filter((h) => h !== entry);
     localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
   };
 
-  const navigateToSummoner = (riotIdGameName: string, riotIdTagline: string) => {
+  const navigateToSummoner = (
+    riotIdGameName: string,
+    riotIdTagline: string,
+  ) => {
     if (riotIdGameName && riotIdTagline) {
-      router.push(`/matches/summoner/${encodeURIComponent(riotIdGameName)}/${encodeURIComponent(riotIdTagline)}`);
+      router.push(
+        `/matches/summoner/${encodeURIComponent(riotIdGameName)}/${encodeURIComponent(riotIdTagline)}`,
+      );
     }
   };
 
@@ -124,7 +146,10 @@ export default function SummonerStatsPage() {
 
     const hashIndex = input.lastIndexOf("#");
     if (hashIndex === -1) {
-      addToast("소환사명#태그 형식으로 입력해주세요 (예: Hide on bush#KR1)", "error");
+      addToast(
+        "소환사명#태그 형식으로 입력해주세요 (예: Hide on bush#KR1)",
+        "error",
+      );
       return;
     }
 
@@ -132,20 +157,29 @@ export default function SummonerStatsPage() {
     const searchTagLine = input.substring(hashIndex + 1).trim();
 
     if (!searchGameName || !searchTagLine) {
-      addToast("소환사명#태그 형식으로 입력해주세요 (예: Hide on bush#KR1)", "error");
+      addToast(
+        "소환사명#태그 형식으로 입력해주세요 (예: Hide on bush#KR1)",
+        "error",
+      );
       return;
     }
 
     saveToHistory(searchGameName, searchTagLine);
     setShowHistory(false);
-    router.push(`/matches/summoner/${encodeURIComponent(searchGameName)}/${encodeURIComponent(searchTagLine)}`);
+    router.push(
+      `/matches/summoner/${encodeURIComponent(searchGameName)}/${encodeURIComponent(searchTagLine)}`,
+    );
   };
 
   // DDragon 최신 버전 조회 (1주일 캐시 — 패치 주기에 맞춤)
   const ddragonVersion = useDdragonVersion();
 
   // 소환사 기본 정보 (Riot API)
-  const { data: summoner, isLoading: isSummonerLoading, error: summonerError } = useQuery<SummonerData>({
+  const {
+    data: summoner,
+    isLoading: isSummonerLoading,
+    error: summonerError,
+  } = useQuery<SummonerData>({
     queryKey: ["summoner", gameName, tagLine],
     queryFn: () => riotApi.getSummoner(gameName, tagLine),
     staleTime: 2 * 60 * 1000,
@@ -157,14 +191,17 @@ export default function SummonerStatsPage() {
     if (summoner?.gameName && summoner?.tagLine) {
       saveToHistory(summoner.gameName, summoner.tagLine);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [summoner?.gameName, summoner?.tagLine]);
 
   // 검색창 외부 클릭 시 히스토리 드롭다운 닫기
   const searchContainerRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
+      if (
+        searchContainerRef.current &&
+        !searchContainerRef.current.contains(e.target as Node)
+      ) {
         setShowHistory(false);
       }
     };
@@ -217,25 +254,27 @@ export default function SummonerStatsPage() {
     isFetching: isFetchingChampionStats,
   } = useQuery<ChampionStatsCacheResponse>({
     queryKey: ["championStatsCache", gameName, tagLine, currentQueueGroup],
-    queryFn: () => statsApi.getChampionStats(gameName, tagLine, currentQueueGroup!),
+    queryFn: () =>
+      statsApi.getChampionStats(gameName, tagLine, currentQueueGroup!),
     staleTime: 10 * 60 * 1000,
+    // 랭크 탭에서는 시즌 스캔이 끝나기 전까지 이 값을 대신 그린다(대체 표시).
+    // currentQueueGroup 이 "ranked" 라 조건은 그대로지만, 의존 관계를 남겨 둔다.
     enabled: !!gameName && !!tagLine && !!nexusUserId && !!currentQueueGroup,
   });
 
   // 랭크 챔피언 시즌 누적 통계 (등록 무관, background 스캔). 수집 중이면 폴링.
-  const {
-    data: championSeasonData,
-    isLoading: isLoadingSeasonStats,
-  } = useQuery({
-    queryKey: ["championSeasonStats", gameName, tagLine],
-    queryFn: () => statsApi.getChampionSeasonStats(gameName, tagLine),
-    staleTime: 60 * 1000,
-    enabled: !!gameName && !!tagLine && !!summoner && champStatTab === "ranked",
-    refetchInterval: (query) => {
-      const s = query.state.data?.status;
-      return s === "queued" || s === "scanning" ? 5000 : false;
-    },
-  });
+  const { data: championSeasonData, isLoading: isLoadingSeasonStats } =
+    useQuery({
+      queryKey: ["championSeasonStats", gameName, tagLine],
+      queryFn: () => statsApi.getChampionSeasonStats(gameName, tagLine),
+      staleTime: 60 * 1000,
+      enabled:
+        !!gameName && !!tagLine && !!summoner && champStatTab === "ranked",
+      refetchInterval: (query) => {
+        const s = query.state.data?.status;
+        return s === "queued" || s === "scanning" ? 5000 : false;
+      },
+    });
 
   const { data: nexusRanking } = useQuery({
     queryKey: ["nexusRanking", nexusUserId],
@@ -254,9 +293,15 @@ export default function SummonerStatsPage() {
   });
 
   const masteryById = useMemo(() => {
-    const map = new Map<number, { championPoints: number; championLevel: number }>();
+    const map = new Map<
+      number,
+      { championPoints: number; championLevel: number }
+    >();
     (masteryList ?? []).forEach((m) =>
-      map.set(m.championId, { championPoints: m.championPoints, championLevel: m.championLevel }),
+      map.set(m.championId, {
+        championPoints: m.championPoints,
+        championLevel: m.championLevel,
+      }),
     );
     return map;
   }, [masteryList]);
@@ -267,7 +312,6 @@ export default function SummonerStatsPage() {
     return String(points);
   };
 
-
   const REFRESH_COOLDOWN_SEC = 30; // 갱신 쿨다운 30초
 
   const handleRefresh = async () => {
@@ -276,27 +320,51 @@ export default function SummonerStatsPage() {
     try {
       if (nexusUserId) {
         await statsApi.refreshStats(nexusUserId, currentQueueGroup ?? "ranked");
-        await queryClient.invalidateQueries({ queryKey: ["statsFetchStatus", nexusUserId] });
+        await queryClient.invalidateQueries({
+          queryKey: ["statsFetchStatus", nexusUserId],
+        });
       }
-      await queryClient.invalidateQueries({ queryKey: ["summoner", gameName, tagLine] });
-      await queryClient.invalidateQueries({ queryKey: ["riotMatches", gameName, tagLine] });
-      await queryClient.invalidateQueries({ queryKey: ["championStatsCache", gameName, tagLine] });
-      await queryClient.invalidateQueries({ queryKey: ["recentAllStats", gameName, tagLine] });
-      await queryClient.invalidateQueries({ queryKey: ["recentSoloRankedStats", gameName, tagLine] });
-      await queryClient.invalidateQueries({ queryKey: ["recentFlexRankedStats", gameName, tagLine] });
-      await queryClient.invalidateQueries({ queryKey: ["recentNormalStats", gameName, tagLine] });
-      await queryClient.invalidateQueries({ queryKey: ["recentAramStats", gameName, tagLine] });
+      await queryClient.invalidateQueries({
+        queryKey: ["summoner", gameName, tagLine],
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ["riotMatches", gameName, tagLine],
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ["championStatsCache", gameName, tagLine],
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ["recentAllStats", gameName, tagLine],
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ["recentSoloRankedStats", gameName, tagLine],
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ["recentFlexRankedStats", gameName, tagLine],
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ["recentNormalStats", gameName, tagLine],
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ["recentAramStats", gameName, tagLine],
+      });
       // 갱신 성공 시 쿨다운 시작
       setRefreshCooldown(REFRESH_COOLDOWN_SEC);
       const timer = setInterval(() => {
-        setRefreshCooldown(prev => {
-          if (prev <= 1) { clearInterval(timer); return 0; }
+        setRefreshCooldown((prev) => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            return 0;
+          }
           return prev - 1;
         });
       }, 1000);
     } catch (err: any) {
       if (err?.response?.status === 429) {
-        addToast("새로고침 요청이 너무 많습니다. 잠시 후 다시 시도해주세요.", "warning");
+        addToast(
+          "새로고침 요청이 너무 많습니다. 잠시 후 다시 시도해주세요.",
+          "warning",
+        );
       } else {
         addToast("데이터 새로고침에 실패했습니다.", "error");
       }
@@ -361,7 +429,10 @@ export default function SummonerStatsPage() {
   };
 
   const isLoading = isSummonerLoading;
-  const error = summonerError ? ((summonerError as any)?.response?.data?.message || "소환사 정보를 불러오는데 실패했습니다.") : null;
+  const error = summonerError
+    ? (summonerError as any)?.response?.data?.message ||
+      "소환사 정보를 불러오는데 실패했습니다."
+    : null;
 
   if (isLoading) {
     return (
@@ -424,7 +495,9 @@ export default function SummonerStatsPage() {
     return (
       <div className="flex-grow flex items-center justify-center">
         <div className="text-center max-w-md">
-          <p className="text-accent-danger mb-4">{error || "소환사를 찾을 수 없습니다."}</p>
+          <p className="text-accent-danger mb-4">
+            {error || "소환사를 찾을 수 없습니다."}
+          </p>
           <Button onClick={() => router.push("/matches")}>
             전적 검색으로 돌아가기
           </Button>
@@ -436,7 +509,9 @@ export default function SummonerStatsPage() {
   const winRate = calculateWinRate();
   const championStats = calculateChampionStats();
   const queueStatus = currentQueueGroup
-    ? fetchStatus?.queueGroups.find((entry) => entry.queueGroup === currentQueueGroup)
+    ? fetchStatus?.queueGroups.find(
+        (entry) => entry.queueGroup === currentQueueGroup,
+      )
     : null;
   const queueTabs: Array<{
     key: QueueGroup | "nexus";
@@ -455,47 +530,71 @@ export default function SummonerStatsPage() {
         { key: "ranked", label: "랭크" },
         { key: "nexus", label: "Nexus" },
       ];
-  // 랭크 탭은 시즌 누적(등록 무관) 사용. 수집 중이면 폴링하며 "수집 중" 표시.
+  // 랭크 탭은 시즌 누적(등록 무관)이 목표지만, 그건 Riot 매치를 하나씩 받아
+  // 합산하는 백그라운드 스캔이라 첫 조회에서는 비어 있다.
+  //
+  // 그런데 Nexus 가입자는 이미 우리가 인제스트해 둔 매치로 계산해 둔 값
+  // (championStatsCache)이 손에 있다. 스캔이 끝날 때까지 빈 화면을 보여줄 이유가
+  // 없으므로, 그동안은 이 값을 대신 그리고 스캔이 끝나면 시즌 전체 수치로 바꾼다.
   const isSeasonScanning =
     championSeasonData?.status === "queued" ||
     championSeasonData?.status === "scanning";
-  const resolvedStats = champStatTab === "ranked"
-    ? (championSeasonData?.stats ?? [])
-    : champStatTab === "nexus"
-    ? championStats
-    : nexusUserId
-    ? (championStatsCache?.stats ?? [])
-    : [];
+  const seasonStats = championSeasonData?.stats ?? [];
+  // 시즌 결과가 아직 없을 때만 캐시로 메운다 (스캔이 끝나면 항상 시즌 값 우선).
+  const rankedFallbackStats =
+    seasonStats.length === 0 && nexusUserId
+      ? (championStatsCache?.stats ?? [])
+      : [];
+  const isRankedUsingFallback =
+    champStatTab === "ranked" && rankedFallbackStats.length > 0;
+
+  const resolvedStats =
+    champStatTab === "ranked"
+      ? seasonStats.length > 0
+        ? seasonStats
+        : rankedFallbackStats
+      : champStatTab === "nexus"
+        ? championStats
+        : nexusUserId
+          ? (championStatsCache?.stats ?? [])
+          : [];
   const currentMatchCount =
     champStatTab === "ranked"
-      ? (championSeasonData?.scannedCount ?? 0)
+      ? isRankedUsingFallback
+        ? (championStatsCache?.matchCount ?? 0)
+        : (championSeasonData?.scannedCount ?? 0)
       : champStatTab === "nexus"
-      ? championStats.reduce((sum, stat) => sum + stat.games, 0)
-      : (championStatsCache?.matchCount ?? queueStatus?.matchCount ?? 0);
+        ? championStats.reduce((sum, stat) => sum + stat.games, 0)
+        : (championStatsCache?.matchCount ?? queueStatus?.matchCount ?? 0);
   const currentComputedAt =
     champStatTab === "ranked"
-      ? (championSeasonData?.lastScanAt ?? null)
+      ? isRankedUsingFallback
+        ? (championStatsCache?.computedAt ?? null)
+        : (championSeasonData?.lastScanAt ?? null)
       : champStatTab === "nexus"
-      ? null
-      : (championStatsCache?.computedAt ?? queueStatus?.computedAt ?? null);
+        ? null
+        : (championStatsCache?.computedAt ?? queueStatus?.computedAt ?? null);
   const isCurrentPartial =
     champStatTab === "ranked"
-      ? isSeasonScanning
+      ? // 대체값을 쓰는 동안은 시즌 전체가 아니므로 항상 부분 집계로 표시한다.
+        isSeasonScanning || isRankedUsingFallback
       : champStatTab === "nexus"
-      ? false
-      : (championStatsCache?.isPartial ?? queueStatus?.isPartial ?? false);
+        ? false
+        : (championStatsCache?.isPartial ?? queueStatus?.isPartial ?? false);
   const currentFetchedAt =
     champStatTab === "nexus" || champStatTab === "ranked"
       ? null
       : (queueStatus?.fetchedAt ?? null);
   const isChampionTabLoading =
     champStatTab === "ranked"
-      ? (isLoadingSeasonStats && !championSeasonData)
+      ? isLoadingSeasonStats &&
+        !championSeasonData &&
+        rankedFallbackStats.length === 0
       : champStatTab === "nexus"
-      ? false
-      : nexusUserId
-      ? (isLoadingChampionStats || isFetchingChampionStats)
-      : false;
+        ? false
+        : nexusUserId
+          ? isLoadingChampionStats || isFetchingChampionStats
+          : false;
 
   return (
     <div className="min-h-screen bg-bg-primary">
@@ -527,50 +626,55 @@ export default function SummonerStatsPage() {
               </form>
 
               {/* 최근 검색 히스토리 드롭다운 */}
-              {showHistory && (() => {
-                // historyVersion 참조로 삭제 시 리렌더 보장
-                void historyVersion;
-                const history = getHistory();
-                if (!history.length) return null;
-                return (
-                  <div className="absolute top-full left-0 right-0 mt-1 bg-bg-secondary border border-bg-tertiary rounded-xl shadow-xl z-50 overflow-hidden">
-                    <div className="px-3 py-2 text-[10px] text-text-tertiary font-medium border-b border-bg-tertiary">최근 검색</div>
-                    {history.map((entry) => (
-                      <div
-                        key={entry}
-                        className="flex items-center gap-2 px-3 py-2 hover:bg-bg-tertiary/60 cursor-pointer group"
-                      >
-                        <Search className="h-3 w-3 text-text-tertiary flex-shrink-0" />
-                        <span
-                          className="flex-1 text-sm text-text-secondary group-hover:text-text-primary transition-colors"
-                          onClick={() => {
-                            const idx = entry.lastIndexOf("#");
-                            if (idx !== -1) {
-                              const gn = entry.substring(0, idx);
-                              const tl = entry.substring(idx + 1);
-                              saveToHistory(gn, tl);
-                              setShowHistory(false);
-                              router.push(`/matches/summoner/${encodeURIComponent(gn)}/${encodeURIComponent(tl)}`);
-                            }
-                          }}
-                        >
-                          {entry}
-                        </span>
-                        <button
-                          className="opacity-0 group-hover:opacity-100 text-text-tertiary hover:text-text-primary transition-all text-xs px-1"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            removeFromHistory(entry);
-                            setHistoryVersion(v => v + 1); // 리렌더 트리거
-                          }}
-                        >
-                          ✕
-                        </button>
+              {showHistory &&
+                (() => {
+                  // historyVersion 참조로 삭제 시 리렌더 보장
+                  void historyVersion;
+                  const history = getHistory();
+                  if (!history.length) return null;
+                  return (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-bg-secondary border border-bg-tertiary rounded-xl shadow-xl z-50 overflow-hidden">
+                      <div className="px-3 py-2 text-[10px] text-text-tertiary font-medium border-b border-bg-tertiary">
+                        최근 검색
                       </div>
-                    ))}
-                  </div>
-                );
-              })()}
+                      {history.map((entry) => (
+                        <div
+                          key={entry}
+                          className="flex items-center gap-2 px-3 py-2 hover:bg-bg-tertiary/60 cursor-pointer group"
+                        >
+                          <Search className="h-3 w-3 text-text-tertiary flex-shrink-0" />
+                          <span
+                            className="flex-1 text-sm text-text-secondary group-hover:text-text-primary transition-colors"
+                            onClick={() => {
+                              const idx = entry.lastIndexOf("#");
+                              if (idx !== -1) {
+                                const gn = entry.substring(0, idx);
+                                const tl = entry.substring(idx + 1);
+                                saveToHistory(gn, tl);
+                                setShowHistory(false);
+                                router.push(
+                                  `/matches/summoner/${encodeURIComponent(gn)}/${encodeURIComponent(tl)}`,
+                                );
+                              }
+                            }}
+                          >
+                            {entry}
+                          </span>
+                          <button
+                            className="opacity-0 group-hover:opacity-100 text-text-tertiary hover:text-text-primary transition-all text-xs px-1"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeFromHistory(entry);
+                              setHistoryVersion((v) => v + 1); // 리렌더 트리거
+                            }}
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
             </div>
           </div>
         </div>
@@ -602,15 +706,20 @@ export default function SummonerStatsPage() {
               {liveGameData?.isLive && (
                 <div className="flex items-center gap-2 mb-3 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2">
                   <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse flex-shrink-0" />
-                  <span className="text-sm font-medium text-red-400">현재 게임 중</span>
+                  <span className="text-sm font-medium text-red-400">
+                    현재 게임 중
+                  </span>
                   {liveGameData.gameInfo?.gameLength != null && (
                     <span className="text-xs text-text-tertiary ml-1">
-                      ({Math.floor(liveGameData.gameInfo.gameLength / 60)}분 {liveGameData.gameInfo.gameLength % 60}초)
+                      ({Math.floor(liveGameData.gameInfo.gameLength / 60)}분{" "}
+                      {liveGameData.gameInfo.gameLength % 60}초)
                     </span>
                   )}
                   {liveGameData.gameInfo?.gameQueueConfigId != null && (
                     <span className="text-xs text-text-secondary ml-auto">
-                      {getQueueTypeName(liveGameData.gameInfo.gameQueueConfigId)}
+                      {getQueueTypeName(
+                        liveGameData.gameInfo.gameQueueConfigId,
+                      )}
                     </span>
                   )}
                 </div>
@@ -620,7 +729,9 @@ export default function SummonerStatsPage() {
               <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4 flex-wrap">
                 <h1 className="text-xl sm:text-3xl font-bold text-text-primary">
                   {summoner.gameName}
-                  <span className="text-text-tertiary text-base sm:text-3xl">#{summoner.tagLine}</span>
+                  <span className="text-text-tertiary text-base sm:text-3xl">
+                    #{summoner.tagLine}
+                  </span>
                 </h1>
                 {nexusUserId && (
                   <Link
@@ -637,17 +748,23 @@ export default function SummonerStatsPage() {
                   size="sm"
                   disabled={isRefreshing || refreshCooldown > 0}
                   className={`ml-auto ${isCurrentPartial ? "shadow-lg shadow-amber-500/10" : ""}`}
-                  title={refreshCooldown > 0 ? `${refreshCooldown}초 후 갱신 가능` : undefined}
+                  title={
+                    refreshCooldown > 0
+                      ? `${refreshCooldown}초 후 갱신 가능`
+                      : undefined
+                  }
                 >
-                  <RefreshCw className={`h-4 w-4 sm:mr-2 ${isRefreshing ? "animate-spin" : ""}`} />
+                  <RefreshCw
+                    className={`h-4 w-4 sm:mr-2 ${isRefreshing ? "animate-spin" : ""}`}
+                  />
                   <span className="hidden sm:inline">
                     {isRefreshing
                       ? "새로고침 중..."
                       : refreshCooldown > 0
-                      ? `${refreshCooldown}초`
-                      : isCurrentPartial
-                      ? "수집 요청"
-                      : "새로고침"}
+                        ? `${refreshCooldown}초`
+                        : isCurrentPartial
+                          ? "수집 요청"
+                          : "새로고침"}
                   </span>
                 </Button>
               </div>
@@ -677,7 +794,9 @@ export default function SummonerStatsPage() {
                     </div>
 
                     <div className="bg-bg-tertiary rounded-lg p-2 sm:p-3">
-                      <p className="text-[10px] sm:text-xs text-text-tertiary mb-0.5 sm:mb-1">승률</p>
+                      <p className="text-[10px] sm:text-xs text-text-tertiary mb-0.5 sm:mb-1">
+                        승률
+                      </p>
                       <p className="text-lg sm:text-2xl font-bold text-accent-primary">
                         {winRate}%
                       </p>
@@ -703,14 +822,20 @@ export default function SummonerStatsPage() {
                       />
                     )}
                     <div>
-                      <p className="text-[10px] sm:text-xs text-text-tertiary mb-0.5">자유 랭크</p>
+                      <p className="text-[10px] sm:text-xs text-text-tertiary mb-0.5">
+                        자유 랭크
+                      </p>
                       <p className="font-bold text-sm sm:text-base text-text-primary">
                         {summoner.flex.tier} {summoner.flex.rank}
                       </p>
                       <p className="text-[10px] sm:text-xs text-text-tertiary">
                         {(() => {
-                          const total = summoner.flex.wins + summoner.flex.losses;
-                          const wr = total > 0 ? Math.round((summoner.flex.wins / total) * 100) : 0;
+                          const total =
+                            summoner.flex.wins + summoner.flex.losses;
+                          const wr =
+                            total > 0
+                              ? Math.round((summoner.flex.wins / total) * 100)
+                              : 0;
                           return `${summoner.flex.wins}승 ${summoner.flex.losses}패 · ${wr}%`;
                         })()}
                       </p>
@@ -725,10 +850,13 @@ export default function SummonerStatsPage() {
                       Nexus 랭킹
                     </p>
                     <p className="text-lg sm:text-xl font-bold text-accent-primary">
-                      {nexusRanking.globalRank ? `#${nexusRanking.globalRank}` : '–'}
+                      {nexusRanking.globalRank
+                        ? `#${nexusRanking.globalRank}`
+                        : "–"}
                     </p>
                     <p className="text-[10px] sm:text-xs text-text-tertiary">
-                      {nexusRanking.totalGames}전 {nexusRanking.wins}승 {nexusRanking.losses}패
+                      {nexusRanking.totalGames}전 {nexusRanking.wins}승{" "}
+                      {nexusRanking.losses}패
                     </p>
                     {nexusRanking.byRole?.length > 0 && (
                       <div className="mt-2 border-t border-bg-elevated pt-2">
@@ -742,7 +870,9 @@ export default function SummonerStatsPage() {
                       <Shield className="h-3 w-3" />
                       Nexus 랭킹
                     </p>
-                    <p className="text-lg sm:text-xl font-bold text-text-secondary">–</p>
+                    <p className="text-lg sm:text-xl font-bold text-text-secondary">
+                      –
+                    </p>
                     <p className="text-[10px] sm:text-xs text-text-tertiary">
                       {nexusUserId ? "기록 부족" : "미등록"}
                     </p>
@@ -788,7 +918,9 @@ export default function SummonerStatsPage() {
                     const tabStatus =
                       tab.key === "nexus" || !fetchStatus
                         ? null
-                        : fetchStatus.queueGroups.find((entry) => entry.queueGroup === tab.key);
+                        : fetchStatus.queueGroups.find(
+                            (entry) => entry.queueGroup === tab.key,
+                          );
 
                     return (
                       <button
@@ -802,7 +934,9 @@ export default function SummonerStatsPage() {
                       >
                         {tab.label}
                         {tab.key !== "nexus" && tabStatus && (
-                          <span className={`text-[10px] ${champStatTab === tab.key ? "text-white/70" : "text-text-tertiary"}`}>
+                          <span
+                            className={`text-[10px] ${champStatTab === tab.key ? "text-white/70" : "text-text-tertiary"}`}
+                          >
                             {tabStatus.matchCount}
                           </span>
                         )}
@@ -814,11 +948,13 @@ export default function SummonerStatsPage() {
 
               {/* 랭크 탭: 시즌 누적(최근 100판) 상태 배너 — 등록 무관 표시 */}
               {champStatTab === "ranked" && (
-                <div className={`mb-4 rounded-lg border px-3 py-2 text-xs ${
-                  isSeasonScanning
-                    ? "border-amber-500/30 bg-amber-500/10 text-amber-200"
-                    : "border-bg-tertiary bg-bg-tertiary/40 text-text-secondary"
-                }`}>
+                <div
+                  className={`mb-4 rounded-lg border px-3 py-2 text-xs ${
+                    isSeasonScanning || isRankedUsingFallback
+                      ? "border-amber-500/30 bg-amber-500/10 text-amber-200"
+                      : "border-bg-tertiary bg-bg-tertiary/40 text-text-secondary"
+                  }`}
+                >
                   <div className="flex items-center gap-2">
                     {isSeasonScanning ? (
                       <AlertCircle className="h-3.5 w-3.5 flex-shrink-0 animate-pulse" />
@@ -826,50 +962,68 @@ export default function SummonerStatsPage() {
                       <Clock3 className="h-3.5 w-3.5 flex-shrink-0" />
                     )}
                     <span>
-                      {isSeasonScanning
-                        ? "전적을 수집 중입니다. 잠시 후 자동으로 갱신됩니다."
-                        : "랭크 시즌 누적 통계 (최근 100판 기준)"}
+                      {/*
+                        어떤 수치를 보고 있는지 분명히 한다. 대체값은 우리가
+                        수집해 둔 매치 범위의 집계라 시즌 전체보다 표본이 적다.
+                      */}
+                      {isRankedUsingFallback
+                        ? "수집된 전적 기준으로 먼저 보여드립니다. 시즌 전체는 수집이 끝나면 자동으로 갱신됩니다."
+                        : isSeasonScanning
+                          ? "전적을 수집 중입니다. 잠시 후 자동으로 갱신됩니다."
+                          : "랭크 시즌 누적 통계 (최근 100판 기준)"}
                     </span>
                   </div>
                   <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-text-tertiary">
-                    <span>마지막 수집: {formatRelativeTime(currentComputedAt)}</span>
+                    <span>
+                      마지막 수집: {formatRelativeTime(currentComputedAt)}
+                    </span>
                     <span>{currentMatchCount}게임 집계</span>
                   </div>
                 </div>
               )}
 
-              {champStatTab !== "nexus" && champStatTab !== "ranked" && nexusUserId && (
-                <div className={`mb-4 rounded-lg border px-3 py-2 text-xs ${
-                  isCurrentPartial
-                    ? "border-amber-500/30 bg-amber-500/10 text-amber-200"
-                    : "border-bg-tertiary bg-bg-tertiary/40 text-text-secondary"
-                }`}>
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                      {isCurrentPartial ? (
-                        <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
-                      ) : (
-                        <Clock3 className="h-3.5 w-3.5 flex-shrink-0" />
+              {champStatTab !== "nexus" &&
+                champStatTab !== "ranked" &&
+                nexusUserId && (
+                  <div
+                    className={`mb-4 rounded-lg border px-3 py-2 text-xs ${
+                      isCurrentPartial
+                        ? "border-amber-500/30 bg-amber-500/10 text-amber-200"
+                        : "border-bg-tertiary bg-bg-tertiary/40 text-text-secondary"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        {isCurrentPartial ? (
+                          <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
+                        ) : (
+                          <Clock3 className="h-3.5 w-3.5 flex-shrink-0" />
+                        )}
+                        <span>
+                          {isCurrentPartial
+                            ? "수집 중인 전적이 있어 통계가 부분 집계 상태입니다."
+                            : "캐시된 통계를 표시하고 있습니다."}
+                        </span>
+                      </div>
+                      {fetchStatus?.queuedAt && (
+                        <Badge variant="secondary" className="text-[10px]">
+                          대기열 {formatRelativeTime(fetchStatus.queuedAt)}
+                        </Badge>
                       )}
-                      <span>
-                        {isCurrentPartial ? "수집 중인 전적이 있어 통계가 부분 집계 상태입니다." : "캐시된 통계를 표시하고 있습니다."}
-                      </span>
                     </div>
-                    {fetchStatus?.queuedAt && (
-                      <Badge variant="secondary" className="text-[10px]">
-                        대기열 {formatRelativeTime(fetchStatus.queuedAt)}
-                      </Badge>
-                    )}
+                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-text-tertiary">
+                      <span>
+                        마지막 계산: {formatRelativeTime(currentComputedAt)}
+                      </span>
+                      {currentQueueGroup !== "all" && (
+                        <span>
+                          마지막 수집: {formatRelativeTime(currentFetchedAt)}
+                        </span>
+                      )}
+                      <span>{currentMatchCount}게임 집계</span>
+                    </div>
                   </div>
-                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-text-tertiary">
-                    <span>마지막 계산: {formatRelativeTime(currentComputedAt)}</span>
-                    {currentQueueGroup !== "all" && (
-                      <span>마지막 수집: {formatRelativeTime(currentFetchedAt)}</span>
-                    )}
-                    <span>{currentMatchCount}게임 집계</span>
-                  </div>
-                </div>
-              )}
+                )}
 
               {(() => {
                 const stats = resolvedStats;
@@ -877,14 +1031,17 @@ export default function SummonerStatsPage() {
                   champStatTab === "ranked" && isSeasonScanning
                     ? "전적 수집 중입니다… 잠시만 기다려주세요"
                     : champStatTab === "nexus"
-                    ? "Nexus 챔피언 통계가 없습니다"
-                    : "해당 큐 챔피언 통계가 없습니다";
+                      ? "Nexus 챔피언 통계가 없습니다"
+                      : "해당 큐 챔피언 통계가 없습니다";
 
                 if (isChampionTabLoading) {
                   return (
                     <div className="space-y-2">
                       {[...Array(5)].map((_, i) => (
-                        <div key={i} className="flex items-center justify-between p-3 bg-bg-tertiary rounded-lg animate-pulse">
+                        <div
+                          key={i}
+                          className="flex items-center justify-between p-3 bg-bg-tertiary rounded-lg animate-pulse"
+                        >
                           <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-full bg-bg-elevated" />
                             <div className="space-y-1.5">
@@ -913,11 +1070,15 @@ export default function SummonerStatsPage() {
                 return (
                   <div className="space-y-2">
                     {stats.slice(0, 5).map((stat: any) => {
-                      const champWinRate = Math.round((stat.wins / stat.games) * 100);
+                      const champWinRate = Math.round(
+                        (stat.wins / stat.games) * 100,
+                      );
                       const avgKDA =
                         stat.deaths === 0
                           ? stat.kills + stat.assists
-                          : ((stat.kills + stat.assists) / stat.deaths).toFixed(2);
+                          : ((stat.kills + stat.assists) / stat.deaths).toFixed(
+                              2,
+                            );
 
                       return (
                         <div
@@ -931,7 +1092,9 @@ export default function SummonerStatsPage() {
                               width={40}
                               height={40}
                               className="w-10 h-10 rounded-full flex-shrink-0"
-                              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                              onError={(e) => {
+                                e.currentTarget.style.display = "none";
+                              }}
                             />
                             <div>
                               <p className="font-semibold text-text-primary text-sm flex items-center gap-1.5">
@@ -944,7 +1107,8 @@ export default function SummonerStatsPage() {
                                       className="inline-flex items-center gap-0.5 rounded bg-accent-primary/15 px-1.5 py-0.5 text-[10px] font-bold text-accent-primary"
                                       title={`숙련도 ${m.championLevel}레벨 · ${m.championPoints.toLocaleString()}점`}
                                     >
-                                      M{m.championLevel} · {formatMasteryPoints(m.championPoints)}
+                                      M{m.championLevel} ·{" "}
+                                      {formatMasteryPoints(m.championPoints)}
                                     </span>
                                   );
                                 })()}
@@ -960,8 +1124,8 @@ export default function SummonerStatsPage() {
                                 champWinRate >= 60
                                   ? "text-accent-success"
                                   : champWinRate >= 50
-                                  ? "text-accent-primary"
-                                  : "text-accent-danger"
+                                    ? "text-accent-primary"
+                                    : "text-accent-danger"
                               }`}
                             >
                               {champWinRate}%
@@ -993,7 +1157,9 @@ export default function SummonerStatsPage() {
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-text-secondary">플레이한 챔피언</span>
+                  <span className="text-sm text-text-secondary">
+                    플레이한 챔피언
+                  </span>
                   <span className="font-bold text-text-primary">
                     {championStats.length}
                   </span>

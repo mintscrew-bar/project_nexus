@@ -15,6 +15,12 @@ import {
 } from "lucide-react";
 import { ChampionSelector } from "./ChampionSelector";
 import { PeakTierSelector } from "./PeakTierSelector";
+import {
+  createEmptyLineTiers,
+  LineTierMap,
+  LineTierSelector,
+  toLineTierPayload,
+} from "./LineTierSelector";
 import Image from "next/image";
 import { getRoleIcon } from "@/lib/role-icon";
 
@@ -61,6 +67,7 @@ export function AddAccountModal({
   const [peakTier, setPeakTier] = useState("");
   const [peakRank, setPeakRank] = useState("");
   const [peakLp, setPeakLp] = useState<number | null>(null);
+  const [roleTiers, setRoleTiers] = useState<LineTierMap>(createEmptyLineTiers);
 
   // 역할 & 챔피언 선택 상태
   const [mainRole, setMainRole] = useState<Role>("MID");
@@ -91,6 +98,8 @@ export function AddAccountModal({
       setIsSubmitting(false);
       setPeakTier("");
       setPeakRank("");
+      setPeakLp(null);
+      setRoleTiers(createEmptyLineTiers());
       setMainRole("MID");
       setSubRole("ADC");
       setChampionsByRole({
@@ -225,6 +234,7 @@ export function AddAccountModal({
           peakTier && ["MASTER", "GRANDMASTER", "CHALLENGER"].includes(peakTier)
             ? (peakLp ?? undefined)
             : undefined,
+        roleTiers: toLineTierPayload(roleTiers),
       });
       onAccountAdded();
       onClose();
@@ -492,15 +502,22 @@ export function AddAccountModal({
       )}
 
       {step === 2 && (
-        <PeakTierSelector
-          peakTier={peakTier}
-          peakRank={peakRank}
-          onTierChange={setPeakTier}
-          onRankChange={setPeakRank}
-          peakLp={peakLp}
-          onLpChange={setPeakLp}
-          disabled={isLoading}
-        />
+        <div className="max-h-[58vh] space-y-4 overflow-y-auto pr-1">
+          <PeakTierSelector
+            peakTier={peakTier}
+            peakRank={peakRank}
+            onTierChange={setPeakTier}
+            onRankChange={setPeakRank}
+            peakLp={peakLp}
+            onLpChange={setPeakLp}
+            disabled={isLoading}
+          />
+          <LineTierSelector
+            value={roleTiers}
+            onChange={setRoleTiers}
+            disabled={isLoading}
+          />
+        </div>
       )}
 
       <div className="flex justify-end gap-3 pt-4">

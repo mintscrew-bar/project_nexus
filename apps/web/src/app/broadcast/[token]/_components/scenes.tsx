@@ -332,13 +332,12 @@ export function WaitingScene({ snapshot }: { snapshot: any }) {
             <h1 className="mt-6 max-w-[1180px] text-[82px] font-black leading-[0.96] tracking-normal text-white">
               {room.name ?? "내전 대기 중"}
             </h1>
-            <HudRule color={accent} />
-            <p className="text-2xl font-black uppercase tracking-[0.32em] text-white/38">
+            <p className="mt-8 text-2xl font-black uppercase tracking-[0.32em] text-white/38">
               Nexus Custom Match
             </p>
           </div>
 
-          <div className="border-y border-white/12 py-9">
+          <div className="bg-black/20 px-7 py-8">
             <HudLabel color={accent}>PLAYERS</HudLabel>
             <div className="mt-5 flex items-end gap-4">
               <span className="text-[132px] font-black leading-none text-white">
@@ -359,7 +358,7 @@ export function WaitingScene({ snapshot }: { snapshot: any }) {
         </div>
 
         {participants.length > 0 && (
-          <div className="border-y border-white/10 py-6">
+          <div className="bg-black/18 px-6 py-5">
             <div className="mb-4 flex items-center justify-between">
               <HudLabel color={accent}>WAITING PLAYERS</HudLabel>
               <p className="text-sm font-black uppercase tracking-[0.28em] text-white/32">
@@ -888,11 +887,22 @@ function RoleSlot({
   member?: any;
   compact?: boolean;
 }) {
+  const roleTier = member?.roleTiers?.find(
+    (entry: any) => normalizeRole(entry.role) === role,
+  );
+  const badge = member
+    ? tierBadge(
+        roleTier?.tier ?? member.tier,
+        roleTier?.rank ?? member.rank,
+        roleTier?.lp ?? member.lp,
+      )
+    : null;
+
   return (
     <div
-      className={`grid min-w-0 ${compact ? "grid-cols-[44px_minmax(0,1fr)]" : "grid-cols-[52px_minmax(0,1fr)]"} items-center border bg-white/[0.035] ${
+      className={`grid min-w-0 ${compact ? "grid-cols-[44px_minmax(0,1fr)]" : "grid-cols-[52px_minmax(0,1fr)]"} items-center bg-white/[0.045] ${
         compact ? "gap-2 px-2.5 py-2" : "gap-3 px-3.5 py-3"
-      } border-white/8`}
+      }`}
     >
       <div className="flex items-center gap-2">
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -922,11 +932,21 @@ function RoleSlot({
               className={`${compact ? "h-7 w-7" : "h-9 w-9"} rounded-full object-cover`}
             />
           </div>
-          <p
-            className={`min-w-0 flex-1 truncate font-black text-white ${compact ? "text-sm" : "text-base"}`}
-          >
-            {member.username}
-          </p>
+          <span className="min-w-0 flex-1">
+            <p
+              className={`truncate font-black text-white ${compact ? "text-sm" : "text-base"}`}
+            >
+              {member.username}
+            </p>
+            {badge && (
+              <p
+                className={`truncate font-black ${compact ? "text-[9px]" : "text-[10px]"}`}
+                style={{ color: badge.color }}
+              >
+                {badge.text}
+              </p>
+            )}
+          </span>
         </div>
       ) : (
         <p
@@ -966,11 +986,11 @@ function RoleSelectionTeam({
 
   return (
     <section
-      className="min-w-0 overflow-hidden border bg-black/38"
-      style={{ borderColor: `${color}55` }}
+      className="min-w-0 overflow-hidden border-t-2 bg-black/34"
+      style={{ borderTopColor: color }}
     >
       <div
-        className={`flex items-center justify-between border-b border-white/10 px-5 ${compact ? "py-2" : "py-3"}`}
+        className={`flex items-center justify-between px-5 ${compact ? "py-2" : "py-3"}`}
         style={{ background: `${color}12` }}
       >
         <div className="flex min-w-0 items-center gap-3">
@@ -995,11 +1015,11 @@ function RoleSelectionTeam({
         ))}
 
         {waitingMembers.length > 0 && (
-          <div className="flex min-w-0 flex-wrap gap-1.5 border-t border-white/10 pt-2">
+          <div className="flex min-w-0 flex-wrap gap-1.5 pt-1">
             {waitingMembers.map((member) => (
               <span
                 key={member.id ?? member.userId ?? member.username}
-                className="max-w-[150px] truncate border border-white/10 bg-black/20 px-2 py-1 text-[10px] font-black text-white/36"
+                className="max-w-[150px] truncate bg-white/[0.04] px-2 py-1 text-[10px] font-black text-white/36"
               >
                 {member.username}
               </span>

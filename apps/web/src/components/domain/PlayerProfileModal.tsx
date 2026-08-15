@@ -17,12 +17,21 @@ import {
   X,
 } from "lucide-react";
 import { LoadingSpinner, Modal } from "@/components/ui";
-import { ReputationSummary, SummaryChip, WinRateSparkline } from "@/components/domain/ProfileStats";
+import {
+  ReputationSummary,
+  SummaryChip,
+  WinRateSparkline,
+} from "@/components/domain/ProfileStats";
 import { ClanTag } from "@/components/domain/ClanEmblem";
 import { matchApi, reputationApi, userApi } from "@/lib/api-client";
 import { useAuthStore } from "@/stores/auth-store";
 import { getChampionIcon } from "@/components/matches/match-utils";
-import { ChampionIcon, PositionIcon, POSITION_LABELS } from "@/app/tournaments/[id]/lobby/_components/icons";
+import {
+  ChampionIcon,
+  PositionIcon,
+  POSITION_LABELS,
+} from "@/app/tournaments/[id]/lobby/_components/icons";
+import { RoleTierBadges } from "@/components/domain/RoleTierBadges";
 
 interface PlayerProfileModalProps {
   userId: string | null;
@@ -74,10 +83,11 @@ const TIER_KO: Record<string, string> = {
   IRON: "아이언",
 };
 
-
 function formatPeakTier(riot: any) {
   if (!riot?.peakTier) return "기록 없음";
-  const isApex = ["MASTER", "GRANDMASTER", "CHALLENGER"].includes(riot.peakTier);
+  const isApex = ["MASTER", "GRANDMASTER", "CHALLENGER"].includes(
+    riot.peakTier,
+  );
   const tier = TIER_KO[riot.peakTier] ?? riot.peakTier;
   return `${tier}${riot.peakRank && !isApex ? ` ${riot.peakRank}` : ""}`;
 }
@@ -121,10 +131,22 @@ function formatOneDecimal(value: number) {
 function getRecentMetrics(matches: any[]) {
   const games = matches.length;
   const wins = matches.filter((match) => match.participant?.win).length;
-  const kills = matches.reduce((sum, match) => sum + (match.participant?.kills ?? 0), 0);
-  const deaths = matches.reduce((sum, match) => sum + (match.participant?.deaths ?? 0), 0);
-  const assists = matches.reduce((sum, match) => sum + (match.participant?.assists ?? 0), 0);
-  const damage = matches.reduce((sum, match) => sum + (match.participant?.damage ?? 0), 0);
+  const kills = matches.reduce(
+    (sum, match) => sum + (match.participant?.kills ?? 0),
+    0,
+  );
+  const deaths = matches.reduce(
+    (sum, match) => sum + (match.participant?.deaths ?? 0),
+    0,
+  );
+  const assists = matches.reduce(
+    (sum, match) => sum + (match.participant?.assists ?? 0),
+    0,
+  );
+  const damage = matches.reduce(
+    (sum, match) => sum + (match.participant?.damage ?? 0),
+    0,
+  );
 
   return {
     games,
@@ -138,7 +160,11 @@ function getRecentMetrics(matches: any[]) {
   };
 }
 
-function getChampionGroups(champions: any[], mainRole?: string | null, subRole?: string | null) {
+function getChampionGroups(
+  champions: any[],
+  mainRole?: string | null,
+  subRole?: string | null,
+) {
   const grouped = new Map<string, any[]>();
   for (const champion of champions) {
     const role = champion.role || "FLEX";
@@ -147,7 +173,8 @@ function getChampionGroups(champions: any[], mainRole?: string | null, subRole?:
 
   const roleOrder: string[] = [];
   const addRole = (role?: string | null) => {
-    if (role && grouped.has(role) && !roleOrder.includes(role)) roleOrder.push(role);
+    if (role && grouped.has(role) && !roleOrder.includes(role))
+      roleOrder.push(role);
   };
 
   addRole(mainRole);
@@ -161,12 +188,23 @@ function getChampionGroups(champions: any[], mainRole?: string | null, subRole?:
 }
 
 function getPrimaryRiot(profile: any) {
-  return profile?.riotAccounts?.find((account: any) => account.isPrimary) || profile?.riotAccounts?.[0] || null;
+  return (
+    profile?.riotAccounts?.find((account: any) => account.isPrimary) ||
+    profile?.riotAccounts?.[0] ||
+    null
+  );
 }
 
-export function PlayerProfileModal({ userId, onClose }: PlayerProfileModalProps) {
+export function PlayerProfileModal({
+  userId,
+  onClose,
+}: PlayerProfileModalProps) {
   const router = useRouter();
-  const { data: profile, isLoading: profileLoading, isError } = useQuery({
+  const {
+    data: profile,
+    isLoading: profileLoading,
+    isError,
+  } = useQuery({
     queryKey: ["userProfile", userId],
     queryFn: () => userApi.getProfile(userId!),
     staleTime: 5 * 60 * 1000,
@@ -254,7 +292,9 @@ export function PlayerProfileModal({ userId, onClose }: PlayerProfileModalProps)
   const riot = getPrimaryRiot(profile);
   const mainRole = riot?.mainRole || null;
   const subRole = riot?.subRole || null;
-  const champions = [...(riot?.championPreferences || [])].sort((a: any, b: any) => a.order - b.order);
+  const champions = [...(riot?.championPreferences || [])].sort(
+    (a: any, b: any) => a.order - b.order,
+  );
   const championGroups = getChampionGroups(champions, mainRole, subRole);
   const recentMatches = Array.isArray(history) ? history : [];
   const recent = getRecentMetrics(recentMatches);
@@ -281,8 +321,14 @@ export function PlayerProfileModal({ userId, onClose }: PlayerProfileModalProps)
 
       {!profileLoading && isError && (
         <div className="space-y-4 py-12 text-center">
-          <p className="text-sm text-text-secondary">프로필을 불러오지 못했습니다</p>
-          <button type="button" onClick={onClose} className="rounded-lg bg-bg-tertiary px-4 py-2 text-sm text-text-primary hover:bg-bg-elevated">
+          <p className="text-sm text-text-secondary">
+            프로필을 불러오지 못했습니다
+          </p>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg bg-bg-tertiary px-4 py-2 text-sm text-text-primary hover:bg-bg-elevated"
+          >
             닫기
           </button>
         </div>
@@ -292,157 +338,202 @@ export function PlayerProfileModal({ userId, onClose }: PlayerProfileModalProps)
         <div className="space-y-4">
           <section className="px-1 pt-1 sm:px-2">
             <div className="flex justify-end gap-2">
-                {!isMe && (
-                  <button
-                    type="button"
-                    onClick={openReport}
-                    title="이 유저 신고"
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-bg-tertiary px-3 py-1.5 text-xs font-semibold text-text-secondary transition-colors hover:text-accent-danger"
-                  >
-                    <Flag className="h-3.5 w-3.5" />
-                    신고
-                  </button>
-                )}
+              {!isMe && (
                 <button
                   type="button"
-                  onClick={onClose}
-                  aria-label="프로필 닫기"
-                  className="rounded-lg bg-bg-tertiary p-1.5 text-text-secondary transition-colors hover:text-text-primary"
+                  onClick={openReport}
+                  title="이 유저 신고"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-bg-tertiary px-3 py-1.5 text-xs font-semibold text-text-secondary transition-colors hover:text-accent-danger"
                 >
-                  <X className="h-4 w-4" />
+                  <Flag className="h-3.5 w-3.5" />
+                  신고
                 </button>
+              )}
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="프로필 닫기"
+                className="rounded-lg bg-bg-tertiary p-1.5 text-text-secondary transition-colors hover:text-text-primary"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="mt-2 flex flex-col gap-4 sm:flex-row sm:items-start">
+              <div
+                className="relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-full bg-bg-tertiary sm:h-24 sm:w-24"
+                style={{
+                  border: `2px solid ${showRiot && riot?.tier && riot.tier !== "UNRANKED" ? ACCENT + "88" : "rgb(var(--color-bg-elevated))"}`,
+                }}
+              >
+                {profile.avatar ? (
+                  <Image
+                    src={profile.avatar}
+                    alt={profile.username}
+                    fill
+                    className="object-cover"
+                    unoptimized
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center">
+                    <Users className="h-9 w-9 text-text-tertiary" />
+                  </div>
+                )}
               </div>
 
-              <div className="mt-2 flex flex-col gap-4 sm:flex-row sm:items-start">
-                <div
-                  className="relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-full bg-bg-tertiary sm:h-24 sm:w-24"
-                  style={{ border: `2px solid ${showRiot && riot?.tier && riot.tier !== "UNRANKED" ? ACCENT + "88" : "rgb(var(--color-bg-elevated))"}` }}
-                >
-                  {profile.avatar ? (
-                    <Image src={profile.avatar} alt={profile.username} fill className="object-cover" unoptimized />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center">
-                      <Users className="h-9 w-9 text-text-tertiary" />
-                    </div>
+              <div className="min-w-0 flex-1 pt-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="truncate text-xl font-black leading-tight text-text-primary sm:text-2xl">
+                    {profile.username}
+                  </h2>
+                  {clan?.tag && (
+                    <ClanTag
+                      tag={clan.tag}
+                      accentColor={clan.accentColor}
+                      title={`${clan.name ?? clan.tag} 클랜 보기`}
+                      onClick={() => {
+                        // 모달을 닫고 클랜 상세 페이지로 이동
+                        onClose();
+                        router.push(`/clans/${clan.id}`);
+                      }}
+                    />
                   )}
+                  {/* 스트리머 채널 배지 — 플랫폼별 채널 링크 */}
+                  {streamerProfiles.map((sp: any, i: number) => (
+                    <a
+                      key={`${sp.platform}-${i}`}
+                      href={sp.channelUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      title={sp.channelName || sp.channelUrl}
+                      className="inline-flex shrink-0 items-center gap-1 rounded-md bg-accent-gold/15 px-2 py-1 text-xs font-black leading-none text-accent-gold transition-colors hover:bg-accent-gold/25"
+                    >
+                      {STREAMER_PLATFORM_LABELS[sp.platform] || sp.platform}
+                    </a>
+                  ))}
                 </div>
 
-                <div className="min-w-0 flex-1 pt-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="truncate text-xl font-black leading-tight text-text-primary sm:text-2xl">
-                      {profile.username}
-                    </h2>
-                    {clan?.tag && (
-                      <ClanTag
-                        tag={clan.tag}
-                        accentColor={clan.accentColor}
-                        title={`${clan.name ?? clan.tag} 클랜 보기`}
-                        onClick={() => {
-                          // 모달을 닫고 클랜 상세 페이지로 이동
-                          onClose();
-                          router.push(`/clans/${clan.id}`);
-                        }}
-                      />
-                    )}
-                    {/* 스트리머 채널 배지 — 플랫폼별 채널 링크 */}
-                    {streamerProfiles.map((sp: any, i: number) => (
+                {/* 자기소개 — 공개 프로필과 동일하게 유저명 아래 노출 */}
+                {profile.bio && (
+                  <p className="mt-1.5 max-w-xl text-sm text-text-secondary">
+                    {profile.bio}
+                  </p>
+                )}
+
+                {/* 스트리머 추가 링크 카드 — 썸네일 + 라벨 */}
+                {streamerLinks.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {streamerLinks.slice(0, 4).map((link: any) => (
                       <a
-                        key={`${sp.platform}-${i}`}
-                        href={sp.channelUrl}
+                        key={link.id}
+                        href={link.url}
                         target="_blank"
                         rel="noreferrer"
-                        title={sp.channelName || sp.channelUrl}
-                        className="inline-flex shrink-0 items-center gap-1 rounded-md bg-accent-gold/15 px-2 py-1 text-xs font-black leading-none text-accent-gold transition-colors hover:bg-accent-gold/25"
+                        className="inline-flex min-w-0 max-w-[220px] items-center gap-2 rounded-lg bg-bg-tertiary px-2.5 py-2 transition-colors hover:bg-bg-elevated"
                       >
-                        {STREAMER_PLATFORM_LABELS[sp.platform] || sp.platform}
+                        <span className="relative h-8 w-10 flex-shrink-0 overflow-hidden rounded bg-bg-primary">
+                          {link.imageUrl ? (
+                            <Image
+                              src={link.imageUrl}
+                              alt={link.label}
+                              fill
+                              className="object-cover"
+                              unoptimized
+                            />
+                          ) : (
+                            <span className="flex h-full w-full items-center justify-center">
+                              <ExternalLink className="h-3.5 w-3.5 text-text-tertiary" />
+                            </span>
+                          )}
+                        </span>
+                        <span className="truncate text-xs font-bold text-text-primary">
+                          {link.label}
+                        </span>
                       </a>
                     ))}
                   </div>
+                )}
 
-                  {/* 자기소개 — 공개 프로필과 동일하게 유저명 아래 노출 */}
-                  {profile.bio && (
-                    <p className="mt-1.5 max-w-xl text-sm text-text-secondary">{profile.bio}</p>
-                  )}
+                {showRiot && riot && (
+                  <p className="mt-1 text-sm text-text-tertiary">
+                    {riot.gameName}
+                    <span className="text-text-muted"> #{riot.tagLine}</span>
+                  </p>
+                )}
 
-                  {/* 스트리머 추가 링크 카드 — 썸네일 + 라벨 */}
-                  {streamerLinks.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {streamerLinks.slice(0, 4).map((link: any) => (
-                        <a
-                          key={link.id}
-                          href={link.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex min-w-0 max-w-[220px] items-center gap-2 rounded-lg bg-bg-tertiary px-2.5 py-2 transition-colors hover:bg-bg-elevated"
-                        >
-                          <span className="relative h-8 w-10 flex-shrink-0 overflow-hidden rounded bg-bg-primary">
-                            {link.imageUrl ? (
-                              <Image src={link.imageUrl} alt={link.label} fill className="object-cover" unoptimized />
-                            ) : (
-                              <span className="flex h-full w-full items-center justify-center">
-                                <ExternalLink className="h-3.5 w-3.5 text-text-tertiary" />
-                              </span>
-                            )}
-                          </span>
-                          <span className="truncate text-xs font-bold text-text-primary">{link.label}</span>
-                        </a>
-                      ))}
-                    </div>
-                  )}
-
-                  {showRiot && riot && (
-                    <p className="mt-1 text-sm text-text-tertiary">
-                      {riot.gameName}<span className="text-text-muted"> #{riot.tagLine}</span>
-                    </p>
-                  )}
-
-                  {showRiot && riot?.tier && riot.tier !== "UNRANKED" && (
-                    <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <span className="text-lg font-black" style={{ color: TIER_COLOR[riot.tier] ?? ACCENT }}>
-                        {formatTier(riot)}
+                {showRiot && riot?.tier && riot.tier !== "UNRANKED" && (
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <span
+                      className="text-lg font-black"
+                      style={{ color: TIER_COLOR[riot.tier] ?? ACCENT }}
+                    >
+                      {formatTier(riot)}
+                    </span>
+                    {riot.lp != null && (
+                      <span className="text-sm font-bold text-text-primary">
+                        {riot.lp} LP
                       </span>
-                      {riot.lp != null && (
-                        <span className="text-sm font-bold text-text-primary">{riot.lp} LP</span>
-                      )}
-                    </div>
-                  )}
-
-                  {showRiot && riot?.peakTier && riot.peakTier !== "UNRANKED" && (
-                    <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                      <span className="text-xs text-text-muted">최고</span>
-                      <span className="text-xs font-semibold text-text-secondary">
-                        {formatPeakTier(riot)}
-                        {riot.peakLp != null && ["MASTER", "GRANDMASTER", "CHALLENGER"].includes(riot.peakTier) ? ` ${riot.peakLp}LP` : ""}
-                      </span>
-                    </div>
-                  )}
-
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
-                    {(mainRole || subRole) && (
-                      <>
-                        {mainRole && (
-                          <div className="flex items-center gap-1.5 rounded-lg bg-bg-tertiary px-2.5 py-1.5">
-                            <PositionIcon position={mainRole} className="!h-4 !w-4" />
-                            <span className="text-xs font-bold text-text-primary">{POSITION_LABELS[mainRole] || mainRole}</span>
-                            <span className="rounded bg-bg-elevated px-1 text-[9px] font-black text-text-muted">주</span>
-                          </div>
-                        )}
-                        {subRole && (
-                          <div className="flex items-center gap-1.5 rounded-lg bg-bg-tertiary px-2.5 py-1.5">
-                            <PositionIcon position={subRole} className="!h-4 !w-4" opacity={0.6} />
-                            <span className="text-xs font-semibold text-text-secondary">{POSITION_LABELS[subRole] || subRole}</span>
-                            <span className="rounded bg-bg-elevated px-1 text-[9px] font-black text-text-muted">부</span>
-                          </div>
-                        )}
-                      </>
                     )}
-                    <span className="inline-flex items-center gap-1 text-xs text-text-muted">
-                      <CalendarDays className="h-3 w-3" />
-                      {formatJoinDate(profile.createdAt)}
+                  </div>
+                )}
+
+                {showRiot && riot?.peakTier && riot.peakTier !== "UNRANKED" && (
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                    <span className="text-xs text-text-muted">최고</span>
+                    <span className="text-xs font-semibold text-text-secondary">
+                      {formatPeakTier(riot)}
+                      {riot.peakLp != null &&
+                      ["MASTER", "GRANDMASTER", "CHALLENGER"].includes(
+                        riot.peakTier,
+                      )
+                        ? ` ${riot.peakLp}LP`
+                        : ""}
                     </span>
                   </div>
+                )}
+
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  {(mainRole || subRole) && (
+                    <>
+                      {mainRole && (
+                        <div className="flex items-center gap-1.5 rounded-lg bg-bg-tertiary px-2.5 py-1.5">
+                          <PositionIcon
+                            position={mainRole}
+                            className="!h-4 !w-4"
+                          />
+                          <span className="text-xs font-bold text-text-primary">
+                            {POSITION_LABELS[mainRole] || mainRole}
+                          </span>
+                          <span className="rounded bg-bg-elevated px-1 text-[9px] font-black text-text-muted">
+                            주
+                          </span>
+                        </div>
+                      )}
+                      {subRole && (
+                        <div className="flex items-center gap-1.5 rounded-lg bg-bg-tertiary px-2.5 py-1.5">
+                          <PositionIcon
+                            position={subRole}
+                            className="!h-4 !w-4"
+                            opacity={0.6}
+                          />
+                          <span className="text-xs font-semibold text-text-secondary">
+                            {POSITION_LABELS[subRole] || subRole}
+                          </span>
+                          <span className="rounded bg-bg-elevated px-1 text-[9px] font-black text-text-muted">
+                            부
+                          </span>
+                        </div>
+                      )}
+                    </>
+                  )}
+                  <span className="inline-flex items-center gap-1 text-xs text-text-muted">
+                    <CalendarDays className="h-3 w-3" />
+                    {formatJoinDate(profile.createdAt)}
+                  </span>
                 </div>
+                <RoleTierBadges roleTiers={riot?.roleTiers} className="mt-2" />
               </div>
+            </div>
           </section>
 
           <div className="grid gap-3 sm:grid-cols-3">
@@ -458,7 +549,9 @@ export function PlayerProfileModal({ userId, onClose }: PlayerProfileModalProps)
               value={`${winRate}%`}
               detail={gamesPlayed > 0 ? `${wins}승 ${losses}패` : "전적 없음"}
               side={<WinRateSparkline matches={recentMatches} />}
-              valueClassName={winRate >= 50 ? "text-accent-success" : "text-accent-danger"}
+              valueClassName={
+                winRate >= 50 ? "text-accent-success" : "text-accent-danger"
+              }
             />
             <SummaryChip
               icon={Activity}
@@ -475,31 +568,65 @@ export function PlayerProfileModal({ userId, onClose }: PlayerProfileModalProps)
           <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
             <section className="rounded-xl bg-bg-secondary p-4">
               <div className="mb-4 flex items-center justify-between">
-                <h3 className="text-sm font-black text-text-primary">포지션 및 선호 챔피언</h3>
+                <h3 className="text-sm font-black text-text-primary">
+                  포지션 및 선호 챔피언
+                </h3>
               </div>
 
               {!mainRole && !subRole && (
-                <p className="text-sm text-text-tertiary">등록된 포지션이 없습니다</p>
+                <p className="text-sm text-text-tertiary">
+                  등록된 포지션이 없습니다
+                </p>
               )}
               {!showChampStats ? (
-                <p className="text-sm text-text-tertiary">선호 챔피언을 비공개로 설정했습니다</p>
+                <p className="text-sm text-text-tertiary">
+                  선호 챔피언을 비공개로 설정했습니다
+                </p>
               ) : championGroups.length > 0 ? (
                 <div className="space-y-2">
                   {championGroups.map((group) => (
-                    <div key={group.role} className="rounded-xl bg-bg-primary p-3">
+                    <div
+                      key={group.role}
+                      className="rounded-xl bg-bg-primary p-3"
+                    >
                       <div className="mb-2 flex items-center justify-between">
                         <span className="inline-flex items-center gap-1.5 text-xs font-bold text-text-primary">
                           <PositionIcon position={group.role} />
                           {POSITION_LABELS[group.role] || group.role}
-                          {group.role === mainRole && <span className="text-text-tertiary">주</span>}
-                          {group.role === subRole && <span className="text-text-tertiary">부</span>}
+                          {group.role === mainRole && (
+                            <span className="text-text-tertiary">주</span>
+                          )}
+                          {group.role === subRole && (
+                            <span className="text-text-tertiary">부</span>
+                          )}
                         </span>
-                        <span className="text-[10px] font-semibold text-text-muted">{group.champions.length}개</span>
+                        <span className="flex items-center gap-2">
+                          {/*
+                            자동 밸런스가 팀을 나눌 때 쓰는 라인별 점수.
+                            티어만으로 설명되지 않는 배정(최고 티어·솔랭 승률·
+                            내전 전적 반영)을 여기서 납득할 수 있게 함께 보여준다.
+                          */}
+                          {typeof riot?.balanceScores?.[group.role] ===
+                            "number" && (
+                            <span className="rounded bg-bg-elevated px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-accent-primary">
+                              {riot.balanceScores[group.role].toFixed(1)}
+                            </span>
+                          )}
+                          <span className="text-[10px] font-semibold text-text-muted">
+                            {group.champions.length}개
+                          </span>
+                        </span>
                       </div>
                       <div className="flex flex-wrap gap-2">
                         {group.champions.map((champion: any, index: number) => (
-                          <div key={`${group.role}-${champion.championId}-${index}`} className="relative">
-                            <ChampionIcon championId={champion.championId} size={34} />
+                          <div
+                            key={`${group.role}-${champion.championId}-${index}`}
+                            className="relative"
+                          >
+                            <ChampionIcon
+                              championId={champion.championId}
+                              size={34}
+                            />
                             <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-bg-primary px-1 text-[9px] font-black text-text-primary ring-1 ring-bg-elevated">
                               {champion.order ?? index + 1}
                             </span>
@@ -510,7 +637,9 @@ export function PlayerProfileModal({ userId, onClose }: PlayerProfileModalProps)
                   ))}
                 </div>
               ) : (
-                <span className="text-sm text-text-tertiary">등록된 선호 챔피언이 없습니다</span>
+                <span className="text-sm text-text-tertiary">
+                  등록된 선호 챔피언이 없습니다
+                </span>
               )}
             </section>
 
@@ -525,7 +654,9 @@ export function PlayerProfileModal({ userId, onClose }: PlayerProfileModalProps)
 
           <section className="rounded-xl bg-bg-secondary p-4">
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-sm font-black text-text-primary">최근 5경기</h3>
+              <h3 className="text-sm font-black text-text-primary">
+                최근 5경기
+              </h3>
               <span className="text-xs text-text-muted">내전 기록</span>
             </div>
             {recentMatches.length > 0 ? (
@@ -533,50 +664,78 @@ export function PlayerProfileModal({ userId, onClose }: PlayerProfileModalProps)
                 {recentMatches.slice(0, 5).map((match: any) => {
                   const participant = match.participant || {};
                   return (
-                  <div key={match.matchId} className="rounded-xl bg-bg-primary p-3">
-                    <div className="flex items-center gap-3">
-                    <Image
-                      src={getChampionIcon(participant.championName)}
-                      alt={participant.championName || "champion"}
-                      width={36}
-                      height={36}
-                      className="h-9 w-9 rounded-full"
-                      unoptimized
-                    />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-bold text-text-primary">
-                        {participant.kills ?? 0}/{participant.deaths ?? 0}/{participant.assists ?? 0} · {participant.championNameKorean || participant.championName || "챔피언"}
-                      </p>
-                      <p className="text-xs text-text-muted">
-                        {POSITION_LABELS[participant.position] || participant.position || "포지션 미상"} · {match.team?.name || "팀 미상"} · {formatTimeAgo(match.match?.completedAt || match.match?.createdAt)}
-                      </p>
+                    <div
+                      key={match.matchId}
+                      className="rounded-xl bg-bg-primary p-3"
+                    >
+                      <div className="flex items-center gap-3">
+                        <Image
+                          src={getChampionIcon(participant.championName)}
+                          alt={participant.championName || "champion"}
+                          width={36}
+                          height={36}
+                          className="h-9 w-9 rounded-full"
+                          unoptimized
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-bold text-text-primary">
+                            {participant.kills ?? 0}/{participant.deaths ?? 0}/
+                            {participant.assists ?? 0} ·{" "}
+                            {participant.championNameKorean ||
+                              participant.championName ||
+                              "챔피언"}
+                          </p>
+                          <p className="text-xs text-text-muted">
+                            {POSITION_LABELS[participant.position] ||
+                              participant.position ||
+                              "포지션 미상"}{" "}
+                            · {match.team?.name || "팀 미상"} ·{" "}
+                            {formatTimeAgo(
+                              match.match?.completedAt ||
+                                match.match?.createdAt,
+                            )}
+                          </p>
+                        </div>
+                        <span
+                          className={`rounded-md px-2 py-1 text-xs font-black ${participant.win ? "bg-accent-success/10 text-accent-success" : "bg-accent-danger/10 text-accent-danger"}`}
+                        >
+                          {participant.win ? "승" : "패"}
+                        </span>
+                      </div>
+                      <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                        <div className="rounded-lg bg-bg-secondary px-2 py-1.5">
+                          <p className="text-[10px] text-text-muted">KDA</p>
+                          <p className="text-xs font-black text-text-primary">
+                            {getKdaRatio(
+                              participant.kills,
+                              participant.deaths,
+                              participant.assists,
+                            ).toFixed(2)}
+                          </p>
+                        </div>
+                        <div className="rounded-lg bg-bg-secondary px-2 py-1.5">
+                          <p className="text-[10px] text-text-muted">피해량</p>
+                          <p className="text-xs font-black text-text-primary">
+                            {formatDamage(participant.damage)}
+                          </p>
+                        </div>
+                        <div className="rounded-lg bg-bg-secondary px-2 py-1.5">
+                          <p className="text-[10px] text-text-muted">상대</p>
+                          <p className="truncate text-xs font-black text-text-primary">
+                            {match.match?.teamA?.id === match.team?.id
+                              ? match.match?.teamB?.name
+                              : match.match?.teamA?.name}
+                          </p>
+                        </div>
+                      </div>
                     </div>
-                    <span className={`rounded-md px-2 py-1 text-xs font-black ${participant.win ? "bg-accent-success/10 text-accent-success" : "bg-accent-danger/10 text-accent-danger"}`}>
-                      {participant.win ? "승" : "패"}
-                    </span>
-                  </div>
-                    <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-                      <div className="rounded-lg bg-bg-secondary px-2 py-1.5">
-                        <p className="text-[10px] text-text-muted">KDA</p>
-                        <p className="text-xs font-black text-text-primary">{getKdaRatio(participant.kills, participant.deaths, participant.assists).toFixed(2)}</p>
-                      </div>
-                      <div className="rounded-lg bg-bg-secondary px-2 py-1.5">
-                        <p className="text-[10px] text-text-muted">피해량</p>
-                        <p className="text-xs font-black text-text-primary">{formatDamage(participant.damage)}</p>
-                      </div>
-                      <div className="rounded-lg bg-bg-secondary px-2 py-1.5">
-                        <p className="text-[10px] text-text-muted">상대</p>
-                        <p className="truncate text-xs font-black text-text-primary">
-                          {match.match?.teamA?.id === match.team?.id ? match.match?.teamB?.name : match.match?.teamA?.name}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
                   );
                 })}
               </div>
             ) : (
-              <p className="rounded-xl bg-bg-primary py-8 text-center text-sm text-text-tertiary">최근 경기 없음</p>
+              <p className="rounded-xl bg-bg-primary py-8 text-center text-sm text-text-tertiary">
+                최근 경기 없음
+              </p>
             )}
           </section>
 
@@ -602,8 +761,12 @@ export function PlayerProfileModal({ userId, onClose }: PlayerProfileModalProps)
                 {reportSuccess ? (
                   /* 신고 완료 */
                   <div className="p-6 text-center">
-                    <p className="mb-1 text-sm font-medium text-text-primary">신고가 접수되었습니다</p>
-                    <p className="mb-4 text-xs text-text-tertiary">운영팀이 검토 후 조치할 예정입니다.</p>
+                    <p className="mb-1 text-sm font-medium text-text-primary">
+                      신고가 접수되었습니다
+                    </p>
+                    <p className="mb-4 text-xs text-text-tertiary">
+                      운영팀이 검토 후 조치할 예정입니다.
+                    </p>
                     <button
                       type="button"
                       onClick={() => setReportOpen(false)}
@@ -625,10 +788,15 @@ export function PlayerProfileModal({ userId, onClose }: PlayerProfileModalProps)
 
                     {/* 사유 선택 */}
                     <div>
-                      <label className="mb-1.5 block text-xs text-text-tertiary">신고 사유</label>
+                      <label className="mb-1.5 block text-xs text-text-tertiary">
+                        신고 사유
+                      </label>
                       <div className="space-y-1.5">
                         {REPORT_REASONS.map((r) => (
-                          <label key={r.value} className="group/r flex cursor-pointer items-center gap-2">
+                          <label
+                            key={r.value}
+                            className="group/r flex cursor-pointer items-center gap-2"
+                          >
                             <input
                               type="radio"
                               name="userReportReason"
@@ -637,7 +805,9 @@ export function PlayerProfileModal({ userId, onClose }: PlayerProfileModalProps)
                               onChange={() => setReportReason(r.value)}
                               className="accent-accent-primary"
                             />
-                            <span className="text-sm text-text-secondary group-hover/r:text-text-primary">{r.label}</span>
+                            <span className="text-sm text-text-secondary group-hover/r:text-text-primary">
+                              {r.label}
+                            </span>
                           </label>
                         ))}
                       </div>
@@ -656,10 +826,14 @@ export function PlayerProfileModal({ userId, onClose }: PlayerProfileModalProps)
                         rows={3}
                         className="w-full resize-none rounded-lg border border-bg-elevated bg-bg-tertiary px-3 py-2 text-sm text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-accent-primary"
                       />
-                      <p className="mt-1 text-right text-xs text-text-tertiary">{reportDescription.length}/1000</p>
+                      <p className="mt-1 text-right text-xs text-text-tertiary">
+                        {reportDescription.length}/1000
+                      </p>
                     </div>
 
-                    {reportError && <p className="text-xs text-red-400">{reportError}</p>}
+                    {reportError && (
+                      <p className="text-xs text-red-400">{reportError}</p>
+                    )}
 
                     {/* 버튼 */}
                     <div className="flex justify-end gap-2">
@@ -673,10 +847,14 @@ export function PlayerProfileModal({ userId, onClose }: PlayerProfileModalProps)
                       <button
                         type="button"
                         onClick={handleSubmitReport}
-                        disabled={isSubmittingReport || !reportDescription.trim()}
+                        disabled={
+                          isSubmittingReport || !reportDescription.trim()
+                        }
                         className="inline-flex items-center gap-1.5 rounded-lg bg-red-500 px-3 py-2 text-sm text-text-primary hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        {isSubmittingReport && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                        {isSubmittingReport && (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        )}
                         {isSubmittingReport ? "신고 중..." : "신고하기"}
                       </button>
                     </div>

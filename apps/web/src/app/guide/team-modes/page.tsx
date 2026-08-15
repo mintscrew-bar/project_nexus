@@ -27,7 +27,7 @@ export default function TeamModesGuidePage() {
         <div className="grid gap-3 sm:grid-cols-2">
           <InfoCard icon={Gavel} title="경매" description="팀장이 제한된 포인트로 선수를 영입합니다. 선택 과정의 전략과 보는 재미가 큽니다." />
           <InfoCard icon={ListOrdered} title="스네이크" description="팀장이 정해진 순서로 번갈아 선수를 선택합니다. 규칙이 단순하고 진행을 따라가기 쉽습니다." />
-          <InfoCard icon={Scale} title="자동 밸런스" description="티어·LP와 선호 포지션을 참고해 빠르게 팀을 나눕니다. 친선전과 빠른 시작에 적합합니다." />
+          <InfoCard icon={Scale} title="자동 밸런스" description="라인별 티어와 랭크·내전 기록을 반영해 팀과 역할을 함께 나눕니다. 친선전과 빠른 시작에 적합합니다." />
           <InfoCard icon={ArrowLeftRight} title="자유 팀 선택" description="참가자가 직접 팀을 고릅니다. 이미 구성이 합의된 연습 경기나 클랜전에 적합합니다." />
         </div>
       </GuideSection>
@@ -42,7 +42,7 @@ export default function TeamModesGuidePage() {
 
       <GuideSection title="자동 밸런스와 자유 팀 선택">
         <BulletList>
-          <Bullet>자동 밸런스는 전원 입장과 준비 완료 뒤 실행하며, 티어·LP와 선호 포지션이 최신인지 확인합니다.</Bullet>
+          <Bullet>자동 밸런스는 전원 입장과 준비 완료 뒤 실행하며, 라인별 티어와 랭크·내전 기록이 최신인지 확인합니다.</Bullet>
           <Bullet>결과가 어색하면 포지션 충돌처럼 분명한 이유가 있을 때만 소수 인원을 조정합니다.</Bullet>
           <Bullet>자유 팀 선택은 참가자가 직접 이동하며, 팀 이동 시 준비 상태가 해제될 수 있습니다.</Bullet>
           <Bullet>각 팀 정원이 맞고 모든 참가자가 다시 준비한 뒤 다음 단계로 진행합니다.</Bullet>

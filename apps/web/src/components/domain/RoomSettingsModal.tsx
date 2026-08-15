@@ -57,7 +57,7 @@ const TEAM_MODES: { value: TeamMode; label: string; description: string; icon: R
   {
     value: "AUTO_BALANCE",
     label: "자동 밸런스",
-    description: "정원 충족 후 티어·LP와 선호 포지션 기준 자동 편성",
+    description: "라인별 티어와 랭크·내전 기록으로 팀·역할 자동 편성",
     icon: <Scale className="w-4 h-4" />,
   },
   {

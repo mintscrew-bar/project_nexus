@@ -928,20 +928,34 @@ export class DiscordVoiceService {
       throw new BadRequestException("Room not found");
     }
 
-    // Move each team to their channel
+    // Move each team to their channel. Name matching is preferred, but channel
+    // creation order is a fallback when a prior rename failed or was skipped.
+    const orderedTeams = [...room.teams].sort(
+      (a, b) => a.createdAt.getTime() - b.createdAt.getTime(),
+    );
+    const orderedTeamChannels = room.discordChannels
+      .filter((channel) => channel.teamName !== "Lobby")
+      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
     let success = 0;
     let failed = 0;
 
-    for (const [index, team] of room.teams.entries()) {
-      const teamChannel = room.discordChannels.find(
+    for (const [index, team] of orderedTeams.entries()) {
+      const matchedTeamChannel = orderedTeamChannels.find(
         (ch: (typeof room.discordChannels)[number]) =>
           ch.teamName === team.name,
       );
+      const teamChannel = matchedTeamChannel ?? orderedTeamChannels[index];
 
       if (!teamChannel) {
         this.logger.warn(`No Discord channel found for team ${team.name}`);
         failed += team.members.length;
         continue;
+      }
+
+      if (!matchedTeamChannel) {
+        this.logger.warn(
+          `Discord channel name mismatch for team ${team.name}; using channel slot ${index + 1}`,
+        );
       }
 
       try {
@@ -959,7 +973,7 @@ export class DiscordVoiceService {
         );
       }
 
-      if (index < room.teams.length - 1) {
+      if (index < orderedTeams.length - 1) {
         await this.delay();
       }
     }

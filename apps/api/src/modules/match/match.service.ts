@@ -445,7 +445,9 @@ export class MatchService {
     // 승패는 Riot 데이터와 무관하게 여기서 확정된다. 예전에는 랭킹 갱신이
     // Riot 전적 수집 성공 후에만 돌아서, 수집이 불가능한 수동 사설방의 결과는
     // 랭킹에 영원히 반영되지 않았다.
-    void this.updateRankingsForMatch(matchId);
+    // 결과 응답 전에 끝까지 기다린다. 수동 사설방은 Riot 재수집이 불가능할 수 있어
+    // fire-and-forget 작업이 서버 재시작과 겹치면 전적을 복구할 기회가 없다.
+    await this.updateRankingsForMatch(matchId);
 
     // 다전제: 게임 결과를 시리즈에 반영한다.
     // 아직 선취 승수에 도달하지 않았으면 진출시키지 않고 다음 세트를 만든다
@@ -966,6 +968,28 @@ export class MatchService {
             name: true,
             color: true,
             captain: { select: { id: true, username: true } },
+            members: {
+              select: {
+                id: true,
+                assignedRole: true,
+                user: {
+                  select: {
+                    id: true,
+                    username: true,
+                    riotAccounts: {
+                      where: { isPrimary: true },
+                      take: 1,
+                      select: {
+                        championPreferences: {
+                          orderBy: { order: "asc" },
+                          select: { role: true, championId: true, order: true },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
           },
         },
         teamB: {
@@ -974,6 +998,28 @@ export class MatchService {
             name: true,
             color: true,
             captain: { select: { id: true, username: true } },
+            members: {
+              select: {
+                id: true,
+                assignedRole: true,
+                user: {
+                  select: {
+                    id: true,
+                    username: true,
+                    riotAccounts: {
+                      where: { isPrimary: true },
+                      take: 1,
+                      select: {
+                        championPreferences: {
+                          orderBy: { order: "asc" },
+                          select: { role: true, championId: true, order: true },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
           },
         },
         winner: {

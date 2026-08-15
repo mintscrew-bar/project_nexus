@@ -2011,6 +2011,20 @@ export default function ProfilePage() {
                                   </span>
                                 )}
                               </div>
+                              {account.roleTiers && account.roleTiers.length > 0 && (
+                                <div className="mt-2 flex flex-wrap gap-1.5">
+                                  {account.roleTiers.map((roleTier: { role: string; tier: string; rank: string }) => (
+                                    <span
+                                      key={roleTier.role}
+                                      className="inline-flex items-center gap-1 rounded bg-bg-secondary px-1.5 py-1 text-[11px] text-text-secondary"
+                                      title={`${POSITION_LABELS[roleTier.role] || roleTier.role} 티어`}
+                                    >
+                                      <PositionIcon position={roleTier.role} className="!h-3.5 !w-3.5" />
+                                      {roleTier.tier} {roleTier.rank}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
                               {account.lastSyncedAt && (
                                 <p className="text-[11px] text-text-tertiary mt-1">
                                   마지막 동기화:{" "}

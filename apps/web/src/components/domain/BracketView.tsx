@@ -4,12 +4,27 @@ import React from "react";
 import { cn } from "@/lib/utils";
 import { getDoubleElimFeeders } from "@nexus/types";
 import { CheckCircle2, CircleDashed, Clock3, Trophy, Swords, ShieldX } from "lucide-react";
+import { ChampionIcon, PositionIcon } from "@/app/tournaments/[id]/lobby/_components/icons";
+
+const ROLE_ORDER = ["TOP", "JUNGLE", "MID", "ADC", "SUPPORT"];
+
+interface TeamMember {
+  id: string;
+  username: string;
+  assignedRole?: string | null;
+  championPreferences?: Array<{
+    role: string;
+    championId: string;
+    order: number;
+  }>;
+}
 
 interface Team {
   id: string;
   name: string;
   score?: number;
   captain?: { id: string; username: string };
+  members?: TeamMember[];
 }
 
 // "팀장닉 팀" 형태로 표시. 팀장 정보가 없으면 원래 name으로 폴백.
@@ -89,10 +104,17 @@ function TeamSlot({
   team?: Team;
   isWinner: boolean;
 }) {
+  const members = [...(team?.members || [])].sort((left, right) => {
+    const leftIndex = ROLE_ORDER.indexOf(left.assignedRole || "");
+    const rightIndex = ROLE_ORDER.indexOf(right.assignedRole || "");
+    return (leftIndex < 0 ? ROLE_ORDER.length : leftIndex) -
+      (rightIndex < 0 ? ROLE_ORDER.length : rightIndex);
+  });
+
   return (
     <div
       className={cn(
-        "flex min-h-[42px] items-center justify-between gap-3 rounded-md border px-3 py-2 transition-colors",
+        "min-h-[178px] rounded-md border px-3 py-2.5 transition-colors",
         isWinner
           ? "border-accent-gold/60 bg-accent-gold/10"
           : team
@@ -100,29 +122,69 @@ function TeamSlot({
             : "border-dashed border-bg-tertiary bg-bg-tertiary/30",
       )}
     >
-      <div className="flex min-w-0 items-center gap-2">
-        <span
-          className={cn(
-            "h-2.5 w-2.5 shrink-0 rounded-full",
-            isWinner ? "bg-accent-gold" : team ? "bg-accent-primary/70" : "bg-text-tertiary/50",
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <span
+            className={cn(
+              "h-2.5 w-2.5 shrink-0 rounded-full",
+              isWinner ? "bg-accent-gold" : team ? "bg-accent-primary/70" : "bg-text-tertiary/50",
+            )}
+          />
+          <span
+            className={cn(
+              "truncate text-sm font-bold",
+              team ? "text-text-primary" : "text-text-tertiary",
+            )}
+          >
+            {getTeamDisplayName(team)}
+          </span>
+        </div>
+        <div className="flex shrink-0 items-center gap-1.5">
+          {team?.score !== undefined && (
+            <span className="text-base font-bold text-text-primary">{team.score}</span>
           )}
-        />
-        <span
-          className={cn(
-            "truncate text-sm font-semibold",
-            team ? "text-text-primary" : "text-text-tertiary",
-          )}
-        >
-          {getTeamDisplayName(team)}
-        </span>
+          {isWinner && <Trophy className="h-4 w-4 text-accent-gold" />}
+        </div>
       </div>
-      {/* 다전제에서는 이긴 팀도 스코어를 함께 보여준다 (2-1처럼 읽히도록) */}
-      <div className="flex shrink-0 items-center gap-1.5">
-        {team?.score !== undefined && (
-          <span className="text-base font-bold text-text-primary">{team.score}</span>
-        )}
-        {isWinner && <Trophy className="h-4 w-4 text-accent-gold" />}
-      </div>
+
+      {members.length > 0 && (
+        <div className="mt-2 space-y-1 border-t border-bg-elevated/70 pt-2">
+          {members.map((member) => {
+            const champions = (member.championPreferences || [])
+              .filter((preference) => preference.role === member.assignedRole)
+              .sort((left, right) => left.order - right.order)
+              .slice(0, 5);
+            return (
+              <div
+                key={member.id}
+                className="grid h-6 grid-cols-[18px_minmax(0,1fr)_auto] items-center gap-1.5"
+              >
+                {member.assignedRole ? (
+                  <PositionIcon position={member.assignedRole} className="!h-4 !w-4" />
+                ) : (
+                  <span className="h-4 w-4 rounded bg-bg-elevated" />
+                )}
+                <span className="truncate text-xs font-medium text-text-secondary">
+                  {member.username}
+                </span>
+                <div className="flex min-w-[114px] justify-end gap-0.5">
+                  {champions.length > 0 ? (
+                    champions.map((preference) => (
+                      <ChampionIcon
+                        key={`${member.id}-${preference.championId}`}
+                        championId={preference.championId}
+                        size={21}
+                      />
+                    ))
+                  ) : (
+                    <span className="text-[10px] text-text-muted">선호 없음</span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -145,7 +207,7 @@ function MatchCard({
       ref={innerRef}
       type="button"
       className={cn(
-        "group relative w-[250px] shrink-0 rounded-lg border bg-bg-secondary/95 p-3 text-left shadow-lg shadow-black/10 transition-all hover:-translate-y-0.5 hover:border-accent-primary/70 hover:shadow-xl md:w-[286px]",
+        "group relative w-[320px] shrink-0 rounded-lg border bg-bg-secondary/95 p-3 text-left shadow-lg shadow-black/10 transition-all hover:-translate-y-0.5 hover:border-accent-primary/70 hover:shadow-xl md:w-[400px]",
         status.cardClassName,
       )}
       onClick={() => onMatchClick(match)}
@@ -221,8 +283,8 @@ function RoundHeader({
 }
 
 // 컬럼 사이 연결선이 차지하는 가로 간격(px). 들어오는 가로선·컬럼 우측 마진과 맞춘다.
-const CONNECTOR_GAP = "w-10 md:w-12";
-const CONNECTOR_MARGIN = "mr-10 md:mr-12";
+const CONNECTOR_GAP = "w-8 md:w-12";
+const CONNECTOR_MARGIN = "mr-8 md:mr-12";
 
 /**
  * 대진 트리의 매치 한 칸을 감싸 연결선을 그린다.
@@ -277,7 +339,7 @@ function getRoundName(round: number, rounds: number): string {
 }
 
 function getRoundHeight(matchCount: number): number {
-  return Math.max(156, matchCount * 148 + Math.max(0, matchCount - 1) * 28);
+  return Math.max(430, matchCount * 420 + Math.max(0, matchCount - 1) * 36);
 }
 
 // --- Standard (single-elim / round-robin) bracket ---
@@ -303,7 +365,7 @@ function StandardBracket({ matches, rounds, onMatchClick }: BracketViewProps) {
           <div
             key={round}
             className={cn(
-              "relative flex w-[250px] shrink-0 flex-col last:mr-0 md:w-[286px]",
+              "relative flex w-[320px] shrink-0 flex-col last:mr-0 md:w-[400px]",
               isTree ? CONNECTOR_MARGIN : "mr-6 md:mr-8",
             )}
           >
@@ -477,7 +539,7 @@ function DoubleEliminationBracket({ matches, onMatchClick }: { matches: Match[];
     <div
       key={section}
       className={cn(
-        "flex w-[250px] shrink-0 flex-col last:mr-0 md:w-[286px]",
+              "flex w-[320px] shrink-0 flex-col last:mr-0 md:w-[400px]",
         opts.tree && CONNECTOR_MARGIN,
       )}
     >

@@ -162,6 +162,13 @@ export class SnakeDraftService {
             }
           }),
         );
+
+        // 팀 채널은 방 생성 시 Team 1, Team 2 이름으로 저장된다.
+        // 스네이크 팀 이름과 매칭되도록 경매와 동일하게 즉시 동기화한다.
+        await this.discordVoiceService.renameTeamChannels(
+          roomId,
+          teams.map((team) => ({ id: team.id, name: team.name })),
+        );
       }
     } catch (error) {
       console.warn("Failed to assign Discord captain roles:", error);

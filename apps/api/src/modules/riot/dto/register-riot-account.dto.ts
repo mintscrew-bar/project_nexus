@@ -62,4 +62,8 @@ export class RegisterRiotAccountDto {
   championsByRole: {
     [key in Role]?: string[];
   };
+
+  @IsOptional()
+  @IsObject()
+  roleTiers?: Record<string, { tier?: string; rank?: string; lp?: number }>;
 }

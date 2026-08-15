@@ -7,7 +7,7 @@ import {
   forwardRef,
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
-import { Prisma, RoomStatus, Role } from "@nexus/database";
+import { Prisma, RoomStatus, Role, TeamMode } from "@nexus/database";
 import { MatchService } from "../match/match.service";
 // 클라이언트와 값이 어긋나지 않도록 공용 패키지에서 가져온다.
 import {
@@ -126,12 +126,18 @@ export class RoleSelectionService {
   async cancelRole(userId: string, roomId: string) {
     const member = await this.prisma.teamMember.findFirst({
       where: { userId, team: { roomId } },
+      include: { team: { select: { room: { select: { teamMode: true } } } } },
     });
     if (!member) {
       throw new ForbiddenException("User is not a member of any team");
     }
     if (!member.assignedRole) {
       throw new BadRequestException("선택된 역할이 없습니다.");
+    }
+    if (member.team.room.teamMode === TeamMode.AUTO_BALANCE) {
+      throw new BadRequestException(
+        "자동 밸런스로 확정된 역할은 변경할 수 없습니다.",
+      );
     }
     await this.prisma.teamMember.update({
       where: { id: member.id },
@@ -159,6 +165,12 @@ export class RoleSelectionService {
 
       if (!room) {
         throw new NotFoundException("Room not found");
+      }
+
+      if (room.teamMode === TeamMode.AUTO_BALANCE) {
+        throw new BadRequestException(
+          "자동 밸런스로 확정된 역할은 변경할 수 없습니다.",
+        );
       }
 
       if (room.status !== RoomStatus.ROLE_SELECTION) {
@@ -281,7 +293,11 @@ export class RoleSelectionService {
                 user: {
                   include: {
                     riotAccounts: {
-                      where: { isPrimary: true },
+                      orderBy: [
+                        { isPrimary: "desc" },
+                        { verifiedAt: { sort: "desc", nulls: "last" } },
+                        { createdAt: "asc" },
+                      ],
                       take: 1,
                     },
                   },
@@ -616,6 +632,12 @@ export class RoleSelectionService {
                     username: true,
                     avatar: true,
                     riotAccounts: {
+                      orderBy: [
+                        { isPrimary: "desc" },
+                        { verifiedAt: { sort: "desc", nulls: "last" } },
+                        { createdAt: "asc" },
+                      ],
+                      take: 1,
                       select: {
                         gameName: true,
                         tagLine: true,
@@ -625,11 +647,18 @@ export class RoleSelectionService {
                         peakRank: true,
                         mainRole: true,
                         subRole: true,
+                        roleTiers: {
+                          select: {
+                            role: true,
+                            tier: true,
+                            rank: true,
+                            lp: true,
+                          },
+                        },
                         championPreferences: {
                           select: { role: true, championId: true, order: true },
                         },
                       },
-                      take: 1,
                     },
                   },
                 },

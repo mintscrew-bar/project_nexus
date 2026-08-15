@@ -38,6 +38,9 @@ const getTeamModeStagePath = (room: {
 }) => {
   if (room.teamMode === "AUCTION") return `/auction/${room.id}`;
   if (room.teamMode === "SNAKE_DRAFT") return `/draft/${room.id}`;
+  if (room.teamMode === "AUTO_BALANCE") {
+    return `/tournaments/${room.id}/bracket`;
+  }
   return `/role-selection/${room.id}`;
 };
 
@@ -51,6 +54,9 @@ const getRoomStagePath = (room: {
   }
 
   if (room.status === "ROLE_SELECTION" || room.status === "DRAFT_COMPLETED") {
+    if (room.teamMode === "AUTO_BALANCE") {
+      return `/tournaments/${room.id}/bracket`;
+    }
     return `/role-selection/${room.id}`;
   }
 
@@ -723,7 +729,7 @@ export default function TournamentLobbyPage() {
                   </p>
                   <p className="mt-0.5 text-xs text-text-secondary">
                     {room.teamMode === "AUTO_BALANCE"
-                      ? "정원과 준비가 완료되면 티어·LP 및 선호 포지션 기준으로 팀을 편성하고 역할 선택으로 이동합니다."
+                      ? "정원과 준비가 완료되면 라인별 티어와 랭크·내전 기록을 반영해 팀과 역할을 함께 편성합니다."
                       : "팀 카드를 선택해 이동하세요. 팀을 바꾸면 준비 상태가 해제되며, 모든 팀을 5명씩 채운 뒤 시작합니다."}
                   </p>
                 </div>

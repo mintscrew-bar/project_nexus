@@ -599,6 +599,12 @@ export const userApi = {
       peakLp: number | null;
       mainRole: string | null;
       subRole: string | null;
+      roleTiers: {
+        role: string;
+        tier: string;
+        rank: string;
+        lp: number;
+      }[];
       championPreferences: {
         role: string;
         championId: string;
@@ -1127,6 +1133,7 @@ export const riotApi = {
       peakTier?: string;
       peakRank?: string;
       peakLp?: number;
+      roleTiers?: Record<string, { tier?: string; rank?: string; lp?: number }>;
     },
   ) => {
     const response = await apiClient.put(`/riot/accounts/${accountId}`, data);
@@ -2209,12 +2216,7 @@ export const adminApi = {
     kind?: "users" | "bots" | "all";
     role?: "USER" | "MODERATOR" | "ADMIN";
     statusFilter?:
-      | "normal"
-      | "banned"
-      | "restricted"
-      | "reported"
-      | "streamer"
-      | "no-riot";
+      "normal" | "banned" | "restricted" | "reported" | "streamer" | "no-riot";
     presence?: "online" | "offline" | "away";
   }) => {
     const response = await apiClient.get("/admin/users", { params });

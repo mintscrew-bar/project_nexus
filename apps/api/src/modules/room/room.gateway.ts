@@ -675,13 +675,9 @@ export class RoomGateway
           client.userId!,
           data.roomId,
         );
-        const roleData = await this.roleSelectionService.startRoleSelection(
-          data.roomId,
-        );
-        await this.roleSelectionGateway.emitRoleSelectionStarted(
-          data.roomId,
-          roleData,
-        );
+        // 팀과 라인을 함께 최적화했으므로 일반 역할 선택을 다시 열지 않는다.
+        // 확정된 assignedRole 그대로 대진표를 생성한다.
+        await this.roleSelectionGateway.completeRoleSelection(data.roomId);
       } else if (room.teamMode === TeamMode.MANUAL_TEAM) {
         result = await this.roomService.finalizeManualTeams(
           client.userId!,

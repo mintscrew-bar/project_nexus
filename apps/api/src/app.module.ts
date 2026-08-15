@@ -37,6 +37,7 @@ import { StreamerModule } from "./modules/streamer/streamer.module";
 import { PrismaModule } from "./modules/prisma/prisma.module";
 import { RedisModule } from "./modules/redis/redis.module";
 import { ShutdownModule } from "./modules/common/shutdown.module";
+import { BalanceScoreModule } from "./modules/common/balance-score.module";
 import { ShutdownService } from "./modules/common/shutdown.service";
 import { PrismaService } from "./modules/prisma/prisma.service";
 import { HealthController } from "./health.controller";
@@ -84,6 +85,7 @@ const projectRoot = resolve(apiRoot, "../..");
     PrismaModule,
     RedisModule,
     ShutdownModule,
+    BalanceScoreModule,
 
     // Feature modules
     AuthModule,

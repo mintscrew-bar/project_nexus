@@ -45,6 +45,19 @@ describe("StatsService", () => {
       riotMatchCache: {
         findMany: jest.fn(),
       },
+      championSeasonStat: {
+        findMany: jest.fn(),
+        deleteMany: jest.fn(),
+        createMany: jest.fn(),
+      },
+      championScanState: {
+        findUnique: jest.fn(),
+        findMany: jest.fn(),
+        update: jest.fn(),
+        updateMany: jest.fn(),
+        upsert: jest.fn(),
+      },
+      $transaction: jest.fn(),
     };
 
     // Redis mock — 캐시 히트/미스 시나리오 제어용
@@ -530,6 +543,71 @@ describe("StatsService", () => {
           }),
         }),
       );
+    });
+  });
+
+  describe("챔피언 시즌 승패 수집", () => {
+    it("저장된 게임 수와 승수로 패수를 계산한다", async () => {
+      riotService.getSummonerByRiotId.mockResolvedValue({ puuid: "puuid-1" });
+      prisma.championSeasonStat.findMany.mockResolvedValue([
+        {
+          championId: 103,
+          championName: "Ahri",
+          games: 3,
+          wins: 1,
+          kills: 10,
+          deaths: 8,
+          assists: 15,
+        },
+      ]);
+      prisma.championScanState.findUnique.mockResolvedValue({
+        status: "done",
+        scannedCount: 3,
+        lastScanAt: new Date(),
+      });
+
+      const result = await service.getChampionSeasonStats("테스터", "KR1");
+
+      expect(result.stats[0]).toEqual(
+        expect.objectContaining({ games: 3, wins: 1, losses: 2 }),
+      );
+    });
+
+    it("큐 작업을 시작할 때 멈춤 판정 기준 시각을 갱신한다", async () => {
+      prisma.championScanState.updateMany.mockResolvedValue({ count: 0 });
+      prisma.championScanState.findMany.mockResolvedValue([
+        {
+          id: "scan-1",
+          puuid: "puuid-1",
+          season: "2026-S2",
+          queueGroup: "ranked",
+        },
+      ]);
+      prisma.championScanState.update.mockResolvedValue({});
+      jest
+        .spyOn(service as any, "scanChampionSeasonForPuuid")
+        .mockResolvedValue(undefined);
+
+      await service.processChampionScanQueue(1);
+
+      expect(prisma.championScanState.update).toHaveBeenCalledWith({
+        where: { id: "scan-1" },
+        data: { status: "scanning", requestedAt: expect.any(Date) },
+      });
+    });
+
+    it("경기 상세가 하나라도 누락되면 기존 승패 통계를 교체하지 않는다", async () => {
+      riotMatchService.getMatchIdsByPuuid.mockResolvedValue(["KR_1"]);
+      riotMatchService.getMatchById.mockResolvedValue(null);
+
+      await expect(
+        (service as any).scanChampionSeasonForPuuid(
+          "puuid-1",
+          "2026-S2",
+          "ranked",
+        ),
+      ).rejects.toThrow("Incomplete champion scan");
+      expect(prisma.$transaction).not.toHaveBeenCalled();
     });
   });
 });

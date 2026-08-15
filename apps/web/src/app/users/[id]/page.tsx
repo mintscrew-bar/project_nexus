@@ -47,6 +47,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { TierBadge } from "@/components/domain/TierBadge";
+import { RoleTierBadges } from "@/components/domain/RoleTierBadges";
 import { ReputationSummary, SummaryChip, WinRateSparkline, getCombinedProfileMetrics } from "@/components/domain/ProfileStats";
 import { PreferredChampionPanel, RankedChampionPanel } from "@/components/domain/ProfileChampionPanels";
 import { useToast } from "@/components/ui/Toast";
@@ -94,6 +95,12 @@ interface ProfileUser {
     lastSyncedAt: string | null;
     mainRole: string | null;
     subRole: string | null;
+    roleTiers: Array<{
+      role: string;
+      tier: string;
+      rank: string;
+      lp: number;
+    }>;
     isPrimary: boolean;
     championPreferences: Array<{
       id: string;
@@ -601,7 +608,8 @@ export default function UserProfilePage() {
                 <div className="space-y-4">
                   {/* 주라인 & 티어 그리드 */}
                   {primary && (
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
                       {/* 주라인 칩 */}
                         {primary.mainRole && (
                           <div className="flex items-center gap-1.5 rounded-lg bg-bg-tertiary border border-bg-elevated px-2.5 py-1.5">
@@ -628,6 +636,8 @@ export default function UserProfilePage() {
                             </div>
                           </div>
                         )}
+                      </div>
+                      <RoleTierBadges roleTiers={primary.roleTiers} />
                     </div>
                   )}
 
@@ -950,6 +960,11 @@ export default function UserProfilePage() {
                                 </span>
                               )}
                             </div>
+                            <RoleTierBadges
+                              roleTiers={account.roleTiers}
+                              className="mt-2"
+                              compact
+                            />
                           </div>
                         </div>
                       </div>

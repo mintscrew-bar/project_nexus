@@ -73,6 +73,12 @@ interface RiotAccount {
   peakRank: string | null;
   mainRole: string | null;
   subRole: string | null;
+  roleTiers: Array<{
+    role: string;
+    tier: string;
+    rank: string;
+    lp: number;
+  }>;
   championPreferences: { role: string; championId: string; order: number }[];
 }
 

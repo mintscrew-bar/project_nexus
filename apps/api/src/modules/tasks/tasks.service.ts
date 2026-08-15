@@ -9,6 +9,7 @@ import { RedisService } from "../redis/redis.service";
 import { StatsService } from "../stats/stats.service";
 import { MatchDataCollectionService } from "../match/match-data-collection.service";
 import { MatchService } from "../match/match.service";
+import { BalanceScoreService } from "../common/balance-score.service";
 
 @Injectable()
 export class TasksService {
@@ -25,6 +26,7 @@ export class TasksService {
     private readonly statsService: StatsService,
     private readonly matchDataCollectionService: MatchDataCollectionService,
     private readonly matchService: MatchService,
+    private readonly balanceScores: BalanceScoreService,
   ) {
     this.riotMatchCacheCleanupEnabled =
       this.configService.get<string>("RIOT_MATCH_CACHE_CLEANUP_ENABLED") ===
@@ -33,6 +35,25 @@ export class TasksService {
       "RIOT_MATCH_CACHE_TTL_DAYS",
       14,
     );
+  }
+
+  /** 이벤트 기반 갱신이 실패했거나 누락된 밸런스 점수를 12시간마다 복구한다. */
+  @Cron("0 */12 * * *")
+  async handleBalanceScoreRefresh(): Promise<void> {
+    const lockKey = "tasks:balance-score-refresh";
+    const lockToken = await this.redis.acquireLock(lockKey, 6 * 60 * 60 * 1000);
+    if (!lockToken) return;
+
+    try {
+      const result = await this.balanceScores.refreshAllAccounts();
+      this.logger.log(
+        `밸런스 점수 정기 갱신: 성공 ${result.updated}건, 실패 ${result.failed}건`,
+      );
+    } catch (error) {
+      this.logger.error("밸런스 점수 정기 갱신 실패", error);
+    } finally {
+      await this.redis.releaseLock(lockKey, lockToken);
+    }
   }
 
   /**
@@ -123,6 +144,34 @@ export class TasksService {
       this.logger.error("Pending custom match collection failed", error);
     } finally {
       clearInterval(lockHeartbeat);
+      await this.redis.releaseLock(lockKey, lockToken);
+    }
+  }
+
+  /**
+   * 챔피언 시즌 통계 background 스캔 - 2분마다 소량씩.
+   *
+   * 전적 검색 시 큐잉된 puuid 를 우선순위/요청순으로 스캔한다.
+   * 퍼스널 키 예산(앱 전체 100req/2분)을 잠식하지 않게 틱당 2건만 처리한다.
+   * 매치 상세는 대부분 DB 캐시에서 나오므로 실제 Riot 호출은 이보다 훨씬 적다.
+   *
+   * 이 크론은 `28e8aff chore: retire lab features and collectors` 에서 Lab 정리와
+   * 함께 삭제됐다. 그 뒤로 큐를 비우는 주체가 없어 화면이 "수집 중"에서 멈춰 있었다.
+   */
+  @Cron("*/2 * * * *")
+  async handleChampionSeasonScan(): Promise<void> {
+    const lockKey = "tasks:champion-season-scan";
+    const lockToken = await this.redis.acquireLock(lockKey, 110_000);
+    if (!lockToken) return;
+
+    try {
+      const processed = await this.statsService.processChampionScanQueue(2);
+      if (processed > 0) {
+        this.logger.log(`챔피언 시즌 스캔 처리: ${processed}건`);
+      }
+    } catch (error) {
+      this.logger.error("챔피언 시즌 스캔 처리 실패", error);
+    } finally {
       await this.redis.releaseLock(lockKey, lockToken);
     }
   }

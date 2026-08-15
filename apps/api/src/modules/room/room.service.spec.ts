@@ -7,13 +7,15 @@ import { ConfigService } from "@nestjs/config";
 import { RoomService } from "./room.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { ShutdownService } from "../common/shutdown.service";
-import { RoomStatus, TeamMode } from "@nexus/database";
+import { Role, RoomStatus, TeamMode } from "@nexus/database";
 import { StreamerService } from "../streamer/streamer.service";
+import { BalanceScoreService } from "../common/balance-score.service";
 
 describe("RoomService", () => {
   let service: RoomService;
   let prisma: any;
   let shutdownService: any;
+  let balanceScores: any;
 
   const baseDto = {
     name: "테스트 방",
@@ -22,6 +24,11 @@ describe("RoomService", () => {
   };
 
   beforeEach(async () => {
+    balanceScores = {
+      readCached: jest.fn().mockReturnValue(null),
+      refreshAccount: jest.fn().mockResolvedValue(null),
+      refreshUser: jest.fn().mockResolvedValue(undefined),
+    };
     prisma = {
       user: { findUnique: jest.fn() },
       authProvider: { findFirst: jest.fn() },
@@ -87,6 +94,12 @@ describe("RoomService", () => {
         {
           provide: StreamerService,
           useValue: { getHostLiveMap: jest.fn().mockResolvedValue(new Map()) },
+        },
+        {
+          // 밸런스 점수는 캐시에서 읽는다. 방 조회 테스트에서는 점수가 없어도
+          // 되므로 기본값은 null 이고, 자동 밸런스 테스트에서만 값을 준다.
+          provide: BalanceScoreService,
+          useValue: balanceScores,
         },
       ],
     }).compile();
@@ -496,12 +509,57 @@ describe("RoomService", () => {
   });
 
   describe("자동 밸런스", () => {
+    beforeEach(() => {
+      // 밸런스 점수는 미리 계산해 둔 캐시에서 읽는다.
+      balanceScores.readCached.mockImplementation(() =>
+        Object.fromEntries(Object.values(Role).map((role) => [role, 20])),
+      );
+    });
+
+    it("대표 라이엇 계정이 없는 참가자가 있으면 누구인지 알려주고 중단한다", async () => {
+      // 참가 시점엔 대표 계정을 요구하지만, 이후 계정을 지우거나 대표를 옮기면
+      // 비게 된다. 임의 점수로 때우면 밸런스가 조용히 틀어지므로 끊어야 한다.
+      const participants = Array.from({ length: 10 }, (_, index) => ({
+        userId: `user-${index}`,
+        id: `participant-${index}`,
+        user: {
+          username: `user-${index}`,
+          riotAccounts: index === 3 ? [] : [{ id: `riot-${index}` }],
+        },
+      }));
+      prisma.room.findUnique.mockResolvedValueOnce({
+        id: "room-1",
+        hostId: "host-1",
+        maxParticipants: 10,
+        teamMode: TeamMode.AUTO_BALANCE,
+        status: RoomStatus.WAITING,
+        participants,
+      });
+
+      await expect(
+        service.createAutoBalancedTeams("host-1", "room-1"),
+      ).rejects.toThrow("user-3");
+    });
+
     it("팀 멤버를 편성하고 역할 선택 직전 상태로 전환한다", async () => {
       const participants = Array.from({ length: 10 }, (_, index) => ({
         userId: `user-${index}`,
         id: `participant-${index}`,
         user: {
-          riotAccounts: [{ tier: "GOLD", rank: "I", lp: 0 }],
+          username: `user-${index}`,
+          riotAccounts: [
+            {
+              id: `riot-${index}`,
+              tier: "GOLD",
+              rank: "I",
+              lp: 0,
+              soloWins: 10,
+              soloLosses: 10,
+              mainRole: Object.values(Role)[index % 5],
+              subRole: null,
+              roleTiers: [],
+            },
+          ],
         },
       }));
       prisma.room.findUnique
@@ -526,6 +584,12 @@ describe("RoomService", () => {
       await service.createAutoBalancedTeams("host-1", "room-1");
 
       expect(prisma.teamMember.createMany).toHaveBeenCalledTimes(2);
+      for (const [call] of prisma.teamMember.createMany.mock.calls) {
+        expect(call.data).toHaveLength(5);
+        expect(
+          new Set(call.data.map((member: any) => member.assignedRole)),
+        ).toEqual(new Set(Object.values(Role)));
+      }
       expect(prisma.room.update).toHaveBeenCalledWith({
         where: { id: "room-1" },
         data: { status: RoomStatus.DRAFT_COMPLETED },
@@ -549,37 +613,96 @@ describe("RoomService", () => {
       expect(prisma.team.create).not.toHaveBeenCalled();
     });
 
-    it("선호 포지션이 고르게 배정된 팀의 패널티가 더 낮다", () => {
-      const players = [
-        ["a", "TOP"],
-        ["b", "JUNGLE"],
-        ["c", "MID"],
-        ["d", "ADC"],
-        ["e", "SUPPORT"],
-        ["f", "TOP"],
-        ["g", "JUNGLE"],
-        ["h", "MID"],
-        ["i", "ADC"],
-        ["j", "SUPPORT"],
-      ].map(([userId, mainRole]) => ({
-        participant: { id: `participant-${userId}`, userId },
-        score: 1000,
+    it("팀마다 모든 라인을 한 명씩 배정하고 선수를 중복시키지 않는다", () => {
+      const roles = Object.values(Role);
+      const players = Array.from({ length: 10 }, (_, index) => {
+        const mainRole = roles[index % roles.length];
+        return {
+          participant: {
+            id: `participant-${index}`,
+            userId: `user-${index}`,
+          },
+          scores: Object.fromEntries(
+            roles.map((role) => [role, role === mainRole ? 35 : 25]),
+          ),
+          mainRole,
+          subRole: null,
+          registeredRoleTiers: [mainRole],
+        };
+      });
+
+      const assignments = (service as any).chooseAutoBalancedAssignments(
+        players,
+        2,
+      );
+
+      expect(assignments).toHaveLength(2);
+      expect(
+        new Set(
+          assignments.flatMap((assignment: any) =>
+            assignment.players.map(
+              (placement: any) => placement.player.participant.userId,
+            ),
+          ),
+        ).size,
+      ).toBe(10);
+      for (const assignment of assignments) {
+        expect(
+          new Set(assignment.players.map((placement: any) => placement.role)),
+        ).toEqual(new Set(roles));
+        expect(
+          assignment.players.every(
+            (placement: any) => placement.role === placement.player.mainRole,
+          ),
+        ).toBe(true);
+      }
+    });
+
+    it("주 포지션 분포가 부족하면 오프롤을 허용해 모든 라인을 채운다", () => {
+      const roles = Object.values(Role);
+      const mainRoles = [
+        Role.TOP,
+        Role.TOP,
+        Role.TOP,
+        Role.JUNGLE,
+        Role.MID,
+        Role.MID,
+        Role.ADC,
+        Role.ADC,
+        Role.SUPPORT,
+        Role.SUPPORT,
+      ];
+      const players = mainRoles.map((mainRole, index) => ({
+        participant: {
+          id: `participant-${index}`,
+          userId: `user-${index}`,
+        },
+        scores: Object.fromEntries(
+          roles.map((role) => [role, role === mainRole ? 35 : 30]),
+        ),
         mainRole,
         subRole: null,
+        registeredRoleTiers: [mainRole],
       }));
-      const balanced = [
-        { score: 5000, players: players.slice(0, 5) },
-        { score: 5000, players: players.slice(5) },
-      ];
-      const conflicted = [
-        { score: 5000, players: [players[0], ...players.slice(5, 9)] },
-        { score: 5000, players: [...players.slice(1, 5), players[9]] },
-      ];
 
-      expect((service as any).getAssignmentRolePenalty(balanced)).toBe(0);
+      const assignments = (service as any).chooseAutoBalancedAssignments(
+        players,
+        2,
+      );
+      const placements = assignments.flatMap(
+        (assignment: any) => assignment.players,
+      );
+
       expect(
-        (service as any).getAssignmentRolePenalty(conflicted),
-      ).toBeGreaterThan(0);
+        placements.some(
+          (placement: any) => placement.role !== placement.player.mainRole,
+        ),
+      ).toBe(true);
+      for (const assignment of assignments) {
+        expect(
+          new Set(assignment.players.map((placement: any) => placement.role)),
+        ).toEqual(new Set(roles));
+      }
     });
   });
 });

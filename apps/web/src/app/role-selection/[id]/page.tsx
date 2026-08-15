@@ -13,6 +13,8 @@ import { GameChatPanel } from "@/components/domain/GameChatPanel";
 import { PlayerHoverCard } from "@/components/domain/PlayerHoverCard";
 import { PlayerProfileModal } from "@/components/domain/PlayerProfileModal";
 import { PositionIcon } from "@/app/tournaments/[id]/lobby/_components/icons";
+import { TierBadge } from "@/components/domain/TierBadge";
+import { getRoleTier } from "@/lib/role-tier";
 import { LoadingSpinner, Badge, Avatar, Button, ConfirmModal } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
 import { Clock, Check, CheckCircle2, TimerReset } from "lucide-react";
@@ -394,6 +396,10 @@ export default function RoleSelectionPage() {
                   {team.members.map((member) => {
                     const memberRole = member.assignedRole as Role | null;
                     const isMe = member.userId === user?.id;
+                    const riotAccount = member.user.riotAccounts?.[0];
+                    const selectedRoleTier = getRoleTier(riotAccount, memberRole);
+                    const displayTier = selectedRoleTier?.tier || riotAccount?.tier;
+                    const displayRank = selectedRoleTier?.rank || riotAccount?.rank;
 
                     return (
                       <div key={member.id} className="space-y-2">
@@ -424,6 +430,16 @@ export default function RoleSelectionPage() {
                               {isMe && <span className="text-xs ml-1">(나)</span>}
                             </p>
                           </div>
+                          {displayTier && displayTier !== "UNRANKED" && (
+                            <span title={selectedRoleTier ? `${ROLE_META[memberRole!]?.label} 티어` : "솔로랭크 티어"}>
+                              <TierBadge
+                                tier={displayTier}
+                                rank={displayRank || undefined}
+                                size="sm"
+                                showIcon={false}
+                              />
+                            </span>
+                          )}
                           {memberRole ? (
                             <div className="flex items-center gap-1.5 px-2.5 py-1 bg-accent-success/10 rounded-md">
                               <PositionIcon position={memberRole} />

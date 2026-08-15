@@ -1703,6 +1703,9 @@ export class StatsService {
 
   private readonly MAX_SEASON_SCAN = 100; // puuid당 최대 스캔 깊이
   private readonly SEASON_RESCAN_THROTTLE_MS = 30 * 60 * 1000; // 재스캔 최소 간격
+  // 한 건 스캔은 매치 최대 100건 조회라 레이트리밋에 걸려도 수 분 안에 끝난다.
+  // 그보다 오래 "scanning" 이면 워커가 죽은 것으로 본다.
+  private readonly SCAN_STALL_TIMEOUT_MS = 15 * 60 * 1000;
 
   // 누적된 챔피언 시즌 통계를 반환하고, 오래됐으면 background 스캔을 큐에 넣는다.
   // 현재 ranked 그룹만 지원(type="ranked" = 솔로+자유).
@@ -1799,8 +1802,37 @@ export class StatsService {
     });
   }
 
+  /**
+   * 워커가 스캔 도중 죽으면 그 항목은 status="scanning" 으로 남는다.
+   * 큐 처리는 "queued" 만 집고, 재큐잉 조건(idle/done/error)에도 "scanning" 은
+   * 없어서 한번 이렇게 되면 영원히 복구되지 않는다. 실제로 운영에서 4건이
+   * 이 상태로 묶여 있었다. 오래 묵은 항목을 큐로 되돌린다.
+   */
+  async requeueStalledChampionScans(): Promise<number> {
+    const stalledBefore = new Date(Date.now() - this.SCAN_STALL_TIMEOUT_MS);
+    const { count } = await this.prisma.championScanState.updateMany({
+      where: {
+        status: "scanning",
+        // requestedAt 은 큐에 넣을 때 항상 갱신되므로 이 값이 오래됐다는 건
+        // 집어간 뒤로 끝내지 못했다는 뜻이다.
+        requestedAt: { lt: stalledBefore },
+      },
+      data: { status: "queued" },
+    });
+
+    if (count > 0) {
+      this.logger.warn(
+        `중단된 챔피언 시즌 스캔 ${count}건을 큐로 되돌렸습니다.`,
+      );
+    }
+    return count;
+  }
+
   // background 워커가 호출: 큐에 쌓인 스캔을 우선순위/요청순으로 처리.
   async processChampionScanQueue(limit = 2): Promise<number> {
+    // 죽은 작업을 먼저 회수해야 큐가 막히지 않는다.
+    await this.requeueStalledChampionScans();
+
     const queued = await this.prisma.championScanState.findMany({
       where: { status: "queued" },
       orderBy: [{ priority: "desc" }, { requestedAt: "asc" }],
@@ -1812,7 +1844,9 @@ export class StatsService {
       try {
         await this.prisma.championScanState.update({
           where: { id: job.id },
-          data: { status: "scanning" },
+          // 큐에서 오래 기다린 정상 작업을 stalled 작업으로 오인하지 않도록
+          // 실제 스캔 시작 시각을 다시 기록한다.
+          data: { status: "scanning", requestedAt: new Date() },
         });
         await this.scanChampionSeasonForPuuid(
           job.puuid,
@@ -1857,6 +1891,7 @@ export class StatsService {
       seasonStartSec,
       undefined,
       "background",
+      { throwOnFailure: true },
     );
 
     const agg = new Map<
@@ -1878,7 +1913,13 @@ export class StatsService {
         3,
         "background",
       );
-      if (!match) continue;
+      // 한 경기라도 상세 조회에 실패한 상태로 전체 교체하면 기존 승패가
+      // 부분 집계로 줄어든다. 이번 스캔을 실패 처리해 이전 통계를 보존한다.
+      if (!match) {
+        throw new Error(
+          `Incomplete champion scan: match ${matchId} unavailable`,
+        );
+      }
       // 방어적 큐 필터 (솔로 420 / 자유 440)
       if (![420, 440].includes(match.info?.queueId ?? 0)) continue;
 

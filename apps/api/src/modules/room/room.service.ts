@@ -17,13 +17,15 @@ import {
   TeamCaptainSelection,
   BracketType,
   MatchStatus,
+  Role,
 } from "@nexus/database";
 import { Prisma } from "@prisma/client";
 import * as bcrypt from "bcrypt";
 import { randomInt } from "crypto";
-import { calculateTierScore } from "../common/tier-score.util";
 import { normalizeSeriesPreset, teamCountForRoomSize } from "@nexus/types";
 import { StreamerService } from "../streamer/streamer.service";
+import { BalanceScoreService } from "../common/balance-score.service";
+import { BALANCE_ROLES } from "../common/balance-score.util";
 
 export interface CreateRoomDto {
   name: string;
@@ -60,14 +62,50 @@ interface AutoBalancePlayer {
     id: string;
     userId: string;
   };
+  scores: Record<Role, number>;
+  mainRole: Role | null;
+  subRole: Role | null;
+  registeredRoleTiers: Role[];
+}
+
+interface AutoBalancePlacement {
+  player: AutoBalancePlayer;
+  role: Role;
   score: number;
-  mainRole: string | null;
-  subRole: string | null;
 }
 
 interface AutoBalanceAssignment {
   score: number;
-  players: AutoBalancePlayer[];
+  players: AutoBalancePlacement[];
+}
+
+/**
+ * 평가 루프에서 쓰는 사전 계산 캐시.
+ *
+ * evaluateAutoBalanceSlots 는 40인 방 기준 37만 회 호출된다. 그 안에서
+ * `scores[role]`(문자열 키 조회)과 registeredRoleTiers.includes() 를 매번 돌면
+ * 호출당 비용이 그대로 곱해지므로, 라인 인덱스로 바로 꺼내 쓰도록 미리 편다.
+ */
+interface PreparedAutoBalancePlayer extends AutoBalancePlayer {
+  /** BALANCE_ROLES 순서의 라인별 점수 */
+  roleScores: number[];
+  /** BALANCE_ROLES 순서의 라인 선호 페널티 */
+  rolePenalties: number[];
+}
+
+/** 평가 때마다 새로 만들지 않고 재사용하는 계산용 버퍼 */
+interface AutoBalanceScratch {
+  teamScores: Float64Array;
+  lineMin: Float64Array;
+  lineMax: Float64Array;
+}
+
+interface AutoBalanceQuality {
+  quality: number;
+  teamSpread: number;
+  teamDeviation: number;
+  lineSpread: number;
+  preferencePenalty: number;
 }
 
 @Injectable()
@@ -81,6 +119,7 @@ export class RoomService {
     private readonly configService: ConfigService,
     private readonly shutdownService: ShutdownService,
     private readonly streamerService: StreamerService,
+    private readonly balanceScores: BalanceScoreService,
     @Optional() @Inject("DISCORD_BOT_SERVICE") discordBot?: any,
     @Optional() @Inject("DISCORD_VOICE_SERVICE") discordVoice?: any,
   ) {
@@ -497,160 +536,285 @@ export class RoomService {
     return shuffled;
   }
 
-  private getAssignmentSignature(assignments: AutoBalanceAssignment[]) {
-    return assignments
-      .map((assignment) =>
-        assignment.players
-          .map((player) => player.participant.userId)
-          .sort()
-          .join(","),
-      )
-      .sort()
-      .join("|");
+  private getRolePreferencePenalty(
+    player: AutoBalancePlayer,
+    role: Role,
+  ): number {
+    if (player.mainRole === role) return 0;
+    if (player.subRole === role) return 0.75;
+    if (player.registeredRoleTiers.includes(role)) return 1.25;
+    if (!player.mainRole && !player.subRole) return 1.5;
+    return 4;
   }
 
-  private getTeamRolePenalty(players: AutoBalancePlayer[]) {
-    const roles = ["TOP", "JUNGLE", "MID", "ADC", "SUPPORT"];
-    let minimumPenalty = Number.POSITIVE_INFINITY;
+  /** 선수마다 라인별 점수·페널티를 한 번만 펴 둔다 (평가 루프 진입 전 1회) */
+  private prepareAutoBalancePlayers(
+    players: AutoBalancePlayer[],
+  ): PreparedAutoBalancePlayer[] {
+    return players.map((player) => ({
+      ...player,
+      roleScores: BALANCE_ROLES.map((role) => player.scores[role]),
+      rolePenalties: BALANCE_ROLES.map((role) =>
+        this.getRolePreferencePenalty(player, role),
+      ),
+    }));
+  }
 
-    const visit = (
-      playerIndex: number,
-      availableRoles: string[],
-      penalty: number,
-    ) => {
-      if (penalty >= minimumPenalty) return;
-      if (playerIndex === players.length) {
-        minimumPenalty = penalty;
-        return;
-      }
+  /**
+   * 슬롯 배치의 품질을 계산한다. 값이 작을수록 좋다.
+   *
+   * 이 함수는 힐클라이밍 내부에서 40인 방 기준 37만 회 이상 호출되므로
+   * 호출당 할당이 없어야 한다. 팀 점수 버퍼는 재사용하고, 라인 편차는
+   * 배열에 모아 max/min 을 다시 구하는 대신 순회하면서 최소·최대만 갱신한다.
+   */
+  private evaluateAutoBalanceSlots(
+    slotPlayers: PreparedAutoBalancePlayer[],
+    teamCount: number,
+    scratch: AutoBalanceScratch,
+  ): AutoBalanceQuality {
+    const roleCount = BALANCE_ROLES.length;
+    const { teamScores, lineMin, lineMax } = scratch;
+    teamScores.fill(0);
+    lineMin.fill(Number.POSITIVE_INFINITY);
+    lineMax.fill(Number.NEGATIVE_INFINITY);
 
-      const player = players[playerIndex];
-      for (const role of availableRoles) {
-        const rolePenalty =
-          player.mainRole === role
-            ? 0
-            : player.subRole === role
-              ? 1
-              : player.mainRole || player.subRole
-                ? 3
-                : 1;
-        visit(
-          playerIndex + 1,
-          availableRoles.filter((availableRole) => availableRole !== role),
-          penalty + rolePenalty,
-        );
-      }
+    let preferencePenalty = 0;
+    let totalScore = 0;
+
+    for (let index = 0; index < slotPlayers.length; index++) {
+      const player = slotPlayers[index];
+      const teamIndex = (index / roleCount) | 0;
+      const roleIndex = index % roleCount;
+      const score = player.roleScores[roleIndex];
+
+      teamScores[teamIndex] += score;
+      totalScore += score;
+      if (score < lineMin[roleIndex]) lineMin[roleIndex] = score;
+      if (score > lineMax[roleIndex]) lineMax[roleIndex] = score;
+      preferencePenalty += player.rolePenalties[roleIndex];
+    }
+
+    const averageTeamScore = totalScore / teamCount;
+    let teamMin = Number.POSITIVE_INFINITY;
+    let teamMax = Number.NEGATIVE_INFINITY;
+    let squaredSum = 0;
+    for (let team = 0; team < teamCount; team++) {
+      const score = teamScores[team];
+      if (score < teamMin) teamMin = score;
+      if (score > teamMax) teamMax = score;
+      const diff = score - averageTeamScore;
+      squaredSum += diff * diff;
+    }
+
+    let lineSpreadSum = 0;
+    for (let roleIndex = 0; roleIndex < roleCount; roleIndex++) {
+      lineSpreadSum += lineMax[roleIndex] - lineMin[roleIndex];
+    }
+
+    const teamSpread = teamMax - teamMin;
+    const teamDeviation = Math.sqrt(squaredSum / teamCount);
+    const lineSpread = lineSpreadSum / roleCount;
+
+    return {
+      teamSpread,
+      teamDeviation,
+      lineSpread,
+      preferencePenalty,
+      quality:
+        teamSpread * 6 +
+        teamDeviation * 3 +
+        lineSpread * 2 +
+        preferencePenalty * 2,
     };
-
-    visit(0, roles, 0);
-    return minimumPenalty;
   }
 
-  private getAssignmentRolePenalty(assignments: AutoBalanceAssignment[]) {
-    return assignments.reduce(
-      (penalty, assignment) =>
-        penalty + this.getTeamRolePenalty(assignment.players),
-      0,
-    );
+  private buildAutoBalanceAssignments(
+    slotPlayers: PreparedAutoBalancePlayer[],
+    teamCount: number,
+  ): AutoBalanceAssignment[] {
+    return Array.from({ length: teamCount }, (_, teamIndex) => {
+      const players = BALANCE_ROLES.map((role, roleIndex) => {
+        const player =
+          slotPlayers[teamIndex * BALANCE_ROLES.length + roleIndex];
+        return { player, role, score: player.scores[role] };
+      });
+      return {
+        players,
+        score: players.reduce((sum, placement) => sum + placement.score, 0),
+      };
+    });
+  }
+
+  private createRoleAwareAutoBalanceSlots(
+    players: PreparedAutoBalancePlayer[],
+    teamCount: number,
+  ): PreparedAutoBalancePlayer[] {
+    const remaining = new Set(players);
+    const roleBuckets = new Map<Role, PreparedAutoBalancePlayer[]>();
+    const rolesByScarcity = [...BALANCE_ROLES].sort((left, right) => {
+      const preferredCount = (role: Role) =>
+        players.filter(
+          (player) => player.mainRole === role || player.subRole === role,
+        ).length;
+      return preferredCount(left) - preferredCount(right);
+    });
+
+    for (const role of rolesByScarcity) {
+      const candidates = this.shuffle([...remaining]).sort(
+        (left, right) =>
+          this.getRolePreferencePenalty(left, role) -
+          this.getRolePreferencePenalty(right, role),
+      );
+      const selected = candidates.slice(0, teamCount);
+      roleBuckets.set(role, this.shuffle(selected));
+      selected.forEach((player) => remaining.delete(player));
+    }
+
+    return Array.from({ length: teamCount }, (_, teamIndex) =>
+      BALANCE_ROLES.map((role) => roleBuckets.get(role)?.[teamIndex]),
+    )
+      .flat()
+      .filter((player): player is PreparedAutoBalancePlayer => Boolean(player));
   }
 
   private chooseAutoBalancedAssignments(
-    rankedPlayers: AutoBalancePlayer[],
+    players: AutoBalancePlayer[],
     teamCount: number,
   ): AutoBalanceAssignment[] {
-    // 튜닝 상수
-    const MAX_ATTEMPTS = 100; // 1단계 랜덤 분배 시도 상한
-    const MIN_DISTINCT = 12; // 스프레드 근방 후보가 이만큼 모이면 조기 종료
-    const SPREAD_SLACK = 100; // 최저 MMR 스프레드 + 이 값 이내를 "근방"으로 간주
-    const ROLE_PENALTY_WEIGHT = 100; // 강제 오프롤 1건 ≈ MMR 1~3티어 가치
-
-    // ── 1단계(저비용): 밴드 분배로 후보를 만들되 MMR 스프레드만 계산한다.
-    //   역할 페널티(팀당 5! 완전탐색)는 여기서 돌리지 않고, 2단계에서
-    //   스프레드 근방까지 살아남은 소수 후보에 대해서만 계산한다.
-    const seen = new Map<
-      string,
-      { assignments: AutoBalanceAssignment[]; spread: number }
-    >();
-    let bestSpread = Number.POSITIVE_INFINITY;
-
-    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-      const assignments = Array.from({ length: teamCount }, () => ({
-        score: 0,
-        players: [] as AutoBalancePlayer[],
-      }));
-
-      for (let offset = 0; offset < rankedPlayers.length; offset += teamCount) {
-        const band = this.shuffle(
-          rankedPlayers.slice(offset, offset + teamCount),
-        );
-        const destinations = this.shuffle(assignments).sort(
-          (left, right) => left.score - right.score,
-        );
-
-        for (let index = 0; index < band.length; index++) {
-          destinations[index].players.push(band[index]);
-          destinations[index].score += band[index].score;
-        }
-      }
-
-      const signature = this.getAssignmentSignature(assignments);
-      // 동일 구성은 다양성 카운트가 부풀지 않도록 건너뛴다.
-      if (seen.has(signature)) continue;
-
-      const scores = assignments.map((assignment) => assignment.score);
-      const spread = Math.max(...scores) - Math.min(...scores);
-      seen.set(signature, { assignments, spread });
-      if (spread < bestSpread) bestSpread = spread;
-
-      // 조기 종료: 최저 스프레드 근방 후보가 충분히 모이면 더 돌 필요 없음.
-      const nearBestCount = [...seen.values()].filter(
-        (candidate) => candidate.spread <= bestSpread + SPREAD_SLACK,
-      ).length;
-      if (nearBestCount >= MIN_DISTINCT) break;
+    const expectedSlots = teamCount * BALANCE_ROLES.length;
+    if (players.length !== expectedSlots) {
+      // 슬롯 인덱스로 팀·라인을 역산하므로 인원이 정확히 맞지 않으면 배치가
+      // 통째로 밀린다. 조용히 어긋나면 추적이 어려워 여기서 끊는다.
+      throw new BadRequestException(
+        `자동 밸런스는 ${expectedSlots}명이 정확히 필요합니다. (현재 ${players.length}명)`,
+      );
     }
 
-    // ── 2단계(고비용): 스프레드 근방 후보에 한해서만 역할 페널티를 계산해
-    //   품질을 매기고, 최적 근방에서 랜덤으로 골라 팀 구성 다양성을 유지한다.
-    const finalists = [...seen.values()]
-      .filter((candidate) => candidate.spread <= bestSpread + SPREAD_SLACK)
-      .map((candidate) => ({
-        assignments: candidate.assignments,
-        spread: candidate.spread,
-        quality:
-          candidate.spread +
-          this.getAssignmentRolePenalty(candidate.assignments) *
-            ROLE_PENALTY_WEIGHT,
-      }))
-      .sort(
-        (left, right) =>
-          left.quality - right.quality || left.spread - right.spread,
-      );
+    const prepared = this.prepareAutoBalancePlayers(players);
+    const scratch: AutoBalanceScratch = {
+      teamScores: new Float64Array(teamCount),
+      lineMin: new Float64Array(BALANCE_ROLES.length),
+      lineMax: new Float64Array(BALANCE_ROLES.length),
+    };
 
-    const bestQuality = finalists[0].quality;
-    const pool = finalists.filter(
-      (candidate) => candidate.quality <= bestQuality + ROLE_PENALTY_WEIGHT,
-    );
-    return pool[randomInt(pool.length)].assignments;
+    const restartCount = teamCount <= 4 ? 36 : 24;
+    const maxPasses = teamCount <= 4 ? 30 : 20;
+    let bestSlots: PreparedAutoBalancePlayer[] | null = null;
+    let bestQuality = Number.POSITIVE_INFINITY;
+
+    for (let restart = 0; restart < restartCount; restart++) {
+      const slots = this.createRoleAwareAutoBalanceSlots(prepared, teamCount);
+      let current = this.evaluateAutoBalanceSlots(slots, teamCount, scratch);
+
+      for (let pass = 0; pass < maxPasses; pass++) {
+        let bestSwap: [number, number] | null = null;
+        let passBestQuality = current.quality;
+
+        for (let left = 0; left < slots.length - 1; left++) {
+          for (let right = left + 1; right < slots.length; right++) {
+            [slots[left], slots[right]] = [slots[right], slots[left]];
+            const candidate = this.evaluateAutoBalanceSlots(
+              slots,
+              teamCount,
+              scratch,
+            );
+            [slots[left], slots[right]] = [slots[right], slots[left]];
+
+            if (candidate.quality + 0.0001 < passBestQuality) {
+              passBestQuality = candidate.quality;
+              bestSwap = [left, right];
+            }
+          }
+        }
+
+        if (!bestSwap) break;
+        [slots[bestSwap[0]], slots[bestSwap[1]]] = [
+          slots[bestSwap[1]],
+          slots[bestSwap[0]],
+        ];
+        current = this.evaluateAutoBalanceSlots(slots, teamCount, scratch);
+      }
+
+      if (current.quality < bestQuality) {
+        bestQuality = current.quality;
+        bestSlots = [...slots];
+      }
+    }
+
+    if (!bestSlots) {
+      throw new BadRequestException("자동 밸런스 팀 구성을 만들 수 없습니다.");
+    }
+
+    return this.buildAutoBalanceAssignments(bestSlots, teamCount);
   }
 
   // Transform room data to flatten participant info for frontend
+  /**
+   * 미리 계산해 둔 라인별 밸런스 점수를 읽는다.
+   *
+   * 자동 밸런스가 쓰는 값과 같은 캐시라, 화면에 보이는 점수와 팀을 나눌 때 쓰는
+   * 점수가 항상 일치한다. 라이엇 계정이 없거나 아직 계산 전이면 null 이다.
+   */
+  private buildParticipantBalance(user: any) {
+    const account = user?.riotAccounts?.[0];
+    if (!account) return null;
+
+    // 저장된 캐시만 읽는다. 값이 없거나 산식 버전이 다르면 표시하지 않는다.
+    // (계정 갱신·내전 종료 때 BalanceScoreService 가 다시 채운다)
+    const byRole = this.balanceScores.readCached(account);
+    if (!byRole) return null;
+
+    // 대표 점수: 주라인 → 부라인 → 가장 높은 라인 순으로 고른다.
+    const primaryRole: Role | null =
+      account.mainRole ?? account.subRole ?? null;
+    const primaryScore = primaryRole
+      ? byRole[primaryRole]
+      : Math.max(...Object.values(byRole));
+
+    return { byRole, primaryRole, primaryScore };
+  }
+
   private transformRoomData(room: any) {
     if (!room) return room;
 
+    // 팀이 짜인 뒤에는 배정된 라인이 곧 그 사람의 자리다. 대표 라인 점수 대신
+    // 배정 라인 점수를 보여줘야 호버 없이도 팀 구성 근거가 읽힌다.
+    const assignedRoleByUser = new Map<string, Role>();
+    for (const team of room.teams ?? []) {
+      for (const member of team.members ?? []) {
+        if (member.userId && member.assignedRole) {
+          assignedRoleByUser.set(member.userId, member.assignedRole);
+        }
+      }
+    }
+
     return {
       ...room,
-      participants: room.participants?.map((p: any) => ({
-        id: p.id,
-        userId: p.userId,
-        username: p.user?.username || "Unknown",
-        avatar: p.user?.avatar || null,
-        isHost: p.userId === room.hostId,
-        isReady: p.isReady,
-        isCaptain: p.isCaptain,
-        teamId: p.teamId,
-        role: p.role,
-        riotAccount: p.user?.riotAccounts?.[0] || null,
-      })),
+      participants: room.participants?.map((p: any) => {
+        const balance = this.buildParticipantBalance(p.user);
+        const assignedRole = assignedRoleByUser.get(p.userId) ?? null;
+        const displayRole = assignedRole ?? balance?.primaryRole ?? null;
+        const displayScore =
+          displayRole && balance ? balance.byRole[displayRole] : null;
+        return {
+          id: p.id,
+          userId: p.userId,
+          username: p.user?.username || "Unknown",
+          avatar: p.user?.avatar || null,
+          isHost: p.userId === room.hostId,
+          isReady: p.isReady,
+          isCaptain: p.isCaptain,
+          teamId: p.teamId,
+          role: p.role,
+          riotAccount: p.user?.riotAccounts?.[0] || null,
+          assignedRole,
+          // 자동 밸런스와 같은 캐시에서 읽은 라인별 점수
+          balanceScores: balance?.byRole ?? null,
+          // 표시용 대표 점수 — 배정 라인이 있으면 그 라인, 없으면 주/부라인 기준
+          balanceScore: displayScore ?? balance?.primaryScore ?? null,
+          balanceScoreRole: displayRole,
+        };
+      }),
     };
   }
 
@@ -981,6 +1145,12 @@ export class RoomService {
                     peakRank: true,
                     mainRole: true,
                     subRole: true,
+                    // 미리 계산해 둔 라인별 밸런스 점수 (BalanceScoreService)
+                    balanceScores: true,
+                    balanceScoreVersion: true,
+                    roleTiers: {
+                      select: { role: true, tier: true, rank: true, lp: true },
+                    },
                     championPreferences: {
                       select: {
                         role: true,
@@ -1030,6 +1200,14 @@ export class RoomService {
                         peakRank: true,
                         mainRole: true,
                         subRole: true,
+                        roleTiers: {
+                          select: {
+                            role: true,
+                            tier: true,
+                            rank: true,
+                            lp: true,
+                          },
+                        },
                         championPreferences: {
                           select: {
                             role: true,
@@ -1944,9 +2122,12 @@ export class RoomService {
           include: {
             user: {
               include: {
+                // 점수는 캐시(balanceScores)를 읽으므로 전적 조인은 필요 없다.
+                // roleTiers 는 라인 선호 페널티 계산에 여전히 쓴다.
                 riotAccounts: {
                   where: { isPrimary: true },
                   take: 1,
+                  include: { roleTiers: { select: { role: true } } },
                 },
               },
             },
@@ -1975,21 +2156,45 @@ export class RoomService {
 
     const configuredTeamCount = Math.floor(room.maxParticipants / 5);
     const teamCount = configuredTeamCount;
-    const rankedPlayers = room.participants
-      .map((participant) => {
+    // 밸런스 점수는 계정·전적이 바뀔 때 미리 계산해 둔다(BalanceScoreService).
+    // 화면에 보이는 점수와 여기서 팀을 나눌 때 쓰는 점수가 같아야 하므로
+    // 같은 캐시를 읽는다. 아직 계산 전인 계정만 이 자리에서 채운다.
+    // 방 참가 자체가 대표 라이엇 계정(isPrimary)을 요구하므로 여기서는 전원
+    // 계정이 있어야 정상이다. 참가 뒤에 대표 계정이 바뀌거나 삭제되면 비는데,
+    // 임의 점수로 때우면 밸런스가 조용히 틀어지므로 누구인지 짚어 중단한다.
+    const missingAccount = room.participants
+      .filter((participant) => !participant.user.riotAccounts[0])
+      .map((participant) => participant.user.username);
+    if (missingAccount.length > 0) {
+      throw new BadRequestException(
+        `대표 라이엇 계정이 없는 참가자가 있어 자동 밸런스를 만들 수 없습니다: ${missingAccount.join(", ")}`,
+      );
+    }
+
+    const rankedPlayers = await Promise.all(
+      room.participants.map(async (participant) => {
         const account = participant.user.riotAccounts[0];
+        // 캐시가 비어 있는 계정만 이 자리에서 채운다.
+        const scores =
+          this.balanceScores.readCached(account) ??
+          (await this.balanceScores.refreshAccount(account.id));
+
+        if (!scores) {
+          throw new BadRequestException(
+            `${participant.user.username} 님의 밸런스 점수를 계산하지 못했습니다.`,
+          );
+        }
+
         return {
           participant,
-          score: calculateTierScore(
-            account?.tier || "UNRANKED",
-            account?.rank || "",
-            account?.lp || 0,
-          ),
-          mainRole: account?.mainRole ?? null,
-          subRole: account?.subRole ?? null,
+          scores,
+          mainRole: account.mainRole ?? null,
+          subRole: account.subRole ?? null,
+          registeredRoleTiers:
+            account.roleTiers?.map((entry: { role: Role }) => entry.role) ?? [],
         };
-      })
-      .sort((a, b) => b.score - a.score);
+      }),
+    );
     const assignments = this.chooseAutoBalancedAssignments(
       rankedPlayers,
       teamCount,
@@ -2004,7 +2209,9 @@ export class RoomService {
       await this.clearTeamSetup(tx, roomId);
       for (let index = 0; index < assignments.length; index++) {
         const assignment = assignments[index];
-        const captain = assignment.players[0]?.participant;
+        const captain = [...assignment.players].sort(
+          (left, right) => right.score - left.score,
+        )[0]?.player.participant;
         if (!captain) continue;
         const team = await tx.team.create({
           data: {
@@ -2018,7 +2225,11 @@ export class RoomService {
         await tx.roomParticipant.updateMany({
           where: {
             roomId,
-            userId: { in: assignment.players.map((p) => p.participant.userId) },
+            userId: {
+              in: assignment.players.map(
+                (placement) => placement.player.participant.userId,
+              ),
+            },
           },
           data: { teamId: team.id },
         });
@@ -2027,9 +2238,10 @@ export class RoomService {
           data: { isCaptain: true },
         });
         await tx.teamMember.createMany({
-          data: assignment.players.map((player) => ({
+          data: assignment.players.map((placement) => ({
             teamId: team.id,
-            userId: player.participant.userId,
+            userId: placement.player.participant.userId,
+            assignedRole: placement.role,
           })),
         });
       }

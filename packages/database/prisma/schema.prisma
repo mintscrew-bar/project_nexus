@@ -252,42 +252,68 @@ model StreamerFollow {
 }
 
 model RiotAccount {
-  id                  String               @id @default(cuid())
+  id                  String                @id @default(cuid())
   userId              String
-  puuid               String               @unique
+  puuid               String                @unique
   summonerId          String?
   gameName            String
   tagLine             String
-  tier                String               @default("UNRANKED")
-  rank                String               @default("")
-  lp                  Int                  @default(0)
+  tier                String                @default("UNRANKED")
+  rank                String                @default("")
+  lp                  Int                   @default(0)
   // 솔로랭크 시즌 누적 승/패 (league-v4 entries에서 동기화)
-  soloWins            Int                  @default(0)
-  soloLosses          Int                  @default(0)
+  soloWins            Int                   @default(0)
+  soloLosses          Int                   @default(0)
   // 자유랭크 5v5 현재값 + 시즌 누적 승/패
-  flexTier            String               @default("UNRANKED")
-  flexRank            String               @default("")
-  flexLp              Int                  @default(0)
-  flexWins            Int                  @default(0)
-  flexLosses          Int                  @default(0)
+  flexTier            String                @default("UNRANKED")
+  flexRank            String                @default("")
+  flexLp              Int                   @default(0)
+  flexWins            Int                   @default(0)
+  flexLosses          Int                   @default(0)
   peakTier            String?
   peakRank            String?
   peakLp              Int?
   mainRole            Role?
   subRole             Role?
-  isPrimary           Boolean              @default(false)
+  isPrimary           Boolean               @default(false)
   verifiedAt          DateTime?
   lastSyncedAt        DateTime?
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  /// 자동 밸런스용 라인별 점수 캐시 ({ TOP: 24.4, JUNGLE: 26.6, ... }).
+  /// 매번 계산하면 방 조회마다 내전 전적까지 조인해야 해서 미리 계산해 둔다.
+  /// 티어 갱신·라인 티어 수정·내전 종료 시 다시 계산한다.
+  balanceScores       Json?
+  /// 계산에 쓰인 산식 버전 (BALANCE_SCORE_VERSION). 값이 다르면 재계산 대상.
+  balanceScoreVersion String?
+  balanceScoresAt     DateTime?
   championPreferences ChampionPreference[]
   championMasteries   ChampionMastery[]
-  user                User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roleTiers           RiotAccountRoleTier[]
+  user                User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([gameName, tagLine])
   @@index([userId])
   @@index([puuid])
   @@map("riot_accounts")
+}
+
+/// 사용자가 직접 입력한 포지션별 체감 티어.
+/// 입력되지 않은 포지션은 RiotAccount의 현재 솔로랭크 티어를 사용한다.
+model RiotAccountRoleTier {
+  id            String      @id @default(cuid())
+  riotAccountId String
+  role          Role
+  tier          String
+  rank          String      @default("")
+  lp            Int         @default(0)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  riotAccount   RiotAccount @relation(fields: [riotAccountId], references: [id], onDelete: Cascade)
+
+  @@unique([riotAccountId, role])
+  @@index([riotAccountId])
+  @@map("riot_account_role_tiers")
 }
 
 // 챔피언별 시즌 누적 통계 (match-v5 스캔 집계). puuid 기준이라 미등록 소환사도 누적.

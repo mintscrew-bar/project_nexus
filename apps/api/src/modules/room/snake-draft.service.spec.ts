@@ -6,6 +6,7 @@ import { RoomStatus, TeamMode } from "@nexus/database";
 describe("SnakeDraftService", () => {
   let service: SnakeDraftService;
   let prisma: any;
+  let discordVoice: any;
 
   beforeEach(async () => {
     prisma = {
@@ -33,12 +34,17 @@ describe("SnakeDraftService", () => {
       },
       $transaction: jest.fn((cb) => cb(prisma)),
     };
+    discordVoice = {
+      assignCaptainRole: jest.fn(),
+      renameTeamChannels: jest.fn(),
+      handleTeamAssignment: jest.fn(),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         SnakeDraftService,
         { provide: PrismaService, useValue: prisma },
-        { provide: "DISCORD_VOICE_SERVICE", useValue: null },
+        { provide: "DISCORD_VOICE_SERVICE", useValue: discordVoice },
       ],
     }).compile();
 
@@ -127,6 +133,7 @@ describe("SnakeDraftService", () => {
       prisma.team.create.mockImplementation((args: any) => ({
         id: `team-${args.data.captainId}`,
         captainId: args.data.captainId,
+        name: args.data.name,
       }));
 
       const result = await service.startSnakeDraft(hostId, roomId);
@@ -137,6 +144,10 @@ describe("SnakeDraftService", () => {
       const t1Id = result.teams[0].id;
       const t2Id = result.teams[1].id;
       expect(result.pickOrder.slice(0, 4)).toEqual([t1Id, t2Id, t2Id, t1Id]);
+      expect(discordVoice.renameTeamChannels).toHaveBeenCalledWith(
+        roomId,
+        result.teams.map((team: any) => ({ id: team.id, name: team.name })),
+      );
     });
   });
 });

@@ -13,7 +13,18 @@ interface Team {
   captain?: { id: string; username: string };
   members?: Array<{
     id: string;
-    username: string;
+    assignedRole?: string | null;
+    user: {
+      id: string;
+      username: string;
+      riotAccounts?: Array<{
+        championPreferences?: Array<{
+          role: string;
+          championId: string;
+          order: number;
+        }>;
+      }>;
+    };
   }>;
 }
 
