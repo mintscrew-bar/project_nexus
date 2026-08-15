@@ -71,6 +71,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { TierBadge } from "@/components/domain/TierBadge";
+import { RoleBalanceScores } from "@/components/domain/RoleBalanceScores";
 import { ChannelVerifyModal } from "@/components/domain/ChannelVerifyModal";
 import {
   RatingStars,
@@ -1493,6 +1494,10 @@ export default function ProfilePage() {
                             </div>
                           )}
                         </div>
+                        <RoleBalanceScores
+                          scores={primary?.balanceScores}
+                          className="max-w-md"
+                        />
                       </div>
                     </div>
 

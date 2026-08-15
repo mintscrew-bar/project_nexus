@@ -222,6 +222,8 @@ export class UserService {
             peakLp: true,
             mainRole: true,
             subRole: true,
+            balanceScores: true,
+            balanceScoreVersion: true,
             roleTiers: {
               select: { role: true, tier: true, rank: true, lp: true },
             },
@@ -273,7 +275,14 @@ export class UserService {
       }),
     ]);
 
-    const riot = user.riotAccounts[0] ?? null;
+    const rawRiot = user.riotAccounts[0] ?? null;
+    const riot = rawRiot
+      ? {
+          ...rawRiot,
+          balanceScores: this.balanceScores.readCached(rawRiot),
+          balanceScoreVersion: undefined,
+        }
+      : null;
     const clan = user.clanMemberships[0]?.clan ?? null;
 
     const kdaGames = kdaAgg._count.id;

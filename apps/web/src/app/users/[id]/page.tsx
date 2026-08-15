@@ -48,6 +48,7 @@ import {
 } from "lucide-react";
 import { TierBadge } from "@/components/domain/TierBadge";
 import { RoleTierBadges } from "@/components/domain/RoleTierBadges";
+import { RoleBalanceScores } from "@/components/domain/RoleBalanceScores";
 import { ReputationSummary, SummaryChip, WinRateSparkline, getCombinedProfileMetrics } from "@/components/domain/ProfileStats";
 import { PreferredChampionPanel, RankedChampionPanel } from "@/components/domain/ProfileChampionPanels";
 import { useToast } from "@/components/ui/Toast";
@@ -101,6 +102,7 @@ interface ProfileUser {
       rank: string;
       lp: number;
     }>;
+    balanceScores: Record<string, number> | null;
     isPrimary: boolean;
     championPreferences: Array<{
       id: string;
@@ -638,6 +640,7 @@ export default function UserProfilePage() {
                         )}
                       </div>
                       <RoleTierBadges roleTiers={primary.roleTiers} />
+                      <RoleBalanceScores scores={primary.balanceScores} />
                     </div>
                   )}
 

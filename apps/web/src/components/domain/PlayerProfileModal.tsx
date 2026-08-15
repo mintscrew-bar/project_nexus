@@ -32,6 +32,7 @@ import {
   POSITION_LABELS,
 } from "@/app/tournaments/[id]/lobby/_components/icons";
 import { RoleTierBadges } from "@/components/domain/RoleTierBadges";
+import { RoleBalanceScores } from "@/components/domain/RoleBalanceScores";
 
 interface PlayerProfileModalProps {
   userId: string | null;
@@ -532,6 +533,10 @@ export function PlayerProfileModal({
                   </span>
                 </div>
                 <RoleTierBadges roleTiers={riot?.roleTiers} className="mt-2" />
+                <RoleBalanceScores
+                  scores={riot?.balanceScores}
+                  className="mt-3"
+                />
               </div>
             </div>
           </section>
@@ -601,17 +606,6 @@ export function PlayerProfileModal({
                           )}
                         </span>
                         <span className="flex items-center gap-2">
-                          {/*
-                            자동 밸런스가 팀을 나눌 때 쓰는 라인별 점수.
-                            티어만으로 설명되지 않는 배정(최고 티어·솔랭 승률·
-                            내전 전적 반영)을 여기서 납득할 수 있게 함께 보여준다.
-                          */}
-                          {typeof riot?.balanceScores?.[group.role] ===
-                            "number" && (
-                            <span className="rounded bg-bg-elevated px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-accent-primary">
-                              {riot.balanceScores[group.role].toFixed(1)}
-                            </span>
-                          )}
                           <span className="text-[10px] font-semibold text-text-muted">
                             {group.champions.length}개
                           </span>

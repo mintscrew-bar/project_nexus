@@ -7,6 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import { userApi } from "@/lib/api-client";
 import { ChampionIcon, PositionIcon, POSITION_LABELS } from "@/app/tournaments/[id]/lobby/_components/icons";
 import { RoleTierBadges } from "@/components/domain/RoleTierBadges";
+import { RoleBalanceScores } from "@/components/domain/RoleBalanceScores";
 
 interface PlayerHoverCardProps {
   userId: string;
@@ -323,6 +324,7 @@ export function PlayerHoverCard({ userId, anchorRect, onOpenProfile, onMouseEnte
             )}
 
             <RoleTierBadges roleTiers={riot?.roleTiers} compact />
+            <RoleBalanceScores scores={riot?.balanceScores} compact />
 
             {/* ── 승률 / KDA ── */}
             {!isActualBot && (

@@ -7,7 +7,12 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { Prisma } from "@prisma/client";
-import { RoomStatus, MatchStatus, BracketType } from "@nexus/database";
+import {
+  RoomStatus,
+  MatchStatus,
+  BracketType,
+  TeamMode,
+} from "@nexus/database";
 import { normalizeSeriesPreset, resolveSeriesBestOf } from "@nexus/types";
 import { randomInt } from "crypto";
 
@@ -57,6 +62,7 @@ export class MatchBracketService {
         id: true,
         hostId: true,
         status: true,
+        teamMode: true,
         bracketFormat: true,
         seriesPreset: true,
         teams: {
@@ -75,7 +81,12 @@ export class MatchBracketService {
       throw new ForbiddenException("Only host can generate bracket");
     }
 
-    if (room.status !== RoomStatus.ROLE_SELECTION) {
+    const canGenerateFromCurrentStatus =
+      room.status === RoomStatus.ROLE_SELECTION ||
+      (room.teamMode === TeamMode.AUTO_BALANCE &&
+        room.status === RoomStatus.DRAFT_COMPLETED);
+
+    if (!canGenerateFromCurrentStatus) {
       // Check if bracket already exists (room might be in IN_PROGRESS)
       const existingMatches = await this.prisma.match.findMany({
         where: { roomId },

@@ -36,6 +36,7 @@ export interface RiotAccount {
   lastSyncedAt: string;
   championPreferences?: ChampionPreference[];
   roleTiers?: RiotAccountRoleTier[];
+  balanceScores?: Record<string, number> | null;
 }
 
 interface VerificationData {

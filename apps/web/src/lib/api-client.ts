@@ -605,6 +605,7 @@ export const userApi = {
         rank: string;
         lp: number;
       }[];
+      balanceScores: Record<string, number> | null;
       championPreferences: {
         role: string;
         championId: string;

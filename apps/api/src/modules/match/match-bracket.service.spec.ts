@@ -102,6 +102,32 @@ describe("MatchBracketService", () => {
       );
     });
 
+    it("자동 밸런스는 DRAFT_COMPLETED에서 바로 대진표를 생성한다", async () => {
+      setupRoom(2, {
+        status: "DRAFT_COMPLETED",
+        teamMode: "AUTO_BALANCE",
+      });
+
+      const bracket = await service.generateBracket("host-1", "room-1");
+
+      expect(bracket.matches).toHaveLength(1);
+      expect(prisma.room.update).toHaveBeenCalledWith({
+        where: { id: "room-1" },
+        data: { status: "IN_PROGRESS" },
+      });
+    });
+
+    it("자동 밸런스가 아니면 DRAFT_COMPLETED에서 생성할 수 없다", async () => {
+      setupRoom(2, {
+        status: "DRAFT_COMPLETED",
+        teamMode: "AUCTION",
+      });
+
+      await expect(service.generateBracket("host-1", "room-1")).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
     it("팀원이 5명이 아닌 팀이 있으면 BadRequestException 발생", async () => {
       prisma.room.findUnique.mockResolvedValue({
         id: "room-1",
