@@ -4,9 +4,6 @@ import React from "react";
 import { cn } from "@/lib/utils";
 import { getDoubleElimFeeders } from "@nexus/types";
 import { CheckCircle2, CircleDashed, Clock3, Trophy, Swords, ShieldX } from "lucide-react";
-import { ChampionIcon, PositionIcon } from "@/app/tournaments/[id]/lobby/_components/icons";
-
-const ROLE_ORDER = ["TOP", "JUNGLE", "MID", "ADC", "SUPPORT"];
 
 interface TeamMember {
   id: string;
@@ -104,17 +101,10 @@ function TeamSlot({
   team?: Team;
   isWinner: boolean;
 }) {
-  const members = [...(team?.members || [])].sort((left, right) => {
-    const leftIndex = ROLE_ORDER.indexOf(left.assignedRole || "");
-    const rightIndex = ROLE_ORDER.indexOf(right.assignedRole || "");
-    return (leftIndex < 0 ? ROLE_ORDER.length : leftIndex) -
-      (rightIndex < 0 ? ROLE_ORDER.length : rightIndex);
-  });
-
   return (
     <div
       className={cn(
-        "min-h-[178px] rounded-md border px-3 py-2.5 transition-colors",
+        "rounded-md border px-3 py-3 transition-colors",
         isWinner
           ? "border-accent-gold/60 bg-accent-gold/10"
           : team
@@ -146,45 +136,6 @@ function TeamSlot({
           {isWinner && <Trophy className="h-4 w-4 text-accent-gold" />}
         </div>
       </div>
-
-      {members.length > 0 && (
-        <div className="mt-2 space-y-1 border-t border-bg-elevated/70 pt-2">
-          {members.map((member) => {
-            const champions = (member.championPreferences || [])
-              .filter((preference) => preference.role === member.assignedRole)
-              .sort((left, right) => left.order - right.order)
-              .slice(0, 5);
-            return (
-              <div
-                key={member.id}
-                className="grid h-6 grid-cols-[18px_minmax(0,1fr)_auto] items-center gap-1.5"
-              >
-                {member.assignedRole ? (
-                  <PositionIcon position={member.assignedRole} className="!h-4 !w-4" />
-                ) : (
-                  <span className="h-4 w-4 rounded bg-bg-elevated" />
-                )}
-                <span className="truncate text-xs font-medium text-text-secondary">
-                  {member.username}
-                </span>
-                <div className="flex min-w-[114px] justify-end gap-0.5">
-                  {champions.length > 0 ? (
-                    champions.map((preference) => (
-                      <ChampionIcon
-                        key={`${member.id}-${preference.championId}`}
-                        championId={preference.championId}
-                        size={21}
-                      />
-                    ))
-                  ) : (
-                    <span className="text-[10px] text-text-muted">선호 없음</span>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
     </div>
   );
 }

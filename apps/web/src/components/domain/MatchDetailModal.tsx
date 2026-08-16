@@ -40,6 +40,7 @@ interface RiotInfo {
   mainRole?: string | null;
   subRole?: string | null;
   championPreferences?: Array<{ role: string; championId: string; order: number }>;
+  balanceScores?: Record<string, number> | null;
 }
 
 interface MatchMember {
@@ -384,7 +385,8 @@ export function MatchDetailModal({
           ? `매치 #${match.matchNumber} · ${match.currentGameNumber ?? 1}세트`
           : `매치 #${match.matchNumber} 상세 정보`
       }
-      size="md"
+      size="full"
+      className="!max-w-6xl"
     >
       <p className="text-text-secondary mb-4">
         {getTeamDisplayName(match.team1)} vs {getTeamDisplayName(match.team2)}
@@ -1039,67 +1041,154 @@ function LaneRoster({
     return map;
   };
 
-  const aByLane = groupByLane(teamA?.members);
-  const bByLane = groupByLane(teamB?.members);
-
   const teamADisplay = teamA ? getTeamDisplayName({ id: teamA.id, name: teamA.name, captain: teamA.captain }) : fallbackTeam1Name;
   const teamBDisplay = teamB ? getTeamDisplayName({ id: teamB.id, name: teamB.name, captain: teamB.captain }) : fallbackTeam2Name;
   const isAWinner = winnerId && teamA && winnerId === teamA.id;
   const isBWinner = winnerId && teamB && winnerId === teamB.id;
 
   return (
-    <div className="rounded-lg overflow-hidden border border-bg-tertiary">
-      {/* 헤더: 팀명 */}
-      <div className="grid grid-cols-[60px_1fr_28px_1fr] sm:grid-cols-[72px_1fr_36px_1fr] bg-bg-tertiary">
-        <div className="px-2 py-2" />
-        <div className={`px-2 py-2 text-center text-xs sm:text-sm font-bold truncate ${isAWinner ? 'text-accent-gold' : 'text-text-primary'}`}>
-          {isAWinner && <Trophy className="inline h-3 w-3 mr-1" />}
-          {teamADisplay}
+    <section>
+      <div className="mb-3 flex items-end justify-between gap-3">
+        <div>
+          <h3 className="text-base font-bold text-text-primary">팀 라인업</h3>
+          <p className="mt-0.5 text-xs text-text-secondary">
+            역할 선택에서 확정한 라인 기준 선호 챔피언입니다.
+          </p>
         </div>
-        <div className="px-1 py-2 text-center text-[10px] text-text-tertiary">vs</div>
-        <div className={`px-2 py-2 text-center text-xs sm:text-sm font-bold truncate ${isBWinner ? 'text-accent-gold' : 'text-text-primary'}`}>
-          {isBWinner && <Trophy className="inline h-3 w-3 mr-1" />}
-          {teamBDisplay}
+        <span className="hidden shrink-0 text-xs text-text-tertiary sm:block">선호 순서대로 최대 5개</span>
+      </div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <TeamRosterPanel
+          team={teamA}
+          displayName={teamADisplay}
+          isWinner={!!isAWinner}
+          groupByLane={groupByLane}
+          onOpenProfile={onOpenProfile}
+        />
+        <TeamRosterPanel
+          team={teamB}
+          displayName={teamBDisplay}
+          isWinner={!!isBWinner}
+          groupByLane={groupByLane}
+          onOpenProfile={onOpenProfile}
+        />
+      </div>
+    </section>
+  );
+}
+
+function TeamRosterPanel({
+  team,
+  displayName,
+  isWinner,
+  groupByLane,
+  onOpenProfile,
+}: {
+  team?: FullMatchDetails['teamA'];
+  displayName: string;
+  isWinner: boolean;
+  groupByLane: (members?: MatchMember[]) => Map<LaneKey | 'UNASSIGNED', MatchMember[]>;
+  onOpenProfile: (userId: string) => void;
+}) {
+  const membersByLane = groupByLane(team?.members);
+  const orderedMembers = [
+    ...LANES.flatMap((lane) => membersByLane.get(lane) ?? []),
+    ...(membersByLane.get('UNASSIGNED') ?? []),
+  ];
+  const memberScores = orderedMembers.map((member) => {
+    const lane = normalizeLane(member.assignedRole);
+    const score = lane
+      ? member.user.riotAccounts?.[0]?.balanceScores?.[lane]
+      : undefined;
+    return typeof score === 'number' && Number.isFinite(score) ? score : null;
+  });
+  const hasCompleteTeamScore =
+    memberScores.length > 0 && memberScores.every((score) => score !== null);
+  const teamScore = hasCompleteTeamScore
+    ? memberScores.reduce<number>((total, score) => total + (score ?? 0), 0)
+    : null;
+
+  return (
+    <div className="overflow-hidden rounded-lg border border-bg-tertiary bg-bg-secondary">
+      <div className="border-b border-bg-tertiary bg-bg-tertiary/60 px-5 py-4">
+        <div className="flex items-center justify-between gap-3">
+          <span className={cn('truncate text-lg font-bold', isWinner ? 'text-accent-gold' : 'text-text-primary')}>
+            {isWinner && <Trophy className="mr-1.5 inline h-5 w-5" />}
+            {displayName}
+          </span>
+          <span className="shrink-0 text-sm text-text-secondary">{orderedMembers.length}명</span>
+        </div>
+        <div className="mt-3 flex items-end justify-between border-t border-bg-elevated/70 pt-3">
+          <span className="text-sm font-medium text-text-secondary">팀 총점</span>
+          <span className="text-2xl font-black tabular-nums text-accent-primary">
+            {teamScore !== null ? teamScore.toFixed(1) : '산정 중'}
+          </span>
         </div>
       </div>
+      <div className="divide-y divide-bg-tertiary">
+        {orderedMembers.map((member) => (
+          <RosterPlayerRow key={member.user.id} member={member} onOpenProfile={onOpenProfile} />
+        ))}
+        {orderedMembers.length === 0 && (
+          <div className="px-4 py-8 text-center text-sm text-text-tertiary">선수 정보가 없습니다.</div>
+        )}
+      </div>
+    </div>
+  );
+}
 
-      {/* 라인별 행 */}
-      {LANES.map((lane) => {
-        const aMembers = aByLane.get(lane) ?? [];
-        const bMembers = bByLane.get(lane) ?? [];
-        if (aMembers.length === 0 && bMembers.length === 0) return null;
-        return (
-          <div key={lane} className="grid grid-cols-[60px_1fr_28px_1fr] sm:grid-cols-[72px_1fr_36px_1fr] border-t border-bg-tertiary items-stretch">
-            <div className="flex items-center justify-center px-2 py-2 bg-bg-tertiary/50">
-              <span className="flex items-center gap-1 text-[11px] sm:text-xs font-medium text-text-secondary">
-                <PositionIcon position={lane} className="!w-3.5 !h-3.5" />
-                <span className="hidden sm:inline">{POSITION_LABELS[lane]}</span>
-              </span>
-            </div>
-            <div className="px-2 py-1.5">
-              {aMembers.map((m) => <PlayerCell key={m.user.id} member={m} onOpenProfile={onOpenProfile} />)}
-            </div>
-            <div className="flex items-center justify-center text-[10px] text-text-tertiary">vs</div>
-            <div className="px-2 py-1.5">
-              {bMembers.map((m) => <PlayerCell key={m.user.id} member={m} onOpenProfile={onOpenProfile} />)}
-            </div>
-          </div>
-        );
-      })}
+function RosterPlayerRow({ member, onOpenProfile }: { member: MatchMember; onOpenProfile: (userId: string) => void }) {
+  const lane = normalizeLane(member.assignedRole);
+  const riotAccount = member.user.riotAccounts?.[0];
+  const lineScore = lane ? riotAccount?.balanceScores?.[lane] : undefined;
+  const champions = (riotAccount?.championPreferences ?? [])
+    .filter((preference) => normalizeLane(preference.role) === lane)
+    .sort((left, right) => left.order - right.order)
+    .slice(0, 5);
 
-      {/* 라인 미배정 멤버는 별도 푸터로 노출 */}
-      {(aByLane.get('UNASSIGNED')?.length || bByLane.get('UNASSIGNED')?.length) ? (
-        <div className="grid grid-cols-[60px_1fr_28px_1fr] sm:grid-cols-[72px_1fr_36px_1fr] border-t border-bg-tertiary items-stretch">
-          <div className="flex items-center justify-center px-2 py-2 bg-bg-tertiary/50 text-[10px] text-text-tertiary">미배정</div>
-          <div className="px-2 py-1.5">
-            {(aByLane.get('UNASSIGNED') ?? []).map((m) => <PlayerCell key={m.user.id} member={m} onOpenProfile={onOpenProfile} />)}
-          </div>
-          <div />
-          <div className="px-2 py-1.5">
-            {(bByLane.get('UNASSIGNED') ?? []).map((m) => <PlayerCell key={m.user.id} member={m} onOpenProfile={onOpenProfile} />)}
+  return (
+    <div className="min-w-0 px-5 py-4">
+      <div className="mb-3 flex min-w-0 flex-wrap items-center gap-2.5">
+        <span className="inline-flex h-9 shrink-0 items-center gap-2 rounded-md bg-bg-tertiary px-3 text-sm font-bold text-text-secondary">
+          {lane ? <PositionIcon position={lane} className="!h-5 !w-5" /> : null}
+          {lane ? POSITION_LABELS[lane] : '미배정'}
+        </span>
+        <div className="min-w-[100px] flex-1">
+          <PlayerCell member={member} onOpenProfile={onOpenProfile} />
+        </div>
+        <TierBadge
+          tier={riotAccount?.tier}
+          rank={riotAccount?.rank}
+          size="lg"
+          className="shrink-0"
+        />
+        <div className="flex h-9 shrink-0 items-center gap-2 rounded-md border border-accent-primary/30 bg-accent-primary/10 px-3">
+          <span className="text-xs font-medium text-text-secondary">라인 점수</span>
+          <strong className="text-base tabular-nums text-accent-primary">
+            {typeof lineScore === 'number' && Number.isFinite(lineScore)
+              ? lineScore.toFixed(1)
+              : '-'}
+          </strong>
+        </div>
+      </div>
+      {champions.length > 0 ? (
+        <div>
+          <p className="mb-2 text-xs font-semibold text-text-tertiary">라인 선호 챔피언</p>
+          <div className="grid w-fit max-w-full grid-cols-5 gap-1 sm:gap-2">
+          {champions.map((preference) => (
+            <ChampionIcon
+              key={`${member.user.id}-${preference.championId}`}
+              championId={preference.championId}
+              size={44}
+            />
+          ))}
           </div>
         </div>
-      ) : null}
+      ) : (
+        <div className="flex h-[44px] items-center text-xs text-text-tertiary">
+          선택한 라인의 선호 챔피언이 없습니다.
+        </div>
+      )}
     </div>
   );
 }
@@ -1118,7 +1207,7 @@ function PlayerCell({ member, onOpenProfile }: { member: MatchMember; onOpenProf
   return (
     <>
       <div
-        className="relative flex items-center gap-1.5 py-0.5 cursor-default"
+        className="relative flex min-w-0 items-center gap-2 py-0.5 cursor-default"
         onMouseEnter={(e) => {
           cancelHoverClose();
           const rect = e.currentTarget.getBoundingClientRect();
@@ -1126,7 +1215,7 @@ function PlayerCell({ member, onOpenProfile }: { member: MatchMember; onOpenProf
         }}
         onMouseLeave={scheduleHoverClose}
       >
-        <div className="w-5 h-5 rounded-full bg-bg-tertiary overflow-hidden flex-shrink-0">
+        <div className="h-7 w-7 flex-shrink-0 overflow-hidden rounded-full bg-bg-tertiary">
           {member.user.avatar ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={member.user.avatar} alt={member.user.username} className="w-full h-full object-cover" />
@@ -1136,7 +1225,7 @@ function PlayerCell({ member, onOpenProfile }: { member: MatchMember; onOpenProf
             </div>
           )}
         </div>
-        <span className="text-xs text-text-primary truncate">{member.user.username}</span>
+        <span className="truncate text-sm font-medium text-text-primary">{member.user.username}</span>
       </div>
       {hovered && (
         <PlayerHoverCard

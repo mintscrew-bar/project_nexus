@@ -21,6 +21,7 @@ import { MatchBracketService, Bracket } from "./match-bracket.service";
 import { MatchAdvancementService } from "./match-advancement.service";
 import { MatchSeriesService } from "./match-series.service";
 import { RankingService } from "../ranking/ranking.service";
+import { BalanceScoreService } from "../common/balance-score.service";
 import {
   Prisma,
   RoomStatus,
@@ -77,6 +78,7 @@ export class MatchService {
     private readonly matchBracketService: MatchBracketService,
     private readonly matchAdvancementService: MatchAdvancementService,
     private readonly matchSeriesService: MatchSeriesService,
+    private readonly balanceScores: BalanceScoreService,
     @Optional() private readonly rankingService?: RankingService,
     @Optional() @Inject("DISCORD_BOT_SERVICE") discordBot?: any,
     @Optional() @Inject("DISCORD_VOICE_SERVICE") discordVoice?: any,
@@ -1361,6 +1363,8 @@ export class MatchService {
                   rank: true,
                   mainRole: true,
                   subRole: true,
+                  balanceScores: true,
+                  balanceScoreVersion: true,
                   championPreferences: {
                     orderBy: { order: "asc" as const },
                     select: {
@@ -1439,6 +1443,35 @@ export class MatchService {
       throw new NotFoundException("Match not found");
     }
 
+    const enrichTeamBalanceScores = <T extends { members: any[] } | null>(
+      team: T,
+    ) => {
+      if (!team) return team;
+
+      return {
+        ...team,
+        members: team.members.map((member) => ({
+          ...member,
+          user: {
+            ...member.user,
+            riotAccounts: (member.user.riotAccounts ?? []).map(
+              (account: any) => {
+                const {
+                  balanceScores: _rawScores,
+                  balanceScoreVersion: _scoreVersion,
+                  ...publicAccount
+                } = account;
+                return {
+                  ...publicAccount,
+                  balanceScores: this.balanceScores.readCached(account),
+                };
+              },
+            ),
+          },
+        })),
+      };
+    };
+
     const buildSnapshotTeam = (
       teamSlot: string,
       id: string | null,
@@ -1465,14 +1498,19 @@ export class MatchService {
           }
         : null;
 
+    const resolvedTeamA = enrichTeamBalanceScores(
+      match.teamA ??
+        buildSnapshotTeam("A", match.teamAIdSnapshot, match.teamAName),
+    );
+    const resolvedTeamB = enrichTeamBalanceScores(
+      match.teamB ??
+        buildSnapshotTeam("B", match.teamBIdSnapshot, match.teamBName),
+    );
+
     return {
       ...match,
-      teamA:
-        match.teamA ??
-        buildSnapshotTeam("A", match.teamAIdSnapshot, match.teamAName),
-      teamB:
-        match.teamB ??
-        buildSnapshotTeam("B", match.teamBIdSnapshot, match.teamBName),
+      teamA: resolvedTeamA,
+      teamB: resolvedTeamB,
       participants: match.participants.map((participant) => ({
         ...participant,
         teamId: participant.teamId ?? participant.teamIdSnapshot,

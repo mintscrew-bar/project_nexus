@@ -9,6 +9,7 @@ import { NotificationService } from "../notification/notification.service";
 import { MatchBracketService } from "./match-bracket.service";
 import { MatchAdvancementService } from "./match-advancement.service";
 import { MatchSeriesService } from "./match-series.service";
+import { BalanceScoreService } from "../common/balance-score.service";
 import {
   getChampionKoreanName,
   getSummonerSpellKoreanName,
@@ -106,6 +107,10 @@ describe("MatchService", () => {
           useValue: mockMatchAdvancementService,
         },
         { provide: MatchSeriesService, useValue: mockMatchSeriesService },
+        {
+          provide: BalanceScoreService,
+          useValue: { readCached: jest.fn().mockReturnValue(null) },
+        },
         // Optional 의존성 — Discord 서비스는 테스트에서 불필요
         { provide: "DISCORD_BOT_SERVICE", useValue: null },
         { provide: "DISCORD_VOICE_SERVICE", useValue: null },
