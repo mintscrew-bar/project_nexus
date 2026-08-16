@@ -18,7 +18,8 @@ describe("SoopLiveProvider", () => {
             user_id: "ecvhao",
             user_nick: "테스트 스트리머",
             station_name: "테스트 방송국",
-            station_title: "NEXUS-1234ABCD",
+            station_title: "오늘의 방송",
+            display: { profile_text: "NEXUS-1234ABCD" },
             upd: { fan_cnt: 321 },
           },
         },
@@ -30,7 +31,7 @@ describe("SoopLiveProvider", () => {
         channelImageUrl:
           "https://profile.img.sooplive.com/LOGO/ec/ecvhao/ecvhao.jpg",
         followerCount: 321,
-        description: "NEXUS-1234ABCD 테스트 방송국",
+        description: "NEXUS-1234ABCD 오늘의 방송 테스트 방송국",
       });
       expect(axios.get).toHaveBeenCalledWith(
         "https://chapi.sooplive.com/api/ecvhao/station",

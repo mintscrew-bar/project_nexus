@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { ConsentBanner } from "@/components/analytics/ConsentBanner";
 import { GoogleAnalytics } from "@/components/analytics/GoogleAnalytics";
 import { PageViewTracker } from "@/components/analytics/PageViewTracker";
+import { AdSenseScript } from "@/components/ads/AdSenseScript";
 
 const PRIVATE_ROUTE_PREFIXES = [
   "/admin",
@@ -44,6 +45,7 @@ export function ThirdPartyScripts() {
 
   return (
     <>
+      <AdSenseScript />
       <GoogleAnalytics />
       <Suspense fallback={null}>
         <PageViewTracker />

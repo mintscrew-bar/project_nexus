@@ -71,7 +71,11 @@ export class SoopLiveProvider implements LiveProvider {
     const station = await this.fetchStation(channelId);
     if (!station) return null;
 
-    const description = [station.station_title, station.station_name]
+    const description = [
+      station.display?.profile_text,
+      station.station_title,
+      station.station_name,
+    ]
       .filter(Boolean)
       .join(" ");
 
@@ -96,6 +100,7 @@ export class SoopLiveProvider implements LiveProvider {
     user_nick?: string;
     station_title?: string;
     station_name?: string;
+    display?: { profile_text?: string };
     upd?: { fan_cnt?: number };
   } | null> {
     try {
@@ -106,6 +111,7 @@ export class SoopLiveProvider implements LiveProvider {
           user_nick?: string;
           station_title?: string;
           station_name?: string;
+          display?: { profile_text?: string };
           upd?: { fan_cnt?: number };
         };
       }>(`${this.stationApiUrl}/${channelId}/station`, {
