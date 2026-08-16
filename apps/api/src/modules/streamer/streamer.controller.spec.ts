@@ -45,10 +45,7 @@ describe("StreamerController", () => {
       "user-1",
       "SOOP",
     );
-    expect(verificationService.confirm).toHaveBeenCalledWith(
-      "user-1",
-      "SOOP",
-    );
+    expect(verificationService.confirm).toHaveBeenCalledWith("user-1", "SOOP");
   });
 
   it("binds the CHZZK OAuth state to the authenticated user id", async () => {
