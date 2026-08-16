@@ -671,13 +671,14 @@ export class RoomGateway
           );
         }
       } else if (room.teamMode === TeamMode.AUTO_BALANCE) {
+        // 팀과 라인을 함께 편성하고 DRAFT_COMPLETED 에서 멈춘다.
+        // 편성이 항상 만족스러울 수는 없으므로(팀 점수 차·비선호 라인) 방장이
+        // 결과를 확인하고 다시 돌리거나 확정하도록 대진표 생성은 미룬다.
+        // 확정은 auto-balance-confirm 에서 처리한다.
         result = await this.roomService.createAutoBalancedTeams(
           client.userId!,
           data.roomId,
         );
-        // 팀과 라인을 함께 최적화했으므로 일반 역할 선택을 다시 열지 않는다.
-        // 확정된 assignedRole 그대로 대진표를 생성한다.
-        await this.roleSelectionGateway.completeRoleSelection(data.roomId);
       } else if (room.teamMode === TeamMode.MANUAL_TEAM) {
         result = await this.roomService.finalizeManualTeams(
           client.userId!,
@@ -768,6 +769,113 @@ export class RoomGateway
   // ========================================
   // Chat Events
   // ========================================
+
+  /**
+   * 자동 밸런스 재편성("주사위").
+   * pinnedUserIds 로 지정한 인원은 현재 팀·라인을 유지하고 나머지만 다시 배치한다.
+   */
+  @SubscribeMessage("auto-balance-reroll")
+  async handleAutoBalanceReroll(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() data: { roomId: string; pinnedUserIds?: string[] },
+  ) {
+    try {
+      const room = await this.roomService.createAutoBalancedTeams(
+        client.userId!,
+        data.roomId,
+        data.pinnedUserIds ?? [],
+      );
+
+      this.server.to(data.roomId).emit("room-updated", room);
+      return { success: true, room };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error?.message ?? "재편성에 실패했습니다.",
+      };
+    }
+  }
+
+  /** 자동 밸런스 편성에서 두 인원의 자리(팀·라인)를 맞바꾼다. */
+  @SubscribeMessage("auto-balance-swap")
+  async handleAutoBalanceSwap(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() data: { roomId: string; userIdA: string; userIdB: string },
+  ) {
+    try {
+      const room = await this.roomService.swapAutoBalanceMembers(
+        client.userId!,
+        data.roomId,
+        data.userIdA,
+        data.userIdB,
+      );
+
+      const undoDepth = await this.roomService.getAutoBalanceHistoryDepth(
+        data.roomId,
+      );
+      this.server.to(data.roomId).emit("room-updated", { ...room, undoDepth });
+      return { success: true, room, undoDepth };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error?.message ?? "자리 교체에 실패했습니다.",
+      };
+    }
+  }
+
+  /** 자동 밸런스 편성을 한 단계 되감는다. */
+  @SubscribeMessage("auto-balance-undo")
+  async handleAutoBalanceUndo(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() data: { roomId: string },
+  ) {
+    try {
+      const room = await this.roomService.undoAutoBalancedTeams(
+        client.userId!,
+        data.roomId,
+      );
+
+      const undoDepth = await this.roomService.getAutoBalanceHistoryDepth(
+        data.roomId,
+      );
+      this.server.to(data.roomId).emit("room-updated", { ...room, undoDepth });
+      return { success: true, room, undoDepth };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error?.message ?? "편성 되감기에 실패했습니다.",
+      };
+    }
+  }
+
+  /** 자동 밸런스 편성 확정 — 여기서 비로소 대진표를 만든다. */
+  @SubscribeMessage("auto-balance-confirm")
+  async handleAutoBalanceConfirm(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() data: { roomId: string },
+  ) {
+    try {
+      // 권한·상태 검증과 팀별 음성채널 이동을 함께 처리한다.
+      // 음성 이동을 확정 시점으로 미룬 이유: 확인 단계에서 재편성·교체를 할 수
+      // 있는데 그때마다 옮기면 통화가 계속 끊긴다.
+      await this.roomService.confirmAutoBalancedTeams(
+        client.userId!,
+        data.roomId,
+      );
+
+      await this.roleSelectionGateway.completeRoleSelection(data.roomId);
+      this.server.to(data.roomId).emit("game-starting", {
+        roomId: data.roomId,
+        teamMode: TeamMode.AUTO_BALANCE,
+      });
+      return { success: true };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error?.message ?? "확정에 실패했습니다.",
+      };
+    }
+  }
 
   @SubscribeMessage("send-message")
   async handleSendMessage(

@@ -10,12 +10,14 @@ import { ShutdownService } from "../common/shutdown.service";
 import { Role, RoomStatus, TeamMode } from "@nexus/database";
 import { StreamerService } from "../streamer/streamer.service";
 import { BalanceScoreService } from "../common/balance-score.service";
+import { RedisService } from "../redis/redis.service";
 
 describe("RoomService", () => {
   let service: RoomService;
   let prisma: any;
   let shutdownService: any;
   let balanceScores: any;
+  let redis: any;
 
   const baseDto = {
     name: "테스트 방",
@@ -24,6 +26,11 @@ describe("RoomService", () => {
   };
 
   beforeEach(async () => {
+    redis = {
+      get: jest.fn().mockResolvedValue(null),
+      set: jest.fn().mockResolvedValue(undefined),
+      del: jest.fn().mockResolvedValue(undefined),
+    };
     balanceScores = {
       readCached: jest.fn().mockReturnValue(null),
       refreshAccount: jest.fn().mockResolvedValue(null),
@@ -101,6 +108,7 @@ describe("RoomService", () => {
           provide: BalanceScoreService,
           useValue: balanceScores,
         },
+        { provide: RedisService, useValue: redis },
       ],
     }).compile();
 
@@ -508,6 +516,266 @@ describe("RoomService", () => {
     });
   });
 
+  describe("자동 밸런스 확정", () => {
+    beforeEach(() => {
+      jest
+        .spyOn(service as any, "moveAssignedTeamsToVoice")
+        .mockResolvedValue(undefined);
+    });
+
+    it("확정할 때 팀별 음성채널로 인원을 옮긴다", async () => {
+      // 확인 단계에서 재편성·교체를 할 수 있어 편성 직후가 아니라 확정 때 옮긴다.
+      prisma.room.findUnique.mockResolvedValue({
+        hostId: "host-1",
+        teamMode: TeamMode.AUTO_BALANCE,
+        status: RoomStatus.DRAFT_COMPLETED,
+      });
+      prisma.room.updateMany = jest.fn().mockResolvedValue({ count: 1 });
+
+      await service.confirmAutoBalancedTeams("host-1", "room-1");
+
+      expect((service as any).moveAssignedTeamsToVoice).toHaveBeenCalledWith(
+        "room-1",
+      );
+    });
+
+    it("재편성과 겹치면 확정을 끊는다", async () => {
+      // DRAFT_COMPLETED 조건부 갱신이 0건이면 다른 작업이 상태를 바꾼 것이다.
+      // 그대로 진행하면 반쯤 쓰인 팀으로 대진표가 만들어진다.
+      prisma.room.findUnique.mockResolvedValue({
+        hostId: "host-1",
+        teamMode: TeamMode.AUTO_BALANCE,
+        status: RoomStatus.DRAFT_COMPLETED,
+      });
+      prisma.room.updateMany = jest.fn().mockResolvedValue({ count: 0 });
+
+      await expect(
+        service.confirmAutoBalancedTeams("host-1", "room-1"),
+      ).rejects.toThrow("편성이 변경 중이거나 이미 확정");
+      expect((service as any).moveAssignedTeamsToVoice).not.toHaveBeenCalled();
+    });
+
+    it("방장이 아니면 확정할 수 없다", async () => {
+      prisma.room.findUnique.mockResolvedValue({
+        hostId: "host-1",
+        teamMode: TeamMode.AUTO_BALANCE,
+        status: RoomStatus.DRAFT_COMPLETED,
+      });
+
+      prisma.room.updateMany = jest.fn().mockResolvedValue({ count: 1 });
+
+      await expect(
+        service.confirmAutoBalancedTeams("other-user", "room-1"),
+      ).rejects.toThrow("방장만");
+      expect((service as any).moveAssignedTeamsToVoice).not.toHaveBeenCalled();
+    });
+
+    it("편성 전에는 확정할 수 없다", async () => {
+      prisma.room.findUnique.mockResolvedValue({
+        hostId: "host-1",
+        teamMode: TeamMode.AUTO_BALANCE,
+        status: RoomStatus.WAITING,
+      });
+
+      prisma.room.updateMany = jest.fn().mockResolvedValue({ count: 0 });
+
+      await expect(
+        service.confirmAutoBalancedTeams("host-1", "room-1"),
+      ).rejects.toThrow("편성이 변경 중이거나 이미 확정");
+    });
+  });
+
+  describe("자동 밸런스 되감기", () => {
+    const snapshot = {
+      teams: [
+        {
+          captainId: "user-a",
+          members: [{ userId: "user-a", assignedRole: "TOP" }],
+        },
+      ],
+    };
+
+    const setup = (history: any[], overrides: Record<string, any> = {}) => {
+      prisma.room.findUnique.mockResolvedValue({
+        hostId: "host-1",
+        teamMode: TeamMode.AUTO_BALANCE,
+        status: RoomStatus.DRAFT_COMPLETED,
+        ...overrides,
+      });
+      prisma.match = { count: jest.fn().mockResolvedValue(0) };
+      prisma.room.update = jest.fn();
+      prisma.team.create = jest.fn().mockResolvedValue({ id: "team-new" });
+      prisma.teamMember = { createMany: jest.fn() };
+      prisma.roomParticipant.updateMany = jest.fn();
+      prisma.roomParticipant.findMany = jest
+        .fn()
+        .mockResolvedValue([{ userId: "user-a", user: { username: "userA" } }]);
+      redis.get.mockResolvedValue(JSON.stringify(history));
+      jest.spyOn(service as any, "clearTeamSetup").mockResolvedValue(undefined);
+      jest
+        .spyOn(service as any, "getRoomById")
+        .mockResolvedValue({ id: "room-1" });
+    };
+
+    it("직전 편성을 복원하고 이력에서 뺀다", async () => {
+      setup([snapshot]);
+
+      await service.undoAutoBalancedTeams("host-1", "room-1");
+
+      // 저장된 팀장·라인 그대로 팀을 다시 만든다.
+      expect(prisma.team.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ captainId: "user-a" }),
+        }),
+      );
+      expect(prisma.teamMember.createMany).toHaveBeenCalledWith({
+        data: [{ teamId: "team-new", userId: "user-a", assignedRole: "TOP" }],
+      });
+      // 되감았으니 재편성 횟수도 줄인다.
+      expect(prisma.room.update).toHaveBeenCalledWith({
+        where: { id: "room-1" },
+        data: { autoBalanceRerollCount: { decrement: 1 } },
+      });
+      // 이력에서 하나 빠진 상태로 다시 저장된다.
+      expect(redis.set).toHaveBeenCalledWith(
+        "room:auto-balance-history:room-1",
+        JSON.stringify([]),
+        expect.any(Number),
+      );
+    });
+
+    it("되감을 이력이 없으면 막는다", async () => {
+      setup([]);
+
+      await expect(
+        service.undoAutoBalancedTeams("host-1", "room-1"),
+      ).rejects.toThrow("더 되감을 편성이 없습니다");
+    });
+
+    it("방장이 아니면 되감을 수 없다", async () => {
+      setup([snapshot]);
+
+      await expect(
+        service.undoAutoBalancedTeams("other", "room-1"),
+      ).rejects.toThrow("방장만");
+    });
+
+    it("대진표가 생성된 뒤에는 되감을 수 없다", async () => {
+      setup([snapshot]);
+      prisma.match.count.mockResolvedValue(2);
+
+      await expect(
+        service.undoAutoBalancedTeams("host-1", "room-1"),
+      ).rejects.toThrow("대진표가 이미 생성");
+    });
+  });
+
+  describe("자동 밸런스 자리 교체", () => {
+    const setupRoom = (overrides: Record<string, any> = {}) => {
+      prisma.room.findUnique.mockResolvedValue({
+        hostId: "host-1",
+        teamMode: TeamMode.AUTO_BALANCE,
+        status: RoomStatus.DRAFT_COMPLETED,
+        ...overrides,
+      });
+      prisma.match = { count: jest.fn().mockResolvedValue(0) };
+      prisma.teamMember = {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: "tm-a",
+            userId: "user-a",
+            teamId: "team-1",
+            assignedRole: "TOP",
+            team: { id: "team-1", captainId: "user-a" },
+          },
+          {
+            id: "tm-b",
+            userId: "user-b",
+            teamId: "team-2",
+            assignedRole: "MID",
+            team: { id: "team-2", captainId: "other" },
+          },
+        ]),
+        update: jest.fn(),
+      };
+      prisma.roomParticipant.updateMany = jest.fn();
+      prisma.team.update = jest.fn();
+      prisma.user = {
+        findUnique: jest.fn().mockResolvedValue({ username: "userB" }),
+      };
+      jest
+        .spyOn(service as any, "getRoomById")
+        .mockResolvedValue({ id: "room-1" });
+    };
+
+    it("두 인원의 팀과 배정 라인을 맞바꾼다", async () => {
+      setupRoom();
+
+      await service.swapAutoBalanceMembers(
+        "host-1",
+        "room-1",
+        "user-a",
+        "user-b",
+      );
+
+      const updates = prisma.teamMember.update.mock.calls.map(
+        (call: any[]) => call[0],
+      );
+      expect(updates).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            where: { id: "tm-a" },
+            data: { teamId: "team-2", assignedRole: "MID" },
+          }),
+          expect.objectContaining({
+            where: { id: "tm-b" },
+            data: { teamId: "team-1", assignedRole: "TOP" },
+          }),
+        ]),
+      );
+    });
+
+    it("팀장이 팀을 옮기면 상대가 팀장을 이어받는다", async () => {
+      setupRoom();
+
+      await service.swapAutoBalanceMembers(
+        "host-1",
+        "room-1",
+        "user-a",
+        "user-b",
+      );
+
+      // user-a 가 team-1 의 팀장이었으므로 들어온 user-b 가 이어받는다.
+      expect(prisma.team.update).toHaveBeenCalledWith({
+        where: { id: "team-1" },
+        data: { captainId: "user-b", name: "userB 팀" },
+      });
+    });
+
+    it("같은 사람을 두 번 고르면 막는다", async () => {
+      await expect(
+        service.swapAutoBalanceMembers("host-1", "room-1", "user-a", "user-a"),
+      ).rejects.toThrow("서로 다른 두 명");
+    });
+
+    it("대진표가 생성된 뒤에는 교체할 수 없다", async () => {
+      setupRoom();
+      prisma.match.count.mockResolvedValue(3);
+
+      await expect(
+        service.swapAutoBalanceMembers("host-1", "room-1", "user-a", "user-b"),
+      ).rejects.toThrow("대진표가 이미 생성");
+    });
+
+    it("확인 단계가 아니면 막는다", async () => {
+      setupRoom({ status: RoomStatus.IN_PROGRESS });
+
+      await expect(
+        service.swapAutoBalanceMembers("host-1", "room-1", "user-a", "user-b"),
+      ).rejects.toThrow("편성 확인 단계");
+    });
+  });
+
   describe("자동 밸런스", () => {
     beforeEach(() => {
       // 밸런스 점수는 미리 계산해 둔 캐시에서 읽는다.
@@ -592,7 +860,7 @@ describe("RoomService", () => {
       }
       expect(prisma.room.update).toHaveBeenCalledWith({
         where: { id: "room-1" },
-        data: { status: RoomStatus.DRAFT_COMPLETED },
+        data: { status: RoomStatus.DRAFT_COMPLETED, autoBalanceRerollCount: 0 },
       });
     });
 

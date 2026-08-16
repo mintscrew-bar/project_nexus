@@ -393,6 +393,9 @@ model Room {
   maxParticipants         Int                   @default(10)
   isPrivate               Boolean               @default(false)
   status                  RoomStatus            @default(WAITING)
+  /// 자동 밸런스를 다시 돌린 횟수. 방장이 마음에 드는 팀이 나올 때까지 돌릴 수
+  /// 있으므로, 제한하는 대신 참가자 전원에게 노출해 투명하게 만든다.
+  autoBalanceRerollCount  Int                   @default(0)
   teamMode                TeamMode              @default(SNAKE_DRAFT)
   allowSpectators         Boolean               @default(true)
   startingPoints          Int?

@@ -24,6 +24,7 @@ import * as bcrypt from "bcrypt";
 import { randomInt } from "crypto";
 import { normalizeSeriesPreset, teamCountForRoomSize } from "@nexus/types";
 import { StreamerService } from "../streamer/streamer.service";
+import { RedisService } from "../redis/redis.service";
 import { BalanceScoreService } from "../common/balance-score.service";
 import { BALANCE_ROLES } from "../common/balance-score.util";
 
@@ -100,6 +101,14 @@ interface AutoBalanceScratch {
   lineMax: Float64Array;
 }
 
+/** 되감기용 편성 스냅샷 (팀 생성 순서대로) */
+interface AutoBalanceSnapshot {
+  teams: Array<{
+    captainId: string;
+    members: Array<{ userId: string; assignedRole: Role | null }>;
+  }>;
+}
+
 interface AutoBalanceQuality {
   quality: number;
   teamSpread: number;
@@ -120,6 +129,7 @@ export class RoomService {
     private readonly shutdownService: ShutdownService,
     private readonly streamerService: StreamerService,
     private readonly balanceScores: BalanceScoreService,
+    private readonly redis: RedisService,
     @Optional() @Inject("DISCORD_BOT_SERVICE") discordBot?: any,
     @Optional() @Inject("DISCORD_VOICE_SERVICE") discordVoice?: any,
   ) {
@@ -645,10 +655,39 @@ export class RoomService {
     });
   }
 
+  /**
+   * 슬롯 배열을 만든다. 고정된 선수는 지정된 자리에 먼저 앉히고 나머지만 섞는다.
+   * (방장이 마음에 드는 배치를 남기고 나머지만 다시 돌리는 "주사위" 동작)
+   */
   private createRoleAwareAutoBalanceSlots(
     players: PreparedAutoBalancePlayer[],
     teamCount: number,
+    lockedSlots?: Map<number, PreparedAutoBalancePlayer>,
   ): PreparedAutoBalancePlayer[] {
+    const roleCount = BALANCE_ROLES.length;
+
+    if (lockedSlots && lockedSlots.size > 0) {
+      const slots = new Array<PreparedAutoBalancePlayer | undefined>(
+        teamCount * roleCount,
+      );
+      const lockedPlayers = new Set(lockedSlots.values());
+      for (const [slotIndex, player] of lockedSlots) {
+        slots[slotIndex] = player;
+      }
+
+      // 고정되지 않은 선수를 남은 자리에 섞어 넣는다.
+      const free = this.shuffle(
+        players.filter((player) => !lockedPlayers.has(player)),
+      );
+      let cursor = 0;
+      for (let index = 0; index < slots.length; index++) {
+        if (!slots[index]) slots[index] = free[cursor++];
+      }
+      return slots.filter((player): player is PreparedAutoBalancePlayer =>
+        Boolean(player),
+      );
+    }
+
     const remaining = new Set(players);
     const roleBuckets = new Map<Role, PreparedAutoBalancePlayer[]>();
     const rolesByScarcity = [...BALANCE_ROLES].sort((left, right) => {
@@ -677,9 +716,14 @@ export class RoomService {
       .filter((player): player is PreparedAutoBalancePlayer => Boolean(player));
   }
 
+  /**
+   * @param pins 고정할 배치 (userId → 팀 인덱스/라인). 다시 편성할 때 방장이
+   *   마음에 드는 자리를 남기고 나머지만 돌리기 위한 것.
+   */
   private chooseAutoBalancedAssignments(
     players: AutoBalancePlayer[],
     teamCount: number,
+    pins?: Map<string, { teamIndex: number; role: Role }>,
   ): AutoBalanceAssignment[] {
     const expectedSlots = teamCount * BALANCE_ROLES.length;
     if (players.length !== expectedSlots) {
@@ -697,13 +741,37 @@ export class RoomService {
       lineMax: new Float64Array(BALANCE_ROLES.length),
     };
 
+    // 고정 배치를 슬롯 인덱스로 환산한다. 잘못된 팀/라인 지정은 무시하고
+    // 자유 슬롯으로 흘려보낸다 (방 구성이 바뀐 뒤의 오래된 요청 대비).
+    const lockedSlots = new Map<number, PreparedAutoBalancePlayer>();
+    const lockedSlotIndices = new Set<number>();
+    if (pins && pins.size > 0) {
+      for (const player of prepared) {
+        const pin = pins.get(player.participant.userId);
+        if (!pin) continue;
+        const roleIndex = BALANCE_ROLES.indexOf(pin.role);
+        if (roleIndex < 0) continue;
+        if (pin.teamIndex < 0 || pin.teamIndex >= teamCount) continue;
+
+        const slotIndex = pin.teamIndex * BALANCE_ROLES.length + roleIndex;
+        // 같은 자리에 둘을 고정할 수는 없다. 먼저 온 쪽을 살린다.
+        if (lockedSlots.has(slotIndex)) continue;
+        lockedSlots.set(slotIndex, player);
+        lockedSlotIndices.add(slotIndex);
+      }
+    }
+
     const restartCount = teamCount <= 4 ? 36 : 24;
     const maxPasses = teamCount <= 4 ? 30 : 20;
     let bestSlots: PreparedAutoBalancePlayer[] | null = null;
     let bestQuality = Number.POSITIVE_INFINITY;
 
     for (let restart = 0; restart < restartCount; restart++) {
-      const slots = this.createRoleAwareAutoBalanceSlots(prepared, teamCount);
+      const slots = this.createRoleAwareAutoBalanceSlots(
+        prepared,
+        teamCount,
+        lockedSlots,
+      );
       let current = this.evaluateAutoBalanceSlots(slots, teamCount, scratch);
 
       for (let pass = 0; pass < maxPasses; pass++) {
@@ -711,7 +779,9 @@ export class RoomService {
         let passBestQuality = current.quality;
 
         for (let left = 0; left < slots.length - 1; left++) {
+          if (lockedSlotIndices.has(left)) continue;
           for (let right = left + 1; right < slots.length; right++) {
+            if (lockedSlotIndices.has(right)) continue;
             [slots[left], slots[right]] = [slots[right], slots[left]];
             const candidate = this.evaluateAutoBalanceSlots(
               slots,
@@ -788,8 +858,32 @@ export class RoomService {
       }
     }
 
+    // 팀별 밸런스 합계 — 방장이 편성을 확인할 때 팀 간 격차를 바로 보게 한다.
+    const teamBalanceTotals = new Map<string, number>();
+    for (const team of room.teams ?? []) {
+      let total = 0;
+      let counted = 0;
+      for (const member of team.members ?? []) {
+        const scores = this.balanceScores.readCached(
+          member.user?.riotAccounts?.[0] ?? {},
+        );
+        const role = member.assignedRole;
+        if (!scores || !role) continue;
+        total += scores[role as Role];
+        counted += 1;
+      }
+      // 한 명이라도 점수를 못 읽으면 합계가 오해를 부르므로 표시하지 않는다.
+      if (counted === (team.members?.length ?? 0) && counted > 0) {
+        teamBalanceTotals.set(team.id, Math.round(total * 10) / 10);
+      }
+    }
+
     return {
       ...room,
+      teams: room.teams?.map((team: any) => ({
+        ...team,
+        balanceTotal: teamBalanceTotals.get(team.id) ?? null,
+      })),
       participants: room.participants?.map((p: any) => {
         const balance = this.buildParticipantBalance(p.user);
         const assignedRole = assignedRoleByUser.get(p.userId) ?? null;
@@ -1200,6 +1294,9 @@ export class RoomService {
                         peakRank: true,
                         mainRole: true,
                         subRole: true,
+                        // 팀 합계 계산용 밸런스 점수 캐시
+                        balanceScores: true,
+                        balanceScoreVersion: true,
                         roleTiers: {
                           select: {
                             role: true,
@@ -2113,7 +2210,50 @@ export class RoomService {
     return { teamId };
   }
 
-  async createAutoBalancedTeams(hostId: string, roomId: string) {
+  /**
+   * 고정할 유저를 현재 배치(팀 순서 + 배정 라인)로 환산한다.
+   *
+   * 팀은 재편성마다 다시 만들어지므로 팀 id 로는 고정할 수 없다. 대신 팀 생성
+   * 순서(createdAt)를 인덱스로 삼는다 — 편성 로직이 같은 순서로 팀을 만든다.
+   * 아직 편성 전이거나 배정 라인이 없는 유저는 고정 대상에서 빠진다.
+   */
+  private async resolveAutoBalancePins(
+    roomId: string,
+    pinnedUserIds: string[],
+  ): Promise<Map<string, { teamIndex: number; role: Role }>> {
+    const pins = new Map<string, { teamIndex: number; role: Role }>();
+    if (pinnedUserIds.length === 0) return pins;
+
+    const teams = await this.prisma.team.findMany({
+      where: { roomId },
+      orderBy: { createdAt: "asc" },
+      select: {
+        id: true,
+        members: { select: { userId: true, assignedRole: true } },
+      },
+    });
+
+    const wanted = new Set(pinnedUserIds);
+    teams.forEach((team, teamIndex) => {
+      for (const member of team.members) {
+        if (!wanted.has(member.userId) || !member.assignedRole) continue;
+        pins.set(member.userId, { teamIndex, role: member.assignedRole });
+      }
+    });
+
+    return pins;
+  }
+
+  /**
+   * 자동 밸런스 팀 편성. 이미 편성된 방(DRAFT_COMPLETED)에서 다시 호출하면
+   * 재편성("주사위")이 된다. pinnedUserIds 로 지정한 인원은 현재 팀·라인을
+   * 그대로 유지하고 나머지만 다시 배치한다.
+   */
+  async createAutoBalancedTeams(
+    hostId: string,
+    roomId: string,
+    pinnedUserIds: string[] = [],
+  ) {
     const room = await this.prisma.room.findUnique({
       where: { id: roomId },
       include: {
@@ -2141,12 +2281,26 @@ export class RoomService {
     if (room.hostId !== hostId || room.teamMode !== TeamMode.AUTO_BALANCE) {
       throw new ForbiddenException("자동 밸런스 팀 구성을 시작할 수 없습니다.");
     }
-    // startGame()이 WAITING → DRAFT로 원자 전환 후 호출되므로 DRAFT도 수용
+    // startGame()이 WAITING → DRAFT로 원자 전환 후 호출되므로 DRAFT도 수용.
+    // DRAFT_COMPLETED는 재편성(주사위) 경로 — 대진표를 만들기 전까지만 허용한다.
     if (
       room.status !== RoomStatus.WAITING &&
-      room.status !== RoomStatus.DRAFT
+      room.status !== RoomStatus.DRAFT &&
+      room.status !== RoomStatus.DRAFT_COMPLETED
     ) {
       throw new BadRequestException("Room has already started");
+    }
+
+    // 대진표가 생긴 뒤에는 팀을 흔들면 매치와 어긋나므로 막는다.
+    if (room.status === RoomStatus.DRAFT_COMPLETED) {
+      const existingMatches = await this.prisma.match.count({
+        where: { roomId },
+      });
+      if (existingMatches > 0) {
+        throw new BadRequestException(
+          "대진표가 이미 생성되어 팀을 다시 편성할 수 없습니다.",
+        );
+      }
     }
     if (room.participants.length !== room.maxParticipants) {
       throw new BadRequestException(
@@ -2195,9 +2349,20 @@ export class RoomService {
         };
       }),
     );
+    // 이미 편성된 방에서 다시 부른 것이면 재편성이다.
+    const isReroll = room.status === RoomStatus.DRAFT_COMPLETED;
+
+    // 다시 돌리기 전에 지금 배치를 이력에 남긴다 (되감기용).
+    if (isReroll) {
+      await this.pushAutoBalanceHistory(roomId);
+    }
+
+    // 고정 요청을 현재 배치(팀 순서 + 배정 라인)로 환산한다.
+    const pins = await this.resolveAutoBalancePins(roomId, pinnedUserIds);
     const assignments = this.chooseAutoBalancedAssignments(
       rankedPlayers,
       teamCount,
+      pins,
     );
 
     // 팀장명 기준 네이밍용 userId→username 맵 (AutoBalancePlayer.participant엔 username이 없음)
@@ -2205,7 +2370,9 @@ export class RoomService {
       room.participants.map((p) => [p.userId, p.user.username]),
     );
 
-    await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    // 교체와 같은 격리 수준을 쓴다. 재편성은 팀을 지우고 다시 만드는 작업이라
+    // 동시에 두 번 들어오면 팀이 중복 생성될 수 있다.
+    await this.runSerializableTx(async (tx: Prisma.TransactionClient) => {
       await this.clearTeamSetup(tx, roomId);
       for (let index = 0; index < assignments.length; index++) {
         const assignment = assignments[index];
@@ -2247,12 +2414,347 @@ export class RoomService {
       }
       await tx.room.update({
         where: { id: roomId },
-        data: { status: RoomStatus.DRAFT_COMPLETED },
+        data: {
+          status: RoomStatus.DRAFT_COMPLETED,
+          // 최초 편성은 0, 다시 돌릴 때마다 1씩 올린다. 참가자 전원에게 보인다.
+          ...(isReroll
+            ? { autoBalanceRerollCount: { increment: 1 } }
+            : { autoBalanceRerollCount: 0 }),
+        },
       });
     });
 
-    await this.moveAssignedTeamsToVoice(roomId);
+    // 음성채널 분리는 여기서 하지 않는다. 확인 단계에서 다시 돌리거나 교체할 수
+    // 있는데 그때마다 사람들을 옮기면 통화가 계속 끊긴다.
+    // 방장이 확정할 때(confirmAutoBalancedTeams) 한 번만 옮긴다.
     return this.getRoomById(roomId);
+  }
+
+  /**
+   * 자동 밸런스 편성 확정 — 이 시점에 팀별 음성채널로 인원을 옮긴다.
+   * 대진표 생성은 호출부가 이어서 처리한다.
+   */
+  async confirmAutoBalancedTeams(hostId: string, roomId: string) {
+    const room = await this.prisma.room.findUnique({
+      where: { id: roomId },
+      select: { hostId: true, teamMode: true, status: true },
+    });
+    if (!room) throw new NotFoundException("Room not found");
+    if (room.hostId !== hostId) {
+      throw new ForbiddenException("방장만 편성을 확정할 수 있습니다.");
+    }
+    if (room.teamMode !== TeamMode.AUTO_BALANCE) {
+      throw new BadRequestException("자동 밸런스 방이 아닙니다.");
+    }
+
+    // 확정을 원자적으로 잠근다.
+    //
+    // 확정은 곧바로 대진표를 만드는데, 그 사이 재편성이 진행 중이면 반쯤 쓰인
+    // 팀 구성으로 대진표가 생성될 수 있다. DRAFT_COMPLETED 에서만 통과하는
+    // 조건부 갱신으로 바꿔, 재편성이나 다른 확정과 겹치면 여기서 끊는다.
+    const { count } = await this.prisma.room.updateMany({
+      where: {
+        id: roomId,
+        status: RoomStatus.DRAFT_COMPLETED,
+        teamMode: TeamMode.AUTO_BALANCE,
+      },
+      data: { status: RoomStatus.ROLE_SELECTION },
+    });
+    if (count === 0) {
+      throw new BadRequestException(
+        "편성이 변경 중이거나 이미 확정되었습니다. 화면을 새로고침해주세요.",
+      );
+    }
+
+    await this.moveAssignedTeamsToVoice(roomId);
+    // 확정했으면 되감기 이력은 필요 없다.
+    await this.redis.del(this.autoBalanceHistoryKey(roomId)).catch(() => {});
+  }
+
+  /** 편성 되감기 이력 키 — 방 단위, 확정되면 지운다 */
+  private autoBalanceHistoryKey(roomId: string) {
+    return `room:auto-balance-history:${roomId}`;
+  }
+
+  /** 되감기 이력 보관 한도. 너무 깊게 쌓아둘 이유가 없다. */
+  private readonly AUTO_BALANCE_HISTORY_LIMIT = 10;
+  private readonly AUTO_BALANCE_HISTORY_TTL_SEC = 2 * 60 * 60;
+
+  /**
+   * 현재 편성을 되감기 이력에 쌓는다.
+   *
+   * 다시 돌리기·교체 직전에 호출한다. 무작위 재편성이라 "방금 게 더 나았는데"가
+   * 반드시 나오는데, 다시 돌려서 같은 배치를 뽑을 방법이 없기 때문이다.
+   * 확정 전까지만 쓰는 임시 상태라 DB 대신 Redis 에 둔다.
+   */
+  private async pushAutoBalanceHistory(roomId: string): Promise<void> {
+    try {
+      const teams = await this.prisma.team.findMany({
+        where: { roomId },
+        orderBy: { createdAt: "asc" },
+        select: {
+          captainId: true,
+          members: { select: { userId: true, assignedRole: true } },
+        },
+      });
+      if (teams.length === 0) return;
+
+      const key = this.autoBalanceHistoryKey(roomId);
+      const raw = await this.redis.get(key);
+      const history: AutoBalanceSnapshot[] = raw ? JSON.parse(raw) : [];
+
+      history.push({
+        teams: teams.map((team) => ({
+          captainId: team.captainId,
+          members: team.members.map((member) => ({
+            userId: member.userId,
+            assignedRole: member.assignedRole,
+          })),
+        })),
+      });
+
+      await this.redis.set(
+        key,
+        JSON.stringify(history.slice(-this.AUTO_BALANCE_HISTORY_LIMIT)),
+        this.AUTO_BALANCE_HISTORY_TTL_SEC,
+      );
+    } catch (error) {
+      // 이력 저장 실패가 편성 자체를 막으면 안 된다.
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`편성 이력 저장 실패 roomId=${roomId}: ${message}`);
+    }
+  }
+
+  /** 남아 있는 되감기 횟수 */
+  async getAutoBalanceHistoryDepth(roomId: string): Promise<number> {
+    try {
+      const raw = await this.redis.get(this.autoBalanceHistoryKey(roomId));
+      return raw ? (JSON.parse(raw) as AutoBalanceSnapshot[]).length : 0;
+    } catch {
+      return 0;
+    }
+  }
+
+  /**
+   * 편성을 한 단계 되감는다.
+   *
+   * 다시 돌리기는 무작위라 되돌아갈 방법이 없으므로, 직전 배치들을 쌓아두고
+   * 하나씩 꺼내 복원한다. 팀은 지우고 다시 만들되 저장된 팀장·라인을 그대로 쓴다.
+   */
+  async undoAutoBalancedTeams(hostId: string, roomId: string) {
+    const key = this.autoBalanceHistoryKey(roomId);
+
+    await this.runSerializableTx(async (tx) => {
+      const room = await tx.room.findUnique({
+        where: { id: roomId },
+        select: { hostId: true, teamMode: true, status: true },
+      });
+      if (!room) throw new NotFoundException("Room not found");
+      if (room.hostId !== hostId) {
+        throw new ForbiddenException("방장만 편성을 되감을 수 있습니다.");
+      }
+      if (room.teamMode !== TeamMode.AUTO_BALANCE) {
+        throw new BadRequestException("자동 밸런스 방이 아닙니다.");
+      }
+      if (room.status !== RoomStatus.DRAFT_COMPLETED) {
+        throw new BadRequestException("되감을 편성이 없습니다.");
+      }
+
+      const existingMatches = await tx.match.count({ where: { roomId } });
+      if (existingMatches > 0) {
+        throw new BadRequestException(
+          "대진표가 이미 생성되어 되감을 수 없습니다.",
+        );
+      }
+
+      const raw = await this.redis.get(key);
+      const history: AutoBalanceSnapshot[] = raw ? JSON.parse(raw) : [];
+      const snapshot = history.pop();
+      if (!snapshot) {
+        throw new BadRequestException("더 되감을 편성이 없습니다.");
+      }
+
+      const usernameByUserId = new Map(
+        (
+          await tx.roomParticipant.findMany({
+            where: { roomId },
+            select: { userId: true, user: { select: { username: true } } },
+          })
+        ).map((participant) => [participant.userId, participant.user.username]),
+      );
+
+      await this.clearTeamSetup(tx, roomId);
+      for (let index = 0; index < snapshot.teams.length; index++) {
+        const saved = snapshot.teams[index];
+        const team = await tx.team.create({
+          data: {
+            roomId,
+            captainId: saved.captainId,
+            name: `${usernameByUserId.get(saved.captainId) ?? `Team ${index + 1}`} 팀`,
+            color: this.teamColors[index % this.teamColors.length],
+          },
+        });
+        await tx.roomParticipant.updateMany({
+          where: {
+            roomId,
+            userId: { in: saved.members.map((member) => member.userId) },
+          },
+          data: { teamId: team.id },
+        });
+        await tx.roomParticipant.updateMany({
+          where: { roomId, userId: saved.captainId },
+          data: { isCaptain: true },
+        });
+        await tx.teamMember.createMany({
+          data: saved.members.map((member) => ({
+            teamId: team.id,
+            userId: member.userId,
+            assignedRole: member.assignedRole,
+          })),
+        });
+      }
+
+      // 되감았으니 재편성 횟수도 함께 줄인다 (표시가 실제와 어긋나지 않게).
+      await tx.room.update({
+        where: { id: roomId },
+        data: { autoBalanceRerollCount: { decrement: 1 } },
+      });
+
+      await this.redis.set(
+        key,
+        JSON.stringify(history),
+        this.AUTO_BALANCE_HISTORY_TTL_SEC,
+      );
+    });
+
+    return this.getRoomById(roomId);
+  }
+
+  /**
+   * 자동 밸런스 편성에서 두 인원의 자리를 맞바꾼다.
+   *
+   * 고정 + 다시 돌리기로는 "이 둘만 바꾸고 싶다"를 표현하기 어렵다. 재편성은
+   * 결국 무작위라 원하는 교환이 나올 때까지 돌려야 하기 때문이다.
+   *
+   * 같은 팀이면 라인만, 다른 팀이면 팀과 라인을 함께 바꾼다.
+   */
+  async swapAutoBalanceMembers(
+    hostId: string,
+    roomId: string,
+    userIdA: string,
+    userIdB: string,
+  ) {
+    if (userIdA === userIdB) {
+      throw new BadRequestException("서로 다른 두 명을 선택해주세요.");
+    }
+
+    // 교체 전 배치를 이력에 남긴다 (되감기용).
+    await this.pushAutoBalanceHistory(roomId);
+
+    await this.runSerializableTx(async (tx) => {
+      const room = await tx.room.findUnique({
+        where: { id: roomId },
+        select: { hostId: true, teamMode: true, status: true },
+      });
+      if (!room) throw new NotFoundException("Room not found");
+      if (room.hostId !== hostId || room.teamMode !== TeamMode.AUTO_BALANCE) {
+        throw new ForbiddenException("방장만 편성을 바꿀 수 있습니다.");
+      }
+      if (room.status !== RoomStatus.DRAFT_COMPLETED) {
+        throw new BadRequestException(
+          "편성 확인 단계에서만 자리를 바꿀 수 있습니다.",
+        );
+      }
+
+      // 대진표가 생긴 뒤에 팀을 흔들면 매치와 어긋난다.
+      const existingMatches = await tx.match.count({ where: { roomId } });
+      if (existingMatches > 0) {
+        throw new BadRequestException(
+          "대진표가 이미 생성되어 자리를 바꿀 수 없습니다.",
+        );
+      }
+
+      const members = await tx.teamMember.findMany({
+        where: {
+          userId: { in: [userIdA, userIdB] },
+          team: { roomId },
+        },
+        select: {
+          id: true,
+          userId: true,
+          teamId: true,
+          assignedRole: true,
+          team: { select: { id: true, captainId: true } },
+        },
+      });
+
+      const memberA = members.find((member) => member.userId === userIdA);
+      const memberB = members.find((member) => member.userId === userIdB);
+      if (!memberA || !memberB) {
+        throw new BadRequestException("두 명 모두 편성된 인원이어야 합니다.");
+      }
+
+      // 자리 교환: 팀과 배정 라인을 서로 바꾼다.
+      await tx.teamMember.update({
+        where: { id: memberA.id },
+        data: { teamId: memberB.teamId, assignedRole: memberB.assignedRole },
+      });
+      await tx.teamMember.update({
+        where: { id: memberB.id },
+        data: { teamId: memberA.teamId, assignedRole: memberA.assignedRole },
+      });
+
+      if (memberA.teamId !== memberB.teamId) {
+        await tx.roomParticipant.updateMany({
+          where: { roomId, userId: userIdA },
+          data: { teamId: memberB.teamId },
+        });
+        await tx.roomParticipant.updateMany({
+          where: { roomId, userId: userIdB },
+          data: { teamId: memberA.teamId },
+        });
+
+        // 팀장이 팀을 옮기면 그 팀에 팀장이 없어진다. 들어온 쪽이 이어받고
+        // 팀명도 함께 바꾼다 (팀명=팀장명 규칙 유지).
+        await this.transferCaptaincyOnSwapTx(tx, roomId, memberA, memberB);
+        await this.transferCaptaincyOnSwapTx(tx, roomId, memberB, memberA);
+      }
+    });
+
+    return this.getRoomById(roomId);
+  }
+
+  /** 교환으로 팀장이 빠진 자리를 상대 인원이 이어받게 한다 */
+  private async transferCaptaincyOnSwapTx(
+    tx: Prisma.TransactionClient,
+    roomId: string,
+    leaving: { userId: string; teamId: string; team: { captainId: string } },
+    incoming: { userId: string },
+  ) {
+    if (leaving.team.captainId !== leaving.userId) return;
+
+    const username = await tx.user
+      .findUnique({
+        where: { id: incoming.userId },
+        select: { username: true },
+      })
+      .then((user) => user?.username);
+
+    await tx.team.update({
+      where: { id: leaving.teamId },
+      data: {
+        captainId: incoming.userId,
+        ...(username ? { name: `${username} 팀` } : {}),
+      },
+    });
+    await tx.roomParticipant.updateMany({
+      where: { roomId, userId: leaving.userId },
+      data: { isCaptain: false },
+    });
+    await tx.roomParticipant.updateMany({
+      where: { roomId, userId: incoming.userId },
+      data: { isCaptain: true },
+    });
   }
 
   async finalizeManualTeams(hostId: string, roomId: string) {

@@ -279,6 +279,68 @@ export const roomSocketHelpers = {
     });
   },
 
+  /**
+   * 자동 밸런스 재편성("주사위").
+   * pinnedUserIds 에 넣은 인원은 현재 팀·라인을 유지하고 나머지만 다시 배치된다.
+   */
+  rerollAutoBalance: (
+    roomId: string,
+    pinnedUserIds: string[],
+  ): Promise<{ success: boolean; error?: string }> =>
+    new Promise((resolve) => {
+      if (!roomSocket) {
+        resolve({ success: false, error: "서버에 연결되어 있지 않습니다." });
+        return;
+      }
+      roomSocket.emit(
+        "auto-balance-reroll",
+        { roomId, pinnedUserIds },
+        resolve,
+      );
+    }),
+
+  /** 자동 밸런스 편성을 한 단계 되감는다. */
+  undoAutoBalance: (
+    roomId: string,
+  ): Promise<{ success: boolean; error?: string }> =>
+    new Promise((resolve) => {
+      if (!roomSocket) {
+        resolve({ success: false, error: "서버에 연결되어 있지 않습니다." });
+        return;
+      }
+      roomSocket.emit("auto-balance-undo", { roomId }, resolve);
+    }),
+
+  /** 자동 밸런스 편성에서 두 인원의 자리를 맞바꾼다. */
+  swapAutoBalance: (
+    roomId: string,
+    userIdA: string,
+    userIdB: string,
+  ): Promise<{ success: boolean; error?: string }> =>
+    new Promise((resolve) => {
+      if (!roomSocket) {
+        resolve({ success: false, error: "서버에 연결되어 있지 않습니다." });
+        return;
+      }
+      roomSocket.emit(
+        "auto-balance-swap",
+        { roomId, userIdA, userIdB },
+        resolve,
+      );
+    }),
+
+  /** 자동 밸런스 편성 확정 — 확정해야 대진표가 만들어진다. */
+  confirmAutoBalance: (
+    roomId: string,
+  ): Promise<{ success: boolean; error?: string }> =>
+    new Promise((resolve) => {
+      if (!roomSocket) {
+        resolve({ success: false, error: "서버에 연결되어 있지 않습니다." });
+        return;
+      }
+      roomSocket.emit("auto-balance-confirm", { roomId }, resolve);
+    }),
+
   // Room list subscription
   subscribeRoomList: (callback: (response: any) => void) => {
     roomSocket?.emit("subscribe-room-list", {}, callback);
