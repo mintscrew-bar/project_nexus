@@ -71,7 +71,7 @@ export class StreamerController {
   @Post("verify/code")
   @UseGuards(JwtAuthGuard)
   @Throttle({ default: { limit: 10, ttl: 60000 } })
-  issueCode(@CurrentUser("id") userId: string, @Body() dto: VerifyChannelDto) {
+  issueCode(@CurrentUser("sub") userId: string, @Body() dto: VerifyChannelDto) {
     return this.verificationService.issueCode(userId, dto.platform);
   }
 
@@ -79,7 +79,7 @@ export class StreamerController {
   @Post("verify/confirm")
   @UseGuards(JwtAuthGuard)
   @Throttle({ default: { limit: 10, ttl: 60000 } })
-  confirm(@CurrentUser("id") userId: string, @Body() dto: VerifyChannelDto) {
+  confirm(@CurrentUser("sub") userId: string, @Body() dto: VerifyChannelDto) {
     return this.verificationService.confirm(userId, dto.platform);
   }
 

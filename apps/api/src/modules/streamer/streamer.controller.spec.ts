@@ -5,10 +5,14 @@ describe("StreamerController", () => {
   const chzzkOAuth = {
     createAuthorizationUrl: jest.fn(),
   };
+  const verificationService = {
+    issueCode: jest.fn(),
+    confirm: jest.fn(),
+  };
 
   const controller = new StreamerController(
     {} as never,
-    {} as never,
+    verificationService as never,
     chzzkOAuth as never,
   );
 
@@ -17,14 +21,33 @@ describe("StreamerController", () => {
   });
 
   it("reads the user id from the JWT subject", () => {
-    const metadata = Reflect.getMetadata(
-      ROUTE_ARGS_METADATA,
-      StreamerController,
-      "startChzzkOAuth",
-    ) as Record<string, { data?: string }>;
+    for (const method of ["issueCode", "confirm", "startChzzkOAuth"]) {
+      const metadata = Reflect.getMetadata(
+        ROUTE_ARGS_METADATA,
+        StreamerController,
+        method,
+      ) as Record<string, { data?: string }>;
 
-    expect(Object.values(metadata).some(({ data }) => data === "sub")).toBe(
-      true,
+      expect(Object.values(metadata).some(({ data }) => data === "sub")).toBe(
+        true,
+      );
+    }
+  });
+
+  it("passes the authenticated user id to channel verification", async () => {
+    verificationService.issueCode.mockResolvedValue({ code: "NEXUS-1234" });
+    verificationService.confirm.mockResolvedValue({ verified: true });
+
+    await controller.issueCode("user-1", { platform: "SOOP" } as never);
+    await controller.confirm("user-1", { platform: "SOOP" } as never);
+
+    expect(verificationService.issueCode).toHaveBeenCalledWith(
+      "user-1",
+      "SOOP",
+    );
+    expect(verificationService.confirm).toHaveBeenCalledWith(
+      "user-1",
+      "SOOP",
     );
   });
 
