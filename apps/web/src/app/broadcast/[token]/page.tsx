@@ -192,10 +192,14 @@ export default function BroadcastPage() {
     controlScene === "auto" && status === "DRAFT" && teamMode === "SNAKE_DRAFT";
   const isRoleSelectionRoom =
     controlScene === "role-selection" ||
-    (controlScene === "auto" && status === "ROLE_SELECTION");
+    (controlScene === "auto" &&
+      status === "ROLE_SELECTION" &&
+      teamMode !== "AUTO_BALANCE");
   // 팀 확정 직후(DRAFT_COMPLETED) — 자동배정/수동편성 모드의 유일한 팀 소개 구간
   const isTeamRevealRoom =
-    controlScene === "auto" && status === "DRAFT_COMPLETED";
+    controlScene === "auto" &&
+    (status === "DRAFT_COMPLETED" ||
+      (teamMode === "AUTO_BALANCE" && status === "ROLE_SELECTION"));
   const displayScene = isAuctionRoom
     ? "auction"
     : isSnakeDraftRoom

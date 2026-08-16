@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { randomBytes } from "crypto";
 import { PrismaService } from "../prisma/prisma.service";
+import { BalanceScoreService } from "../common/balance-score.service";
 import {
   hashBroadcastToken,
   activeRoomIdForUser,
@@ -35,7 +36,10 @@ const MATCH_INTRO_SCENE_MS = 12_000;
  */
 @Injectable()
 export class BroadcastService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly balanceScores: BalanceScoreService,
+  ) {}
 
   /**
    * 방송 토큰 발급/재생성. 로그인 유저 본인 것만.
@@ -270,6 +274,39 @@ export class BroadcastService {
   /** 팀 요약 공통 형태 */
   private teamSummary(team: any) {
     if (!team) return null;
+    const members = (team.members ?? []).map((m: any) => {
+      const account = m.user?.riotAccounts?.[0];
+      const scores = account ? this.balanceScores.readCached(account) : null;
+      const lineScore =
+        scores && m.assignedRole
+          ? scores[m.assignedRole as keyof typeof scores]
+          : null;
+      return {
+        userId: m.userId,
+        username: m.user?.username ?? null,
+        avatar: m.user?.avatar ?? null,
+        assignedRole: m.assignedRole ?? null,
+        soldPrice: m.soldPrice ?? null,
+        tier: account?.tier ?? null,
+        rank: account?.rank ?? null,
+        lp: account?.lp ?? null,
+        roleTiers: account?.roleTiers ?? [],
+        lineScore:
+          typeof lineScore === "number" && Number.isFinite(lineScore)
+            ? lineScore
+            : null,
+      };
+    });
+    const hasCompleteBalanceTotal =
+      members.length > 0 &&
+      members.every((member: any) => member.lineScore !== null);
+    const balanceTotal = hasCompleteBalanceTotal
+      ? members.reduce(
+          (total: number, member: any) => total + member.lineScore,
+          0,
+        )
+      : null;
+
     return {
       id: team.id,
       name: team.name,
@@ -277,20 +314,8 @@ export class BroadcastService {
       captainId: team.captainId,
       initialBudget: team.initialBudget,
       remainingBudget: team.remainingBudget,
-      members: (team.members ?? []).map((m: any) => {
-        const account = m.user?.riotAccounts?.[0];
-        return {
-          userId: m.userId,
-          username: m.user?.username ?? null,
-          avatar: m.user?.avatar ?? null,
-          assignedRole: m.assignedRole ?? null,
-          soldPrice: m.soldPrice ?? null,
-          tier: account?.tier ?? null,
-          rank: account?.rank ?? null,
-          lp: account?.lp ?? null,
-          roleTiers: account?.roleTiers ?? [],
-        };
-      }),
+      balanceTotal,
+      members,
     };
   }
 
@@ -475,6 +500,8 @@ export class BroadcastService {
                         tier: true,
                         rank: true,
                         lp: true,
+                        balanceScores: true,
+                        balanceScoreVersion: true,
                         roleTiers: {
                           select: {
                             role: true,

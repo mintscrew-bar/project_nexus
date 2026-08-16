@@ -583,6 +583,28 @@ describe("RoomService", () => {
         service.confirmAutoBalancedTeams("host-1", "room-1"),
       ).rejects.toThrow("편성이 변경 중이거나 이미 확정");
     });
+
+    it("대진 생성 실패 시 오토밸런싱 검토 상태로 복구한다", async () => {
+      prisma.room.updateMany = jest.fn().mockResolvedValue({ count: 1 });
+      const restoredRoom = {
+        id: "room-1",
+        teamMode: TeamMode.AUTO_BALANCE,
+        status: RoomStatus.DRAFT_COMPLETED,
+      };
+      jest.spyOn(service, "getRoomById").mockResolvedValue(restoredRoom as any);
+
+      await expect(service.restoreAutoBalanceReview("room-1")).resolves.toEqual(
+        restoredRoom,
+      );
+      expect(prisma.room.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: "room-1",
+          teamMode: TeamMode.AUTO_BALANCE,
+          status: RoomStatus.ROLE_SELECTION,
+        },
+        data: { status: RoomStatus.DRAFT_COMPLETED },
+      });
+    });
   });
 
   describe("자동 밸런스 되감기", () => {

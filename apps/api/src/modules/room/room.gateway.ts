@@ -19,6 +19,7 @@ import { AuctionService } from "../auction/auction.service";
 import { AuctionGateway } from "../auction/auction.gateway";
 import { RoleSelectionService } from "../role-selection/role-selection.service";
 import { RoleSelectionGateway } from "../role-selection/role-selection.gateway";
+import { MatchGateway } from "../match/match.gateway";
 import { DiscordVoiceService } from "../discord/discord-voice.service";
 import { RoomStatus, TeamMode } from "@nexus/database";
 
@@ -69,6 +70,7 @@ export class RoomGateway
     private readonly roleSelectionService: RoleSelectionService,
     @Inject(forwardRef(() => RoleSelectionGateway))
     private readonly roleSelectionGateway: RoleSelectionGateway,
+    private readonly matchGateway: MatchGateway,
     @Inject("DISCORD_VOICE_SERVICE")
     private readonly discordVoiceService: DiscordVoiceService,
   ) {}
@@ -695,15 +697,23 @@ export class RoomGateway
 
       coreStartSucceeded = true;
 
-      // Notify all players that game is starting (for navigation)
       try {
-        this.server.to(data.roomId).emit("game-starting", {
-          roomId: data.roomId,
-          teamMode: room.teamMode,
-        });
+        if (room.teamMode === TeamMode.AUTO_BALANCE) {
+          // Auto balance must stay in the lobby for review. Navigation is emitted
+          // only after auto-balance-confirm successfully generates the bracket.
+          this.server.to(data.roomId).emit("room-updated", result);
+          this.matchGateway.emitBroadcastControl(data.roomId, {
+            reason: "auto-balance-updated",
+          });
+        } else {
+          this.server.to(data.roomId).emit("game-starting", {
+            roomId: data.roomId,
+            teamMode: room.teamMode,
+          });
+        }
       } catch (emitError) {
         console.error(
-          `[Room] Failed to emit game-starting for room ${data.roomId}:`,
+          `[Room] Failed to emit game stage update for room ${data.roomId}:`,
           emitError,
         );
       }
@@ -787,6 +797,9 @@ export class RoomGateway
       );
 
       this.server.to(data.roomId).emit("room-updated", room);
+      this.matchGateway.emitBroadcastControl(data.roomId, {
+        reason: "auto-balance-updated",
+      });
       return { success: true, room };
     } catch (error: any) {
       return {
@@ -814,6 +827,9 @@ export class RoomGateway
         data.roomId,
       );
       this.server.to(data.roomId).emit("room-updated", { ...room, undoDepth });
+      this.matchGateway.emitBroadcastControl(data.roomId, {
+        reason: "auto-balance-updated",
+      });
       return { success: true, room, undoDepth };
     } catch (error: any) {
       return {
@@ -839,6 +855,9 @@ export class RoomGateway
         data.roomId,
       );
       this.server.to(data.roomId).emit("room-updated", { ...room, undoDepth });
+      this.matchGateway.emitBroadcastControl(data.roomId, {
+        reason: "auto-balance-updated",
+      });
       return { success: true, room, undoDepth };
     } catch (error: any) {
       return {
@@ -854,6 +873,7 @@ export class RoomGateway
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() data: { roomId: string },
   ) {
+    let confirmationClaimed = false;
     try {
       // 권한·상태 검증과 팀별 음성채널 이동을 함께 처리한다.
       // 음성 이동을 확정 시점으로 미룬 이유: 확인 단계에서 재편성·교체를 할 수
@@ -862,6 +882,7 @@ export class RoomGateway
         client.userId!,
         data.roomId,
       );
+      confirmationClaimed = true;
 
       await this.roleSelectionGateway.completeRoleSelection(data.roomId);
       this.server.to(data.roomId).emit("game-starting", {
@@ -870,6 +891,24 @@ export class RoomGateway
       });
       return { success: true };
     } catch (error: any) {
+      if (confirmationClaimed) {
+        try {
+          const restoredRoom = await this.roomService.restoreAutoBalanceReview(
+            data.roomId,
+          );
+          if (restoredRoom) {
+            this.server.to(data.roomId).emit("room-updated", restoredRoom);
+            this.matchGateway.emitBroadcastControl(data.roomId, {
+              reason: "auto-balance-restored",
+            });
+          }
+        } catch (restoreError: any) {
+          console.error(
+            `[Room] Failed to restore auto-balance review for room ${data.roomId}:`,
+            restoreError?.message ?? restoreError,
+          );
+        }
+      }
       return {
         success: false,
         error: error?.message ?? "확정에 실패했습니다.",

@@ -2471,6 +2471,19 @@ export class RoomService {
     await this.redis.del(this.autoBalanceHistoryKey(roomId)).catch(() => {});
   }
 
+  async restoreAutoBalanceReview(roomId: string) {
+    const { count } = await this.prisma.room.updateMany({
+      where: {
+        id: roomId,
+        teamMode: TeamMode.AUTO_BALANCE,
+        status: RoomStatus.ROLE_SELECTION,
+      },
+      data: { status: RoomStatus.DRAFT_COMPLETED },
+    });
+
+    return count > 0 ? this.getRoomById(roomId) : null;
+  }
+
   /** 편성 되감기 이력 키 — 방 단위, 확정되면 지운다 */
   private autoBalanceHistoryKey(roomId: string) {
     return `room:auto-balance-history:${roomId}`;

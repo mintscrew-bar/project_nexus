@@ -74,14 +74,15 @@ const getRoomStagePath = (room: {
     return `/tournaments/${room.id}/bracket`;
   }
 
+  // Auto balance stays in the lobby while teams are generated and reviewed.
+  // The server emits game-starting only after confirmation and bracket creation.
+  if (room.teamMode === "AUTO_BALANCE") {
+    return null;
+  }
+
   if (room.status === "ROLE_SELECTION" || room.status === "DRAFT_COMPLETED") {
     // 자동 밸런스는 편성 직후 대진표로 넘기지 않는다. 팀 점수 차나 비선호 라인이
     // 나올 수 있어서 방장이 로비에서 결과를 확인하고 다시 돌리거나 확정한다.
-    if (room.teamMode === "AUTO_BALANCE") {
-      return room.status === "DRAFT_COMPLETED"
-        ? null
-        : `/tournaments/${room.id}/bracket`;
-    }
     return `/role-selection/${room.id}`;
   }
 

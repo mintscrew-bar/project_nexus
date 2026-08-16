@@ -1993,12 +1993,21 @@ function RevealMemberRow({
         </span>
       </div>
       <div className="flex flex-shrink-0 items-center">
-        {member.soldPrice != null && (
+        {member.soldPrice != null ? (
           <span className="text-2xl font-black" style={{ color: teamColor }}>
             {member.soldPrice}
             <span className="ml-0.5 text-sm opacity-60">P</span>
           </span>
-        )}
+        ) : member.lineScore != null ? (
+          <div className="text-right">
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/35">
+              Line Score
+            </p>
+            <p className="text-2xl font-black tabular-nums" style={{ color: teamColor }}>
+              {Number(member.lineScore).toFixed(1)}
+            </p>
+          </div>
+        ) : null}
       </div>
     </div>
   );
@@ -2013,6 +2022,10 @@ export function TeamRevealScene({ snapshot }: { snapshot: any }) {
   const accent = accentOf(snapshot);
   const teams: any[] = snapshot?.teams ?? [];
   const roomName = snapshot?.room?.name ?? "";
+  const isAutoBalanceReview =
+    snapshot?.room?.teamMode === "AUTO_BALANCE" &&
+    (snapshot?.room?.status === "DRAFT_COMPLETED" ||
+      snapshot?.room?.status === "ROLE_SELECTION");
   // 팀마다 인원이 달라도 행 높이를 맞추기 위해 최대 인원 기준으로 트랙을 잡는다.
   // (1fr 트랙이라 남는 세로 공간 없이 패널을 꽉 채운다)
   const maxMembers = Math.max(
@@ -2036,7 +2049,9 @@ export function TeamRevealScene({ snapshot }: { snapshot: any }) {
       <div className="flex h-full w-full flex-col px-24 pb-36 pt-16">
         <div className="flex items-end justify-between gap-8">
           <div className="min-w-0">
-            <HudLabel color={accent}>TEAMS LOCKED IN</HudLabel>
+            <HudLabel color={accent}>
+              {isAutoBalanceReview ? "AUTO BALANCE REVIEW" : "TEAMS LOCKED IN"}
+            </HudLabel>
             <p className="mt-2 truncate text-5xl font-black">{roomName}</p>
           </div>
           <p className="flex-shrink-0 text-3xl font-black text-white/45">
@@ -2104,12 +2119,24 @@ export function TeamRevealScene({ snapshot }: { snapshot: any }) {
                       }}
                     />
                     {/* 팀명을 로스터와 같은 좌측 정렬선에 붙여 제목이 뜨지 않게 한다 */}
-                    <p
-                      className="truncate text-3xl font-black tracking-wide text-white"
-                      style={{ textShadow: `0 0 24px ${teamColor}55` }}
-                    >
-                      {team.name}
-                    </p>
+                    <div className="flex items-end justify-between gap-4">
+                      <p
+                        className="min-w-0 truncate text-3xl font-black tracking-wide text-white"
+                        style={{ textShadow: `0 0 24px ${teamColor}55` }}
+                      >
+                        {team.name}
+                      </p>
+                      {team.balanceTotal != null && (
+                        <div className="shrink-0 text-right">
+                          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/35">
+                            Team Score
+                          </p>
+                          <p className="text-2xl font-black tabular-nums" style={{ color: teamColor }}>
+                            {Number(team.balanceTotal).toFixed(1)}
+                          </p>
+                        </div>
+                      )}
+                    </div>
                     <div
                       // 행이 덩어리로 읽히므로 1fr 로 세로를 꽉 채운다
                       className="mt-4 grid min-h-0 flex-1 gap-3"

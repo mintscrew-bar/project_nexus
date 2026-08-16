@@ -190,7 +190,14 @@ export const useLobbyStore = create<LobbyStoreState>((set, get) => ({
     });
 
     socket.on("room-updated", (updatedRoom: Room) => {
-      set({ room: updatedRoom });
+      set((state) => ({
+        room: updatedRoom,
+        gameStarting:
+          updatedRoom.teamMode === "AUTO_BALANCE" &&
+          updatedRoom.status !== "IN_PROGRESS"
+            ? false
+            : state.gameStarting,
+      }));
     });
 
     socket.on("participant-kicked", (data: { participantId: string }) => {
