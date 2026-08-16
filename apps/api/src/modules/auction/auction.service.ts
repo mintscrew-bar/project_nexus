@@ -17,6 +17,7 @@ import { calculateTierScore } from "../common/tier-score.util";
 const BONUS_GOLD = 500;
 const DEFAULT_BID_TIME_SECONDS = 30;
 const BID_EXTENSION_SECONDS = 10;
+const MAX_EXTENDED_BID_TIME_SECONDS = 30;
 const MIN_BID_TIME_SECONDS = 5;
 const MAX_BID_TIME_SECONDS = 120;
 const DEFAULT_BID_INCREMENT = 50;
@@ -333,7 +334,14 @@ export class AuctionService implements OnModuleInit {
   }
 
   private getExtendedBidTimerEnd(currentTimerEnd: number): number {
-    return currentTimerEnd + BID_EXTENSION_SECONDS * 1000;
+    const maxExtendedTimerEnd =
+      Date.now() + MAX_EXTENDED_BID_TIME_SECONDS * 1000;
+    if (currentTimerEnd >= maxExtendedTimerEnd) return currentTimerEnd;
+
+    return Math.min(
+      currentTimerEnd + BID_EXTENSION_SECONDS * 1000,
+      maxExtendedTimerEnd,
+    );
   }
 
   // ========================================

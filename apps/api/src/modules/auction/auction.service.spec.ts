@@ -273,6 +273,28 @@ describe("AuctionService", () => {
 
       expect(result.timerEnd).toBe(now + 13000);
     });
+
+    it("입찰 연장 후 남은 시간은 30초를 넘지 않는다", () => {
+      const now = 1_700_000_000_000;
+      jest.spyOn(Date, "now").mockReturnValue(now);
+
+      const extendedTimerEnd = (service as any).getExtendedBidTimerEnd(
+        now + 25000,
+      );
+
+      expect(extendedTimerEnd).toBe(now + 30000);
+    });
+
+    it("기본 남은 시간이 30초보다 길면 입찰로 시간을 줄이지 않는다", () => {
+      const now = 1_700_000_000_000;
+      jest.spyOn(Date, "now").mockReturnValue(now);
+
+      const extendedTimerEnd = (service as any).getExtendedBidTimerEnd(
+        now + 60000,
+      );
+
+      expect(extendedTimerEnd).toBe(now + 60000);
+    });
   });
 
   describe("resolveCurrentBid", () => {
