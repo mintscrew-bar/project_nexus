@@ -142,6 +142,8 @@ export class BroadcastController {
       "control",
       "match",
       "bracket",
+      "match-intro",
+      "lineup",
       "result",
       "idle",
       "break",

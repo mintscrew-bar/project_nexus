@@ -14,6 +14,7 @@ import {
   RoomScene,
   MatchScene,
   MatchIntroScene,
+  LineupOverlayScene,
   MatchResultScene,
   IdleScene,
   BreakScene,
@@ -94,6 +95,12 @@ const SCENE_TRANSITIONS: Record<
     eyebrow: "STARTING LINEUP",
     tone: "match",
   },
+  lineup: {
+    label: "LINEUP",
+    subLabel: "밴픽 라인업",
+    eyebrow: "MATCH GUIDE",
+    tone: "match",
+  },
   result: {
     label: "RESULT",
     subLabel: "경기 결과",
@@ -128,6 +135,7 @@ function sceneKeyOf({
   if (scene === "break") return "break";
   if (scene === "bracket") return "bracket";
   if (scene === "match-intro") return "match-intro";
+  if (scene === "lineup") return "lineup";
   if (scene === "auction") return "auction";
   if (scene === "role-selection") return "role-selection";
   if (scene === "draft") return "draft";
@@ -312,6 +320,8 @@ export default function BroadcastPage() {
       <TournamentSummaryScene snapshot={snapshot} />
     ) : displayScene === "match-intro" ? (
       <MatchIntroScene snapshot={snapshot} />
+    ) : displayScene === "lineup" ? (
+      <LineupOverlayScene snapshot={snapshot} />
     ) : displayScene === "result" ? (
       <MatchResultScene snapshot={snapshot} />
     ) : displayScene === "match" ? (
@@ -338,6 +348,7 @@ export default function BroadcastPage() {
     snapshot?.broadcast?.lowerThirdVisible === false ||
     displayScene === "match" ||
     displayScene === "match-intro" ||
+    displayScene === "lineup" ||
     displayScene === "result" ||
     displayScene === "summary" ? null : (
       <>

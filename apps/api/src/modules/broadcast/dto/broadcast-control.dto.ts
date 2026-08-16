@@ -14,6 +14,7 @@ export const BROADCAST_CONTROL_SCENES = [
   "role-selection",
   "bracket",
   "match-intro",
+  "lineup",
   "match",
   "result",
   "summary",

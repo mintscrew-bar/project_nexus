@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { getChampionIconUrl } from "@/app/tournaments/[id]/lobby/_components/icons";
 import { getTierIcon } from "@/lib/tier-icon";
 import { getRoleIcon, normalizeRole } from "@/lib/role-icon";
 
@@ -745,22 +746,45 @@ function MatchIntroTeam({ team, side }: { team: any; side: "left" | "right" }) {
 
   return (
     <section className="min-w-0">
-      <div className={side === "right" ? "text-right" : "text-left"}>
-        <p className="text-xs font-black uppercase tracking-[0.3em] text-white/36">
-          {side === "left" ? "Blue Side" : "Red Side"}
-        </p>
-        <h2
-          className="mt-2 truncate text-[46px] font-black leading-none"
-          style={{ color }}
+      <div className="flex items-end justify-between gap-4">
+        <div
+          className={
+            side === "right"
+              ? "order-2 min-w-0 text-right"
+              : "min-w-0 text-left"
+          }
         >
-          {team?.name ?? "팀 미정"}
-        </h2>
+          <p className="text-xs font-black uppercase tracking-[0.3em] text-white/36">
+            {side === "left" ? "Blue Side" : "Red Side"}
+          </p>
+          <h2
+            className="mt-2 truncate text-[42px] font-black leading-none"
+            style={{ color }}
+          >
+            {team?.name ?? "팀 미정"}
+          </h2>
+        </div>
+        {team?.balanceTotal != null && (
+          <div
+            className={side === "right" ? "order-1 text-left" : "text-right"}
+          >
+            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-white/34">
+              Team Score
+            </p>
+            <p
+              className="mt-1 text-2xl font-black tabular-nums"
+              style={{ color }}
+            >
+              {Number(team.balanceTotal).toFixed(1)}
+            </p>
+          </div>
+        )}
       </div>
-      <div className="mt-7 grid gap-2.5">
+      <div className="mt-5 grid gap-2">
         {roster.map(({ role, member }, index) => (
           <div
             key={role}
-            className={`grid h-[82px] items-center gap-4 border-y border-white/12 bg-black/28 px-5 ${
+            className={`grid h-[96px] items-center gap-4 border-y border-white/12 bg-black/34 px-5 ${
               side === "left"
                 ? "grid-cols-[54px_64px_minmax(0,1fr)]"
                 : "grid-cols-[minmax(0,1fr)_64px_54px] text-right"
@@ -774,11 +798,11 @@ function MatchIntroTeam({ team, side }: { team: any; side: "left" | "right" }) {
               <>
                 <IntroRole role={role} />
                 <IntroAvatar member={member} />
-                <IntroMember member={member} />
+                <IntroMember member={member} role={role} side={side} />
               </>
             ) : (
               <>
-                <IntroMember member={member} />
+                <IntroMember member={member} role={role} side={side} />
                 <IntroAvatar member={member} />
                 <IntroRole role={role} />
               </>
@@ -818,15 +842,56 @@ function IntroAvatar({ member }: { member?: any }) {
   );
 }
 
-function IntroMember({ member }: { member?: any }) {
+function IntroMember({
+  member,
+  role,
+  side,
+}: {
+  member?: any;
+  role: string;
+  side: "left" | "right";
+}) {
+  const preferences = (member?.championPreferences ?? [])
+    .filter((item: any) => normalizeRole(item.role) === role)
+    .sort((a: any, b: any) => Number(a.order ?? 0) - Number(b.order ?? 0))
+    .slice(0, 5);
+
   return (
     <div className="min-w-0">
-      <p className="truncate text-2xl font-black text-white">
-        {member?.username ?? "미정"}
-      </p>
-      <p className="mt-1 text-xs font-bold uppercase tracking-[0.14em] text-white/34">
-        {member?.tier ?? "NEXUS PLAYER"}
-      </p>
+      <div
+        className={`flex min-w-0 items-center gap-2 ${side === "right" ? "justify-end" : ""}`}
+      >
+        <p className="truncate text-xl font-black text-white">
+          {member?.username ?? "미정"}
+        </p>
+        <span className="shrink-0 text-[11px] font-bold uppercase text-white/42">
+          {member?.tier ?? "UNRANKED"}
+        </span>
+        {member?.lineScore != null && (
+          <span className="shrink-0 text-sm font-black tabular-nums text-white/72">
+            {Number(member.lineScore).toFixed(1)}
+          </span>
+        )}
+      </div>
+      <div
+        className={`mt-2 flex h-7 items-center gap-1.5 ${side === "right" ? "justify-end" : ""}`}
+      >
+        {preferences.length > 0 ? (
+          preferences.map((preference: any, index: number) => (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              key={`${preference.championId}-${index}`}
+              src={getChampionIconUrl(preference.championId)}
+              alt=""
+              className="h-7 w-7 rounded-full border border-white/18 object-cover"
+            />
+          ))
+        ) : (
+          <span className="text-[10px] font-black uppercase tracking-[0.12em] text-white/22">
+            No Preferences
+          </span>
+        )}
+      </div>
     </div>
   );
 }
@@ -866,6 +931,25 @@ export function MatchIntroScene({ snapshot }: { snapshot: any }) {
         </div>
       </div>
     </StageFrame>
+  );
+}
+
+export function LineupOverlayScene({ snapshot }: { snapshot: any }) {
+  const match = snapshot?.match;
+  if (!match) return <div className="h-full w-full bg-transparent" />;
+
+  return (
+    <div className="relative h-full w-full overflow-hidden bg-transparent text-white">
+      <style>{broadcastBgCss}</style>
+      <div className="absolute inset-x-8 top-8 flex items-start justify-between gap-[460px]">
+        <div className="w-[690px] border-y border-blue-400/35 bg-black/80 p-5 shadow-[0_24px_80px_rgba(0,0,0,0.5)] backdrop-blur-sm">
+          <MatchIntroTeam team={match.blue} side="left" />
+        </div>
+        <div className="w-[690px] border-y border-red-400/35 bg-black/80 p-5 shadow-[0_24px_80px_rgba(0,0,0,0.5)] backdrop-blur-sm">
+          <MatchIntroTeam team={match.red} side="right" />
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -2003,7 +2087,10 @@ function RevealMemberRow({
             <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/35">
               Line Score
             </p>
-            <p className="text-2xl font-black tabular-nums" style={{ color: teamColor }}>
+            <p
+              className="text-2xl font-black tabular-nums"
+              style={{ color: teamColor }}
+            >
               {Number(member.lineScore).toFixed(1)}
             </p>
           </div>
@@ -2131,7 +2218,10 @@ export function TeamRevealScene({ snapshot }: { snapshot: any }) {
                           <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/35">
                             Team Score
                           </p>
-                          <p className="text-2xl font-black tabular-nums" style={{ color: teamColor }}>
+                          <p
+                            className="text-2xl font-black tabular-nums"
+                            style={{ color: teamColor }}
+                          >
                             {Number(team.balanceTotal).toFixed(1)}
                           </p>
                         </div>

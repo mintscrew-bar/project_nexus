@@ -9,6 +9,8 @@ import { LowerThird } from "../[token]/_components/LowerThird";
 import {
   RoomScene,
   MatchScene,
+  MatchIntroScene,
+  LineupOverlayScene,
   IdleScene,
   BracketScene,
   RoleSelectionScene,
@@ -154,6 +156,32 @@ const withPartialAssignedRoles = (team: any, roles: Array<string | null>) => ({
   })),
 });
 
+const withLineupData = (team: any, roles: string[], scoreOffset: number) => {
+  const championIds = ["103", "64", "84", "81", "89"];
+  const members = (team.members ?? []).map((member: any, index: number) => ({
+    ...member,
+    assignedRole: roles[index],
+    lineScore: 118.5 + scoreOffset + index * 3.2,
+    championPreferences: championIds.map((championId, order) => ({
+      role: roles[index],
+      championId,
+      order,
+    })),
+  }));
+  return {
+    ...team,
+    members,
+    balanceTotal: members.reduce(
+      (total: number, member: any) => total + member.lineScore,
+      0,
+    ),
+  };
+};
+
+const LINEUP_ROLES = ["TOP", "JUNGLE", "MID", "ADC", "SUPPORT"];
+const LINEUP_BLUE = withLineupData(TEAM_BLUE, LINEUP_ROLES, 4);
+const LINEUP_RED = withLineupData(TEAM_RED, LINEUP_ROLES, 0);
+
 // 프리뷰용 티어 샘플 — 언랭(UNRANKED)/미연동(null) 케이스도 섞어 표기를 확인한다.
 // 길이를 소수(7)로 둬 그리드 열 수(5·6·8)와 주기가 겹치지 않게 한다.
 const PREVIEW_TIERS: Array<[string | null, string | null, number | null]> = [
@@ -243,8 +271,8 @@ const SNAP: Record<string, any> = {
       blueSideTeamId: "teamA",
       blueScore: 1,
       redScore: 0,
-      blue: TEAM_BLUE,
-      red: TEAM_RED,
+      blue: LINEUP_BLUE,
+      red: LINEUP_RED,
     },
   },
   bracket: {
@@ -811,6 +839,8 @@ const SCENES: { key: string; label: string }[] = [
   { key: "bracketSingle", label: "일반 대진표(8팀)" },
   { key: "bracketDouble", label: "더블 엘림(4팀)" },
   { key: "bracketDouble8", label: "더블 엘림(8팀)" },
+  { key: "matchIntro", label: "경기 소개" },
+  { key: "lineup", label: "라인업 패널" },
   { key: "match", label: "경기 중계" },
   { key: "matchDone", label: "경기 종료(승팀)" },
   { key: "idle", label: "Idle(방 없음)" },
@@ -915,6 +945,18 @@ const PREVIEW_TRANSITIONS: Record<
     eyebrow: "MATCH STATUS",
     tone: "match",
   },
+  matchIntro: {
+    label: "MATCH INTRO",
+    subLabel: "선수 소개",
+    eyebrow: "STARTING LINEUP",
+    tone: "match",
+  },
+  lineup: {
+    label: "LINEUP",
+    subLabel: "밴픽 라인업",
+    eyebrow: "MATCH GUIDE",
+    tone: "match",
+  },
   matchDone: {
     label: "RESULT",
     subLabel: "경기 결과",
@@ -965,6 +1007,10 @@ export default function BroadcastPreviewPage() {
     <IdleScene snapshot={snapshot} />
   ) : sceneKey.startsWith("bracket") ? (
     <BracketScene snapshot={snapshot} />
+  ) : sceneKey === "matchIntro" ? (
+    <MatchIntroScene snapshot={SNAP.match} />
+  ) : sceneKey === "lineup" ? (
+    <LineupOverlayScene snapshot={SNAP.match} />
   ) : isMatch ? (
     <MatchScene snapshot={snapshot} />
   ) : sceneKey === "auction" || sceneKey === "auctionMulti" ? (

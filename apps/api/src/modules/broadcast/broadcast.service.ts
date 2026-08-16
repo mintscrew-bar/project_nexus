@@ -16,6 +16,7 @@ export type BroadcastScene =
   | "control"
   | "room"
   | "match-intro"
+  | "lineup"
   | "match"
   | "bracket"
   | "result"
@@ -25,8 +26,8 @@ export type BroadcastScene =
 
 const RESULT_SCENE_MS = 12_000;
 const BRACKET_SCENE_AFTER_RESULT_MS = 15_000;
-const BRACKET_SCENE_BEFORE_MATCH_MS = 15_000;
-const MATCH_INTRO_SCENE_MS = 12_000;
+const BRACKET_SCENE_BEFORE_MATCH_MS = 0;
+const MATCH_INTRO_SCENE_MS = 60_000;
 
 /**
  * 방송 오버레이 서비스.
@@ -291,6 +292,7 @@ export class BroadcastService {
         rank: account?.rank ?? null,
         lp: account?.lp ?? null,
         roleTiers: account?.roleTiers ?? [],
+        championPreferences: account?.championPreferences ?? [],
         lineScore:
           typeof lineScore === "number" && Number.isFinite(lineScore)
             ? lineScore
@@ -502,6 +504,14 @@ export class BroadcastService {
                         lp: true,
                         balanceScores: true,
                         balanceScoreVersion: true,
+                        championPreferences: {
+                          orderBy: { order: "asc" },
+                          select: {
+                            role: true,
+                            championId: true,
+                            order: true,
+                          },
+                        },
                         roleTiers: {
                           select: {
                             role: true,
@@ -570,6 +580,7 @@ export class BroadcastService {
     if (
       effectiveScene === "match" ||
       effectiveScene === "match-intro" ||
+      effectiveScene === "lineup" ||
       effectiveScene === "result"
     ) {
       // 우선순위: URL matchId → 방 focus → 진행 중 경기 → null
@@ -649,6 +660,7 @@ export class BroadcastService {
     if (
       scene === "bracket" ||
       scene === "match-intro" ||
+      scene === "lineup" ||
       scene === "match" ||
       scene === "result" ||
       scene === "summary"
@@ -669,7 +681,12 @@ export class BroadcastService {
     // 조작 패널에서 중계 경기를 바꾸면 바로 경기 화면으로 점프하지 않는다.
     // 선택된 경기를 강조한 대진표를 잠깐 보여 준 뒤 자연스럽게 송출한다.
     if (room.broadcastFocusChangedAt && liveMatch) {
-      const focusAt = room.broadcastFocusChangedAt.getTime();
+      // 경기가 이미 시작됐다면 가위바위보/진영 선택 완료 뒤 기록되는 startedAt을
+      // 우선한다. 미리 대진을 선택해 둔 시간 때문에 60초 소개가 줄어들면 안 된다.
+      const focusAt = Math.max(
+        room.broadcastFocusChangedAt.getTime(),
+        liveMatch.startedAt?.getTime() ?? 0,
+      );
       const bracketUntil = focusAt + BRACKET_SCENE_BEFORE_MATCH_MS;
       if (now <= bracketUntil) {
         return { scene: "bracket", nextChangeAt: bracketUntil };

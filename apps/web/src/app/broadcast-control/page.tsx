@@ -175,9 +175,13 @@ function BroadcastControlContent() {
 
   const activeScene = displayState?.scene ?? "auto";
   const activeLabel = useMemo(
-    () => SCENES.find((item) => item.scene === activeScene)?.label ?? "자동",
+    () =>
+      activeScene === "lineup"
+        ? "라인업 패널"
+        : (SCENES.find((item) => item.scene === activeScene)?.label ?? "자동"),
     [activeScene],
   );
+  const lineupVisible = activeScene === "lineup";
 
   const load = async (options?: {
     silent?: boolean;
@@ -577,11 +581,36 @@ function BroadcastControlContent() {
 
           <button
             type="button"
+            onClick={() => update({ scene: lineupVisible ? "auto" : "lineup" })}
+            disabled={saving || !focusedMatch}
+            className={`mt-3 flex w-full items-center justify-between rounded-lg border px-3 py-2.5 text-left disabled:opacity-50 ${
+              lineupVisible
+                ? "border-accent-primary bg-accent-primary/12"
+                : "border-bg-elevated bg-bg-tertiary"
+            }`}
+          >
+            <span>
+              <span className="block text-xs font-bold text-text-primary">
+                라인업 패널
+              </span>
+              <span className="text-[11px] text-text-tertiary">
+                밴픽 중 선수·선호 챔피언 표시
+              </span>
+            </span>
+            {lineupVisible ? (
+              <Eye className="h-5 w-5 text-accent-primary" />
+            ) : (
+              <EyeOff className="h-5 w-5 text-text-tertiary" />
+            )}
+          </button>
+
+          <button
+            type="button"
             onClick={() =>
               update({ lowerThirdVisible: !displayState?.lowerThirdVisible })
             }
             disabled={saving}
-            className="mt-3 flex w-full items-center justify-between rounded-lg border border-bg-elevated bg-bg-tertiary px-3 py-2.5 text-left disabled:opacity-50"
+            className="mt-2 flex w-full items-center justify-between rounded-lg border border-bg-elevated bg-bg-tertiary px-3 py-2.5 text-left disabled:opacity-50"
           >
             <span>
               <span className="block text-xs font-bold text-text-primary">

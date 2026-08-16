@@ -787,6 +787,7 @@ export type BroadcastControlScene =
   | "role-selection"
   | "bracket"
   | "match-intro"
+  | "lineup"
   | "match"
   | "result"
   | "summary"
