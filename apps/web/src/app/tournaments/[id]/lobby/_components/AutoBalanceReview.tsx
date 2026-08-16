@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Dices,
   Lock,
@@ -17,6 +17,8 @@ interface ReviewMember {
   assignedRole: string | null;
   /** 배정된 라인 기준 밸런스 점수 */
   score: number | null;
+  /** 교체될 라인 기준 예상 점수를 계산하기 위한 전체 라인 점수 */
+  scoresByRole: Record<string, number> | null;
 }
 
 interface ReviewTeam {
@@ -61,34 +63,34 @@ export function AutoBalanceReview({
   const [busy, setBusy] = useState<
     "reroll" | "confirm" | "swap" | "undo" | null
   >(null);
-  // 교체는 두 번 눌러 완성한다. 첫 번째 선택을 여기 담아 둔다.
   // ─── 드래그 교체 ───
   //
-  // 실수로 밸런스가 바뀌면 안 되므로 "집는" 동작부터 분명해야 한다.
-  // 이동 거리로 판정하면 목록을 스크롤하려다 집히거나, 손이 살짝 밀린 것을
-  // 드래그로 오인한다. 그래서 **누르고 있어야** 집히도록 했다.
-  //   - HOLD_TO_PICK_MS 동안 누르고 있어야 집힌다 (짧은 클릭·탭은 무시)
-  //   - 집히기 전에 움직이면 스크롤로 보고 취소한다
-  //   - 대상 행의 세로 중앙 영역 안에서 놓아야 교체 (가장자리는 무효)
+  // 마우스는 누르는 즉시, 터치는 짧게 누른 뒤 카드를 집는다.
+  //   - 이름뿐 아니라 선수 행 전체가 드래그·드롭 영역이다
+  //   - 터치에서 집히기 전에 크게 움직이면 스크롤로 보고 취소한다
+  //   - 대상 행 어느 위치에 놓아도 교체된다
   //   - ESC·포인터 취소·유효하지 않은 위치는 전부 취소
-  const HOLD_TO_PICK_MS = 250;
-  const HOLD_MOVE_TOLERANCE_PX = 10;
-  const DROP_SAFE_RATIO = 0.6; // 행 높이의 가운데 60%만 유효
+  const TOUCH_HOLD_TO_PICK_MS = 140;
+  const HOLD_MOVE_TOLERANCE_PX = 14;
 
   const [swapFrom, setSwapFrom] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
+  const [dragPosition, setDragPosition] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
   const dragOrigin = useRef<{ x: number; y: number; userId: string } | null>(
     null,
   );
   const draggingRef = useRef(false);
   const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const clearHoldTimer = () => {
+  const clearHoldTimer = useCallback(() => {
     if (holdTimerRef.current) {
       clearTimeout(holdTimerRef.current);
       holdTimerRef.current = null;
     }
-  };
+  }, []);
 
   const resolveDropTarget = (clientX: number, clientY: number) => {
     const element = document
@@ -96,38 +98,44 @@ export function AutoBalanceReview({
       ?.closest<HTMLElement>("[data-swap-user]");
     if (!element) return null;
 
-    // 행 경계 근처는 어느 쪽을 노렸는지 모호하다. 가운데만 유효로 본다.
-    const rect = element.getBoundingClientRect();
-    const margin = (rect.height * (1 - DROP_SAFE_RATIO)) / 2;
-    if (clientY < rect.top + margin || clientY > rect.bottom - margin) {
-      return null;
-    }
     return element.dataset.swapUser ?? null;
   };
 
-  const cancelDrag = () => {
+  const cancelDrag = useCallback(() => {
     clearHoldTimer();
     dragOrigin.current = null;
     draggingRef.current = false;
     setSwapFrom(null);
     setDropTarget(null);
+    setDragPosition(null);
+  }, [clearHoldTimer]);
+
+  const beginDrag = (origin: { x: number; y: number; userId: string }) => {
+    draggingRef.current = true;
+    setSwapFrom(origin.userId);
+    setDragPosition({ x: origin.x, y: origin.y });
   };
 
   const handlePointerDown = (
     event: React.PointerEvent<HTMLElement>,
     userId: string,
   ) => {
-    if (busy !== null) return;
+    if (busy !== null || event.button !== 0) return;
     dragOrigin.current = { x: event.clientX, y: event.clientY, userId };
     event.currentTarget.setPointerCapture(event.pointerId);
 
-    // 누르고 있는 동안만 집힌다. 짧게 누르면 아무 일도 일어나지 않는다.
     clearHoldTimer();
+    if (event.pointerType === "mouse") {
+      event.preventDefault();
+      beginDrag(dragOrigin.current);
+      return;
+    }
+
+    // 터치는 스크롤과 충돌하지 않도록 짧은 홀드 뒤 집는다.
     holdTimerRef.current = setTimeout(() => {
       if (!dragOrigin.current) return;
-      draggingRef.current = true;
-      setSwapFrom(dragOrigin.current.userId);
-    }, HOLD_TO_PICK_MS);
+      beginDrag(dragOrigin.current);
+    }, TOUCH_HOLD_TO_PICK_MS);
   };
 
   const handlePointerMove = (event: React.PointerEvent<HTMLElement>) => {
@@ -144,6 +152,8 @@ export function AutoBalanceReview({
       return;
     }
 
+    event.preventDefault();
+    setDragPosition({ x: event.clientX, y: event.clientY });
     const target = resolveDropTarget(event.clientX, event.clientY);
     setDropTarget(target && target !== origin.userId ? target : null);
   };
@@ -158,12 +168,14 @@ export function AutoBalanceReview({
     if (!origin || !wasDragging) {
       setSwapFrom(null);
       setDropTarget(null);
+      setDragPosition(null);
       return;
     }
 
     const target = resolveDropTarget(event.clientX, event.clientY);
     setSwapFrom(null);
     setDropTarget(null);
+    setDragPosition(null);
 
     // 유효한 대상 위에서 놓았을 때만 교체한다.
     if (!target || target === origin.userId) return;
@@ -199,7 +211,7 @@ export function AutoBalanceReview({
    * 바꿨을 때의 팀 합계 변화를 그대로 구할 수 있다. 실수로 밸런스를 크게
    * 망가뜨리는 걸 누르기 전에 막는 것이 목적이다.
    */
-  const previewSpread = (() => {
+  const swapPreview = (() => {
     if (!swapFrom || !dropTarget || swapFrom === dropTarget) return null;
 
     const locate = (userId: string) => {
@@ -220,27 +232,50 @@ export function AutoBalanceReview({
     ) {
       return null;
     }
-    // 같은 팀이면 라인만 바뀌어 합계가 그대로다.
-    if (from.team.id === to.team.id) return null;
 
-    const totals = teams.map((team) => {
+    const scoreAtRole = (member: ReviewMember, role: string | null) => {
+      if (!role || !member.scoresByRole) return null;
+      const value = member.scoresByRole[role];
+      return typeof value === "number" && Number.isFinite(value) ? value : null;
+    };
+    const fromNextScore = scoreAtRole(from.member, to.member.assignedRole);
+    const toNextScore = scoreAtRole(to.member, from.member.assignedRole);
+    if (fromNextScore === null || toNextScore === null) return null;
+
+    const projectedTotals: Record<string, number> = {};
+    for (const team of teams) {
       if (team.balanceTotal === null) return null;
-      if (team.id === from.team.id) {
-        return team.balanceTotal - from.member.score! + to.member.score!;
-      }
-      if (team.id === to.team.id) {
-        return team.balanceTotal - to.member.score! + from.member.score!;
-      }
-      return team.balanceTotal;
-    });
+      projectedTotals[team.id] = team.balanceTotal;
+    }
 
-    if (totals.some((total) => total === null)) return null;
-    const values = totals as number[];
-    return Math.max(...values) - Math.min(...values);
+    if (from.team.id === to.team.id) {
+      projectedTotals[from.team.id] =
+        projectedTotals[from.team.id] -
+        from.member.score -
+        to.member.score +
+        fromNextScore +
+        toNextScore;
+    } else {
+      projectedTotals[from.team.id] =
+        projectedTotals[from.team.id] - from.member.score + toNextScore;
+      projectedTotals[to.team.id] =
+        projectedTotals[to.team.id] - to.member.score + fromNextScore;
+    }
+
+    const values = Object.values(projectedTotals);
+    return {
+      spread: Math.max(...values) - Math.min(...values),
+      totals: projectedTotals,
+    };
   })();
+  const draggedMember = swapFrom
+    ? teams
+        .flatMap((team) => team.members)
+        .find((member) => member.userId === swapFrom)
+    : null;
 
   // 언마운트 시 대기 중인 집기 타이머를 정리한다.
-  useEffect(() => clearHoldTimer, []);
+  useEffect(() => clearHoldTimer, [clearHoldTimer]);
 
   // 드래그 도중 ESC 로 취소할 수 있게 한다.
   useEffect(() => {
@@ -250,7 +285,7 @@ export function AutoBalanceReview({
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [swapFrom]);
+  }, [swapFrom, cancelDrag]);
 
   const handleReroll = async () => {
     setBusy("reroll");
@@ -288,7 +323,7 @@ export function AutoBalanceReview({
           </h3>
           <p className="mt-0.5 text-xs text-text-tertiary">
             {isHost
-              ? "이름을 꾹 눌러 옮기면 교체되고, 자물쇠로 고정한 뒤 다시 돌릴 수 있습니다."
+              ? "선수 카드를 끌어 교체하고, 자물쇠로 고정한 뒤 다시 돌릴 수 있습니다."
               : "방장이 편성을 확정하면 대진표로 넘어갑니다."}
           </p>
         </div>
@@ -329,114 +364,184 @@ export function AutoBalanceReview({
       </div>
 
       <div className="grid gap-3 md:grid-cols-2">
-        {teams.map((team) => (
-          <div
-            key={team.id}
-            className="overflow-hidden rounded-lg border border-bg-tertiary bg-bg-primary"
-          >
+        {teams.map((team) => {
+          const projectedTotal = swapPreview?.totals[team.id] ?? null;
+          return (
             <div
-              className="flex items-center justify-between gap-2 px-3 py-2"
-              style={{ backgroundColor: `${team.color ?? "#667eea"}1a` }}
+              key={team.id}
+              className="overflow-hidden rounded-lg border border-bg-tertiary bg-bg-primary"
             >
-              <span className="flex min-w-0 items-center gap-2">
-                <span
-                  className="h-2 w-2 flex-shrink-0 rounded-full"
-                  style={{ backgroundColor: team.color ?? "#667eea" }}
-                />
-                <span className="truncate text-xs font-bold text-text-primary">
-                  {team.name}
+              <div
+                className="flex items-center justify-between gap-2 px-3 py-2"
+                style={{ backgroundColor: `${team.color ?? "#667eea"}1a` }}
+              >
+                <span className="flex min-w-0 items-center gap-2">
+                  <span
+                    className="h-2 w-2 flex-shrink-0 rounded-full"
+                    style={{ backgroundColor: team.color ?? "#667eea" }}
+                  />
+                  <span className="truncate text-xs font-bold text-text-primary">
+                    {team.name}
+                  </span>
                 </span>
-              </span>
-              {team.balanceTotal !== null && (
-                <span className="flex-shrink-0 text-xs font-black tabular-nums text-text-secondary">
-                  {team.balanceTotal.toFixed(1)}
-                </span>
-              )}
-            </div>
+                {team.balanceTotal !== null && (
+                  <span className="flex flex-shrink-0 items-center gap-1.5 text-xs font-black tabular-nums">
+                    <span
+                      className={
+                        projectedTotal !== null
+                          ? "text-text-tertiary line-through"
+                          : "text-text-secondary"
+                      }
+                    >
+                      {team.balanceTotal.toFixed(1)}
+                    </span>
+                    {projectedTotal !== null && (
+                      <>
+                        <span className="text-text-muted">→</span>
+                        <span className="text-accent-primary">
+                          {projectedTotal.toFixed(1)}
+                        </span>
+                      </>
+                    )}
+                  </span>
+                )}
+              </div>
 
-            <ul className="divide-y divide-bg-tertiary/60">
-              {team.members.map((member) => {
-                const isPinned = pinned.has(member.userId);
-                return (
-                  <li
-                    key={member.userId}
-                    className="flex items-center gap-2 px-3 py-1.5"
-                  >
-                    {member.assignedRole ? (
-                      <PositionIcon
-                        position={member.assignedRole}
-                        className="!h-4 !w-4 flex-shrink-0"
-                      />
-                    ) : (
-                      <span className="h-4 w-4 flex-shrink-0" />
-                    )}
-                    <span className="w-7 flex-shrink-0 text-[10px] text-text-tertiary">
-                      {member.assignedRole
-                        ? (POSITION_LABELS[member.assignedRole] ??
-                          member.assignedRole)
-                        : "-"}
-                    </span>
-                    {isHost ? (
-                      <span
-                        // 드롭 판정에 쓰는 표식. elementFromPoint 로 이 속성을 찾는다.
-                        data-swap-user={member.userId}
-                        onPointerDown={(event) =>
-                          handlePointerDown(event, member.userId)
-                        }
-                        onPointerMove={handlePointerMove}
-                        onPointerUp={handlePointerUp}
-                        onPointerCancel={cancelDrag}
-                        title="꾹 눌러 집은 뒤 바꿀 인원 위에 놓으세요"
-                        // touch-pan-y: 세로 스크롤은 그대로 통과시킨다. 이름이 행에서 가장 넓은
-                        // 영역이라 여기서 스크롤이 막히면 모바일에서 목록을 못 넘긴다.
-                        // 스크롤 의도는 집기 전 이동으로 감지해 취소한다.
-                        className={`min-w-0 flex-1 cursor-grab touch-pan-y select-none truncate rounded px-1 py-0.5 text-xs transition-colors active:cursor-grabbing ${
-                          swapFrom === member.userId
-                            ? "bg-accent-warning/20 text-accent-warning"
-                            : dropTarget === member.userId
-                              ? "bg-accent-primary/20 text-accent-primary ring-1 ring-accent-primary/40"
-                              : "text-text-primary hover:bg-bg-tertiary"
-                        }`}
-                      >
-                        {member.username}
+              <ul className="divide-y divide-bg-tertiary/60">
+                {team.members.map((member) => {
+                  const isPinned = pinned.has(member.userId);
+                  return (
+                    <li
+                      key={member.userId}
+                      data-swap-user={isHost ? member.userId : undefined}
+                      onPointerDown={
+                        isHost
+                          ? (event) => handlePointerDown(event, member.userId)
+                          : undefined
+                      }
+                      onPointerMove={isHost ? handlePointerMove : undefined}
+                      onPointerUp={isHost ? handlePointerUp : undefined}
+                      onPointerCancel={isHost ? cancelDrag : undefined}
+                      title={
+                        isHost
+                          ? "선수 카드를 끌어 바꿀 인원 위에 놓으세요"
+                          : undefined
+                      }
+                      className={`relative flex items-center gap-2 px-3 py-2 transition-[opacity,transform,box-shadow,background-color] duration-150 ${
+                        isHost
+                          ? `select-none ${swapFrom ? "touch-none" : "touch-pan-y"} cursor-grab active:cursor-grabbing`
+                          : ""
+                      } ${
+                        swapFrom === member.userId
+                          ? "z-10 scale-[1.015] bg-accent-warning/12 opacity-45 shadow-lg ring-1 ring-accent-warning/50"
+                          : dropTarget === member.userId
+                            ? "scale-[0.985] bg-accent-primary/18 opacity-60 ring-2 ring-inset ring-accent-primary"
+                            : isHost
+                              ? "hover:bg-bg-tertiary/70"
+                              : ""
+                      }`}
+                    >
+                      {member.assignedRole ? (
+                        <PositionIcon
+                          position={member.assignedRole}
+                          className="!h-4 !w-4 flex-shrink-0"
+                        />
+                      ) : (
+                        <span className="h-4 w-4 flex-shrink-0" />
+                      )}
+                      <span className="w-7 flex-shrink-0 text-[10px] text-text-tertiary">
+                        {member.assignedRole
+                          ? (POSITION_LABELS[member.assignedRole] ??
+                            member.assignedRole)
+                          : "-"}
                       </span>
-                    ) : (
-                      <span className="min-w-0 flex-1 truncate text-xs text-text-primary">
-                        {member.username}
+                      {isHost ? (
+                        <span className="min-w-0 flex-1 truncate text-xs font-semibold text-text-primary">
+                          {member.username}
+                        </span>
+                      ) : (
+                        <span className="min-w-0 flex-1 truncate text-xs text-text-primary">
+                          {member.username}
+                        </span>
+                      )}
+                      <span className="w-10 flex-shrink-0 text-right text-xs font-bold tabular-nums text-text-secondary">
+                        {member.score !== null ? member.score.toFixed(1) : "–"}
                       </span>
-                    )}
-                    <span className="w-10 flex-shrink-0 text-right text-xs font-bold tabular-nums text-text-secondary">
-                      {member.score !== null ? member.score.toFixed(1) : "–"}
-                    </span>
-                    {isHost && (
-                      <button
-                        type="button"
-                        onClick={() => togglePin(member.userId)}
-                        title={
-                          isPinned
-                            ? "고정 해제 — 다시 돌릴 때 자리가 바뀔 수 있습니다"
-                            : "이 자리 고정 — 다시 돌려도 팀과 라인이 유지됩니다"
-                        }
-                        className={`flex-shrink-0 rounded p-1 transition-colors ${
-                          isPinned
-                            ? "bg-accent-primary/20 text-accent-primary"
-                            : "text-text-muted hover:bg-bg-tertiary hover:text-text-secondary"
-                        }`}
-                      >
-                        {isPinned ? (
-                          <Lock className="h-3.5 w-3.5" />
-                        ) : (
-                          <Unlock className="h-3.5 w-3.5" />
-                        )}
-                      </button>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        ))}
+                      {isHost && (
+                        <button
+                          type="button"
+                          onPointerDown={(event) => event.stopPropagation()}
+                          onClick={() => togglePin(member.userId)}
+                          title={
+                            isPinned
+                              ? "고정 해제 — 다시 돌릴 때 자리가 바뀔 수 있습니다"
+                              : "이 자리 고정 — 다시 돌려도 팀과 라인이 유지됩니다"
+                          }
+                          className={`flex-shrink-0 rounded p-1 transition-colors ${
+                            isPinned
+                              ? "bg-accent-primary/20 text-accent-primary"
+                              : "text-text-muted hover:bg-bg-tertiary hover:text-text-secondary"
+                          }`}
+                        >
+                          {isPinned ? (
+                            <Lock className="h-3.5 w-3.5" />
+                          ) : (
+                            <Unlock className="h-3.5 w-3.5" />
+                          )}
+                        </button>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          );
+        })}
       </div>
+
+      {dragPosition && draggedMember && (
+        <div
+          className="pointer-events-none fixed z-[100] flex min-w-48 items-center gap-3 rounded-lg border border-accent-warning/70 bg-bg-elevated/95 px-4 py-3 text-sm shadow-2xl backdrop-blur-sm"
+          style={{
+            left: dragPosition.x,
+            top: dragPosition.y,
+            transform: "translate(-50%, calc(-100% - 14px)) rotate(-1deg)",
+          }}
+        >
+          <ArrowLeftRight className="h-4 w-4 flex-shrink-0 text-accent-warning" />
+          <span className="max-w-44 truncate font-black text-text-primary">
+            {draggedMember.username}
+          </span>
+          <span className="font-black tabular-nums text-text-secondary">
+            {draggedMember.score !== null
+              ? draggedMember.score.toFixed(1)
+              : "–"}
+          </span>
+        </div>
+      )}
+
+      {swapPreview && spread !== null && (
+        <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-accent-primary/40 bg-accent-primary/10 px-4 py-3">
+          <span className="text-xs font-bold text-text-secondary">
+            교체 후 예상 팀 점수 차
+          </span>
+          <span className="flex items-center gap-2 text-lg font-black tabular-nums">
+            <span className="text-text-tertiary line-through">
+              {spread.toFixed(1)}
+            </span>
+            <span className="text-text-muted">→</span>
+            <span
+              className={
+                swapPreview.spread <= spread
+                  ? "text-accent-success"
+                  : "text-accent-warning"
+              }
+            >
+              {swapPreview.spread.toFixed(1)}
+            </span>
+          </span>
+        </div>
+      )}
 
       {isHost && (
         <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -447,19 +552,14 @@ export function AutoBalanceReview({
                 {dropTarget
                   ? "여기에 놓으면 교체됩니다"
                   : "바꿀 인원 위로 끌어다 놓으세요 (ESC 취소)"}
-                {previewSpread !== null && spread !== null && (
-                  <span className="ml-1 font-bold tabular-nums">
-                    · 점수 차 {spread.toFixed(1)} → {previewSpread.toFixed(1)}
-                  </span>
-                )}
               </span>
             ) : pinned.size > 0 ? (
               `${pinned.size}명 고정 — 나머지만 다시 배치됩니다`
             ) : (
-              "이름을 꾹 눌러 집은 뒤 옮기면 교체됩니다"
+              "선수 카드를 끌어 다른 선수 위에 놓으면 교체됩니다"
             )}
           </p>
-          <div className="flex gap-2">
+          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
             <button
               type="button"
               onClick={handleUndo}
@@ -469,7 +569,7 @@ export function AutoBalanceReview({
                   ? "되감을 이전 편성이 없습니다"
                   : `직전 편성으로 되감기 (${undoDepth}단계 남음)`
               }
-              className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-bg-elevated px-3 text-sm font-bold text-text-secondary transition-colors hover:bg-bg-tertiary hover:text-text-primary disabled:opacity-40"
+              className="inline-flex min-h-10 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-bg-elevated px-3 text-sm font-bold text-text-secondary transition-colors hover:bg-bg-tertiary hover:text-text-primary disabled:opacity-40"
             >
               <RotateCcw className="h-4 w-4" />
               {busy === "undo" ? "되감는 중..." : "뒤로"}
@@ -483,7 +583,7 @@ export function AutoBalanceReview({
               type="button"
               onClick={handleReroll}
               disabled={busy !== null}
-              className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-bg-elevated bg-bg-tertiary px-4 text-sm font-bold text-text-primary transition-colors hover:bg-bg-elevated disabled:opacity-50"
+              className="inline-flex min-h-10 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-bg-elevated bg-bg-tertiary px-4 text-sm font-bold text-text-primary transition-colors hover:bg-bg-elevated disabled:opacity-50"
             >
               <Dices className="h-4 w-4" />
               {busy === "reroll" ? "편성 중..." : "다시 돌리기"}
@@ -492,7 +592,7 @@ export function AutoBalanceReview({
               type="button"
               onClick={handleConfirm}
               disabled={busy !== null}
-              className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg bg-accent-success px-5 text-sm font-bold text-white transition-colors hover:bg-accent-success/90 disabled:opacity-50"
+              className="col-span-2 inline-flex min-h-10 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-accent-success px-5 text-sm font-bold text-white transition-colors hover:bg-accent-success/90 disabled:opacity-50 sm:col-span-1"
             >
               <Check className="h-4 w-4" />
               {busy === "confirm" ? "확정 중..." : "확정하고 대진표로"}

@@ -645,6 +645,7 @@ export default function TournamentLobbyPage() {
                 role && participant?.balanceScores
                   ? (participant.balanceScores[role] ?? null)
                   : null,
+              scoresByRole: participant?.balanceScores ?? null,
             };
           }),
         }))}
