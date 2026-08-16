@@ -525,7 +525,7 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
               {/* 하단: 최고 입찰 바 — 별도 박스 대신 카드 하단 띠로 분리 */}
               <div
                 className={cn(
-                  "flex items-center justify-between px-6 py-4 bg-bg-secondary/60 border-t border-bg-tertiary transition-colors",
+                  "flex items-center justify-center px-6 py-4 bg-bg-secondary/60 border-t border-bg-tertiary transition-colors",
                   bidFlash && "animate-bid-flash",
                 )}
               >
@@ -538,40 +538,6 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
                     G
                   </span>
                 </div>
-                {auctionState.currentHighestBidder ? (
-                  (() => {
-                    const bidderTeam = sortedTeams.find(
-                      (t) =>
-                        t.id === auctionState.currentHighestBidder ||
-                        t.captainId === auctionState.currentHighestBidder,
-                    );
-                    return (
-                      <div className="flex items-center gap-2">
-                        {bidderTeam?.color && (
-                          <div
-                            className="w-3 h-3 rounded-full flex-shrink-0"
-                            style={{ backgroundColor: bidderTeam.color }}
-                          />
-                        )}
-                        <span className="text-base font-semibold text-text-primary">
-                          {highestBidderName}
-                        </span>
-                        {bidderTeam && (
-                          <span className="text-xs text-text-muted">
-                            · {bidderTeam.name}
-                          </span>
-                        )}
-                        <Badge variant="warning" className="ml-1">
-                          현재 선두
-                        </Badge>
-                      </div>
-                    );
-                  })()
-                ) : (
-                  <span className="text-sm text-text-tertiary">
-                    아직 입찰 없음
-                  </span>
-                )}
               </div>
             </CardContent>
           </Card>
@@ -651,6 +617,58 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
               </div>
             );
           })}
+        </div>
+      )}
+
+      {auctionState.currentPlayer && (
+        <div
+          className={cn(
+            "hidden min-h-[140px] flex-1 flex-col items-center justify-center py-5 text-center lg:flex",
+            bidFlash && "animate-bid-flash",
+          )}
+        >
+          {auctionState.currentHighestBidder ? (
+            (() => {
+              const bidderTeam = sortedTeams.find(
+                (team) =>
+                  team.id === auctionState.currentHighestBidder ||
+                  team.captainId === auctionState.currentHighestBidder,
+              );
+
+              return (
+                <>
+                  <span className="mb-2 text-xs font-bold uppercase text-accent-gold">
+                    현재 선두
+                  </span>
+                  <div className="flex max-w-full items-center justify-center gap-3">
+                    {bidderTeam?.color && (
+                      <span
+                        className="h-4 w-4 flex-shrink-0 rounded-full"
+                        style={{ backgroundColor: bidderTeam.color }}
+                      />
+                    )}
+                    <strong className="truncate text-3xl font-black text-text-primary xl:text-4xl">
+                      {highestBidderName}
+                    </strong>
+                  </div>
+                  {bidderTeam && (
+                    <span className="mt-2 max-w-full truncate text-sm font-medium text-text-secondary">
+                      {bidderTeam.name}
+                    </span>
+                  )}
+                </>
+              );
+            })()
+          ) : (
+            <>
+              <span className="text-xs font-bold uppercase text-text-tertiary">
+                현재 선두
+              </span>
+              <span className="mt-2 text-lg font-semibold text-text-muted">
+                첫 입찰을 기다리는 중
+              </span>
+            </>
+          )}
         </div>
       )}
 
