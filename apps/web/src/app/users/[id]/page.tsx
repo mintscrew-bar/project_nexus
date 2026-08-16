@@ -49,6 +49,7 @@ import {
 import { TierBadge } from "@/components/domain/TierBadge";
 import { RoleTierBadges } from "@/components/domain/RoleTierBadges";
 import { RoleBalanceScores } from "@/components/domain/RoleBalanceScores";
+import { StreamerPlatformBadge } from "@/components/domain/StreamerPlatformBadge";
 import { ReputationSummary, SummaryChip, WinRateSparkline, getCombinedProfileMetrics } from "@/components/domain/ProfileStats";
 import { PreferredChampionPanel, RankedChampionPanel } from "@/components/domain/ProfileChampionPanels";
 import { useToast } from "@/components/ui/Toast";
@@ -564,13 +565,17 @@ export default function UserProfilePage() {
                       {clan.tag}
                     </Badge>
                   )}
-                  {(profile.streamerProfiles ?? []).length > 0 && (
-                    <a href={profile.streamerProfiles![0].channelUrl} target="_blank" rel="noreferrer">
-                      <Badge variant="gold" size="sm" className="rounded-md px-2 py-1 text-xs font-black">
-                        streamer
-                      </Badge>
+                  {(profile.streamerProfiles ?? []).map((streamer) => (
+                    <a
+                      key={streamer.platform}
+                      href={streamer.channelUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      title={streamer.channelName ?? streamer.channelUrl}
+                    >
+                      <StreamerPlatformBadge platform={streamer.platform} />
                     </a>
-                  )}
+                  ))}
                 </div>
 
                 {/* Bio */}

@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useState } from "react";
 import { Bell, BellOff, Eye, Radio, Swords } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { StreamerListItem } from "@/lib/api-client";
+import type { StreamerChannelItem, StreamerListItem } from "@/lib/api-client";
+import { StreamerPlatformBadge } from "@/components/domain/StreamerPlatformBadge";
 
 const PLATFORM_LABELS: Record<string, string> = {
   CHZZK: "치지직",
@@ -56,7 +57,15 @@ export function LiveStreamerCard({
 }: StreamerCardProps) {
   // 실패한 URL 자체를 기억한다. 폴링으로 URL이 바뀌면 자연히 다시 시도하게 된다.
   const [failedThumbnail, setFailedThumbnail] = useState<string | null>(null);
-  const live = streamer.live;
+  const channels = getStreamerChannels(streamer);
+  const liveChannels = channels.filter((channel) => channel.live?.isLive);
+  const [selectedPlatform, setSelectedPlatform] = useState(streamer.platform);
+  const selectedChannel =
+    liveChannels.find((channel) => channel.platform === selectedPlatform) ??
+    liveChannels[0] ??
+    channels[0];
+  const live = selectedChannel.live;
+  const displayStreamer = { ...streamer, ...selectedChannel };
   const thumbnail =
     live?.thumbnailUrl && live.checkedAt
       ? withCacheBuster(live.thumbnailUrl, live.checkedAt)
@@ -66,7 +75,7 @@ export function LiveStreamerCard({
   return (
     <div className="group overflow-hidden rounded-2xl border border-bg-tertiary bg-bg-secondary transition-colors hover:border-accent-primary/40">
       <a
-        href={streamer.channelUrl}
+        href={selectedChannel.channelUrl}
         target="_blank"
         rel="noopener noreferrer"
         className="block"
@@ -103,22 +112,44 @@ export function LiveStreamerCard({
         </div>
 
         <div className="flex gap-3 p-4">
-          <StreamerAvatar streamer={streamer} size={40} />
+          <StreamerAvatar streamer={displayStreamer} size={40} />
 
           <div className="min-w-0 flex-1">
             <p className="truncate font-semibold text-text-primary">
-              {live?.title || streamer.channelName || streamer.username}
+              {streamer.username}
             </p>
             <p className="mt-0.5 truncate text-sm text-text-secondary">
-              {streamer.channelName ?? streamer.username}
+              {live?.title || selectedChannel.channelName || streamer.username}
             </p>
             <p className="mt-1 truncate text-xs text-text-muted">
-              {PLATFORM_LABELS[streamer.platform] ?? streamer.platform}
+              {PLATFORM_LABELS[selectedChannel.platform] ??
+                selectedChannel.platform}
               {live?.categoryName ? ` · ${live.categoryName}` : ""}
             </p>
           </div>
         </div>
       </a>
+
+      {liveChannels.length > 1 && (
+        <div className="flex flex-wrap gap-1.5 border-t border-bg-tertiary px-4 py-2">
+          {liveChannels.map((channel) => (
+            <button
+              key={channel.platform}
+              type="button"
+              onClick={() => setSelectedPlatform(channel.platform)}
+              title={`${PLATFORM_LABELS[channel.platform] ?? channel.platform} 미리보기`}
+              className={cn(
+                "rounded-md transition-opacity hover:opacity-80",
+                channel.platform === selectedChannel.platform
+                  ? "ring-2 ring-accent-primary ring-offset-1 ring-offset-bg-secondary"
+                  : "opacity-60",
+              )}
+            >
+              <StreamerPlatformBadge platform={channel.platform} />
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="flex items-center gap-2 border-t border-bg-tertiary px-4 py-3">
         {streamer.activeRoom && (
@@ -152,8 +183,10 @@ export function OfflineStreamerCard({
   onToggleFollow,
   followPending,
 }: StreamerCardProps) {
+  const channels = getStreamerChannels(streamer);
+
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-bg-tertiary bg-bg-secondary p-3 transition-colors hover:border-bg-elevated hover:bg-bg-tertiary/60">
+    <div className="flex min-w-0 items-center gap-3 rounded-xl border border-bg-tertiary bg-bg-secondary p-3 transition-colors hover:border-bg-elevated hover:bg-bg-tertiary/60">
       <a
         href={streamer.channelUrl}
         target="_blank"
@@ -164,14 +197,27 @@ export function OfflineStreamerCard({
 
         <div className="min-w-0 flex-1">
           <p className="truncate font-medium text-text-primary">
-            {streamer.channelName ?? streamer.username}
+            {streamer.username}
           </p>
           <p className="truncate text-xs text-text-muted">
-            {PLATFORM_LABELS[streamer.platform] ?? streamer.platform} ·{" "}
             {formatLastLive(streamer.lastLiveAt)}
           </p>
         </div>
       </a>
+      <div className="flex min-w-0 flex-wrap justify-end gap-1">
+        {channels.map((channel) => (
+          <a
+            key={channel.platform}
+            href={channel.channelUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={channel.channelName ?? channel.platform}
+            className="rounded-md transition-opacity hover:opacity-80"
+          >
+            <StreamerPlatformBadge platform={channel.platform} />
+          </a>
+        ))}
+      </div>
       {onToggleFollow && (
         <FollowButton
           streamer={streamer}
@@ -181,6 +227,12 @@ export function OfflineStreamerCard({
       )}
     </div>
   );
+}
+
+function getStreamerChannels(
+  streamer: StreamerListItem,
+): StreamerChannelItem[] {
+  return streamer.channels?.length ? streamer.channels : [streamer];
 }
 
 function FollowButton({

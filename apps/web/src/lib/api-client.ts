@@ -2484,10 +2484,7 @@ export interface StreamerLiveState {
   checkedAt: string;
 }
 
-export interface StreamerListItem {
-  userId: string;
-  username: string;
-  avatar: string | null;
+export interface StreamerChannelItem {
   platform: StreamerPlatformKind;
   channelUrl: string;
   channelName: string | null;
@@ -2496,6 +2493,13 @@ export interface StreamerListItem {
   verified: boolean;
   lastLiveAt: string | null;
   live: StreamerLiveState | null;
+}
+
+export interface StreamerListItem extends StreamerChannelItem {
+  userId: string;
+  username: string;
+  avatar: string | null;
+  channels: StreamerChannelItem[];
   activeRoom: { id: string; name: string; status: string } | null;
   isFollowing: boolean;
 }

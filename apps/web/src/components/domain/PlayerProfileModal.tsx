@@ -33,6 +33,7 @@ import {
 } from "@/app/tournaments/[id]/lobby/_components/icons";
 import { RoleTierBadges } from "@/components/domain/RoleTierBadges";
 import { RoleBalanceScores } from "@/components/domain/RoleBalanceScores";
+import { StreamerPlatformBadge } from "@/components/domain/StreamerPlatformBadge";
 
 interface PlayerProfileModalProps {
   userId: string | null;
@@ -50,13 +51,6 @@ const REPORT_REASONS: { value: ReportReason; label: string }[] = [
 ];
 
 const ACCENT = "#667EEA";
-
-// 스트리머 플랫폼 표시 라벨
-const STREAMER_PLATFORM_LABELS: Record<string, string> = {
-  CHZZK: "치지직",
-  SOOP: "SOOP",
-  YOUTUBE: "유튜브",
-};
 
 const TIER_COLOR: Record<string, string> = {
   CHALLENGER: "#F59E0B",
@@ -400,16 +394,16 @@ export function PlayerProfileModal({
                     />
                   )}
                   {/* 스트리머 채널 배지 — 플랫폼별 채널 링크 */}
-                  {streamerProfiles.map((sp: any, i: number) => (
+                  {streamerProfiles.map((sp: any) => (
                     <a
-                      key={`${sp.platform}-${i}`}
+                      key={sp.platform}
                       href={sp.channelUrl}
                       target="_blank"
                       rel="noreferrer"
                       title={sp.channelName || sp.channelUrl}
-                      className="inline-flex shrink-0 items-center gap-1 rounded-md bg-accent-gold/15 px-2 py-1 text-xs font-black leading-none text-accent-gold transition-colors hover:bg-accent-gold/25"
+                      className="inline-flex shrink-0 rounded-md transition-opacity hover:opacity-80"
                     >
-                      {STREAMER_PLATFORM_LABELS[sp.platform] || sp.platform}
+                      <StreamerPlatformBadge platform={sp.platform} />
                     </a>
                   ))}
                 </div>

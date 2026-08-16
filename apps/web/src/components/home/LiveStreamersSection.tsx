@@ -66,10 +66,7 @@ export function LiveStreamersSection({
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {liveStreamers.slice(0, 3).map((streamer) => (
-          <LiveStreamerTile
-            key={`${streamer.userId}-${streamer.platform}`}
-            streamer={streamer}
-          />
+          <LiveStreamerTile key={streamer.userId} streamer={streamer} />
         ))}
       </div>
     </section>
@@ -79,6 +76,12 @@ export function LiveStreamersSection({
 function LiveStreamerTile({ streamer }: { streamer: StreamerListItem }) {
   const [failedThumbnail, setFailedThumbnail] = useState<string | null>(null);
   const live = streamer.live;
+  const livePlatforms = (
+    streamer.channels?.length ? streamer.channels : [streamer]
+  )
+    .filter((channel) => channel.live?.isLive)
+    .map((channel) => PLATFORM_LABELS[channel.platform] ?? channel.platform)
+    .join(" · ");
 
   const thumbnail =
     live?.thumbnailUrl && live.checkedAt
@@ -124,8 +127,7 @@ function LiveStreamerTile({ streamer }: { streamer: StreamerListItem }) {
             {live?.title || streamer.channelName || streamer.username}
           </p>
           <p className="mt-0.5 truncate text-xs text-text-muted">
-            {streamer.channelName ?? streamer.username} ·{" "}
-            {PLATFORM_LABELS[streamer.platform] ?? streamer.platform}
+            {streamer.username} · {livePlatforms}
           </p>
         </div>
       </a>

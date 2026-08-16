@@ -36,10 +36,7 @@ export interface StreamerLiveState extends LiveSnapshot {
   checkedAt: string;
 }
 
-export interface StreamerListItem {
-  userId: string;
-  username: string;
-  avatar: string | null;
+export interface StreamerChannelItem {
   platform: StreamerPlatform;
   channelUrl: string;
   channelName: string | null;
@@ -48,6 +45,13 @@ export interface StreamerListItem {
   verified: boolean;
   lastLiveAt: Date | null;
   live: StreamerLiveState | null;
+}
+
+export interface StreamerListItem extends StreamerChannelItem {
+  userId: string;
+  username: string;
+  avatar: string | null;
+  channels: StreamerChannelItem[];
   /** 이 스트리머가 지금 호스트로 열어둔 내전 방 */
   activeRoom: { id: string; name: string; status: string } | null;
   /** 요청한 유저가 팔로우 중인지. 비로그인 요청이면 항상 false. */
@@ -210,15 +214,22 @@ export class StreamerService {
       ? new Set(await this.getFollowedStreamerIds(viewerId))
       : new Set<string>();
 
-    const items: StreamerListItem[] = profiles.map((profile) => {
+    const grouped = new Map<
+      string,
+      Pick<
+        StreamerListItem,
+        "userId" | "username" | "avatar" | "activeRoom" | "isFollowing"
+      > & {
+        channels: StreamerChannelItem[];
+      }
+    >();
+
+    for (const profile of profiles) {
       const live = profile.channelId
         ? (liveStates.get(`${profile.platform}:${profile.channelId}`) ?? null)
         : null;
 
-      return {
-        userId: profile.userId,
-        username: profile.user.username,
-        avatar: profile.user.avatar,
+      const channel: StreamerChannelItem = {
         platform: profile.platform,
         channelUrl: profile.channelUrl,
         channelName: profile.channelName,
@@ -227,10 +238,58 @@ export class StreamerService {
         verified: !!profile.verifiedAt,
         lastLiveAt: profile.lastLiveAt,
         live,
-        activeRoom: activeRooms.get(profile.userId) ?? null,
-        isFollowing: followedIds.has(profile.userId),
       };
-    });
+
+      const existing = grouped.get(profile.userId);
+      if (existing) {
+        existing.channels.push(channel);
+      } else {
+        grouped.set(profile.userId, {
+          userId: profile.userId,
+          username: profile.user.username,
+          avatar: profile.user.avatar,
+          channels: [channel],
+          activeRoom: activeRooms.get(profile.userId) ?? null,
+          isFollowing: followedIds.has(profile.userId),
+        });
+      }
+    }
+
+    const items: StreamerListItem[] = Array.from(grouped.values()).map(
+      (streamer) => {
+        const channels = [...streamer.channels].sort((a, b) => {
+          const liveDiff = Number(!!b.live?.isLive) - Number(!!a.live?.isLive);
+          if (liveDiff !== 0) return liveDiff;
+
+          if (a.live?.isLive && b.live?.isLive) {
+            const viewerDiff =
+              (b.live.viewerCount ?? 0) - (a.live.viewerCount ?? 0);
+            if (viewerDiff !== 0) return viewerDiff;
+          }
+
+          return (
+            (b.lastLiveAt?.getTime() ?? 0) - (a.lastLiveAt?.getTime() ?? 0)
+          );
+        });
+        const primary = channels[0];
+        const lastLiveAt = channels.reduce<Date | null>(
+          (latest, channel) =>
+            !latest ||
+            (channel.lastLiveAt &&
+              channel.lastLiveAt.getTime() > latest.getTime())
+              ? channel.lastLiveAt
+              : latest,
+          null,
+        );
+
+        return {
+          ...streamer,
+          ...primary,
+          channels,
+          lastLiveAt,
+        };
+      },
+    );
 
     // 방송 중 → 시청자 수 많은 순 → 최근 방송 순
     return items.sort((a, b) => {

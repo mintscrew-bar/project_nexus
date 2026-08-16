@@ -107,7 +107,7 @@ export function StreamersClient() {
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {liveStreamers.map((streamer) => (
               <LiveStreamerCard
-                key={`${streamer.userId}-${streamer.platform}`}
+                key={streamer.userId}
                 streamer={streamer}
                 onToggleFollow={toggleFollow}
                 followPending={
@@ -132,7 +132,7 @@ export function StreamersClient() {
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {offlineStreamers.map((streamer) => (
               <OfflineStreamerCard
-                key={`${streamer.userId}-${streamer.platform}`}
+                key={streamer.userId}
                 streamer={streamer}
                 onToggleFollow={toggleFollow}
                 followPending={
