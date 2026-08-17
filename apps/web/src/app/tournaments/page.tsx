@@ -11,7 +11,15 @@ import {
 import { RoomCreationForm } from "@/components/rooms/RoomCreationForm";
 import { Button, Input, Modal } from "@/components/ui";
 import { useKeyboardShortcutsContext } from "@/components/KeyboardShortcuts";
-import { ArrowUpDown, CheckCircle, Clock, Plus, Search, Users, X } from "lucide-react";
+import {
+  ArrowUpDown,
+  CheckCircle,
+  Clock,
+  Plus,
+  Search,
+  Users,
+  X,
+} from "lucide-react";
 import { useAuthStore } from "@/stores/auth-store";
 import { TournamentsTour } from "@/components/onboarding/TournamentsTour";
 import { AdSlotCard } from "@/components/ads/AdSlot";
@@ -95,20 +103,30 @@ export default function TournamentsPage() {
                   onClick={openRoomCreation}
                   className="h-11 w-full rounded-lg px-5 text-sm font-semibold sm:w-auto"
                 >
-                  <Plus className="mr-2 h-4 w-4" />
-                  방 생성
+                  <Plus className="mr-2 h-4 w-4" />방 생성
                 </Button>
               </div>
             </div>
 
-            <div data-tour="tournaments-filters" className="mt-3 flex flex-wrap items-center gap-2">
+            <div
+              data-tour="tournaments-filters"
+              className="mt-3 flex flex-wrap items-center gap-2"
+            >
               <div className="scrollbar-none flex max-w-full items-center gap-1 overflow-x-auto rounded-xl bg-bg-secondary/55 p-1">
-                {([
+                {[
                   { value: "ALL" as const, label: "전체", icon: null },
                   { value: "WAITING" as const, label: "대기 중", icon: Clock },
-                  { value: "IN_PROGRESS" as const, label: "진행 중", icon: Users },
-                  { value: "COMPLETED" as const, label: "완료", icon: CheckCircle },
-                ]).map((option) => {
+                  {
+                    value: "IN_PROGRESS" as const,
+                    label: "진행 중",
+                    icon: Users,
+                  },
+                  {
+                    value: "COMPLETED" as const,
+                    label: "완료",
+                    icon: CheckCircle,
+                  },
+                ].map((option) => {
                   const Icon = option.icon;
                   const isSelected = statusFilter === option.value;
                   return (
@@ -133,10 +151,14 @@ export default function TournamentsPage() {
                 <input
                   type="checkbox"
                   checked={showOnlyJoinable}
-                  onChange={(event) => setShowOnlyJoinable(event.target.checked)}
+                  onChange={(event) =>
+                    setShowOnlyJoinable(event.target.checked)
+                  }
                   className="h-4 w-4 cursor-pointer rounded accent-accent-primary"
                 />
-                <span className="whitespace-nowrap text-xs font-medium text-text-secondary">참가 가능한 방만</span>
+                <span className="whitespace-nowrap text-xs font-medium text-text-secondary">
+                  참가 가능한 방만
+                </span>
               </label>
 
               <label className="relative ml-auto flex items-center gap-2 rounded-lg bg-bg-secondary/55 px-3 py-2 text-text-tertiary">
@@ -144,11 +166,17 @@ export default function TournamentsPage() {
                 <select
                   aria-label="방 정렬"
                   value={sortBy}
-                  onChange={(event) => setSortBy(event.target.value as SortOption)}
+                  onChange={(event) =>
+                    setSortBy(event.target.value as SortOption)
+                  }
                   className="cursor-pointer bg-transparent pr-1 text-xs font-medium text-text-secondary outline-none"
                 >
                   {roomSortOptions.map((option) => (
-                    <option key={option.value} value={option.value} className="bg-bg-secondary text-text-primary">
+                    <option
+                      key={option.value}
+                      value={option.value}
+                      className="bg-bg-secondary text-text-primary"
+                    >
                       {option.label}
                     </option>
                   ))}
@@ -157,6 +185,8 @@ export default function TournamentsPage() {
             </div>
           </div>
         </header>
+
+        <AdSlotCard slotKey="feed" minHeight={90} className="mt-5" />
 
         <section data-tour="tournaments-results" className="py-8">
           <RoomList
@@ -171,12 +201,6 @@ export default function TournamentsPage() {
             onSortByChange={setSortBy}
           />
         </section>
-
-        <AdSlotCard
-          slotKey="feed"
-          minHeight={100}
-          className="mb-8"
-        />
 
         <Modal
           isOpen={isCreatingRoom}

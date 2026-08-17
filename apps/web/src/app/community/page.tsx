@@ -1,13 +1,25 @@
 "use client";
 
-import { Suspense, useEffect, useTransition, useRef, useState, useCallback } from "react";
+import {
+  Suspense,
+  useEffect,
+  useTransition,
+  useRef,
+  useState,
+  useCallback,
+} from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useQueries } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/auth-store";
 import { useCommunityStore } from "@/stores/community-store";
 import { communityApi, boardApi, type Board } from "@/lib/api-client";
 import { useDebounce } from "@/hooks/useDebounce";
-import { Card, CardContent, EmptyState, PostCardSkeleton } from "@/components/ui";
+import {
+  Card,
+  CardContent,
+  EmptyState,
+  PostCardSkeleton,
+} from "@/components/ui";
 import { MessageCircle, Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { resolveBoardIcon } from "@/lib/board-icons";
@@ -155,7 +167,15 @@ function CommunityPageContent() {
   // key 가 충돌하여 단일 모드가 캐시된 Post[] 를 받고 feedData?.posts === undefined → "게시글 없음" 버그
   const categoryQueries = useQueries({
     queries: boards.map((board) => ({
-      queryKey: ["communityPosts", "CARD", board.slug, apiSortBy, debouncedSearch, selectedTag, 1],
+      queryKey: [
+        "communityPosts",
+        "CARD",
+        board.slug,
+        apiSortBy,
+        debouncedSearch,
+        selectedTag,
+        1,
+      ],
       queryFn: async () => {
         const data = await communityApi.getPosts({
           boardSlug: board.slug,
@@ -174,7 +194,14 @@ function CommunityPageContent() {
 
   // ── React Query: ALL 모드 — 전체 최신글 통합 피드 ──
   const { data: allFeedData, isLoading: allFeedLoading } = useQuery({
-    queryKey: ["communityPosts", "ALL_FEED", apiSortBy, debouncedSearch, selectedTag, currentPage],
+    queryKey: [
+      "communityPosts",
+      "ALL_FEED",
+      apiSortBy,
+      debouncedSearch,
+      selectedTag,
+      currentPage,
+    ],
     queryFn: async () => {
       const data = await communityApi.getPosts({
         limit: POSTS_PER_PAGE,
@@ -192,8 +219,19 @@ function CommunityPageContent() {
   });
 
   // ── React Query: 단일 카테고리 + 페이지네이션 ──
-  const { data: singleCategoryData, isLoading: singleLoading, error: singleError } = useQuery({
-    queryKey: ["communityPosts", selectedCategory, apiSortBy, debouncedSearch, selectedTag, currentPage],
+  const {
+    data: singleCategoryData,
+    isLoading: singleLoading,
+    error: singleError,
+  } = useQuery({
+    queryKey: [
+      "communityPosts",
+      selectedCategory,
+      apiSortBy,
+      debouncedSearch,
+      selectedTag,
+      currentPage,
+    ],
     queryFn: async () => {
       const data = await communityApi.getPosts({
         boardSlug: selectedCategory,
@@ -212,7 +250,8 @@ function CommunityPageContent() {
   });
 
   // ALL 모드 카드 로딩 여부
-  const allModeCardsLoading = selectedCategory === "ALL" && categoryQueries.some((q) => q.isLoading);
+  const allModeCardsLoading =
+    selectedCategory === "ALL" && categoryQueries.some((q) => q.isLoading);
 
   // 단일 카테고리 / ALL 피드 공용 데이터
   const isAllMode = selectedCategory === "ALL";
@@ -224,10 +263,16 @@ function CommunityPageContent() {
   const pinnedPosts = feedPosts.filter((p) => p.isPinned);
   const regularPosts = feedPosts.filter((p) => !p.isPinned);
 
-  const error = singleError ? (singleError as any).message || "게시글을 불러오는데 실패했습니다." : null;
+  const error = singleError
+    ? (singleError as any).message || "게시글을 불러오는데 실패했습니다."
+    : null;
 
   // 초기 로딩 스켈레톤
-  if (allModeCardsLoading && categoryQueries.every((q) => !q.data) && !allFeedData) {
+  if (
+    allModeCardsLoading &&
+    categoryQueries.every((q) => !q.data) &&
+    !allFeedData
+  ) {
     return (
       <div className="flex-grow p-4 md:p-6">
         <div className="container mx-auto max-w-5xl space-y-2">
@@ -263,7 +308,6 @@ function CommunityPageContent() {
     <div className="flex-grow p-4 md:p-6 animate-fade-in">
       <CommunityTour />
       <div className="container mx-auto max-w-5xl">
-
         {/* 사이드바 없이 모든 해상도에서 게시판 전환을 제공한다. */}
         <BoardChips
           boards={boards}
@@ -276,7 +320,9 @@ function CommunityPageContent() {
         {categoryTitle && CategoryIcon ? (
           <div className="flex items-center gap-2 mb-4">
             <CategoryIcon className={cn("h-5 w-5", categoryColor)} />
-            <h1 className="text-lg font-bold text-text-primary">{categoryTitle}</h1>
+            <h1 className="text-lg font-bold text-text-primary">
+              {categoryTitle}
+            </h1>
           </div>
         ) : (
           <h1 className="sr-only">커뮤니티</h1>
@@ -298,60 +344,151 @@ function CommunityPageContent() {
         {(debouncedSearch || selectedTag) && (
           <p className="text-sm text-text-secondary mb-4">
             {debouncedSearch && <>&quot;{debouncedSearch}&quot; </>}
-            {selectedTag && <><span className="text-accent-primary">#{selectedTag}</span> </>}
+            {selectedTag && (
+              <>
+                <span className="text-accent-primary">#{selectedTag}</span>{" "}
+              </>
+            )}
             검색 결과
           </p>
         )}
 
+        <AdSlotCard slotKey="feed" minHeight={90} className="my-6" />
+
         {/* ── ALL 모드: 대문 카드 + 통합 피드 ── */}
         <div data-tour="community-feed">
-        {isAllMode && (
-          <div className="space-y-6">
-            {/* 2x2 카테고리 카드 그리드 (검색 중이 아닐 때만) */}
-            {!debouncedSearch && !selectedTag && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {boards.map((board, idx) => (
-                  <CategoryCard
-                    key={board.id}
-                    board={board}
-                    posts={categoryQueries[idx]?.data ?? []}
-                    totalCount={categoryQueries[idx]?.data?.length ?? 0}
-                    isLoading={categoryQueries[idx]?.isLoading ?? false}
-                  />
-                ))}
-              </div>
-            )}
-
-            {/* 전체 최신글 통합 피드 */}
-            <div>
+          {isAllMode && (
+            <div className="space-y-6">
+              {/* 2x2 카테고리 카드 그리드 (검색 중이 아닐 때만) */}
               {!debouncedSearch && !selectedTag && (
-                <h2 className="text-sm font-semibold text-text-secondary mb-3">
-                  전체 최신글
-                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {boards.map((board, idx) => (
+                    <CategoryCard
+                      key={board.id}
+                      board={board}
+                      posts={categoryQueries[idx]?.data ?? []}
+                      totalCount={categoryQueries[idx]?.data?.length ?? 0}
+                      isLoading={categoryQueries[idx]?.isLoading ?? false}
+                    />
+                  ))}
+                </div>
               )}
-              {allFeedLoading && feedPosts.length === 0 ? (
+
+              {/* 전체 최신글 통합 피드 */}
+              <div>
+                {!debouncedSearch && !selectedTag && (
+                  <h2 className="text-sm font-semibold text-text-secondary mb-3">
+                    전체 최신글
+                  </h2>
+                )}
+                {allFeedLoading && feedPosts.length === 0 ? (
+                  <div className="space-y-2">
+                    {[1, 2, 3, 4, 5].map((i) => (
+                      <PostCardSkeleton key={i} />
+                    ))}
+                  </div>
+                ) : feedTotal === 0 ? (
+                  <EmptyState
+                    icon={
+                      debouncedSearch || selectedTag ? Search : MessageCircle
+                    }
+                    title={
+                      debouncedSearch || selectedTag
+                        ? "검색 결과가 없습니다"
+                        : "게시글이 없습니다"
+                    }
+                    description={
+                      debouncedSearch || selectedTag
+                        ? "다른 검색어나 태그로 시도해보세요."
+                        : isAuthenticated
+                          ? "첫 번째 게시글을 작성해보세요!"
+                          : "로그인하면 게시글을 작성할 수 있어요."
+                    }
+                    action={
+                      selectedTag
+                        ? {
+                            label: "태그 필터 초기화",
+                            onClick: () =>
+                              useCommunityStore.getState().setSelectedTag(""),
+                          }
+                        : debouncedSearch
+                          ? {
+                              label: "검색어 초기화",
+                              onClick: () =>
+                                useCommunityStore.getState().setSearchQuery(""),
+                            }
+                          : isAuthenticated
+                            ? {
+                                label: "글쓰기",
+                                onClick: () => router.push("/community/write"),
+                              }
+                            : {
+                                label: "로그인하기",
+                                onClick: () => router.push("/auth/login"),
+                              }
+                    }
+                  />
+                ) : (
+                  <PostListSection
+                    pinnedPosts={pinnedPosts}
+                    regularPosts={regularPosts}
+                    total={feedTotal}
+                    totalPages={totalPages}
+                    currentPage={currentPage}
+                    onPageChange={handlePageChange}
+                    showCategory
+                  />
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ── 단일 카테고리 모드 ── */}
+          {!isAllMode && (
+            <>
+              {feedLoading && feedPosts.length === 0 ? (
                 <div className="space-y-2">
-                  {[1, 2, 3, 4, 5].map((i) => <PostCardSkeleton key={i} />)}
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <PostCardSkeleton key={i} />
+                  ))}
                 </div>
               ) : feedTotal === 0 ? (
                 <EmptyState
                   icon={debouncedSearch || selectedTag ? Search : MessageCircle}
-                  title={debouncedSearch || selectedTag ? "검색 결과가 없습니다" : "게시글이 없습니다"}
+                  title={
+                    debouncedSearch || selectedTag
+                      ? "검색 결과가 없습니다"
+                      : "게시글이 없습니다"
+                  }
                   description={
                     debouncedSearch || selectedTag
                       ? "다른 검색어나 태그로 시도해보세요."
                       : isAuthenticated
-                      ? "첫 번째 게시글을 작성해보세요!"
-                      : "로그인하면 게시글을 작성할 수 있어요."
+                        ? "첫 번째 게시글을 작성해보세요!"
+                        : "로그인하면 게시글을 작성할 수 있어요."
                   }
                   action={
                     selectedTag
-                      ? { label: "태그 필터 초기화", onClick: () => useCommunityStore.getState().setSelectedTag("") }
+                      ? {
+                          label: "태그 필터 초기화",
+                          onClick: () =>
+                            useCommunityStore.getState().setSelectedTag(""),
+                        }
                       : debouncedSearch
-                      ? { label: "검색어 초기화", onClick: () => useCommunityStore.getState().setSearchQuery("") }
-                      : isAuthenticated
-                      ? { label: "글쓰기", onClick: () => router.push("/community/write") }
-                      : { label: "로그인하기", onClick: () => router.push("/auth/login") }
+                        ? {
+                            label: "검색어 초기화",
+                            onClick: () =>
+                              useCommunityStore.getState().setSearchQuery(""),
+                          }
+                        : isAuthenticated
+                          ? {
+                              label: "글쓰기",
+                              onClick: () => router.push("/community/write"),
+                            }
+                          : {
+                              label: "로그인하기",
+                              onClick: () => router.push("/auth/login"),
+                            }
                   }
                 />
               ) : (
@@ -362,60 +499,11 @@ function CommunityPageContent() {
                   totalPages={totalPages}
                   currentPage={currentPage}
                   onPageChange={handlePageChange}
-                  showCategory
                 />
               )}
-            </div>
-          </div>
-        )}
-
-        {/* ── 단일 카테고리 모드 ── */}
-        {!isAllMode && (
-          <>
-            {feedLoading && feedPosts.length === 0 ? (
-              <div className="space-y-2">
-                {[1, 2, 3, 4, 5].map((i) => <PostCardSkeleton key={i} />)}
-              </div>
-            ) : feedTotal === 0 ? (
-              <EmptyState
-                icon={debouncedSearch || selectedTag ? Search : MessageCircle}
-                title={debouncedSearch || selectedTag ? "검색 결과가 없습니다" : "게시글이 없습니다"}
-                description={
-                  debouncedSearch || selectedTag
-                    ? "다른 검색어나 태그로 시도해보세요."
-                    : isAuthenticated
-                    ? "첫 번째 게시글을 작성해보세요!"
-                    : "로그인하면 게시글을 작성할 수 있어요."
-                }
-                action={
-                  selectedTag
-                    ? { label: "태그 필터 초기화", onClick: () => useCommunityStore.getState().setSelectedTag("") }
-                    : debouncedSearch
-                    ? { label: "검색어 초기화", onClick: () => useCommunityStore.getState().setSearchQuery("") }
-                    : isAuthenticated
-                    ? { label: "글쓰기", onClick: () => router.push("/community/write") }
-                    : { label: "로그인하기", onClick: () => router.push("/auth/login") }
-                }
-              />
-            ) : (
-              <PostListSection
-                pinnedPosts={pinnedPosts}
-                regularPosts={regularPosts}
-                total={feedTotal}
-                totalPages={totalPages}
-                currentPage={currentPage}
-                onPageChange={handlePageChange}
-              />
-            )}
-          </>
-        )}
+            </>
+          )}
         </div>
-
-        <AdSlotCard
-          slotKey="feed"
-          minHeight={100}
-          className="mt-8"
-        />
       </div>
     </div>
   );
@@ -452,10 +540,18 @@ function PostListSection({
         </div>
         <CardContent className="p-0">
           {pinnedPosts.map((post) => (
-            <PostRow key={post.id} post={post} showCategoryIcon={showCategory} />
+            <PostRow
+              key={post.id}
+              post={post}
+              showCategoryIcon={showCategory}
+            />
           ))}
           {regularPosts.map((post) => (
-            <PostRow key={post.id} post={post} showCategoryIcon={showCategory} />
+            <PostRow
+              key={post.id}
+              post={post}
+              showCategoryIcon={showCategory}
+            />
           ))}
         </CardContent>
       </Card>
@@ -480,7 +576,7 @@ function PostListSection({
               (page) =>
                 page === 1 ||
                 page === totalPages ||
-                Math.abs(page - currentPage) <= 2
+                Math.abs(page - currentPage) <= 2,
             )
             .reduce<(number | "...")[]>((acc, page, idx, arr) => {
               if (idx > 0 && page - (arr[idx - 1] as number) > 1) {
@@ -491,7 +587,10 @@ function PostListSection({
             }, [])
             .map((item, idx) =>
               item === "..." ? (
-                <span key={`ellipsis-${idx}`} className="px-2 text-text-tertiary text-sm">
+                <span
+                  key={`ellipsis-${idx}`}
+                  className="px-2 text-text-tertiary text-sm"
+                >
                   …
                 </span>
               ) : (
@@ -502,12 +601,12 @@ function PostListSection({
                     "w-8 h-8 rounded-lg text-sm font-medium transition-colors",
                     currentPage === item
                       ? "bg-accent-primary text-white"
-                      : "text-text-secondary hover:text-text-primary hover:bg-bg-tertiary"
+                      : "text-text-secondary hover:text-text-primary hover:bg-bg-tertiary",
                   )}
                 >
                   {item}
                 </button>
-              )
+              ),
             )}
           <button
             onClick={() => onPageChange(currentPage + 1)}
@@ -525,13 +624,15 @@ function PostListSection({
 /** useSearchParams가 있으므로 Suspense 래핑 필수 (Next.js 요건) */
 export default function CommunityPage() {
   return (
-    <Suspense fallback={
-      <div className="flex-grow p-4 md:p-6">
-        <div className="container mx-auto max-w-5xl space-y-2">
-          <div className="h-10 bg-bg-tertiary rounded-lg skeleton mb-4" />
+    <Suspense
+      fallback={
+        <div className="flex-grow p-4 md:p-6">
+          <div className="container mx-auto max-w-5xl space-y-2">
+            <div className="h-10 bg-bg-tertiary rounded-lg skeleton mb-4" />
+          </div>
         </div>
-      </div>
-    }>
+      }
+    >
       <CommunityPageContent />
     </Suspense>
   );

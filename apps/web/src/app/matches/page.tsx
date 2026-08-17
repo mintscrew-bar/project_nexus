@@ -117,7 +117,10 @@ export default function StatsPage() {
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
         setShowDropdown(false);
       }
     };
@@ -160,7 +163,7 @@ export default function StatsPage() {
             s.gameName === search.gameName &&
             s.tagLine === search.tagLine &&
             s.userId === search.userId
-          )
+          ),
       ),
     ].slice(0, 10); // Keep only 10 recent searches
 
@@ -183,10 +186,15 @@ export default function StatsPage() {
             tagLine: tagLine.trim(),
             timestamp: Date.now(),
           });
-          router.push(`/matches/summoner/${encodeURIComponent(gameName.trim())}/${encodeURIComponent(tagLine.trim())}`);
+          router.push(
+            `/matches/summoner/${encodeURIComponent(gameName.trim())}/${encodeURIComponent(tagLine.trim())}`,
+          );
         }
       } else {
-        addToast("소환사 이름은 '게임명#태그' 형식으로 입력해주세요. (예: Hide on bush#KR1)", "error");
+        addToast(
+          "소환사 이름은 '게임명#태그' 형식으로 입력해주세요. (예: Hide on bush#KR1)",
+          "error",
+        );
       }
     } else {
       // User search - if only one result, go directly
@@ -211,7 +219,9 @@ export default function StatsPage() {
 
   const handleRecentSearchClick = (search: RecentSearch) => {
     if (search.type === "summoner" && search.gameName && search.tagLine) {
-      router.push(`/matches/summoner/${encodeURIComponent(search.gameName)}/${encodeURIComponent(search.tagLine)}`);
+      router.push(
+        `/matches/summoner/${encodeURIComponent(search.gameName)}/${encodeURIComponent(search.tagLine)}`,
+      );
     } else if (search.type === "user" && search.userId) {
       router.push(`/matches/user/${search.userId}`);
     }
@@ -250,7 +260,10 @@ export default function StatsPage() {
           </p>
 
           {/* Search Bar */}
-          <div data-tour="matches-search" className="mx-auto max-w-3xl rounded-2xl border border-white/[0.09] bg-black/25 p-3 shadow-[0_24px_70px_rgba(0,0,0,0.3)] backdrop-blur-sm sm:p-4">
+          <div
+            data-tour="matches-search"
+            className="mx-auto max-w-3xl rounded-2xl border border-white/[0.09] bg-black/25 p-3 shadow-[0_24px_70px_rgba(0,0,0,0.3)] backdrop-blur-sm sm:p-4"
+          >
             {/* Search Type Tabs */}
             <div className="mb-3 grid grid-cols-2 gap-1 rounded-xl bg-white/[0.04] p-1">
               <button
@@ -293,7 +306,9 @@ export default function StatsPage() {
                 <Input
                   type="text"
                   aria-label={
-                    searchType === "summoner" ? "소환사 검색" : "Nexus 유저 검색"
+                    searchType === "summoner"
+                      ? "소환사 검색"
+                      : "Nexus 유저 검색"
                   }
                   placeholder={
                     searchType === "summoner"
@@ -316,46 +331,51 @@ export default function StatsPage() {
                 />
 
                 {/* Search Results Dropdown */}
-                {searchType === "user" && showDropdown && searchResults.length > 0 && (
-                  <div className="absolute top-full left-0 right-0 mt-2 bg-bg-secondary border border-bg-tertiary rounded-lg shadow-xl z-50 max-h-96 overflow-y-auto">
-                    {searchResults.map((user) => (
-                      <button
-                        key={user.id}
-                        onClick={() => handleUserSelect(user)}
-                        className="w-full flex items-center gap-3 p-4 hover:bg-bg-tertiary transition-colors text-left border-b border-bg-tertiary/50 last:border-b-0"
-                      >
-                        {user.avatar ? (
-                          <Image
-                            src={user.avatar}
-                            alt={user.username}
-                            width={48}
-                            height={48}
-                            className="w-12 h-12 rounded-full"
-                          />
-                        ) : (
-                          <div className="w-12 h-12 rounded-full bg-bg-elevated flex items-center justify-center">
-                            <User className="h-6 w-6 text-text-tertiary" />
-                          </div>
-                        )}
-                        <div className="flex-grow">
-                          <p className="font-semibold text-text-primary">
-                            {user.username}
-                          </p>
-                          {user.primaryRiotAccount && (
-                            <p className="text-sm text-text-secondary">
-                              {user.primaryRiotAccount.gameName}#{user.primaryRiotAccount.tagLine}
-                              {user.primaryRiotAccount.tier && user.primaryRiotAccount.rank && (
-                                <span className="ml-2 text-accent-primary">
-                                  {user.primaryRiotAccount.tier} {user.primaryRiotAccount.rank}
-                                </span>
-                              )}
-                            </p>
+                {searchType === "user" &&
+                  showDropdown &&
+                  searchResults.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 mt-2 bg-bg-secondary border border-bg-tertiary rounded-lg shadow-xl z-50 max-h-96 overflow-y-auto">
+                      {searchResults.map((user) => (
+                        <button
+                          key={user.id}
+                          onClick={() => handleUserSelect(user)}
+                          className="w-full flex items-center gap-3 p-4 hover:bg-bg-tertiary transition-colors text-left border-b border-bg-tertiary/50 last:border-b-0"
+                        >
+                          {user.avatar ? (
+                            <Image
+                              src={user.avatar}
+                              alt={user.username}
+                              width={48}
+                              height={48}
+                              className="w-12 h-12 rounded-full"
+                            />
+                          ) : (
+                            <div className="w-12 h-12 rounded-full bg-bg-elevated flex items-center justify-center">
+                              <User className="h-6 w-6 text-text-tertiary" />
+                            </div>
                           )}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
+                          <div className="flex-grow">
+                            <p className="font-semibold text-text-primary">
+                              {user.username}
+                            </p>
+                            {user.primaryRiotAccount && (
+                              <p className="text-sm text-text-secondary">
+                                {user.primaryRiotAccount.gameName}#
+                                {user.primaryRiotAccount.tagLine}
+                                {user.primaryRiotAccount.tier &&
+                                  user.primaryRiotAccount.rank && (
+                                    <span className="ml-2 text-accent-primary">
+                                      {user.primaryRiotAccount.tier}{" "}
+                                      {user.primaryRiotAccount.rank}
+                                    </span>
+                                  )}
+                              </p>
+                            )}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
 
                 {/* Loading indicator */}
                 {searchType === "user" && isSearching && (
@@ -384,11 +404,18 @@ export default function StatsPage() {
         </div>
       </div>
 
+      <div className="container mx-auto max-w-[1480px] px-4 pt-6 md:px-6 md:pt-8">
+        <AdSlotCard slotKey="matchHub" minHeight={90} />
+      </div>
+
       {/* Content Section */}
       <div className="container mx-auto max-w-[1480px] px-4 py-8 md:px-6 md:py-12">
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[0.8fr_1.2fr]">
           {/* Recent Searches */}
-          <section data-tour="matches-recent" className="overflow-hidden rounded-2xl border border-white/[0.06] bg-bg-secondary/60 backdrop-blur-sm">
+          <section
+            data-tour="matches-recent"
+            className="overflow-hidden rounded-2xl border border-white/[0.06] bg-bg-secondary/60 backdrop-blur-sm"
+          >
             <div className="flex items-center justify-between border-b border-white/[0.05] px-5 py-4">
               <h2 className="flex items-center gap-2 text-sm font-bold text-text-primary">
                 <Clock className="h-4 w-4 text-violet-400" />
@@ -442,8 +469,10 @@ export default function StatsPage() {
                             : search.username}
                         </p>
                         <p className="mt-0.5 text-[11px] text-text-tertiary">
-                          {search.type === "summoner" ? "Riot ID" : "NEXUS 유저"} ·{" "}
-                          {formatRecentTime(search.timestamp)}
+                          {search.type === "summoner"
+                            ? "Riot ID"
+                            : "NEXUS 유저"}{" "}
+                          · {formatRecentTime(search.timestamp)}
                         </p>
                       </div>
                     </div>
@@ -492,12 +521,6 @@ export default function StatsPage() {
             </div>
           </section>
         </div>
-
-        <AdSlotCard
-          slotKey="matchHub"
-          minHeight={100}
-          className="mt-10"
-        />
       </div>
     </div>
   );
