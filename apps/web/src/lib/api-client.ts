@@ -992,11 +992,6 @@ export const matchApi = {
     return response.data;
   },
 
-  getLiveStatus: async (matchId: string) => {
-    const response = await apiClient.get(`/matches/${matchId}/live-status`);
-    return response.data;
-  },
-
   getUserMatchHistory: async (
     userId: string,
     limit: number = 20,

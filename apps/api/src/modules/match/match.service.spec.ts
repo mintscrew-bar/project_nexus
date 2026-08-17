@@ -3,7 +3,6 @@ import { MatchService } from "./match.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { ConfigService } from "@nestjs/config";
 import { RiotTournamentService } from "../riot/riot-tournament.service";
-import { RiotSpectatorService } from "../riot/riot-spectator.service";
 import { MatchDataCollectionService } from "./match-data-collection.service";
 import { NotificationService } from "../notification/notification.service";
 import { MatchBracketService } from "./match-bracket.service";
@@ -18,7 +17,6 @@ import {
 describe("MatchService", () => {
   let service: MatchService;
   let prisma: any;
-  let spectator: any;
 
   beforeEach(async () => {
     // Prisma mock — 실제 DB 연결 없이 단위 테스트
@@ -61,9 +59,6 @@ describe("MatchService", () => {
     const mockRiotTournamentService = {
       createTournamentCode: jest.fn().mockResolvedValue("NEXUS-TEST"),
     };
-    spectator = {
-      findActiveGameByPUUIDs: jest.fn().mockResolvedValue({ isLive: false }),
-    };
     const mockMatchDataCollectionService = {
       collectMatchData: jest.fn().mockResolvedValue(undefined),
     };
@@ -93,10 +88,6 @@ describe("MatchService", () => {
         { provide: ConfigService, useValue: mockConfigService },
         { provide: RiotTournamentService, useValue: mockRiotTournamentService },
         {
-          provide: RiotSpectatorService,
-          useValue: spectator,
-        },
-        {
           provide: MatchDataCollectionService,
           useValue: mockMatchDataCollectionService,
         },
@@ -118,197 +109,6 @@ describe("MatchService", () => {
     }).compile();
 
     service = module.get<MatchService>(MatchService);
-  });
-
-  describe("수동 사설방 픽/밴 라이브 캡처", () => {
-    const makeMember = (puuid: string) => ({
-      user: { riotAccounts: [{ puuid }] },
-    });
-    const teamAPuuids = ["a1", "a2", "a3", "a4", "a5"];
-    const teamBPuuids = ["b1", "b2", "b3", "b4", "b5"];
-
-    const liveCustomGame = (overrides: Record<string, any> = {}) => ({
-      isLive: true,
-      gameInfo: {
-        gameId: 8339000000,
-        gameType: "CUSTOM_GAME",
-        gameQueueConfigId: 0,
-        platformId: "KR1",
-        gameStartTime: 1_760_000_000_000,
-        gameLength: 900,
-        bannedChampions: [{ championId: 64, teamId: 100, pickTurn: 1 }],
-        participants: [...teamAPuuids, ...teamBPuuids].map((puuid, index) => ({
-          puuid,
-          championId: 100 + index,
-          teamId: index < 5 ? 100 : 200,
-          spell1Id: 4,
-          spell2Id: 14,
-          bot: false,
-        })),
-        ...overrides,
-      },
-    });
-
-    const baseMatch = (overrides: Record<string, any> = {}) => ({
-      id: "match-1",
-      status: "IN_PROGRESS",
-      riotMatchId: null,
-      spectatorGameId: null,
-      draftCapturedAt: null,
-      tournamentCode: null,
-      teamAId: "team-a",
-      teamBId: "team-b",
-      teamAIdSnapshot: "team-a",
-      teamBIdSnapshot: "team-b",
-      rosterSnapshots: [],
-      teamA: { members: teamAPuuids.map(makeMember) },
-      teamB: { members: teamBPuuids.map(makeMember) },
-      ...overrides,
-    });
-
-    it("사설게임의 픽/밴과 gameId를 스냅샷으로 저장한다", async () => {
-      prisma.match.findUnique.mockResolvedValue(baseMatch());
-      spectator.findActiveGameByPUUIDs.mockResolvedValue(liveCustomGame());
-
-      await service.getLiveMatchStatus("match-1");
-
-      const update = prisma.match.updateMany.mock.calls[0][0];
-      expect(update.where).toEqual({ id: "match-1", draftCapturedAt: null });
-      expect(update.data.spectatorGameId).toBe("KR_8339000000");
-      expect(update.data.gameDuration).toBe(900);
-      expect(update.data.draftBans).toEqual([
-        { championId: 64, teamId: 100, pickTurn: 1 },
-      ]);
-      // 토너먼트 코드가 없으면 riotMatchId를 채우지 않는다 —
-      // match-v5로 조회되지 않아 수집 큐만 낭비한다.
-      expect(update.data.riotMatchId).toBeUndefined();
-
-      const drafts = prisma.matchDraftSnapshot.createMany.mock.calls[0][0];
-      expect(drafts.data).toHaveLength(10);
-      expect(drafts.data[0]).toMatchObject({
-        matchId: "match-1",
-        puuid: "a1",
-        riotTeamId: 100,
-        championId: 100,
-        spell1Id: 4,
-        spell2Id: 14,
-      });
-    });
-
-    it("토너먼트 코드가 있으면 riotMatchId도 함께 채운다", async () => {
-      prisma.match.findUnique.mockResolvedValue(
-        baseMatch({ tournamentCode: "NEXUS-ABC" }),
-      );
-      spectator.findActiveGameByPUUIDs.mockResolvedValue(liveCustomGame());
-
-      await service.getLiveMatchStatus("match-1");
-
-      expect(prisma.match.updateMany.mock.calls[0][0].data.riotMatchId).toBe(
-        "KR_8339000000",
-      );
-    });
-
-    it("참가자가 겹치지 않으면 저장하지 않는다", async () => {
-      prisma.match.findUnique.mockResolvedValue(baseMatch());
-      spectator.findActiveGameByPUUIDs.mockResolvedValue(
-        liveCustomGame({
-          participants: ["x1", "x2"].map((puuid) => ({
-            puuid,
-            championId: 1,
-            teamId: 100,
-            spell1Id: 4,
-            spell2Id: 14,
-            bot: false,
-          })),
-        }),
-      );
-
-      await service.getLiveMatchStatus("match-1");
-
-      expect(prisma.$transaction).not.toHaveBeenCalled();
-    });
-
-    it("커스텀이 아니면 저장하지 않는다", async () => {
-      prisma.match.findUnique.mockResolvedValue(baseMatch());
-      spectator.findActiveGameByPUUIDs.mockResolvedValue(
-        liveCustomGame({ gameType: "MATCHED_GAME", gameQueueConfigId: 420 }),
-      );
-
-      await service.getLiveMatchStatus("match-1");
-
-      expect(prisma.$transaction).not.toHaveBeenCalled();
-    });
-
-    it("이미 캡처한 매치는 경기 시간만 갱신한다", async () => {
-      prisma.match.findUnique.mockResolvedValue(
-        baseMatch({
-          draftCapturedAt: new Date(),
-          spectatorGameId: "KR_8339000000",
-        }),
-      );
-      spectator.findActiveGameByPUUIDs.mockResolvedValue(
-        liveCustomGame({ gameLength: 1500 }),
-      );
-      prisma.match.updateMany.mockResolvedValue({ count: 1 });
-
-      await service.getLiveMatchStatus("match-1");
-
-      expect(prisma.$transaction).not.toHaveBeenCalled();
-      expect(prisma.match.updateMany).toHaveBeenCalledWith({
-        where: { id: "match-1" },
-        data: { gameDuration: 1500 },
-      });
-    });
-
-    it("팀이 삭제된 매치는 로스터 스냅샷의 puuid로 캡처한다", async () => {
-      prisma.match.findUnique.mockResolvedValue(
-        baseMatch({
-          teamA: null,
-          teamB: null,
-          teamAId: null,
-          teamBId: null,
-          rosterSnapshots: [
-            ...teamAPuuids.map((puuid, i) => ({
-              puuid,
-              userId: `ua${i}`,
-              username: `A${i}`,
-              teamIdSnapshot: "team-a",
-            })),
-            ...teamBPuuids.map((puuid, i) => ({
-              puuid,
-              userId: `ub${i}`,
-              username: `B${i}`,
-              teamIdSnapshot: "team-b",
-            })),
-          ],
-        }),
-      );
-      spectator.findActiveGameByPUUIDs.mockResolvedValue(liveCustomGame());
-
-      await service.getLiveMatchStatus("match-1");
-
-      expect(prisma.$transaction).toHaveBeenCalled();
-    });
-
-    it("같은 매치의 반복 요청은 20초 캐시로 Spectator를 다시 호출하지 않는다", async () => {
-      prisma.match.findUnique.mockResolvedValue(
-        baseMatch({ id: "match-2", teamA: { members: [makeMember("a1")] } }),
-      );
-
-      await service.getLiveMatchStatus("match-2");
-      await service.getLiveMatchStatus("match-2");
-
-      expect(spectator.findActiveGameByPUUIDs).toHaveBeenCalledTimes(1);
-    });
-
-    it("forceRefresh 는 캐시를 무시하고 다시 조회한다", async () => {
-      prisma.match.findUnique.mockResolvedValue(baseMatch({ id: "match-3" }));
-
-      await service.getLiveMatchStatus("match-3");
-      await service.getLiveMatchStatus("match-3", true);
-
-      expect(spectator.findActiveGameByPUUIDs).toHaveBeenCalledTimes(2);
-    });
   });
 
   describe("방이 정리된 매치의 투표", () => {

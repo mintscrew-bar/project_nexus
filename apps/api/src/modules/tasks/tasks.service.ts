@@ -8,7 +8,6 @@ import { getPeakTierUpdate } from "../riot/riot-rank.util";
 import { RedisService } from "../redis/redis.service";
 import { StatsService } from "../stats/stats.service";
 import { MatchDataCollectionService } from "../match/match-data-collection.service";
-import { MatchService } from "../match/match.service";
 import { BalanceScoreService } from "../common/balance-score.service";
 
 @Injectable()
@@ -25,7 +24,6 @@ export class TasksService {
     private readonly redis: RedisService,
     private readonly statsService: StatsService,
     private readonly matchDataCollectionService: MatchDataCollectionService,
-    private readonly matchService: MatchService,
     private readonly balanceScores: BalanceScoreService,
   ) {
     this.riotMatchCacheCleanupEnabled =
@@ -68,39 +66,6 @@ export class TasksService {
    *
    * 대상이 없으면 Riot 호출 0이라 유휴 비용이 없다.
    */
-  @Cron(CronExpression.EVERY_MINUTE)
-  async handleActiveCustomMatchDiscovery(): Promise<void> {
-    const lockKey = "tasks:active-custom-match-discovery";
-    const lockToken = await this.redis.acquireLock(lockKey, 55_000);
-    if (!lockToken) return;
-
-    try {
-      const matches = await this.prisma.match.findMany({
-        where: {
-          status: "IN_PROGRESS",
-          isInternal: true,
-          // 이미 캡처한 매치는 다시 훑지 않는다 — 경기 시간 갱신은
-          // getLiveMatchStatus 내부에서 저렴하게 처리된다.
-          draftCapturedAt: null,
-        },
-        select: { id: true },
-        take: 10,
-      });
-
-      if (matches.length === 0) return;
-
-      for (const match of matches) {
-        await this.matchService.getLiveMatchStatus(match.id);
-      }
-
-      this.logger.log(`진행 중 사설게임 픽/밴 탐색: 대상 ${matches.length}건`);
-    } catch (error) {
-      this.logger.error("진행 중 사설게임 픽/밴 탐색 실패", error);
-    } finally {
-      await this.redis.releaseLock(lockKey, lockToken);
-    }
-  }
-
   /** Re-process completed internal matches whose Riot data was not persisted. */
   @Cron("*/15 * * * *")
   async handlePendingCustomMatchCollection(): Promise<void> {

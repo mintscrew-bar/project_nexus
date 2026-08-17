@@ -49,7 +49,6 @@ export default function BracketPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAborting, setIsAborting] = useState(false);
   const [isAbortConfirmOpen, setIsAbortConfirmOpen] = useState(false);
-  const [liveStatus, setLiveStatus] = useState<any>(null);
 
   // host 여부 — 브래킷 세션 중 변경되지 않으므로 1회만 조회
   const { data: isHost = false } = useQuery({
@@ -102,28 +101,12 @@ export default function BracketPage() {
   const handleMatchClick = (match: Match) => {
     setSelectedMatchId(match.id);
     setIsModalOpen(true);
-    setLiveStatus(null);
   };
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setSelectedMatchId(null);
-    setLiveStatus(null);
   };
-
-  const handleRefreshLiveStatus = useCallback(
-    async (matchId: string) => {
-      try {
-        const status = await matchApi.getLiveStatus(matchId);
-        setLiveStatus(status);
-      } catch (error: any) {
-        // 기존 라이브 상태를 유지하고 다음 폴링에서 재시도한다.
-        if (error?.response?.status === 429) return;
-        addToast("라이브 상태 새로고침에 실패했습니다.", "error");
-      }
-    },
-    [addToast],
-  );
 
   const handleStartMatch = async (matchId: string) => {
     try {
@@ -483,11 +466,9 @@ export default function BracketPage() {
           match={selectedMatch}
           isOpen={isModalOpen}
           isHost={isHost}
-          liveStatus={liveStatus}
           onClose={handleCloseModal}
           onStartMatch={handleStartMatch}
           onReportResult={handleReportResult}
-          onRefreshLiveStatus={handleRefreshLiveStatus}
         />
 
         {/* Victory Screen */}
