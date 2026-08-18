@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useMatchStore } from "@/stores/match-store";
 import { useAuthStore } from "@/stores/auth-store";
-import { roomApi, matchApi } from "@/lib/api-client";
+import { roomApi } from "@/lib/api-client";
 import { connectMatchSocket } from "@/lib/socket-client";
 import {
   BracketView,
@@ -35,7 +35,6 @@ export default function BracketPage() {
     connectToBracket,
     disconnect,
     reset,
-    startMatch,
     reportResult,
     tournamentCompleted,
     finalStandings,
@@ -50,16 +49,20 @@ export default function BracketPage() {
   const [isAborting, setIsAborting] = useState(false);
   const [isAbortConfirmOpen, setIsAbortConfirmOpen] = useState(false);
 
-  // host 여부 — 브래킷 세션 중 변경되지 않으므로 1회만 조회
-  const { data: isHost = false } = useQuery({
-    queryKey: ["bracketHost", roomId, user?.id],
+  // host 여부·방 이름 — 브래킷 세션 중 변경되지 않으므로 1회만 조회
+  const { data: roomInfo } = useQuery({
+    queryKey: ["bracketRoom", roomId, user?.id],
     queryFn: async () => {
       const room = await roomApi.getRoom(roomId);
-      return room.hostId === user!.id;
+      return {
+        isHost: room.hostId === user!.id,
+        name: (room.name ?? null) as string | null,
+      };
     },
     staleTime: Infinity,
     enabled: Boolean(roomId && user),
   });
+  const isHost = roomInfo?.isHost ?? false;
 
   // fetchRoomMatches/connectToBracket/disconnect는 zustand 스토어 함수로 참조가 안정적이므로 dependency에서 제외
   useEffect(() => {
@@ -106,18 +109,6 @@ export default function BracketPage() {
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setSelectedMatchId(null);
-  };
-
-  const handleStartMatch = async (matchId: string) => {
-    try {
-      await startMatch(matchId);
-      // roomMatches가 WebSocket으로 자동 업데이트되므로 selectedMatch 수동 갱신 불필요
-    } catch (error: any) {
-      addToast(
-        error?.response?.data?.message || "매치 시작에 실패했습니다.",
-        "error",
-      );
-    }
   };
 
   const handleReportResult = async (matchId: string, winnerId: string) => {
@@ -357,24 +348,25 @@ export default function BracketPage() {
                 <Trophy className="h-6 w-6 md:h-8 md:w-8 text-accent-gold" />
                 대진표
               </h1>
+              {/* 방 ID는 사용자에게 의미가 없다 — 방 이름을 보여준다 */}
               <p className="mt-1 truncate text-text-secondary">
-                방 ID:{" "}
-                <span className="font-mono text-accent-primary">
-                  {roomId.slice(0, 8)}
-                </span>
+                {roomInfo?.name ?? `방 #${roomId.slice(0, 4)}`}
               </p>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-            <Button
-              variant="danger"
-              size="sm"
-              isLoading={isAborting}
-              onClick={handleAbortToLobby}
-            >
-              내전 종료
-            </Button>
+            {/* 내전 종료는 방장 전용 컨트롤 — 서버도 막지만 버튼 자체를 숨긴다 */}
+            {isHost && (
+              <Button
+                variant="danger"
+                size="sm"
+                isLoading={isAborting}
+                onClick={handleAbortToLobby}
+              >
+                내전 종료
+              </Button>
+            )}
             <Button
               variant="secondary"
               onClick={handleRefresh}
@@ -385,37 +377,6 @@ export default function BracketPage() {
               />
               새로고침
             </Button>
-          </div>
-        </div>
-
-        {/* Tournament Status */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-4">
-            <p className="text-sm text-text-secondary mb-1">총 경기</p>
-            <p className="text-xl md:text-2xl font-bold text-text-primary">
-              {totalMatches}
-            </p>
-          </div>
-          <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-4">
-            <p className="text-sm text-text-secondary mb-1">완료된 경기</p>
-            <p className="text-xl md:text-2xl font-bold text-accent-success">
-              {completedMatches}
-            </p>
-          </div>
-          <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-4">
-            <p className="text-sm text-text-secondary mb-1">진행 중</p>
-            <p className="text-xl md:text-2xl font-bold text-accent-primary">
-              {inProgressMatches}
-            </p>
-          </div>
-          <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-4">
-            <p className="text-sm text-text-secondary mb-1">진행률</p>
-            <p className="text-xl md:text-2xl font-bold text-accent-gold">
-              {totalMatches > 0
-                ? Math.round((completedMatches / totalMatches) * 100)
-                : 0}
-              %
-            </p>
           </div>
         </div>
 
@@ -436,9 +397,38 @@ export default function BracketPage() {
         {bracketMatches.length > 0 ? (
           <div className="overflow-hidden rounded-xl border border-bg-tertiary bg-bg-secondary">
             <div className="border-b border-bg-tertiary bg-bg-tertiary/30 px-4 py-3">
-              <div className="flex items-center gap-2 text-sm font-bold text-text-primary">
-                <Trophy className="h-4 w-4 text-accent-gold" />
-                토너먼트 브래킷
+              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+                <div className="flex items-center gap-2 text-sm font-bold text-text-primary">
+                  <Trophy className="h-4 w-4 text-accent-gold" />
+                  토너먼트 브래킷
+                </div>
+                {/* 경기 수가 적은 내전에서 카드 4장은 과하다 — 헤더 한 줄로 요약 */}
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-text-secondary">
+                  <span>
+                    완료{" "}
+                    <strong className="tabular-nums text-accent-success">
+                      {completedMatches}
+                    </strong>
+                    <span className="text-text-tertiary">/{totalMatches}</span>
+                  </span>
+                  {inProgressMatches > 0 && (
+                    <span>
+                      진행 중{" "}
+                      <strong className="tabular-nums text-accent-primary">
+                        {inProgressMatches}
+                      </strong>
+                    </span>
+                  )}
+                  <span>
+                    진행률{" "}
+                    <strong className="tabular-nums text-accent-gold">
+                      {totalMatches > 0
+                        ? Math.round((completedMatches / totalMatches) * 100)
+                        : 0}
+                      %
+                    </strong>
+                  </span>
+                </div>
               </div>
             </div>
             <div className="bg-[linear-gradient(to_right,rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[size:28px_28px] p-3 md:p-4">
@@ -467,7 +457,6 @@ export default function BracketPage() {
           isOpen={isModalOpen}
           isHost={isHost}
           onClose={handleCloseModal}
-          onStartMatch={handleStartMatch}
           onReportResult={handleReportResult}
         />
 

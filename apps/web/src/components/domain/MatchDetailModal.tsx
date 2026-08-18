@@ -89,7 +89,6 @@ interface MatchDetailModalProps {
   isOpen: boolean;
   isHost?: boolean;
   onClose: () => void;
-  onStartMatch: (matchId: string) => Promise<void>;
   onReportResult: (matchId: string, winnerId: string) => Promise<void>;
 }
 
@@ -98,7 +97,6 @@ export function MatchDetailModal({
   isOpen,
   isHost = false,
   onClose,
-  onStartMatch,
   onReportResult,
 }: MatchDetailModalProps) {
   const { user } = useAuthStore();
@@ -332,16 +330,17 @@ export function MatchDetailModal({
       size="full"
       className="!max-w-6xl"
     >
-      <p className="text-text-secondary mb-4">
-        {getTeamDisplayName(match.team1)} vs {getTeamDisplayName(match.team2)}
-      </p>
+      {/* 대진 요약 — 상태 배지를 별도 행으로 빼지 않고 제목 줄에 붙인다 */}
+      <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+        <p className="text-lg font-bold text-text-primary">
+          {getTeamDisplayName(match.team1)}
+          <span className="mx-2 text-sm font-medium text-text-tertiary">vs</span>
+          {getTeamDisplayName(match.team2)}
+        </p>
+        {getStatusBadge(match.status)}
+      </div>
 
-      <div className="py-4 space-y-4">
-        <div className="flex items-center justify-between">
-          <span className="text-sm font-medium text-text-secondary">상태</span>
-          {getStatusBadge(match.status)}
-        </div>
-
+      <div className="py-2 space-y-4">
         {/* 다전제 시리즈 스코어 */}
         {(match.bestOf ?? 1) > 1 && (
           <div className="rounded-xl border border-accent-primary/25 bg-accent-primary/5 p-3">
@@ -370,6 +369,17 @@ export function MatchDetailModal({
           </div>
         )}
 
+        {/* 경기 결과 — 종료된 매치는 결과부터 보여준다 */}
+        {match.status === 'COMPLETED' && match.winner && (
+          <Alert variant="success">
+            <Trophy className="h-4 w-4" />
+            <AlertTitle>경기 종료</AlertTitle>
+            <AlertDescription>
+              승자: <span className="font-bold">{getTeamDisplayName(match.winner)}</span>
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* 가위바위보 진영 결정 */}
         {rpsActive && rps && rpsTeamA && rpsTeamB && (
           <div className="rounded-xl border border-bg-tertiary bg-bg-secondary/40 p-3">
@@ -386,26 +396,6 @@ export function MatchDetailModal({
               <p className="mt-2 text-center text-sm text-accent-danger">{rpsError}</p>
             )}
           </div>
-        )}
-
-        {/* 라인별 멤버 테이블 — 팀A vs 팀B */}
-        <LaneRoster
-          teamA={fullMatch?.teamA}
-          teamB={fullMatch?.teamB}
-          fallbackTeam1Name={getTeamDisplayName(match.team1)}
-          fallbackTeam2Name={getTeamDisplayName(match.team2)}
-          winnerId={fullMatch?.winnerId}
-          onOpenProfile={setProfileUserId}
-        />
-
-        {match.status === 'COMPLETED' && match.winner && (
-           <Alert variant="success">
-              <Trophy className="h-4 w-4" />
-              <AlertTitle>경기 종료</AlertTitle>
-              <AlertDescription>
-                승자: <span className="font-bold">{getTeamDisplayName(match.winner)}</span>
-              </AlertDescription>
-          </Alert>
         )}
 
         {/* MVP / ACE 투표 */}
@@ -455,29 +445,6 @@ export function MatchDetailModal({
           />
         )}
 
-        {match.status !== 'COMPLETED' && !rpsActive && (
-          <div>
-            <h3 className="text-md font-semibold mb-2 text-text-primary">토너먼트 코드</h3>
-            {match.tournamentCode ? (
-              <div className="flex items-center gap-2">
-                <code className="flex-grow p-2 bg-bg-tertiary rounded font-mono text-text-primary select-all">
-                  {match.tournamentCode}
-                </code>
-                <Button size="icon" variant="ghost" onClick={handleCopyCode}>
-                  <Copy className="h-4 w-4" />
-                </Button>
-              </div>
-            ) : (
-              <p className="text-sm text-text-secondary text-center py-2">
-                {!match.team1 || !match.team2
-                  ? "팀이 확정되면 코드가 자동 생성됩니다."
-                  : "커스텀 게임을 생성하고 직접 입장해주세요."}
-              </p>
-            )}
-            {copied && <p className="text-xs text-accent-success mt-2 text-center">코드가 복사되었습니다!</p>}
-          </div>
-        )}
-
         {currentGameStatus === 'PENDING' && !rpsActive && match.team1 && match.team2 && (() => {
           const captainAId = rpsReadyState?.captainAId ?? match.team1.captain?.id;
           const captainBId = rpsReadyState?.captainBId ?? match.team2.captain?.id;
@@ -486,7 +453,7 @@ export function MatchDetailModal({
           const aReady = captainAId ? (rpsReadyState?.readyIds.includes(captainAId) ?? false) : false;
           const bReady = captainBId ? (rpsReadyState?.readyIds.includes(captainBId) ?? false) : false;
           return (
-            <div className="pt-4 border-t border-bg-tertiary space-y-3">
+            <div className="rounded-xl border border-bg-tertiary bg-bg-secondary/40 p-3 space-y-3">
               <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
                 <Swords className="h-4 w-4 text-accent-primary" />
                 {(match.currentGameNumber ?? 1) > 1
@@ -545,7 +512,7 @@ export function MatchDetailModal({
         })()}
 
         {canManageMatch && currentGameStatus === 'IN_PROGRESS' && (
-          <div className="pt-4 border-t border-bg-tertiary">
+          <div className="rounded-xl border border-accent-primary/25 bg-accent-primary/5 p-3">
             <h3 className="text-md font-semibold mb-2 text-text-primary flex items-center gap-2">
               <ShieldCheck className="h-5 w-5 text-accent-primary" />
               승리 팀 보고
@@ -575,6 +542,43 @@ export function MatchDetailModal({
             )}
           </div>
         )}
+
+        {/* 토너먼트 코드 — 행동 섹션 아래, 라인업 위 */}
+        {match.status !== 'COMPLETED' && !rpsActive && (
+          <div>
+            <h3 className="text-md font-semibold mb-2 text-text-primary">토너먼트 코드</h3>
+            {match.tournamentCode ? (
+              <div className="flex items-center gap-2">
+                <code className="flex-grow p-2 bg-bg-tertiary rounded font-mono text-text-primary select-all">
+                  {match.tournamentCode}
+                </code>
+                <Button size="icon" variant="ghost" onClick={handleCopyCode}>
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
+            ) : (
+              <p className="text-sm text-text-secondary text-center py-2">
+                {!match.team1 || !match.team2
+                  ? "팀이 확정되면 코드가 자동 생성됩니다."
+                  : "커스텀 게임을 생성하고 직접 입장해주세요."}
+              </p>
+            )}
+            {copied && <p className="text-xs text-accent-success mt-2 text-center">코드가 복사되었습니다!</p>}
+          </div>
+        )}
+
+        {/* 라인별 멤버 테이블 — 참고 정보라 행동 섹션 아래에 둔다 */}
+        <div className="border-t border-bg-tertiary pt-4">
+          <LaneRoster
+            teamA={fullMatch?.teamA}
+            teamB={fullMatch?.teamB}
+            fallbackTeam1Name={getTeamDisplayName(match.team1)}
+            fallbackTeam2Name={getTeamDisplayName(match.team2)}
+            winnerId={fullMatch?.winnerId}
+            isLoading={!fullMatch && isLoadingVotes}
+            onOpenProfile={setProfileUserId}
+          />
+        </div>
       </div>
 
       <div className="flex justify-end gap-3 pt-4">
@@ -895,8 +899,13 @@ function VoteColumn({
           >
             <div className="flex items-center justify-between gap-2 mb-1">
               <div className="flex items-center gap-1.5 min-w-0">
-                <div className="w-5 h-5 rounded-full bg-bg-secondary flex items-center justify-center text-xs font-bold text-text-secondary flex-shrink-0">
-                  {member.username.charAt(0).toUpperCase()}
+                <div className="w-5 h-5 rounded-full bg-bg-secondary overflow-hidden flex items-center justify-center text-xs font-bold text-text-secondary flex-shrink-0">
+                  {member.avatar ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={member.avatar} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    member.username.charAt(0).toUpperCase()
+                  )}
                 </div>
                 <span className={`text-xs truncate ${isVotedFor ? 'text-accent-gold font-semibold' : 'text-text-primary'}`}>
                   {member.username}
@@ -942,6 +951,7 @@ function LaneRoster({
   fallbackTeam1Name,
   fallbackTeam2Name,
   winnerId,
+  isLoading = false,
   onOpenProfile,
 }: {
   teamA?: FullMatchDetails['teamA'];
@@ -949,6 +959,7 @@ function LaneRoster({
   fallbackTeam1Name: string;
   fallbackTeam2Name: string;
   winnerId?: string;
+  isLoading?: boolean;
   onOpenProfile: (userId: string) => void;
 }) {
   // 라인별로 멤버를 분류. assignedRole이 없거나 알 수 없으면 'UNASSIGNED' 버킷에 모음.
@@ -978,22 +989,29 @@ function LaneRoster({
         </div>
         <span className="hidden shrink-0 text-xs text-text-tertiary sm:block">선호 순서대로 최대 5개</span>
       </div>
-      <div className="grid gap-4 lg:grid-cols-2">
-        <TeamRosterPanel
-          team={teamA}
-          displayName={teamADisplay}
-          isWinner={!!isAWinner}
-          groupByLane={groupByLane}
-          onOpenProfile={onOpenProfile}
-        />
-        <TeamRosterPanel
-          team={teamB}
-          displayName={teamBDisplay}
-          isWinner={!!isBWinner}
-          groupByLane={groupByLane}
-          onOpenProfile={onOpenProfile}
-        />
-      </div>
+      {isLoading ? (
+        // 로드 전에 빈 패널을 그리면 "선수 정보가 없습니다"가 깜빡인다
+        <div className="flex justify-center rounded-lg border border-bg-tertiary bg-bg-secondary py-10">
+          <Loader2 className="h-6 w-6 animate-spin text-text-secondary" />
+        </div>
+      ) : (
+        <div className="grid gap-4 lg:grid-cols-2">
+          <TeamRosterPanel
+            team={teamA}
+            displayName={teamADisplay}
+            isWinner={!!isAWinner}
+            groupByLane={groupByLane}
+            onOpenProfile={onOpenProfile}
+          />
+          <TeamRosterPanel
+            team={teamB}
+            displayName={teamBDisplay}
+            isWinner={!!isBWinner}
+            groupByLane={groupByLane}
+            onOpenProfile={onOpenProfile}
+          />
+        </div>
+      )}
     </section>
   );
 }
@@ -1031,7 +1049,7 @@ function TeamRosterPanel({
 
   return (
     <div className="overflow-hidden rounded-lg border border-bg-tertiary bg-bg-secondary">
-      <div className="border-b border-bg-tertiary bg-bg-tertiary/60 px-5 py-4">
+      <div className="border-b border-bg-tertiary bg-bg-tertiary/60 px-4 py-3">
         <div className="flex items-center justify-between gap-3">
           <span className={cn('truncate text-lg font-bold', isWinner ? 'text-accent-gold' : 'text-text-primary')}>
             {isWinner && <Trophy className="mr-1.5 inline h-5 w-5" />}
@@ -1068,8 +1086,8 @@ function RosterPlayerRow({ member, onOpenProfile }: { member: MatchMember; onOpe
     .slice(0, 5);
 
   return (
-    <div className="min-w-0 px-5 py-4">
-      <div className="mb-3 flex min-w-0 flex-wrap items-center gap-2.5">
+    <div className="min-w-0 px-4 py-3">
+      <div className="mb-2.5 flex min-w-0 flex-wrap items-center gap-2.5">
         <span className="inline-flex h-9 shrink-0 items-center gap-2 rounded-md bg-bg-tertiary px-3 text-sm font-bold text-text-secondary">
           {lane ? <PositionIcon position={lane} className="!h-5 !w-5" /> : null}
           {lane ? POSITION_LABELS[lane] : '미배정'}
