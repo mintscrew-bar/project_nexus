@@ -11,7 +11,6 @@ import {
   Users,
   Volume2,
   VolumeX,
-  X,
 } from "lucide-react";
 import { TierBadge } from "@/components/domain/TierBadge";
 import { ChampionIcon, PositionIcon } from "./icons";
@@ -201,15 +200,11 @@ export function ParticipantCard({
               <VolumeX className="h-4 w-4" />
             </span>
           ))}
-        {p.isReady ? (
+        {/* 준비 완료만 표시 — 미준비는 무표시가 노이즈 없이 더 잘 읽힌다 */}
+        {p.isReady && (
           <span className="flex items-center gap-1 text-xs font-medium text-accent-success bg-accent-success/10 px-2 py-1 rounded-md">
             <Check className="h-3.5 w-3.5 animate-bounce-in" />
             준비
-          </span>
-        ) : (
-          <span className="flex items-center gap-1 text-xs font-medium text-text-tertiary bg-bg-secondary px-2 py-1 rounded-md">
-            <X className="h-3.5 w-3.5" />
-            대기
           </span>
         )}
         {isCurrentUserHost && !isSelf && (

@@ -45,24 +45,14 @@ export function CompactParticipantCard({
       onMouseEnter={handleMouseEnter}
       onMouseLeave={scheduleHoverClose ?? (() => setHoveredPlayer(null))}
     >
-      {/* Avatar + 준비 상태 점 */}
-      <div className="relative flex-shrink-0">
-        <div className="relative w-7 h-7 rounded-full bg-bg-elevated overflow-hidden">
-          <Image
-            src={p.avatar || "/images/placeholders/non-avatar-64.png"}
-            alt={p.username}
-            fill
-            className="object-cover"
-            unoptimized
-          />
-        </div>
-        {/* 준비 상태 — 디스코드식 프레즌스 점. ✓/X 아이콘은 버튼처럼 읽혀서
-            아바타에 상태로 붙인다. 수십 장을 훑어도 미준비(회색)만 바로 짚인다. */}
-        <span
-          title={p.isReady ? "준비 완료" : "준비 대기 중"}
-          className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-bg-tertiary transition-colors group-hover:border-bg-elevated ${
-            p.isReady ? "bg-accent-success" : "bg-text-tertiary/60"
-          }`}
+      {/* Avatar */}
+      <div className="relative w-7 h-7 rounded-full bg-bg-elevated overflow-hidden flex-shrink-0">
+        <Image
+          src={p.avatar || "/images/placeholders/non-avatar-64.png"}
+          alt={p.username}
+          fill
+          className="object-cover"
+          unoptimized
         />
       </div>
 
@@ -101,9 +91,15 @@ export function CompactParticipantCard({
         </div>
       </div>
 
-      {/* 상태 표시(음성·준비)를 먼저, 액션 버튼(친추·강퇴)을 뒤에 모은다.
-          상태 아이콘이 버튼 사이에 끼면 동작 없는 버튼처럼 읽힌다. */}
+      {/* 상태 표시(준비·음성)를 먼저, 액션 버튼(친추·강퇴)을 뒤에 모은다 */}
       <div className="flex items-center gap-1 flex-shrink-0">
+        {/* 준비 완료만 표시한다 — 미준비에 회색 표시를 붙이면 노이즈만 늘고,
+            초록 칩이 채워질수록 없는 카드가 오히려 눈에 띈다 */}
+        {p.isReady && (
+          <span className="flex-shrink-0 rounded bg-accent-success/10 px-1.5 py-0.5 text-[10px] font-semibold text-accent-success">
+            준비
+          </span>
+        )}
         {/* Discord 음성채널 참가 상태 뱃지 (inVoice가 정의된 경우만 표시) */}
         {p.inVoice !== undefined &&
           (p.inVoice ? (
