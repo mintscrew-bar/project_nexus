@@ -340,53 +340,116 @@ export function MatchDetailModal({
         {getStatusBadge(match.status)}
       </div>
 
-      {/* 데스크톱: 좌측 정보(스코어·라인업) / 우측 액션(가위바위보·코드·보고) 2컬럼.
-          모바일: 스코어 → 액션 → 라인업 순서로 쌓인다. */}
-      <div className="grid gap-4 py-2 lg:grid-cols-[minmax(0,1fr)_360px] lg:grid-rows-[auto_minmax(0,1fr)] lg:items-start">
-        {/* ── 좌상단: 시리즈 스코어·경기 결과 ── */}
-        <div className="min-w-0 space-y-4 lg:col-start-1 lg:row-start-1">
-        {/* 다전제 시리즈 스코어 */}
-        {(match.bestOf ?? 1) > 1 && (
-          <div className="rounded-xl border border-accent-primary/25 bg-accent-primary/5 p-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-semibold text-text-primary">
-                {match.bestOf}판 {Math.floor((match.bestOf ?? 1) / 2) + 1}선
-              </span>
-              <span className="text-sm text-text-secondary">
-                {match.status === 'COMPLETED'
+      {/* 데스크톱: 좌측 라인업 / 우측 액션(스코어보드·가위바위보·코드·보고) 2컬럼.
+          모바일: 스코어보드 → 액션 → 라인업 순서로 쌓인다. */}
+      <div className="grid gap-4 py-2 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
+        {/* ── 우측(모바일 상단): 스코어보드 + 액션 컬럼 ── */}
+        <div className="order-1 min-w-0 space-y-4 lg:order-2">
+        {/* 스코어보드 & 승리 팀 보고 — 진행 중엔 점수를 지켜보다가 끝나면 여기서 보고한다 */}
+        <div className="rounded-xl border border-bg-tertiary bg-bg-secondary/40 p-3 space-y-3">
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-semibold text-text-primary">
+              {(match.bestOf ?? 1) > 1
+                ? `${match.bestOf}판 ${Math.floor((match.bestOf ?? 1) / 2) + 1}선`
+                : '단판'}
+            </span>
+            <span className="text-text-secondary">
+              {match.status === 'COMPLETED'
+                ? (match.bestOf ?? 1) > 1
                   ? '시리즈 종료'
-                  : `${match.currentGameNumber ?? 1}세트 진행 중`}
+                  : '경기 종료'
+                : (match.bestOf ?? 1) > 1
+                  ? `${match.currentGameNumber ?? 1}세트 진행 중`
+                  : match.status === 'IN_PROGRESS'
+                    ? '진행 중'
+                    : '대기 중'}
+            </span>
+          </div>
+          <div className="flex items-center justify-center gap-2">
+            <span
+              className={cn(
+                'min-w-0 flex-1 truncate text-right text-sm font-bold',
+                match.status === 'COMPLETED' && match.winner?.id === match.team1?.id
+                  ? 'text-accent-gold'
+                  : 'text-text-primary',
+              )}
+            >
+              {getTeamDisplayName(match.team1)}
+            </span>
+            {(match.bestOf ?? 1) > 1 ? (
+              <span className="flex shrink-0 items-baseline gap-1.5 px-1">
+                <span className="text-2xl font-black tabular-nums text-accent-primary">
+                  {match.team1?.score ?? 0}
+                </span>
+                <span className="text-xs font-bold text-text-muted">vs</span>
+                <span className="text-2xl font-black tabular-nums text-accent-primary">
+                  {match.team2?.score ?? 0}
+                </span>
               </span>
-            </div>
-            <div className="mt-2 flex items-center justify-center gap-3 text-lg font-bold text-text-primary">
-              <span className="truncate">{getTeamDisplayName(match.team1)}</span>
-              <span className="shrink-0 text-accent-primary">
-                {match.team1?.score ?? 0} : {match.team2?.score ?? 0}
-              </span>
-              <span className="truncate">{getTeamDisplayName(match.team2)}</span>
-            </div>
-            {match.status !== 'COMPLETED' && (match.currentGameNumber ?? 1) > 1 && (
-              <p className="mt-2 text-center text-xs text-text-tertiary">
+            ) : (
+              <span className="shrink-0 px-1 text-xs font-bold text-text-muted">vs</span>
+            )}
+            <span
+              className={cn(
+                'min-w-0 flex-1 truncate text-sm font-bold',
+                match.status === 'COMPLETED' && match.winner?.id === match.team2?.id
+                  ? 'text-accent-gold'
+                  : 'text-text-primary',
+              )}
+            >
+              {getTeamDisplayName(match.team2)}
+            </span>
+          </div>
+          {match.status !== 'COMPLETED' &&
+            (match.bestOf ?? 1) > 1 &&
+            (match.currentGameNumber ?? 1) > 1 && (
+              <p className="text-center text-xs text-text-tertiary">
                 직전 세트와 블루·레드 진영이 자동으로 교대됩니다.
               </p>
             )}
-          </div>
-        )}
 
-        {/* 경기 결과 — 종료된 매치는 결과부터 보여준다 */}
-        {match.status === 'COMPLETED' && match.winner && (
-          <Alert variant="success">
-            <Trophy className="h-4 w-4" />
-            <AlertTitle>경기 종료</AlertTitle>
-            <AlertDescription>
-              승자: <span className="font-bold">{getTeamDisplayName(match.winner)}</span>
-            </AlertDescription>
-          </Alert>
-        )}
+          {/* 다 끝나면 승자 확정 표시 */}
+          {match.status === 'COMPLETED' && match.winner && (
+            <div className="flex items-center justify-center gap-1.5 rounded-lg bg-accent-success/10 py-2 text-sm font-bold text-accent-success">
+              <Trophy className="h-4 w-4" />
+              {getTeamDisplayName(match.winner)} 승리
+            </div>
+          )}
+
+          {/* 세트가 끝나면 스코어보드에서 바로 보고한다 */}
+          {canManageMatch && currentGameStatus === 'IN_PROGRESS' && (
+            <div className="border-t border-bg-tertiary pt-3">
+              <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-text-primary">
+                <ShieldCheck className="h-4 w-4 text-accent-primary" />
+                승리 팀 보고
+              </h3>
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => handleReport(match.team1!.id)}
+                  disabled={isReporting}
+                >
+                  {isReporting ? <Loader2 className="h-4 w-4 animate-spin"/> : `${getTeamDisplayName(match.team1)} 승리`}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => handleReport(match.team2!.id)}
+                  disabled={isReporting}
+                >
+                  {isReporting ? <Loader2 className="h-4 w-4 animate-spin"/> : `${getTeamDisplayName(match.team2)} 승리`}
+                </Button>
+              </div>
+              {reportError && (
+                <Alert variant="destructive" className="mt-2">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>오류</AlertTitle>
+                  <AlertDescription>{reportError}</AlertDescription>
+                </Alert>
+              )}
+            </div>
+          )}
         </div>
 
-        {/* ── 우측: 액션 컬럼 — 지금 할 일(가위바위보·준비·보고·코드·투표)이 모인다 ── */}
-        <div className="min-w-0 space-y-4 lg:col-start-2 lg:row-start-1 lg:row-span-2">
         {/* 가위바위보 진영 결정 */}
         {rpsActive && rps && rpsTeamA && rpsTeamB && (
           <div className="rounded-xl border border-bg-tertiary bg-bg-secondary/40 p-3">
@@ -518,38 +581,6 @@ export function MatchDetailModal({
           );
         })()}
 
-        {canManageMatch && currentGameStatus === 'IN_PROGRESS' && (
-          <div className="rounded-xl border border-accent-primary/25 bg-accent-primary/5 p-3">
-            <h3 className="text-md font-semibold mb-2 text-text-primary flex items-center gap-2">
-              <ShieldCheck className="h-5 w-5 text-accent-primary" />
-              승리 팀 보고
-            </h3>
-            <div className="grid grid-cols-2 gap-2">
-              <Button
-                variant="outline"
-                onClick={() => handleReport(match.team1!.id)}
-                disabled={isReporting}
-              >
-                {isReporting ? <Loader2 className="h-4 w-4 animate-spin"/> : `${getTeamDisplayName(match.team1)} 승리`}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => handleReport(match.team2!.id)}
-                disabled={isReporting}
-              >
-                {isReporting ? <Loader2 className="h-4 w-4 animate-spin"/> : `${getTeamDisplayName(match.team2)} 승리`}
-              </Button>
-            </div>
-            {reportError && (
-              <Alert variant="destructive" className="mt-2">
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle>오류</AlertTitle>
-                <AlertDescription>{reportError}</AlertDescription>
-              </Alert>
-            )}
-          </div>
-        )}
-
         {/* 토너먼트 코드 — 행동 섹션 아래, 라인업 위 */}
         {match.status !== 'COMPLETED' && !rpsActive && (
           <div>
@@ -581,8 +612,8 @@ export function MatchDetailModal({
 
         </div>
 
-        {/* ── 좌하단: 팀 라인업 (모바일에선 맨 아래) ── */}
-        <div className="min-w-0 lg:col-start-1 lg:row-start-2">
+        {/* ── 좌측: 팀 라인업 (모바일에선 맨 아래) ── */}
+        <div className="order-2 min-w-0 lg:order-1">
           <LaneRoster
             teamA={fullMatch?.teamA}
             teamB={fullMatch?.teamB}
