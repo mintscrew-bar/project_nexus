@@ -340,6 +340,7 @@ export default function BracketPage() {
               href={`/tournaments/${roomId}/lobby`}
               className="shrink-0 rounded-lg p-2 transition-colors hover:bg-bg-tertiary"
               aria-label="로비로 돌아가기"
+              title="로비로 돌아가기"
             >
               <ArrowLeft className="h-5 w-5 text-text-secondary" />
             </Link>

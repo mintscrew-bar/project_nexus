@@ -552,7 +552,12 @@ export function MatchDetailModal({
                 <code className="flex-grow p-2 bg-bg-tertiary rounded font-mono text-text-primary select-all">
                   {match.tournamentCode}
                 </code>
-                <Button size="icon" variant="ghost" onClick={handleCopyCode}>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={handleCopyCode}
+                  title="토너먼트 코드 복사"
+                >
                   <Copy className="h-4 w-4" />
                 </Button>
               </div>
