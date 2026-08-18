@@ -620,70 +620,74 @@ export default function TournamentLobbyPage() {
     router.push("/tournaments");
   };
 
-  // 자동 밸런스 편성 확인 패널 — DRAFT_COMPLETED 에서만 뜬다.
-  const autoBalanceReview =
-    room.teamMode === "AUTO_BALANCE" && room.status === "DRAFT_COMPLETED" ? (
-      <AutoBalanceReview
-        isHost={isCurrentUserHost}
-        teams={(room.teams ?? []).map((team: any) => ({
-          id: team.id,
-          name: team.name,
-          color: team.color,
-          balanceTotal: team.balanceTotal ?? null,
-          members: (team.members ?? []).map((member: any) => {
-            const participant = players.find(
-              (player: any) => player.userId === member.userId,
-            );
-            const role = member.assignedRole ?? null;
-            return {
-              userId: member.userId,
-              username:
-                member.user?.username ?? participant?.username ?? "알 수 없음",
-              assignedRole: role,
-              // 배정된 라인 기준 점수 (참가자 페이로드의 라인별 점수에서 꺼낸다)
-              score:
-                role && participant?.balanceScores
-                  ? (participant.balanceScores[role] ?? null)
-                  : null,
-              scoresByRole: participant?.balanceScores ?? null,
-            };
-          }),
-        }))}
-        onReroll={async (pinnedUserIds) => {
-          const result = await roomSocketHelpers.rerollAutoBalance(
-            room.id,
-            pinnedUserIds,
+  // 자동 밸런스 편성 확인 단계 — 이 동안 로비는 전용 화면으로 통째로 전환된다.
+  // 준비바·참가자 목록·하단 액션바는 이 단계에서 정보 가치가 없는데 공간만
+  // 차지해서 (준비는 이미 끝났고, 팀 배치가 곧 참가자 목록이다) 모두 숨긴다.
+  const isAutoBalanceReviewStage =
+    room.teamMode === "AUTO_BALANCE" && room.status === "DRAFT_COMPLETED";
+
+  const autoBalanceReview = isAutoBalanceReviewStage ? (
+    <AutoBalanceReview
+      isHost={isCurrentUserHost}
+      teams={(room.teams ?? []).map((team: any) => ({
+        id: team.id,
+        name: team.name,
+        color: team.color,
+        balanceTotal: team.balanceTotal ?? null,
+        members: (team.members ?? []).map((member: any) => {
+          const participant = players.find(
+            (player: any) => player.userId === member.userId,
           );
-          if (!result.success) {
-            addToast(result.error ?? "재편성에 실패했습니다.", "error");
-          }
-        }}
-        onConfirm={async () => {
-          const result = await roomSocketHelpers.confirmAutoBalance(room.id);
-          if (!result.success) {
-            addToast(result.error ?? "확정에 실패했습니다.", "error");
-          }
-        }}
-        rerollCount={room.autoBalanceRerollCount ?? 0}
-        undoDepth={room.undoDepth ?? 0}
-        onUndo={async () => {
-          const result = await roomSocketHelpers.undoAutoBalance(room.id);
-          if (!result.success) {
-            addToast(result.error ?? "편성 되감기에 실패했습니다.", "error");
-          }
-        }}
-        onSwap={async (userIdA, userIdB) => {
-          const result = await roomSocketHelpers.swapAutoBalance(
-            room.id,
-            userIdA,
-            userIdB,
-          );
-          if (!result.success) {
-            addToast(result.error ?? "자리 교체에 실패했습니다.", "error");
-          }
-        }}
-      />
-    ) : null;
+          const role = member.assignedRole ?? null;
+          return {
+            userId: member.userId,
+            username:
+              member.user?.username ?? participant?.username ?? "알 수 없음",
+            assignedRole: role,
+            // 배정된 라인 기준 점수 (참가자 페이로드의 라인별 점수에서 꺼낸다)
+            score:
+              role && participant?.balanceScores
+                ? (participant.balanceScores[role] ?? null)
+                : null,
+            scoresByRole: participant?.balanceScores ?? null,
+          };
+        }),
+      }))}
+      onReroll={async (pinnedUserIds) => {
+        const result = await roomSocketHelpers.rerollAutoBalance(
+          room.id,
+          pinnedUserIds,
+        );
+        if (!result.success) {
+          addToast(result.error ?? "재편성에 실패했습니다.", "error");
+        }
+      }}
+      onConfirm={async () => {
+        const result = await roomSocketHelpers.confirmAutoBalance(room.id);
+        if (!result.success) {
+          addToast(result.error ?? "확정에 실패했습니다.", "error");
+        }
+      }}
+      rerollCount={room.autoBalanceRerollCount ?? 0}
+      undoDepth={room.undoDepth ?? 0}
+      onUndo={async () => {
+        const result = await roomSocketHelpers.undoAutoBalance(room.id);
+        if (!result.success) {
+          addToast(result.error ?? "편성 되감기에 실패했습니다.", "error");
+        }
+      }}
+      onSwap={async (userIdA, userIdB) => {
+        const result = await roomSocketHelpers.swapAutoBalance(
+          room.id,
+          userIdA,
+          userIdB,
+        );
+        if (!result.success) {
+          addToast(result.error ?? "자리 교체에 실패했습니다.", "error");
+        }
+      }}
+    />
+  ) : null;
 
   const participantsList = (
     <LobbyParticipantsList
@@ -820,94 +824,96 @@ export default function TournamentLobbyPage() {
           </div>
         </header>
 
-        {/* ═══ Ready Progress Bar ═══ */}
-        <div
-          data-tour="lobby-ready-status"
-          className={`border-b px-4 py-3 lg:px-6 ${
-            canStart
-              ? "border-accent-success/30 bg-accent-success/10"
-              : "border-bg-tertiary bg-bg-secondary/90"
-          }`}
-        >
-          <div className="container mx-auto flex flex-col gap-3">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex min-w-0 items-center gap-3">
-                <div
-                  className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg ${
-                    canStart
-                      ? "bg-accent-success text-white"
-                      : "bg-bg-tertiary text-accent-primary"
-                  }`}
-                >
-                  {canStart ? (
-                    <CheckCircle2 className="h-5 w-5" />
-                  ) : (
-                    <Clock3 className="h-5 w-5" />
-                  )}
-                </div>
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                    <span className="text-sm font-bold text-text-primary">
-                      준비 현황
-                    </span>
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-bold ${
-                        canStart
-                          ? "bg-accent-success text-white"
-                          : "bg-bg-tertiary text-text-secondary"
-                      }`}
-                    >
-                      {readyBarStatus}
-                    </span>
+        {/* ═══ Ready Progress Bar — 편성 확인 단계에선 이미 전원 준비 완료라 숨긴다 ═══ */}
+        {!isAutoBalanceReviewStage && (
+          <div
+            data-tour="lobby-ready-status"
+            className={`border-b px-4 py-3 lg:px-6 ${
+              canStart
+                ? "border-accent-success/30 bg-accent-success/10"
+                : "border-bg-tertiary bg-bg-secondary/90"
+            }`}
+          >
+            <div className="container mx-auto flex flex-col gap-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div
+                    className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg ${
+                      canStart
+                        ? "bg-accent-success text-white"
+                        : "bg-bg-tertiary text-accent-primary"
+                    }`}
+                  >
+                    {canStart ? (
+                      <CheckCircle2 className="h-5 w-5" />
+                    ) : (
+                      <Clock3 className="h-5 w-5" />
+                    )}
                   </div>
-                  <p className="mt-0.5 truncate text-xs text-text-secondary">
-                    {readyBarHint}
-                  </p>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <span className="text-sm font-bold text-text-primary">
+                        준비 현황
+                      </span>
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-xs font-bold ${
+                          canStart
+                            ? "bg-accent-success text-white"
+                            : "bg-bg-tertiary text-text-secondary"
+                        }`}
+                      >
+                        {readyBarStatus}
+                      </span>
+                    </div>
+                    <p className="mt-0.5 truncate text-xs text-text-secondary">
+                      {readyBarHint}
+                    </p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-shrink-0">
+                  <span className="rounded-lg bg-bg-tertiary px-3 py-1.5 text-center text-xs font-semibold text-text-secondary">
+                    전체 {totalPlayers}
+                  </span>
+                  <span className="rounded-lg bg-accent-success/10 px-3 py-1.5 text-center text-xs font-semibold text-accent-success">
+                    준비 {readyCount}
+                  </span>
+                  <span className="rounded-lg bg-bg-tertiary px-3 py-1.5 text-center text-xs font-semibold text-text-secondary">
+                    대기 {pendingReadyCount}
+                  </span>
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-shrink-0">
-                <span className="rounded-lg bg-bg-tertiary px-3 py-1.5 text-center text-xs font-semibold text-text-secondary">
-                  전체 {totalPlayers}
-                </span>
-                <span className="rounded-lg bg-accent-success/10 px-3 py-1.5 text-center text-xs font-semibold text-accent-success">
-                  준비 {readyCount}
-                </span>
-                <span className="rounded-lg bg-bg-tertiary px-3 py-1.5 text-center text-xs font-semibold text-text-secondary">
-                  대기 {pendingReadyCount}
-                </span>
+              <div
+                className="grid h-4 gap-1"
+                style={{
+                  gridTemplateColumns: `repeat(${Math.max(totalPlayers, 1)}, minmax(0, 1fr))`,
+                }}
+                aria-label={`준비 ${readyCount}명, 대기 ${pendingReadyCount}명`}
+              >
+                {totalPlayers > 0 ? (
+                  players.map((player: any) => {
+                    const playerName =
+                      player.riotAccount?.gameName ?? player.username;
+                    return (
+                      <div
+                        key={player.id}
+                        title={`${playerName}: ${player.isReady ? "준비 완료" : "대기 중"}`}
+                        className={`rounded-sm transition-colors ${
+                          player.isReady
+                            ? canStart
+                              ? "bg-accent-success"
+                              : "bg-accent-primary"
+                            : "bg-bg-elevated ring-1 ring-inset ring-bg-tertiary"
+                        }`}
+                      />
+                    );
+                  })
+                ) : (
+                  <div className="rounded-sm bg-bg-elevated ring-1 ring-inset ring-bg-tertiary" />
+                )}
               </div>
-            </div>
-            <div
-              className="grid h-4 gap-1"
-              style={{
-                gridTemplateColumns: `repeat(${Math.max(totalPlayers, 1)}, minmax(0, 1fr))`,
-              }}
-              aria-label={`준비 ${readyCount}명, 대기 ${pendingReadyCount}명`}
-            >
-              {totalPlayers > 0 ? (
-                players.map((player: any) => {
-                  const playerName =
-                    player.riotAccount?.gameName ?? player.username;
-                  return (
-                    <div
-                      key={player.id}
-                      title={`${playerName}: ${player.isReady ? "준비 완료" : "대기 중"}`}
-                      className={`rounded-sm transition-colors ${
-                        player.isReady
-                          ? canStart
-                            ? "bg-accent-success"
-                            : "bg-accent-primary"
-                          : "bg-bg-elevated ring-1 ring-inset ring-bg-tertiary"
-                      }`}
-                    />
-                  );
-                })
-              ) : (
-                <div className="rounded-sm bg-bg-elevated ring-1 ring-inset ring-bg-tertiary" />
-              )}
             </div>
           </div>
-        </div>
+        )}
 
         {requiresFullTeams && room.status === "WAITING" && (
           <div className="bg-bg-secondary border-b border-bg-tertiary px-4 py-3 lg:px-6">
@@ -952,44 +958,67 @@ export default function TournamentLobbyPage() {
 
         {/* ═══ Main Content: Desktop 2-col / Mobile Tabs ═══ */}
         <div className="min-h-0 flex-1 basis-0 overflow-hidden">
-          {/* Desktop layout (lg+) */}
-          <div className="container mx-auto hidden h-full min-h-0 gap-4 px-6 py-4 lg:flex">
-            {/* Participants: 2/3 */}
-            <section
-              data-tour="lobby-participants"
-              className="flex min-h-0 min-w-0 flex-[2] flex-col overflow-hidden rounded-xl border border-bg-tertiary bg-bg-secondary"
-            >
-              <div className="px-5 py-3 border-b border-bg-tertiary flex items-center justify-between">
-                <h2 className="font-bold text-text-primary flex items-center gap-2">
-                  <Users className="h-5 w-5 text-text-secondary" />
-                  {room.teamMode === "MANUAL_TEAM" ? "팀 편성" : "참가자"}
-                  <span className="text-sm font-normal text-text-tertiary">
-                    {totalPlayers}/{room.maxParticipants}
-                  </span>
-                </h2>
-              </div>
-              <div className="min-h-0 flex-1 basis-0 space-y-4 overflow-y-auto p-4">
+          {isAutoBalanceReviewStage ? (
+            /* ═══ 편성 확인 전용 데스크톱 레이아웃 ═══
+               2:1 분할을 버리고 편성 영역이 폭 전체를 쓴다. 채팅은 좁은 사이드로 유지. */
+            <div className="mx-auto hidden h-full min-h-0 max-w-screen-2xl gap-4 px-6 py-4 lg:flex">
+              <section className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain">
                 {autoBalanceReview}
-                {participantsList}
-              </div>
-            </section>
+              </section>
+              <aside
+                data-tour="lobby-chat"
+                className="flex min-h-0 w-80 flex-shrink-0 flex-col overflow-hidden rounded-xl border border-bg-tertiary bg-bg-secondary"
+              >
+                <div className="border-b border-bg-tertiary px-4 py-2.5">
+                  <h2 className="flex items-center gap-2 text-sm font-bold text-text-primary">
+                    <MessageSquare className="h-4 w-4 text-text-secondary" />
+                    채팅
+                  </h2>
+                </div>
+                <div className="min-h-0 flex-1 basis-0 overflow-hidden">
+                  {chatPanel}
+                </div>
+              </aside>
+            </div>
+          ) : (
+            /* Desktop layout (lg+) */
+            <div className="container mx-auto hidden h-full min-h-0 gap-4 px-6 py-4 lg:flex">
+              {/* Participants: 2/3 */}
+              <section
+                data-tour="lobby-participants"
+                className="flex min-h-0 min-w-0 flex-[2] flex-col overflow-hidden rounded-xl border border-bg-tertiary bg-bg-secondary"
+              >
+                <div className="px-5 py-3 border-b border-bg-tertiary flex items-center justify-between">
+                  <h2 className="font-bold text-text-primary flex items-center gap-2">
+                    <Users className="h-5 w-5 text-text-secondary" />
+                    {room.teamMode === "MANUAL_TEAM" ? "팀 편성" : "참가자"}
+                    <span className="text-sm font-normal text-text-tertiary">
+                      {totalPlayers}/{room.maxParticipants}
+                    </span>
+                  </h2>
+                </div>
+                <div className="min-h-0 flex-1 basis-0 space-y-4 overflow-y-auto p-4">
+                  {participantsList}
+                </div>
+              </section>
 
-            {/* Chat: 1/3 */}
-            <section
-              data-tour="lobby-chat"
-              className="flex min-h-0 min-w-0 flex-[1] flex-col overflow-hidden rounded-xl border border-bg-tertiary bg-bg-secondary"
-            >
-              <div className="px-5 py-3 border-b border-bg-tertiary">
-                <h2 className="font-bold text-text-primary flex items-center gap-2">
-                  <MessageSquare className="h-5 w-5 text-text-secondary" />
-                  채팅
-                </h2>
-              </div>
-              <div className="min-h-0 flex-1 basis-0 overflow-hidden">
-                {chatPanel}
-              </div>
-            </section>
-          </div>
+              {/* Chat: 1/3 */}
+              <section
+                data-tour="lobby-chat"
+                className="flex min-h-0 min-w-0 flex-[1] flex-col overflow-hidden rounded-xl border border-bg-tertiary bg-bg-secondary"
+              >
+                <div className="px-5 py-3 border-b border-bg-tertiary">
+                  <h2 className="font-bold text-text-primary flex items-center gap-2">
+                    <MessageSquare className="h-5 w-5 text-text-secondary" />
+                    채팅
+                  </h2>
+                </div>
+                <div className="min-h-0 flex-1 basis-0 overflow-hidden">
+                  {chatPanel}
+                </div>
+              </section>
+            </div>
+          )}
 
           {/* Mobile layout (< lg) */}
           <div className="flex h-full min-h-0 flex-col lg:hidden">
@@ -1007,8 +1036,12 @@ export default function TournamentLobbyPage() {
                     className="flex-1 justify-center"
                   >
                     <Users className="h-4 w-4 mr-1.5" />
-                    {room.teamMode === "MANUAL_TEAM" ? "팀 편성" : "참가자"} (
-                    {totalPlayers})
+                    {isAutoBalanceReviewStage
+                      ? "편성 확인"
+                      : room.teamMode === "MANUAL_TEAM"
+                        ? "팀 편성"
+                        : "참가자"}{" "}
+                    ({totalPlayers})
                   </TabsTrigger>
                   <TabsTrigger
                     data-tour="lobby-chat"
@@ -1025,7 +1058,8 @@ export default function TournamentLobbyPage() {
                 className="min-h-0 flex-1 basis-0 space-y-4 overflow-y-auto overscroll-contain p-4"
               >
                 {autoBalanceReview}
-                {participantsList}
+                {/* 편성 확인 중엔 팀 배치가 곧 참가자 목록이라 숨긴다 */}
+                {!isAutoBalanceReviewStage && participantsList}
               </TabsContent>
               <TabsContent
                 value="chat"
@@ -1037,115 +1071,119 @@ export default function TournamentLobbyPage() {
           </div>
         </div>
 
-        {/* ═══ Sticky Bottom Action Bar ═══ */}
-        <footer
-          data-tour="lobby-ready-action"
-          className="bg-bg-secondary border-t border-bg-tertiary px-4 py-3 lg:px-6 flex-shrink-0"
-        >
-          <div className="container mx-auto flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              {room.status !== "DRAFT_COMPLETED" && !currentUserIsSpectator && (
-                <button
-                  className={`inline-flex min-h-11 items-center justify-center rounded-lg px-5 py-2.5 text-sm font-bold transition-all ${
-                    currentUserIsReady
-                      ? "border border-bg-elevated bg-bg-tertiary text-text-primary hover:bg-bg-elevated"
-                      : "bg-accent-primary hover:bg-accent-hover text-white"
-                  } disabled:cursor-not-allowed disabled:opacity-50`}
-                  disabled={needsManualTeamSelection}
-                  title={
-                    needsManualTeamSelection
-                      ? "먼저 팀을 선택해주세요."
-                      : undefined
-                  }
-                  onClick={handleReadyToggle}
-                >
-                  {needsManualTeamSelection
-                    ? "팀 선택 필요"
-                    : currentUserIsReady
-                      ? "준비 취소"
-                      : "준비하기"}
-                </button>
-              )}
-              {room.status !== "DRAFT_COMPLETED" && currentUserIsSpectator && (
-                <span className="inline-flex min-h-11 items-center justify-center rounded-lg bg-bg-tertiary px-5 py-2.5 text-sm font-medium text-text-muted">
-                  관전 중
-                </span>
-              )}
-              {/*
+        {/* ═══ Sticky Bottom Action Bar — 편성 확인 단계에선 내용이 전부 비어 숨긴다 ═══ */}
+        {!isAutoBalanceReviewStage && (
+          <footer
+            data-tour="lobby-ready-action"
+            className="bg-bg-secondary border-t border-bg-tertiary px-4 py-3 lg:px-6 flex-shrink-0"
+          >
+            <div className="container mx-auto flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                {room.status !== "DRAFT_COMPLETED" &&
+                  !currentUserIsSpectator && (
+                    <button
+                      className={`inline-flex min-h-11 items-center justify-center rounded-lg px-5 py-2.5 text-sm font-bold transition-all ${
+                        currentUserIsReady
+                          ? "border border-bg-elevated bg-bg-tertiary text-text-primary hover:bg-bg-elevated"
+                          : "bg-accent-primary hover:bg-accent-hover text-white"
+                      } disabled:cursor-not-allowed disabled:opacity-50`}
+                      disabled={needsManualTeamSelection}
+                      title={
+                        needsManualTeamSelection
+                          ? "먼저 팀을 선택해주세요."
+                          : undefined
+                      }
+                      onClick={handleReadyToggle}
+                    >
+                      {needsManualTeamSelection
+                        ? "팀 선택 필요"
+                        : currentUserIsReady
+                          ? "준비 취소"
+                          : "준비하기"}
+                    </button>
+                  )}
+                {room.status !== "DRAFT_COMPLETED" &&
+                  currentUserIsSpectator && (
+                    <span className="inline-flex min-h-11 items-center justify-center rounded-lg bg-bg-tertiary px-5 py-2.5 text-sm font-medium text-text-muted">
+                      관전 중
+                    </span>
+                  )}
+                {/*
                 자동 밸런스는 방장이 확정해야 대진표가 만들어진다. 확정 전에는
                 링크를 눌러도 없는 대진표를 요청하게 되므로 감춘다.
               */}
-              {room.status === "DRAFT_COMPLETED" &&
-                room.teamMode !== "AUTO_BALANCE" && (
-                  <Link
-                    href={`/tournaments/${room.id}/bracket`}
-                    className="inline-flex min-h-11 items-center justify-center rounded-lg bg-accent-success px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-accent-success/90"
-                  >
-                    대진표 보기
-                  </Link>
-                )}
-            </div>
-
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
-              {/* 어드민 전용: 봇 추가 버튼 */}
-              {currentUser?.role === "ADMIN" &&
-                room.status === "WAITING" &&
-                totalPlayers < room.maxParticipants && (
-                  <button
-                    onClick={handleAddBot}
-                    disabled={isAddingBot}
-                    className="inline-flex min-h-11 items-center justify-center rounded-lg border border-bg-tertiary px-4 py-2.5 text-sm font-medium text-text-secondary transition-colors hover:bg-bg-tertiary hover:text-text-primary disabled:opacity-50"
-                    title="남은 자리를 봇으로 모두 채움 (어드민 전용)"
-                  >
-                    {isAddingBot
-                      ? "추가 중..."
-                      : `봇 채우기 (${room.maxParticipants - totalPlayers}자리 남음)`}
-                  </button>
-                )}
-              {isCurrentUserHost && room.status === "WAITING" && (
-                <div className="flex flex-col gap-1.5 sm:items-end">
-                  {!canStart && startBlockedMessage && (
-                    <p className="max-w-[280px] text-xs font-medium text-accent-warning sm:text-right">
-                      {startBlockedMessage}
-                    </p>
+                {room.status === "DRAFT_COMPLETED" &&
+                  room.teamMode !== "AUTO_BALANCE" && (
+                    <Link
+                      href={`/tournaments/${room.id}/bracket`}
+                      className="inline-flex min-h-11 items-center justify-center rounded-lg bg-accent-success px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-accent-success/90"
+                    >
+                      대진표 보기
+                    </Link>
                   )}
-                  <button
-                    className={`inline-flex min-h-11 items-center justify-center rounded-lg px-6 py-2.5 text-sm font-bold text-white transition-all ${
-                      canStart
-                        ? "bg-accent-success hover:bg-accent-success/90 animate-glow-success"
-                        : "bg-accent-success/50 cursor-not-allowed opacity-60"
-                    }`}
-                    disabled={!canStart}
-                    onClick={() =>
-                      startGame((err) => {
-                        // 음성채널 미참가 유저가 있는 경우 구체적인 메시지 표시
-                        if (
-                          err.missingVoiceUsers &&
-                          err.missingVoiceUsers.length > 0
-                        ) {
-                          addToast(
-                            `음성채널 미참가: ${err.missingVoiceUsers.join(", ")}`,
-                            "error",
-                          );
-                        } else {
-                          addToast(err.message, "error");
-                        }
-                      })
-                    }
-                    title={startBlockedMessage}
-                  >
-                    내전 시작
-                  </button>
-                </div>
-              )}
-              {!isCurrentUserHost && room.status === "WAITING" && (
-                <p className="text-text-tertiary text-xs hidden sm:block">
-                  방장이 내전을 시작할 때까지 대기 중...
-                </p>
-              )}
+              </div>
+
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+                {/* 어드민 전용: 봇 추가 버튼 */}
+                {currentUser?.role === "ADMIN" &&
+                  room.status === "WAITING" &&
+                  totalPlayers < room.maxParticipants && (
+                    <button
+                      onClick={handleAddBot}
+                      disabled={isAddingBot}
+                      className="inline-flex min-h-11 items-center justify-center rounded-lg border border-bg-tertiary px-4 py-2.5 text-sm font-medium text-text-secondary transition-colors hover:bg-bg-tertiary hover:text-text-primary disabled:opacity-50"
+                      title="남은 자리를 봇으로 모두 채움 (어드민 전용)"
+                    >
+                      {isAddingBot
+                        ? "추가 중..."
+                        : `봇 채우기 (${room.maxParticipants - totalPlayers}자리 남음)`}
+                    </button>
+                  )}
+                {isCurrentUserHost && room.status === "WAITING" && (
+                  <div className="flex flex-col gap-1.5 sm:items-end">
+                    {!canStart && startBlockedMessage && (
+                      <p className="max-w-[280px] text-xs font-medium text-accent-warning sm:text-right">
+                        {startBlockedMessage}
+                      </p>
+                    )}
+                    <button
+                      className={`inline-flex min-h-11 items-center justify-center rounded-lg px-6 py-2.5 text-sm font-bold text-white transition-all ${
+                        canStart
+                          ? "bg-accent-success hover:bg-accent-success/90 animate-glow-success"
+                          : "bg-accent-success/50 cursor-not-allowed opacity-60"
+                      }`}
+                      disabled={!canStart}
+                      onClick={() =>
+                        startGame((err) => {
+                          // 음성채널 미참가 유저가 있는 경우 구체적인 메시지 표시
+                          if (
+                            err.missingVoiceUsers &&
+                            err.missingVoiceUsers.length > 0
+                          ) {
+                            addToast(
+                              `음성채널 미참가: ${err.missingVoiceUsers.join(", ")}`,
+                              "error",
+                            );
+                          } else {
+                            addToast(err.message, "error");
+                          }
+                        })
+                      }
+                      title={startBlockedMessage}
+                    >
+                      내전 시작
+                    </button>
+                  </div>
+                )}
+                {!isCurrentUserHost && room.status === "WAITING" && (
+                  <p className="text-text-tertiary text-xs hidden sm:block">
+                    방장이 내전을 시작할 때까지 대기 중...
+                  </p>
+                )}
+              </div>
             </div>
-          </div>
-        </footer>
+          </footer>
+        )}
       </div>
 
       {/* ═══ Modals ═══ */}

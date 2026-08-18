@@ -347,13 +347,14 @@ export function AutoBalanceReview({
   };
 
   return (
-    <div className="rounded-xl border border-bg-tertiary bg-bg-secondary p-4">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+    // 편성 확인 단계의 본 화면 — 로비 폭 전체를 쓰므로 카드 하나가 화면을 채운다.
+    <div className="flex min-h-full flex-col rounded-xl border border-bg-tertiary bg-bg-secondary p-5">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h3 className="text-sm font-black text-text-primary">
+          <h3 className="text-lg font-black text-text-primary">
             자동 편성 결과 확인
           </h3>
-          <p className="mt-0.5 text-xs text-text-tertiary">
+          <p className="mt-1 text-sm text-text-tertiary">
             {isHost
               ? "선수 카드를 끌어 교체하고, 자물쇠로 고정한 뒤 다시 돌릴 수 있습니다."
               : "방장이 편성을 확정하면 대진표로 넘어갑니다."}
@@ -366,21 +367,21 @@ export function AutoBalanceReview({
           */}
           {rerollCount > 0 && (
             <div className="text-right">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-text-tertiary">
+              <p className="text-xs font-semibold uppercase tracking-wider text-text-tertiary">
                 다시 돌림
               </p>
-              <p className="text-lg font-black tabular-nums text-text-secondary">
+              <p className="text-2xl font-black tabular-nums text-text-secondary">
                 {rerollCount}회
               </p>
             </div>
           )}
           {spread !== null && (
             <div className="text-right">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-text-tertiary">
+              <p className="text-xs font-semibold uppercase tracking-wider text-text-tertiary">
                 팀 점수 차
               </p>
               <p
-                className={`text-lg font-black tabular-nums ${
+                className={`text-2xl font-black tabular-nums ${
                   spread <= 2
                     ? "text-accent-success"
                     : spread <= 5
@@ -395,7 +396,7 @@ export function AutoBalanceReview({
         </div>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-2">
+      <div className="grid content-start gap-4 md:grid-cols-2">
         {teams.map((team) => {
           const projectedTotal = swapPreview?.totals[team.id] ?? null;
           return (
@@ -404,20 +405,20 @@ export function AutoBalanceReview({
               className="overflow-hidden rounded-lg border border-bg-tertiary bg-bg-primary"
             >
               <div
-                className="flex items-center justify-between gap-2 px-3 py-2"
+                className="flex items-center justify-between gap-2 px-4 py-2.5"
                 style={{ backgroundColor: `${team.color ?? "#667eea"}1a` }}
               >
                 <span className="flex min-w-0 items-center gap-2">
                   <span
-                    className="h-2 w-2 flex-shrink-0 rounded-full"
+                    className="h-2.5 w-2.5 flex-shrink-0 rounded-full"
                     style={{ backgroundColor: team.color ?? "#667eea" }}
                   />
-                  <span className="truncate text-xs font-bold text-text-primary">
+                  <span className="truncate text-sm font-bold text-text-primary">
                     {team.name}
                   </span>
                 </span>
                 {team.balanceTotal !== null && (
-                  <span className="flex flex-shrink-0 items-center gap-1.5 text-xs font-black tabular-nums">
+                  <span className="flex flex-shrink-0 items-center gap-1.5 text-sm font-black tabular-nums">
                     <span
                       className={
                         projectedTotal !== null
@@ -459,7 +460,7 @@ export function AutoBalanceReview({
                           ? "선수 카드를 끌어 바꿀 인원 위에 놓으세요"
                           : undefined
                       }
-                      className={`relative flex items-center gap-2 px-3 py-2 transition-[opacity,transform,box-shadow,background-color] duration-150 ${
+                      className={`relative flex items-center gap-3 px-4 py-3 transition-[opacity,transform,box-shadow,background-color] duration-150 ${
                         isHost
                           ? `select-none ${swapFrom ? "touch-none" : "touch-pan-y"} cursor-grab active:cursor-grabbing`
                           : ""
@@ -476,27 +477,27 @@ export function AutoBalanceReview({
                       {member.assignedRole ? (
                         <PositionIcon
                           position={member.assignedRole}
-                          className="!h-4 !w-4 flex-shrink-0"
+                          className="!h-5 !w-5 flex-shrink-0"
                         />
                       ) : (
-                        <span className="h-4 w-4 flex-shrink-0" />
+                        <span className="h-5 w-5 flex-shrink-0" />
                       )}
-                      <span className="w-7 flex-shrink-0 text-[10px] text-text-tertiary">
+                      <span className="w-9 flex-shrink-0 text-xs text-text-tertiary">
                         {member.assignedRole
                           ? (POSITION_LABELS[member.assignedRole] ??
                             member.assignedRole)
                           : "-"}
                       </span>
                       {isHost ? (
-                        <span className="min-w-0 flex-1 truncate text-xs font-semibold text-text-primary">
+                        <span className="min-w-0 flex-1 truncate text-sm font-semibold text-text-primary">
                           {member.username}
                         </span>
                       ) : (
-                        <span className="min-w-0 flex-1 truncate text-xs text-text-primary">
+                        <span className="min-w-0 flex-1 truncate text-sm text-text-primary">
                           {member.username}
                         </span>
                       )}
-                      <span className="w-10 flex-shrink-0 text-right text-xs font-bold tabular-nums text-text-secondary">
+                      <span className="w-14 flex-shrink-0 text-right text-sm font-bold tabular-nums text-text-secondary">
                         {member.score !== null ? member.score.toFixed(1) : "–"}
                       </span>
                       {isHost && (
@@ -516,9 +517,9 @@ export function AutoBalanceReview({
                           }`}
                         >
                           {isPinned ? (
-                            <Lock className="h-3.5 w-3.5" />
+                            <Lock className="h-4 w-4" />
                           ) : (
-                            <Unlock className="h-3.5 w-3.5" />
+                            <Unlock className="h-4 w-4" />
                           )}
                         </button>
                       )}
@@ -562,86 +563,89 @@ export function AutoBalanceReview({
         </div>
       )}
 
-      {swapPreview && spread !== null && (
-        <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-accent-primary/40 bg-accent-primary/10 px-4 py-3">
-          <span className="text-xs font-bold text-text-secondary">
-            교체 후 예상 팀 점수 차
-          </span>
-          <span className="flex items-center gap-2 text-lg font-black tabular-nums">
-            <span className="text-text-tertiary line-through">
-              {spread.toFixed(1)}
+      {/* 하단 고정 영역 — 카드가 화면을 채우므로 조작부는 항상 바닥에 붙인다 */}
+      <div className="mt-auto pt-4">
+        {swapPreview && spread !== null && (
+          <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-accent-primary/40 bg-accent-primary/10 px-4 py-3">
+            <span className="text-sm font-bold text-text-secondary">
+              교체 후 예상 팀 점수 차
             </span>
-            <span className="text-text-muted">→</span>
-            <span
-              className={
-                swapPreview.spread <= spread
-                  ? "text-accent-success"
-                  : "text-accent-warning"
-              }
-            >
-              {swapPreview.spread.toFixed(1)}
-            </span>
-          </span>
-        </div>
-      )}
-
-      {isHost && (
-        <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-xs text-text-tertiary">
-            {swapFrom ? (
-              <span className="inline-flex items-center gap-1 text-accent-warning">
-                <ArrowLeftRight className="h-3.5 w-3.5" />
-                {dropTarget
-                  ? "여기에 놓으면 교체됩니다"
-                  : "바꿀 인원 위로 끌어다 놓으세요 (ESC 취소)"}
+            <span className="flex items-center gap-2 text-xl font-black tabular-nums">
+              <span className="text-text-tertiary line-through">
+                {spread.toFixed(1)}
               </span>
-            ) : pinned.size > 0 ? (
-              `${pinned.size}명 고정 — 나머지만 다시 배치됩니다`
-            ) : (
-              "선수 카드를 끌어 다른 선수 위에 놓으면 교체됩니다"
-            )}
-          </p>
-          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
-            <button
-              type="button"
-              onClick={handleUndo}
-              disabled={busy !== null || undoDepth === 0}
-              title={
-                undoDepth === 0
-                  ? "되감을 이전 편성이 없습니다"
-                  : `직전 편성으로 되감기 (${undoDepth}단계 남음)`
-              }
-              className="inline-flex min-h-10 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-bg-elevated px-3 text-sm font-bold text-text-secondary transition-colors hover:bg-bg-tertiary hover:text-text-primary disabled:opacity-40"
-            >
-              <RotateCcw className="h-4 w-4" />
-              {busy === "undo" ? "되감는 중..." : "뒤로"}
-              {undoDepth > 0 && (
-                <span className="text-[10px] tabular-nums opacity-70">
-                  {undoDepth}
-                </span>
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={handleReroll}
-              disabled={busy !== null}
-              className="inline-flex min-h-10 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-bg-elevated bg-bg-tertiary px-4 text-sm font-bold text-text-primary transition-colors hover:bg-bg-elevated disabled:opacity-50"
-            >
-              <Dices className="h-4 w-4" />
-              {busy === "reroll" ? "편성 중..." : "다시 돌리기"}
-            </button>
-            <button
-              type="button"
-              onClick={handleConfirm}
-              disabled={busy !== null}
-              className="col-span-2 inline-flex min-h-10 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-accent-success px-5 text-sm font-bold text-white transition-colors hover:bg-accent-success/90 disabled:opacity-50 sm:col-span-1"
-            >
-              <Check className="h-4 w-4" />
-              {busy === "confirm" ? "확정 중..." : "확정하고 대진표로"}
-            </button>
+              <span className="text-text-muted">→</span>
+              <span
+                className={
+                  swapPreview.spread <= spread
+                    ? "text-accent-success"
+                    : "text-accent-warning"
+                }
+              >
+                {swapPreview.spread.toFixed(1)}
+              </span>
+            </span>
           </div>
-        </div>
-      )}
+        )}
+
+        {isHost && (
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-text-tertiary">
+              {swapFrom ? (
+                <span className="inline-flex items-center gap-1 text-accent-warning">
+                  <ArrowLeftRight className="h-3.5 w-3.5" />
+                  {dropTarget
+                    ? "여기에 놓으면 교체됩니다"
+                    : "바꿀 인원 위로 끌어다 놓으세요 (ESC 취소)"}
+                </span>
+              ) : pinned.size > 0 ? (
+                `${pinned.size}명 고정 — 나머지만 다시 배치됩니다`
+              ) : (
+                "선수 카드를 끌어 다른 선수 위에 놓으면 교체됩니다"
+              )}
+            </p>
+            <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
+              <button
+                type="button"
+                onClick={handleUndo}
+                disabled={busy !== null || undoDepth === 0}
+                title={
+                  undoDepth === 0
+                    ? "되감을 이전 편성이 없습니다"
+                    : `직전 편성으로 되감기 (${undoDepth}단계 남음)`
+                }
+                className="inline-flex min-h-10 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-bg-elevated px-3 text-sm font-bold text-text-secondary transition-colors hover:bg-bg-tertiary hover:text-text-primary disabled:opacity-40"
+              >
+                <RotateCcw className="h-4 w-4" />
+                {busy === "undo" ? "되감는 중..." : "뒤로"}
+                {undoDepth > 0 && (
+                  <span className="text-[10px] tabular-nums opacity-70">
+                    {undoDepth}
+                  </span>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={handleReroll}
+                disabled={busy !== null}
+                className="inline-flex min-h-10 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-bg-elevated bg-bg-tertiary px-4 text-sm font-bold text-text-primary transition-colors hover:bg-bg-elevated disabled:opacity-50"
+              >
+                <Dices className="h-4 w-4" />
+                {busy === "reroll" ? "편성 중..." : "다시 돌리기"}
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirm}
+                disabled={busy !== null}
+                className="col-span-2 inline-flex min-h-10 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-accent-success px-5 text-sm font-bold text-white transition-colors hover:bg-accent-success/90 disabled:opacity-50 sm:col-span-1"
+              >
+                <Check className="h-4 w-4" />
+                {busy === "confirm" ? "확정 중..." : "확정하고 대진표로"}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
