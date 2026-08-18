@@ -125,10 +125,15 @@ export function CompactParticipantCard({
               <VolumeX className="h-4 w-4 text-text-tertiary/50 flex-shrink-0" />
             </span>
           ))}
+        {/* 준비 상태 표시 — 버튼이 아니라 상태 아이콘이다 (✓ 준비, X 대기) */}
         {p.isReady ? (
-          <Check className="h-4 w-4 text-accent-success flex-shrink-0" />
+          <span title="준비 완료" className="flex items-center">
+            <Check className="h-4 w-4 text-accent-success flex-shrink-0" />
+          </span>
         ) : (
-          <X className="h-4 w-4 text-text-tertiary/50 flex-shrink-0" />
+          <span title="준비 대기 중" className="flex items-center">
+            <X className="h-4 w-4 text-text-tertiary/50 flex-shrink-0" />
+          </span>
         )}
         {isCurrentUserHost && !isSelf && (
           <button
