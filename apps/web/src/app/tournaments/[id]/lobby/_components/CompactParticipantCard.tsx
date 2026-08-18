@@ -2,15 +2,7 @@
 
 import { useRef } from "react";
 import Image from "next/image";
-import {
-  Check,
-  Crown,
-  UserMinus,
-  UserPlus,
-  Volume2,
-  VolumeX,
-  X,
-} from "lucide-react";
+import { Crown, UserMinus, UserPlus, Volume2, VolumeX } from "lucide-react";
 import { TierBadge } from "@/components/domain/TierBadge";
 import { PositionIcon } from "./icons";
 import { getRoleTier } from "@/lib/role-tier";
@@ -53,14 +45,24 @@ export function CompactParticipantCard({
       onMouseEnter={handleMouseEnter}
       onMouseLeave={scheduleHoverClose ?? (() => setHoveredPlayer(null))}
     >
-      {/* Avatar */}
-      <div className="relative w-7 h-7 rounded-full bg-bg-elevated overflow-hidden flex-shrink-0">
-        <Image
-          src={p.avatar || "/images/placeholders/non-avatar-64.png"}
-          alt={p.username}
-          fill
-          className="object-cover"
-          unoptimized
+      {/* Avatar + 준비 상태 점 */}
+      <div className="relative flex-shrink-0">
+        <div className="relative w-7 h-7 rounded-full bg-bg-elevated overflow-hidden">
+          <Image
+            src={p.avatar || "/images/placeholders/non-avatar-64.png"}
+            alt={p.username}
+            fill
+            className="object-cover"
+            unoptimized
+          />
+        </div>
+        {/* 준비 상태 — 디스코드식 프레즌스 점. ✓/X 아이콘은 버튼처럼 읽혀서
+            아바타에 상태로 붙인다. 수십 장을 훑어도 미준비(회색)만 바로 짚인다. */}
+        <span
+          title={p.isReady ? "준비 완료" : "준비 대기 중"}
+          className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-bg-tertiary transition-colors group-hover:border-bg-elevated ${
+            p.isReady ? "bg-accent-success" : "bg-text-tertiary/60"
+          }`}
         />
       </div>
 
@@ -113,16 +115,6 @@ export function CompactParticipantCard({
               <VolumeX className="h-4 w-4 text-text-tertiary/50 flex-shrink-0" />
             </span>
           ))}
-        {/* 준비 상태 표시 — 버튼이 아니라 상태 아이콘이다 (✓ 준비, X 대기) */}
-        {p.isReady ? (
-          <span title="준비 완료" className="flex items-center">
-            <Check className="h-4 w-4 text-accent-success flex-shrink-0" />
-          </span>
-        ) : (
-          <span title="준비 대기 중" className="flex items-center">
-            <X className="h-4 w-4 text-text-tertiary/50 flex-shrink-0" />
-          </span>
-        )}
         {!isSelf && !isFriend && !isSent && (
           <button
             onClick={(e) => {
