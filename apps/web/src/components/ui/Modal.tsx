@@ -2,7 +2,7 @@
 
 import { cn } from '@/lib/utils';
 import { X } from 'lucide-react';
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 interface ModalProps {
@@ -113,13 +113,16 @@ export function Modal({
 interface ConfirmModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: () => void;
+  /** dontAskAgainLabel을 쓰면 체크 여부가 인자로 전달된다 */
+  onConfirm: (dontAskAgain?: boolean) => void;
   title: string;
   message: string;
   confirmText?: string;
   cancelText?: string;
   variant?: 'danger' | 'warning' | 'default';
   isLoading?: boolean;
+  /** "다시 보지 않기" 체크박스 라벨 — 지정하면 체크박스가 표시된다 */
+  dontAskAgainLabel?: string;
 }
 
 export function ConfirmModal({
@@ -132,7 +135,15 @@ export function ConfirmModal({
   cancelText = '취소',
   variant = 'default',
   isLoading = false,
+  dontAskAgainLabel,
 }: ConfirmModalProps) {
+  const [dontAskAgain, setDontAskAgain] = useState(false);
+
+  // 열 때마다 체크 상태 초기화 — 이전에 켜둔 체크가 남지 않게
+  useEffect(() => {
+    if (isOpen) setDontAskAgain(false);
+  }, [isOpen]);
+
   const confirmButtonStyles = {
     danger: 'bg-accent-danger hover:bg-accent-danger/90',
     warning: 'bg-accent-warning hover:bg-accent-warning/90',
@@ -141,7 +152,20 @@ export function ConfirmModal({
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={title} size="sm">
-      <p className="text-text-secondary mb-6">{message}</p>
+      <p className={cn('text-text-secondary', dontAskAgainLabel ? 'mb-3' : 'mb-6')}>
+        {message}
+      </p>
+      {dontAskAgainLabel && (
+        <label className="mb-6 flex cursor-pointer select-none items-center gap-2 text-sm text-text-secondary">
+          <input
+            type="checkbox"
+            checked={dontAskAgain}
+            onChange={(event) => setDontAskAgain(event.target.checked)}
+            className="accent-accent-primary"
+          />
+          {dontAskAgainLabel}
+        </label>
+      )}
       <div className="flex gap-3 justify-end">
         <button
           onClick={onClose}
@@ -151,7 +175,7 @@ export function ConfirmModal({
           {cancelText}
         </button>
         <button
-          onClick={onConfirm}
+          onClick={() => onConfirm(dontAskAgain)}
           className={cn(
             'px-4 py-2 text-white rounded-lg transition-colors disabled:opacity-50',
             confirmButtonStyles[variant]

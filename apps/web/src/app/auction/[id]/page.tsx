@@ -15,6 +15,9 @@ import { Users, Hand, Check, Coins, ScrollText, Gavel, MessageSquare, Maximize2,
 import { Modal } from "@/components/ui/Modal";
 import { getRoleIcon } from "@/lib/role-icon";
 
+// 입찰 포기 확인 모달의 "다시 보지 않기" 저장 키 (브라우저 단위)
+const FOLD_CONFIRM_SKIP_KEY = "auction:fold-confirm-skip";
+
 function RoleIcon({ role, dim }: { role?: string; dim?: boolean }) {
   if (!role) return null;
   const url = getRoleIcon(role.toUpperCase());
@@ -597,9 +600,23 @@ export default function AuctionRoomPage() {
     }
   };
 
-  // 포기는 되돌릴 수 없으므로 실행 전에 반드시 확인을 받는다
-  const requestFold = () => setIsFoldConfirmOpen(true);
-  const handleFoldConfirm = async () => {
+  // 포기는 되돌릴 수 없으므로 실행 전에 확인을 받는다.
+  // "다시 보지 않기"를 선택했으면 이후에는 바로 실행한다.
+  const requestFold = () => {
+    if (localStorage.getItem(FOLD_CONFIRM_SKIP_KEY) === "1") {
+      void handleVoteItemSkip();
+      return;
+    }
+    setIsFoldConfirmOpen(true);
+  };
+  const handleFoldConfirm = async (dontAskAgain?: boolean) => {
+    if (dontAskAgain) {
+      try {
+        localStorage.setItem(FOLD_CONFIRM_SKIP_KEY, "1");
+      } catch {
+        // 저장 실패(시크릿 모드 등)해도 포기 진행에는 지장 없다
+      }
+    }
     setIsFoldConfirmOpen(false);
     await handleVoteItemSkip();
   };
@@ -1098,6 +1115,7 @@ export default function AuctionRoomPage() {
         cancelText="취소"
         variant="warning"
         isLoading={isVotingItemSkip}
+        dontAskAgainLabel="다시 보지 않기"
       />
 
       <div className="mx-auto flex w-full max-w-[1720px] flex-1 flex-col min-h-0">
