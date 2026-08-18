@@ -57,6 +57,13 @@ export function ParticipantCard({
       onMouseEnter={handleMouseEnter}
       onMouseLeave={scheduleHoverClose ?? (() => setHoveredPlayer(null))}
     >
+      {/* 준비 완료 — 압축 카드와 동일한 왼쪽 초록 띠로 통일. 미준비는 무표시 */}
+      {p.isReady && (
+        <span
+          title="준비 완료"
+          className="absolute inset-y-0 left-0 w-[3px] rounded-l-lg bg-accent-success"
+        />
+      )}
       <div className="flex items-center gap-3 flex-1 min-w-0">
         <div className="relative w-10 h-10 rounded-full bg-bg-elevated overflow-hidden flex-shrink-0">
           <Image
@@ -200,13 +207,6 @@ export function ParticipantCard({
               <VolumeX className="h-4 w-4" />
             </span>
           ))}
-        {/* 준비 완료만 표시 — 미준비는 무표시가 노이즈 없이 더 잘 읽힌다 */}
-        {p.isReady && (
-          <span className="flex items-center gap-1 text-xs font-medium text-accent-success bg-accent-success/10 px-2 py-1 rounded-md">
-            <Check className="h-3.5 w-3.5 animate-bounce-in" />
-            준비
-          </span>
-        )}
         {isCurrentUserHost && !isSelf && (
           <button
             onClick={() => setKickTarget({ id: p.id, username: p.username })}
