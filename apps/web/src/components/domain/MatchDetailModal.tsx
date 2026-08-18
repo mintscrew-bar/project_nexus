@@ -1040,8 +1040,9 @@ function LaneRoster({
           <Loader2 className="h-6 w-6 animate-spin text-text-secondary" />
         </div>
       ) : (
-        // 좌측 컬럼 폭이 좁아졌으므로 xl부터만 두 팀을 나란히 놓는다
-        <div className="grid gap-4 xl:grid-cols-2">
+        // 팀 A를 첫 줄, 팀 B를 둘째 줄에 고정해 양 팀 전체를 한눈에 비교한다.
+        // 모바일에서는 5개 라인 카드의 가독성을 유지하기 위해 팀 줄만 가로 스크롤한다.
+        <div className="space-y-3 overflow-x-auto pb-1">
           <TeamRosterPanel
             team={teamA}
             displayName={teamADisplay}
@@ -1093,36 +1094,41 @@ function TeamRosterPanel({
     ? memberScores.reduce<number>((total, score) => total + (score ?? 0), 0)
     : null;
 
+  const playerColumnCount = Math.max(orderedMembers.length, 1);
+
   return (
-    <div className="overflow-hidden rounded-lg border border-bg-tertiary bg-bg-secondary">
-      <div className="border-b border-bg-tertiary bg-bg-tertiary/60 px-4 py-3">
-        <div className="flex items-center justify-between gap-3">
-          <span className={cn('truncate text-lg font-bold', isWinner ? 'text-accent-gold' : 'text-text-primary')}>
-            {isWinner && <Trophy className="mr-1.5 inline h-5 w-5" />}
+    <div
+      className="grid min-w-[680px] overflow-hidden rounded-lg border border-bg-tertiary bg-bg-secondary"
+      style={{ gridTemplateColumns: `140px repeat(${playerColumnCount}, minmax(108px, 1fr))` }}
+    >
+      <div className="flex min-w-0 flex-col justify-between border-r border-bg-tertiary bg-bg-tertiary/60 px-3 py-3">
+        <div>
+          <span className={cn('block truncate text-sm font-bold', isWinner ? 'text-accent-gold' : 'text-text-primary')}>
+            {isWinner && <Trophy className="mr-1 inline h-4 w-4" />}
             {displayName}
           </span>
-          <span className="shrink-0 text-sm text-text-secondary">{orderedMembers.length}명</span>
+          <span className="mt-1 block text-xs text-text-tertiary">{orderedMembers.length}명</span>
         </div>
-        <div className="mt-3 flex items-end justify-between border-t border-bg-elevated/70 pt-3">
-          <span className="text-sm font-medium text-text-secondary">팀 총점</span>
-          <span className="text-2xl font-black tabular-nums text-accent-primary">
-            {teamScore !== null ? teamScore.toFixed(1) : '산정 중'}
-          </span>
+        <div className="mt-3 border-t border-bg-elevated/70 pt-2">
+          <span className="block text-[11px] font-medium text-text-secondary">팀 총점</span>
+          <strong className="mt-0.5 block text-xl font-black tabular-nums text-accent-primary">
+            {teamScore !== null ? teamScore.toFixed(1) : '-'}
+          </strong>
         </div>
       </div>
-      <div className="divide-y divide-bg-tertiary">
-        {orderedMembers.map((member) => (
-          <RosterPlayerRow key={member.user.id} member={member} onOpenProfile={onOpenProfile} />
-        ))}
-        {orderedMembers.length === 0 && (
-          <div className="px-4 py-8 text-center text-sm text-text-tertiary">선수 정보가 없습니다.</div>
-        )}
-      </div>
+      {orderedMembers.map((member) => (
+        <RosterPlayerCard key={member.user.id} member={member} onOpenProfile={onOpenProfile} />
+      ))}
+      {orderedMembers.length === 0 && (
+        <div className="flex items-center justify-center px-4 py-8 text-sm text-text-tertiary">
+          선수 정보가 없습니다.
+        </div>
+      )}
     </div>
   );
 }
 
-function RosterPlayerRow({ member, onOpenProfile }: { member: MatchMember; onOpenProfile: (userId: string) => void }) {
+function RosterPlayerCard({ member, onOpenProfile }: { member: MatchMember; onOpenProfile: (userId: string) => void }) {
   const lane = normalizeLane(member.assignedRole);
   const riotAccount = member.user.riotAccounts?.[0];
   const lineScore = lane ? riotAccount?.balanceScores?.[lane] : undefined;
@@ -1132,48 +1138,39 @@ function RosterPlayerRow({ member, onOpenProfile }: { member: MatchMember; onOpe
     .slice(0, 5);
 
   return (
-    <div className="min-w-0 px-4 py-3">
-      <div className="mb-2.5 flex min-w-0 flex-wrap items-center gap-2.5">
-        <span className="inline-flex h-9 shrink-0 items-center gap-2 rounded-md bg-bg-tertiary px-3 text-sm font-bold text-text-secondary">
-          {lane ? <PositionIcon position={lane} className="!h-5 !w-5" /> : null}
+    <div className="min-w-0 border-r border-bg-tertiary px-2.5 py-3 last:border-r-0">
+      <div className="mb-2 flex min-w-0 items-center justify-between gap-1.5">
+        <span className="inline-flex min-w-0 items-center gap-1 text-xs font-bold text-text-secondary">
+          {lane ? <PositionIcon position={lane} className="!h-4 !w-4 shrink-0" /> : null}
           {lane ? POSITION_LABELS[lane] : '미배정'}
         </span>
-        <div className="min-w-[100px] flex-1">
-          <PlayerCell member={member} onOpenProfile={onOpenProfile} />
-        </div>
-        <TierBadge
-          tier={riotAccount?.tier}
-          rank={riotAccount?.rank}
-          size="lg"
-          className="shrink-0"
-        />
-        <div className="flex h-9 shrink-0 items-center gap-2 rounded-md border border-accent-primary/30 bg-accent-primary/10 px-3">
-          <span className="text-xs font-medium text-text-secondary">라인 점수</span>
-          <strong className="text-base tabular-nums text-accent-primary">
-            {typeof lineScore === 'number' && Number.isFinite(lineScore)
-              ? lineScore.toFixed(1)
-              : '-'}
-          </strong>
-        </div>
+        <strong className="shrink-0 text-sm tabular-nums text-accent-primary">
+          {typeof lineScore === 'number' && Number.isFinite(lineScore) ? lineScore.toFixed(1) : '-'}
+        </strong>
       </div>
-      {champions.length > 0 ? (
-        <div>
-          <p className="mb-2 text-xs font-semibold text-text-tertiary">라인 선호 챔피언</p>
-          <div className="grid w-fit max-w-full grid-cols-5 gap-1 sm:gap-2">
-          {champions.map((preference) => (
-            <ChampionIcon
-              key={`${member.user.id}-${preference.championId}`}
-              championId={preference.championId}
-              size={44}
-            />
-          ))}
+      <PlayerCell member={member} onOpenProfile={onOpenProfile} />
+      <TierBadge
+        tier={riotAccount?.tier}
+        rank={riotAccount?.rank}
+        size="sm"
+        className="mt-2 max-w-full overflow-hidden text-[10px]"
+      />
+      <div className="mt-2 border-t border-bg-tertiary pt-2">
+        <p className="mb-1 text-[10px] font-semibold text-text-tertiary">선호 챔피언</p>
+        {champions.length > 0 ? (
+          <div className="flex min-w-0 gap-0.5 overflow-hidden">
+            {champions.map((preference) => (
+              <ChampionIcon
+                key={`${member.user.id}-${preference.championId}`}
+                championId={preference.championId}
+                size={22}
+              />
+            ))}
           </div>
-        </div>
-      ) : (
-        <div className="flex h-[44px] items-center text-xs text-text-tertiary">
-          선택한 라인의 선호 챔피언이 없습니다.
-        </div>
-      )}
+        ) : (
+          <span className="text-[10px] text-text-tertiary">정보 없음</span>
+        )}
+      </div>
     </div>
   );
 }
