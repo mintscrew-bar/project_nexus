@@ -99,21 +99,9 @@ export function CompactParticipantCard({
         </div>
       </div>
 
-      {/* Ready status + actions */}
+      {/* 상태 표시(음성·준비)를 먼저, 액션 버튼(친추·강퇴)을 뒤에 모은다.
+          상태 아이콘이 버튼 사이에 끼면 동작 없는 버튼처럼 읽힌다. */}
       <div className="flex items-center gap-1 flex-shrink-0">
-        {!isSelf && !isFriend && !isSent && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleAddFriend(p.userId);
-            }}
-            disabled={addingFriend === p.userId}
-            className="opacity-60 group-hover:opacity-100 p-1.5 text-accent-primary hover:text-accent-hover hover:bg-accent-primary/10 rounded transition-all disabled:opacity-30"
-            title="친구 추가"
-          >
-            <UserPlus className="h-4 w-4" />
-          </button>
-        )}
         {/* Discord 음성채널 참가 상태 뱃지 (inVoice가 정의된 경우만 표시) */}
         {p.inVoice !== undefined &&
           (p.inVoice ? (
@@ -134,6 +122,19 @@ export function CompactParticipantCard({
           <span title="준비 대기 중" className="flex items-center">
             <X className="h-4 w-4 text-text-tertiary/50 flex-shrink-0" />
           </span>
+        )}
+        {!isSelf && !isFriend && !isSent && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleAddFriend(p.userId);
+            }}
+            disabled={addingFriend === p.userId}
+            className="opacity-60 group-hover:opacity-100 p-1.5 text-accent-primary hover:text-accent-hover hover:bg-accent-primary/10 rounded transition-all disabled:opacity-30"
+            title="친구 추가"
+          >
+            <UserPlus className="h-4 w-4" />
+          </button>
         )}
         {isCurrentUserHost && !isSelf && (
           <button
