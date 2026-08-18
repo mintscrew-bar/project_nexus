@@ -363,6 +363,7 @@ export default function BracketPage() {
               size="sm"
               isLoading={isAborting}
               onClick={handleAbortToLobby}
+              title="이 판을 종료하고 대기실로 돌아갑니다 (전적에 반영되지 않음, 방장만 가능)"
             >
               내전 종료
             </Button>
@@ -370,6 +371,7 @@ export default function BracketPage() {
               variant="secondary"
               onClick={handleRefresh}
               disabled={isLoading}
+              title="대진표를 다시 불러옵니다"
             >
               <RefreshCw
                 className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`}

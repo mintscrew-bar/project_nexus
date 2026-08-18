@@ -1135,7 +1135,11 @@ export default function AuctionRoomPage() {
                 {error}
               </span>
             )}
-            <Badge variant={isConnected ? 'success' : 'danger'} className="hidden sm:inline-flex">
+            <Badge
+              variant={isConnected ? 'success' : 'danger'}
+              className="hidden sm:inline-flex"
+              title={isConnected ? '서버와 실시간 연결됨' : '연결이 끊겼습니다 — 입찰이 반영되지 않을 수 있습니다'}
+            >
               {isConnected ? '● 연결됨' : '● 연결 끊김'}
             </Badge>
             {/* 매물 스킵 투표는 입찰 패널 안에 있다 (데스크톱: AuctionBoard, 모바일: 하단 패널) */}
@@ -1144,6 +1148,7 @@ export default function AuctionRoomPage() {
               size="sm"
               isLoading={isAborting}
               onClick={handleAbortToLobby}
+              title="경매를 종료하고 대기실로 돌아갑니다 (진행 중인 입찰이 모두 취소됨, 방장만 가능)"
             >
               <span className="hidden sm:inline">내전 종료</span>
               <span className="sm:hidden">종료</span>

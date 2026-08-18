@@ -162,6 +162,7 @@ function MatchCard({
         status.cardClassName,
       )}
       onClick={() => onMatchClick(match)}
+      title="클릭해 매치 상세 열기 (라인업·진영 결정·결과 보고)"
     >
       <div className="mb-3 flex items-center justify-between gap-3">
         <div className="min-w-0">

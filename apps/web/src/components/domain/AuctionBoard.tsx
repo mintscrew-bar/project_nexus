@@ -726,12 +726,18 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
               <Badge variant="success">지금 입찰 가능</Badge>
               <p className="text-sm text-text-tertiary">
                 사용 가능:{" "}
-                <span className="text-accent-gold font-bold">
+                <span
+                  className="text-accent-gold font-bold"
+                  title="남은 예산에서 예비금을 뺀 금액 — 이번 매물에 실제로 걸 수 있는 최대치입니다"
+                >
                   <Coins className="w-3.5 h-3.5 inline mr-0.5" />
                   {availableBudget.toLocaleString()}G
                 </span>
                 {reserveAmount > 0 && (
-                  <span className="text-text-muted text-xs ml-1.5">
+                  <span
+                    className="text-text-muted text-xs ml-1.5"
+                    title={`남은 빈자리를 채우려면 최소 ${bidIncrement}G씩은 남겨둬야 해서 예약된 금액입니다`}
+                  >
                     (예비 {reserveAmount.toLocaleString()}G)
                   </span>
                 )}
@@ -785,6 +791,7 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
                   variant="secondary"
                   size="sm"
                   onClick={() => addToBid(inc)}
+                  title={`입찰가를 ${inc.toLocaleString()}G 올립니다 (누르면 누적)`}
                   disabled={
                     disabled ||
                     isBidding ||
