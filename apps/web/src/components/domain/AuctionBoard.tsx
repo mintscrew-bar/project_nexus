@@ -12,7 +12,13 @@ import { TierBadge } from "./TierBadge";
 import { PlayerHoverCard } from "./PlayerHoverCard";
 import { PlayerProfileModal } from "./PlayerProfileModal";
 import { cn } from "@/lib/utils";
-import { Coins, AlertTriangle, ChevronDown, ChevronUp } from "lucide-react";
+import {
+  Coins,
+  AlertTriangle,
+  ChevronDown,
+  ChevronUp,
+  SkipForward,
+} from "lucide-react";
 import { getRoleIcon } from "@/lib/role-icon";
 
 interface Player {
@@ -50,6 +56,9 @@ interface AuctionState {
   yuchalCount: number;
   maxYuchalCycles: number;
   bidIncrement?: number;
+  /** 매물 스킵에 동의한 팀 ID — 전 팀장이 모이면 현재 최고 입찰로 즉시 마감 */
+  skipTeamIds?: string[];
+  skipVotesRequired?: number;
 }
 
 interface BidHistoryEntry {
@@ -73,6 +82,9 @@ interface AuctionBoardProps {
   hideBidPanel?: boolean;
   /** 팀 그리드를 숨김 (데스크톱 3열 레이아웃에서 팀을 외부 사이드 컬럼으로 분리할 때) */
   hideTeams?: boolean;
+  /** 매물 스킵 투표 — 입찰 패널 안에서 팀장이 누른다 */
+  onVoteItemSkip?: () => void | Promise<void>;
+  isVotingItemSkip?: boolean;
 }
 
 const POSITION_LABELS: Record<string, string> = {
@@ -125,6 +137,8 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
   className,
   hideBidPanel = false,
   hideTeams = false,
+  onVoteItemSkip,
+  isVotingItemSkip = false,
 }) => {
   const sortedTeams = useMemo(
     () =>
@@ -163,6 +177,13 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
   const canPlaceBid =
     accumulatedBid > 0 && totalBid <= availableBudget && !isBidding;
   const shouldDockBidPanel = hideTeams && !hideBidPanel;
+
+  // 입찰 포기(fold) — 입찰과 같은 결정이라 입찰 패널 안에서 함께 다룬다.
+  // 포기한 팀은 이번 매물에 입찰 불가. 입찰자만 남으면 즉시 낙찰, 전원 포기 시 유찰.
+  const foldCount = auctionState.skipTeamIds?.length ?? 0;
+  const foldRequired = auctionState.skipVotesRequired || sortedTeams.length;
+  const hasFolded =
+    !!currentTeam && (auctionState.skipTeamIds ?? []).includes(currentTeam.id);
 
   const [hoveredPlayer, setHoveredPlayer] = useState<{
     userId: string;
@@ -684,6 +705,11 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
           {auctionState.status === "IN_PROGRESS"
             ? "모든 팀장이 동시에 입찰 중입니다. 현재 관전 중입니다."
             : "경매가 종료되었습니다."}
+          {auctionState.status === "IN_PROGRESS" && foldCount > 0 && (
+            <span className="ml-1.5 text-accent-warning">
+              · 입찰 포기 {foldCount}/{foldRequired}
+            </span>
+          )}
         </div>
       )}
 
@@ -746,6 +772,12 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
               </div>
             )}
 
+            {hasFolded && (
+              <div className="mb-3 py-2 px-3 rounded-lg bg-bg-tertiary border border-bg-elevated text-sm text-text-secondary text-center font-medium">
+                이번 매물 입찰을 포기했습니다 — 다음 매물부터 다시 참여합니다
+              </div>
+            )}
+
             <div className="grid grid-cols-3 gap-2 mb-4">
               {bidSteps.map((inc) => (
                 <Button
@@ -757,6 +789,7 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
                     disabled ||
                     isBidding ||
                     isAlreadyHighestBidder ||
+                    hasFolded ||
                     auctionState.currentHighestBid + accumulatedBid + inc >
                       availableBudget
                   }
@@ -778,7 +811,9 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
               <Button
                 variant="primary"
                 onClick={handleBid}
-                disabled={disabled || !canPlaceBid || isAlreadyHighestBidder}
+                disabled={
+                  disabled || !canPlaceBid || isAlreadyHighestBidder || hasFolded
+                }
                 isLoading={isBidding}
                 className="flex-1"
               >
@@ -786,11 +821,42 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
                   ? "입찰 중..."
                   : isAlreadyHighestBidder
                     ? "최고 입찰 중"
-                    : canPlaceBid
-                      ? `${totalBid.toLocaleString()}G 입찰`
-                      : "금액을 먼저 추가하세요"}
+                    : hasFolded
+                      ? "입찰 포기함"
+                      : canPlaceBid
+                        ? `${totalBid.toLocaleString()}G 입찰`
+                        : "금액을 먼저 추가하세요"}
               </Button>
             </div>
+
+            {/* 입찰 포기 — 입찰을 접는 결정도 입찰 패널에서 내린다 */}
+            {onVoteItemSkip && !hasFolded && (
+              <div className="mt-3 flex items-center justify-between gap-3 border-t border-bg-tertiary pt-3">
+                <p className="text-xs text-text-tertiary">
+                  포기하면 이 매물에 입찰할 수 없습니다. 입찰자만 남으면 즉시
+                  낙찰, 전원 포기 시 유찰됩니다.
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  isLoading={isVotingItemSkip}
+                  disabled={disabled || isVotingItemSkip || isAlreadyHighestBidder}
+                  onClick={() => void onVoteItemSkip()}
+                  title={
+                    isAlreadyHighestBidder
+                      ? "현재 최고 입찰자는 포기할 수 없습니다"
+                      : undefined
+                  }
+                  className="shrink-0"
+                >
+                  <SkipForward className="h-3.5 w-3.5" />
+                  입찰 포기
+                  <span className="text-xs tabular-nums opacity-70">
+                    {foldCount}/{foldRequired}
+                  </span>
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

@@ -565,8 +565,8 @@ describe("AuctionService", () => {
     });
   });
 
-  describe("current item skip voting", () => {
-    const roomId = "room-skip";
+  describe("current item fold (입찰 포기)", () => {
+    const roomId = "room-fold";
     const currentPlayer = {
       id: "participant-1",
       userId: "player-1",
@@ -594,41 +594,102 @@ describe("AuctionService", () => {
         id: roomId,
         participants: [currentPlayer],
         teams: [
-          { id: "team-1", captainId: "captain-1" },
-          { id: "team-2", captainId: "captain-2" },
-          { id: "team-3", captainId: "captain-3" },
+          { id: "team-1", captainId: "captain-1", _count: { members: 2 } },
+          { id: "team-2", captainId: "captain-2", _count: { members: 2 } },
+          { id: "team-3", captainId: "captain-3", _count: { members: 2 } },
         ],
       });
     });
 
-    it("expires the item only after every captain agrees", async () => {
-      await service.voteToSkipCurrentPlayer("captain-1", roomId);
-      await service.voteToSkipCurrentPlayer("captain-2", roomId);
-      const duplicate = await service.voteToSkipCurrentPlayer(
-        "captain-2",
-        roomId,
-      );
-      const beforeFinalVote = (service as any).auctionStates.get(roomId);
+    it("입찰자가 없으면 전원이 포기해야 마감(유찰)한다", async () => {
+      await service.foldCurrentItem("captain-1", roomId);
+      const duplicate = await service.foldCurrentItem("captain-1", roomId);
+      await service.foldCurrentItem("captain-2", roomId);
+      const beforeFinalFold = (service as any).auctionStates.get(roomId);
 
-      expect(duplicate.voteCount).toBe(2);
-      expect(duplicate.teamIds).toEqual(["team-1", "team-2"]);
-      expect(duplicate.allCaptainsAgreed).toBe(false);
-      expect(beforeFinalVote.timerEnd).toBeGreaterThan(Date.now());
+      // 같은 팀의 중복 포기는 집계에 다시 반영되지 않는다
+      expect(duplicate.voteCount).toBe(1);
+      expect(beforeFinalFold.timerEnd).toBeGreaterThan(Date.now());
 
-      const result = await service.voteToSkipCurrentPlayer("captain-3", roomId);
+      const result = await service.foldCurrentItem("captain-3", roomId);
 
       expect(result).toMatchObject({
         voteCount: 3,
         requiredVotes: 3,
         allCaptainsAgreed: true,
       });
-      expect(beforeFinalVote.timerEnd).toBeLessThanOrEqual(Date.now());
+      expect(beforeFinalFold.timerEnd).toBeLessThanOrEqual(Date.now());
     });
 
-    it("rejects non-captains", async () => {
+    it("입찰자가 있으면 나머지 전원이 포기할 때 즉시 낙찰로 마감한다", async () => {
+      const state = (service as any).auctionStates.get(roomId);
+      state.currentHighestBid = 300;
+      state.currentHighestBidder = "team-1";
+
+      const first = await service.foldCurrentItem("captain-2", roomId);
+      expect(first.allCaptainsAgreed).toBe(false);
+
+      const result = await service.foldCurrentItem("captain-3", roomId);
+
+      // 입찰자(team-1)를 제외한 2팀이 전부 포기 → 즉시 마감
+      expect(result).toMatchObject({
+        voteCount: 2,
+        requiredVotes: 2,
+        allCaptainsAgreed: true,
+      });
+      expect(state.timerEnd).toBeLessThanOrEqual(Date.now());
+    });
+
+    it("최고 입찰자는 포기할 수 없다", async () => {
+      const state = (service as any).auctionStates.get(roomId);
+      state.currentHighestBidder = "team-1";
+
       await expect(
-        service.voteToSkipCurrentPlayer("player-1", roomId),
-      ).rejects.toThrow("팀장만 매물 스킵 투표에 참여할 수 있습니다.");
+        service.foldCurrentItem("captain-1", roomId),
+      ).rejects.toThrow("현재 최고 입찰자는 포기할 수 없습니다.");
+    });
+
+    it("포기한 팀은 이번 매물에 입찰할 수 없다", async () => {
+      const state = (service as any).auctionStates.get(roomId);
+      state.skipTeamIds = ["team-1"];
+      prisma.team.findFirst.mockResolvedValue({
+        id: "team-1",
+        remainingBudget: 1000,
+        captain: { username: "captain-1" },
+        _count: { members: 2 },
+      });
+
+      await expect(service.placeBid("captain-1", roomId, 100)).rejects.toThrow(
+        "이번 매물 입찰을 포기했습니다",
+      );
+    });
+
+    it("만석 팀은 포기 정족수에서 제외된다", async () => {
+      prisma.room.findUnique.mockResolvedValue({
+        id: roomId,
+        participants: [currentPlayer],
+        teams: [
+          { id: "team-1", captainId: "captain-1", _count: { members: 2 } },
+          { id: "team-2", captainId: "captain-2", _count: { members: 2 } },
+          // 만석 팀 — 입찰 자체가 불가하므로 포기를 기다리지 않는다
+          { id: "team-3", captainId: "captain-3", _count: { members: 5 } },
+        ],
+      });
+
+      await service.foldCurrentItem("captain-1", roomId);
+      const result = await service.foldCurrentItem("captain-2", roomId);
+
+      expect(result).toMatchObject({
+        voteCount: 2,
+        requiredVotes: 2,
+        allCaptainsAgreed: true,
+      });
+    });
+
+    it("팀장이 아니면 포기할 수 없다", async () => {
+      await expect(service.foldCurrentItem("player-1", roomId)).rejects.toThrow(
+        "팀장만 입찰을 포기할 수 있습니다.",
+      );
     });
   });
 });

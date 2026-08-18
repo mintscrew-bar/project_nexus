@@ -590,7 +590,7 @@ export default function AuctionRoomPage() {
     try {
       await voteItemSkip();
     } catch (err: any) {
-      addToast(err.message || "매물 스킵 투표에 실패했습니다.", "error");
+      addToast(err.message || "입찰 포기에 실패했습니다.", "error");
     } finally {
       setIsVotingItemSkip(false);
     }
@@ -1060,8 +1060,6 @@ export default function AuctionRoomPage() {
   // 현재 유저가 캡틴인지 (모바일 하단 입찰 패널 표시 여부 판단)
   const myTeam = teams.find((t) => t.captainId === user?.id);
   const isCaptainTurn = Boolean(myTeam) && auctionState.status === "IN_PROGRESS";
-  const hasVotedItemSkip =
-    !!myTeam?.id && auctionState.skipTeamIds.includes(myTeam.id);
   // currentHighestBidder는 teamId 또는 userId일 수 있음 — 둘 다 체크
   const isAlreadyHighest = !!auctionState.currentHighestBidder && (
     auctionState.currentHighestBidder === user?.id ||
@@ -1102,26 +1100,7 @@ export default function AuctionRoomPage() {
             <Badge variant={isConnected ? 'success' : 'danger'} className="hidden sm:inline-flex">
               {isConnected ? '● 연결됨' : '● 연결 끊김'}
             </Badge>
-            {auctionState.status === "IN_PROGRESS" && (
-              <Badge variant="warning">
-                스킵 {auctionState.skipTeamIds.length}/{auctionState.skipVotesRequired}
-              </Badge>
-            )}
-            {isCaptainTurn && (
-              <Button
-                variant={hasVotedItemSkip ? "secondary" : "outline"}
-                size="sm"
-                isLoading={isVotingItemSkip}
-                disabled={!isConnected || hasVotedItemSkip || isVotingItemSkip}
-                onClick={handleVoteItemSkip}
-                title="모든 팀장이 동의하면 현재 최고 입찰 결과로 매물을 즉시 마감합니다."
-              >
-                <SkipForward className="h-4 w-4" />
-                <span className="hidden sm:inline">
-                  {hasVotedItemSkip ? "스킵 투표 완료" : "매물 스킵 투표"}
-                </span>
-              </Button>
-            )}
+            {/* 매물 스킵 투표는 입찰 패널 안에 있다 (데스크톱: AuctionBoard, 모바일: 하단 패널) */}
             <Button
               variant="danger"
               size="sm"
@@ -1187,6 +1166,8 @@ export default function AuctionRoomPage() {
               bidHistory={bidHistory}
               hideTeams
               className="min-h-full"
+              onVoteItemSkip={handleVoteItemSkip}
+              isVotingItemSkip={isVotingItemSkip}
             />
           </div>
 
@@ -1244,6 +1225,8 @@ export default function AuctionRoomPage() {
           isConnected={isConnected}
           onPlaceBid={placeBid}
           onFocusAuction={() => setMobileTab("auction")}
+          onVoteItemSkip={handleVoteItemSkip}
+          isVotingItemSkip={isVotingItemSkip}
         />
       )}
 
@@ -1278,6 +1261,8 @@ function MobileBidPanel({
   isConnected,
   onPlaceBid,
   onFocusAuction,
+  onVoteItemSkip,
+  isVotingItemSkip = false,
 }: {
   auctionState: any;
   myTeam: any;
@@ -1285,6 +1270,8 @@ function MobileBidPanel({
   isConnected: boolean;
   onPlaceBid: (amount: number) => void | Promise<void>;
   onFocusAuction?: () => void;
+  onVoteItemSkip?: () => void | Promise<void>;
+  isVotingItemSkip?: boolean;
 }) {
   const [accBid, setAccBid] = useState(0);
   const [isBidding, setIsBidding] = useState(false);
@@ -1300,6 +1287,11 @@ function MobileBidPanel({
   const totalBid = auctionState.currentHighestBid + accBid;
   const canBid = accBid > 0 && totalBid <= availableBudget && !isBidding;
   const currentPlayer = auctionState.currentPlayer;
+  // 입찰 포기(fold) 상태 — 포기하면 이번 매물엔 입찰 불가, 다음 매물에서 초기화
+  const foldCount = auctionState.skipTeamIds?.length ?? 0;
+  const foldRequired = auctionState.skipVotesRequired || 0;
+  const hasFolded =
+    !!myTeam?.id && (auctionState.skipTeamIds ?? []).includes(myTeam.id);
 
   // 매물 전환 시 리셋
   React.useEffect(() => { setAccBid(0); }, [auctionState.currentPlayer?.id]);
@@ -1371,6 +1363,29 @@ function MobileBidPanel({
             {auctionState.currentHighestBidderName ? ` · 선두 ${auctionState.currentHighestBidderName}` : ""}
           </p>
         </div>
+        {onVoteItemSkip && (
+          <button
+            type="button"
+            onClick={() => void onVoteItemSkip()}
+            disabled={
+              !isConnected || hasFolded || isVotingItemSkip || isAlreadyHighest
+            }
+            title={
+              isAlreadyHighest
+                ? "현재 최고 입찰자는 포기할 수 없습니다"
+                : "포기하면 이 매물에 입찰할 수 없습니다. 입찰자만 남으면 즉시 낙찰, 전원 포기 시 유찰됩니다."
+            }
+            className={cn(
+              "inline-flex shrink-0 items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-semibold",
+              hasFolded
+                ? "border-bg-elevated text-text-tertiary"
+                : "border-bg-tertiary text-text-secondary",
+            )}
+          >
+            <SkipForward className="h-3 w-3" />
+            {hasFolded ? "포기함" : "포기"} {foldCount}/{foldRequired}
+          </button>
+        )}
         {onFocusAuction && (
           <button
             type="button"
@@ -1406,6 +1421,10 @@ function MobileBidPanel({
       {isAlreadyHighest ? (
         <div className="py-2 rounded-lg bg-accent-primary/10 border border-accent-primary/30 text-sm text-accent-primary text-center font-medium">
           현재 최고 입찰자입니다
+        </div>
+      ) : hasFolded ? (
+        <div className="py-2 rounded-lg bg-bg-tertiary border border-bg-elevated text-sm text-text-secondary text-center font-medium">
+          이번 매물 입찰을 포기했습니다 — 다음 매물부터 다시 참여합니다
         </div>
       ) : (
         <>

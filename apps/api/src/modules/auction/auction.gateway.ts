@@ -513,6 +513,7 @@ export class AuctionGateway
     }
   }
 
+  // 입찰 포기(fold). 이벤트명은 기존 클라이언트와의 호환을 위해 유지한다.
   @SubscribeMessage("vote-item-skip")
   async handleVoteItemSkip(
     @ConnectedSocket() client: AuthenticatedSocket,
@@ -521,33 +522,30 @@ export class AuctionGateway
     if (!client.userId) return { error: "Unauthorized" };
 
     try {
-      const skipVote = await this._withRoomBidLock(
+      const foldResult = await this._withRoomBidLock(
         data.roomId,
-        () =>
-          this.auctionService.voteToSkipCurrentPlayer(
-            client.userId!,
-            data.roomId,
-          ),
+        () => this.auctionService.foldCurrentItem(client.userId!, data.roomId),
         { wait: true },
       );
 
       this.server.to(`room:${data.roomId}`).emit("item-skip-vote-updated", {
-        ...skipVote,
+        ...foldResult,
         serverNow: Date.now(),
       });
 
-      if (skipVote.allCaptainsAgreed) {
+      // 입찰자만 남았거나 전원이 포기 → 즉시 마감 (낙찰 또는 유찰)
+      if (foldResult.allCaptainsAgreed) {
         this._cancelBidResolve(data.roomId);
         this.emitTimerExpired(data.roomId);
         this._resolveCurrentBidAndAdvance(data.roomId).catch((error) => {
           console.error(
-            `[Auction] Failed to resolve unanimously skipped item in room ${data.roomId}:`,
+            `[Auction] Failed to resolve folded item in room ${data.roomId}:`,
             error,
           );
         });
       }
 
-      return { success: true, skipVote };
+      return { success: true, skipVote: foldResult };
     } catch (error: any) {
       return { error: error.message };
     }

@@ -34,6 +34,9 @@ export interface AuctionState {
   maxYuchalCycles: number;
   deferredPlayerIds?: string[];
   yuchalCountsByPlayer?: Record<string, number>;
+  // 입찰 포기(fold): 포기한 팀은 이번 매물에 입찰할 수 없다. 매물이 바뀌면 초기화.
+  // 입찰자가 있는 상태에서 나머지 전원이 포기하면 현재가로 즉시 낙찰,
+  // 아무도 입찰하지 않은 채 전원이 포기하면 유찰. (필드명은 wire 호환을 위해 skip 유지)
   skipVotePlayerId?: string | null;
   skipTeamIds?: string[];
   skipVotesRequired?: number;
@@ -1034,6 +1037,13 @@ export class AuctionService implements OnModuleInit {
       throw new BadRequestException("You are already the highest bidder");
     }
 
+    // 이번 매물 입찰을 포기한 팀은 다시 참여할 수 없다 (다음 매물에서 초기화)
+    if ((state.skipTeamIds ?? []).includes(team.id)) {
+      throw new BadRequestException(
+        "이번 매물 입찰을 포기했습니다. 다음 매물부터 다시 참여할 수 있습니다.",
+      );
+    }
+
     // Validate bid
     if (amount < state.currentHighestBid + bidIncrement) {
       throw new BadRequestException(
@@ -1156,7 +1166,16 @@ export class AuctionService implements OnModuleInit {
     return state;
   }
 
-  async voteToSkipCurrentPlayer(userId: string, roomId: string) {
+  /**
+   * 현재 매물 입찰 포기(fold).
+   *
+   * 포기한 팀은 이번 매물에 입찰할 수 없고(placeBid에서 차단), 매물이 바뀌면
+   * 초기화된다. 마감 조건:
+   *  - 입찰자가 있는 상태에서 나머지 전원이 포기 → 현재 최고가로 즉시 낙찰
+   *  - 아무도 입찰하지 않은 채 전원이 포기 → 유찰
+   * 만석(5인) 팀은 입찰 자체가 불가하므로 포기 정족수에서 제외한다.
+   */
+  async foldCurrentItem(userId: string, roomId: string) {
     const state = this.auctionStates.get(roomId);
     if (!state) {
       throw new BadRequestException("경매가 진행 중이 아닙니다.");
@@ -1176,7 +1195,13 @@ export class AuctionService implements OnModuleInit {
           },
           orderBy: { joinedAt: "asc" },
         },
-        teams: { select: { id: true, captainId: true } },
+        teams: {
+          select: {
+            id: true,
+            captainId: true,
+            _count: { select: { members: true } },
+          },
+        },
       },
     });
     if (!room) throw new NotFoundException("Room not found");
@@ -1185,27 +1210,48 @@ export class AuctionService implements OnModuleInit {
       (team: any) => team.captainId === userId,
     );
     if (!captainTeam) {
-      throw new ForbiddenException(
-        "팀장만 매물 스킵 투표에 참여할 수 있습니다.",
-      );
+      throw new ForbiddenException("팀장만 입찰을 포기할 수 있습니다.");
     }
 
     const participants = this._sortAuctionParticipants(room.participants);
     const currentPlayer = this._syncCurrentAuctionPlayer(state, participants);
     if (!currentPlayer) {
-      throw new BadRequestException("스킵할 경매 매물이 없습니다.");
+      throw new BadRequestException("포기할 경매 매물이 없습니다.");
     }
 
-    const teamIds = new Set(room.teams.map((team: any) => team.id));
-    const votes = new Set(state.skipTeamIds ?? []);
-    votes.add(captainTeam.id);
-    state.skipVotePlayerId = currentPlayer.id;
-    state.skipTeamIds = [...votes].filter((id) => teamIds.has(id));
-    state.skipVotesRequired = teamIds.size;
-    const allCaptainsAgreed =
-      teamIds.size > 0 && state.skipTeamIds.length === teamIds.size;
+    // 최고 입찰자는 포기할 수 없다 — 나머지가 다 포기하면 그가 낙찰자가 된다.
+    if (state.currentHighestBidder === captainTeam.id) {
+      throw new BadRequestException("현재 최고 입찰자는 포기할 수 없습니다.");
+    }
 
-    if (allCaptainsAgreed) {
+    // 만석 팀은 입찰 불가라 정족수에서 뺀다.
+    const eligibleTeamIds = new Set(
+      room.teams
+        .filter((team: any) => (team._count?.members ?? 0) < 5)
+        .map((team: any) => team.id),
+    );
+
+    const folded = new Set(state.skipTeamIds ?? []);
+    folded.add(captainTeam.id);
+    state.skipVotePlayerId = currentPlayer.id;
+    state.skipTeamIds = [...folded].filter((id) => eligibleTeamIds.has(id));
+
+    const highestBidderTeamId = state.currentHighestBidder;
+    // 아직 포기하지 않은 입찰 가능 팀
+    const remaining = [...eligibleTeamIds].filter(
+      (id) => !state.skipTeamIds!.includes(id),
+    );
+
+    // 표시용 정족수: 입찰자가 있으면 그 팀은 포기 대상이 아니므로 뺀다.
+    state.skipVotesRequired = highestBidderTeamId
+      ? Math.max(eligibleTeamIds.size - 1, 0)
+      : eligibleTeamIds.size;
+
+    const shouldResolve = highestBidderTeamId
+      ? remaining.every((id) => id === highestBidderTeamId)
+      : remaining.length === 0;
+
+    if (shouldResolve) {
       state.timerEnd = Date.now();
     }
     this._setAuctionState(roomId, state);
@@ -1214,8 +1260,9 @@ export class AuctionService implements OnModuleInit {
       playerId: currentPlayer.id,
       teamIds: state.skipTeamIds,
       voteCount: state.skipTeamIds.length,
-      requiredVotes: teamIds.size,
-      allCaptainsAgreed,
+      requiredVotes: state.skipVotesRequired,
+      // wire 호환 필드명 — true면 게이트웨이가 즉시 마감(낙찰 또는 유찰)한다
+      allCaptainsAgreed: shouldResolve,
     };
   }
 
