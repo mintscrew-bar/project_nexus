@@ -423,6 +423,8 @@ export class BroadcastService {
         status: true,
         teamMode: true,
         maxParticipants: true,
+        // 자동 밸런스 검토 씬에서 "다시 돌림 N회"를 시청자에게도 보여준다
+        autoBalanceRerollCount: true,
         broadcastFocusMatchId: true,
         broadcastFocusChangedAt: true,
         host: {
@@ -552,6 +554,7 @@ export class BroadcastService {
         teamMode: room.teamMode,
         participantCount: room.participants.length,
         maxParticipants: room.maxParticipants,
+        autoBalanceRerollCount: room.autoBalanceRerollCount ?? 0,
         hostName: room.host?.username ?? null,
         participants: (room.participants ?? []).map((p: any) => {
           const riot = p.user?.riotAccounts?.[0] ?? null;

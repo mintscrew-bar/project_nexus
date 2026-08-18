@@ -2033,6 +2033,10 @@ function RevealMemberRow({
 }) {
   // 대기화면과 같은 배지 규칙을 써서 방송 전체의 티어 표기를 통일한다
   const badge = tierBadge(member.tier, member.rank, member.lp);
+  // 자동 밸런스 검토처럼 라인이 배정된 로스터는 라인 아이콘을 함께 보여준다
+  const roleIcon = member.assignedRole
+    ? getRoleIcon(member.assignedRole)
+    : null;
 
   return (
     // 프레임리스: 테두리·배경 없이, 행 자체를 실하게 만들어 내용이 곧 블록이 되게 한다.
@@ -2047,6 +2051,14 @@ function RevealMemberRow({
           className="h-14 w-14 rounded-full object-cover"
         />
       </div>
+      {roleIcon && (
+        /* eslint-disable-next-line @next/next/no-img-element */
+        <img
+          src={roleIcon}
+          alt={member.assignedRole}
+          className="h-6 w-6 shrink-0 brightness-0 invert opacity-70"
+        />
+      )}
       <div className="flex min-w-0 flex-1 flex-col justify-center leading-tight">
         <p className="truncate text-2xl font-black text-white">
           {member.username}
@@ -2113,6 +2125,17 @@ export function TeamRevealScene({ snapshot }: { snapshot: any }) {
     snapshot?.room?.teamMode === "AUTO_BALANCE" &&
     (snapshot?.room?.status === "DRAFT_COMPLETED" ||
       snapshot?.room?.status === "ROLE_SELECTION");
+
+  // 검토 중 핵심 지표 — 방장 화면과 같은 값을 시청자도 본다.
+  // 재편성·교체가 일어나면 폴링 주기(5초) 안에 갱신된다.
+  const totals = teams
+    .map((team) => team.balanceTotal)
+    .filter((total: unknown): total is number => typeof total === "number");
+  const scoreGap =
+    isAutoBalanceReview && totals.length > 1 && totals.length === teams.length
+      ? Math.max(...totals) - Math.min(...totals)
+      : null;
+  const rerollCount = snapshot?.room?.autoBalanceRerollCount ?? 0;
   // 팀마다 인원이 달라도 행 높이를 맞추기 위해 최대 인원 기준으로 트랙을 잡는다.
   // (1fr 트랙이라 남는 세로 공간 없이 패널을 꽉 채운다)
   const maxMembers = Math.max(
@@ -2141,9 +2164,37 @@ export function TeamRevealScene({ snapshot }: { snapshot: any }) {
             </HudLabel>
             <p className="mt-2 truncate text-5xl font-black">{roomName}</p>
           </div>
-          <p className="flex-shrink-0 text-3xl font-black text-white/45">
-            {teams.length} TEAMS
-          </p>
+          {isAutoBalanceReview && (scoreGap !== null || rerollCount > 0) ? (
+            <div className="flex flex-shrink-0 items-end gap-10 text-right">
+              {rerollCount > 0 && (
+                <div>
+                  <p className="text-[11px] font-black uppercase tracking-[0.16em] text-white/35">
+                    Rerolls
+                  </p>
+                  <p className="text-4xl font-black tabular-nums text-white/60">
+                    {rerollCount}
+                  </p>
+                </div>
+              )}
+              {scoreGap !== null && (
+                <div>
+                  <p className="text-[11px] font-black uppercase tracking-[0.16em] text-white/35">
+                    Score Gap
+                  </p>
+                  <p
+                    className="text-4xl font-black tabular-nums"
+                    style={{ color: accent }}
+                  >
+                    {scoreGap.toFixed(1)}
+                  </p>
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="flex-shrink-0 text-3xl font-black text-white/45">
+              {teams.length} TEAMS
+            </p>
+          )}
         </div>
 
         <HudRule color={accent} />
