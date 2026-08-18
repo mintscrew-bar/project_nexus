@@ -29,6 +29,27 @@ interface ReviewTeam {
   members: ReviewMember[];
 }
 
+/** 라인 칸을 고정된 순서로 둔다 — 교체해도 사람만 바뀌고 행 위치는 그대로 유지된다. */
+const ROLE_ORDER = ["TOP", "JUNGLE", "MID", "ADC", "SUPPORT"];
+
+function sortByRoleSlot(members: ReviewMember[]): ReviewMember[] {
+  return [...members].sort((a, b) => {
+    const indexA = a.assignedRole ? ROLE_ORDER.indexOf(a.assignedRole) : -1;
+    const indexB = b.assignedRole ? ROLE_ORDER.indexOf(b.assignedRole) : -1;
+    return (
+      (indexA === -1 ? ROLE_ORDER.length : indexA) -
+      (indexB === -1 ? ROLE_ORDER.length : indexB)
+    );
+  });
+}
+
+/** 특정 라인으로 옮겼을 때 해당 인원의 예상 점수 */
+function scoreAtRole(member: ReviewMember, role: string | null) {
+  if (!role || !member.scoresByRole) return null;
+  const value = member.scoresByRole[role];
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
 interface AutoBalanceReviewProps {
   teams: ReviewTeam[];
   isHost: boolean;
@@ -233,11 +254,6 @@ export function AutoBalanceReview({
       return null;
     }
 
-    const scoreAtRole = (member: ReviewMember, role: string | null) => {
-      if (!role || !member.scoresByRole) return null;
-      const value = member.scoresByRole[role];
-      return typeof value === "number" && Number.isFinite(value) ? value : null;
-    };
     const fromNextScore = scoreAtRole(from.member, to.member.assignedRole);
     const toNextScore = scoreAtRole(to.member, from.member.assignedRole);
     if (fromNextScore === null || toNextScore === null) return null;
@@ -273,6 +289,22 @@ export function AutoBalanceReview({
         .flatMap((team) => team.members)
         .find((member) => member.userId === swapFrom)
     : null;
+
+  // 잡고 있는 카드가 다른 라인 위로 올라가면, 그 라인 기준 예상 점수로 바꿔 보여준다.
+  const dropTargetMember = dropTarget
+    ? teams.flatMap((team) => team.members).find((m) => m.userId === dropTarget)
+    : null;
+  const draggedPreview = (() => {
+    if (!draggedMember) return null;
+    if (!dropTargetMember) {
+      return { role: draggedMember.assignedRole, score: draggedMember.score };
+    }
+    const projected = scoreAtRole(draggedMember, dropTargetMember.assignedRole);
+    return {
+      role: dropTargetMember.assignedRole,
+      score: projected ?? draggedMember.score,
+    };
+  })();
 
   // 언마운트 시 대기 중인 집기 타이머를 정리한다.
   useEffect(() => clearHoldTimer, [clearHoldTimer]);
@@ -408,7 +440,7 @@ export function AutoBalanceReview({
               </div>
 
               <ul className="divide-y divide-bg-tertiary/60">
-                {team.members.map((member) => {
+                {sortByRoleSlot(team.members).map((member) => {
                   const isPinned = pinned.has(member.userId);
                   return (
                     <li
@@ -499,7 +531,7 @@ export function AutoBalanceReview({
         })}
       </div>
 
-      {dragPosition && draggedMember && (
+      {dragPosition && draggedMember && draggedPreview && (
         <div
           className="pointer-events-none fixed z-[100] flex min-w-48 items-center gap-3 rounded-lg border border-accent-warning/70 bg-bg-elevated/95 px-4 py-3 text-sm shadow-2xl backdrop-blur-sm"
           style={{
@@ -509,12 +541,22 @@ export function AutoBalanceReview({
           }}
         >
           <ArrowLeftRight className="h-4 w-4 flex-shrink-0 text-accent-warning" />
+          {draggedPreview.role ? (
+            <PositionIcon
+              position={draggedPreview.role}
+              className="!h-4 !w-4 flex-shrink-0"
+            />
+          ) : null}
           <span className="max-w-44 truncate font-black text-text-primary">
             {draggedMember.username}
           </span>
-          <span className="font-black tabular-nums text-text-secondary">
-            {draggedMember.score !== null
-              ? draggedMember.score.toFixed(1)
+          <span
+            className={`font-black tabular-nums ${
+              dropTargetMember ? "text-accent-primary" : "text-text-secondary"
+            }`}
+          >
+            {draggedPreview.score !== null
+              ? draggedPreview.score.toFixed(1)
               : "–"}
           </span>
         </div>
