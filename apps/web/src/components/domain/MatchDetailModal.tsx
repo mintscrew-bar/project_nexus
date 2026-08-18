@@ -340,7 +340,11 @@ export function MatchDetailModal({
         {getStatusBadge(match.status)}
       </div>
 
-      <div className="py-2 space-y-4">
+      {/* 데스크톱: 좌측 정보(스코어·라인업) / 우측 액션(가위바위보·코드·보고) 2컬럼.
+          모바일: 스코어 → 액션 → 라인업 순서로 쌓인다. */}
+      <div className="grid gap-4 py-2 lg:grid-cols-[minmax(0,1fr)_360px] lg:grid-rows-[auto_minmax(0,1fr)] lg:items-start">
+        {/* ── 좌상단: 시리즈 스코어·경기 결과 ── */}
+        <div className="min-w-0 space-y-4 lg:col-start-1 lg:row-start-1">
         {/* 다전제 시리즈 스코어 */}
         {(match.bestOf ?? 1) > 1 && (
           <div className="rounded-xl border border-accent-primary/25 bg-accent-primary/5 p-3">
@@ -379,7 +383,10 @@ export function MatchDetailModal({
             </AlertDescription>
           </Alert>
         )}
+        </div>
 
+        {/* ── 우측: 액션 컬럼 — 지금 할 일(가위바위보·준비·보고·코드·투표)이 모인다 ── */}
+        <div className="min-w-0 space-y-4 lg:col-start-2 lg:row-start-1 lg:row-span-2">
         {/* 가위바위보 진영 결정 */}
         {rpsActive && rps && rpsTeamA && rpsTeamB && (
           <div className="rounded-xl border border-bg-tertiary bg-bg-secondary/40 p-3">
@@ -572,8 +579,10 @@ export function MatchDetailModal({
           </div>
         )}
 
-        {/* 라인별 멤버 테이블 — 참고 정보라 행동 섹션 아래에 둔다 */}
-        <div className="border-t border-bg-tertiary pt-4">
+        </div>
+
+        {/* ── 좌하단: 팀 라인업 (모바일에선 맨 아래) ── */}
+        <div className="min-w-0 lg:col-start-1 lg:row-start-2">
           <LaneRoster
             teamA={fullMatch?.teamA}
             teamB={fullMatch?.teamB}
@@ -1000,7 +1009,8 @@ function LaneRoster({
           <Loader2 className="h-6 w-6 animate-spin text-text-secondary" />
         </div>
       ) : (
-        <div className="grid gap-4 lg:grid-cols-2">
+        // 좌측 컬럼 폭이 좁아졌으므로 xl부터만 두 팀을 나란히 놓는다
+        <div className="grid gap-4 xl:grid-cols-2">
           <TeamRosterPanel
             team={teamA}
             displayName={teamADisplay}
