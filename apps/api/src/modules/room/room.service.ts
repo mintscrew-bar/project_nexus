@@ -3287,17 +3287,23 @@ export class RoomService {
       throw new NotFoundException("Room not found");
     }
 
-    if (room.status === RoomStatus.WAITING) {
-      throw new BadRequestException("Room is already in lobby state");
-    }
-
-    // COMPLETED rooms can also return to lobby for reuse
-
     if (room.hostId !== requesterId) {
       throw new ForbiddenException(
         "Only the room host can abort the active session",
       );
     }
+
+    // 이미 대기실이면 성공으로 본다(멱등).
+    // 응답이 늦어 방장이 한 번 더 누르는 경우가 실제로 있는데, 여기서 400을 내면
+    // 클라이언트가 실패로 처리해 로비로 이동하지 못하고 대진표에 갇힌다.
+    if (room.status === RoomStatus.WAITING) {
+      return {
+        message: "Room is already in lobby state",
+        room: await this.getRoomById(roomId),
+      };
+    }
+
+    // COMPLETED rooms can also return to lobby for reuse
 
     const captainDiscordIds = room.teams
       .map(
@@ -3358,20 +3364,26 @@ export class RoomService {
       });
     });
 
-    try {
-      if (this.discordVoiceService) {
-        await Promise.all(
-          captainDiscordIds.map((providerId: string) =>
-            this.discordVoiceService.removeCaptainRole(roomId, providerId),
-          ),
-        );
-        await this.discordVoiceService.moveAllToLobby(roomId);
-      }
-    } catch (error) {
-      this.logger.warn(
-        "Failed to clean up Discord state after session abort:",
-        error,
-      );
+    // Discord 정리는 응답을 막지 않는다.
+    // 방 상태는 위 트랜잭션에서 이미 WAITING 으로 확정됐고, 역할 제거·채널 이동은
+    // 외부 API라 느리거나 실패할 수 있다. 이걸 await 하면 종료 요청이 수십 초씩
+    // 걸려 방장이 "안 됐다"고 판단해 다시 누르게 된다(운영 실측 32초).
+    if (this.discordVoiceService) {
+      void (async () => {
+        try {
+          await Promise.all(
+            captainDiscordIds.map((providerId: string) =>
+              this.discordVoiceService.removeCaptainRole(roomId, providerId),
+            ),
+          );
+          await this.discordVoiceService.moveAllToLobby(roomId);
+        } catch (error) {
+          this.logger.warn(
+            "Failed to clean up Discord state after session abort:",
+            error,
+          );
+        }
+      })();
     }
 
     this.logger.warn(

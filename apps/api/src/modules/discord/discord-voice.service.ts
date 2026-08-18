@@ -11,6 +11,11 @@ import {
   Role as DiscordRole,
 } from "discord.js";
 
+/** Discord 스노우플레이크는 17~20자리 숫자다. 봇·테스트 계정의 가짜 ID를 걸러낸다. */
+function isDiscordSnowflake(value?: string | null): boolean {
+  return typeof value === "string" && /^\d{17,20}$/.test(value);
+}
+
 @Injectable()
 export class DiscordVoiceService {
   private client!: Client;
@@ -1123,6 +1128,10 @@ export class DiscordVoiceService {
     roomId: string,
     discordUserId: string,
   ): Promise<void> {
+    // 봇·로드테스트 계정은 providerId 가 실제 snowflake 가 아니라 문자열이다.
+    // 그대로 넘기면 Discord 가 50035(Invalid Form Body)를 던져 에러 로그만 쌓인다.
+    if (!isDiscordSnowflake(discordUserId)) return;
+
     const guildId = await this.resolveRoomGuildId(roomId);
     const captainRoleName =
       this.configService.get("DISCORD_CAPTAIN_ROLE_NAME") || "팀장";
