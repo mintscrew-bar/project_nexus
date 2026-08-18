@@ -356,17 +356,15 @@ export default function BracketPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-            {/* 내전 종료는 방장 전용 컨트롤 — 서버도 막지만 버튼 자체를 숨긴다 */}
-            {isHost && (
-              <Button
-                variant="danger"
-                size="sm"
-                isLoading={isAborting}
-                onClick={handleAbortToLobby}
-              >
-                내전 종료
-              </Button>
-            )}
+            {/* 종료 버튼은 전원에게 보인다. 실행 권한(assertHost)은 서버가 판단한다. */}
+            <Button
+              variant="danger"
+              size="sm"
+              isLoading={isAborting}
+              onClick={handleAbortToLobby}
+            >
+              내전 종료
+            </Button>
             <Button
               variant="secondary"
               onClick={handleRefresh}
