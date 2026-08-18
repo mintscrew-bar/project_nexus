@@ -465,6 +465,7 @@ export default function AuctionRoomPage() {
   const [volunteerTimer, setVolunteerTimer] = useState(0);
   const [isAborting, setIsAborting] = useState(false);
   const [isVotingItemSkip, setIsVotingItemSkip] = useState(false);
+  const [isFoldConfirmOpen, setIsFoldConfirmOpen] = useState(false);
   const [isAbortConfirmOpen, setIsAbortConfirmOpen] = useState(false);
   // 모바일 탭: "auction" | "players" | "log" | "chat"
   const [mobileTab, setMobileTab] = useState<"auction" | "players" | "log" | "chat">("auction");
@@ -594,6 +595,13 @@ export default function AuctionRoomPage() {
     } finally {
       setIsVotingItemSkip(false);
     }
+  };
+
+  // 포기는 되돌릴 수 없으므로 실행 전에 반드시 확인을 받는다
+  const requestFold = () => setIsFoldConfirmOpen(true);
+  const handleFoldConfirm = async () => {
+    setIsFoldConfirmOpen(false);
+    await handleVoteItemSkip();
   };
 
   if (isLoading) {
@@ -1080,6 +1088,18 @@ export default function AuctionRoomPage() {
         isLoading={isAborting}
       />
 
+      <ConfirmModal
+        isOpen={isFoldConfirmOpen}
+        onClose={() => setIsFoldConfirmOpen(false)}
+        onConfirm={handleFoldConfirm}
+        title="입찰 포기"
+        message={`${auctionState.currentPlayer?.username ?? "현재 매물"} 입찰을 포기하시겠습니까? 이번 매물에는 다시 입찰할 수 없습니다.`}
+        confirmText="포기"
+        cancelText="취소"
+        variant="warning"
+        isLoading={isVotingItemSkip}
+      />
+
       <div className="mx-auto flex w-full max-w-[1720px] flex-1 flex-col min-h-0">
         {/* 헤더 */}
         <div className="mb-3 flex h-12 shrink-0 items-center justify-between">
@@ -1166,7 +1186,7 @@ export default function AuctionRoomPage() {
               bidHistory={bidHistory}
               hideTeams
               className="min-h-full"
-              onVoteItemSkip={handleVoteItemSkip}
+              onVoteItemSkip={requestFold}
               isVotingItemSkip={isVotingItemSkip}
             />
           </div>
@@ -1225,7 +1245,7 @@ export default function AuctionRoomPage() {
           isConnected={isConnected}
           onPlaceBid={placeBid}
           onFocusAuction={() => setMobileTab("auction")}
-          onVoteItemSkip={handleVoteItemSkip}
+          onVoteItemSkip={requestFold}
           isVotingItemSkip={isVotingItemSkip}
         />
       )}
