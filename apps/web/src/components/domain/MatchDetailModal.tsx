@@ -328,7 +328,8 @@ export function MatchDetailModal({
           : `매치 #${match.matchNumber} 상세 정보`
       }
       size="full"
-      className="!max-w-6xl"
+      // 좌측 라인업(팀당 5명 가로 한 줄)이 스크롤 없이 들어가려면 폭이 필요하다
+      className="!max-w-[1560px]"
     >
       {/* 대진 요약 — 상태 배지를 별도 행으로 빼지 않고 제목 줄에 붙인다 */}
       <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -343,8 +344,26 @@ export function MatchDetailModal({
       {/* 데스크톱: 좌측 라인업 / 우측 액션(스코어보드·가위바위보·코드·보고) 2컬럼.
           모바일: 스코어보드 → 액션 → 라인업 순서로 쌓인다. */}
       <div className="grid gap-4 py-2 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
-        {/* ── 우측(모바일 상단): 스코어보드 + 액션 컬럼 ── */}
+        {/* ── 우측(모바일 상단): 가위바위보 → 스코어보드·보고 → 코드 순 액션 컬럼 ── */}
         <div className="order-1 min-w-0 space-y-4 lg:order-2">
+        {/* 가위바위보 진영 결정 — 지금 당장 해야 하는 일이라 맨 위 */}
+        {rpsActive && rps && rpsTeamA && rpsTeamB && (
+          <div className="rounded-xl border border-bg-tertiary bg-bg-secondary/40 p-3">
+            <MatchRpsFlow
+              rps={rps}
+              reveal={rpsReveal}
+              currentUserId={user?.id}
+              teamA={rpsTeamA}
+              teamB={rpsTeamB}
+              onSubmit={(hand: RpsHand) => { void matchSocketHelpers.rpsSubmit(match.id, hand); }}
+              onChooseSide={(side) => { void matchSocketHelpers.rpsChooseSide(match.id, side); }}
+            />
+            {rpsError && (
+              <p className="mt-2 text-center text-sm text-accent-danger">{rpsError}</p>
+            )}
+          </div>
+        )}
+
         {/* 스코어보드 & 승리 팀 보고 — 진행 중엔 점수를 지켜보다가 끝나면 여기서 보고한다 */}
         <div className="rounded-xl border border-bg-tertiary bg-bg-secondary/40 p-3 space-y-3">
           <div className="flex items-center justify-between text-xs">
@@ -449,24 +468,6 @@ export function MatchDetailModal({
             </div>
           )}
         </div>
-
-        {/* 가위바위보 진영 결정 */}
-        {rpsActive && rps && rpsTeamA && rpsTeamB && (
-          <div className="rounded-xl border border-bg-tertiary bg-bg-secondary/40 p-3">
-            <MatchRpsFlow
-              rps={rps}
-              reveal={rpsReveal}
-              currentUserId={user?.id}
-              teamA={rpsTeamA}
-              teamB={rpsTeamB}
-              onSubmit={(hand: RpsHand) => { void matchSocketHelpers.rpsSubmit(match.id, hand); }}
-              onChooseSide={(side) => { void matchSocketHelpers.rpsChooseSide(match.id, side); }}
-            />
-            {rpsError && (
-              <p className="mt-2 text-center text-sm text-accent-danger">{rpsError}</p>
-            )}
-          </div>
-        )}
 
         {/* MVP / ACE 투표 */}
         {match.status === 'COMPLETED' && (
@@ -1040,9 +1041,9 @@ function LaneRoster({
           <Loader2 className="h-6 w-6 animate-spin text-text-secondary" />
         </div>
       ) : (
-        // 팀 A를 첫 줄, 팀 B를 둘째 줄에 고정해 양 팀 전체를 한눈에 비교한다.
-        // 모바일에서는 5개 라인 카드의 가독성을 유지하기 위해 팀 줄만 가로 스크롤한다.
-        <div className="space-y-3 overflow-x-auto pb-1">
+        // 두 팀을 좌우로 나란히 놓고 각 팀은 라인 순서대로 세로로 쌓는다.
+        // 같은 라인끼리 수평으로 마주 보게 되어 비교가 바로 된다.
+        <div className="grid gap-3 lg:grid-cols-2">
           <TeamRosterPanel
             team={teamA}
             displayName={teamADisplay}
@@ -1094,41 +1095,34 @@ function TeamRosterPanel({
     ? memberScores.reduce<number>((total, score) => total + (score ?? 0), 0)
     : null;
 
-  const playerColumnCount = Math.max(orderedMembers.length, 1);
-
   return (
-    <div
-      className="grid min-w-[680px] overflow-hidden rounded-lg border border-bg-tertiary bg-bg-secondary"
-      style={{ gridTemplateColumns: `140px repeat(${playerColumnCount}, minmax(108px, 1fr))` }}
-    >
-      <div className="flex min-w-0 flex-col justify-between border-r border-bg-tertiary bg-bg-tertiary/60 px-3 py-3">
-        <div>
-          <span className={cn('block truncate text-sm font-bold', isWinner ? 'text-accent-gold' : 'text-text-primary')}>
-            {isWinner && <Trophy className="mr-1 inline h-4 w-4" />}
-            {displayName}
-          </span>
-          <span className="mt-1 block text-xs text-text-tertiary">{orderedMembers.length}명</span>
-        </div>
-        <div className="mt-3 border-t border-bg-elevated/70 pt-2">
-          <span className="block text-[11px] font-medium text-text-secondary">팀 총점</span>
-          <strong className="mt-0.5 block text-xl font-black tabular-nums text-accent-primary">
+    <div className="min-w-0 overflow-hidden rounded-lg border border-bg-tertiary bg-bg-secondary">
+      <div className="flex items-center justify-between gap-3 border-b border-bg-tertiary bg-bg-tertiary/60 px-3 py-2">
+        <span className={cn('min-w-0 truncate text-sm font-bold', isWinner ? 'text-accent-gold' : 'text-text-primary')}>
+          {isWinner && <Trophy className="mr-1 inline h-4 w-4" />}
+          {displayName}
+        </span>
+        <span className="flex shrink-0 items-baseline gap-1.5">
+          <span className="text-[11px] font-medium text-text-secondary">팀 총점</span>
+          <strong className="text-lg font-black tabular-nums text-accent-primary">
             {teamScore !== null ? teamScore.toFixed(1) : '-'}
           </strong>
-        </div>
+        </span>
       </div>
-      {orderedMembers.map((member) => (
-        <RosterPlayerCard key={member.user.id} member={member} onOpenProfile={onOpenProfile} />
-      ))}
-      {orderedMembers.length === 0 && (
-        <div className="flex items-center justify-center px-4 py-8 text-sm text-text-tertiary">
-          선수 정보가 없습니다.
-        </div>
-      )}
+      <div className="divide-y divide-bg-tertiary">
+        {orderedMembers.map((member) => (
+          <RosterPlayerRow key={member.user.id} member={member} onOpenProfile={onOpenProfile} />
+        ))}
+        {orderedMembers.length === 0 && (
+          <div className="px-4 py-8 text-center text-sm text-text-tertiary">선수 정보가 없습니다.</div>
+        )}
+      </div>
     </div>
   );
 }
 
-function RosterPlayerCard({ member, onOpenProfile }: { member: MatchMember; onOpenProfile: (userId: string) => void }) {
+// 선수 한 명 = 한 줄. 5명이 세로로 쌓여도 스크롤이 안 생기도록 압축한다.
+function RosterPlayerRow({ member, onOpenProfile }: { member: MatchMember; onOpenProfile: (userId: string) => void }) {
   const lane = normalizeLane(member.assignedRole);
   const riotAccount = member.user.riotAccounts?.[0];
   const lineScore = lane ? riotAccount?.balanceScores?.[lane] : undefined;
@@ -1138,37 +1132,38 @@ function RosterPlayerCard({ member, onOpenProfile }: { member: MatchMember; onOp
     .slice(0, 5);
 
   return (
-    <div className="min-w-0 border-r border-bg-tertiary px-2.5 py-3 last:border-r-0">
-      <div className="mb-2 flex min-w-0 items-center justify-between gap-1.5">
-        <span className="inline-flex min-w-0 items-center gap-1 text-xs font-bold text-text-secondary">
+    <div className="min-w-0 px-3 py-2">
+      {/* 윗줄: 라인 · 선수 · 티어 · 라인 점수 */}
+      <div className="flex min-w-0 items-center gap-2">
+        <span className="inline-flex w-14 shrink-0 items-center gap-1 text-xs font-bold text-text-secondary">
           {lane ? <PositionIcon position={lane} className="!h-4 !w-4 shrink-0" /> : null}
-          {lane ? POSITION_LABELS[lane] : '미배정'}
+          {lane ? POSITION_LABELS[lane] : '미정'}
         </span>
-        <strong className="shrink-0 text-sm tabular-nums text-accent-primary">
+        <div className="min-w-0 flex-1">
+          <PlayerCell member={member} onOpenProfile={onOpenProfile} />
+        </div>
+        <TierBadge
+          tier={riotAccount?.tier}
+          rank={riotAccount?.rank}
+          size="sm"
+          className="shrink-0 text-[10px]"
+        />
+        <strong className="w-10 shrink-0 text-right text-sm tabular-nums text-accent-primary">
           {typeof lineScore === 'number' && Number.isFinite(lineScore) ? lineScore.toFixed(1) : '-'}
         </strong>
       </div>
-      <PlayerCell member={member} onOpenProfile={onOpenProfile} />
-      <TierBadge
-        tier={riotAccount?.tier}
-        rank={riotAccount?.rank}
-        size="sm"
-        className="mt-2 max-w-full overflow-hidden text-[10px]"
-      />
-      <div className="mt-2 border-t border-bg-tertiary pt-2">
-        <p className="mb-1 text-[10px] font-semibold text-text-tertiary">선호 챔피언</p>
+      {/* 아랫줄: 선호 챔피언 — 초상화를 키워 한눈에 알아보게 하고, 폭은 윗줄과 나눠 쓴다 */}
+      <div className="mt-1.5 flex gap-1 pl-16">
         {champions.length > 0 ? (
-          <div className="flex min-w-0 gap-0.5 overflow-hidden">
-            {champions.map((preference) => (
-              <ChampionIcon
-                key={`${member.user.id}-${preference.championId}`}
-                championId={preference.championId}
-                size={22}
-              />
-            ))}
-          </div>
+          champions.map((preference) => (
+            <ChampionIcon
+              key={`${member.user.id}-${preference.championId}`}
+              championId={preference.championId}
+              size={34}
+            />
+          ))
         ) : (
-          <span className="text-[10px] text-text-tertiary">정보 없음</span>
+          <span className="text-[10px] leading-[34px] text-text-tertiary">선호 챔피언 없음</span>
         )}
       </div>
     </div>
