@@ -49,6 +49,8 @@ describe("StatsService", () => {
         findMany: jest.fn(),
         deleteMany: jest.fn(),
         createMany: jest.fn(),
+        // 배치 이어받기는 전체 교체 대신 누적 upsert 를 쓴다.
+        upsert: jest.fn(),
       },
       championScanState: {
         findUnique: jest.fn(),
@@ -596,6 +598,106 @@ describe("StatsService", () => {
         where: { id: "scan-1" },
         data: { status: "scanning", requestedAt: expect.any(Date) },
       });
+    });
+
+    it("중단된 지점(scannedCount)부터 이어받는다", async () => {
+      prisma.championScanState.updateMany.mockResolvedValue({ count: 0 });
+      prisma.championScanState.findMany.mockResolvedValue([
+        {
+          id: "scan-1",
+          puuid: "puuid-1",
+          season: "2026-S2",
+          queueGroup: "ranked",
+          scannedCount: 200,
+        },
+      ]);
+      prisma.championScanState.update.mockResolvedValue({});
+      const scan = jest
+        .spyOn(service as any, "scanChampionSeasonForPuuid")
+        .mockResolvedValue({ fetched: 100, reachedEnd: false });
+
+      await service.processChampionScanQueue(1);
+
+      expect(scan).toHaveBeenCalledWith("puuid-1", "2026-S2", "ranked", 200);
+    });
+
+    it("배치가 가득 차면 큐로 되돌려 다음에 이어받게 한다", async () => {
+      // 시즌 전체를 한 번에 받으면 판수 많은 계정이 큐를 몇 시간씩 잡는다.
+      riotMatchService.getMatchIdsByPuuid.mockResolvedValue(
+        Array.from({ length: 100 }, (_, i) => `KR_${i}`),
+      );
+      riotMatchService.getMatchById.mockResolvedValue({
+        info: {
+          queueId: 420,
+          participants: [
+            {
+              puuid: "puuid-1",
+              championId: 103,
+              championName: "Ahri",
+              win: true,
+              kills: 5,
+              deaths: 2,
+              assists: 7,
+            },
+          ],
+        },
+      });
+      prisma.$transaction.mockResolvedValue([]);
+
+      const result = await (service as any).scanChampionSeasonForPuuid(
+        "puuid-1",
+        "2026-S2",
+        "ranked",
+        100,
+      );
+
+      expect(result).toEqual({ fetched: 100, reachedEnd: false });
+      // 이어받는 배치는 앞 배치가 쌓아둔 통계를 지우면 안 된다.
+      expect(prisma.championSeasonStat.deleteMany).not.toHaveBeenCalled();
+      expect(riotMatchService.getMatchIdsByPuuid).toHaveBeenCalledWith(
+        "puuid-1",
+        100,
+        100,
+        undefined,
+        "ranked",
+        3,
+        expect.any(Number),
+        undefined,
+        "background",
+        { throwOnFailure: true },
+      );
+    });
+
+    it("배치가 덜 차면 시즌 끝으로 보고 완료 처리한다", async () => {
+      riotMatchService.getMatchIdsByPuuid.mockResolvedValue(["KR_1"]);
+      riotMatchService.getMatchById.mockResolvedValue({
+        info: {
+          queueId: 420,
+          participants: [
+            {
+              puuid: "puuid-1",
+              championId: 103,
+              championName: "Ahri",
+              win: true,
+              kills: 5,
+              deaths: 2,
+              assists: 7,
+            },
+          ],
+        },
+      });
+      prisma.$transaction.mockResolvedValue([]);
+
+      const result = await (service as any).scanChampionSeasonForPuuid(
+        "puuid-1",
+        "2026-S2",
+        "ranked",
+        0,
+      );
+
+      expect(result).toEqual({ fetched: 1, reachedEnd: true });
+      // 첫 배치는 이전 시즌 잔재를 지우고 시작한다.
+      expect(prisma.championSeasonStat.deleteMany).toHaveBeenCalled();
     });
 
     it("경기 상세가 하나라도 누락되면 기존 승패 통계를 교체하지 않는다", async () => {

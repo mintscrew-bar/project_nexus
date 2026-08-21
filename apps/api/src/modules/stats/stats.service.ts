@@ -1717,7 +1717,15 @@ export class StatsService {
   // 챔피언 시즌 통계 — 증분 누적 (match-v5 스캔)
   // ========================================
 
-  private readonly MAX_SEASON_SCAN = 100; // puuid당 최대 스캔 깊이
+  /**
+   * 한 사이클에 훑는 매치 수 (Riot 매치 ID 조회의 요청당 최대치).
+   *
+   * 예전에는 이 값이 곧 "puuid당 최대 스캔 깊이"라, 100판을 넘게 한 사람은
+   * 최근 100판만 남고 나머지 시즌 전체가 통째로 빠졌다. 지금은 배치 크기이고,
+   * scannedCount 를 커서 삼아 시즌 끝에 닿을 때까지 이어받는다.
+   * (실측: 계정당 평균 279판, 최대 1851판)
+   */
+  private readonly SEASON_SCAN_BATCH = 100;
   private readonly SEASON_RESCAN_THROTTLE_MS = 30 * 60 * 1000; // 재스캔 최소 간격
   /**
    * 이보다 오래 "scanning" 이면 워커가 죽은 것으로 보고 큐에 되돌린다.
@@ -1774,6 +1782,8 @@ export class StatsService {
         season,
         queueGroup,
         options?.priority ?? 0,
+        // 다 훑은 계정만 처음부터 다시. 중단된 스캔은 이어받는다.
+        !state || state.status === "done",
       );
     }
 
@@ -1836,7 +1846,13 @@ export class StatsService {
       }
 
       try {
-        await this.enqueueChampionScan(puuid, season, queueGroup, priority);
+        await this.enqueueChampionScan(
+          puuid,
+          season,
+          queueGroup,
+          priority,
+          !state || state.status === "done",
+        );
         enqueued++;
       } catch (error) {
         this.logger.warn(`스캔 큐잉 실패 (${puuid}): ${error}`);
@@ -1894,11 +1910,17 @@ export class StatsService {
     );
   }
 
+  /**
+   * @param resetCursor 처음부터 다시 훑을지. 이어받는 중인 계정(queued/error 이고
+   *   scannedCount > 0)에 이걸 켜면 앞서 받은 배치를 버리고 되돌아간다. 새 스캔
+   *   (상태가 없거나 done)일 때만 켜야 한다.
+   */
   private async enqueueChampionScan(
     puuid: string,
     season: string,
     queueGroup: string,
     priority: number,
+    resetCursor: boolean,
   ): Promise<void> {
     await this.prisma.championScanState.upsert({
       where: { puuid_season_queueGroup: { puuid, season, queueGroup } },
@@ -1915,6 +1937,9 @@ export class StatsService {
         // 더 높은 우선순위 요청이 오면 승격
         priority: { set: priority },
         requestedAt: new Date(),
+        // 이어받는 중이면 커서를 유지한다. 여기서 0으로 밀면 큰 계정은
+        // 누가 전적을 열어볼 때마다 처음으로 돌아가 끝내 완주하지 못한다.
+        ...(resetCursor ? { scannedCount: 0 } : {}),
       },
     });
   }
@@ -1987,6 +2012,7 @@ export class StatsService {
           job.puuid,
           job.season,
           job.queueGroup,
+          job.scannedCount,
         );
         processed++;
       } catch (error) {
@@ -2004,13 +2030,22 @@ export class StatsService {
     return processed;
   }
 
-  // 한 puuid의 ranked 시즌 매치(최대 MAX_SEASON_SCAN)를 스캔해 챔피언 통계를 전체 교체.
-  // 매치는 DB 캐시 우선이라 재스캔 시 신규분만 Riot API 예산을 소모한다.
+  /**
+   * 한 puuid의 ranked 시즌 매치를 한 배치(100건)만 훑어 챔피언 통계에 누적한다.
+   *
+   * 시즌 전체를 한 번에 받으면 1851판짜리 계정이 1.5시간 동안 큐를 잡고,
+   * 그사이 컨테이너가 교체되면 처음부터 다시 받게 된다. 그래서 배치로 끊고
+   * scannedCount 를 커서로 남겨 다음 사이클에 이어받는다.
+   *
+   * @param startOffset 이어받을 지점 (지금까지 훑은 매치 수)
+   * @returns fetched 이번에 훑은 수, reachedEnd 시즌 끝에 닿았는지
+   */
   private async scanChampionSeasonForPuuid(
     puuid: string,
     season: string,
     queueGroup: string,
-  ): Promise<void> {
+    startOffset: number,
+  ): Promise<{ fetched: number; reachedEnd: boolean }> {
     const seasonStartSec = Math.floor(
       this.getSeasonStartDate().getTime() / 1000,
     );
@@ -2018,8 +2053,8 @@ export class StatsService {
     // ranked = 솔로+자유 (type="ranked"). 시즌 시작 이후 최신 매치 ID.
     const matchIds = await this.riotMatchService.getMatchIdsByPuuid(
       puuid,
-      0,
-      this.MAX_SEASON_SCAN,
+      startOffset,
+      this.SEASON_SCAN_BATCH,
       undefined,
       "ranked",
       3,
@@ -2048,8 +2083,8 @@ export class StatsService {
         3,
         "background",
       );
-      // 한 경기라도 상세 조회에 실패한 상태로 전체 교체하면 기존 승패가
-      // 부분 집계로 줄어든다. 이번 스캔을 실패 처리해 이전 통계를 보존한다.
+      // 한 경기라도 빠진 채로 누적하면 이 배치가 통계를 영구히 어긋나게 한다
+      // (커서가 넘어가 다시 훑지 않는다). 배치 전체를 실패 처리해 되돌린다.
       if (!match) {
         throw new Error(
           `Incomplete champion scan: match ${matchId} unavailable`,
@@ -2079,38 +2114,64 @@ export class StatsService {
     }
 
     const rows = Array.from(agg.values());
+    // 받아온 게 요청한 배치보다 적으면 시즌 시작까지 다 훑은 것이다.
+    const reachedEnd = matchIds.length < this.SEASON_SCAN_BATCH;
 
-    // 전체 교체(멱등): 기존 행 삭제 후 일괄 삽입 + 상태 갱신
     await this.prisma.$transaction([
-      this.prisma.championSeasonStat.deleteMany({
-        where: { puuid, season, queueGroup },
-      }),
-      ...(rows.length > 0
+      // 첫 배치는 이전 시즌 스캔의 잔재를 지우고 새로 쌓기 시작한다.
+      // 이어받는 배치(startOffset > 0)는 지우면 안 된다 — 앞 배치들이 거기 있다.
+      ...(startOffset === 0
         ? [
-            this.prisma.championSeasonStat.createMany({
-              data: rows.map((r) => ({
-                puuid,
-                season,
-                queueGroup,
-                championId: r.championId,
-                championName: r.championName,
-                games: r.games,
-                wins: r.wins,
-                kills: r.kills,
-                deaths: r.deaths,
-                assists: r.assists,
-              })),
+            this.prisma.championSeasonStat.deleteMany({
+              where: { puuid, season, queueGroup },
             }),
           ]
         : []),
+      ...rows.map((r) =>
+        this.prisma.championSeasonStat.upsert({
+          where: {
+            puuid_season_queueGroup_championId: {
+              puuid,
+              season,
+              queueGroup,
+              championId: r.championId,
+            },
+          },
+          create: {
+            puuid,
+            season,
+            queueGroup,
+            championId: r.championId,
+            championName: r.championName,
+            games: r.games,
+            wins: r.wins,
+            kills: r.kills,
+            deaths: r.deaths,
+            assists: r.assists,
+          },
+          update: {
+            championName: r.championName,
+            games: { increment: r.games },
+            wins: { increment: r.wins },
+            kills: { increment: r.kills },
+            deaths: { increment: r.deaths },
+            assists: { increment: r.assists },
+          },
+        }),
+      ),
       this.prisma.championScanState.update({
         where: { puuid_season_queueGroup: { puuid, season, queueGroup } },
         data: {
-          status: "done",
-          scannedCount: matchIds.length,
+          // 아직 남았으면 큐로 되돌려 다음 사이클에 이어받는다. requestedAt 을
+          // 갱신해 큐 뒤로 보내므로, 판수가 많은 계정이 큐를 독점하지 않는다.
+          status: reachedEnd ? "done" : "queued",
+          scannedCount: startOffset + matchIds.length,
           lastScanAt: new Date(),
+          requestedAt: new Date(),
         },
       }),
     ]);
+
+    return { fetched: matchIds.length, reachedEnd };
   }
 }
