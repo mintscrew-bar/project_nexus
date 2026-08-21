@@ -34,7 +34,7 @@ export class PresenceGateway
   implements OnGatewayConnection, OnGatewayDisconnect, OnModuleDestroy
 {
   @WebSocketServer()
-  server: Server;
+  server!: Server;
 
   private userSockets = new Map<string, Set<string>>(); // userId -> Set of socketIds
   private socketUsers = new Map<string, string>(); // socketId -> userId

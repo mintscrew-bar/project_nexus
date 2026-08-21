@@ -11,5 +11,5 @@ export class UpdateCommentDto {
   @IsString()
   @IsNotEmpty({ message: "댓글 내용을 입력해주세요." })
   @MaxLength(2000, { message: "댓글은 2,000자를 초과할 수 없습니다." })
-  content: string;
+  content!: string;
 }

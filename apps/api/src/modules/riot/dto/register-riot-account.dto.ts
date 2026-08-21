@@ -27,12 +27,12 @@ export class RegisterRiotAccountDto {
   @IsString()
   @IsNotEmpty({ message: "게임 닉네임을 입력해주세요." })
   @MaxLength(50)
-  gameName: string;
+  gameName!: string;
 
   @IsString()
   @IsNotEmpty({ message: "태그라인을 입력해주세요." })
   @MaxLength(10)
-  tagLine: string;
+  tagLine!: string;
 
   @Transform(optionalUppercase)
   @IsOptional()
@@ -53,13 +53,13 @@ export class RegisterRiotAccountDto {
   peakLp?: number;
 
   @IsEnum(Role, { message: "유효한 주 포지션을 선택해주세요." })
-  mainRole: Role;
+  mainRole!: Role;
 
   @IsEnum(Role, { message: "유효한 부 포지션을 선택해주세요." })
-  subRole: Role;
+  subRole!: Role;
 
   @IsObject()
-  championsByRole: {
+  championsByRole!: {
     [key in Role]?: string[];
   };
 

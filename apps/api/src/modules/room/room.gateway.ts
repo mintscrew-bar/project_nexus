@@ -43,7 +43,7 @@ export class RoomGateway
   implements OnGatewayConnection, OnGatewayDisconnect, OnModuleDestroy
 {
   @WebSocketServer()
-  server: Server | Namespace;
+  server!: Server | Namespace;
 
   private userSockets = new Map<string, Set<string>>(); // userId -> Set<socketId>
   private socketRooms = new Map<string, string>(); // socketId -> roomId

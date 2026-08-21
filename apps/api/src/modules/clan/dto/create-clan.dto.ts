@@ -34,7 +34,7 @@ export class CreateClanDto {
   @IsNotEmpty({ message: "클랜 이름을 입력해주세요." })
   @MinLength(2, { message: "클랜 이름은 최소 2자 이상이어야 합니다." })
   @MaxLength(50, { message: "클랜 이름은 50자를 초과할 수 없습니다." })
-  name: string;
+  name!: string;
 
   @IsString()
   @MinLength(2, { message: "클랜 태그는 최소 2자 이상이어야 합니다." })
@@ -42,7 +42,7 @@ export class CreateClanDto {
   @Matches(/^[A-Za-z0-9]+$/, {
     message: "클랜 태그는 영문과 숫자만 사용할 수 있습니다.",
   })
-  tag: string;
+  tag!: string;
 
   /** 클랜 설명은 플레인 텍스트만 허용 (모든 HTML 태그 제거) */
   @IsOptional()
@@ -52,7 +52,7 @@ export class CreateClanDto {
   description?: string;
 
   @IsBoolean()
-  isRecruiting: boolean;
+  isRecruiting!: boolean;
 
   @IsOptional()
   @IsString()

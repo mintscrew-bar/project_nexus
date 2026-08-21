@@ -26,7 +26,7 @@ export class CreatePostDto {
   @IsNotEmpty({ message: "제목을 입력해주세요." })
   @MinLength(2, { message: "제목은 최소 2자 이상이어야 합니다." })
   @MaxLength(200, { message: "제목은 200자를 초과할 수 없습니다." })
-  title: string;
+  title!: string;
 
   /** 본문은 마크다운 허용, 위험한 태그/속성만 선택적 제거 */
   @Transform(({ value }) => sanitizeHtml(value))
@@ -34,7 +34,7 @@ export class CreatePostDto {
   @IsNotEmpty({ message: "내용을 입력해주세요." })
   @MinLength(5, { message: "내용은 최소 5자 이상이어야 합니다." })
   @MaxLength(10000, { message: "내용은 10,000자를 초과할 수 없습니다." })
-  content: string;
+  content!: string;
 
   /** 본문 저장 방식. 미지정 시 기존 마크다운으로 처리 */
   @IsOptional()
