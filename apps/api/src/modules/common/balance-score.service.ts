@@ -64,15 +64,20 @@ export class BalanceScoreService {
    * 솔로랭크 라인별 전적을 집계한다.
    *
    * 리그 엔트리(soloWins/soloLosses)에는 라인 정보가 없어서, 이미 수집해 둔
-   * 매치 참가 기록에서 직접 센다. 유저 한 명당 인덱스(userId)를 타고 수백 행만
+   * 매치 참가 기록에서 직접 센다. 계정 하나당 인덱스(puuid)를 타고 수백 행만
    * 읽으므로 3ms 안팎이고, 이 메서드는 점수 캐시를 갱신할 때만 불린다.
+   *
+   * userId 가 아니라 puuid 로 찾는 이유가 둘 있다. 점수 자체가 계정 단위라
+   * 부계정 전적이 섞이면 안 되고, MatchParticipant.userId 는 매치를 저장하던
+   * 시점에 연동돼 있던 계정만 채워져 있어서 나중에 연동한 사람은 비어 있다
+   * (실측: puuid 로 찾으면 95계정, userId 로 찾으면 51명).
    *
    * 자유랭크(440)는 라인 실력 신호가 약해 제외하고 솔로랭크(420)만 센다.
    */
   private async loadRankedRoleRecords(
-    userId: string | null,
+    puuid: string | null,
   ): Promise<{ role: Role; wins: number; losses: number }[]> {
-    if (!userId) return [];
+    if (!puuid) return [];
 
     try {
       const rows = await this.prisma.$queryRaw<
@@ -83,7 +88,7 @@ export class BalanceScoreService {
                COUNT(*) AS games
         FROM match_participants p
         JOIN matches m ON m.id = p."matchId"
-        WHERE p."userId" = ${userId}
+        WHERE p.puuid = ${puuid}
           AND m."queueId" = ${RANKED_SOLO_QUEUE_ID}
           AND p.position = ANY(${BALANCE_ROLES}::text[])
         GROUP BY p.position
@@ -97,7 +102,7 @@ export class BalanceScoreService {
     } catch (error) {
       // 집계 실패로 점수 갱신 자체가 멈추면 안 된다 — 라인 보정 없이 계산한다.
       const message = error instanceof Error ? error.message : String(error);
-      this.logger.warn(`솔랭 라인 전적 집계 실패 userId=${userId}: ${message}`);
+      this.logger.warn(`솔랭 라인 전적 집계 실패 puuid=${puuid}: ${message}`);
       return [];
     }
   }
@@ -111,7 +116,7 @@ export class BalanceScoreService {
       where: { id: riotAccountId },
       select: {
         id: true,
-        userId: true,
+        puuid: true,
         tier: true,
         rank: true,
         lp: true,
@@ -151,7 +156,7 @@ export class BalanceScoreService {
       soloLosses: account.soloLosses,
       overallRecord: account.user?.nexusRanking ?? null,
       roleRecords: account.user?.nexusRoleRecords ?? [],
-      rankedRoleRecords: await this.loadRankedRoleRecords(account.userId),
+      rankedRoleRecords: await this.loadRankedRoleRecords(account.puuid),
     });
 
     const scores = Object.fromEntries(

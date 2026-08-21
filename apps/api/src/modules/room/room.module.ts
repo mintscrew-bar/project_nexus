@@ -12,6 +12,7 @@ import { DiscordModule } from "../discord/discord.module";
 import { DiscordBotService } from "../discord/discord-bot.service";
 import { DiscordVoiceService } from "../discord/discord-voice.service";
 import { StreamerModule } from "../streamer/streamer.module";
+import { StatsModule } from "../stats/stats.module";
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { StreamerModule } from "../streamer/streamer.module";
     forwardRef(() => MatchModule),
     DiscordModule,
     StreamerModule,
+    StatsModule,
   ],
   controllers: [RoomController],
   providers: [

@@ -107,6 +107,12 @@ export interface AuctionStats {
   titles: AuctionTitle[];
 }
 
+/**
+ * 배경 백필 작업의 우선순위.
+ * 사람이 기다리는 조회(0 이상)보다 항상 뒤로 밀리도록 음수를 쓴다.
+ */
+export const SCAN_BACKFILL_PRIORITY = -10;
+
 @Injectable()
 export class StatsService {
   private readonly logger = new Logger(StatsService.name);
@@ -1777,6 +1783,93 @@ export class StatsService {
     };
   }
 
+  /**
+   * 여러 puuid 를 한 번에 스캔 큐에 넣는다 (방 입장 등에서 미리 채워두는 용도).
+   *
+   * 이미 진행 중이거나 최근에 스캔한 건은 건드리지 않는다 — 방을 드나들 때마다
+   * 같은 사람을 다시 큐에 넣으면 배경 예산을 그 사람에게만 쓰게 된다.
+   *
+   * @returns 실제로 큐에 넣은 수
+   */
+  async enqueueChampionScanForPuuids(
+    puuids: string[],
+    priority = 0,
+  ): Promise<number> {
+    const unique = [...new Set(puuids.filter((puuid) => !!puuid))];
+    if (unique.length === 0) return 0;
+
+    const season = this.getCurrentSeason();
+    const queueGroup = "ranked";
+    const existing = await this.prisma.championScanState.findMany({
+      where: { puuid: { in: unique }, season, queueGroup },
+      select: { puuid: true, status: true, lastScanAt: true },
+    });
+    const stateByPuuid = new Map(existing.map((row) => [row.puuid, row]));
+
+    const now = Date.now();
+    let enqueued = 0;
+    for (const puuid of unique) {
+      const state = stateByPuuid.get(puuid);
+      if (state) {
+        const busy = state.status === "queued" || state.status === "scanning";
+        const recentlyScanned =
+          !!state.lastScanAt &&
+          now - state.lastScanAt.getTime() <= this.SEASON_RESCAN_THROTTLE_MS;
+        if (busy || recentlyScanned) continue;
+      }
+
+      try {
+        await this.enqueueChampionScan(puuid, season, queueGroup, priority);
+        enqueued++;
+      } catch (error) {
+        this.logger.warn(`스캔 큐잉 실패 (${puuid}): ${error}`);
+      }
+    }
+    return enqueued;
+  }
+
+  /**
+   * 아직 한 번도 스캔된 적 없는 우리 유저 계정을 배경 백필 큐에 넣는다.
+   *
+   * 매치 수집은 지금까지 "누군가 그 사람의 전적 화면을 열었을 때"만 일어나서,
+   * 라이엇 연동 계정 대부분이 라인별 전적 없이 남아 있었다. 서버가 한가할 때만
+   * 조금씩 채운다.
+   *
+   * @returns 실제로 큐에 넣은 수
+   */
+  async enqueueChampionScanBackfill(limit = 4): Promise<number> {
+    const season = this.getCurrentSeason();
+    const queueGroup = "ranked";
+
+    // 큐가 이미 밀려 있으면 더 쌓지 않는다 — 워커는 틱당 몇 건만 소화한다.
+    const pending = await this.prisma.championScanState.count({
+      where: { season, queueGroup, status: { in: ["queued", "scanning"] } },
+    });
+    if (pending >= limit) return 0;
+
+    const rows = await this.prisma.$queryRaw<{ puuid: string }[]>`
+      SELECT r.puuid
+      FROM riot_accounts r
+      WHERE r.puuid IS NOT NULL
+        AND r.puuid <> ''
+        AND NOT EXISTS (
+          SELECT 1 FROM champion_scan_states c
+          WHERE c.puuid = r.puuid
+            AND c.season = ${season}
+            AND c."queueGroup" = ${queueGroup}
+        )
+      ORDER BY r."isPrimary" DESC, r."createdAt" ASC
+      LIMIT ${limit - pending}
+    `;
+    if (rows.length === 0) return 0;
+
+    // 사람이 기다리는 요청(priority >= 0)보다 항상 뒤로 밀리게 둔다.
+    return this.enqueueChampionScanForPuuids(
+      rows.map((row) => row.puuid),
+      SCAN_BACKFILL_PRIORITY,
+    );
+  }
+
   private async enqueueChampionScan(
     puuid: string,
     season: string,
@@ -1829,12 +1922,22 @@ export class StatsService {
   }
 
   // background 워커가 호출: 큐에 쌓인 스캔을 우선순위/요청순으로 처리.
-  async processChampionScanQueue(limit = 2): Promise<number> {
+  async processChampionScanQueue(
+    limit = 2,
+    minPriority?: number,
+  ): Promise<number> {
     // 죽은 작업을 먼저 회수해야 큐가 막히지 않는다.
     await this.requeueStalledChampionScans();
 
     const queued = await this.prisma.championScanState.findMany({
-      where: { status: "queued" },
+      where: {
+        status: "queued",
+        // 서버가 붐빌 때는 배경 백필(낮은 우선순위)을 건너뛰고 사람이
+        // 기다리는 요청만 처리한다. Riot 예산이 하나뿐이라 둘이 경쟁한다.
+        ...(minPriority !== undefined
+          ? { priority: { gte: minPriority } }
+          : {}),
+      },
       orderBy: [{ priority: "desc" }, { requestedAt: "asc" }],
       take: limit,
     });

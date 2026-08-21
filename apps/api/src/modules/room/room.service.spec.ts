@@ -10,6 +10,7 @@ import { ShutdownService } from "../common/shutdown.service";
 import { Role, RoomStatus, TeamMode } from "@nexus/database";
 import { StreamerService } from "../streamer/streamer.service";
 import { BalanceScoreService } from "../common/balance-score.service";
+import { StatsService } from "../stats/stats.service";
 import { RedisService } from "../redis/redis.service";
 
 describe("RoomService", () => {
@@ -107,6 +108,10 @@ describe("RoomService", () => {
           // 되므로 기본값은 null 이고, 자동 밸런스 테스트에서만 값을 준다.
           provide: BalanceScoreService,
           useValue: balanceScores,
+        },
+        {
+          provide: StatsService,
+          useValue: { enqueueChampionScanForPuuids: jest.fn() },
         },
         { provide: RedisService, useValue: redis },
       ],

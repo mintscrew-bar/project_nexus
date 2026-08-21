@@ -9,6 +9,16 @@ export class PresenceService {
 
   constructor(private readonly prisma: PrismaService) {}
 
+  /**
+   * 지금 소켓이 붙어 있는 유저 수.
+   *
+   * 서버가 한가한지 판단하는 데 쓴다 — Riot 예산(앱 전체 100req/2분)을
+   * 배경 수집에 얼마나 내줘도 되는지가 여기에 달려 있다.
+   */
+  getOnlineUserCount(): number {
+    return this.userConnections.size;
+  }
+
   async setUserOnline(userId: string, socketId: string): Promise<void> {
     // Add socket to user's connections
     if (!this.userConnections.has(userId)) {

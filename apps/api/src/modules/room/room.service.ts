@@ -26,6 +26,7 @@ import { normalizeSeriesPreset, teamCountForRoomSize } from "@nexus/types";
 import { StreamerService } from "../streamer/streamer.service";
 import { RedisService } from "../redis/redis.service";
 import { BalanceScoreService } from "../common/balance-score.service";
+import { StatsService } from "../stats/stats.service";
 import { BALANCE_ROLES } from "../common/balance-score.util";
 
 export interface CreateRoomDto {
@@ -129,6 +130,7 @@ export class RoomService {
     private readonly shutdownService: ShutdownService,
     private readonly streamerService: StreamerService,
     private readonly balanceScores: BalanceScoreService,
+    private readonly statsService: StatsService,
     private readonly redis: RedisService,
     @Optional() @Inject("DISCORD_BOT_SERVICE") discordBot?: any,
     @Optional() @Inject("DISCORD_VOICE_SERVICE") discordVoice?: any,
@@ -1573,8 +1575,38 @@ export class RoomService {
     const roomData = await this.getRoomById(joinedRoomId);
 
     this.refreshDiscordRoomNotification(joinedRoomId);
+    this.warmRankedScanForUser(userId);
 
     return roomData;
+  }
+
+  /**
+   * 방에 들어온 사람의 솔랭 매치 수집을 미리 걸어둔다.
+   *
+   * 밸런스 점수의 라인 차별화는 라인별 솔랭 전적에서 나오는데, 수집은 지금까지
+   * 누군가 그 사람의 전적 화면을 열어야만 시작됐다. 방에 들어온 시점부터
+   * 시작이 눌릴 때까지 보통 몇 분은 있으므로, 그 사이에 채워두면 이번 편성부터
+   * 반영될 수 있다. 사람이 기다리는 조회(우선순위 0)보다 앞서도록 5를 준다.
+   *
+   * 실패해도 입장 자체는 영향받지 않게 삼킨다.
+   */
+  private warmRankedScanForUser(userId: string): void {
+    void (async () => {
+      try {
+        const accounts = await this.prisma.riotAccount.findMany({
+          where: { userId, puuid: { not: "" } },
+          select: { puuid: true },
+        });
+        const puuids = accounts
+          .map((account) => account.puuid)
+          .filter((puuid): puuid is string => !!puuid);
+        if (puuids.length === 0) return;
+
+        await this.statsService.enqueueChampionScanForPuuids(puuids, 5);
+      } catch (error) {
+        this.logger.warn(`솔랭 스캔 큐잉 실패 userId=${userId}: ${error}`);
+      }
+    })();
   }
 
   /** PLAYER ↔ SPECTATOR 역할 전환 */

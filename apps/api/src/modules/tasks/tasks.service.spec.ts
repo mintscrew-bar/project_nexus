@@ -50,7 +50,7 @@ describe("TasksService pending custom match collection lock", () => {
 });
 
 describe("TasksService 챔피언 시즌 스캔", () => {
-  const makeService = (statsService: any, redis: any) =>
+  const makeService = (statsService: any, redis: any, onlineCount = 0) =>
     new TasksService(
       { get: jest.fn() } as any,
       {} as any,
@@ -60,7 +60,13 @@ describe("TasksService 챔피언 시즌 스캔", () => {
       statsService as any,
       {} as any,
       {} as any,
+      { getOnlineUserCount: () => onlineCount } as any,
     );
+
+  const makeStatsService = () => ({
+    processChampionScanQueue: jest.fn().mockResolvedValue(2),
+    enqueueChampionScanBackfill: jest.fn().mockResolvedValue(0),
+  });
 
   it("큐를 비우고 락을 반납한다", async () => {
     // 이 크론이 사라져 있던 동안 큐가 계속 쌓이기만 했다.
@@ -68,17 +74,51 @@ describe("TasksService 챔피언 시즌 스캔", () => {
       acquireLock: jest.fn().mockResolvedValue("token"),
       releaseLock: jest.fn().mockResolvedValue(undefined),
     };
-    const statsService = {
-      processChampionScanQueue: jest.fn().mockResolvedValue(2),
-    };
+    const statsService = makeStatsService();
 
     await makeService(statsService, redis).handleChampionSeasonScan();
 
-    expect(statsService.processChampionScanQueue).toHaveBeenCalledWith(2);
+    expect(statsService.processChampionScanQueue).toHaveBeenCalledWith(
+      2,
+      undefined,
+    );
     expect(redis.releaseLock).toHaveBeenCalledWith(
       "tasks:champion-season-scan",
       "token",
     );
+  });
+
+  it("접속자가 적으면 아직 수집 안 된 계정을 백필 큐에 채운다", async () => {
+    // 수집이 "누가 전적을 열어봤을 때"만 돌던 탓에 대부분의 계정이 비어 있었다.
+    const redis = {
+      acquireLock: jest.fn().mockResolvedValue("token"),
+      releaseLock: jest.fn().mockResolvedValue(undefined),
+    };
+    const statsService = makeStatsService();
+    statsService.enqueueChampionScanBackfill.mockResolvedValue(3);
+
+    await makeService(statsService, redis, 0).handleChampionSeasonScan();
+
+    expect(statsService.enqueueChampionScanBackfill).toHaveBeenCalledWith(4);
+    // 한가할 때는 백필 작업(음수 우선순위)도 처리 대상이다.
+    expect(statsService.processChampionScanQueue).toHaveBeenCalledWith(
+      2,
+      undefined,
+    );
+  });
+
+  it("접속자가 많으면 백필을 걸지도, 집지도 않는다", async () => {
+    // Riot 예산은 하나뿐이라, 사람이 붙어 있으면 전적 검색이 먼저 써야 한다.
+    const redis = {
+      acquireLock: jest.fn().mockResolvedValue("token"),
+      releaseLock: jest.fn().mockResolvedValue(undefined),
+    };
+    const statsService = makeStatsService();
+
+    await makeService(statsService, redis, 20).handleChampionSeasonScan();
+
+    expect(statsService.enqueueChampionScanBackfill).not.toHaveBeenCalled();
+    expect(statsService.processChampionScanQueue).toHaveBeenCalledWith(2, 0);
   });
 
   it("락을 못 잡으면 큐를 건드리지 않는다", async () => {

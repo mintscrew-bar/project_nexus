@@ -7,7 +7,7 @@ describe("BalanceScoreService", () => {
 
   const account = {
     id: "riot-1",
-    userId: "user-1",
+    puuid: "puuid-1",
     tier: "GOLD",
     rank: "II",
     lp: 40,

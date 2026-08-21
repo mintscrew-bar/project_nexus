@@ -6,6 +6,7 @@ import { DataDragonService } from "../riot/data-dragon.service";
 import { RiotService } from "../riot/riot.service";
 import { getPeakTierUpdate } from "../riot/riot-rank.util";
 import { RedisService } from "../redis/redis.service";
+import { PresenceService } from "../presence/presence.service";
 import { StatsService } from "../stats/stats.service";
 import { MatchDataCollectionService } from "../match/match-data-collection.service";
 import { BalanceScoreService } from "../common/balance-score.service";
@@ -15,6 +16,13 @@ export class TasksService {
   private readonly logger = new Logger(TasksService.name);
   private readonly riotMatchCacheCleanupEnabled: boolean;
   private readonly riotMatchCacheTtlDays: number;
+  /**
+   * 배경 백필을 돌려도 되는 접속자 수 상한.
+   *
+   * Riot 예산은 앱 전체가 하나를 나눠 쓰므로, 사람이 붙어 있을 때 백필이
+   * 예산을 먹으면 전적 검색이 429로 튕긴다. 이 수 이하일 때만 백필한다.
+   */
+  private readonly scanBackfillOnlineMax: number;
 
   constructor(
     private readonly configService: ConfigService,
@@ -25,6 +33,7 @@ export class TasksService {
     private readonly statsService: StatsService,
     private readonly matchDataCollectionService: MatchDataCollectionService,
     private readonly balanceScores: BalanceScoreService,
+    private readonly presence: PresenceService,
   ) {
     this.riotMatchCacheCleanupEnabled =
       this.configService.get<string>("RIOT_MATCH_CACHE_CLEANUP_ENABLED") ===
@@ -33,6 +42,17 @@ export class TasksService {
       "RIOT_MATCH_CACHE_TTL_DAYS",
       14,
     );
+    // 0 을 허용해야 "아무도 없을 때만" 설정이 가능하므로 별도로 읽는다.
+    const rawOnlineMax = this.configService.get<string>(
+      "SCAN_BACKFILL_ONLINE_MAX",
+    );
+    const parsedOnlineMax = Number(rawOnlineMax);
+    this.scanBackfillOnlineMax =
+      rawOnlineMax !== undefined &&
+      Number.isFinite(parsedOnlineMax) &&
+      parsedOnlineMax >= 0
+        ? Math.floor(parsedOnlineMax)
+        : 2;
   }
 
   /** 이벤트 기반 갱신이 실패했거나 누락된 밸런스 점수를 12시간마다 복구한다. */
@@ -120,6 +140,12 @@ export class TasksService {
    * 퍼스널 키 예산(앱 전체 100req/2분)을 잠식하지 않게 틱당 2건만 처리한다.
    * 매치 상세는 대부분 DB 캐시에서 나오므로 실제 Riot 호출은 이보다 훨씬 적다.
    *
+   * 접속자가 적을 때는 아직 한 번도 수집되지 않은 계정을 백필 큐에 채운다.
+   * 지금까지는 누군가 그 사람의 전적 화면을 열어야만 수집이 시작돼서, 라이엇을
+   * 연동해 둔 계정 대부분이 라인별 전적 없이 남아 있었다(밸런스 점수의 라인
+   * 차별화가 그 데이터에 기댄다). 반대로 사람이 붙어 있을 때는 백필 작업을
+   * 아예 집지 않아, 전적 검색이 예산을 먼저 쓰게 한다.
+   *
    * 이 크론은 `28e8aff chore: retire lab features and collectors` 에서 Lab 정리와
    * 함께 삭제됐다. 그 뒤로 큐를 비우는 주체가 없어 화면이 "수집 중"에서 멈춰 있었다.
    */
@@ -130,7 +156,21 @@ export class TasksService {
     if (!lockToken) return;
 
     try {
-      const processed = await this.statsService.processChampionScanQueue(2);
+      const online = this.presence.getOnlineUserCount();
+      const quiet = online <= this.scanBackfillOnlineMax;
+
+      if (quiet) {
+        const queued = await this.statsService.enqueueChampionScanBackfill(4);
+        if (queued > 0) {
+          this.logger.log(`스캔 백필 큐잉: ${queued}건 (접속 ${online}명)`);
+        }
+      }
+
+      // 붐빌 때는 배경 백필(음수 우선순위)을 건너뛴다.
+      const processed = await this.statsService.processChampionScanQueue(
+        2,
+        quiet ? undefined : 0,
+      );
       if (processed > 0) {
         this.logger.log(`챔피언 시즌 스캔 처리: ${processed}건`);
       }
