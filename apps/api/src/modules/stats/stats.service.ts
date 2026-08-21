@@ -116,10 +116,12 @@ export const SCAN_BACKFILL_PRIORITY = -10;
 /**
  * 동시에 진행할 수 있는 스캔 수.
  *
- * Riot 전역 예산이 하나뿐이라 여러 건을 같이 돌려도 총 처리량은 그대로다.
- * 오히려 각자 예산을 기다리며 늘어져 stall 판정(15분)에 걸리기만 한다.
+ * 1 이어야 한다. 백그라운드 매치 요청의 8초 간격은 프로세스 전체가 공유하는
+ * 단일 값이라, 여러 건을 같이 돌리면 그 간격을 나눠 갖는다. 총 처리량은
+ * 그대로인데 건당 소요만 배로 늘어 전부 stall 판정에 걸린다.
+ * (실측: 4건 동시 → 건당 32초 간격 → 한 건에 54분)
  */
-const MAX_CONCURRENT_SCANS = 2;
+const MAX_CONCURRENT_SCANS = 1;
 
 @Injectable()
 export class StatsService {
@@ -1717,9 +1719,16 @@ export class StatsService {
 
   private readonly MAX_SEASON_SCAN = 100; // puuid당 최대 스캔 깊이
   private readonly SEASON_RESCAN_THROTTLE_MS = 30 * 60 * 1000; // 재스캔 최소 간격
-  // 한 건 스캔은 매치 최대 100건 조회라 레이트리밋에 걸려도 수 분 안에 끝난다.
-  // 그보다 오래 "scanning" 이면 워커가 죽은 것으로 본다.
-  private readonly SCAN_STALL_TIMEOUT_MS = 15 * 60 * 1000;
+  /**
+   * 이보다 오래 "scanning" 이면 워커가 죽은 것으로 보고 큐에 되돌린다.
+   *
+   * 한 건이 실제로 얼마나 걸리는지로 잡아야 한다. 백그라운드 매치 요청은
+   * 8초 간격(RIOT_MATCH_BACKGROUND_REQUEST_DELAY_MS)이라 매치 100건이면
+   * 캐시가 비어 있을 때 13분 넘게 걸린다. 15분으로 두면 처음 수집하는 계정이
+   * 완주 직전에 회수돼 처음부터 다시 시작하고, 그게 무한히 반복된다.
+   * (실측: scannedCount 가 0 인 채로 2분마다 새 작업만 쌓였다)
+   */
+  private readonly SCAN_STALL_TIMEOUT_MS = 30 * 60 * 1000;
 
   // 누적된 챔피언 시즌 통계를 반환하고, 오래됐으면 background 스캔을 큐에 넣는다.
   // 현재 ranked 그룹만 지원(type="ranked" = 솔로+자유).
