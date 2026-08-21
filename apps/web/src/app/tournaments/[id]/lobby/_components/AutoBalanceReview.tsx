@@ -23,6 +23,8 @@ interface ReviewMember {
   mainRole: string | null;
   /** 등록해 둔 부라인 */
   subRole: string | null;
+  /** 라인별 티어를 등록해 둔 라인들 — 주·부라인 다음가는 약한 선호 */
+  registeredRoles: string[];
 }
 
 interface ReviewTeam {
@@ -45,6 +47,19 @@ function sortByRoleSlot(members: ReviewMember[]): ReviewMember[] {
       (indexB === -1 ? ROLE_ORDER.length : indexB)
     );
   });
+}
+
+/**
+ * 라인 선호 페널티 — 서버(room.service.ts getRolePreferencePenalty)와 같은 값이다.
+ * 추천 교체가 "점수는 맞지만 다들 비선호 라인" 같은 결과를 밀지 않도록 쓴다.
+ */
+function rolePenalty(member: ReviewMember, role: string | null): number {
+  if (!role) return 4;
+  if (member.mainRole === role) return 0;
+  if (member.subRole === role) return 0.75;
+  if (member.registeredRoles.includes(role)) return 1.25;
+  if (!member.mainRole && !member.subRole) return 1.5;
+  return 4;
 }
 
 /** 특정 라인으로 옮겼을 때 해당 인원의 예상 점수 */
@@ -311,50 +326,99 @@ export function AutoBalanceReview({
   })();
 
   /**
-   * 편성 근거 ① 라인별 점수 분포.
+   * 편성 근거 ① 추천 교체.
    *
-   * 팀이 2개든 8개든 행 수는 라인 수(5)로 고정이라, 40인 방에서도 이 영역의
-   * 높이는 그대로다. 같은 라인에 배정된 인원의 점수를 전체 범위 위에 찍어
-   * "어느 라인이 벌어졌는지"를 팀 합계보다 먼저 읽게 한다.
+   * 지금 배치에서 두 사람을 맞바꿨을 때 팀 점수 차가 얼마나 줄어드는지를
+   * 모든 짝에 대해 계산해 상위 3개만 보여준다. 40인(8팀)이라도 짝은 780개,
+   * 짝마다 팀 합계 갱신 두 번이라 렌더마다 돌려도 부담이 없다.
+   *
+   * 점수만 보고 밀면 다들 비선호 라인으로 가버리므로, 선호 페널티 변화도
+   * 같이 계산해 순위에 반영하고 화면에도 함께 적는다.
    */
-  const roleBreakdown = (() => {
-    const rows = ROLE_ORDER.map((role) => {
-      const points: {
-        key: string;
-        teamName: string;
-        color: string;
-        username: string;
-        score: number;
-      }[] = [];
-      for (const team of teams) {
-        for (const member of team.members) {
-          if (member.assignedRole !== role || member.score === null) continue;
-          points.push({
-            key: member.userId,
-            teamName: team.name,
-            color: team.color ?? "#667eea",
-            username: member.username,
-            score: member.score,
-          });
+  const swapSuggestions = (() => {
+    if (spread === null) return [];
+
+    const entries: { team: ReviewTeam; member: ReviewMember }[] = [];
+    const baseTotals: Record<string, number> = {};
+    for (const team of teams) {
+      // 한 팀이라도 합계를 못 읽으면 비교 자체가 성립하지 않는다.
+      if (team.balanceTotal === null) return [];
+      baseTotals[team.id] = team.balanceTotal;
+      for (const member of team.members) {
+        if (member.assignedRole && member.score !== null) {
+          entries.push({ team, member });
         }
       }
-      points.sort((a, b) => a.score - b.score);
-      const scores = points.map((point) => point.score);
-      return {
-        role,
-        points,
-        min: scores.length > 0 ? Math.min(...scores) : null,
-        max: scores.length > 0 ? Math.max(...scores) : null,
-      };
-    }).filter((row) => row.points.length > 0);
+    }
 
-    if (rows.length === 0) return null;
+    const found: {
+      key: string;
+      from: { team: ReviewTeam; member: ReviewMember };
+      to: { team: ReviewTeam; member: ReviewMember };
+      fromRole: string;
+      toRole: string;
+      nextSpread: number;
+      gain: number;
+      preferenceGain: number;
+    }[] = [];
 
-    // 모든 행이 같은 눈금을 쓰도록 전체 최소·최대로 정규화한다.
-    const all = rows.flatMap((row) => row.points.map((point) => point.score));
-    const min = Math.min(...all);
-    const max = Math.max(...all);
-    return { rows, min, max, span: max - min };
+    for (let i = 0; i < entries.length; i++) {
+      for (let j = i + 1; j < entries.length; j++) {
+        const from = entries[i];
+        const to = entries[j];
+        const fromRole = from.member.assignedRole;
+        const toRole = to.member.assignedRole;
+        const fromScore = from.member.score;
+        const toScore = to.member.score;
+        if (!fromRole || !toRole || fromScore === null || toScore === null) {
+          continue;
+        }
+        // 같은 팀·같은 라인이면 바꿔도 달라지는 게 없다.
+        if (from.team.id === to.team.id && fromRole === toRole) continue;
+
+        const fromNext = scoreAtRole(from.member, toRole);
+        const toNext = scoreAtRole(to.member, fromRole);
+        if (fromNext === null || toNext === null) continue;
+
+        const totals = { ...baseTotals };
+        if (from.team.id === to.team.id) {
+          totals[from.team.id] += fromNext + toNext - fromScore - toScore;
+        } else {
+          totals[from.team.id] += toNext - fromScore;
+          totals[to.team.id] += fromNext - toScore;
+        }
+
+        const values = Object.values(totals);
+        const nextSpread = Math.max(...values) - Math.min(...values);
+        const gain = spread - nextSpread;
+        const preferenceGain =
+          rolePenalty(from.member, fromRole) +
+          rolePenalty(to.member, toRole) -
+          rolePenalty(from.member, toRole) -
+          rolePenalty(to.member, fromRole);
+
+        // 점수가 좋아지거나, 점수를 크게 해치지 않으면서 선호가 좋아지는 것만.
+        const meaningful = gain > 0.05 || (preferenceGain > 0 && gain > -0.3);
+        if (!meaningful) continue;
+
+        found.push({
+          key: `${from.member.userId}:${to.member.userId}`,
+          from,
+          to,
+          fromRole,
+          toRole,
+          nextSpread,
+          gain,
+          preferenceGain,
+        });
+      }
+    }
+
+    found.sort(
+      (a, b) =>
+        b.gain + b.preferenceGain * 0.25 - (a.gain + a.preferenceGain * 0.25),
+    );
+    return found.slice(0, 3);
   })();
 
   /**
@@ -635,78 +699,124 @@ export function AutoBalanceReview({
         행 수가 라인 수(5)로 고정이라 2팀이든 8팀(40인)이든 이 영역의 높이는
         같고, 팀이 많아 목록이 길어지면 자연스럽게 아래로 밀린다.
       */}
-      {(roleBreakdown || preferenceSummary) && (
+      {teams.length > 0 && (
         <div className="mt-4 flex flex-1 flex-col gap-3 rounded-lg border border-bg-tertiary bg-bg-primary/60 p-4">
-          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-            <h4 className="text-sm font-black text-text-primary">편성 근거</h4>
-            {roleBreakdown && (
+          {/* ─── 추천 교체 ─── 행 수가 3개로 고정이라 팀이 늘어도 높이는 그대로다 */}
+          <div className="flex flex-1 flex-col gap-2">
+            <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+              <h4 className="text-sm font-black text-text-primary">
+                추천 교체
+              </h4>
               <p className="text-xs text-text-tertiary">
-                라인별 점수 분포 · 전체{" "}
-                <span className="tabular-nums">
-                  {roleBreakdown.min.toFixed(1)}–{roleBreakdown.max.toFixed(1)}
-                </span>
+                점수 차를 가장 많이 줄이는 조합
               </p>
-            )}
-          </div>
+            </div>
 
-          {roleBreakdown && (
-            <div className="flex flex-1 flex-col gap-1.5">
-              {roleBreakdown.rows.map((row) => {
-                const rowMin = row.min ?? 0;
-                const rowMax = row.max ?? 0;
-                const rowGap = rowMax - rowMin;
-                return (
-                  <div
-                    key={row.role}
-                    className="flex min-h-8 flex-1 items-center gap-3"
+            {swapSuggestions.length === 0 ? (
+              <p className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-bg-tertiary px-3 py-4 text-center text-xs text-text-tertiary">
+                지금 배치보다 나아지는 교체가 없습니다 — 이대로 확정해도
+                좋습니다
+              </p>
+            ) : (
+              <ul className="flex flex-1 flex-col gap-1.5">
+                {swapSuggestions.map((suggestion) => (
+                  <li
+                    key={suggestion.key}
+                    className="flex min-h-11 flex-1 flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-bg-tertiary bg-bg-primary px-3 py-2"
                   >
-                    <PositionIcon
-                      position={row.role}
-                      className="!h-4 !w-4 flex-shrink-0"
-                    />
-                    <span className="w-9 flex-shrink-0 text-xs text-text-tertiary">
-                      {POSITION_LABELS[row.role] ?? row.role}
-                    </span>
-                    {/* 같은 라인끼리의 점수 분포 — 점 하나가 그 라인에 배정된 한 명 */}
-                    <div className="relative h-1.5 min-w-0 flex-1 rounded-full bg-bg-tertiary">
-                      {row.points.map((point) => (
+                    <span className="flex min-w-0 flex-1 items-center gap-2">
+                      <span className="flex min-w-0 flex-1 items-center gap-1.5">
                         <span
-                          key={point.key}
-                          title={`${point.teamName} · ${point.username} ${point.score.toFixed(1)}`}
-                          className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-bg-primary"
+                          className="h-2 w-2 flex-shrink-0 rounded-full"
                           style={{
-                            left: `${
-                              roleBreakdown.span > 0
-                                ? ((point.score - roleBreakdown.min) /
-                                    roleBreakdown.span) *
-                                  100
-                                : 50
-                            }%`,
-                            backgroundColor: point.color,
+                            backgroundColor:
+                              suggestion.from.team.color ?? "#667eea",
                           }}
                         />
-                      ))}
-                    </div>
-                    <span className="hidden w-20 flex-shrink-0 text-right text-xs tabular-nums text-text-tertiary sm:inline">
-                      {rowMin.toFixed(1)}–{rowMax.toFixed(1)}
+                        <PositionIcon
+                          position={suggestion.fromRole}
+                          className="!h-3.5 !w-3.5 flex-shrink-0"
+                        />
+                        <span className="truncate text-xs font-bold text-text-primary">
+                          {suggestion.from.member.username}
+                        </span>
+                      </span>
+                      <ArrowLeftRight className="h-3.5 w-3.5 flex-shrink-0 text-text-muted" />
+                      <span className="flex min-w-0 flex-1 items-center gap-1.5">
+                        <span
+                          className="h-2 w-2 flex-shrink-0 rounded-full"
+                          style={{
+                            backgroundColor:
+                              suggestion.to.team.color ?? "#667eea",
+                          }}
+                        />
+                        <PositionIcon
+                          position={suggestion.toRole}
+                          className="!h-3.5 !w-3.5 flex-shrink-0"
+                        />
+                        <span className="truncate text-xs font-bold text-text-primary">
+                          {suggestion.to.member.username}
+                        </span>
+                      </span>
                     </span>
+
                     <span
-                      title="이 라인에 배정된 인원끼리의 점수 편차"
-                      className={`w-10 flex-shrink-0 text-right text-xs font-bold tabular-nums ${
-                        rowGap <= 1
-                          ? "text-accent-success"
-                          : rowGap <= 2.5
-                            ? "text-text-secondary"
-                            : "text-accent-warning"
-                      }`}
+                      title="교체 후 팀 점수 차"
+                      className="flex flex-shrink-0 items-center gap-1 text-xs font-black tabular-nums"
                     >
-                      {rowGap.toFixed(1)}
+                      <span className="text-text-tertiary line-through">
+                        {spread !== null ? spread.toFixed(1) : "–"}
+                      </span>
+                      <span className="text-text-muted">→</span>
+                      <span
+                        className={
+                          suggestion.gain > 0
+                            ? "text-accent-success"
+                            : "text-text-secondary"
+                        }
+                      >
+                        {suggestion.nextSpread.toFixed(1)}
+                      </span>
                     </span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+
+                    {suggestion.preferenceGain !== 0 && (
+                      <span
+                        title="교체 후 선호 라인 만족도 변화"
+                        className={`flex-shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                          suggestion.preferenceGain > 0
+                            ? "bg-accent-success/15 text-accent-success"
+                            : "bg-accent-warning/15 text-accent-warning"
+                        }`}
+                      >
+                        선호 {suggestion.preferenceGain > 0 ? "개선" : "악화"}
+                      </span>
+                    )}
+
+                    {isHost && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          setBusy("swap");
+                          try {
+                            await onSwap(
+                              suggestion.from.member.userId,
+                              suggestion.to.member.userId,
+                            );
+                          } finally {
+                            setBusy(null);
+                          }
+                        }}
+                        disabled={busy !== null}
+                        className="flex-shrink-0 rounded-md border border-bg-elevated bg-bg-tertiary px-2.5 py-1 text-xs font-bold text-text-primary transition-colors hover:bg-bg-elevated disabled:opacity-40"
+                      >
+                        교체
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
 
           {preferenceSummary && (
             <div className="flex flex-shrink-0 flex-col gap-2 border-t border-bg-tertiary pt-3">

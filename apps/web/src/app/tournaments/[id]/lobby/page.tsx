@@ -659,6 +659,12 @@ export default function TournamentLobbyPage() {
               member.user?.riotAccounts?.[0]?.subRole ??
               participant?.riotAccount?.subRole ??
               null,
+            // 라인별 티어를 등록한 라인 — 주·부라인 다음가는 약한 선호로 본다
+            registeredRoles: (
+              member.user?.riotAccounts?.[0]?.roleTiers ??
+              (participant?.riotAccount as any)?.roleTiers ??
+              []
+            ).map((entry: any) => entry.role),
           };
         }),
       }))}
