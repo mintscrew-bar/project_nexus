@@ -56,6 +56,8 @@ describe("StatsService", () => {
         update: jest.fn(),
         updateMany: jest.fn(),
         upsert: jest.fn(),
+        // 진행 중인 스캔 수 (동시 실행 상한 체크)
+        count: jest.fn().mockResolvedValue(0),
       },
       $transaction: jest.fn(),
     };
@@ -608,6 +610,16 @@ describe("StatsService", () => {
         ),
       ).rejects.toThrow("Incomplete champion scan");
       expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it("이미 진행 중인 스캔이 상한에 닿으면 새 작업을 집지 않는다", async () => {
+      // Riot 예산이 하나뿐이라 같이 돌려도 총 처리량은 그대로고, 각자 예산을
+      // 기다리며 늘어져 stall 판정에만 걸린다.
+      prisma.championScanState.updateMany.mockResolvedValue({ count: 0 });
+      prisma.championScanState.count.mockResolvedValue(2);
+
+      await expect(service.processChampionScanQueue(2)).resolves.toBe(0);
+      expect(prisma.championScanState.findMany).not.toHaveBeenCalled();
     });
   });
 });

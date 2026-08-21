@@ -113,6 +113,14 @@ export interface AuctionStats {
  */
 export const SCAN_BACKFILL_PRIORITY = -10;
 
+/**
+ * 동시에 진행할 수 있는 스캔 수.
+ *
+ * Riot 전역 예산이 하나뿐이라 여러 건을 같이 돌려도 총 처리량은 그대로다.
+ * 오히려 각자 예산을 기다리며 늘어져 stall 판정(15분)에 걸리기만 한다.
+ */
+const MAX_CONCURRENT_SCANS = 2;
+
 @Injectable()
 export class StatsService {
   private readonly logger = new Logger(StatsService.name);
@@ -1857,6 +1865,13 @@ export class StatsService {
           WHERE c.puuid = r.puuid
             AND c.season = ${season}
             AND c."queueGroup" = ${queueGroup}
+            -- 실패로 끝난 계정은 한동안 쉬었다가 다시 시도한다. 이 조건이
+            -- 없으면 한 번 실패한 계정은 상태 행이 남아 영영 백필에서 빠진다.
+            AND (
+              c.status <> 'error'
+              OR c."lastScanAt" IS NULL
+              OR c."lastScanAt" > NOW() - INTERVAL '6 hours'
+            )
         )
       ORDER BY r."isPrimary" DESC, r."createdAt" ASC
       LIMIT ${limit - pending}
@@ -1929,6 +1944,14 @@ export class StatsService {
     // 죽은 작업을 먼저 회수해야 큐가 막히지 않는다.
     await this.requeueStalledChampionScans();
 
+    // 한 건이 매치 100개라 Riot 예산(95/2분) 안에 못 끝난다. 진행 중인 게
+    // 남아 있는데 새로 집으면 서로 예산을 뺏어 전부 느려지고, 사람이 기다리는
+    // 전적 검색까지 밀린다.
+    const running = await this.prisma.championScanState.count({
+      where: { status: "scanning" },
+    });
+    if (running >= MAX_CONCURRENT_SCANS) return 0;
+
     const queued = await this.prisma.championScanState.findMany({
       where: {
         status: "queued",
@@ -1939,7 +1962,7 @@ export class StatsService {
           : {}),
       },
       orderBy: [{ priority: "desc" }, { requestedAt: "asc" }],
-      take: limit,
+      take: Math.max(0, Math.min(limit, MAX_CONCURRENT_SCANS - running)),
     });
 
     let processed = 0;

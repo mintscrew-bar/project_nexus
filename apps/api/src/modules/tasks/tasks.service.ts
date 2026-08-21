@@ -152,8 +152,26 @@ export class TasksService {
   @Cron("*/2 * * * *")
   async handleChampionSeasonScan(): Promise<void> {
     const lockKey = "tasks:champion-season-scan";
-    const lockToken = await this.redis.acquireLock(lockKey, 110_000);
+    // 한 건이 매치 100개라 Riot 전역 예산(95/2분) 안에 못 끝나는 게 정상이다.
+    // 락이 크론 주기(2분)에 맞춰 만료되면 다음 틱이 진행 중인 작업을 모르고
+    // 새 작업을 또 집어, scanning 이 계속 쌓이고 예산을 서로 뺏는다.
+    // 작업이 도는 동안 락을 갱신해 크론을 한 번에 하나만 돌게 한다.
+    const lockTtlMs = 10 * 60 * 1000;
+    const lockRenewIntervalMs = 60 * 1000;
+    const lockToken = await this.redis.acquireLock(lockKey, lockTtlMs);
     if (!lockToken) return;
+
+    const lockHeartbeat = setInterval(() => {
+      void this.redis
+        .extendLock(lockKey, lockToken, lockTtlMs)
+        .then((extended) => {
+          if (!extended) {
+            this.logger.error("챔피언 시즌 스캔 락을 실행 도중 잃었습니다");
+          }
+        })
+        .catch(() => undefined);
+    }, lockRenewIntervalMs);
+    if (typeof lockHeartbeat.unref === "function") lockHeartbeat.unref();
 
     try {
       const online = this.presence.getOnlineUserCount();
@@ -177,6 +195,7 @@ export class TasksService {
     } catch (error) {
       this.logger.error("챔피언 시즌 스캔 처리 실패", error);
     } finally {
+      clearInterval(lockHeartbeat);
       await this.redis.releaseLock(lockKey, lockToken);
     }
   }
