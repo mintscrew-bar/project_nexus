@@ -95,10 +95,13 @@ describe("BalanceScoreService", () => {
     });
 
     it("솔랭 라인별 전적을 반영해 라인마다 다른 점수를 낸다", async () => {
-      prisma.$queryRaw.mockResolvedValue([
-        { position: "MID", wins: BigInt(60), games: BigInt(80) },
-        { position: "SUPPORT", wins: BigInt(20), games: BigInt(80) },
-      ]);
+      // 첫 쿼리는 라인별 승패, 두 번째는 라인 대결 지표.
+      prisma.$queryRaw
+        .mockResolvedValueOnce([
+          { position: "MID", wins: BigInt(60), games: BigInt(80) },
+          { position: "SUPPORT", wins: BigInt(20), games: BigInt(80) },
+        ])
+        .mockResolvedValueOnce([]);
 
       const scores = await service.refreshAccount("riot-1");
 
@@ -111,6 +114,48 @@ describe("BalanceScoreService", () => {
 
     it("라인 전적 집계가 실패해도 점수 갱신은 계속한다", async () => {
       prisma.$queryRaw.mockRejectedValue(new Error("db down"));
+
+      await expect(service.refreshAccount("riot-1")).resolves.not.toBeNull();
+      expect(prisma.riotAccount.update).toHaveBeenCalled();
+    });
+
+    it("라인 대결 지표가 앞서는 라인의 점수를 올린다", async () => {
+      // 라인별 티어 등록률이 2%라 티어 점수는 다섯 라인이 같았다.
+      // 라인 상대 대비 지표가 그 자리를 대신한다.
+      prisma.$queryRaw.mockResolvedValueOnce([]).mockResolvedValueOnce([
+        {
+          position: "TOP",
+          games: BigInt(40),
+          gold: 120,
+          cs: 1.6,
+          damage: 400,
+          vision: 0.3,
+          net: 10,
+        },
+        {
+          position: "ADC",
+          games: BigInt(40),
+          gold: -140,
+          cs: -1.5,
+          damage: -480,
+          vision: -0.35,
+          net: -12,
+        },
+      ]);
+
+      const scores = await service.refreshAccount("riot-1");
+
+      expect(scores).not.toBeNull();
+      expect(scores!.TOP).toBeGreaterThan(scores!.MID);
+      expect(scores!.ADC).toBeLessThan(scores!.MID);
+      // 대결 표본이 없는 라인은 보정 없이 종전 점수 그대로다.
+      expect(scores!.MID).toBe(scores!.JUNGLE);
+    });
+
+    it("라인 대결 집계가 실패해도 점수 갱신은 계속한다", async () => {
+      prisma.$queryRaw
+        .mockResolvedValueOnce([])
+        .mockRejectedValueOnce(new Error("timeout"));
 
       await expect(service.refreshAccount("riot-1")).resolves.not.toBeNull();
       expect(prisma.riotAccount.update).toHaveBeenCalled();

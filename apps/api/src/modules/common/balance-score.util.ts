@@ -26,6 +26,74 @@ const RANK_POINTS: Record<string, number> = {
 
 const APEX_TIERS = new Set(["MASTER", "GRANDMASTER", "CHALLENGER"]);
 
+/**
+ * 라인 대결 지표의 라인별 표준편차 (우리 DB 솔로랭크 라인 대결 191,613쌍 실측, 2026-08).
+ *
+ * 서포터의 골드·CS 편차는 다른 라인의 절반도 안 되므로, 라인마다 다른 자로
+ * 재야 "서포터는 다 못한다"는 결론이 나오지 않는다. 값은 메타에 따라 조금씩
+ * 움직이지만 밸런스 점수 규모에 영향을 줄 만큼은 아니라 상수로 둔다.
+ */
+const LANE_METRIC_DEVIATIONS: Record<
+  string,
+  {
+    goldPerMin: number;
+    csPerMin: number;
+    damagePerMin: number;
+    visionPerMin: number;
+    netKills: number;
+  }
+> = {
+  TOP: {
+    goldPerMin: 127.2,
+    csPerMin: 1.81,
+    damagePerMin: 430.9,
+    visionPerMin: 0.36,
+    netKills: 12.05,
+  },
+  JUNGLE: {
+    goldPerMin: 122.1,
+    csPerMin: 1.79,
+    damagePerMin: 376.8,
+    visionPerMin: 0.48,
+    netKills: 13.08,
+  },
+  MID: {
+    goldPerMin: 114.6,
+    csPerMin: 1.64,
+    damagePerMin: 414.7,
+    visionPerMin: 0.38,
+    netKills: 12.42,
+  },
+  ADC: {
+    goldPerMin: 147.9,
+    csPerMin: 1.57,
+    damagePerMin: 495.7,
+    visionPerMin: 0.37,
+    netKills: 13.66,
+  },
+  SUPPORT: {
+    goldPerMin: 68.3,
+    csPerMin: 0.73,
+    damagePerMin: 293.3,
+    visionPerMin: 0.75,
+    netKills: 13.91,
+  },
+};
+
+/**
+ * 라인 우위 1 표준편차를 티어 점수 몇 점으로 볼지.
+ *
+ * 실측(홀수 경기 지표로 짝수 경기 승률 예측)에서 지표 상·하위 구간의 승률이
+ * 55.3% 대 44.8% 로 갈렸다. 티어 한 단계(4~6점) 안팎으로 보는 게 맞다.
+ */
+const LANE_EDGE_TIER_POINTS = 5;
+
+/** 라인 우위 보정의 상·하한 — 표본이 튀어도 티어 한 단계 조금 넘게만 움직인다 */
+const LANE_EDGE_MAX_POINTS = 6;
+
+/** 라인 우위를 믿기 시작하는 판수 기준 (10판이면 절반만 반영) */
+const LANE_EDGE_PRIOR_GAMES = 10;
+
 export const BALANCE_ROLES: Role[] = [
   Role.TOP,
   Role.JUNGLE,
@@ -69,6 +137,25 @@ export interface PlayerBalanceScoreInput {
    * 다섯 라인에 똑같은 값이 더해질 수밖에 없었다. 이 값이 라인별 차이를 만든다.
    */
   rankedRoleRecords?: BalanceRoleRecordInput[] | null;
+  /**
+   * 라인 대결 지표(솔로랭크 라인 상대 대비 차이의 평균).
+   *
+   * 라인별 티어는 본인이 직접 등록해야 하는데 실제 등록률이 2%(341계정 중 7)라,
+   * 티어 점수는 다섯 라인이 늘 같은 값이었다. 같은 경기·같은 라인·반대 팀이라는
+   * 대조군이 티어를 자동으로 통제해 주므로, 이 차이로 라인 실력을 추정한다.
+   */
+  laneEdges?: BalanceLaneEdgeInput[] | null;
+}
+
+/** 라인 상대 대비 지표 차이의 평균 (분당 기준, netKills 만 경기당) */
+export interface BalanceLaneEdgeInput {
+  role: Role;
+  games: number;
+  goldPerMin: number;
+  csPerMin: number;
+  damagePerMin: number;
+  visionPerMin: number;
+  netKills: number;
 }
 
 export interface PlayerRoleBalanceScore {
@@ -88,6 +175,12 @@ export interface PlayerRoleBalanceScore {
   rankedRoleGames: number;
   /** 솔랭 승률에서 이 라인 승률이 차지한 비중 */
   rankedRoleWeight: number;
+  /** 라인 상대 대비 우위 (표준편차 단위). 대결 표본이 없으면 null */
+  laneEdgeZ: number | null;
+  /** 라인 우위로 티어 점수에 더해진 값 */
+  laneEdgeBonus: number;
+  /** 라인 우위 계산에 쓴 대결 판수 */
+  laneEdgeGames: number;
   adjustedSoloWinRate: number;
   adjustedNexusWinRate: number;
   version: string;
@@ -157,6 +250,40 @@ export function calculatePlayerRoleBalanceScore(
     ? roleTierScore * roleTierWeight + currentTierScore * (1 - roleTierWeight)
     : currentTierScore;
 
+  // ── 라인 우위 보정 ──
+  // 같은 경기·같은 라인·반대 팀 상대와의 지표 차이를 라인별 표준편차로 나눠
+  // 평균한다. 지표가 서로 겹치므로(골드가 높으면 데미지도 높다) 합이 아니라
+  // 평균을 쓴다 — 한 방향으로 과장되는 걸 막는다.
+  const laneEdge = input.laneEdges?.find((entry) => entry.role === role);
+  const laneDeviation = LANE_METRIC_DEVIATIONS[role];
+  const laneEdgeGames = normalizedCount(laneEdge?.games);
+  const laneEdgeZ =
+    laneEdge && laneDeviation && laneEdgeGames > 0
+      ? (laneEdge.goldPerMin / laneDeviation.goldPerMin +
+          laneEdge.csPerMin / laneDeviation.csPerMin +
+          laneEdge.damagePerMin / laneDeviation.damagePerMin +
+          laneEdge.visionPerMin / laneDeviation.visionPerMin +
+          laneEdge.netKills / laneDeviation.netKills) /
+        5
+      : null;
+
+  // 판수가 적으면 0 쪽으로 수축시킨다 (10판이면 절반).
+  const laneEdgeConfidence =
+    laneEdgeGames / (laneEdgeGames + LANE_EDGE_PRIOR_GAMES);
+  const laneEdgeOffset =
+    laneEdgeZ === null
+      ? 0
+      : clamp(
+          laneEdgeZ * LANE_EDGE_TIER_POINTS * laneEdgeConfidence,
+          -LANE_EDGE_MAX_POINTS,
+          LANE_EDGE_MAX_POINTS,
+        );
+  // 본인이 등록한 라인 티어가 있으면 그만큼은 이미 반영된 것으로 보고, 그
+  // 나머지 몫만 추정치로 채운다.
+  const laneEdgeBonus = roleTierScore
+    ? laneEdgeOffset * (1 - roleTierWeight)
+    : laneEdgeOffset;
+
   const peakTierScore = input.peakTier
     ? calculateBalanceTierPoints(input.peakTier)
     : currentTierScore;
@@ -196,7 +323,14 @@ export function calculatePlayerRoleBalanceScore(
   return {
     role,
     score: roundToOneDecimal(
-      Math.max(0, tierScore + peakBonus + soloWinRateBonus + nexusWinRateBonus),
+      Math.max(
+        0,
+        tierScore +
+          laneEdgeBonus +
+          peakBonus +
+          soloWinRateBonus +
+          nexusWinRateBonus,
+      ),
     ),
     tierScore,
     currentTierScore,
@@ -210,6 +344,9 @@ export function calculatePlayerRoleBalanceScore(
     roleGames,
     rankedRoleGames,
     rankedRoleWeight,
+    laneEdgeZ,
+    laneEdgeBonus,
+    laneEdgeGames,
     adjustedSoloWinRate,
     adjustedNexusWinRate,
     version: BALANCE_SCORE_VERSION,

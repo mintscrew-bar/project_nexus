@@ -5,10 +5,14 @@ import {
   BALANCE_ROLES,
   BALANCE_SCORE_VERSION,
   calculatePlayerBalanceScores,
+  type BalanceLaneEdgeInput,
 } from "./balance-score.util";
 
 /** 솔로랭크 큐 ID — 자유랭크(440)는 라인 실력 신호가 약해 쓰지 않는다 */
 const RANKED_SOLO_QUEUE_ID = 420;
+
+/** 이보다 짧은 경기는 리메이크·조기 종료라 지표가 실력을 반영하지 않는다 */
+const MIN_RATED_GAME_SECONDS = 600;
 
 /** 라인별 점수 맵 ({ TOP: 24.4, ... }) */
 export type BalanceScoreMap = Record<Role, number>;
@@ -108,6 +112,79 @@ export class BalanceScoreService {
   }
 
   /**
+   * 라인 대결 지표를 집계한다 — 같은 경기·같은 라인·반대 팀 상대와의 차이.
+   *
+   * 라인별 티어는 본인이 등록해야 하는데 실제 등록률이 2%라 티어 점수가 다섯
+   * 라인 모두 같았다. 라인 상대라는 대조군은 랭크 매칭이 티어를 맞춰 주므로,
+   * 별도 보정 없이도 "이 사람이 이 라인에서 얼마나 앞서는가"를 잴 수 있다.
+   *
+   * 리메이크·조기 종료는 지표가 무의미하므로 10분 미만 경기는 뺀다.
+   */
+  private async loadLaneEdges(
+    puuid: string | null,
+  ): Promise<BalanceLaneEdgeInput[]> {
+    if (!puuid) return [];
+
+    try {
+      const rows = await this.prisma.$queryRaw<
+        {
+          position: string;
+          games: bigint;
+          gold: number | null;
+          cs: number | null;
+          damage: number | null;
+          vision: number | null;
+          net: number | null;
+        }[]
+      >`
+        WITH me AS (
+          SELECT p."matchId", p.position, p."riotTeamId",
+                 m."gameDuration" / 60.0 AS mins,
+                 p."goldEarned"::numeric AS gold,
+                 (p."totalMinionsKilled" + p."neutralMinionsKilled")::numeric AS cs,
+                 p."totalDamageDealtToChampions"::numeric AS damage,
+                 p."visionScore"::numeric AS vision,
+                 (p.kills + p.assists - p.deaths)::numeric AS net
+          FROM match_participants p
+          JOIN matches m ON m.id = p."matchId"
+          WHERE p.puuid = ${puuid}
+            AND m."queueId" = ${RANKED_SOLO_QUEUE_ID}
+            AND m."gameDuration" >= ${MIN_RATED_GAME_SECONDS}
+            AND p.position = ANY(${BALANCE_ROLES}::text[])
+        )
+        SELECT me.position,
+               COUNT(*) AS games,
+               AVG((me.gold - o."goldEarned") / me.mins)::float8 AS gold,
+               AVG((me.cs - (o."totalMinionsKilled" + o."neutralMinionsKilled")) / me.mins)::float8 AS cs,
+               AVG((me.damage - o."totalDamageDealtToChampions") / me.mins)::float8 AS damage,
+               AVG((me.vision - o."visionScore") / me.mins)::float8 AS vision,
+               AVG(me.net - (o.kills + o.assists - o.deaths))::float8 AS net
+        FROM me
+        JOIN match_participants o
+          ON o."matchId" = me."matchId"
+         AND o.position = me.position
+         AND o."riotTeamId" <> me."riotTeamId"
+        GROUP BY me.position
+      `;
+
+      return rows.map((row) => ({
+        role: row.position as Role,
+        games: Number(row.games),
+        goldPerMin: row.gold ?? 0,
+        csPerMin: row.cs ?? 0,
+        damagePerMin: row.damage ?? 0,
+        visionPerMin: row.vision ?? 0,
+        netKills: row.net ?? 0,
+      }));
+    } catch (error) {
+      // 라인 보정 없이도 점수는 나와야 한다.
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`라인 대결 지표 집계 실패 puuid=${puuid}: ${message}`);
+      return [];
+    }
+  }
+
+  /**
    * 한 라이엇 계정의 점수를 다시 계산해 저장한다.
    * 계정이 없으면 아무것도 하지 않는다(탈퇴·연동 해제 경합 대비).
    */
@@ -157,6 +234,7 @@ export class BalanceScoreService {
       overallRecord: account.user?.nexusRanking ?? null,
       roleRecords: account.user?.nexusRoleRecords ?? [],
       rankedRoleRecords: await this.loadRankedRoleRecords(account.puuid),
+      laneEdges: await this.loadLaneEdges(account.puuid),
     });
 
     const scores = Object.fromEntries(

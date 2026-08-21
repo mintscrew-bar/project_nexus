@@ -134,6 +134,83 @@ describe("balance-score.util", () => {
     expect(withRankedGames.score).toBeGreaterThan(withoutAnyGames.score);
   });
 
+  it("라인 상대를 앞서면 그 라인 티어 점수가 올라간다", () => {
+    const base = { currentTier: { tier: "GOLD", rank: "II", lp: 0 } };
+    const ahead = calculatePlayerRoleBalanceScore(
+      {
+        ...base,
+        laneEdges: [
+          {
+            role: Role.MID,
+            games: 60,
+            goldPerMin: 114.6,
+            csPerMin: 1.64,
+            damagePerMin: 414.7,
+            visionPerMin: 0.38,
+            netKills: 12.42,
+          },
+        ],
+      },
+      Role.MID,
+    );
+    const even = calculatePlayerRoleBalanceScore(base, Role.MID);
+
+    // 모든 지표가 정확히 1 표준편차 앞서면 z = 1.
+    expect(ahead.laneEdgeZ).toBeCloseTo(1, 5);
+    // 60판이면 신뢰도 60/70 → 5점 * 1 * 0.857.
+    expect(ahead.laneEdgeBonus).toBeCloseTo(4.29, 1);
+    expect(ahead.score).toBeGreaterThan(even.score);
+    expect(even.laneEdgeZ).toBeNull();
+    expect(even.laneEdgeBonus).toBe(0);
+  });
+
+  it("라인 대결 판수가 적으면 보정을 0 쪽으로 수축시킨다", () => {
+    const makeEdge = (games: number) => ({
+      role: Role.TOP,
+      games,
+      goldPerMin: 127.2,
+      csPerMin: 1.81,
+      damagePerMin: 430.9,
+      visionPerMin: 0.36,
+      netKills: 12.05,
+    });
+
+    const few = calculatePlayerRoleBalanceScore(
+      { currentTier: { tier: "GOLD" }, laneEdges: [makeEdge(2)] },
+      Role.TOP,
+    );
+    const many = calculatePlayerRoleBalanceScore(
+      { currentTier: { tier: "GOLD" }, laneEdges: [makeEdge(60)] },
+      Role.TOP,
+    );
+
+    expect(few.laneEdgeZ).toBeCloseTo(many.laneEdgeZ ?? 0, 5);
+    expect(few.laneEdgeBonus).toBeLessThan(many.laneEdgeBonus / 3);
+  });
+
+  it("서포터는 서포터끼리의 자로 잰다", () => {
+    // 서포터의 골드 편차는 다른 라인의 절반도 안 된다. 같은 자를 쓰면
+    // 서포터는 늘 뒤처지는 것으로 나온다.
+    const supportEdge = {
+      games: 40,
+      goldPerMin: 68.3,
+      csPerMin: 0.73,
+      damagePerMin: 293.3,
+      visionPerMin: 0.75,
+      netKills: 13.91,
+    };
+    const support = calculatePlayerRoleBalanceScore(
+      {
+        currentTier: { tier: "GOLD" },
+        laneEdges: [{ role: Role.SUPPORT, ...supportEdge }],
+      },
+      Role.SUPPORT,
+    );
+
+    // 서포터 기준으로는 정확히 1 표준편차 우위다.
+    expect(support.laneEdgeZ).toBeCloseTo(1, 5);
+  });
+
   it("최종 개인 점수에 상한을 두지 않는다", () => {
     const result = calculatePlayerRoleBalanceScore(
       {
