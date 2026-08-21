@@ -175,6 +175,7 @@ describe("MatchService", () => {
         room: {
           id: "room-1",
           name: "여름 내전",
+          isPrivate: false,
           teamMode: "MANUAL_TEAM",
           host: { id: "host-1", username: "방장" },
         },
@@ -226,6 +227,7 @@ describe("MatchService", () => {
           isInternal: true,
           roomIdSnapshot: "room-1",
           roomName: "여름 내전",
+          roomIsPrivate: false,
           teamAIdSnapshot: "team-a",
           teamBIdSnapshot: "team-b",
           winnerIdSnapshot: "team-a",
@@ -246,6 +248,48 @@ describe("MatchService", () => {
           }),
         ]),
       });
+    });
+  });
+
+  describe("공개 완료 경기", () => {
+    it("공개 여부가 확인되고 실제 기록이 있는 경기만 사이트맵 후보로 반환한다", async () => {
+      prisma.match.findMany.mockResolvedValue([
+        {
+          id: "match-public",
+          completedAt: new Date("2026-08-20T12:00:00.000Z"),
+          updatedAt: new Date("2026-08-20T12:05:00.000Z"),
+        },
+      ]);
+
+      const result = await service.getPublicCompletedMatches(100);
+
+      expect(prisma.match.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            isInternal: true,
+            status: "COMPLETED",
+            OR: expect.arrayContaining([{ roomIsPrivate: false }]),
+            AND: expect.arrayContaining([
+              expect.objectContaining({
+                OR: expect.arrayContaining([
+                  { participants: { some: {} } },
+                  { draftSnapshots: { some: {} } },
+                ]),
+              }),
+            ]),
+          }),
+          take: 100,
+        }),
+      );
+      expect(result).toHaveLength(1);
+    });
+
+    it("비공개이거나 공개 여부를 확인할 수 없는 경기는 공개 상세에서 거부한다", async () => {
+      prisma.match.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.getPublicMatchDetails("match-private"),
+      ).rejects.toThrow("Public match not found");
     });
   });
 

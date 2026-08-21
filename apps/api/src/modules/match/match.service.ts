@@ -1281,6 +1281,7 @@ export class MatchService {
           isInternal: true,
           roomIdSnapshot: match.room!.id,
           roomName: match.room!.name,
+          roomIsPrivate: match.room!.isPrivate,
           roomTeamMode: match.room!.teamMode,
           roomHostId: match.room!.host.id,
           roomHostName: match.room!.host.username,
@@ -1303,6 +1304,101 @@ export class MatchService {
   // ========================================
   // Match Details (Riot API Data)
   // ========================================
+
+  /**
+   * 검색엔진과 비로그인 방문자에게 공개할 수 있는 완료 경기 목록.
+   * 비공개 여부를 알 수 없는 과거 기록은 노출하지 않는다.
+   */
+  async getPublicCompletedMatches(limit: number = 5000) {
+    return this.prisma.match.findMany({
+      where: {
+        isInternal: true,
+        status: MatchStatus.COMPLETED,
+        completedAt: { not: null },
+        roomName: { not: null },
+        teamAName: { not: null },
+        teamBName: { not: null },
+        OR: [
+          { roomIsPrivate: false },
+          {
+            roomIsPrivate: null,
+            room: { is: { isPrivate: false } },
+          },
+        ],
+        AND: [
+          {
+            OR: [
+              { participants: { some: {} } },
+              { draftSnapshots: { some: {} } },
+            ],
+          },
+        ],
+      },
+      select: {
+        id: true,
+        completedAt: true,
+        updatedAt: true,
+      },
+      orderBy: { completedAt: "desc" },
+      take: Math.min(Math.max(limit, 1), 5000),
+    });
+  }
+
+  /**
+   * 공개 방에서 완료된 경기만 상세 데이터를 반환한다.
+   * 실시간 경기와 비공개 방 기록은 기존 인증 API에서만 조회할 수 있다.
+   */
+  async getPublicMatchDetails(matchId: string) {
+    const match = await this.prisma.match.findFirst({
+      where: {
+        id: matchId,
+        isInternal: true,
+        status: MatchStatus.COMPLETED,
+        roomName: { not: null },
+        teamAName: { not: null },
+        teamBName: { not: null },
+        OR: [
+          { roomIsPrivate: false },
+          {
+            roomIsPrivate: null,
+            room: { is: { isPrivate: false } },
+          },
+        ],
+        AND: [
+          {
+            OR: [
+              { participants: { some: {} } },
+              { draftSnapshots: { some: {} } },
+            ],
+          },
+        ],
+      },
+      select: { id: true },
+    });
+
+    if (!match) {
+      throw new NotFoundException("Public match not found");
+    }
+
+    const details = await this.getMatchDetails(matchId);
+    const {
+      tournamentCode: _tournamentCode,
+      spectatorGameId: _spectatorGameId,
+      roomHostId: _roomHostId,
+      collectAttempts: _collectAttempts,
+      lastCollectAttemptAt: _lastCollectAttemptAt,
+      rosterSnapshots: _rosterSnapshots,
+      ...publicDetails
+    } = details;
+
+    return {
+      ...publicDetails,
+      // PUUID는 화면 표시에 필요하지 않은 안정 식별자라 공개 응답에서 제거한다.
+      draftSnapshots: details.draftSnapshots.map(
+        ({ puuid: _puuid, ...snapshot }) => snapshot,
+      ),
+    };
+  }
 
   /**
    * Get match details with participant stats

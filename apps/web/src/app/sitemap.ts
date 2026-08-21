@@ -2,6 +2,37 @@ import type { MetadataRoute } from "next";
 import { absoluteUrl } from "@/lib/seo";
 import { RESOURCE_ARTICLES } from "./resources/articles";
 
+const API_BASE =
+  process.env.API_URL ||
+  process.env.NEXT_PUBLIC_API_URL ||
+  "http://localhost:4000";
+
+type PublicMatchSitemapItem = {
+  id: string;
+  completedAt: string;
+  updatedAt: string;
+};
+
+async function getPublicMatchEntries(): Promise<MetadataRoute.Sitemap> {
+  try {
+    const response = await fetch(`${API_BASE}/api/public/matches?limit=5000`, {
+      next: { revalidate: 3600 },
+    });
+    if (!response.ok) return [];
+
+    const matches = (await response.json()) as PublicMatchSitemapItem[];
+    return matches.map((match) => ({
+      url: absoluteUrl(`/matches/match/${match.id}`),
+      lastModified: new Date(match.updatedAt || match.completedAt),
+      changeFrequency: "monthly",
+      priority: 0.65,
+    }));
+  } catch {
+    // API 점검 중에도 정적 사이트맵은 정상 제공한다.
+    return [];
+  }
+}
+
 const staticRoutes = [
   { path: "/", priority: 1, changeFrequency: "weekly" },
   // lab은 아직 비공개 — 공개 전까지 사이트맵·robots에서 제외 (크롤 예산을 내전 페이지에 집중)
@@ -41,5 +72,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }),
   );
 
-  return [...staticEntries, ...articleEntries];
+  const publicMatchEntries = await getPublicMatchEntries();
+
+  return [...staticEntries, ...articleEntries, ...publicMatchEntries];
 }

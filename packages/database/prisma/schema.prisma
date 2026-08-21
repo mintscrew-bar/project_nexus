@@ -625,6 +625,9 @@ model Match {
   roomId               String?
   roomIdSnapshot       String?
   roomName             String?
+  // 완료된 내전의 공개 여부를 방 삭제 뒤에도 보존한다.
+  // NULL은 스냅샷 도입 전 기록이므로 공개 API에서 안전하게 제외한다.
+  roomIsPrivate        Boolean?
   roomTeamMode         TeamMode?
   roomHostId           String?
   roomHostName         String?
@@ -701,6 +704,7 @@ model Match {
   reports              UserReport[]
 
   @@index([roomId])
+  @@index([roomIsPrivate, status, completedAt])
   @@index([seriesId])
   @@index([isInternal, completedAt])
   @@index([teamAId])

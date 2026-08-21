@@ -14,6 +14,7 @@ import { DiscordBotService } from "../discord/discord-bot.service";
 import { DiscordVoiceService } from "../discord/discord-voice.service";
 import { NotificationModule } from "../notification/notification.module";
 import { RankingModule } from "../ranking/ranking.module";
+import { PublicMatchController } from "./public-match.controller";
 
 @Module({
   imports: [
@@ -23,7 +24,7 @@ import { RankingModule } from "../ranking/ranking.module";
     NotificationModule,
     RankingModule,
   ],
-  controllers: [MatchController],
+  controllers: [MatchController, PublicMatchController],
   providers: [
     MatchService,
     MatchGateway,
