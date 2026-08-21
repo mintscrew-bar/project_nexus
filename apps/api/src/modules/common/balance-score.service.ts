@@ -7,6 +7,9 @@ import {
   calculatePlayerBalanceScores,
 } from "./balance-score.util";
 
+/** 솔로랭크 큐 ID — 자유랭크(440)는 라인 실력 신호가 약해 쓰지 않는다 */
+const RANKED_SOLO_QUEUE_ID = 420;
+
 /** 라인별 점수 맵 ({ TOP: 24.4, ... }) */
 export type BalanceScoreMap = Record<Role, number>;
 
@@ -15,7 +18,8 @@ export type BalanceScoreMap = Record<Role, number>;
  *
  * 점수 계산 자체는 싸다(40명에 1ms). 비싼 건 입력을 모으는 쪽이다 —
  * 현재 티어·최고 티어·라인 티어·솔랭 전적에 더해 내전 전적(NexusRanking,
- * NexusRoleRecord)까지 필요해서, 방을 조회할 때마다 조인이 붙는다.
+ * NexusRoleRecord)과 솔랭 라인별 전적(MatchParticipant 집계)까지 필요해서,
+ * 방을 조회할 때마다 조인이 붙는다.
  * 프로필·호버 프로필처럼 점수를 보여줄 곳이 늘수록 같은 조인이 곳곳에 번진다.
  *
  * 그래서 값이 바뀌는 시점(계정 갱신·라인 티어 수정·내전 종료)에만 계산해
@@ -57,6 +61,48 @@ export class BalanceScoreService {
   }
 
   /**
+   * 솔로랭크 라인별 전적을 집계한다.
+   *
+   * 리그 엔트리(soloWins/soloLosses)에는 라인 정보가 없어서, 이미 수집해 둔
+   * 매치 참가 기록에서 직접 센다. 유저 한 명당 인덱스(userId)를 타고 수백 행만
+   * 읽으므로 3ms 안팎이고, 이 메서드는 점수 캐시를 갱신할 때만 불린다.
+   *
+   * 자유랭크(440)는 라인 실력 신호가 약해 제외하고 솔로랭크(420)만 센다.
+   */
+  private async loadRankedRoleRecords(
+    userId: string | null,
+  ): Promise<{ role: Role; wins: number; losses: number }[]> {
+    if (!userId) return [];
+
+    try {
+      const rows = await this.prisma.$queryRaw<
+        { position: string; wins: bigint; games: bigint }[]
+      >`
+        SELECT p.position,
+               COUNT(*) FILTER (WHERE p.win) AS wins,
+               COUNT(*) AS games
+        FROM match_participants p
+        JOIN matches m ON m.id = p."matchId"
+        WHERE p."userId" = ${userId}
+          AND m."queueId" = ${RANKED_SOLO_QUEUE_ID}
+          AND p.position = ANY(${BALANCE_ROLES}::text[])
+        GROUP BY p.position
+      `;
+
+      return rows.map((row) => {
+        const wins = Number(row.wins);
+        const games = Number(row.games);
+        return { role: row.position as Role, wins, losses: games - wins };
+      });
+    } catch (error) {
+      // 집계 실패로 점수 갱신 자체가 멈추면 안 된다 — 라인 보정 없이 계산한다.
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`솔랭 라인 전적 집계 실패 userId=${userId}: ${message}`);
+      return [];
+    }
+  }
+
+  /**
    * 한 라이엇 계정의 점수를 다시 계산해 저장한다.
    * 계정이 없으면 아무것도 하지 않는다(탈퇴·연동 해제 경합 대비).
    */
@@ -65,6 +111,7 @@ export class BalanceScoreService {
       where: { id: riotAccountId },
       select: {
         id: true,
+        userId: true,
         tier: true,
         rank: true,
         lp: true,
@@ -104,6 +151,7 @@ export class BalanceScoreService {
       soloLosses: account.soloLosses,
       overallRecord: account.user?.nexusRanking ?? null,
       roleRecords: account.user?.nexusRoleRecords ?? [],
+      rankedRoleRecords: await this.loadRankedRoleRecords(account.userId),
     });
 
     const scores = Object.fromEntries(

@@ -80,6 +80,60 @@ describe("balance-score.util", () => {
     expect(withRoleGames.score).toBeGreaterThan(withoutRoleGames.score);
   });
 
+  it("솔랭 라인별 전적이 있으면 라인마다 점수가 갈린다", () => {
+    // 큐 전체 승률(soloWins/soloLosses)은 라인 정보가 없어 다섯 라인이 같은 값을
+    // 받는다. 라인별 전적이 들어오면 잘하는 라인과 못하는 라인이 벌어져야 한다.
+    const input = {
+      currentTier: { tier: "PLATINUM", rank: "IV", lp: 0 },
+      soloWins: 100,
+      soloLosses: 100,
+      rankedRoleRecords: [
+        { role: Role.MID, totalGames: 80, wins: 52, losses: 28 },
+        { role: Role.SUPPORT, totalGames: 80, wins: 28, losses: 52 },
+      ],
+    };
+
+    const mid = calculatePlayerRoleBalanceScore(input, Role.MID);
+    const support = calculatePlayerRoleBalanceScore(input, Role.SUPPORT);
+    const untouched = calculatePlayerRoleBalanceScore(input, Role.TOP);
+
+    expect(mid.score).toBeGreaterThan(support.score);
+    // 전적이 없는 라인은 큐 전체 승률(50%)만 남아 보너스가 0에 가깝다.
+    expect(untouched.rankedRoleGames).toBe(0);
+    expect(untouched.rankedRoleWeight).toBe(0);
+    expect(mid.rankedRoleWeight).toBeGreaterThan(
+      support.rankedRoleWeight * 0.9,
+    );
+  });
+
+  it("솔랭 라인 판수도 라인 티어 신뢰도로 센다", () => {
+    const common = {
+      currentTier: { tier: "GOLD", rank: "IV", lp: 0 },
+      roleTiers: [{ role: Role.JUNGLE, tier: "DIAMOND", rank: "IV", lp: 0 }],
+    };
+
+    // 내전 라인 판수가 없어도 솔랭에서 그 라인을 많이 뛰었으면 라인 티어를 믿는다.
+    const withRankedGames = calculatePlayerRoleBalanceScore(
+      {
+        ...common,
+        rankedRoleRecords: [
+          { role: Role.JUNGLE, totalGames: 40, wins: 20, losses: 20 },
+        ],
+      },
+      Role.JUNGLE,
+    );
+    const withoutAnyGames = calculatePlayerRoleBalanceScore(
+      common,
+      Role.JUNGLE,
+    );
+
+    expect(withRankedGames.roleTierWeight).toBeGreaterThan(
+      withoutAnyGames.roleTierWeight,
+    );
+    expect(withRankedGames.roleTierWeight).toBeCloseTo(0.7, 5);
+    expect(withRankedGames.score).toBeGreaterThan(withoutAnyGames.score);
+  });
+
   it("최종 개인 점수에 상한을 두지 않는다", () => {
     const result = calculatePlayerRoleBalanceScore(
       {

@@ -7,6 +7,7 @@ describe("BalanceScoreService", () => {
 
   const account = {
     id: "riot-1",
+    userId: "user-1",
     tier: "GOLD",
     rank: "II",
     lp: 40,
@@ -27,6 +28,8 @@ describe("BalanceScoreService", () => {
         update: jest.fn().mockResolvedValue({}),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
+      // 솔랭 라인별 전적 집계 (match_participants)
+      $queryRaw: jest.fn().mockResolvedValue([]),
     };
     service = new BalanceScoreService(prisma);
   });
@@ -89,6 +92,28 @@ describe("BalanceScoreService", () => {
         ["ADC", "JUNGLE", "MID", "SUPPORT", "TOP"].sort(),
       );
       expect(data.balanceScoresAt).toBeInstanceOf(Date);
+    });
+
+    it("솔랭 라인별 전적을 반영해 라인마다 다른 점수를 낸다", async () => {
+      prisma.$queryRaw.mockResolvedValue([
+        { position: "MID", wins: BigInt(60), games: BigInt(80) },
+        { position: "SUPPORT", wins: BigInt(20), games: BigInt(80) },
+      ]);
+
+      const scores = await service.refreshAccount("riot-1");
+
+      expect(scores).not.toBeNull();
+      expect(scores!.MID).toBeGreaterThan(scores!.SUPPORT);
+      // 전적이 없는 라인은 큐 전체 승률만 반영돼 둘 사이에 놓인다.
+      expect(scores!.TOP).toBeLessThan(scores!.MID);
+      expect(scores!.TOP).toBeGreaterThan(scores!.SUPPORT);
+    });
+
+    it("라인 전적 집계가 실패해도 점수 갱신은 계속한다", async () => {
+      prisma.$queryRaw.mockRejectedValue(new Error("db down"));
+
+      await expect(service.refreshAccount("riot-1")).resolves.not.toBeNull();
+      expect(prisma.riotAccount.update).toHaveBeenCalled();
     });
 
     it("계정이 없으면 아무것도 쓰지 않는다", async () => {

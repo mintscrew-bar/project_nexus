@@ -7,16 +7,22 @@
  *
  * 산식 버전(BALANCE_SCORE_VERSION)이 올라갔을 때도 같은 스크립트로 다시 채운다.
  *
+ * 계산은 BalanceScoreService.refreshAccount 에 그대로 맡긴다 — 예전에는 입력을
+ * 모으는 코드를 스크립트가 따로 갖고 있어서, 산식에 입력이 하나 늘 때마다 서비스와
+ * 스크립트가 다른 점수를 내놓을 수 있었다.
+ *
  * 실행: cd apps/api && npx ts-node --transpile-only src/scripts/backfill-balance-scores.ts
  */
-import { PrismaClient, Role } from "@nexus/database";
-import {
-  BALANCE_ROLES,
-  BALANCE_SCORE_VERSION,
-  calculatePlayerBalanceScores,
-} from "../modules/common/balance-score.util";
+import { PrismaClient } from "@nexus/database";
+import { BalanceScoreService } from "../modules/common/balance-score.service";
+import { BALANCE_SCORE_VERSION } from "../modules/common/balance-score.util";
+import type { PrismaService } from "../modules/prisma/prisma.service";
 
 const prisma = new PrismaClient();
+// 서비스는 PrismaClient 의 메서드만 쓰므로 그대로 넘긴다.
+const balanceScores = new BalanceScoreService(
+  prisma as unknown as PrismaService,
+);
 const BATCH_SIZE = 200;
 
 async function main() {
@@ -29,35 +35,14 @@ async function main() {
   let processed = 0;
   let updated = 0;
   let skipped = 0;
+  let failed = 0;
 
   for (let offset = 0; offset < total; offset += BATCH_SIZE) {
     const accounts = await prisma.riotAccount.findMany({
       skip: offset,
       take: BATCH_SIZE,
       orderBy: { createdAt: "asc" },
-      select: {
-        id: true,
-        tier: true,
-        rank: true,
-        lp: true,
-        peakTier: true,
-        peakRank: true,
-        peakLp: true,
-        soloWins: true,
-        soloLosses: true,
-        balanceScoreVersion: true,
-        roleTiers: {
-          select: { role: true, tier: true, rank: true, lp: true },
-        },
-        user: {
-          select: {
-            nexusRanking: { select: { wins: true, losses: true } },
-            nexusRoleRecords: {
-              select: { role: true, wins: true, losses: true },
-            },
-          },
-        },
-      },
+      select: { id: true, balanceScoreVersion: true },
     });
 
     for (const account of accounts) {
@@ -67,47 +52,23 @@ async function main() {
         continue;
       }
 
-      const details = calculatePlayerBalanceScores({
-        currentTier: {
-          tier: account.tier,
-          rank: account.rank,
-          lp: account.lp,
-        },
-        peakTier: account.peakTier
-          ? {
-              tier: account.peakTier,
-              rank: account.peakRank,
-              lp: account.peakLp,
-            }
-          : null,
-        roleTiers: account.roleTiers,
-        soloWins: account.soloWins,
-        soloLosses: account.soloLosses,
-        overallRecord: account.user?.nexusRanking ?? null,
-        roleRecords: account.user?.nexusRoleRecords ?? [],
-      });
-
-      const scores = Object.fromEntries(
-        BALANCE_ROLES.map((role: Role) => [role, details[role].score]),
-      );
-
-      await prisma.riotAccount.update({
-        where: { id: account.id },
-        data: {
-          balanceScores: scores,
-          balanceScoreVersion: BALANCE_SCORE_VERSION,
-          balanceScoresAt: new Date(),
-        },
-      });
-      updated++;
+      try {
+        const scores = await balanceScores.refreshAccount(account.id);
+        if (scores) updated++;
+      } catch (error) {
+        failed++;
+        console.warn(`  계정 ${account.id} 실패:`, error);
+      }
     }
 
     console.log(
-      `  진행 ${processed}/${total} (갱신 ${updated}, 건너뜀 ${skipped})`,
+      `  진행 ${processed}/${total} (갱신 ${updated}, 건너뜀 ${skipped}, 실패 ${failed})`,
     );
   }
 
-  console.log(`완료 — 갱신 ${updated}건, 건너뜀 ${skipped}건`);
+  console.log(
+    `완료 — 갱신 ${updated}건, 건너뜀 ${skipped}건, 실패 ${failed}건`,
+  );
 }
 
 main()

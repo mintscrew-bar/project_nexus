@@ -1,6 +1,6 @@
 import { Role } from "@nexus/database";
 
-export const BALANCE_SCORE_VERSION = "2026-08-v1";
+export const BALANCE_SCORE_VERSION = "2026-08-v2";
 
 const TIER_POINTS: Record<string, number> = {
   UNRANKED: 10,
@@ -62,6 +62,13 @@ export interface PlayerBalanceScoreInput {
   soloLosses?: number | null;
   overallRecord?: BalanceRecordInput | null;
   roleRecords?: BalanceRoleRecordInput[] | null;
+  /**
+   * 솔로랭크 라인별 전적(match_participants 집계).
+   *
+   * 리그 엔트리의 soloWins/soloLosses 는 큐 전체 합계라 라인 구분이 없어서,
+   * 다섯 라인에 똑같은 값이 더해질 수밖에 없었다. 이 값이 라인별 차이를 만든다.
+   */
+  rankedRoleRecords?: BalanceRoleRecordInput[] | null;
 }
 
 export interface PlayerRoleBalanceScore {
@@ -77,6 +84,10 @@ export interface PlayerRoleBalanceScore {
   soloGames: number;
   overallGames: number;
   roleGames: number;
+  /** 이 라인의 솔로랭크 판수 */
+  rankedRoleGames: number;
+  /** 솔랭 승률에서 이 라인 승률이 차지한 비중 */
+  rankedRoleWeight: number;
   adjustedSoloWinRate: number;
   adjustedNexusWinRate: number;
   version: string;
@@ -130,7 +141,18 @@ export function calculatePlayerRoleBalanceScore(
   const roleTierScore = roleTier ? calculateBalanceTierPoints(roleTier) : null;
   const roleRecord = input.roleRecords?.find((entry) => entry.role === role);
   const roleGames = recordGames(roleRecord);
-  const roleTierWeight = roleTier ? 0.4 + Math.min(roleGames / 20, 1) * 0.3 : 0;
+  const rankedRoleRecord = input.rankedRoleRecords?.find(
+    (entry) => entry.role === role,
+  );
+  const rankedRoleGames = recordGames(rankedRoleRecord);
+
+  // 등록한 라인 티어를 얼마나 믿을지는 "그 라인을 실제로 얼마나 뛰었나"로 정한다.
+  // 내전만 세면 라인당 몇 판에 그쳐 가중치가 바닥에 붙어 있었다. 솔랭 라인 판수를
+  // 함께 세면서 라인 티어가 제 몫을 하게 됐다.
+  const roleEvidenceGames = roleGames + rankedRoleGames;
+  const roleTierWeight = roleTier
+    ? 0.4 + Math.min(roleEvidenceGames / 20, 1) * 0.3
+    : 0;
   const tierScore = roleTierScore
     ? roleTierScore * roleTierWeight + currentTierScore * (1 - roleTierWeight)
     : currentTierScore;
@@ -140,18 +162,32 @@ export function calculatePlayerRoleBalanceScore(
     : currentTierScore;
   const peakBonus = clamp((peakTierScore - currentTierScore) * 0.2, 0, 2);
 
+  // ── 솔로랭크 승률: 큐 전체 승률에 그 라인 승률을 섞는다 ──
+  // 라인 판수가 쌓일수록 라인 승률이 지배한다(최대 70%). 판수가 없으면
+  // 예전처럼 큐 전체 승률만 남아 다섯 라인이 같은 값을 받는다.
   const soloWins = normalizedCount(input.soloWins);
   const soloLosses = normalizedCount(input.soloLosses);
   const soloGames = soloWins + soloLosses;
-  const adjustedSoloWinRate = smoothedWinRate(soloWins, soloGames, 20);
-  const soloWinRateBonus = clamp((adjustedSoloWinRate - 0.5) * 10, -2, 2);
+  const adjustedSoloOverallWinRate = smoothedWinRate(soloWins, soloGames, 20);
+  const rankedRoleWins = normalizedCount(rankedRoleRecord?.wins);
+  const adjustedRankedRoleWinRate = smoothedWinRate(
+    rankedRoleWins,
+    rankedRoleGames,
+    10,
+  );
+  const rankedRoleWeight = 0.7 * (rankedRoleGames / (rankedRoleGames + 20));
+  const adjustedSoloWinRate =
+    adjustedSoloOverallWinRate * (1 - rankedRoleWeight) +
+    adjustedRankedRoleWinRate * rankedRoleWeight;
+  const soloWinRateBonus = clamp((adjustedSoloWinRate - 0.5) * 10, -2.5, 2.5);
 
   const overallWins = normalizedCount(input.overallRecord?.wins);
   const overallGames = recordGames(input.overallRecord);
   const adjustedOverallWinRate = smoothedWinRate(overallWins, overallGames, 20);
   const roleWins = normalizedCount(roleRecord?.wins);
   const adjustedRoleWinRate = smoothedWinRate(roleWins, roleGames, 10);
-  const roleWinRateWeight = 0.7 * (roleGames / (roleGames + 20));
+  // 내전은 라인당 판수가 적게 쌓이므로 랭크(20)보다 낮은 기준을 쓴다.
+  const roleWinRateWeight = 0.7 * (roleGames / (roleGames + 10));
   const adjustedNexusWinRate =
     adjustedOverallWinRate * (1 - roleWinRateWeight) +
     adjustedRoleWinRate * roleWinRateWeight;
@@ -172,6 +208,8 @@ export function calculatePlayerRoleBalanceScore(
     soloGames,
     overallGames,
     roleGames,
+    rankedRoleGames,
+    rankedRoleWeight,
     adjustedSoloWinRate,
     adjustedNexusWinRate,
     version: BALANCE_SCORE_VERSION,
