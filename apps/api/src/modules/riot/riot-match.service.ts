@@ -196,13 +196,23 @@ export class RiotMatchService {
       "RIOT_MATCH_REQUEST_DELAY_MS",
       1350,
     );
+    // ── 배경 수집이 쓰는 몫 ──
+    //
+    // 전역 예산은 95/2분인데 실측 사용량이 7/2분에 그쳤다. 배경 수집이 스스로
+    // 8초 간격으로 묶여 있었기 때문이다. 계정 하나가 매치 101건이라 그 간격이면
+    // 13분이 걸리고, 그 사이 아무것도 완주하지 못했다.
+    //
+    // 40건/2분은 3초 간격과 정확히 맞물린다(120/3 = 40). 계정당 약 5분이 되고,
+    // 전역 예산의 42%만 쓰므로 사람이 기다리는 전적 검색(전경 요청)에 절반 넘게
+    // 남는다. 배경 요청은 3초에 한 번만 토큰을 집으므로 순간 독점도 없다.
+    // 더 밀어붙이려면 두 값을 함께 올려야 한다 — 한쪽만 올리면 다른 쪽이 병목이다.
     this.backgroundMatchRateLimitMax = this.getPositiveIntConfig(
       "RIOT_MATCH_BACKGROUND_RATE_LIMIT_MAX",
-      15,
+      40,
     );
     this.backgroundMatchRequestDelayMs = this.getPositiveIntConfig(
       "RIOT_MATCH_BACKGROUND_REQUEST_DELAY_MS",
-      8000,
+      3000,
     );
 
     // 만료된 in-memory 캐시 엔트리를 1시간마다 정리 (메모리 누수 방지)
