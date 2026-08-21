@@ -19,6 +19,10 @@ interface ReviewMember {
   score: number | null;
   /** 교체될 라인 기준 예상 점수를 계산하기 위한 전체 라인 점수 */
   scoresByRole: Record<string, number> | null;
+  /** 등록해 둔 주라인 — 편성 근거의 선호 충족 계산에 쓴다 */
+  mainRole: string | null;
+  /** 등록해 둔 부라인 */
+  subRole: string | null;
 }
 
 interface ReviewTeam {
@@ -306,6 +310,97 @@ export function AutoBalanceReview({
     };
   })();
 
+  /**
+   * 편성 근거 ① 라인별 점수 분포.
+   *
+   * 팀이 2개든 8개든 행 수는 라인 수(5)로 고정이라, 40인 방에서도 이 영역의
+   * 높이는 그대로다. 같은 라인에 배정된 인원의 점수를 전체 범위 위에 찍어
+   * "어느 라인이 벌어졌는지"를 팀 합계보다 먼저 읽게 한다.
+   */
+  const roleBreakdown = (() => {
+    const rows = ROLE_ORDER.map((role) => {
+      const points: {
+        key: string;
+        teamName: string;
+        color: string;
+        username: string;
+        score: number;
+      }[] = [];
+      for (const team of teams) {
+        for (const member of team.members) {
+          if (member.assignedRole !== role || member.score === null) continue;
+          points.push({
+            key: member.userId,
+            teamName: team.name,
+            color: team.color ?? "#667eea",
+            username: member.username,
+            score: member.score,
+          });
+        }
+      }
+      points.sort((a, b) => a.score - b.score);
+      const scores = points.map((point) => point.score);
+      return {
+        role,
+        points,
+        min: scores.length > 0 ? Math.min(...scores) : null,
+        max: scores.length > 0 ? Math.max(...scores) : null,
+      };
+    }).filter((row) => row.points.length > 0);
+
+    if (rows.length === 0) return null;
+
+    // 모든 행이 같은 눈금을 쓰도록 전체 최소·최대로 정규화한다.
+    const all = rows.flatMap((row) => row.points.map((point) => point.score));
+    const min = Math.min(...all);
+    const max = Math.max(...all);
+    return { rows, min, max, span: max - min };
+  })();
+
+  /**
+   * 편성 근거 ② 선호 라인 충족.
+   *
+   * 자동 편성은 팀 점수 차와 라인 선호를 함께 최소화하므로, 점수가 맞아도
+   * 누군가는 비선호 라인에 간다. 몇 명이 어긋났는지와 누구인지를 같이 보여줘
+   * 방장이 교체 대상을 바로 고르게 한다.
+   */
+  const preferenceSummary = (() => {
+    let main = 0;
+    let sub = 0;
+    let unknown = 0;
+    const offRole: { userId: string; username: string; role: string }[] = [];
+
+    for (const team of teams) {
+      for (const member of team.members) {
+        if (!member.assignedRole) continue;
+        if (!member.mainRole && !member.subRole) {
+          // 주·부라인을 등록하지 않은 사람은 어긋난 것으로 세지 않는다.
+          unknown += 1;
+        } else if (member.mainRole === member.assignedRole) {
+          main += 1;
+        } else if (member.subRole === member.assignedRole) {
+          sub += 1;
+        } else {
+          offRole.push({
+            userId: member.userId,
+            username: member.username,
+            role: member.assignedRole,
+          });
+        }
+      }
+    }
+
+    const total = main + sub + unknown + offRole.length;
+    if (total === 0) return null;
+    return { main, sub, unknown, offRole, total };
+  })();
+
+  // 팀 카드는 폭에 맞춰 자동으로 열을 만든다 — 2팀이면 2열로 넓게, 8팀이면
+  // 4열 × 2행으로 접혀서 팀이 늘어도 세로로만 길어지지 않는다.
+  const teamGridStyle = {
+    gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 16rem), 1fr))",
+  };
+
   // 언마운트 시 대기 중인 집기 타이머를 정리한다.
   useEffect(() => clearHoldTimer, [clearHoldTimer]);
 
@@ -396,7 +491,10 @@ export function AutoBalanceReview({
         </div>
       </div>
 
-      <div className="grid content-start gap-4 md:grid-cols-2">
+      <div
+        className="grid flex-shrink-0 content-start gap-4"
+        style={teamGridStyle}
+      >
         {teams.map((team) => {
           const projectedTotal = swapPreview?.totals[team.id] ?? null;
           return (
@@ -531,6 +629,172 @@ export function AutoBalanceReview({
           );
         })}
       </div>
+
+      {/*
+        편성 근거 — 팀 목록 아래 남는 높이를 채운다.
+        행 수가 라인 수(5)로 고정이라 2팀이든 8팀(40인)이든 이 영역의 높이는
+        같고, 팀이 많아 목록이 길어지면 자연스럽게 아래로 밀린다.
+      */}
+      {(roleBreakdown || preferenceSummary) && (
+        <div className="mt-4 flex flex-1 flex-col gap-3 rounded-lg border border-bg-tertiary bg-bg-primary/60 p-4">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            <h4 className="text-sm font-black text-text-primary">편성 근거</h4>
+            {roleBreakdown && (
+              <p className="text-xs text-text-tertiary">
+                라인별 점수 분포 · 전체{" "}
+                <span className="tabular-nums">
+                  {roleBreakdown.min.toFixed(1)}–{roleBreakdown.max.toFixed(1)}
+                </span>
+              </p>
+            )}
+          </div>
+
+          {roleBreakdown && (
+            <div className="flex flex-1 flex-col gap-1.5">
+              {roleBreakdown.rows.map((row) => {
+                const rowMin = row.min ?? 0;
+                const rowMax = row.max ?? 0;
+                const rowGap = rowMax - rowMin;
+                return (
+                  <div
+                    key={row.role}
+                    className="flex min-h-8 flex-1 items-center gap-3"
+                  >
+                    <PositionIcon
+                      position={row.role}
+                      className="!h-4 !w-4 flex-shrink-0"
+                    />
+                    <span className="w-9 flex-shrink-0 text-xs text-text-tertiary">
+                      {POSITION_LABELS[row.role] ?? row.role}
+                    </span>
+                    {/* 같은 라인끼리의 점수 분포 — 점 하나가 그 라인에 배정된 한 명 */}
+                    <div className="relative h-1.5 min-w-0 flex-1 rounded-full bg-bg-tertiary">
+                      {row.points.map((point) => (
+                        <span
+                          key={point.key}
+                          title={`${point.teamName} · ${point.username} ${point.score.toFixed(1)}`}
+                          className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-bg-primary"
+                          style={{
+                            left: `${
+                              roleBreakdown.span > 0
+                                ? ((point.score - roleBreakdown.min) /
+                                    roleBreakdown.span) *
+                                  100
+                                : 50
+                            }%`,
+                            backgroundColor: point.color,
+                          }}
+                        />
+                      ))}
+                    </div>
+                    <span className="hidden w-20 flex-shrink-0 text-right text-xs tabular-nums text-text-tertiary sm:inline">
+                      {rowMin.toFixed(1)}–{rowMax.toFixed(1)}
+                    </span>
+                    <span
+                      title="이 라인에 배정된 인원끼리의 점수 편차"
+                      className={`w-10 flex-shrink-0 text-right text-xs font-bold tabular-nums ${
+                        rowGap <= 1
+                          ? "text-accent-success"
+                          : rowGap <= 2.5
+                            ? "text-text-secondary"
+                            : "text-accent-warning"
+                      }`}
+                    >
+                      {rowGap.toFixed(1)}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {preferenceSummary && (
+            <div className="flex flex-shrink-0 flex-col gap-2 border-t border-bg-tertiary pt-3">
+              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+                <span className="text-xs font-semibold uppercase tracking-wider text-text-tertiary">
+                  선호 라인 충족
+                </span>
+                <span className="text-xs font-bold tabular-nums text-text-secondary">
+                  주라인 {preferenceSummary.main} · 부라인{" "}
+                  {preferenceSummary.sub} · 비선호{" "}
+                  {preferenceSummary.offRole.length}
+                  {preferenceSummary.unknown > 0
+                    ? ` · 미등록 ${preferenceSummary.unknown}`
+                    : ""}
+                  <span className="text-text-tertiary">
+                    {" "}
+                    / {preferenceSummary.total}명
+                  </span>
+                </span>
+              </div>
+              <div className="flex h-2 gap-0.5 overflow-hidden rounded-full bg-bg-tertiary">
+                {[
+                  {
+                    key: "main",
+                    label: "주라인",
+                    value: preferenceSummary.main,
+                    className: "bg-accent-success",
+                  },
+                  {
+                    key: "sub",
+                    label: "부라인",
+                    value: preferenceSummary.sub,
+                    className: "bg-accent-primary",
+                  },
+                  {
+                    key: "off",
+                    label: "비선호 라인",
+                    value: preferenceSummary.offRole.length,
+                    className: "bg-accent-warning",
+                  },
+                  {
+                    key: "unknown",
+                    label: "주·부라인 미등록",
+                    value: preferenceSummary.unknown,
+                    className: "bg-bg-elevated",
+                  },
+                ]
+                  .filter((segment) => segment.value > 0)
+                  .map((segment) => (
+                    <span
+                      key={segment.key}
+                      title={`${segment.label} ${segment.value}명`}
+                      className={segment.className}
+                      style={{
+                        width: `${(segment.value / preferenceSummary.total) * 100}%`,
+                      }}
+                    />
+                  ))}
+              </div>
+              {/* 비선호 라인으로 간 인원 — 교체 후보를 바로 집게 이름을 드러낸다 */}
+              {preferenceSummary.offRole.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {preferenceSummary.offRole.slice(0, 12).map((entry) => (
+                    <span
+                      key={entry.userId}
+                      title={`${entry.username} — 선호하지 않는 라인에 배정됨`}
+                      className="inline-flex max-w-40 items-center gap-1 rounded-full border border-accent-warning/30 bg-accent-warning/10 px-2 py-0.5 text-[11px] text-text-secondary"
+                    >
+                      <PositionIcon
+                        position={entry.role}
+                        className="!h-3 !w-3 flex-shrink-0"
+                      />
+                      <span className="truncate font-semibold">
+                        {entry.username}
+                      </span>
+                    </span>
+                  ))}
+                  {preferenceSummary.offRole.length > 12 && (
+                    <span className="inline-flex items-center px-1 text-[11px] font-semibold text-text-tertiary">
+                      +{preferenceSummary.offRole.length - 12}명
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {dragPosition && draggedMember && draggedPreview && (
         <div

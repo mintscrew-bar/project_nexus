@@ -650,6 +650,15 @@ export default function TournamentLobbyPage() {
                 ? (participant.balanceScores[role] ?? null)
                 : null,
             scoresByRole: participant?.balanceScores ?? null,
+            // 선호 라인 충족 계산용 — 편성에 쓰인 것과 같은 대표 계정 값
+            mainRole:
+              member.user?.riotAccounts?.[0]?.mainRole ??
+              participant?.riotAccount?.mainRole ??
+              null,
+            subRole:
+              member.user?.riotAccounts?.[0]?.subRole ??
+              participant?.riotAccount?.subRole ??
+              null,
           };
         }),
       }))}
