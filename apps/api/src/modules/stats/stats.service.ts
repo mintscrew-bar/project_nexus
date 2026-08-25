@@ -123,6 +123,21 @@ export const SCAN_BACKFILL_PRIORITY = -10;
  */
 const MAX_CONCURRENT_SCANS = 1;
 
+/**
+ * Riot PUUID 길이(고정 78자).
+ *
+ * 시드·테스트로 만들어진 계정이 `concbot_puuid_013` 같은 짧은 문자열을 puuid
+ * 자리에 갖고 있다. 실측으로 343계정 중 150건(44%)이 이런 값이었고, 배경 수집이
+ * 이들에게 6시간마다 매치 조회를 걸어 400 을 받고 있었다 — 스캔 실패 149건 중
+ * 147건이 여기서 나왔다. 되지 않을 요청에 Riot 예산을 쓰지 않도록 걸러낸다.
+ */
+const RIOT_PUUID_LENGTH = 78;
+
+/** Riot 에 물어볼 수 있는 puuid 인지 */
+function isQueryablePuuid(puuid: string | null | undefined): boolean {
+  return !!puuid && puuid.length === RIOT_PUUID_LENGTH;
+}
+
 @Injectable()
 export class StatsService {
   private readonly logger = new Logger(StatsService.name);
@@ -1822,7 +1837,7 @@ export class StatsService {
     puuids: string[],
     priority = 0,
   ): Promise<number> {
-    const unique = [...new Set(puuids.filter((puuid) => !!puuid))];
+    const unique = [...new Set(puuids.filter(isQueryablePuuid))];
     if (unique.length === 0) return 0;
 
     const season = this.getCurrentSeason();
@@ -1884,7 +1899,7 @@ export class StatsService {
       SELECT r.puuid
       FROM riot_accounts r
       WHERE r.puuid IS NOT NULL
-        AND r.puuid <> ''
+        AND LENGTH(r.puuid) = ${RIOT_PUUID_LENGTH}
         AND NOT EXISTS (
           SELECT 1 FROM champion_scan_states c
           WHERE c.puuid = r.puuid

@@ -714,6 +714,30 @@ describe("StatsService", () => {
       expect(prisma.$transaction).not.toHaveBeenCalled();
     });
 
+    it("Riot 에 물어볼 수 없는 puuid 는 큐에 넣지 않는다", async () => {
+      // 시드·테스트 계정이 concbot_puuid_013 같은 값을 puuid 자리에 갖고 있어,
+      // 배경 수집이 6시간마다 400 을 받으며 예산만 버리고 있었다.
+      prisma.championScanState.findMany.mockResolvedValue([]);
+
+      const enqueued = await service.enqueueChampionScanForPuuids(
+        ["concbot_puuid_013", "short", ""],
+        0,
+      );
+
+      expect(enqueued).toBe(0);
+      expect(prisma.championScanState.upsert).not.toHaveBeenCalled();
+    });
+
+    it("정상 길이(78자) puuid 는 큐에 넣는다", async () => {
+      const puuid = "a".repeat(78);
+      prisma.championScanState.findMany.mockResolvedValue([]);
+      prisma.championScanState.upsert.mockResolvedValue({});
+
+      const enqueued = await service.enqueueChampionScanForPuuids([puuid], 5);
+
+      expect(enqueued).toBe(1);
+    });
+
     it("이미 진행 중인 스캔이 상한에 닿으면 새 작업을 집지 않는다", async () => {
       // Riot 예산이 하나뿐이라 같이 돌려도 총 처리량은 그대로고, 각자 예산을
       // 기다리며 늘어져 stall 판정에만 걸린다.
