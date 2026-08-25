@@ -1,7 +1,9 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { randomBytes } from "crypto";
 import { PrismaService } from "../prisma/prisma.service";
 import { BalanceScoreService } from "../common/balance-score.service";
+import { MatchSeriesService } from "../match/match-series.service";
+import type { SeriesScore } from "../match/match-series.service";
 import {
   hashBroadcastToken,
   activeRoomIdForUser,
@@ -44,9 +46,12 @@ const MATCH_INTRO_SCENE_MS = 60_000;
  */
 @Injectable()
 export class BroadcastService {
+  private readonly logger = new Logger(BroadcastService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly balanceScores: BalanceScoreService,
+    private readonly matchSeries: MatchSeriesService,
   ) {}
 
   /**
@@ -329,12 +334,17 @@ export class BroadcastService {
   }
 
   /** 매치 상세(방송 Match Scene용) — 진영/상태/승패 중심. 라이브 스코어 없음. */
-  private matchDetail(match: any, teamById: Map<string, any>) {
+  private matchDetail(
+    match: any,
+    teamById: Map<string, any>,
+    series?: SeriesScore | null,
+  ) {
     if (!match) return null;
     const teamA = teamById.get(match.teamAId) ?? null;
     const teamB = teamById.get(match.teamBId) ?? null;
     // blueSideTeamId 가 지정되면 그 팀이 블루, 나머지가 레드. 미지정이면 A=블루 관례.
     const blueId = match.blueSideTeamId ?? match.teamAId ?? null;
+    const blueIsTeamB = blueId === match.teamBId;
     return {
       id: match.id,
       status: match.status,
@@ -345,8 +355,19 @@ export class BroadcastService {
       blueSideTeamId: match.blueSideTeamId ?? null,
       bracketType: match.bracketType ?? null,
       bracketSection: match.bracketRound ?? null,
-      blue: this.teamSummary(blueId === match.teamBId ? teamB : teamA),
-      red: this.teamSummary(blueId === match.teamBId ? teamA : teamB),
+      blue: this.teamSummary(blueIsTeamB ? teamB : teamA),
+      red: this.teamSummary(blueIsTeamB ? teamA : teamB),
+      // 다전제 세트 스코어. 시리즈는 A/B 기준이라 진영(블루/레드)으로 옮겨 담는다.
+      // 이 값이 비어 있던 동안 오버레이가 승패로 0/1 을 만들어 써서, 2-1 로
+      // 이긴 경기가 1-0 으로 보였다.
+      ...(series
+        ? {
+            bestOf: series.bestOf,
+            currentGameNumber: series.currentGameNumber,
+            blueScore: blueIsTeamB ? series.teamBWins : series.teamAWins,
+            redScore: blueIsTeamB ? series.teamAWins : series.teamBWins,
+          }
+        : {}),
     };
   }
 
@@ -617,16 +638,27 @@ export class BroadcastService {
             },
           })
         : null;
+      const seriesByMatchId = await this.seriesScoreByMatchId(roomId);
+
       // 중계 중인 경기 옆으로 흘려보낼 "다른 경기 속보".
       // 지금 보고 있는 경기가 아닌, 방금 끝난 경기가 있을 때만 붙는다.
       const sideResult =
         effectiveScene === "match"
-          ? await this.recentOtherResult(roomId, match?.id ?? null, teamById)
+          ? await this.recentOtherResult(
+              roomId,
+              match?.id ?? null,
+              teamById,
+              seriesByMatchId,
+            )
           : null;
 
       return {
         ...common,
-        match: this.matchDetail(match, teamById),
+        match: this.matchDetail(
+          match,
+          teamById,
+          match ? seriesByMatchId.get(match.id) : null,
+        ),
         ...(sideResult ? { sideResult } : {}),
       };
     }
@@ -648,9 +680,12 @@ export class BroadcastService {
           teamBId: true,
         },
       });
+      const seriesByMatchId = await this.seriesScoreByMatchId(roomId);
       return {
         ...common,
-        matches: matches.map((m) => this.matchDetail(m, teamById)),
+        matches: matches.map((m) =>
+          this.matchDetail(m, teamById, seriesByMatchId.get(m.id)),
+        ),
       };
     }
 
@@ -785,6 +820,7 @@ export class BroadcastService {
     roomId: string,
     currentMatchId: string | null,
     teamById: Map<string, any>,
+    seriesByMatchId?: Map<string, SeriesScore>,
   ) {
     const since = new Date(Date.now() - SIDE_RESULT_MS);
     const match = await this.prisma.match.findFirst({
@@ -812,9 +848,42 @@ export class BroadcastService {
     if (!match?.completedAt) return null;
 
     return {
-      ...this.matchDetail(match, teamById),
+      ...this.matchDetail(match, teamById, seriesByMatchId?.get(match.id)),
       hideAt: match.completedAt.getTime() + SIDE_RESULT_MS,
     };
+  }
+
+  /**
+   * 매치 id → 그 매치가 속한 시리즈의 세트 스코어.
+   *
+   * 시리즈는 여러 세트(Match)를 묶으므로, 어느 세트를 보고 있든 같은 스코어가
+   * 나와야 한다. 시리즈를 안 쓰는 단판 방이면 빈 맵이라 종전대로 동작한다.
+   */
+  private async seriesScoreByMatchId(
+    roomId: string,
+  ): Promise<Map<string, SeriesScore>> {
+    const byMatchId = new Map<string, SeriesScore>();
+    try {
+      const scores = await this.matchSeries.getRoomSeriesScores(roomId);
+      if (scores.length === 0) return byMatchId;
+
+      const sets = await this.prisma.match.findMany({
+        where: { roomId, seriesId: { not: null } },
+        select: { id: true, seriesId: true },
+      });
+      const scoreBySeriesId = new Map(scores.map((s) => [s.seriesId, s]));
+      for (const set of sets) {
+        const score = set.seriesId
+          ? scoreBySeriesId.get(set.seriesId)
+          : undefined;
+        if (score) byMatchId.set(set.id, score);
+      }
+    } catch (error) {
+      // 스코어를 못 읽어도 오버레이는 떠야 한다. 세트 표시만 빠진다.
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`시리즈 스코어 조회 실패 roomId=${roomId}: ${message}`);
+    }
+    return byMatchId;
   }
 
   /** 진행 중(IN_PROGRESS) 경기 중 첫 번째 id. */

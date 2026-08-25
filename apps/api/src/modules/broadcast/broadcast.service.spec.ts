@@ -33,9 +33,72 @@ describe("BroadcastService auto 장면", () => {
   const resolve = (room: any) =>
     (service as any).resolveControlledScene("auto", roomId, room);
 
+  let matchSeries: any;
+
   beforeEach(() => {
-    prisma = { match: { findFirst: jest.fn().mockResolvedValue(null) } };
-    service = new BroadcastService(prisma, {} as any);
+    prisma = {
+      match: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+    };
+    matchSeries = { getRoomSeriesScores: jest.fn().mockResolvedValue([]) };
+    service = new BroadcastService(prisma, {} as any, matchSeries);
+  });
+
+  describe("다전제 세트 스코어", () => {
+    it("시리즈 승수를 진영 기준으로 옮겨 담는다", () => {
+      // 시리즈는 A/B 기준이라, 블루가 teamB 면 스코어도 뒤집어야 한다.
+      const detail = (service as any).matchDetail(
+        {
+          id: "set-3",
+          status: "COMPLETED",
+          teamAId: "team-a",
+          teamBId: "team-b",
+          blueSideTeamId: "team-b",
+          winnerId: "team-a",
+        },
+        new Map([
+          ["team-a", { id: "team-a", name: "A팀", members: [] }],
+          ["team-b", { id: "team-b", name: "B팀", members: [] }],
+        ]),
+        {
+          seriesId: "series-1",
+          bestOf: 3,
+          teamAId: "team-a",
+          teamBId: "team-b",
+          teamAWins: 2,
+          teamBWins: 1,
+          winsNeeded: 2,
+          status: "COMPLETED",
+          winnerId: "team-a",
+          currentGameNumber: 3,
+        },
+      );
+
+      expect(detail.blue.name).toBe("B팀");
+      expect(detail.blueScore).toBe(1);
+      expect(detail.redScore).toBe(2);
+      expect(detail.bestOf).toBe(3);
+    });
+
+    it("시리즈가 없는 단판이면 스코어 필드를 붙이지 않는다", () => {
+      // 이 값이 비어 있으면 오버레이가 승패로 0/1 을 만든다(종전 동작).
+      const detail = (service as any).matchDetail(
+        {
+          id: "match-1",
+          status: "COMPLETED",
+          teamAId: "team-a",
+          teamBId: "team-b",
+          winnerId: "team-a",
+        },
+        new Map(),
+        null,
+      );
+
+      expect(detail.blueScore).toBeUndefined();
+      expect(detail.bestOf).toBeUndefined();
+    });
   });
 
   it("경기가 끝나면 다음 경기가 진행 중이어도 결과를 먼저 보여준다", async () => {

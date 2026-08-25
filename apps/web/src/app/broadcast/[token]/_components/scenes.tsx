@@ -695,9 +695,9 @@ function SideResultBanner({ result }: { result?: any }) {
     result.bracketRound ||
     (result.round != null ? `${result.round}라운드` : null);
 
-  // 방송 스냅샷의 matchDetail 에는 라이브 스코어가 없다(다전제 세트 승수도
-  // 마찬가지). 없는 숫자를 0 으로 채워 보여 주느니 승패만 분명히 한다.
-  const row = (team: any, won: boolean) => (
+  // 다전제면 세트 스코어(2-1)를, 단판이면 승패만 보여 준다.
+  const isSeries = (result.bestOf ?? 1) > 1;
+  const row = (team: any, won: boolean, score?: number) => (
     <div className="flex items-center gap-3">
       <span
         className="h-8 w-1 shrink-0 rounded-full"
@@ -712,10 +712,22 @@ function SideResultBanner({ result }: { result?: any }) {
       >
         {team?.name ?? "TBD"}
       </span>
-      {won && (
-        <span className="shrink-0 rounded-md bg-white/90 px-2.5 py-0.5 text-[15px] font-black tracking-wider text-black">
-          WIN
+      {isSeries ? (
+        <span
+          className={
+            won
+              ? "shrink-0 text-[26px] font-black tabular-nums text-white"
+              : "shrink-0 text-[26px] font-black tabular-nums text-white/45"
+          }
+        >
+          {score ?? 0}
         </span>
+      ) : (
+        won && (
+          <span className="shrink-0 rounded-md bg-white/90 px-2.5 py-0.5 text-[15px] font-black tracking-wider text-black">
+            WIN
+          </span>
+        )
       )}
     </div>
   );
@@ -737,11 +749,12 @@ function SideResultBanner({ result }: { result?: any }) {
           <span className="shrink-0 text-[13px] font-bold text-white/50">
             {roundLabel ? `${roundLabel} · ` : ""}
             Match {result.matchNumber ?? "-"}
+            {isSeries ? ` · BO${result.bestOf}` : ""}
           </span>
         </div>
         <div className="space-y-2 px-5 py-4">
-          {row(blue, !!blueWon)}
-          {row(red, !!redWon)}
+          {row(blue, !!blueWon, result.blueScore)}
+          {row(red, !!redWon, result.redScore)}
         </div>
       </div>
     </div>
