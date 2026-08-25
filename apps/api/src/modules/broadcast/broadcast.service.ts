@@ -681,6 +681,29 @@ export class BroadcastService {
     ]);
     const now = Date.now();
 
+    // ── 결과 화면은 무엇보다 먼저 ──
+    //
+    // 아래 focus 분기가 이보다 앞에 있었을 때, 방금 끝난 경기의 결과가 화면에
+    // 뜨자마자 사라졌다. 다전제는 한 세트가 끝나도 시리즈 슬롯이 IN_PROGRESS로
+    // 남아 liveMatch 가 계속 잡히고, 단판도 다음 경기가 시작되는 순간 같은 일이
+    // 벌어진다. 그래서 결과를 볼 새도 없이 대진표·경기 소개로 넘어갔다.
+    //
+    // 다만 방장이 결과를 본 뒤 직접 다음 중계 경기를 고른 경우(포커스 변경이
+    // 경기 종료보다 나중)는 그 의사를 따른다.
+    const focusPickedAfterResult =
+      !!room.broadcastFocusChangedAt &&
+      !!latestCompleted?.completedAt &&
+      room.broadcastFocusChangedAt.getTime() >
+        latestCompleted.completedAt.getTime();
+
+    if (latestCompleted?.completedAt && !focusPickedAfterResult) {
+      const resultUntil =
+        latestCompleted.completedAt.getTime() + RESULT_SCENE_MS;
+      if (now <= resultUntil) {
+        return { scene: "result", nextChangeAt: resultUntil };
+      }
+    }
+
     // 조작 패널에서 중계 경기를 바꾸면 바로 경기 화면으로 점프하지 않는다.
     // 선택된 경기를 강조한 대진표를 잠깐 보여 준 뒤 자연스럽게 송출한다.
     if (room.broadcastFocusChangedAt && liveMatch) {
@@ -697,14 +720,6 @@ export class BroadcastService {
       const introUntil = bracketUntil + MATCH_INTRO_SCENE_MS;
       if (now <= introUntil) {
         return { scene: "match-intro", nextChangeAt: introUntil };
-      }
-    }
-
-    if (latestCompleted?.completedAt) {
-      const resultUntil =
-        latestCompleted.completedAt.getTime() + RESULT_SCENE_MS;
-      if (now <= resultUntil) {
-        return { scene: "result", nextChangeAt: resultUntil };
       }
     }
 
