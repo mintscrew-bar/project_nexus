@@ -25,6 +25,13 @@ export type BroadcastScene =
   | "break";
 
 const RESULT_SCENE_MS = 12_000;
+/**
+ * 중계 중인 경기 화면에 다른 경기 결과를 띄워 두는 시간.
+ *
+ * 야구 중계에서 한쪽에 잠깐 떴다 사라지는 배너와 같은 역할이다. 관전 화면을
+ * 오래 가리면 안 되므로 짧게 보여 주고 스스로 빠진다.
+ */
+const SIDE_RESULT_MS = 8_000;
 const BRACKET_SCENE_AFTER_RESULT_MS = 15_000;
 const BRACKET_SCENE_BEFORE_MATCH_MS = 0;
 const MATCH_INTRO_SCENE_MS = 60_000;
@@ -610,7 +617,18 @@ export class BroadcastService {
             },
           })
         : null;
-      return { ...common, match: this.matchDetail(match, teamById) };
+      // 중계 중인 경기 옆으로 흘려보낼 "다른 경기 속보".
+      // 지금 보고 있는 경기가 아닌, 방금 끝난 경기가 있을 때만 붙는다.
+      const sideResult =
+        effectiveScene === "match"
+          ? await this.recentOtherResult(roomId, match?.id ?? null, teamById)
+          : null;
+
+      return {
+        ...common,
+        match: this.matchDetail(match, teamById),
+        ...(sideResult ? { sideResult } : {}),
+      };
     }
 
     if (effectiveScene === "bracket" || effectiveScene === "summary") {
@@ -754,6 +772,49 @@ export class BroadcastService {
     if (await this.hasBracket(roomId)) return fixed("bracket");
 
     return fixed("room");
+  }
+
+  /**
+   * 중계 중인 경기 말고 방금 끝난 다른 경기.
+   *
+   * 여러 코트가 동시에 도는 대진에서, 한 경기를 중계하는 동안 다른 경기가
+   * 먼저 끝나면 시청자는 그 사실을 알 길이 없었다. 끝난 직후 잠깐만 붙여
+   * 보내고, 언제 걷을지(`hideAt`)도 함께 알려 준다.
+   */
+  private async recentOtherResult(
+    roomId: string,
+    currentMatchId: string | null,
+    teamById: Map<string, any>,
+  ) {
+    const since = new Date(Date.now() - SIDE_RESULT_MS);
+    const match = await this.prisma.match.findFirst({
+      where: {
+        roomId,
+        status: "COMPLETED",
+        completedAt: { not: null, gte: since },
+        ...(currentMatchId ? { id: { not: currentMatchId } } : {}),
+      },
+      orderBy: { completedAt: "desc" },
+      select: {
+        id: true,
+        status: true,
+        round: true,
+        bracketRound: true,
+        matchNumber: true,
+        winnerId: true,
+        blueSideTeamId: true,
+        bracketType: true,
+        teamAId: true,
+        teamBId: true,
+        completedAt: true,
+      },
+    });
+    if (!match?.completedAt) return null;
+
+    return {
+      ...this.matchDetail(match, teamById),
+      hideAt: match.completedAt.getTime() + SIDE_RESULT_MS,
+    };
   }
 
   /** 진행 중(IN_PROGRESS) 경기 중 첫 번째 id. */

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { getChampionIconUrl } from "@/app/tournaments/[id]/lobby/_components/icons";
 import { getTierIcon } from "@/lib/tier-icon";
@@ -34,6 +35,15 @@ const broadcastBgCss = `
 @keyframes nexus-result-rise {
   from { opacity: 0; transform: translate3d(0, 24px, 0) scale(0.98); }
   to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+/* 다른 경기 속보 — 오른쪽에서 들어왔다가 같은 쪽으로 빠진다 */
+@keyframes nexus-side-result-in {
+  from { opacity: 0; transform: translate3d(120%, 0, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+@keyframes nexus-side-result-out {
+  from { opacity: 1; transform: translate3d(0, 0, 0); }
+  to { opacity: 0; transform: translate3d(120%, 0, 0); }
 }
 `;
 
@@ -629,12 +639,111 @@ export function MatchScene({ snapshot }: { snapshot: any }) {
         </div>
       </div>
 
+      {/* 다른 경기 속보 — 미니맵 위에서 잠깐 떴다 사라진다 */}
+      <SideResultBanner result={snapshot?.sideResult} />
+
       {/*
         경기 중 오버레이는 양옆 플랭킹(팀명 + 세트 스코어)만 남긴다.
         상단 중앙에 라운드/Match/Live 캡션이 있었는데, 롤 자체 점수창 바로 아래에
         붙어 관전 화면을 가렸다. 이 씬에서는 하단 바(LowerThird)도 띄우지 않으므로
         (page.tsx 의 persistent 참고) 화면을 최대한 비워 두는 쪽이 맞다.
       */}
+    </div>
+  );
+}
+
+/**
+ * 다른 경기 결과 속보.
+ *
+ * 여러 경기가 동시에 도는 대진에서, 한 경기를 중계하는 동안 다른 경기가 먼저
+ * 끝나면 시청자는 알 길이 없었다. 야구 중계에서 한쪽에 잠깐 떴다 사라지는
+ * 배너처럼, 끝난 직후에만 오른쪽에서 밀려 들어왔다 같은 쪽으로 빠진다.
+ *
+ * 자리는 미니맵 바로 위다. 1920×1080 기준 미니맵이 아래 340px 안쪽을 차지하고,
+ * 그 위는 관전 화면에서 비어 있어 인게임 정보를 가리지 않는다.
+ */
+function SideResultBanner({ result }: { result?: any }) {
+  const hideAt: number | undefined = result?.hideAt;
+  const [leaving, setLeaving] = useState(false);
+  const [gone, setGone] = useState(false);
+
+  useEffect(() => {
+    setLeaving(false);
+    setGone(false);
+    if (!hideAt) return;
+
+    // 나가는 애니메이션(450ms)을 먼저 돌리고 실제로 걷는다.
+    const outAt = hideAt - Date.now() - 450;
+    const leaveTimer = setTimeout(() => setLeaving(true), Math.max(0, outAt));
+    const goneTimer = setTimeout(
+      () => setGone(true),
+      Math.max(0, hideAt - Date.now()),
+    );
+    return () => {
+      clearTimeout(leaveTimer);
+      clearTimeout(goneTimer);
+    };
+  }, [hideAt, result?.id]);
+
+  if (!result || gone) return null;
+
+  const blue = result.blue;
+  const red = result.red;
+  const blueWon = result.winnerId && result.winnerId === blue?.id;
+  const redWon = result.winnerId && result.winnerId === red?.id;
+  const roundLabel =
+    result.bracketRound ||
+    (result.round != null ? `${result.round}라운드` : null);
+
+  // 방송 스냅샷의 matchDetail 에는 라이브 스코어가 없다(다전제 세트 승수도
+  // 마찬가지). 없는 숫자를 0 으로 채워 보여 주느니 승패만 분명히 한다.
+  const row = (team: any, won: boolean) => (
+    <div className="flex items-center gap-3">
+      <span
+        className="h-8 w-1 shrink-0 rounded-full"
+        style={{ backgroundColor: team?.color ?? "rgba(255,255,255,0.35)" }}
+      />
+      <span
+        className={
+          won
+            ? "min-w-0 flex-1 truncate text-[22px] font-black text-white"
+            : "min-w-0 flex-1 truncate text-[22px] font-bold text-white/50"
+        }
+      >
+        {team?.name ?? "TBD"}
+      </span>
+      {won && (
+        <span className="shrink-0 rounded-md bg-white/90 px-2.5 py-0.5 text-[15px] font-black tracking-wider text-black">
+          WIN
+        </span>
+      )}
+    </div>
+  );
+
+  return (
+    <div
+      className="pointer-events-none absolute bottom-[360px] right-10 w-[420px]"
+      style={{
+        animation: leaving
+          ? "nexus-side-result-out 450ms ease-in both"
+          : "nexus-side-result-in 520ms cubic-bezier(0.16, 1, 0.3, 1) both",
+      }}
+    >
+      <div className="overflow-hidden rounded-l-xl border-y border-l border-white/15 bg-black/78 shadow-[0_20px_60px_rgba(0,0,0,0.5)] backdrop-blur-sm">
+        <div className="flex items-center justify-between gap-3 border-b border-white/10 bg-white/[0.06] px-5 py-2">
+          <span className="text-[13px] font-black uppercase tracking-[0.2em] text-white/70">
+            다른 경기 종료
+          </span>
+          <span className="shrink-0 text-[13px] font-bold text-white/50">
+            {roundLabel ? `${roundLabel} · ` : ""}
+            Match {result.matchNumber ?? "-"}
+          </span>
+        </div>
+        <div className="space-y-2 px-5 py-4">
+          {row(blue, !!blueWon)}
+          {row(red, !!redWon)}
+        </div>
+      </div>
     </div>
   );
 }

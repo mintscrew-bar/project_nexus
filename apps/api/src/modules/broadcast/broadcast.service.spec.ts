@@ -80,6 +80,54 @@ describe("BroadcastService auto 장면", () => {
     expect(result.scene).not.toBe("result");
   });
 
+  it("중계 중인 경기는 속보로 다시 띄우지 않는다", async () => {
+    // 지금 보고 있는 경기가 끝난 건 결과 화면이 맡는다. 속보는 "다른" 경기다.
+    prisma.match.findFirst.mockResolvedValue(null);
+
+    const result = await (service as any).recentOtherResult(
+      roomId,
+      "match-1",
+      new Map(),
+    );
+
+    expect(result).toBeNull();
+    const where = prisma.match.findFirst.mock.calls[0][0].where;
+    expect(where.id).toEqual({ not: "match-1" });
+    expect(where.status).toBe("COMPLETED");
+    // 방금 끝난 것만 — 오래된 결과가 뒤늦게 튀어나오면 안 된다.
+    expect(where.completedAt.gte).toBeInstanceOf(Date);
+  });
+
+  it("다른 경기가 방금 끝났으면 걷을 시각과 함께 내보낸다", async () => {
+    const completedAt = new Date(now - 1_000);
+    prisma.match.findFirst.mockResolvedValue({
+      id: "match-2",
+      status: "COMPLETED",
+      matchNumber: 3,
+      round: 1,
+      bracketRound: null,
+      winnerId: "team-a",
+      blueSideTeamId: null,
+      bracketType: null,
+      teamAId: "team-a",
+      teamBId: "team-b",
+      completedAt,
+    });
+
+    const result = await (service as any).recentOtherResult(
+      roomId,
+      "match-1",
+      new Map([
+        ["team-a", { id: "team-a", name: "A팀", members: [] }],
+        ["team-b", { id: "team-b", name: "B팀", members: [] }],
+      ]),
+    );
+
+    expect(result.id).toBe("match-2");
+    expect(result.winnerId).toBe("team-a");
+    expect(result.hideAt).toBe(completedAt.getTime() + 8_000);
+  });
+
   it("고정 장면은 그대로 내보낸다", async () => {
     const result = await (service as any).resolveControlledScene(
       "result",
