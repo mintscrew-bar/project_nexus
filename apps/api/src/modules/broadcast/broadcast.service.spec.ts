@@ -191,6 +191,63 @@ describe("BroadcastService auto 장면", () => {
     expect(result.hideAt).toBe(completedAt.getTime() + 8_000);
   });
 
+  it("대진표는 다전제 시리즈를 한 장으로 묶는다", () => {
+    // 세트를 그대로 그리면 BO3 한 대진이 카드 세 장이 된다.
+    const series = {
+      seriesId: "series-1",
+      bestOf: 3,
+      teamAId: "team-a",
+      teamBId: "team-b",
+      teamAWins: 2,
+      teamBWins: 1,
+      winsNeeded: 2,
+      status: "COMPLETED",
+      winnerId: "team-a",
+      currentGameNumber: 3,
+    };
+    const sets = ["set-1", "set-2", "set-3"].map((id) => ({
+      id,
+      // 세트별 승자는 갈리지만 대진 승자는 시리즈 것이어야 한다
+      status: "COMPLETED",
+      winnerId: id === "set-2" ? "team-b" : "team-a",
+      round: 1,
+      matchNumber: 1,
+      teamAId: "team-a",
+      teamBId: "team-b",
+    }));
+    const seriesByMatchId = new Map(sets.map((set) => [set.id, series]));
+
+    const result = (service as any).collapseSeries(
+      sets,
+      seriesByMatchId,
+      new Map([
+        ["team-a", { id: "team-a", name: "A팀", members: [] }],
+        ["team-b", { id: "team-b", name: "B팀", members: [] }],
+      ]),
+    );
+
+    expect(result).toHaveLength(1);
+    // 마지막 세트를 진 팀이 대진 승자로 보이면 안 된다
+    expect(result[0].winnerId).toBe("team-a");
+    expect(result[0].blueScore).toBe(2);
+    expect(result[0].redScore).toBe(1);
+  });
+
+  it("단판 방은 매치를 그대로 통과시킨다", () => {
+    const matches = [
+      { id: "m1", status: "COMPLETED", teamAId: "a", teamBId: "b" },
+      { id: "m2", status: "PENDING", teamAId: "a", teamBId: "b" },
+    ];
+
+    const result = (service as any).collapseSeries(
+      matches,
+      new Map(),
+      new Map(),
+    );
+
+    expect(result).toHaveLength(2);
+  });
+
   it("고정 장면은 그대로 내보낸다", async () => {
     const result = await (service as any).resolveControlledScene(
       "result",

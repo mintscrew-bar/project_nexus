@@ -681,11 +681,10 @@ export class BroadcastService {
         },
       });
       const seriesByMatchId = await this.seriesScoreByMatchId(roomId);
+
       return {
         ...common,
-        matches: matches.map((m) =>
-          this.matchDetail(m, teamById, seriesByMatchId.get(m.id)),
-        ),
+        matches: this.collapseSeries(matches, seriesByMatchId, teamById),
       };
     }
 
@@ -851,6 +850,43 @@ export class BroadcastService {
       ...this.matchDetail(match, teamById, seriesByMatchId?.get(match.id)),
       hideAt: match.completedAt.getTime() + SIDE_RESULT_MS,
     };
+  }
+
+  /**
+   * 대진표용으로 다전제 시리즈를 한 장으로 묶는다.
+   *
+   * 다전제는 대진 하나가 여러 세트(Match)다. 그대로 그리면 BO3 한 대진이 카드
+   * 세 장으로 늘어나 대진표가 어긋난다. 웹 대진표(tournaments/[id]/bracket)는
+   * 시리즈로 묶어 그리는데 방송만 raw 매치를 넘기고 있었다.
+   *
+   * 시리즈당 한 장만 남기고, 상태·승자는 세트가 아니라 시리즈 것을 쓴다 —
+   * 2-1 로 끝난 대진에서 마지막 세트를 진 팀이 승자로 보이면 안 된다.
+   * 시리즈를 쓰지 않는 단판 방은 그대로 통과한다.
+   */
+  private collapseSeries(
+    matches: any[],
+    seriesByMatchId: Map<string, SeriesScore>,
+    teamById: Map<string, any>,
+  ) {
+    const seen = new Set<string>();
+    return matches
+      .filter((match) => {
+        const score = seriesByMatchId.get(match.id);
+        if (!score) return true;
+        if (seen.has(score.seriesId)) return false;
+        seen.add(score.seriesId);
+        return true;
+      })
+      .map((match) => {
+        const score = seriesByMatchId.get(match.id);
+        return this.matchDetail(
+          score
+            ? { ...match, status: score.status, winnerId: score.winnerId }
+            : match,
+          teamById,
+          score,
+        );
+      });
   }
 
   /**
