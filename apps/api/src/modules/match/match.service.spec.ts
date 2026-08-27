@@ -272,6 +272,7 @@ describe("MatchService", () => {
             AND: expect.arrayContaining([
               expect.objectContaining({
                 OR: expect.arrayContaining([
+                  { rosterSnapshots: { some: {} } },
                   { participants: { some: {} } },
                   { draftSnapshots: { some: {} } },
                 ]),

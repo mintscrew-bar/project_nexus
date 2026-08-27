@@ -1327,7 +1327,10 @@ export class MatchService {
         ],
         AND: [
           {
+            // 내전은 완료 시 로스터를 matchRosterSnapshot에 기록한다.
+            // participants/draftSnapshots만 보면 정상적인 공개 내전도 전부 걸러진다.
             OR: [
+              { rosterSnapshots: { some: {} } },
               { participants: { some: {} } },
               { draftSnapshots: { some: {} } },
             ],
@@ -1366,7 +1369,10 @@ export class MatchService {
         ],
         AND: [
           {
+            // 내전은 완료 시 로스터를 matchRosterSnapshot에 기록한다.
+            // participants/draftSnapshots만 보면 정상적인 공개 내전도 전부 걸러진다.
             OR: [
+              { rosterSnapshots: { some: {} } },
               { participants: { some: {} } },
               { draftSnapshots: { some: {} } },
             ],
