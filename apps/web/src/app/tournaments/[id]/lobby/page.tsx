@@ -24,13 +24,16 @@ import {
   Settings,
   UserCog,
   ArrowLeft,
+  LogOut,
   Shield,
   Swords,
   Share2,
   CheckCircle2,
   Clock3,
   Radio,
+  MoreHorizontal,
 } from "lucide-react";
+import { Dropdown } from "@/components/ui/Dropdown";
 import Link from "next/link";
 import {
   friendApi,
@@ -45,6 +48,7 @@ import { LobbyParticipantsList } from "./_components/LobbyParticipantsList";
 import { AutoBalanceReview } from "./_components/AutoBalanceReview";
 import { LobbyErrorState } from "./_components/LobbyErrorState";
 import { BroadcastLinkModal } from "./_components/BroadcastLinkModal";
+import { TeamModeHelp, type TeamMode } from "@/components/rooms/TeamModeHelp";
 
 const STAGE_TRANSITION_MAX_ATTEMPTS = 12;
 const STAGE_TRANSITION_RETRY_DELAY_MS = 750;
@@ -152,6 +156,7 @@ export default function TournamentLobbyPage() {
   );
 
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [isLeaveConfirmOpen, setIsLeaveConfirmOpen] = useState(false);
   const [isUserSettingsModalOpen, setIsUserSettingsModalOpen] = useState(false);
   const [isBroadcastModalOpen, setIsBroadcastModalOpen] = useState(false);
   const [kickTarget, setKickTarget] = useState<{
@@ -168,6 +173,9 @@ export default function TournamentLobbyPage() {
   const [addingFriend, setAddingFriend] = useState<string | null>(null);
   const [sentFriendIds, setSentFriendIds] = useState<Set<string>>(new Set());
   const [mobileTab, setMobileTab] = useState<string>("participants");
+  const [unreadChatCount, setUnreadChatCount] = useState(0);
+  const [isMobileLayout, setIsMobileLayout] = useState(false);
+  const previousMessageCountRef = useRef(messages.length);
   const [connectTimedOut, setConnectTimedOut] = useState(false);
   // "다시 시도"를 누를 때마다 증가시켜 connect 이펙트를 재실행한다.
   const [retryNonce, setRetryNonce] = useState(0);
@@ -184,6 +192,41 @@ export default function TournamentLobbyPage() {
     inFlight: false,
     notified: false,
   });
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(max-width: 1023px)");
+    const updateLayout = () => setIsMobileLayout(mediaQuery.matches);
+    updateLayout();
+    mediaQuery.addEventListener("change", updateLayout);
+    return () => mediaQuery.removeEventListener("change", updateLayout);
+  }, []);
+
+  useEffect(() => {
+    const previousCount = previousMessageCountRef.current;
+    const addedCount = Math.max(0, messages.length - previousCount);
+    previousMessageCountRef.current = messages.length;
+
+    if (!isMobileLayout || mobileTab === "chat") {
+      setUnreadChatCount(0);
+    } else if (addedCount > 0) {
+      setUnreadChatCount((count) => Math.min(100, count + addedCount));
+    }
+  }, [messages.length, mobileTab, isMobileLayout]);
+
+  useEffect(() => {
+    previousMessageCountRef.current = 0;
+    setUnreadChatCount(0);
+  }, [roomId]); // 새 방에서는 이전 방의 읽지 않은 개수를 이어가지 않는다.
+
+  useEffect(() => {
+    if (!error?.startsWith("ACTIVE_ROOM_EXISTS::")) return;
+    const [, activeRoomId, message] = error.split("::");
+    if (!activeRoomId || activeRoomId === roomId || hasRedirected.current)
+      return;
+    hasRedirected.current = true;
+    addToast(message || "진행 중인 내전으로 돌아갑니다.", "warning");
+    router.replace(`/tournaments/${activeRoomId}/lobby`);
+  }, [error, roomId, router, addToast]);
 
   // 내전 방 링크 공유 — 로비 URL을 클립보드에 복사 (붙여넣으면 OG 카드로 표시됨)
   const handleShare = useCallback(async () => {
@@ -364,7 +407,8 @@ export default function TournamentLobbyPage() {
     return () => {
       clearTransitionRetry();
       if (hasRedirected.current) return;
-      disconnect();
+      // 로비 연결은 전역 스토어가 소유한다. 사이트 내부 페이지 이동에서는
+      // 연결을 유지해 게임 시작·강퇴 알림을 놓치지 않도록 한다.
     };
   }, [roomId, isAuthenticated, retryNonce]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -620,6 +664,10 @@ export default function TournamentLobbyPage() {
     router.push("/tournaments");
   };
 
+  const requestLeaveLobby = () => {
+    setIsLeaveConfirmOpen(true);
+  };
+
   // 자동 밸런스 편성 확인 단계 — 이 동안 로비는 전용 화면으로 통째로 전환된다.
   // 준비바·참가자 목록·하단 액션바는 이 단계에서 정보 가치가 없는데 공간만
   // 차지해서 (준비는 이미 끝났고, 팀 배치가 곧 참가자 목록이다) 모두 숨긴다.
@@ -761,11 +809,12 @@ export default function TournamentLobbyPage() {
             {/* Left: back + room info */}
             <div className="flex items-center gap-3 min-w-0">
               <button
-                onClick={handleLeaveLobby}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-red-500/40 bg-red-500/10 px-2.5 py-2 text-xs font-semibold text-red-400 transition-colors hover:bg-red-500/20 hover:text-red-300 flex-shrink-0"
+                onClick={requestLeaveLobby}
+                className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-lg border border-red-500/40 bg-red-500/10 px-2.5 py-2 text-xs font-semibold text-red-400 transition-colors hover:bg-red-500/20 hover:text-red-300"
                 title="방 나가기"
+                aria-label="방 나가기"
               >
-                <ArrowLeft className="h-4 w-4" />
+                <LogOut className="h-4 w-4" />
                 <span className="hidden sm:inline">방 나가기</span>
               </button>
               <div className="min-w-0">
@@ -785,9 +834,10 @@ export default function TournamentLobbyPage() {
                 </div>
                 {/* Badges row - visible on md+ */}
                 <div className="hidden md:flex items-center gap-2 mt-1">
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-bg-tertiary rounded-full text-xs text-text-secondary">
+                  <span className="inline-flex items-center gap-0.5 rounded-full bg-bg-tertiary py-0.5 pl-2 pr-0.5 text-xs text-text-secondary">
                     <Swords className="h-3 w-3" />
                     {teamModeLabel}
+                    <TeamModeHelp mode={room.teamMode as TeamMode} compact />
                   </span>
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-bg-tertiary rounded-full text-xs text-text-secondary">
                     <Users className="h-3 w-3" />
@@ -802,26 +852,29 @@ export default function TournamentLobbyPage() {
             </div>
 
             {/* Right: setting buttons */}
-            <div className="flex items-center gap-2 flex-shrink-0">
+            <div className="flex flex-shrink-0 items-center gap-1 sm:gap-2">
               <button
                 onClick={handleShare}
-                className="p-2 rounded-lg hover:bg-bg-tertiary transition-colors text-text-secondary hover:text-text-primary"
+                className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-text-secondary transition-colors hover:bg-bg-tertiary hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary"
                 title="내전 방 링크 공유"
+                aria-label="내전 방 링크 공유"
               >
                 <Share2 className="h-5 w-5" />
               </button>
               <button
                 onClick={() => setIsUserSettingsModalOpen(true)}
-                className="p-2 rounded-lg hover:bg-bg-tertiary transition-colors text-text-secondary hover:text-text-primary"
+                className="hidden min-h-11 min-w-11 items-center justify-center rounded-lg text-text-secondary transition-colors hover:bg-bg-tertiary hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary sm:inline-flex"
                 title="내 설정"
+                aria-label="내 설정"
               >
                 <UserCog className="h-5 w-5" />
               </button>
               {isCurrentUserHost && (
                 <button
                   onClick={() => setIsBroadcastModalOpen(true)}
-                  className="p-2 rounded-lg hover:bg-bg-tertiary transition-colors text-text-secondary hover:text-text-primary"
+                  className="hidden min-h-11 min-w-11 items-center justify-center rounded-lg text-text-secondary transition-colors hover:bg-bg-tertiary hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary sm:inline-flex"
                   title="방송용 오버레이 링크"
+                  aria-label="방송용 오버레이 링크"
                 >
                   <Radio className="h-5 w-5" />
                 </button>
@@ -829,12 +882,58 @@ export default function TournamentLobbyPage() {
               {isCurrentUserHost && (
                 <button
                   onClick={() => setIsSettingsModalOpen(true)}
-                  className="p-2 rounded-lg hover:bg-bg-tertiary transition-colors text-text-secondary hover:text-text-primary"
+                  className="hidden min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-lg px-2 text-text-secondary transition-colors hover:bg-bg-tertiary hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary sm:inline-flex md:px-3"
                   title="방 설정"
+                  aria-label="방 설정"
                 >
                   <Settings className="h-5 w-5" />
+                  <span className="hidden md:inline">방 설정</span>
                 </button>
               )}
+              <Dropdown
+                align="right"
+                className="sm:hidden"
+                trigger={
+                  <button
+                    type="button"
+                    className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-text-secondary transition-colors hover:bg-bg-tertiary hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary"
+                    aria-label="로비 메뉴"
+                  >
+                    <MoreHorizontal className="h-5 w-5" />
+                  </button>
+                }
+                items={[
+                  {
+                    key: "user-settings",
+                    label: "내 설정",
+                    icon: <UserCog className="h-4 w-4" />,
+                    onClick: () => setIsUserSettingsModalOpen(true),
+                  },
+                  ...(isCurrentUserHost
+                    ? [
+                        {
+                          key: "broadcast",
+                          label: "방송 링크",
+                          icon: <Radio className="h-4 w-4" />,
+                          onClick: () => setIsBroadcastModalOpen(true),
+                        },
+                        {
+                          key: "room-settings",
+                          label: "방 설정",
+                          icon: <Settings className="h-4 w-4" />,
+                          onClick: () => setIsSettingsModalOpen(true),
+                        },
+                        {
+                          key: "leave-room",
+                          label: "방 나가기",
+                          danger: true,
+                          icon: <ArrowLeft className="h-4 w-4" />,
+                          onClick: requestLeaveLobby,
+                        },
+                      ]
+                    : []),
+                ]}
+              />
             </div>
           </div>
         </header>
@@ -1065,6 +1164,18 @@ export default function TournamentLobbyPage() {
                   >
                     <MessageSquare className="h-4 w-4 mr-1.5" />
                     채팅
+                    {unreadChatCount > 0 && (
+                      <span
+                        className="ml-1 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-accent-danger px-1.5 text-[11px] font-bold leading-none text-white"
+                        aria-label={
+                          unreadChatCount >= 100
+                            ? "읽지 않은 채팅 100개 이상"
+                            : `읽지 않은 채팅 ${unreadChatCount}개`
+                        }
+                      >
+                        {unreadChatCount >= 100 ? "99+" : unreadChatCount}
+                      </span>
+                    )}
                   </TabsTrigger>
                 </TabsList>
               </div>
@@ -1090,7 +1201,7 @@ export default function TournamentLobbyPage() {
         {!isAutoBalanceReviewStage && (
           <footer
             data-tour="lobby-ready-action"
-            className="bg-bg-secondary border-t border-bg-tertiary px-4 py-3 lg:px-6 flex-shrink-0"
+            className="sticky bottom-0 z-20 flex-shrink-0 border-t border-bg-tertiary bg-bg-secondary px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_20px_rgb(0_0_0/0.12)] lg:px-6"
           >
             <div className="container mx-auto flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -1114,7 +1225,7 @@ export default function TournamentLobbyPage() {
                         ? "팀 선택 필요"
                         : currentUserIsReady
                           ? "준비 취소"
-                          : "준비하기"}
+                          : "준비 완료하기"}
                     </button>
                   )}
                 {room.status !== "DRAFT_COMPLETED" &&
@@ -1188,11 +1299,14 @@ export default function TournamentLobbyPage() {
                     >
                       내전 시작
                     </button>
+                    <p className="text-right text-xs text-text-tertiary">
+                      모든 플레이어가 준비되면 시작할 수 있습니다.
+                    </p>
                   </div>
                 )}
                 {!isCurrentUserHost && room.status === "WAITING" && (
-                  <p className="text-text-tertiary text-xs hidden sm:block">
-                    방장이 내전을 시작할 때까지 대기 중...
+                  <p className="text-text-tertiary text-xs">
+                    준비 완료 후 방장이 내전을 시작합니다.
                   </p>
                 )}
               </div>
@@ -1229,6 +1343,23 @@ export default function TournamentLobbyPage() {
         cancelText="취소"
         variant="danger"
         isLoading={isKicking}
+      />
+      <ConfirmModal
+        isOpen={isLeaveConfirmOpen}
+        onClose={() => setIsLeaveConfirmOpen(false)}
+        onConfirm={async () => {
+          setIsLeaveConfirmOpen(false);
+          await handleLeaveLobby();
+        }}
+        title="방을 나가시겠습니까?"
+        message={
+          room.status === "WAITING"
+            ? "준비 상태와 참가 슬롯이 해제됩니다."
+            : "진행 중인 내전의 실시간 연결을 종료합니다."
+        }
+        confirmText="방 나가기"
+        cancelText="계속 있기"
+        variant="danger"
       />
       <UserSettingsModal
         isOpen={isUserSettingsModalOpen}

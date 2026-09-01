@@ -10,6 +10,8 @@ import { FriendsPanel } from '@/components/domain/FriendsPanel';
 import { FloatingDmPanel } from '@/components/domain/FloatingDmPanel';
 import { FloatingClanChatPanel } from '@/components/domain/FloatingClanChatPanel';
 import { CreatorPromoStrip } from './CreatorPromoStrip';
+import { ActiveRoomBanner } from './ActiveRoomBanner';
+import { useLobbyStore } from '@/stores/lobby-store';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -26,6 +28,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (mounted && !isAuthenticated) {
+      useLobbyStore.getState().disconnect();
+    }
+  }, [mounted, isAuthenticated]);
 
   // /auth/* 라우트 → 풀스크린 (셸 없음)
   const isAuthRoute = pathname.startsWith('/auth');
@@ -59,6 +67,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <main className="flex min-h-0 min-w-0 flex-grow">
         <div className="flex min-h-0 min-w-0 flex-grow flex-col overflow-hidden bg-bg-primary">
           {showCreatorPromo && <CreatorPromoStrip />}
+          <ActiveRoomBanner />
           {/*
             - isDashboardRoute: 페이지 전체가 viewport에 맞게 고정되어야 함 (h-full)
             - 일반 페이지: 내용에 따라 전체 스크롤 가능 (overflow-auto)
