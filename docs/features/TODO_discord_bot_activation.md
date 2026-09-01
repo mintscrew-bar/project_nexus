@@ -162,7 +162,10 @@ const lobbyChannelId = room.discordChannels?.[0]?.channelId;
 
 원인 5. 위 단계가 돌기 시작한 뒤에 한다.
 
-- [ ] Task 17: 길드 연동 시 클랜 생성/연결 유도 (`DiscordGuildLink.clanId` 채우기)
+- [x] Task 17: 길드 연동 시 클랜 생성/연결 유도 (`DiscordGuildLink.clanId` 채우기)
+      `/nexus linkclan [clan]` — 서버 관리 권한 + 그 클랜의 오너/임원인 사람만 연결한다.
+      옵션을 비우면 현재 연결 상태와 연결 가능한 클랜 목록을 보여준다.
+      공지 채널 온보딩 메시지에도 안내 한 줄을 붙였다.
 - [ ] Task 18: 정원 미달로 만료된 방 자동 정리 + 개설자에게 재시도 제안
 - [ ] Task 19: 서버별 내전 기록 요약 (`/nexus 서버기록`)
 

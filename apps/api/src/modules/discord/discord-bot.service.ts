@@ -325,6 +325,8 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
       "아래 버튼을 누르면 **이 채널**이 공지 채널이 됩니다.",
       "다른 채널로 지정하려면 `/nexus setannounce channel:#원하는채널`",
       "",
+      "클랜이 있다면 `/nexus linkclan` 으로 이 서버와 연결해두세요.",
+      "",
       "(서버 관리 권한이 있는 분만 설정할 수 있습니다)",
     ].join("\n");
 
@@ -532,6 +534,138 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
       crossGuild,
     );
     await interaction.editReply(message);
+  }
+
+  /**
+   * `/nexus linkclan` — 연동된 서버를 클랜에 이어붙인다.
+   *
+   * 지금까지 `DiscordGuildLink.clanId`는 스키마에만 있고 아무도 채우지 않았다.
+   * 서버와 클랜이 연결돼야 "이 서버 사람들"이 한 조직으로 이어지고, 서버 기록도
+   * 클랜 기록으로 쌓인다. 클랜 오너/임원이면서 서버 관리 권한이 있는 사람만 연결한다.
+   */
+  private async handleLinkClanCommand(
+    interaction: ChatInputCommandInteraction,
+  ) {
+    if (!this.hasRulesPublishPermission(interaction)) {
+      await interaction.reply({
+        content: "❌ 서버 관리 권한이 있어야 클랜을 연결할 수 있습니다.",
+        ephemeral: true,
+      });
+      return;
+    }
+    if (!interaction.guildId) {
+      await interaction.reply({
+        content: "❌ 서버 안에서만 사용할 수 있는 명령어입니다.",
+        ephemeral: true,
+      });
+      return;
+    }
+
+    await interaction.deferReply({ ephemeral: true });
+
+    const appUrl =
+      this.configService.get("APP_URL") || "https://labs-nexus.com";
+
+    const link = await this.prisma.discordGuildLink.findUnique({
+      where: { guildId: interaction.guildId },
+      select: { clan: { select: { name: true, tag: true } } },
+    });
+    if (!link) {
+      await interaction.editReply(
+        [
+          "❌ 이 서버는 아직 NEXUS에 연동되어 있지 않습니다.",
+          `${appUrl} 에서 서버를 먼저 연동해주세요.`,
+        ].join("\n"),
+      );
+      return;
+    }
+
+    const provider = await this.prisma.authProvider.findFirst({
+      where: { provider: "DISCORD", providerId: interaction.user.id },
+      select: { userId: true },
+    });
+    if (!provider) {
+      await interaction.editReply(
+        [
+          "❌ 이 디스코드 계정과 연결된 NEXUS 계정을 찾지 못했습니다.",
+          `${appUrl} 에서 디스코드로 로그인한 뒤 다시 시도해주세요.`,
+        ].join("\n"),
+      );
+      return;
+    }
+
+    // 남의 클랜을 마음대로 붙일 수 없게, 본인이 운영하는 클랜만 후보로 둔다.
+    const memberships = await this.prisma.clanMember.findMany({
+      where: { userId: provider.userId, role: { in: ["OWNER", "OFFICER"] } },
+      select: { clan: { select: { id: true, name: true, tag: true } } },
+      orderBy: { joinedAt: "asc" },
+    });
+    if (memberships.length === 0) {
+      await interaction.editReply(
+        [
+          "❌ 연결할 수 있는 클랜이 없습니다.",
+          "클랜의 오너 또는 임원만 서버를 연결할 수 있습니다.",
+          `클랜 만들기: ${appUrl}/clans`,
+        ].join("\n"),
+      );
+      return;
+    }
+
+    const currentLine = link.clan
+      ? `현재 연결: **${link.clan.name}** [${link.clan.tag}]`
+      : "현재 연결된 클랜이 없습니다.";
+    const clanList = memberships
+      .map(({ clan }) => `• **${clan.name}** [${clan.tag}]`)
+      .join("\n");
+
+    const query = interaction.options.getString("clan")?.trim().toLowerCase();
+    if (!query) {
+      await interaction.editReply(
+        [
+          currentLine,
+          "",
+          "연결할 수 있는 클랜:",
+          clanList,
+          "",
+          "`/nexus linkclan clan:태그` 로 연결해주세요.",
+        ].join("\n"),
+      );
+      return;
+    }
+
+    // 태그·이름 정확히 일치를 먼저 보고, 없으면 이름 부분 일치로 넓힌다.
+    const matched =
+      memberships.find(
+        ({ clan }) =>
+          clan.tag.toLowerCase() === query ||
+          clan.name.toLowerCase() === query,
+      ) ??
+      memberships.find(({ clan }) =>
+        clan.name.toLowerCase().includes(query),
+      );
+    if (!matched) {
+      await interaction.editReply(
+        [
+          `❌ \`${query}\` 와 맞는 클랜을 찾지 못했습니다.`,
+          "",
+          "연결할 수 있는 클랜:",
+          clanList,
+        ].join("\n"),
+      );
+      return;
+    }
+
+    await this.prisma.discordGuildLink.update({
+      where: { guildId: interaction.guildId },
+      data: { clanId: matched.clan.id },
+    });
+
+    await interaction.editReply(
+      [
+        `✅ 이 서버를 **${matched.clan.name}** [${matched.clan.tag}] 클랜과 연결했습니다.`,
+        `클랜 페이지: ${appUrl}/clans/${matched.clan.id}`,
+      ].join("\n"),
+    );
   }
 
   /**
@@ -835,6 +969,18 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
                 .setMaxLength(50)
                 .setRequired(false),
             ),
+        )
+        .addSubcommand((sub) =>
+          sub
+            .setName("linkclan")
+            .setDescription("이 서버를 내 클랜과 연결 (관리자)")
+            .addStringOption((opt) =>
+              opt
+                .setName("clan")
+                .setDescription("클랜 태그 또는 이름 (비우면 연결 가능한 클랜 목록)")
+                .setMaxLength(50)
+                .setRequired(false),
+            ),
         ),
     ].map((cmd) => cmd.toJSON());
 
@@ -948,6 +1094,9 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
             break;
           case "schedule":
             await this.handleScheduleCommand(interaction);
+            break;
+          case "linkclan":
+            await this.handleLinkClanCommand(interaction);
             break;
         }
       } catch (error) {
@@ -1412,6 +1561,7 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
             "`/nexus verify` - 서버 기본 역할 받기",
             "`/nexus setuproles` - 티어/라인 역할 자동 생성 (관리자)",
             "`/nexus setannounce` - 모집 공지 채널 지정 (관리자)",
+            "`/nexus linkclan` - 이 서버를 내 클랜과 연결 (관리자)",
             "`/nexus setupverifypanel` - 인증 패널 게시 (관리자)",
           ].join("\n"),
         },
