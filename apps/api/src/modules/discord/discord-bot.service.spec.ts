@@ -285,3 +285,98 @@ describe("DiscordBotService room notification", () => {
     expect(text).toContain("player");
   });
 });
+
+describe("DiscordBotService 공지 채널 지정", () => {
+  const config = { get: jest.fn().mockReturnValue("") };
+  const eventEmitter = { emit: jest.fn() };
+  const redis = { get: jest.fn(), set: jest.fn(), del: jest.fn() };
+  const emojiService = { ensureRecruitEmojis: jest.fn() };
+
+  function build(opts: { canPost: boolean; link: { status: string } | null }) {
+    const prisma = {
+      discordGuildLink: {
+        findUnique: jest.fn().mockResolvedValue(opts.link),
+        update: jest.fn().mockResolvedValue({}),
+      },
+    };
+    const service = new DiscordBotService(
+      config as any,
+      prisma as any,
+      eventEmitter as any,
+      redis as any,
+      emojiService as any,
+    );
+    const guild = {
+      id: "guild-1",
+      members: { me: {}, fetchMe: jest.fn() },
+    };
+    const channel = {
+      id: "channel-1",
+      permissionsFor: () => ({ has: () => opts.canPost }),
+    };
+    return { service, prisma, guild, channel };
+  }
+
+  it("봇이 글을 못 쓰는 채널은 저장하지 않는다", async () => {
+    // 지정만 되고 실제로는 공지가 안 나가는 상태를 만들지 않는다.
+    const { service, prisma, guild, channel } = build({
+      canPost: false,
+      link: { status: "ACTIVE" },
+    });
+
+    const message = await (service as any).applyAnnounceChannel(guild, channel);
+
+    expect(message).toContain("권한이 없습니다");
+    expect(prisma.discordGuildLink.update).not.toHaveBeenCalled();
+  });
+
+  it("연동되지 않은 서버는 저장하지 않는다", async () => {
+    const { service, prisma, guild, channel } = build({
+      canPost: true,
+      link: null,
+    });
+
+    const message = await (service as any).applyAnnounceChannel(guild, channel);
+
+    expect(message).toContain("연동되지 않았습니다");
+    expect(prisma.discordGuildLink.update).not.toHaveBeenCalled();
+  });
+
+  it("권한과 연동이 모두 확인되면 저장한다", async () => {
+    const { service, prisma, guild, channel } = build({
+      canPost: true,
+      link: { status: "ACTIVE" },
+    });
+
+    const message = await (service as any).applyAnnounceChannel(guild, channel);
+
+    expect(prisma.discordGuildLink.update).toHaveBeenCalledWith({
+      where: { guildId: "guild-1" },
+      data: { announceChannelId: "channel-1" },
+    });
+    expect(message).toContain("지정했습니다");
+  });
+
+  it("아직 ACTIVE가 아니면 공지가 나가지 않는다고 알린다", async () => {
+    const { service, guild, channel } = build({
+      canPost: true,
+      link: { status: "PENDING" },
+    });
+
+    const message = await (service as any).applyAnnounceChannel(guild, channel);
+
+    expect(message).toContain("활성화");
+  });
+
+  it("안내 메시지에 이 채널로 지정 버튼이 포함된다", () => {
+    const { service } = build({ canPost: true, link: { status: "ACTIVE" } });
+
+    const notice = service.buildAnnounceSetupNotice();
+
+    expect(notice.content).toContain("공지 채널을 지정해주세요");
+    expect(notice.components).toHaveLength(1);
+    expect(JSON.stringify(notice.components[0].toJSON())).toContain(
+      "nexus_set_announce_here_button",
+    );
+  });
+});

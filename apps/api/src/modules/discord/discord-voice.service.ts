@@ -93,19 +93,70 @@ export class DiscordVoiceService {
     );
   }
 
+  /**
+   * 길드에서 내전 모집 공지를 보낼 만한 텍스트 채널을 찾는다.
+   * 시스템 채널 → 봇이 실제로 쓸 수 있는 첫 텍스트 채널 순.
+   *
+   * 관리자가 /nexus setannounce로 지정하지 않은 길드를 위한 폴백이다.
+   * 지정을 유도하되, 지정 전에도 공지가 아예 사라지지는 않게 한다.
+   */
+  private async resolveDefaultAnnounceChannel(
+    guildId: string,
+  ): Promise<string | null> {
+    try {
+      const guild = await this.client.guilds.fetch(guildId);
+      const me = guild.members.me ?? (await guild.members.fetchMe());
+
+      const canPost = (channel: {
+        type: ChannelType;
+        permissionsFor: (
+          m: typeof me,
+        ) => { has: (p: bigint) => boolean } | null;
+      }) =>
+        channel.type === ChannelType.GuildText &&
+        Boolean(
+          channel
+            .permissionsFor(me)
+            ?.has(
+              PermissionFlagsBits.ViewChannel |
+                PermissionFlagsBits.SendMessages,
+            ),
+        );
+
+      const systemChannel = guild.systemChannel;
+      if (systemChannel && canPost(systemChannel)) return systemChannel.id;
+
+      const channels = await guild.channels.fetch();
+      for (const channel of channels.values()) {
+        if (channel && canPost(channel as never)) return channel.id;
+      }
+      return null;
+    } catch (error) {
+      this.logger.warn(
+        `[RoomNotify] 길드 ${guildId} 기본 공지 채널 탐색 실패: ${(error as Error).message}`,
+      );
+      return null;
+    }
+  }
+
+  /**
+   * 내전 모집 공지를 보낼 대상을 정한다.
+   *
+   * 우선순위:
+   *  1. 길드가 지정한 공지 채널(DiscordGuildLink.announceChannelId)
+   *  2. 홈 길드에 한해 중앙 공지 채널(DISCORD_NOTIFICATION_CHANNEL_ID) — 하위 호환
+   *  3. 길드의 시스템 채널 / 봇이 쓸 수 있는 첫 텍스트 채널
+   *
+   * 방 대기실 채널로의 폴백은 의도적으로 제거했다. 그 채널은 방을 만든 직후
+   * 생성되는 음성 채널이라, 공지를 보내도 보는 사람이 없어 모집이 성립하지 않았다.
+   * 보낼 곳이 없으면 차라리 경고를 남기고 건너뛴다.
+   */
   async getRoomNotificationTarget(
     roomId: string,
   ): Promise<{ guildId: string; channelId: string } | null> {
     const room = await this.prisma.room.findUnique({
       where: { id: roomId },
-      select: {
-        discordGuildId: true,
-        discordChannels: {
-          where: { teamName: "Lobby" },
-          select: { channelId: true },
-          take: 1,
-        },
-      },
+      select: { discordGuildId: true },
     });
     if (!room) return null;
 
@@ -119,11 +170,17 @@ export class DiscordVoiceService {
       return null;
     }
 
-    // "내전 모집" 알림은 발견·참가용이라 중앙 모집 채널로 보낸다.
-    // 홈 서버(멀티길드 아님)일 때만 중앙 채널을 쓰고, 없으면 방 대기실 채널로 폴백.
-    const isHomeGuild =
-      !room.discordGuildId || room.discordGuildId === homeGuildId;
-    if (isHomeGuild) {
+    // 1. 길드 관리자가 지정한 공지 채널
+    const link = await this.prisma.discordGuildLink.findUnique({
+      where: { guildId },
+      select: { announceChannelId: true },
+    });
+    if (link?.announceChannelId) {
+      return { guildId, channelId: link.announceChannelId };
+    }
+
+    // 2. 홈 길드 하위 호환 — 기존 운영 설정을 깨지 않는다
+    if (guildId === homeGuildId) {
       const centralChannelId = this.configService.get<string>(
         "DISCORD_NOTIFICATION_CHANNEL_ID",
       );
@@ -132,13 +189,17 @@ export class DiscordVoiceService {
       }
     }
 
-    const lobbyChannelId = room.discordChannels?.[0]?.channelId;
-    if (lobbyChannelId) {
-      return { guildId, channelId: lobbyChannelId };
+    // 3. 미지정 길드 폴백
+    const fallbackChannelId = await this.resolveDefaultAnnounceChannel(guildId);
+    if (fallbackChannelId) {
+      this.logger.log(
+        `[RoomNotify] 길드 ${guildId}: 공지 채널 미지정 → 기본 채널로 발송 (/nexus setannounce 권장)`,
+      );
+      return { guildId, channelId: fallbackChannelId };
     }
 
     this.logger.warn(
-      `[RoomNotify] room ${roomId}: 중앙 채널(DISCORD_NOTIFICATION_CHANNEL_ID) 미설정 & 대기실 채널 없음 → 알림 스킵`,
+      `[RoomNotify] 길드 ${guildId}: 보낼 수 있는 텍스트 채널을 찾지 못함 → 알림 스킵`,
     );
     return null;
   }

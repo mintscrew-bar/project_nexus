@@ -25,6 +25,8 @@ import {
   TextInputStyle,
   ActionRowBuilder,
   VoiceState,
+  ChannelType,
+  TextChannel,
   ContainerBuilder,
   SectionBuilder,
   SeparatorBuilder,
@@ -93,6 +95,8 @@ const RULES_TITLE_INPUT_ID = "nexus_rules_title";
 const RULES_CONTENT_INPUT_ID = "nexus_rules_content";
 const VERIFY_MODAL_ID = "nexus_verify_modal";
 const VERIFY_BUTTON_ID = "nexus_verify_start_button";
+/** 안내 메시지가 올라온 채널을 그대로 공지 채널로 지정하는 버튼 */
+const SET_ANNOUNCE_BUTTON_ID = "nexus_set_announce_here_button";
 const VERIFY_RIOT_ID_INPUT_ID = "nexus_verify_riot_id";
 const ROOM_NOTIFICATION_CACHE_PREFIX = "discord:room-notification:";
 const ROOM_NOTIFICATION_TTL_SECONDS = 24 * 60 * 60;
@@ -281,9 +285,219 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
         data: { guildName: guild.name },
       });
       console.log(`[DiscordBot] 길드 연동 확인: ${guild.name} (${guild.id})`);
+
+      // 공지 채널이 없으면 내전이 열려도 멤버들이 볼 수 없다. 들어오자마자 안내한다.
+      if (!link.announceChannelId) {
+        await this.sendAnnounceSetupOnboarding(guild.id);
+      }
     } catch (err: any) {
       console.warn(`[DiscordBot] guildCreate 처리 실패: ${err?.message}`);
     }
+  }
+
+  // ────────────────────────────────────────────────────────────────
+  // 내전 모집 공지 채널
+  //
+  // 이 기능이 생기기 전에는 홈 길드만 중앙 공지 채널(env)을 썼고, 외부 길드는
+  // 방을 만든 직후 생성되는 "대기실" 음성 채널로 공지가 갔다. 아무도 보지 않는
+  // 곳이라 연동된 커뮤니티는 내전이 열린 사실 자체를 알 수 없었다.
+  // ────────────────────────────────────────────────────────────────
+
+  /** 공지 채널 설정 안내. 온보딩과 백필에서 함께 쓴다. */
+  buildAnnounceSetupNotice(): {
+    content: string;
+    components: ActionRowBuilder<ButtonBuilder>[];
+  } {
+    const content = [
+      "**NEXUS 내전 모집 공지 채널을 지정해주세요**",
+      "",
+      "지정하지 않으면 이 서버 멤버들이 내전이 열린 것을 제때 보지 못합니다.",
+      "",
+      "아래 버튼을 누르면 **이 채널**이 공지 채널이 됩니다.",
+      "다른 채널로 지정하려면 `/nexus setannounce channel:#원하는채널`",
+      "",
+      "(서버 관리 권한이 있는 분만 설정할 수 있습니다)",
+    ].join("\n");
+
+    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder()
+        .setCustomId(SET_ANNOUNCE_BUTTON_ID)
+        .setLabel("이 채널로 지정")
+        .setStyle(ButtonStyle.Primary),
+    );
+
+    return { content, components: [row] };
+  }
+
+  /**
+   * 공지 채널 지정 공통 처리. 슬래시 커맨드와 버튼이 같은 규칙을 쓰도록 모았다.
+   * 지정해도 봇이 글을 못 쓰면 의미가 없으므로 저장 전에 권한을 확인한다.
+   */
+  private async applyAnnounceChannel(
+    guild: Guild,
+    channel: TextChannel,
+  ): Promise<string> {
+    const me = guild.members.me ?? (await guild.members.fetchMe());
+    const canPost = channel
+      .permissionsFor(me)
+      ?.has(PermissionFlagsBits.ViewChannel | PermissionFlagsBits.SendMessages);
+    if (!canPost) {
+      return `❌ <#${channel.id}> 에 글을 쓸 권한이 없습니다. 봇에게 채널 보기/메시지 보내기 권한을 준 뒤 다시 시도해주세요.`;
+    }
+
+    const link = await this.prisma.discordGuildLink.findUnique({
+      where: { guildId: guild.id },
+      select: { status: true },
+    });
+    if (!link) {
+      return "❌ 이 서버는 아직 NEXUS에 연동되지 않았습니다. 웹에서 서버 연동을 먼저 진행해주세요.";
+    }
+
+    await this.prisma.discordGuildLink.update({
+      where: { guildId: guild.id },
+      data: { announceChannelId: channel.id },
+    });
+
+    return [
+      `✅ 내전 모집 공지 채널을 <#${channel.id}> 로 지정했습니다.`,
+      link.status === "ACTIVE"
+        ? "이제 이 서버에서 내전이 열리면 해당 채널로 공지가 올라갑니다."
+        : "⚠️ 서버 연동이 아직 활성화(ACTIVE) 상태가 아닙니다. 활성화 후부터 공지가 발송됩니다.",
+    ].join("\n");
+  }
+
+  private async handleSetAnnounceButton(interaction: ButtonInteraction) {
+    if (
+      !interaction.memberPermissions?.has(PermissionFlagsBits.Administrator) &&
+      !interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)
+    ) {
+      await interaction.reply({
+        content: "❌ 서버 관리 권한이 있어야 공지 채널을 지정할 수 있습니다.",
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const channel = interaction.channel as TextChannel | null;
+    if (
+      !interaction.guild ||
+      !channel ||
+      channel.type !== ChannelType.GuildText
+    ) {
+      await interaction.reply({
+        content: "❌ 텍스트 채널에서만 사용할 수 있습니다.",
+        ephemeral: true,
+      });
+      return;
+    }
+
+    await interaction.deferReply({ ephemeral: true });
+    const message = await this.applyAnnounceChannel(interaction.guild, channel);
+    await interaction.editReply(message);
+  }
+
+  /** 길드에서 봇이 실제로 글을 쓸 수 있는 채널을 찾는다. 온보딩 안내 발송용. */
+  private async findPostableChannel(guild: Guild): Promise<TextChannel | null> {
+    const me = guild.members.me ?? (await guild.members.fetchMe());
+    const canPost = (channel: TextChannel) =>
+      Boolean(
+        channel
+          .permissionsFor(me)
+          ?.has(
+            PermissionFlagsBits.ViewChannel | PermissionFlagsBits.SendMessages,
+          ),
+      );
+
+    const systemChannel = guild.systemChannel;
+    if (systemChannel && canPost(systemChannel)) return systemChannel;
+
+    const channels = await guild.channels.fetch();
+    for (const channel of channels.values()) {
+      if (channel?.type === ChannelType.GuildText && canPost(channel)) {
+        return channel;
+      }
+    }
+    return null;
+  }
+
+  /** 봇이 서버에 들어온 직후 공지 채널 설정을 안내한다. */
+  private async sendAnnounceSetupOnboarding(guildId: string): Promise<boolean> {
+    try {
+      const guild = await this.client.guilds.fetch(guildId);
+      const channel = await this.findPostableChannel(guild);
+      if (!channel) {
+        console.warn(
+          `[DiscordBot] 길드 ${guildId}: 안내를 보낼 텍스트 채널을 찾지 못함`,
+        );
+        return false;
+      }
+      await channel.send(this.buildAnnounceSetupNotice());
+      return true;
+    } catch (err: any) {
+      console.warn(
+        `[DiscordBot] 길드 ${guildId} 공지 채널 안내 실패: ${err?.message}`,
+      );
+      return false;
+    }
+  }
+
+  /** 공지 채널이 아직 없는 ACTIVE 길드 전체에 안내를 1회 보낸다. (백필) */
+  async notifyGuildsMissingAnnounceChannel(): Promise<{
+    total: number;
+    notified: number;
+  }> {
+    const links = await this.prisma.discordGuildLink.findMany({
+      where: { status: "ACTIVE", announceChannelId: null },
+      select: { guildId: true, guildName: true },
+    });
+
+    let notified = 0;
+    for (const link of links) {
+      const ok = await this.sendAnnounceSetupOnboarding(link.guildId);
+      if (ok) notified++;
+      // 길드가 많아도 Discord 레이트 리밋에 걸리지 않게 간격을 둔다.
+      await new Promise((resolve) => setTimeout(resolve, 1_000));
+    }
+
+    console.log(
+      `[DiscordBot] 공지 채널 미설정 길드 안내: ${notified}/${links.length}건 발송`,
+    );
+    return { total: links.length, notified };
+  }
+
+  private async handleSetAnnounceCommand(
+    interaction: ChatInputCommandInteraction,
+  ) {
+    if (!this.hasRulesPublishPermission(interaction)) {
+      await interaction.reply({
+        content: "❌ 서버 관리 권한이 있어야 공지 채널을 지정할 수 있습니다.",
+        ephemeral: true,
+      });
+      return;
+    }
+    if (!interaction.guild) {
+      await interaction.reply({
+        content: "❌ 서버 안에서만 사용할 수 있는 명령어입니다.",
+        ephemeral: true,
+      });
+      return;
+    }
+
+    await interaction.deferReply({ ephemeral: true });
+
+    // 옵션을 비우면 명령을 실행한 채널을 쓴다 — 가장 흔한 사용 방식이다.
+    const option = interaction.options.getChannel("channel");
+    const target = (option ?? interaction.channel) as TextChannel | null;
+
+    if (!target || target.type !== ChannelType.GuildText) {
+      await interaction.editReply(
+        "❌ 텍스트 채널만 공지 채널로 지정할 수 있습니다.",
+      );
+      return;
+    }
+
+    const message = await this.applyAnnounceChannel(interaction.guild, target);
+    await interaction.editReply(message);
   }
 
   /**
@@ -516,6 +730,18 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
           sub
             .setName("setupverifypanel")
             .setDescription("현재 채널에 인증 패널(버튼+모달) 게시"),
+        )
+        .addSubcommand((sub) =>
+          sub
+            .setName("setannounce")
+            .setDescription("내전 모집 공지를 받을 채널 지정")
+            .addChannelOption((opt) =>
+              opt
+                .setName("channel")
+                .setDescription("공지를 받을 텍스트 채널 (비우면 현재 채널)")
+                .addChannelTypes(ChannelType.GuildText)
+                .setRequired(false),
+            ),
         ),
     ].map((cmd) => cmd.toJSON());
 
@@ -562,6 +788,9 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
     if (interaction.isButton()) {
       if (interaction.customId === VERIFY_BUTTON_ID) {
         await this.handleVerifyButton(interaction);
+      }
+      if (interaction.customId === SET_ANNOUNCE_BUTTON_ID) {
+        await this.handleSetAnnounceButton(interaction);
       }
       return;
     }
@@ -614,6 +843,9 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
             break;
           case "setuproles":
             await this.handleSetupRolesCommand(interaction);
+            break;
+          case "setannounce":
+            await this.handleSetAnnounceCommand(interaction);
             break;
           case "setupverifypanel":
             await this.handleSetupVerifyPanelCommand(interaction);

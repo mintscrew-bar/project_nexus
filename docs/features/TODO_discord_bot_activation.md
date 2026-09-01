@@ -95,12 +95,13 @@ const lobbyChannelId = room.discordChannels?.[0]?.channelId;
 
 원인 1·2를 막는다. 이것만 해도 잠재 도달 인원이 11배가 된다.
 
-- [ ] Task 1: `DiscordGuildLink`에 `announceChannelId` 추가 (마이그레이션)
-- [ ] Task 2: `/nexus setup announce #채널` 슬래시 커맨드 — 서버 관리자가 모집 공지 채널 지정
-- [ ] Task 3: `getRoomNotificationTarget()`이 외부 길드도 `announceChannelId`로 보내도록 수정
+- [x] Task 1: `DiscordGuildLink`에 `announceChannelId` 추가 (마이그레이션)
+- [x] Task 2: `/nexus setannounce [channel]` 슬래시 커맨드 — 서버 관리자가 모집 공지 채널 지정
+      (기존 `setuproles`·`setupverifypanel` 네이밍에 맞춤. 채널 생략 시 실행한 채널로 지정)
+- [x] Task 3: `getRoomNotificationTarget()`이 외부 길드도 `announceChannelId`로 보내도록 수정
       (미설정 길드는 시스템 채널 → 첫 텍스트 채널 순으로 폴백, 음성 채널 폴백은 제거)
-- [ ] Task 4: 봇 초대 직후 온보딩 DM/메시지에 "공지 채널을 지정하세요" 안내 + 버튼
-- [ ] Task 5: 기존 연동 길드 11곳에 공지 채널 설정 요청 1회 발송 (백필 성격)
+- [x] Task 4: 봇 초대 직후 온보딩 메시지에 "공지 채널을 지정하세요" 안내 + `이 채널로 지정` 버튼
+- [x] Task 5: 기존 연동 길드 11곳에 공지 채널 설정 요청 1회 발송 (백필 성격)
 
 ### Phase 2 — 모집 메시지 자체를 참가 동선으로
 

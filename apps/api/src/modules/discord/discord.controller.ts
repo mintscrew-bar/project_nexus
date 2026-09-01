@@ -1,6 +1,7 @@
 import {
   Controller,
   Get,
+  Post,
   Query,
   Res,
   UseGuards,
@@ -10,6 +11,9 @@ import {
 import { Response } from "express";
 import { ConfigService } from "@nestjs/config";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { RolesGuard } from "../auth/guards/roles.guard";
+import { Roles } from "../auth/decorators/roles.decorator";
+import { UserRole } from "@nexus/database";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { AuthService } from "../auth/auth.service";
 import { DiscordService } from "./discord.service";
@@ -268,5 +272,24 @@ export class DiscordController {
       this.logger.error(`디스코드 길드 연동 실패: ${error.message}`);
       return res.redirect(`${appUrl}/settings?discord_guild=error`);
     }
+  }
+
+  /**
+   * 공지 채널이 없는 ACTIVE 길드 전체에 설정 안내를 1회 발송한다.
+   *
+   * announceChannelId 도입 이전에 연동된 길드들은 공지 채널이 비어 있어
+   * 내전 모집 알림이 사실상 전달되지 않는다. 그 길드들에 안내를 보내기 위한
+   * 일회성 운영 작업이라 관리자 전용이다.
+   */
+  @Post("guild-links/notify-announce-setup")
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  async notifyAnnounceSetup() {
+    const result =
+      await this.discordBotService.notifyGuildsMissingAnnounceChannel();
+    this.logger.log(
+      `공지 채널 미설정 길드 안내 발송: ${result.notified}/${result.total}`,
+    );
+    return result;
   }
 }

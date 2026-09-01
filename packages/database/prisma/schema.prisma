@@ -487,11 +487,18 @@ model RoomDiscordChannel {
 // 멀티 길드 지원: 넥서스 봇을 외부 디스코드 서버에 연동한 기록.
 // guildId 1개당 1행(소유권/활성화 상태). Room.discordGuildId는 ACTIVE 링크에서 도출.
 model DiscordGuildLink {
-  id          String                 @id @default(cuid())
-  guildId     String                 @unique
-  guildName   String?
-  ownerId     String
-  clanId      String?
+  id        String  @id @default(cuid())
+  guildId   String  @unique
+  guildName String?
+  ownerId   String
+  clanId    String?
+
+  /// 내전 모집 공지를 보낼 텍스트 채널.
+  /// 없으면 시스템 채널 → 봇이 쓸 수 있는 첫 텍스트 채널 순으로 폴백한다.
+  /// 이 필드가 생기기 전에는 외부 길드의 모집 공지가 방 대기실(음성) 채널로 가서
+  /// 사실상 아무도 볼 수 없었다.
+  announceChannelId String?
+
   status      DiscordGuildLinkStatus @default(PENDING)
   activatedAt DateTime?
   createdAt   DateTime               @default(now())
