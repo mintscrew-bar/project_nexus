@@ -205,6 +205,68 @@ export class DiscordVoiceService {
   }
 
   /**
+   * 모집 공지를 보낼 길드 전체를 정한다.
+   *
+   * 원 서버 1곳 + (조건을 만족하면) 연동된 다른 서버들.
+   * 서버 하나로는 5v5 정원 10명을 채우기 어렵다는 실측에서 나온 기능이다.
+   *
+   * 타 서버에는 관리자가 공지 채널을 **명시적으로 지정한 경우에만** 보낸다.
+   * 자기 서버 내전도 아닌 글을 임의 채널에 떨구지 않기 위한 안전장치다.
+   * (원 서버는 기존대로 시스템 채널 폴백을 쓴다)
+   */
+  async getRoomAnnounceTargets(roomId: string): Promise<
+    Array<{
+      guildId: string;
+      channelId: string;
+      isOrigin: boolean;
+      guildName: string | null;
+    }>
+  > {
+    const origin = await this.getRoomNotificationTarget(roomId);
+    const targets: Array<{
+      guildId: string;
+      channelId: string;
+      isOrigin: boolean;
+      guildName: string | null;
+    }> = [];
+
+    if (origin) {
+      targets.push({ ...origin, isOrigin: true, guildName: null });
+    }
+
+    const room = await this.prisma.room.findUnique({
+      where: { id: roomId },
+      select: { crossGuildAnnounce: true, isPrivate: true },
+    });
+
+    // 비공개 방은 호스트 설정과 무관하게 밖으로 내보내지 않는다.
+    if (!room || room.isPrivate || !room.crossGuildAnnounce) {
+      return targets;
+    }
+
+    const others = await this.prisma.discordGuildLink.findMany({
+      where: {
+        status: "ACTIVE",
+        acceptsCrossGuildRooms: true,
+        announceChannelId: { not: null },
+        ...(origin ? { guildId: { not: origin.guildId } } : {}),
+      },
+      select: { guildId: true, guildName: true, announceChannelId: true },
+    });
+
+    for (const link of others) {
+      targets.push({
+        guildId: link.guildId,
+        channelId: link.announceChannelId!,
+        isOrigin: false,
+        guildName: link.guildName,
+      });
+    }
+
+    return targets;
+  }
+
+  /**
    * 채널 ID로부터 소속 길드 ID를 해석한다. RoomDiscordChannel → Room.discordGuildId
    * 순으로 찾고, 없으면 홈 서버(env)로 폴백한다.
    */

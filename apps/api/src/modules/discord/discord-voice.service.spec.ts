@@ -192,3 +192,97 @@ describe("DiscordVoiceService", () => {
     });
   });
 });
+
+describe("DiscordVoiceService.getRoomAnnounceTargets", () => {
+  function build(opts: {
+    room: { crossGuildAnnounce: boolean; isPrivate: boolean } | null;
+    others?: Array<{
+      guildId: string;
+      guildName: string | null;
+      announceChannelId: string;
+    }>;
+  }) {
+    const prisma = {
+      room: {
+        findUnique: jest
+          .fn()
+          // getRoomNotificationTarget이 먼저 호출된다
+          .mockResolvedValueOnce({ discordGuildId: "origin-guild" })
+          .mockResolvedValue(opts.room),
+      },
+      discordGuildLink: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({ announceChannelId: "origin-channel" }),
+        findMany: jest.fn().mockResolvedValue(opts.others ?? []),
+      },
+    };
+    const config = { get: jest.fn().mockReturnValue(undefined) };
+    const service = new DiscordVoiceService(config as any, prisma as any);
+    return { service, prisma };
+  }
+
+  it("공개 방은 원 서버와 교차 수신 서버 모두에 공지한다", async () => {
+    const { service } = build({
+      room: { crossGuildAnnounce: true, isPrivate: false },
+      others: [
+        { guildId: "g2", guildName: "롤파크", announceChannelId: "c2" },
+        { guildId: "g3", guildName: "내전내전", announceChannelId: "c3" },
+      ],
+    });
+
+    const targets = await service.getRoomAnnounceTargets("room-1");
+
+    expect(targets).toHaveLength(3);
+    expect(targets[0]).toMatchObject({
+      guildId: "origin-guild",
+      isOrigin: true,
+    });
+    expect(targets.slice(1).map((t) => t.guildId)).toEqual(["g2", "g3"]);
+    expect(targets[1].guildName).toBe("롤파크");
+  });
+
+  it("비공개 방은 호스트 설정과 무관하게 밖으로 내보내지 않는다", async () => {
+    const { service } = build({
+      room: { crossGuildAnnounce: true, isPrivate: true },
+      others: [{ guildId: "g2", guildName: "롤파크", announceChannelId: "c2" }],
+    });
+
+    const targets = await service.getRoomAnnounceTargets("room-1");
+
+    expect(targets).toHaveLength(1);
+    expect(targets[0].isOrigin).toBe(true);
+  });
+
+  it("호스트가 교차 공지를 끄면 원 서버에만 올린다", async () => {
+    const { service } = build({
+      room: { crossGuildAnnounce: false, isPrivate: false },
+      others: [{ guildId: "g2", guildName: "롤파크", announceChannelId: "c2" }],
+    });
+
+    const targets = await service.getRoomAnnounceTargets("room-1");
+
+    expect(targets).toHaveLength(1);
+  });
+
+  it("타 서버는 공지 채널을 명시 지정한 곳에만 보낸다", async () => {
+    // 자기 서버 내전도 아닌 글을 임의 채널에 떨구지 않기 위한 안전장치.
+    const { service, prisma } = build({
+      room: { crossGuildAnnounce: true, isPrivate: false },
+      others: [],
+    });
+
+    await service.getRoomAnnounceTargets("room-1");
+
+    expect(prisma.discordGuildLink.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          status: "ACTIVE",
+          acceptsCrossGuildRooms: true,
+          announceChannelId: { not: null },
+          guildId: { not: "origin-guild" },
+        }),
+      }),
+    );
+  });
+});

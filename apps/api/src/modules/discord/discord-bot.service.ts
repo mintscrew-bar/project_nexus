@@ -129,6 +129,10 @@ interface RoomNotifEntry {
   teamMode: string;
   isPrivate: boolean;
   voiceChannelId?: string;
+  /** 방이 생성된 서버의 공지인지. false면 다른 서버로 퍼진 사본이다. */
+  isOrigin?: boolean;
+  /** 사본에 표시할 원 서버 이름 */
+  originGuildName?: string | null;
 }
 
 @Injectable()
@@ -137,7 +141,7 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
   private rest: REST;
   private voiceService: DiscordVoiceService | null = null;
   // 방 생성 알림 메시지 참조 (roomId → 메시지 정보), 재시작 시 초기화됨
-  private readonly roomNotifMap = new Map<string, RoomNotifEntry>();
+  private readonly roomNotifMap = new Map<string, RoomNotifEntry[]>();
   // 같은 방의 참가/퇴장 편집이 역순으로 완료되지 않도록 직렬화한다.
   private readonly roomNotifUpdateQueue = new Map<string, Promise<void>>();
 
@@ -339,6 +343,7 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
     guild: Guild,
     channel: TextChannel,
     roleId?: string | null,
+    acceptsCrossGuild?: boolean | null,
   ): Promise<string> {
     const me = guild.members.me ?? (await guild.members.fetchMe());
     const canPost = channel
@@ -360,15 +365,23 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
       where: { guildId: guild.id },
       data: {
         announceChannelId: channel.id,
-        // 역할을 넘기지 않으면 기존 설정을 건드리지 않는다.
-        // 채널만 바꾸려던 사람이 역할 설정을 잃지 않게 한다.
+        // 넘기지 않은 항목은 기존 설정을 건드리지 않는다.
+        // 채널만 바꾸려던 사람이 다른 설정을 잃지 않게 한다.
         ...(roleId !== undefined ? { announceRoleId: roleId } : {}),
+        ...(acceptsCrossGuild !== undefined && acceptsCrossGuild !== null
+          ? { acceptsCrossGuildRooms: acceptsCrossGuild }
+          : {}),
       },
     });
 
     return [
       `✅ 내전 모집 공지 채널을 <#${channel.id}> 로 지정했습니다.`,
       roleId ? `📢 공지 시 <@&${roleId}> 를 멘션합니다.` : null,
+      acceptsCrossGuild === false
+        ? "🚫 다른 서버 내전 공지는 받지 않습니다."
+        : acceptsCrossGuild === true
+          ? "🌐 다른 서버에서 열린 내전 공지도 받습니다."
+          : null,
       link.status === "ACTIVE"
         ? "이제 이 서버에서 내전이 열리면 해당 채널로 공지가 올라갑니다."
         : "⚠️ 서버 연동이 아직 활성화(ACTIVE) 상태가 아닙니다. 활성화 후부터 공지가 발송됩니다.",
@@ -508,10 +521,12 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
     }
 
     const role = interaction.options.getRole("role");
+    const crossGuild = interaction.options.getBoolean("crossguild");
     const message = await this.applyAnnounceChannel(
       interaction.guild,
       target,
       role ? role.id : undefined,
+      crossGuild,
     );
     await interaction.editReply(message);
   }
@@ -762,6 +777,14 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
               opt
                 .setName("role")
                 .setDescription("모집 공지에 멘션할 역할 (선택)")
+                .setRequired(false),
+            )
+            .addBooleanOption((opt) =>
+              opt
+                .setName("crossguild")
+                .setDescription(
+                  "다른 서버에서 열린 내전 공지도 받을지 (기본: 받음)",
+                )
                 .setRequired(false),
             ),
         ),
@@ -2305,6 +2328,7 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
       isPrivate: boolean;
       participants: string[];
       voiceChannelId?: string | null;
+      originGuildName?: string | null;
     },
   ): Promise<string | null> {
     const guild = await this.client.guilds.fetch(guildId);
@@ -2321,11 +2345,14 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
       args.teamMode,
       args.isPrivate,
       args.participants,
-      args.voiceChannelId
+      // 사본에는 음성채널 버튼을 달지 않는다 — 그 서버 멤버는 원 서버
+      // 음성채널에 들어갈 수 없어 눌러도 아무 일이 없다.
+      !args.originGuildName && args.voiceChannelId
         ? { guildId, channelId: args.voiceChannelId }
         : undefined,
       emojis,
       mentionRoleId,
+      args.originGuildName ?? null,
     );
 
     const message = await channel.send(payload);
@@ -2430,12 +2457,13 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
     return null;
   }
 
-  storeRoomNotification(roomId: string, entry: RoomNotifEntry) {
-    this.roomNotifMap.set(roomId, entry);
+  /** 방 하나가 여러 서버에 공지되므로 엔트리를 배열로 보관한다. */
+  storeRoomNotifications(roomId: string, entries: RoomNotifEntry[]) {
+    this.roomNotifMap.set(roomId, entries);
     void this.redis
       .set(
         `${ROOM_NOTIFICATION_CACHE_PREFIX}${roomId}`,
-        JSON.stringify(entry),
+        JSON.stringify(entries),
         ROOM_NOTIFICATION_TTL_SECONDS,
       )
       .catch((error: unknown) => {
@@ -2445,9 +2473,14 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
       });
   }
 
-  private async getRoomNotification(
+  /** 단일 엔트리 저장 (기존 호출부 호환) */
+  storeRoomNotification(roomId: string, entry: RoomNotifEntry) {
+    this.storeRoomNotifications(roomId, [entry]);
+  }
+
+  private async getRoomNotifications(
     roomId: string,
-  ): Promise<RoomNotifEntry | null> {
+  ): Promise<RoomNotifEntry[]> {
     const inMemory = this.roomNotifMap.get(roomId);
     if (inMemory) return inMemory;
 
@@ -2455,15 +2488,17 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
       const cached = await this.redis.get(
         `${ROOM_NOTIFICATION_CACHE_PREFIX}${roomId}`,
       );
-      if (!cached) return null;
-      const entry = JSON.parse(cached) as RoomNotifEntry;
-      this.roomNotifMap.set(roomId, entry);
-      return entry;
+      if (!cached) return [];
+      // 배포 시점에 이미 캐시에 있던 방은 단일 객체 형태다. 둘 다 받아준다.
+      const parsed = JSON.parse(cached) as RoomNotifEntry | RoomNotifEntry[];
+      const entries = Array.isArray(parsed) ? parsed : [parsed];
+      this.roomNotifMap.set(roomId, entries);
+      return entries;
     } catch (error: unknown) {
       console.warn(
         `[DiscordBot] 방 알림 캐시 조회 실패 (${roomId}): ${error instanceof Error ? error.message : String(error)}`,
       );
-      return null;
+      return [];
     }
   }
 
@@ -2490,8 +2525,8 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
     roomId: string,
     fallbackParticipants?: string[],
   ): Promise<void> {
-    const notif = await this.getRoomNotification(roomId);
-    if (!notif) return;
+    const notifs = await this.getRoomNotifications(roomId);
+    if (notifs.length === 0) return;
     try {
       const room = await this.prisma.room.findUnique({
         where: { id: roomId },
@@ -2513,49 +2548,59 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
           },
         },
       });
-      const latestNotif: RoomNotifEntry = room
-        ? {
-            ...notif,
-            roomName: room.name,
-            hostName: room.host.username,
-            maxPlayers: room.maxParticipants,
-            teamMode: room.teamMode,
-            isPrivate: room.isPrivate,
-            voiceChannelId:
-              room.discordChannels[0]?.channelId ?? notif.voiceChannelId,
-          }
-        : notif;
       const latestParticipants = room
         ? room.participants.map((participant) => participant.user.username)
         : (fallbackParticipants ?? []);
 
-      this.storeRoomNotification(roomId, latestNotif);
-      const guild = await this.client.guilds.fetch(notif.guildId);
-      const channel = await guild.channels.fetch(notif.channelId);
-      if (!channel?.isTextBased()) return;
-      const message = await channel.messages.fetch(notif.messageId);
-      const emojis = await this.emojiService.ensureRecruitEmojis(guild);
-      // 갱신에서는 역할을 멘션하지 않는다. 인원이 바뀔 때마다 핑이 가면
-      // 알림 역할이 곧 소음이 되어 사람들이 역할을 떼어버린다.
-      const payload = this.buildRoomRecruitMessage(
-        roomId,
-        latestNotif.roomName,
-        latestNotif.hostName,
-        latestNotif.maxPlayers,
-        latestNotif.teamMode,
-        latestNotif.isPrivate,
-        latestParticipants,
-        latestNotif.voiceChannelId
+      const latestNotifs: RoomNotifEntry[] = notifs.map((notif) =>
+        room
           ? {
-              guildId: latestNotif.guildId,
-              channelId: latestNotif.voiceChannelId,
+              ...notif,
+              roomName: room.name,
+              hostName: room.host.username,
+              maxPlayers: room.maxParticipants,
+              teamMode: room.teamMode,
+              isPrivate: room.isPrivate,
+              voiceChannelId:
+                room.discordChannels[0]?.channelId ?? notif.voiceChannelId,
             }
-          : undefined,
-        emojis,
+          : notif,
       );
-      // V2 로 전환하기 전에 보낸 메시지는 플래그를 나중에 붙일 수 없어 edit 이
-      // 실패한다. 그 방들은 아래 catch 로 떨어지고, 다음 모집부터 새 형식이 된다.
-      await message.edit(payload);
+      this.storeRoomNotifications(roomId, latestNotifs);
+
+      // 한 서버 갱신이 실패해도 나머지는 갱신되어야 한다.
+      // (봇 추방·채널 삭제·권한 회수는 서버마다 개별적으로 일어난다)
+      await Promise.allSettled(
+        latestNotifs.map(async (notif) => {
+          const guild = await this.client.guilds.fetch(notif.guildId);
+          const channel = await guild.channels.fetch(notif.channelId);
+          if (!channel?.isTextBased()) return;
+          const message = await channel.messages.fetch(notif.messageId);
+          const emojis = await this.emojiService.ensureRecruitEmojis(guild);
+          // 갱신에서는 역할을 멘션하지 않는다. 인원이 바뀔 때마다 핑이 가면
+          // 알림 역할이 곧 소음이 되어 사람들이 역할을 떼어버린다.
+          const payload = this.buildRoomRecruitMessage(
+            roomId,
+            notif.roomName,
+            notif.hostName,
+            notif.maxPlayers,
+            notif.teamMode,
+            notif.isPrivate,
+            latestParticipants,
+            // 타 서버 사본에는 음성채널 버튼을 달지 않는다. 그 서버 멤버는
+            // 원 서버 음성채널에 들어갈 수 없어 눌러도 아무 일이 없다.
+            notif.isOrigin !== false && notif.voiceChannelId
+              ? { guildId: notif.guildId, channelId: notif.voiceChannelId }
+              : undefined,
+            emojis,
+            null,
+            notif.isOrigin === false ? notif.originGuildName : null,
+          );
+          // V2 로 전환하기 전에 보낸 메시지는 플래그를 나중에 붙일 수 없어 edit 이
+          // 실패한다. 그 방들은 다음 모집부터 새 형식이 된다.
+          await message.edit(payload);
+        }),
+      );
     } catch (err: any) {
       console.warn(
         `[DiscordBot] 방 알림 업데이트 실패 (${roomId}): ${err?.message}`,
@@ -2680,6 +2725,8 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
     voiceChannel?: { guildId: string; channelId: string },
     emojis: EmojiMap = {},
     mentionRoleId?: string | null,
+    /** 타 서버로 퍼진 사본일 때 원 서버 이름. null이면 원 서버 공지다. */
+    originGuildName?: string | null,
   ): {
     components: ContainerBuilder[];
     flags: number;
@@ -2767,6 +2814,11 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
       `## ${isPrivate ? "🔒 " : ""}${roomName}`,
       `${modeIcon ? `${modeIcon} ` : ""}${modeLabel}  ·  방장 **${hostName}**`,
     ];
+    // 다른 서버에서 열린 내전임을 밝힌다. 출처를 숨기면 우리 서버 공지로
+    // 오해하고 들어왔다가 낯선 사람들과 만나게 된다.
+    if (originGuildName) {
+      headerLines.push(`-# 🌐 **${originGuildName}** 서버에서 열린 내전입니다`);
+    }
     container.addSectionComponents(
       new SectionBuilder()
         .addTextDisplayComponents(
@@ -2849,7 +2901,13 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
     // 임베드 footer 대응 — `-# ` 는 작은 회색 텍스트로 렌더된다.
     container.addTextDisplayComponents(
       new TextDisplayBuilder().setContent(
-        "-# 참가자 변경 시 자동으로 업데이트됩니다.",
+        originGuildName
+          ? // 사본에서는 음성채널 버튼을 뺐으므로 어디로 가야 하는지 알려준다.
+            [
+              "-# 참가자 변경 시 자동으로 업데이트됩니다.",
+              `-# 음성 채널은 **${originGuildName}** 서버에 있습니다. 참가 후 로비에서 안내를 확인하세요.`,
+            ].join("\n")
+          : "-# 참가자 변경 시 자동으로 업데이트됩니다.",
       ),
     );
 

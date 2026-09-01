@@ -1096,29 +1096,55 @@ export class RoomService {
     // Send Discord notification (if bot is configured)
     try {
       if (this.discordBotService) {
-        const notificationTarget =
-          await this.discordVoiceService?.getRoomNotificationTarget?.(room.id);
+        // 사본에 "어느 서버에서 열린 내전인지"를 표시하기 위한 원 서버 이름.
+        const originLink = room.discordGuildId
+          ? await this.prisma.discordGuildLink.findUnique({
+              where: { guildId: room.discordGuildId },
+              select: { guildName: true },
+            })
+          : null;
+        const originGuildName = originLink?.guildName ?? null;
 
-        if (notificationTarget) {
-          const messageId = await this.discordBotService.sendRoomRecruitMessage(
-            notificationTarget.guildId,
-            notificationTarget.channelId,
-            {
-              roomId: room.id,
-              roomName: room.name,
-              hostName: room.host.username,
-              maxPlayers: room.maxParticipants,
-              teamMode: room.teamMode,
-              isPrivate: room.isPrivate,
-              participants: [room.host.username], // 방 생성 시 방장 1명
-              voiceChannelId: lobbyVoiceChannelId,
-            },
-          );
+        // 서버 하나로는 5v5 정원 10명을 채우기 어렵다(실측: 방 4개 최대 참가 5명).
+        // 원 서버 + 교차 공지를 허용한 연동 서버들에 함께 모집을 올린다.
+        const targets =
+          (await this.discordVoiceService?.getRoomAnnounceTargets?.(room.id)) ??
+          [];
 
-          if (messageId) {
-            this.discordBotService.storeRoomNotification(room.id, {
-              guildId: notificationTarget.guildId,
-              channelId: notificationTarget.channelId,
+        // 한 서버 발송이 실패해도 나머지는 올라가야 한다.
+        const results = await Promise.allSettled(
+          targets.map(async (target: any) => {
+            const messageId =
+              await this.discordBotService.sendRoomRecruitMessage(
+                target.guildId,
+                target.channelId,
+                {
+                  roomId: room.id,
+                  roomName: room.name,
+                  hostName: room.host.username,
+                  maxPlayers: room.maxParticipants,
+                  teamMode: room.teamMode,
+                  isPrivate: room.isPrivate,
+                  participants: [room.host.username], // 방 생성 시 방장 1명
+                  voiceChannelId: lobbyVoiceChannelId,
+                  // 사본에는 원 서버 이름을 표시한다. 출처를 숨기면 우리 서버
+                  // 공지로 오해하고 들어왔다가 낯선 사람들과 만나게 된다.
+                  originGuildName: target.isOrigin
+                    ? null
+                    : (originGuildName ?? null),
+                },
+              );
+
+            if (!messageId) {
+              this.logger.warn(
+                `[RoomNotify] room ${room.id}: 전송 실패 (guild=${target.guildId} channel=${target.channelId}) — 채널 미존재/텍스트 아님(봇 권한 포함)`,
+              );
+              return null;
+            }
+
+            return {
+              guildId: target.guildId,
+              channelId: target.channelId,
               messageId,
               roomName: room.name,
               hostName: room.host.username,
@@ -1126,13 +1152,24 @@ export class RoomService {
               teamMode: room.teamMode,
               isPrivate: room.isPrivate,
               voiceChannelId: lobbyVoiceChannelId,
-            });
-          } else {
-            // 대상은 찾았으나 전송 실패 — 채널이 없거나 텍스트 채널이 아님(봇 권한 포함)
-            this.logger.warn(
-              `[RoomNotify] room ${room.id}: 임베드 전송 실패 (guild=${notificationTarget.guildId} channel=${notificationTarget.channelId}) — 채널 미존재/텍스트 아님/권한 확인`,
-            );
-          }
+              isOrigin: target.isOrigin,
+              originGuildName: target.isOrigin ? null : originGuildName,
+            };
+          }),
+        );
+
+        const entries = results
+          .filter(
+            (r): r is PromiseFulfilledResult<any> =>
+              r.status === "fulfilled" && r.value !== null,
+          )
+          .map((r) => r.value);
+
+        if (entries.length > 0) {
+          this.discordBotService.storeRoomNotifications(room.id, entries);
+          this.logger.log(
+            `[RoomNotify] room ${room.id}: ${entries.length}/${targets.length}개 서버에 모집 공지 발송`,
+          );
         }
       }
     } catch (error) {

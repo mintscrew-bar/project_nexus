@@ -386,6 +386,10 @@ model ChampionPreference {
 }
 
 model Room {
+  /// 이 방의 모집 공지를 연동된 다른 서버에도 보낼지.
+  /// 비공개 방은 이 값과 무관하게 원 서버에만 공지한다.
+  crossGuildAnnounce Boolean @default(true)
+
   id                      String                @id @default(cuid())
   name                    String
   hostId                  String
@@ -503,6 +507,11 @@ model DiscordGuildLink {
   /// 공지 채널을 정해도 상주하지 않는 멤버는 놓치므로, 알림을 원하는 사람만
   /// 이 역할을 받아 가게 하는 것이 목적이다.
   announceRoleId String?
+
+  /// 다른 서버에서 열린 내전 공지도 이 서버에 받을지.
+  /// 서버 하나로는 5v5 정원 10명을 채우기 어려워 기본값은 수신이다.
+  /// 우리 커뮤니티끼리만 하고 싶은 서버는 끌 수 있다.
+  acceptsCrossGuildRooms Boolean @default(true)
 
   status      DiscordGuildLinkStatus @default(PENDING)
   activatedAt DateTime?

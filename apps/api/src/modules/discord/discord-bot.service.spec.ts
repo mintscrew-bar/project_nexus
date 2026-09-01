@@ -550,3 +550,57 @@ describe("DiscordBotService 모집 공지 — 참가 버튼과 역할 멘션", (
     });
   });
 });
+
+describe("DiscordBotService 교차 서버 공지 사본", () => {
+  const config = {
+    get: jest.fn((key: string) =>
+      key === "APP_URL" ? "https://labs-nexus.com" : "",
+    ),
+  };
+  const service = new DiscordBotService(
+    config as any,
+    {} as any,
+    { emit: jest.fn() } as any,
+    { get: jest.fn(), set: jest.fn(), del: jest.fn() } as any,
+    { ensureRecruitEmojis: jest.fn() } as any,
+  );
+
+  function render(originGuildName: string | null) {
+    const payload = service.buildRoomRecruitMessage(
+      "room-1",
+      "테스트 내전",
+      "방장",
+      10,
+      "AUCTION",
+      false,
+      ["a"],
+      originGuildName ? undefined : { guildId: "g1", channelId: "v1" },
+      {},
+      null,
+      originGuildName,
+    );
+    return JSON.stringify(payload.components[0].toJSON());
+  }
+
+  it("사본에는 어느 서버 내전인지 표시한다", () => {
+    // 출처를 숨기면 우리 서버 공지로 오해하고 들어왔다가 낯선 사람들과 만난다.
+    expect(render("롤파크")).toContain("롤파크");
+  });
+
+  it("사본에는 음성채널 버튼 대신 안내 문구를 둔다", () => {
+    // 다른 서버 멤버는 원 서버 음성채널에 못 들어가므로 버튼이 무의미하다.
+    const copy = render("롤파크");
+    expect(copy).not.toContain("음성채널 참가");
+    expect(copy).toContain("음성 채널은");
+  });
+
+  it("원 서버 공지에는 출처 표기가 없고 음성채널 버튼이 있다", () => {
+    const origin = render(null);
+    expect(origin).toContain("음성채널 참가");
+    expect(origin).not.toContain("에서 열린 내전입니다");
+  });
+
+  it("사본에서도 참가 버튼은 그대로 동작한다", () => {
+    expect(render("롤파크")).toContain("nexus_join_room:room-1");
+  });
+});
