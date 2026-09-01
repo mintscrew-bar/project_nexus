@@ -43,6 +43,7 @@ import { PrismaService } from "./modules/prisma/prisma.service";
 import { HealthController } from "./health.controller";
 import { RiotTournamentService } from "./modules/riot/riot-tournament.service";
 import { AuthAwareThrottlerGuard } from "./common/guards/auth-aware-throttler.guard";
+import { validateEnv } from "./common/config/env.validation";
 
 // dist/에서 실행되므로 상위 디렉토리로 이동하여 .env 파일 경로 설정
 const apiRoot = resolve(__dirname, "..");
@@ -53,6 +54,8 @@ const projectRoot = resolve(apiRoot, "../..");
     // Config
     ConfigModule.forRoot({
       isGlobal: true,
+      // 잘못된 설정을 기능 첫 사용 시점이 아니라 부팅 시점에 드러낸다.
+      validate: validateEnv,
       envFilePath: [
         resolve(apiRoot, ".env.local"),
         resolve(apiRoot, ".env"),
