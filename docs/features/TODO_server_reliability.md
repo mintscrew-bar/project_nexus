@@ -8,23 +8,26 @@
 
 ## 즉시 (사고 직후 우선순위, 작업량 작음)
 
-- [ ] Task 1: 디스크 자동 정리 cron
+- [x] Task 1: 디스크 자동 정리 cron — `scripts/ops/nexus-cleanup.sh`
+      **호스트에 설치 필요**: 스크립트 상단 주석의 `install` 두 줄을 실행해야 동작한다.
   - 매일 새벽 안 쓰는 도커 이미지/컨테이너/네트워크/빌드캐시 prune
   - `docker system prune -af --filter "until=24h"` + `journalctl --vacuum-time=7d`
   - **위치**: 서버 systemd timer 또는 cron (`/etc/cron.daily/nexus-cleanup`)
   - **효과**: 빌드마다 누적되는 dangling 이미지로 디스크가 차서 발생한 오늘 사고 재발 방지
 
-- [ ] Task 2: Docker 로그 size 제한
+- [x] Task 2: Docker 로그 size 제한 — `x-logging` 앵커로 7개 서비스 전부 적용 (10m × 3)
   - 컨테이너 로그가 무한 누적되어 디스크를 잠식하는 문제 차단
   - `docker-compose.prod.yml` 각 서비스에 `logging.options.max-size: "10m"`, `max-file: "3"` 추가
   - **효과**: 컨테이너당 로그를 30MB로 제한, 디스크 보호
 
-- [ ] Task 3: 디스크 사용량 알림
+- [x] Task 3: 디스크 사용량 알림 — `scripts/ops/disk-alert.sh` (기본 80%, 하루 1회 쿨다운)
+      **호스트에 설치 필요** + `/etc/nexus-disk-alert.env`에 웹훅 지정.
   - Uptime Kuma에 디스크 사용률 모니터링 추가 또는 별도 cron으로 80% 초과 시 Discord 웹훅 알림
   - **위치**: `~/scripts/disk-alert.sh` + cron, 또는 Uptime Kuma push monitor
   - **효과**: 사후 복구가 아니라 사전 경고로 전환
 
-- [ ] Task 4: swap 파일 추가
+- [x] Task 4: swap 파일 추가 — `scripts/ops/setup-swap.sh` (4G, swappiness=10)
+      **호스트에서 실행 필요**: `sudo bash scripts/ops/setup-swap.sh`. 아직 적용 안 됨.
   - 메모리 부족 시 OOM-killer가 nginx/sshd/Tailscale 같은 핵심 서비스를 죽이는 위험 완화
   - 4~8GB swap 파일 + `swappiness=10`
   - **위치**: 서버 `/swapfile` + `/etc/fstab`
@@ -34,7 +37,9 @@
 
 ## 핵심 인프라 (중간 작업량)
 
-- [ ] Task 5: 빌드를 GitHub-hosted runner로 이전 ★ **구조적 원인** — 최우선
+- [x] Task 5: 빌드를 GitHub-hosted runner로 이전 ★ **구조적 원인** — 최우선
+      이미 완료돼 있었다(체크박스만 낡음). `ci.yml`의 `docker` 잡이 ubuntu-latest에서
+      빌드해 GHCR에 푸시하고, `deploy.yml`은 pull + 단계별 롤아웃만 한다.
   - **현재 구조의 문제**:
     - `deploy.yml` 이 self-hosted (= 운영 서버) 위에서 `docker compose build` 실행
     - 매 빌드마다 nexus-api(~1.5GB) + nexus-web(~1GB) 이미지 layer 가 `/var/lib/containerd/...` 누적
@@ -75,7 +80,9 @@
   - **위치**: `docker-compose.prod.yml`
   - **효과**: nexus-web/nginx unhealthy 시 자동 재시작
 
-- [ ] Task 8: 빌드 스토리지 압축 정책
+- [x] Task 8: 빌드 스토리지 압축 정책 — Task 5로 해소됨.
+      운영 호스트는 더 이상 빌드하지 않고, CI는 GitHub Actions 캐시(저장소당 10GB LRU 자동 관리)를 쓴다.
+      잔재 방지용 `builder prune`은 CD와 일일 정리 스크립트 양쪽에 있다.
   - BuildKit 캐시가 무제한 누적 → 빌드 한 번에 수 GB 추가
   - `buildkitd.toml` 또는 빌드 옵션으로 `gc.maxStorage: 10GB` 설정
   - **효과**: 빌드 캐시 자동 GC, 디스크 잠식 방지
@@ -111,7 +118,9 @@
   - 사이트 다운 시 즉시 푸시 알림 받도록
   - **효과**: 오늘처럼 사용자 보고 후에야 알게 되는 상황 방지
 
-- [ ] Task 13: deploy 워크플로우 실패 알림
+- [x] Task 13: deploy 워크플로우 실패 알림 — CI(이미지 빌드)·CD(배포) 양쪽에 추가.
+      `DEPLOY_ALERT_DISCORD_WEBHOOK` 시크릿 미설정이면 조용히 건너뛴다.
+      **시크릿 등록 필요**: 없으면 알림은 오지 않는다.
   - 현재 GitHub Actions 빌드 실패가 Discord/이메일로 안 와서 사용자가 사이트 502 보고 알아챔
   - workflow 끝에 conclusion=failure 시 webhook 호출 step 추가
   - **효과**: 배포 실패 즉시 인지
@@ -125,11 +134,14 @@
 
 ## 정책 / 프로세스
 
-- [ ] Task 15: 배포 전 리소스 체크 게이트
+- [x] Task 15: 배포 전 리소스 체크 게이트 — 이미 완료돼 있었다.
+      `deploy.yml`의 「디스크 여유 체크」가 90% 초과 시 배포를 중단하고 정리 명령을 안내한다.
   - deploy.yml 에 빌드 직전 `df -h`, `free -h` 검사 → 임계치 미만이면 abort
   - **효과**: 디스크/메모리 부족 상태에서 배포 진입 자체 차단
 
-- [ ] Task 16: 운영 런북 (recovery playbook) 정리
+- [x] Task 16: 운영 런북 — `docs/setup/RECOVERY_PLAYBOOK.md`
+      502·디스크·메모리·롤백·SSH 불가·재부팅·스키마까지 사고 중에 순서대로 읽는 명령 모음.
+      구조 설명은 기존 `OPERATIONS_RECOVERY.md`에 두고 런북에는 명령만 남겼다.
   - "사이트 502 시 1분 안에 할 일", "SSH 안 될 때 복구 순서", "디스크 풀 시 정리 명령"
   - **위치**: `docs/setup/RECOVERY_PLAYBOOK.md`
   - **효과**: 사건 시 우왕좌왕 방지, 다른 사람도 복구 가능

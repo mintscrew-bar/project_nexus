@@ -1,9 +1,18 @@
 name: nexus
 
+# 컨테이너 로그가 무한히 쌓여 디스크를 잠식하는 것을 막는다.
+# 2026-05-09 디스크 I/O 사고의 재발 방지책 중 하나 — 컨테이너당 최대 30MB.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   postgres:
     image: postgres:16-alpine
     container_name: nexus-postgres
+    logging: *default-logging
     restart: unless-stopped
     mem_limit: 1024m
     memswap_limit: 1024m
@@ -24,6 +33,7 @@ services:
   redis:
     image: redis:7-alpine
     container_name: nexus-redis
+    logging: *default-logging
     restart: unless-stopped
     mem_limit: 256m
     memswap_limit: 256m
@@ -49,6 +59,7 @@ services:
       context: .
       dockerfile: apps/api/Dockerfile
     container_name: nexus-api
+    logging: *default-logging
     restart: unless-stopped
     mem_limit: 1536m
     memswap_limit: 1536m
@@ -98,6 +109,7 @@ services:
         # Next.js rewrites destination — 컴포즈 내부 호스트명 사용
         API_URL: http://api:4000
     container_name: nexus-web
+    logging: *default-logging
     restart: unless-stopped
     mem_limit: 2048m
     memswap_limit: 2048m
@@ -125,6 +137,7 @@ services:
   nginx:
     image: nginx:alpine
     container_name: nexus-nginx
+    logging: *default-logging
     restart: unless-stopped
     mem_limit: 128m
     memswap_limit: 128m
@@ -147,6 +160,7 @@ services:
   cloudflared:
     image: cloudflare/cloudflared:2026.7.2
     container_name: nexus-cloudflared
+    logging: *default-logging
     restart: unless-stopped
     mem_limit: 256m
     memswap_limit: 256m
@@ -162,6 +176,7 @@ services:
   uptime-kuma:
     image: louislam/uptime-kuma:2
     container_name: nexus-uptime-kuma
+    logging: *default-logging
     restart: unless-stopped
     mem_limit: 512m
     memswap_limit: 512m
