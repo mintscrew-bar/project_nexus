@@ -499,6 +499,11 @@ model DiscordGuildLink {
   /// 사실상 아무도 볼 수 없었다.
   announceChannelId String?
 
+  /// 내전 모집 공지에 멘션할 역할. 지정하면 공지 상단에 <@&id>가 붙는다.
+  /// 공지 채널을 정해도 상주하지 않는 멤버는 놓치므로, 알림을 원하는 사람만
+  /// 이 역할을 받아 가게 하는 것이 목적이다.
+  announceRoleId String?
+
   status      DiscordGuildLinkStatus @default(PENDING)
   activatedAt DateTime?
   createdAt   DateTime               @default(now())

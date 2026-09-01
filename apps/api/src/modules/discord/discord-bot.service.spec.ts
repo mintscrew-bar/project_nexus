@@ -380,3 +380,173 @@ describe("DiscordBotService 공지 채널 지정", () => {
     );
   });
 });
+
+describe("DiscordBotService 모집 공지 — 참가 버튼과 역할 멘션", () => {
+  const config = {
+    get: jest.fn((key: string) =>
+      key === "APP_URL" ? "https://labs-nexus.com" : "",
+    ),
+  };
+  const eventEmitter = { emit: jest.fn() };
+  const redis = { get: jest.fn(), set: jest.fn(), del: jest.fn() };
+  const emojiService = { ensureRecruitEmojis: jest.fn() };
+
+  function makeService(prisma: any = {}) {
+    return new DiscordBotService(
+      config as any,
+      prisma as any,
+      eventEmitter as any,
+      redis as any,
+      emojiService as any,
+    );
+  }
+
+  function render(
+    service: DiscordBotService,
+    opts: { participants: string[]; max: number; roleId?: string | null },
+  ) {
+    const payload = service.buildRoomRecruitMessage(
+      "room-1",
+      "테스트 내전",
+      "방장",
+      opts.max,
+      "AUCTION",
+      false,
+      opts.participants,
+      undefined,
+      {},
+      opts.roleId,
+    );
+    return { payload, json: JSON.stringify(payload.components[0].toJSON()) };
+  }
+
+  describe("참가하기 버튼", () => {
+    it("자리가 남으면 참가 버튼이 붙는다", () => {
+      const { json } = render(makeService(), {
+        participants: ["a", "b"],
+        max: 10,
+      });
+      expect(json).toContain("nexus_join_room:room-1");
+    });
+
+    it("정원이 차면 참가 버튼을 빼서 헛클릭을 막는다", () => {
+      const { json } = render(makeService(), {
+        participants: Array.from({ length: 10 }, (_, i) => `p${i}`),
+        max: 10,
+      });
+      expect(json).not.toContain("nexus_join_room:");
+    });
+  });
+
+  describe("역할 멘션", () => {
+    it("역할이 지정되면 멘션하고 allowedMentions로 허용한다", () => {
+      const { payload, json } = render(makeService(), {
+        participants: ["a"],
+        max: 10,
+        roleId: "role-9",
+      });
+      expect(json).toContain("<@&role-9>");
+      expect(payload.allowedMentions).toEqual({ roles: ["role-9"] });
+    });
+
+    it("역할 미지정이면 아무도 멘션하지 않는다", () => {
+      const { payload } = render(makeService(), {
+        participants: ["a"],
+        max: 10,
+      });
+      expect(payload.allowedMentions).toEqual({ roles: [] });
+    });
+
+    it("정원이 찬 뒤에는 멘션하지 않는다", () => {
+      // 참가할 수 없는 상태에서 오는 알림은 소음일 뿐이다.
+      const { payload, json } = render(makeService(), {
+        participants: Array.from({ length: 10 }, (_, i) => `p${i}`),
+        max: 10,
+        roleId: "role-9",
+      });
+      expect(json).not.toContain("<@&role-9>");
+      expect(payload.allowedMentions).toEqual({ roles: [] });
+    });
+  });
+
+  describe("참가 버튼 처리", () => {
+    function makeInteraction(customId = "nexus_join_room:room-1") {
+      return {
+        customId,
+        user: { id: "discord-1" },
+        deferReply: jest.fn().mockResolvedValue(undefined),
+        editReply: jest.fn().mockResolvedValue(undefined),
+      };
+    }
+
+    it("연동된 계정이 없으면 참가시키지 않고 안내한다", async () => {
+      const prisma = {
+        authProvider: { findFirst: jest.fn().mockResolvedValue(null) },
+      };
+      const service = makeService(prisma);
+      const joinRoom = jest.fn();
+      service.setRoomJoiner({ joinRoom });
+      const interaction = makeInteraction();
+
+      await (service as any).handleJoinRoomButton(interaction);
+
+      expect(joinRoom).not.toHaveBeenCalled();
+      expect(interaction.editReply.mock.calls[0][0]).toContain(
+        "NEXUS 계정을 찾지 못했습니다",
+      );
+    });
+
+    it("연동된 계정이면 그 유저로 방에 참가시킨다", async () => {
+      const prisma = {
+        authProvider: {
+          findFirst: jest.fn().mockResolvedValue({ userId: "nexus-1" }),
+        },
+      };
+      const service = makeService(prisma);
+      const joinRoom = jest.fn().mockResolvedValue({});
+      service.setRoomJoiner({ joinRoom });
+      const interaction = makeInteraction();
+
+      await (service as any).handleJoinRoomButton(interaction);
+
+      expect(joinRoom).toHaveBeenCalledWith("nexus-1", { roomId: "room-1" });
+      expect(interaction.editReply.mock.calls[0][0]).toContain("참가했습니다");
+    });
+
+    it("참가 실패 사유를 그대로 보여주고 로비 링크를 함께 준다", async () => {
+      // 정원 초과·이미 참가·비밀번호 필요 등은 joinRoom이 메시지로 알려준다.
+      const prisma = {
+        authProvider: {
+          findFirst: jest.fn().mockResolvedValue({ userId: "nexus-1" }),
+        },
+      };
+      const service = makeService(prisma);
+      service.setRoomJoiner({
+        joinRoom: jest.fn().mockRejectedValue(new Error("Room is full")),
+      });
+      const interaction = makeInteraction();
+
+      await (service as any).handleJoinRoomButton(interaction);
+
+      const reply = interaction.editReply.mock.calls[0][0];
+      expect(reply).toContain("Room is full");
+      expect(reply).toContain("/tournaments/room-1/lobby");
+    });
+
+    it("배선 전이면 참가를 시도하지 않고 로비로 안내한다", async () => {
+      const prisma = {
+        authProvider: {
+          findFirst: jest.fn().mockResolvedValue({ userId: "nexus-1" }),
+        },
+      };
+      const service = makeService(prisma);
+      const interaction = makeInteraction();
+
+      await (service as any).handleJoinRoomButton(interaction);
+
+      expect(interaction.editReply.mock.calls[0][0]).toContain(
+        "/tournaments/room-1/lobby",
+      );
+    });
+  });
+});

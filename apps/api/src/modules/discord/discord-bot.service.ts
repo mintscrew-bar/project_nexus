@@ -97,6 +97,8 @@ const VERIFY_MODAL_ID = "nexus_verify_modal";
 const VERIFY_BUTTON_ID = "nexus_verify_start_button";
 /** 안내 메시지가 올라온 채널을 그대로 공지 채널로 지정하는 버튼 */
 const SET_ANNOUNCE_BUTTON_ID = "nexus_set_announce_here_button";
+/** 모집 공지에서 바로 방에 참가하는 버튼. `nexus_join_room:{roomId}` 형태 */
+const JOIN_ROOM_BUTTON_PREFIX = "nexus_join_room:";
 const VERIFY_RIOT_ID_INPUT_ID = "nexus_verify_riot_id";
 const ROOM_NOTIFICATION_CACHE_PREFIX = "discord:room-notification:";
 const ROOM_NOTIFICATION_TTL_SECONDS = 24 * 60 * 60;
@@ -336,6 +338,7 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
   private async applyAnnounceChannel(
     guild: Guild,
     channel: TextChannel,
+    roleId?: string | null,
   ): Promise<string> {
     const me = guild.members.me ?? (await guild.members.fetchMe());
     const canPost = channel
@@ -355,15 +358,23 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
 
     await this.prisma.discordGuildLink.update({
       where: { guildId: guild.id },
-      data: { announceChannelId: channel.id },
+      data: {
+        announceChannelId: channel.id,
+        // 역할을 넘기지 않으면 기존 설정을 건드리지 않는다.
+        // 채널만 바꾸려던 사람이 역할 설정을 잃지 않게 한다.
+        ...(roleId !== undefined ? { announceRoleId: roleId } : {}),
+      },
     });
 
     return [
       `✅ 내전 모집 공지 채널을 <#${channel.id}> 로 지정했습니다.`,
+      roleId ? `📢 공지 시 <@&${roleId}> 를 멘션합니다.` : null,
       link.status === "ACTIVE"
         ? "이제 이 서버에서 내전이 열리면 해당 채널로 공지가 올라갑니다."
         : "⚠️ 서버 연동이 아직 활성화(ACTIVE) 상태가 아닙니다. 활성화 후부터 공지가 발송됩니다.",
-    ].join("\n");
+    ]
+      .filter(Boolean)
+      .join("\n");
   }
 
   private async handleSetAnnounceButton(interaction: ButtonInteraction) {
@@ -496,7 +507,12 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    const message = await this.applyAnnounceChannel(interaction.guild, target);
+    const role = interaction.options.getRole("role");
+    const message = await this.applyAnnounceChannel(
+      interaction.guild,
+      target,
+      role ? role.id : undefined,
+    );
     await interaction.editReply(message);
   }
 
@@ -741,6 +757,12 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
                 .setDescription("공지를 받을 텍스트 채널 (비우면 현재 채널)")
                 .addChannelTypes(ChannelType.GuildText)
                 .setRequired(false),
+            )
+            .addRoleOption((opt) =>
+              opt
+                .setName("role")
+                .setDescription("모집 공지에 멘션할 역할 (선택)")
+                .setRequired(false),
             ),
         ),
     ].map((cmd) => cmd.toJSON());
@@ -791,6 +813,9 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
       }
       if (interaction.customId === SET_ANNOUNCE_BUTTON_ID) {
         await this.handleSetAnnounceButton(interaction);
+      }
+      if (interaction.customId.startsWith(JOIN_ROOM_BUTTON_PREFIX)) {
+        await this.handleJoinRoomButton(interaction);
       }
       return;
     }
@@ -2287,6 +2312,7 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
     if (!channel?.isTextBased()) return null;
 
     const emojis = await this.emojiService.ensureRecruitEmojis(guild);
+    const mentionRoleId = await this.getAnnounceRoleId(guildId);
     const payload = this.buildRoomRecruitMessage(
       args.roomId,
       args.roomName,
@@ -2299,10 +2325,90 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
         ? { guildId, channelId: args.voiceChannelId }
         : undefined,
       emojis,
+      mentionRoleId,
     );
 
     const message = await channel.send(payload);
     return message.id;
+  }
+
+  /**
+   * 방 참가에 필요한 최소 인터페이스.
+   * RoomModule이 이미 DiscordModule을 임포트하므로 반대 방향 임포트는 순환이 된다.
+   * 기존 setVoiceService와 같은 세터 주입 방식으로 배선한다.
+   */
+  private roomJoiner?: {
+    joinRoom(userId: string, dto: { roomId: string }): Promise<unknown>;
+  };
+
+  setRoomJoiner(joiner: NonNullable<DiscordBotService["roomJoiner"]>) {
+    this.roomJoiner = joiner;
+  }
+
+  /**
+   * 모집 공지의 "참가하기" 버튼.
+   *
+   * 기존에는 웹 로비로 가는 링크뿐이라 디스코드 → 브라우저 → 로그인 → 참가로
+   * 이어졌다. 그 사이 이탈이 커서, 연동된 계정이면 버튼 한 번으로 끝나게 한다.
+   */
+  private async handleJoinRoomButton(interaction: ButtonInteraction) {
+    const roomId = interaction.customId.slice(JOIN_ROOM_BUTTON_PREFIX.length);
+    if (!roomId) return;
+
+    await interaction.deferReply({ ephemeral: true });
+
+    const appUrl =
+      this.configService.get("APP_URL") || "https://labs-nexus.com";
+    const lobbyUrl = `${appUrl}/tournaments/${roomId}/lobby`;
+
+    const provider = await this.prisma.authProvider.findFirst({
+      where: { provider: "DISCORD", providerId: interaction.user.id },
+      select: { userId: true },
+    });
+    if (!provider) {
+      await interaction.editReply(
+        [
+          "❌ 이 디스코드 계정과 연결된 NEXUS 계정을 찾지 못했습니다.",
+          `${appUrl} 에서 디스코드로 로그인한 뒤 다시 시도해주세요.`,
+        ].join("\n"),
+      );
+      return;
+    }
+
+    if (!this.roomJoiner) {
+      await interaction.editReply(
+        `참가 처리를 준비 중입니다. 잠시 후 다시 시도하거나 ${lobbyUrl} 에서 참가해주세요.`,
+      );
+      return;
+    }
+
+    try {
+      await this.roomJoiner.joinRoom(provider.userId, { roomId });
+      await interaction.editReply(
+        [`✅ 참가했습니다.`, `로비: ${lobbyUrl}`].join("\n"),
+      );
+    } catch (error: any) {
+      // joinRoom은 정원 초과·이미 참가·비밀번호 필요 등을 예외 메시지로 준다.
+      // 사용자가 다음에 뭘 하면 되는지 알 수 있게 그대로 보여주고 로비 링크를 붙인다.
+      const reason =
+        typeof error?.response?.message === "string"
+          ? error.response.message
+          : typeof error?.message === "string"
+            ? error.message
+            : "참가에 실패했습니다.";
+      await interaction.editReply(
+        [`❌ ${reason}`, `로비에서 시도: ${lobbyUrl}`].join("\n"),
+      );
+    }
+  }
+
+  /** 모집 공지에 멘션할 역할 ID. 미설정이면 null. */
+  private async getAnnounceRoleId(guildId: string): Promise<string | null> {
+    const link = await this.prisma.discordGuildLink.findUnique({
+      where: { guildId },
+      select: { announceRoleId: true },
+    });
+    return link?.announceRoleId ?? null;
   }
 
   async sendEmbedNotification(
@@ -2429,6 +2535,8 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
       if (!channel?.isTextBased()) return;
       const message = await channel.messages.fetch(notif.messageId);
       const emojis = await this.emojiService.ensureRecruitEmojis(guild);
+      // 갱신에서는 역할을 멘션하지 않는다. 인원이 바뀔 때마다 핑이 가면
+      // 알림 역할이 곧 소음이 되어 사람들이 역할을 떼어버린다.
       const payload = this.buildRoomRecruitMessage(
         roomId,
         latestNotif.roomName,
@@ -2571,7 +2679,12 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
     participants: string[] = [],
     voiceChannel?: { guildId: string; channelId: string },
     emojis: EmojiMap = {},
-  ): { components: ContainerBuilder[]; flags: number } {
+    mentionRoleId?: string | null,
+  ): {
+    components: ContainerBuilder[];
+    flags: number;
+    allowedMentions: { roles: string[] };
+  } {
     const appUrl =
       this.configService.get("APP_URL") || "https://labs-nexus.com";
     const lobbyUrl = `${appUrl}/tournaments/${roomId}/lobby`;
@@ -2642,6 +2755,14 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
 
     // 헤더: 방 이름을 제목으로 올리고 모드/방장은 요약 줄로. 참가 버튼을 우측에 붙여
     // 스크롤 없이 바로 누를 수 있게 한다.
+    // Components V2 메시지는 content를 가질 수 없어 멘션도 TextDisplay로 넣는다.
+    // 정원이 찬 뒤에는 멘션하지 않는다 — 참가할 수 없는 알림은 소음일 뿐이다.
+    if (mentionRoleId && !isFull) {
+      container.addTextDisplayComponents(
+        new TextDisplayBuilder().setContent(`<@&${mentionRoleId}>`),
+      );
+    }
+
     const headerLines = [
       `## ${isPrivate ? "🔒 " : ""}${roomName}`,
       `${modeIcon ? `${modeIcon} ` : ""}${modeLabel}  ·  방장 **${hostName}**`,
@@ -2685,26 +2806,43 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
       ),
     );
 
-    // 음성채널 버튼만 하단에 둔다 — "룸 참가"는 이미 헤더 우측 액세서리로 있어
-    // 여기 또 넣으면 같은 버튼이 두 번 보인다.
+    // 하단 액션 로우.
+    // "참가하기"는 디스코드 안에서 바로 참가시키는 버튼이다. 헤더의 "룸 참가"는
+    // 웹 로비로 가는 링크로 남겨둔다 — 비밀방 비밀번호 입력처럼 버튼으로
+    // 처리할 수 없는 경우의 경로가 필요하다.
+    const actionButtons: ButtonBuilder[] = [];
+    if (!isFull) {
+      actionButtons.push(
+        withEmoji(
+          new ButtonBuilder()
+            .setCustomId(`${JOIN_ROOM_BUTTON_PREFIX}${roomId}`)
+            .setLabel("참가하기")
+            .setStyle(ButtonStyle.Success),
+          emojis.nx_btn_join,
+        ),
+      );
+    }
     if (voiceChannel) {
+      actionButtons.push(
+        withEmoji(
+          new ButtonBuilder()
+            .setLabel("음성채널 참가")
+            .setStyle(ButtonStyle.Link)
+            .setURL(
+              `https://discord.com/channels/${voiceChannel.guildId}/${voiceChannel.channelId}`,
+            ),
+          emojis.nx_btn_voice,
+        ),
+      );
+    }
+    if (actionButtons.length > 0) {
       container.addSeparatorComponents(
         new SeparatorBuilder()
           .setDivider(false)
           .setSpacing(SeparatorSpacingSize.Small),
       );
       container.addActionRowComponents(
-        new ActionRowBuilder<ButtonBuilder>().addComponents(
-          withEmoji(
-            new ButtonBuilder()
-              .setLabel("음성채널 참가")
-              .setStyle(ButtonStyle.Link)
-              .setURL(
-                `https://discord.com/channels/${voiceChannel.guildId}/${voiceChannel.channelId}`,
-              ),
-            emojis.nx_btn_voice,
-          ),
-        ),
+        new ActionRowBuilder<ButtonBuilder>().addComponents(...actionButtons),
       );
     }
 
@@ -2715,7 +2853,14 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
       ),
     );
 
-    return { components: [container], flags: MessageFlags.IsComponentsV2 };
+    return {
+      components: [container],
+      flags: MessageFlags.IsComponentsV2,
+      // 지정된 역할만 실제로 핑한다. @everyone/@here 오남용을 구조적으로 막는다.
+      allowedMentions: {
+        roles: mentionRoleId && !isFull ? [mentionRoleId] : [],
+      },
+    };
   }
 
   buildAuctionStartEmbed(roomName: string, teams: string[]) {
