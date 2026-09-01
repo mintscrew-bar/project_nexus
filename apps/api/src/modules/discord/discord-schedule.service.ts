@@ -104,7 +104,9 @@ export class DiscordScheduleService {
       data: { scheduledRemind1hAt: new Date() },
     });
     const sent = await this.botService.sendRoomScheduleReminder(room.id, "1h");
-    this.logger.log(`[Schedule] 방 ${room.id}: 1시간 전 리마인드 ${sent}개 서버`);
+    this.logger.log(
+      `[Schedule] 방 ${room.id}: 1시간 전 리마인드 ${sent}개 서버`,
+    );
   }
 
   /** 시작 10분 전: 음성채널을 이제 만들고, 대기실 링크와 함께 부른다. */
@@ -145,7 +147,9 @@ export class DiscordScheduleService {
     }
 
     const sent = await this.botService.sendRoomScheduleReminder(room.id, "10m");
-    this.logger.log(`[Schedule] 방 ${room.id}: 10분 전 리마인드 ${sent}개 서버`);
+    this.logger.log(
+      `[Schedule] 방 ${room.id}: 10분 전 리마인드 ${sent}개 서버`,
+    );
   }
 
   /** 예정 시각: 참가 신청자에게 DM으로 직접 부른다. */

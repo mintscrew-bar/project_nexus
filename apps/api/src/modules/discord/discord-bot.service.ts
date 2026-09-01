@@ -2505,7 +2505,9 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
    * 사용자들이 이미 방 제목에 "9시 시작"을 적어 우회하고 있던 것을 정식 기능으로
    * 만든다. 웹으로 넘어가지 않고 명령 한 줄로 끝나야 의미가 있다.
    */
-  private async handleScheduleCommand(interaction: ChatInputCommandInteraction) {
+  private async handleScheduleCommand(
+    interaction: ChatInputCommandInteraction,
+  ) {
     await interaction.deferReply({ ephemeral: true });
 
     const appUrl =

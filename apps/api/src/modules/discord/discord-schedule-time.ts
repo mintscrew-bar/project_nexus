@@ -80,7 +80,10 @@ const PM_WORDS = ["오후", "저녁", "밤"];
  * 읽는다. 오후 3시에 `9시`라고 치면 오늘 21시, 밤 10시에 치면 내일 9시가 된다.
  * 날짜를 명시했으면 적힌 그대로 해석한다 — 추측이 끼면 예약 시각을 신뢰할 수 없다.
  */
-export function parseKstSchedule(input: string, now: Date = new Date()): Date | null {
+export function parseKstSchedule(
+  input: string,
+  now: Date = new Date(),
+): Date | null {
   const text = input.trim().replace(/\s+/g, " ");
   if (!text) return null;
 
@@ -180,7 +183,13 @@ export function parseKstSchedule(input: string, now: Date = new Date()): Date | 
   }
   const tomorrow = addKstDays(base, 1);
   options.push(
-    kstWallClockToDate(tomorrow.year, tomorrow.month, tomorrow.day, hour, minute),
+    kstWallClockToDate(
+      tomorrow.year,
+      tomorrow.month,
+      tomorrow.day,
+      hour,
+      minute,
+    ),
   );
 
   const future = options

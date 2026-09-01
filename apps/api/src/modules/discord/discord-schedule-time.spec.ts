@@ -1,4 +1,8 @@
-import { formatKst, parseKstSchedule, toKstParts } from "./discord-schedule-time";
+import {
+  formatKst,
+  parseKstSchedule,
+  toKstParts,
+} from "./discord-schedule-time";
 
 /** 테스트 기준 시각: 2026-09-01(화) 15:00 KST */
 const NOW = new Date("2026-09-01T06:00:00.000Z");
@@ -28,7 +32,9 @@ describe("parseKstSchedule", () => {
 
   it("오후를 명시하면 그대로 읽는다", () => {
     expect(kst(parseKstSchedule("오후 9시", NOW))).toBe("2026-09-01 21:00");
-    expect(kst(parseKstSchedule("저녁 8시 30분", NOW))).toBe("2026-09-01 20:30");
+    expect(kst(parseKstSchedule("저녁 8시 30분", NOW))).toBe(
+      "2026-09-01 20:30",
+    );
   });
 
   it("오늘/내일/모레를 앞에 붙일 수 있다", () => {
@@ -62,7 +68,9 @@ describe("parseKstSchedule", () => {
   it("서버 TZ와 무관하게 KST로 해석한다", () => {
     // UTC 자정 직전(= KST 오전 8시 59분)에도 "오늘"은 KST 기준 날짜다.
     const lateUtc = new Date("2026-09-01T23:30:00.000Z"); // KST 9/2 08:30
-    expect(kst(parseKstSchedule("오늘 21:00", lateUtc))).toBe("2026-09-02 21:00");
+    expect(kst(parseKstSchedule("오늘 21:00", lateUtc))).toBe(
+      "2026-09-02 21:00",
+    );
   });
 });
 

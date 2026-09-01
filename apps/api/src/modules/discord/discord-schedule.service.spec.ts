@@ -36,7 +36,9 @@ function createHarness(room: Record<string, unknown>) {
       lobbyChannelId: "lobby-voice",
     }),
   };
-  const configService = { get: jest.fn().mockReturnValue("https://nexus.test") };
+  const configService = {
+    get: jest.fn().mockReturnValue("https://nexus.test"),
+  };
 
   const service = new DiscordScheduleService(
     prisma as any,
