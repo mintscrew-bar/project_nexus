@@ -23,6 +23,7 @@ import { AdSlotCard } from "@/components/ads/AdSlot";
 import { LandingMobileNav } from "./LandingMobileNav";
 import { LiveStreamersSection } from "@/components/home/LiveStreamersSection";
 import { AutoBalanceDemo } from "./AutoBalanceDemo";
+import { LandingFeatureDemo } from "./LandingFeatureDemo";
 
 const operations: Array<{
   index: string;
@@ -36,30 +37,30 @@ const operations: Array<{
   {
     index: "01",
     icon: Users,
-    title: "모집보다 중요한 건 시작 준비",
+    title: "참가 상태와 계정 정보를 한 번에",
     description:
-      "참가 인원과 준비 여부, Riot 계정, 선호 포지션을 한 화면에서 확인하고 시작 조건을 점검합니다",
-    features: ["전원 준비 확인", "Riot 계정·포지션", "시작 조건 잠금"],
+      "참가 인원과 준비 여부를 확인하고, 연동된 Riot 계정과 등록한 포지션을 기준으로 다음 단계를 준비합니다.",
+    features: ["참가·준비 상태", "Riot 계정 연동", "주·부 포지션"],
     visual: "readiness",
     accent: "text-amber-300",
   },
   {
     index: "02",
     icon: Scale,
-    title: "목적에 맞는 4가지 팀 편성",
+    title: "팀을 나눈 뒤에도 직접 검토",
     description:
-      "빠른 시작은 자동 밸런스, 선택의 재미는 경매·스네이크, 고정 팀은 자유 선택으로 진행합니다",
-    features: ["경매·스네이크", "자동 밸런스", "자유 팀 선택"],
+      "자동 밸런스·경매·스네이크·자유 선택 중 방에 맞는 방식을 고르고, 방장은 결과를 확인한 뒤 확정합니다.",
+    features: ["자동 밸런스", "경매·스네이크", "자유 팀 선택"],
     visual: "balance",
     accent: "text-amber-200",
   },
   {
     index: "03",
     icon: Trophy,
-    title: "경기 결과를 기록하고 방송까지",
+    title: "경기 결과를 남기고 공유",
     description:
-      "대진표·승패·KDA를 남기고, OBS 브라우저 소스 하나로 대기부터 결과까지 방송 화면을 이어갑니다",
-    features: ["대진표·경기 결과", "개인 전적", "OBS 오버레이"],
+      "대진표와 승패, 경기 후 개인 기록을 확인하고 OBS 브라우저 소스로 대기·진행·결과 화면을 방송에 연결합니다.",
+    features: ["대진표·승패", "KDA·개인 전적", "OBS 브라우저 소스"],
     visual: "records",
     accent: "text-emerald-300",
   },
@@ -912,17 +913,15 @@ export function LandingContentSections() {
             WHY NEXUS
           </p>
           <h2 className="mt-8 max-w-[1240px] text-[clamp(2.5rem,6vw,6.6rem)] font-black leading-[1.02] tracking-[-0.065em]">
-            내전은 방을 만드는 순간이 아니라,
+            내전 운영은 방 생성에서 끝나지 않습니다.
             <span className="text-[#5d63d8]">
-              {" "}
-              마지막 경기가 끝나는 순간
-            </span>{" "}
-            완성됩니다
+              {" "}참가 준비부터 경기 결과까지 이어집니다
+            </span>
           </h2>
           <div className="mt-12 flex flex-col justify-between gap-8 border-t border-black/15 pt-6 md:flex-row md:items-start">
             <p className="max-w-xl text-base leading-7 text-black/55 md:text-lg">
-              NEXUS는 방 생성과 참가 준비, 팀 구성, 경기 결과 기록을 하나의 운영
-              흐름으로 제공합니다
+            방 생성, 참가 준비, 팀 구성, 경기 결과 기록을 각각 다른 도구로 옮기지
+            않고 하나의 내전 방에서 이어서 관리합니다.
             </p>
             <Link
               href="/about"
@@ -1043,10 +1042,7 @@ export function LandingContentSections() {
                   }`}
                 />
                 <div aria-hidden="true">
-                  <OperationCardVisual
-                    kind={operation.visual}
-                    wide={operation.index === "03"}
-                  />
+                  <LandingFeatureDemo kind={operation.visual} />
                 </div>
                 <div className="relative flex h-full flex-col">
                   <div className="flex items-center justify-between">
@@ -1096,12 +1092,13 @@ export function LandingContentSections() {
                 READY TO HOST
               </div>
               <h2 className="mt-6 max-w-5xl text-4xl font-black leading-[1.04] tracking-[-0.05em] text-white sm:text-5xl md:text-6xl">
-                내전 준비,
-                <br />방 하나로 끝
+            내전 준비,
+            <br />한 방에서 시작하세요
               </h2>
               <p className="mt-5 max-w-2xl text-sm leading-6 text-white/60 sm:text-base">
-                브라우저에서 참가자를 확인하고 팀을 구성하세요. 방송 토큰을 OBS에
-                한 번 등록하면 활성 내전의 대기·경매·대진표·결과 화면이 따라옵니다.
+                브라우저에서 참가자와 팀 구성을 확인하세요. 활성 내전의 방송 토큰을
+                OBS 브라우저 소스에 등록하면 대기·경매·대진표·결과 화면을 방송에
+                사용할 수 있습니다.
               </p>
             </div>
             <div className="flex flex-col items-start gap-3 lg:items-end">

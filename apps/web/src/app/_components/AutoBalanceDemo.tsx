@@ -144,6 +144,18 @@ export function AutoBalanceDemo() {
   const previewScore = draggedPlayer && targetPlayer
     ? draggedPlayer.scores[targetPlayer.role] ?? draggedPlayer.score
     : draggedPlayer?.score;
+  const projectedSpread = draggedPlayer && targetPlayer
+    ? (() => {
+        const source = locate(draggedPlayer.id);
+        const target = locate(targetPlayer.id);
+        const nextTotals = [...totals];
+        const sourceScore = draggedPlayer.scores[targetPlayer.role] ?? draggedPlayer.score;
+        const targetScore = targetPlayer.scores[draggedPlayer.role] ?? targetPlayer.score;
+        nextTotals[source.team] += sourceScore - draggedPlayer.score;
+        nextTotals[target.team] += targetScore - targetPlayer.score;
+        return Math.abs(nextTotals[0] - nextTotals[1]);
+      })()
+    : null;
 
   return (
     <div className="relative overflow-hidden rounded-[28px] border border-white/[0.09] bg-[#17181c] p-3 shadow-[0_40px_120px_rgba(0,0,0,0.45)] sm:p-5">
@@ -214,7 +226,7 @@ export function AutoBalanceDemo() {
         </div>
       </div>
       <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]">
-        <div className="rounded-xl border border-amber-200/15 bg-amber-200/[0.04] px-3 py-2.5"><div className="flex items-center justify-between gap-3"><p className="text-[9px] font-bold tracking-[0.14em] text-amber-100/80">SWAP PREVIEW</p><span className="text-[10px] font-black tabular-nums text-amber-100">{dragged && dropTarget ? "예상 점수 계산 중" : "드래그하면 미리보기"}</span></div><p className="mt-1 text-[10px] leading-5 text-white/50">교체 전 팀 점수 차 <span className="font-bold text-white/70">{spread.toFixed(1)}</span> · 대상 라인에 놓으면 예상 개인 점수를 보여줍니다</p></div>
+        <div className="rounded-xl border border-amber-200/15 bg-amber-200/[0.04] px-3 py-2.5"><div className="flex items-center justify-between gap-3"><p className="text-[9px] font-bold tracking-[0.14em] text-amber-100/80">SWAP PREVIEW</p><span className="text-[10px] font-black tabular-nums text-amber-100">{dragged && dropTarget ? `예상 차 ${projectedSpread?.toFixed(1)}` : "드래그하면 미리보기"}</span></div><p className="mt-1 text-[10px] leading-5 text-white/50">현재 팀 점수 차 <span className="font-bold text-white/70">{spread.toFixed(1)}</span> · 대상 라인 예상 개인 점수 <span className="font-bold text-amber-100">{dragged && dropTarget ? `${previewScore?.toFixed(1)}점` : "–"}</span></p></div>
         <div className="flex items-center gap-1.5 rounded-xl border border-white/[0.07] bg-white/[0.025] p-2"><button type="button" onClick={reset} className="flex items-center gap-1.5 rounded-lg border border-white/[0.08] px-2.5 py-2 text-[10px] font-bold text-white/55 hover:bg-white/[0.06] hover:text-white"><Undo2 className="h-3 w-3" />되돌리기</button><button type="button" onClick={reset} className="flex items-center gap-1.5 rounded-lg bg-amber-200 px-2.5 py-2 text-[10px] font-black text-[#17130b] hover:bg-amber-100"><Dices className="h-3 w-3" />다시 뽑기</button></div>
       </div>
       <p className="mt-3 px-1 text-[10px] font-medium leading-5 text-white/45"><Scale className="mr-1 inline h-3 w-3" />예시 데이터로 만든 미리보기입니다. 실제 화면처럼 라인 위치는 고정되고, 드래그 중 대상 라인의 예상 점수를 표시합니다.</p>
