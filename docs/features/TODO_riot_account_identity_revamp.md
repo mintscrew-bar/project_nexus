@@ -11,7 +11,7 @@
 1. **시즌 승/패·승률 부정확** — `entries`에서 받은 솔로 wins/losses를 저장 안 함(`RiotAccount`에 컬럼 없음). 프로필·전적 승률은 ingest 표본(`stats.service.ts:1035`)으로 계산해 실제 시즌과 불일치.
 2. **챔피언 통계 불완전** — 등록 유저는 ingest된 매치만 집계(부분), 미등록 외부인은 `findUserByRiotAccount` 404로 **빈 화면**. 컨트롤러 주석(`stats.controller.ts:143`)이 말하는 "시즌 풀스캔"은 실제 코드에 없음.
 3. **숙련도 미수집** — `champion-mastery-v4` 호출 자체가 없음.
-4. **레이트 한도 미스매치** — `RIOT_RATE_LIMITS`(`riot.service.ts:26`)가 프로덕션 키 기준(MATCH 2000/10s 등). 전역 100/2분 합산 캡이 코드에 없어 누적 스캔 붙이면 429 위험.
+4. **레이트 한도 미스매치** — 해결됨. 현재 Riot 호출은 `RiotRateLimiterService`의 Redis dual-window 전역 제한(`20/1초`, `95/120초`)을 공유한다. 신규 Riot 호출 경로가 이 서비스를 우회하지 않는지만 계속 점검한다.
 
 ## 핵심 원칙 (퍼스널 키)
 

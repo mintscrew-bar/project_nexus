@@ -23,7 +23,7 @@ export class CreateRoomDto {
   @IsString()
   @IsNotEmpty({ message: "방 이름을 입력해주세요." })
   @MaxLength(50, { message: "방 이름은 50자를 초과할 수 없습니다." })
-  name: string;
+  name!: string;
 
   @IsOptional()
   @IsString()
@@ -33,10 +33,10 @@ export class CreateRoomDto {
   @IsInt()
   @Min(10, { message: "최소 10명 이상이어야 합니다." })
   @Max(40, { message: "최대 40명까지 가능합니다." })
-  maxParticipants: number;
+  maxParticipants!: number;
 
   @IsEnum(TeamMode, { message: "유효한 팀 모드를 선택해주세요." })
-  teamMode: TeamMode;
+  teamMode!: TeamMode;
 
   @IsOptional()
   @IsBoolean()

@@ -38,7 +38,7 @@ export class ClanGateway
   implements OnGatewayConnection, OnGatewayDisconnect, OnModuleDestroy
 {
   @WebSocketServer()
-  server: Server;
+  server!: Server;
 
   private typingUsers = new Map<string, Map<string, NodeJS.Timeout>>(); // clanId -> Map<userId, Timeout>
   private readonly TYPING_TIMEOUT_MS = 3000; // 3 seconds

@@ -367,7 +367,24 @@ function DashboardHero({
   );
 }
 
-function QuickActions({ clan }: { clan: ClanSummary | null }) {
+/**
+ * 퀵액션 — "무언가를 새로 만드는" 행동만 둔다.
+ *
+ * 위쪽 히어로 지표(참가 가능한 내전 / 내전 기록 / 내 클랜)는 상태를 읽는 곳이고,
+ * 여기는 행동을 시작하는 곳이다. 예전에는 "내 클랜"·"내 전적"처럼 단순 이동도
+ * 섞여 있었는데, 목적지가 지표와 완전히 같은 데다 헤더 내비게이션에도 있어서
+ * 같은 곳으로 가는 입구가 셋씩 됐다. 이동은 지표와 헤더에 맡기고 뺐다.
+ *
+ * 남는 자리는 지금 상태에서 실제로 할 만한 것으로 채운다 —
+ * 계정을 안 걸었으면 연동, 클랜이 없으면 클랜 만들기.
+ */
+function QuickActions({
+  clan,
+  primaryAccount,
+}: {
+  clan: ClanSummary | null;
+  primaryAccount: RiotAccount | null;
+}) {
   const router = useRouter();
   const actions = [
     {
@@ -377,20 +394,30 @@ function QuickActions({ clan }: { clan: ClanSummary | null }) {
       href: "/tournaments?create=true",
       tone: "text-amber-300 bg-amber-300/[0.08] border-amber-300/10",
     },
-    {
-      label: clan ? "내 클랜" : "클랜 찾기",
-      description: clan ? `[${clan.tag}] ${clan.name}으로 이동` : "함께할 팀을 찾아보세요",
-      icon: Users,
-      href: "/clans",
-      tone: "text-violet-300 bg-violet-300/[0.08] border-violet-300/10",
-    },
-    {
-      label: "내 전적",
-      description: "경기 기록과 플레이 성향을 확인하세요",
-      icon: UserRound,
-      href: "/profile",
-      tone: "text-cyan-300 bg-cyan-300/[0.08] border-cyan-300/10",
-    },
+    // 라이엇 계정이 없으면 전적·티어가 아무것도 안 잡히므로 이게 가장 먼저 할 일이다.
+    ...(primaryAccount
+      ? []
+      : [
+          {
+            label: "라이엇 계정 연동",
+            description: "티어와 전적을 불러오려면 계정이 필요해요",
+            icon: UserRound,
+            href: "/settings?tab=accounts",
+            tone: "text-cyan-300 bg-cyan-300/[0.08] border-cyan-300/10",
+          },
+        ]),
+    // 클랜이 없을 때만 노출. 있으면 지표의 "내 클랜"이 그 역할을 한다.
+    ...(clan
+      ? []
+      : [
+          {
+            label: "클랜 만들기",
+            description: "같이 할 사람들을 모아보세요",
+            icon: Users,
+            href: "/clans/create",
+            tone: "text-violet-300 bg-violet-300/[0.08] border-violet-300/10",
+          },
+        ]),
     {
       label: "글쓰기",
       description: "커뮤니티에 새로운 이야기를 남겨보세요",
@@ -400,8 +427,17 @@ function QuickActions({ clan }: { clan: ClanSummary | null }) {
     },
   ];
 
+  // 상황에 따라 2~4개로 달라지므로 열 수를 개수에 맞춘다.
+  // 고정 4열로 두면 항목이 2개일 때 절반이 빈 채로 남는다.
+  const columnClass =
+    actions.length >= 4
+      ? "sm:grid-cols-2 xl:grid-cols-4"
+      : actions.length === 3
+        ? "sm:grid-cols-2 xl:grid-cols-3"
+        : "sm:grid-cols-2";
+
   return (
-    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <div className={cn("grid gap-3", columnClass)}>
       {actions.map((action) => (
         <button
           key={action.label}
@@ -1226,7 +1262,7 @@ export function DashboardContent() {
         clan={myClan}
       />
 
-      <QuickActions clan={myClan} />
+      <QuickActions clan={myClan} primaryAccount={primaryAccount} />
 
       {/* 방송 중인 스트리머가 있을 때만 나타나는 섹션 */}
       <ErrorBoundary>

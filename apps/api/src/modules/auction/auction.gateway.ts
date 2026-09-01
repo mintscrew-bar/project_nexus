@@ -40,7 +40,7 @@ export class AuctionGateway
   implements OnGatewayConnection, OnGatewayDisconnect, OnModuleDestroy
 {
   @WebSocketServer()
-  server: Server;
+  server!: Server;
 
   // Track connected users per room for disconnect handling
   private connectedUsers = new Map<

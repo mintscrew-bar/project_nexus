@@ -15,7 +15,7 @@ export type QueueGroupQuery = (typeof QUEUE_GROUPS)[number];
 export class SearchUsersQueryDto {
   @IsString()
   @IsNotEmpty({ message: "검색어(q)는 필수입니다." })
-  q: string;
+  q!: string;
 
   @IsOptional()
   @IsInt({ message: "limit는 정수여야 합니다." })
@@ -59,11 +59,11 @@ export class UserMatchHistoryQueryDto {
 export class FindSummonerQueryDto {
   @IsString()
   @IsNotEmpty({ message: "gameName은 필수입니다." })
-  gameName: string;
+  gameName!: string;
 
   @IsString()
   @IsNotEmpty({ message: "tagLine은 필수입니다." })
-  tagLine: string;
+  tagLine!: string;
 }
 
 // /stats/refresh/:userId

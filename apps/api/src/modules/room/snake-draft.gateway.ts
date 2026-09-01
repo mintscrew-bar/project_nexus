@@ -40,7 +40,7 @@ export class SnakeDraftGateway
   implements OnGatewayConnection, OnGatewayDisconnect, OnModuleDestroy
 {
   @WebSocketServer()
-  server: Server;
+  server!: Server;
 
   private connectedUsers = new Map<
     string,

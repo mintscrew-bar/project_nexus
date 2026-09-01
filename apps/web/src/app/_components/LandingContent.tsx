@@ -13,7 +13,6 @@ import {
   ArrowLeftRight,
   Scale,
   ShieldCheck,
-  Sparkles,
   Swords,
   Trophy,
   Users,
@@ -821,14 +820,7 @@ export function LandingContentSections() {
 
         <div className="mx-auto grid w-full max-w-[1480px] items-center gap-14 lg:grid-cols-[0.88fr_1.12fr] lg:gap-12">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5">
-              <Sparkles className="h-3.5 w-3.5 text-amber-300" />
-              <span className="text-[10px] font-semibold tracking-[0.16em] text-white/55 sm:text-xs">
-                CUSTOM MATCH OPERATIONS
-              </span>
-            </div>
-
-            <h1 className="mt-7 max-w-[760px] text-[clamp(3rem,6vw,6.25rem)] font-black leading-[0.98] tracking-[-0.065em] text-white">
+            <h1 className="max-w-[760px] text-[clamp(3rem,6vw,6.25rem)] font-black leading-[0.98] tracking-[-0.065em] text-white">
               내전 운영,
               <br />
               <span className="text-amber-200">
