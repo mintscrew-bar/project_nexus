@@ -186,8 +186,6 @@ export default function TournamentsPage() {
           </div>
         </header>
 
-        <AdSlotCard slotKey="feed" minHeight={90} className="mt-5" />
-
         <section data-tour="tournaments-results" className="py-8">
           <RoomList
             onCreateRoom={openRoomCreation}
@@ -201,6 +199,8 @@ export default function TournamentsPage() {
             onSortByChange={setSortBy}
           />
         </section>
+
+        <AdSlotCard slotKey="feed" minHeight={90} className="mb-6" />
 
         <Modal
           isOpen={isCreatingRoom}
