@@ -52,10 +52,24 @@
 
 > 현재 단일 인스턴스(`ecosystem.config.js` `instances:1`)라 매치 리미터가 동시 요청을 한 줄로 직렬화함 → "동시 429"는 안 나지만, 우선순위·중복제거가 없음.
 
-- [ ] Task 14: foreground 비차단 원칙 — 검색자에겐 캐시/부분 통계 즉시 반환 + "수집 중", 라이브 예산은 "최근 N판"에만 소량 사용
-- [ ] Task 15: 깊은 시즌 스캔은 전부 background 큐로 (foreground 줄 진입 금지). 한 명의 풀스캔이 다른 검색을 굶기지 않게
-- [ ] Task 16: single-flight 코얼레싱 — 같은 matchId / 같은 puuid 스캔이 진행 중이면 후속 요청은 올라타기 (인기 소환사 동시 검색 중복 fetch 제거)
-- [ ] Task 17: background 누적 큐 라운드로빈 — 유저별 공평 분배로 단일 깊은 스캔의 독점 방지
+- [x] Task 14: foreground 비차단 원칙 — 이미 만족돼 있었다(체크박스만 낡음).
+      `getChampionSeasonStats`는 DB에 쌓인 누적을 즉시 돌려주고 스캔은 큐에만 넣는다.
+      라이브 예산을 쓰는 foreground 경로는 `getRiotMatchHistory`의 최근 N판(기본 20)뿐이다.
+- [x] Task 15: 깊은 시즌 스캔 background 큐 — 이미 만족돼 있었다.
+      `ChampionScanState` 큐 + 2분 크론 워커(`handleChampionSeasonScan`)가 처리하고,
+      foreground는 큐잉만 한다. 접속자가 많으면 배경 백필(음수 우선순위)은 건너뛴다.
+- [x] Task 16: single-flight 코얼레싱 — `SingleFlight`(`common/utils/single-flight.ts`) 신설.
+      `getSummonerByRiotId`(조회당 3콜)와 `getMatchById`에 적용했다. 캐시는 "이미 끝난
+      요청"만 막고 "진행 중인 요청"은 못 막는데, 캐시가 비는 첫 순간의 중복이 전역
+      예산을 가장 크게 태운다. 매치 쪽은 우선순위까지 키에 넣어, 사람이 기다리는
+      요청이 배경 스캔의 예산 대기에 얹혀 오래 붙잡히지 않게 했다.
+      puuid 단위 스캔 중복은 `ChampionScanState.status`가 이미 막고 있다.
+      (주의: 재시도는 `fetchMatchById`를 직접 부른다 — 같은 키의 flight를 다시
+      기다리면 자기 완료를 기다리는 교착이 된다.)
+- [x] Task 17: background 큐 라운드로빈 — 이미 만족돼 있었다.
+      스캔은 100판 배치로 끊고 `scannedCount`를 커서로 남기며, 배치가 끝나면
+      `status=queued` + `requestedAt` 갱신으로 큐 뒤로 간다. 정렬이
+      `priority desc, requestedAt asc`라 같은 우선순위 안에서 자연스럽게 회전한다.
 - [ ] Task 18: (확장 대비, 후순위) 매치 리미터 간격을 인메모리(`lastMatchRequestAt`) → Redis로 이전. 현재 `instances:1`이라 미발생, 클러스터 전환 시 필수
 
 ### F. 예산 회수 (Lab 보류 후속)

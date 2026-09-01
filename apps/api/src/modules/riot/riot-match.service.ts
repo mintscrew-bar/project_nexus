@@ -5,6 +5,7 @@ import axios from "axios";
 import { PrismaService } from "../prisma/prisma.service";
 import { RedisService } from "../redis/redis.service";
 import { RiotRateLimiterService } from "./riot-rate-limiter.service";
+import { SingleFlight } from "@/common/utils/single-flight";
 
 // Riot Match-V5 API Response Types
 export interface MatchDto {
@@ -154,6 +155,14 @@ export class RiotMatchService {
   private readonly logger = new Logger(RiotMatchService.name);
   private readonly apiKey: string;
   private readonly baseUrl = "https://asia.api.riotgames.com";
+  /**
+   * 같은 매치를 동시에 받으려는 호출을 하나로 합친다.
+   * 대진표·전적·시즌 스캔이 같은 경기를 겹쳐 요청하는 일이 잦은데,
+   * 캐시에 들어가기 전까지는 전부 각자 Riot을 때린다.
+   * 우선순위까지 키에 넣어, 사람이 기다리는 요청이 배경 스캔의 예산 대기에
+   * 얹혀 오래 붙잡히지 않게 한다.
+   */
+  private readonly matchFlight = new SingleFlight();
   private readonly matchRateLimitMax: number;
   private readonly matchRateLimitWindowSeconds: number;
   private readonly matchRequestDelayMs: number;
@@ -457,6 +466,24 @@ export class RiotMatchService {
       this.logger.warn(`DB cache read failed for ${matchId}: ${dbErr}`);
     }
 
+    // 캐시에 없으면 여기서부터가 실제 호출이다. 같은 매치를 동시에 노리는
+    // 호출은 한 줄로 합쳐 전역 예산을 아낀다.
+    return this.matchFlight.run(`${priority}:${matchId}`, () =>
+      this.fetchMatchById(matchId, retries, priority, options),
+    );
+  }
+
+  /**
+   * 실제 Riot 호출. 이미 single-flight 안에서 도는 중이므로 재시도는
+   * `getMatchById`가 아니라 자기 자신을 다시 부른다 — 같은 키의 flight를
+   * 다시 기다리면 자기 완료를 기다리는 교착이 된다.
+   */
+  private async fetchMatchById(
+    matchId: string,
+    retries: number,
+    priority: RiotMatchRequestPriority,
+    options: GetMatchByIdOptions,
+  ): Promise<MatchDto | null> {
     try {
       const url = `${this.baseUrl}/lol/match/v5/matches/${matchId}`;
 
@@ -526,7 +553,7 @@ export class RiotMatchService {
       if (error.response?.status === 429) {
         if (retries > 0) {
           await this.waitForRateLimit(error.response.headers["retry-after"]);
-          return this.getMatchById(matchId, retries - 1, priority, options);
+          return this.fetchMatchById(matchId, retries - 1, priority, options);
         }
         this.logger.error(
           `Rate limit exhausted for match ${matchId}, skipping`,
@@ -549,7 +576,7 @@ export class RiotMatchService {
           `Riot API ${error.response.status} for ${matchId}, retrying (${retries} left)...`,
         );
         await new Promise((resolve) => setTimeout(resolve, 800));
-        return this.getMatchById(matchId, retries - 1, priority, options);
+        return this.fetchMatchById(matchId, retries - 1, priority, options);
       }
 
       if (!error.response && retries > 0) {
@@ -558,7 +585,7 @@ export class RiotMatchService {
           `Network error for match ${matchId}, retrying (${retries} left)...`,
         );
         await new Promise((resolve) => setTimeout(resolve, 1000));
-        return this.getMatchById(matchId, retries - 1, priority, options);
+        return this.fetchMatchById(matchId, retries - 1, priority, options);
       }
 
       this.logger.error(`Error fetching match ${matchId}:`, error.message);

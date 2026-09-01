@@ -23,6 +23,7 @@ import {
   toStoredPeakTier,
 } from "./riot-rank.util";
 import { RiotRateLimiterService } from "./riot-rate-limiter.service";
+import { SingleFlight } from "@/common/utils/single-flight";
 
 // 티어별 포인트 (팀 밸런싱, 경매 선수 가치 산정에 사용)
 export const TIER_POINTS: Record<string, number> = {
@@ -88,6 +89,12 @@ export class RiotService {
   private readonly apiKey: string;
   private readonly baseUrl: string;
   private readonly asiaUrl = "https://asia.api.riotgames.com";
+  /**
+   * 같은 소환사를 여러 명이 동시에 검색할 때 중복 호출을 막는다.
+   * 한 번 조회에 account-v1 + summoner-v4 + league-v4 로 3콜이 나가므로,
+   * 캐시가 비어 있는 첫 순간의 중복이 전역 예산(100/2분)을 가장 크게 태운다.
+   */
+  private readonly summonerFlight = new SingleFlight();
 
   constructor(
     private readonly configService: ConfigService,
@@ -305,6 +312,18 @@ export class RiotService {
       return JSON.parse(cached);
     }
 
+    // 캐시는 "이미 끝난 요청"만 막는다. 캐시가 비는 첫 순간에 몰린 동시 검색은
+    // 여기서 한 줄로 합쳐, 뒤따라온 요청은 앞선 조회 결과를 그대로 받는다.
+    return this.summonerFlight.run(cacheKey, () =>
+      this.fetchSummonerByRiotId(gameName, tagLine, cacheKey),
+    );
+  }
+
+  private async fetchSummonerByRiotId(
+    gameName: string,
+    tagLine: string,
+    cacheKey: string,
+  ) {
     const url = `${this.asiaUrl}/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}`;
 
     let account;
