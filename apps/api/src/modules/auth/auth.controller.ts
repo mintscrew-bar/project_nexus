@@ -42,6 +42,21 @@ export class AuthController {
     };
   }
 
+  /**
+   * OAuth 로그인 state 쿠키.
+   * 공격자는 피해자 브라우저에 이 쿠키를 심을 수 없으므로,
+   * 콜백의 state 쿼리와 이 값이 일치해야만 우리가 시작시킨 흐름으로 인정한다.
+   */
+  private getOAuthStateCookieOptions(): CookieOptions {
+    return {
+      httpOnly: true,
+      secure: this.configService.get("NODE_ENV") === "production",
+      sameSite: "lax",
+      maxAge: 10 * 60 * 1000,
+      path: "/api/auth",
+    };
+  }
+
   private setRefreshTokenCookie(res: Response, refreshToken: string) {
     res.cookie(
       "refresh_token",
@@ -95,9 +110,26 @@ export class AuthController {
   // ========================================
 
   @Get("discord")
-  @UseGuards(AuthGuard("discord"))
-  discordAuth() {
-    // Passport가 Discord로 리다이렉트함
+  async discordAuth(@Res() res: Response) {
+    // Passport 기본 리다이렉트 대신 직접 URL을 만든다.
+    // 로그인 CSRF를 막으려면 state를 우리가 발급해 쿠키와 묶어야 하는데,
+    // 이 앱은 무상태 JWT 구조라 passport의 세션 기반 state 옵션을 쓸 수 없다.
+    const callbackUrl =
+      this.configService.get<string>("DISCORD_CALLBACK_URL") ||
+      `${this.configService.get("API_URL") || "http://localhost:4000"}/api/auth/discord/callback`;
+
+    const state = await this.authService.issueOAuthLoginState();
+    res.cookie("oauth_state", state, this.getOAuthStateCookieOptions());
+
+    const discordAuthUrl =
+      `https://discord.com/api/oauth2/authorize` +
+      `?client_id=${this.configService.get("DISCORD_CLIENT_ID")}` +
+      `&redirect_uri=${encodeURIComponent(callbackUrl)}` +
+      `&response_type=code` +
+      `&scope=identify%20email` +
+      `&state=${state}`;
+
+    return res.redirect(discordAuthUrl);
   }
 
   @Get("discord/callback")
@@ -111,6 +143,25 @@ export class AuthController {
     // 실제 Redis link token인지 확인된 경우에만 연동 로직으로 분기한다.
     if (state && (await this.authService.isValidLinkToken(state, "discord"))) {
       return this.handleDiscordLink(code, state, res);
+    }
+
+    // ── 로그인 CSRF 방어 ──
+    // 우리가 발급한 state여야 하고(Redis 단회), 그 state를 받은 브라우저여야 한다(쿠키).
+    // 둘 중 하나라도 어긋나면 공격자가 자기 인가 코드를 피해자에게 흘린 경우다.
+    const stateCookie = req.cookies?.oauth_state as string | undefined;
+    res.clearCookie("oauth_state", this.getOAuthStateCookieOptions());
+
+    const stateMatchesBrowser =
+      !!state && !!stateCookie && state === stateCookie;
+    const stateConsumed =
+      stateMatchesBrowser &&
+      (await this.authService.consumeOAuthLoginState(state));
+
+    if (!stateConsumed) {
+      this.logger.warn(
+        "Discord OAuth 콜백 state 검증 실패 — 로그인 CSRF 가능성",
+      );
+      return res.redirect(`${appUrl}/auth/login?error=invalid_state`);
     }
 
     try {

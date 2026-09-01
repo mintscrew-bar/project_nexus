@@ -197,6 +197,35 @@ export class AuthService {
    * 신규 OAuth 가입자에게 약관 동의 전용 임시 토큰 발급 (10분 유효)
    * 정식 JWT 발급 전 약관 동의를 강제하기 위해 Redis에만 저장
    */
+  /**
+   * OAuth 로그인 CSRF 방어용 state 발급.
+   *
+   * state가 없으면 공격자가 자기 계정의 인가 코드를 피해자 브라우저에 흘려보내
+   * 피해자를 공격자 계정으로 로그인시킬 수 있다(로그인 CSRF).
+   * Redis는 단회성·만료를 담당하고, 브라우저 결속은 컨트롤러가 심는
+   * HttpOnly 쿠키가 담당한다. 둘 다 맞아야 통과시킨다.
+   *
+   * Redis만으로는 부족하다 — 공격자도 정상적으로 flow를 시작해
+   * 유효한 state를 얻을 수 있기 때문이다. 쿠키는 공격자가 피해자 브라우저에
+   * 심을 수 없으므로 그쪽이 실제 결속 수단이다.
+   */
+  async issueOAuthLoginState(): Promise<string> {
+    const state = randomUUID();
+    // 10분 — 약관을 읽거나 Discord 로그인을 새로 하는 시간까지 감안
+    await this.redis.set(`oauth_login_state:${state}`, "1", 600);
+    return state;
+  }
+
+  /** state를 1회 소비한다. 유효하지 않거나 이미 쓰였으면 false. */
+  async consumeOAuthLoginState(state: string | undefined): Promise<boolean> {
+    if (!state) return false;
+    const key = `oauth_login_state:${state}`;
+    const stored = await this.redis.get(key);
+    if (!stored) return false;
+    await this.redis.del(key);
+    return true;
+  }
+
   async generatePendingTermsToken(userId: string): Promise<string> {
     const token = randomUUID();
     // 10분 유효 (약관을 읽고 동의하기에 충분한 시간)

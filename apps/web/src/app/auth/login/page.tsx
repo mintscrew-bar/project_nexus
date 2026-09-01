@@ -33,6 +33,23 @@ function getRedirectNotice(redirect: string | null) {
 }
 
 /**
+ * 서버가 넘기는 에러 코드 → 사용자 문구.
+ * 코드를 그대로 노출하면 "invalid_state" 같은 문자열이 화면에 뜬다.
+ */
+const ERROR_MESSAGES: Record<string, string> = {
+  invalid_state:
+    "로그인 요청이 만료되었거나 올바르지 않습니다. 다시 시도해주세요.",
+  session_failed: "세션을 시작하지 못했습니다. 다시 로그인해주세요.",
+  exchange_failed: "로그인 처리 중 문제가 발생했습니다. 다시 시도해주세요.",
+  missing_code: "로그인 정보가 전달되지 않았습니다. 다시 시도해주세요.",
+  auth_failed: "로그인에 실패했습니다. 다시 시도해주세요.",
+};
+
+function toErrorMessage(code: string): string {
+  return ERROR_MESSAGES[code] ?? code;
+}
+
+/**
  * URL 쿼리(error, redirect)에 의존하는 부분만 분리한 컴포넌트.
  * useSearchParams는 SSR에서 CSR bailout을 일으키므로, 이 부분만 Suspense 경계 안에 두어야
  * 로그인 카드 본문(로고, 버튼, 안내 문구)이 SSR HTML에 남는다. 합쳐두면 첫 페인트가 빈 화면이 된다.
@@ -47,7 +64,7 @@ function LoginQueryNotices() {
   useEffect(() => {
     const errorParam = searchParams.get("error");
     if (errorParam) {
-      setError(decodeURIComponent(errorParam));
+      setError(toErrorMessage(decodeURIComponent(errorParam)));
       // URL에서 에러 파라미터 제거
       window.history.replaceState({}, "", "/auth/login");
     }
