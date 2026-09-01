@@ -2324,6 +2324,14 @@ export const adminApi = {
     const response = await apiClient.get("/admin/chat-logs", { params });
     return response.data;
   },
+  getErrorLogs: async (params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+  }) => {
+    const response = await apiClient.get("/admin/error-logs", { params });
+    return response.data;
+  },
   // Community
   getPosts: async (params?: {
     page?: number;

@@ -16,6 +16,7 @@ import { ClansTab } from "@/components/admin/game/ClansTab";
 import { RoomsTab } from "@/components/admin/game/RoomsTab";
 import { MatchesTab } from "@/components/admin/game/MatchesTab";
 import { DiscordGuildLinksTab } from "@/components/admin/system/DiscordGuildLinksTab";
+import { ErrorLogsTab } from "@/components/admin/system/ErrorLogsTab";
 import {
   Shield,
   Users,
@@ -29,6 +30,7 @@ import {
   Megaphone,
   Radio,
   Bot,
+  Bug,
 } from "lucide-react";
 
 type Tab =
@@ -43,7 +45,8 @@ type Tab =
   | "announcements"
   | "streamers"
   | "appeals"
-  | "discord";
+  | "discord"
+  | "errors";
 
 interface TabItem {
   id: Tab;
@@ -129,6 +132,11 @@ const TAB_GROUPS: TabGroup[] = [
   {
     label: "시스템",
     tabs: [
+      {
+        id: "errors",
+        label: "오류 로그",
+        icon: <Bug className="h-4 w-4" />,
+      },
       {
         id: "discord",
         label: "디스코드 연동",
@@ -248,6 +256,7 @@ export default function AdminPage() {
         {activeTab === "reports" && <ReportsTab addToast={addToast} />}
         {activeTab === "appeals" && <AppealsTab addToast={addToast} />}
         {activeTab === "chatlogs" && <ChatLogsTab />}
+        {activeTab === "errors" && <ErrorLogsTab />}
         {activeTab === "community" && (
           <CommunityTab addToast={addToast} isAdmin={isAdmin} />
         )}

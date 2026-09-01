@@ -7,6 +7,7 @@ import { TasksModule } from "../tasks/tasks.module";
 import { DiscordModule } from "../discord/discord.module";
 import { DmModule } from "../dm/dm.module";
 import { NotificationModule } from "../notification/notification.module";
+import { ClientErrorLogController } from "./client-error-log.controller";
 
 @Module({
   imports: [
@@ -17,7 +18,7 @@ import { NotificationModule } from "../notification/notification.module";
     DmModule,
     NotificationModule,
   ],
-  controllers: [AdminController],
+  controllers: [AdminController, ClientErrorLogController],
   providers: [AdminService],
   exports: [AdminService],
 })

@@ -836,6 +836,45 @@ export class AdminService {
 
   // ── Chat Logs ─────────────────────────────────────────────────────────────
 
+  async getClientErrorLogs(params: {
+    page: number;
+    limit: number;
+    search?: string;
+  }) {
+    const { page, limit, search } = params;
+    const where = search
+      ? {
+          OR: [
+            { message: { contains: search, mode: "insensitive" as const } },
+            { path: { contains: search, mode: "insensitive" as const } },
+            {
+              user: {
+                username: {
+                  contains: search,
+                  mode: "insensitive" as const,
+                },
+              },
+            },
+          ],
+        }
+      : {};
+
+    const [logs, total] = await Promise.all([
+      this.prisma.clientErrorLog.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * limit,
+        take: limit,
+        include: {
+          user: { select: { id: true, username: true, role: true } },
+        },
+      }),
+      this.prisma.clientErrorLog.count({ where }),
+    ]);
+
+    return { logs, total, page, limit };
+  }
+
   async getChatLogs(params: {
     page: number;
     limit: number;

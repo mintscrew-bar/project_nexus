@@ -205,6 +205,17 @@ export class AdminController {
     return this.adminService.sendUserMessage(req.user.sub, body);
   }
 
+  // ── Client Error Logs (ADMIN only) ─────────────────────────────────────────
+  @Get("error-logs")
+  @Roles(UserRole.ADMIN)
+  getClientErrorLogs(@Query() query: AdminPageQueryDto) {
+    return this.adminService.getClientErrorLogs({
+      page: query.page,
+      limit: query.limit,
+      search: query.search,
+    });
+  }
+
   // ── Chat Logs (ADMIN + MODERATOR) ──────────────────────────────────────────
   @Get("chat-logs")
   @Roles(UserRole.ADMIN, UserRole.MODERATOR)
