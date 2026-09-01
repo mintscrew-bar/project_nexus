@@ -15,9 +15,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL('/auth/login?error=missing_code', appUrl));
   }
 
-  // 서버 사이드에서 단회용 코드를 실제 토큰으로 교환
-  // 브라우저가 토큰을 URL로 받지 않으므로 히스토리/로그 노출 없음
-  let accessToken: string;
+  // 서버 사이드에서 단회용 코드를 refresh 쿠키로 교환한다.
+  // access token은 응답에 담겨 오지만 브라우저로 넘기지 않는다 —
+  // 리다이렉트 URL에 실으면 nginx access log와 same-origin 요청의 Referer에
+  // 평문으로 남는다. 클라이언트는 이 쿠키로 /api/auth/refresh를 호출해
+  // 메모리에만 토큰을 받아간다.
   let refreshCookieValue: string;
   try {
     const exchangeRes = await fetch(`${apiUrl}/api/auth/exchange`, {
@@ -29,9 +31,6 @@ export async function GET(request: NextRequest) {
     if (!exchangeRes.ok) {
       throw new Error(`코드 교환 실패: ${exchangeRes.status}`);
     }
-
-    const data = await exchangeRes.json();
-    accessToken = data.accessToken;
 
     // Set-Cookie 헤더에서 암호화된 refresh_token 쿠키 값을 프론트엔드 도메인으로 전달
     const setCookieHeader = exchangeRes.headers.get('set-cookie');
@@ -45,21 +44,24 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL('/auth/login?error=exchange_failed', appUrl));
   }
 
-  // access_token만 /auth/callback 페이지로 전달 (메모리에 저장 후 URL 즉시 제거)
-  const response = NextResponse.redirect(
-    new URL(`/auth/callback?token=${accessToken}`, appUrl)
-  );
+  // refresh 쿠키가 없으면 세션을 세울 수단이 없다. 깨진 콜백 화면 대신 로그인으로 되돌린다.
+  if (!refreshCookieValue) {
+    return NextResponse.redirect(
+      new URL('/auth/login?error=exchange_failed', appUrl)
+    );
+  }
+
+  // 쿼리스트링 없이 콜백 페이지로 보낸다. 토큰은 아래 쿠키로만 전달된다.
+  const response = NextResponse.redirect(new URL('/auth/callback', appUrl));
 
   // refresh_token은 암호화된 HTTP-only 쿠키 값으로 설정
-  if (refreshCookieValue) {
-    response.cookies.set('refresh_token', refreshCookieValue, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60,
-      path: '/api/auth',
-    });
-  }
+  response.cookies.set('refresh_token', refreshCookieValue, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: 7 * 24 * 60 * 60,
+    path: '/api/auth',
+  });
 
   return response;
 }

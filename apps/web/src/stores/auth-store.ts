@@ -18,6 +18,8 @@ interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   initializeAuth: () => Promise<void>;
+  /** OAuth 콜백 직후 refresh 쿠키만으로 세션을 세운다. */
+  completeOAuthLogin: () => Promise<void>;
   emailLogin: (credentials: { email: string; password: string }) => Promise<void>;
   loginWithDiscord: () => void;
   logout: () => Promise<void>;
@@ -195,6 +197,23 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   setUser: (user: User | null) => {
     set({ user, isAuthenticated: !!user });
+  },
+
+  completeOAuthLogin: async () => {
+    // OAuth 콜백 시점에는 refresh 쿠키가 방금 설정된 상태다.
+    // initializeAuth는 세션 힌트/캐시가 없으면 비로그인으로 단정하고 조기 반환하므로
+    // 최초 로그인에는 쓸 수 없다. 여기서는 조건 없이 refresh → /auth/me를 수행한다.
+    set({ isLoading: true });
+    try {
+      const user = await authApi.initSession();
+      saveUserToStorage(user);
+      set({ user, isAuthenticated: true, isLoading: false });
+    } catch (error) {
+      clearUserFromStorage();
+      set({ user: null, isAuthenticated: false, isLoading: false });
+      setAccessToken(null);
+      throw error;
+    }
   },
 
   fetchUser: async () => {

@@ -1,8 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useRef } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
-import { setAccessToken } from "@/lib/api-client";
+import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/auth-store";
 
 const POST_LOGIN_REDIRECT_KEY = "nexus_post_login_redirect";
@@ -16,37 +15,28 @@ function takeStoredRedirect() {
 }
 
 function AuthCallbackContent() {
-  const searchParams = useSearchParams();
   const router = useRouter();
-  const { fetchUser } = useAuthStore();
+  const { completeOAuthLogin } = useAuthStore();
   const processed = useRef(false);
 
   useEffect(() => {
-    // 중복 실행 방지 (replaceState 후 searchParams 변경으로 재실행되는 문제)
+    // 중복 실행 방지 (StrictMode 이중 마운트 포함)
     if (processed.current) return;
+    processed.current = true;
 
-    const token = searchParams.get("token");
-
-    if (token) {
-      processed.current = true;
-
-      // 토큰을 URL에서 즉시 제거 (브라우저 히스토리/Referer 노출 방지)
-      window.history.replaceState({}, "", "/auth/callback");
-
-      // 토큰 저장
-      setAccessToken(token);
-
-      // 사용자 정보 가져오기
-      fetchUser().then(() => {
+    // 토큰은 URL이 아니라 직전 라우트 핸들러가 심어둔 HTTP-only refresh 쿠키로 온다.
+    // 쿠키 → /api/auth/refresh → 메모리 저장 순서라 URL·로그·Referer에 남지 않는다.
+    completeOAuthLogin()
+      .then(() => {
         const redirect = takeStoredRedirect();
         // 신규 사용자도 설정 페이지로 강제 이동시키지 않는다.
         // 메인 페이지에서 온보딩 모달을 띄우고 필요한 설정을 이어서 진행한다.
         router.push(redirect ?? "/");
+      })
+      .catch(() => {
+        router.push("/auth/login?error=session_failed");
       });
-    } else {
-      router.push("/auth/login");
-    }
-  }, [searchParams, router, fetchUser]);
+  }, [router, completeOAuthLogin]);
 
   return (
     <div className="flex items-center justify-center min-h-screen">
