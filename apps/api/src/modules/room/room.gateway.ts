@@ -59,6 +59,8 @@ export class RoomGateway
   private readonly TYPING_TIMEOUT_MS = 3000; // 3 seconds
   private roomListDeltaTimers = new Map<string, NodeJS.Timeout>();
   private readonly ROOM_LIST_DELTA_DEBOUNCE_MS = 250;
+  private disconnectCleanupTimers = new Map<string, NodeJS.Timeout>();
+  private readonly DISCONNECT_CLEANUP_GRACE_MS = 90_000;
   // Guard against concurrent start-game calls (double-click, race)
   private startingRooms = new Set<string>();
 
@@ -94,6 +96,10 @@ export class RoomGateway
       clearTimeout(timer);
     }
     this.roomListDeltaTimers.clear();
+    for (const timer of this.disconnectCleanupTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.disconnectCleanupTimers.clear();
     this.userSockets.clear();
     this.socketRooms.clear();
     this.roomUserSockets.clear();
@@ -123,6 +129,11 @@ export class RoomGateway
 
   private trackRoomSocket(roomId: string, userId: string, socketId: string) {
     const key = this.getRoomUserSocketKey(roomId, userId);
+    const pendingCleanup = this.disconnectCleanupTimers.get(key);
+    if (pendingCleanup) {
+      clearTimeout(pendingCleanup);
+      this.disconnectCleanupTimers.delete(key);
+    }
     if (!this.roomUserSockets.has(key)) {
       this.roomUserSockets.set(key, new Set());
     }
@@ -153,6 +164,11 @@ export class RoomGateway
     options?: { skipRoomLeftForSocketId?: string },
   ) {
     const key = this.getRoomUserSocketKey(roomId, userId);
+    const pendingCleanup = this.disconnectCleanupTimers.get(key);
+    if (pendingCleanup) {
+      clearTimeout(pendingCleanup);
+      this.disconnectCleanupTimers.delete(key);
+    }
     const sockets = this.roomUserSockets.get(key);
     if (!sockets) return;
 
@@ -168,40 +184,110 @@ export class RoomGateway
     this.stopTyping(roomId, userId);
   }
 
+  async finalizeAtomicRoomSwitch(
+    userId: string,
+    username: string | undefined,
+    previousRoomIds: string[],
+  ) {
+    for (const previousRoomId of previousRoomIds) {
+      this.detachUserFromRoom(previousRoomId, userId);
+      this.server.to(previousRoomId).emit("user-left", { userId, username });
+      try {
+        await this.roomService.getRoomStatus(previousRoomId);
+        this.broadcastRoomDelta("update", previousRoomId);
+      } catch {
+        this.broadcastRoomDelta("remove", previousRoomId);
+      }
+    }
+  }
+
   private async leaveOtherWaitingRooms(
     client: AuthenticatedSocket,
     targetRoomId: string,
+    atomicallyRemovedRoomIds: string[] = [],
+    switchHandledInTransaction = false,
   ) {
     if (!client.userId) return;
 
-    const previousRoomIds = this.getTrackedRoomIdsForUser(client.userId).filter(
-      (roomId) => roomId !== targetRoomId,
-    );
+    // 신규 입장은 서비스 트랜잭션이 DB의 이전 참가 기록까지 모두 정리한다.
+    // 재접속 경로만 레거시/비정상 중복 기록을 확인한다. 신규 입장 커밋 뒤에
+    // 별도 DB 조회를 두지 않아 "응답은 실패했지만 참가는 완료"되는 상태를 막는다.
+    const persistedRoomIds = switchHandledInTransaction
+      ? []
+      : await this.roomService.getOtherWaitingRoomIdsForUser(
+          client.userId,
+          targetRoomId,
+        );
+    const previousRoomIds = [
+      ...new Set([
+        ...this.getTrackedRoomIdsForUser(client.userId),
+        ...persistedRoomIds,
+        ...atomicallyRemovedRoomIds,
+      ]),
+    ].filter((roomId) => roomId !== targetRoomId);
 
     for (const previousRoomId of previousRoomIds) {
-      const isCurrentSocketInPreviousRoom =
-        this.socketRooms.get(client.id) === previousRoomId;
-
-      this.detachUserFromRoom(previousRoomId, client.userId, {
-        skipRoomLeftForSocketId: isCurrentSocketInPreviousRoom
-          ? client.id
-          : undefined,
-      });
-
       try {
         const prevStatus = await this.roomService.getRoomStatus(previousRoomId);
         if (prevStatus === RoomStatus.WAITING) {
-          await this.roomService.leaveRoom(client.userId, previousRoomId);
+          if (!atomicallyRemovedRoomIds.includes(previousRoomId)) {
+            await this.roomService.leaveRoom(client.userId, previousRoomId);
+          }
+          const isCurrentSocketInPreviousRoom =
+            this.socketRooms.get(client.id) === previousRoomId;
+          this.detachUserFromRoom(previousRoomId, client.userId, {
+            skipRoomLeftForSocketId: isCurrentSocketInPreviousRoom
+              ? client.id
+              : undefined,
+          });
           this.server.to(previousRoomId).emit("user-left", {
             userId: client.userId,
             username: client.username,
           });
           this.broadcastRoomDelta("update", previousRoomId);
         }
-      } catch {
-        // 이전 방이 이미 삭제됐거나 오류 — 무시
+      } catch (error) {
+        if (atomicallyRemovedRoomIds.includes(previousRoomId)) {
+          this.detachUserFromRoom(previousRoomId, client.userId);
+          this.broadcastRoomDelta("remove", previousRoomId);
+          continue;
+        }
+        throw error;
       }
     }
+  }
+
+  private scheduleDisconnectedWaitingRoomCleanup(
+    roomId: string,
+    userId: string,
+    username?: string,
+  ) {
+    const key = this.getRoomUserSocketKey(roomId, userId);
+    if (this.roomUserSockets.has(key)) return;
+
+    const previousTimer = this.disconnectCleanupTimers.get(key);
+    if (previousTimer) clearTimeout(previousTimer);
+
+    const timer = setTimeout(async () => {
+      this.disconnectCleanupTimers.delete(key);
+      if (this.roomUserSockets.has(key)) return;
+
+      try {
+        const status = await this.roomService.getRoomStatus(roomId);
+        if (status !== RoomStatus.WAITING) return;
+
+        const result: any = await this.roomService.leaveRoom(userId, roomId);
+        this.server.to(roomId).emit("user-left", { userId, username });
+        this.broadcastRoomDelta(
+          result?.roomDeleted ? "remove" : "update",
+          roomId,
+        );
+      } catch {
+        // 이미 명시적으로 퇴장했거나 방이 삭제된 경우에는 할 일이 없다.
+      }
+    }, this.DISCONNECT_CLEANUP_GRACE_MS);
+
+    this.disconnectCleanupTimers.set(key, timer);
   }
 
   async handleConnection(client: AuthenticatedSocket) {
@@ -258,6 +344,11 @@ export class RoomGateway
     this.untrackRoomSocket(roomId, userId, client.id);
     // 타이핑 상태도 즉시 해제 (재연결 시 알아서 다시 emit)
     this.stopTyping(roomId, userId);
+    this.scheduleDisconnectedWaitingRoomCleanup(
+      roomId,
+      userId,
+      client.username,
+    );
   }
 
   // ========================================
@@ -363,10 +454,6 @@ export class RoomGateway
         return { error: "Unauthorized" };
       }
 
-      // 같은 유저가 다른 탭/새 소켓으로 다른 방에 들어오면 이전 방을 정리한다.
-      // 같은 방을 여러 탭으로 보는 것은 유지하고, 다른 방에 동시에 남는 것만 막는다.
-      await this.leaveOtherWaitingRooms(client, data.roomId);
-
       // First, check if user is already a participant
       let room = await this.roomService.getRoomById(data.roomId);
       const isAlreadyParticipant = room.participants.some(
@@ -387,6 +474,16 @@ export class RoomGateway
         // 재입장: 최신 방 데이터 재조회 (상태가 변경되었을 수 있음)
         room = await this.roomService.getRoomById(data.roomId);
       }
+
+      // 대상 방 입장이 성공한 뒤 기존 대기방을 정리한다. 비밀번호 오류·정원 초과 등으로
+      // 새 방 입장이 실패했을 때 기존 참가 상태까지 잃지 않게 순서가 중요하다.
+      // 같은 방을 여러 탭으로 보는 것은 유지하고, 다른 방에 동시에 남는 것만 막는다.
+      await this.leaveOtherWaitingRooms(
+        client,
+        data.roomId,
+        (room as any).switchedFromRoomIds ?? [],
+        isNewJoin,
+      );
 
       // Join Socket.IO room
       client.join(data.roomId);

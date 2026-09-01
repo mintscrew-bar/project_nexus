@@ -1531,7 +1531,7 @@ export class RoomService {
   async joinRoom(userId: string, dto: JoinRoomDto) {
     const joinAsSpectator = dto.asSpectator === true;
 
-    const joinedRoomId = await this.runSerializableTx(async (tx) => {
+    const switchResult = await this.runSerializableTx(async (tx) => {
       const room = await tx.room.findUnique({
         where: { id: dto.roomId },
         include: {
@@ -1598,6 +1598,40 @@ export class RoomService {
         );
       }
 
+      const otherParticipations = await tx.roomParticipant.findMany({
+        where: {
+          userId,
+          roomId: { not: room.id },
+        },
+        include: {
+          room: {
+            include: {
+              participants: {
+                include: {
+                  user: { select: { username: true } },
+                },
+              },
+            },
+          },
+        },
+      });
+
+      const activeParticipation = otherParticipations.find(
+        (participation: any) =>
+          participation.room.status !== RoomStatus.WAITING &&
+          participation.room.status !== RoomStatus.COMPLETED,
+      );
+      if (activeParticipation) {
+        throw new BadRequestException(
+          `ACTIVE_ROOM_EXISTS::${activeParticipation.room.id}::진행 중인 내전 '${activeParticipation.room.name}'에 먼저 복귀해주세요.`,
+        );
+      }
+
+      const previousWaitingParticipations = otherParticipations.filter(
+        (participation: any) =>
+          participation.room.status === RoomStatus.WAITING,
+      );
+
       await tx.roomParticipant.create({
         data: {
           roomId: room.id,
@@ -1606,15 +1640,100 @@ export class RoomService {
         },
       });
 
-      return room.id;
+      const roomsToDelete: string[] = [];
+      for (const participation of previousWaitingParticipations as any[]) {
+        const previousRoom = participation.room;
+        const remainingParticipants = previousRoom.participants.filter(
+          (candidate: any) => candidate.userId !== userId,
+        );
+        const onlyBotsRemain =
+          remainingParticipants.length > 0 &&
+          remainingParticipants.every((candidate: any) =>
+            /^testbot_\d+$/.test(candidate.user?.username ?? ""),
+          );
+
+        await tx.roomParticipant.deleteMany({
+          where: { roomId: previousRoom.id, userId },
+        });
+
+        if (remainingParticipants.length === 0 || onlyBotsRemain) {
+          roomsToDelete.push(previousRoom.id);
+          continue;
+        }
+
+        if (previousRoom.hostId === userId) {
+          const nextHost =
+            remainingParticipants.find(
+              (candidate: any) =>
+                !/^testbot_\d+$/.test(candidate.user?.username ?? ""),
+            ) ?? remainingParticipants[0];
+          await tx.room.update({
+            where: { id: previousRoom.id },
+            data: { hostId: nextHost.userId },
+          });
+        }
+      }
+
+      return {
+        joinedRoomId: room.id,
+        previousRoomIds: previousWaitingParticipations.map(
+          (participation: any) => participation.roomId,
+        ),
+        roomsToDelete,
+      };
     });
 
-    const roomData = await this.getRoomById(joinedRoomId);
+    for (const previousRoomId of switchResult.roomsToDelete) {
+      try {
+        if (this.discordVoiceService) {
+          await this.discordVoiceService.deleteRoomChannels(previousRoomId);
+        }
+        await this.deleteRoomData(previousRoomId);
+        this.discordBotService?.clearRoomNotification(previousRoomId);
+      } catch (error) {
+        this.logger.warn(
+          `[Room] Failed to clean empty previous room ${previousRoomId} after room switch: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
 
-    this.refreshDiscordRoomNotification(joinedRoomId);
+    const roomData = await this.getRoomById(switchResult.joinedRoomId);
+
+    this.refreshDiscordRoomNotification(switchResult.joinedRoomId);
+    for (const previousRoomId of switchResult.previousRoomIds) {
+      if (!switchResult.roomsToDelete.includes(previousRoomId)) {
+        this.refreshDiscordRoomNotification(previousRoomId);
+      }
+    }
     this.warmRankedScanForUser(userId);
 
-    return roomData;
+    return {
+      ...roomData,
+      switchedFromRoomIds: switchResult.previousRoomIds,
+    };
+  }
+
+  /**
+   * 새 방 입장 시 정리할 기존 대기방을 DB 참가 기록 기준으로 찾는다.
+   *
+   * 사용자가 로비에서 사이트 내부의 다른 페이지로 이동하면 소켓 연결은 끊기지만
+   * 참가 슬롯은 유지한다. 따라서 새 방에 들어올 때는 Gateway의 현재 소켓 추적만으로
+   * 이전 방을 찾을 수 없고, 영속화된 참가 기록을 기준으로 조회해야 한다.
+   */
+  async getOtherWaitingRoomIdsForUser(
+    userId: string,
+    targetRoomId: string,
+  ): Promise<string[]> {
+    const participants = await this.prisma.roomParticipant.findMany({
+      where: {
+        userId,
+        roomId: { not: targetRoomId },
+        room: { status: RoomStatus.WAITING },
+      },
+      select: { roomId: true },
+    });
+
+    return [...new Set(participants.map((participant) => participant.roomId))];
   }
 
   /**

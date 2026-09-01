@@ -179,14 +179,21 @@ export class RoomController {
   @HttpCode(HttpStatus.OK)
   async joinRoom(
     @CurrentUser("sub") userId: string,
+    @CurrentUser("username") username: string,
     @Param("id") roomId: string,
     @Body() body: { password?: string; asSpectator?: boolean },
   ) {
-    return this.roomService.joinRoom(userId, {
+    const result = await this.roomService.joinRoom(userId, {
       roomId,
       password: body.password,
       asSpectator: body.asSpectator,
     });
+    await this.roomGateway.finalizeAtomicRoomSwitch(
+      userId,
+      username,
+      (result as any).switchedFromRoomIds ?? [],
+    );
+    return result;
   }
 
   @Post(":id/toggle-spectator")

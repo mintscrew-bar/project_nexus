@@ -40,7 +40,10 @@ describe("RoomService", () => {
     prisma = {
       user: { findUnique: jest.fn() },
       authProvider: { findFirst: jest.fn() },
-      riotAccount: { findFirst: jest.fn() },
+      riotAccount: {
+        findFirst: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
       discordGuildLink: { findFirst: jest.fn().mockResolvedValue(null) },
       room: {
         create: jest.fn(),
@@ -67,7 +70,9 @@ describe("RoomService", () => {
       userRating: { deleteMany: jest.fn() },
       userReport: { updateMany: jest.fn() },
       roomParticipant: {
+        create: jest.fn(),
         findFirst: jest.fn(),
+        findMany: jest.fn(),
         count: jest.fn(),
         update: jest.fn(),
         updateMany: jest.fn(),
@@ -118,6 +123,108 @@ describe("RoomService", () => {
     }).compile();
 
     service = module.get<RoomService>(RoomService);
+  });
+
+  describe("getOtherWaitingRoomIdsForUser", () => {
+    it("현재 방을 제외한 기존 대기방 참가 기록을 반환한다", async () => {
+      prisma.roomParticipant.findMany.mockResolvedValue([
+        { roomId: "old-room-1" },
+        { roomId: "old-room-2" },
+      ]);
+
+      await expect(
+        service.getOtherWaitingRoomIdsForUser("user-1", "target-room"),
+      ).resolves.toEqual(["old-room-1", "old-room-2"]);
+
+      expect(prisma.roomParticipant.findMany).toHaveBeenCalledWith({
+        where: {
+          userId: "user-1",
+          roomId: { not: "target-room" },
+          room: { status: RoomStatus.WAITING },
+        },
+        select: { roomId: true },
+      });
+    });
+  });
+
+  describe("joinRoom — 기존 참가방 전환", () => {
+    const targetRoom = {
+      id: "target-room",
+      name: "새 방",
+      status: RoomStatus.WAITING,
+      isPrivate: false,
+      password: null,
+      allowSpectators: true,
+      maxParticipants: 10,
+      participants: [],
+    };
+
+    beforeEach(() => {
+      prisma.room.findUnique.mockResolvedValue(targetRoom);
+      prisma.authProvider.findFirst.mockResolvedValue({ id: "discord" });
+      prisma.riotAccount.findFirst.mockResolvedValue({ id: "riot" });
+      prisma.roomParticipant.create.mockResolvedValue({
+        id: "new-participant",
+      });
+    });
+
+    it("진행 중인 다른 내전이 있으면 새 방 참가를 막는다", async () => {
+      prisma.roomParticipant.findMany.mockResolvedValue([
+        {
+          roomId: "active-room",
+          room: {
+            id: "active-room",
+            name: "진행방",
+            status: RoomStatus.IN_PROGRESS,
+            participants: [],
+          },
+        },
+      ]);
+
+      await expect(
+        service.joinRoom("user-1", { roomId: "target-room" }),
+      ).rejects.toThrow("ACTIVE_ROOM_EXISTS::active-room");
+      expect(prisma.roomParticipant.create).not.toHaveBeenCalled();
+    });
+
+    it("새 참가 생성과 기존 대기방 퇴장을 같은 트랜잭션에서 처리한다", async () => {
+      prisma.roomParticipant.findMany.mockResolvedValue([
+        {
+          roomId: "old-room",
+          room: {
+            id: "old-room",
+            name: "기존 방",
+            hostId: "user-1",
+            status: RoomStatus.WAITING,
+            participants: [
+              { userId: "user-1", user: { username: "나" } },
+              { userId: "user-2", user: { username: "다음 방장" } },
+            ],
+          },
+        },
+      ]);
+      jest.spyOn(service, "getRoomById").mockResolvedValue(targetRoom as any);
+
+      const result = await service.joinRoom("user-1", {
+        roomId: "target-room",
+      });
+
+      expect(prisma.roomParticipant.create).toHaveBeenCalledWith({
+        data: {
+          roomId: "target-room",
+          userId: "user-1",
+          role: "PLAYER",
+        },
+      });
+      expect(prisma.roomParticipant.deleteMany).toHaveBeenCalledWith({
+        where: { roomId: "old-room", userId: "user-1" },
+      });
+      expect(prisma.room.update).toHaveBeenCalledWith({
+        where: { id: "old-room" },
+        data: { hostId: "user-2" },
+      });
+      expect(result.switchedFromRoomIds).toEqual(["old-room"]);
+    });
   });
 
   describe("deleteRoomData — 완료 기록 보존", () => {

@@ -43,7 +43,7 @@ interface Participant {
   inVoice?: boolean;
 }
 
-interface Room {
+export interface Room {
   id: string;
   name: string;
   /** 자동 밸런스를 다시 돌린 횟수 (참가자 전원에게 노출) */
@@ -147,15 +147,36 @@ export const useLobbyStore = create<LobbyStoreState>((set, get) => ({
 
   connect: (roomId, password?) => {
     const existingSocket = get().socket;
-    // reconnect 시도 중이거나 이미 연결된 경우 중복 연결 방지
+    const existingRoomId = get().room?.id;
+    // 같은 방의 reconnect 시도 중이거나 이미 연결된 경우 중복 연결 방지
     if (
-      existingSocket?.connected ||
-      existingSocket?.active ||
-      (existingSocket as any)?.__nexusPreparing
+      existingRoomId === roomId &&
+      (existingSocket?.connected ||
+        existingSocket?.active ||
+        (existingSocket as any)?.__nexusPreparing)
     )
       return;
+    // 다른 방으로 이동하면 이전 소켓만 정리한다. 참가 기록 전환은 새 방 입장을
+    // 처리하는 서버 트랜잭션이 담당하므로, 여기서 먼저 leave를 보내지 않는다.
+    if (existingSocket && existingRoomId && existingRoomId !== roomId) {
+      existingSocket.removeAllListeners();
+      existingSocket.disconnect();
+      set({
+        socket: null,
+        room: null,
+        messages: [],
+        gameStarting: false,
+        error: null,
+        isConnected: false,
+      });
+    }
+    if (existingSocket && !existingRoomId) {
+      existingSocket.removeAllListeners();
+      existingSocket.disconnect();
+      set({ socket: null, isConnected: false });
+    }
     // Clean up stale disconnected socket
-    if (existingSocket) {
+    if (existingSocket && existingRoomId === roomId) {
       existingSocket.removeAllListeners();
       existingSocket.disconnect();
       set({ socket: null });
