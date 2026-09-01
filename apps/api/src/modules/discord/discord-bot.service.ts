@@ -3198,6 +3198,67 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
+   * 정원을 못 채운 채 식어버린 방의 모집 공지를 닫는다.
+   *
+   * 메시지를 지우지 않고 "모집 종료"로 바꿔 남긴다 — 공지를 지우면 그 서버에서
+   * 내전이 열렸던 사실 자체가 사라진다. 참가 버튼만 걷어내 더 이상 들어올 수
+   * 없게 하고, 이후 인원 변동이 카드를 되살리지 않도록 캐시도 비운다.
+   *
+   * @returns 실제로 닫은 서버 수
+   */
+  async closeRoomRecruitMessages(roomId: string): Promise<number> {
+    const notifs = await this.getRoomNotifications(roomId);
+    if (notifs.length === 0) return 0;
+
+    const room = await this.prisma.room.findUnique({
+      where: { id: roomId },
+      select: {
+        name: true,
+        maxParticipants: true,
+        participants: { where: { role: "PLAYER" }, select: { id: true } },
+      },
+    });
+    const current = room?.participants.length ?? 0;
+
+    const results = await Promise.allSettled(
+      notifs.map(async (notif) => {
+        const guild = await this.client.guilds.fetch(notif.guildId);
+        const channel = await guild.channels.fetch(notif.channelId);
+        if (!channel?.isTextBased()) return false;
+        const message = await channel.messages.fetch(notif.messageId);
+
+        const container = new ContainerBuilder()
+          .setAccentColor(0x6b7280)
+          .addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(
+              [
+                `## ${room?.name ?? notif.roomName}`,
+                "-# 모집이 종료되었습니다",
+                `정원을 채우지 못했습니다. (**${current}** / ${
+                  room?.maxParticipants ?? notif.maxPlayers
+                })`,
+              ].join("\n"),
+            ),
+          );
+
+        await message.edit({
+          components: [container],
+          flags: MessageFlags.IsComponentsV2,
+          allowedMentions: { roles: [] },
+        });
+        return true;
+      }),
+    );
+
+    // 캐시를 비워야 이후 인원 변동이 닫힌 카드를 다시 그리지 않는다.
+    this.clearRoomNotification(roomId);
+
+    return results.filter(
+      (result) => result.status === "fulfilled" && result.value,
+    ).length;
+  }
+
+  /**
    * 디스코드 DM 발송. DM을 막아둔 사용자에게는 실패하는 게 정상이라
    * 한 명의 실패가 나머지를 막지 않게 개별 처리한다.
    *

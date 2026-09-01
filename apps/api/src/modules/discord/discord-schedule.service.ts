@@ -19,6 +19,10 @@ const MIN_LEAD_FOR_1H_MS = 70 * 60 * 1000;
  * 30분 늦은 "지금 시작합니다" DM은 안 보내느니만 못하다.
  */
 const CATCHUP_LIMIT_MS = 30 * 60 * 1000;
+/** 즉시 개설 방이 정원을 못 채운 채 이만큼 지나면 모집을 닫는다. */
+const STALE_INSTANT_ROOM_MS = 6 * 60 * 60 * 1000;
+/** 예약 방은 예정 시각을 이만큼 넘기면 닫는다. 조금 늦게 모이는 경우가 있다. */
+const STALE_SCHEDULED_ROOM_MS = 60 * 60 * 1000;
 
 /**
  * 예고제(예약 개설) 알림.
@@ -93,6 +97,117 @@ export class DiscordScheduleService {
         );
       }
     }
+  }
+
+  /**
+   * 정원을 못 채운 채 식어버린 방의 모집 공지를 닫는다.
+   *
+   * 방 자체는 지우지 않는다. 호스트가 잠시 자리를 비운 사이 사라지는 것보다,
+   * 공지만 닫히고 방은 남아 있는 쪽이 되돌리기 쉽다. 다만 아무도 안 오는 방의
+   * 빈 음성채널까지 남겨두면 서버 채널 목록이 계속 더러워지므로 그건 정리한다.
+   */
+  @Cron("*/10 * * * *")
+  async closeStaleRecruitments(): Promise<void> {
+    const now = new Date();
+    const rooms = await this.prisma.room.findMany({
+      where: {
+        status: "WAITING",
+        recruitClosedAt: null,
+        OR: [
+          {
+            scheduledAt: {
+              not: null,
+              lt: new Date(now.getTime() - STALE_SCHEDULED_ROOM_MS),
+            },
+          },
+          {
+            scheduledAt: null,
+            createdAt: { lt: new Date(now.getTime() - STALE_INSTANT_ROOM_MS) },
+          },
+        ],
+      },
+      select: {
+        id: true,
+        name: true,
+        maxParticipants: true,
+        discordCategoryId: true,
+        host: {
+          select: {
+            authProviders: {
+              where: { provider: "DISCORD" },
+              select: { providerId: true },
+              take: 1,
+            },
+          },
+        },
+        participants: { where: { role: "PLAYER" }, select: { id: true } },
+      },
+    });
+
+    for (const room of rooms) {
+      // 정원을 채운 방은 시작이 늦어지고 있을 뿐이다. 건드리지 않는다.
+      if (room.participants.length >= room.maxParticipants) continue;
+
+      try {
+        await this.prisma.room.update({
+          where: { id: room.id },
+          data: { recruitClosedAt: now },
+        });
+
+        const closed = await this.botService.closeRoomRecruitMessages(room.id);
+
+        if (room.discordCategoryId) {
+          try {
+            await this.voiceService.deleteRoomChannels(room.id);
+          } catch (error) {
+            this.logger.warn(
+              `[Schedule] 방 ${room.id} 음성채널 정리 실패: ${
+                error instanceof Error ? error.message : String(error)
+              }`,
+            );
+          }
+        }
+
+        await this.suggestRetryToHost(room);
+
+        this.logger.log(
+          `[Schedule] 방 ${room.id}: 모집 종료 (${room.participants.length}/${room.maxParticipants}), 공지 ${closed}개 서버`,
+        );
+      } catch (error) {
+        this.logger.warn(
+          `[Schedule] 방 ${room.id} 모집 종료 처리 실패: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+    }
+  }
+
+  /** 호스트에게 왜 닫혔는지와 다음에 뭘 하면 되는지를 DM으로 알린다. */
+  private async suggestRetryToHost(room: {
+    id: string;
+    name: string;
+    maxParticipants: number;
+    host: { authProviders: { providerId: string }[] };
+    participants: { id: string }[];
+  }): Promise<void> {
+    const hostDiscordId = room.host.authProviders[0]?.providerId;
+    if (!hostDiscordId) return;
+
+    const appUrl =
+      this.configService.get("APP_URL") || "https://labs-nexus.com";
+
+    await this.botService.sendDirectMessages(
+      [hostDiscordId],
+      [
+        `**${room.name}** 모집을 닫았습니다. (${room.participants.length}/${room.maxParticipants})`,
+        "",
+        "사람이 가장 잘 모이는 시간에 미리 예고해두면 확률이 올라갑니다.",
+        "`/nexus schedule time:오늘 21:00 mode:경매 드래프트` 처럼 예약해보세요.",
+        "",
+        `방은 그대로 남아 있습니다: ${appUrl}/tournaments/${room.id}/lobby`,
+      ].join("\n"),
+    );
   }
 
   /** 시작 1시간 전: 아직 모집 중이면 알림 역할까지 다시 부른다. */

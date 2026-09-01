@@ -422,6 +422,9 @@ model Room {
   scheduledRemind1hAt     DateTime?
   scheduledRemind10mAt    DateTime?
   scheduledStartNotifiedAt DateTime?
+  /// 정원을 못 채운 채 식어버려 모집 공지를 닫은 시각.
+  /// 방 자체는 남긴다 — 호스트가 직접 닫거나 다시 쓸 수 있어야 한다.
+  recruitClosedAt         DateTime?
   startedAt               DateTime?
   completedAt             DateTime?
   // 방송 오버레이: 호스트가 중계 중인 경기(방송 토큰은 User로 이동 — per-streamer 단일 토큰)

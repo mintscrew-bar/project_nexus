@@ -28,6 +28,7 @@ function createHarness(room: Record<string, unknown>) {
     sendRoomScheduleReminder: jest.fn().mockResolvedValue(1),
     sendDirectMessages: jest.fn().mockResolvedValue(1),
     updateRoomNotification: jest.fn().mockResolvedValue(undefined),
+    closeRoomRecruitMessages: jest.fn().mockResolvedValue(1),
   };
   const voiceService = {
     createRoomChannels: jest.fn().mockResolvedValue({
@@ -35,6 +36,7 @@ function createHarness(room: Record<string, unknown>) {
       teamChannels: [],
       lobbyChannelId: "lobby-voice",
     }),
+    deleteRoomChannels: jest.fn().mockResolvedValue(undefined),
   };
   const configService = {
     get: jest.fn().mockReturnValue("https://nexus.test"),
@@ -214,5 +216,99 @@ describe("DiscordScheduleService.processScheduledRooms", () => {
       "room-ok",
       "1h",
     );
+  });
+});
+
+/** 식은 방 기본값. 정원 10명에 3명만 모였고 음성채널은 이미 만들어져 있다. */
+function staleRoom(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "room-1",
+    name: "9월 1일 내전",
+    maxParticipants: 10,
+    discordCategoryId: "category-1",
+    host: { authProviders: [{ providerId: "host-discord" }] },
+    participants: [{ id: "p1" }, { id: "p2" }, { id: "p3" }],
+    ...overrides,
+  };
+}
+
+describe("DiscordScheduleService.closeStaleRecruitments", () => {
+  beforeEach(() => {
+    jest.useFakeTimers().setSystemTime(NOW);
+    jest.spyOn(Logger.prototype, "log").mockImplementation(() => undefined);
+    jest.spyOn(Logger.prototype, "warn").mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.restoreAllMocks();
+  });
+
+  it("정원 미달이면 공지를 닫고 음성채널을 정리한 뒤 호스트에게 DM한다", async () => {
+    const { service, prisma, botService, voiceService } = createHarness(
+      staleRoom(),
+    );
+
+    await service.closeStaleRecruitments();
+
+    expect(prisma.room.update).toHaveBeenCalledWith({
+      where: { id: "room-1" },
+      data: { recruitClosedAt: NOW },
+    });
+    expect(botService.closeRoomRecruitMessages).toHaveBeenCalledWith("room-1");
+    expect(voiceService.deleteRoomChannels).toHaveBeenCalledWith("room-1");
+
+    const [recipients, content] = botService.sendDirectMessages.mock.calls[0];
+    expect(recipients).toEqual(["host-discord"]);
+    expect(content).toContain("9월 1일 내전");
+    expect(content).toContain("/nexus schedule");
+    // 방은 남는다 — 로비 링크를 함께 준다.
+    expect(content).toContain("https://nexus.test/tournaments/room-1/lobby");
+  });
+
+  it("정원을 채운 방은 건드리지 않는다", async () => {
+    const { service, prisma, botService } = createHarness(
+      staleRoom({
+        participants: Array.from({ length: 10 }, (_, index) => ({
+          id: `p${index}`,
+        })),
+      }),
+    );
+
+    await service.closeStaleRecruitments();
+
+    expect(prisma.room.update).not.toHaveBeenCalled();
+    expect(botService.closeRoomRecruitMessages).not.toHaveBeenCalled();
+  });
+
+  it("음성채널이 없으면 삭제를 시도하지 않는다", async () => {
+    const { service, voiceService, botService } = createHarness(
+      staleRoom({ discordCategoryId: null }),
+    );
+
+    await service.closeStaleRecruitments();
+
+    expect(voiceService.deleteRoomChannels).not.toHaveBeenCalled();
+    expect(botService.closeRoomRecruitMessages).toHaveBeenCalledWith("room-1");
+  });
+
+  it("음성채널 정리가 실패해도 호스트 DM은 나간다", async () => {
+    const { service, voiceService, botService } = createHarness(staleRoom());
+    voiceService.deleteRoomChannels.mockRejectedValue(new Error("권한 없음"));
+
+    await service.closeStaleRecruitments();
+
+    expect(botService.sendDirectMessages).toHaveBeenCalledTimes(1);
+  });
+
+  it("호스트가 디스코드 미연동이면 DM을 건너뛴다", async () => {
+    const { service, botService } = createHarness(
+      staleRoom({ host: { authProviders: [] } }),
+    );
+
+    await service.closeStaleRecruitments();
+
+    expect(botService.closeRoomRecruitMessages).toHaveBeenCalledWith("room-1");
+    expect(botService.sendDirectMessages).not.toHaveBeenCalled();
   });
 });
