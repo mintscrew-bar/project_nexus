@@ -1,14 +1,32 @@
 "use client";
 
-import { useEffect, useState } from 'react';
-import { Modal } from '@/components/ui/Modal';
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
-import { Label } from '@/components/ui/Label';
-import { Switch } from '@/components/ui/Switch';
-import { Loader2, Users, Lock, Unlock, Gavel, ListOrdered, Trophy, Info, Eye, EyeOff, GitBranch, Scale, ArrowLeftRight } from 'lucide-react';
+import { useEffect, useState } from "react";
+import { ConfirmModal, Modal } from "@/components/ui/Modal";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Label } from "@/components/ui/Label";
+import { Switch } from "@/components/ui/Switch";
+import {
+  Users,
+  Lock,
+  Unlock,
+  Gavel,
+  ListOrdered,
+  Trophy,
+  Info,
+  Eye,
+  EyeOff,
+  GitBranch,
+  Scale,
+  ArrowLeftRight,
+} from "lucide-react";
 import { RoomSettingsDto, useLobbyStore } from "@/stores/lobby-store";
 import { SeriesPresetSelector } from "@/components/rooms/SeriesPresetSelector";
+import {
+  TEAM_MODE_GUIDES,
+  TeamModeHelp,
+  type TeamMode,
+} from "@/components/rooms/TeamModeHelp";
 import {
   DEFAULT_SERIES_PRESET,
   normalizeSeriesPreset,
@@ -16,7 +34,6 @@ import {
   type SeriesPreset,
 } from "@nexus/types";
 
-type TeamMode = "AUCTION" | "SNAKE_DRAFT" | "AUTO_BALANCE" | "MANUAL_TEAM";
 type TeamCaptainSelection = "RANDOM" | "TIER" | "MANUAL" | "VOLUNTEER";
 type AuctionCaptainSelection = "TIER" | "MANUAL" | "VOLUNTEER";
 type SnakeCaptainSelection = "RANDOM" | "TIER";
@@ -41,100 +58,190 @@ interface RoomSettingsModalProps {
   };
 }
 
-const TEAM_MODES: { value: TeamMode; label: string; description: string; icon: React.ReactNode }[] = [
+const TEAM_MODES: {
+  value: TeamMode;
+  label: string;
+  description: string;
+  icon: React.ReactNode;
+}[] = [
   {
     value: "AUCTION",
     label: "경매 드래프트",
-    description: "팀장이 포인트를 사용해 선수를 입찰",
+    description: TEAM_MODE_GUIDES.AUCTION.summary,
     icon: <Gavel className="w-4 h-4" />,
   },
   {
     value: "SNAKE_DRAFT",
     label: "스네이크 드래프트",
-    description: "팀장이 번갈아가며 선수를 선택",
+    description: TEAM_MODE_GUIDES.SNAKE_DRAFT.summary,
     icon: <ListOrdered className="w-4 h-4" />,
   },
   {
     value: "AUTO_BALANCE",
     label: "자동 밸런스",
-    description: "라인별 티어와 랭크·내전 기록으로 팀·역할 자동 편성",
+    description: TEAM_MODE_GUIDES.AUTO_BALANCE.summary,
     icon: <Scale className="w-4 h-4" />,
   },
   {
     value: "MANUAL_TEAM",
     label: "자유 팀 선택",
-    description: "로비에서 직접 선택, 팀당 5명 필요",
+    description: TEAM_MODE_GUIDES.MANUAL_TEAM.summary,
     icon: <ArrowLeftRight className="w-4 h-4" />,
   },
 ];
 
 const PLAYER_OPTIONS = [
-  { value: 10, label: "10명", description: "5 vs 5", teams: 2, format: "단판", supportsDE: false },
-  { value: 15, label: "15명", description: "3팀 리그전", teams: 3, format: "리그전", supportsDE: false },
-  { value: 20, label: "20명", description: "4팀 토너먼트", teams: 4, format: "준결승+결승", supportsDE: true },
-  { value: 30, label: "30명", description: "6팀 리그전", teams: 6, format: "리그전", supportsDE: false },
-  { value: 40, label: "40명", description: "8팀 토너먼트", teams: 8, format: "8강+4강+결승", supportsDE: true },
+  {
+    value: 10,
+    label: "10명",
+    description: "5 vs 5",
+    teams: 2,
+    format: "단판",
+    supportsDE: false,
+  },
+  {
+    value: 15,
+    label: "15명",
+    description: "3팀 리그전",
+    teams: 3,
+    format: "리그전",
+    supportsDE: false,
+  },
+  {
+    value: 20,
+    label: "20명",
+    description: "4팀 토너먼트",
+    teams: 4,
+    format: "준결승+결승",
+    supportsDE: true,
+  },
+  {
+    value: 30,
+    label: "30명",
+    description: "6팀 리그전",
+    teams: 6,
+    format: "리그전",
+    supportsDE: false,
+  },
+  {
+    value: 40,
+    label: "40명",
+    description: "8팀 토너먼트",
+    teams: 8,
+    format: "8강+4강+결승",
+    supportsDE: true,
+  },
 ];
 
 const toAuctionCaptainSelection = (
   value?: TeamCaptainSelection,
-): AuctionCaptainSelection => (
+): AuctionCaptainSelection =>
   value === "MANUAL" || value === "VOLUNTEER" || value === "TIER"
     ? value
-    : "TIER"
-);
+    : "TIER";
 
 const toSnakeCaptainSelection = (
   value?: TeamCaptainSelection,
-): SnakeCaptainSelection => (
-  value === "TIER" ? "TIER" : "RANDOM"
-);
+): SnakeCaptainSelection => (value === "TIER" ? "TIER" : "RANDOM");
 
-export function RoomSettingsModal({ isOpen, onClose, room }: RoomSettingsModalProps) {
+export function RoomSettingsModal({
+  isOpen,
+  onClose,
+  room,
+}: RoomSettingsModalProps) {
   const { updateRoomSettings } = useLobbyStore();
 
   // Basic settings
   const [name, setName] = useState(room.name);
   const [maxParticipants, setMaxParticipants] = useState(room.maxParticipants);
   const [isPrivate, setIsPrivate] = useState(room.isPrivate);
-  const [password, setPassword] = useState('');
+  const [password, setPassword] = useState("");
   const [teamMode, setTeamMode] = useState<TeamMode>(room.teamMode);
-  const [allowSpectators, setAllowSpectators] = useState(room.allowSpectators ?? true);
+  const [allowSpectators, setAllowSpectators] = useState(
+    room.allowSpectators ?? true,
+  );
 
   // Auction settings
-  const [startingPoints, setStartingPoints] = useState(room.startingPoints ?? 1000);
-  const [minBidIncrement, setMinBidIncrement] = useState(room.minBidIncrement ?? 50);
+  const [startingPoints, setStartingPoints] = useState(
+    room.startingPoints ?? 1000,
+  );
+  const [minBidIncrement, setMinBidIncrement] = useState(
+    room.minBidIncrement ?? 50,
+  );
   const [bidTimeLimit, setBidTimeLimit] = useState(room.bidTimeLimit ?? 30);
 
   // Snake draft settings
   const [pickTimeLimit, setPickTimeLimit] = useState(room.pickTimeLimit ?? 60);
-  const [snakeCaptainSelection, setSnakeCaptainSelection] = useState<SnakeCaptainSelection>(
-    toSnakeCaptainSelection(room.captainSelection),
-  );
-  const [auctionCaptainSelection, setAuctionCaptainSelection] = useState<AuctionCaptainSelection>(
-    toAuctionCaptainSelection(room.captainSelection),
-  );
+  const [snakeCaptainSelection, setSnakeCaptainSelection] =
+    useState<SnakeCaptainSelection>(
+      toSnakeCaptainSelection(room.captainSelection),
+    );
+  const [auctionCaptainSelection, setAuctionCaptainSelection] =
+    useState<AuctionCaptainSelection>(
+      toAuctionCaptainSelection(room.captainSelection),
+    );
 
   // Bracket format
-  const [useDoubleElim, setUseDoubleElim] = useState(room.bracketFormat === "DOUBLE_ELIMINATION");
+  const [useDoubleElim, setUseDoubleElim] = useState(
+    room.bracketFormat === "DOUBLE_ELIMINATION",
+  );
   // 다전제 프리셋 — 방 크기가 바뀌면 팀 수가 달라져 이전 선택이 무효일 수 있다.
   const [seriesPreset, setSeriesPreset] = useState<SeriesPreset>(
-    normalizeSeriesPreset(room.seriesPreset, teamCountForRoomSize(room.maxParticipants)),
+    normalizeSeriesPreset(
+      room.seriesPreset,
+      teamCountForRoomSize(room.maxParticipants),
+    ),
   );
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const selectedPlayerOption = PLAYER_OPTIONS.find((option) => option.value === maxParticipants);
+  const [isCloseConfirmOpen, setIsCloseConfirmOpen] = useState(false);
+  const selectedPlayerOption = PLAYER_OPTIONS.find(
+    (option) => option.value === maxParticipants,
+  );
   const resetsManualTeamSetup =
     (room.teamMode === "MANUAL_TEAM" || teamMode === "MANUAL_TEAM") &&
     (room.teamMode !== teamMode || room.maxParticipants !== maxParticipants);
+  const currentParticipantCount = (room as { participants?: unknown[] }).participants?.length ?? 0;
+  const changesRosterCapacity =
+    maxParticipants !== room.maxParticipants &&
+    currentParticipantCount > 0;
+  const changesTeamFlow = teamMode !== room.teamMode;
+
+  const isDirty =
+    name !== room.name ||
+    maxParticipants !== room.maxParticipants ||
+    isPrivate !== room.isPrivate ||
+    teamMode !== room.teamMode ||
+    allowSpectators !== (room.allowSpectators ?? true) ||
+    startingPoints !== (room.startingPoints ?? 1000) ||
+    minBidIncrement !== (room.minBidIncrement ?? 50) ||
+    bidTimeLimit !== (room.bidTimeLimit ?? 30) ||
+    pickTimeLimit !== (room.pickTimeLimit ?? 60) ||
+    auctionCaptainSelection !== toAuctionCaptainSelection(room.captainSelection) ||
+    snakeCaptainSelection !== toSnakeCaptainSelection(room.captainSelection) ||
+    useDoubleElim !== (room.bracketFormat === "DOUBLE_ELIMINATION") ||
+    seriesPreset !== normalizeSeriesPreset(
+      room.seriesPreset,
+      teamCountForRoomSize(room.maxParticipants),
+    ) ||
+    password.length > 0;
+
+  const requestClose = () => {
+    if (isSubmitting) return;
+    if (isDirty) {
+      setIsCloseConfirmOpen(true);
+      return;
+    }
+    onClose();
+  };
 
   useEffect(() => {
     if (isOpen) {
       setName(room.name);
       setMaxParticipants(room.maxParticipants);
       setIsPrivate(room.isPrivate);
-      setPassword('');
+      setPassword("");
       setTeamMode(room.teamMode);
       setAllowSpectators(room.allowSpectators ?? true);
       setStartingPoints(room.startingPoints ?? 1000);
@@ -142,7 +249,9 @@ export function RoomSettingsModal({ isOpen, onClose, room }: RoomSettingsModalPr
       setBidTimeLimit(room.bidTimeLimit ?? 30);
       setPickTimeLimit(room.pickTimeLimit ?? 60);
       setSnakeCaptainSelection(toSnakeCaptainSelection(room.captainSelection));
-      setAuctionCaptainSelection(toAuctionCaptainSelection(room.captainSelection));
+      setAuctionCaptainSelection(
+        toAuctionCaptainSelection(room.captainSelection),
+      );
       setUseDoubleElim(room.bracketFormat === "DOUBLE_ELIMINATION");
       setSeriesPreset(
         normalizeSeriesPreset(
@@ -163,11 +272,15 @@ export function RoomSettingsModal({ isOpen, onClose, room }: RoomSettingsModalPr
   };
 
   const handleSave = async () => {
+    if (!name.trim()) {
+      setError("방 제목을 입력해주세요.");
+      return;
+    }
     setIsSubmitting(true);
     setError(null);
     try {
       const settingsToUpdate: RoomSettingsDto = {
-        name,
+        name: name.trim(),
         maxParticipants,
         teamMode,
         allowSpectators,
@@ -175,13 +288,16 @@ export function RoomSettingsModal({ isOpen, onClose, room }: RoomSettingsModalPr
         minBidIncrement,
         bidTimeLimit,
         pickTimeLimit,
-        captainSelection: teamMode === "AUCTION"
-          ? auctionCaptainSelection
-          : teamMode === "SNAKE_DRAFT"
-            ? snakeCaptainSelection
-            : undefined,
+        captainSelection:
+          teamMode === "AUCTION"
+            ? auctionCaptainSelection
+            : teamMode === "SNAKE_DRAFT"
+              ? snakeCaptainSelection
+              : undefined,
         bracketFormat: selectedPlayerOption?.supportsDE
-          ? (useDoubleElim ? "DOUBLE_ELIMINATION" : "SINGLE_ELIMINATION")
+          ? useDoubleElim
+            ? "DOUBLE_ELIMINATION"
+            : "SINGLE_ELIMINATION"
           : undefined,
         // 더블 일리미네이션은 아직 다전제를 지원하지 않는다.
         seriesPreset:
@@ -199,17 +315,23 @@ export function RoomSettingsModal({ isOpen, onClose, room }: RoomSettingsModalPr
       }
 
       await updateRoomSettings(room.id, settingsToUpdate);
+      setIsCloseConfirmOpen(false);
       onClose();
     } catch (err: any) {
-      setError(err.response?.data?.message || err.message || '설정 저장에 실패했습니다.');
+      setError(
+        err.response?.data?.message ||
+          err.message ||
+          "설정 저장에 실패했습니다.",
+      );
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="방 설정" size="lg">
-      <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-2">
+    <>
+    <Modal isOpen={isOpen} onClose={requestClose} title="방 설정" size="lg">
+      <div className="space-y-6">
         {/* 기본 정보 */}
         <div className="space-y-4">
           <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
@@ -246,10 +368,16 @@ export function RoomSettingsModal({ isOpen, onClose, room }: RoomSettingsModalPr
                     ? "border-accent-primary bg-accent-primary/10"
                     : "border-bg-tertiary hover:border-bg-elevated bg-bg-tertiary/50"
                 }`}
-                >
-                <div className="font-bold text-text-primary text-sm">{option.label}</div>
-                <div className="text-xs text-text-secondary">{option.description}</div>
-                <div className="text-xs text-accent-primary mt-1">{option.format}</div>
+              >
+                <div className="font-bold text-text-primary text-sm">
+                  {option.label}
+                </div>
+                <div className="text-xs text-text-secondary">
+                  {option.description}
+                </div>
+                <div className="text-xs text-accent-primary mt-1">
+                  {option.format}
+                </div>
               </button>
             ))}
           </div>
@@ -258,18 +386,24 @@ export function RoomSettingsModal({ isOpen, onClose, room }: RoomSettingsModalPr
         {/* 더블 일리미네이션 (4/8팀 전용) */}
         {selectedPlayerOption?.supportsDE && (
           <div className="p-3 bg-bg-tertiary/50 rounded-lg border border-bg-elevated">
-            <label className="flex items-center justify-between cursor-pointer" onClick={() => setUseDoubleElim(v => !v)}>
+            <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-2">
                 <GitBranch className="w-4 h-4 text-accent-primary" />
                 <div>
-                  <div className="text-text-primary text-sm font-medium">더블 일리미네이션</div>
-                  <div className="text-text-secondary text-xs">패자도 패자조에서 재도전 가능 (총 경기 수 증가)</div>
+                  <div className="text-text-primary text-sm font-medium">
+                    더블 일리미네이션
+                  </div>
+                  <div className="text-text-secondary text-xs">
+                    패자도 패자조에서 재도전 가능 (총 경기 수 증가)
+                  </div>
                 </div>
               </div>
-              <div className={`w-10 h-5 rounded-full transition-colors ${useDoubleElim ? "bg-accent-primary" : "bg-bg-elevated"}`}>
-                <div className={`w-4 h-4 rounded-full bg-white shadow transform transition-transform mt-0.5 ${useDoubleElim ? "translate-x-5" : "translate-x-0.5"}`} />
-              </div>
-            </label>
+              <Switch
+                checked={useDoubleElim}
+                onCheckedChange={setUseDoubleElim}
+                aria-label="더블 일리미네이션"
+              />
+            </div>
             {useDoubleElim && (
               <p className="text-xs text-accent-primary mt-2">
                 {selectedPlayerOption.teams === 4
@@ -292,29 +426,40 @@ export function RoomSettingsModal({ isOpen, onClose, room }: RoomSettingsModalPr
         {/* 팀 구성 방식 */}
         <div className="space-y-3">
           <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
-            <Trophy className="w-4 h-4" />
-            팀 구성 방식
+            <Trophy className="w-4 h-4" />팀 구성 방식
           </h3>
           <div className="grid grid-cols-2 gap-2">
             {TEAM_MODES.map((mode) => (
-              <button
+              <div
                 key={mode.value}
-                type="button"
-                onClick={() => setTeamMode(mode.value)}
-                className={`p-3 rounded-lg border-2 transition-all text-left flex items-start gap-3 ${
+                className={`flex min-w-0 items-start gap-0.5 rounded-lg border-2 p-1.5 transition-all ${
                   teamMode === mode.value
                     ? "border-accent-primary bg-accent-primary/10"
                     : "border-bg-tertiary hover:border-bg-elevated bg-bg-tertiary/50"
                 }`}
               >
-                <div className={`p-1.5 rounded-lg ${teamMode === mode.value ? "bg-accent-primary text-white" : "bg-bg-elevated text-text-secondary"}`}>
-                  {mode.icon}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-semibold text-text-primary text-sm">{mode.label}</div>
-                  <div className="text-xs text-text-secondary leading-snug">{mode.description}</div>
-                </div>
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setTeamMode(mode.value)}
+                  aria-pressed={teamMode === mode.value}
+                  className="flex min-w-0 flex-1 items-start gap-2 rounded-md p-1.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary"
+                >
+                  <div
+                    className={`p-1.5 rounded-lg ${teamMode === mode.value ? "bg-accent-primary text-white" : "bg-bg-elevated text-text-secondary"}`}
+                  >
+                    {mode.icon}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-text-primary text-sm">
+                      {mode.label}
+                    </div>
+                    <div className="text-xs text-text-secondary leading-snug">
+                      {mode.description}
+                    </div>
+                  </div>
+                </button>
+                <TeamModeHelp mode={mode.value} compact />
+              </div>
             ))}
           </div>
         </div>
@@ -329,11 +474,12 @@ export function RoomSettingsModal({ isOpen, onClose, room }: RoomSettingsModalPr
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label className="text-xs">시작 포인트</Label>
+                <Label htmlFor="settings-starting-points" className="text-xs">시작 포인트</Label>
                 <select
+                  id="settings-starting-points"
                   value={startingPoints}
                   onChange={(e) => setStartingPoints(Number(e.target.value))}
-                  className="w-full p-2 border rounded-md bg-bg-secondary text-sm mt-1"
+                  className="mt-1 w-full input text-sm"
                 >
                   <option value={500}>500 포인트</option>
                   <option value={1000}>1,000 포인트</option>
@@ -342,11 +488,12 @@ export function RoomSettingsModal({ isOpen, onClose, room }: RoomSettingsModalPr
                 </select>
               </div>
               <div>
-                <Label className="text-xs">최소 입찰 단위</Label>
+                <Label htmlFor="settings-min-bid-increment" className="text-xs">최소 입찰 단위</Label>
                 <select
+                  id="settings-min-bid-increment"
                   value={minBidIncrement}
                   onChange={(e) => setMinBidIncrement(Number(e.target.value))}
-                  className="w-full p-2 border rounded-md bg-bg-secondary text-sm mt-1"
+                  className="mt-1 w-full input text-sm"
                 >
                   <option value={10}>10 포인트</option>
                   <option value={25}>25 포인트</option>
@@ -357,11 +504,12 @@ export function RoomSettingsModal({ isOpen, onClose, room }: RoomSettingsModalPr
             </div>
 
             <div>
-              <Label className="text-xs">입찰 제한 시간</Label>
+              <Label htmlFor="settings-bid-time-limit" className="text-xs">입찰 제한 시간</Label>
               <select
+                id="settings-bid-time-limit"
                 value={bidTimeLimit}
                 onChange={(e) => setBidTimeLimit(Number(e.target.value))}
-                className="w-full p-2 border rounded-md bg-bg-secondary text-sm mt-1"
+                className="mt-1 w-full input text-sm"
               >
                 <option value={15}>15초</option>
                 <option value={30}>30초</option>
@@ -371,11 +519,16 @@ export function RoomSettingsModal({ isOpen, onClose, room }: RoomSettingsModalPr
             </div>
 
             <div>
-              <Label className="text-xs">팀장 선정 방식</Label>
+              <Label htmlFor="settings-auction-captain-selection" className="text-xs">팀장 선정 방식</Label>
               <select
+                id="settings-auction-captain-selection"
                 value={auctionCaptainSelection}
-                onChange={(e) => setAuctionCaptainSelection(e.target.value as AuctionCaptainSelection)}
-                className="w-full p-2 border rounded-md bg-bg-secondary text-sm mt-1"
+                onChange={(e) =>
+                  setAuctionCaptainSelection(
+                    e.target.value as AuctionCaptainSelection,
+                  )
+                }
+                className="mt-1 w-full input text-sm"
               >
                 <option value="TIER">자동 (MMR 기준 상위 N명)</option>
                 <option value="MANUAL">방장 직접 지명</option>
@@ -383,7 +536,8 @@ export function RoomSettingsModal({ isOpen, onClose, room }: RoomSettingsModalPr
               </select>
               {auctionCaptainSelection === "VOLUNTEER" && (
                 <p className="text-xs text-text-tertiary mt-1">
-                  경매 시작 시 30초 동안 자원자를 모집합니다. 방장은 조기 마감할 수 있습니다.
+                  경매 시작 시 30초 동안 자원자를 모집합니다. 방장은 조기 마감할
+                  수 있습니다.
                 </p>
               )}
               {auctionCaptainSelection === "MANUAL" && (
@@ -404,11 +558,16 @@ export function RoomSettingsModal({ isOpen, onClose, room }: RoomSettingsModalPr
             </div>
 
             <div>
-              <Label className="text-xs">팀장 선정 방식</Label>
+              <Label htmlFor="settings-snake-captain-selection" className="text-xs">팀장 선정 방식</Label>
               <select
+                id="settings-snake-captain-selection"
                 value={snakeCaptainSelection}
-                onChange={(e) => setSnakeCaptainSelection(e.target.value as SnakeCaptainSelection)}
-                className="w-full p-2 border rounded-md bg-bg-secondary text-sm mt-1"
+                onChange={(e) =>
+                  setSnakeCaptainSelection(
+                    e.target.value as SnakeCaptainSelection,
+                  )
+                }
+                className="mt-1 w-full input text-sm"
               >
                 <option value="RANDOM">랜덤 선정</option>
                 <option value="TIER">티어 기반 (높은 티어 우선)</option>
@@ -416,11 +575,12 @@ export function RoomSettingsModal({ isOpen, onClose, room }: RoomSettingsModalPr
             </div>
 
             <div>
-              <Label className="text-xs">픽 제한 시간</Label>
+              <Label htmlFor="settings-pick-time-limit" className="text-xs">픽 제한 시간</Label>
               <select
+                id="settings-pick-time-limit"
                 value={pickTimeLimit}
                 onChange={(e) => setPickTimeLimit(Number(e.target.value))}
-                className="w-full p-2 border rounded-md bg-bg-secondary text-sm mt-1"
+                className="mt-1 w-full input text-sm"
               >
                 <option value={30}>30초</option>
                 <option value={45}>45초</option>
@@ -446,14 +606,15 @@ export function RoomSettingsModal({ isOpen, onClose, room }: RoomSettingsModalPr
                     <Unlock className="w-4 h-4 text-text-secondary" />
                   )}
                   <div>
-                    <div className="text-text-primary font-medium text-sm">비공개 방</div>
-                    <div className="text-text-secondary text-xs">비밀번호 사용</div>
+                    <div className="text-text-primary font-medium text-sm">
+                      비공개 방
+                    </div>
+                    <div className="text-text-secondary text-xs">
+                      비밀번호 사용
+                    </div>
                   </div>
                 </div>
-                <Switch
-                  checked={isPrivate}
-                  onCheckedChange={setIsPrivate}
-                />
+                <Switch checked={isPrivate} onCheckedChange={setIsPrivate} />
               </div>
 
               {isPrivate && (
@@ -479,8 +640,12 @@ export function RoomSettingsModal({ isOpen, onClose, room }: RoomSettingsModalPr
                     <EyeOff className="w-4 h-4 text-text-secondary" />
                   )}
                   <div>
-                    <div className="text-text-primary font-medium text-sm">관전 허용</div>
-                    <div className="text-text-secondary text-xs">관전자 입장 가능</div>
+                    <div className="text-text-primary font-medium text-sm">
+                      관전 허용
+                    </div>
+                    <div className="text-text-secondary text-xs">
+                      관전자 입장 가능
+                    </div>
                   </div>
                 </div>
                 <Switch
@@ -490,33 +655,42 @@ export function RoomSettingsModal({ isOpen, onClose, room }: RoomSettingsModalPr
               </div>
             </div>
           </div>
+          <p className="text-xs text-text-tertiary">
+            Discord 음성 서버는 방 생성 시 선택한 서버를 유지합니다. 음성 채널 변경은 Discord에서 직접 진행해주세요.
+          </p>
         </div>
 
         {/* 요약 */}
         <div className="p-3 bg-accent-primary/5 rounded-lg border border-accent-primary/20">
           <div className="text-xs text-text-secondary">
-            <span className="font-semibold text-text-primary">{selectedPlayerOption?.label ?? `${maxParticipants}명`}</span>
+            <span className="font-semibold text-text-primary">
+              {selectedPlayerOption?.label ?? `${maxParticipants}명`}
+            </span>
             {selectedPlayerOption && <> ({selectedPlayerOption.description})</>}
             {" • "}
             <span className="font-semibold text-text-primary">
-              {TEAM_MODES.find(m => m.value === teamMode)?.label}
+              {TEAM_MODES.find((m) => m.value === teamMode)?.label}
             </span>
             {selectedPlayerOption?.supportsDE && (
               <>
                 {" • "}
-                <span className={useDoubleElim ? "text-accent-primary font-semibold" : ""}>
+                <span
+                  className={
+                    useDoubleElim ? "text-accent-primary font-semibold" : ""
+                  }
+                >
                   {useDoubleElim ? "더블 일리미네이션" : "싱글 일리미네이션"}
                 </span>
               </>
             )}
             {" • "}
-            <span className={isPrivate ? "text-accent-gold" : "text-accent-success"}>
+            <span
+              className={isPrivate ? "text-accent-gold" : "text-accent-success"}
+            >
               {isPrivate ? "비공개" : "공개"}
             </span>
             {" • "}
-            <span>
-              {allowSpectators ? "관전 허용" : "관전 비허용"}
-            </span>
+            <span>{allowSpectators ? "관전 허용" : "관전 비허용"}</span>
           </div>
         </div>
 
@@ -526,7 +700,22 @@ export function RoomSettingsModal({ isOpen, onClose, room }: RoomSettingsModalPr
               저장하면 현재 팀 선택과 준비 상태가 초기화됩니다.
             </p>
             <p className="mt-1 text-xs text-text-secondary">
-              자유 팀 선택 모드 또는 참가 인원이 바뀌면 새 팀 슬롯으로 다시 편성해야 합니다.
+              자유 팀 선택 모드 또는 참가 인원이 바뀌면 새 팀 슬롯으로 다시
+              편성해야 합니다.
+            </p>
+          </div>
+        )}
+
+        {(changesRosterCapacity || changesTeamFlow) && !resetsManualTeamSetup && (
+          <div className="rounded-lg border border-accent-warning/30 bg-accent-warning/10 p-3">
+            <p className="text-sm font-medium text-accent-warning">
+              저장하면 현재 참가자 흐름에 영향을 줄 수 있습니다.
+            </p>
+            <p className="mt-1 text-xs text-text-secondary">
+              팀 구성 방식이나 참가 인원을 바꾸면 준비 상태·팀 배정·시작 조건을 다시 확인해야 합니다.
+              {changesRosterCapacity && currentParticipantCount > maxParticipants
+                ? ` 현재 참가자 ${currentParticipantCount}명이 새 정원 ${maxParticipants}명을 초과합니다.`
+                : ""}
             </p>
           </div>
         )}
@@ -538,13 +727,28 @@ export function RoomSettingsModal({ isOpen, onClose, room }: RoomSettingsModalPr
         )}
       </div>
 
-      <div className="flex justify-end gap-3 pt-4 mt-4 border-t border-bg-tertiary">
-        <Button variant="outline" onClick={onClose}>취소</Button>
-        <Button onClick={handleSave} disabled={isSubmitting}>
-          {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+      <div className="sticky bottom-0 -mx-4 -mb-4 mt-4 flex justify-end gap-3 border-t border-bg-tertiary bg-bg-secondary/95 px-4 py-4 backdrop-blur-sm">
+        <Button variant="outline" onClick={requestClose} disabled={isSubmitting}>
+          취소
+        </Button>
+        <Button onClick={handleSave} isLoading={isSubmitting} loadingText="저장 중...">
           저장
         </Button>
       </div>
     </Modal>
+    <ConfirmModal
+      isOpen={isCloseConfirmOpen}
+      onClose={() => setIsCloseConfirmOpen(false)}
+      onConfirm={() => {
+        setIsCloseConfirmOpen(false);
+        onClose();
+      }}
+      title="변경사항을 버릴까요?"
+      message="저장하지 않은 방 설정 변경사항이 사라집니다."
+      confirmText="버리고 닫기"
+      cancelText="계속 편집"
+      variant="warning"
+    />
+    </>
   );
 }

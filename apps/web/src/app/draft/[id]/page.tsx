@@ -9,6 +9,7 @@ import { DraftBoard } from "@/components/domain/DraftBoard";
 import { GameChatPanel } from "@/components/domain/GameChatPanel";
 import { LoadingSpinner, Badge, Button, ConfirmModal } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
+import { TeamModeHelp } from "@/components/rooms/TeamModeHelp";
 
 export default function SnakeDraftPage() {
   const params = useParams();
@@ -53,11 +54,24 @@ export default function SnakeDraftPage() {
 
   useEffect(() => {
     if (!sessionAbortedAt) return;
-    addToast(sessionAbortMessage ?? "내전이 종료되어 로비로 이동합니다.", "warning");
+    addToast(
+      sessionAbortMessage ?? "내전이 종료되어 로비로 이동합니다.",
+      "warning",
+    );
     clearSessionAbort();
-    const timer = setTimeout(() => router.push(`/tournaments/${draftId}/lobby`), 1500);
+    const timer = setTimeout(
+      () => router.push(`/tournaments/${draftId}/lobby`),
+      1500,
+    );
     return () => clearTimeout(timer);
-  }, [sessionAbortedAt, sessionAbortMessage, clearSessionAbort, addToast, router, draftId]);
+  }, [
+    sessionAbortedAt,
+    sessionAbortMessage,
+    clearSessionAbort,
+    addToast,
+    router,
+    draftId,
+  ]);
 
   const handleAbortToLobby = () => setIsAbortConfirmOpen(true);
 
@@ -82,7 +96,10 @@ export default function SnakeDraftPage() {
     try {
       await makePick(draftId, playerId);
     } catch (err: any) {
-      addToast(err?.response?.data?.message || "픽 선택에 실패했습니다.", "error");
+      addToast(
+        err?.response?.data?.message || "픽 선택에 실패했습니다.",
+        "error",
+      );
     }
   };
 
@@ -102,12 +119,17 @@ export default function SnakeDraftPage() {
       <div className="flex-grow flex items-center justify-center">
         <div className="text-center">
           <p className="text-accent-danger mb-4">오류: {error}</p>
-          <p className="text-text-secondary mb-6">드래프트에 연결할 수 없습니다</p>
+          <p className="text-text-secondary mb-6">
+            드래프트에 연결할 수 없습니다
+          </p>
           <div className="flex gap-3 justify-center">
             <Button variant="primary" onClick={() => window.location.reload()}>
               다시 시도
             </Button>
-            <Button variant="secondary" onClick={() => router.push(`/tournaments/${draftId}/lobby`)}>
+            <Button
+              variant="secondary"
+              onClick={() => router.push(`/tournaments/${draftId}/lobby`)}
+            >
               로비로 돌아가기
             </Button>
           </div>
@@ -145,16 +167,17 @@ export default function SnakeDraftPage() {
       <div className="container mx-auto max-w-6xl">
         <div className="mb-5 flex flex-col gap-4 animate-fade-in sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-text-primary mb-1">
+            <h1 className="mb-1 flex items-center gap-2 text-2xl font-bold text-text-primary md:text-3xl">
               스네이크 드래프트
+              <TeamModeHelp mode="SNAKE_DRAFT" />
             </h1>
             <p className="text-sm text-text-secondary">
               차례가 되면 영입할 플레이어를 선택하세요.
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Badge variant={isConnected ? 'success' : 'danger'}>
-              {isConnected ? '● 연결됨' : '● 연결 끊김'}
+            <Badge variant={isConnected ? "success" : "danger"}>
+              {isConnected ? "● 연결됨" : "● 연결 끊김"}
             </Badge>
             <Button
               variant="danger"

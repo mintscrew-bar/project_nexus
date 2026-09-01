@@ -1,19 +1,49 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import React, {
+  useEffect,
+  useRef,
+  useState,
+  useCallback,
+  useMemo,
+} from "react";
 import { useAuction } from "@/hooks/useAuction";
 import { useAuthStore } from "@/stores/auth-store";
 import { roomApi } from "@/lib/api-client";
-import { AuctionBoard, TierBadge, PlayerHoverCard, PlayerProfileModal } from "@/components/domain";
-import { LoadingSpinner, Badge, Button, Card, CardContent, ConfirmModal, Avatar } from "@/components/ui";
+import {
+  AuctionBoard,
+  TierBadge,
+  PlayerHoverCard,
+  PlayerProfileModal,
+} from "@/components/domain";
+import {
+  LoadingSpinner,
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  ConfirmModal,
+  Avatar,
+} from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
 import { GameChatPanel } from "@/components/domain/GameChatPanel";
 import { cn } from "@/lib/utils";
 import { getTierIcon } from "@/lib/tier-icon";
-import { Users, Hand, Check, Coins, ScrollText, Gavel, MessageSquare, Maximize2, SkipForward } from "lucide-react";
+import {
+  Users,
+  Hand,
+  Check,
+  Coins,
+  ScrollText,
+  Gavel,
+  MessageSquare,
+  Maximize2,
+  SkipForward,
+} from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { getRoleIcon } from "@/lib/role-icon";
+import { TeamModeHelp } from "@/components/rooms/TeamModeHelp";
 
 // 입찰 포기 확인 모달의 "다시 보지 않기" 저장 키 (브라우저 단위)
 const FOLD_CONFIRM_SKIP_KEY = "auction:fold-confirm-skip";
@@ -23,7 +53,14 @@ function RoleIcon({ role, dim }: { role?: string; dim?: boolean }) {
   const url = getRoleIcon(role.toUpperCase());
   if (!url) return null;
   // eslint-disable-next-line @next/next/no-img-element
-  return <img src={url} alt={role} className="h-3.5 w-3.5 shrink-0 brightness-0 invert" style={{ opacity: dim ? 0.35 : 0.8 }} />;
+  return (
+    <img
+      src={url}
+      alt={role}
+      className="h-3.5 w-3.5 shrink-0 brightness-0 invert"
+      style={{ opacity: dim ? 0.35 : 0.8 }}
+    />
+  );
 }
 
 /** 대기 선수 목록 (데스크톱 사이드바 & 모바일 탭에서 공유) */
@@ -38,7 +75,10 @@ function PlayersList({
   onExpand?: () => void;
   compact?: boolean;
 }) {
-  const [hoveredPlayer, setHoveredPlayer] = useState<{ userId: string; rect: DOMRect } | null>(null);
+  const [hoveredPlayer, setHoveredPlayer] = useState<{
+    userId: string;
+    rect: DOMRect;
+  } | null>(null);
   const [profileUserId, setProfileUserId] = useState<string | null>(null);
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cancelHoverClose = useCallback(() => {
@@ -48,11 +88,17 @@ function PlayersList({
     if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
     hoverTimerRef.current = setTimeout(() => setHoveredPlayer(null), 80);
   }, []);
-  const handleHover = useCallback((userId: string, el: HTMLElement) => {
-    cancelHoverClose();
-    const rect = el.getBoundingClientRect();
-    hoverTimerRef.current = setTimeout(() => setHoveredPlayer({ userId, rect }), 300);
-  }, [cancelHoverClose]);
+  const handleHover = useCallback(
+    (userId: string, el: HTMLElement) => {
+      cancelHoverClose();
+      const rect = el.getBoundingClientRect();
+      hoverTimerRef.current = setTimeout(
+        () => setHoveredPlayer({ userId, rect }),
+        300,
+      );
+    },
+    [cancelHoverClose],
+  );
 
   return (
     <div className="h-full flex flex-col min-h-0">
@@ -78,7 +124,9 @@ function PlayersList({
         /* compact: 2열 그리드로 한눈에 보기 */
         <div className="flex-1 min-h-0 overflow-y-auto">
           {players.length === 0 ? (
-            <p className="text-xs text-text-tertiary text-center py-4">모든 선수가 배정되었습니다</p>
+            <p className="text-xs text-text-tertiary text-center py-4">
+              모든 선수가 배정되었습니다
+            </p>
           ) : (
             <div className="grid grid-cols-2 gap-1 p-0.5">
               {players.map((player, idx) => {
@@ -93,7 +141,9 @@ function PlayersList({
                         ? "bg-accent-primary/15 ring-1 ring-accent-primary/40"
                         : "bg-bg-secondary hover:bg-bg-tertiary",
                     )}
-                    onMouseEnter={(e) => handleHover(player.id, e.currentTarget)}
+                    onMouseEnter={(e) =>
+                      handleHover(player.id, e.currentTarget)
+                    }
                     onMouseLeave={scheduleHoverClose}
                     onClick={() => setProfileUserId(player.id)}
                   >
@@ -102,7 +152,13 @@ function PlayersList({
                     </span>
                     {tierIcon && (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={tierIcon} alt={player.tier} width={13} height={13} className="shrink-0 object-contain" />
+                      <img
+                        src={tierIcon}
+                        alt={player.tier}
+                        width={13}
+                        height={13}
+                        className="shrink-0 object-contain"
+                      />
                     )}
                     <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-text-primary">
                       {player.username}
@@ -110,7 +166,9 @@ function PlayersList({
                     {(player.mainRole || player.subRole) && (
                       <span className="flex shrink-0 items-center gap-0.5">
                         {player.mainRole && <RoleIcon role={player.mainRole} />}
-                        {player.subRole && <RoleIcon role={player.subRole} dim />}
+                        {player.subRole && (
+                          <RoleIcon role={player.subRole} dim />
+                        )}
                       </span>
                     )}
                   </div>
@@ -123,7 +181,9 @@ function PlayersList({
         /* 일반 모드: 1열 상세 목록 */
         <div className="flex-1 min-h-0 overflow-y-auto space-y-1.5">
           {players.length === 0 ? (
-            <p className="text-xs text-text-tertiary text-center py-4">모든 선수가 배정되었습니다</p>
+            <p className="text-xs text-text-tertiary text-center py-4">
+              모든 선수가 배정되었습니다
+            </p>
           ) : (
             players.map((player, idx) => {
               const isCurrentTarget = currentPlayerId === player.id;
@@ -150,14 +210,24 @@ function PlayersList({
                       {player.username}
                     </p>
                     <div className="flex items-center gap-1">
-                      <TierBadge tier={player.tier} size="sm" showIcon={false} />
+                      <TierBadge
+                        tier={player.tier}
+                        size="sm"
+                        showIcon={false}
+                      />
                       {player.mmr !== undefined && (
-                        <span className="text-[10px] font-mono text-text-muted">{player.mmr}</span>
+                        <span className="text-[10px] font-mono text-text-muted">
+                          {player.mmr}
+                        </span>
                       )}
                       {(player.mainRole || player.subRole) && (
                         <span className="flex items-center gap-0.5 ml-auto">
-                          {player.mainRole && <RoleIcon role={player.mainRole} />}
-                          {player.subRole && <RoleIcon role={player.subRole} dim />}
+                          {player.mainRole && (
+                            <RoleIcon role={player.mainRole} />
+                          )}
+                          {player.subRole && (
+                            <RoleIcon role={player.subRole} dim />
+                          )}
                         </span>
                       )}
                     </div>
@@ -176,18 +246,30 @@ function PlayersList({
           anchorRect={hoveredPlayer.rect}
           onMouseEnter={cancelHoverClose}
           onMouseLeave={scheduleHoverClose}
-          onOpenProfile={(uid) => { setProfileUserId(uid); setHoveredPlayer(null); }}
+          onOpenProfile={(uid) => {
+            setProfileUserId(uid);
+            setHoveredPlayer(null);
+          }}
         />
       )}
       {profileUserId && (
-        <PlayerProfileModal userId={profileUserId} onClose={() => setProfileUserId(null)} />
+        <PlayerProfileModal
+          userId={profileUserId}
+          onClose={() => setProfileUserId(null)}
+        />
       )}
     </div>
   );
 }
 
 /** 입찰 로그 (데스크톱 사이드바 & 모바일 탭에서 공유) */
-function BidLog({ bidHistory, logEndRef }: { bidHistory: any[]; logEndRef: React.RefObject<HTMLDivElement> }) {
+function BidLog({
+  bidHistory,
+  logEndRef,
+}: {
+  bidHistory: any[];
+  logEndRef: React.RefObject<HTMLDivElement>;
+}) {
   return (
     <div className="h-full flex flex-col min-h-0">
       <h3 className="text-sm font-semibold text-text-primary mb-2 flex items-center gap-1.5 flex-shrink-0">
@@ -196,7 +278,9 @@ function BidLog({ bidHistory, logEndRef }: { bidHistory: any[]; logEndRef: React
       </h3>
       <div className="flex-1 min-h-0 overflow-y-auto space-y-1">
         {bidHistory.length === 0 ? (
-          <p className="text-xs text-text-tertiary text-center py-4">아직 입찰이 없습니다</p>
+          <p className="text-xs text-text-tertiary text-center py-4">
+            아직 입찰이 없습니다
+          </p>
         ) : (
           bidHistory.map((entry, idx) =>
             entry.isSeparator ? (
@@ -210,7 +294,11 @@ function BidLog({ bidHistory, logEndRef }: { bidHistory: any[]; logEndRef: React
             ) : (
               <div key={idx} className="flex items-center gap-2 p-1.5 text-xs">
                 <span className="text-text-tertiary font-mono text-[10px] flex-shrink-0">
-                  {new Date(entry.timestamp).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                  {new Date(entry.timestamp).toLocaleTimeString("ko-KR", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    second: "2-digit",
+                  })}
                 </span>
                 <span className="text-text-primary font-medium truncate">
                   {entry.username}
@@ -221,7 +309,7 @@ function BidLog({ bidHistory, logEndRef }: { bidHistory: any[]; logEndRef: React
                   {entry.amount.toLocaleString()}G
                 </span>
               </div>
-            )
+            ),
           )
         )}
         <div ref={logEndRef} />
@@ -240,7 +328,10 @@ function TeamSummaryPanel({
   currentUserId?: string;
   auctionState: any;
 }) {
-  const [hoveredPlayer, setHoveredPlayer] = useState<{ userId: string; rect: DOMRect } | null>(null);
+  const [hoveredPlayer, setHoveredPlayer] = useState<{
+    userId: string;
+    rect: DOMRect;
+  } | null>(null);
   const [profileUserId, setProfileUserId] = useState<string | null>(null);
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -253,18 +344,26 @@ function TeamSummaryPanel({
     hoverTimerRef.current = setTimeout(() => setHoveredPlayer(null), 80);
   }, []);
 
-  const handleHover = useCallback((userId: string, el: HTMLElement) => {
-    cancelHoverClose();
-    const rect = el.getBoundingClientRect();
-    hoverTimerRef.current = setTimeout(() => setHoveredPlayer({ userId, rect }), 300);
-  }, [cancelHoverClose]);
+  const handleHover = useCallback(
+    (userId: string, el: HTMLElement) => {
+      cancelHoverClose();
+      const rect = el.getBoundingClientRect();
+      hoverTimerRef.current = setTimeout(
+        () => setHoveredPlayer({ userId, rect }),
+        300,
+      );
+    },
+    [cancelHoverClose],
+  );
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
       <div className="mb-2 flex h-10 shrink-0 items-center justify-between rounded-lg border border-bg-tertiary bg-bg-secondary px-3">
         <div className="flex items-center gap-1.5">
           <Users className="h-3.5 w-3.5 text-accent-primary" />
-          <span className="text-sm font-semibold text-text-primary">팀 요약</span>
+          <span className="text-sm font-semibold text-text-primary">
+            팀 요약
+          </span>
         </div>
         <span className="rounded bg-bg-elevated px-1.5 py-0.5 text-[10px] font-bold text-text-tertiary">
           {teams.length}
@@ -276,7 +375,8 @@ function TeamSummaryPanel({
           const members = team.members ?? [];
           const budget = team.remainingGold ?? team.remainingBudget ?? 0;
           const captain = members.find((m: any) => m.id === team.captainId);
-          const captainName = captain?.username ?? team.captainName ?? team.name;
+          const captainName =
+            captain?.username ?? team.captainName ?? team.name;
           const isMine =
             team.captainId === currentUserId ||
             members.some((m: any) => m.id === currentUserId);
@@ -286,122 +386,159 @@ function TeamSummaryPanel({
           const isFull = members.length >= 5;
 
           return (
-          <Card
-            key={team.id}
-            className={cn(
-              "overflow-hidden p-0",
-              isCurrentBidder && "border-accent-gold/50 shadow-sm shadow-accent-gold/10",
-              isMine && !isCurrentBidder && "border-accent-primary/40",
-              isFull && "opacity-80",
-            )}
-          >
-            <div
+            <Card
+              key={team.id}
               className={cn(
-                "flex items-center gap-2 border-b border-bg-tertiary/70 px-3 py-2.5",
-                isCurrentBidder ? "bg-accent-gold/10" : "bg-bg-tertiary/20",
+                "overflow-hidden p-0",
+                isCurrentBidder &&
+                  "border-accent-gold/50 shadow-sm shadow-accent-gold/10",
+                isMine && !isCurrentBidder && "border-accent-primary/40",
+                isFull && "opacity-80",
               )}
             >
               <div
-                className="relative shrink-0"
-                onMouseEnter={(e) => captain && handleHover(captain.id, e.currentTarget)}
-                onMouseLeave={scheduleHoverClose}
-                onClick={() => captain && setProfileUserId(captain.id)}
+                className={cn(
+                  "flex items-center gap-2 border-b border-bg-tertiary/70 px-3 py-2.5",
+                  isCurrentBidder ? "bg-accent-gold/10" : "bg-bg-tertiary/20",
+                )}
               >
-                <Avatar
-                  src={captain?.avatar}
-                  alt={captainName}
-                  fallback={captainName?.[0] ?? "?"}
-                  size="sm"
-                  className={cn(
-                    "cursor-pointer",
-                    isCurrentBidder ? "ring-2 ring-accent-gold/60" : "ring-1 ring-bg-elevated",
-                  )}
-                />
-                <span className="absolute -bottom-1 -right-1 rounded bg-accent-gold px-1 text-[9px] font-bold text-bg-primary">
-                  C
-                </span>
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex min-w-0 items-center gap-1.5">
-                  {team.color && (
-                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: team.color }} />
-                  )}
-                  <span className={cn("truncate text-sm font-bold", isMine ? "text-accent-primary" : "text-text-primary")}>
-                    {captainName}
+                <div
+                  className="relative shrink-0"
+                  onMouseEnter={(e) =>
+                    captain && handleHover(captain.id, e.currentTarget)
+                  }
+                  onMouseLeave={scheduleHoverClose}
+                  onClick={() => captain && setProfileUserId(captain.id)}
+                >
+                  <Avatar
+                    src={captain?.avatar}
+                    alt={captainName}
+                    fallback={captainName?.[0] ?? "?"}
+                    size="sm"
+                    className={cn(
+                      "cursor-pointer",
+                      isCurrentBidder
+                        ? "ring-2 ring-accent-gold/60"
+                        : "ring-1 ring-bg-elevated",
+                    )}
+                  />
+                  <span className="absolute -bottom-1 -right-1 rounded bg-accent-gold px-1 text-[9px] font-bold text-bg-primary">
+                    C
                   </span>
-                  {isCurrentBidder && (
-                    <span className="shrink-0 rounded bg-accent-gold/15 px-1.5 py-0.5 text-[10px] font-bold text-accent-gold">
-                      최고
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex min-w-0 items-center gap-1.5">
+                    {team.color && (
+                      <span
+                        className="h-2 w-2 shrink-0 rounded-full"
+                        style={{ backgroundColor: team.color }}
+                      />
+                    )}
+                    <span
+                      className={cn(
+                        "truncate text-sm font-bold",
+                        isMine ? "text-accent-primary" : "text-text-primary",
+                      )}
+                    >
+                      {captainName}
                     </span>
-                  )}
+                    {isCurrentBidder && (
+                      <span className="shrink-0 rounded bg-accent-gold/15 px-1.5 py-0.5 text-[10px] font-bold text-accent-gold">
+                        최고
+                      </span>
+                    )}
+                  </div>
+                  <p className="truncate text-[11px] text-text-tertiary">
+                    {team.name} · {members.length}/5
+                  </p>
                 </div>
-                <p className="truncate text-[11px] text-text-tertiary">
-                  {team.name} · {members.length}/5
-                </p>
-              </div>
-              <div className="shrink-0 text-right">
-                <div className={cn("flex items-center justify-end gap-0.5 text-xs font-bold", budget === 0 ? "text-accent-danger" : "text-accent-gold")}>
-                  <Coins className="h-3 w-3" />
-                  {budget.toLocaleString()}
+                <div className="shrink-0 text-right">
+                  <div
+                    className={cn(
+                      "flex items-center justify-end gap-0.5 text-xs font-bold",
+                      budget === 0 ? "text-accent-danger" : "text-accent-gold",
+                    )}
+                  >
+                    <Coins className="h-3 w-3" />
+                    {budget.toLocaleString()}
+                  </div>
+                  <p className="text-[10px] text-text-muted">
+                    {isFull ? "만석" : `${5 - members.length}자리`}
+                  </p>
                 </div>
-                <p className="text-[10px] text-text-muted">{isFull ? "만석" : `${5 - members.length}자리`}</p>
               </div>
-            </div>
 
-            <div className="grid grid-cols-5 gap-1 p-2">
-              {Array.from({ length: 5 }).map((_, idx) => {
-                const member = members[idx];
-                if (!member) {
+              <div className="grid grid-cols-5 gap-1 p-2">
+                {Array.from({ length: 5 }).map((_, idx) => {
+                  const member = members[idx];
+                  if (!member) {
+                    return (
+                      <div
+                        key={`empty-${idx}`}
+                        className="min-w-0 px-1 py-1.5 text-center"
+                      >
+                        <div className="mx-auto h-8 w-8 rounded-full border border-dashed border-bg-tertiary/70 bg-bg-tertiary/20" />
+                        <p className="mt-1 truncate text-[10px] text-text-muted">
+                          빈 슬롯
+                        </p>
+                      </div>
+                    );
+                  }
+                  const isCaptain = member.id === team.captainId;
+                  const tier = String(member.tier ?? "").toUpperCase();
+                  const tierIcon = getTierIcon(tier);
                   return (
-                    <div key={`empty-${idx}`} className="min-w-0 px-1 py-1.5 text-center">
-                      <div className="mx-auto h-8 w-8 rounded-full border border-dashed border-bg-tertiary/70 bg-bg-tertiary/20" />
-                      <p className="mt-1 truncate text-[10px] text-text-muted">빈 슬롯</p>
+                    <div
+                      key={member.id}
+                      className="min-w-0 cursor-pointer rounded-lg px-1 py-1.5 text-center transition-colors hover:bg-bg-elevated/60"
+                      onMouseEnter={(e) =>
+                        handleHover(member.id, e.currentTarget)
+                      }
+                      onMouseLeave={scheduleHoverClose}
+                      onClick={() => setProfileUserId(member.id)}
+                    >
+                      <div className="relative mx-auto h-8 w-8">
+                        <Avatar
+                          src={member.avatar}
+                          alt={member.username}
+                          fallback={member.username[0]}
+                          size="sm"
+                          className={cn(
+                            isCaptain
+                              ? "ring-2 ring-accent-gold/60"
+                              : "ring-1 ring-bg-elevated",
+                          )}
+                        />
+                        {isCaptain && (
+                          <span className="absolute -bottom-1 -right-1 rounded bg-accent-gold px-1 text-[9px] font-bold text-bg-primary">
+                            C
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-1 flex min-w-0 items-center justify-center gap-0.5">
+                        {tierIcon ? (
+                          <>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={tierIcon}
+                              alt={tier}
+                              width={12}
+                              height={12}
+                              className="shrink-0 object-contain"
+                            />
+                          </>
+                        ) : (
+                          <span className="h-3 w-3 shrink-0 rounded-full bg-bg-elevated" />
+                        )}
+                        <span className="min-w-0 truncate text-[10px] font-medium text-text-secondary">
+                          {member.username}
+                        </span>
+                      </div>
                     </div>
                   );
-                }
-                const isCaptain = member.id === team.captainId;
-                const tier = String(member.tier ?? "").toUpperCase();
-                const tierIcon = getTierIcon(tier);
-                return (
-                  <div
-                    key={member.id}
-                    className="min-w-0 cursor-pointer rounded-lg px-1 py-1.5 text-center transition-colors hover:bg-bg-elevated/60"
-                    onMouseEnter={(e) => handleHover(member.id, e.currentTarget)}
-                    onMouseLeave={scheduleHoverClose}
-                    onClick={() => setProfileUserId(member.id)}
-                  >
-                    <div className="relative mx-auto h-8 w-8">
-                      <Avatar
-                        src={member.avatar}
-                        alt={member.username}
-                        fallback={member.username[0]}
-                        size="sm"
-                        className={cn(isCaptain ? "ring-2 ring-accent-gold/60" : "ring-1 ring-bg-elevated")}
-                      />
-                      {isCaptain && (
-                        <span className="absolute -bottom-1 -right-1 rounded bg-accent-gold px-1 text-[9px] font-bold text-bg-primary">
-                          C
-                        </span>
-                      )}
-                    </div>
-                    <div className="mt-1 flex min-w-0 items-center justify-center gap-0.5">
-                      {tierIcon ? (
-                        <>
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={tierIcon} alt={tier} width={12} height={12} className="shrink-0 object-contain" />
-                        </>
-                      ) : (
-                        <span className="h-3 w-3 shrink-0 rounded-full bg-bg-elevated" />
-                      )}
-                      <span className="min-w-0 truncate text-[10px] font-medium text-text-secondary">
-                        {member.username}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </Card>
+                })}
+              </div>
+            </Card>
           );
         })}
       </div>
@@ -410,12 +547,18 @@ function TeamSummaryPanel({
         <PlayerHoverCard
           userId={hoveredPlayer.userId}
           anchorRect={hoveredPlayer.rect}
-          onOpenProfile={(uid) => { setProfileUserId(uid); setHoveredPlayer(null); }}
+          onOpenProfile={(uid) => {
+            setProfileUserId(uid);
+            setHoveredPlayer(null);
+          }}
           onMouseEnter={cancelHoverClose}
           onMouseLeave={scheduleHoverClose}
         />
       )}
-      <PlayerProfileModal userId={profileUserId} onClose={() => setProfileUserId(null)} />
+      <PlayerProfileModal
+        userId={profileUserId}
+        onClose={() => setProfileUserId(null)}
+      />
     </div>
   );
 }
@@ -434,7 +577,9 @@ function RemainingPlayersPanel({
     <Card className="flex min-h-0 flex-col overflow-hidden p-0">
       <div className="flex h-10 shrink-0 items-center gap-2 border-b border-bg-tertiary/70 bg-bg-tertiary/20 px-3">
         <Users className="h-3.5 w-3.5 text-accent-primary" />
-        <span className="flex-1 text-sm font-semibold text-text-primary">남은 매물</span>
+        <span className="flex-1 text-sm font-semibold text-text-primary">
+          남은 매물
+        </span>
         <span className="rounded bg-bg-elevated px-1.5 py-0.5 text-[10px] font-bold text-text-tertiary">
           {players.length}
         </span>
@@ -447,10 +592,7 @@ function RemainingPlayersPanel({
         </button>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto p-2">
-        <PlayersList
-          players={players}
-          currentPlayerId={currentPlayerId}
-        />
+        <PlayersList players={players} currentPlayerId={currentPlayerId} />
       </div>
     </Card>
   );
@@ -471,9 +613,13 @@ export default function AuctionRoomPage() {
   const [isFoldConfirmOpen, setIsFoldConfirmOpen] = useState(false);
   const [isAbortConfirmOpen, setIsAbortConfirmOpen] = useState(false);
   // 모바일 탭: "auction" | "players" | "log" | "chat"
-  const [mobileTab, setMobileTab] = useState<"auction" | "players" | "log" | "chat">("auction");
+  const [mobileTab, setMobileTab] = useState<
+    "auction" | "players" | "log" | "chat"
+  >("auction");
   // 경매 완료 결과 화면 카운트다운
-  const [completeCountdown, setCompleteCountdown] = useState<number | null>(null);
+  const [completeCountdown, setCompleteCountdown] = useState<number | null>(
+    null,
+  );
   // 대기 선수 전체 보기 모달
   const [playersModalOpen, setPlayersModalOpen] = useState(false);
 
@@ -497,13 +643,17 @@ export default function AuctionRoomPage() {
     lastSoldEvent,
   } = useAuction(auctionId);
 
-  const isHost = user?.id === (captainSelectionPhase?.hostId ?? auctionState?.hostId);
+  const isHost =
+    user?.id === (captainSelectionPhase?.hostId ?? auctionState?.hostId);
 
   // VOLUNTEER 타이머 카운트다운 (클라이언트 표시용)
   useEffect(() => {
     if (!captainSelectionPhase?.timerEnd) return;
     const interval = setInterval(() => {
-      const left = Math.max(0, Math.floor((captainSelectionPhase.timerEnd! - Date.now()) / 1000));
+      const left = Math.max(
+        0,
+        Math.floor((captainSelectionPhase.timerEnd! - Date.now()) / 1000),
+      );
       setVolunteerTimer(left);
     }, 200);
     return () => clearInterval(interval);
@@ -533,11 +683,24 @@ export default function AuctionRoomPage() {
 
   useEffect(() => {
     if (!sessionAbortedAt) return;
-    addToast(sessionAbortMessage ?? "내전이 종료되어 로비로 이동합니다.", "warning");
+    addToast(
+      sessionAbortMessage ?? "내전이 종료되어 로비로 이동합니다.",
+      "warning",
+    );
     clearSessionAbort();
-    const timer = setTimeout(() => router.push(`/tournaments/${auctionId}/lobby`), 1500);
+    const timer = setTimeout(
+      () => router.push(`/tournaments/${auctionId}/lobby`),
+      1500,
+    );
     return () => clearTimeout(timer);
-  }, [sessionAbortedAt, sessionAbortMessage, clearSessionAbort, addToast, router, auctionId]);
+  }, [
+    sessionAbortedAt,
+    sessionAbortMessage,
+    clearSessionAbort,
+    addToast,
+    router,
+    auctionId,
+  ]);
 
   // 낙찰 토스트 표시
   useEffect(() => {
@@ -637,12 +800,11 @@ export default function AuctionRoomPage() {
       <div className="flex-grow flex items-center justify-center">
         <div className="text-center">
           <p className="text-accent-danger mb-4">오류: {error}</p>
-          <p className="text-text-secondary mb-6">경매 방에 연결할 수 없습니다</p>
+          <p className="text-text-secondary mb-6">
+            경매 방에 연결할 수 없습니다
+          </p>
           <div className="flex gap-3 justify-center">
-            <Button
-              variant="primary"
-              onClick={() => window.location.reload()}
-            >
+            <Button variant="primary" onClick={() => window.location.reload()}>
               다시 시도
             </Button>
             <Button
@@ -659,11 +821,16 @@ export default function AuctionRoomPage() {
 
   // 팀장 선정 단계
   if (captainSelectionPhase) {
-    const { mode, requiredCount, volunteers, participants } = captainSelectionPhase;
-    const isVolunteer = volunteers.includes(user?.id ?? '');
+    const { mode, requiredCount, volunteers, participants } =
+      captainSelectionPhase;
+    const isVolunteer = volunteers.includes(user?.id ?? "");
     const tooManyVolunteers = volunteers.length > requiredCount;
-    const meParticipant = (participants ?? []).find((p: any) => p.id === user?.id);
-    const volunteerParticipants = (participants ?? []).filter((p: any) => volunteers.includes(p.id));
+    const meParticipant = (participants ?? []).find(
+      (p: any) => p.id === user?.id,
+    );
+    const volunteerParticipants = (participants ?? []).filter((p: any) =>
+      volunteers.includes(p.id),
+    );
     const otherWaitingParticipants = (participants ?? []).filter(
       (p: any) => p.id !== user?.id && !volunteers.includes(p.id),
     );
@@ -687,268 +854,364 @@ export default function AuctionRoomPage() {
           : volunteers.length < requiredCount
             ? `현재 지원: ${volunteerConfirmSummary} · 부족분은 MMR로 자동 선정`
             : `확정 대상: ${volunteerConfirmSummary}`;
-    const progressPct = Math.min(100, (volunteers.length / requiredCount) * 100);
+    const progressPct = Math.min(
+      100,
+      (volunteers.length / requiredCount) * 100,
+    );
     // 자원자 부족 시 백엔드가 MMR로 자동 채움
-    const willBeFilledByMmr = !tooManyVolunteers && volunteers.length < requiredCount;
+    const willBeFilledByMmr =
+      !tooManyVolunteers && volunteers.length < requiredCount;
 
     return (
       <div className="flex-grow min-h-0 p-4 md:p-8">
         <div className="container mx-auto flex h-[calc(100vh-6rem)] max-w-4xl min-h-[520px] flex-col">
           {/* 헤더 */}
           <div className="mb-4 flex-shrink-0 text-center">
-            <h1 className="text-2xl font-bold text-text-primary mb-1">팀장 선정</h1>
-            {mode === 'VOLUNTEER' && (
+            <h1 className="mb-1 flex items-center justify-center gap-2 text-2xl font-bold text-text-primary">
+              팀장 선정
+              <TeamModeHelp mode="AUCTION" compact />
+            </h1>
+            {mode === "VOLUNTEER" && (
               <p className="text-text-secondary">
-                필요 팀장 <span className="font-bold text-accent-primary">{requiredCount}명</span>
+                필요 팀장{" "}
+                <span className="font-bold text-accent-primary">
+                  {requiredCount}명
+                </span>
                 {captainSelectionPhase.timerEnd && (
-                  <span className="ml-3 text-accent-warning font-mono text-lg">{volunteerTimer}초</span>
+                  <span className="ml-3 text-accent-warning font-mono text-lg">
+                    {volunteerTimer}초
+                  </span>
                 )}
               </p>
             )}
-            {mode === 'MANUAL' && (
+            {mode === "MANUAL" && (
               <p className="text-text-secondary">
-                {isHost
-                  ? <>참가자 중 <span className="font-bold text-accent-primary">{requiredCount}명</span>의 팀장을 선택해주세요</>
-                  : <>방장이 <span className="font-bold text-accent-primary">{requiredCount}명</span>의 팀장을 선택하고 있습니다</>}
+                {isHost ? (
+                  <>
+                    참가자 중{" "}
+                    <span className="font-bold text-accent-primary">
+                      {requiredCount}명
+                    </span>
+                    의 팀장을 선택해주세요
+                  </>
+                ) : (
+                  <>
+                    방장이{" "}
+                    <span className="font-bold text-accent-primary">
+                      {requiredCount}명
+                    </span>
+                    의 팀장을 선택하고 있습니다
+                  </>
+                )}
               </p>
             )}
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto pr-1 pb-4">
             {/* ─── VOLUNTEER 모드 ─── */}
-            {mode === 'VOLUNTEER' && (
-            <>
-              {/* 1) 본인 액션 카드 — 가장 큰 시각 비중, 명시적 지원/취소 버튼 */}
-              {meParticipant && (
-                <Card className="mb-4 p-0">
-                  <CardContent className="p-5">
-                    <div className="flex items-center gap-4 mb-4">
-                      <div className={cn(
-                        'w-12 h-12 rounded-full flex items-center justify-center text-base font-bold flex-shrink-0 transition-colors',
-                        isVolunteer
-                          ? 'bg-accent-primary text-white'
-                          : 'bg-bg-elevated text-text-primary',
-                      )}>
-                        {meParticipant.username[0].toUpperCase()}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="font-semibold text-text-primary truncate">{meParticipant.username}</div>
-                        {meParticipant.tier && (
-                          <div className="text-xs text-text-tertiary">
-                            {meParticipant.tier} {meParticipant.rank} · MMR {meParticipant.mmr}
-                          </div>
-                        )}
-                        <div className={cn(
-                          'mt-1 text-xs font-medium',
-                          isVolunteer ? 'text-accent-success' : 'text-text-tertiary',
-                        )}>
-                          {isVolunteer ? '✓ 팀장 지원 완료' : '아직 지원하지 않음'}
-                        </div>
-                      </div>
-                    </div>
-                    <Button
-                      onClick={() => volunteerAsCaptain(auctionId)}
-                      variant={isVolunteer ? 'secondary' : 'primary'}
-                      className="w-full"
-                      size="lg"
-                    >
-                      {isVolunteer ? '지원 취소' : (
-                        <>
-                          <Hand className="w-4 h-4 mr-2" />
-                          팀장 지원하기
-                        </>
-                      )}
-                    </Button>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* 2) 자원자 현황 — 진행 바 + 자원자 카드 (초과 시 방장 선택 영역) */}
-              <Card className="mb-4 p-0">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-semibold text-text-primary">자원자 현황</span>
-                    <span className={cn(
-                      'text-sm font-bold tabular-nums',
-                      tooManyVolunteers ? 'text-accent-warning' : 'text-accent-primary',
-                    )}>
-                      {volunteers.length}/{requiredCount}명
-                    </span>
-                  </div>
-                  <div className="h-1.5 bg-bg-tertiary rounded-full overflow-hidden mb-3">
-                    <div
-                      className={cn(
-                        'h-full transition-all',
-                        tooManyVolunteers ? 'bg-accent-warning' : 'bg-accent-primary',
-                      )}
-                      style={{ width: `${progressPct}%` }}
-                    />
-                  </div>
-                  {volunteerParticipants.length === 0 ? (
-                    <p className="text-xs text-text-tertiary text-center py-2">
-                      아직 자원한 사람이 없습니다.
-                    </p>
-                  ) : (
-                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                      {volunteerParticipants.map((p: any) => {
-                        const isSelected = tooManyVolunteers && selectedCaptains.includes(p.id);
-                        const canHostSelect = tooManyVolunteers && isHost;
-                        return (
-                          <div
-                            key={p.id}
-                            className={cn(
-                              'flex items-center gap-2.5 p-2 rounded-lg border transition-all',
-                              canHostSelect ? 'cursor-pointer hover:border-accent-primary/50' : 'cursor-default',
-                              isSelected
-                                ? 'border-accent-primary bg-accent-primary/10'
-                                : 'border-bg-tertiary bg-bg-secondary',
-                            )}
-                            onClick={() => {
-                              if (!canHostSelect) return;
-                              setSelectedCaptains(prev =>
-                                prev.includes(p.id)
-                                  ? prev.filter(id => id !== p.id)
-                                  : prev.length < requiredCount ? [...prev, p.id] : prev
-                              );
-                            }}
-                          >
-                            <div className="w-7 h-7 rounded-full bg-accent-primary/20 text-accent-primary flex items-center justify-center text-xs font-bold flex-shrink-0">
-                              {p.username[0].toUpperCase()}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <span className="text-sm font-medium text-text-primary truncate block">{p.username}</span>
-                              {p.tier && <span className="text-[11px] text-text-tertiary">{p.tier} {p.rank}</span>}
-                            </div>
-                            {isSelected && <Check className="w-4 h-4 text-accent-primary flex-shrink-0" />}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                  {tooManyVolunteers && (
-                    <p className="text-xs text-accent-warning mt-3 text-center">
-                      {isHost
-                        ? `자원자가 초과되었습니다. ${requiredCount}명을 선택해 확정해주세요.`
-                        : '자원자가 초과되어 방장이 선택합니다.'}
-                    </p>
-                  )}
-                  {willBeFilledByMmr && volunteers.length > 0 && (
-                    <p className="text-xs text-text-tertiary mt-3 text-center">
-                      자원자가 부족하면 부족한 자리는 MMR 상위 참가자로 자동 채워집니다.
-                    </p>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* 3) 아직 미지원 참가자 (작은 칩) */}
-              {otherWaitingParticipants.length > 0 && (
-                <Card className="mb-4 p-0">
-                  <CardContent className="p-4">
-                    <div className="text-xs font-semibold text-text-tertiary uppercase tracking-wider mb-2">
-                      대기 중 ({otherWaitingParticipants.length})
-                    </div>
-                    <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-                      {otherWaitingParticipants.map((p: any) => (
+            {mode === "VOLUNTEER" && (
+              <>
+                {/* 1) 본인 액션 카드 — 가장 큰 시각 비중, 명시적 지원/취소 버튼 */}
+                {meParticipant && (
+                  <Card className="mb-4 p-0">
+                    <CardContent className="p-5">
+                      <div className="flex items-center gap-4 mb-4">
                         <div
-                          key={p.id}
-                          className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-bg-secondary text-xs text-text-secondary"
-                          title={p.tier ? `${p.username} · ${p.tier} ${p.rank}` : p.username}
+                          className={cn(
+                            "w-12 h-12 rounded-full flex items-center justify-center text-base font-bold flex-shrink-0 transition-colors",
+                            isVolunteer
+                              ? "bg-accent-primary text-white"
+                              : "bg-bg-elevated text-text-primary",
+                          )}
                         >
-                          <div className="w-4 h-4 rounded-full bg-bg-elevated flex items-center justify-center text-[9px] font-bold">
-                            {p.username[0].toUpperCase()}
-                          </div>
-                          <span className="truncate max-w-[120px]">{p.username}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </>
-          )}
-
-            {/* ─── MANUAL 모드 ─── */}
-            {mode === 'MANUAL' && (
-            <>
-              {isHost ? (
-                <div className="mb-6 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  {(participants ?? []).map((p: any) => {
-                    const isSelected = selectedCaptains.includes(p.id);
-                    return (
-                      <div
-                        key={p.id}
-                        className={cn(
-                          'flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all',
-                          isSelected
-                            ? 'border-accent-primary bg-accent-primary/10'
-                            : 'border-bg-tertiary bg-bg-secondary hover:border-accent-primary/50',
-                        )}
-                        onClick={() => {
-                          setSelectedCaptains(prev =>
-                            prev.includes(p.id)
-                              ? prev.filter(id => id !== p.id)
-                              : prev.length < requiredCount ? [...prev, p.id] : prev
-                          );
-                        }}
-                      >
-                        <div className="w-8 h-8 rounded-full bg-bg-elevated flex items-center justify-center text-sm font-bold text-text-primary flex-shrink-0">
-                          {p.username[0].toUpperCase()}
+                          {meParticipant.username[0].toUpperCase()}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <span className="font-medium text-text-primary truncate block">{p.username}</span>
-                          {p.tier && <span className="text-xs text-text-tertiary">{p.tier} {p.rank} · MMR {p.mmr}</span>}
-                        </div>
-                        {isSelected && <Check className="w-4 h-4 text-accent-primary flex-shrink-0" />}
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                /* 비방장: 참가자 목록 표시 (방장 선택 중 상태 안내) */
-                <Card className="mb-6 p-0">
-                  <CardContent className="p-5">
-                    <div className="flex items-center gap-2 mb-4">
-                      <Users className="w-4 h-4 text-accent-primary animate-pulse" />
-                      <p className="text-text-primary font-medium">방장이 팀장을 선택 중입니다</p>
-                    </div>
-                    {(participants ?? []).length > 0 ? (
-                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                        {(participants ?? []).map((p: any) => (
-                          <div
-                            key={p.id}
-                            className="flex items-center gap-2.5 p-2 rounded-lg bg-bg-secondary"
-                          >
-                            <div className="w-7 h-7 rounded-full bg-bg-elevated flex items-center justify-center text-xs font-bold text-text-primary flex-shrink-0">
-                              {p.username[0].toUpperCase()}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <span className="text-sm font-medium text-text-primary truncate block">{p.username}</span>
-                              {p.tier && <span className="text-[11px] text-text-tertiary">{p.tier} {p.rank}</span>}
-                            </div>
+                          <div className="font-semibold text-text-primary truncate">
+                            {meParticipant.username}
                           </div>
-                        ))}
+                          {meParticipant.tier && (
+                            <div className="text-xs text-text-tertiary">
+                              {meParticipant.tier} {meParticipant.rank} · MMR{" "}
+                              {meParticipant.mmr}
+                            </div>
+                          )}
+                          <div
+                            className={cn(
+                              "mt-1 text-xs font-medium",
+                              isVolunteer
+                                ? "text-accent-success"
+                                : "text-text-tertiary",
+                            )}
+                          >
+                            {isVolunteer
+                              ? "✓ 팀장 지원 완료"
+                              : "아직 지원하지 않음"}
+                          </div>
+                        </div>
                       </div>
+                      <Button
+                        onClick={() => volunteerAsCaptain(auctionId)}
+                        variant={isVolunteer ? "secondary" : "primary"}
+                        className="w-full"
+                        size="lg"
+                      >
+                        {isVolunteer ? (
+                          "지원 취소"
+                        ) : (
+                          <>
+                            <Hand className="w-4 h-4 mr-2" />
+                            팀장 지원하기
+                          </>
+                        )}
+                      </Button>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* 2) 자원자 현황 — 진행 바 + 자원자 카드 (초과 시 방장 선택 영역) */}
+                <Card className="mb-4 p-0">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-semibold text-text-primary">
+                        자원자 현황
+                      </span>
+                      <span
+                        className={cn(
+                          "text-sm font-bold tabular-nums",
+                          tooManyVolunteers
+                            ? "text-accent-warning"
+                            : "text-accent-primary",
+                        )}
+                      >
+                        {volunteers.length}/{requiredCount}명
+                      </span>
+                    </div>
+                    <div className="h-1.5 bg-bg-tertiary rounded-full overflow-hidden mb-3">
+                      <div
+                        className={cn(
+                          "h-full transition-all",
+                          tooManyVolunteers
+                            ? "bg-accent-warning"
+                            : "bg-accent-primary",
+                        )}
+                        style={{ width: `${progressPct}%` }}
+                      />
+                    </div>
+                    {volunteerParticipants.length === 0 ? (
+                      <p className="text-xs text-text-tertiary text-center py-2">
+                        아직 자원한 사람이 없습니다.
+                      </p>
                     ) : (
-                      <p className="text-sm text-text-tertiary text-center py-2">잠시만 기다려주세요...</p>
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        {volunteerParticipants.map((p: any) => {
+                          const isSelected =
+                            tooManyVolunteers &&
+                            selectedCaptains.includes(p.id);
+                          const canHostSelect = tooManyVolunteers && isHost;
+                          return (
+                            <div
+                              key={p.id}
+                              className={cn(
+                                "flex items-center gap-2.5 p-2 rounded-lg border transition-all",
+                                canHostSelect
+                                  ? "cursor-pointer hover:border-accent-primary/50"
+                                  : "cursor-default",
+                                isSelected
+                                  ? "border-accent-primary bg-accent-primary/10"
+                                  : "border-bg-tertiary bg-bg-secondary",
+                              )}
+                              onClick={() => {
+                                if (!canHostSelect) return;
+                                setSelectedCaptains((prev) =>
+                                  prev.includes(p.id)
+                                    ? prev.filter((id) => id !== p.id)
+                                    : prev.length < requiredCount
+                                      ? [...prev, p.id]
+                                      : prev,
+                                );
+                              }}
+                            >
+                              <div className="w-7 h-7 rounded-full bg-accent-primary/20 text-accent-primary flex items-center justify-center text-xs font-bold flex-shrink-0">
+                                {p.username[0].toUpperCase()}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <span className="text-sm font-medium text-text-primary truncate block">
+                                  {p.username}
+                                </span>
+                                {p.tier && (
+                                  <span className="text-[11px] text-text-tertiary">
+                                    {p.tier} {p.rank}
+                                  </span>
+                                )}
+                              </div>
+                              {isSelected && (
+                                <Check className="w-4 h-4 text-accent-primary flex-shrink-0" />
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {tooManyVolunteers && (
+                      <p className="text-xs text-accent-warning mt-3 text-center">
+                        {isHost
+                          ? `자원자가 초과되었습니다. ${requiredCount}명을 선택해 확정해주세요.`
+                          : "자원자가 초과되어 방장이 선택합니다."}
+                      </p>
+                    )}
+                    {willBeFilledByMmr && volunteers.length > 0 && (
+                      <p className="text-xs text-text-tertiary mt-3 text-center">
+                        자원자가 부족하면 부족한 자리는 MMR 상위 참가자로 자동
+                        채워집니다.
+                      </p>
                     )}
                   </CardContent>
                 </Card>
-              )}
-            </>
+
+                {/* 3) 아직 미지원 참가자 (작은 칩) */}
+                {otherWaitingParticipants.length > 0 && (
+                  <Card className="mb-4 p-0">
+                    <CardContent className="p-4">
+                      <div className="text-xs font-semibold text-text-tertiary uppercase tracking-wider mb-2">
+                        대기 중 ({otherWaitingParticipants.length})
+                      </div>
+                      <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                        {otherWaitingParticipants.map((p: any) => (
+                          <div
+                            key={p.id}
+                            className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-bg-secondary text-xs text-text-secondary"
+                            title={
+                              p.tier
+                                ? `${p.username} · ${p.tier} ${p.rank}`
+                                : p.username
+                            }
+                          >
+                            <div className="w-4 h-4 rounded-full bg-bg-elevated flex items-center justify-center text-[9px] font-bold">
+                              {p.username[0].toUpperCase()}
+                            </div>
+                            <span className="truncate max-w-[120px]">
+                              {p.username}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </>
+            )}
+
+            {/* ─── MANUAL 모드 ─── */}
+            {mode === "MANUAL" && (
+              <>
+                {isHost ? (
+                  <div className="mb-6 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    {(participants ?? []).map((p: any) => {
+                      const isSelected = selectedCaptains.includes(p.id);
+                      return (
+                        <div
+                          key={p.id}
+                          className={cn(
+                            "flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all",
+                            isSelected
+                              ? "border-accent-primary bg-accent-primary/10"
+                              : "border-bg-tertiary bg-bg-secondary hover:border-accent-primary/50",
+                          )}
+                          onClick={() => {
+                            setSelectedCaptains((prev) =>
+                              prev.includes(p.id)
+                                ? prev.filter((id) => id !== p.id)
+                                : prev.length < requiredCount
+                                  ? [...prev, p.id]
+                                  : prev,
+                            );
+                          }}
+                        >
+                          <div className="w-8 h-8 rounded-full bg-bg-elevated flex items-center justify-center text-sm font-bold text-text-primary flex-shrink-0">
+                            {p.username[0].toUpperCase()}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <span className="font-medium text-text-primary truncate block">
+                              {p.username}
+                            </span>
+                            {p.tier && (
+                              <span className="text-xs text-text-tertiary">
+                                {p.tier} {p.rank} · MMR {p.mmr}
+                              </span>
+                            )}
+                          </div>
+                          {isSelected && (
+                            <Check className="w-4 h-4 text-accent-primary flex-shrink-0" />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  /* 비방장: 참가자 목록 표시 (방장 선택 중 상태 안내) */
+                  <Card className="mb-6 p-0">
+                    <CardContent className="p-5">
+                      <div className="flex items-center gap-2 mb-4">
+                        <Users className="w-4 h-4 text-accent-primary animate-pulse" />
+                        <p className="text-text-primary font-medium">
+                          방장이 팀장을 선택 중입니다
+                        </p>
+                      </div>
+                      {(participants ?? []).length > 0 ? (
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                          {(participants ?? []).map((p: any) => (
+                            <div
+                              key={p.id}
+                              className="flex items-center gap-2.5 p-2 rounded-lg bg-bg-secondary"
+                            >
+                              <div className="w-7 h-7 rounded-full bg-bg-elevated flex items-center justify-center text-xs font-bold text-text-primary flex-shrink-0">
+                                {p.username[0].toUpperCase()}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <span className="text-sm font-medium text-text-primary truncate block">
+                                  {p.username}
+                                </span>
+                                {p.tier && (
+                                  <span className="text-[11px] text-text-tertiary">
+                                    {p.tier} {p.rank}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-text-tertiary text-center py-2">
+                          잠시만 기다려주세요...
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+              </>
             )}
           </div>
 
           {/* 방장 마감/확정 버튼 */}
-          {(mode === 'VOLUNTEER' || mode === 'MANUAL') && isHost && (
+          {(mode === "VOLUNTEER" || mode === "MANUAL") && isHost && (
             <div className="flex-shrink-0 border-t border-bg-tertiary bg-bg-primary/95 px-1 pt-4 backdrop-blur">
               <p className="mx-auto mb-3 max-w-xl truncate text-center text-xs font-medium text-text-secondary">
                 {captainFooterSummary}
               </p>
-              {mode === 'VOLUNTEER' && (
+              {mode === "VOLUNTEER" && (
                 <div className="flex justify-center">
                   <Button
-                    onClick={() => finalizeVolunteers(auctionId, tooManyVolunteers ? selectedCaptains : undefined)}
-                    disabled={tooManyVolunteers && selectedCaptains.length !== requiredCount}
+                    onClick={() =>
+                      finalizeVolunteers(
+                        auctionId,
+                        tooManyVolunteers ? selectedCaptains : undefined,
+                      )
+                    }
+                    disabled={
+                      tooManyVolunteers &&
+                      selectedCaptains.length !== requiredCount
+                    }
                     size="lg"
                     className="w-full sm:w-auto"
                   >
@@ -956,17 +1219,19 @@ export default function AuctionRoomPage() {
                     {tooManyVolunteers
                       ? `${selectedCaptains.length}/${requiredCount}명 선택 후 확정`
                       : volunteers.length === requiredCount
-                        ? '팀장 확정'
+                        ? "팀장 확정"
                         : volunteers.length === 0
-                          ? 'MMR 자동 선정으로 시작'
+                          ? "MMR 자동 선정으로 시작"
                           : `지금 마감 (부족분 MMR 자동)`}
                   </Button>
                 </div>
               )}
-              {mode === 'MANUAL' && (
+              {mode === "MANUAL" && (
                 <div className="flex justify-center">
                   <Button
-                    onClick={() => selectManualCaptains(auctionId, selectedCaptains)}
+                    onClick={() =>
+                      selectManualCaptains(auctionId, selectedCaptains)
+                    }
                     disabled={selectedCaptains.length !== requiredCount}
                     size="lg"
                     className="w-full sm:w-auto"
@@ -989,7 +1254,9 @@ export default function AuctionRoomPage() {
       <div className="flex-grow p-4 md:p-8">
         <div className="container mx-auto max-w-3xl animate-fade-in">
           <div className="text-center mb-6">
-            <h1 className="text-2xl font-bold text-text-primary mb-2">경매 완료!</h1>
+            <h1 className="text-2xl font-bold text-text-primary mb-2">
+              경매 완료!
+            </h1>
             <p className="text-text-secondary">
               {completeCountdown > 0
                 ? `${completeCountdown}초 후 역할 선택으로 이동합니다...`
@@ -1003,39 +1270,64 @@ export default function AuctionRoomPage() {
               .sort((a, b) => {
                 const na = String(a?.name ?? "");
                 const nb = String(b?.name ?? "");
-                const oa = na.match(/\d+/) ? Number(na.match(/\d+/)![0]) : Infinity;
-                const ob = nb.match(/\d+/) ? Number(nb.match(/\d+/)![0]) : Infinity;
+                const oa = na.match(/\d+/)
+                  ? Number(na.match(/\d+/)![0])
+                  : Infinity;
+                const ob = nb.match(/\d+/)
+                  ? Number(nb.match(/\d+/)![0])
+                  : Infinity;
                 return oa - ob || na.localeCompare(nb);
               })
               .map((team) => {
                 const members = (team as any).members ?? [];
-                const budget = (team as any).remainingGold ?? (team as any).remainingBudget ?? 0;
+                const budget =
+                  (team as any).remainingGold ??
+                  (team as any).remainingBudget ??
+                  0;
                 return (
                   <Card key={team.id} className="p-0">
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
                           {(team as any).color && (
-                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: (team as any).color }} />
+                            <div
+                              className="w-3 h-3 rounded-full"
+                              style={{ backgroundColor: (team as any).color }}
+                            />
                           )}
-                          <h3 className="font-semibold text-text-primary">{team.name}</h3>
+                          <h3 className="font-semibold text-text-primary">
+                            {team.name}
+                          </h3>
                         </div>
                         <div className="flex items-center gap-1 text-sm">
                           <Coins className="w-3.5 h-3.5 text-accent-gold" />
-                          <span className="font-bold text-accent-gold">{budget.toLocaleString()}G</span>
+                          <span className="font-bold text-accent-gold">
+                            {budget.toLocaleString()}G
+                          </span>
                         </div>
                       </div>
                       <div className="space-y-1.5">
                         {members.map((m: any) => (
-                          <div key={m.id} className={cn(
-                            "flex items-center gap-2 p-1.5 rounded text-sm",
-                            m.id === team.captainId ? "bg-accent-gold/10" : "bg-bg-tertiary",
-                          )}>
+                          <div
+                            key={m.id}
+                            className={cn(
+                              "flex items-center gap-2 p-1.5 rounded text-sm",
+                              m.id === team.captainId
+                                ? "bg-accent-gold/10"
+                                : "bg-bg-tertiary",
+                            )}
+                          >
                             <span className="text-[10px] text-text-tertiary w-3 flex-shrink-0">
                               {m.id === team.captainId ? "C" : "·"}
                             </span>
-                            <span className="font-medium text-text-primary truncate flex-1">{m.username}</span>
-                            <TierBadge tier={m.tier} size="sm" showIcon={false} />
+                            <span className="font-medium text-text-primary truncate flex-1">
+                              {m.username}
+                            </span>
+                            <TierBadge
+                              tier={m.tier}
+                              size="sm"
+                              showIcon={false}
+                            />
                           </div>
                         ))}
                       </div>
@@ -1067,12 +1359,22 @@ export default function AuctionRoomPage() {
       <div className="flex-grow flex items-center justify-center">
         <div className="text-center animate-fade-in">
           <LoadingSpinner size="lg" />
-          <p className="text-lg font-semibold text-text-primary mt-4">경매 준비 중</p>
-          <p className="text-text-secondary mt-2">팀장이 확정되었습니다. 잠시 후 경매가 시작됩니다...</p>
+          <p className="text-lg font-semibold text-text-primary mt-4">
+            경매 준비 중
+          </p>
+          <p className="text-text-secondary mt-2">
+            팀장이 확정되었습니다. 잠시 후 경매가 시작됩니다...
+          </p>
           {!isConnected && (
             <div className="mt-6">
-              <p className="text-accent-warning text-sm mb-3">연결이 끊어졌습니다</p>
-              <Button variant="primary" size="sm" onClick={() => window.location.reload()}>
+              <p className="text-accent-warning text-sm mb-3">
+                연결이 끊어졌습니다
+              </p>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => window.location.reload()}
+              >
                 다시 연결
               </Button>
             </div>
@@ -1084,12 +1386,13 @@ export default function AuctionRoomPage() {
 
   // 현재 유저가 캡틴인지 (모바일 하단 입찰 패널 표시 여부 판단)
   const myTeam = teams.find((t) => t.captainId === user?.id);
-  const isCaptainTurn = Boolean(myTeam) && auctionState.status === "IN_PROGRESS";
+  const isCaptainTurn =
+    Boolean(myTeam) && auctionState.status === "IN_PROGRESS";
   // currentHighestBidder는 teamId 또는 userId일 수 있음 — 둘 다 체크
-  const isAlreadyHighest = !!auctionState.currentHighestBidder && (
-    auctionState.currentHighestBidder === user?.id ||
-    auctionState.currentHighestBidder === myTeam?.id
-  );
+  const isAlreadyHighest =
+    !!auctionState.currentHighestBidder &&
+    (auctionState.currentHighestBidder === user?.id ||
+      auctionState.currentHighestBidder === myTeam?.id);
 
   return (
     <div className="flex h-full flex-col overflow-hidden p-4">
@@ -1122,8 +1425,9 @@ export default function AuctionRoomPage() {
         {/* 헤더 */}
         <div className="mb-3 flex h-12 shrink-0 items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold text-text-primary">
+            <h1 className="flex items-center gap-2 text-xl font-bold text-text-primary">
               경매 진행 중
+              <TeamModeHelp mode="AUCTION" compact />
               <span className="text-sm font-normal text-text-secondary ml-2">
                 ({players.length}명 남음)
               </span>
@@ -1136,11 +1440,15 @@ export default function AuctionRoomPage() {
               </span>
             )}
             <Badge
-              variant={isConnected ? 'success' : 'danger'}
+              variant={isConnected ? "success" : "danger"}
               className="hidden sm:inline-flex"
-              title={isConnected ? '서버와 실시간 연결됨' : '연결이 끊겼습니다 — 입찰이 반영되지 않을 수 있습니다'}
+              title={
+                isConnected
+                  ? "서버와 실시간 연결됨"
+                  : "연결이 끊겼습니다 — 입찰이 반영되지 않을 수 있습니다"
+              }
             >
-              {isConnected ? '● 연결됨' : '● 연결 끊김'}
+              {isConnected ? "● 연결됨" : "● 연결 끊김"}
             </Badge>
             {/* 매물 스킵 투표는 입찰 패널 안에 있다 (데스크톱: AuctionBoard, 모바일: 하단 패널) */}
             <Button
@@ -1165,12 +1473,12 @@ export default function AuctionRoomPage() {
 
         {/* ── 모바일 탭 네비게이션 (lg 미만) ── */}
         <div className="lg:hidden flex shrink-0 rounded-lg bg-bg-secondary p-1 mb-3 gap-1">
-          {([
+          {[
             { key: "auction" as const, label: "경매", icon: Gavel },
             { key: "players" as const, label: "대기", icon: Users },
             { key: "log" as const, label: "로그", icon: ScrollText },
             { key: "chat" as const, label: "채팅", icon: MessageSquare },
-          ]).map(({ key, label, icon: Icon }) => (
+          ].map(({ key, label, icon: Icon }) => (
             <button
               key={key}
               onClick={() => setMobileTab(key)}
@@ -1195,7 +1503,11 @@ export default function AuctionRoomPage() {
               currentUserId={user?.id}
               auctionState={auctionState}
             />
-            <GameChatPanel roomId={auctionId} variant="inline" className="min-h-0" />
+            <GameChatPanel
+              roomId={auctionId}
+              variant="inline"
+              className="min-h-0"
+            />
           </div>
 
           <div className="min-h-0 overflow-y-auto pr-1">
@@ -1238,7 +1550,10 @@ export default function AuctionRoomPage() {
           {mobileTab === "players" && (
             <Card className="p-0">
               <CardContent className="p-3">
-                <PlayersList players={players} currentPlayerId={auctionState.currentPlayer?.id} />
+                <PlayersList
+                  players={players}
+                  currentPlayerId={auctionState.currentPlayer?.id}
+                />
               </CardContent>
             </Card>
           )}
@@ -1325,7 +1640,7 @@ function MobileBidPanel({
   const memberCount = myTeam.members?.length ?? 0;
   const slotsNeeded = Math.max(0, 5 - memberCount);
   const reserveAmount = Math.max(0, (slotsNeeded - 1) * bidIncrement);
-  const budget = (myTeam.remainingGold ?? myTeam.remainingBudget ?? 0);
+  const budget = myTeam.remainingGold ?? myTeam.remainingBudget ?? 0;
   const availableBudget = Math.max(0, budget - reserveAmount);
   const totalBid = auctionState.currentHighestBid + accBid;
   const canBid = accBid > 0 && totalBid <= availableBudget && !isBidding;
@@ -1337,15 +1652,16 @@ function MobileBidPanel({
     !!myTeam?.id && (auctionState.skipTeamIds ?? []).includes(myTeam.id);
 
   // 매물 전환 시 리셋
-  React.useEffect(() => { setAccBid(0); }, [auctionState.currentPlayer?.id]);
+  React.useEffect(() => {
+    setAccBid(0);
+  }, [auctionState.currentPlayer?.id]);
   // 예산 초과 시 클램핑
   React.useEffect(() => {
     const max = Math.max(0, availableBudget - auctionState.currentHighestBid);
     setAccBid((prev) => Math.min(prev, max));
   }, [auctionState.currentHighestBid, availableBudget]);
   const calculateTimeLeft = React.useCallback(
-    () =>
-      Math.max(0, Math.ceil((auctionState.timerEnd - Date.now()) / 1000)),
+    () => Math.max(0, Math.ceil((auctionState.timerEnd - Date.now()) / 1000)),
     [auctionState.timerEnd],
   );
   React.useEffect(() => {
@@ -1359,7 +1675,9 @@ function MobileBidPanel({
   const addToBid = (inc: number) => {
     setAccBid((prev) => {
       const next = prev + inc;
-      return auctionState.currentHighestBid + next <= availableBudget ? next : prev;
+      return auctionState.currentHighestBid + next <= availableBudget
+        ? next
+        : prev;
     });
   };
 
@@ -1403,7 +1721,9 @@ function MobileBidPanel({
           </div>
           <p className="truncate text-[11px] text-text-secondary">
             최고가 {auctionState.currentHighestBid.toLocaleString()}G
-            {auctionState.currentHighestBidderName ? ` · 선두 ${auctionState.currentHighestBidderName}` : ""}
+            {auctionState.currentHighestBidderName
+              ? ` · 선두 ${auctionState.currentHighestBidderName}`
+              : ""}
           </p>
         </div>
         {onVoteItemSkip && (
@@ -1451,11 +1771,19 @@ function MobileBidPanel({
       {/* 2줄: 예산 + 입찰가 디스플레이 */}
       <div className="flex items-center justify-between mb-2">
         <span className="text-xs text-text-tertiary">
-          예산 <span className="text-accent-gold font-bold">{availableBudget.toLocaleString()}G</span>
+          예산{" "}
+          <span className="text-accent-gold font-bold">
+            {availableBudget.toLocaleString()}G
+          </span>
         </span>
         <div className="flex items-center gap-1">
           <Coins className="w-4 h-4 text-accent-gold" />
-          <span className={cn("text-xl font-bold", accBid > 0 ? "text-accent-gold" : "text-text-tertiary")}>
+          <span
+            className={cn(
+              "text-xl font-bold",
+              accBid > 0 ? "text-accent-gold" : "text-text-tertiary",
+            )}
+          >
             {totalBid.toLocaleString()}G
           </span>
         </div>
@@ -1479,7 +1807,12 @@ function MobileBidPanel({
                 variant="secondary"
                 size="sm"
                 onClick={() => addToBid(inc)}
-                disabled={!isConnected || isBidding || auctionState.currentHighestBid + accBid + inc > availableBudget}
+                disabled={
+                  !isConnected ||
+                  isBidding ||
+                  auctionState.currentHighestBid + accBid + inc >
+                    availableBudget
+                }
                 className="flex-1 text-xs px-1"
               >
                 +{inc}G
@@ -1502,7 +1835,11 @@ function MobileBidPanel({
               isLoading={isBidding}
               className="flex-[2] text-xs"
             >
-              {isBidding ? "입찰 중..." : canBid ? `${totalBid.toLocaleString()}G` : "금액 추가"}
+              {isBidding
+                ? "입찰 중..."
+                : canBid
+                  ? `${totalBid.toLocaleString()}G`
+                  : "금액 추가"}
             </Button>
           </div>
         </>

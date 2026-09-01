@@ -19,6 +19,7 @@ import { LoadingSpinner, Badge, Button, ConfirmModal } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
 import { ArrowLeft, RefreshCw, Trophy } from "lucide-react";
 import Link from "next/link";
+import { TeamModeHelp, type TeamMode } from "@/components/rooms/TeamModeHelp";
 
 export default function BracketPage() {
   const params = useParams();
@@ -57,6 +58,7 @@ export default function BracketPage() {
       return {
         isHost: room.hostId === user!.id,
         name: (room.name ?? null) as string | null,
+        teamMode: room.teamMode as TeamMode,
       };
     },
     staleTime: Infinity,
@@ -348,6 +350,9 @@ export default function BracketPage() {
               <h1 className="flex items-center gap-2 text-2xl font-bold text-text-primary md:text-3xl">
                 <Trophy className="h-6 w-6 md:h-8 md:w-8 text-accent-gold" />
                 대진표
+                {roomInfo?.teamMode && (
+                  <TeamModeHelp mode={roomInfo.teamMode} compact />
+                )}
               </h1>
               {/* 방 ID는 사용자에게 의미가 없다 — 방 이름을 보여준다 */}
               <p className="mt-1 truncate text-text-secondary">

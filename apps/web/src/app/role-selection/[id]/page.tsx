@@ -15,21 +15,29 @@ import { PlayerProfileModal } from "@/components/domain/PlayerProfileModal";
 import { PositionIcon } from "@/app/tournaments/[id]/lobby/_components/icons";
 import { TierBadge } from "@/components/domain/TierBadge";
 import { getRoleTier } from "@/lib/role-tier";
-import { LoadingSpinner, Badge, Avatar, Button, ConfirmModal } from "@/components/ui";
+import {
+  LoadingSpinner,
+  Badge,
+  Avatar,
+  Button,
+  ConfirmModal,
+} from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
 import { Clock, Check, CheckCircle2, TimerReset } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { RoleSelectionHelp } from "@/components/rooms/TeamModeHelp";
 
 const ROLES = ["TOP", "JUNGLE", "MID", "ADC", "SUPPORT"] as const;
 type Role = (typeof ROLES)[number];
 
-const ROLE_META: Record<Role, { label: string; icon: string; color: string }> = {
-  TOP: { label: "탑", icon: "⚔️", color: "text-red-400" },
-  JUNGLE: { label: "정글", icon: "🌲", color: "text-green-400" },
-  MID: { label: "미드", icon: "⭐", color: "text-yellow-400" },
-  ADC: { label: "원딜", icon: "🏹", color: "text-blue-400" },
-  SUPPORT: { label: "서포터", icon: "🛡️", color: "text-pink-400" },
-};
+const ROLE_META: Record<Role, { label: string; icon: string; color: string }> =
+  {
+    TOP: { label: "탑", icon: "⚔️", color: "text-red-400" },
+    JUNGLE: { label: "정글", icon: "🌲", color: "text-green-400" },
+    MID: { label: "미드", icon: "⭐", color: "text-yellow-400" },
+    ADC: { label: "원딜", icon: "🏹", color: "text-blue-400" },
+    SUPPORT: { label: "서포터", icon: "🛡️", color: "text-pink-400" },
+  };
 
 export default function RoleSelectionPage() {
   const params = useParams();
@@ -41,7 +49,10 @@ export default function RoleSelectionPage() {
   const [isAborting, setIsAborting] = useState(false);
   const [isMarkingReady, setIsMarkingReady] = useState(false);
   const [isAbortConfirmOpen, setIsAbortConfirmOpen] = useState(false);
-  const [hoveredMember, setHoveredMember] = useState<{ userId: string; rect: DOMRect } | null>(null);
+  const [hoveredMember, setHoveredMember] = useState<{
+    userId: string;
+    rect: DOMRect;
+  } | null>(null);
   const [profileUserId, setProfileUserId] = useState<string | null>(null);
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -54,11 +65,17 @@ export default function RoleSelectionPage() {
     hoverTimerRef.current = setTimeout(() => setHoveredMember(null), 80);
   }, []);
 
-  const handleMemberHover = useCallback((userId: string, el: HTMLElement) => {
-    cancelHoverClose();
-    const rect = el.getBoundingClientRect();
-    hoverTimerRef.current = setTimeout(() => setHoveredMember({ userId, rect }), 300);
-  }, [cancelHoverClose]);
+  const handleMemberHover = useCallback(
+    (userId: string, el: HTMLElement) => {
+      cancelHoverClose();
+      const rect = el.getBoundingClientRect();
+      hoverTimerRef.current = setTimeout(
+        () => setHoveredMember({ userId, rect }),
+        300,
+      );
+    },
+    [cancelHoverClose],
+  );
 
   const {
     room,
@@ -99,12 +116,25 @@ export default function RoleSelectionPage() {
 
   useEffect(() => {
     if (!sessionAbortedAt) return;
-    addToast(sessionAbortMessage ?? "내전이 종료되어 로비로 이동합니다.", "warning");
+    addToast(
+      sessionAbortMessage ?? "내전이 종료되어 로비로 이동합니다.",
+      "warning",
+    );
     clearSessionAbort();
     // 사용자가 toast 메시지를 읽을 수 있도록 약간의 딜레이 후 이동
-    const timer = setTimeout(() => router.push(`/tournaments/${roomId}/lobby`), 1500);
+    const timer = setTimeout(
+      () => router.push(`/tournaments/${roomId}/lobby`),
+      1500,
+    );
     return () => clearTimeout(timer);
-  }, [sessionAbortedAt, sessionAbortMessage, clearSessionAbort, addToast, router, roomId]);
+  }, [
+    sessionAbortedAt,
+    sessionAbortMessage,
+    clearSessionAbort,
+    addToast,
+    router,
+    roomId,
+  ]);
 
   const handleAbortToLobby = () => setIsAbortConfirmOpen(true);
 
@@ -206,10 +236,13 @@ export default function RoleSelectionPage() {
     readyCaptainsRequired > 0 &&
     readyCaptainIds.length === readyCaptainsRequired;
   const selectedRole = myMember?.assignedRole as Role | null;
-  const myTeamTakenRoles = myTeam?.members
-    .filter((member) => member.assignedRole)
-    .map((member) => member.assignedRole as Role) ?? [];
-  const myTeamOpenRoles = ROLES.filter((role) => !myTeamTakenRoles.includes(role));
+  const myTeamTakenRoles =
+    myTeam?.members
+      .filter((member) => member.assignedRole)
+      .map((member) => member.assignedRole as Role) ?? [];
+  const myTeamOpenRoles = ROLES.filter(
+    (role) => !myTeamTakenRoles.includes(role),
+  );
 
   return (
     // AppShell이 이 라우트를 대시보드로 보고 overflow-hidden으로 가두므로
@@ -231,11 +264,13 @@ export default function RoleSelectionPage() {
         {/* Header */}
         <div className="flex flex-col gap-4 mb-5 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-text-primary">
+            <h1 className="flex items-center gap-2 text-2xl font-bold text-text-primary md:text-3xl">
               역할 선택
+              <RoleSelectionHelp />
             </h1>
             <p className="text-text-secondary text-sm mt-1">
-              원하는 포지션을 선택하세요. 시간 종료 시 선호 포지션으로 자동 배정됩니다.
+              원하는 포지션을 선택하세요. 시간 종료 시 선호 포지션으로 자동
+              배정됩니다.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2 lg:justify-end">
@@ -274,7 +309,7 @@ export default function RoleSelectionPage() {
                 "flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border transition-colors",
                 remainingExtensions <= 0
                   ? "bg-bg-tertiary text-text-muted border-bg-tertiary cursor-not-allowed opacity-50"
-                  : "bg-accent-primary/10 text-accent-primary border-accent-primary/30 hover:bg-accent-primary/20"
+                  : "bg-accent-primary/10 text-accent-primary border-accent-primary/30 hover:bg-accent-primary/20",
               )}
             >
               <TimerReset className="h-4 w-4" />
@@ -290,8 +325,14 @@ export default function RoleSelectionPage() {
             </button>
             <div className="flex items-center gap-2 bg-bg-secondary border border-bg-tertiary rounded-lg px-4 py-2">
               <Clock className={cn("h-5 w-5", timerColor)} />
-              <span className={cn("text-xl md:text-2xl font-bold tabular-nums", timerColor)}>
-                {Math.floor(timeRemaining / 60)}:{String(timeRemaining % 60).padStart(2, "0")}
+              <span
+                className={cn(
+                  "text-xl md:text-2xl font-bold tabular-nums",
+                  timerColor,
+                )}
+              >
+                {Math.floor(timeRemaining / 60)}:
+                {String(timeRemaining % 60).padStart(2, "0")}
               </span>
             </div>
           </div>
@@ -312,7 +353,9 @@ export default function RoleSelectionPage() {
                 </p>
                 <div className="mt-1 flex flex-wrap items-center gap-2">
                   <span className="text-base font-bold text-text-primary">
-                    {selectedRole ? `${ROLE_META[selectedRole]?.label} 선택됨` : "아직 선택하지 않았습니다"}
+                    {selectedRole
+                      ? `${ROLE_META[selectedRole]?.label} 선택됨`
+                      : "아직 선택하지 않았습니다"}
                   </span>
                   {selectedRole && (
                     <span className="inline-flex items-center gap-1 rounded-md bg-accent-success/10 px-2 py-1 text-xs font-bold text-accent-success">
@@ -369,21 +412,28 @@ export default function RoleSelectionPage() {
                 key={team.id}
                 className={cn(
                   "bg-bg-secondary border rounded-xl overflow-hidden",
-                  isMyTeam ? "border-accent-primary/40" : "border-bg-tertiary"
+                  isMyTeam ? "border-accent-primary/40" : "border-bg-tertiary",
                 )}
               >
                 {/* Team Header */}
-                <div className={cn(
-                  "px-5 py-3 flex items-center justify-between",
-                  isMyTeam ? "bg-accent-primary/5" : "bg-bg-tertiary/20"
-                )}>
+                <div
+                  className={cn(
+                    "px-5 py-3 flex items-center justify-between",
+                    isMyTeam ? "bg-accent-primary/5" : "bg-bg-tertiary/20",
+                  )}
+                >
                   <div className="flex items-center gap-2">
                     {team.color && (
-                      <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: team.color }} />
+                      <span
+                        className="h-2.5 w-2.5 rounded-full"
+                        style={{ backgroundColor: team.color }}
+                      />
                     )}
                     <h2 className="font-bold text-text-primary">{team.name}</h2>
                     {isMyTeam && (
-                      <Badge variant="primary" size="sm">내 팀</Badge>
+                      <Badge variant="primary" size="sm">
+                        내 팀
+                      </Badge>
                     )}
                   </div>
                   <span className="text-xs text-text-tertiary">
@@ -397,9 +447,14 @@ export default function RoleSelectionPage() {
                     const memberRole = member.assignedRole as Role | null;
                     const isMe = member.userId === user?.id;
                     const riotAccount = member.user.riotAccounts?.[0];
-                    const selectedRoleTier = getRoleTier(riotAccount, memberRole);
-                    const displayTier = selectedRoleTier?.tier || riotAccount?.tier;
-                    const displayRank = selectedRoleTier?.rank || riotAccount?.rank;
+                    const selectedRoleTier = getRoleTier(
+                      riotAccount,
+                      memberRole,
+                    );
+                    const displayTier =
+                      selectedRoleTier?.tier || riotAccount?.tier;
+                    const displayRank =
+                      selectedRoleTier?.rank || riotAccount?.rank;
 
                     return (
                       <div key={member.id} className="space-y-2">
@@ -410,9 +465,11 @@ export default function RoleSelectionPage() {
                               ? "bg-accent-warning/10 border-accent-warning/35"
                               : isMe
                                 ? "bg-accent-primary/5 border-accent-primary/20"
-                                : "bg-bg-tertiary/60 border-transparent"
+                                : "bg-bg-tertiary/60 border-transparent",
                           )}
-                          onMouseEnter={(e) => handleMemberHover(member.userId, e.currentTarget)}
+                          onMouseEnter={(e) =>
+                            handleMemberHover(member.userId, e.currentTarget)
+                          }
                           onMouseLeave={scheduleHoverClose}
                         >
                           <Avatar
@@ -422,16 +479,28 @@ export default function RoleSelectionPage() {
                             size="sm"
                           />
                           <div className="flex-1 min-w-0">
-                            <p className={cn(
-                              "text-sm font-medium truncate",
-                              isMe ? "text-accent-primary" : "text-text-primary"
-                            )}>
+                            <p
+                              className={cn(
+                                "text-sm font-medium truncate",
+                                isMe
+                                  ? "text-accent-primary"
+                                  : "text-text-primary",
+                              )}
+                            >
                               {member.user.username}
-                              {isMe && <span className="text-xs ml-1">(나)</span>}
+                              {isMe && (
+                                <span className="text-xs ml-1">(나)</span>
+                              )}
                             </p>
                           </div>
                           {displayTier && displayTier !== "UNRANKED" && (
-                            <span title={selectedRoleTier ? `${ROLE_META[memberRole!]?.label} 티어` : "솔로랭크 티어"}>
+                            <span
+                              title={
+                                selectedRoleTier
+                                  ? `${ROLE_META[memberRole!]?.label} 티어`
+                                  : "솔로랭크 티어"
+                              }
+                            >
                               <TierBadge
                                 tier={displayTier}
                                 rank={displayRank || undefined}
@@ -460,7 +529,9 @@ export default function RoleSelectionPage() {
                           <div className="grid grid-cols-5 gap-1.5">
                             {ROLES.map((role) => {
                               const takenByOther = team.members.some(
-                                (m) => m.assignedRole === role && m.userId !== user?.id
+                                (m) =>
+                                  m.assignedRole === role &&
+                                  m.userId !== user?.id,
                               );
                               const isMyCurrentRole = myRole === role;
                               const meta = ROLE_META[role];
@@ -474,18 +545,28 @@ export default function RoleSelectionPage() {
                                       handleSelectRole(role);
                                     }
                                   }}
-                                  disabled={takenByOther && !isMyCurrentRole || !isConnected}
-                                  title={isMyCurrentRole ? "클릭해서 취소" : undefined}
+                                  disabled={
+                                    (takenByOther && !isMyCurrentRole) ||
+                                    !isConnected
+                                  }
+                                  title={
+                                    isMyCurrentRole
+                                      ? "클릭해서 취소"
+                                      : undefined
+                                  }
                                   className={cn(
                                     "flex flex-col items-center gap-0.5 py-2 rounded-lg border text-xs font-medium transition-colors",
                                     isMyCurrentRole
                                       ? "bg-accent-primary/10 text-accent-primary border-accent-primary/40"
                                       : takenByOther
                                         ? "bg-bg-tertiary/40 text-text-muted border-transparent cursor-not-allowed opacity-40"
-                                        : "bg-bg-tertiary/60 border-transparent hover:bg-bg-elevated cursor-pointer text-text-primary"
+                                        : "bg-bg-tertiary/60 border-transparent hover:bg-bg-elevated cursor-pointer text-text-primary",
                                   )}
                                 >
-                                  <PositionIcon position={role} className="!w-5 !h-5" />
+                                  <PositionIcon
+                                    position={role}
+                                    className="!w-5 !h-5"
+                                  />
                                   <span>{meta.label}</span>
                                 </button>
                               );
@@ -515,12 +596,18 @@ export default function RoleSelectionPage() {
         <PlayerHoverCard
           userId={hoveredMember.userId}
           anchorRect={hoveredMember.rect}
-          onOpenProfile={(uid) => { setProfileUserId(uid); setHoveredMember(null); }}
+          onOpenProfile={(uid) => {
+            setProfileUserId(uid);
+            setHoveredMember(null);
+          }}
           onMouseEnter={cancelHoverClose}
           onMouseLeave={scheduleHoverClose}
         />
       )}
-      <PlayerProfileModal userId={profileUserId} onClose={() => setProfileUserId(null)} />
+      <PlayerProfileModal
+        userId={profileUserId}
+        onClose={() => setProfileUserId(null)}
+      />
     </div>
   );
 }
