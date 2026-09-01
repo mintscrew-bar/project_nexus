@@ -64,7 +64,13 @@ COPY --from=builder /app/packages/types/package.json ./node_modules/@nexus/types
 # Prisma 스키마/마이그레이션 파일
 COPY --from=builder /app/packages/database/prisma ./prisma
 
+# 시작 스크립트 (마이그레이션 / 백필 / 기동 분리)
+COPY --from=builder /app/apps/api/docker-entrypoint.sh ./docker-entrypoint.sh
+RUN chmod +x ./docker-entrypoint.sh
+
 EXPOSE 4000
 
-# 운영에서는 스키마 강제 동기화(db push)를 쓰지 않고 검증된 마이그레이션만 적용한다.
-CMD ["sh", "-c", "node_modules/.bin/prisma migrate deploy --schema=/app/prisma/schema.prisma && node dist/scripts/backfill-encrypted-emails.js && node dist/scripts/backfill-balance-scores.js && pm2-runtime ecosystem.config.js"]
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
+# 기본 동작: 마이그레이션 적용 후 API 기동.
+# 백필은 시작 경로에서 분리했다 — `run --rm api backfill`로 별도 실행한다.
+CMD ["serve"]

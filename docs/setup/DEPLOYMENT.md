@@ -40,6 +40,23 @@ pnpm compose:prod:up
 
 The API image runs `prisma migrate deploy` before starting. Production must not use `prisma db push`.
 
+### Data backfills
+
+One-off data backfills are **not** part of container startup — a failing backfill
+must not block the API from booting, and re-scanning every table on each restart
+is wasted work. Run them explicitly when needed:
+
+```bash
+docker compose --env-file .env.production -f docker-compose.prod.yml \
+  run --rm api backfill
+```
+
+`backfill-balance-scores` also recomputes stored scores when
+`BALANCE_SCORE_VERSION` changes, so run the command above after deploying a
+balance-formula version bump.
+
+The entrypoint accepts `serve` (default), `migrate`, and `backfill`.
+
 ## 4. Check Health
 
 ```bash
