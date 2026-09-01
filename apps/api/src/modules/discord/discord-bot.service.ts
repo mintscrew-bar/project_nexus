@@ -780,12 +780,9 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
     const matched =
       memberships.find(
         ({ clan }) =>
-          clan.tag.toLowerCase() === query ||
-          clan.name.toLowerCase() === query,
+          clan.tag.toLowerCase() === query || clan.name.toLowerCase() === query,
       ) ??
-      memberships.find(({ clan }) =>
-        clan.name.toLowerCase().includes(query),
-      );
+      memberships.find(({ clan }) => clan.name.toLowerCase().includes(query));
     if (!matched) {
       await interaction.editReply(
         [
@@ -1120,7 +1117,9 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
             .addStringOption((opt) =>
               opt
                 .setName("clan")
-                .setDescription("클랜 태그 또는 이름 (비우면 연결 가능한 클랜 목록)")
+                .setDescription(
+                  "클랜 태그 또는 이름 (비우면 연결 가능한 클랜 목록)",
+                )
                 .setMaxLength(50)
                 .setRequired(false),
             ),

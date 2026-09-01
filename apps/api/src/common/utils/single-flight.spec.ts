@@ -30,10 +30,7 @@ describe("SingleFlight", () => {
     const flight = new SingleFlight();
     const fn = jest.fn().mockResolvedValue("ok");
 
-    await Promise.all([
-      flight.run("match-1", fn),
-      flight.run("match-2", fn),
-    ]);
+    await Promise.all([flight.run("match-1", fn), flight.run("match-2", fn)]);
 
     expect(fn).toHaveBeenCalledTimes(2);
   });
@@ -79,9 +76,9 @@ describe("SingleFlight", () => {
       throw new Error("즉시 실패");
     };
 
-    await expect(flight.run("match-1", fn as () => Promise<never>)).rejects.toThrow(
-      "즉시 실패",
-    );
+    await expect(
+      flight.run("match-1", fn as () => Promise<never>),
+    ).rejects.toThrow("즉시 실패");
     expect(flight.size).toBe(0);
   });
 });

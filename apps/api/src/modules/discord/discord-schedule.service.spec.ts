@@ -245,9 +245,8 @@ describe("DiscordScheduleService.closeStaleRecruitments", () => {
   });
 
   it("정원 미달이면 공지를 닫고 음성채널을 정리한 뒤 호스트에게 DM한다", async () => {
-    const { service, prisma, botService, voiceService } = createHarness(
-      staleRoom(),
-    );
+    const { service, prisma, botService, voiceService } =
+      createHarness(staleRoom());
 
     await service.closeStaleRecruitments();
 
