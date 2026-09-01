@@ -537,6 +537,149 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
+   * `/nexus serverstats` — 최근 30일 이 서버의 내전 기록 요약.
+   *
+   * "우리 서버에서 내전이 돌고 있다"를 서버 사람들이 눈으로 보게 하는 게 목적이라
+   * 개인 통계와 달리 공개로 답한다. 이 서버가 원 서버인 방만 센다 —
+   * 교차 공지로 흘러온 다른 서버 내전까지 세면 우리 기록이 아니게 된다.
+   */
+  private async handleServerStatsCommand(
+    interaction: ChatInputCommandInteraction,
+  ) {
+    if (!interaction.guildId) {
+      await interaction.reply({
+        content: "❌ 서버 안에서만 사용할 수 있는 명령어입니다.",
+        ephemeral: true,
+      });
+      return;
+    }
+
+    await interaction.deferReply();
+
+    const appUrl =
+      this.configService.get("APP_URL") || "https://labs-nexus.com";
+    const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+    const link = await this.prisma.discordGuildLink.findUnique({
+      where: { guildId: interaction.guildId },
+      select: { clan: { select: { name: true, tag: true } } },
+    });
+
+    const rooms = await this.prisma.room.findMany({
+      where: { discordGuildId: interaction.guildId, createdAt: { gte: since } },
+      select: {
+        id: true,
+        name: true,
+        status: true,
+        maxParticipants: true,
+        createdAt: true,
+        scheduledAt: true,
+        completedAt: true,
+        host: { select: { username: true } },
+        participants: {
+          where: { role: "PLAYER" },
+          select: { userId: true },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (rooms.length === 0) {
+      await interaction.editReply({
+        embeds: [
+          new EmbedBuilder()
+            .setColor(Colors.Grey)
+            .setTitle("📊 최근 30일 내전 기록")
+            .setDescription(
+              [
+                "이 서버에서 열린 내전이 아직 없습니다.",
+                "`/nexus schedule` 로 첫 내전을 예약해보세요.",
+              ].join("\n"),
+            )
+            .setFooter({ text: appUrl })
+            .setTimestamp(),
+        ],
+      });
+      return;
+    }
+
+    // 삭제된 방은 남지 않으므로 이 숫자는 "지금까지 남아 있는 방" 기준이다.
+    const startedRooms = rooms.filter(
+      (room) => room.status !== "WAITING" || room.completedAt !== null,
+    );
+    const completedRooms = rooms.filter((room) => room.completedAt !== null);
+    const fullRooms = rooms.filter(
+      (room) => room.participants.length >= room.maxParticipants,
+    );
+    const scheduledRooms = rooms.filter((room) => room.scheduledAt !== null);
+    const uniquePlayers = new Set(
+      rooms.flatMap((room) =>
+        room.participants.map((participant) => participant.userId),
+      ),
+    );
+    const peak = rooms.reduce(
+      (max, room) => Math.max(max, room.participants.length),
+      0,
+    );
+
+    const hostCounts = new Map<string, number>();
+    for (const room of rooms) {
+      const name = room.host.username;
+      hostCounts.set(name, (hostCounts.get(name) ?? 0) + 1);
+    }
+    const topHosts = [...hostCounts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([name, count], index) => `${index + 1}. ${name} — ${count}회`)
+      .join("\n");
+
+    const recent = rooms
+      .slice(0, 5)
+      .map((room) => {
+        const when = Math.floor(
+          (room.scheduledAt ?? room.createdAt).getTime() / 1000,
+        );
+        return `<t:${when}:d> **${room.name}** — ${room.participants.length}/${room.maxParticipants} · ${
+          ROOM_STATUS_KR[room.status] ?? room.status
+        }`;
+      })
+      .join("\n");
+
+    const embed = new EmbedBuilder()
+      .setColor(Colors.Blurple)
+      .setTitle("📊 최근 30일 내전 기록")
+      .setDescription(
+        link?.clan
+          ? `**${link.clan.name}** [${link.clan.tag}] · ${interaction.guild?.name ?? ""}`
+          : (interaction.guild?.name ?? null),
+      )
+      .addFields(
+        {
+          name: "개설",
+          value: [
+            `총 **${rooms.length}회** (예약 ${scheduledRooms.length}회)`,
+            `시작한 내전 **${startedRooms.length}회** · 완료 **${completedRooms.length}회**`,
+          ].join("\n"),
+          inline: false,
+        },
+        {
+          name: "모집",
+          value: [
+            `정원 충족 **${fullRooms.length}회**`,
+            `최다 참가 **${peak}명** · 참여한 사람 **${uniquePlayers.size}명**`,
+          ].join("\n"),
+          inline: false,
+        },
+        { name: "많이 연 사람", value: topHosts || "-", inline: false },
+        { name: "최근 내전", value: recent || "-", inline: false },
+      )
+      .setFooter({ text: `${appUrl} · 삭제된 방은 집계되지 않습니다` })
+      .setTimestamp();
+
+    await interaction.editReply({ embeds: [embed] });
+  }
+
+  /**
    * `/nexus linkclan` — 연동된 서버를 클랜에 이어붙인다.
    *
    * 지금까지 `DiscordGuildLink.clanId`는 스키마에만 있고 아무도 채우지 않았다.
@@ -981,6 +1124,11 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
                 .setMaxLength(50)
                 .setRequired(false),
             ),
+        )
+        .addSubcommand((sub) =>
+          sub
+            .setName("serverstats")
+            .setDescription("최근 30일 이 서버의 내전 기록 요약"),
         ),
     ].map((cmd) => cmd.toJSON());
 
@@ -1097,6 +1245,9 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
             break;
           case "linkclan":
             await this.handleLinkClanCommand(interaction);
+            break;
+          case "serverstats":
+            await this.handleServerStatsCommand(interaction);
             break;
         }
       } catch (error) {
@@ -1549,6 +1700,7 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
           value: [
             "`/nexus leaderboard` - 티어+LP 상위 10명",
             "`/nexus clan` - 내 클랜 정보",
+            "`/nexus serverstats` - 최근 30일 이 서버 내전 기록",
           ].join("\n"),
         },
         {
