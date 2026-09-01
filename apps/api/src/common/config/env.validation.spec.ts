@@ -11,6 +11,8 @@ function baseEnv(overrides: Record<string, unknown> = {}) {
     JWT_REFRESH_SECRET: SECRET_32,
     DATA_ENCRYPTION_KEY: KEY_32,
     DATA_LOOKUP_HMAC_KEY: KEY_32,
+    DISCORD_CLIENT_ID: "discord-client-id",
+    DISCORD_CLIENT_SECRET: "discord-client-secret",
     ...overrides,
   };
 }
@@ -84,6 +86,23 @@ describe("validateEnv", () => {
       validateEnv(
         baseEnv({ NODE_ENV: "development", SOME_KEY: "change-me-please" }),
       ),
+    ).not.toThrow();
+  });
+
+  it("운영에서 Discord 자격증명이 없으면 부팅을 막는다", () => {
+    // 로그인 시작 라우트가 authorize URL을 직접 만들기 때문에
+    // 값이 없으면 client_id=undefined인 URL로 리다이렉트된다.
+    expect(() => validateEnv(baseEnv({ DISCORD_CLIENT_ID: "" }))).toThrow(
+      /DISCORD_CLIENT_ID/,
+    );
+    expect(() => validateEnv(baseEnv({ DISCORD_CLIENT_SECRET: "" }))).toThrow(
+      /DISCORD_CLIENT_SECRET/,
+    );
+  });
+
+  it("개발에서는 Discord 자격증명이 없어도 경고만 한다", () => {
+    expect(() =>
+      validateEnv(baseEnv({ NODE_ENV: "development", DISCORD_CLIENT_ID: "" })),
     ).not.toThrow();
   });
 

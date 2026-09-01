@@ -1,6 +1,8 @@
 import {
   CHAT_RATE_LIMIT,
+  TYPING_RATE_LIMIT,
   checkChatRateLimit,
+  checkTypingRateLimit,
   chatRateLimitMessage,
 } from "./chat-rate-limit";
 
@@ -71,5 +73,49 @@ describe("checkChatRateLimit", () => {
 
   it("안내 문구에 남은 시간을 담는다", () => {
     expect(chatRateLimitMessage(5)).toContain("5초");
+  });
+});
+
+describe("checkTypingRateLimit", () => {
+  it("메시지보다 느슨한 한도를 쓴다", async () => {
+    // 같은 한도를 쓰면 정상 타이핑 표시가 끊긴다.
+    expect(TYPING_RATE_LIMIT.limit).toBeGreaterThan(CHAT_RATE_LIMIT.limit);
+
+    const redis = {
+      checkRateLimit: jest
+        .fn()
+        .mockResolvedValue({ allowed: true, remaining: 29, resetIn: 10 }),
+    };
+    await checkTypingRateLimit(redis, "typing:room:u1");
+    expect(redis.checkRateLimit).toHaveBeenCalledWith(
+      "typing:room:u1",
+      TYPING_RATE_LIMIT.limit,
+      TYPING_RATE_LIMIT.windowSeconds,
+    );
+  });
+
+  it("한도를 넘으면 차단한다", async () => {
+    const redis = {
+      checkRateLimit: jest
+        .fn()
+        .mockResolvedValue({ allowed: false, remaining: 0, resetIn: 3 }),
+    };
+    await expect(checkTypingRateLimit(redis, "typing:dm:u1")).resolves.toEqual({
+      allowed: false,
+      retryIn: 3,
+    });
+  });
+
+  it("메시지 한도와 키를 공유하지 않는다", async () => {
+    // chat:*와 typing:* 키가 분리돼야 타이핑이 메시지 한도를 갉아먹지 않는다.
+    const redis = {
+      checkRateLimit: jest
+        .fn()
+        .mockResolvedValue({ allowed: true, remaining: 5, resetIn: 10 }),
+    };
+    await checkChatRateLimit(redis, "chat:room:u1");
+    await checkTypingRateLimit(redis, "typing:room:u1");
+    const keys = redis.checkRateLimit.mock.calls.map((c) => c[0]);
+    expect(keys).toEqual(["chat:room:u1", "typing:room:u1"]);
   });
 });

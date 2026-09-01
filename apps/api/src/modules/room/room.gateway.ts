@@ -25,6 +25,7 @@ import { RoomStatus, TeamMode } from "@nexus/database";
 import { RedisService } from "../redis/redis.service";
 import {
   checkChatRateLimit,
+  checkTypingRateLimit,
   chatRateLimitMessage,
 } from "../../common/utils/chat-rate-limit";
 
@@ -960,13 +961,23 @@ export class RoomGateway
   }
 
   @SubscribeMessage("is-typing")
-  handleIsTyping(
+  async handleIsTyping(
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() data: { roomId: string; isTyping: boolean },
   ) {
     if (!client.userId || !client.username) {
       return;
     }
+
+    // 타이핑 표시는 상대/방 전체 브로드캐스트를 유발한다.
+    // isTyping을 false↔true로 번갈아 보내 전환을 강제하면 무제한 팬아웃이 되므로
+    // 메시지보다 느슨한 별도 한도로 막는다. 막혔을 때는 조용히 무시한다 —
+    // 타이핑 표시는 장식이라 사용자에게 알릴 것이 없다.
+    const typingRate = await checkTypingRateLimit(
+      this.redisService,
+      `typing:room:${client.userId}`,
+    );
+    if (!typingRate.allowed) return;
 
     const { roomId, isTyping } = data;
 

@@ -83,6 +83,18 @@ export function validateEnv(
     }
   }
 
+  // ── Discord OAuth ──
+  // 로그인 시작 라우트가 authorize URL을 직접 조립하므로, 값이 없으면
+  // client_id=undefined인 URL로 리다이렉트되어 Discord 쪽 오류 화면만 뜬다.
+  // 서버에서 먼저 막는 편이 원인을 훨씬 빨리 알 수 있다.
+  for (const key of ["DISCORD_CLIENT_ID", "DISCORD_CLIENT_SECRET"]) {
+    if (!asString(config[key])) {
+      const message = `${key}이(가) 없습니다. Discord 로그인이 동작하지 않습니다.`;
+      if (isProduction) errors.push(message);
+      else warnings.push(message);
+    }
+  }
+
   // ── 자리표시자가 그대로 배포되는 것 방지 ──
   if (isProduction) {
     for (const [key, value] of Object.entries(config)) {
