@@ -11,6 +11,11 @@ import { OnModuleDestroy } from "@nestjs/common";
 import { Server, Socket } from "socket.io";
 import { AuthService } from "../auth/auth.service";
 import { DmService } from "./dm.service";
+import { RedisService } from "../redis/redis.service";
+import {
+  checkChatRateLimit,
+  chatRateLimitMessage,
+} from "../../common/utils/chat-rate-limit";
 
 interface AuthenticatedSocket extends Socket {
   userId?: string;
@@ -52,6 +57,7 @@ export class DmGateway
   constructor(
     private readonly authService: AuthService,
     private readonly dmService: DmService,
+    private readonly redisService: RedisService,
   ) {}
 
   async handleConnection(client: AuthenticatedSocket) {
@@ -142,6 +148,15 @@ export class DmGateway
 
     if (receiverId === client.userId) {
       return { success: false, error: "Cannot send message to yourself" };
+    }
+
+    // 채팅은 전역 HTTP 스로틀러가 닿지 않는 경로다. 소켓 단에서 직접 제한한다.
+    const rate = await checkChatRateLimit(
+      this.redisService,
+      `chat:dm:${client.userId}`,
+    );
+    if (!rate.allowed) {
+      return { success: false, error: chatRateLimitMessage(rate.retryIn) };
     }
 
     try {

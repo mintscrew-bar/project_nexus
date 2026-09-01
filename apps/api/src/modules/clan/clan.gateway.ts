@@ -11,6 +11,11 @@ import { OnModuleDestroy } from "@nestjs/common";
 import { Server, Socket } from "socket.io";
 import { AuthService } from "../auth/auth.service";
 import { ClanService } from "./clan.service";
+import { RedisService } from "../redis/redis.service";
+import {
+  checkChatRateLimit,
+  chatRateLimitMessage,
+} from "../../common/utils/chat-rate-limit";
 
 interface AuthenticatedSocket extends Socket {
   userId?: string;
@@ -40,6 +45,7 @@ export class ClanGateway
   constructor(
     private readonly authService: AuthService,
     private readonly clanService: ClanService,
+    private readonly redisService: RedisService,
   ) {}
 
   onModuleDestroy() {
@@ -143,6 +149,15 @@ export class ClanGateway
   ) {
     if (!client.userId) {
       return { error: "Unauthorized" };
+    }
+
+    // 채팅은 전역 HTTP 스로틀러가 닿지 않는 경로다. 소켓 단에서 직접 제한한다.
+    const rate = await checkChatRateLimit(
+      this.redisService,
+      `chat:clan:${client.userId}`,
+    );
+    if (!rate.allowed) {
+      return { error: chatRateLimitMessage(rate.retryIn) };
     }
 
     try {

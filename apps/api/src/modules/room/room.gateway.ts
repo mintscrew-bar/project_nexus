@@ -22,6 +22,11 @@ import { RoleSelectionGateway } from "../role-selection/role-selection.gateway";
 import { MatchGateway } from "../match/match.gateway";
 import { DiscordVoiceService } from "../discord/discord-voice.service";
 import { RoomStatus, TeamMode } from "@nexus/database";
+import { RedisService } from "../redis/redis.service";
+import {
+  checkChatRateLimit,
+  chatRateLimitMessage,
+} from "../../common/utils/chat-rate-limit";
 
 interface AuthenticatedSocket extends Socket {
   userId?: string;
@@ -73,6 +78,7 @@ export class RoomGateway
     private readonly matchGateway: MatchGateway,
     @Inject("DISCORD_VOICE_SERVICE")
     private readonly discordVoiceService: DiscordVoiceService,
+    private readonly redisService: RedisService,
   ) {}
 
   onModuleDestroy() {
@@ -924,6 +930,15 @@ export class RoomGateway
     try {
       if (!client.userId) {
         return { error: "Unauthorized" };
+      }
+
+      // 채팅은 전역 HTTP 스로틀러가 닿지 않는 경로다. 소켓 단에서 직접 제한한다.
+      const rate = await checkChatRateLimit(
+        this.redisService,
+        `chat:room:${client.userId}`,
+      );
+      if (!rate.allowed) {
+        return { error: chatRateLimitMessage(rate.retryIn) };
       }
 
       const message = await this.roomService.sendChatMessage(
