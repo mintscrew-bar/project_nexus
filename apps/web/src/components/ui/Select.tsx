@@ -2,7 +2,7 @@
 
 import { cn } from '@/lib/utils';
 import { ChevronDown } from 'lucide-react';
-import { forwardRef } from 'react';
+import { forwardRef, useId } from 'react';
 
 export interface SelectOption {
   value: string;
@@ -19,17 +19,24 @@ export interface SelectProps extends Omit<React.SelectHTMLAttributes<HTMLSelectE
 }
 
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(
-  ({ options, placeholder, label, error, className, onChange, ...props }, ref) => {
+  ({ options, placeholder, label, error, className, onChange, id, 'aria-describedby': ariaDescribedBy, ...props }, ref) => {
+    const generatedId = useId();
+    const selectId = id ?? generatedId;
+    const errorId = `${selectId}-error`;
+
     return (
       <div className="w-full">
         {label && (
-          <label className="block text-text-primary text-sm font-semibold mb-1">
+          <label htmlFor={selectId} className="block text-text-primary text-sm font-semibold mb-1">
             {label}
           </label>
         )}
         <div className="relative">
           <select
+            id={selectId}
             ref={ref}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? [ariaDescribedBy, errorId].filter(Boolean).join(' ') : ariaDescribedBy}
             className={cn(
               'w-full px-4 py-2.5 bg-bg-tertiary border text-text-primary rounded-lg appearance-none cursor-pointer',
               'focus:border-accent-primary focus:outline-none transition-colors duration-150',
@@ -60,7 +67,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
           />
         </div>
         {error && (
-          <p className="mt-1 text-sm text-accent-danger">{error}</p>
+          <p id={errorId} className="mt-1 text-sm text-accent-danger" role="alert">{error}</p>
         )}
       </div>
     );

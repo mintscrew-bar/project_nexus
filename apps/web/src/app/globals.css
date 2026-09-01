@@ -32,8 +32,8 @@
     /* Text Colors */
     --color-text-primary: 15 15 15;
     --color-text-secondary: 70 70 70;
-    --color-text-tertiary: 112 112 112;
-    --color-text-muted: 150 150 150;
+    --color-text-tertiary: 90 90 90;
+    --color-text-muted: 118 118 118;
 
     /* Accent Colors — 로고 그라디언트(#667EEA → #764BA2) 기반 */
     --color-accent-primary: 102 126 234; /* #667EEA 로고 인디고 */
@@ -71,8 +71,8 @@
     /* Text Colors */
     --color-text-primary: 240 240 240; /* #f0f0f0 */
     --color-text-secondary: 176 176 176; /* #b0b0b0 */
-    --color-text-tertiary: 112 112 112; /* #707070 */
-    --color-text-muted: 74 74 74; /* #4a4a4a */
+    --color-text-tertiary: 150 150 150; /* #969696 — 보조 문구도 4.5:1 이상 유지 */
+    --color-text-muted: 132 132 132; /* #848484 — placeholder/비활성 정보도 4.5:1 이상 유지 */
 
     /* Accent Colors — 로고 그라디언트(#667EEA → #764BA2) 기반 */
     --color-accent-primary: 102 126 234; /* #667EEA 로고 인디고 */
@@ -103,15 +103,8 @@
     @apply antialiased bg-bg-primary text-text-primary; /* Use new semantic colors */
   }
 
-  /* 모바일 전역 축소:
-     Tailwind 크기 단위(text-*, p-*, gap-* 등)는 rem 기반이므로
-     루트 폰트를 줄이면 폰트와 여백이 함께 비례 축소된다.
-     데스크톱(>=640px)은 16px 그대로 유지. */
-  @media (max-width: 639px) {
-    html {
-      font-size: 15px;
-    }
-  }
+  /* 모바일에서도 브라우저 기본 16px을 유지한다.
+     루트 크기를 줄이면 글자뿐 아니라 rem 기반 터치 영역까지 함께 작아진다. */
 }
 
 @layer components {

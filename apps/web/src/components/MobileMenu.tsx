@@ -4,12 +4,13 @@ import { cn } from '@/lib/utils';
 import { X, Menu, Home, Swords, Trophy, Users, Radio, MessageSquare, Settings, User, ExternalLink, Shield, Moon, Sun, BookOpen } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Logo } from './Logo';
 import { DiscordIcon } from './icons/DiscordIcon';
 import { NEXUS_DISCORD_INVITE_URL } from '@/lib/constants';
 import { useAuthStore } from '@/stores/auth-store';
 import { usePersistentTheme } from '@/hooks/usePersistentTheme';
+import { acquireBodyScrollLock, releaseBodyScrollLock } from '@/lib/body-scroll-lock';
 
 interface MobileMenuProps {
   className?: string;
@@ -18,9 +19,13 @@ interface MobileMenuProps {
 export function MobileMenu({ className }: MobileMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
-  const { user } = useAuthStore();
+  const { user, isAuthenticated } = useAuthStore();
   const { resolvedTheme, toggleTheme } = usePersistentTheme();
   const [mounted, setMounted] = useState(false);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const drawerRef = useRef<HTMLDivElement>(null);
+  const scrollLockOwnerRef = useRef(Symbol('mobile-menu'));
+  const wasOpenRef = useRef(false);
 
   // 관리자/모더레이터 여부 (마운트 후에만 확정 → hydration 불일치 방지)
   const isStaff = mounted && (user?.role === 'ADMIN' || user?.role === 'MODERATOR');
@@ -36,14 +41,54 @@ export function MobileMenu({ className }: MobileMenuProps) {
   }, []);
 
   useEffect(() => {
+    const scrollLockOwner = scrollLockOwnerRef.current;
     if (isOpen) {
-      document.body.style.overflow = 'hidden';
+      wasOpenRef.current = true;
+      acquireBodyScrollLock(scrollLockOwner);
+      drawerRef.current?.querySelector<HTMLElement>('[data-mobile-menu-close]')?.focus();
     } else {
-      document.body.style.overflow = 'unset';
+      releaseBodyScrollLock(scrollLockOwner);
+      if (wasOpenRef.current) {
+        wasOpenRef.current = false;
+        menuButtonRef.current?.focus();
+      }
     }
     return () => {
-      document.body.style.overflow = 'unset';
+      releaseBodyScrollLock(scrollLockOwner);
     };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setIsOpen(false);
+        menuButtonRef.current?.focus();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+
+      const focusable = Array.from(
+        drawerRef.current?.querySelectorAll<HTMLElement>(
+          'a[href], button:not(:disabled), [tabindex]:not([tabindex="-1"])',
+        ) ?? [],
+      );
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isOpen]);
 
   const navItems = [
@@ -68,9 +113,10 @@ export function MobileMenu({ className }: MobileMenuProps) {
     <div className={cn('nav:hidden', className)}>
       {/* Menu Button */}
       <button
+        ref={menuButtonRef}
         onClick={() => setIsOpen(true)}
-        className="p-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-bg-tertiary transition-colors"
-        aria-label="Open menu"
+        className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-text-secondary transition-colors hover:bg-bg-tertiary hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary"
+        aria-label="메뉴 열기"
         aria-expanded={isOpen}
       >
         <Menu className="h-6 w-6" />
@@ -87,11 +133,15 @@ export function MobileMenu({ className }: MobileMenuProps) {
 
       {/* Drawer */}
       <div
+        ref={drawerRef}
         className={cn(
           'fixed top-0 left-0 bottom-0 w-72 bg-bg-secondary border-r border-bg-tertiary z-50 flex flex-col transform transition-transform duration-300 ease-out',
           isOpen ? 'translate-x-0' : '-translate-x-full'
         )}
         aria-hidden={!isOpen}
+        role="dialog"
+        aria-modal={isOpen ? true : undefined}
+        aria-label="사이트 메뉴"
         inert={!isOpen}
       >
         {/* Header */}
@@ -101,9 +151,10 @@ export function MobileMenu({ className }: MobileMenuProps) {
             <span className="text-xl font-bold text-text-primary">Nexus</span>
           </Link>
           <button
+            data-mobile-menu-close
             onClick={() => setIsOpen(false)}
-            className="p-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-bg-tertiary transition-colors"
-            aria-label="Close menu"
+            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-text-secondary transition-colors hover:bg-bg-tertiary hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary"
+            aria-label="메뉴 닫기"
           >
             <X className="h-5 w-5" />
           </button>
@@ -136,6 +187,7 @@ export function MobileMenu({ className }: MobileMenuProps) {
             </ul>
           </div>
 
+          {mounted && isAuthenticated ? (
           <div>
             <h3 className="text-xs font-semibold text-text-tertiary uppercase tracking-wider mb-2 px-3">
               내 계정
@@ -160,6 +212,21 @@ export function MobileMenu({ className }: MobileMenuProps) {
               ))}
             </ul>
           </div>
+          ) : mounted ? (
+            <div>
+              <h3 className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-text-tertiary">
+                내 계정
+              </h3>
+              <Link
+                href="/auth/login"
+                onClick={() => setIsOpen(false)}
+                className="flex min-h-11 items-center gap-3 rounded-lg bg-accent-primary px-3 py-2.5 font-semibold text-white transition-colors hover:bg-accent-hover"
+              >
+                <User className="h-5 w-5" />
+                Discord로 로그인
+              </Link>
+            </div>
+          ) : null}
 
           <div>
             <h3 className="text-xs font-semibold text-text-tertiary uppercase tracking-wider mb-2 px-3">

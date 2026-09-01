@@ -44,15 +44,17 @@ export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof buttonVariants> {
   isLoading?: boolean;
+  loadingText?: React.ReactNode;
 }
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, fullWidth, isLoading, disabled, children, ...props }, ref) => {
+  ({ className, variant, size, fullWidth, isLoading, loadingText = '처리 중...', disabled, children, ...props }, ref) => {
     return (
       <button
         ref={ref}
         className={cn(buttonVariants({ variant, size, fullWidth, className }))}
         disabled={disabled || isLoading}
+        aria-busy={isLoading || undefined}
         {...props}
       >
         {isLoading ? (
@@ -77,7 +79,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
                 d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
               />
             </svg>
-            처리 중...
+            {loadingText}
           </>
         ) : (
           children

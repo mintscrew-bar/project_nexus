@@ -102,12 +102,13 @@ export function Header() {
               href="/admin"
               className={cn(
                 // 좁은 데스크톱까지는 햄버거 메뉴로 이동 → 넓은 데스크톱에서만 노출
-                'hidden nav:inline-flex p-2 rounded-lg transition-colors duration-150',
+                'hidden min-h-11 min-w-11 items-center justify-center rounded-lg transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary nav:inline-flex',
                 pathname.startsWith('/admin')
                   ? 'bg-accent-primary/10 text-accent-primary'
                   : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary'
               )}
               title="관리자 패널"
+              aria-label="관리자 패널"
             >
               <Shield className="h-5 w-5" />
             </Link>
@@ -118,12 +119,13 @@ export function Header() {
           <button
             onClick={togglePanel}
             className={cn(
-              'relative p-2 rounded-lg transition-colors duration-150',
+              'relative inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary',
               clientIsOpen
                 ? 'bg-accent-primary/10 text-accent-primary'
                 : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary'
             )}
             title="친구 목록"
+            aria-label={`친구 목록${clientIncomingCount > 0 ? `, 새 요청 ${clientIncomingCount}건` : ''}`}
           >
             <Users className="h-5 w-5" />
             {clientIncomingCount > 0 && (
