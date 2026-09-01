@@ -151,8 +151,8 @@ export function AutoBalanceDemo() {
         const nextTotals = [...totals];
         const sourceScore = draggedPlayer.scores[targetPlayer.role] ?? draggedPlayer.score;
         const targetScore = targetPlayer.scores[draggedPlayer.role] ?? targetPlayer.score;
-        nextTotals[source.team] += sourceScore - draggedPlayer.score;
-        nextTotals[target.team] += targetScore - targetPlayer.score;
+        nextTotals[source.teamIndex] += sourceScore - draggedPlayer.score;
+        nextTotals[target.teamIndex] += targetScore - targetPlayer.score;
         return Math.abs(nextTotals[0] - nextTotals[1]);
       })()
     : null;
