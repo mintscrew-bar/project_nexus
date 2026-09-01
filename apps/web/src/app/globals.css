@@ -713,6 +713,22 @@
   }
 }
 
+/* 랜딩 자동 밸런스 데모: 카드 고스트가 실제 드래그 경로를 안내 */
+@keyframes demo-drag-card {
+  0%, 14% {
+    opacity: 0;
+    transform: translateX(0) translateY(4px);
+  }
+  24%, 68% {
+    opacity: 1;
+    transform: translateX(220px) translateY(0) rotate(1deg);
+  }
+  78%, 100% {
+    opacity: 0;
+    transform: translateX(250px) translateY(4px) rotate(1deg);
+  }
+}
+
 /* prefers-reduced-motion 대응 — 모션 감소 선호 시 애니메이션 비활성화 */
 @media (prefers-reduced-motion: reduce) {
   *,

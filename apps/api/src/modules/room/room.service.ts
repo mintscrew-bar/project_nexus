@@ -29,6 +29,11 @@ import { BalanceScoreService } from "../common/balance-score.service";
 import { StatsService } from "../stats/stats.service";
 import { BALANCE_ROLES } from "../common/balance-score.util";
 
+/** 예고 방 최소 리드타임. 이보다 가까우면 그냥 지금 열면 된다. */
+const MIN_SCHEDULE_MINUTES_AHEAD = 10;
+/** 예고 방 최대 리드타임. 너무 먼 예약은 잊혀진 채 빈 방으로 남는다. */
+const MAX_SCHEDULE_DAYS_AHEAD = 14;
+
 export interface CreateRoomDto {
   name: string;
   password?: string;
@@ -36,6 +41,8 @@ export interface CreateRoomDto {
   teamMode: TeamMode;
   allowSpectators?: boolean;
   discordGuildId?: string;
+  /** 예고제: 내전 예정 시각(ISO 8601). 없으면 지금 바로 여는 방이다. */
+  scheduledAt?: string;
 
   // Auction Settings
   startingPoints?: number;
@@ -965,6 +972,28 @@ export class RoomService {
     // 게임 설정값 서비스 레이어 재검증 — ValidationPipe 우회 방어
     this.validateGameSettings(dto);
 
+    // 예고제: 예정 시각 검증. 지난 시각은 리마인드가 즉시 몰리고,
+    // 너무 먼 예약은 아무도 기억하지 못한 채 빈 방으로 남는다.
+    let scheduledAt: Date | null = null;
+    if (dto.scheduledAt) {
+      const parsed = new Date(dto.scheduledAt);
+      if (Number.isNaN(parsed.getTime())) {
+        throw new BadRequestException("예정 시각을 해석할 수 없습니다.");
+      }
+      const minutesAhead = (parsed.getTime() - Date.now()) / 60000;
+      if (minutesAhead < MIN_SCHEDULE_MINUTES_AHEAD) {
+        throw new BadRequestException(
+          `예정 시각은 지금부터 ${MIN_SCHEDULE_MINUTES_AHEAD}분 이후로 잡아주세요.`,
+        );
+      }
+      if (minutesAhead > MAX_SCHEDULE_DAYS_AHEAD * 24 * 60) {
+        throw new BadRequestException(
+          `예정 시각은 최대 ${MAX_SCHEDULE_DAYS_AHEAD}일 뒤까지만 지정할 수 있습니다.`,
+        );
+      }
+      scheduledAt = parsed;
+    }
+
     // Hash password if provided
     let hashedPassword: string | undefined;
     if (dto.password) {
@@ -1007,6 +1036,7 @@ export class RoomService {
             teamMode: dto.teamMode,
             allowSpectators: dto.allowSpectators ?? true,
             discordGuildId: resolvedDiscordGuildId,
+            scheduledAt,
 
             // Draft settings
             startingPoints: dto.startingPoints,
@@ -1067,9 +1097,12 @@ export class RoomService {
     );
 
     // Discord 봇 연동: 팀별 음성채널 생성
+    // 예고 방은 여기서 만들지 않는다. 몇 시간 뒤 내전 때문에 지금부터
+    // 빈 채널이 서버에 방치되면 예약이 쌓일수록 채널 목록이 무너진다.
+    // 시작 10분 전 리마인드와 같은 타이밍에 DiscordScheduleService가 만든다.
     let lobbyVoiceChannelId: string | undefined;
     try {
-      if (this.discordVoiceService) {
+      if (this.discordVoiceService && !scheduledAt) {
         const numTeams = Math.floor(dto.maxParticipants / 5);
 
         // 카테고리 + 내전 대기실 + 팀별 음성채널 생성
@@ -1127,6 +1160,7 @@ export class RoomService {
                   isPrivate: room.isPrivate,
                   participants: [room.host.username], // 방 생성 시 방장 1명
                   voiceChannelId: lobbyVoiceChannelId,
+                  scheduledAt,
                   // 사본에는 원 서버 이름을 표시한다. 출처를 숨기면 우리 서버
                   // 공지로 오해하고 들어왔다가 낯선 사람들과 만나게 된다.
                   originGuildName: target.isOrigin
@@ -1152,6 +1186,7 @@ export class RoomService {
               teamMode: room.teamMode,
               isPrivate: room.isPrivate,
               voiceChannelId: lobbyVoiceChannelId,
+              scheduledAt: scheduledAt ? scheduledAt.toISOString() : null,
               isOrigin: target.isOrigin,
               originGuildName: target.isOrigin ? null : originGuildName,
             };

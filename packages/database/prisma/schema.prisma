@@ -414,6 +414,14 @@ model Room {
   seriesPreset            String?
   discordGuildId          String?
   discordCategoryId       String?
+  /// 예고제: 내전 예정 시각. NULL이면 지금 바로 여는 방이다.
+  /// 예고 중인 방도 status는 WAITING이라 목록·참가·정원 로직은 그대로 쓴다.
+  scheduledAt             DateTime?
+  /// 리마인드·시작 알림을 보낸 시각. 재시작이나 크론 중복 실행에도
+  /// 같은 알림이 두 번 가지 않게 발송 여부를 DB에 남긴다.
+  scheduledRemind1hAt     DateTime?
+  scheduledRemind10mAt    DateTime?
+  scheduledStartNotifiedAt DateTime?
   startedAt               DateTime?
   completedAt             DateTime?
   // 방송 오버레이: 호스트가 중계 중인 경기(방송 토큰은 User로 이동 — per-streamer 단일 토큰)
@@ -435,6 +443,8 @@ model Room {
   @@index([status])
   @@index([isPrivate])
   @@index([createdAt])
+  // 예약 리마인드 크론: WHERE status='WAITING' AND scheduledAt BETWEEN ...
+  @@index([status, scheduledAt])
   @@map("rooms")
 }
 

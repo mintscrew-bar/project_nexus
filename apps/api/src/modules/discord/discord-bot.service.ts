@@ -38,6 +38,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { RedisService } from "../redis/redis.service";
 import type { DiscordVoiceService } from "./discord-voice.service";
 import { DiscordEmojiService, parseEmojiRef } from "./discord-emoji.service";
+import { formatKst, parseKstSchedule } from "./discord-schedule-time";
 import type { EmojiMap, RecruitEmojiName } from "./discord-emoji.service";
 
 // 티어 이모지 맵핑
@@ -129,6 +130,8 @@ interface RoomNotifEntry {
   teamMode: string;
   isPrivate: boolean;
   voiceChannelId?: string;
+  /** 예고 방의 예정 시각(ISO). 즉시 개설된 방은 null이다. */
+  scheduledAt?: string | null;
   /** 방이 생성된 서버의 공지인지. false면 다른 서버로 퍼진 사본이다. */
   isOrigin?: boolean;
   /** 사본에 표시할 원 서버 이름 */
@@ -787,6 +790,51 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
                 )
                 .setRequired(false),
             ),
+        )
+        .addSubcommand((sub) =>
+          sub
+            .setName("schedule")
+            .setDescription("내전을 예약 개설하고 모집 공지를 올린다")
+            .addStringOption((opt) =>
+              opt
+                .setName("time")
+                .setDescription(
+                  "예: 21:00 / 9시 / 내일 20:30 / 9월 3일 21시 / 2시간 뒤",
+                )
+                .setRequired(true),
+            )
+            .addStringOption((opt) =>
+              opt
+                .setName("mode")
+                .setDescription("팀 구성 방식")
+                .setRequired(true)
+                .addChoices(
+                  { name: "경매 드래프트", value: "AUCTION" },
+                  { name: "스네이크 드래프트", value: "SNAKE_DRAFT" },
+                  { name: "자동 밸런스", value: "AUTO_BALANCE" },
+                  { name: "자유 팀 선택", value: "MANUAL_TEAM" },
+                ),
+            )
+            .addIntegerOption((opt) =>
+              opt
+                .setName("size")
+                .setDescription("정원 (기본: 10명)")
+                .setRequired(false)
+                .addChoices(
+                  { name: "10명 (5v5)", value: 10 },
+                  { name: "15명 (3팀)", value: 15 },
+                  { name: "20명 (4팀)", value: 20 },
+                  { name: "30명 (6팀)", value: 30 },
+                  { name: "40명 (8팀)", value: 40 },
+                ),
+            )
+            .addStringOption((opt) =>
+              opt
+                .setName("name")
+                .setDescription("방 이름 (비우면 예정 시각으로 자동 생성)")
+                .setMaxLength(50)
+                .setRequired(false),
+            ),
         ),
     ].map((cmd) => cmd.toJSON());
 
@@ -897,6 +945,9 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
             break;
           case "setupverifypanel":
             await this.handleSetupVerifyPanelCommand(interaction);
+            break;
+          case "schedule":
+            await this.handleScheduleCommand(interaction);
             break;
         }
       } catch (error) {
@@ -1355,10 +1406,12 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
           name: "🏠 방 관련",
           value: [
             "`/nexus rooms` - 활성 방 목록 (대기~역할선택~진행중)",
+            "`/nexus schedule <시간> <모드>` - 내전 예약 개설",
             "`/nexus team` - 현재 팀 정보",
             "`/nexus rules` - 서버 규칙 게시 (관리자)",
             "`/nexus verify` - 서버 기본 역할 받기",
             "`/nexus setuproles` - 티어/라인 역할 자동 생성 (관리자)",
+            "`/nexus setannounce` - 모집 공지 채널 지정 (관리자)",
             "`/nexus setupverifypanel` - 인증 패널 게시 (관리자)",
           ].join("\n"),
         },
@@ -2329,6 +2382,8 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
       participants: string[];
       voiceChannelId?: string | null;
       originGuildName?: string | null;
+      /** 예고 방의 예정 시각. 없으면 지금 바로 여는 방이다. */
+      scheduledAt?: Date | string | null;
     },
   ): Promise<string | null> {
     const guild = await this.client.guilds.fetch(guildId);
@@ -2353,6 +2408,7 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
       emojis,
       mentionRoleId,
       args.originGuildName ?? null,
+      args.scheduledAt ?? null,
     );
 
     const message = await channel.send(payload);
@@ -2366,6 +2422,20 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
    */
   private roomJoiner?: {
     joinRoom(userId: string, dto: { roomId: string }): Promise<unknown>;
+    /**
+     * 예약 개설용. 반환 타입은 RoomService 쪽 변환 결과(방 상세/요약)라
+     * 형태가 고정되지 않아 여기서는 id만 쓴다.
+     */
+    createRoom?(
+      hostId: string,
+      dto: {
+        name: string;
+        maxParticipants: number;
+        teamMode: any;
+        discordGuildId?: string;
+        scheduledAt?: string;
+      },
+    ): Promise<any>;
   };
 
   setRoomJoiner(joiner: NonNullable<DiscordBotService["roomJoiner"]>) {
@@ -2426,6 +2496,106 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
       await interaction.editReply(
         [`❌ ${reason}`, `로비에서 시도: ${lobbyUrl}`].join("\n"),
       );
+    }
+  }
+
+  /**
+   * `/nexus schedule` — 디스코드 안에서 예약 내전을 연다.
+   *
+   * 사용자들이 이미 방 제목에 "9시 시작"을 적어 우회하고 있던 것을 정식 기능으로
+   * 만든다. 웹으로 넘어가지 않고 명령 한 줄로 끝나야 의미가 있다.
+   */
+  private async handleScheduleCommand(interaction: ChatInputCommandInteraction) {
+    await interaction.deferReply({ ephemeral: true });
+
+    const appUrl =
+      this.configService.get("APP_URL") || "https://labs-nexus.com";
+
+    if (!interaction.guildId) {
+      await interaction.editReply(
+        "❌ 서버 안에서만 사용할 수 있는 명령어입니다.",
+      );
+      return;
+    }
+
+    const provider = await this.prisma.authProvider.findFirst({
+      where: { provider: "DISCORD", providerId: interaction.user.id },
+      select: { userId: true },
+    });
+    if (!provider) {
+      await interaction.editReply(
+        [
+          "❌ 이 디스코드 계정과 연결된 NEXUS 계정을 찾지 못했습니다.",
+          `${appUrl} 에서 디스코드로 로그인한 뒤 다시 시도해주세요.`,
+        ].join("\n"),
+      );
+      return;
+    }
+
+    if (!this.roomJoiner?.createRoom) {
+      await interaction.editReply(
+        "예약 개설을 준비 중입니다. 잠시 후 다시 시도해주세요.",
+      );
+      return;
+    }
+
+    const rawTime = interaction.options.getString("time", true);
+    const scheduledAt = parseKstSchedule(rawTime);
+    if (!scheduledAt) {
+      await interaction.editReply(
+        [
+          `❌ 시각 \`${rawTime}\` 을 이해하지 못했습니다.`,
+          "이렇게 적어주세요: `21:00` `9시` `내일 20:30` `9월 3일 21시` `2시간 뒤`",
+        ].join("\n"),
+      );
+      return;
+    }
+
+    const teamMode = interaction.options.getString("mode", true);
+    const maxParticipants = interaction.options.getInteger("size") ?? 10;
+    const name =
+      interaction.options.getString("name")?.trim() ||
+      `${formatKst(scheduledAt)} 내전`;
+
+    // 방의 원 서버로 지정하려면 그 길드 연동의 소유자여야 한다. 소유자가 아니면
+    // 원 서버 없이 만들고, 교차 공지를 통해 이 서버에도 공지가 올라간다.
+    const ownedLink = await this.prisma.discordGuildLink.findFirst({
+      where: {
+        guildId: interaction.guildId,
+        ownerId: provider.userId,
+        status: "ACTIVE",
+      },
+      select: { guildId: true },
+    });
+
+    try {
+      const room = await this.roomJoiner.createRoom(provider.userId, {
+        name,
+        maxParticipants,
+        teamMode,
+        ...(ownedLink ? { discordGuildId: ownedLink.guildId } : {}),
+        scheduledAt: scheduledAt.toISOString(),
+      });
+
+      const unix = Math.floor(scheduledAt.getTime() / 1000);
+      await interaction.editReply(
+        [
+          `✅ **${name}** 예약 완료 — <t:${unix}:F> (<t:${unix}:R>)`,
+          "모집 공지를 올렸습니다. 시작 1시간 전과 10분 전에 다시 알려드릴게요.",
+          `로비: ${appUrl}/tournaments/${room?.id}/lobby`,
+        ].join("\n"),
+      );
+    } catch (error: any) {
+      // createRoom은 Discord/Riot 미연동·정원 오류 등을 예외 메시지로 준다.
+      // 접두어(`RIOT_NOT_LINKED::`)는 웹 전용이라 떼고 보여준다.
+      const raw =
+        typeof error?.response?.message === "string"
+          ? error.response.message
+          : typeof error?.message === "string"
+            ? error.message
+            : "예약에 실패했습니다.";
+      const reason = raw.includes("::") ? raw.split("::").pop() : raw;
+      await interaction.editReply(`❌ ${reason}`);
     }
   }
 
@@ -2535,6 +2705,7 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
           maxParticipants: true,
           teamMode: true,
           isPrivate: true,
+          scheduledAt: true,
           host: { select: { username: true } },
           participants: {
             where: { role: "PLAYER" },
@@ -2561,6 +2732,9 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
               maxPlayers: room.maxParticipants,
               teamMode: room.teamMode,
               isPrivate: room.isPrivate,
+              scheduledAt: room.scheduledAt
+                ? room.scheduledAt.toISOString()
+                : null,
               voiceChannelId:
                 room.discordChannels[0]?.channelId ?? notif.voiceChannelId,
             }
@@ -2595,6 +2769,7 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
             emojis,
             null,
             notif.isOrigin === false ? notif.originGuildName : null,
+            notif.scheduledAt ?? null,
           );
           // V2 로 전환하기 전에 보낸 메시지는 플래그를 나중에 붙일 수 없어 edit 이
           // 실패한다. 그 방들은 다음 모집부터 새 형식이 된다.
@@ -2606,6 +2781,135 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
         `[DiscordBot] 방 알림 업데이트 실패 (${roomId}): ${err?.message}`,
       );
     }
+  }
+
+  /**
+   * 예약 내전 리마인드를 모집 공지가 올라간 모든 서버에 새 메시지로 보낸다.
+   *
+   * 기존 공지를 edit하지 않고 새로 보내는 이유: edit는 알림이 가지 않는다.
+   * 리마인드의 목적 자체가 "지금 봐야 한다"를 알리는 것이다.
+   *
+   * @returns 실제로 전송된 서버 수
+   */
+  async sendRoomScheduleReminder(
+    roomId: string,
+    phase: "1h" | "10m",
+  ): Promise<number> {
+    const notifs = await this.getRoomNotifications(roomId);
+    if (notifs.length === 0) return 0;
+
+    const room = await this.prisma.room.findUnique({
+      where: { id: roomId },
+      select: {
+        name: true,
+        maxParticipants: true,
+        scheduledAt: true,
+        participants: {
+          where: { role: "PLAYER" },
+          select: {
+            user: {
+              select: {
+                authProviders: {
+                  where: { provider: "DISCORD" },
+                  select: { providerId: true },
+                  take: 1,
+                },
+              },
+            },
+          },
+          orderBy: { joinedAt: "asc" },
+        },
+        discordChannels: {
+          where: { teamName: "Lobby" },
+          select: { channelId: true },
+          take: 1,
+        },
+      },
+    });
+    if (!room?.scheduledAt) return 0;
+
+    const unix = Math.floor(room.scheduledAt.getTime() / 1000);
+    const current = room.participants.length;
+    const remaining = Math.max(0, room.maxParticipants - current);
+    const participantIds = room.participants
+      .map((participant) => participant.user.authProviders[0]?.providerId)
+      .filter((id): id is string => !!id);
+    const lobbyChannelId = room.discordChannels[0]?.channelId ?? null;
+    const appUrl =
+      this.configService.get("APP_URL") || "https://labs-nexus.com";
+
+    const results = await Promise.allSettled(
+      notifs.map(async (notif) => {
+        const guild = await this.client.guilds.fetch(notif.guildId);
+        const channel = await guild.channels.fetch(notif.channelId);
+        if (!channel?.isTextBased()) return false;
+
+        const isOrigin = notif.isOrigin !== false;
+        // 참가자 멘션은 원 서버에서만 한다. 사본 서버에는 그 사람들이 없어
+        // 멘션이 깨진 이름으로 남을 뿐이다.
+        const mentionUsers = isOrigin ? participantIds : [];
+        // 아직 자리가 남은 1시간 전에만 알림 역할을 다시 부른다.
+        // 정원이 찼거나 10분 전이면 참가할 수 없는 사람에게는 소음이다.
+        const roleId =
+          phase === "1h" && remaining > 0
+            ? await this.getAnnounceRoleId(notif.guildId)
+            : null;
+
+        const lines: string[] = [];
+        if (roleId) lines.push(`<@&${roleId}>`);
+        lines.push(
+          phase === "1h"
+            ? `⏰ **${notif.roomName}** 시작 1시간 전 · <t:${unix}:t> (<t:${unix}:R>)`
+            : `🔔 **${notif.roomName}** 곧 시작합니다 · <t:${unix}:R>`,
+        );
+        lines.push(
+          remaining > 0
+            ? `모집 현황 **${current}** / ${room.maxParticipants} — ${remaining}자리 남았습니다`
+            : `모집 완료 **${current}** / ${room.maxParticipants}`,
+        );
+        if (phase === "10m" && isOrigin && lobbyChannelId) {
+          lines.push(
+            `음성 대기실: https://discord.com/channels/${notif.guildId}/${lobbyChannelId}`,
+          );
+        }
+        lines.push(`로비: ${appUrl}/tournaments/${roomId}/lobby`);
+        if (mentionUsers.length > 0) {
+          lines.push(mentionUsers.map((id) => `<@${id}>`).join(" "));
+        }
+
+        await channel.send({
+          content: lines.join("\n"),
+          allowedMentions: {
+            users: mentionUsers,
+            roles: roleId ? [roleId] : [],
+          },
+        });
+        return true;
+      }),
+    );
+
+    return results.filter(
+      (result) => result.status === "fulfilled" && result.value,
+    ).length;
+  }
+
+  /**
+   * 디스코드 DM 발송. DM을 막아둔 사용자에게는 실패하는 게 정상이라
+   * 한 명의 실패가 나머지를 막지 않게 개별 처리한다.
+   *
+   * @returns 실제로 전달된 수
+   */
+  async sendDirectMessages(
+    discordUserIds: string[],
+    content: string,
+  ): Promise<number> {
+    const results = await Promise.allSettled(
+      discordUserIds.map(async (discordUserId) => {
+        const user = await this.client.users.fetch(discordUserId);
+        await user.send(content);
+      }),
+    );
+    return results.filter((result) => result.status === "fulfilled").length;
   }
 
   clearRoomNotification(roomId: string) {
@@ -2727,6 +3031,8 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
     mentionRoleId?: string | null,
     /** 타 서버로 퍼진 사본일 때 원 서버 이름. null이면 원 서버 공지다. */
     originGuildName?: string | null,
+    /** 예고 방의 예정 시각. null이면 지금 바로 여는 방이다. */
+    scheduledAt?: Date | string | null,
   ): {
     components: ContainerBuilder[];
     flags: number;
@@ -2814,6 +3120,13 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
       `## ${isPrivate ? "🔒 " : ""}${roomName}`,
       `${modeIcon ? `${modeIcon} ` : ""}${modeLabel}  ·  방장 **${hostName}**`,
     ];
+    // 예고 방은 언제 시작하는지가 참가 판단의 첫 번째 정보다.
+    // Discord 타임스탬프로 넣으면 보는 사람의 시간대로 알아서 렌더된다.
+    const scheduledDate = scheduledAt ? new Date(scheduledAt) : null;
+    if (scheduledDate && !Number.isNaN(scheduledDate.getTime())) {
+      const unix = Math.floor(scheduledDate.getTime() / 1000);
+      headerLines.push(`🗓️ <t:${unix}:F> 시작 · <t:${unix}:R>`);
+    }
     // 다른 서버에서 열린 내전임을 밝힌다. 출처를 숨기면 우리 서버 공지로
     // 오해하고 들어왔다가 낯선 사람들과 만나게 된다.
     if (originGuildName) {

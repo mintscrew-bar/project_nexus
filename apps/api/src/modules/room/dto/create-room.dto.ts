@@ -8,6 +8,7 @@ import {
   Max,
   IsEnum,
   IsBoolean,
+  IsISO8601,
 } from "class-validator";
 import { Transform } from "class-transformer";
 import { TeamMode, TeamCaptainSelection, BracketType } from "@nexus/database";
@@ -45,6 +46,14 @@ export class CreateRoomDto {
   @IsString()
   @MaxLength(32)
   discordGuildId?: string;
+
+  /**
+   * 예고제: 내전 예정 시각(ISO 8601).
+   * 없으면 지금 바로 여는 방이다. 과거 시각·너무 먼 미래는 room.service에서 거른다.
+   */
+  @IsOptional()
+  @IsISO8601()
+  scheduledAt?: string;
 
   // ── Auction 설정 ──
   @IsOptional()
