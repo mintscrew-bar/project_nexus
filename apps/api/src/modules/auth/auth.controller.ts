@@ -21,6 +21,7 @@ import { LoginDto, RegisterDto } from "./dto";
 import { CurrentUser } from "./decorators/current-user.decorator";
 import { JwtAuthGuard } from "./guards/jwt-auth.guard";
 import { JwtRefreshGuard } from "./guards/jwt-refresh.guard";
+import { getClientIp } from "../../common/utils/client-ip";
 
 @Controller("auth")
 export class AuthController {
@@ -77,10 +78,8 @@ export class AuthController {
     @Req() req: Request,
     @Res() res: Response,
   ) {
-    const ip =
-      (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
-      req.ip ||
-      "unknown";
+    // X-Forwarded-For 직접 파싱 금지 — 위조 시 IP+이메일 로그인 잠금이 무력화된다.
+    const ip = getClientIp(req);
     const tokens = await this.authService.login(dto, ip);
 
     this.setRefreshTokenCookie(res, tokens.refreshToken);

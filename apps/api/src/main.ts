@@ -33,9 +33,21 @@ async function bootstrap() {
 
   // Cloudflared/nginx 뒤에서 실제 클라이언트 IP를 사용해야
   // 전역 Throttler가 프록시 컨테이너 IP 하나로 모든 사용자를 묶지 않는다.
+  //
+  // 단, `true`(모든 프록시 신뢰)를 쓰면 안 된다. proxy-addr가 X-Forwarded-For의
+  // 맨 앞 값까지 거슬러 올라가므로, 클라이언트가 헤더에 아무 IP나 넣어 보내면
+  // 그 값이 그대로 req.ip가 되어 IP 기반 rate limit이 통째로 무력화된다.
+  // 신뢰 범위를 사설 대역으로 좁혀 도커 네트워크의 nginx만 프록시로 인정한다.
   const httpAdapter = app.getHttpAdapter().getInstance();
   if (typeof httpAdapter.set === "function") {
-    httpAdapter.set("trust proxy", true);
+    const configuredProxies = configService.get<string>("TRUSTED_PROXIES");
+    const trustedProxies = configuredProxies
+      ? configuredProxies
+          .split(",")
+          .map((entry) => entry.trim())
+          .filter(Boolean)
+      : ["loopback", "linklocal", "uniquelocal"];
+    httpAdapter.set("trust proxy", trustedProxies);
   }
 
   app.use(cookieParser());

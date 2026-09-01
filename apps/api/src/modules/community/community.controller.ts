@@ -24,6 +24,7 @@ import { RolesGuard } from "../auth/guards/roles.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { UploadService } from "../upload/upload.service";
+import { getClientIp } from "../../common/utils/client-ip";
 import { CommunityService } from "./community.service";
 import {
   CreatePostDto,
@@ -86,9 +87,8 @@ export class CommunityController {
     // 로그인 유저이면 userId 기반, 비로그인이면 IP 기반 조회수 중복 방지 (24시간)
     const user = req.user as any;
     const viewerId: string | undefined = user?.sub;
-    const viewerIp: string | undefined =
-      (req.headers["x-forwarded-for"] as string)?.split(",")[0].trim() ||
-      req.socket?.remoteAddress;
+    // X-Forwarded-For 직접 파싱 금지 — 위조 시 조회수 중복 방지를 우회할 수 있다.
+    const viewerIp: string | undefined = getClientIp(req);
     return this.communityService.getPostById(id, viewerId, viewerIp);
   }
 

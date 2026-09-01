@@ -9,6 +9,7 @@ import {
   ThrottlerStorage,
 } from "@nestjs/throttler";
 import { verify } from "jsonwebtoken";
+import { getClientIp } from "../utils/client-ip";
 
 type JwtTrackerPayload = {
   sub?: unknown;
@@ -54,9 +55,8 @@ export class AuthAwareThrottlerGuard extends ThrottlerGuard {
   }
 
   private getClientIp(req: Record<string, any>): string {
-    if (Array.isArray(req.ips) && req.ips.length > 0) {
-      return req.ips[0];
-    }
-    return req.ip ?? req.socket?.remoteAddress ?? "unknown";
+    // req.ips[0]은 X-Forwarded-For의 맨 앞 값이라 클라이언트가 위조할 수 있다.
+    // trust proxy 설정을 반영한 req.ip만 사용한다. (common/utils/client-ip.ts 참고)
+    return getClientIp(req);
   }
 }
