@@ -93,7 +93,11 @@ interface ClanStoreState {
   // WebSocket 메서드
   connectToClan: (clanId: string) => void;
   disconnectFromClan: () => void;
-  sendChatMessage: (clanId: string, message: string) => void;
+  sendChatMessage: (
+    clanId: string,
+    message: string,
+    callback?: (ack: any) => void,
+  ) => void;
   setTypingStatus: (clanId: string, isTyping: boolean) => void;
 }
 
@@ -291,8 +295,12 @@ export const useClanStore = create<ClanStoreState>((set, get) => ({
     });
   },
 
-  sendChatMessage: (clanId: string, message: string) => {
-    clanSocketHelpers.sendMessage(clanId, message);
+  sendChatMessage: (
+    clanId: string,
+    message: string,
+    callback?: (ack: any) => void,
+  ) => {
+    clanSocketHelpers.sendMessage(clanId, message, callback);
   },
 
   setTypingStatus: (clanId: string, isTyping: boolean) => {

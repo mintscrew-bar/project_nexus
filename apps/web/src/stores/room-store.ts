@@ -78,7 +78,11 @@ interface RoomStoreState {
   // WebSocket methods
   connectToRoom: (roomId: string) => void;
   disconnectFromRoom: (options?: { preserveRoom?: boolean }) => void;
-  sendChatMessage: (roomId: string, message: string) => void;
+  sendChatMessage: (
+    roomId: string,
+    message: string,
+    callback?: (ack: any) => void,
+  ) => void;
   setTypingStatus: (roomId: string, isTyping: boolean) => void;
 
   // Room list subscription methods
@@ -274,8 +278,12 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
     });
   },
 
-  sendChatMessage: (roomId: string, message: string) => {
-    roomSocketHelpers.sendMessage(roomId, message);
+  sendChatMessage: (
+    roomId: string,
+    message: string,
+    callback?: (ack: any) => void,
+  ) => {
+    roomSocketHelpers.sendMessage(roomId, message, callback);
   },
 
   setTypingStatus: (roomId: string, isTyping: boolean) => {

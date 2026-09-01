@@ -268,8 +268,13 @@ export const roomSocketHelpers = {
     roomSocket?.emit("leave-room", { roomId });
   },
 
-  sendMessage: (roomId: string, message: string) => {
-    roomSocket?.emit("send-message", { roomId, content: message });
+  sendMessage: (
+    roomId: string,
+    message: string,
+    callback?: (ack: any) => void,
+  ) => {
+    // ACK를 받아야 서버가 거절한 이유(레이트 리밋·길이 초과 등)를 사용자에게 알릴 수 있다.
+    roomSocket?.emit("send-message", { roomId, content: message }, callback);
   },
 
   sendIsTyping: (roomId: string, isTyping: boolean) => {
@@ -980,9 +985,14 @@ export const clanSocketHelpers = {
     clanSocket?.emit("leave-clan-chat", { clanId });
   },
 
-  sendMessage: (clanId: string, message: string) => {
+  sendMessage: (
+    clanId: string,
+    message: string,
+    callback?: (ack: any) => void,
+  ) => {
     // 백엔드: send-clan-message, content 필드 사용
-    clanSocket?.emit("send-clan-message", { clanId, content: message });
+    // ACK를 받아야 서버가 거절한 이유(레이트 리밋 등)를 사용자에게 알릴 수 있다.
+    clanSocket?.emit("send-clan-message", { clanId, content: message }, callback);
   },
 
   sendIsTyping: (clanId: string, isTyping: boolean) => {

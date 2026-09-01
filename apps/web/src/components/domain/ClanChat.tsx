@@ -227,6 +227,8 @@ export function ClanChat({ clanId, myRole }: ClanChatProps) {
   } = useClanStore();
 
   const [input, setInput] = useState("");
+  // 서버가 전송을 거절한 이유(레이트 리밋 등). ACK 없이는 조용히 사라진다.
+  const [sendError, setSendError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [isAtBottom, setIsAtBottom] = useState(true);
@@ -311,7 +313,16 @@ export function ClanChat({ clanId, myRole }: ClanChatProps) {
     const trimmed = input.trim();
     if (!trimmed || !isConnected) return;
 
-    sendChatMessage(clanId, trimmed);
+    setSendError(null);
+    sendChatMessage(clanId, trimmed, (ack) => {
+      // 서버가 거절하면 사유를 보여주고 입력을 되돌린다.
+      // ACK를 무시하면 사용자는 메시지가 왜 사라졌는지 알 수 없다.
+      if (ack && ack.error) {
+        setSendError(ack.error);
+        setInput((current) => (current ? current : trimmed));
+        setTimeout(() => setSendError(null), 3000);
+      }
+    });
     setInput("");
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     setTypingStatus(clanId, false);
@@ -566,6 +577,11 @@ export function ClanChat({ clanId, myRole }: ClanChatProps) {
 
         <div ref={messagesEndRef} />
       </div>
+
+      {/* 전송 실패 사유 */}
+      {sendError && (
+        <div className="px-3 pt-2 text-xs text-accent-danger">{sendError}</div>
+      )}
 
       {/* 입력창 */}
       <div className="border-t border-bg-tertiary p-3 flex gap-2">
