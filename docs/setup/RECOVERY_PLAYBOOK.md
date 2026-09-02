@@ -52,17 +52,56 @@ $COMPOSE exec -T nginx nginx -t && $COMPOSE exec -T nginx nginx -s reload
 `df -h /`가 90% 이상이면 배포도 자동으로 막힌다(CD의 디스크 게이트).
 
 ```bash
-sudo nexus-cleanup                  # 설치돼 있으면 이것만으로 끝난다
+scripts/ops/nexus-cleanup.sh        # 이것만으로 대개 끝난다 (매일 04:00 cron 으로도 돈다)
 
-# 설치 전이거나 더 급하면 직접:
+# 더 급하면 직접:
 docker system df                    # 무엇이 차지하는지 먼저 본다
 docker image prune -a -f            # 안 쓰는 이미지 (실행 중 이미지는 보호됨)
 docker builder prune -a -f          # 빌드 캐시
 docker container prune -f           # 종료된 컨테이너
-journalctl --vacuum-time=7d         # 시스템 로그
+journalctl --vacuum-time=7d         # 시스템 로그 (sudo 필요)
 ```
 
-스크립트 설치는 [scripts/ops/nexus-cleanup.sh](../../scripts/ops/nexus-cleanup.sh) 상단 주석 참고.
+cron 설치/확인은 `scripts/ops/install-cron.sh --show`.
+
+---
+
+## 2-1. DB·업로드 복원
+
+백업 위치: `~/nexus-backups/` (daily = core 덤프·업로드, weekly = full 덤프)
+- `db-core-*.sql.gz` — **매일**. `riot_match_cache` 데이터만 빠진 전체 DB. 평상시엔 이걸로 복원한다.
+- `db-full-*.sql.gz` — **주 1회(일요일)**. 외부 매치 캐시까지 포함.
+- `uploads-*.tar.gz` — 업로드 볼륨(클랜 로고·배너 등)
+
+```bash
+# 0) 먼저 무엇을 복원할지 고른다
+ls -lht ~/nexus-backups/daily ~/nexus-backups/weekly
+
+# 1) 앱을 내려 쓰기를 멈춘다 (DB·redis 는 그대로 둔다)
+docker compose -f docker-compose.prod.yml stop api web
+
+# 2) DB 복원 — 덤프에 DROP 이 들어 있어 기존 객체를 지우고 덮어쓴다
+gunzip -c ~/nexus-backups/daily/db-core-<STAMP>.sql.gz \
+  | docker exec -i nexus-postgres psql -U nexus -d nexus
+
+# 3) 업로드 복원
+docker run --rm -v nexus_uploads_data:/data -i alpine \
+  sh -c 'rm -rf /data/* && tar xzf - -C /data' < ~/nexus-backups/daily/uploads-<STAMP>.tar.gz
+
+# 4) 올린다
+docker compose -f docker-compose.prod.yml start api web
+```
+
+**되돌릴 수 없는 작업이다.** 확신이 없으면 먼저 임시 DB 로 복원해 내용을 확인한다:
+
+```bash
+docker exec nexus-postgres psql -U nexus -d postgres -c "CREATE DATABASE restore_check;"
+gunzip -c <덤프> | docker exec -i nexus-postgres psql -U nexus -d restore_check
+docker exec nexus-postgres psql -U nexus -d restore_check -c "SELECT count(*) FROM users;"
+docker exec nexus-postgres psql -U nexus -d postgres -c "DROP DATABASE restore_check;"
+```
+
+이 절차는 2026-09-03 에 실제로 한 번 돌려 검증했다(임시 DB 복원 → 행 수 대조 일치).
 
 ---
 
@@ -149,6 +188,12 @@ docker exec -i nexus-api npx prisma migrate deploy --schema packages/database/pr
 
 [TODO_server_reliability.md](../features/TODO_server_reliability.md) 기준:
 
-- Task 9 Cloudflare Tunnel SSH 라우트 — Tailscale이 끊기면 아직 원격 복구 수단이 없다
+- Task 6 tailscaled 행(hang) 대응 — systemd 는 `Restart=on-failure` 라 프로세스가 죽으면 살아나지만,
+  응답 없이 매달린 경우는 감지하지 못한다
+- Task 7 컨테이너 자가 복구 — healthcheck 는 5개 서비스에 있는데 unhealthy 를 보고 재시작해 줄 주체가 없다
+- Task 9 Cloudflare Tunnel SSH 라우트 — Tailscale이 끊기면 아직 원격 복구 수단이 없다.
+  cloudflared 가 `TUNNEL_TOKEN` 원격 관리형이라 이 저장소가 아니라 Cloudflare 대시보드에서 설정해야 한다
 - Task 10 Wake-on-LAN — 호스트가 완전히 행 걸리면 물리 접근 외 방법이 없다
 - Task 11 Discord ops 명령 — 봇만 살아 있을 때 컨테이너를 재시작할 수단
+- **백업 호스트 밖 사본** — `NEXUS_BACKUP_RSYNC_TARGET` 이 비어 있어 지금 백업은 이 호스트에만 있다.
+  볼륨 손상에는 대응하지만 호스트 전손에는 대응하지 못한다

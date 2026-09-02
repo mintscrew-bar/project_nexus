@@ -24,29 +24,40 @@
 
 ---
 
-## P0 — 데이터 유실 위험
+## 완료 (2026-09-03 이 세션에서 처리)
 
-- [ ] **DB 자동 백업** ([TODO_improvements](../features/TODO_improvements.md) Task 6)
-  - 지금 Postgres 데이터는 컨테이너 볼륨 한 벌뿐이다. 주기 백업이 없다.
-  - `scripts/deploy.sh:52` 의 배포 직전 `pg_dump` 가 유일한 백업이었는데, 배포가
-    GitHub Actions 로 넘어가면서 그 스크립트는 더 이상 실행되지 않는다.
-  - 할 일: `scripts/ops/` 에 `pg_dump | gzip` 스크립트 + cron, 보관 주기(7일/30일) 결정,
-    호스트 밖 사본 위치 결정. 복원 절차를 한 번 실제로 돌려볼 것.
+- [x] **DB·업로드 자동 백업** — `scripts/ops/nexus-backup.sh`, 매일 03:30.
+      core(매일 220MB/54초) + full(주간) 2단계. 임시 DB 복원으로 검증까지 마쳤다.
+- [x] **디스크 정리 스크립트 통합** — 갈라져 있던 두 벌을 하나로. 구버전 삭제.
+- [x] **디스크 경고 설치** — 30분 주기, 80% 임계. 작성만 되고 안 돌던 것을 실제로 걸었다.
+- [x] **웹훅을 crontab 평문 → `~/.config/nexus-ops.env`(0600)**
+- [x] **Uptime Kuma 알림** — 확인해 보니 이미 Discord 로 6개 모니터 전부 연결돼 있었다
+- [x] **swap 4G** — 불필요로 종결. 빌드가 CI 로 빠져 OOM 요인이 사라졌다(available 10Gi, OOM 0건)
+- [x] **핵심 메트릭 대시보드** — Kuma + 디스크 알림으로 커버. Grafana 는 이 규모에 과하다
+
+설치 확인: `scripts/ops/install-cron.sh --show`
 
 ---
 
-## P1 — 이미 짜둔 운영 스크립트가 안 돌고 있음
+## P0 — 남은 데이터 위험
 
-세 항목이 얽혀 있어 한 번에 처리하는 게 낫다. ([TODO_server_reliability](../features/TODO_server_reliability.md))
+- [ ] **백업 호스트 밖 사본** — `NEXUS_BACKUP_RSYNC_TARGET` 이 비어 있어 백업이 운영 호스트에만 있다.
+  볼륨 손상은 막지만 호스트 전손은 못 막는다. **목적지 결정이 필요하다**(NAS / 외장 디스크 /
+  클라우드 오브젝트 스토리지 / 다른 PC). core 덤프가 220MB 라 어디든 부담은 없다.
 
-- [ ] **디스크 정리 스크립트 통합** (Task 1)
-  - `scripts/disk-cleanup.sh`(구, crontab 04:00 등록됨) 와
-    `scripts/ops/nexus-cleanup.sh`(신, 미설치) 가 기능이 겹친 채 공존한다.
-  - 한 벌로 합치고 `/etc/cron.daily/` 에 설치. 각각의 고유 기능(캐시 정리·Discord 보고 /
-    `until=24h` 필터)은 살릴 것.
-- [ ] **Discord 웹훅 URL 을 crontab 평문에서 env 파일로 분리** (Task 1 부수)
-- [ ] **디스크 사용량 알림 설치** (Task 3) — `/etc/nexus-disk-alert.env` + cron. 지금은 죽은 코드다.
-- [ ] **`DEPLOY_ALERT_DISCORD_WEBHOOK` 시크릿 등록 여부 확인** (Task 13) — 저장소 밖이라 코드로 확인 불가
+- [ ] **R2 버킷 보호** — 운영이 `UPLOAD_DRIVER=r2` 라 사용자 업로드(클랜 로고·배너 등) 원본이
+  Cloudflare R2 에 있고, 위 백업은 이걸 포함하지 않는다. 로컬 `uploads` 볼륨은 비어 있다(0개 파일).
+  버킷 버저닝을 켜거나 rclone 주기 동기화를 붙여야 한다.
+
+- [ ] **운영 DB 의 죽은 데이터 정리** — 결정 필요
+  - DB 6.7GB 중 6.6GB 가 폐기된 Lab 인제스트 잔재다.
+    `riot_match_cache` 4.8GB(102,693행), `match_participants` 1.6GB(1,075,950행 전부 외부),
+    `known_puuids` 192MB, 외부 `matches` 107,545행.
+  - 실제로 대체 불가능한 데이터는 **2.0MB** 다 (유저 387, 클랜 10, 방 4, 채팅 1842,
+    내전 매치 19, 내전 참가자 10).
+  - 지우면 DB 6.7GB → 약 50MB, 백업 220MB → 2MB, 덤프 54초 → 1초 미만.
+  - 다만 **되돌릴 수 없다.** 전적 기능이 이 캐시를 읽고 있는지 먼저 확인해야 한다
+    (`riot-match-cache-ingest.service.ts` 의 */5 크론이 여전히 쓰고 있다).
 
 ## P1 — 사람이 직접 해야 하는 검증 (코드는 다 됐음)
 
@@ -81,13 +92,14 @@
 
 빌드가 GitHub runner 로 빠지면서 원인 자체는 크게 줄었지만, 사고 시 복구 경로는 여전히 Tailscale 하나뿐이다.
 
-- [ ] 컨테이너 자가 복구 강화 — autoheal 또는 healthcheck 실패 핸들러 (server_reliability Task 7)
-- [ ] tailscaled 자동 재시작 watchdog (Task 6)
+- [ ] **컨테이너 자가 복구** — healthcheck 는 5개 서비스에 있는데 unhealthy 를 보고
+      재시작해 줄 주체가 없다. autoheal 컨테이너 추가 (server_reliability Task 7)
+- [ ] **tailscaled watchdog** — systemd 는 `Restart=on-failure` 라 죽으면 살아나지만
+      응답 없이 매달리면 감지 못 한다 (Task 6)
 - [ ] Discord 봇 ops 명령 (`/ops restart web` 등) (Task 11)
       — SSH 가 죽어도 봇은 살아 있던 게 지난 사고의 교훈
-- [ ] Cloudflare Tunnel SSH 라우트 (Task 9)
-- [ ] Uptime Kuma 알림 채널 연결 (Task 12) / 핵심 메트릭 대시보드 (Task 14)
-- [ ] swap 4G 적용 (Task 4) — `sudo bash scripts/ops/setup-swap.sh` 한 줄. 빌드 분리로 급하진 않음
+- [ ] Cloudflare Tunnel SSH 라우트 (Task 9) — **저장소 밖 작업**.
+      cloudflared 가 `TUNNEL_TOKEN` 원격 관리형이라 Cloudflare Zero Trust 대시보드에서 설정한다
 - [ ] Wake-on-LAN (Task 10) — 물리 접근 대체 수단
 
 ---

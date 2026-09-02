@@ -12,42 +12,31 @@
 
 ## 즉시 (사고 직후 우선순위, 작업량 작음)
 
-- [~] Task 1: 디스크 자동 정리 cron — `scripts/ops/nexus-cleanup.sh`
-      ⚠️ **스크립트가 두 벌이고, 설치된 건 이 스크립트가 아니다.**
-      호스트 crontab 에는 이 작업 이전부터 있던 **구버전 `scripts/disk-cleanup.sh`** 가
-      매일 04:00 로 걸려 있고, Task 1이 만든 `scripts/ops/nexus-cleanup.sh` 는 설치돼 있지 않다.
-      기능이 겹치므로(도커 prune + journald vacuum) **하나로 합치는 게 먼저다.**
-      - 구버전 추가 기능: npm/pnpm/apt 캐시 정리, before/after 디스크 Discord 보고
-      - 신버전 추가 기능: `--filter until=24h`(롤백 여지 보존), `docker system df` 로그
-      - 부수 문제: crontab 라인에 Discord 웹훅 URL 이 평문으로 박혀 있다 → env 파일로 분리 필요
-  - 매일 새벽 안 쓰는 도커 이미지/컨테이너/네트워크/빌드캐시 prune
-  - `docker system prune -af --filter "until=24h"` + `journalctl --vacuum-time=7d`
-  - **위치**: 서버 systemd timer 또는 cron (`/etc/cron.daily/nexus-cleanup`)
-  - **효과**: 빌드마다 누적되는 dangling 이미지로 디스크가 차서 발생한 오늘 사고 재발 방지
+- [x] Task 1: 디스크 자동 정리 cron — `scripts/ops/nexus-cleanup.sh` (2026-09-03 완료)
+      갈라져 있던 두 스크립트를 하나로 합쳤다. 구버전 `scripts/disk-cleanup.sh` 는 삭제하고
+      그 고유 기능(npm/pnpm/apt 캐시 정리, before/after 디스크 Discord 보고)을 흡수했다.
+      `until=24h` 필터(롤백용 직전 이미지 보존)는 유지.
+      **설치 방식 변경**: 이 호스트에 passwordless sudo 가 없어 `/etc/cron.daily` 설치가
+      불가능했다. `scripts/ops/install-cron.sh` 로 유저 crontab 에 등록한다(매일 04:00).
+      웹훅은 crontab 평문에서 `~/.config/nexus-ops.env`(0600)로 옮겼다.
 
 - [x] Task 2: Docker 로그 size 제한 — `x-logging` 앵커로 7개 서비스 전부 적용 (10m × 3)
   - 컨테이너 로그가 무한 누적되어 디스크를 잠식하는 문제 차단
   - `docker-compose.prod.yml` 각 서비스에 `logging.options.max-size: "10m"`, `max-file: "3"` 추가
   - **효과**: 컨테이너당 로그를 30MB로 제한, 디스크 보호
 
-- [~] Task 3: 디스크 사용량 알림 — `scripts/ops/disk-alert.sh` (기본 80%, 하루 1회 쿨다운)
-      ⚠️ **미설치 확인(2026-09-03).** `/etc/nexus-disk-alert.env` 없음, cron 등록 없음 →
-      현재 이 스크립트는 실행되지 않는 죽은 코드다. Task 1 통합과 함께 설치할 것.
-  - Uptime Kuma에 디스크 사용률 모니터링 추가 또는 별도 cron으로 80% 초과 시 Discord 웹훅 알림
-  - **위치**: `~/scripts/disk-alert.sh` + cron, 또는 Uptime Kuma push monitor
-  - **효과**: 사후 복구가 아니라 사전 경고로 전환
+- [x] Task 3: 디스크 사용량 알림 — `scripts/ops/disk-alert.sh` (2026-09-03 설치 완료)
+      30분마다 검사, 80% 초과 시 Discord, 하루 1회 쿨다운. `install-cron.sh` 가 함께 등록한다.
+      상태 파일과 웹훅을 `/etc/` → 유저 홈으로 옮겨 sudo 없이 돌게 했다.
+      임계치 오버라이드(`DISK_ALERT_THRESHOLD=1 ./disk-alert.sh`)로 전송 경로까지 실검증했다.
 
-- [~] Task 4: swap 파일 추가 — `scripts/ops/setup-swap.sh` (4G, swappiness=10)
-      ⚠️ **미실행 확인(2026-09-03).** 지금 잡혀 있는 스왑은 WSL 기본값 2G(`/dev/sdc` 파티션)이고
-      이미 891MB 사용 중이다. 스크립트가 만들려는 `/swapfile` 은 없다.
-      다만 빌드가 GitHub runner 로 빠져(Task 5) 원래 노렸던 빌드 OOM 위험은 크게 줄었으므로,
-      우선순위는 내려간다. `sudo bash scripts/ops/setup-swap.sh` 한 줄이면 끝난다.
-  - 메모리 부족 시 OOM-killer가 nginx/sshd/Tailscale 같은 핵심 서비스를 죽이는 위험 완화
-  - 4~8GB swap 파일 + `swappiness=10`
-  - **위치**: 서버 `/swapfile` + `/etc/fstab`
-  - **효과**: 빌드 시점 메모리 스파이크에도 OOM 회피, sshd 살아있게 유지
-
----
+- [x] ~~Task 4: swap 파일 추가~~ — **불필요로 종결 (2026-09-03 실측)**
+      원래 목적은 "빌드 메모리 스파이크로 OOM-killer 가 sshd/tailscaled 를 죽이는 것" 방지였는데,
+      Task 5 로 빌드가 GitHub runner 로 빠지면서 그 스파이크 자체가 사라졌다.
+      현재 호스트: 총 11Gi 중 사용 1.5Gi / available 10Gi, 컨테이너 7개 합계 약 440MB,
+      OOM 이력 0건. 지금 잡힌 WSL 기본 스왑 2G 로 충분하다.
+      메모리를 크게 먹는 작업을 호스트에서 다시 돌리게 되면 그때
+      `sudo bash scripts/ops/setup-swap.sh` 한 줄로 되살린다. 스크립트는 남겨 둔다.
 
 ## 핵심 인프라 (중간 작업량)
 
@@ -84,11 +73,14 @@
 
 - [ ] Task 6: tailscaled 자동 재시작
   - Tailscale 데몬이 행 걸리면 SSH 못 함 = 원격 복구 채널 단절
-  - systemd unit 에 `Restart=always`, `RestartSec=5s` 보장 (이미 기본값일 가능성 있음 — 확인 필요)
+  - 확인 결과(2026-09-03): `Restart=on-failure`, `RestartUSec=100ms`.
+    프로세스가 죽으면 살아나지만 **응답 없이 매달린 경우는 감지하지 못한다** → watchdog 은 여전히 필요
   - watchdog 스크립트: 1분마다 `tailscale status` 검사, 실패 시 데몬 재시작
   - **효과**: SSH 채널 자가 복구
 
 - [ ] Task 7: 컨테이너 자가 복구 강화
+  - 확인 결과(2026-09-03): healthcheck 는 postgres·redis·api·web·nginx 5개에 정의돼 있는데
+    autoheal 컨테이너가 없어 **unhealthy 를 보고 재시작해 줄 주체가 없다**
   - `restart: unless-stopped` 만으로는 healthcheck 실패 시 자동 재시작 안 됨
   - autoheal 컨테이너 추가 또는 healthcheck failure 핸들러 작성
   - **위치**: `docker-compose.prod.yml`
@@ -105,7 +97,10 @@
 
 ## 원격 복구 채널 (중요도 높음)
 
-- [ ] Task 9: Cloudflare Tunnel SSH 라우트 추가
+- [ ] Task 9: Cloudflare Tunnel SSH 라우트 추가 — **저장소 밖 작업**
+  - `cloudflared` 가 `TUNNEL_TOKEN` 기반 원격 관리형이라 compose 파일이 아니라
+    Cloudflare Zero Trust 대시보드에서 Public Hostname 을 추가해야 한다 (2026-09-03 확인)
+  - 참고: Tailscale 은 현재 정상 동작 중(이 호스트 = `oldfriend`)이라 당장 단절 상태는 아니다
   - Tailscale 끊겨도 Cloudflare Zero Trust 통해 SSH 가능하게
   - `cloudflared` 설정에 `ssh.labs-nexus.com` → `ssh://localhost:22` 추가
   - 클라이언트는 `cloudflared access ssh --hostname ssh.labs-nexus.com`
@@ -127,10 +122,10 @@
 
 ## 모니터링 / 가시성
 
-- [ ] Task 12: Uptime Kuma 알림 채널 연결
-  - 컨테이너는 떠 있지만 알림 발송 채널(Discord 웹훅/이메일)이 연결돼 있는지 확인
-  - 사이트 다운 시 즉시 푸시 알림 받도록
-  - **효과**: 오늘처럼 사용자 보고 후에야 알게 되는 상황 방지
+- [x] Task 12: Uptime Kuma 알림 채널 연결 — **이미 되어 있었다 (2026-09-03 확인)**
+      Kuma DB 를 직접 조회한 결과 Discord 알림(`notification` id=1, active)이
+      모니터 6개 전부(`Nexus Public`, `Nexus API Public`, `Nexus API Internal`,
+      `Nginx`, `PostgreSQL`, `Redis`)에 연결돼 있다.
 
 - [x] Task 13: deploy 워크플로우 실패 알림 — CI(이미지 빌드)·CD(배포) 양쪽에 추가
       (`ci.yml:151`, `deploy.yml:225`). `DEPLOY_ALERT_DISCORD_WEBHOOK` 시크릿 미설정이면
@@ -139,12 +134,13 @@
   - workflow 끝에 conclusion=failure 시 webhook 호출 step 추가
   - **효과**: 배포 실패 즉시 인지
 
-- [ ] Task 14: 핵심 메트릭 노출
-  - 디스크 사용률, 메모리, 컨테이너 healthcheck 상태를 한눈에 볼 대시보드
-  - Uptime Kuma 보강 또는 Grafana + node_exporter 추가 검토
-  - **효과**: 사고 전조 감지
-
----
+- [x] Task 14: 핵심 메트릭 노출 — **별도 스택 없이 종결 (2026-09-03)**
+      원래 Grafana + node_exporter 를 검토했지만, 실제로 필요한 세 가지가 이미 커버된다.
+      - 컨테이너 healthcheck 상태 → Uptime Kuma 모니터 6개 (Task 12)
+      - 디스크 사용률 → `disk-alert.sh` 30분 주기 임계 알림 (Task 3)
+      - 메모리 → 현재 여유 10Gi, 빌드가 호스트를 떠나 스파이크 요인이 없음 (Task 4 참고)
+      운영자 1인·컨테이너 7개 규모에 Grafana 를 얹으면 그 자체가 또 하나의 관리 대상이 된다.
+      필요해지는 시점은 "왜 느린지"를 사후에 봐야 할 때이고, 그때 다시 연다.
 
 ## 정책 / 프로세스
 

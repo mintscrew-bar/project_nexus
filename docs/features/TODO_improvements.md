@@ -46,9 +46,22 @@
 
 ## 인프라/안정성
 
-- [ ] Task 6: DB 자동 백업 ★ **현재 남은 항목 중 위험도 1순위**
-  - 주기 백업이 **없다**. `scripts/deploy.sh:52` 의 배포 직전 `pg_dump` 가 전부인데,
-    배포가 GitHub Actions(`deploy.yml`)로 넘어가서 그 스크립트는 더 이상 돌지 않는다.
-  - 즉 지금 Postgres 데이터는 컨테이너 볼륨 한 벌뿐 → 볼륨 손상 = 전손.
-  - 주기적 `pg_dump | gzip` → 호스트 경로 + 외부 스토리지 cron 추가
-  - **위치**: `scripts/ops/` 에 백업 스크립트 + cron (디스크 정리 스크립트와 같은 방식)
+- [x] Task 6: DB 자동 백업 (2026-09-03 완료)
+  - `scripts/ops/nexus-backup.sh` — 매일 03:30 cron (`install-cron.sh`).
+  - **2단계 구조로 나눴다.** 실측해 보니 DB 6.7GB 중 `riot_match_cache` 가 4.8GB 로,
+    폐기된 Lab 인제스트가 남긴 외부 매치 원본 JSON 이었다. 전체 덤프는 700MB·4분이 넘어
+    매일 돌리면 결국 백업을 꺼버리게 되는 크기다.
+    - `db-core-*.sql.gz` — 매일. `--exclude-table-data=riot_match_cache`. **220MB / 54초**
+    - `db-full-*.sql.gz` — 일요일만. 캐시까지 포함
+    - `uploads-*.tar.gz` — 업로드 볼륨 폴백. **운영에서는 사실상 빈 파일이다**:
+      운영이 `UPLOAD_DRIVER=r2` 라 실제 파일은 Cloudflare R2 버킷에 있고 볼륨은 0개다.
+      로컬 드라이버 환경용으로만 의미가 있다.
+  - 보관: core 14벌, full 3벌. 실패 시에만 Discord 알림(매일 오는 성공 알림은 곧 무시하게 된다).
+  - **복원 검증 완료** — 임시 DB 로 실제 복원해 행 수를 대조했다.
+    users 387 / clans 10 / rooms 4 / chat 1842 / 내전매치 19 / 내전참가자 10 전부 일치.
+    절차는 [RECOVERY_PLAYBOOK.md](../setup/RECOVERY_PLAYBOOK.md) §2-1.
+  - ⚠️ **남은 구멍 2가지**
+    1. `NEXUS_BACKUP_RSYNC_TARGET` 미설정 → 백업이 이 호스트에만 있다. 볼륨 손상에는
+       대응하지만 호스트 전손에는 대응하지 못한다. 외부 목적지 결정 필요.
+    2. **R2 버킷은 이 백업에 포함되지 않는다.** 클랜 로고·배너 등 사용자 업로드 원본이
+       거기 있다. 버킷 버저닝을 켜거나 rclone 주기 동기화가 필요하다.
