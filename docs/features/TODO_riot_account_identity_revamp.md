@@ -31,14 +31,14 @@
 ### B. 전체 승률/티어 — entries 기반
 
 - [x] Task 3: `getRankedInfoByPuuid`가 솔로(평면 유지) + 자유랭크(`flex`)를 함께 반환
-- [x] Task 4: `RiotAccount`에 `soloWins/soloLosses/flexTier/flexRank/flexLp/flexWins/flexLosses` 추가 + 마이그레이션(`20260529_add_riot_account_season_records`). **운영 반영은 `migrate deploy` 필요**
+- [x] Task 4: `RiotAccount`에 `soloWins/soloLosses/flexTier/flexRank/flexLp/flexWins/flexLosses` 추가 + 마이그레이션(`20260529_add_riot_account_season_records`) — 운영 DB 반영 완료(2026-09-03 확인)
 - [x] Task 5: 등록(`registerRiotAccount`)·동기화(`syncRankedInfo`)·3시 크론(`lab-tasks.service.ts`)에서 solo+flex 승/패 저장 — 추가 호출 0
 - [x] Task 6: 전적 검색 헤더 솔로 승률은 이미 entries 기반(정확) + 자유랭크 카드 추가 표시. (RecentStatsSummary 도넛은 "최근 N판" 폼 지표로 유지 — Task 12에서 라벨 명시 예정. 자기 `/profile` 페이지 내전 통계는 별개)
 
 ### C. 챔피언 숙련도 — champion-mastery-v4
 
 - [x] Task 7: `champion-masteries/by-puuid/{puuid}` fetch(전역 캡 적용) + `ChampionMastery` 테이블 신설(마이그레이션 `20260529_add_champion_mastery`). 등록·수동 sync 시 전체 교체 저장. 미등록 소환사는 라이브+Redis 캐시(1h) 조회 엔드포인트(`/riot/summoner/:gameName/:tagLine/mastery`)
-- [x] Task 8: 전적 검색 챔피언 통계 카드에 숙련 레벨/포인트 배지 표시 (championId 매칭). **운영 DB는 migrate deploy 필요**
+- [x] Task 8: 전적 검색 챔피언 통계 카드에 숙련 레벨/포인트 배지 표시 (championId 매칭). (운영 DB 반영 완료 — 2026-09-03 확인)
 
 ### D. 챔피언 시즌 통계 — 증분 누적
 
@@ -74,7 +74,13 @@
 
 ### F. 예산 회수 (Lab 보류 후속)
 
-- [x] Task 19: `handleMatchFetch`(*/30 대량 ingest)·`handleHighTierSeeding`을 `MATCH_FETCH_ENABLED` env로 게이트(기본 비활성). 되살리려면 `MATCH_FETCH_ENABLED=true`. 수동 트리거(`runMatchFetch`)·Lab UI·recompute 크론은 유지
+- [x] Task 19: 예산 회수 — **env 게이트가 아니라 코드 제거로 끝났다.**
+      Lab을 접으면서 `lab-tasks.service.ts` 자체가 사라졌고, 그 안에 있던
+      `handleMatchFetch`(*/30 대량 ingest)·`handleHighTierSeeding`·`runMatchFetch` 와
+      `POST /admin/matches/seed-high-tiers` 도 함께 없어졌다. `MATCH_FETCH_ENABLED` env는
+      존재하지 않는다 — 되살리려면 게이트를 켜는 게 아니라 다시 구현해야 한다.
+      남아 있는 매치 수집 경로는 `riot-match-cache-ingest.service.ts` 의 */5 크론 하나뿐이다.
+      스키마(`KnownPuuid`/`MatchStatsCache`/`StatsRecomputeQueue`/`RiotMatchCache`)는 보존.
 
 ---
 

@@ -27,6 +27,7 @@
 
 ### 📊 [Status & Issues](./status/)
 프로젝트 진행 현황 및 알려진 문제점들입니다.
+- **[NEXT_UP.md](./status/NEXT_UP.md)**: 통합 백로그 — 다음에 할 일을 우선순위로 (여기부터 본다)
 - **[PROJECT_STATUS.md](./status/PROJECT_STATUS.md)**: 현재 개발 현황 및 모듈별 상태
 - **[KNOWN_ISSUES.md](./status/KNOWN_ISSUES.md)**: 해결이 필요한 알려진 이슈 목록
 - **[BETA_PUBLIC_TEST_PLAN.md](./status/BETA_PUBLIC_TEST_PLAN.md)**: 공개 베타 테스트 계획
@@ -38,10 +39,17 @@
 
 ### 🧩 [Feature Improvements](./features/)
 개별 기능별 상세 개선안 및 TODO 목록입니다.
+- **Broadcast**: [Broadcast Overlay](./features/TODO_broadcast_overlay.md) — OBS 오버레이 / scene / 조작 패널
+- **Match**: [Series Match](./features/TODO_series_match.md) — 다전제(Bo3/Bo5)
+- **Riot**: [Riot Account Identity Revamp](./features/TODO_riot_account_identity_revamp.md) — 퍼스널 키 제약 하 전적 설계
+- **Streamer**: [Streamer Live](./features/TODO_streamer_live.md) — 치지직/SOOP 라이브 감지
+- **Ops**: [Server Reliability](./features/TODO_server_reliability.md) — 디스크·복구·모니터링
+- **Discord**: [Bot Activation](./features/TODO_discord_bot_activation.md) · [Voice Validation](./features/DISCORD_VOICE_VALIDATION_TODO.md)
+- **Clan**: [Clan Improvement](./features/TODO_clan_improvement.md) · [Identity & Recruit](./features/TODO_clan_identity_recruit.md)
 - **Auction**: [Spectator Improvement](./features/TODO_auction_spectator_improvement.md)
-- **Clan**: [Clan Improvement](./features/TODO_clan_improvement.md)
-- **Match**: [Matches Crawling](./features/TODO_matches_crawling.md)
-- **Discord**: [Voice Validation](./features/DISCORD_VOICE_VALIDATION_TODO.md)
+- **기타**: [General Improvements](./features/TODO_improvements.md) · [Quick Wins](./features/TODO_quick_wins.md) · [Profile Modal Sync](./features/TODO_profile_modal_sync.md)
+
+> 보관된 문서는 [`./archive/`](./archive/) 에 있다 (예: 대량 매치 수집 파이프라인).
 
 ---
 
@@ -66,5 +74,4 @@ pnpm dev
 
 ---
 
-**마지막 업데이트**: 2026-04-28
-**,file_path:
+**마지막 업데이트**: 2026-09-03

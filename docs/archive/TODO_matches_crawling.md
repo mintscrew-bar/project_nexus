@@ -1,3 +1,20 @@
+> ⚠️ **보관 문서 (2026-09-03 archive)**
+>
+> Lab 대시보드를 접으면서 이 문서가 설계한 대량 수집 파이프라인 대부분이 코드에서 제거됐다.
+> 지금 없는 것: `lab-tasks.service.ts`, `handleMatchFetch`, `handleHighTierSeeding`,
+> `runMatchFetch`, `POST /admin/matches/seed-high-tiers`(Task 25), 그리고 연계 문서로 적힌
+> `TODO_lab_dashboard.md` 자체.
+>
+> 살아남은 것: 스키마 4종(`KnownPuuid`/`MatchStatsCache`/`StatsRecomputeQueue`/`RiotMatchCache`),
+> `POST /stats/refresh/:userId`·`GET /stats/fetch-status/:userId`(Task 9·10),
+> `riot-match-cache-ingest.service.ts` 의 */5 크론.
+>
+> 전적 수집의 현행 설계는 [`../features/TODO_riot_account_identity_revamp.md`](../features/TODO_riot_account_identity_revamp.md)
+> 를 본다 — 퍼스널 키(앱 전체 100req/2분) 전제의 entries 기반 재설계다.
+> 보류로 남아 있던 Task 28·29·30 은 재개 시 그 문서의 전역 레이트 캡 위에서 다시 짜야 한다.
+
+---
+
 # 전적 페이지 크롤링/배치 처리 개선 계획
 
 > 진행 기준일: 2026-04-22

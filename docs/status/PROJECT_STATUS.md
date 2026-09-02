@@ -1,6 +1,7 @@
 # Project Nexus - 프로젝트 현황
 
 > 기준일: 2026-04-27
+> 최종 검증: 2026-09-03 (배포 현황을 실제 운영 호스트와 대조해 갱신)
 
 ---
 
@@ -74,14 +75,18 @@
 
 ## 남은 작업
 
-### 베타 배포 준비 (즉시)
+### 베타 배포 준비 — **완료** (2026-09-03 확인)
 
-- [ ] `docker-compose.prod.yml` 작성 (GHCR 이미지 pull 방식)
-- [ ] GitHub Actions `deploy.yml` 작성 (GHCR push → SSH pull)
-- [ ] Lightsail 인스턴스 셋업 (`scripts/setup-server.sh` 활용)
-- [ ] Caddy/nginx HTTPS 설정
-- [ ] 베타 도메인 Discord/Riot OAuth redirect URL 재등록
-- [ ] 운영 `.env` 구성 (Riot key, Discord OAuth, JWT secrets)
+배포는 이미 돌고 있다. 이 섹션은 기록용으로만 남긴다.
+
+- [x] `docker-compose.prod.yml` — GHCR 이미지 pull 방식 (`ghcr.io/mintscrew-bar/project_nexus/{api,web}`)
+- [x] GitHub Actions — `ci.yml` 이 ubuntu-latest 에서 빌드·GHCR push, `deploy.yml` 은 self-hosted 에서 pull + 단계별 롤아웃
+- [x] ~~Lightsail 인스턴스~~ — 클라우드로 안 갔다. **자택 WSL2 호스트 상주 운영**이다
+      (`docs/setup/OPERATIONS_RECOVERY.md`, `TODO_server_reliability.md` 참조)
+- [x] HTTPS — Caddy 대신 **nginx + Cloudflare Tunnel**(`nexus-cloudflared`)
+- [x] Discord/Riot OAuth redirect URL 등록
+- [x] 운영 `.env` — GitHub Secrets → `deploy.yml` 이 `.env.production` 으로 주입
+- 현재 상태: `nexus-{postgres,redis,api,web,nginx,cloudflared,uptime-kuma}` 7개 컨테이너 healthy
 
 ### 테스트
 

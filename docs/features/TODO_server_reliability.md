@@ -3,13 +3,23 @@
 > 작성일: 2026-05-09
 > 트리거: 디스크 I/O 에러로 nexus-web/nginx 다운 + Tailscale 응답 불가 + SSH 거부 → 원격 복구 불가능 사고
 > 목표: 같은 사고 재발 방지, 사고 발생 시 원격 복구 경로 확보
+>
+> **호스트 실측(2026-09-03):** 코드로 들어간 것과 호스트에 실제로 설치된 것이 다르다.
+> 아래 각 항목의 "설치 필요" 표기는 이 날짜 기준으로 재확인한 것이다.
+> 현재 디스크는 39G/1007G(5%)로 여유가 있어 급한 불은 없다.
 
 ---
 
 ## 즉시 (사고 직후 우선순위, 작업량 작음)
 
-- [x] Task 1: 디스크 자동 정리 cron — `scripts/ops/nexus-cleanup.sh`
-      **호스트에 설치 필요**: 스크립트 상단 주석의 `install` 두 줄을 실행해야 동작한다.
+- [~] Task 1: 디스크 자동 정리 cron — `scripts/ops/nexus-cleanup.sh`
+      ⚠️ **스크립트가 두 벌이고, 설치된 건 이 스크립트가 아니다.**
+      호스트 crontab 에는 이 작업 이전부터 있던 **구버전 `scripts/disk-cleanup.sh`** 가
+      매일 04:00 로 걸려 있고, Task 1이 만든 `scripts/ops/nexus-cleanup.sh` 는 설치돼 있지 않다.
+      기능이 겹치므로(도커 prune + journald vacuum) **하나로 합치는 게 먼저다.**
+      - 구버전 추가 기능: npm/pnpm/apt 캐시 정리, before/after 디스크 Discord 보고
+      - 신버전 추가 기능: `--filter until=24h`(롤백 여지 보존), `docker system df` 로그
+      - 부수 문제: crontab 라인에 Discord 웹훅 URL 이 평문으로 박혀 있다 → env 파일로 분리 필요
   - 매일 새벽 안 쓰는 도커 이미지/컨테이너/네트워크/빌드캐시 prune
   - `docker system prune -af --filter "until=24h"` + `journalctl --vacuum-time=7d`
   - **위치**: 서버 systemd timer 또는 cron (`/etc/cron.daily/nexus-cleanup`)
@@ -20,14 +30,18 @@
   - `docker-compose.prod.yml` 각 서비스에 `logging.options.max-size: "10m"`, `max-file: "3"` 추가
   - **효과**: 컨테이너당 로그를 30MB로 제한, 디스크 보호
 
-- [x] Task 3: 디스크 사용량 알림 — `scripts/ops/disk-alert.sh` (기본 80%, 하루 1회 쿨다운)
-      **호스트에 설치 필요** + `/etc/nexus-disk-alert.env`에 웹훅 지정.
+- [~] Task 3: 디스크 사용량 알림 — `scripts/ops/disk-alert.sh` (기본 80%, 하루 1회 쿨다운)
+      ⚠️ **미설치 확인(2026-09-03).** `/etc/nexus-disk-alert.env` 없음, cron 등록 없음 →
+      현재 이 스크립트는 실행되지 않는 죽은 코드다. Task 1 통합과 함께 설치할 것.
   - Uptime Kuma에 디스크 사용률 모니터링 추가 또는 별도 cron으로 80% 초과 시 Discord 웹훅 알림
   - **위치**: `~/scripts/disk-alert.sh` + cron, 또는 Uptime Kuma push monitor
   - **효과**: 사후 복구가 아니라 사전 경고로 전환
 
-- [x] Task 4: swap 파일 추가 — `scripts/ops/setup-swap.sh` (4G, swappiness=10)
-      **호스트에서 실행 필요**: `sudo bash scripts/ops/setup-swap.sh`. 아직 적용 안 됨.
+- [~] Task 4: swap 파일 추가 — `scripts/ops/setup-swap.sh` (4G, swappiness=10)
+      ⚠️ **미실행 확인(2026-09-03).** 지금 잡혀 있는 스왑은 WSL 기본값 2G(`/dev/sdc` 파티션)이고
+      이미 891MB 사용 중이다. 스크립트가 만들려는 `/swapfile` 은 없다.
+      다만 빌드가 GitHub runner 로 빠져(Task 5) 원래 노렸던 빌드 OOM 위험은 크게 줄었으므로,
+      우선순위는 내려간다. `sudo bash scripts/ops/setup-swap.sh` 한 줄이면 끝난다.
   - 메모리 부족 시 OOM-killer가 nginx/sshd/Tailscale 같은 핵심 서비스를 죽이는 위험 완화
   - 4~8GB swap 파일 + `swappiness=10`
   - **위치**: 서버 `/swapfile` + `/etc/fstab`
@@ -118,9 +132,9 @@
   - 사이트 다운 시 즉시 푸시 알림 받도록
   - **효과**: 오늘처럼 사용자 보고 후에야 알게 되는 상황 방지
 
-- [x] Task 13: deploy 워크플로우 실패 알림 — CI(이미지 빌드)·CD(배포) 양쪽에 추가.
-      `DEPLOY_ALERT_DISCORD_WEBHOOK` 시크릿 미설정이면 조용히 건너뛴다.
-      **시크릿 등록 필요**: 없으면 알림은 오지 않는다.
+- [x] Task 13: deploy 워크플로우 실패 알림 — CI(이미지 빌드)·CD(배포) 양쪽에 추가
+      (`ci.yml:151`, `deploy.yml:225`). `DEPLOY_ALERT_DISCORD_WEBHOOK` 시크릿 미설정이면
+      조용히 건너뛴다. **시크릿 등록 여부는 저장소 밖이라 코드로 확인 불가** — GitHub Settings 에서 확인할 것.
   - 현재 GitHub Actions 빌드 실패가 Discord/이메일로 안 와서 사용자가 사이트 502 보고 알아챔
   - workflow 끝에 conclusion=failure 시 webhook 호출 step 추가
   - **효과**: 배포 실패 즉시 인지

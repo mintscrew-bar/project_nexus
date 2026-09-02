@@ -64,6 +64,6 @@ NEXUS에 채널을 등록·인증한 스트리머가 방송을 켜면, **스트�
 - SOOP 코드 대조 대상은 `station_title` + `station_name`을 합친 문자열이라 **둘 중 아무 데나** 코드를 넣어도 통과한다. 방송국 API는 오프라인이어도 응답하므로 방송을 켜지 않고 인증할 수 있다.
 - 비공식 엔드포인트가 막히면 `apps/api/src/modules/streamer/providers/` 의 해당 파일만 교체하면 된다. 조회 실패는 전부 `null`로 흡수되어 **LIVE 뱃지만 사라지고 스트리머 탭·목록은 그대로 동작한다.**
 - 치지직 OAuth용 환경변수는 `CHZZK_CLIENT_ID` / `CHZZK_CLIENT_SECRET` / `CHZZK_CALLBACK_URL`. GitHub Secrets와 배포 워크플로를 통해 `.env.production`으로 내려준다. 앱 권한은 공식 `/users/me` 호출에 필요한 **"유저 정보 조회"만 요청한다** (스트림키·방송 설정 권한은 요청하지 않음).
-- 스키마 변경분(`StreamerFollow` 포함)은 아직 운영 DB에 반영되지 않았다. `migrate deploy` 필요.
+- 스키마 변경분(`StreamerFollow` 포함) 운영 DB 반영 완료 — 로컬 마이그레이션과 운영 `_prisma_migrations` 대조 결과 미적용 0건(2026-09-03 확인).
 
 관련: [`TODO_broadcast_overlay.md`](./TODO_broadcast_overlay.md)

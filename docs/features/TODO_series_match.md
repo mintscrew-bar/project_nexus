@@ -102,7 +102,9 @@
 
 ### 2단계 — 운영 편의
 
-- [ ] Task 16: 방송 오버레이에 시리즈 스코어 (`scenes.tsx`, `broadcast-control`)
+- [x] Task 16: 방송 오버레이에 시리즈 스코어 — `scenes.tsx` 의 `isSeries` 분기가
+      단판이면 WIN 배지, 다전제면 세트 스코어(2-1)와 `BO{n}` 라벨을 렌더한다.
+      `MatchScene`·`SideResultBanner` 양쪽 적용
 - [ ] Task 17: 결과 오보고 정정 — Bo5 2세트를 잘못 보고하면 시리즈 전체가 틀어지므로 다전제에서 필요도가 올라간다
 - [ ] Task 18: 세트 단위 무효 처리 / 재생성 (리메이크 대응)
 - [ ] Task 19: 관리자 매치 탭·`guide/match-flow` 문서 갱신

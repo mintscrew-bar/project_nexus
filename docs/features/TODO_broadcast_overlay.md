@@ -4,7 +4,13 @@
 > 코드네임: **Broadcast Overlay** (사용자 노출 문구: "방송 화면 링크" / "방송용 오버레이")
 > 내부 명칭으로 "스트리머 모드"보다 Broadcast Overlay를 사용한다.
 >
-> **진행(2026-07-06, 브랜치):** Phase 0 인프라 완료(스키마·토큰·스냅샷·read-only 소켓·AppShell 우회·1920×1080 셸), Phase 1 lower-third 완료, Phase 2 Room Scene(Waiting + 스냅샷 기반 Auction) + 호스트 방송링크 모달, Phase 3 MatchScene·focus 백엔드 기본형. api/web 빌드·린트 그린. **남음: Task 10 실사용 검증, 라이브 auction 배관, Result Toast, Bracket/Result/Break, 전환 연출, 호스트 "이 경기 중계" UI.**
+> **진행(2026-07-06, 브랜치):** Phase 0 인프라 완료(스키마·토큰·스냅샷·read-only 소켓·AppShell 우회·1920×1080 셸), Phase 1 lower-third 완료, Phase 2 Room Scene(Waiting + 스냅샷 기반 Auction) + 호스트 방송링크 모달, Phase 3 MatchScene·focus 백엔드 기본형.
+>
+> **재검증(2026-09-03):** 코드 대조 결과 문서가 크게 뒤처져 있었다. Phase 4·5·6이 사실상 끝나 있고
+> (Result Toast, Bracket/Result/Break scene, 전환 레이어), 호스트 "이 경기 중계" UI도 `/broadcast-control`
+> 조작 패널로 나와 있었다. 계획에 없던 scene 7종과 컨트롤 모드·외부 조작 토큰까지 붙었다.
+> `pnpm lint`·`pnpm build` 통과 확인. **남음: Task 10(실사용 OBS 검증), 14(focus 전환 연출),
+> 20(마이크로 전환), 21(위치 조절 옵션).** 실질 블로커는 Task 10 하나다.
 
 ---
 
@@ -141,36 +147,63 @@ BroadcastShell
 
 ### Phase 2 — Room Scene  ← **검증 게이트**
 - [x] Task 8: Waiting scene (방 제목·모집 현황·준비 상태)
-- [~] Task 9: Auction scene — **스냅샷 기반**(팀/예산/멤버) 구현. 라이브 현재매물/입찰(auction 게이트웨이 read-only join)은 후속.
-- [ ] Task 10: **실제 스트리머 1명 OBS 테스트** — 파이프라인 검증 후 다음 Phase 진행
+- [x] Task 9: Auction scene — 스냅샷 기반(팀/예산/멤버)에 더해 라이브 경로까지 붙었다.
+      `BroadcastAuctionLive` + `connectBroadcastAuctionSocket` 으로 현재 매물·입찰을
+      read-only 구독한다. 스네이크 드래프트도 같은 방식(`BroadcastSnakeDraftLive`).
+- [ ] Task 10: **실제 스트리머 1명 OBS 테스트** — 실사용 E2E. 코드 쪽 파이프라인은 다 열렸고 사람만 남았다
 - [x] (추가) 방송 토큰 UI — **설정 > 방송 탭**에서 발급/재생성/폐기 + scene별 링크 복사, 로비는 "이 방 고정 송출" 토글 + idle 화면(활성 방 없음)
 
 ### Phase 3 — Match Scene
-- [~] Task 11: 고정 matchId 표시 — **MatchScene(좌우 플레이트 + 상태 칩, `blueSideTeamId` 진영색, 상단 앵커) 구현.** HUD 데드존 미세조정·연출은 후속.
-- [x] Task 12(백엔드): `Room.broadcastFocusMatchId` + `PATCH /rooms/:id/broadcast-focus` + `broadcast-focus-updated` emit. 프론트 추종(스냅샷 매치 해석)도 반영. 호스트 "이 경기 중계" UI(Task 13)는 후속.
-- [ ] Task 13: 호스트 측 "이 경기 중계" UI (방 관리/대진 화면에서 focus 설정 + 고정 링크 복사)
-- [ ] Task 14: 종료 시 승팀 강조 + Focus 전환(상단 바만) 연출
+- [x] Task 11: 고정 matchId 표시 — MatchScene(좌우 플레이트 + 상태 칩, `blueSideTeamId` 진영색, 상단 앵커).
+      HUD 데드존은 상단 앵커 고정으로 회피했고, 남은 미세조정은 Task 21의 위치 옵션으로 넘긴다.
+- [x] Task 12(백엔드): `Room.broadcastFocusMatchId` + `PATCH /rooms/:id/broadcast-focus` + `broadcast-focus-updated` emit. 프론트 추종(스냅샷 매치 해석)도 반영
+- [x] Task 13: 호스트 측 "이 경기 중계" UI — 계획했던 "방 관리/대진 화면 안"이 아니라
+      **독립 조작 패널 `/broadcast-control`** 로 나왔다. 경기 목록에서 고르면 `focusMatch()` →
+      `broadcastApi.setFocus`. OBS 옆에 새 창으로 띄워 쓰는 형태라 방송 중 조작이 더 편하다.
+- [~] Task 14: 종료 시 승팀 강조는 됐다(MatchScene 의 `blueWin`/`redWin` 분기).
+      **Focus 전환 연출(상단 바만 갈아끼우기)은 미구현** — 지금은 scene 전환 레이어가 통째로 덮는다.
 
 ### Phase 4 — Result Toast
-- [ ] Task 15: `match-result`(bracket 룸) 구독 → 큐 store → 우상단 toast(핀한 경기 제외, 4초, 큐 순차)
+- [x] Task 15: 계획한 "클라 큐 store" 대신 **서버 스냅샷 주도**로 갔다.
+      `broadcast.service.ts` 가 `sideResult`(핀한 경기 제외)를 스냅샷에 실어 주고
+      `SideResultBanner` 가 in/out 애니메이션으로 띄운다. 시리즈면 세트 스코어까지 표시.
+      스냅샷 한 곳에서 상태가 결정돼 큐 동기화 버그가 원천적으로 없다.
+      위치는 우상단이 아니라 **우측 중하단**(`bottom-[360px] right-10`) — 상단은 Match 플레이트가 쓴다.
 
 ### Phase 5 — Bracket / Result / Break
-- [ ] Task 16: Bracket scene (`BracketView` 재사용, 방송용 크게)
-- [ ] Task 17: Result scene (`VictoryScreen` 재사용)
-- [ ] Task 18: Break scene (다음 경기 + 팀 요약 + 브랜딩)
+- [x] Task 16: `BracketScene` — `BracketView` 재사용이 아니라 방송 전용으로 새로 그렸다
+      (`SingleElimBoard`/`DoubleElimBoard`/`BracketLines`/`BracketSlot`). 1920×1080 고정 캔버스에
+      맞춘 좌표 계산이 필요해서 재사용이 오히려 비쌌다.
+- [x] Task 17: `MatchResultScene`
+- [x] Task 18: `BreakScene`
+- [x] (추가) 계획에 없던 scene 들: `IdleScene`, `MatchIntroScene`, `LineupOverlayScene`,
+      `RoleSelectionScene`, `TeamRevealScene`, `TournamentSummaryScene`, `RoomScene`.
+      실제로 방송을 짜 보니 경매→매치 사이의 빈 구간이 제일 허전해서 채운 것들이다.
 
 ### Phase 6 — 전환 (clean)
-- [ ] Task 19: Scene Transition Layer (`AnimatePresence mode="wait"`, NEXUS 라인 스윕, transform/opacity만)
+- [x] Task 19: Scene Transition Layer — `BroadcastShell` 의 `transitionKey` 감지 →
+      `BroadcastTransition` 오버레이(1200ms). framer-motion `AnimatePresence` 가 아니라
+      **CSS keyframes**(`nexus-transition-fade`/`-sweep`/`-mark`)로 구현했다. transform/opacity/filter만 쓴다.
+      scene 별 문구는 `SCENE_TRANSITIONS` 테이블(`page.tsx`).
 - [ ] Task 20: Auction 다음 매물 전환(`layoutId`로 남은매물→현재선수), Toast/Match-bar 마이크로 전환
+      — `layoutId` 사용처 0. Phase 6 중 유일하게 남은 항목
 
 ### Phase 7 — 마무리
-- [ ] Task 21: OBS 가이드 문서 + 위치 조절 옵션(`overlayAnchor`/`offset`/`scale`) 노출
-- [ ] Task 22: 전체 빌드·린트 검증
+- [~] Task 21: OBS 가이드는 **문서 대신 제품 안**에 들어갔다 — 설정 > 방송 탭에
+      브라우저 소스 등록 절차와 scene별 링크 복사가 있다.
+      **남은 건 위치 조절 옵션**(`overlayAnchor`/`offset`/`scale` 쿼리) 노출.
+- [x] Task 22: 전체 빌드·린트 검증 — `pnpm lint`, `pnpm build` 통과 (2026-09-03)
+
+### 계획에 없던 확장 (구현됨)
+- **컨트롤 모드 + 외부 조작 토큰** — OBS에 링크 하나만 걸고, 별도 조작 패널이나
+  스트림덱 같은 외부 장비의 webhook 명령으로 scene을 전환한다. 출력 토큰과 분리된 제한 토큰.
+- **`/broadcast/preview`** — 방 없이 scene 레이아웃을 확인하는 프리뷰 경로.
 
 ---
 
 ## 범위 밖 (후속)
-- **Series/BO 모델** → BO3 시리즈 스코어. 수요 확인 후 신규 스키마.
+- ~~**Series/BO 모델** → BO3 시리즈 스코어~~ — **구현됨.** `MatchSeries` 스키마가 들어갔고
+  (`TODO_series_match.md`), 오버레이도 세트 스코어를 표시한다.
 - 전환 프리셋 `energetic`/`none`, OBS 설정 패널 고도화.
 - DRAFT / ROLE_SELECT Room scene 세부 화면(우선 자동추종 기본 표시만, 정밀 polish는 후순위).
 
