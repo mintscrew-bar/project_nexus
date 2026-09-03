@@ -69,6 +69,65 @@ export function extractChallengeMetrics(p: ParticipantDto) {
   };
 }
 
+/**
+ * 원본 match JSON 에서 "정형 컬럼으로 안 뽑은 것 전부"를 압축해 아카이브 payload 로 만든다.
+ *
+ * RiotMatchCache 는 TTL 14일로 버리지만 Riot 은 오래된 매치를 영구히 주지 않는다.
+ * 지금 컬럼으로 안 쓰는 값이라도 나중에 쓸 수 있으므로 버리기 전에 전부 옮긴다.
+ *
+ * 압축(실측 2000매치 44.5KB → 11KB, 4배):
+ *  - 매치당 한 덩어리로 묶는다. 참가자별로 행을 쪼개면 Postgres TOAST 압축이
+ *    행 단위라 오히려 커진다(89MB → 107MB).
+ *  - 값이 0/false/"" 인 키는 뺀다. 없으면 0으로 읽으면 되므로 무손실이고,
+ *    challenges 는 129키 중 평균 87키가 0이라 여기서 절감이 가장 크다.
+ *  - MatchParticipant 컬럼으로 이미 들고 있는 키는 중복 저장하지 않는다.
+ *
+ * 백필 SQL(scripts/ops/backfill-match-archive.sql)과 같은 규칙이어야 한다.
+ */
+const ARCHIVE_SKIP_KEYS = new Set([
+  "puuid", "teamId", "championId", "championName", "teamPosition",
+  "summoner1Id", "summoner2Id", "kills", "deaths", "assists",
+  "totalMinionsKilled", "neutralMinionsKilled", "goldEarned", "goldSpent",
+  "totalDamageDealt", "totalDamageDealtToChampions", "totalDamageTaken",
+  "totalHeal", "damageSelfMitigated", "visionScore", "wardsPlaced",
+  "wardsKilled", "detectorWardsPlaced", "item0", "item1", "item2", "item3",
+  "item4", "item5", "item6", "perks", "champLevel", "largestKillingSpree",
+  "largestMultiKill", "longestTimeSpentLiving", "totalTimeSpentDead",
+  "turretKills", "inhibitorKills", "dragonKills", "baronKills",
+  "doubleKills", "tripleKills", "quadraKills", "pentaKills",
+  "firstBloodKill", "firstTowerKill", "win", "challenges",
+  "magicDamageDealtToChampions", "physicalDamageDealtToChampions",
+  "trueDamageDealtToChampions", "damageDealtToObjectives",
+  "damageDealtToTurrets", "timePlayed", "champExperience", "participantId",
+]);
+
+const isEmptyValue = (v: unknown) => v === 0 || v === false || v === "";
+
+const pruneEmpty = (obj: Record<string, unknown> | undefined) => {
+  if (!obj) return undefined;
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (!isEmptyValue(v)) out[k] = v;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+};
+
+export function buildMatchArchivePayload(data: any) {
+  const participants: any[] = data?.info?.participants ?? [];
+  return {
+    p: participants.map((p) => ({
+      id: p.puuid ?? null,
+      c: pruneEmpty(p.challenges),
+      x: pruneEmpty(
+        Object.fromEntries(
+          Object.entries(p).filter(([k]) => !ARCHIVE_SKIP_KEYS.has(k)),
+        ),
+      ),
+    })),
+    t: data?.info?.teams ?? null,
+  };
+}
+
 @Injectable()
 export class RiotMatchCacheIngestService {
   private readonly logger = new Logger(RiotMatchCacheIngestService.name);
@@ -251,6 +310,13 @@ export class RiotMatchCacheIngestService {
 
         await tx.matchParticipant.createMany({
           data: participantRows.map((row) => ({ ...row, matchId: match.id })),
+        });
+
+        // 원본 캐시는 TTL 로 사라지므로, 컬럼에 안 담긴 나머지를 여기서 보존한다.
+        // 같은 트랜잭션에 두어 "정형화는 됐는데 아카이브만 없는" 상태를 만들지 않는다.
+        await tx.riotMatchArchive.createMany({
+          data: [{ matchId, payload: buildMatchArchivePayload(data) as any }],
+          skipDuplicates: true,
         });
       });
 

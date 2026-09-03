@@ -7,7 +7,7 @@ import { useAuthStore } from "@/stores/auth-store";
 import { useDdragonStore } from "@/stores/ddragon-store";
 import { userApi, matchApi, friendApi, statsApi, presenceApi, reputationApi } from "@/lib/api-client";
 import { ChampionImage } from "@/components/ChampionImage";
-import { PositionIcon, POSITION_LABELS } from "@/app/tournaments/[id]/lobby/_components/icons";
+import { PositionIcon, POSITION_LABELS } from "@/app/[game]/tournaments/[id]/lobby/_components/icons";
 import { getChampionIcon } from "@/components/matches/match-utils";
 import {
   LoadingSpinner,
@@ -183,7 +183,7 @@ export default function UserProfilePage() {
   // Redirect to own profile if viewing self
   useEffect(() => {
     if (currentUser && currentUser.id === userId) {
-      router.replace("/profile");
+      router.replace("/lol/profile");
     }
   }, [currentUser, userId, router]);
 
@@ -1065,7 +1065,7 @@ export default function UserProfilePage() {
                       <div
                         key={match.id}
                         className="rounded-xl bg-bg-tertiary border border-bg-elevated p-3 hover:bg-bg-elevated transition-colors cursor-pointer"
-                        onClick={() => router.push(`/matches/match/${match.id}`)}
+                        onClick={() => router.push(`/lol/matches/match/${match.id}`)}
                       >
                         <div className="flex items-center gap-3">
                           {/* 챔피언 아이콘 or 색상 바 */}

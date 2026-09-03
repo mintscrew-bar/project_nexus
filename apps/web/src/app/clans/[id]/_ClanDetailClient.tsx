@@ -34,7 +34,7 @@ import {
 import {
   PositionIcon,
   POSITION_LABELS,
-} from "@/app/tournaments/[id]/lobby/_components/icons";
+} from "@/app/[game]/tournaments/[id]/lobby/_components/icons";
 import { TierBadge } from "@/components/domain/TierBadge";
 import { cn } from "@/lib/utils";
 

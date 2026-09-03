@@ -17,8 +17,7 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
-    "backfill:balance-scores": "ts-node --transpile-only src/scripts/backfill-balance-scores.ts",
-    "backfill:challenges": "ts-node --transpile-only -r tsconfig-paths/register scripts/backfill-challenge-metrics.ts"
+    "backfill:balance-scores": "ts-node --transpile-only src/scripts/backfill-balance-scores.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1084.0",

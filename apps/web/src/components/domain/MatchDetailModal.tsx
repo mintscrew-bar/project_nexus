@@ -11,7 +11,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import { matchApi, reputationApi } from '@/lib/api-client';
 import { connectMatchSocket, matchSocketHelpers } from '@/lib/socket-client';
 import { MatchRpsFlow, type RpsStateData, type RpsRevealData, type RpsHand } from './MatchRpsFlow';
-import { ChampionIcon, PositionIcon, POSITION_LABELS } from '@/app/tournaments/[id]/lobby/_components/icons';
+import { ChampionIcon, PositionIcon, POSITION_LABELS } from '@/app/[game]/tournaments/[id]/lobby/_components/icons';
 import { TierBadge } from '@/components/domain/TierBadge';
 import { PlayerHoverCard } from '@/components/domain/PlayerHoverCard';
 import { PlayerProfileModal } from '@/components/domain/PlayerProfileModal';

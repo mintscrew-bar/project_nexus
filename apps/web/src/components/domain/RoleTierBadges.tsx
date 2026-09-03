@@ -1,4 +1,4 @@
-import { PositionIcon, POSITION_LABELS } from "@/app/tournaments/[id]/lobby/_components/icons";
+import { PositionIcon, POSITION_LABELS } from "@/app/[game]/tournaments/[id]/lobby/_components/icons";
 import type { RoleTier } from "@/lib/role-tier";
 
 const ROLE_ORDER = ["TOP", "JUNGLE", "MID", "ADC", "SUPPORT"];

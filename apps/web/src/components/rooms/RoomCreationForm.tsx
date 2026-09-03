@@ -25,11 +25,14 @@ import { Switch } from "@/components/ui/Switch";
 import { TEAM_MODE_GUIDES, TeamModeHelp, type TeamMode } from "./TeamModeHelp";
 import {
   DEFAULT_SERIES_PRESET,
+  GAMES,
   normalizeSeriesPreset,
   type SeriesPreset,
 } from "@nexus/types";
+import type { GameTitle } from "@nexus/types";
 
 interface RoomCreationFormProps {
+  gameTitle?: GameTitle;
   onCancel: () => void;
   onRoomCreated?: (roomId: string) => void;
 }
@@ -116,6 +119,7 @@ const PLAYER_OPTIONS = [
 ];
 
 export function RoomCreationForm({
+  gameTitle = "LOL",
   onCancel,
   onRoomCreated,
 }: RoomCreationFormProps) {
@@ -123,7 +127,17 @@ export function RoomCreationForm({
   const { createRoom, isLoading, error } = useRoomStore();
   const { user, isAuthenticated, isLoading: authLoading } = useAuthStore();
   const [name, setName] = useState("");
-  const [maxParticipants, setMaxParticipants] = useState(10);
+  const [pubgPlatform, setPubgPlatform] = useState<"STEAM" | "KAKAO">("STEAM");
+  const game = GAMES[gameTitle];
+  const playerOptions = game.roomSizes.map((value) => ({
+    value,
+    label: `${value}명`,
+    description: `${Math.floor(value / game.teamSize)}팀 · ${game.teamSize}인`,
+    teams: Math.floor(value / game.teamSize),
+    format: game.resultShape === "POINT_LEADERBOARD" ? "순위·킬 리더보드" : "대진표",
+    supportsDE: game.resultShape === "BRACKET" && (value === 20 || value === 40),
+  }));
+  const [maxParticipants, setMaxParticipants] = useState(game.roomSizes[0] ?? 10);
   const [teamMode, setTeamMode] = useState<TeamMode>("AUCTION");
   const [isPrivate, setIsPrivate] = useState(false);
   const [password, setPassword] = useState("");
@@ -141,9 +155,9 @@ export function RoomCreationForm({
 
   // 스네이크 드래프트 설정
   const [pickTimeLimit, setPickTimeLimit] = useState(60);
-  const [captainSelection, setCaptainSelection] = useState<"RANDOM" | "TIER">(
-    "RANDOM",
-  );
+  const [captainSelection, setCaptainSelection] = useState<
+    "RANDOM" | "TIER" | "MANUAL" | "VOLUNTEER"
+  >("RANDOM");
   const [auctionCaptainSelection, setAuctionCaptainSelection] = useState<
     "TIER" | "MANUAL" | "VOLUNTEER"
   >("TIER");
@@ -198,7 +212,7 @@ export function RoomCreationForm({
   // 이전 선택이 새 팀 수에서 유효하지 않으면 단판으로 되돌린다.
   const handleParticipantChange = (value: number) => {
     setMaxParticipants(value);
-    const nextTeams = PLAYER_OPTIONS.find((o) => o.value === value)?.teams ?? 0;
+    const nextTeams = playerOptions.find((o) => o.value === value)?.teams ?? 0;
     setSeriesPreset(normalizeSeriesPreset(seriesPreset, nextTeams));
   };
 
@@ -211,12 +225,14 @@ export function RoomCreationForm({
       return;
     }
 
-    const selectedOption = PLAYER_OPTIONS.find(
+    const selectedOption = playerOptions.find(
       (opt) => opt.value === maxParticipants,
     );
     const roomData = {
       name: name.trim(),
-      maxParticipants: maxParticipants as 10 | 15 | 20 | 30 | 40,
+      gameTitle,
+      pubgPlatform: gameTitle === "PUBG" ? pubgPlatform : undefined,
+      maxParticipants,
       teamMode: teamMode,
       password: isPrivate ? password : undefined,
       allowSpectators: allowSpectators,
@@ -246,14 +262,14 @@ export function RoomCreationForm({
       if (onRoomCreated) {
         onRoomCreated(newRoom.id);
       } else {
-        router.push(`/tournaments/${newRoom.id}/lobby`);
+      router.push(`/${game.slug}/tournaments/${newRoom.id}/lobby`);
       }
     } else {
       setErrorMessage(error || "방 생성에 실패했습니다");
     }
   };
 
-  const selectedPlayerOption = PLAYER_OPTIONS.find(
+  const selectedPlayerOption = playerOptions.find(
     (opt) => opt.value === maxParticipants,
   );
   const selectedDiscordServerLabel = selectedDiscordGuildId
@@ -284,6 +300,23 @@ export function RoomCreationForm({
           />
           <p className="text-text-tertiary text-xs mt-1">{name.length}/50자</p>
         </div>
+        {gameTitle === "PUBG" && (
+          <div>
+            <label htmlFor="pubgPlatform" className="block text-text-primary text-sm font-semibold mb-2">
+              플랫폼
+            </label>
+            <select
+              id="pubgPlatform"
+              value={pubgPlatform}
+              onChange={(e) => setPubgPlatform(e.target.value as "STEAM" | "KAKAO")}
+              className="w-full input"
+            >
+              <option value="STEAM">Steam (스팀 배틀그라운드)</option>
+              <option value="KAKAO">Kakao (카카오 배틀그라운드)</option>
+            </select>
+            <p className="mt-1 text-xs text-text-tertiary">방 제목 앞에 [{pubgPlatform === "STEAM" ? "스배" : "카배"}]가 자동으로 붙습니다.</p>
+          </div>
+        )}
       </div>
 
       {/* Discord 서버 선택 */}
@@ -329,7 +362,7 @@ export function RoomCreationForm({
           참가 인원
         </label>
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-          {PLAYER_OPTIONS.map((option) => (
+          {playerOptions.map((option) => (
             <button
               key={option.value}
               type="button"
@@ -401,7 +434,7 @@ export function RoomCreationForm({
           <Trophy className="w-4 h-4 inline mr-2" />팀 구성 방식
         </label>
         <div className="space-y-3">
-          {TEAM_MODES.map((mode) => (
+          {TEAM_MODES.filter((mode) => game.teamModes.includes(mode.value)).map((mode) => (
             <div
               key={mode.value}
               className={`flex w-full items-start gap-1 rounded-lg border-2 p-2 transition-all ${
@@ -517,14 +550,14 @@ export function RoomCreationForm({
               }
               className="w-full input text-sm"
             >
-              <option value="TIER">자동 (MMR 기준 상위 N명)</option>
+              <option value="TIER">자동 (고도화 점수 기준 상위 N명)</option>
               <option value="MANUAL">방장 직접 지명</option>
               <option value="VOLUNTEER">자원 모집 (30초 타이머)</option>
             </select>
             {auctionCaptainSelection === "VOLUNTEER" && (
               <p className="text-xs text-text-tertiary mt-1">
                 경매 시작 시 30초 동안 자원자를 모집합니다. 방장은 조기 마감
-                가능. 아무도 안 하면 MMR 자동 선정.
+                가능. 아무도 안 하면 고도화 점수 기준으로 자동 선정합니다.
               </p>
             )}
             {auctionCaptainSelection === "MANUAL" && (
@@ -551,13 +584,31 @@ export function RoomCreationForm({
             <select
               value={captainSelection}
               onChange={(e) =>
-                setCaptainSelection(e.target.value as "RANDOM" | "TIER")
+                setCaptainSelection(
+                  e.target.value as "RANDOM" | "TIER" | "MANUAL" | "VOLUNTEER",
+                )
               }
               className="w-full input text-sm"
             >
               <option value="RANDOM">랜덤 선정</option>
-              <option value="TIER">티어 기반 (높은 티어 우선)</option>
+              <option value="TIER">
+                {gameTitle === "PUBG"
+                  ? "등록 점수 기준 (상위 N명)"
+                  : "고도화 점수 기준 (상위 N명)"}
+              </option>
+              {gameTitle === "PUBG" && (
+                <>
+                  <option value="MANUAL">방장 직접 지명</option>
+                  <option value="VOLUNTEER">자원 모집</option>
+                </>
+              )}
             </select>
+            {gameTitle === "PUBG" && (
+              <p className="mt-1 text-xs text-text-tertiary">
+                팀장은 고도화 점수 기준으로 정하거나 방장이 직접 지정합니다.
+                점수가 없는 계정은 자동 선정 점수에서 제외됩니다.
+              </p>
+            )}
           </div>
 
           <div>
@@ -693,6 +744,7 @@ export function RoomCreationForm({
         (() => {
           const isDiscordError = errorMessage.includes("DISCORD_NOT_LINKED");
           const isRiotError = errorMessage.includes("RIOT_NOT_LINKED");
+          const isPubgError = errorMessage.includes("PUBG_NOT_LINKED");
           const displayMessage = errorMessage.includes("::")
             ? errorMessage.split("::")[1]
             : errorMessage;
@@ -716,10 +768,18 @@ export function RoomCreationForm({
                   )}
                   {isRiotError && (
                     <Link
-                      href="/profile"
+                      href="/lol/profile"
                       className="inline-block text-sm text-accent-primary hover:underline"
                     >
                       프로필 페이지에서 Riot 계정 연동하기 →
+                    </Link>
+                  )}
+                  {isPubgError && (
+                    <Link
+                      href="/pubg/profile"
+                      className="inline-block text-sm text-accent-primary hover:underline"
+                    >
+                      PUBG 프로필에서 계정 등록하기 →
                     </Link>
                   )}
                 </div>

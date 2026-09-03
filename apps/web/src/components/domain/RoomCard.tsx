@@ -21,6 +21,8 @@ interface Room {
   participants?: any[];
   /** 호스트가 방송 중이면 채워진다. 라이브 조회 실패 시에는 null이라 뱃지가 숨는다. */
   hostLive?: { platform: string; channelUrl: string } | null;
+  gameTitle?: 'LOL' | 'PUBG';
+  pubgPlatform?: 'STEAM' | 'KAKAO' | null;
 }
 
 interface RoomCardProps {
@@ -134,6 +136,11 @@ export const RoomCard: React.FC<RoomCardProps> = ({ room, currentUserId, onClick
                 <h3 className="truncate text-base font-bold tracking-[-0.02em] text-text-primary md:text-lg">
                   {room.name}
                 </h3>
+                {room.gameTitle === 'PUBG' && room.pubgPlatform && (
+                  <span className="flex-shrink-0 rounded-full bg-accent-primary/10 px-2 py-0.5 text-[10px] font-bold text-accent-primary">
+                    {room.pubgPlatform === 'STEAM' ? '스배' : '카배'}
+                  </span>
+                )}
                 {room.isPrivate && <LockKeyhole className="h-3.5 w-3.5 flex-shrink-0 text-accent-warning" />}
                 {room.hostLive && <HostLiveBadge channelUrl={room.hostLive.channelUrl} />}
               </div>

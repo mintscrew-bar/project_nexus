@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui";
 import { TierBadge } from "@/components/domain/TierBadge";
 import { PlayerHoverCard } from "@/components/domain/PlayerHoverCard";
-import { PositionIcon } from "@/app/tournaments/[id]/lobby/_components/icons";
+import { PositionIcon } from "@/app/[game]/tournaments/[id]/lobby/_components/icons";
 import { roomApi } from "@/lib/api-client";
 
 interface TeamMember {
@@ -196,14 +196,14 @@ export function VictoryScreen({
     setIsReturning(true);
     try { await roomApi.returnToLobby(roomId); } catch { /* 이미 복귀 처리됐거나 방 상태가 바뀐 경우에도 이동은 계속 */ }
     onClose?.();
-    router.push(`/tournaments/${roomId}/lobby`);
+    router.push(`/lol/tournaments/${roomId}/lobby`);
   };
 
   const handleExit = async () => {
     if (hasNavigated.current) return;
     hasNavigated.current = true;
     try { await roomApi.leaveRoom(roomId); } catch { /* 무시 */ }
-    router.push("/tournaments");
+    router.push("/lol/tournaments");
   };
 
   useEffect(() => {

@@ -1,64 +1,38 @@
-- [ ] **`riot_match_cache` 정리 실행** — 검증 끝, 실행만 남음
-  - `scripts/ops/purge-riot-match-cache.sh --apply` (드라이런이 기본값)
-  - 101,292건 / 4.8GB 삭제. 보호되는 것: 미인제스트 61건, 최근 14일 1,340건
-  - 앱 코드의 `TasksService.runRiotMatchCacheCleanup()` 과 완전히 같은 조건이다.
-    그 크론은 `RIOT_MATCH_CACHE_CLEANUP_ENABLED` 가 `false` 라 한 번도 돈 적이 없다.
-  - **앞으로도 자동으로 돌게 하려면** GitHub Secret `RIOT_MATCH_CACHE_CLEANUP_ENABLED` 를
-    `true` 로 바꿔야 한다 (`.env.production` 은 배포 때마다 Secrets 에서 재생성된다).
+- [ ] **PUBG 확장 — Phase 1 라우팅 안정화** ([상세 기획](../features/TODO_pubg_expansion.md))
+  - `/lol/*`·`/pubg/*` 게임 컨텍스트 유지, 기존 롤 URL 리다이렉트
+  - 롤/배그 프로필·호버 프로필·계정 등록 모달 분리
+  - 공통 영역은 유지하되 계정·전적·랭킹 데이터는 게임별로만 조회
+  - PUBG 방 생성에 경기 모드·팀 크기·팀 수·스팀/카카오 필수 설정
+  - 방 제목 `[스배]`/`[카배]` 접두사, 목록·로비·Discord 플랫폼 표시
+  - 기존 경매·스네이크·순환·오토 밸런스·수동 팀 배정을 게임별 팀 크기로 일반화
+
+- [ ] **PUBG 확장 — 계정·프로필 기반**
+  - `PubgAccount`와 공식 랭크 스냅샷 추가
+  - PUBG 닉네임 조회와 Steam/Kakao 샤드 탐색·캐시
+  - 공식 PUBG 랭크와 NEXUS `1티어·2티어` 편성 등급 분리
+  - 초기 편성 등급은 운영자 지정, 이후 평균 순위·킬·내전 성적으로 자동화
+
+- [ ] **PUBG 확장 — 실제 경기 MVP**
+  - 킬내기: 기존 2팀 경기·다전제·결과 보고 재사용
+  - 배틀로얄 내전: 다팀·다라운드·순위/킬 누적 리더보드 신규 구현
+  - 자동 매칭은 커스텀 매치 실측 전까지 보류하고 수동 매치 ID 입력 경로 우선 제공
+
+- [~] **`riot_match_cache` 정리** — 추출 완료 후 삭제 (진행 중)
+  - **먼저 확인한 것**: 원본 JSON 의 `participants[].challenges` 에 Riot 이 서버에서
+    계산해 주는 지표 129개가 있었다. 우리 컬럼으로는 되계산 불가, match-v5 는 오래된
+    매치를 영구히 주지 않음 → **그냥 지우면 자산이 영구 소실**이었다.
+  - 조치: 분석 가치 있는 27개를 `match_participants` 컬럼으로 추출하는 코드 + 마이그레이션
+    (커밋 f91febcb). 기존 102,693 매치 백필 실행.
+  - 남은 순서: 백필 완료 확인 → `scripts/ops/purge-riot-match-cache.sh --apply`
+  - GitHub Secret `RIOT_MATCH_CACHE_CLEANUP_ENABLED` = `true` 로 변경 완료.
+    다음 배포부터 매일 02:20 크론이 TTL 14일 지난 것을 자동 정리한다.
   - 전체 백업 확보됨: `~/nexus-backups/weekly/db-full-20260903-090005.sql.gz` (1.1GB)
 
-> **정정**: 앞서 "죽은 데이터 6.6GB" 라고 했는데 절반은 틀렸다.
-> 지워도 되는 건 `riot_match_cache` 4.8GB(원본 JSON, 정형화 후 중복)뿐이다.
-> `match_participants`(1.6GB)와 `known_puuids`(192MB)는 **살아 있는 기능이 읽는다** —
-> ranking.service, user.service, stats.service, match.service 등 10곳 이상에서
-> 전적·랭킹·챔피언 통계·"부분 통계" 판정에 쓰인다. 지우면 기능이 깨진다.
-
-# 다음 할 일 (통합 백로그)
-
-> 작성일: 2026-09-03
-> 근거: `docs/features/*` 전체와 `docs/status/*` 를 코드·운영 DB·호스트와 대조한 결과
->
-> 각 항목의 상세 설계는 원본 문서에 있다. 여기는 **무엇을 먼저 할지**만 정리한다.
-> 원본과 어긋나면 원본이 아니라 이 문서를 먼저 고친다.
-
----
-
-## 이번 검증에서 정리된 것 (참고)
-
-문서가 코드보다 뒤처져 있던 항목들을 실제 구현에 맞춰 갱신했다. 되짚을 필요 없는 것들:
-
-- 방송 오버레이는 문서상 Phase 4~6이 미착수였지만 **사실상 완료** 상태였다.
-  Result Toast·Bracket/Result/Break scene·전환 레이어가 다 있고, 호스트 조작 UI는
-  `/broadcast-control` 패널로 나왔다. 계획에 없던 scene 7종과 컨트롤 모드·외부 조작
-  토큰(스트림덱 webhook)까지 붙어 있다.
-- 방 목록 델타 업데이트, 소켓 lazy connect는 이미 되어 있었다.
-- 운영 DB 마이그레이션 미적용 0건 — 여러 문서의 "migrate deploy 필요" 경고는 모두 해소.
-- 베타 배포 준비 항목 6개는 전부 완료(Lightsail 대신 자택 WSL2 상주, Caddy 대신 nginx+Cloudflare Tunnel).
-- 대량 매치 수집 파이프라인은 Lab 폐기와 함께 **제거**됐다. `TODO_matches_crawling.md` 는
-  `docs/archive/` 로 옮겼다.
-
----
-
-## 완료 (2026-09-03 이 세션에서 처리)
-
-- [x] **DB·업로드 자동 백업** — `scripts/ops/nexus-backup.sh`, 매일 03:30.
-      core(매일 220MB/54초) + full(주간) 2단계. 임시 DB 복원으로 검증까지 마쳤다.
-- [x] **디스크 정리 스크립트 통합** — 갈라져 있던 두 벌을 하나로. 구버전 삭제.
-- [x] **디스크 경고 설치** — 30분 주기, 80% 임계. 작성만 되고 안 돌던 것을 실제로 걸었다.
-- [x] **웹훅을 crontab 평문 → `~/.config/nexus-ops.env`(0600)**
-- [x] **Uptime Kuma 알림** — 확인해 보니 이미 Discord 로 6개 모니터 전부 연결돼 있었다
-- [x] **swap 4G** — 불필요로 종결. 빌드가 CI 로 빠져 OOM 요인이 사라졌다(available 10Gi, OOM 0건)
-- [x] **핵심 메트릭 대시보드** — Kuma + 디스크 알림으로 커버. Grafana 는 이 규모에 과하다
-
-설치 확인: `scripts/ops/install-cron.sh --show`
-
----
-
-## P0 — 남은 데이터 위험
-
-- [ ] **백업 호스트 밖 사본** — `NEXUS_BACKUP_RSYNC_TARGET` 이 비어 있어 백업이 운영 호스트에만 있다.
-  볼륨 손상은 막지만 호스트 전손은 못 막는다. **목적지 결정이 필요하다**(NAS / 외장 디스크 /
-  클라우드 오브젝트 스토리지 / 다른 PC). core 덤프가 220MB 라 어디든 부담은 없다.
+> **정정**: 앞서 "죽은 데이터 6.6GB" 라고 했는데 두 번 틀렸다.
+> ① `match_participants`(1.6GB)·`known_puuids`(192MB)는 **살아 있는 기능이 읽는다** —
+>   ranking/user/stats/match 서비스 10곳 이상. 전적·랭킹·챔피언 통계의 실데이터다.
+> ② `riot_match_cache` 도 "순수 중복"이 아니었다 — challenges 129개가 추출본에 없었다.
+>   추출을 먼저 확장하고서야 버릴 수 있다.
 
 - [ ] **R2 버킷 보호** — 운영이 `UPLOAD_DRIVER=r2` 라 사용자 업로드(클랜 로고·배너 등) 원본이
   Cloudflare R2 에 있고, 위 백업은 이걸 포함하지 않는다. 로컬 `uploads` 볼륨은 비어 있다(0개 파일).

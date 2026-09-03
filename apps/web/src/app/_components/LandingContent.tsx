@@ -319,7 +319,7 @@ function AuctionShowcase() {
           </ul>
 
           <Link
-            href="/guide#draft"
+            href="/lol/guide#draft"
             className="group mt-10 inline-flex items-center gap-2 text-sm font-bold text-amber-200 transition-colors hover:text-amber-100"
           >
             경매 진행 방식 보기
@@ -852,7 +852,7 @@ export function LandingContentSections() {
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
               </Link>
               <Link
-                href="/tournaments"
+                href="/lol/tournaments"
                 className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/12 bg-white/[0.04] px-6 py-3.5 text-sm font-semibold text-white/80 transition-colors hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300"
               >
                 열린 내전 보기

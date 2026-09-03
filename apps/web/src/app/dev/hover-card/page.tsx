@@ -5,7 +5,7 @@
 
 import Image from "next/image";
 import { Activity, ArrowRight, ShieldCheck, TrendingUp, Users } from "lucide-react";
-import { PositionIcon, POSITION_LABELS, ChampionIcon } from "@/app/tournaments/[id]/lobby/_components/icons";
+import { PositionIcon, POSITION_LABELS, ChampionIcon } from "@/app/[game]/tournaments/[id]/lobby/_components/icons";
 
 type Tier = "CHALLENGER" | "GRANDMASTER" | "MASTER" | "DIAMOND" | "PLATINUM" | "EMERALD" | "GOLD" | "SILVER" | "BRONZE" | "IRON" | null;
 

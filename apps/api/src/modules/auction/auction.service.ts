@@ -12,7 +12,10 @@ import { PrismaService } from "../prisma/prisma.service";
 import { RedisService } from "../redis/redis.service";
 import { Prisma } from "@prisma/client";
 import { RoomStatus, TeamCaptainSelection, TeamMode } from "@nexus/database";
-import { calculateTierScore } from "../common/tier-score.util";
+import {
+  calculateCaptainScore,
+  calculateTierScore,
+} from "../common/tier-score.util";
 
 const BONUS_GOLD = 500;
 const DEFAULT_BID_TIME_SECONDS = 30;
@@ -207,11 +210,7 @@ export class AuctionService implements OnModuleInit {
 
   private _getParticipantScore(participant: any): number {
     const acc = participant?.user?.riotAccounts?.[0];
-    return calculateTierScore(
-      acc?.tier || "UNRANKED",
-      acc?.rank || "",
-      acc?.lp || 0,
-    );
+    return calculateCaptainScore(acc);
   }
 
   private _sortAuctionParticipants<

@@ -1,7 +1,7 @@
 import {
   PositionIcon,
   POSITION_LABELS,
-} from "@/app/tournaments/[id]/lobby/_components/icons";
+} from "@/app/[game]/tournaments/[id]/lobby/_components/icons";
 
 const ROLE_ORDER = ["TOP", "JUNGLE", "MID", "ADC", "SUPPORT"];
 

@@ -10,7 +10,10 @@ import { randomInt } from "crypto";
 import { PrismaService } from "../prisma/prisma.service";
 import { RoomStatus, TeamMode, TeamCaptainSelection } from "@nexus/database";
 import { Prisma } from "@prisma/client";
-import { calculateTierScore } from "../common/tier-score.util";
+import {
+  calculateCaptainScore,
+  calculateTierScore,
+} from "../common/tier-score.util";
 
 export interface SnakeDraftState {
   roomId: string;
@@ -232,16 +235,8 @@ export class SnakeDraftService {
           // Tier + Rank + LP 통합 점수 기준 정렬
           const aAcc = a.user.riotAccounts[0];
           const bAcc = b.user.riotAccounts[0];
-          const aScore = calculateTierScore(
-            aAcc?.tier || "UNRANKED",
-            aAcc?.rank || "",
-            aAcc?.lp || 0,
-          );
-          const bScore = calculateTierScore(
-            bAcc?.tier || "UNRANKED",
-            bAcc?.rank || "",
-            bAcc?.lp || 0,
-          );
+          const aScore = calculateCaptainScore(aAcc);
+          const bScore = calculateCaptainScore(bAcc);
           return bScore - aScore;
         })
         .slice(0, numTeams);

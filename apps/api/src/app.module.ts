@@ -18,6 +18,7 @@ import { RoomModule } from "./modules/room/room.module";
 import { AuctionModule } from "./modules/auction/auction.module";
 import { MatchModule } from "./modules/match/match.module";
 import { RiotModule } from "./modules/riot/riot.module";
+import { PubgModule } from "./modules/pubg/pubg.module";
 import { DiscordModule } from "./modules/discord/discord.module";
 import { ClanModule } from "./modules/clan/clan.module";
 import { BroadcastModule } from "./modules/broadcast/broadcast.module";
@@ -98,6 +99,7 @@ const projectRoot = resolve(apiRoot, "../..");
     RoleSelectionModule,
     MatchModule,
     RiotModule,
+    PubgModule,
     StatsModule,
     DiscordModule,
     ClanModule,

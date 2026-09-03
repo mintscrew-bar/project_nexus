@@ -178,7 +178,7 @@ export function HeroBanner({ isAuthenticated = false }: HeroBannerProps) {
           </motion.p>
 
           <motion.div className="flex justify-center" variants={itemVariants}>
-            <Link href="/tournaments">
+            <Link href="/lol/tournaments">
               <button
                 className="group relative inline-flex items-center gap-2 px-6 py-3 rounded-lg text-sm font-semibold text-white overflow-hidden transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
                 style={{
@@ -359,7 +359,7 @@ export function HeroBanner({ isAuthenticated = false }: HeroBannerProps) {
               Discord로 시작하기
             </button>
           </Link>
-          <Link href="/tournaments">
+          <Link href="/lol/tournaments">
             <Button variant="secondary" size="md" className="w-full sm:w-auto">
               자세히 알아보기
             </Button>

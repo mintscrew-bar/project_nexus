@@ -30,7 +30,7 @@ import {
   ChampionIcon,
   PositionIcon,
   POSITION_LABELS,
-} from "@/app/tournaments/[id]/lobby/_components/icons";
+} from "@/app/[game]/tournaments/[id]/lobby/_components/icons";
 import { RoleTierBadges } from "@/components/domain/RoleTierBadges";
 import { RoleBalanceScores } from "@/components/domain/RoleBalanceScores";
 import { StreamerPlatformBadge } from "@/components/domain/StreamerPlatformBadge";

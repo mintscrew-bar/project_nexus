@@ -38,7 +38,7 @@ export function ActiveRoomBanner() {
         </div>
       </div>
       <Link
-        href={`/tournaments/${room.id}/lobby`}
+        href={`/lol/tournaments/${room.id}/lobby`}
         className="inline-flex min-h-11 flex-shrink-0 items-center gap-1.5 rounded-lg bg-accent-primary px-3 py-2 font-semibold text-white transition-colors hover:bg-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary focus-visible:ring-offset-2 focus-visible:ring-offset-bg-primary"
       >
         돌아가기

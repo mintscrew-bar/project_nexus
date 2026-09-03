@@ -10,7 +10,7 @@ export function AuthButton() {
     return (
       <div className="flex items-center gap-4">
         <Link
-          href="/profile"
+          href="/lol/profile"
           className="text-text-secondary hover:text-accent-primary transition-colors"
         >
           {user.username}

@@ -761,7 +761,7 @@ export default function SettingsPage() {
                               variant={hasRiot ? "outline" : "primary"}
                               onClick={() => {
                                 if (hasRiot) {
-                                  router.push("/profile");
+                                  router.push("/lol/profile");
                                   return;
                                 }
                                 setShowRiotModal(true);
@@ -782,7 +782,7 @@ export default function SettingsPage() {
                             <Button
                               size="sm"
                               variant={hasRoles ? "outline" : "primary"}
-                              onClick={() => router.push("/profile")}
+                              onClick={() => router.push("/lol/profile")}
                             >
                               {hasRoles ? "수정" : "설정하기"}
                             </Button>

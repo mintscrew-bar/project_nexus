@@ -78,7 +78,7 @@ export function StatsBanner({ isActive = true }: { isActive?: boolean }) {
 
   return (
     <Link
-      href="/matches"
+      href="/lol/matches"
       aria-label="내전 전적 통계 — 매치 기록 페이지로 이동"
       className="group relative block h-full rounded-2xl overflow-hidden cursor-pointer focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-black focus-visible:outline-none"
       onMouseEnter={() => setIsHovered(true)}

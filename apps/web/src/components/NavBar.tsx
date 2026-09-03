@@ -26,7 +26,7 @@ export function NavBar() {
             옥션
           </Link>
           <Link
-            href="/matches"
+            href="/lol/matches"
             className="text-text-secondary hover:text-accent-primary transition-colors"
           >
             경기

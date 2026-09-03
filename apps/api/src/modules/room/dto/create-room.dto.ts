@@ -16,6 +16,7 @@ import {
   TeamCaptainSelection,
   BracketType,
   GameTitle,
+  PubgPlatform,
 } from "@nexus/database";
 import { stripAllHtml } from "@/common/utils/sanitize";
 
@@ -42,6 +43,11 @@ export class CreateRoomDto {
   @IsOptional()
   @IsEnum(GameTitle, { message: "지원하지 않는 게임입니다." })
   gameTitle?: GameTitle;
+
+  @IsOptional()
+  @IsEnum(PubgPlatform)
+  /** PUBG 방 제목 접두사와 계정 플랫폼을 맞추기 위한 선택값 */
+  pubgPlatform?: PubgPlatform;
 
   @IsInt()
   @Min(10, { message: "최소 10명 이상이어야 합니다." })

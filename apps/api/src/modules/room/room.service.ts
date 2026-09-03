@@ -19,6 +19,7 @@ import {
   MatchStatus,
   Role,
   GameTitle,
+  PubgPlatform,
 } from "@nexus/database";
 import { Prisma } from "@prisma/client";
 import * as bcrypt from "bcrypt";
@@ -49,6 +50,7 @@ export interface CreateRoomDto {
   discordGuildId?: string;
   /** 어떤 게임의 내전인지. 생략하면 롤이다. */
   gameTitle?: GameTitle;
+  pubgPlatform?: PubgPlatform;
   /** 예고제: 내전 예정 시각(ISO 8601). 없으면 지금 바로 여는 방이다. */
   scheduledAt?: string;
 
@@ -918,6 +920,7 @@ export class RoomService {
           teamId: p.teamId,
           role: p.role,
           riotAccount: p.user?.riotAccounts?.[0] || null,
+          pubgAccount: p.user?.pubgAccounts?.[0] || null,
           assignedRole,
           // 자동 밸런스와 같은 캐시에서 읽은 라인별 점수
           balanceScores: balance?.byRole ?? null,
@@ -941,8 +944,21 @@ export class RoomService {
       );
     }
 
+    // 게임마다 팀 인원·계정 요구사항이 다르다.
+    const gameTitle = dto.gameTitle ?? GameTitle.LOL;
+    const game = getGame(gameTitle);
+    const roomName =
+      gameTitle === GameTitle.PUBG && dto.pubgPlatform
+        ? `[${dto.pubgPlatform === "STEAM" ? "스배" : "카배"}] ${dto.name.trim()}`
+        : dto.name.trim();
+    if (roomName.length > 50) {
+      throw new BadRequestException(
+        "플랫폼 접두사를 포함한 방 제목은 50자를 초과할 수 없습니다.",
+      );
+    }
+
     // ========================================
-    // Discord + Riot 계정 연동 필수 체크 (관리자는 면제)
+    // Discord + 게임 계정 연동 필수 체크 (관리자는 면제)
     // ========================================
     const host = await this.prisma.user.findUnique({
       where: { id: hostId },
@@ -960,19 +976,28 @@ export class RoomService {
         );
       }
 
-      const riotAccount = await this.prisma.riotAccount.findFirst({
-        where: { userId: hostId, isPrimary: true },
-      });
-      if (!riotAccount) {
-        throw new BadRequestException(
-          "RIOT_NOT_LINKED::Riot 계정 연동이 필요합니다. 프로필 페이지에서 Riot 계정을 연동해주세요.",
-        );
+      if (gameTitle === GameTitle.PUBG) {
+        const pubgAccount = await this.prisma.pubgAccount.findFirst({
+          where: { userId: hostId },
+        });
+        if (!pubgAccount) {
+          throw new BadRequestException(
+            "PUBG_NOT_LINKED::PUBG 계정 등록이 필요합니다. PUBG 프로필에서 Steam 또는 Kakao 계정을 등록해주세요.",
+          );
+        }
+      } else {
+        const riotAccount = await this.prisma.riotAccount.findFirst({
+          where: { userId: hostId, isPrimary: true },
+        });
+        if (!riotAccount) {
+          throw new BadRequestException(
+            "RIOT_NOT_LINKED::Riot 계정 연동이 필요합니다. 프로필 페이지에서 Riot 계정을 연동해주세요.",
+          );
+        }
       }
     }
 
     // 게임마다 팀 인원이 달라 고를 수 있는 정원도 다르다.
-    const gameTitle = dto.gameTitle ?? GameTitle.LOL;
-    const game = getGame(gameTitle);
     if (!game.enabled) {
       throw new BadRequestException(`${game.label} 내전은 아직 준비 중입니다.`);
     }
@@ -1041,7 +1066,7 @@ export class RoomService {
       async (tx: Prisma.TransactionClient) => {
         const created = await tx.room.create({
           data: {
-            name: dto.name,
+            name: roomName,
             hostId,
             password: hashedPassword,
             maxParticipants: dto.maxParticipants,
@@ -1050,6 +1075,8 @@ export class RoomService {
             allowSpectators: dto.allowSpectators ?? true,
             discordGuildId: resolvedDiscordGuildId,
             gameTitle,
+            pubgPlatform:
+              gameTitle === GameTitle.PUBG ? dto.pubgPlatform : null,
             scheduledAt,
 
             // Draft settings
@@ -1344,6 +1371,23 @@ export class RoomService {
                     },
                   },
                 },
+                pubgAccounts: {
+                  orderBy: { createdAt: "asc" },
+                  take: 2,
+                  select: {
+                    platform: true,
+                    playerName: true,
+                    verificationStatus: true,
+                    pubgTier: true,
+                    nexusTier: true,
+                    nexusScore: true,
+                    combatScore: true,
+                    iglScore: true,
+                    teamplayScore: true,
+                    consistencyScore: true,
+                    experienceScore: true,
+                  },
+                },
               },
             },
           },
@@ -1438,6 +1482,7 @@ export class RoomService {
   ]);
 
   async listRoomsPage(filters?: {
+    gameTitle?: "LOL" | "PUBG";
     status?: "WAITING" | "IN_PROGRESS" | "COMPLETED";
     teamMode?: TeamMode;
     includePrivate?: boolean;
@@ -1448,6 +1493,10 @@ export class RoomService {
   }) {
     try {
       const where: Prisma.RoomWhereInput = {};
+
+      if (filters?.gameTitle) {
+        where.gameTitle = filters.gameTitle;
+      }
 
       if (filters?.status === "IN_PROGRESS") {
         where.status = {

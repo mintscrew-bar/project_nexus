@@ -77,6 +77,7 @@ model User {
   postReports                    PostReport[]          @relation("PostReportReporter")
   posts                          Post[]
   riotAccounts                   RiotAccount[]
+  pubgAccounts                   PubgAccount[]
   roomParticipations             RoomParticipant[]
   hostedRooms                    Room[]                @relation("RoomHost")
   sessions                       Session[]
@@ -299,6 +300,35 @@ model RiotAccount {
   @@map("riot_accounts")
 }
 
+/// PUBG 계정. 외부 전적 API가 연결되기 전까지는 사용자가 등록한 식별자만 보관하고
+/// verificationStatus를 UNVERIFIED로 유지한다.
+model PubgAccount {
+  id                 String   @id @default(cuid())
+  userId             String
+  platform           PubgPlatform
+  playerName         String
+  playerId           String?
+  verificationStatus String   @default("UNVERIFIED")
+  pubgTier           String?
+  nexusTier          String?
+  combatScore       Int?
+  iglScore          Int?
+  teamplayScore     Int?
+  consistencyScore  Int?
+  experienceScore   Int?
+  nexusScore        Int?
+  scoreUpdatedAt    DateTime?
+  lastSyncedAt       DateTime?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, platform])
+  @@unique([platform, playerName])
+  @@index([userId])
+  @@map("pubg_accounts")
+}
+
 /// 사용자가 직접 입력한 포지션별 체감 티어.
 /// 입력되지 않은 포지션은 RiotAccount의 현재 솔로랭크 티어를 사용한다.
 model RiotAccountRoleTier {
@@ -394,6 +424,7 @@ model Room {
   id                      String                @id @default(cuid())
   /// 이 방이 어떤 게임의 내전인지. 목록·전적·랭킹이 이 값으로 갈린다.
   gameTitle               GameTitle             @default(LOL)
+  pubgPlatform            PubgPlatform?
   name                    String
   hostId                  String
   password                String?
@@ -1408,6 +1439,28 @@ model StatsRecomputeQueue {
   @@map("stats_recompute_queue")
 }
 
+/// 원본 match JSON 에서 "정형 컬럼으로 안 뽑은 것 전부"를 압축 보관하는 아카이브.
+///
+/// RiotMatchCache(원본, 매치당 ~44KB)는 TTL 14일로 버린다. 하지만 그 안에는
+/// participants[].challenges 129키를 비롯해 컬럼으로 내리지 않은 값이 많고,
+/// Riot 은 오래된 매치를 영구히 주지 않는다 → 버리기 전에 여기로 옮긴다.
+///
+/// 압축 방식 (실측 2000매치 기준 44.5KB → 11KB, 4배):
+///  - 매치당 한 행에 묶는다. 참가자별로 행을 쪼개면 Postgres TOAST 압축이
+///    행 단위라 오히려 커진다(실측: 89MB → 107MB).
+///  - 값이 0/false/"" 인 키는 뺀다. 없으면 0으로 읽으면 되므로 무손실이고,
+///    challenges 는 129키 중 평균 87키가 0이라 절감이 가장 크다.
+///  - MatchParticipant 컬럼으로 이미 들고 있는 키는 중복 저장하지 않는다.
+///
+/// payload 구조: { p: [{ id: puuid, c: {challenges}, x: {미보유 루트필드} }], t: [teams] }
+model RiotMatchArchive {
+  matchId   String   @id
+  payload   Json
+  createdAt DateTime @default(now())
+
+  @@map("riot_match_archives")
+}
+
 model RiotMatchCache {
   matchId      String   @id
   data         Json
@@ -1594,6 +1647,11 @@ enum RoomStatus {
 enum GameTitle {
   LOL
   PUBG
+}
+
+enum PubgPlatform {
+  STEAM
+  KAKAO
 }
 
 enum TeamMode {

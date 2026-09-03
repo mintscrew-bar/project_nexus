@@ -16,6 +16,8 @@ interface Room {
   isPrivate: boolean;
   status: "WAITING" | "IN_PROGRESS" | "COMPLETED" | "DRAFT" | "DRAFT_COMPLETED" | "ROLE_SELECTION" | "TEAM_SELECTION";
   teamMode: "AUCTION" | "SNAKE_DRAFT" | "AUTO_BALANCE" | "MANUAL_TEAM";
+  gameTitle?: "LOL" | "PUBG";
+  pubgPlatform?: "STEAM" | "KAKAO";
   createdAt: string;
   participants?: any[];
 }
@@ -39,8 +41,9 @@ interface LeaveRoomResponse {
 }
 
 interface RoomCreationData {
+  gameTitle?: "LOL" | "PUBG";
   name: string;
-  maxParticipants: 10 | 15 | 20 | 30 | 40;
+  maxParticipants: number;
   teamMode: "AUCTION" | "SNAKE_DRAFT" | "AUTO_BALANCE" | "MANUAL_TEAM";
   password?: string;
   allowSpectators?: boolean;
@@ -68,7 +71,7 @@ interface RoomStoreState {
   isSubscribedToRoomList: boolean;
 
   // REST API methods
-  fetchRooms: (params?: { status?: string; teamMode?: string; search?: string }) => Promise<void>;
+  fetchRooms: (params?: { gameTitle?: "LOL" | "PUBG"; status?: string; teamMode?: string; search?: string }) => Promise<void>;
   createRoom: (data: RoomCreationData) => Promise<Room | null>;
   joinRoom: (roomId: string, password?: string) => Promise<void>;
   leaveRoom: (roomId: string) => Promise<void>;

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { getChampionIconUrl } from "@/app/tournaments/[id]/lobby/_components/icons";
+import { getChampionIconUrl } from "@/app/[game]/tournaments/[id]/lobby/_components/icons";
 import { getTierIcon } from "@/lib/tier-icon";
 import { getRoleIcon, normalizeRole } from "@/lib/role-icon";
 

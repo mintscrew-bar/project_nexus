@@ -22,7 +22,7 @@ export default function NotFound() {
             홈으로 돌아가기
           </Link>
           <Link
-            href="/tournaments"
+            href="/lol/tournaments"
             className="px-6 py-2.5 bg-bg-tertiary hover:bg-bg-elevated text-text-primary font-medium border border-text-tertiary rounded-lg transition-colors duration-150 inline-block"
           >
             내전 목록

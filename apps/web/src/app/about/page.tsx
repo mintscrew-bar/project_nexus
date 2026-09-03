@@ -116,7 +116,7 @@ export default function AboutPage() {
           </p>
           <div className="mt-7 flex flex-wrap gap-3">
             <Link
-              href="/guide"
+              href="/lol/guide"
               className="inline-flex items-center gap-2 rounded-lg bg-accent-primary px-5 py-2.5 font-semibold text-white transition-colors hover:bg-accent-hover"
             >
               가이드 · 운영 자료

@@ -20,7 +20,7 @@ import {
   ChampionIcon,
   PositionIcon,
   POSITION_LABELS,
-} from "@/app/tournaments/[id]/lobby/_components/icons";
+} from "@/app/[game]/tournaments/[id]/lobby/_components/icons";
 
 const MOCK_PROFILE = {
   username: "mintscrew",

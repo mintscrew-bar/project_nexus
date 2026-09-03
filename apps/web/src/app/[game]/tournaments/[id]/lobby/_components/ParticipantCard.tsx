@@ -1,0 +1,250 @@
+"use client";
+
+import { useRef } from "react";
+import Image from "next/image";
+import {
+  Check,
+  CheckCircle,
+  Crown,
+  UserMinus,
+  UserPlus,
+  Users,
+  Volume2,
+  VolumeX,
+} from "lucide-react";
+import { TierBadge } from "@/components/domain/TierBadge";
+import { ChampionIcon, PositionIcon } from "./icons";
+import { getRoleTier } from "@/lib/role-tier";
+
+/* ─── Participant Card ─── */
+export function ParticipantCard({
+  p,
+  isCurrentUserHost,
+  isSelf,
+  isFriend,
+  isSent,
+  addingFriend,
+  setHoveredPlayer,
+  scheduleHoverClose,
+  cancelHoverClose,
+  handleAddFriend,
+  setKickTarget,
+}: any) {
+  const riot = p.riotAccount;
+  const pubg = p.pubgAccount;
+  const mainRole = riot?.mainRole || null;
+  const subRole = riot?.subRole || null;
+  const displayTier = getRoleTier(riot, mainRole);
+  const mainRoleChamps = (riot?.championPreferences || [])
+    .filter((cp: any) => cp.role === mainRole)
+    .sort((a: any, b: any) => a.order - b.order)
+    .slice(0, 3);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  const handleMouseEnter = () => {
+    cancelHoverClose?.();
+    if (cardRef.current) {
+      setHoveredPlayer({
+        id: p.userId ?? p.id,
+        rect: cardRef.current.getBoundingClientRect(),
+      });
+    }
+  };
+
+  return (
+    <div
+      ref={cardRef}
+      className="relative flex items-center justify-between bg-bg-tertiary p-3 rounded-lg hover:bg-bg-elevated transition-colors group animate-slide-in-right"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={scheduleHoverClose ?? (() => setHoveredPlayer(null))}
+    >
+      {/* 준비 완료 — 압축 카드와 동일한 왼쪽 초록 띠로 통일. 미준비는 무표시 */}
+      {p.isReady && (
+        <span
+          title="준비 완료"
+          className="absolute inset-y-0 left-0 w-[3px] rounded-l-lg bg-accent-success"
+        />
+      )}
+      <div className="flex items-center gap-3 flex-1 min-w-0">
+        <div className="relative w-10 h-10 rounded-full bg-bg-elevated overflow-hidden flex-shrink-0">
+          <Image
+            src={p.avatar || "/images/placeholders/non-avatar-128.png"}
+            alt={p.username}
+            fill
+            className="object-cover"
+            unoptimized
+          />
+        </div>
+        <div className="flex flex-col min-w-0 flex-1">
+          <div className="flex items-center gap-1.5 mb-0.5">
+            {p.isHost && (
+              <Crown className="h-3.5 w-3.5 text-accent-gold flex-shrink-0" />
+            )}
+            <span className="font-semibold text-sm text-text-primary truncate">
+              {riot ? riot.gameName : pubg ? pubg.playerName : p.username}
+            </span>
+            {riot && (
+              <span className="text-xs text-text-tertiary flex-shrink-0">
+                #{riot.tagLine}
+              </span>
+            )}
+            {riot?.tier && (
+              <span
+                className="flex-shrink-0"
+                title={displayTier ? "주 포지션 티어" : "솔로랭크 티어"}
+              >
+                <TierBadge
+                  tier={displayTier?.tier || riot.tier}
+                  rank={displayTier?.rank || riot.rank || undefined}
+                  size="sm"
+                  showIcon={false}
+                />
+              </span>
+            )}
+            {pubg && (
+              <span className="flex-shrink-0 rounded bg-accent-primary/10 px-1.5 py-0.5 text-[10px] font-bold text-accent-primary">
+                {pubg.platform === "STEAM" ? "스팀" : "카배"}
+              </span>
+            )}
+            {/^testbot_\d+$/.test(p.username) && (
+              <span className="text-[9px] font-bold bg-bg-secondary text-text-muted px-1 py-0.5 rounded border border-bg-elevated flex-shrink-0">
+                BOT
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {riot && (
+              <span className="text-[11px] text-text-tertiary truncate">
+                {p.username}
+              </span>
+            )}
+            {pubg && (
+              <span className="text-[11px] text-text-tertiary">
+                {pubg.verificationStatus === "VERIFIED" ? "검증됨" : "미검증"}
+                {pubg.pubgTier ? ` · PUBG ${pubg.pubgTier}` : ""}
+                {pubg.nexusTier ? ` · NEXUS ${pubg.nexusTier}` : ""}
+              </span>
+            )}
+            {(mainRole || subRole) && (
+              <div className="flex items-center gap-1">
+                {mainRole && (
+                  <PositionIcon position={mainRole} className="!w-4 !h-4" />
+                )}
+                {subRole && (
+                  <PositionIcon
+                    position={subRole}
+                    className="!w-3.5 !h-3.5"
+                    opacity={0.5}
+                  />
+                )}
+              </div>
+            )}
+            {/*
+              자동 밸런스가 팀을 나눌 때 쓰는 점수. 티어만으로는 설명되지 않는
+              배정(최고 티어·솔랭 승률·내전 전적 반영)의 근거를 호스트가 바로
+              확인할 수 있게 노출한다. 대표 라인 기준 값이다.
+            */}
+            {typeof p.balanceScore === "number" && (
+              <span
+                className={`ml-auto flex-shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold tabular-nums ${
+                  p.assignedRole
+                    ? "bg-accent-primary/15 text-accent-primary"
+                    : "bg-bg-secondary text-text-secondary"
+                }`}
+                title={
+                  p.balanceScores
+                    ? `라인별 점수 — ${Object.entries(p.balanceScores)
+                        .map(([role, score]) => `${role} ${score}`)
+                        .join(" · ")}`
+                    : undefined
+                }
+              >
+                {/* 팀이 짜인 뒤에는 배정된 라인 기준 점수라 라인 아이콘을 같이 보인다 */}
+                {p.assignedRole && (
+                  <PositionIcon
+                    position={p.assignedRole}
+                    className="!mr-0.5 !inline-block !h-3 !w-3 align-[-1px]"
+                  />
+                )}
+                {p.balanceScore.toFixed(1)}
+              </span>
+            )}
+          </div>
+          {mainRoleChamps.length > 0 && (
+            <div className="flex items-center gap-0.5 mt-1">
+              {mainRoleChamps.map((cp: any, idx: number) => (
+                <ChampionIcon key={idx} championId={cp.championId} size={20} />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
+        {!isSelf && !isFriend && !isSent && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleAddFriend(p.userId);
+            }}
+            disabled={addingFriend === p.userId}
+            className="opacity-60 group-hover:opacity-100 p-2 text-accent-primary hover:text-accent-hover hover:bg-accent-primary/10 rounded-md transition-all disabled:opacity-30"
+            title="친구 추가"
+          >
+            <UserPlus className="h-5 w-5" />
+          </button>
+        )}
+        {!isSelf && isSent && (
+          <span className="p-2 text-text-tertiary" title="친구 요청됨">
+            <CheckCircle className="h-5 w-5" />
+          </span>
+        )}
+        {!isSelf && isFriend && (
+          <span className="p-2 text-accent-success" title="친구">
+            <Check className="h-5 w-5" />
+          </span>
+        )}
+        {/* Discord 음성채널 참가 상태 뱃지 (inVoice가 정의된 경우만 표시) */}
+        {p.inVoice !== undefined &&
+          (p.inVoice ? (
+            <span
+              title="음성채널 참가 중"
+              className="flex items-center text-green-400"
+            >
+              <Volume2 className="h-4 w-4" />
+            </span>
+          ) : (
+            <span
+              title="음성채널 미참가"
+              className="flex items-center text-text-tertiary/50"
+            >
+              <VolumeX className="h-4 w-4" />
+            </span>
+          ))}
+        {isCurrentUserHost && !isSelf && (
+          <button
+            onClick={() => setKickTarget({ id: p.id, username: p.username })}
+            className="opacity-60 group-hover:opacity-100 p-2 text-accent-danger hover:text-accent-danger/80 hover:bg-accent-danger/10 rounded-md transition-all"
+            title="강퇴"
+          >
+            <UserMinus className="h-5 w-5" />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ─── Empty Slot ─── */
+export function EmptySlot({ index }: { index: number }) {
+  return (
+    <div
+      className="flex items-center gap-3 p-3 rounded-lg border-2 border-dashed border-bg-elevated/60"
+      style={{ animationDelay: `${index * 40}ms` }}
+    >
+      <div className="w-10 h-10 rounded-full bg-bg-tertiary/40 flex items-center justify-center flex-shrink-0">
+        <Users className="h-4 w-4 text-text-muted" />
+      </div>
+      <span className="text-sm text-text-muted">참가자 대기 중...</span>
+    </div>
+  );
+}

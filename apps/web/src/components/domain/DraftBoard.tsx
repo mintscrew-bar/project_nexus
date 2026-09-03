@@ -4,7 +4,7 @@ import React, { useCallback, useRef, useState } from "react";
 import { TierBadge } from "@/components/domain";
 import { PlayerHoverCard } from "@/components/domain/PlayerHoverCard";
 import { PlayerProfileModal } from "@/components/domain/PlayerProfileModal";
-import { PositionIcon } from "@/app/tournaments/[id]/lobby/_components/icons";
+import { PositionIcon } from "@/app/[game]/tournaments/[id]/lobby/_components/icons";
 import { Clock, Crown, Users, Swords } from "lucide-react";
 import { cn } from "@/lib/utils";
 

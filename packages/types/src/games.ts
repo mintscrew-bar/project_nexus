@@ -67,8 +67,8 @@ const PUBG: GameDefinition = {
   // 배그용 밸런스 지표를 세운 뒤에 다시 넣는다.
   teamModes: ["AUCTION", "SNAKE_DRAFT", "MANUAL_TEAM"],
   resultShape: "POINT_LEADERBOARD",
-  // Phase 3까지 끝나기 전에는 방을 만들 수 없다.
-  enabled: false,
+  // 계정 식별자 등록과 방 생성 틀을 사용할 수 있다. 외부 전적 검증은 별도 상태다.
+  enabled: true,
 };
 
 export const GAMES: Record<GameTitle, GameDefinition> = { LOL, PUBG };

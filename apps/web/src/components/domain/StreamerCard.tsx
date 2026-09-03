@@ -154,7 +154,7 @@ export function LiveStreamerCard({
       <div className="flex items-center gap-2 border-t border-bg-tertiary px-4 py-3">
         {streamer.activeRoom && (
           <Link
-            href={`/tournaments/${streamer.activeRoom.id}`}
+            href={`/lol/tournaments/${streamer.activeRoom.id}`}
             className="flex min-w-0 flex-1 items-center gap-2 text-sm font-medium text-accent-primary"
           >
             <Swords className="h-4 w-4 flex-shrink-0" />

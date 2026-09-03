@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { Activity, ArrowRight, ShieldCheck, TrendingUp, Users } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { userApi } from "@/lib/api-client";
-import { ChampionIcon, PositionIcon, POSITION_LABELS } from "@/app/tournaments/[id]/lobby/_components/icons";
+import { ChampionIcon, PositionIcon, POSITION_LABELS } from "@/app/[game]/tournaments/[id]/lobby/_components/icons";
 import { RoleTierBadges } from "@/components/domain/RoleTierBadges";
 import { RoleBalanceScores } from "@/components/domain/RoleBalanceScores";
 

@@ -31,7 +31,7 @@ import { cn } from "@/lib/utils";
 import {
   PositionIcon,
   POSITION_LABELS,
-} from "@/app/tournaments/[id]/lobby/_components/icons";
+} from "@/app/[game]/tournaments/[id]/lobby/_components/icons";
 import { ClanEmblem, ClanTag } from "@/components/domain/ClanEmblem";
 import { ClansTour } from "@/components/onboarding/PrimaryPageTours";
 import ClanDetailClient from "./[id]/_ClanDetailClient";

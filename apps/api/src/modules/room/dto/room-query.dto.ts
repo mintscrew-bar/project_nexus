@@ -10,10 +10,14 @@ import {
   Min,
 } from "class-validator";
 import { Transform } from "class-transformer";
-import { TeamMode } from "@nexus/database";
+import { GameTitle, TeamMode } from "@nexus/database";
 
 /** 방 목록 조회 쿼리 DTO */
 export class ListRoomsQueryDto {
+  @IsOptional()
+  @IsEnum(GameTitle)
+  gameTitle?: GameTitle;
+
   @IsOptional()
   @IsIn(["WAITING", "IN_PROGRESS", "COMPLETED"])
   status?: "WAITING" | "IN_PROGRESS" | "COMPLETED";

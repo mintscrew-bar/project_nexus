@@ -809,6 +809,8 @@ export type BroadcastControlRoom = {
 // 방 관련 API
 export const roomApi = {
   getRooms: async (params?: {
+    gameTitle?: "LOL" | "PUBG";
+    pubgPlatform?: "STEAM" | "KAKAO";
     status?: string;
     teamMode?: string;
     search?: string;
@@ -826,6 +828,7 @@ export const roomApi = {
   },
 
   createRoom: async (data: {
+    gameTitle?: "LOL" | "PUBG";
     name: string;
     maxParticipants: number;
     teamMode: "AUCTION" | "SNAKE_DRAFT" | "AUTO_BALANCE" | "MANUAL_TEAM";
@@ -1168,6 +1171,43 @@ export const riotApi = {
       championPoints: number;
       championLevel: number;
     }>;
+  },
+};
+
+export const pubgApi = {
+  getAccounts: async () => {
+    const response = await apiClient.get("/pubg/accounts");
+    return response.data;
+  },
+
+  registerAccount: async (data: {
+    platform: "STEAM" | "KAKAO";
+    playerName: string;
+    playerId?: string;
+  }) => {
+    const response = await apiClient.post("/pubg/accounts", data);
+    return response.data;
+  },
+
+  deleteAccount: async (accountId: string) => {
+    await apiClient.delete(`/pubg/accounts/${accountId}`);
+  },
+
+  updateScore: async (
+    accountId: string,
+    data: {
+      combatScore: number;
+      iglScore: number;
+      teamplayScore: number;
+      consistencyScore: number;
+      experienceScore: number;
+    },
+  ) => {
+    const response = await apiClient.patch(
+      `/pubg/accounts/${accountId}/score`,
+      data,
+    );
+    return response.data;
   },
 };
 

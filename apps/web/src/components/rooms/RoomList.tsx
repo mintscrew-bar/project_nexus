@@ -11,6 +11,7 @@ import { NEXUS_DISCORD_INVITE_URL } from "@/lib/constants";
 import { RoomCard } from "@/components/domain";
 import { EmptyState, RoomCardSkeleton } from "@/components/ui";
 import { RefreshCcw, Home, Search, Gavel, ListOrdered, Scale, ArrowLeftRight, LayoutGrid } from "lucide-react";
+import { GAMES } from "@nexus/types";
 
 export type StatusFilter = "ALL" | "WAITING" | "IN_PROGRESS" | "COMPLETED";
 type ModeFilter = "ALL" | "AUCTION" | "SNAKE_DRAFT" | "AUTO_BALANCE" | "MANUAL_TEAM";
@@ -65,6 +66,7 @@ const modeOptions = [
 ];
 
 interface RoomListProps {
+  gameTitle?: "LOL" | "PUBG";
   /** 빈 목록 상태에서 방 생성 모달을 여는 콜백 (페이지가 모달과 로그인 리다이렉트를 소유) */
   onCreateRoom?: () => void;
   searchQuery: string;
@@ -78,6 +80,7 @@ interface RoomListProps {
 }
 
 export function RoomList({
+  gameTitle = "LOL",
   onCreateRoom,
   searchQuery,
   onSearchQueryChange,
@@ -106,12 +109,13 @@ export function RoomList({
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
   const roomQuery = useMemo(() => ({
+    gameTitle,
     status: statusFilter === "ALL" ? undefined : statusFilter,
     teamMode: modeFilter === "ALL" ? undefined : modeFilter,
     search: debouncedSearchQuery || undefined,
     sort: sortBy,
     limit: 24,
-  }), [statusFilter, modeFilter, debouncedSearchQuery, sortBy]);
+  }), [gameTitle, statusFilter, modeFilter, debouncedSearchQuery, sortBy]);
 
   const loadRooms = useCallback(async (append = false) => {
     const cursor = nextCursorRef.current;
@@ -180,7 +184,7 @@ export function RoomList({
       router.push(`/auth/login?redirect=${redirect}`);
       return;
     }
-    router.push(`/tournaments/${roomId}/lobby`);
+    router.push(`/${GAMES[gameTitle].slug}/tournaments/${roomId}/lobby`);
   };
 
   return (
@@ -193,7 +197,12 @@ export function RoomList({
         </div>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-          {modeOptions.map((option) => {
+          {modeOptions
+            .filter((option) =>
+              option.value === "ALL" ||
+              GAMES[gameTitle].teamModes.includes(option.value),
+            )
+            .map((option) => {
             const Icon = option.icon;
             const isSelected = modeFilter === option.value;
 
@@ -231,7 +240,7 @@ export function RoomList({
                 </span>
               </button>
             );
-          })}
+            })}
         </div>
       </section>
 

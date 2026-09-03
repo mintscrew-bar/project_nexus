@@ -74,6 +74,7 @@ export class RoomController {
     try {
       return await this.roomService.listRoomsPage({
         status: query.status,
+        gameTitle: query.gameTitle,
         teamMode: query.teamMode,
         includePrivate: query.includePrivate,
         search: query.search,

@@ -2,7 +2,7 @@
 
 import { Trophy } from "lucide-react";
 import { ChampionImage } from "@/components/ChampionImage";
-import { PositionIcon, POSITION_LABELS } from "@/app/tournaments/[id]/lobby/_components/icons";
+import { PositionIcon, POSITION_LABELS } from "@/app/[game]/tournaments/[id]/lobby/_components/icons";
 import { cn } from "@/lib/utils";
 import { getChampionKoreanName } from "@nexus/types";
 
