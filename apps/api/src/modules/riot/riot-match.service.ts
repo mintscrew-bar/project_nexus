@@ -120,6 +120,22 @@ export interface ParticipantDto {
 
   // Result
   win: boolean;
+
+  // 데미지 유형 분해 — 총합만 쓰다가 챔피언·빌드 분석용으로 추가.
+  magicDamageDealtToChampions?: number;
+  physicalDamageDealtToChampions?: number;
+  trueDamageDealtToChampions?: number;
+  damageDealtToObjectives?: number;
+  damageDealtToTurrets?: number;
+  timePlayed?: number;
+  champExperience?: number;
+
+  /**
+   * Riot 이 서버에서 계산해 주는 파생 지표(키 129개).
+   * 우리가 가진 다른 컬럼으로는 되계산할 수 없고 원본 캐시를 버리면 사라지므로
+   * 정형 추출 대상이다. 전부 optional — 큐·포지션에 따라 빠지는 키가 있다.
+   */
+  challenges?: Record<string, number | undefined>;
 }
 
 export interface TeamDto {

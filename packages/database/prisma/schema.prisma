@@ -835,6 +835,47 @@ model MatchParticipant {
   firstBloodKill              Boolean
   firstTowerKill              Boolean
   win                         Boolean
+
+  // ── Riot challenges 추출분 ──────────────────────────────────────────────
+  // 원본 match JSON 의 participants[].challenges 는 키가 129개인데 대부분
+  // 잡다한 업적 카운터(SWARM_*, dancedWithRiftHerald 등)다. 분석 가치가 있는
+  // 것만 골라 컬럼으로 내린다. Riot 이 서버에서 계산해 주는 값이라 우리가 가진
+  // 다른 컬럼으로는 되계산할 수 없고, match-v5 가 오래된 매치를 영구히 주지도
+  // 않는다 → 원본 캐시(RiotMatchCache)를 TTL 로 버리기 전에 반드시 여기로
+  // 옮겨 둬야 하는 값들이다.
+  // 표본 3000 기준 커버리지: 대부분 100%, 라인전 관련 3개만 ~90%(정글/서폿 제외).
+  kda                          Float?
+  killParticipation            Float?
+  damagePerMinute              Float?
+  goldPerMinute                Float?
+  teamDamagePercentage         Float?
+  damageTakenOnTeamPercentage  Float?
+  visionScorePerMinute         Float?
+  laneMinionsFirst10Minutes    Int?
+  jungleCsBefore10Minutes      Float?
+  laningPhaseGoldExpAdvantage  Int?
+  maxCsAdvantageOnLaneOpponent Float?
+  maxLevelLeadLaneOpponent     Int?
+  soloKills                    Int?
+  turretPlatesTaken            Int?
+  effectiveHealAndShielding    Float?
+  controlWardsPlaced           Int?
+  skillshotsHit                Int?
+  skillshotsDodged             Int?
+  saveAllyFromDeath            Int?
+  abilityUses                  Int?
+
+  // ── 원본 participant 루트에서 추가 추출 ─────────────────────────────────
+  // 데미지 유형 분해는 챔피언·빌드 분석의 기본 축인데 총합만 저장하고 있었다.
+  magicDamageToChampions       Int?
+  physicalDamageToChampions    Int?
+  trueDamageToChampions        Int?
+  damageDealtToObjectives      Int?
+  damageDealtToTurrets         Int?
+  timePlayed                   Int?
+  champExperience              Int?
+  // 원본을 버린 뒤에도 "이 행이 추출을 거쳤는지" 구분하기 위해 남긴다.
+  challengesExtractedAt        DateTime?
   createdAt                   DateTime  @default(now())
   match                       Match     @relation(fields: [matchId], references: [id], onDelete: Cascade)
   team                        Team?     @relation(fields: [teamId], references: [id], onDelete: SetNull)

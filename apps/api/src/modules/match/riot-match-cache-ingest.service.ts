@@ -15,6 +15,60 @@ import { normalizeRiotPosition } from "./position-normalizer";
  * 내전 전적과 사용자 통계가 match_participants를 직접 쿼리하므로
  * 외부(랭크) 데이터를 정규화 테이블에 채워야 통계가 잡힌다.
  */
+/**
+ * participants[].challenges 중 분석 가치가 있는 지표만 골라 정형 컬럼 형태로 만든다.
+ *
+ * 원본 challenges 는 키가 129개인데 대부분 잡다한 업적 카운터(SWARM_*,
+ * dancedWithRiftHerald 등)라 전부 들고 있을 이유가 없다. 반대로 여기 고른 값들은
+ * Riot 이 서버에서 계산해 주는 것이라 우리 컬럼으로는 되계산할 수 없고,
+ * match-v5 가 오래된 매치를 영구히 주지도 않는다 → 원본 캐시를 TTL 로 버리기 전에
+ * 반드시 옮겨 둬야 한다.
+ *
+ * 백필 스크립트(scripts/ops/backfill-challenge-metrics.ts)도 이 함수를 쓴다.
+ * 규칙이 갈리면 신규분과 과거분의 통계가 어긋나므로 반드시 한 곳에서만 정의한다.
+ */
+export function extractChallengeMetrics(p: ParticipantDto) {
+  const c = p.challenges ?? {};
+  // 정수 컬럼에 소수가 들어오면 Prisma 가 던진다. Riot 이 정수여야 할 값을
+  // 소수로 주는 경우가 있어(예: turretPlatesTaken) 반올림해 받는다.
+  const int = (v: number | undefined) =>
+    v == null || !Number.isFinite(v) ? null : Math.round(v);
+  const num = (v: number | undefined) =>
+    v == null || !Number.isFinite(v) ? null : v;
+
+  return {
+    kda: num(c.kda),
+    killParticipation: num(c.killParticipation),
+    damagePerMinute: num(c.damagePerMinute),
+    goldPerMinute: num(c.goldPerMinute),
+    teamDamagePercentage: num(c.teamDamagePercentage),
+    damageTakenOnTeamPercentage: num(c.damageTakenOnTeamPercentage),
+    visionScorePerMinute: num(c.visionScorePerMinute),
+    laneMinionsFirst10Minutes: int(c.laneMinionsFirst10Minutes),
+    jungleCsBefore10Minutes: num(c.jungleCsBefore10Minutes),
+    laningPhaseGoldExpAdvantage: int(c.laningPhaseGoldExpAdvantage),
+    maxCsAdvantageOnLaneOpponent: num(c.maxCsAdvantageOnLaneOpponent),
+    maxLevelLeadLaneOpponent: int(c.maxLevelLeadLaneOpponent),
+    soloKills: int(c.soloKills),
+    turretPlatesTaken: int(c.turretPlatesTaken),
+    effectiveHealAndShielding: num(c.effectiveHealAndShielding),
+    controlWardsPlaced: int(c.controlWardsPlaced),
+    skillshotsHit: int(c.skillshotsHit),
+    skillshotsDodged: int(c.skillshotsDodged),
+    saveAllyFromDeath: int(c.saveAllyFromDeath),
+    abilityUses: int(c.abilityUses),
+
+    magicDamageToChampions: int(p.magicDamageDealtToChampions),
+    physicalDamageToChampions: int(p.physicalDamageDealtToChampions),
+    trueDamageToChampions: int(p.trueDamageDealtToChampions),
+    damageDealtToObjectives: int(p.damageDealtToObjectives),
+    damageDealtToTurrets: int(p.damageDealtToTurrets),
+    timePlayed: int(p.timePlayed),
+    champExperience: int(p.champExperience),
+    challengesExtractedAt: new Date(),
+  };
+}
+
 @Injectable()
 export class RiotMatchCacheIngestService {
   private readonly logger = new Logger(RiotMatchCacheIngestService.name);
@@ -166,6 +220,7 @@ export class RiotMatchCacheIngestService {
         firstBloodKill: p.firstBloodKill,
         firstTowerKill: p.firstTowerKill,
         win: p.win,
+        ...extractChallengeMetrics(p),
       };
     });
 
