@@ -17,22 +17,14 @@
   - 배틀로얄 내전: 다팀·다라운드·순위/킬 누적 리더보드 신규 구현
   - 자동 매칭은 커스텀 매치 실측 전까지 보류하고 수동 매치 ID 입력 경로 우선 제공
 
-- [~] **`riot_match_cache` 정리** — 추출 완료 후 삭제 (진행 중)
-  - **먼저 확인한 것**: 원본 JSON 의 `participants[].challenges` 에 Riot 이 서버에서
-    계산해 주는 지표 129개가 있었다. 우리 컬럼으로는 되계산 불가, match-v5 는 오래된
-    매치를 영구히 주지 않음 → **그냥 지우면 자산이 영구 소실**이었다.
-  - 조치: 분석 가치 있는 27개를 `match_participants` 컬럼으로 추출하는 코드 + 마이그레이션
-    (커밋 f91febcb). 기존 102,693 매치 백필 실행.
-  - 남은 순서: 백필 완료 확인 → `scripts/ops/purge-riot-match-cache.sh --apply`
-  - GitHub Secret `RIOT_MATCH_CACHE_CLEANUP_ENABLED` = `true` 로 변경 완료.
-    다음 배포부터 매일 02:20 크론이 TTL 14일 지난 것을 자동 정리한다.
+- [ ] **`riot_match_cache` purge 실행** — 준비 끝, 실행만 남음
+  - `! ./scripts/ops/purge-riot-match-cache.sh --apply` (권한 분류기가 막아 대신 실행 필요)
+  - 대상 101,466건 / 보호: 미인제스트 61, 최근 14일 1,295, **미아카이브 0**
+  - 선행 작업 완료: 원본 전량을 `RiotMatchArchive` 로 압축 보존(4,797MB → 1,149MB, 4.2배).
+    challenges 129키·미보유 루트필드·teams 전부 보존. 검증 통과(커밋 72d0faaf).
+  - 삭제 가드 3중(TTL + 정형화 + 아카이브)으로 강화 — 아카이브 안 된 매치는 안 지워진다
+  - 코드 변경(인제스트 아카이브 기록, 가드)은 **배포돼야** 신규 매치에 적용된다
   - 전체 백업 확보됨: `~/nexus-backups/weekly/db-full-20260903-090005.sql.gz` (1.1GB)
-
-> **정정**: 앞서 "죽은 데이터 6.6GB" 라고 했는데 두 번 틀렸다.
-> ① `match_participants`(1.6GB)·`known_puuids`(192MB)는 **살아 있는 기능이 읽는다** —
->   ranking/user/stats/match 서비스 10곳 이상. 전적·랭킹·챔피언 통계의 실데이터다.
-> ② `riot_match_cache` 도 "순수 중복"이 아니었다 — challenges 129개가 추출본에 없었다.
->   추출을 먼저 확장하고서야 버릴 수 있다.
 
 - [ ] **R2 버킷 보호** — 운영이 `UPLOAD_DRIVER=r2` 라 사용자 업로드(클랜 로고·배너 등) 원본이
   Cloudflare R2 에 있고, 위 백업은 이걸 포함하지 않는다. 로컬 `uploads` 볼륨은 비어 있다(0개 파일).
