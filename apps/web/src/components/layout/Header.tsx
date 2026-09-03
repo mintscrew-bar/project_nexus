@@ -1,34 +1,53 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
-import { cn } from '@/lib/utils';
-import { Logo } from '@/components/Logo';
-import { ThemeToggle } from '@/components/ThemeToggle';
-import { UserMenu } from '@/components/UserMenu';
-import { MobileMenu } from '@/components/MobileMenu';
-import { DiscordIcon } from '@/components/icons/DiscordIcon';
-import { Users, Shield } from 'lucide-react';
-import { useAuthStore } from '@/stores/auth-store';
-import { useFriendStore } from '@/stores/friend-store';
-import { NEXUS_DISCORD_INVITE_URL } from '@/lib/constants';
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
+import { cn } from "@/lib/utils";
+import { Logo } from "@/components/Logo";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { UserMenu } from "@/components/UserMenu";
+import { MobileMenu } from "@/components/MobileMenu";
+import { DiscordIcon } from "@/components/icons/DiscordIcon";
+import { Users, Shield } from "lucide-react";
+import { useAuthStore } from "@/stores/auth-store";
+import { useFriendStore } from "@/stores/friend-store";
+import { NEXUS_DISCORD_INVITE_URL } from "@/lib/constants";
+import { GameSwitcher } from "@/components/layout/GameSwitcher";
+import { gamePath, useCurrentGame } from "@/hooks/useCurrentGame";
 
-const navItems = [
-  { href: '/tournaments', label: '내전' },
-  { href: '/matches', label: '내전 전적' },
-  { href: '/ranking', label: '랭킹' },
-  { href: '/clans', label: '클랜' },
-  { href: '/streamers', label: '스트리머' },
-  { href: '/community', label: '커뮤니티' },
-  { href: '/guide', label: '가이드' },
+// 게임별 화면은 `/lol/*` 처럼 현재 게임 프리픽스가 붙는다.
+// 옛 경로를 그대로 쓰면 매 클릭마다 리다이렉트를 한 번 더 타고,
+// pathname(`/lol/tournaments`)과 href(`/tournaments`)가 달라 활성 표시도 깨진다.
+const gameNavItems = [
+  { path: "/tournaments", label: "내전" },
+  { path: "/matches", label: "내전 전적" },
+  { path: "/ranking", label: "랭킹" },
+];
+
+// 게임과 무관한 화면. 프리픽스 없이 그대로 둔다.
+const commonNavItems = [
+  { href: "/clans", label: "클랜" },
+  { href: "/streamers", label: "스트리머" },
+  { href: "/community", label: "커뮤니티" },
 ];
 
 export function Header() {
   const pathname = usePathname();
+  const currentGame = useCurrentGame();
+  const navItems = [
+    ...gameNavItems.map((item) => ({
+      href: gamePath(currentGame, item.path),
+      label: item.label,
+    })),
+    ...commonNavItems,
+    { href: gamePath(currentGame, "/guide"), label: "가이드" },
+  ];
   const { isAuthenticated, user } = useAuthStore();
   const { togglePanel, isOpen, pendingRequests } = useFriendStore();
-  const incomingCount = pendingRequests.filter((r: any) => r.status === 'PENDING').length;
+  const incomingCount = pendingRequests.filter(
+    (r: any) => r.status === "PENDING",
+  ).length;
 
   // ---------------------------------------------------------------
   // Hydration 불일치 방지:
@@ -49,7 +68,8 @@ export function Header() {
   const clientIncomingCount = mounted ? incomingCount : 0;
   const clientUser = mounted ? user : null;
 
-  const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
+  const isActive = (href: string) =>
+    pathname === href || pathname.startsWith(`${href}/`);
 
   return (
     <header className="bg-bg-secondary border-b border-bg-tertiary px-3 py-2 md:px-4 md:py-3 flex justify-between items-center gap-3 z-50 sticky top-0">
@@ -59,6 +79,7 @@ export function Header() {
         <Link href="/" className="flex items-center">
           <Logo className="h-8 w-auto" />
         </Link>
+        <GameSwitcher className="hidden sm:flex" />
       </div>
 
       {/* Center: Navigation (kept compact until wide desktop to avoid crowding) */}
@@ -69,10 +90,10 @@ export function Header() {
               <Link
                 href={item.href}
                 className={cn(
-                  'whitespace-nowrap px-3 py-2 rounded-lg font-medium transition-colors duration-150',
+                  "whitespace-nowrap px-3 py-2 rounded-lg font-medium transition-colors duration-150",
                   isActive(item.href)
-                    ? 'bg-accent-primary/10 text-accent-primary'
-                    : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary'
+                    ? "bg-accent-primary/10 text-accent-primary"
+                    : "text-text-secondary hover:text-text-primary hover:bg-bg-tertiary",
                 )}
               >
                 {item.label}
@@ -96,36 +117,38 @@ export function Header() {
           <span>Discord</span>
         </a>
         {/* 어드민/모더레이터 전용 링크: 마운트 후에만 표시하여 hydration 불일치 방지 */}
-        {clientIsAuthenticated && (clientUser?.role === 'ADMIN' || clientUser?.role === 'MODERATOR') && (
-          <>
-            <Link
-              href="/admin"
-              className={cn(
-                // 좁은 데스크톱까지는 햄버거 메뉴로 이동 → 넓은 데스크톱에서만 노출
-                'hidden min-h-11 min-w-11 items-center justify-center rounded-lg transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary nav:inline-flex',
-                pathname.startsWith('/admin')
-                  ? 'bg-accent-primary/10 text-accent-primary'
-                  : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary'
-              )}
-              title="관리자 패널"
-              aria-label="관리자 패널"
-            >
-              <Shield className="h-5 w-5" />
-            </Link>
-          </>
-        )}
+        {clientIsAuthenticated &&
+          (clientUser?.role === "ADMIN" ||
+            clientUser?.role === "MODERATOR") && (
+            <>
+              <Link
+                href="/admin"
+                className={cn(
+                  // 좁은 데스크톱까지는 햄버거 메뉴로 이동 → 넓은 데스크톱에서만 노출
+                  "hidden min-h-11 min-w-11 items-center justify-center rounded-lg transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary nav:inline-flex",
+                  pathname.startsWith("/admin")
+                    ? "bg-accent-primary/10 text-accent-primary"
+                    : "text-text-secondary hover:text-text-primary hover:bg-bg-tertiary",
+                )}
+                title="관리자 패널"
+                aria-label="관리자 패널"
+              >
+                <Shield className="h-5 w-5" />
+              </Link>
+            </>
+          )}
         {/* 친구 목록 버튼: 마운트 후에만 표시하여 뱃지 카운트 hydration 불일치 방지 */}
         {clientIsAuthenticated && (
           <button
             onClick={togglePanel}
             className={cn(
-              'relative inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary',
+              "relative inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary",
               clientIsOpen
-                ? 'bg-accent-primary/10 text-accent-primary'
-                : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary'
+                ? "bg-accent-primary/10 text-accent-primary"
+                : "text-text-secondary hover:text-text-primary hover:bg-bg-tertiary",
             )}
             title="친구 목록"
-            aria-label={`친구 목록${clientIncomingCount > 0 ? `, 새 요청 ${clientIncomingCount}건` : ''}`}
+            aria-label={`친구 목록${clientIncomingCount > 0 ? `, 새 요청 ${clientIncomingCount}건` : ""}`}
           >
             <Users className="h-5 w-5" />
             {clientIncomingCount > 0 && (

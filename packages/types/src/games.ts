@@ -30,6 +30,8 @@ export interface GameDefinition {
   /** URL 프리픽스. `/lol/tournaments` 처럼 쓰인다. */
   slug: string;
   label: string;
+  /** 헤더 스위처처럼 자리가 좁은 곳에 쓰는 짧은 이름 */
+  shortLabel: string;
   /** 한 팀의 인원 */
   teamSize: number;
   /** 방 정원으로 고를 수 있는 값 */
@@ -47,6 +49,7 @@ const LOL: GameDefinition = {
   title: "LOL",
   slug: "lol",
   label: "리그 오브 레전드",
+  shortLabel: "롤",
   teamSize: 5,
   roomSizes: [10, 15, 20, 30, 40],
   hasPositions: true,
@@ -59,6 +62,7 @@ const PUBG: GameDefinition = {
   title: "PUBG",
   slug: "pubg",
   label: "배틀그라운드",
+  shortLabel: "배그",
   teamSize: 4,
   // 스쿼드 4인 기준. 실제 커스텀 매치 정원은 Phase 0 실측 뒤 조정한다.
   roomSizes: [16, 32, 48, 64],

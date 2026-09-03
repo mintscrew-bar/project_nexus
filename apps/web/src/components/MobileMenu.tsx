@@ -1,16 +1,37 @@
-'use client';
+"use client";
 
-import { cn } from '@/lib/utils';
-import { X, Menu, Home, Swords, Trophy, Users, Radio, MessageSquare, Settings, User, ExternalLink, Shield, Moon, Sun, BookOpen } from 'lucide-react';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { useState, useEffect, useRef } from 'react';
-import { Logo } from './Logo';
-import { DiscordIcon } from './icons/DiscordIcon';
-import { NEXUS_DISCORD_INVITE_URL } from '@/lib/constants';
-import { useAuthStore } from '@/stores/auth-store';
-import { usePersistentTheme } from '@/hooks/usePersistentTheme';
-import { acquireBodyScrollLock, releaseBodyScrollLock } from '@/lib/body-scroll-lock';
+import { cn } from "@/lib/utils";
+import {
+  X,
+  Menu,
+  Home,
+  Swords,
+  Trophy,
+  Users,
+  Radio,
+  MessageSquare,
+  Settings,
+  User,
+  ExternalLink,
+  Shield,
+  Moon,
+  Sun,
+  BookOpen,
+} from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useState, useEffect, useRef } from "react";
+import { Logo } from "./Logo";
+import { DiscordIcon } from "./icons/DiscordIcon";
+import { NEXUS_DISCORD_INVITE_URL } from "@/lib/constants";
+import { useAuthStore } from "@/stores/auth-store";
+import { usePersistentTheme } from "@/hooks/usePersistentTheme";
+import {
+  acquireBodyScrollLock,
+  releaseBodyScrollLock,
+} from "@/lib/body-scroll-lock";
+import { GameSwitcher } from "@/components/layout/GameSwitcher";
+import { gamePath, useCurrentGame } from "@/hooks/useCurrentGame";
 
 interface MobileMenuProps {
   className?: string;
@@ -19,16 +40,18 @@ interface MobileMenuProps {
 export function MobileMenu({ className }: MobileMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
+  const currentGame = useCurrentGame();
   const { user, isAuthenticated } = useAuthStore();
   const { resolvedTheme, toggleTheme } = usePersistentTheme();
   const [mounted, setMounted] = useState(false);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const drawerRef = useRef<HTMLDivElement>(null);
-  const scrollLockOwnerRef = useRef(Symbol('mobile-menu'));
+  const scrollLockOwnerRef = useRef(Symbol("mobile-menu"));
   const wasOpenRef = useRef(false);
 
   // 관리자/모더레이터 여부 (마운트 후에만 확정 → hydration 불일치 방지)
-  const isStaff = mounted && (user?.role === 'ADMIN' || user?.role === 'MODERATOR');
+  const isStaff =
+    mounted && (user?.role === "ADMIN" || user?.role === "MODERATOR");
 
   // Close menu on route change
   useEffect(() => {
@@ -45,7 +68,9 @@ export function MobileMenu({ className }: MobileMenuProps) {
     if (isOpen) {
       wasOpenRef.current = true;
       acquireBodyScrollLock(scrollLockOwner);
-      drawerRef.current?.querySelector<HTMLElement>('[data-mobile-menu-close]')?.focus();
+      drawerRef.current
+        ?.querySelector<HTMLElement>("[data-mobile-menu-close]")
+        ?.focus();
     } else {
       releaseBodyScrollLock(scrollLockOwner);
       if (wasOpenRef.current) {
@@ -62,13 +87,13 @@ export function MobileMenu({ className }: MobileMenuProps) {
     if (!isOpen) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
+      if (event.key === "Escape") {
         event.preventDefault();
         setIsOpen(false);
         menuButtonRef.current?.focus();
         return;
       }
-      if (event.key !== 'Tab') return;
+      if (event.key !== "Tab") return;
 
       const focusable = Array.from(
         drawerRef.current?.querySelectorAll<HTMLElement>(
@@ -87,30 +112,45 @@ export function MobileMenu({ className }: MobileMenuProps) {
       }
     };
 
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
   }, [isOpen]);
 
+  // 게임별 화면은 현재 게임 프리픽스가 붙는다(`/lol/tournaments`).
+  // 옛 경로를 쓰면 리다이렉트를 한 번 더 타고 활성 표시도 어긋난다.
   const navItems = [
-    { href: '/', label: '홈', icon: Home },
-    { href: '/tournaments', label: '내전', icon: Swords },
-    { href: '/matches', label: '내전 전적', icon: Trophy },
-    { href: '/clans', label: '클랜', icon: Users },
-    { href: '/streamers', label: '스트리머', icon: Radio },
-    { href: '/community', label: '커뮤니티', icon: MessageSquare },
-    { href: '/guide', label: '가이드', icon: BookOpen },
+    { href: "/", label: "홈", icon: Home },
+    {
+      href: gamePath(currentGame, "/tournaments"),
+      label: "내전",
+      icon: Swords,
+    },
+    {
+      href: gamePath(currentGame, "/matches"),
+      label: "내전 전적",
+      icon: Trophy,
+    },
+    { href: "/clans", label: "클랜", icon: Users },
+    { href: "/streamers", label: "스트리머", icon: Radio },
+    { href: "/community", label: "커뮤니티", icon: MessageSquare },
+    { href: gamePath(currentGame, "/guide"), label: "가이드", icon: BookOpen },
   ];
 
   const sidebarItems = [
-    { href: '/profile', label: '마이페이지', icon: User },
-    { href: '/ranking', label: '랭킹', icon: Trophy },
-    { href: '/settings', label: '설정', icon: Settings },
+    {
+      href: gamePath(currentGame, "/profile"),
+      label: "마이페이지",
+      icon: User,
+    },
+    { href: gamePath(currentGame, "/ranking"), label: "랭킹", icon: Trophy },
+    { href: "/settings", label: "설정", icon: Settings },
   ];
 
-  const isActive = (href: string) => pathname === href || (href !== '/' && pathname.startsWith(href));
+  const isActive = (href: string) =>
+    pathname === href || (href !== "/" && pathname.startsWith(href));
 
   return (
-    <div className={cn('nav:hidden', className)}>
+    <div className={cn("nav:hidden", className)}>
       {/* Menu Button */}
       <button
         ref={menuButtonRef}
@@ -135,8 +175,8 @@ export function MobileMenu({ className }: MobileMenuProps) {
       <div
         ref={drawerRef}
         className={cn(
-          'fixed top-0 left-0 bottom-0 w-72 bg-bg-secondary border-r border-bg-tertiary z-50 flex flex-col transform transition-transform duration-300 ease-out',
-          isOpen ? 'translate-x-0' : '-translate-x-full'
+          "fixed top-0 left-0 bottom-0 w-72 bg-bg-secondary border-r border-bg-tertiary z-50 flex flex-col transform transition-transform duration-300 ease-out",
+          isOpen ? "translate-x-0" : "-translate-x-full",
         )}
         aria-hidden={!isOpen}
         role="dialog"
@@ -146,7 +186,12 @@ export function MobileMenu({ className }: MobileMenuProps) {
       >
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-bg-tertiary flex-shrink-0">
-          <Link href="/" className="flex items-center gap-2" onClick={() => setIsOpen(false)}>
+          <GameSwitcher className="mr-auto" />
+          <Link
+            href="/"
+            className="flex items-center gap-2"
+            onClick={() => setIsOpen(false)}
+          >
             <Logo size="sm" variant="icon-only" />
             <span className="text-xl font-bold text-text-primary">Nexus</span>
           </Link>
@@ -173,10 +218,10 @@ export function MobileMenu({ className }: MobileMenuProps) {
                     href={item.href}
                     onClick={() => setIsOpen(false)}
                     className={cn(
-                      'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors',
+                      "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors",
                       isActive(item.href)
-                        ? 'bg-accent-primary/10 text-accent-primary'
-                        : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary'
+                        ? "bg-accent-primary/10 text-accent-primary"
+                        : "text-text-secondary hover:text-text-primary hover:bg-bg-tertiary",
                     )}
                   >
                     <item.icon className="h-5 w-5" />
@@ -188,30 +233,30 @@ export function MobileMenu({ className }: MobileMenuProps) {
           </div>
 
           {mounted && isAuthenticated ? (
-          <div>
-            <h3 className="text-xs font-semibold text-text-tertiary uppercase tracking-wider mb-2 px-3">
-              내 계정
-            </h3>
-            <ul className="space-y-1">
-              {sidebarItems.map((item) => (
-                <li key={item.href}>
-                  <Link
-                    href={item.href}
-                    onClick={() => setIsOpen(false)}
-                    className={cn(
-                      'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors',
-                      isActive(item.href)
-                        ? 'bg-accent-primary/10 text-accent-primary'
-                        : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary'
-                    )}
-                  >
-                    <item.icon className="h-5 w-5" />
-                    <span className="font-medium">{item.label}</span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
+            <div>
+              <h3 className="text-xs font-semibold text-text-tertiary uppercase tracking-wider mb-2 px-3">
+                내 계정
+              </h3>
+              <ul className="space-y-1">
+                {sidebarItems.map((item) => (
+                  <li key={item.href}>
+                    <Link
+                      href={item.href}
+                      onClick={() => setIsOpen(false)}
+                      className={cn(
+                        "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors",
+                        isActive(item.href)
+                          ? "bg-accent-primary/10 text-accent-primary"
+                          : "text-text-secondary hover:text-text-primary hover:bg-bg-tertiary",
+                      )}
+                    >
+                      <item.icon className="h-5 w-5" />
+                      <span className="font-medium">{item.label}</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
           ) : mounted ? (
             <div>
               <h3 className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-text-tertiary">
@@ -241,13 +286,13 @@ export function MobileMenu({ className }: MobileMenuProps) {
                     className="flex w-full items-center justify-between gap-3 px-3 py-2.5 rounded-lg text-text-secondary hover:text-text-primary hover:bg-bg-tertiary transition-colors"
                   >
                     <span className="flex items-center gap-3">
-                      {resolvedTheme === 'dark' ? (
+                      {resolvedTheme === "dark" ? (
                         <Sun className="h-5 w-5" />
                       ) : (
                         <Moon className="h-5 w-5" />
                       )}
                       <span className="font-medium">
-                        {resolvedTheme === 'dark' ? '라이트 모드' : '다크 모드'}
+                        {resolvedTheme === "dark" ? "라이트 모드" : "다크 모드"}
                       </span>
                     </span>
                   </button>
@@ -260,10 +305,10 @@ export function MobileMenu({ className }: MobileMenuProps) {
                     href="/admin"
                     onClick={() => setIsOpen(false)}
                     className={cn(
-                      'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors',
-                      isActive('/admin')
-                        ? 'bg-accent-primary/10 text-accent-primary'
-                        : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary'
+                      "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors",
+                      isActive("/admin")
+                        ? "bg-accent-primary/10 text-accent-primary"
+                        : "text-text-secondary hover:text-text-primary hover:bg-bg-tertiary",
                     )}
                   >
                     <Shield className="h-5 w-5" />
