@@ -4,6 +4,8 @@ import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../prisma/prisma.service";
 import { DiscordBotService } from "./discord-bot.service";
 import { DiscordVoiceService } from "./discord-voice.service";
+import { roomLobbyUrl } from "../../common/utils/app-url.util";
+import type { GameTitle } from "@nexus/types";
 
 /** 시작 1시간 전 리마인드를 보내는 구간 */
 const REMIND_1H_MS = 60 * 60 * 1000;
@@ -60,6 +62,8 @@ export class DiscordScheduleService {
       select: {
         id: true,
         name: true,
+        // 로비 링크가 `/lol/...` 처럼 게임별 경로라 URL 조립에 필요하다
+        gameTitle: true,
         maxParticipants: true,
         scheduledAt: true,
         createdAt: true,
@@ -129,6 +133,7 @@ export class DiscordScheduleService {
       select: {
         id: true,
         name: true,
+        gameTitle: true,
         maxParticipants: true,
         discordCategoryId: true,
         host: {
@@ -190,6 +195,7 @@ export class DiscordScheduleService {
     maxParticipants: number;
     host: { authProviders: { providerId: string }[] };
     participants: { id: string }[];
+    gameTitle: GameTitle;
   }): Promise<void> {
     const hostDiscordId = room.host.authProviders[0]?.providerId;
     if (!hostDiscordId) return;
@@ -205,7 +211,7 @@ export class DiscordScheduleService {
         "사람이 가장 잘 모이는 시간에 미리 예고해두면 확률이 올라갑니다.",
         "`/nexus schedule time:오늘 21:00 mode:경매 드래프트` 처럼 예약해보세요.",
         "",
-        `방은 그대로 남아 있습니다: ${appUrl}/tournaments/${room.id}/lobby`,
+        `방은 그대로 남아 있습니다: ${roomLobbyUrl(appUrl, room.id, room.gameTitle)}`,
       ].join("\n"),
     );
   }
@@ -272,6 +278,7 @@ export class DiscordScheduleService {
     id: string;
     name: string;
     discordGuildId: string | null;
+    gameTitle: GameTitle;
   }): Promise<void> {
     await this.prisma.room.update({
       where: { id: room.id },
@@ -306,7 +313,7 @@ export class DiscordScheduleService {
 
     const lines = [
       `🎮 **${room.name}** 내전이 시작됩니다.`,
-      `로비: ${appUrl}/tournaments/${room.id}/lobby`,
+      `로비: ${roomLobbyUrl(appUrl, room.id, room.gameTitle)}`,
     ];
     if (room.discordGuildId && lobbyChannel) {
       lines.push(

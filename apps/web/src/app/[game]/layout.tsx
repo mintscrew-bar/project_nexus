@@ -1,6 +1,28 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { DEFAULT_GAME, GAMES, gameFromSlug } from "@nexus/types";
+import {
+  DEFAULT_GAME,
+  GAMES,
+  GAME_TITLES,
+  gameFromSlug,
+} from "@nexus/types";
+
+/**
+ * 이 세그먼트가 받을 수 있는 게임 슬러그를 못박는다.
+ *
+ * layout 의 `notFound()` 만으로는 부족했다 — layout 과 page 는 병렬로 렌더돼서
+ * `/foobar/matches` 가 롤 전적 페이지를 그대로 200 으로 내보내고 있었다.
+ * (`/zzz-not-real` 도 마찬가지로 200) 아무 URL 이나 실제 페이지가 되면
+ * 검색엔진이 무한한 중복 문서를 색인한다.
+ *
+ * `dynamicParams = false` 와 함께 쓰면 목록에 없는 슬러그는 Next 가 세그먼트
+ * 단계에서 404 로 끊는다. 아래 `notFound()` 는 이중 방어로 남겨 둔다.
+ */
+export function generateStaticParams() {
+  return GAME_TITLES.map((title) => ({ game: GAMES[title].slug }));
+}
+
+export const dynamicParams = false;
 
 /**
  * 게임별 화면의 공통 진입점.

@@ -40,6 +40,7 @@ import type { DiscordVoiceService } from "./discord-voice.service";
 import { DiscordEmojiService, parseEmojiRef } from "./discord-emoji.service";
 import { formatKst, parseKstSchedule } from "./discord-schedule-time";
 import type { EmojiMap, RecruitEmojiName } from "./discord-emoji.service";
+import { roomBracketUrl, roomLobbyUrl } from "../../common/utils/app-url.util";
 
 // 티어 이모지 맵핑
 const TIER_EMOJI: Record<string, string> = {
@@ -2275,6 +2276,8 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
             id: true,
             name: true,
             status: true,
+            // 대진표 링크가 게임별 경로다
+            gameTitle: true,
           },
         },
       },
@@ -2326,7 +2329,7 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
         `**상태:** ${ROOM_STATUS_KR[room.status] ?? room.status} · ${completedCount}/${matches.length}경기 완료`,
       )
       .setFooter({
-        text: `웹에서 보기: ${appUrl}/tournaments/${room.id}/bracket`,
+        text: `웹에서 보기: ${roomBracketUrl(appUrl, room.id, room.gameTitle)}`,
       })
       .setTimestamp();
 
@@ -2757,7 +2760,7 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
 
     const appUrl =
       this.configService.get("APP_URL") || "https://labs-nexus.com";
-    const lobbyUrl = `${appUrl}/tournaments/${roomId}/lobby`;
+    const lobbyUrl = roomLobbyUrl(appUrl, roomId);
 
     const provider = await this.prisma.authProvider.findFirst({
       where: { provider: "DISCORD", providerId: interaction.user.id },
@@ -2885,7 +2888,7 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
         [
           `✅ **${name}** 예약 완료 — <t:${unix}:F> (<t:${unix}:R>)`,
           "모집 공지를 올렸습니다. 시작 1시간 전과 10분 전에 다시 알려드릴게요.",
-          `로비: ${appUrl}/tournaments/${room?.id}/lobby`,
+          `로비: ${roomLobbyUrl(appUrl, room!.id, room?.gameTitle)}`,
         ].join("\n"),
       );
     } catch (error: any) {
@@ -3175,7 +3178,7 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
             `음성 대기실: https://discord.com/channels/${notif.guildId}/${lobbyChannelId}`,
           );
         }
-        lines.push(`로비: ${appUrl}/tournaments/${roomId}/lobby`);
+        lines.push(`로비: ${roomLobbyUrl(appUrl, roomId)}`);
         if (mentionUsers.length > 0) {
           lines.push(mentionUsers.map((id) => `<@${id}>`).join(" "));
         }
@@ -3404,7 +3407,7 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
   } {
     const appUrl =
       this.configService.get("APP_URL") || "https://labs-nexus.com";
-    const lobbyUrl = `${appUrl}/tournaments/${roomId}/lobby`;
+    const lobbyUrl = roomLobbyUrl(appUrl, roomId);
 
     const MODE_LABEL: Record<string, string> = {
       AUCTION: "경매 드래프트",

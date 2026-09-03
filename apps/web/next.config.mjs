@@ -199,15 +199,38 @@ const nextConfig = {
     ];
   },
   async redirects() {
+    // 게임별 화면이 `/lol/*` 아래로 옮겨졌다(배그 확장). 옮기기 전 링크가
+    // 검색 색인·디스코드 공지·북마크에 이미 퍼져 있어 리다이렉트 없이 배포하면
+    // 그 링크가 전부 404 가 된다. 게임을 특정할 수 없는 옛 경로는 기본 게임(롤)으로 보낸다.
+    const MOVED_TO_GAME = [
+      "matches",
+      "ranking",
+      "guide",
+      "tournaments",
+      "auction",
+      "draft",
+      "profile",
+      "role-selection",
+    ];
+    const gameRedirects = MOVED_TO_GAME.flatMap((path) => [
+      { source: `/${path}`, destination: `/lol/${path}`, permanent: true },
+      {
+        source: `/${path}/:rest*`,
+        destination: `/lol/${path}/:rest*`,
+        permanent: true,
+      },
+    ]);
+
     return [
+      ...gameRedirects,
       {
         source: "/lab",
-        destination: "/matches",
+        destination: "/lol/matches",
         permanent: false,
       },
       {
         source: "/lab/:path*",
-        destination: "/matches",
+        destination: "/lol/matches",
         permanent: false,
       },
     ];
