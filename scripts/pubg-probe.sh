@@ -79,6 +79,7 @@ async function get(url) {
   const limit = Math.min(5, found.matches.length);
   console.log(`\n[Task 2] 최근 매치 ${limit}건 확인`);
   let custom = null;
+  let firstMatch = null;
 
   for (let i = 0; i < limit; i++) {
     const r = await get(`https://api.pubg.com/shards/${found.shard}/matches/${found.matches[i]}`);
@@ -89,23 +90,30 @@ async function get(url) {
       `  #${i + 1} ${a.createdAt} · ${a.gameMode} · ${a.mapName}` +
       ` · isCustomMatch=${a.isCustomMatch} · 팀 ${rosters.length}개`
     );
-    if (a.isCustomMatch && !custom) custom = { id: found.matches[i], attrs: a, included: r.body.included };
+    const parsed = { id: found.matches[i], attrs: a, included: r.body.included };
+    if (!firstMatch) firstMatch = parsed;
+    if (a.isCustomMatch && !custom) custom = parsed;
   }
 
-  if (!custom) {
-    console.log("\n[Task 3] 최근 매치 중 커스텀이 없어 자동 매칭은 검증하지 못했습니다.");
-    console.log("         커스텀 매치를 한 판 하신 뒤 다시 실행해주세요(보존 2주).");
+  // 커스텀이 없어도 응답 구조는 같다. 집계에 필요한 필드가 실제로 채워져 오는지는
+  // 일반 매치로도 확인할 수 있다 — 커스텀 여부 판별만 미검증으로 남는다.
+  const target = custom ?? firstMatch;
+  if (!target) {
+    console.log("\n[Task 3] 매치를 하나도 받지 못해 검증하지 못했습니다.");
     return;
   }
 
-  // ── Task 3: 스크림 집계에 필요한 필드가 다 나오는가 ──
-  const rosters = custom.included.filter((x) => x.type === "roster");
+  const rosters = target.included.filter((x) => x.type === "roster");
   const participants = new Map(
-    custom.included.filter((x) => x.type === "participant").map((p) => [p.id, p.attributes.stats])
+    target.included.filter((x) => x.type === "participant").map((p) => [p.id, p.attributes.stats])
   );
 
-  console.log(`\n[Task 3] 커스텀 매치 ${custom.id}`);
-  console.log(`  시작: ${custom.attrs.createdAt} / 팀 ${rosters.length}개`);
+  console.log(
+    custom
+      ? `\n[Task 3] 커스텀 매치 ${target.id}`
+      : `\n[Task 3] 커스텀 매치가 없어 일반 매치 ${target.id} 로 구조만 확인`
+  );
+  console.log(`  시작: ${target.attrs.createdAt} / 팀 ${rosters.length}개`);
   const rows = rosters.map((r) => {
     const members = (r.relationships?.participants?.data ?? []).map((p) => participants.get(p.id)).filter(Boolean);
     return {
@@ -122,6 +130,9 @@ async function get(url) {
 
   const ok = rows.every((r) => typeof r.rank === "number") && rows.every((r) => r.names.length > 0);
   console.log(`\n결론: 순위·킬·참가자 명단 ${ok ? "전부 확보 — 자동 집계 가능" : "일부 누락 — 설계 재검토 필요"}`);
-  console.log(`      매치 특정 조건: createdAt(${custom.attrs.createdAt}) + isCustomMatch=true + 참가자 명단`);
+  console.log(`      매치 특정 조건: createdAt(${target.attrs.createdAt}) + isCustomMatch + 참가자 명단`);
+  if (!custom) {
+    console.log("      ※ 일반 매치 기준. isCustomMatch=true 인 매치가 같은 구조로 오는지는 미검증.");
+  }
 })().catch((e) => { console.error("실패:", e.message); process.exit(1); });
 '
