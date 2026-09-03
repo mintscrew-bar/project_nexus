@@ -392,6 +392,8 @@ model Room {
   crossGuildAnnounce Boolean @default(true)
 
   id                      String                @id @default(cuid())
+  /// 이 방이 어떤 게임의 내전인지. 목록·전적·랭킹이 이 값으로 갈린다.
+  gameTitle               GameTitle             @default(LOL)
   name                    String
   hostId                  String
   password                String?
@@ -448,6 +450,8 @@ model Room {
   @@index([createdAt])
   // 예약 리마인드 크론: WHERE status='WAITING' AND scheduledAt BETWEEN ...
   @@index([status, scheduledAt])
+  // 방 목록은 항상 게임별로 조회한다: WHERE gameTitle=X AND status=Y
+  @@index([gameTitle, status])
   @@map("rooms")
 }
 
@@ -1542,6 +1546,13 @@ enum RoomStatus {
   ROLE_SELECTION
   IN_PROGRESS
   COMPLETED
+}
+
+/// 사이트가 지원하는 게임. 롤과 배그는 진행 방식이 달라 방·전적·랭킹이 분리된다.
+/// 기존 데이터는 전부 LOL이다.
+enum GameTitle {
+  LOL
+  PUBG
 }
 
 enum TeamMode {

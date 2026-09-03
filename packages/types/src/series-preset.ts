@@ -221,7 +221,4 @@ export function normalizeSeriesPreset(
     : DEFAULT_SERIES_PRESET;
 }
 
-/** 룸 최대 인원 → 팀 수 (5인 1팀) */
-export function teamCountForRoomSize(maxParticipants: number): number {
-  return Math.floor(maxParticipants / 5);
-}
+// teamCountForRoomSize 는 게임마다 팀 인원이 달라 games.ts 로 옮겼다.

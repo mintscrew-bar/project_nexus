@@ -1,3 +1,18 @@
+- [ ] **`riot_match_cache` 정리 실행** — 검증 끝, 실행만 남음
+  - `scripts/ops/purge-riot-match-cache.sh --apply` (드라이런이 기본값)
+  - 101,292건 / 4.8GB 삭제. 보호되는 것: 미인제스트 61건, 최근 14일 1,340건
+  - 앱 코드의 `TasksService.runRiotMatchCacheCleanup()` 과 완전히 같은 조건이다.
+    그 크론은 `RIOT_MATCH_CACHE_CLEANUP_ENABLED` 가 `false` 라 한 번도 돈 적이 없다.
+  - **앞으로도 자동으로 돌게 하려면** GitHub Secret `RIOT_MATCH_CACHE_CLEANUP_ENABLED` 를
+    `true` 로 바꿔야 한다 (`.env.production` 은 배포 때마다 Secrets 에서 재생성된다).
+  - 전체 백업 확보됨: `~/nexus-backups/weekly/db-full-20260903-090005.sql.gz` (1.1GB)
+
+> **정정**: 앞서 "죽은 데이터 6.6GB" 라고 했는데 절반은 틀렸다.
+> 지워도 되는 건 `riot_match_cache` 4.8GB(원본 JSON, 정형화 후 중복)뿐이다.
+> `match_participants`(1.6GB)와 `known_puuids`(192MB)는 **살아 있는 기능이 읽는다** —
+> ranking.service, user.service, stats.service, match.service 등 10곳 이상에서
+> 전적·랭킹·챔피언 통계·"부분 통계" 판정에 쓰인다. 지우면 기능이 깨진다.
+
 # 다음 할 일 (통합 백로그)
 
 > 작성일: 2026-09-03

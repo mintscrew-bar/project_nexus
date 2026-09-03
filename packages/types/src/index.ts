@@ -251,8 +251,25 @@ export {
   getSeriesPresetsForTeamCount,
   isSeriesPresetAllowed,
   normalizeSeriesPreset,
-  teamCountForRoomSize,
 } from './series-preset';
+
+export {
+  GAMES,
+  GAME_TITLES,
+  DEFAULT_GAME,
+  getGame,
+  gameFromSlug,
+  enabledGames,
+  teamCountForRoomSize,
+  isValidRoomSize,
+} from './games';
+
+export type {
+  GameTitle,
+  GameDefinition,
+  GameTeamMode,
+  GameResultShape,
+} from './games';
 
 export type { SeriesPreset, SeriesPresetInfo } from './series-preset';
 

@@ -49,7 +49,7 @@
 - [x] Task 6: DB 자동 백업 (2026-09-03 완료)
   - `scripts/ops/nexus-backup.sh` — 매일 03:30 cron (`install-cron.sh`).
   - **2단계 구조로 나눴다.** 실측해 보니 DB 6.7GB 중 `riot_match_cache` 가 4.8GB 로,
-    폐기된 Lab 인제스트가 남긴 외부 매치 원본 JSON 이었다. 전체 덤프는 700MB·4분이 넘어
+    폐기된 Lab 인제스트가 남긴 외부 매치 원본 JSON 이었다. 전체 덤프는 실측 1.1GB·452초라
     매일 돌리면 결국 백업을 꺼버리게 되는 크기다.
     - `db-core-*.sql.gz` — 매일. `--exclude-table-data=riot_match_cache`. **220MB / 54초**
     - `db-full-*.sql.gz` — 일요일만. 캐시까지 포함
