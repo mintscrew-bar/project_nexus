@@ -18,11 +18,17 @@ import {
   BracketType,
   MatchStatus,
   Role,
+  GameTitle,
 } from "@nexus/database";
 import { Prisma } from "@prisma/client";
 import * as bcrypt from "bcrypt";
 import { randomInt } from "crypto";
-import { normalizeSeriesPreset, teamCountForRoomSize } from "@nexus/types";
+import {
+  normalizeSeriesPreset,
+  teamCountForRoomSize,
+  isValidRoomSize,
+  getGame,
+} from "@nexus/types";
 import { StreamerService } from "../streamer/streamer.service";
 import { RedisService } from "../redis/redis.service";
 import { BalanceScoreService } from "../common/balance-score.service";
@@ -41,6 +47,8 @@ export interface CreateRoomDto {
   teamMode: TeamMode;
   allowSpectators?: boolean;
   discordGuildId?: string;
+  /** 어떤 게임의 내전인지. 생략하면 롤이다. */
+  gameTitle?: GameTitle;
   /** 예고제: 내전 예정 시각(ISO 8601). 없으면 지금 바로 여는 방이다. */
   scheduledAt?: string;
 
@@ -962,10 +970,15 @@ export class RoomService {
       }
     }
 
-    // Validate max participants
-    if (![10, 15, 20, 30, 40].includes(dto.maxParticipants)) {
+    // 게임마다 팀 인원이 달라 고를 수 있는 정원도 다르다.
+    const gameTitle = dto.gameTitle ?? GameTitle.LOL;
+    const game = getGame(gameTitle);
+    if (!game.enabled) {
+      throw new BadRequestException(`${game.label} 내전은 아직 준비 중입니다.`);
+    }
+    if (!isValidRoomSize(dto.maxParticipants, gameTitle)) {
       throw new BadRequestException(
-        "Max participants must be 10, 15, 20, 30, or 40",
+        `정원은 ${game.roomSizes.join(", ")}명 중에서 골라주세요.`,
       );
     }
 
@@ -1036,6 +1049,7 @@ export class RoomService {
             teamMode: dto.teamMode,
             allowSpectators: dto.allowSpectators ?? true,
             discordGuildId: resolvedDiscordGuildId,
+            gameTitle,
             scheduledAt,
 
             // Draft settings
@@ -1048,7 +1062,7 @@ export class RoomService {
             // 팀 수에 맞지 않는 프리셋은 단판으로 떨어뜨린다.
             seriesPreset: normalizeSeriesPreset(
               dto.seriesPreset,
-              teamCountForRoomSize(dto.maxParticipants),
+              teamCountForRoomSize(dto.maxParticipants, gameTitle),
             ),
 
             participants: {
@@ -2228,7 +2242,7 @@ export class RoomService {
     ) {
       data.seriesPreset = normalizeSeriesPreset(
         updates.seriesPreset ?? room.seriesPreset,
-        teamCountForRoomSize(nextMaxParticipants),
+        teamCountForRoomSize(nextMaxParticipants, room.gameTitle),
       );
     }
 

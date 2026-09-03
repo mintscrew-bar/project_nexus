@@ -11,7 +11,12 @@ import {
   IsISO8601,
 } from "class-validator";
 import { Transform } from "class-transformer";
-import { TeamMode, TeamCaptainSelection, BracketType } from "@nexus/database";
+import {
+  TeamMode,
+  TeamCaptainSelection,
+  BracketType,
+  GameTitle,
+} from "@nexus/database";
 import { stripAllHtml } from "@/common/utils/sanitize";
 
 /**
@@ -30,9 +35,17 @@ export class CreateRoomDto {
   @MaxLength(20)
   password?: string;
 
+  /**
+   * 어떤 게임의 내전인지. 생략하면 롤이다.
+   * 정원·팀 수·고를 수 있는 팀 편성 방식이 이 값에 따라 갈린다.
+   */
+  @IsOptional()
+  @IsEnum(GameTitle, { message: "지원하지 않는 게임입니다." })
+  gameTitle?: GameTitle;
+
   @IsInt()
   @Min(10, { message: "최소 10명 이상이어야 합니다." })
-  @Max(40, { message: "최대 40명까지 가능합니다." })
+  @Max(64, { message: "정원이 너무 많습니다." })
   maxParticipants: number;
 
   @IsEnum(TeamMode, { message: "유효한 팀 모드를 선택해주세요." })
