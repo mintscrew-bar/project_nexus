@@ -194,15 +194,19 @@ model ScrimTeamResult  { roundId, teamId, placement, kills, points }
 샤드 판별 → 최근 매치 훑기 → 팀별 순위·킬·명단 추출까지 한 번에 본다.
 
 - [x] Task 1: PUBG 개발자 키 발급 + 샤드 구분 — 키는 GitHub Secrets 경유로 배포에 주입.
-      **닉네임 조회는 샤드와 무관하다.** 계정 2개(`Mango-mint`, `AD_ENTAC`)를
-      steam·kakao 양쪽에 물었더니 **동일한 `account.xxx` ID**가 돌아왔다.
+      **닉네임 조회는 샤드와 무관하다.** 계정 여러 개를 steam·kakao 양쪽에
+      물었더니 **동일한 `account.xxx` ID**가 돌아왔다.
       응답의 `shardId`는 요청한 샤드를 그대로 되돌려줄 뿐 계정의 소속이 아니다.
-      **갈리는 것은 매치 기록이다** — `Mango-mint`은 steam 20건 / kakao 0건.
+      **갈리는 것은 매치 기록이다** — 스팀으로 플레이하는 계정은 steam 20건 / kakao 0건.
+
+      반대 방향도 확인했다 — 카카오로 플레이하는 계정 하나는 steam 0건 / **kakao 86건**으로,
+      카카오 플레이 계정은 kakao 샤드에서만 매치가 나온다.
+      kakao 샤드의 매치 응답 구조는 steam과 동일했다(팀 16개, 순위·킬·명단 정상).
 
       → 계정 연동에서 사용자에게 샤드를 묻지 않는다. 닉네임으로 계정 ID를 확정하고,
         매치는 두 샤드를 훑어 나오는 쪽을 `PubgAccount`에 기억해 이후 예산을 아낀다.
-      → 남은 확인: 카카오로 실제 플레이한 계정이 kakao 샤드에서 매치를 반환하는지.
-        검증에 쓴 두 계정이 모두 스팀 플레이라 반대 방향 증거가 없다.
+      → 주의: 로스터 인원이 항상 팀 정원과 같지는 않다(3인 로스터 관측).
+        포인트 집계는 로스터 인원수를 가정하지 말고 실제 참가자로 계산한다.
 - [x] Task 2: 매치 응답 구조 실측 (2026-09-03)
       `data.attributes` — `createdAt`, `gameMode`(squad), `mapName`, **`isCustomMatch`**
       `included[type=roster]` — 팀별 `attributes.stats.rank`(순위)
@@ -287,9 +291,7 @@ model ScrimTeamResult  { roundId, teamId, placement, kills, points }
 - **2주 보존.** 라운드가 끝나고 방치되면 결과를 영영 못 받는다. 수동 입력 경로(Task 23)가 보험이다.
 - **커스텀 매치 개설 권한**(Task 5)이 제한적이라면 롤 토너먼트 코드와 같은 병목이 된다.
   Phase 0에서 가장 먼저 확인해야 한다.
-- **카카오 플레이 기록 미확인.** 닉네임 조회가 샤드 무관인 것은 확인했지만(Task 1),
-  카카오로 플레이한 계정이 kakao 샤드에서 매치를 돌려주는지는 아직 보지 못했다.
-  Phase 2 전에 카카오 유저 닉네임 하나로 확인한다.
+- 샤드 문제는 해소됐다(Task 1). steam·kakao 양쪽 모두 실측으로 확인했다.
 - 엔드포인트 경로·응답 스키마는 2026-09-03 실측으로 확인됐다 (Task 2).
 
 ## 참고
