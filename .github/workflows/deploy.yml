@@ -88,6 +88,7 @@ jobs:
           DISCORD_CLIENT_ID=${{ secrets.DISCORD_CLIENT_ID }}
           DISCORD_CLIENT_SECRET=${{ secrets.DISCORD_CLIENT_SECRET }}
           RIOT_API_KEY=${{ secrets.RIOT_API_KEY }}
+          PUBG_API_KEY=${{ secrets.PUBG_API_KEY }}
           RIOT_REGION=${{ secrets.RIOT_REGION }}
           RIOT_TOURNAMENT_PROVIDER_ID=${{ secrets.RIOT_TOURNAMENT_PROVIDER_ID }}
           RIOT_TOURNAMENT_ID=${{ secrets.RIOT_TOURNAMENT_ID }}
