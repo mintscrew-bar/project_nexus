@@ -364,6 +364,11 @@ export class TasksService {
       return { deletedCount: 0, cutoff, enabled: false };
     }
 
+    // 가드 2개를 모두 만족하는 행만 지운다.
+    //  1) 정형 인제스트 완료(matches 에 대응 행) — 컬럼으로 뽑을 건 뽑혔다
+    //  2) 아카이브 존재(riot_match_archives) — 컬럼으로 안 뽑은 나머지도 보존됐다
+    // 2번이 없으면 아직 아카이브되지 않은 매치의 challenges 129키가 영구 소실된다.
+    // Riot 은 오래된 매치를 다시 주지 않으므로 되돌릴 방법이 없다.
     const deleted = await this.prisma.$executeRaw`
       DELETE FROM "riot_match_cache" rmc
       WHERE rmc."gameEnd" < ${cutoff}
@@ -372,6 +377,11 @@ export class TasksService {
           FROM "matches" m
           WHERE m."riotMatchId" = rmc."matchId"
         )
+        AND EXISTS (
+          SELECT 1
+          FROM "riot_match_archives" a
+          WHERE a."matchId" = rmc."matchId"
+        )
     `;
 
     return { deletedCount: Number(deleted), cutoff, enabled: true };
@@ -379,7 +389,7 @@ export class TasksService {
 
   /**
    * Riot raw match cache TTL cleanup - 매일 새벽 2시 20분.
-   * 정형 MatchParticipant 인제스트가 완료된 row만 삭제 (EXISTS 조건).
+   * 정형 인제스트 + 아카이브가 모두 끝난 row만 삭제 (EXISTS 조건 2개).
    * RIOT_MATCH_CACHE_CLEANUP_ENABLED=true 로 활성화.
    */
   @Cron("20 2 * * *")

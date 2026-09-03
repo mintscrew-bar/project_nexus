@@ -4,8 +4,11 @@
 #
 # 무엇을 지우나: 앱 코드의 TasksService.runRiotMatchCacheCleanup() 과 **완전히 같은 조건**이다.
 #   1) gameEnd 가 TTL(기본 14일) 보다 오래됐고
-#   2) matches 테이블에 대응 행이 있다 (= 정형 인제스트가 끝나 원본 JSON 이 중복인 것)
-# 두 조건 중 하나라도 안 맞으면 남는다. 최근 매치와 아직 인제스트 안 된 매치는 보호된다.
+#   2) matches 테이블에 대응 행이 있고 (= 정형 인제스트 완료)
+#   3) riot_match_archives 에 대응 행이 있다 (= 컬럼으로 안 뽑은 나머지도 보존됨)
+# 셋 중 하나라도 안 맞으면 남는다. 최근 매치·미인제스트·미아카이브는 보호된다.
+# 3번이 핵심이다 — 아카이브 안 된 매치를 지우면 challenges 129키가 영구 소실되고
+# Riot 은 오래된 매치를 다시 주지 않는다.
 #
 # 왜 따로 필요한가: 그 크론은 RIOT_MATCH_CACHE_CLEANUP_ENABLED=true 일 때만 도는데
 # 운영은 false 라서 한 번도 돌지 않았고, 폐기된 Lab 인제스트가 남긴 10만 건이 쌓였다.
@@ -39,9 +42,12 @@ SELECT
   (SELECT count(*) FROM riot_match_cache) AS "전체",
   (SELECT count(*) FROM riot_match_cache rmc
      WHERE rmc."gameEnd" < now() - interval '${TTL_DAYS} days'
-       AND EXISTS (SELECT 1 FROM matches m WHERE m."riotMatchId" = rmc."matchId")) AS "삭제대상",
+       AND EXISTS (SELECT 1 FROM matches m WHERE m."riotMatchId" = rmc."matchId")
+       AND EXISTS (SELECT 1 FROM riot_match_archives a WHERE a."matchId" = rmc."matchId")) AS "삭제대상",
   (SELECT count(*) FROM riot_match_cache rmc
      WHERE NOT EXISTS (SELECT 1 FROM matches m WHERE m."riotMatchId" = rmc."matchId")) AS "미인제스트_보호",
+  (SELECT count(*) FROM riot_match_cache rmc
+     WHERE NOT EXISTS (SELECT 1 FROM riot_match_archives a WHERE a."matchId" = rmc."matchId")) AS "미아카이브_보호",
   (SELECT count(*) FROM riot_match_cache
      WHERE "gameEnd" >= now() - interval '${TTL_DAYS} days') AS "최근_보호",
   pg_size_pretty(pg_total_relation_size('riot_match_cache')) AS "현재크기";
@@ -69,6 +75,7 @@ BEGIN
       FROM riot_match_cache rmc
       WHERE rmc."gameEnd" < cutoff
         AND EXISTS (SELECT 1 FROM matches m WHERE m."riotMatchId" = rmc."matchId")
+        AND EXISTS (SELECT 1 FROM riot_match_archives a WHERE a."matchId" = rmc."matchId")
       LIMIT ${BATCH}
     )
     DELETE FROM riot_match_cache r USING victims v WHERE r."matchId" = v."matchId";

@@ -9,61 +9,87 @@
 \set ON_ERROR_STOP on
 \timing on
 
+-- 진행 커서. 캐시 행 기준으로 돌아 같은 원본을 10번 detoast 하지 않게 한다.
+CREATE TABLE IF NOT EXISTS _backfill_cursor(name text PRIMARY KEY, pos text NOT NULL);
+INSERT INTO _backfill_cursor VALUES ('challenge_columns','') ON CONFLICT DO NOTHING;
+
 DO $$
 DECLARE
   done bigint := 0;
   batch bigint;
+  cur text;
+  last text;
 BEGIN
   LOOP
-    WITH tgt AS (
-      SELECT mp.id, p AS pj
-      FROM match_participants mp
-      JOIN matches m            ON m.id = mp."matchId"
-      JOIN riot_match_cache rmc ON rmc."matchId" = m."riotMatchId"
-      CROSS JOIN LATERAL jsonb_array_elements(rmc.data->'info'->'participants') p
-      WHERE mp."challengesExtractedAt" IS NULL
-        AND mp.puuid IS NOT NULL
-        AND p->>'puuid' = mp.puuid
-      LIMIT 20000
+    SELECT pos INTO cur FROM _backfill_cursor WHERE name='challenge_columns';
+
+    CREATE TEMP TABLE IF NOT EXISTS chunk(match_id text, riot_id text, pj jsonb) ON COMMIT DROP;
+
+    WITH src AS (
+      SELECT rmc."matchId", rmc.data
+      FROM riot_match_cache rmc
+      WHERE rmc."matchId" > cur
+      ORDER BY rmc."matchId"
+      LIMIT 500
     )
+    INSERT INTO chunk
+    SELECT m.id, src."matchId", p
+    FROM src
+    JOIN matches m ON m."riotMatchId" = src."matchId"
+    CROSS JOIN LATERAL jsonb_array_elements(src.data->'info'->'participants') p;
+
+    SELECT max(riot_id) INTO last FROM chunk;
+    IF last IS NULL THEN
+      -- 이 구간에 정형화된 매치가 없다. 커서만 밀고 계속한다.
+      SELECT max("matchId") INTO last FROM (
+        SELECT "matchId" FROM riot_match_cache WHERE "matchId" > cur ORDER BY "matchId" LIMIT 500
+      ) t;
+      EXIT WHEN last IS NULL;
+      UPDATE _backfill_cursor SET pos = last WHERE name='challenge_columns';
+      COMMIT;
+      CONTINUE;
+    END IF;
+
     UPDATE match_participants mp SET
-      -- 실수형 지표
-      "kda"                          = (pj->'challenges'->>'kda')::double precision,
-      "killParticipation"            = (pj->'challenges'->>'killParticipation')::double precision,
-      "damagePerMinute"              = (pj->'challenges'->>'damagePerMinute')::double precision,
-      "goldPerMinute"                = (pj->'challenges'->>'goldPerMinute')::double precision,
-      "teamDamagePercentage"         = (pj->'challenges'->>'teamDamagePercentage')::double precision,
-      "damageTakenOnTeamPercentage"  = (pj->'challenges'->>'damageTakenOnTeamPercentage')::double precision,
-      "visionScorePerMinute"         = (pj->'challenges'->>'visionScorePerMinute')::double precision,
-      "jungleCsBefore10Minutes"      = (pj->'challenges'->>'jungleCsBefore10Minutes')::double precision,
-      "maxCsAdvantageOnLaneOpponent" = (pj->'challenges'->>'maxCsAdvantageOnLaneOpponent')::double precision,
-      "effectiveHealAndShielding"    = (pj->'challenges'->>'effectiveHealAndShielding')::double precision,
-      -- 정수형 지표. Riot 이 정수여야 할 값을 소수로 주는 경우가 있어 반올림한다.
-      "laneMinionsFirst10Minutes"    = round((pj->'challenges'->>'laneMinionsFirst10Minutes')::numeric),
-      "laningPhaseGoldExpAdvantage"  = round((pj->'challenges'->>'laningPhaseGoldExpAdvantage')::numeric),
-      "maxLevelLeadLaneOpponent"     = round((pj->'challenges'->>'maxLevelLeadLaneOpponent')::numeric),
-      "soloKills"                    = round((pj->'challenges'->>'soloKills')::numeric),
-      "turretPlatesTaken"            = round((pj->'challenges'->>'turretPlatesTaken')::numeric),
-      "controlWardsPlaced"           = round((pj->'challenges'->>'controlWardsPlaced')::numeric),
-      "skillshotsHit"                = round((pj->'challenges'->>'skillshotsHit')::numeric),
-      "skillshotsDodged"             = round((pj->'challenges'->>'skillshotsDodged')::numeric),
-      "saveAllyFromDeath"            = round((pj->'challenges'->>'saveAllyFromDeath')::numeric),
-      "abilityUses"                  = round((pj->'challenges'->>'abilityUses')::numeric),
-      -- 참가자 루트에서 추가 추출
-      "magicDamageToChampions"       = round((pj->>'magicDamageDealtToChampions')::numeric),
-      "physicalDamageToChampions"    = round((pj->>'physicalDamageDealtToChampions')::numeric),
-      "trueDamageToChampions"        = round((pj->>'trueDamageDealtToChampions')::numeric),
-      "damageDealtToObjectives"      = round((pj->>'damageDealtToObjectives')::numeric),
-      "damageDealtToTurrets"         = round((pj->>'damageDealtToTurrets')::numeric),
-      "timePlayed"                   = round((pj->>'timePlayed')::numeric),
-      "champExperience"              = round((pj->>'champExperience')::numeric),
+      "kda"                          = (c.pj->'challenges'->>'kda')::double precision,
+      "killParticipation"            = (c.pj->'challenges'->>'killParticipation')::double precision,
+      "damagePerMinute"              = (c.pj->'challenges'->>'damagePerMinute')::double precision,
+      "goldPerMinute"                = (c.pj->'challenges'->>'goldPerMinute')::double precision,
+      "teamDamagePercentage"         = (c.pj->'challenges'->>'teamDamagePercentage')::double precision,
+      "damageTakenOnTeamPercentage"  = (c.pj->'challenges'->>'damageTakenOnTeamPercentage')::double precision,
+      "visionScorePerMinute"         = (c.pj->'challenges'->>'visionScorePerMinute')::double precision,
+      "jungleCsBefore10Minutes"      = (c.pj->'challenges'->>'jungleCsBefore10Minutes')::double precision,
+      "maxCsAdvantageOnLaneOpponent" = (c.pj->'challenges'->>'maxCsAdvantageOnLaneOpponent')::double precision,
+      "effectiveHealAndShielding"    = (c.pj->'challenges'->>'effectiveHealAndShielding')::double precision,
+      "laneMinionsFirst10Minutes"    = round((c.pj->'challenges'->>'laneMinionsFirst10Minutes')::numeric),
+      "laningPhaseGoldExpAdvantage"  = round((c.pj->'challenges'->>'laningPhaseGoldExpAdvantage')::numeric),
+      "maxLevelLeadLaneOpponent"     = round((c.pj->'challenges'->>'maxLevelLeadLaneOpponent')::numeric),
+      "soloKills"                    = round((c.pj->'challenges'->>'soloKills')::numeric),
+      "turretPlatesTaken"            = round((c.pj->'challenges'->>'turretPlatesTaken')::numeric),
+      "controlWardsPlaced"           = round((c.pj->'challenges'->>'controlWardsPlaced')::numeric),
+      "skillshotsHit"                = round((c.pj->'challenges'->>'skillshotsHit')::numeric),
+      "skillshotsDodged"             = round((c.pj->'challenges'->>'skillshotsDodged')::numeric),
+      "saveAllyFromDeath"            = round((c.pj->'challenges'->>'saveAllyFromDeath')::numeric),
+      "abilityUses"                  = round((c.pj->'challenges'->>'abilityUses')::numeric),
+      "magicDamageToChampions"       = round((c.pj->>'magicDamageDealtToChampions')::numeric),
+      "physicalDamageToChampions"    = round((c.pj->>'physicalDamageDealtToChampions')::numeric),
+      "trueDamageToChampions"        = round((c.pj->>'trueDamageDealtToChampions')::numeric),
+      "damageDealtToObjectives"      = round((c.pj->>'damageDealtToObjectives')::numeric),
+      "damageDealtToTurrets"         = round((c.pj->>'damageDealtToTurrets')::numeric),
+      "timePlayed"                   = round((c.pj->>'timePlayed')::numeric),
+      "champExperience"              = round((c.pj->>'champExperience')::numeric),
       "challengesExtractedAt"        = now()
-    FROM tgt WHERE mp.id = tgt.id;
+    FROM chunk c
+    WHERE mp."matchId" = c.match_id
+      AND mp.puuid = c.pj->>'puuid'
+      AND mp."challengesExtractedAt" IS NULL;
 
     GET DIAGNOSTICS batch = ROW_COUNT;
-    EXIT WHEN batch = 0;
     done := done + batch;
-    RAISE NOTICE '컬럼 백필 누적 %', done;
+
+    UPDATE _backfill_cursor SET pos = last WHERE name='challenge_columns';
+    COMMIT;  -- 배치마다 커밋해야 락과 팽창이 쌓이지 않는다
+    RAISE NOTICE '컬럼 백필 누적 % (커서 %)', done, last;
   END LOOP;
   RAISE NOTICE '=== 총 % 행 갱신 ===', done;
 END $$;
