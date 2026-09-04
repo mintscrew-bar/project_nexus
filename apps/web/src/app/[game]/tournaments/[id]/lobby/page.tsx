@@ -2,7 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useGamePrefix } from "@/hooks/useCurrentGame";
-import { GAMES, DEFAULT_GAME, type GameTitle } from "@nexus/types";
+import { getRoomStagePath, getTeamModeStagePath } from "@nexus/types";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useLobbyStore } from "@/stores/lobby-store";
 import { useAuthStore } from "@/stores/auth-store";
@@ -58,73 +58,6 @@ const STAGE_TRANSITION_MIN_TOKEN_TTL_MS = 2 * 60 * 1000;
 const STAGE_HANDOFF_LOBBY_CLEANUP_DELAY_MS = 15 * 1000;
 // 소켓 연결이 이 시간 내에 성립하지 않으면 무한 스피너 대신 복구 화면으로 전환한다.
 const LOBBY_CONNECT_TIMEOUT_MS = 10 * 1000;
-
-// 스테이지 경로는 전부 게임 프리픽스(`/lol` · `/pubg`) 아래에 있다.
-// 프리픽스를 빼먹으면 리다이렉트를 한 번 더 타고, 배그 방에서는 롤 화면으로 샌다.
-type StageRoom = {
-  id: string;
-  gameTitle?: GameTitle;
-  pubgGameMode?: "KILL_MATCH" | "BATTLE_ROYALE" | "FREE_MATCH" | null;
-  teamMode: "AUCTION" | "SNAKE_DRAFT" | "AUTO_BALANCE" | "MANUAL_TEAM";
-};
-
-/**
- * 팀 편성이 끝난 뒤 어디로 가는가.
- *
- * 롤은 역할 선택 → 대진표. 배그는 역할 선택 단계가 없고,
- * 배틀로얄은 대진표가 아니라 라운드 누적 리더보드(스크림)로 간다.
- */
-const afterTeamsPath = (room: StageRoom, gamePrefix: string) => {
-  if (GAMES[room.gameTitle ?? DEFAULT_GAME].hasPositions) {
-    return `${gamePrefix}/role-selection/${room.id}`;
-  }
-  if (room.pubgGameMode === "BATTLE_ROYALE") {
-    return `${gamePrefix}/tournaments/${room.id}/scrim`;
-  }
-  return `${gamePrefix}/tournaments/${room.id}/bracket`;
-};
-
-const getTeamModeStagePath = (room: StageRoom, gamePrefix: string) => {
-  if (room.teamMode === "AUCTION") return `${gamePrefix}/auction/${room.id}`;
-  if (room.teamMode === "SNAKE_DRAFT") return `${gamePrefix}/draft/${room.id}`;
-  if (room.teamMode === "AUTO_BALANCE") {
-    return afterTeamsPath(room, gamePrefix);
-  }
-  return afterTeamsPath(room, gamePrefix);
-};
-
-const getRoomStagePath = (
-  room: StageRoom & { status?: string },
-  gamePrefix: string,
-) => {
-  if (room.status === "IN_PROGRESS") {
-    return room.pubgGameMode === "BATTLE_ROYALE"
-      ? `${gamePrefix}/tournaments/${room.id}/scrim`
-      : `${gamePrefix}/tournaments/${room.id}/bracket`;
-  }
-
-  // Auto balance stays in the lobby while teams are generated and reviewed.
-  // The server emits game-starting only after confirmation and bracket creation.
-  if (room.teamMode === "AUTO_BALANCE") {
-    return null;
-  }
-
-  if (room.status === "ROLE_SELECTION" || room.status === "DRAFT_COMPLETED") {
-    // 자동 밸런스는 편성 직후 대진표로 넘기지 않는다. 팀 점수 차나 비선호 라인이
-    // 나올 수 있어서 방장이 로비에서 결과를 확인하고 다시 돌리거나 확정한다.
-    return afterTeamsPath(room, gamePrefix);
-  }
-
-  if (room.status === "DRAFT" || room.status === "TEAM_SELECTION") {
-    return getTeamModeStagePath(room, gamePrefix);
-  }
-
-  if (!room.status) {
-    return getTeamModeStagePath(room, gamePrefix);
-  }
-
-  return null;
-};
 
 /* ─── Main Page ─── */
 export default function TournamentLobbyPage() {

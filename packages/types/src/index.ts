@@ -312,6 +312,14 @@ export type {
   PubgBalanceResult,
 } from './pubg-balance';
 
+export {
+  afterTeamsPath,
+  getTeamModeStagePath,
+  getRoomStagePath,
+} from './lobby-stage-path';
+
+export type { StageRoom } from './lobby-stage-path';
+
 export type {
   GameTitle,
   GameDefinition,
