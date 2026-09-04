@@ -1216,6 +1216,27 @@ export const pubgApi = {
     await apiClient.delete(`/pubg/accounts/${accountId}`);
   },
 
+  /** 킬내기 결과 — 승패는 기존 2팀 흐름을 쓰고 킬 수만 얹는다. */
+  reportKillMatch: async (
+    matchId: string,
+    data: {
+      winnerId?: string;
+      teams: { teamId: string; kills: number }[];
+      players?: { userId: string; kills: number }[];
+    },
+  ) => {
+    const response = await apiClient.post(
+      `/pubg/matches/${matchId}/kills`,
+      data,
+    );
+    return response.data;
+  },
+
+  getKillMatchResult: async (matchId: string) => {
+    const response = await apiClient.get(`/pubg/matches/${matchId}/kills`);
+    return response.data;
+  },
+
   setPrimary: async (accountId: string) => {
     const response = await apiClient.patch(
       `/pubg/accounts/${accountId}/primary`,

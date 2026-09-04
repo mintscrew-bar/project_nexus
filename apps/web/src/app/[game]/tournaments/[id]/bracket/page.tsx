@@ -21,6 +21,7 @@ import { useToast } from "@/components/ui/Toast";
 import { ArrowLeft, RefreshCw, Trophy } from "lucide-react";
 import Link from "next/link";
 import { TeamModeHelp, type TeamMode } from "@/components/rooms/TeamModeHelp";
+import { PubgKillMatchModal } from "@/components/domain/PubgKillMatchModal";
 
 export default function BracketPage() {
   const params = useParams();
@@ -61,12 +62,22 @@ export default function BracketPage() {
         isHost: room.hostId === user!.id,
         name: (room.name ?? null) as string | null,
         teamMode: room.teamMode as TeamMode,
+        // 배그 킬내기는 승패만이 아니라 킬 수까지 받아야 한다.
+        gameTitle: (room.gameTitle ?? "LOL") as "LOL" | "PUBG",
+        pubgGameMode: (room.pubgGameMode ?? null) as
+          | "KILL_MATCH"
+          | "BATTLE_ROYALE"
+          | "FREE_MATCH"
+          | null,
       };
     },
     staleTime: Infinity,
     enabled: Boolean(roomId && user),
   });
   const isHost = roomInfo?.isHost ?? false;
+  // 킬내기는 결과 입력 화면이 다르다 — 승자만이 아니라 팀별 킬을 받는다.
+  const isPubgKillMatch =
+    roomInfo?.gameTitle === "PUBG" && roomInfo?.pubgGameMode === "KILL_MATCH";
 
   // fetchRoomMatches/connectToBracket/disconnect는 zustand 스토어 함수로 참조가 안정적이므로 dependency에서 제외
   useEffect(() => {
@@ -460,14 +471,33 @@ export default function BracketPage() {
           </div>
         )}
 
-        {/* Match Detail Modal */}
-        <MatchDetailModal
-          match={selectedMatch}
-          isOpen={isModalOpen}
-          isHost={isHost}
-          onClose={handleCloseModal}
-          onReportResult={handleReportResult}
-        />
+        {/* Match Detail Modal — 킬내기는 킬 수까지 받는 전용 화면을 쓴다 */}
+        {isPubgKillMatch ? (
+          <PubgKillMatchModal
+            isOpen={isModalOpen}
+            onClose={handleCloseModal}
+            matchId={selectedMatch?.id ?? null}
+            teamA={
+              selectedMatch?.team1
+                ? { id: selectedMatch.team1.id, name: selectedMatch.team1.name }
+                : null
+            }
+            teamB={
+              selectedMatch?.team2
+                ? { id: selectedMatch.team2.id, name: selectedMatch.team2.name }
+                : null
+            }
+            onReported={() => void fetchRoomMatches(roomId)}
+          />
+        ) : (
+          <MatchDetailModal
+            match={selectedMatch}
+            isOpen={isModalOpen}
+            isHost={isHost}
+            onClose={handleCloseModal}
+            onReportResult={handleReportResult}
+          />
+        )}
 
         {/* Victory Screen */}
         {tournamentCompleted && finalStandings.length > 0 && (

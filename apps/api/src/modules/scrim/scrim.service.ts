@@ -14,6 +14,7 @@ import {
   type PubgPointRule,
   type ScrimLeaderboardRow,
 } from "@nexus/types";
+import { Inject, Optional } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateScrimDto, SubmitRoundResultDto } from "./dto";
 
@@ -24,7 +25,20 @@ const RESULT_SOURCE_MANUAL = "MANUAL";
 export class ScrimService {
   private readonly logger = new Logger(ScrimService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  /** 디스코드 봇 (선택 의존). 봇이 꺼져 있어도 스크림은 굴러가야 한다. */
+  private readonly discordBot?: {
+    sendRoomResultNotification: (
+      roomId: string,
+      result: { title: string; lines: string[] },
+    ) => Promise<number>;
+  };
+
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() @Inject("DISCORD_BOT_SERVICE") discordBot?: any,
+  ) {
+    this.discordBot = discordBot;
+  }
 
   /**
    * 스크림 생성.
@@ -237,7 +251,15 @@ export class ScrimService {
       }),
     ]);
 
-    return this.getScrimByRoom(roomId);
+    const finished = await this.getScrimByRoom(roomId);
+
+    // 모집 공지가 나갔던 채널에 결과를 그대로 보낸다.
+    // 공지 실패로 확정이 막히면 안 되므로 붙잡지 않는다.
+    void this.announceResult(roomId, finished).catch((error: Error) =>
+      this.logger.warn(`스크림 결과 공지 실패: ${error.message}`),
+    );
+
+    return finished;
   }
 
   /**
@@ -272,6 +294,25 @@ export class ScrimService {
     ]);
 
     return this.getScrimByRoom(roomId);
+  }
+
+  /** 디스코드 결과 공지 — 누적 리더보드 상위권을 그대로 옮긴다. */
+  private async announceResult(
+    roomId: string,
+    scrim: Awaited<ReturnType<ScrimService["getScrimByRoom"]>>,
+  ) {
+    if (!this.discordBot || !scrim) return;
+    const lines = scrim.leaderboard.map(
+      (row, index) =>
+        `**${index + 1}위** ${row.teamName} — ${row.totalPoints}점 (킬 ${row.totalKills})`,
+    );
+    const rounds = scrim.rounds.filter(
+      (round) => round.status === ScrimRoundStatus.COMPLETED,
+    ).length;
+    await this.discordBot.sendRoomResultNotification(roomId, {
+      title: `배틀로얄 ${rounds}라운드 결과`,
+      lines,
+    });
   }
 
   private async findOwnedScrim(hostId: string, roomId: string) {

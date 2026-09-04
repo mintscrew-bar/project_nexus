@@ -12,8 +12,13 @@ import {
   MatchStatus,
   BracketType,
   TeamMode,
+  GameTitle,
 } from "@nexus/database";
-import { normalizeSeriesPreset, resolveSeriesBestOf } from "@nexus/types";
+import {
+  getGame,
+  normalizeSeriesPreset,
+  resolveSeriesBestOf,
+} from "@nexus/types";
 import { randomInt } from "crypto";
 
 export interface BracketMatch {
@@ -63,6 +68,8 @@ export class MatchBracketService {
         hostId: true,
         status: true,
         teamMode: true,
+        // 팀 인원·역할 선택 유무가 게임마다 다르다
+        gameTitle: true,
         bracketFormat: true,
         seriesPreset: true,
         teams: {
@@ -81,10 +88,17 @@ export class MatchBracketService {
       throw new ForbiddenException("Only host can generate bracket");
     }
 
+    const game = getGame(room.gameTitle ?? GameTitle.LOL);
+
+    // 역할 선택이 없는 게임(배그)은 편성이 끝나면 곧바로 대진표로 온다.
+    // ROLE_SELECTION 만 통과시키면 배그 킬내기는 대진표를 아예 못 만든다.
     const canGenerateFromCurrentStatus =
       room.status === RoomStatus.ROLE_SELECTION ||
       (room.teamMode === TeamMode.AUTO_BALANCE &&
-        room.status === RoomStatus.DRAFT_COMPLETED);
+        room.status === RoomStatus.DRAFT_COMPLETED) ||
+      (!game.hasPositions &&
+        (room.status === RoomStatus.DRAFT_COMPLETED ||
+          room.status === RoomStatus.TEAM_SELECTION));
 
     if (!canGenerateFromCurrentStatus) {
       // Check if bracket already exists (room might be in IN_PROGRESS)
@@ -123,11 +137,11 @@ export class MatchBracketService {
 
     const teamCount = room.teams.length;
 
-    // Validate all teams have 5 players
+    // 팀 정원은 게임마다 다르다 — 롤 5인, 배그 4인 스쿼드.
     for (const team of room.teams) {
-      if (team.members.length !== 5) {
+      if (team.members.length !== game.teamSize) {
         throw new BadRequestException(
-          `Team ${team.name} does not have 5 players`,
+          `${team.name} 팀 인원이 ${game.teamSize}명이 아닙니다.`,
         );
       }
     }

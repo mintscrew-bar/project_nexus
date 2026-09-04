@@ -3098,6 +3098,49 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
    *
    * @returns 실제로 전송된 서버 수
    */
+  /**
+   * 내전 결과 공지.
+   *
+   * 모집 공지가 나갔던 서버·채널에 그대로 보낸다. 결과만 다른 곳에 뜨면
+   * 모집을 본 사람들이 어떻게 끝났는지 알 수 없다.
+   *
+   * @returns 실제로 전송된 서버 수
+   */
+  async sendRoomResultNotification(
+    roomId: string,
+    result: { title: string; lines: string[] },
+  ): Promise<number> {
+    const notifs = await this.getRoomNotifications(roomId);
+    if (notifs.length === 0) return 0;
+
+    const room = await this.prisma.room.findUnique({
+      where: { id: roomId },
+      select: { name: true, gameTitle: true, pubgPlatform: true },
+    });
+    if (!room) return 0;
+
+    const embed = new EmbedBuilder()
+      .setTitle(`🏆 ${roomDisplayName(room)} — ${result.title}`)
+      // 줄이 너무 많으면 임베드가 잘린다. 상위권만 남기고 끊는다.
+      .setDescription(result.lines.slice(0, 25).join("\n") || "결과 없음")
+      .setColor(0x5865f2)
+      .setTimestamp(new Date());
+
+    let sent = 0;
+    for (const notif of notifs) {
+      try {
+        await this.sendEmbedNotification(notif.guildId, notif.channelId, embed);
+        sent += 1;
+      } catch (error: unknown) {
+        // 한 서버가 실패해도 나머지에는 보낸다. 채널이 지워졌을 뿐일 수 있다.
+        console.warn(
+          `[DiscordBot] 결과 공지 실패 (${notif.guildId}): ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+    return sent;
+  }
+
   async sendRoomScheduleReminder(
     roomId: string,
     phase: "1h" | "10m",

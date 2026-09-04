@@ -15,14 +15,19 @@ import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import {
   LookupPubgPlayerDto,
   RegisterPubgAccountDto,
+  ReportKillMatchDto,
   UpdatePubgScoreDto,
 } from "./dto";
 import { PubgService } from "./pubg.service";
+import { PubgKillMatchService } from "./pubg-kill-match.service";
 
 @Controller("pubg")
 @UseGuards(JwtAuthGuard)
 export class PubgController {
-  constructor(private readonly pubgService: PubgService) {}
+  constructor(
+    private readonly pubgService: PubgService,
+    private readonly killMatchService: PubgKillMatchService,
+  ) {}
 
   @Get("accounts")
   getAccounts(@CurrentUser("sub") userId: string) {
@@ -63,6 +68,21 @@ export class PubgController {
     @Param("id") accountId: string,
   ) {
     return this.pubgService.setPrimary(userId, accountId);
+  }
+
+  /** 킬내기 결과 — 승패는 기존 2팀 흐름을 쓰고 킬 수만 얹는다. */
+  @Get("matches/:matchId/kills")
+  getKillMatchResult(@Param("matchId") matchId: string) {
+    return this.killMatchService.getKillMatchResult(matchId);
+  }
+
+  @Post("matches/:matchId/kills")
+  reportKillMatch(
+    @CurrentUser("sub") userId: string,
+    @Param("matchId") matchId: string,
+    @Body() dto: ReportKillMatchDto,
+  ) {
+    return this.killMatchService.reportKills(userId, matchId, dto);
   }
 
   @Patch("accounts/:id/score")
