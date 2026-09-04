@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useEffect, useState, useCallback, useMemo } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { useAuthStore } from "@/stores/auth-store";
 import { useDdragonStore } from "@/stores/ddragon-store";
@@ -55,6 +55,14 @@ import { PreferredChampionPanel, RankedChampionPanel } from "@/components/domain
 import { useToast } from "@/components/ui/Toast";
 import { getChampionKoreanName, searchChampionsByQuery } from "@nexus/types";
 import { useGamePrefix } from "@/hooks/useCurrentGame";
+import {
+  DEFAULT_GAME,
+  GAMES,
+  GAME_TITLES,
+  gameFromSlug,
+  type GameTitle,
+} from "@nexus/types";
+import { PubgProfileSection } from "@/components/pubg/PubgProfileSection";
 
 const ROLE_LABELS: Record<string, string> = {
   TOP: "탑",
@@ -86,6 +94,17 @@ interface ProfileUser {
   profileBanner: string | null;
   createdAt: string;
   reputationScore: number | null;
+  /** 이 사람이 연동한 게임. 프로필 탭과 `/profile/:id` 폴백이 여기서 갈린다. */
+  linkedGames?: Record<GameTitle, boolean>;
+  pubgAccounts?: Array<{
+    id: string;
+    playerName: string;
+    lastMatchShard: "STEAM" | "KAKAO" | null;
+    isPrimary: boolean;
+    pubgTier: string | null;
+    nexusTier: string | null;
+    nexusScore: number | null;
+  }>;
   riotAccounts: Array<{
     id: string;
     gameName: string;
@@ -181,6 +200,37 @@ export default function UserProfilePage() {
   const [auctionStats, setAuctionStats] = useState<any>(null);
   const [onlineStatus, setOnlineStatus] = useState<string | null>(null);
   const [rep, setRep] = useState<any>(null);
+  const searchParams = useSearchParams();
+  /**
+   * 프로필에 띄울 게임 탭.
+   *
+   * 연동한 게임만 나온다. 아무것도 연동 안 했으면 기본 게임 하나만 둔다 —
+   * 탭이 하나면 아예 안 그리므로 화면에는 롤 구획만 보인다.
+   */
+  const availableGames = useMemo<GameTitle[]>(() => {
+    const linked = profile?.linkedGames;
+    if (!linked) return [DEFAULT_GAME];
+    const games = GAME_TITLES.filter((title) => linked[title]);
+    return games.length > 0 ? games : [DEFAULT_GAME];
+  }, [profile?.linkedGames]);
+  const [activeGame, setActiveGame] = useState<GameTitle>(DEFAULT_GAME);
+  /**
+   * 어느 게임 경로에서 넘어왔는지(`/lol/profile/:id` → `?game=lol`).
+   * 그 게임을 연동한 사람이면 그 탭으로 연다.
+   */
+  const requestedGame = gameFromSlug(searchParams.get("game"));
+
+  // 연동 목록이 확정되면(로딩 완료) 탭을 맞춘다.
+  // 롤 미연동·배그만 하는 사람 프로필이 빈 롤 탭으로 열리면 안 된다.
+  useEffect(() => {
+    const preferred =
+      requestedGame && availableGames.includes(requestedGame)
+        ? requestedGame
+        : availableGames[0];
+    setActiveGame((current) =>
+      availableGames.includes(current) && !requestedGame ? current : preferred,
+    );
+  }, [availableGames, requestedGame]);
 
   // Redirect to own profile if viewing self
   useEffect(() => {
@@ -730,6 +780,38 @@ export default function UserProfilePage() {
           </CardContent>
         </Card>
 
+        {/*
+          게임 탭.
+
+          신원(이름·아바타·평판·클랜)은 공통이고 전적만 게임별이다.
+          연동하지 않은 게임의 탭은 아예 띄우지 않는다 — 배그를 안 하는 사람
+          프로필에 빈 배그 탭이 뜨면 안 된다.
+        */}
+        {availableGames.length > 1 && (
+          <div className="mb-4 flex items-center gap-1.5">
+            {availableGames.map((title) => (
+              <button
+                key={title}
+                type="button"
+                onClick={() => setActiveGame(title)}
+                aria-pressed={activeGame === title}
+                className={`rounded-lg px-3 py-2 text-sm font-bold transition-colors ${
+                  activeGame === title
+                    ? "bg-accent-primary text-white"
+                    : "bg-bg-tertiary text-text-secondary hover:text-text-primary"
+                }`}
+              >
+                {GAMES[title].label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {activeGame === "PUBG" ? (
+          <PubgProfileSection userId={userId} accounts={profile.pubgAccounts ?? []} />
+        ) : (
+        <>
+
         {/* ── 요약 스탯 칩 (전적/승률/KDA) ── */}
         <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
           <SummaryChip
@@ -1143,6 +1225,8 @@ export default function UserProfilePage() {
             <AdSlotCard slotKey="profile" minHeight={100} />
           </div>
         </div>
+        </>
+        )}
       </div>
     </div>
   );

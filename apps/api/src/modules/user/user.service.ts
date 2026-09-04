@@ -71,6 +71,19 @@ export class UserService {
           include: { championPreferences: true, roleTiers: true },
           orderBy: [{ isPrimary: "desc" }, { createdAt: "desc" }],
         },
+        // 프로필은 게임별 탭으로 갈린다. 연동하지 않은 게임의 탭은 띄우지 않는다.
+        pubgAccounts: {
+          orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }],
+          select: {
+            id: true,
+            playerName: true,
+            lastMatchShard: true,
+            isPrimary: true,
+            pubgTier: true,
+            nexusTier: true,
+            nexusScore: true,
+          },
+        },
         clanMemberships: {
           include: {
             clan: {
@@ -157,6 +170,18 @@ export class UserService {
     return {
       ...safeUser,
       stats,
+      /**
+       * 이 사람이 연동한 게임.
+       *
+       * 프로필 화면이 어느 게임 탭을 띄울지, `/profile/:id` 가 어디로 보낼지가
+       * 여기서 갈린다. 배그를 안 하는 사람 프로필에 빈 배그 탭이 뜨면 안 된다.
+       */
+      linkedGames: {
+        // 공개 설정으로 가려진 뒤(safeUser)가 아니라 원본으로 판단한다.
+        // 계정을 숨겼다고 "이 게임을 안 한다"가 되면 프로필이 엉뚱한 탭으로 열린다.
+        LOL: user.riotAccounts.length > 0,
+        PUBG: user.pubgAccounts.length > 0,
+      },
     };
   }
 

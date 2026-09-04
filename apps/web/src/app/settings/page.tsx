@@ -47,6 +47,8 @@ import { BroadcastTokenSection } from "./_components/BroadcastTokenSection";
 import { StreamerSettingsSection } from "./_components/StreamerSettingsSection";
 import { useRiotStore } from "@/stores/riot-store";
 import { useGamePrefix } from "@/hooks/useCurrentGame";
+import { enabledGames } from "@nexus/types";
+import { pubgApi } from "@/lib/api-client";
 
 type SettingsTab =
   | "accounts"
@@ -117,6 +119,23 @@ export default function SettingsPage() {
   const { setTheme: setNextTheme } = useTheme();
   const { fetchAccounts } = useRiotStore();
   const [showRiotModal, setShowRiotModal] = useState(false);
+  // 배그 계정 수. 등록 화면이 따로라 여기서는 개수만 확인한다.
+  const [pubgAccountCount, setPubgAccountCount] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const accounts = await pubgApi.getAccounts();
+        if (!cancelled) setPubgAccountCount(accounts?.length ?? 0);
+      } catch {
+        // 배그 연동은 선택이다. 실패해도 설정 화면은 그대로 뜬다.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const { addToast } = useToast();
   const [activeTab, setActiveTab] = useState<SettingsTab>("notifications");
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
@@ -882,6 +901,60 @@ export default function SettingsPage() {
                         </div>
                       );
                     })()}
+                  </CardContent>
+                </Card>
+
+                {/*
+                  게임 계정.
+
+                  설정은 게임 무관 화면이라 어느 게임 계정을 등록할지 먼저 고른다.
+                  롤은 기존 Riot ID 모달, 배그는 닉네임 조회 흐름이라 화면이 다르다.
+                */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>게임 계정</CardTitle>
+                    <p className="text-sm text-text-secondary mt-1">
+                      플레이하는 게임의 계정을 등록하면 그 게임 내전에 참여할 수
+                      있습니다
+                    </p>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {enabledGames().map((game) => {
+                      const linked =
+                        game.title === "LOL"
+                          ? (user?.riotAccounts?.length ?? 0) > 0
+                          : pubgAccountCount > 0;
+                      return (
+                        <div
+                          key={game.title}
+                          className="flex items-center justify-between gap-3 rounded-lg bg-bg-tertiary/50 px-3 py-2.5"
+                        >
+                          <div className="min-w-0">
+                            <p className="font-semibold text-text-primary">
+                              {game.label}
+                            </p>
+                            <p className="text-xs text-text-tertiary">
+                              {linked ? "연동됨" : "미연동"}
+                            </p>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant={linked ? "outline" : "primary"}
+                            onClick={() => {
+                              // 롤은 이 화면에서 바로 모달을 연다.
+                              // 배그는 닉네임 조회 → 확인 → 등록이라 전용 화면으로 보낸다.
+                              if (game.title === "LOL" && !linked) {
+                                setShowRiotModal(true);
+                                return;
+                              }
+                              router.push(`/${game.slug}/profile`);
+                            }}
+                          >
+                            {linked ? "계정 관리" : "등록하기"}
+                          </Button>
+                        </div>
+                      );
+                    })}
                   </CardContent>
                 </Card>
 
