@@ -984,7 +984,7 @@ export class RoomService {
         });
         if (!pubgAccount) {
           throw new BadRequestException(
-            "PUBG_NOT_LINKED::PUBG 계정 등록이 필요합니다. PUBG 프로필에서 Steam 또는 Kakao 계정을 등록해주세요.",
+            "PUBG_NOT_LINKED::PUBG 계정 등록이 필요합니다. PUBG 프로필에서 닉네임으로 계정을 등록해주세요.",
           );
         }
       } else {
@@ -1375,11 +1375,14 @@ export class RoomService {
                   },
                 },
                 pubgAccounts: {
-                  orderBy: { createdAt: "asc" },
+                  // 대표 계정을 먼저 — 로비는 대표 계정 하나만 보여준다
+                  orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }],
                   take: 2,
                   select: {
-                    platform: true,
                     playerName: true,
+                    // 매치가 나온 샤드. 방 플랫폼과 다르면 로비에서 경고한다.
+                    lastMatchShard: true,
+                    isPrimary: true,
                     verificationStatus: true,
                     pubgTier: true,
                     nexusTier: true,

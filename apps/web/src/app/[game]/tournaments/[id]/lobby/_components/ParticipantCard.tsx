@@ -103,7 +103,12 @@ export function ParticipantCard({
             )}
             {pubg && (
               <span className="flex-shrink-0 rounded bg-accent-primary/10 px-1.5 py-0.5 text-[10px] font-bold text-accent-primary">
-                {pubg.platform === "STEAM" ? "스팀" : "카배"}
+                {/* 매치가 나온 샤드. 미확인은 등록 직후이거나 최근 2주 매치가 없는 계정이다. */}
+                {pubg.lastMatchShard === "STEAM"
+                  ? "스배"
+                  : pubg.lastMatchShard === "KAKAO"
+                    ? "카배"
+                    : "플랫폼 미확인"}
               </span>
             )}
             {/^testbot_\d+$/.test(p.username) && (
@@ -120,7 +125,8 @@ export function ParticipantCard({
             )}
             {pubg && (
               <span className="text-[11px] text-text-tertiary">
-                {pubg.verificationStatus === "VERIFIED" ? "검증됨" : "미검증"}
+                {/* PUBG API 에 소유권 인증이 없다. 항상 미검증이며 그렇게 표시한다. */}
+                미검증
                 {pubg.pubgTier ? ` · PUBG ${pubg.pubgTier}` : ""}
                 {pubg.nexusTier ? ` · NEXUS ${pubg.nexusTier}` : ""}
               </span>

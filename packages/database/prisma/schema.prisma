@@ -300,16 +300,33 @@ model RiotAccount {
   @@map("riot_accounts")
 }
 
-/// PUBG 계정. 외부 전적 API가 연결되기 전까지는 사용자가 등록한 식별자만 보관하고
-/// verificationStatus를 UNVERIFIED로 유지한다.
+/// PUBG 계정.
+///
+/// 사용자에게 스팀/카카오를 묻지 않는다. 닉네임 조회는 샤드와 무관하고 두 샤드에서
+/// 같은 `account.xxx` 가 나온다 — 갈리는 건 매치 기록뿐이다(Phase 0 Task 1 실측).
+/// 그래서 등록은 닉네임 → accountId 로 확정하고, 매치가 나온 샤드를 기억해
+/// 이후 조회에서 그쪽만 본다(10 req/분 예산 절약).
+///
+/// PUBG API 는 소유권을 인증하지 않는다. `verificationStatus` 는 항상 UNVERIFIED 이며
+/// 사칭을 완전히 막을 수단이 없다는 사실을 화면에서 명시한다.
 model PubgAccount {
   id                 String   @id @default(cuid())
   userId             String
-  platform           PubgPlatform
+  /// PUBG 고유 계정 ID (`account.xxx`). 닉네임을 바꿔도 유지된다.
+  /// 같은 계정을 두 사람이 등록하지 못하도록 전역 유니크다.
+  playerId           String   @unique
+  /// 등록 시점의 닉네임. PUBG 에서 바뀔 수 있으므로 표시용이다.
   playerName         String
-  playerId           String?
+  /// 매치 기록이 나온 샤드. 아직 못 찾았으면 null(미확인이지 오류가 아니다).
+  lastMatchShard     PubgPlatform?
+  /// 샤드를 마지막으로 탐색한 시각. 매치가 없던 계정을 언제 다시 볼지 판단한다.
+  lastMatchShardCheckedAt DateTime?
+  /// 대표 계정. 로비·프로필에 이 계정을 보여준다.
+  isPrimary          Boolean  @default(false)
   verificationStatus String   @default("UNVERIFIED")
+  /// PUBG 공식 랭크 스냅샷 (NEXUS 편성 등급과 다른 값이다)
   pubgTier           String?
+  /// NEXUS 내부 편성 등급 (운영자 지정 또는 산정)
   nexusTier          String?
   combatScore       Int?
   iglScore          Int?
@@ -323,8 +340,8 @@ model PubgAccount {
   updatedAt          DateTime @updatedAt
   user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, platform])
-  @@unique([platform, playerName])
+  /// 한 사람이 같은 닉네임을 두 번 넣지 못하게
+  @@unique([userId, playerName])
   @@index([userId])
   @@map("pubg_accounts")
 }

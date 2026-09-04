@@ -1174,23 +1174,52 @@ export const riotApi = {
   },
 };
 
+/** 닉네임 조회 결과. 못 찾았을 때와 찾았을 때의 모양이 다르다. */
+export type PubgPlayerLookupResult =
+  | { found: false; message: string }
+  | {
+      found: true;
+      playerId: string;
+      playerName: string;
+      /** 매치가 나온 샤드. null 이면 최근 2주 매치가 없어 확인되지 않았다. */
+      matchShard: "STEAM" | "KAKAO" | null;
+      recentMatchCount: number;
+      alreadyRegistered: boolean;
+      /** PUBG API 에는 소유권 인증이 없다. 항상 false 다. */
+      ownershipVerified: false;
+    };
+
 export const pubgApi = {
   getAccounts: async () => {
     const response = await apiClient.get("/pubg/accounts");
     return response.data;
   },
 
-  registerAccount: async (data: {
-    platform: "STEAM" | "KAKAO";
-    playerName: string;
-    playerId?: string;
-  }) => {
+  /**
+   * 등록 전 닉네임 확인. 계정 존재·플레이 플랫폼·중복 등록 여부를 돌려준다.
+   * PUBG 전역 예산(10 req/분)을 쓰므로 타이핑마다 부르지 않는다.
+   */
+  lookupPlayer: async (playerName: string) => {
+    const response = await apiClient.post("/pubg/accounts/lookup", {
+      playerName,
+    });
+    return response.data as PubgPlayerLookupResult;
+  },
+
+  registerAccount: async (data: { playerName: string }) => {
     const response = await apiClient.post("/pubg/accounts", data);
     return response.data;
   },
 
   deleteAccount: async (accountId: string) => {
     await apiClient.delete(`/pubg/accounts/${accountId}`);
+  },
+
+  setPrimary: async (accountId: string) => {
+    const response = await apiClient.patch(
+      `/pubg/accounts/${accountId}/primary`,
+    );
+    return response.data;
   },
 
   updateScore: async (

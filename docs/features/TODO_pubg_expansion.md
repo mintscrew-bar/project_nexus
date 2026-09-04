@@ -399,13 +399,32 @@ enum PubgPlatform { STEAM KAKAO }
 
 ### Phase 2 — PUBG 계정 연동
 
-- [ ] Task 15: `PubgAccount` 모델 — 닉네임·accountId·`lastMatchShard` (사용자에게 샤드를 먼저 묻지 않음)
-      샤드는 사용자에게 묻지 않는다(Task 1 실측). 매치가 나온 샤드를 기억해
-      다음 조회부터 그쪽만 본다.
-- [ ] Task 16: 닉네임 → accountId 조회 + Steam/Kakao 탐색 + 캐시 (전역 레이트 캡에 편입)
-- [ ] Task 17: 소유권 검증 한계 명시 + 중복 accountId 등록 차단
+- [x] Task 15: `PubgAccount` 모델 — 닉네임·accountId·`lastMatchShard` (2026-09-04)
+      먼저 들어가 있던 모델이 실측 결론과 반대였다 — 사용자에게 스팀/카카오를 고르게 하고
+      `playerId` 는 손으로 적는 선택 항목이었다. 오타든 사칭이든 걸러낼 방법이 없었다.
+  - `platform` 제거, `lastMatchShard`(nullable)·`lastMatchShardCheckedAt`·`isPrimary` 추가
+  - `playerId` 를 필수·전역 유니크로 — 계정 식별은 닉네임이 아니라 `account.xxx` 다
+  - 마이그레이션은 기존 `platform` 을 샤드 힌트로 옮기고 첫 계정을 대표로 승격한다.
+    조회 없이 등록된 행은 `local:<id>` 임시 ID 를 받고 재등록 시 실제 ID 로 덮인다
+- [x] Task 16: 닉네임 → accountId 조회 + Steam/Kakao 탐색 + 캐시 (2026-09-04)
+  - `PubgApiService` — 닉네임 조회, 매치 상세 파싱(팀별 순위·합산 킬·명단)
+  - `PubgRateLimiterService` — 전역 9/분(10 에서 마진 1). 롤과 같은 구조·별개 예산.
+    Redis 원자 소비를 그대로 재사용한다
+  - 조회 캐시 6시간, 못 찾은 닉네임도 10분 캐시 — 오타를 반복해 예산을 태우지 않게
+  - steam → kakao 순으로 보되 **매치가 나오는 쪽에서 멈춘다**. 계정만 있고 매치가 없으면
+    샤드를 null 로 두고 하루 뒤 재탐색한다(`refreshShardIfUnknown`)
+  - 로스터 인원수를 가정하지 않고 실제 참가자로 킬을 합산한다(Task 1 주의사항)
+- [x] Task 17: 소유권 검증 한계 명시 + 중복 accountId 등록 차단 (2026-09-04)
+  - `playerId` 전역 유니크로 중복 등록 차단. 기준은 "먼저 등록한 사람"뿐이다
+  - 등록 화면에 소유권 인증 절차가 없다는 사실을 명시
+  - 로비 배지의 `검증됨/미검증` 분기를 없앴다 — 올라갈 경로가 없는데 분기를 두면
+    언젠가 검증되는 것처럼 읽힌다. 항상 `미검증` 으로 적는다
 - [ ] Task 18: `/pubg` 프로필·호버 프로필·로비 모달에 PUBG 데이터 표시
-- [ ] Task 19: 게임별 계정 등록 모달 분리 — LoL 기존 3단계 유지, PUBG 닉네임 조회 흐름 추가
+- [x] Task 19: PUBG 등록을 닉네임 조회 → 확인 → 등록 2단계로 (2026-09-04)
+      `POST /pubg/accounts/lookup` 으로 계정·플레이 플랫폼·중복 여부를 먼저 보여주고,
+      사람이 확인한 뒤 등록한다. 소유권을 기계가 못 가리므로 눈으로 보는 단계가 필요하다.
+      대표 계정 지정(`PATCH /pubg/accounts/:id/primary`)도 함께.
+      LoL 기존 3단계 흐름은 그대로 둔다.
 - [ ] Task 20: 공통 설정에서 게임 선택 후 해당 계정 등록 모달 열기
 - [ ] Task 21: PUBG 공식 랭크 스냅샷 저장 — API에서 확인된 시즌·모드·티어만 표시
 - [ ] Task 22: NEXUS 편성 등급·전체 편성 점수 모델 — 운영자 지정/자동 산정/데이터 부족 상태 구분
