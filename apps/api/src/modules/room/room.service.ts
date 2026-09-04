@@ -875,6 +875,11 @@ export class RoomService {
   private transformRoomData(room: any) {
     if (!room) return room;
 
+    // 로비 응답은 **이 방의 게임 데이터만** 담는다.
+    // 배그 방 참가자에게도 라이엇 계정이 있을 수 있는데, 그대로 내보내면
+    // 배그 로비에 솔로랭크 티어와 라인 아이콘이 뜬다. 반대도 마찬가지다.
+    const isPubg = room.gameTitle === GameTitle.PUBG;
+
     // 팀이 짜인 뒤에는 배정된 라인이 곧 그 사람의 자리다. 대표 라인 점수 대신
     // 배정 라인 점수를 보여줘야 호버 없이도 팀 구성 근거가 읽힌다.
     const assignedRoleByUser = new Map<string, Role>();
@@ -887,8 +892,9 @@ export class RoomService {
     }
 
     // 팀별 밸런스 합계 — 방장이 편성을 확인할 때 팀 간 격차를 바로 보게 한다.
+    // 라인별 점수는 롤 개념이라 배그 방에서는 계산하지 않는다.
     const teamBalanceTotals = new Map<string, number>();
-    for (const team of room.teams ?? []) {
+    for (const team of isPubg ? [] : (room.teams ?? [])) {
       let total = 0;
       let counted = 0;
       for (const member of team.members ?? []) {
@@ -913,7 +919,7 @@ export class RoomService {
         balanceTotal: teamBalanceTotals.get(team.id) ?? null,
       })),
       participants: room.participants?.map((p: any) => {
-        const balance = this.buildParticipantBalance(p.user);
+        const balance = isPubg ? null : this.buildParticipantBalance(p.user);
         const assignedRole = assignedRoleByUser.get(p.userId) ?? null;
         const displayRole = assignedRole ?? balance?.primaryRole ?? null;
         const displayScore =
@@ -928,9 +934,11 @@ export class RoomService {
           isCaptain: p.isCaptain,
           teamId: p.teamId,
           role: p.role,
-          riotAccount: p.user?.riotAccounts?.[0] || null,
-          pubgAccount: p.user?.pubgAccounts?.[0] || null,
-          assignedRole,
+          // 게임 경계 — 다른 게임 계정은 아예 내보내지 않는다.
+          riotAccount: isPubg ? null : p.user?.riotAccounts?.[0] || null,
+          pubgAccount: isPubg ? p.user?.pubgAccounts?.[0] || null : null,
+          // 배정 라인은 롤 전용 개념이다.
+          assignedRole: isPubg ? null : assignedRole,
           // 자동 밸런스와 같은 캐시에서 읽은 라인별 점수
           balanceScores: balance?.byRole ?? null,
           // 표시용 대표 점수 — 배정 라인이 있으면 그 라인, 없으면 주/부라인 기준
@@ -2575,6 +2583,141 @@ export class RoomService {
   }
 
   /**
+   * 배그 자동 밸런스 1차.
+   *
+   * 롤은 라인마다 점수가 따로 있어 "누구를 어느 라인에" 까지 풀어야 하지만,
+   * 배그에는 포지션이 없어 팀 합계만 맞추면 된다. NEXUS 편성 점수를 내림차순으로
+   * 세워 뱀 순서(1-2-3-4-4-3-2-1)로 나눠 담는다 — 팀 수가 많아도 합계가 고르게 갈린다.
+   *
+   * 공식 PUBG 랭크가 아니라 NEXUS 편성 점수를 쓴다. 공식 랭크는 스쿼드 내전
+   * 실력과 직결되지 않고, 무엇보다 아직 수집 경로가 없다(Task 21).
+   */
+  private async createPubgBalancedTeams(hostId: string, roomId: string) {
+    const room = await this.prisma.room.findUnique({
+      where: { id: roomId },
+      include: {
+        participants: {
+          where: { role: "PLAYER" },
+          include: {
+            user: {
+              include: {
+                pubgAccounts: {
+                  where: { isPrimary: true },
+                  take: 1,
+                  select: { playerName: true, nexusScore: true },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!room) throw new NotFoundException("Room not found");
+    if (room.hostId !== hostId || room.teamMode !== TeamMode.AUTO_BALANCE) {
+      throw new ForbiddenException("자동 밸런스 팀 구성을 시작할 수 없습니다.");
+    }
+    if (
+      room.status !== RoomStatus.WAITING &&
+      room.status !== RoomStatus.DRAFT &&
+      room.status !== RoomStatus.DRAFT_COMPLETED
+    ) {
+      throw new BadRequestException("Room has already started");
+    }
+    if (room.status === RoomStatus.DRAFT_COMPLETED) {
+      const existingMatches = await this.prisma.match.count({
+        where: { roomId },
+      });
+      if (existingMatches > 0) {
+        throw new BadRequestException(
+          "대진표가 이미 생성되어 팀을 다시 편성할 수 없습니다.",
+        );
+      }
+    }
+    if (room.participants.length !== room.maxParticipants) {
+      throw new BadRequestException(
+        "자동 밸런스 모드는 모든 팀 자리가 채워져야 시작할 수 있습니다.",
+      );
+    }
+
+    // 점수 없는 사람을 0점으로 치면 밸런스가 조용히 틀어진다. 누구인지 짚어 중단한다.
+    const missingScore = room.participants
+      .filter((p) => p.user.pubgAccounts[0]?.nexusScore == null)
+      .map((p) => p.user.username);
+    if (missingScore.length > 0) {
+      throw new BadRequestException(
+        `NEXUS 편성 점수가 없는 참가자가 있어 자동 밸런스를 만들 수 없습니다: ${missingScore.join(", ")}`,
+      );
+    }
+
+    const teamCount = teamCountForRoomSize(
+      room.maxParticipants,
+      room.gameTitle,
+    );
+    const ranked = [...room.participants].sort(
+      (a, b) =>
+        (b.user.pubgAccounts[0]?.nexusScore ?? 0) -
+        (a.user.pubgAccounts[0]?.nexusScore ?? 0),
+    );
+
+    // 뱀 순서 분배 — 한 방향으로만 돌리면 1번 팀에 상위권이 몰린다.
+    const teams: (typeof ranked)[] = Array.from(
+      { length: teamCount },
+      () => [],
+    );
+    ranked.forEach((participant, index) => {
+      const round = Math.floor(index / teamCount);
+      const offset = index % teamCount;
+      const teamIndex =
+        round % 2 === 0 ? offset : teamCount - 1 - offset;
+      teams[teamIndex].push(participant);
+    });
+
+    const isReroll = room.status === RoomStatus.DRAFT_COMPLETED;
+    if (isReroll) await this.pushAutoBalanceHistory(roomId);
+
+    await this.runSerializableTx(async (tx: Prisma.TransactionClient) => {
+      await this.clearTeamSetup(tx, roomId);
+      for (let index = 0; index < teams.length; index++) {
+        const members = teams[index];
+        // 팀장은 팀 내 최고 점수. 롤 쪽과 같은 규칙이라 설명이 하나로 끝난다.
+        const captain = members[0];
+        if (!captain) continue;
+        const team = await tx.team.create({
+          data: {
+            roomId,
+            captainId: captain.userId,
+            name: `${captain.user.username} 팀`,
+            color: this.teamColors[index % this.teamColors.length],
+          },
+        });
+        await tx.roomParticipant.updateMany({
+          where: { roomId, userId: { in: members.map((m) => m.userId) } },
+          data: { teamId: team.id },
+        });
+        await tx.roomParticipant.updateMany({
+          where: { roomId, userId: captain.userId },
+          data: { isCaptain: true },
+        });
+        await tx.teamMember.createMany({
+          // 배그에는 배정 라인이 없다.
+          data: members.map((m) => ({ teamId: team.id, userId: m.userId })),
+        });
+      }
+      await tx.room.update({
+        where: { id: roomId },
+        data: {
+          status: RoomStatus.DRAFT_COMPLETED,
+          ...(isReroll
+            ? { autoBalanceRerollCount: { increment: 1 } }
+            : { autoBalanceRerollCount: 0 }),
+        },
+      });
+    });
+
+    return this.getRoomById(roomId);
+  }
+
+  /**
    * 자동 밸런스 팀 편성. 이미 편성된 방(DRAFT_COMPLETED)에서 다시 호출하면
    * 재편성("주사위")이 된다. pinnedUserIds 로 지정한 인원은 현재 팀·라인을
    * 그대로 유지하고 나머지만 다시 배치한다.
@@ -2608,6 +2751,13 @@ export class RoomService {
     if (!room) {
       throw new NotFoundException("Room not found");
     }
+
+    // 포지션이 없는 게임(배그)은 라인별 점수라는 개념 자체가 없어 산식이 다르다.
+    // 여기서 갈라 보내고, 아래는 롤 전용 경로로 둔다.
+    if (!getGame(room.gameTitle ?? GameTitle.LOL).hasPositions) {
+      return this.createPubgBalancedTeams(hostId, roomId);
+    }
+
     if (room.hostId !== hostId || room.teamMode !== TeamMode.AUTO_BALANCE) {
       throw new ForbiddenException("자동 밸런스 팀 구성을 시작할 수 없습니다.");
     }

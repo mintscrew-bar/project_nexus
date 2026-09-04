@@ -29,14 +29,17 @@ describe("게임 정의", () => {
     }
   });
 
-  it("포지션이 없는 게임은 자동 밸런스를 고를 수 없다", () => {
-    // 자동 밸런스는 라인별 점수에 기대는 방식이다.
+  it("모든 게임이 수동 팀 배정은 지원한다 — 마지막 수단이 항상 있어야 한다", () => {
     for (const title of GAME_TITLES) {
-      const game = GAMES[title];
-      if (!game.hasPositions) {
-        expect(game.teamModes).not.toContain("AUTO_BALANCE");
-      }
+      expect(GAMES[title].teamModes).toContain("MANUAL_TEAM");
     }
+  });
+
+  it("포지션이 없는 게임은 역할 선택 단계를 거치지 않는다", () => {
+    // 자동 밸런스는 포지션 유무와 무관하다 — 배그는 NEXUS 편성 점수로 돈다.
+    // 갈리는 건 편성 뒤에 역할 선택 화면을 여는지다.
+    expect(GAMES.PUBG.hasPositions).toBe(false);
+    expect(GAMES.LOL.hasPositions).toBe(true);
   });
 
   it("기본 게임은 활성 상태여야 한다", () => {

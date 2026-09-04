@@ -88,9 +88,8 @@ const PUBG: GameDefinition = {
   // 16명부터가 배틀로얄 스크림 규모다.
   roomSizes: [8, 16, 32, 48, 64],
   hasPositions: false,
-  // 자동 밸런스는 라인별 점수에 기대는 방식이라 포지션이 없는 게임에서는 쓸 수 없다.
-  // 배그용 밸런스 지표를 세운 뒤에 다시 넣는다.
-  teamModes: ["AUCTION", "SNAKE_DRAFT", "MANUAL_TEAM"],
+  // 자동 밸런스는 라인별 점수가 아니라 NEXUS 편성 점수로 돈다(뱀 순서 분배).
+  teamModes: ["AUCTION", "SNAKE_DRAFT", "AUTO_BALANCE", "MANUAL_TEAM"],
   resultShape: "POINT_LEADERBOARD",
   // 계정 식별자 등록과 방 생성 틀을 사용할 수 있다. 외부 전적 검증은 별도 상태다.
   enabled: true,

@@ -9,6 +9,7 @@ import {
 import { PrismaService } from "../prisma/prisma.service";
 import { Prisma, RoomStatus, Role, TeamMode } from "@nexus/database";
 import { MatchService } from "../match/match.service";
+import { getGame } from "@nexus/types";
 // 클라이언트와 값이 어긋나지 않도록 공용 패키지에서 가져온다.
 import {
   ROLE_SELECTION_TIME_MS,
@@ -87,6 +88,14 @@ export class RoleSelectionService {
 
     if (!room) {
       throw new NotFoundException("Room not found");
+    }
+
+    // 포지션이 없는 게임에는 역할 선택 단계 자체가 없다(배그).
+    // 여기서 막지 않으면 라인 5개짜리 화면이 배그 방에 열린다.
+    if (!getGame(room.gameTitle).hasPositions) {
+      throw new BadRequestException(
+        `${getGame(room.gameTitle).label}에는 역할 선택 단계가 없습니다.`,
+      );
     }
 
     if (room.status !== RoomStatus.DRAFT_COMPLETED) {

@@ -2,6 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useGamePrefix } from "@/hooks/useCurrentGame";
+import { GAMES, DEFAULT_GAME, type GameTitle } from "@nexus/types";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useLobbyStore } from "@/stores/lobby-store";
 import { useAuthStore } from "@/stores/auth-store";
@@ -60,27 +61,29 @@ const LOBBY_CONNECT_TIMEOUT_MS = 10 * 1000;
 
 // 스테이지 경로는 전부 게임 프리픽스(`/lol` · `/pubg`) 아래에 있다.
 // 프리픽스를 빼먹으면 리다이렉트를 한 번 더 타고, 배그 방에서는 롤 화면으로 샌다.
-const getTeamModeStagePath = (
-  room: {
-    id: string;
-    teamMode: "AUCTION" | "SNAKE_DRAFT" | "AUTO_BALANCE" | "MANUAL_TEAM";
-  },
-  gamePrefix: string,
-) => {
+type StageRoom = {
+  id: string;
+  gameTitle?: GameTitle;
+  teamMode: "AUCTION" | "SNAKE_DRAFT" | "AUTO_BALANCE" | "MANUAL_TEAM";
+};
+
+/** 포지션이 없는 게임(배그)에는 역할 선택 단계가 없다 — 바로 경기로 간다. */
+const afterTeamsPath = (room: StageRoom, gamePrefix: string) =>
+  GAMES[room.gameTitle ?? DEFAULT_GAME].hasPositions
+    ? `${gamePrefix}/role-selection/${room.id}`
+    : `${gamePrefix}/tournaments/${room.id}/bracket`;
+
+const getTeamModeStagePath = (room: StageRoom, gamePrefix: string) => {
   if (room.teamMode === "AUCTION") return `${gamePrefix}/auction/${room.id}`;
   if (room.teamMode === "SNAKE_DRAFT") return `${gamePrefix}/draft/${room.id}`;
   if (room.teamMode === "AUTO_BALANCE") {
     return `${gamePrefix}/tournaments/${room.id}/bracket`;
   }
-  return `${gamePrefix}/role-selection/${room.id}`;
+  return afterTeamsPath(room, gamePrefix);
 };
 
 const getRoomStagePath = (
-  room: {
-    id: string;
-    status?: string;
-    teamMode: "AUCTION" | "SNAKE_DRAFT" | "AUTO_BALANCE" | "MANUAL_TEAM";
-  },
+  room: StageRoom & { status?: string },
   gamePrefix: string,
 ) => {
   if (room.status === "IN_PROGRESS") {
@@ -96,7 +99,7 @@ const getRoomStagePath = (
   if (room.status === "ROLE_SELECTION" || room.status === "DRAFT_COMPLETED") {
     // 자동 밸런스는 편성 직후 대진표로 넘기지 않는다. 팀 점수 차나 비선호 라인이
     // 나올 수 있어서 방장이 로비에서 결과를 확인하고 다시 돌리거나 확정한다.
-    return `${gamePrefix}/role-selection/${room.id}`;
+    return afterTeamsPath(room, gamePrefix);
   }
 
   if (room.status === "DRAFT" || room.status === "TEAM_SELECTION") {
