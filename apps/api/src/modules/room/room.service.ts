@@ -1359,6 +1359,19 @@ export class RoomService {
   }
 
   async getRoomById(roomId: string) {
+    /**
+     * 어느 게임인지 먼저 본다.
+     *
+     * 로비 조회는 참가자마다 라이엇 계정 + 라인 티어 + 챔피언 선호 15개를 끌어온다.
+     * 배그 64명 방이면 쓰지도 않을 1,000줄 가까이를 매번 읽는 셈이다
+     * (`transformRoomData` 가 어차피 잘라낸다). PK 조회 한 번으로 그걸 막는다.
+     */
+    const gameOfRoom = await this.prisma.room.findUnique({
+      where: { id: roomId },
+      select: { gameTitle: true },
+    });
+    const isPubgRoom = gameOfRoom?.gameTitle === GameTitle.PUBG;
+
     const room = await this.prisma.room.findUnique({
       where: { id: roomId },
       include: {
@@ -1379,7 +1392,10 @@ export class RoomService {
                 avatar: true,
                 reputation: true,
                 riotAccounts: {
-                  where: { isPrimary: true },
+                  // 배그 방에서는 아예 읽지 않는다. 어차피 응답에서 잘라낸다.
+                  where: isPubgRoom
+                    ? { id: "__none__" }
+                    : { isPrimary: true },
                   select: {
                     gameName: true,
                     tagLine: true,
@@ -1408,6 +1424,8 @@ export class RoomService {
                   },
                 },
                 pubgAccounts: {
+                  // 롤 방에서는 읽지 않는다.
+                  where: isPubgRoom ? {} : { id: "__none__" },
                   // 대표 계정을 먼저 — 로비는 대표 계정 하나만 보여준다
                   orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }],
                   take: 2,
@@ -1455,7 +1473,9 @@ export class RoomService {
                     username: true,
                     avatar: true,
                     riotAccounts: {
-                      where: { isPrimary: true },
+                      where: isPubgRoom
+                        ? { id: "__none__" }
+                        : { isPrimary: true },
                       select: {
                         gameName: true,
                         tagLine: true,

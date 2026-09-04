@@ -338,6 +338,8 @@ describe("RoomService", () => {
           teamMode: TeamMode.AUCTION,
           host: { id: "host-1", username: "방장" },
         })
+        // getRoomById 는 게임을 먼저 확인한다(배그 방이면 롤 계정을 읽지 않는다).
+        .mockResolvedValueOnce({ gameTitle: "LOL" })
         .mockResolvedValueOnce({
           id: "room-1",
           hostId: "host-1",
@@ -570,6 +572,8 @@ describe("RoomService", () => {
           status: RoomStatus.WAITING,
           teams: [{ id: "team-1" }],
         })
+        // getRoomById 는 게임을 먼저 확인한다(배그 방이면 롤 계정을 읽지 않는다).
+        .mockResolvedValueOnce({ gameTitle: "LOL" })
         .mockResolvedValueOnce({
           id: "room-1",
           hostId: "host-1",
@@ -607,6 +611,8 @@ describe("RoomService", () => {
           participants,
           teams: [{ id: "team-1" }, { id: "team-2" }],
         })
+        // getRoomById 는 게임을 먼저 확인한다(배그 방이면 롤 계정을 읽지 않는다).
+        .mockResolvedValueOnce({ gameTitle: "LOL" })
         .mockResolvedValueOnce({
           id: "room-1",
           hostId: "user-0",
@@ -973,6 +979,8 @@ describe("RoomService", () => {
           teamMode: TeamMode.AUTO_BALANCE,
           participants,
         })
+        // getRoomById 는 게임을 먼저 확인한다(배그 방이면 롤 계정을 읽지 않는다).
+        .mockResolvedValueOnce({ gameTitle: "LOL" })
         .mockResolvedValueOnce({
           id: "room-1",
           hostId: "host-1",

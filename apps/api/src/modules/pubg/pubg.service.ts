@@ -258,18 +258,46 @@ export class PubgService {
       roundsPlayed,
     });
 
-    return this.prisma.pubgAccount.update({
+    const newTier = calculateNexusTier(result.score);
+    const previous = await this.prisma.pubgAccount.findUnique({
       where: { id: accountId },
-      data: {
-        nexusScore: result.score,
-        nexusTier: calculateNexusTier(result.score),
-        nexusTierSource:
-          result.score === null ? PubgTierSource.NONE : PubgTierSource.AUTO,
-        balanceVersion: result.score === null ? null : PUBG_BALANCE_VERSION,
-        balanceSampleSize: roundsPlayed,
-        balanceComputedAt: new Date(),
-      },
+      select: { nexusTier: true, nexusScore: true },
     });
+
+    const [updated] = await this.prisma.$transaction([
+      this.prisma.pubgAccount.update({
+        where: { id: accountId },
+        data: {
+          nexusScore: result.score,
+          nexusTier: newTier,
+          nexusTierSource:
+            result.score === null ? PubgTierSource.NONE : PubgTierSource.AUTO,
+          balanceVersion: result.score === null ? null : PUBG_BALANCE_VERSION,
+          balanceSampleSize: roundsPlayed,
+          balanceComputedAt: new Date(),
+        },
+      }),
+      // 등급이 실제로 바뀐 경우에만 이력을 남긴다. 재계산할 때마다 같은 값을
+      // 쌓으면 정작 언제 바뀌었는지가 묻힌다.
+      ...(previous?.nexusTier !== newTier
+        ? [
+            this.prisma.pubgTierHistory.create({
+              data: {
+                accountId,
+                previousTier: previous?.nexusTier ?? null,
+                newTier,
+                previousScore: previous?.nexusScore ?? null,
+                newScore: result.score,
+                source:
+                  result.score === null
+                    ? PubgTierSource.NONE
+                    : PubgTierSource.AUTO,
+              },
+            }),
+          ]
+        : []),
+    ]);
+    return updated;
   }
 
   /**
@@ -278,21 +306,51 @@ export class PubgService {
    * 자동 산정이 사람 눈에 명백히 틀린 경우를 위한 경로다. 사유를 남기게 해서
    * "누가 왜 올렸는지"가 기록에 남는다.
    */
-  async setTierByAdmin(accountId: string, tier: string, note?: string) {
+  async setTierByAdmin(
+    adminId: string,
+    accountId: string,
+    tier: string,
+    note?: string,
+  ) {
     const account = await this.prisma.pubgAccount.findUnique({
       where: { id: accountId },
-      select: { id: true },
+      select: { id: true, nexusTier: true, nexusScore: true },
     });
     if (!account) throw new NotFoundException("PUBG 계정을 찾을 수 없습니다.");
 
-    return this.prisma.pubgAccount.update({
-      where: { id: accountId },
-      data: {
-        nexusTier: tier,
-        nexusTierSource: PubgTierSource.ADMIN,
-        nexusTierNote: note ?? null,
-        scoreUpdatedAt: new Date(),
-      },
+    const [updated] = await this.prisma.$transaction([
+      this.prisma.pubgAccount.update({
+        where: { id: accountId },
+        data: {
+          nexusTier: tier,
+          nexusTierSource: PubgTierSource.ADMIN,
+          nexusTierNote: note ?? null,
+          scoreUpdatedAt: new Date(),
+        },
+      }),
+      // 사람이 손으로 바꾼 값은 반드시 근거가 남아야 한다.
+      this.prisma.pubgTierHistory.create({
+        data: {
+          accountId,
+          previousTier: account.nexusTier,
+          newTier: tier,
+          previousScore: account.nexusScore,
+          newScore: account.nexusScore,
+          source: PubgTierSource.ADMIN,
+          note: note ?? null,
+          changedById: adminId,
+        },
+      }),
+    ]);
+    return updated;
+  }
+
+  /** 등급 변경 이력. 왜 이 등급이 됐는지 되짚을 수 있어야 한다. */
+  async getTierHistory(accountId: string) {
+    return this.prisma.pubgTierHistory.findMany({
+      where: { accountId },
+      orderBy: { createdAt: "desc" },
+      take: 50,
     });
   }
 

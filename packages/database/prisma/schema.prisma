@@ -350,6 +350,7 @@ model PubgAccount {
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
   user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tierHistory        PubgTierHistory[]
 
   /// 한 사람이 같은 닉네임을 두 번 넣지 못하게
   @@unique([userId, playerName])
@@ -2081,4 +2082,30 @@ model PubgMatchPlayerKills {
   @@unique([matchId, userId])
   @@index([matchId])
   @@map("pubg_match_player_kills")
+}
+
+
+/// 편성 등급이 바뀐 기록.
+///
+/// 마지막 상태만 남기면 "왜 2티어가 됐는지"를 나중에 아무도 설명하지 못한다.
+/// 운영자 보정은 특히 근거가 남아야 한다.
+model PubgTierHistory {
+  id            String         @id @default(cuid())
+  accountId     String
+  /// 바뀌기 전 등급 (없었으면 null)
+  previousTier  String?
+  /// 바뀐 뒤 등급 (산정 불가로 지워졌으면 null)
+  newTier       String?
+  previousScore Int?
+  newScore      Int?
+  source        PubgTierSource
+  /// 운영자 보정 사유. 자동 산정에는 없다.
+  note          String?
+  /// 보정한 운영자. 자동 산정이면 null.
+  changedById   String?
+  createdAt     DateTime       @default(now())
+  account       PubgAccount    @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId, createdAt])
+  @@map("pubg_tier_history")
 }

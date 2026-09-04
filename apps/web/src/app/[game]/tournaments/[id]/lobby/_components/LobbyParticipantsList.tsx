@@ -62,6 +62,17 @@ export function LobbyParticipantsList({
   addToast,
 }: LobbyParticipantsListProps) {
   const [expandedWaiting, setExpandedWaiting] = useState(false);
+  // 팀이 많으면(배그 16팀) 카드가 세로로 끝없이 늘어난다. 접었다 펼 수 있게 둔다.
+  const [collapsedTeams, setCollapsedTeams] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const toggleTeam = (teamId: string) =>
+    setCollapsedTeams((current) => {
+      const next = new Set(current);
+      if (next.has(teamId)) next.delete(teamId);
+      else next.add(teamId);
+      return next;
+    });
   // 팀 정원은 게임마다 다르다 — 롤 5인, 배그 4인 스쿼드.
   const game = GAMES[(room.gameTitle as GameTitle) ?? DEFAULT_GAME];
   const teamSize = game.teamSize;
@@ -135,7 +146,12 @@ export function LobbyParticipantsList({
                       : "border-bg-elevated bg-bg-secondary"
                   }`}
                 >
-                  <div className="mb-2 flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => toggleTeam(team.id)}
+                    className="mb-2 flex w-full items-center justify-between"
+                    aria-expanded={!collapsedTeams.has(team.id)}
+                  >
                     <span className="flex items-center gap-1.5 text-sm font-semibold text-text-primary">
                       <span
                         className="h-2.5 w-2.5 rounded-full"
@@ -146,15 +162,17 @@ export function LobbyParticipantsList({
                     <span className="text-xs text-text-tertiary">
                       {members.length}/{teamSize}
                     </span>
-                  </div>
-                  <div className="mb-2 grid gap-1.5">
-                    {members.map(participantCard)}
-                    {members.length === 0 && (
-                      <div className="rounded-md border border-dashed border-bg-elevated/60 py-2 text-center text-xs text-text-muted">
-                        비어 있음
-                      </div>
-                    )}
-                  </div>
+                  </button>
+                  {!collapsedTeams.has(team.id) && (
+                    <div className="mb-2 grid gap-1.5">
+                      {members.map(participantCard)}
+                      {members.length === 0 && (
+                        <div className="rounded-md border border-dashed border-bg-elevated/60 py-2 text-center text-xs text-text-muted">
+                          비어 있음
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <button
                     type="button"
                     // 선택된 팀이면 '팀 나가기'로 동작 → 이동/나가기 동선을 카드 한 곳에 통일

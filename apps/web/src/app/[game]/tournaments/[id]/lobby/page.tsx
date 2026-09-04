@@ -275,7 +275,27 @@ export default function TournamentLobbyPage() {
     }
   }, [roomId, room?.name, addToast]);
 
+  /**
+   * 호버 프로필 열기를 살짝 미룬다.
+   *
+   * 배그 방은 참가자가 64명까지 간다. 마우스가 카드 위를 스쳐 지나갈 때마다
+   * 프로필을 조회하면 한 번 훑는 것만으로 수십 건이 나간다.
+   */
+  const openHoverTimer = useRef<NodeJS.Timeout | null>(null);
+  const scheduleHoverOpen = useCallback(
+    (next: { id: string; rect: DOMRect; participant: any } | null) => {
+      if (openHoverTimer.current) clearTimeout(openHoverTimer.current);
+      if (!next) {
+        setHoveredPlayer(null);
+        return;
+      }
+      openHoverTimer.current = setTimeout(() => setHoveredPlayer(next), 180);
+    },
+    [],
+  );
+
   const scheduleHoverClose = useCallback(() => {
+    if (openHoverTimer.current) clearTimeout(openHoverTimer.current);
     if (hoverCloseTimer.current) clearTimeout(hoverCloseTimer.current);
     hoverCloseTimer.current = setTimeout(() => setHoveredPlayer(null), 80);
   }, []);
@@ -791,7 +811,7 @@ export default function TournamentLobbyPage() {
       friendUserIds={friendUserIds}
       sentFriendIds={sentFriendIds}
       addingFriend={addingFriend}
-      setHoveredPlayer={setHoveredPlayer}
+      setHoveredPlayer={scheduleHoverOpen}
       scheduleHoverClose={scheduleHoverClose}
       cancelHoverClose={cancelHoverClose}
       handleAddFriend={handleAddFriend}
