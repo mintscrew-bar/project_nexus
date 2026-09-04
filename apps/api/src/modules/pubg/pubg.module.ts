@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { DiscordModule } from "../discord/discord.module";
 import { DiscordBotService } from "../discord/discord-bot.service";
 import { PubgController } from "./pubg.controller";
+import { PubgAdminController } from "./pubg-admin.controller";
 import { PubgService } from "./pubg.service";
 import { PubgApiService } from "./pubg-api.service";
 import { PubgRateLimiterService } from "./pubg-rate-limiter.service";
@@ -10,7 +11,7 @@ import { PubgHistoryService } from "./pubg-history.service";
 
 @Module({
   imports: [DiscordModule],
-  controllers: [PubgController],
+  controllers: [PubgController, PubgAdminController],
   providers: [
     PubgService,
     PubgApiService,

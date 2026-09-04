@@ -903,6 +903,48 @@ function PubgProfilePage() {
     }
   };
 
+  /** 공식 랭크 갱신. NEXUS 편성 등급과 다른 값이라 따로 눌러야 한다. */
+  const handleSyncRank = async (id: string) => {
+    setSaving(true);
+    setError(null);
+    try {
+      await pubgApi.syncRank(id);
+      await loadAccounts();
+    } catch (err: any) {
+      setError(
+        err?.response?.data?.message || "공식 랭크를 가져오지 못했습니다.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  /**
+   * 편성 점수 자동 산정.
+   *
+   * 직접 넣은 점수는 서버가 덮지 않는다 — 손으로 매긴 값을 기계가 조용히
+   * 지우면 왜 바뀌었는지 알 수 없다.
+   */
+  const handleRecompute = async (id: string) => {
+    setSaving(true);
+    setError(null);
+    try {
+      const updated = await pubgApi.recomputeBalance(id);
+      if (!updated) {
+        setError(
+          "직접 입력한 점수가 있어 자동 산정을 건너뛰었습니다. 점수를 비우면 자동으로 매겨집니다.",
+        );
+      }
+      await loadAccounts();
+    } catch (err: any) {
+      setError(
+        err?.response?.data?.message || "편성 점수를 계산하지 못했습니다.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleDelete = async (id: string) => {
     if (!window.confirm("이 PUBG 계정을 삭제할까요?")) return;
     try {
@@ -1106,10 +1148,26 @@ function PubgProfilePage() {
                       )}
                       <button
                         type="button"
+                        onClick={() => handleSyncRank(account.id)}
+                        disabled={saving}
+                        className="text-xs text-text-secondary hover:underline disabled:opacity-50"
+                      >
+                        공식 랭크 갱신
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleRecompute(account.id)}
+                        disabled={saving}
+                        className="text-xs text-text-secondary hover:underline disabled:opacity-50"
+                      >
+                        자동 산정
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => openScoreModal(account)}
                         className="text-xs font-semibold text-accent-primary hover:underline"
                       >
-                        점수 산정
+                        직접 입력
                       </button>
                       <button
                         type="button"

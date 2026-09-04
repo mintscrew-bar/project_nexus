@@ -119,6 +119,23 @@ export class PubgController {
     return this.pubgService.recomputeBalanceScore(accountId);
   }
 
+  /**
+   * 편성 등급 변경 이력.
+   *
+   * 본인 계정만 본다. 마지막 상태만 남기면 왜 이 등급이 됐는지 되짚을 수 없다.
+   */
+  @Get("accounts/:id/tier-history")
+  async getTierHistory(
+    @CurrentUser("sub") userId: string,
+    @Param("id") accountId: string,
+  ) {
+    const accounts = await this.pubgService.getAccounts(userId);
+    if (!accounts.some((account) => account.id === accountId)) {
+      throw new NotFoundException("PUBG 계정을 찾을 수 없습니다.");
+    }
+    return this.pubgService.getTierHistory(accountId);
+  }
+
   @Patch("accounts/:id/score")
   updateScore(
     @CurrentUser("sub") userId: string,

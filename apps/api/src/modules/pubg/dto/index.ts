@@ -6,3 +6,4 @@ export {
   TeamKillsDto,
   PlayerKillsDto,
 } from "./report-kill-match.dto";
+export { SetPubgTierDto } from "./set-pubg-tier.dto";

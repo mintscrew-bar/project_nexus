@@ -75,6 +75,7 @@ export default function ScrimPage() {
   const [editingRound, setEditingRound] = useState<number | null>(null);
   // 자동 수집은 커스텀 매치 판별이 실측되기 전까지 서버에서 꺼둔다.
   const [collectorEnabled, setCollectorEnabled] = useState(false);
+  const [ruleOpen, setRuleOpen] = useState(false);
 
   const isHost = !!user && !!room && room.hostId === user.id;
   const teams = useMemo(() => room?.teams ?? [], [room]);
@@ -179,6 +180,29 @@ export default function ScrimPage() {
     }
   };
 
+  /**
+   * 포인트 규칙 변경.
+   *
+   * 이미 입력된 결과의 포인트도 서버가 다시 계산해 덮는다 —
+   * 규칙만 바꾸고 결과를 그대로 두면 화면 합계와 저장값이 어긋난다.
+   */
+  const handleRuleChange = async (rule: PubgPointRule) => {
+    setBusy(true);
+    try {
+      await scrimApi.updatePointRule(roomId, rule);
+      addToast("포인트 규칙을 바꾸고 기존 결과를 다시 계산했습니다.", "success");
+      setRuleOpen(false);
+      await load();
+    } catch (err: any) {
+      addToast(
+        err?.response?.data?.message || "규칙을 바꾸지 못했습니다.",
+        "error",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const handleComplete = async () => {
     setBusy(true);
     try {
@@ -243,13 +267,50 @@ export default function ScrimPage() {
               로비로
             </Link>
             {isHost && scrim.status !== "COMPLETED" && (
-              <Button onClick={handleComplete} disabled={busy}>
-                <Flag className="mr-1.5 h-4 w-4" />
-                스크림 확정
-              </Button>
+              <>
+                <Button
+                  variant="ghost"
+                  onClick={() => setRuleOpen((open) => !open)}
+                >
+                  포인트 규칙
+                </Button>
+                <Button onClick={handleComplete} disabled={busy}>
+                  <Flag className="mr-1.5 h-4 w-4" />
+                  스크림 확정
+                </Button>
+              </>
             )}
           </div>
         </header>
+
+        {ruleOpen && isHost && (
+          <Card>
+            <CardHeader>
+              <CardTitle>포인트 규칙 변경</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <p className="text-xs text-text-tertiary">
+                이미 입력된 라운드 결과의 점수도 함께 다시 계산됩니다.
+              </p>
+              {PUBG_POINT_RULE_PRESETS.map((option) => (
+                <button
+                  key={option.key}
+                  type="button"
+                  disabled={busy}
+                  onClick={() => handleRuleChange(option.rule)}
+                  className="w-full rounded-xl border border-bg-tertiary p-3 text-left transition-colors hover:border-accent-primary disabled:opacity-50"
+                >
+                  <div className="font-semibold text-text-primary">
+                    {option.label}
+                  </div>
+                  <div className="mt-0.5 text-xs text-text-tertiary">
+                    {option.description}
+                  </div>
+                </button>
+              ))}
+            </CardContent>
+          </Card>
+        )}
 
         <Leaderboard scrim={scrim} />
 

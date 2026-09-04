@@ -1296,6 +1296,36 @@ export const pubgApi = {
     return response.data as PubgHistoryResponse;
   },
 
+  /** 공식 PUBG 랭크 스냅샷 갱신. NEXUS 편성 등급과 다른 값이다. */
+  syncRank: async (accountId: string) => {
+    const response = await apiClient.post(
+      `/pubg/accounts/${accountId}/rank-sync`,
+    );
+    return response.data;
+  },
+
+  /** 편성 점수 자동 산정. 본인이 넣은 점수는 덮지 않는다. */
+  recomputeBalance: async (accountId: string) => {
+    const response = await apiClient.post(
+      `/pubg/accounts/${accountId}/recompute-balance`,
+    );
+    return response.data;
+  },
+
+  getTierHistory: async (accountId: string) => {
+    const response = await apiClient.get(
+      `/pubg/accounts/${accountId}/tier-history`,
+    );
+    return response.data as {
+      id: string;
+      previousTier: string | null;
+      newTier: string | null;
+      source: "NONE" | "SELF" | "ADMIN" | "AUTO";
+      note: string | null;
+      createdAt: string;
+    }[];
+  },
+
   getKillMatchResult: async (matchId: string) => {
     const response = await apiClient.get(`/pubg/matches/${matchId}/kills`);
     return response.data;
