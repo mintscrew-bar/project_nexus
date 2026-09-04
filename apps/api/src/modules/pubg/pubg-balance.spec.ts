@@ -19,7 +19,9 @@ describe("PUBG 편성 점수 자동 산정", () => {
   });
 
   it("모르는 티어 문자열은 무시한다", () => {
-    expect(calculateAutoBalanceScore({ officialTier: "Unranked" }).score).toBeNull();
+    expect(
+      calculateAutoBalanceScore({ officialTier: "Unranked" }).score,
+    ).toBeNull();
   });
 
   it("표본이 적으면 내전 성적을 반영하지 않는다", () => {

@@ -96,10 +96,7 @@ export class PubgController {
 
   /** 공식 PUBG 랭크 스냅샷 갱신. NEXUS 편성 등급과 다른 값이다. */
   @Post("accounts/:id/rank-sync")
-  syncRank(
-    @CurrentUser("sub") userId: string,
-    @Param("id") accountId: string,
-  ) {
+  syncRank(@CurrentUser("sub") userId: string, @Param("id") accountId: string) {
     return this.pubgService.refreshRankSnapshot(userId, accountId);
   }
 

@@ -38,7 +38,9 @@ describe("NEXUS 편성 점수", () => {
   it("항목이 하나라도 비면 점수를 내지 않는다", () => {
     // 빈 값을 0으로 치면 등급이 조용히 내려간다. 데이터 부족과 낮은 점수는 다르다.
     expect(calculateNexusScore({ ...full, iglScore: null })).toBeNull();
-    expect(calculateNexusScore({ ...full, experienceScore: undefined })).toBeNull();
+    expect(
+      calculateNexusScore({ ...full, experienceScore: undefined }),
+    ).toBeNull();
   });
 
   it("등급 경계", () => {

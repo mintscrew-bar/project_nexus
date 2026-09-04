@@ -188,7 +188,9 @@ describe("DiscordScheduleService.processScheduledRooms", () => {
     const [recipients, content] = botService.sendDirectMessages.mock.calls[0];
     expect(recipients).toEqual(["discord-1"]);
     expect(content).toContain("9월 1일 내전");
-    expect(content).toContain("https://nexus.test/lol/tournaments/room-1/lobby");
+    expect(content).toContain(
+      "https://nexus.test/lol/tournaments/room-1/lobby",
+    );
     expect(content).toContain(
       "https://discord.com/channels/guild-1/lobby-voice",
     );
@@ -262,7 +264,9 @@ describe("DiscordScheduleService.closeStaleRecruitments", () => {
     expect(content).toContain("9월 1일 내전");
     expect(content).toContain("/nexus schedule");
     // 방은 남는다 — 로비 링크를 함께 준다.
-    expect(content).toContain("https://nexus.test/lol/tournaments/room-1/lobby");
+    expect(content).toContain(
+      "https://nexus.test/lol/tournaments/room-1/lobby",
+    );
   });
 
   it("정원을 채운 방은 건드리지 않는다", async () => {

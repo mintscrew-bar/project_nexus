@@ -77,11 +77,7 @@ export class ScrimController {
     @Param("roomId") roomId: string,
     @Body() rule: PointRuleDto,
   ) {
-    const scrim = await this.scrimService.updatePointRule(
-      userId,
-      roomId,
-      rule,
-    );
+    const scrim = await this.scrimService.updatePointRule(userId, roomId, rule);
     this.scrimGateway.broadcastScrimUpdate(roomId, "scrim-updated", scrim);
     return scrim;
   }

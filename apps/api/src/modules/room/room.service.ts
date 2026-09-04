@@ -1393,9 +1393,7 @@ export class RoomService {
                 reputation: true,
                 riotAccounts: {
                   // 배그 방에서는 아예 읽지 않는다. 어차피 응답에서 잘라낸다.
-                  where: isPubgRoom
-                    ? { id: "__none__" }
-                    : { isPrimary: true },
+                  where: isPubgRoom ? { id: "__none__" } : { isPrimary: true },
                   select: {
                     gameName: true,
                     tagLine: true,
@@ -2687,8 +2685,7 @@ export class RoomService {
     ranked.forEach((participant, index) => {
       const round = Math.floor(index / teamCount);
       const offset = index % teamCount;
-      const teamIndex =
-        round % 2 === 0 ? offset : teamCount - 1 - offset;
+      const teamIndex = round % 2 === 0 ? offset : teamCount - 1 - offset;
       teams[teamIndex].push(participant);
     });
 

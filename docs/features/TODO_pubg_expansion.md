@@ -512,10 +512,10 @@ enum PubgPlatform { STEAM KAKAO }
       `MatchTeamStats` 는 타워·바론·용, `MatchParticipant` 는 챔피언·라인·소환사 주문이
       전부 필수라 재사용할 수 없다. `PubgMatchTeamKills`·`PubgMatchPlayerKills` 를 따로 팠다.
       승자를 안 넣으면 킬이 많은 팀이 이긴 것으로 보고, 동점이면 되묻는다.
-- [~] Task 33: PUBG 킬내기 결과 화면 + Discord 결과 공지 (2026-09-04)
+- [x] Task 33: PUBG 킬내기 전적·프로필 요약·Discord 결과 공지 (2026-09-04)
       대진표에서 배그 킬내기면 전용 결과 입력 모달이 열린다(킬 수 → 승자 자동 판정).
       Discord 결과 공지는 모집 공지가 나갔던 채널로 그대로 보낸다.
-      남은 것: 프로필 요약(전적 화면이 열린 뒤에).
+      프로필 요약은 배그 탭의 전적 요약 타일에 들어갔다(킬내기 승/전).
 
 ### Phase 5 — 배틀로얄 내전
 

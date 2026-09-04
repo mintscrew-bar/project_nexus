@@ -41,9 +41,7 @@ export interface PubgKillMatchHistoryItem {
   completedAt: Date | null;
 }
 
-export type PubgHistoryItem =
-  | PubgScrimHistoryItem
-  | PubgKillMatchHistoryItem;
+export type PubgHistoryItem = PubgScrimHistoryItem | PubgKillMatchHistoryItem;
 
 /**
  * 배그 전적.
@@ -259,7 +257,9 @@ export class PubgHistoryService {
         averageRank === null ? null : Math.round(averageRank * 10) / 10,
       /** 라운드당 팀 킬 평균 */
       averageKillsPerRound:
-        scrimRounds > 0 ? Math.round((scrimKills / scrimRounds) * 10) / 10 : null,
+        scrimRounds > 0
+          ? Math.round((scrimKills / scrimRounds) * 10) / 10
+          : null,
       killMatchWins: killMatches.filter((item) => item.win).length,
     };
   }

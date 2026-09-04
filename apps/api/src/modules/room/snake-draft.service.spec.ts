@@ -173,10 +173,7 @@ describe("SnakeDraftService", () => {
 });
 
 describe("팀 인원과 픽 순서 추첨", () => {
-  const service = new (require("./snake-draft.service").SnakeDraftService)(
-    {} as any,
-    {} as any,
-  );
+  const service = new SnakeDraftService({} as any, {} as any);
 
   it("배그 4인 스쿼드는 팀당 3픽 — 롤보다 한 번 적다", () => {
     // 캡틴을 뺀 나머지가 픽 대상이다. 5인 하드코딩을 그대로 두면

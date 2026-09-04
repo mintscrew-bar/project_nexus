@@ -5,7 +5,12 @@ import {
   Logger,
   NotFoundException,
 } from "@nestjs/common";
-import { Prisma, RoomStatus, ScrimRoundStatus, ScrimStatus } from "@nexus/database";
+import {
+  Prisma,
+  RoomStatus,
+  ScrimRoundStatus,
+  ScrimStatus,
+} from "@nexus/database";
 import {
   DEFAULT_PUBG_POINT_RULE,
   calculateScrimPoints,

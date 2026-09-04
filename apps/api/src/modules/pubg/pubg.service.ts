@@ -10,10 +10,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { RegisterPubgAccountDto, UpdatePubgScoreDto } from "./dto";
 import { PubgApiService, type PubgPlayerLookup } from "./pubg-api.service";
 import { calculateNexusScore, calculateNexusTier } from "./pubg-score.util";
-import {
-  PUBG_BALANCE_VERSION,
-  calculateAutoBalanceScore,
-} from "@nexus/types";
+import { PUBG_BALANCE_VERSION, calculateAutoBalanceScore } from "@nexus/types";
 import { PubgHistoryService } from "./pubg-history.service";
 
 /** 매치가 없어 샤드를 못 정한 계정을 다시 탐색하기까지 두는 간격. */
@@ -190,8 +187,7 @@ export class PubgService {
 
     // 매치가 나온 샤드를 모르면 어느 쪽 랭크를 물어야 할지 알 수 없다.
     const shard =
-      account.lastMatchShard ??
-      (await this.refreshShardIfUnknown(accountId));
+      account.lastMatchShard ?? (await this.refreshShardIfUnknown(accountId));
     if (!shard) {
       throw new BadRequestException(
         "플레이 플랫폼이 확인되지 않아 공식 랭크를 가져올 수 없습니다. 커스텀이 아닌 경기를 한 판 치른 뒤 다시 시도해주세요.",
@@ -222,7 +218,10 @@ export class PubgService {
    * 본인이 직접 넣은 점수(SELF)나 운영자 보정(ADMIN)은 덮지 않는다.
    * 사람이 판단한 값을 기계가 조용히 지우면 왜 바뀌었는지 아무도 모른다.
    */
-  async recomputeBalanceScore(accountId: string, options?: { force?: boolean }) {
+  async recomputeBalanceScore(
+    accountId: string,
+    options?: { force?: boolean },
+  ) {
     const account = await this.prisma.pubgAccount.findUnique({
       where: { id: accountId },
       select: {

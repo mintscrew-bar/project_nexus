@@ -32,9 +32,7 @@ export class PubgRateLimiterService {
       "PUBG_GLOBAL_RATE_WINDOW_SEC",
       60,
     );
-    this.logger.log(
-      `PUBG global rate limiter: ${this.max}/${this.windowSec}s`,
-    );
+    this.logger.log(`PUBG global rate limiter: ${this.max}/${this.windowSec}s`);
   }
 
   private getPositiveIntConfig(key: string, fallback: number): number {
