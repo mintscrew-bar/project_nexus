@@ -29,6 +29,7 @@ import { AuctionGateway } from "../auction/auction.gateway";
 import { RoleSelectionService } from "../role-selection/role-selection.service";
 import { RoleSelectionGateway } from "../role-selection/role-selection.gateway";
 import { MatchGateway } from "../match/match.gateway";
+import { roomDisplayName } from "../../common/utils/room-title.util";
 
 @Controller("rooms")
 @UseGuards(JwtAuthGuard)
@@ -110,6 +111,11 @@ export class RoomController {
     return {
       id: room.id,
       name: room.name,
+      // 공유 카드에는 배지를 그릴 수 없어 제목에 플랫폼을 담아 보낸다.
+      displayName: roomDisplayName(room),
+      gameTitle: room.gameTitle,
+      pubgPlatform: room.pubgPlatform,
+      pubgGameMode: room.pubgGameMode,
       teamMode: room.teamMode,
       status: room.status,
       isPrivate: room.isPrivate,

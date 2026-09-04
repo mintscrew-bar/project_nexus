@@ -4,6 +4,7 @@ import React from 'react';
 import { Card, CardContent, CardFooter, Badge } from '@/components/ui';
 import { cn, getRelativeTime } from '@/lib/utils';
 import { ArrowRight, ArrowLeftRight, Eye, EyeOff, Gavel, ListOrdered, LockKeyhole, Scale, Server, Users } from 'lucide-react';
+import { PUBG_PLATFORM_LABELS, getPubgGameMode } from '@nexus/types';
 
 interface Room {
   id: string;
@@ -23,6 +24,7 @@ interface Room {
   hostLive?: { platform: string; channelUrl: string } | null;
   gameTitle?: 'LOL' | 'PUBG';
   pubgPlatform?: 'STEAM' | 'KAKAO' | null;
+  pubgGameMode?: 'KILL_MATCH' | 'BATTLE_ROYALE' | 'FREE_MATCH' | null;
 }
 
 interface RoomCardProps {
@@ -136,9 +138,15 @@ export const RoomCard: React.FC<RoomCardProps> = ({ room, currentUserId, onClick
                 <h3 className="truncate text-base font-bold tracking-[-0.02em] text-text-primary md:text-lg">
                   {room.name}
                 </h3>
+{/* 스배/카배는 같이 플레이할 수 없어서 제목 옆에 항상 붙인다. */}
                 {room.gameTitle === 'PUBG' && room.pubgPlatform && (
                   <span className="flex-shrink-0 rounded-full bg-accent-primary/10 px-2 py-0.5 text-[10px] font-bold text-accent-primary">
-                    {room.pubgPlatform === 'STEAM' ? '스배' : '카배'}
+                    {PUBG_PLATFORM_LABELS[room.pubgPlatform].short}
+                  </span>
+                )}
+                {room.gameTitle === 'PUBG' && room.pubgGameMode && (
+                  <span className="flex-shrink-0 rounded-full bg-bg-elevated px-2 py-0.5 text-[10px] font-bold text-text-secondary">
+                    {getPubgGameMode(room.pubgGameMode).label}
                   </span>
                 )}
                 {room.isPrivate && <LockKeyhole className="h-3.5 w-3.5 flex-shrink-0 text-accent-warning" />}

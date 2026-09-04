@@ -268,6 +268,24 @@ export {
   isSectionReady,
 } from './games';
 
+export {
+  PUBG_PLATFORMS,
+  PUBG_PLATFORM_LABELS,
+  PUBG_GAME_MODES,
+  DEFAULT_PUBG_GAME_MODE,
+  getPubgGameMode,
+  pubgGameModes,
+  isValidPubgRoomSize,
+  pubgRoomTitle,
+  stripPubgTitlePrefix,
+} from './pubg';
+
+export type {
+  PubgPlatform,
+  PubgGameMode,
+  PubgGameModeDefinition,
+} from './pubg';
+
 export type {
   GameTitle,
   GameDefinition,

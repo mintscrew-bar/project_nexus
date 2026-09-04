@@ -31,6 +31,15 @@ import {
 } from "@nexus/types";
 import type { GameTitle } from "@nexus/types";
 import { roomSizeOptions } from "@/lib/room-size-options";
+import {
+  DEFAULT_PUBG_GAME_MODE,
+  PUBG_PLATFORM_LABELS,
+  getPubgGameMode,
+  isValidPubgRoomSize,
+  pubgGameModes,
+  type PubgGameMode,
+  type PubgPlatform,
+} from "@nexus/types";
 import { useGamePrefix } from "@/hooks/useCurrentGame";
 
 interface RoomCreationFormProps {
@@ -88,10 +97,23 @@ export function RoomCreationForm({
   const { createRoom, isLoading, error } = useRoomStore();
   const { user, isAuthenticated, isLoading: authLoading } = useAuthStore();
   const [name, setName] = useState("");
-  const [pubgPlatform, setPubgPlatform] = useState<"STEAM" | "KAKAO">("STEAM");
+  const [pubgPlatform, setPubgPlatform] = useState<PubgPlatform>("STEAM");
+  // 배그는 경기 모드에 따라 정원과 고를 수 있는 팀 편성이 달라진다.
+  const [pubgGameMode, setPubgGameMode] = useState<PubgGameMode>(
+    DEFAULT_PUBG_GAME_MODE,
+  );
   const game = GAMES[gameTitle];
-  const playerOptions = roomSizeOptions(gameTitle);
-  const [maxParticipants, setMaxParticipants] = useState(game.roomSizes[0] ?? 10);
+  const playerOptions =
+    gameTitle === "PUBG"
+      ? roomSizeOptions(gameTitle).filter((option) =>
+          isValidPubgRoomSize(option.value, pubgGameMode),
+        )
+      : roomSizeOptions(gameTitle);
+  const [maxParticipants, setMaxParticipants] = useState(
+    gameTitle === "PUBG"
+      ? (getPubgGameMode(DEFAULT_PUBG_GAME_MODE).roomSizes[0] ?? 16)
+      : (game.roomSizes[0] ?? 10),
+  );
   const [teamMode, setTeamMode] = useState<TeamMode>("AUCTION");
   const [isPrivate, setIsPrivate] = useState(false);
   const [password, setPassword] = useState("");
@@ -170,6 +192,24 @@ export function RoomCreationForm({
     setSeriesPreset(normalizeSeriesPreset(seriesPreset, nextTeams));
   };
 
+  /**
+   * 경기 모드가 바뀌면 정원 선택지가 통째로 달라진다
+   * (킬내기는 8명 고정, 배틀로얄은 16명부터).
+   * 이전 정원이 새 모드에서 유효하지 않으면 그 모드의 첫 정원으로 옮긴다.
+   */
+  const handlePubgModeChange = (mode: PubgGameMode) => {
+    setPubgGameMode(mode);
+    const sizes = getPubgGameMode(mode).roomSizes;
+    if (!sizes.includes(maxParticipants)) {
+      handleParticipantChange(sizes[0] ?? 16);
+    }
+    // 자유 매치는 수동 팀 배정만 쓴다.
+    const allowed = getPubgGameMode(mode).teamModes;
+    if (!allowed.includes(teamMode as never)) {
+      setTeamMode(allowed[0] as TeamMode);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
@@ -186,6 +226,7 @@ export function RoomCreationForm({
       name: name.trim(),
       gameTitle,
       pubgPlatform: gameTitle === "PUBG" ? pubgPlatform : undefined,
+      pubgGameMode: gameTitle === "PUBG" ? pubgGameMode : undefined,
       maxParticipants,
       teamMode: teamMode,
       password: isPrivate ? password : undefined,
@@ -268,7 +309,35 @@ export function RoomCreationForm({
               <option value="STEAM">Steam (스팀 배틀그라운드)</option>
               <option value="KAKAO">Kakao (카카오 배틀그라운드)</option>
             </select>
-            <p className="mt-1 text-xs text-text-tertiary">방 제목 앞에 [{pubgPlatform === "STEAM" ? "스배" : "카배"}]가 자동으로 붙습니다.</p>
+            <p className="mt-1 text-xs text-text-tertiary">
+              목록·공지에 [{PUBG_PLATFORM_LABELS[pubgPlatform].short}] 표시가
+              붙습니다. 스배와 카배는 같이 플레이할 수 없습니다.
+            </p>
+          </div>
+        )}
+        {gameTitle === "PUBG" && (
+          <div>
+            <label
+              htmlFor="pubgGameMode"
+              className="block text-text-primary text-sm font-semibold mb-2"
+            >
+              경기 모드
+            </label>
+            <select
+              id="pubgGameMode"
+              value={pubgGameMode}
+              onChange={(e) => handlePubgModeChange(e.target.value as PubgGameMode)}
+              className="w-full input"
+            >
+              {pubgGameModes().map((mode) => (
+                <option key={mode.mode} value={mode.mode}>
+                  {mode.label}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-text-tertiary">
+              {getPubgGameMode(pubgGameMode).description}
+            </p>
           </div>
         )}
       </div>
@@ -388,7 +457,12 @@ export function RoomCreationForm({
           <Trophy className="w-4 h-4 inline mr-2" />팀 구성 방식
         </label>
         <div className="space-y-3">
-          {TEAM_MODES.filter((mode) => game.teamModes.includes(mode.value)).map((mode) => (
+          {/* 배그는 경기 모드가 팀 편성 선택지를 더 좁힌다(자유 매치는 수동 배정만). */}
+          {TEAM_MODES.filter((mode) =>
+            gameTitle === "PUBG"
+              ? getPubgGameMode(pubgGameMode).teamModes.includes(mode.value)
+              : game.teamModes.includes(mode.value),
+          ).map((mode) => (
             <div
               key={mode.value}
               className={`flex w-full items-start gap-1 rounded-lg border-2 p-2 transition-all ${

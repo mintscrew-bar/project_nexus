@@ -41,6 +41,7 @@ import { DiscordEmojiService, parseEmojiRef } from "./discord-emoji.service";
 import { formatKst, parseKstSchedule } from "./discord-schedule-time";
 import type { EmojiMap, RecruitEmojiName } from "./discord-emoji.service";
 import { roomBracketUrl, roomLobbyUrl } from "../../common/utils/app-url.util";
+import { roomDisplayName } from "../../common/utils/room-title.util";
 
 // 티어 이모지 맵핑
 const TIER_EMOJI: Record<string, string> = {
@@ -1941,7 +1942,7 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
       const lockIcon = room.isPrivate ? "🔒" : "🔓";
 
       embed.addFields({
-        name: `${statusEmoji} ${room.name} ${lockIcon}`,
+        name: `${statusEmoji} ${roomDisplayName(room)} ${lockIcon}`,
         value: [
           `**호스트:** ${room.host.username}`,
           `**인원:** ${room._count.participants}/${room.maxParticipants}`,

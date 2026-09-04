@@ -441,7 +441,10 @@ model Room {
   id                      String                @id @default(cuid())
   /// 이 방이 어떤 게임의 내전인지. 목록·전적·랭킹이 이 값으로 갈린다.
   gameTitle               GameTitle             @default(LOL)
+  /// 배그 방에서만 채워진다. 이번 경기를 어느 플랫폼에서 하는지는 방 설정으로 확정한다.
   pubgPlatform            PubgPlatform?
+  /// 배그 방에서만 채워진다. 정원·팀 편성 선택지·결과 처리 방식이 여기서 갈린다.
+  pubgGameMode            PubgGameMode?
   name                    String
   hostId                  String
   password                String?
@@ -1669,6 +1672,15 @@ enum GameTitle {
 enum PubgPlatform {
   STEAM
   KAKAO
+}
+
+/// 배그 경기 모드. 롤과 달리 "경기 규칙"과 "팀 구성 방식"이 별개다.
+/// KILL_MATCH 는 2팀 승패라 기존 Match/MatchSeries 를 재사용하고,
+/// BATTLE_ROYALE 만 다팀·다라운드 리더보드(Scrim 계열)를 쓴다.
+enum PubgGameMode {
+  KILL_MATCH
+  BATTLE_ROYALE
+  FREE_MATCH
 }
 
 enum TeamMode {

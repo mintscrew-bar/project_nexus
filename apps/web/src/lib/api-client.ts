@@ -811,6 +811,7 @@ export const roomApi = {
   getRooms: async (params?: {
     gameTitle?: "LOL" | "PUBG";
     pubgPlatform?: "STEAM" | "KAKAO";
+    pubgGameMode?: "KILL_MATCH" | "BATTLE_ROYALE" | "FREE_MATCH";
     status?: string;
     teamMode?: string;
     search?: string;

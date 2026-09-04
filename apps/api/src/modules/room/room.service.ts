@@ -19,6 +19,7 @@ import {
   MatchStatus,
   Role,
   GameTitle,
+  PubgGameMode,
   PubgPlatform,
 } from "@nexus/database";
 import { Prisma } from "@prisma/client";
@@ -29,6 +30,9 @@ import {
   teamCountForRoomSize,
   isValidRoomSize,
   getGame,
+  getPubgGameMode,
+  isValidPubgRoomSize,
+  DEFAULT_PUBG_GAME_MODE,
 } from "@nexus/types";
 import type { GameTitle as GameTitleValue } from "@nexus/types";
 import { StreamerService } from "../streamer/streamer.service";
@@ -51,7 +55,10 @@ export interface CreateRoomDto {
   discordGuildId?: string;
   /** 어떤 게임의 내전인지. 생략하면 롤이다. */
   gameTitle?: GameTitle;
+  /** 배그 방에서만 — 이번 경기를 스팀에서 하는지 카카오에서 하는지 */
   pubgPlatform?: PubgPlatform;
+  /** 배그 방에서만 — 킬내기 / 배틀로얄 / 자유 매치 */
+  pubgGameMode?: PubgGameMode;
   /** 예고제: 내전 예정 시각(ISO 8601). 없으면 지금 바로 여는 방이다. */
   scheduledAt?: string;
 
@@ -949,15 +956,9 @@ export class RoomService {
     // 게임마다 팀 인원·계정 요구사항이 다르다.
     const gameTitle = dto.gameTitle ?? GameTitle.LOL;
     const game = getGame(gameTitle);
-    const roomName =
-      gameTitle === GameTitle.PUBG && dto.pubgPlatform
-        ? `[${dto.pubgPlatform === "STEAM" ? "스배" : "카배"}] ${dto.name.trim()}`
-        : dto.name.trim();
-    if (roomName.length > 50) {
-      throw new BadRequestException(
-        "플랫폼 접두사를 포함한 방 제목은 50자를 초과할 수 없습니다.",
-      );
-    }
+    // 플랫폼 접두사(`[스배]`)는 저장하지 않고 보여줄 때 붙인다.
+    // 저장해 두면 방장이 제목을 고칠 때마다 겹쳐 붙거나 사라진다.
+    const roomName = dto.name.trim();
 
     // ========================================
     // Discord + 게임 계정 연동 필수 체크 (관리자는 면제)
@@ -1003,7 +1004,30 @@ export class RoomService {
     if (!game.enabled) {
       throw new BadRequestException(`${game.label} 내전은 아직 준비 중입니다.`);
     }
-    if (!isValidRoomSize(dto.maxParticipants, gameTitle)) {
+
+    // 배그는 어느 플랫폼에서 하는지와 어떤 경기를 하는지가 방마다 확정돼야 한다.
+    // 스배 방에 카배 사람이 들어와도 같이 못 하고, 킬내기와 배틀로얄은 정원부터 다르다.
+    let pubgGameMode: PubgGameMode | null = null;
+    if (gameTitle === GameTitle.PUBG) {
+      if (!dto.pubgPlatform) {
+        throw new BadRequestException(
+          "배그 방은 스팀/카카오 중 하나를 선택해야 합니다.",
+        );
+      }
+      const mode = dto.pubgGameMode ?? DEFAULT_PUBG_GAME_MODE;
+      pubgGameMode = mode;
+      const modeDef = getPubgGameMode(mode);
+      if (!isValidPubgRoomSize(dto.maxParticipants, mode)) {
+        throw new BadRequestException(
+          `${modeDef.label} 정원은 ${modeDef.roomSizes.join(", ")}명 중에서 골라주세요.`,
+        );
+      }
+      if (!modeDef.teamModes.includes(dto.teamMode as never)) {
+        throw new BadRequestException(
+          `${modeDef.label}에서는 이 팀 편성 방식을 쓸 수 없습니다.`,
+        );
+      }
+    } else if (!isValidRoomSize(dto.maxParticipants, gameTitle)) {
       throw new BadRequestException(
         `정원은 ${game.roomSizes.join(", ")}명 중에서 골라주세요.`,
       );
@@ -1079,6 +1103,7 @@ export class RoomService {
             gameTitle,
             pubgPlatform:
               gameTitle === GameTitle.PUBG ? dto.pubgPlatform : null,
+            pubgGameMode,
             scheduledAt,
 
             // Draft settings
@@ -1491,6 +1516,8 @@ export class RoomService {
     gameTitle?: "LOL" | "PUBG";
     status?: "WAITING" | "IN_PROGRESS" | "COMPLETED";
     teamMode?: TeamMode;
+    pubgPlatform?: PubgPlatform;
+    pubgGameMode?: PubgGameMode;
     includePrivate?: boolean;
     search?: string;
     sort?: "newest" | "oldest" | "mostPlayers" | "leastPlayers";
@@ -1522,6 +1549,13 @@ export class RoomService {
       }
       if (filters?.teamMode && this.validTeamModes.has(filters.teamMode)) {
         where.teamMode = filters.teamMode;
+      }
+      // 스배/카배는 같이 못 하므로 목록에서 갈라 볼 수 있어야 한다.
+      if (filters?.pubgPlatform) {
+        where.pubgPlatform = filters.pubgPlatform;
+      }
+      if (filters?.pubgGameMode) {
+        where.pubgGameMode = filters.pubgGameMode;
       }
       if (!filters?.includePrivate) {
         where.isPrivate = false;
