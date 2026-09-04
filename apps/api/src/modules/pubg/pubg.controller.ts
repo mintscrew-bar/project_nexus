@@ -20,6 +20,7 @@ import {
 } from "./dto";
 import { PubgService } from "./pubg.service";
 import { PubgKillMatchService } from "./pubg-kill-match.service";
+import { PubgHistoryService } from "./pubg-history.service";
 
 @Controller("pubg")
 @UseGuards(JwtAuthGuard)
@@ -27,6 +28,7 @@ export class PubgController {
   constructor(
     private readonly pubgService: PubgService,
     private readonly killMatchService: PubgKillMatchService,
+    private readonly historyService: PubgHistoryService,
   ) {}
 
   @Get("accounts")
@@ -68,6 +70,12 @@ export class PubgController {
     @Param("id") accountId: string,
   ) {
     return this.pubgService.setPrimary(userId, accountId);
+  }
+
+  /** 배그 전적 — 스크림 참가 이력과 킬내기 결과를 시간순으로 섞어 돌려준다. */
+  @Get("history/:userId")
+  getUserHistory(@Param("userId") userId: string) {
+    return this.historyService.getUserHistory(userId);
   }
 
   /** 킬내기 결과 — 승패는 기존 2팀 흐름을 쓰고 킬 수만 얹는다. */

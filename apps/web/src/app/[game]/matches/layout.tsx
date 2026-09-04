@@ -13,11 +13,11 @@ const COPY = {
       "롤 내전 전적을 검색하세요. 소환사별 매치 기록, 팀 구성, 챔피언 픽, KDA, 승패를 전부 확인할 수 있습니다.",
   },
   PUBG: {
-    title: "배그 내전 전적 검색",
+    title: "배그 내전 전적",
     description:
-      "배틀그라운드 내전 전적을 검색하고 확인하세요. 스크림 라운드별 순위와 킬, 팀 구성, 누적 포인트를 Nexus에서 한눈에.",
+      "Nexus에서 치른 배틀로얄 스크림과 킬내기 기록입니다. 라운드별 순위와 킬, 누적 포인트를 확인하세요.",
     ogDescription:
-      "배그 내전 전적을 검색하세요. 라운드별 순위·킬과 팀별 누적 포인트를 확인할 수 있습니다.",
+      "배그 내전 전적. 라운드별 순위·킬과 팀별 누적 포인트를 확인할 수 있습니다.",
   },
 } as const;
 
@@ -33,7 +33,9 @@ export async function generateMetadata({
   const url = gameCanonical(GAMES[title].slug, "/matches");
 
   // 준비 중 안내는 색인할 내용이 아니다.
-  if (!isSectionReady(title, "matches")) {
+  // 배그 전적은 로그인한 본인 기록만 보여주는 화면이라 색인해도 빈 페이지가 잡힌다
+  // (PUBG API 로는 남의 내전 기록을 찾아올 수 없어 검색 축 자체가 없다).
+  if (!isSectionReady(title, "matches") || title === "PUBG") {
     return { title: copy.title, robots: { index: false, follow: true } };
   }
 

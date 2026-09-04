@@ -93,9 +93,9 @@ const PUBG: GameDefinition = {
   resultShape: "POINT_LEADERBOARD",
   // 계정 식별자 등록과 방 생성 틀을 사용할 수 있다. 외부 전적 검증은 별도 상태다.
   enabled: true,
-  // 전적·랭킹은 스크림 결과 수집(Phase 5·6)이 들어와야 채울 데이터가 생긴다.
-  // 가이드는 배그용 문안을 아직 쓰지 않았다. 그때까지 롤 화면을 대신 보여주지 않는다.
-  comingSoonSections: ["matches", "ranking", "guide"],
+  // 전적은 스크림·킬내기 결과가 쌓이므로 열었다.
+  // 랭킹은 줄 세울 표본이 아직 없고, 가이드는 배그용 문안을 쓰지 않았다.
+  comingSoonSections: ["ranking", "guide"],
 };
 
 export const GAMES: Record<GameTitle, GameDefinition> = { LOL, PUBG };

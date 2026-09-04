@@ -2,6 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useGamePrefix } from "@/hooks/useCurrentGame";
+import { useRequireGame } from "@/components/games/RequireGame";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { riotApi, matchApi, statsApi, rankingApi } from "@/lib/api-client";
@@ -78,6 +79,8 @@ interface FetchStatusResponse {
 }
 
 export default function SummonerStatsPage() {
+  // 소환사 검색·챔피언 기록은 롤 전용 개념이다. `/pubg/...` 에서는 404.
+  useRequireGame("LOL");
   const params = useParams();
   const router = useRouter();
   const gamePrefix = useGamePrefix();

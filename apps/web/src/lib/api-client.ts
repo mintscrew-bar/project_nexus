@@ -1190,6 +1190,47 @@ export type PubgPlayerLookupResult =
       ownershipVerified: false;
     };
 
+export interface PubgScrimHistoryItem {
+  kind: "SCRIM";
+  roomId: string;
+  roomName: string;
+  pubgPlatform: "STEAM" | "KAKAO" | null;
+  teamName: string;
+  finalRank: number | null;
+  totalTeams: number;
+  totalPoints: number;
+  totalKills: number;
+  rounds: number;
+  completedAt: string | null;
+}
+
+export interface PubgKillMatchHistoryItem {
+  kind: "KILL_MATCH";
+  matchId: string;
+  roomId: string | null;
+  roomName: string;
+  pubgPlatform: "STEAM" | "KAKAO" | null;
+  teamName: string;
+  opponentName: string;
+  win: boolean;
+  teamKills: number;
+  opponentKills: number;
+  /** 개인 킬은 선택 입력이다. 안 넣었으면 0이 아니라 null. */
+  playerKills: number | null;
+  completedAt: string | null;
+}
+
+export interface PubgHistoryResponse {
+  items: (PubgScrimHistoryItem | PubgKillMatchHistoryItem)[];
+  summary: {
+    scrimCount: number;
+    killMatchCount: number;
+    averageScrimRank: number | null;
+    averageKillsPerRound: number | null;
+    killMatchWins: number;
+  };
+}
+
 export const pubgApi = {
   getAccounts: async () => {
     const response = await apiClient.get("/pubg/accounts");
@@ -1230,6 +1271,12 @@ export const pubgApi = {
       data,
     );
     return response.data;
+  },
+
+  /** 배그 전적 — 스크림 참가 이력 + 킬내기 결과 */
+  getHistory: async (userId: string) => {
+    const response = await apiClient.get(`/pubg/history/${userId}`);
+    return response.data as PubgHistoryResponse;
   },
 
   getKillMatchResult: async (matchId: string) => {

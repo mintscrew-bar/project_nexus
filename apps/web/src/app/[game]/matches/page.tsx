@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useGamePrefix } from "@/hooks/useCurrentGame";
+import { PubgMatchesPage } from "./_PubgMatchesPage";
 import Image from "next/image";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -92,7 +93,7 @@ function formatRecentTime(timestamp: number) {
   return new Date(timestamp).toLocaleDateString("ko-KR");
 }
 
-export default function StatsPage() {
+function LolMatchesPage() {
   const router = useRouter();
   const gamePrefix = useGamePrefix();
   const { addToast } = useToast();
@@ -525,5 +526,20 @@ export default function StatsPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * 게임별 전적 화면.
+ *
+ * 롤은 소환사 검색 중심, 배그는 Nexus 내전 기록 중심이라 화면이 아예 다르다.
+ * 같은 컴포넌트에 조건문을 뿌리는 대신 통째로 갈아끼운다.
+ */
+export default function MatchesPage() {
+  const pathname = usePathname();
+  return pathname.startsWith("/pubg/") ? (
+    <PubgMatchesPage />
+  ) : (
+    <LolMatchesPage />
   );
 }
