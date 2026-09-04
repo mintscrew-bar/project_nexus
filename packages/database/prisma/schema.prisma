@@ -329,6 +329,16 @@ model PubgAccount {
   pubgTier           String?
   /// NEXUS 내부 편성 등급 (운영자 지정 또는 산정)
   nexusTier          String?
+  /// 편성 등급이 어디서 나왔는지. "데이터 부족"과 "낮은 등급"은 다르다.
+  nexusTierSource    PubgTierSource @default(NONE)
+  /// 운영자가 등급을 손으로 고쳤을 때의 메모 (사유·근거)
+  nexusTierNote      String?
+  /// 자동 산정에 쓰인 산식 버전. 버전이 다르면 화면에서 다시 계산한다.
+  balanceVersion     Int?
+  /// 자동 산정에 쓰인 라운드 수. 표본이 적으면 화면에서 그렇게 밝힌다.
+  balanceSampleSize  Int?
+  /// 자동 산정 시각
+  balanceComputedAt  DateTime?
   combatScore       Int?
   iglScore          Int?
   teamplayScore     Int?
@@ -1686,6 +1696,15 @@ enum PubgPlatform {
 /// 배그 경기 모드. 롤과 달리 "경기 규칙"과 "팀 구성 방식"이 별개다.
 /// KILL_MATCH 는 2팀 승패라 기존 Match/MatchSeries 를 재사용하고,
 /// BATTLE_ROYALE 만 다팀·다라운드 리더보드(Scrim 계열)를 쓴다.
+/// 편성 등급의 출처.
+/// NONE 은 "아직 판단할 자료가 없다"는 뜻이고, 5티어(가장 낮음)와 전혀 다르다.
+enum PubgTierSource {
+  NONE
+  SELF
+  ADMIN
+  AUTO
+}
+
 enum PubgGameMode {
   KILL_MATCH
   BATTLE_ROYALE

@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  NotFoundException,
   Delete,
   Get,
   HttpCode,
@@ -91,6 +92,34 @@ export class PubgController {
     @Body() dto: ReportKillMatchDto,
   ) {
     return this.killMatchService.reportKills(userId, matchId, dto);
+  }
+
+  /** 공식 PUBG 랭크 스냅샷 갱신. NEXUS 편성 등급과 다른 값이다. */
+  @Post("accounts/:id/rank-sync")
+  syncRank(
+    @CurrentUser("sub") userId: string,
+    @Param("id") accountId: string,
+  ) {
+    return this.pubgService.refreshRankSnapshot(userId, accountId);
+  }
+
+  /**
+   * 편성 점수 자동 산정.
+   *
+   * 본인이 넣은 점수나 운영자 보정은 덮지 않는다 —
+   * 사람이 판단한 값을 기계가 조용히 지우면 왜 바뀌었는지 아무도 모른다.
+   */
+  @Post("accounts/:id/recompute-balance")
+  async recomputeBalance(
+    @CurrentUser("sub") userId: string,
+    @Param("id") accountId: string,
+  ) {
+    // 본인 계정인지 먼저 확인한다(getAccounts 와 같은 소유 검사).
+    const accounts = await this.pubgService.getAccounts(userId);
+    if (!accounts.some((account) => account.id === accountId)) {
+      throw new NotFoundException("PUBG 계정을 찾을 수 없습니다.");
+    }
+    return this.pubgService.recomputeBalanceScore(accountId);
   }
 
   @Patch("accounts/:id/score")

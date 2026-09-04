@@ -301,6 +301,17 @@ export type {
   ScrimLeaderboardRow,
 } from './pubg-scrim';
 
+export {
+  PUBG_BALANCE_VERSION,
+  MIN_ROUNDS_FOR_BALANCE,
+  calculateAutoBalanceScore,
+} from './pubg-balance';
+
+export type {
+  PubgBalanceInput,
+  PubgBalanceResult,
+} from './pubg-balance';
+
 export type {
   GameTitle,
   GameDefinition,

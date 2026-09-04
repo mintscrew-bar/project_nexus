@@ -33,6 +33,10 @@ describe("PubgService 계정 등록", () => {
     $transaction: jest.fn(),
   });
 
+  /** 편성 점수 자동 산정은 별도 테스트에서 본다. 여기서는 호출되지 않는다. */
+  const makeHistory = () =>
+    ({ getUserHistory: jest.fn() }) as any;
+
   const makeApi = (lookup: PubgPlayerLookup | null) =>
     ({ lookupPlayer: jest.fn().mockResolvedValue(lookup) }) as unknown as
       | PubgApiService
@@ -41,7 +45,7 @@ describe("PubgService 계정 등록", () => {
   it("조회로 확정한 계정 ID·샤드를 저장한다 (샤드를 사용자에게 묻지 않는다)", async () => {
     const prisma = makePrisma();
     const api = makeApi(lookupResult());
-    const service = new PubgService(prisma as any, api);
+    const service = new PubgService(prisma as any, api, makeHistory());
 
     const created = await service.registerAccount("user-1", {
       playerName: "  테스트닉  ",
@@ -63,6 +67,7 @@ describe("PubgService 계정 등록", () => {
     const service = new PubgService(
       prisma as any,
       makeApi(lookupResult({ matchShard: null, recentMatchIds: [] })),
+      makeHistory(),
     );
 
     const created = await service.registerAccount("user-1", {
@@ -74,7 +79,7 @@ describe("PubgService 계정 등록", () => {
   });
 
   it("조회로 못 찾은 닉네임은 등록하지 않는다", async () => {
-    const service = new PubgService(makePrisma() as any, makeApi(null));
+    const service = new PubgService(makePrisma() as any, makeApi(null), makeHistory());
     await expect(
       service.registerAccount("user-1", { playerName: "없는닉" }),
     ).rejects.toBeInstanceOf(NotFoundException);
@@ -83,7 +88,7 @@ describe("PubgService 계정 등록", () => {
   it("같은 계정을 다른 사용자가 가져갈 수 없다", async () => {
     const prisma = makePrisma();
     prisma.pubgAccount.findUnique.mockResolvedValue({ userId: "other" });
-    const service = new PubgService(prisma as any, makeApi(lookupResult()));
+    const service = new PubgService(prisma as any, makeApi(lookupResult()), makeHistory());
 
     await expect(
       service.registerAccount("user-1", { playerName: "테스트닉" }),
@@ -94,7 +99,7 @@ describe("PubgService 계정 등록", () => {
   it("두 번째 계정은 대표가 되지 않는다", async () => {
     const prisma = makePrisma();
     prisma.pubgAccount.count.mockResolvedValue(1);
-    const service = new PubgService(prisma as any, makeApi(lookupResult()));
+    const service = new PubgService(prisma as any, makeApi(lookupResult()), makeHistory());
 
     const created = await service.registerAccount("user-1", {
       playerName: "부계정",
@@ -104,7 +109,7 @@ describe("PubgService 계정 등록", () => {
 
   it("남의 계정 점수는 못 고친다", async () => {
     const prisma = makePrisma();
-    const service = new PubgService(prisma as any, makeApi(lookupResult()));
+    const service = new PubgService(prisma as any, makeApi(lookupResult()), makeHistory());
     await expect(
       service.updateScore("user-1", "acc-x", {
         combatScore: 50,

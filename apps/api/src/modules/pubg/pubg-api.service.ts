@@ -27,6 +27,26 @@ const SHARD_PATH: Record<PubgPlatform, string> = {
 const PLAYER_CACHE_TTL_SEC = 6 * 60 * 60;
 /** 못 찾은 닉네임도 캐시한다. 오타를 계속 두드려 예산을 태우는 걸 막는다. */
 const PLAYER_MISS_CACHE_TTL_SEC = 10 * 60;
+/**
+ * 현재 시즌 ID 캐시.
+ *
+ * 시즌은 몇 달에 한 번 바뀌는데 조회는 1콜을 그대로 먹는다.
+ * 랭크를 볼 때마다 시즌 목록을 다시 받으면 예산의 절반이 여기로 샌다.
+ */
+const SEASON_CACHE_TTL_SEC = 12 * 60 * 60;
+/** 랭크 스냅샷 캐시. 랭크는 자주 바뀌지 않고, 프로필을 열 때마다 조회할 수 없다. */
+const RANKED_CACHE_TTL_SEC = 60 * 60;
+
+/** 공식 PUBG 랭크 한 줄. NEXUS 편성 등급과는 다른 값이다. */
+export interface PubgRankedSnapshot {
+  seasonId: string;
+  /** 어떤 모드 기준인지 (squad / squad-fpp …). 모드가 다르면 티어도 다르다. */
+  mode: string;
+  tier: string | null;
+  subTier: string | null;
+  rankPoint: number | null;
+  roundsPlayed: number;
+}
 
 export interface PubgPlayerLookup {
   /** `account.xxx` — 닉네임이 바뀌어도 유지되는 고유 ID */
@@ -149,6 +169,94 @@ export class PubgApiService {
         (m) => m.id,
       ),
     };
+  }
+
+  /**
+   * 현재 시즌의 공식 랭크.
+   *
+   * 시즌 조회 1콜 + 랭크 조회 1콜이라 캐시가 없으면 프로필 한 번에 2콜을 쓴다.
+   * 랭크가 없는 계정(배치 미완)은 null 이며, 이는 오류가 아니다.
+   */
+  async getRankedStats(
+    platform: PubgPlatform,
+    playerId: string,
+  ): Promise<PubgRankedSnapshot | null> {
+    const seasonId = await this.getCurrentSeasonId(platform);
+    if (!seasonId) return null;
+
+    const cacheKey = `pubg:ranked:${SHARD_PATH[platform]}:${playerId}`;
+    const cached = await this.redis.get(cacheKey);
+    if (cached) {
+      return cached === "" ? null : (JSON.parse(cached) as PubgRankedSnapshot);
+    }
+
+    const url =
+      `${API_BASE}/${SHARD_PATH[platform]}/players/${encodeURIComponent(playerId)}` +
+      `/seasons/${encodeURIComponent(seasonId)}/ranked`;
+    const body = await this.request<{
+      data?: {
+        attributes?: {
+          rankedGameModeStats?: Record<
+            string,
+            {
+              currentTier?: { tier?: string; subTier?: string };
+              currentRankPoint?: number;
+              roundsPlayed?: number;
+            }
+          >;
+        };
+      };
+    }>(url, { allowNotFound: true });
+
+    const modes = body?.data?.attributes?.rankedGameModeStats ?? {};
+    // 스쿼드가 배그 내전의 기준 모드다. 없으면 판수가 가장 많은 모드를 쓴다.
+    const entries = Object.entries(modes).filter(
+      ([, stats]) => (stats?.roundsPlayed ?? 0) > 0,
+    );
+    if (entries.length === 0) {
+      await this.redis.set(cacheKey, "", RANKED_CACHE_TTL_SEC);
+      return null;
+    }
+    const picked =
+      entries.find(([mode]) => mode.startsWith("squad")) ??
+      entries.sort(
+        (a, b) => (b[1].roundsPlayed ?? 0) - (a[1].roundsPlayed ?? 0),
+      )[0];
+
+    const [mode, stats] = picked;
+    const snapshot: PubgRankedSnapshot = {
+      seasonId,
+      mode,
+      tier: stats.currentTier?.tier ?? null,
+      subTier: stats.currentTier?.subTier ?? null,
+      rankPoint: stats.currentRankPoint ?? null,
+      roundsPlayed: stats.roundsPlayed ?? 0,
+    };
+    await this.redis.set(
+      cacheKey,
+      JSON.stringify(snapshot),
+      RANKED_CACHE_TTL_SEC,
+    );
+    return snapshot;
+  }
+
+  /** 현재 시즌 ID. 시즌 목록은 몇 달에 한 번만 바뀌므로 길게 캐시한다. */
+  private async getCurrentSeasonId(
+    platform: PubgPlatform,
+  ): Promise<string | null> {
+    const cacheKey = `pubg:season:${SHARD_PATH[platform]}`;
+    const cached = await this.redis.get(cacheKey);
+    if (cached) return cached || null;
+
+    const body = await this.request<{
+      data?: { id: string; attributes?: { isCurrentSeason?: boolean } }[];
+    }>(`${API_BASE}/${SHARD_PATH[platform]}/seasons`, { allowNotFound: true });
+
+    const current = body?.data?.find(
+      (season) => season.attributes?.isCurrentSeason,
+    );
+    await this.redis.set(cacheKey, current?.id ?? "", SEASON_CACHE_TTL_SEC);
+    return current?.id ?? null;
   }
 
   /**

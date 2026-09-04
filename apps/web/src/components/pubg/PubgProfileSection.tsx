@@ -22,6 +22,37 @@ interface PubgAccountSummary {
   pubgTier: string | null;
   nexusTier: string | null;
   nexusScore: number | null;
+  /** 등급이 어디서 나왔는지. NONE 은 "판단할 자료가 없다"는 뜻이다. */
+  nexusTierSource?: "NONE" | "SELF" | "ADMIN" | "AUTO";
+  balanceVersion?: number | null;
+  balanceSampleSize?: number | null;
+  balanceComputedAt?: string | null;
+}
+
+const TIER_SOURCE_LABEL: Record<string, string> = {
+  SELF: "본인 입력",
+  ADMIN: "운영자 지정",
+  AUTO: "자동 산정",
+};
+
+/** 등급 아래 한 줄. 숫자만 두면 어디서 나온 값인지 알 수 없다. */
+function tierFootnote(account: PubgAccountSummary): string | null {
+  const source = account.nexusTierSource;
+  if (!source || source === "NONE") return null;
+  const parts = [TIER_SOURCE_LABEL[source] ?? source];
+  if (source === "AUTO") {
+    if (account.balanceSampleSize != null) {
+      parts.push(`${account.balanceSampleSize}라운드 기준`);
+    }
+    if (account.balanceComputedAt) {
+      const date = new Date(account.balanceComputedAt);
+      parts.push(`${date.getMonth() + 1}/${date.getDate()} 산정`);
+    }
+    if (account.balanceVersion != null) {
+      parts.push(`v${account.balanceVersion}`);
+    }
+  }
+  return parts.join(" · ");
 }
 
 /**
@@ -91,12 +122,20 @@ export function PubgProfileSection({
                   {account.pubgTier && (
                     <Badge variant="secondary">공식 {account.pubgTier}</Badge>
                   )}
-                  {account.nexusTier && (
+                  {account.nexusTier ? (
                     <Badge variant="primary">
                       NEXUS {account.nexusTier}티어
                     </Badge>
+                  ) : (
+                    // 등급 없음과 최하위 등급은 다르다. 그대로 적는다.
+                    <Badge variant="secondary">등급 산정 전</Badge>
                   )}
                 </span>
+                {tierFootnote(account) && (
+                  <p className="w-full text-[11px] text-text-tertiary">
+                    {tierFootnote(account)}
+                  </p>
+                )}
               </div>
             ))
           )}

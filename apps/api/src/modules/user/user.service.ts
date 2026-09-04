@@ -82,6 +82,12 @@ export class UserService {
             pubgTier: true,
             nexusTier: true,
             nexusScore: true,
+            // 점수의 근거를 함께 보여준다. 산식이 바뀌었거나 표본이 적으면
+            // 화면에서 그렇게 밝혀야 숫자를 곧이곧대로 믿지 않는다.
+            nexusTierSource: true,
+            balanceVersion: true,
+            balanceSampleSize: true,
+            balanceComputedAt: true,
           },
         },
         clanMemberships: {
