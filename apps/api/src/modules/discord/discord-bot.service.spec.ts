@@ -93,7 +93,7 @@ describe("DiscordBotService room notification", () => {
         }),
         expect.objectContaining({
           label: "룸 참가",
-          url: "https://labs-nexus.com/tournaments/room-1/lobby",
+          url: "https://labs-nexus.com/lol/tournaments/room-1/lobby",
         }),
       ]),
     );
@@ -530,7 +530,7 @@ describe("DiscordBotService 모집 공지 — 참가 버튼과 역할 멘션", (
 
       const reply = interaction.editReply.mock.calls[0][0];
       expect(reply).toContain("Room is full");
-      expect(reply).toContain("/tournaments/room-1/lobby");
+      expect(reply).toContain("/lol/tournaments/room-1/lobby");
     });
 
     it("배선 전이면 참가를 시도하지 않고 로비로 안내한다", async () => {
@@ -545,7 +545,7 @@ describe("DiscordBotService 모집 공지 — 참가 버튼과 역할 멘션", (
       await (service as any).handleJoinRoomButton(interaction);
 
       expect(interaction.editReply.mock.calls[0][0]).toContain(
-        "/tournaments/room-1/lobby",
+        "/lol/tournaments/room-1/lobby",
       );
     });
   });

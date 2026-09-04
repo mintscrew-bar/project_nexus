@@ -14,6 +14,7 @@ import {
   calculateCaptainScore,
   calculateTierScore,
 } from "../common/tier-score.util";
+import { minDraftParticipants, teamCountForParticipants } from "@nexus/types";
 
 export interface SnakeDraftState {
   roomId: string;
@@ -82,10 +83,17 @@ export class SnakeDraftService {
       throw new BadRequestException("Room is not in snake draft mode");
     }
 
-    const numTeams = Math.floor(room.participants.length / 5);
-    if (numTeams < 2) {
-      throw new BadRequestException("Need at least 10 players for draft");
+    // 팀 인원은 게임별로 다르다(롤 5인, 배그 4인). 2팀이 안 나오면 드래프트를 못 연다.
+    const minPlayers = minDraftParticipants(room.gameTitle);
+    if (room.participants.length < minPlayers) {
+      throw new BadRequestException(
+        `Need at least ${minPlayers} players for draft`,
+      );
     }
+    const numTeams = teamCountForParticipants(
+      room.participants.length,
+      room.gameTitle,
+    );
 
     const captains = await this.selectCaptains(
       room.participants,

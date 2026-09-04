@@ -6,6 +6,7 @@ import { DiscordBotService } from "./discord-bot.service";
 import { DiscordVoiceService } from "./discord-voice.service";
 import { roomLobbyUrl } from "../../common/utils/app-url.util";
 import type { GameTitle } from "@nexus/types";
+import { teamCountForRoomSize } from "@nexus/types";
 
 /** 시작 1시간 전 리마인드를 보내는 구간 */
 const REMIND_1H_MS = 60 * 60 * 1000;
@@ -236,6 +237,8 @@ export class DiscordScheduleService {
     name: string;
     maxParticipants: number;
     discordCategoryId: string | null;
+    // 팀 음성채널 수는 게임별 팀 인원으로 나눠 정한다(롤 5인 / 배그 4인)
+    gameTitle: GameTitle;
   }): Promise<void> {
     await this.prisma.room.update({
       where: { id: room.id },
@@ -249,7 +252,7 @@ export class DiscordScheduleService {
         const channels = await this.voiceService.createRoomChannels(
           room.id,
           room.name,
-          Math.floor(room.maxParticipants / 5),
+          teamCountForRoomSize(room.maxParticipants, room.gameTitle),
         );
         await this.prisma.room.update({
           where: { id: room.id },

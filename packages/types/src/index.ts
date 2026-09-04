@@ -261,6 +261,9 @@ export {
   gameFromSlug,
   enabledGames,
   teamCountForRoomSize,
+  teamCountForParticipants,
+  teamSizeForGame,
+  minDraftParticipants,
   isValidRoomSize,
 } from './games';
 

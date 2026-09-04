@@ -7,6 +7,9 @@ import {
   getGame,
   isValidRoomSize,
   teamCountForRoomSize,
+  teamCountForParticipants,
+  teamSizeForGame,
+  minDraftParticipants,
 } from "@nexus/types";
 
 describe("게임 정의", () => {
@@ -77,10 +80,41 @@ describe("gameFromSlug", () => {
 });
 
 describe("enabledGames", () => {
-  it("준비 중인 게임은 빠진다", () => {
+  it("노출하기로 한 게임만 나온다", () => {
     const titles = enabledGames().map((game) => game.title);
-    expect(titles).toContain("LOL");
-    // 배그는 Phase 3까지 끝나기 전에는 방을 만들 수 없다.
-    expect(titles).not.toContain("PUBG");
+    // 배그는 계정 등록·방 개설 틀이 들어간 뒤로 스위처에 노출한다.
+    expect(titles).toEqual(["LOL", "PUBG"]);
+  });
+
+  it("enabled=false 인 게임은 목록에서 빠진다", () => {
+    const disabled = GAME_TITLES.filter((title) => !GAMES[title].enabled);
+    const titles = enabledGames().map((game) => game.title);
+    disabled.forEach((title) => expect(titles).not.toContain(title));
+  });
+});
+
+describe("팀 인원 일반화", () => {
+  it("게임별 팀 인원 — 롤 5인, 배그 4인", () => {
+    expect(teamSizeForGame("LOL")).toBe(5);
+    expect(teamSizeForGame("PUBG")).toBe(4);
+    expect(teamSizeForGame()).toBe(teamSizeForGame(DEFAULT_GAME));
+  });
+
+  it("실제 참가 인원으로 팀 수를 낸다", () => {
+    expect(teamCountForParticipants(10, "LOL")).toBe(2);
+    expect(teamCountForParticipants(40, "LOL")).toBe(8);
+    expect(teamCountForParticipants(16, "PUBG")).toBe(4);
+    expect(teamCountForParticipants(64, "PUBG")).toBe(16);
+  });
+
+  it("정원이 덜 찬 테스트 로비에서도 최소 2팀은 나온다", () => {
+    expect(teamCountForParticipants(4, "LOL")).toBe(2);
+    expect(teamCountForParticipants(4, "PUBG")).toBe(2);
+    expect(teamCountForParticipants(0, "LOL")).toBe(2);
+  });
+
+  it("드래프트 최소 인원은 2팀 정원", () => {
+    expect(minDraftParticipants("LOL")).toBe(10);
+    expect(minDraftParticipants("PUBG")).toBe(8);
   });
 });

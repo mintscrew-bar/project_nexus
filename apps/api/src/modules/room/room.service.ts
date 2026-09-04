@@ -30,6 +30,7 @@ import {
   isValidRoomSize,
   getGame,
 } from "@nexus/types";
+import type { GameTitle as GameTitleValue } from "@nexus/types";
 import { StreamerService } from "../streamer/streamer.service";
 import { RedisService } from "../redis/redis.service";
 import { BalanceScoreService } from "../common/balance-score.service";
@@ -195,8 +196,9 @@ export class RoomService {
     roomId: string,
     hostId: string,
     maxParticipants: number,
+    gameTitle: GameTitleValue = GameTitle.LOL,
   ) {
-    const numTeams = Math.floor(maxParticipants / 5);
+    const numTeams = teamCountForRoomSize(maxParticipants, gameTitle);
     for (let index = 0; index < numTeams; index++) {
       await tx.team.create({
         data: {
@@ -1130,6 +1132,7 @@ export class RoomService {
             created.id,
             hostId,
             dto.maxParticipants,
+            gameTitle,
           );
         }
 
@@ -1144,7 +1147,7 @@ export class RoomService {
     let lobbyVoiceChannelId: string | undefined;
     try {
       if (this.discordVoiceService && !scheduledAt) {
-        const numTeams = Math.floor(dto.maxParticipants / 5);
+        const numTeams = teamCountForRoomSize(dto.maxParticipants, gameTitle);
 
         // 카테고리 + 내전 대기실 + 팀별 음성채널 생성
         const channelData = await this.discordVoiceService.createRoomChannels(
@@ -2317,6 +2320,7 @@ export class RoomService {
             roomId,
             room.hostId,
             updates.maxParticipants ?? room.maxParticipants,
+            room.gameTitle,
           );
         }
       });
@@ -2326,7 +2330,10 @@ export class RoomService {
     if (this.discordVoiceService) {
       // 인원 변경 → 팀 채널 수 조정
       if (updates.maxParticipants) {
-        const newNumTeams = Math.floor(updates.maxParticipants / 5);
+        const newNumTeams = teamCountForRoomSize(
+          updates.maxParticipants,
+          room.gameTitle,
+        );
         this.discordVoiceService
           .updateRoomChannels(roomId, newNumTeams)
           .catch((err: Error) =>
@@ -2594,7 +2601,10 @@ export class RoomService {
       );
     }
 
-    const configuredTeamCount = Math.floor(room.maxParticipants / 5);
+    const configuredTeamCount = teamCountForRoomSize(
+      room.maxParticipants,
+      room.gameTitle,
+    );
     const teamCount = configuredTeamCount;
     // 밸런스 점수는 계정·전적이 바뀔 때 미리 계산해 둔다(BalanceScoreService).
     // 화면에 보이는 점수와 여기서 팀을 나눌 때 쓰는 점수가 같아야 하므로
@@ -3274,6 +3284,7 @@ export class RoomService {
           roomId,
           room.hostId,
           room.maxParticipants,
+          room.gameTitle,
         );
       }
 
@@ -3499,6 +3510,7 @@ export class RoomService {
           roomId,
           room.hostId,
           room.maxParticipants,
+          room.gameTitle,
         );
       }
 
@@ -3637,6 +3649,7 @@ export class RoomService {
           roomId,
           room.hostId,
           room.maxParticipants,
+          room.gameTitle,
         );
       }
 

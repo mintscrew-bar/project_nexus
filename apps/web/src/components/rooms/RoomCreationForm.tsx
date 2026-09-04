@@ -30,6 +30,7 @@ import {
   type SeriesPreset,
 } from "@nexus/types";
 import type { GameTitle } from "@nexus/types";
+import { roomSizeOptions } from "@/lib/room-size-options";
 
 interface RoomCreationFormProps {
   gameTitle?: GameTitle;
@@ -75,48 +76,6 @@ const TEAM_MODES: {
   },
 ];
 
-const PLAYER_OPTIONS = [
-  {
-    value: 10,
-    label: "10명",
-    description: "5 vs 5",
-    teams: 2,
-    format: "단판",
-    supportsDE: false,
-  },
-  {
-    value: 15,
-    label: "15명",
-    description: "3팀 리그전",
-    teams: 3,
-    format: "리그전",
-    supportsDE: false,
-  },
-  {
-    value: 20,
-    label: "20명",
-    description: "4팀 토너먼트",
-    teams: 4,
-    format: "준결승+결승",
-    supportsDE: true,
-  },
-  {
-    value: 30,
-    label: "30명",
-    description: "6팀 리그전",
-    teams: 6,
-    format: "리그전",
-    supportsDE: false,
-  },
-  {
-    value: 40,
-    label: "40명",
-    description: "8팀 토너먼트",
-    teams: 8,
-    format: "8강+4강+결승",
-    supportsDE: true,
-  },
-];
 
 export function RoomCreationForm({
   gameTitle = "LOL",
@@ -129,14 +88,7 @@ export function RoomCreationForm({
   const [name, setName] = useState("");
   const [pubgPlatform, setPubgPlatform] = useState<"STEAM" | "KAKAO">("STEAM");
   const game = GAMES[gameTitle];
-  const playerOptions = game.roomSizes.map((value) => ({
-    value,
-    label: `${value}명`,
-    description: `${Math.floor(value / game.teamSize)}팀 · ${game.teamSize}인`,
-    teams: Math.floor(value / game.teamSize),
-    format: game.resultShape === "POINT_LEADERBOARD" ? "순위·킬 리더보드" : "대진표",
-    supportsDE: game.resultShape === "BRACKET" && (value === 20 || value === 40),
-  }));
+  const playerOptions = roomSizeOptions(gameTitle);
   const [maxParticipants, setMaxParticipants] = useState(game.roomSizes[0] ?? 10);
   const [teamMode, setTeamMode] = useState<TeamMode>("AUCTION");
   const [isPrivate, setIsPrivate] = useState(false);

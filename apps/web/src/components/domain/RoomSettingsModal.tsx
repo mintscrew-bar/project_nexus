@@ -32,7 +32,9 @@ import {
   normalizeSeriesPreset,
   teamCountForRoomSize,
   type SeriesPreset,
+  type GameTitle,
 } from "@nexus/types";
+import { roomSizeOptions } from "@/lib/room-size-options";
 
 type TeamCaptainSelection = "RANDOM" | "TIER" | "MANUAL" | "VOLUNTEER";
 type AuctionCaptainSelection = "TIER" | "MANUAL" | "VOLUNTEER";
@@ -55,6 +57,8 @@ interface RoomSettingsModalProps {
     captainSelection?: TeamCaptainSelection;
     bracketFormat?: string;
     seriesPreset?: string | null;
+    /** 방이 속한 게임. 팀 인원·정원 선택지가 여기서 갈린다. */
+    gameTitle?: GameTitle;
   };
 }
 
@@ -90,48 +94,6 @@ const TEAM_MODES: {
   },
 ];
 
-const PLAYER_OPTIONS = [
-  {
-    value: 10,
-    label: "10명",
-    description: "5 vs 5",
-    teams: 2,
-    format: "단판",
-    supportsDE: false,
-  },
-  {
-    value: 15,
-    label: "15명",
-    description: "3팀 리그전",
-    teams: 3,
-    format: "리그전",
-    supportsDE: false,
-  },
-  {
-    value: 20,
-    label: "20명",
-    description: "4팀 토너먼트",
-    teams: 4,
-    format: "준결승+결승",
-    supportsDE: true,
-  },
-  {
-    value: 30,
-    label: "30명",
-    description: "6팀 리그전",
-    teams: 6,
-    format: "리그전",
-    supportsDE: false,
-  },
-  {
-    value: 40,
-    label: "40명",
-    description: "8팀 토너먼트",
-    teams: 8,
-    format: "8강+4강+결승",
-    supportsDE: true,
-  },
-];
 
 const toAuctionCaptainSelection = (
   value?: TeamCaptainSelection,
@@ -150,6 +112,9 @@ export function RoomSettingsModal({
   room,
 }: RoomSettingsModalProps) {
   const { updateRoomSettings } = useLobbyStore();
+  // 방의 게임에 따라 팀 인원(롤 5인 / 배그 4인)과 정원 선택지가 달라진다.
+  const gameTitle: GameTitle = room.gameTitle ?? "LOL";
+  const playerOptions = roomSizeOptions(gameTitle);
 
   // Basic settings
   const [name, setName] = useState(room.name);
@@ -189,14 +154,14 @@ export function RoomSettingsModal({
   const [seriesPreset, setSeriesPreset] = useState<SeriesPreset>(
     normalizeSeriesPreset(
       room.seriesPreset,
-      teamCountForRoomSize(room.maxParticipants),
+      teamCountForRoomSize(room.maxParticipants, gameTitle),
     ),
   );
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isCloseConfirmOpen, setIsCloseConfirmOpen] = useState(false);
-  const selectedPlayerOption = PLAYER_OPTIONS.find(
+  const selectedPlayerOption = playerOptions.find(
     (option) => option.value === maxParticipants,
   );
   const resetsManualTeamSetup =
@@ -223,7 +188,7 @@ export function RoomSettingsModal({
     useDoubleElim !== (room.bracketFormat === "DOUBLE_ELIMINATION") ||
     seriesPreset !== normalizeSeriesPreset(
       room.seriesPreset,
-      teamCountForRoomSize(room.maxParticipants),
+      teamCountForRoomSize(room.maxParticipants, gameTitle),
     ) ||
     password.length > 0;
 
@@ -256,18 +221,18 @@ export function RoomSettingsModal({
       setSeriesPreset(
         normalizeSeriesPreset(
           room.seriesPreset,
-          teamCountForRoomSize(room.maxParticipants),
+          teamCountForRoomSize(room.maxParticipants, gameTitle),
         ),
       );
       setError(null);
     }
-  }, [isOpen, room]);
+  }, [isOpen, room, gameTitle]);
 
   // 인원(=팀 수)이 바뀌면 고를 수 있는 프리셋 목록도 갈아끼워진다.
   const handleParticipantChange = (value: number) => {
     setMaxParticipants(value);
     setSeriesPreset(
-      normalizeSeriesPreset(seriesPreset, teamCountForRoomSize(value)),
+      normalizeSeriesPreset(seriesPreset, teamCountForRoomSize(value, gameTitle)),
     );
   };
 
@@ -358,7 +323,7 @@ export function RoomSettingsModal({
             참가 인원
           </h3>
           <div className="grid grid-cols-3 gap-2">
-            {PLAYER_OPTIONS.map((option) => (
+            {playerOptions.map((option) => (
               <button
                 key={option.value}
                 type="button"

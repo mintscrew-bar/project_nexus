@@ -317,7 +317,20 @@ enum PubgPlatform { STEAM KAKAO }
 
 - [x] Task 6: `GameTitle` enum + `Room.gameTitle` 추가 (기본값 LOL, 마이그레이션)
 - [x] Task 7: 게임별 설정 테이블 신설 (`packages/types/src/games/`) — 팀 인원·팀 수·포지션 유무·가능한 팀 편성 모드
-- [~] Task 8: 팀 수·팀 크기 계산을 게임/모드 설정으로 일반화 + 롤 호출부 회귀 확인
+- [x] Task 8: 팀 수·팀 크기 계산을 게임/모드 설정으로 일반화 + 롤 호출부 회귀 확인 (2026-09-04)
+  - `Math.floor(n / 5)` 하드코딩이 8곳 남아 있었다 — 경매 3, 스네이크 1, 방 서비스 3, 디스코드 예약 1.
+    `games.ts` 에 `teamCountForRoomSize` 만 있고 **실제 참가 인원**으로 나누는 자리가 비어 있어서
+    경매·드래프트는 그냥 5로 나누고 있었다. 배그 방을 열면 16명이 3팀이 된다.
+  - `teamSizeForGame` · `teamCountForParticipants` · `minDraftParticipants` 추가
+  - 스네이크 최소 인원을 `"10명"` 문구 하드코딩에서 `2 × teamSize` 로 (배그 8명)
+  - `createManualTeamSlots` 에 `gameTitle` 인자 추가 — 호출부 5곳 전부 방의 게임을 넘긴다
+  - 디스코드 팀 음성채널 수도 게임별 팀 인원 기준 (배그 64명 방이면 16채널)
+  - 웹 정원 선택지를 `lib/room-size-options.ts` 로 공용화. 롤 표현("5 vs 5", "8강+4강+결승")은
+    표를 그대로 두고, 배그는 게임 설정에서 만든다. `RoomSettingsModal` 이 여전히
+    롤 정원 표를 쓰고 있어 배그 방 설정에서 10/15/20/30/40 이 뜨던 것도 같이 고쳤다.
+  - **부수 수정**: main 에서 이미 깨져 있던 테스트 4개. 라우트 이전(`/lol/*`)으로 낡은
+    디스코드 링크 기대값 3개와, PUBG `enabled:true` 로 바뀐 뒤 맞지 않게 된 `enabledGames` 1개.
+  - 검증: API 492 테스트 통과, api·web `tsc --noEmit`, `next lint` 0 에러
 - [~] Task 9: 라우트를 `/lol/*` 아래로 이동 (내전·전적·랭킹·가이드·프로필)
 - [x] Task 10: 기존 경로 → `/lol/*` 리다이렉트 + 사이트맵 갱신 (2026-09-04)
       **배포 차단 요소였다.** 라우트가 `[game]` 아래로 옮겨졌는데 리다이렉트가 없어서,

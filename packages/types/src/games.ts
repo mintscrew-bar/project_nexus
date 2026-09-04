@@ -111,3 +111,26 @@ export function isValidRoomSize(
 ): boolean {
   return GAMES[game].roomSizes.includes(maxParticipants);
 }
+
+/** 한 팀의 인원 */
+export function teamSizeForGame(game: GameTitle = DEFAULT_GAME): number {
+  return GAMES[game].teamSize;
+}
+
+/**
+ * 실제 참가 인원 → 팀 수.
+ *
+ * 정원(`teamCountForRoomSize`)이 아니라 지금 방에 있는 사람 수로 나눈다.
+ * 정원이 덜 찬 상태에서 경매·드래프트를 돌리는 테스트 로비를 위해 최소 2팀은 보장한다.
+ */
+export function teamCountForParticipants(
+  participantCount: number,
+  game: GameTitle = DEFAULT_GAME,
+): number {
+  return Math.max(2, Math.floor(participantCount / GAMES[game].teamSize));
+}
+
+/** 팀 편성(경매·스네이크)을 시작할 수 있는 최소 인원 = 2팀 */
+export function minDraftParticipants(game: GameTitle = DEFAULT_GAME): number {
+  return GAMES[game].teamSize * 2;
+}
