@@ -172,6 +172,24 @@ export class PubgApiService {
   }
 
   /**
+   * 계정 ID 로 최근 매치 목록만 받는다.
+   *
+   * 닉네임 조회(`lookupPlayer`)와 달리 계정 ID 를 이미 알고 있을 때 쓴다.
+   * 라운드 결과를 찾을 때마다 닉네임으로 다시 훑으면 샤드 탐색까지 딸려와
+   * 예산을 두 배로 쓴다.
+   */
+  async getPlayerMatchIds(
+    platform: PubgPlatform,
+    playerId: string,
+  ): Promise<string[]> {
+    const url = `${API_BASE}/${SHARD_PATH[platform]}/players/${encodeURIComponent(playerId)}`;
+    const body = await this.request<{
+      data?: { relationships?: { matches?: { data?: { id: string }[] } } };
+    }>(url, { allowNotFound: true, background: true });
+    return (body?.data?.relationships?.matches?.data ?? []).map((m) => m.id);
+  }
+
+  /**
    * 현재 시즌의 공식 랭크.
    *
    * 시즌 조회 1콜 + 랭크 조회 1콜이라 캐시가 없으면 프로필 한 번에 2콜을 쓴다.

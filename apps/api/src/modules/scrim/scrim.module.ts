@@ -5,13 +5,16 @@ import { DiscordBotService } from "../discord/discord-bot.service";
 import { ScrimController } from "./scrim.controller";
 import { ScrimService } from "./scrim.service";
 import { ScrimGateway } from "./scrim.gateway";
+import { ScrimCollectorService } from "./scrim-collector.service";
+import { PubgModule } from "../pubg/pubg.module";
 
 @Module({
-  imports: [AuthModule, DiscordModule],
+  imports: [AuthModule, DiscordModule, PubgModule],
   controllers: [ScrimController],
   providers: [
     ScrimService,
     ScrimGateway,
+    ScrimCollectorService,
     // 봇이 꺼져 있어도 스크림은 굴러가야 해서 선택 의존으로 넣는다.
     { provide: "DISCORD_BOT_SERVICE", useExisting: DiscordBotService },
   ],

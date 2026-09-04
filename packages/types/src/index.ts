@@ -320,6 +320,17 @@ export {
 
 export type { StageRoom } from './lobby-stage-path';
 
+export {
+  identifyRoundMatch,
+  rosterOverlap,
+} from './pubg-match-identify';
+
+export type {
+  MatchCandidate,
+  IdentifyOptions,
+  IdentifyResult,
+} from './pubg-match-identify';
+
 export type {
   GameTitle,
   GameDefinition,

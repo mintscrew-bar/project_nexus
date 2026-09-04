@@ -1344,6 +1344,25 @@ export const scrimApi = {
     return response.data;
   },
 
+  /** 자동 수집을 쓸 수 있는 상태인지. 버튼을 띄울지 판단한다. */
+  getCollectorState: async (roomId: string) => {
+    const response = await apiClient.get(`/rooms/${roomId}/scrim/collector`);
+    return response.data as { enabled: boolean };
+  },
+
+  /**
+   * 라운드 결과를 인게임 기록에서 찾아 채운다.
+   * 못 찾으면 아무것도 쓰지 않고 이유를 돌려준다.
+   */
+  collectRound: async (roomId: string, roundNumber: number) => {
+    const response = await apiClient.post(
+      `/rooms/${roomId}/scrim/rounds/${roundNumber}/collect`,
+    );
+    return response.data as
+      | { matched: true; matchId: string; teamsFilled: number }
+      | { matched: false; reason: string; message: string };
+  },
+
   startRound: async (roomId: string, roundNumber: number) => {
     const response = await apiClient.post(
       `/rooms/${roomId}/scrim/rounds/${roundNumber}/start`,

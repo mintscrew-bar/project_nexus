@@ -3,7 +3,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { Crosshair, Flag, ListOrdered, Play, Trophy } from "lucide-react";
+import {
+  Crosshair,
+  Download,
+  Flag,
+  ListOrdered,
+  Play,
+  Trophy,
+} from "lucide-react";
 import {
   DEFAULT_PUBG_POINT_RULE,
   PUBG_POINT_RULE_PRESETS,
@@ -33,6 +40,8 @@ type ScrimRound = {
   roundNumber: number;
   status: "PENDING" | "IN_PROGRESS" | "COMPLETED";
   pubgMatchId: string | null;
+  /** 결과를 어떻게 넣었는지. 자동으로 가져온 값과 손으로 넣은 값을 구분한다. */
+  resultSource: string | null;
   results: {
     teamId: string | null;
     teamName: string;
@@ -64,6 +73,8 @@ export default function ScrimPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [editingRound, setEditingRound] = useState<number | null>(null);
+  // 자동 수집은 커스텀 매치 판별이 실측되기 전까지 서버에서 꺼둔다.
+  const [collectorEnabled, setCollectorEnabled] = useState(false);
 
   const isHost = !!user && !!room && room.hostId === user.id;
   const teams = useMemo(() => room?.teams ?? [], [room]);
@@ -81,6 +92,14 @@ export default function ScrimPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    void scrimApi
+      .getCollectorState(roomId)
+      .then((state) => setCollectorEnabled(state.enabled))
+      // 상태를 못 받으면 버튼을 띄우지 않는다. 수동 입력은 그대로 쓸 수 있다.
+      .catch(() => setCollectorEnabled(false));
+  }, [roomId]);
 
   // 라운드 시작·결과가 방장 화면에서만 보이면 나머지는 새로고침을 눌러야 한다.
   useEffect(() => {
@@ -122,6 +141,37 @@ export default function ScrimPage() {
     } catch (err: any) {
       addToast(
         err?.response?.data?.message || "라운드를 시작하지 못했습니다.",
+        "error",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /**
+   * 라운드 결과 자동 수집.
+   *
+   * 못 찾으면 서버가 아무것도 쓰지 않고 이유를 돌려준다. 그 문장을 그대로
+   * 보여주고 수동 입력으로 넘어가게 한다.
+   */
+  const handleCollect = async (roundNumber: number) => {
+    setBusy(true);
+    try {
+      const result = await scrimApi.collectRound(roomId, roundNumber);
+      if (result.matched) {
+        addToast(
+          `${roundNumber} 라운드 결과를 가져왔습니다. (${result.teamsFilled}팀)`,
+          "success",
+        );
+        await load();
+      } else {
+        addToast(result.message, "warning");
+        // 자동으로 못 찾았으면 바로 손으로 넣을 수 있게 입력창을 연다.
+        setEditingRound(roundNumber);
+      }
+    } catch (err: any) {
+      addToast(
+        err?.response?.data?.message || "결과를 가져오지 못했습니다.",
         "error",
       );
     } finally {
@@ -214,6 +264,8 @@ export default function ScrimPage() {
                 round={round}
                 isHost={isHost && scrim.status !== "COMPLETED"}
                 busy={busy}
+                canCollect={collectorEnabled}
+                onCollect={() => handleCollect(round.roundNumber)}
                 editing={editingRound === round.roundNumber}
                 onStart={() => handleStartRound(round.roundNumber)}
                 onEdit={() =>
@@ -419,8 +471,10 @@ function RoundRow({
   isHost,
   busy,
   editing,
+  canCollect,
   onStart,
   onEdit,
+  onCollect,
   onSubmitted,
   roomId,
   teams,
@@ -430,8 +484,11 @@ function RoundRow({
   isHost: boolean;
   busy: boolean;
   editing: boolean;
+  /** 자동 수집이 열려 있는지. 닫혀 있으면 버튼 자체를 띄우지 않는다. */
+  canCollect: boolean;
   onStart: () => void;
   onEdit: () => void;
+  onCollect: () => void;
   onSubmitted: () => void;
   roomId: string;
   teams: { id: string; name: string }[];
@@ -461,6 +518,11 @@ function RoundRow({
               매치 {round.pubgMatchId.slice(0, 12)}…
             </span>
           )}
+          {round.resultSource && (
+            <span className="text-[11px] text-text-tertiary">
+              {round.resultSource === "AUTO" ? "자동 수집" : "직접 입력"}
+            </span>
+          )}
         </div>
         {isHost && (
           <div className="flex items-center gap-2">
@@ -468,6 +530,12 @@ function RoundRow({
               <Button size="sm" onClick={onStart} disabled={busy}>
                 <Play className="mr-1 h-3.5 w-3.5" />
                 라운드 시작
+              </Button>
+            )}
+            {canCollect && round.status === "IN_PROGRESS" && (
+              <Button size="sm" onClick={onCollect} disabled={busy}>
+                <Download className="mr-1 h-3.5 w-3.5" />
+                결과 가져오기
               </Button>
             )}
             <Button size="sm" variant="ghost" onClick={onEdit}>
