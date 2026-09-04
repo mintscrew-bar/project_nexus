@@ -8,6 +8,7 @@ import Link from 'next/link';
 import { useState, useRef, useEffect } from 'react';
 import { resetOnboardingGuides } from '@/lib/onboarding';
 import { userApi } from '@/lib/api-client';
+import { DEFAULT_GAME_PREFIX } from "@/lib/game-links";
 
 export function UserMenu() {
   const { user, isAuthenticated, isLoading, logout } = useAuthStore();
@@ -77,7 +78,7 @@ export function UserMenu() {
 
           <div className="p-1">
             <Link
-              href="/lol/profile"
+              href={`${DEFAULT_GAME_PREFIX}/profile`}
               onClick={() => setIsOpen(false)}
               className="flex items-center gap-3 px-3 py-2 text-text-secondary hover:text-text-primary hover:bg-bg-tertiary rounded-lg transition-colors"
             >

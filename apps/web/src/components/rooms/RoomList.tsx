@@ -180,7 +180,9 @@ export function RoomList({
 
   const handleRoomClick = (roomId: string) => {
     if (!isAuthenticated) {
-      const redirect = encodeURIComponent(`/tournaments/${roomId}/lobby`);
+      const redirect = encodeURIComponent(
+        `/${GAMES[gameTitle].slug}/tournaments/${roomId}/lobby`,
+      );
       router.push(`/auth/login?redirect=${redirect}`);
       return;
     }

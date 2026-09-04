@@ -2544,7 +2544,13 @@ export interface StreamerListItem extends StreamerChannelItem {
   username: string;
   avatar: string | null;
   channels: StreamerChannelItem[];
-  activeRoom: { id: string; name: string; status: string } | null;
+  activeRoom: {
+    id: string;
+    name: string;
+    status: string;
+    // 방 링크가 게임별 경로라 방마다 게임이 실려 온다
+    gameTitle?: "LOL" | "PUBG";
+  } | null;
   isFollowing: boolean;
 }
 

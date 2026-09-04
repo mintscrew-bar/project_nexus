@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/stores/auth-store";
 import { Logo } from "@/components/Logo";
 import { AlertCircle, X, CornerDownLeft } from "lucide-react";
+import Link from "next/link";
 
 const POST_LOGIN_REDIRECT_KEY = "nexus_post_login_redirect";
 
@@ -189,13 +190,19 @@ function LoginPageContent() {
             <div className="text-center text-xs text-text-tertiary">
               <p>
                 로그인하면{" "}
-                <a href="/terms" className="text-accent-primary hover:underline">
+                <Link
+                  href="/terms"
+                  className="text-accent-primary hover:underline"
+                >
                   이용약관
-                </a>
+                </Link>
                 과{" "}
-                <a href="/privacy" className="text-accent-primary hover:underline">
+                <Link
+                  href="/privacy"
+                  className="text-accent-primary hover:underline"
+                >
                   개인정보 처리방침
-                </a>
+                </Link>
                 에 동의하는 것으로 간주됩니다.
               </p>
             </div>

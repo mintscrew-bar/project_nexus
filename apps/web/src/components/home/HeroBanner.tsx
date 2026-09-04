@@ -7,6 +7,7 @@ import { ChevronDown, Swords } from "lucide-react";
 import { Exo_2 } from "next/font/google";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui";
+import { useGamePrefix } from "@/hooks/useCurrentGame";
 
 const exo2 = Exo_2({ subsets: ["latin"], weight: ["700"] });
 
@@ -60,6 +61,7 @@ interface HeroBannerProps {
 }
 
 export function HeroBanner({ isAuthenticated = false }: HeroBannerProps) {
+  const gamePrefix = useGamePrefix();
   // 마우스 패럴랙스 — RAF lerp (리렌더 없음)
   const hexGridRef = useRef<HTMLDivElement>(null);
   const glowRef = useRef<HTMLDivElement>(null);
@@ -178,7 +180,7 @@ export function HeroBanner({ isAuthenticated = false }: HeroBannerProps) {
           </motion.p>
 
           <motion.div className="flex justify-center" variants={itemVariants}>
-            <Link href="/lol/tournaments">
+            <Link href={`${gamePrefix}/tournaments`}>
               <button
                 className="group relative inline-flex items-center gap-2 px-6 py-3 rounded-lg text-sm font-semibold text-white overflow-hidden transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
                 style={{
@@ -359,7 +361,7 @@ export function HeroBanner({ isAuthenticated = false }: HeroBannerProps) {
               Discord로 시작하기
             </button>
           </Link>
-          <Link href="/lol/tournaments">
+          <Link href={`${gamePrefix}/tournaments`}>
             <Button variant="secondary" size="md" className="w-full sm:w-auto">
               자세히 알아보기
             </Button>

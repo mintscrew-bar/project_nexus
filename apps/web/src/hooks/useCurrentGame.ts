@@ -22,7 +22,16 @@ export function useCurrentGame(): GameTitle {
   return gameFromSlug(first) ?? DEFAULT_GAME;
 }
 
-/** 게임별 경로를 만든다. `gamePath("LOL", "/tournaments")` → `/lol/tournaments` */
-export function gamePath(game: GameTitle, path: string): string {
-  return `/${GAMES[game].slug}${path.startsWith("/") ? path : `/${path}`}`;
+/**
+ * 현재 게임의 URL 프리픽스(`/lol` · `/pubg`).
+ *
+ * 게임별 화면 안에서 만드는 링크는 거의 전부 "현재 게임 + 나머지 경로"라
+ * `` `${prefix}/tournaments/${id}/lobby` `` 처럼 그냥 이어붙이는 편이
+ * `gamePath()` 를 매번 부르는 것보다 읽기 쉽다.
+ */
+export function useGamePrefix(): string {
+  return `/${GAMES[useCurrentGame()].slug}`;
 }
+
+// 순수 함수·상수는 서버 컴포넌트에서도 필요해 별도 모듈에 둔다.
+export { gamePath, DEFAULT_GAME_PREFIX } from "@/lib/game-links";

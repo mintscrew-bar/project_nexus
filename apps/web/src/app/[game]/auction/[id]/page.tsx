@@ -1,6 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
+import { useGamePrefix } from "@/hooks/useCurrentGame";
 import React, {
   useEffect,
   useRef,
@@ -601,6 +602,7 @@ function RemainingPlayersPanel({
 export default function AuctionRoomPage() {
   const params = useParams();
   const router = useRouter();
+  const gamePrefix = useGamePrefix();
   const auctionId = params.id as string;
   const { user } = useAuthStore();
   const { addToast } = useToast();
@@ -671,7 +673,7 @@ export default function AuctionRoomPage() {
           clearInterval(interval);
           if (!hasRedirected.current) {
             hasRedirected.current = true;
-            router.push(`/lol/role-selection/${auctionId}`);
+            router.push(`${gamePrefix}/role-selection/${auctionId}`);
           }
           return 0;
         }
@@ -689,7 +691,7 @@ export default function AuctionRoomPage() {
     );
     clearSessionAbort();
     const timer = setTimeout(
-      () => router.push(`/lol/tournaments/${auctionId}/lobby`),
+      () => router.push(`${gamePrefix}/tournaments/${auctionId}/lobby`),
       1500,
     );
     return () => clearTimeout(timer);
@@ -741,7 +743,7 @@ export default function AuctionRoomPage() {
     try {
       await roomApi.abortToLobby(auctionId);
       addToast("내전을 종료하고 대기실로 복귀합니다.", "success");
-      router.push(`/lol/tournaments/${auctionId}/lobby`);
+      router.push(`${gamePrefix}/tournaments/${auctionId}/lobby`);
     } catch (err: any) {
       addToast(
         err?.response?.data?.message || "내전 종료에 실패했습니다.",
@@ -809,7 +811,7 @@ export default function AuctionRoomPage() {
             </Button>
             <Button
               variant="secondary"
-              onClick={() => router.push(`/lol/tournaments/${auctionId}/lobby`)}
+              onClick={() => router.push(`${gamePrefix}/tournaments/${auctionId}/lobby`)}
             >
               로비로 돌아가기
             </Button>
@@ -1343,7 +1345,7 @@ export default function AuctionRoomPage() {
               onClick={() => {
                 hasRedirected.current = true;
                 setCompleteCountdown(0);
-                router.push(`/lol/role-selection/${auctionId}`);
+                router.push(`${gamePrefix}/role-selection/${auctionId}`);
               }}
             >
               역할 선택으로 이동

@@ -1,6 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
+import { useGamePrefix } from "@/hooks/useCurrentGame";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useLobbyStore } from "@/stores/lobby-store";
 import { useAuthStore } from "@/stores/auth-store";
@@ -57,25 +58,33 @@ const STAGE_HANDOFF_LOBBY_CLEANUP_DELAY_MS = 15 * 1000;
 // 소켓 연결이 이 시간 내에 성립하지 않으면 무한 스피너 대신 복구 화면으로 전환한다.
 const LOBBY_CONNECT_TIMEOUT_MS = 10 * 1000;
 
-const getTeamModeStagePath = (room: {
-  id: string;
-  teamMode: "AUCTION" | "SNAKE_DRAFT" | "AUTO_BALANCE" | "MANUAL_TEAM";
-}) => {
-  if (room.teamMode === "AUCTION") return `/auction/${room.id}`;
-  if (room.teamMode === "SNAKE_DRAFT") return `/draft/${room.id}`;
+// 스테이지 경로는 전부 게임 프리픽스(`/lol` · `/pubg`) 아래에 있다.
+// 프리픽스를 빼먹으면 리다이렉트를 한 번 더 타고, 배그 방에서는 롤 화면으로 샌다.
+const getTeamModeStagePath = (
+  room: {
+    id: string;
+    teamMode: "AUCTION" | "SNAKE_DRAFT" | "AUTO_BALANCE" | "MANUAL_TEAM";
+  },
+  gamePrefix: string,
+) => {
+  if (room.teamMode === "AUCTION") return `${gamePrefix}/auction/${room.id}`;
+  if (room.teamMode === "SNAKE_DRAFT") return `${gamePrefix}/draft/${room.id}`;
   if (room.teamMode === "AUTO_BALANCE") {
-    return `/tournaments/${room.id}/bracket`;
+    return `${gamePrefix}/tournaments/${room.id}/bracket`;
   }
-  return `/role-selection/${room.id}`;
+  return `${gamePrefix}/role-selection/${room.id}`;
 };
 
-const getRoomStagePath = (room: {
-  id: string;
-  status?: string;
-  teamMode: "AUCTION" | "SNAKE_DRAFT" | "AUTO_BALANCE" | "MANUAL_TEAM";
-}) => {
+const getRoomStagePath = (
+  room: {
+    id: string;
+    status?: string;
+    teamMode: "AUCTION" | "SNAKE_DRAFT" | "AUTO_BALANCE" | "MANUAL_TEAM";
+  },
+  gamePrefix: string,
+) => {
   if (room.status === "IN_PROGRESS") {
-    return `/tournaments/${room.id}/bracket`;
+    return `${gamePrefix}/tournaments/${room.id}/bracket`;
   }
 
   // Auto balance stays in the lobby while teams are generated and reviewed.
@@ -87,15 +96,15 @@ const getRoomStagePath = (room: {
   if (room.status === "ROLE_SELECTION" || room.status === "DRAFT_COMPLETED") {
     // 자동 밸런스는 편성 직후 대진표로 넘기지 않는다. 팀 점수 차나 비선호 라인이
     // 나올 수 있어서 방장이 로비에서 결과를 확인하고 다시 돌리거나 확정한다.
-    return `/role-selection/${room.id}`;
+    return `${gamePrefix}/role-selection/${room.id}`;
   }
 
   if (room.status === "DRAFT" || room.status === "TEAM_SELECTION") {
-    return getTeamModeStagePath(room);
+    return getTeamModeStagePath(room, gamePrefix);
   }
 
   if (!room.status) {
-    return getTeamModeStagePath(room);
+    return getTeamModeStagePath(room, gamePrefix);
   }
 
   return null;
@@ -105,6 +114,7 @@ const getRoomStagePath = (room: {
 export default function TournamentLobbyPage() {
   const params = useParams();
   const router = useRouter();
+  const gamePrefix = useGamePrefix();
   const roomId = params.id as string;
 
   // Zustand Selector Optimization
@@ -225,7 +235,7 @@ export default function TournamentLobbyPage() {
       return;
     hasRedirected.current = true;
     addToast(message || "진행 중인 내전으로 돌아갑니다.", "warning");
-    router.replace(`/lol/tournaments/${activeRoomId}/lobby`);
+    router.replace(`${gamePrefix}/tournaments/${activeRoomId}/lobby`);
   }, [error, roomId, router, addToast]);
 
   // 내전 방 링크 공유 — 로비 URL을 클립보드에 복사 (붙여넣으면 OG 카드로 표시됨)
@@ -443,16 +453,16 @@ export default function TournamentLobbyPage() {
   useEffect(() => {
     if (hasRedirected.current || !room) return;
     if (gameStarting) {
-      navigateToGameStage(getTeamModeStagePath(room));
+      navigateToGameStage(getTeamModeStagePath(room, gamePrefix));
       return;
     }
     // IN_PROGRESS인 경우에만 bracket으로 리다이렉트.
     // COMPLETED는 returnToLobby API 호출 후 WAITING으로 리셋되어 오기 때문에
     // 여기서 리다이렉트하면 무한 루프가 발생한다.
     if (room.status === "COMPLETED" || room.status === "WAITING") return;
-    const target = getRoomStagePath(room);
+    const target = getRoomStagePath(room, gamePrefix);
     if (target) navigateToGameStage(target);
-  }, [gameStarting, room, navigateToGameStage]);
+  }, [gameStarting, room, navigateToGameStage, gamePrefix]);
 
   /* ─── Loading / Error States ─── */
   const connectingSpinner = (
@@ -473,8 +483,8 @@ export default function TournamentLobbyPage() {
       <LobbyErrorState
         error="NOT_AUTHENTICATED::내전 방에 입장하려면 로그인이 필요합니다. 로그인하면 이 방으로 다시 돌아옵니다."
         onGoSettings={() => router.push("/settings")}
-        onGoProfile={() => router.push("/lol/profile")}
-        loginHref={`/auth/login?redirect=${encodeURIComponent(`/tournaments/${roomId}/lobby`)}`}
+        onGoProfile={() => router.push(`${gamePrefix}/profile`)}
+        loginHref={`/auth/login?redirect=${encodeURIComponent(`${gamePrefix}/tournaments/${roomId}/lobby`)}`}
       />
     );
   }
@@ -484,7 +494,7 @@ export default function TournamentLobbyPage() {
       <LobbyErrorState
         error={error}
         onGoSettings={() => router.push("/settings")}
-        onGoProfile={() => router.push("/lol/profile")}
+        onGoProfile={() => router.push(`${gamePrefix}/profile`)}
       />
     );
   }
@@ -494,7 +504,7 @@ export default function TournamentLobbyPage() {
       <LobbyErrorState
         error="CONNECT_TIMEOUT::방이 삭제되었거나 네트워크 연결이 불안정할 수 있습니다. 다시 시도하거나 내전 목록에서 방을 확인해 주세요."
         onGoSettings={() => router.push("/settings")}
-        onGoProfile={() => router.push("/lol/profile")}
+        onGoProfile={() => router.push(`${gamePrefix}/profile`)}
         onRetry={handleRetryConnect}
       />
     );
@@ -651,7 +661,7 @@ export default function TournamentLobbyPage() {
   const handleLeaveLobby = async () => {
     if (!room?.id) {
       disconnect();
-      router.push("/lol/tournaments");
+      router.push(`${gamePrefix}/tournaments`);
       return;
     }
 
@@ -661,7 +671,7 @@ export default function TournamentLobbyPage() {
     } catch {
       disconnect();
     }
-    router.push("/lol/tournaments");
+    router.push(`${gamePrefix}/tournaments`);
   };
 
   const requestLeaveLobby = () => {
@@ -1241,7 +1251,7 @@ export default function TournamentLobbyPage() {
                 {room.status === "DRAFT_COMPLETED" &&
                   room.teamMode !== "AUTO_BALANCE" && (
                     <Link
-                      href={`/lol/tournaments/${room.id}/bracket`}
+                      href={`${gamePrefix}/tournaments/${room.id}/bracket`}
                       className="inline-flex min-h-11 items-center justify-center rounded-lg bg-accent-success px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-accent-success/90"
                     >
                       대진표 보기

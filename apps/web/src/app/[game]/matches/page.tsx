@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { useGamePrefix } from "@/hooks/useCurrentGame";
 import Image from "next/image";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -93,6 +94,7 @@ function formatRecentTime(timestamp: number) {
 
 export default function StatsPage() {
   const router = useRouter();
+  const gamePrefix = useGamePrefix();
   const { addToast } = useToast();
   const [searchInput, setSearchInput] = useState("");
   const [searchType, setSearchType] = useState<"summoner" | "user">("summoner");
@@ -187,7 +189,7 @@ export default function StatsPage() {
             timestamp: Date.now(),
           });
           router.push(
-            `/matches/summoner/${encodeURIComponent(gameName.trim())}/${encodeURIComponent(tagLine.trim())}`,
+            `${gamePrefix}/matches/summoner/${encodeURIComponent(gameName.trim())}/${encodeURIComponent(tagLine.trim())}`,
           );
         }
       } else {
@@ -214,16 +216,16 @@ export default function StatsPage() {
       timestamp: Date.now(),
     });
     setShowDropdown(false);
-    router.push(`/lol/matches/user/${user.id}`);
+    router.push(`${gamePrefix}/matches/user/${user.id}`);
   };
 
   const handleRecentSearchClick = (search: RecentSearch) => {
     if (search.type === "summoner" && search.gameName && search.tagLine) {
       router.push(
-        `/matches/summoner/${encodeURIComponent(search.gameName)}/${encodeURIComponent(search.tagLine)}`,
+        `${gamePrefix}/matches/summoner/${encodeURIComponent(search.gameName)}/${encodeURIComponent(search.tagLine)}`,
       );
     } else if (search.type === "user" && search.userId) {
-      router.push(`/lol/matches/user/${search.userId}`);
+      router.push(`${gamePrefix}/matches/user/${search.userId}`);
     }
   };
 

@@ -1,5 +1,6 @@
+import { GUIDE_BASE } from "@/lib/guide-links";
 import { permanentRedirect } from "next/navigation";
 
 export default function LegacyResourcesPage() {
-  permanentRedirect("/guide/resources");
+  permanentRedirect(`${GUIDE_BASE}/guide/resources`);
 }

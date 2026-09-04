@@ -1,6 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
+import { useGamePrefix } from "@/hooks/useCurrentGame";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useMatchStore } from "@/stores/match-store";
@@ -24,6 +25,7 @@ import { TeamModeHelp, type TeamMode } from "@/components/rooms/TeamModeHelp";
 export default function BracketPage() {
   const params = useParams();
   const router = useRouter();
+  const gamePrefix = useGamePrefix();
   const roomId = params.id as string;
   const { addToast } = useToast();
 
@@ -86,7 +88,7 @@ export default function BracketPage() {
     );
     clearSessionAbort();
     const timer = setTimeout(
-      () => router.push(`/lol/tournaments/${roomId}/lobby`),
+      () => router.push(`${gamePrefix}/tournaments/${roomId}/lobby`),
       1500,
     );
     return () => clearTimeout(timer);
@@ -133,7 +135,7 @@ export default function BracketPage() {
     try {
       await roomApi.abortToLobby(roomId);
       addToast("내전을 종료하고 대기실로 복귀합니다.", "success");
-      router.push(`/lol/tournaments/${roomId}/lobby`);
+      router.push(`${gamePrefix}/tournaments/${roomId}/lobby`);
     } catch (err: any) {
       addToast(
         err?.response?.data?.message || "내전 종료에 실패했습니다.",
@@ -339,7 +341,7 @@ export default function BracketPage() {
         <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex min-w-0 items-center gap-3 sm:gap-4">
             <Link
-              href={`/lol/tournaments/${roomId}/lobby`}
+              href={`${gamePrefix}/tournaments/${roomId}/lobby`}
               className="shrink-0 rounded-lg p-2 transition-colors hover:bg-bg-tertiary"
               aria-label="로비로 돌아가기"
               title="로비로 돌아가기"

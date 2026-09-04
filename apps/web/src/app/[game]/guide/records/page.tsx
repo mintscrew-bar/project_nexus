@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import { BarChart3, Shield, Trophy } from "lucide-react";
-import { absoluteUrl } from "@/lib/seo";
+import { guideUrl } from "@/lib/guide-links";
 import { Bullet, BulletList, GuidePageLayout, GuideSection, InfoCard } from "../_components/GuidePageLayout";
 
 export const metadata: Metadata = {
   title: "기록과 커뮤니티 가이드 — Nexus",
   description: "내전 전적, 랭킹, 클랜 기능을 다음 경기 준비에 활용하는 방법을 안내합니다.",
-  alternates: { canonical: absoluteUrl("/guide/records") },
+  alternates: { canonical: guideUrl("/guide/records") },
 };
 
 export default function RecordsGuidePage() {

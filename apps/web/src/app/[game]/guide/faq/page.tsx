@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import { HelpCircle } from "lucide-react";
-import { absoluteUrl } from "@/lib/seo";
+import { guideUrl } from "@/lib/guide-links";
 import { GuidePageLayout, GuideSection } from "../_components/GuidePageLayout";
 
 export const metadata: Metadata = {
   title: "자주 묻는 질문 — Nexus",
   description: "Nexus 내전 시작 조건, 팀 편성, 대진표, Discord 연동에 관한 답변입니다.",
-  alternates: { canonical: absoluteUrl("/guide/faq") },
+  alternates: { canonical: guideUrl("/guide/faq") },
 };
 
 const faqs = [

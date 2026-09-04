@@ -4,13 +4,21 @@ import {
   Logger,
   NotFoundException,
 } from "@nestjs/common";
-import { Prisma, StreamerPlatform } from "@nexus/database";
+import { GameTitle, Prisma, StreamerPlatform } from "@nexus/database";
 import { PrismaService } from "../prisma/prisma.service";
 import { RedisService } from "../redis/redis.service";
 import { DiscordAdminAlertService } from "../discord/discord-admin-alert.service";
 import { NotificationService } from "../notification/notification.service";
 import { LiveProviderRegistry } from "./providers/live-provider.registry";
 import { LiveSnapshot } from "./providers/live-provider.interface";
+
+/** 스트리머가 열어둔 방. 방 링크가 게임별 경로라 게임을 함께 싣는다. */
+interface ActiveRoomInfo {
+  id: string;
+  name: string;
+  status: string;
+  gameTitle: GameTitle;
+}
 
 /**
  * "방송 시작" 전환 감지용 캐시 TTL. 라이브 캐시(90초)보다 넉넉히 길게 잡아
@@ -53,7 +61,13 @@ export interface StreamerListItem extends StreamerChannelItem {
   avatar: string | null;
   channels: StreamerChannelItem[];
   /** 이 스트리머가 지금 호스트로 열어둔 내전 방 */
-  activeRoom: { id: string; name: string; status: string } | null;
+  activeRoom: {
+    id: string;
+    name: string;
+    status: string;
+    // 방 링크가 게임별 경로라(`/pubg/tournaments/...`) 방마다 게임을 실어야 한다
+    gameTitle: GameTitle;
+  } | null;
   /** 요청한 유저가 팔로우 중인지. 비로그인 요청이면 항상 false. */
   isFollowing: boolean;
 }
@@ -310,7 +324,7 @@ export class StreamerService {
   /** 스트리머들이 지금 호스트로 잡고 있는 진행 중 방을 찾는다. */
   private async findActiveRooms(
     userIds: string[],
-  ): Promise<Map<string, { id: string; name: string; status: string }>> {
+  ): Promise<Map<string, ActiveRoomInfo>> {
     if (userIds.length === 0) return new Map();
 
     const rooms = await this.prisma.room.findMany({
@@ -328,11 +342,17 @@ export class StreamerService {
           ],
         },
       },
-      select: { id: true, name: true, status: true, hostId: true },
+      select: {
+        id: true,
+        name: true,
+        status: true,
+        hostId: true,
+        gameTitle: true,
+      },
       orderBy: { createdAt: "desc" },
     });
 
-    const map = new Map<string, { id: string; name: string; status: string }>();
+    const map = new Map<string, ActiveRoomInfo>();
     for (const room of rooms) {
       // 같은 호스트의 방이 여러 개면 가장 최근 것만 노출한다.
       if (!map.has(room.hostId)) {
@@ -340,6 +360,7 @@ export class StreamerService {
           id: room.id,
           name: room.name,
           status: room.status,
+          gameTitle: room.gameTitle,
         });
       }
     }

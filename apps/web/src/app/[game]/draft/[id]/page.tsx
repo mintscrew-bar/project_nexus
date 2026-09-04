@@ -1,6 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
+import { useGamePrefix } from "@/hooks/useCurrentGame";
 import { useEffect, useRef, useState } from "react";
 import { useSnakeDraftStore } from "@/stores/snake-draft-store";
 import { useAuthStore } from "@/stores/auth-store";
@@ -14,6 +15,7 @@ import { TeamModeHelp } from "@/components/rooms/TeamModeHelp";
 export default function SnakeDraftPage() {
   const params = useParams();
   const router = useRouter();
+  const gamePrefix = useGamePrefix();
   const draftId = params.id as string;
   const { addToast } = useToast();
   const hasRedirected = useRef(false);
@@ -48,7 +50,7 @@ export default function SnakeDraftPage() {
     if (hasRedirected.current) return;
     if (draftState?.status === "COMPLETED") {
       hasRedirected.current = true;
-      router.push(`/lol/role-selection/${draftId}`);
+      router.push(`${gamePrefix}/role-selection/${draftId}`);
     }
   }, [draftState?.status, draftId, router]);
 
@@ -60,7 +62,7 @@ export default function SnakeDraftPage() {
     );
     clearSessionAbort();
     const timer = setTimeout(
-      () => router.push(`/lol/tournaments/${draftId}/lobby`),
+      () => router.push(`${gamePrefix}/tournaments/${draftId}/lobby`),
       1500,
     );
     return () => clearTimeout(timer);
@@ -81,7 +83,7 @@ export default function SnakeDraftPage() {
     try {
       await roomApi.abortToLobby(draftId);
       addToast("내전을 종료하고 대기실로 복귀합니다.", "success");
-      router.push(`/lol/tournaments/${draftId}/lobby`);
+      router.push(`${gamePrefix}/tournaments/${draftId}/lobby`);
     } catch (err: any) {
       addToast(
         err?.response?.data?.message || "내전 종료에 실패했습니다.",
@@ -128,7 +130,7 @@ export default function SnakeDraftPage() {
             </Button>
             <Button
               variant="secondary"
-              onClick={() => router.push(`/lol/tournaments/${draftId}/lobby`)}
+              onClick={() => router.push(`${gamePrefix}/tournaments/${draftId}/lobby`)}
             >
               로비로 돌아가기
             </Button>

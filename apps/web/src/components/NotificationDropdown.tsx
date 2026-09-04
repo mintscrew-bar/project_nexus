@@ -3,6 +3,7 @@
 import { useNotificationStore } from "@/stores/notification-store";
 import { NotificationItem } from "./NotificationItem";
 import { CheckCheck, Trash2 } from "lucide-react";
+import Link from "next/link";
 
 interface NotificationDropdownProps {
   onClose: () => void;
@@ -76,13 +77,13 @@ export function NotificationDropdown({ onClose }: NotificationDropdownProps) {
       {/* Footer */}
       {notifications.length > 0 && (
         <div className="px-4 py-3 border-t border-bg-tertiary bg-bg-primary text-center">
-          <a
+          <Link
             href="/notifications"
             className="text-sm text-accent-primary hover:text-accent-gold transition-colors"
             onClick={onClose}
           >
             모든 알림 보기
-          </a>
+          </Link>
         </div>
       )}
     </div>

@@ -1,14 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, BookOpen, CalendarDays, Clock3 } from "lucide-react";
-import { absoluteUrl } from "@/lib/seo";
+import { guideUrl } from "@/lib/guide-links";
 import { RESOURCE_ARTICLES } from "@/app/resources/articles";
 import { GuidePageLayout, GuideSection } from "../_components/GuidePageLayout";
 
 export const metadata: Metadata = {
   title: "내전 운영 자료 — Nexus",
   description: "Nexus의 실제 운영 체크리스트와 기능 개선 기록을 문서별로 확인하세요.",
-  alternates: { canonical: absoluteUrl("/guide/resources") },
+  alternates: { canonical: guideUrl("/guide/resources") },
 };
 
 export default function GuideResourcesPage() {

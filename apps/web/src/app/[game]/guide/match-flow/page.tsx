@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import { Brackets, Flag, Gamepad2, Trophy } from "lucide-react";
-import { absoluteUrl } from "@/lib/seo";
+import { guideUrl } from "@/lib/guide-links";
 import { GuidePageLayout, GuideSection, GuideStep, InfoCard } from "../_components/GuidePageLayout";
 
 export const metadata: Metadata = {
   title: "경기 진행 가이드 — Nexus",
   description: "역할 선택, 대진표 생성, 경기 시작과 결과 기록 순서를 안내합니다.",
-  alternates: { canonical: absoluteUrl("/guide/match-flow") },
+  alternates: { canonical: guideUrl("/guide/match-flow") },
 };
 
 export default function MatchFlowGuidePage() {

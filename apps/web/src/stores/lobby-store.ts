@@ -74,6 +74,10 @@ export interface Room {
   bracketFormat?: string;
   // 다전제 프리셋 (@nexus/types의 SeriesPreset 키)
   seriesPreset?: string | null;
+  /** 방이 속한 게임. 로비 링크·팀 인원·표시 항목이 여기서 갈린다. */
+  gameTitle?: "LOL" | "PUBG";
+  /** 배그 방에서만 채워진다 — 스팀(스배) / 카카오(카배) */
+  pubgPlatform?: "STEAM" | "KAKAO" | null;
 }
 
 interface ChatMessage {

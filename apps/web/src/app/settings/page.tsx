@@ -46,6 +46,7 @@ import { AddAccountModal } from "@/components/domain/AddAccountModal";
 import { BroadcastTokenSection } from "./_components/BroadcastTokenSection";
 import { StreamerSettingsSection } from "./_components/StreamerSettingsSection";
 import { useRiotStore } from "@/stores/riot-store";
+import { useGamePrefix } from "@/hooks/useCurrentGame";
 
 type SettingsTab =
   | "accounts"
@@ -109,6 +110,7 @@ const DISCORD_GUILD_STATUS_META: Record<
 
 export default function SettingsPage() {
   const router = useRouter();
+  const gamePrefix = useGamePrefix();
   const { user, isAuthenticated, isLoading, logout, deleteAccount, fetchUser } =
     useAuthStore();
   const { champions, championMap, fetchChampions } = useDdragonStore();
@@ -761,7 +763,7 @@ export default function SettingsPage() {
                               variant={hasRiot ? "outline" : "primary"}
                               onClick={() => {
                                 if (hasRiot) {
-                                  router.push("/lol/profile");
+                                  router.push(`${gamePrefix}/profile`);
                                   return;
                                 }
                                 setShowRiotModal(true);
@@ -782,7 +784,7 @@ export default function SettingsPage() {
                             <Button
                               size="sm"
                               variant={hasRoles ? "outline" : "primary"}
-                              onClick={() => router.push("/lol/profile")}
+                              onClick={() => router.push(`${gamePrefix}/profile`)}
                             >
                               {hasRoles ? "수정" : "설정하기"}
                             </Button>

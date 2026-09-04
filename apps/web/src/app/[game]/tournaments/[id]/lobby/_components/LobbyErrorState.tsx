@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Shield } from "lucide-react";
+import { useGamePrefix } from "@/hooks/useCurrentGame";
 
 interface LobbyErrorStateProps {
   error: string;
@@ -18,6 +19,7 @@ export function LobbyErrorState({
   loginHref,
   onRetry,
 }: LobbyErrorStateProps) {
+  const gamePrefix = useGamePrefix();
   const [errorType, errorMessage] = error.includes("::") ? error.split("::") : ["UNKNOWN", error];
   const isDiscordError = errorType === "DISCORD_NOT_LINKED";
   const isRiotError = errorType === "RIOT_NOT_LINKED";
@@ -69,7 +71,7 @@ export function LobbyErrorState({
               다시 시도
             </button>
           )}
-          <Link href="/lol/tournaments" className="w-full px-4 py-3 bg-bg-tertiary text-text-primary text-center rounded-lg font-medium hover:bg-bg-elevated transition-colors">
+          <Link href={`${gamePrefix}/tournaments`} className="w-full px-4 py-3 bg-bg-tertiary text-text-primary text-center rounded-lg font-medium hover:bg-bg-elevated transition-colors">
             로비 목록으로 돌아가기
           </Link>
         </div>

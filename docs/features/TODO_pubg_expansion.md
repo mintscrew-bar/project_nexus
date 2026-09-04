@@ -331,7 +331,26 @@ enum PubgPlatform { STEAM KAKAO }
   - **부수 수정**: main 에서 이미 깨져 있던 테스트 4개. 라우트 이전(`/lol/*`)으로 낡은
     디스코드 링크 기대값 3개와, PUBG `enabled:true` 로 바뀐 뒤 맞지 않게 된 `enabledGames` 1개.
   - 검증: API 492 테스트 통과, api·web `tsc --noEmit`, `next lint` 0 에러
-- [~] Task 9: 라우트를 `/lol/*` 아래로 이동 (내전·전적·랭킹·가이드·프로필)
+- [x] Task 9: 라우트를 `/lol/*` 아래로 이동 (내전·전적·랭킹·가이드·프로필) (2026-09-04)
+      파일 이동은 끝나 있었지만 **링크가 `/lol/` 로 하드코딩된 곳이 85군데** 남아 있었다.
+      배그 로비에서 나가면 롤로 튕기고, 배그 프로필에서 전적을 누르면 롤 전적으로 갔다.
+  - `useGamePrefix()` 도입 — `[game]` 하위 화면의 링크는 전부 현재 게임을 따라간다
+  - 프리픽스가 아예 빠져 리다이렉트를 한 번 더 타던 링크도 정리
+    (`/matches/summoner/...`, `/tournaments/:id/bracket` 등)
+  - 로비의 `getRoomStagePath`/`getTeamModeStagePath` 가 `/auction/:id` 처럼 프리픽스 없이
+    반환하고 있었다 — 게임 프리픽스를 인자로 받게 바꿨다
+  - **canonical 이 전부 옛 경로를 가리키고 있었다.** `/lol/matches` 를 서비스하면서
+    canonical 은 `/matches`(308 리다이렉트)였다. 리다이렉트되는 URL 을 canonical 로 주면
+    색인이 엉킨다. `matches`·`tournaments`·`ranking` 레이아웃을 게임별 `generateMetadata` 로
+    바꾸고 배그 문안을 따로 넣었다
+  - `robots.txt` 가 `/auction`·`/draft`·`/role-selection`·`/profile` 만 막고 있어
+    실제 서비스 경로인 `/lol/auction` 등은 열려 있었다. 게임별로 펼쳐 막는다
+    (애널리틱스 비공개 경로 판정도 같은 문제였다)
+  - 방으로 가는 링크는 **보는 화면이 아니라 그 방의 게임**을 따른다 (`lib/room-links.ts`).
+    대시보드·스트리머 목록처럼 게임이 섞이는 목록에서 배그 방을 눌러도 맞게 간다.
+    이를 위해 스트리머 활성 방 응답과 로비 스토어에 `gameTitle` 을 실었다
+  - **부수 발견**: `ActiveRoomBanner` 의 현재 화면 판정이 프리픽스 없는 경로와 비교하고 있어
+    정작 로비에 있을 때도 "참가 중" 배너가 겹쳐 떴다
 - [x] Task 10: 기존 경로 → `/lol/*` 리다이렉트 + 사이트맵 갱신 (2026-09-04)
       **배포 차단 요소였다.** 라우트가 `[game]` 아래로 옮겨졌는데 리다이렉트가 없어서,
       현재 main 을 배포하면 `/matches`·`/ranking`·`/guide/*`·`/tournaments` 등
@@ -360,7 +379,21 @@ enum PubgPlatform { STEAM KAKAO }
     `enabled:false` 일 때 안내 화면을 내보내는 쪽으로 이미 되어 있다.
   - 검증: `/lol/*` 에서 헤더 링크가 전부 `/lol/*`, `/pubg/*` 에서 전부 `/pubg/*`
   - 남은 것: `Footer` 는 서버 컴포넌트라 게임을 못 읽어 가이드 링크가 `/lol/guide` 고정이다
-- [~] Task 12: 공통 영역(클랜·커뮤니티·스트리머·설정)은 프리픽스 없이 유지되는지 확인 + 내부 링크 정리
+- [x] Task 12: 공통 영역(클랜·커뮤니티·스트리머·설정)은 프리픽스 없이 유지되는지 확인 + 내부 링크 정리 (2026-09-04)
+  - 공통 경로는 프리픽스 없이 200 으로 확인 (클랜·커뮤니티·스트리머·설정·대시보드)
+  - 공통 화면에서 게임별 화면으로 가는 링크는 기본 게임 프리픽스를 거친다
+    (`lib/game-links.ts`) — 슬러그를 코드에 박아두지 않는다
+  - `useCurrentGame` 은 `"use client"` 라 서버 컴포넌트가 끌어오면 안 돼서
+    순수 함수·상수는 `lib/game-links.ts` 로 분리하고 훅 파일이 재수출한다
+
+### 배그에서 아직 열지 않은 화면
+
+- [x] Task 51: 게임별 "준비 중" 화면 구획 (2026-09-04)
+      `/pubg/ranking` 이 롤 티어·KDA 표를, `/pubg/matches` 가 소환사·챔피언을,
+      `/pubg/guide` 가 롤 가이드 문안을 그대로 렌더하고 있었다.
+      `GameDefinition.comingSoonSections` 에 아직 안 여는 화면을 명시하고,
+      해당 경로는 안내 화면(`GameSectionPending`) + `noindex` 로 내보낸다.
+      배그 전적·랭킹은 Phase 5·6 에서, 가이드는 배그 문안을 쓸 때 연다.
 - [ ] Task 13: `/profile/:id` 리다이렉트 규칙 — 현재 게임 컨텍스트 우선, 미연동이면 폴백
 - [ ] Task 14: 게임별 API·프로필·계정·결과 수집 경계 정의 (롤 기존 코드 회귀 없음)
 

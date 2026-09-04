@@ -1,6 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
+import { useGamePrefix } from "@/hooks/useCurrentGame";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { riotApi, matchApi, statsApi, rankingApi } from "@/lib/api-client";
@@ -79,6 +80,7 @@ interface FetchStatusResponse {
 export default function SummonerStatsPage() {
   const params = useParams();
   const router = useRouter();
+  const gamePrefix = useGamePrefix();
   const queryClient = useQueryClient();
   const { addToast } = useToast();
   const gameName = decodeURIComponent(params.gameName as string).replace(
@@ -134,7 +136,7 @@ export default function SummonerStatsPage() {
   ) => {
     if (riotIdGameName && riotIdTagline) {
       router.push(
-        `/matches/summoner/${encodeURIComponent(riotIdGameName)}/${encodeURIComponent(riotIdTagline)}`,
+        `${gamePrefix}/matches/summoner/${encodeURIComponent(riotIdGameName)}/${encodeURIComponent(riotIdTagline)}`,
       );
     }
   };
@@ -167,7 +169,7 @@ export default function SummonerStatsPage() {
     saveToHistory(searchGameName, searchTagLine);
     setShowHistory(false);
     router.push(
-      `/matches/summoner/${encodeURIComponent(searchGameName)}/${encodeURIComponent(searchTagLine)}`,
+      `${gamePrefix}/matches/summoner/${encodeURIComponent(searchGameName)}/${encodeURIComponent(searchTagLine)}`,
     );
   };
 
@@ -498,7 +500,7 @@ export default function SummonerStatsPage() {
           <p className="text-accent-danger mb-4">
             {error || "소환사를 찾을 수 없습니다."}
           </p>
-          <Button onClick={() => router.push("/lol/matches")}>
+          <Button onClick={() => router.push(`${gamePrefix}/matches`)}>
             전적 검색으로 돌아가기
           </Button>
         </div>
@@ -603,7 +605,7 @@ export default function SummonerStatsPage() {
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center gap-2 sm:gap-4">
             <Link
-              href="/lol/matches"
+              href={`${gamePrefix}/matches`}
               className="inline-flex items-center gap-1 text-text-secondary hover:text-text-primary transition-colors text-xs sm:text-sm flex-shrink-0"
             >
               <ArrowLeft className="h-4 w-4" />
@@ -653,7 +655,7 @@ export default function SummonerStatsPage() {
                                 saveToHistory(gn, tl);
                                 setShowHistory(false);
                                 router.push(
-                                  `/matches/summoner/${encodeURIComponent(gn)}/${encodeURIComponent(tl)}`,
+                                  `${gamePrefix}/matches/summoner/${encodeURIComponent(gn)}/${encodeURIComponent(tl)}`,
                                 );
                               }
                             }}
@@ -735,7 +737,7 @@ export default function SummonerStatsPage() {
                 </h1>
                 {nexusUserId && (
                   <Link
-                    href={`/lol/matches/user/${nexusUserId}`}
+                    href={`${gamePrefix}/matches/user/${nexusUserId}`}
                     className="text-sm text-accent-primary hover:text-accent-hover flex items-center gap-1"
                   >
                     <ExternalLink className="h-4 w-4" />

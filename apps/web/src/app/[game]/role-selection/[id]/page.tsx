@@ -1,6 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
+import { useGamePrefix } from "@/hooks/useCurrentGame";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   useRoleSelectionStore,
@@ -42,6 +43,7 @@ const ROLE_META: Record<Role, { label: string; icon: string; color: string }> =
 export default function RoleSelectionPage() {
   const params = useParams();
   const router = useRouter();
+  const gamePrefix = useGamePrefix();
   const roomId = params.id as string;
   const { addToast } = useToast();
   const { user } = useAuthStore();
@@ -110,7 +112,7 @@ export default function RoleSelectionPage() {
     if (isCompleted) {
       hasRedirected.current = true;
       addToast("역할 선택 완료! 대진표로 이동합니다.", "success");
-      router.push(navigationTarget ?? `/tournaments/${roomId}/bracket`);
+      router.push(navigationTarget ?? `${gamePrefix}/tournaments/${roomId}/bracket`);
     }
   }, [isCompleted, navigationTarget, roomId, router, addToast]);
 
@@ -123,7 +125,7 @@ export default function RoleSelectionPage() {
     clearSessionAbort();
     // 사용자가 toast 메시지를 읽을 수 있도록 약간의 딜레이 후 이동
     const timer = setTimeout(
-      () => router.push(`/lol/tournaments/${roomId}/lobby`),
+      () => router.push(`${gamePrefix}/tournaments/${roomId}/lobby`),
       1500,
     );
     return () => clearTimeout(timer);
@@ -144,7 +146,7 @@ export default function RoleSelectionPage() {
     try {
       await roomApi.abortToLobby(roomId);
       addToast("내전을 종료하고 대기실로 복귀합니다.", "success");
-      router.push(`/lol/tournaments/${roomId}/lobby`);
+      router.push(`${gamePrefix}/tournaments/${roomId}/lobby`);
     } catch (err: any) {
       addToast(
         err?.response?.data?.message || "내전 종료에 실패했습니다.",

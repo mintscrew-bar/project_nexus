@@ -54,6 +54,7 @@ import { ReputationSummary, SummaryChip, WinRateSparkline, getCombinedProfileMet
 import { PreferredChampionPanel, RankedChampionPanel } from "@/components/domain/ProfileChampionPanels";
 import { useToast } from "@/components/ui/Toast";
 import { getChampionKoreanName, searchChampionsByQuery } from "@nexus/types";
+import { useGamePrefix } from "@/hooks/useCurrentGame";
 
 const ROLE_LABELS: Record<string, string> = {
   TOP: "탑",
@@ -158,6 +159,7 @@ type FriendshipStatus =
 export default function UserProfilePage() {
   const params = useParams();
   const router = useRouter();
+  const gamePrefix = useGamePrefix();
   const userId = params.id as string;
   const { user: currentUser, isAuthenticated } = useAuthStore();
   const { championMap, fetchChampions } = useDdragonStore();
@@ -183,7 +185,7 @@ export default function UserProfilePage() {
   // Redirect to own profile if viewing self
   useEffect(() => {
     if (currentUser && currentUser.id === userId) {
-      router.replace("/lol/profile");
+      router.replace(`${gamePrefix}/profile`);
     }
   }, [currentUser, userId, router]);
 
@@ -1065,7 +1067,7 @@ export default function UserProfilePage() {
                       <div
                         key={match.id}
                         className="rounded-xl bg-bg-tertiary border border-bg-elevated p-3 hover:bg-bg-elevated transition-colors cursor-pointer"
-                        onClick={() => router.push(`/lol/matches/match/${match.id}`)}
+                        onClick={() => router.push(`${gamePrefix}/matches/match/${match.id}`)}
                       >
                         <div className="flex items-center gap-3">
                           {/* 챔피언 아이콘 or 색상 바 */}

@@ -29,6 +29,7 @@ import { Button } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
 import { useAuthStore } from "@/stores/auth-store";
 import { openBroadcastControlWindow } from "@/lib/open-broadcast-control";
+import Link from "next/link";
 
 const SCENES: Array<{
   scene: BroadcastControlScene;
@@ -363,12 +364,12 @@ function BroadcastControlContent() {
           방송 조작 패널은 본인 방송 오버레이 상태를 바꾸는 화면입니다. 로그인
           후 설정의 방송 탭에서 다시 열어주세요.
         </p>
-        <a
+        <Link
           href="/auth/login"
           className="mt-5 inline-flex items-center justify-center rounded-lg bg-accent-primary px-4 py-2 text-sm font-bold text-white hover:bg-accent-hover"
         >
           로그인으로 이동
-        </a>
+        </Link>
       </main>
     );
   }

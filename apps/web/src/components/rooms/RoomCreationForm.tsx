@@ -31,6 +31,7 @@ import {
 } from "@nexus/types";
 import type { GameTitle } from "@nexus/types";
 import { roomSizeOptions } from "@/lib/room-size-options";
+import { useGamePrefix } from "@/hooks/useCurrentGame";
 
 interface RoomCreationFormProps {
   gameTitle?: GameTitle;
@@ -83,6 +84,7 @@ export function RoomCreationForm({
   onRoomCreated,
 }: RoomCreationFormProps) {
   const router = useRouter();
+  const gamePrefix = useGamePrefix();
   const { createRoom, isLoading, error } = useRoomStore();
   const { user, isAuthenticated, isLoading: authLoading } = useAuthStore();
   const [name, setName] = useState("");
@@ -720,7 +722,7 @@ export function RoomCreationForm({
                   )}
                   {isRiotError && (
                     <Link
-                      href="/lol/profile"
+                      href={`${gamePrefix}/profile`}
                       className="inline-block text-sm text-accent-primary hover:underline"
                     >
                       프로필 페이지에서 Riot 계정 연동하기 →

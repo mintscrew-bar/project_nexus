@@ -12,6 +12,7 @@ import {
   Users,
 } from "lucide-react";
 import { absoluteUrl } from "@/lib/seo";
+import { DEFAULT_GAME_PREFIX } from "@/lib/game-links";
 
 export const metadata: Metadata = {
   title: "Nexus 소개 — 롤 내전 운영과 전적 기록을 연결하는 서비스",
@@ -116,7 +117,7 @@ export default function AboutPage() {
           </p>
           <div className="mt-7 flex flex-wrap gap-3">
             <Link
-              href="/lol/guide"
+              href={`${DEFAULT_GAME_PREFIX}/guide`}
               className="inline-flex items-center gap-2 rounded-lg bg-accent-primary px-5 py-2.5 font-semibold text-white transition-colors hover:bg-accent-hover"
             >
               가이드 · 운영 자료

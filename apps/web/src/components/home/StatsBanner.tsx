@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { STATS_COLORS, bannerBadgeStyle, bannerGlowGradient } from "./banner-constants";
+import { useGamePrefix } from "@/hooks/useCurrentGame";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 상수 정의
@@ -41,6 +42,7 @@ const STAT_COUNT_DURATION = 1400;
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function StatsBanner({ isActive = true }: { isActive?: boolean }) {
+  const gamePrefix = useGamePrefix();
   const [isHovered, setIsHovered] = useState(false);
 
   // 스탯 카운트업 — 슬라이드가 활성화될 때마다 0→목표값
@@ -78,7 +80,7 @@ export function StatsBanner({ isActive = true }: { isActive?: boolean }) {
 
   return (
     <Link
-      href="/lol/matches"
+      href={`${gamePrefix}/matches`}
       aria-label="내전 전적 통계 — 매치 기록 페이지로 이동"
       className="group relative block h-full rounded-2xl overflow-hidden cursor-pointer focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-black focus-visible:outline-none"
       onMouseEnter={() => setIsHovered(true)}

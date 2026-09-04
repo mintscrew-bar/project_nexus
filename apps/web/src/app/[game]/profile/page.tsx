@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import type { ElementType, ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { useGamePrefix } from "@/hooks/useCurrentGame";
 import Image from "next/image";
 import { useAuthStore } from "@/stores/auth-store";
 import { useRiotStore } from "@/stores/riot-store";
@@ -795,6 +796,7 @@ function ProfileOverviewStat({
 
 function PubgProfilePage() {
   const router = useRouter();
+  const gamePrefix = useGamePrefix();
   const { isAuthenticated, isLoading: authLoading } = useAuthStore();
   const [accounts, setAccounts] = useState<any[]>([]);
   const [platform, setPlatform] = useState<"STEAM" | "KAKAO">("STEAM");
@@ -1148,6 +1150,7 @@ function PubgProfilePage() {
 
 function LolProfilePage() {
   const router = useRouter();
+  const gamePrefix = useGamePrefix();
   const {
     user,
     isAuthenticated,
@@ -2623,7 +2626,7 @@ function LolProfilePage() {
                         key={match.id}
                         className="flex items-center gap-3 p-3 bg-bg-tertiary border border-bg-elevated rounded-lg hover:bg-bg-elevated transition-colors cursor-pointer"
                         onClick={() =>
-                          router.push(`/lol/matches/match/${match.id}`)
+                          router.push(`${gamePrefix}/matches/match/${match.id}`)
                         }
                       >
                         {/* 승/패 인디케이터 */}
@@ -2710,7 +2713,7 @@ function LolProfilePage() {
                   description="내전에 참여하면 여기에 활동 내역이 표시됩니다"
                   action={{
                     label: "내전 참여하기",
-                    onClick: () => router.push("/lol/tournaments"),
+                    onClick: () => router.push(`${gamePrefix}/tournaments`),
                   }}
                 />
               )}

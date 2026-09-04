@@ -41,6 +41,8 @@ import {
   Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useGamePrefix } from "@/hooks/useCurrentGame";
+import { roomPath } from "@/lib/room-links";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -62,6 +64,8 @@ interface Room {
   teamMode: string;
   isPrivate: boolean;
   participants: { id: string }[];
+  /** 대시보드에는 롤·배그 방이 섞여 나오므로 링크는 방의 게임을 따라간다 */
+  gameTitle?: "LOL" | "PUBG";
 }
 
 interface Post {
@@ -211,6 +215,7 @@ function DashboardHero({
   clan: ClanSummary | null;
 }) {
   const router = useRouter();
+  const gamePrefix = useGamePrefix();
   const clanMemberCount = clan?._count?.members ?? clan?.members?.length ?? 0;
   const metrics = [
     {
@@ -279,7 +284,7 @@ function DashboardHero({
           <div className="mt-7 flex flex-col gap-3 sm:flex-row">
             <button
               type="button"
-              onClick={() => router.push("/lol/tournaments")}
+              onClick={() => router.push(`${gamePrefix}/tournaments`)}
               className="group inline-flex items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-bold text-[#111218] transition-all hover:bg-violet-100"
             >
               참가할 내전 찾기
@@ -287,7 +292,7 @@ function DashboardHero({
             </button>
             <button
               type="button"
-              onClick={() => router.push("/lol/tournaments?create=true")}
+              onClick={() => router.push(`${gamePrefix}/tournaments?create=true`)}
               className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-5 py-3 text-sm font-bold text-white/75 transition-colors hover:border-violet-300/25 hover:bg-violet-300/[0.08] hover:text-white"
             >
               <Plus className="h-4 w-4" />
@@ -298,7 +303,7 @@ function DashboardHero({
           <div className="mt-7 flex flex-wrap gap-2">
             <button
               type="button"
-              onClick={() => router.push("/lol/profile")}
+              onClick={() => router.push(`${gamePrefix}/profile`)}
               className="inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.035] px-3 py-1.5 text-xs text-white/50 transition-colors hover:text-white/80"
             >
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />
@@ -581,6 +586,7 @@ function MyStatsCard({
   positionStats: PositionStat[];
 }) {
   const router = useRouter();
+  const gamePrefix = useGamePrefix();
   const winRate = stats?.winRate ?? 0;
   const topPositions = positionStats.slice(0, 3);
   const topChampions = championStats.slice(0, 3);
@@ -596,7 +602,7 @@ function MyStatsCard({
         iconColor="bg-violet-500/80"
         title="내 전적"
         actionLabel="프로필"
-        onAction={() => router.push("/lol/profile")}
+        onAction={() => router.push(`${gamePrefix}/profile`)}
       />
 
       <div className="relative px-5 pb-5">
@@ -614,7 +620,7 @@ function MyStatsCard({
               </p>
             </div>
             <button
-              onClick={() => router.push("/lol/profile")}
+              onClick={() => router.push(`${gamePrefix}/profile`)}
               className="px-5 py-2 rounded-xl text-sm font-medium text-violet-400 border border-violet-500/30 hover:bg-violet-500/10 transition-colors"
             >
               계정 연동하기
@@ -772,6 +778,7 @@ function MyStatsCard({
 
 function ActiveRoomsCard({ rooms }: { rooms: Room[] }) {
   const router = useRouter();
+  const gamePrefix = useGamePrefix();
 
   return (
     <div data-tour="home-active-rooms">
@@ -781,7 +788,7 @@ function ActiveRoomsCard({ rooms }: { rooms: Room[] }) {
         iconColor="bg-amber-500/80"
         title="모집중인 내전"
         actionLabel="전체"
-        onAction={() => router.push("/lol/tournaments")}
+        onAction={() => router.push(`${gamePrefix}/tournaments`)}
       />
 
       <div className="px-5 pb-5">
@@ -792,7 +799,7 @@ function ActiveRoomsCard({ rooms }: { rooms: Room[] }) {
             </div>
             <p className="text-sm text-text-secondary">모집 중인 내전이 없습니다</p>
             <button
-              onClick={() => router.push("/lol/tournaments")}
+              onClick={() => router.push(`${gamePrefix}/tournaments`)}
               data-tour="home-create-room"
               className="px-5 py-2 rounded-xl text-sm font-medium text-amber-400 border border-amber-500/30 hover:bg-amber-500/10 transition-colors flex items-center gap-1.5"
             >
@@ -810,7 +817,7 @@ function ActiveRoomsCard({ rooms }: { rooms: Room[] }) {
               return (
                 <div
                   key={room.id}
-                  onClick={() => router.push(`/lol/tournaments/${room.id}/lobby`)}
+                  onClick={() => router.push(roomPath(room))}
                   className="flex flex-col gap-3 p-4 rounded-xl bg-white/[0.02] border border-white/[0.05] hover:border-violet-500/20 hover:bg-white/[0.04] cursor-pointer transition-all duration-200 group"
                 >
                   <div className="flex items-start justify-between gap-2">
@@ -853,7 +860,7 @@ function ActiveRoomsCard({ rooms }: { rooms: Room[] }) {
               );
             })}
             <button
-              onClick={() => router.push("/lol/tournaments")}
+              onClick={() => router.push(`${gamePrefix}/tournaments`)}
               data-tour="home-create-room"
               className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl border border-dashed border-white/[0.08] text-text-tertiary hover:text-violet-400 hover:border-violet-500/30 transition-all duration-200 min-h-[80px]"
             >

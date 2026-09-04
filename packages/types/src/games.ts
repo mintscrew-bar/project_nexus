@@ -19,6 +19,17 @@ export type GameTeamMode =
   | "MANUAL_TEAM";
 
 /** 경기가 끝난 뒤 승부를 가리는 방식 */
+/**
+ * 게임별로 갈리는 화면 구획. URL 두 번째 칸과 같다(`/pubg/ranking`).
+ * 게임이 늘어도 화면 목록은 같아서, 다른 점은 "이 게임에서 여는가"뿐이다.
+ */
+export type GameSection =
+  | "tournaments"
+  | "matches"
+  | "ranking"
+  | "guide"
+  | "profile";
+
 export type GameResultShape =
   /** 팀 대 팀 승패 → 대진표 */
   | "BRACKET"
@@ -43,6 +54,14 @@ export interface GameDefinition {
   resultShape: GameResultShape;
   /** 사이트에 노출할지. 준비 중인 게임은 false로 두고 UI에서 "준비 중"으로 표시한다. */
   enabled: boolean;
+  /**
+   * 이 게임에서 아직 열지 않은 화면.
+   *
+   * 게임을 열되 화면은 순차로 여는 중간 상태가 필요하다. 여기 없는 화면을
+   * 그대로 렌더하면 `/pubg/ranking` 이 롤 티어·KDA 표를 보여주고,
+   * 검색엔진은 같은 내용을 두 URL 로 색인한다.
+   */
+  comingSoonSections: readonly GameSection[];
 }
 
 const LOL: GameDefinition = {
@@ -56,6 +75,7 @@ const LOL: GameDefinition = {
   teamModes: ["AUCTION", "SNAKE_DRAFT", "AUTO_BALANCE", "MANUAL_TEAM"],
   resultShape: "BRACKET",
   enabled: true,
+  comingSoonSections: [],
 };
 
 const PUBG: GameDefinition = {
@@ -64,8 +84,9 @@ const PUBG: GameDefinition = {
   label: "배틀그라운드",
   shortLabel: "배그",
   teamSize: 4,
-  // 스쿼드 4인 기준. 실제 커스텀 매치 정원은 Phase 0 실측 뒤 조정한다.
-  roomSizes: [16, 32, 48, 64],
+  // 4인 스쿼드가 기준이다. 8명은 킬내기(2팀 4대4)이자 드래프트 최소 인원이고,
+  // 16명부터가 배틀로얄 스크림 규모다.
+  roomSizes: [8, 16, 32, 48, 64],
   hasPositions: false,
   // 자동 밸런스는 라인별 점수에 기대는 방식이라 포지션이 없는 게임에서는 쓸 수 없다.
   // 배그용 밸런스 지표를 세운 뒤에 다시 넣는다.
@@ -73,6 +94,9 @@ const PUBG: GameDefinition = {
   resultShape: "POINT_LEADERBOARD",
   // 계정 식별자 등록과 방 생성 틀을 사용할 수 있다. 외부 전적 검증은 별도 상태다.
   enabled: true,
+  // 전적·랭킹은 스크림 결과 수집(Phase 5·6)이 들어와야 채울 데이터가 생긴다.
+  // 가이드는 배그용 문안을 아직 쓰지 않았다. 그때까지 롤 화면을 대신 보여주지 않는다.
+  comingSoonSections: ["matches", "ranking", "guide"],
 };
 
 export const GAMES: Record<GameTitle, GameDefinition> = { LOL, PUBG };
@@ -133,4 +157,12 @@ export function teamCountForParticipants(
 /** 팀 편성(경매·스네이크)을 시작할 수 있는 최소 인원 = 2팀 */
 export function minDraftParticipants(game: GameTitle = DEFAULT_GAME): number {
   return GAMES[game].teamSize * 2;
+}
+
+/** 이 게임에서 해당 화면을 열었는지 */
+export function isSectionReady(
+  game: GameTitle,
+  section: GameSection,
+): boolean {
+  return !GAMES[game].comingSoonSections.includes(section);
 }

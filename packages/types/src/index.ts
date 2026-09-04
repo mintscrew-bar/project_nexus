@@ -265,6 +265,7 @@ export {
   teamSizeForGame,
   minDraftParticipants,
   isValidRoomSize,
+  isSectionReady,
 } from './games';
 
 export type {
@@ -272,6 +273,7 @@ export type {
   GameDefinition,
   GameTeamMode,
   GameResultShape,
+  GameSection,
 } from './games';
 
 export type { SeriesPreset, SeriesPresetInfo } from './series-preset';
