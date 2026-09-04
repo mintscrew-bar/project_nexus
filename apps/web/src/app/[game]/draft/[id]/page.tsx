@@ -52,7 +52,7 @@ export default function SnakeDraftPage() {
       hasRedirected.current = true;
       router.push(`${gamePrefix}/role-selection/${draftId}`);
     }
-  }, [draftState?.status, draftId, router]);
+  }, [draftState?.status, draftId, router, gamePrefix]);
 
   useEffect(() => {
     if (!sessionAbortedAt) return;
@@ -73,6 +73,7 @@ export default function SnakeDraftPage() {
     addToast,
     router,
     draftId,
+    gamePrefix,
   ]);
 
   const handleAbortToLobby = () => setIsAbortConfirmOpen(true);

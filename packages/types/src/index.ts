@@ -286,6 +286,21 @@ export type {
   PubgGameModeDefinition,
 } from './pubg';
 
+export {
+  DEFAULT_PUBG_POINT_RULE,
+  KILL_ONLY_POINT_RULE,
+  PUBG_POINT_RULE_PRESETS,
+  calculateScrimPoints,
+  isValidPointRule,
+  sortScrimLeaderboard,
+} from './pubg-scrim';
+
+export type {
+  PubgPointRule,
+  PubgPointRulePreset,
+  ScrimLeaderboardRow,
+} from './pubg-scrim';
+
 export type {
   GameTitle,
   GameDefinition,

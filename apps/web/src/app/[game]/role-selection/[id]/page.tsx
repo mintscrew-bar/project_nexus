@@ -114,7 +114,7 @@ export default function RoleSelectionPage() {
       addToast("역할 선택 완료! 대진표로 이동합니다.", "success");
       router.push(navigationTarget ?? `${gamePrefix}/tournaments/${roomId}/bracket`);
     }
-  }, [isCompleted, navigationTarget, roomId, router, addToast]);
+  }, [isCompleted, navigationTarget, roomId, router, addToast, gamePrefix]);
 
   useEffect(() => {
     if (!sessionAbortedAt) return;
@@ -136,6 +136,7 @@ export default function RoleSelectionPage() {
     addToast,
     router,
     roomId,
+    gamePrefix,
   ]);
 
   const handleAbortToLobby = () => setIsAbortConfirmOpen(true);

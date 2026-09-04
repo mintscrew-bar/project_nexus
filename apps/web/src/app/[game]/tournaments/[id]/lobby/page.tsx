@@ -64,20 +64,31 @@ const LOBBY_CONNECT_TIMEOUT_MS = 10 * 1000;
 type StageRoom = {
   id: string;
   gameTitle?: GameTitle;
+  pubgGameMode?: "KILL_MATCH" | "BATTLE_ROYALE" | "FREE_MATCH" | null;
   teamMode: "AUCTION" | "SNAKE_DRAFT" | "AUTO_BALANCE" | "MANUAL_TEAM";
 };
 
-/** 포지션이 없는 게임(배그)에는 역할 선택 단계가 없다 — 바로 경기로 간다. */
-const afterTeamsPath = (room: StageRoom, gamePrefix: string) =>
-  GAMES[room.gameTitle ?? DEFAULT_GAME].hasPositions
-    ? `${gamePrefix}/role-selection/${room.id}`
-    : `${gamePrefix}/tournaments/${room.id}/bracket`;
+/**
+ * 팀 편성이 끝난 뒤 어디로 가는가.
+ *
+ * 롤은 역할 선택 → 대진표. 배그는 역할 선택 단계가 없고,
+ * 배틀로얄은 대진표가 아니라 라운드 누적 리더보드(스크림)로 간다.
+ */
+const afterTeamsPath = (room: StageRoom, gamePrefix: string) => {
+  if (GAMES[room.gameTitle ?? DEFAULT_GAME].hasPositions) {
+    return `${gamePrefix}/role-selection/${room.id}`;
+  }
+  if (room.pubgGameMode === "BATTLE_ROYALE") {
+    return `${gamePrefix}/tournaments/${room.id}/scrim`;
+  }
+  return `${gamePrefix}/tournaments/${room.id}/bracket`;
+};
 
 const getTeamModeStagePath = (room: StageRoom, gamePrefix: string) => {
   if (room.teamMode === "AUCTION") return `${gamePrefix}/auction/${room.id}`;
   if (room.teamMode === "SNAKE_DRAFT") return `${gamePrefix}/draft/${room.id}`;
   if (room.teamMode === "AUTO_BALANCE") {
-    return `${gamePrefix}/tournaments/${room.id}/bracket`;
+    return afterTeamsPath(room, gamePrefix);
   }
   return afterTeamsPath(room, gamePrefix);
 };
@@ -87,7 +98,9 @@ const getRoomStagePath = (
   gamePrefix: string,
 ) => {
   if (room.status === "IN_PROGRESS") {
-    return `${gamePrefix}/tournaments/${room.id}/bracket`;
+    return room.pubgGameMode === "BATTLE_ROYALE"
+      ? `${gamePrefix}/tournaments/${room.id}/scrim`
+      : `${gamePrefix}/tournaments/${room.id}/bracket`;
   }
 
   // Auto balance stays in the lobby while teams are generated and reviewed.
@@ -239,7 +252,7 @@ export default function TournamentLobbyPage() {
     hasRedirected.current = true;
     addToast(message || "진행 중인 내전으로 돌아갑니다.", "warning");
     router.replace(`${gamePrefix}/tournaments/${activeRoomId}/lobby`);
-  }, [error, roomId, router, addToast]);
+  }, [error, roomId, router, addToast, gamePrefix]);
 
   // 내전 방 링크 공유 — 로비 URL을 클립보드에 복사 (붙여넣으면 OG 카드로 표시됨)
   const handleShare = useCallback(async () => {

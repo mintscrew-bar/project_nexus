@@ -502,6 +502,8 @@ model Room {
   // 예약 리마인드 크론: WHERE status='WAITING' AND scheduledAt BETWEEN ...
   @@index([status, scheduledAt])
   // 방 목록은 항상 게임별로 조회한다: WHERE gameTitle=X AND status=Y
+  scrim                   Scrim?
+
   @@index([gameTitle, status])
   @@map("rooms")
 }
@@ -617,6 +619,7 @@ model Team {
   wonSeries         MatchSeries[]      @relation("SeriesWinner")
   roomParticipants  RoomParticipant[]
   snakeDraftPicks   SnakeDraftPick[]
+  scrimResults      ScrimTeamResult[]
   members           TeamMember[]
   captain           User               @relation("TeamCaptain", fields: [captainId], references: [id])
   room              Room               @relation(fields: [roomId], references: [id], onDelete: Cascade)
@@ -1932,4 +1935,82 @@ model LabCounterSnapshot {
   @@index([period, champId])
   @@index([period, champId, position])
   @@map("lab_counter_snapshots")
+}
+
+
+/// 배틀로얄 스크림. 여러 팀이 한 매치에 들어가 라운드를 반복하고 포인트를 누적한다.
+/// `Match`/`MatchSeries` 는 2팀 고정이라 재사용할 수 없어 따로 판다.
+/// 킬내기(2팀)는 기존 Match 흐름을 그대로 쓴다.
+model Scrim {
+  id          String       @id @default(cuid())
+  roomId      String       @unique
+  /// 예정 라운드 수. 실제로 몇 판을 했는지는 rounds 로 센다.
+  totalRounds Int          @default(3)
+  /// 순위별 포인트 배열 + 킬당 포인트. 대회마다 표가 달라 방마다 고칠 수 있다.
+  pointRule   Json
+  status      ScrimStatus  @default(PENDING)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  room        Room         @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  rounds      ScrimRound[]
+
+  @@index([status])
+  @@map("scrims")
+}
+
+enum ScrimStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+/// 스크림 한 라운드 = 인게임 커스텀 매치 한 판.
+model ScrimRound {
+  id          String            @id @default(cuid())
+  scrimId     String
+  roundNumber Int
+  /// 이 라운드에 해당하는 PUBG 매치 ID. 자동 매칭 전이거나 수동 입력이면 비어 있다.
+  pubgMatchId String?
+  /// 라운드 시작 시각. 매치를 특정할 때 기준이 된다.
+  startedAt   DateTime?
+  endedAt     DateTime?
+  status      ScrimRoundStatus  @default(PENDING)
+  /// 결과를 어떻게 넣었는지. 자동 수집이 붙기 전에는 전부 MANUAL 이다.
+  resultSource String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  scrim       Scrim             @relation(fields: [scrimId], references: [id], onDelete: Cascade)
+  results     ScrimTeamResult[]
+
+  @@unique([scrimId, roundNumber])
+  @@map("scrim_rounds")
+}
+
+enum ScrimRoundStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+}
+
+/// 한 라운드에서 한 팀이 낸 성적.
+/// 팀이 지워져도 기록은 남겨야 해서 teamId 는 SetNull 이고 이름은 스냅샷으로 둔다.
+model ScrimTeamResult {
+  id        String     @id @default(cuid())
+  roundId   String
+  teamId    String?
+  /// 기록 시점의 팀 이름. 팀이 사라진 뒤에도 리더보드를 읽을 수 있어야 한다.
+  teamName  String
+  /// 순위 (1이 우승)
+  placement Int
+  kills     Int        @default(0)
+  /// 규칙표로 환산한 포인트. 규칙이 바뀌면 다시 계산해 덮어쓴다.
+  points    Int        @default(0)
+  createdAt DateTime   @default(now())
+  round     ScrimRound @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  team      Team?      @relation(fields: [teamId], references: [id], onDelete: SetNull)
+
+  @@unique([roundId, teamId])
+  @@index([roundId])
+  @@map("scrim_team_results")
 }

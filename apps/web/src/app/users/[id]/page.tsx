@@ -187,7 +187,7 @@ export default function UserProfilePage() {
     if (currentUser && currentUser.id === userId) {
       router.replace(`${gamePrefix}/profile`);
     }
-  }, [currentUser, userId, router]);
+  }, [currentUser, userId, router, gamePrefix]);
 
   const fetchProfile = useCallback(async () => {
     setIsLoading(true);

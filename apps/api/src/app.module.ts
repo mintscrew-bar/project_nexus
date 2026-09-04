@@ -19,6 +19,7 @@ import { AuctionModule } from "./modules/auction/auction.module";
 import { MatchModule } from "./modules/match/match.module";
 import { RiotModule } from "./modules/riot/riot.module";
 import { PubgModule } from "./modules/pubg/pubg.module";
+import { ScrimModule } from "./modules/scrim/scrim.module";
 import { DiscordModule } from "./modules/discord/discord.module";
 import { ClanModule } from "./modules/clan/clan.module";
 import { BroadcastModule } from "./modules/broadcast/broadcast.module";
@@ -100,6 +101,7 @@ const projectRoot = resolve(apiRoot, "../..");
     MatchModule,
     RiotModule,
     PubgModule,
+    ScrimModule,
     StatsModule,
     DiscordModule,
     ClanModule,

@@ -42,6 +42,8 @@ let roomSocket: Socket | null = null;
 let auctionSocket: Socket | null = null;
 let snakeDraftSocket: Socket | null = null;
 let matchSocket: Socket | null = null;
+// 배틀로얄 스크림 진행 — 라운드 시작·결과·리더보드 갱신을 참가자 전원에게 민다.
+let scrimSocket: Socket | null = null;
 let clanSocket: Socket | null = null;
 let presenceSocket: Socket | null = null;
 let notificationSocket: Socket | null = null;
@@ -205,6 +207,29 @@ export const connectMatchSocket = () => {
   matchSocket = createAuthenticatedSocket("/match", "Match");
 
   return matchSocket;
+};
+
+// ============================================================
+// [게임 소켓] Scrim — 배그 배틀로얄 스크림 진행 전용
+// 사용 시점: 배틀로얄 방에서 스크림이 시작된 뒤
+// 해제 시점: 스크림 확정 또는 방 퇴장 시 disconnectScrimSocket() 호출
+// ============================================================
+export const connectScrimSocket = () => {
+  if (isReusableSocket(scrimSocket)) return scrimSocket;
+  if (scrimSocket) {
+    scrimSocket.removeAllListeners();
+    scrimSocket = null;
+  }
+
+  scrimSocket = createAuthenticatedSocket("/scrim", "Scrim");
+
+  return scrimSocket;
+};
+
+export const disconnectScrimSocket = () => {
+  scrimSocket?.removeAllListeners();
+  scrimSocket?.disconnect();
+  scrimSocket = null;
 };
 
 /**

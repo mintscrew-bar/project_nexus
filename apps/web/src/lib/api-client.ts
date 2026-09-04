@@ -1241,6 +1241,67 @@ export const pubgApi = {
   },
 };
 
+/** 배틀로얄 스크림 — 라운드 진행·결과 입력·누적 리더보드 */
+export const scrimApi = {
+  getScrim: async (roomId: string) => {
+    const response = await apiClient.get(`/rooms/${roomId}/scrim`);
+    return response.data;
+  },
+
+  createScrim: async (
+    roomId: string,
+    data: {
+      totalRounds?: number;
+      pointRule?: { placementPoints: number[]; killPoints: number };
+    },
+  ) => {
+    const response = await apiClient.post(`/rooms/${roomId}/scrim`, data);
+    return response.data;
+  },
+
+  startRound: async (roomId: string, roundNumber: number) => {
+    const response = await apiClient.post(
+      `/rooms/${roomId}/scrim/rounds/${roundNumber}/start`,
+    );
+    return response.data;
+  },
+
+  /**
+   * 라운드 결과 입력. 자동 매칭이 붙기 전에는 유일한 경로이고,
+   * 붙은 뒤에도 실패했을 때의 보험으로 남는다(커스텀 매치 기록은 2주 보존).
+   */
+  submitRoundResult: async (
+    roomId: string,
+    roundNumber: number,
+    data: {
+      pubgMatchId?: string;
+      results: { teamId: string; placement: number; kills: number }[];
+    },
+  ) => {
+    const response = await apiClient.post(
+      `/rooms/${roomId}/scrim/rounds/${roundNumber}/result`,
+      data,
+    );
+    return response.data;
+  },
+
+  updatePointRule: async (
+    roomId: string,
+    rule: { placementPoints: number[]; killPoints: number },
+  ) => {
+    const response = await apiClient.patch(
+      `/rooms/${roomId}/scrim/point-rule`,
+      rule,
+    );
+    return response.data;
+  },
+
+  completeScrim: async (roomId: string) => {
+    const response = await apiClient.post(`/rooms/${roomId}/scrim/complete`);
+    return response.data;
+  },
+};
+
 // 클랜 관련 API
 export const clanApi = {
   getClans: async (params?: {

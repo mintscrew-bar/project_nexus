@@ -99,6 +99,7 @@ export default function BracketPage() {
     addToast,
     router,
     roomId,
+    gamePrefix,
   ]);
 
   const handleRefresh = () => {

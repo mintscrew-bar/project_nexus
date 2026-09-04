@@ -78,6 +78,8 @@ export interface Room {
   gameTitle?: "LOL" | "PUBG";
   /** 배그 방에서만 채워진다 — 스팀(스배) / 카카오(카배) */
   pubgPlatform?: "STEAM" | "KAKAO" | null;
+  /** 배그 방에서만 — 편성 뒤에 대진표로 갈지 스크림으로 갈지가 여기서 갈린다 */
+  pubgGameMode?: "KILL_MATCH" | "BATTLE_ROYALE" | "FREE_MATCH" | null;
 }
 
 interface ChatMessage {

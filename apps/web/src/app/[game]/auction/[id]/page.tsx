@@ -681,7 +681,7 @@ export default function AuctionRoomPage() {
       });
     }, 1000);
     return () => clearInterval(interval);
-  }, [auctionState?.status, auctionId, router]);
+  }, [auctionState?.status, auctionId, router, gamePrefix]);
 
   useEffect(() => {
     if (!sessionAbortedAt) return;
@@ -702,6 +702,7 @@ export default function AuctionRoomPage() {
     addToast,
     router,
     auctionId,
+    gamePrefix,
   ]);
 
   // 낙찰 토스트 표시
