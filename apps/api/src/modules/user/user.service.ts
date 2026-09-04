@@ -5,7 +5,7 @@ import {
   BadRequestException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { StreamerPlatform } from "@nexus/database";
+import { GameTitle, StreamerPlatform } from "@nexus/database";
 import { PrismaService } from "../prisma/prisma.service";
 import { BalanceScoreService } from "../common/balance-score.service";
 import { DiscordAdminAlertService } from "../discord/discord-admin-alert.service";
@@ -233,7 +233,13 @@ export class UserService {
     };
   }
 
-  async getHoverProfile(userId: string) {
+  /**
+   * 호버 프로필.
+   *
+   * `game` 은 보고 있는 화면의 게임이다. 배그 로비에서 이름 위에 올렸는데
+   * 솔로랭크 티어와 라인이 뜨면 안 된다 — 해당 게임 데이터만 내보낸다.
+   */
+  async getHoverProfile(userId: string, game: GameTitle = GameTitle.LOL) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -262,6 +268,17 @@ export class UserService {
               orderBy: { order: "asc" },
               select: { role: true, championId: true, order: true },
             },
+          },
+        },
+        pubgAccounts: {
+          where: { isPrimary: true },
+          select: {
+            playerName: true,
+            lastMatchShard: true,
+            pubgTier: true,
+            nexusTier: true,
+            nexusScore: true,
+            nexusTierSource: true,
           },
         },
         clanMemberships: {
@@ -306,7 +323,8 @@ export class UserService {
       }),
     ]);
 
-    const rawRiot = user.riotAccounts[0] ?? null;
+    const isPubg = game === GameTitle.PUBG;
+    const rawRiot = isPubg ? null : (user.riotAccounts[0] ?? null);
     const riot = rawRiot
       ? {
           ...rawRiot,
@@ -314,9 +332,11 @@ export class UserService {
           balanceScoreVersion: undefined,
         }
       : null;
+    const pubgAccount = isPubg ? (user.pubgAccounts[0] ?? null) : null;
     const clan = user.clanMemberships[0]?.clan ?? null;
 
-    const kdaGames = kdaAgg._count.id;
+    // KDA 는 롤 개념이다. 배그 로비에서 보여줄 값이 아니다.
+    const kdaGames = isPubg ? 0 : kdaAgg._count.id;
     const kda =
       kdaGames > 0
         ? {
@@ -332,6 +352,7 @@ export class UserService {
       avatar: user.avatar,
       profileBanner: user.profileBanner,
       riotAccount: riot,
+      pubgAccount,
       clan,
       streamerProfiles: (user.streamerProfiles ?? []).filter(
         (p: any) => p.isActive,

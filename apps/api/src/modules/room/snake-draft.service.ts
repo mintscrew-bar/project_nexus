@@ -14,7 +14,11 @@ import {
   calculateCaptainScore,
   calculateTierScore,
 } from "../common/tier-score.util";
-import { minDraftParticipants, teamCountForParticipants } from "@nexus/types";
+import {
+  minDraftParticipants,
+  teamCountForParticipants,
+  teamSizeForGame,
+} from "@nexus/types";
 
 export interface SnakeDraftState {
   roomId: string;
@@ -185,9 +189,14 @@ export class SnakeDraftService {
       console.warn("Failed to assign Discord captain roles:", error);
     }
 
+    // 픽 순서는 주장 선발과 **따로** 뽑는다.
+    //
+    // 팀 목록은 주장이 정해진 순서 그대로다. 티어 우선으로 주장을 뽑으면
+    // 가장 센 주장이 첫 픽까지 가져가 이점이 두 번 쌓인다.
     const pickOrder = this.generatePickOrder(
-      teams.map((t: (typeof teams)[number]) => t.id),
+      this.shuffle(teams.map((t: (typeof teams)[number]) => t.id)),
       numTeams,
+      teamSizeForGame(room.gameTitle),
     );
 
     const draftState: SnakeDraftState = {
@@ -251,12 +260,7 @@ export class SnakeDraftService {
     }
 
     // Default to RANDOM — 암호학적 난수로 Fisher-Yates 셔플(예측 불가능성 보장)
-    const shuffled = [...participants];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-      const j = randomInt(i + 1);
-      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-    }
-    return shuffled.slice(0, numTeams);
+    return this.shuffle(participants).slice(0, numTeams);
   }
 
   // ========================================
@@ -265,10 +269,24 @@ export class SnakeDraftService {
 
   // ... (rest of the file is unchanged)
 
-  private generatePickOrder(teamIds: string[], numTeams: number): string[] {
+  /** 암호학적 난수 Fisher-Yates. 픽 순서 추첨과 랜덤 주장 선발이 같이 쓴다. */
+  private shuffle<T>(items: T[]): T[] {
+    const shuffled = [...items];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = randomInt(i + 1);
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+  }
+
+  private generatePickOrder(
+    teamIds: string[],
+    numTeams: number,
+    playersPerTeam: number,
+  ): string[] {
     const order: string[] = [];
-    const playersPerTeam = 5;
-    const picksNeededPerTeam = playersPerTeam - 1; // 캡틴 제외 4명
+    // 팀 인원은 게임마다 다르다(롤 5인 / 배그 4인 스쿼드).
+    const picksNeededPerTeam = playersPerTeam - 1; // 캡틴 제외
     const totalPicksNeeded = picksNeededPerTeam * numTeams;
 
     // 공정성 강화: 순환형 스네이크(Rotating Snake)

@@ -583,8 +583,15 @@ export const userApi = {
     return response.data;
   },
 
+  /**
+   * 호버 프로필.
+   *
+   * `game` 은 보고 있는 화면의 게임이다. 배그 로비에서 이름 위에 올렸는데
+   * 솔로랭크 티어·라인·챔피언이 뜨면 안 되므로 서버가 해당 게임 데이터만 준다.
+   */
   getHoverProfile: async (
     userId: string,
+    game: "LOL" | "PUBG" = "LOL",
   ): Promise<{
     username: string;
     avatar: string | null;
@@ -612,6 +619,14 @@ export const userApi = {
         order: number;
       }[];
     } | null;
+    pubgAccount: {
+      playerName: string;
+      lastMatchShard: "STEAM" | "KAKAO" | null;
+      pubgTier: string | null;
+      nexusTier: string | null;
+      nexusScore: number | null;
+      nexusTierSource: "NONE" | "SELF" | "ADMIN" | "AUTO";
+    } | null;
     clan: { name: string; tag: string | null } | null;
     streamerProfiles: Pick<
       StreamerProfile,
@@ -630,7 +645,9 @@ export const userApi = {
     } | null;
     reputation: { overallAverage: number; totalRatings: number };
   }> => {
-    const response = await apiClient.get(`/users/${userId}/hover-profile`);
+    const response = await apiClient.get(`/users/${userId}/hover-profile`, {
+      params: { game },
+    });
     return response.data;
   },
 

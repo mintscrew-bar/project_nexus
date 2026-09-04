@@ -8,6 +8,8 @@ import { userApi } from "@/lib/api-client";
 import { ChampionIcon, PositionIcon, POSITION_LABELS } from "@/app/[game]/tournaments/[id]/lobby/_components/icons";
 import { RoleTierBadges } from "@/components/domain/RoleTierBadges";
 import { RoleBalanceScores } from "@/components/domain/RoleBalanceScores";
+import { useCurrentGame } from "@/hooks/useCurrentGame";
+import { PUBG_PLATFORM_LABELS } from "@nexus/types";
 
 interface PlayerHoverCardProps {
   userId: string;
@@ -173,9 +175,11 @@ function CardSkeleton() {
 }
 
 export function PlayerHoverCard({ userId, anchorRect, onOpenProfile, onMouseEnter, onMouseLeave }: PlayerHoverCardProps) {
+  // 보고 있는 화면의 게임 데이터만 받는다. 배그 로비에서 솔랭 티어가 뜨면 안 된다.
+  const currentGame = useCurrentGame();
   const { data, isLoading } = useQuery({
-    queryKey: ["hoverProfile", userId],
-    queryFn: () => userApi.getHoverProfile(userId),
+    queryKey: ["hoverProfile", userId, currentGame],
+    queryFn: () => userApi.getHoverProfile(userId, currentGame),
     staleTime: 10 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
     enabled: Boolean(userId),
@@ -194,6 +198,7 @@ export function PlayerHoverCard({ userId, anchorRect, onOpenProfile, onMouseEnte
 
   const isActualBot = data ? /^testbot_\d+$/.test(data.username) : false;
   const riot = data?.riotAccount ?? null;
+  const pubg = data?.pubgAccount ?? null;
 
   const champions = [...(riot?.championPreferences ?? [])].sort((a, b) => a.order - b.order);
   const mainRole = riot?.mainRole ?? null;
@@ -273,6 +278,37 @@ export function PlayerHoverCard({ userId, anchorRect, onOpenProfile, onMouseEnte
                   <p className="mt-0.5 text-[11px] text-text-tertiary">
                     {riot.gameName}<span className="text-text-muted"> #{riot.tagLine}</span>
                   </p>
+                )}
+
+                {/* 배그 닉네임 + 편성 등급. 롤 데이터는 서버에서 이미 비워져 온다. */}
+                {pubg && (
+                  <>
+                    <p className="mt-0.5 text-[11px] text-text-tertiary">
+                      {pubg.playerName}
+                      {pubg.lastMatchShard && (
+                        <span className="text-text-muted">
+                          {" "}
+                          · {PUBG_PLATFORM_LABELS[pubg.lastMatchShard].short}
+                        </span>
+                      )}
+                    </p>
+                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                      {/* 공식 랭크와 NEXUS 편성 등급은 다른 값이라 라벨을 갈라 적는다. */}
+                      {pubg.pubgTier && (
+                        <span className="text-[11px] font-semibold text-text-secondary">
+                          공식 {pubg.pubgTier}
+                        </span>
+                      )}
+                      <span
+                        className="text-sm font-black"
+                        style={{ color: ACCENT }}
+                      >
+                        {pubg.nexusTier
+                          ? `NEXUS ${pubg.nexusTier}티어`
+                          : "등급 산정 전"}
+                      </span>
+                    </div>
+                  </>
                 )}
 
                 {/* 현재 티어 */}
