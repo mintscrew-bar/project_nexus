@@ -80,6 +80,13 @@ interface AutoBalanceReviewProps {
   undoDepth: number;
   /** 다시 돌린 횟수 — 참가자 전원에게 보인다 */
   rerollCount: number;
+  /**
+   * 라인(포지션) 관련 표시를 띄울지.
+   *
+   * 배그에는 라인 개념이 없다. 그대로 두면 빈 라인 칸과 "선호 라인 충족 0/0"이
+   * 뜨는데, 없는 개념을 0으로 보여주면 뭔가 잘못된 것처럼 읽힌다.
+   */
+  showRoles?: boolean;
 }
 
 /**
@@ -98,6 +105,7 @@ export function AutoBalanceReview({
   onUndo,
   undoDepth,
   rerollCount,
+  showRoles = true,
 }: AutoBalanceReviewProps) {
   const [pinned, setPinned] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState<
@@ -636,20 +644,25 @@ export function AutoBalanceReview({
                               : ""
                       }`}
                     >
-                      {member.assignedRole ? (
-                        <PositionIcon
-                          position={member.assignedRole}
-                          className="!h-5 !w-5 flex-shrink-0"
-                        />
-                      ) : (
-                        <span className="h-5 w-5 flex-shrink-0" />
+                      {/* 라인은 롤에만 있는 개념이다. 배그에서는 빈 칸도 두지 않는다. */}
+                      {showRoles && (
+                        <>
+                          {member.assignedRole ? (
+                            <PositionIcon
+                              position={member.assignedRole}
+                              className="!h-5 !w-5 flex-shrink-0"
+                            />
+                          ) : (
+                            <span className="h-5 w-5 flex-shrink-0" />
+                          )}
+                          <span className="w-9 flex-shrink-0 text-xs text-text-tertiary">
+                            {member.assignedRole
+                              ? (POSITION_LABELS[member.assignedRole] ??
+                                member.assignedRole)
+                              : "-"}
+                          </span>
+                        </>
                       )}
-                      <span className="w-9 flex-shrink-0 text-xs text-text-tertiary">
-                        {member.assignedRole
-                          ? (POSITION_LABELS[member.assignedRole] ??
-                            member.assignedRole)
-                          : "-"}
-                      </span>
                       {isHost ? (
                         <span className="min-w-0 flex-1 truncate text-sm font-semibold text-text-primary">
                           {member.username}
@@ -818,7 +831,7 @@ export function AutoBalanceReview({
             )}
           </div>
 
-          {preferenceSummary && (
+          {showRoles && preferenceSummary && (
             <div className="flex flex-shrink-0 flex-col gap-2 border-t border-bg-tertiary pt-3">
               <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
                 <span className="text-xs font-semibold uppercase tracking-wider text-text-tertiary">

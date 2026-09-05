@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { Users } from "lucide-react";
 import { useState } from "react";
-import { GAMES, DEFAULT_GAME, type GameTitle } from "@nexus/types";
+import { teamSizeForRoom } from "@nexus/types";
 import { CompactParticipantCard } from "./CompactParticipantCard";
 
 /**
@@ -73,9 +73,14 @@ export function LobbyParticipantsList({
       else next.add(teamId);
       return next;
     });
-  // 팀 정원은 게임마다 다르다 — 롤 5인, 배그 4인 스쿼드.
-  const game = GAMES[(room.gameTitle as GameTitle) ?? DEFAULT_GAME];
-  const teamSize = game.teamSize;
+  // 팀 정원은 게임과 모드마다 다르다 — 롤 5인, 배그 배틀로얄 4인 스쿼드,
+  // 킬내기는 정원을 반으로 나눈 값(3대3~8대8).
+  // 게임 기본값만 보면 8대8 깐부킬내기가 팀당 4명에서 "가득 참"으로 잠긴다.
+  const teamSize = teamSizeForRoom({
+    gameTitle: room.gameTitle,
+    pubgGameMode: room.pubgGameMode,
+    maxParticipants: room.maxParticipants,
+  });
   const manualTeams = room.teamMode === "MANUAL_TEAM" ? room.teams ?? [] : [];
   const isManualTeamMode = manualTeams.length > 0 && room.status === "WAITING";
   const waitingPlayers = isManualTeamMode

@@ -130,3 +130,62 @@ describe("방 제목 플랫폼 태그", () => {
     );
   });
 });
+
+/**
+ * 로비가 보여줄 팀 정원.
+ *
+ * 게임 기본값(배그 4인)만 보면 8대8 깐부킬내기가 팀당 4명에서 "가득 참"으로
+ * 잠긴다. 실제로 그렇게 되어 있었다(2026-09-05 수정).
+ */
+describe("로비 팀 정원", () => {
+  const killMatch = (maxParticipants: number) => ({
+    gameTitle: "PUBG" as const,
+    pubgGameMode: "KILL_MATCH" as const,
+    maxParticipants,
+  });
+
+  it("킬내기 정원마다 팀 정원이 따라간다", () => {
+    expect(teamSizeForRoom(killMatch(6))).toBe(3);
+    expect(teamSizeForRoom(killMatch(8))).toBe(4);
+    expect(teamSizeForRoom(killMatch(14))).toBe(7);
+    expect(teamSizeForRoom(killMatch(16))).toBe(8);
+  });
+
+  it("배틀로얄은 정원과 무관하게 4인 스쿼드", () => {
+    for (const size of [16, 32, 64]) {
+      expect(
+        teamSizeForRoom({
+          gameTitle: "PUBG",
+          pubgGameMode: "BATTLE_ROYALE",
+          maxParticipants: size,
+        }),
+      ).toBe(4);
+    }
+  });
+
+  it("롤은 모드와 무관하게 5인", () => {
+    expect(teamSizeForRoom({ gameTitle: "LOL", maxParticipants: 40 })).toBe(5);
+  });
+
+  it("팀 정원 × 팀 수가 방 정원과 맞는다", () => {
+    // 안 맞으면 로비에 빈자리가 남거나 들어갈 수 없는 사람이 생긴다.
+    for (const size of getPubgGameMode("KILL_MATCH").roomSizes) {
+      const room = killMatch(size);
+      expect(teamSizeForRoom(room) * teamCountForRoom(room)).toBe(size);
+    }
+    for (const size of getPubgGameMode("BATTLE_ROYALE").roomSizes) {
+      const room = {
+        gameTitle: "PUBG" as const,
+        pubgGameMode: "BATTLE_ROYALE" as const,
+        maxParticipants: size,
+      };
+      expect(teamSizeForRoom(room) * teamCountForRoom(room)).toBe(size);
+    }
+  });
+
+  it("게임·모드가 비어 있어도 터지지 않는다", () => {
+    // 게임 축이 생기기 전 데이터가 남아 있다.
+    expect(teamSizeForRoom({ maxParticipants: 10 })).toBe(5);
+    expect(teamCountForRoom({ maxParticipants: 10 })).toBe(2);
+  });
+});

@@ -2,7 +2,13 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useGamePrefix } from "@/hooks/useCurrentGame";
-import { getRoomStagePath, getTeamModeStagePath } from "@nexus/types";
+import {
+  DEFAULT_GAME,
+  GAMES,
+  getRoomStagePath,
+  getTeamModeStagePath,
+  type GameTitle,
+} from "@nexus/types";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useLobbyStore } from "@/stores/lobby-store";
 import { useAuthStore } from "@/stores/auth-store";
@@ -655,6 +661,8 @@ export default function TournamentLobbyPage() {
 
   const autoBalanceReview = isAutoBalanceReviewStage ? (
     <AutoBalanceReview
+      // 배그에는 라인이 없다. 빈 라인 칸과 "선호 라인 충족"을 띄우지 않는다.
+      showRoles={GAMES[(room?.gameTitle as GameTitle) ?? DEFAULT_GAME].hasPositions}
       isHost={isCurrentUserHost}
       teams={(room.teams ?? []).map((team: any) => ({
         id: team.id,
