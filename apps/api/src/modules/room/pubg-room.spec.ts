@@ -54,11 +54,14 @@ describe("배그 경기 모드", () => {
     expect(isSplitSquadTeam(kkanbu)).toBe(true);
   });
 
-  it("배틀로얄은 4팀부터 — 2~3팀으로는 순위 점수가 의미를 잃는다", () => {
+  it("배틀로얄은 8팀(32명)부터 25팀(100명)까지", () => {
     const br = getPubgGameMode("BATTLE_ROYALE");
-    expect(br.roomSizes[0]).toBe(16);
-    expect(teamCountForRoomSize(br.roomSizes[0], "PUBG")).toBe(4);
-    expect(teamCountForRoomSize(64, "PUBG")).toBe(16);
+    // 4팀으로는 순위 점수가 몇 판만에 굳어 리더보드가 의미를 잃는다.
+    expect(br.roomSizes[0]).toBe(32);
+    expect(teamCountForRoomSize(32, "PUBG")).toBe(8);
+    // 인게임 커스텀 매치 정원 한계가 100명이다.
+    expect(br.roomSizes[br.roomSizes.length - 1]).toBe(100);
+    expect(teamCountForRoomSize(100, "PUBG")).toBe(25);
     expect(br.resultShape).toBe("POINT_LEADERBOARD");
   });
 
@@ -73,9 +76,11 @@ describe("배그 경기 모드", () => {
     expect(isValidPubgRoomSize(16, "KILL_MATCH")).toBe(true);
     // 킬내기는 짝수로 반씩 갈라야 해서 홀수·10명 같은 값은 없다.
     expect(isValidPubgRoomSize(10, "KILL_MATCH")).toBe(false);
-    // 배틀로얄은 4팀부터 — 2~3팀으로는 순위 점수가 의미를 잃는다.
+    // 배틀로얄은 8팀(32명)부터 — 그 아래로는 순위 점수가 금방 굳는다.
     expect(isValidPubgRoomSize(8, "BATTLE_ROYALE")).toBe(false);
-    expect(isValidPubgRoomSize(16, "BATTLE_ROYALE")).toBe(true);
+    expect(isValidPubgRoomSize(16, "BATTLE_ROYALE")).toBe(false);
+    expect(isValidPubgRoomSize(32, "BATTLE_ROYALE")).toBe(true);
+    expect(isValidPubgRoomSize(100, "BATTLE_ROYALE")).toBe(true);
   });
 
   it("배틀로얄 정원은 4의 배수 — 인게임 스쿼드가 4인이다", () => {

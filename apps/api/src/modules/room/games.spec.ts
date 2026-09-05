@@ -21,7 +21,12 @@ describe("게임 정의", () => {
 
   it("정원은 팀 인원으로 나누어떨어져야 한다", () => {
     // 나머지가 남으면 인원이 모여도 팀을 못 짠다.
+    //
+    // 배그는 예외다 — 모드마다 팀 인원이 달라(킬내기는 정원÷2) 게임 단위
+    // `roomSizes` 는 모드별 값의 합집합일 뿐이다. 실제 불변식은 모드별로
+    // `pubg-room.spec.ts` 에서 "팀 정원 × 팀 수 = 방 정원"으로 검증한다.
     for (const title of GAME_TITLES) {
+      if (title === "PUBG") continue;
       const game = GAMES[title];
       for (const size of game.roomSizes) {
         expect(size % game.teamSize).toBe(0);

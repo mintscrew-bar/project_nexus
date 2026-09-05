@@ -67,7 +67,9 @@ const MODE_DEFINITIONS: Record<PubgGameMode, PubgGameModeDefinition> = {
     label: "배틀로얄 내전",
     description:
       "여러 팀이 한 매치에 들어가 라운드를 반복하고 순위·킬 포인트를 누적합니다.",
-    roomSizes: [16, 32, 48, 64],
+    // 8팀(32명)부터 인게임 정원 한계인 25팀(100명)까지.
+    // 4팀(16명)으로는 순위 점수가 몇 판만에 굳어 리더보드가 의미를 잃는다.
+    roomSizes: [32, 40, 48, 64, 80, 100],
     resultShape: "POINT_LEADERBOARD",
     teamModes: ["AUCTION", "SNAKE_DRAFT", "AUTO_BALANCE", "MANUAL_TEAM"],
   },
@@ -87,7 +89,7 @@ const MODE_DEFINITIONS: Record<PubgGameMode, PubgGameModeDefinition> = {
     label: "자유 매치",
     description:
       "팀만 나누고 진행은 방에서 알아서 합니다. 전적에 남기지 않습니다.",
-    roomSizes: [8, 16, 32, 48, 64],
+    roomSizes: [8, 16, 32, 48, 64, 80, 100],
     resultShape: "NONE",
     teamModes: ["MANUAL_TEAM"],
   },

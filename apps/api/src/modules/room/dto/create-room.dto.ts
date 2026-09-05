@@ -56,10 +56,13 @@ export class CreateRoomDto {
   pubgGameMode?: PubgGameMode;
 
   @IsInt()
-  // 게임마다 최소 정원이 다르다(롤 10명 / 배그 킬내기 8명).
-  // 실제 검증은 게임별 정원표(`isValidRoomSize`)가 하고, 여기서는 하한만 막는다.
-  @Min(8, { message: "최소 8명 이상이어야 합니다." })
-  @Max(64, { message: "정원이 너무 많습니다." })
+  // 게임·모드마다 정원이 다르다. 실제 검증은 정원표(`isValidRoomSize` /
+  // `isValidPubgRoomSize`)가 하고 여기서는 범위만 막는다.
+  // 가장 작은 방은 배그 킬내기 3대3(6명), 가장 큰 방은 배틀로얄 100명이다.
+  @Min(6, { message: "최소 6명 이상이어야 합니다." })
+  // 인게임 커스텀 매치 정원 한계가 100명이다. 실제 검증은 게임·모드별
+  // 정원표가 하고, 여기서는 상한만 막는다.
+  @Max(100, { message: "정원이 너무 많습니다." })
   maxParticipants: number;
 
   @IsEnum(TeamMode, { message: "유효한 팀 모드를 선택해주세요." })

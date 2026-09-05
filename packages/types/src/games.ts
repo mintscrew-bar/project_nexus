@@ -84,9 +84,9 @@ const PUBG: GameDefinition = {
   label: "배틀그라운드",
   shortLabel: "배그",
   teamSize: 4,
-  // 4인 스쿼드가 기준이다. 8명은 킬내기(2팀 4대4)이자 드래프트 최소 인원이고,
-  // 16명부터가 배틀로얄 스크림 규모다.
-  roomSizes: [8, 16, 32, 48, 64],
+  // 모드별 정원은 `pubg.ts` 의 모드 정의가 정한다. 여기는 배그 전체에서
+  // 나올 수 있는 값의 합집합이다 — 킬내기 6~16, 배틀로얄 32~100.
+  roomSizes: [6, 8, 14, 16, 32, 40, 48, 64, 80, 100],
   hasPositions: false,
   // 자동 밸런스는 라인별 점수가 아니라 NEXUS 편성 점수로 돈다(뱀 순서 분배).
   teamModes: ["AUCTION", "SNAKE_DRAFT", "AUTO_BALANCE", "MANUAL_TEAM"],
