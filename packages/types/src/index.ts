@@ -278,17 +278,23 @@ export {
   isValidPubgRoomSize,
   pubgRoomTitle,
   stripPubgTitlePrefix,
+  teamSizeForRoom,
+  teamCountForRoom,
+  teamCountForRoster,
+  isSplitSquadTeam,
 } from './pubg';
 
 export type {
   PubgPlatform,
   PubgGameMode,
   PubgGameModeDefinition,
+  RoomTeamShape,
 } from './pubg';
 
 export {
   DEFAULT_PUBG_POINT_RULE,
   KILL_ONLY_POINT_RULE,
+  KILL_MATCH_POINT_RULE,
   PUBG_POINT_RULE_PRESETS,
   calculateScrimPoints,
   isValidPointRule,

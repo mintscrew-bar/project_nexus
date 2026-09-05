@@ -1207,8 +1207,9 @@ export type PubgPlayerLookupResult =
       ownershipVerified: false;
     };
 
-export interface PubgScrimHistoryItem {
-  kind: "SCRIM";
+export interface PubgHistoryItem {
+  /** 배틀로얄인지 킬내기인지. 같은 스크림 모델을 쓰지만 읽는 법이 다르다. */
+  mode: "BATTLE_ROYALE" | "KILL_MATCH" | "FREE_MATCH";
   roomId: string;
   roomName: string;
   pubgPlatform: "STEAM" | "KAKAO" | null;
@@ -1217,28 +1218,13 @@ export interface PubgScrimHistoryItem {
   totalTeams: number;
   totalPoints: number;
   totalKills: number;
+  totalDeaths: number;
   rounds: number;
   completedAt: string | null;
 }
 
-export interface PubgKillMatchHistoryItem {
-  kind: "KILL_MATCH";
-  matchId: string;
-  roomId: string | null;
-  roomName: string;
-  pubgPlatform: "STEAM" | "KAKAO" | null;
-  teamName: string;
-  opponentName: string;
-  win: boolean;
-  teamKills: number;
-  opponentKills: number;
-  /** 개인 킬은 선택 입력이다. 안 넣었으면 0이 아니라 null. */
-  playerKills: number | null;
-  completedAt: string | null;
-}
-
 export interface PubgHistoryResponse {
-  items: (PubgScrimHistoryItem | PubgKillMatchHistoryItem)[];
+  items: PubgHistoryItem[];
   summary: {
     scrimCount: number;
     killMatchCount: number;
@@ -1272,22 +1258,6 @@ export const pubgApi = {
 
   deleteAccount: async (accountId: string) => {
     await apiClient.delete(`/pubg/accounts/${accountId}`);
-  },
-
-  /** 킬내기 결과 — 승패는 기존 2팀 흐름을 쓰고 킬 수만 얹는다. */
-  reportKillMatch: async (
-    matchId: string,
-    data: {
-      winnerId?: string;
-      teams: { teamId: string; kills: number }[];
-      players?: { userId: string; kills: number }[];
-    },
-  ) => {
-    const response = await apiClient.post(
-      `/pubg/matches/${matchId}/kills`,
-      data,
-    );
-    return response.data;
   },
 
   /** 배그 전적 — 스크림 참가 이력 + 킬내기 결과 */
@@ -1326,11 +1296,6 @@ export const pubgApi = {
     }[];
   },
 
-  getKillMatchResult: async (matchId: string) => {
-    const response = await apiClient.get(`/pubg/matches/${matchId}/kills`);
-    return response.data;
-  },
-
   setPrimary: async (accountId: string) => {
     const response = await apiClient.patch(
       `/pubg/accounts/${accountId}/primary`,
@@ -1367,7 +1332,11 @@ export const scrimApi = {
     roomId: string,
     data: {
       totalRounds?: number;
-      pointRule?: { placementPoints: number[]; killPoints: number };
+      pointRule?: {
+        placementPoints: number[];
+        killPoints: number;
+        deathPoints?: number;
+      };
     },
   ) => {
     const response = await apiClient.post(`/rooms/${roomId}/scrim`, data);
@@ -1409,7 +1378,13 @@ export const scrimApi = {
     roundNumber: number,
     data: {
       pubgMatchId?: string;
-      results: { teamId: string; placement: number; kills: number }[];
+      results: {
+        teamId: string;
+        placement: number;
+        kills: number;
+        /** 죽은 팀원 수. 킬내기는 감점이라 점수에 들어간다. */
+        deaths?: number;
+      }[];
     },
   ) => {
     const response = await apiClient.post(
@@ -1421,7 +1396,11 @@ export const scrimApi = {
 
   updatePointRule: async (
     roomId: string,
-    rule: { placementPoints: number[]; killPoints: number },
+    rule: {
+      placementPoints: number[];
+      killPoints: number;
+      deathPoints?: number;
+    },
   ) => {
     const response = await apiClient.patch(
       `/rooms/${roomId}/scrim/point-rule`,

@@ -27,6 +27,13 @@ export class RoundTeamResultDto {
   @Min(0)
   @Max(200)
   kills: number;
+
+  /** 이 라운드에서 죽은 팀원 수. 킬내기는 감점이라 점수에 들어간다. */
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(100)
+  deaths?: number;
 }
 
 /**

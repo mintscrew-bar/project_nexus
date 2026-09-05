@@ -1,19 +1,55 @@
 import {
   DEFAULT_PUBG_GAME_MODE,
   getPubgGameMode,
+  isSplitSquadTeam,
   isValidPubgRoomSize,
   pubgGameModes,
   pubgRoomTitle,
   stripPubgTitlePrefix,
+  teamCountForRoom,
   teamCountForRoomSize,
+  teamCountForRoster,
+  teamSizeForRoom,
 } from "@nexus/types";
 
 describe("배그 경기 모드", () => {
-  it("킬내기는 2팀 8명 — 4대4가 기준", () => {
+  it("킬내기는 항상 2팀 — 정원이 곧 팀 인원 × 2", () => {
     const killMatch = getPubgGameMode("KILL_MATCH");
-    expect(killMatch.roomSizes).toEqual([8]);
-    expect(teamCountForRoomSize(8, "PUBG")).toBe(2);
-    expect(killMatch.resultShape).toBe("BRACKET");
+    // 3대3·4대4, 그리고 두 스쿼드가 한 팀인 깐부킬내기(7대7·8대8).
+    expect(killMatch.roomSizes).toEqual([6, 8, 14, 16]);
+    for (const size of killMatch.roomSizes) {
+      const room = {
+        gameTitle: "PUBG" as const,
+        pubgGameMode: "KILL_MATCH" as const,
+        maxParticipants: size,
+      };
+      expect(teamCountForRoom(room)).toBe(2);
+      expect(teamSizeForRoom(room)).toBe(size / 2);
+    }
+    // 라운드마다 점수를 누적한다 — 한 판 승패가 아니다.
+    expect(killMatch.resultShape).toBe("POINT_LEADERBOARD");
+  });
+
+  it("킬내기 팀 수는 참가 인원이 늘어도 2팀이다", () => {
+    // 인원으로 나누면 8명 킬내기가 2팀, 16명이 4팀이 돼 킬내기가 아니게 된다.
+    const room = {
+      gameTitle: "PUBG" as const,
+      pubgGameMode: "KILL_MATCH" as const,
+    };
+    expect(teamCountForRoster(room, 8)).toBe(2);
+    expect(teamCountForRoster(room, 16)).toBe(2);
+  });
+
+  it("깐부킬내기는 한 팀이 인게임 스쿼드를 넘는다", () => {
+    const solo = {
+      gameTitle: "PUBG" as const,
+      pubgGameMode: "KILL_MATCH" as const,
+      maxParticipants: 8,
+    };
+    const kkanbu = { ...solo, maxParticipants: 16 };
+    // 4대4는 스쿼드 하나에 들어가지만 8대8은 두 스쿼드로 갈라진다.
+    expect(isSplitSquadTeam(solo)).toBe(false);
+    expect(isSplitSquadTeam(kkanbu)).toBe(true);
   });
 
   it("배틀로얄은 4팀부터 — 2~3팀으로는 순위 점수가 의미를 잃는다", () => {
@@ -31,17 +67,25 @@ describe("배그 경기 모드", () => {
   });
 
   it("모드에 없는 정원은 거른다", () => {
-    expect(isValidPubgRoomSize(8, "KILL_MATCH")).toBe(true);
-    // 킬내기는 2팀 고정이라 16명(4팀)이 될 수 없다.
-    expect(isValidPubgRoomSize(16, "KILL_MATCH")).toBe(false);
+    expect(isValidPubgRoomSize(6, "KILL_MATCH")).toBe(true);
+    expect(isValidPubgRoomSize(16, "KILL_MATCH")).toBe(true);
+    // 킬내기는 짝수로 반씩 갈라야 해서 홀수·10명 같은 값은 없다.
+    expect(isValidPubgRoomSize(10, "KILL_MATCH")).toBe(false);
+    // 배틀로얄은 4팀부터 — 2~3팀으로는 순위 점수가 의미를 잃는다.
     expect(isValidPubgRoomSize(8, "BATTLE_ROYALE")).toBe(false);
     expect(isValidPubgRoomSize(16, "BATTLE_ROYALE")).toBe(true);
   });
 
-  it("모든 모드 정원이 4의 배수 — 4인 스쿼드 기준", () => {
+  it("배틀로얄 정원은 4의 배수 — 인게임 스쿼드가 4인이다", () => {
+    for (const size of getPubgGameMode("BATTLE_ROYALE").roomSizes) {
+      expect(size % 4).toBe(0);
+    }
+  });
+
+  it("모든 모드 정원이 짝수 — 팀이 최소 둘로 갈려야 한다", () => {
     for (const mode of pubgGameModes()) {
       for (const size of mode.roomSizes) {
-        expect(size % 4).toBe(0);
+        expect(size % 2).toBe(0);
       }
     }
   });

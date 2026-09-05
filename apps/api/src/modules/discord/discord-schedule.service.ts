@@ -5,8 +5,8 @@ import { PrismaService } from "../prisma/prisma.service";
 import { DiscordBotService } from "./discord-bot.service";
 import { DiscordVoiceService } from "./discord-voice.service";
 import { roomLobbyUrl } from "../../common/utils/app-url.util";
-import type { GameTitle } from "@nexus/types";
-import { teamCountForRoomSize } from "@nexus/types";
+import type { GameTitle, PubgGameMode } from "@nexus/types";
+import { teamCountForRoom } from "@nexus/types";
 
 /** 시작 1시간 전 리마인드를 보내는 구간 */
 const REMIND_1H_MS = 60 * 60 * 1000;
@@ -65,6 +65,8 @@ export class DiscordScheduleService {
         name: true,
         // 로비 링크가 `/lol/...` 처럼 게임별 경로라 URL 조립에 필요하다
         gameTitle: true,
+        // 팀 음성채널 수가 모드에 따라 달라진다(킬내기는 2팀)
+        pubgGameMode: true,
         maxParticipants: true,
         scheduledAt: true,
         createdAt: true,
@@ -237,8 +239,9 @@ export class DiscordScheduleService {
     name: string;
     maxParticipants: number;
     discordCategoryId: string | null;
-    // 팀 음성채널 수는 게임별 팀 인원으로 나눠 정한다(롤 5인 / 배그 4인)
+    // 팀 음성채널 수는 게임·모드마다 다르다(롤 5인 / 배그 4인 / 킬내기는 2팀)
     gameTitle: GameTitle;
+    pubgGameMode: PubgGameMode | null;
   }): Promise<void> {
     await this.prisma.room.update({
       where: { id: room.id },
@@ -252,7 +255,11 @@ export class DiscordScheduleService {
         const channels = await this.voiceService.createRoomChannels(
           room.id,
           room.name,
-          teamCountForRoomSize(room.maxParticipants, room.gameTitle),
+          teamCountForRoom({
+            gameTitle: room.gameTitle,
+            pubgGameMode: room.pubgGameMode,
+            maxParticipants: room.maxParticipants,
+          }),
         );
         await this.prisma.room.update({
           where: { id: room.id },

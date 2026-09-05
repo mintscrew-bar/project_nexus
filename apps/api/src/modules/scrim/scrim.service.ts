@@ -13,6 +13,7 @@ import {
 } from "@nexus/database";
 import {
   DEFAULT_PUBG_POINT_RULE,
+  KILL_MATCH_POINT_RULE,
   calculateScrimPoints,
   isValidPointRule,
   sortScrimLeaderboard,
@@ -60,9 +61,15 @@ export class ScrimService {
     if (room.hostId !== hostId) {
       throw new ForbiddenException("방장만 스크림을 시작할 수 있습니다.");
     }
-    if (room.gameTitle !== "PUBG" || room.pubgGameMode !== "BATTLE_ROYALE") {
+    // 배틀로얄과 킬내기가 같은 모델을 쓴다 — 둘 다 라운드를 반복하며 포인트를
+    // 누적한다. 자유 매치만 결과를 남기지 않는다.
+    if (
+      room.gameTitle !== "PUBG" ||
+      (room.pubgGameMode !== "BATTLE_ROYALE" &&
+        room.pubgGameMode !== "KILL_MATCH")
+    ) {
       throw new BadRequestException(
-        "배틀로얄 내전 방에서만 스크림을 만들 수 있습니다.",
+        "배틀로얄 내전 또는 킬내기 방에서만 스크림을 만들 수 있습니다.",
       );
     }
     if (room.scrim) {
@@ -74,7 +81,12 @@ export class ScrimService {
       );
     }
 
-    const pointRule = dto.pointRule ?? DEFAULT_PUBG_POINT_RULE;
+    // 킬내기와 배틀로얄은 점수 규칙이 아예 다르다(킬내기는 사망이 감점).
+    const pointRule =
+      dto.pointRule ??
+      (room.pubgGameMode === "KILL_MATCH"
+        ? KILL_MATCH_POINT_RULE
+        : DEFAULT_PUBG_POINT_RULE);
     if (!isValidPointRule(pointRule)) {
       throw new BadRequestException("포인트 규칙표가 올바르지 않습니다.");
     }
@@ -212,7 +224,13 @@ export class ScrimService {
           teamName: teamById.get(row.teamId)?.name ?? "삭제된 팀",
           placement: row.placement,
           kills: row.kills,
-          points: calculateScrimPoints(row.placement, row.kills, rule),
+          deaths: row.deaths ?? 0,
+          points: calculateScrimPoints(
+            row.placement,
+            row.kills,
+            rule,
+            row.deaths ?? 0,
+          ),
         })),
       });
       await tx.scrimRound.update({
@@ -280,7 +298,7 @@ export class ScrimService {
 
     const results = await this.prisma.scrimTeamResult.findMany({
       where: { round: { scrimId: scrim.id } },
-      select: { id: true, placement: true, kills: true },
+      select: { id: true, placement: true, kills: true, deaths: true },
     });
 
     await this.prisma.$transaction([
@@ -292,7 +310,12 @@ export class ScrimService {
         this.prisma.scrimTeamResult.update({
           where: { id: row.id },
           data: {
-            points: calculateScrimPoints(row.placement, row.kills, rule),
+            points: calculateScrimPoints(
+              row.placement,
+              row.kills,
+              rule,
+              row.deaths,
+            ),
           },
         }),
       ),
@@ -361,6 +384,7 @@ export class ScrimService {
           teamName: string;
           placement: number;
           kills: number;
+          deaths: number;
           points: number;
         }[];
       }[];
@@ -378,6 +402,7 @@ export class ScrimService {
         roundPoints: Array(roundCount).fill(null),
         totalPoints: 0,
         totalKills: 0,
+        totalDeaths: 0,
         placementSum: 0,
         bestPlacement: null,
         wins: 0,
@@ -396,6 +421,7 @@ export class ScrimService {
             roundPoints: Array(roundCount).fill(null),
             totalPoints: 0,
             totalKills: 0,
+            totalDeaths: 0,
             placementSum: 0,
             bestPlacement: null,
             wins: 0,
@@ -405,6 +431,7 @@ export class ScrimService {
         row.roundPoints[index] = result.points;
         row.totalPoints += result.points;
         row.totalKills += result.kills;
+        row.totalDeaths += result.deaths;
         row.placementSum += result.placement;
         row.bestPlacement =
           row.bestPlacement === null

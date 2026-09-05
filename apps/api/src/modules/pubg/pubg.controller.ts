@@ -16,11 +16,9 @@ import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import {
   LookupPubgPlayerDto,
   RegisterPubgAccountDto,
-  ReportKillMatchDto,
   UpdatePubgScoreDto,
 } from "./dto";
 import { PubgService } from "./pubg.service";
-import { PubgKillMatchService } from "./pubg-kill-match.service";
 import { PubgHistoryService } from "./pubg-history.service";
 
 @Controller("pubg")
@@ -28,7 +26,6 @@ import { PubgHistoryService } from "./pubg-history.service";
 export class PubgController {
   constructor(
     private readonly pubgService: PubgService,
-    private readonly killMatchService: PubgKillMatchService,
     private readonly historyService: PubgHistoryService,
   ) {}
 
@@ -77,21 +74,6 @@ export class PubgController {
   @Get("history/:userId")
   getUserHistory(@Param("userId") userId: string) {
     return this.historyService.getUserHistory(userId);
-  }
-
-  /** 킬내기 결과 — 승패는 기존 2팀 흐름을 쓰고 킬 수만 얹는다. */
-  @Get("matches/:matchId/kills")
-  getKillMatchResult(@Param("matchId") matchId: string) {
-    return this.killMatchService.getKillMatchResult(matchId);
-  }
-
-  @Post("matches/:matchId/kills")
-  reportKillMatch(
-    @CurrentUser("sub") userId: string,
-    @Param("matchId") matchId: string,
-    @Body() dto: ReportKillMatchDto,
-  ) {
-    return this.killMatchService.reportKills(userId, matchId, dto);
   }
 
   /** 공식 PUBG 랭크 스냅샷 갱신. NEXUS 편성 등급과 다른 값이다. */

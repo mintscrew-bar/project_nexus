@@ -366,6 +366,13 @@ export interface PubgMatchTeamResult {
   placement: number;
   /** 팀 합산 킬 */
   kills: number;
+  /**
+   * 죽은 팀원 수.
+   *
+   * `deathType` 이 `alive` 가 아닌 인원을 센다. 킬내기는 사망이 감점이라
+   * 이 값이 점수에 직접 들어간다.
+   */
+  deaths: number;
   /** 실제 참가자 닉네임. 로스터 인원이 팀 정원과 다를 수 있다(Task 1 주의). */
   playerNames: string[];
 }
@@ -393,7 +400,13 @@ interface PubgMatchResponse {
     id: string;
     type: string;
     attributes?: {
-      stats?: { rank?: number; name?: string; kills?: number };
+      stats?: {
+        rank?: number;
+        name?: string;
+        kills?: number;
+        /** `alive` 면 생존, 그 외("byplayer"·"suicide"·"logout")는 사망 */
+        deathType?: string;
+      };
     };
     relationships?: { participants?: { data?: { id: string }[] } };
   }[];
@@ -425,6 +438,10 @@ function parseMatch(body: PubgMatchResponse): PubgMatchDetail {
         placement: roster.attributes?.stats?.rank ?? 0,
         // 로스터 인원수를 가정하지 않는다. 3인 로스터도 관측됐다(Task 1).
         kills: members.reduce((sum, s) => sum + (s.kills ?? 0), 0),
+        // `deathType` 이 없으면 판단할 수 없으므로 사망으로 세지 않는다.
+        // 없는 정보를 감점으로 바꾸면 점수가 조용히 깎인다.
+        deaths: members.filter((s) => s.deathType && s.deathType !== "alive")
+          .length,
         playerNames: members.map((s) => s.name ?? "").filter(Boolean),
       };
     })

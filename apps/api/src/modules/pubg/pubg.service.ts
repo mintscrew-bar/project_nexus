@@ -239,9 +239,10 @@ export class PubgService {
     if (isManual && !options?.force) return null;
 
     const history = await this.history.getUserHistory(account.userId, 50);
+    // 편성 점수는 배틀로얄 성적으로 낸다. 킬내기는 항상 2팀이라 순위가
+    // 사실상 승/패이고, 그걸 16팀 스크림의 순위와 같은 눈금에 올릴 수 없다.
     const scrims = history.items.filter(
-      (item): item is Extract<typeof item, { kind: "SCRIM" }> =>
-        item.kind === "SCRIM",
+      (item) => item.mode === "BATTLE_ROYALE",
     );
     const roundsPlayed = scrims.reduce((sum, item) => sum + item.rounds, 0);
     const averageTeamCount =

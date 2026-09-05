@@ -12,6 +12,7 @@ import {
   identifyRoundMatch,
   isValidPointRule,
   DEFAULT_PUBG_POINT_RULE,
+  isSplitSquadTeam,
   type MatchCandidate,
   type PubgPointRule,
 } from "@nexus/types";
@@ -218,32 +219,53 @@ export class ScrimCollectorService {
       }
     }
 
-    const used = new Set<string>();
-    const rows: {
-      teamId: string;
-      teamName: string;
-      placement: number;
-      kills: number;
-    }[] = [];
+    // 깐부킬내기(7대7~8대8)는 한 팀이 인게임 스쿼드 두 개로 갈라져 들어간다.
+    // 로스터 하나당 팀 하나로 못 박으면 우리 팀의 절반이 통째로 빠진다.
+    const splitSquad = isSplitSquadTeam({
+      gameTitle: "PUBG",
+      pubgGameMode: room.pubgGameMode,
+      maxParticipants: room.maxParticipants,
+    });
+
+    const merged = new Map<
+      string,
+      { placement: number; kills: number; deaths: number }
+    >();
 
     for (const roster of detail.teams) {
       const votes = new Map<string, number>();
       for (const name of roster.playerNames) {
         const teamId = nameToTeam.get(name.trim().toLowerCase());
-        if (!teamId || used.has(teamId)) continue;
+        if (!teamId) continue;
+        // 갈라지지 않는 구성에서는 한 팀이 로스터 두 개를 가질 수 없다.
+        if (!splitSquad && merged.has(teamId)) continue;
         votes.set(teamId, (votes.get(teamId) ?? 0) + 1);
       }
       const winner = [...votes.entries()].sort((a, b) => b[1] - a[1])[0];
       if (!winner) continue;
-      used.add(winner[0]);
-      rows.push({
-        teamId: winner[0],
-        teamName:
-          room.teams.find((team) => team.id === winner[0])?.name ?? "삭제된 팀",
-        placement: roster.placement,
-        kills: roster.kills,
-      });
+
+      const current = merged.get(winner[0]);
+      if (!current) {
+        merged.set(winner[0], {
+          placement: roster.placement,
+          kills: roster.kills,
+          deaths: roster.deaths,
+        });
+        continue;
+      }
+      // 같은 팀의 두 스쿼드를 합친다. 순위는 더 좋은 쪽(작은 수)을 팀 순위로 본다 —
+      // 한 스쿼드가 먼저 죽었다고 팀 전체가 그 등수인 건 아니다.
+      current.placement = Math.min(current.placement, roster.placement);
+      current.kills += roster.kills;
+      current.deaths += roster.deaths;
     }
+
+    const rows = [...merged.entries()].map(([teamId, stat]) => ({
+      teamId,
+      teamName:
+        room.teams.find((team) => team.id === teamId)?.name ?? "삭제된 팀",
+      ...stat,
+    }));
 
     if (rows.length < 2) {
       // 우리 팀을 두 개도 못 붙였으면 남의 판일 가능성이 높다.
@@ -266,7 +288,13 @@ export class ScrimCollectorService {
           teamName: row.teamName,
           placement: row.placement,
           kills: row.kills,
-          points: calculateScrimPoints(row.placement, row.kills, rule),
+          deaths: row.deaths,
+          points: calculateScrimPoints(
+            row.placement,
+            row.kills,
+            rule,
+            row.deaths,
+          ),
         })),
       });
       await tx.scrimRound.update({

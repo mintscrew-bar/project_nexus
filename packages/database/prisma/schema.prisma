@@ -78,7 +78,6 @@ model User {
   posts                          Post[]
   riotAccounts                   RiotAccount[]
   pubgAccounts                   PubgAccount[]
-  pubgMatchPlayerKills           PubgMatchPlayerKills[]
   roomParticipations             RoomParticipant[]
   hostedRooms                    Room[]                @relation("RoomHost")
   sessions                       Session[]
@@ -632,8 +631,6 @@ model Team {
   roomParticipants  RoomParticipant[]
   snakeDraftPicks   SnakeDraftPick[]
   scrimResults      ScrimTeamResult[]
-  pubgTeamKills     PubgMatchTeamKills[]
-  pubgPlayerKills   PubgMatchPlayerKills[]
   members           TeamMember[]
   captain           User               @relation("TeamCaptain", fields: [captainId], references: [id])
   room              Room               @relation(fields: [roomId], references: [id], onDelete: Cascade)
@@ -797,9 +794,6 @@ model Match {
   rosterSnapshots      MatchRosterSnapshot[]
   draftSnapshots       MatchDraftSnapshot[]
   teamStats            MatchTeamStats[]
-  // 배그 킬내기 결과. 롤 전용 필드로 가득한 MatchTeamStats/MatchParticipant 대신 따로 둔다.
-  pubgTeamKills        PubgMatchTeamKills[]
-  pubgPlayerKills      PubgMatchPlayerKills[]
   votes                MatchVote[]
   // 시리즈는 대진 진행용 스캐폴딩이라 방과 함께 지워지지만, 매치(전적)는 남아야 한다.
   // Cascade로 두면 방 삭제 시 시리즈를 타고 완료된 경기까지 지워진다.
@@ -2030,6 +2024,8 @@ model ScrimTeamResult {
   /// 순위 (1이 우승)
   placement Int
   kills     Int        @default(0)
+  /// 이 라운드에서 죽은 팀원 수. 킬내기는 사망이 감점이라 점수에 들어간다.
+  deaths    Int        @default(0)
   /// 규칙표로 환산한 포인트. 규칙이 바뀌면 다시 계산해 덮어쓴다.
   points    Int        @default(0)
   createdAt DateTime   @default(now())
@@ -2044,45 +2040,9 @@ model ScrimTeamResult {
 
 /// 배그 킬내기 팀별 총 킬.
 ///
-/// `MatchTeamStats` 는 타워·바론·용처럼 롤 전용 필드로 채워져 있어 재사용할 수 없다.
-/// 킬내기는 2팀 승패 흐름(Match)을 그대로 쓰고 킬 수만 여기에 따로 붙인다.
-model PubgMatchTeamKills {
-  id        String   @id @default(cuid())
-  matchId   String
-  teamId    String?
-  /// 기록 시점의 팀 이름. 팀이 사라져도 전적을 읽을 수 있어야 한다.
-  teamName  String
-  kills     Int      @default(0)
-  createdAt DateTime @default(now())
-  match     Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
-  team      Team?    @relation(fields: [teamId], references: [id], onDelete: SetNull)
-
-  @@unique([matchId, teamId])
-  @@index([matchId])
-  @@map("pubg_match_team_kills")
-}
 
 /// 배그 킬내기 개인 킬.
 ///
-/// `MatchParticipant` 는 championId·position·소환사 주문이 전부 필수라
-/// 배그 기록을 넣으려면 의미 없는 값으로 채워야 한다. 따로 둔다.
-model PubgMatchPlayerKills {
-  id        String   @id @default(cuid())
-  matchId   String
-  userId    String?
-  /// 기록 시점의 사용자명. 탈퇴해도 전적에 이름이 남아야 한다.
-  username  String
-  teamId    String?
-  kills     Int      @default(0)
-  createdAt DateTime @default(now())
-  match     Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
-  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
-  team      Team?    @relation(fields: [teamId], references: [id], onDelete: SetNull)
-
-  @@unique([matchId, userId])
-  @@index([matchId])
-  @@map("pubg_match_player_kills")
-}
 
 
 /// 편성 등급이 바뀐 기록.

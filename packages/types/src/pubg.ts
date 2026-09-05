@@ -6,7 +6,12 @@
  * 팀 구성은 참가자를 팀에 넣는 방법(경매·스네이크·수동)이다.
  */
 
-import type { GameTeamMode } from "./games";
+import {
+  DEFAULT_GAME,
+  GAMES,
+  type GameTeamMode,
+  type GameTitle,
+} from "./games";
 
 /** 배그를 어느 플랫폼에서 하는가. Prisma `PubgPlatform` 과 값이 일치해야 한다. */
 export type PubgPlatform = "STEAM" | "KAKAO";
@@ -68,9 +73,12 @@ const MODE_DEFINITIONS: Record<PubgGameMode, PubgGameModeDefinition> = {
   KILL_MATCH: {
     mode: "KILL_MATCH",
     label: "킬내기",
-    description: "두 팀이 붙어 킬 수 또는 승패로 가립니다. 4대4 기준입니다.",
-    roomSizes: [8],
-    resultShape: "BRACKET",
+    description:
+      "두 팀이 같은 판에 들어가 대도시에서 싸웁니다. 킬 +1 · 사망 −3 · 치킨 +8 로 라운드마다 누적합니다.",
+    // 항상 2팀이라 정원이 곧 팀 인원 × 2다.
+    // 6·8 은 한 스쿼드(3대3·4대4), 14·16 은 두 스쿼드가 한 팀인 깐부킬내기다.
+    roomSizes: [6, 8, 14, 16],
+    resultShape: "POINT_LEADERBOARD",
     teamModes: ["AUCTION", "SNAKE_DRAFT", "AUTO_BALANCE", "MANUAL_TEAM"],
   },
   FREE_MATCH: {
@@ -124,4 +132,76 @@ export function stripPubgTitlePrefix(title: string): string {
   const shorts = PUBG_PLATFORMS.map((p) => PUBG_PLATFORM_LABELS[p].short);
   const pattern = new RegExp(`^\\[(?:${shorts.join("|")})\\]\\s*`);
   return title.replace(pattern, "");
+}
+
+
+/** 팀 인원·팀 수를 정하는 데 필요한 방 정보 */
+export interface RoomTeamShape {
+  /** 없으면 기본 게임으로 본다 — 게임 축이 생기기 전 데이터가 남아 있다. */
+  gameTitle?: GameTitle | null;
+  pubgGameMode?: PubgGameMode | null;
+  maxParticipants?: number | null;
+}
+
+/**
+ * 이 방의 한 팀 인원.
+ *
+ * 배그는 보통 인게임 스쿼드 정원(4인)이 곧 팀 인원이지만, **킬내기는 다르다.**
+ * 항상 두 팀이 붙는 형식이라 팀 인원이 정원을 반으로 나눈 값이다 —
+ * 3대3부터 8대8(깐부킬내기, 한 팀이 인게임 2스쿼드)까지 간다.
+ */
+export function teamSizeForRoom(room: RoomTeamShape): number {
+  if (isKillMatch(room)) {
+    return Math.max(1, Math.floor((room.maxParticipants ?? 0) / 2));
+  }
+  return GAMES[room.gameTitle ?? DEFAULT_GAME].teamSize;
+}
+
+/**
+ * 정원 기준 팀 수.
+ *
+ * 방 설정·수동 팀 슬롯·디스코드 음성채널처럼 "이 방은 몇 팀짜리인가"를
+ * 묻는 자리에서 쓴다.
+ */
+export function teamCountForRoom(room: RoomTeamShape): number {
+  // 킬내기는 정원과 무관하게 두 팀이다.
+  if (isKillMatch(room)) return 2;
+  return Math.floor(
+    (room.maxParticipants ?? 0) / GAMES[room.gameTitle ?? DEFAULT_GAME].teamSize,
+  );
+}
+
+/**
+ * 실제 참가 인원 기준 팀 수.
+ *
+ * 경매·스네이크는 정원이 덜 찬 상태에서도 돌릴 수 있어야 해서 지금 있는
+ * 사람 수로 나눈다. 정원으로 나누면 빈 팀이 생긴다.
+ * 킬내기만은 인원과 무관하게 두 팀이다 — 인원에 따라 3팀·4팀으로 늘어나면
+ * 킬내기가 아니게 된다.
+ */
+export function teamCountForRoster(
+  room: RoomTeamShape,
+  participantCount: number,
+): number {
+  if (isKillMatch(room)) return 2;
+  return Math.max(
+    2,
+    Math.floor(
+      participantCount / GAMES[room.gameTitle ?? DEFAULT_GAME].teamSize,
+    ),
+  );
+}
+
+function isKillMatch(room: RoomTeamShape): boolean {
+  return room.gameTitle === "PUBG" && room.pubgGameMode === "KILL_MATCH";
+}
+
+/**
+ * 깐부킬내기인가 — 한 팀이 인게임 스쿼드 하나에 안 들어가는 구성.
+ *
+ * 인게임에서는 한 팀이 두 스쿼드로 갈라져 들어가므로, 결과 수집이 로스터
+ * 두 개를 같은 Nexus 팀에 붙여야 한다.
+ */
+export function isSplitSquadTeam(room: RoomTeamShape): boolean {
+  return isKillMatch(room) && teamSizeForRoom(room) > GAMES.PUBG.teamSize;
 }

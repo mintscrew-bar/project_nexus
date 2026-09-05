@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { Crosshair, Layers, Trophy } from "lucide-react";
-import { PUBG_PLATFORM_LABELS } from "@nexus/types";
+import { Crosshair, Skull, Trophy } from "lucide-react";
+import { PUBG_PLATFORM_LABELS, getPubgGameMode } from "@nexus/types";
 import type { PubgHistoryResponse } from "@/lib/api-client";
 import { Badge, Card, CardContent, EmptyState } from "@/components/ui";
 import { roomPath } from "@/lib/room-links";
@@ -16,8 +16,9 @@ function formatDate(value: string | null) {
 /**
  * 배그 전적.
  *
- * 롤과 달리 승률이 중심이 아니다. 배틀로얄은 여러 팀이 붙어 순위·킬로 점수를
- * 매기고, 킬내기만 승패가 있다. 두 종류를 시간순으로 섞어 보여준다.
+ * 배틀로얄과 킬내기가 같은 스크림 모델을 쓴다 — 둘 다 라운드를 반복하며
+ * 포인트를 누적한다. 갈리는 건 팀 수(킬내기는 2팀)와 점수 규칙뿐이라
+ * 카드 모양도 하나로 둔다.
  */
 export function PubgMatchHistory({
   history,
@@ -31,7 +32,7 @@ export function PubgMatchHistory({
       <EmptyState
         icon={Trophy}
         title="배그 내전 기록이 없습니다"
-        description="스크림이나 킬내기에 참가하면 여기에 기록이 쌓입니다."
+        description="배틀로얄 스크림이나 킬내기에 참가하면 여기에 기록이 쌓입니다."
       />
     );
   }
@@ -40,9 +41,9 @@ export function PubgMatchHistory({
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <SummaryTile
-          label="스크림"
+          label="배틀로얄"
           value={`${summary.scrimCount}회`}
-          hint={`${summary.killMatchCount}회 킬내기`}
+          hint={`킬내기 ${summary.killMatchCount}회`}
         />
         <SummaryTile
           label="평균 순위"
@@ -52,7 +53,7 @@ export function PubgMatchHistory({
               ? "–"
               : `${summary.averageScrimRank}위`
           }
-          hint={`${summary.scrimCount}회 기준`}
+          hint={`배틀로얄 ${summary.scrimCount}회 기준`}
         />
         <SummaryTile
           label="라운드당 팀 킬"
@@ -61,7 +62,7 @@ export function PubgMatchHistory({
               ? "–"
               : `${summary.averageKillsPerRound}`
           }
-          hint="스크림 기준"
+          hint="두 모드 합산"
         />
         <SummaryTile
           label="킬내기 승"
@@ -71,13 +72,13 @@ export function PubgMatchHistory({
       </div>
 
       <div className="space-y-2">
-        {items.map((item) =>
-          item.kind === "SCRIM" ? (
-            <Card key={`scrim-${item.roomId}`}>
+        {items.map((item) => {
+          const isKillMatch = item.mode === "KILL_MATCH";
+          return (
+            <Card key={`${item.roomId}-${item.teamName}`}>
               <CardContent className="flex flex-wrap items-center justify-between gap-3 py-4">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <Layers className="h-4 w-4 flex-shrink-0 text-accent-primary" />
                     <Link
                       href={roomPath(
                         { id: item.roomId, gameTitle: "PUBG" },
@@ -87,6 +88,9 @@ export function PubgMatchHistory({
                     >
                       {item.roomName}
                     </Link>
+                    <Badge variant="secondary">
+                      {getPubgGameMode(item.mode).label}
+                    </Badge>
                     {item.pubgPlatform && (
                       <Badge variant="secondary">
                         {PUBG_PLATFORM_LABELS[item.pubgPlatform].short}
@@ -103,54 +107,33 @@ export function PubgMatchHistory({
                     <Crosshair className="mr-1 inline h-3.5 w-3.5" />
                     {item.totalKills}
                   </span>
+                  {/* 사망은 킬내기에서만 점수에 들어간다. 배틀로얄에서는 숨긴다. */}
+                  {isKillMatch && (
+                    <span className="text-text-tertiary">
+                      <Skull className="mr-1 inline h-3.5 w-3.5" />
+                      {item.totalDeaths}
+                    </span>
+                  )}
                   <span className="font-black text-text-primary">
                     {item.totalPoints}점
                   </span>
-                  <Badge variant={item.finalRank === 1 ? "primary" : "secondary"}>
+                  <Badge
+                    variant={item.finalRank === 1 ? "primary" : "secondary"}
+                  >
                     {item.finalRank === null
                       ? "기록 없음"
-                      : `${item.finalRank}/${item.totalTeams}위`}
+                      : isKillMatch
+                        ? // 두 팀뿐이라 순위보다 승패로 읽는 게 자연스럽다.
+                          item.finalRank === 1
+                          ? "승"
+                          : "패"
+                        : `${item.finalRank}/${item.totalTeams}위`}
                   </Badge>
                 </div>
               </CardContent>
             </Card>
-          ) : (
-            <Card key={`kill-${item.matchId}`}>
-              <CardContent className="flex flex-wrap items-center justify-between gap-3 py-4">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <Crosshair className="h-4 w-4 flex-shrink-0 text-accent-primary" />
-                    <span className="truncate font-semibold text-text-primary">
-                      {item.teamName} vs {item.opponentName}
-                    </span>
-                    {item.pubgPlatform && (
-                      <Badge variant="secondary">
-                        {PUBG_PLATFORM_LABELS[item.pubgPlatform].short}
-                      </Badge>
-                    )}
-                  </div>
-                  <p className="mt-1 text-xs text-text-tertiary">
-                    {item.roomName} · 킬내기 · {formatDate(item.completedAt)}
-                  </p>
-                </div>
-                <div className="flex items-center gap-4 text-sm">
-                  <span className="text-text-secondary">
-                    {item.teamKills} : {item.opponentKills}
-                  </span>
-                  {/* 개인 킬은 선택 입력이라 안 넣었으면 아예 안 보여준다. */}
-                  {item.playerKills !== null && (
-                    <span className="text-text-tertiary">
-                      내 킬 {item.playerKills}
-                    </span>
-                  )}
-                  <Badge variant={item.win ? "primary" : "secondary"}>
-                    {item.win ? "승" : "패"}
-                  </Badge>
-                </div>
-              </CardContent>
-            </Card>
-          ),
-        )}
+          );
+        })}
       </div>
     </div>
   );

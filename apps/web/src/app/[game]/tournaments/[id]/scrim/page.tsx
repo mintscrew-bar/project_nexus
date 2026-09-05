@@ -9,6 +9,7 @@ import {
   Flag,
   ListOrdered,
   Play,
+  Skull,
   Trophy,
 } from "lucide-react";
 import {
@@ -47,6 +48,7 @@ type ScrimRound = {
     teamName: string;
     placement: number;
     kills: number;
+    deaths: number;
     points: number;
   }[];
 };
@@ -248,15 +250,20 @@ export default function ScrimPage() {
         <header className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <p className="text-sm font-semibold text-accent-primary">
-              배틀로얄 스크림
+              {room?.pubgGameMode === "KILL_MATCH"
+                ? "킬내기"
+                : "배틀로얄 스크림"}
             </p>
             <h1 className="mt-1 text-2xl font-bold text-text-primary">
               {room?.name ?? "스크림"}
             </h1>
             <p className="mt-1 text-sm text-text-secondary">
-              {completedRounds}/{scrim.totalRounds} 라운드 완료 · 순위 1위{" "}
+              {completedRounds}/{scrim.totalRounds} 라운드 완료 ·{" "}
+              {room?.pubgGameMode === "KILL_MATCH" ? "치킨" : "1위"}{" "}
               {scrim.pointRule.placementPoints[0] ?? 0}점 · 킬{" "}
               {scrim.pointRule.killPoints}점
+              {(scrim.pointRule.deathPoints ?? 0) !== 0 &&
+                ` · 사망 ${scrim.pointRule.deathPoints}점`}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -388,8 +395,8 @@ function ScrimSetup({
         <header>
           <h1 className="text-2xl font-bold text-text-primary">스크림 설정</h1>
           <p className="mt-2 text-sm text-text-secondary">
-            라운드를 반복하며 순위·킬 포인트를 누적합니다. 규칙은 시작한 뒤에도
-            고칠 수 있고, 이미 입력한 결과의 점수도 함께 다시 계산됩니다.
+            라운드를 반복하며 포인트를 누적합니다. 규칙은 시작한 뒤에도 고칠 수
+            있고, 이미 입력한 결과의 점수도 함께 다시 계산됩니다.
           </p>
         </header>
 
@@ -623,6 +630,12 @@ function RoundRow({
               <span className="flex items-center gap-2 text-text-secondary">
                 <Crosshair className="h-3 w-3" />
                 {result.kills}
+                {result.deaths > 0 && (
+                  <span className="text-text-tertiary">
+                    <Skull className="mr-0.5 inline h-3 w-3" />
+                    {result.deaths}
+                  </span>
+                )}
                 <span className="font-bold text-accent-primary">
                   {result.points}점
                 </span>
@@ -666,7 +679,12 @@ function RoundResultForm({
   roundNumber: number;
   teams: { id: string; name: string }[];
   pointRule: PubgPointRule;
-  existing: { teamId: string | null; placement: number; kills: number }[];
+  existing: {
+    teamId: string | null;
+    placement: number;
+    kills: number;
+    deaths: number;
+  }[];
   existingMatchId: string | null;
   onSubmitted: () => void;
 }) {
@@ -680,10 +698,14 @@ function RoundResultForm({
         teamName: team.name,
         placement: prev?.placement ?? index + 1,
         kills: prev?.kills ?? 0,
+        deaths: prev?.deaths ?? 0,
       };
     }),
   );
   const [saving, setSaving] = useState(false);
+
+  // 사망 감점이 있는 규칙(킬내기)에서만 사망 칸을 띄운다.
+  const tracksDeaths = (pointRule.deathPoints ?? 0) !== 0;
 
   const duplicatePlacements = useMemo(() => {
     const seen = new Set<number>();
@@ -708,6 +730,7 @@ function RoundResultForm({
           teamId: row.teamId,
           placement: row.placement,
           kills: row.kills,
+          deaths: row.deaths,
         })),
       });
       addToast(`${roundNumber} 라운드 결과를 저장했습니다.`, "success");
@@ -735,11 +758,29 @@ function RoundResultForm({
         />
       </label>
 
+      <div
+        className={
+          tracksDeaths
+            ? "grid grid-cols-[1fr_4.5rem_4.5rem_4.5rem_3.5rem] gap-2 px-1 text-[11px] text-text-tertiary"
+            : "grid grid-cols-[1fr_5rem_5rem_3.5rem] gap-2 px-1 text-[11px] text-text-tertiary"
+        }
+      >
+        <span>팀</span>
+        <span className="text-center">순위</span>
+        <span className="text-center">킬</span>
+        {tracksDeaths && <span className="text-center">사망</span>}
+        <span className="text-right">점수</span>
+      </div>
+
       <div className="space-y-1.5">
         {rows.map((row, index) => (
           <div
             key={row.teamId}
-            className="grid grid-cols-[1fr_5rem_5rem_3.5rem] items-center gap-2"
+            className={
+              tracksDeaths
+                ? "grid grid-cols-[1fr_4.5rem_4.5rem_4.5rem_3.5rem] items-center gap-2"
+                : "grid grid-cols-[1fr_5rem_5rem_3.5rem] items-center gap-2"
+            }
           >
             <span className="truncate text-sm text-text-primary">
               {row.teamName}
@@ -782,8 +823,36 @@ function RoundResultForm({
               className="input text-center"
               aria-label={`${row.teamName} 킬`}
             />
+            {/* 사망은 감점 규칙이 있을 때만 받는다 — 배틀로얄엔 없는 개념이다. */}
+            {tracksDeaths && (
+              <input
+                type="number"
+                min={0}
+                max={100}
+                value={row.deaths}
+                onChange={(e) =>
+                  setRows((current) =>
+                    current.map((r, i) =>
+                      i === index
+                        ? {
+                            ...r,
+                            deaths: Math.max(0, Number(e.target.value) || 0),
+                          }
+                        : r,
+                    ),
+                  )
+                }
+                className="input text-center"
+                aria-label={`${row.teamName} 사망`}
+              />
+            )}
             <span className="text-right text-sm font-bold text-accent-primary">
-              {calculateScrimPoints(row.placement, row.kills, pointRule)}
+              {calculateScrimPoints(
+                row.placement,
+                row.kills,
+                pointRule,
+                row.deaths,
+              )}
             </span>
           </div>
         ))}

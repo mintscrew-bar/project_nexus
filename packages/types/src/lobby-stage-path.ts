@@ -26,7 +26,12 @@ export function afterTeamsPath(room: StageRoom, gamePrefix: string): string {
   if (GAMES[room.gameTitle ?? DEFAULT_GAME].hasPositions) {
     return `${gamePrefix}/role-selection/${room.id}`;
   }
-  if (room.pubgGameMode === "BATTLE_ROYALE") {
+  // 배틀로얄과 킬내기는 둘 다 라운드를 반복하며 포인트를 누적한다.
+  // 자유 매치만 결과를 남기지 않아 대진표로 간다.
+  if (
+    room.pubgGameMode === "BATTLE_ROYALE" ||
+    room.pubgGameMode === "KILL_MATCH"
+  ) {
     return `${gamePrefix}/tournaments/${room.id}/scrim`;
   }
   return `${gamePrefix}/tournaments/${room.id}/bracket`;
@@ -49,7 +54,8 @@ export function getRoomStagePath(
   gamePrefix: string,
 ): string | null {
   if (room.status === "IN_PROGRESS") {
-    return room.pubgGameMode === "BATTLE_ROYALE"
+    return room.pubgGameMode === "BATTLE_ROYALE" ||
+      room.pubgGameMode === "KILL_MATCH"
       ? `${gamePrefix}/tournaments/${room.id}/scrim`
       : `${gamePrefix}/tournaments/${room.id}/bracket`;
   }

@@ -1,4 +1,4 @@
-import { GAMES, type GameTitle } from "@nexus/types";
+import { GAMES, getPubgGameMode, type GameTitle } from "@nexus/types";
 
 /** 방 정원 선택지 한 칸 */
 export interface RoomSizeOption {
@@ -75,6 +75,27 @@ function generatedOptions(game: GameTitle): RoomSizeOption[] {
       description: `${teams}팀 · ${def.teamSize}인 스쿼드`,
       teams,
       format: "순위·킬 리더보드",
+      supportsDE: false,
+    };
+  });
+}
+
+/**
+ * 킬내기 정원 선택지.
+ *
+ * 항상 두 팀이라 정원이 곧 팀 인원 × 2다. 14·16 은 한 팀이 인게임 스쿼드
+ * 두 개로 갈라지는 깐부킬내기다.
+ */
+export function killMatchSizeOptions(): RoomSizeOption[] {
+  return getPubgGameMode("KILL_MATCH").roomSizes.map((value) => {
+    const perTeam = value / 2;
+    const kkanbu = perTeam > GAMES.PUBG.teamSize;
+    return {
+      value,
+      label: `${value}명`,
+      description: `${perTeam}대${perTeam}${kkanbu ? " (깐부)" : ""}`,
+      teams: 2,
+      format: kkanbu ? "두 스쿼드가 한 팀" : "킬 · 사망 · 치킨 누적",
       supportsDE: false,
     };
   });

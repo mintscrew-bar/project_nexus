@@ -27,7 +27,7 @@ import * as bcrypt from "bcrypt";
 import { randomInt } from "crypto";
 import {
   normalizeSeriesPreset,
-  teamCountForRoomSize,
+  teamCountForRoom,
   isValidRoomSize,
   getGame,
   getPubgGameMode,
@@ -204,8 +204,14 @@ export class RoomService {
     hostId: string,
     maxParticipants: number,
     gameTitle: GameTitleValue = GameTitle.LOL,
+    pubgGameMode: PubgGameMode | null = null,
   ) {
-    const numTeams = teamCountForRoomSize(maxParticipants, gameTitle);
+    // 킬내기는 정원과 무관하게 2팀이라 게임 기본 팀 인원으로 나누면 안 된다.
+    const numTeams = teamCountForRoom({
+      gameTitle,
+      pubgGameMode,
+      maxParticipants,
+    });
     for (let index = 0; index < numTeams; index++) {
       await tx.team.create({
         data: {
@@ -1124,7 +1130,11 @@ export class RoomService {
             // 팀 수에 맞지 않는 프리셋은 단판으로 떨어뜨린다.
             seriesPreset: normalizeSeriesPreset(
               dto.seriesPreset,
-              teamCountForRoomSize(dto.maxParticipants, gameTitle),
+              teamCountForRoom({
+                gameTitle,
+                pubgGameMode,
+                maxParticipants: dto.maxParticipants,
+              }),
             ),
 
             participants: {
@@ -1166,6 +1176,7 @@ export class RoomService {
             hostId,
             dto.maxParticipants,
             gameTitle,
+            pubgGameMode,
           );
         }
 
@@ -1180,7 +1191,11 @@ export class RoomService {
     let lobbyVoiceChannelId: string | undefined;
     try {
       if (this.discordVoiceService && !scheduledAt) {
-        const numTeams = teamCountForRoomSize(dto.maxParticipants, gameTitle);
+        const numTeams = teamCountForRoom({
+          gameTitle,
+          pubgGameMode,
+          maxParticipants: dto.maxParticipants,
+        });
 
         // 카테고리 + 내전 대기실 + 팀별 음성채널 생성
         const channelData = await this.discordVoiceService.createRoomChannels(
@@ -2357,7 +2372,11 @@ export class RoomService {
     ) {
       data.seriesPreset = normalizeSeriesPreset(
         updates.seriesPreset ?? room.seriesPreset,
-        teamCountForRoomSize(nextMaxParticipants, room.gameTitle),
+        teamCountForRoom({
+          gameTitle: room.gameTitle,
+          pubgGameMode: room.pubgGameMode,
+          maxParticipants: nextMaxParticipants,
+        }),
       );
     }
 
@@ -2384,6 +2403,7 @@ export class RoomService {
             room.hostId,
             updates.maxParticipants ?? room.maxParticipants,
             room.gameTitle,
+            room.pubgGameMode,
           );
         }
       });
@@ -2393,10 +2413,11 @@ export class RoomService {
     if (this.discordVoiceService) {
       // 인원 변경 → 팀 채널 수 조정
       if (updates.maxParticipants) {
-        const newNumTeams = teamCountForRoomSize(
-          updates.maxParticipants,
-          room.gameTitle,
-        );
+        const newNumTeams = teamCountForRoom({
+          gameTitle: room.gameTitle,
+          pubgGameMode: room.pubgGameMode,
+          maxParticipants: updates.maxParticipants,
+        });
         this.discordVoiceService
           .updateRoomChannels(roomId, newNumTeams)
           .catch((err: Error) =>
@@ -2667,10 +2688,11 @@ export class RoomService {
       );
     }
 
-    const teamCount = teamCountForRoomSize(
-      room.maxParticipants,
-      room.gameTitle,
-    );
+    const teamCount = teamCountForRoom({
+      gameTitle: room.gameTitle,
+      pubgGameMode: room.pubgGameMode,
+      maxParticipants: room.maxParticipants,
+    });
     const ranked = [...room.participants].sort(
       (a, b) =>
         (b.user.pubgAccounts[0]?.nexusScore ?? 0) -
@@ -2805,10 +2827,11 @@ export class RoomService {
       );
     }
 
-    const configuredTeamCount = teamCountForRoomSize(
-      room.maxParticipants,
-      room.gameTitle,
-    );
+    const configuredTeamCount = teamCountForRoom({
+      gameTitle: room.gameTitle,
+      pubgGameMode: room.pubgGameMode,
+      maxParticipants: room.maxParticipants,
+    });
     const teamCount = configuredTeamCount;
     // 밸런스 점수는 계정·전적이 바뀔 때 미리 계산해 둔다(BalanceScoreService).
     // 화면에 보이는 점수와 여기서 팀을 나눌 때 쓰는 점수가 같아야 하므로
@@ -3489,6 +3512,7 @@ export class RoomService {
           room.hostId,
           room.maxParticipants,
           room.gameTitle,
+          room.pubgGameMode,
         );
       }
 
@@ -3715,6 +3739,7 @@ export class RoomService {
           room.hostId,
           room.maxParticipants,
           room.gameTitle,
+          room.pubgGameMode,
         );
       }
 
@@ -3854,6 +3879,7 @@ export class RoomService {
           room.hostId,
           room.maxParticipants,
           room.gameTitle,
+          room.pubgGameMode,
         );
       }
 

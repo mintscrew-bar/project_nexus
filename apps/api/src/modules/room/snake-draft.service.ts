@@ -16,8 +16,8 @@ import {
 } from "../common/tier-score.util";
 import {
   minDraftParticipants,
-  teamCountForParticipants,
-  teamSizeForGame,
+  teamCountForRoster,
+  teamSizeForRoom,
 } from "@nexus/types";
 
 export interface SnakeDraftState {
@@ -94,9 +94,9 @@ export class SnakeDraftService {
         `Need at least ${minPlayers} players for draft`,
       );
     }
-    const numTeams = teamCountForParticipants(
+    const numTeams = teamCountForRoster(
+      { gameTitle: room.gameTitle, pubgGameMode: room.pubgGameMode },
       room.participants.length,
-      room.gameTitle,
     );
 
     const captains = await this.selectCaptains(
@@ -196,7 +196,11 @@ export class SnakeDraftService {
     const pickOrder = this.generatePickOrder(
       this.shuffle(teams.map((t: (typeof teams)[number]) => t.id)),
       numTeams,
-      teamSizeForGame(room.gameTitle),
+      teamSizeForRoom({
+        gameTitle: room.gameTitle,
+        pubgGameMode: room.pubgGameMode,
+        maxParticipants: room.maxParticipants,
+      }),
     );
 
     const draftState: SnakeDraftState = {

@@ -18,6 +18,7 @@ import {
   getGame,
   normalizeSeriesPreset,
   resolveSeriesBestOf,
+  teamSizeForRoom,
 } from "@nexus/types";
 import { randomInt } from "crypto";
 
@@ -68,8 +69,10 @@ export class MatchBracketService {
         hostId: true,
         status: true,
         teamMode: true,
-        // 팀 인원·역할 선택 유무가 게임마다 다르다
+        // 팀 인원·역할 선택 유무가 게임과 모드마다 다르다
         gameTitle: true,
+        pubgGameMode: true,
+        maxParticipants: true,
         bracketFormat: true,
         seriesPreset: true,
         teams: {
@@ -137,11 +140,17 @@ export class MatchBracketService {
 
     const teamCount = room.teams.length;
 
-    // 팀 정원은 게임마다 다르다 — 롤 5인, 배그 4인 스쿼드.
+    // 팀 정원은 게임과 모드마다 다르다 — 롤 5인, 배그 4인 스쿼드,
+    // 킬내기는 정원을 반으로 나눈 값(3대3~8대8).
+    const expectedTeamSize = teamSizeForRoom({
+      gameTitle: room.gameTitle ?? GameTitle.LOL,
+      pubgGameMode: room.pubgGameMode,
+      maxParticipants: room.maxParticipants,
+    });
     for (const team of room.teams) {
-      if (team.members.length !== game.teamSize) {
+      if (team.members.length !== expectedTeamSize) {
         throw new BadRequestException(
-          `${team.name} 팀 인원이 ${game.teamSize}명이 아닙니다.`,
+          `${team.name} 팀 인원이 ${expectedTeamSize}명이 아닙니다.`,
         );
       }
     }

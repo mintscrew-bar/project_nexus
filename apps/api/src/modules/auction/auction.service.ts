@@ -16,7 +16,7 @@ import {
   calculateCaptainScore,
   calculateTierScore,
 } from "../common/tier-score.util";
-import { teamCountForParticipants } from "@nexus/types";
+import { teamCountForRoster } from "@nexus/types";
 
 const BONUS_GOLD = 500;
 const DEFAULT_BID_TIME_SECONDS = 30;
@@ -400,9 +400,9 @@ export class AuctionService implements OnModuleInit {
         `Auction mode requires at least ${MIN_AUCTION_PLAYERS} players`,
       );
     }
-    const numTeams = teamCountForParticipants(
+    const numTeams = teamCountForRoster(
+      { gameTitle: room.gameTitle, pubgGameMode: room.pubgGameMode },
       room.participants.length,
-      room.gameTitle,
     );
 
     const captainMode = room.captainSelection ?? TeamCaptainSelection.TIER;
@@ -506,9 +506,9 @@ export class AuctionService implements OnModuleInit {
     roomId: string,
     room: any,
   ) {
-    const numTeams = teamCountForParticipants(
+    const numTeams = teamCountForRoster(
+      { gameTitle: room.gameTitle, pubgGameMode: room.pubgGameMode },
       room.participants.length,
-      room.gameTitle,
     );
 
     const sortedPlayers = this._sortAuctionParticipants(room.participants);
@@ -864,9 +864,9 @@ export class AuctionService implements OnModuleInit {
     if (room.hostId !== hostId)
       throw new ForbiddenException("Only host can select captains");
 
-    const numTeams = teamCountForParticipants(
+    const numTeams = teamCountForRoster(
+      { gameTitle: room.gameTitle, pubgGameMode: room.pubgGameMode },
       room.participants.length,
-      room.gameTitle,
     );
     if (userIds.length !== numTeams) {
       throw new BadRequestException(`Need exactly ${numTeams} captains`);

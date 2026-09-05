@@ -36,9 +36,16 @@ describe("팀 편성 이후 경로", () => {
     );
   });
 
-  it("킬내기는 2팀 승패라 대진표로", () => {
+  it("킬내기도 라운드 누적이라 스크림으로", () => {
+    // 킬 +1 · 사망 −3 · 치킨 +8 을 여러 판에 걸쳐 누적한다. 한 판 승패가 아니다.
     expect(
       afterTeamsPath(pubgRoom({ pubgGameMode: "KILL_MATCH" }), "/pubg"),
+    ).toBe("/pubg/tournaments/r1/scrim");
+  });
+
+  it("자유 매치만 결과를 남기지 않아 대진표로 간다", () => {
+    expect(
+      afterTeamsPath(pubgRoom({ pubgGameMode: "FREE_MATCH" }), "/pubg"),
     ).toBe("/pubg/tournaments/r1/bracket");
   });
 

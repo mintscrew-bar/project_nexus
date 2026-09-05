@@ -1,5 +1,6 @@
 import {
   DEFAULT_PUBG_POINT_RULE,
+  KILL_MATCH_POINT_RULE,
   KILL_ONLY_POINT_RULE,
   calculateScrimPoints,
   isValidPointRule,
@@ -60,6 +61,7 @@ describe("누적 리더보드 정렬", () => {
     roundPoints: [],
     totalPoints: 0,
     totalKills: 0,
+    totalDeaths: 0,
     placementSum: 0,
     bestPlacement: null,
     wins: 0,
@@ -106,5 +108,53 @@ describe("누적 리더보드 정렬", () => {
     ];
     sortScrimLeaderboard(rows);
     expect(rows.map((r) => r.teamName)).toEqual(["A", "B"]);
+  });
+});
+
+/**
+ * 킬내기 점수 규칙 (fmkorea 커뮤니티 규칙 기준).
+ *
+ * 배틀로얄과 달리 **사망이 감점**이다. 두 팀이 같은 판에 들어가 대도시에서
+ * 싸우는 형식이라, 많이 죽으면 킬을 벌어도 손해가 나야 규칙이 성립한다.
+ */
+describe("킬내기 점수", () => {
+  const rule = KILL_MATCH_POINT_RULE;
+
+  it("킬 +1 · 사망 −3 · 치킨 +8", () => {
+    // 치킨 + 10킬 + 2명 사망 = 8 + 10 − 6 = 12
+    expect(calculateScrimPoints(1, 10, rule, 2)).toBe(12);
+  });
+
+  it("2위는 순위 점수가 없다 — 두 팀뿐이라 순위표가 길 이유가 없다", () => {
+    expect(calculateScrimPoints(2, 5, rule, 1)).toBe(2); // 0 + 5 − 3
+  });
+
+  it("많이 죽으면 합계가 음수가 된다 — 0으로 자르지 않는다", () => {
+    // 자르면 "많이 죽어도 손해가 없다"가 돼서 규칙이 무의미해진다.
+    expect(calculateScrimPoints(2, 1, rule, 4)).toBe(-11);
+  });
+
+  it("사녹은 치킨을 낮춰 잡는다", () => {
+    const sanhok = { placementPoints: [5], killPoints: 1, deathPoints: -3 };
+    expect(calculateScrimPoints(1, 10, sanhok, 2)).toBe(9);
+  });
+
+  it("사망 점수가 없는 규칙은 사망을 세도 점수가 안 변한다", () => {
+    // 배틀로얄은 한 팀 빼고 다 죽어서, 사망을 세면 순위 점수와 같은 말을 두 번 한다.
+    expect(calculateScrimPoints(1, 5, DEFAULT_PUBG_POINT_RULE, 4)).toBe(
+      calculateScrimPoints(1, 5, DEFAULT_PUBG_POINT_RULE, 0),
+    );
+  });
+
+  it("음수 사망 점수도 유효한 규칙이다", () => {
+    expect(isValidPointRule(KILL_MATCH_POINT_RULE)).toBe(true);
+    // 감점이 지나치게 크면 입력 실수다.
+    expect(
+      isValidPointRule({
+        placementPoints: [8],
+        killPoints: 1,
+        deathPoints: -5000,
+      }),
+    ).toBe(false);
   });
 });

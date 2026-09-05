@@ -30,7 +30,10 @@ import {
   type SeriesPreset,
 } from "@nexus/types";
 import type { GameTitle } from "@nexus/types";
-import { roomSizeOptions } from "@/lib/room-size-options";
+import {
+  killMatchSizeOptions,
+  roomSizeOptions,
+} from "@/lib/room-size-options";
 import {
   DEFAULT_PUBG_GAME_MODE,
   PUBG_PLATFORM_LABELS,
@@ -103,12 +106,15 @@ export function RoomCreationForm({
     DEFAULT_PUBG_GAME_MODE,
   );
   const game = GAMES[gameTitle];
+  // 킬내기는 팀 인원이 정원을 따라가서(3대3~8대8) 선택지 모양이 아예 다르다.
   const playerOptions =
-    gameTitle === "PUBG"
-      ? roomSizeOptions(gameTitle).filter((option) =>
-          isValidPubgRoomSize(option.value, pubgGameMode),
-        )
-      : roomSizeOptions(gameTitle);
+    gameTitle !== "PUBG"
+      ? roomSizeOptions(gameTitle)
+      : pubgGameMode === "KILL_MATCH"
+        ? killMatchSizeOptions()
+        : roomSizeOptions(gameTitle).filter((option) =>
+            isValidPubgRoomSize(option.value, pubgGameMode),
+          );
   const [maxParticipants, setMaxParticipants] = useState(
     gameTitle === "PUBG"
       ? (getPubgGameMode(DEFAULT_PUBG_GAME_MODE).roomSizes[0] ?? 16)
