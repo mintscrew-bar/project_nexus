@@ -35,6 +35,21 @@ export interface IdentifyOptions {
    * 인게임에서 닉네임을 바꾼 사람이 있다. 그렇다고 낮추면 남의 판을 주워 온다.
    */
   minRosterOverlap?: number;
+  /**
+   * 이미 다른 라운드가 가져간 매치 ID.
+   *
+   * 스크림은 같은 사람들이 15~20분 간격으로 여러 판을 친다(2026-09-05 실측).
+   * 라운드마다 명단이 완전히 같아서 명단만으로는 2라운드와 3라운드를 못 가른다.
+   * 이미 쓴 매치를 빼지 않으면 여러 라운드가 같은 판을 가리킨다.
+   */
+  excludeMatchIds?: string[];
+  /**
+   * 이 시각보다 앞선 매치는 이 라운드의 것일 수 없다.
+   *
+   * 보통 직전 라운드의 시작 시각을 넣는다. 호스트가 라운드를 건너뛰고
+   * 뒤 라운드부터 수집하면, 시간 창만으로는 앞 라운드의 판을 주워 온다.
+   */
+  notBefore?: Date;
 }
 
 const DEFAULT_GRACE_BEFORE_MS = 15 * 60 * 1000;
@@ -90,32 +105,55 @@ export function identifyRoundMatch(
   const windowAfter = options.windowAfterMs ?? DEFAULT_WINDOW_AFTER_MS;
   const minOverlap = options.minRosterOverlap ?? DEFAULT_MIN_OVERLAP;
   const startedAt = options.roundStartedAt.getTime();
+  const used = new Set(options.excludeMatchIds ?? []);
 
-  const customs = candidates.filter((c) => c.isCustomMatch);
+  const customs = candidates.filter(
+    (c) => c.isCustomMatch && !used.has(c.matchId),
+  );
   if (customs.length === 0) {
     return { match: null, reason: "NO_CUSTOM_MATCH", bestOverlap: 0 };
   }
 
+  // 앞 라운드가 시작되기 전의 판은 이 라운드 것일 수 없다.
+  const lowerBound = Math.max(
+    startedAt - graceBefore,
+    options.notBefore?.getTime() ?? Number.NEGATIVE_INFINITY,
+  );
+
   const inWindow = customs.filter((c) => {
     const at = new Date(c.createdAt).getTime();
     if (Number.isNaN(at)) return false;
-    return at >= startedAt - graceBefore && at <= startedAt + windowAfter;
+    return at >= lowerBound && at <= startedAt + windowAfter;
   });
   if (inWindow.length === 0) {
     return { match: null, reason: "OUT_OF_TIME_WINDOW", bestOverlap: 0 };
   }
 
-  const scored = inWindow
+  // 명단은 "우리 판인가"만 판단한다.
+  //
+  // 스크림은 라운드마다 명단이 똑같아서 명단 일치율로는 2라운드와 3라운드를
+  // 가를 수 없다. 어느 라운드인지는 시간이 답한다.
+  const ours = inWindow
     .map((match) => ({
       match,
       overlap: rosterOverlap(options.rosterNames, match.playerNames),
+      at: new Date(match.createdAt).getTime(),
     }))
-    .sort((a, b) => b.overlap - a.overlap);
+    .filter((row) => row.overlap >= minOverlap);
 
-  const best = scored[0];
-  if (best.overlap < minOverlap) {
-    return { match: null, reason: "ROSTER_MISMATCH", bestOverlap: best.overlap };
+  if (ours.length === 0) {
+    const bestOverlap = Math.max(
+      ...inWindow.map((m) => rosterOverlap(options.rosterNames, m.playerNames)),
+    );
+    return { match: null, reason: "ROSTER_MISMATCH", bestOverlap };
   }
 
-  return { match: best.match, reason: "MATCHED", bestOverlap: best.overlap };
+  // 조건을 만족하는 것 중 가장 이른 판이 이 라운드다.
+  // 뒤쪽 판들은 다음 라운드가 가져간다.
+  const picked = ours.sort((a, b) => a.at - b.at)[0];
+  return {
+    match: picked.match,
+    reason: "MATCHED",
+    bestOverlap: picked.overlap,
+  };
 }

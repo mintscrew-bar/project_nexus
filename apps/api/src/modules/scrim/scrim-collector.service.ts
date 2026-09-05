@@ -108,11 +108,19 @@ export class ScrimCollectorService {
     }
     if (!room.scrim) throw new NotFoundException("시작된 스크림이 없습니다.");
 
-    const round = await this.prisma.scrimRound.findUnique({
-      where: {
-        scrimId_roundNumber: { scrimId: room.scrim.id, roundNumber },
+    // 같은 스크림의 다른 라운드 정보가 필요하다.
+    // 이미 쓴 매치를 빼고, 직전 라운드 시작 시각을 하한으로 삼는다.
+    const rounds = await this.prisma.scrimRound.findMany({
+      where: { scrimId: room.scrim.id },
+      orderBy: { roundNumber: "asc" },
+      select: {
+        id: true,
+        roundNumber: true,
+        startedAt: true,
+        pubgMatchId: true,
       },
     });
+    const round = rounds.find((r) => r.roundNumber === roundNumber);
     if (!round) throw new NotFoundException("라운드를 찾을 수 없습니다.");
     if (!round.startedAt) {
       throw new BadRequestException(
@@ -161,9 +169,19 @@ export class ScrimCollectorService {
       .map((p) => p.user.pubgAccounts[0]?.playerName)
       .filter((name): name is string => !!name);
 
+    // 스크림은 같은 사람들이 15~20분 간격으로 여러 판을 친다(2026-09-05 실측).
+    // 라운드마다 명단이 완전히 같아서, 어느 라운드인지는 시간으로만 가를 수 있다.
     const identified = identifyRoundMatch(candidates, {
       roundStartedAt: round.startedAt,
       rosterNames,
+      // 다른 라운드가 이미 가져간 판은 후보에서 뺀다.
+      excludeMatchIds: rounds
+        .filter((r) => r.roundNumber !== roundNumber && r.pubgMatchId)
+        .map((r) => r.pubgMatchId as string),
+      // 직전 라운드가 시작되기 전의 판은 이 라운드 것일 수 없다.
+      notBefore:
+        rounds.find((r) => r.roundNumber === roundNumber - 1)?.startedAt ??
+        undefined,
     });
 
     if (!identified.match) {
