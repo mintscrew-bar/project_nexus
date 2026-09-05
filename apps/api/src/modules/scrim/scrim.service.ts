@@ -13,8 +13,8 @@ import {
 } from "@nexus/database";
 import {
   DEFAULT_PUBG_POINT_RULE,
-  KILL_MATCH_POINT_RULE,
   calculateScrimPoints,
+  defaultPointRuleForMode,
   isValidPointRule,
   sortScrimLeaderboard,
   type PubgPointRule,
@@ -84,9 +84,7 @@ export class ScrimService {
     // 킬내기와 배틀로얄은 점수 규칙이 아예 다르다(킬내기는 사망이 감점).
     const pointRule =
       dto.pointRule ??
-      (room.pubgGameMode === "KILL_MATCH"
-        ? KILL_MATCH_POINT_RULE
-        : DEFAULT_PUBG_POINT_RULE);
+      defaultPointRuleForMode(room.pubgGameMode ?? "BATTLE_ROYALE");
     if (!isValidPointRule(pointRule)) {
       throw new BadRequestException("포인트 규칙표가 올바르지 않습니다.");
     }

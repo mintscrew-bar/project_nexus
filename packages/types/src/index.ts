@@ -297,6 +297,8 @@ export {
   KILL_MATCH_POINT_RULE,
   PUBG_POINT_RULE_PRESETS,
   calculateScrimPoints,
+  defaultPointRuleForMode,
+  defaultPresetKeyForMode,
   isValidPointRule,
   sortScrimLeaderboard,
 } from './pubg-scrim';

@@ -1,5 +1,7 @@
 import {
   DEFAULT_PUBG_GAME_MODE,
+  defaultPointRuleForMode,
+  defaultPresetKeyForMode,
   getPubgGameMode,
   isSplitSquadTeam,
   isValidPubgRoomSize,
@@ -90,8 +92,20 @@ describe("배그 경기 모드", () => {
     }
   });
 
-  it("기본 모드는 배틀로얄", () => {
-    expect(DEFAULT_PUBG_GAME_MODE).toBe("BATTLE_ROYALE");
+  it("기본 모드는 킬내기 — 6명이면 열리는 형식이 먼저 와야 한다", () => {
+    // 배틀로얄은 16명(4팀)부터라 사람이 모여야 열린다.
+    expect(DEFAULT_PUBG_GAME_MODE).toBe("KILL_MATCH");
+    expect(getPubgGameMode(DEFAULT_PUBG_GAME_MODE).roomSizes[0]).toBe(6);
+    // 목록 순서가 곧 화면 노출 순서다.
+    expect(pubgGameModes()[0].mode).toBe("KILL_MATCH");
+  });
+
+  it("모드별 기본 포인트 규칙이 갈린다", () => {
+    // 킬내기 방에서 배틀로얄 표로 시작하면 사망 감점이 빠진 채로 굴러간다.
+    expect(defaultPointRuleForMode("KILL_MATCH").deathPoints).toBe(-3);
+    expect(defaultPointRuleForMode("BATTLE_ROYALE").deathPoints ?? 0).toBe(0);
+    expect(defaultPresetKeyForMode("KILL_MATCH")).toBe("kill-match");
+    expect(defaultPresetKeyForMode("BATTLE_ROYALE")).toBe("standard");
   });
 });
 

@@ -123,6 +123,22 @@ export function calculateScrimPoints(
 }
 
 /** 규칙표가 쓸 만한 모양인지. 사용자가 직접 고칠 수 있어 서버에서 한 번 더 본다. */
+/** 이 모드에 어울리는 기본 포인트 규칙 */
+export function defaultPointRuleForMode(
+  mode: "KILL_MATCH" | "BATTLE_ROYALE" | "FREE_MATCH",
+): PubgPointRule {
+  return mode === "KILL_MATCH"
+    ? KILL_MATCH_POINT_RULE
+    : DEFAULT_PUBG_POINT_RULE;
+}
+
+/** 이 모드에서 먼저 보여줄 프리셋 키 */
+export function defaultPresetKeyForMode(
+  mode: "KILL_MATCH" | "BATTLE_ROYALE" | "FREE_MATCH",
+): string {
+  return mode === "KILL_MATCH" ? "kill-match" : "standard";
+}
+
 export function isValidPointRule(rule: unknown): rule is PubgPointRule {
   if (!rule || typeof rule !== "object") return false;
   const candidate = rule as PubgPointRule;

@@ -33,9 +33,10 @@ export const PUBG_PLATFORM_LABELS: Record<
 /** 배그 경기 모드. Prisma `PubgGameMode` 와 값이 일치해야 한다. */
 export type PubgGameMode = "KILL_MATCH" | "BATTLE_ROYALE" | "FREE_MATCH";
 
+/** 목록 순서가 곧 화면 노출 순서다. 킬내기가 가장 많이 열리는 형식이다. */
 export const PUBG_GAME_MODES: readonly PubgGameMode[] = [
-  "BATTLE_ROYALE",
   "KILL_MATCH",
+  "BATTLE_ROYALE",
   "FREE_MATCH",
 ] as const;
 
@@ -92,7 +93,13 @@ const MODE_DEFINITIONS: Record<PubgGameMode, PubgGameModeDefinition> = {
   },
 };
 
-export const DEFAULT_PUBG_GAME_MODE: PubgGameMode = "BATTLE_ROYALE";
+/**
+ * 기본 모드.
+ *
+ * 킬내기가 배그 내전의 주류다. 배틀로얄은 16명(4팀)부터라 사람이 모여야 열리는데,
+ * 킬내기는 6명이면 시작할 수 있어 첫 판을 열기가 훨씬 쉽다.
+ */
+export const DEFAULT_PUBG_GAME_MODE: PubgGameMode = "KILL_MATCH";
 
 export function getPubgGameMode(mode: PubgGameMode): PubgGameModeDefinition {
   return MODE_DEFINITIONS[mode];

@@ -13,9 +13,10 @@ import {
   Trophy,
 } from "lucide-react";
 import {
-  DEFAULT_PUBG_POINT_RULE,
   PUBG_POINT_RULE_PRESETS,
   calculateScrimPoints,
+  defaultPointRuleForMode,
+  defaultPresetKeyForMode,
   type PubgPointRule,
   type ScrimLeaderboardRow,
 } from "@nexus/types";
@@ -234,6 +235,9 @@ export default function ScrimPage() {
       <ScrimSetup
         isHost={isHost}
         busy={busy}
+        // 방 모드에 맞는 규칙으로 열어야 한다. 킬내기 방에서 배틀로얄 표를
+        // 기본으로 띄우면 사망 감점이 빠진 채 시작된다.
+        mode={room?.pubgGameMode ?? "BATTLE_ROYALE"}
         onCreate={handleCreate}
         lobbyHref={`${gamePrefix}/tournaments/${roomId}/lobby`}
       />
@@ -363,19 +367,21 @@ export default function ScrimPage() {
 function ScrimSetup({
   isHost,
   busy,
+  mode,
   onCreate,
   lobbyHref,
 }: {
   isHost: boolean;
   busy: boolean;
+  mode: "KILL_MATCH" | "BATTLE_ROYALE" | "FREE_MATCH";
   onCreate: (rule: PubgPointRule, totalRounds: number) => void;
   lobbyHref: string;
 }) {
-  const [preset, setPreset] = useState(PUBG_POINT_RULE_PRESETS[0].key);
+  const [preset, setPreset] = useState(() => defaultPresetKeyForMode(mode));
   const [totalRounds, setTotalRounds] = useState(3);
   const rule =
     PUBG_POINT_RULE_PRESETS.find((p) => p.key === preset)?.rule ??
-    DEFAULT_PUBG_POINT_RULE;
+    defaultPointRuleForMode(mode);
 
   if (!isHost) {
     return (
