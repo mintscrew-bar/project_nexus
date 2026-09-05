@@ -32,9 +32,8 @@ const RESULT_SOURCE_AUTO = "AUTO";
 /**
  * 라운드 결과 자동 수집.
  *
- * **기본값은 꺼져 있다.** 커스텀 매치가 `isCustomMatch: true` 로 오는지,
- * 그리고 애초에 커스텀 방을 열 수 있는지가 아직 실측되지 않았다
- * (Phase 0 Task 3·5). 한 판 치러 확인한 뒤 `PUBG_SCRIM_AUTO_COLLECT=true` 로 연다.
+ * 기본으로 켜져 있고 `PUBG_SCRIM_AUTO_COLLECT=false` 로 끈다.
+ * (Phase 0 Task 3·5 실측 완료 — `isCustomMatch` 판별과 커스텀 개설 권한 확인됨)
  *
  * 켜져 있어도 호스트가 버튼을 눌러야 돈다. 라운드가 끝난 시점을 아는 건
  * 사람이고, 폴링으로 돌리면 10/분 예산을 조용히 태운다.
@@ -50,13 +49,18 @@ export class ScrimCollectorService {
     private readonly pubgApi: PubgApiService,
     private readonly config: ConfigService,
   ) {
+    // 기본 켜짐, 끄려면 명시적으로 false.
+    //
+    // 2026-09-05 실측으로 `isCustomMatch` 판별과 커스텀 개설 권한이 확인돼
+    // opt-in 에서 opt-out 으로 뒤집었다. 시크릿을 안 넣으면 빈 문자열이라
+    // opt-in 방식으로는 배포해도 켜지지 않는다.
     this.enabled =
-      this.config.get<string>("PUBG_SCRIM_AUTO_COLLECT") === "true";
-    if (!this.enabled) {
-      this.logger.log(
-        "스크림 자동 수집 비활성 (커스텀 매치 판별 미검증). 수동 입력만 동작합니다.",
-      );
-    }
+      this.config.get<string>("PUBG_SCRIM_AUTO_COLLECT") !== "false";
+    this.logger.log(
+      this.enabled
+        ? "스크림 자동 수집 활성 (호스트가 누를 때만 동작)."
+        : "스크림 자동 수집 비활성. 수동 입력만 동작합니다.",
+    );
   }
 
   get isEnabled(): boolean {
@@ -72,7 +76,7 @@ export class ScrimCollectorService {
   async collectRound(hostId: string, roomId: string, roundNumber: number) {
     if (!this.isEnabled) {
       throw new BadRequestException(
-        "자동 결과 수집이 아직 열려 있지 않습니다. 결과를 직접 입력해주세요.",
+        "자동 결과 수집을 쓸 수 없는 상태입니다. 결과를 직접 입력해주세요.",
       );
     }
 
