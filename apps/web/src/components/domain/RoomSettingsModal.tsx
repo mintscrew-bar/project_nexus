@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ConfirmModal, Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -126,7 +126,11 @@ export function RoomSettingsModal({
     gameTitle === "PUBG" && pubgGameMode === "KILL_MATCH"
       ? killMatchSizeOptions()
       : roomSizeOptions(gameTitle);
-  const teamShape = { gameTitle, pubgGameMode };
+  // 매 렌더 새 객체가 되면 effect deps 에 못 넣는다. 값 두 개로 들고 다닌다.
+  const teamShape = useMemo(
+    () => ({ gameTitle, pubgGameMode }),
+    [gameTitle, pubgGameMode],
+  );
 
   // Basic settings
   const [name, setName] = useState(room.name);
@@ -238,7 +242,7 @@ export function RoomSettingsModal({
       );
       setError(null);
     }
-  }, [isOpen, room, gameTitle, pubgGameMode]);
+  }, [isOpen, room, gameTitle, pubgGameMode, teamShape]);
 
   // 인원(=팀 수)이 바뀌면 고를 수 있는 프리셋 목록도 갈아끼워진다.
   const handleParticipantChange = (value: number) => {

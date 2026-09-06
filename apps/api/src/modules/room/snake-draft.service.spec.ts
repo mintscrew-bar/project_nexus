@@ -1,5 +1,6 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { SnakeDraftService } from "./snake-draft.service";
+import { resolveLadderOrder } from "@nexus/types";
 import { PrismaService } from "../prisma/prisma.service";
 import { RoomStatus, TeamMode } from "@nexus/database";
 
@@ -164,6 +165,15 @@ describe("SnakeDraftService", () => {
       expect(
         result.pickOrder.filter((id: string) => id === first),
       ).toHaveLength(4);
+
+      // 픽 순서 추첨을 사다리로 보여준다. 사다리를 타고 내려간 결과가
+      // 실제 첫 픽 순서와 어긋나면 연출이 거짓말을 하는 셈이다.
+      const ladder = result.draftState.ladder;
+      expect(ladder).toBeDefined();
+      expect(resolveLadderOrder(ladder!)).toEqual([first, second]);
+      expect(new Set(ladder!.columns)).toEqual(
+        new Set(result.teams.map((team: any) => team.id)),
+      );
       expect(discordVoice.renameTeamChannels).toHaveBeenCalledWith(
         roomId,
         result.teams.map((team: any) => ({ id: team.id, name: team.name })),

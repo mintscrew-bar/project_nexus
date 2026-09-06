@@ -6,6 +6,7 @@ import {
   snakeDraftSocketHelpers,
 } from '@/lib/socket-client';
 import { useLobbyStore } from '@/stores/lobby-store';
+import type { LadderDraw } from '@nexus/types';
 
 interface Player {
   id: string;
@@ -29,6 +30,13 @@ interface DraftState {
   teams: Team[];
   availablePlayers: Player[];
   pickOrder: string[];
+  /**
+   * 픽 순서 추첨 사다리.
+   *
+   * 서버가 만들어 모두에게 같은 사다리를 보낸다. 화면에서 다시 뽑으면
+   * 사람마다 다른 결과를 보게 된다.
+   */
+  ladder?: LadderDraw;
   currentPickIndex: number;
   currentTeamId: string | null;
   timerEnd: number;

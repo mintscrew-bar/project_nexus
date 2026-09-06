@@ -7,6 +7,7 @@ import { useSnakeDraftStore } from "@/stores/snake-draft-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { roomApi } from "@/lib/api-client";
 import { DraftBoard } from "@/components/domain/DraftBoard";
+import { LadderDrawBoard } from "@/components/domain/LadderDrawBoard";
 import { GameChatPanel } from "@/components/domain/GameChatPanel";
 import { LoadingSpinner, Badge, Button, ConfirmModal } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
@@ -20,6 +21,10 @@ export default function SnakeDraftPage() {
   const { addToast } = useToast();
   const hasRedirected = useRef(false);
   const [isAborting, setIsAborting] = useState(false);
+  // 추첨 연출은 시작 직후 한 번만 띄운다. 새로고침해도 다시 뜨지 않게
+  // 화면 상태로만 들고 있는다.
+  const [showLadder, setShowLadder] = useState(true);
+  const ladderDoneRef = useRef(false);
   const [isAbortConfirmOpen, setIsAbortConfirmOpen] = useState(false);
 
   const { user } = useAuthStore();
@@ -192,6 +197,45 @@ export default function SnakeDraftPage() {
             </Button>
           </div>
         </div>
+
+        {/*
+          픽 순서 추첨 사다리.
+
+          드래프트가 시작되면 한 번 보여주고 넘어간다. 순서는 서버가 이미
+          정했고 이건 그 결과를 보여주는 연출이라, 건너뛰어도 진행에 지장이 없다.
+        */}
+        {draftState.ladder && showLadder && (
+          <div className="mb-5 rounded-2xl border border-bg-tertiary bg-bg-secondary p-4">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-bold text-text-primary">
+                  픽 순서 추첨
+                </h2>
+                <p className="mt-0.5 text-xs text-text-tertiary">
+                  주장 선발과 따로 뽑습니다. 사다리를 타고 내려간 자리가 그
+                  팀의 픽 순서입니다.
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowLadder(false)}
+              >
+                건너뛰기
+              </Button>
+            </div>
+            <LadderDrawBoard
+              draw={draftState.ladder}
+              teams={draftState.teams}
+              // 다 보여준 뒤 잠깐 두었다가 접는다 — 결과를 읽을 시간은 준다.
+              onFinished={() => {
+                if (ladderDoneRef.current) return;
+                ladderDoneRef.current = true;
+                setTimeout(() => setShowLadder(false), 2500);
+              }}
+            />
+          </div>
+        )}
 
         <DraftBoard
           draftState={draftState}

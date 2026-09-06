@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Logger,
   NotFoundException,
   BadRequestException,
   ForbiddenException,
@@ -15,14 +16,25 @@ import {
   calculateTierScore,
 } from "../common/tier-score.util";
 import {
+  buildLadderDraw,
   minDraftParticipants,
+  resolveLadderOrder,
   teamCountForRoster,
   teamSizeForRoom,
+  type LadderDraw,
 } from "@nexus/types";
 
 export interface SnakeDraftState {
   roomId: string;
   numTeams: number;
+  /**
+   * 픽 순서 추첨 사다리.
+   *
+   * 순서 자체는 아래 `pickOrder` 가 이미 정한 값이고, 이건 그 결과를 화면에서
+   * 보여주기 위한 연출이다. 서버가 만들어 모두에게 같은 사다리를 보낸다 —
+   * 화면에서 각자 뽑으면 사람마다 다른 결과를 본다.
+   */
+  ladder?: LadderDraw;
   currentTeamIndex: number;
   currentRound: number;
   pickOrder: string[]; // Team IDs in pick order
@@ -33,6 +45,8 @@ export interface SnakeDraftState {
 
 @Injectable()
 export class SnakeDraftService {
+  private readonly logger = new Logger(SnakeDraftService.name);
+
   private draftStates = new Map<string, SnakeDraftState>();
   private discordVoiceService: any; // DiscordVoiceService (optional dependency)
 
@@ -193,8 +207,27 @@ export class SnakeDraftService {
     //
     // 팀 목록은 주장이 정해진 순서 그대로다. 티어 우선으로 주장을 뽑으면
     // 가장 센 주장이 첫 픽까지 가져가 이점이 두 번 쌓인다.
+    const teamIds = teams.map((t: (typeof teams)[number]) => t.id);
+    const drawnOrder = this.shuffle(teamIds);
+
+    // 추첨 결과를 사다리로 옮긴다. 사다리로 순서를 뽑는 게 아니라,
+    // 이미 뽑힌 순서가 나오도록 사다리를 구성한다 — 사다리 모양으로 뽑으면
+    // 가로줄 개수에 따라 분포가 쏠려 균등하지 않다.
+    const ladder = buildLadderDraw(teamIds, drawnOrder, (max) =>
+      randomInt(max),
+    );
+    // 연출이 결과와 어긋나면 "사다리는 3번인데 실제로는 1번 픽"이 된다.
+    // 내보내기 전에 한 번 검증하고, 어긋나면 사다리 없이 진행한다.
+    const ladderMatches =
+      resolveLadderOrder(ladder).join(",") === drawnOrder.join(",");
+    if (!ladderMatches) {
+      this.logger.error(
+        `사다리 추첨이 실제 순서와 달라 연출을 생략합니다 (room ${roomId})`,
+      );
+    }
+
     const pickOrder = this.generatePickOrder(
-      this.shuffle(teams.map((t: (typeof teams)[number]) => t.id)),
+      drawnOrder,
       numTeams,
       teamSizeForRoom({
         gameTitle: room.gameTitle,
@@ -206,6 +239,7 @@ export class SnakeDraftService {
     const draftState: SnakeDraftState = {
       roomId,
       numTeams: teams.length,
+      ladder: ladderMatches ? ladder : undefined,
       currentTeamIndex: 0,
       currentRound: 1,
       pickOrder,
