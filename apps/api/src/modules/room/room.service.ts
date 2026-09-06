@@ -41,6 +41,14 @@ import { BalanceScoreService } from "../common/balance-score.service";
 import { StatsService } from "../stats/stats.service";
 import { BALANCE_ROLES } from "../common/balance-score.util";
 
+/**
+ * 편성 점수가 없는 참가자에게 임시로 매기는 값.
+ *
+ * 아무도 점수가 없으면 전원이 이 값이 되어 사실상 무작위 분배가 된다.
+ * 그게 "점수가 없어서 편성을 못 한다"보다 낫다.
+ */
+const NEUTRAL_PUBG_BALANCE_SCORE = 50;
+
 /** 예고 방 최소 리드타임. 이보다 가까우면 그냥 지금 열면 된다. */
 const MIN_SCHEDULE_MINUTES_AHEAD = 10;
 /** 예고 방 최대 리드타임. 너무 먼 예약은 잊혀진 채 빈 방으로 남는다. */
@@ -2678,25 +2686,39 @@ export class RoomService {
       );
     }
 
-    // 점수 없는 사람을 0점으로 치면 밸런스가 조용히 틀어진다. 누구인지 짚어 중단한다.
-    const missingScore = room.participants
-      .filter((p) => p.user.pubgAccounts[0]?.nexusScore == null)
-      .map((p) => p.user.username);
-    if (missingScore.length > 0) {
-      throw new BadRequestException(
-        `NEXUS 편성 점수가 없는 참가자가 있어 자동 밸런스를 만들 수 없습니다: ${missingScore.join(", ")}`,
-      );
-    }
+    /**
+     * 편성 점수는 배그에서 **선택 항목**이다.
+     *
+     * 롤은 방 참가 자체가 대표 라이엇 계정을 요구해서 전원이 점수를 갖지만,
+     * 배그 편성 점수는 본인이 넣거나 내전 6라운드가 쌓여야 생긴다.
+     * 전원을 요구하면 내전이 한 번도 없는 초기에 자동 밸런스가 100% 실패한다.
+     *
+     * 그래서 막지 않고 **없는 사람은 중간값으로 두고 몇 명인지 알린다.**
+     * 조용히 0점으로 치면 점수 없는 사람이 전부 한쪽에 몰린다.
+     */
+    const scored = room.participants.filter(
+      (p) => p.user.pubgAccounts[0]?.nexusScore != null,
+    );
+    const unscoredCount = room.participants.length - scored.length;
+    const averageScore =
+      scored.length > 0
+        ? scored.reduce(
+            (sum, p) => sum + (p.user.pubgAccounts[0]?.nexusScore ?? 0),
+            0,
+          ) / scored.length
+        : NEUTRAL_PUBG_BALANCE_SCORE;
 
     const teamCount = teamCountForRoom({
       gameTitle: room.gameTitle,
       pubgGameMode: room.pubgGameMode,
       maxParticipants: room.maxParticipants,
     });
+    // 점수 없는 사람은 참가자 평균으로 둔다. 0으로 두면 전부 한쪽 끝에 몰리고,
+    // 100으로 두면 반대가 된다. 평균이면 어느 쪽으로도 치우치지 않는다.
+    const scoreOf = (participant: (typeof room.participants)[number]) =>
+      participant.user.pubgAccounts[0]?.nexusScore ?? averageScore;
     const ranked = [...room.participants].sort(
-      (a, b) =>
-        (b.user.pubgAccounts[0]?.nexusScore ?? 0) -
-        (a.user.pubgAccounts[0]?.nexusScore ?? 0),
+      (a, b) => scoreOf(b) - scoreOf(a),
     );
 
     // 뱀 순서 분배 — 한 방향으로만 돌리면 1번 팀에 상위권이 몰린다.
@@ -2753,7 +2775,17 @@ export class RoomService {
       });
     });
 
-    return this.getRoomById(roomId);
+    const room2 = await this.getRoomById(roomId);
+    return {
+      ...room2,
+      /**
+       * 편성 점수가 없던 참가자 수.
+       *
+       * 0보다 크면 그만큼은 실력이 아니라 평균값으로 나뉜 것이라
+       * 화면에서 "참고용"임을 밝혀야 한다.
+       */
+      unscoredParticipants: unscoredCount,
+    };
   }
 
   /**

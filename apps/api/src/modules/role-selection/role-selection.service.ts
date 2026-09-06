@@ -7,7 +7,7 @@ import {
   forwardRef,
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
-import { Prisma, RoomStatus, Role, TeamMode } from "@nexus/database";
+import { GameTitle, Prisma, RoomStatus, Role, TeamMode } from "@nexus/database";
 import { MatchService } from "../match/match.service";
 import { getGame } from "@nexus/types";
 // 클라이언트와 값이 어긋나지 않도록 공용 패키지에서 가져온다.
@@ -398,6 +398,8 @@ export class RoleSelectionService {
     });
 
     if (!room) return;
+    // 포지션이 없는 게임(배그)에 라인을 배정하면 없는 개념이 데이터에 남는다.
+    if (!getGame(room.gameTitle).hasPositions) return;
 
     const ALL_ROLES: Role[] = [
       Role.TOP,
@@ -438,13 +440,28 @@ export class RoleSelectionService {
     }
   }
 
+  /**
+   * 팀 편성 확정.
+   *
+   * 이름은 "역할 선택 완료"지만 자동 밸런스 확정 경로도 여기로 들어온다.
+   * 게임에 따라 하는 일이 갈린다 —
+   *   롤: 라인이 전부 정해졌는지 확인하고 대진표를 만든다
+   *   배그 배틀로얄·킬내기: 라인이 없고, 대진표가 아니라 스크림으로 간다
+   */
   async completeRoleSelection(roomId: string) {
-    const allSelected = await this.checkAllRolesSelected(roomId);
+    const gameOfRoom = await this.prisma.room.findUnique({
+      where: { id: roomId },
+      select: { gameTitle: true, pubgGameMode: true },
+    });
+    const game = getGame(gameOfRoom?.gameTitle ?? GameTitle.LOL);
 
-    if (!allSelected) {
-      throw new BadRequestException(
-        "Not all team members have selected their roles",
-      );
+    if (game.hasPositions) {
+      const allSelected = await this.checkAllRolesSelected(roomId);
+      if (!allSelected) {
+        throw new BadRequestException(
+          "Not all team members have selected their roles",
+        );
+      }
     }
 
     // Get room data first
@@ -467,20 +484,39 @@ export class RoleSelectionService {
       throw new NotFoundException("Room not found");
     }
 
-    // Generate bracket (this will also update room status to IN_PROGRESS)
-    // If bracket generation fails, we should not proceed to IN_PROGRESS status
-    try {
-      await this.matchService.generateBracket(room.hostId, roomId);
-      // Bracket generation successful - room status is already updated to IN_PROGRESS
-    } catch (error: any) {
-      // Log error with more details
-      console.error("Error generating bracket:", error);
+    /**
+     * 라운드 누적 방식(배그 배틀로얄·킬내기)은 대진표를 만들지 않는다.
+     *
+     * 대진표는 2의 거듭제곱에 가까운 팀 수를 전제로 짜여 있어 25팀에서는
+     * 애초에 만들어지지 않고, 만들어져도 배그에서는 쓰이지 않는다.
+     * 이 방들은 `Scrim` 이 진행을 맡는다.
+     */
+    const usesScrim =
+      !game.hasPositions &&
+      (gameOfRoom?.pubgGameMode === "BATTLE_ROYALE" ||
+        gameOfRoom?.pubgGameMode === "KILL_MATCH");
 
-      // If bracket generation fails, throw error instead of silently continuing
-      // This prevents room from being in IN_PROGRESS state without a bracket
-      throw new BadRequestException(
-        `Failed to generate bracket: ${error.message || "Unknown error"}. Please try again or generate bracket manually.`,
-      );
+    if (usesScrim) {
+      await this.prisma.room.update({
+        where: { id: roomId },
+        data: { status: RoomStatus.IN_PROGRESS },
+      });
+    } else {
+      // Generate bracket (this will also update room status to IN_PROGRESS)
+      // If bracket generation fails, we should not proceed to IN_PROGRESS status
+      try {
+        await this.matchService.generateBracket(room.hostId, roomId);
+        // Bracket generation successful - room status is already updated to IN_PROGRESS
+      } catch (error: any) {
+        // Log error with more details
+        console.error("Error generating bracket:", error);
+
+        // If bracket generation fails, throw error instead of silently continuing
+        // This prevents room from being in IN_PROGRESS state without a bracket
+        throw new BadRequestException(
+          `Failed to generate bracket: ${error.message || "Unknown error"}. Please try again or generate bracket manually.`,
+        );
+      }
     }
 
     // Fetch updated room (status already updated by generateBracket)

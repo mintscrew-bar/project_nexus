@@ -16,6 +16,7 @@ import { MatchGateway } from "../match/match.gateway";
 import { MatchService } from "../match/match.service";
 import { resolveBroadcastRoomId } from "../broadcast/broadcast-resolve.util";
 import { Role } from "@nexus/database";
+import { DEFAULT_GAME, GAMES, afterTeamsPath } from "@nexus/types";
 
 interface AuthenticatedSocket extends Socket {
   userId?: string;
@@ -330,8 +331,25 @@ export class RoleSelectionGateway
       const room =
         await this.roleSelectionService.completeRoleSelection(roomId);
 
+      // 이동 경로는 게임·모드에 따라 갈린다.
+      // 프리픽스 없는 옛 경로를 보내면 클라이언트가 308 을 한 번 더 타고,
+      // 배그 배틀로얄은 대진표가 아니라 스크림으로 가야 한다.
+      const navRoom = await this.prisma.room.findUnique({
+        where: { id: roomId },
+        select: { gameTitle: true, pubgGameMode: true, teamMode: true },
+      });
+      const gameSlug = GAMES[navRoom?.gameTitle ?? DEFAULT_GAME].slug;
+      const target = afterTeamsPath(
+        {
+          id: roomId,
+          gameTitle: navRoom?.gameTitle ?? DEFAULT_GAME,
+          pubgGameMode: navRoom?.pubgGameMode,
+          teamMode: navRoom?.teamMode ?? "MANUAL_TEAM",
+        },
+        `/${gameSlug}`,
+      );
       this.server.to(`room:${roomId}`).emit("role-selection-navigation", {
-        target: `/tournaments/${roomId}/bracket`,
+        target,
       });
 
       // Notify all clients

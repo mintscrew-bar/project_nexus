@@ -288,6 +288,16 @@ export class DiscordVoiceService {
   // Channel Creation
   // ========================================
 
+  /**
+   * 팀 음성채널을 만들 최대 팀 수.
+   *
+   * 배그 배틀로얄은 25팀까지 간다. 그대로 만들면 방 하나에 27채널(카테고리 +
+   * 대기실 + 팀 25)이고, 순차 생성이라 디스코드 레이트에 걸리며 서버 채널
+   * 목록도 무너진다. 이 수를 넘으면 대기실만 만든다 — 큰 방은 어차피 스쿼드가
+   * 각자 통화를 쓴다.
+   */
+  private static readonly MAX_TEAM_VOICE_CHANNELS = 12;
+
   async createRoomChannels(
     roomId: string,
     roomName: string,
@@ -370,7 +380,16 @@ export class DiscordVoiceService {
       // displayName: Discord 채널 표시명, dbTeamName: snake-draft의 team.name과 매칟용 (Team 1, Team 2...)
       const teamChannels: Array<{ teamName: string; channelId: string }> = [];
 
-      for (let i = 0; i < numTeams; i++) {
+      // 팀이 너무 많으면 팀 채널을 만들지 않는다. 대기실은 그대로 둔다.
+      const teamChannelCount =
+        numTeams > DiscordVoiceService.MAX_TEAM_VOICE_CHANNELS ? 0 : numTeams;
+      if (teamChannelCount === 0 && numTeams > 0) {
+        this.logger.log(
+          `[DiscordVoice] 팀 ${numTeams}개는 음성채널을 만들지 않습니다 (상한 ${DiscordVoiceService.MAX_TEAM_VOICE_CHANNELS}). 대기실만 생성합니다.`,
+        );
+      }
+
+      for (let i = 0; i < teamChannelCount; i++) {
         const displayName = `┊ ${i + 1}팀`;
         const dbTeamName = `Team ${i + 1}`;
 
