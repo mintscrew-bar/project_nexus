@@ -28,7 +28,9 @@ import {
   type TeamMode,
 } from "@/components/rooms/TeamModeHelp";
 import {
+  DEFAULT_PUBG_GAME_MODE,
   DEFAULT_SERIES_PRESET,
+  isValidPubgRoomSize,
   normalizeSeriesPreset,
   teamCountForRoom,
   type SeriesPreset,
@@ -121,11 +123,19 @@ export function RoomSettingsModal({
   // 팀 인원과 정원 선택지는 게임뿐 아니라 배그 모드에 따라서도 갈린다.
   // 킬내기는 항상 2팀이라 정원이 곧 팀 인원 × 2다(3대3~8대8).
   const gameTitle: GameTitle = room.gameTitle ?? "LOL";
-  const pubgGameMode = room.pubgGameMode ?? null;
-  const playerOptions =
-    gameTitle === "PUBG" && pubgGameMode === "KILL_MATCH"
-      ? killMatchSizeOptions()
-      : roomSizeOptions(gameTitle);
+  // 모드가 비어 있는 옛 배그 방은 기본 모드로 본다. 모드가 정원표를 정한다.
+  const pubgGameMode: PubgGameMode | null =
+    gameTitle === "PUBG" ? (room.pubgGameMode ?? DEFAULT_PUBG_GAME_MODE) : null;
+  // 배그 정원표는 모드마다 다르다. `roomSizeOptions("PUBG")` 는 모드 전체의
+  // 합집합이라 그대로 쓰면 배틀로얄 방에 킬내기 정원(6·8·14·16)이 섞여 나오고,
+  // 고르면 서버가 되돌려보낸다.
+  const playerOptions = useMemo(() => {
+    if (gameTitle !== "PUBG" || !pubgGameMode) return roomSizeOptions(gameTitle);
+    if (pubgGameMode === "KILL_MATCH") return killMatchSizeOptions();
+    return roomSizeOptions(gameTitle).filter((option) =>
+      isValidPubgRoomSize(option.value, pubgGameMode),
+    );
+  }, [gameTitle, pubgGameMode]);
   // 매 렌더 새 객체가 되면 effect deps 에 못 넣는다. 값 두 개로 들고 다닌다.
   const teamShape = useMemo(
     () => ({ gameTitle, pubgGameMode }),

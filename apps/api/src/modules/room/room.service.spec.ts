@@ -1115,4 +1115,64 @@ describe("RoomService", () => {
       }
     });
   });
+  describe("updateRoomSettings — 정원 검증", () => {
+    const pubgRoom = (mode: string, maxParticipants: number) => ({
+      id: "room-1",
+      hostId: "host-1",
+      status: RoomStatus.WAITING,
+      gameTitle: "PUBG",
+      pubgGameMode: mode,
+      maxParticipants,
+      teamMode: TeamMode.AUCTION,
+      seriesPreset: null,
+    });
+
+    it("배그 방 정원을 그 모드의 정원표로 검증한다", async () => {
+      // 롤 정원표를 박아 두면 배그 방은 정원을 아예 바꾸지 못한다.
+      prisma.room.findUnique.mockResolvedValue(pubgRoom("BATTLE_ROYALE", 32));
+      prisma.room.update.mockResolvedValue({});
+      prisma.roomParticipant.findMany.mockResolvedValue([]);
+
+      await service.updateRoomSettings("host-1", "room-1", {
+        maxParticipants: 64,
+      });
+
+      expect(prisma.room.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ maxParticipants: 64 }),
+        }),
+      );
+    });
+
+    it("모드 정원표에 없는 값은 막는다", async () => {
+      // 40은 롤 정원표에는 있지만 킬내기(6·8·14·16)에는 없다.
+      prisma.room.findUnique.mockResolvedValue(pubgRoom("KILL_MATCH", 16));
+
+      await expect(
+        service.updateRoomSettings("host-1", "room-1", {
+          maxParticipants: 40,
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(prisma.room.update).not.toHaveBeenCalled();
+    });
+
+    it("롤 방은 롤 정원표를 그대로 쓴다", async () => {
+      prisma.room.findUnique.mockResolvedValue({
+        id: "room-2",
+        hostId: "host-1",
+        status: RoomStatus.WAITING,
+        gameTitle: "LOL",
+        pubgGameMode: null,
+        maxParticipants: 10,
+        teamMode: TeamMode.AUCTION,
+        seriesPreset: null,
+      });
+
+      await expect(
+        service.updateRoomSettings("host-1", "room-2", {
+          maxParticipants: 32,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
 });

@@ -2346,9 +2346,22 @@ export class RoomService {
     }
 
     if (updates.maxParticipants) {
-      if (![10, 15, 20, 30, 40].includes(updates.maxParticipants)) {
+      // 정원표는 게임·모드마다 다르다. 롤 값을 박아 두면 배그 방은 정원을
+      // 아예 못 바꾼다 — 40만 통과하는데 그 40은 킬내기 정원표에 없는 값이다.
+      // 생성 경로와 같은 표를 쓴다.
+      const roomGame = (room.gameTitle ?? GameTitle.LOL) as GameTitleValue;
+      if (roomGame === GameTitle.PUBG) {
+        const mode = (room.pubgGameMode ??
+          DEFAULT_PUBG_GAME_MODE) as PubgGameMode;
+        const modeDef = getPubgGameMode(mode);
+        if (!isValidPubgRoomSize(updates.maxParticipants, mode)) {
+          throw new BadRequestException(
+            `${modeDef.label} 정원은 ${modeDef.roomSizes.join(", ")}명 중에서 골라주세요.`,
+          );
+        }
+      } else if (!isValidRoomSize(updates.maxParticipants, roomGame)) {
         throw new BadRequestException(
-          "Max participants must be 10, 15, 20, 30, or 40",
+          `정원은 ${getGame(roomGame).roomSizes.join(", ")}명 중에서 골라주세요.`,
         );
       }
       data.maxParticipants = updates.maxParticipants;
