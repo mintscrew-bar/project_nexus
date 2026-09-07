@@ -29,6 +29,7 @@ import {
   normalizeSeriesPreset,
   teamCountForRoom,
   teamSizeForRoom,
+  squadCountForRoom,
   isValidRoomSize,
   getGame,
   getPubgGameMode,
@@ -1216,6 +1217,12 @@ export class RoomService {
           {
             // 팀 채널 정원·대기실 정원이 게임과 모드를 따라간다.
             teamSize: teamSizeForRoom({
+              gameTitle,
+              pubgGameMode,
+              maxParticipants: dto.maxParticipants,
+            }),
+            // 깐부킬내기는 한 팀이 인게임 4인 스쿼드 둘로 갈라져 들어간다.
+            squadsPerTeam: squadCountForRoom({
               gameTitle,
               pubgGameMode,
               maxParticipants: dto.maxParticipants,

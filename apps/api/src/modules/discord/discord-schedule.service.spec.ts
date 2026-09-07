@@ -131,7 +131,7 @@ describe("DiscordScheduleService.processScheduledRooms", () => {
       "room-1",
       "9월 1일 내전",
       2,
-      { teamSize: 5, maxParticipants: 10 },
+      { teamSize: 5, squadsPerTeam: 1, maxParticipants: 10 },
     );
     expect(prisma.room.update).toHaveBeenCalledWith({
       where: { id: "room-1" },

@@ -7,7 +7,11 @@ import { DiscordVoiceService } from "./discord-voice.service";
 import { roomLobbyUrl } from "../../common/utils/app-url.util";
 import { roomDisplayName } from "../../common/utils/room-title.util";
 import type { GameTitle, PubgGameMode, PubgPlatform } from "@nexus/types";
-import { teamCountForRoom, teamSizeForRoom } from "@nexus/types";
+import {
+  squadCountForRoom,
+  teamCountForRoom,
+  teamSizeForRoom,
+} from "@nexus/types";
 
 /** 시작 1시간 전 리마인드를 보내는 구간 */
 const REMIND_1H_MS = 60 * 60 * 1000;
@@ -267,6 +271,7 @@ export class DiscordScheduleService {
           teamCountForRoom(shape),
           {
             teamSize: teamSizeForRoom(shape),
+            squadsPerTeam: squadCountForRoom(shape),
             maxParticipants: room.maxParticipants,
           },
         );

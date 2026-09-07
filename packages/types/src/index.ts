@@ -282,6 +282,8 @@ export {
   teamCountForRoom,
   teamCountForRoster,
   isSplitSquadTeam,
+  squadCountForRoom,
+  squadSizeForRoom,
 } from './pubg';
 
 export type {

@@ -51,8 +51,57 @@ describe("DiscordVoiceService", () => {
 
       await service.handleTeamAssignment("room-1");
 
-      expect(moveTeamToChannel).toHaveBeenNthCalledWith(1, "team-1", "voice-1");
-      expect(moveTeamToChannel).toHaveBeenNthCalledWith(2, "team-2", "voice-2");
+      // 팀당 채널 하나면 배열 원소도 하나다.
+      expect(moveTeamToChannel).toHaveBeenNthCalledWith(1, "team-1", [
+        "voice-1",
+      ]);
+      expect(moveTeamToChannel).toHaveBeenNthCalledWith(2, "team-2", [
+        "voice-2",
+      ]);
+    });
+
+    it("깐부킬내기는 한 팀의 채널 두 개를 함께 넘긴다", async () => {
+      // 8대8은 인게임에서 4인 스쿼드 둘로 갈라져 들어간다.
+      // 팀당 채널 하나(8인)로 몰면 인게임 파티와 어긋난다.
+      const createdAt = new Date("2026-09-07T00:00:00.000Z");
+      const at = (offset: number) => new Date(createdAt.getTime() + offset);
+      const prisma = {
+        room: {
+          findUnique: jest.fn().mockResolvedValue({
+            id: "room-1",
+            teams: [
+              { id: "team-1", name: "A 팀", createdAt, members: [] },
+              { id: "team-2", name: "B 팀", createdAt: at(1), members: [] },
+            ],
+            discordChannels: [
+              { channelId: "lobby", teamName: "Lobby", createdAt },
+              { channelId: "t1-a", teamName: "Team 1 A", createdAt: at(1) },
+              { channelId: "t1-b", teamName: "Team 1 B", createdAt: at(2) },
+              { channelId: "t2-a", teamName: "Team 2 A", createdAt: at(3) },
+              { channelId: "t2-b", teamName: "Team 2 B", createdAt: at(4) },
+            ],
+          }),
+        },
+      };
+      const service = new DiscordVoiceService(
+        { get: jest.fn() } as any,
+        prisma as any,
+      );
+      const moveTeamToChannel = jest
+        .spyOn(service as any, "moveTeamToChannel")
+        .mockResolvedValue({ success: 0, failed: 0 });
+      jest.spyOn(service as any, "delay").mockResolvedValue(undefined);
+
+      await service.handleTeamAssignment("room-1");
+
+      expect(moveTeamToChannel).toHaveBeenNthCalledWith(1, "team-1", [
+        "t1-a",
+        "t1-b",
+      ]);
+      expect(moveTeamToChannel).toHaveBeenNthCalledWith(2, "team-2", [
+        "t2-a",
+        "t2-b",
+      ]);
     });
   });
 

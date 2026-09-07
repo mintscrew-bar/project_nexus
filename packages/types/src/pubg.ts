@@ -212,5 +212,29 @@ function isKillMatch(room: RoomTeamShape): boolean {
  * 두 개를 같은 Nexus 팀에 붙여야 한다.
  */
 export function isSplitSquadTeam(room: RoomTeamShape): boolean {
-  return isKillMatch(room) && teamSizeForRoom(room) > GAMES.PUBG.teamSize;
+  return squadCountForRoom(room) > 1;
+}
+
+/**
+ * 한 팀이 인게임에서 몇 개 스쿼드로 갈라지는가.
+ *
+ * 인게임 스쿼드 정원은 4명이다. 깐부킬내기 8대8은 한 팀이 4인 스쿼드 둘로
+ * 나뉘어 들어가므로, 음성채널도 팀당 하나가 아니라 스쿼드마다 하나가 필요하다.
+ * 롤과 배틀로얄은 팀이 곧 스쿼드라 항상 1이다.
+ */
+export function squadCountForRoom(room: RoomTeamShape): number {
+  if (room.gameTitle !== "PUBG") return 1;
+  return Math.max(
+    1,
+    Math.ceil(teamSizeForRoom(room) / GAMES.PUBG.teamSize),
+  );
+}
+
+/**
+ * 스쿼드 하나에 들어갈 인원.
+ *
+ * 7대7이면 4명 + 3명으로 갈리므로 채널 정원은 큰 쪽(4)에 맞춘다.
+ */
+export function squadSizeForRoom(room: RoomTeamShape): number {
+  return Math.ceil(teamSizeForRoom(room) / squadCountForRoom(room));
 }
