@@ -5,8 +5,9 @@ import { PrismaService } from "../prisma/prisma.service";
 import { DiscordBotService } from "./discord-bot.service";
 import { DiscordVoiceService } from "./discord-voice.service";
 import { roomLobbyUrl } from "../../common/utils/app-url.util";
-import type { GameTitle, PubgGameMode } from "@nexus/types";
-import { teamCountForRoom } from "@nexus/types";
+import { roomDisplayName } from "../../common/utils/room-title.util";
+import type { GameTitle, PubgGameMode, PubgPlatform } from "@nexus/types";
+import { teamCountForRoom, teamSizeForRoom } from "@nexus/types";
 
 /** 시작 1시간 전 리마인드를 보내는 구간 */
 const REMIND_1H_MS = 60 * 60 * 1000;
@@ -65,8 +66,10 @@ export class DiscordScheduleService {
         name: true,
         // 로비 링크가 `/lol/...` 처럼 게임별 경로라 URL 조립에 필요하다
         gameTitle: true,
-        // 팀 음성채널 수가 모드에 따라 달라진다(킬내기는 2팀)
+        // 팀 음성채널 수·정원이 모드에 따라 달라진다(킬내기는 2팀)
         pubgGameMode: true,
+        // 카테고리 이름에 붙일 스배/카배 태그
+        pubgPlatform: true,
         maxParticipants: true,
         scheduledAt: true,
         createdAt: true,
@@ -239,9 +242,10 @@ export class DiscordScheduleService {
     name: string;
     maxParticipants: number;
     discordCategoryId: string | null;
-    // 팀 음성채널 수는 게임·모드마다 다르다(롤 5인 / 배그 4인 / 킬내기는 2팀)
+    // 팀 음성채널 수·정원이 게임·모드마다 다르다(롤 5인 / 배그 4인 / 킬내기는 2팀)
     gameTitle: GameTitle;
     pubgGameMode: PubgGameMode | null;
+    pubgPlatform: PubgPlatform | null;
   }): Promise<void> {
     await this.prisma.room.update({
       where: { id: room.id },
@@ -252,14 +256,19 @@ export class DiscordScheduleService {
     // 시작 직전인 지금이 만들 시점이다.
     if (!room.discordCategoryId) {
       try {
+        const shape = {
+          gameTitle: room.gameTitle,
+          pubgGameMode: room.pubgGameMode,
+          maxParticipants: room.maxParticipants,
+        };
         const channels = await this.voiceService.createRoomChannels(
           room.id,
-          room.name,
-          teamCountForRoom({
-            gameTitle: room.gameTitle,
-            pubgGameMode: room.pubgGameMode,
+          roomDisplayName(room),
+          teamCountForRoom(shape),
+          {
+            teamSize: teamSizeForRoom(shape),
             maxParticipants: room.maxParticipants,
-          }),
+          },
         );
         await this.prisma.room.update({
           where: { id: room.id },

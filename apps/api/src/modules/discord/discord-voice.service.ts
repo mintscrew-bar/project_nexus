@@ -302,6 +302,14 @@ export class DiscordVoiceService {
     roomId: string,
     roomName: string,
     numTeams: number,
+    /**
+     * 채널 정원을 정하는 값.
+     *
+     * 넘기지 않으면 롤 기준(팀 5인)으로 둔다. 배그는 팀 인원이 모드마다 달라
+     * (배틀로얄 4인 스쿼드, 킬내기 3~8인) 고정값을 쓰면 8대8 깐부킬내기에서
+     * 8명이 5인 채널에 못 들어간다.
+     */
+    shape?: { teamSize?: number; maxParticipants?: number },
   ): Promise<{
     categoryId: string;
     teamChannels: Array<{ teamName: string; channelId: string }>;
@@ -360,11 +368,14 @@ export class DiscordVoiceService {
       }
 
       // Create lobby channel first (생성 순서로 맨 위 고정)
+      // 대기실은 방 전원이 들어갈 수 있어야 한다. 50 고정이면 100명 방의
+      // 절반이 못 들어간다. 디스코드 상한이 99라 그 이상은 제한 없음(0)으로 둔다.
+      const roomCapacity = shape?.maxParticipants ?? 50;
       const lobbyChannel = await guild.channels.create({
         name: "── 대기실 ──",
         type: ChannelType.GuildVoice,
         parent: category.id,
-        userLimit: 50,
+        userLimit: roomCapacity > 99 ? 0 : roomCapacity,
       });
 
       await this.prisma.roomDiscordChannel.create({
@@ -379,6 +390,9 @@ export class DiscordVoiceService {
       // Create team voice channels
       // displayName: Discord 채널 표시명, dbTeamName: snake-draft의 team.name과 매칟용 (Team 1, Team 2...)
       const teamChannels: Array<{ teamName: string; channelId: string }> = [];
+
+      // 팀 채널 정원도 게임·모드를 따른다. 넘기지 않으면 롤 기준(5인)이다.
+      const teamChannelLimit = Math.min(99, Math.max(1, shape?.teamSize ?? 5));
 
       // 팀이 너무 많으면 팀 채널을 만들지 않는다. 대기실은 그대로 둔다.
       const teamChannelCount =
@@ -397,7 +411,7 @@ export class DiscordVoiceService {
           name: displayName,
           type: ChannelType.GuildVoice,
           parent: category.id,
-          userLimit: 5,
+          userLimit: teamChannelLimit,
         });
 
         teamChannels.push({ teamName: dbTeamName, channelId: channel.id });
@@ -712,7 +726,11 @@ export class DiscordVoiceService {
   // Channel Update (방 설정 변경 시 팀 채널 동기화)
   // ========================================
 
-  async updateRoomChannels(roomId: string, newNumTeams: number): Promise<void> {
+  async updateRoomChannels(
+    roomId: string,
+    newNumTeams: number,
+    shape?: { teamSize?: number },
+  ): Promise<void> {
     const guildId = await this.resolveRoomGuildId(roomId);
     if (!guildId) return;
 
@@ -757,7 +775,8 @@ export class DiscordVoiceService {
           name: displayName,
           type: ChannelType.GuildVoice,
           parent: room.discordCategoryId,
-          userLimit: 5,
+          // 생성 때와 같은 기준. 팀 인원은 게임·모드마다 다르다.
+          userLimit: Math.min(99, Math.max(1, shape?.teamSize ?? 5)),
         });
 
         await this.prisma.roomDiscordChannel.create({

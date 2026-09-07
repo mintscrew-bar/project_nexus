@@ -126,10 +126,12 @@ describe("DiscordScheduleService.processScheduledRooms", () => {
 
     await service.processScheduledRooms();
 
+    // 채널 정원은 게임·모드를 따라간다. 롤은 팀 5인이고 대기실은 방 정원만큼.
     expect(voiceService.createRoomChannels).toHaveBeenCalledWith(
       "room-1",
       "9월 1일 내전",
       2,
+      { teamSize: 5, maxParticipants: 10 },
     );
     expect(prisma.room.update).toHaveBeenCalledWith({
       where: { id: "room-1" },

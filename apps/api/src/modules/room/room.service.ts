@@ -28,6 +28,7 @@ import { randomInt } from "crypto";
 import {
   normalizeSeriesPreset,
   teamCountForRoom,
+  teamSizeForRoom,
   isValidRoomSize,
   getGame,
   getPubgGameMode,
@@ -1209,8 +1210,18 @@ export class RoomService {
         // 카테고리 + 내전 대기실 + 팀별 음성채널 생성
         const channelData = await this.discordVoiceService.createRoomChannels(
           room.id,
-          room.name,
+          // 배그 방은 카테고리 이름에도 스배/카배가 드러나야 한다.
+          roomDisplayName(room),
           numTeams,
+          {
+            // 팀 채널 정원·대기실 정원이 게임과 모드를 따라간다.
+            teamSize: teamSizeForRoom({
+              gameTitle,
+              pubgGameMode,
+              maxParticipants: dto.maxParticipants,
+            }),
+            maxParticipants: dto.maxParticipants,
+          },
         );
         lobbyVoiceChannelId = channelData.lobbyChannelId;
 
@@ -2429,7 +2440,13 @@ export class RoomService {
           maxParticipants: updates.maxParticipants,
         });
         this.discordVoiceService
-          .updateRoomChannels(roomId, newNumTeams)
+          .updateRoomChannels(roomId, newNumTeams, {
+            teamSize: teamSizeForRoom({
+              gameTitle: room.gameTitle,
+              pubgGameMode: room.pubgGameMode,
+              maxParticipants: updates.maxParticipants,
+            }),
+          })
           .catch((err: Error) =>
             this.logger.warn(`Discord channel update failed: ${err.message}`),
           );
