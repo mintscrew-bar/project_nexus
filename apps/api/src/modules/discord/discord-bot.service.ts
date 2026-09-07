@@ -42,6 +42,14 @@ import { formatKst, parseKstSchedule } from "./discord-schedule-time";
 import type { EmojiMap, RecruitEmojiName } from "./discord-emoji.service";
 import { roomBracketUrl, roomLobbyUrl } from "../../common/utils/app-url.util";
 import { roomDisplayName } from "../../common/utils/room-title.util";
+import {
+  DEFAULT_PUBG_GAME_MODE,
+  GAMES,
+  PUBG_PLATFORM_LABELS,
+  getPubgGameMode,
+  type PubgGameMode,
+  type PubgPlatform,
+} from "@nexus/types";
 
 // 티어 이모지 맵핑
 const TIER_EMOJI: Record<string, string> = {
@@ -572,6 +580,9 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
       select: {
         id: true,
         name: true,
+        // 배그 방 제목에 스배/카배 태그를 붙이려면 함께 읽어야 한다
+        gameTitle: true,
+        pubgPlatform: true,
         status: true,
         maxParticipants: true,
         createdAt: true,
@@ -641,7 +652,7 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
         const when = Math.floor(
           (room.scheduledAt ?? room.createdAt).getTime() / 1000,
         );
-        return `<t:${when}:d> **${room.name}** — ${room.participants.length}/${room.maxParticipants} · ${
+        return `<t:${when}:d> **${roomDisplayName(room)}** — ${room.participants.length}/${room.maxParticipants} · ${
           ROOM_STATUS_KR[room.status] ?? room.status
         }`;
       })
@@ -1091,17 +1102,60 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
                   { name: "자유 팀 선택", value: "MANUAL_TEAM" },
                 ),
             )
+            .addStringOption((opt) =>
+              opt
+                .setName("game")
+                .setDescription("어떤 게임의 내전인지 (기본: 롤)")
+                .setRequired(false)
+                .addChoices(
+                  { name: "리그 오브 레전드", value: "LOL" },
+                  { name: "배틀그라운드", value: "PUBG" },
+                ),
+            )
+            .addStringOption((opt) =>
+              opt
+                .setName("pubgmode")
+                .setDescription("배그 경기 모드 (배그일 때 필수)")
+                .setRequired(false)
+                .addChoices(
+                  { name: "킬내기", value: "KILL_MATCH" },
+                  { name: "배틀로얄 내전", value: "BATTLE_ROYALE" },
+                  { name: "자유 매치", value: "FREE_MATCH" },
+                ),
+            )
+            .addStringOption((opt) =>
+              opt
+                .setName("platform")
+                .setDescription("배그 플랫폼 (배그일 때 필수)")
+                .setRequired(false)
+                .addChoices(
+                  { name: "스팀 배그 (스배)", value: "STEAM" },
+                  { name: "카카오 배그 (카배)", value: "KAKAO" },
+                ),
+            )
             .addIntegerOption((opt) =>
               opt
                 .setName("size")
-                .setDescription("정원 (기본: 10명)")
+                .setDescription("정원 (게임·모드에 맞는 값을 고르세요)")
                 .setRequired(false)
+                // 디스코드 선택지는 조건부로 바꿀 수 없어 세 게임·모드를 한
+                // 목록에 담고, 맞지 않는 조합은 서버가 걸러 이유를 돌려준다.
                 .addChoices(
-                  { name: "10명 (5v5)", value: 10 },
-                  { name: "15명 (3팀)", value: 15 },
-                  { name: "20명 (4팀)", value: 20 },
-                  { name: "30명 (6팀)", value: 30 },
-                  { name: "40명 (8팀)", value: 40 },
+                  { name: "[롤] 10명 (5v5)", value: 10 },
+                  { name: "[롤] 15명 (3팀)", value: 15 },
+                  { name: "[롤] 20명 (4팀)", value: 20 },
+                  { name: "[롤] 30명 (6팀)", value: 30 },
+                  { name: "[롤] 40명 (8팀)", value: 40 },
+                  { name: "[배그 킬내기] 6명 (3대3)", value: 6 },
+                  { name: "[배그 킬내기] 8명 (4대4)", value: 8 },
+                  { name: "[배그 킬내기] 14명 (7대7 깐부)", value: 14 },
+                  { name: "[배그 킬내기] 16명 (8대8 깐부)", value: 16 },
+                  { name: "[배그 배틀로얄] 32명 (8팀)", value: 32 },
+                  { name: "[배그 배틀로얄] 40명 (10팀)", value: 40 },
+                  { name: "[배그 배틀로얄] 48명 (12팀)", value: 48 },
+                  { name: "[배그 배틀로얄] 64명 (16팀)", value: 64 },
+                  { name: "[배그 배틀로얄] 80명 (20팀)", value: 80 },
+                  { name: "[배그 배틀로얄] 100명 (25팀)", value: 100 },
                 ),
             )
             .addStringOption((opt) =>
@@ -1709,6 +1763,7 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
           value: [
             "`/nexus rooms` - 활성 방 목록 (대기~역할선택~진행중)",
             "`/nexus schedule <시간> <모드>` - 내전 예약 개설",
+            "  └ 배그는 `game:배틀그라운드` + `pubgmode` + `platform` 을 함께",
             "`/nexus team` - 현재 팀 정보",
             "`/nexus rules` - 서버 규칙 게시 (관리자)",
             "`/nexus verify` - 서버 기본 역할 받기",
@@ -1889,6 +1944,10 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
       select: {
         id: true,
         name: true,
+        // 방 목록에 스배/카배와 배그 모드를 표시하려면 함께 읽어야 한다
+        gameTitle: true,
+        pubgPlatform: true,
+        pubgGameMode: true,
         status: true,
         teamMode: true,
         isPrivate: true,
@@ -1941,12 +2000,19 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
               : "자유 팀 선택";
       const lockIcon = room.isPrivate ? "🔒" : "🔓";
 
+      // 배그는 "팀 편성 방식"과 "경기 모드"가 별개다. 둘 다 보여야
+      // 킬내기인지 배틀로얄인지 목록에서 구분된다.
+      const gameModeText =
+        room.gameTitle === "PUBG" && room.pubgGameMode
+          ? `${getPubgGameMode(room.pubgGameMode).label} · `
+          : "";
+
       embed.addFields({
         name: `${statusEmoji} ${roomDisplayName(room)} ${lockIcon}`,
         value: [
           `**호스트:** ${room.host.username}`,
           `**인원:** ${room._count.participants}/${room.maxParticipants}`,
-          `**모드:** ${modeText}`,
+          `**모드:** ${gameModeText}${modeText}`,
           `**상태:** ${ROOM_STATUS_KR[room.status] ?? room.status}`,
         ].join("\n"),
         inline: true,
@@ -2737,6 +2803,9 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
         name: string;
         maxParticipants: number;
         teamMode: any;
+        gameTitle?: any;
+        pubgGameMode?: any;
+        pubgPlatform?: any;
         discordGuildId?: string;
         scheduledAt?: string;
       },
@@ -2859,7 +2928,30 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
     }
 
     const teamMode = interaction.options.getString("mode", true);
-    const maxParticipants = interaction.options.getInteger("size") ?? 10;
+    const gameTitle = interaction.options.getString("game") ?? "LOL";
+    const pubgGameMode = interaction.options.getString("pubgmode");
+    const pubgPlatform = interaction.options.getString("platform");
+
+    if (gameTitle === "PUBG" && !pubgPlatform) {
+      await interaction.editReply(
+        "❌ 배그 방은 플랫폼(스배/카배)을 골라야 합니다. `platform` 을 지정해주세요.",
+      );
+      return;
+    }
+
+    // 기본 정원은 게임·모드마다 다르다. 롤 10명을 배그 방에 그대로 쓰면
+    // "정원은 6, 8, 14, 16명 중에서" 같은 오류로 튕긴다.
+    const resolvedPubgMode =
+      gameTitle === "PUBG"
+        ? ((pubgGameMode as PubgGameMode) ?? DEFAULT_PUBG_GAME_MODE)
+        : null;
+    const defaultSize =
+      gameTitle === "PUBG"
+        ? (getPubgGameMode(resolvedPubgMode!).roomSizes[0] ?? 8)
+        : 10;
+    const maxParticipants =
+      interaction.options.getInteger("size") ?? defaultSize;
+
     const name =
       interaction.options.getString("name")?.trim() ||
       `${formatKst(scheduledAt)} 내전`;
@@ -2880,14 +2972,24 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
         name,
         maxParticipants,
         teamMode,
+        gameTitle,
+        ...(gameTitle === "PUBG"
+          ? { pubgGameMode: resolvedPubgMode, pubgPlatform }
+          : {}),
         ...(ownedLink ? { discordGuildId: ownedLink.guildId } : {}),
         scheduledAt: scheduledAt.toISOString(),
       });
 
       const unix = Math.floor(scheduledAt.getTime() / 1000);
+      const gameLabel =
+        gameTitle === "PUBG"
+          ? `${getPubgGameMode(resolvedPubgMode!).label} · ${
+              PUBG_PLATFORM_LABELS[pubgPlatform as PubgPlatform].short
+            }`
+          : GAMES.LOL.label;
       await interaction.editReply(
         [
-          `✅ **${name}** 예약 완료 — <t:${unix}:F> (<t:${unix}:R>)`,
+          `✅ **${name}** (${gameLabel}) 예약 완료 — <t:${unix}:F> (<t:${unix}:R>)`,
           "모집 공지를 올렸습니다. 시작 1시간 전과 10분 전에 다시 알려드릴게요.",
           `로비: ${roomLobbyUrl(appUrl, room!.id, room?.gameTitle)}`,
         ].join("\n"),

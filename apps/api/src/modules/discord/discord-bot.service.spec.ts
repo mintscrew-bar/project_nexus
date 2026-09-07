@@ -604,3 +604,121 @@ describe("DiscordBotService 교차 서버 공지 사본", () => {
     expect(render("롤파크")).toContain("nexus_join_room:room-1");
   });
 });
+
+/**
+ * 배그 방을 디스코드에서 여는 경로.
+ *
+ * `/nexus schedule` 이 롤 전용이라 봇으로는 배그 방을 못 열고 있었다.
+ * 게임·경기 모드·플랫폼을 받아 그대로 넘기는지, 그리고 게임에 맞는 기본 정원을
+ * 고르는지를 본다 — 롤 기본값 10명을 배그에 그대로 쓰면 정원 오류로 튕긴다.
+ */
+describe("DiscordBotService 배그 예약 개설", () => {
+  const config = {
+    get: jest.fn((key: string) =>
+      key === "APP_URL" ? "https://labs-nexus.com" : "",
+    ),
+  };
+  const prisma = {
+    authProvider: {
+      findFirst: jest.fn().mockResolvedValue({ userId: "user-1" }),
+    },
+    discordGuildLink: { findFirst: jest.fn().mockResolvedValue(null) },
+  };
+  const eventEmitter = { emit: jest.fn() };
+  const redis = { get: jest.fn(), set: jest.fn(), del: jest.fn() };
+  const emojiService = { ensureRecruitEmojis: jest.fn() };
+
+  let service: DiscordBotService;
+  let createRoom: jest.Mock;
+  let reply: jest.Mock;
+
+  const makeInteraction = (options: Record<string, unknown>) => {
+    reply = jest.fn();
+    return {
+      guildId: "guild-1",
+      user: { id: "discord-1" },
+      deferReply: jest.fn(),
+      editReply: reply,
+      options: {
+        getString: (name: string, _required?: boolean) =>
+          (options[name] as string) ?? null,
+        getInteger: (name: string) => (options[name] as number) ?? null,
+      },
+    } as any;
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    service = new DiscordBotService(
+      config as any,
+      prisma as any,
+      eventEmitter as any,
+      redis as any,
+      emojiService as any,
+    );
+    createRoom = jest
+      .fn()
+      .mockResolvedValue({ id: "room-1", gameTitle: "PUBG" });
+    service.setRoomJoiner({ joinRoom: jest.fn(), createRoom } as any);
+  });
+
+  const schedule = (interaction: any) =>
+    (service as any).handleScheduleCommand(interaction);
+
+  it("배그 킬내기 방을 만든다", async () => {
+    await schedule(
+      makeInteraction({
+        time: "21:00",
+        mode: "AUCTION",
+        game: "PUBG",
+        pubgmode: "KILL_MATCH",
+        platform: "STEAM",
+        size: 8,
+      }),
+    );
+
+    expect(createRoom).toHaveBeenCalledTimes(1);
+    const dto = createRoom.mock.calls[0][1];
+    expect(dto.gameTitle).toBe("PUBG");
+    expect(dto.pubgGameMode).toBe("KILL_MATCH");
+    expect(dto.pubgPlatform).toBe("STEAM");
+    expect(dto.maxParticipants).toBe(8);
+  });
+
+  it("정원을 안 주면 그 모드의 기본 정원을 쓴다", async () => {
+    // 롤 기본값 10명을 배그에 그대로 쓰면 "정원은 32, 40 … 중에서"로 튕긴다.
+    await schedule(
+      makeInteraction({
+        time: "21:00",
+        mode: "MANUAL_TEAM",
+        game: "PUBG",
+        pubgmode: "BATTLE_ROYALE",
+        platform: "KAKAO",
+      }),
+    );
+    expect(createRoom.mock.calls[0][1].maxParticipants).toBe(32);
+  });
+
+  it("배그인데 플랫폼을 안 고르면 만들지 않는다", async () => {
+    // 스배와 카배는 같이 플레이할 수 없어 방마다 확정돼야 한다.
+    await schedule(
+      makeInteraction({
+        time: "21:00",
+        mode: "AUCTION",
+        game: "PUBG",
+        pubgmode: "KILL_MATCH",
+      }),
+    );
+    expect(createRoom).not.toHaveBeenCalled();
+    expect(reply.mock.calls[0][0]).toContain("플랫폼");
+  });
+
+  it("게임을 안 고르면 롤이고 배그 필드는 넘기지 않는다", async () => {
+    await schedule(makeInteraction({ time: "21:00", mode: "AUCTION" }));
+    const dto = createRoom.mock.calls[0][1];
+    expect(dto.gameTitle).toBe("LOL");
+    expect(dto.pubgGameMode).toBeUndefined();
+    expect(dto.pubgPlatform).toBeUndefined();
+    expect(dto.maxParticipants).toBe(10);
+  });
+});

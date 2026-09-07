@@ -35,6 +35,7 @@ import {
   DEFAULT_PUBG_GAME_MODE,
 } from "@nexus/types";
 import type { GameTitle as GameTitleValue } from "@nexus/types";
+import { roomDisplayName } from "../../common/utils/room-title.util";
 import { StreamerService } from "../streamer/streamer.service";
 import { RedisService } from "../redis/redis.service";
 import { BalanceScoreService } from "../common/balance-score.service";
@@ -1253,7 +1254,8 @@ export class RoomService {
                 target.channelId,
                 {
                   roomId: room.id,
-                  roomName: room.name,
+                  // 배그 방은 제목에 플랫폼 태그가 붙어야 스배/카배가 구분된다.
+                  roomName: roomDisplayName(room),
                   hostName: room.host.username,
                   maxPlayers: room.maxParticipants,
                   teamMode: room.teamMode,
