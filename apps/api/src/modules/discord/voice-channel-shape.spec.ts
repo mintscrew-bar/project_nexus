@@ -130,3 +130,70 @@ describe("스쿼드 분할", () => {
     expect(split(1, 2)).toEqual([1, 0]);
   });
 });
+
+/**
+ * 방 하나가 만드는 채널 수.
+ *
+ * 카테고리 1 + 대기실 1 + 스쿼드 채널. 디스코드는 카테고리당 50개,
+ * 서버당 500개가 한도다. 100명 배틀로얄(25스쿼드)이 그 안에 들어가야
+ * 대회 규모를 열 수 있다. 방이 끝나면 통째로 지워진다.
+ */
+describe("방당 채널 수", () => {
+  /** 서비스와 같은 상한 */
+  const MAX_TEAM_VOICE_CHANNELS = 30;
+  const DISCORD_CHANNELS_PER_CATEGORY = 50;
+
+  const channelCount = (room: {
+    gameTitle: "PUBG";
+    pubgGameMode: "KILL_MATCH" | "BATTLE_ROYALE";
+    maxParticipants: number;
+  }) => {
+    const squads = teamCountForRoom(room) * squadCountForRoom(room);
+    const teamChannels = squads <= MAX_TEAM_VOICE_CHANNELS ? squads : 0;
+    return { squads, total: 2 + teamChannels };
+  };
+
+  it("100명 배틀로얄은 25스쿼드 · 27채널로 한도 안에 들어간다", () => {
+    const room = {
+      gameTitle: "PUBG" as const,
+      pubgGameMode: "BATTLE_ROYALE" as const,
+      maxParticipants: 100,
+    };
+    const { squads, total } = channelCount(room);
+    expect(squads).toBe(25);
+    expect(total).toBe(27);
+    expect(total).toBeLessThan(DISCORD_CHANNELS_PER_CATEGORY);
+  });
+
+  it("모든 정원에서 스쿼드 채널이 생략되지 않는다", () => {
+    // 상한에 걸려 대기실만 남으면 100명이 한 채널에 몰려 통화가 불가능해진다.
+    const rooms = [
+      ...[6, 8, 14, 16].map((n) => ({
+        gameTitle: "PUBG" as const,
+        pubgGameMode: "KILL_MATCH" as const,
+        maxParticipants: n,
+      })),
+      ...[32, 40, 48, 64, 80, 100].map((n) => ({
+        gameTitle: "PUBG" as const,
+        pubgGameMode: "BATTLE_ROYALE" as const,
+        maxParticipants: n,
+      })),
+    ];
+    for (const room of rooms) {
+      const { squads, total } = channelCount(room);
+      expect(squads).toBeLessThanOrEqual(MAX_TEAM_VOICE_CHANNELS);
+      expect(total).toBe(2 + squads);
+      expect(total).toBeLessThan(DISCORD_CHANNELS_PER_CATEGORY);
+    }
+  });
+
+  it("8대8 깐부는 팀이 둘인데 채널은 넷", () => {
+    const { squads, total } = channelCount({
+      gameTitle: "PUBG",
+      pubgGameMode: "KILL_MATCH",
+      maxParticipants: 16,
+    });
+    expect(squads).toBe(4);
+    expect(total).toBe(6);
+  });
+});

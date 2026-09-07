@@ -289,14 +289,24 @@ export class DiscordVoiceService {
   // ========================================
 
   /**
-   * 팀 음성채널을 만들 최대 팀 수.
+   * 한 방에 만들 팀(스쿼드) 음성채널 상한.
    *
-   * 배그 배틀로얄은 25팀까지 간다. 그대로 만들면 방 하나에 27채널(카테고리 +
-   * 대기실 + 팀 25)이고, 순차 생성이라 디스코드 레이트에 걸리며 서버 채널
-   * 목록도 무너진다. 이 수를 넘으면 대기실만 만든다 — 큰 방은 어차피 스쿼드가
-   * 각자 통화를 쓴다.
+   * 100명 배틀로얄은 25스쿼드라 25개가 필요하고, 스쿼드끼리 통화가 갈려야
+   * 경기가 된다. 카테고리 하나에 27개(카테고리+대기실+25)면 디스코드 한도
+   * (카테고리당 50, 서버당 500) 안에 들어가고, 방이 끝나면 통째로 지워진다.
+   *
+   * 상한은 실수 방어용이다 — 정원표에 없는 값이 들어와도 서버 채널이
+   * 무한정 늘어나지 않게 막는다.
    */
-  private static readonly MAX_TEAM_VOICE_CHANNELS = 12;
+  private static readonly MAX_TEAM_VOICE_CHANNELS = 30;
+
+  /**
+   * 채널을 연달아 만들 때 사이에 두는 간격.
+   *
+   * 25개를 한 번에 몰아치면 디스코드 레이트에 걸려 discord.js 가 큐에
+   * 쌓아두고 기다린다. 조금씩 띄우는 편이 전체적으로 더 빠르고 실패도 적다.
+   */
+  private static readonly CHANNEL_CREATE_DELAY_MS = 350;
 
   async createRoomChannels(
     roomId: string,
@@ -442,6 +452,12 @@ export class DiscordVoiceService {
               teamName: dbTeamName, // 생성 순서와 함께 팀 매칭 키로 쓴다
             },
           });
+
+          // 마지막 채널 뒤에는 기다리지 않는다.
+          const isLast = i === numTeams - 1 && squad === squadsPerTeam - 1;
+          if (!isLast) {
+            await this.delay(DiscordVoiceService.CHANNEL_CREATE_DELAY_MS);
+          }
         }
       }
 
