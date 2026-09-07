@@ -154,3 +154,64 @@ describe("RoleSelectionService timer extension", () => {
     );
   });
 });
+
+describe("RoleSelectionService 편성 확정 — 게임별 경로", () => {
+  const roomWithTeams = {
+    id: "room-1",
+    hostId: "host-1",
+    teams: [{ id: "team-1", members: [] }],
+  };
+
+  const makePrisma = (gameTitle: string, pubgGameMode: string | null) => ({
+    room: {
+      // 1) 게임 판단용 조회 2) 팀 조회 3) 확정 후 재조회
+      findUnique: jest
+        .fn()
+        .mockResolvedValueOnce({ gameTitle, pubgGameMode })
+        .mockResolvedValueOnce(roomWithTeams)
+        .mockResolvedValue(roomWithTeams),
+      update: jest.fn().mockResolvedValue({}),
+    },
+    teamMember: { findMany: jest.fn().mockResolvedValue([]) },
+  });
+
+  it.each(["BATTLE_ROYALE", "KILL_MATCH", "FREE_MATCH"])(
+    "배그 %s 방은 대진표를 만들지 않는다",
+    async (mode) => {
+      // 대진표는 2~8팀만 만들 수 있어 12팀 이상 배그 방은 여기서 막혔다.
+      // 자유 매치는 결과를 남기지 않는 방이라 더더욱 만들 대진표가 없다.
+      const prisma = makePrisma("PUBG", mode);
+      const matchService = { generateBracket: jest.fn() };
+      const service = new RoleSelectionService(
+        prisma as any,
+        matchService as any,
+      );
+
+      await service.completeRoleSelection("room-1");
+
+      expect(matchService.generateBracket).not.toHaveBeenCalled();
+      expect(prisma.room.update).toHaveBeenCalledWith({
+        where: { id: "room-1" },
+        data: { status: RoomStatus.IN_PROGRESS },
+      });
+    },
+  );
+
+  it("롤 방은 그대로 대진표를 만든다", async () => {
+    const prisma = makePrisma("LOL", null);
+    // 라인 검사를 통과시킨다 — 여기서 보려는 건 대진표 생성 여부다.
+    prisma.teamMember.findMany.mockResolvedValue([]);
+    const matchService = { generateBracket: jest.fn().mockResolvedValue({}) };
+    const service = new RoleSelectionService(
+      prisma as any,
+      matchService as any,
+    );
+
+    await service.completeRoleSelection("room-1");
+
+    expect(matchService.generateBracket).toHaveBeenCalledWith(
+      "host-1",
+      "room-1",
+    );
+  });
+});

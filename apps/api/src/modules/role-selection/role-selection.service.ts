@@ -446,7 +446,8 @@ export class RoleSelectionService {
    * 이름은 "역할 선택 완료"지만 자동 밸런스 확정 경로도 여기로 들어온다.
    * 게임에 따라 하는 일이 갈린다 —
    *   롤: 라인이 전부 정해졌는지 확인하고 대진표를 만든다
-   *   배그 배틀로얄·킬내기: 라인이 없고, 대진표가 아니라 스크림으로 간다
+   *   배그: 라인이 없고 대진표도 만들지 않는다. 배틀로얄·킬내기는 스크림이,
+   *        자유 매치는 방이 알아서 진행을 맡는다
    */
   async completeRoleSelection(roomId: string) {
     const gameOfRoom = await this.prisma.room.findUnique({
@@ -485,18 +486,17 @@ export class RoleSelectionService {
     }
 
     /**
-     * 라운드 누적 방식(배그 배틀로얄·킬내기)은 대진표를 만들지 않는다.
+     * 배그 방은 대진표를 만들지 않는다.
      *
-     * 대진표는 2의 거듭제곱에 가까운 팀 수를 전제로 짜여 있어 25팀에서는
-     * 애초에 만들어지지 않고, 만들어져도 배그에서는 쓰이지 않는다.
-     * 이 방들은 `Scrim` 이 진행을 맡는다.
+     * 대진표는 2~8팀만 만들 수 있는데 배그는 25팀까지 간다. 배틀로얄·킬내기는
+     * 라운드 누적(`Scrim`)이 진행을 맡고, 자유 매치는 애초에 결과를 남기지
+     * 않는 방이라 만들 대진표가 없다. 모드로 가르면 자유 매치가 롤 경로로
+     * 새어 들어가 12팀부터 "Unsupported team count" 로 시작 자체가 막힌다.
      */
-    const usesScrim =
-      !game.hasPositions &&
-      (gameOfRoom?.pubgGameMode === "BATTLE_ROYALE" ||
-        gameOfRoom?.pubgGameMode === "KILL_MATCH");
+    const skipBracket =
+      (gameOfRoom?.gameTitle ?? GameTitle.LOL) === GameTitle.PUBG;
 
-    if (usesScrim) {
+    if (skipBracket) {
       await this.prisma.room.update({
         where: { id: roomId },
         data: { status: RoomStatus.IN_PROGRESS },

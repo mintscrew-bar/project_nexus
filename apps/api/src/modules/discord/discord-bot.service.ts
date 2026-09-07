@@ -47,6 +47,7 @@ import {
   GAMES,
   PUBG_PLATFORM_LABELS,
   getPubgGameMode,
+  pubgGameModes,
   type PubgGameMode,
   type PubgPlatform,
 } from "@nexus/types";
@@ -1117,10 +1118,13 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
                 .setName("pubgmode")
                 .setDescription("배그 경기 모드 (배그일 때 필수)")
                 .setRequired(false)
+                // 목록은 코드에서 만든다 — 열 수 없는 모드를 봇에만 남기면
+                // 고를 수는 있는데 서버가 되돌려보낸다.
                 .addChoices(
-                  { name: "킬내기", value: "KILL_MATCH" },
-                  { name: "배틀로얄 내전", value: "BATTLE_ROYALE" },
-                  { name: "자유 매치", value: "FREE_MATCH" },
+                  ...pubgGameModes().map((mode) => ({
+                    name: mode.label,
+                    value: mode.mode,
+                  })),
                 ),
             )
             .addStringOption((opt) =>

@@ -275,6 +275,8 @@ export {
   DEFAULT_PUBG_GAME_MODE,
   getPubgGameMode,
   pubgGameModes,
+  allPubgGameModes,
+  isSelectablePubgGameMode,
   isValidPubgRoomSize,
   pubgRoomTitle,
   stripPubgTitlePrefix,

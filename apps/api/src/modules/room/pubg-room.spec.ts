@@ -1,5 +1,7 @@
 import {
   DEFAULT_PUBG_GAME_MODE,
+  allPubgGameModes,
+  isSelectablePubgGameMode,
   defaultPointRuleForMode,
   defaultPresetKeyForMode,
   getPubgGameMode,
@@ -65,10 +67,21 @@ describe("배그 경기 모드", () => {
     expect(br.resultShape).toBe("POINT_LEADERBOARD");
   });
 
-  it("자유 매치는 수동 배정만 쓰고 결과를 남기지 않는다", () => {
+  it("자유 매치는 지금 열 수 없다 — 값은 남기고 목록에서만 뺀다", () => {
     const free = getPubgGameMode("FREE_MATCH");
+    // 정의는 남아 있어야 한다. 이미 이 모드로 만들어진 방이 값을 읽는다.
     expect(free.teamModes).toEqual(["MANUAL_TEAM"]);
     expect(free.resultShape).toBe("NONE");
+    // 새 방 선택지에는 나오지 않는다.
+    expect(isSelectablePubgGameMode("FREE_MATCH")).toBe(false);
+    expect(pubgGameModes().map((mode) => mode.mode)).not.toContain(
+      "FREE_MATCH",
+    );
+    // 전체 목록에는 그대로 있다.
+    expect(allPubgGameModes().map((mode) => mode.mode)).toContain("FREE_MATCH");
+    // 킬내기·배틀로얄은 계속 열 수 있어야 한다.
+    expect(isSelectablePubgGameMode("KILL_MATCH")).toBe(true);
+    expect(isSelectablePubgGameMode("BATTLE_ROYALE")).toBe(true);
   });
 
   it("모드에 없는 정원은 거른다", () => {

@@ -33,6 +33,7 @@ import {
   isValidRoomSize,
   getGame,
   getPubgGameMode,
+  isSelectablePubgGameMode,
   isValidPubgRoomSize,
   DEFAULT_PUBG_GAME_MODE,
 } from "@nexus/types";
@@ -1042,6 +1043,12 @@ export class RoomService {
       const mode = dto.pubgGameMode ?? DEFAULT_PUBG_GAME_MODE;
       pubgGameMode = mode;
       const modeDef = getPubgGameMode(mode);
+      // 지금 열 수 없는 모드는 값이 남아 있어도 새 방으로는 못 만든다.
+      if (!isSelectablePubgGameMode(mode)) {
+        throw new BadRequestException(
+          `${modeDef.label}는 지금 열 수 없는 경기 모드입니다.`,
+        );
+      }
       if (!isValidPubgRoomSize(dto.maxParticipants, mode)) {
         throw new BadRequestException(
           `${modeDef.label} 정원은 ${modeDef.roomSizes.join(", ")}명 중에서 골라주세요.`,

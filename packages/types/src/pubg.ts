@@ -54,6 +54,13 @@ export interface PubgGameModeDefinition {
    */
   resultShape: "BRACKET" | "POINT_LEADERBOARD" | "NONE";
   teamModes: readonly GameTeamMode[];
+  /**
+   * 지금 새 방을 열 수 있는 모드인지.
+   *
+   * 값을 지우지 않고 플래그로 막는다 — 이미 이 모드로 만들어진 방과 기록이
+   * 값을 읽어야 하고, `PubgGameMode` enum 에서 빼면 그 행들이 깨진다.
+   */
+  selectable: boolean;
 }
 
 /**
@@ -72,6 +79,7 @@ const MODE_DEFINITIONS: Record<PubgGameMode, PubgGameModeDefinition> = {
     roomSizes: [32, 40, 48, 64, 80, 100],
     resultShape: "POINT_LEADERBOARD",
     teamModes: ["AUCTION", "SNAKE_DRAFT", "AUTO_BALANCE", "MANUAL_TEAM"],
+    selectable: true,
   },
   KILL_MATCH: {
     mode: "KILL_MATCH",
@@ -83,7 +91,16 @@ const MODE_DEFINITIONS: Record<PubgGameMode, PubgGameModeDefinition> = {
     roomSizes: [6, 8, 14, 16],
     resultShape: "POINT_LEADERBOARD",
     teamModes: ["AUCTION", "SNAKE_DRAFT", "AUTO_BALANCE", "MANUAL_TEAM"],
+    selectable: true,
   },
+  /**
+   * 자유 매치는 지금 열 수 없다(`selectable: false`).
+   *
+   * 결과를 남기지 않는 방이라 팀 확정 뒤 갈 곳이 없다 — 대진표로 보내면
+   * 대진표는 2~8팀만 만들 수 있어 12팀(48명)부터 시작 자체가 막히고,
+   * 스크림으로 보내면 "전적에 안 남긴다"는 정의가 무너진다.
+   * 진행 방식을 정하기 전까지는 목록에서 뺀다.
+   */
   FREE_MATCH: {
     mode: "FREE_MATCH",
     label: "자유 매치",
@@ -92,6 +109,7 @@ const MODE_DEFINITIONS: Record<PubgGameMode, PubgGameModeDefinition> = {
     roomSizes: [8, 16, 32, 48, 64, 80, 100],
     resultShape: "NONE",
     teamModes: ["MANUAL_TEAM"],
+    selectable: false,
   },
 };
 
@@ -107,8 +125,21 @@ export function getPubgGameMode(mode: PubgGameMode): PubgGameModeDefinition {
   return MODE_DEFINITIONS[mode];
 }
 
+/** 지금 새 방을 열 수 있는 모드만. 화면·봇의 선택지는 전부 이걸 쓴다. */
 export function pubgGameModes(): PubgGameModeDefinition[] {
+  return PUBG_GAME_MODES.map((mode) => MODE_DEFINITIONS[mode]).filter(
+    (definition) => definition.selectable,
+  );
+}
+
+/** 옛 방과 기록까지 포함한 전체 목록 */
+export function allPubgGameModes(): PubgGameModeDefinition[] {
   return PUBG_GAME_MODES.map((mode) => MODE_DEFINITIONS[mode]);
+}
+
+/** 새 방을 이 모드로 열 수 있는지 */
+export function isSelectablePubgGameMode(mode: PubgGameMode): boolean {
+  return MODE_DEFINITIONS[mode].selectable;
 }
 
 /** 이 모드에서 고를 수 있는 정원인지 */
