@@ -2466,13 +2466,17 @@ export class RoomService {
           pubgGameMode: room.pubgGameMode,
           maxParticipants: updates.maxParticipants,
         });
+        const nextShape = {
+          gameTitle: room.gameTitle,
+          pubgGameMode: room.pubgGameMode,
+          maxParticipants: updates.maxParticipants,
+        };
         this.discordVoiceService
           .updateRoomChannels(roomId, newNumTeams, {
-            teamSize: teamSizeForRoom({
-              gameTitle: room.gameTitle,
-              pubgGameMode: room.pubgGameMode,
-              maxParticipants: updates.maxParticipants,
-            }),
+            teamSize: teamSizeForRoom(nextShape),
+            // 깐부킬내기는 한 팀이 스쿼드 둘로 갈려 채널도 팀당 두 개다.
+            // 안 넘기면 채널 수를 팀 수로 착각해 멀쩡한 팀 채널을 지운다.
+            squadsPerTeam: squadCountForRoom(nextShape),
           })
           .catch((err: Error) =>
             this.logger.warn(`Discord channel update failed: ${err.message}`),

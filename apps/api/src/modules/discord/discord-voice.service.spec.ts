@@ -334,4 +334,140 @@ describe("DiscordVoiceService.getRoomAnnounceTargets", () => {
       }),
     );
   });
+  describe("updateRoomChannels — 스쿼드 분할", () => {
+    const createdAt = new Date("2026-09-08T00:00:00.000Z");
+
+    /** 팀당 스쿼드 2개인 깐부킬내기 방(2팀 = 채널 4개) */
+    const splitSquadChannels = [
+      { id: "row-1", channelId: "v1", teamName: "Team 1 A", createdAt },
+      {
+        id: "row-2",
+        channelId: "v2",
+        teamName: "Team 1 B",
+        createdAt: new Date(createdAt.getTime() + 1),
+      },
+      {
+        id: "row-3",
+        channelId: "v3",
+        teamName: "Team 2 A",
+        createdAt: new Date(createdAt.getTime() + 2),
+      },
+      {
+        id: "row-4",
+        channelId: "v4",
+        teamName: "Team 2 B",
+        createdAt: new Date(createdAt.getTime() + 3),
+      },
+      {
+        id: "row-0",
+        channelId: "lobby",
+        teamName: "Lobby",
+        createdAt: new Date(createdAt.getTime() - 1),
+      },
+    ];
+
+    const makeService = (channels: typeof splitSquadChannels) => {
+      const deleted: string[] = [];
+      const prisma: any = {
+        room: {
+          findUnique: jest.fn().mockResolvedValue({
+            id: "room-1",
+            discordCategoryId: "category-1",
+            discordChannels: channels,
+          }),
+        },
+        roomDiscordChannel: {
+          create: jest.fn().mockResolvedValue({}),
+          delete: jest.fn(async ({ where }: any) => {
+            deleted.push(where.id);
+            return {};
+          }),
+        },
+      };
+      const created: any[] = [];
+      const guild = {
+        channels: {
+          fetch: jest.fn(async (id: string) => ({
+            id,
+            delete: jest.fn().mockResolvedValue(undefined),
+          })),
+          create: jest.fn(async (options: any) => {
+            created.push(options);
+            return { id: `new-${created.length}` };
+          }),
+        },
+      };
+      const service = new DiscordVoiceService(
+        { get: jest.fn() } as any,
+        prisma as any,
+      );
+      service.setClient({
+        guilds: { fetch: jest.fn().mockResolvedValue(guild) },
+      } as any);
+      jest
+        .spyOn(service as any, "resolveRoomGuildId")
+        .mockResolvedValue("guild-1");
+      jest.spyOn(service as any, "delay").mockResolvedValue(undefined);
+      return { service, created, deleted };
+    };
+
+    it("팀이 줄면 스쿼드 단위로 지운다", async () => {
+      // 채널 4개를 팀 4개로 착각하면 2팀으로 줄일 때 "1팀 A·B"만 남기고
+      // 2팀을 통째로 날린다. 팀당 2채널이므로 지울 것은 2팀의 A·B 뿐이다.
+      const { service, deleted } = makeService(splitSquadChannels);
+
+      await service.updateRoomChannels("room-1", 2, {
+        teamSize: 8,
+        squadsPerTeam: 2,
+      });
+
+      expect(deleted).toEqual([]);
+    });
+
+    it("팀이 하나 줄면 그 팀의 스쿼드 채널만 지운다", async () => {
+      const { service, deleted } = makeService(splitSquadChannels);
+
+      await service.updateRoomChannels("room-1", 1, {
+        teamSize: 8,
+        squadsPerTeam: 2,
+      });
+
+      expect(deleted).toEqual(["row-3", "row-4"]);
+    });
+
+    it("팀이 늘면 스쿼드 수만큼 만들고 정원은 스쿼드 크기로 둔다", async () => {
+      const { service, created } = makeService(splitSquadChannels);
+
+      await service.updateRoomChannels("room-1", 3, {
+        teamSize: 8,
+        squadsPerTeam: 2,
+      });
+
+      expect(created.map((options) => options.name)).toEqual([
+        "┊ 3팀 A",
+        "┊ 3팀 B",
+      ]);
+      // 8대8은 4인 스쿼드 둘이라 채널 정원은 8이 아니라 4다.
+      expect(created.every((options) => options.userLimit === 4)).toBe(true);
+    });
+
+    it("스쿼드가 하나면 예전 그대로 팀당 채널 하나", async () => {
+      const single = [
+        { id: "row-1", channelId: "v1", teamName: "Team 1", createdAt },
+        {
+          id: "row-2",
+          channelId: "v2",
+          teamName: "Team 2",
+          createdAt: new Date(createdAt.getTime() + 1),
+        },
+      ];
+      const { service, created, deleted } = makeService(single as any);
+
+      await service.updateRoomChannels("room-1", 3, { teamSize: 5 });
+
+      expect(created.map((options) => options.name)).toEqual(["┊ 3팀"]);
+      expect(created[0].userLimit).toBe(5);
+      expect(deleted).toEqual([]);
+    });
+  });
 });
