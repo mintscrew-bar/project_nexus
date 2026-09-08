@@ -222,7 +222,8 @@ export default function TournamentsPage({
           isOpen={isCreatingRoom}
           onClose={() => setIsCreatingRoom(false)}
           title="새 내전 방 생성"
-          size="md"
+          // 설정을 좌우 두 칸으로 펴려면 md(448px)로는 좁다.
+          size="full"
         >
           <RoomCreationForm
             gameTitle={gameTitle}

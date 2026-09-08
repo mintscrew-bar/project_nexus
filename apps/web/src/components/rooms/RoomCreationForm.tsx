@@ -316,6 +316,17 @@ export function RoomCreationForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {/*
+        데스크톱에서는 좌우로 편다.
+
+        설정이 늘면서 한 줄로 세우면 모달이 끝없이 길어져, 아래쪽 팀 편성
+        설정을 보려면 위쪽 정원 설정이 화면 밖으로 나간다. 왼쪽은 "무슨
+        방인가"(제목·플랫폼·모드·정원), 오른쪽은 "팀을 어떻게 짜는가"로
+        나눈다. 모바일은 그대로 한 줄이다 — 좁은 화면에서 두 칸으로 쪼개면
+        칸마다 글자가 접힌다.
+      */}
+      <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
+        <div className="space-y-6">
       {/* 기본 정보 */}
       <div className="space-y-4">
         <div>
@@ -370,23 +381,38 @@ export function RoomCreationForm({
             >
               경기 모드
             </label>
-            <select
-              id="pubgGameMode"
-              value={pubgGameMode}
-              onChange={(e) =>
-                handlePubgModeChange(e.target.value as PubgGameMode)
-              }
-              className="w-full input"
-            >
+            {/*
+              경기 모드는 참가 인원과 같은 카드로 고른다.
+              드롭다운은 열기 전까지 선택지가 안 보여서, 배그에서 가장 먼저
+              정해야 하는 값을 정작 가장 안 보이게 둔다. 모드마다 정원과
+              결과 처리가 통째로 달라지므로 설명을 함께 보여야 한다.
+            */}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {pubgGameModes().map((mode) => (
-                <option key={mode.mode} value={mode.mode}>
-                  {mode.label}
-                </option>
+                <button
+                  key={mode.mode}
+                  type="button"
+                  onClick={() => handlePubgModeChange(mode.mode)}
+                  aria-pressed={pubgGameMode === mode.mode}
+                  className={`rounded-lg border-2 p-3 text-left transition-all ${
+                    pubgGameMode === mode.mode
+                      ? "border-accent-primary bg-accent-primary/10"
+                      : "border-bg-tertiary bg-bg-tertiary/50 hover:border-bg-elevated"
+                  }`}
+                >
+                  <div className="font-bold text-text-primary">
+                    {mode.label}
+                  </div>
+                  <div className="mt-1 text-xs leading-5 text-text-secondary">
+                    {mode.description}
+                  </div>
+                  <div className="mt-1 text-xs text-accent-primary">
+                    {mode.roomSizes[0]}~
+                    {mode.roomSizes[mode.roomSizes.length - 1]}명
+                  </div>
+                </button>
               ))}
-            </select>
-            <p className="mt-1 text-xs text-text-tertiary">
-              {getPubgGameMode(pubgGameMode).description}
-            </p>
+            </div>
           </div>
         )}
       </div>
@@ -550,6 +576,9 @@ export function RoomCreationForm({
           </span>
         </label>
       )}
+        </div>
+
+        <div className="space-y-6">
       <div>
         <label className="block text-text-primary text-sm font-semibold mb-3">
           <Trophy className="w-4 h-4 inline mr-2" />팀 구성 방식
@@ -826,6 +855,9 @@ export function RoomCreationForm({
               aria-labelledby="allow-spectators-label"
             />
           </div>
+        </div>
+      </div>
+
         </div>
       </div>
 
