@@ -13,6 +13,8 @@ import { CreatorPromoStrip } from './CreatorPromoStrip';
 import { ActiveRoomBanner } from './ActiveRoomBanner';
 import { useLobbyStore } from '@/stores/lobby-store';
 import { useCurrentGame } from '@/hooks/useCurrentGame';
+import { gameFromSlug } from '@nexus/types';
+import { rememberGame } from '@/lib/last-game';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -45,6 +47,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // 모달만 롤 색으로 뜬다.
   // 질감(.game-pubg-surface)은 래퍼 한 곳에만 — 두 겹으로 깔리면 안 된다.
   // ---------------------------------------------------------------
+  // 마지막으로 본 게임을 기억한다. 게임을 한 번 고른 사람에게 매번 다시
+  // 고르라고 하지 않기 위한 값이다. 경로로 게임이 특정되는 화면에서만 적는다 —
+  // 클랜·커뮤니티처럼 게임과 무관한 화면은 기본 게임으로 떨어지므로,
+  // 거기서 적으면 배그를 보던 사람의 기억이 롤로 덮인다.
+  useEffect(() => {
+    if (gameFromSlug(pathname.split('/')[1])) rememberGame(currentGame);
+  }, [pathname, currentGame]);
+
   const themeClass = currentGame === 'PUBG' ? 'game-pubg' : null;
   useEffect(() => {
     if (!themeClass) return;

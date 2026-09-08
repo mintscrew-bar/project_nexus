@@ -25,6 +25,7 @@ import { LiveStreamersSection } from "@/components/home/LiveStreamersSection";
 import { AutoBalanceDemo } from "./AutoBalanceDemo";
 import { LandingFeatureDemo } from "./LandingFeatureDemo";
 import { DEFAULT_GAME_PREFIX } from "@/lib/game-links";
+import { GamePickerCards } from "@/components/games/GamePickerCards";
 
 const operations: Array<{
   index: string;
@@ -881,6 +882,9 @@ export function LandingContentSections() {
           </div>
         </div>
       </section>
+
+      {/* 히어로 바로 아래. 본문을 가로막지 않으면서 게임 선택을 눈에 띄게 둔다. */}
+      <GamePickerCards />
 
       {/* 방송 중인 스트리머가 있을 때만 나타난다 (없으면 섹션째 렌더 안 함) */}
       <LiveStreamersSection className="mx-auto max-w-[1480px] px-5 py-10 sm:px-6" />

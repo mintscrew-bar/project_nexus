@@ -1,6 +1,8 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
+import { lastGameOrDefault } from "@/lib/last-game";
 import {
   DEFAULT_GAME,
   GAMES,
@@ -31,6 +33,24 @@ export function useCurrentGame(): GameTitle {
  */
 export function useGamePrefix(): string {
   return `/${GAMES[useCurrentGame()].slug}`;
+}
+
+/**
+ * 게임을 특정할 수 없는 화면(홈 대시보드)에서 쓸 게임 프리픽스.
+ *
+ * 경로로는 게임을 알 수 없어 `useGamePrefix()` 가 기본 게임으로 떨어진다.
+ * 그러면 배그만 하는 사람이 로그인 직후 홈에서 누르는 링크가 전부 롤로 간다.
+ * 마지막으로 본 게임을 기억해 두었다가 그걸 쓴다.
+ *
+ * **첫 렌더는 기본 게임으로 시작한다.** localStorage 는 서버에 없어서, 처음부터
+ * 읽은 값을 쓰면 SSR 결과와 어긋나 하이드레이션이 깨진다. 마운트 뒤에 바꾼다.
+ */
+export function useLastGamePrefix(): string {
+  const [game, setGame] = useState<GameTitle>(DEFAULT_GAME);
+  useEffect(() => {
+    setGame(lastGameOrDefault());
+  }, []);
+  return `/${GAMES[game].slug}`;
 }
 
 // 순수 함수·상수는 서버 컴포넌트에서도 필요해 별도 모듈에 둔다.
