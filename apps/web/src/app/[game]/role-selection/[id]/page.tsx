@@ -1,7 +1,8 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useGamePrefix } from "@/hooks/useCurrentGame";
+import { useCurrentGame, useGamePrefix } from "@/hooks/useCurrentGame";
+import { GAMES, afterTeamsPath } from "@nexus/types";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   useRoleSelectionStore,
@@ -44,7 +45,22 @@ export default function RoleSelectionPage() {
   const params = useParams();
   const router = useRouter();
   const gamePrefix = useGamePrefix();
+  const game = useCurrentGame();
   const roomId = params.id as string;
+
+  /**
+   * 역할 선택이 없는 게임(배그)은 이 화면에 올 일이 없다.
+   *
+   * 편성 경로는 이미 건너뛰지만 주소를 직접 치거나 옛 링크를 누르면 여기로
+   * 온다. 그때 라인 5개짜리 화면이 열리고, 서버는 "역할 선택 단계가
+   * 없습니다"만 돌려줘 아무것도 못 하는 상태로 남는다.
+   */
+  useEffect(() => {
+    if (GAMES[game].hasPositions) return;
+    router.replace(
+      afterTeamsPath({ id: roomId, gameTitle: game, teamMode: "MANUAL_TEAM" }, gamePrefix),
+    );
+  }, [game, roomId, gamePrefix, router]);
   const { addToast } = useToast();
   const { user } = useAuthStore();
   const hasRedirected = useRef(false);

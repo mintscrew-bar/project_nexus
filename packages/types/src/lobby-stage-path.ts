@@ -26,15 +26,11 @@ export function afterTeamsPath(room: StageRoom, gamePrefix: string): string {
   if (GAMES[room.gameTitle ?? DEFAULT_GAME].hasPositions) {
     return `${gamePrefix}/role-selection/${room.id}`;
   }
-  // 배틀로얄과 킬내기는 둘 다 라운드를 반복하며 포인트를 누적한다.
-  // 자유 매치만 결과를 남기지 않아 대진표로 간다.
-  if (
-    room.pubgGameMode === "BATTLE_ROYALE" ||
-    room.pubgGameMode === "KILL_MATCH"
-  ) {
-    return `${gamePrefix}/tournaments/${room.id}/scrim`;
-  }
-  return `${gamePrefix}/tournaments/${room.id}/bracket`;
+  // 포지션이 없는 게임은 대진표를 쓰지 않는다. 배그는 모드와 무관하게
+  // 라운드 화면으로 간다 — 대진표 생성 자체를 서버가 거부하므로 그쪽으로
+  // 보내면 빈 화면만 남는다. 모드를 모르는 호출부(드래프트 완료 등)도
+  // 같은 곳으로 보낼 수 있어야 한다.
+  return `${gamePrefix}/tournaments/${room.id}/scrim`;
 }
 
 /** 팀 편성 방식에 따른 다음 화면 */
@@ -54,10 +50,10 @@ export function getRoomStagePath(
   gamePrefix: string,
 ): string | null {
   if (room.status === "IN_PROGRESS") {
-    return room.pubgGameMode === "BATTLE_ROYALE" ||
-      room.pubgGameMode === "KILL_MATCH"
-      ? `${gamePrefix}/tournaments/${room.id}/scrim`
-      : `${gamePrefix}/tournaments/${room.id}/bracket`;
+    // 진행 중 화면도 게임으로 가른다. 배그는 라운드 화면이다.
+    return GAMES[room.gameTitle ?? DEFAULT_GAME].hasPositions
+      ? `${gamePrefix}/tournaments/${room.id}/bracket`
+      : `${gamePrefix}/tournaments/${room.id}/scrim`;
   }
 
   // 자동 밸런스는 편성 결과를 로비에서 확인하는 동안 그대로 머무른다.

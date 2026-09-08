@@ -43,10 +43,15 @@ describe("팀 편성 이후 경로", () => {
     ).toBe("/pubg/tournaments/r1/scrim");
   });
 
-  it("자유 매치만 결과를 남기지 않아 대진표로 간다", () => {
+  it("배그는 모드와 무관하게 대진표로 가지 않는다", () => {
+    // 서버가 배그 방의 대진표 생성을 거부하므로 그쪽으로 보내면 빈 화면만
+    // 남는다. 모드를 모르는 호출부(드래프트 완료 등)도 같은 곳으로 보낸다.
     expect(
       afterTeamsPath(pubgRoom({ pubgGameMode: "FREE_MATCH" }), "/pubg"),
-    ).toBe("/pubg/tournaments/r1/bracket");
+    ).toBe("/pubg/tournaments/r1/scrim");
+    expect(afterTeamsPath(pubgRoom({ pubgGameMode: null }), "/pubg")).toBe(
+      "/pubg/tournaments/r1/scrim",
+    );
   });
 
   it("모든 경로가 게임 프리픽스 아래에 있다", () => {

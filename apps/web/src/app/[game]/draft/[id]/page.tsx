@@ -1,7 +1,8 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useGamePrefix } from "@/hooks/useCurrentGame";
+import { useCurrentGame, useGamePrefix } from "@/hooks/useCurrentGame";
+import { afterTeamsPath } from "@nexus/types";
 import { useEffect, useRef, useState } from "react";
 import { useSnakeDraftStore } from "@/stores/snake-draft-store";
 import { useAuthStore } from "@/stores/auth-store";
@@ -17,6 +18,7 @@ export default function SnakeDraftPage() {
   const params = useParams();
   const router = useRouter();
   const gamePrefix = useGamePrefix();
+  const game = useCurrentGame();
   const draftId = params.id as string;
   const { addToast } = useToast();
   const hasRedirected = useRef(false);
@@ -55,7 +57,14 @@ export default function SnakeDraftPage() {
     if (hasRedirected.current) return;
     if (draftState?.status === "COMPLETED") {
       hasRedirected.current = true;
-      router.push(`${gamePrefix}/role-selection/${draftId}`);
+      // 배그에는 역할 선택 단계가 없다. 게임에 맞는 다음 화면으로 보낸다 —
+      // 고정해 두면 배그 드래프트가 끝나고 롤 역할 선택 화면이 열린다.
+      router.push(
+        afterTeamsPath(
+          { id: draftId, gameTitle: game, teamMode: "SNAKE_DRAFT" },
+          gamePrefix,
+        ),
+      );
     }
   }, [draftState?.status, draftId, router, gamePrefix]);
 
