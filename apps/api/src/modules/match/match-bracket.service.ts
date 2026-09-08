@@ -15,7 +15,9 @@ import {
   GameTitle,
 } from "@nexus/database";
 import {
+  DEFAULT_PUBG_GAME_MODE,
   getGame,
+  getPubgGameMode,
   normalizeSeriesPreset,
   resolveSeriesBestOf,
   teamSizeForRoom,
@@ -92,6 +94,27 @@ export class MatchBracketService {
     }
 
     const game = getGame(room.gameTitle ?? GameTitle.LOL);
+
+    /**
+     * 결과를 대진표로 가리지 않는 방은 여기서 막는다.
+     *
+     * 편성 확정 경로는 이미 배그를 건너뛰지만 이 메서드는 수동 엔드포인트
+     * (`POST /matches/rooms/:roomId/bracket`)로도 열려 있다. 그대로 두면
+     * 배틀로얄은 팀 수 제한에 걸려 알 수 없는 400 이 나고, 킬내기는
+     * 아무도 안 보는 대진표가 만들어져 Match 기록만 남는다.
+     * 모드의 결과 방식으로 가른다 — 게임으로 가르면 나중에 대진표를 쓰는
+     * 배그 모드가 생겼을 때 다시 막힌다.
+     */
+    const resultShape =
+      room.gameTitle === GameTitle.PUBG
+        ? getPubgGameMode(room.pubgGameMode ?? DEFAULT_PUBG_GAME_MODE)
+            .resultShape
+        : game.resultShape;
+    if (resultShape !== "BRACKET") {
+      throw new BadRequestException(
+        "이 경기 방식은 대진표를 쓰지 않습니다. 라운드 결과로 순위를 매깁니다.",
+      );
+    }
 
     // 역할 선택이 없는 게임(배그)은 편성이 끝나면 곧바로 대진표로 온다.
     // ROLE_SELECTION 만 통과시키면 배그 킬내기는 대진표를 아예 못 만든다.

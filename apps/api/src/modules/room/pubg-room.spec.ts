@@ -1,7 +1,9 @@
 import {
   DEFAULT_PUBG_GAME_MODE,
   allPubgGameModes,
+  getGame,
   isSelectablePubgGameMode,
+  type PubgGameMode,
   defaultPointRuleForMode,
   defaultPresetKeyForMode,
   getPubgGameMode,
@@ -205,5 +207,27 @@ describe("로비 팀 정원", () => {
     // 게임 축이 생기기 전 데이터가 남아 있다.
     expect(teamSizeForRoom({ maxParticipants: 10 })).toBe(5);
     expect(teamCountForRoom({ maxParticipants: 10 })).toBe(2);
+  });
+});
+
+describe("대진표를 쓰는 방식인지", () => {
+  /** match-bracket.service 가 쓰는 것과 같은 판단 */
+  const usesBracket = (gameTitle: "LOL" | "PUBG", mode: PubgGameMode | null) =>
+    (gameTitle === "PUBG"
+      ? getPubgGameMode(mode ?? DEFAULT_PUBG_GAME_MODE).resultShape
+      : getGame(gameTitle).resultShape) === "BRACKET";
+
+  it("롤만 대진표를 쓴다", () => {
+    expect(usesBracket("LOL", null)).toBe(true);
+  });
+
+  it("배그는 어느 모드도 대진표를 쓰지 않는다", () => {
+    // 배틀로얄·킬내기는 라운드 누적, 자유 매치는 결과를 남기지 않는다.
+    // 대진표는 2~8팀만 만들 수 있어 25팀 방은 만들어지지도 않는다.
+    for (const mode of allPubgGameModes()) {
+      expect(usesBracket("PUBG", mode.mode)).toBe(false);
+    }
+    // 모드가 비어 있는 옛 방도 마찬가지다.
+    expect(usesBracket("PUBG", null)).toBe(false);
   });
 });
