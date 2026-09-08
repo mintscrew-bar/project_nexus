@@ -22,7 +22,7 @@ import { discordApi } from "@/lib/api-client";
 import { useAuthStore } from "@/stores/auth-store";
 import { SeriesPresetSelector } from "./SeriesPresetSelector";
 import { Switch } from "@/components/ui/Switch";
-import { TEAM_MODE_GUIDES, TeamModeHelp, type TeamMode } from "./TeamModeHelp";
+import { teamModeGuides, TeamModeHelp, type TeamMode } from "./TeamModeHelp";
 import {
   DEFAULT_SERIES_PRESET,
   GAMES,
@@ -54,34 +54,42 @@ type DiscordGuildOption = {
   status: "PENDING" | "ACTIVE" | "DISABLED";
 };
 
-const TEAM_MODES: {
+/**
+ * 팀 구성 모드 목록.
+ *
+ * 설명 문안이 게임마다 다르다(배그에는 라인 선택도 대진표도 없다).
+ * 모듈 상수로 두면 롤 문안이 배그 화면에 그대로 박힌다.
+ */
+const buildTeamModes = (
+  guides: Record<TeamMode, { summary: string }>,
+): {
   value: TeamMode;
   label: string;
   description: string;
   icon: React.ReactNode;
-}[] = [
+}[] => [
   {
     value: "AUCTION",
     label: "경매 드래프트",
-    description: TEAM_MODE_GUIDES.AUCTION.summary,
+    description: guides.AUCTION.summary,
     icon: <Gavel className="w-5 h-5" />,
   },
   {
     value: "SNAKE_DRAFT",
     label: "스네이크 드래프트",
-    description: TEAM_MODE_GUIDES.SNAKE_DRAFT.summary,
+    description: guides.SNAKE_DRAFT.summary,
     icon: <ListOrdered className="w-5 h-5" />,
   },
   {
     value: "AUTO_BALANCE",
     label: "자동 밸런스",
-    description: TEAM_MODE_GUIDES.AUTO_BALANCE.summary,
+    description: guides.AUTO_BALANCE.summary,
     icon: <Scale className="w-5 h-5" />,
   },
   {
     value: "MANUAL_TEAM",
     label: "자유 팀 선택",
-    description: TEAM_MODE_GUIDES.MANUAL_TEAM.summary,
+    description: guides.MANUAL_TEAM.summary,
     icon: <ArrowLeftRight className="w-5 h-5" />,
   },
 ];
@@ -104,6 +112,9 @@ export function RoomCreationForm({
     DEFAULT_PUBG_GAME_MODE,
   );
   const game = GAMES[gameTitle];
+  // 팀 구성 설명은 게임마다 다르다. 방을 만들 게임 기준으로 고른다 —
+  // 이 폼은 경로가 아니라 고른 게임을 따라간다.
+  const TEAM_MODES = buildTeamModes(teamModeGuides(gameTitle));
   // 모드마다 참가 정원 선택지는 다르지만 배그 팀 인원은 항상 4명이다.
   const playerOptions =
     gameTitle !== "PUBG"

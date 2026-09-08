@@ -11,6 +11,8 @@ import {
 import { createPortal } from "react-dom";
 import { HelpCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useCurrentGame } from "@/hooks/useCurrentGame";
+import type { GameTitle } from "@nexus/types";
 
 export type TeamMode =
   "AUCTION" | "SNAKE_DRAFT" | "AUTO_BALANCE" | "MANUAL_TEAM";
@@ -22,7 +24,7 @@ interface TeamModeGuide {
   details: string[];
 }
 
-export const TEAM_MODE_GUIDES: Record<TeamMode, TeamModeGuide> = {
+const LOL_GUIDES: Record<TeamMode, TeamModeGuide> = {
   AUCTION: {
     label: "경매 드래프트",
     summary: "팀장이 보유 포인트로 선수를 입찰해 팀을 구성합니다.",
@@ -72,6 +74,74 @@ interface TeamModeHelpProps {
 }
 
 /** 팀 구성 방식과 무관하게 공통으로 진입하는 역할 선택 단계 안내 */
+
+/**
+ * 배그 문안.
+ *
+ * 롤 설명을 그대로 쓰면 툴팁이 "라인 선택 → 대진표"를 안내하는데 배그에는
+ * 둘 다 없다. 팀 정원도 5명이 아니라 4인 스쿼드다.
+ */
+const PUBG_GUIDES: Record<TeamMode, TeamModeGuide> = {
+  AUCTION: {
+    label: "경매 드래프트",
+    summary: "팀장이 보유 포인트로 팀원을 입찰해 스쿼드를 구성합니다.",
+    flow: "팀장 선정 → 팀원 경매 → 경기",
+    details: [
+      "자동·직접 지명·자원 모집 중 팀장 선정 방식을 고를 수 있습니다.",
+      "최고 입찰 팀이 팀원을 영입하며, 팀별 잔여 포인트가 실시간 반영됩니다.",
+      "배그는 라인 선택이 없어 편성이 끝나면 바로 경기로 넘어갑니다.",
+    ],
+  },
+  SNAKE_DRAFT: {
+    label: "스네이크 드래프트",
+    summary: "팀장이 순서를 번갈아 가며 팀원을 지명합니다.",
+    flow: "팀장 선정 → 픽 순서 추첨 → 교차 지명 → 경기",
+    details: [
+      "라운드마다 지명 순서가 반대로 바뀌어 선픽 이점을 보정합니다.",
+      "픽 순서는 사다리타기로 뽑아 모두에게 같은 화면으로 보여줍니다.",
+      "배그는 라인 선택이 없어 편성이 끝나면 바로 경기로 넘어갑니다.",
+    ],
+  },
+  AUTO_BALANCE: {
+    label: "자동 밸런스",
+    summary: "NEXUS 편성 점수로 스쿼드를 고르게 나눕니다.",
+    flow: "전원 준비 → 자동 편성 → 방장 검토·재편성 → 확정",
+    details: [
+      "설정한 정원이 모두 참가하고 준비해야 시작할 수 있습니다.",
+      "라인별 점수가 아니라 NEXUS 편성 점수를 뱀 순서로 나눠 담습니다.",
+      "점수가 없는 참가자는 참가자 평균으로 두고 몇 명이었는지 알려줍니다.",
+    ],
+  },
+  MANUAL_TEAM: {
+    label: "자유 팀 선택",
+    summary: "참가자가 로비에서 원하는 스쿼드로 직접 이동합니다.",
+    flow: "스쿼드 직접 선택 → 전원 준비 → 경기",
+    details: [
+      "설정한 정원이 모두 참가하고 각 스쿼드를 4명씩 채워야 합니다.",
+      "팀을 이동하거나 대기석으로 나오면 준비 상태가 해제됩니다.",
+      "배그는 라인 선택이 없어 확정 뒤 바로 경기로 넘어갑니다.",
+    ],
+  },
+};
+
+const GUIDES_BY_GAME: Record<GameTitle, Record<TeamMode, TeamModeGuide>> = {
+  LOL: LOL_GUIDES,
+  PUBG: PUBG_GUIDES,
+};
+
+/** 그 게임의 팀 구성 설명. 방 만들기·설정 화면의 모드 목록이 쓴다. */
+export function teamModeGuides(
+  game: GameTitle,
+): Record<TeamMode, TeamModeGuide> {
+  return GUIDES_BY_GAME[game] ?? LOL_GUIDES;
+}
+
+/**
+ * 게임을 특정할 수 없는 자리에서 쓰는 기본값.
+ * 화면 안에서는 `teamModeGuides(game)` 를 쓴다.
+ */
+export const TEAM_MODE_GUIDES = LOL_GUIDES;
+
 export function RoleSelectionHelp({ compact = false }: { compact?: boolean }) {
   const tooltipId = useId();
   const [open, setOpen] = useState(false);
@@ -125,7 +195,8 @@ export function TeamModeHelp({
   const [open, setOpen] = useState(false);
   const [pinned, setPinned] = useState(false);
   const [position, setPosition] = useState<CSSProperties>({});
-  const guide = TEAM_MODE_GUIDES[mode];
+  // 툴팁은 화면 안에서만 뜬다. 경로로 게임을 알 수 있다.
+  const guide = teamModeGuides(useCurrentGame())[mode];
 
   const updatePosition = useCallback(() => {
     const trigger = triggerRef.current;
