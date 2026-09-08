@@ -18,7 +18,9 @@ import {
   type StreamerLink,
   pubgApi,
   type PubgPlayerLookupResult,
+  type PubgHistoryResponse,
 } from "@/lib/api-client";
+import { PubgMatchHistory } from "@/components/pubg/PubgMatchHistory";
 import { AddAccountModal } from "@/components/domain/AddAccountModal";
 import { EditAccountModal } from "@/components/domain/EditAccountModal";
 import { ChampionImage } from "@/components/ChampionImage";
@@ -798,7 +800,7 @@ function ProfileOverviewStat({
 function PubgProfilePage() {
   const router = useRouter();
   const gamePrefix = useGamePrefix();
-  const { isAuthenticated, isLoading: authLoading } = useAuthStore();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuthStore();
   const [accounts, setAccounts] = useState<any[]>([]);
   const [playerName, setPlayerName] = useState("");
   // 등록은 두 단계다 — 닉네임으로 계정을 찾아 보여주고, 확인한 뒤에 등록한다.
@@ -835,6 +837,10 @@ function PubgProfilePage() {
             ? "4"
             : "5";
 
+  // 전적은 계정 목록과 따로 받는다. 전적을 못 받아도 계정 카드는 떠야 한다.
+  const [history, setHistory] = useState<PubgHistoryResponse | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(true);
+
   const loadAccounts = useCallback(async () => {
     try {
       setLoading(true);
@@ -853,6 +859,25 @@ function PubgProfilePage() {
     }
     if (isAuthenticated) void loadAccounts();
   }, [authLoading, isAuthenticated, loadAccounts, router]);
+
+  // 전적 조회. 계정이 없어도 부른다 — 계정을 지운 뒤에도 지난 내전 기록은 남는다.
+  useEffect(() => {
+    if (!isAuthenticated || !user?.id) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const data = await pubgApi.getHistory(user.id);
+        if (!cancelled) setHistory(data);
+      } catch {
+        // 전적을 못 불러와도 계정 카드는 그대로 보여준다.
+      } finally {
+        if (!cancelled) setHistoryLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, user?.id]);
 
   const handleLookup = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -993,13 +1018,11 @@ function PubgProfilePage() {
   }
 
   return (
-    <div className="flex-grow bg-bg-primary px-5 py-8 sm:px-6 md:py-10 lg:px-8">
-      <div className="mx-auto max-w-4xl space-y-6">
+    <div className="flex-grow p-4 md:p-8 animate-fade-in">
+      <div className="container mx-auto max-w-6xl space-y-6">
         <header>
-          <p className="text-sm font-semibold text-accent-primary">
-            PUBG PROFILE
-          </p>
-          <h1 className="mt-2 text-3xl font-bold text-text-primary">
+          <h1 className="flex items-center gap-2 text-3xl font-bold text-text-primary">
+            <Gamepad2 className="h-7 w-7 text-accent-primary" />
             배틀그라운드 프로필
           </h1>
           <p className="mt-2 text-sm text-text-secondary">
@@ -1010,7 +1033,10 @@ function PubgProfilePage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>계정 등록</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <Plus className="h-5 w-5 text-accent-primary" />
+              계정 등록
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <form
@@ -1099,7 +1125,11 @@ function PubgProfilePage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>등록된 PUBG 계정</CardTitle>
+            {/* 롤 프로필의 "연동된 Riot 계정" 과 이름·아이콘을 맞춘다. */}
+            <CardTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5 text-accent-primary" />
+              연동된 PUBG 계정
+            </CardTitle>
           </CardHeader>
           <CardContent>
             {loading ? (
@@ -1180,6 +1210,34 @@ function PubgProfilePage() {
                   </div>
                 ))}
               </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/*
+          전적을 프로필에서 볼 수 있게 붙인다. 롤 프로필은 "포지션별 통계 ·
+          최근 활동"을 여기서 보여주는데 배그는 계정 등록 폼만 있어서,
+          같은 프로필인데 한쪽에만 기록이 없었다.
+          `PubgMatchHistory` 가 요약 타일과 경기 목록을 함께 그린다.
+        */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <History className="h-5 w-5 text-accent-primary" />
+              내전 전적
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {historyLoading ? (
+              <Skeleton className="h-40 w-full" />
+            ) : history ? (
+              <PubgMatchHistory history={history} />
+            ) : (
+              <EmptyState
+                icon={Trophy}
+                title="배그 내전 기록이 없습니다"
+                description="배틀로얄 스크림이나 킬내기에 참가하면 여기에 기록이 쌓입니다."
+              />
             )}
           </CardContent>
         </Card>
