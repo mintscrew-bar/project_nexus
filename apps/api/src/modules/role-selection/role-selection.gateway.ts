@@ -16,7 +16,7 @@ import { MatchGateway } from "../match/match.gateway";
 import { MatchService } from "../match/match.service";
 import { resolveBroadcastRoomId } from "../broadcast/broadcast-resolve.util";
 import { Role } from "@nexus/database";
-import { DEFAULT_GAME, GAMES, afterTeamsPath } from "@nexus/types";
+import { DEFAULT_GAME, GAMES, afterTeamsPath, getGame } from "@nexus/types";
 
 interface AuthenticatedSocket extends Socket {
   userId?: string;
@@ -313,6 +313,32 @@ export class RoleSelectionGateway
   // ========================================
   // Completion
   // ========================================
+
+  /**
+   * 팀 편성이 끝난 뒤 다음 단계로 보낸다.
+   *
+   * 롤은 역할 선택으로 가지만 배그에는 그 단계가 없다. 그런데 경매·드래프트·
+   * 자유 팀 선택이 전부 `startRoleSelection` 을 직접 불렀고, 그 메서드는
+   * 포지션 없는 게임이면 예외를 던진다 — 배그 방은 팀을 다 짜고도
+   * "역할 선택 시작에 실패했습니다"로 끝났다(경매는 3번 재시도까지 했다).
+   *
+   * 다음 단계를 고르는 판단을 한 곳에 모은다.
+   */
+  async advanceAfterTeams(roomId: string) {
+    const room = await this.prisma.room.findUnique({
+      where: { id: roomId },
+      select: { gameTitle: true },
+    });
+    if (getGame(room?.gameTitle ?? DEFAULT_GAME).hasPositions) {
+      const roleSelectionData =
+        await this.roleSelectionService.startRoleSelection(roomId);
+      this.emitRoleSelectionStarted(roomId, roleSelectionData);
+      return;
+    }
+    // 역할 선택이 없는 게임은 곧바로 확정 단계로 간다.
+    // (경기 화면으로 보내는 이동 경로도 여기서 함께 내보낸다.)
+    await this.completeRoleSelection(roomId);
+  }
 
   async completeRoleSelection(roomId: string) {
     // Prevent duplicate completion (timer expiry + all-roles-selected can race)

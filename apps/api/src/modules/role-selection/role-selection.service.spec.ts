@@ -1,4 +1,5 @@
 import { RoleSelectionService } from "./role-selection.service";
+import { RoleSelectionGateway } from "./role-selection.gateway";
 import { RoomStatus, TeamMode } from "@nexus/database";
 
 describe("RoleSelectionService 자동 밸런스 역할 잠금", () => {
@@ -213,5 +214,47 @@ describe("RoleSelectionService 편성 확정 — 게임별 경로", () => {
       "host-1",
       "room-1",
     );
+  });
+});
+
+describe("RoleSelectionGateway.advanceAfterTeams — 게임별 다음 단계", () => {
+  /**
+   * 배그 방은 팀을 다 짜고도 "역할 선택 시작에 실패했습니다"로 끝났다.
+   * 경매·드래프트·자유 팀 선택이 모두 `startRoleSelection` 을 직접 불렀는데
+   * 그 메서드는 포지션 없는 게임이면 예외를 던지기 때문이다.
+   */
+  const makeGateway = (gameTitle: string) => {
+    const prisma = {
+      room: { findUnique: jest.fn().mockResolvedValue({ gameTitle }) },
+    };
+    const service = { startRoleSelection: jest.fn().mockResolvedValue({}) };
+    const gateway = Object.create(RoleSelectionGateway.prototype);
+    Object.assign(gateway, {
+      prisma,
+      roleSelectionService: service,
+      emitRoleSelectionStarted: jest.fn(),
+      completeRoleSelection: jest.fn().mockResolvedValue(undefined),
+    });
+    return { gateway, service };
+  };
+
+  it("롤은 역할 선택을 시작한다", async () => {
+    const { gateway, service } = makeGateway("LOL");
+    await gateway.advanceAfterTeams("room-1");
+    expect(service.startRoleSelection).toHaveBeenCalledWith("room-1");
+    expect(gateway.completeRoleSelection).not.toHaveBeenCalled();
+  });
+
+  it("배그는 역할 선택을 건너뛰고 곧바로 확정한다", async () => {
+    const { gateway, service } = makeGateway("PUBG");
+    await gateway.advanceAfterTeams("room-1");
+    expect(service.startRoleSelection).not.toHaveBeenCalled();
+    expect(gateway.completeRoleSelection).toHaveBeenCalledWith("room-1");
+  });
+
+  it("게임이 비어 있으면 기본 게임(롤)으로 본다", async () => {
+    const { gateway, service } = makeGateway(null as never);
+    await gateway.advanceAfterTeams("room-1");
+    expect(service.startRoleSelection).toHaveBeenCalled();
   });
 });

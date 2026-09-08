@@ -625,12 +625,7 @@ export class AuctionGateway
     attempt = 1,
   ): Promise<void> {
     try {
-      const roleSelectionData =
-        await this.roleSelectionService.startRoleSelection(roomId);
-      this.roleSelectionGateway.emitRoleSelectionStarted(
-        roomId,
-        roleSelectionData,
-      );
+      await this.roleSelectionGateway.advanceAfterTeams(roomId);
     } catch (error) {
       console.error(
         `[Auction] Failed to start role selection for room ${roomId} (attempt ${attempt}):`,

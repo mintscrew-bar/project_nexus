@@ -306,13 +306,8 @@ export class SnakeDraftGateway
             teams: finalState?.teams ?? [],
           });
 
-          // Start role selection
-          const roleSelectionData =
-            await this.roleSelectionService.startRoleSelection(data.roomId);
-          this.roleSelectionGateway.emitRoleSelectionStarted(
-            data.roomId,
-            roleSelectionData,
-          );
+          // 다음 단계 — 롤은 역할 선택, 배그는 곧바로 경기로.
+          await this.roleSelectionGateway.advanceAfterTeams(data.roomId);
         } finally {
           this.completingDrafts.delete(data.roomId);
         }
@@ -468,12 +463,7 @@ export class SnakeDraftGateway
               teams: finalState?.teams ?? [],
             });
 
-            const roleSelectionData =
-              await this.roleSelectionService.startRoleSelection(roomId);
-            this.roleSelectionGateway.emitRoleSelectionStarted(
-              roomId,
-              roleSelectionData,
-            );
+            await this.roleSelectionGateway.advanceAfterTeams(roomId);
           } finally {
             this.completingDrafts.delete(roomId);
           }

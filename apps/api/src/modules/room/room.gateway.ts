@@ -790,13 +790,8 @@ export class RoomGateway
           client.userId!,
           data.roomId,
         );
-        const roleData = await this.roleSelectionService.startRoleSelection(
-          data.roomId,
-        );
-        await this.roleSelectionGateway.emitRoleSelectionStarted(
-          data.roomId,
-          roleData,
-        );
+        // 역할 선택이 없는 게임(배그)은 이 안에서 곧바로 확정으로 간다.
+        await this.roleSelectionGateway.advanceAfterTeams(data.roomId);
       }
 
       coreStartSucceeded = true;
