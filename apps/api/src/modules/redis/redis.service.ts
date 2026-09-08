@@ -211,6 +211,42 @@ export class RedisService implements OnModuleDestroy {
     return {1, 0}
   `;
 
+  /**
+   * 창이 하나뿐인 레이트 리밋 소비.
+   *
+   * `consumeDualWindow` 에 같은 키를 두 번 넘겨 쓰면 안 된다 —
+   * 스크립트가 KEYS[1] 과 KEYS[2] 를 각각 INCR 해서 한 번 호출에 카운터가
+   * 2씩 오르고, 실제 예산이 설정값의 절반으로 줄어든다.
+   */
+  private readonly singleWindowScript = `
+    local c = tonumber(redis.call('GET', KEYS[1])) or 0
+    local limit = tonumber(ARGV[1])
+    local winMs = tonumber(ARGV[2])
+    if c >= limit then
+      local ttl = redis.call('PTTL', KEYS[1])
+      if ttl < 0 then ttl = winMs end
+      return {0, ttl}
+    end
+    if redis.call('INCR', KEYS[1]) == 1 then redis.call('PEXPIRE', KEYS[1], winMs) end
+    return {1, 0}
+  `;
+
+  async consumeWindow(
+    key: string,
+    limit: number,
+    windowSeconds: number,
+  ): Promise<{ allowed: boolean; retryAfterMs: number }> {
+    const result = (await this.client.eval(
+      this.singleWindowScript,
+      1,
+      key,
+      String(limit),
+      String(windowSeconds * 1000),
+    )) as [number, number];
+
+    return { allowed: result[0] === 1, retryAfterMs: result[1] };
+  }
+
   async consumeDualWindow(
     keyShort: string,
     keyLong: string,

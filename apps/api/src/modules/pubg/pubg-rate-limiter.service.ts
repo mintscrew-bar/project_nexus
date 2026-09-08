@@ -18,8 +18,7 @@ export class PubgRateLimiterService {
   private readonly max: number;
   private readonly windowSec: number;
 
-  // 전역 버킷 키 — 모든 인스턴스/호출 경로가 공유한다.
-  // 짧은 창은 쓰지 않지만 원자적 소비 스크립트를 재사용하려고 같은 키를 두 번 넘긴다.
+  // 전역 버킷 키 — 모든 인스턴스/호출 경로가 공유한다. 창은 하나뿐이다.
   private readonly key = "pubg:global:minute";
 
   constructor(
@@ -48,15 +47,12 @@ export class PubgRateLimiterService {
 
   /** 전역 예산에서 토큰 1개를 원자적으로 소비 시도(대기 없음). */
   async tryConsume(): Promise<{ allowed: boolean; retryAfterMs: number }> {
-    // 창이 하나뿐이라 같은 키·같은 한도를 양쪽에 넘긴다.
-    return this.redis.consumeDualWindow(
-      this.key,
-      this.key,
-      this.max,
-      this.max,
-      this.windowSec,
-      this.windowSec,
-    );
+    // 창이 하나짜리 스크립트를 쓴다. 예전에는 `consumeDualWindow` 에 같은 키를
+    // 두 번 넘겼는데, 그 스크립트가 KEYS 둘을 각각 INCR 해서 호출 한 번에
+    // 카운터가 2씩 올랐다 — 실제 예산이 절반(9→4)이 됐다.
+    // 닉네임 조회는 샤드 두 곳을 훑어 한 번에 2콜이라, 못 찾는 닉네임을
+    // 두 번만 넣어도 한도에 닿았다.
+    return this.redis.consumeWindow(this.key, this.max, this.windowSec);
   }
 
   /**
