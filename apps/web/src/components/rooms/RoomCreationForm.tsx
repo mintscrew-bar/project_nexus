@@ -105,7 +105,14 @@ export function RoomCreationForm({
   const { user, isAuthenticated, isLoading: authLoading } = useAuthStore();
   const [name, setName] = useState("");
   const [killMatchDurationMinutes, setKillMatchDurationMinutes] = useState(60);
-  const [battleRoyaleRounds, setBattleRoyaleRounds] = useState(3);
+  /**
+   * 총 경기 수는 **문자열로** 들고 있는다.
+   *
+   * 숫자로 두고 `Number(값) || 1` 로 받으면 칸을 비우는 순간 1로 튕겨서
+   * "12"를 치려고 지우면 "1"이 남고 "112"가 된다. 빈 칸을 그대로 두고
+   * 제출할 때 검사한다.
+   */
+  const [battleRoyaleRounds, setBattleRoyaleRounds] = useState("3");
   const [pubgPlatform, setPubgPlatform] = useState<PubgPlatform>("STEAM");
   // 배그는 경기 모드에 따라 정원과 고를 수 있는 팀 편성이 달라진다.
   const [pubgGameMode, setPubgGameMode] = useState<PubgGameMode>(
@@ -212,6 +219,14 @@ export function RoomCreationForm({
    * (킬내기는 8명 고정, 배틀로얄은 16명부터).
    * 이전 정원이 새 모드에서 유효하지 않으면 그 모드의 첫 정원으로 옮긴다.
    */
+  const parsedRounds = Number(battleRoyaleRounds);
+  const roundsValid =
+    battleRoyaleRounds.trim() !== "" &&
+    Number.isInteger(parsedRounds) &&
+    parsedRounds >= 1 &&
+    parsedRounds <= 20;
+  const needsRounds = gameTitle === "PUBG" && pubgGameMode === "BATTLE_ROYALE";
+
   const handlePubgModeChange = (mode: PubgGameMode) => {
     setPubgGameMode(mode);
     const sizes = getPubgGameMode(mode).roomSizes;
@@ -234,6 +249,16 @@ export function RoomCreationForm({
       return;
     }
 
+    // 빈 칸을 그대로 둘 수 있게 했으므로 제출에서 막는다.
+    if (needsRounds && !roundsValid) {
+      setErrorMessage(
+        battleRoyaleRounds.trim() === ""
+          ? "총 경기 수를 입력해야 방을 만들 수 있습니다"
+          : "총 경기 수는 1~20 사이의 정수로 입력해주세요",
+      );
+      return;
+    }
+
     const selectedOption = playerOptions.find(
       (opt) => opt.value === maxParticipants,
     );
@@ -243,7 +268,7 @@ export function RoomCreationForm({
       pubgPlatform: gameTitle === "PUBG" ? pubgPlatform : undefined,
       pubgGameMode: gameTitle === "PUBG" ? pubgGameMode : undefined,
       killMatchDurationMinutes,
-      battleRoyaleRounds,
+      battleRoyaleRounds: parsedRounds,
       maxParticipants,
       teamMode: teamMode,
       password: isPrivate ? password : undefined,
@@ -486,17 +511,22 @@ export function RoomCreationForm({
             max={20}
             className="input mt-2"
             value={battleRoyaleRounds}
-            onChange={(e) =>
-              setBattleRoyaleRounds(
-                Math.min(20, Math.max(1, Number(e.target.value) || 1)),
-              )
-            }
+            onChange={(e) => setBattleRoyaleRounds(e.target.value)}
+            aria-invalid={!roundsValid}
           />
-          <span className="mt-2 block text-text-secondary">
-            {maxParticipants}명 · {maxParticipants / 4}팀이 탈락 없이{" "}
-            {battleRoyaleRounds}판 모두 참가합니다. 킬·순위 점수를 합산해 최종
-            순위를 정합니다.
-          </span>
+          {roundsValid ? (
+            <span className="mt-2 block text-text-secondary">
+              {maxParticipants}명 · {maxParticipants / 4}팀이 탈락 없이{" "}
+              {parsedRounds}판 모두 참가합니다. 킬·순위 점수를 합산해 최종
+              순위를 정합니다.
+            </span>
+          ) : (
+            <span className="mt-2 block text-accent-danger">
+              {battleRoyaleRounds.trim() === ""
+                ? "총 경기 수를 입력해야 방을 만들 수 있습니다."
+                : "총 경기 수는 1~20 사이의 정수로 입력해주세요."}
+            </span>
+          )}
         </label>
       )}
       {gameTitle === "PUBG" && pubgGameMode === "KILL_MATCH" && (

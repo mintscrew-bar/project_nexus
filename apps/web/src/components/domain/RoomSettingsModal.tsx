@@ -199,8 +199,32 @@ export function RoomSettingsModal({
   );
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [killMatchDurationMinutes, setKillMatchDurationMinutes] = useState(room.killMatchDurationMinutes ?? 60);
-  const [battleRoyaleRounds, setBattleRoyaleRounds] = useState(room.battleRoyaleRounds ?? 3);
+  /**
+   * 진행시간·총 경기 수는 **문자열로** 들고 있는다.
+   *
+   * 숫자로 두고 `Number(값)` 을 그대로 받으면 칸을 비우는 순간 0이 되고,
+   * 그 0이 저장까지 흘러간다. 숫자를 고치려면 한 번은 비워야 하므로
+   * 빈 칸을 허용하고 저장할 때 막는다.
+   */
+  const [killMatchDurationMinutes, setKillMatchDurationMinutes] = useState(
+    String(room.killMatchDurationMinutes ?? 60),
+  );
+  const [battleRoyaleRounds, setBattleRoyaleRounds] = useState(
+    String(room.battleRoyaleRounds ?? 3),
+  );
+  const isKillMatchRoom = pubgGameMode === "KILL_MATCH";
+  const pubgNumberInput = isKillMatchRoom
+    ? killMatchDurationMinutes
+    : battleRoyaleRounds;
+  const pubgNumberRange = isKillMatchRoom
+    ? { min: 10, max: 360, label: "진행시간은 10~360분" }
+    : { min: 1, max: 20, label: "총 경기 수는 1~20판" };
+  const parsedPubgNumber = Number(pubgNumberInput);
+  const pubgNumberValid =
+    pubgNumberInput.trim() !== "" &&
+    Number.isInteger(parsedPubgNumber) &&
+    parsedPubgNumber >= pubgNumberRange.min &&
+    parsedPubgNumber <= pubgNumberRange.max;
   const [error, setError] = useState<string | null>(null);
   const [isCloseConfirmOpen, setIsCloseConfirmOpen] = useState(false);
   const selectedPlayerOption = playerOptions.find(
@@ -233,8 +257,8 @@ export function RoomSettingsModal({
       teamCountForRoom({ ...teamShape, maxParticipants: room.maxParticipants }),
     ) ||
     password.length > 0 ||
-    killMatchDurationMinutes !== (room.killMatchDurationMinutes ?? 60) ||
-    battleRoyaleRounds !== (room.battleRoyaleRounds ?? 3);
+    killMatchDurationMinutes !== String(room.killMatchDurationMinutes ?? 60) ||
+    battleRoyaleRounds !== String(room.battleRoyaleRounds ?? 3);
 
   const requestClose = () => {
     if (isSubmitting) return;
@@ -248,8 +272,8 @@ export function RoomSettingsModal({
   useEffect(() => {
     if (isOpen) {
       setName(room.name);
-      setKillMatchDurationMinutes(room.killMatchDurationMinutes ?? 60);
-      setBattleRoyaleRounds(room.battleRoyaleRounds ?? 3);
+      setKillMatchDurationMinutes(String(room.killMatchDurationMinutes ?? 60));
+      setBattleRoyaleRounds(String(room.battleRoyaleRounds ?? 3));
       setMaxParticipants(room.maxParticipants);
       setIsPrivate(room.isPrivate);
       setPassword("");
@@ -287,6 +311,15 @@ export function RoomSettingsModal({
       setError("방 제목을 입력해주세요.");
       return;
     }
+    // 빈 칸을 그대로 둘 수 있게 했으므로 저장에서 막는다.
+    if (gameTitle === "PUBG" && !pubgNumberValid) {
+      setError(
+        pubgNumberInput.trim() === ""
+          ? `${isKillMatchRoom ? "진행시간" : "총 경기 수"}을 입력해야 저장할 수 있습니다.`
+          : `${pubgNumberRange.label} 사이의 정수로 입력해주세요.`,
+      );
+      return;
+    }
     setIsSubmitting(true);
     setError(null);
     try {
@@ -296,8 +329,8 @@ export function RoomSettingsModal({
         teamMode,
         allowSpectators,
         startingPoints,
-        killMatchDurationMinutes,
-        battleRoyaleRounds,
+        killMatchDurationMinutes: Number(killMatchDurationMinutes),
+        battleRoyaleRounds: Number(battleRoyaleRounds),
         minBidIncrement,
         bidTimeLimit,
         pickTimeLimit,
@@ -442,13 +475,23 @@ export function RoomSettingsModal({
             <input
               type="number"
               className="input mt-2"
-              min={pubgGameMode === "KILL_MATCH" ? 10 : 1}
-              max={pubgGameMode === "KILL_MATCH" ? 360 : 20}
-              value={pubgGameMode === "KILL_MATCH" ? killMatchDurationMinutes : battleRoyaleRounds}
-              onChange={(event) => pubgGameMode === "KILL_MATCH"
-                ? setKillMatchDurationMinutes(Number(event.target.value))
-                : setBattleRoyaleRounds(Number(event.target.value))}
+              min={pubgNumberRange.min}
+              max={pubgNumberRange.max}
+              value={pubgNumberInput}
+              aria-invalid={!pubgNumberValid}
+              onChange={(event) =>
+                isKillMatchRoom
+                  ? setKillMatchDurationMinutes(event.target.value)
+                  : setBattleRoyaleRounds(event.target.value)
+              }
             />
+            {!pubgNumberValid && (
+              <span className="mt-2 block text-sm text-accent-danger">
+                {pubgNumberInput.trim() === ""
+                  ? "값을 입력해야 저장할 수 있습니다."
+                  : `${pubgNumberRange.label} 사이의 정수로 입력해주세요.`}
+              </span>
+            )}
           </label>
         )}
 
