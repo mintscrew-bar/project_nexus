@@ -1,7 +1,8 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useGamePrefix } from "@/hooks/useCurrentGame";
+import { useCurrentGame, useGamePrefix } from "@/hooks/useCurrentGame";
+import { GAMES } from "@nexus/types";
 import React, {
   useEffect,
   useRef,
@@ -210,12 +211,31 @@ function PlayersList({
                     <p className="text-xs font-medium text-text-primary truncate">
                       {player.username}
                     </p>
+                    {/* 배그는 인게임 닉네임으로 서로를 알아본다. */}
+                    {player.pubgName && (
+                      <p className="truncate text-[10px] text-text-tertiary">
+                        {player.pubgName}
+                      </p>
+                    )}
                     <div className="flex items-center gap-1">
-                      <TierBadge
-                        tier={player.tier}
-                        size="sm"
-                        showIcon={false}
-                      />
+                      {/*
+                        배그에는 라이엇 티어가 없다. 서버가 tier 를 비워 보내고
+                        NEXUS 편성 등급을 대신 싣는다. 롤 배지를 그대로 그리면
+                        전원 "UNRANKED" 가 된다.
+                      */}
+                      {player.tier ? (
+                        <TierBadge
+                          tier={player.tier}
+                          size="sm"
+                          showIcon={false}
+                        />
+                      ) : (
+                        <span className="rounded bg-bg-elevated px-1 text-[10px] font-bold text-text-secondary">
+                          {player.nexusTier
+                            ? `${player.nexusTier}티어`
+                            : "등급 산정 전"}
+                        </span>
+                      )}
                       {player.mmr !== undefined && (
                         <span className="text-[10px] font-mono text-text-muted">
                           {player.mmr}
@@ -1634,6 +1654,7 @@ function MobileBidPanel({
   onVoteItemSkip?: () => void | Promise<void>;
   isVotingItemSkip?: boolean;
 }) {
+  const game = useCurrentGame();
   const [accBid, setAccBid] = useState(0);
   const [isBidding, setIsBidding] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
@@ -1641,7 +1662,9 @@ function MobileBidPanel({
   const bidIncrement = auctionState.bidIncrement ?? 50;
   const bidSteps = [bidIncrement, bidIncrement * 2, bidIncrement * 5];
   const memberCount = myTeam.members?.length ?? 0;
-  const slotsNeeded = Math.max(0, 5 - memberCount);
+  // 팀 정원은 게임마다 다르다(롤 5인 · 배그 4인 스쿼드).
+  // 5로 박아 두면 배그 팀이 있지도 않은 다섯 번째 자리 몫까지 예산을 남긴다.
+  const slotsNeeded = Math.max(0, GAMES[game].teamSize - memberCount);
   const reserveAmount = Math.max(0, (slotsNeeded - 1) * bidIncrement);
   const budget = myTeam.remainingGold ?? myTeam.remainingBudget ?? 0;
   const availableBudget = Math.max(0, budget - reserveAmount);

@@ -27,6 +27,11 @@ const MAX_BID_TIME_SECONDS = 120;
 const DEFAULT_BID_INCREMENT = 50;
 /** 경매를 돌릴 수 있는 최소 인원. 정원 미달 테스트 로비를 허용하는 하한값. */
 const MIN_AUCTION_PLAYERS = 4;
+/**
+ * 편성 점수가 없는 배그 참가자에게 매기는 중간값.
+ * 배그 편성 점수는 선택 항목이라 비어 있는 사람이 많다.
+ */
+const NEUTRAL_PUBG_SCORE = 50;
 
 export interface AuctionState {
   roomId: string;
@@ -189,15 +194,44 @@ export class AuctionService implements OnModuleInit {
       );
   }
 
-  private _mapAuctionParticipant(participant: any) {
+  /**
+   * 경매 매물 카드에 실을 값.
+   *
+   * 롤은 라이엇 티어가 실력 지표지만 배그에는 그런 게 없다. 롤 계정만 보면
+   * 배그 방에서는 전원이 "UNRANKED"로 뜨고 점수가 전부 같아진다.
+   * 배그는 NEXUS 편성 등급·점수를 싣고, 라인 관련 값은 아예 비운다.
+   */
+  private _mapAuctionParticipant(participant: any, gameTitle?: string) {
     const acc = participant?.user?.riotAccounts?.[0];
-    return {
+    const pubg = participant?.user?.pubgAccounts?.[0];
+    const base = {
       id: participant?.userId ?? participant?.user?.id ?? participant?.id,
       participantId: participant?.id,
       userId: participant?.userId ?? participant?.user?.id,
       username:
         participant?.user?.username ?? participant?.username ?? "Unknown",
       avatar: participant?.user?.avatar ?? participant?.avatar,
+    };
+
+    if (gameTitle === "PUBG") {
+      return {
+        ...base,
+        // 롤 티어 배지를 그리지 않도록 비운다.
+        tier: null,
+        rank: null,
+        mainRole: null,
+        subRole: null,
+        /** 인게임 닉네임 — 배그는 이걸로 서로를 알아본다. */
+        pubgName: pubg?.playerName ?? null,
+        /** NEXUS 편성 등급(1~5). 없으면 "산정 전"이다. */
+        nexusTier: pubg?.nexusTier ?? null,
+        mmr: pubg?.nexusScore ?? NEUTRAL_PUBG_SCORE,
+        position: null,
+      };
+    }
+
+    return {
+      ...base,
       tier: acc?.tier ?? "UNRANKED",
       rank: acc?.rank,
       mainRole: acc?.mainRole,
@@ -211,17 +245,25 @@ export class AuctionService implements OnModuleInit {
     };
   }
 
-  private _getParticipantScore(participant: any): number {
+  private _getParticipantScore(participant: any, gameTitle?: string): number {
+    if (gameTitle === "PUBG") {
+      // 편성 점수가 없는 사람은 중간값으로 둔다. 0으로 두면 점수를 안 넣은
+      // 사람이 전부 매물 끝으로 밀린다.
+      return (
+        participant?.user?.pubgAccounts?.[0]?.nexusScore ?? NEUTRAL_PUBG_SCORE
+      );
+    }
     const acc = participant?.user?.riotAccounts?.[0];
     return calculateCaptainScore(acc);
   }
 
   private _sortAuctionParticipants<
     T extends { joinedAt?: Date | string | null },
-  >(participants: T[]): T[] {
+  >(participants: T[], gameTitle?: string): T[] {
     return [...participants].sort((a: any, b: any) => {
       const scoreDiff =
-        this._getParticipantScore(b) - this._getParticipantScore(a);
+        this._getParticipantScore(b, gameTitle) -
+        this._getParticipantScore(a, gameTitle);
       if (scoreDiff !== 0) return scoreDiff;
 
       const aJoined = a.joinedAt ? new Date(a.joinedAt).getTime() : 0;
@@ -365,6 +407,9 @@ export class AuctionService implements OnModuleInit {
                 riotAccounts: {
                   where: { isPrimary: true },
                 },
+                pubgAccounts: {
+                  where: { isPrimary: true },
+                },
               },
             },
           },
@@ -432,21 +477,9 @@ export class AuctionService implements OnModuleInit {
           volunteers: [],
           timerEnd: null,
         },
-        participants: room.participants.map((p) => {
-          const acc = p.user.riotAccounts[0];
-          return {
-            id: p.userId,
-            username: p.user.username,
-            avatar: p.user.avatar,
-            tier: acc?.tier,
-            rank: acc?.rank,
-            mmr: calculateTierScore(
-              acc?.tier || "UNRANKED",
-              acc?.rank || "",
-              acc?.lp || 0,
-            ),
-          };
-        }),
+        participants: room.participants.map((p) =>
+          this._mapAuctionParticipant(p, room.gameTitle),
+        ),
       };
     }
 
@@ -475,21 +508,9 @@ export class AuctionService implements OnModuleInit {
           volunteers: [],
           timerEnd,
         },
-        participants: room.participants.map((p) => {
-          const acc = p.user.riotAccounts[0];
-          return {
-            id: p.userId,
-            username: p.user.username,
-            avatar: p.user.avatar,
-            tier: acc?.tier,
-            rank: acc?.rank,
-            mmr: calculateTierScore(
-              acc?.tier || "UNRANKED",
-              acc?.rank || "",
-              acc?.lp || 0,
-            ),
-          };
-        }),
+        participants: room.participants.map((p) =>
+          this._mapAuctionParticipant(p, room.gameTitle),
+        ),
       };
     }
 
@@ -511,7 +532,10 @@ export class AuctionService implements OnModuleInit {
       room.participants.length,
     );
 
-    const sortedPlayers = this._sortAuctionParticipants(room.participants);
+    const sortedPlayers = this._sortAuctionParticipants(
+      room.participants,
+      room.gameTitle,
+    );
 
     const captains = sortedPlayers.slice(0, numTeams);
     const players = sortedPlayers.slice(numTeams);
@@ -698,7 +722,12 @@ export class AuctionService implements OnModuleInit {
         participants: {
           where: { role: "PLAYER" },
           include: {
-            user: { include: { riotAccounts: { where: { isPrimary: true } } } },
+            user: {
+              include: {
+                riotAccounts: { where: { isPrimary: true } },
+                pubgAccounts: { where: { isPrimary: true } },
+              },
+            },
           },
         },
       },
@@ -791,6 +820,7 @@ export class AuctionService implements OnModuleInit {
 
     const nonCaptains = this._sortAuctionParticipants(
       room.participants.filter((p) => !captainUserIds.includes(p.userId)),
+      room.gameTitle,
     );
     const numTeamsFinal = teams.length;
     const botCaptainIds = await this._filterBotCaptains(
@@ -855,7 +885,12 @@ export class AuctionService implements OnModuleInit {
         participants: {
           where: { role: "PLAYER" },
           include: {
-            user: { include: { riotAccounts: { where: { isPrimary: true } } } },
+            user: {
+              include: {
+                riotAccounts: { where: { isPrimary: true } },
+                pubgAccounts: { where: { isPrimary: true } },
+              },
+            },
           },
         },
       },
@@ -881,6 +916,7 @@ export class AuctionService implements OnModuleInit {
     const { teams } = await this._applySelectedCaptains(roomId, room, userIds);
     const nonCaptains = this._sortAuctionParticipants(
       room.participants.filter((p: any) => !userIds.includes(p.userId)),
+      room.gameTitle,
     );
     const botCaptainIds = await this._filterBotCaptains(
       userIds,
@@ -952,7 +988,10 @@ export class AuctionService implements OnModuleInit {
           where: { role: "PLAYER" },
           include: {
             user: {
-              include: { riotAccounts: { where: { isPrimary: true } } },
+              include: {
+                riotAccounts: { where: { isPrimary: true } },
+                pubgAccounts: { where: { isPrimary: true } },
+              },
             },
           },
         },
@@ -1094,6 +1133,7 @@ export class AuctionService implements OnModuleInit {
             user: {
               include: {
                 riotAccounts: { where: { isPrimary: true } },
+                pubgAccounts: { where: { isPrimary: true } },
               },
             },
           },
@@ -1104,6 +1144,7 @@ export class AuctionService implements OnModuleInit {
 
     const availableParticipants = this._sortAuctionParticipants(
       roomWithParticipants?.participants ?? [],
+      roomWithParticipants?.gameTitle,
     );
     const currentPlayer = this._syncCurrentAuctionPlayer(
       state,
@@ -1204,6 +1245,7 @@ export class AuctionService implements OnModuleInit {
             user: {
               include: {
                 riotAccounts: { where: { isPrimary: true } },
+                pubgAccounts: { where: { isPrimary: true } },
               },
             },
           },
@@ -1227,7 +1269,10 @@ export class AuctionService implements OnModuleInit {
       throw new ForbiddenException("팀장만 입찰을 포기할 수 있습니다.");
     }
 
-    const participants = this._sortAuctionParticipants(room.participants);
+    const participants = this._sortAuctionParticipants(
+      room.participants,
+      room.gameTitle,
+    );
     const currentPlayer = this._syncCurrentAuctionPlayer(state, participants);
     if (!currentPlayer) {
       throw new BadRequestException("포기할 경매 매물이 없습니다.");
@@ -1305,6 +1350,7 @@ export class AuctionService implements OnModuleInit {
             user: {
               include: {
                 riotAccounts: { where: { isPrimary: true } },
+                pubgAccounts: { where: { isPrimary: true } },
               },
             },
           },
@@ -1330,6 +1376,7 @@ export class AuctionService implements OnModuleInit {
 
     const availableParticipants = this._sortAuctionParticipants(
       room.participants,
+      room.gameTitle,
     );
     const currentPlayer = this._syncCurrentAuctionPlayer(
       state,
@@ -1401,7 +1448,7 @@ export class AuctionService implements OnModuleInit {
 
       return {
         sold: true,
-        player: this._mapAuctionParticipant(currentPlayer),
+        player: this._mapAuctionParticipant(currentPlayer, room?.gameTitle),
         team,
         price: soldPrice,
       };
@@ -1438,7 +1485,7 @@ export class AuctionService implements OnModuleInit {
         this._setAuctionState(roomId, state);
         return {
           sold: false,
-          player: this._mapAuctionParticipant(currentPlayer),
+          player: this._mapAuctionParticipant(currentPlayer, room?.gameTitle),
           yuchalCount: nextYuchalCount,
         };
       }
@@ -1460,7 +1507,7 @@ export class AuctionService implements OnModuleInit {
         );
         return {
           sold: false,
-          player: this._mapAuctionParticipant(currentPlayer),
+          player: this._mapAuctionParticipant(currentPlayer, room?.gameTitle),
         };
       }
 
@@ -1520,7 +1567,7 @@ export class AuctionService implements OnModuleInit {
 
       return {
         sold: true,
-        player: this._mapAuctionParticipant(currentPlayer),
+        player: this._mapAuctionParticipant(currentPlayer, room?.gameTitle),
         team: targetTeam,
         price: 0,
       };
@@ -1548,6 +1595,7 @@ export class AuctionService implements OnModuleInit {
             user: {
               include: {
                 riotAccounts: { where: { isPrimary: true } },
+                pubgAccounts: { where: { isPrimary: true } },
               },
             },
           },
@@ -1570,6 +1618,7 @@ export class AuctionService implements OnModuleInit {
     if (incompleteTeams.length !== 1) return [];
     const remainingParticipants = this._sortAuctionParticipants(
       room.participants,
+      room.gameTitle,
     );
     if (remainingParticipants.length === 0) return [];
 
@@ -1603,7 +1652,7 @@ export class AuctionService implements OnModuleInit {
     });
 
     return remainingParticipants.map((participant: any) => ({
-      player: this._mapAuctionParticipant(participant),
+      player: this._mapAuctionParticipant(participant, room?.gameTitle),
       team: targetTeam,
       price: 0,
     }));
@@ -1786,7 +1835,10 @@ export class AuctionService implements OnModuleInit {
             members: {
               include: {
                 user: {
-                  include: { riotAccounts: { where: { isPrimary: true } } },
+                  include: {
+                    riotAccounts: { where: { isPrimary: true } },
+                    pubgAccounts: { where: { isPrimary: true } },
+                  },
                 },
               },
             },
@@ -1795,7 +1847,12 @@ export class AuctionService implements OnModuleInit {
         participants: {
           where: { isCaptain: false, teamId: null },
           include: {
-            user: { include: { riotAccounts: { where: { isPrimary: true } } } },
+            user: {
+              include: {
+                riotAccounts: { where: { isPrimary: true } },
+                pubgAccounts: { where: { isPrimary: true } },
+              },
+            },
           },
           orderBy: { joinedAt: "asc" },
         },
@@ -1803,7 +1860,10 @@ export class AuctionService implements OnModuleInit {
     });
     if (!room) return { teams: [], players: [] };
 
-    const sortedParticipants = this._sortAuctionParticipants(room.participants);
+    const sortedParticipants = this._sortAuctionParticipants(
+      room.participants,
+      room.gameTitle,
+    );
     const state = this.auctionStates.get(roomId);
     if (state) {
       this._syncCurrentAuctionPlayer(state, sortedParticipants);
