@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { CheckCircle2, DoorOpen, Play, Users } from "lucide-react";
-import { guideUrl } from "@/lib/guide-links";
+import { guideGame, guideUrl } from "@/lib/guide-links";
 import {
   Bullet,
   BulletList,
@@ -9,14 +9,26 @@ import {
   GuideStep,
   InfoCard,
 } from "../_components/GuidePageLayout";
+import { PubgStartGuide } from "../_content/pubg";
 
-export const metadata: Metadata = {
-  title: "빠른 시작 가이드 — Nexus",
-  description: "내전 방 생성부터 참가 확인, 준비 완료, 시작까지 필요한 순서를 안내합니다.",
-  alternates: { canonical: guideUrl("/guide/start") },
-};
+/**
+ * 가이드는 게임마다 문안이 다르다. canonical 을 게임 경로로 내지 않으면
+ * 같은 주소 하나에 두 글이 걸린 것처럼 색인된다.
+ */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ game: string }>;
+}): Promise<Metadata> {
+  const game = guideGame((await params).game);
+  return {
+    title: game === "PUBG" ? "빠른 시작 가이드 (배그) — Nexus" : "빠른 시작 가이드 — Nexus",
+    description: "내전 방 생성부터 참가 확인, 준비 완료, 시작까지 필요한 순서를 안내합니다.",
+    alternates: { canonical: guideUrl("/guide/start", game) },
+  };
+}
 
-export default function StartGuidePage() {
+function LolStartGuidePage() {
   return (
     <GuidePageLayout
       icon={Users}
@@ -59,4 +71,13 @@ export default function StartGuidePage() {
       </GuideSection>
     </GuidePageLayout>
   );
+}
+
+export default async function GuidePage({
+  params,
+}: {
+  params: Promise<{ game: string }>;
+}) {
+  const game = guideGame((await params).game);
+  return game === "PUBG" ? <PubgStartGuide /> : <LolStartGuidePage />;
 }

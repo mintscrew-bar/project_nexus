@@ -9,17 +9,23 @@ export function GuidePageLayout({
   title,
   description,
   children,
+  /**
+   * "가이드 홈"이 돌아갈 경로. 게임마다 가이드가 갈려서, 고정하면
+   * 배그 가이드를 읽다가 롤 가이드 홈으로 튕긴다.
+   */
+  homeHref = `${GUIDE_BASE}/guide`,
 }: {
   icon: LucideIcon;
   title: string;
   description: string;
   children: React.ReactNode;
+  homeHref?: string;
 }) {
   return (
     <main className="flex-grow bg-bg-primary">
       <div className="mx-auto max-w-6xl px-4 py-10 md:px-6 md:py-16">
         <Link
-          href={`${GUIDE_BASE}/guide`}
+          href={homeHref}
           className="inline-flex items-center gap-2 text-sm font-semibold text-text-tertiary transition-colors hover:text-accent-primary"
         >
           <ArrowLeft className="h-4 w-4" /> 가이드 홈

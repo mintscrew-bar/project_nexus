@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { ArrowLeftRight, Gavel, ListOrdered, Scale } from "lucide-react";
-import { guideUrl } from "@/lib/guide-links";
+import { guideGame, guideUrl } from "@/lib/guide-links";
 import {
   Bullet,
   BulletList,
@@ -9,14 +9,26 @@ import {
   GuideStep,
   InfoCard,
 } from "../_components/GuidePageLayout";
+import { PubgTeamModesGuide } from "../_content/pubg";
 
-export const metadata: Metadata = {
-  title: "팀 구성 모드 가이드 — Nexus",
-  description: "경매, 스네이크, 자동 밸런스, 자유 팀 선택의 차이와 진행 방법을 비교합니다.",
-  alternates: { canonical: guideUrl("/guide/team-modes") },
-};
+/**
+ * 가이드는 게임마다 문안이 다르다. canonical 을 게임 경로로 내지 않으면
+ * 같은 주소 하나에 두 글이 걸린 것처럼 색인된다.
+ */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ game: string }>;
+}): Promise<Metadata> {
+  const game = guideGame((await params).game);
+  return {
+    title: game === "PUBG" ? "팀 구성 모드 가이드 (배그) — Nexus" : "팀 구성 모드 가이드 — Nexus",
+    description: "경매, 스네이크, 자동 밸런스, 자유 팀 선택의 차이와 진행 방법을 비교합니다.",
+    alternates: { canonical: guideUrl("/guide/team-modes", game) },
+  };
+}
 
-export default function TeamModesGuidePage() {
+function LolTeamModesGuidePage() {
   return (
     <GuidePageLayout
       icon={Scale}
@@ -50,4 +62,13 @@ export default function TeamModesGuidePage() {
       </GuideSection>
     </GuidePageLayout>
   );
+}
+
+export default async function GuidePage({
+  params,
+}: {
+  params: Promise<{ game: string }>;
+}) {
+  const game = guideGame((await params).game);
+  return game === "PUBG" ? <PubgTeamModesGuide /> : <LolTeamModesGuidePage />;
 }

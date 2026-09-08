@@ -1,13 +1,25 @@
 import type { Metadata } from "next";
 import { Bot, Link2, MessageSquareText, ShieldCheck } from "lucide-react";
-import { guideUrl } from "@/lib/guide-links";
+import { guideGame, guideUrl } from "@/lib/guide-links";
 import { GuidePageLayout, GuideSection, GuideStep, InfoCard } from "../_components/GuidePageLayout";
+import { PubgDiscordGuide } from "../_content/pubg";
 
-export const metadata: Metadata = {
-  title: "Discord 연동 가이드 — Nexus",
-  description: "Nexus Discord 봇 추가, 서버 승인, 음성 채널 이동과 주요 명령어를 안내합니다.",
-  alternates: { canonical: guideUrl("/guide/discord") },
-};
+/**
+ * 가이드는 게임마다 문안이 다르다. canonical 을 게임 경로로 내지 않으면
+ * 같은 주소 하나에 두 글이 걸린 것처럼 색인된다.
+ */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ game: string }>;
+}): Promise<Metadata> {
+  const game = guideGame((await params).game);
+  return {
+    title: game === "PUBG" ? "Discord 연동 가이드 (배그) — Nexus" : "Discord 연동 가이드 — Nexus",
+    description: "Nexus Discord 봇 추가, 서버 승인, 음성 채널 이동과 주요 명령어를 안내합니다.",
+    alternates: { canonical: guideUrl("/guide/discord", game) },
+  };
+}
 
 const commands = [
   ["/nexus help", "사용 가능한 명령어 보기"],
@@ -23,7 +35,7 @@ const commands = [
   ["/nexus clan", "클랜 정보 확인"],
 ];
 
-export default function DiscordGuidePage() {
+function LolDiscordGuidePage() {
   return (
     <GuidePageLayout
       icon={Bot}
@@ -58,4 +70,13 @@ export default function DiscordGuidePage() {
       </GuideSection>
     </GuidePageLayout>
   );
+}
+
+export default async function GuidePage({
+  params,
+}: {
+  params: Promise<{ game: string }>;
+}) {
+  const game = guideGame((await params).game);
+  return game === "PUBG" ? <PubgDiscordGuide /> : <LolDiscordGuidePage />;
 }

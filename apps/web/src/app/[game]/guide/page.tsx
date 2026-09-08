@@ -11,71 +11,89 @@ import {
   Trophy,
   Users,
 } from "lucide-react";
-import { guideUrl, GUIDE_BASE } from "@/lib/guide-links";
+import { guideBase, guideGame, guideUrl } from "@/lib/guide-links";
 import { NEXUS_DISCORD_INVITE_URL } from "@/lib/constants";
 import { RESOURCE_ARTICLES } from "@/app/resources/articles";
 import { GuideCarousel } from "./_components/GuideCarousel";
 
-export const metadata: Metadata = {
-  title: "롤 내전 가이드와 운영 자료 — Nexus",
-  description:
-    "Nexus의 방 생성, 팀 구성, 역할 선택, 대진표, Discord 연동 사용법과 실제 내전 운영 자료를 주제별로 확인하세요.",
-  alternates: { canonical: guideUrl("/guide") },
-  openGraph: {
-    title: "롤 내전 가이드와 운영 자료 — Nexus",
-    description: "기능 사용법과 실제 운영 자료를 주제별 페이지에서 확인하세요.",
-    url: guideUrl("/guide"),
-  },
-};
+/**
+ * 가이드 홈은 게임마다 다른 글 묶음을 가리킨다.
+ * canonical 을 게임 경로로 내야 같은 주소에 두 글이 걸리지 않는다.
+ */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ game: string }>;
+}): Promise<Metadata> {
+  const game = guideGame((await params).game);
+  const label = game === "PUBG" ? "배그" : "롤";
+  return {
+    title: `${label} 내전 가이드와 운영 자료 — Nexus`,
+    description:
+      game === "PUBG"
+        ? "배그 내전의 계정 연동, 방 개설, 팀 구성, 라운드 진행과 결과 기록 방법을 주제별로 확인하세요."
+        : "Nexus의 방 생성, 팀 구성, 역할 선택, 대진표, Discord 연동 사용법과 실제 내전 운영 자료를 주제별로 확인하세요.",
+    alternates: { canonical: guideUrl("/guide", game) },
+    openGraph: {
+      title: `${label} 내전 가이드와 운영 자료 — Nexus`,
+      description: "기능 사용법과 실제 운영 자료를 주제별 페이지에서 확인하세요.",
+      url: guideUrl("/guide", game),
+    },
+  };
+}
 
-const categories = [
+const buildCategories = (base: string) => [
   {
-    href: `${GUIDE_BASE}/guide/start`,
+    href: `${base}/guide/start`,
     visual: "start",
     title: "빠른 시작",
     description: "방 생성부터 참가, 준비 완료, 내전 시작까지 처음 필요한 흐름을 확인합니다.",
   },
   {
-    href: `${GUIDE_BASE}/guide/team-modes`,
+    href: `${base}/guide/team-modes`,
     visual: "teams",
     title: "팀 구성",
     description: "경매, 스네이크, 자동 밸런스, 자유 팀 선택의 차이와 진행법을 비교합니다.",
   },
   {
-    href: `${GUIDE_BASE}/guide/match-flow`,
+    href: `${base}/guide/match-flow`,
     visual: "match",
     title: "경기 진행",
     description: "역할 선택부터 대진표, 경기 결과 입력까지 이어지는 순서를 안내합니다.",
   },
   {
-    href: `${GUIDE_BASE}/guide/discord`,
+    href: `${base}/guide/discord`,
     visual: "discord",
     title: "Discord 연동",
     description: "봇 추가, 서버 승인, 음성 채널 이동과 주요 명령어를 정리했습니다.",
   },
   {
-    href: `${GUIDE_BASE}/guide/records`,
+    href: `${base}/guide/records`,
     visual: "records",
     title: "기록과 커뮤니티",
     description: "내전 전적, 랭킹, 클랜을 다음 내전 준비에 활용하는 방법을 확인합니다.",
   },
   {
-    href: `${GUIDE_BASE}/guide/resources`,
+    href: `${base}/guide/resources`,
     visual: "resources",
     title: "운영 자료",
     description: "실제 운영 체크리스트와 기능 개선 기록을 문서별로 찾아볼 수 있습니다.",
   },
   {
-    href: `${GUIDE_BASE}/guide/faq`,
+    href: `${base}/guide/faq`,
     visual: "faq",
     title: "자주 묻는 질문",
     description: "시작 조건, 팀 편성, 대진표와 Discord 연동에 관한 답변을 모았습니다.",
   },
 ];
 
-const flow = ["방 만들기", "팀 구성", "역할 선택", "경기 기록"];
+// 진행 순서도 게임마다 다르다. 배그에는 역할 선택 단계가 없다.
+const FLOW = {
+  LOL: ["방 만들기", "팀 구성", "역할 선택", "경기 기록"],
+  PUBG: ["계정 연동", "방 만들기", "팀 구성", "라운드 기록"],
+} as const;
 
-type GuideVisual = (typeof categories)[number]["visual"];
+type GuideVisual = ReturnType<typeof buildCategories>[number]["visual"];
 
 function VisualShell({ children }: { children: React.ReactNode }) {
   return (
@@ -252,7 +270,15 @@ function GuideCardVisual({ type }: { type: GuideVisual }) {
   );
 }
 
-export default function GuidePage() {
+export default async function GuidePage({
+  params,
+}: {
+  params: Promise<{ game: string }>;
+}) {
+  const game = guideGame((await params).game);
+  const base = guideBase(game);
+  const categories = buildCategories(base);
+  const flow = FLOW[game];
   return (
     <main className="flex-grow bg-bg-primary">
       <div className="mx-auto max-w-[1320px] px-4 py-10 md:px-6 md:py-16">
@@ -273,7 +299,7 @@ export default function GuidePage() {
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
                 <Link
-                  href="/lol/tournaments"
+                  href={`${base}/tournaments`}
                   className="inline-flex items-center gap-2 rounded-xl bg-accent-primary px-5 py-3 font-semibold text-white transition-colors hover:bg-accent-hover"
                 >
                   내전 방 보기 <ArrowRight className="h-4 w-4" />
@@ -350,13 +376,13 @@ export default function GuidePage() {
               <h2 className="text-2xl font-black tracking-[-0.035em] text-text-primary">최근 운영 자료</h2>
               <p className="mt-2 text-sm text-text-tertiary">실제 운영과 개선 과정에서 남긴 문서입니다.</p>
             </div>
-            <Link href="/lol/guide/resources" className="inline-flex items-center gap-1.5 text-sm font-semibold text-accent-primary">
+            <Link href={`${base}/guide/resources`} className="inline-flex items-center gap-1.5 text-sm font-semibold text-accent-primary">
               전체 자료 보기 <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
           <div className="mt-6 grid gap-3 md:grid-cols-3">
             {RESOURCE_ARTICLES.slice(0, 3).map((article) => (
-              <Link key={article.slug} href={`/lol/guide/${article.slug}`} className="rounded-2xl bg-bg-primary/35 p-5 transition-colors hover:bg-bg-elevated/35">
+              <Link key={article.slug} href={`${base}/guide/${article.slug}`} className="rounded-2xl bg-bg-primary/35 p-5 transition-colors hover:bg-bg-elevated/35">
                 <p className="text-xs text-text-tertiary">{article.readingTime} 읽기 · {article.updatedAt}</p>
                 <h3 className="mt-3 line-clamp-2 font-bold leading-snug text-text-primary">{article.title}</h3>
                 <p className="mt-2 line-clamp-2 text-sm leading-6 text-text-secondary">{article.description}</p>

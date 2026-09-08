@@ -1,13 +1,25 @@
 import type { Metadata } from "next";
 import { HelpCircle } from "lucide-react";
-import { guideUrl } from "@/lib/guide-links";
+import { guideGame, guideUrl } from "@/lib/guide-links";
 import { GuidePageLayout, GuideSection } from "../_components/GuidePageLayout";
+import { PubgFaqGuide } from "../_content/pubg";
 
-export const metadata: Metadata = {
-  title: "자주 묻는 질문 — Nexus",
-  description: "Nexus 내전 시작 조건, 팀 편성, 대진표, Discord 연동에 관한 답변입니다.",
-  alternates: { canonical: guideUrl("/guide/faq") },
-};
+/**
+ * 가이드는 게임마다 문안이 다르다. canonical 을 게임 경로로 내지 않으면
+ * 같은 주소 하나에 두 글이 걸린 것처럼 색인된다.
+ */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ game: string }>;
+}): Promise<Metadata> {
+  const game = guideGame((await params).game);
+  return {
+    title: game === "PUBG" ? "자주 묻는 질문 (배그) — Nexus" : "자주 묻는 질문 — Nexus",
+    description: "Nexus 내전 시작 조건, 팀 편성, 대진표, Discord 연동에 관한 답변입니다.",
+    alternates: { canonical: guideUrl("/guide/faq", game) },
+  };
+}
 
 const faqs = [
   ["Nexus는 어떤 서비스인가요?", "경매·스네이크·자동 밸런스·자유 팀 선택, 역할 선택, 대진표, Discord 음성 연동과 경기 기록을 한 흐름으로 지원하는 롤 내전 도구입니다."],
@@ -20,7 +32,7 @@ const faqs = [
   ["내전 기록도 볼 수 있나요?", "내전 전적에서 경기별 승패, KDA, 챔피언과 역할을 확인할 수 있고, 누적 기록은 랭킹과 클랜 페이지에서도 활용됩니다."],
 ] as const;
 
-export default function FaqGuidePage() {
+function LolFaqGuidePage() {
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "FAQPage",
@@ -50,4 +62,13 @@ export default function FaqGuidePage() {
       </GuideSection>
     </GuidePageLayout>
   );
+}
+
+export default async function GuidePage({
+  params,
+}: {
+  params: Promise<{ game: string }>;
+}) {
+  const game = guideGame((await params).game);
+  return game === "PUBG" ? <PubgFaqGuide /> : <LolFaqGuidePage />;
 }
