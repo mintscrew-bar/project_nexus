@@ -10,11 +10,13 @@ import { cn } from "@/lib/utils";
 import { NEXUS_DISCORD_INVITE_URL } from "@/lib/constants";
 import { RoomCard } from "@/components/domain";
 import { EmptyState, RoomCardSkeleton } from "@/components/ui";
-import { RefreshCcw, Home, Search, Gavel, ListOrdered, Scale, ArrowLeftRight, LayoutGrid } from "lucide-react";
+import { RefreshCcw, Home, Search, Gavel, ListOrdered, Scale, ArrowLeftRight, LayoutGrid, Crosshair, Trophy } from "lucide-react";
 import {
   GAMES,
   PUBG_PLATFORMS,
   PUBG_PLATFORM_LABELS,
+  pubgGameModes,
+  type PubgGameMode,
   type PubgPlatform,
 } from "@nexus/types";
 
@@ -35,6 +37,35 @@ export const roomSortOptions: { value: SortOption; label: string }[] = [
   { value: "oldest", label: "오래된순" },
   { value: "mostPlayers", label: "인원 많은순" },
   { value: "leastPlayers", label: "인원 적은순" },
+];
+
+/**
+ * 배그 방 목록의 1순위는 **경기 모드**다.
+ *
+ * 킬내기와 배틀로얄은 정원도 진행 방식도 결과 처리도 다른, 사실상 다른
+ * 경기다. 반면 팀 편성 방식(경매·스네이크…)은 그 안에서 사람을 담는 방법일
+ * 뿐이라 고르는 순서가 뒤다. 롤은 경기 모드가 하나뿐이라 지금처럼
+ * 팀 편성이 1순위다.
+ */
+const PUBG_MODE_ICONS: Record<PubgGameMode, typeof Crosshair> = {
+  KILL_MATCH: Crosshair,
+  BATTLE_ROYALE: Trophy,
+  FREE_MATCH: LayoutGrid,
+};
+
+const pubgModeOptions = () => [
+  {
+    value: "ALL" as const,
+    label: "전체",
+    description: "모든 경기 모드 보기",
+    icon: LayoutGrid,
+  },
+  ...pubgGameModes().map((mode) => ({
+    value: mode.mode,
+    label: mode.label,
+    description: `${mode.roomSizes[0]}~${mode.roomSizes[mode.roomSizes.length - 1]}명 · 4인 스쿼드`,
+    icon: PUBG_MODE_ICONS[mode.mode],
+  })),
 ];
 
 const modeOptions = [
@@ -109,6 +140,10 @@ export function RoomList({
   const [error, setError] = useState<string | null>(null);
 
   const [modeFilter, setModeFilter] = useState<ModeFilter>("ALL");
+  // 배그는 경기 모드가 1순위 필터다.
+  const [gameModeFilter, setGameModeFilter] = useState<PubgGameMode | "ALL">(
+    "ALL",
+  );
   // 스배와 카배는 같이 못 하므로 목록에서 갈라 볼 수 있어야 한다.
   const [platformFilter, setPlatformFilter] = useState<PubgPlatform | "ALL">(
     "ALL",
@@ -125,10 +160,14 @@ export function RoomList({
       gameTitle === "PUBG" && platformFilter !== "ALL"
         ? platformFilter
         : undefined,
+    pubgGameMode:
+      gameTitle === "PUBG" && gameModeFilter !== "ALL"
+        ? gameModeFilter
+        : undefined,
     search: debouncedSearchQuery || undefined,
     sort: sortBy,
     limit: 24,
-  }), [gameTitle, statusFilter, modeFilter, platformFilter, debouncedSearchQuery, sortBy]);
+  }), [gameTitle, statusFilter, modeFilter, platformFilter, gameModeFilter, debouncedSearchQuery, sortBy]);
 
   const loadRooms = useCallback(async (append = false) => {
     const cursor = nextCursorRef.current;
@@ -202,12 +241,33 @@ export function RoomList({
     router.push(`/${GAMES[gameTitle].slug}/tournaments/${roomId}/lobby`);
   };
 
+  /**
+   * 1순위 필터.
+   *
+   * 배그는 경기 모드(킬내기·배틀로얄)가 먼저다 — 정원도 진행도 결과도 다른
+   * 사실상 다른 경기라서다. 팀 편성 방식은 그 안에서 사람을 담는 방법이라
+   * 아래 줄로 내린다. 롤은 경기 모드가 하나뿐이라 지금처럼 팀 편성이 1순위다.
+   */
+  const isPubg = gameTitle === "PUBG";
+  const primaryOptions = isPubg
+    ? pubgModeOptions()
+    : modeOptions.filter(
+        (option) =>
+          option.value === "ALL" ||
+          GAMES[gameTitle].teamModes.includes(option.value),
+      );
+  const primaryValue = isPubg ? gameModeFilter : modeFilter;
+  const selectPrimary = (value: string) => {
+    if (isPubg) setGameModeFilter(value as PubgGameMode | "ALL");
+    else setModeFilter(value as ModeFilter);
+  };
+
   return (
     <div className="space-y-8">
       <section aria-labelledby="room-mode-heading">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h2 id="room-mode-heading" className="text-sm font-bold text-text-primary">
-            모드 선택
+            {gameTitle === "PUBG" ? "경기 모드" : "모드 선택"}
           </h2>
           {gameTitle === "PUBG" && (
             <div className="flex items-center gap-1.5">
@@ -234,20 +294,17 @@ export function RoomList({
         </div>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-          {modeOptions
-            .filter((option) =>
-              option.value === "ALL" ||
-              GAMES[gameTitle].teamModes.includes(option.value),
-            )
-            .map((option) => {
+          {primaryOptions.map((option) => {
             const Icon = option.icon;
-            const isSelected = modeFilter === option.value;
+            const isSelected = primaryValue === option.value;
 
             return (
               <button
                 key={option.value}
                 type="button"
-                onClick={() => setModeFilter(isSelected ? "ALL" : option.value)}
+                onClick={() =>
+                  selectPrimary(isSelected ? "ALL" : (option.value as never))
+                }
                 aria-pressed={isSelected}
                 className={cn(
                   "group flex min-w-0 items-center gap-3 rounded-xl border p-4 text-left transition-all duration-150",
@@ -277,8 +334,39 @@ export function RoomList({
                 </span>
               </button>
             );
-            })}
+          })}
         </div>
+
+        {/* 팀 편성은 2순위 — 경기 모드를 고른 뒤에 좁히는 조건이다. */}
+        {isPubg && (
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <span className="text-xs font-bold text-text-tertiary">
+              팀 편성
+            </span>
+            {modeOptions
+              .filter(
+                (option) =>
+                  option.value === "ALL" ||
+                  GAMES.PUBG.teamModes.includes(option.value),
+              )
+              .map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setModeFilter(option.value)}
+                  aria-pressed={modeFilter === option.value}
+                  className={cn(
+                    "rounded-lg px-3 py-1.5 text-xs font-bold transition-colors",
+                    modeFilter === option.value
+                      ? "bg-accent-primary text-white"
+                      : "bg-bg-tertiary/60 text-text-secondary hover:text-text-primary",
+                  )}
+                >
+                  {option.label}
+                </button>
+              ))}
+          </div>
+        )}
       </section>
 
       {/* Results */}

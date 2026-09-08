@@ -145,7 +145,7 @@ export const RoomCard: React.FC<RoomCardProps> = ({ room, currentUserId, onClick
                   </span>
                 )}
                 {room.gameTitle === 'PUBG' && room.pubgGameMode && (
-                  <span className="flex-shrink-0 rounded-full bg-bg-elevated px-2 py-0.5 text-[10px] font-bold text-text-secondary">
+                  <span className="flex-shrink-0 rounded-full bg-bg-elevated px-2 py-0.5 text-[10px] font-bold text-text-primary">
                     {getPubgGameMode(room.pubgGameMode).label}
                   </span>
                 )}
@@ -162,9 +162,26 @@ export const RoomCard: React.FC<RoomCardProps> = ({ room, currentUserId, onClick
 
         {/* Room Info */}
         <div className="grid grid-cols-3 gap-3">
+          {/*
+            배그는 경기 모드가 1순위다. 킬내기와 배틀로얄은 정원도 진행도
+            결과 처리도 다른 사실상 다른 경기라, 팀 편성 방식보다 먼저 눈에
+            들어와야 한다. 팀 편성은 그 안에서 사람을 담는 방법이라 아래 줄로.
+            롤은 경기 모드가 하나뿐이라 지금처럼 팀 편성이 이 칸을 쓴다.
+          */}
           <div className="rounded-xl border border-bg-elevated/30 bg-bg-elevated/20 px-3.5 py-4">
             <p className="mb-2.5 text-[10px] font-semibold tracking-[0.1em] text-text-tertiary">MODE</p>
-            <p className="truncate text-xs font-semibold text-text-secondary">{getModeLabel(room.teamMode)}</p>
+            {room.gameTitle === 'PUBG' && room.pubgGameMode ? (
+              <>
+                <p className="truncate text-xs font-semibold text-text-primary">
+                  {getPubgGameMode(room.pubgGameMode).label}
+                </p>
+                <p className="mt-1 truncate text-[10px] text-text-tertiary">
+                  {getModeLabel(room.teamMode)}
+                </p>
+              </>
+            ) : (
+              <p className="truncate text-xs font-semibold text-text-secondary">{getModeLabel(room.teamMode)}</p>
+            )}
           </div>
           <div className="rounded-xl border border-bg-elevated/30 bg-bg-elevated/20 px-3.5 py-4">
             <div className="mb-2.5 flex items-center gap-1.5 text-text-tertiary">
