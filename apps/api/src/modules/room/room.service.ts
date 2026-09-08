@@ -2461,16 +2461,12 @@ export class RoomService {
     if (this.discordVoiceService) {
       // 인원 변경 → 팀 채널 수 조정
       if (updates.maxParticipants) {
-        const newNumTeams = teamCountForRoom({
-          gameTitle: room.gameTitle,
-          pubgGameMode: room.pubgGameMode,
-          maxParticipants: updates.maxParticipants,
-        });
         const nextShape = {
           gameTitle: room.gameTitle,
           pubgGameMode: room.pubgGameMode,
           maxParticipants: updates.maxParticipants,
         };
+        const newNumTeams = teamCountForRoom(nextShape);
         this.discordVoiceService
           .updateRoomChannels(roomId, newNumTeams, {
             teamSize: teamSizeForRoom(nextShape),

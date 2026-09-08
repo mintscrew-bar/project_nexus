@@ -451,6 +451,52 @@ describe("DiscordVoiceService.getRoomAnnounceTargets", () => {
       expect(created.every((options) => options.userLimit === 4)).toBe(true);
     });
 
+    it("팀당 채널 수가 바뀌면 팀 채널을 다시 만든다", async () => {
+      // 킬내기 8명(4대4·팀당 1채널) → 16명(8대8·팀당 2채널).
+      // 새 스쿼드 수로 옛 채널을 세면 2팀을 1팀으로 읽고, 접미사 없는 채널과
+      // 있는 채널이 섞인 채로 남는다. 배치가 바뀌면 갈아엎어야 한다.
+      const single = [
+        { id: "row-1", channelId: "v1", teamName: "Team 1", createdAt },
+        {
+          id: "row-2",
+          channelId: "v2",
+          teamName: "Team 2",
+          createdAt: new Date(createdAt.getTime() + 1),
+        },
+      ];
+      const { service, created, deleted } = makeService(single as any);
+
+      await service.updateRoomChannels("room-1", 2, {
+        teamSize: 8,
+        squadsPerTeam: 2,
+      });
+
+      expect(deleted).toEqual(["row-1", "row-2"]);
+      expect(created.map((options) => options.name)).toEqual([
+        "┊ 1팀 A",
+        "┊ 1팀 B",
+        "┊ 2팀 A",
+        "┊ 2팀 B",
+      ]);
+      expect(created.every((options) => options.userLimit === 4)).toBe(true);
+    });
+
+    it("반대로 갈라진 채널을 하나로 합칠 때도 다시 만든다", async () => {
+      // 16명 → 8명. 팀당 2채널이 1채널이 된다.
+      const { service, created, deleted } = makeService(splitSquadChannels);
+
+      await service.updateRoomChannels("room-1", 2, {
+        teamSize: 4,
+        squadsPerTeam: 1,
+      });
+
+      expect(deleted).toEqual(["row-1", "row-2", "row-3", "row-4"]);
+      expect(created.map((options) => options.name)).toEqual([
+        "┊ 1팀",
+        "┊ 2팀",
+      ]);
+    });
+
     it("스쿼드가 하나면 예전 그대로 팀당 채널 하나", async () => {
       const single = [
         { id: "row-1", channelId: "v1", teamName: "Team 1", createdAt },

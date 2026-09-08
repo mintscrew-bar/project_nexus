@@ -829,9 +829,56 @@ export class DiscordVoiceService {
     const teamSize = Math.max(1, shape?.teamSize ?? 5);
     // 채널 정원은 스쿼드 하나 크기다. 생성 때와 같은 기준을 쓴다.
     const squadLimit = Math.min(99, Math.ceil(teamSize / squadsPerTeam));
-    const currentNumTeams = Math.floor(
-      existingTeamChannels.length / squadsPerTeam,
+
+    /**
+     * 지금 있는 채널이 팀당 몇 개로 만들어졌는가.
+     *
+     * 넘어온 `squadsPerTeam` 은 **바뀐 뒤** 값이라 기존 채널을 세는 데 쓰면
+     * 안 된다. 킬내기 정원을 8→16 으로 올리면 팀당 스쿼드가 1→2 로 바뀌는데,
+     * 새 값으로 기존 채널을 세면 2팀을 1팀으로 읽고 엉뚱한 채널을 만든다.
+     * 이름 접미사(" A" · " B")가 만들어질 때의 배치를 그대로 담고 있다.
+     */
+    const existingSquadsPerTeam = existingTeamChannels.reduce(
+      (max: number, ch: (typeof existingTeamChannels)[number]) => {
+        const suffix = /\s([A-Z])$/.exec(ch.teamName ?? "");
+        if (!suffix) return max;
+        return Math.max(max, suffix[1].charCodeAt(0) - 64);
+      },
+      1,
     );
+
+    /**
+     * 배치 자체가 바뀌면 갈아엎는다.
+     *
+     * 팀당 채널 수가 달라지면 기존 채널을 새 배치에 하나씩 대응시킬 방법이
+     * 없다 — 남겨두면 "1팀 A · 1팀 B" 두 개가 서로 다른 팀 것이 되거나,
+     * 접미사 없는 채널과 있는 채널이 섞인다. 정원 변경은 방이 WAITING 일
+     * 때만 되고 그때 팀 채널은 대개 비어 있으므로 지웠다 다시 만드는 편이
+     * 안전하다(대기실은 건드리지 않는다).
+     */
+    const layoutChanged =
+      existingTeamChannels.length > 0 &&
+      existingSquadsPerTeam !== squadsPerTeam;
+    if (layoutChanged) {
+      this.logger.log(
+        `[DiscordVoice] 팀당 채널 수가 ${existingSquadsPerTeam}→${squadsPerTeam} 로 바뀌어 팀 채널을 다시 만듭니다 (room ${roomId}).`,
+      );
+      for (const ch of existingTeamChannels) {
+        try {
+          const channel = await guild.channels
+            .fetch(ch.channelId)
+            .catch(() => null);
+          if (channel) await channel.delete();
+        } catch {
+          // Already deleted
+        }
+        await this.prisma.roomDiscordChannel.delete({ where: { id: ch.id } });
+      }
+    }
+
+    const currentNumTeams = layoutChanged
+      ? 0
+      : Math.floor(existingTeamChannels.length / squadsPerTeam);
 
     if (newNumTeams > currentNumTeams) {
       // 생성 때와 같은 상한을 건다. 정원표에 없는 값이 들어와도 서버 채널이
