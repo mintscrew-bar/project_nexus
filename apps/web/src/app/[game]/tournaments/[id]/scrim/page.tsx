@@ -66,6 +66,19 @@ type Scrim = {
   pointRule: PubgPointRule;
   rounds: ScrimRound[];
   leaderboard: ScrimLeaderboardRow[];
+  /** 시작 전 팀장 준비 현황. 시작한 뒤에는 null. */
+  ready: {
+    captains: {
+      teamId: string;
+      teamName: string;
+      userId: string;
+      username: string;
+      avatar: string | null;
+      ready: boolean;
+    }[];
+    readyCount: number;
+    requiredCount: number;
+  } | null;
 };
 
 export default function ScrimPage() {
@@ -127,6 +140,9 @@ export default function ScrimPage() {
     socket.emit("join-scrim", { roomId });
     const refresh = () => void load();
     socket.on("scrim-created", refresh);
+    // 준비 상태와 시작은 모두에게 동시에 보여야 한다.
+    socket.on("scrim-ready", refresh);
+    socket.on("scrim-started", refresh);
     socket.on("round-started", refresh);
     socket.on("round-completed", refresh);
     socket.on("scrim-updated", refresh);
@@ -403,7 +419,17 @@ export default function ScrimPage() {
           어딘가에 묻힌다. 대회 중계처럼 한 라운드가 끝나면 순위를 보여주고
           다음 라운드 시작을 눌러 넘어가는 흐름을 만든다.
         */}
-        {roundStatus && (
+        {/* 시작 전에는 준비가 화면의 전부다. 라운드·리더보드는 시작 뒤에. */}
+        {scrim.ready ? (
+          <KillMatchReady
+            ready={scrim.ready}
+            meId={user?.id}
+            roomId={roomId}
+            onChanged={load}
+          />
+        ) : null}
+
+        {!scrim.ready && roundStatus && (
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-accent-primary/25 bg-accent-primary/[0.07] px-4 py-3">
             <p className="text-sm font-semibold text-text-primary">
               {roundStatus.message}
@@ -420,7 +446,9 @@ export default function ScrimPage() {
           </div>
         )}
 
-        <Leaderboard scrim={scrim} lastRoundIndex={lastRoundIndex} />
+        {!scrim.ready && (
+          <Leaderboard scrim={scrim} lastRoundIndex={lastRoundIndex} />
+        )}
         {scrim.cutoffAt && (
           <Card>
             <CardContent className="space-y-2 pt-5">
@@ -497,6 +525,98 @@ export default function ScrimPage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+/**
+ * 시간제 킬내기 준비 화면.
+ *
+ * 만들자마자 시계가 돌면 아무도 안 모인 채로 제한시간이 흘러간다.
+ * 팀장이 전원 준비를 누르면 그 순간 시작한다 — 마지막 사람이 누르는 즉시라
+ * 방장이 따로 시작을 누르지 않는다.
+ */
+function KillMatchReady({
+  ready,
+  meId,
+  roomId,
+  onChanged,
+}: {
+  ready: NonNullable<Scrim["ready"]>;
+  meId: string | undefined;
+  roomId: string;
+  onChanged: () => Promise<void> | void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const { addToast } = useToast();
+  const mine = ready.captains.find((captain) => captain.userId === meId);
+
+  const toggle = async () => {
+    setBusy(true);
+    try {
+      await scrimApi.toggleReady(roomId);
+      await onChanged();
+    } catch (error: any) {
+      addToast(
+        error?.response?.data?.message ?? "준비 상태를 바꾸지 못했습니다.",
+        "error",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>팀장 준비</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <p className="text-sm text-text-secondary">
+          팀장 {ready.readyCount}/{ready.requiredCount}명 준비됐습니다.
+          전원이 준비하면 그 순간 제한시간이 돌기 시작합니다.
+        </p>
+
+        <ul className="grid gap-2 sm:grid-cols-2">
+          {ready.captains.map((captain) => (
+            <li
+              key={captain.teamId}
+              className={`flex items-center justify-between gap-2 rounded-lg border px-3 py-2.5 ${
+                captain.ready
+                  ? "border-accent-success/40 bg-accent-success/[0.08]"
+                  : "border-bg-tertiary bg-bg-primary/40"
+              }`}
+            >
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-semibold text-text-primary">
+                  {captain.teamName}
+                </span>
+                <span className="block truncate text-xs text-text-tertiary">
+                  {captain.username}
+                </span>
+              </span>
+              <Badge variant={captain.ready ? "success" : "secondary"}>
+                {captain.ready ? "준비" : "대기"}
+              </Badge>
+            </li>
+          ))}
+        </ul>
+
+        {mine ? (
+          <Button
+            className="w-full"
+            variant={mine.ready ? "secondary" : "primary"}
+            disabled={busy}
+            onClick={toggle}
+          >
+            {mine.ready ? "준비 취소" : "준비"}
+          </Button>
+        ) : (
+          <p className="text-xs text-text-tertiary">
+            팀장이 모두 준비하면 자동으로 시작합니다.
+          </p>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

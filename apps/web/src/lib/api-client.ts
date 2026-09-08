@@ -1328,6 +1328,14 @@ export const scrimApi = {
     return response.data;
   },
 
+  /**
+   * 팀장 준비 토글. 전원이 준비되면 서버가 그 자리에서 경기를 시작한다.
+   */
+  toggleReady: async (roomId: string) => {
+    const response = await apiClient.post(`/rooms/${roomId}/scrim/ready`);
+    return response.data;
+  },
+
   createScrim: async (
     roomId: string,
     data: {

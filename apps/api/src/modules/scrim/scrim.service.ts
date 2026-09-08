@@ -188,17 +188,16 @@ export class ScrimService {
         data: {
           roomId,
           totalRounds,
-          startsAt,
-          cutoffAt: startsAt
-            ? new Date(
-                startsAt.getTime() + room.killMatchDurationMinutes * 60_000,
-              )
-            : null,
+          // 시간제(킬내기)는 팀장이 전원 준비하기 전까지 시계를 돌리지 않는다.
+          // 만들자마자 시작하면 아무도 안 모인 채로 제한시간이 흘러간다.
+          startsAt: timed ? null : startsAt,
+          cutoffAt: null,
           ...(collection && {
             collectorState: collection as unknown as Prisma.InputJsonValue,
           }),
           pointRule: pointRule as unknown as Prisma.InputJsonValue,
-          status: ScrimStatus.IN_PROGRESS,
+          // 시간제는 준비가 끝나야 시작이다.
+          status: timed ? ScrimStatus.PENDING : ScrimStatus.IN_PROGRESS,
           // 라운드는 미리 다 만들어 둔다. 몇 판 남았는지가 화면에 바로 보여야 한다.
           rounds: {
             create: Array.from({ length: totalRounds }, (_, index) => ({
@@ -238,7 +237,110 @@ export class ScrimService {
       collectorState: undefined,
       pointRule: this.readPointRule(scrim.pointRule),
       leaderboard: this.buildLeaderboard(scrim, teams),
+      // 시작 전에는 누가 준비했는지가 화면의 전부다.
+      ready:
+        scrim.status === ScrimStatus.PENDING
+          ? await this.getReadyState(roomId)
+          : null,
     };
+  }
+
+  /**
+   * 시간제 킬내기의 팀장 준비.
+   *
+   * 팀장이 전원 준비를 누르면 그 순간 제한시간이 돈다. 마지막 사람이 누르는
+   * 즉시 시작하므로 방장이 따로 시작을 누를 필요가 없다.
+   *
+   * 준비 상태는 메모리에만 둔다. 시작 전 몇 초짜리 상태라 서버가 내려가면
+   * 다시 누르면 그만이고, 이걸 DB 에 넣으면 시작 뒤에도 남아 정리 대상이 된다.
+   */
+  private readonly readyCaptains = new Map<string, Set<string>>();
+
+  /** 방의 팀장 목록 — 준비를 받을 대상 */
+  private async loadCaptains(roomId: string) {
+    return this.prisma.team.findMany({
+      where: { roomId },
+      select: {
+        id: true,
+        name: true,
+        captainId: true,
+        captain: { select: { id: true, username: true, avatar: true } },
+      },
+      orderBy: { createdAt: "asc" },
+    });
+  }
+
+  /** 준비 현황. 화면이 누가 남았는지 보여준다. */
+  async getReadyState(roomId: string) {
+    const captains = await this.loadCaptains(roomId);
+    const ready = this.readyCaptains.get(roomId) ?? new Set<string>();
+    return {
+      captains: captains.map((team) => ({
+        teamId: team.id,
+        teamName: team.name,
+        userId: team.captainId,
+        username: team.captain?.username ?? "알 수 없음",
+        avatar: team.captain?.avatar ?? null,
+        ready: ready.has(team.captainId),
+      })),
+      readyCount: captains.filter((team) => ready.has(team.captainId)).length,
+      requiredCount: captains.length,
+    };
+  }
+
+  /**
+   * 준비 토글. 전원이 준비되면 그 자리에서 시작한다.
+   *
+   * @returns 시작됐는지와 준비 현황
+   */
+  async toggleReady(userId: string, roomId: string) {
+    const scrim = await this.prisma.scrim.findUnique({
+      where: { roomId },
+      select: { id: true, status: true, cutoffAt: true },
+    });
+    if (!scrim) throw new NotFoundException("시작된 스크림이 없습니다.");
+    if (scrim.status !== ScrimStatus.PENDING) {
+      throw new BadRequestException("이미 시작한 경기입니다.");
+    }
+
+    const captains = await this.loadCaptains(roomId);
+    const isCaptain = captains.some((team) => team.captainId === userId);
+    if (!isCaptain) {
+      throw new ForbiddenException("팀장만 준비할 수 있습니다.");
+    }
+
+    const ready = this.readyCaptains.get(roomId) ?? new Set<string>();
+    if (ready.has(userId)) ready.delete(userId);
+    else ready.add(userId);
+    this.readyCaptains.set(roomId, ready);
+
+    const allReady =
+      captains.length > 0 &&
+      captains.every((team) => ready.has(team.captainId));
+
+    if (!allReady) {
+      return { started: false as const, ...(await this.getReadyState(roomId)) };
+    }
+
+    // 마지막 팀장이 누른 순간이 시작이다.
+    const room = await this.prisma.room.findUnique({
+      where: { id: roomId },
+      select: { killMatchDurationMinutes: true },
+    });
+    const startsAt = new Date();
+    await this.prisma.scrim.update({
+      where: { id: scrim.id },
+      data: {
+        status: ScrimStatus.IN_PROGRESS,
+        startsAt,
+        cutoffAt: new Date(
+          startsAt.getTime() + (room?.killMatchDurationMinutes ?? 60) * 60_000,
+        ),
+      },
+    });
+    this.readyCaptains.delete(roomId);
+
+    return { started: true as const, ...(await this.getReadyState(roomId)) };
   }
 
   /** 라운드 시작 — 호스트가 인게임에서 커스텀 매치를 여는 시점 */

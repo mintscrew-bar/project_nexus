@@ -47,6 +47,27 @@ export class ScrimController {
     return scrim;
   }
 
+  /**
+   * 팀장 준비 토글.
+   *
+   * 시간제 킬내기는 팀장이 전원 준비하면 그 순간 제한시간이 돈다.
+   * 마지막 사람이 누르는 즉시 시작하므로 방장이 따로 시작을 누르지 않는다.
+   */
+  @Post("ready")
+  async toggleReady(
+    @CurrentUser("sub") userId: string,
+    @Param("roomId") roomId: string,
+  ) {
+    const result = await this.scrimService.toggleReady(userId, roomId);
+    if (result.started) {
+      const scrim = await this.scrimService.getScrimByRoom(roomId);
+      this.scrimGateway.broadcastScrimUpdate(roomId, "scrim-started", scrim);
+    } else {
+      this.scrimGateway.broadcastScrimUpdate(roomId, "scrim-ready", result);
+    }
+    return result;
+  }
+
   @Post("rounds/:roundNumber/start")
   async startRound(
     @CurrentUser("sub") userId: string,
