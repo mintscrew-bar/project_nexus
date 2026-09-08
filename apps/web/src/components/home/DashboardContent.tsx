@@ -235,7 +235,7 @@ function DashboardHero({
           : "첫 경기를 시작해보세요",
       icon: Trophy,
       color: "text-cyan-200",
-      href: "/profile",
+      href: `${gamePrefix}/profile`,
     },
     {
       label: "내 클랜",
@@ -374,12 +374,15 @@ function DashboardHero({
 
 function QuickActions({ clan }: { clan: ClanSummary | null }) {
   const router = useRouter();
+  // 내전·전적은 게임별 화면이다. 프리픽스 없이 두면 배그를 보다가 눌러도
+  // 롤 화면으로 넘어간다(맨 경로는 308 로 기본 게임에 붙는다).
+  const gamePrefix = useGamePrefix();
   const actions = [
     {
       label: "내전 만들기",
       description: "새 로비를 열고 참가자를 모집하세요",
       icon: Plus,
-      href: "/tournaments?create=true",
+      href: `${gamePrefix}/tournaments?create=true`,
       tone: "text-amber-300 bg-amber-300/[0.08] border-amber-300/10",
     },
     {
@@ -393,7 +396,7 @@ function QuickActions({ clan }: { clan: ClanSummary | null }) {
       label: "내 전적",
       description: "경기 기록과 플레이 성향을 확인하세요",
       icon: UserRound,
-      href: "/profile",
+      href: `${gamePrefix}/profile`,
       tone: "text-cyan-300 bg-cyan-300/[0.08] border-cyan-300/10",
     },
     {

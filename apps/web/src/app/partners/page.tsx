@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, Bot, BookOpen, Radio, Shield, Users } from "lucide-react";
 import { absoluteUrl } from "@/lib/seo";
+import { DEFAULT_GAME_PREFIX } from "@/lib/game-links";
 
 export const metadata: Metadata = {
   title: "NEXUS 파트너 안내",
@@ -24,7 +25,9 @@ export const metadata: Metadata = {
 
 const partnerCards = [
   {
-    href: "/profile",
+    // 게임 맥락이 없는 페이지라 기본 게임으로 보낸다.
+    // 맨 `/profile` 은 308 로 같은 곳에 붙지만 한 번 더 튕긴다.
+    href: `${DEFAULT_GAME_PREFIX}/profile`,
     icon: Radio,
     title: "스트리머로 함께하기",
     body: "프로필에서 방송 채널과 소개를 정리하고, 시참 내전과 커뮤니티 내전 운영에 NEXUS를 활용해요.",
