@@ -272,6 +272,47 @@ export default function ScrimPage() {
     (round) => round.status === "COMPLETED",
   ).length;
 
+  /**
+   * 지금 어느 라운드인가.
+   *
+   * 진행 중이면 그 라운드를, 방금 끝났으면 다음 라운드를 가리킨다.
+   * 킬내기는 시간제라 라운드를 미리 세어두지 않으므로 "다음 라운드"가 없다.
+   */
+  const lastRoundIndex = scrim.rounds.reduce(
+    (last, round, index) => (round.status === "COMPLETED" ? index : last),
+    -1,
+  );
+
+  /**
+   * 라운드 형태는 배틀로얄만이다.
+   *
+   * 배틀로얄은 정해둔 판수를 차례로 치르므로 "한 판 끝 → 순위 확인 →
+   * 다음 판 시작"이 흐름이 된다. 킬내기는 제한시간 안에 몇 판이든 치르는
+   * 형식이라 다음 라운드라는 개념이 없다 — 판마다 기록이 쌓이고 총점만 본다.
+   */
+  const isTimed = !!scrim.cutoffAt;
+  const runningRound = scrim.rounds.find(
+    (round) => round.status === "IN_PROGRESS",
+  );
+  const nextPending = scrim.rounds.find((round) => round.status === "PENDING");
+  const roundStatus = isTimed
+    ? completedRounds > 0
+      ? { message: `${completedRounds}판 기록됨 · 지금 총점입니다`, nextRound: null }
+      : { message: "아직 기록된 판이 없습니다", nextRound: null }
+    : runningRound
+      ? { message: `${runningRound.roundNumber}라운드 진행 중`, nextRound: null }
+      : lastRoundIndex >= 0
+        ? {
+            message: `${scrim.rounds[lastRoundIndex].roundNumber}라운드 종료 · 지금 순위입니다`,
+            nextRound: nextPending?.roundNumber ?? null,
+          }
+        : nextPending
+          ? {
+              message: "아직 시작한 라운드가 없습니다",
+              nextRound: nextPending.roundNumber,
+            }
+          : null;
+
   return (
     <div className="flex-grow bg-bg-primary px-5 py-8 sm:px-6 md:py-10 lg:px-8">
       <div className="mx-auto max-w-5xl space-y-6">
@@ -355,7 +396,31 @@ export default function ScrimPage() {
           </Card>
         )}
 
-        <Leaderboard scrim={scrim} />
+        {/*
+          라운드 사이에 멈춰 서는 자리.
+
+          누적 표만 있으면 "지금 몇 라운드고 다음에 뭘 해야 하는지"가 표
+          어딘가에 묻힌다. 대회 중계처럼 한 라운드가 끝나면 순위를 보여주고
+          다음 라운드 시작을 눌러 넘어가는 흐름을 만든다.
+        */}
+        {roundStatus && (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-accent-primary/25 bg-accent-primary/[0.07] px-4 py-3">
+            <p className="text-sm font-semibold text-text-primary">
+              {roundStatus.message}
+            </p>
+            {roundStatus.nextRound && isHost && scrim.status !== "COMPLETED" && (
+              <Button
+                size="sm"
+                disabled={busy}
+                onClick={() => handleStartRound(roundStatus.nextRound!)}
+              >
+                {roundStatus.nextRound}라운드 시작
+              </Button>
+            )}
+          </div>
+        )}
+
+        <Leaderboard scrim={scrim} lastRoundIndex={lastRoundIndex} />
         {scrim.cutoffAt && (
           <Card>
             <CardContent className="space-y-2 pt-5">
@@ -551,7 +616,55 @@ function ScrimSetup({
   );
 }
 
-function Leaderboard({ scrim }: { scrim: Scrim }) {
+/**
+ * 직전 라운드가 끝나기 전의 순위.
+ *
+ * 라운드 하나로 순위가 어떻게 뒤집혔는지가 대회에서 가장 재미있는 지점인데,
+ * 누적 표만 보면 그게 안 보인다. 방금 끝난 라운드 점수를 빼고 다시 세운다.
+ *
+ * 동점은 지금 순위 순서를 그대로 둔다 — 서버가 총점 다음에 쓰는 기준(총킬 등)을
+ * 라운드별로는 알 수 없어서, 억지로 가르면 없던 변동이 생긴다.
+ */
+function previousRanks(
+  scrim: Scrim,
+  lastRoundIndex: number,
+): Map<string, number> {
+  if (lastRoundIndex < 0) return new Map();
+  const rows = scrim.leaderboard.map((row, index) => ({
+    key: row.teamId ?? row.teamName,
+    before: row.totalPoints - (row.roundPoints[lastRoundIndex] ?? 0),
+    order: index,
+  }));
+  rows.sort((a, b) => b.before - a.before || a.order - b.order);
+  return new Map(rows.map((row, index) => [row.key, index + 1]));
+}
+
+/** 순위 변동 표시. 오른 팀은 초록 ▲, 내린 팀은 빨강 ▼. */
+function RankDelta({ delta }: { delta: number | null }) {
+  if (delta === null) return null;
+  if (delta === 0) {
+    return <span className="ml-1 text-[10px] text-text-tertiary">–</span>;
+  }
+  const up = delta > 0;
+  return (
+    <span
+      className={`ml-1 text-[10px] font-bold ${up ? "text-accent-success" : "text-accent-danger"}`}
+    >
+      {up ? "▲" : "▼"}
+      {Math.abs(delta)}
+    </span>
+  );
+}
+
+function Leaderboard({
+  scrim,
+  lastRoundIndex,
+}: {
+  scrim: Scrim;
+  /** 방금 결과가 들어간 라운드. 그 칸을 강조하고 순위 변동을 계산한다. */
+  lastRoundIndex: number;
+}) {
+  const before = previousRanks(scrim, lastRoundIndex);
   return (
     <Card>
       <CardHeader>
@@ -565,10 +678,12 @@ function Leaderboard({ scrim }: { scrim: Scrim }) {
               <tr className="border-b border-bg-tertiary text-left text-xs text-text-tertiary">
                 <th className="py-2 pr-3 font-semibold">#</th>
                 <th className="py-2 pr-3 font-semibold">팀</th>
-                {scrim.rounds.map((round) => (
+                {scrim.rounds.map((round, roundIndex) => (
                   <th
                     key={round.id}
-                    className="py-2 pr-3 text-center font-semibold"
+                    className={`py-2 pr-3 text-center font-semibold ${
+                      roundIndex === lastRoundIndex ? "text-accent-primary" : ""
+                    }`}
                   >
                     {round.roundNumber}R
                   </th>
@@ -584,8 +699,17 @@ function Leaderboard({ scrim }: { scrim: Scrim }) {
                   key={row.teamId ?? row.teamName}
                   className="border-b border-bg-tertiary/50 last:border-0"
                 >
-                  <td className="py-2.5 pr-3 font-bold text-text-tertiary">
+                  <td className="whitespace-nowrap py-2.5 pr-3 font-bold text-text-tertiary">
                     {index + 1}
+                    <RankDelta
+                      delta={
+                        before.size === 0
+                          ? null
+                          : (before.get(row.teamId ?? row.teamName) ??
+                              index + 1) -
+                            (index + 1)
+                      }
+                    />
                   </td>
                   <td className="py-2.5 pr-3">
                     <span className="font-semibold text-text-primary">
@@ -600,7 +724,11 @@ function Leaderboard({ scrim }: { scrim: Scrim }) {
                   {row.roundPoints.map((points, roundIndex) => (
                     <td
                       key={roundIndex}
-                      className="py-2.5 pr-3 text-center text-text-secondary"
+                      className={`py-2.5 pr-3 text-center ${
+                        roundIndex === lastRoundIndex
+                          ? "font-bold text-accent-primary"
+                          : "text-text-secondary"
+                      }`}
                     >
                       {/* 아직 안 한 판과 0점 받은 판은 다르다. */}
                       {points === null ? "–" : points}
@@ -661,7 +789,14 @@ function RoundRow({
         : "대기";
 
   return (
-    <div className="rounded-xl border border-bg-tertiary bg-bg-primary/40 p-4">
+    <div
+      className={
+        round.status === "IN_PROGRESS"
+          ? // 지금 치르는 판이 어느 것인지 목록에서도 바로 보여야 한다.
+            "rounded-xl border border-accent-primary/40 bg-accent-primary/[0.06] p-4"
+          : "rounded-xl border border-bg-tertiary bg-bg-primary/40 p-4"
+      }
+    >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <span className="font-bold text-text-primary">
