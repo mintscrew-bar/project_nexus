@@ -222,10 +222,11 @@ export function teamCountForRoster(
 }
 
 /**
- * 깐부킬내기인가 — 한 팀이 인게임 스쿼드 하나에 안 들어가는 구성.
+ * 한 팀이 인게임 스쿼드 하나에 안 들어가는 구성인가.
  *
- * 인게임에서는 한 팀이 두 스쿼드로 갈라져 들어가므로, 결과 수집이 로스터
- * 두 개를 같은 Nexus 팀에 붙여야 한다.
+ * 팀 인원이 4인 스쿼드와 같아진 지금은 항상 false 다. 팀 인원이 4를 넘던
+ * 시절에는 한 팀이 두 스쿼드로 갈라져 들어가서, 결과 수집이 로스터 두 개를
+ * 같은 Nexus 팀에 붙여야 했다. 팀 인원을 다시 늘리면 그 판단이 살아난다.
  */
 export function isSplitSquadTeam(room: RoomTeamShape): boolean {
   return squadCountForRoom(room) > 1;

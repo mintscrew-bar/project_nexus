@@ -2351,10 +2351,20 @@ export class RoomService {
     this.validateGameSettings(updates);
 
     const data: any = {};
-    for (const [field, max] of [["killMatchDurationMinutes", 360], ["battleRoyaleRounds", 20]] as const) {
+    for (const [field, max] of [
+      ["killMatchDurationMinutes", 360],
+      ["battleRoyaleRounds", 20],
+    ] as const) {
       const value = updates[field];
       if (value !== undefined) {
-        if (!Number.isInteger(value) || value < (field === "killMatchDurationMinutes" ? 10 : 1) || value > max) throw new BadRequestException("진행시간 또는 경기 수가 올바르지 않습니다.");
+        if (
+          !Number.isInteger(value) ||
+          value < (field === "killMatchDurationMinutes" ? 10 : 1) ||
+          value > max
+        )
+          throw new BadRequestException(
+            "진행시간 또는 경기 수가 올바르지 않습니다.",
+          );
         data[field] = value;
       }
     }

@@ -112,7 +112,10 @@ export class ScrimCollectorService {
       throw new ForbiddenException("방장만 결과를 수집할 수 있습니다.");
     }
     if (!room.scrim) throw new NotFoundException("시작된 스크림이 없습니다.");
-    if (room.scrim.cutoffAt) throw new BadRequestException("시간제 킬내기는 서버에서 자동 수집합니다.");
+    if (room.scrim.cutoffAt)
+      throw new BadRequestException(
+        "시간제 킬내기는 서버에서 자동 수집합니다.",
+      );
 
     // 같은 스크림의 다른 라운드 정보가 필요하다.
     // 이미 쓴 매치를 빼고, 직전 라운드 시작 시각을 하한으로 삼는다.
@@ -244,7 +247,8 @@ export class ScrimCollectorService {
       }
       const winner = [...votes.entries()].sort((a, b) => b[1] - a[1])[0];
       if (!winner) continue;
-      if (!splitSquad && (winner[1] !== 4 || roster.playerNames.length !== 4)) continue;
+      if (!splitSquad && (winner[1] !== 4 || roster.playerNames.length !== 4))
+        continue;
 
       const current = merged.get(winner[0]);
       if (!current) {

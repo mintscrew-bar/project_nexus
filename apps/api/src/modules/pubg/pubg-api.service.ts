@@ -187,7 +187,10 @@ export class PubgApiService {
     const body = await this.request<{
       data?: { relationships?: { matches?: { data?: { id: string }[] } } };
     }>(url, { allowNotFound: true, background });
-    if (!body?.data) throw new ServiceUnavailableException("참가자의 경기 목록을 받지 못했습니다.");
+    if (!body?.data)
+      throw new ServiceUnavailableException(
+        "참가자의 경기 목록을 받지 못했습니다.",
+      );
     return (body.data.relationships?.matches?.data ?? []).map((m) => m.id);
   }
 

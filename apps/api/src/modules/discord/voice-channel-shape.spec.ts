@@ -1,4 +1,5 @@
 import {
+  getPubgGameMode,
   squadCountForRoom,
   squadSizeForRoom,
   teamCountForRoom,
@@ -8,9 +9,14 @@ import {
 /**
  * 디스코드 음성채널 정원.
  *
- * 팀 채널이 `userLimit: 5`(롤 고정), 대기실이 `50` 고정이었다.
- * 8대8 깐부킬내기는 8명이 5인 채널에 못 들어가고, 100명 배틀로얄은
- * 절반이 대기실에 못 들어간다. 여기서 검증하는 건 방 형태 → 정원 계산이다.
+ * 팀 채널이 `userLimit: 5`(롤 고정), 대기실이 `50` 고정이던 시절이 있었다.
+ * 100명 배틀로얄은 절반이 대기실에 못 들어갔다.
+ * 여기서 검증하는 건 방 형태 → 정원 계산이다.
+ *
+ * 배그는 인게임 스쿼드가 4인이고, **그 스쿼드가 곧 한 팀이다.**
+ * 편을 몇 개로 나눌지(16명이면 2대2일 수도, 1대1대1대1일 수도)는 방에서
+ * 정하는 것이라 코드가 강제하지 않는다. 코드가 보는 것은 스쿼드가 딱
+ * 떨어지는가 뿐이다.
  */
 describe("음성채널 정원", () => {
   /** 서비스가 쓰는 것과 같은 계산 */
@@ -19,29 +25,26 @@ describe("음성채널 정원", () => {
   const lobbyLimit = (maxParticipants: number) =>
     maxParticipants > 99 ? 0 : maxParticipants;
 
-  it("킬내기는 팀 인원이 정원을 따라간다", () => {
-    for (const [size, expected] of [
-      [6, 3],
-      [8, 4],
-      [14, 7],
-      [16, 8],
-    ] as const) {
-      const shape = {
-        gameTitle: "PUBG" as const,
-        pubgGameMode: "KILL_MATCH" as const,
-        maxParticipants: size,
-      };
-      expect(teamChannelLimit(teamSizeForRoom(shape))).toBe(expected);
+  it("배그는 모드와 무관하게 4인 스쿼드가 한 팀", () => {
+    for (const mode of ["KILL_MATCH", "BATTLE_ROYALE"] as const) {
+      for (const size of getPubgGameMode(mode).roomSizes) {
+        const shape = {
+          gameTitle: "PUBG" as const,
+          pubgGameMode: mode,
+          maxParticipants: size,
+        };
+        expect(teamSizeForRoom(shape)).toBe(4);
+        expect(teamChannelLimit(teamSizeForRoom(shape))).toBe(4);
+      }
     }
   });
 
-  it("배틀로얄은 4인 스쿼드", () => {
+  it("팀 수는 정원을 4로 나눈 값", () => {
     const shape = {
       gameTitle: "PUBG" as const,
       pubgGameMode: "BATTLE_ROYALE" as const,
       maxParticipants: 64,
     };
-    expect(teamChannelLimit(teamSizeForRoom(shape))).toBe(4);
     expect(teamCountForRoom(shape)).toBe(16);
   });
 
@@ -67,67 +70,48 @@ describe("음성채널 정원", () => {
 });
 
 /**
- * 인게임 스쿼드 정원은 4명이다.
+ * 정원은 스쿼드가 딱 떨어져야 한다.
  *
- * 깐부킬내기(7대7·8대8)는 한 팀이 스쿼드 둘로 갈라져 들어가므로 음성채널도
- * 팀당 하나가 아니라 스쿼드마다 하나가 필요하다.
+ * 4로 나누어떨어지지 않는 정원(6명·14명)은 인게임에서 3인·2인 스쿼드가
+ * 생겨 실제 배그 판과 어긋난다. 정원표가 그런 값을 담지 않는 것이
+ * 이 규칙의 유일한 방어선이다.
  */
-describe("스쿼드 분할", () => {
-  const killMatch = (maxParticipants: number) => ({
-    gameTitle: "PUBG" as const,
-    pubgGameMode: "KILL_MATCH" as const,
-    maxParticipants,
+describe("정원과 스쿼드", () => {
+  it("배그 정원은 전부 4의 배수", () => {
+    for (const mode of ["KILL_MATCH", "BATTLE_ROYALE"] as const) {
+      for (const size of getPubgGameMode(mode).roomSizes) {
+        expect(size % 4).toBe(0);
+      }
+    }
   });
 
-  it("4인 이하 팀은 스쿼드 하나", () => {
-    expect(squadCountForRoom(killMatch(6))).toBe(1); // 3대3
-    expect(squadCountForRoom(killMatch(8))).toBe(1); // 4대4
+  it("킬내기 정원마다 스쿼드 수가 나온다", () => {
+    // 8명 2스쿼드 · 12명 3파전 · 16명 4스쿼드(2대2도 1대1대1대1도 가능).
+    for (const size of getPubgGameMode("KILL_MATCH").roomSizes) {
+      const room = {
+        gameTitle: "PUBG" as const,
+        pubgGameMode: "KILL_MATCH" as const,
+        maxParticipants: size,
+      };
+      expect(teamCountForRoom(room)).toBe(size / 4);
+    }
   });
 
-  it("깐부는 스쿼드 둘로 갈린다", () => {
-    expect(squadCountForRoom(killMatch(14))).toBe(2); // 7대7
-    expect(squadCountForRoom(killMatch(16))).toBe(2); // 8대8
-  });
-
-  it("채널 정원은 스쿼드 크기 — 7명은 4 + 3 이라 4에 맞춘다", () => {
-    expect(squadSizeForRoom(killMatch(14))).toBe(4);
-    expect(squadSizeForRoom(killMatch(16))).toBe(4);
-    expect(squadSizeForRoom(killMatch(6))).toBe(3);
-  });
-
-  it("8대8은 채널이 넷 필요하다", () => {
-    const room = killMatch(16);
-    expect(teamCountForRoom(room) * squadCountForRoom(room)).toBe(4);
-  });
-
-  it("배틀로얄과 롤은 팀이 곧 스쿼드", () => {
-    expect(
-      squadCountForRoom({
-        gameTitle: "PUBG",
-        pubgGameMode: "BATTLE_ROYALE",
-        maxParticipants: 64,
-      }),
-    ).toBe(1);
+  it("팀이 곧 스쿼드라 팀당 채널은 하나", () => {
+    // 팀 인원이 4를 넘던 시절에는 한 팀이 스쿼드 둘로 갈렸다.
+    // 지금은 팀 자체가 스쿼드라 나눌 일이 없다.
+    for (const size of getPubgGameMode("KILL_MATCH").roomSizes) {
+      const room = {
+        gameTitle: "PUBG" as const,
+        pubgGameMode: "KILL_MATCH" as const,
+        maxParticipants: size,
+      };
+      expect(squadCountForRoom(room)).toBe(1);
+      expect(squadSizeForRoom(room)).toBe(4);
+    }
     expect(squadCountForRoom({ gameTitle: "LOL", maxParticipants: 40 })).toBe(
       1,
     );
-  });
-
-  it("스쿼드 채널에 인원을 나눠 담는다", () => {
-    // 서비스가 쓰는 것과 같은 계산 — 7명을 2채널이면 4 + 3.
-    const split = (memberCount: number, channels: number) => {
-      const perChannel = Math.ceil(memberCount / channels);
-      const counts = new Array(channels).fill(0);
-      for (let i = 0; i < memberCount; i++) {
-        counts[Math.min(channels - 1, Math.floor(i / perChannel))] += 1;
-      }
-      return counts;
-    };
-    expect(split(8, 2)).toEqual([4, 4]);
-    expect(split(7, 2)).toEqual([4, 3]);
-    expect(split(4, 1)).toEqual([4]);
-    // 인원이 채널보다 적어도 넘치지 않는다.
-    expect(split(1, 2)).toEqual([1, 0]);
   });
 });
 
@@ -167,18 +151,13 @@ describe("방당 채널 수", () => {
 
   it("모든 정원에서 스쿼드 채널이 생략되지 않는다", () => {
     // 상한에 걸려 대기실만 남으면 100명이 한 채널에 몰려 통화가 불가능해진다.
-    const rooms = [
-      ...[6, 8, 14, 16].map((n) => ({
+    const rooms = (["KILL_MATCH", "BATTLE_ROYALE"] as const).flatMap((mode) =>
+      getPubgGameMode(mode).roomSizes.map((n) => ({
         gameTitle: "PUBG" as const,
-        pubgGameMode: "KILL_MATCH" as const,
+        pubgGameMode: mode,
         maxParticipants: n,
       })),
-      ...[32, 40, 48, 64, 80, 100].map((n) => ({
-        gameTitle: "PUBG" as const,
-        pubgGameMode: "BATTLE_ROYALE" as const,
-        maxParticipants: n,
-      })),
-    ];
+    );
     for (const room of rooms) {
       const { squads, total } = channelCount(room);
       expect(squads).toBeLessThanOrEqual(MAX_TEAM_VOICE_CHANNELS);
@@ -187,7 +166,7 @@ describe("방당 채널 수", () => {
     }
   });
 
-  it("8대8 깐부는 팀이 둘인데 채널은 넷", () => {
+  it("16명 킬내기는 스쿼드 넷 · 채널 여섯", () => {
     const { squads, total } = channelCount({
       gameTitle: "PUBG",
       pubgGameMode: "KILL_MATCH",

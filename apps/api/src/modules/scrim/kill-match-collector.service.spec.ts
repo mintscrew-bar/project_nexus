@@ -43,14 +43,12 @@ describe("시간제 킬내기 자동 집계", () => {
     db.$transaction = (fn: any) => fn(db);
     const api: any = {
       isEnabled: true,
-      getMatch: jest
-        .fn()
-        .mockResolvedValue({
-          matchId: "match",
-          createdAt,
-          gameMode: "squad-fpp",
-          teams: [{ playerIds, placement: 1, kills: 10, deaths: 2 }],
-        }),
+      getMatch: jest.fn().mockResolvedValue({
+        matchId: "match",
+        createdAt,
+        gameMode: "squad-fpp",
+        teams: [{ playerIds, placement: 1, kills: 10, deaths: 2 }],
+      }),
     };
     const redis: any = {
       acquireLock: jest.fn().mockResolvedValue("token"),
@@ -123,18 +121,48 @@ describe("시간제 킬내기 자동 집계", () => {
 
 describe("100명 25팀 3판 누적", () => {
   it("25팀 중 한 팀이라도 빠진 경기 결과를 저장하지 않는다", async () => {
-    const teams = Array.from({ length: 25 }, (_, i) => ({ id: `t${i}`, name: `팀${i}` }));
-    const db: any = { room: { findUnique: jest.fn().mockResolvedValue({ hostId: "host", teams, scrim: { id: "s", status: "IN_PROGRESS", totalRounds: 3 } }) },
-      scrimRound: { findUnique: jest.fn().mockResolvedValue({ id: "round" }) }, $transaction: jest.fn() };
-    await expect(new ScrimService(db).submitRoundResult("host", "room", 1, {
-      results: teams.slice(0,24).map((team,i) => ({ teamId: team.id, placement: i+1, kills: 0, deaths: 4 })),
-    })).rejects.toThrow("매 경기 모든 팀");
+    const teams = Array.from({ length: 25 }, (_, i) => ({
+      id: `t${i}`,
+      name: `팀${i}`,
+    }));
+    const db: any = {
+      room: {
+        findUnique: jest.fn().mockResolvedValue({
+          hostId: "host",
+          teams,
+          scrim: { id: "s", status: "IN_PROGRESS", totalRounds: 3 },
+        }),
+      },
+      scrimRound: { findUnique: jest.fn().mockResolvedValue({ id: "round" }) },
+      $transaction: jest.fn(),
+    };
+    await expect(
+      new ScrimService(db).submitRoundResult("host", "room", 1, {
+        results: teams.slice(0, 24).map((team, i) => ({
+          teamId: team.id,
+          placement: i + 1,
+          kills: 0,
+          deaths: 4,
+        })),
+      }),
+    ).rejects.toThrow("매 경기 모든 팀");
     expect(db.$transaction).not.toHaveBeenCalled();
   });
   it("세 판 중 두 판만 완료됐으면 대회를 확정하지 않는다", async () => {
-    const db: any = { room: { findUnique: jest.fn().mockResolvedValue({ hostId: "host", teams: [], scrim: { id: "s", status: "IN_PROGRESS", totalRounds: 3 } }) },
-      scrimRound: { count: jest.fn().mockResolvedValue(2) }, $transaction: jest.fn() };
-    await expect(new ScrimService(db).completeScrim("host", "room")).rejects.toThrow("모든 경기");
+    const db: any = {
+      room: {
+        findUnique: jest.fn().mockResolvedValue({
+          hostId: "host",
+          teams: [],
+          scrim: { id: "s", status: "IN_PROGRESS", totalRounds: 3 },
+        }),
+      },
+      scrimRound: { count: jest.fn().mockResolvedValue(2) },
+      $transaction: jest.fn(),
+    };
+    await expect(
+      new ScrimService(db).completeScrim("host", "room"),
+    ).rejects.toThrow("모든 경기");
     expect(db.$transaction).not.toHaveBeenCalled();
   });
   it("탈락 없이 25팀 모두 세 경기의 킬·데스·순위를 누적한다", () => {
