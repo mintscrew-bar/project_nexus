@@ -5,14 +5,25 @@ import { useQuery } from "@tanstack/react-query";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useGamePrefix } from "@/hooks/useCurrentGame";
+import { useCurrentGame, useGamePrefix } from "@/hooks/useCurrentGame";
+import { PubgRankingPage } from "./_PubgRankingPage";
 import { rankingApi } from "@/lib/api-client";
 import { Skeleton, Button, EmptyState } from "@/components/ui";
 import { Trophy, Crown, ChevronLeft, ChevronRight, Users } from "lucide-react";
 import { getTierImage } from "@/components/matches/match-utils";
 import { RankingTour } from "@/components/onboarding/PrimaryPageTours";
 
+/**
+ * 롤과 배그는 줄 세우는 기준 자체가 다르다 — 롤은 승률, 배그는 누적 포인트.
+ * 같은 표에 올릴 수 없어 화면을 갈랐다.
+ */
 export default function RankingPage() {
+  const game = useCurrentGame();
+  if (game === "PUBG") return <PubgRankingPage />;
+  return <LolRankingPage />;
+}
+
+function LolRankingPage() {
   const router = useRouter();
   const gamePrefix = useGamePrefix();
   const [page, setPage] = useState(1);

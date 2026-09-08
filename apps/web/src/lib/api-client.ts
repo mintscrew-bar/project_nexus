@@ -2318,7 +2318,47 @@ export const statsApi = {
 // Ranking API
 // ========================================
 
+export interface PubgRankingRow {
+  rank: number;
+  userId: string;
+  scrims: number;
+  averagePlacement: number;
+  wins: number;
+  totalPoints: number;
+  totalKills: number;
+  totalDeaths: number;
+  averageKills: number;
+  user: {
+    id: string;
+    username: string;
+    avatar: string | null;
+    pubgAccounts: { playerName: string; nexusTier: string | null }[];
+  } | null;
+}
+
+export interface PubgRankingResponse {
+  rankings: PubgRankingRow[];
+  total: number;
+  page: number;
+  totalPages: number;
+  /** 랭킹에 오르는 최소 참가 횟수. 화면 설명에 쓴다. */
+  minScrims: number;
+}
+
 export const rankingApi = {
+  /**
+   * 배그 랭킹. 롤과 지표가 달라(승패가 없다) 엔드포인트를 따로 둔다.
+   */
+  getPubgRanking: async (
+    page: number = 1,
+    limit: number = 50,
+  ): Promise<PubgRankingResponse> => {
+    const response = await apiClient.get("/pubg/ranking", {
+      params: { page, limit },
+    });
+    return response.data;
+  },
+
   getGlobalRanking: async (page: number = 1, limit: number = 50) => {
     const response = await apiClient.get("/ranking/global", {
       params: { page, limit },

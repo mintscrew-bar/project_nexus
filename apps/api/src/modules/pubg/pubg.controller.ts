@@ -9,10 +9,12 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from "@nestjs/common";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
+import { Public } from "../auth/decorators/public.decorator";
 import {
   LookupPubgPlayerDto,
   RegisterPubgAccountDto,
@@ -20,6 +22,7 @@ import {
 } from "./dto";
 import { PubgService } from "./pubg.service";
 import { PubgHistoryService } from "./pubg-history.service";
+import { PubgRankingService } from "./pubg-ranking.service";
 
 @Controller("pubg")
 @UseGuards(JwtAuthGuard)
@@ -27,6 +30,7 @@ export class PubgController {
   constructor(
     private readonly pubgService: PubgService,
     private readonly historyService: PubgHistoryService,
+    private readonly rankingService: PubgRankingService,
   ) {}
 
   @Get("accounts")
@@ -68,6 +72,20 @@ export class PubgController {
     @Param("id") accountId: string,
   ) {
     return this.pubgService.setPrimary(userId, accountId);
+  }
+
+  /**
+   * 배그 랭킹.
+   *
+   * 로그인 없이도 봐야 하는 공개 화면이라 인증을 걸지 않는다.
+   * (컨트롤러 전체에 걸린 가드를 이 경로에서만 푼다.)
+   */
+  @Public()
+  @Get("ranking")
+  getRanking(@Query("page") page?: string, @Query("limit") limit?: string) {
+    const parsedPage = Math.max(1, Number(page) || 1);
+    const parsedLimit = Math.min(100, Math.max(1, Number(limit) || 50));
+    return this.rankingService.getRanking(parsedPage, parsedLimit);
   }
 
   /** 배그 전적 — 스크림 참가 이력과 킬내기 결과를 시간순으로 섞어 돌려준다. */
