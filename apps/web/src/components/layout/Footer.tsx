@@ -1,7 +1,13 @@
+'use client';
+
 import Link from 'next/link';
-import { DEFAULT_GAME_PREFIX } from "@/lib/game-links";
+import { useGamePrefix } from "@/hooks/useCurrentGame";
 
 export function Footer() {
+  // 가이드는 게임마다 다른 글이다. 기본 게임으로 박아 두면 배그 화면 하단의
+  // "가이드"가 롤 가이드로 간다.
+  const gamePrefix = useGamePrefix();
+
   return (
     <footer className="bg-bg-secondary border-t border-bg-tertiary px-6 py-5">
       <div className="max-w-7xl mx-auto flex flex-col gap-3 text-sm text-text-tertiary">
@@ -12,7 +18,7 @@ export function Footer() {
             <Link href="/about" className="hover:text-text-secondary transition-colors duration-150">
               서비스 소개
             </Link>
-            <Link href={`${DEFAULT_GAME_PREFIX}/guide`} className="hover:text-text-secondary transition-colors duration-150">
+            <Link href={`${gamePrefix}/guide`} className="hover:text-text-secondary transition-colors duration-150">
               가이드 · 자료
             </Link>
             <Link href="/community" className="hover:text-text-secondary transition-colors duration-150">

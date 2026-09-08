@@ -12,6 +12,7 @@ import {
   Users,
 } from "lucide-react";
 import { guideBase, guideGame, guideUrl } from "@/lib/guide-links";
+import type { GameTitle } from "@nexus/types";
 import { NEXUS_DISCORD_INVITE_URL } from "@/lib/constants";
 import { RESOURCE_ARTICLES } from "@/app/resources/articles";
 import { GuideCarousel } from "./_components/GuideCarousel";
@@ -42,50 +43,65 @@ export async function generateMetadata({
   };
 }
 
-const buildCategories = (base: string) => [
-  {
-    href: `${base}/guide/start`,
-    visual: "start",
-    title: "빠른 시작",
-    description: "방 생성부터 참가, 준비 완료, 내전 시작까지 처음 필요한 흐름을 확인합니다.",
+/**
+ * 가이드 홈 카드.
+ *
+ * 문안이 게임마다 다르다. 롤 설명을 그대로 두면 배그 홈이 "역할 선택부터
+ * 대진표까지"를 안내하는데, 배그에는 둘 다 없다.
+ */
+const CATEGORY_COPY = {
+  LOL: {
+    start: "방 생성부터 참가, 준비 완료, 내전 시작까지 처음 필요한 흐름을 확인합니다.",
+    teams: "경매, 스네이크, 자동 밸런스, 자유 팀 선택의 차이와 진행법을 비교합니다.",
+    match: "역할 선택부터 대진표, 경기 결과 입력까지 이어지는 순서를 안내합니다.",
+    discord: "봇 추가, 서버 승인, 음성 채널 이동과 주요 명령어를 정리했습니다.",
+    records: "내전 전적, 랭킹, 클랜을 다음 내전 준비에 활용하는 방법을 확인합니다.",
+    resources: "실제 운영 체크리스트와 기능 개선 기록을 문서별로 찾아볼 수 있습니다.",
+    faq: "시작 조건, 팀 편성, 대진표와 Discord 연동에 관한 답변을 모았습니다.",
   },
-  {
-    href: `${base}/guide/team-modes`,
-    visual: "teams",
-    title: "팀 구성",
-    description: "경매, 스네이크, 자동 밸런스, 자유 팀 선택의 차이와 진행법을 비교합니다.",
+  PUBG: {
+    start: "PUBG 계정 연동부터 플랫폼·경기 모드 고르기, 방 열기까지의 순서입니다.",
+    teams: "4인 스쿼드가 한 팀입니다. 편성 네 가지와 NEXUS 편성 점수를 설명합니다.",
+    match: "킬내기 시간제와 배틀로얄 라운드, 결과를 넣는 두 가지 방법을 안내합니다.",
+    discord: "방을 열면 생기는 카테고리·대기실·스쿼드 채널과 봇 명령어를 정리했습니다.",
+    records: "리더보드와 개인 전적에 무엇이 어떻게 남는지 확인합니다.",
+    resources: "실제 운영 체크리스트와 기능 개선 기록을 문서별로 찾아볼 수 있습니다.",
+    faq: "스배·카배, 계정 선착순 등록, 정원이 4의 배수인 이유를 모았습니다.",
   },
-  {
-    href: `${base}/guide/match-flow`,
-    visual: "match",
-    title: "경기 진행",
-    description: "역할 선택부터 대진표, 경기 결과 입력까지 이어지는 순서를 안내합니다.",
-  },
-  {
-    href: `${base}/guide/discord`,
-    visual: "discord",
-    title: "Discord 연동",
-    description: "봇 추가, 서버 승인, 음성 채널 이동과 주요 명령어를 정리했습니다.",
-  },
-  {
-    href: `${base}/guide/records`,
-    visual: "records",
-    title: "기록과 커뮤니티",
-    description: "내전 전적, 랭킹, 클랜을 다음 내전 준비에 활용하는 방법을 확인합니다.",
-  },
-  {
-    href: `${base}/guide/resources`,
-    visual: "resources",
-    title: "운영 자료",
-    description: "실제 운영 체크리스트와 기능 개선 기록을 문서별로 찾아볼 수 있습니다.",
-  },
-  {
-    href: `${base}/guide/faq`,
-    visual: "faq",
-    title: "자주 묻는 질문",
-    description: "시작 조건, 팀 편성, 대진표와 Discord 연동에 관한 답변을 모았습니다.",
-  },
-];
+} as const;
+
+const CATEGORY_ORDER = [
+  { key: "start", visual: "start", title: "빠른 시작" },
+  { key: "teams", visual: "teams", title: "팀 구성" },
+  { key: "match", visual: "match", title: "경기 진행" },
+  { key: "discord", visual: "discord", title: "Discord 연동" },
+  { key: "records", visual: "records", title: "기록과 커뮤니티" },
+  { key: "resources", visual: "resources", title: "운영 자료" },
+  { key: "faq", visual: "faq", title: "자주 묻는 질문" },
+] as const;
+
+/** 카드가 가리키는 하위 페이지 경로 */
+const CATEGORY_PATH: Record<(typeof CATEGORY_ORDER)[number]["key"], string> = {
+  start: "start",
+  teams: "team-modes",
+  match: "match-flow",
+  discord: "discord",
+  records: "records",
+  resources: "resources",
+  faq: "faq",
+};
+
+const buildCategories = (base: string, game: GameTitle) =>
+  CATEGORY_ORDER.map((item) => ({
+    href: `${base}/guide/${CATEGORY_PATH[item.key]}`,
+    // 배그 "경기 진행"은 대진표가 아니라 라운드 누적이라 그림도 갈라야 한다.
+    visual:
+      game === "PUBG" && item.visual === "match"
+        ? ("rounds" as const)
+        : item.visual,
+    title: item.title,
+    description: CATEGORY_COPY[game][item.key],
+  }));
 
 // 진행 순서도 게임마다 다르다. 배그에는 역할 선택 단계가 없다.
 const FLOW = {
@@ -172,6 +188,37 @@ function GuideCardVisual({ type }: { type: GuideVisual }) {
           </div>
           <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-amber-300/10 text-amber-300">
             <Trophy className="h-9 w-9" />
+          </div>
+        </div>
+      </VisualShell>
+    );
+  }
+
+  // 배그 경기 진행 — 라운드가 쌓여 리더보드가 되는 그림.
+  // 대진표(4강→결승→트로피)를 쓰면 배그에 없는 개념을 그리게 된다.
+  if (type === "rounds") {
+    return (
+      <VisualShell>
+        <div className="flex h-full w-full max-w-[260px] flex-col justify-center gap-2">
+          {[
+            { label: "R1", width: "w-1/3" },
+            { label: "R2", width: "w-2/3" },
+            { label: "R3", width: "w-full" },
+          ].map((round) => (
+            <div key={round.label} className="flex items-center gap-2">
+              <span className="w-6 text-[10px] font-bold text-white/40">
+                {round.label}
+              </span>
+              <div className="h-4 flex-1 rounded bg-white/[0.07]">
+                <div
+                  className={`h-full rounded bg-accent-primary/45 ${round.width}`}
+                />
+              </div>
+            </div>
+          ))}
+          <div className="mt-2 flex items-center gap-2 border-t border-white/[0.07] pt-2">
+            <Trophy className="h-4 w-4 text-amber-300" />
+            <span className="text-[10px] font-bold text-white/50">누적 포인트</span>
           </div>
         </div>
       </VisualShell>
@@ -277,7 +324,7 @@ export default async function GuidePage({
 }) {
   const game = guideGame((await params).game);
   const base = guideBase(game);
-  const categories = buildCategories(base);
+  const categories = buildCategories(base, game);
   const flow = FLOW[game];
   return (
     <main className="flex-grow bg-bg-primary">
@@ -287,15 +334,16 @@ export default async function GuidePage({
           <div className="relative grid gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:items-center lg:gap-14">
             <div>
               <h1 className="text-4xl font-black leading-[1.02] tracking-[-0.055em] text-text-primary sm:text-5xl lg:text-6xl">
-                필요한 가이드를
+                {game === "PUBG" ? "배그 내전 가이드를" : "필요한 가이드를"}
                 <br />
                 <span className="bg-gradient-to-r from-accent-primary via-violet-400 to-cyan-400 bg-clip-text text-transparent">
                   페이지별로 빠르게
                 </span>
               </h1>
               <p className="mt-6 max-w-3xl text-sm leading-7 text-text-secondary md:text-lg">
-                처음 방을 만드는 방법부터 팀 구성, 경기 진행, Discord 연동과 실제 운영 자료까지
-                필요한 주제만 골라 확인하세요.
+                {game === "PUBG"
+                  ? "PUBG 계정 연동부터 팀 구성, 라운드 진행, Discord 연동과 실제 운영 자료까지 필요한 주제만 골라 확인하세요."
+                  : "처음 방을 만드는 방법부터 팀 구성, 경기 진행, Discord 연동과 실제 운영 자료까지 필요한 주제만 골라 확인하세요."}
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
                 <Link
