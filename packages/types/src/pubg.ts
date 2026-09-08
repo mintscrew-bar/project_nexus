@@ -2,7 +2,7 @@
  * 배틀그라운드 전용 설정.
  *
  * 롤과 달리 "경기 모드"와 "팀 구성 방식"이 별개다.
- * 모드는 경기 규칙(2팀 킬내기 / 다팀 배틀로얄)이고,
+ * 모드는 경기 규칙(시간제 킬내기 / 판수제 배틀로얄)이고,
  * 팀 구성은 참가자를 팀에 넣는 방법(경매·스네이크·수동)이다.
  */
 
@@ -64,7 +64,7 @@ export interface PubgGameModeDefinition {
 }
 
 /**
- * 킬내기는 2팀이라 정원이 곧 팀 인원 × 2다.
+ * 킬내기와 배틀로얄 모두 4인 스쿼드 단위다.
  * 배틀로얄은 4팀부터 — 2~3팀으로는 순위 점수가 의미를 잃는다.
  * 자유 매치는 방장이 알아서 굴리는 방이라 결과를 남기지 않는다.
  */
@@ -85,10 +85,9 @@ const MODE_DEFINITIONS: Record<PubgGameMode, PubgGameModeDefinition> = {
     mode: "KILL_MATCH",
     label: "킬내기",
     description:
-      "두 팀이 같은 판에 들어가 대도시에서 싸웁니다. 킬 +1 · 사망 −3 · 치킨 +8 로 라운드마다 누적합니다.",
-    // 항상 2팀이라 정원이 곧 팀 인원 × 2다.
-    // 6·8 은 한 스쿼드(3대3·4대4), 14·16 은 두 스쿼드가 한 팀인 깐부킬내기다.
-    roomSizes: [6, 8, 14, 16],
+      "4인 스쿼드로 제한시간 동안 플레이합니다. 시간 안에 시작한 경기의 킬 +1 · 사망 −3 · 치킨 +8을 누적합니다.",
+    // 4인 스쿼드 2~4팀.
+    roomSizes: [8, 12, 16],
     resultShape: "POINT_LEADERBOARD",
     teamModes: ["AUCTION", "SNAKE_DRAFT", "AUTO_BALANCE", "MANUAL_TEAM"],
     selectable: true,
@@ -116,8 +115,7 @@ const MODE_DEFINITIONS: Record<PubgGameMode, PubgGameModeDefinition> = {
 /**
  * 기본 모드.
  *
- * 킬내기가 배그 내전의 주류다. 배틀로얄은 16명(4팀)부터라 사람이 모여야 열리는데,
- * 킬내기는 6명이면 시작할 수 있어 첫 판을 열기가 훨씬 쉽다.
+ * 기본 모드는 8명부터 시작할 수 있는 시간제 킬내기다.
  */
 export const DEFAULT_PUBG_GAME_MODE: PubgGameMode = "KILL_MATCH";
 
@@ -186,14 +184,9 @@ export interface RoomTeamShape {
 /**
  * 이 방의 한 팀 인원.
  *
- * 배그는 보통 인게임 스쿼드 정원(4인)이 곧 팀 인원이지만, **킬내기는 다르다.**
- * 항상 두 팀이 붙는 형식이라 팀 인원이 정원을 반으로 나눈 값이다 —
- * 3대3부터 8대8(깐부킬내기, 한 팀이 인게임 2스쿼드)까지 간다.
+ * 배그는 모드와 관계없이 4인 스쿼드다.
  */
 export function teamSizeForRoom(room: RoomTeamShape): number {
-  if (isKillMatch(room)) {
-    return Math.max(1, Math.floor((room.maxParticipants ?? 0) / 2));
-  }
   return GAMES[room.gameTitle ?? DEFAULT_GAME].teamSize;
 }
 
@@ -204,8 +197,6 @@ export function teamSizeForRoom(room: RoomTeamShape): number {
  * 묻는 자리에서 쓴다.
  */
 export function teamCountForRoom(room: RoomTeamShape): number {
-  // 킬내기는 정원과 무관하게 두 팀이다.
-  if (isKillMatch(room)) return 2;
   return Math.floor(
     (room.maxParticipants ?? 0) / GAMES[room.gameTitle ?? DEFAULT_GAME].teamSize,
   );
@@ -216,24 +207,18 @@ export function teamCountForRoom(room: RoomTeamShape): number {
  *
  * 경매·스네이크는 정원이 덜 찬 상태에서도 돌릴 수 있어야 해서 지금 있는
  * 사람 수로 나눈다. 정원으로 나누면 빈 팀이 생긴다.
- * 킬내기만은 인원과 무관하게 두 팀이다 — 인원에 따라 3팀·4팀으로 늘어나면
- * 킬내기가 아니게 된다.
+ * 배그는 참가 인원에 따라 4인 스쿼드를 구성한다.
  */
 export function teamCountForRoster(
   room: RoomTeamShape,
   participantCount: number,
 ): number {
-  if (isKillMatch(room)) return 2;
   return Math.max(
     2,
     Math.floor(
       participantCount / GAMES[room.gameTitle ?? DEFAULT_GAME].teamSize,
     ),
   );
-}
-
-function isKillMatch(room: RoomTeamShape): boolean {
-  return room.gameTitle === "PUBG" && room.pubgGameMode === "KILL_MATCH";
 }
 
 /**
@@ -249,9 +234,7 @@ export function isSplitSquadTeam(room: RoomTeamShape): boolean {
 /**
  * 한 팀이 인게임에서 몇 개 스쿼드로 갈라지는가.
  *
- * 인게임 스쿼드 정원은 4명이다. 깐부킬내기 8대8은 한 팀이 4인 스쿼드 둘로
- * 나뉘어 들어가므로, 음성채널도 팀당 하나가 아니라 스쿼드마다 하나가 필요하다.
- * 롤과 배틀로얄은 팀이 곧 스쿼드라 항상 1이다.
+ * 현재 배그 팀은 4명이라 스쿼드와 팀이 일치한다.
  */
 export function squadCountForRoom(room: RoomTeamShape): number {
   if (room.gameTitle !== "PUBG") return 1;
@@ -264,7 +247,7 @@ export function squadCountForRoom(room: RoomTeamShape): number {
 /**
  * 스쿼드 하나에 들어갈 인원.
  *
- * 7대7이면 4명 + 3명으로 갈리므로 채널 정원은 큰 쪽(4)에 맞춘다.
+ * 음성채널 정원도 같은 인원을 사용한다.
  */
 export function squadSizeForRoom(room: RoomTeamShape): number {
   return Math.ceil(teamSizeForRoom(room) / squadCountForRoom(room));

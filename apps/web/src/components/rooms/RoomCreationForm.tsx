@@ -30,10 +30,7 @@ import {
   type SeriesPreset,
 } from "@nexus/types";
 import type { GameTitle } from "@nexus/types";
-import {
-  killMatchSizeOptions,
-  roomSizeOptions,
-} from "@/lib/room-size-options";
+import { killMatchSizeOptions, roomSizeOptions } from "@/lib/room-size-options";
 import {
   DEFAULT_PUBG_GAME_MODE,
   PUBG_PLATFORM_LABELS,
@@ -89,7 +86,6 @@ const TEAM_MODES: {
   },
 ];
 
-
 export function RoomCreationForm({
   gameTitle = "LOL",
   onCancel,
@@ -100,13 +96,15 @@ export function RoomCreationForm({
   const { createRoom, isLoading, error } = useRoomStore();
   const { user, isAuthenticated, isLoading: authLoading } = useAuthStore();
   const [name, setName] = useState("");
+  const [killMatchDurationMinutes, setKillMatchDurationMinutes] = useState(60);
+  const [battleRoyaleRounds, setBattleRoyaleRounds] = useState(3);
   const [pubgPlatform, setPubgPlatform] = useState<PubgPlatform>("STEAM");
   // 배그는 경기 모드에 따라 정원과 고를 수 있는 팀 편성이 달라진다.
   const [pubgGameMode, setPubgGameMode] = useState<PubgGameMode>(
     DEFAULT_PUBG_GAME_MODE,
   );
   const game = GAMES[gameTitle];
-  // 킬내기는 팀 인원이 정원을 따라가서(3대3~8대8) 선택지 모양이 아예 다르다.
+  // 모드마다 참가 정원 선택지는 다르지만 배그 팀 인원은 항상 4명이다.
   const playerOptions =
     gameTitle !== "PUBG"
       ? roomSizeOptions(gameTitle)
@@ -233,6 +231,8 @@ export function RoomCreationForm({
       gameTitle,
       pubgPlatform: gameTitle === "PUBG" ? pubgPlatform : undefined,
       pubgGameMode: gameTitle === "PUBG" ? pubgGameMode : undefined,
+      killMatchDurationMinutes,
+      battleRoyaleRounds,
       maxParticipants,
       teamMode: teamMode,
       password: isPrivate ? password : undefined,
@@ -263,7 +263,7 @@ export function RoomCreationForm({
       if (onRoomCreated) {
         onRoomCreated(newRoom.id);
       } else {
-      router.push(`/${game.slug}/tournaments/${newRoom.id}/lobby`);
+        router.push(`/${game.slug}/tournaments/${newRoom.id}/lobby`);
       }
     } else {
       setErrorMessage(error || "방 생성에 실패했습니다");
@@ -303,13 +303,18 @@ export function RoomCreationForm({
         </div>
         {gameTitle === "PUBG" && (
           <div>
-            <label htmlFor="pubgPlatform" className="block text-text-primary text-sm font-semibold mb-2">
+            <label
+              htmlFor="pubgPlatform"
+              className="block text-text-primary text-sm font-semibold mb-2"
+            >
               플랫폼
             </label>
             <select
               id="pubgPlatform"
               value={pubgPlatform}
-              onChange={(e) => setPubgPlatform(e.target.value as "STEAM" | "KAKAO")}
+              onChange={(e) =>
+                setPubgPlatform(e.target.value as "STEAM" | "KAKAO")
+              }
               className="w-full input"
             >
               <option value="STEAM">Steam (스팀 배틀그라운드)</option>
@@ -332,7 +337,9 @@ export function RoomCreationForm({
             <select
               id="pubgGameMode"
               value={pubgGameMode}
-              onChange={(e) => handlePubgModeChange(e.target.value as PubgGameMode)}
+              onChange={(e) =>
+                handlePubgModeChange(e.target.value as PubgGameMode)
+              }
               className="w-full input"
             >
               {pubgGameModes().map((mode) => (
@@ -449,15 +456,59 @@ export function RoomCreationForm({
       )}
 
       {/* 다전제 프리셋 — 더블 일리미네이션은 아직 단판만 지원한다 */}
-      {!(selectedPlayerOption?.supportsDE && useDoubleElim) && (
-        <SeriesPresetSelector
-          teamCount={selectedPlayerOption?.teams ?? 0}
-          value={seriesPreset}
-          onChange={setSeriesPreset}
-        />
-      )}
+      {gameTitle === "LOL" &&
+        !(selectedPlayerOption?.supportsDE && useDoubleElim) && (
+          <SeriesPresetSelector
+            teamCount={selectedPlayerOption?.teams ?? 0}
+            value={seriesPreset}
+            onChange={setSeriesPreset}
+          />
+        )}
 
       {/* 팀 구성 방식 */}
+      {gameTitle === "PUBG" && pubgGameMode === "BATTLE_ROYALE" && (
+        <label className="block text-sm text-text-primary">
+          총 경기 수
+          <input
+            type="number"
+            min={1}
+            max={20}
+            className="input mt-2"
+            value={battleRoyaleRounds}
+            onChange={(e) =>
+              setBattleRoyaleRounds(
+                Math.min(20, Math.max(1, Number(e.target.value) || 1)),
+              )
+            }
+          />
+          <span className="mt-2 block text-text-secondary">
+            {maxParticipants}명 · {maxParticipants / 4}팀이 탈락 없이{" "}
+            {battleRoyaleRounds}판 모두 참가합니다. 킬·순위 점수를 합산해 최종
+            순위를 정합니다.
+          </span>
+        </label>
+      )}
+      {gameTitle === "PUBG" && pubgGameMode === "KILL_MATCH" && (
+        <label className="block text-sm text-text-primary">
+          킬내기 진행시간
+          <select
+            className="input mt-2"
+            value={killMatchDurationMinutes}
+            onChange={(e) =>
+              setKillMatchDurationMinutes(Number(e.target.value))
+            }
+          >
+            {[30, 60, 90, 120, 180, 240].map((minutes) => (
+              <option key={minutes} value={minutes}>
+                {minutes}분
+              </option>
+            ))}
+          </select>
+          <span className="mt-2 block text-text-secondary">
+            제한시간 안에 시작한 경기는 종료 후에도 자동 집계합니다.
+          </span>
+        </label>
+      )}
       <div>
         <label className="block text-text-primary text-sm font-semibold mb-3">
           <Trophy className="w-4 h-4 inline mr-2" />팀 구성 방식

@@ -45,6 +45,7 @@ type ScrimRound = {
   /** 결과를 어떻게 넣었는지. 자동으로 가져온 값과 손으로 넣은 값을 구분한다. */
   resultSource: string | null;
   results: {
+    damage?: number;
     teamId: string | null;
     teamName: string;
     placement: number;
@@ -55,6 +56,10 @@ type ScrimRound = {
 };
 
 type Scrim = {
+  startsAt: string | null;
+  cutoffAt: string | null;
+  lastCollectedAt: string | null;
+  collectionError: string | null;
   id: string;
   totalRounds: number;
   status: "PENDING" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
@@ -79,6 +84,11 @@ export default function ScrimPage() {
   // 자동 수집은 커스텀 매치 판별이 실측되기 전까지 서버에서 꺼둔다.
   const [collectorEnabled, setCollectorEnabled] = useState(false);
   const [ruleOpen, setRuleOpen] = useState(false);
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   const isHost = !!user && !!room && room.hostId === user.id;
   const teams = useMemo(() => room?.teams ?? [], [room]);
@@ -96,6 +106,11 @@ export default function ScrimPage() {
   useEffect(() => {
     void load();
   }, [load]);
+  useEffect(() => {
+    if (!scrim?.cutoffAt || scrim.status === "COMPLETED") return;
+    const timer = setInterval(() => void load(), 15_000);
+    return () => clearInterval(timer);
+  }, [load, scrim?.cutoffAt, scrim?.status]);
 
   useEffect(() => {
     void scrimApi
@@ -193,7 +208,10 @@ export default function ScrimPage() {
     setBusy(true);
     try {
       await scrimApi.updatePointRule(roomId, rule);
-      addToast("포인트 규칙을 바꾸고 기존 결과를 다시 계산했습니다.", "success");
+      addToast(
+        "포인트 규칙을 바꾸고 기존 결과를 다시 계산했습니다.",
+        "success",
+      );
       setRuleOpen(false);
       await load();
     } catch (err: any) {
@@ -207,16 +225,20 @@ export default function ScrimPage() {
   };
 
   const handleComplete = async () => {
+    if (
+      scrim?.cutoffAt &&
+      !window.confirm(
+        "시간 안에 시작한 마지막 경기까지 결과가 반영됐나요? 확정하면 자동 수집이 종료됩니다.",
+      )
+    )
+      return;
     setBusy(true);
     try {
       await scrimApi.completeScrim(roomId);
       addToast("스크림을 확정했습니다.", "success");
       await load();
     } catch (err: any) {
-      addToast(
-        err?.response?.data?.message || "확정하지 못했습니다.",
-        "error",
-      );
+      addToast(err?.response?.data?.message || "확정하지 못했습니다.", "error");
     } finally {
       setBusy(false);
     }
@@ -238,6 +260,8 @@ export default function ScrimPage() {
         // 방 모드에 맞는 규칙으로 열어야 한다. 킬내기 방에서 배틀로얄 표를
         // 기본으로 띄우면 사망 감점이 빠진 채 시작된다.
         mode={room?.pubgGameMode ?? "BATTLE_ROYALE"}
+        durationMinutes={room?.killMatchDurationMinutes ?? 60}
+        configuredRounds={room?.battleRoyaleRounds ?? 3}
         onCreate={handleCreate}
         lobbyHref={`${gamePrefix}/tournaments/${roomId}/lobby`}
       />
@@ -262,8 +286,10 @@ export default function ScrimPage() {
               {room?.name ?? "스크림"}
             </h1>
             <p className="mt-1 text-sm text-text-secondary">
-              {completedRounds}/{scrim.totalRounds} 라운드 완료 ·{" "}
-              {room?.pubgGameMode === "KILL_MATCH" ? "치킨" : "1위"}{" "}
+              {scrim.cutoffAt
+                ? `${completedRounds}경기 자동 집계`
+                : `${completedRounds}/${scrim.totalRounds} 라운드 완료`}{" "}
+              · {room?.pubgGameMode === "KILL_MATCH" ? "치킨" : "1위"}{" "}
               {scrim.pointRule.placementPoints[0] ?? 0}점 · 킬{" "}
               {scrim.pointRule.killPoints}점
               {(scrim.pointRule.deathPoints ?? 0) !== 0 &&
@@ -285,7 +311,13 @@ export default function ScrimPage() {
                 >
                   포인트 규칙
                 </Button>
-                <Button onClick={handleComplete} disabled={busy}>
+                <Button
+                  onClick={handleComplete}
+                  disabled={
+                    busy ||
+                    !!(scrim.cutoffAt && now < Date.parse(scrim.cutoffAt))
+                  }
+                >
                   <Flag className="mr-1.5 h-4 w-4" />
                   스크림 확정
                 </Button>
@@ -324,6 +356,38 @@ export default function ScrimPage() {
         )}
 
         <Leaderboard scrim={scrim} />
+        {scrim.cutoffAt && (
+          <Card>
+            <CardContent className="space-y-2 pt-5">
+              <p className="text-lg font-bold">
+                {scrim.status === "COMPLETED"
+                  ? "집계 확정"
+                  : now < Date.parse(scrim.cutoffAt)
+                    ? `남은 시간 ${Math.ceil((Date.parse(scrim.cutoffAt) - now) / 60_000)}분`
+                    : "진행시간 종료 · 마지막 경기 결과 수집 중"}
+              </p>
+              <p className="text-sm text-text-secondary">
+                종료 기준: {new Date(scrim.cutoffAt).toLocaleString("ko-KR")}{" "}
+                이전에 시작한 경기. 이후 끝나도 포함합니다.
+              </p>
+              <p className="text-sm text-text-secondary">
+                4명이 같은 스쿼드로 플레이한 경기를 자동 기록합니다. 마지막
+                경기까지 반영된 뒤 방장이 확정해주세요.
+              </p>
+              <p className="text-sm text-text-secondary">
+                {scrim.lastCollectedAt
+                  ? `마지막 조회: ${new Date(scrim.lastCollectedAt).toLocaleTimeString("ko-KR")}`
+                  : "첫 경기 기록을 기다리고 있습니다."}
+              </p>
+              {(!collectorEnabled || scrim.collectionError) && (
+                <p className="text-accent-warning">
+                  {scrim.collectionError ??
+                    "자동 수집 연결을 사용할 수 없습니다. 운영자에게 문의해주세요."}
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardHeader>
@@ -336,7 +400,7 @@ export default function ScrimPage() {
                 round={round}
                 isHost={isHost && scrim.status !== "COMPLETED"}
                 busy={busy}
-                canCollect={collectorEnabled}
+                canCollect={collectorEnabled && !scrim.cutoffAt}
                 onCollect={() => handleCollect(round.roundNumber)}
                 editing={editingRound === round.roundNumber}
                 onStart={() => handleStartRound(round.roundNumber)}
@@ -352,7 +416,15 @@ export default function ScrimPage() {
                   await load();
                 }}
                 roomId={roomId}
-                teams={teams}
+                teams={
+                  scrim.cutoffAt
+                    ? teams.filter((team) =>
+                        round.results.some(
+                          (result) => result.teamId === team.id,
+                        ),
+                      )
+                    : teams
+                }
                 pointRule={scrim.pointRule}
               />
             ))}
@@ -365,12 +437,16 @@ export default function ScrimPage() {
 
 /** 스크림 시작 전 — 라운드 수와 포인트표를 고른다. */
 function ScrimSetup({
+  configuredRounds,
+  durationMinutes,
   isHost,
   busy,
   mode,
   onCreate,
   lobbyHref,
 }: {
+  configuredRounds: number;
+  durationMinutes: number;
   isHost: boolean;
   busy: boolean;
   mode: "KILL_MATCH" | "BATTLE_ROYALE" | "FREE_MATCH";
@@ -378,7 +454,7 @@ function ScrimSetup({
   lobbyHref: string;
 }) {
   const [preset, setPreset] = useState(() => defaultPresetKeyForMode(mode));
-  const [totalRounds, setTotalRounds] = useState(3);
+  const totalRounds = configuredRounds;
   const rule =
     PUBG_POINT_RULE_PRESETS.find((p) => p.key === preset)?.rule ??
     defaultPointRuleForMode(mode);
@@ -389,7 +465,7 @@ function ScrimSetup({
         <EmptyState
           icon={Trophy}
           title="아직 스크림이 시작되지 않았습니다"
-          description="방장이 라운드 수와 포인트 규칙을 정하면 여기에 리더보드가 나타납니다."
+          description="방장이 시작하면 경기별 결과와 누적 팀 순위가 표시됩니다."
         />
       </div>
     );
@@ -401,33 +477,38 @@ function ScrimSetup({
         <header>
           <h1 className="text-2xl font-bold text-text-primary">스크림 설정</h1>
           <p className="mt-2 text-sm text-text-secondary">
-            라운드를 반복하며 포인트를 누적합니다. 규칙은 시작한 뒤에도 고칠 수
-            있고, 이미 입력한 결과의 점수도 함께 다시 계산됩니다.
+            {mode === "KILL_MATCH"
+              ? "시작 버튼을 누르면 제한시간이 흐르고, 참가 계정을 기준으로 경기 결과를 자동 수집합니다."
+              : `모든 팀이 탈락 없이 ${totalRounds}판에 참가합니다. 매 판 킬·순위 점수를 합산하며 데스는 통계로 기록합니다.`}
           </p>
         </header>
 
         <Card>
           <CardContent className="space-y-5 pt-5">
             <label className="block text-sm text-text-secondary">
-              라운드 수
-              <input
-                type="number"
-                min={1}
-                max={20}
-                value={totalRounds}
-                onChange={(e) =>
-                  setTotalRounds(
-                    Math.min(20, Math.max(1, Number(e.target.value) || 1)),
-                  )
-                }
-                className="mt-2 w-full input"
-              />
+              {mode === "KILL_MATCH"
+                ? `진행시간 ${durationMinutes}분 · 경기 수 제한 없음`
+                : "라운드 수"}
+              {mode !== "KILL_MATCH" && (
+                <input
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={totalRounds}
+                  readOnly
+                  className="mt-2 w-full input"
+                />
+              )}
             </label>
 
             <div>
               <p className="text-sm text-text-secondary">포인트 규칙</p>
               <div className="mt-2 space-y-2">
-                {PUBG_POINT_RULE_PRESETS.map((option) => (
+                {PUBG_POINT_RULE_PRESETS.filter((option) =>
+                  mode === "KILL_MATCH"
+                    ? option.key.startsWith("kill-match")
+                    : !option.key.startsWith("kill-match"),
+                ).map((option) => (
                   <button
                     key={option.key}
                     type="button"
@@ -493,6 +574,7 @@ function Leaderboard({ scrim }: { scrim: Scrim }) {
                   </th>
                 ))}
                 <th className="py-2 pr-3 text-right font-semibold">킬</th>
+                <th className="py-2 pr-3 text-right font-semibold">데스</th>
                 <th className="py-2 text-right font-semibold">총점</th>
               </tr>
             </thead>
@@ -511,7 +593,7 @@ function Leaderboard({ scrim }: { scrim: Scrim }) {
                     </span>
                     {row.wins > 0 && (
                       <Badge variant="primary" className="ml-2">
-                        {row.wins}승
+                        치킨 {row.wins}회
                       </Badge>
                     )}
                   </td>
@@ -526,6 +608,9 @@ function Leaderboard({ scrim }: { scrim: Scrim }) {
                   ))}
                   <td className="py-2.5 pr-3 text-right text-text-secondary">
                     {row.totalKills}
+                  </td>
+                  <td className="py-2.5 pr-3 text-right text-text-secondary">
+                    {row.totalDeaths}
                   </td>
                   <td className="py-2.5 text-right font-black text-text-primary">
                     {row.totalPoints}
@@ -686,6 +771,7 @@ function RoundResultForm({
   teams: { id: string; name: string }[];
   pointRule: PubgPointRule;
   existing: {
+    damage?: number;
     teamId: string | null;
     placement: number;
     kills: number;
@@ -705,13 +791,14 @@ function RoundResultForm({
         placement: prev?.placement ?? index + 1,
         kills: prev?.kills ?? 0,
         deaths: prev?.deaths ?? 0,
+        damage: prev?.damage ?? 0,
       };
     }),
   );
   const [saving, setSaving] = useState(false);
 
   // 사망 감점이 있는 규칙(킬내기)에서만 사망 칸을 띄운다.
-  const tracksDeaths = (pointRule.deathPoints ?? 0) !== 0;
+  const tracksDeaths = true;
 
   const duplicatePlacements = useMemo(() => {
     const seen = new Set<number>();
@@ -737,6 +824,7 @@ function RoundResultForm({
           placement: row.placement,
           kills: row.kills,
           deaths: row.deaths,
+          damage: row.damage,
         })),
       });
       addToast(`${roundNumber} 라운드 결과를 저장했습니다.`, "success");
@@ -821,7 +909,10 @@ function RoundResultForm({
                 setRows((current) =>
                   current.map((r, i) =>
                     i === index
-                      ? { ...r, kills: Math.max(0, Number(e.target.value) || 0) }
+                      ? {
+                          ...r,
+                          kills: Math.max(0, Number(e.target.value) || 0),
+                        }
                       : r,
                   ),
                 )
@@ -865,6 +956,37 @@ function RoundResultForm({
       </div>
 
       <div className="flex justify-end">
+        <details className="mr-auto text-xs text-text-secondary">
+          <summary className="cursor-pointer">동점 판정용 팀 데미지</summary>
+          {rows.map((row, index) => (
+            <label key={row.teamId} className="mt-2 flex items-center gap-2">
+              {row.teamName}
+              <input
+                type="number"
+                min={0}
+                max={100000}
+                step="any"
+                className="input w-28"
+                value={row.damage}
+                onChange={(event) =>
+                  setRows((current) =>
+                    current.map((r, i) =>
+                      i === index
+                        ? {
+                            ...r,
+                            damage: Math.max(
+                              0,
+                              Number(event.target.value) || 0,
+                            ),
+                          }
+                        : r,
+                    ),
+                  )
+                }
+              />
+            </label>
+          ))}
+        </details>
         <Button size="sm" onClick={submit} disabled={saving}>
           {saving ? "저장 중..." : "결과 저장"}
         </Button>

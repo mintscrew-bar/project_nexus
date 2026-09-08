@@ -181,12 +181,14 @@ export class PubgApiService {
   async getPlayerMatchIds(
     platform: PubgPlatform,
     playerId: string,
+    background = true,
   ): Promise<string[]> {
     const url = `${API_BASE}/${SHARD_PATH[platform]}/players/${encodeURIComponent(playerId)}`;
     const body = await this.request<{
       data?: { relationships?: { matches?: { data?: { id: string }[] } } };
-    }>(url, { allowNotFound: true, background: true });
-    return (body?.data?.relationships?.matches?.data ?? []).map((m) => m.id);
+    }>(url, { allowNotFound: true, background });
+    if (!body?.data) throw new ServiceUnavailableException("참가자의 경기 목록을 받지 못했습니다.");
+    return (body.data.relationships?.matches?.data ?? []).map((m) => m.id);
   }
 
   /**
@@ -317,6 +319,7 @@ export class PubgApiService {
     let res: Response;
     try {
       res = await fetch(url, {
+        signal: AbortSignal.timeout(15_000),
         headers: {
           Authorization: `Bearer ${this.apiKey}`,
           Accept: "application/vnd.api+json",
@@ -375,6 +378,8 @@ export interface PubgMatchTeamResult {
   deaths: number;
   /** 실제 참가자 닉네임. 로스터 인원이 팀 정원과 다를 수 있다(Task 1 주의). */
   playerNames: string[];
+  playerIds: string[];
+  damage: number;
 }
 
 export interface PubgMatchDetail {
@@ -403,6 +408,8 @@ interface PubgMatchResponse {
       stats?: {
         rank?: number;
         name?: string;
+        playerId?: string;
+        damageDealt?: number;
         kills?: number;
         /** `alive` 면 생존, 그 외("byplayer"·"suicide"·"logout")는 사망 */
         deathType?: string;
@@ -443,6 +450,8 @@ function parseMatch(body: PubgMatchResponse): PubgMatchDetail {
         deaths: members.filter((s) => s.deathType && s.deathType !== "alive")
           .length,
         playerNames: members.map((s) => s.name ?? "").filter(Boolean),
+        playerIds: members.map((s) => s.playerId ?? "").filter(Boolean),
+        damage: members.reduce((sum, s) => sum + (s.damageDealt ?? 0), 0),
       };
     })
     .sort((a, b) => a.placement - b.placement);

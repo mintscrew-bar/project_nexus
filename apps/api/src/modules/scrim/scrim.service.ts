@@ -23,6 +23,9 @@ import {
 import { Inject, Optional } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateScrimDto, SubmitRoundResultDto } from "./dto";
+import type { KillMatchCollectionState } from "./kill-match-collector.service";
+import { PubgApiService } from "../pubg/pubg-api.service";
+import { ConfigService } from "@nestjs/config";
 
 /** 결과를 어디서 받았는지. 자동 수집이 붙기 전에는 전부 수동이다. */
 const RESULT_SOURCE_MANUAL = "MANUAL";
@@ -42,6 +45,8 @@ export class ScrimService {
   constructor(
     private readonly prisma: PrismaService,
     @Optional() @Inject("DISCORD_BOT_SERVICE") discordBot?: any,
+    @Optional() private readonly pubgApi?: PubgApiService,
+    @Optional() private readonly config?: ConfigService,
   ) {
     this.discordBot = discordBot;
   }
@@ -80,6 +85,18 @@ export class ScrimService {
         "팀 편성을 먼저 끝내야 스크림을 시작할 수 있습니다.",
       );
     }
+    const teamSizes = await this.prisma.team.findMany({
+      where: { roomId },
+      include: { _count: { select: { members: true } } },
+    });
+    if (
+      teamSizes.length * 4 !== room.maxParticipants ||
+      teamSizes.some((team) => team._count.members !== 4)
+    ) {
+      throw new BadRequestException(
+        "방 정원에 맞게 모든 팀을 4명씩 채운 뒤 시작해주세요.",
+      );
+    }
 
     // 킬내기와 배틀로얄은 점수 규칙이 아예 다르다(킬내기는 사망이 감점).
     const pointRule =
@@ -89,23 +106,110 @@ export class ScrimService {
       throw new BadRequestException("포인트 규칙표가 올바르지 않습니다.");
     }
 
-    const totalRounds = dto.totalRounds ?? 3;
-
-    return this.prisma.scrim.create({
-      data: {
-        roomId,
-        totalRounds,
-        pointRule: pointRule as unknown as Prisma.InputJsonValue,
-        status: ScrimStatus.IN_PROGRESS,
-        // 라운드는 미리 다 만들어 둔다. 몇 판 남았는지가 화면에 바로 보여야 한다.
-        rounds: {
-          create: Array.from({ length: totalRounds }, (_, index) => ({
-            roundNumber: index + 1,
-          })),
+    const timed = room.pubgGameMode === "KILL_MATCH";
+    if (
+      timed &&
+      (!this.pubgApi?.isEnabled ||
+        this.config?.get("PUBG_SCRIM_AUTO_COLLECT") === "false")
+    ) {
+      throw new BadRequestException(
+        "배그 자동 수집 연결을 사용할 수 없어 시간제 킬내기를 시작할 수 없습니다.",
+      );
+    }
+    const totalRounds = timed ? 0 : room.battleRoyaleRounds;
+    let collection: KillMatchCollectionState | undefined;
+    if (timed) {
+      const teams = await this.prisma.team.findMany({
+        where: { roomId },
+        include: {
+          members: {
+            include: {
+              user: {
+                include: { pubgAccounts: { where: { isPrimary: true } } },
+              },
+            },
+          },
         },
-      },
-      include: { rounds: { orderBy: { roundNumber: "asc" } } },
+      });
+      if (teams.length < 2 || teams.some((team) => team.members.length !== 4)) {
+        throw new BadRequestException(
+          "모든 팀을 4인 스쿼드로 편성한 뒤 시작해주세요.",
+        );
+      }
+      const roster: KillMatchCollectionState["roster"] = [];
+      for (const team of teams)
+        for (const member of team.members) {
+          const account = member.user.pubgAccounts[0];
+          if (
+            !account?.playerId ||
+            !account.lastMatchShard ||
+            account.lastMatchShard !== room.pubgPlatform
+          ) {
+            throw new BadRequestException(
+              "모든 참가자의 대표 배그 계정과 방 플랫폼을 확인해주세요.",
+            );
+          }
+          roster.push({
+            teamId: team.id,
+            teamName: team.name,
+            playerId: account.playerId,
+            platform: account.lastMatchShard,
+          });
+        }
+      if (new Set(roster.map((p) => p.playerId)).size !== roster.length)
+        throw new BadRequestException("참가 계정이 중복됩니다.");
+      collection = { roster, cursor: 0, pending: [], seen: [] };
+      // 시작 전에 기존 경기 ID를 제외해 첫 집계가 과거 기록 탐색으로 밀리지 않게 한다.
+      // 각 스쿼드의 네 계정은 같은 경기에 참가하므로 팀당 한 계정의 목록을 조회한다.
+      for (const teamId of new Set(roster.map((p) => p.teamId))) {
+        const anchor = roster.find((p) => p.teamId === teamId)!;
+        collection.seen.push(
+          ...(await this.pubgApi!.getPlayerMatchIds(
+            anchor.platform,
+            anchor.playerId,
+            false,
+          )),
+        );
+      }
+      collection.seen = [...new Set(collection.seen)];
+    }
+    const startsAt = timed ? new Date() : null;
+
+    const created = await this.prisma.$transaction(async (tx) => {
+      const changed = await tx.room.updateMany({
+        where: { id: roomId, updatedAt: room.updatedAt },
+        data: { status: "IN_PROGRESS" },
+      });
+      if (!changed.count)
+        throw new BadRequestException(
+          "방 상태가 바뀌었습니다. 팀 편성을 확인하고 다시 시작해주세요.",
+        );
+      return tx.scrim.create({
+        data: {
+          roomId,
+          totalRounds,
+          startsAt,
+          cutoffAt: startsAt
+            ? new Date(
+                startsAt.getTime() + room.killMatchDurationMinutes * 60_000,
+              )
+            : null,
+          ...(collection && {
+            collectorState: collection as unknown as Prisma.InputJsonValue,
+          }),
+          pointRule: pointRule as unknown as Prisma.InputJsonValue,
+          status: ScrimStatus.IN_PROGRESS,
+          // 라운드는 미리 다 만들어 둔다. 몇 판 남았는지가 화면에 바로 보여야 한다.
+          rounds: {
+            create: Array.from({ length: totalRounds }, (_, index) => ({
+              roundNumber: index + 1,
+            })),
+          },
+        },
+        include: { rounds: { orderBy: { roundNumber: "asc" } } },
+      });
     });
+    return { ...created, collectorState: undefined };
   }
 
   /** 방 기준 스크림 조회 + 누적 리더보드 */
@@ -131,6 +235,7 @@ export class ScrimService {
 
     return {
       ...scrim,
+      collectorState: undefined,
       pointRule: this.readPointRule(scrim.pointRule),
       leaderboard: this.buildLeaderboard(scrim, teams),
     };
@@ -139,6 +244,10 @@ export class ScrimService {
   /** 라운드 시작 — 호스트가 인게임에서 커스텀 매치를 여는 시점 */
   async startRound(hostId: string, roomId: string, roundNumber: number) {
     const { scrim } = await this.findOwnedScrim(hostId, roomId);
+    if (scrim.cutoffAt)
+      throw new BadRequestException(
+        "시간제 킬내기는 경기를 자동으로 등록합니다.",
+      );
 
     const round = await this.prisma.scrimRound.findUnique({
       where: { scrimId_roundNumber: { scrimId: scrim.id, roundNumber } },
@@ -147,6 +256,15 @@ export class ScrimService {
     if (round.status === ScrimRoundStatus.COMPLETED) {
       throw new BadRequestException("이미 결과가 확정된 라운드입니다.");
     }
+    const prior = await this.prisma.scrimRound.count({
+      where: {
+        scrimId: scrim.id,
+        roundNumber: { lt: roundNumber },
+        status: "COMPLETED",
+      },
+    });
+    if (prior !== roundNumber - 1)
+      throw new BadRequestException("이전 경기 결과를 먼저 확정해주세요.");
 
     // 여러 라운드가 동시에 진행 중이면 결과를 어느 라운드에 붙일지 알 수 없다.
     const running = await this.prisma.scrimRound.findFirst({
@@ -193,12 +311,38 @@ export class ScrimService {
     if (!round) throw new NotFoundException("라운드를 찾을 수 없습니다.");
 
     const teamById = new Map(teams.map((team) => [team.id, team]));
+    if (scrim.cutoffAt) {
+      const existing = await this.prisma.scrimTeamResult.findMany({
+        where: { roundId: round.id },
+        select: { teamId: true },
+      });
+      if (
+        dto.results.length !== existing.length ||
+        dto.results.some(
+          (row) => !existing.some((r) => r.teamId === row.teamId),
+        ) ||
+        (dto.pubgMatchId && dto.pubgMatchId !== round.pubgMatchId)
+      ) {
+        throw new BadRequestException(
+          "자동 수집한 경기의 참가팀과 경기 ID는 변경할 수 없습니다.",
+        );
+      }
+    }
     const unknown = dto.results.filter((row) => !teamById.has(row.teamId));
     if (unknown.length > 0) {
       throw new BadRequestException("이 방에 없는 팀이 포함되어 있습니다.");
     }
 
     const teamIds = new Set(dto.results.map((row) => row.teamId));
+    if (
+      !scrim.cutoffAt &&
+      (teamIds.size !== teams.length ||
+        dto.results.some((row) => row.placement > teams.length))
+    ) {
+      throw new BadRequestException(
+        "매 경기 모든 팀의 결과와 유효한 순위를 입력해주세요.",
+      );
+    }
     if (teamIds.size !== dto.results.length) {
       throw new BadRequestException("같은 팀이 두 번 들어 있습니다.");
     }
@@ -223,6 +367,7 @@ export class ScrimService {
           placement: row.placement,
           kills: row.kills,
           deaths: row.deaths ?? 0,
+          damage: row.damage ?? 0,
           points: calculateScrimPoints(
             row.placement,
             row.kills,
@@ -247,14 +392,30 @@ export class ScrimService {
 
   /**
    * 스크림 확정 — 더 이상 결과를 받지 않는다.
-   * 남은 라운드가 있어도 방장이 끝낼 수 있다(사람이 빠져 못 채우는 일이 흔하다).
+   * 배틀로얄은 전 경기 완료, 시간제는 종료 시각 이후 결과 확인이 필요하다.
    */
   async completeScrim(hostId: string, roomId: string) {
     const { scrim } = await this.findOwnedScrim(hostId, roomId);
+    if (scrim.cutoffAt && new Date() < scrim.cutoffAt)
+      throw new BadRequestException("진행시간이 끝난 뒤 확정할 수 있습니다.");
+    if (
+      scrim.cutoffAt &&
+      (scrim.collectionError ||
+        (scrim.collectorState as unknown as KillMatchCollectionState)?.pending
+          ?.length)
+    ) {
+      throw new BadRequestException(
+        "수집 중인 경기 기록이 있습니다. 자동 수집이 끝난 뒤 확정해주세요.",
+      );
+    }
 
     const completed = await this.prisma.scrimRound.count({
       where: { scrimId: scrim.id, status: ScrimRoundStatus.COMPLETED },
     });
+    if (!scrim.cutoffAt && completed !== scrim.totalRounds)
+      throw new BadRequestException(
+        "예정된 모든 경기의 결과를 입력한 뒤 확정해주세요.",
+      );
     if (completed === 0) {
       throw new BadRequestException(
         "결과가 입력된 라운드가 없어 확정할 수 없습니다.",
@@ -375,6 +536,8 @@ export class ScrimService {
    */
   private buildLeaderboard(
     scrim: {
+      cutoffAt?: Date | null;
+      pointRule?: unknown;
       rounds: {
         roundNumber: number;
         results: {
@@ -383,6 +546,7 @@ export class ScrimService {
           placement: number;
           kills: number;
           deaths: number;
+          damage?: number;
           points: number;
         }[];
       }[];
@@ -430,6 +594,14 @@ export class ScrimService {
         row.totalPoints += result.points;
         row.totalKills += result.kills;
         row.totalDeaths += result.deaths;
+        if (!scrim.cutoffAt) {
+          const rule = this.readPointRule(scrim.pointRule);
+          row.totalPlacementPoints =
+            (row.totalPlacementPoints ?? 0) +
+            (rule.placementPoints[result.placement - 1] ?? 0);
+          row.lastPlacement = result.placement;
+          row.lastDamage = result.damage ?? 0;
+        }
         row.placementSum += result.placement;
         row.bestPlacement =
           row.bestPlacement === null

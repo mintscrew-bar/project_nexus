@@ -74,6 +74,8 @@ export interface Room {
   bracketFormat?: string;
   // 다전제 프리셋 (@nexus/types의 SeriesPreset 키)
   seriesPreset?: string | null;
+  killMatchDurationMinutes?: number;
+  battleRoyaleRounds?: number;
   /** 방이 속한 게임. 로비 링크·팀 인원·표시 항목이 여기서 갈린다. */
   gameTitle?: "LOL" | "PUBG";
   /** 배그 방에서만 채워진다 — 스팀(스배) / 카카오(카배) */
@@ -108,6 +110,8 @@ export interface RoomSettingsDto {
   bracketFormat?: string;
   // 다전제 프리셋
   seriesPreset?: string;
+  killMatchDurationMinutes?: number;
+  battleRoyaleRounds?: number;
 }
 
 // 게임 시작 실패 시 서버에서 내려오는 에러 응답 타입

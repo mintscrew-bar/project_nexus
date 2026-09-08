@@ -42,6 +42,8 @@ interface LeaveRoomResponse {
 }
 
 interface RoomCreationData {
+  battleRoyaleRounds?: number;
+  killMatchDurationMinutes?: number;
   gameTitle?: "LOL" | "PUBG";
   /** 배그 방에서만 — 스팀(스배) / 카카오(카배) */
   pubgPlatform?: "STEAM" | "KAKAO";

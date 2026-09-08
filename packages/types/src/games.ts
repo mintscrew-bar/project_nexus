@@ -86,7 +86,7 @@ const PUBG: GameDefinition = {
   teamSize: 4,
   // 모드별 정원은 `pubg.ts` 의 모드 정의가 정한다. 여기는 배그 전체에서
   // 나올 수 있는 값의 합집합이다 — 킬내기 6~16, 배틀로얄 32~100.
-  roomSizes: [6, 8, 14, 16, 32, 40, 48, 64, 80, 100],
+  roomSizes: [8, 12, 16, 32, 40, 48, 64, 80, 100],
   hasPositions: false,
   // 자동 밸런스는 라인별 점수가 아니라 NEXUS 편성 점수로 돈다(뱀 순서 분배).
   teamModes: ["AUCTION", "SNAKE_DRAFT", "AUTO_BALANCE", "MANUAL_TEAM"],

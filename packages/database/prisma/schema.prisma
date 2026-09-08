@@ -445,6 +445,8 @@ model ChampionPreference {
 }
 
 model Room {
+  killMatchDurationMinutes Int @default(60)
+  battleRoyaleRounds Int @default(3)
   /// 이 방의 모집 공지를 연동된 다른 서버에도 보낼지.
   /// 비공개 방은 이 값과 무관하게 원 서버에만 공지한다.
   crossGuildAnnounce Boolean @default(true)
@@ -1962,6 +1964,11 @@ model LabCounterSnapshot {
 /// `Match`/`MatchSeries` 는 2팀 고정이라 재사용할 수 없어 따로 판다.
 /// 킬내기(2팀)는 기존 Match 흐름을 그대로 쓴다.
 model Scrim {
+  startsAt DateTime?
+  cutoffAt DateTime?
+  collectorState Json?
+  lastCollectedAt DateTime?
+  collectionError String?
   id          String       @id @default(cuid())
   roomId      String       @unique
   /// 예정 라운드 수. 실제로 몇 판을 했는지는 rounds 로 센다.
@@ -2004,6 +2011,7 @@ model ScrimRound {
   results     ScrimTeamResult[]
 
   @@unique([scrimId, roundNumber])
+  @@unique([scrimId, pubgMatchId])
   @@map("scrim_rounds")
 }
 
@@ -2016,6 +2024,7 @@ enum ScrimRoundStatus {
 /// 한 라운드에서 한 팀이 낸 성적.
 /// 팀이 지워져도 기록은 남겨야 해서 teamId 는 SetNull 이고 이름은 스냅샷으로 둔다.
 model ScrimTeamResult {
+  damage Float @default(0)
   id        String     @id @default(cuid())
   roundId   String
   teamId    String?

@@ -63,6 +63,8 @@ interface RoomSettingsModalProps {
     captainSelection?: TeamCaptainSelection;
     bracketFormat?: string;
     seriesPreset?: string | null;
+    killMatchDurationMinutes?: number;
+    battleRoyaleRounds?: number;
     /** 방이 속한 게임. 팀 인원·정원 선택지가 여기서 갈린다. */
     gameTitle?: GameTitle;
     /** 배그 방에서만 — 킬내기는 정원 선택지와 팀 수가 아예 다르다. */
@@ -121,7 +123,7 @@ export function RoomSettingsModal({
 }: RoomSettingsModalProps) {
   const { updateRoomSettings } = useLobbyStore();
   // 팀 인원과 정원 선택지는 게임뿐 아니라 배그 모드에 따라서도 갈린다.
-  // 킬내기는 항상 2팀이라 정원이 곧 팀 인원 × 2다(3대3~8대8).
+  // 배그는 모든 모드에서 4인 스쿼드를 구성한다.
   const gameTitle: GameTitle = room.gameTitle ?? "LOL";
   // 팀 인원·팀 수 계산에는 방의 값을 그대로 쓴다. 없는 모드를 채워 넣으면
   // 모드가 비어 있는 배그 방의 팀 수가 조용히 달라진다
@@ -187,6 +189,8 @@ export function RoomSettingsModal({
   );
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [killMatchDurationMinutes, setKillMatchDurationMinutes] = useState(room.killMatchDurationMinutes ?? 60);
+  const [battleRoyaleRounds, setBattleRoyaleRounds] = useState(room.battleRoyaleRounds ?? 3);
   const [error, setError] = useState<string | null>(null);
   const [isCloseConfirmOpen, setIsCloseConfirmOpen] = useState(false);
   const selectedPlayerOption = playerOptions.find(
@@ -218,7 +222,9 @@ export function RoomSettingsModal({
       room.seriesPreset,
       teamCountForRoom({ ...teamShape, maxParticipants: room.maxParticipants }),
     ) ||
-    password.length > 0;
+    password.length > 0 ||
+    killMatchDurationMinutes !== (room.killMatchDurationMinutes ?? 60) ||
+    battleRoyaleRounds !== (room.battleRoyaleRounds ?? 3);
 
   const requestClose = () => {
     if (isSubmitting) return;
@@ -232,6 +238,8 @@ export function RoomSettingsModal({
   useEffect(() => {
     if (isOpen) {
       setName(room.name);
+      setKillMatchDurationMinutes(room.killMatchDurationMinutes ?? 60);
+      setBattleRoyaleRounds(room.battleRoyaleRounds ?? 3);
       setMaxParticipants(room.maxParticipants);
       setIsPrivate(room.isPrivate);
       setPassword("");
@@ -278,6 +286,8 @@ export function RoomSettingsModal({
         teamMode,
         allowSpectators,
         startingPoints,
+        killMatchDurationMinutes,
+        battleRoyaleRounds,
         minBidIncrement,
         bidTimeLimit,
         pickTimeLimit,
@@ -408,12 +418,28 @@ export function RoomSettingsModal({
         )}
 
         {/* 다전제 프리셋 — 더블 일리미네이션은 아직 단판만 지원한다 */}
-        {!(selectedPlayerOption?.supportsDE && useDoubleElim) && (
+        {gameTitle === "LOL" && !(selectedPlayerOption?.supportsDE && useDoubleElim) && (
           <SeriesPresetSelector
             teamCount={selectedPlayerOption?.teams ?? 0}
             value={seriesPreset}
             onChange={setSeriesPreset}
           />
+        )}
+
+        {gameTitle === "PUBG" && (
+          <label className="block text-sm text-text-primary">
+            {pubgGameMode === "KILL_MATCH" ? "진행시간 (분)" : "총 경기 수"}
+            <input
+              type="number"
+              className="input mt-2"
+              min={pubgGameMode === "KILL_MATCH" ? 10 : 1}
+              max={pubgGameMode === "KILL_MATCH" ? 360 : 20}
+              value={pubgGameMode === "KILL_MATCH" ? killMatchDurationMinutes : battleRoyaleRounds}
+              onChange={(event) => pubgGameMode === "KILL_MATCH"
+                ? setKillMatchDurationMinutes(Number(event.target.value))
+                : setBattleRoyaleRounds(Number(event.target.value))}
+            />
+          </label>
         )}
 
         {/* 팀 구성 방식 */}

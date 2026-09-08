@@ -1384,6 +1384,7 @@ export const scrimApi = {
         kills: number;
         /** 죽은 팀원 수. 킬내기는 감점이라 점수에 들어간다. */
         deaths?: number;
+        damage?: number;
       }[];
     },
   ) => {

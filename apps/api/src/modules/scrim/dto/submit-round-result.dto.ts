@@ -4,6 +4,7 @@ import {
   ArrayMinSize,
   IsArray,
   IsInt,
+  IsNumber,
   IsOptional,
   IsString,
   Max,
@@ -14,6 +15,11 @@ import {
 
 /** 한 팀의 라운드 성적 */
 export class RoundTeamResultDto {
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(100000)
+  damage?: number;
   @IsString()
   teamId: string;
 
@@ -50,7 +56,7 @@ export class SubmitRoundResultDto {
   pubgMatchId?: string;
 
   @IsArray()
-  @ArrayMinSize(2)
+  @ArrayMinSize(1)
   @ArrayMaxSize(25)
   @ValidateNested({ each: true })
   @Type(() => RoundTeamResultDto)

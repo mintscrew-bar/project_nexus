@@ -59,6 +59,8 @@ const MIN_SCHEDULE_MINUTES_AHEAD = 10;
 const MAX_SCHEDULE_DAYS_AHEAD = 14;
 
 export interface CreateRoomDto {
+  killMatchDurationMinutes?: number;
+  battleRoyaleRounds?: number;
   name: string;
   password?: string;
   maxParticipants: number;
@@ -1137,6 +1139,8 @@ export class RoomService {
               gameTitle === GameTitle.PUBG ? dto.pubgPlatform : null,
             pubgGameMode,
             scheduledAt,
+            killMatchDurationMinutes: dto.killMatchDurationMinutes ?? 60,
+            battleRoyaleRounds: dto.battleRoyaleRounds ?? 3,
 
             // Draft settings
             startingPoints: dto.startingPoints,
@@ -2347,6 +2351,13 @@ export class RoomService {
     this.validateGameSettings(updates);
 
     const data: any = {};
+    for (const [field, max] of [["killMatchDurationMinutes", 360], ["battleRoyaleRounds", 20]] as const) {
+      const value = updates[field];
+      if (value !== undefined) {
+        if (!Number.isInteger(value) || value < (field === "killMatchDurationMinutes" ? 10 : 1) || value > max) throw new BadRequestException("진행시간 또는 경기 수가 올바르지 않습니다.");
+        data[field] = value;
+      }
+    }
 
     if (updates.name) {
       data.name = updates.name;

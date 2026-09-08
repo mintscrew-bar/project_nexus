@@ -25,6 +25,16 @@ import { stripAllHtml } from "@/common/utils/sanitize";
  * 내전방 생성 DTO
  */
 export class CreateRoomDto {
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(20)
+  battleRoyaleRounds?: number;
+  @IsOptional()
+  @IsInt()
+  @Min(10)
+  @Max(360)
+  killMatchDurationMinutes?: number;
   /** 방 이름은 플레인 텍스트만 허용 (모든 HTML 태그 제거) */
   @Transform(({ value }) => stripAllHtml(value))
   @IsString()

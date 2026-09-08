@@ -168,6 +168,9 @@ export function isValidPointRule(rule: unknown): rule is PubgPointRule {
 }
 
 export interface ScrimLeaderboardRow {
+  totalPlacementPoints?: number;
+  lastPlacement?: number;
+  lastDamage?: number;
   teamId: string | null;
   teamName: string;
   /** 라운드별 포인트 (라운드 번호 순). 결과가 없는 라운드는 null. */
@@ -195,6 +198,19 @@ export function sortScrimLeaderboard(
 ): ScrimLeaderboardRow[] {
   return [...rows].sort((a, b) => {
     if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints;
+    // SUPER v5.0.5: 누적 순위 점수 → 마지막 판 점수 → 마지막 순위 → 마지막 데미지.
+    if (
+      a.totalPlacementPoints !== undefined &&
+      b.totalPlacementPoints !== undefined
+    ) {
+      return (
+        b.totalPlacementPoints - a.totalPlacementPoints ||
+        (b.roundPoints.filter((p) => p !== null).at(-1) ?? 0) -
+          (a.roundPoints.filter((p) => p !== null).at(-1) ?? 0) ||
+        (a.lastPlacement ?? 100) - (b.lastPlacement ?? 100) ||
+        (b.lastDamage ?? 0) - (a.lastDamage ?? 0)
+      );
+    }
     if (b.totalKills !== a.totalKills) return b.totalKills - a.totalKills;
     const aBest = a.bestPlacement ?? Number.MAX_SAFE_INTEGER;
     const bBest = b.bestPlacement ?? Number.MAX_SAFE_INTEGER;

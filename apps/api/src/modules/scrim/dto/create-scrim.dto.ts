@@ -12,6 +12,11 @@ import {
 
 /** 포인트 규칙표. 대회마다 달라서 방마다 고칠 수 있게 받는다. */
 export class PointRuleDto {
+  @IsOptional()
+  @IsNumber()
+  @Min(-1000)
+  @Max(1000)
+  deathPoints?: number;
   /** 순위별 포인트. `[0]` 이 1위. 표에 없는 등수는 0점이다. */
   @IsArray()
   @ArrayMaxSize(100)
